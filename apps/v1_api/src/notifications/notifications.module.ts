@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { ResultEscalationController } from '../game-operations/result-escalation.controller';
+import { PlatformResultEscalationController } from '../game-operations/platform-result-escalation.controller';
 import { ResultEscalationAccessService } from '../game-operations/result-escalation-access.service';
 import { ResultEscalationMutationService } from '../game-operations/result-escalation-mutation.service';
 import { ResultEscalationService } from '../game-operations/result-escalation.service';
@@ -13,7 +14,7 @@ import { WebPushService } from './web-push.service';
 
 @Module({
   imports: [RealtimeModule],
-  controllers: [NotificationsController, WebPushController, ResultEscalationController],
+  controllers: [NotificationsController, WebPushController, ResultEscalationController, PlatformResultEscalationController],
   providers: [
     NotificationsService,
     WebPushService,

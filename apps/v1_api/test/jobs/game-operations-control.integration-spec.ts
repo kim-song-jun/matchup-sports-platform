@@ -10,13 +10,13 @@ import {
 import { join } from 'node:path';
 import { AdminContextService } from '../../src/common/admin-context.service';
 import {
-  GameOperationFlagKey,
   GameOperationFlagsService,
+  resolveGameOperationGateRoot,
 } from '../../src/config/game-operation-flags';
+import type { GameOperationFlagKey } from '../../src/config/game-operation-flags';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
-const EVIDENCE_ROOT =
-  '/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1';
+const EVIDENCE_ROOT = resolveGameOperationGateRoot();
 const BASELINE_SHA = 'a'.repeat(40);
 const CANDIDATE_SHA = 'b'.repeat(40);
 const PLAN_SHA = 'c'.repeat(64);

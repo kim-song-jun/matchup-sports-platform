@@ -12,19 +12,7 @@ export class ResultEscalationAccessService {
     userId: string,
     tournamentId: string,
   ): Promise<EscalationRole> {
-    const platform = await tx.$queryRaw<Array<{ allowed: boolean }>>`
-      SELECT EXISTS (
-        SELECT 1
-        FROM v1_admin_users admin_user
-        INNER JOIN v1_users user_account ON user_account.id = admin_user.user_id
-        WHERE admin_user.user_id = ${userId}
-          AND admin_user.admin_role IN ('owner', 'ops')
-          AND admin_user.status = 'active'
-          AND admin_user.revoked_at IS NULL
-          AND user_account.account_status = 'active'
-      ) AS allowed
-    `;
-    if (platform[0]?.allowed === true) return 'PLATFORM_OPS';
+    if (await this.isPlatformOps(tx, userId)) return 'PLATFORM_OPS';
     const reviewer = await tx.$queryRaw<Array<{ allowed: boolean }>>`
       SELECT EXISTS (
         SELECT 1
@@ -41,6 +29,42 @@ export class ResultEscalationAccessService {
     `;
     if (reviewer[0]?.allowed === true) return 'REVIEWER';
     return this.deny();
+  }
+
+  async requirePlatformOps(tx: EscalationClient, userId: string): Promise<void> {
+    if (!(await this.isPlatformOps(tx, userId))) this.deny();
+  }
+
+  async platformRows(
+    tx: EscalationClient,
+    status?: V1EscalationStatus,
+  ): Promise<EscalationRow[]> {
+    const statusFilter = status === undefined
+      ? Prisma.empty
+      : Prisma.sql`AND escalation.status = ${status}::"V1EscalationStatus"`;
+    return tx.$queryRaw<EscalationRow[]>`
+      ${this.selectRows()}
+      WHERE escalation.due_at <= CURRENT_TIMESTAMP
+        AND escalation.kind = 'ESCALATION'
+      ${statusFilter}
+      ORDER BY escalation.due_at ASC, escalation.id ASC
+    `;
+  }
+
+  async platformRow(
+    tx: EscalationClient,
+    escalationId: string,
+    lock: boolean,
+  ): Promise<EscalationRow> {
+    const lockClause = lock ? Prisma.sql`FOR UPDATE OF escalation` : Prisma.empty;
+    const rows = await tx.$queryRaw<EscalationRow[]>`
+      ${this.selectRows()}
+      WHERE escalation.id = ${escalationId}
+        AND escalation.due_at <= CURRENT_TIMESTAMP
+        AND escalation.kind = 'ESCALATION'
+      ${lockClause}
+    `;
+    return this.requireRow(rows[0]);
   }
 
   async rows(
@@ -84,20 +108,37 @@ export class ResultEscalationAccessService {
       ${kindFilter}
       ${lockClause}
     `;
-    const row = rows[0];
-    if (row === undefined) {
-      throw new NotFoundException({
-        code: 'RESULT_ESCALATION_NOT_FOUND',
-        message: 'Result escalation was not found in this tournament scope',
-      });
-    }
-    return row;
+    return this.requireRow(rows[0]);
   }
 
   deny(): never {
     throw new ForbiddenException({
       code: 'ESCALATION_SCOPE_DENIED',
       message: 'Result escalation scope is denied',
+    });
+  }
+
+  private async isPlatformOps(tx: EscalationClient, userId: string): Promise<boolean> {
+    const platform = await tx.$queryRaw<Array<{ allowed: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM v1_admin_users admin_user
+        INNER JOIN v1_users user_account ON user_account.id = admin_user.user_id
+        WHERE admin_user.user_id = ${userId}
+          AND admin_user.admin_role IN ('owner', 'ops')
+          AND admin_user.status = 'active'
+          AND admin_user.revoked_at IS NULL
+          AND user_account.account_status = 'active'
+      ) AS allowed
+    `;
+    return platform[0]?.allowed === true;
+  }
+
+  private requireRow(row: EscalationRow | undefined): EscalationRow {
+    if (row !== undefined) return row;
+    throw new NotFoundException({
+      code: 'RESULT_ESCALATION_NOT_FOUND',
+      message: 'Result escalation was not found in this tournament scope',
     });
   }
 

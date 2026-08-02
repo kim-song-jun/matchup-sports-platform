@@ -147,6 +147,12 @@ const taskNineR11OwnedPaths = [
   ...taskNineR10OwnedPaths,
   'apps/v1_api/jest.config.ts',
 ];
+const taskNineR12OwnedPaths = [
+  ...taskNineR11OwnedPaths,
+  'apps/v1_api/src/config/game-operation-flags.ts',
+  'apps/v1_api/src/config/game-operation-flags.spec.ts',
+  'apps/v1_api/test/jobs/game-operations-control.integration-spec.ts',
+];
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -1576,7 +1582,7 @@ test('legacy Task1 host pressure override remains accepted', () => {
   }
 });
 
-test('Task 9 R11 descriptor keeps R5-R10 receipts immutable while appending only jobs integration discovery', () => {
+test('Task 9 R12 descriptor keeps R5-R11 receipts immutable while appending only portable control-root repairs', () => {
   const canonicalReceipt = JSON.parse(
     readFileSync(resolve(repoRoot, taskNineR6OverridePath), 'utf8'),
   );
@@ -1617,9 +1623,10 @@ test('Task 9 R11 descriptor keeps R5-R10 receipts immutable while appending only
   const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
   const previousSession = process.env.V1_VERIFICATION_SESSION_ID;
   try {
-    assert.deepEqual(ledgerOutputs, taskNineR11OwnedPaths);
+    assert.deepEqual(ledgerOutputs, taskNineR12OwnedPaths);
     assert.deepEqual(planOutputs, taskNineR7OwnedPaths);
-    assert.equal(ledgerOutputs.length, 30);
+    assert.equal(ledgerOutputs.length, 33);
+    assert.deepEqual(ledgerOutputs.slice(0, 30), taskNineR11OwnedPaths);
     assert.deepEqual(ledgerOutputs.slice(0, 29), taskNineR10OwnedPaths);
     assert.deepEqual(ledgerOutputs.slice(0, 25), taskNineR9OwnedPaths);
     assert.deepEqual(ledgerOutputs.slice(0, 24), taskNineR8OwnedPaths);
@@ -1639,6 +1646,9 @@ test('Task 9 R11 descriptor keeps R5-R10 receipts immutable while appending only
     assert.equal(ledgerOutputs.at(27), 'apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts');
     assert.equal(ledgerOutputs.at(28), 'apps/v1_api/src/admin/admin-terms.service.spec.ts');
     assert.equal(ledgerOutputs.at(29), 'apps/v1_api/jest.config.ts');
+    assert.equal(ledgerOutputs.at(30), 'apps/v1_api/src/config/game-operation-flags.ts');
+    assert.equal(ledgerOutputs.at(31), 'apps/v1_api/src/config/game-operation-flags.spec.ts');
+    assert.equal(ledgerOutputs.at(32), 'apps/v1_api/test/jobs/game-operations-control.integration-spec.ts');
     assert.equal(
       dependencyRow,
       '| 9 | 5, 6, 7, 11 | 10, 16, 18, 22, 24, 27 | 8; Task 9A completes projection infrastructure without personal rows, while Task 24 performs Task 9B after 14 |',

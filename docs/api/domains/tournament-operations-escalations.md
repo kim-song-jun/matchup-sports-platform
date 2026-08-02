@@ -14,6 +14,10 @@ All routes are authenticated and use the `/api/v1` prefix. Responses use the glo
 | `GET /api/v1/tournament-ops/tournaments/:tournamentId/escalations/:escalationId` | UUID path parameters | one `Escalation` |
 | `POST /api/v1/tournament-ops/tournaments/:tournamentId/escalations/:escalationId/ack` | mandatory nonblank `Idempotency-Key` header and `{expectedVersion,reason}` | acknowledged `Escalation` plus `replayed` |
 | `POST /api/v1/tournament-ops/tournaments/:tournamentId/escalations/:escalationId/resolve` | mandatory nonblank `Idempotency-Key` header and `{expectedVersion,reason}` | resolved `Escalation` plus `replayed` |
+| `GET /api/v1/tournament-ops/escalations` | optional query `status=PENDING|ACKNOWLEDGED|RESOLVED|CLOSED` | cross-tournament `{items: Escalation[]}` ordered by `dueAt`, then `id` |
+| `GET /api/v1/tournament-ops/escalations/:escalationId` | UUID path parameter | one due `ESCALATION` |
+| `POST /api/v1/tournament-ops/escalations/:escalationId/ack` | mandatory nonblank `Idempotency-Key` header and `{expectedVersion,reason}` | acknowledged due `ESCALATION` plus `replayed` |
+| `POST /api/v1/tournament-ops/escalations/:escalationId/resolve` | mandatory nonblank `Idempotency-Key` header and `{expectedVersion,reason}` | resolved due `ESCALATION` plus `replayed` |
 
 `expectedVersion` is an integer greater than or equal to `0`. `reason` is a string of 1 to 1,000 characters; after trimming, an empty reason is rejected. An escalation view contains `id`, `resultRevisionId`, `gameId`, `tournamentId`, `kind`, `dueAt`, `status`, `ackByUserId`, `resolvedByUserId`, `reason`, `version`, `createdAt`, and `updatedAt`.
 
@@ -24,10 +28,10 @@ The mutation idempotency scope is `(actorUserId, action, "RESULT_ESCALATION", es
 Authorization and queue visibility are deliberately separate:
 
 - A current, unrevoked, unexpired tournament assignment with role `SUPPORT_READONLY` or `TOURNAMENT_DIRECTOR` is a reviewer for that tournament. Both roles may list, view, and acknowledge only due `REMINDER` items. Neither role may resolve an item.
-- An active platform administrator with role `owner` or `ops` is `platform_ops`. This actor may list, view, acknowledge, and resolve only due `ESCALATION` items in the requested tournament queue.
+- An active platform administrator with role `owner` or `ops` is `platform_ops`. This actor may list, view, acknowledge, and resolve only due `ESCALATION` items in either the existing requested tournament queue or the dedicated cross-tournament `/tournament-ops/escalations` queue.
 - Only rows whose `dueAt` is at or before database current time are visible. A different tournament, the wrong queue kind, a future-due row, or an unknown escalation ID is intentionally indistinguishable and returns `404 RESULT_ESCALATION_NOT_FOUND` on detail or mutation.
 
-`SUPPORT_READONLY` and `TOURNAMENT_DIRECTOR` therefore share the implemented reviewer reminder contract. `platform_ops` has global actor authority, but the route still scopes every read and mutation to its `:tournamentId` and to the platform escalation queue kind.
+`SUPPORT_READONLY` and `TOURNAMENT_DIRECTOR` therefore share the implemented reviewer reminder contract. The existing tournament-scoped routes remain available to `platform_ops`; the dedicated global route adds cross-tournament visibility without widening reviewer access. Global routes retain the `ESCALATION` kind and due-time filters, return unknown/reminder/future rows as `404 RESULT_ESCALATION_NOT_FOUND`, and derive every mutation audit `tournamentId` from the fetched escalation row rather than client input.
 
 ## State, CAS, and audit
 

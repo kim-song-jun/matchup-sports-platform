@@ -4,6 +4,7 @@ import { AdminContextModule } from '../common/admin-context.module';
 import { GameOperationFlagsController } from '../config/game-operation-flags.controller';
 import { GameOperationFlagsService } from '../config/game-operation-flags';
 import { ResultEscalationController } from '../game-operations/result-escalation.controller';
+import { PlatformResultEscalationController } from '../game-operations/platform-result-escalation.controller';
 import { ResultEscalationAccessService } from '../game-operations/result-escalation-access.service';
 import { ResultEscalationMutationService } from '../game-operations/result-escalation-mutation.service';
 import { ResultEscalationService } from '../game-operations/result-escalation.service';
@@ -22,6 +23,7 @@ import { V1GameOperationsWorkerService } from './v1-game-operations-worker.servi
     V1GameOperationsJobsController,
     GameOperationFlagsController,
     ResultEscalationController,
+    PlatformResultEscalationController,
   ],
   providers: [
     V1GameOperationsWorkerService,

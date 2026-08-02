@@ -15,7 +15,8 @@ import {
   readFileSync,
   realpathSync,
 } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -53,14 +54,37 @@ const FLAG_KEYS: GameOperationFlagKey[] = [
   'GAME_WRITE',
   'PUBLIC_LIVE',
 ];
-const GATE_ROOT =
-  '/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1/';
+const GATE_EVIDENCE_DIRECTORY = 'teameet-ulw-evidence';
+const GATE_EVIDENCE_ATTEMPT = 'teameet-team-tournament-operations-v1';
+const GATE_ROOT = `${resolveGameOperationGateRoot()}/`;
 const SYSTEM_ACTOR = 'PLATFORM_OPS_CONTROL';
 const IDEMPOTENCY_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 const SHA_PATTERN = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export class GameOperationGateRootConfigurationError extends Error {
+  readonly name = 'GameOperationGateRootConfigurationError';
+
+  constructor(readonly configuredTemporaryRoot: string) {
+    super('Game operation gate evidence must use the current OS temporary root');
+  }
+}
+
+export function resolveGameOperationGateRoot(
+  configuredTemporaryRoot: string = tmpdir(),
+): string {
+  const currentTemporaryRoot = resolve(tmpdir());
+  if (resolve(configuredTemporaryRoot) !== currentTemporaryRoot) {
+    throw new GameOperationGateRootConfigurationError(configuredTemporaryRoot);
+  }
+  return join(
+    currentTemporaryRoot,
+    GATE_EVIDENCE_DIRECTORY,
+    GATE_EVIDENCE_ATTEMPT,
+  );
+}
 
 export type PatchGameOperationFlagInput = {
   expectedVersion: number;

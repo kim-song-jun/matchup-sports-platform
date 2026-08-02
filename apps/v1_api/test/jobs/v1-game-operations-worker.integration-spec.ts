@@ -238,17 +238,24 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     });
   });
 
-  it('queries durable queue state for not-ready and poisoned health without leaking owner identity', async () => {
+  it('reports built-in handler readiness and poisoned queue health without leaking owner identity', async () => {
     const service = new V1GameOperationsWorkerService(prisma);
     await expect(service.getHealth()).resolves.toMatchObject({
-      status: 'not_ready',
-      registeredHandlers: 0,
+      status: 'healthy',
+      registeredHandlers: 4,
+      queue: {
+        pending: 0,
+        retry: 0,
+        processing: 0,
+        poisoned: 0,
+        completed: 0,
+      },
     });
 
     service.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 1,
+      registeredHandlers: 5,
     });
 
     await insertJob({ status: 'POISONED', attempts: 6 });

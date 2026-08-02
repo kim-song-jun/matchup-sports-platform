@@ -26,6 +26,18 @@ export class ResultEscalationService {
     return escalationView(row);
   }
 
+  async listPlatform(userId: string, status?: V1EscalationStatus) {
+    await this.access.requirePlatformOps(this.prisma, userId);
+    const rows = await this.access.platformRows(this.prisma, status);
+    return { items: rows.map(escalationView) };
+  }
+
+  async detailPlatform(userId: string, escalationId: string) {
+    await this.access.requirePlatformOps(this.prisma, userId);
+    const row = await this.access.platformRow(this.prisma, escalationId, false);
+    return escalationView(row);
+  }
+
   acknowledge(
     userId: string,
     tournamentId: string,
@@ -54,6 +66,36 @@ export class ResultEscalationService {
       'RESOLVED',
       userId,
       tournamentId,
+      escalationId,
+      dto,
+      idempotencyKey,
+    );
+  }
+
+  acknowledgePlatform(
+    userId: string,
+    escalationId: string,
+    dto: ResultEscalationActionDto,
+    idempotencyKey: string,
+  ) {
+    return this.mutations.mutatePlatform(
+      'ACKNOWLEDGED',
+      userId,
+      escalationId,
+      dto,
+      idempotencyKey,
+    );
+  }
+
+  resolvePlatform(
+    userId: string,
+    escalationId: string,
+    dto: ResultEscalationActionDto,
+    idempotencyKey: string,
+  ) {
+    return this.mutations.mutatePlatform(
+      'RESOLVED',
+      userId,
       escalationId,
       dto,
       idempotencyKey,

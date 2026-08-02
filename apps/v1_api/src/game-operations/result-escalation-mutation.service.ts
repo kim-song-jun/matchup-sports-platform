@@ -4,7 +4,9 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ResultEscalationActionDto } from './dto/result-escalation.dto';
 import { ResultEscalationAccessService } from './result-escalation-access.service';
-import { escalationAuditValue, escalationView } from './result-escalation.types';
+import { escalationAuditValue, escalationView, type EscalationRow } from './result-escalation.types';
+
+type EscalationRowLoader = (lock: boolean) => Promise<EscalationRow>;
 
 @Injectable()
 export class ResultEscalationMutationService {
@@ -21,6 +23,46 @@ export class ResultEscalationMutationService {
     dto: ResultEscalationActionDto,
     idempotencyKey: string,
   ) {
+    return this.prisma.$transaction(async (tx) => {
+      let role: 'PLATFORM_OPS' | 'REVIEWER' | undefined;
+      return this.mutateInTransaction(tx, target, userId, escalationId, dto, idempotencyKey, async (lock) => {
+        role ??= await this.access.role(tx, userId, tournamentId);
+        if (target === 'RESOLVED' && role !== 'PLATFORM_OPS') this.access.deny();
+        return this.access.row(tx, tournamentId, escalationId, role, lock);
+      });
+    });
+  }
+
+  mutatePlatform(
+    target: 'ACKNOWLEDGED' | 'RESOLVED',
+    userId: string,
+    escalationId: string,
+    dto: ResultEscalationActionDto,
+    idempotencyKey: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await this.access.requirePlatformOps(tx, userId);
+      return this.mutateInTransaction(
+        tx,
+        target,
+        userId,
+        escalationId,
+        dto,
+        idempotencyKey,
+        (lock) => this.access.platformRow(tx, escalationId, lock),
+      );
+    });
+  }
+
+  private async mutateInTransaction(
+    tx: Prisma.TransactionClient,
+    target: 'ACKNOWLEDGED' | 'RESOLVED',
+    userId: string,
+    escalationId: string,
+    dto: ResultEscalationActionDto,
+    idempotencyKey: string,
+    loadRow: EscalationRowLoader,
+  ) {
     const reason = dto.reason.trim();
     if (reason.length === 0) {
       throw new ConflictException({
@@ -35,72 +77,68 @@ export class ResultEscalationMutationService {
     const payloadHash = createHash('sha256')
       .update(JSON.stringify({ expectedVersion: dto.expectedVersion, reason, target }))
       .digest('hex');
-    return this.prisma.$transaction(async (tx) => {
-      await this.lockIdempotency(tx, userId, action, escalationId, requestId);
-      const replay = await tx.v1IdempotencyRecord.findUnique({
-        where: {
-          actorUserId_action_resourceType_resourceId_idempotencyKey: {
-            actorUserId: userId,
-            action,
-            resourceType: 'RESULT_ESCALATION',
-            resourceId: escalationId,
-            idempotencyKey: requestId,
-          },
-        },
-        select: { payloadHash: true, responseBody: true, expiresAt: true },
-      });
-      if (replay !== null && replay.expiresAt > new Date()) {
-        if (replay.payloadHash !== payloadHash) {
-          throw new ConflictException({
-            code: 'IDEMPOTENCY_PAYLOAD_CONFLICT',
-            message: 'Idempotency key was already used with a different payload',
-          });
-        }
-        return { ...(replay.responseBody as Prisma.JsonObject), replayed: true };
-      }
-      const role = await this.access.role(tx, userId, tournamentId);
-      if (target === 'RESOLVED' && role !== 'PLATFORM_OPS') this.access.deny();
-      const row = await this.access.row(tx, tournamentId, escalationId, role, true);
-      this.assertTransition(row.version, row.status, dto.expectedVersion, target);
-      const updated = await this.update(tx, escalationId, userId, reason, dto.expectedVersion, target);
-      if (updated !== 1) {
-        throw new ConflictException({
-          code: 'ESCALATION_VERSION_CONFLICT',
-          message: 'Escalation version changed during the action',
-        });
-      }
-      const after = await this.access.row(tx, tournamentId, escalationId, role, false);
-      await tx.v1OperationAudit.create({
-        data: {
-          id: randomUUID(),
-          actorType: 'USER',
-          actorUserId: userId,
-          action,
-          resourceType: 'RESULT_ESCALATION',
-          resourceId: escalationId,
-          requestId,
-          before: escalationAuditValue(escalationView(row)),
-          after: escalationAuditValue(escalationView(after)),
-          reason,
-          tournamentId,
-        },
-      });
-      const response = { ...escalationView(after), replayed: false };
-      await tx.v1IdempotencyRecord.create({
-        data: {
+    await this.lockIdempotency(tx, userId, action, escalationId, requestId);
+    const replay = await tx.v1IdempotencyRecord.findUnique({
+      where: {
+        actorUserId_action_resourceType_resourceId_idempotencyKey: {
           actorUserId: userId,
           action,
           resourceType: 'RESULT_ESCALATION',
           resourceId: escalationId,
           idempotencyKey: requestId,
-          payloadHash,
-          responseStatus: 200,
-          responseBody: { ...escalationAuditValue(escalationView(after)), replayed: false },
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
         },
-      });
-      return response;
+      },
+      select: { payloadHash: true, responseBody: true, expiresAt: true },
     });
+    if (replay !== null && replay.expiresAt > new Date()) {
+      if (replay.payloadHash !== payloadHash) {
+        throw new ConflictException({
+          code: 'IDEMPOTENCY_PAYLOAD_CONFLICT',
+          message: 'Idempotency key was already used with a different payload',
+        });
+      }
+      return { ...(replay.responseBody as Prisma.JsonObject), replayed: true };
+    }
+    const row = await loadRow(true);
+    this.assertTransition(row.version, row.status, dto.expectedVersion, target);
+    const updated = await this.update(tx, escalationId, userId, reason, dto.expectedVersion, target);
+    if (updated !== 1) {
+      throw new ConflictException({
+        code: 'ESCALATION_VERSION_CONFLICT',
+        message: 'Escalation version changed during the action',
+      });
+    }
+    const after = await loadRow(false);
+    await tx.v1OperationAudit.create({
+      data: {
+        id: randomUUID(),
+        actorType: 'USER',
+        actorUserId: userId,
+        action,
+        resourceType: 'RESULT_ESCALATION',
+        resourceId: escalationId,
+        requestId,
+        before: escalationAuditValue(escalationView(row)),
+        after: escalationAuditValue(escalationView(after)),
+        reason,
+        tournamentId: row.tournamentId,
+      },
+    });
+    const response = { ...escalationView(after), replayed: false };
+    await tx.v1IdempotencyRecord.create({
+      data: {
+        actorUserId: userId,
+        action,
+        resourceType: 'RESULT_ESCALATION',
+        resourceId: escalationId,
+        idempotencyKey: requestId,
+        payloadHash,
+        responseStatus: 200,
+        responseBody: { ...escalationAuditValue(escalationView(after)), replayed: false },
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
+      },
+    });
+    return response;
   }
 
   private async lockIdempotency(

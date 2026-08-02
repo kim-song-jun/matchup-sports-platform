@@ -158,6 +158,21 @@ jobs:
       - name: V1 API build check
         run: pnpm --filter v1_api build
 
+      - name: Task 9 literal HTTP and DB manual QA
+        timeout-minutes: 8
+        run: >-
+          node scripts/qa/task9-ci-manual-http.mjs
+          --output-dir "${{ runner.temp }}/task9-ci-manual-http"
+
+      - name: Upload Task 9 literal HTTP and DB evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task9-ci-manual-http-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/task9-ci-manual-http
+          if-no-files-found: error
+          retention-days: 14
+
   # ── Web: 린트·타입·유닛·빌드 ────────────────────────────────────────────────
   # v1_web 은 Prisma 클라이언트도 Postgres도 쓰지 않으므로 DB 서비스를 붙이지 않는다.
   web:

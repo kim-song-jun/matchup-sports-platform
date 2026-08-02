@@ -35,7 +35,7 @@ resolve_compose_binary() {
     printf 'docker-compose\n'
     return 0
   fi
-  echo "[prod-deploy] 이 호스트에서 docker compose 도 docker-compose 도 실행할 수 없습니다" >&2
+  echo "[${0##*/}] 이 호스트에서 docker compose 도 docker-compose 도 실행할 수 없습니다" >&2
   return 1
 }
 

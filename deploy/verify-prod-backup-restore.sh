@@ -22,7 +22,7 @@ SCRATCH_VOLUME="teameet_restore_rehearsal_data"
 SCRATCH_DB="rehearsal"
 SCRATCH_USER="rehearsal"
 # 리허설 전용 일회성 비밀번호. 이 컨테이너는 네트워크에 노출되지 않고 즉시 파기된다.
-SCRATCH_PASSWORD="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')"
+SCRATCH_PASSWORD="$(while true; do p="$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"; [[ ${#p} -ge 16 ]] && { echo "$p"; break; }; done)"
 
 log() { echo "[restore-rehearsal] $*"; }
 

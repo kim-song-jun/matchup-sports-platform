@@ -1,0 +1,16 @@
+[Unit]
+Description=Daily Teameet production Postgres logical backup
+
+[Timer]
+# 17:30 UTC = 02:30 KST. DLM 의 EBS 스냅샷(18:00 UTC / 03:00 KST)보다 먼저 돌려서
+# 스냅샷이 방금 뜬 덤프까지 포함하도록 한다.
+OnCalendar=*-*-* 17:30:00 UTC
+# 인스턴스가 꺼져 있어 시각을 놓쳤으면 부팅 후 곧바로 한 번 실행한다 — 조용히 하루를
+# 건너뛰는 것이 백업에서는 가장 나쁜 실패 방식이다.
+Persistent=true
+# 여러 인스턴스가 같은 순간에 S3 로 몰리지 않도록 흔든다.
+RandomizedDelaySec=300
+Unit=teameet-backup-db.service
+
+[Install]
+WantedBy=timers.target

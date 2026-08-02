@@ -1,0 +1,14 @@
+[Unit]
+Description=Teameet production Postgres logical backup to S3
+Documentation=https://github.com/kim-song-jun/matchup-sports-platform/blob/main/docs/ops/prod-backup.md
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/teameet-backup-db.sh
+# 덤프가 인스턴스 디스크를 오래 점유하지 않도록 상한을 둔다. 24MB + 43MB 규모에서
+# 30분은 충분히 여유롭고, 넘어가면 뭔가 잘못된 것이므로 실패로 끊는 편이 낫다.
+TimeoutStartSec=1800
+Nice=10
+IOSchedulingClass=idle

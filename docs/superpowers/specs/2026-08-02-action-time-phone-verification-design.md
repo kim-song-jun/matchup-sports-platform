@@ -34,34 +34,48 @@ proof token 없이는 `register`가 거절되고, 카카오 가입은 소셜 프
 - 인증 수단(옥토모 MO / SMS) 자체는 바꾸지 않는다.
 - 기존 인증 완료 계정의 데이터는 건드리지 않는다.
 
-## 3. 결정 사항
+## 3. 핵심 결정 — 불변식으로 범위를 접는다
+
+이 설계의 중심 결정은 하나다.
+
+> **불변식 I**: 활성 계정에서 `phone`이 채워져 있으면 그 번호는 반드시 인증된 번호다.
+> (`accountStatus != deleted` 이면 `phone != null` ⟹ `phoneVerifiedAt != null`)
+
+미인증 사용자의 번호는 **아예 저장하지 않는다**. 인증을 마치는 순간에만 `phone`과
+`phoneVerifiedAt`을 함께 쓴다.
+
+이 불변식이 있으면 `phone`의 전역 `@unique` 제약을 그대로 둘 수 있고 — Postgres에서 NULL은 서로
+충돌하지 않으므로 `@unique`가 사실상 "인증된 번호만 유일"을 뜻하게 된다 — 스키마도 마이그레이션도
+바뀌지 않는다. 더 중요한 건, 코드베이스 곳곳에서 "번호가 있는가"로 실명성을 판정하는 기존 코드가
+**전부 저절로 옳아진다**는 점이다.
+
+### 검토했으나 채택하지 않은 대안
+
+미인증 번호도 저장하고 partial unique index(`WHERE phone_verified_at IS NOT NULL`)로 제약을 거는
+방식을 검토했다. 폐기용 Postgres 16으로 실측한 결과 **기술적으로는 성립한다** — origin/dev
+마이그레이션 82개 재생 후 `prisma migrate diff --exit-code`가 exit 0("No difference detected")을
+반환해 CI 드리프트 게이트를 통과했고, 미인증 중복 허용·인증 중복 거부도 확인했다.
+
+채택하지 않은 이유는 비용이다. 이 방식은 `phone`이 전역 유일하다는 전제를 깨뜨리므로,
+전제에 기대고 있던 코드를 전부 손봐야 한다 — 계정 복구 로직(잘못된 계정을 반환해 본인 복구가
+봉쇄될 수 있음), 팀·매치·팀매치 생성 가드, 대회 선수 등록 자격 검사, 중복 검사 3곳, 번호 노출
+2곳, 그리고 프론트 2곳. 얻는 것은 "미인증 사용자가 적어둔 번호를 나중에 프리필해주는" 편의
+하나뿐이다. 그 편의는 인증 화면에서 번호를 한 번 더 입력하는 것으로 대체된다.
+
+## 4. 결정 사항
 
 | # | 결정 | 근거 |
 |---|---|---|
 | D1 | 가입 시점 hard-block 2곳을 제거한다 | 목표 그 자체 |
-| D2 | `V1AuthGuard`의 전역 쓰기 게이트는 **허용 목록(fail-closed) 구조를 유지**하고 예외만 넓힌다 | 차단 목록으로 뒤집으면 새 엔드포인트가 기본 통과가 되어, 목록 추가를 잊는 순간 조용히 인증 우회가 생긴다 |
-| D3 | `phone`의 전역 unique를 **partial unique index**(`WHERE phone_verified_at IS NOT NULL`)로 바꾼다 | 미인증 번호도 보관하면서 "인증된 번호만 유일"을 DB가 강제. 미인증 계정이 남의 번호로 unique 슬롯을 선점하는 것을 막는다 |
-| D4 | 가입 폼에서 번호 입력과 인증을 **모두 선택**으로 둔다 | 지금 인증하고 싶은 사용자의 경로를 없애지 않으면서, 건너뛰는 경로를 연다 |
-| D5 | 기존 계정 데이터 마이그레이션은 하지 않는다 | 인증 완료 계정은 동작이 동일하고, 미인증 계정은 새 게이트에서 같은 판정을 받는다 |
+| D2 | `phone`은 **증명이 검증됐을 때만** 쓴다 (불변식 I) | §3 |
+| D3 | `phone String? @unique`와 스키마·마이그레이션은 그대로 둔다 | 불변식 I 아래에서는 이미 "인증된 번호만 유일"을 뜻한다 |
+| D4 | `V1AuthGuard`의 전역 쓰기 게이트는 **허용 목록(fail-closed) 구조를 유지**하고 예외만 넓힌다 | 차단 목록으로 뒤집으면 새 엔드포인트가 기본 통과가 되어, 목록 추가를 잊는 순간 조용히 인증 우회가 생긴다 |
+| D5 | 가입 폼에서 번호 입력과 인증을 **모두 선택**으로 둔다 | 지금 인증하고 싶은 사용자의 경로를 없애지 않으면서, 건너뛰는 경로를 연다 |
+| D6 | 기존 계정 데이터 마이그레이션은 하지 않는다 | 인증 완료 계정은 동작이 동일하고, 미인증 계정은 새 게이트에서 같은 판정을 받는다 |
 
-### D3 사전 검증 (실측 완료, 2026-08-02)
+## 5. 아키텍처
 
-D3은 CI의 마이그레이션 드리프트 게이트(`deploy.yml:160` "V1 migration replay + drift gate")와
-충돌할 위험이 있어 채택 전에 폐기용 Postgres 16으로 실측했다.
-
-| 검증 항목 | 결과 |
-|---|---|
-| origin/dev 마이그레이션 82개를 빈 DB에 재생 | 성공 |
-| partial unique index 적용 후 `prisma migrate diff --exit-code` | **exit 0, "No difference detected"** — Prisma가 partial index를 표현할 수 없어 무시하므로 드리프트로 잡히지 않는다 |
-| 미인증 동일 번호 2건 저장 | 허용 |
-| 인증된 동일 번호 2건 저장 | 거부 (`v1_users_phone_verified_key` 위반) |
-| 미인증 중복 2건이 둘 다 인증 시도 | 먼저 인증한 쪽만 성공, 나머지 거부 |
-
-마지막 항목이 새 에러 경로를 만든다 — 아래 W6 참조.
-
-## 4. 아키텍처
-
-### 4.1 게이트의 단일 판정점
+### 5.1 게이트의 단일 판정점
 
 인증 강제 여부의 판정은 `apps/v1_api/src/verification/phone-verification-access.ts`의
 `isPhoneVerificationEnforced()` 하나로 유지한다. 이 파일의 기존 주석이 지적하듯,
@@ -69,7 +83,7 @@ D3은 CI의 마이그레이션 드리프트 게이트(`deploy.yml:160` "V1 migra
 
 바뀌는 것은 판정이 아니라 **어떤 요청을 예외로 둘 것인가** 뿐이다.
 
-### 4.2 미인증 계정이 할 수 있는 일
+### 5.2 미인증 계정이 할 수 있는 일
 
 ```
 GET / HEAD / OPTIONS         → 전부 허용 (기존과 동일)
@@ -98,38 +112,18 @@ GET / HEAD / OPTIONS         → 전부 허용 (기존과 동일)
 | 팀 매치 | `/team-matches` 전체 |
 | 리뷰 | `POST /reviews` |
 
-### 4.3 번호와 unique
-
-```
-V1User.phone  (String?, 전역 unique 제거)
-V1User.phoneVerifiedAt  (DateTime?)
-
-UNIQUE INDEX v1_users_phone_verified_key ON v1_users(phone)
-  WHERE phone_verified_at IS NOT NULL
-```
-
-불변식: **인증된 번호는 계정 하나에만 존재한다.** 미인증 번호는 중복될 수 있고, 그것은
-"아직 아무 의미도 부여되지 않은 사용자 입력값"으로만 취급한다.
-
-Prisma는 partial index를 스키마 문법으로 표현할 수 없다. 따라서 `schema.prisma`에서
-`@unique`를 제거하고, 인덱스는 raw SQL 마이그레이션으로 만든 뒤 **스키마 주석으로 존재를 명시**한다.
-이 주석이 없으면 스키마만 읽는 사람은 제약의 존재를 알 수 없다.
-
-`@unique` 제거의 부수 효과로 Prisma Client의 `findUnique({ where: { phone } })`가 사라진다 —
-`findFirst`로 바꿔야 한다. 이는 의미상으로도 옳다. `phone`은 더 이상 전역 유일이 아니다.
-
-### 4.4 가입 플로우
+### 5.3 가입 플로우
 
 | 단계 | 이메일 가입 | 카카오 가입 |
 |---|---|---|
 | 번호 입력 | 선택 | 선택 |
 | 인증 | 선택 | 선택 |
 | 인증함 | `phone` + `phoneVerifiedAt` 저장 | 동일 |
-| 번호만 입력하고 인증 안 함 | `phone`만 저장, `phoneVerifiedAt`은 null | 동일 |
-| 둘 다 건너뜀 | `phone`도 null | 동일 |
+| 번호만 입력하고 인증 안 함 | **아무것도 저장하지 않음** (불변식 I) | 동일 |
+| 둘 다 건너뜀 | `phone`은 null | 동일 |
 | 결과 | `onboardingStatus = signup_done` | `signup_done` |
 
-### 4.5 인증으로 유도하는 흐름
+### 5.4 인증으로 유도하는 흐름
 
 프론트에는 이미 필요한 배관이 전부 있다. 새로 만들 것이 없다.
 
@@ -148,60 +142,56 @@ Prisma는 partial index를 스키마 문법으로 표현할 수 없다. 따라�
 `apps/v1_web/src/app/tournaments/[id]/apply/tournament-apply-client.tsx:1467`이 이미
 `authMe.data?.verification?.phoneVerified`를 읽어 이 패턴대로 동작한다. 다른 화면은 이것을 따른다.
 
-## 5. 작업 항목
-
-가입 게이트 제거만으로는 끝나지 않는다. 아래는 `phone` 사용처 전수 감사(2026-08-02)에서
-확정된 항목이다. 감사는 `apps/v1_api/src`와 `apps/v1_web/src` 전체(테스트·시드 제외)를 대상으로 했다.
+## 6. 작업 항목
 
 ### 백엔드
 
-| ID | 심각도 | 위치 | 내용 |
-|---|---|---|---|
-| W1 | Critical | `auth/account-recovery.service.ts:174` | `findFirst({ where: { phone, accountStatus } })`에 `phoneVerifiedAt: { not: null }` 추가. 지금은 phone이 전역 unique라 항상 한 계정이지만, D3 이후에는 여러 계정이 같은 미인증 번호를 가질 수 있어 정렬 미정의 상태로 아무 계정이나 반환한다. 공격자가 피해자 번호를 미인증으로 등록해두면 피해자가 자기 번호를 정상 인증해 복구를 시도해도 공격자 계정이 잡혀 **본인 계정 복구가 봉쇄**된다 |
-| W2 | High | `profile/creator-profile.guard.ts:21` | `if (!user?.phone?.trim())` → `phoneVerifiedAt` 검사로 교체. 이 가드는 **팀 생성(`teams.controller.ts:43`) · 매치 생성(`matches.controller.ts:26`) · 팀매치 생성(`team-matches.controller.ts:36`)** 에 걸려 있다. 고치지 않으면 미인증 번호를 적는 것만으로 이번에 세우는 게이트가 뚫린다 |
-| W3 | High | `tournaments/tournament-players.service.ts:194` | `memberPhone` 존재 검사 → 인증 여부 검사. 해당 쿼리는 이미 `phoneVerifiedAt: true`를 select 하고도 쓰지 않고 있다(179행) |
-| W4 | Medium | `auth/auth.service.ts:89` | 가입 시 번호 중복 검사에 `phoneVerifiedAt: { not: null }` 추가 + `findUnique` → `findFirst` |
-| W5 | Medium | `auth/auth.service.ts:602` | 소셜 프로필 완성 시 번호 중복 검사에 동일 적용 |
-| W6 | Medium | `profile/profile.service.ts:146` | 프로필 수정 시 번호 중복 검사에 동일 적용. 아울러 인증 시점에 그 번호가 이미 다른 계정에서 인증된 경우 `PHONE_CONFLICT`("이미 다른 계정에서 인증된 번호예요")로 잡는 경로를 추가한다 |
-| W7 | Medium | `teams/teams.service.ts:468`, `tournaments/tournament-players.service.ts:352` | 미인증 번호는 `null`로 내려보내고, 응답에 `phoneVerified: boolean`을 함께 실어 소비자가 "번호 없음"과 "미인증"을 구분할 수 있게 한다 |
-| W11 | Medium | `inquiries/inquiries.controller.ts:20` | `POST /inquiries`에 `@Throttle({ default: { limit: 5, ttl: 60_000 } })` 추가. 현재 전용 제한이 없어 전역 기본값 1000/분만 적용되며, 미인증 계정에 열어주기 전에 필요하다. `/uploads`는 이미 20/분(이미지)·3/분(영상)이 걸려 있어 추가 조치가 없다 |
-| W8 | — | `auth/auth.service.ts:101`, `auth/auth.service.ts:616` | 가입 hard-block 제거 (D1) |
-| W9 | — | `verification/phone-verification-access.ts` | 허용 목록 확장 (D2) |
-| W10 | — | `prisma/schema.prisma` + 새 마이그레이션 | partial unique index 전환 (D3) |
+| ID | 위치 | 내용 |
+|---|---|---|
+| A1 | `auth/auth.service.ts:101`, `auth/auth.service.ts:119` | 가입 hard-block 제거(D1). 동시에 `phone`은 **proof token이 검증됐을 때만** 쓴다 — 현재는 `V1_PHONE_VERIFICATION_DISABLED=true` 비상 opt-out 시 증명 없이 `phone`이 저장되어 불변식 I를 깬다 |
+| A2 | `auth/auth.service.ts:616`, `auth/auth.service.ts:632` | 소셜 프로필 완성의 hard-block 제거 + A1과 같은 규칙 적용 |
+| A3 | `profile/profile.service.ts:196` | 번호 변경 시에도 증명이 없으면 `phone`을 쓰지 않는다. A1과 같은 이유(비상 opt-out 경로에서 불변식이 깨짐) |
+| A4 | `verification/phone-verification-access.ts` | 허용 목록 확장(D4, §5.2) |
+| A5 | `inquiries/inquiries.controller.ts:20` | `POST /inquiries`에 `@Throttle({ default: { limit: 5, ttl: 60_000 } })` 추가. 현재 전용 제한이 없어 전역 기본값 1000/분만 적용되며, 미인증 계정에 열어주기 전에 필요하다. `/uploads`는 이미 20/분(이미지)·3/분(영상)이 걸려 있어 추가 조치가 없다 |
 
 ### 프론트엔드
 
-| ID | 심각도 | 위치 | 내용 |
-|---|---|---|---|
-| F1 | High | `app/tournaments/[id]/registrations/[registrationId]/roster/tournament-roster-client.tsx:247·256·259·263` | `isRegisterableMember` / `memberMissingReason`가 번호 존재만 보고 "선수 등록 가능"이라 안내한다. W3과 같은 결함이며, UI가 먼저 가능이라 해놓고 서버가 거절하면 사용자는 이유를 알 수 없다. `V1TournamentPlayer` 모델에는 phone 컬럼이 없어(realName·birthDate·gender만 스냅샷) 항상 `V1User.phone`을 실시간으로 읽는다 |
-| F2 | Medium | `app/admin/tournaments/[id]/tournament-detail-client.tsx:584` | 운영자 화면의 선수 번호 표시에 인증 여부 표기 추가 |
-| F3 | Medium | `lib/creator-profile.ts:5` | W2에 맞춰 누락 필드 라벨을 "휴대폰 본인인증"으로 |
-| F4 | — | `components/auth/signup-client.tsx:396` | `step === verify` 단계에 건너뛰기 경로 추가 (D4) |
-| F5 | — | `components/auth/signup-profile-validation.ts:23` | 번호 필수 검증을 선택으로 완화 (D4) |
-| F6 | — | `components/auth/social-signup-client.tsx:121` | 인증 미완료 시 제출 차단 해제 (D4) |
+| ID | 위치 | 내용 |
+|---|---|---|
+| A6 | `components/auth/signup-client.tsx:396` | `step === verify` 단계에 건너뛰기 경로 추가(D5) |
+| A7 | `components/auth/signup-profile-validation.ts:23` | 번호 필수 검증을 선택으로 완화(D5) |
+| A8 | `components/auth/social-signup-client.tsx:121` | 인증 미완료 시 제출 차단 해제(D5) |
 
-### 변경하지 않는 것
+### 손대지 않는 것 — 불변식 I 덕분에 저절로 옳은 코드
 
-- `admin/admin.service.ts:316` (탈퇴 시 번호 파기), `common/logging/mask-sensitive.ts:23` (로그 마스킹),
-  `auth/kakao-profile.ts` (프리필 정규화), `verification/phone-proof-token.ts` (토큰 페이로드)
-  — 인증 상태를 전제하지 않아 영향이 없다.
-- `guestPhone` 계열(비회원 문의) — `V1User.phone`과 별개 필드다.
-- `components/auth/account-recovery-client.tsx` — proof token 기반이라 W1 수정만으로 충분하다.
+아래는 모두 "번호가 있는가"로 실명성을 판정한다. 불변식 I 아래에서 그 판정은 "인증됐는가"와
+같은 뜻이므로 **변경하지 않는다.** 대신 A9 테스트로 이 의존을 명시적으로 박제한다.
 
-## 6. 테스트
+- `auth/account-recovery.service.ts:174` — 번호로 복구 대상 계정 조회
+- `profile/creator-profile.guard.ts:21` — 팀·매치·팀매치 생성 자격
+- `tournaments/tournament-players.service.ts:194` — 대회 선수 등록 자격
+- `auth/auth.service.ts:89`, `auth/auth.service.ts:602`, `profile/profile.service.ts:146` — 번호 중복 검사
+- `teams/teams.service.ts:468`, `tournaments/tournament-players.service.ts:352` — 번호 노출
+- `app/tournaments/[id]/registrations/[registrationId]/roster/tournament-roster-client.tsx:247` — 선수 등록 가능 안내
+- `app/admin/tournaments/[id]/tournament-detail-client.tsx:584` — 운영자 화면 번호 표시
 
-| 대상 | 내용 |
-|---|---|
-| 게이트 | `test/integration/phone-verification-write-gate.e2e-spec.ts` 확장 — 허용 경로 9개가 미인증으로 통과하고, 차단 도메인 6개가 403 `PHONE_VERIFICATION_REQUIRED`를 반환하는지 |
-| unique 계약 | 미인증 중복 허용 / 인증 중복 거부 / 미인증 중복이 둘 다 인증 시도할 때 후발이 `PHONE_CONFLICT` |
-| 가입 | 인증 없이 가입 성공 → 프로필 수정 성공 → 팀 생성 403 (전체 흐름 1건) |
-| W1 | 같은 번호를 가진 미인증 계정이 있을 때 계정 복구가 **인증된 계정만** 반환하는지 |
-| W2 | 미인증 번호만 가진 사용자가 팀·매치·팀매치 생성에서 거절되는지 |
-| W3 | 미인증 번호를 가진 팀원이 대회 선수로 등록되지 않는지 |
+### 알려진 예외
+
+`admin/admin.service.ts:316` — 탈퇴 처리는 `phone`에 tombstone 값(`buildDeletedPhone`)을 넣고
+`phoneVerifiedAt`을 null로 만든다. 계정이 `deleted`이므로 불변식 I의 범위 밖이며, A9 테스트도
+활성 계정만 대상으로 한다.
+
+## 7. 테스트
+
+| ID | 대상 | 내용 |
+|---|---|---|
+| A9 | 불변식 I | 활성 계정에서 `phone != null` ⟹ `phoneVerifiedAt != null`. 증명 없는 가입·소셜 완성·번호 변경 각각에서 `phone`이 저장되지 않는지 확인한다. **§6 "손대지 않는 것" 전체가 이 테스트에 의존하므로, 이 테스트가 이번 변경에서 가장 중요하다** |
+| A10 | 게이트 | `test/integration/phone-verification-write-gate.e2e-spec.ts` 확장 — 허용 경로가 미인증으로 통과하고, 차단 도메인 6개가 403 `PHONE_VERIFICATION_REQUIRED`를 반환하는지 |
+| A11 | 가입 흐름 | 인증 없이 가입 성공 → 프로필 수정 성공 → 팀 생성 403 (1건) |
 
 테스트는 위 계약을 증명하는 가장 좁은 범위로 쓴다. 구현을 되읊는 테스트는 쓰지 않는다.
 
-## 7. 배포와 검증
+## 8. 배포와 검증
 
 1. base는 `origin/dev` (로컬 커밋 미반영). 브랜치 `feat/v1-action-time-phone-verification`.
 2. `.changeset/*.md` 동반 — 없으면 dev push CI가 실패하고 alpha 배포가 막힌다.
@@ -211,22 +201,22 @@ Prisma는 partial index를 스키마 문법으로 표현할 수 없다. 따라�
 6. dev 머지 = alpha 자동 실배포. 머지 전 검증을 실배포 게이트로 취급한다.
 7. alpha에서 실검증: 인증 없이 가입 → 프로필 수정 → 팀 생성 시도(모달) → 인증 → 복귀 후 성공.
 
-`dev → main` 승격은 사용자만 한다.
+`dev → main` 승격은 사용자만 한다. `main`과 `dev`는 같은 코드베이스이므로 이 변경을 양쪽에
+따로 적용하지 않는다 — dev에 머지한 뒤 사용자가 승격하면 프로덕션에 반영된다.
 
-## 8. 리스크
+## 9. 리스크
 
 | 리스크 | 대응 |
 |---|---|
-| 미인증 계정 급증 → 스팸 유입 | 게이트가 남에게 도달하는 모든 액션을 막으므로 스팸 도달 경로가 없다. 허용한 두 경로 중 `/uploads`는 이미 `@Throttle` 20/분(이미지)·3/분(영상)이 걸려 있고, `/inquiries`는 W11에서 5/분을 추가한다 |
-| partial index가 스키마에 보이지 않음 | 스키마 주석 + 마이그레이션 주석 + 이 문서에 명시 |
-| 미인증 번호가 검증된 연락처처럼 보임 | W7·F1·F2에서 처리 |
-| 감사 누락 | 감사는 `apps/v1_api/src`·`apps/v1_web/src`를 대상으로 했다. 구현 중 새로 발견되면 이 문서에 추가한다 |
+| 불변식 I가 나중에 깨져 §6 "손대지 않는 것"이 조용히 취약해짐 | A9 테스트로 박제. 향후 `phone`을 쓰는 코드를 추가할 때 이 테스트가 깨진다 |
+| 미인증 계정 급증 → 스팸 유입 | 게이트가 남에게 도달하는 모든 액션을 막으므로 스팸 도달 경로가 없다. 허용한 두 경로 중 `/uploads`는 이미 제한이 있고, `/inquiries`는 A5에서 5/분을 추가한다 |
+| 미인증 사용자의 번호 프리필 부재 | 인증 화면에서 번호를 한 번 더 입력한다. §3에서 의도적으로 감수한 비용이다 |
 
-## 9. 감사 범위와 한계
+## 10. 감사 범위와 한계
 
-이 설계의 작업 항목은 `apps/v1_api/src`와 `apps/v1_web/src` 전체(테스트·시드 제외)를 대상으로 한
-`phone` 사용처 전수 감사에서 도출했다. 운영 스택(`apps/api` / `apps/web`)과 `guestPhone` 계열
-(비회원 문의)은 의도적으로 범위 밖에 두었다.
+§6의 작업 항목과 "손대지 않는 것" 목록은 `apps/v1_api/src`와 `apps/v1_web/src`
+전체(테스트·시드 제외)를 대상으로 한 `phone` 사용처 전수 감사(2026-08-02)에서 도출했다.
+운영 스택(`apps/api` / `apps/web`)과 `guestPhone` 계열(비회원 문의)은 의도적으로 범위 밖에 두었다.
 
-D3(partial unique index)은 폐기용 Postgres 16에 origin/dev 마이그레이션 82개를 재생해
-실측 검증했다(§3 참조). 나머지 항목은 코드 정독에 근거하며, 구현 시 테스트로 확정한다.
+§3의 대안(partial unique index)은 폐기용 Postgres 16에 origin/dev 마이그레이션 82개를 재생해
+실측 검증했다. 나머지 항목은 코드 정독에 근거하며, 구현 시 테스트로 확정한다.

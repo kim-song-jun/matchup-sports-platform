@@ -170,7 +170,7 @@ async function recoverStaleClones(
           `SELECT d.datname, COUNT(a.pid)::int AS "activeConnections"
            FROM pg_database d
            LEFT JOIN pg_stat_activity a ON a.datname = d.datname
-           WHERE left(d.datname, $1) = $2
+           WHERE left(d.datname, $1::integer) = $2
            GROUP BY d.datname
            ORDER BY d.datname
            LIMIT ${MAX_RECOVERY_SCAN}`,

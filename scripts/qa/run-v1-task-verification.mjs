@@ -123,13 +123,13 @@ const TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_PATH =
   '.omo/start-work/host-pressure-override-task-9-plan-r3.json';
 const TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_SHA256 =
   '026b453a615973b71ace9734f21f895df58397c8a3fb995f9d259c47cd6feb7c';
-const TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_PATH =
-  '.omo/start-work/host-pressure-override-task-9-plan-r4.json';
-const TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_SHA256 =
-  '3fe058c0e3ee4596023f49714f5d7e88e02056fe9f847011a5c186c8c99d6ee9';
-const TASK_NINE_R4_AUTHORIZATION_TEXT =
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_R5_PATH =
+  '.omo/start-work/host-pressure-override-task-9-plan-r5.json';
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_R5_SHA256 =
+  '924b127d300c9aa73e6b0e71bf5d93e47facf5c0fa3cfb2c47a8e093397a6ae5';
+const TASK_NINE_R5_AUTHORIZATION_TEXT =
   '부하는 상관하지말고 작업해 더 늘려서작업하라는거야';
-const TASK_NINE_R4_CONSTRAINTS = [
+const TASK_NINE_R5_CONSTRAINTS = [
   'load average above the prior maximum of 24 is explicitly approved for this Task 9 continuation',
   'Task 9 validation runs serially with minimum workers',
   'record actual host load, swap, Node/MCP, browser, Docker, target-port, command, exit-code, and owned-process metrics on every invocation',
@@ -455,15 +455,15 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
   const canonicalPath = resolve(repoRoot, OVERRIDE_PATH);
   const historicalPath = resolve(repoRoot, HISTORICAL_TASK_ONE_OVERRIDE_PATH);
   const pressureBPath = resolve(repoRoot, TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH);
-  const taskNineR4Path = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_PATH);
+  const taskNineR5Path = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_R5_PATH);
   const absoluteSupplied = resolve(supplied);
   const historical = task === 1 && absoluteSupplied === historicalPath;
   const pressureB = absoluteSupplied === pressureBPath;
-  const taskNine = task === 9 && absoluteSupplied === taskNineR4Path;
+  const taskNine = task === 9 && absoluteSupplied === taskNineR5Path;
   if (absoluteSupplied !== canonicalPath && !historical && !pressureB && !taskNine) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
-      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}, or ${TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_PATH}`,
+      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}, or ${TASK_NINE_HOST_PRESSURE_OVERRIDE_R5_PATH}`,
       75,
     );
   }
@@ -472,7 +472,7 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     : pressureB
       ? TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256
       : taskNine
-        ? TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_SHA256
+        ? TASK_NINE_HOST_PRESSURE_OVERRIDE_R5_SHA256
         : OVERRIDE_SHA256;
   const descriptor = secureImmutableDescriptor(
     absoluteSupplied,
@@ -944,11 +944,11 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     JSON.stringify(receipt.allowedTasks) === JSON.stringify([9]) &&
     receipt.authorizationSource === 'user-pressure-override' &&
     Number.isFinite(Date.parse(receipt.authorizedAt)) &&
-    receipt.authorizationText === TASK_NINE_R4_AUTHORIZATION_TEXT &&
+    receipt.authorizationText === TASK_NINE_R5_AUTHORIZATION_TEXT &&
     Array.isArray(receipt.constraints) &&
     receipt.constraints.length > 0 &&
-    JSON.stringify(receipt.constraints) === JSON.stringify(TASK_NINE_R4_CONSTRAINTS) &&
-    receipt.receiptType === 'task-9-host-pressure-override-r4' &&
+    JSON.stringify(receipt.constraints) === JSON.stringify(TASK_NINE_R5_CONSTRAINTS) &&
+    receipt.receiptType === 'task-9-host-pressure-override-r5' &&
     receipt.mode === 'direct' &&
     receipt.scope === 'host-preflight-only' &&
     receipt.task === 9 &&
@@ -1075,7 +1075,7 @@ function validatePressureReceiptOnly(options, payload) {
   const suppliedSHA = options['pressure-receipt-sha'];
   if (
     suppliedSHA !== TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256 &&
-    suppliedSHA !== TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_SHA256
+    suppliedSHA !== TASK_NINE_HOST_PRESSURE_OVERRIDE_R5_SHA256
   ) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
@@ -1098,12 +1098,12 @@ function validatePressureReceiptOnly(options, payload) {
     return;
   }
   if (
-    resolve(receiptPath) !== resolve(TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_PATH) ||
+    resolve(receiptPath) !== resolve(TASK_NINE_HOST_PRESSURE_OVERRIDE_R5_PATH) ||
     resolve(process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT ?? '') !== resolve(receiptPath)
   ) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
-      'Task 9 descriptor-only validation requires the exact R4 receipt path in both option and environment',
+      'Task 9 descriptor-only validation requires the exact R5 receipt path in both option and environment',
       75,
     );
   }
@@ -1111,7 +1111,7 @@ function validatePressureReceiptOnly(options, payload) {
   const plan = verifyPlanBinding({}, repoRoot, 9);
   const override = verifyOverride(repoRoot, plan, 9, []);
   process.stdout.write(
-    `TASK9_PRESSURE_RECEIPT_R4_PASS exact_sha=${override.receiptSHA256} normalized_plan_sha=${plan.normalizedSHA} owned_paths=18 accepted=true\n`,
+    `TASK9_PRESSURE_RECEIPT_R5_PASS exact_sha=${override.receiptSHA256} normalized_plan_sha=${plan.normalizedSHA} owned_paths=19 accepted=true\n`,
   );
 }
 

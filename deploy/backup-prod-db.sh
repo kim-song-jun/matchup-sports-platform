@@ -60,6 +60,19 @@ dump_database() {
   log "${label}: s3://${BACKUP_BUCKET}/${key} (${size} bytes)"
 }
 
+# CloudWatch 하트비트. 성공했을 때만 1 을 올린다 — 알람은 "지표가 없음"을 위반으로 취급하므로
+# 스크립트가 실패한 경우뿐 아니라 **타이머가 아예 안 돌았거나 인스턴스가 꺼져 있던 경우**도
+# 잡힌다. 실패 시에 0 을 올리는 방식은 스크립트가 실행조차 안 되면 침묵하므로 쓰지 않는다.
+publish_heartbeat() {
+  aws cloudwatch put-metric-data \
+    --region "${AWS_REGION}" \
+    --namespace Teameet/Backup \
+    --metric-name BackupSuccess \
+    --value 1 \
+    --unit Count >/dev/null 2>&1 \
+    || log "하트비트 지표 발행 실패 — 백업 자체는 성공했습니다"
+}
+
 failed=0
 # v1 이 현재 서비스, teameet 은 아직 도는 레거시 스택. 레거시도 데이터가 남아 있어
 # 정리 판단이 끝나기 전까지는 같이 뜬다.
@@ -70,4 +83,5 @@ if (( failed != 0 )); then
   log "일부 백업이 실패했습니다"
   exit 1
 fi
+publish_heartbeat
 log "모든 백업 완료"

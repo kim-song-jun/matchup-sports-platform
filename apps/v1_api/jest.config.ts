@@ -26,6 +26,7 @@ const config: Config = {
         '<rootDir>/test/integration/**/*.e2e-spec.ts',
         '<rootDir>/test/tournaments/**/*.integration-spec.ts',
         '<rootDir>/test/games/**/*.integration-spec.ts',
+        '<rootDir>/test/jobs/**/*.integration-spec.ts',
       ],
     },
     {

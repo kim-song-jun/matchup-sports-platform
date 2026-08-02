@@ -136,6 +136,17 @@ const taskNineR9OwnedPaths = [
   ...taskNineR8OwnedPaths,
   'apps/v1_api/test/fixtures/game-schema.fixture.ts',
 ];
+const taskNineR10OwnedPaths = [
+  ...taskNineR9OwnedPaths,
+  'apps/v1_api/src/jobs/v1-game-operations-worker.service.spec.ts',
+  'apps/v1_api/test/jobs/v1-game-operations-worker.integration-spec.ts',
+  'apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts',
+  'apps/v1_api/src/admin/admin-terms.service.spec.ts',
+];
+const taskNineR11OwnedPaths = [
+  ...taskNineR10OwnedPaths,
+  'apps/v1_api/jest.config.ts',
+];
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -1565,7 +1576,7 @@ test('legacy Task1 host pressure override remains accepted', () => {
   }
 });
 
-test('Task 9 R9 descriptor keeps R5-R8 receipts immutable while appending only the schema fixture helper', () => {
+test('Task 9 R11 descriptor keeps R5-R10 receipts immutable while appending only jobs integration discovery', () => {
   const canonicalReceipt = JSON.parse(
     readFileSync(resolve(repoRoot, taskNineR6OverridePath), 'utf8'),
   );
@@ -1606,9 +1617,11 @@ test('Task 9 R9 descriptor keeps R5-R8 receipts immutable while appending only t
   const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
   const previousSession = process.env.V1_VERIFICATION_SESSION_ID;
   try {
-    assert.deepEqual(ledgerOutputs, taskNineR9OwnedPaths);
+    assert.deepEqual(ledgerOutputs, taskNineR11OwnedPaths);
     assert.deepEqual(planOutputs, taskNineR7OwnedPaths);
-    assert.equal(ledgerOutputs.length, 25);
+    assert.equal(ledgerOutputs.length, 30);
+    assert.deepEqual(ledgerOutputs.slice(0, 29), taskNineR10OwnedPaths);
+    assert.deepEqual(ledgerOutputs.slice(0, 25), taskNineR9OwnedPaths);
     assert.deepEqual(ledgerOutputs.slice(0, 24), taskNineR8OwnedPaths);
     assert.deepEqual(ledgerOutputs.slice(0, 21), taskNineR7OwnedPaths);
     assert.deepEqual(ledgerOutputs.slice(0, 20), taskNineR6OwnedPaths);
@@ -1621,6 +1634,11 @@ test('Task 9 R9 descriptor keeps R5-R8 receipts immutable while appending only t
     assert.equal(ledgerOutputs.at(22), 'apps/v1_api/test/games/game-schema.integration-spec.ts');
     assert.equal(ledgerOutputs.at(23), 'apps/v1_api/test/integration/tournament-campaign.e2e-spec.ts');
     assert.equal(ledgerOutputs.at(24), 'apps/v1_api/test/fixtures/game-schema.fixture.ts');
+    assert.equal(ledgerOutputs.at(25), 'apps/v1_api/src/jobs/v1-game-operations-worker.service.spec.ts');
+    assert.equal(ledgerOutputs.at(26), 'apps/v1_api/test/jobs/v1-game-operations-worker.integration-spec.ts');
+    assert.equal(ledgerOutputs.at(27), 'apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts');
+    assert.equal(ledgerOutputs.at(28), 'apps/v1_api/src/admin/admin-terms.service.spec.ts');
+    assert.equal(ledgerOutputs.at(29), 'apps/v1_api/jest.config.ts');
     assert.equal(
       dependencyRow,
       '| 9 | 5, 6, 7, 11 | 10, 16, 18, 22, 24, 27 | 8; Task 9A completes projection infrastructure without personal rows, while Task 24 performs Task 9B after 14 |',

@@ -593,8 +593,7 @@ describe('TournamentBracketService', () => {
     }
   });
 
-  // TB-4: 완전 동점 시 registrationId asc로 안정적 순위 결정
-  it('recalculateStandings: complete tie → registrationId asc decides position (TB-4)', async () => {
+  it('recalculateStandings: complete tie → seeded draw decides the full position order (TB-4)', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
 
@@ -615,13 +614,11 @@ describe('TournamentBracketService', () => {
     await service.recalculateStandings(ownerUser, 'tournament-1');
 
     const upsertCalls = (prisma.v1TournamentStanding.upsert as jest.Mock).mock.calls;
-    const pos1 = upsertCalls.find((c) => c[0].create.position === 1);
-    const pos2 = upsertCalls.find((c) => c[0].create.position === 2);
-    const pos3 = upsertCalls.find((c) => c[0].create.position === 3);
-    // registrationId asc: reg-a(1위) < reg-b(2위) < reg-c(3위)
-    expect(pos1?.[0].create.registrationId).toBe('reg-a');
-    expect(pos2?.[0].create.registrationId).toBe('reg-b');
-    expect(pos3?.[0].create.registrationId).toBe('reg-c');
+    expect(upsertCalls.map((call) => call[0].create)).toEqual([
+      expect.objectContaining({ position: 1, registrationId: 'reg-b' }),
+      expect.objectContaining({ position: 2, registrationId: 'reg-c' }),
+      expect.objectContaining({ position: 3, registrationId: 'reg-a' }),
+    ]);
   });
 
   // ─── getBracket ───────────────────────────────────────────────────────────

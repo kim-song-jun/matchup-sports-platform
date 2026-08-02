@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
 import {
   GAME_OPERATION_HEARTBEAT_MS,
   GAME_OPERATION_LEASE_MS,
@@ -8,7 +8,7 @@ import {
   GAME_OPERATION_SHUTDOWN_MS,
   GameOperationClaim,
   V1GameOperationsWorkerService,
-} from './v1-game-operations-worker.service';
+} from '../../src/jobs/v1-game-operations-worker.service';
 
 type JobState = {
   id: string;

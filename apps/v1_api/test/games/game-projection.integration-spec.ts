@@ -1202,6 +1202,202 @@ describe('Task 9 game projection real-database contract', () => {
         await cleanupApp?.();
       }
     });
+
+    it('[RED-AC6] global platform_ops queue lists, details, acknowledges, resolves, and audits due escalations across tournaments', async () => {
+      const primary = await createAc6EscalationFixture(ids.tournamentGame, 'global-primary');
+      const otherTournamentGameId = randomUUID();
+      await prisma.v1Game.create({
+        data: {
+          id: otherTournamentGameId,
+          sourceType: 'TOURNAMENT_FIXTURE',
+          tournamentFixtureId: ids.otherTournamentFixture,
+          state: 'ENDED',
+          version: 0,
+          competitionConfigVersionId: ids.config,
+        },
+      });
+      const secondary = await createAc6EscalationFixture(otherTournamentGameId, 'global-secondary');
+
+      let app: INestApplication | undefined;
+      let cleanupApp: (() => Promise<void>) | undefined;
+      try {
+        ({ app, cleanup: cleanupApp } = await createV1IntegrationApp());
+        await acceptAc6SignupTerms(app, [ids.opsUser]);
+
+        const queueRoute = '/api/v1/tournament-ops/escalations';
+        const list = await request(app.getHttpServer())
+          .get(queueRoute)
+          .set('x-v1-user-id', ids.opsUser);
+        const primaryDetail = await request(app.getHttpServer())
+          .get(`${queueRoute}/${primary.escalationId}`)
+          .set('x-v1-user-id', ids.opsUser);
+        const acknowledged = await request(app.getHttpServer())
+          .post(`${queueRoute}/${primary.escalationId}/ack`)
+          .set('x-v1-user-id', ids.opsUser)
+          .set('idempotency-key', `${prefix}:ac6-global-ack`)
+          .send({ expectedVersion: 0, reason: 'AC6 global queue acknowledgement' });
+        const resolved = await request(app.getHttpServer())
+          .post(`${queueRoute}/${secondary.escalationId}/resolve`)
+          .set('x-v1-user-id', ids.opsUser)
+          .set('idempotency-key', `${prefix}:ac6-global-resolve`)
+          .send({ expectedVersion: 0, reason: 'AC6 global queue resolution' });
+        const audits = await prisma.v1OperationAudit.findMany({
+          where: {
+            resourceType: 'RESULT_ESCALATION',
+            resourceId: { in: [primary.escalationId, secondary.escalationId] },
+          },
+          orderBy: { resourceId: 'asc' },
+          select: { action: true, resourceId: true, tournamentId: true },
+        });
+
+        const observable = {
+          list: {
+            status: list.status,
+            escalationIds: (list.body.data?.items ?? []).map((item: { id: string }) => item.id).sort(),
+          },
+          detail: { status: primaryDetail.status, id: primaryDetail.body.data?.id },
+          acknowledged: { status: acknowledged.status, state: acknowledged.body.data?.status },
+          resolved: { status: resolved.status, state: resolved.body.data?.status },
+          audits,
+        };
+        process.stdout.write(`TASK9_AC6_GLOBAL_QUEUE=${JSON.stringify(observable)}\n`);
+
+        expect(observable).toEqual({
+          list: {
+            status: 200,
+            escalationIds: [primary.escalationId, secondary.escalationId].sort(),
+          },
+          detail: { status: 200, id: primary.escalationId },
+          acknowledged: { status: 200, state: 'ACKNOWLEDGED' },
+          resolved: { status: 200, state: 'RESOLVED' },
+          audits: [
+            {
+              action: 'RESULT_ESCALATION_ACKNOWLEDGED',
+              resourceId: primary.escalationId,
+              tournamentId: ids.tournament,
+            },
+            {
+              action: 'RESULT_ESCALATION_RESOLVED',
+              resourceId: secondary.escalationId,
+              tournamentId: ids.otherTournament,
+            },
+          ].sort((left, right) => left.resourceId.localeCompare(right.resourceId)),
+        });
+      } finally {
+        await cleanupApp?.();
+      }
+    });
+
+    it('[RED-AC6] escalation queue rejects wrong role, kind, tournament, and future-due rows without mutation', async () => {
+      const due = await createAc6EscalationFixture(ids.tournamentGame, 'denial-due');
+      const future = await createAc6EscalationFixture(ids.tournamentGame, 'denial-future', 60_000);
+
+      let app: INestApplication | undefined;
+      let cleanupApp: (() => Promise<void>) | undefined;
+      try {
+        ({ app, cleanup: cleanupApp } = await createV1IntegrationApp());
+        await acceptAc6SignupTerms(app, [ids.supportUser, ids.opsUser]);
+
+        const route = (tournamentId: string, escalationId: string) =>
+          `/api/v1/tournament-ops/tournaments/${tournamentId}/escalations/${escalationId}`;
+        const before = await escalationMutationSnapshot([
+          due.reminderId,
+          due.escalationId,
+          future.reminderId,
+          future.escalationId,
+        ]);
+        const reviewerResolve = await request(app.getHttpServer())
+          .post(`${route(ids.tournament, due.escalationId)}/resolve`)
+          .set('x-v1-user-id', ids.supportUser)
+          .set('idempotency-key', `${prefix}:ac6-wrong-role`)
+          .send({ expectedVersion: 0, reason: 'AC6 reviewer cannot resolve an ops escalation' });
+        const wrongKind = await request(app.getHttpServer())
+          .get(route(ids.tournament, due.reminderId))
+          .set('x-v1-user-id', ids.opsUser);
+        const wrongTournament = await request(app.getHttpServer())
+          .get(route(ids.otherTournament, due.escalationId))
+          .set('x-v1-user-id', ids.opsUser);
+        const futureDue = await request(app.getHttpServer())
+          .get(route(ids.tournament, future.escalationId))
+          .set('x-v1-user-id', ids.opsUser);
+        const after = await escalationMutationSnapshot([
+          due.reminderId,
+          due.escalationId,
+          future.reminderId,
+          future.escalationId,
+        ]);
+        const observable = {
+          reviewerResolve: { status: reviewerResolve.status, code: reviewerResolve.body.code },
+          wrongKind: { status: wrongKind.status, code: wrongKind.body.code },
+          wrongTournament: { status: wrongTournament.status, code: wrongTournament.body.code },
+          futureDue: { status: futureDue.status, code: futureDue.body.code },
+          unchanged: after,
+        };
+        process.stdout.write(`TASK9_AC6_DENIALS=${JSON.stringify(observable)}\n`);
+
+        expect(observable).toEqual({
+          reviewerResolve: { status: 403, code: 'ESCALATION_SCOPE_DENIED' },
+          wrongKind: { status: 404, code: 'RESULT_ESCALATION_NOT_FOUND' },
+          wrongTournament: { status: 404, code: 'RESULT_ESCALATION_NOT_FOUND' },
+          futureDue: { status: 404, code: 'RESULT_ESCALATION_NOT_FOUND' },
+          unchanged: before,
+        });
+      } finally {
+        await cleanupApp?.();
+      }
+    });
+
+    it('[RED-AC6] reassignment preserves escalation identity while the next reminder reaches only the newly eligible reviewer', async () => {
+      const fixture = await createAc6ReassignmentFixture();
+      let submittedDelivery: ExactWorkerDiagnostic | undefined;
+      let reminderDelivery: ExactWorkerDiagnostic | undefined;
+      try {
+        submittedDelivery = await processExactOutboxEvent(fixture.submittedOutboxId, 'ac6-reassignment-submitted');
+        const before = await ac6ReassignmentObservation(fixture);
+
+        await prisma.v1Team.update({
+          where: { id: fixture.reviewerTeamId },
+          data: { ownerUserId: ids.opponentUser },
+        });
+        await prisma.v1TeamMembership.create({
+          data: {
+            teamId: fixture.reviewerTeamId,
+            userId: ids.opponentUser,
+            role: 'owner',
+            status: 'active',
+          },
+        });
+        await resetOfficialDelivery(fixture.reminderOutboxId, { revisionId: fixture.revisionId });
+        reminderDelivery = await processExactOutboxEvent(fixture.reminderOutboxId, 'ac6-reassignment-reminder');
+        const after = await ac6ReassignmentObservation(fixture);
+        const observable = {
+          submitted: { status: submittedDelivery.after.event.status, processed: submittedDelivery.processed },
+          reminder: { status: reminderDelivery.after.event.status, processed: reminderDelivery.processed },
+          before,
+          after,
+        };
+        process.stdout.write(`TASK9_AC6_REASSIGNMENT=${JSON.stringify(observable)}\n`);
+
+        expect(observable).toEqual({
+          submitted: { status: 'COMPLETED', processed: true },
+          reminder: { status: 'COMPLETED', processed: true },
+          before: {
+            escalationId: before.escalationId,
+            deliveries: [{ recipientUserId: ids.supportUser, count: 1 }],
+          },
+          after: {
+            escalationId: before.escalationId,
+            deliveries: [
+              { recipientUserId: ids.opponentUser, count: 1 },
+              { recipientUserId: ids.supportUser, count: 1 },
+            ],
+          },
+        });
+      } finally {
+        await isolateLane4Outbox([fixture.submittedOutboxId, fixture.reminderOutboxId]);
+        await assertNoWorkerResidue('ac6-reassignment');
+      }
+    });
   });
 });
 
@@ -2300,6 +2496,187 @@ async function seedEscalationRows(revisionId: string): Promise<void> {
       update: { status: 'PENDING', version: 0, ackByUserId: null, resolvedByUserId: null, reason: null },
     }),
   ]);
+}
+
+async function createAc6EscalationFixture(
+  gameId: string,
+  label: string,
+  dueOffsetMs = -1_000,
+): Promise<{ revisionId: string; reminderId: string; escalationId: string }> {
+  const revisionId = randomUUID();
+  const [revisionAggregate, databaseNow] = await Promise.all([
+    prisma.v1GameResultRevision.aggregate({ where: { gameId }, _max: { revision: true } }),
+    prisma.$queryRaw<Array<{ now: Date }>>`SELECT CURRENT_TIMESTAMP AS now`,
+  ]);
+  const now = databaseNow[0]?.now;
+  if (now === undefined) {
+    throw new Error(`Task 9 AC6 fixture requires database CURRENT_TIMESTAMP: ${label}`);
+  }
+  const reminderId = randomUUID();
+  const escalationId = randomUUID();
+  await prisma.v1GameResultRevision.create({
+    data: {
+      id: revisionId,
+      gameId,
+      revision: (revisionAggregate._max.revision ?? 0) + 1,
+      state: 'SUBMITTED',
+      score: { home: 0, away: 0 },
+      eventsHash: `${prefix}:ac6:${label}:${revisionId}`,
+      createdByActorType: 'SYSTEM',
+      createdBySystemActor: 'TASK9_AC6_RED_FIXTURE',
+      submittedAt: new Date('2026-08-01T00:00:00.000Z'),
+    },
+  });
+  await prisma.v1ResultEscalation.createMany({
+    data: [
+      {
+        id: reminderId,
+        resultRevisionId: revisionId,
+        kind: 'REMINDER',
+        dueAt: new Date(now.getTime() + dueOffsetMs),
+      },
+      {
+        id: escalationId,
+        resultRevisionId: revisionId,
+        kind: 'ESCALATION',
+        dueAt: new Date(now.getTime() + dueOffsetMs),
+      },
+    ],
+  });
+  return { revisionId, reminderId, escalationId };
+}
+
+async function acceptAc6SignupTerms(app: INestApplication, userIds: readonly string[]): Promise<void> {
+  const termsService = app.get(ManagedTermsRuntimeService);
+  const documentIds = (await termsService.currentSignupTerms()).items
+    .filter((item) => item.requirement === 'required')
+    .map((item) => item.documentId);
+  if (documentIds.length === 0) {
+    throw new Error('Task 9 AC6 fixture requires at least one required signup term');
+  }
+  await Promise.all(userIds.map((userId) => termsService.acceptSignupTerms(userId, documentIds)));
+}
+
+async function createAc6ReassignmentFixture(): Promise<{
+  reviewerTeamId: string;
+  teamMatchId: string;
+  gameId: string;
+  revisionId: string;
+  submittedOutboxId: string;
+  reminderOutboxId: string;
+}> {
+  const reviewerTeamId = randomUUID();
+  const teamMatchId = randomUUID();
+  const gameId = randomUUID();
+  const revisionId = randomUUID();
+  const submittedOutboxId = randomUUID();
+  const reminderOutboxId = randomUUID();
+  await prisma.v1Team.create({
+    data: {
+      id: reviewerTeamId,
+      ownerUserId: ids.supportUser,
+      sportId: ids.sport,
+      regionId: ids.region,
+      name: `Task 9 AC6 reviewer ${runId}`,
+    },
+  });
+  await prisma.v1TeamMembership.create({
+    data: { teamId: reviewerTeamId, userId: ids.supportUser, role: 'owner', status: 'active' },
+  });
+  await prisma.v1TeamMatch.create({
+    data: {
+      id: teamMatchId,
+      hostTeamId: ids.lane4HostTeam,
+      approvedApplicantTeamId: reviewerTeamId,
+      createdByUserId: ids.hostUser,
+      sportId: ids.sport,
+      regionId: ids.region,
+      title: `Task 9 AC6 reassignment ${runId}`,
+      placeName: 'Task 9 AC6 test ground',
+      startAt: new Date('2026-08-01T00:00:00.000Z'),
+      competitionConfigVersionId: ids.config,
+    },
+  });
+  await prisma.v1Game.create({
+    data: {
+      id: gameId,
+      sourceType: 'TEAM_MATCH',
+      teamMatchId,
+      state: 'ENDED',
+      version: 0,
+      competitionConfigVersionId: ids.config,
+    },
+  });
+  await prisma.v1GameResultRevision.create({
+    data: {
+      id: revisionId,
+      gameId,
+      revision: 1,
+      state: 'SUBMITTED',
+      score: { home: 0, away: 0 },
+      eventsHash: `${prefix}:ac6:reassignment:${revisionId}`,
+      createdByActorType: 'SYSTEM',
+      createdBySystemActor: 'TASK9_AC6_RED_FIXTURE',
+      submittedAt: new Date('2098-01-01T00:00:00.000Z'),
+    },
+  });
+  await prisma.v1OutboxEvent.create({
+    data: {
+      id: submittedOutboxId,
+      businessKey: `${prefix}:ac6:reassignment:submitted`,
+      aggregateType: 'GAME',
+      aggregateId: gameId,
+      revisionId,
+      type: 'GAME_RESULT_SUBMITTED',
+      payload: { gameId, revisionId },
+      availableAt: new Date('2000-01-01T00:00:00.000Z'),
+    },
+  });
+  await prisma.v1OutboxEvent.create({
+    data: {
+      id: reminderOutboxId,
+      businessKey: `${prefix}:ac6:reassignment:reminder`,
+      aggregateType: 'GAME',
+      aggregateId: gameId,
+      revisionId,
+      type: 'GAME_RESULT_REVIEW_REMINDER',
+      payload: { gameId, revisionId },
+      availableAt: new Date('2099-01-01T00:00:00.000Z'),
+    },
+  });
+  return { reviewerTeamId, teamMatchId, gameId, revisionId, submittedOutboxId, reminderOutboxId };
+}
+
+async function ac6ReassignmentObservation(fixture: {
+  teamMatchId: string;
+  revisionId: string;
+}): Promise<{
+  escalationId: string;
+  deliveries: Array<{ recipientUserId: string; count: number }>;
+}> {
+  const [escalation, deliveries] = await Promise.all([
+    prisma.v1ResultEscalation.findUniqueOrThrow({
+      where: { resultRevisionId_kind: { resultRevisionId: fixture.revisionId, kind: 'ESCALATION' } },
+      select: { id: true },
+    }),
+    prisma.v1Notification.groupBy({
+      by: ['recipientUserId'],
+      where: {
+        recipientUserId: { in: [ids.supportUser, ids.opponentUser] },
+        targetType: 'team_match',
+        targetId: fixture.teamMatchId,
+      },
+      _count: { _all: true },
+      orderBy: { recipientUserId: 'asc' },
+    }),
+  ]);
+  return {
+    escalationId: escalation.id,
+    deliveries: deliveries.map((delivery) => ({
+      recipientUserId: delivery.recipientUserId,
+      count: delivery._count._all,
+    })),
+  };
 }
 
 async function assertR7FixturePreconditions(requiredDocumentIds: readonly string[]): Promise<void> {

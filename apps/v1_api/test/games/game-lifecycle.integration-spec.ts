@@ -177,9 +177,6 @@ describe('Task 6 L1 game lifecycle', () => {
           grantedByUserId: ids.operatorUser,
         },
       });
-      await tx.v1TournamentStaffFixtureScope.create({
-        data: { assignmentId: ids.assignment, fixtureId: ids.fixture },
-      });
     });
     await prisma.v1GameOperationFlag.upsert({
       where: { key: 'PUBLIC_LIVE' },

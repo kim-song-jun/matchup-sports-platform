@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config';
 import { gameConfigData, gameSchemaFixture, gameSchemaSourceManifest, verifyGameSchemaSourceSnapshot } from '../fixtures/game-schema.fixture';
 
 const prisma = new PrismaClient();
@@ -41,14 +42,27 @@ function expectRawFailure(error: RawDatabaseError, sqlState: string, marker: str
 }
 
 async function insertConfig(id: string) {
-  const config = gameConfigData(id);
-  const name = id === gameSchemaFixture.secondConfigId ? 'football-v1-secondary' : config.name;
-  const version = id === gameSchemaFixture.secondConfigId ? 2 : config.version;
+  const name = id === gameSchemaFixture.secondConfigId
+    ? 'game-schema-football-v1-secondary'
+    : 'game-schema-football-v1';
+  const version = id === gameSchemaFixture.secondConfigId ? 2 : 1;
+  const config = {
+    ...gameConfigData(id),
+    sportCode: 'football',
+    name,
+    version,
+    periods: FOOTBALL_V1_CONFIG.periods,
+    events: FOOTBALL_V1_CONFIG.events,
+    lineup: FOOTBALL_V1_CONFIG.lineup,
+    result: FOOTBALL_V1_CONFIG.result,
+    tieBreak: FOOTBALL_V1_CONFIG.tieBreak,
+    visibility: FOOTBALL_V1_CONFIG.visibility,
+  };
   await prisma.$executeRaw`
     INSERT INTO v1_competition_config_versions
       (id, sport_code, name, version, status, periods, events, lineup, result, tie_break, visibility, content_hash, created_at, updated_at)
     VALUES
-      (${config.id}, ${config.sportCode}, ${name}, ${version}, 'ACTIVE', ${JSON.stringify(config.periods)}::jsonb,
+      (${config.id}, ${config.sportCode}, ${config.name}, ${config.version}, 'ACTIVE', ${JSON.stringify(config.periods)}::jsonb,
        ${JSON.stringify(config.events)}::jsonb, ${JSON.stringify(config.lineup)}::jsonb, ${JSON.stringify(config.result)}::jsonb,
        ${JSON.stringify(config.tieBreak)}::jsonb, ${JSON.stringify(config.visibility)}::jsonb, ${config.contentHash}, ${config.createdAt}, ${config.updatedAt})
     ON CONFLICT (sport_code, name, version) DO NOTHING

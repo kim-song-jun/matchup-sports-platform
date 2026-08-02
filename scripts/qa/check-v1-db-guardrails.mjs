@@ -3,7 +3,10 @@ import { existsSync, readFileSync } from 'node:fs';
 
 const deployFiles = [
   '.github/workflows/deploy.yml',
-  'deploy/restart-containers.sh',
+  // deploy/restart-containers.sh 는 prod ECR digest 고정 전환(deploy-prod.sh 가 activation +
+  // migrate + 컨테이너 교체를 전부 흡수)으로 삭제됐다 — 같은 검사 대상을 deploy-prod.sh 로
+  // 옮긴다.
+  'deploy/deploy-prod.sh',
   'deploy/setup-ec2.sh',
 ];
 

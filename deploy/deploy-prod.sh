@@ -219,19 +219,27 @@ if [[ "${had_active}" == false ]]; then
   cp "${PROD_RUNTIME_METADATA_FILE}" "${legacy_metadata_backup}"
 fi
 write_release_metadata "${PROD_MANIFEST_FILE}"
-"${compose[@]}" up -d v1_postgres
+# DB 가 인스턴스 밖(RDS)에 있으면 로컬 컨테이너를 띄우고 그것의 준비 상태를 기다리는 것은
+# 의미가 없다 — 앱이 접속하는 대상이 아니기 때문이다. V1_DB_HOST 가 기본값(v1_postgres)일
+# 때만 로컬 경로를 탄다. 전환 후에도 컨테이너와 볼륨은 남겨 두지만(롤백 창), 기동과 대기는
+# 건너뛴다.
+if [[ "${V1_DB_HOST:-v1_postgres}" == "v1_postgres" ]]; then
+  "${compose[@]}" up -d v1_postgres
 
-for attempt in $(seq 1 30); do
-  if "${compose[@]}" exec -T v1_postgres \
-    pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
-    break
-  fi
-  if [[ "${attempt}" -eq 30 ]]; then
-    echo "[prod-deploy] PostgreSQL did not become ready" >&2
-    false
-  fi
-  sleep 2
-done
+  for attempt in $(seq 1 30); do
+    if "${compose[@]}" exec -T v1_postgres \
+      pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
+      break
+    fi
+    if [[ "${attempt}" -eq 30 ]]; then
+      echo "[prod-deploy] PostgreSQL did not become ready" >&2
+      false
+    fi
+    sleep 2
+  done
+else
+  echo "[prod-deploy] 외부 DB(${V1_DB_HOST}) 사용 — 로컬 v1_postgres 기동을 건너뜁니다"
+fi
 
 # D7: prisma migrate deploy 는 이 스크립트 안에서 정확히 1회만 실행한다(구 restart-containers.sh
 # 의 이중 실행을 이번 변경에서 제거). alpha 와 달리 sanitize/QA 시드는 절대 이식하지 않는다

@@ -1,0 +1,82 @@
+name: Rollback Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_active_sha:
+        description: "되돌리기 전 현재 active로 보이는 40자리 커밋 SHA (compare-and-swap 안전장치)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    if: github.ref == 'refs/heads/main'
+    name: Rollback
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.PROD_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.PROD_AWS_REGION }}
+
+      - name: Verify production AWS target
+        id: target
+        env:
+          PROD_AWS_REGION: ${{ vars.PROD_AWS_REGION }}
+          PROD_EXPECTED_ACCOUNT_ID: ${{ vars.PROD_EXPECTED_ACCOUNT_ID }}
+          PROD_EC2_INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
+        run: bash scripts/release/verify-prod-aws-target.sh
+
+      - name: Sign in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
+
+      - name: Roll back active and previous manifests
+        timeout-minutes: 12
+        env:
+          EXPECTED_ACTIVE_SHA: ${{ inputs.expected_active_sha }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          AWS_REGION: ${{ vars.PROD_AWS_REGION }}
+          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
+        run: bash scripts/release/rollback-prod-via-ssm.sh
+
+      # rollback-prod.sh 는 EC2 안에서 이미 wait_for_prod_health_contract 로 로컬 헬스를
+      # 확인한 뒤에만 성공 리턴한다. 여기서는 §2-2 5번과 동일하게 "EC2 로컬은 성공했지만
+      # 네트워크 경로 문제로 퍼블릭엔 아직 안 나온" 케이스를 잡기 위해 러너에서 한 번 더
+      # 확인한다(deploy.yml Health check 스텝과 동일한 패턴).
+      - name: Verify public production release identity
+        env:
+          EXPECTED_ACTIVE_SHA: ${{ inputs.expected_active_sha }}
+        run: |
+          set -Eeuo pipefail
+          # 롤백은 "이전 릴리스로 돌아갔는지"가 핵심이라, 단순 200 확인으로는 부족하다.
+          # 퍼블릭 응답의 릴리스 SHA 가 롤백 전 active(=되돌리려던 그 SHA)와 **달라졌는지**를
+          # 본다. 같다면 컨테이너가 안 바뀐 것이므로 실패로 처리한다.
+          for i in $(seq 1 12); do
+            served="$(curl -fsSI --connect-timeout 5 --max-time 15 https://teameet.co.kr/ 2>/dev/null |
+              awk -F': ' 'tolower($1)=="x-teameet-commit"{gsub("\r","",$2); print $2}')"
+            code="$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' \
+              https://teameet.co.kr/landing 2>/dev/null || true)"
+            if [[ "${code}" == "200" && -n "${served}" && "${served}" != "${EXPECTED_ACTIVE_SHA}" ]]; then
+              echo "Rollback OK — 퍼블릭 응답이 ${served} 로 바뀌었습니다 (이전 active: ${EXPECTED_ACTIVE_SHA})"
+              exit 0
+            fi
+            echo "Attempt ${i}/12 — landing=${code:-?}, served=${served:-없음}, 10초 후 재시도..."
+            sleep 10
+          done
+          echo "Rollback FAILED — 퍼블릭 응답이 이전 릴리스로 바뀌지 않았습니다" >&2
+          exit 1

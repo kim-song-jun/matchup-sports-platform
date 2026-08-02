@@ -1,40 +1,200 @@
 #!/usr/bin/env bash
-# 프로덕션 릴리스 이미지 관리 헬퍼.
-#
-# `.github/workflows/deploy.yml` 의 build-images job 이 이 파일을 source 한다.
-# Sync code 스텝이 저장소 전체를 ~/teameet 로 rsync 한 뒤에 실행되므로 호스트에 존재한다.
-#
-# 워크플로 YAML 안의 heredoc 에 함수를 직접 적어 두면 테스트할 방법이 없다 — 그래서
-# main push 때만 도는 경로의 버그가 몇 주씩 발견되지 않았다(아래 참조). alpha 가
-# deploy/alpha-*-common.sh + scripts/qa/test-alpha-release-state.sh 로 쓰는 것과 같은
-# 구조로 분리해 scripts/qa/test-prod-release-prune.sh 가 실제로 호출할 수 있게 한다.
 
-# 릴리스 태그를 `keep` 개까지만 남긴다. 예전에는 dangling 이미지만 정리해도 됐지만
-# 이제 커밋 SHA 로 태그를 붙이므로 정리하지 않으면 디스크가 찬다.
-# `:latest` 는 마지막 '승인된' 배포를 가리키므로 절대 지우지 않는다.
-prune_stale_release_tags() {
-  local repo="$1"
-  local keep="$2"
+# 불변(immutable) prod 릴리스 상태 기계장치. deploy/alpha-release-common.sh 를 prod 용으로
+# 일반화한 것 — 호출자는 `set -Eeuo pipefail` 을 직접 설정하고, 런타임 헬퍼를 부르기 전에
+# 전역 `compose` 명령 배열을 정의해야 한다.
+#
+# 이 파일은 이전에는 `prune_stale_release_tags`(로컬 docker 이미지 SHA 태그 정리) 하나만
+# 담고 있었다(#220). 이번 변경으로 EC2 가 더 이상 로컬에서 `docker build`를 하지 않고
+# ECR digest 를 그대로 pull 만 하므로(요구사항 1·2), 로컬 SHA 태그가 쌓이는 문제 자체가
+# 구조적으로 사라진다 — 그래서 그 함수와 회귀 테스트(scripts/qa/test-prod-release-prune.sh)
+# 를 이번 변경에서 완전히 제거했다(CLAUDE.md 기술부채 원칙: 변경으로 인해 죽는 코드는 같은
+# 변경에서 청소한다). 대신 이 파일은 alpha 와 동일한 candidate→promote 원자 승격 상태
+# 기계장치를 담당한다.
 
-  # 여기서 grep -v 를 쓰면 안 된다. grep 은 출력이 한 줄도 없으면 exit 1 이고,
-  # 이 함수를 부르는 원격 스크립트는 `set -euo pipefail` 로 돈다 — 즉 "지울 게 없다"는
-  # 지극히 정상적인 상태가 배포 전체를 중단시킨다.
-  #
-  # 2026-08-01 에 실제로 그렇게 터졌다. 프로덕션 호스트에는 SHA 태그가 하나도 없고
-  # `:latest` 뿐이었으므로 grep -v 가 전부 걸러내 exit 1 → 배포 실패.
-  # 게다가 이 상태는 스스로 풀리지 않는다: 빌드가 막혀 SHA 태그가 영영 생기지 않으니
-  # 이후 모든 프로덕션 배포가 같은 지점에서 죽는 교착이 된다.
-  #
-  # awk 는 일치하는 줄이 없어도 0 을 반환하므로 실패 모드 자체가 사라진다.
-  # docker images 자체가 실패하는 경우는 pipefail 이 그대로 잡는다 — 진짜 오류를
-  # 덮는 `|| true` 와는 다르다.
-  sudo docker images --filter "reference=${repo}:*" \
-      --format '{{.CreatedAt}}|{{.Repository}}:{{.Tag}}' \
-    | awk -F'|' -v latest="${repo}:latest" '$2 != latest' \
-    | sort -r \
-    | awk -F'|' -v keep="${keep}" 'NR > keep { print $2 }' \
-    | while IFS= read -r stale_image; do
-        echo "[cleanup] dropping stale release tag ${stale_image}"
-        sudo docker rmi "${stale_image}" >/dev/null 2>&1 || true
-      done
+PROD_HOME_DIR="${PROD_HOME_DIR:-/home/ec2-user}"
+PROD_LIVE_DIR="${PROD_LIVE_DIR:-${PROD_HOME_DIR}/teameet}"
+PROD_RELEASE_STATE_DIR="${PROD_RELEASE_STATE_DIR:-${PROD_HOME_DIR}/.teameet-prod-releases}"
+PROD_RELEASE_STATE_FILE="${PROD_RELEASE_STATE_FILE:-${PROD_RELEASE_STATE_DIR}/state.json}"
+PROD_CANDIDATE_MANIFEST="${PROD_CANDIDATE_MANIFEST:-${PROD_RELEASE_STATE_DIR}/candidate.json}"
+PROD_FAILED_RELEASE_DIR="${PROD_FAILED_RELEASE_DIR:-${PROD_RELEASE_STATE_DIR}/failed}"
+PROD_LEGACY_STATE_FILE="${PROD_LEGACY_STATE_FILE:-${PROD_HOME_DIR}/.teameet-prod-release}"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-source-common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-manifest-common.sh"
+
+write_candidate_manifest() {
+  local manifest_file="$1"
+  local candidate_tmp
+
+  install -d -m 700 "${PROD_RELEASE_STATE_DIR}" "${PROD_FAILED_RELEASE_DIR}"
+  candidate_tmp="$(mktemp "${PROD_RELEASE_STATE_DIR}/candidate.XXXXXX")"
+  install -m 600 "${manifest_file}" "${candidate_tmp}"
+  mv "${candidate_tmp}" "${PROD_CANDIDATE_MANIFEST}"
+}
+
+promote_candidate_manifest() {
+  local previous_json='null'
+  local previous_checksum_json='null'
+  local candidate_checksum
+  local state_tmp
+
+  candidate_checksum="$(sha256sum "${PROD_CANDIDATE_MANIFEST}" | awk '{print $1}')"
+  if [[ -f "${PROD_RELEASE_STATE_FILE}" ]]; then
+    previous_json="$(jq -c '.active' "${PROD_RELEASE_STATE_FILE}")"
+    previous_checksum_json="$(jq -c '.activeManifestSha256' "${PROD_RELEASE_STATE_FILE}")"
+  fi
+
+  state_tmp="$(mktemp "${PROD_RELEASE_STATE_DIR}/state.XXXXXX")"
+  jq -n \
+    --slurpfile candidate "${PROD_CANDIDATE_MANIFEST}" \
+    --arg candidateChecksum "${candidate_checksum}" \
+    --argjson previous "${previous_json}" \
+    --argjson previousChecksum "${previous_checksum_json}" \
+    --arg updatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{schemaVersion: 1, active: $candidate[0], activeManifestSha256: $candidateChecksum, previous: $previous, previousManifestSha256: $previousChecksum, updatedAt: $updatedAt}' \
+    > "${state_tmp}"
+  chmod 600 "${state_tmp}"
+  mv "${state_tmp}" "${PROD_RELEASE_STATE_FILE}"
+  rm -f "${PROD_CANDIDATE_MANIFEST}"
+}
+
+extract_active_manifest() {
+  local output_file="$1"
+  jq -e '.active' "${PROD_RELEASE_STATE_FILE}" > "${output_file}"
+  chmod 600 "${output_file}"
+}
+
+extract_previous_manifest() {
+  local output_file="$1"
+  jq -e '.previous | select(. != null)' "${PROD_RELEASE_STATE_FILE}" > "${output_file}"
+  chmod 600 "${output_file}"
+}
+
+swap_active_previous_manifests() {
+  local previous_tmp
+
+  previous_tmp="$(mktemp "${PROD_RELEASE_STATE_DIR}/previous.XXXXXX")"
+  extract_previous_manifest "${previous_tmp}"
+  write_candidate_manifest "${previous_tmp}"
+  rm -f "${previous_tmp}"
+  promote_candidate_manifest
+}
+
+archive_failed_candidate() {
+  local failed_sha='unknown'
+  local failed_path
+
+  if [[ ! -f "${PROD_CANDIDATE_MANIFEST}" ]]; then
+    return
+  fi
+  failed_sha="$(jq -r '.release.sha // "unknown"' "${PROD_CANDIDATE_MANIFEST}")"
+  failed_path="${PROD_FAILED_RELEASE_DIR}/${failed_sha}-$(date -u +%Y%m%dT%H%M%SZ).json"
+  mv "${PROD_CANDIDATE_MANIFEST}" "${failed_path}"
+  chmod 600 "${failed_path}"
+}
+
+write_release_metadata() {
+  local manifest_file="$1"
+  local metadata_snippet="${PROD_RUNTIME_METADATA_FILE}"
+  local metadata_tmp
+  local release_version
+  local release_sha
+
+  release_version="$(jq -er '.release.version' "${manifest_file}")"
+  release_sha="$(jq -er '.release.sha' "${manifest_file}")"
+  metadata_tmp="$(mktemp)"
+  printf 'add_header X-Teameet-Release "%s" always;\nadd_header X-Teameet-Commit "%s" always;\n' \
+    "${release_version}" \
+    "${release_sha}" > "${metadata_tmp}"
+  chmod 644 "${metadata_tmp}"
+  mv "${metadata_tmp}" "${metadata_snippet}"
+}
+
+pull_release_images() {
+  sudo docker pull "${V1_API_IMAGE}" || return 1
+  sudo docker pull "${V1_WEB_IMAGE}" || return 1
+}
+
+# D5: prod compose 에는 v1_game_operations_worker 가 없다 — v1_api/v1_web 2개만 확인한다.
+assert_running_release_digests() {
+  local api_container
+  local web_container
+  local running_api_image
+  local running_web_image
+
+  api_container="$("${compose[@]}" ps -q v1_api)" || return 1
+  web_container="$("${compose[@]}" ps -q v1_web)" || return 1
+  [[ -n "${api_container}" && -n "${web_container}" ]] || return 1
+  running_api_image="$(sudo docker inspect --format '{{.Config.Image}}' "${api_container}")" || return 1
+  running_web_image="$(sudo docker inspect --format '{{.Config.Image}}' "${web_container}")" || return 1
+  [[ "${running_api_image}" == "${V1_API_IMAGE}" ]] || return 1
+  [[ "${running_web_image}" == "${V1_WEB_IMAGE}" ]] || return 1
+}
+
+check_prod_health_contract() {
+  local headers
+  local deployed_release
+  local deployed_sha
+
+  if ! curl -fsS --connect-timeout 3 --max-time 10 \
+    http://127.0.0.1:8121/api/v1/health |
+    jq -e '.data.checks.db == true' >/dev/null; then
+    return 1
+  fi
+  headers="$(curl -fsSI --connect-timeout 3 --max-time 10 \
+    https://teameet.co.kr/landing)" || return 1
+  deployed_release="$(awk -F': ' 'tolower($1) == "x-teameet-release" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
+  deployed_sha="$(awk -F': ' 'tolower($1) == "x-teameet-commit" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
+  [[ "${deployed_release}" == "${PROD_RELEASE_VERSION}" ]] || return 1
+  [[ "${deployed_sha}" == "${PROD_RELEASE_SHA}" ]] || return 1
+  [[ "$(curl -sS --connect-timeout 3 --max-time 10 -o /dev/null -w '%{http_code}' \
+    https://teameet.co.kr/v1/home)" == "308" ]] || return 1
+  [[ "$(curl -sS --connect-timeout 3 --max-time 10 -o /dev/null -w '%{http_code}' \
+    https://teameet.co.kr/landing)" == "200" ]] || return 1
+}
+
+wait_for_prod_health_contract() {
+  for attempt in $(seq 1 36); do
+    if check_prod_health_contract; then
+      return
+    fi
+    if [[ "${attempt}" -eq 36 ]]; then
+      echo "[prod-release] Health contract failed" >&2
+      return 1
+    fi
+    sleep 5
+  done
+}
+
+restore_active_release() {
+  local active_tmp
+  local active_sha
+  local active_checksum
+
+  active_tmp="$(mktemp "${PROD_RELEASE_STATE_DIR}/active.XXXXXX")"
+  extract_active_manifest "${active_tmp}" || return 1
+  active_checksum="$(jq -er '.activeManifestSha256' "${PROD_RELEASE_STATE_FILE}")" || return 1
+  validate_stored_prod_manifest "${active_tmp}" "${PROD_ECR_REGISTRY}" "${active_checksum}" || return 1
+  active_sha="$(jq -er '.release.sha' "${active_tmp}")" || return 1
+  activate_prod_release_source "${active_sha}" || return 1
+  load_prod_release_manifest "${active_tmp}" || return 1
+  pull_release_images || return 1
+  write_release_metadata "${active_tmp}" || return 1
+  "${compose[@]}" up -d --no-deps v1_api v1_web || return 1
+  "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
+  wait_for_prod_health_contract || return 1
+  assert_running_release_digests || return 1
+  rm -f "${active_tmp}" || return 1
+}
+
+write_legacy_release_state() {
+  local state_tmp
+
+  state_tmp="$(mktemp)"
+  printf 'release=%s\nsha=%s\ndeployed_at=%s\n' \
+    "${PROD_RELEASE_VERSION}" \
+    "${PROD_RELEASE_SHA}" \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${state_tmp}"
+  chmod 600 "${state_tmp}"
+  mv "${state_tmp}" "${PROD_LEGACY_STATE_FILE}"
 }

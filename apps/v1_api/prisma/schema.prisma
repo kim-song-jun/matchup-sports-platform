@@ -447,14 +447,15 @@ enum V1CompetitionConfigStatus {
 }
 
 enum V1EscalationKind {
-  REMINDER
   ESCALATION
+  REMINDER
 }
 
 enum V1EscalationStatus {
   PENDING
   ACKNOWLEDGED
   RESOLVED
+  CLOSED
 }
 
 enum V1OperationActorType {
@@ -539,6 +540,8 @@ model V1User {
   verificationTokens             V1VerificationToken[]
   inquiries                      V1Inquiry[]
   uploadAssets                   V1UploadAsset[]
+  acknowledgedResultEscalations V1ResultEscalation[]          @relation("V1EscalationAcknowledgedBy")
+  resolvedResultEscalations     V1ResultEscalation[]          @relation("V1EscalationResolvedBy")
 
   @@index([accountStatus])
   @@index([onboardingStatus])
@@ -1472,6 +1475,7 @@ model V1ChatMessage {
 
 model V1Notification {
   id              String                   @id @default(uuid())
+  businessKey     String?                  @unique @map("business_key")
   recipientUserId String                   @map("recipient_user_id")
   targetType      V1NotificationTargetType @map("target_type")
   targetId        String?                  @map("target_id")
@@ -1909,6 +1913,7 @@ model V1Tournament {
   staffAssignments  V1TournamentStaffAssignment[]
   operationAudits   V1OperationAudit[]
   advancementEdges  V1TournamentFixtureAdvancementEdge[]
+  officialResultCaches V1GameOfficialResultCache[]
 
   @@index([status, scheduledAt])
   @@index([sportId, status])
@@ -2340,6 +2345,7 @@ model V1Game {
   events                     V1GameEvent[]
   resultRevisions            V1GameResultRevision[]     @relation("V1GameResultRevisions")
   visibilityPolicy           V1GameVisibilityPolicy?
+  officialResultCaches       V1GameOfficialResultCache[]
   competitionConfig          V1CompetitionConfigVersion @relation("V1GameCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_games_competition_config_fk")
 
   @@unique([id, currentOfficialRevisionId], map: "v1_games_id_current_official_revision_key")
@@ -2511,6 +2517,8 @@ model V1GameResultRevision {
   resultParticipants   V1GameResultParticipant[]
   officialFact         V1GameOfficialFact?
   teamRecordFacts      V1TeamRecordFact[]
+  resultEscalations    V1ResultEscalation[]
+  officialResultCache  V1GameOfficialResultCache?
 
   @@unique([gameId, revision], map: "v1_game_result_revisions_game_revision_key")
   @@unique([gameId, id], map: "v1_game_result_revisions_game_id_id_key")
@@ -2541,6 +2549,29 @@ model V1GameOfficialFact {
   @@index([homeTeamId, officialAt], map: "v1_game_official_facts_home_team_official_at_idx")
   @@index([awayTeamId, officialAt], map: "v1_game_official_facts_away_team_official_at_idx")
   @@map("v1_game_official_facts")
+}
+
+model V1GameOfficialResultCache {
+  id               String               @id @default(uuid())
+  revisionId       String               @unique(map: "v1_game_official_result_cache_revision_key") @map("revision_id")
+  gameId           String               @map("game_id")
+  tournamentId     String?              @map("tournament_id")
+  revision         Int
+  visibilityMode   V1VisibilityMode     @map("visibility_mode")
+  isCurrent        Boolean              @default(false) @map("is_current")
+  sourceHash       String               @map("source_hash")
+  canonicalPayload Json                 @map("canonical_payload")
+  payloadHash      String               @map("payload_hash")
+  cachedAt         DateTime             @default(now()) @map("cached_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  resultRevision   V1GameResultRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict, map: "v1_game_official_result_cache_revision_fk")
+  game             V1Game               @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_official_result_cache_game_fk")
+  tournament       V1Tournament?        @relation(fields: [tournamentId], references: [id], onDelete: Restrict, map: "v1_game_official_result_cache_tournament_fk")
+
+  @@unique([gameId, revision], map: "v1_game_official_result_cache_game_revision_key")
+  @@index([gameId, isCurrent], map: "v1_game_official_result_cache_current_idx")
+  @@index([tournamentId, isCurrent], map: "v1_game_official_result_cache_tournament_current_idx")
+  @@map("v1_game_official_result_cache")
 }
 
 model V1TeamRecordFact {
@@ -2823,8 +2854,12 @@ model V1ResultEscalation {
   ackByUserId      String?            @map("ack_by_user_id")
   resolvedByUserId String?            @map("resolved_by_user_id")
   reason           String?
+  version          Int                @default(0)
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
+  resultRevision   V1GameResultRevision @relation(fields: [resultRevisionId], references: [id], onDelete: Restrict, map: "v1_result_escalations_revision_fk")
+  acknowledgedBy   V1User?              @relation("V1EscalationAcknowledgedBy", fields: [ackByUserId], references: [id], onDelete: Restrict, map: "v1_result_escalations_ack_user_fk")
+  resolvedBy       V1User?              @relation("V1EscalationResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: Restrict, map: "v1_result_escalations_resolved_user_fk")
 
   @@unique([resultRevisionId, kind], map: "v1_result_escalations_revision_kind_key")
   @@index([status, dueAt], map: "v1_result_escalations_status_due_idx")

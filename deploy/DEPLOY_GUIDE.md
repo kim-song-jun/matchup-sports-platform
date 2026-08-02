@@ -55,11 +55,15 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 
 필수 GitHub Actions secret:
 
+> **2026-08-02 변경**: 프로덕션 배포는 더 이상 SSH를 쓰지 않는다. 러너는 OIDC로 단기
+> 자격증명을 얻어 S3에 릴리스를 올리고 SSM으로 EC2에 명령한다. `EC2_HOST` ·
+> `EC2_SSH_KEY` · `EC2_KNOWN_HOSTS`는 **프로덕션 배포에 더 이상 필요하지 않다**
+> (운영자 수동 접속용으로 남겨 둘 수는 있다). 대신 아래 repository **variable**이 필요하다:
+> `PROD_AWS_ROLE_ARN` · `PROD_AWS_REGION` · `PROD_DEPLOY_BUCKET` ·
+> `PROD_EC2_INSTANCE_ID` · `PROD_EXPECTED_ACCOUNT_ID`.
+
 | 이름 | 책임 |
 |---|---|
-| `EC2_HOST` | 배포 대상 EC2 주소 |
-| `EC2_SSH_KEY` | EC2 SSH private key |
-| `EC2_KNOWN_HOSTS` | 신뢰한 EC2 SSH host public key를 담은 known_hosts 한 줄 이상 |
 | `TOSS_CLIENT_KEY` | 결제 client key, 선택 |
 | `TOSS_SECRET_KEY` | 결제 server key, 선택 |
 | `TOSS_WEBHOOK_SECRET` | 결제 webhook 검증 key, 선택 |

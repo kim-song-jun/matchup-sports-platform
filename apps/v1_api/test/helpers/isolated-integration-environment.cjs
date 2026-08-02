@@ -159,7 +159,7 @@ async function recoverStaleClones(
     await maintenance.$transaction(
       async (transaction) => {
         const lockRows = await transaction.$queryRawUnsafe(
-          'SELECT pg_try_advisory_xact_lock($1, $2) AS acquired',
+          'SELECT pg_try_advisory_xact_lock($1::integer, $2::integer) AS acquired',
           ...RECOVERY_LOCK_KEYS,
         );
         if (lockRows.length !== 1 || lockRows[0].acquired !== true) {

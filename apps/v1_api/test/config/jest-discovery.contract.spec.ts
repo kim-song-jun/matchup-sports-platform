@@ -182,6 +182,67 @@ describe('v1_api Jest integration discovery contract', () => {
     );
   });
 
+  it('uses a real transaction-scoped advisory lock and fails closed when another recovery holds it', async () => {
+    const sourceDatabaseUrl = process.env.DATABASE_URL;
+    if (sourceDatabaseUrl === undefined) {
+      throw new Error('DATABASE_URL is required for the integration recovery contract.');
+    }
+    const maintenanceDatabaseUrl = recoveryContract.approvedMaintenanceUrl(sourceDatabaseUrl);
+    const sourceDatabaseName = decodeURIComponent(new URL(sourceDatabaseUrl).pathname.slice(1));
+    const maintenance = new PrismaClient({ datasourceUrl: maintenanceDatabaseUrl });
+    const blocker = new PrismaClient({ datasourceUrl: maintenanceDatabaseUrl });
+    let releaseLock = () => undefined;
+    let reportLockReady = () => undefined;
+    let reportLockFailure = (_error: unknown) => undefined;
+    const lockReleased = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const lockReady = new Promise<void>((resolve, reject) => {
+      reportLockReady = resolve;
+      reportLockFailure = reject;
+    });
+    const blockerTransaction = blocker.$transaction(
+      async (transaction) => {
+        const lockRows = await transaction.$queryRawUnsafe<Array<{ acquired: boolean }>>(
+          'SELECT pg_try_advisory_xact_lock(782091::integer, 9::integer) AS acquired',
+        );
+        expect(lockRows).toHaveLength(1);
+        expect(lockRows[0].acquired).toBe(true);
+        reportLockReady();
+        await lockReleased;
+      },
+      { timeout: recoveryContract.DROP_TIMEOUT_SECONDS * 4000 },
+    );
+    void blockerTransaction.catch(reportLockFailure);
+
+    try {
+      await lockReady;
+      await expect(
+        recoveryContract.recoverStaleClones(
+          maintenance,
+          maintenanceDatabaseUrl,
+          '',
+          sourceDatabaseName,
+        ),
+      ).rejects.toThrow('Integration database recovery lock is already held.');
+
+      releaseLock();
+      await blockerTransaction;
+      await expect(
+        recoveryContract.recoverStaleClones(
+          maintenance,
+          maintenanceDatabaseUrl,
+          '',
+          sourceDatabaseName,
+        ),
+      ).resolves.toBeUndefined();
+    } finally {
+      releaseLock();
+      await blockerTransaction.catch(() => undefined);
+      await Promise.all([maintenance.$disconnect(), blocker.$disconnect()]);
+    }
+  });
+
   it('removes an expired unleased clone while preserving live, current, and prefix-near databases', async () => {
     const sourceDatabaseUrl = process.env.DATABASE_URL;
     if (sourceDatabaseUrl === undefined) {

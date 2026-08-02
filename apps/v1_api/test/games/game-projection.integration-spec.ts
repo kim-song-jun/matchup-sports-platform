@@ -4,6 +4,7 @@ import { OperationAuditWriterService } from '../../src/common/audit/operation-au
 import { GamesService } from '../../src/games/games.service';
 import {
   GAME_OPERATION_RETRY_DELAYS_MS,
+  type GameOperationClaim,
   V1GameOperationsWorkerService,
 } from '../../src/jobs/v1-game-operations-worker.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -14,6 +15,7 @@ const games = new GamesService(prisma, new OperationAuditWriterService());
 const runId = randomUUID();
 const prefix = `task9:${runId}`;
 let tournamentOutboxId = '';
+const DIAGNOSTIC_WORKER_TIMEOUT_MS = 5_000;
 
 const ids = {
   hostUser: '79000000-0000-4000-8000-000000000001',
@@ -59,63 +61,29 @@ const ids = {
   bracketDeliveryA: '79000000-0000-4000-8000-000000000054',
   bracketDeliveryB: '79000000-0000-4000-8000-000000000055',
   bracketConflictDelivery: '79000000-0000-4000-8000-000000000056',
+  lane4Revision: '79000000-0000-4000-8000-000000000057',
+  lane4HostTeam: '79000000-0000-4000-8000-000000000060',
+  lane4OpponentTeam: '79000000-0000-4000-8000-000000000061',
+  lane4Match: '79000000-0000-4000-8000-000000000062',
+  lane4Game: '79000000-0000-4000-8000-000000000063',
+  lane4HomeSide: '79000000-0000-4000-8000-000000000064',
+  lane4AwaySide: '79000000-0000-4000-8000-000000000065',
+  lane4TerminalApprovedRevision: '79000000-0000-4000-8000-000000000067',
+  lane4Lineup: '79000000-0000-4000-8000-00000000006a',
+  lane4Participant: '79000000-0000-4000-8000-00000000006b',
+  lane4DirectorAssignment: '79000000-0000-4000-8000-00000000006c',
+  lane4SubmittedReplay: '79000000-0000-4000-8000-00000000006d',
 } as const;
 
-type OfficialProjectionRuntime = {
-  projectOfficialResult(input: { outboxEventId: string; deliveredSequence: number }): Promise<unknown>;
-  reconcileOfficialResult(input: {
-    revisionId: string;
-    expectedCount: number;
-    expectedHash: string;
-    actorUserId: string;
-    reason: string;
-    failBeforeWatermark?: boolean;
-  }): Promise<{ mismatchDetected: boolean; repaired: boolean }>;
-  getTeamRecordTotals(input: {
-    teamId: string;
-    utcYear: number;
-    tournamentId?: string;
-  }): Promise<{
-    calendarYear: { played: number; won: number; drawn: number; lost: number };
-    tournament: { played: number; won: number; drawn: number; lost: number } | null;
-    lifetime: { played: number; won: number; drawn: number; lost: number };
-  }>;
-  getProjectionHealth(input: { entityType: string; entityId: string }): Promise<{
-    visibleStatuses: string[];
-    currentStatuses: string[];
-  }>;
-  configureBracketEdges(input: {
-    actorUserId: string;
-    edges: Array<{
-      sourceFixtureId: string;
-      outcome: 'WINNER' | 'LOSER';
-      targetFixtureId: string;
-      targetSide: 'HOME' | 'AWAY';
-    }>;
-  }): Promise<unknown>;
-  setVisibilityMode(input: {
-    gameId: string;
-    mode: 'HIDDEN' | 'OFFICIAL_ONLY';
-    actorUserId: string;
-    expectedVersion: number;
-  }): Promise<unknown>;
-  getPublicProjection(input: { gameId: string }): Promise<{
-    lineup: unknown | null;
-    events: unknown[];
-    pendingResult: unknown | null;
-    officialResult: { revisionId: string } | null;
-    records: { revisionId: string } | null;
-  }>;
-};
+class DiagnosticGameOperationsWorker extends V1GameOperationsWorkerService {
+  readonly claims: GameOperationClaim[] = [];
 
-type EscalationRuntime = {
-  materializeDue(now: Date): Promise<{ reminders: number; escalations: number }>;
-  closeForRevision(revisionId: string, reason: string): Promise<unknown>;
-  list(input: { actorUserId: string; status?: string }): Promise<{ items: Array<{ id: string }> }>;
-  detail(input: { escalationId: string; actorUserId: string }): Promise<{ id: string; resultRevisionId: string }>;
-  acknowledge(input: { escalationId: string; actorUserId: string; expectedVersion: number; reason: string }): Promise<unknown>;
-  resolve(input: { escalationId: string; actorUserId: string; expectedVersion: number; reason: string }): Promise<unknown>;
-};
+  override async claimOne(): Promise<GameOperationClaim | null> {
+    const claim = await super.claimOne();
+    if (claim) this.claims.push({ ...claim });
+    return claim;
+  }
+}
 
 describe('Task 9 game projection real-database contract', () => {
   let officialOutboxId = '';
@@ -605,46 +573,68 @@ describe('Task 9 game projection real-database contract', () => {
       });
     });
 
-    it.skip('[RED] persisted HIDDEN denies every public field while OFFICIAL_ONLY exposes only official result and records', async () => {
-      const runtime = loadTask9Runtime<OfficialProjectionRuntime>(
-        '../../src/games/projections/game-projection.service',
-        'GameProjectionService',
+    it('[RED-L4] actual result submission is delivered once to the current reviewer and never exposes pending facts publicly', async () => {
+      const frozenSubmittedAt = new Date('2026-08-01T00:00:00.000Z');
+      const sharedBefore = await sharedFixtureSnapshot();
+      await games.submitResultRevision(
+        authUser(ids.hostUser),
+        ids.lane4Game,
+        ids.lane4Revision,
+        `${prefix}:lane4-submit`,
+        { expectedVersion: 0, clientCommandId: `${prefix}:lane4-submit` },
       );
-      if (runtime.setVisibilityMode) {
-        await runtime.setVisibilityMode({ gameId: ids.game, mode: 'HIDDEN', actorUserId: ids.opsUser, expectedVersion: 0 });
+      await prisma.v1GameResultRevision.update({
+        where: { id: ids.lane4Revision },
+        data: { submittedAt: frozenSubmittedAt },
+      });
+      const submitted = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: ids.lane4Revision } });
+      const outbox = await prisma.v1OutboxEvent.findUniqueOrThrow({
+        where: { businessKey: `game:${ids.lane4Game}:revision:1:submitted` },
+      });
+      let processed = false;
+      let delivery: Awaited<ReturnType<typeof outboxState>>;
+      try {
+        const diagnostic = await processExactOutboxEvent(outbox.id, 'lane4-submitted');
+        processed = diagnostic.processed;
+        delivery = await outboxState(outbox.id);
+      } finally {
+        await isolateLane4Outbox([outbox.id]);
+        await assertNoWorkerResidue('lane4-submitted');
       }
-      const hiddenMode = await persistedVisibilityMode(ids.game);
-      const hidden = runtime.getPublicProjection ? await runtime.getPublicProjection({ gameId: ids.game }) : null;
-      if (runtime.setVisibilityMode) {
-        await runtime.setVisibilityMode({
-          gameId: ids.game,
-          mode: 'OFFICIAL_ONLY',
-          actorUserId: ids.opsUser,
-          expectedVersion: 1,
-        });
-      }
-      const officialOnlyMode = await persistedVisibilityMode(ids.game);
-      const officialOnly = runtime.getPublicProjection ? await runtime.getPublicProjection({ gameId: ids.game }) : null;
+      const isolatedDelivery = await outboxState(outbox.id);
+      const reviewerNotifications = await prisma.v1Notification.findMany({
+        where: { recipientUserId: ids.opponentUser, targetType: 'team_match', targetId: ids.lane4Match },
+        select: { recipientUserId: true, targetType: true, targetId: true },
+      });
+      const pendingPublicFacts = await futureFactCount('v1_game_official_facts', ids.lane4Revision);
+      const sharedAfter = await sharedFixtureSnapshot();
+      process.stdout.write(`TASK9_RED_L4_SUBMITTED=${JSON.stringify({
+        outboxId: outbox.id,
+        observedStatus: delivery!.status,
+        observedAttempts: delivery!.attempts,
+        observedLastError: delivery!.lastError,
+        isolatedStatus: isolatedDelivery.status,
+        submittedAt: submitted.submittedAt?.toISOString(),
+        sharedFixtureUnchanged: JSON.stringify(sharedAfter) === JSON.stringify(sharedBefore),
+      })}\n`);
 
+      expect(sharedAfter).toEqual(sharedBefore);
       expect({
-        visibilityRuntimeAvailable:
-          typeof runtime.setVisibilityMode === 'function' && typeof runtime.getPublicProjection === 'function',
-        hiddenMode,
-        hidden,
-        officialOnlyMode,
-        officialOnly,
+        submitted: { state: submitted.state, submittedAt: submitted.submittedAt?.toISOString() },
+        outboxType: outbox.type,
+        processed,
+        delivery: { status: delivery!.status, attempts: delivery!.attempts, lastError: delivery!.lastError },
+        reviewerNotifications,
+        pendingPublicFacts,
       }).toEqual({
-        visibilityRuntimeAvailable: true,
-        hiddenMode: 'HIDDEN',
-        hidden: { lineup: null, events: [], pendingResult: null, officialResult: null, records: null },
-        officialOnlyMode: 'OFFICIAL_ONLY',
-        officialOnly: {
-          lineup: null,
-          events: [],
-          pendingResult: null,
-          officialResult: { revisionId: ids.revision },
-          records: { revisionId: ids.revision },
-        },
+        submitted: { state: 'SUBMITTED', submittedAt: frozenSubmittedAt.toISOString() },
+        outboxType: 'GAME_RESULT_SUBMITTED',
+        processed: true,
+        delivery: { status: 'COMPLETED', attempts: 1, lastError: null },
+        reviewerNotifications: [
+          { recipientUserId: ids.opponentUser, targetType: 'team_match', targetId: ids.lane4Match },
+        ],
+        pendingPublicFacts: 0,
       });
     });
 
@@ -689,11 +679,17 @@ describe('Task 9 game projection real-database contract', () => {
       let event: Awaited<ReturnType<typeof outboxState>>;
       let after: Awaited<ReturnType<typeof projectionTransactionSnapshot>>;
       try {
-        processed = await productionWorker().processOne();
+        const diagnostic = await processExactOutboxEvent(
+          officialOutboxId,
+          'lane2-watermark-trigger',
+          { triggerMayExist: true },
+        );
+        processed = diagnostic.processed;
         event = await outboxState(officialOutboxId);
         after = await projectionTransactionSnapshot(ids.revision);
       } finally {
         await removeWatermarkFailureTrigger();
+        await assertNoWorkerResidue('lane2-watermark-trigger');
       }
 
       expect({
@@ -709,155 +705,261 @@ describe('Task 9 game projection real-database contract', () => {
       });
     });
 
-    it.skip('[RED] frozen +23:59/+24h/+47:59/+48h boundaries materialize exactly one reminder and escalation', async () => {
+    it('[RED-L4] frozen +24h/+48h worker reruns materialize one reviewer reminder and one actor-neutral ops queue item', async () => {
       const submittedAt = new Date('2026-08-01T00:00:00.000Z');
+      const sharedBefore = await sharedFixtureSnapshot();
       await prisma.$executeRaw`
         UPDATE v1_game_result_revisions
         SET state = 'SUBMITTED', submitted_at = ${submittedAt}, official_at = NULL
-        WHERE id = ${ids.slaRevision}
+        WHERE id = ${ids.lane4Revision}
       `;
-      await prisma.v1ResultEscalation.deleteMany({ where: { resultRevisionId: ids.slaRevision } });
-
-      const runtime = loadTask9Runtime<EscalationRuntime>(
-        '../../src/jobs/result-escalation/result-escalation.service',
-        'ResultEscalationService',
-      );
-      if (runtime.materializeDue) await runtime.materializeDue(new Date('2026-08-01T23:59:00.000Z'));
-      expect(await escalationCounts(ids.slaRevision)).toEqual({ reminders: 0, escalations: 0 });
-      if (runtime.materializeDue) await runtime.materializeDue(new Date('2026-08-02T00:00:00.000Z'));
-      if (runtime.materializeDue) await runtime.materializeDue(new Date('2026-08-02T23:59:00.000Z'));
-      expect(await escalationCounts(ids.slaRevision)).toEqual({ reminders: 1, escalations: 0 });
-      if (runtime.materializeDue) await runtime.materializeDue(new Date('2026-08-03T00:00:00.000Z'));
-      if (runtime.materializeDue) await runtime.materializeDue(new Date('2026-08-03T00:00:00.000Z'));
-      expect({
-        materializeRuntimeAvailable: typeof runtime.materializeDue === 'function',
-        counts: await escalationCounts(ids.slaRevision),
-      }).toEqual({ materializeRuntimeAvailable: true, counts: { reminders: 1, escalations: 1 } });
-    });
-
-    it.skip('[RED] superseded, approved, change-requested, and cancelled revisions independently close prior SLA jobs', async () => {
-      const cases = [
-        { revisionId: ids.terminalSupersededRevision, reason: 'superseded' },
-        { revisionId: ids.terminalApprovedRevision, reason: 'approved' },
-        { revisionId: ids.terminalChangeRequestedRevision, reason: 'change_requested' },
-        { revisionId: ids.terminalCancelledRevision, reason: 'cancelled' },
-      ];
-      const runtime = loadTask9Runtime<EscalationRuntime>(
-        '../../src/jobs/result-escalation/result-escalation.service',
-        'ResultEscalationService',
-      );
-      const results: Array<{ revisionId: string; reason: string; open: number; closedReasons: string[] }> = [];
-      for (const terminal of cases) {
-        await seedEscalationRows(terminal.revisionId);
-        if (runtime.closeForRevision) await runtime.closeForRevision(terminal.revisionId, terminal.reason);
-        const rows = await prisma.v1ResultEscalation.findMany({
-          where: { resultRevisionId: terminal.revisionId },
-          orderBy: { kind: 'asc' },
-        });
-        results.push({
-          revisionId: terminal.revisionId,
-          reason: terminal.reason,
-          open: rows.filter((row) => row.status === 'PENDING' || row.status === 'ACKNOWLEDGED').length,
-          closedReasons: rows.map((row) => row.reason ?? ''),
-        });
+      const outbox = await prisma.v1OutboxEvent.findUniqueOrThrow({
+        where: { businessKey: `game:${ids.lane4Game}:revision:1:submitted` },
+      });
+      await prisma.v1TeamMembership.update({
+        where: { teamId_userId: { teamId: ids.lane4OpponentTeam, userId: ids.opponentUser } },
+        data: { status: 'removed', removedByUserId: ids.opsUser, leftAt: new Date('2026-08-02T00:00:00.000Z') },
+      });
+      await prisma.v1Team.update({ where: { id: ids.lane4OpponentTeam }, data: { ownerUserId: ids.supportUser } });
+      await prisma.v1TeamMembership.create({
+        data: { teamId: ids.lane4OpponentTeam, userId: ids.supportUser, role: 'manager', status: 'active' },
+      });
+      await resetOfficialDelivery(outbox.id, { revisionId: ids.lane4Revision });
+      let delivery: Awaited<ReturnType<typeof outboxState>>;
+      let diagnostic: ExactWorkerDiagnostic;
+      try {
+        diagnostic = await processExactOutboxEvent(outbox.id, 'lane4-due');
+        delivery = await outboxState(outbox.id);
+      } finally {
+        await isolateLane4Outbox([outbox.id]);
+        await assertNoWorkerResidue('lane4-due');
       }
-
-      expect({ closeRuntimeAvailable: typeof runtime.closeForRevision === 'function', results }).toEqual({
-        closeRuntimeAvailable: true,
-        results: cases.map((terminal) => ({
-          ...terminal,
-          open: 0,
-          closedReasons: [terminal.reason, terminal.reason],
-        })),
+      const rows = await prisma.v1ResultEscalation.findMany({
+        where: { resultRevisionId: ids.lane4Revision },
+        orderBy: { kind: 'asc' },
+        select: { id: true, kind: true, status: true, dueAt: true, ackByUserId: true, resolvedByUserId: true },
       });
-    });
-
-    it.skip('[RED] escalation list/detail/ack/resolve enforces role, validation, version, and audit lifecycle', async () => {
-      await seedEscalationRows(ids.slaRevision);
-      await prisma.v1ResultEscalation.updateMany({
-        where: { resultRevisionId: ids.slaRevision, kind: 'REMINDER' },
-        data: { status: 'RESOLVED', resolvedByUserId: ids.opsUser, reason: 'reminder-complete' },
-      });
-      const row = await prisma.v1ResultEscalation.findFirstOrThrow({
-        where: { resultRevisionId: ids.slaRevision, kind: 'ESCALATION' },
-      });
-      await prisma.v1ResultEscalation.update({
-        where: { id: row.id },
-        data: { status: 'PENDING', ackByUserId: null, resolvedByUserId: null, reason: null },
-      });
-      const runtime = loadTask9Runtime<EscalationRuntime>(
-        '../../src/jobs/result-escalation/result-escalation.service',
-        'ResultEscalationService',
-      );
-      const list = runtime.list
-        ? await runtime.list({ actorUserId: ids.supportUser, status: 'PENDING' })
-        : { contractUnavailable: true };
-      const detail = runtime.detail
-        ? await runtime.detail({ escalationId: row.id, actorUserId: ids.supportUser })
-        : { contractUnavailable: true };
-      const denied = runtime.detail
-        ? await captureBusinessFailure(() => runtime.detail!({ escalationId: row.id, actorUserId: ids.linkedUser }))
-        : { code: 'ESCALATION_RUNTIME_MISSING' };
-      if (runtime.acknowledge) {
-        await runtime.acknowledge({
-          escalationId: row.id,
-          actorUserId: ids.supportUser,
-          expectedVersion: 0,
-          reason: 'triaged',
-        });
-      }
-      const afterAck = await prisma.v1ResultEscalation.findUniqueOrThrow({ where: { id: row.id } });
-      if (runtime.resolve) {
-        await runtime.resolve({
-          escalationId: row.id,
-          actorUserId: ids.opsUser,
-          expectedVersion: 1,
-          reason: 'repaired',
-        });
-      }
-      const afterResolve = await prisma.v1ResultEscalation.findUniqueOrThrow({ where: { id: row.id } });
-      const audits = await prisma.v1OperationAudit.count({
+      const personalPendingIdentity = rows.filter(
+        (row) => row.ackByUserId !== null || row.resolvedByUserId !== null,
+      ).length;
+      const recipientDeliveries = await prisma.v1Notification.groupBy({
+        by: ['recipientUserId'],
         where: {
-          resourceId: row.id,
-          action: { in: ['RESULT_ESCALATION_ACKNOWLEDGED', 'RESULT_ESCALATION_RESOLVED'] },
+          recipientUserId: { in: [ids.opponentUser, ids.supportUser] },
+          targetType: 'team_match',
+          targetId: ids.lane4Match,
+        },
+        _count: { _all: true },
+        orderBy: { recipientUserId: 'asc' },
+      });
+      const sharedAfter = await sharedFixtureSnapshot();
+      process.stdout.write(`TASK9_RED_L4_DUE=${JSON.stringify({
+        resultRevisionId: ids.lane4Revision,
+        submittedAt: submittedAt.toISOString(),
+        worker: {
+          claimedId: diagnostic!.claimed.id,
+          durationMs: diagnostic!.durationMs,
+          deadlineOutcome: diagnostic!.deadlineOutcome,
+          deliveryStatus: delivery!.status,
+        },
+        escalationRows: rows.map((row) => ({ id: row.id, kind: row.kind, dueAt: row.dueAt.toISOString() })),
+        recipientDeliveries: recipientDeliveries.map((delivery) => ({
+          recipientUserId: delivery.recipientUserId,
+          count: delivery._count._all,
+        })),
+        sharedFixtureUnchanged: JSON.stringify(sharedAfter) === JSON.stringify(sharedBefore),
+      })}\n`);
+
+      expect(sharedAfter).toEqual(sharedBefore);
+      expect({
+        submittedDeliveryStatus: delivery!.status,
+        rows: rows.map((row) => ({
+          kind: row.kind,
+          status: row.status,
+          dueAt: row.dueAt.toISOString(),
+        })),
+        stableEscalationIdentity: new Set(rows.filter((row) => row.kind === 'ESCALATION').map((row) => row.id)).size,
+        personalPendingIdentity,
+        recipientDeliveries: recipientDeliveries.map((delivery) => ({
+          recipientUserId: delivery.recipientUserId,
+          count: delivery._count._all,
+        })),
+      }).toEqual({
+        submittedDeliveryStatus: 'COMPLETED',
+        rows: [
+          { kind: 'ESCALATION', status: 'PENDING', dueAt: '2026-08-03T00:00:00.000Z' },
+          { kind: 'REMINDER', status: 'PENDING', dueAt: '2026-08-02T00:00:00.000Z' },
+        ],
+        stableEscalationIdentity: 1,
+        personalPendingIdentity: 0,
+        recipientDeliveries: [
+          { recipientUserId: ids.opponentUser, count: 1 },
+          { recipientUserId: ids.supportUser, count: 1 },
+        ],
+      });
+    });
+
+    it('[RED-L4] terminal official delivery closes prior reminder and escalation rows without recreating either', async () => {
+      const sharedBefore = await sharedFixtureSnapshot();
+      const revisionId = ids.lane4TerminalApprovedRevision;
+      await seedEscalationRows(revisionId);
+      const decision = await games.decideResultRevision(
+        authUser(ids.supportUser),
+        ids.lane4Game,
+        revisionId,
+        `${prefix}:lane4-terminal-approve`,
+        {
+          expectedVersion: 1,
+          clientCommandId: `${prefix}:lane4-terminal-approve`,
+          decision: 'approve',
+        },
+      );
+      const event = await prisma.v1OutboxEvent.findUniqueOrThrow({
+        where: { businessKey: `game:${ids.lane4Game}:revision:3:approve` },
+      });
+      const terminalUpdateBefore = await prisma.$transaction((tx) =>
+        postgresTransactionGraph('terminal-available-at:before', tx),
+      );
+      try {
+        await prisma.v1OutboxEvent.update({
+          where: { id: event.id },
+          data: {
+            availableAt: new Date('2000-01-01T00:00:00.000Z'),
+            version: { increment: 1 },
+          },
+        });
+      } catch (error: unknown) {
+        const terminalUpdateAfter = await prisma.$transaction((tx) =>
+          postgresTransactionGraph('terminal-available-at:after-error', tx),
+        );
+        process.stdout.write(`TASK9_P2034_DIAGNOSTIC=${JSON.stringify({
+          boundary: 'terminal-available-at',
+          eventId: event.id,
+          error: prismaErrorDiagnostic(error),
+          before: terminalUpdateBefore,
+          after: terminalUpdateAfter,
+        })}\n`);
+        throw error;
+      }
+      let delivery: Awaited<ReturnType<typeof outboxState>>;
+      let rows: Awaited<ReturnType<typeof prisma.v1ResultEscalation.findMany>>;
+      let revision: Awaited<ReturnType<typeof prisma.v1GameResultRevision.findUniqueOrThrow>>;
+      let game: Awaited<ReturnType<typeof prisma.v1Game.findUniqueOrThrow>>;
+      let projection: Awaited<ReturnType<typeof projectionTransactionSnapshot>>;
+      try {
+        await processExactOutboxEvent(event.id, 'lane4-terminal:approved');
+        [rows, delivery, revision, game, projection] = await Promise.all([
+          prisma.v1ResultEscalation.findMany({
+            where: { resultRevisionId: revisionId },
+            orderBy: { kind: 'asc' },
+          }),
+          outboxState(event.id),
+          prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: revisionId } }),
+          prisma.v1Game.findUniqueOrThrow({ where: { id: ids.lane4Game } }),
+          projectionTransactionSnapshot(revisionId),
+        ]);
+      } finally {
+        await isolateLane4Outbox([event.id]);
+        await assertNoWorkerResidue('lane4-terminal:approved');
+      }
+      const sharedAfter = await sharedFixtureSnapshot();
+      process.stdout.write(`TASK9_RED_L4_TERMINAL=${JSON.stringify({
+        decision,
+        revision: { id: revision!.id, state: revision!.state, officialAt: revision!.officialAt },
+        game: {
+          version: game!.version,
+          currentOfficialRevisionId: game!.currentOfficialRevisionId,
+        },
+        event: {
+          id: event.id,
+          businessKey: event.businessKey,
+          type: event.type,
+          status: delivery!.status,
+          attempts: delivery!.attempts,
+          lastError: delivery!.lastError,
+        },
+        projection,
+        escalation: {
+          open: rows!.filter((row) => row.status === 'PENDING' || row.status === 'ACKNOWLEDGED').length,
+          statuses: rows!.map((row) => row.status),
+          reasons: rows!.map((row) => row.reason),
+        },
+        sharedFixtureUnchanged: JSON.stringify(sharedAfter) === JSON.stringify(sharedBefore),
+      })}\n`);
+
+      expect(sharedAfter).toEqual(sharedBefore);
+      expect({
+        decision,
+        revision: { state: revision!.state, official: revision!.officialAt !== null },
+        game: { version: game!.version, currentOfficialRevisionId: game!.currentOfficialRevisionId },
+        event: { status: delivery!.status, attempts: delivery!.attempts, lastError: delivery!.lastError },
+        projection: {
+          officialFacts: projection!.officialFacts,
+          hasAppliedWatermark: projection!.watermarks.some(({ status }) => status === 'APPLIED'),
+        },
+        escalation: {
+          open: rows!.filter((row) => row.status === 'PENDING' || row.status === 'ACKNOWLEDGED').length,
+          statuses: rows!.map((row) => row.status),
+          reasons: rows!.map((row) => row.reason),
+        },
+      }).toEqual({
+        decision: expect.objectContaining({ revisionId, revisionState: 'OFFICIAL', replayed: false }),
+        revision: { state: 'OFFICIAL', official: true },
+        game: { version: 2, currentOfficialRevisionId: revisionId },
+        event: { status: 'COMPLETED', attempts: 1, lastError: null },
+        projection: { officialFacts: 1, hasAppliedWatermark: true },
+        escalation: {
+          open: 0,
+          statuses: ['CLOSED', 'CLOSED'],
+          reasons: ['approved', 'approved'],
         },
       });
+    });
 
-      expect({
-        listIds: 'items' in list ? list.items.map((item) => item.id) : [],
-        detail: 'id' in detail ? { id: detail.id, resultRevisionId: detail.resultRevisionId } : null,
-        denied,
-        ackRuntimeAvailable: typeof runtime.acknowledge === 'function',
-        afterAck: { status: afterAck.status, ackByUserId: afterAck.ackByUserId },
-        resolveRuntimeAvailable: typeof runtime.resolve === 'function',
-        afterResolve: { status: afterResolve.status, resolvedByUserId: afterResolve.resolvedByUserId },
-        audits,
-      }).toEqual({
-        listIds: [row.id],
-        detail: { id: row.id, resultRevisionId: ids.slaRevision },
-        denied: { code: 'ESCALATION_FORBIDDEN' },
-        ackRuntimeAvailable: true,
-        afterAck: { status: 'ACKNOWLEDGED', ackByUserId: ids.supportUser },
-        resolveRuntimeAvailable: true,
-        afterResolve: { status: 'RESOLVED', resolvedByUserId: ids.opsUser },
-        audits: 2,
+    it('[RED-L4] submitted-event replay preserves one result-scoped queue identity and actor-neutral pending rows', async () => {
+      const sharedBefore = await sharedFixtureSnapshot();
+      const event = await prisma.v1OutboxEvent.create({
+        data: {
+          id: ids.lane4SubmittedReplay,
+          businessKey: `${prefix}:lane4-submitted-replay`,
+          aggregateType: 'GAME',
+          aggregateId: ids.lane4Game,
+          revisionId: ids.lane4Revision,
+          type: 'GAME_RESULT_SUBMITTED',
+          payload: { gameId: ids.lane4Game, revisionId: ids.lane4Revision },
+          availableAt: new Date('2000-01-01T00:00:00.000Z'),
+        },
       });
-      const staleVersion = runtime.acknowledge
-        ? await captureBusinessFailure(() => runtime.acknowledge!({
-            escalationId: row.id,
-            actorUserId: ids.supportUser,
-            expectedVersion: 0,
-            reason: 'stale replay',
-          }))
-        : { code: 'ESCALATION_RUNTIME_MISSING' };
-      const malformedStatus = runtime.list
-        ? await captureBusinessFailure(() =>
-            runtime.list!({ actorUserId: ids.supportUser, status: 'NOT_A_STATUS' }),
-          )
-        : { code: 'ESCALATION_RUNTIME_MISSING' };
-      expect({ staleVersion, malformedStatus }).toEqual({
-        staleVersion: { code: 'ESCALATION_VERSION_CONFLICT' },
-        malformedStatus: { code: 'ESCALATION_STATUS_INVALID' },
+      let delivery: Awaited<ReturnType<typeof outboxState>>;
+      try {
+        await processExactOutboxEvent(event.id, 'lane4-submitted-replay');
+        delivery = await outboxState(event.id);
+      } finally {
+        await isolateLane4Outbox([event.id]);
+        await assertNoWorkerResidue('lane4-submitted-replay');
+      }
+      const rows = await prisma.v1ResultEscalation.findMany({
+        where: { resultRevisionId: ids.lane4Revision },
+        orderBy: { kind: 'asc' },
+        select: { kind: true, status: true, ackByUserId: true, resolvedByUserId: true },
+      });
+      const sharedAfter = await sharedFixtureSnapshot();
+      process.stdout.write(`TASK9_RED_L4_REPLAY=${JSON.stringify({
+        delivery: { status: delivery!.status, attempts: delivery!.attempts, lastError: delivery!.lastError },
+        rows,
+        sharedFixtureUnchanged: JSON.stringify(sharedAfter) === JSON.stringify(sharedBefore),
+      })}\n`);
+
+      expect(sharedAfter).toEqual(sharedBefore);
+      expect({
+        delivery: { status: delivery!.status, attempts: delivery!.attempts, lastError: delivery!.lastError },
+        rows,
+      }).toEqual({
+        delivery: { status: 'COMPLETED', attempts: 1, lastError: null },
+        rows: [
+          { kind: 'ESCALATION', status: 'PENDING', ackByUserId: null, resolvedByUserId: null },
+          { kind: 'REMINDER', status: 'PENDING', ackByUserId: null, resolvedByUserId: null },
+        ],
       });
     });
   });
@@ -1150,6 +1252,134 @@ async function createFixture(): Promise<void> {
       submittedAt: new Date('2026-08-01T00:00:00.000Z'),
     })),
   });
+
+  await prisma.v1Team.createMany({
+    data: [
+      {
+        id: ids.lane4HostTeam,
+        ownerUserId: ids.hostUser,
+        sportId: ids.sport,
+        regionId: ids.region,
+        name: 'Task 9 Lane 4 Host',
+      },
+      {
+        id: ids.lane4OpponentTeam,
+        ownerUserId: ids.opponentUser,
+        sportId: ids.sport,
+        regionId: ids.region,
+        name: 'Task 9 Lane 4 Opponent',
+      },
+    ],
+  });
+  await prisma.v1TeamMembership.createMany({
+    data: [
+      { teamId: ids.lane4HostTeam, userId: ids.hostUser, role: 'owner', status: 'active' },
+      { teamId: ids.lane4OpponentTeam, userId: ids.opponentUser, role: 'owner', status: 'active' },
+    ],
+  });
+  await prisma.v1TeamMatch.create({
+    data: {
+      id: ids.lane4Match,
+      hostTeamId: ids.lane4HostTeam,
+      approvedApplicantTeamId: ids.lane4OpponentTeam,
+      createdByUserId: ids.hostUser,
+      sportId: ids.sport,
+      regionId: ids.region,
+      title: 'Task 9 Lane 4 result escalation',
+      placeName: 'Task 9 Lane 4 ground',
+      startAt: new Date('2026-08-01T00:00:00.000Z'),
+      competitionConfigVersionId: ids.config,
+    },
+  });
+  await prisma.v1Game.create({
+    data: {
+      id: ids.lane4Game,
+      sourceType: 'TEAM_MATCH',
+      teamMatchId: ids.lane4Match,
+      state: 'SCHEDULED',
+      version: 0,
+      competitionConfigVersionId: ids.config,
+    },
+  });
+  await prisma.v1GameSide.createMany({
+    data: [
+      {
+        id: ids.lane4HomeSide,
+        gameId: ids.lane4Game,
+        sideKey: 'HOME',
+        teamId: ids.lane4HostTeam,
+        displayNameSnapshot: 'Task 9 Lane 4 Host',
+      },
+      {
+        id: ids.lane4AwaySide,
+        gameId: ids.lane4Game,
+        sideKey: 'AWAY',
+        teamId: ids.lane4OpponentTeam,
+        displayNameSnapshot: 'Task 9 Lane 4 Opponent',
+      },
+    ],
+  });
+  await prisma.v1GameLineup.create({
+    data: {
+      id: ids.lane4Lineup,
+      gameId: ids.lane4Game,
+      sideId: ids.lane4HomeSide,
+      revision: 1,
+      state: 'LOCKED',
+    },
+  });
+  await prisma.v1GameParticipant.create({
+    data: {
+      id: ids.lane4Participant,
+      gameId: ids.lane4Game,
+      sideId: ids.lane4HomeSide,
+      lineupId: ids.lane4Lineup,
+      displayNameSnapshot: 'Task 9 Lane 4 Player',
+    },
+  });
+  await prisma.v1GameResultRevision.create({
+    data: {
+      id: ids.lane4Revision,
+      gameId: ids.lane4Game,
+      revision: 1,
+      state: 'DRAFT',
+      score: { home: 1, away: 0 },
+      eventsHash: 'lane4-submitted-source-hash',
+      createdByActorType: 'USER',
+      createdByUserId: ids.hostUser,
+      resultParticipants: {
+        create: {
+          participantId: ids.lane4Participant,
+          sideId: ids.lane4HomeSide,
+          started: true,
+          goals: 1,
+          cards: { yellow: 0, red: 0 },
+        },
+      },
+    },
+  });
+  await prisma.v1GameResultRevision.createMany({
+    data: [
+      { id: ids.lane4TerminalApprovedRevision, revision: 3, eventsHash: 'lane4-terminal-approved', reason: 'approved' },
+    ].map((revision) => ({
+      ...revision,
+      gameId: ids.lane4Game,
+      state: 'SUBMITTED' as const,
+      score: { home: 0, away: 0 },
+      createdByActorType: 'SYSTEM' as const,
+      createdBySystemActor: 'TASK9_LANE4_RED_FIXTURE',
+      submittedAt: new Date('2026-08-01T00:00:00.000Z'),
+    })),
+  });
+  await prisma.v1TournamentStaffAssignment.create({
+    data: {
+      id: ids.lane4DirectorAssignment,
+      tournamentId: ids.tournament,
+      userId: ids.supportUser,
+      role: 'TOURNAMENT_DIRECTOR',
+      grantedByUserId: ids.opsUser,
+    },
+  });
 }
 
 function authUser(id: string) {
@@ -1162,11 +1392,390 @@ function auditWorker(): V1GameOperationsWorkerService {
   return worker;
 }
 
-function productionWorker(): V1GameOperationsWorkerService {
-  const worker = new V1GameOperationsWorkerService(prisma);
+function productionWorker(): DiagnosticGameOperationsWorker {
+  const worker = new DiagnosticGameOperationsWorker(prisma, DIAGNOSTIC_WORKER_TIMEOUT_MS);
   worker.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
   worker.registerDurableAuditHandler('GAME_OPERATION_JOB_REQUEUED');
   return worker;
+}
+
+type PostgresTransactionGraph = {
+  label: string;
+  current: {
+    pid: number;
+    applicationName: string;
+    transactionId: string | null;
+  };
+  activities: Array<{
+    pid: number;
+    applicationName: string;
+    state: string | null;
+    transactionId: string | null;
+    transactionAgeMs: number | null;
+    waitEventType: string | null;
+    waitEvent: string | null;
+    blockingPids: number[];
+    query: string;
+  }>;
+  locks: Array<{
+    pid: number;
+    applicationName: string;
+    lockType: string;
+    relation: string | null;
+    page: number | null;
+    tuple: number | null;
+    transactionId: string | null;
+    virtualTransactionId: string | null;
+    mode: string;
+    granted: boolean;
+    fastpath: boolean;
+    blockingPids: number[];
+  }>;
+};
+
+async function postgresTransactionGraph(
+  label: string,
+  tx: Prisma.TransactionClient,
+): Promise<PostgresTransactionGraph> {
+  const [currentRows, activities, locks] = await Promise.all([
+    tx.$queryRaw<Array<{ pid: number; applicationName: string; transactionId: string | null }>>`
+      SELECT
+        pg_backend_pid() AS pid,
+        current_setting('application_name') AS "applicationName",
+        txid_current_if_assigned()::text AS "transactionId"
+    `,
+    tx.$queryRaw<PostgresTransactionGraph['activities']>`
+      SELECT
+        activity.pid,
+        activity.application_name AS "applicationName",
+        activity.state,
+        activity.backend_xid::text AS "transactionId",
+        CASE
+          WHEN activity.xact_start IS NULL THEN NULL
+          ELSE (EXTRACT(EPOCH FROM (clock_timestamp() - activity.xact_start)) * 1000)::float8
+        END AS "transactionAgeMs",
+        activity.wait_event_type AS "waitEventType",
+        activity.wait_event AS "waitEvent",
+        pg_blocking_pids(activity.pid) AS "blockingPids",
+        LEFT(activity.query, 500) AS query
+      FROM pg_stat_activity AS activity
+      WHERE activity.datname = current_database()
+      ORDER BY activity.pid ASC
+    `,
+    tx.$queryRaw<PostgresTransactionGraph['locks']>`
+      SELECT
+        lock_row.pid,
+        activity.application_name AS "applicationName",
+        lock_row.locktype AS "lockType",
+        relation.relname AS relation,
+        lock_row.page,
+        lock_row.tuple,
+        lock_row.transactionid::text AS "transactionId",
+        lock_row.virtualxid::text AS "virtualTransactionId",
+        lock_row.mode,
+        lock_row.granted,
+        lock_row.fastpath,
+        pg_blocking_pids(lock_row.pid) AS "blockingPids"
+      FROM pg_locks AS lock_row
+      LEFT JOIN pg_class AS relation ON relation.oid = lock_row.relation
+      LEFT JOIN pg_stat_activity AS activity ON activity.pid = lock_row.pid
+      WHERE lock_row.database = (SELECT oid FROM pg_database WHERE datname = current_database())
+         OR lock_row.locktype IN ('transactionid', 'virtualxid')
+      ORDER BY lock_row.pid ASC, lock_row.locktype ASC, relation.relname ASC NULLS LAST,
+               lock_row.page ASC NULLS LAST, lock_row.tuple ASC NULLS LAST, lock_row.mode ASC
+    `,
+  ]);
+  const current = currentRows[0];
+  if (!current) throw new Error(`TASK9_POSTGRES_DIAGNOSTIC_MISSING_CURRENT:${label}`);
+  return { label, current, activities, locks };
+}
+
+function prismaErrorDiagnostic(error: unknown): {
+  name: string;
+  code: string | null;
+  message: string;
+  meta: unknown;
+} {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return { name: error.name, code: error.code, message: error.message, meta: error.meta ?? null };
+  }
+  if (error instanceof Error) {
+    return { name: error.name, code: null, message: error.message, meta: null };
+  }
+  return { name: 'UnknownError', code: null, message: String(error), meta: null };
+}
+
+function elapsed(startedAt: number): number {
+  return Number((performance.now() - startedAt).toFixed(3));
+}
+
+type WorkerDatabaseDiagnostics = {
+  event: Awaited<ReturnType<typeof outboxState>>;
+  activities: Array<{
+    pid: number;
+    state: string | null;
+    waitEventType: string | null;
+    waitEvent: string | null;
+    query: string;
+  }>;
+  locks: Array<{ pid: number; relation: string; mode: string; granted: boolean }>;
+  triggerExists: boolean;
+  ownedProcessing: number;
+};
+
+type ExactWorkerDiagnostic = {
+  label: string;
+  expected: { id: string; businessKey: string; type: string; version: number };
+  claimed: { id: string; businessKey: string; type: string; version: number };
+  processed: boolean;
+  durationMs: number;
+  deadlineMs: number;
+  deadlineOutcome: 'settled' | 'handler-deadline';
+  before: WorkerDatabaseDiagnostics;
+  during: WorkerDatabaseDiagnostics;
+  after: WorkerDatabaseDiagnostics;
+  metrics: Awaited<ReturnType<DiagnosticGameOperationsWorker['getMetrics']>>;
+};
+
+async function processExactOutboxEvent(
+  outboxEventId: string,
+  label: string,
+  options: { triggerMayExist?: boolean } = {},
+): Promise<ExactWorkerDiagnostic> {
+  const settlementTimeline: Array<{ phase: string; elapsedMs: number }> = [];
+  const helperStartedAt = performance.now();
+  let quarantineBeforeUpdate: PostgresTransactionGraph | null = null;
+  let quarantined: {
+    expected: { id: string; businessKey: string; type: string; version: number };
+    rows: Array<{ id: string; availableAt: Date }>;
+  };
+  try {
+    quarantined = await prisma.$transaction(async (tx) => {
+      settlementTimeline.push({ phase: 'quarantine-transaction-started', elapsedMs: elapsed(helperStartedAt) });
+    const expectedRows = await tx.$queryRaw<Array<{
+      id: string;
+      businessKey: string;
+      type: string;
+      version: number;
+    }>>`
+      SELECT id, business_key AS "businessKey", type, version
+      FROM v1_outbox_events
+      WHERE id = ${outboxEventId}
+        AND status IN ('PENDING', 'RETRY')
+        AND available_at <= CURRENT_TIMESTAMP
+        AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP)
+      FOR UPDATE
+    `;
+    const expected = expectedRows[0];
+    if (!expected) throw new Error(`TASK9_DIAGNOSTIC_EXPECTED_EVENT_NOT_CLAIMABLE:${label}:${outboxEventId}`);
+
+    const rows = await tx.$queryRaw<Array<{ id: string; availableAt: Date }>>`
+      SELECT id, available_at AS "availableAt"
+      FROM v1_outbox_events
+      WHERE id <> ${outboxEventId}
+        AND status IN ('PENDING', 'RETRY')
+        AND available_at <= CURRENT_TIMESTAMP
+        AND (
+          business_key LIKE ${`${prefix}%`}
+          OR aggregate_id IN (${ids.game}, ${ids.tournamentGame}, ${ids.lane4Game})
+        )
+      ORDER BY id ASC
+      FOR UPDATE
+    `;
+    if (rows.length > 0) {
+      quarantineBeforeUpdate = await postgresTransactionGraph(`${label}:quarantine-before-update`, tx);
+      await tx.v1OutboxEvent.updateMany({
+        where: { id: { in: rows.map(({ id }) => id) } },
+        data: {
+          availableAt: new Date('2098-01-01T00:00:00.000Z'),
+          version: { increment: 1 },
+        },
+      });
+    }
+    const eligible = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM v1_outbox_events
+      WHERE status IN ('PENDING', 'RETRY')
+        AND available_at <= CURRENT_TIMESTAMP
+        AND (lease_until IS NULL OR lease_until <= CURRENT_TIMESTAMP)
+      ORDER BY available_at ASC, created_at ASC, id ASC
+    `;
+    if (eligible.length !== 1 || eligible[0].id !== outboxEventId) {
+      throw new Error(`TASK9_DIAGNOSTIC_CROSS_CLAIM:${label}:${eligible.map(({ id }) => id).join(',')}`);
+    }
+    return { expected, rows };
+    });
+    settlementTimeline.push({ phase: 'quarantine-transaction-committed', elapsedMs: elapsed(helperStartedAt) });
+  } catch (error: unknown) {
+    const after = await prisma.$transaction((tx) =>
+      postgresTransactionGraph(`${label}:quarantine-after-error`, tx),
+    );
+    process.stdout.write(`TASK9_P2034_DIAGNOSTIC=${JSON.stringify({
+      boundary: 'quarantine-update',
+      label,
+      outboxEventId,
+      error: prismaErrorDiagnostic(error),
+      before: quarantineBeforeUpdate,
+      after,
+      settlementTimeline,
+    })}\n`);
+    throw error;
+  }
+
+  const worker = productionWorker();
+  const before = await workerDatabaseDiagnostics(outboxEventId);
+  const startedAt = performance.now();
+  let processPromise: Promise<boolean> | null = null;
+  let processed = false;
+  let during: WorkerDatabaseDiagnostics | null = null;
+  let failure: unknown;
+  try {
+    processPromise = worker.processOne();
+    settlementTimeline.push({ phase: 'worker-process-promise-created', elapsedMs: elapsed(helperStartedAt) });
+    during = await workerDatabaseDiagnostics(outboxEventId);
+    processed = await processPromise;
+    settlementTimeline.push({ phase: 'worker-process-promise-settled', elapsedMs: elapsed(helperStartedAt) });
+  } catch (error: unknown) {
+    failure = error;
+  } finally {
+    if (processPromise) await processPromise.catch(() => false);
+    settlementTimeline.push({ phase: 'worker-process-promise-finally-awaited', elapsedMs: elapsed(helperStartedAt) });
+    await worker.shutdown(1_000);
+    settlementTimeline.push({ phase: 'worker-shutdown-settled', elapsedMs: elapsed(helperStartedAt) });
+    if (quarantined.rows.length > 0) {
+      await prisma.$transaction(
+        quarantined.rows.map((row) => prisma.v1OutboxEvent.update({
+          where: { id: row.id },
+          data: {
+            availableAt: row.availableAt,
+            version: { increment: 1 },
+          },
+        })),
+      );
+      settlementTimeline.push({ phase: 'quarantine-restore-committed', elapsedMs: elapsed(helperStartedAt) });
+    }
+  }
+  const durationMs = Number((performance.now() - startedAt).toFixed(3));
+  const after = await workerDatabaseDiagnostics(outboxEventId);
+  const claimed = worker.claims[0];
+  const metrics = await worker.getMetrics();
+  const diagnostic: ExactWorkerDiagnostic = {
+    label,
+    expected: quarantined.expected,
+    claimed: claimed
+      ? { id: claimed.id, businessKey: claimed.businessKey, type: claimed.type, version: claimed.version }
+      : { id: '', businessKey: '', type: '', version: -1 },
+    processed,
+    durationMs,
+    deadlineMs: DIAGNOSTIC_WORKER_TIMEOUT_MS,
+    deadlineOutcome: after.event.lastError?.includes('Handler deadline exceeded')
+      ? 'handler-deadline'
+      : 'settled',
+    before,
+    during: during ?? before,
+    after,
+    metrics,
+  };
+  process.stdout.write(`TASK9_WORKER_DIAGNOSTIC=${JSON.stringify({ ...diagnostic, settlementTimeline })}\n`);
+
+  if (failure) throw failure;
+  if (!claimed || claimed.id !== outboxEventId) {
+    throw new Error(`TASK9_DIAGNOSTIC_CLAIM_MISMATCH:${label}:${claimed?.id ?? 'none'}`);
+  }
+  if (after.ownedProcessing !== 0 || after.event.status === 'PROCESSING' || metrics.active !== 0) {
+    throw new Error(`TASK9_DIAGNOSTIC_WORKER_RESIDUE:${label}`);
+  }
+  if (!options.triggerMayExist && after.triggerExists) {
+    throw new Error(`TASK9_DIAGNOSTIC_TRIGGER_RESIDUE:${label}`);
+  }
+  return diagnostic;
+}
+
+async function workerDatabaseDiagnostics(outboxEventId: string): Promise<WorkerDatabaseDiagnostics> {
+  const [event, activities, locks, triggerRows, processingRows] = await Promise.all([
+    outboxState(outboxEventId),
+    prisma.$queryRaw<WorkerDatabaseDiagnostics['activities']>`
+      SELECT
+        pid,
+        state,
+        wait_event_type AS "waitEventType",
+        wait_event AS "waitEvent",
+        LEFT(query, 240) AS query
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+        AND state <> 'idle'
+      ORDER BY pid ASC
+    `,
+    prisma.$queryRaw<WorkerDatabaseDiagnostics['locks']>`
+      SELECT
+        lock_row.pid,
+        COALESCE(relation.relname, '') AS relation,
+        lock_row.mode,
+        lock_row.granted
+      FROM pg_locks AS lock_row
+      LEFT JOIN pg_class AS relation ON relation.oid = lock_row.relation
+      WHERE lock_row.database = (SELECT oid FROM pg_database WHERE datname = current_database())
+        AND lock_row.pid <> pg_backend_pid()
+        AND (
+          relation.relname IN ('v1_outbox_events', 'v1_projection_watermarks')
+          OR lock_row.granted = false
+        )
+      ORDER BY lock_row.pid ASC, relation ASC, lock_row.mode ASC
+    `,
+    prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_trigger
+        WHERE tgname = 'task9_l2_fail_watermark_insert'
+          AND NOT tgisinternal
+      ) AS exists
+    `,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count
+      FROM v1_outbox_events
+      WHERE status = 'PROCESSING'
+        AND (
+          business_key LIKE ${`${prefix}%`}
+          OR aggregate_id IN (${ids.game}, ${ids.tournamentGame}, ${ids.lane4Game})
+        )
+    `,
+  ]);
+  return {
+    event,
+    activities,
+    locks,
+    triggerExists: triggerRows[0]?.exists === true,
+    ownedProcessing: processingRows[0]?.count ?? 0,
+  };
+}
+
+async function assertNoWorkerResidue(label: string): Promise<void> {
+  const [triggerRows, processingRows, waitingLocks] = await Promise.all([
+    prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'task9_l2_fail_watermark_insert' AND NOT tgisinternal
+      ) AS exists
+    `,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count FROM v1_outbox_events WHERE status = 'PROCESSING'
+    `,
+    prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::int AS count
+      FROM pg_locks
+      WHERE database = (SELECT oid FROM pg_database WHERE datname = current_database())
+        AND granted = false
+    `,
+  ]);
+  const observable = {
+    label,
+    triggerExists: triggerRows[0]?.exists === true,
+    processing: processingRows[0]?.count ?? 0,
+    waitingLocks: waitingLocks[0]?.count ?? 0,
+  };
+  process.stdout.write(`TASK9_WORKER_CLEANUP=${JSON.stringify(observable)}\n`);
+  expect(observable).toEqual({ label, triggerExists: false, processing: 0, waitingLocks: 0 });
 }
 
 async function resetOfficialDelivery(
@@ -1378,12 +1987,49 @@ async function outboxState(id: string) {
   });
 }
 
-async function escalationCounts(revisionId: string): Promise<{ reminders: number; escalations: number }> {
-  const [reminders, escalationCount] = await Promise.all([
-    prisma.v1ResultEscalation.count({ where: { resultRevisionId: revisionId, kind: 'REMINDER' } }),
-    prisma.v1ResultEscalation.count({ where: { resultRevisionId: revisionId, kind: 'ESCALATION' } }),
+async function sharedFixtureSnapshot() {
+  const [game, opponentTeam, opponentMembership, officialEvents, watermarks] = await Promise.all([
+    prisma.v1Game.findUniqueOrThrow({
+      where: { id: ids.game },
+      select: { state: true, version: true, currentOfficialRevisionId: true },
+    }),
+    prisma.v1Team.findUniqueOrThrow({
+      where: { id: ids.opponentTeam },
+      select: { ownerUserId: true },
+    }),
+    prisma.v1TeamMembership.findUniqueOrThrow({
+      where: { teamId_userId: { teamId: ids.opponentTeam, userId: ids.opponentUser } },
+      select: { role: true, status: true, leftAt: true, removedByUserId: true },
+    }),
+    prisma.v1OutboxEvent.findMany({
+      where: { aggregateId: ids.game, type: 'GAME_RESULT_OFFICIAL' },
+      orderBy: { id: 'asc' },
+      select: {
+        id: true,
+        status: true,
+        attempts: true,
+        version: true,
+        lastError: true,
+        availableAt: true,
+        leaseOwner: true,
+        leaseUntil: true,
+      },
+    }),
+    prisma.v1ProjectionWatermark.findMany({
+      where: { revisionId: ids.revision },
+      orderBy: [{ projection: 'asc' }, { entityType: 'asc' }, { entityId: 'asc' }],
+      select: {
+        projection: true,
+        entityType: true,
+        entityId: true,
+        revisionId: true,
+        sourceHash: true,
+        status: true,
+        projectedAt: true,
+      },
+    }),
   ]);
-  return { reminders, escalations: escalationCount };
+  return { game, opponentTeam, opponentMembership, officialEvents, watermarks };
 }
 
 async function seedEscalationRows(revisionId: string): Promise<void> {
@@ -1596,15 +2242,6 @@ async function futureTableExists(table: string): Promise<boolean> {
   return rows[0]?.exists === true;
 }
 
-async function persistedVisibilityMode(gameId: string): Promise<string | null> {
-  const rows = await prisma.$queryRaw<Array<{ mode: string }>>`
-    SELECT mode::text AS mode
-    FROM v1_game_visibility_policies
-    WHERE game_id = ${gameId}
-  `;
-  return rows[0]?.mode ?? null;
-}
-
 async function projectionTransactionSnapshot(revisionId: string): Promise<{
   officialFacts: number;
   teamFacts: number;
@@ -1632,36 +2269,18 @@ async function projectionTransactionSnapshot(revisionId: string): Promise<{
   return { officialFacts, teamFacts, repairAudits, watermarks };
 }
 
-function loadTask9Runtime<T extends object>(modulePath: string, exportName: string): Partial<T> {
-  try {
-    const loaded: unknown = require(modulePath);
-    if (typeof loaded !== 'object' || loaded === null || !(exportName in loaded)) return {};
-    const Constructor = (loaded as Record<string, unknown>)[exportName];
-    if (typeof Constructor !== 'function') return {};
-    return Reflect.construct(Constructor, [prisma]) as Partial<T>;
-  } catch (error) {
-    if (typeof error === 'object' && error !== null) {
-      const moduleError = error as { code?: unknown; message?: unknown };
-      if (
-        moduleError.code === 'MODULE_NOT_FOUND' &&
-        typeof moduleError.message === 'string' &&
-        moduleError.message.includes(`Cannot find module '${modulePath}'`)
-      ) {
-        return {};
-      }
-    }
-    throw error;
-  }
-}
-
-async function captureBusinessFailure(operation: () => Promise<unknown>): Promise<{ code: string }> {
-  try {
-    await operation();
-    return { code: 'MISLEADING_SUCCESS' };
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && typeof (error as Error & { code?: unknown }).code === 'string') {
-      return { code: (error as Error & { code: string }).code };
-    }
-    return { code: 'UNRELATED_EXCEPTION' };
-  }
+async function isolateLane4Outbox(outboxEventIds: readonly string[]): Promise<void> {
+  await prisma.v1OutboxEvent.updateMany({
+    where: {
+      id: { in: [...outboxEventIds] },
+      status: { in: ['PENDING', 'RETRY', 'PROCESSING'] },
+    },
+    data: {
+      status: 'COMPLETED',
+      leaseOwner: null,
+      leaseUntil: null,
+      availableAt: new Date('2099-01-01T00:00:00.000Z'),
+      version: { increment: 1 },
+    },
+  });
 }

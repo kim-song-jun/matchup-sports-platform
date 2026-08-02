@@ -311,8 +311,8 @@ jobs:
           PGPASSWORD: task10_ci
         run: |
           set -Eeuo pipefail
-          database_name="task10_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
-          if [[ ! "${database_name}" =~ ^task10_[1-9][0-9]*_[1-9][0-9]*$ ]] || (( ${#database_name} > 63 )); then
+          database_name="ulw_v1_integration_task10_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          if [[ ! "${database_name}" =~ ^ulw_v1_integration_task10_ci_[1-9][0-9]*_[1-9][0-9]*$ ]] || (( ${#database_name} > 63 )); then
             echo "Unsafe Task 10 database identifier" >&2
             exit 1
           fi

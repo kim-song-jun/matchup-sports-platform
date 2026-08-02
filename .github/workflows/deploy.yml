@@ -512,6 +512,15 @@ jobs:
         env:
           INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
           AWS_REGION: ${{ vars.PROD_AWS_REGION }}
+          # compose 가 기본값 없이 참조하는 뿌리 변수 두 개. 값이 없으면 compose 는 빈
+          # 문자열로 치환하고 ${V1_JWT_SECRET:-${JWT_SECRET}} 같은 중첩 기본값까지 전부
+          # 비어서, 빈 JWT 서명 비밀키로 배포될 수 있다(2026-08-02 실사고 — DB 인증 실패가
+          # 먼저 나서 그 상태로 뜨지는 않았다). 지금은 Parameter Store 에만 값이 있는데,
+          # 여기에 걸어 두면 시크릿을 등록하는 순간 GitHub 이 단일 출처가 된다.
+          # 등록 전이라도 안전하다 — sync 스크립트는 빈 값을 건너뛰므로(빈 값이라 건너뜀
+          # 카운터) 기존 Parameter Store 값을 지우지 않는다.
+          SECRET_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SECRET_JWT_SECRET: ${{ secrets.JWT_SECRET }}
           SECRET_KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
           SECRET_KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           SECRET_KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}

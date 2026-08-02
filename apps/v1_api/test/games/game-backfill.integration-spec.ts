@@ -12,6 +12,7 @@ import type { NotificationsService } from '../../src/notifications/notifications
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TeamMatchesService } from '../../src/team-matches/team-matches.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
+import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import type {
   GameBackfillCompareResult,
@@ -65,7 +66,7 @@ async function seedTask10Sources() {
     data: { id: ids.admin, userId: ids.user, adminRole: 'ops', createdAt: timestamps.created },
   });
   await prisma.v1Sport.create({
-    data: { id: ids.sport, code: 'task10-football', name: 'Football', createdAt: timestamps.created },
+    data: { id: ids.sport, code: 'football', name: 'Football', createdAt: timestamps.created },
   });
   await prisma.v1Region.create({
     data: {
@@ -79,15 +80,16 @@ async function seedTask10Sources() {
   await prisma.v1CompetitionConfigVersion.create({
     data: {
       id: ids.competitionConfigVersion,
-      sportCode: 'task10-football',
+      sportCode: 'football',
       name: 'task10-football-v1',
       version: 1,
-      periods: [{ number: 1, durationSeconds: 2700 }, { number: 2, durationSeconds: 2700 }],
-      events: ['GOAL'],
-      lineup: { minimum: 5, maximum: 18 },
-      result: { requiresScorer: false },
-      tieBreak: { order: ['points', 'goalDifference', 'goalsFor'] },
-      visibility: { default: 'OFFICIAL_ONLY' },
+      status: 'ACTIVE',
+      periods: FOOTBALL_V1_CONFIG.periods,
+      events: FOOTBALL_V1_CONFIG.events,
+      lineup: FOOTBALL_V1_CONFIG.lineup,
+      result: FOOTBALL_V1_CONFIG.result,
+      tieBreak: FOOTBALL_V1_CONFIG.tieBreak,
+      visibility: FOOTBALL_V1_CONFIG.visibility,
       contentHash: 'task-10-exact-competition-config-version',
       createdAt: timestamps.created,
     },

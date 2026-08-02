@@ -6,6 +6,38 @@ const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
 const workflow = readFileSync(workflowPath, 'utf8');
 const errors = [];
 
+// docker-compose.prod.yml 은 alpha 가 베이스로 함께 로드한다(deploy-alpha.sh 가
+// `-f docker-compose.prod.yml -f docker-compose.alpha.yml`). compose 는 override 병합
+// **전에** 모든 파일의 변수를 보간하므로, 이 파일에 `${VAR:?...}` 를 넣으면 alpha 오버레이가
+// 값을 덮어써도 베이스의 가드가 먼저 터져 alpha 배포가 깨진다.
+// (2026-08-02 실사고: "error while interpolating services.v1_uploads_init.image")
+// prod 전용 검증은 deploy/prod-manifest-common.sh 의 load_prod_release_manifest() 에 둔다.
+{
+  const composePath = 'deploy/docker-compose.prod.yml';
+  let compose = '';
+  try {
+    compose = readFileSync(composePath, 'utf8');
+  } catch {
+    errors.push(`${composePath}: 파일을 읽을 수 없습니다`);
+  }
+  if (compose && /\$\{V1_(API|WEB)_IMAGE:\?/.test(compose)) {
+    errors.push(
+      `${composePath}: shared compose base must not use \${VAR:?} on V1_*_IMAGE — ` +
+        'alpha loads this file as a base and compose interpolates before merging overrides ' +
+        '(guard belongs in load_prod_release_manifest instead)',
+    );
+  }
+  const manifestCommon = (() => {
+    try { return readFileSync('deploy/prod-manifest-common.sh', 'utf8'); } catch { return ''; }
+  })();
+  if (!/V1_API_IMAGE V1_WEB_IMAGE/.test(manifestCommon)) {
+    errors.push(
+      'deploy/prod-manifest-common.sh: load_prod_release_manifest must assert that ' +
+        'V1_API_IMAGE / V1_WEB_IMAGE are ECR digest URIs',
+    );
+  }
+}
+
 const requiredPatterns = [
   {
     pattern: /^permissions:\n  contents: read$/m,

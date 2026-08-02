@@ -484,8 +484,25 @@ jobs:
     concurrency:
       group: deploy-production
       cancel-in-progress: false
+    # 이 job 의 세 스텝은 전부 aws CLI(ssm put-parameter / send-command)를 호출한다.
+    # 워크플로 기본값은 contents: read 뿐이라 여기서 OIDC 토큰을 따로 요청해야 한다.
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
+      # SSH → SSM 전환에서 "Setup SSH" 스텝을 걷어낼 때 checkout 과 AWS 자격증명 스텝이
+      # 함께 빠졌다. 그 결과 첫 승인 배포가 "sync-prod-runtime-env.sh: No such file or
+      # directory"(exit 127) 로 죽었다 — 이 job 은 러너에 리포도, 자격증명도 없이 시작한다.
+      # build-images 와 달리 git history 를 walk 하는 스크립트가 없으므로 얕은 checkout 으로
+      # 충분하다(여기서 도는 스크립트는 S3 에 올라간 소스를 SSM 으로 내려받게 시킬 뿐이다).
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.PROD_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.PROD_AWS_REGION }}
 
       # 런타임 시크릿은 Parameter Store(SecureString) 를 거쳐 전달한다.
       # SSM send-command 의 파라미터는 CloudTrail 과 명령 이력에 남으므로 시크릿을 명령

@@ -26,8 +26,8 @@ dump_database() {
   local stamp key tmp size
 
   if ! sudo docker inspect "${container}" >/dev/null 2>&1; then
-    log "${label}: 컨테이너 ${container} 가 없습니다 — 건너뜁니다"
-    return 0
+    log "${label}: 컨테이너 ${container} 가 없습니다 — 백업을 실패로 처리합니다"
+    return 1
   fi
 
   stamp="$(date -u +%Y/%m/%d/%Y%m%dT%H%M%SZ)"

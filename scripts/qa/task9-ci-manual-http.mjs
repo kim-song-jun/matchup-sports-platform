@@ -493,21 +493,45 @@ async function seedFixture() {
       ],
     });
     await tx.v1Sport.create({
-      data: { id: FIXTURE.sport, code: 'task9_ci_sport', name: 'Task 9 CI Sport' },
+      data: { id: FIXTURE.sport, code: 'football', name: 'Task 9 CI Sport' },
     });
     await tx.v1CompetitionConfigVersion.create({
       data: {
         id: FIXTURE.config,
-        sportCode: 'task9_ci_sport',
+        sportCode: 'football',
         name: 'Task 9 CI Config',
         version: 1,
         status: 'ACTIVE',
-        periods: {},
-        events: {},
-        lineup: {},
-        result: {},
-        tieBreak: {},
-        visibility: {},
+        periods: [
+          { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
+          { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
+        ],
+        events: ['GOAL', 'OWN_GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION'],
+        lineup: {
+          minPlayers: 7,
+          maxPlayers: 11,
+          substitutions: 'limited',
+          maxSubstitutions: 5,
+        },
+        result: {
+          tournamentScorerPolicy: 'required',
+          teamMatchScorerPolicy: 'optional_with_warning',
+          mvpMin: 0,
+          mvpMax: 1,
+        },
+        tieBreak: {
+          points: { win: 3, draw: 1, loss: 0 },
+          order: [
+            'points',
+            'head_to_head',
+            'goal_difference',
+            'goals_for',
+            'fair_play',
+            'seeded_draw',
+          ],
+          seededDraw: 'sha256-v1',
+        },
+        visibility: { default: 'live', allowed: ['live', 'official'] },
         contentHash: 'task9-ci-competition-config-content-hash-v1',
         createdByUserId: FIXTURE.opsUser,
       },

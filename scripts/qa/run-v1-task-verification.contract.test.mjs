@@ -81,6 +81,28 @@ const taskNineR3OwnedPaths = [
   'docs/api/domains/tournaments.md',
   'docs/api/domains/tournament-operations-escalations.md',
 ];
+const taskNineR4OverridePath =
+  '.omo/start-work/host-pressure-override-task-9-plan-r4.json';
+const taskNineR4OverrideSHA =
+  '3fe058c0e3ee4596023f49714f5d7e88e02056fe9f847011a5c186c8c99d6ee9';
+const taskNineR4PlanSHA =
+  'bbb1b2eaad68150f33a027e3de2971d9409235b3193a7c8bc2bed3600cbd2071';
+const taskNineR4AuthorizationText =
+  '부하는 상관하지말고 작업해 더 늘려서작업하라는거야';
+const taskNineR4Constraints = [
+  'load average above the prior maximum of 24 is explicitly approved for this Task 9 continuation',
+  'Task 9 validation runs serially with minimum workers',
+  'record actual host load, swap, Node/MCP, browser, Docker, target-port, command, exit-code, and owned-process metrics on every invocation',
+  'record exact owned PID/PPID, command, and port before starting any owned process',
+  'do not terminate, alter, or clean up other sessions\' processes or resources',
+  'after each owned workload, clean up only the exact owned process tree with TERM then bounded KILL if required',
+  'verify cleanup residual is zero and foreignTouched is zero',
+  'continue monitoring swap and Node/MCP growth; approval does not waive those observations or cleanup',
+];
+const taskNineR4OwnedPaths = [
+  ...taskNineR3OwnedPaths,
+  'apps/v1_api/prisma/migrations/20260802000300_v1_result_escalation_lifecycle',
+];
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -527,6 +549,10 @@ function hostPressureOverrideFunction({
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256',
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_PATH',
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_SHA256',
+    'TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_PATH',
+    'TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_SHA256',
+    'TASK_NINE_R4_AUTHORIZATION_TEXT',
+    'TASK_NINE_R4_CONSTRAINTS',
     'OVERRIDE_SHA256',
     'VERIFICATION_SESSION_ID',
     'secureImmutableDescriptor',
@@ -564,6 +590,10 @@ function hostPressureOverrideFunction({
     taskNineR2OverrideSHA,
     taskNineR3OverridePath,
     taskNineR3OverrideSHA,
+    taskNineR4OverridePath,
+    taskNineR4OverrideSHA,
+    taskNineR4AuthorizationText,
+    taskNineR4Constraints,
     '2c04e6621fccb1017838c6b479ac8addabba9061852654cec4c893ed588631c2',
     'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
     (path, expectedSHA, code, exitCode) => {
@@ -603,7 +633,7 @@ function hostPressureOverrideFunction({
       if (!row) throw new Error(`Missing Todo ${task}`);
       return row;
     },
-    () => ({ ownership: [{ todo: 9, outputs: taskNineR3OwnedPaths }] }),
+    () => ({ ownership: [{ todo: 9, outputs: taskNineR4OwnedPaths }] }),
     '.github/tasks/127-v1-team-tournament-operations-game-record.md',
   );
 }
@@ -1481,16 +1511,16 @@ test('legacy Task1 host pressure override remains accepted', () => {
   }
 });
 
-test('Task 9 R3 host pressure receipt binds the normalized plan and exact ownership', () => {
+test('Task 9 R4 host pressure receipt binds the normalized plan, additive migration, and explicit load authority', () => {
   const canonicalReceipt = JSON.parse(
-    readFileSync(resolve(repoRoot, taskNineR3OverridePath), 'utf8'),
+    readFileSync(resolve(repoRoot, taskNineR4OverridePath), 'utf8'),
   );
   const source = readFileSync(
     join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
     'utf8',
   );
   const productionSHA = source.match(
-    /const TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_SHA256 =\s*'([0-9a-f]{64})'/,
+    /const TASK_NINE_HOST_PRESSURE_OVERRIDE_R4_SHA256 =\s*'([0-9a-f]{64})'/,
   )?.[1];
   const ledgerText = readFileSync(
     join(repoRoot, '.github/tasks/127-v1-team-tournament-operations-game-record.md'),
@@ -1515,61 +1545,74 @@ test('Task 9 R3 host pressure receipt binds the normalized plan and exact owners
   const planOutputs = planRow.slice(1, -1).split('|')[2].trim().split('; ').map(
     (entry) => entry.replace(/^`|`$/g, ''),
   );
+  const dependencyRow = readFileSync(
+    join(repoRoot, '.omo/plans/teameet-team-tournament-operations-v1.md'),
+    'utf8',
+  ).split('\n').find((line) => line.startsWith('| 9 | 5, 6, 7, 11 |'));
   const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
   const previousSession = process.env.V1_VERIFICATION_SESSION_ID;
   try {
-    assert.deepEqual(ledgerOutputs, taskNineR3OwnedPaths);
-    assert.deepEqual(planOutputs, taskNineR3OwnedPaths);
-    assert.deepEqual(canonicalReceipt.ownedPaths, taskNineR3OwnedPaths);
-    assert.equal(canonicalReceipt.planSHA256, taskNineR3PlanSHA);
-    assert.equal(sha256(readFileSync(resolve(repoRoot, taskNineR3OverridePath))), taskNineR3OverrideSHA);
-    assert.equal(productionSHA, taskNineR3OverrideSHA);
+    assert.deepEqual(ledgerOutputs, taskNineR4OwnedPaths);
+    assert.deepEqual(planOutputs, taskNineR4OwnedPaths);
+    assert.equal(ledgerOutputs.length, 18);
+    assert.equal(
+      dependencyRow,
+      '| 9 | 5, 6, 7, 11 | 10, 16, 18, 22, 24, 27 | 8; Task 9A completes projection infrastructure without personal rows, while Task 24 performs Task 9B after 14 |',
+    );
+    assert.deepEqual(canonicalReceipt.ownedPaths, taskNineR4OwnedPaths);
+    assert.equal(canonicalReceipt.planSHA256, taskNineR4PlanSHA);
+    assert.equal(canonicalReceipt.authorizationText, taskNineR4AuthorizationText);
+    assert.deepEqual(canonicalReceipt.constraints, taskNineR4Constraints);
+    assert.equal(sha256(readFileSync(resolve(repoRoot, taskNineR4OverridePath))), taskNineR4OverrideSHA);
+    assert.equal(productionSHA, taskNineR4OverrideSHA);
     const verifyDescriptor = secureImmutableDescriptorFunction();
     assert.doesNotThrow(() => verifyDescriptor(
-      resolve(repoRoot, taskNineR3OverridePath),
-      taskNineR3OverrideSHA,
+      resolve(repoRoot, taskNineR4OverridePath),
+      taskNineR4OverrideSHA,
       'HOST_PRESSURE_OVERRIDE_INVALID',
       75,
+      true,
     ));
-    const hardLinkDirectory = mkdtempSync('/private/tmp/teameet-task9-hardlink-');
+    const hardLinkDirectory = mkdtempSync('/private/tmp/teameet-task9-r4-hardlink-');
     const hardLinkPath = join(hardLinkDirectory, 'receipt.json');
     try {
-      linkSync(resolve(repoRoot, taskNineR3OverridePath), hardLinkPath);
-      assert.equal(lstatSync(resolve(repoRoot, taskNineR3OverridePath)).nlink, 2);
+      linkSync(resolve(repoRoot, taskNineR4OverridePath), hardLinkPath);
+      assert.equal(lstatSync(resolve(repoRoot, taskNineR4OverridePath)).nlink, 2);
       assert.throws(
         () => verifyDescriptor(
-          resolve(repoRoot, taskNineR3OverridePath),
-          taskNineR3OverrideSHA,
+          resolve(repoRoot, taskNineR4OverridePath),
+          taskNineR4OverrideSHA,
           'HOST_PRESSURE_OVERRIDE_INVALID',
           75,
+          true,
         ),
         (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
-        'the exact Task 9 R3 receipt must reject a hard-linked inode',
+        'the exact Task 9 R4 receipt must reject a hard-linked inode',
       );
     } finally {
       rmSync(hardLinkDirectory, { recursive: true, force: true });
     }
-    const symlinkDirectory = mkdtempSync('/private/tmp/teameet-task9-symlink-');
+    const symlinkDirectory = mkdtempSync('/private/tmp/teameet-task9-r4-symlink-');
     try {
       const symlinkPath = join(symlinkDirectory, 'receipt.json');
-      symlinkSync(resolve(repoRoot, taskNineR3OverridePath), symlinkPath);
+      symlinkSync(resolve(repoRoot, taskNineR4OverridePath), symlinkPath);
       assert.throws(
-        () => verifyDescriptor(symlinkPath, taskNineR3OverrideSHA, 'HOST_PRESSURE_OVERRIDE_INVALID', 75),
+        () => verifyDescriptor(symlinkPath, taskNineR4OverrideSHA, 'HOST_PRESSURE_OVERRIDE_INVALID', 75, true),
         (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
-        'the exact Task 9 R3 receipt must reject a symlink',
+      'the exact Task 9 R4 receipt must reject a symlink',
       );
     } finally {
       rmSync(symlinkDirectory, { recursive: true, force: true });
     }
-    process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, taskNineR3OverridePath);
+    process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, taskNineR4OverridePath);
     process.env.V1_VERIFICATION_SESSION_ID = verificationSessionId;
     const verifyOverride = hostPressureOverrideFunction({
       receipt: canonicalReceipt,
-      sha256: taskNineR3OverrideSHA,
+      sha256: taskNineR4OverrideSHA,
     });
     const accepted = verifyOverride(
       repoRoot,
-      { rawSHA: 'different-raw-plan-sha', normalizedSHA: taskNineR3PlanSHA },
+      { rawSHA: 'different-raw-plan-sha', normalizedSHA: taskNineR4PlanSHA },
       9,
       ['NODE_MCP_PROCESS_PROLIFERATION'],
     );
@@ -1577,10 +1620,10 @@ test('Task 9 R3 host pressure receipt binds the normalized plan and exact owners
     assert.deepEqual(accepted.observedFailures, ['NODE_MCP_PROCESS_PROLIFERATION']);
 
     const rejected = (name, {
-      path = taskNineR3OverridePath,
-      sha256: receiptSHA = taskNineR3OverrideSHA,
+      path = taskNineR4OverridePath,
+      sha256: receiptSHA = taskNineR4OverrideSHA,
       session = verificationSessionId,
-      planSHA = taskNineR3PlanSHA,
+      planSHA = taskNineR4PlanSHA,
       task = 9,
       receipt = canonicalReceipt,
     }) => {
@@ -1593,7 +1636,7 @@ test('Task 9 R3 host pressure receipt binds the normalized plan and exact owners
       assert.throws(
         () => verifier(
           repoRoot,
-          { rawSHA: 'different-raw-plan-sha', normalizedSHA: taskNineR3PlanSHA },
+      { rawSHA: 'different-raw-plan-sha', normalizedSHA: taskNineR4PlanSHA },
           task,
           ['NODE_MCP_PROCESS_PROLIFERATION'],
         ),
@@ -1605,18 +1648,24 @@ test('Task 9 R3 host pressure receipt binds the normalized plan and exact owners
     rejected('wrong SHA', { sha256: '0'.repeat(64) });
     rejected('wrong session', { session: 'codex:wrong-session' });
     rejected('wrong plan', { planSHA: '0'.repeat(64) });
+    rejected('missing load authority', {
+      receipt: {
+        ...canonicalReceipt,
+        constraints: canonicalReceipt.constraints.slice(1),
+      },
+    });
     rejected('wrong direct mode', {
       receipt: { ...canonicalReceipt, mode: 'indirect' },
     });
     rejected('wrong task', { task: 8 });
     rejected('missing the new migration path', {
-      receipt: { ...canonicalReceipt, ownedPaths: taskNineR3OwnedPaths.filter((path) => path !== 'apps/v1_api/prisma/migrations/20260802000200_v1_team_record_facts') },
+      receipt: { ...canonicalReceipt, ownedPaths: taskNineR4OwnedPaths.filter((path) => path !== 'apps/v1_api/prisma/migrations/20260802000300_v1_result_escalation_lifecycle') },
     });
     rejected('missing the new game-operations path', {
-      receipt: { ...canonicalReceipt, ownedPaths: taskNineR3OwnedPaths.filter((path) => path !== 'apps/v1_api/src/game-operations') },
+      receipt: { ...canonicalReceipt, ownedPaths: taskNineR4OwnedPaths.filter((path) => path !== 'apps/v1_api/src/game-operations') },
     });
     rejected('extra unrelated path', {
-      receipt: { ...canonicalReceipt, ownedPaths: [...taskNineR3OwnedPaths, 'apps/v1_api/src/unrelated'] },
+      receipt: { ...canonicalReceipt, ownedPaths: [...taskNineR4OwnedPaths, 'apps/v1_api/src/unrelated'] },
     });
   } finally {
     if (previousReceipt === undefined) {
@@ -1630,6 +1679,73 @@ test('Task 9 R3 host pressure receipt binds the normalized plan and exact owners
       process.env.V1_VERIFICATION_SESSION_ID = previousSession;
     }
   }
+});
+
+test('Task 9 R3 remains immutable evidence and is rejected after the R4 ownership rebind', () => {
+  const r3 = JSON.parse(readFileSync(resolve(repoRoot, taskNineR3OverridePath), 'utf8'));
+  assert.equal(sha256(readFileSync(resolve(repoRoot, taskNineR3OverridePath))), taskNineR3OverrideSHA);
+  assert.deepEqual(r3.ownedPaths, taskNineR3OwnedPaths);
+  assert.equal(r3.ownedPaths.length, 17);
+  assert.equal(
+    r3.ownedPaths.includes('apps/v1_api/prisma/migrations/20260802000300_v1_result_escalation_lifecycle'),
+    false,
+  );
+  const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+  const previousSession = process.env.V1_VERIFICATION_SESSION_ID;
+  try {
+    process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, taskNineR3OverridePath);
+    process.env.V1_VERIFICATION_SESSION_ID = verificationSessionId;
+    const verifyOverride = hostPressureOverrideFunction({
+      receipt: r3,
+      sha256: taskNineR3OverrideSHA,
+    });
+    assert.throws(
+      () => verifyOverride(
+        repoRoot,
+        { rawSHA: taskNineR3PlanSHA, normalizedSHA: taskNineR4PlanSHA },
+        9,
+        ['LOAD_PER_CORE_PRESSURE'],
+      ),
+      (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
+    );
+  } finally {
+    if (previousReceipt === undefined) delete process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+    else process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = previousReceipt;
+    if (previousSession === undefined) delete process.env.V1_VERIFICATION_SESSION_ID;
+    else process.env.V1_VERIFICATION_SESSION_ID = previousSession;
+  }
+});
+
+test('Task 9 R4 native receipt channel accepts its exact authority and rejects a misleading-success payload', () => {
+  const command = [
+    'scripts/qa/run-v1-task-verification.mjs',
+    '--pressure-receipt-only',
+    taskNineR4OverridePath,
+    '--pressure-receipt-sha',
+    taskNineR4OverrideSHA,
+  ];
+  const environment = {
+    ...process.env,
+    OMO_SELECTED_PLAN_SHA: taskNineR4PlanSHA,
+    V1_HOST_PRESSURE_OVERRIDE_RECEIPT: taskNineR4OverridePath,
+    V1_VERIFICATION_SESSION_ID: verificationSessionId,
+  };
+  const accepted = runNode(command, { env: environment });
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.match(accepted.stdout, /TASK9_PRESSURE_RECEIPT_R4_PASS/);
+  assert.match(accepted.stdout, /owned_paths=18/);
+  const misleading = runNode(
+    [
+      ...command,
+      '--',
+      'node',
+      '-e',
+      'process.stdout.write("accepted");process.exit(23)',
+    ],
+    { env: environment },
+  );
+  assert.equal(misleading.status, 75, misleading.stderr);
+  assert.match(misleading.stderr, /Descriptor-only pressure receipt validation accepts only the exact path\/SHA pair/);
 });
 
 test('Task 9 R2 host pressure receipt is rejected after the R3 ownership rebind', () => {

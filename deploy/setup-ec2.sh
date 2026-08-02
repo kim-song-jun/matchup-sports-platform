@@ -47,6 +47,18 @@ if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/
   sudo chmod +x /usr/local/bin/docker-compose
 fi
 
+# standalone 바이너리만 깔린 호스트에서는 `docker compose` 가 동작하지 않는다. 프로덕션
+# 인스턴스가 정확히 그 상태였고, 그 결과 첫 실배포가 `unknown flag: --project-name` 으로
+# 죽었다(2026-08-02) — alpha 인스턴스에는 플러그인이 있어 alpha 검증으로는 잡히지 않았다.
+# standalone 바이너리는 플러그인 규약(docker-cli-plugin-metadata)을 그대로 지원하므로
+# cli-plugins 에 링크해 두 형태를 모두 성립시킨다. 두 환경의 호출 형태를 같게 맞춰야
+# alpha 검증이 프로덕션 동작을 예측할 수 있다.
+if ! docker compose version >/dev/null 2>&1 && command -v docker-compose >/dev/null 2>&1; then
+  echo "🔗 docker-compose 를 cli-plugin 으로 링크..."
+  sudo mkdir -p /usr/local/lib/docker/cli-plugins
+  sudo ln -sf "$(command -v docker-compose)" /usr/local/lib/docker/cli-plugins/docker-compose
+fi
+
 # 4. Git 설치
 echo "📂 Git 설치..."
 sudo yum install -y git 2>/dev/null || sudo apt-get install -y git 2>/dev/null

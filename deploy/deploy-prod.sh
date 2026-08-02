@@ -117,8 +117,16 @@ export COMPOSE_PARALLEL_LIMIT=1
 # restore_legacy_runtime() 은 V1_*_IMAGE 를 레거시 태그로 **재할당**한다. 배열에 값을
 # 박아 넣으면 그 시점의 값이 굳어 stale 해진다. --preserve-env 는 exec 시점의 환경을
 # 넘기므로 두 경우 모두 올바르게 동작한다. (sudo 1.9.15p5 에서 동작 확인)
+# compose 호출 형태는 호스트마다 다르다 — 판정 근거는 resolve_compose_binary() 주석 참조.
+# 여기서 실패하면 컨테이너를 하나도 건드리기 전에 멈춘다.
+compose_binary=()
+while IFS= read -r compose_token; do
+  compose_binary+=("${compose_token}")
+done < <(resolve_compose_binary)
+[[ ${#compose_binary[@]} -gt 0 ]] || exit 1
+
 compose=(
-  sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE docker compose
+  sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE "${compose_binary[@]}"
   --project-name deploy
   -f "${COMPOSE_PROD}"
   --env-file "${ENV_FILE}"

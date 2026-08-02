@@ -21,11 +21,18 @@ const config: Config = {
       ...base,
       displayName: 'integration',
       rootDir: '.',
+      testEnvironment: '<rootDir>/test/helpers/isolated-integration-environment.cjs',
       testMatch: [
         '<rootDir>/test/integration/**/*.e2e-spec.ts',
         '<rootDir>/test/tournaments/**/*.integration-spec.ts',
         '<rootDir>/test/games/**/*.integration-spec.ts',
       ],
+    },
+    {
+      ...base,
+      displayName: 'runner-contract',
+      rootDir: '.',
+      testMatch: ['<rootDir>/test/config/**/*.contract.spec.ts'],
     },
   ],
   testTimeout: 15000,

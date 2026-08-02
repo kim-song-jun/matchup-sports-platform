@@ -49,8 +49,16 @@ set +a
 # export 하는데 이 호스트는 `Defaults env_reset` 이라 sudo 가 그걸 떨군다.
 # 롤백에서는 특히 중요하다 — 이 배열은 load_prod_release_manifest() 보다 **먼저** 정의되므로
 # 배열에 값을 박아 넣으면 항상 빈 문자열이 굳는다.
+# compose 호출 형태는 호스트마다 다르다 — 판정 근거는 resolve_compose_binary() 주석 참조.
+# 롤백에서 특히 중요하다: 이 배열이 틀리면 되돌릴 수단 자체가 없다.
+compose_binary=()
+while IFS= read -r compose_token; do
+  compose_binary+=("${compose_token}")
+done < <(resolve_compose_binary)
+[[ ${#compose_binary[@]} -gt 0 ]] || exit 1
+
 compose=(
-  sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE docker compose
+  sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE "${compose_binary[@]}"
   --project-name deploy
   -f "${COMPOSE_PROD}"
   --env-file "${ENV_FILE}"

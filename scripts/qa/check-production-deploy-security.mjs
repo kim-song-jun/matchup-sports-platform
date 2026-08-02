@@ -156,6 +156,41 @@ for (const problem of findJobsMissingRunnerPrereqs(workflow)) {
   }
 }
 
+// prod 배포/롤백 스크립트는 compose 호출 형태를 하드코딩하면 안 된다. 프로덕션 인스턴스에는
+// v2 플러그인이 없고 standalone `docker-compose` 만 있는데(2026-08-02 실측), 스크립트가
+// `docker compose` 를 박아 두는 바람에 첫 실배포가 `unknown flag: --project-name` 으로 죽었고
+// **레거시 복구 경로도 같은 배열을 써서 함께 실패**했다. alpha 인스턴스에는 플러그인이 있어
+// alpha 검증으로는 잡히지 않는다 — 호스트 차이 그 자체가 원인이므로 코드로 막는다.
+{
+  for (const rel of ['deploy/deploy-prod.sh', 'deploy/rollback-prod.sh']) {
+    let body = '';
+    try {
+      body = readFileSync(rel, 'utf8');
+    } catch {
+      errors.push(`${rel}: 파일을 읽을 수 없습니다`);
+      continue;
+    }
+    const code = body
+      .split('\n')
+      .filter((line) => !/^\s*#/.test(line))
+      .join('\n');
+    // compose=( ... ) 배열은 여러 줄에 걸쳐 있으므로 블록 단위로 본다 — 한 줄 정규식은
+    // 실제 코드 형태를 못 잡아 조용히 통과한다(그런 검사는 없는 것만 못하다).
+    const composeArray = code.match(/compose=\([\s\S]*?\n\)/)?.[0] ?? '';
+    if (/\bdocker(?:\s+compose|-compose)\b/.test(composeArray)) {
+      errors.push(
+        `${rel}: compose 호출 형태를 하드코딩했습니다 — resolve_compose_binary() 로 해석해야 합니다 ` +
+          '(프로덕션 호스트에는 docker compose 플러그인이 없고 standalone docker-compose 만 있다)',
+      );
+    }
+    if (!/resolve_compose_binary/.test(code)) {
+      errors.push(
+        `${rel}: resolve_compose_binary() 를 거치지 않습니다 — 호스트마다 compose 호출 형태가 다릅니다`,
+      );
+    }
+  }
+}
+
 const requiredPatterns = [
   {
     pattern: /^permissions:\n  contents: read$/m,

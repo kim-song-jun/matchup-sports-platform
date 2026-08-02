@@ -237,8 +237,12 @@ jobs:
 
     outputs:
       registry: ${{ steps.login-ecr.outputs.registry }}
-      manifestSha256: ${{ steps.manifest.outputs.manifestSha256 }}
+      # manifestSha256 은 실제로 S3 에 올라간 바이트를 해싱한 값이어야 한다 —
+      # 업로드 스텝에서 계산해 내보낸다(생성 스텝이 아니라).
+      manifestSha256: ${{ steps.manifest_upload.outputs.manifestSha256 }}
+      manifestVersionId: ${{ steps.manifest_upload.outputs.manifestVersionId }}
       sourceSha256: ${{ steps.source.outputs.sourceSha256 }}
+      sourceVersionId: ${{ steps.source.outputs.sourceVersionId }}
       releaseVersion: ${{ steps.version.outputs.stable }}
 
     steps:
@@ -267,36 +271,6 @@ jobs:
       - name: Sign in to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
-
-      - name: Setup SSH
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        run: |
-          set -Eeuo pipefail
-          if [[ -z "${EC2_HOST}" || -z "${EC2_KNOWN_HOSTS}" || -z "${EC2_SSH_KEY}" ]]; then
-            echo "EC2_HOST, EC2_KNOWN_HOSTS, and EC2_SSH_KEY are required" >&2
-            exit 1
-          fi
-          mkdir -p ~/.ssh
-          printf '%s\n' "${EC2_SSH_KEY}" > ~/.ssh/deploy_key
-          printf '%s\n' "${EC2_KNOWN_HOSTS}" > ~/.ssh/known_hosts
-          chmod 400 ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/known_hosts
-          if ! ssh-keygen -F "${EC2_HOST}" -f ~/.ssh/known_hosts >/dev/null; then
-            echo "EC2_KNOWN_HOSTS does not contain the configured EC2_HOST" >&2
-            exit 1
-          fi
-          cat >> ~/.ssh/config << EOF
-          Host ec2
-            HostName ${EC2_HOST}
-            User ec2-user
-            IdentityFile ~/.ssh/deploy_key
-            IdentitiesOnly yes
-            StrictHostKeyChecking yes
-            UserKnownHostsFile ~/.ssh/known_hosts
-          EOF
 
       - name: Resolve rollback compatibility base
         id: rollback-base
@@ -353,12 +327,34 @@ jobs:
           sbom: false
 
       # 웹 이미지 빌드 인자 하나(INTERNAL_API_ORIGIN)만 EC2 .env 에서 읽는다. 승인 전
-      # 단계라 .env 를 쓰지는 않는다 — 값만 조회하는 짧은 SSH 조회다(기존 로직 이식).
+      # 단계라 .env 를 쓰지는 않는다 — 값만 조회한다.
       - name: Resolve internal API origin
         id: origin
+        env:
+          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
         run: |
           set -Eeuo pipefail
-          origin="$(ssh ec2 "awk -F= '/^V1_INTERNAL_API_ORIGIN=/{sub(/^V1_INTERNAL_API_ORIGIN=/,\"\"); print; exit}' ~/teameet/deploy/.env" || true)"
+          # SSH 대신 SSM 으로 읽는다. 값이 없거나 조회가 실패하면 기본값으로 떨어진다 —
+          # 이 값은 웹 이미지 빌드 인자일 뿐이라 조회 실패로 배포를 막지 않는다.
+          origin=""
+          cmd_id="$(aws ssm send-command --instance-ids "${INSTANCE_ID}" \
+            --document-name AWS-RunShellScript --comment "Teameet prod resolve internal api origin" \
+            --parameters 'commands=["awk -F= '"'"'/^V1_INTERNAL_API_ORIGIN=/{sub(/^V1_INTERNAL_API_ORIGIN=/,\"\"); print; exit}'"'"' /home/ec2-user/teameet/deploy/.env 2>/dev/null || true"]' \
+            --query 'Command.CommandId' --output text 2>/dev/null || true)"
+          if [[ -n "${cmd_id}" ]]; then
+            for _ in $(seq 1 20); do
+              status="$(aws ssm get-command-invocation --command-id "${cmd_id}" \
+                --instance-id "${INSTANCE_ID}" --query Status --output text 2>/dev/null || true)"
+              [[ "${status}" == "InProgress" || "${status}" == "Pending" || -z "${status}" ]] || break
+              sleep 3
+            done
+            if [[ "${status:-}" == "Success" ]]; then
+              origin="$(aws ssm get-command-invocation --command-id "${cmd_id}" \
+                --instance-id "${INSTANCE_ID}" --query StandardOutputContent --output text 2>/dev/null | tr -d '\r\n' || true)"
+            else
+              echo "[prod-build] internal API origin 조회 실패(${status:-unknown}) — 기본값을 씁니다" >&2
+            fi
+          fi
           echo "internalApiOrigin=${origin:-http://v1_api:8121}" >> "${GITHUB_OUTPUT}"
 
       - name: Build and push immutable Web image
@@ -389,34 +385,43 @@ jobs:
       # D2: S3 중계 없이 러너가 저장소를 EC2 의 고정 스테이징 경로로 직접 rsync 한다.
       # 이 스텝은 아직 어떤 release-sha 도 활성화하지 않는다 — activation(symlink 스왑)은
       # 승인 이후 deploy job 의 deploy-prod.sh 책임이다(D3).
-      - name: Stage release source on EC2
+      - name: Upload release source to S3
         id: source
         env:
           RELEASE_SHA: ${{ github.sha }}
+          DEPLOY_BUCKET: ${{ vars.PROD_DEPLOY_BUCKET }}
+          EXPECTED_BUCKET_OWNER: ${{ vars.PROD_EXPECTED_ACCOUNT_ID }}
         run: |
           set -Eeuo pipefail
-          staging="~/.teameet-prod-staging/${RELEASE_SHA}"
-          ssh ec2 "mkdir -p ${staging}"
-          rsync -avz --delete \
-            --exclude node_modules --exclude .next --exclude dist --exclude .git \
-            --exclude backups --exclude 'deploy/certbot' --exclude 'deploy/.env' \
-            --exclude 'deploy/release-metadata.prod.conf' \
-            -e ssh ./ "ec2:${staging}/"
-          # R8: sourceSha256 은 EC2 로 실제 전송된 바이트를 그대로 재해싱한다(별도 재구성값이
-          # 아니다) — rsync exclude 목록과 어긋날 수 있는 값을 신뢰하지 않는다.
-          # 원격 커맨드를 문자열로 넘기면 로컬 set -e 는 ssh 자체의 종료코드만 본다. 그런데
-          # 그 안이 파이프라인이라 tar 가 실패해도 sha256sum 이 0 으로 끝나면 ssh 도 0 이 되어
-          # **빈 입력의 해시**가 정상값처럼 흘러간다. 원격에서도 pipefail 을 켜 tar 실패를
-          # 전파시키고, awk 는 로컬로 옮겨 원격 문자열의 $1 이스케이프 지옥을 없앤다.
-          source_sha256="$(ssh ec2 "set -o pipefail; tar --sort=name -C '${staging}' -cf - . | sha256sum")"
-          source_sha256="${source_sha256%% *}"
-          # 형식 검증까지 해야 위 pipefail 이 어떤 이유로든 안 걸렸을 때도 빈 값/쓰레기가
-          # 매니페스트에 박히지 않는다.
+          # SSH/rsync 대신 러너에서 tarball 을 만들어 S3 로 올린다(alpha 와 동일 구조).
+          # EC2 는 배포 시점에 SSM 명령으로 이 객체를 내려받아 푼다 — 인바운드 포트도,
+          # 저장소가 보관하는 장기 사설키도 필요 없어진다.
+          archive="${RUNNER_TEMP}/teameet-prod-${RELEASE_SHA}.tar.gz"
+          # --sort=name + 고정 mtime/uid/gid 로 재현 가능한 tarball 을 만든다. 같은 트리면
+          # 같은 sha256 이 나와야 재배포·검증이 성립한다.
+          tar --sort=name --owner=0 --group=0 --numeric-owner \
+            --mtime='UTC 2020-01-01' \
+            --exclude=./node_modules --exclude=./.next --exclude=./dist --exclude=./.git \
+            --exclude=./backups --exclude=./deploy/certbot --exclude=./deploy/.env \
+            --exclude=./deploy/release-metadata.prod.conf \
+            -czf "${archive}" -C . .
+          # R8: sourceSha256 은 실제로 업로드되는 바이트를 그대로 해싱한다 — 별도 재구성값이
+          # 아니므로 exclude 목록과 어긋날 여지가 없다.
+          source_sha256="$(sha256sum "${archive}" | awk '{print $1}')"
           if [[ ! "${source_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
-            echo "Failed to compute sourceSha256 from ${staging} (got: '${source_sha256}')" >&2
+            echo "Failed to compute sourceSha256 from ${archive} (got: '${source_sha256}')" >&2
+            exit 1
+          fi
+          source_version_id="$(aws s3api put-object \
+            --bucket "${DEPLOY_BUCKET}" --key "releases/${RELEASE_SHA}.tar.gz" \
+            --body "${archive}" --expected-bucket-owner "${EXPECTED_BUCKET_OWNER}" \
+            --query 'VersionId' --output text)"
+          if [[ -z "${source_version_id}" || "${source_version_id}" == "None" ]]; then
+            echo "S3 put-object did not return a VersionId — 버킷 버전 관리가 켜져 있는지 확인하세요" >&2
             exit 1
           fi
           echo "sourceSha256=${source_sha256}" >> "${GITHUB_OUTPUT}"
+          echo "sourceVersionId=${source_version_id}" >> "${GITHUB_OUTPUT}"
 
       - name: Create release manifest
         id: manifest
@@ -430,15 +435,33 @@ jobs:
           MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
         run: bash scripts/release/create-prod-release-manifest.sh
 
-      - name: Copy release manifest onto EC2 staging
+      - name: Upload release manifest to S3
+        id: manifest_upload
         env:
           RELEASE_SHA: ${{ github.sha }}
           MANIFEST_PATH: ${{ steps.manifest.outputs.manifestPath }}
+          DEPLOY_BUCKET: ${{ vars.PROD_DEPLOY_BUCKET }}
+          EXPECTED_BUCKET_OWNER: ${{ vars.PROD_EXPECTED_ACCOUNT_ID }}
         run: |
           set -Eeuo pipefail
-          ssh ec2 "mkdir -p ~/.teameet-prod-staging/${RELEASE_SHA}/deploy"
-          scp -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
-            "${MANIFEST_PATH}" "ec2:~/.teameet-prod-staging/${RELEASE_SHA}/deploy/release-manifest.json"
+          # 매니페스트도 소스와 같은 버킷에 버전 고정으로 올린다. EC2 는 배포 시점에
+          # version-id 로 정확히 이 객체를 받고 sha256 으로 대조한다 — 중간에 바꿔치기해도
+          # 검증에서 걸린다.
+          manifest_sha256="$(sha256sum "${MANIFEST_PATH}" | awk '{print $1}')"
+          if [[ ! "${manifest_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Failed to compute manifestSha256 from ${MANIFEST_PATH}" >&2
+            exit 1
+          fi
+          manifest_version_id="$(aws s3api put-object \
+            --bucket "${DEPLOY_BUCKET}" --key "manifests/${RELEASE_SHA}.json" \
+            --body "${MANIFEST_PATH}" --expected-bucket-owner "${EXPECTED_BUCKET_OWNER}" \
+            --query 'VersionId' --output text)"
+          if [[ -z "${manifest_version_id}" || "${manifest_version_id}" == "None" ]]; then
+            echo "S3 put-object did not return a VersionId — 버킷 버전 관리 확인 필요" >&2
+            exit 1
+          fi
+          echo "manifestSha256=${manifest_sha256}" >> "${GITHUB_OUTPUT}"
+          echo "manifestVersionId=${manifest_version_id}" >> "${GITHUB_OUTPUT}"
 
   # ── Deploy job: 승인 후 activation + 마이그레이션 + 컨테이너 교체만 수행 ───────
   deploy:
@@ -457,214 +480,35 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - name: Setup SSH
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        run: |
-          set -Eeuo pipefail
-          if [[ -z "${EC2_HOST}" || -z "${EC2_KNOWN_HOSTS}" || -z "${EC2_SSH_KEY}" ]]; then
-            echo "EC2_HOST, EC2_KNOWN_HOSTS, and EC2_SSH_KEY are required" >&2
-            exit 1
-          fi
-          mkdir -p ~/.ssh
-          printf '%s\n' "${EC2_SSH_KEY}" > ~/.ssh/deploy_key
-          printf '%s\n' "${EC2_KNOWN_HOSTS}" > ~/.ssh/known_hosts
-          chmod 400 ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/known_hosts
-          if ! ssh-keygen -F "${EC2_HOST}" -f ~/.ssh/known_hosts >/dev/null; then
-            echo "EC2_KNOWN_HOSTS does not contain the configured EC2_HOST" >&2
-            exit 1
-          fi
-          cat >> ~/.ssh/config << EOF
-          Host ec2
-            HostName ${EC2_HOST}
-            User ec2-user
-            IdentityFile ~/.ssh/deploy_key
-            IdentitiesOnly yes
-            StrictHostKeyChecking yes
-            UserKnownHostsFile ~/.ssh/known_hosts
-          EOF
 
-      # 승인된 릴리스만 런타임 설정에 반영한다. 예전에는 이 스텝이 :latest 승격 +
-      # migrate 까지 겸했지만, 이제 그 책임은 deploy-prod.sh(D3) 로 옮겼다 — 여기서는
-      # 시크릿을 고정 런타임 경로(~/.teameet-prod-runtime/.env)에 동기화만 한다.
+      # 런타임 시크릿은 Parameter Store(SecureString) 를 거쳐 전달한다.
+      # SSM send-command 의 파라미터는 CloudTrail 과 명령 이력에 남으므로 시크릿을 명령
+      # 문자열에 실을 수 없다. 값은 KMS 로 암호화해 Parameter Store 에 올리고, 명령에는
+      # 경로만 실어 보낸다 — 인스턴스가 자기 IAM role 로 복호화해 .env 를 재구성한다.
       - name: Sync runtime env
-        timeout-minutes: 5
         env:
-          RELEASE_SHA: ${{ github.sha }}
-          KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
-          KAKAO_CLIENT_SECRET_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
-          KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
-          # 공개 동의항목 목록이라 시크릿이 아닌 repository variable.
-          KAKAO_SCOPE_SECRET: ${{ vars.KAKAO_SCOPE }}
-          V1_HOST_ADMIN_PASSWORD_SECRET: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}
-          GA_MEASUREMENT_ID_SECRET: ${{ secrets.GA_PROD }}
-          VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
-          # 휴대폰 SMS OTP 발송처. 솔라피·가비아 양쪽을 모두 주입하고 SMS_PROVIDER
-          # 플래그로만 전환한다.
-          SMS_PROVIDER_SECRET: ${{ secrets.SMS_PROVIDER }}
-          SOLAPI_API_KEY_SECRET: ${{ secrets.SOLAPI_API_KEY }}
-          SOLAPI_API_SECRET_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
-          SOLAPI_SENDER_NUMBER_SECRET: ${{ secrets.SOLAPI_SENDER_NUMBER }}
-          GABIA_SMS_ID_SECRET: ${{ secrets.GABIA_SMS_ID }}
-          GABIA_API_KEY_SECRET: ${{ secrets.GABIA_API_KEY }}
-          GABIA_SENDER_NUMBER_SECRET: ${{ secrets.GABIA_SENDER_NUMBER }}
-          # 이메일 OTP 발송처(SesEmailSender). 값이 공개 설정이라 시크릿이 아닌
-          # repository variable 이다.
-          SES_REGION_SECRET: ${{ vars.SES_REGION }}
-          EMAIL_FROM_SECRET: ${{ vars.EMAIL_FROM }}
-        run: |
-          KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
-          KAKAO_CLIENT_SECRET_B64="$(printf '%s' "${KAKAO_CLIENT_SECRET_SECRET:-}" | base64 | tr -d '\n')"
-          KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
-          KAKAO_SCOPE_B64="$(printf '%s' "${KAKAO_SCOPE_SECRET:-}" | base64 | tr -d '\n')"
-          V1_HOST_ADMIN_PASSWORD_B64="$(printf '%s' "${V1_HOST_ADMIN_PASSWORD_SECRET:-}" | base64 | tr -d '\n')"
-          GA_MEASUREMENT_ID_B64="$(printf '%s' "${GA_MEASUREMENT_ID_SECRET:-}" | base64 | tr -d '\n')"
-          VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          VAPID_PRIVATE_KEY_B64="$(printf '%s' "${VAPID_PRIVATE_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          VAPID_SUBJECT_B64="$(printf '%s' "${VAPID_SUBJECT_SECRET:-}" | base64 | tr -d '\n')"
-          SMS_PROVIDER_B64="$(printf '%s' "${SMS_PROVIDER_SECRET:-}" | base64 | tr -d '\n')"
-          SOLAPI_API_KEY_B64="$(printf '%s' "${SOLAPI_API_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          SOLAPI_API_SECRET_B64="$(printf '%s' "${SOLAPI_API_SECRET_SECRET:-}" | base64 | tr -d '\n')"
-          SOLAPI_SENDER_NUMBER_B64="$(printf '%s' "${SOLAPI_SENDER_NUMBER_SECRET:-}" | base64 | tr -d '\n')"
-          GABIA_SMS_ID_B64="$(printf '%s' "${GABIA_SMS_ID_SECRET:-}" | base64 | tr -d '\n')"
-          GABIA_API_KEY_B64="$(printf '%s' "${GABIA_API_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          GABIA_SENDER_NUMBER_B64="$(printf '%s' "${GABIA_SENDER_NUMBER_SECRET:-}" | base64 | tr -d '\n')"
-          SES_REGION_B64="$(printf '%s' "${SES_REGION_SECRET:-}" | base64 | tr -d '\n')"
-          EMAIL_FROM_B64="$(printf '%s' "${EMAIL_FROM_SECRET:-}" | base64 | tr -d '\n')"
+          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.PROD_AWS_REGION }}
+          SECRET_KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
+          SECRET_KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          SECRET_KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
+          SECRET_KAKAO_SCOPE: ${{ vars.KAKAO_SCOPE }}
+          SECRET_V1_HOST_ADMIN_PASSWORD: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}
+          SECRET_GA_MEASUREMENT_ID: ${{ secrets.GA_PROD }}
+          SECRET_VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          SECRET_VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          SECRET_VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          SECRET_SMS_PROVIDER: ${{ secrets.SMS_PROVIDER }}
+          SECRET_SOLAPI_API_KEY: ${{ secrets.SOLAPI_API_KEY }}
+          SECRET_SOLAPI_API_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
+          SECRET_SOLAPI_SENDER_NUMBER: ${{ secrets.SOLAPI_SENDER_NUMBER }}
+          SECRET_GABIA_SMS_ID: ${{ secrets.GABIA_SMS_ID }}
+          SECRET_GABIA_API_KEY: ${{ secrets.GABIA_API_KEY }}
+          SECRET_GABIA_SENDER_NUMBER: ${{ secrets.GABIA_SENDER_NUMBER }}
+          SECRET_SES_REGION: ${{ vars.SES_REGION }}
+          SECRET_EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+        run: bash scripts/release/sync-prod-runtime-env.sh
 
-          {
-            printf 'RELEASE_SHA=%s\n' "${RELEASE_SHA}"
-            printf 'KAKAO_CLIENT_ID_B64=%s\n' "${KAKAO_CLIENT_ID_B64}"
-            printf 'KAKAO_CLIENT_SECRET_B64=%s\n' "${KAKAO_CLIENT_SECRET_B64}"
-            printf 'KAKAO_REDIRECT_URI_B64=%s\n' "${KAKAO_REDIRECT_URI_B64}"
-            printf 'KAKAO_SCOPE_B64=%s\n' "${KAKAO_SCOPE_B64}"
-            printf 'V1_HOST_ADMIN_PASSWORD_B64=%s\n' "${V1_HOST_ADMIN_PASSWORD_B64}"
-            printf 'GA_MEASUREMENT_ID_B64=%s\n' "${GA_MEASUREMENT_ID_B64}"
-            printf 'VAPID_PUBLIC_KEY_B64=%s\n' "${VAPID_PUBLIC_KEY_B64}"
-            printf 'VAPID_PRIVATE_KEY_B64=%s\n' "${VAPID_PRIVATE_KEY_B64}"
-            printf 'VAPID_SUBJECT_B64=%s\n' "${VAPID_SUBJECT_B64}"
-            printf 'SMS_PROVIDER_B64=%s\n' "${SMS_PROVIDER_B64}"
-            printf 'SOLAPI_API_KEY_B64=%s\n' "${SOLAPI_API_KEY_B64}"
-            printf 'SOLAPI_API_SECRET_B64=%s\n' "${SOLAPI_API_SECRET_B64}"
-            printf 'SOLAPI_SENDER_NUMBER_B64=%s\n' "${SOLAPI_SENDER_NUMBER_B64}"
-            printf 'GABIA_SMS_ID_B64=%s\n' "${GABIA_SMS_ID_B64}"
-            printf 'GABIA_API_KEY_B64=%s\n' "${GABIA_API_KEY_B64}"
-            printf 'GABIA_SENDER_NUMBER_B64=%s\n' "${GABIA_SENDER_NUMBER_B64}"
-            printf 'SES_REGION_B64=%s\n' "${SES_REGION_B64}"
-            printf 'EMAIL_FROM_B64=%s\n' "${EMAIL_FROM_B64}"
-            cat <<'REMOTE_SCRIPT'
-          set -euo pipefail
-
-          sync_env_from_github_secret() {
-            local key="$1"
-            local b64_value="$2"
-            local decoded_value=""
-            local tmp_env
-
-            if [ -n "$b64_value" ]; then
-              decoded_value=$(printf '%s' "$b64_value" | base64 -d)
-            fi
-
-            tmp_env=$(mktemp)
-            awk -v key="${key}=" 'index($0, key) != 1' "${RUNTIME_ENV_FILE}" > "$tmp_env"
-            {
-              cat "$tmp_env"
-              printf '%s=%s\n' "$key" "$decoded_value"
-            } > "${RUNTIME_ENV_FILE}"
-            rm -f "$tmp_env"
-          }
-
-          RUNTIME_DIR="${HOME}/.teameet-prod-runtime"
-          RUNTIME_ENV_FILE="${RUNTIME_DIR}/.env"
-          mkdir -p "${RUNTIME_DIR}"
-          # 최초 1회 부트스트랩: prepare_prod_release_source() 도 같은 일을 하지만, 이
-          # 스텝이 그보다 먼저 실행되므로 여기서도 방어적으로 한 번 더 보장한다.
-          if [ ! -f "${RUNTIME_ENV_FILE}" ]; then
-            # umask 077 로 감싸는 이유: cp 는 새 파일 권한을 umask 로 정한다. EC2 기본 umask 022
-            # 에서는 644 로 만들어지고, 아래에서 시크릿 18개를 다 기록한 뒤에야 chmod 600 이
-            # 걸린다 — 그 사이 구간 동안 프로덕션 시크릿이 world-readable 로 디스크에 놓인다.
-            # 처음부터 600 으로 만들어 그 창 자체를 없앤다(최초 1회 경로라 이후 배포엔 무영향).
-            ( umask 077; cp "${HOME}/teameet/deploy/.env" "${RUNTIME_ENV_FILE}" )
-          fi
-
-          sync_env_from_github_secret "KAKAO_CLIENT_ID" "${KAKAO_CLIENT_ID_B64:-}"
-          sync_env_from_github_secret "KAKAO_CLIENT_SECRET" "${KAKAO_CLIENT_SECRET_B64:-}"
-          sync_env_from_github_secret "KAKAO_REDIRECT_URI" "${KAKAO_REDIRECT_URI_B64:-}"
-          sync_env_from_github_secret "KAKAO_SCOPE" "${KAKAO_SCOPE_B64:-}"
-          sync_env_from_github_secret "V1_HOST_ADMIN_PASSWORD" "${V1_HOST_ADMIN_PASSWORD_B64:-}"
-          sync_env_from_github_secret "GA_MEASUREMENT_ID" "${GA_MEASUREMENT_ID_B64:-}"
-          sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
-          sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
-          sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
-          sync_env_from_github_secret "SMS_PROVIDER" "${SMS_PROVIDER_B64:-}"
-          sync_env_from_github_secret "SOLAPI_API_KEY" "${SOLAPI_API_KEY_B64:-}"
-          sync_env_from_github_secret "SOLAPI_API_SECRET" "${SOLAPI_API_SECRET_B64:-}"
-          sync_env_from_github_secret "SOLAPI_SENDER_NUMBER" "${SOLAPI_SENDER_NUMBER_B64:-}"
-          sync_env_from_github_secret "GABIA_SMS_ID" "${GABIA_SMS_ID_B64:-}"
-          sync_env_from_github_secret "GABIA_API_KEY" "${GABIA_API_KEY_B64:-}"
-          sync_env_from_github_secret "GABIA_SENDER_NUMBER" "${GABIA_SENDER_NUMBER_B64:-}"
-          sync_env_from_github_secret "SES_REGION" "${SES_REGION_B64:-}"
-          sync_env_from_github_secret "EMAIL_FROM" "${EMAIL_FROM_B64:-}"
-
-          # Harden ~/.teameet-prod-runtime/.env perms against EC2 umask 022 — contains
-          # DB_PASSWORD/JWT_SECRET and other secrets.
-          chmod 600 "${RUNTIME_ENV_FILE}"
-
-          set -a
-          . "${RUNTIME_ENV_FILE}"
-          set +a
-
-          required_env_vars=(DB_PASSWORD JWT_SECRET)
-          for required_env in "${required_env_vars[@]}"; do
-            if [ -z "${!required_env:-}" ]; then
-              echo "[ERROR] Missing required deploy env: ${required_env}"
-              exit 1
-            fi
-          done
-
-          # ── env 드리프트 경고 ──────────────────────────────────────────────
-          # compose 는 ${VAR:-} 형태라 값이 없어도 빈 문자열로 조용히 치환된다. 앱은 그걸
-          # "설정 없음"으로 보고 기능을 graceful disable 하므로, 배포는 성공한 채 해당 기능만
-          # 죽는다. 위 sync 목록과 compose 참조 목록이 어긋나면 여기서 눈에 띄게 만든다.
-          # V1_API_IMAGE/V1_WEB_IMAGE 는 .env 가 아니라 deploy-prod.sh 가 manifest 에서
-          # export 하므로 이 검사 대상에서 제외한다(§9 — 매 배포마다 오탐 WARN 을 막는다).
-          # grep 은 일치하는 줄이 하나도 없으면 exit 1 이고, 이 블록은 set -euo pipefail 로
-          # 돈다 — compose 에서 ${VAR} 참조가 전부 사라지는 정상 상태가 배포를 중단시킨다.
-          # #220(프로덕션 배포 교착)과 정확히 같은 계열이라 애초에 그 실패 모드를 없앤다.
-          # awk 는 일치가 없어도 0 을 반환한다. 한 줄에 여러 참조가 있을 수 있으므로
-          # match 를 반복 적용해 grep -o 와 동일하게 전부 뽑는다.
-          drift_keys=$(awk '{
-              s = $0
-              while (match(s, /\$\{[A-Z0-9_]+/)) {
-                print substr(s, RSTART + 2, RLENGTH - 2)
-                s = substr(s, RSTART + RLENGTH)
-              }
-            }' "${HOME}/teameet/deploy/docker-compose.prod.yml" | sort -u)
-          empty_keys=""
-          for drift_key in ${drift_keys}; do
-            case "${drift_key}" in
-              V1_API_IMAGE|V1_WEB_IMAGE) continue ;;
-            esac
-            if [ -z "${!drift_key:-}" ]; then
-              empty_keys="${empty_keys} ${drift_key}"
-            fi
-          done
-          if [ -n "${empty_keys}" ]; then
-            echo "[WARN] compose 가 참조하지만 런타임 .env 에 값이 없는 키:${empty_keys}"
-            echo "[WARN] 의도한 기본값이 아니라면 GitHub secret/variable 등록과 이 워크플로의 sync 목록을 함께 확인할 것."
-          fi
-          echo "[INFO] Runtime env synced to ${RUNTIME_ENV_FILE}"
-          REMOTE_SCRIPT
-          } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
-
-      # activation(symlink 스왑) + migrate + 컨테이너 교체를 전부 이 한 스텝에서 한다
-      # (D3). build-images 가 승인 전에 이미지 push + 소스 스테이징까지 끝내 뒀으므로
-      # 여기서 남는 일은 이것뿐이다.
       - name: Run deploy-prod.sh
         timeout-minutes: 20
         env:
@@ -674,38 +518,87 @@ jobs:
           PROD_ECR_REGISTRY: ${{ needs.build-images.outputs.registry }}
           PROD_AWS_REGION: ${{ vars.PROD_AWS_REGION }}
           PROD_SOURCE_SHA256: ${{ needs.build-images.outputs.sourceSha256 }}
+          PROD_SOURCE_VERSION_ID: ${{ needs.build-images.outputs.sourceVersionId }}
+          PROD_MANIFEST_VERSION_ID: ${{ needs.build-images.outputs.manifestVersionId }}
+          PROD_DEPLOY_BUCKET: ${{ vars.PROD_DEPLOY_BUCKET }}
+          PROD_EXPECTED_ACCOUNT_ID: ${{ vars.PROD_EXPECTED_ACCOUNT_ID }}
+          PROD_EC2_INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
         run: |
           set -Eeuo pipefail
-          staging="/home/ec2-user/.teameet-prod-staging/${PROD_SHA}"
-          ssh ec2 "sudo -u ec2-user -H env \
-            PROD_SOURCE_DIR='${staging}' \
-            PROD_MANIFEST_FILE='${staging}/deploy/release-manifest.json' \
-            PROD_MANIFEST_SHA256='${PROD_MANIFEST_SHA256}' \
-            PROD_SHA='${PROD_SHA}' \
-            PROD_RELEASE_VERSION='${PROD_RELEASE_VERSION}' \
-            PROD_ECR_REGISTRY='${PROD_ECR_REGISTRY}' \
-            PROD_AWS_REGION='${PROD_AWS_REGION}' \
-            PROD_SOURCE_SHA256='${PROD_SOURCE_SHA256}' \
-            bash '${staging}/deploy/deploy-prod.sh'"
+          # SSH 대신 SSM. 스크립트가 S3 에서 소스·매니페스트를 내려받아 sha256 으로 대조한 뒤
+          # deploy-prod.sh 를 실행한다. 시크릿은 명령 파라미터에 들어가지 않는다.
+          RELEASE_SHA="${PROD_SHA}" \
+          RELEASE_VERSION="${PROD_RELEASE_VERSION}" \
+          DEPLOY_BUCKET="${PROD_DEPLOY_BUCKET}" \
+          EXPECTED_BUCKET_OWNER="${PROD_EXPECTED_ACCOUNT_ID}" \
+          INSTANCE_ID="${PROD_EC2_INSTANCE_ID}" \
+          SOURCE_VERSION_ID="${PROD_SOURCE_VERSION_ID}" \
+          SOURCE_SHA256="${PROD_SOURCE_SHA256}" \
+          MANIFEST_VERSION_ID="${PROD_MANIFEST_VERSION_ID}" \
+          MANIFEST_SHA256="${PROD_MANIFEST_SHA256}" \
+          REGISTRY="${PROD_ECR_REGISTRY}" \
+          AWS_REGION="${PROD_AWS_REGION}" \
+            bash scripts/release/deploy-prod-via-ssm.sh
 
       # deploy-prod.sh 는 EC2 안에서 이미 wait_for_prod_health_contract 로 로컬 헬스를
       # 확인한 뒤에만 성공 리턴한다. 여기서는 "EC2 로컬은 성공했지만 네트워크 경로 문제로
       # 퍼블릭엔 아직 안 나온" 케이스를 잡기 위해 러너에서 한 번 더 확인한다(요구사항 5).
       - name: Health check
+        env:
+          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
+          RELEASE_VERSION: ${{ needs.build-images.outputs.releaseVersion }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
+          set -Eeuo pipefail
+          # ① 인스턴스 내부 계약 검사(기존 SSH 검사와 동일 내용)를 SSM 으로 실행한다.
+          health_script=$(cat <<'REMOTE'
+          set -Eeuo pipefail
+          curl -fsS --connect-timeout 5 --max-time 15 http://localhost:8121/api/v1/health |
+            jq -e '.data.checks.db == true' >/dev/null
+          test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 \
+            -o /dev/null -w '%{http_code}' https://teameet.co.kr/landing)" = "200"
+          curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 \
+            https://teameet.co.kr/api/v1/health | jq -e '.data.checks.db == true' >/dev/null
+          test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 \
+            -o /dev/null -w '%{http_code}' https://teameet.co.kr/v1/home)" = "308"
+          echo LOCAL_HEALTH_OK
+          REMOTE
+          )
+          params="$(jq -nc --arg s "${health_script}" '{commands:[$s]}')"
+          ok=false
           for i in $(seq 1 12); do
-            if ssh ec2 'curl -fsS --connect-timeout 5 --max-time 15 http://localhost:8121/api/v1/health | \
-                        jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/landing 2>/dev/null | \
-                        grep -qx 200 && \
-                        curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 https://teameet.co.kr/api/v1/health 2>/dev/null | \
-                        jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w %{http_code} https://teameet.co.kr/v1/home 2>/dev/null)" = "308"'; then
-              echo "Deploy OK"
-              exit 0
-            fi
-            echo "Attempt $i/12 — not ready yet, retrying in 10s..."
+            cid="$(aws ssm send-command --instance-ids "${INSTANCE_ID}" \
+              --document-name AWS-RunShellScript --comment "Teameet prod health ${RELEASE_SHA}" \
+              --parameters "${params}" --query 'Command.CommandId' --output text)"
+            for _ in $(seq 1 20); do
+              st="$(aws ssm get-command-invocation --command-id "${cid}" \
+                --instance-id "${INSTANCE_ID}" --query Status --output text 2>/dev/null || true)"
+              [[ "${st}" == "InProgress" || "${st}" == "Pending" || -z "${st}" ]] || break
+              sleep 3
+            done
+            if [[ "${st:-}" == "Success" ]]; then ok=true; break; fi
+            echo "Attempt ${i}/12 — 아직 준비되지 않았습니다(${st:-unknown}), 10초 후 재시도..."
             sleep 10
           done
-          echo "Deploy FAILED"
+          if [[ "${ok}" != true ]]; then
+            echo "인스턴스 내부 헬스 계약이 통과하지 못했습니다" >&2
+            aws ssm get-command-invocation --command-id "${cid}" --instance-id "${INSTANCE_ID}" \
+              --query '{status:Status,stdout:StandardOutputContent,stderr:StandardErrorContent}' --output json >&2 || true
+            exit 1
+          fi
+
+          # ② 러너에서 퍼블릭 경로를 직접 확인한다. ①은 --resolve 로 루프백을 강제하므로
+          #    ALB·DNS·인증서 경로가 실제로 새 릴리스를 내보내는지는 검증하지 못한다.
+          #    릴리스 헤더까지 대조해야 "옛 컨테이너가 응답해서 통과"하는 것을 배제할 수 있다.
+          for i in $(seq 1 12); do
+            served="$(curl -fsSI --connect-timeout 5 --max-time 15 https://teameet.co.kr/ 2>/dev/null |
+              awk -F': ' 'tolower($1)=="x-teameet-commit"{gsub("\r","",$2); print $2}')"
+            if [[ "${served}" == "${RELEASE_SHA}" ]]; then
+              echo "Deploy OK — 퍼블릭 응답이 ${RELEASE_VERSION} (${RELEASE_SHA}) 입니다"
+              exit 0
+            fi
+            echo "Attempt ${i}/12 — 퍼블릭 응답이 아직 '${served:-없음}' 입니다, 10초 후 재시도..."
+            sleep 10
+          done
+          echo "Deploy FAILED — 퍼블릭 경로가 새 릴리스를 내보내지 않습니다" >&2
           exit 1

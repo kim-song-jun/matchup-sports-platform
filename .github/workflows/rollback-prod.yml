@@ -45,61 +45,38 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
 
-      - name: Setup SSH
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        run: |
-          set -Eeuo pipefail
-          if [[ -z "${EC2_HOST}" || -z "${EC2_KNOWN_HOSTS}" || -z "${EC2_SSH_KEY}" ]]; then
-            echo "EC2_HOST, EC2_KNOWN_HOSTS, and EC2_SSH_KEY are required" >&2
-            exit 1
-          fi
-          mkdir -p ~/.ssh
-          printf '%s\n' "${EC2_SSH_KEY}" > ~/.ssh/deploy_key
-          printf '%s\n' "${EC2_KNOWN_HOSTS}" > ~/.ssh/known_hosts
-          chmod 400 ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/known_hosts
-          if ! ssh-keygen -F "${EC2_HOST}" -f ~/.ssh/known_hosts >/dev/null; then
-            echo "EC2_KNOWN_HOSTS does not contain the configured EC2_HOST" >&2
-            exit 1
-          fi
-          cat >> ~/.ssh/config << EOF
-          Host ec2
-            HostName ${EC2_HOST}
-            User ec2-user
-            IdentityFile ~/.ssh/deploy_key
-            IdentitiesOnly yes
-            StrictHostKeyChecking yes
-            UserKnownHostsFile ~/.ssh/known_hosts
-          EOF
-
       - name: Roll back active and previous manifests
         timeout-minutes: 12
         env:
           EXPECTED_ACTIVE_SHA: ${{ inputs.expected_active_sha }}
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           AWS_REGION: ${{ vars.PROD_AWS_REGION }}
-        run: bash scripts/release/rollback-prod-via-ssh.sh
+          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
+        run: bash scripts/release/rollback-prod-via-ssm.sh
 
       # rollback-prod.sh 는 EC2 안에서 이미 wait_for_prod_health_contract 로 로컬 헬스를
       # 확인한 뒤에만 성공 리턴한다. 여기서는 §2-2 5번과 동일하게 "EC2 로컬은 성공했지만
       # 네트워크 경로 문제로 퍼블릭엔 아직 안 나온" 케이스를 잡기 위해 러너에서 한 번 더
       # 확인한다(deploy.yml Health check 스텝과 동일한 패턴).
       - name: Verify public production release identity
+        env:
+          EXPECTED_ACTIVE_SHA: ${{ inputs.expected_active_sha }}
         run: |
+          set -Eeuo pipefail
+          # 롤백은 "이전 릴리스로 돌아갔는지"가 핵심이라, 단순 200 확인으로는 부족하다.
+          # 퍼블릭 응답의 릴리스 SHA 가 롤백 전 active(=되돌리려던 그 SHA)와 **달라졌는지**를
+          # 본다. 같다면 컨테이너가 안 바뀐 것이므로 실패로 처리한다.
           for i in $(seq 1 12); do
-            if ssh ec2 'curl -fsS --connect-timeout 5 --max-time 15 http://localhost:8121/api/v1/health | \
-                        jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/landing 2>/dev/null | \
-                        grep -qx 200 && \
-                        test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w %{http_code} https://teameet.co.kr/v1/home 2>/dev/null)" = "308"'; then
-              echo "Rollback OK"
+            served="$(curl -fsSI --connect-timeout 5 --max-time 15 https://teameet.co.kr/ 2>/dev/null |
+              awk -F': ' 'tolower($1)=="x-teameet-commit"{gsub("\r","",$2); print $2}')"
+            code="$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w '%{http_code}' \
+              https://teameet.co.kr/landing 2>/dev/null || true)"
+            if [[ "${code}" == "200" && -n "${served}" && "${served}" != "${EXPECTED_ACTIVE_SHA}" ]]; then
+              echo "Rollback OK — 퍼블릭 응답이 ${served} 로 바뀌었습니다 (이전 active: ${EXPECTED_ACTIVE_SHA})"
               exit 0
             fi
-            echo "Attempt $i/12 — not ready yet, retrying in 10s..."
+            echo "Attempt ${i}/12 — landing=${code:-?}, served=${served:-없음}, 10초 후 재시도..."
             sleep 10
           done
-          echo "Rollback FAILED"
+          echo "Rollback FAILED — 퍼블릭 응답이 이전 릴리스로 바뀌지 않았습니다" >&2
           exit 1

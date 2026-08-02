@@ -44,8 +44,13 @@ set -a
 source "${ENV_FILE}"
 set +a
 
+# --preserve-env 가 필수인 이유는 deploy-prod.sh 의 같은 지점 주석 참조 — 요약하면
+# ${V1_API_IMAGE}/${V1_WEB_IMAGE} 는 .env 가 아니라 load_prod_release_manifest() 가
+# export 하는데 이 호스트는 `Defaults env_reset` 이라 sudo 가 그걸 떨군다.
+# 롤백에서는 특히 중요하다 — 이 배열은 load_prod_release_manifest() 보다 **먼저** 정의되므로
+# 배열에 값을 박아 넣으면 항상 빈 문자열이 굳는다.
 compose=(
-  sudo docker compose
+  sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE docker compose
   --project-name deploy
   -f "${COMPOSE_PROD}"
   --env-file "${ENV_FILE}"

@@ -12,12 +12,19 @@ const requiredPatterns = [
     message: 'workflow permissions must be explicitly limited to contents: read',
   },
   {
-    pattern: /EC2_KNOWN_HOSTS: \$\{\{ secrets\.EC2_KNOWN_HOSTS \}\}/,
-    message: 'production SSH must use a pinned EC2_KNOWN_HOSTS secret',
+    // SSH → SSM 전환(Phase C). 예전에는 EC2_KNOWN_HOSTS 핀과 StrictHostKeyChecking 으로
+    // 호스트 검증을 fail-closed 시켰지만, 이제 인바운드 SSH 자체가 없다. 등가 계약은
+    // "대상 인스턴스를 변수로 고정하고, 자격증명은 단기 OIDC 로만 얻는다" 이다.
+    pattern: /INSTANCE_ID: \$\{\{ vars\.PROD_EC2_INSTANCE_ID \}\}/,
+    message: 'production SSM commands must target the pinned PROD_EC2_INSTANCE_ID',
   },
   {
-    pattern: /StrictHostKeyChecking yes/,
-    message: 'production SSH host verification must fail closed',
+    pattern: /id-token: write/,
+    message: 'production deploy must obtain AWS credentials through OIDC, not stored keys',
+  },
+  {
+    pattern: /role-to-assume: \$\{\{ vars\.PROD_AWS_ROLE_ARN \}\}/,
+    message: 'production deploy must assume the dedicated prod deploy role',
   },
   {
     // ECR digest 고정 전환(build-images 가 러너에서 docker/build-push-action 으로 직접
@@ -27,12 +34,23 @@ const requiredPatterns = [
     message: 'production analytics must use the registered GA_PROD secret',
   },
   {
-    pattern: /cat <<'REMOTE_SCRIPT'/,
-    message: 'remote deploy script must be streamed with its secret assignments over stdin',
+    // 예전에는 시크릿을 heredoc 으로 SSH stdin 에 흘려 보내 인자 노출을 피했다.
+    // SSM 에서는 send-command 파라미터가 CloudTrail 과 명령 이력에 남으므로 그 방식
+    // 자체가 불가능하다 — 시크릿은 Parameter Store(SecureString) 를 거치고 명령에는
+    // 경로만 실린다. 그 스크립트를 반드시 경유하도록 강제한다.
+    pattern: /bash scripts\/release\/sync-prod-runtime-env\.sh/,
+    message: 'runtime secrets must be delivered through Parameter Store, never in SSM command parameters',
   },
   {
-    pattern: /--exclude backups/,
-    message: 'production rsync must exclude the operator backup directory',
+    // 배포 소스는 러너에서 tar 로 묶어 S3 에 올린다. 운영자 백업 디렉터리가 그 tarball 에
+    // 섞이면 프로덕션 백업이 배포 아티팩트로 흘러나간다.
+    pattern: /--exclude=\.\/backups/,
+    message: 'production release tarball must exclude the operator backup directory',
+  },
+  {
+    // S3 객체는 반드시 버킷 소유자를 확인하고 받는다(계정 혼동 공격 방지).
+    pattern: /--expected-bucket-owner/,
+    message: 'production release artifacts must be fetched with --expected-bucket-owner',
   },
   {
     pattern:

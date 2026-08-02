@@ -106,8 +106,19 @@ source "${ENV_FILE}"
 set +a
 
 export COMPOSE_PARALLEL_LIMIT=1
+# --preserve-env 가 반드시 필요하다. docker-compose.prod.yml 은 이미지를
+# ${V1_API_IMAGE}/${V1_WEB_IMAGE} 로 참조하는데 이 값들은 .env 에 없고
+# load_prod_release_manifest() 가 export 한다. 그런데 이 호스트의 /etc/sudoers 에는
+# `Defaults env_reset` 이 걸려 있어(실측) 그냥 `sudo docker compose` 로 부르면 root 쪽에
+# 전달되지 않는다 — compose 는 빈 문자열로 치환하고 배포가 이상하게 깨진다.
+#
+# `sudo env VAR=...` 대신 --preserve-env 를 쓰는 이유: 이 배열은 값이 확정되기 전에
+# 정의될 수 있고(rollback-prod.sh 는 매니페스트 로드보다 먼저 배열을 만든다), 아래
+# restore_legacy_runtime() 은 V1_*_IMAGE 를 레거시 태그로 **재할당**한다. 배열에 값을
+# 박아 넣으면 그 시점의 값이 굳어 stale 해진다. --preserve-env 는 exec 시점의 환경을
+# 넘기므로 두 경우 모두 올바르게 동작한다. (sudo 1.9.15p5 에서 동작 확인)
 compose=(
-  sudo docker compose
+  sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE docker compose
   --project-name deploy
   -f "${COMPOSE_PROD}"
   --env-file "${ENV_FILE}"

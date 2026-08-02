@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { GameResultOfficialProjectionService } from '../game-operations/game-result-official-projection.service';
+import { GameResultSubmittedEscalationService } from './result-escalation/game-result-submitted-escalation.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const GAME_OPERATION_RETRY_DELAYS_MS = [1_000, 5_000, 30_000, 120_000, 600_000] as const;
@@ -65,6 +66,10 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     }
     const officialProjection = new GameResultOfficialProjectionService();
     this.registerHandler('GAME_RESULT_OFFICIAL', officialProjection.handler);
+    const submittedEscalation = new GameResultSubmittedEscalationService();
+    this.registerHandler('GAME_RESULT_SUBMITTED', submittedEscalation.handler);
+    this.registerHandler('GAME_RESULT_REVIEW_REMINDER', submittedEscalation.reminderHandler);
+    this.registerHandler('GAME_RESULT_REVIEW_ESCALATION', submittedEscalation.escalationHandler);
   }
 
   registerHandler(type: string, handler: GameOperationHandler): void {

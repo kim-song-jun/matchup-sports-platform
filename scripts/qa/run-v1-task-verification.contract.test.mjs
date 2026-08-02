@@ -104,16 +104,17 @@ const taskNineR4OwnedPaths = [
   'apps/v1_api/prisma/migrations/20260802000300_v1_result_escalation_lifecycle',
 ];
 const taskNineR5OverridePath =
-  '.omo/start-work/host-pressure-override-task-9-plan-r5.json';
+  '.omo/start-work/host-pressure-override-task-9-plan-r6.json';
 const taskNineR5OverrideSHA =
-  '924b127d300c9aa73e6b0e71bf5d93e47facf5c0fa3cfb2c47a8e093397a6ae5';
+  '7e9c8eaaca4540a2137a333e92493df9a55c9467aa760a5652c28f10f763a86e';
 const taskNineR5PlanSHA =
-  'f435670dbe4db3de2cb75f5b3e54540b02e0f6485a94374f2947c9aab2f4d678';
+  '5d59d8b616414fe81cf05cf5e9a09b3b985b065940651cd0a4e8d647c35bd027';
 const taskNineR5AuthorizationText = taskNineR4AuthorizationText;
 const taskNineR5Constraints = taskNineR4Constraints;
 const taskNineR5OwnedPaths = [
   ...taskNineR4OwnedPaths,
   'docs/api/global-contract.md',
+  'docs/api/domains/tournament-operations-auth.md',
 ];
 
 function runNode(args, options = {}) {
@@ -565,6 +566,10 @@ function hostPressureOverrideFunction({
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_R5_SHA256',
     'TASK_NINE_R5_AUTHORIZATION_TEXT',
     'TASK_NINE_R5_CONSTRAINTS',
+    'TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_PATH',
+    'TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_SHA256',
+    'TASK_NINE_R6_AUTHORIZATION_TEXT',
+    'TASK_NINE_R6_CONSTRAINTS',
     'OVERRIDE_SHA256',
     'VERIFICATION_SESSION_ID',
     'secureImmutableDescriptor',
@@ -602,6 +607,10 @@ function hostPressureOverrideFunction({
     taskNineR2OverrideSHA,
     taskNineR3OverridePath,
     taskNineR3OverrideSHA,
+    taskNineR5OverridePath,
+    taskNineR5OverrideSHA,
+    taskNineR5AuthorizationText,
+    taskNineR5Constraints,
     taskNineR5OverridePath,
     taskNineR5OverrideSHA,
     taskNineR5AuthorizationText,
@@ -1523,7 +1532,7 @@ test('legacy Task1 host pressure override remains accepted', () => {
   }
 });
 
-test('Task 9 R5 host pressure receipt binds the normalized plan, exact 19-path transfer, and explicit load authority', () => {
+test('Task 9 R6 host pressure receipt binds the normalized plan, exact 20-path transfer, and explicit load authority', () => {
   const canonicalReceipt = JSON.parse(
     readFileSync(resolve(repoRoot, taskNineR5OverridePath), 'utf8'),
   );
@@ -1532,7 +1541,7 @@ test('Task 9 R5 host pressure receipt binds the normalized plan, exact 19-path t
     'utf8',
   );
   const productionSHA = source.match(
-    /const TASK_NINE_HOST_PRESSURE_OVERRIDE_R5_SHA256 =\s*'([0-9a-f]{64})'/,
+    /const TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_SHA256 =\s*'([0-9a-f]{64})'/,
   )?.[1];
   const ledgerText = readFileSync(
     join(repoRoot, '.github/tasks/127-v1-team-tournament-operations-game-record.md'),
@@ -1566,10 +1575,11 @@ test('Task 9 R5 host pressure receipt binds the normalized plan, exact 19-path t
   try {
     assert.deepEqual(ledgerOutputs, taskNineR5OwnedPaths);
     assert.deepEqual(planOutputs, taskNineR5OwnedPaths);
-    assert.equal(ledgerOutputs.length, 19);
+    assert.equal(ledgerOutputs.length, 20);
     assert.deepEqual(ledgerOutputs.slice(0, 18), taskNineR4OwnedPaths);
     assert.equal(ledgerOutputs.includes('docs/api/global-contract.md'), true);
-    assert.equal(ledgerOutputs.at(-1), 'docs/api/global-contract.md');
+    assert.equal(ledgerOutputs.at(-2), 'docs/api/global-contract.md');
+    assert.equal(ledgerOutputs.at(-1), 'docs/api/domains/tournament-operations-auth.md');
     assert.equal(
       dependencyRow,
       '| 9 | 5, 6, 7, 11 | 10, 16, 18, 22, 24, 27 | 8; Task 9A completes projection infrastructure without personal rows, while Task 24 performs Task 9B after 14 |',
@@ -1682,8 +1692,11 @@ test('Task 9 R5 host pressure receipt binds the normalized plan, exact 19-path t
     rejected('missing transferred global contract path', {
       receipt: { ...canonicalReceipt, ownedPaths: taskNineR5OwnedPaths.filter((path) => path !== 'docs/api/global-contract.md') },
     });
+    rejected('missing transferred auth contract path', {
+      receipt: { ...canonicalReceipt, ownedPaths: taskNineR5OwnedPaths.filter((path) => path !== 'docs/api/domains/tournament-operations-auth.md') },
+    });
     rejected('reordered transfer path', {
-      receipt: { ...canonicalReceipt, ownedPaths: [...taskNineR5OwnedPaths.slice(0, 18).reverse(), 'docs/api/global-contract.md'] },
+      receipt: { ...canonicalReceipt, ownedPaths: [...taskNineR5OwnedPaths].reverse() },
     });
     rejected('extra unrelated path', {
       receipt: { ...canonicalReceipt, ownedPaths: [...taskNineR5OwnedPaths, 'apps/v1_api/src/unrelated'] },
@@ -1702,7 +1715,33 @@ test('Task 9 R5 host pressure receipt binds the normalized plan, exact 19-path t
   }
 });
 
-test('Task 9 R4 remains immutable 18-path evidence and is rejected as stale after the R5 transfer', () => {
+test('Task 9 R5 remains immutable 19-path evidence and is rejected as stale after the R6 transfer', () => {
+  const historicalPath = '.omo/start-work/host-pressure-override-task-9-plan-r5.json';
+  const historicalSHA = '924b127d300c9aa73e6b0e71bf5d93e47facf5c0fa3cfb2c47a8e093397a6ae5';
+  const r5 = JSON.parse(readFileSync(resolve(repoRoot, historicalPath), 'utf8'));
+  assert.equal(sha256(readFileSync(resolve(repoRoot, historicalPath))), historicalSHA);
+  assert.deepEqual(r5.ownedPaths, taskNineR5OwnedPaths.slice(0, 19));
+  assert.equal(r5.ownedPaths.at(-1), 'docs/api/global-contract.md');
+  assert.equal(r5.ownedPaths.includes('docs/api/domains/tournament-operations-auth.md'), false);
+  const rejected = runNode([
+    'scripts/qa/run-v1-task-verification.mjs',
+    '--pressure-receipt-only',
+    historicalPath,
+    '--pressure-receipt-sha',
+    historicalSHA,
+  ], {
+    env: {
+      ...process.env,
+      OMO_SELECTED_PLAN_SHA: taskNineR5PlanSHA,
+      V1_HOST_PRESSURE_OVERRIDE_RECEIPT: historicalPath,
+      V1_VERIFICATION_SESSION_ID: verificationSessionId,
+    },
+  });
+  assert.equal(rejected.status, 75, rejected.stderr);
+  assert.match(rejected.stderr, /Descriptor-only pressure receipt SHA does not match the immutable authority/);
+});
+
+test('Task 9 R4 remains immutable 18-path evidence and is rejected as stale after the R6 transfer', () => {
   const r4 = JSON.parse(readFileSync(resolve(repoRoot, taskNineR4OverridePath), 'utf8'));
   assert.equal(sha256(readFileSync(resolve(repoRoot, taskNineR4OverridePath))), taskNineR4OverrideSHA);
   assert.deepEqual(r4.ownedPaths, taskNineR4OwnedPaths);
@@ -1727,7 +1766,7 @@ test('Task 9 R4 remains immutable 18-path evidence and is rejected as stale afte
   assert.match(rejected.stderr, /Descriptor-only pressure receipt SHA does not match the immutable authority/);
 });
 
-test('Task 9 R3 remains immutable evidence and is rejected after the R5 ownership rebind', () => {
+test('Task 9 R3 remains immutable evidence and is rejected after the R6 ownership rebind', () => {
   const r3 = JSON.parse(readFileSync(resolve(repoRoot, taskNineR3OverridePath), 'utf8'));
   assert.equal(sha256(readFileSync(resolve(repoRoot, taskNineR3OverridePath))), taskNineR3OverrideSHA);
   assert.deepEqual(r3.ownedPaths, taskNineR3OwnedPaths);
@@ -1762,7 +1801,7 @@ test('Task 9 R3 remains immutable evidence and is rejected after the R5 ownershi
   }
 });
 
-test('Task 9 R5 native receipt channel accepts its exact authority and rejects a misleading-success payload', () => {
+test('Task 9 R6 native receipt channel accepts its exact authority and rejects a misleading-success payload', () => {
   const command = [
     'scripts/qa/run-v1-task-verification.mjs',
     '--pressure-receipt-only',
@@ -1778,8 +1817,8 @@ test('Task 9 R5 native receipt channel accepts its exact authority and rejects a
   };
   const accepted = runNode(command, { env: environment });
   assert.equal(accepted.status, 0, accepted.stderr);
-  assert.match(accepted.stdout, /TASK9_PRESSURE_RECEIPT_R5_PASS/);
-  assert.match(accepted.stdout, /owned_paths=19/);
+  assert.match(accepted.stdout, /TASK9_PRESSURE_RECEIPT_R6_PASS/);
+  assert.match(accepted.stdout, /owned_paths=20/);
   const misleading = runNode(
     [
       ...command,

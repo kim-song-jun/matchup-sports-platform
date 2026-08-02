@@ -24,6 +24,7 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..');
 const API_ROOT = join(REPOSITORY_ROOT, 'apps', 'v1_api');
 const API_ENTRYPOINT = join(API_ROOT, 'dist', 'src', 'main.js');
+const TERMS_RUNTIME_SERVICE_ENTRYPOINT = join(API_ROOT, 'dist', 'src', 'terms', 'managed-terms-runtime.service.js');
 const DB_PREFIX = 'ulw_v1_integration_task9_ci_';
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 const REQUIRED_OUTPUTS = [
@@ -44,11 +45,6 @@ const FIXTURE = Object.freeze({
   adminGrant: '90000000-0000-4000-8000-000000000003',
   sport: '90000000-0000-4000-8000-000000000010',
   config: '90000000-0000-4000-8000-000000000011',
-  termsPolicy: '90000000-0000-4000-8000-000000000012',
-  termsDocument: '90000000-0000-4000-8000-000000000013',
-  termsPlacement: '90000000-0000-4000-8000-000000000014',
-  opsTermsConsent: '90000000-0000-4000-8000-000000000015',
-  reviewerTermsConsent: '90000000-0000-4000-8000-000000000016',
   tournamentA: '90000000-0000-4000-8000-000000000101',
   tournamentB: '90000000-0000-4000-8000-000000000102',
   fixtureA: '90000000-0000-4000-8000-000000000111',
@@ -89,6 +85,7 @@ const state = {
   databaseUrl: null,
   databaseCreationAttempted: false,
   prisma: null,
+  termsService: null,
   apiProcess: null,
   apiLogFd: null,
   activeCommand: null,
@@ -391,10 +388,15 @@ async function migrateDatabase() {
   });
 }
 
-function loadPrismaClient() {
+function loadRuntimeClients() {
   const requireFromApi = createRequire(join(API_ROOT, 'package.json'));
+  requireFromApi('reflect-metadata');
   const { PrismaClient } = requireFromApi('@prisma/client');
+  assert(existsSync(TERMS_RUNTIME_SERVICE_ENTRYPOINT), 'The built managed terms runtime service is missing; run this harness after the API build');
+  const { ManagedTermsRuntimeService } = requireFromApi(TERMS_RUNTIME_SERVICE_ENTRYPOINT);
+  assert(typeof ManagedTermsRuntimeService === 'function', 'The built managed terms runtime service export is invalid');
   state.prisma = new PrismaClient({ datasources: { db: { url: state.databaseUrl } } });
+  state.termsService = new ManagedTermsRuntimeService(state.prisma);
 }
 
 async function seedFixture() {
@@ -407,25 +409,37 @@ async function seedFixture() {
   const futureAt = new Date(databaseNow.getTime() + 24 * 60 * 60 * 1_000);
   const phoneVerifiedAt = new Date(databaseNow.getTime() - 60_000);
 
+  await prisma.v1User.createMany({
+    data: [
+      {
+        id: FIXTURE.opsUser,
+        email: 'task9-ci-ops@example.invalid',
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+        phoneVerifiedAt,
+      },
+      {
+        id: FIXTURE.reviewerUser,
+        email: 'task9-ci-reviewer@example.invalid',
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+        phoneVerifiedAt,
+      },
+    ],
+  });
+
+  const termsService = state.termsService;
+  assert(termsService !== null, 'Managed terms runtime service is not initialized');
+  const requiredDocumentIds = (await termsService.currentSignupTerms()).items
+    .filter((item) => item.requirement === 'required')
+    .map((item) => item.documentId);
+  assert(requiredDocumentIds.length > 0, 'At least one current required signup terms document must exist');
+  await Promise.all([
+    termsService.acceptSignupTerms(FIXTURE.opsUser, requiredDocumentIds),
+    termsService.acceptSignupTerms(FIXTURE.reviewerUser, requiredDocumentIds),
+  ]);
+
   await prisma.$transaction(async (tx) => {
-    await tx.v1User.createMany({
-      data: [
-        {
-          id: FIXTURE.opsUser,
-          email: 'task9-ci-ops@example.invalid',
-          accountStatus: 'active',
-          onboardingStatus: 'completed',
-          phoneVerifiedAt,
-        },
-        {
-          id: FIXTURE.reviewerUser,
-          email: 'task9-ci-reviewer@example.invalid',
-          accountStatus: 'active',
-          onboardingStatus: 'completed',
-          phoneVerifiedAt,
-        },
-      ],
-    });
     await tx.v1AdminUser.create({
       data: {
         id: FIXTURE.adminGrant,
@@ -433,64 +447,6 @@ async function seedFixture() {
         adminRole: 'ops',
         status: 'active',
       },
-    });
-    await tx.v1ManagedTermsPolicy.create({
-      data: {
-        id: FIXTURE.termsPolicy,
-        code: 'task9_ci_required_terms',
-        name: 'Task 9 CI required terms',
-        isActive: true,
-      },
-    });
-    await tx.v1ManagedTermsDocument.create({
-      data: {
-        id: FIXTURE.termsDocument,
-        policyId: FIXTURE.termsPolicy,
-        version: 'task9-ci-v1',
-        title: 'Task 9 CI required terms',
-        content: 'Isolated continuous-integration fixture only.',
-        contentHash: 'task9-ci-required-terms-content-hash-v1',
-        requiresReconsent: true,
-        status: 'published',
-        effectiveAt: dueAt,
-        publishedAt: dueAt,
-      },
-    });
-    await tx.v1ManagedTermsPlacement.create({
-      data: {
-        id: FIXTURE.termsPlacement,
-        policyId: FIXTURE.termsPolicy,
-        context: 'signup',
-        requirement: 'required',
-        displayOrder: 1,
-        isActive: true,
-      },
-    });
-    await tx.v1ManagedTermsConsentEvent.createMany({
-      data: [
-        {
-          id: FIXTURE.opsTermsConsent,
-          documentId: FIXTURE.termsDocument,
-          userId: FIXTURE.opsUser,
-          context: 'signup',
-          decision: 'accepted',
-          decidedAt: dueAt,
-          source: 'web',
-          versionVerified: true,
-          dedupeKey: 'task9-ci-ops-terms-accepted',
-        },
-        {
-          id: FIXTURE.reviewerTermsConsent,
-          documentId: FIXTURE.termsDocument,
-          userId: FIXTURE.reviewerUser,
-          context: 'signup',
-          decision: 'accepted',
-          decidedAt: dueAt,
-          source: 'web',
-          versionVerified: true,
-          dedupeKey: 'task9-ci-reviewer-terms-accepted',
-        },
-      ],
     });
     await tx.v1Sport.create({
       data: { id: FIXTURE.sport, code: 'football', name: 'Task 9 CI Sport' },
@@ -648,22 +604,34 @@ async function seedFixture() {
     });
   });
 
-  const preconditions = await fixturePreconditions(databaseNow);
+  const preconditions = await fixturePreconditions(databaseNow, requiredDocumentIds);
   assert(preconditions.users.every((user) => user.accountStatus === 'active' && user.phoneVerifiedAt !== null), 'Fixture users must be active and phone verified');
   assert(preconditions.platformRole?.adminRole === 'ops' && preconditions.platformRole.status === 'active' && preconditions.platformRole.revokedAt === null, 'Fixture ops grant is not active');
   assert(preconditions.reviewerGrant?.role === 'TOURNAMENT_DIRECTOR' && preconditions.reviewerGrant.revokedAt === null, 'Fixture reviewer grant is not active');
   assert(preconditions.reviewerPlatformRole === null, 'Fixture reviewer must not have a platform role');
-  assert(preconditions.acceptedTerms.length === 2, 'Both fixture actors must accept the current required signup terms');
+  const expectedTermsAcceptances = new Set(
+    [FIXTURE.opsUser, FIXTURE.reviewerUser]
+      .flatMap((userId) => requiredDocumentIds.map((documentId) => `${userId}:${documentId}`)),
+  );
+  const acceptanceCounts = new Map();
+  for (const acceptance of preconditions.acceptedTerms) {
+    const key = `${acceptance.userId}:${acceptance.documentId}`;
+    acceptanceCounts.set(key, (acceptanceCounts.get(key) ?? 0) + 1);
+  }
+  assert(preconditions.acceptedTerms.length === expectedTermsAcceptances.size, 'Current required signup terms acceptance count must equal the actor-document cross-product');
+  assert([...expectedTermsAcceptances].every((key) => acceptanceCounts.get(key) === 1), 'Every fixture actor must accept every current required signup terms document exactly once');
+  assert([...acceptanceCounts].every(([key, count]) => expectedTermsAcceptances.has(key) && count === 1), 'Signup terms preconditions contain an unexpected or duplicate acceptance');
   assert(preconditions.rows.filter((row) => row.kind === 'ESCALATION' && row.dueAt <= databaseNow).length === 2, 'Fixture must contain exactly two due escalations');
   assert(preconditions.rows.filter((row) => row.kind === 'ESCALATION' && row.dueAt > databaseNow).length === 1, 'Fixture must contain exactly one future escalation');
   assert(preconditions.rows.filter((row) => row.kind === 'REMINDER' && row.dueAt <= databaseNow).length === 1, 'Fixture must contain exactly one due reminder');
   state.snapshots.fixture = serialize(preconditions);
 }
 
-async function fixturePreconditions(databaseNow) {
+async function fixturePreconditions(databaseNow, requiredDocumentIds) {
   const prisma = state.prisma;
   return {
     databaseNow,
+    requiredSignupDocumentIds: requiredDocumentIds,
     users: await prisma.v1User.findMany({
       where: { id: { in: [FIXTURE.opsUser, FIXTURE.reviewerUser] } },
       orderBy: { id: 'asc' },
@@ -684,11 +652,11 @@ async function fixturePreconditions(databaseNow) {
     acceptedTerms: await prisma.v1ManagedTermsConsentEvent.findMany({
       where: {
         userId: { in: [FIXTURE.opsUser, FIXTURE.reviewerUser] },
-        documentId: FIXTURE.termsDocument,
+        documentId: { in: requiredDocumentIds },
         context: 'signup',
         decision: 'accepted',
       },
-      orderBy: { userId: 'asc' },
+      orderBy: [{ userId: 'asc' }, { documentId: 'asc' }],
       select: { userId: true, documentId: true, decision: true },
     }),
     rows: await prisma.v1ResultEscalation.findMany({
@@ -1399,7 +1367,7 @@ async function main() {
   await commandExists('pnpm');
   await createDatabase();
   await migrateDatabase();
-  loadPrismaClient();
+  loadRuntimeClients();
   await seedFixture();
   await startApi();
   await executeScenarios();

@@ -10,9 +10,9 @@
 | `team_manager`/`team_owner` | manage own schedule/lineup/result submission | none unless separate staff assignment | none | none | read |
 | `opponent_manager` | request opponent lineup change before lock; approve/change-request opponent result | none | approve/change-request team result only | none | read |
 | `field_operator` | none | assigned fixture/field commands and event input | none | own warnings read | read |
-| `support_readonly` | none | assigned board read | none | read/ack, never resolve | read |
-| `tournament_director` | none | assigned tournament/field operations | correction plus flag-gated officialize/void | manage subordinate staff; read escalation | read |
-| `platform_ops` | audit/read | all tournaments | officialize/correct/void | bootstrap director, revoke, resolve | read |
+| `support_readonly` | none | assigned board read | none | list/detail/ack due `REMINDER`, never resolve | read |
+| `tournament_director` | none | assigned tournament/field operations | correction plus flag-gated officialize/void | manage subordinate staff; list/detail/ack due `REMINDER`, never resolve | read |
+| `platform_ops` | audit/read | all tournaments | officialize/correct/void | bootstrap director and revoke; list/detail/ack/resolve due `ESCALATION` | read |
 
 <!-- API_CONTRACT_SECTION_END:Canonical actor-action matrix -->
 

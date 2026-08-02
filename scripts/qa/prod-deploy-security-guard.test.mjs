@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { usesSshAlias } from './check-production-deploy-security.mjs';
+import { usesSshAlias, findJobsMissingRunnerPrereqs } from './check-production-deploy-security.mjs';
 
 // 이 가드는 "prod 배포 스크립트에 SSH alias 잔재가 없는가" 를 지킨다. 그런데 가드 자체가
 // 약해서 놓친 전례가 있다 — 2026-08-02 첫 프로덕션 배포가 `ssh ec2` 잔재로 죽었고,
@@ -48,6 +48,94 @@ test('주석과 정상 SSM 코드에는 오탐하지 않는다', () => {
         '오탐은 정상 배포를 막고, 전환 이력을 코드 옆에 설명하지 못하게 만든다.',
     );
   }
+});
+
+// 2026-08-02: 첫 승인 배포가 exit 127 로 죽었다 — deploy job 에 checkout 도 AWS 자격증명도
+// 없었는데, 가드가 파일 전체를 grep 하는 바람에 build-images 의 것을 보고 green 을 냈다.
+// 아래 표는 "다른 job 이 갖췄다고 이 job 이 갖춘 게 아니다" 를 고정한다.
+const JOB_FIXTURE = (deploySteps) => `
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@abc
+      - uses: aws-actions/configure-aws-credentials@def
+      - run: aws ecr describe-images
+
+  deploy:
+    runs-on: ubuntu-latest
+${deploySteps}
+`;
+
+test('다른 job 의 checkout·자격증명을 이 job 것으로 착각하지 않는다', () => {
+  const bare = JOB_FIXTURE(`    steps:
+      - run: bash scripts/release/sync-prod-runtime-env.sh
+      - run: aws ssm send-command --instance-ids "$ID"`);
+  const problems = findJobsMissingRunnerPrereqs(bare);
+  const deployProblems = problems.filter((p) => p.includes("job 'deploy'"));
+  assert.equal(
+    deployProblems.length,
+    3,
+    `deploy job 의 checkout·자격증명·id-token 누락 3건을 모두 잡아야 합니다. 실제: ${JSON.stringify(problems)}`,
+  );
+  assert.ok(problems.every((p) => !p.includes("job 'build-images'")),
+    `준비물을 갖춘 build-images 를 오탐했습니다: ${JSON.stringify(problems)}`);
+});
+
+test('준비물을 모두 갖춘 job 은 통과시킨다', () => {
+  const ok = JOB_FIXTURE(`    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@abc
+      - uses: aws-actions/configure-aws-credentials@def
+      - run: bash scripts/release/sync-prod-runtime-env.sh
+      - run: aws ssm send-command --instance-ids "$ID"`);
+  assert.deepEqual(findJobsMissingRunnerPrereqs(ok), []);
+});
+
+test('워크플로 레벨 permissions 로 상속된 id-token 은 인정한다', () => {
+  // deploy-alpha.yml 이 이 형태다 — job 블록만 보면 없다고 오탐한다.
+  const inherited = `
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@abc
+      - uses: aws-actions/configure-aws-credentials@def
+      - run: aws ssm send-command --instance-ids "$ID"
+`;
+  assert.deepEqual(findJobsMissingRunnerPrereqs(inherited), []);
+});
+
+test('aws 도 스크립트도 안 쓰는 job 에는 준비물을 요구하지 않는다', () => {
+  const trivial = `
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "done"
+`;
+  assert.deepEqual(findJobsMissingRunnerPrereqs(trivial), []);
+});
+
+test('주석 속 aws·스크립트 언급은 요구조건을 발동시키지 않는다', () => {
+  const commented = `
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      # 예전에는 aws ssm send-command 로 bash scripts/release/foo.sh 를 돌렸다
+      - run: echo "done"
+`;
+  assert.deepEqual(findJobsMissingRunnerPrereqs(commented), []);
 });
 
 test('여러 줄 중 한 줄만 위반해도 탐지한다', () => {

@@ -24,9 +24,79 @@ export function usesSshAlias(body) {
   return sshAlias.test(code) || scpAlias.test(code) || rsyncSsh.test(code);
 }
 
+// 워크플로를 job 블록으로 쪼갠다. 아래 전제조건 검사는 반드시 **job 단위**여야 한다 —
+// 파일 전체에서 grep 하면 다른 job 이 갖춘 것을 이 job 도 가진 것으로 착각한다.
+export function splitJobs(workflow) {
+  const lines = workflow.split('\n');
+  const jobs = [];
+  let current = null;
+  let inJobs = false;
+  for (const line of lines) {
+    if (/^jobs:\s*$/.test(line)) { inJobs = true; continue; }
+    if (!inJobs) continue;
+    // 최상위 키(들여쓰기 0)를 만나면 jobs: 섹션이 끝난 것이다.
+    if (/^\S/.test(line)) { inJobs = false; continue; }
+    const header = line.match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
+    if (header) {
+      current = { name: header[1], body: [] };
+      jobs.push(current);
+      continue;
+    }
+    if (current) current.body.push(line);
+  }
+  return jobs.map((j) => ({ name: j.name, body: j.body.join('\n') }));
+}
+
+// 러너에서 무언가를 실행하려면 그 job 자신이 준비물을 갖춰야 한다.
+//  - 리포 스크립트를 돌린다  → actions/checkout 이 그 job 안에 있어야 한다
+//  - aws CLI 를 호출한다     → 자격증명 스텝 + id-token: write 가 그 job 안에 있어야 한다
+// 2026-08-02 실사고: SSH → SSM 전환에서 deploy job 의 checkout 과 AWS 자격증명 스텝이 함께
+// 사라졌는데, 가드가 파일 전체를 grep 했기 때문에 build-images 의 것을 보고 green 을 냈다.
+// 첫 승인 배포가 `sync-prod-runtime-env.sh: No such file or directory`(127) 로 죽었다.
+export function findJobsMissingRunnerPrereqs(workflow) {
+  const problems = [];
+  // 워크플로 레벨 permissions 는 모든 job 이 상속한다 — 여기서 id-token: write 를 주면
+  // job 블록에 다시 적을 필요가 없다(deploy-alpha.yml 이 그 형태다). jobs: 이전 구간만 본다.
+  const preamble = workflow.split(/^jobs:\s*$/m)[0] ?? '';
+  const inheritsIdToken = /^permissions:\s*$[\s\S]*?^\s+id-token:\s*write\s*$/m.test(preamble);
+  for (const { name, body } of splitJobs(workflow)) {
+    const code = body
+      .split('\n')
+      .filter((line) => !/^\s*#/.test(line))
+      .map((line) => line.replace(/\s#.*$/, ''))
+      .join('\n');
+    const usesAwsCli = /\baws\s+(?:ssm|s3|ecr|sts|ec2|elbv2)\b/.test(code);
+    const runsRepoScript = /\b(?:bash|sh|node)\s+scripts\//.test(code);
+    if (!usesAwsCli && !runsRepoScript) continue;
+
+    if (!/uses:\s*actions\/checkout@/.test(code)) {
+      problems.push(
+        `job '${name}': 리포 스크립트/aws 호출이 있는데 actions/checkout 스텝이 없습니다 ` +
+          '(러너에 리포가 없어 첫 실행에서 exit 127 로 죽는다)',
+      );
+    }
+    if (usesAwsCli && !/uses:\s*aws-actions\/configure-aws-credentials@/.test(code)) {
+      problems.push(
+        `job '${name}': aws CLI 를 호출하는데 configure-aws-credentials 스텝이 없습니다`,
+      );
+    }
+    if (usesAwsCli && !inheritsIdToken && !/id-token:\s*write/.test(code)) {
+      problems.push(
+        `job '${name}': aws CLI 를 호출하는데 job 레벨 id-token: write 가 없습니다 ` +
+          '(워크플로 기본값은 contents: read 뿐이라 OIDC 토큰을 못 받는다)',
+      );
+    }
+  }
+  return problems;
+}
+
 const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
 const workflow = readFileSync(workflowPath, 'utf8');
 const errors = [];
+
+for (const problem of findJobsMissingRunnerPrereqs(workflow)) {
+  errors.push(`${workflowPath}: ${problem}`);
+}
 
 // deploy.yml 이 SSH 를 안 쓰게 됐어도, **그 워크플로가 호출하는 스크립트**가 여전히
 // `ssh ec2` 를 쓰면 배포는 첫 실행에서 죽는다 — alias 를 만들던 "Setup SSH" 스텝이

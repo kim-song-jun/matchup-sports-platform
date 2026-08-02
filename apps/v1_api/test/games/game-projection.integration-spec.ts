@@ -2514,9 +2514,6 @@ async function cleanupR7EscalationArtifacts(): Promise<void> {
     await tx.v1IdempotencyRecord.deleteMany({
       where: { resourceType: 'RESULT_ESCALATION', resourceId: { in: escalationIds } },
     });
-    await tx.v1OperationAudit.deleteMany({
-      where: { resourceType: 'RESULT_ESCALATION', resourceId: { in: escalationIds } },
-    });
     await tx.v1ResultEscalation.deleteMany({ where: { id: { in: escalationIds } } });
   });
 }

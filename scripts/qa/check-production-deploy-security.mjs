@@ -2,6 +2,28 @@
 
 import { readFileSync } from 'node:fs';
 
+// SSH alias 잔재 탐지. 테스트(scripts/qa/prod-deploy-security-guard.test.mjs)에서 직접
+// 호출할 수 있도록 export 한다 — 이 가드 자체가 약해서 놓친 전례가 있어(2026-08-02,
+// `ssh -o ... ec2` 미탐 + 인라인 주석 오탐) 동작을 테스트로 고정한다.
+export function usesSshAlias(body) {
+  // 전체 주석 줄과 트레일링 주석을 걷어낸다 — 전환 이력을 설명하는 문장에 `ssh ec2` 가
+  // 나오는 것은 정상이고, 그걸 막으면 왜 바꿨는지 적을 수가 없다.
+  // 공백이 앞선 `#` 만 자른다: `sha256#...` 같은 토큰 중간의 `#` 은 건드리지 않는다.
+  const code = body
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .map((line) => line.replace(/\s#.*$/, ''))
+    .join('\n');
+  // `ssh ec2` 만 보면 `ssh -o StrictHostKeyChecking=yes ec2` 같은 형태를 놓친다.
+  // 옵션은 `-o Key=Val`(붙임/분리), `-i /path`, `-F ~/.ssh/config` 처럼 별도 인자를 갖는
+  // 형태도 있으므로 둘 다 허용하되, 값 토큰이 ec2 자체를 삼키지 않도록 (?!ec2\b) 로 막는다.
+  const OPTS = String.raw`(?:\s+-[^\s|;&<>]*(?:\s+(?!ec2\b)[^\s|;&<>-][^\s|;&<>]*)?|\s+[^\s|;&<>]+=[^\s|;&<>]*)*`;
+  const sshAlias = new RegExp(String.raw`\bssh${OPTS}\s+ec2\b`);
+  const scpAlias = new RegExp(String.raw`\bscp${OPTS}(?:\s+[^\s|;&<>]+)*\s+ec2:`);
+  const rsyncSsh = /\brsync\b[^\n]*(?:-e\s+ssh|\bec2:)/;
+  return sshAlias.test(code) || scpAlias.test(code) || rsyncSsh.test(code);
+}
+
 const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
 const workflow = readFileSync(workflowPath, 'utf8');
 const errors = [];
@@ -23,13 +45,7 @@ const errors = [];
       errors.push(`${rel}: ${workflowPath} 가 참조하지만 파일이 없습니다`);
       continue;
     }
-    // 주석은 제외한다 — 전환 이력을 설명하는 문장에 `ssh ec2` 가 나오는 것은 정상이고,
-    // 그걸 막으면 왜 바꿨는지 적을 수가 없다. 실제 실행되는 줄만 본다.
-    const code = body
-      .split('\n')
-      .filter((line) => !/^\s*#/.test(line))
-      .join('\n');
-    if (/\bssh\s+ec2\b|\bscp\b[^\n]*\bec2:|rsync[^\n]*-e\s+ssh/.test(code)) {
+    if (usesSshAlias(body)) {
       errors.push(
         `${rel}: production deploy scripts must not use the ssh/scp/rsync ec2 alias — ` +
           'the workflow no longer creates it (use SSM instead)',

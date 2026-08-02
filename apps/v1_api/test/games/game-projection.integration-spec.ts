@@ -1178,20 +1178,20 @@ describe('Task 9 game projection real-database contract', () => {
           afterValid: {
             rows: [
               {
-                id: escalation.id,
-                status: 'ACKNOWLEDGED',
-                version: 1,
-                ackByUserId: ids.supportUser,
-                resolvedByUserId: null,
-                reason: 'R7 reviewer acknowledgement',
-              },
-              {
                 id: reminder.id,
                 status: 'RESOLVED',
                 version: 1,
                 ackByUserId: null,
                 resolvedByUserId: ids.opsUser,
                 reason: 'R7 operations resolution',
+              },
+              {
+                id: escalation.id,
+                status: 'ACKNOWLEDGED',
+                version: 1,
+                ackByUserId: ids.supportUser,
+                resolvedByUserId: null,
+                reason: 'R7 reviewer acknowledgement',
               },
             ],
             auditCount: 2,

@@ -276,6 +276,7 @@ jobs:
         id: rollback-base
         env:
           RELEASE_SHA: ${{ github.sha }}
+          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
         run: bash scripts/release/resolve-prod-rollback-base.sh
 
       - name: Resolve immutable image tags

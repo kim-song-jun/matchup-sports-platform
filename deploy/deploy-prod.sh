@@ -132,6 +132,8 @@ compose=(
   --env-file "${ENV_FILE}"
 )
 
+assert_compose_variables_resolve "${compose[@]}"
+
 restore_legacy_runtime() {
   [[ -n "${legacy_api_image}" && -n "${legacy_web_image}" ]] || return 1
   restore_legacy_prod_release_source || return 1

@@ -2175,7 +2175,7 @@ model V1TournamentFixtureAdvancementEdge {
   targetSide      V1FixtureTargetSide         @map("target_side")
   createdAt       DateTime                    @default(now()) @map("created_at")
 
-  tournament    V1Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournament    V1Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "v1_fixture_advancement_tournament_fk")
   sourceFixture V1TournamentFixture @relation("V1FixtureAdvancementSource", fields: [tournamentId, sourceFixtureId], references: [tournamentId, id], onDelete: Cascade, map: "v1_fixture_advancement_source_fk")
   targetFixture V1TournamentFixture @relation("V1FixtureAdvancementTarget", fields: [tournamentId, targetFixtureId], references: [tournamentId, id], onDelete: Cascade, map: "v1_fixture_advancement_target_fk")
 

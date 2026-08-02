@@ -82,6 +82,11 @@ jobs:
       - name: Production deploy security guardrails
         run: pnpm qa:production-deploy-security
 
+      # 이 가드 자체가 약해서 놓친 전례가 있다 — `ssh -o ... ec2` 를 미탐하고 인라인 주석에는
+      # 오탐했다(2026-08-02). 탐지 로직을 바꿀 때 그 회귀를 잡도록 동작을 테스트로 고정한다.
+      - name: Prod deploy security guard tests
+        run: node --test scripts/qa/prod-deploy-security-guard.test.mjs
+
       # 이 스위트는 존재만 하고 CI 에서 한 번도 실행되지 않았다 — 그래서
       # "changeset 을 전부 소비하면 alpha 배포가 깨진다"는 계약 위반이 계속 살아 있었다.
       # 디렉터리 인자(`node --test scripts/release/`)는 Node 버전에 따라 모듈 해석으로
@@ -276,6 +281,7 @@ jobs:
         id: rollback-base
         env:
           RELEASE_SHA: ${{ github.sha }}
+          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
         run: bash scripts/release/resolve-prod-rollback-base.sh
 
       - name: Resolve immutable image tags

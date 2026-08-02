@@ -221,23 +221,36 @@ describe('v1 game operations schema', () => {
     `), '23514', 'v1_games_source_exactly_one_ck');
   });
 
-  it('keeps source adapters nullable and unique for soft-deleted source records', async () => {
+  it('keeps game source adapters nullable and unique for soft-deleted source records', async () => {
     await insertGame(gameSchemaFixture.gameId, 'TEAM_MATCH');
     await prisma.$executeRaw`UPDATE v1_team_matches SET deleted_at = ${gameSchemaFixture.now} WHERE id = ${gameSchemaFixture.teamMatchId}`;
     const survivingGame = await prisma.$queryRaw<Array<{ id: string }>>`SELECT id FROM v1_games WHERE id = ${gameSchemaFixture.gameId}`;
     expect(survivingGame).toEqual([{ id: gameSchemaFixture.gameId }]);
     await prisma.$executeRaw`UPDATE v1_team_matches SET deleted_at = NULL WHERE id = ${gameSchemaFixture.teamMatchId}`;
     await prisma.$executeRaw`DELETE FROM v1_games WHERE id = ${gameSchemaFixture.gameId}`;
-    const columns = await prisma.$queryRaw<Array<{ column_name: string; is_nullable: string }>>`
+    const sourceAdapterColumns = await prisma.$queryRaw<Array<{ column_name: string; is_nullable: string }>>`
       SELECT column_name, is_nullable
       FROM information_schema.columns
       WHERE table_schema = 'public'
-        AND ((table_name = 'v1_team_matches' AND column_name = 'competition_config_version_id')
-          OR (table_name = 'v1_tournament_fixtures' AND column_name = 'competition_config_version_id'))
+        AND table_name = 'v1_games'
+        AND column_name IN ('team_match_id', 'tournament_fixture_id')
+      ORDER BY column_name
+    `;
+    expect(sourceAdapterColumns).toHaveLength(2);
+    expect(sourceAdapterColumns.every((column) => column.is_nullable === 'YES')).toBe(true);
+
+    const sourceConfigPins = await prisma.$queryRaw<Array<{ table_name: string; column_name: string; is_nullable: string }>>`
+      SELECT table_name, column_name, is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND column_name = 'competition_config_version_id'
+        AND table_name IN ('v1_team_matches', 'v1_tournament_fixtures')
       ORDER BY table_name
     `;
-    expect(columns).toHaveLength(2);
-    expect(columns.every((column) => column.is_nullable === 'YES')).toBe(true);
+    expect(sourceConfigPins).toEqual([
+      { table_name: 'v1_team_matches', column_name: 'competition_config_version_id', is_nullable: 'NO' },
+      { table_name: 'v1_tournament_fixtures', column_name: 'competition_config_version_id', is_nullable: 'NO' },
+    ]);
 
     const uniqueIndexes = await prisma.$queryRaw<Array<{ indexname: string }>>`
       SELECT indexname
@@ -440,7 +453,7 @@ describe('v1 game operations schema', () => {
     expectRawFailure(await captureRawFailure(() => prisma.$executeRaw`
       INSERT INTO v1_competition_config_versions
         (id, sport_code, name, version, status, periods, events, lineup, result, tie_break, visibility, content_hash, created_at, updated_at)
-      VALUES ('00000000-0000-4000-8000-0000000009d2', 'FOOTBALL', 'unversioned', NULL, 'ACTIVE', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 'unversioned', ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
+      VALUES ('00000000-0000-4000-8000-0000000009d2', 'FOOTBALL', 'unversioned', NULL, 'ACTIVE', '[{"code":"FIRST_HALF","label":"전반","durationMinutes":45,"extraTime":false},{"code":"SECOND_HALF","label":"후반","durationMinutes":45,"extraTime":false}]'::jsonb, '["GOAL","OWN_GOAL","YELLOW_CARD","RED_CARD","SUBSTITUTION"]'::jsonb, '{"minPlayers":7,"maxPlayers":11,"substitutions":"limited","maxSubstitutions":5}'::jsonb, '{"tournamentScorerPolicy":"required","teamMatchScorerPolicy":"optional_with_warning","mvpMin":0,"mvpMax":1}'::jsonb, '{"points":{"win":3,"draw":1,"loss":0},"order":["points","head_to_head","goal_difference","goals_for","fair_play","seeded_draw"],"seededDraw":"sha256-v1"}'::jsonb, '{"default":"live","allowed":["live","official"]}'::jsonb, 'unversioned', ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
     `), '23502', 'Failing row contains');
     await prisma.$executeRaw`
       INSERT INTO v1_outbox_events (id, business_key, aggregate_type, aggregate_id, type, payload, updated_at)

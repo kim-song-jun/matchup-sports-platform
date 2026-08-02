@@ -27,10 +27,8 @@ export const gameSchemaFixture = {
 } as const;
 
 export const gameSchemaSourceManifest = {
-  schema: 'e9ce76f37813b7760ac110089fdfafef5a357b3fbcb91e7d6b2e90fc28537c07',
+  schema: '0f34070772cd39a2754ce5a6dd1590907389aad9c35633a52dcf5a3c628aeab9',
   migration: 'bda8608ee5b4498939eea0b68ac837612338e781e09a16a41f7325ff971110d7',
-  integrationSpec: 'a5f57dcaf31fe6086fd338676a3e8374b446605547f2c37c8c2fb0a9b6bf9220',
-  fixture: '843201c8d59ca612151215b71c29d5e8eaf98c9231487fdedf70f502470859a1',
 } as const;
 
 type GameSchemaSourcePaths = {

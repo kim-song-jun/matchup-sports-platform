@@ -126,6 +126,12 @@ const taskNineR7OwnedPaths = [
   ...taskNineR6OwnedPaths,
   'apps/v1_api/prisma/migrations/20260802000400_v1_public_official_result_cache',
 ];
+const taskNineR8OwnedPaths = [
+  ...taskNineR7OwnedPaths,
+  'apps/v1_api/test/games/game-lifecycle.integration-spec.ts',
+  'apps/v1_api/test/games/game-schema.integration-spec.ts',
+  'apps/v1_api/test/integration/tournament-campaign.e2e-spec.ts',
+];
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -1555,7 +1561,7 @@ test('legacy Task1 host pressure override remains accepted', () => {
   }
 });
 
-test('Task 9 R6 host pressure receipt remains immutable exact 20-path predecessor evidence', () => {
+test('Task 9 R8 descriptor keeps R5-R7 receipts immutable while appending only the three fixture paths', () => {
   const canonicalReceipt = JSON.parse(
     readFileSync(resolve(repoRoot, taskNineR6OverridePath), 'utf8'),
   );
@@ -1596,15 +1602,19 @@ test('Task 9 R6 host pressure receipt remains immutable exact 20-path predecesso
   const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
   const previousSession = process.env.V1_VERIFICATION_SESSION_ID;
   try {
-    assert.deepEqual(ledgerOutputs, taskNineR7OwnedPaths);
+    assert.deepEqual(ledgerOutputs, taskNineR8OwnedPaths);
     assert.deepEqual(planOutputs, taskNineR7OwnedPaths);
-    assert.equal(ledgerOutputs.length, 21);
+    assert.equal(ledgerOutputs.length, 24);
+    assert.deepEqual(ledgerOutputs.slice(0, 21), taskNineR7OwnedPaths);
     assert.deepEqual(ledgerOutputs.slice(0, 20), taskNineR6OwnedPaths);
     assert.deepEqual(ledgerOutputs.slice(0, 18), taskNineR4OwnedPaths);
     assert.equal(ledgerOutputs.includes('docs/api/global-contract.md'), true);
-    assert.equal(ledgerOutputs.at(-3), 'docs/api/global-contract.md');
-    assert.equal(ledgerOutputs.at(-2), 'docs/api/domains/tournament-operations-auth.md');
-    assert.equal(ledgerOutputs.at(-1), 'apps/v1_api/prisma/migrations/20260802000400_v1_public_official_result_cache');
+    assert.equal(ledgerOutputs.at(18), 'docs/api/global-contract.md');
+    assert.equal(ledgerOutputs.at(19), 'docs/api/domains/tournament-operations-auth.md');
+    assert.equal(ledgerOutputs.at(20), 'apps/v1_api/prisma/migrations/20260802000400_v1_public_official_result_cache');
+    assert.equal(ledgerOutputs.at(21), 'apps/v1_api/test/games/game-lifecycle.integration-spec.ts');
+    assert.equal(ledgerOutputs.at(22), 'apps/v1_api/test/games/game-schema.integration-spec.ts');
+    assert.equal(ledgerOutputs.at(23), 'apps/v1_api/test/integration/tournament-campaign.e2e-spec.ts');
     assert.equal(
       dependencyRow,
       '| 9 | 5, 6, 7, 11 | 10, 16, 18, 22, 24, 27 | 8; Task 9A completes projection infrastructure without personal rows, while Task 24 performs Task 9B after 14 |',

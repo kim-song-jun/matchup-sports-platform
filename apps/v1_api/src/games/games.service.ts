@@ -1079,6 +1079,20 @@ export class GamesService {
     headerIdempotencyKey: string | undefined,
     dto: CreateGameResultRevisionDto,
   ): Promise<GameRevisionMutationResult> {
+    const source = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { sourceType: true },
+    });
+    if (source === null) {
+      throw this.notFound();
+    }
+    if (source.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
+      await this.resolveActor(this.prisma, gameId, user.id, 'read');
+      throw new ConflictException({
+        code: 'TOURNAMENT_RESULT_DERIVED_ONLY',
+        message: 'Tournament result revisions are derived by the end command',
+      });
+    }
     return this.withCommand(
       {
         gameId,
@@ -1090,12 +1104,6 @@ export class GamesService {
         payload: dto,
       },
       async (tx, game, context) => {
-        if (game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
-          throw new ConflictException({
-            code: 'TOURNAMENT_RESULT_DERIVED_ONLY',
-            message: 'Tournament result revisions are derived by the end command',
-          });
-        }
         const invariant = await this.resultInvariantInput(tx, game, dto);
         try {
           validateGameResultInvariants(invariant);

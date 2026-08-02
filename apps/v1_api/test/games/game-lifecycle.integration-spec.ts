@@ -173,7 +173,7 @@ describe('Task 6 L1 game lifecycle', () => {
           id: ids.assignment,
           tournamentId: ids.tournament,
           userId: ids.operatorUser,
-          role: 'FIELD_OPERATOR',
+          role: 'TOURNAMENT_DIRECTOR',
           grantedByUserId: ids.operatorUser,
         },
       });
@@ -605,7 +605,7 @@ describe('Task 6 L1 game lifecycle', () => {
     );
     expect(String(crossSupersedes)).toContain('v1_result_revisions_supersedes_fk');
     process.stdout.write(
-      'TASK6_L1=PASS game=1 replay_same=1 event_append=1 revision_frozen=1 approval_winner=1 visibility=1\n',
+      'TASK6_L1_CROSS_GAME_REFERENCES=PASS current_fk=1 supersedes_fk=1\n',
     );
   });
 });

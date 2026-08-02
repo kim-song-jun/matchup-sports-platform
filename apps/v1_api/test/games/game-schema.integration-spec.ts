@@ -80,7 +80,7 @@ describe('v1 game operations schema', () => {
     `;
     await prisma.$executeRaw`
       INSERT INTO v1_sports (id, code, name, created_at, updated_at)
-      VALUES (${gameSchemaFixture.sportId}, 'GAME_SCHEMA_FOOTBALL', 'Game schema football', ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
+      VALUES (${gameSchemaFixture.sportId}, 'football', 'Game schema football', ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
       ON CONFLICT (id) DO NOTHING
     `;
     await prisma.$executeRaw`

@@ -100,10 +100,23 @@ if [[ "${had_active}" == false ]]; then
   fi
 fi
 
-set -a
-# shellcheck disable=SC1090 -- protected operator-managed runtime configuration.
-source "${ENV_FILE}"
-set +a
+# 런타임 .env 를 `source` 하지 않는다. `source` 는 파일을 **셸 코드로 실행**하므로, 값에
+# `$`·공백·세미콜론·`$(...)` 가 들어가면 원문이 보존되지 않거나 명령이 실제로 실행된다.
+# 실측(2026-08-03): 'pa$$word' → PID 로 확장, 'a b' → 뒤 토큰을 명령으로 실행 시도,
+# '$(cmd)' 와 'a;cmd' → 실행됨. 값은 Parameter Store 에서 오므로 지금은 무해하지만,
+# KAKAO_SCOPE 처럼 공백이 정상인 값 하나만 들어와도 조용히 깨진다.
+#
+# 따옴표로 감싸는 방법은 쓸 수 없다 — 이 파일은 compose 도 `--env-file` 로 읽는데,
+# compose 는 셸의 '\'' 이스케이프를 파싱하지 못하고 **파일 전체를 거부**한다(실측).
+# 그래서 파일은 compose 원형(따옴표 없는 KEY=VALUE)으로 두고, 셸 쪽에서 source 를 없앴다.
+#
+# 시크릿은 compose 가 --env-file 로 직접 읽으므로 셸 환경에 올릴 이유가 없다.
+# 이 스크립트가 실제로 필요한 값은 아래 두 개뿐이고, 셸 해석 없이 읽는다.
+env_value() {
+  sed -n "s/^$1=//p" "${ENV_FILE}" | head -1
+}
+V1_DB_USER="$(env_value V1_DB_USER)"
+V1_DB_NAME="$(env_value V1_DB_NAME)"
 
 export COMPOSE_PARALLEL_LIMIT=1
 # --preserve-env 가 반드시 필요하다. docker-compose.prod.yml 은 이미지를

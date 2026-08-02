@@ -1,5 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import type { INestApplication } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import request = require('supertest');
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GamesService } from '../../src/games/games.service';
 import {
@@ -8,7 +10,9 @@ import {
   V1GameOperationsWorkerService,
 } from '../../src/jobs/v1-game-operations-worker.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config';
+import { createV1IntegrationApp } from '../integration/integration-app';
 
 const prisma = new PrismaService();
 const games = new GamesService(prisma, new OperationAuditWriterService());
@@ -271,11 +275,14 @@ describe('Task 9 game projection real-database contract', () => {
       const worker = productionWorker();
       const processed = [
         await worker.processOne(),
-        await worker.processOne(),
-        await worker.processOne(),
       ];
+      const cacheAfterFirst = await publicCacheSnapshot(ids.game);
+      processed.push(
+        await worker.processOne(),
+        await worker.processOne(),
+      );
 
-      const [events, factCount, watermarks] = await Promise.all([
+      const [events, factCount, watermarks, cacheAfterDuplicates, officialRevision] = await Promise.all([
         prisma.v1OutboxEvent.findMany({
           where: { id: { in: deliveryIds } },
           orderBy: { availableAt: 'asc' },
@@ -301,13 +308,55 @@ describe('Task 9 game projection real-database contract', () => {
           orderBy: [{ entityType: 'asc' }, { entityId: 'asc' }],
           select: { projection: true, entityType: true, entityId: true, revisionId: true, status: true },
         }),
+        publicCacheSnapshot(ids.game),
+        prisma.v1GameResultRevision.findUniqueOrThrow({
+          where: { id: ids.revision },
+          select: { officialAt: true },
+        }),
       ]);
+
+      const canonicalPayload = {
+        gameId: ids.game,
+        revisionId: ids.revision,
+        revision: 1,
+        sourceType: 'TEAM_MATCH',
+        tournamentId: null,
+        homeTeamId: ids.hostTeam,
+        awayTeamId: ids.opponentTeam,
+        score: { home: 2, away: 1 },
+        eventsHash: 'official-source-hash',
+        officialAt: officialRevision.officialAt!.toISOString(),
+        visibility: 'HIDDEN',
+      };
+      const expectedCache = {
+        tableExists: true,
+        rows: [{
+          revisionId: ids.revision,
+          gameId: ids.game,
+          tournamentId: null,
+          revision: 1,
+          visibility: 'HIDDEN',
+          isCurrent: true,
+          sourceHash: 'official-source-hash',
+          payloadHash: createHash('sha256').update(JSON.stringify(canonicalPayload)).digest('hex'),
+          canonicalPayload,
+          cachedAt: cacheAfterFirst.rows[0]?.cachedAt,
+          updatedAt: cacheAfterFirst.rows[0]?.updatedAt,
+        }],
+        currentCount: 1,
+      };
+      process.stdout.write(`TASK9_PUBLIC_CACHE_IDEMPOTENCY=${JSON.stringify({
+        afterFirst: cacheAfterFirst,
+        afterDuplicateAndReordered: cacheAfterDuplicates,
+      })}\n`);
 
       expect({
         processed,
         events,
         factCount,
         watermarks,
+        cacheAfterFirst,
+        cacheAfterDuplicates,
       }).toEqual({
         processed: [true, true, true],
         events: [
@@ -356,11 +405,13 @@ describe('Task 9 game projection real-database contract', () => {
             status: 'APPLIED',
           },
         ],
+        cacheAfterFirst: expectedCache,
+        cacheAfterDuplicates: expectedCache,
       });
     });
 
     it('[RED-L2] malformed official payload poisons with a projection error and never writes a current watermark', async () => {
-      const [beforeFactCount, beforeWatermarks] = await Promise.all([
+      const [beforeFactCount, beforeWatermarks, beforeCache] = await Promise.all([
         futureFactCount('v1_game_official_facts', ids.revision),
         prisma.v1ProjectionWatermark.findMany({
           where: { revisionId: ids.revision },
@@ -374,10 +425,11 @@ describe('Task 9 game projection real-database contract', () => {
             status: true,
           },
         }),
+        publicCacheSnapshot(ids.game),
       ]);
       await resetOfficialDelivery(officialOutboxId, { revisionId: '' }, 5);
       const processed = await productionWorker().processOne();
-      const [event, afterFactCount, afterWatermarks] = await Promise.all([
+      const [event, afterFactCount, afterWatermarks, afterCache] = await Promise.all([
         outboxState(officialOutboxId),
         futureFactCount('v1_game_official_facts', ids.revision),
         prisma.v1ProjectionWatermark.findMany({
@@ -392,10 +444,16 @@ describe('Task 9 game projection real-database contract', () => {
             status: true,
           },
         }),
+        publicCacheSnapshot(ids.game),
       ]);
 
       expect(afterFactCount).toBe(beforeFactCount);
       expect(afterWatermarks).toEqual(beforeWatermarks);
+      expect(afterCache).toEqual(beforeCache);
+      process.stdout.write(`TASK9_PUBLIC_CACHE_MALFORMED_ROLLBACK=${JSON.stringify({
+        before: beforeCache,
+        after: afterCache,
+      })}\n`);
       expect({
         processed,
         event: { status: event.status, attempts: event.attempts, lastError: event.lastError },
@@ -414,7 +472,7 @@ describe('Task 9 game projection real-database contract', () => {
       await resetOfficialDelivery(tournamentOutboxId);
       const worker = productionWorker();
       const processed = [await worker.processOne(), await worker.processOne()];
-      const [teamMatchFacts, tournamentFacts, totals, personalRows] = await Promise.all([
+      const [teamMatchFacts, tournamentFacts, totals, personalRows, tournamentCache] = await Promise.all([
         futureFactCount('v1_game_official_facts', ids.revision),
         futureFactCount('v1_game_official_facts', ids.tournamentRevision),
         officialTeamTotals(ids.hostTeam, 2026, ids.tournament),
@@ -429,9 +487,21 @@ describe('Task 9 game projection real-database contract', () => {
             ],
           },
         }),
+        publicCacheSnapshot(ids.tournamentGame),
       ]);
 
-      expect({ processed, facts: teamMatchFacts + tournamentFacts, totals, personalRows }).toEqual({
+      expect({
+        processed,
+        facts: teamMatchFacts + tournamentFacts,
+        totals,
+        personalRows,
+        officialOnlyCache: {
+          tableExists: tournamentCache.tableExists,
+          currentCount: tournamentCache.currentCount,
+          visibility: tournamentCache.rows[0]?.visibility,
+          revisionId: tournamentCache.rows[0]?.revisionId,
+        },
+      }).toEqual({
         processed: [true, true],
         facts: 2,
         totals: {
@@ -440,6 +510,12 @@ describe('Task 9 game projection real-database contract', () => {
           lifetime: { played: 2, won: 2, drawn: 0, lost: 0 },
         },
         personalRows: 0,
+        officialOnlyCache: {
+          tableExists: true,
+          currentCount: 1,
+          visibility: 'OFFICIAL_ONLY',
+          revisionId: ids.tournamentRevision,
+        },
       });
     });
 
@@ -641,6 +717,7 @@ describe('Task 9 game projection real-database contract', () => {
     it('[RED-L2] reconciliation repairs an injected aggregate mismatch with an audit and writes APPLIED watermark last', async () => {
       await resetOfficialDelivery(officialOutboxId);
       await ensureInjectedMismatch();
+      await ensureInjectedCacheMismatch(ids.game, ids.revision);
       const processed = await productionWorker().processOne();
       const repaired = await prisma.v1ProjectionWatermark.findFirst({
         where: { projection: 'TEAM_RECORD', entityType: 'TEAM', entityId: ids.hostTeam },
@@ -649,7 +726,15 @@ describe('Task 9 game projection real-database contract', () => {
         where: { resourceId: ids.revision, action: 'GAME_PROJECTION_REPAIRED' },
         select: { createdAt: true },
       });
-      const event = await outboxState(officialOutboxId);
+      const [event, cache] = await Promise.all([
+        outboxState(officialOutboxId),
+        publicCacheSnapshot(ids.game),
+      ]);
+      process.stdout.write(`TASK9_PUBLIC_CACHE_RECONCILIATION=${JSON.stringify({
+        eventStatus: event.status,
+        repairAuditCount: repairAudits.length,
+        cache,
+      })}\n`);
 
       expect({
         processed,
@@ -658,6 +743,12 @@ describe('Task 9 game projection real-database contract', () => {
           ? { sourceHash: repaired.sourceHash, status: repaired.status }
           : null,
         repairAuditCount: repairAudits.length,
+        cacheCurrent:
+          cache.tableExists &&
+          cache.currentCount === 1 &&
+          cache.rows[0]?.revisionId === ids.revision &&
+          cache.rows[0].sourceHash === 'official-source-hash' &&
+          cache.rows[0].visibility === 'HIDDEN',
         watermarkWrittenLast:
           repaired !== null &&
           repairAudits.length === 1 &&
@@ -667,6 +758,7 @@ describe('Task 9 game projection real-database contract', () => {
         eventStatus: 'COMPLETED',
         repaired: { sourceHash: 'official-source-hash', status: 'APPLIED' },
         repairAuditCount: 1,
+        cacheCurrent: true,
         watermarkWrittenLast: true,
       });
     });
@@ -691,6 +783,11 @@ describe('Task 9 game projection real-database contract', () => {
         await removeWatermarkFailureTrigger();
         await assertNoWorkerResidue('lane2-watermark-trigger');
       }
+      process.stdout.write(`TASK9_PUBLIC_CACHE_TRANSACTION_ROLLBACK=${JSON.stringify({
+        status: event!.status,
+        cacheBefore: before.publicCache,
+        cacheAfter: after!.publicCache,
+      })}\n`);
 
       expect({
         processed,
@@ -962,6 +1059,149 @@ describe('Task 9 game projection real-database contract', () => {
         ],
       });
     });
+
+    it('[RED-R7] escalation HTTP boundaries reject malformed UUIDs and absent idempotency keys without changing state', async () => {
+      await seedEscalationRows(ids.tournamentRevision);
+      const rows = await prisma.v1ResultEscalation.findMany({
+        where: { resultRevisionId: ids.tournamentRevision },
+        orderBy: { kind: 'asc' },
+        select: { id: true, kind: true },
+      });
+      const [reminder, escalation] = rows;
+      if (reminder === undefined || escalation === undefined) {
+        throw new Error('Task 9 R7 fixture must create reminder and escalation rows');
+      }
+      if (reminder.kind !== 'ESCALATION' || escalation.kind !== 'REMINDER') {
+        throw new Error('Task 9 R7 fixture must order ESCALATION then REMINDER');
+      }
+
+      let app: INestApplication | undefined;
+      let cleanupApp: (() => Promise<void>) | undefined;
+      try {
+        ({ app, cleanup: cleanupApp } = await createV1IntegrationApp());
+        const termsService = app.get(ManagedTermsRuntimeService);
+        const requiredDocumentIds = (await termsService.currentSignupTerms()).items
+          .filter((item) => item.requirement === 'required')
+          .map((item) => item.documentId);
+        await Promise.all([
+          termsService.acceptSignupTerms(ids.supportUser, requiredDocumentIds),
+          termsService.acceptSignupTerms(ids.opsUser, requiredDocumentIds),
+        ]);
+        await assertR7FixturePreconditions(requiredDocumentIds);
+        const route = (escalationId: string, action: 'ack' | 'resolve') =>
+          `/api/v1/tournament-ops/tournaments/${ids.tournament}/escalations/${escalationId}/${action}`;
+        const beforeBoundary = await escalationMutationSnapshot([reminder.id, escalation.id]);
+
+        const malformedTournament = await request(app.getHttpServer())
+          .get(`/api/v1/tournament-ops/tournaments/not-a-uuid/escalations`)
+          .set('x-v1-user-id', ids.supportUser);
+        const malformedEscalation = await request(app.getHttpServer())
+          .post(route('not-a-uuid', 'ack'))
+          .set('x-v1-user-id', ids.supportUser)
+          .set('idempotency-key', `${prefix}:r7-malformed`)
+          .send({ expectedVersion: 0, reason: 'R7 malformed escalation identifier' });
+        const missingHeader = await request(app.getHttpServer())
+          .post(route(escalation.id, 'ack'))
+          .set('x-v1-user-id', ids.supportUser)
+          .send({ expectedVersion: 0, reason: 'R7 reviewer acknowledgement' });
+        const blankHeader = await request(app.getHttpServer())
+          .post(route(reminder.id, 'resolve'))
+          .set('x-v1-user-id', ids.opsUser)
+          .set('idempotency-key', '   ')
+          .send({ expectedVersion: 0, reason: 'R7 operations resolution' });
+        const afterBoundary = await escalationMutationSnapshot([reminder.id, escalation.id]);
+
+        const first = await request(app.getHttpServer())
+          .post(route(escalation.id, 'ack'))
+          .set('x-v1-user-id', ids.supportUser)
+          .set('idempotency-key', `${prefix}:r7-ack`)
+          .send({ expectedVersion: 0, reason: 'R7 reviewer acknowledgement' });
+        const replay = await request(app.getHttpServer())
+          .post(route(escalation.id, 'ack'))
+          .set('x-v1-user-id', ids.supportUser)
+          .set('idempotency-key', `${prefix}:r7-ack`)
+          .send({ expectedVersion: 0, reason: 'R7 reviewer acknowledgement' });
+        const payloadConflict = await request(app.getHttpServer())
+          .post(route(escalation.id, 'ack'))
+          .set('x-v1-user-id', ids.supportUser)
+          .set('idempotency-key', `${prefix}:r7-ack`)
+          .send({ expectedVersion: 0, reason: 'R7 changed payload' });
+        const staleVersion = await request(app.getHttpServer())
+          .post(route(escalation.id, 'ack'))
+          .set('x-v1-user-id', ids.supportUser)
+          .set('idempotency-key', `${prefix}:r7-stale`)
+          .send({ expectedVersion: 0, reason: 'R7 stale version' });
+        const resolved = await request(app.getHttpServer())
+          .post(route(reminder.id, 'resolve'))
+          .set('x-v1-user-id', ids.opsUser)
+          .set('idempotency-key', `${prefix}:r7-resolve`)
+          .send({ expectedVersion: 0, reason: 'R7 operations resolution' });
+        const afterValid = await escalationMutationSnapshot([reminder.id, escalation.id]);
+
+        process.stdout.write(`TASK9_R7_HTTP=${JSON.stringify({
+          malformedTournament: { status: malformedTournament.status, body: malformedTournament.body },
+          malformedEscalation: { status: malformedEscalation.status, body: malformedEscalation.body },
+          missingHeader: { status: missingHeader.status, body: missingHeader.body },
+          blankHeader: { status: blankHeader.status, body: blankHeader.body },
+          first: { status: first.status, body: first.body },
+          replay: { status: replay.status, body: replay.body },
+          payloadConflict: { status: payloadConflict.status, body: payloadConflict.body },
+          staleVersion: { status: staleVersion.status, body: staleVersion.body },
+          resolved: { status: resolved.status, body: resolved.body },
+        })}\n`);
+        const observable = {
+          malformedTournament: malformedTournament.status,
+          malformedEscalation: malformedEscalation.status,
+          missingHeader: missingHeader.status,
+          blankHeader: blankHeader.status,
+          boundaryUnchanged: afterBoundary,
+          first: { status: first.status, replayed: first.body.data?.replayed },
+          replay: { status: replay.status, replayed: replay.body.data?.replayed },
+          payloadConflict: { status: payloadConflict.status, code: payloadConflict.body.code },
+          staleVersion: { status: staleVersion.status, code: staleVersion.body.code },
+          resolved: { status: resolved.status, replayed: resolved.body.data?.replayed },
+          afterValid,
+        };
+        process.stdout.write(`TASK9_R7_BOUNDARY=${JSON.stringify(observable)}\n`);
+
+        expect(observable).toEqual({
+          malformedTournament: 422,
+          malformedEscalation: 422,
+          missingHeader: 422,
+          blankHeader: 422,
+          boundaryUnchanged: beforeBoundary,
+          first: { status: 200, replayed: false },
+          replay: { status: 200, replayed: true },
+          payloadConflict: { status: 409, code: 'IDEMPOTENCY_PAYLOAD_CONFLICT' },
+          staleVersion: { status: 409, code: 'ESCALATION_VERSION_CONFLICT' },
+          resolved: { status: 200, replayed: false },
+          afterValid: {
+            rows: [
+              {
+                id: escalation.id,
+                status: 'ACKNOWLEDGED',
+                version: 1,
+                ackByUserId: ids.supportUser,
+                resolvedByUserId: null,
+                reason: 'R7 reviewer acknowledgement',
+              },
+              {
+                id: reminder.id,
+                status: 'RESOLVED',
+                version: 1,
+                ackByUserId: null,
+                resolvedByUserId: ids.opsUser,
+                reason: 'R7 operations resolution',
+              },
+            ],
+            auditCount: 2,
+            idempotencyCount: 2,
+          },
+        });
+      } finally {
+        await cleanupApp?.();
+      }
+    });
   });
 });
 
@@ -973,6 +1213,10 @@ async function createFixture(): Promise<void> {
         email: `task9-${index}@example.test`,
         accountStatus: 'active',
         onboardingStatus: 'completed',
+        phoneVerifiedAt:
+          id === ids.supportUser || id === ids.opsUser
+            ? new Date('2026-08-01T00:00:00.000Z')
+            : null,
       }),
     ),
   });
@@ -1037,6 +1281,9 @@ async function createFixture(): Promise<void> {
       version: 0,
       competitionConfigVersionId: ids.config,
     },
+  });
+  await prisma.v1GameVisibilityPolicy.create({
+    data: { gameId: ids.game, mode: 'HIDDEN' },
   });
   await prisma.v1GameSide.createMany({
     data: [
@@ -1180,6 +1427,9 @@ async function createFixture(): Promise<void> {
       version: 0,
       competitionConfigVersionId: ids.config,
     },
+  });
+  await prisma.v1GameVisibilityPolicy.create({
+    data: { gameId: ids.tournamentGame, mode: 'OFFICIAL_ONLY' },
   });
   await prisma.v1GameSide.createMany({
     data: [
@@ -2033,18 +2283,141 @@ async function sharedFixtureSnapshot() {
 }
 
 async function seedEscalationRows(revisionId: string): Promise<void> {
+  const databaseNow = await prisma.$queryRaw<Array<{ now: Date }>>`SELECT CURRENT_TIMESTAMP AS now`;
+  const now = databaseNow[0]?.now;
+  if (now === undefined) {
+    throw new Error('Task 9 escalation fixture requires database CURRENT_TIMESTAMP');
+  }
   await Promise.all([
     prisma.v1ResultEscalation.upsert({
       where: { resultRevisionId_kind: { resultRevisionId: revisionId, kind: 'REMINDER' } },
-      create: { resultRevisionId: revisionId, kind: 'REMINDER', dueAt: new Date('2026-08-02T00:00:00.000Z') },
-      update: { status: 'PENDING', ackByUserId: null, resolvedByUserId: null, reason: null },
+      create: { resultRevisionId: revisionId, kind: 'REMINDER', dueAt: new Date(now.getTime() - 2_000) },
+      update: { status: 'PENDING', version: 0, ackByUserId: null, resolvedByUserId: null, reason: null },
     }),
     prisma.v1ResultEscalation.upsert({
       where: { resultRevisionId_kind: { resultRevisionId: revisionId, kind: 'ESCALATION' } },
-      create: { resultRevisionId: revisionId, kind: 'ESCALATION', dueAt: new Date('2026-08-03T00:00:00.000Z') },
-      update: { status: 'PENDING', ackByUserId: null, resolvedByUserId: null, reason: null },
+      create: { resultRevisionId: revisionId, kind: 'ESCALATION', dueAt: new Date(now.getTime() - 1_000) },
+      update: { status: 'PENDING', version: 0, ackByUserId: null, resolvedByUserId: null, reason: null },
     }),
   ]);
+}
+
+async function assertR7FixturePreconditions(requiredDocumentIds: readonly string[]): Promise<void> {
+  const [revision, users, staffAssignment, platformOps, rows, terms] = await Promise.all([
+    prisma.v1GameResultRevision.findUniqueOrThrow({
+      where: { id: ids.tournamentRevision },
+      select: {
+        id: true,
+        gameId: true,
+        game: {
+          select: {
+            id: true,
+            sourceType: true,
+            tournamentFixture: {
+              select: {
+                id: true,
+                tournamentId: true,
+                tournament: { select: { id: true } },
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.v1User.findMany({
+      where: { id: { in: [ids.supportUser, ids.opsUser] } },
+      orderBy: { id: 'asc' },
+      select: { id: true, accountStatus: true, onboardingStatus: true, phoneVerifiedAt: true },
+    }),
+    prisma.v1TournamentStaffAssignment.findUniqueOrThrow({
+      where: { id: ids.lane4DirectorAssignment },
+      select: { tournamentId: true, userId: true, role: true, revokedAt: true, expiresAt: true },
+    }),
+    prisma.v1AdminUser.findUniqueOrThrow({
+      where: { userId: ids.opsUser },
+      select: { adminRole: true, status: true, revokedAt: true },
+    }),
+    prisma.v1ResultEscalation.findMany({
+      where: { resultRevisionId: ids.tournamentRevision },
+      orderBy: { kind: 'asc' },
+      select: { kind: true, status: true, version: true, dueAt: true },
+    }),
+    prisma.v1ManagedTermsConsentEvent.findMany({
+      where: {
+        userId: { in: [ids.supportUser, ids.opsUser] },
+        context: 'signup',
+        documentId: { in: [...requiredDocumentIds] },
+        decision: 'accepted',
+      },
+      select: { userId: true, documentId: true, decision: true },
+    }),
+  ]);
+  const databaseNow = await prisma.$queryRaw<Array<{ now: Date }>>`SELECT CURRENT_TIMESTAMP AS now`;
+  const now = databaseNow[0]?.now;
+  if (now === undefined) {
+    throw new Error('Task 9 R7 prerequisite assertion requires database CURRENT_TIMESTAMP');
+  }
+
+  expect(requiredDocumentIds.length).toBeGreaterThan(0);
+  expect(revision).toEqual({
+    id: ids.tournamentRevision,
+    gameId: ids.tournamentGame,
+    game: {
+      id: ids.tournamentGame,
+      sourceType: 'TOURNAMENT_FIXTURE',
+      tournamentFixture: {
+        id: ids.sourceFixture,
+        tournamentId: ids.tournament,
+        tournament: { id: ids.tournament },
+      },
+    },
+  });
+  expect(users).toEqual([
+    {
+      id: ids.supportUser,
+      accountStatus: 'active',
+      onboardingStatus: 'completed',
+      phoneVerifiedAt: expect.any(Date),
+    },
+    {
+      id: ids.opsUser,
+      accountStatus: 'active',
+      onboardingStatus: 'completed',
+      phoneVerifiedAt: expect.any(Date),
+    },
+  ]);
+  expect(staffAssignment).toEqual({
+    tournamentId: ids.tournament,
+    userId: ids.supportUser,
+    role: 'TOURNAMENT_DIRECTOR',
+    revokedAt: null,
+    expiresAt: null,
+  });
+  expect(platformOps).toEqual({ adminRole: 'ops', status: 'active', revokedAt: null });
+  expect(rows).toHaveLength(2);
+  expect(rows).toEqual([
+    { kind: 'ESCALATION', status: 'PENDING', version: 0, dueAt: expect.any(Date) },
+    { kind: 'REMINDER', status: 'PENDING', version: 0, dueAt: expect.any(Date) },
+  ]);
+  expect(rows.every((row) => row.dueAt <= now)).toBe(true);
+  expect(terms).toHaveLength(requiredDocumentIds.length * 2);
+}
+
+async function escalationMutationSnapshot(escalationIds: readonly string[]) {
+  const [rows, auditCount, idempotencyCount] = await Promise.all([
+    prisma.v1ResultEscalation.findMany({
+      where: { id: { in: [...escalationIds] } },
+      orderBy: { kind: 'asc' },
+      select: { id: true, status: true, version: true, ackByUserId: true, resolvedByUserId: true, reason: true },
+    }),
+    prisma.v1OperationAudit.count({
+      where: { resourceType: 'RESULT_ESCALATION', resourceId: { in: [...escalationIds] } },
+    }),
+    prisma.v1IdempotencyRecord.count({
+      where: { resourceType: 'RESULT_ESCALATION', resourceId: { in: [...escalationIds] } },
+    }),
+  ]);
+  return { rows, auditCount, idempotencyCount };
 }
 
 async function seedDiagnosticWatermarks(): Promise<void> {
@@ -2242,13 +2615,78 @@ async function futureTableExists(table: string): Promise<boolean> {
   return rows[0]?.exists === true;
 }
 
+type PublicCacheSnapshot = {
+  tableExists: boolean;
+  rows: Array<{
+    revisionId: string;
+    gameId: string;
+    tournamentId: string | null;
+    revision: number;
+    visibility: string;
+    isCurrent: boolean;
+    sourceHash: string;
+    payloadHash: string;
+    canonicalPayload: Prisma.JsonValue;
+    cachedAt: Date;
+    updatedAt: Date;
+  }>;
+  currentCount: number;
+};
+
+async function publicCacheSnapshot(gameId: string): Promise<PublicCacheSnapshot> {
+  if (!(await futureTableExists('v1_game_official_result_cache'))) {
+    return { tableExists: false, rows: [], currentCount: 0 };
+  }
+  const rows = await prisma.$queryRaw<PublicCacheSnapshot['rows']>`
+    SELECT
+      revision_id AS "revisionId",
+      game_id AS "gameId",
+      tournament_id AS "tournamentId",
+      revision,
+      visibility_mode::text AS visibility,
+      is_current AS "isCurrent",
+      source_hash AS "sourceHash",
+      payload_hash AS "payloadHash",
+      canonical_payload AS "canonicalPayload",
+      cached_at AS "cachedAt",
+      updated_at AS "updatedAt"
+    FROM v1_game_official_result_cache
+    WHERE game_id = ${gameId}
+    ORDER BY revision ASC
+  `;
+  return {
+    tableExists: true,
+    rows,
+    currentCount: rows.filter(({ isCurrent }) => isCurrent).length,
+  };
+}
+
+async function ensureInjectedCacheMismatch(gameId: string, revisionId: string): Promise<void> {
+  if (!(await futureTableExists('v1_game_official_result_cache'))) return;
+  await prisma.$executeRaw`
+    UPDATE v1_game_official_result_cache
+    SET canonical_payload = '{"corrupt":true}'::jsonb,
+        payload_hash = ${'0'.repeat(64)},
+        source_hash = 'corrupt-source-hash',
+        visibility_mode = 'LIVE'::"V1VisibilityMode",
+        updated_at = CURRENT_TIMESTAMP
+    WHERE game_id = ${gameId}
+      AND revision_id = ${revisionId}
+  `;
+}
+
 async function projectionTransactionSnapshot(revisionId: string): Promise<{
   officialFacts: number;
   teamFacts: number;
   repairAudits: number;
   watermarks: Array<{ projection: string; entityType: string; entityId: string; sourceHash: string; status: string }>;
+  publicCache: PublicCacheSnapshot;
 }> {
-  const [officialFacts, teamFacts, repairAudits, watermarks] = await Promise.all([
+  const revision = await prisma.v1GameResultRevision.findUniqueOrThrow({
+    where: { id: revisionId },
+    select: { gameId: true },
+  });
+  const [officialFacts, teamFacts, repairAudits, watermarks, publicCache] = await Promise.all([
     futureFactCount('v1_game_official_facts', revisionId),
     futureFactCount('v1_team_record_facts', revisionId),
     prisma.v1OperationAudit.count({
@@ -2265,8 +2703,9 @@ async function projectionTransactionSnapshot(revisionId: string): Promise<{
         status: true,
       },
     }),
+    publicCacheSnapshot(revision.gameId),
   ]);
-  return { officialFacts, teamFacts, repairAudits, watermarks };
+  return { officialFacts, teamFacts, repairAudits, watermarks, publicCache };
 }
 
 async function isolateLane4Outbox(outboxEventIds: readonly string[]): Promise<void> {

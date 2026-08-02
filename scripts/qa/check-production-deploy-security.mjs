@@ -6,6 +6,38 @@ const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
 const workflow = readFileSync(workflowPath, 'utf8');
 const errors = [];
 
+// deploy.yml 이 SSH 를 안 쓰게 됐어도, **그 워크플로가 호출하는 스크립트**가 여전히
+// `ssh ec2` 를 쓰면 배포는 첫 실행에서 죽는다 — alias 를 만들던 "Setup SSH" 스텝이
+// 사라졌기 때문이다. 2026-08-02 첫 프로덕션 배포가 정확히 이렇게 실패했다
+// (resolve-prod-rollback-base.sh: "ssh: Could not resolve hostname ec2").
+// 워크플로가 부르는 prod 스크립트 전체를 훑어 SSH 잔재를 막는다.
+{
+  const referenced = new Set(
+    [...workflow.matchAll(/scripts\/release\/[a-z0-9-]+\.sh/g)].map((m) => m[0]),
+  );
+  for (const rel of referenced) {
+    let body = '';
+    try {
+      body = readFileSync(rel, 'utf8');
+    } catch {
+      errors.push(`${rel}: ${workflowPath} 가 참조하지만 파일이 없습니다`);
+      continue;
+    }
+    // 주석은 제외한다 — 전환 이력을 설명하는 문장에 `ssh ec2` 가 나오는 것은 정상이고,
+    // 그걸 막으면 왜 바꿨는지 적을 수가 없다. 실제 실행되는 줄만 본다.
+    const code = body
+      .split('\n')
+      .filter((line) => !/^\s*#/.test(line))
+      .join('\n');
+    if (/\bssh\s+ec2\b|\bscp\b[^\n]*\bec2:|rsync[^\n]*-e\s+ssh/.test(code)) {
+      errors.push(
+        `${rel}: production deploy scripts must not use the ssh/scp/rsync ec2 alias — ` +
+          'the workflow no longer creates it (use SSM instead)',
+      );
+    }
+  }
+}
+
 // docker-compose.prod.yml 은 alpha 가 베이스로 함께 로드한다(deploy-alpha.sh 가
 // `-f docker-compose.prod.yml -f docker-compose.alpha.yml`). compose 는 override 병합
 // **전에** 모든 파일의 변수를 보간하므로, 이 파일에 `${VAR:?...}` 를 넣으면 alpha 오버레이가

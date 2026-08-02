@@ -358,9 +358,13 @@ describe('Task 10 legacy result pin and migration RED', () => {
       undefined as unknown as GamesService,
     );
 
-    await expect(service.detail(null, ids.completedTeamMatch)).resolves.toEqual(
-      gameBackfillFixture.expected.completedTeamMatchDetail,
-    );
+    await expect(service.detail(null, ids.completedTeamMatch)).resolves.toEqual({
+      ...gameBackfillFixture.expected.completedTeamMatchDetail,
+      hostTeam: {
+        ...gameBackfillFixture.expected.completedTeamMatchDetail.hostTeam,
+        trustState: 'sample',
+      },
+    });
     const deletedError = await service.detail(null, ids.deletedTeamMatch).catch((error: unknown) => error);
     expect(deletedError).toBeInstanceOf(NotFoundException);
     expect((deletedError as NotFoundException).getResponse()).toEqual({

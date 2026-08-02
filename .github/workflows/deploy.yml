@@ -215,6 +215,7 @@ jobs:
     name: Task 10 game-result cutover (PIN / RED)
     needs: [gates, api, web]
     if: >-
+      always() &&
       github.event_name == 'workflow_dispatch' &&
       github.ref_type == 'branch' &&
       github.ref_name != 'main' &&
@@ -255,6 +256,36 @@ jobs:
           set -Eeuo pipefail
           printf '%s\n' "TASK10_EVIDENCE_DIR=${RUNNER_TEMP}/task10" >> "${GITHUB_ENV}"
           printf '%s\n' "TASK10_RUNTIME_FILE=${RUNNER_TEMP}/task10-runtime-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json" >> "${GITHUB_ENV}"
+
+      - name: Fail closed on prerequisite outcomes
+        env:
+          GATES_RESULT: ${{ needs.gates.result }}
+          API_RESULT: ${{ needs.api.result }}
+          WEB_RESULT: ${{ needs.web.result }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "${TASK10_EVIDENCE_DIR}"
+          if [[ "${GATES_RESULT}" != "success" || "${WEB_RESULT}" != "success" ]]; then
+            printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"not-evaluated"}\n' \
+              "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" \
+              > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
+            echo "Task 10 prerequisites failed closed: gates=${GATES_RESULT} web=${WEB_RESULT}" >&2
+            exit 1
+          fi
+          if [[ "${API_RESULT}" != "success" && "${API_RESULT}" != "failure" ]]; then
+            printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"unexpected"}\n' \
+              "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" \
+              > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
+            echo "Task 10 API prerequisite did not complete: api=${API_RESULT}" >&2
+            exit 1
+          fi
+          api_disposition="success"
+          if [[ "${API_RESULT}" == "failure" ]]; then
+            api_disposition="pending-task10-red-signature"
+          fi
+          printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"%s"}\n' \
+            "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" "${api_disposition}" \
+            > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
 
       - name: Verify immutable clean candidate
         run: |
@@ -372,10 +403,35 @@ jobs:
 
       - name: Enforce Task 10 RED or continue GREEN path
         env:
+          API_RESULT: ${{ needs.api.result }}
+          GATES_RESULT: ${{ needs.gates.result }}
           ROUTE_OUTCOME: ${{ steps.task10-route-preflight.outcome }}
           BOUNDARY_OUTCOME: ${{ steps.task10-boundary-test.outcome }}
+          WEB_RESULT: ${{ needs.web.result }}
         run: |
           set -Eeuo pipefail
+          boundary_expected=false
+          jest_expected=false
+          if grep -q '"boundaryExpected":true' "${TASK10_EVIDENCE_DIR}/task10-red-exit-codes.json"; then
+            boundary_expected=true
+          fi
+          if grep -q '"jestExpected":true' "${TASK10_EVIDENCE_DIR}/task10-red-exit-codes.json"; then
+            jest_expected=true
+          fi
+          api_disposition="success"
+          if [[ "${API_RESULT}" == "failure" ]]; then
+            if [[ "${boundary_expected}" != "true" || "${jest_expected}" != "true" ]]; then
+              printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"unexpected-failure","boundaryExpected":%s,"jestExpected":%s}\n' \
+                "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" "${boundary_expected}" "${jest_expected}" \
+                > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
+              echo "API failure did not reproduce both Task 10 RED signatures" >&2
+              exit 1
+            fi
+            api_disposition="expected-task10-red"
+          fi
+          printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"%s","boundaryExpected":%s,"jestExpected":%s}\n' \
+            "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" "${api_disposition}" "${boundary_expected}" "${jest_expected}" \
+            > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
           if [[ "${ROUTE_OUTCOME}" != "success" || "${BOUNDARY_OUTCOME}" != "success" ]]; then
             echo "TASK10_IMPLEMENTATION_MISSING: route=${ROUTE_OUTCOME} boundary=${BOUNDARY_OUTCOME}" >&2
             exit 1

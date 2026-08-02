@@ -106,6 +106,9 @@ restore_current_on_failure() {
 trap 'restore_current_on_failure' ERR
 
 load_prod_release_manifest "${PREVIOUS_MANIFEST}"
+# 매니페스트 로드 뒤에 검사한다 — V1_*_IMAGE 는 여기서 export 되므로 그 전에 부르면
+# 이미지 변수까지 미설정으로 잡힌다. 롤백에서 빈 비밀키로 되살아나는 것도 똑같이 막아야 한다.
+assert_compose_variables_resolve "${compose[@]}"
 pull_release_images
 activate_prod_release_source "${previous_sha}"
 write_release_metadata "${PREVIOUS_MANIFEST}"

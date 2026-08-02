@@ -39,6 +39,26 @@ resolve_compose_binary() {
   return 1
 }
 
+# compose 는 값을 못 찾은 변수를 **빈 문자열로 조용히 치환**하고 경고만 남긴다. 그래서
+# 런타임 .env 에 키가 빠져 있어도 배포가 그대로 진행된다 — 2026-08-02 배포에서 DB_PASSWORD 와
+# JWT_SECRET 이 빠진 채로 컨테이너가 떴고, DB 인증 실패(P1000)로 죽었다. 더 위험한 건 그
+# 인증 실패가 없었다면 API 가 **빈 JWT 서명 비밀키와 빈 세션 비밀키**로 프로덕션에 떴으리라는
+# 점이다(JWT_SECRET: ${V1_JWT_SECRET:-${JWT_SECRET}} 형태의 중첩 기본값 때문에 뿌리 변수가
+# 비면 전부 빈 문자열이 된다).
+#
+# 변수 해석 규칙을 여기서 다시 구현하면 compose 와 어긋난다 — `config` 로 compose 자신에게
+# 물어보고 미설정 경고가 하나라도 있으면 **컨테이너를 건드리기 전에** 멈춘다.
+assert_compose_variables_resolve() {
+  local unset_vars
+  unset_vars="$("$@" config 2>&1 >/dev/null | grep -F 'variable is not set' | sort -u || true)"
+  if [[ -n "${unset_vars}" ]]; then
+    echo "[${0##*/}] 런타임 .env 에 값이 없는 변수가 있어 배포를 중단합니다:" >&2
+    echo "${unset_vars}" >&2
+    echo "[${0##*/}] compose 는 이런 변수를 빈 문자열로 치환합니다 — 빈 비밀키로 배포되는 것을 막기 위해 여기서 멈춥니다." >&2
+    return 1
+  fi
+}
+
 PROD_HOME_DIR="${PROD_HOME_DIR:-/home/ec2-user}"
 PROD_LIVE_DIR="${PROD_LIVE_DIR:-${PROD_HOME_DIR}/teameet}"
 PROD_RELEASE_STATE_DIR="${PROD_RELEASE_STATE_DIR:-${PROD_HOME_DIR}/.teameet-prod-releases}"

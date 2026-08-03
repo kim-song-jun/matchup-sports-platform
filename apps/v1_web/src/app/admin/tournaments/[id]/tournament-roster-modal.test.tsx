@@ -11,10 +11,22 @@ let queryState: Record<string, unknown>;
 const addPlayer = vi.fn();
 const removePlayer = vi.fn();
 
+const DEFAULT_ELIGIBLE_MEMBERS = [
+  { userId: 'user-42', nickname: '명철', realName: '김명철',
+    role: 'member' as const, alreadyOnRoster: false, eligible: true,
+    ineligibleReason: null },
+  { userId: 'user-99', nickname: '무프로필', realName: null,
+    role: 'member' as const, alreadyOnRoster: false, eligible: false,
+    ineligibleReason: '실명·생년월일·휴대폰이 모두 필요해요' },
+];
+
+let eligibleState: Record<string, unknown>;
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentPlayers: () => queryState,
   useV1UpdatePlayerEligibility: () => ({ mutate: updateEligibility, isPending: false }),
   useV1AdminAddPlayer: () => ({ mutate: addPlayer, isPending: false }),
+  useV1AdminRosterEligibleMembers: () => eligibleState,
   useV1AdminRemovePlayer: () => ({ mutate: removePlayer, isPending: false }),
 }));
 
@@ -45,6 +57,12 @@ const registration: V1AdminTournamentRegistration = {
 describe('admin tournament roster modal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    eligibleState = {
+      data: { members: DEFAULT_ELIGIBLE_MEMBERS },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
     queryState = {
       data: {
         registrationId: 'registration-1',
@@ -182,7 +200,9 @@ describe('admin tournament roster modal', () => {
     expect(removePlayer.mock.calls[0][0]).toBe('player-1');
   });
 
-  it('선수 추가는 입력값을 그대로 보내고, 값이 비면 요청하지 않는다', async () => {
+  // UUID 를 직접 입력받던 폼은 운영자가 그 값을 얻을 방법이 없어 사실상 쓸 수 없었다
+  // (2026-08-04 alpha UI 검수). 팀원 목록에서 고르는 방식으로 바뀌었다.
+  it('팀원을 골라 추가하면 그 userId 와 실명이 전송된다', async () => {
     render(
       <RosterModal
         open
@@ -193,17 +213,37 @@ describe('admin tournament roster modal', () => {
       />,
     );
 
-    // 빈 폼으로 누르면 API 를 호출하지 않고 폼 안에서 알린다.
-    await userEvent.click(screen.getByRole('button', { name: '추가' }));
-    expect(addPlayer).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('사용자 ID 와 실명을 모두 입력해주세요.');
+    // 아무도 안 고른 상태에서는 버튼이 비활성이라 요청이 나가지 않는다.
+    expect(screen.getByRole('button', { name: '추가' })).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText('사용자 ID'), 'user-42');
-    await userEvent.type(screen.getByLabelText('실명'), '김명철');
+    await userEvent.selectOptions(screen.getByLabelText('추가할 팀원'), 'user-42');
     await userEvent.click(screen.getByRole('button', { name: '추가' }));
 
     expect(addPlayer).toHaveBeenCalledTimes(1);
     expect(addPlayer.mock.calls[0][0]).toEqual({ userId: 'user-42', realName: '김명철' });
+  });
+
+  it('자격이 없는 팀원은 이유와 함께 보이되 고를 수 없다', () => {
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    const options = screen.getAllByRole('option');
+    const ineligible = options.find((o) =>
+      o.textContent?.includes('실명·생년월일·휴대폰이 모두 필요해요'),
+    );
+    // 목록에서 지우지 않고 이유를 붙여 보여 준다 — 지우면 "왜 없지?" 를 화면 밖에서 찾게 된다.
+    expect(ineligible).toBeTruthy();
+    expect(ineligible).toBeDisabled();
+
+    const selectable = options.find((o) => o.textContent?.includes('김명철'));
+    expect(selectable).not.toBeDisabled();
   });
 
   it('읽기 전용 어드민에게는 추가 폼과 제외 버튼이 보이지 않는다', () => {
@@ -219,5 +259,66 @@ describe('admin tournament roster modal', () => {
 
     expect(screen.queryByRole('button', { name: '추가' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '홍길동 선수를 명단에서 제외' })).toBeDisabled();
+  });
+
+  // 목록이 비어 보이는 이유는 셋인데(조회 실패 / 멤버 0명 / 전원 자격 미달) 화면이 하나로
+  // 뭉뚱그리면 운영자가 엉뚱한 데를 고치러 간다. 각 상태를 구분해 말하는지 본다.
+  it('팀원 목록 조회에 실패하면 "멤버가 없다" 고 말하지 않는다', () => {
+    eligibleState = {
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new Error('boom'),
+    };
+
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    const placeholder = screen.getByRole('option', { name: '팀원 목록을 불러오지 못했어요' });
+    expect(placeholder).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '팀에 활성 멤버가 없어요' })).not.toBeInTheDocument();
+  });
+
+  it('멤버는 있지만 전원 자격 미달이면 "활성 멤버가 없다" 고 말하지 않는다', () => {
+    eligibleState = {
+      data: {
+        members: [
+          {
+            ...DEFAULT_ELIGIBLE_MEMBERS[0],
+            eligible: false,
+            ineligibleReason: '정원이 찼어요 (10/10명)',
+          },
+        ],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    expect(
+      screen.getByRole('option', { name: '추가할 수 있는 팀원이 없어요' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '팀에 활성 멤버가 없어요' })).not.toBeInTheDocument();
+    // 사유는 여전히 읽을 수 있어야 한다 — 왜 못 고르는지가 화면에 남아야 조치할 수 있다.
+    expect(
+      screen.getByRole('option', { name: /정원이 찼어요 \(10\/10명\)/ }),
+    ).toBeDisabled();
   });
 });

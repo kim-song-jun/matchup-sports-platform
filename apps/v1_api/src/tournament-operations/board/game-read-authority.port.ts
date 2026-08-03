@@ -27,8 +27,14 @@
  * goes on to serialize (the board would still have blindly trusted its own now-stale in-memory
  * `row.game.currentOfficialRevision`). `resolve()` now receives the EXACT expected identity/value
  * the board is about to serialize -- `expectedGameVersion`, `expectedRevisionId`,
- * `expectedScoreHash` (a `sha256` hex digest of `JSON.stringify(currentOfficialRevision.score)`,
- * computed once by the board from the same read it is about to serialize).
+ * `expectedScoreHash` (a `sha256` hex digest of the CANONICAL JSON of `currentOfficialRevision.score`
+ * -- object keys recursively sorted before `JSON.stringify`, via `canonicalizeForHash()` in
+ * `tournament-operations-board.service.ts` -- computed once by the board from the same read it is
+ * about to serialize). Canonicalization is required, not cosmetic: Postgres `jsonb` normalizes key
+ * order on storage, so a score read back from the DB can have keys in a different order than
+ * whatever order it was originally written in even though nothing about the score's actual value
+ * changed -- hashing the raw (non-canonical) JSON would make this digest, and therefore the
+ * mismatch check below, spuriously fire (or spuriously agree) purely on jsonb key-order noise.
  *
  * A conforming implementation of `resolve()` MUST treat `{ outcome: 'ok' }` as meaning "the
  * expected identity/value given to me is exactly what I independently observe as the current
@@ -63,8 +69,10 @@ export interface GameReadAuthorityPort {
     /** `V1Game.currentOfficialRevisionId` at that same instant (never null when `resolve()` is
      * called -- the board only calls this port for rows that have a current official revision). */
     readonly expectedRevisionId: string;
-    /** `sha256` hex digest of `JSON.stringify(currentOfficialRevision.score)` at that same
-     * instant -- lets the authority detect a same-revision-id-different-payload drift, not just a
+    /** `sha256` hex digest of the CANONICAL JSON (keys recursively sorted, see
+     * `canonicalizeForHash()` in `tournament-operations-board.service.ts`) of
+     * `currentOfficialRevision.score` at that same instant -- lets the authority detect a
+     * same-revision-id-different-payload drift, not just a
      * revision-id change. */
     readonly expectedScoreHash: string;
   }): Promise<GameReadAuthorityResult>;

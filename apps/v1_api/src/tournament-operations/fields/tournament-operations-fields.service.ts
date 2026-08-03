@@ -76,17 +76,24 @@ export type TournamentFixtureFieldResult = {
  * literal field CRUD, because assigning an existing field to a fixture is
  * day-of-tournament operations work, not field inventory management.
  *
- * assignFixtureField()/clearFixtureField() re-derive the acting principal
- * with TournamentStaffAccessService.assertAccess() as the *first* statement
- * inside the write transaction (Task 18 review finding #8) instead of before
- * `$transaction` opens. This service does not own
- * apps/v1_api/src/tournaments/staff/ so it cannot pass the transaction
- * client into assertAccess() itself, but re-running the same authorization
- * read as late as possible -- immediately before the CAS write, in the same
- * async continuation -- closes the concrete regression the review flags
- * ("revoke the actor, resume, and expect no write"): a revoke that already
- * committed is visible to this recheck's fresh query and aborts the
- * transaction before any row is touched.
+ * create()/update()/assignFixtureField()/clearFixtureField() all re-derive
+ * the acting principal with TournamentStaffAccessService.assertAccess() as
+ * the *first* statement inside the write transaction, passing this
+ * method's own `tx` through (Task 18 review findings #8 and P0-3) instead of
+ * authorizing before `$transaction` opens (P0-3's specific complaint about
+ * the pre-fix create()/update()) or re-running the check on a separate
+ * connection from the root PrismaService (P0-3's complaint about the pre-fix
+ * assignFixtureField()/clearFixtureField(), which authorized "as late as
+ * possible" in the same async continuation but still via `this.prisma`, not
+ * `tx` -- a revoke committing in the gap between that separate-connection
+ * read and this transaction's own write was still an unordered race).
+ * Passing `tx` closes both: `assertAccess()` now takes a `FOR SHARE` row
+ * lock on the candidate admin/assignment row(s) as literally its first
+ * statement (see that method's doc comment) BEFORE reading them, so a
+ * concurrent revoke's `UPDATE` on that same row must wait for this
+ * transaction to finish -- there is no longer a window where a write can
+ * complete using authorization that a concurrent revoke already committed,
+ * nor one where this recheck's own read races that revoke unordered.
  *
  * Both fixture-field writes are also optimistic-concurrency CAS'd against
  * the exact fieldId value this request observed (`where: {..., fieldId:
@@ -138,7 +145,6 @@ export class TournamentOperationsFieldsService {
     dto: CreateTournamentFieldDto,
     audit: TournamentOperationsFieldAuditContext,
   ): Promise<TournamentFieldResult> {
-    const principal = await this.authorizeFieldManagement(actorUserId, tournamentId);
     await this.assertTournamentExists(tournamentId);
 
     const action = 'tournament.field.create';
@@ -155,6 +161,10 @@ export class TournamentOperationsFieldsService {
     });
 
     return this.prisma.$transaction(async (tx) => {
+      // Recheck as the first statement inside the transaction (P0-3): authorizing before
+      // `$transaction` opened (the pre-fix behavior) left the entire transaction body -- including
+      // the create() write below -- unprotected against a revoke committing after the check.
+      const principal = await this.authorizeFieldManagement(actorUserId, tournamentId, tx);
       const replay = await this.consumeIdempotency<TournamentFieldResult>(
         tx,
         actorUserId,
@@ -221,8 +231,6 @@ export class TournamentOperationsFieldsService {
     dto: UpdateTournamentFieldDto,
     audit: TournamentOperationsFieldAuditContext,
   ): Promise<TournamentFieldResult> {
-    const principal = await this.authorizeFieldManagement(actorUserId, tournamentId);
-
     // Reject a no-op patch instead of silently manufacturing a new version
     // and audit row for a request that changes nothing (finding #16.1).
     if (dto.name === undefined && dto.sortOrder === undefined && dto.active === undefined) {
@@ -242,6 +250,8 @@ export class TournamentOperationsFieldsService {
     });
 
     return this.prisma.$transaction(async (tx) => {
+      // Recheck as the first statement inside the transaction (P0-3) -- see create()'s comment.
+      const principal = await this.authorizeFieldManagement(actorUserId, tournamentId, tx);
       const replay = await this.consumeIdempotency<TournamentFieldResult>(
         tx,
         actorUserId,
@@ -326,15 +336,19 @@ export class TournamentOperationsFieldsService {
     const payloadHash = this.hashPayload({ fieldId: dto.fieldId });
 
     return this.prisma.$transaction(async (tx) => {
-      // Recheck as the first statement inside the transaction -- see the
-      // class doc comment (finding #8). A revoke that committed before this
-      // point is visible here and aborts the whole transaction before any
-      // fixture row is touched.
-      const principal = await this.access.assertAccess({
-        userId: actorUserId,
-        action: 'event_reverse',
-        resource: { tournamentId, fixtureId },
-      });
+      // Recheck as the first statement inside the transaction, passing `tx` through (Task 18
+      // review findings #8 and P0-3) -- see the class doc comment. A revoke that already
+      // committed is visible to this recheck; a revoke racing this transaction is forced to wait
+      // for it via the row lock `assertAccess()` now takes on `tx`, so it can never interleave
+      // between this check and the fixture write below with an unordered outcome.
+      const principal = await this.access.assertAccess(
+        {
+          userId: actorUserId,
+          action: 'event_reverse',
+          resource: { tournamentId, fixtureId },
+        },
+        tx,
+      );
 
       const replay = await this.consumeIdempotency<TournamentFixtureFieldResult>(
         tx,
@@ -442,12 +456,15 @@ export class TournamentOperationsFieldsService {
     const payloadHash = this.hashPayload({ action });
 
     return this.prisma.$transaction(async (tx) => {
-      // Same late recheck as assignFixtureField() -- see finding #8.
-      const principal = await this.access.assertAccess({
-        userId: actorUserId,
-        action: 'event_reverse',
-        resource: { tournamentId, fixtureId },
-      });
+      // Same tx-bound recheck as assignFixtureField() -- see finding #8 / P0-3.
+      const principal = await this.access.assertAccess(
+        {
+          userId: actorUserId,
+          action: 'event_reverse',
+          resource: { tournamentId, fixtureId },
+        },
+        tx,
+      );
 
       const replay = await this.consumeIdempotency<TournamentFixtureFieldResult>(
         tx,
@@ -535,12 +552,16 @@ export class TournamentOperationsFieldsService {
   private async authorizeFieldManagement(
     actorUserId: string,
     tournamentId: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<TournamentStaffPrincipal> {
-    const principal = await this.access.assertAccess({
-      userId: actorUserId,
-      action: 'event_reverse',
-      resource: { tournamentId },
-    });
+    const principal = await this.access.assertAccess(
+      {
+        userId: actorUserId,
+        action: 'event_reverse',
+        resource: { tournamentId },
+      },
+      tx,
+    );
     if (principal.role !== 'platform_ops') {
       throw new ForbiddenException({
         code: 'FIELD_MANAGEMENT_DENIED',
@@ -577,6 +598,12 @@ export class TournamentOperationsFieldsService {
    * Throws 409 IDEMPOTENCY_PAYLOAD_CONFLICT if the same key is reused with a
    * different request body (`payloadHash` mismatch) instead of silently
    * treating it as a fresh mutation or a valid replay.
+   *
+   * Task 18 review P1-5: an EXPIRED row (`existing.expiresAt <= now`) makes
+   * this method return `undefined` -- correctly telling the caller "proceed
+   * as a fresh mutation" -- but the row itself is not deleted here. See
+   * `recordIdempotency()`'s doc comment for why that made the expired key
+   * permanently unusable before this fix.
    */
   private async consumeIdempotency<T>(
     tx: Prisma.TransactionClient,
@@ -614,6 +641,22 @@ export class TournamentOperationsFieldsService {
     return existing.responseBody as unknown as T;
   }
 
+  /**
+   * Task 18 review P1-5: this used to be a bare `create()`. `consumeIdempotency()` above treats an
+   * EXPIRED row as "no existing record" and returns `undefined` so the mutation proceeds fresh --
+   * but the expired row is still physically present, still satisfying the unique constraint on
+   * `(actorUserId, action, resourceType, resourceId, idempotencyKey)`. A bare `create()` for that
+   * same key then always fails with Postgres `P2002`, aborting the ENTIRE transaction (the mutation
+   * that was just correctly applied gets rolled back too) -- so once a key's record expired, that
+   * exact key became permanently unusable forever, not just for the one replay window.
+   *
+   * `upsert()` on the same unique key fixes this: a genuinely fresh key hits `create` exactly as
+   * before; a key whose only existing row is expired hits `update`, overwriting the stale
+   * response/hash/expiry with this mutation's fresh ones instead of colliding with them. The
+   * `pg_advisory_xact_lock()` `consumeIdempotency()` already took on this exact scope (before
+   * reading `existing`) still serializes this against any concurrent request racing the same key,
+   * so this remains race-safe, not just single-request-safe.
+   */
   private async recordIdempotency(
     tx: Prisma.TransactionClient,
     actorUserId: string,
@@ -625,8 +668,19 @@ export class TournamentOperationsFieldsService {
     responseStatus: number,
     responseBody: unknown,
   ): Promise<void> {
-    await tx.v1IdempotencyRecord.create({
-      data: {
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
+    const responseBodyJson = responseBody as unknown as Prisma.InputJsonValue;
+    await tx.v1IdempotencyRecord.upsert({
+      where: {
+        actorUserId_action_resourceType_resourceId_idempotencyKey: {
+          actorUserId,
+          action,
+          resourceType,
+          resourceId,
+          idempotencyKey,
+        },
+      },
+      create: {
         actorUserId,
         action,
         resourceType,
@@ -634,8 +688,14 @@ export class TournamentOperationsFieldsService {
         idempotencyKey,
         payloadHash,
         responseStatus,
-        responseBody: responseBody as unknown as Prisma.InputJsonValue,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
+        responseBody: responseBodyJson,
+        expiresAt,
+      },
+      update: {
+        payloadHash,
+        responseStatus,
+        responseBody: responseBodyJson,
+        expiresAt,
       },
     });
   }

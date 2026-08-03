@@ -36,6 +36,23 @@ type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
  * (enforced server-side with `409 REVISION_MUST_BE_SUPERSEDED` otherwise);
  * this panel only ever offers "start a correction" when a current official
  * revision exists and no correction draft is already pending against it.
+ *
+ * `game.currentOfficialRevisionId` can point at a revision whose `state` is
+ * `VOID`, not just `OFFICIAL` -- `voidResultRevision`
+ * (`tournament-result-review.service.ts`) appends a new `VOID` revision and
+ * repoints the current pointer at it. Per
+ * `docs/api/domains/tournament-operations.md`'s void contract ("official
+ * correction is `official→superseding correction draft→official|void`"),
+ * `VOID` is a TERMINAL state with no further transition defined anywhere in
+ * that contract -- `supersedeAndSubmit` (the only "submit a new result"
+ * route this domain has) explicitly requires a `REJECTED`/
+ * `SUPPLEMENT_REQUESTED` base (`409 RESULT_RESUBMISSION_NOT_ALLOWED`
+ * otherwise) and never accepts `VOID`. So after a void, this panel offers
+ * NO correction/void CTA at all -- both would be guaranteed rejected
+ * server-side (`createResultCorrection`'s `assertRevisionSupersession`
+ * requires `baseState === OFFICIAL`; `voidResultRevision` requires
+ * `revision.state === OFFICIAL`) -- and instead shows an explicit "voided"
+ * banner so the operator never fills out a doomed form.
  */
 export function GameResultCorrectionPanel({
   gameId,
@@ -74,7 +91,11 @@ export function GameResultCorrectionPanel({
 
   const game = gameQuery.data;
   const revisions = revisionsQuery.data ?? [];
-  const currentOfficial = revisions.find((revision) => revision.id === game.currentOfficialRevisionId) ?? null;
+  const currentPointerRevision =
+    revisions.find((revision) => revision.id === game.currentOfficialRevisionId) ?? null;
+  const currentOfficial =
+    currentPointerRevision && currentPointerRevision.state === 'OFFICIAL' ? currentPointerRevision : null;
+  const isVoided = currentPointerRevision?.state === 'VOID';
   const pendingCorrection =
     currentOfficial
       ? revisions.find(
@@ -112,17 +133,21 @@ export function GameResultCorrectionPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <GameSummaryHeader
-        game={game}
-        currentScoreLabel={currentOfficial ? `${currentOfficial.score.home}:${currentOfficial.score.away}` : null}
-      />
+      <GameSummaryHeader game={game} currentRevision={currentPointerRevision} />
 
       {readOnly ? (
         <AlertBanner tone="info" message="이 화면에서는 결과를 볼 수만 있어요. 정정·무효화 권한이 없어요." />
       ) : null}
 
-      {!currentOfficial ? (
+      {!currentPointerRevision ? (
         <AlertBanner tone="info" message="공식 확정된 결과가 없어서 정정할 수 없어요." />
+      ) : null}
+
+      {isVoided ? (
+        <AlertBanner
+          tone="error"
+          message="공식 결과가 무효 처리됐어요. 무효화는 되돌릴 수 없고, 이 결과는 더 이상 정정하거나 다시 무효화할 수 없어요."
+        />
       ) : null}
 
       {currentOfficial && !readOnly ? (

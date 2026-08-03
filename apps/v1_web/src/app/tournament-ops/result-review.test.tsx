@@ -539,3 +539,41 @@ describe('correction/void unavailable without an official result', () => {
     expect(screen.queryByRole('button', { name: '무효화' })).not.toBeInTheDocument();
   });
 });
+
+describe('correction/void unavailable once the official result was just voided', () => {
+  it('does not re-offer "start correction"/"void" and shows the void notice when currentOfficialRevisionId now points at the VOID revision', () => {
+    // Mirrors exactly what `invalidateGame` refetches right after a
+    // successful void: `game.currentOfficialRevisionId` now points at the
+    // freshly-created VOID revision (`rev-2`), which supersedes the prior
+    // OFFICIAL revision (`rev-1`) still sitting in the revisions list.
+    hookMocks.game.data = buildGame('platform_ops', { version: 5, currentOfficialRevisionId: 'rev-2' });
+    hookMocks.revisions.data = [
+      buildRevision({ id: 'rev-2', revision: 2, state: 'VOID', supersedesId: 'rev-1', reason: '중복 경기로 확인' }),
+      buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' }),
+    ];
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    // Both CTAs are guaranteed to be rejected server-side once the current
+    // pointer is VOID (`createResultCorrection`'s `assertRevisionSupersession`
+    // and `voidResultRevision` both require an OFFICIAL base/target) --
+    // reverting the `currentPointerRevision.state === 'OFFICIAL'` check on
+    // `currentOfficial` makes it truthy again for a VOID pointer, and both
+    // buttons would reappear.
+    expect(screen.queryByRole('button', { name: '정정 시작' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '무효화' })).not.toBeInTheDocument();
+
+    // This explicit notice only exists on the `isVoided` branch; it is not
+    // present at all on the reverted code (which had no way to distinguish
+    // "voided" from "currently official").
+    expect(
+      screen.getByText(/공식 결과가 무효 처리됐어요\. 무효화는 되돌릴 수 없고, 이 결과는 더 이상 정정하거나 다시 무효화할 수 없어요\./),
+    ).toBeInTheDocument();
+
+    // The header must render the void badge, not the void revision's score
+    // as a plain "confirmed" number. Reverted code passes a pre-formatted
+    // score label straight through, so the header would show a `tab-num`
+    // score instead -- leaving only ONE "무효 처리됨" text node (the
+    // RevisionTimeline entry) instead of two (header badge + timeline entry).
+    expect(screen.getAllByText('무효 처리됨')).toHaveLength(2);
+  });
+});

@@ -1,6 +1,11 @@
 'use client';
 
-import type { GameActorRole, TournamentGameDetail } from '@/hooks/use-tournament-result-review';
+import type {
+  GameActorRole,
+  GameResultRevisionState,
+  GameResultScore,
+  TournamentGameDetail,
+} from '@/hooks/use-tournament-result-review';
 import { ACTOR_ROLE_LABELS } from './result-review-copy';
 
 const GAME_STATE_LABELS: Record<TournamentGameDetail['state'], string> = {
@@ -16,17 +21,33 @@ const GAME_STATE_LABELS: Record<TournamentGameDetail['state'], string> = {
  * fixture/side/state identity stays visible while the operator scrolls a
  * long revision history on tablet(768)/desktop(1440) -- see this task's
  * acceptance criterion "tablet/desktop focus and sticky context work".
+ *
+ * `currentRevision` is the revision `game.currentOfficialRevisionId` points
+ * at (or `null` if the game has never had an official result). Per
+ * `docs/api/domains/tournament-operations.md`'s void contract, that pointer
+ * is only ever repointed to a revision whose state is `OFFICIAL` (via
+ * officialize) or `VOID` (via void) -- there is no third reachable state for
+ * this pointer. The header must distinguish those two explicitly: a `VOID`
+ * pointer is NOT a confirmed score and must never render as one (the defect
+ * this replaced showed the void revision's score as a plain "confirmed"
+ * number with no void indication, because callers used to pass a pre-
+ * formatted label without a state check).
  */
 export function GameSummaryHeader({
   game,
-  currentScoreLabel,
+  currentRevision,
 }: {
   game: TournamentGameDetail;
-  currentScoreLabel: string | null;
+  currentRevision: { score: GameResultScore; state: GameResultRevisionState } | null;
 }) {
   const home = game.sides.find((side) => side.sideKey === 'HOME');
   const away = game.sides.find((side) => side.sideKey === 'AWAY');
   const roleLabel: GameActorRole | undefined = game.actorRole;
+  const confirmedScoreLabel =
+    currentRevision && currentRevision.state === 'OFFICIAL'
+      ? `${currentRevision.score.home}:${currentRevision.score.away}`
+      : null;
+  const isVoided = currentRevision?.state === 'VOID';
 
   return (
     <div
@@ -52,10 +73,12 @@ export function GameSummaryHeader({
           {roleLabel ? ` · ${ACTOR_ROLE_LABELS[roleLabel]}` : ''}
         </p>
       </div>
-      {currentScoreLabel ? (
+      {confirmedScoreLabel ? (
         <p className="tab-num" style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-strong)' }}>
-          {currentScoreLabel}
+          {confirmedScoreLabel}
         </p>
+      ) : isVoided ? (
+        <span className="tm-badge tm-badge-red">무효 처리됨</span>
       ) : (
         <span className="tm-badge tm-badge-grey">공식 결과 없음</span>
       )}

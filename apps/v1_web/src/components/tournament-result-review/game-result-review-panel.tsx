@@ -115,12 +115,7 @@ export function GameResultReviewPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <GameSummaryHeader
-        game={game}
-        currentScoreLabel={
-          currentOfficial ? `${currentOfficial.score.home}:${currentOfficial.score.away}` : null
-        }
-      />
+      <GameSummaryHeader game={game} currentRevision={currentOfficial ?? null} />
 
       {readOnly ? (
         <AlertBanner tone="info" message="이 화면에서는 결과를 볼 수만 있어요. 검토·확정 권한이 없어요." />

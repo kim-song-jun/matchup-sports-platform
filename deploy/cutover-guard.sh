@@ -19,7 +19,9 @@ ENV_FILE="${ENV_FILE:-${PROD_HOME_DIR}/.teameet-prod-runtime/.env}"
 COMPOSE_FILE="${COMPOSE_FILE:-${PROD_LIVE_DIR}/deploy/docker-compose.prod.yml}"
 INTERNAL_HEALTH_URL="${INTERNAL_HEALTH_URL:-http://127.0.0.1:8121/api/v1/health}"
 PUBLIC_URL="${PUBLIC_URL:-https://teameet.co.kr/landing}"
-RUN_ROOT="${PROD_HOME_DIR}/.teameet-cutover"
+# 다른 설정과 마찬가지로 재정의 가능해야 한다 — 이 값이 고정이면 안전망을 실제 상태와
+# 분리해서 시험할 방법이 없다(2026-08-03 검증 시도에서 실제로 막혔다).
+RUN_ROOT="${RUN_ROOT:-${PROD_HOME_DIR}/.teameet-cutover}"
 OPS_TOPIC_ARN="${OPS_TOPIC_ARN:-arn:aws:sns:ap-northeast-2:851725525576:teameet-prod-ops-alerts}"
 
 log() { echo "[cutover-guard] $*"; }

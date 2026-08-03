@@ -80,7 +80,9 @@ function makeTeamDetail(role: string): V1TeamDetail {
     membersPreview: [],
     memberCount: 7,
     managerCount: 1,
-    trust: { trustState: 'none', score: null },
+    // V1TeamDetail.trust.trustState is strictly TrustState ('verified' | 'estimated' | 'sample').
+    // Only the separate optional top-level V1TeamDetail.trustState widens to include 'none'.
+    trust: { trustState: 'sample', score: null },
     viewer: {
       role,
       membershipId: role === 'none' ? null : 'membership-1',

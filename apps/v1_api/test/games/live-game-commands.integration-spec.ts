@@ -137,8 +137,12 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     await prisma.v1AdminUser.create({
       data: { userId: ids.platformOps, adminRole: 'ops', status: 'active' },
     });
+    // The code must be one the DB actually supports: v1_competition_config_for_sport()
+    // (migration 20260729000200) maps only soccer/football/futsal and otherwise raises
+    // COMPETITION_CONFIG_SPORT_UNSUPPORTED, which fires the moment a Tournament or TeamMatch is
+    // created against this sport. Sibling game suites use the same shared code with a per-suite name.
     await prisma.v1Sport.create({
-      data: { id: ids.sport, code: 'task20football', name: 'Task 20 Football' },
+      data: { id: ids.sport, code: 'football', name: 'Task 20 Football' },
     });
     await prisma.v1Region.create({
       data: { id: ids.region, code: 'TASK20_REGION', name: 'Task 20 Region', level: 1 },

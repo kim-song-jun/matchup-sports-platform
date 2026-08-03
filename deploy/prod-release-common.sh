@@ -49,8 +49,21 @@ resolve_compose_binary() {
 # 변수 해석 규칙을 여기서 다시 구현하면 compose 와 어긋난다 — `config` 로 compose 자신에게
 # 물어보고 미설정 경고가 하나라도 있으면 **컨테이너를 건드리기 전에** 멈춘다.
 assert_compose_variables_resolve() {
-  local unset_vars
-  unset_vars="$("$@" config 2>&1 >/dev/null | grep -F 'variable is not set' | sort -u || true)"
+  local stderr_file status unset_vars
+  stderr_file="$(mktemp)"
+  # `config` 의 **종료 상태**를 먼저 본다. 첫 버전은 stderr 를 grep 에 바로 물려서, 경고
+  # 문구가 없는 실패(YAML 문법 오류, `${VAR:?}` 미충족, compose 파일 부재)는 grep 이 빈
+  # 결과를 내고 `|| true` 가 실패를 삼켜 **성공으로 통과**했다. 실측(2026-08-03): 문법이
+  # 깨진 파일과 필수 변수 미충족 파일이 정상 파일과 똑같이 return 0 을 받았다.
+  # 빈 값을 막으려고 만든 가드가 정작 compose 가 통째로 깨진 경우를 놓치고 있었다.
+  if ! "$@" config >/dev/null 2>"${stderr_file}"; then
+    echo "[${0##*/}] compose 설정을 해석할 수 없어 배포를 중단합니다:" >&2
+    cat "${stderr_file}" >&2
+    rm -f "${stderr_file}"
+    return 1
+  fi
+  unset_vars="$(grep -F 'variable is not set' "${stderr_file}" | sort -u || true)"
+  rm -f "${stderr_file}"
   if [[ -n "${unset_vars}" ]]; then
     echo "[${0##*/}] 런타임 .env 에 값이 없는 변수가 있어 배포를 중단합니다:" >&2
     echo "${unset_vars}" >&2

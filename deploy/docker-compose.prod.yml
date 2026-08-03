@@ -48,7 +48,15 @@ services:
     volumes:
       - v1_uploads_data:/app/apps/v1_api/uploads
     environment:
-      DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_PASSWORD:-${DB_PASSWORD}}@v1_postgres:5432/${V1_DB_NAME:-teameet_v1}
+      # DB 접속 대상을 변수로 뺀다 — 기본값이 v1_postgres 라 미설정 시 지금과 완전히 동일하게
+      # 동작한다(alpha 도 이 파일을 베이스로 로드하므로 기본값 유지가 필수다).
+      #
+      # 비밀번호를 V1_DB_APP_PASSWORD 로 따로 둔 이유: V1_DB_PASSWORD 는 바로 위
+      # v1_postgres 컨테이너의 POSTGRES_PASSWORD 로도 쓰인다. RDS 로 옮기면서 그 값을
+      # RDS 비밀번호로 바꾸면, 데이터 디렉터리가 이미 초기화된 로컬 컨테이너는 옛 비밀번호를
+      # 유지한 채 접속 문자열만 바뀌어 인증에 실패한다(2026-08-03 실제로 이 상태를 만들 뻔했다).
+      # 앱이 무엇으로 접속하는지와 로컬 컨테이너가 무엇으로 초기화됐는지는 별개 값이어야 한다.
+      DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_APP_PASSWORD:-${V1_DB_PASSWORD:-${DB_PASSWORD}}}@${V1_DB_HOST:-v1_postgres}:5432/${V1_DB_NAME:-teameet_v1}
       JWT_SECRET: ${V1_JWT_SECRET:-${JWT_SECRET}}
       V1_SESSION_SECRET: ${V1_SESSION_SECRET:-${V1_JWT_SECRET:-${JWT_SECRET}}}
       FRONTEND_URL: ${FRONTEND_URL:-https://teameet.co.kr}

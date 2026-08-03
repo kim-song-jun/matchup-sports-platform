@@ -100,10 +100,23 @@ if [[ "${had_active}" == false ]]; then
   fi
 fi
 
-set -a
-# shellcheck disable=SC1090 -- protected operator-managed runtime configuration.
-source "${ENV_FILE}"
-set +a
+# 런타임 .env 를 `source` 하지 않는다. `source` 는 파일을 **셸 코드로 실행**하므로, 값에
+# `$`·공백·세미콜론·`$(...)` 가 들어가면 원문이 보존되지 않거나 명령이 실제로 실행된다.
+# 실측(2026-08-03): 'pa$$word' → PID 로 확장, 'a b' → 뒤 토큰을 명령으로 실행 시도,
+# '$(cmd)' 와 'a;cmd' → 실행됨. 값은 Parameter Store 에서 오므로 지금은 무해하지만,
+# KAKAO_SCOPE 처럼 공백이 정상인 값 하나만 들어와도 조용히 깨진다.
+#
+# 따옴표로 감싸는 방법은 쓸 수 없다 — 이 파일은 compose 도 `--env-file` 로 읽는데,
+# compose 는 셸의 '\'' 이스케이프를 파싱하지 못하고 **파일 전체를 거부**한다(실측).
+# 그래서 파일은 compose 원형(따옴표 없는 KEY=VALUE)으로 두고, 셸 쪽에서 source 를 없앴다.
+#
+# 시크릿은 compose 가 --env-file 로 직접 읽으므로 셸 환경에 올릴 이유가 없다.
+# 이 스크립트가 실제로 필요한 값은 아래 두 개뿐이고, 셸 해석 없이 읽는다.
+env_value() {
+  sed -n "s/^$1=//p" "${ENV_FILE}" | head -1
+}
+V1_DB_USER="$(env_value V1_DB_USER)"
+V1_DB_NAME="$(env_value V1_DB_NAME)"
 
 export COMPOSE_PARALLEL_LIMIT=1
 # --preserve-env 가 반드시 필요하다. docker-compose.prod.yml 은 이미지를
@@ -219,19 +232,27 @@ if [[ "${had_active}" == false ]]; then
   cp "${PROD_RUNTIME_METADATA_FILE}" "${legacy_metadata_backup}"
 fi
 write_release_metadata "${PROD_MANIFEST_FILE}"
-"${compose[@]}" up -d v1_postgres
+# DB 가 인스턴스 밖(RDS)에 있으면 로컬 컨테이너를 띄우고 그것의 준비 상태를 기다리는 것은
+# 의미가 없다 — 앱이 접속하는 대상이 아니기 때문이다. V1_DB_HOST 가 기본값(v1_postgres)일
+# 때만 로컬 경로를 탄다. 전환 후에도 컨테이너와 볼륨은 남겨 두지만(롤백 창), 기동과 대기는
+# 건너뛴다.
+if [[ "${V1_DB_HOST:-v1_postgres}" == "v1_postgres" ]]; then
+  "${compose[@]}" up -d v1_postgres
 
-for attempt in $(seq 1 30); do
-  if "${compose[@]}" exec -T v1_postgres \
-    pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
-    break
-  fi
-  if [[ "${attempt}" -eq 30 ]]; then
-    echo "[prod-deploy] PostgreSQL did not become ready" >&2
-    false
-  fi
-  sleep 2
-done
+  for attempt in $(seq 1 30); do
+    if "${compose[@]}" exec -T v1_postgres \
+      pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
+      break
+    fi
+    if [[ "${attempt}" -eq 30 ]]; then
+      echo "[prod-deploy] PostgreSQL did not become ready" >&2
+      false
+    fi
+    sleep 2
+  done
+else
+  echo "[prod-deploy] 외부 DB(${V1_DB_HOST}) 사용 — 로컬 v1_postgres 기동을 건너뜁니다"
+fi
 
 # D7: prisma migrate deploy 는 이 스크립트 안에서 정확히 1회만 실행한다(구 restart-containers.sh
 # 의 이중 실행을 이번 변경에서 제거). alpha 와 달리 sanitize/QA 시드는 절대 이식하지 않는다
@@ -250,9 +271,24 @@ done
 v1_uploads_backup_dir="$(mktemp -d)"
 if sudo docker ps -a --format '{{.Names}}' | grep -qx 'teameet_v1_api'; then
   echo "[prod-deploy] Backing up existing v1 uploads before recreating v1_api..."
-  sudo docker cp teameet_v1_api:/app/apps/v1_api/uploads "${v1_uploads_backup_dir}/" 2>/dev/null || {
-    echo "[prod-deploy] No existing v1 uploads directory found to back up."
-  }
+  # 실패 원인을 구분한다. 예전에는 stderr 를 버리고 모든 실패를 "업로드 디렉터리 없음"
+  # 으로 보고했는데, 디스크 부족·권한 오류·docker 데몬 오류까지 같은 문구로 묻혔다.
+  # 그 뒤 [[ -d ... ]] 가 false 가 되어 복원이 조용히 건너뛰어지므로, 진짜 실패였을 때
+  # 사용자 업로드가 말없이 사라진다. "없어서 못 받음"과 "받다가 실패"는 다르게 다뤄야 한다.
+  cp_stderr="$(mktemp)"
+  if ! sudo docker cp teameet_v1_api:/app/apps/v1_api/uploads "${v1_uploads_backup_dir}/" 2>"${cp_stderr}"; then
+    if grep -qiE 'no such file or directory|not found' "${cp_stderr}"; then
+      echo "[prod-deploy] No existing v1 uploads directory found to back up."
+      rm -f "${cp_stderr}"
+    else
+      echo "[prod-deploy] 기존 업로드 백업에 실패했습니다 — 복원 없이 진행하면 유실됩니다:" >&2
+      cat "${cp_stderr}" >&2
+      rm -f "${cp_stderr}"
+      false
+    fi
+  else
+    rm -f "${cp_stderr}"
+  fi
 fi
 
 "${compose[@]}" up -d

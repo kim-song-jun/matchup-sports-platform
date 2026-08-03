@@ -271,9 +271,24 @@ fi
 v1_uploads_backup_dir="$(mktemp -d)"
 if sudo docker ps -a --format '{{.Names}}' | grep -qx 'teameet_v1_api'; then
   echo "[prod-deploy] Backing up existing v1 uploads before recreating v1_api..."
-  sudo docker cp teameet_v1_api:/app/apps/v1_api/uploads "${v1_uploads_backup_dir}/" 2>/dev/null || {
-    echo "[prod-deploy] No existing v1 uploads directory found to back up."
-  }
+  # 실패 원인을 구분한다. 예전에는 stderr 를 버리고 모든 실패를 "업로드 디렉터리 없음"
+  # 으로 보고했는데, 디스크 부족·권한 오류·docker 데몬 오류까지 같은 문구로 묻혔다.
+  # 그 뒤 [[ -d ... ]] 가 false 가 되어 복원이 조용히 건너뛰어지므로, 진짜 실패였을 때
+  # 사용자 업로드가 말없이 사라진다. "없어서 못 받음"과 "받다가 실패"는 다르게 다뤄야 한다.
+  cp_stderr="$(mktemp)"
+  if ! sudo docker cp teameet_v1_api:/app/apps/v1_api/uploads "${v1_uploads_backup_dir}/" 2>"${cp_stderr}"; then
+    if grep -qiE 'no such file or directory|not found' "${cp_stderr}"; then
+      echo "[prod-deploy] No existing v1 uploads directory found to back up."
+      rm -f "${cp_stderr}"
+    else
+      echo "[prod-deploy] 기존 업로드 백업에 실패했습니다 — 복원 없이 진행하면 유실됩니다:" >&2
+      cat "${cp_stderr}" >&2
+      rm -f "${cp_stderr}"
+      false
+    fi
+  else
+    rm -f "${cp_stderr}"
+  fi
 fi
 
 "${compose[@]}" up -d

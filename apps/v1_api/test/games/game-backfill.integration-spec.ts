@@ -449,9 +449,13 @@ describe('Task 10 legacy result migration contract', () => {
       state: 'ENDED',
       competitionConfigVersionId: ids.competitionConfigVersion,
       currentOfficialRevisionId: valid.resultRevisions[0]?.id,
+      // HOME before AWAY: sideKey is the V1GameSideKey enum, and PostgreSQL
+      // orders enum columns by DECLARATION order (schema.prisma declares
+      // HOME then AWAY), not alphabetically. `orderBy: { sideKey: 'asc' }`
+      // above therefore yields HOME first regardless of insertion order.
       sides: [
-        { sideKey: 'AWAY', teamId: ids.awayTeam, displayNameSnapshot: 'Task 10 Away' },
         { sideKey: 'HOME', teamId: ids.homeTeam, displayNameSnapshot: 'Task 10 Home' },
+        { sideKey: 'AWAY', teamId: ids.awayTeam, displayNameSnapshot: 'Task 10 Away' },
       ],
       resultRevisions: [
         {
@@ -603,6 +607,11 @@ describe('Task 10 legacy result migration contract', () => {
           value: 'compare',
           version: 1,
           ownerActor: 'platform_ops',
+          // Must mirror the update branch: the suite truncates before each
+          // run, so this is the branch that actually executes. Omitting
+          // rollbackValue here left the row null and the GET assertion below
+          // (rollbackValue: 'legacy') could never hold.
+          rollbackValue: 'legacy',
         },
         update: {
           value: 'compare',

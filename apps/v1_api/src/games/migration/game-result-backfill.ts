@@ -28,9 +28,14 @@ export type GameBackfillRunResult = {
 /**
  * Distinct from GameBackfillRunResult.populationHash (which hashes the
  * pre-import SOURCE snapshot only). sourceHash mirrors that value; resultHash
- * hashes the RESULT side — the score/sides actually persisted (or, for
- * sources this process has not imported yet, the projected equivalent that
- * would be persisted) — so drift between the two hashes is detectable.
+ * hashes the RESULT side: the persisted score for sources this process has
+ * already imported (or the projected equivalent that would be persisted, for
+ * sources not yet imported), paired with `sides` — which is always taken
+ * from the freshly recomputed SOURCE snapshot, never read back from
+ * persisted V1GameSide rows (see resultProjection() below). Score drift
+ * between the two hashes is therefore detectable; a corruption confined to
+ * the persisted sides alone is not, since sides here doesn't reflect what
+ * was actually written.
  */
 export type GameBackfillHashes = {
   sourceHash: string;
@@ -121,11 +126,14 @@ export async function runGameResultBackfill(
  * Computes the two 64-hex hashes the CLI/CI contract requires:
  * - sourceHash: the pre-import source/quarantine snapshot hash (identical to
  *   GameBackfillRunResult.populationHash).
- * - resultHash: a hash of the RESULT side — the persisted score/sides for
- *   sources this process has already imported (this run or a prior apply
- *   call), or the projected equivalent (what would be persisted) for
- *   sources not yet imported. Distinct computation from sourceHash so
- *   result-side corruption is independently detectable.
+ * - resultHash: a hash of the RESULT side — the persisted score for sources
+ *   this process has already imported (this run or a prior apply call), or
+ *   the projected equivalent (what would be persisted) for sources not yet
+ *   imported. `sides` in this hash is always the recomputed SOURCE snapshot
+ *   (see resultProjection() below), never read back from persisted
+ *   V1GameSide rows, so this hash detects score corruption but not a
+ *   corruption confined to the persisted sides. Distinct computation from
+ *   sourceHash so score-side corruption is independently detectable.
  *
  * Exposed as a standalone read so callers (e.g. a CLI wrapper) can obtain
  * both hashes without changing the shape of GameBackfillRunResult, which is

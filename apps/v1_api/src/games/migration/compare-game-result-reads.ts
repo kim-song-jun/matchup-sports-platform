@@ -155,9 +155,26 @@ function collectMismatches(
     ).flat();
   }
 
-  return [{ field: path || '$', legacy, projected }];
+  return [{ field: path || '$', legacy: toComparableValue(legacy), projected: toComparableValue(projected) }];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// A leaf mismatch can legitimately have `undefined` on one side — e.g. two
+// arrays of different length recurse index-by-index, and reading past the
+// shorter array's end yields `undefined` with no key ever having existed.
+// `JSON.stringify` silently drops object properties whose value is
+// `undefined` (unlike `null`, which survives), so a mismatch report shipped
+// as-is over the CLI/logs boundary would silently lose "which side was
+// missing" — the only evidence a human gets that something diverged. Replace
+// `undefined` with an explicit, JSON-safe absent-marker object so it survives
+// serialization. Never applied to a genuinely-`null` value (`Object.is(null,
+// undefined)` is false, so `null` always takes the branch below unchanged),
+// keeping "absent" and "genuinely null" distinguishable on the wire.
+const ABSENT_VALUE_MARKER = { __gameResultCompareAbsent: true } as const;
+
+function toComparableValue(value: unknown): unknown {
+  return value === undefined ? ABSENT_VALUE_MARKER : value;
 }

@@ -1,0 +1,26 @@
+[Unit]
+Description=One-shot Teameet RDS cutover at the scheduled maintenance window
+
+[Timer]
+# 한국시간 2026-08-04 04:07 = UTC 2026-08-03 19:07.
+# systemd 252 는 OnCalendar 에 타임존 이름을 직접 받는다(호스트는 UTC 로 동작하지만
+# 점검창은 한국 사용자 기준으로 잡아야 하므로 KST 로 적는다).
+#   systemd-analyze calendar "2026-08-04 04:07:00 Asia/Seoul"
+#     Next elapse: Mon 2026-08-03 19:07:00 UTC
+#
+# 분을 04:00 정각으로 두지 않은 이유: 03:00 KST 의 DLM EBS 스냅샷과 02:30 KST 의 논리
+# 백업이 끝난 뒤에 들어가야 하고, 정각은 다른 정기 작업과 겹치기 쉽다.
+OnCalendar=2026-08-04 04:07:00 Asia/Seoul
+
+# **일부러 false 다.** 인스턴스가 그 시각에 꺼져 있었다면 부팅 직후에 전환이 시작되는데,
+# 그 시점은 낮 트래픽 한가운데일 수 있다. 점검창을 동반하는 작업은 놓친 실행을 나중에
+# 따라잡으면 안 된다 — 놓쳤으면 사람이 다시 잡는 것이 맞다.
+Persistent=false
+
+# 정각 회피와 별개로, 예정 시각에서 크게 밀리지 않게 한다(기본값은 1분 여유).
+AccuracySec=30s
+
+Unit=teameet-rds-cutover.service
+
+[Install]
+WantedBy=timers.target

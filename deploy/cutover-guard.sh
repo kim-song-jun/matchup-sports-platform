@@ -95,12 +95,22 @@ else
   fi
 
   source "${PROD_LIVE_DIR}/deploy/prod-release-common.sh"
-  mapfile -t compose_binary < <(resolve_compose_binary)
+  # 프로세스 치환의 종료코드는 전파되지 않으므로(bash 5.2 실측) 출력을 받아 종료 코드로
+  # 판정한다. 빈 배열을 그냥 통과시키면 compose 명령이 바이너리 없이 조립돼 복구가 조용히
+  # 실패한다 — 앱이 죽어 있는 상태에서 그게 마지막 시도다. cutover-to-rds.sh 와 같은 형태.
+  compose_binary=()
+  if compose_binary_out="$(resolve_compose_binary)"; then
+    while IFS= read -r compose_token; do
+      [[ -n "${compose_token}" ]] && compose_binary+=("${compose_token}")
+    done <<< "${compose_binary_out}"
+  fi
   # 이미지 URI 는 .env 가 아니라 릴리스 매니페스트에서 온다. 이걸 빼먹으면 compose 가 빈
   # 이미지 이름으로 앱을 띄우려 하고, 복구하려던 가드가 오히려 장애를 굳힌다.
   # sudoers 의 env_reset 때문에 --preserve-env 도 함께 필요하다.
   guard_manifest="${run_dir}/guard-active-manifest.json"
-  if extract_active_manifest "${guard_manifest}" && load_prod_release_manifest "${guard_manifest}"; then
+  if [[ ${#compose_binary[@]} -eq 0 ]]; then
+    log "!!! compose 실행 파일을 찾지 못했습니다 — 앱 재기동은 건너뜁니다"
+  elif extract_active_manifest "${guard_manifest}" && load_prod_release_manifest "${guard_manifest}"; then
     log "활성 릴리스 이미지 로드: ${PROD_RELEASE_VERSION}"
 
     compose=(

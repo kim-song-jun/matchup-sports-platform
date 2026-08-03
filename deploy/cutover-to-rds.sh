@@ -250,6 +250,22 @@ maintenance_off() {
 
 rollback() {
   local exit_code=$?
+
+  # `set -E` 는 ERR trap 을 **명령 치환·프로세스 치환·서브셸에도 상속**시킨다. 그래서 `$(...)`
+  # 안의 명령이 실패하면 롤백이 그 서브셸 안에서 실행된다. 두 가지가 망가진다.
+  #
+  #  1. 롤백의 stdout 이 호출부의 변수·배열로 흘러들어간다. 실측(2026-08-03): 프로세스 치환
+  #     `< <(resolve_compose_binary)` 이 실패했을 때 `compose_binary` 에 담긴 것은 compose
+  #     실행 파일이 아니라 **롤백이 찍은 로그 한 줄**이었다. "배열이 비었는가" 로 실패를
+  #     판정하던 가드가 그래서 영원히 통과했다.
+  #  2. 알림과 지표가 중복 발행된다 — 서브셸에서 한 번, 바깥 셸에서 다시 한 번.
+  #
+  # 롤백은 메인 셸에서만 의미가 있다(서브셸에서 exit 해도 서브셸만 끝난다). 상속된 호출은
+  # 종료 코드만 그대로 넘기고 빠진다.
+  if [[ "${BASHPID}" != "$$" ]]; then
+    return "${exit_code}"
+  fi
+
   trap - ERR EXIT
 
   if (( DANGER_ZONE == 0 )); then
@@ -321,7 +337,21 @@ trap rollback ERR
 
 source "${PROD_LIVE_DIR}/deploy/prod-release-common.sh"
 
-mapfile -t compose_binary < <(resolve_compose_binary) || fail "compose 실행 파일을 찾지 못했습니다"
+# 프로세스 치환의 종료코드는 mapfile 로 전파되지 않는다 — `mapfile ... < <(f) || fail` 은
+# f 가 실패해도 fail 을 부르지 않는다(bash 5.2 실측: 종료코드 0 으로 통과). 그래서 출력을
+# 먼저 받아 두고 **종료 코드로** 판정한다.
+#
+# 호출을 `if` 조건에 두는 것이 중요하다. 조건부 컨텍스트는 errexit 이 면제되므로 상속된
+# ERR trap 이 서브셸에서 발화하지 않는다 — 발화하면 롤백 출력이 이 값에 섞인다(rollback()
+# 주석 참조). 두 겹으로 막는 셈이고, 둘 중 하나만 있어도 안전하지만 이 줄은 실패했을 때
+# 되돌릴 수단 자체를 잃는 자리라 양쪽 다 둔다.
+compose_binary=()
+if compose_binary_out="$(resolve_compose_binary)"; then
+  while IFS= read -r compose_token; do
+    [[ -n "${compose_token}" ]] && compose_binary+=("${compose_token}")
+  done <<< "${compose_binary_out}"
+fi
+[[ ${#compose_binary[@]} -gt 0 ]] || fail "compose 실행 파일을 찾지 못했습니다"
 
 # --preserve-env 가 반드시 있어야 한다. compose 는 이미지를 ${V1_API_IMAGE}/${V1_WEB_IMAGE}
 # 로 참조하는데 이 값들은 .env 가 아니라 릴리스 매니페스트에서 오고, 이 호스트의

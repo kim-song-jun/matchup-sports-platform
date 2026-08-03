@@ -1276,7 +1276,9 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
       return row.fieldId;
     }
     async function auditCount(action: string): Promise<number> {
-      return fieldsPrisma.v1OperationAudit.count({ where: { action, targetId: fieldIds.fixture } });
+      // OperationAuditWriter maps the envelope's targetType/targetId onto the DB columns
+      // resourceType/resourceId, so the persisted column to filter on is resourceId.
+      return fieldsPrisma.v1OperationAudit.count({ where: { action, resourceId: fieldIds.fixture } });
     }
 
     const assignRequestId = randomUUID();
@@ -1351,7 +1353,7 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
     const before = await fieldsService.list(fieldIds.platformOps, fieldIds.tournament);
     const courtA = before.items.find((field) => field.scopeKey === 'court-a')!;
     const auditCountBefore = await fieldsPrisma.v1OperationAudit.count({
-      where: { action: 'tournament.field.update', targetId: courtA.id },
+      where: { action: 'tournament.field.update', resourceId: courtA.id },
     });
 
     const emptyPatch = await captureFailure(() =>
@@ -1369,7 +1371,7 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
     const after = await fieldsPrisma.v1TournamentField.findUniqueOrThrow({ where: { id: courtA.id } });
     expect(after.version).toBe(courtA.version);
     const auditCountAfter = await fieldsPrisma.v1OperationAudit.count({
-      where: { action: 'tournament.field.update', targetId: courtA.id },
+      where: { action: 'tournament.field.update', resourceId: courtA.id },
     });
     expect(auditCountAfter).toBe(auditCountBefore);
   });
@@ -1377,7 +1379,7 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
   it('breaks ties on id when two fields share both sortOrder and createdAt, so the list order is total and repeatable (regression for review finding #16.2)', async () => {
     const tieSortOrder = 9_000;
     const sharedCreatedAt = new Date('2026-01-01T00:00:00.000Z');
-    const tieFieldIds = [randomUUID(), randomUUID(), randomUUID()].sort();
+    const tieFieldIds: string[] = [randomUUID(), randomUUID(), randomUUID()].sort();
 
     await fieldsPrisma.v1TournamentField.createMany({
       data: tieFieldIds.map((id, index) => ({
@@ -2388,7 +2390,11 @@ describe('Task 18 operations board single-consistent-snapshot barrier (review fi
         $allModels: {
           async $allOperations({ model, operation, args, query }) {
             const result = await query(args);
-            if (model === 'v1TournamentFixture' && operation === 'findMany') {
+            // Prisma's $allOperations reports `model` with the PascalCase model name from the
+            // schema ('V1TournamentFixture'), not the camelCase client property. Comparing against
+            // the camelCase form never matched, so the barrier below silently never fired and the
+            // tearing assertion passed vacuously.
+            if (model === 'V1TournamentFixture' && operation === 'findMany') {
               // Barrier: commit a concurrent mutation on a SEPARATE connection right here --
               // strictly AFTER list()'s fixture-page read has already executed but BEFORE its
               // escalation read runs. If both reads genuinely share one RepeatableRead snapshot,

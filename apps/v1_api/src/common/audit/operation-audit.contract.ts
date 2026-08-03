@@ -31,6 +31,12 @@ export interface CreateOperationAuditEnvelopeInput {
   sourceIp?: string | null;
   before: JsonValue;
   after: JsonValue;
+  /** Optional free-text justification persisted on the SAME audit row as the mutation it explains.
+   * It must travel in the envelope rather than being patched on afterwards: the
+   * `v1_operation_audits_append_only` trigger rejects every UPDATE against this table (SQLSTATE
+   * 55000), so a create-then-update sequence cannot work, and a second follow-up row would break
+   * the "one audit row per mutation" contract. */
+  reason?: string | null;
 }
 
 export interface OperationAuditEnvelope {
@@ -43,6 +49,7 @@ export interface OperationAuditEnvelope {
   readonly maskedSourceIp: string | null;
   readonly before: JsonValue;
   readonly after: JsonValue;
+  readonly reason: string | null;
 }
 
 export function createOperationAuditEnvelope(
@@ -64,6 +71,7 @@ export function createOperationAuditEnvelope(
     maskedSourceIp: maskSourceIp(input.sourceIp),
     before: cloneJsonSnapshot(input.before, 'before'),
     after: cloneJsonSnapshot(input.after, 'after'),
+    reason: typeof input.reason === 'string' && input.reason.trim().length > 0 ? input.reason : null,
   });
 }
 

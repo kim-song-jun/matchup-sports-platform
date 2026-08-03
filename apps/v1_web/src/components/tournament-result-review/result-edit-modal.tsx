@@ -114,7 +114,16 @@ export function ResultEditModal({
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement;
-    const id = setTimeout(() => firstFieldRef.current?.focus(), 60);
+    const id = setTimeout(() => {
+      // Guard against clobbering focus the user (or the focus trap) has
+      // already moved into the dialog by the time this fires -- e.g. typing
+      // straight into the reason textarea right after the dialog opens.
+      // Without this check, this unconditional `.focus()` steals focus back
+      // to the home-score input mid-keystroke, silently dropping the tail of
+      // whatever the user was typing elsewhere in the form.
+      if (dialogRef.current?.contains(document.activeElement)) return;
+      firstFieldRef.current?.focus();
+    }, 60);
     return () => {
       clearTimeout(id);
       // Restore focus on unmount (WCAG 2.4.3) -- this component is always

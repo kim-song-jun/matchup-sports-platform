@@ -128,10 +128,17 @@ describe('TournamentOperationsStaffService', () => {
     }
   });
 
-  // Finding #11 -- a contract-required revoke `reason` must be persisted
-  // somewhere the audit trail can show it, not silently discarded.
-  it('revoke() persists the reason against the revoked assignment', async () => {
-    const { service, moduleRef, operationAuditCreate } = await buildHarness();
+  // Finding #11 / Task 18 review P1-3 -- a contract-required revoke `reason` must be persisted
+  // somewhere the audit trail can show it, not silently discarded, AND it must be forwarded into
+  // the SAME revokeStaff() transaction rather than written by a separate follow-up call from this
+  // lane (which could commit the revoke while losing the reason if that follow-up write failed).
+  // This lane no longer touches `prisma.v1OperationAudit` directly at all for revoke -- the real,
+  // atomicity-proving regression test (that the reason lands in the SAME audit row as the revoke,
+  // against a real database) lives in
+  // test/tournaments/tournament-operations-board.integration-spec.ts, since a mocked
+  // `TournamentStaffService` here cannot exercise real transaction atomicity.
+  it('revoke() forwards the reason into TournamentStaffService.revokeStaff() instead of writing a separate follow-up audit row itself', async () => {
+    const { service, moduleRef, revokeStaff, operationAuditCreate } = await buildHarness();
 
     try {
       await service.revoke(
@@ -142,14 +149,18 @@ describe('TournamentOperationsStaffService', () => {
         audit('req-4'),
       );
 
-      expect(operationAuditCreate).toHaveBeenCalledTimes(1);
-      const call = operationAuditCreate.mock.calls[0][0] as { data: Record<string, unknown> };
-      expect(call.data).toMatchObject({
-        resourceId: assignmentId,
-        resourceType: 'TOURNAMENT_STAFF_ASSIGNMENT',
-        reason: 'no longer needed',
-        tournamentId,
-      });
+      expect(revokeStaff).toHaveBeenCalledTimes(1);
+      expect(revokeStaff).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorUserId,
+          tournamentId,
+          assignmentId,
+          expectedVersion: 1,
+          reason: 'no longer needed',
+        }),
+      );
+      // No separate, non-atomic follow-up write from this lane anymore.
+      expect(operationAuditCreate).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }

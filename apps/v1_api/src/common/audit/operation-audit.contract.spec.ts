@@ -51,7 +51,12 @@ describe('operation audit envelope contract', () => {
 
     const serialized = JSON.stringify(envelope);
     expect(serialized).toBe(
-      '{"actor":{"type":"PLATFORM_OPS","id":"user:ops-17"},"requestId":"req-20260801-001","action":"tournament.publish","targetType":"TOURNAMENT","targetId":"tournament-42","occurredAt":"2026-08-01T00:00:00.000Z","maskedSourceIp":"203.0.113.0","before":{"status":"DRAFT","rounds":[1,2]},"after":{"status":"PUBLISHED","rounds":[1,2,3]}}',
+      // `reason` is part of the envelope (not a post-create UPDATE) because the
+      // `v1_operation_audits_append_only` trigger forbids UPDATE on
+      // v1_operation_audits -- the previous create-then-update pattern rolled
+      // back every revoke that carried a reason. It serializes last and is
+      // `null` when the caller supplies none.
+      '{"actor":{"type":"PLATFORM_OPS","id":"user:ops-17"},"requestId":"req-20260801-001","action":"tournament.publish","targetType":"TOURNAMENT","targetId":"tournament-42","occurredAt":"2026-08-01T00:00:00.000Z","maskedSourceIp":"203.0.113.0","before":{"status":"DRAFT","rounds":[1,2]},"after":{"status":"PUBLISHED","rounds":[1,2,3]},"reason":null}',
     );
     expect(serialized).not.toContain('203.0.113.42');
     expect(serialized).not.toContain('sourceIp');

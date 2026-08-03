@@ -27,6 +27,12 @@ const config: Config = {
         '<rootDir>/test/tournaments/**/*.integration-spec.ts',
         '<rootDir>/test/games/**/*.integration-spec.ts',
         '<rootDir>/test/jobs/**/*.integration-spec.ts',
+        // Task 12 (team schedules): without this glob, none of the three specs under
+        // test/team-schedules/ (attendance, schedule-crud, and this HTTP contract spec) are ever
+        // selected by `jest --selectProjects integration` — the CI "V1 migration replay + drift
+        // gate" step runs exactly that command, so they would silently never execute despite
+        // existing on disk. Added while writing the HTTP contract spec for this reason.
+        '<rootDir>/test/team-schedules/**/*.integration-spec.ts',
       ],
     },
     {

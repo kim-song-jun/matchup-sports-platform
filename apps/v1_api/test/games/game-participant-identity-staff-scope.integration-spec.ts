@@ -33,6 +33,7 @@ const ids = {
   opponentTeam: '6b000000-0000-4000-8000-000000000021',
   tournament: '6b000000-0000-4000-8000-000000000030',
   fixture: '6b000000-0000-4000-8000-000000000040',
+  fieldOperatorAssignment: '6b000000-0000-4000-8000-000000000050',
 } as const;
 
 const prisma = new PrismaService();
@@ -126,12 +127,28 @@ describe('Task 14 participant identity/consent scope excludes tournament staff',
         competitionConfigVersionId: configId,
       },
     });
-    await prisma.v1TournamentStaffAssignment.createMany({
-      data: [
-        { tournamentId: ids.tournament, userId: ids.fieldOperator, role: 'FIELD_OPERATOR', grantedByUserId: ids.platformOps },
-        { tournamentId: ids.tournament, userId: ids.supportReadonly, role: 'SUPPORT_READONLY', grantedByUserId: ids.platformOps },
-        { tournamentId: ids.tournament, userId: ids.director, role: 'TOURNAMENT_DIRECTOR', grantedByUserId: ids.platformOps },
-      ],
+    // v1_require_staff_scope (see prisma/migrations/20260729000100_v1_game_operations)
+    // is a DEFERRED constraint trigger that rejects any FIELD_OPERATOR
+    // assignment with neither a fieldId nor a v1_tournament_staff_fixture_scopes
+    // row by the end of its transaction. Both inserts must land in the same
+    // transaction so the deferred check sees the scope row before it fires.
+    await prisma.$transaction(async (tx) => {
+      await tx.v1TournamentStaffAssignment.createMany({
+        data: [
+          {
+            id: ids.fieldOperatorAssignment,
+            tournamentId: ids.tournament,
+            userId: ids.fieldOperator,
+            role: 'FIELD_OPERATOR',
+            grantedByUserId: ids.platformOps,
+          },
+          { tournamentId: ids.tournament, userId: ids.supportReadonly, role: 'SUPPORT_READONLY', grantedByUserId: ids.platformOps },
+          { tournamentId: ids.tournament, userId: ids.director, role: 'TOURNAMENT_DIRECTOR', grantedByUserId: ids.platformOps },
+        ],
+      });
+      await tx.v1TournamentStaffFixtureScope.create({
+        data: { assignmentId: ids.fieldOperatorAssignment, fixtureId: ids.fixture },
+      });
     });
 
     const input: GameSourceCreationInput = {

@@ -106,6 +106,31 @@
  *       process (spawned by the SAME CI job, same runner) will read them
  *       from. This is genuine evidence satisfying `verifyGateBundle()`
  *       exactly as written, not a relaxation of it.
+ *   (d) TERMS RECONSENT — `V1AuthGuard.canActivate()` (`src/auth/v1-auth.guard.ts`) calls
+ *       `ManagedTermsRuntimeService.signupCompliance(user.id)` for every request whose path is not
+ *       one of the small `isTermsReconsentRequestAllowed()` allow-list entries (`/auth/me`,
+ *       `/auth/logout`, `/terms/current`, `/terms/consents`) — the `legacy`/`compare`/`kill-switch`
+ *       operations-board GET is none of those, so this gate is live for it. Migration
+ *       `20260722090000_v1_managed_terms_v11_baseline` unconditionally seeds two `required`,
+ *       already-`published`, already-effective `signup`-context policies
+ *       (`signup_service_terms`, `signup_privacy`) into EVERY environment this migration chain has
+ *       ever run against, including a from-scratch isolated Task 10 CI database — there is no
+ *       environment where those two rows are absent. A brand-new `V1User` with zero
+ *       `V1ManagedTermsConsentEvent` rows therefore has two pending required signup documents, and
+ *       `signupCompliance()` reports `compliant: false`, which `V1AuthGuard` turns into
+ *       `403 TERMS_RECONSENT_REQUIRED` — this is NOT a relaxation target (`ManagedTermsRuntimeService`
+ *       is untouched) and NOT related to the `V1AdminUser`/`TournamentStaffAccessService` platform-ops
+ *       bypass, which only ever runs for `TournamentStaffGuard`, a guard that sits AFTER
+ *       `V1AuthGuard` in this route's guard order and is never reached while `V1AuthGuard` itself
+ *       still 403s. The fix: after seeding the ops principal, this producer resolves the CURRENT
+ *       required `signup`-context document ids via the exact same `ManagedTermsRuntimeService` the
+ *       guard consults (`currentSignupTerms()`), then calls that service's own
+ *       `acceptSignupTerms(userId, requiredDocumentIds)` to record real, ordinary acceptance events
+ *       for the seeded ops user — the identical pattern already established by
+ *       `test/games/game-projection.integration-spec.ts`'s `assertR7FixturePreconditions()` fixture
+ *       setup for its own `supportUser`/`opsUser`. Nothing about the guard, the service, or the
+ *       required-document set is bypassed or special-cased; the seeded user simply satisfies the
+ *       same compliance check any real onboarded user would.
  */
 
 // Must be the first import — mirrors game-result-backfill.cli.ts's own
@@ -118,6 +143,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { createV1SessionToken } from '../../auth/v1-session';
 import { resolveGameOperationGateRoot } from '../../config/game-operation-flags';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../../terms/managed-terms-runtime.service';
 import { FOOTBALL_V1_CONFIG } from '../../tournaments/competition-config/competition-config';
 
 const RUNTIME_MANIFEST_SCHEMA_VERSION = 1;
@@ -190,6 +216,18 @@ async function seedOperationsBoardFixture(prisma: PrismaService): Promise<void> 
       createdAt: CREATED_AT,
     },
   });
+  // Terms reconsent gate (blocker (d) in this file's header comment) — record real acceptance
+  // events for whatever signup-context documents are CURRENTLY required, using the exact same
+  // ManagedTermsRuntimeService V1AuthGuard consults, so the seeded ops user is genuinely compliant
+  // rather than exempted. Mirrors test/games/game-projection.integration-spec.ts's
+  // assertR7FixturePreconditions() fixture setup for its own supportUser/opsUser.
+  const managedTerms = new ManagedTermsRuntimeService(prisma);
+  const requiredSignupDocumentIds = (await managedTerms.currentSignupTerms()).items
+    .filter((item) => item.requirement === 'required')
+    .map((item) => item.documentId);
+  if (requiredSignupDocumentIds.length > 0) {
+    await managedTerms.acceptSignupTerms(IDS.user, requiredSignupDocumentIds);
+  }
   // Ops-role admin — AdminContextService.getMutationAdmin() (called by every
   // GameOperationFlagsService mutation) accepts owner/ops and rejects
   // support; this is the SAME mechanism (and the SAME row shape) every other

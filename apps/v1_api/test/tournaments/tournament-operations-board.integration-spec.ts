@@ -804,32 +804,38 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     await setGameReadFlag('legacy');
   });
 
-  it('fails closed with 409 GAME_RESULT_READ_STALE when the SAME official revision\'s score/missingScorer changes between the compare-mode authority decision and the post-resolution freshness recheck, even though V1Game.version/currentOfficialRevisionId never move (Task 18 review P0-4 score-only race)', async () => {
-    // The pre-fix post-resolution CAS recheck only compared V1Game.version/
-    // currentOfficialRevisionId -- both are proxies for "which revision is official", not that
-    // revision's OWN content. This fake lands deterministically in the gap the fix closes: it
-    // mutates the CURRENT official revision's score/missingScorer IN PLACE (same revision id, same
-    // V1Game.version) from inside resolve() itself, before returning 'ok'. No production write path
-    // does this today (every real score write goes through V1GameResultRevision.create(), see
-    // games.service.ts) -- this proves the recheck itself, independent of whether anything can
-    // reach it yet.
+  it('cannot race on the SAME official revision\'s score between the compare-mode authority decision and the post-resolution recheck -- the database rejects the in-place write outright (Task 18 review P0-4 score-only race, reclassified)', async () => {
+    // The review described a race in which the CURRENT official revision's own score/missingScorer
+    // change between the authority decision and the freshness recheck, while V1Game.version and
+    // currentOfficialRevisionId stay put. That interleaving is UNREACHABLE: the pointer is only
+    // ever aimed at an OFFICIAL revision (games.service.ts:1309) and trigger
+    // v1_block_terminal_revision_mutation (migration 20260729000100, lines 293-300) rejects every
+    // UPDATE against a terminal revision with SQLSTATE 55000.
+    //
+    // The earlier version of this test performed exactly that write from inside a fake resolve()
+    // and was killed by the trigger before the recheck ran, so it could never pass. What is proven
+    // here instead is the invariant itself, from inside the same authority callback -- i.e. at the
+    // precise moment the race would have to occur. The reachable half of the recheck (the official
+    // pointer or V1Game.version moving underneath a decision) is covered by the preceding test.
+    let attempt: unknown = null;
     const staleScoreAuthority = new RecordingGameReadAuthority({ outcome: 'ok' }, async () => {
-      await prisma.v1GameResultRevision.update({
-        where: { id: overdueRevisionId },
-        data: { score: { home: 9, away: 9 }, missingScorer: false },
-      });
+      attempt = await captureFailure(() =>
+        prisma.v1GameResultRevision.update({
+          where: { id: overdueRevisionId },
+          data: { score: { home: 9, away: 9 }, missingScorer: false },
+        }),
+      );
     });
     const staleScoreBoard = new TournamentOperationsBoardService(prisma, staleScoreAuthority);
     await setGameReadFlag('compare');
 
-    const caught = await captureFailure(() => staleScoreBoard.list(ids.detailTournament, { limit: 50 }, safeNow));
-    expectHttpError(caught, 409, 'GAME_RESULT_READ_STALE');
+    // The read still succeeds, because the write that would have made it stale never landed.
+    const page = await staleScoreBoard.list(ids.detailTournament, { limit: 50 }, safeNow);
+    expect(String(attempt)).toContain('terminal result revisions are immutable');
 
-    // Restore the seeded score/missingScorer so later tests/re-runs are unaffected.
-    await prisma.v1GameResultRevision.update({
-      where: { id: overdueRevisionId },
-      data: { score: { home: 1, away: 0 }, missingScorer: true },
-    });
+    // And the served score is still the seeded one -- proving nothing slipped through.
+    const overdue = page.items.find((item) => item.fixtureId === ids.overdueFixture)!;
+    expect(overdue.currentScore).toEqual({ home: 1, away: 0 });
     await setGameReadFlag('legacy');
   });
 
@@ -2255,46 +2261,55 @@ describe('Task 18 operations board items[].stableRevision incremental key (revie
     expect(snapshot3.watermark).not.toBe(snapshot2.watermark);
   });
 
-  it("moves stableRevision (and the page watermark) when the CURRENT official revision's own score/missingScorer changes in place, even though V1TournamentFixture.updatedAt/V1Game.version/V1Game.currentOfficialRevisionId never move (Task 18 review P0-5)", async () => {
-    // Pre-fix, `stableRevision` hashed only `currentOfficialRevisionId` (a proxy for "WHICH
-    // revision is official"), never the revision's own `score`/`missingScorer` content -- so a
-    // write that changes those two columns on the SAME revision row, without creating a new
-    // revision or touching V1Game at all, moved `items[].currentScore`/`warnings` in the response
-    // while `stableRevision` (and the watermark derived from it) silently stayed identical. No
-    // production write path does this today (every real score write goes through
-    // `V1GameResultRevision.create()`, see games.service.ts) -- this proves the hash itself now
-    // covers that content directly, independent of whether anything can reach it yet.
+  it("cannot have the CURRENT official revision's own score/missingScorer change in place -- the database forbids it, which is what makes stableRevision's revision-id component sufficient (Task 18 review P0-5, reclassified)", async () => {
+    // The review asked for `stableRevision` to move when the CURRENT official revision's own
+    // score/missingScorer change in place, without a new revision and without touching V1Game.
+    // That state is UNREACHABLE, and the two facts that make it unreachable are asserted below
+    // rather than assumed:
+    //
+    //   1. `V1Game.currentOfficialRevisionId` is only ever pointed at a revision whose state is
+    //      OFFICIAL -- games.service.ts:1309 sets it exclusively when
+    //      `target === V1GameResultRevisionState.OFFICIAL`.
+    //   2. A revision in a terminal state (CHANGE_REQUESTED / SUPPLEMENT_REQUESTED / REJECTED /
+    //      OFFICIAL / VOID) cannot be updated at all: trigger `v1_block_terminal_revision_mutation`
+    //      (migration 20260729000100, lines 293-300) raises SQLSTATE 55000 on any UPDATE where
+    //      NEW IS DISTINCT FROM OLD.
+    //
+    // So the content behind `currentOfficialRevisionId` is immutable for as long as that pointer
+    // holds, and the only reachable way to change a game's official score is to create a NEW
+    // revision and repoint -- which increments V1Game.version in the same statement
+    // (games.service.ts:1305-1311) and therefore already moves stableRevision and the watermark.
+    //
+    // The earlier version of this test tried to perform the in-place mutation and was rejected by
+    // the trigger before it could assert anything, so it could never pass. Asserting the invariant
+    // is the honest replacement: drop the trigger and this test goes red, which is precisely the
+    // condition under which the review's scenario would become real.
     const before = await board.list(stableRevIds.tournament, { limit: 50 });
     const withGameBefore = before.items.find((item) => item.fixtureId === stableRevIds.fixtureWithGame)!;
     expect(withGameBefore.currentScore).toEqual({ home: 2, away: 1 });
-    expect(withGameBefore.warnings).not.toContain('MISSING_SCORER');
 
-    await stableRevPrisma.v1GameResultRevision.update({
+    const official = await stableRevPrisma.v1GameResultRevision.findUniqueOrThrow({
       where: { id: officialRevisionId },
-      data: { score: { home: 9, away: 9 }, missingScorer: true },
+      select: { state: true },
     });
+    expect(official.state).toBe('OFFICIAL');
 
+    // Fact 2, proven against the live database rather than read off the migration file.
+    const rejected = await captureFailure(() =>
+      stableRevPrisma.v1GameResultRevision.update({
+        where: { id: officialRevisionId },
+        data: { score: { home: 9, away: 9 }, missingScorer: true },
+      }),
+    );
+    expect(String(rejected)).toContain('terminal result revisions are immutable');
+
+    // Nothing changed, so a second read is byte-identical -- the board's stability guarantee holds
+    // by construction here, not by defensive hashing.
     const after = await board.list(stableRevIds.tournament, { limit: 50 });
     const withGameAfter = after.items.find((item) => item.fixtureId === stableRevIds.fixtureWithGame)!;
-
-    // The mutation really did take effect and really is reflected in the response -- otherwise a
-    // pass below would be vacuous (nothing to detect in the first place).
-    expect(withGameAfter.currentScore).toEqual({ home: 9, away: 9 });
-    expect(withGameAfter.warnings).toContain('MISSING_SCORER');
-    // V1Game itself was never touched by this mutation -- version/currentOfficialRevisionId stay
-    // put, which is exactly why the pre-fix hash (built only from those two) could not move.
-    expect(withGameAfter.version).toBe(withGameBefore.version);
-    expect(withGameAfter.revisionId).toBe(withGameBefore.revisionId);
-    // Yet the incremental key -- and the page watermark derived from it -- MUST move.
-    expect(withGameAfter.stableRevision).not.toBe(withGameBefore.stableRevision);
-    expect(after.watermark).not.toBe(before.watermark);
-
-    // Restore the seeded score/missingScorer so this describe block's own state is unaffected if
-    // Jest ever re-runs this file's tests in a different order.
-    await stableRevPrisma.v1GameResultRevision.update({
-      where: { id: officialRevisionId },
-      data: { score: { home: 2, away: 1 }, missingScorer: false },
-    });
+    expect(withGameAfter.currentScore).toEqual({ home: 2, away: 1 });
+    expect(withGameAfter.stableRevision).toBe(withGameBefore.stableRevision);
+    expect(after.watermark).toBe(before.watermark);
   });
 });
 

@@ -8,15 +8,18 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
+  V1ConsentState,
   V1GameEventType,
   V1GameLineupState,
   V1GameResultRevisionState,
   V1GameSourceType,
   V1GameState,
+  V1IdentityActorType,
+  V1IdentityLinkAction,
   type V1TournamentStaffRole,
   V1VisibilityMode,
 } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import type {
   JsonValue as AuditJsonValue,
@@ -35,9 +38,11 @@ import {
   assertGameSourceCreationInput,
   assertRevisionTransition,
   GameContractError,
+  projectParticipantForPublic,
   resolveGameIdempotency,
   serializeGameVisibility,
   validateGameResultInvariants,
+  type PublicParticipantProjection,
 } from './core';
 import type {
   GameActorScope,
@@ -65,6 +70,13 @@ import type {
   DecideGameResultRevisionDto,
   SubmitGameResultRevisionDto,
 } from './dto/game-result.dto';
+import type {
+  AttestIdentityLinkDto,
+  GrantParticipantConsentDto,
+  RequestIdentityLinkDto,
+  RevokeIdentityLinkDto,
+  RevokeParticipantConsentDto,
+} from './dto/game-participant-identity.dto';
 
 type Transaction = Prisma.TransactionClient;
 type CommandResult = object;
@@ -76,7 +88,8 @@ type GameAuthorizationAction =
   | 'lineup_mutate'
   | 'team_result_submit'
   | 'opponent_result_decide'
-  | 'cancel';
+  | 'cancel'
+  | 'participant_identity';
 
 type LockedGame = {
   id: string;
@@ -961,6 +974,13 @@ export class GamesService {
         payload: { sideId, ...dto },
       },
       async (tx, game, context) => {
+        if (game.sourceType === V1GameSourceType.TEAM_MATCH) {
+          throw new ConflictException({
+            code: 'TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN',
+            message:
+              'Team matches manage lineups only through /team-matches/:teamMatchId/lineup, which enforces roster/eligibility/deadline invariants this generic route does not.',
+          });
+        }
         const side = await tx.v1GameSide.findFirst({ where: { id: sideId, gameId } });
         if (side === null) {
           throw this.notFound('GAME_SIDE_NOT_FOUND');
@@ -1025,9 +1045,14 @@ export class GamesService {
         payload: { lineupId, ...dto },
       },
       async (tx, game, context) => {
-        if (game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
-          this.requireTakeover(context);
+        if (game.sourceType === V1GameSourceType.TEAM_MATCH) {
+          throw new ConflictException({
+            code: 'TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN',
+            message:
+              'Team matches manage lineups only through /team-matches/:teamMatchId/lineup, which enforces roster/eligibility/deadline invariants this generic route does not.',
+          });
         }
+        this.requireTakeover(context);
         const lineup = await tx.v1GameLineup.findFirst({ where: { id: lineupId, gameId } });
         if (lineup === null) {
           throw this.notFound('GAME_LINEUP_NOT_FOUND');
@@ -1334,6 +1359,784 @@ export class GamesService {
     );
   }
 
+  // ─── Task 14: participant identity link + consent (append-only, ≤5s purge) ───
+  //
+  // Design notes (see games.module.ts callers / task-14 tests for the literal
+  // contract these implement):
+  // - `userId` on a `V1ParticipantIdentityLinkEvent` row always names the
+  //   human centrally relevant to THAT row: the requester for REQUESTED, the
+  //   attestor/rejector for ATTESTED/REJECTED, the revoker for REVOKED, and
+  //   the original requester (copied forward) for the system-generated
+  //   EXPIRED row. `V1ParticipantIdentityLinkCurrent.userId` is populated from
+  //   the REQUESTED row specifically, because that is the identity actually
+  //   being linked — not whoever later attested it.
+  // - `linkId` is minted once per request cycle (`linkId === requestId`) and
+  //   never reused; a fresh request after reject/expire/revoke always gets a
+  //   new linkId, which is what keeps consent (`consents/grant` requires the
+  //   caller's `linkId` to match the *current* link) from silently
+  //   reattaching to a superseded identity.
+  // - The DB trigger `v1_guard_identity_event` is defense-in-depth (it always
+  //   overwrites `effective_at` with `CURRENT_TIMESTAMP`, so a caller-supplied
+  //   timestamp can never land even if a future DTO regression allowed the
+  //   field through). The service layer performs the same checks earlier so
+  //   the API can return the literal, distinguishable contract error codes
+  //   (`IDENTITY_LINK_REQUEST_EXPIRED`, self-attestation 403, etc.) instead of
+  //   a generic trigger failure string.
+
+  async requestIdentityLink(
+    user: V1AuthUser,
+    gameId: string,
+    participantId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: RequestIdentityLinkDto,
+  ) {
+    return this.withParticipantCommand(
+      {
+        gameId,
+        action: 'identity_link_request',
+        resourceId: participantId,
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: { participantId, ...dto },
+        resolveActor: (tx) => this.resolveActor(tx, gameId, user.id, 'participant_identity'),
+      },
+      async (tx, _game, actor, context) => {
+        const participant = await tx.v1GameParticipant.findFirst({
+          where: { id: participantId, gameId },
+          select: { id: true },
+        });
+        if (participant === null) {
+          throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
+        }
+        const current = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+          where: { participantId },
+        });
+        if (current !== null) {
+          throw new ConflictException({
+            code: 'IDENTITY_LINK_ALREADY_ACTIVE',
+            message: '이미 다른 사용자와 연결된 참가자예요.',
+          });
+        }
+        const last = await tx.v1ParticipantIdentityLinkEvent.findFirst({
+          where: { participantId },
+          orderBy: { eventVersion: 'desc' },
+        });
+        if (last !== null && last.action === V1IdentityLinkAction.REQUESTED) {
+          const stillPending = Date.now() - last.effectiveAt.getTime() < 24 * 60 * 60 * 1000;
+          if (stillPending) {
+            throw new ConflictException({
+              code: 'IDENTITY_LINK_REQUEST_PENDING',
+              message: '이미 대기 중인 연결 요청이 있어요.',
+            });
+          }
+          await this.appendIdentityEvent(tx, {
+            participantId,
+            linkId: last.linkId,
+            requestId: last.requestId,
+            action: V1IdentityLinkAction.EXPIRED,
+            userId: last.userId,
+            actorType: V1IdentityActorType.SYSTEM,
+            systemActor: 'IDENTITY_LINK_EXPIRY',
+          });
+        }
+        const requestId = randomUUID();
+        const created = await this.appendIdentityEvent(tx, {
+          participantId,
+          linkId: requestId,
+          requestId,
+          action: V1IdentityLinkAction.REQUESTED,
+          userId: user.id,
+          actorType: V1IdentityActorType.USER,
+          actorUserId: user.id,
+        });
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 } },
+        });
+        const response = {
+          gameId,
+          participantId,
+          requestId,
+          state: 'pending_attestation' as const,
+          version: updated.version,
+          effectiveAt: created.effectiveAt.toISOString(),
+          expiresAt: new Date(created.effectiveAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+          replayed: false,
+        };
+        await this.writeAudit(
+          tx,
+          actor,
+          'IDENTITY_LINK_REQUESTED',
+          gameId,
+          context.durableCommandId,
+          null,
+          response,
+        );
+        return response;
+      },
+    );
+  }
+
+  async attestIdentityLink(
+    user: V1AuthUser,
+    gameId: string,
+    participantId: string,
+    requestId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: AttestIdentityLinkDto,
+  ) {
+    // The lazy-expiry write must durably commit even though the request as a
+    // whole still fails with 409 — so `mutate` never throws for the expiry
+    // case (a throw would roll back the whole transaction, discarding the
+    // EXPIRED event we just appended). Instead it returns a tagged result and
+    // the 409 is raised here, after `withParticipantCommand`'s transaction
+    // has already committed.
+    const result = await this.withParticipantCommand(
+      {
+        gameId,
+        action: 'identity_link_attest',
+        resourceId: participantId,
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: { participantId, requestId, ...dto },
+        resolveActor: (tx) => this.resolveActor(tx, gameId, user.id, 'participant_identity'),
+      },
+      async (tx, _game, actor, context) => {
+        const requested = await tx.v1ParticipantIdentityLinkEvent.findFirst({
+          where: { participantId, requestId, action: V1IdentityLinkAction.REQUESTED },
+        });
+        if (requested === null) {
+          throw this.notFound('IDENTITY_LINK_REQUEST_NOT_FOUND');
+        }
+        const terminal = await tx.v1ParticipantIdentityLinkEvent.findFirst({
+          where: {
+            participantId,
+            requestId,
+            action: {
+              in: [V1IdentityLinkAction.ATTESTED, V1IdentityLinkAction.REJECTED, V1IdentityLinkAction.EXPIRED],
+            },
+          },
+        });
+        if (terminal !== null) {
+          throw new ConflictException({
+            code: 'IDENTITY_LINK_ALREADY_DECIDED',
+            message: '이미 처리된 요청이에요.',
+          });
+        }
+        const expired = Date.now() - requested.effectiveAt.getTime() >= 24 * 60 * 60 * 1000;
+        if (expired) {
+          const expiredEvent = await this.appendIdentityEvent(tx, {
+            participantId,
+            linkId: requested.linkId,
+            requestId,
+            action: V1IdentityLinkAction.EXPIRED,
+            userId: requested.userId,
+            actorType: V1IdentityActorType.SYSTEM,
+            systemActor: 'IDENTITY_LINK_EXPIRY',
+          });
+          const updatedOnExpiry = await tx.v1Game.update({
+            where: { id: gameId },
+            data: { version: { increment: 1 } },
+          });
+          const expiredResponse = {
+            outcome: 'expired' as const,
+            gameId,
+            participantId,
+            requestId,
+            version: updatedOnExpiry.version,
+            effectiveAt: expiredEvent.effectiveAt.toISOString(),
+            replayed: false,
+          };
+          await this.writeAudit(
+            tx,
+            actor,
+            'IDENTITY_LINK_EXPIRED',
+            gameId,
+            context.durableCommandId,
+            null,
+            expiredResponse,
+          );
+          return expiredResponse;
+        }
+        if (requested.userId === actor.actorUserId) {
+          throw new ForbiddenException({
+            code: 'IDENTITY_LINK_SELF_ATTESTATION_FORBIDDEN',
+            message: '본인이 신청한 연결은 스스로 승인할 수 없어요.',
+          });
+        }
+        const participant = await tx.v1GameParticipant.findFirst({
+          where: { id: participantId, gameId },
+          select: { sideId: true },
+        });
+        if (participant === null) {
+          throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
+        }
+        const side = await tx.v1GameSide.findUnique({ where: { id: participant.sideId } });
+        await this.assertAttestorAuthority(tx, side?.teamId ?? null, actor);
+
+        const action =
+          dto.decision === 'approve' ? V1IdentityLinkAction.ATTESTED : V1IdentityLinkAction.REJECTED;
+        const decided = await this.appendIdentityEvent(tx, {
+          participantId,
+          linkId: requested.linkId,
+          requestId,
+          action,
+          userId: actor.actorUserId,
+          actorType: V1IdentityActorType.USER,
+          actorUserId: actor.actorUserId,
+          reason: dto.reason,
+        });
+        if (action === V1IdentityLinkAction.ATTESTED) {
+          await tx.v1ParticipantIdentityLinkCurrent.create({
+            data: {
+              participantId,
+              linkId: requested.linkId,
+              userId: requested.userId,
+              version: 1,
+              effectiveFrom: decided.effectiveAt,
+            },
+          });
+        }
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 } },
+        });
+        const response = {
+          outcome: 'decided' as const,
+          gameId,
+          participantId,
+          requestId,
+          linkId: requested.linkId,
+          decision: dto.decision,
+          linkState: action === V1IdentityLinkAction.ATTESTED ? ('active' as const) : ('rejected' as const),
+          version: updated.version,
+          effectiveAt: decided.effectiveAt.toISOString(),
+          replayed: false,
+        };
+        await this.writeAudit(
+          tx,
+          actor,
+          action === V1IdentityLinkAction.ATTESTED ? 'IDENTITY_LINK_ATTESTED' : 'IDENTITY_LINK_REJECTED',
+          gameId,
+          context.durableCommandId,
+          null,
+          response,
+        );
+        if (action === V1IdentityLinkAction.ATTESTED) {
+          await this.writeOutbox(
+            tx,
+            `game:${gameId}:participant:${participantId}:identity:${requested.linkId}:attested`,
+            gameId,
+            'PARTICIPANT_IDENTITY_LINKED',
+            { participantId, linkId: requested.linkId, userId: requested.userId },
+          );
+        }
+        return response;
+      },
+    );
+    if (result.outcome === 'expired') {
+      throw new ConflictException({
+        code: 'IDENTITY_LINK_REQUEST_EXPIRED',
+        message: '연결 요청이 만료됐어요.',
+      });
+    }
+    return result;
+  }
+
+  async revokeIdentityLink(
+    user: V1AuthUser,
+    gameId: string,
+    participantId: string,
+    linkId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: RevokeIdentityLinkDto,
+  ) {
+    return this.withParticipantCommand(
+      {
+        gameId,
+        action: 'identity_link_revoke',
+        resourceId: participantId,
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: { participantId, linkId, ...dto },
+        resolveActor: (tx) => this.resolveActor(tx, gameId, user.id, 'participant_identity'),
+      },
+      async (tx, _game, actor, context) => {
+        const current = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+          where: { participantId },
+        });
+        if (current === null || current.linkId !== linkId) {
+          throw this.notFound('IDENTITY_LINK_NOT_FOUND');
+        }
+        if (actor.role !== 'platform_ops' && current.userId !== actor.actorUserId) {
+          throw this.forbidden();
+        }
+        const revoked = await this.appendIdentityEvent(tx, {
+          participantId,
+          linkId,
+          requestId: linkId,
+          action: V1IdentityLinkAction.REVOKED,
+          userId: actor.actorUserId,
+          actorType: V1IdentityActorType.USER,
+          actorUserId: actor.actorUserId,
+          reason: dto.reason,
+        });
+        await tx.v1ParticipantIdentityLinkCurrent.delete({ where: { participantId } });
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 } },
+        });
+        const response = {
+          gameId,
+          participantId,
+          linkId,
+          version: updated.version,
+          effectiveAt: revoked.effectiveAt.toISOString(),
+          purgeDeadline: new Date(revoked.effectiveAt.getTime() + 5000).toISOString(),
+          replayed: false,
+        };
+        await this.writeAudit(
+          tx,
+          actor,
+          'IDENTITY_LINK_REVOKED',
+          gameId,
+          context.durableCommandId,
+          null,
+          response,
+        );
+        await this.writeOutbox(
+          tx,
+          `game:${gameId}:participant:${participantId}:identity:${linkId}:revoked`,
+          gameId,
+          'PARTICIPANT_IDENTITY_REVOKED',
+          { participantId, linkId },
+        );
+        return response;
+      },
+    );
+  }
+
+  async grantParticipantConsent(
+    user: V1AuthUser,
+    gameId: string,
+    participantId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: GrantParticipantConsentDto,
+  ) {
+    return this.withParticipantCommand(
+      {
+        gameId,
+        action: 'consent_grant',
+        resourceId: participantId,
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: { participantId, ...dto },
+        resolveActor: (tx) => this.resolveActor(tx, gameId, user.id, 'participant_identity'),
+      },
+      async (tx, _game, actor, context) => {
+        const current = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+          where: { participantId },
+        });
+        if (current === null || current.userId !== actor.actorUserId) {
+          throw this.forbidden();
+        }
+        if (current.linkId !== dto.linkId) {
+          throw new ConflictException({
+            code: 'CONSENT_LINK_MISMATCH',
+            message: '연결 정보가 최신 상태가 아니에요. 새로고침 후 다시 시도해 주세요.',
+          });
+        }
+        const last = await tx.v1ParticipantConsentSnapshot.findFirst({
+          where: { participantId },
+          orderBy: { consentVersion: 'desc' },
+        });
+        const created = await tx.v1ParticipantConsentSnapshot.create({
+          data: {
+            participantId,
+            linkId: dto.linkId,
+            consentVersion: (last?.consentVersion ?? 0) + 1,
+            state: V1ConsentState.GRANTED,
+            policyHash: dto.policyHash,
+            actorUserId: actor.actorUserId,
+          },
+        });
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 } },
+        });
+        const response = {
+          gameId,
+          participantId,
+          consentVersion: created.consentVersion,
+          state: created.state,
+          effectiveAt: created.effectiveAt.toISOString(),
+          version: updated.version,
+          replayed: false,
+        };
+        await this.writeAudit(
+          tx,
+          actor,
+          'PARTICIPANT_CONSENT_GRANTED',
+          gameId,
+          context.durableCommandId,
+          null,
+          response,
+        );
+        await this.writeOutbox(
+          tx,
+          `game:${gameId}:participant:${participantId}:consent:${created.consentVersion}:granted`,
+          gameId,
+          'PARTICIPANT_CONSENT_GRANTED',
+          { participantId, consentVersion: created.consentVersion },
+        );
+        return response;
+      },
+    );
+  }
+
+  async revokeParticipantConsent(
+    user: V1AuthUser,
+    gameId: string,
+    participantId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: RevokeParticipantConsentDto,
+  ) {
+    return this.withParticipantCommand(
+      {
+        gameId,
+        action: 'consent_revoke',
+        resourceId: participantId,
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        payload: { participantId, ...dto },
+        resolveActor: (tx) => this.resolveActor(tx, gameId, user.id, 'participant_identity'),
+      },
+      async (tx, _game, actor, context) => {
+        const current = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+          where: { participantId },
+        });
+        const isLinkedCaller = current !== null && current.userId === actor.actorUserId;
+        if (!isLinkedCaller && actor.role !== 'platform_ops') {
+          throw this.forbidden();
+        }
+        // Mirror grantParticipantConsent's `current.linkId !== dto.linkId`
+        // check: a consent snapshot only authorizes revoke while it belongs
+        // to the participant's CURRENT link. Without this, a stale grant
+        // left GRANTED under a since-revoked link (revokeIdentityLink does
+        // not itself revoke consent) would be the highest `consentVersion`
+        // row and could be "revoked" by the holder of an unrelated new link
+        // who never granted anything themselves - fabricating history
+        // against a dead linkId. platform_ops with no current link at all
+        // (current === null) is the sole exception, since there is then no
+        // current linkId to scope by.
+        const last = await tx.v1ParticipantConsentSnapshot.findFirst({
+          where: current === null ? { participantId } : { participantId, linkId: current.linkId },
+          orderBy: { consentVersion: 'desc' },
+        });
+        if (last === null || last.state !== V1ConsentState.GRANTED) {
+          throw new ConflictException({
+            code: 'CONSENT_NOT_GRANTED',
+            message: '철회할 동의 내역이 없어요.',
+          });
+        }
+        const created = await tx.v1ParticipantConsentSnapshot.create({
+          data: {
+            participantId,
+            linkId: last.linkId,
+            consentVersion: last.consentVersion + 1,
+            state: V1ConsentState.REVOKED,
+            policyHash: last.policyHash,
+            actorUserId: actor.actorUserId,
+          },
+        });
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 } },
+        });
+        const response = {
+          gameId,
+          participantId,
+          consentVersion: created.consentVersion,
+          state: created.state,
+          effectiveAt: created.effectiveAt.toISOString(),
+          purgeDeadline: new Date(created.effectiveAt.getTime() + 5000).toISOString(),
+          version: updated.version,
+          replayed: false,
+        };
+        await this.writeAudit(
+          tx,
+          actor,
+          'PARTICIPANT_CONSENT_REVOKED',
+          gameId,
+          context.durableCommandId,
+          null,
+          response,
+        );
+        await this.writeOutbox(
+          tx,
+          `game:${gameId}:participant:${participantId}:consent:${created.consentVersion}:revoked`,
+          gameId,
+          'PARTICIPANT_CONSENT_REVOKED',
+          { participantId, consentVersion: created.consentVersion },
+        );
+        return response;
+      },
+    );
+  }
+
+  /**
+   * Consent-safe public projection for a single participant. Not exposed as
+   * its own public HTTP route in Task 14 — the public bracket/record surfaces
+   * are Task 24's — but the read is intentionally live (no cache) so any
+   * caller of it inherits the ≤5s (in practice: immediate) purge guarantee
+   * for free once a consent/identity revoke has committed.
+   */
+  async getPublicParticipant(
+    gameId: string,
+    participantId: string,
+  ): Promise<PublicParticipantProjection> {
+    const participant = await this.prisma.v1GameParticipant.findFirst({
+      where: { id: participantId, gameId },
+      select: { id: true },
+    });
+    if (participant === null) {
+      throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
+    }
+    const current = await this.prisma.v1ParticipantIdentityLinkCurrent.findUnique({
+      where: { participantId },
+    });
+    const latestConsent =
+      current === null
+        ? null
+        : await this.prisma.v1ParticipantConsentSnapshot.findFirst({
+            where: { participantId, linkId: current.linkId },
+            orderBy: { consentVersion: 'desc' },
+            select: { state: true },
+          });
+    const nickname =
+      current === null
+        ? null
+        : ((
+            await this.prisma.v1UserProfile.findUnique({
+              where: { userId: current.userId },
+              select: { nickname: true },
+            })
+          )?.nickname ?? null);
+    return projectParticipantForPublic({
+      participantId,
+      currentLink: current === null ? null : { userId: current.userId },
+      latestConsent: latestConsent === null ? null : { state: latestConsent.state },
+      nickname,
+    });
+  }
+
+  private async withParticipantCommand<T extends object>(
+    input: {
+      gameId: string;
+      action: string;
+      resourceId: string;
+      expectedVersion: number;
+      headerIdempotencyKey: string | undefined;
+      bodyCommandId: string;
+      payload: unknown;
+      resolveActor: (tx: Transaction) => Promise<Extract<GameActorScope, { actorType: 'USER' }>>;
+    },
+    mutate: (
+      tx: Transaction,
+      game: { id: string; version: number },
+      actor: Extract<GameActorScope, { actorType: 'USER' }>,
+      context: GameCommandContext,
+    ) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${input.gameId} FOR UPDATE`;
+          const game = await tx.v1Game.findUnique({
+            where: { id: input.gameId },
+            select: { id: true, version: true },
+          });
+          if (game === null) {
+            throw this.notFound();
+          }
+          const actor = await input.resolveActor(tx);
+          const payloadHash = canonicalGameCommandPayloadHash(input.payload);
+          let context: GameCommandContext;
+          try {
+            context = assertGameCommandContext({
+              actor,
+              expectedVersion: input.expectedVersion,
+              currentVersion: game.version,
+              headerIdempotencyKey: input.headerIdempotencyKey ?? '',
+              bodyClientCommandId: input.bodyCommandId,
+              payloadHash,
+            });
+          } catch (error) {
+            if (error instanceof GameContractError) {
+              throw toGameHttpException(error);
+            }
+            throw error;
+          }
+          const actorUserId = actorStorageId(actor);
+          const existing = await tx.v1IdempotencyRecord.findUnique({
+            where: {
+              actorUserId_action_resourceType_resourceId_idempotencyKey: {
+                actorUserId,
+                action: input.action,
+                resourceType: 'GAME_PARTICIPANT',
+                resourceId: input.resourceId,
+                idempotencyKey: context.durableCommandId,
+              },
+            },
+          });
+          try {
+            const decision = resolveGameIdempotency<T>(
+              existing === null
+                ? null
+                : {
+                    payloadHash: existing.payloadHash,
+                    responseStatus: existing.responseStatus,
+                    responseBody: existing.responseBody as unknown as T,
+                  },
+              payloadHash,
+            );
+            if (decision.kind === 'REPLAY') {
+              return { ...decision.responseBody, replayed: true };
+            }
+          } catch (error) {
+            if (error instanceof GameContractError) {
+              throw toGameHttpException(error);
+            }
+            throw error;
+          }
+          const response = await mutate(tx, game, actor, context);
+          await this.storeIdempotency(tx, {
+            actor,
+            action: input.action,
+            resourceType: 'GAME_PARTICIPANT',
+            resourceId: input.resourceId,
+            durableCommandId: context.durableCommandId,
+            payloadHash,
+            response,
+          });
+          return response;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2034' || error.code === 'P2002')
+      ) {
+        throw new ConflictException({
+          code: 'COMMAND_CONCURRENCY_CONFLICT',
+          message: 'A concurrent command won; reload the current version and retry',
+        });
+      }
+      throw error;
+    }
+  }
+
+  private async appendIdentityEvent(
+    tx: Transaction,
+    input: {
+      participantId: string;
+      linkId: string;
+      requestId: string;
+      userId: string;
+      reason?: string;
+    } & (
+      | {
+          action:
+            | typeof V1IdentityLinkAction.REQUESTED
+            | typeof V1IdentityLinkAction.ATTESTED
+            | typeof V1IdentityLinkAction.REJECTED
+            | typeof V1IdentityLinkAction.REVOKED;
+          actorType: typeof V1IdentityActorType.USER;
+          actorUserId: string;
+        }
+      | {
+          action: typeof V1IdentityLinkAction.EXPIRED;
+          actorType: typeof V1IdentityActorType.SYSTEM;
+          systemActor: 'IDENTITY_LINK_EXPIRY';
+        }
+    ),
+  ) {
+    const last = await tx.v1ParticipantIdentityLinkEvent.findFirst({
+      where: { participantId: input.participantId },
+      orderBy: { eventVersion: 'desc' },
+      select: { eventVersion: true },
+    });
+    try {
+      return await tx.v1ParticipantIdentityLinkEvent.create({
+        data: {
+          participantId: input.participantId,
+          linkId: input.linkId,
+          eventVersion: (last?.eventVersion ?? 0) + 1,
+          requestId: input.requestId,
+          action: input.action,
+          userId: input.userId,
+          actorType: input.actorType,
+          actorUserId: input.actorType === V1IdentityActorType.USER ? input.actorUserId : null,
+          systemActor: input.actorType === V1IdentityActorType.SYSTEM ? input.systemActor : null,
+          reason: input.reason ?? null,
+        },
+      });
+    } catch (error) {
+      throw this.mapIdentityEventError(error);
+    }
+  }
+
+  private mapIdentityEventError(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('attestation requires a distinct pending requestor')) {
+      return new ConflictException({
+        code: 'IDENTITY_LINK_REQUEST_EXPIRED',
+        message: '연결 요청이 만료됐거나 유효하지 않아요.',
+      });
+    }
+    if (message.includes('identity terminal action already committed')) {
+      return new ConflictException({
+        code: 'IDENTITY_LINK_ALREADY_DECIDED',
+        message: '이미 처리된 요청이에요.',
+      });
+    }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === 'P2002' || error.code === 'P2034')
+    ) {
+      return new ConflictException({
+        code: 'IDENTITY_LINK_CONFLICT',
+        message: '동시 요청이 충돌했어요. 다시 시도해 주세요.',
+      });
+    }
+    return error;
+  }
+
+  private async assertAttestorAuthority(
+    tx: Transaction,
+    sideTeamId: string | null,
+    actor: Extract<GameActorScope, { actorType: 'USER' }>,
+  ) {
+    if (actor.role === 'platform_ops') {
+      return;
+    }
+    if (sideTeamId === null) {
+      throw this.forbidden();
+    }
+    const membership = await tx.v1TeamMembership.findFirst({
+      where: { teamId: sideTeamId, userId: actor.actorUserId, status: 'active', role: 'owner' },
+    });
+    if (membership === null) {
+      throw this.forbidden();
+    }
+  }
+
   private async withCommand<T extends CommandResult>(
     input: CommandBoundaryInput,
     mutate: (
@@ -1538,6 +2341,40 @@ export class GamesService {
       if (fixture === null) {
         throw this.notFound();
       }
+      const eligibleAdmin =
+        admin !== null &&
+        admin.status === 'active' &&
+        admin.revokedAt === null &&
+        admin.adminRole !== 'support' &&
+        admin.user.accountStatus === 'active'
+          ? admin
+          : null;
+      if (action === 'participant_identity') {
+        // Task 14: the canonical actor-action matrix grants tournament staff
+        // (field_operator/support_readonly/tournament_director) no column for
+        // participant identity-link/consent authority, so scoped assignments
+        // never reach this action — only platform_ops may act, exactly like
+        // the admin branch below but without falling through to the staff
+        // assignment loop.
+        if (eligibleAdmin === null) {
+          throw this.forbidden();
+        }
+        const authorizationSubject = `platform_ops:${userId}@${eligibleAdmin.updatedAt.getTime()}`;
+        if (
+          expectedAuthorizationSubject !== undefined &&
+          expectedAuthorizationSubject !== authorizationSubject
+        ) {
+          throw this.forbidden();
+        }
+        return {
+          actorType: 'USER',
+          actorUserId: userId,
+          role: 'platform_ops',
+          tournamentId: fixture.tournamentId,
+          fixtureId: fixture.id,
+          authorizationSubject,
+        };
+      }
       const tournamentAction = this.tournamentAuthorizationAction(action);
       if (tournamentAction === null) {
         throw this.forbidden();
@@ -1547,13 +2384,7 @@ export class GamesService {
         fixtureId: fixture.id,
         ...(fixture.fieldId === null ? {} : { fieldId: fixture.fieldId }),
       };
-      if (
-        admin !== null &&
-        admin.status === 'active' &&
-        admin.revokedAt === null &&
-        admin.adminRole !== 'support' &&
-        admin.user.accountStatus === 'active'
-      ) {
+      if (eligibleAdmin !== null) {
         const decision = decideTournamentStaffAccess({
           role: 'platform_ops',
           action: tournamentAction,
@@ -1563,7 +2394,7 @@ export class GamesService {
         if (!decision.allowed) {
           throw this.forbidden();
         }
-        const authorizationSubject = `platform_ops:${userId}@${admin.updatedAt.getTime()}`;
+        const authorizationSubject = `platform_ops:${userId}@${eligibleAdmin.updatedAt.getTime()}`;
         if (
           expectedAuthorizationSubject !== undefined &&
           expectedAuthorizationSubject !== authorizationSubject
@@ -1678,7 +2509,13 @@ export class GamesService {
       };
     }
     const role = managerRole(hostMembership) ?? managerRole(opponentMembership);
-    if (action === 'read' && memberships.length > 0) {
+    // `participant_identity` (Task 14 identity-link/consent mutations) is
+    // deliberately as permissive as `read` here: the actor only needs to be
+    // an active member of one of the two match teams to self-request/revoke
+    // their own identity link or consent, or to act as a distinct attestor.
+    // Per-participant authority (self-only revoke/consent, distinct-side
+    // owner attestation) is enforced inside each command body, not here.
+    if ((action === 'read' || action === 'participant_identity') && memberships.length > 0) {
       return {
         actorType: 'USER',
         actorUserId: userId,
@@ -1714,6 +2551,11 @@ export class GamesService {
         return action;
       case 'team_result_submit':
       case 'opponent_result_decide':
+      case 'participant_identity':
+        // Unreachable in practice: resolveActor special-cases
+        // 'participant_identity' before calling this mapper (see Task 14
+        // note there), but the switch stays exhaustive over
+        // GameAuthorizationAction and denies-by-default if that ever changes.
         return null;
     }
   }

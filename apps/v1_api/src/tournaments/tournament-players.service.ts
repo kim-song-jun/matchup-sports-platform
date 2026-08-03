@@ -486,12 +486,18 @@ export class TournamentPlayersService {
 
   /** 어드민이 명단에서 선수를 뺀다. 팀 경로와 달리 잠금·마감을 넘길 수 있다. */
   async removePlayerForAdmin(user: V1AuthUser, playerId: string) {
-    await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getMutationAdmin(user.id);
 
     const removed = await this.prisma.$transaction(async (tx) => {
       const player = await tx.v1TournamentPlayer.findFirst({
         where: { id: playerId, removedAt: null },
-        select: { id: true, registrationId: true, registration: { select: { tournamentId: true } } },
+        select: {
+          id: true,
+          registrationId: true,
+          userId: true,
+          realName: true,
+          registration: { select: { tournamentId: true } },
+        },
       });
       if (!player) {
         throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
@@ -503,10 +509,29 @@ export class TournamentPlayersService {
         player.registrationId,
         { allowLockedAndExpired: true },
       );
-      return tx.v1TournamentPlayer.update({
+      const updated = await tx.v1TournamentPlayer.update({
         where: { id: playerId },
         data: { removedAt: new Date() },
       });
+
+      // 추가와 같은 이유로 제거도 기록한다 — 명단 변경과 같은 트랜잭션에 넣어야 "명단은
+      // 바뀌었는데 로그가 없는" 상태가 생기지 않는다.
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'player.remove',
+          targetType: 'tournament_player',
+          targetId: playerId,
+          beforeJson: {
+            registrationId: player.registrationId,
+            userId: player.userId,
+            realName: player.realName,
+          },
+          afterJson: { removedAt: updated.removedAt },
+        },
+        tx,
+      );
+      return updated;
     });
 
     return this.serializePlayer(removed);

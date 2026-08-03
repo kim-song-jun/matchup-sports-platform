@@ -227,6 +227,52 @@ export function findUnwiredComposeVariables(compose, workflow) {
   }
 }
 
+// 배포 스크립트가 `.env` 를 더 이상 `source` 하지 않으므로, 셸에서 봐야 하는 값은
+// env_value() 로 **명시적으로 읽어야만** 들어온다. 읽는 걸 빠뜨리면 변수는 조용히
+// 미설정으로 남고, `${VAR:-기본값}` 형태의 분기는 언제나 기본값 쪽으로만 간다.
+//
+// 실제로 그렇게 됐다: V1_DB_HOST 를 읽지 않아 "외부 DB 면 로컬 Postgres 기동을 건너뛴다"
+// 분기가 **한 번도 실행될 수 없는 죽은 코드**였다(.env 가 RDS 엔드포인트를 가리켜도
+// 로컬 컨테이너를 띄우고 기다렸다). 이 저장소에서 "발화하지 않는 가드"가 나온 세 번째
+// 사례라서, 다음번에는 사람이 아니라 CI 가 잡도록 여기에 둔다.
+export function findUnreadRuntimeEnvVariables(script) {
+  // 주석 안의 `${V1_...}` 는 코드가 아니다. 이 파일의 주석은 전부 `#` 또는 ` # ` 형태다.
+  const code = script
+    .split('\n')
+    .map((line) => line.replace(/^\s*#.*$/, '').replace(/\s#\s.*$/, ''))
+    .join('\n');
+
+  const referenced = new Set(
+    [...code.matchAll(/\$\{(V1_[A-Z0-9_]+)(?::-[^}]*)?\}/g)].map((m) => m[1]),
+  );
+  const assigned = new Set(
+    [...code.matchAll(/^\s*(V1_[A-Z0-9_]+)=/gm)].map((m) => m[1]),
+  );
+  // 이미지 변수만 예외다 — .env 가 아니라 load_prod_release_manifest() 가 export 한다.
+  const fromManifest = new Set(['V1_API_IMAGE', 'V1_WEB_IMAGE']);
+
+  return [...referenced]
+    .filter((name) => !fromManifest.has(name) && !assigned.has(name))
+    .sort();
+}
+
+{
+  let deployScript = '';
+  try {
+    deployScript = readFileSync('deploy/deploy-prod.sh', 'utf8');
+  } catch {
+    deployScript = '';
+  }
+  if (deployScript) {
+    for (const name of findUnreadRuntimeEnvVariables(deployScript)) {
+      errors.push(
+        `deploy/deploy-prod.sh: ${name} 를 참조하지만 env_value() 로 읽지 않습니다 — ` +
+          `.env 를 source 하지 않으므로 셸에서는 항상 미설정이고, 이 변수로 갈리는 분기는 죽은 코드가 됩니다`,
+      );
+    }
+  }
+}
+
 const requiredPatterns = [
   {
     pattern: /^permissions:\n  contents: read$/m,

@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   usesSshAlias,
   findJobsMissingRunnerPrereqs,
   findUnwiredComposeVariables,
+  findUnreadRuntimeEnvVariables,
 } from './check-production-deploy-security.mjs';
 
 // 이 가드는 "prod 배포 스크립트에 SSH alias 잔재가 없는가" 를 지킨다. 그런데 가드 자체가
@@ -193,4 +195,54 @@ test('여러 줄 중 한 줄만 위반해도 탐지한다', () => {
     'echo done',
   ].join('\n');
   assert.equal(usesSshAlias(body), true);
+});
+
+// --- .env 를 source 하지 않는 배포 스크립트의 "읽지 않은 변수" 탐지 -----------------
+//
+// 이 가드가 존재하는 이유는 실패 사례가 있어서다. deploy-prod.sh 가 .env 를 source 하지
+// 않게 바뀐 뒤 V1_DB_HOST 를 env_value() 로 읽는 것을 빠뜨렸고, 그 결과
+// `${V1_DB_HOST:-v1_postgres}` 분기의 else 쪽이 한 번도 실행될 수 없는 죽은 코드가 됐다.
+// 그래서 아래 첫 테스트는 **탐지 실패 케이스**부터 확인한다 — 가드가 정작 자기가 막아야 할
+// 상황에서 침묵하는 일이 이 저장소에서 반복됐기 때문이다.
+
+test('참조만 하고 읽지 않은 런타임 env 변수를 탐지한다', () => {
+  const script = [
+    'env_value() { sed -n "s/^$1=//p" "${ENV_FILE}" | head -1; }',
+    'V1_DB_USER="$(env_value V1_DB_USER)"',
+    'if [[ "${V1_DB_HOST:-v1_postgres}" == "v1_postgres" ]]; then',
+    '  compose up -d v1_postgres',
+    'fi',
+  ].join('\n');
+  assert.deepEqual(findUnreadRuntimeEnvVariables(script), ['V1_DB_HOST']);
+});
+
+test('env_value 로 읽은 변수는 통과시킨다', () => {
+  const script = [
+    'V1_DB_HOST="$(env_value V1_DB_HOST)"',
+    'if [[ "${V1_DB_HOST:-v1_postgres}" == "v1_postgres" ]]; then :; fi',
+  ].join('\n');
+  assert.deepEqual(findUnreadRuntimeEnvVariables(script), []);
+});
+
+test('매니페스트가 채우는 이미지 변수는 요구하지 않는다', () => {
+  const script = 'compose up -d "${V1_API_IMAGE}" "${V1_WEB_IMAGE}"\n';
+  assert.deepEqual(findUnreadRuntimeEnvVariables(script), []);
+});
+
+test('주석 안의 변수 참조는 오탐하지 않는다', () => {
+  const script = [
+    '# 예전에는 ${V1_DB_LEGACY} 를 봤다',
+    'echo ok  # ${V1_DB_ANOTHER} 도 마찬가지',
+  ].join('\n');
+  assert.deepEqual(findUnreadRuntimeEnvVariables(script), []);
+});
+
+test('읽지 않은 변수가 여러 개면 모두 정렬해 돌려준다', () => {
+  const script = 'echo "${V1_DB_PORT}" "${V1_DB_HOST:-x}"\n';
+  assert.deepEqual(findUnreadRuntimeEnvVariables(script), ['V1_DB_HOST', 'V1_DB_PORT']);
+});
+
+test('실제 deploy-prod.sh 에 읽지 않은 변수가 없다', () => {
+  const script = readFileSync('deploy/deploy-prod.sh', 'utf8');
+  assert.deepEqual(findUnreadRuntimeEnvVariables(script), []);
 });

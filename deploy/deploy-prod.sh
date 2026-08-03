@@ -111,12 +111,19 @@ fi
 # 그래서 파일은 compose 원형(따옴표 없는 KEY=VALUE)으로 두고, 셸 쪽에서 source 를 없앴다.
 #
 # 시크릿은 compose 가 --env-file 로 직접 읽으므로 셸 환경에 올릴 이유가 없다.
-# 이 스크립트가 실제로 필요한 값은 아래 두 개뿐이고, 셸 해석 없이 읽는다.
+# 이 스크립트가 셸에서 직접 봐야 하는 값만 아래에서 읽는다(셸 해석 없이).
+#
+# V1_DB_HOST 를 여기서 함께 읽는 것이 중요하다. source 를 없앤 뒤에도 아래 로컬 Postgres
+# 분기가 이 변수를 참조하는데, 정작 셸에는 값이 들어오지 않아 **항상 미설정**이었다. 즉
+# `${V1_DB_HOST:-v1_postgres}` 가 언제나 기본값으로 떨어져 외부 DB 분기가 죽은 코드였다
+# — .env 가 RDS 엔드포인트를 가리켜도 로컬 컨테이너를 띄우고 기다렸다.
+# (Copilot 리뷰 지적, 2026-08-03 재현으로 확인.)
 env_value() {
   sed -n "s/^$1=//p" "${ENV_FILE}" | head -1
 }
 V1_DB_USER="$(env_value V1_DB_USER)"
 V1_DB_NAME="$(env_value V1_DB_NAME)"
+V1_DB_HOST="$(env_value V1_DB_HOST)"
 
 export COMPOSE_PARALLEL_LIMIT=1
 # --preserve-env 가 반드시 필요하다. docker-compose.prod.yml 은 이미지를

@@ -501,7 +501,8 @@ export class TournamentPlayersService {
       where: { id: registrationId },
       select: {
         teamId: true,
-        tournament: { select: { genderCategory: true } },
+        status: true,
+        tournament: { select: { genderCategory: true, maxPlayers: true } },
       },
     });
     if (!registration) {
@@ -540,6 +541,15 @@ export class TournamentPlayersService {
     const requiresGender = registration.tournament.genderCategory === 'mixed';
     const phoneEnforced = isPhoneVerificationEnforced();
 
+    // 명단 전체를 막는 사유. 개인 자격과 무관하게 추가 자체가 거부되므로 여기서 먼저 판정한다 —
+    // 빼놓으면 모든 팀원이 "선택 가능" 으로 보이고 눌러야 409 를 받는다. 특히 정원이 찬 경우가
+    // 그랬는데, 유령 명단 한 자리 때문에 팀이 선수를 못 넣던 2026-08-03 사고가 바로 이 모양이었다.
+    // (잠금·마감은 어드민이 넘길 수 있으므로 여기서 막지 않는다 — assertRosterMutable 주석 참조.)
+    const registrationCancelled =
+      registration.status === 'cancel_requested' || registration.status === 'cancelled';
+    const maxPlayers = registration.tournament.maxPlayers;
+    const rosterFull = activePlayers.length >= maxPlayers;
+
     return {
       members: memberships
         .map(({ role, user: member }) => {
@@ -552,7 +562,11 @@ export class TournamentPlayersService {
           // 어긋나면 운영자가 더 헷갈린다.
           let ineligibleReason: string | null = null;
           if (onRoster.has(member.id)) ineligibleReason = '이미 명단에 있어요';
-          else if (!realName || !birthDate || !phone || (requiresGender && !gender)) {
+          else if (registrationCancelled) {
+            ineligibleReason = '취소된 신청이라 명단을 수정할 수 없어요';
+          } else if (rosterFull) {
+            ineligibleReason = `정원이 찼어요 (${activePlayers.length}/${maxPlayers}명)`;
+          } else if (!realName || !birthDate || !phone || (requiresGender && !gender)) {
             ineligibleReason = requiresGender
               ? '실명·생년월일·휴대폰·성별이 모두 필요해요'
               : '실명·생년월일·휴대폰이 모두 필요해요';

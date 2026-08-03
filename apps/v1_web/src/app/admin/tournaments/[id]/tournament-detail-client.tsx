@@ -537,6 +537,8 @@ export function RosterModal({
   const [addError, setAddError] = useState<string | null>(null);
   const eligible = useV1AdminRosterEligibleMembers(registration?.id ?? '', open && canWrite);
   const members = eligible.data?.members ?? [];
+  // 멤버는 있는데 전원 자격 미달인 경우(정원 초과·취소된 신청 등)를 "멤버 0명" 과 구분한다.
+  const hasEligibleMember = members.some((m) => m.eligible);
   const selectedMember = members.find((m) => m.userId === selectedUserId) ?? null;
 
   const players = [...(data?.players ?? [])].sort(
@@ -674,11 +676,17 @@ export function RosterModal({
                 className="h-[44px] w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               >
                 <option value="">
+                  {/* 조회 실패를 "멤버 없음" 으로 말하지 않는다 — 목록이 비어 있는 이유가
+                      다르면 운영자가 팀 구성을 의심하며 엉뚱한 데를 찾게 된다. */}
                   {eligible.isPending
                     ? '팀원 불러오는 중…'
-                    : members.length === 0
-                      ? '추가할 수 있는 팀원이 없어요'
-                      : '팀원 선택'}
+                    : eligible.isError
+                      ? '팀원 목록을 불러오지 못했어요'
+                      : members.length === 0
+                        ? '팀에 활성 멤버가 없어요'
+                        : hasEligibleMember
+                          ? '팀원 선택'
+                          : '추가할 수 있는 팀원이 없어요'}
                 </option>
                 {members.map((m) => (
                   // 못 고르는 팀원도 이유와 함께 보여 준다 — 목록에서 지워 버리면 운영자가

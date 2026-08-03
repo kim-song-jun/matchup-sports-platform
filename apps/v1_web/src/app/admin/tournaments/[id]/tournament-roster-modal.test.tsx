@@ -11,24 +11,22 @@ let queryState: Record<string, unknown>;
 const addPlayer = vi.fn();
 const removePlayer = vi.fn();
 
+const DEFAULT_ELIGIBLE_MEMBERS = [
+  { userId: 'user-42', nickname: '명철', realName: '김명철', birthDate: '19900101',
+    gender: 'male' as const, role: 'member' as const, alreadyOnRoster: false, eligible: true,
+    ineligibleReason: null },
+  { userId: 'user-99', nickname: '무프로필', realName: null, birthDate: null,
+    gender: null, role: 'member' as const, alreadyOnRoster: false, eligible: false,
+    ineligibleReason: '실명·생년월일·휴대폰이 모두 필요해요' },
+];
+
+let eligibleState: Record<string, unknown>;
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentPlayers: () => queryState,
   useV1UpdatePlayerEligibility: () => ({ mutate: updateEligibility, isPending: false }),
   useV1AdminAddPlayer: () => ({ mutate: addPlayer, isPending: false }),
-  useV1AdminRosterEligibleMembers: () => ({
-    data: {
-      members: [
-        { userId: 'user-42', nickname: '명철', realName: '김명철', birthDate: '19900101',
-          gender: 'male', role: 'member', alreadyOnRoster: false, eligible: true, ineligibleReason: null },
-        { userId: 'user-99', nickname: '무프로필', realName: null, birthDate: null,
-          gender: null, role: 'member', alreadyOnRoster: false, eligible: false,
-          ineligibleReason: '실명·생년월일·휴대폰이 모두 필요해요' },
-      ],
-    },
-    isPending: false,
-    isError: false,
-    error: null,
-  }),
+  useV1AdminRosterEligibleMembers: () => eligibleState,
   useV1AdminRemovePlayer: () => ({ mutate: removePlayer, isPending: false }),
 }));
 
@@ -59,6 +57,12 @@ const registration: V1AdminTournamentRegistration = {
 describe('admin tournament roster modal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    eligibleState = {
+      data: { members: DEFAULT_ELIGIBLE_MEMBERS },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
     queryState = {
       data: {
         registrationId: 'registration-1',
@@ -255,5 +259,66 @@ describe('admin tournament roster modal', () => {
 
     expect(screen.queryByRole('button', { name: '추가' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '홍길동 선수를 명단에서 제외' })).toBeDisabled();
+  });
+
+  // 목록이 비어 보이는 이유는 셋인데(조회 실패 / 멤버 0명 / 전원 자격 미달) 화면이 하나로
+  // 뭉뚱그리면 운영자가 엉뚱한 데를 고치러 간다. 각 상태를 구분해 말하는지 본다.
+  it('팀원 목록 조회에 실패하면 "멤버가 없다" 고 말하지 않는다', () => {
+    eligibleState = {
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new Error('boom'),
+    };
+
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    const placeholder = screen.getByRole('option', { name: '팀원 목록을 불러오지 못했어요' });
+    expect(placeholder).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '팀에 활성 멤버가 없어요' })).not.toBeInTheDocument();
+  });
+
+  it('멤버는 있지만 전원 자격 미달이면 "활성 멤버가 없다" 고 말하지 않는다', () => {
+    eligibleState = {
+      data: {
+        members: [
+          {
+            ...DEFAULT_ELIGIBLE_MEMBERS[0],
+            eligible: false,
+            ineligibleReason: '정원이 찼어요 (10/10명)',
+          },
+        ],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    expect(
+      screen.getByRole('option', { name: '추가할 수 있는 팀원이 없어요' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '팀에 활성 멤버가 없어요' })).not.toBeInTheDocument();
+    // 사유는 여전히 읽을 수 있어야 한다 — 왜 못 고르는지가 화면에 남아야 조치할 수 있다.
+    expect(
+      screen.getByRole('option', { name: /정원이 찼어요 \(10\/10명\)/ }),
+    ).toBeDisabled();
   });
 });

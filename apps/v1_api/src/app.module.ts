@@ -32,6 +32,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { LogsModule } from './logs/logs.module';
 import { ErrorLogsModule } from './error-logs/error-logs.module';
 import { GamesModule } from './games/games.module';
+import { GameOperationFlagsModule } from './config/game-operation-flags.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { GamesModule } from './games/games.module';
     TeamsModule,
     TeamMatchesModule,
     GamesModule,
+    GameOperationFlagsModule,
     ChatModule,
     RealtimeModule,
     NotificationsModule,

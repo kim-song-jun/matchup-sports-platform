@@ -277,9 +277,13 @@ describe('Task 12 reminders — real worker composition root (T1 regression)', (
       // proven against the REAL running worker (not a mock): reset the already-COMPLETED RSVP
       // outbox row back to PENDING (simulating an operational re-delivery/forced replay of the
       // same outbox id) and let the live worker re-claim and re-run it.
+      // `v1_outbox_version_cas` (a BEFORE UPDATE trigger on v1_outbox_events, migration
+      // 20260729000100 line 376) raises 40001 'version compare-and-swap required' unless every
+      // UPDATE sets version = OLD.version + 1. The production claim/complete paths already do this;
+      // this operational-replay simulation must obey the same contract rather than bypass it.
       await prisma.$executeRaw`
         UPDATE v1_outbox_events
-        SET status = 'PENDING'::"V1OutboxStatus", lease_owner = NULL, lease_until = NULL, available_at = CURRENT_TIMESTAMP
+        SET status = 'PENDING'::"V1OutboxStatus", lease_owner = NULL, lease_until = NULL, available_at = CURRENT_TIMESTAMP, version = version + 1
         WHERE id = ${rsvpOutboxId}
       `;
       await waitForOutboxCompletion(rsvpBusinessKey, 20_000);

@@ -96,6 +96,12 @@ export const v1Keys = {
   myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
+  tournamentOperationsBoard: (tournamentId: string, filters?: Record<string, unknown>) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'operations', filters ?? {}] as const,
+  tournamentOperationsStaff: (tournamentId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'staff'] as const,
+  tournamentOperationsFields: (tournamentId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'fields'] as const,
 };
 
 // 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아

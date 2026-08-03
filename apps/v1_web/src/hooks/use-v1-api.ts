@@ -214,6 +214,13 @@ import type {
   V1IntegrationSettings,
   V1UpdateIntegrationSettingsPayload,
   V1PublicKakaoMapsKeyResponse,
+  V1TournamentOperationsBoardFilters,
+  V1TournamentOperationsBoardPage,
+  V1TournamentStaffListResponse,
+  V1TournamentStaffAssignment,
+  V1GrantTournamentStaffPayload,
+  V1RevokeTournamentStaffPayload,
+  V1TournamentFieldListResponse,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
@@ -3501,5 +3508,105 @@ export function useV1DeleteAdminContentAsset() {
   return useMutation({
     mutationFn: (assetId: string) =>
       v1Delete<{ assetId: string; deleted: true }>(`/admin/content-assets/${assetId}`),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 대회 운영(tournament-ops) 셸/보드/스태프 (Task 19 — 백엔드는 Task 18)
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /tournament-ops/tournaments/:tournamentId/operations — 운영 보드 한 페이지.
+ * `refetchInterval`로 상단(현재 커서) 페이지를 주기적으로 재조회해 점진 업데이트를
+ * 지원한다 — `placeholderData: keepPreviousData`가 재조회 중 목록이 빈 화면으로
+ * 깜빡이는 것을 막아, 필터 입력 등 화면의 로컬 상태가 유지된다.
+ */
+export function useV1TournamentOperationsBoard(
+  tournamentId: string,
+  filters?: V1TournamentOperationsBoardFilters,
+  options?: QueryOptions,
+) {
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
+    queryFn: () =>
+      v1Get<V1TournamentOperationsBoardPage>(
+        `/tournament-ops/tournaments/${tournamentId}/operations`,
+        filters,
+      ),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+    placeholderData: keepPreviousData,
+    refetchInterval: 15_000,
+  });
+}
+
+/** "더 보기" 등 일회성 다음 페이지 조회용 — 폴링 대상이 아닌 과거 페이지는 훅 없이 직접 fetchQuery로 가져온다. */
+export function fetchV1TournamentOperationsBoardPage(
+  queryClient: QueryClient,
+  tournamentId: string,
+  filters: V1TournamentOperationsBoardFilters,
+) {
+  return queryClient.fetchQuery({
+    queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
+    queryFn: () =>
+      v1Get<V1TournamentOperationsBoardPage>(
+        `/tournament-ops/tournaments/${tournamentId}/operations`,
+        filters,
+      ),
+  });
+}
+
+/**
+ * GET /tournament-ops/tournaments/:tournamentId/staff — 대회 전체 스태프 배정 목록.
+ * `read` 액션은 platform_ops/tournament_director/support_readonly에게만 허용된다
+ * (field_operator는 항상 field/fixture 스코프가 있어 대회 전역 리소스로는 403) — 이 응답이
+ * 성공하면 셸 게이트가 여기서 내 역할을 함께 도출한다.
+ */
+export function useV1TournamentStaffAssignments(tournamentId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsStaff(tournamentId),
+    queryFn: () => v1Get<V1TournamentStaffListResponse>(`/tournament-ops/tournaments/${tournamentId}/staff`),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+  });
+}
+
+/** GET /tournament-ops/tournaments/:tournamentId/fields — 필터 드롭다운용 필드/코트 목록. */
+export function useV1TournamentFields(tournamentId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsFields(tournamentId),
+    queryFn: () => v1Get<V1TournamentFieldListResponse>(`/tournament-ops/tournaments/${tournamentId}/fields`),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+  });
+}
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff — 스태프 배정(관리자/대회 디렉터). */
+export function useV1GrantTournamentStaff(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1GrantTournamentStaffPayload) =>
+      v1Post<V1TournamentStaffAssignment>(`/tournament-ops/tournaments/${tournamentId}/staff`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsStaff(tournamentId) });
+    },
+  });
+}
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke — 스태프 배정 해제. */
+export function useV1RevokeTournamentStaff(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      assignmentId,
+      payload,
+    }: {
+      assignmentId: string;
+      payload: V1RevokeTournamentStaffPayload;
+    }) =>
+      v1Post<V1TournamentStaffAssignment>(
+        `/tournament-ops/tournaments/${tournamentId}/staff/${assignmentId}/revoke`,
+        payload,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsStaff(tournamentId) });
+    },
   });
 }

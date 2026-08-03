@@ -400,9 +400,13 @@ export class TournamentOperationsBoardService {
         // response for a caller to use as a cross-tournament existence oracle.
         const cursorPayload =
           query.cursor !== undefined ? decodeOperationsBoardCursor(query.cursor) : undefined;
+        // `== null` on purpose: cursorPayload is `null` when a supplied cursor fails to decode and
+        // `undefined` when no cursor was supplied at all. The outer `query.cursor !== undefined`
+        // already excludes the latter at runtime, but TypeScript does not carry that correlation
+        // across the two expressions, so a strict `=== null` leaves `undefined` unnarrowed.
         const cursorInvalid =
           query.cursor !== undefined &&
-          (cursorPayload === null || cursorPayload.tournamentId !== tournamentId);
+          (cursorPayload == null || cursorPayload.tournamentId !== tournamentId);
 
         const cursorPredicate: Prisma.V1TournamentFixtureWhereInput | undefined =
           cursorPayload != null && !cursorInvalid

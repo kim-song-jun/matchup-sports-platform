@@ -392,7 +392,7 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
         data: {
           id: archivedOwnerId,
           email: `${archivedOwnerId}@example.test`,
-          phone: `010${archivedOwnerId.slice(-8)}`,
+          phone: '01099000001', // NOT the `010${id.slice(-8)}` helper: these ids differ only in their FIRST segment, so that helper would collide with the base fixture users on the phone unique index
           accountStatus: 'active',
           onboardingStatus: 'completed',
         },
@@ -488,7 +488,7 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
         data: {
           id: managerToRevokeId,
           email: `${managerToRevokeId}@example.test`,
-          phone: `010${managerToRevokeId.slice(-8)}`,
+          phone: '01099000002', // see the note above: explicit, collision-free number
           accountStatus: 'active',
           onboardingStatus: 'completed',
         },

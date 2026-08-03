@@ -254,10 +254,14 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     const recruitment = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId } });
     expect(recruitment.state).toBe('CLOSED');
 
-    // Already-terminal: a second cancel attempt (even with the original version) must reject,
-    // not delete or re-cancel.
+    // Already-terminal: a second cancel attempt must reject, not delete or re-cancel.
+    // This passes the CURRENT version (1, bumped by the cancel above) on purpose. The P1-9 fix
+    // made the optimistic-concurrency check run BEFORE the terminal-state check, so passing the
+    // now-stale original version 0 here would correctly answer 409 VERSION_CONFLICT and this test
+    // would no longer be exercising the terminal guard at all. Stale-version-wins-over-terminal is
+    // covered separately by the P1-9 regression test.
     const error = await captureFailure(() =>
-      service.cancel(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 0, cancelReason: 'again' }, 'cancel-key-2'),
+      service.cancel(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 1, cancelReason: 'again' }, 'cancel-key-2'),
     );
     expectHttpCode(error, 409, 'SCHEDULE_TERMINAL');
   });

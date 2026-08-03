@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -8,6 +9,7 @@ import {
 import { createHash } from 'node:crypto';
 import { Prisma, V1EscalationStatus, V1GameSideKey, V1TournamentStaffRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { TournamentStaffPrincipal } from '../../tournaments/staff/tournament-staff-access.service';
 import type {
   ListTournamentOperationsQueryDto,
   StableWarningCode,
@@ -145,10 +147,14 @@ interface CursorLookup {
  * Each item now carries `stableRevision` -- a `sha256` hex digest over EVERY persisted input that
  * can change that item's stable fields: `V1TournamentFixture.updatedAt`, `V1TournamentField.version`
  * (nullable), `V1Game.version`+`updatedAt` (nullable), `V1Game.currentOfficialRevisionId`
- * (nullable), and the max `V1ResultEscalation.version`/`updatedAt` across ALL (not only open)
- * escalations tied to the fixture's game -- so an escalation closing (open -> closed) also moves
- * this hash even though it does not, by itself, change `RESULT_REVIEW_OVERDUE`'s stable boolean
- * membership for a fixture that already had other reasons to carry that code, or none at all.
+ * (nullable), the CANONICALIZED `V1GameResultRevision.score`+`missingScorer` of that current
+ * official revision (nullable; Task 18 review P0-5 -- `currentOfficialRevisionId` alone is a proxy
+ * for "which revision is official", not that revision's own content, so it cannot by itself detect
+ * a same-revision score/missingScorer change), and the max `V1ResultEscalation.version`/`updatedAt`
+ * across ALL (not only open) escalations tied to the fixture's game -- so an escalation closing
+ * (open -> closed) also moves this hash even though it does not, by itself, change
+ * `RESULT_REVIEW_OVERDUE`'s stable boolean membership for a fixture that already had other reasons
+ * to carry that code, or none at all.
  * `watermark` is the hash of the page's ordered `(fixtureId, stableRevision)` list rather than two
  * running maxima, so it moves whenever ANY item's `stableRevision` moves, regardless of which
  * underlying model changed. A correct client diff is: compare `stableRevision` per `fixtureId`
@@ -263,8 +269,29 @@ export class TournamentOperationsBoardService {
    * into every time-relative computation below -- see the "Time-relative warnings" doc section
    * above for why this parameter exists instead of `isLineupOverdue()`/`staffCoverage()` each
    * calling `Date.now()`/`new Date()` internally.
+   *
+   * ## `principal` re-verification (Task 18 review P0-2)
+   * `TournamentStaffGuard` computes a `TournamentStaffPrincipal` before this method is ever
+   * reached over HTTP (see `tournament-operations-board.controller.ts`), but that decision and
+   * THIS transaction's own reads are two separate moments in time -- an assignment revoked (or an
+   * admin grant deactivated) in between must not still be served a response built from the
+   * snapshot that decision authorized. When `principal` is supplied, `reverifyPrincipal()` re-reads
+   * the EXACT admin/assignment row the guard's decision was based on as the very first statement
+   * inside this method's own `RepeatableRead` transaction -- a revoke that fully committed before
+   * this transaction's own snapshot was taken is always observed and denied here. Deliberately
+   * UNLOCKED (no `FOR SHARE`), unlike `TournamentStaffAccessService.assertAccess()`'s own `tx`-aware
+   * P0-3 fix: see `reverifyPrincipal()`'s own doc comment for why a locking read is the wrong tool
+   * inside a `RepeatableRead` transaction specifically. `principal` is optional and, when omitted,
+   * this recheck is skipped entirely -- every direct service-level caller in this file's own test
+   * suite bypasses `TournamentStaffGuard` altogether already (there is no principal to re-verify),
+   * and remains unaffected.
    */
-  async list(tournamentId: string, query: ListTournamentOperationsQueryDto, now: Date = new Date()) {
+  async list(
+    tournamentId: string,
+    query: ListTournamentOperationsQueryDto,
+    now: Date = new Date(),
+    principal?: TournamentStaffPrincipal,
+  ) {
     const limit = query.limit ?? 20;
 
     // Review finding #2: reject a time-relative `warning` value here too, defensively, for any
@@ -293,6 +320,11 @@ export class TournamentOperationsBoardService {
     // RepeatableRead transaction so the response reflects a single database instant.
     const snapshot = await this.prisma.$transaction(
       async (tx) => {
+        // Task 18 review P0-2: re-verify the caller's authorization fresh, inside this
+        // transaction, as literally the first statement -- see this method's doc comment.
+        if (principal !== undefined) {
+          await this.reverifyPrincipal(tx, tournamentId, principal, now);
+        }
         // Review finding #7: a cursor whose row belongs to a different tournament must not
         // silently anchor this query's page. Resolved inside the same snapshot as the main page
         // read so the check itself cannot race a concurrent cross-tournament mutation.
@@ -397,11 +429,19 @@ export class TournamentOperationsBoardService {
     const isCompareMode = gameReadMode === 'compare';
 
     if (isCompareMode) {
-      // Review finding #3: bind the authority decision to the EXACT revision/score this response
-      // is about to serialize, then re-verify (CAS-style, fresh non-transactional read) that
-      // nothing changed between the snapshot above and this point, for every row the authority
-      // approved.
-      const expectedByGameId = new Map<string, { version: number; revisionId: string }>();
+      // Review finding #3 / Task 18 review P0-4: bind the authority decision to the EXACT
+      // revision/score this response is about to serialize, then re-verify (CAS-style, fresh
+      // non-transactional read) that nothing changed between the snapshot above and this point,
+      // for every row the authority approved. P0-4 fix: `expectedScoreHash`/`missingScorer` are now
+      // ALSO tracked and re-checked below (previously only `version`/`currentOfficialRevisionId`
+      // were), so a write that mutates the SAME official revision's score/missingScorer in place
+      // (no production write path does this today, see the `stableRevision` doc comment above --
+      // but the CAS recheck existing purely to guard `version`/`revisionId` while silently trusting
+      // the score/missingScorer payload underneath them was never a real guarantee) is caught too.
+      const expectedByGameId = new Map<
+        string,
+        { version: number; revisionId: string; scoreHash: string; missingScorer: boolean }
+      >();
       for (const row of pageRows) {
         if (row.game === null || row.game.currentOfficialRevisionId === null) continue;
         const expectedGameVersion = row.game.version;
@@ -416,26 +456,66 @@ export class TournamentOperationsBoardService {
           expectedRevisionId,
           expectedScoreHash,
         });
-        if (result.outcome === 'mismatch') {
+        // P0-4 fix: exhaustively narrow the RUNTIME value, not just the TypeScript union -- a
+        // `GAME_READ_AUTHORITY` implementation (Task 10's real comparator is not present in this
+        // worktree) is external input as far as this method is concerned, and nothing at runtime
+        // stopped a value that is neither `'ok'` nor `'mismatch'` from being silently treated as
+        // approval by an `else`-less `if (outcome === 'mismatch') throw`. Fail closed on anything
+        // unrecognized instead of defaulting to "approved".
+        if (result.outcome === 'ok') {
+          expectedByGameId.set(row.game.id, {
+            version: expectedGameVersion,
+            revisionId: expectedRevisionId,
+            scoreHash: expectedScoreHash,
+            missingScorer: row.game.currentOfficialRevision?.missingScorer ?? false,
+          });
+        } else if (result.outcome === 'mismatch') {
           throw new ConflictException({
             code: 'GAME_RESULT_READ_MISMATCH',
             message: '경기 결과 조회 값이 일치하지 않아 안전하게 처리했어요. 잠시 후 다시 시도해주세요.',
             details: { mismatch: result.detail },
           });
+        } else {
+          throw new InternalServerErrorException({
+            code: 'GAME_READ_AUTHORITY_INVALID_RESULT',
+            message: '경기 결과 조회 비교 결과를 해석할 수 없어요. 운영팀에 문의해주세요.',
+          });
         }
-        expectedByGameId.set(row.game.id, { version: expectedGameVersion, revisionId: expectedRevisionId });
       }
 
       if (expectedByGameId.size > 0) {
         const freshGameRows = await this.prisma.v1Game.findMany({
           where: { id: { in: [...expectedByGameId.keys()] } },
-          select: { id: true, version: true, currentOfficialRevisionId: true },
+          select: {
+            id: true,
+            version: true,
+            currentOfficialRevisionId: true,
+            currentOfficialRevision: { select: { score: true, missingScorer: true } },
+          },
         });
+        // P0-4 fix: an expected game missing entirely from the fresh read (e.g. deleted between
+        // the snapshot and this point) must not silently pass just because the loop below only
+        // ever iterates rows that DID come back -- require exact coverage of every game the
+        // authority approved.
+        if (freshGameRows.length !== expectedByGameId.size) {
+          throw new ConflictException({
+            code: 'GAME_RESULT_READ_STALE',
+            message: '경기 결과가 조회 도중 변경되어 안전하게 처리했어요. 다시 시도해주세요.',
+            details: { reason: 'EXPECTED_GAME_MISSING' },
+          });
+        }
         for (const fresh of freshGameRows) {
           const expected = expectedByGameId.get(fresh.id);
+          if (expected === undefined) continue;
+          const freshScoreHash = createHash('sha256')
+            .update(JSON.stringify(canonicalizeForHash(fresh.currentOfficialRevision?.score ?? null)))
+            .digest('hex');
+          const freshMissingScorer = fresh.currentOfficialRevision?.missingScorer ?? false;
           if (
-            expected !== undefined &&
-            (fresh.version !== expected.version || fresh.currentOfficialRevisionId !== expected.revisionId)
+            fresh.version !== expected.version ||
+            fresh.currentOfficialRevisionId !== expected.revisionId ||
+            freshScoreHash !== expected.scoreHash ||
+            freshMissingScorer !== expected.missingScorer
           ) {
             throw new ConflictException({
               code: 'GAME_RESULT_READ_STALE',
@@ -483,8 +563,22 @@ export class TournamentOperationsBoardService {
         liveWarnings.push('LINEUP_NOT_SUBMITTED');
       }
 
-      // Review finding #5: one hash covering every persisted input that can move this item's
-      // stable fields -- see the "Incremental key" doc section above.
+      // Review finding #5 / Task 18 review P0-5: one hash covering every persisted input that can
+      // move this item's stable fields -- see the "Incremental key" doc section above.
+      //
+      // P0-5 fix: `revisionId` alone is a proxy for "which revision is official", not for that
+      // revision's OWN content -- it only moves when a DIFFERENT revision becomes official. If the
+      // SAME official revision's `score`/`missingScorer` were ever changed in place (no production
+      // write path does this today -- every score write goes through
+      // `V1GameResultRevision.create()`, never a post-creation `update()` of those two columns, see
+      // games.service.ts -- but nothing at the schema or transaction level forbids a future/direct
+      // write from doing so), `items[].currentScore`/`items[].warnings`'s `MISSING_SCORER` entry
+      // would change while this hash and the page `watermark` derived from it stayed identical,
+      // silently breaking the incremental-diff contract this section documents. Hash the actual
+      // (canonicalized, so jsonb key-order alone can never move this hash) `score`/`missingScorer`
+      // values directly instead of only their revision-identity proxy.
+      const currentScoreForHash = canonicalizeForHash(row.game?.currentOfficialRevision?.score ?? null);
+      const missingScorerForHash = row.game?.currentOfficialRevision?.missingScorer ?? null;
       const stableRevision = createHash('sha256')
         .update(
           JSON.stringify([
@@ -493,6 +587,8 @@ export class TournamentOperationsBoardService {
             gameVersion,
             gameUpdatedAtMs,
             revisionId,
+            currentScoreForHash,
+            missingScorerForHash,
             escalationSummary.maxVersion,
             escalationSummary.maxUpdatedAtMs,
           ]),
@@ -551,6 +647,80 @@ export class TournamentOperationsBoardService {
   private encodeWatermark(entries: ReadonlyArray<{ fixtureId: string; stableRevision: string }>): string {
     const hash = createHash('sha256').update(JSON.stringify(entries)).digest('hex');
     return Buffer.from(JSON.stringify({ h: hash })).toString('base64url');
+  }
+
+  /** Task 18 review P0-2: re-reads the EXACT admin/assignment row `principal` was decided from,
+   * inside `tx` (this method's caller's own transaction, as its first statement), and denies
+   * unless it is still exactly as valid as it was when `TournamentStaffGuard` made its decision --
+   * closing the window between the guard's decision and this transaction's own snapshot.
+   *
+   * Deliberately UNLOCKED (no `FOR SHARE`), unlike `TournamentStaffAccessService.assertAccess()`'s
+   * own P0-3 fix: this method's caller (`list()`) runs inside a `RepeatableRead` transaction, and
+   * `RepeatableRead` raises a serialization-failure error (Postgres `40001`) if a locking read
+   * (`FOR SHARE`/`FOR UPDATE`) has to wait on a row a concurrent transaction then commits a change
+   * to -- turning a clean, expected "someone revoked you" outcome into an unexpected 500. That
+   * lock is the right tool for P0-3's fields-service writes (which run under the DEFAULT `READ
+   * COMMITTED` isolation, where a locking read simply re-reads the latest committed row with no
+   * such error) but wrong here. A plain, unlocked read as literally this transaction's first
+   * statement already closes the main gap this fix targets (a revoke that fully committed before
+   * this transaction's own `RepeatableRead` snapshot was taken is always observed here) without
+   * that failure mode. */
+  private async reverifyPrincipal(
+    tx: Tx,
+    tournamentId: string,
+    principal: TournamentStaffPrincipal,
+    now: Date,
+  ): Promise<void> {
+    if (principal.tournamentId !== tournamentId) {
+      this.denyStalePrincipal();
+    }
+    if (principal.assignmentId !== null) {
+      const assignment = await tx.v1TournamentStaffAssignment.findUnique({
+        where: { id: principal.assignmentId },
+        select: { tournamentId: true, userId: true, version: true, revokedAt: true, expiresAt: true },
+      });
+      const stillValid =
+        assignment !== null &&
+        assignment.tournamentId === principal.tournamentId &&
+        assignment.userId === principal.userId &&
+        assignment.version === principal.assignmentVersion &&
+        assignment.revokedAt === null &&
+        (assignment.expiresAt === null || assignment.expiresAt > now);
+      if (!stillValid) {
+        this.denyStalePrincipal();
+      }
+      return;
+    }
+
+    // `assignmentId === null` only ever means the platform-admin bypass (see
+    // TournamentStaffAccessService.assertAccess()) -- re-verify that admin grant is still active
+    // too, closing the same TOCTOU for that path.
+    const admin = await tx.v1AdminUser.findUnique({
+      where: { userId: principal.userId },
+      select: {
+        status: true,
+        revokedAt: true,
+        adminRole: true,
+        user: { select: { accountStatus: true } },
+      },
+    });
+    const stillActive =
+      admin !== null &&
+      admin.status === 'active' &&
+      admin.revokedAt === null &&
+      admin.user.accountStatus === 'active' &&
+      (admin.adminRole === 'owner' || admin.adminRole === 'ops');
+    if (!stillActive) {
+      this.denyStalePrincipal();
+    }
+  }
+
+  private denyStalePrincipal(): never {
+    throw new ForbiddenException({
+      code: 'STAFF_SCOPE_DENIED',
+      message: '스태프 권한이 만료되었거나 취소됐어요. 새로고침 후 다시 시도해주세요.',
+      details: { reason: 'STALE_PRINCIPAL' },
+    });
   }
 
   private async latestLineupStateBySide(

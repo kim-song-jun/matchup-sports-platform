@@ -25,6 +25,8 @@ import {
   type GameReadAuthorityPort,
   type GameReadAuthorityResult,
 } from '../../src/tournament-operations/board/game-read-authority.port';
+import { TournamentOperationsBoardController } from '../../src/tournament-operations/board/tournament-operations-board.controller';
+import type { ListTournamentOperationsQueryDto } from '../../src/tournament-operations/board/dto/list-operations-query.dto';
 import { TournamentOperationsBoardModule } from '../../src/tournament-operations/board/tournament-operations-board.module';
 import { TournamentOperationsBoardService } from '../../src/tournament-operations/board/tournament-operations-board.service';
 import type {
@@ -37,8 +39,8 @@ import { TournamentFixtureLineupService } from '../../src/tournament-operations/
 import type { GrantTournamentStaffDto } from '../../src/tournament-operations/staff/dto/grant-tournament-staff.dto';
 import type { RevokeTournamentStaffDto } from '../../src/tournament-operations/staff/dto/revoke-tournament-staff.dto';
 import { TournamentOperationsStaffService } from '../../src/tournament-operations/staff/tournament-operations-staff.service';
-import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
-import { TournamentStaffGuard } from '../../src/tournaments/staff/tournament-staff.guard';
+import { TournamentStaffAccessService, type TournamentStaffPrincipal } from '../../src/tournaments/staff/tournament-staff-access.service';
+import { TournamentStaffGuard, type TournamentStaffRequest } from '../../src/tournaments/staff/tournament-staff.guard';
 import { TournamentStaffService } from '../../src/tournaments/staff/tournament-staff.service';
 
 const ids = {
@@ -702,7 +704,13 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     expect(hashBody(stableBodyOf(compare))).toBe(hashBody(stableBodyOf(legacy)));
     expect(hashBody(stableBodyOf(rolled))).toBe(hashBody(stableBodyOf(legacy)));
 
+    // Task 18 review P0-1: the required sequence is legacy -> compare -> ROLLBACK-to-legacy, with
+    // a fresh re-query AFTER the rollback -- not legacy -> compare -> 'new' (a third, DIFFERENT
+    // mode, never actually re-verifying that flipping GAME_READ back to 'legacy' reproduces the
+    // original baseline). Query again now that the flag is back to 'legacy'.
     await setGameReadFlag('legacy');
+    const rolledBackToLegacy = await okBoard.list(ids.detailTournament, { limit: 50 }, safeNow);
+    expect(hashBody(stableBodyOf(rolledBackToLegacy))).toBe(hashBody(stableBodyOf(legacy)));
   });
 
   it('fails closed with 409 GAME_RESULT_READ_MISMATCH under GAME_READ=compare when the seam reports a mismatch, called with the exact expected revision/score (regression for review finding #12.2)', async () => {
@@ -771,6 +779,79 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     // describe blocks which never touch this game) are unaffected by this test's induced race.
     await prisma.v1Game.update({ where: { id: overdueGameId }, data: { version: 0 } });
     await setGameReadFlag('legacy');
+  });
+
+  it('fails closed with 500 GAME_READ_AUTHORITY_INVALID_RESULT when the compare-mode authority returns an outcome that is neither "ok" nor "mismatch", instead of silently treating it as approval (Task 18 review P0-4)', async () => {
+    // `GameReadAuthorityResult` is a two-member TypeScript union, but `GAME_READ_AUTHORITY` is an
+    // injected seam -- nothing at RUNTIME stops a misbehaving (or future/buggy Task 10) comparator
+    // from returning something outside that union. The pre-fix code was
+    // `if (outcome === 'mismatch') throw; else approve` -- an `else`-less check that treated every
+    // non-'mismatch' value, including one that isn't 'ok' either, as approval. `as unknown as
+    // GameReadAuthorityResult` below is deliberate: it is the only way to construct this value at
+    // all, since the type system correctly forbids it directly -- exactly what a real runtime
+    // violation of the contract would look like from the board's point of view.
+    const rogueAuthority: GameReadAuthorityPort = {
+      async resolve(): Promise<GameReadAuthorityResult> {
+        return { outcome: 'unrecognized-outcome' } as unknown as GameReadAuthorityResult;
+      },
+    };
+    const rogueBoard = new TournamentOperationsBoardService(prisma, rogueAuthority);
+    await setGameReadFlag('compare');
+
+    const caught = await captureFailure(() => rogueBoard.list(ids.detailTournament, { limit: 50 }, safeNow));
+    expectHttpError(caught, 500, 'GAME_READ_AUTHORITY_INVALID_RESULT');
+
+    await setGameReadFlag('legacy');
+  });
+
+  it('fails closed with 409 GAME_RESULT_READ_STALE when the SAME official revision\'s score/missingScorer changes between the compare-mode authority decision and the post-resolution freshness recheck, even though V1Game.version/currentOfficialRevisionId never move (Task 18 review P0-4 score-only race)', async () => {
+    // The pre-fix post-resolution CAS recheck only compared V1Game.version/
+    // currentOfficialRevisionId -- both are proxies for "which revision is official", not that
+    // revision's OWN content. This fake lands deterministically in the gap the fix closes: it
+    // mutates the CURRENT official revision's score/missingScorer IN PLACE (same revision id, same
+    // V1Game.version) from inside resolve() itself, before returning 'ok'. No production write path
+    // does this today (every real score write goes through V1GameResultRevision.create(), see
+    // games.service.ts) -- this proves the recheck itself, independent of whether anything can
+    // reach it yet.
+    const staleScoreAuthority = new RecordingGameReadAuthority({ outcome: 'ok' }, async () => {
+      await prisma.v1GameResultRevision.update({
+        where: { id: overdueRevisionId },
+        data: { score: { home: 9, away: 9 }, missingScorer: false },
+      });
+    });
+    const staleScoreBoard = new TournamentOperationsBoardService(prisma, staleScoreAuthority);
+    await setGameReadFlag('compare');
+
+    const caught = await captureFailure(() => staleScoreBoard.list(ids.detailTournament, { limit: 50 }, safeNow));
+    expectHttpError(caught, 409, 'GAME_RESULT_READ_STALE');
+
+    // Restore the seeded score/missingScorer so later tests/re-runs are unaffected.
+    await prisma.v1GameResultRevision.update({
+      where: { id: overdueRevisionId },
+      data: { score: { home: 1, away: 0 }, missingScorer: true },
+    });
+    await setGameReadFlag('legacy');
+  });
+
+  it('fails closed with 409 GAME_RESULT_READ_STALE when the post-resolution freshness recheck cannot find one of the games the authority already approved at all (Task 18 review P0-4, "expected game missing from fresh results")', async () => {
+    // The pre-fix recheck only iterated whatever rows the fresh `v1Game.findMany()` actually
+    // returned -- an expected game silently absent from that result set was never checked against
+    // at all (the loop simply never visited it), so it passed by omission instead of failing
+    // closed. Spying the fresh read to return zero rows (rather than deleting a real V1Game, which
+    // this schema's FK constraints do not allow while result revisions reference it) deterministically
+    // exercises that exact gap without depending on any real deletion path existing.
+    const authority = new RecordingGameReadAuthority({ outcome: 'ok' });
+    const board = new TournamentOperationsBoardService(prisma, authority);
+    await setGameReadFlag('compare');
+
+    const findManySpy = jest.spyOn(prisma.v1Game, 'findMany').mockResolvedValueOnce([]);
+    try {
+      const caught = await captureFailure(() => board.list(ids.detailTournament, { limit: 50 }, safeNow));
+      expectHttpError(caught, 409, 'GAME_RESULT_READ_STALE');
+    } finally {
+      findManySpy.mockRestore();
+      await setGameReadFlag('legacy');
+    }
   });
 
   it('fails closed with 500 GAME_READ_FLAG_INVALID when V1GameOperationFlag(GAME_READ) holds an unrecognized value, instead of silently defaulting to non-compare (review finding #4)', async () => {
@@ -1412,6 +1493,132 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
     expect(tieOrderFirst).toEqual(tieFieldIds);
     expect(tieOrderSecond).toEqual(tieFieldIds);
   });
+
+  it("TournamentStaffAccessService.assertAccess() row-locks the candidate assignment row when given a transaction client, so a concurrent revoke cannot commit in the gap between this decision and the caller's own subsequent write (Task 18 review P0-3)", async () => {
+    const lockDirectorId = randomUUID();
+    await fieldsPrisma.v1User.create({
+      data: {
+        id: lockDirectorId,
+        email: `task18-p03-lock-${lockDirectorId}@example.test`,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+      },
+    });
+    const assignment = await fieldsPrisma.v1TournamentStaffAssignment.create({
+      data: {
+        tournamentId: fieldIds.tournament,
+        userId: lockDirectorId,
+        role: V1TournamentStaffRole.TOURNAMENT_DIRECTOR,
+        grantedByUserId: fieldIds.platformOps,
+      },
+    });
+    const access = new TournamentStaffAccessService(fieldsPrisma);
+
+    const order: string[] = [];
+    let releaseHold: (() => void) | undefined;
+    const holdReleased = new Promise<void>((resolve) => {
+      releaseHold = resolve;
+    });
+    let signalLockAcquired: (() => void) | undefined;
+    const lockAcquired = new Promise<void>((resolve) => {
+      signalLockAcquired = resolve;
+    });
+
+    // Simulates TournamentOperationsFieldsService.assignFixtureField()'s own `$transaction`:
+    // assertAccess(input, tx) takes its `FOR SHARE` lock on the assignment row as literally its
+    // first statement, then this transaction is deliberately held open (not yet committed) until
+    // this test explicitly releases it below.
+    const holdingTransaction = fieldsPrisma.$transaction(async (tx) => {
+      await access.assertAccess(
+        { userId: lockDirectorId, action: 'event_reverse', resource: { tournamentId: fieldIds.tournament } },
+        tx,
+      );
+      order.push('lock-acquired');
+      signalLockAcquired?.();
+      await holdReleased;
+      order.push('holding-tx-committing');
+    });
+
+    // Deterministic (not a timing guess): resolves exactly when the lock statement has completed.
+    await lockAcquired;
+
+    const revokePromise = fieldsPrisma.v1TournamentStaffAssignment
+      .updateMany({
+        where: { id: assignment.id, revokedAt: null },
+        data: { revokedAt: new Date(), version: { increment: 1 } },
+      })
+      .then((result) => {
+        order.push('revoke-committed');
+        return result;
+      });
+
+    // The revoke must NOT be able to complete while the holding transaction still holds its
+    // `FOR SHARE` lock on this exact assignment row -- give it ample time to (incorrectly) race
+    // through if the pre-fix, unlocked read were still in place.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(order).toEqual(['lock-acquired']); // still just one entry -- the revoke is still blocked.
+
+    releaseHold?.();
+    await holdingTransaction;
+    const revokeResult = await revokePromise;
+
+    expect(order).toEqual(['lock-acquired', 'holding-tx-committing', 'revoke-committed']);
+    expect(revokeResult.count).toBe(1);
+  });
+
+  it('assignFixtureField passes its OWN transaction client into TournamentStaffAccessService.assertAccess() (not the root PrismaService, and not omitted), so the authorization recheck row-locks against the same connection as the fixture write (Task 18 review P0-3)', async () => {
+    const access = (fieldsService as unknown as { access: TournamentStaffAccessService }).access;
+    const seenClients: unknown[] = [];
+    const originalAssertAccess = access.assertAccess.bind(access);
+    const spy = jest.spyOn(access, 'assertAccess').mockImplementation(async (input, client) => {
+      seenClients.push(client);
+      return originalAssertAccess(input, client);
+    });
+
+    try {
+      const wiringFixtureId = randomUUID();
+      const wiringFieldId = randomUUID();
+      await fieldsPrisma.v1TournamentFixture.create({
+        data: {
+          id: wiringFixtureId,
+          tournamentId: fieldIds.tournament,
+          round: 'group',
+          fixtureNumber: 9001,
+          competitionConfigVersionId: (
+            await fieldsPrisma.v1Tournament.findUniqueOrThrow({
+              where: { id: fieldIds.tournament },
+              select: { competitionConfigVersionId: true },
+            })
+          ).competitionConfigVersionId,
+        },
+      });
+      await fieldsPrisma.v1TournamentField.create({
+        data: {
+          id: wiringFieldId,
+          tournamentId: fieldIds.tournament,
+          scopeKey: `p03-wiring-${wiringFieldId}`,
+          name: 'P0-3 wiring court',
+        },
+      });
+
+      await fieldsService.assignFixtureField(
+        fieldIds.director,
+        fieldIds.tournament,
+        wiringFixtureId,
+        { fieldId: wiringFieldId } as AssignTournamentFixtureFieldDto,
+        { requestId: randomUUID() },
+      );
+
+      expect(seenClients).toHaveLength(1);
+      // The pre-fix call site was `this.access.assertAccess({...})` -- a single argument, so
+      // `client` here would have been `undefined`. A real transaction client is also never the
+      // literal root `fieldsPrisma` instance.
+      expect(seenClients[0]).not.toBeUndefined();
+      expect(seenClients[0]).not.toBe(fieldsPrisma);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1872,6 +2079,7 @@ const stableRevIds = {
 describe('Task 18 operations board items[].stableRevision incremental key (review finding #5)', () => {
   let board: TournamentOperationsBoardService;
   let escalationId: string;
+  let officialRevisionId: string;
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
@@ -1963,6 +2171,7 @@ describe('Task 18 operations board items[].stableRevision incremental key (revie
       },
     });
     escalationId = escalation.id;
+    officialRevisionId = revision.id;
 
     await stableRevPrisma.v1GameOperationFlag.upsert({
       where: { key: 'GAME_READ' },
@@ -2044,6 +2253,48 @@ describe('Task 18 operations board items[].stableRevision incremental key (revie
     expect(withGame3.revisionId).toBe(withGame0.revisionId); // currentOfficialRevisionId UNCHANGED
     expect(withGame3.stableRevision).not.toBe(withGame0.stableRevision); // yet the key MOVES
     expect(snapshot3.watermark).not.toBe(snapshot2.watermark);
+  });
+
+  it("moves stableRevision (and the page watermark) when the CURRENT official revision's own score/missingScorer changes in place, even though V1TournamentFixture.updatedAt/V1Game.version/V1Game.currentOfficialRevisionId never move (Task 18 review P0-5)", async () => {
+    // Pre-fix, `stableRevision` hashed only `currentOfficialRevisionId` (a proxy for "WHICH
+    // revision is official"), never the revision's own `score`/`missingScorer` content -- so a
+    // write that changes those two columns on the SAME revision row, without creating a new
+    // revision or touching V1Game at all, moved `items[].currentScore`/`warnings` in the response
+    // while `stableRevision` (and the watermark derived from it) silently stayed identical. No
+    // production write path does this today (every real score write goes through
+    // `V1GameResultRevision.create()`, see games.service.ts) -- this proves the hash itself now
+    // covers that content directly, independent of whether anything can reach it yet.
+    const before = await board.list(stableRevIds.tournament, { limit: 50 });
+    const withGameBefore = before.items.find((item) => item.fixtureId === stableRevIds.fixtureWithGame)!;
+    expect(withGameBefore.currentScore).toEqual({ home: 2, away: 1 });
+    expect(withGameBefore.warnings).not.toContain('MISSING_SCORER');
+
+    await stableRevPrisma.v1GameResultRevision.update({
+      where: { id: officialRevisionId },
+      data: { score: { home: 9, away: 9 }, missingScorer: true },
+    });
+
+    const after = await board.list(stableRevIds.tournament, { limit: 50 });
+    const withGameAfter = after.items.find((item) => item.fixtureId === stableRevIds.fixtureWithGame)!;
+
+    // The mutation really did take effect and really is reflected in the response -- otherwise a
+    // pass below would be vacuous (nothing to detect in the first place).
+    expect(withGameAfter.currentScore).toEqual({ home: 9, away: 9 });
+    expect(withGameAfter.warnings).toContain('MISSING_SCORER');
+    // V1Game itself was never touched by this mutation -- version/currentOfficialRevisionId stay
+    // put, which is exactly why the pre-fix hash (built only from those two) could not move.
+    expect(withGameAfter.version).toBe(withGameBefore.version);
+    expect(withGameAfter.revisionId).toBe(withGameBefore.revisionId);
+    // Yet the incremental key -- and the page watermark derived from it -- MUST move.
+    expect(withGameAfter.stableRevision).not.toBe(withGameBefore.stableRevision);
+    expect(after.watermark).not.toBe(before.watermark);
+
+    // Restore the seeded score/missingScorer so this describe block's own state is unaffected if
+    // Jest ever re-runs this file's tests in a different order.
+    await stableRevPrisma.v1GameResultRevision.update({
+      where: { id: officialRevisionId },
+      data: { score: { home: 2, away: 1 }, missingScorer: false },
+    });
   });
 });
 
@@ -2685,6 +2936,134 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
         timestamp: expect.any(String),
       }),
     );
+  });
+
+  it('board GET: the REAL HTTP response is byte-identical across GAME_READ legacy -> compare -> rollback-to-legacy, proven from the actual response bytes (key order preserved, no field slicing) rather than a hand-picked, re-sorted subset (Task 18 review P0-1)', async () => {
+    // `JSON.parse` (which supertest/superagent already ran to produce `res.body`) assigns own
+    // string-keyed properties in the exact order they appeared in the source text, and
+    // `JSON.stringify` re-emits own enumerable string keys in that SAME insertion order (both
+    // guaranteed by the ECMAScript spec, not an implementation detail) -- so re-serializing
+    // `res.body` this way reproduces the literal wire key ORDER and field SET the server actually
+    // sent, unlike this file's own `stableBodyOf()`/`normalized()` test helpers above, which
+    // deliberately re-sort every object's keys and hand-pick only `{items, nextCursor, watermark}`
+    // before hashing (correct for THEIR purpose -- proving the persisted-only stable body is
+    // invariant under `now` -- but unable to catch a real key-order or extra/missing-field
+    // regression in the actual wire response, or one that only exists in the real HTTP path this
+    // describe block exercises through the full guard/interceptor chain, not the service called
+    // directly).
+    const boardUrl = `/api/v1/tournament-ops/tournaments/${httpIds.tournamentA}/operations`;
+    // The only field any two calls to this endpoint may legitimately differ on is the global
+    // envelope's per-request `timestamp` (`TransformInterceptor`, shared by every v1 endpoint, not
+    // board-specific) -- stripped identically from all three bodies before comparing. `fixtureA`
+    // has no `scheduledAt` and is permanently covered by `fieldOperatorA`'s fixture scope (see this
+    // block's `beforeAll`), so its `liveWarnings` is always `[]` regardless of wall-clock time --
+    // nothing else in this response is time-relative.
+    const stripTimestamp = (body: unknown) => JSON.stringify(body).replace(/"timestamp":"[^"]*"/, '"timestamp":""');
+
+    await httpPrisma.v1GameOperationFlag.upsert({
+      where: { key: 'GAME_READ' },
+      create: { key: 'GAME_READ', value: 'legacy', ownerActor: 'platform_ops' },
+      update: { value: 'legacy' },
+    });
+    const legacy = await request(app.getHttpServer()).get(boardUrl).set(withUser(httpIds.directorA)).expect(200);
+
+    await httpPrisma.v1GameOperationFlag.update({ where: { key: 'GAME_READ' }, data: { value: 'compare' } });
+    // fixtureA's game has no official result revision at all (no lineup/result was ever
+    // submitted for it in this describe block's fixtures), so the board never calls
+    // GAME_READ_AUTHORITY.resolve() for this page -- 'compare' is safe here even though the real
+    // AppModule wires the throwing default DirectGameReadAuthorityService (Task 10's real
+    // comparator is not present in this worktree).
+    const compare = await request(app.getHttpServer()).get(boardUrl).set(withUser(httpIds.directorA)).expect(200);
+
+    await httpPrisma.v1GameOperationFlag.update({ where: { key: 'GAME_READ' }, data: { value: 'legacy' } });
+    const rolledBackToLegacy = await request(app.getHttpServer())
+      .get(boardUrl)
+      .set(withUser(httpIds.directorA))
+      .expect(200);
+
+    expect(stripTimestamp(compare.body)).toBe(stripTimestamp(legacy.body));
+    expect(stripTimestamp(rolledBackToLegacy.body)).toBe(stripTimestamp(legacy.body));
+  });
+
+  it('TournamentOperationsBoardController forwards the guard-established request.tournamentStaff principal into board.list() as a 4th argument, instead of discarding it (Task 18 review P0-2)', async () => {
+    // Unit-style, deterministic proof of the controller-side wiring specifically -- the service-
+    // level test below proves the recheck itself protects against a stale principal, but that test
+    // calls TournamentOperationsBoardService directly and would not notice a regression where the
+    // CONTROLLER stops forwarding request.tournamentStaff at all (the pre-fix
+    // `return this.board.list(tournamentId, query);`, discarding the guard's own decision).
+    const fakePrincipal: TournamentStaffPrincipal = {
+      userId: 'controller-wiring-user',
+      role: 'tournament_director',
+      tournamentId: httpIds.tournamentA,
+      fixtureId: null,
+      fieldOrCourtId: null,
+      authorizationSubject: 'assignment:controller-wiring-fake@0',
+      assignmentId: 'controller-wiring-fake-assignment',
+      assignmentVersion: 0,
+    };
+    const listSpy = jest
+      .fn()
+      .mockResolvedValue({ items: [], nextCursor: null, watermark: 'w', liveWarnings: [] });
+    const controller = new TournamentOperationsBoardController({
+      list: listSpy,
+    } as unknown as TournamentOperationsBoardService);
+    const fakeRequest = { tournamentStaff: fakePrincipal } as unknown as TournamentStaffRequest;
+    const query = { limit: 50 } as ListTournamentOperationsQueryDto;
+
+    await controller.list(httpIds.tournamentA, query, fakeRequest);
+
+    expect(listSpy).toHaveBeenCalledWith(httpIds.tournamentA, query, undefined, fakePrincipal);
+  });
+
+  it('board.list() denies STAFF_SCOPE_DENIED when the caller-supplied principal\'s own assignment has since been revoked, instead of trusting a principal decided before this call (Task 18 review P0-2)', async () => {
+    // A fresh, disposable director assignment for tournamentA -- NOT httpIds.directorA's shared
+    // assignment used by every other test in this describe block -- so revoking it here cannot
+    // affect any other test.
+    const staleDirectorId = randomUUID();
+    await httpPrisma.v1User.create({
+      data: {
+        id: staleDirectorId,
+        email: `task18-p02-${staleDirectorId}@example.test`,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+      },
+    });
+    const assignment = await httpPrisma.v1TournamentStaffAssignment.create({
+      data: {
+        tournamentId: httpIds.tournamentA,
+        userId: staleDirectorId,
+        role: V1TournamentStaffRole.TOURNAMENT_DIRECTOR,
+        grantedByUserId: httpIds.platformOps,
+      },
+    });
+    const principal: TournamentStaffPrincipal = {
+      userId: staleDirectorId,
+      role: 'tournament_director',
+      tournamentId: httpIds.tournamentA,
+      fixtureId: null,
+      fieldOrCourtId: null,
+      authorizationSubject: `assignment:${assignment.id}@${assignment.version}`,
+      assignmentId: assignment.id,
+      assignmentVersion: assignment.version,
+    };
+    const board = new TournamentOperationsBoardService(httpPrisma, new DirectGameReadAuthorityService());
+
+    // This principal is still fully valid right now -- the service must serve it normally.
+    await expect(board.list(httpIds.tournamentA, { limit: 50 }, undefined, principal)).resolves.toEqual(
+      expect.objectContaining({ items: expect.any(Array) }),
+    );
+
+    // Revoke it out-of-band -- simulating a revoke committing after TournamentStaffGuard already
+    // decided this exact principal, but before (or during) the board's own transaction.
+    await httpPrisma.v1TournamentStaffAssignment.update({
+      where: { id: assignment.id },
+      data: { revokedAt: new Date(), version: { increment: 1 } },
+    });
+
+    const caught = await captureFailure(() =>
+      board.list(httpIds.tournamentA, { limit: 50 }, undefined, principal),
+    );
+    expectHttpError(caught, 403, 'STAFF_SCOPE_DENIED');
   });
 
   // ── Fields POST (real guards) ────────────────────────────────────────────

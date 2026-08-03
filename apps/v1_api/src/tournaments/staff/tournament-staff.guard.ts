@@ -20,7 +20,10 @@ import {
   type TournamentStaffResource,
 } from './tournament-staff-access.service';
 
-type TournamentStaffRequest = Request & {
+/** Exported (Task 18 review P0-2) so downstream controllers -- e.g.
+ * `TournamentOperationsBoardController` -- can type `@Req()` against the exact shape this guard
+ * populates, instead of redeclaring an equivalent type that could drift from this one. */
+export type TournamentStaffRequest = Request & {
   readonly v1User?: V1AuthUser;
   tournamentStaff?: TournamentStaffPrincipal;
 };

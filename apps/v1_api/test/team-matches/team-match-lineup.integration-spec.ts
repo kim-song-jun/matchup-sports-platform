@@ -254,6 +254,30 @@ describe('Task 14 team-match lineup builder', () => {
     expect(await currentVersion(ids.hostOwner, ids.futureMatch)).toBe(version);
   });
 
+  // Task 15 blocker-1 regression: the client used to lose a placed roster member's userId on
+  // every hydrate (reopen/conflict-reload) — see lineup.test.tsx's "hydrate-then-add" test —
+  // which could let a rebuilt payload carry the same userId twice (once linked, once re-added
+  // as if unplaced). The server is the final backstop: reverting this guard makes this test fail.
+  it('rejects a save where the same linked userId appears twice across starters and bench', async () => {
+    const version = await currentVersion(ids.hostOwner, ids.futureMatch);
+
+    const duplicateParticipant = await captureFailure(() =>
+      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, undefined, {
+        expectedVersion: version,
+        starters: [
+          { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
+          { userId: ids.hostP2, jerseyNumber: 2 },
+          { userId: ids.hostP3, jerseyNumber: 3 },
+        ],
+        bench: [{ userId: ids.hostP2, jerseyNumber: 12 }],
+      }),
+    );
+    expectHttpCode(duplicateParticipant, 422, 'LINEUP_DUPLICATE_PARTICIPANT');
+
+    // The rejected attempt must not have created a new revision.
+    expect(await currentVersion(ids.hostOwner, ids.futureMatch)).toBe(version);
+  });
+
   it('rejects a non-member and a non-attending member, but allows an unlinked guest', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 

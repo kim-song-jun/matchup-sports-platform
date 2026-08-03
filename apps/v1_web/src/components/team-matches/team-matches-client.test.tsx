@@ -27,6 +27,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatch: useV1TeamMatchMock,
   useV1TeamMatchEligibility: useV1TeamMatchEligibilityMock,
   useV1TeamMatchApplications: () => ({ data: undefined, isPending: false }),
+  // 라인업 CTA(Task 15) 계산용 — 이 스위트는 GA 이벤트만 검증하므로 소속 팀 없음으로 고정.
+  useV1MyTeams: () => ({ data: undefined, isPending: false }),
   useV1ApplyTeamMatch: () => ({ mutateAsync: applyTeamMatchMutateAsync, isPending: false }),
   useV1ApproveTeamMatchApplication: () => ({ mutate: vi.fn(), isPending: false }),
   useV1RejectTeamMatchApplication: () => ({ mutate: vi.fn(), isPending: false }),

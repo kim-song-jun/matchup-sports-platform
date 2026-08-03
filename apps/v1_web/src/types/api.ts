@@ -973,6 +973,85 @@ export type V1MyTeamMatch = {
   detailRoute: string;
 };
 
+// ── 팀 매치 라인업 (Task 14/15) ──
+// GET .../lineup 은 호출자 소속 팀(내 팀) 쪽 사이드만 돌려준다 — 상대팀 라인업을 읽는
+// 엔드포인트는 없다(정정 요청은 내용을 보지 않고 사유만 남기는 blind 액션).
+export type V1TeamMatchLineupRole = 'team_owner' | 'team_manager';
+export type V1TeamMatchLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
+
+export type V1TeamMatchLineupStarter = {
+  displayName: string;
+  jerseyNumber: number | null;
+  position: string | null;
+  goalkeeper: boolean;
+};
+
+export type V1TeamMatchLineupBenchEntry = {
+  displayName: string;
+  jerseyNumber: number | null;
+};
+
+export type V1TeamMatchLineup = {
+  teamMatchId: string;
+  gameId: string;
+  sideId: string;
+  role: V1TeamMatchLineupRole;
+  lineupId: string | null;
+  // revision은 이 라인업 계보의 CAS 토큰(expectedVersion으로 그대로 재사용). 매 저장마다
+  // 새 행으로 supersede되므로 row 자체의 `version`과는 별개다 — team-match-lineup.service.ts 참조.
+  revision: number;
+  state: V1TeamMatchLineupState;
+  version: number;
+  publicLineupAt: string | null;
+  starters: V1TeamMatchLineupStarter[];
+  bench: V1TeamMatchLineupBenchEntry[];
+};
+
+// 저장 요청 한 명분 — userId(연동된 활성 팀원) 또는 displayName(비연동 게스트) 중 하나는
+// 반드시 있어야 한다(서버 XOR 검증, 프론트는 이 계약을 어기지 않도록 뷰모델에서 보장).
+export type V1TeamMatchLineupParticipantInput = {
+  userId?: string;
+  displayName?: string;
+  jerseyNumber?: number;
+  position?: string;
+  goalkeeper?: boolean;
+};
+
+// `formation`은 의도적으로 없다 — `V1GameLineup`에 저장할 컬럼이 없고, 이번 변경 범위에서는
+// 마이그레이션을 추가할 수 없어 받아도 버려질 뿐이다(Task 15 blocker-2 report 참고).
+export type V1TeamMatchLineupSavePayload = {
+  expectedVersion: number;
+  starters: V1TeamMatchLineupParticipantInput[];
+  bench: V1TeamMatchLineupParticipantInput[];
+};
+
+export type V1TeamMatchLineupSaveResult = {
+  teamMatchId: string;
+  gameId: string;
+  sideId: string;
+  lineupId: string;
+  revision: number;
+  state: V1TeamMatchLineupState;
+  version: number;
+  replayed: boolean;
+};
+
+export type V1TeamMatchLineupSubmitResult = V1TeamMatchLineupSaveResult & {
+  publicLineupAt: string | null;
+};
+
+export type V1TeamMatchLineupChangeRequestResult = {
+  teamMatchId: string;
+  gameId: string;
+  sideId: string;
+  lineupId: string;
+  revision: number;
+  state: 'change_requested';
+  version: number;
+  reason: string;
+  replayed: boolean;
+};
+
 export type V1ReviewSourceType = 'match' | 'team_match' | 'tournament_fixture';
 export type V1ReviewTargetType = 'user' | 'team';
 

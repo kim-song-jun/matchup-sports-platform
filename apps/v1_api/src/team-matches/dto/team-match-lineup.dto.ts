@@ -55,10 +55,10 @@ export class SaveTeamMatchLineupDto {
   @Min(0)
   expectedVersion!: number;
 
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  formation?: string;
+  // `formation`은 의도적으로 없다: `V1GameLineup`에 이를 저장할 컬럼이 없고, 이번 변경
+  // 범위에서는 마이그레이션을 추가할 수 없어 받아도 저장·응답 어디에도 반영할 방법이
+  // 없다 — 검증만 통과시키고 조용히 버리는 필드를 DTO에 남겨두지 않는다
+  // (Task 15 blocker-2 report 참고).
 
   @IsArray()
   @ValidateNested({ each: true })

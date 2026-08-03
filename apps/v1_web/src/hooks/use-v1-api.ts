@@ -128,6 +128,11 @@ import type {
   V1TeamMatchApplicationsPage,
   V1TeamMatchEdit,
   V1TeamMatchEligibility,
+  V1TeamMatchLineup,
+  V1TeamMatchLineupChangeRequestResult,
+  V1TeamMatchLineupSavePayload,
+  V1TeamMatchLineupSaveResult,
+  V1TeamMatchLineupSubmitResult,
   V1TeamMatchMutationPayload,
   V1TeamMatchMutationResult,
   V1TeamMatchUpdatePayload,
@@ -1172,6 +1177,60 @@ export function useV1MyTeamMatches(filters?: ListFilters) {
   return useQuery({
     queryKey: [...v1Keys.all, 'me', 'team-matches', filters ?? {}] as const,
     queryFn: () => v1Get<CursorPage<V1MyTeamMatch>>('/me/team-matches', filters),
+  });
+}
+
+// ── 팀 매치 라인업 (Task 15) ──
+// GET은 호출자 소속 팀(내 팀) 쪽 사이드만 돌려준다 — 403/404는 재시도해도 같은 답이므로
+// retry: false (V1CheckEmail 등 다른 read 계열과 동일 컨벤션).
+export function useV1TeamMatchLineup(teamMatchId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] as const,
+    queryFn: () => v1Get<V1TeamMatchLineup>(`/team-matches/${teamMatchId}/lineup`),
+    enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1SaveTeamMatchLineup(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; payload: V1TeamMatchLineupSavePayload }) =>
+      v1Put<V1TeamMatchLineupSaveResult>(`/team-matches/${teamMatchId}/lineup`, vars.payload, {
+        headers: { 'Idempotency-Key': vars.idempotencyKey },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+    },
+  });
+}
+
+export function useV1SubmitTeamMatchLineup(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; expectedVersion: number }) =>
+      v1Post<V1TeamMatchLineupSubmitResult>(
+        `/team-matches/${teamMatchId}/lineup/submit`,
+        { expectedVersion: vars.expectedVersion },
+        { headers: { 'Idempotency-Key': vars.idempotencyKey } },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+    },
+  });
+}
+
+// 상대팀 라인업을 재작성(초안화)하라고 요청한다 — 대상은 항상 "내가 아닌 쪽" 사이드이며,
+// 그 사이드를 조회하는 API가 없어 내용은 볼 수 없고 사유만 남길 수 있는 blind 액션이다
+// (lineup-client.tsx의 안내 문구 참고). 성공해도 내 사이드 쿼리는 바뀌지 않으므로 invalidate하지 않는다.
+export function useV1RequestTeamMatchLineupChange(teamMatchId: string) {
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; expectedVersion: number; reason: string }) =>
+      v1Post<V1TeamMatchLineupChangeRequestResult>(
+        `/team-matches/${teamMatchId}/lineup/change-request`,
+        { expectedVersion: vars.expectedVersion, reason: vars.reason },
+        { headers: { 'Idempotency-Key': vars.idempotencyKey } },
+      ),
   });
 }
 

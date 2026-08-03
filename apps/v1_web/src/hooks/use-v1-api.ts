@@ -2560,12 +2560,13 @@ export function useV1AdminAddPlayer(registrationId: string) {
   return useMutation({
     mutationFn: (body: { userId: string; realName: string }) =>
       v1Post(`/admin/registrations/${registrationId}/players`, body),
-    // await 해야 버튼이 "추가 중" 에서 풀리는 시점에 새 명단이 이미 캐시에 있다. 안 그러면
-    // 버튼만 먼저 살아나 방금 넣은 선수를 한 번 더 넣으려는 클릭이 가능하다.
+    // onSuccess 가 반환하는 프라미스는 React Query 가 내부에서 await 한다(mutation.ts
+    // `await this.options.onSuccess?.(...)`) — 그래서 버튼이 "추가 중" 에서 풀리는 시점엔
+    // 이미 아래 무효화가 끝나 있다. 안 그러면 버튼만 먼저 살아나 방금 넣은 선수를 한 번 더
+    // 넣으려는 클릭이 가능하다.
     // 자격 판정(alreadyOnRoster/eligible)이 명단에서 파생되므로 선택 목록도 함께 턴다.
     // roster 키('…/players')는 eligible 키('…/eligible-players')의 접두사가 아니라서
     // 자동으로 딸려오지 않는다 — 빠뜨리면 방금 추가한 팀원이 계속 선택 가능해 보인다.
-    // await 해야 버튼이 "추가 중" 에서 풀리는 시점에 새 명단이 이미 캐시에 있다.
     onSuccess: () => invalidateRosterViews(queryClient, null, registrationId),
   });
 }

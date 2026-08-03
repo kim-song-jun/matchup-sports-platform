@@ -1,0 +1,153 @@
+import { Injectable } from '@nestjs/common';
+import { V1TournamentStaffRole } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import {
+  TournamentStaffAccessService,
+} from '../../tournaments/staff/tournament-staff-access.service';
+import {
+  TournamentStaffService,
+  type TournamentStaffAssignmentResult,
+  type TournamentStaffAuditContext,
+} from '../../tournaments/staff/tournament-staff.service';
+import type { GrantTournamentStaffDto } from './dto/grant-tournament-staff.dto';
+import type { RevokeTournamentStaffDto } from './dto/revoke-tournament-staff.dto';
+
+export type TournamentStaffAssignmentListItem = TournamentStaffAssignmentResult & {
+  readonly grantedByUserId: string | null;
+  readonly createdAt: Date;
+};
+
+const STAFF_LIST_SELECT = {
+  id: true,
+  tournamentId: true,
+  userId: true,
+  role: true,
+  fieldId: true,
+  version: true,
+  expiresAt: true,
+  revokedAt: true,
+  grantedByUserId: true,
+  createdAt: true,
+  fixtureScopes: { select: { fixtureId: true }, orderBy: { fixtureId: 'asc' as const } },
+} as const;
+
+/**
+ * List/grant/revoke orchestration for tournament staff assignments (Task 18).
+ *
+ * Reuses Task 7's TournamentStaffAccessService (read authorization) and
+ * TournamentStaffService (grant/revoke/bootstrap -- already transactional,
+ * CAS'd, and audited) wholesale. This lane does not own
+ * apps/v1_api/src/tournaments/staff/, so `listStaff` is implemented here as a
+ * local read against PrismaService directly rather than as an addition to
+ * TournamentStaffService, per the plan's guidance.
+ */
+@Injectable()
+export class TournamentOperationsStaffService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: TournamentStaffAccessService,
+    private readonly staffService: TournamentStaffService,
+  ) {}
+
+  async list(
+    userId: string,
+    tournamentId: string,
+  ): Promise<{ readonly items: readonly TournamentStaffAssignmentListItem[] }> {
+    await this.access.assertAccess({
+      userId,
+      action: 'read',
+      resource: { tournamentId },
+    });
+
+    const assignments = await this.prisma.v1TournamentStaffAssignment.findMany({
+      where: { tournamentId },
+      select: STAFF_LIST_SELECT,
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return {
+      items: assignments.map((assignment) => ({
+        id: assignment.id,
+        tournamentId: assignment.tournamentId,
+        userId: assignment.userId,
+        role: assignment.role,
+        fieldId: assignment.fieldId,
+        fixtureIds: assignment.fixtureScopes.map((scope) => scope.fixtureId),
+        version: assignment.version,
+        expiresAt: assignment.expiresAt,
+        revokedAt: assignment.revokedAt,
+        grantedByUserId: assignment.grantedByUserId,
+        createdAt: assignment.createdAt,
+      })),
+    };
+  }
+
+  async grant(
+    actorUserId: string,
+    tournamentId: string,
+    dto: GrantTournamentStaffDto,
+    audit: TournamentStaffAuditContext,
+  ): Promise<TournamentStaffAssignmentResult> {
+    const expiresAt = dto.expiresAt === undefined ? null : new Date(dto.expiresAt);
+
+    // Decision #3 default: the frozen contract exposes a single POST route
+    // for staff grants with no separate "bootstrap" endpoint, yet
+    // TournamentStaffService.grantStaff() *always* throws
+    // FIRST_DIRECTOR_REQUIRES_BOOTSTRAP when granting TOURNAMENT_DIRECTOR
+    // while the tournament has zero active directors (by design -- see Task
+    // 7). So a director grant while the tournament has none is routed to
+    // bootstrapFirstDirector() instead. This is a pre-check only: both
+    // target methods re-verify the active-director invariant themselves
+    // inside a Serializable transaction, so a race between this check and
+    // the call still fails closed with the correct 409/403 from the
+    // authoritative method -- this branch never bypasses that invariant.
+    if (dto.role === V1TournamentStaffRole.TOURNAMENT_DIRECTOR) {
+      const activeDirectorCount = await this.prisma.v1TournamentStaffAssignment.count({
+        where: {
+          tournamentId,
+          role: V1TournamentStaffRole.TOURNAMENT_DIRECTOR,
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      });
+      if (activeDirectorCount === 0) {
+        return this.staffService.bootstrapFirstDirector({
+          actorUserId,
+          tournamentId,
+          targetUserId: dto.userId,
+          expiresAt,
+          audit,
+        });
+      }
+    }
+
+    return this.staffService.grantStaff({
+      actorUserId,
+      tournamentId,
+      targetUserId: dto.userId,
+      role: dto.role,
+      fieldId: dto.fieldId ?? null,
+      fixtureIds: dto.fixtureIds ?? [],
+      expiresAt,
+      audit,
+    });
+  }
+
+  async revoke(
+    actorUserId: string,
+    tournamentId: string,
+    assignmentId: string,
+    dto: RevokeTournamentStaffDto,
+    audit: TournamentStaffAuditContext,
+  ): Promise<TournamentStaffAssignmentResult> {
+    // dto.reason is intentionally not forwarded -- see the doc comment on
+    // RevokeTournamentStaffDto for why.
+    return this.staffService.revokeStaff({
+      actorUserId,
+      tournamentId,
+      assignmentId,
+      expectedVersion: dto.expectedVersion,
+      audit,
+    });
+  }
+}

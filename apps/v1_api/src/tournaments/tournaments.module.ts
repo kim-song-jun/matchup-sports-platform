@@ -38,6 +38,8 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { TournamentStaffGuard } from './staff/tournament-staff.guard';
 import { TournamentStaffService } from './staff/tournament-staff.service';
+import { TournamentResultReviewController } from '../tournament-operations/results/tournament-result-review.controller';
+import { TournamentResultReviewService } from '../tournament-operations/results/tournament-result-review.service';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -70,6 +72,7 @@ import { TournamentStaffService } from './staff/tournament-staff.service';
     TournamentPopupController,
     TournamentReviewsController,
     TournamentsReadController,
+    TournamentResultReviewController,
   ],
   providers: [
     TournamentsAdminService,
@@ -91,6 +94,7 @@ import { TournamentStaffService } from './staff/tournament-staff.service';
     TournamentStaffAccessService,
     TournamentStaffGuard,
     TournamentStaffService,
+    TournamentResultReviewService,
   ],
 })
 export class TournamentsModule {}

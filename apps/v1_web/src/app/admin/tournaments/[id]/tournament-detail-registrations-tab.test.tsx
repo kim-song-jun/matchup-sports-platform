@@ -14,6 +14,9 @@ import {
   useV1RosterUnlock,
   useV1AdminTournamentPlayers,
   useV1UpdatePlayerEligibility,
+  useV1AdminAddPlayer,
+  useV1AdminRemovePlayer,
+  useV1AdminRosterEligibleMembers,
 } from '@/hooks/use-v1-api';
 import { RegistrationsTab } from './tournament-detail-client';
 
@@ -30,9 +33,16 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ExportRosterCsv: vi.fn(),
   useV1AdminTournamentPlayers: vi.fn(),
   useV1UpdatePlayerEligibility: vi.fn(),
+  // RosterModal 이 이 탭에서 렌더되므로 모달이 쓰는 훅도 함께 mock 해야 한다.
+  useV1AdminAddPlayer: vi.fn(),
+  useV1AdminRemovePlayer: vi.fn(),
+  useV1AdminRosterEligibleMembers: vi.fn(),
 }));
 
 const useV1AdminTournamentRegistrationsMock = vi.mocked(useV1AdminTournamentRegistrations);
+const useV1AdminAddPlayerMock = vi.mocked(useV1AdminAddPlayer);
+const useV1AdminRemovePlayerMock = vi.mocked(useV1AdminRemovePlayer);
+const useV1AdminRosterEligibleMembersMock = vi.mocked(useV1AdminRosterEligibleMembers);
 const useV1ConfirmPaymentMock = vi.mocked(useV1ConfirmPayment);
 const useV1ConfirmRegistrationMock = vi.mocked(useV1ConfirmRegistration);
 const useV1CancelRegistrationAdminMock = vi.mocked(useV1CancelRegistrationAdmin);
@@ -98,6 +108,9 @@ describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
       isPending: false,
     } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
     useV1UpdatePlayerEligibilityMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1UpdatePlayerEligibility>>());
+    useV1AdminAddPlayerMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1AdminAddPlayer>>());
+    useV1AdminRemovePlayerMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1AdminRemovePlayer>>());
+    useV1AdminRosterEligibleMembersMock.mockReturnValue({ data: { members: [] }, isPending: false, isError: false } as unknown as ReturnType<typeof useV1AdminRosterEligibleMembers>);
   });
 
   it('shows "마감 예외 허용" for a confirmed registration with no override, and calls the grant mutation with a success toast', () => {

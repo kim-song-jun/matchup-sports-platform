@@ -6,6 +6,7 @@ import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type {
+  V1AdminRosterEligibleMembersResponse,
   ApiEnvelope,
   ApiErrorBody,
   AdminListFilters,
@@ -2164,7 +2165,11 @@ export function useV1DeleteAdminUser(userId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1AdminDeleteUserPayload) =>
-      v1Delete<V1AdminStatusChangeResult>(`/admin/users/${userId}`, { body: JSON.stringify(body) }),
+      // v1Delete 의 2번째 인자는 fetch 의 init 이 아니라 **body 그 자체**다. 여기서
+      // { body: JSON.stringify(body) } 를 넘기면 한 번 더 감싸져
+      // {"body":"{\"reason\":...}"} 가 전송되고, reason 이 없으니 서버가 400 을 낸다 —
+      // 프로덕션에서 어드민 사용자 삭제가 두 번 다 400 으로 실패한 원인이다(2026-08-03).
+      v1Delete<V1AdminStatusChangeResult>(`/admin/users/${userId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminUser(userId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'users'] });
@@ -2842,6 +2847,101 @@ export function useV1AdminTournamentPlayers(registrationId: string) {
   });
 }
 
+/**
+ * 어드민이 팀 대신 명단에 선수를 추가·제거한다.
+ *
+ * 이 두 훅이 없던 동안 어드민 콘솔은 명단을 **볼 수만** 있었다. 팀장이 자리를 비웠거나
+ * 마감이 지난 뒤 운영 조정이 필요해도 손댈 방법이 없었고, 화면에서 시도해도 서버로
+ * 요청이 가지 않아 로그에 실패조차 남지 않았다(2026-08-03 실사고).
+ */
+/** 명단에 올릴 수 있는 팀원 목록. 어드민이 UUID 를 직접 입력하지 않아도 되게 한다. */
+export function useV1AdminRosterEligibleMembers(registrationId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
+    queryFn: () =>
+      v1Get<V1AdminRosterEligibleMembersResponse>(
+        `/admin/registrations/${registrationId}/eligible-players`,
+      ),
+    enabled: enabled && !!registrationId,
+    retry: false,
+  });
+}
+
+export function useV1AdminAddPlayer(registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { userId: string; realName: string }) =>
+      v1Post(`/admin/registrations/${registrationId}/players`, body),
+    // onSuccess 가 반환하는 프라미스는 React Query 가 내부에서 await 한다(mutation.ts
+    // `await this.options.onSuccess?.(...)`) — 그래서 버튼이 "추가 중" 에서 풀리는 시점엔
+    // 이미 아래 무효화가 끝나 있다. 안 그러면 버튼만 먼저 살아나 방금 넣은 선수를 한 번 더
+    // 넣으려는 클릭이 가능하다.
+    // 자격 판정(alreadyOnRoster/eligible)이 명단에서 파생되므로 선택 목록도 함께 턴다.
+    // roster 키('…/players')는 eligible 키('…/eligible-players')의 접두사가 아니라서
+    // 자동으로 딸려오지 않는다 — 빠뜨리면 방금 추가한 팀원이 계속 선택 가능해 보인다.
+    onSuccess: () => invalidateRosterViews(queryClient, null, registrationId),
+  });
+}
+
+export function useV1AdminRemovePlayer(registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (playerId: string) => v1Delete(`/admin/players/${playerId}`),
+    // 제외한 팀원은 다시 고를 수 있어야 한다 — 접두사가 달라 roster 무효화로는 안 따라온다.
+    onSuccess: () => invalidateRosterViews(queryClient, null, registrationId),
+  });
+}
+
+/**
+ * 같은 명단을 보는 모든 캐시를 한 번에 턴다.
+ *
+ * 소비자와 어드민이 같은 로스터를 **다른 키**로 캐싱한다(`v1/tournaments/…/players` vs
+ * `v1/admin/registrations/…/players`). 한쪽만 무효화하면 어드민이면서 팀 매니저인 사용자나
+ * 두 화면을 오가는 세션에서 방금 바꾼 명단이 옛 값으로 보인다.
+ *
+ * 어드민 훅은 tournamentId 를 모르는 자리라 소비자 키를 predicate 로 찾는다.
+ */
+function invalidateRosterViews(
+  queryClient: QueryClient,
+  tournamentId: string | null,
+  registrationId: string,
+) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentRoster(registrationId) }),
+    queryClient.invalidateQueries({
+      queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
+    }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments().slice(0, 3) }),
+    tournamentId
+      ? queryClient.invalidateQueries({
+          queryKey: v1Keys.tournamentPlayers(tournamentId, registrationId),
+        })
+      : queryClient.invalidateQueries({
+          // ['v1','tournaments',<tid>,'registrations',<rid>,'players']
+          predicate: (query) => {
+            const key = query.queryKey;
+            return (
+              key[0] === 'v1' &&
+              key[1] === 'tournaments' &&
+              key[3] === 'registrations' &&
+              key[4] === registrationId &&
+              key[5] === 'players'
+            );
+          },
+        }),
+    ...(tournamentId
+      ? [
+          queryClient.invalidateQueries({
+            queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: v1Keys.myTournamentRegistration(tournamentId),
+          }),
+        ]
+      : []),
+  ]);
+}
+
 export function useV1AddPlayer(tournamentId: string, registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2850,17 +2950,7 @@ export function useV1AddPlayer(tournamentId: string, registrationId: string) {
         `/tournaments/${tournamentId}/registrations/${registrationId}/players`,
         body,
       ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.tournamentPlayers(tournamentId, registrationId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.myTournamentRegistration(tournamentId),
-      });
-    },
+    onSuccess: () => invalidateRosterViews(queryClient, tournamentId, registrationId),
   });
 }
 
@@ -2872,17 +2962,7 @@ export function useV1UpdatePlayer(tournamentId: string, registrationId: string) 
         `/tournaments/${tournamentId}/registrations/${registrationId}/players/${playerId}`,
         body,
       ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.tournamentPlayers(tournamentId, registrationId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.myTournamentRegistration(tournamentId),
-      });
-    },
+    onSuccess: () => invalidateRosterViews(queryClient, tournamentId, registrationId),
   });
 }
 
@@ -2894,17 +2974,7 @@ export function useV1RemovePlayer(tournamentId: string, registrationId: string) 
         `/tournaments/${tournamentId}/registrations/${registrationId}/players/${playerId}`,
         { method: 'DELETE' },
       ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.tournamentPlayers(tournamentId, registrationId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.myTournamentRegistration(tournamentId),
-      });
-    },
+    onSuccess: () => invalidateRosterViews(queryClient, tournamentId, registrationId),
   });
 }
 
@@ -3193,7 +3263,12 @@ export function useV1ExportRosterCsv(registrationId: string) {
   });
 }
 
-export function useV1UpdatePlayerEligibility() {
+/**
+ * @param registrationId 자격을 바꾼 선수가 속한 신청. 명단 캐시 키가 registrationId 기준이라
+ *   이걸 모르면 방금 바꾼 자격이 화면에 반영되지 않는다 — 서버는 바뀌고 토스트도 뜨는데
+ *   행의 배지는 옛 값 그대로였다.
+ */
+export function useV1UpdatePlayerEligibility(registrationId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -3201,10 +3276,15 @@ export function useV1UpdatePlayerEligibility() {
       ...body
     }: { playerId: string } & V1UpdatePlayerEligibilityPayload) =>
       v1Patch<V1TournamentPlayer>(`/admin/players/${playerId}/eligibility`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
-      });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+        }),
+        // 자격 상태도 명단·선택목록에 그대로 반영되는 값이라 add/remove 와 같은 헬퍼를 쓴다 —
+        // 여기만 admin roster 키만 털면 eligible-players 와 소비자 명단 캐시가 낡는다.
+        ...(registrationId ? [invalidateRosterViews(queryClient, null, registrationId)] : []),
+      ]);
     },
   });
 }

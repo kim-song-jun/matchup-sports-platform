@@ -97,7 +97,7 @@ flowchart TD
   ```
   실제 Compose 볼륨 이름은 `docker volume ls`로 확인하고, 복구 후에는
   `docker exec teameet_v1_api sh -c 'test -w /app/apps/v1_api/uploads'`와 실제
-  인증된 이미지 업로드로 검증한다. `deploy/restart-containers.sh`를 통하지
+  인증된 이미지 업로드로 검증한다. `deploy/deploy-prod.sh`를 통하지
   않는 수동 기동도 `v1_uploads_init` 완료 후 `v1_api`가 시작되는 의존성을
   사용한다.
 - [ ] **HSTS `includeSubDomains`** (M2/M3) — `teameet.co.kr` **모든 서브도메인에 HTTPS 를 강제**한다. HTTP-only 서브도메인이 있으면 접속이 깨지므로, 그런 서브도메인이 없음을 확인한 뒤 배포한다. `preload` 는 되돌리기 어려워 의도적으로 제외했다.
@@ -150,7 +150,7 @@ flowchart LR
 
 ## 6. 이 PR에서 다루지 않은 것 (투명성)
 
-- **L3 — v1-api 이미지 devDependencies 미제거(prune)**: **의도적 보류**. `deploy/restart-containers.sh`·`setup-ec2.sh`가 배포 시 컨테이너 내부에서 `ts-node`(devDependency)로 v1 seed를 실행한다. 무단 `pnpm prune --prod`는 `ts-node`를 제거해 **배포 seed 스텝을 깨뜨린다**. 안전한 해결은 (a) `ts-node`를 `dependencies`로 이동 후 prune, 또는 (b) seed 실행을 컴파일된 JS로 전환하는 별도 작업이 필요하므로 후속 과제로 남긴다. (이미지 비대 = Low 심각도, 배포 안정성 > 이미지 슬림화.)
+- **L3 — v1-api 이미지 devDependencies 미제거(prune)**: **의도적 보류**. `deploy/deploy-prod.sh`·`setup-ec2.sh`가 배포 시 컨테이너 내부에서 `ts-node`(devDependency)로 v1 seed를 실행한다. 무단 `pnpm prune --prod`는 `ts-node`를 제거해 **배포 seed 스텝을 깨뜨린다**. 안전한 해결은 (a) `ts-node`를 `dependencies`로 이동 후 prune, 또는 (b) seed 실행을 컴파일된 JS로 전환하는 별도 작업이 필요하므로 후속 과제로 남긴다. (이미지 비대 = Low 심각도, 배포 안정성 > 이미지 슬림화.)
 - **CSP 잔여 경계**: production 정책에서 `unsafe-eval`은 제거했다. Next.js inline bootstrap 호환 때문에 `unsafe-inline`은 유지하며, 임의 외부 script·object·base URI와 외부 frame embedding은 허용하지 않는다. nonce 기반 정책은 모든 페이지를 동적 렌더링하게 만드는 별도 아키텍처 선택이므로 현재 배포 계약에는 포함하지 않는다.
 - **서버측 세션 철회 목록/키 회전**: 현재 토큰은 계정 상태를 매 요청 확인하고 로그아웃 시 브라우저 쿠키를 지우지만, 이미 탈취된 토큰의 즉시 서버측 폐기를 위한 session row/jti denylist는 별도 hardening 대상이다.
 

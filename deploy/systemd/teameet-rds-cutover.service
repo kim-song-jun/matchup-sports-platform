@@ -1,0 +1,18 @@
+[Unit]
+Description=Teameet container Postgres to RDS cutover (one-shot, unattended)
+Documentation=https://github.com/kim-song-jun/matchup-sports-platform/blob/main/docs/ops/rds-cutover-runbook.md
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/teameet-cutover-to-rds.sh --cutover
+# 전환은 점검창을 연 채로 진행된다. 여기서 막히면 사용자에게 503 이 계속 보이므로,
+# 무한정 기다리지 않고 끊는다. 24MB DB 기준 정상 소요는 1분 안쪽이고, 스크립트 안의
+# 헬스 대기(36회 x 5초 = 180초)를 두 번 겪어도 10분을 넘지 않는다.
+#
+# 타임아웃으로 죽으면 systemd 가 SIGTERM 을 보내고, 스크립트의 ERR trap 은 그 신호를
+# 잡지 못한다 — 즉 **점검창이 켜진 채로 남을 수 있다**. 그래서 아래 ExecStopPost 가
+# 실패 시 점검창 해제를 한 번 더 보장한다.
+TimeoutStartSec=900
+ExecStopPost=/usr/local/bin/teameet-cutover-guard.sh

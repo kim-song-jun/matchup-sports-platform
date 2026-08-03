@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -18,6 +19,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { RevealedTeamTrust, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
+import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import {
   ChangeTeamMembershipRoleDto,
   LeaveTeamDto,
@@ -91,6 +93,8 @@ type TeamCapacityLike = {
 
 @Injectable()
 export class TeamsService {
+  private readonly logger = new Logger(TeamsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
@@ -805,8 +809,22 @@ export class TeamsService {
         dto.reason ?? 'team_membership_removed',
       );
 
-      return { updated, team };
+      // 팀에서 빠진 사람은 그 팀의 대회 명단에도 남아 있으면 안 된다. 남겨 두면 정원만
+      // 차지하고, 대회 당일 출전 자격 문제가 된다 — 2026-08-03 프로덕션에서 이 경로로
+      // 실제 사고가 났다(추방된 멤버가 12명 정원 중 한 자리를 계속 점유).
+      const removedRosterCount = await removeUserFromActiveRosters(tx, target.userId, {
+        teamId: target.teamId,
+        at: removedAt,
+      });
+
+      return { updated, team, removedRosterCount };
     });
+
+    if (result.removedRosterCount > 0) {
+      this.logger.log(
+        `roster cleanup on member removal team=${target.teamId} user=${target.userId} rosters=${result.removedRosterCount}`,
+      );
+    }
 
     return {
       membershipId: result.updated.id,
@@ -881,8 +899,20 @@ export class TeamsService {
       });
       await this.leaveTeamChatParticipant(tx, teamId, user.id, user.id, leftAt, reason);
 
-      return { updated, team: updatedTeam };
+      // 추방(removeMembership)과 같은 이유로 자진 이탈에서도 대회 명단을 비운다.
+      const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, {
+        teamId,
+        at: leftAt,
+      });
+
+      return { updated, team: updatedTeam, removedRosterCount };
     });
+
+    if (result.removedRosterCount > 0) {
+      this.logger.log(
+        `roster cleanup on self leave team=${teamId} user=${user.id} rosters=${result.removedRosterCount}`,
+      );
+    }
 
     return {
       membershipId: result.updated.id,

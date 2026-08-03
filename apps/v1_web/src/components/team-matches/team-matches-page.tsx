@@ -316,6 +316,23 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)' }}>{match.description}</div>
                 </Card>
               ) : null}
+              {/* 라인업 CTA(Task 15): 호스트팀/승인된 상대팀 매니저에게만 노출된다 —
+                  model.lineupHref는 team-matches-client.tsx가 그 조건일 때만 설정한다. */}
+              {model.lineupHref ? (
+                <Card pad={16} style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="tm-text-body-lg">라인업</div>
+                      <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+                        선발·후보 명단을 작성하고 제출하세요.
+                      </div>
+                    </div>
+                    <Link className="tm-btn tm-btn-sm tm-btn-primary" href={model.lineupHref} style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+                      라인업 관리
+                    </Link>
+                  </div>
+                </Card>
+              ) : null}
               {/* 홈팀 카드: 모바일은 왼쪽 컬럼 하단, 데스크톱은 우측 컬럼(tm-hide-desktop)으로 이동 */}
               <div className="tm-hide-desktop" style={{ marginTop: 14 }}>{hostTeamCard}</div>
               {mode === 'mine' ? (

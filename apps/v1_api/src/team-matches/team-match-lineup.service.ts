@@ -104,11 +104,13 @@ export class TeamMatchLineupService {
           // row whose own `version` always restarts at 0, so `version` alone
           // could never detect "someone else already saved a newer draft".
           if ((previous?.revision ?? 0) !== dto.expectedVersion) {
+            // details로 감싸지 않으면 AllExceptionsFilter가 messageObj?.details만 클라이언트로
+            // 전달하기 때문에 expectedVersion/currentVersion이 응답에서 통째로 사라진다 —
+            // team-schedules.service.ts 등 다른 VERSION_CONFLICT 던지는 곳과 동일한 계약으로 맞춘다.
             throw new ConflictException({
               code: 'VERSION_CONFLICT',
               message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
-              expectedVersion: dto.expectedVersion,
-              currentVersion: previous?.revision ?? 0,
+              details: { expectedVersion: dto.expectedVersion, currentVersion: previous?.revision ?? 0 },
             });
           }
 
@@ -190,8 +192,7 @@ export class TeamMatchLineupService {
             throw new ConflictException({
               code: 'VERSION_CONFLICT',
               message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
-              expectedVersion: dto.expectedVersion,
-              currentVersion: lineup.revision,
+              details: { expectedVersion: dto.expectedVersion, currentVersion: lineup.revision },
             });
           }
           const submitted = await tx.v1GameLineup.update({
@@ -258,11 +259,13 @@ export class TeamMatchLineupService {
             });
           }
           if (target.revision !== dto.expectedVersion) {
+            // 호출자는 상대팀 사이드를 조회할 방법이 없어 이 currentVersion이 사실상 유일한
+            // expectedVersion 획득 경로다 — 프론트는 첫 시도(버전 0)가 이 409로 실패하면
+            // details.currentVersion으로 정확한 값을 알아내 한 번 더 재시도한다.
             throw new ConflictException({
               code: 'VERSION_CONFLICT',
               message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
-              expectedVersion: dto.expectedVersion,
-              currentVersion: target.revision,
+              details: { expectedVersion: dto.expectedVersion, currentVersion: target.revision },
             });
           }
           const existingParticipants = await tx.v1GameParticipant.findMany({
@@ -575,6 +578,20 @@ export class TeamMatchLineupService {
       throw new UnprocessableEntityException({
         code: 'LINEUP_DUPLICATE_JERSEY_NUMBER',
         message: '등번호가 중복돼요. 등번호는 팀 내에서 유일해야 해요.',
+      });
+    }
+
+    // 같은 연동 사용자를 선발+후보를 통틀어 두 번 이상 등록할 수 없다. 이 방어가 없으면
+    // 클라이언트가 재수화(hydrate) 시점의 정체성 유실 버그(Task 15 blocker-1) 때문에, 또는
+    // 어떤 클라이언트든 버그·경합으로 같은 userId를 두 번 실어 보내는 순간 한 사람에 대해
+    // 두 개의 V1GameParticipant 행이 생겨버린다 — 서버가 최종 방어선이다.
+    const userIds = [...dto.starters, ...dto.bench]
+      .map((entry) => entry.userId)
+      .filter((userId): userId is string => userId !== undefined);
+    if (new Set(userIds).size !== userIds.length) {
+      throw new UnprocessableEntityException({
+        code: 'LINEUP_DUPLICATE_PARTICIPANT',
+        message: '같은 선수가 라인업에 두 번 등록되어 있어요.',
       });
     }
 

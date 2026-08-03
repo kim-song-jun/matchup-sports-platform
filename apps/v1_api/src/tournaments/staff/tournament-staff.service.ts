@@ -490,13 +490,18 @@ export class TournamentStaffService {
    * `V1OperationAudit` row this method creates, inside the SAME `tx` the caller's own
    * revoke/grant/bootstrap mutation just committed to -- not as a separate follow-up
    * `v1OperationAudit.create()` from a different transaction after this one has already
-   * committed. `OperationAuditWriterService.create()`'s shared envelope has no `reason` field (it
-   * is a cross-lane contract used by several callers, not owned by this file), so this method
-   * issues one additional `tx.v1OperationAudit.update()` on the row `auditWriter.create()` just
-   * returned the id of -- still fully inside `tx`, so either both the audit row's core fields AND
-   * its `reason` persist together with the revoke, or (if anything here throws) the whole
-   * transaction rolls back together, INCLUDING the revoke itself. This is the fix for the pre-fix
-   * behavior where `TournamentOperationsStaffService.revoke()` (a different lane's orchestration,
+   * committed.
+   *
+   * The reason travels in the shared `OperationAuditWriterService.create()` envelope, which now
+   * carries an optional `reason`. An earlier attempt at this fix instead created the row and then
+   * patched the reason on with `tx.v1OperationAudit.update()`; that can never work, because the
+   * `v1_operation_audits_append_only` trigger rejects EVERY update against this table with SQLSTATE
+   * 55000 -- so the whole transaction, revoke included, rolled back on any revoke that carried a
+   * reason. Writing it in the create keeps the atomicity guarantee without fighting the trigger:
+   * either the audit row lands complete alongside the revoke, or nothing does.
+   *
+   * This is the fix for the pre-fix behavior where
+   * `TournamentOperationsStaffService.revoke()` (a different lane's orchestration,
    * apps/v1_api/src/tournament-operations/staff/) called `revokeStaff()` here to completion (this
    * transaction already committed) and only THEN, in a wholly separate `prisma.v1OperationAudit.
    * create()` call outside any transaction, tried to persist the reason -- a failure in that
@@ -521,7 +526,10 @@ export class TournamentStaffService {
         create: ({ data }) => tx.v1OperationAudit.create({ data, select: { id: true } }),
       },
     };
-    const created = await this.auditWriter.create(auditClient, {
+    // P1-3: the reason travels in the SAME create as the mutation it explains. It used to be
+    // patched on with a follow-up UPDATE, which `v1_operation_audits_append_only` rejects outright
+    // (SQLSTATE 55000) -- so the revocation could never be recorded with its reason at all.
+    await this.auditWriter.create(auditClient, {
       actor: this.auditActor(principal),
       requestId: audit.requestId,
       sourceIp: audit.sourceIp,
@@ -533,13 +541,8 @@ export class TournamentStaffService {
       after: mutation.after,
       tournamentId: mutation.assignment.tournamentId,
       fieldId: mutation.assignment.fieldId,
+      reason: mutation.reason ?? null,
     });
-    if (mutation.reason !== undefined) {
-      await tx.v1OperationAudit.update({
-        where: { id: created.id },
-        data: { reason: mutation.reason },
-      });
-    }
   }
 
   private auditActor(principal: TournamentStaffPrincipal): OperationAuditActor {

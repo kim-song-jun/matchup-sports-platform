@@ -43,13 +43,34 @@ const MISMATCH_ERROR_CODE = 'GAME_RESULT_COMPARISON_MISMATCH';
 // a >=32-char V1_SESSION_SECRET (assertV1SessionRuntimeConfiguration throws
 // without it) and an HTTPS-origin FRONTEND_URL (requireProductionFrontendOrigin
 // throws without it). Neither is a real secret: this harness only ever talks
-// to the API over Bearer tokens against an ephemeral, isolated CI database,
-// and FRONTEND_URL is compared only against a mutation request's Origin header
-// (curl sends none, so the comparison never engages) — fixed, unshared,
-// CI-only placeholders are safe. A real value already present in the job
-// environment always wins (see startApi()'s `??`).
+// to the API over a signed v1 session cookie (see V1_SESSION_COOKIE_NAME below)
+// against an ephemeral, isolated CI database, and FRONTEND_URL is compared only
+// against a mutation request's Origin header (curl sends none, so the
+// comparison never engages) — fixed, unshared, CI-only placeholders are safe.
+// A real value already present in the job environment always wins (see
+// startApi()'s `??`).
+//
+// NODE_ENV stays 'production' for the whole harness-spawned API on purpose —
+// there is NO environment variable that reopens header-based auth once
+// NODE_ENV='production' (apps/v1_api/src/auth/v1-session.ts's
+// resolveV1RequestIdentity() forecloses the x-v1-user-id/x-v1-user-email
+// header path unconditionally whenever nodeEnv==='production', with no
+// override). In particular V1_ALLOW_HEADER_AUTH is NOT such an override: it
+// is a NEGATIVE gate — assertV1SessionRuntimeConfiguration() throws and
+// refuses to boot if it is 'true' while NODE_ENV='production' — so this
+// harness never sets it. Authentication instead travels over the SAME signed
+// `teameet_v1_session` cookie a real logged-in session would use (checked
+// FIRST in resolveV1RequestIdentity(), unconditionally on NODE_ENV) — see
+// curlJson()'s `cookie` option and V1_SESSION_COOKIE_NAME below. The runtime
+// manifest's `opsToken` (apps/v1_api/src/games/migration/
+// task10-runtime-manifest.cli.ts) is that real, HMAC-signed token, minted
+// with this exact V1_SESSION_SECRET value.
 const TASK10_SESSION_SECRET_PLACEHOLDER = 'task10-ci-isolated-v1-session-secret-not-a-real-secret';
 const TASK10_FRONTEND_ORIGIN_PLACEHOLDER = 'https://task10-ci.invalid';
+// Mirrors V1_SESSION_COOKIE_NAME exported from apps/v1_api/src/auth/v1-session.ts
+// — duplicated here (not imported) because this harness is a standalone .mjs
+// script outside the API's TypeScript build.
+const V1_SESSION_COOKIE_NAME = 'teameet_v1_session';
 
 const state = {
   evidenceDir: null,
@@ -76,6 +97,7 @@ function redactText(value) {
     .replaceAll(/postgres(?:ql)?:\/\/[^\s"']+/gi, '[REDACTED_DATABASE_URL]')
     .replaceAll(/(authorization\s*:\s*bearer\s+)[^\s"']+/gi, '$1[REDACTED_TOKEN]')
     .replaceAll(/(bearer\s+)[A-Za-z0-9._~+\/-]+/gi, '$1[REDACTED_TOKEN]')
+    .replaceAll(new RegExp(`(cookie\\s*:\\s*${V1_SESSION_COOKIE_NAME}=)[^\\s"';]+`, 'gi'), '$1[REDACTED_TOKEN]')
     .replaceAll(/("opsToken"\s*:\s*")[^"]+"/gi, '$1[REDACTED_TOKEN]"')
     .replaceAll(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[REDACTED_EMAIL]');
 }
@@ -84,6 +106,7 @@ function sensitiveHitCount(value) {
   const patterns = [
     /postgres(?:ql)?:\/\/[^\s"']+/gi,
     /authorization\s*:\s*bearer\s+(?!\[REDACTED_TOKEN\])[^\s"']+/gi,
+    new RegExp(`cookie\\s*:\\s*${V1_SESSION_COOKIE_NAME}=(?!\\[REDACTED_TOKEN\\])[^\\s"';]+`, 'gi'),
     /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
   ];
   return patterns.reduce((count, pattern) => count + (String(value).match(pattern) ?? []).length, 0);
@@ -623,9 +646,24 @@ async function startApi(port) {
   fail('API startup timed out');
 }
 
-async function curlJson({ label, url, token, method = 'GET', body = null, expectedStatuses = [200] }) {
-  const logged = ['-i', '-H', 'Authorization: Bearer [REDACTED_TOKEN]'];
-  const actual = ['-sS', '-i', '--max-time', '20', '-X', method, '-H', `Authorization: Bearer ${token}`];
+// `cookie` carries the real v1 session token (see V1_SESSION_COOKIE_NAME
+// above) — this is the ONLY credential resolveV1RequestIdentity() accepts
+// unconditionally on every NODE_ENV, including 'production'. `extraHeaders`
+// carries additional plain (non-secret) request headers such as
+// Idempotency-Key. (Named `extraHeaders`, not `headers`, because this
+// function already has an unrelated local `headers` binding for the parsed
+// HTTP response headers below — reusing the name would redeclare it.)
+async function curlJson({ label, url, cookie = null, extraHeaders = {}, method = 'GET', body = null, expectedStatuses = [200] }) {
+  const logged = ['-i'];
+  const actual = ['-sS', '-i', '--max-time', '20', '-X', method];
+  if (cookie !== null) {
+    logged.push('-H', `Cookie: ${V1_SESSION_COOKIE_NAME}=[REDACTED_TOKEN]`);
+    actual.push('-H', `Cookie: ${V1_SESSION_COOKIE_NAME}=${cookie}`);
+  }
+  for (const [name, value] of Object.entries(extraHeaders)) {
+    logged.push('-H', `${name}: ${value}`);
+    actual.push('-H', `${name}: ${value}`);
+  }
   if (body !== null) {
     logged.push('-H', 'Content-Type: application/json', '--data-binary', '[REDACTED_REQUEST_BODY]');
     actual.push('-H', 'Content-Type: application/json', '--data-binary', JSON.stringify(body));
@@ -670,7 +708,10 @@ async function operationFlagRoutePreflight() {
       response = await curlJson({
         label: 'operation-flag-route-preflight',
         url,
-        token: 'task10-ci-route-presence-token',
+        // Route-existence probe only — this is not a valid signed session
+        // token, so it authenticates as nobody; 401 is an accepted status
+        // (a genuinely missing route still 404s regardless of auth outcome).
+        cookie: 'task10-ci-route-presence-probe',
         expectedStatuses: [200, 401, 403],
       });
     } catch (error) {
@@ -703,11 +744,12 @@ function runtimeManifest() {
   assert(runtime.schemaVersion === 1, 'Runtime manifest schemaVersion must be 1');
   assert(typeof runtime.opsToken === 'string' && runtime.opsToken.length >= 20, 'Runtime manifest requires opsToken');
   assert(typeof runtime.tournamentId === 'string' && /^[0-9a-f-]{36}$/i.test(runtime.tournamentId), 'Runtime manifest requires tournamentId');
-  for (const key of ['compareTransition', 'killSwitchTransition']) {
+  for (const key of ['compareTransition', 'writeForwardTransition', 'killSwitchTransition']) {
     const transition = runtime[key];
     assert(transition !== null && typeof transition === 'object', `Runtime manifest requires ${key}`);
     assert(['PATCH', 'POST'].includes(transition.method), `${key}.method is invalid`);
     assert(typeof transition.path === 'string' && transition.path.startsWith('/api/v1/tournament-ops/operation-flags/'), `${key}.path is invalid`);
+    assert(typeof transition.idempotencyKey === 'string' && transition.idempotencyKey.length > 0 && transition.idempotencyKey.length <= 200, `${key}.idempotencyKey is invalid`);
     assert(transition.body !== null && typeof transition.body === 'object', `${key}.body is invalid`);
   }
   return runtime;
@@ -721,32 +763,47 @@ async function liveCutover() {
   await startApi(port);
   try {
     const operationsUrl = `${baseUrl}/api/v1/tournament-ops/tournaments/${runtime.tournamentId}/operations`;
-    const legacy = await curlJson({ label: 'legacy', url: operationsUrl, token: runtime.opsToken });
+    const legacy = await curlJson({ label: 'legacy', url: operationsUrl, cookie: runtime.opsToken });
     await curlJson({
       label: 'transition-compare',
       method: runtime.compareTransition.method,
       url: `${baseUrl}${runtime.compareTransition.path}`,
-      token: runtime.opsToken,
+      cookie: runtime.opsToken,
+      extraHeaders: { 'Idempotency-Key': runtime.compareTransition.idempotencyKey },
       body: runtime.compareTransition.body,
       expectedStatuses: [200, 201],
     });
-    const compare = await curlJson({ label: 'compare', url: operationsUrl, token: runtime.opsToken });
+    const compare = await curlJson({ label: 'compare', url: operationsUrl, cookie: runtime.opsToken });
     assert(compare.hash === legacy.hash, 'Compare response hash differs from legacy baseline');
+    // Advances GAME_WRITE (legacy -> new) so the kill-switch below has a
+    // genuinely valid {GAME_READ, GAME_WRITE} tuple to roll backward — see
+    // blocker (b) in task10-runtime-manifest.cli.ts's header comment.
+    // tupleTransition() itself is not touched or relaxed by this step.
+    await curlJson({
+      label: 'transition-write-forward',
+      method: runtime.writeForwardTransition.method,
+      url: `${baseUrl}${runtime.writeForwardTransition.path}`,
+      cookie: runtime.opsToken,
+      extraHeaders: { 'Idempotency-Key': runtime.writeForwardTransition.idempotencyKey },
+      body: runtime.writeForwardTransition.body,
+      expectedStatuses: [200, 201],
+    });
     const mismatch = await invokeBackfill('inject-mismatch', BACKFILL_FIXTURE);
     assert(mismatch.mismatches.length > 0, 'Injected mismatch was not detected');
     const mismatchEntry = mismatch.mismatches[0];
     for (const key of ['entity', 'revision', 'field']) assert(typeof mismatchEntry[key] === 'string' && mismatchEntry[key].length > 0, `Mismatch requires ${key}`);
-    const mismatchResponse = await curlJson({ label: 'mismatch', url: operationsUrl, token: runtime.opsToken, expectedStatuses: [409] });
+    const mismatchResponse = await curlJson({ label: 'mismatch', url: operationsUrl, cookie: runtime.opsToken, expectedStatuses: [409] });
     assertMismatchErrorContract(mismatchResponse.body, mismatchEntry);
     await curlJson({
       label: 'transition-kill-switch',
       method: runtime.killSwitchTransition.method,
       url: `${baseUrl}${runtime.killSwitchTransition.path}`,
-      token: runtime.opsToken,
+      cookie: runtime.opsToken,
+      extraHeaders: { 'Idempotency-Key': runtime.killSwitchTransition.idempotencyKey },
       body: runtime.killSwitchTransition.body,
       expectedStatuses: [200, 201],
     });
-    const rollback = await curlJson({ label: 'kill-switch', url: operationsUrl, token: runtime.opsToken });
+    const rollback = await curlJson({ label: 'kill-switch', url: operationsUrl, cookie: runtime.opsToken });
     assert(rollback.hash === legacy.hash, 'Rollback body hash differs from legacy baseline');
     const latch = await invokeLatchProbe(BACKFILL_FIXTURE);
     updateJson(state.summaryPath, (summary) => {

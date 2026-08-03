@@ -15,6 +15,20 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentPlayers: () => queryState,
   useV1UpdatePlayerEligibility: () => ({ mutate: updateEligibility, isPending: false }),
   useV1AdminAddPlayer: () => ({ mutate: addPlayer, isPending: false }),
+  useV1AdminRosterEligibleMembers: () => ({
+    data: {
+      members: [
+        { userId: 'user-42', nickname: '명철', realName: '김명철', birthDate: '19900101',
+          gender: 'male', role: 'member', alreadyOnRoster: false, eligible: true, ineligibleReason: null },
+        { userId: 'user-99', nickname: '무프로필', realName: null, birthDate: null,
+          gender: null, role: 'member', alreadyOnRoster: false, eligible: false,
+          ineligibleReason: '실명·생년월일·휴대폰이 모두 필요해요' },
+      ],
+    },
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
   useV1AdminRemovePlayer: () => ({ mutate: removePlayer, isPending: false }),
 }));
 
@@ -182,7 +196,9 @@ describe('admin tournament roster modal', () => {
     expect(removePlayer.mock.calls[0][0]).toBe('player-1');
   });
 
-  it('선수 추가는 입력값을 그대로 보내고, 값이 비면 요청하지 않는다', async () => {
+  // UUID 를 직접 입력받던 폼은 운영자가 그 값을 얻을 방법이 없어 사실상 쓸 수 없었다
+  // (2026-08-04 alpha UI 검수). 팀원 목록에서 고르는 방식으로 바뀌었다.
+  it('팀원을 골라 추가하면 그 userId 와 실명이 전송된다', async () => {
     render(
       <RosterModal
         open
@@ -193,17 +209,37 @@ describe('admin tournament roster modal', () => {
       />,
     );
 
-    // 빈 폼으로 누르면 API 를 호출하지 않고 폼 안에서 알린다.
-    await userEvent.click(screen.getByRole('button', { name: '추가' }));
-    expect(addPlayer).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('사용자 ID 와 실명을 모두 입력해주세요.');
+    // 아무도 안 고른 상태에서는 버튼이 비활성이라 요청이 나가지 않는다.
+    expect(screen.getByRole('button', { name: '추가' })).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText('사용자 ID'), 'user-42');
-    await userEvent.type(screen.getByLabelText('실명'), '김명철');
+    await userEvent.selectOptions(screen.getByLabelText('추가할 팀원'), 'user-42');
     await userEvent.click(screen.getByRole('button', { name: '추가' }));
 
     expect(addPlayer).toHaveBeenCalledTimes(1);
     expect(addPlayer.mock.calls[0][0]).toEqual({ userId: 'user-42', realName: '김명철' });
+  });
+
+  it('자격이 없는 팀원은 이유와 함께 보이되 고를 수 없다', () => {
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    const options = screen.getAllByRole('option');
+    const ineligible = options.find((o) =>
+      o.textContent?.includes('실명·생년월일·휴대폰이 모두 필요해요'),
+    );
+    // 목록에서 지우지 않고 이유를 붙여 보여 준다 — 지우면 "왜 없지?" 를 화면 밖에서 찾게 된다.
+    expect(ineligible).toBeTruthy();
+    expect(ineligible).toBeDisabled();
+
+    const selectable = options.find((o) => o.textContent?.includes('김명철'));
+    expect(selectable).not.toBeDisabled();
   });
 
   it('읽기 전용 어드민에게는 추가 폼과 제외 버튼이 보이지 않는다', () => {

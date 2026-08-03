@@ -484,6 +484,101 @@ export class TournamentPlayersService {
     return this.serializePlayer(player);
   }
 
+  /**
+   * 어드민 명단 추가 화면에서 고를 수 있는 팀원 목록.
+   *
+   * 이게 없던 동안 어드민은 **사용자 UUID 를 직접 입력**해야 했는데, 운영자가 그 값을 얻을
+   * 경로가 화면에 없었다(2026-08-04 alpha UI 검수에서 확인). 기능은 동작했지만 실제로는
+   * 쓸 수 없는 상태였다.
+   *
+   * 추가 자격을 여기서 미리 계산해 내려준다 — 왜 못 고르는지가 화면에 보여야, 운영자가
+   * 눌러 보고 나서야 400 을 받는 일이 없다. 판정 기준은 addPlayer 의 검사와 같다.
+   */
+  async listEligiblePlayersForAdmin(user: V1AuthUser, registrationId: string) {
+    await this.adminContext.getActiveAdmin(user.id);
+
+    const registration = await this.prisma.v1TournamentRegistration.findUnique({
+      where: { id: registrationId },
+      select: {
+        teamId: true,
+        tournament: { select: { genderCategory: true } },
+      },
+    });
+    if (!registration) {
+      throw new NotFoundException({
+        code: 'REGISTRATION_NOT_FOUND',
+        message: '신청 내역을 찾을 수 없어요.',
+      });
+    }
+
+    const [memberships, activePlayers] = await Promise.all([
+      this.prisma.v1TeamMembership.findMany({
+        where: {
+          teamId: registration.teamId,
+          status: 'active',
+          team: { status: 'active', deletedAt: null },
+        },
+        select: {
+          role: true,
+          user: {
+            select: {
+              id: true,
+              phone: true,
+              phoneVerifiedAt: true,
+              profile: { select: { nickname: true, realName: true, birthDate: true, gender: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.v1TournamentPlayer.findMany({
+        where: { registrationId, removedAt: null },
+        select: { userId: true },
+      }),
+    ]);
+
+    const onRoster = new Set(activePlayers.map((player) => player.userId));
+    const requiresGender = registration.tournament.genderCategory === 'mixed';
+    const phoneEnforced = isPhoneVerificationEnforced();
+
+    return {
+      members: memberships
+        .map(({ role, user: member }) => {
+          const realName = member.profile?.realName?.trim() ?? null;
+          const birthDate = member.profile?.birthDate?.trim() ?? null;
+          const gender = normalizeGender(member.profile?.gender);
+          const phone = member.phone?.trim() ?? null;
+
+          // addPlayer 와 같은 순서로 판정한다 — 화면이 보여주는 이유와 서버가 내는 에러가
+          // 어긋나면 운영자가 더 헷갈린다.
+          let ineligibleReason: string | null = null;
+          if (onRoster.has(member.id)) ineligibleReason = '이미 명단에 있어요';
+          else if (!realName || !birthDate || !phone || (requiresGender && !gender)) {
+            ineligibleReason = requiresGender
+              ? '실명·생년월일·휴대폰·성별이 모두 필요해요'
+              : '실명·생년월일·휴대폰이 모두 필요해요';
+          } else if (phoneEnforced && !member.phoneVerifiedAt) {
+            ineligibleReason = '휴대폰 본인인증이 필요해요';
+          }
+
+          return {
+            userId: member.id,
+            nickname: member.profile?.nickname ?? null,
+            realName,
+            birthDate,
+            gender,
+            role,
+            alreadyOnRoster: onRoster.has(member.id),
+            eligible: ineligibleReason === null,
+            ineligibleReason,
+          };
+        })
+        .sort((left, right) => {
+          if (left.eligible !== right.eligible) return left.eligible ? -1 : 1;
+          return (left.realName ?? left.nickname ?? '').localeCompare(right.realName ?? right.nickname ?? '');
+        }),
+    };
+  }
+
   /** 어드민이 명단에서 선수를 뺀다. 팀 경로와 달리 잠금·마감을 넘길 수 있다. */
   async removePlayerForAdmin(user: V1AuthUser, playerId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);

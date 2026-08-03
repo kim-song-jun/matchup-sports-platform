@@ -2966,3 +2966,20 @@ export type V1UpdateIntegrationSettingsPayload = {
 export type V1PublicKakaoMapsKeyResponse = {
   kakaoMapsJsKey: string | null;
 };
+
+export type V1AdminRosterEligibleMember = {
+  userId: string;
+  nickname: string | null;
+  realName: string | null;
+  birthDate: string | null;
+  gender: string | null;
+  role: string;
+  alreadyOnRoster: boolean;
+  eligible: boolean;
+  /** 못 고르는 이유. 화면에 그대로 보여 준다 — 눌러 보고 400 을 받는 일이 없도록. */
+  ineligibleReason: string | null;
+};
+
+export type V1AdminRosterEligibleMembersResponse = {
+  members: V1AdminRosterEligibleMember[];
+};

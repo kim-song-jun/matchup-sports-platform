@@ -83,6 +83,7 @@ import {
   useV1UnhideReview,
   useV1AdminAddPlayer,
   useV1AdminRemovePlayer,
+  useV1AdminRosterEligibleMembers,
 } from '@/hooks/use-v1-api';
 import type {
   V1TournamentStatus,
@@ -530,30 +531,35 @@ export function RosterModal({
   const addPlayer = useV1AdminAddPlayer(registration?.id ?? '');
   const removePlayer = useV1AdminRemovePlayer(registration?.id ?? '');
 
-  // 어드민 추가는 팀 화면과 달리 사용자를 직접 지목한다 — 운영자가 팀원 목록을 고르는
-  // 흐름이 아직 없으므로, 확인된 userId 와 실명을 입력받는 최소 폼으로 시작한다.
-  const [draftUserId, setDraftUserId] = useState('');
-  const [draftRealName, setDraftRealName] = useState('');
+  // 팀의 활성 멤버를 불러와 고르게 한다. 예전에는 userId 를 직접 입력받았는데, 운영자가
+  // UUID 를 얻을 경로가 화면에 없어 사실상 쓸 수 없었다(2026-08-04 alpha UI 검수).
+  const [selectedUserId, setSelectedUserId] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
+  const eligible = useV1AdminRosterEligibleMembers(registration?.id ?? '', open && canWrite);
+  const members = eligible.data?.members ?? [];
+  const selectedMember = members.find((m) => m.userId === selectedUserId) ?? null;
 
   const players = [...(data?.players ?? [])].sort(
     (left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain),
   );
 
   const handleAddPlayer = () => {
-    const userId = draftUserId.trim();
-    const realName = draftRealName.trim();
-    if (!userId || !realName) {
-      setAddError('사용자 ID 와 실명을 모두 입력해주세요.');
+    if (!selectedMember) {
+      setAddError('추가할 팀원을 선택해주세요.');
+      return;
+    }
+    // 실명은 서버가 팀원 프로필에서 다시 읽지만, DTO 가 필수로 받으므로 함께 보낸다.
+    const realName = selectedMember.realName?.trim();
+    if (!realName) {
+      setAddError('실명이 등록되지 않은 팀원이에요.');
       return;
     }
     setAddError(null);
     addPlayer.mutate(
-      { userId, realName },
+      { userId: selectedMember.userId, realName },
       {
         onSuccess: () => {
-          setDraftUserId('');
-          setDraftRealName('');
+          setSelectedUserId('');
           showToast('선수를 명단에 추가했어요.', 'success');
         },
         onError: (err) => setAddError(extractErrorMessage(err, '선수를 추가하지 못했어요.')),
@@ -654,38 +660,51 @@ export function RosterModal({
           </p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <div className="flex-1">
-              <label htmlFor="admin-roster-user-id" className="sr-only">
-                사용자 ID
+              <label htmlFor="admin-roster-member" className="sr-only">
+                추가할 팀원
               </label>
-              <input
-                id="admin-roster-user-id"
-                value={draftUserId}
-                onChange={(e) => setDraftUserId(e.target.value)}
-                placeholder="사용자 ID"
-                className="h-[44px] w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
-            <div className="flex-1">
-              <label htmlFor="admin-roster-real-name" className="sr-only">
-                실명
-              </label>
-              <input
-                id="admin-roster-real-name"
-                value={draftRealName}
-                onChange={(e) => setDraftRealName(e.target.value)}
-                placeholder="실명"
-                className="h-[44px] w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              />
+              <select
+                id="admin-roster-member"
+                value={selectedUserId}
+                onChange={(e) => {
+                  setSelectedUserId(e.target.value);
+                  setAddError(null);
+                }}
+                disabled={eligible.isPending || members.length === 0}
+                className="h-[44px] w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="">
+                  {eligible.isPending
+                    ? '팀원 불러오는 중…'
+                    : members.length === 0
+                      ? '추가할 수 있는 팀원이 없어요'
+                      : '팀원 선택'}
+                </option>
+                {members.map((m) => (
+                  // 못 고르는 팀원도 이유와 함께 보여 준다 — 목록에서 지워 버리면 운영자가
+                  // "왜 이 사람이 없지?" 를 화면 밖에서 찾아야 한다.
+                  <option key={m.userId} value={m.userId} disabled={!m.eligible}>
+                    {(m.realName ?? m.nickname ?? m.userId.slice(0, 8))}
+                    {m.role === 'owner' ? ' (팀장)' : m.role === 'manager' ? ' (매니저)' : ''}
+                    {m.eligible ? '' : ` — ${m.ineligibleReason}`}
+                  </option>
+                ))}
+              </select>
             </div>
             <button
               type="button"
               onClick={handleAddPlayer}
-              disabled={addPlayer.isPending}
+              disabled={addPlayer.isPending || !selectedUserId}
               className="h-[44px] shrink-0 rounded-xl bg-blue-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               {addPlayer.isPending ? '추가 중…' : '추가'}
             </button>
           </div>
+          {eligible.isError ? (
+            <p role="alert" className="mt-2 text-xs text-red-600">
+              {extractErrorMessage(eligible.error, '팀원 목록을 불러오지 못했어요.')}
+            </p>
+          ) : null}
           {addError ? (
             <p role="alert" className="mt-2 text-xs text-red-600">
               {addError}

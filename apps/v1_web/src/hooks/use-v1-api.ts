@@ -5,6 +5,7 @@ import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1D
 import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import type {
+  V1AdminRosterEligibleMembersResponse,
   ApiEnvelope,
   ApiErrorBody,
   AdminListFilters,
@@ -2541,6 +2542,19 @@ export function useV1AdminTournamentPlayers(registrationId: string) {
  * 마감이 지난 뒤 운영 조정이 필요해도 손댈 방법이 없었고, 화면에서 시도해도 서버로
  * 요청이 가지 않아 로그에 실패조차 남지 않았다(2026-08-03 실사고).
  */
+/** 명단에 올릴 수 있는 팀원 목록. 어드민이 UUID 를 직접 입력하지 않아도 되게 한다. */
+export function useV1AdminRosterEligibleMembers(registrationId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
+    queryFn: () =>
+      v1Get<V1AdminRosterEligibleMembersResponse>(
+        `/admin/registrations/${registrationId}/eligible-players`,
+      ),
+    enabled: enabled && !!registrationId,
+    retry: false,
+  });
+}
+
 export function useV1AdminAddPlayer(registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({

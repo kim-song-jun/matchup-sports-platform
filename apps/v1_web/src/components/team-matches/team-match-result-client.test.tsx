@@ -29,6 +29,12 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateGameResultRevision: () => ({ mutateAsync: createMutateAsync, isPending: false }),
   useV1SubmitGameResultRevision: () => ({ mutateAsync: submitMutateAsync, isPending: false }),
   useV1DecideGameResultRevision: () => ({ mutateAsync: decideMutateAsync, isPending: false }),
+  // Both clients below render `AppChrome`, whose `NotificationBell` calls this
+  // hook. Because this factory replaces the whole module, omitting it makes
+  // vitest throw "No export is defined on the mock" before any assertion runs.
+  // `data: undefined` is the real pre-fetch shape — the bell reads
+  // `summary.data?.unreadCount ?? 0`.
+  useV1NotificationUnreadSummary: () => ({ data: undefined, isPending: false }),
 }));
 
 // 백엔드가 실제로 내려주는 필드만 사용하는 순수 목 데이터 — team-matches-client.test.tsx의

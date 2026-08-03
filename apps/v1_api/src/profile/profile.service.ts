@@ -1,8 +1,16 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, V1AuthProvider } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
+import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import {
@@ -15,6 +23,8 @@ import {
 
 @Injectable()
 export class ProfileService {
+  private readonly logger = new Logger(ProfileService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async me(user: V1AuthUser) {
@@ -598,6 +608,8 @@ export class ProfileService {
   async withdrawalRequest(user: V1AuthUser, dto: WithdrawalRequestDto) {
     this.assertMutableAccount(user);
     await this.assertWithdrawable(user.id);
+    // 상태 전이·로스터 제거·팀 이탈이 같은 시각을 갖도록 트랜잭션 밖에서 한 번만 만든다.
+    const withdrawnAt = new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM "v1_users" WHERE id = ${user.id} FOR UPDATE
@@ -626,6 +638,30 @@ export class ProfileService {
         where: { id: user.id },
         data: { accountStatus: 'withdrawal_pending' },
       });
+
+      // 탈퇴 신청 시점에 자리를 비운다. `withdrawal_pending` 이 되면 가드가 모든 요청을
+      // 막으므로 본인은 더 이상 아무것도 할 수 없는데, 대회 로스터와 팀 명단에는 그대로
+      // 남아 정원만 차지한다 — 2026-08-03 프로덕션에서 실제로 이렇게 됐다.
+      // 완료된 대회는 기록 보존을 위해 건드리지 않는다(roster-cleanup.ts 주석 참조).
+      const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, { at: withdrawnAt });
+
+      // assertWithdrawable() 이 owner·manager 를 이미 막았으므로 여기 남는 것은 일반
+      // 멤버십뿐이다. 추방(`removed`)이 아니라 본인 의사에 의한 이탈이므로 `left` 로 둔다.
+      const memberships = await tx.v1TeamMembership.findMany({
+        where: { userId: user.id, status: 'active' },
+        select: { id: true, teamId: true },
+      });
+      for (const membership of memberships) {
+        await tx.v1TeamMembership.update({
+          where: { id: membership.id },
+          data: { status: 'left', leftAt: withdrawnAt },
+        });
+        await tx.v1Team.update({
+          where: { id: membership.teamId },
+          data: { memberCount: { decrement: 1 } },
+        });
+      }
+
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'user',
@@ -637,9 +673,20 @@ export class ProfileService {
           reason: dto.reason ?? 'withdrawal_requested',
         },
       });
-      return next;
+      return { next, removedRosterCount, leftTeamCount: memberships.length };
     });
-    return { userId: updated.id, accountStatus: updated.accountStatus, requestedAt: updated.updatedAt };
+
+    if (updated.removedRosterCount > 0 || updated.leftTeamCount > 0) {
+      this.logger.log(
+        `withdrawal cleanup user=${user.id} rosters=${updated.removedRosterCount} teams=${updated.leftTeamCount}`,
+      );
+    }
+
+    return {
+      userId: updated.next.id,
+      accountStatus: updated.next.accountStatus,
+      requestedAt: updated.next.updatedAt,
+    };
   }
 
   private async getUserSnapshot(userId: string) {

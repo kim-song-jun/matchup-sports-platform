@@ -1,9 +1,26 @@
-import { Body, Controller, Get, Headers, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { SaveGameLineupDto, SubmitGameLineupDto } from '../../games/dto/game-lineup.dto';
 import { TournamentFixtureLineupService } from './tournament-fixture-lineup.service';
+
+// Review finding #14 (S2): board/fields/staff all reject malformed uuid path params with a
+// contracted 422 via this shared pipe -- this controller was the one sibling missing it, so a
+// malformed tournamentId/fixtureId/sideId/lineupId previously fell through to the service layer
+// instead of failing fast at the HTTP boundary.
+const UUID_PARAM = new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY });
 
 /**
  * Fixture-scoped adapter over the canonical /games/:gameId/lineups routes.
@@ -20,8 +37,8 @@ export class TournamentFixtureLineupController {
   @Get()
   listLineups(
     @CurrentUser() user: V1AuthUser,
-    @Param('tournamentId') tournamentId: string,
-    @Param('fixtureId') fixtureId: string,
+    @Param('tournamentId', UUID_PARAM) tournamentId: string,
+    @Param('fixtureId', UUID_PARAM) fixtureId: string,
   ) {
     return this.lineupService.listLineups(user, tournamentId, fixtureId);
   }
@@ -29,9 +46,9 @@ export class TournamentFixtureLineupController {
   @Put(':sideId')
   saveLineup(
     @CurrentUser() user: V1AuthUser,
-    @Param('tournamentId') tournamentId: string,
-    @Param('fixtureId') fixtureId: string,
-    @Param('sideId') sideId: string,
+    @Param('tournamentId', UUID_PARAM) tournamentId: string,
+    @Param('fixtureId', UUID_PARAM) fixtureId: string,
+    @Param('sideId', UUID_PARAM) sideId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: SaveGameLineupDto,
   ) {
@@ -41,9 +58,9 @@ export class TournamentFixtureLineupController {
   @Post(':lineupId/submit')
   submitLineup(
     @CurrentUser() user: V1AuthUser,
-    @Param('tournamentId') tournamentId: string,
-    @Param('fixtureId') fixtureId: string,
-    @Param('lineupId') lineupId: string,
+    @Param('tournamentId', UUID_PARAM) tournamentId: string,
+    @Param('fixtureId', UUID_PARAM) fixtureId: string,
+    @Param('lineupId', UUID_PARAM) lineupId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: SubmitGameLineupDto,
   ) {

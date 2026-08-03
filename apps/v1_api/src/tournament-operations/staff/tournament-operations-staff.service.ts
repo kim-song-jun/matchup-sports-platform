@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { V1TournamentStaffRole } from '@prisma/client';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma, V1OperationActorType, V1TournamentStaffRole } from '@prisma/client';
+import { maskSourceIp } from '../../common/audit/operation-audit.contract';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   TournamentStaffAccessService,
@@ -102,6 +103,23 @@ export class TournamentOperationsStaffService {
     // the call still fails closed with the correct 409/403 from the
     // authoritative method -- this branch never bypasses that invariant.
     if (dto.role === V1TournamentStaffRole.TOURNAMENT_DIRECTOR) {
+      // bootstrapFirstDirector() (Task 7, apps/v1_api/src/tournaments/staff/,
+      // not this lane) has no fieldId/fixtureIds parameters at all -- a
+      // director grant can never legitimately carry a field or fixture
+      // scope. Reject that explicitly, with the same STAFF_SCOPE_NOT_ALLOWED
+      // contract normalizeGrant() uses for an ordinary director grant,
+      // *before* branching on activeDirectorCount. Previously this branch
+      // just dropped dto.fieldId/dto.fixtureIds on the floor by never
+      // forwarding them, so an illegal scope silently "succeeded" only while
+      // the tournament had zero active directors and started failing the
+      // instant a director existed (Task 18 review finding #10).
+      if (dto.fieldId !== undefined || (dto.fixtureIds !== undefined && dto.fixtureIds.length > 0)) {
+        throw new BadRequestException({
+          code: 'STAFF_SCOPE_NOT_ALLOWED',
+          message: 'Only field operators can receive field or fixture scopes',
+        });
+      }
+
       const activeDirectorCount = await this.prisma.v1TournamentStaffAssignment.count({
         where: {
           tournamentId,
@@ -140,14 +158,43 @@ export class TournamentOperationsStaffService {
     dto: RevokeTournamentStaffDto,
     audit: TournamentStaffAuditContext,
   ): Promise<TournamentStaffAssignmentResult> {
-    // dto.reason is intentionally not forwarded -- see the doc comment on
-    // RevokeTournamentStaffDto for why.
-    return this.staffService.revokeStaff({
+    const result = await this.staffService.revokeStaff({
       actorUserId,
       tournamentId,
       assignmentId,
       expectedVersion: dto.expectedVersion,
       audit,
     });
+
+    // TournamentStaffService.revokeStaff() (Task 7, apps/v1_api/src/tournaments/staff/,
+    // not this lane) has no parameter for a free-text reason -- its audit
+    // envelope cannot carry one. The frozen contract requires `reason` in
+    // this endpoint's body, so instead of validating and then silently
+    // dropping it (Task 18 review finding #11), persist it ourselves as a
+    // durable, queryable V1OperationAudit row scoped to the same assignment,
+    // using the table's own `reason` column (schema.prisma V1OperationAudit.reason)
+    // that the shared writer-service contract doesn't (yet) expose. This is a
+    // best-effort follow-up write (revokeStaff()'s own transaction has
+    // already committed by the time this runs, so it cannot be made atomic
+    // with the revocation itself without editing the out-of-lane service),
+    // but it means the reason is genuinely persisted and auditable instead
+    // of thrown away every single time.
+    await this.prisma.v1OperationAudit.create({
+      data: {
+        actorType: V1OperationActorType.USER,
+        actorUserId,
+        action: 'tournament.staff.revoke_reason',
+        resourceType: 'TOURNAMENT_STAFF_ASSIGNMENT',
+        resourceId: assignmentId,
+        requestId: audit.requestId,
+        maskedSourceIp: maskSourceIp(audit.sourceIp),
+        reason: dto.reason,
+        before: Prisma.JsonNull,
+        after: { reason: dto.reason },
+        tournamentId,
+      },
+    });
+
+    return result;
   }
 }

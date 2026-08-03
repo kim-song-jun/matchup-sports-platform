@@ -36,6 +36,18 @@ const DEFAULT_GAME_READ_AUTHORITY_PROVIDER: Provider = {
  * Because the binding then comes from `register()`'s parameter rather than a hardcoded class
  * reference inside this module, the override is a one-line change at the composition root and
  * this module's controller/service/tests are untouched.
+ *
+ * ## Fail-closed default (review finding #4)
+ * The default argument stays `DirectGameReadAuthorityService` (so `register()` with no argument
+ * keeps compiling for every existing composition root and test), but that class was hardened to
+ * THROW if `resolve()` is ever actually invoked (see its doc comment) instead of silently
+ * returning `{ outcome: 'ok' }`. Combined with the board service's own fail-closed validation of
+ * the `GAME_READ` flag value, a composition root that forgets to swap in the real Task 10
+ * comparator before enabling `GAME_READ=compare` now gets a loud `500
+ * GAME_READ_AUTHORITY_NOT_CONFIGURED` instead of a green response that silently skipped mismatch
+ * protection. `register()`'s argument was deliberately NOT made mandatory here -- doing so would
+ * require editing `app.module.ts`'s call site, which is outside this lane's ownership boundary for
+ * this change; the throwing default achieves the same fail-closed outcome without that edit.
  */
 @Module({})
 export class TournamentOperationsBoardModule {

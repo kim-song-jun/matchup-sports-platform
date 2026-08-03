@@ -1,4 +1,11 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { Prisma, V1EscalationStatus, V1GameSideKey, V1TournamentStaffRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
@@ -6,10 +13,31 @@ import type {
   StableWarningCode,
   TimeRelativeWarningCode,
 } from './dto/list-operations-query.dto';
+import { STABLE_WARNING_CODES } from './dto/list-operations-query.dto';
 import {
   GAME_READ_AUTHORITY,
   type GameReadAuthorityPort,
 } from './game-read-authority.port';
+
+type Tx = Prisma.TransactionClient;
+
+const GAME_READ_MODES = ['legacy', 'compare', 'new'] as const;
+type GameReadMode = (typeof GAME_READ_MODES)[number];
+
+/** Review finding #2: type guard so a `?warning=` value can be narrowed (and rejected when it
+ * isn't stable) without an unchecked cast -- see `list()`'s use near the top of the method. */
+function isStableWarningCode(code: string): code is StableWarningCode {
+  return (STABLE_WARNING_CODES as readonly string[]).includes(code);
+}
+
+/** Opaque keyset-cursor tuple. The *wire* shape of `cursor`/`nextCursor` is unchanged (a raw
+ * `V1TournamentFixture.id`, per the frozen "returns a clean empty page... when the cursor value
+ * does not match any existing fixture row" test) -- what changed (review finding #7) is that a
+ * cursor whose underlying row belongs to a DIFFERENT tournament than the one being queried is now
+ * rejected instead of silently being used as a foreign sort-position anchor. */
+interface CursorLookup {
+  readonly tournamentId: string;
+}
 
 /**
  * Operations board snapshot/filter service (Task 18).
@@ -32,12 +60,17 @@ import {
  * - `RESULT_REVIEW_OVERDUE`  -- an open (`PENDING`|`ACKNOWLEDGED`) `V1ResultEscalation` exists
  *                               for the fixture's game (any of its result revisions). (stable)
  *
- * `warning=<code>` filters the *returned* items/liveWarnings to fixtures whose computed warning
- * set (stable ∪ time-relative) contains that code; the underlying keyset page (and therefore
- * `nextCursor`) is unaffected by this filter, so a filtered page can legitimately return fewer
- * than `limit` items while more remain on later pages -- callers must keep paging until
- * `nextCursor` is null. Filtering by a time-relative code means the *filtered* response is no
- * longer guaranteed clock-stable -- see the "stable body" section below.
+ * ## `warning=<code>` only accepts STABLE_WARNING_CODES (P0 fix, review finding #2)
+ * `?warning=<code>` filters the *returned* `items`/`liveWarnings` to fixtures whose STABLE warning
+ * set contains that code. Time-relative codes (`NO_STAFF_ASSIGNED`, `LINEUP_NOT_SUBMITTED`) are
+ * REJECTED here (`BadRequestException`, `OPERATIONS_BOARD_WARNING_FILTER_NOT_STABLE`) -- see the
+ * DTO's doc comment for why: filtering `items` by a value that depends on `now` would make the
+ * claimed persisted-only stable body clock-dependent. This check runs in the service itself (not
+ * only the HTTP `ValidationPipe`) because several callers (this service's own unit/integration
+ * tests included) call `list()` directly, bypassing the DTO's `@IsIn` validator entirely. The
+ * underlying keyset page (and therefore `nextCursor`) is unaffected by the `warning` filter, so a
+ * filtered page can legitimately return fewer than `limit` items while more remain on later pages
+ * -- callers must keep paging until `nextCursor` is null.
  *
  * ## Stable body vs. time-relative part (D3 determinism hardening)
  * The response is split into a **hash-stable body** -- `{items, nextCursor, watermark}`, every
@@ -66,9 +99,10 @@ import {
  *                                     `RESULT_REVIEW_OVERDUE` <- `V1ResultEscalation.status`)
  * - `items[].version`              <- `V1Game.version`
  * - `items[].revisionId`           <- `V1Game.currentOfficialRevisionId`
+ * - `items[].stableRevision`       <- see "incremental key" section below (review finding #5)
  * - `nextCursor`                   <- `V1TournamentFixture.id` of the last page row (keyset cursor)
- * - `watermark`                    <- `max(V1Game.version, V1Game.updatedAt, V1TournamentFixture.updatedAt)`
- *                                     across the page -- all persisted columns, no clock read
+ * - `watermark`                    <- hash of the page's ordered `(fixtureId, stableRevision)`
+ *                                     pairs (see below) -- all persisted columns, no clock read
  *
  * `liveWarnings[].fixtureId` correlates back to `items[].fixtureId` (not new information);
  * `liveWarnings[].warnings` holds `TIME_RELATIVE_WARNING_CODES` only, each a function of
@@ -76,73 +110,122 @@ import {
  * `now`; `LINEUP_NOT_SUBMITTED` <- `V1TournamentFixture.scheduledAt - 60m` vs `now`, plus the
  * latest `V1GameLineup.state` per side).
  *
+ * ## Incremental key: `items[].stableRevision` + hashed `watermark` (P0 fix, review finding #5)
+ * `(fixtureId, version, revisionId)` cannot identify every stable-body change: `version`/
+ * `revisionId` are `V1Game` fields, so a fixture-only mutation (field (re)assignment, a field
+ * rename, an escalation transition between two non-`RESULT_REVIEW_OVERDUE`-relevant states that
+ * still touches `V1ResultEscalation.version`) can change the response without moving either. A
+ * fixture with no game at all always has `version:null, revisionId:null` and was previously
+ * indistinguishable from any other game-less fixture regardless of its own mutations.
+ *
+ * Each item now carries `stableRevision` -- a `sha256` hex digest over EVERY persisted input that
+ * can change that item's stable fields: `V1TournamentFixture.updatedAt`, `V1TournamentField.version`
+ * (nullable), `V1Game.version`+`updatedAt` (nullable), `V1Game.currentOfficialRevisionId`
+ * (nullable), and the max `V1ResultEscalation.version`/`updatedAt` across ALL (not only open)
+ * escalations tied to the fixture's game -- so an escalation closing (open -> closed) also moves
+ * this hash even though it does not, by itself, change `RESULT_REVIEW_OVERDUE`'s stable boolean
+ * membership for a fixture that already had other reasons to carry that code, or none at all.
+ * `watermark` is the hash of the page's ordered `(fixtureId, stableRevision)` list rather than two
+ * running maxima, so it moves whenever ANY item's `stableRevision` moves, regardless of which
+ * underlying model changed. A correct client diff is: compare `stableRevision` per `fixtureId`
+ * (fall back to "present in one snapshot but not the other" for adds/removals within the walked
+ * range); `version`/`revisionId` remain in the response for backward-compatible consumers but are
+ * no longer sufficient on their own to detect every change -- `stableRevision` is.
+ *
  * ## status filter
  * Reads `V1Game.state`, NOT `V1TournamentFixture.status` (`V1TournamentFixtureStatus`) --
  * `GamesService` never writes that column once the Game model became authoritative, so it is
  * dead/unmaintained and would silently under/over-match.
  *
- * ## Pagination
+ * ## Pagination (review finding #7)
  * Deterministic keyset cursor on `(round, fixtureNumber, id)` via Prisma's native unique-id
- * cursor (`cursor: { id }, skip: 1`), so a 100-fixture tournament streams without
- * duplicate/loss and without N+1 -- exactly 4 bounded queries run per page regardless of page
- * size: (1) the fixture page itself, (2) lineups for the page's games, (3) open escalations for
- * the page's games, (4) live field_operator staff assignments for the tournament.
+ * cursor (`cursor: { id }, skip: 1`) -- `id` is a total tie-breaker so the sort order itself is
+ * total. The cursor's WIRE shape is unchanged (a raw fixture id) to stay compatible with the
+ * existing "opaque token, garbage id -> clean empty page, never 500" contract. What changed:
+ * before running the main page query, a supplied `cursor` is resolved to its owning
+ * `tournamentId`; if that row exists AND belongs to a DIFFERENT tournament than the one being
+ * queried, the request is now rejected (`BadRequestException`,
+ * `OPERATIONS_BOARD_CURSOR_TOURNAMENT_MISMATCH`) instead of silently using a foreign row's sort
+ * position as this query's page-2 anchor (previously: `where: { tournamentId }` would combine with
+ * an unrelated row's `(round, fixtureNumber, id)` tuple with no validation at all). A cursor whose
+ * row does not exist at all still yields a clean empty page (Prisma's cursor subquery finds no
+ * anchor), matching the existing frozen test.
+ *
+ * **What this pagination DOES and does NOT guarantee, stated precisely:** for any row already
+ * emitted by a walk (or any row that existed, matched the filter, and had not yet been emitted at
+ * the moment its page was queried), the walk will emit it exactly once, in total `(round,
+ * fixtureNumber, id)` order, with no duplicates -- this holds even if OTHER rows are concurrently
+ * inserted, updated, or deleted, and even if the cursor's own row is later deleted. It does NOT
+ * guarantee that a row inserted (or mutated to newly match the filter) so that it sorts BEFORE the
+ * walk's current position will be retroactively included in that same walk -- this is the standard,
+ * expected trade-off of forward-only keyset pagination shared by this repo's other cursor-paginated
+ * endpoints (docs/api/global-contract.md's "opaque cursor" contract) and not a defect specific to
+ * this endpoint: a client that needs to observe such a row starts a new walk (`cursor` omitted).
+ * `nextCursor`/`watermark` are unrelated concerns; a client that wants to detect ALL changes across
+ * two full walks should compare `stableRevision` per `fixtureId` as described above, not rely on
+ * pagination alone.
  *
  * ## watermark
  * NOT the Task-9 `V1ProjectionWatermark` table -- that model is reserved for the async official-
  * result projection pipeline (a distinct, already-shipped purpose) and reusing it here would
- * collide semantically. Sensible default (Decision #3): an opaque per-response token derived
- * from the max `(V1Game.version, V1Game.updatedAt)` (and fixture `updatedAt`, so a field
- * reassignment with no game change still moves the watermark) observed across the page. This is
- * unrelated to and does not vary with the `GAME_READ` flag -- content is always drawn from
- * V1Game/V1GameResultRevision regardless of flag, so watermark and body bytes stay identical
- * across legacy/compare/rollback (scripts/qa/verify-game-result-cutover.mjs's `liveCutover()`
- * hash-equality assertions).
+ * collide semantically. Content is always drawn from the same persisted columns regardless of the
+ * `GAME_READ` flag, so watermark and body bytes stay identical across legacy/compare/rollback
+ * (scripts/qa/verify-game-result-cutover.mjs's `liveCutover()` hash-equality assertions).
  *
  * ## Time-relative warnings are a pure function of (persisted state, `now`)
  * `LINEUP_NOT_SUBMITTED` (scheduledAt-60m deadline) and staff-assignment coverage for
  * `NO_STAFF_ASSIGNED` (`expiresAt`) are genuinely time-relative business rules -- whether they
- * fire legitimately depends on the current instant, not solely on data written to the DB. Calling
- * `Date.now()`/`new Date()` freshly for *each row* (an earlier implementation) additionally let
- * the reference instant drift *within a single response* if row processing took any wall-clock
- * time. Both are eliminated by resolving `now` exactly ONCE per `list()` call and threading it
- * explicitly into `isLineupOverdue()`/`staffCoverage()` as a parameter (never read from inside
- * those functions) -- every row in one response is judged against the identical instant, and the
- * function becomes a pure function of its arguments (`now` included) rather than of ambient wall-
- * clock state. `now` defaults to `new Date()` (re-evaluated on every HTTP call, since the
- * controller never pins it -- so production behavior is unchanged, the board still reflects live
- * time) but can be pinned by a caller (see the "swap GAME_READ_AUTHORITY" HTTP test and the
- * "stable body is a pure function of persisted state" test in the Task 18 integration spec) for
- * exact reproducibility.
+ * fire legitimately depends on the current instant, not solely on data written to the DB. `now` is
+ * resolved exactly ONCE per `list()` call and threaded explicitly into `isLineupOverdue()`/
+ * `staffCoverage()` as a parameter (never read from inside those functions) -- every row in one
+ * response is judged against the identical instant. `now` defaults to `new Date()` (re-evaluated
+ * on every HTTP call, since the controller never pins it) but can be pinned by a caller for exact
+ * reproducibility.
  *
  * Per-response internal consistency is NOT the same guarantee as cross-response determinism: two
  * `list()` calls separated by real wall-clock time, with ZERO intervening DB writes, CAN still
  * legitimately disagree on `LINEUP_NOT_SUBMITTED`/`NO_STAFF_ASSIGNED` if a fixture/assignment
  * straddles the `scheduledAt-60m`/`expiresAt` boundary between those calls -- that is correct,
- * live behavior, not a bug. Rather than requiring every caller to keep fixtures "safely away" from
- * those boundaries by convention, the two time-relative codes are structurally kept OUT of the
- * hash-stable body: they live only in the separate `liveWarnings` array (see the "Stable body vs.
- * time-relative part" section above), so `{items, nextCursor, watermark}` is provably invariant
- * under `now` alone. Any hash-equality check spanning real time (e.g.
- * scripts/qa/verify-game-result-cutover.mjs's `liveCutover()`, which hashes the *whole* response
- * body) still requires fixtures/assignments held away from those two boundaries so that
- * `liveWarnings` itself doesn't change either -- exactly as this spec's own fixtures already are
- * (`overdueFixture.scheduledAt` is 3h in the past; the seeded staff assignment has
- * `expiresAt: null`) -- but the *architectural* guarantee (stable body provably pure) no longer
- * depends on that convention being followed correctly.
+ * live behavior, not a bug. The two time-relative codes are structurally kept OUT of the
+ * hash-stable body: they live only in the separate `liveWarnings` array, so `{items, nextCursor,
+ * watermark}` is provably invariant under `now` alone (and, per the fix above, can no longer be
+ * perturbed by the `warning` query filter either).
  *
- * ## GAME_READ authority seam
+ * ## Single consistent read snapshot (P1 fix, review finding #6)
+ * All persisted reads that feed the stable body -- the fixture page, lineups, `V1GameSide` rows,
+ * escalations, staff assignments, and the `GAME_READ` flag -- now run inside ONE
+ * `RepeatableRead` Prisma interactive transaction, so the response reflects a single database
+ * instant rather than tearing across several independent round-trips (an escalation opening/
+ * closing, or a staff assignment being granted/revoked, between two of the previously-independent
+ * queries could previously produce a response that never corresponded to any real committed
+ * state). The compare-mode authority call and its post-resolution CAS recheck (review finding #3)
+ * deliberately run AFTER that transaction commits, using fresh non-transactional reads -- holding
+ * a `RepeatableRead` snapshot open across an arbitrary external comparator call (which, once Task
+ * 10 lands, may not even share this process's Prisma connection) is an anti-pattern independent of
+ * this fix, so consistency for THAT seam is instead provided by binding the authority call to
+ * explicit expected values and re-verifying them fresh afterward -- see the port's doc comment.
+ *
+ * ## GAME_READ authority seam (P0 fix, review finding #4)
  * The current `GAME_READ` value is read via a plain `findUnique` against the
  * `V1GameOperationFlag` Prisma model (mirrors the pattern already used in
  * games.service.ts:494 for `PUBLIC_LIVE`) -- NOT via `GameOperationFlagsService.getFlag()`,
  * which hard-gates to `platform_ops` (`assertPlatformOps`) and would wrongly 403 a
- * field_operator/support_readonly board viewer. Only when the flag is `'compare'` does the board
- * call `GAME_READ_AUTHORITY.resolve()` once per page row that has a current/official result; on
- * the first `'mismatch'` outcome it aborts building the response entirely and throws
- * `ConflictException` with `GAME_RESULT_READ_MISMATCH` before any partial body is serialized
- * (fail-closed for the whole page, not a per-row omission). Under `'legacy'`/`'new'` the
- * comparator is never called and the response is built identically to `'compare'`-with-no-
- * mismatch.
+ * field_operator/support_readonly board viewer. A MISSING flag row still defaults to the
+ * documented `'legacy'` (a fresh environment where `GameOperationFlagsService.ensureDefaults()`
+ * has never run) -- but a flag row that EXISTS with a value other than exactly `'legacy'`,
+ * `'compare'`, or `'new'` is no longer silently treated as non-compare: it now fails closed with
+ * `InternalServerErrorException` (`GAME_READ_FLAG_INVALID`), since the board cannot determine
+ * which mode was intended and must refuse rather than guess. Only when the (validated) mode is
+ * `'compare'` does the board call `GAME_READ_AUTHORITY.resolve()` once per page row that has a
+ * current/official result, bound to that row's exact `expectedGameVersion`/`expectedRevisionId`/
+ * `expectedScoreHash`; on the first `'mismatch'` outcome (or a post-resolution CAS mismatch) it
+ * aborts building the response entirely and throws `ConflictException` before any partial body is
+ * serialized (fail-closed for the whole page, not a per-row omission). Under `'legacy'`/`'new'`
+ * the comparator is never called. The DEFAULT `GAME_READ_AUTHORITY` binding
+ * (`DirectGameReadAuthorityService`) itself now throws if ever actually invoked, rather than
+ * always returning `{ outcome: 'ok' }` -- see that class's doc comment -- so a composition root
+ * that flips `GAME_READ=compare` without wiring a real comparator fails loudly instead of silently
+ * approving every result.
  */
 @Injectable()
 export class TournamentOperationsBoardService {
@@ -160,72 +243,154 @@ export class TournamentOperationsBoardService {
   async list(tournamentId: string, query: ListTournamentOperationsQueryDto, now: Date = new Date()) {
     const limit = query.limit ?? 20;
 
+    // Review finding #2: reject a time-relative `warning` value here too, defensively, for any
+    // caller (this service's own tests included) that calls `list()` directly and bypasses the
+    // HTTP `ValidationPipe`/DTO `@IsIn` check. Captured into a local so the type-guard narrowing
+    // below is reliable (narrowing a destructured/aliased object property across a user-defined
+    // type guard is not as consistently supported by TS as narrowing a local `const`).
+    const rawWarning = query.warning;
+    if (rawWarning !== undefined && !isStableWarningCode(rawWarning)) {
+      throw new BadRequestException({
+        code: 'OPERATIONS_BOARD_WARNING_FILTER_NOT_STABLE',
+        message:
+          '해당 경고는 실시간(시간 의존) 값이라 목록 필터로 사용할 수 없어요. 전체 목록을 조회한 뒤 liveWarnings로 걸러주세요.',
+      });
+    }
+    // Narrowed by the guard above (throws otherwise): safe to treat as stable-only from here on.
+    const warningFilter: StableWarningCode | undefined = rawWarning;
+
     const where: Prisma.V1TournamentFixtureWhereInput = {
       tournamentId,
       ...(query.fieldId ? { fieldId: query.fieldId } : {}),
       ...(query.status ? { game: { is: { state: query.status } } } : {}),
     };
 
-    const rawRows = await this.prisma.v1TournamentFixture.findMany({
-      where,
-      orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }, { id: 'asc' }],
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        tournamentId: true,
-        round: true,
-        fixtureNumber: true,
-        fieldId: true,
-        field: { select: { name: true } },
-        homeRegistrationId: true,
-        awayRegistrationId: true,
-        scheduledAt: true,
-        updatedAt: true,
-        game: {
+    // Review finding #6: every persisted read that feeds the stable body runs inside one
+    // RepeatableRead transaction so the response reflects a single database instant.
+    const snapshot = await this.prisma.$transaction(
+      async (tx) => {
+        // Review finding #7: a cursor whose row belongs to a different tournament must not
+        // silently anchor this query's page. Resolved inside the same snapshot as the main page
+        // read so the check itself cannot race a concurrent cross-tournament mutation.
+        if (query.cursor !== undefined) {
+          const cursorRow: CursorLookup | null = await tx.v1TournamentFixture.findUnique({
+            where: { id: query.cursor },
+            select: { tournamentId: true },
+          });
+          if (cursorRow !== null && cursorRow.tournamentId !== tournamentId) {
+            throw new BadRequestException({
+              code: 'OPERATIONS_BOARD_CURSOR_TOURNAMENT_MISMATCH',
+              message: '다른 대회의 커서는 사용할 수 없어요. 처음부터 다시 조회해주세요.',
+            });
+          }
+          // cursorRow === null (garbage/non-existent id) falls through unchanged -- Prisma's
+          // cursor subquery below finds no anchor row and yields a clean empty page, matching the
+          // existing frozen "never a 500" test.
+        }
+
+        const rawRows = await tx.v1TournamentFixture.findMany({
+          where,
+          orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }, { id: 'asc' }],
+          take: limit + 1,
+          ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
           select: {
             id: true,
-            state: true,
-            version: true,
+            tournamentId: true,
+            round: true,
+            fixtureNumber: true,
+            fieldId: true,
+            field: { select: { name: true, version: true } },
+            homeRegistrationId: true,
+            awayRegistrationId: true,
+            scheduledAt: true,
             updatedAt: true,
-            currentOfficialRevisionId: true,
-            currentOfficialRevision: {
-              select: { id: true, score: true, missingScorer: true },
+            game: {
+              select: {
+                id: true,
+                state: true,
+                version: true,
+                updatedAt: true,
+                currentOfficialRevisionId: true,
+                currentOfficialRevision: {
+                  select: { id: true, score: true, missingScorer: true },
+                },
+              },
             },
           },
-        },
+        });
+
+        const hasNext = rawRows.length > limit;
+        const pageRows = hasNext ? rawRows.slice(0, limit) : rawRows;
+        const nextCursor = hasNext ? pageRows[pageRows.length - 1].id : null;
+
+        const gameIds = pageRows
+          .map((row) => row.game?.id)
+          .filter((gameId): gameId is string => gameId !== undefined);
+
+        const [lineupLatestBySideKey, escalationSummaryMap, staffCoverageResult, gameReadFlag] =
+          await Promise.all([
+            this.latestLineupStateBySide(tx, gameIds),
+            this.escalationSummaryByGameId(tx, gameIds),
+            this.staffCoverage(tx, tournamentId, now),
+            tx.v1GameOperationFlag.findUnique({
+              where: { key: 'GAME_READ' },
+              select: { value: true },
+            }),
+          ]);
+
+        return {
+          pageRows,
+          nextCursor,
+          lineupLatestBySideKey,
+          escalationSummaryMap,
+          staffCoverageResult,
+          gameReadFlag,
+        };
       },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
 
-    const hasNext = rawRows.length > limit;
-    const pageRows = hasNext ? rawRows.slice(0, limit) : rawRows;
-    const nextCursor = hasNext ? pageRows[pageRows.length - 1].id : null;
+    const {
+      pageRows,
+      nextCursor,
+      lineupLatestBySideKey,
+      escalationSummaryMap,
+      staffCoverageResult,
+      gameReadFlag,
+    } = snapshot;
 
-    const gameIds = pageRows
-      .map((row) => row.game?.id)
-      .filter((gameId): gameId is string => gameId !== undefined);
-
-    const [lineupLatestBySideKey, overdueGameIds, staffCoverage, gameReadFlag] = await Promise.all([
-      this.latestLineupStateBySide(gameIds),
-      this.overdueEscalationGameIds(gameIds),
-      this.staffCoverage(tournamentId, now),
-      this.prisma.v1GameOperationFlag.findUnique({
-        where: { key: 'GAME_READ' },
-        select: { value: true },
-      }),
-    ]);
-
-    // Table is only ever populated by GameOperationFlagsService.ensureDefaults(); if that has
-    // never run (e.g. a fresh environment), fall back to the documented default of 'legacy'
-    // (GAME_OPERATION_FLAG_DEFAULTS.GAME_READ in config/game-operation-flags.ts).
-    const isCompareMode = (gameReadFlag?.value ?? 'legacy') === 'compare';
+    // Review finding #4: a flag row that exists but holds an unrecognized value is a
+    // configuration defect, not a safe legacy fallback -- fail closed rather than guess. A
+    // genuinely MISSING row (fresh environment) still defaults to 'legacy'.
+    const rawGameReadValue = gameReadFlag?.value;
+    if (rawGameReadValue !== undefined && !(GAME_READ_MODES as readonly string[]).includes(rawGameReadValue)) {
+      throw new InternalServerErrorException({
+        code: 'GAME_READ_FLAG_INVALID',
+        message: '경기 결과 조회 모드 설정값이 올바르지 않아요. 운영팀에 문의해주세요.',
+      });
+    }
+    const gameReadMode: GameReadMode = (rawGameReadValue as GameReadMode | undefined) ?? 'legacy';
+    const isCompareMode = gameReadMode === 'compare';
 
     if (isCompareMode) {
+      // Review finding #3: bind the authority decision to the EXACT revision/score this response
+      // is about to serialize, then re-verify (CAS-style, fresh non-transactional read) that
+      // nothing changed between the snapshot above and this point, for every row the authority
+      // approved.
+      const expectedByGameId = new Map<string, { version: number; revisionId: string }>();
       for (const row of pageRows) {
         if (row.game === null || row.game.currentOfficialRevisionId === null) continue;
+        const expectedGameVersion = row.game.version;
+        const expectedRevisionId = row.game.currentOfficialRevisionId;
+        const expectedScoreHash = createHash('sha256')
+          .update(JSON.stringify(row.game.currentOfficialRevision?.score ?? null))
+          .digest('hex');
         const result = await this.readAuthority.resolve({
           gameId: row.game.id,
           tournamentFixtureId: row.id,
+          expectedGameVersion,
+          expectedRevisionId,
+          expectedScoreHash,
         });
         if (result.outcome === 'mismatch') {
           throw new ConflictException({
@@ -234,20 +399,44 @@ export class TournamentOperationsBoardService {
             details: { mismatch: result.detail },
           });
         }
+        expectedByGameId.set(row.game.id, { version: expectedGameVersion, revisionId: expectedRevisionId });
+      }
+
+      if (expectedByGameId.size > 0) {
+        const freshGameRows = await this.prisma.v1Game.findMany({
+          where: { id: { in: [...expectedByGameId.keys()] } },
+          select: { id: true, version: true, currentOfficialRevisionId: true },
+        });
+        for (const fresh of freshGameRows) {
+          const expected = expectedByGameId.get(fresh.id);
+          if (
+            expected !== undefined &&
+            (fresh.version !== expected.version || fresh.currentOfficialRevisionId !== expected.revisionId)
+          ) {
+            throw new ConflictException({
+              code: 'GAME_RESULT_READ_STALE',
+              message: '경기 결과가 조회 도중 변경되어 안전하게 처리했어요. 다시 시도해주세요.',
+              details: { gameId: fresh.id },
+            });
+          }
+        }
       }
     }
 
-    let maxVersion = 0;
-    let maxUpdatedAtMs = 0;
     // Built as one array of {item, liveWarnings} pairs (rather than two independently-mapped
     // arrays) so the stable/time-relative split can never drift out of (fixtureId) alignment with
     // each other or with `pageRows`' deterministic order.
     const rows = pageRows.map((row) => {
-      maxUpdatedAtMs = Math.max(maxUpdatedAtMs, row.updatedAt.getTime());
-      if (row.game !== null) {
-        maxVersion = Math.max(maxVersion, row.game.version);
-        maxUpdatedAtMs = Math.max(maxUpdatedAtMs, row.game.updatedAt.getTime());
-      }
+      const fieldVersion = row.field?.version ?? null;
+      const gameVersion = row.game?.version ?? null;
+      const gameUpdatedAtMs = row.game?.updatedAt.getTime() ?? null;
+      const revisionId = row.game?.currentOfficialRevisionId ?? null;
+      const escalationSummary =
+        (row.game !== null ? escalationSummaryMap.get(row.game.id) : undefined) ?? {
+          overdue: false,
+          maxVersion: 0,
+          maxUpdatedAtMs: 0,
+        };
 
       // Stable: a pure function of persisted columns alone -- see the "Stable body vs.
       // time-relative part" doc section for the field-by-field persisted source of each code.
@@ -256,19 +445,35 @@ export class TournamentOperationsBoardService {
       if (row.game?.currentOfficialRevision?.missingScorer === true) {
         warnings.push('MISSING_SCORER');
       }
-      if (row.game !== null && overdueGameIds.has(row.game.id)) {
+      if (escalationSummary.overdue) {
         warnings.push('RESULT_REVIEW_OVERDUE');
       }
 
       // Time-relative: additionally a function of `now` -- deliberately kept OUT of `warnings`
       // above and surfaced only via the separate `liveWarnings` array below.
       const liveWarnings: TimeRelativeWarningCode[] = [];
-      if (!this.isStaffCovered(row.id, row.fieldId, staffCoverage)) {
+      if (!this.isStaffCovered(row.id, row.fieldId, staffCoverageResult)) {
         liveWarnings.push('NO_STAFF_ASSIGNED');
       }
       if (row.game !== null && this.isLineupOverdue(row.scheduledAt, row.game.id, lineupLatestBySideKey, now)) {
         liveWarnings.push('LINEUP_NOT_SUBMITTED');
       }
+
+      // Review finding #5: one hash covering every persisted input that can move this item's
+      // stable fields -- see the "Incremental key" doc section above.
+      const stableRevision = createHash('sha256')
+        .update(
+          JSON.stringify([
+            row.updatedAt.getTime(),
+            fieldVersion,
+            gameVersion,
+            gameUpdatedAtMs,
+            revisionId,
+            escalationSummary.maxVersion,
+            escalationSummary.maxUpdatedAtMs,
+          ]),
+        )
+        .digest('hex');
 
       return {
         item: {
@@ -285,29 +490,33 @@ export class TournamentOperationsBoardService {
           scheduledAt: row.scheduledAt,
           currentScore: row.game?.currentOfficialRevision?.score ?? null,
           warnings,
-          version: row.game?.version ?? null,
-          revisionId: row.game?.currentOfficialRevisionId ?? null,
+          version: gameVersion,
+          revisionId,
+          stableRevision,
         },
         liveWarningEntry: { fixtureId: row.id, warnings: liveWarnings },
       };
     });
 
-    // `?warning=` matches against the UNION of stable + time-relative codes per fixture (Decision:
-    // the filter must keep working across both groups), but filtering never mutates which group a
-    // code is reported under -- a fixture matched only via a time-relative code still reports that
-    // code in `liveWarnings`, never copied into the stable `items[].warnings`.
-    const warningFilter: string | undefined = query.warning;
+    // `?warning=` now matches ONLY stable codes (review finding #2) -- `items` membership must
+    // never depend on `now`. `liveWarnings` for the filtered fixtures is still reported (a fixture
+    // matched via a stable code may ALSO carry time-relative warnings worth surfacing), but the
+    // filter predicate itself never looks at a time-relative code. `warningFilter` was already
+    // validated/narrowed near the top of this method (throws before reaching here otherwise).
     const matchesWarningFilter = warningFilter
-      ? ({ item, liveWarningEntry }: (typeof rows)[number]) =>
-          (item.warnings as readonly string[]).includes(warningFilter) ||
-          (liveWarningEntry.warnings as readonly string[]).includes(warningFilter)
+      ? ({ item }: (typeof rows)[number]) => (item.warnings as readonly string[]).includes(warningFilter)
       : () => true;
     const filteredRows = rows.filter(matchesWarningFilter);
 
     return {
       items: filteredRows.map((row) => row.item),
       nextCursor,
-      watermark: this.encodeWatermark(maxVersion, maxUpdatedAtMs),
+      // Computed over the FULL unfiltered page (`rows`), matching `nextCursor`'s semantics: the
+      // `warning` filter only narrows what is returned, it does not change what the underlying
+      // page/watermark represents.
+      watermark: this.encodeWatermark(
+        rows.map((row) => ({ fixtureId: row.item.fixtureId, stableRevision: row.item.stableRevision })),
+      ),
       // NOT part of the stable snapshot -- see the "Stable body vs. time-relative part" doc
       // section above. May legitimately differ between two reads separated by real wall-clock
       // time even with zero intervening DB writes.
@@ -315,25 +524,51 @@ export class TournamentOperationsBoardService {
     };
   }
 
-  private encodeWatermark(version: number, updatedAtMs: number): string {
-    return Buffer.from(
-      JSON.stringify({ v: version, t: new Date(updatedAtMs).toISOString() }),
-    ).toString('base64url');
+  private encodeWatermark(entries: ReadonlyArray<{ fixtureId: string; stableRevision: string }>): string {
+    const hash = createHash('sha256').update(JSON.stringify(entries)).digest('hex');
+    return Buffer.from(JSON.stringify({ h: hash })).toString('base64url');
   }
 
   private async latestLineupStateBySide(
+    tx: Tx,
     gameIds: readonly string[],
   ): Promise<Map<string, string>> {
     if (gameIds.length === 0) return new Map();
-    const rows = await this.prisma.v1GameLineup.findMany({
-      where: { gameId: { in: [...gameIds] } },
-      orderBy: [{ gameId: 'asc' }, { sideId: 'asc' }, { revision: 'desc' }],
-      select: { gameId: true, sideId: true, state: true },
-    });
+
+    // V1GameLineup.sideId is V1GameSide.id (a UUID, no Prisma relation between the two models --
+    // see the schema comment trail), but isLineupOverdue() needs to look up by the stable
+    // V1GameSideKey ('HOME'/'AWAY'), not by that UUID (which is per-game and unknowable to the
+    // caller). Resolve sideId -> sideKey via V1GameSide once here, so the map below can be keyed
+    // by `${gameId}:${sideKey}` -- exactly what isLineupOverdue() looks up.
+    const [rows, sides] = await Promise.all([
+      // Review finding #13: bound this to exactly one row per (gameId, sideId) -- the latest
+      // revision -- instead of transferring every historical revision a side has ever had.
+      // Prisma's `distinct` + matching leading `orderBy` fields compiles to a single DISTINCT
+      // ON-style query (one round-trip, still `v1GameLineup.findMany`), so this stays within
+      // the fixed six-query board.list() budget while no longer scaling with revision count.
+      tx.v1GameLineup.findMany({
+        where: { gameId: { in: [...gameIds] } },
+        orderBy: [{ gameId: 'asc' }, { sideId: 'asc' }, { revision: 'desc' }],
+        distinct: ['gameId', 'sideId'],
+        select: { gameId: true, sideId: true, state: true },
+      }),
+      tx.v1GameSide.findMany({
+        where: { gameId: { in: [...gameIds] } },
+        select: { id: true, sideKey: true },
+      }),
+    ]);
+    const sideKeyBySideId = new Map(sides.map((side) => [side.id, side.sideKey]));
+
     const latest = new Map<string, string>();
-    // Ordered by revision desc within (gameId, sideId), so the first row seen per key is latest.
+    // `distinct` already collapsed each (gameId, sideId) to its single latest-revision row, so
+    // this loop no longer needs to skip repeats -- one row per key by construction.
     for (const row of rows) {
-      const key = `${row.gameId}:${row.sideId}`;
+      const sideKey = sideKeyBySideId.get(row.sideId);
+      // A lineup row whose sideId no longer resolves to a V1GameSide is unexpected data drift,
+      // not a valid HOME/AWAY state -- skip it rather than fabricating a key isLineupOverdue()
+      // could never intentionally look up.
+      if (sideKey === undefined) continue;
+      const key = `${row.gameId}:${sideKey}`;
       if (!latest.has(key)) latest.set(key, row.state);
     }
     return latest;
@@ -353,23 +588,47 @@ export class TournamentOperationsBoardService {
     return homeState === undefined || homeState === 'DRAFT' || awayState === undefined || awayState === 'DRAFT';
   }
 
-  private async overdueEscalationGameIds(gameIds: readonly string[]): Promise<Set<string>> {
-    if (gameIds.length === 0) return new Set();
-    const rows = await this.prisma.v1ResultEscalation.findMany({
-      where: {
-        status: { in: [V1EscalationStatus.PENDING, V1EscalationStatus.ACKNOWLEDGED] },
-        resultRevision: { gameId: { in: [...gameIds] } },
+  /** Review finding #5: returns, per gameId, both the stable `RESULT_REVIEW_OVERDUE` boolean
+   * (open PENDING/ACKNOWLEDGED escalation) AND the max version/updatedAt across ALL escalations
+   * for that game (open or not) -- the latter feeds `stableRevision` so a status transition that
+   * doesn't flip the boolean (e.g. ACKNOWLEDGED -> RESOLVED while another escalation is still
+   * open, or an escalation opening/closing on a fixture with no other warnings) still moves the
+   * item's incremental key. Single query, same query-count as the prior `overdueEscalationGameIds`
+   * it replaces. */
+  private async escalationSummaryByGameId(
+    tx: Tx,
+    gameIds: readonly string[],
+  ): Promise<Map<string, { overdue: boolean; maxVersion: number; maxUpdatedAtMs: number }>> {
+    const summary = new Map<string, { overdue: boolean; maxVersion: number; maxUpdatedAtMs: number }>();
+    if (gameIds.length === 0) return summary;
+    const rows = await tx.v1ResultEscalation.findMany({
+      where: { resultRevision: { gameId: { in: [...gameIds] } } },
+      select: {
+        status: true,
+        version: true,
+        updatedAt: true,
+        resultRevision: { select: { gameId: true } },
       },
-      select: { resultRevision: { select: { gameId: true } } },
     });
-    return new Set(rows.map((row) => row.resultRevision.gameId));
+    for (const row of rows) {
+      const gameId = row.resultRevision.gameId;
+      const existing = summary.get(gameId) ?? { overdue: false, maxVersion: 0, maxUpdatedAtMs: 0 };
+      existing.maxVersion = Math.max(existing.maxVersion, row.version);
+      existing.maxUpdatedAtMs = Math.max(existing.maxUpdatedAtMs, row.updatedAt.getTime());
+      if (row.status === V1EscalationStatus.PENDING || row.status === V1EscalationStatus.ACKNOWLEDGED) {
+        existing.overdue = true;
+      }
+      summary.set(gameId, existing);
+    }
+    return summary;
   }
 
   private async staffCoverage(
+    tx: Tx,
     tournamentId: string,
     now: Date,
   ): Promise<{ fieldIds: Set<string>; fixtureIds: Set<string> }> {
-    const assignments = await this.prisma.v1TournamentStaffAssignment.findMany({
+    const assignments = await tx.v1TournamentStaffAssignment.findMany({
       where: {
         tournamentId,
         role: V1TournamentStaffRole.FIELD_OPERATOR,

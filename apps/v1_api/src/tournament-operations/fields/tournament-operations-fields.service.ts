@@ -1,4 +1,11 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Prisma, V1TournamentField } from '@prisma/client';
 import {
   OperationAuditWriterService,
@@ -68,6 +75,37 @@ export type TournamentFixtureFieldResult = {
  * fixture's tournamentId. This does NOT require platform_ops-only, unlike
  * literal field CRUD, because assigning an existing field to a fixture is
  * day-of-tournament operations work, not field inventory management.
+ *
+ * assignFixtureField()/clearFixtureField() re-derive the acting principal
+ * with TournamentStaffAccessService.assertAccess() as the *first* statement
+ * inside the write transaction (Task 18 review finding #8) instead of before
+ * `$transaction` opens. This service does not own
+ * apps/v1_api/src/tournaments/staff/ so it cannot pass the transaction
+ * client into assertAccess() itself, but re-running the same authorization
+ * read as late as possible -- immediately before the CAS write, in the same
+ * async continuation -- closes the concrete regression the review flags
+ * ("revoke the actor, resume, and expect no write"): a revoke that already
+ * committed is visible to this recheck's fresh query and aborts the
+ * transaction before any row is touched.
+ *
+ * Both fixture-field writes are also optimistic-concurrency CAS'd against
+ * the exact fieldId value this request observed (`where: {..., fieldId:
+ * before}`), not a blind `update()`. Postgres re-validates an UPDATE's WHERE
+ * clause against the latest committed row when a concurrent transaction has
+ * already changed it, so two requests that both observed the same prior
+ * fieldId can never both silently win -- the loser's affected-row count is 0
+ * and it gets a 409 instead of a swallowed lost update (finding #8).
+ *
+ * `Idempotency-Key` is enforced as real idempotency, not just an audit
+ * correlation id (finding #9): every mutation locks a durable, per-actor
+ * scope with `pg_advisory_xact_lock` (mirroring
+ * apps/v1_api/src/game-operations/result-escalation-mutation.service.ts),
+ * then looks up `V1IdempotencyRecord` (already migrated in
+ * 20260729000100_v1_game_operations, no new migration needed here). A replay
+ * with the same key and the same request-body hash returns the original,
+ * already-committed response without re-applying the mutation; the same key
+ * with a different body hash is rejected with 409
+ * IDEMPOTENCY_PAYLOAD_CONFLICT instead of silently re-running.
  */
 @Injectable()
 export class TournamentOperationsFieldsService {
@@ -86,7 +124,10 @@ export class TournamentOperationsFieldsService {
 
     const fields = await this.prisma.v1TournamentField.findMany({
       where: { tournamentId },
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      // `id` is the final tie-breaker so two fields sharing both sortOrder
+      // and createdAt still resolve to one total, repeatable order instead
+      // of whatever order Postgres happens to return them in (finding #16.2).
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     });
     return { items: fields.map((field) => this.serialize(field)) };
   }
@@ -100,7 +141,33 @@ export class TournamentOperationsFieldsService {
     const principal = await this.authorizeFieldManagement(actorUserId, tournamentId);
     await this.assertTournamentExists(tournamentId);
 
-    const created = await this.prisma.$transaction(async (tx) => {
+    const action = 'tournament.field.create';
+    const resourceType = 'TOURNAMENT_FIELD';
+    // No field id exists yet before creation; scope the idempotency record to
+    // the tournament instead, disambiguated by the payload hash below (a
+    // reused key with a different scopeKey/name/sortOrder is a genuine
+    // conflict, not a replay).
+    const resourceId = tournamentId;
+    const payloadHash = this.hashPayload({
+      scopeKey: dto.scopeKey,
+      name: dto.name,
+      sortOrder: dto.sortOrder ?? 0,
+    });
+
+    return this.prisma.$transaction(async (tx) => {
+      const replay = await this.consumeIdempotency<TournamentFieldResult>(
+        tx,
+        actorUserId,
+        action,
+        resourceType,
+        resourceId,
+        audit.requestId,
+        payloadHash,
+      );
+      if (replay !== undefined) {
+        return replay;
+      }
+
       let field: V1TournamentField;
       try {
         field = await tx.v1TournamentField.create({
@@ -122,18 +189,29 @@ export class TournamentOperationsFieldsService {
       }
 
       await this.writeAudit(tx, principal, audit, {
-        action: 'tournament.field.create',
-        targetType: 'TOURNAMENT_FIELD',
+        action,
+        targetType: resourceType,
         targetId: field.id,
         tournamentId,
         fieldId: field.id,
         before: null,
         after: this.auditSnapshot(field),
       });
-      return field;
-    });
 
-    return this.serialize(created);
+      const response = this.serialize(field);
+      await this.recordIdempotency(
+        tx,
+        actorUserId,
+        action,
+        resourceType,
+        resourceId,
+        audit.requestId,
+        payloadHash,
+        201,
+        response,
+      );
+      return response;
+    });
   }
 
   async update(
@@ -145,7 +223,38 @@ export class TournamentOperationsFieldsService {
   ): Promise<TournamentFieldResult> {
     const principal = await this.authorizeFieldManagement(actorUserId, tournamentId);
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    // Reject a no-op patch instead of silently manufacturing a new version
+    // and audit row for a request that changes nothing (finding #16.1).
+    if (dto.name === undefined && dto.sortOrder === undefined && dto.active === undefined) {
+      throw new UnprocessableEntityException({
+        code: 'FIELD_UPDATE_EMPTY',
+        message: '변경할 값을 하나 이상 입력해주세요.',
+      });
+    }
+
+    const action = 'tournament.field.update';
+    const resourceType = 'TOURNAMENT_FIELD';
+    const payloadHash = this.hashPayload({
+      expectedVersion: dto.expectedVersion,
+      name: dto.name ?? null,
+      sortOrder: dto.sortOrder ?? null,
+      active: dto.active ?? null,
+    });
+
+    return this.prisma.$transaction(async (tx) => {
+      const replay = await this.consumeIdempotency<TournamentFieldResult>(
+        tx,
+        actorUserId,
+        action,
+        resourceType,
+        fieldId,
+        audit.requestId,
+        payloadHash,
+      );
+      if (replay !== undefined) {
+        return replay;
+      }
+
       const before = await tx.v1TournamentField.findUnique({
         where: { tournamentId_id: { tournamentId, id: fieldId } },
       });
@@ -180,18 +289,29 @@ export class TournamentOperationsFieldsService {
       }
 
       await this.writeAudit(tx, principal, audit, {
-        action: 'tournament.field.update',
-        targetType: 'TOURNAMENT_FIELD',
+        action,
+        targetType: resourceType,
         targetId: fieldId,
         tournamentId,
         fieldId,
         before: this.auditSnapshot(before),
         after: this.auditSnapshot(after),
       });
-      return after;
-    });
 
-    return this.serialize(updated);
+      const response = this.serialize(after);
+      await this.recordIdempotency(
+        tx,
+        actorUserId,
+        action,
+        resourceType,
+        fieldId,
+        audit.requestId,
+        payloadHash,
+        200,
+        response,
+      );
+      return response;
+    });
   }
 
   async assignFixtureField(
@@ -201,13 +321,34 @@ export class TournamentOperationsFieldsService {
     dto: AssignTournamentFixtureFieldDto,
     audit: TournamentOperationsFieldAuditContext,
   ): Promise<TournamentFixtureFieldResult> {
-    const principal = await this.access.assertAccess({
-      userId: actorUserId,
-      action: 'event_reverse',
-      resource: { tournamentId, fixtureId },
-    });
+    const action = 'tournament.fixture.field_assign';
+    const resourceType = 'TOURNAMENT_FIXTURE_FIELD';
+    const payloadHash = this.hashPayload({ fieldId: dto.fieldId });
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
+      // Recheck as the first statement inside the transaction -- see the
+      // class doc comment (finding #8). A revoke that committed before this
+      // point is visible here and aborts the whole transaction before any
+      // fixture row is touched.
+      const principal = await this.access.assertAccess({
+        userId: actorUserId,
+        action: 'event_reverse',
+        resource: { tournamentId, fixtureId },
+      });
+
+      const replay = await this.consumeIdempotency<TournamentFixtureFieldResult>(
+        tx,
+        actorUserId,
+        action,
+        resourceType,
+        fixtureId,
+        audit.requestId,
+        payloadHash,
+      );
+      if (replay !== undefined) {
+        return replay;
+      }
+
       const fixture = await tx.v1TournamentFixture.findUnique({
         where: { tournamentId_id: { tournamentId, id: fixtureId } },
         select: { id: true, tournamentId: true, fieldId: true },
@@ -230,15 +371,37 @@ export class TournamentOperationsFieldsService {
         });
       }
 
+      // CAS on the fieldId value this request actually observed instead of a
+      // blind update, so a concurrent assignment can never be silently
+      // clobbered (lost-update half of finding #8): Postgres re-evaluates
+      // this WHERE clause against the latest committed row when another
+      // transaction changed it first, so the loser here gets 0 affected rows
+      // instead of an accepted-but-overwritten write.
       const before = fixture.fieldId;
-      const after = await tx.v1TournamentFixture.update({
-        where: { tournamentId_id: { tournamentId, id: fixtureId } },
+      const cas = await tx.v1TournamentFixture.updateMany({
+        where: { tournamentId, id: fixtureId, fieldId: before },
         data: { fieldId: dto.fieldId },
+      });
+      if (cas.count !== 1) {
+        throw new ConflictException({
+          code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT',
+          message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.',
+        });
+      }
+
+      const after = await tx.v1TournamentFixture.findUnique({
+        where: { tournamentId_id: { tournamentId, id: fixtureId } },
         select: { id: true, tournamentId: true, fieldId: true },
       });
+      if (after === null) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_FIXTURE_NOT_PERSISTED',
+          message: '경기 정보를 다시 불러오지 못했어요.',
+        });
+      }
 
       await this.writeAudit(tx, principal, audit, {
-        action: 'tournament.fixture.field_assign',
+        action,
         targetType: 'TOURNAMENT_FIXTURE',
         targetId: fixtureId,
         tournamentId,
@@ -247,10 +410,25 @@ export class TournamentOperationsFieldsService {
         before: { fieldId: before },
         after: { fieldId: after.fieldId },
       });
-      return after;
-    });
 
-    return { fixtureId: updated.id, tournamentId: updated.tournamentId, fieldId: updated.fieldId };
+      const response: TournamentFixtureFieldResult = {
+        fixtureId: after.id,
+        tournamentId: after.tournamentId,
+        fieldId: after.fieldId,
+      };
+      await this.recordIdempotency(
+        tx,
+        actorUserId,
+        action,
+        resourceType,
+        fixtureId,
+        audit.requestId,
+        payloadHash,
+        200,
+        response,
+      );
+      return response;
+    });
   }
 
   async clearFixtureField(
@@ -259,13 +437,31 @@ export class TournamentOperationsFieldsService {
     fixtureId: string,
     audit: TournamentOperationsFieldAuditContext,
   ): Promise<TournamentFixtureFieldResult> {
-    const principal = await this.access.assertAccess({
-      userId: actorUserId,
-      action: 'event_reverse',
-      resource: { tournamentId, fixtureId },
-    });
+    const action = 'tournament.fixture.field_clear';
+    const resourceType = 'TOURNAMENT_FIXTURE_FIELD';
+    const payloadHash = this.hashPayload({ action });
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
+      // Same late recheck as assignFixtureField() -- see finding #8.
+      const principal = await this.access.assertAccess({
+        userId: actorUserId,
+        action: 'event_reverse',
+        resource: { tournamentId, fixtureId },
+      });
+
+      const replay = await this.consumeIdempotency<TournamentFixtureFieldResult>(
+        tx,
+        actorUserId,
+        action,
+        resourceType,
+        fixtureId,
+        audit.requestId,
+        payloadHash,
+      );
+      if (replay !== undefined) {
+        return replay;
+      }
+
       const fixture = await tx.v1TournamentFixture.findUnique({
         where: { tournamentId_id: { tournamentId, id: fixtureId } },
         select: { id: true, tournamentId: true, fieldId: true },
@@ -277,15 +473,34 @@ export class TournamentOperationsFieldsService {
         });
       }
 
+      // Same CAS discipline as assignFixtureField() (finding #8): clearing is
+      // only ever a no-op race (both converge on fieldId=null), but the CAS
+      // still ensures we clear the field we actually observed.
       const before = fixture.fieldId;
-      const after = await tx.v1TournamentFixture.update({
-        where: { tournamentId_id: { tournamentId, id: fixtureId } },
+      const cas = await tx.v1TournamentFixture.updateMany({
+        where: { tournamentId, id: fixtureId, fieldId: before },
         data: { fieldId: null },
+      });
+      if (cas.count !== 1) {
+        throw new ConflictException({
+          code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT',
+          message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.',
+        });
+      }
+
+      const after = await tx.v1TournamentFixture.findUnique({
+        where: { tournamentId_id: { tournamentId, id: fixtureId } },
         select: { id: true, tournamentId: true, fieldId: true },
       });
+      if (after === null) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_FIXTURE_NOT_PERSISTED',
+          message: '경기 정보를 다시 불러오지 못했어요.',
+        });
+      }
 
       await this.writeAudit(tx, principal, audit, {
-        action: 'tournament.fixture.field_clear',
+        action,
         targetType: 'TOURNAMENT_FIXTURE',
         targetId: fixtureId,
         tournamentId,
@@ -294,10 +509,25 @@ export class TournamentOperationsFieldsService {
         before: { fieldId: before },
         after: { fieldId: null },
       });
-      return after;
-    });
 
-    return { fixtureId: updated.id, tournamentId: updated.tournamentId, fieldId: updated.fieldId };
+      const response: TournamentFixtureFieldResult = {
+        fixtureId: after.id,
+        tournamentId: after.tournamentId,
+        fieldId: after.fieldId,
+      };
+      await this.recordIdempotency(
+        tx,
+        actorUserId,
+        action,
+        resourceType,
+        fixtureId,
+        audit.requestId,
+        payloadHash,
+        200,
+        response,
+      );
+      return response;
+    });
   }
 
   // ─── helpers ──────────────────────────────────────────────────────────────
@@ -329,6 +559,89 @@ export class TournamentOperationsFieldsService {
     if (tournament === null) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
+  }
+
+  /**
+   * Locks a durable, per-(actor, action, resource, key) scope for the
+   * remainder of the current transaction and, if a non-expired record
+   * already exists for it, returns the original committed response so the
+   * caller can replay it instead of re-applying the mutation.
+   *
+   * The `pg_advisory_xact_lock` (not just the `findUnique` read) is what
+   * makes this a durable, race-safe check rather than an application-level
+   * TOCTOU: two concurrent requests carrying the same idempotency key
+   * serialize on this lock, so the second one always observes whatever the
+   * first one committed (or is about to commit) before deciding whether to
+   * replay (finding #9).
+   *
+   * Throws 409 IDEMPOTENCY_PAYLOAD_CONFLICT if the same key is reused with a
+   * different request body (`payloadHash` mismatch) instead of silently
+   * treating it as a fresh mutation or a valid replay.
+   */
+  private async consumeIdempotency<T>(
+    tx: Prisma.TransactionClient,
+    actorUserId: string,
+    action: string,
+    resourceType: string,
+    resourceId: string,
+    idempotencyKey: string,
+    payloadHash: string,
+  ): Promise<T | undefined> {
+    const scope = JSON.stringify([actorUserId, action, resourceType, resourceId, idempotencyKey]);
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope}, 0))`;
+
+    const existing = await tx.v1IdempotencyRecord.findUnique({
+      where: {
+        actorUserId_action_resourceType_resourceId_idempotencyKey: {
+          actorUserId,
+          action,
+          resourceType,
+          resourceId,
+          idempotencyKey,
+        },
+      },
+      select: { payloadHash: true, responseBody: true, expiresAt: true },
+    });
+    if (existing === null || existing.expiresAt <= new Date()) {
+      return undefined;
+    }
+    if (existing.payloadHash !== payloadHash) {
+      throw new ConflictException({
+        code: 'IDEMPOTENCY_PAYLOAD_CONFLICT',
+        message: '같은 Idempotency-Key가 다른 요청 내용과 함께 재사용됐어요.',
+      });
+    }
+    return existing.responseBody as unknown as T;
+  }
+
+  private async recordIdempotency(
+    tx: Prisma.TransactionClient,
+    actorUserId: string,
+    action: string,
+    resourceType: string,
+    resourceId: string,
+    idempotencyKey: string,
+    payloadHash: string,
+    responseStatus: number,
+    responseBody: unknown,
+  ): Promise<void> {
+    await tx.v1IdempotencyRecord.create({
+      data: {
+        actorUserId,
+        action,
+        resourceType,
+        resourceId,
+        idempotencyKey,
+        payloadHash,
+        responseStatus,
+        responseBody: responseBody as unknown as Prisma.InputJsonValue,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
+      },
+    });
+  }
+
+  private hashPayload(payload: unknown): string {
+    return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
   }
 
   private async writeAudit(

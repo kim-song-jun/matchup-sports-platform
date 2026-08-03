@@ -371,12 +371,14 @@ jobs:
           jest_log="${RUNNER_TEMP}/task10-jest-red.log"
           trap 'rm -f "${boundary_log}" "${jest_log}"' EXIT
 
+          set +e
           node scripts/qa/verify-game-result-cutover.mjs \
             --mode red \
             --evidence-dir "${TASK10_EVIDENCE_DIR}" >"${boundary_log}" 2>&1
           boundary_exit=$?
-          pnpm --filter v1_api test:integration -- --runInBand --runTestsByPath test/games/game-backfill.integration-spec.ts >"${jest_log}" 2>&1
+          pnpm --filter v1_api exec jest --selectProjects integration --runInBand --runTestsByPath test/games/game-backfill.integration-spec.ts >"${jest_log}" 2>&1
           jest_exit=$?
+          set -e
 
           boundary_expected=false
           jest_expected=false

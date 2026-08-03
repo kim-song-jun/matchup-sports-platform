@@ -13,9 +13,9 @@ import { TeamSchedulesService } from './team-schedules.service';
 
 // Task 12 (team schedules) is split into five standalone controllers so concurrent edits never
 // collide on the same file, all delegating to the one shared TeamSchedulesService (list/create/
-// detail/update/cancel/triggerReminder/mySchedule) plus two dedicated services for their own
-// lanes (ScheduleAttendanceService, GuestRecruitmentService):
-//   - TeamSchedulesController: GET/POST .../schedules, GET/PATCH/cancel .../schedules/:id
+// detail/update/cancel/complete/triggerReminder/mySchedule) plus two dedicated services for their
+// own lanes (ScheduleAttendanceService, GuestRecruitmentService):
+//   - TeamSchedulesController: GET/POST .../schedules, GET/PATCH/cancel/complete .../schedules/:id
 //   - ScheduleAttendanceController: PUT .../attendance/me
 //   - GuestRecruitmentController: GET/POST/PATCH .../guest-recruitment + POST .../applications
 //   - ScheduleRemindersController: POST .../reminders

@@ -24,13 +24,21 @@ import { WorkerRealtimeNotifier } from './worker-realtime-notifier';
  *   gateway and HTTP routes the worker has no business serving, duplicated across two
  *   independently-scaled processes.
  *
- * This module supplies the ONLY thing the worker's ScheduleReminderService actually needs — a
- * live NotificationsService (for `emitNotificationToMany`) — while binding REALTIME_NOTIFIER
- * (see notifications/realtime-notifier.port.ts) to WorkerRealtimeNotifier, a no-op that never
- * imports realtime/ or games/. Persistence (V1Notification row) and web push
- * (WebPushService.sendToUser) behave identically to the HTTP path; only the in-process
- * Socket.IO `notification:new` emit differs for worker-originated notifications — see
- * WorkerRealtimeNotifier's docblock for the exact, explicit behavioural delta.
+ * This module supplies what the worker's ScheduleReminderService needs while binding
+ * REALTIME_NOTIFIER (see notifications/realtime-notifier.port.ts) to WorkerRealtimeNotifier, a
+ * no-op that never imports realtime/ or games/.
+ *
+ * W1 fix note (see schedule-reminder.service.ts's class docblock for the full defect): the worker
+ * no longer persists reminder notifications through `NotificationsService.emitNotificationToMany`
+ * — that method is fire-and-forget against a separate Prisma connection and swallows failures,
+ * which is correct for the HTTP path but let the outbox mark a reminder COMPLETED before (or even
+ * if never) a V1Notification row existed. `ScheduleReminderService` now writes the row directly
+ * through the worker's own transaction (`tx`) instead, so `NotificationsService` is still declared
+ * here only for the un-owned v1-game-operations-worker.main.ts call site's existing constructor
+ * arity. `WebPushService` remains genuinely used — `ScheduleReminderService` calls
+ * `sendToUser` best-effort, but ONLY after the durable row has been created. The in-process
+ * Socket.IO `notification:new` emit still never fires for worker-originated notifications — see
+ * WorkerRealtimeNotifier's docblock for that explicit, unrelated behavioural delta.
  *
  * This module and the HTTP app's notifications-service.module.ts both declare
  * NotificationsService/WebPushService as providers, but that is safe: the worker

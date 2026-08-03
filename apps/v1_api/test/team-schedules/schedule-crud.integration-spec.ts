@@ -168,6 +168,68 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     expect(row.version).toBe(1);
   });
 
+  // CP1 regression: `UpdateScheduleDto.rsvpDeadlineAt` previously let `null` bypass validation and
+  // fall straight into `new Date(null)`, which silently persists 1970-01-01T00:00:00.000Z instead
+  // of clearing the column. The fix distinguishes three states: omitted (preserve), `null`
+  // (explicit clear to SQL NULL), and a real date string (parse it). If the fix is reverted, the
+  // `toBeNull()` assertions below fail — the row would instead read back as `new Date(0)`.
+  it(
+    'CP1 regression: PATCH rsvpDeadlineAt:null clears it to SQL NULL (never a silent ' +
+      '1970-01-01 corruption), and omitting the field preserves whatever value is already set',
+    async () => {
+      const created = await service.create(
+        authUser(ids.ownerA),
+        ids.teamA,
+        { ...baseDto(), rsvpDeadlineAt: '2026-09-05T00:00:00.000Z' },
+        'cp1-create-key',
+      );
+      const scheduleId = (created as { id: string }).id;
+
+      const cleared = await service.update(
+        authUser(ids.ownerA),
+        ids.teamA,
+        scheduleId,
+        { expectedVersion: 0, rsvpDeadlineAt: null },
+        'cp1-clear-key',
+      );
+      expect((cleared as { rsvpDeadlineAt: Date | null }).rsvpDeadlineAt).toBeNull();
+
+      const rowAfterClear = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
+      expect(rowAfterClear.rsvpDeadlineAt).toBeNull();
+      // The historical bug: `new Date(null)` silently becomes epoch instead of SQL NULL.
+      expect(rowAfterClear.rsvpDeadlineAt).not.toEqual(new Date(0));
+
+      // Omitting rsvpDeadlineAt entirely on a later update must preserve the now-NULL value —
+      // never silently resurrect or re-corrupt it.
+      const omittedAfterClear = await service.update(
+        authUser(ids.ownerA),
+        ids.teamA,
+        scheduleId,
+        { expectedVersion: 1, title: 'CP1 omit-preserves-null title' },
+        'cp1-omit-after-clear-key',
+      );
+      expect((omittedAfterClear as { rsvpDeadlineAt: Date | null }).rsvpDeadlineAt).toBeNull();
+
+      // Omitting the field when a real value IS currently set must preserve that real value too
+      // (not just the null case).
+      const withDeadline = await service.create(
+        authUser(ids.ownerA),
+        ids.teamA,
+        { ...baseDto(), rsvpDeadlineAt: '2026-09-06T00:00:00.000Z' },
+        'cp1-preserve-create-key',
+      );
+      const withDeadlineId = (withDeadline as { id: string }).id;
+      const omittedWithValue = await service.update(
+        authUser(ids.ownerA),
+        ids.teamA,
+        withDeadlineId,
+        { expectedVersion: 0, title: 'CP1 omit-preserves-value title' },
+        'cp1-preserve-omit-key',
+      );
+      expect((omittedWithValue as { rsvpDeadlineAt: Date }).rsvpDeadlineAt).toEqual(new Date('2026-09-06T00:00:00.000Z'));
+    },
+  );
+
   it('cancel is a state transition (never a delete) and closes an attached OPEN guest recruitment', async () => {
     const created = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'cancel-create-key');
     const scheduleId = (created as { id: string }).id;
@@ -272,5 +334,214 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
       ),
     );
     expectHttpCode(error, 404, 'GUEST_RECRUITMENT_NOT_FOUND');
+  });
+
+  // W7 regression: teamMatchId previously bypassed cross-team ownership validation for every
+  // non-MATCH type (the check only ran `if (dto.type === 'MATCH' && dto.teamMatchId)`). If that
+  // guard is ever reverted, this call would silently persist a TRAINING schedule carrying team
+  // B's teamMatchId (201) instead of rejecting it — this test fails on the `expectHttpCode` call
+  // and/or the row-count assertion in that case.
+  it(
+    'W7 regression: rejects teamMatchId on a non-MATCH schedule type outright (cross-team ' +
+      'ownership validation must never be skippable via type) and creates no row',
+    async () => {
+      const before = await prisma.v1TeamSchedule.count({ where: { teamId: ids.teamA } });
+
+      const error = await captureFailure(() =>
+        service.create(
+          authUser(ids.ownerA),
+          ids.teamA,
+          { ...baseDto(), type: 'TRAINING', teamMatchId: ids.otherTeamMatch } as never,
+          'w7-non-match-team-match-id-key',
+        ),
+      );
+      expectHttpCode(error, 422, 'SCHEDULE_TEAM_MATCH_NOT_ALLOWED');
+
+      const after = await prisma.v1TeamSchedule.count({ where: { teamId: ids.teamA } });
+      expect(after).toBe(before);
+    },
+  );
+
+  // W9 regression (schedule creation, the "unordered findFirst can select the stale expired row"
+  // shape): create with key K, expire K's record, legitimately reuse K once (creates a second,
+  // distinct schedule), then immediately retry K again. The fixed lookup filters to
+  // `expiresAt > now` and orders by recency, so it deterministically finds only the still-active
+  // second record and replays it. Reverting to an unfiltered/unordered findFirst risks the still-
+  // present expired first record shadowing the active one and creating a THIRD schedule instead
+  // of replaying the second — this test's final count/replay assertions catch that.
+  it(
+    'W9 regression: reusing a create Idempotency-Key after its record has expired creates a new ' +
+      'schedule once, and an immediate retry of that same key replays the second schedule ' +
+      '(never a third)',
+    async () => {
+      const key = 'w9-create-expiry-key';
+      const dto = { ...baseDto(), title: 'W9 create expiry fixture' };
+
+      const first = await service.create(authUser(ids.ownerA), ids.teamA, dto, key);
+      const firstId = (first as { id: string; replayed: boolean }).id;
+      expect((first as { replayed: boolean }).replayed).toBe(false);
+
+      // Simulate the key's 30-day retention window having elapsed.
+      await prisma.v1IdempotencyRecord.updateMany({
+        where: { action: 'SCHEDULE_CREATE', resourceType: 'V1_TEAM_SCHEDULE', resourceId: firstId, idempotencyKey: key },
+        data: { expiresAt: new Date(Date.now() - 1_000) },
+      });
+
+      // Legitimate reuse after expiry: a genuinely new schedule, not a replay or a crash.
+      const second = await service.create(authUser(ids.ownerA), ids.teamA, dto, key);
+      const secondId = (second as { id: string; replayed: boolean }).id;
+      expect((second as { replayed: boolean }).replayed).toBe(false);
+      expect(secondId).not.toBe(firstId);
+
+      // Immediate retry of the same key: must replay the second schedule's response, never create
+      // a third.
+      const retry = await service.create(authUser(ids.ownerA), ids.teamA, dto, key);
+      expect(retry).toMatchObject({ id: secondId, replayed: true });
+
+      const scheduleCount = await prisma.v1TeamSchedule.count({ where: { teamId: ids.teamA, title: dto.title } });
+      expect(scheduleCount).toBe(2);
+    },
+  );
+
+  // W9 regression (update/cancel/reminder shape): checkReplay() now DELETES an expired
+  // exact-scope idempotency record (under the already-held advisory lock) instead of merely
+  // treating it as absent. Without the delete, the final `storeIdempotency` insert at the end of
+  // a legitimately-reused key hits the still-present expired row's unique constraint (P2002) and
+  // the whole mutation rolls back instead of succeeding. Preinsert an already-expired record for
+  // each action, then drive a real, valid call through that exact (resource, key) scope and assert
+  // it succeeds cleanly with exactly one live idempotency record surviving.
+  it('W9 regression: an expired update idempotency record is replaced (not P2002) on legitimate key reuse', async () => {
+    const created = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'w9-update-create-key');
+    const scheduleId = (created as { id: string }).id;
+    const key = 'w9-update-expiry-key';
+
+    await prisma.v1IdempotencyRecord.create({
+      data: {
+        actorUserId: ids.ownerA,
+        action: 'SCHEDULE_UPDATE',
+        resourceType: 'V1_TEAM_SCHEDULE',
+        resourceId: scheduleId,
+        idempotencyKey: key,
+        payloadHash: 'stale-hash-from-a-previous-generation',
+        responseStatus: 200,
+        responseBody: {},
+        expiresAt: new Date(Date.now() - 1_000),
+      },
+    });
+
+    const result = await service.update(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 0, title: 'W9 update survives expiry' }, key);
+    expect(result).toMatchObject({ title: 'W9 update survives expiry', version: 1, replayed: false });
+
+    const records = await prisma.v1IdempotencyRecord.findMany({
+      where: { action: 'SCHEDULE_UPDATE', resourceType: 'V1_TEAM_SCHEDULE', resourceId: scheduleId, idempotencyKey: key },
+    });
+    expect(records).toHaveLength(1);
+    expect(records[0].expiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('W9 regression: an expired cancel idempotency record is replaced (not P2002) on legitimate key reuse', async () => {
+    const created = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'w9-cancel-create-key');
+    const scheduleId = (created as { id: string }).id;
+    const key = 'w9-cancel-expiry-key';
+
+    await prisma.v1IdempotencyRecord.create({
+      data: {
+        actorUserId: ids.ownerA,
+        action: 'SCHEDULE_CANCEL',
+        resourceType: 'V1_TEAM_SCHEDULE',
+        resourceId: scheduleId,
+        idempotencyKey: key,
+        payloadHash: 'stale-hash-from-a-previous-generation',
+        responseStatus: 200,
+        responseBody: {},
+        expiresAt: new Date(Date.now() - 1_000),
+      },
+    });
+
+    const result = await service.cancel(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 0, cancelReason: 'W9 expiry test' }, key);
+    expect(result).toMatchObject({ state: 'cancelled', version: 1, replayed: false });
+
+    const records = await prisma.v1IdempotencyRecord.findMany({
+      where: { action: 'SCHEDULE_CANCEL', resourceType: 'V1_TEAM_SCHEDULE', resourceId: scheduleId, idempotencyKey: key },
+    });
+    expect(records).toHaveLength(1);
+    expect(records[0].expiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('W9 regression: an expired reminder-trigger idempotency record is replaced (not P2002) on legitimate key reuse', async () => {
+    const created = await service.create(
+      authUser(ids.ownerA),
+      ids.teamA,
+      { ...baseDto(), rsvpDeadlineAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000).toISOString() },
+      'w9-reminder-create-key',
+    );
+    const scheduleId = (created as { id: string }).id;
+    const key = 'w9-reminder-expiry-key';
+
+    await prisma.v1IdempotencyRecord.create({
+      data: {
+        actorUserId: ids.ownerA,
+        action: 'SCHEDULE_REMINDER_TRIGGER',
+        resourceType: 'V1_TEAM_SCHEDULE',
+        resourceId: scheduleId,
+        idempotencyKey: key,
+        payloadHash: 'stale-hash-from-a-previous-generation',
+        responseStatus: 200,
+        responseBody: {},
+        expiresAt: new Date(Date.now() - 1_000),
+      },
+    });
+
+    const result = await service.triggerReminder(authUser(ids.ownerA), ids.teamA, scheduleId, { kind: 'rsvp_deadline' }, key);
+    expect(result).toMatchObject({ kind: 'rsvp_deadline', replayed: false });
+
+    const records = await prisma.v1IdempotencyRecord.findMany({
+      where: { action: 'SCHEDULE_REMINDER_TRIGGER', resourceType: 'V1_TEAM_SCHEDULE', resourceId: scheduleId, idempotencyKey: key },
+    });
+    expect(records).toHaveLength(1);
+    expect(records[0].expiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  // W10 regression: TeamSchedulesService.complete() is the only mechanism that makes COMPLETED
+  // reachable. If this mutation were ever removed (reverting to the pre-W10 state where the
+  // `status=completed` filter was reachable-but-dead), this whole block fails: complete() itself
+  // would not exist, or a schedule would never actually reach COMPLETED, or a completed schedule
+  // would remain mutable.
+  it('W10 regression: complete() transitions an ended schedule to COMPLETED, rejects before endAt, and the state is terminal', async () => {
+    const notYetEnded = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'w10-not-ended-key');
+    const notYetEndedId = (notYetEnded as { id: string }).id;
+    const tooEarly = await captureFailure(() =>
+      service.complete(authUser(ids.ownerA), ids.teamA, notYetEndedId, { expectedVersion: 0 }, 'w10-too-early-key'),
+    );
+    expectHttpCode(tooEarly, 409, 'SCHEDULE_NOT_YET_ENDED');
+
+    const ended = await service.create(
+      authUser(ids.ownerA),
+      ids.teamA,
+      { ...baseDto(), startAt: '2020-01-01T10:00:00.000Z', endAt: '2020-01-01T12:00:00.000Z' },
+      'w10-ended-create-key',
+    );
+    const endedId = (ended as { id: string }).id;
+
+    const completed = await service.complete(authUser(ids.ownerA), ids.teamA, endedId, { expectedVersion: 0 }, 'w10-complete-key');
+    expect(completed).toMatchObject({ state: 'completed', version: 1, replayed: false });
+
+    const row = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: endedId } });
+    expect(row.state).toBe('COMPLETED');
+
+    // Terminal: neither a second complete() nor an update()/cancel() can move it anywhere else.
+    const secondComplete = await captureFailure(() =>
+      service.complete(authUser(ids.ownerA), ids.teamA, endedId, { expectedVersion: 1 }, 'w10-complete-again-key'),
+    );
+    expectHttpCode(secondComplete, 409, 'SCHEDULE_TERMINAL');
+
+    const cancelAfterComplete = await captureFailure(() =>
+      service.cancel(authUser(ids.ownerA), ids.teamA, endedId, { expectedVersion: 1, cancelReason: 'should not apply' }, 'w10-cancel-after-complete-key'),
+    );
+    expectHttpCode(cancelAfterComplete, 409, 'SCHEDULE_TERMINAL');
+
+    // The contract's query filter must actually surface it now that it is reachable.
+    const mine = await service.mySchedule(authUser(ids.ownerA), { status: 'completed' });
+    expect(mine.items.map((i: { id: string }) => i.id)).toContain(endedId);
   });
 });

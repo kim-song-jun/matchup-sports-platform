@@ -103,9 +103,17 @@ export class UpdateScheduleDto {
   @Min(1)
   capacity?: number;
 
+  /**
+   * CP1 fix: the type is explicitly `string | null` because `null` and "omitted" are two
+   * different, meaningful signals TeamSchedulesService.update() must distinguish — omitted means
+   * "leave the existing rsvpDeadlineAt unchanged", `null` means "explicitly clear it to SQL NULL".
+   * `@IsOptional()` already skips `@IsDateString()` for both `undefined` and `null` (that is
+   * exactly what makes `null` a valid explicit-clear value here, not a validation bug) — a real,
+   * non-null value is still required to pass `@IsDateString()`.
+   */
   @IsOptional()
   @IsDateString()
-  rsvpDeadlineAt?: string;
+  rsvpDeadlineAt?: string | null;
 
   @IsOptional()
   @IsEnum(V1ScheduleVisibility)

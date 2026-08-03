@@ -21,8 +21,9 @@ export class MyScheduleQueryDto {
   @IsDateString()
   to?: string;
 
-  // 'completed' accepted for forward compatibility only — Task 12 introduces no mechanism
-  // that ever transitions a schedule to COMPLETED (see team-schedules.service.ts notes).
+  // W10 fix: 'completed' is now reachable — TeamSchedulesService.complete() (see its docblock)
+  // is the versioned mutation that transitions a schedule from SCHEDULED to COMPLETED, so this
+  // filter is a live query path, not forward-compat-only as it was before.
   @IsOptional()
   @IsIn(['scheduled', 'cancelled', 'completed'])
   status?: 'scheduled' | 'cancelled' | 'completed';

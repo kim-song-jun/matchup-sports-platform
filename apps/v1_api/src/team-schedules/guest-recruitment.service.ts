@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, V1ScheduleGuestApplication, V1ScheduleGuestRecruitment } from '@prisma/client';
+import { Prisma, V1ScheduleGuestRecruitment } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -59,27 +60,42 @@ export class GuestRecruitmentService {
   async getRecruitment(user: V1AuthUser | null, teamId: string, scheduleId: string): Promise<RecruitmentView> {
     const schedule = await this.prisma.v1TeamSchedule.findFirst({
       where: { id: scheduleId, teamId },
-      select: { id: true },
+      select: { id: true, visibility: true },
     });
     if (!schedule) {
       throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Schedule was not found' });
     }
 
+    const isMember = user !== null && (await this.hasActiveMembership(teamId, user.id));
+
+    // W8-B fix: the PARENT schedule's own visibility must gate this read too, not just the
+    // recruitment's — mirrors team-schedules.service.ts's detail() gate ("only PUBLIC is
+    // anonymous/non-member readable"). Without this check, a PUBLIC-visibility recruitment
+    // attached to a TEAM/MEMBERS-visibility (private) schedule was reachable by any anonymous
+    // caller who merely knew the scheduleId, bypassing the parent schedule's privacy entirely.
+    // This must run BEFORE the recruitment lookup below (not after) so that, together with the
+    // CP4 fix below, a non-member on a private schedule gets the same NOT_FOUND_OR_ARCHIVED
+    // regardless of whether a recruitment row exists underneath it.
+    if (schedule.visibility !== 'PUBLIC' && !isMember) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Schedule was not found' });
+    }
+
     const recruitment = await this.prisma.v1ScheduleGuestRecruitment.findUnique({ where: { scheduleId: schedule.id } });
     if (!recruitment) {
+      // CP4 fix: this GUEST_RECRUITMENT_NOT_FOUND is now only reachable once the schedule-visibility
+      // gate above has already let the caller through (isMember, or the schedule is PUBLIC), so it
+      // can no longer be used to distinguish "private schedule" from "no recruitment" — that
+      // distinction collapsed into the single NOT_FOUND_OR_ARCHIVED thrown above.
       throw new NotFoundException({ code: 'GUEST_RECRUITMENT_NOT_FOUND', message: 'Guest recruitment was not found' });
     }
 
-    // recruitment.visibility (not the parent schedule's visibility) gates read access here, per
-    // the recon spec's literal actor description: MEMBERS requires an active team membership,
-    // PUBLIC is readable by anonymous callers too. A non-member reading a MEMBERS-visibility
-    // recruitment gets the existence-hiding 404 (never GUEST_RECRUITMENT_NOT_FOUND, never 403) so
-    // the recruitment's existence is never leaked to outsiders.
-    if (recruitment.visibility === 'MEMBERS') {
-      const isMember = user !== null && (await this.hasActiveMembership(teamId, user.id));
-      if (!isMember) {
-        throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Guest recruitment was not found' });
-      }
+    // recruitment.visibility gates independently from the schedule's own visibility: a PUBLIC
+    // schedule can still carry a MEMBERS-only recruitment. Use the same NOT_FOUND_OR_ARCHIVED
+    // code/message as the schedule-visibility gate above (not GUEST_RECRUITMENT_NOT_FOUND) so a
+    // non-member can never distinguish "schedule is private", "recruitment is members-only", and
+    // "no recruitment exists" from each other via the error code.
+    if (recruitment.visibility === 'MEMBERS' && !isMember) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Guest recruitment was not found' });
     }
 
     const counts = await this.countApplications(this.prisma, recruitment.id);
@@ -196,11 +212,19 @@ export class GuestRecruitmentService {
         return { ...(replay.responseBody as unknown as RecruitmentResponse), replayed: true };
       }
 
-      const teamLock = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM v1_team_schedules WHERE id = ${scheduleId} AND team_id = ${teamId} FOR UPDATE
+      const teamLock = await tx.$queryRaw<Array<{ id: string; state: string }>>`
+        SELECT id, state FROM v1_team_schedules WHERE id = ${scheduleId} AND team_id = ${teamId} FOR UPDATE
       `;
       if (teamLock.length === 0) {
         throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Schedule was not found' });
+      }
+      // W4 fix: a CANCELLED schedule's recruitment must stay terminal. Without this check a
+      // manager could PATCH { expectedVersion, state: "open" } straight after cancellation and
+      // flip the just-CLOSED recruitment back to OPEN, since only recruitment.state === 'FILLED'
+      // was previously treated as terminal here. Re-read the *locked* schedule row's state (not a
+      // stale pre-lock read) so this is checked atomically with the recruitment mutation below.
+      if (teamLock[0].state !== 'SCHEDULED') {
+        throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
       }
 
       const recruitmentLock = await tx.$queryRaw<{ id: string }[]>`
@@ -305,18 +329,34 @@ export class GuestRecruitmentService {
         return { ...(replay.responseBody as unknown as ApplicationResponse), replayed: true };
       }
 
-      const schedule = await tx.v1TeamSchedule.findFirst({ where: { id: scheduleId, teamId }, select: { id: true, state: true } });
-      if (!schedule) {
+      // W2 fix: lock the schedule row FOR UPDATE *before* reading its state, using the same lock
+      // order as cancellation (TeamSchedulesService.cancel -> lockSchedule) and updateRecruitment
+      // above (schedule first, recruitment second). Without this lock, an application transaction
+      // could read SCHEDULED/OPEN, then a concurrent cancellation could lock the schedule, flip it
+      // to CANCELLED, close the recruitment, and commit — all before this transaction's insert,
+      // letting a PENDING application land on an already-terminal schedule. Taking the lock here
+      // makes this transaction wait behind (or block) any concurrent cancel/update, so the state
+      // re-read immediately below is always current.
+      const scheduleLock = await tx.$queryRaw<Array<{ id: string; state: string }>>`
+        SELECT id, state FROM v1_team_schedules WHERE id = ${scheduleId} AND team_id = ${teamId} FOR UPDATE
+      `;
+      if (scheduleLock.length === 0) {
         throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Schedule was not found' });
       }
-      if (schedule.state !== 'SCHEDULED') {
+      if (scheduleLock[0].state !== 'SCHEDULED') {
         throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is no longer active' });
       }
 
-      const recruitment = await tx.v1ScheduleGuestRecruitment.findUnique({ where: { scheduleId } });
-      if (!recruitment) {
+      // Same fix, recruitment side: lock the recruitment row FOR UPDATE (second in lock order,
+      // matching updateRecruitment) so a concurrent close (updateRecruitment) or cancellation
+      // (which closes OPEN recruitment) cannot commit between this read and the insert below.
+      const recruitmentLock = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM v1_schedule_guest_recruitments WHERE schedule_id = ${scheduleId} FOR UPDATE
+      `;
+      if (recruitmentLock.length === 0) {
         throw new NotFoundException({ code: 'GUEST_RECRUITMENT_NOT_FOUND', message: 'Guest recruitment was not found' });
       }
+      const recruitment = await tx.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId } });
 
       // Duplicate check happens BEFORE the terminal/deadline checks below: a caller who already
       // applied while recruitment was open must always be able to idempotently re-fetch their own
@@ -355,41 +395,73 @@ export class GuestRecruitmentService {
         throw new ConflictException({ code: 'GUEST_RECRUITMENT_DEADLINE_PASSED', message: 'Guest recruitment deadline has passed' });
       }
 
-      let created: V1ScheduleGuestApplication;
-      try {
-        created = await tx.v1ScheduleGuestApplication.create({
+      // W3 fix: insert with `ON CONFLICT ... DO NOTHING RETURNING` instead of a Prisma
+      // .create() wrapped in a try/catch for P2002. The old code caught P2002 and then issued
+      // `findUniqueOrThrow()` on the *same* `tx` — but a statement error (including a unique
+      // violation) aborts the enclosing PostgreSQL transaction; every subsequent statement on
+      // that transaction, including the recovery SELECT, fails with
+      // "current transaction is aborted". The intended "alreadyApplied: true" recovery path was
+      // therefore unreachable for a genuine concurrent duplicate. `ON CONFLICT DO NOTHING` never
+      // raises a statement error, so the transaction stays healthy and the fallback SELECT below
+      // actually runs. (With the W2 locks above, two inserts for the same recruitment now also
+      // serialize behind the recruitment row's FOR UPDATE lock, but this fix is independently
+      // correct and does not rely on that serialization holding.)
+      const applicationId = randomUUID();
+      const insertedRows = await tx.$queryRaw<
+        Array<{ id: string; state: string; display_name_snapshot: string; note: string | null }>
+      >`
+        INSERT INTO v1_schedule_guest_applications (
+          id, recruitment_id, user_id, display_name_snapshot, note, state, created_at, updated_at
+        ) VALUES (
+          ${applicationId}, ${recruitment.id}, ${user.id}, ${dto.displayName}, ${dto.note ?? null},
+          'PENDING'::"V1GuestApplicationState", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT ON CONSTRAINT v1_schedule_guest_applications_recruitment_user_key DO NOTHING
+        RETURNING id, state, display_name_snapshot, note
+      `;
+
+      if (insertedRows.length === 0) {
+        // A genuine concurrent duplicate: another transaction's insert won the race and committed
+        // between our duplicate check above and this insert. The transaction is still healthy, so
+        // this SELECT reliably returns the winner's row instead of throwing
+        // "transaction aborted".
+        const raceExisting = await tx.v1ScheduleGuestApplication.findUniqueOrThrow({
+          where: { recruitmentId_userId: { recruitmentId: recruitment.id, userId: user.id } },
+        });
+        const raceResponse: ApplicationResponse = {
+          applicationId: raceExisting.id,
+          state: raceExisting.state,
+          displayName: raceExisting.displayNameSnapshot,
+          note: raceExisting.note,
+          alreadyApplied: true,
+        };
+        // CP3 fix: this branch previously returned without ever calling
+        // v1IdempotencyRecord.create() for the current idempotencyKey, unlike every other return
+        // path in this method. A client retry with the same key therefore never found a replay
+        // record here — it re-ran the whole transaction (including the INSERT ... ON CONFLICT)
+        // from scratch every time, and never got `replayed: true` back. Persisting the record
+        // here closes that gap so the idempotency contract holds uniformly across every branch.
+        await tx.v1IdempotencyRecord.create({
           data: {
-            recruitmentId: recruitment.id,
-            userId: user.id,
-            displayNameSnapshot: dto.displayName,
-            note: dto.note ?? null,
-            state: 'PENDING',
+            actorUserId: user.id,
+            action: APPLICATION_ACTION,
+            resourceType: APPLICATION_RESOURCE_TYPE,
+            resourceId: scheduleId,
+            idempotencyKey,
+            payloadHash,
+            responseStatus: 200,
+            responseBody: raceResponse as unknown as Prisma.InputJsonValue,
+            expiresAt: new Date(Date.now() + IDEMPOTENCY_RETENTION_MS),
           },
         });
-      } catch (err) {
-        // Defense against a true concurrent double-submit racing past the read above (the
-        // (recruitmentId, userId) unique constraint is the final source of truth) — treat it the
-        // same as the already-applied path above rather than surfacing a raw 23505/P2002.
-        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-          const raceExisting = await tx.v1ScheduleGuestApplication.findUniqueOrThrow({
-            where: { recruitmentId_userId: { recruitmentId: recruitment.id, userId: user.id } },
-          });
-          return {
-            applicationId: raceExisting.id,
-            state: raceExisting.state,
-            displayName: raceExisting.displayNameSnapshot,
-            note: raceExisting.note,
-            alreadyApplied: true,
-            replayed: false,
-          };
-        }
-        throw err;
+        return { ...raceResponse, replayed: false };
       }
 
+      const created = insertedRows[0];
       const response: ApplicationResponse = {
         applicationId: created.id,
         state: created.state,
-        displayName: created.displayNameSnapshot,
+        displayName: created.display_name_snapshot,
         note: created.note,
         alreadyApplied: false,
       };
@@ -499,19 +571,32 @@ export class GuestRecruitmentService {
     resourceId: string,
     idempotencyKey: string,
   ) {
+    const identity = {
+      actorUserId: userId,
+      action,
+      resourceType,
+      resourceId,
+      idempotencyKey,
+    };
     const record = await tx.v1IdempotencyRecord.findUnique({
-      where: {
-        actorUserId_action_resourceType_resourceId_idempotencyKey: {
-          actorUserId: userId,
-          action,
-          resourceType,
-          resourceId,
-          idempotencyKey,
-        },
-      },
+      where: { actorUserId_action_resourceType_resourceId_idempotencyKey: identity },
       select: { payloadHash: true, responseBody: true, expiresAt: true },
     });
-    if (record === null || record.expiresAt <= new Date()) return null;
+    if (record === null) return null;
+    if (record.expiresAt <= new Date()) {
+      // W9 fix (same defect family as team-schedules.service.ts's checkReplay): an expired
+      // record was previously treated as "absent" here but never removed, so the later
+      // v1IdempotencyRecord.create() call on this same composite unique key hit a P2002
+      // constraint violation and rolled back the whole mutation — a post-expiry replay with the
+      // same key could never actually re-apply. Every caller of findReplay already holds the
+      // exact-scope advisory lock (lockIdempotencyScope, called immediately before findReplay),
+      // so deleting the stale row here is race-safe: no concurrent caller can recreate it before
+      // we do.
+      await tx.v1IdempotencyRecord.delete({
+        where: { actorUserId_action_resourceType_resourceId_idempotencyKey: identity },
+      });
+      return null;
+    }
     return record;
   }
 }

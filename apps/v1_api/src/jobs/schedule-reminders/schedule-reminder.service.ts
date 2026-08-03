@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../v1-game-operations-worker.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { WebPushService } from '../../notifications/web-push.service';
 
 type LockedSchedule = {
   id: string;
@@ -15,27 +16,71 @@ type LockedRecruitment = {
   state: string;
 };
 
+type ReminderEvent = {
+  /** Compound "${teamId}:${scheduleId}" — matches NotificationsService's own targetId shape for these events. */
+  targetId: string;
+  deepLink: string;
+  title: string;
+  body: string;
+};
+
+// Mirrors NotificationsService's EVENT_TITLES/EVENT_BODIES entries for these two event types
+// exactly (see notifications.service.ts). Duplicated locally — not imported — because those
+// tables are module-private there and this class must not depend on
+// NotificationsService.emitNotificationToMany for persistence (see deliverDurableReminder below).
+const RSVP_REMINDER_COPY = {
+  title: '참석 여부를 알려주세요',
+  body: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
+} as const;
+
+const GUEST_RECRUITMENT_CLOSE_REMINDER_COPY = {
+  title: '용병 모집이 곧 마감돼요',
+  body: '모집 마감 전에 신청 현황을 확인해 주세요.',
+} as const;
+
 /**
- * Task 12 reminders lane — mirrors GameResultSubmittedEscalationService's shape (Task 9) but,
- * per user decision #3 ("reuse the existing NotificationsService rather than a second
- * notification path"), needs a live NotificationsService dependency. Unlike the Task 9 handler
- * classes (which have no DI deps and are `new`'d inline inside
- * V1GameOperationsWorkerService's constructor), this class is `new`'d in
- * v1-game-operations-worker.main.ts after `app.get(NotificationsService)` resolves, once
- * WorkerNotificationsModule (the narrow, worker-only module declaring just
+ * Task 12 reminders lane — mirrors GameResultSubmittedEscalationService's shape (Task 9): each
+ * handler locks the target row FOR UPDATE inside the worker's transaction, re-checks the current
+ * state (no-op if the schedule was cancelled or the recruitment already closed since the reminder
+ * was scheduled), then durably notifies every active team member (owner/manager/member).
+ *
+ * `new`'d in v1-game-operations-worker.main.ts after `app.get(NotificationsService)` resolves,
+ * once WorkerNotificationsModule (the narrow, worker-only module declaring just
  * NotificationsService/WebPushService with a non-realtime REALTIME_NOTIFIER binding — see
  * worker-notifications.module.ts) is imported into V1GameOperationsWorkerModule.
  *
- * Each handler locks the target row FOR UPDATE inside the worker's transaction, re-checks the
- * current state (no-op if the schedule was cancelled or the recruitment already closed since
- * the reminder was scheduled — the same "skip if state already changed" guard Task 9 uses),
- * then notifies every active team member (owner/manager/member) via
- * NotificationsService.emitNotificationToMany. The actual outbox row (with its
- * `ON CONFLICT (business_key) DO NOTHING` dedup) is inserted by
- * TeamSchedulesService.triggerReminder — this class only fires once the worker claims a due row.
+ * Fix (W1, durable-delivery defect — see review/git history): the constructor originally took
+ * `NotificationsService` and each handler called `notifications.emitNotificationToMany(...)`, then
+ * `await`ed it. But `emitNotificationToMany` is fire-and-forget BY DESIGN for the HTTP path — it
+ * launches `createNotificationWithPrefCheck(...)` against `NotificationsService`'s own
+ * `this.prisma` (a connection entirely separate from this worker's `tx`) without awaiting it, and
+ * swallows every failure (its docblock: "Notification failures must NEVER propagate to the
+ * caller's transaction or response"). Awaiting `emitNotificationToMany` therefore only awaited the
+ * synchronous `for` loop that *kicks off* those detached promises, not their completion. The
+ * result: the worker's transaction (and therefore the outbox row's COMPLETED transition) could
+ * commit before any V1Notification row existed, or even if the detached create ultimately
+ * rejected — silent data loss the outbox's retry mechanism could never see or correct.
+ *
+ * `deliverDurableReminder()` below fixes this by writing directly through `tx` — the SAME
+ * transaction the worker uses to lock the source row and mark the outbox claim COMPLETED. If that
+ * write throws, the error propagates out of the handler, the worker's `$transaction` rolls back
+ * (no COMPLETED transition), and `V1GameOperationsWorkerService.fail()` puts the outbox row back
+ * in RETRY. The `notifications: NotificationsService` constructor parameter is kept ONLY because
+ * v1-game-operations-worker.main.ts (outside this lane's ownership) still constructs this class
+ * with `new ScheduleReminderService(notifications)`; it is no longer used for persistence. The
+ * `webPush` parameter is new and optional so that construction stays backward compatible until
+ * main.ts is updated to also pass `app.get(WebPushService)` — see the deferred note this fix ships
+ * with. Until that wiring lands, reminders are durably persisted and visible in-app but do not
+ * additionally trigger a Web Push; that is a strictly better failure mode than before (no
+ * notification silently lost) and never a regression relative to the last known-correct behavior.
  */
 export class ScheduleReminderService {
-  constructor(private readonly notifications: NotificationsService) {}
+  constructor(
+    // Kept only for the un-owned main.ts call site's existing constructor arity — no longer used
+    // for persistence; see class docblock.
+    private readonly notifications: NotificationsService,
+    private readonly webPush?: WebPushService,
+  ) {}
 
   readonly rsvpDeadlineReminderHandler: GameOperationHandler = async (claim, tx) => {
     const scheduleId = this.scheduleId(claim.payload);
@@ -45,11 +90,11 @@ export class ScheduleReminderService {
     const recipients = await this.activeTeamMemberIds(tx, schedule.teamId);
     if (recipients.length === 0) return;
 
-    await this.notifications.emitNotificationToMany(
-      recipients,
-      'schedule_rsvp_deadline_reminder',
-      `${schedule.teamId}:${schedule.id}`,
-    );
+    await this.deliverDurableReminder(tx, claim.id, recipients, {
+      targetId: `${schedule.teamId}:${schedule.id}`,
+      deepLink: `/teams/${schedule.teamId}/schedules/${schedule.id}`,
+      ...RSVP_REMINDER_COPY,
+    });
   };
 
   readonly guestRecruitmentCloseReminderHandler: GameOperationHandler = async (claim, tx) => {
@@ -60,12 +105,66 @@ export class ScheduleReminderService {
     const recipients = await this.activeTeamMemberIds(tx, recruitment.teamId);
     if (recipients.length === 0) return;
 
-    await this.notifications.emitNotificationToMany(
-      recipients,
-      'schedule_guest_recruitment_close_reminder',
-      `${recruitment.teamId}:${recruitment.scheduleId}`,
-    );
+    await this.deliverDurableReminder(tx, claim.id, recipients, {
+      targetId: `${recruitment.teamId}:${recruitment.scheduleId}`,
+      deepLink: `/teams/${recruitment.teamId}/schedules/${recruitment.scheduleId}`,
+      ...GUEST_RECRUITMENT_CLOSE_REMINDER_COPY,
+    });
   };
+
+  /**
+   * Durable delivery for a reminder claim. Everything up to and including the
+   * `tx.v1Notification.createMany` call happens inside the caller's transaction (`tx`):
+   *
+   *   1. Read each recipient's `teamEnabled` preference through `tx` (defaulting to enabled when
+   *      no preference row exists — mirrors NotificationsService.createNotificationWithPrefCheck).
+   *   2. Create one V1Notification row per enabled recipient through `tx`, with `businessKey`
+   *      `${outboxId}:${recipientUserId}` so re-processing the SAME outbox claim (crash + retry,
+   *      or any future re-delivery bug) can never produce more than one row per recipient —
+   *      `skipDuplicates` absorbs only that exact collision; every other failure (connection loss,
+   *      constraint violation, etc.) still throws and propagates.
+   *
+   * Only once that create has been awaited successfully (i.e. the notification is durable within
+   * this transaction) does step 3 best-effort a Web Push per recipient — caught locally so a push
+   * failure can never fail the job or roll back the already-durable notification row, and
+   * structurally incapable of running before step 2 succeeds.
+   */
+  private async deliverDurableReminder(
+    tx: Prisma.TransactionClient,
+    outboxId: string,
+    recipients: string[],
+    event: ReminderEvent,
+  ): Promise<void> {
+    const preferences = await tx.v1NotificationPreference.findMany({
+      where: { userId: { in: recipients } },
+      select: { userId: true, teamEnabled: true },
+    });
+    const teamEnabledByUser = new Map(preferences.map((p) => [p.userId, p.teamEnabled] as const));
+    const enabledRecipients = recipients.filter((userId) => teamEnabledByUser.get(userId) !== false);
+    if (enabledRecipients.length === 0) return;
+
+    await tx.v1Notification.createMany({
+      data: enabledRecipients.map((userId) => ({
+        recipientUserId: userId,
+        targetType: 'team',
+        targetId: event.targetId,
+        title: event.title,
+        body: event.body,
+        deepLink: event.deepLink,
+        businessKey: `${outboxId}:${userId}`,
+      })),
+      skipDuplicates: true,
+    });
+
+    for (const userId of enabledRecipients) {
+      void this.webPush
+        ?.sendToUser(userId, { title: event.title, body: event.body, url: event.deepLink })
+        .catch(() => {
+          // Best-effort only, and structurally unreachable before the createMany above has
+          // resolved — a push failure must never undo or retry the already-durable notification.
+        });
+    }
+  }
 
   private scheduleId(payload: unknown): string {
     if (

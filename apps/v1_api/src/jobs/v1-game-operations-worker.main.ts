@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WebPushService } from '../notifications/web-push.service';
 import { ScheduleReminderService } from './schedule-reminders/schedule-reminder.service';
 import { V1GameOperationsWorkerModule } from './v1-game-operations-worker.module';
 import { V1GameOperationsWorkerService } from './v1-game-operations-worker.service';
@@ -12,9 +13,13 @@ async function bootstrap(): Promise<void> {
   worker.registerDurableAuditHandler('GAME_OPERATION_JOB_REQUEUED');
 
   // Task 12 reminders lane: reuses this same DB-leased worker (no second scheduler) — see
-  // schedule-reminder.service.ts for the handler bodies.
+  // schedule-reminder.service.ts for the handler bodies. WebPushService is passed as the second
+  // constructor argument (previously omitted, so worker-originated reminders persisted a durable
+  // V1Notification row but never fired a Web Push, unlike the HTTP path) — WorkerNotificationsModule
+  // already provides and exports WebPushService for exactly this call site.
   const notifications = app.get(NotificationsService);
-  const scheduleReminders = new ScheduleReminderService(notifications);
+  const webPush = app.get(WebPushService);
+  const scheduleReminders = new ScheduleReminderService(notifications, webPush);
   worker.registerHandler('SCHEDULE_RSVP_DEADLINE_REMINDER', scheduleReminders.rsvpDeadlineReminderHandler);
   worker.registerHandler(
     'SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER',

@@ -55,26 +55,39 @@ export class ScheduleAttendanceService {
         status: dto.status,
         expectedVersion: dto.expectedVersion,
       });
+      const idempotencyIdentity = {
+        actorUserId: user.id,
+        action: ACTION,
+        resourceType: RESOURCE_TYPE,
+        resourceId: scheduleId,
+        idempotencyKey,
+      };
       const replay = await tx.v1IdempotencyRecord.findUnique({
-        where: {
-          actorUserId_action_resourceType_resourceId_idempotencyKey: {
-            actorUserId: user.id,
-            action: ACTION,
-            resourceType: RESOURCE_TYPE,
-            resourceId: scheduleId,
-            idempotencyKey,
-          },
-        },
+        where: { actorUserId_action_resourceType_resourceId_idempotencyKey: idempotencyIdentity },
         select: { payloadHash: true, responseBody: true, expiresAt: true },
       });
-      if (replay !== null && replay.expiresAt > new Date()) {
-        if (replay.payloadHash !== payloadHash) {
-          throw new ConflictException({
-            code: 'IDEMPOTENCY_PAYLOAD_CONFLICT',
-            message: 'Idempotency key was already used with a different payload',
+      if (replay !== null) {
+        if (replay.expiresAt <= new Date()) {
+          // W9 fix (same defect family as team-schedules.service.ts's checkReplay and the
+          // sibling guest-recruitment.service.ts's findReplay): an expired record was previously
+          // treated as "absent" here but never removed, so the v1IdempotencyRecord.create() call
+          // further down this same transaction hit a P2002 constraint violation on this exact
+          // composite key and rolled back the whole attendance write — a post-expiry replay with
+          // the same key could never actually re-apply. lockIdempotencyScope (called immediately
+          // above) already holds the exact-scope advisory lock for the remainder of this
+          // transaction, so deleting the stale row here is race-safe.
+          await tx.v1IdempotencyRecord.delete({
+            where: { actorUserId_action_resourceType_resourceId_idempotencyKey: idempotencyIdentity },
           });
+        } else {
+          if (replay.payloadHash !== payloadHash) {
+            throw new ConflictException({
+              code: 'IDEMPOTENCY_PAYLOAD_CONFLICT',
+              message: 'Idempotency key was already used with a different payload',
+            });
+          }
+          return { ...(replay.responseBody as unknown as SetAttendanceResponse), replayed: true };
         }
-        return { ...(replay.responseBody as unknown as SetAttendanceResponse), replayed: true };
       }
 
       // Existence-hiding: a caller who is not an active member of :teamId (or whose team is
@@ -150,8 +163,12 @@ export class ScheduleAttendanceService {
       }
 
       const previousStatus = existing?.status ?? null;
+      const previousWaitlistPosition = existing?.waitlistPosition ?? null;
       let nextStatus: 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED' = dto.status;
-      let waitlistPosition: number | null = null;
+      // Default to the row's current position; the branches below only ever narrow this
+      // to `null` (leaving the waitlist) or a freshly computed tail position (newly
+      // joining it) — see the WAITLISTED handling immediately after the capacity check.
+      let waitlistPosition: number | null = previousWaitlistPosition;
 
       if (dto.status === 'GOING' && schedule.capacity !== null) {
         const goingCount = await tx.v1ScheduleAttendance.count({
@@ -159,11 +176,30 @@ export class ScheduleAttendanceService {
         });
         if (goingCount >= schedule.capacity) {
           nextStatus = 'WAITLISTED';
-          const waitlistedCount = await tx.v1ScheduleAttendance.count({
-            where: { scheduleId, status: 'WAITLISTED', userId: { not: user.id } },
-          });
-          waitlistPosition = waitlistedCount + 1;
         }
+      }
+
+      if (nextStatus === 'WAITLISTED') {
+        if (previousStatus !== 'WAITLISTED') {
+          // Newly joining the waitlist. Assign the true tail position via
+          // MAX(waitlist_position), never a COUNT() over rows (Task 12 review W6): a prior
+          // waitlister who left without a still-pending compaction reaching them leaves a gap,
+          // and a COUNT-based position collides with a later row's already-assigned position
+          // (duplicate + out-of-order positions). This MAX() read is race-safe for the same
+          // reason the capacity COUNT() above is: the schedule row is locked FOR UPDATE at the
+          // top of this transaction, serializing every concurrent writer for this schedule.
+          const tail = await tx.$queryRaw<{ maxPosition: number | null }[]>`
+            SELECT MAX(waitlist_position) AS "maxPosition"
+            FROM v1_schedule_attendance
+            WHERE schedule_id = ${scheduleId} AND status = 'WAITLISTED'::"V1AttendanceStatus"
+          `;
+          waitlistPosition = Number(tail[0]?.maxPosition ?? 0) + 1;
+        }
+        // else: already WAITLISTED and still WAITLISTED (e.g. a repeat GOING request while the
+        // schedule is still full) — preserve the existing position (already the default above)
+        // instead of recomputing and potentially colliding with another row's position.
+      } else {
+        waitlistPosition = null;
       }
 
       let newVersion: number;
@@ -194,6 +230,24 @@ export class ScheduleAttendanceService {
           },
         });
         newVersion = 0;
+      }
+
+      // Waitlist compaction on departure (Task 12 review W6): whenever the caller's own row
+      // LEAVES the waitlist — for any reason: switching to MAYBE/NOT_GOING while still
+      // waitlisted, or taking an already-open GOING slot directly — every remaining WAITLISTED
+      // row behind the departed position must shift down by one so positions stay contiguous
+      // and unique. Without this, a later join computed a tail position from MAX() (or the old
+      // COUNT()) against a queue with a hole in it and could collide with a position that was
+      // never vacated. This is unconditional on capacity because a row can only be WAITLISTED
+      // in the first place on a capacity-bounded schedule.
+      if (previousStatus === 'WAITLISTED' && nextStatus !== 'WAITLISTED' && previousWaitlistPosition !== null) {
+        await tx.$executeRaw`
+          UPDATE v1_schedule_attendance
+          SET waitlist_position = waitlist_position - 1
+          WHERE schedule_id = ${scheduleId}
+            AND status = 'WAITLISTED'::"V1AttendanceStatus"
+            AND waitlist_position > ${previousWaitlistPosition}
+        `;
       }
 
       // Waitlist promotion on vacancy (design extension beyond the literal frozen contract —

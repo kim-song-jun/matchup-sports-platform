@@ -2,6 +2,7 @@ import { HttpException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ScheduleAttendanceService } from '../../src/team-schedules/attendance.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { holdRowLock, isStillPending } from './helpers/lock-barrier';
 
 const ids = {
   team: '6c000000-0000-4000-8000-000000000020',
@@ -195,18 +196,93 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
     expect(waitlisted?.waitlistPosition).toBe(1);
   });
 
-  it('rejects a stale expectedVersion with VERSION_CONFLICT and leaves the row unchanged', async () => {
-    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000105' });
-    await service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'MAYBE', expectedVersion: 0 }, 'ver-key-1');
+  it(
+    'T3 regression: the schedule row lock genuinely serializes two concurrent last-slot GOING ' +
+      'writers — proven with a deterministic barrier, not a lucky Promise.all() overlap',
+    async () => {
+      const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000108', capacity: 1 });
+
+      // Hold the exact same row lock setMyAttendance() itself takes (SELECT ... FOR UPDATE on
+      // this schedule row). Any concurrent setMyAttendance() call for this schedule cannot even
+      // reach its capacity COUNT() until this external holder releases.
+      const holder = await holdRowLock(
+        prisma,
+        (tx) => tx.$queryRaw`SELECT id FROM v1_team_schedules WHERE id = ${schedule.id} FOR UPDATE`,
+      );
+
+      const callA = service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'barrier-a-key');
+      const callB = service.setMyAttendance(authUser(ids.userB), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'barrier-b-key');
+
+      // The actual proof of contention: with the lock genuinely held, BOTH calls must still be
+      // pending. If the production code ever drops the FOR UPDATE lock, these calls would race
+      // past the (now-unlocked) holder's transaction immediately and this assertion would flip to
+      // false, catching the regression directly instead of relying on lucky scheduling.
+      const [aPending, bPending] = await Promise.all([isStillPending(callA, 250), isStillPending(callB, 250)]);
+      expect(aPending).toBe(true);
+      expect(bPending).toBe(true);
+
+      await holder.release();
+
+      const [resultA, resultB] = await Promise.all([callA, callB]);
+      const statuses = [resultA.status, resultB.status].sort();
+      expect(statuses).toEqual(['GOING', 'WAITLISTED']);
+      const goingCount = await prisma.v1ScheduleAttendance.count({ where: { scheduleId: schedule.id, status: 'GOING' } });
+      expect(goingCount).toBe(1);
+    },
+  );
+
+  // L1 fix: the ORIGINAL version of this test asserted that a SECOND expectedVersion:0 call
+  // (fresh idempotency key) after a row-creating first call must be a STALE version and reject
+  // with 409. That is logically incompatible with the implementation: a freshly-created row's
+  // persisted `version` really is 0 (see attendance.service.ts's create branch — `newVersion = 0`,
+  // never incremented on creation), and the pre-existing, still-passing "promotes the lowest-
+  // position WAITLISTED user..." test below relies on that exact same pattern (create at v0, then
+  // a second write also at expectedVersion:0) SUCCEEDING. Two tests in the same suite cannot both
+  // be correct against one deterministic implementation if they assert opposite outcomes for the
+  // identical input shape — the still-passing promotion test proves version:0 after creation is
+  // genuinely current, not stale, so the ORIGINAL "stale version" test was asserting the wrong
+  // thing about a correct implementation (a CI-red-for-the-wrong-reason bug, not a production
+  // defect). Rewritten below to construct genuine staleness: create (v0) -> a real successful
+  // update (v0 -> v1) -> THEN reuse the now-stale v0 token and expect the conflict.
+  it('rejects a genuinely stale expectedVersion with VERSION_CONFLICT once the row has actually advanced past it', async () => {
+    const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000109' });
+
+    // First call creates the row. Per the implementation, a freshly-created row's persisted
+    // version is 0 — it has not yet been mutated, so 0 is not yet stale.
+    const created = await service.setMyAttendance(
+      authUser(ids.userA),
+      ids.team,
+      schedule.id,
+      { status: 'MAYBE', expectedVersion: 0 },
+      'genuine-stale-key-1',
+    );
+    expect(created).toMatchObject({ status: 'MAYBE', version: 0 });
+
+    // Second call legitimately succeeds: expectedVersion:0 still matches the row's real, current
+    // version. This is the write the ORIGINAL (buggy) test wrongly expected to fail with 409.
+    const updated = await service.setMyAttendance(
+      authUser(ids.userA),
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'genuine-stale-key-2',
+    );
+    expect(updated).toMatchObject({ status: 'GOING', version: 1 });
+
+    // Third call reuses expectedVersion:0 again (fresh idempotency key) — NOW it is genuinely
+    // stale, since the persisted version has moved to 1. This is the real regression guard: a
+    // change that stops advancing the version on a real update (or that lets a truly-stale caller
+    // through) fails here.
     const error = await captureFailure(() =>
-      service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'ver-key-2'),
+      service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'NOT_GOING', expectedVersion: 0 }, 'genuine-stale-key-3'),
     );
     expectHttpCode(error, 409, 'VERSION_CONFLICT');
+
     const row = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
       where: { scheduleId_userId: { scheduleId: schedule.id, userId: ids.userA } },
     });
-    expect(row.status).toBe('MAYBE');
-    expect(row.version).toBe(0);
+    expect(row.status).toBe('GOING');
+    expect(row.version).toBe(1);
   });
 
   it('promotes the lowest-position WAITLISTED user to GOING when a GOING slot frees up', async () => {
@@ -229,4 +305,55 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
     expect(promoted.status).toBe('GOING');
     expect(promoted.waitlistPosition).toBeNull();
   });
+
+  // W6 regression: drives the reviewer's exact deterministic corruption scenario (A going, B
+  // waitlisted 1, C waitlisted 2, B withdraws, D joins) and asserts the previously-possible
+  // collision (C and D both landing on position 2) can no longer happen, plus that a repeat
+  // GOING request from an already-waitlisted user never recomputes/moves their position. If the
+  // fix is reverted to the old COUNT()-based tail assignment with no departure compaction, this
+  // test fails on the "C === 1, D === 2" assertion (both would instead be 2).
+  it(
+    'W6 regression: compacts waitlist positions when a WAITLISTED user withdraws, keeps positions ' +
+      'unique and contiguous for new joiners, and preserves position on a repeat GOING request',
+    async () => {
+      const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000107', capacity: 1 });
+
+      await service.setMyAttendance(authUser(ids.owner), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'w6-a-going');
+      const bJoin = await service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'w6-b-wait');
+      expect(bJoin).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1 });
+      const cJoin = await service.setMyAttendance(authUser(ids.userB), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'w6-c-wait');
+      expect(cJoin).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 2 });
+
+      // B withdraws from the waitlist entirely (not a GOING-vacancy promotion path — B was never
+      // GOING). C must compact down to position 1.
+      await service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'NOT_GOING', expectedVersion: 0 }, 'w6-b-withdraw');
+      const cAfterWithdrawal = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId: schedule.id, userId: ids.userB } },
+      });
+      expect(cAfterWithdrawal).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1 });
+
+      // D joins next — the new tail must be 2 (immediately after C's compacted position), never
+      // colliding with C's position via a stale COUNT()-based computation.
+      const dJoin = await service.setMyAttendance(authUser(ids.userC), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'w6-d-wait');
+      expect(dJoin).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 2 });
+
+      const waitlistRows = await prisma.v1ScheduleAttendance.findMany({
+        where: { scheduleId: schedule.id, status: 'WAITLISTED' },
+        orderBy: { waitlistPosition: 'asc' },
+        select: { userId: true, waitlistPosition: true },
+      });
+      expect(waitlistRows.map((r) => r.waitlistPosition)).toEqual([1, 2]);
+      expect(new Set(waitlistRows.map((r) => r.waitlistPosition)).size).toBe(waitlistRows.length);
+      expect(waitlistRows.map((r) => r.userId)).toEqual([ids.userB, ids.userC]);
+
+      // A repeat GOING request from C (still WAITLISTED, schedule still full) under a fresh
+      // idempotency key must preserve C's existing position (1), never recompute/move it. Note:
+      // the waitlist-compaction UPDATE above is a raw SQL statement scoped to *other* rows'
+      // waitlist_position and does not touch C's own `version` column, so C's row is still at the
+      // version its own single prior write (w6-c-wait) left it at — 0 (a freshly-created row's
+      // version, per attendance.service.ts's create branch).
+      const cRepeat = await service.setMyAttendance(authUser(ids.userB), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'w6-c-repeat');
+      expect(cRepeat).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1 });
+    },
+  );
 });

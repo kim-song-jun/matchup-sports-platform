@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MyScheduleQueryDto } from './dto/my-schedule-query.dto';
 import { TriggerReminderDto } from './dto/reminder.dto';
 import { CancelScheduleDto } from './dto/cancel-schedule.dto';
+import { CompleteScheduleDto } from './dto/complete-schedule.dto';
 import { CreateScheduleDto, ScheduleListQueryDto, UpdateScheduleDto } from './dto/team-schedule.dto';
 
 const RESOURCE_TYPE = 'V1_TEAM_SCHEDULE';
@@ -21,8 +22,8 @@ const IDEMPOTENCY_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 type Tx = Prisma.TransactionClient;
 
 /**
- * Owns exactly the "schedule CRUD / versioned mutate / cancel / reminder-trigger / my-schedule"
- * lane of Task 12 (team schedules). Sibling lanes — self-only RSVP and guest-recruitment — are
+ * Owns exactly the "schedule CRUD / versioned mutate / cancel / complete / reminder-trigger /
+ * my-schedule" lane of Task 12 (team schedules). Sibling lanes — self-only RSVP and guest-recruitment — are
  * owned by ScheduleAttendanceService and GuestRecruitmentService respectively (see
  * team-schedules.module.ts for wiring; each lane has its own standalone controller so they never
  * collide on the same file).
@@ -102,25 +103,32 @@ export class TeamSchedulesService {
 
     const myAttendance = user ? schedule.attendance.find((row) => row.userId === user.id) ?? null : null;
     const recruitment = schedule.guestRecruitment;
+    // W8-A fix: schedule detail must not leak a MEMBERS-only recruitment to a caller who could
+    // not read it through the dedicated guest-recruitment endpoint (GuestRecruitmentService's own
+    // rule: MEMBERS visibility requires active membership). Passing the parent schedule's
+    // visibility check (above) is not sufficient — a PUBLIC schedule can still carry a MEMBERS
+    // recruitment, so the child's own visibility must be re-checked here independently.
+    const canSeeRecruitment = recruitment !== null && (isMember || recruitment.visibility === 'PUBLIC');
 
     return {
       ...this.toSummary(schedule),
       cancelReason: schedule.cancelReason,
       cancelledAt: schedule.state === V1ScheduleState.CANCELLED ? schedule.updatedAt : null,
-      guestRecruitment: recruitment
-        ? {
-            id: recruitment.id,
-            scheduleId: recruitment.scheduleId,
-            slots: recruitment.slots,
-            closesAt: recruitment.closesAt,
-            note: recruitment.note,
-            visibility: recruitment.visibility,
-            state: recruitment.state,
-            version: recruitment.version,
-            applicantCount: recruitment.applications.filter((a) => a.state !== 'WITHDRAWN').length,
-            approvedCount: recruitment.applications.filter((a) => a.state === 'APPROVED').length,
-          }
-        : null,
+      guestRecruitment:
+        recruitment && canSeeRecruitment
+          ? {
+              id: recruitment.id,
+              scheduleId: recruitment.scheduleId,
+              slots: recruitment.slots,
+              closesAt: recruitment.closesAt,
+              note: recruitment.note,
+              visibility: recruitment.visibility,
+              state: recruitment.state,
+              version: recruitment.version,
+              applicantCount: recruitment.applications.filter((a) => a.state !== 'WITHDRAWN').length,
+              approvedCount: recruitment.applications.filter((a) => a.state === 'APPROVED').length,
+            }
+          : null,
       myAttendance: myAttendance
         ? { status: myAttendance.status, version: myAttendance.version, waitlistPosition: myAttendance.waitlistPosition }
         : null,
@@ -200,6 +208,16 @@ export class TeamSchedulesService {
         message: 'A MATCH-type schedule must reference an existing team match',
       });
     }
+    // W7 fix: teamMatchId previously bypassed cross-team ownership validation for every
+    // non-MATCH type (the check below only ran `if (dto.type === 'MATCH' && dto.teamMatchId)`),
+    // so a TRAINING/EVENT schedule could carry another team's teamMatchId undetected. Reject the
+    // field outright for non-MATCH types instead of silently persisting an unvalidated relation.
+    if (dto.type !== 'MATCH' && dto.teamMatchId) {
+      throw new UnprocessableEntityException({
+        code: 'SCHEDULE_TEAM_MATCH_NOT_ALLOWED',
+        message: 'teamMatchId is only allowed for MATCH-type schedules',
+      });
+    }
 
     const payloadHash = canonicalGameCommandPayloadHash({ actorUserId: user.id, teamId, dto });
 
@@ -209,16 +227,35 @@ export class TeamSchedulesService {
       // Create-style replay: resourceId is omitted from the pre-creation lookup (mirrors
       // team-matches.service.ts's create() findFirst pattern) since the resource does not
       // exist yet on first attempt.
+      //
+      // W9 fix: this previously had no `expiresAt` filter and no `orderBy`, so once a key had
+      // legitimately been reused after expiry (creating a second schedule with a *different*
+      // resourceId — resourceId cannot be part of this lookup's where-clause since the resource
+      // doesn't exist yet on first attempt), an unordered findFirst() could nondeterministically
+      // return the stale expired row instead of the active one. Treating that stale row as "no
+      // existing record" on an immediate retry would create a third schedule instead of replaying
+      // the second. Restricting the lookup to non-expired rows and ordering by recency makes the
+      // active record the only, deterministic match; an expired row is now correctly
+      // indistinguishable from "no record" without ever being able to shadow the active one.
+      //
+      // CP2 fix: `createdAt: 'desc'` alone is not a *total* order — Postgres timestamp columns
+      // have finite (microsecond) resolution, so two rows could in principle tie. Selecting
+      // `resourceId` and adding it as a secondary, deterministic tiebreaker (rather than relying
+      // on whatever arbitrary order Postgres happens to return for tied rows) closes that gap:
+      // repeated identical queries against the same data now always resolve to the exact same
+      // "latest non-expired" row instead of one that can vary run to run.
       const existing = await tx.v1IdempotencyRecord.findFirst({
         where: {
           actorUserId: user.id,
           action: 'SCHEDULE_CREATE',
           resourceType: RESOURCE_TYPE,
           idempotencyKey,
+          expiresAt: { gt: new Date() },
         },
-        select: { payloadHash: true, responseBody: true, expiresAt: true },
+        orderBy: [{ createdAt: 'desc' }, { resourceId: 'desc' }],
+        select: { resourceId: true, payloadHash: true, responseBody: true, expiresAt: true },
       });
-      if (existing !== null && existing.expiresAt > new Date()) {
+      if (existing !== null) {
         if (existing.payloadHash !== payloadHash) {
           throw new ConflictException({
             code: 'IDEMPOTENCY_PAYLOAD_CONFLICT',
@@ -230,7 +267,10 @@ export class TeamSchedulesService {
 
       await this.assertManageableTeam(tx, user, teamId);
 
-      if (dto.type === 'MATCH' && dto.teamMatchId) {
+      // dto.teamMatchId is only ever set here for type === 'MATCH' (enforced above), but we
+      // validate ownership whenever the field is present rather than re-branching on type, so
+      // this check can never again be silently skipped for a type that admits the field.
+      if (dto.teamMatchId) {
         const teamMatch = await tx.v1TeamMatch.findUnique({
           where: { id: dto.teamMatchId },
           select: { hostTeamId: true, approvedApplicantTeamId: true },
@@ -301,13 +341,25 @@ export class TeamSchedulesService {
         });
       }
 
+      // CP1 fix: dto.rsvpDeadlineAt has three meaningful states — `undefined` (field omitted,
+      // preserve the existing value), `null` (explicitly cleared, must persist as SQL NULL, NOT
+      // `new Date(null)` which silently corrupts the row to 1970-01-01), and a real date string
+      // (parse it). The previous two-way `=== undefined` check conflated `null` with "a date
+      // string", passing `null` straight into `new Date(...)`.
+      const nextRsvpDeadlineAt =
+        dto.rsvpDeadlineAt === undefined
+          ? schedule.rsvpDeadlineAt
+          : dto.rsvpDeadlineAt === null
+            ? null
+            : new Date(dto.rsvpDeadlineAt);
+
       const updated = await tx.$executeRaw`
         UPDATE v1_team_schedules
         SET title = ${dto.title ?? schedule.title},
             start_at = ${dto.startAt ? new Date(dto.startAt) : schedule.startAt},
             end_at = ${dto.endAt ? new Date(dto.endAt) : schedule.endAt},
             capacity = ${dto.capacity === undefined ? schedule.capacity : dto.capacity},
-            rsvp_deadline_at = ${dto.rsvpDeadlineAt === undefined ? schedule.rsvpDeadlineAt : new Date(dto.rsvpDeadlineAt)},
+            rsvp_deadline_at = ${nextRsvpDeadlineAt},
             visibility = ${(dto.visibility ?? schedule.visibility)}::"V1ScheduleVisibility",
             version = version + 1,
             updated_at = CURRENT_TIMESTAMP
@@ -381,6 +433,78 @@ export class TeamSchedulesService {
     });
   }
 
+  /**
+   * W10 fix: chosen resolution is "implement the transition" (not "make the state machine
+   * honest" by dropping COMPLETED from the query filter), because the frozen contract
+   * (docs/api/global-contract.md:59) literally lists `scheduled -> cancelled|completed` as the
+   * only permitted transitions — completion is a contractual requirement, not an optional
+   * extension. An explicit, versioned, idempotent mutation (mirroring cancel()'s CAS pattern)
+   * was chosen over a persisted background worker because a worker would require new files
+   * outside this lane's ownership (a cron/job composition root, per the separate
+   * jobs/schedule-reminders lane) that cannot be wired up or verified from here. Team
+   * owner/manager explicitly marks a schedule complete once its endAt has passed; this makes
+   * COMPLETED reachable and terminal without requiring schema/migration changes, since
+   * attendance.service.ts's existing `schedule.state !== 'SCHEDULED'` terminal check already
+   * rejects mutations once this transition lands.
+   */
+  async complete(
+    user: V1AuthUser,
+    teamId: string,
+    scheduleId: string,
+    dto: CompleteScheduleDto,
+    idempotencyKey: string,
+  ) {
+    this.assertActiveAccount(user);
+    const payloadHash = canonicalGameCommandPayloadHash({ dto });
+
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockIdempotencyScope(tx, user.id, 'SCHEDULE_COMPLETE', scheduleId, idempotencyKey);
+      const replay = await this.checkReplay(tx, user.id, 'SCHEDULE_COMPLETE', scheduleId, idempotencyKey, payloadHash);
+      if (replay) return replay;
+
+      await this.assertManageableTeam(tx, user, teamId);
+      const schedule = await this.lockSchedule(tx, teamId, scheduleId);
+
+      if (schedule.state !== V1ScheduleState.SCHEDULED) {
+        throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
+      }
+      if (schedule.endAt.getTime() > Date.now()) {
+        throw new ConflictException({
+          code: 'SCHEDULE_NOT_YET_ENDED',
+          message: 'Schedule cannot be completed before its end time',
+        });
+      }
+      if (schedule.version !== dto.expectedVersion) {
+        throw new ConflictException({
+          code: 'VERSION_CONFLICT',
+          message: 'Schedule version is stale',
+          details: { expectedVersion: dto.expectedVersion, currentVersion: schedule.version },
+        });
+      }
+
+      const updated = await tx.$executeRaw`
+        UPDATE v1_team_schedules
+        SET state = 'COMPLETED'::"V1ScheduleState",
+            version = version + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${scheduleId} AND version = ${dto.expectedVersion}
+      `;
+      if (updated !== 1) {
+        throw new ConflictException({ code: 'VERSION_CONFLICT', message: 'Schedule version changed during the write' });
+      }
+
+      const after = await tx.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
+      const response = {
+        state: 'completed' as const,
+        version: after.version,
+        completedAt: after.updatedAt,
+        replayed: false,
+      };
+      await this.storeIdempotency(tx, user.id, 'SCHEDULE_COMPLETE', scheduleId, idempotencyKey, payloadHash, 200, response);
+      return response;
+    });
+  }
+
   // ---------------------------------------------------------------------------------------
   // Reminders
   // ---------------------------------------------------------------------------------------
@@ -408,17 +532,27 @@ export class TeamSchedulesService {
       if (replay) return replay;
 
       await this.assertManageableTeam(tx, user, teamId);
-      const schedule = await tx.v1TeamSchedule.findFirst({ where: { id: scheduleId, teamId } });
-      if (!schedule) {
-        throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Schedule was not found' });
+      // W5 fix: this previously used an unlocked findFirst(), racing against cancel()'s FOR UPDATE
+      // lock on the same row — a concurrent cancel could commit between this read and the outbox
+      // insert below, letting a reminder be scheduled for a schedule that is (or is about to be)
+      // terminal. lockSchedule() takes the same FOR UPDATE lock, in the same lock order, that
+      // cancel()/update()/complete() already take on this row, so this transaction now either
+      // observes the post-cancel state or blocks until the concurrent cancel commits.
+      const schedule = await this.lockSchedule(tx, teamId, scheduleId);
+
+      // W5 fix: this terminal check previously only guarded the rsvp_deadline branch. A cancelled
+      // schedule's attached OPEN guest-recruitment is closed in the same transaction as cancel()
+      // (see cancel() above), but nothing stopped a `guest_recruitment_close` trigger from racing
+      // in and reading the recruitment before that close landed, or from firing right after a
+      // schedule was cancelled without ever checking schedule.state at all. Hoisting this check
+      // above the branch makes both reminder kinds reject once the parent schedule is terminal.
+      if (schedule.state !== V1ScheduleState.SCHEDULED) {
+        throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
       }
 
       let outboxType: string;
       let availableAt: Date;
       if (dto.kind === 'rsvp_deadline') {
-        if (schedule.state !== V1ScheduleState.SCHEDULED) {
-          throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
-        }
         outboxType = 'SCHEDULE_RSVP_DEADLINE_REMINDER';
         availableAt = schedule.rsvpDeadlineAt ?? new Date();
       } else {
@@ -427,6 +561,16 @@ export class TeamSchedulesService {
           throw new NotFoundException({
             code: 'GUEST_RECRUITMENT_NOT_FOUND',
             message: 'No guest recruitment is attached to this schedule',
+          });
+        }
+        // W5 fix: the guest_recruitment_close branch previously accepted and enqueued a reminder
+        // regardless of the recruitment's own state, so a CLOSED/FILLED recruitment could still
+        // get a "closing soon" reminder scheduled against it. Mirrors the rsvp_deadline branch's
+        // schedule-terminal guard above, one level down.
+        if (recruitment.state !== 'OPEN') {
+          throw new ConflictException({
+            code: 'GUEST_RECRUITMENT_TERMINAL',
+            message: 'Guest recruitment is already terminal',
           });
         }
         outboxType = 'SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER';
@@ -598,19 +742,30 @@ export class TeamSchedulesService {
     idempotencyKey: string,
     payloadHash: string,
   ): Promise<Record<string, unknown> | null> {
+    const identity = {
+      actorUserId: userId,
+      action,
+      resourceType: RESOURCE_TYPE,
+      resourceId,
+      idempotencyKey,
+    };
     const existing = await tx.v1IdempotencyRecord.findUnique({
-      where: {
-        actorUserId_action_resourceType_resourceId_idempotencyKey: {
-          actorUserId: userId,
-          action,
-          resourceType: RESOURCE_TYPE,
-          resourceId,
-          idempotencyKey,
-        },
-      },
+      where: { actorUserId_action_resourceType_resourceId_idempotencyKey: identity },
       select: { payloadHash: true, responseBody: true, expiresAt: true },
     });
-    if (existing === null || existing.expiresAt <= new Date()) {
+    if (existing === null) {
+      return null;
+    }
+    if (existing.expiresAt <= new Date()) {
+      // W9 fix: an expired record was previously treated as "absent" here but never removed, so
+      // storeIdempotency()'s later create() on this same composite unique key hit a P2002
+      // constraint violation and rolled back the whole mutation. We hold the exact-scope
+      // advisory lock (lockIdempotencyScope, called before this) for the remainder of this
+      // transaction, so deleting the stale row here is race-safe: no concurrent caller can
+      // recreate it before we do.
+      await tx.v1IdempotencyRecord.delete({
+        where: { actorUserId_action_resourceType_resourceId_idempotencyKey: identity },
+      });
       return null;
     }
     if (existing.payloadHash !== payloadHash) {

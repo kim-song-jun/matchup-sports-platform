@@ -87,6 +87,10 @@ describe('OperationAuditWriterService', () => {
         fixtureId: 'fixture-42',
         fieldId: 'field-7',
         createdAt: new Date('2026-08-01T04:59:00.000Z'),
+        // The writer persists `reason` in the CREATE because
+        // `v1_operation_audits_append_only` forbids UPDATE on
+        // v1_operation_audits; it is null when the caller supplies none.
+        reason: null,
       });
       expect(JSON.stringify(persistedData)).not.toContain(sourceIp);
       expect(Object.isFrozen(persistedData?.before)).toBe(true);

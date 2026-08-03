@@ -220,6 +220,7 @@ export class PublicUserRecordsService {
       }
 
       return {
+        id: row.participantResultId,
         gameId: row.gameId,
         matchType: row.sourceType === 'TOURNAMENT_FIXTURE' ? ('tournament' as const) : ('team_match' as const),
         tournamentId: fixture?.tournamentId ?? null,

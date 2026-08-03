@@ -1852,7 +1852,11 @@ export function useV1DeleteAdminUser(userId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1AdminDeleteUserPayload) =>
-      v1Delete<V1AdminStatusChangeResult>(`/admin/users/${userId}`, { body: JSON.stringify(body) }),
+      // v1Delete 의 2번째 인자는 fetch 의 init 이 아니라 **body 그 자체**다. 여기서
+      // { body: JSON.stringify(body) } 를 넘기면 한 번 더 감싸져
+      // {"body":"{\"reason\":...}"} 가 전송되고, reason 이 없으니 서버가 400 을 낸다 —
+      // 프로덕션에서 어드민 사용자 삭제가 두 번 다 400 으로 실패한 원인이다(2026-08-03).
+      v1Delete<V1AdminStatusChangeResult>(`/admin/users/${userId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminUser(userId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'users'] });
@@ -2527,6 +2531,42 @@ export function useV1AdminTournamentPlayers(registrationId: string) {
       v1Get<V1AdminTournamentRosterResponse>(`/admin/registrations/${registrationId}/players`),
     enabled: !!registrationId,
     retry: false,
+  });
+}
+
+/**
+ * 어드민이 팀 대신 명단에 선수를 추가·제거한다.
+ *
+ * 이 두 훅이 없던 동안 어드민 콘솔은 명단을 **볼 수만** 있었다. 팀장이 자리를 비웠거나
+ * 마감이 지난 뒤 운영 조정이 필요해도 손댈 방법이 없었고, 화면에서 시도해도 서버로
+ * 요청이 가지 않아 로그에 실패조차 남지 않았다(2026-08-03 실사고).
+ */
+export function useV1AdminAddPlayer(registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { userId: string; realName: string }) =>
+      v1Post(`/admin/registrations/${registrationId}/players`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: v1Keys.adminTournamentRoster(registrationId),
+      });
+      // 신청 목록 카드가 playerCount 를 그대로 보여주므로 명단만 갱신하면 인원수가 옛값으로
+      // 남는다. tournamentId 를 모르는 자리라 admin tournaments 접두사로 한 번에 무효화한다.
+      void queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments().slice(0, 3) });
+    },
+  });
+}
+
+export function useV1AdminRemovePlayer(registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (playerId: string) => v1Delete(`/admin/players/${playerId}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: v1Keys.adminTournamentRoster(registrationId),
+      });
+      void queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments().slice(0, 3) });
+    },
   });
 }
 

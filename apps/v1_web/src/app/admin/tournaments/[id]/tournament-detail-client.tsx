@@ -81,6 +81,8 @@ import {
   useV1AdminTournamentReviews,
   useV1HideReview,
   useV1UnhideReview,
+  useV1AdminAddPlayer,
+  useV1AdminRemovePlayer,
 } from '@/hooks/use-v1-api';
 import type {
   V1TournamentStatus,
@@ -525,10 +527,46 @@ export function RosterModal({
     registration?.id ?? '',
   );
   const updateEligibility = useV1UpdatePlayerEligibility();
+  const addPlayer = useV1AdminAddPlayer(registration?.id ?? '');
+  const removePlayer = useV1AdminRemovePlayer(registration?.id ?? '');
+
+  // 어드민 추가는 팀 화면과 달리 사용자를 직접 지목한다 — 운영자가 팀원 목록을 고르는
+  // 흐름이 아직 없으므로, 확인된 userId 와 실명을 입력받는 최소 폼으로 시작한다.
+  const [draftUserId, setDraftUserId] = useState('');
+  const [draftRealName, setDraftRealName] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
 
   const players = [...(data?.players ?? [])].sort(
     (left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain),
   );
+
+  const handleAddPlayer = () => {
+    const userId = draftUserId.trim();
+    const realName = draftRealName.trim();
+    if (!userId || !realName) {
+      setAddError('사용자 ID 와 실명을 모두 입력해주세요.');
+      return;
+    }
+    setAddError(null);
+    addPlayer.mutate(
+      { userId, realName },
+      {
+        onSuccess: () => {
+          setDraftUserId('');
+          setDraftRealName('');
+          showToast('선수를 명단에 추가했어요.', 'success');
+        },
+        onError: (err) => setAddError(extractErrorMessage(err, '선수를 추가하지 못했어요.')),
+      },
+    );
+  };
+
+  const handleRemovePlayer = (playerId: string, realName: string) => {
+    removePlayer.mutate(playerId, {
+      onSuccess: () => showToast(`${realName} 선수를 명단에서 제외했어요.`, 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '선수를 제외하지 못했어요.'), 'error'),
+    });
+  };
 
   const handleEligibilityChange = (playerId: string, status: string) => {
     updateEligibility.mutate(
@@ -595,10 +633,66 @@ export function RosterModal({
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={() => handleRemovePlayer(p.id, p.realName)}
+                disabled={!canWrite || removePlayer.isPending}
+                aria-label={`${p.realName} 선수를 명단에서 제외`}
+                className="h-[44px] shrink-0 rounded-xl border border-gray-200 px-3 text-[13px] font-semibold text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-red-950/30"
+              >
+                제외
+              </button>
             </li>
           ))}
         </ul>
       )}
+      {canWrite ? (
+        <div className="mt-4 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+          <p className="text-[13px] font-semibold text-gray-900 dark:text-white">선수 추가</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            팀의 활성 멤버만 추가할 수 있어요. 명단 잠금과 제출 마감은 운영자 권한으로 넘어갑니다.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <div className="flex-1">
+              <label htmlFor="admin-roster-user-id" className="sr-only">
+                사용자 ID
+              </label>
+              <input
+                id="admin-roster-user-id"
+                value={draftUserId}
+                onChange={(e) => setDraftUserId(e.target.value)}
+                placeholder="사용자 ID"
+                className="h-[44px] w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
+            <div className="flex-1">
+              <label htmlFor="admin-roster-real-name" className="sr-only">
+                실명
+              </label>
+              <input
+                id="admin-roster-real-name"
+                value={draftRealName}
+                onChange={(e) => setDraftRealName(e.target.value)}
+                placeholder="실명"
+                className="h-[44px] w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleAddPlayer}
+              disabled={addPlayer.isPending}
+              className="h-[44px] shrink-0 rounded-xl bg-blue-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              {addPlayer.isPending ? '추가 중…' : '추가'}
+            </button>
+          </div>
+          {addError ? (
+            <p role="alert" className="mt-2 text-xs text-red-600">
+              {addError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <button
         type="button"
         onClick={onClose}

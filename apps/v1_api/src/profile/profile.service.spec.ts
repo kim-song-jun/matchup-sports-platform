@@ -40,6 +40,7 @@ describe('ProfileService identity binding', () => {
         upsert: jest.fn().mockResolvedValue(profile),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+      v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
@@ -104,6 +105,7 @@ describe('ProfileService phone change proof gate', () => {
         upsert: jest.fn().mockResolvedValue(profile),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+      v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
@@ -514,9 +516,14 @@ describe('ProfileService withdrawal admin lockout', () => {
       },
       v1TeamMembership: {
         findFirst: jest.fn().mockResolvedValue(null),
+        // 탈퇴 시 남은 일반 멤버십을 left 로 정리한다.
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
       },
+      v1Team: { update: jest.fn().mockResolvedValue({}) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $queryRaw: jest.fn().mockResolvedValue([]),
+      v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));

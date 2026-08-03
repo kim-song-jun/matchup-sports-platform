@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1TournamentPlayer, V1TournamentRegistration } from '@prisma/client';
-import { AdminContextService } from '../common/admin-context.service';
+import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -78,8 +78,13 @@ export class TournamentPlayersService {
   private assertRosterMutable(
     registration: V1TournamentRegistration,
     tournament: { rosterDeadlineAt: Date | null },
+    // 어드민 경로 전용. 잠금(rosterLockedAt)과 마감(rosterDeadlineAt)은 **운영진이 풀라고
+    // 있는 장치**이므로 어드민은 넘길 수 있다(이미 roster-lock / roster-deadline-override
+    // 엔드포인트가 같은 목적으로 존재한다). 반면 취소된 신청은 어드민도 건드릴 수 없다 —
+    // 그건 권한 문제가 아니라 "존재하지 않는 참가"에 선수를 넣는 것이라 의미가 없다.
+    options: { allowLockedAndExpired?: boolean } = {},
   ) {
-    if (registration.rosterLockedAt) {
+    if (!options.allowLockedAndExpired && registration.rosterLockedAt) {
       throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
     }
     if (registration.status === 'cancel_requested' || registration.status === 'cancelled') {
@@ -90,6 +95,7 @@ export class TournamentPlayersService {
     }
     // 명단 제출 마감 하드 차단 — 어드민이 해당 팀에 개별 예외(rosterDeadlineOverrideAt)를 부여한 경우만 예외.
     if (
+      !options.allowLockedAndExpired &&
       tournament.rosterDeadlineAt &&
       new Date() > tournament.rosterDeadlineAt &&
       !registration.rosterDeadlineOverrideAt
@@ -152,8 +158,28 @@ export class TournamentPlayersService {
 
     this.assertRosterMutable(registration, tournament);
 
-    const player = await this.prisma.$transaction(async (tx) => {
-      const current = await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId);
+    const player = await this.insertPlayerIntoRoster(tournamentId, registrationId, dto);
+    return this.serializePlayer(player);
+  }
+
+  /**
+   * 명단 추가의 실제 본체. 팀 매니저 경로와 어드민 경로가 공유한다.
+   *
+   * 어드민이라고 해서 정원·팀멤버십·프로필·중복 검사를 건너뛰지는 않는다 — 그건 권한이
+   * 아니라 데이터 정합성이라서, 넘기면 대회 당일에 문제가 되는 명단이 만들어진다.
+   * 어드민이 넘길 수 있는 것은 잠금과 마감뿐이다(assertRosterMutable 주석 참조).
+   */
+  private async insertPlayerIntoRoster(
+    tournamentId: string,
+    registrationId: string,
+    dto: AddPlayerDto,
+    options: {
+      allowLockedAndExpired?: boolean;
+      auditAs?: { admin: V1ActiveAdmin; action: string };
+    } = {},
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const current = await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId, options);
       const activeCount = await tx.v1TournamentPlayer.count({
         where: { registrationId, removedAt: null },
       });
@@ -218,7 +244,7 @@ export class TournamentPlayersService {
         });
       }
 
-      return tx.v1TournamentPlayer.upsert({
+      const saved = await tx.v1TournamentPlayer.upsert({
         where: { registrationId_userId: { registrationId, userId: dto.userId } },
         create: {
           registrationId,
@@ -238,9 +264,26 @@ export class TournamentPlayersService {
           addedAt: new Date(),
         },
       });
-    });
 
-    return this.serializePlayer(player);
+      if (options.auditAs) {
+        await this.adminContext.logAdminAction(
+          options.auditAs.admin,
+          {
+            action: options.auditAs.action,
+            targetType: 'tournament_player',
+            targetId: saved.id,
+            afterJson: {
+              registrationId,
+              userId: dto.userId,
+              realName: memberRealName,
+            },
+          },
+          tx,
+        );
+      }
+
+      return saved;
+    });
   }
 
   // ─── 선수 soft remove ─────────────────────────────────────────────────────────
@@ -409,6 +452,91 @@ export class TournamentPlayersService {
 
   // ─── 어드민: 선출여부 확정 ────────────────────────────────────────────────────
 
+  /**
+   * 어드민이 팀 대신 명단에 선수를 넣는다.
+   *
+   * 2026-08-03 이전에는 어드민 콘솔에 조회·내보내기·자격변경만 있고 **추가·제거가 아예
+   * 없었다.** 운영자가 화면에서 아무리 눌러도 서버로 요청이 가지 않아, 로그에는 실패조차
+   * 남지 않았다(실측: 24시간 동안 해당 등록 건 POST 0건, 4xx 0건). 팀장이 자리를 비웠거나
+   * 마감이 지난 뒤 운영 판단으로 조정해야 하는 상황을 손댈 방법이 없었다.
+   */
+  async addPlayerForAdmin(user: V1AuthUser, registrationId: string, dto: AddPlayerDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+
+    const registration = await this.prisma.v1TournamentRegistration.findUnique({
+      where: { id: registrationId },
+      select: { tournamentId: true },
+    });
+    if (!registration) {
+      throw new NotFoundException({
+        code: 'REGISTRATION_NOT_FOUND',
+        message: '신청 내역을 찾을 수 없어요.',
+      });
+    }
+
+    const player = await this.insertPlayerIntoRoster(registration.tournamentId, registrationId, dto, {
+      allowLockedAndExpired: true,
+      // 운영자가 팀 대신 명단을 고친 기록은 반드시 남아야 한다. 정원·자격 분쟁이 생겼을 때
+      // "누가 언제 넣었나"를 되짚을 수 있는 유일한 근거이고, 잠금·마감을 넘길 수 있는
+      // 경로라서 더욱 그렇다. 명단 변경과 같은 트랜잭션에 기록해 둘이 어긋나지 않게 한다.
+      auditAs: { admin, action: 'player.add' },
+    });
+    return this.serializePlayer(player);
+  }
+
+  /** 어드민이 명단에서 선수를 뺀다. 팀 경로와 달리 잠금·마감을 넘길 수 있다. */
+  async removePlayerForAdmin(user: V1AuthUser, playerId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+
+    const removed = await this.prisma.$transaction(async (tx) => {
+      const player = await tx.v1TournamentPlayer.findFirst({
+        where: { id: playerId, removedAt: null },
+        select: {
+          id: true,
+          registrationId: true,
+          userId: true,
+          realName: true,
+          registration: { select: { tournamentId: true } },
+        },
+      });
+      if (!player) {
+        throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      }
+      // 취소된 신청인지만 확인하고(잠금·마감은 통과) 정합성을 지킨다.
+      await this.lockAndLoadMutableRegistration(
+        tx,
+        player.registration.tournamentId,
+        player.registrationId,
+        { allowLockedAndExpired: true },
+      );
+      const updated = await tx.v1TournamentPlayer.update({
+        where: { id: playerId },
+        data: { removedAt: new Date() },
+      });
+
+      // 추가와 같은 이유로 제거도 기록한다 — 명단 변경과 같은 트랜잭션에 넣어야 "명단은
+      // 바뀌었는데 로그가 없는" 상태가 생기지 않는다.
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'player.remove',
+          targetType: 'tournament_player',
+          targetId: playerId,
+          beforeJson: {
+            registrationId: player.registrationId,
+            userId: player.userId,
+            realName: player.realName,
+          },
+          afterJson: { removedAt: updated.removedAt },
+        },
+        tx,
+      );
+      return updated;
+    });
+
+    return this.serializePlayer(removed);
+  }
+
   async updateEligibility(user: V1AuthUser, playerId: string, dto: UpdatePlayerEligibilityDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
 
@@ -466,6 +594,7 @@ export class TournamentPlayersService {
     tx: Prisma.TransactionClient,
     tournamentId: string,
     registrationId: string,
+    options: { allowLockedAndExpired?: boolean } = {},
   ) {
     await tx.$queryRaw`SELECT id FROM "v1_tournament_registrations" WHERE id = ${registrationId} FOR UPDATE`;
     const registration = await tx.v1TournamentRegistration.findFirst({
@@ -489,7 +618,7 @@ export class TournamentPlayersService {
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
-    this.assertRosterMutable(registration, tournament);
+    this.assertRosterMutable(registration, tournament, options);
     return { registration, tournament };
   }
 

@@ -2971,9 +2971,6 @@ export type V1AdminRosterEligibleMember = {
   userId: string;
   nickname: string | null;
   realName: string | null;
-  birthDate: string | null;
-  /** 서버가 normalizeGender() 로 좁혀서 내려준다 — 그 밖의 값은 null 이 된다. */
-  gender: 'male' | 'female' | null;
   role: 'owner' | 'manager' | 'member';
   alreadyOnRoster: boolean;
   eligible: boolean;

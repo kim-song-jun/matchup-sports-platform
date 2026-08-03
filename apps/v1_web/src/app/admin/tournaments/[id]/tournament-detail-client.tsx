@@ -540,6 +540,25 @@ export function RosterModal({
   // 멤버는 있는데 전원 자격 미달인 경우(정원 초과·취소된 신청 등)를 "멤버 0명" 과 구분한다.
   const hasEligibleMember = members.some((m) => m.eligible);
   const selectedMember = members.find((m) => m.userId === selectedUserId) ?? null;
+  // 버튼은 "무언가 골랐는지" 가 아니라 "그게 지금도 추가 가능한지" 를 봐야 한다. 목록이
+  // 갱신되는 사이(다른 운영자가 먼저 추가, 팀 탈퇴 등) 고른 사람이 자격을 잃을 수 있다.
+  const canAddSelectedMember = !!selectedMember?.eligible && !!selectedMember.realName?.trim();
+
+  // 다른 신청으로 모달을 다시 열면 앞선 선택이 남는다 — RosterModal 은 항상 마운트돼 있고
+  // 숨겨질 뿐이라 useState 가 초기화되지 않는다. 같은 사람이 두 팀에 속하면 이전 팀에서
+  // 고른 userId 가 새 팀에서도 유효한 선택으로 보인다.
+  useEffect(() => {
+    setSelectedUserId('');
+    setAddError(null);
+  }, [registration?.id, open]);
+
+  // 고른 팀원이 목록에서 사라지거나 자격을 잃으면 선택을 비운다 — select 는 없는 값을 못
+  // 그려 빈칸이 되는데, 상태만 남아 있으면 화면과 어긋난다.
+  useEffect(() => {
+    if (!selectedUserId || !eligible.data) return;
+    const still = eligible.data.members.find((m) => m.userId === selectedUserId);
+    if (!still || !still.eligible) setSelectedUserId('');
+  }, [eligible.data, selectedUserId]);
 
   const players = [...(data?.players ?? [])].sort(
     (left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain),
@@ -548,6 +567,12 @@ export function RosterModal({
   const handleAddPlayer = () => {
     if (!selectedMember) {
       setAddError('추가할 팀원을 선택해주세요.');
+      return;
+    }
+    // 버튼이 열려 있어도 마지막에 한 번 더 본다 — 목록 갱신과 클릭이 겹치면 버튼 상태가
+    // 한 박자 늦을 수 있다.
+    if (!selectedMember.eligible) {
+      setAddError(selectedMember.ineligibleReason ?? '지금은 추가할 수 없는 팀원이에요.');
       return;
     }
     // 실명은 서버가 팀원 프로필에서 다시 읽지만, DTO 가 필수로 받으므로 함께 보낸다.
@@ -702,7 +727,7 @@ export function RosterModal({
             <button
               type="button"
               onClick={handleAddPlayer}
-              disabled={addPlayer.isPending || !selectedUserId}
+              disabled={addPlayer.isPending || eligible.isFetching || !canAddSelectedMember}
               className="h-[44px] shrink-0 rounded-xl bg-blue-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               {addPlayer.isPending ? '추가 중…' : '추가'}

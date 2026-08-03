@@ -1046,11 +1046,13 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
       teamId: 'team-1',
       status: 'submitted',
-      tournament: { genderCategory: null, maxPlayers: 10 },
+      tournament: {
+        genderCategory: null,
+        maxPlayers: 10,
+        deletedAt: null,
+        ...(options.tournament ?? {}),
+      },
       ...(options.registration ?? {}),
-      ...(options.tournament
-        ? { tournament: { genderCategory: null, maxPlayers: 10, ...options.tournament } }
-        : {}),
     });
     prisma.v1TeamMembership.findMany.mockResolvedValue(options.members);
     prisma.v1TournamentPlayer.findMany.mockResolvedValue(
@@ -1156,6 +1158,42 @@ describe('TournamentPlayersService', () => {
     await expect(
       service.listEligiblePlayersForAdmin(nonManager, 'reg-1'),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  // 이 목록은 "추가" 폼 전용인데 명단 밖 팀원의 실명까지 담는다. 추가 권한이 없는 support 가
+  // 읽을 이유가 없으므로 조회 게이트를 쓰기 게이트와 같은 높이(getMutationAdmin)로 둔다.
+  it('listEligiblePlayersForAdmin: support 어드민은 추가 권한이 없으므로 후보도 못 본다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+
+    await expect(
+      service.listEligiblePlayersForAdmin({ ...adminUser, id: 'support-user-id' }, 'reg-1'),
+    ).rejects.toThrow(ForbiddenException);
+    // 게이트에서 끊겨야 한다 — 신청 조회까지 갔다면 PII 쿼리가 이미 나간 것이다.
+    expect(prisma.v1TournamentRegistration.findUnique).not.toHaveBeenCalled();
+  });
+
+  // 삭제된 대회는 add 가 404 를 낸다. 후보만 열려 있으면 지난 대회의 registration ID 로
+  // 그 팀 명단 밖 사람의 실명을 읽는 경로가 남는다.
+  it('listEligiblePlayersForAdmin: 삭제된 대회의 신청은 404 로 막는다', async () => {
+    setupEligible({
+      members: [eligibleMembershipRow()],
+      tournament: { deletedAt: new Date('2026-07-01T00:00:00.000Z') },
+    });
+
+    await expect(
+      service.listEligiblePlayersForAdmin(adminUser, 'reg-1'),
+    ).rejects.toMatchObject({ response: { code: 'REGISTRATION_NOT_FOUND' } });
+  });
+
+  it('listEligiblePlayersForAdmin: 화면이 안 쓰는 생년월일·성별은 응답에 담지 않는다', async () => {
+    setupEligible({ members: [eligibleMembershipRow()] });
+
+    const [member] = (await service.listEligiblePlayersForAdmin(adminUser, 'reg-1')).members;
+
+    expect(member).not.toHaveProperty('birthDate');
+    expect(member).not.toHaveProperty('gender');
+    // 판정 자체는 계속 프로필을 읽어야 한다 — 값이 있으니 선택 가능이어야 맞다.
+    expect(member.eligible).toBe(true);
   });
 
   it('listEligiblePlayersForAdmin: 없는 신청이면 404', async () => {

@@ -495,17 +495,22 @@ export class TournamentPlayersService {
    * 눌러 보고 나서야 400 을 받는 일이 없다. 판정 기준은 addPlayer 의 검사와 같다.
    */
   async listEligiblePlayersForAdmin(user: V1AuthUser, registrationId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    // 이 목록은 오직 "선수 추가" 폼을 채우기 위해 존재한다. 그런데 명단에 없는 팀원의 실명까지
+    // 담고 있으므로, 추가 권한이 없는 support 어드민이 읽을 이유가 없다 — 조회 게이트를 쓰기
+    // 게이트와 같은 높이로 맞춘다(addPlayerForAdmin 과 동일한 getMutationAdmin).
+    await this.adminContext.getMutationAdmin(user.id);
 
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
       select: {
         teamId: true,
         status: true,
-        tournament: { select: { genderCategory: true, maxPlayers: true } },
+        tournament: { select: { genderCategory: true, maxPlayers: true, deletedAt: true } },
       },
     });
-    if (!registration) {
+    // 삭제된 대회는 add 가 404 를 내므로 후보도 내려주지 않는다 — 안 막으면 지난 대회의
+    // registration ID 만 알면 그 팀 명단 밖 사람의 실명까지 읽을 수 있는 경로가 남는다.
+    if (!registration || registration.tournament.deletedAt) {
       throw new NotFoundException({
         code: 'REGISTRATION_NOT_FOUND',
         message: '신청 내역을 찾을 수 없어요.',
@@ -558,8 +563,11 @@ export class TournamentPlayersService {
           const gender = normalizeGender(member.profile?.gender);
           const phone = member.phone?.trim() ?? null;
 
-          // addPlayer 와 같은 순서로 판정한다 — 화면이 보여주는 이유와 서버가 내는 에러가
-          // 어긋나면 운영자가 더 헷갈린다.
+          // addPlayer 가 강제하는 **모든** 조건을 여기서도 본다 — 하나라도 빠지면 고를 수는
+          // 있는데 서버가 거절하는 폼이 된다. 다만 순서는 addPlayer 와 다르게 "그 사람에게
+          // 가장 구체적인 사유" 를 먼저 둔다(만석이면서 이미 명단에 있으면 '이미 명단'). 어차피
+          // 전부 선택 불가로 그려지므로 어느 사유를 보여주든 결과는 같고, 운영자에게는
+          // 개인 사유가 먼저 보이는 편이 조치하기 쉽다.
           let ineligibleReason: string | null = null;
           if (onRoster.has(member.id)) ineligibleReason = '이미 명단에 있어요';
           else if (registrationCancelled) {
@@ -574,12 +582,12 @@ export class TournamentPlayersService {
             ineligibleReason = '휴대폰 본인인증이 필요해요';
           }
 
+          // 생년월일·성별은 판정에만 쓰고 응답에는 싣지 않는다 — 화면이 안 쓰는 PII 를
+          // 명단 밖 팀원까지 포함해 내보낼 이유가 없다.
           return {
             userId: member.id,
             nickname: member.profile?.nickname ?? null,
             realName,
-            birthDate,
-            gender,
             role,
             alreadyOnRoster: onRoster.has(member.id),
             eligible: ineligibleReason === null,

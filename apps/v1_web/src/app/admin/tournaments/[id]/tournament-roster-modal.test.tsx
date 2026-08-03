@@ -12,11 +12,11 @@ const addPlayer = vi.fn();
 const removePlayer = vi.fn();
 
 const DEFAULT_ELIGIBLE_MEMBERS = [
-  { userId: 'user-42', nickname: '명철', realName: '김명철', birthDate: '19900101',
-    gender: 'male' as const, role: 'member' as const, alreadyOnRoster: false, eligible: true,
+  { userId: 'user-42', nickname: '명철', realName: '김명철',
+    role: 'member' as const, alreadyOnRoster: false, eligible: true,
     ineligibleReason: null },
-  { userId: 'user-99', nickname: '무프로필', realName: null, birthDate: null,
-    gender: null, role: 'member' as const, alreadyOnRoster: false, eligible: false,
+  { userId: 'user-99', nickname: '무프로필', realName: null,
+    role: 'member' as const, alreadyOnRoster: false, eligible: false,
     ineligibleReason: '실명·생년월일·휴대폰이 모두 필요해요' },
 ];
 

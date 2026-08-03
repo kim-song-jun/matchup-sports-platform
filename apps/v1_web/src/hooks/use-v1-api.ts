@@ -2560,19 +2560,23 @@ export function useV1AdminAddPlayer(registrationId: string) {
   return useMutation({
     mutationFn: (body: { userId: string; realName: string }) =>
       v1Post(`/admin/registrations/${registrationId}/players`, body),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: v1Keys.adminTournamentRoster(registrationId),
-      });
-      // 자격 판정(alreadyOnRoster/eligible)이 명단에서 파생되므로 함께 무효화해야 한다.
-      // roster 키('…/players')는 eligible 키('…/eligible-players')의 접두사가 아니라서
-      // 위 무효화에 딸려오지 않는다 — 빠뜨리면 방금 추가한 팀원이 계속 선택 가능해 보인다.
-      void queryClient.invalidateQueries({
-        queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
-      });
-      // 신청 목록 카드가 playerCount 를 그대로 보여주므로 명단만 갱신하면 인원수가 옛값으로
-      // 남는다. tournamentId 를 모르는 자리라 admin tournaments 접두사로 한 번에 무효화한다.
-      void queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments().slice(0, 3) });
+    // await 해야 버튼이 "추가 중" 에서 풀리는 시점에 새 명단이 이미 캐시에 있다. 안 그러면
+    // 버튼만 먼저 살아나 방금 넣은 선수를 한 번 더 넣으려는 클릭이 가능하다.
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: v1Keys.adminTournamentRoster(registrationId),
+        }),
+        // 자격 판정(alreadyOnRoster/eligible)이 명단에서 파생되므로 함께 무효화해야 한다.
+        // roster 키('…/players')는 eligible 키('…/eligible-players')의 접두사가 아니라서
+        // 위 무효화에 딸려오지 않는다 — 빠뜨리면 방금 추가한 팀원이 계속 선택 가능해 보인다.
+        queryClient.invalidateQueries({
+          queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
+        }),
+        // 신청 목록 카드가 playerCount 를 그대로 보여주므로 명단만 갱신하면 인원수가 옛값으로
+        // 남는다. tournamentId 를 모르는 자리라 admin tournaments 접두사로 한 번에 무효화한다.
+        queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments().slice(0, 3) }),
+      ]);
     },
   });
 }
@@ -2581,15 +2585,17 @@ export function useV1AdminRemovePlayer(registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (playerId: string) => v1Delete(`/admin/players/${playerId}`),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: v1Keys.adminTournamentRoster(registrationId),
-      });
-      // 제외한 팀원은 다시 고를 수 있어야 한다 — 접두사가 달라 roster 무효화로는 안 따라온다.
-      void queryClient.invalidateQueries({
-        queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
-      });
-      void queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments().slice(0, 3) });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: v1Keys.adminTournamentRoster(registrationId),
+        }),
+        // 제외한 팀원은 다시 고를 수 있어야 한다 — 접두사가 달라 roster 무효화로는 안 따라온다.
+        queryClient.invalidateQueries({
+          queryKey: v1Keys.adminRosterEligibleMembers(registrationId),
+        }),
+        queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments().slice(0, 3) }),
+      ]);
     },
   });
 }

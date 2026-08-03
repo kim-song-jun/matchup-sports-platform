@@ -620,8 +620,6 @@ export class TournamentPlayersService {
     ]);
 
     const onRoster = new Set(activePlayers.map((player) => player.userId));
-    const requiresGender = registration.tournament.genderCategory === 'mixed';
-    const requiredGender = genderRequiredByCategory(registration.tournament.genderCategory);
     const phoneEnforced = isPhoneVerificationEnforced();
 
     // 명단 전체를 막는 사유. 개인 자격과 무관하게 추가 자체가 거부되므로 여기서 먼저 판정한다 —
@@ -632,7 +630,6 @@ export class TournamentPlayersService {
     const registrationCancelled =
       registration.status === 'cancel_requested' || registration.status === 'cancelled';
     const maxPlayers = registration.tournament.maxPlayers;
-    const rosterFull = activePlayers.length >= maxPlayers;
 
     return {
       members: memberships

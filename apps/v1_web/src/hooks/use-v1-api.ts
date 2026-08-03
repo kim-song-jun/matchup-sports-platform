@@ -2610,6 +2610,7 @@ function invalidateRosterViews(
             return (
               key[0] === 'v1' &&
               key[1] === 'tournaments' &&
+              key[3] === 'registrations' &&
               key[4] === registrationId &&
               key[5] === 'players'
             );
@@ -2967,13 +2968,9 @@ export function useV1UpdatePlayerEligibility(registrationId?: string) {
         queryClient.invalidateQueries({
           queryKey: [...v1Keys.all, 'admin', 'tournaments'],
         }),
-        ...(registrationId
-          ? [
-              queryClient.invalidateQueries({
-                queryKey: v1Keys.adminTournamentRoster(registrationId),
-              }),
-            ]
-          : []),
+        // 자격 상태도 명단·선택목록에 그대로 반영되는 값이라 add/remove 와 같은 헬퍼를 쓴다 —
+        // 여기만 admin roster 키만 털면 eligible-players 와 소비자 명단 캐시가 낡는다.
+        ...(registrationId ? [invalidateRosterViews(queryClient, null, registrationId)] : []),
       ]);
     },
   });

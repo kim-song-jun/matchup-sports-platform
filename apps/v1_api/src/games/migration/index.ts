@@ -2,8 +2,10 @@ export {
   compareGameResultReads,
   computeGameBackfillHashes,
   runGameResultBackfill,
+  runGameResultBackfillEvidence,
 } from './game-result-backfill';
 export type {
+  GameBackfillEvidence,
   GameBackfillHashes,
   GameBackfillQuarantine,
   GameBackfillRunResult,
@@ -11,6 +13,7 @@ export type {
 export {
   compareGameResultSnapshots,
   evaluateConsecutiveZeroGate,
+  GameReadAuthorityMismatchError,
   selectGameReadAuthority,
 } from './compare-game-result-reads';
 export type {

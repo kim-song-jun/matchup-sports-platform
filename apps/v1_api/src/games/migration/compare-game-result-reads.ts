@@ -30,7 +30,26 @@ type SnapshotPair = {
   };
   legacy: unknown;
   projected: unknown;
+  // Set this when the source has genuinely no persisted projected-side
+  // revision to read back (never imported, or the import row could not be
+  // located) — NOT when a projection exists but happens to look
+  // uninteresting. Callers MUST NOT paper over a missing projection by
+  // substituting the source's own value as `projected` (that previously made
+  // every not-yet-imported source compare against itself and count as a
+  // silent, construction-level match). When `missingProjection` is true this
+  // pair is unconditionally reported as a mismatch — `legacy`/`projected`
+  // are not diffed at all, so no combination of caller-supplied values can
+  // make it pass. `identity.revisionId` must still be a real, non-empty,
+  // non-fabricated placeholder (not the entityId) so the mismatch record
+  // stays a genuine, addressable identity.
+  missingProjection?: boolean;
 };
+
+// Sentinel `field` for a forced missing-projection mismatch. `$`-prefixed to
+// stay disjoint from real dotted/indexed field paths produced by
+// `collectMismatches` (e.g. `score.regulation.home`), mirroring the existing
+// root-value convention (`path || '$'`) below.
+const MISSING_PROJECTION_FIELD = '$missingProjection';
 
 export function compareGameResultSnapshots(input: {
   populationHash: string;
@@ -39,14 +58,24 @@ export function compareGameResultSnapshots(input: {
   quarantined: number;
   pairs: SnapshotPair[];
 }): GameResultComparison {
-  const mismatches = input.pairs.flatMap((pair) =>
-    collectMismatches(pair.legacy, pair.projected).map((difference) => ({
+  const mismatches = input.pairs.flatMap((pair) => {
+    if (pair.missingProjection) {
+      return [
+        {
+          ...pair.identity,
+          field: MISSING_PROJECTION_FIELD,
+          legacy: pair.legacy,
+          projected: ABSENT_VALUE_MARKER,
+        },
+      ];
+    }
+    return collectMismatches(pair.legacy, pair.projected).map((difference) => ({
       ...pair.identity,
       field: difference.field,
       legacy: difference.legacy,
       projected: difference.projected,
-    })),
-  );
+    }));
+  });
   const mismatchedEntities = new Set(
     mismatches.map((mismatch) => `${mismatch.entityType}:${mismatch.entityId}`),
   ).size;
@@ -65,6 +94,51 @@ export function compareGameResultSnapshots(input: {
   };
 }
 
+// Thrown by `selectGameReadAuthority()` when `mode === 'new'` is asked to
+// serve the projected/new-system response while the supplied `comparison`
+// still shows a mismatch against legacy for this exact read. `mode: 'new'`
+// means the projected side has become the source of truth — it must never
+// silently hand back a response already known to diverge from legacy.
+// Callers that reach this branch should treat it as a hard stop (log +
+// surface, do not swallow), not retry-and-ignore.
+export class GameReadAuthorityMismatchError extends Error {
+  readonly comparison: GameResultComparison;
+
+  constructor(comparison: GameResultComparison) {
+    super(
+      `Refusing to serve the projected game result as authoritative: ` +
+        `${comparison.counts.mismatched} mismatch(es) detected against the legacy source ` +
+        `(populationHash=${comparison.populationHash}).`,
+    );
+    this.name = 'GameReadAuthorityMismatchError';
+    this.comparison = comparison;
+  }
+}
+
+// Read-path authority selection for the Task 10 legacy -> projected game
+// result cutover.
+//
+// `mode: 'compare'` intentionally keeps legacy as the served authority even
+// when `comparison` reports a mismatch (pinned by
+// compare-game-result-reads.spec.ts — "keeps legacy response authority in
+// compare mode while surfacing mismatches"): during the comparison phase the
+// projected side is unverified by definition, so live reads must keep
+// serving the trusted source while the mismatch is surfaced as evidence via
+// `comparison`. The fail-closed guarantee for this phase lives one level up,
+// at the population gate (`evaluateConsecutiveZeroGate`), which must reach
+// `requiredConsecutiveRuns` fully-populated, zero-mismatch runs before
+// anything is allowed to flip `mode` to `'new'`. Per-request throwing here
+// would contradict that pinned contract and would also turn a single
+// in-flight comparison bug into a live-traffic outage during the very phase
+// meant to de-risk the cutover.
+//
+// `mode: 'new'` is different: it means the projected side has *already*
+// become authoritative, so there is no "keep serving the trusted side while
+// evidence accumulates" step left to fall back on. If the caller still
+// passes a `comparison` for this read (every call site is required to
+// supply one) and it shows a mismatch, that is a live divergence on the
+// authoritative path itself — this DOES fail closed by throwing
+// `GameReadAuthorityMismatchError` instead of returning a response.
 export function selectGameReadAuthority<Legacy, Projected>(
   mode: 'legacy' | 'compare' | 'new',
   legacy: Legacy,
@@ -74,6 +148,9 @@ export function selectGameReadAuthority<Legacy, Projected>(
   | { authority: 'legacy'; response: Legacy; comparison: GameResultComparison | null }
   | { authority: 'new'; response: Projected; comparison: null } {
   if (mode === 'new') {
+    if (comparison.counts.mismatched > 0) {
+      throw new GameReadAuthorityMismatchError(comparison);
+    }
     return { authority: 'new', response: projected, comparison: null };
   }
   return {

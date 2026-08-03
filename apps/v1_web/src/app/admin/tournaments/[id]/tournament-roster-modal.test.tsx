@@ -8,9 +8,14 @@ const refetch = vi.fn();
 const updateEligibility = vi.fn();
 let queryState: Record<string, unknown>;
 
+const addPlayer = vi.fn();
+const removePlayer = vi.fn();
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentPlayers: () => queryState,
   useV1UpdatePlayerEligibility: () => ({ mutate: updateEligibility, isPending: false }),
+  useV1AdminAddPlayer: () => ({ mutate: addPlayer, isPending: false }),
+  useV1AdminRemovePlayer: () => ({ mutate: removePlayer, isPending: false }),
 }));
 
 const registration: V1AdminTournamentRegistration = {
@@ -155,5 +160,64 @@ describe('admin tournament roster modal', () => {
     expect(screen.queryByText('등록된 선수가 없어요.')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  // 2026-08-03 사고: 어드민 콘솔에 명단 추가·제거가 아예 없어서, 운영자가 무엇을 눌러도
+  // 서버로 요청이 가지 않았다(24시간 로그에 POST 0건·4xx 0건). 아래 두 테스트는 "버튼이
+  // 있는가"가 아니라 **실제로 요청이 나가는가**를 확인한다.
+  it('제외 버튼이 해당 선수 id 로 제거를 요청한다', async () => {
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: '홍길동 선수를 명단에서 제외' }));
+
+    expect(removePlayer).toHaveBeenCalledTimes(1);
+    expect(removePlayer.mock.calls[0][0]).toBe('player-1');
+  });
+
+  it('선수 추가는 입력값을 그대로 보내고, 값이 비면 요청하지 않는다', async () => {
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    // 빈 폼으로 누르면 API 를 호출하지 않고 폼 안에서 알린다.
+    await userEvent.click(screen.getByRole('button', { name: '추가' }));
+    expect(addPlayer).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('사용자 ID 와 실명을 모두 입력해주세요.');
+
+    await userEvent.type(screen.getByLabelText('사용자 ID'), 'user-42');
+    await userEvent.type(screen.getByLabelText('실명'), '김명철');
+    await userEvent.click(screen.getByRole('button', { name: '추가' }));
+
+    expect(addPlayer).toHaveBeenCalledTimes(1);
+    expect(addPlayer.mock.calls[0][0]).toEqual({ userId: 'user-42', realName: '김명철' });
+  });
+
+  it('읽기 전용 어드민에게는 추가 폼과 제외 버튼이 보이지 않는다', () => {
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite={false}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '추가' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동 선수를 명단에서 제외' })).toBeDisabled();
   });
 });

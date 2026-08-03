@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1TournamentPlayer, V1TournamentRegistration } from '@prisma/client';
-import { AdminContextService } from '../common/admin-context.service';
+import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -173,7 +173,10 @@ export class TournamentPlayersService {
     tournamentId: string,
     registrationId: string,
     dto: AddPlayerDto,
-    options: { allowLockedAndExpired?: boolean } = {},
+    options: {
+      allowLockedAndExpired?: boolean;
+      auditAs?: { admin: V1ActiveAdmin; action: string };
+    } = {},
   ) {
     return this.prisma.$transaction(async (tx) => {
       const current = await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId, options);
@@ -241,7 +244,7 @@ export class TournamentPlayersService {
         });
       }
 
-      return tx.v1TournamentPlayer.upsert({
+      const saved = await tx.v1TournamentPlayer.upsert({
         where: { registrationId_userId: { registrationId, userId: dto.userId } },
         create: {
           registrationId,
@@ -261,6 +264,25 @@ export class TournamentPlayersService {
           addedAt: new Date(),
         },
       });
+
+      if (options.auditAs) {
+        await this.adminContext.logAdminAction(
+          options.auditAs.admin,
+          {
+            action: options.auditAs.action,
+            targetType: 'tournament_player',
+            targetId: saved.id,
+            afterJson: {
+              registrationId,
+              userId: dto.userId,
+              realName: memberRealName,
+            },
+          },
+          tx,
+        );
+      }
+
+      return saved;
     });
   }
 
@@ -439,7 +461,7 @@ export class TournamentPlayersService {
    * 마감이 지난 뒤 운영 판단으로 조정해야 하는 상황을 손댈 방법이 없었다.
    */
   async addPlayerForAdmin(user: V1AuthUser, registrationId: string, dto: AddPlayerDto) {
-    await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getMutationAdmin(user.id);
 
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
@@ -454,6 +476,10 @@ export class TournamentPlayersService {
 
     const player = await this.insertPlayerIntoRoster(registration.tournamentId, registrationId, dto, {
       allowLockedAndExpired: true,
+      // 운영자가 팀 대신 명단을 고친 기록은 반드시 남아야 한다. 정원·자격 분쟁이 생겼을 때
+      // "누가 언제 넣었나"를 되짚을 수 있는 유일한 근거이고, 잠금·마감을 넘길 수 있는
+      // 경로라서 더욱 그렇다. 명단 변경과 같은 트랜잭션에 기록해 둘이 어긋나지 않게 한다.
+      auditAs: { admin, action: 'player.add' },
     });
     return this.serializePlayer(player);
   }

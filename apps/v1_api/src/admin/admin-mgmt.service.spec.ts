@@ -107,7 +107,10 @@ describe('AdminService — admin-management (owner-only)', () => {
     v1UserProfile: { updateMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1Match: { findMany: jest.Mock; findUnique: jest.Mock };
-    v1Team: { findMany: jest.Mock; findUnique: jest.Mock };
+    v1Team: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+    // 계정 비활성화 시 팀 권한 검사·명단 정리가 이 모델들을 쓴다.
+    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
+    v1TournamentPlayer: { findMany: jest.Mock; updateMany: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock };
     v1StatusChangeLog: { findMany: jest.Mock; create: jest.Mock };
     $transaction: jest.Mock;
@@ -129,7 +132,16 @@ describe('AdminService — admin-management (owner-only)', () => {
       v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
       v1Match: { findMany: jest.fn(), findUnique: jest.fn() },
-      v1Team: { findMany: jest.fn(), findUnique: jest.fn() },
+      v1Team: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn().mockResolvedValue({}) },
+      v1TeamMembership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      v1TournamentPlayer: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn() },
       v1StatusChangeLog: { findMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
@@ -150,6 +162,9 @@ describe('AdminService — admin-management (owner-only)', () => {
             | 'v1UserProfile'
             | 'v1AdminActionLog'
             | 'v1StatusChangeLog'
+            | 'v1TeamMembership'
+            | 'v1Team'
+            | 'v1TournamentPlayer'
             | '$queryRaw'
           >,
         ) => Promise<unknown>,
@@ -161,6 +176,9 @@ describe('AdminService — admin-management (owner-only)', () => {
           v1UserProfile: p.v1UserProfile,
           v1AdminActionLog: p.v1AdminActionLog,
           v1StatusChangeLog: p.v1StatusChangeLog,
+          v1TeamMembership: p.v1TeamMembership,
+          v1Team: p.v1Team,
+          v1TournamentPlayer: p.v1TournamentPlayer,
           $queryRaw: p.$queryRaw,
         }),
     );

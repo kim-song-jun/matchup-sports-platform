@@ -122,6 +122,8 @@ describe('TeamsService', () => {
     v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1User: { findUnique: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
+    // 팀 이탈 시 대회 명단도 함께 정리한다(roster-cleanup).
+    v1TournamentPlayer: { findMany: jest.Mock; updateMany: jest.Mock };
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
     v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
@@ -165,6 +167,7 @@ describe('TeamsService', () => {
       },
       v1User: { findUnique: jest.fn() },
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
+      v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
       v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },

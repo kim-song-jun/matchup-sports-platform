@@ -2546,6 +2546,9 @@ export function useV1AdminAddPlayer(registrationId: string) {
       void queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentRoster(registrationId),
       });
+      // 신청 목록 카드가 playerCount 를 그대로 보여주므로 명단만 갱신하면 인원수가 옛값으로
+      // 남는다. tournamentId 를 모르는 자리라 admin tournaments 접두사로 한 번에 무효화한다.
+      void queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments().slice(0, 3) });
     },
   });
 }
@@ -2558,6 +2561,7 @@ export function useV1AdminRemovePlayer(registrationId: string) {
       void queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentRoster(registrationId),
       });
+      void queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments().slice(0, 3) });
     },
   });
 }

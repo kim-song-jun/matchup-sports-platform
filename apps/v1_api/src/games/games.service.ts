@@ -13,6 +13,7 @@ import {
   V1GameResultRevisionState,
   V1GameSourceType,
   V1GameState,
+  type V1GameParticipant,
   type V1TournamentStaffRole,
   V1VisibilityMode,
 } from '@prisma/client';
@@ -269,6 +270,30 @@ function scoreFromJson(value: Prisma.JsonValue): GameScore {
     home: typeof score.home === 'number' ? score.home : 0,
     away: typeof score.away === 'number' ? score.away : 0,
   };
+}
+
+/**
+ * Pure grouping helper backing `GamesService.listLineups()`'s `participants`
+ * field (Task 21) -- kept as a standalone exported function so it is
+ * unit-testable without a database. Preserves each lineup's own
+ * `(jerseyNumber asc, createdAt asc)` ordering: `findMany`'s `orderBy` is a
+ * property of the QUERY, not of `Map` insertion, so this only has to bucket
+ * by `lineupId` without re-sorting -- the caller (`listLineups`) already
+ * requested rows in the order this function must preserve per bucket.
+ */
+export function groupParticipantsByLineupId(
+  participants: readonly V1GameParticipant[],
+): Map<string, V1GameParticipant[]> {
+  const byLineupId = new Map<string, V1GameParticipant[]>();
+  for (const participant of participants) {
+    const bucket = byLineupId.get(participant.lineupId);
+    if (bucket === undefined) {
+      byLineupId.set(participant.lineupId, [participant]);
+    } else {
+      bucket.push(participant);
+    }
+  }
+  return byLineupId;
 }
 
 const CLOCK_DRIFT_TOLERANCE_MS = 30_000;
@@ -971,12 +996,31 @@ export class GamesService {
     );
   }
 
+  /**
+   * Task 21 addition: the live operations console needs the actual roster
+   * (name/jersey/position) behind each lineup revision to render tappable
+   * player targets, not just the revision/state rows `V1GameLineup` itself
+   * carries -- `V1GameParticipant` has no Prisma relation back to
+   * `V1GameLineup` (see schema), so this is a second bounded query (by
+   * `lineupId IN (...)`, not per-row N+1) rather than a nested `include`.
+   * Purely additive to the response shape: every field this method already
+   * returned is unchanged, `participants` is a new array appended per row.
+   */
   async listLineups(user: V1AuthUser, gameId: string) {
     await this.resolveActor(this.prisma, gameId, user.id, 'read');
-    return this.prisma.v1GameLineup.findMany({
+    const lineups = await this.prisma.v1GameLineup.findMany({
       where: { gameId },
       orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
     });
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { lineupId: { in: lineups.map((lineup) => lineup.id) } },
+      orderBy: [{ jerseyNumber: 'asc' }, { createdAt: 'asc' }],
+    });
+    const participantsByLineupId = groupParticipantsByLineupId(participants);
+    return lineups.map((lineup) => ({
+      ...lineup,
+      participants: participantsByLineupId.get(lineup.id) ?? [],
+    }));
   }
 
   async saveLineup(

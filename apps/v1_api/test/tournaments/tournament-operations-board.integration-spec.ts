@@ -1971,12 +1971,17 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
   });
 
   it('lists an empty lineup set before any capture', async () => {
-    const lineups = await lineupService.listLineups(
+    // Task 21 shape change: the bare `V1GameLineup[]` became `{gameId, lineups}` so the live
+    // operations console can resolve fixtureId -> gameId before any lineup has ever been saved
+    // (an empty `lineups` array alone carries no id to call any `/games/:gameId/*` route with;
+    // see `OperateConsole`'s `useV1FixtureLineup` -> `gameId` -> `useV1Game`/command dispatch in
+    // apps/v1_web/src/app/tournament-ops/.../operate/operate-console.tsx).
+    const result = await lineupService.listLineups(
       authUser(lineupIds.director),
       lineupIds.tournament,
       lineupIds.fixture,
     );
-    expect(lineups).toEqual([]);
+    expect(result).toEqual({ gameId, lineups: [] });
   });
 
   // NOTE: per tournament-staff-policy.ts's allowsRoleAction(), FIELD_OPERATOR is authorized for
@@ -2058,13 +2063,14 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
     expect(saved).toEqual(expect.objectContaining({ gameId, lineupRevision: 1, replayed: false }));
     lineupId = saved.lineupId;
 
-    const lineups = await lineupService.listLineups(
+    const result = await lineupService.listLineups(
       authUser(lineupIds.director),
       lineupIds.tournament,
       lineupIds.fixture,
     );
-    expect(lineups).toHaveLength(1);
-    expect(lineups[0]).toEqual(expect.objectContaining({ id: lineupId, state: 'DRAFT', sideId: homeSideId }));
+    expect(result.gameId).toBe(gameId);
+    expect(result.lineups).toHaveLength(1);
+    expect(result.lineups[0]).toEqual(expect.objectContaining({ id: lineupId, state: 'DRAFT', sideId: homeSideId }));
   });
 
   it('requires a takeover token to submit a tournament-fixture lineup', async () => {

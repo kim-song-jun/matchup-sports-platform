@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { V1GameState } from '@prisma/client';
+import { V1GameState, type V1GameParticipant } from '@prisma/client';
 import { validate } from 'class-validator';
 import { GameContractError } from './core';
 import { GameCommandDto } from './dto/game-command.dto';
@@ -7,8 +7,24 @@ import {
   canonicalGameCommandPayloadHash,
   gameAuthorizationAction,
   gameOperationAuditActor,
+  groupParticipantsByLineupId,
   toGameHttpException,
 } from './games.service';
+
+function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
+  return {
+    id: 'participant-id',
+    gameId: 'game-id',
+    sideId: 'side-id',
+    lineupId: 'lineup-id',
+    displayNameSnapshot: 'Player',
+    jerseyNumber: null,
+    position: null,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
 
 describe('GamesService command boundary', () => {
   it('hashes semantic command payloads deterministically while distinguishing changed payloads', () => {
@@ -134,5 +150,36 @@ describe('GamesService command boundary', () => {
     expect(
       gameOperationAuditActor({ actorType: 'SYSTEM', systemActor: 'PROJECTION_REPAIR' }),
     ).toEqual({ type: 'SYSTEM', id: 'PROJECTION_REPAIR' });
+  });
+
+  describe('groupParticipantsByLineupId (Task 21: listLineups() participants roster)', () => {
+    it('buckets participants under their own lineupId and preserves each bucket\'s row order', () => {
+      const homeOne = participant({ id: 'p1', lineupId: 'lineup-home', jerseyNumber: 7 });
+      const homeTwo = participant({ id: 'p2', lineupId: 'lineup-home', jerseyNumber: 10 });
+      const away = participant({ id: 'p3', lineupId: 'lineup-away', jerseyNumber: 9 });
+
+      const grouped = groupParticipantsByLineupId([homeOne, homeTwo, away]);
+
+      expect(grouped.get('lineup-home')).toEqual([homeOne, homeTwo]);
+      expect(grouped.get('lineup-away')).toEqual([away]);
+    });
+
+    it('returns an empty map for no participants, and undefined for a lineupId with none -- listLineups() falls back to []', () => {
+      expect(groupParticipantsByLineupId([]).size).toBe(0);
+      expect(groupParticipantsByLineupId([]).get('any-lineup-id')).toBeUndefined();
+    });
+
+    it('never merges rows from two different lineups into the same bucket', () => {
+      const rows = [
+        participant({ id: 'a', lineupId: 'lineup-1' }),
+        participant({ id: 'b', lineupId: 'lineup-2' }),
+        participant({ id: 'c', lineupId: 'lineup-1' }),
+      ];
+
+      const grouped = groupParticipantsByLineupId(rows);
+
+      expect(grouped.get('lineup-1')?.map((row) => row.id)).toEqual(['a', 'c']);
+      expect(grouped.get('lineup-2')?.map((row) => row.id)).toEqual(['b']);
+    });
   });
 });

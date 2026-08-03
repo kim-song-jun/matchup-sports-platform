@@ -95,7 +95,7 @@ These two routes are new (deviation 5): `V1TournamentFixture.fieldId` and its FK
 
 | Method and route | Body | Result | Actor |
 |---|---|---|---|
-| `GET /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/lineup` | — | lineup revisions (ordered by `sideId` asc, `revision` desc) | any actor `GamesService.resolveActor` authorizes for `read` on this fixture's game |
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/lineup` | — | **Task 21 shape change**: `{gameId, lineups}` — previously a bare `V1GameLineup[]`. `gameId` lets a caller resolve `/games/:gameId/*` (game detail, commands, events) BEFORE any lineup exists (an empty `lineups` array alone carried no id). Each lineup row also carries a `participants` roster array (Task 21 addition — see [games.md](./games.md)), ordered by `sideId` asc, `revision` desc | any actor `GamesService.resolveActor` authorizes for `read` on this fixture's game |
 | `PUT /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/lineup/:sideId` | `SaveGameLineupDto` — see deviation 2 above | new `DRAFT` lineup revision | `tournament_director` or `platform_ops` only (see deviation 3) |
 | `POST /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/lineup/:lineupId/submit` | `SubmitGameLineupDto {expectedVersion,clientCommandId,takeoverToken?}` | `DRAFT → SUBMITTED` | same as save; `takeoverToken` is mandatory for a `TOURNAMENT_FIXTURE` game (`403 TAKEOVER_TOKEN_EXPIRED` without one) |
 

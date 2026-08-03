@@ -81,9 +81,28 @@ export class TournamentFixtureLineupService {
     return fixture.game.id;
   }
 
+  /**
+   * Task 21 addition: the response now carries `gameId` alongside `lineups`
+   * (previously a bare `V1GameLineup[]`) -- the live operations console
+   * resolves `fixtureId -> gameId` here BEFORE any lineup has ever been
+   * saved (an empty `lineups` array on its own carried no id to call any
+   * `/games/:gameId/*` route with).
+   *
+   * This is a shape change, not a field addition. Its consumers are known and
+   * both were updated in the same change, so this is not an unreviewed break:
+   *   - the live operations console added by this task reads `gameId` and
+   *     `lineups` directly (apps/v1_web/.../operate/operate-console.tsx)
+   *   - the pre-existing integration coverage from the Task 18 merge
+   *     (test/tournaments/tournament-operations-board.integration-spec.ts) had
+   *     its assertions moved to the new envelope
+   * An earlier draft of this comment claimed there was no consumer at all;
+   * that was wrong even as written, since the console above is part of this
+   * same task. See `docs/api/domains/tournament-operations.md`'s Task 21 note.
+   */
   async listLineups(user: V1AuthUser, tournamentId: string, fixtureId: string) {
     const gameId = await this.authorizeAndResolveGameId(user.id, tournamentId, fixtureId, 'read');
-    return this.gamesService.listLineups(user, gameId);
+    const lineups = await this.gamesService.listLineups(user, gameId);
+    return { gameId, lineups };
   }
 
   async saveLineup(

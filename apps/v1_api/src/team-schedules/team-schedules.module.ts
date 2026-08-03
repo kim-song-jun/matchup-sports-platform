@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
-import { NotificationsModule } from '../notifications/notifications.module';
 import { ScheduleAttendanceController } from './attendance.controller';
 import { ScheduleAttendanceService } from './attendance.service';
 import { GuestRecruitmentController } from './guest-recruitment.controller';
@@ -23,11 +22,11 @@ import { TeamSchedulesService } from './team-schedules.service';
 // No two controllers register the same method+path (Nest/Express silently shadows on collision
 // rather than erroring, so this was verified route-by-route against docs/api/global-contract.md).
 // V1AuthGuard/OptionalV1AuthGuard are locally re-provided (not imported via AuthModule) to mirror
-// the existing convention in teams.module.ts / team-matches.module.ts. NotificationsModule is
-// imported because GuestRecruitmentService injects NotificationsService (manager-notified-
-// immediately path on a new guest application).
+// the existing convention in teams.module.ts / team-matches.module.ts. GuestRecruitmentService no
+// longer injects NotificationsService (P1-4 fix: the new-guest-application manager notification is
+// now a durable outbox row delivered by the worker's ScheduleReminderService handler instead of an
+// in-request fire-and-forget call), so NotificationsModule is no longer imported here.
 @Module({
-  imports: [NotificationsModule],
   controllers: [
     TeamSchedulesController,
     ScheduleAttendanceController,

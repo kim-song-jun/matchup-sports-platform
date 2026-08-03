@@ -303,6 +303,9 @@ describe('Game core contract', () => {
   it('accepts a score, event, and participant set that agrees', () => {
     expect(() =>
       validateGameResultInvariants({
+        // TOURNAMENT_FIXTURE keeps the event-based score cross-check enforced
+        // (Task 17 exempts only TEAM_MATCH — see game-invariants.ts).
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
         score: { home: 2, away: 1 },
         sides: [
           { id: 'side-home', sideKey: 'HOME' },
@@ -334,6 +337,9 @@ describe('Game core contract', () => {
 
   it('rejects negative scores, malformed events, foreign participants, and score mismatches', () => {
     const validBase = {
+      // TOURNAMENT_FIXTURE keeps the event-based score cross-check enforced
+      // (Task 17 exempts only TEAM_MATCH — see game-invariants.ts).
+      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
       sides: [
         { id: 'side-home', sideKey: 'HOME' as const },
         { id: 'side-away', sideKey: 'AWAY' as const },

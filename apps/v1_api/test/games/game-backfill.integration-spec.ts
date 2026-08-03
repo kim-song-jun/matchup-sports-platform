@@ -304,7 +304,7 @@ async function seedTask10Sources() {
   });
 }
 
-describe('Task 10 legacy result pin and migration RED', () => {
+describe('Task 10 legacy result migration contract', () => {
   let app: INestApplication;
   let cleanupApp: (() => Promise<void>) | undefined;
 

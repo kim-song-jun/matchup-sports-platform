@@ -114,6 +114,35 @@ describe('Game core contract', () => {
     ).toThrow(expect.objectContaining({ code: 'INVALID_STATE_TRANSITION' }));
   });
 
+  it('permits a TEAM_RESULT_SUBMISSION resubmit from ENDED (the correction loop) but never from CANCELLED', () => {
+    // Task 16 deadlock regression: a corrected revision (created after the
+    // opponent's change-request on an already-ENDED game) must be able to
+    // resubmit without the Game lifecycle guard rejecting it just because
+    // the Game is already ENDED. If this predicate ever narrows back to
+    // only activeGameStates, the correction loop dead-ends at "corrected
+    // draft created" and can never reach SUBMITTED/OFFICIAL again.
+    expect(() =>
+      assertGameLifecycleTransition({
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        trigger: 'TEAM_RESULT_SUBMISSION',
+        from: V1GameState.ENDED,
+        to: V1GameState.ENDED,
+      }),
+    ).not.toThrow();
+
+    // Cancellation must stay terminal for result submission even though
+    // ENDED is now allowed — the guard must not degrade into a blanket
+    // "any from state goes" permission.
+    expect(() =>
+      assertGameLifecycleTransition({
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        trigger: 'TEAM_RESULT_SUBMISSION',
+        from: V1GameState.CANCELLED,
+        to: V1GameState.ENDED,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'INVALID_STATE_TRANSITION' }));
+  });
+
   it('rejects terminal lifecycle exits and unknown states', () => {
     for (const from of [V1GameState.ENDED, V1GameState.CANCELLED]) {
       for (const to of lifecycleStates) {

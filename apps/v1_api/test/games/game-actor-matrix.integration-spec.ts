@@ -212,6 +212,10 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
       data: {
         id: ids.teamMatch,
         hostTeamId: ids.hostTeam,
+        // Task 16: result draft/submit now requires a real matched opponent (see
+        // GamesService.assertTeamMatchMatched) — status must agree with
+        // approvedApplicantTeamId exactly as the real approve-application flow leaves it.
+        status: 'matched',
         approvedApplicantTeamId: ids.opponentTeam,
         createdByUserId: ids.teamOwner,
         sportId,

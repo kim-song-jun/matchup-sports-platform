@@ -319,28 +319,6 @@ describe('TeamMatchesService', () => {
     );
   });
 
-  it('complete: matched 팀매치를 completed로 전환하고 양 팀 운영자에게 알림을 보낸다', async () => {
-    prisma.v1TeamMatch.findFirst.mockResolvedValue(
-      teamMatchRow({ status: 'matched', startAt: PAST, approvedApplicantTeamId: 'team-applicant' }),
-    );
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
-    prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'completed', completedAt: new Date() }));
-    prisma.v1StatusChangeLog.create.mockResolvedValue({});
-
-    const result = await service.complete(manager, 'tm-1', { note: '경기 완료' });
-
-    expect(result.status).toBe('completed');
-    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'completed', completedAt: expect.any(Date) }) }),
-    );
-    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
-      expect.any(Function),
-      'team_match_completed',
-      'tm-1',
-      '"풋살 상대팀 모집" 팀매치 리뷰를 남겨보세요.',
-    );
-  });
-
   it('edit: 모집 상태여도 시작 시간이 지났으면 수정 잠금 상태로 내려준다', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(
       teamMatchRow({ status: 'recruiting', startAt: PAST }),

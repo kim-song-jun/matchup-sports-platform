@@ -16,6 +16,7 @@ import {
   V1GameState,
   V1IdentityActorType,
   V1IdentityLinkAction,
+  V1TeamMatchStatus,
   type V1TournamentStaffRole,
   V1VisibilityMode,
 } from '@prisma/client';
@@ -1129,6 +1130,7 @@ export class GamesService {
         payload: dto,
       },
       async (tx, game, context) => {
+        await this.assertTeamMatchMatched(tx, game.teamMatchId);
         const invariant = await this.resultInvariantInput(tx, game, dto);
         try {
           validateGameResultInvariants(invariant);
@@ -1216,6 +1218,7 @@ export class GamesService {
             message: 'Tournament result submission is owned by the end command',
           });
         }
+        await this.assertTeamMatchMatched(tx, game.teamMatchId);
         this.assertLifecycle(
           game.sourceType,
           'TEAM_RESULT_SUBMISSION',
@@ -1248,6 +1251,40 @@ export class GamesService {
           where: { id: gameId },
           data: { state: V1GameState.ENDED, version: { increment: 1 } },
         });
+        if (game.teamMatchId !== null) {
+          // Task 16: submission is the literal end-of-match boundary for a team
+          // match (see the frozen REST contract note on this route) — the same
+          // transaction that ends the Game now also completes its TeamMatch, so
+          // review eligibility (reviews.service.ts reads TeamMatch.status/
+          // completedAt) keeps working now that the old complete()-only
+          // shortcut that used to set this is removed. The `status: { not:
+          // completed }` guard makes this idempotent across the correction loop
+          // (a later change-request -> corrected-revision -> resubmit cycle finds
+          // the TeamMatch already completed and skips the update); the log write
+          // below is gated on `.count === 1` for the same reason, so a
+          // no-op resubmit never writes a fromStatus==toStatus log row.
+          const completion = await tx.v1TeamMatch.updateMany({
+            where: { id: game.teamMatchId, status: { not: V1TeamMatchStatus.completed } },
+            data: { status: V1TeamMatchStatus.completed, completedAt: new Date() },
+          });
+          if (completion.count === 1) {
+            // assertTeamMatchMatched (above) already established that the TeamMatch's
+            // status is `matched` or `completed`; the guard on the updateMany above
+            // means a real transition only happens when it was `matched`, so
+            // `matched` is the only possible fromStatus here.
+            await tx.v1StatusChangeLog.create({
+              data: {
+                targetType: 'team_match',
+                targetId: game.teamMatchId,
+                fromStatus: V1TeamMatchStatus.matched,
+                toStatus: V1TeamMatchStatus.completed,
+                actorType: 'user',
+                actorUserId: user.id,
+                reason: 'team_match_result_submitted',
+              },
+            });
+          }
+        }
         await this.writeOutbox(
           tx,
           `game:${gameId}:revision:${submitted.revision}:submitted`,
@@ -2508,6 +2545,22 @@ export class GamesService {
         teamId: match.approvedApplicantTeamId ?? undefined,
       };
     }
+    if (action === 'team_result_submit') {
+      // Task 16: draft creation and submission are host-only. The opponent side's
+      // sole authority over the result is the decision surface above
+      // (approve/change_request) — an opponent manager must never be able to draft
+      // or submit the result their own team is being evaluated against.
+      const hostRole = managerRole(hostMembership);
+      if (hostRole === null) {
+        throw this.forbidden();
+      }
+      return {
+        actorType: 'USER',
+        actorUserId: userId,
+        role: hostRole,
+        teamId: match.hostTeamId,
+      };
+    }
     const role = managerRole(hostMembership) ?? managerRole(opponentMembership);
     // `participant_identity` (Task 14 identity-link/consent mutations) is
     // deliberately as permissive as `read` here: the actor only needs to be
@@ -2790,6 +2843,45 @@ export class GamesService {
       }
     });
     return { home, away };
+  }
+
+  private async assertTeamMatchMatched(tx: Transaction, teamMatchId: string | null): Promise<void> {
+    // Task 16: mirrors the precondition the removed `/team-matches/:teamMatchId/complete`
+    // shortcut used to enforce (matched status + a locked-in opponent) before letting a
+    // host draft or submit a result. Without this, a still-recruiting or closed team
+    // match's Game row (created up front with a placeholder, teamId-less AWAY side —
+    // see TeamMatchesService.teamMatchGameSourceInput) could be drafted/ended against a
+    // side that isn't a real opposing team yet.
+    //
+    // `completed` is intentionally accepted alongside `matched`: submitResultRevision
+    // atomically flips the TeamMatch to `completed` on the *first* submission, and this
+    // guard runs at the top of both createResultRevision and submitResultRevision — so a
+    // matched-only check would make status `completed` after that first submission and
+    // permanently reject every later call, including the correction loop this task
+    // requires (opponent change-request -> host drafts + submits a superseding
+    // revision). Any status the match reached before ever becoming `matched` (recruiting,
+    // closed, cancelled) has approvedApplicantTeamId === null and fails below; `archived`,
+    // which only an admin sets after the fact, is neither `matched` nor `completed` and
+    // fails the status check directly. So the "never reached a playable state" rejection
+    // is preserved either way.
+    if (teamMatchId === null) {
+      return;
+    }
+    const teamMatch = await tx.v1TeamMatch.findUnique({
+      where: { id: teamMatchId },
+      select: { status: true, approvedApplicantTeamId: true },
+    });
+    const reachedPlayableState =
+      teamMatch !== null &&
+      teamMatch.approvedApplicantTeamId !== null &&
+      (teamMatch.status === V1TeamMatchStatus.matched ||
+        teamMatch.status === V1TeamMatchStatus.completed);
+    if (!reachedPlayableState) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_NOT_MATCHED',
+        message: 'Only a matched team match with an approved opponent can draft or submit a result',
+      });
+    }
   }
 
   private assertLifecycle(

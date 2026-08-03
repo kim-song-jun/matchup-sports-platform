@@ -25,7 +25,6 @@ describe('TeamMatchesController', () => {
     cancel: jest.fn(),
     close: jest.fn(),
     reopen: jest.fn(),
-    complete: jest.fn(),
     createApplication: jest.fn(),
     applications: jest.fn(),
     withdrawApplication: jest.fn(),
@@ -184,20 +183,6 @@ describe('TeamMatchesController', () => {
     await expect(controller.reopen(user, 'team-match-1', { reason: '추가 모집' })).resolves.toEqual({
       teamMatchId: 'team-match-1',
       status: 'recruiting',
-    });
-  });
-
-  it('completes a team match', async () => {
-    teamMatchesService.complete.mockResolvedValue({
-      teamMatchId: 'team-match-1',
-      status: 'completed',
-      completedAt: '2026-05-18T12:00:00.000Z',
-    });
-
-    await expect(controller.complete(user, 'team-match-1', { note: '경기 완료' })).resolves.toEqual({
-      teamMatchId: 'team-match-1',
-      status: 'completed',
-      completedAt: '2026-05-18T12:00:00.000Z',
     });
   });
 

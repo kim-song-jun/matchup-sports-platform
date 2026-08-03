@@ -17,8 +17,11 @@ export type GameLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
 
 /**
  * The October minimum event set is GOAL/CARD; SUBSTITUTION and the
- * PERIOD_*/PAUSE/RESUME lifecycle markers are backend-emitted, not
- * operator-composed from this console. CORRECTION is reused (per the
+ * PERIOD_START / PERIOD_END / PAUSE / RESUME lifecycle markers are
+ * backend-emitted, not operator-composed from this console. (Written out
+ * rather than as a `PERIOD_*` glob on purpose: the `*` followed by `/` would
+ * close this block comment early and everything below it would parse as code.)
+ * CORRECTION is reused (per the
  * `V1GameEventType` enum — there is no dedicated FOUL type and the schema is
  * frozen, see Task 4) as the extensible bucket for a foul note: it is
  * captured for the record but is NOT read by `deriveTournamentRevision()`'s

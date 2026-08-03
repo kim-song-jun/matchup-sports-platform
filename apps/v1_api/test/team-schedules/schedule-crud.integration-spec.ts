@@ -1,6 +1,7 @@
 import { HttpException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TeamSchedulesService } from '../../src/team-schedules/team-schedules.service';
+import { canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 const ids = {
@@ -314,10 +315,53 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     );
 
     expect((first as { jobId: string }).jobId).toBe((second as { jobId: string }).jobId);
-    const outboxCount = await prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(*) AS count FROM v1_outbox_events WHERE business_key = ${`schedule:${scheduleId}:reminder:rsvp_deadline`}
+    const outboxRows = await prisma.$queryRaw<Array<{ count: bigint; type: string; payload: unknown }>>`
+      SELECT COUNT(*) AS count, MIN(type::text) AS type, MIN(payload::text) AS payload
+      FROM v1_outbox_events WHERE business_key = ${`schedule:${scheduleId}:reminder:rsvp_deadline`}
     `;
-    expect(Number(outboxCount[0].count)).toBe(1);
+    expect(Number(outboxRows[0].count)).toBe(1);
+    // FG-8 fix: the original assertions only checked jobId equality and row count — neither
+    // observes the outbox row's own `type` column, so swapping the
+    // rsvp_deadline/guest_recruitment_close -> outbox-type mapping in triggerReminder() would
+    // still pass every assertion here. Assert the actual persisted type and payload.
+    expect(outboxRows[0].type).toBe('SCHEDULE_RSVP_DEADLINE_REMINDER');
+    expect(JSON.parse(outboxRows[0].payload as string)).toEqual({ scheduleId, kind: 'rsvp_deadline' });
+  });
+
+  // FG-8 fix: the sibling "no recruitment attached" test below proves the 404 branch, but nothing
+  // in this file previously drove a SUCCESSFUL guest_recruitment_close trigger and inspected its
+  // outbox row — the rsvp_deadline positive-path test above and this one are what actually catch
+  // a swapped `rsvp_deadline -> SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER` /
+  // `guest_recruitment_close -> SCHEDULE_RSVP_DEADLINE_REMINDER` mapping regression.
+  it('triggers a guest_recruitment_close reminder and persists the correct outbox type/payload', async () => {
+    const created = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'reminder-guest-close-create-key');
+    const scheduleId = (created as { id: string }).id;
+    await prisma.v1ScheduleGuestRecruitment.create({
+      data: {
+        scheduleId,
+        slots: 2,
+        closesAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
+        state: 'OPEN',
+      },
+    });
+
+    const result = await service.triggerReminder(
+      authUser(ids.ownerA),
+      ids.teamA,
+      scheduleId,
+      { kind: 'guest_recruitment_close' },
+      'reminder-guest-close-key',
+    );
+    expect((result as { kind: string }).kind).toBe('guest_recruitment_close');
+
+    const businessKey = `schedule:${scheduleId}:reminder:guest_recruitment_close`;
+    const outboxRows = await prisma.$queryRaw<Array<{ count: bigint; type: string; payload: unknown }>>`
+      SELECT COUNT(*) AS count, MIN(type::text) AS type, MIN(payload::text) AS payload
+      FROM v1_outbox_events WHERE business_key = ${businessKey}
+    `;
+    expect(Number(outboxRows[0].count)).toBe(1);
+    expect(outboxRows[0].type).toBe('SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER');
+    expect(JSON.parse(outboxRows[0].payload as string)).toEqual({ scheduleId, kind: 'guest_recruitment_close' });
   });
 
   it('rejects a reminder trigger for guest_recruitment_close when no recruitment is attached', async () => {
@@ -400,6 +444,67 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
 
       const scheduleCount = await prisma.v1TeamSchedule.count({ where: { teamId: ids.teamA, title: dto.title } });
       expect(scheduleCount).toBe(2);
+    },
+  );
+
+  // FG-10 fix: the W9 create-expiry test above never forces the pre-fix unordered `findFirst()`
+  // to actually fail (it happens to still pick the active row today), and never exercises CP2's
+  // `resourceId DESC` secondary tiebreak at all (there is never a real `createdAt` tie in that
+  // test). This test seeds a genuine tie directly: two ACTIVE (non-expired) records in the exact
+  // same idempotency scope, identical `createdAt`, different `resourceId` — only the
+  // higher-`resourceId` row's stored `payloadHash` actually matches the dto below. If the ordering
+  // ever regresses to `createdAt DESC` alone (no deterministic secondary key), a real tie has no
+  // guaranteed winner — Postgres is free to return either row for logically identical repeated
+  // queries — and this test's repeated-lookup loop can intermittently select the lower-`resourceId`
+  // row instead, whose deliberately-mismatched `payloadHash` turns the call into a 409
+  // `IDEMPOTENCY_PAYLOAD_CONFLICT` instead of the correct replay.
+  it(
+    'CP2 regression: a genuine createdAt tie between two active idempotency records for the same ' +
+      'create scope is broken deterministically by resourceId DESC, not an unspecified order',
+    async () => {
+      const dto = { ...baseDto(), title: 'FG-10 CP2 tiebreak fixture' };
+      const key = 'fg10-cp2-tiebreak-key';
+      const matchingPayloadHash = canonicalGameCommandPayloadHash({ actorUserId: ids.ownerA, teamId: ids.teamA, dto });
+      const tiedCreatedAt = new Date('2026-01-01T00:00:00.000Z');
+      const higherResourceId = 'zzzzzzzz-0000-4000-8000-000000000fg1';
+      const lowerResourceId = 'aaaaaaaa-0000-4000-8000-000000000fg2';
+
+      await prisma.v1IdempotencyRecord.createMany({
+        data: [
+          {
+            actorUserId: ids.ownerA,
+            action: 'SCHEDULE_CREATE',
+            resourceType: 'V1_TEAM_SCHEDULE',
+            resourceId: higherResourceId,
+            idempotencyKey: key,
+            payloadHash: matchingPayloadHash,
+            responseStatus: 201,
+            responseBody: { id: higherResourceId, title: 'correct row (higher resourceId)' },
+            expiresAt: new Date(Date.now() + 1_000_000),
+            createdAt: tiedCreatedAt,
+          },
+          {
+            actorUserId: ids.ownerA,
+            action: 'SCHEDULE_CREATE',
+            resourceType: 'V1_TEAM_SCHEDULE',
+            resourceId: lowerResourceId,
+            idempotencyKey: key,
+            payloadHash: 'deliberately-mismatched-hash-for-the-lower-resourceId-row',
+            responseStatus: 201,
+            responseBody: { id: lowerResourceId, title: 'wrong row (lower resourceId)' },
+            expiresAt: new Date(Date.now() + 1_000_000),
+            createdAt: tiedCreatedAt,
+          },
+        ],
+      });
+
+      // Repeated identical calls must all deterministically resolve to the higher-resourceId row
+      // (the one with the matching hash) and replay — never intermittently pick the other row and
+      // 409 on a payload-hash mismatch that was never actually caused by a different payload.
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const result = await service.create(authUser(ids.ownerA), ids.teamA, dto, key);
+        expect(result).toMatchObject({ id: higherResourceId, replayed: true });
+      }
     },
   );
 
@@ -501,6 +606,87 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     expect(records).toHaveLength(1);
     expect(records[0].expiresAt.getTime()).toBeGreaterThan(Date.now());
   });
+
+  // P1-9 regression: a stale expectedVersion must ALWAYS report VERSION_CONFLICT, even when the
+  // row has ALSO independently become terminal (or, for complete(), also hasn't ended yet) since
+  // the version the caller last saw. Before the fix, update()/cancel()/complete() all checked
+  // state (and complete() also checked endAt) BEFORE checking version, so a stale-version caller
+  // racing a terminal transition saw SCHEDULE_TERMINAL/SCHEDULE_NOT_YET_ENDED instead of
+  // VERSION_CONFLICT — violating the CAS contract that a stale version is unconditionally a
+  // version conflict, never masked by whatever else changed underneath it. Each case below drives
+  // a real, independent state/time change first (so the "terminal" or "not yet ended" condition
+  // is genuinely true), THEN reuses the ORIGINAL (now-stale) expectedVersion.
+  it(
+    'P1-9 regression: a stale expectedVersion reports VERSION_CONFLICT (never SCHEDULE_TERMINAL or ' +
+      'SCHEDULE_NOT_YET_ENDED) even when the row has independently become terminal in the meantime',
+    async () => {
+      // update(): schedule is cancelled (now terminal) by someone else; a stale-version PATCH must
+      // still 409 VERSION_CONFLICT, not SCHEDULE_TERMINAL.
+      const forUpdate = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'p1-9-update-create-key');
+      const forUpdateId = (forUpdate as { id: string }).id;
+      await service.cancel(
+        authUser(ids.ownerA),
+        ids.teamA,
+        forUpdateId,
+        { expectedVersion: 0, cancelReason: 'P1-9 fixture: make it terminal first' },
+        'p1-9-update-cancel-key',
+      );
+      const staleUpdateError = await captureFailure(() =>
+        service.update(authUser(ids.ownerA), ids.teamA, forUpdateId, { expectedVersion: 0, title: 'stale' }, 'p1-9-update-key'),
+      );
+      expectHttpCode(staleUpdateError, 409, 'VERSION_CONFLICT');
+
+      // cancel(): schedule is already completed by someone else; a stale-version cancel must
+      // still 409 VERSION_CONFLICT, not SCHEDULE_TERMINAL.
+      const forCancel = await service.create(
+        authUser(ids.ownerA),
+        ids.teamA,
+        { ...baseDto(), startAt: '2020-01-01T10:00:00.000Z', endAt: '2020-01-01T12:00:00.000Z' },
+        'p1-9-cancel-create-key',
+      );
+      const forCancelId = (forCancel as { id: string }).id;
+      await service.complete(authUser(ids.ownerA), ids.teamA, forCancelId, { expectedVersion: 0 }, 'p1-9-cancel-complete-key');
+      const staleCancelError = await captureFailure(() =>
+        service.cancel(authUser(ids.ownerA), ids.teamA, forCancelId, { expectedVersion: 0, cancelReason: 'stale' }, 'p1-9-cancel-key'),
+      );
+      expectHttpCode(staleCancelError, 409, 'VERSION_CONFLICT');
+
+      // complete(): schedule was cancelled by someone else AND hasn't ended yet — both the
+      // terminal-state and not-yet-ended conditions are true, but a stale-version complete() must
+      // still report VERSION_CONFLICT ahead of either.
+      const forComplete = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'p1-9-complete-create-key');
+      const forCompleteId = (forComplete as { id: string }).id;
+      await service.cancel(
+        authUser(ids.ownerA),
+        ids.teamA,
+        forCompleteId,
+        { expectedVersion: 0, cancelReason: 'P1-9 fixture: make it terminal (and still not-yet-ended)' },
+        'p1-9-complete-cancel-key',
+      );
+      const staleCompleteError = await captureFailure(() =>
+        service.complete(authUser(ids.ownerA), ids.teamA, forCompleteId, { expectedVersion: 0 }, 'p1-9-complete-key'),
+      );
+      expectHttpCode(staleCompleteError, 409, 'VERSION_CONFLICT');
+
+      // complete(), second shape: the schedule is still SCHEDULED (not terminal) and its endAt is
+      // still in the future (genuinely not-yet-ended) — only the version is stale. The old order
+      // checked endAt before version, so this specific combination (not terminal, not yet ended,
+      // but stale version) previously returned SCHEDULE_NOT_YET_ENDED instead of VERSION_CONFLICT.
+      const forCompleteNotEnded = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'p1-9-complete-not-ended-create-key');
+      const forCompleteNotEndedId = (forCompleteNotEnded as { id: string }).id;
+      await service.update(
+        authUser(ids.ownerA),
+        ids.teamA,
+        forCompleteNotEndedId,
+        { expectedVersion: 0, title: 'P1-9 fixture: advance version without ending or cancelling' },
+        'p1-9-complete-not-ended-update-key',
+      );
+      const staleNotYetEndedError = await captureFailure(() =>
+        service.complete(authUser(ids.ownerA), ids.teamA, forCompleteNotEndedId, { expectedVersion: 0 }, 'p1-9-complete-not-ended-key'),
+      );
+      expectHttpCode(staleNotYetEndedError, 409, 'VERSION_CONFLICT');
+    },
+  );
 
   // W10 regression: TeamSchedulesService.complete() is the only mechanism that makes COMPLETED
   // reachable. If this mutation were ever removed (reverting to the pre-W10 state where the

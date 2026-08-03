@@ -97,19 +97,24 @@ export class ScheduleAttendanceService {
       // distinct case handled below as 403 PERMISSION_DENIED per the frozen error contract for
       // this specific route (the contract lists PERMISSION_DENIED, not existence-hiding, for
       // "not an active team member" on this authenticated-only mutation route).
-      const team = await tx.v1Team.findFirst({
-        where: { id: teamId, status: 'active', deletedAt: null },
-        select: { id: true },
-      });
-      if (!team) {
+      //
+      // P1-8 fix: both reads below used to be plain (unlocked) Prisma queries. A concurrent,
+      // already-committed transaction revoking this exact membership row could commit in the gap
+      // between this check and the schedule row lock taken immediately after it (a few lines
+      // down) — an already-removed member's RSVP could still land. FOR SHARE on both rows, in the
+      // same team-then-membership order every other lane in this module uses, forces a concurrent
+      // revoke to serialize against this read instead.
+      const teamRows = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM v1_teams WHERE id = ${teamId} AND status = 'active' AND deleted_at IS NULL FOR SHARE
+      `;
+      if (teamRows.length === 0) {
         throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
       }
 
-      const membership = await tx.v1TeamMembership.findFirst({
-        where: { teamId, userId: user.id, status: 'active' },
-        select: { id: true },
-      });
-      if (!membership) {
+      const membershipRows = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM v1_team_memberships WHERE team_id = ${teamId} AND user_id = ${user.id} AND status = 'active' FOR SHARE
+      `;
+      if (membershipRows.length === 0) {
         throw new ForbiddenException({
           code: 'PERMISSION_DENIED',
           message: 'Only active team members can set attendance',

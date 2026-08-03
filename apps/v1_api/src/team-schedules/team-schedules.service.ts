@@ -84,6 +84,19 @@ export class TeamSchedulesService {
   }
 
   async detail(user: V1AuthUser | null, teamId: string, scheduleId: string) {
+    // P1-7 fix: this method previously queried the schedule with no team-active check at all
+    // (unlike list(), just above, which already filters `status:'active', deletedAt:null`) — an
+    // archived or soft-deleted team's schedule stayed readable (even anonymously, for a PUBLIC
+    // one) through this endpoint. Mirror list()'s own gate, and the same NOT_FOUND_OR_ARCHIVED
+    // code/message it already uses for an archived team, for consistency across both read paths.
+    const team = await this.prisma.v1Team.findFirst({
+      where: { id: teamId, status: 'active', deletedAt: null },
+      select: { id: true },
+    });
+    if (!team) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
+    }
+
     const schedule = await this.prisma.v1TeamSchedule.findFirst({
       where: { id: scheduleId, teamId },
       include: {
@@ -146,8 +159,12 @@ export class TeamSchedulesService {
             ? V1ScheduleState.COMPLETED
             : undefined;
 
+    // P1-7 fix: previously filtered only on the membership row's own status, with no check on
+    // the team itself — an archived/soft-deleted team's schedules stayed included in `/me/
+    // schedule` for anyone whose (now-stale) membership row was still `active`. Scope to teams
+    // that are themselves still active/non-deleted, same predicate list()/detail() use.
     const memberships = await this.prisma.v1TeamMembership.findMany({
-      where: { userId: user.id, status: 'active' },
+      where: { userId: user.id, status: 'active', team: { status: 'active', deletedAt: null } },
       select: { teamId: true, role: true, team: { select: { name: true } } },
     });
     if (memberships.length === 0) {
@@ -330,15 +347,20 @@ export class TeamSchedulesService {
       await this.assertManageableTeam(tx, user, teamId);
       const schedule = await this.lockSchedule(tx, teamId, scheduleId);
 
-      if (schedule.state !== V1ScheduleState.SCHEDULED) {
-        throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
-      }
+      // P1-9 fix: version must be checked BEFORE the terminal-state check. Previously
+      // SCHEDULE_TERMINAL was thrown first, so a stale expectedVersion against an
+      // already-cancelled/completed schedule returned SCHEDULE_TERMINAL instead of
+      // VERSION_CONFLICT — violating the CAS contract that a stale version is always
+      // VERSION_CONFLICT regardless of what else has changed underneath it.
       if (schedule.version !== dto.expectedVersion) {
         throw new ConflictException({
           code: 'VERSION_CONFLICT',
           message: 'Schedule version is stale',
           details: { expectedVersion: dto.expectedVersion, currentVersion: schedule.version },
         });
+      }
+      if (schedule.state !== V1ScheduleState.SCHEDULED) {
+        throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
       }
 
       // CP1 fix: dto.rsvpDeadlineAt has three meaningful states — `undefined` (field omitted,
@@ -388,15 +410,18 @@ export class TeamSchedulesService {
       await this.assertManageableTeam(tx, user, teamId);
       const schedule = await this.lockSchedule(tx, teamId, scheduleId);
 
-      if (schedule.state !== V1ScheduleState.SCHEDULED) {
-        throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
-      }
+      // P1-9 fix: see update()'s identical fix above — version must be checked before terminal
+      // state, so a stale expectedVersion against an already-terminal schedule still reports
+      // VERSION_CONFLICT, never SCHEDULE_TERMINAL.
       if (schedule.version !== dto.expectedVersion) {
         throw new ConflictException({
           code: 'VERSION_CONFLICT',
           message: 'Schedule version is stale',
           details: { expectedVersion: dto.expectedVersion, currentVersion: schedule.version },
         });
+      }
+      if (schedule.state !== V1ScheduleState.SCHEDULED) {
+        throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
       }
 
       const updated = await tx.$executeRaw`
@@ -465,6 +490,17 @@ export class TeamSchedulesService {
       await this.assertManageableTeam(tx, user, teamId);
       const schedule = await this.lockSchedule(tx, teamId, scheduleId);
 
+      // P1-9 fix: version must be checked before EITHER the terminal-state check or the
+      // not-yet-ended time check. Previously both of those ran first, so a stale expectedVersion
+      // against a schedule that either hadn't ended yet or was already terminal returned
+      // SCHEDULE_NOT_YET_ENDED/SCHEDULE_TERMINAL instead of VERSION_CONFLICT.
+      if (schedule.version !== dto.expectedVersion) {
+        throw new ConflictException({
+          code: 'VERSION_CONFLICT',
+          message: 'Schedule version is stale',
+          details: { expectedVersion: dto.expectedVersion, currentVersion: schedule.version },
+        });
+      }
       if (schedule.state !== V1ScheduleState.SCHEDULED) {
         throw new ConflictException({ code: 'SCHEDULE_TERMINAL', message: 'Schedule is already terminal' });
       }
@@ -472,13 +508,6 @@ export class TeamSchedulesService {
         throw new ConflictException({
           code: 'SCHEDULE_NOT_YET_ENDED',
           message: 'Schedule cannot be completed before its end time',
-        });
-      }
-      if (schedule.version !== dto.expectedVersion) {
-        throw new ConflictException({
-          code: 'VERSION_CONFLICT',
-          message: 'Schedule version is stale',
-          details: { expectedVersion: dto.expectedVersion, currentVersion: schedule.version },
         });
       }
 
@@ -696,19 +725,31 @@ export class TeamSchedulesService {
    * broader team-follower concept, so the two levels collapse to the same check. The two-level
    * enum is preserved in the schema for future granularity.
    */
+  /**
+   * P1-8 fix: both reads here used to be plain (unlocked) Prisma queries. A plain SELECT takes no
+   * row lock, so a *concurrent, already-committed* transaction revoking or demoting this exact
+   * membership row could commit in the gap between this check returning and the schedule row
+   * lock taken immediately afterward (lockSchedule, called right after this method returns from
+   * every call site) — an already-permission-revoked actor's mutation could still land. Locking
+   * both rows FOR SHARE — team first, then membership, matching the same order
+   * GuestRecruitmentService.assertActiveManagerLocked uses — forces a concurrent revoke/demotion
+   * to serialize against this read via Postgres's own MVCC lock wait, so the two can never
+   * interleave. (The team `status`/`deletedAt` filter itself was already correct — P1-7's
+   * archived-team gap was in detail()/mySchedule()/GuestRecruitmentService, not here.)
+   */
   private async assertManageableTeam(tx: Tx, user: V1AuthUser, teamId: string): Promise<void> {
-    const team = await tx.v1Team.findFirst({
-      where: { id: teamId, status: 'active', deletedAt: null },
-      select: { id: true },
-    });
-    if (!team) {
+    const teamRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM v1_teams WHERE id = ${teamId} AND status = 'active' AND deleted_at IS NULL FOR SHARE
+    `;
+    if (teamRows.length === 0) {
       throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
     }
-    const membership = await tx.v1TeamMembership.findFirst({
-      where: { teamId, userId: user.id, status: 'active', role: { in: ['owner', 'manager'] } },
-      select: { id: true },
-    });
-    if (!membership) {
+    const membershipRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM v1_team_memberships
+      WHERE team_id = ${teamId} AND user_id = ${user.id} AND status = 'active' AND role IN ('owner', 'manager')
+      FOR SHARE
+    `;
+    if (membershipRows.length === 0) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Only team owners or managers can manage schedules' });
     }
   }

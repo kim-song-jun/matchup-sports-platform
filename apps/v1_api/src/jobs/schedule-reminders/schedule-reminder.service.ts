@@ -128,6 +128,26 @@ export class ScheduleReminderService {
    * this transaction) does step 3 best-effort a Web Push per recipient — caught locally so a push
    * failure can never fail the job or roll back the already-durable notification row, and
    * structurally incapable of running before step 2 succeeds.
+   *
+   * P0-3 fix: Web Push is, and remains, a best-effort/at-least-once channel by design — matching
+   * `NotificationsService.createNotificationWithPrefCheck`'s identical fire-and-forget
+   * `sendToUser(...).catch(...)` call for the HTTP path, and `WebPushService`'s own documented
+   * policy (a push failure must never fail the notification flow; failures land in
+   * `V1WebPushFailureLog` for ops visibility instead of an automatic retry — see Task 76's ops
+   * dashboard). That is an accepted, system-wide tradeoff, not a defect on its own. The genuine,
+   * fixable-without-a-schema-change defect the review found is narrower: because the OUTBOX
+   * WORKER (unlike the single-shot HTTP path) retries a claim whose transaction failed to commit
+   * fully, a forced reprocess of the SAME outbox claim previously re-sent a Web Push to every
+   * recipient every single retry, even though `skipDuplicates` correctly kept the durable
+   * `V1Notification` row to exactly one per recipient — the DB row was exactly-once, the push was
+   * not even "at-least-once" in the intended sense, it was "once per retry". Querying which
+   * recipients already have a durable row for this exact `businessKey` BEFORE issuing `createMany`
+   * — and only pushing to the ones that are genuinely new in *this* invocation — closes that gap:
+   * a forced re-delivery of an already-fully-delivered claim never re-pushes. A true delivery
+   * ledger with per-recipient retry (the review's suggested `(outboxId, recipientUserId, channel)
+   * UNIQUE` table) would still be needed to make an individual failed push retryable — that
+   * requires a migration and is out of scope here (HARD CONSTRAINTS forbid schema changes); see
+   * the Task 12 review response for that residual, explicitly-scoped gap.
    */
   private async deliverDurableReminder(
     tx: Prisma.TransactionClient,
@@ -143,6 +163,13 @@ export class ScheduleReminderService {
     const enabledRecipients = recipients.filter((userId) => teamEnabledByUser.get(userId) !== false);
     if (enabledRecipients.length === 0) return;
 
+    const businessKeyFor = (userId: string): string => `${outboxId}:${userId}`;
+    const alreadyDelivered = await tx.v1Notification.findMany({
+      where: { businessKey: { in: enabledRecipients.map(businessKeyFor) } },
+      select: { businessKey: true },
+    });
+    const alreadyDeliveredKeys = new Set(alreadyDelivered.map((n) => n.businessKey));
+
     await tx.v1Notification.createMany({
       data: enabledRecipients.map((userId) => ({
         recipientUserId: userId,
@@ -151,12 +178,14 @@ export class ScheduleReminderService {
         title: event.title,
         body: event.body,
         deepLink: event.deepLink,
-        businessKey: `${outboxId}:${userId}`,
+        businessKey: businessKeyFor(userId),
       })),
       skipDuplicates: true,
     });
 
-    for (const userId of enabledRecipients) {
+    const newlyDeliveredRecipients = enabledRecipients.filter((userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId)));
+
+    for (const userId of newlyDeliveredRecipients) {
       void this.webPush
         ?.sendToUser(userId, { title: event.title, body: event.body, url: event.deepLink })
         .catch(() => {

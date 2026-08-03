@@ -61,6 +61,14 @@ async function createScheduleWithRecruitment(overrides: { closesAt?: Date } = {}
       endAt: new Date('2026-09-10T12:00:00.000Z'),
       timezone: 'Asia/Seoul',
       state: 'SCHEDULED',
+      // FG-7 / P0-1 fix: this schedule previously relied on the Prisma schema default
+      // (TEAM — private). Every race test in this file applies as `ids.outsider`/`ids.outsiderB`,
+      // who hold no membership on `ids.team` — before createApplication() checked
+      // schedule/recruitment visibility (P0-1), that gap didn't matter here. With the gate in
+      // place, an outsider against a private schedule now correctly 404s before ever reaching the
+      // state/lock/race logic these tests exist to exercise, so the schedule must be PUBLIC (the
+      // recruitment below already is) for these outsider personas to be legitimately reachable.
+      visibility: 'PUBLIC',
     },
   });
   const recruitment = await prisma.v1ScheduleGuestRecruitment.create({
@@ -323,4 +331,203 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
     expect(createdFlags).toEqual([false, true]);
     expect(await prisma.v1ScheduleGuestApplication.count({ where: { recruitmentId: recruitment.id, userId: ids.outsiderB } })).toBe(1);
   });
+
+  // FG-3 regression: exercises GuestRecruitmentService's private
+  // insertApplicationOrRecoverDuplicate() DIRECTLY against a pre-seeded, already-committed
+  // duplicate row — deterministically hitting the `insertedRows.length === 0` recovery branch
+  // that the review found unreachable through the public createApplication() method (the W2
+  // schedule/recruitment locks fully serialize concurrent public calls, so the losing caller's
+  // pre-insert existence check always observes the winner first). No timing/race dependency here:
+  // the row is committed and visible before this call ever starts. If the ON CONFLICT DO NOTHING
+  // RETURNING recovery in that method is ever reverted to the old try/catch(P2002) +
+  // findUniqueOrThrow-on-the-same-tx pattern, this call throws
+  // "current transaction is aborted" instead of returning the recovered row.
+  it(
+    'FG-3 regression: insertApplicationOrRecoverDuplicate() recovers a genuine duplicate insert ' +
+      'via ON CONFLICT DO NOTHING RETURNING, proven directly against a pre-existing committed row',
+    async () => {
+      const { recruitment } = await createScheduleWithRecruitment();
+      await prisma.v1ScheduleGuestApplication.create({
+        data: {
+          recruitmentId: recruitment.id,
+          userId: ids.outsiderB,
+          displayNameSnapshot: 'Already here (pre-seeded, no race needed)',
+          note: null,
+          state: 'PENDING',
+        },
+      });
+
+      const serviceWithPrivateAccess = service as unknown as {
+        insertApplicationOrRecoverDuplicate: (
+          tx: unknown,
+          recruitmentId: string,
+          userId: string,
+          dto: { displayName: string; note?: string },
+        ) => Promise<{ response: { alreadyApplied: boolean; displayName: string }; isNewInsert: boolean }>;
+      };
+
+      const result = await prisma.$transaction((tx) =>
+        serviceWithPrivateAccess.insertApplicationOrRecoverDuplicate(tx, recruitment.id, ids.outsiderB, {
+          displayName: 'Racer B (conflicting insert attempt)',
+        }),
+      );
+
+      expect(result.isNewInsert).toBe(false);
+      expect(result.response.alreadyApplied).toBe(true);
+      expect(result.response.displayName).toBe('Already here (pre-seeded, no race needed)');
+      expect(await prisma.v1ScheduleGuestApplication.count({ where: { recruitmentId: recruitment.id, userId: ids.outsiderB } })).toBe(1);
+    },
+  );
+
+  // P1-7 regression: an archived team's guest recruitment must 404 on every mutation path
+  // (create/update/apply), not just reads. Uses a dedicated, throwaway team so archiving it can
+  // never affect `ids.team`'s shared fixtures used by every other test in this file.
+  it(
+    "P1-7 regression: an archived team's guest recruitment create/update/apply all reject with " +
+      '404 NOT_FOUND_OR_ARCHIVED instead of succeeding',
+    async () => {
+      const archivedTeamId = 'a1000000-0000-4000-8000-000000000001';
+      const archivedOwnerId = 'a1000000-0000-4000-8000-000000000002';
+      await prisma.v1User.create({
+        data: {
+          id: archivedOwnerId,
+          email: `${archivedOwnerId}@example.test`,
+          phone: `010${archivedOwnerId.slice(-8)}`,
+          accountStatus: 'active',
+          onboardingStatus: 'completed',
+        },
+      });
+      await prisma.v1Team.create({
+        data: {
+          id: archivedTeamId,
+          ownerUserId: archivedOwnerId,
+          sportId: ids.sport,
+          regionId: ids.region,
+          name: 'Task 12 P1-7 archived team fixture',
+          status: 'active',
+        },
+      });
+      await prisma.v1TeamMembership.create({
+        data: { teamId: archivedTeamId, userId: archivedOwnerId, role: 'owner', status: 'active' },
+      });
+
+      const scheduleForCreate = await prisma.v1TeamSchedule.create({
+        data: {
+          teamId: archivedTeamId,
+          title: 'P1-7 fixture schedule (no recruitment yet)',
+          type: 'TRAINING',
+          startAt: new Date('2026-09-10T10:00:00.000Z'),
+          endAt: new Date('2026-09-10T12:00:00.000Z'),
+          timezone: 'Asia/Seoul',
+          state: 'SCHEDULED',
+          visibility: 'PUBLIC',
+        },
+      });
+      const { schedule: scheduleForUpdate, recruitment } = await createScheduleWithRecruitment();
+      // createScheduleWithRecruitment() always targets ids.team — move this recruitment's parent
+      // schedule under the archived team instead, so update()/createApplication() below exercise
+      // an archived-team schedule that already had a recruitment attached before archival (the
+      // realistic "was active, later archived" sequence the review describes).
+      await prisma.v1TeamSchedule.update({ where: { id: scheduleForUpdate.id }, data: { teamId: archivedTeamId } });
+
+      // Archive the team AFTER both schedules/the recruitment already exist.
+      await prisma.v1Team.update({ where: { id: archivedTeamId }, data: { status: 'archived' } });
+
+      const createError = await captureFailure(() =>
+        service.createRecruitment(
+          authUser(archivedOwnerId),
+          archivedTeamId,
+          scheduleForCreate.id,
+          { slots: 2, closesAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000).toISOString() },
+          'p1-7-create-key',
+        ),
+      );
+      expectHttpCode(createError, 404, 'NOT_FOUND_OR_ARCHIVED');
+      expect(await prisma.v1ScheduleGuestRecruitment.count({ where: { scheduleId: scheduleForCreate.id } })).toBe(0);
+
+      const updateError = await captureFailure(() =>
+        service.updateRecruitment(
+          authUser(archivedOwnerId),
+          archivedTeamId,
+          scheduleForUpdate.id,
+          { expectedVersion: 0, slots: 5 },
+          'p1-7-update-key',
+        ),
+      );
+      expectHttpCode(updateError, 404, 'NOT_FOUND_OR_ARCHIVED');
+      const recruitmentAfter = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { id: recruitment.id } });
+      expect(recruitmentAfter.slots).toBe(recruitment.slots);
+      expect(recruitmentAfter.version).toBe(recruitment.version);
+
+      const applyError = await captureFailure(() =>
+        service.createApplication(
+          authUser(ids.outsider),
+          archivedTeamId,
+          scheduleForUpdate.id,
+          { displayName: 'P1-7 outsider applicant' },
+          'p1-7-apply-key',
+        ),
+      );
+      expectHttpCode(applyError, 404, 'NOT_FOUND_OR_ARCHIVED');
+      expect(await prisma.v1ScheduleGuestApplication.count({ where: { recruitmentId: recruitment.id } })).toBe(0);
+    },
+  );
+
+  // P1-8 regression: a manager's own membership row is locked FOR SHARE and re-checked against
+  // the LATEST committed state, so a concurrent revoke that commits WHILE a manager mutation is
+  // genuinely blocked on that exact row is observed — never raced past with a stale pre-revoke
+  // read. Uses a dedicated, throwaway manager membership (not `ids.owner`) so revoking it cannot
+  // affect any other test in this file.
+  it(
+    "P1-8 regression: a manager's guest-recruitment update genuinely serializes against, and " +
+      'observes, a concurrent membership revoke that commits while it is blocked on the locked ' +
+      'membership row',
+    async () => {
+      const managerToRevokeId = 'a2000000-0000-4000-8000-000000000001';
+      await prisma.v1User.create({
+        data: {
+          id: managerToRevokeId,
+          email: `${managerToRevokeId}@example.test`,
+          phone: `010${managerToRevokeId.slice(-8)}`,
+          accountStatus: 'active',
+          onboardingStatus: 'completed',
+        },
+      });
+      const membership = await prisma.v1TeamMembership.create({
+        data: { teamId: ids.team, userId: managerToRevokeId, role: 'manager', status: 'active' },
+      });
+      const { schedule, recruitment } = await createScheduleWithRecruitment();
+
+      // Holder: a real (uncommitted) UPDATE that revokes this exact membership row — takes the
+      // same implicit row lock an ordinary UPDATE always takes, which conflicts with the
+      // production code's `SELECT ... FOR SHARE` on that row (assertActiveManagerLocked).
+      const holder = await holdRowLock(prisma, (tx) =>
+        tx.$executeRaw`UPDATE v1_team_memberships SET status = 'removed'::"V1TeamMembershipStatus" WHERE id = ${membership.id}`,
+      );
+
+      const updateCall = service.updateRecruitment(
+        authUser(managerToRevokeId),
+        ids.team,
+        schedule.id,
+        { expectedVersion: 0, slots: 9 },
+        'p1-8-race-key',
+      );
+
+      // Proof of genuine contention: with the revoke UPDATE's row lock still held (uncommitted),
+      // the manager's own mutation cannot even reach its FOR SHARE membership check yet.
+      expect(await isStillPending(updateCall, 250)).toBe(true);
+
+      await holder.release();
+
+      // Once unblocked, the mutation must observe the NOW-COMMITTED revoke, not a stale
+      // pre-revoke "active manager" snapshot — this is what a plain (unlocked) read could not
+      // guarantee.
+      const error = await captureFailure(() => updateCall);
+      expectHttpCode(error, 403, 'PERMISSION_DENIED');
+
+      const recruitmentAfter = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { id: recruitment.id } });
+      expect(recruitmentAfter.slots).toBe(recruitment.slots);
+      expect(recruitmentAfter.version).toBe(recruitment.version);
+    },
+  );
 });

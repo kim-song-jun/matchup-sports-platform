@@ -202,21 +202,32 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
     async () => {
       const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000108', capacity: 1 });
 
-      // Hold the exact same row lock setMyAttendance() itself takes (SELECT ... FOR UPDATE on
-      // this schedule row). Any concurrent setMyAttendance() call for this schedule cannot even
-      // reach its capacity COUNT() until this external holder releases.
+      // Hold a lock on the exact same schedule row setMyAttendance() itself locks. Any concurrent
+      // setMyAttendance() call for this schedule cannot even reach its capacity COUNT() until
+      // this external holder releases.
+      //
+      // FG-5 fix: this previously took `FOR UPDATE`, the same lock mode an attendance INSERT's
+      // own FK-implied reference to the parent schedule row takes automatically (Postgres takes a
+      // `FOR KEY SHARE`-equivalent lock on a referenced row for any INSERT into a table with an FK
+      // to it) — so even with production's explicit `SELECT ... FOR UPDATE` schedule lock deleted
+      // entirely, the attendance row INSERT's own FK check would still contend with a `FOR UPDATE`
+      // holder, and this test would keep "passing" for the wrong reason. `FOR KEY SHARE` is the
+      // weakest mode that still conflicts with an explicit `FOR UPDATE` (what the production lock
+      // takes) while NOT conflicting with another `FOR KEY SHARE` (what the FK-implied lock takes)
+      // — so if the production lock is ever removed, this holder no longer blocks the INSERT and
+      // the "still pending" assertions below correctly flip to false.
       const holder = await holdRowLock(
         prisma,
-        (tx) => tx.$queryRaw`SELECT id FROM v1_team_schedules WHERE id = ${schedule.id} FOR UPDATE`,
+        (tx) => tx.$queryRaw`SELECT id FROM v1_team_schedules WHERE id = ${schedule.id} FOR KEY SHARE`,
       );
 
       const callA = service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'barrier-a-key');
       const callB = service.setMyAttendance(authUser(ids.userB), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'barrier-b-key');
 
       // The actual proof of contention: with the lock genuinely held, BOTH calls must still be
-      // pending. If the production code ever drops the FOR UPDATE lock, these calls would race
-      // past the (now-unlocked) holder's transaction immediately and this assertion would flip to
-      // false, catching the regression directly instead of relying on lucky scheduling.
+      // pending. If the production code ever drops its explicit schedule lock, these calls would
+      // race past the (now-unlocked) holder's transaction immediately and this assertion would
+      // flip to false, catching the regression directly instead of relying on lucky scheduling.
       const [aPending, bPending] = await Promise.all([isStillPending(callA, 250), isStillPending(callB, 250)]);
       expect(aPending).toBe(true);
       expect(bPending).toBe(true);

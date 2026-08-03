@@ -42,6 +42,17 @@ function idempotencyKey(label: string): string {
   return `${label}-${randomUUID()}`;
 }
 
+// FG-6 / P0-1 / P0-2: existence-leak regressions must compare the ENTIRE error response body —
+// code, message, and (via supertest's `.expect(status)`) status — between an "exists but hidden"
+// case and a "does not exist" case, never just `.code`. AllExceptionsFilter's error envelope
+// (http-exception.filter.ts) includes `requestId` and `timestamp`, which legitimately differ on
+// every request and must be excluded from the comparison; every other field (`status`,
+// `statusCode`, `code`, `message`, `details`) must be byte-identical.
+function stripVolatileFields(body: Record<string, unknown>): Record<string, unknown> {
+  const { requestId, timestamp, ...rest } = body;
+  return rest;
+}
+
 describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/deadline, cancel/reminder/Game safety, real concurrency)', () => {
   let app: INestApplication;
   let cleanupApp: (() => Promise<void>) | undefined;
@@ -172,8 +183,18 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
   }
 
   it('rejects a guest application submitted after the recruitment deadline and creates no row', async () => {
-    const schedule = await createSchedule();
-    const recruitment = await createRecruitment(schedule.id, { closesAt: '2020-01-01T00:00:00.000Z' });
+    // FG-7 fix: this outsider-facing test must use a fixture the outsider can actually reach
+    // (PUBLIC schedule + PUBLIC recruitment) — createSchedule()/createRecruitment() default to
+    // TEAM/MEMBERS (private), so before the P0-1 fix this outsider POST only "worked" (reaching
+    // the deadline check at all) because createApplication() never checked visibility. With that
+    // gate in place, an outsider against the private default fixture now 404s before ever
+    // reaching the deadline check — see the dedicated P0-1 regression test below for that gate
+    // itself.
+    const schedule = await createSchedule({ visibility: 'PUBLIC' });
+    const recruitment = await createRecruitment(schedule.id, {
+      visibility: 'PUBLIC',
+      closesAt: '2020-01-01T00:00:00.000Z',
+    });
 
     const response = await request(app.getHttpServer())
       .post(`/api/v1/teams/${ids.teamA}/schedules/${schedule.id}/guest-recruitment/applications`)
@@ -189,8 +210,9 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
   });
 
   it('replays the identical response for a duplicate application under the same Idempotency-Key instead of double-applying', async () => {
-    const schedule = await createSchedule();
-    const recruitment = await createRecruitment(schedule.id);
+    // FG-7 fix: PUBLIC/PUBLIC fixture — see the deadline test above for why.
+    const schedule = await createSchedule({ visibility: 'PUBLIC' });
+    const recruitment = await createRecruitment(schedule.id, { visibility: 'PUBLIC' });
     const key = idempotencyKey('replay');
 
     const first = await request(app.getHttpServer())
@@ -215,8 +237,9 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
   });
 
   it('short-circuits a duplicate application sent under a fresh Idempotency-Key with alreadyApplied:true, never creating a second row', async () => {
-    const schedule = await createSchedule();
-    const recruitment = await createRecruitment(schedule.id);
+    // FG-7 fix: PUBLIC/PUBLIC fixture — see the deadline test above for why.
+    const schedule = await createSchedule({ visibility: 'PUBLIC' });
+    const recruitment = await createRecruitment(schedule.id, { visibility: 'PUBLIC' });
 
     const first = await request(app.getHttpServer())
       .post(`/api/v1/teams/${ids.teamA}/schedules/${schedule.id}/guest-recruitment/applications`)
@@ -345,7 +368,11 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
 
       expect(noRecruitmentResponse.body.code).toBe('NOT_FOUND_OR_ARCHIVED');
       expect(trulyMissingResponse.body.code).toBe('NOT_FOUND_OR_ARCHIVED');
-      expect(noRecruitmentResponse.body.code).toBe(trulyMissingResponse.body.code);
+      // FG-6 fix: comparing `.code` alone would still pass if the two bodies differed in
+      // `message` (or any other field) — a real existence leak that a code-only comparison
+      // cannot catch. Compare the entire response body (excluding only the two fields that
+      // legitimately vary per-request: `requestId` and `timestamp`).
+      expect(stripVolatileFields(noRecruitmentResponse.body)).toEqual(stripVolatileFields(trulyMissingResponse.body));
 
       // A real member, by contrast, legitimately CAN distinguish the two — existence is not a
       // secret from active members. This is what proves the collapse above is a genuine
@@ -355,6 +382,114 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
         .set('x-v1-user-id', ids.managerA)
         .expect(404);
       expect(memberSeesRealGap.body.code).toBe('GUEST_RECRUITMENT_NOT_FOUND');
+    },
+  );
+
+  // P0-2 regression: on a PUBLIC schedule (so the CP4 collapse above, which is about the
+  // *parent* schedule's visibility, does not apply), a non-member must get an IDENTICAL 404 for
+  // "no recruitment attached at all" and "a recruitment exists but is MEMBERS-only". Before the
+  // fix these returned different codes (GUEST_RECRUITMENT_NOT_FOUND vs NOT_FOUND_OR_ARCHIVED),
+  // a one-bit "a hidden recruitment exists" leak. If GuestRecruitmentService.getRecruitment()
+  // ever reintroduces a distinct code for the hidden-MEMBERS branch, the comparison below diverges.
+  it(
+    'P0-2 regression: on a PUBLIC schedule, a non-member gets an IDENTICAL 404 for "no ' +
+      'recruitment" and "a hidden MEMBERS-only recruitment"',
+    async () => {
+      const publicNoRecruitment = await createSchedule({ visibility: 'PUBLIC' });
+      const publicWithHiddenRecruitment = await createSchedule({ visibility: 'PUBLIC' });
+      await createRecruitment(publicWithHiddenRecruitment.id); // default visibility: MEMBERS
+
+      const noRecruitmentResponse = await request(app.getHttpServer())
+        .get(`/api/v1/teams/${ids.teamA}/schedules/${publicNoRecruitment.id}/guest-recruitment`)
+        .set('x-v1-user-id', ids.outsider)
+        .expect(404);
+      const hiddenRecruitmentResponse = await request(app.getHttpServer())
+        .get(`/api/v1/teams/${ids.teamA}/schedules/${publicWithHiddenRecruitment.id}/guest-recruitment`)
+        .set('x-v1-user-id', ids.outsider)
+        .expect(404);
+
+      expect(hiddenRecruitmentResponse.body.code).toBe('GUEST_RECRUITMENT_NOT_FOUND');
+      expect(stripVolatileFields(hiddenRecruitmentResponse.body)).toEqual(stripVolatileFields(noRecruitmentResponse.body));
+
+      // A real member, by contrast, legitimately CAN see the real gap between the two.
+      const memberSeesRealGap = await request(app.getHttpServer())
+        .get(`/api/v1/teams/${ids.teamA}/schedules/${publicWithHiddenRecruitment.id}/guest-recruitment`)
+        .set('x-v1-user-id', ids.managerA)
+        .expect(200);
+      expect(memberSeesRealGap.body.data).toMatchObject({ visibility: 'MEMBERS' });
+    },
+  );
+
+  // P0-1 regression: createApplication() previously never checked schedule.visibility or
+  // recruitment.visibility at all — only existence + team_id — so an outsider could successfully
+  // POST a guest application to a private (non-PUBLIC) schedule's recruitment, or to a
+  // MEMBERS-only recruitment on an otherwise-PUBLIC schedule, even though the matching GET (the
+  // W8-B/P0-2 tests above) 404s for both. Proves both shapes 404 identically to the corresponding
+  // "does not exist" case, AND that no application row is ever created.
+  it(
+    "P0-1 regression: an outsider's guest application POST is rejected — identically to a " +
+      'truly-missing schedule/recruitment — for a private schedule and for a MEMBERS-only ' +
+      'recruitment on a PUBLIC schedule',
+    async () => {
+      const privateSchedule = await createSchedule(); // default visibility: TEAM (private)
+      const privateRecruitment = await createRecruitment(privateSchedule.id); // default: MEMBERS, OPEN
+      const missingScheduleId = randomUUID();
+
+      const privateResponse = await request(app.getHttpServer())
+        .post(`/api/v1/teams/${ids.teamA}/schedules/${privateSchedule.id}/guest-recruitment/applications`)
+        .set('x-v1-user-id', ids.outsider)
+        .set('idempotency-key', idempotencyKey('p0-1-private'))
+        .send({ displayName: 'Outsider on private schedule' })
+        .expect(404);
+      const missingResponse = await request(app.getHttpServer())
+        .post(`/api/v1/teams/${ids.teamA}/schedules/${missingScheduleId}/guest-recruitment/applications`)
+        .set('x-v1-user-id', ids.outsider)
+        .set('idempotency-key', idempotencyKey('p0-1-missing'))
+        .send({ displayName: 'Outsider on missing schedule' })
+        .expect(404);
+
+      expect(privateResponse.body.code).toBe('NOT_FOUND_OR_ARCHIVED');
+      expect(stripVolatileFields(privateResponse.body)).toEqual(stripVolatileFields(missingResponse.body));
+      expect(
+        await prisma.v1ScheduleGuestApplication.count({ where: { recruitmentId: privateRecruitment.id } }),
+      ).toBe(0);
+
+      // Same defect, second shape: a PUBLIC schedule whose recruitment is explicitly MEMBERS-only,
+      // compared against a PUBLIC schedule with no recruitment attached at all.
+      const publicSchedule = await createSchedule({ visibility: 'PUBLIC' });
+      const membersOnlyRecruitment = await createRecruitment(publicSchedule.id); // default: MEMBERS
+      const publicWithNoRecruitment = await createSchedule({ visibility: 'PUBLIC' });
+
+      const hiddenRecruitmentResponse = await request(app.getHttpServer())
+        .post(`/api/v1/teams/${ids.teamA}/schedules/${publicSchedule.id}/guest-recruitment/applications`)
+        .set('x-v1-user-id', ids.outsider)
+        .set('idempotency-key', idempotencyKey('p0-1-hidden-recruitment'))
+        .send({ displayName: 'Outsider on hidden recruitment' })
+        .expect(404);
+      const noRecruitmentAtAllResponse = await request(app.getHttpServer())
+        .post(`/api/v1/teams/${ids.teamA}/schedules/${publicWithNoRecruitment.id}/guest-recruitment/applications`)
+        .set('x-v1-user-id', ids.outsider)
+        .set('idempotency-key', idempotencyKey('p0-1-no-recruitment'))
+        .send({ displayName: 'Outsider on schedule with no recruitment' })
+        .expect(404);
+
+      expect(hiddenRecruitmentResponse.body.code).toBe('GUEST_RECRUITMENT_NOT_FOUND');
+      expect(stripVolatileFields(hiddenRecruitmentResponse.body)).toEqual(
+        stripVolatileFields(noRecruitmentAtAllResponse.body),
+      );
+      expect(
+        await prisma.v1ScheduleGuestApplication.count({ where: { recruitmentId: membersOnlyRecruitment.id } }),
+      ).toBe(0);
+
+      // A real member CAN apply to the MEMBERS-only recruitment — this is an outsider-scoped
+      // visibility gate, not a universal block on applying.
+      const memberApplies = await request(app.getHttpServer())
+        .post(`/api/v1/teams/${ids.teamA}/schedules/${publicSchedule.id}/guest-recruitment/applications`)
+        .set('x-v1-user-id', ids.managerA)
+        .set('idempotency-key', idempotencyKey('p0-1-member-applies'))
+        .send({ displayName: 'Manager applying as guest' })
+        .expect(200);
+      expect(memberApplies.body.data.alreadyApplied).toBe(false);
     },
   );
 
@@ -419,10 +554,22 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
   // — the two HTTP requests could simply have executed sequentially (Express/Nest's request
   // handling and the DB connection pool do not guarantee true simultaneity) and the test would
   // still pass. This test forces the exact contention with a real Postgres row lock: an external
-  // holder acquires the same schedule row's FOR UPDATE lock TeamSchedulesService.update() itself
-  // takes, proves both concurrent PATCHes are genuinely blocked on it, then releases and asserts
-  // the same one-winner-one-conflict outcome. If update() ever stops locking the schedule row
-  // before its CAS check, the "still pending" assertions below flip to false.
+  // holder acquires a lock on the same schedule row TeamSchedulesService.update() itself locks,
+  // proves both concurrent PATCHes are genuinely blocked on it, then releases and asserts the
+  // same one-winner-one-conflict outcome.
+  //
+  // FG-4 fix: the holder previously took `FOR UPDATE` — the SAME lock mode update()'s own
+  // trailing `UPDATE v1_team_schedules SET ... WHERE id=... AND version=...` CAS statement
+  // implicitly takes (any UPDATE that doesn't touch key columns takes `FOR NO KEY UPDATE`, which
+  // still conflicts with another `FOR UPDATE` holder). That meant this test passed even with
+  // update()'s OWN explicit `lockSchedule()` (`SELECT ... FOR UPDATE`) deleted entirely — the
+  // "still pending" assertions below would stay true regardless, because the final bare UPDATE
+  // alone was enough to block behind a `FOR UPDATE` holder. `FOR KEY SHARE` is the weakest lock
+  // mode that still conflicts with an explicit `FOR UPDATE` (what lockSchedule() takes) while NOT
+  // conflicting with an ordinary non-key-column `UPDATE`'s implicit `FOR NO KEY UPDATE` (what the
+  // trailing CAS statement takes) — so if lockSchedule()'s explicit lock is ever removed, this
+  // holder no longer blocks anything and the "still pending" assertions correctly flip to false,
+  // catching the regression instead of silently continuing to pass for the wrong reason.
   it(
     'T3 regression: the schedule row lock genuinely serializes a concurrent PATCH race — proven ' +
       'with a deterministic barrier, not a lucky Promise.all() overlap',
@@ -430,7 +577,7 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
       const schedule = await createSchedule();
 
       const holder = await holdRowLock(prisma, (tx) =>
-        tx.$queryRaw`SELECT id FROM v1_team_schedules WHERE id = ${schedule.id} FOR UPDATE`,
+        tx.$queryRaw`SELECT id FROM v1_team_schedules WHERE id = ${schedule.id} FOR KEY SHARE`,
       );
 
       const callA = request(app.getHttpServer())
@@ -655,5 +802,94 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
     // only schedule-adjacent linkage — V1Game has no direct scheduleId at all): still explicitly
     // confirm no Game references the specific team match this test's MATCH-type schedule used.
     expect(await prisma.v1Game.count({ where: { teamMatchId: ids.teamMatchForTeamA } })).toBe(0);
+  });
+
+  // FG-9 fix: attendance.integration-spec.ts and schedule-crud.integration-spec.ts only ever call
+  // ScheduleAttendanceService/TeamSchedulesService methods directly — never through the real HTTP
+  // pipeline. Deleting ScheduleAttendanceController or MyScheduleController from their module's
+  // `controllers` array, or deleting the `POST .../complete` route/decorator entirely, would not
+  // fail a single test in this suite before this block existed. These three smoke tests drive the
+  // actual routes through the real Nest HTTP pipeline (guards + ValidationPipe +
+  // TransformInterceptor), proving each one is genuinely wired.
+  it('PUT .../attendance/me is wired: 200 on success, 401 anonymous, 422 missing Idempotency-Key', async () => {
+    const schedule = await createSchedule();
+
+    const missingKey = await request(app.getHttpServer())
+      .put(`/api/v1/teams/${ids.teamA}/schedules/${schedule.id}/attendance/me`)
+      .set('x-v1-user-id', ids.managerA)
+      .send({ status: 'GOING', expectedVersion: 0 })
+      .expect(422);
+    expect(missingKey.body.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+
+    const anonymous = await request(app.getHttpServer())
+      .put(`/api/v1/teams/${ids.teamA}/schedules/${schedule.id}/attendance/me`)
+      .set('idempotency-key', idempotencyKey('attendance-anon'))
+      .send({ status: 'GOING', expectedVersion: 0 })
+      .expect(401);
+    expect(anonymous.body.code).toBe('UNAUTHENTICATED');
+
+    const success = await request(app.getHttpServer())
+      .put(`/api/v1/teams/${ids.teamA}/schedules/${schedule.id}/attendance/me`)
+      .set('x-v1-user-id', ids.managerA)
+      .set('idempotency-key', idempotencyKey('attendance-ok'))
+      .send({ status: 'GOING', expectedVersion: 0 })
+      .expect(200);
+    expect(success.body.data).toMatchObject({ status: 'GOING', version: 0 });
+
+    const row = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+      where: { scheduleId_userId: { scheduleId: schedule.id, userId: ids.managerA } },
+    });
+    expect(row.status).toBe('GOING');
+  });
+
+  it('POST .../complete is wired: 200 on a real transition, and the default POST 201 regression would be caught here too', async () => {
+    const schedule = await createSchedule({
+      startAt: '2020-01-01T10:00:00.000Z',
+      endAt: '2020-01-01T12:00:00.000Z',
+    });
+
+    const missingKey = await request(app.getHttpServer())
+      .post(`/api/v1/teams/${ids.teamA}/schedules/${schedule.id}/complete`)
+      .set('x-v1-user-id', ids.ownerA)
+      .send({ expectedVersion: 0 })
+      .expect(422);
+    expect(missingKey.body.code).toBe('IDEMPOTENCY_KEY_REQUIRED');
+
+    // The frozen contract specifies 200 for this route (mirrors the `cancel` HTTP-200 regression
+    // test above) — if the `@HttpCode(200)` decorator is ever removed, this becomes NestJS's
+    // unmarked-@Post() default of 201 and this `.expect(200)` fails.
+    const completed = await request(app.getHttpServer())
+      .post(`/api/v1/teams/${ids.teamA}/schedules/${schedule.id}/complete`)
+      .set('x-v1-user-id', ids.ownerA)
+      .set('idempotency-key', idempotencyKey('complete-http'))
+      .send({ expectedVersion: 0 })
+      .expect(200);
+    expect(completed.body.data).toMatchObject({ state: 'completed', version: 1 });
+
+    const row = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: schedule.id } });
+    expect(row.state).toBe('COMPLETED');
+  });
+
+  it('GET /me/schedule is wired: 401 anonymous, 200 with the caller\'s own schedules including a just-completed one', async () => {
+    const anonymous = await request(app.getHttpServer()).get('/api/v1/me/schedule').expect(401);
+    expect(anonymous.body.code).toBe('UNAUTHENTICATED');
+
+    const schedule = await createSchedule({
+      startAt: '2020-01-01T10:00:00.000Z',
+      endAt: '2020-01-01T12:00:00.000Z',
+    });
+    await request(app.getHttpServer())
+      .post(`/api/v1/teams/${ids.teamA}/schedules/${schedule.id}/complete`)
+      .set('x-v1-user-id', ids.ownerA)
+      .set('idempotency-key', idempotencyKey('complete-for-me-schedule'))
+      .send({ expectedVersion: 0 })
+      .expect(200);
+
+    const mine = await request(app.getHttpServer())
+      .get('/api/v1/me/schedule')
+      .query({ status: 'completed' })
+      .set('x-v1-user-id', ids.ownerA)
+      .expect(200);
+    expect(mine.body.data.items.map((item: { id: string }) => item.id)).toContain(schedule.id);
   });
 });

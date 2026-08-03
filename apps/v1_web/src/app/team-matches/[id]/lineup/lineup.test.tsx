@@ -49,8 +49,8 @@ describe('lineup.view-model', () => {
       state: 'DRAFT',
       version: 2,
       publicLineupAt: null,
-      starters: [{ displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true }],
-      bench: [{ displayName: '게스트', jerseyNumber: null }],
+      starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true }],
+      bench: [{ id: 'participant-bench-1', displayName: '게스트', jerseyNumber: null }],
     };
     const state = hydrateLineupEditorState(lineup);
     expect(state.baseRevision).toBe(2);
@@ -233,7 +233,7 @@ describe('lineup.view-model', () => {
       state: 'DRAFT',
       version: 3,
       publicLineupAt: null,
-      starters: [{ displayName: rosterMember.displayName, jerseyNumber: 7, position: null, goalkeeper: true }],
+      starters: [{ id: 'participant-2', displayName: rosterMember.displayName, jerseyNumber: 7, position: null, goalkeeper: true }],
       bench: [],
     };
     let state = hydrateLineupEditorState(lineup);
@@ -392,7 +392,7 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 0,
-        starters: [{ displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true }],
+        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true }],
       }),
       isLoading: false,
       isError: false,

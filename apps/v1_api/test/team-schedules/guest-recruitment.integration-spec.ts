@@ -298,7 +298,7 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
             gen_random_uuid(), ${recruitment.id}, ${ids.outsiderB}, 'SQL contract racer', NULL,
             'PENDING'::"V1GuestApplicationState", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
           )
-          ON CONFLICT ON CONSTRAINT v1_schedule_guest_applications_recruitment_user_key DO NOTHING
+          ON CONFLICT (recruitment_id, user_id) DO NOTHING
           RETURNING id
         `;
         if (rows.length > 0) return { created: true };

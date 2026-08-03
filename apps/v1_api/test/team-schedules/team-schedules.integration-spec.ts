@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { createV1IntegrationApp } from '../integration/integration-app';
 import { holdRowLock, isStillPending } from './helpers/lock-barrier';
 
@@ -64,6 +65,21 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
         phoneVerifiedAt: new Date('2026-01-01T00:00:00.000Z'),
       })),
     });
+    // V1AuthGuard's terms-reconsent gate (TERMS_RECONSENT_REQUIRED) blocks every mutation for an
+    // account that hasn't accepted the currently-required signup terms — every DB-seeded V1User
+    // starts with zero v1ManagedTermsConsentEvent rows, and the baseline migration always ships
+    // required signup terms documents. Mirrors the pattern in
+    // test/integration/phone-verification-write-gate.e2e-spec.ts.
+    const termsService = app.get(ManagedTermsRuntimeService);
+    const currentSignupTerms = await termsService.currentSignupTerms();
+    const requiredDocumentIds = currentSignupTerms.items
+      .filter((item) => item.requirement === 'required')
+      .map((item) => item.documentId);
+    await Promise.all(
+      [ids.ownerA, ids.managerA, ids.outsider].map((id) =>
+        termsService.acceptSignupTerms(id, requiredDocumentIds),
+      ),
+    );
     const sport = await prisma.v1Sport.upsert({
       where: { code: 'football' },
       update: {},

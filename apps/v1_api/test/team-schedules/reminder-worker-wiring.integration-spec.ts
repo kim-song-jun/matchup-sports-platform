@@ -158,7 +158,11 @@ describe('Task 12 reminders — real worker composition root (T1 regression)', (
     // module-load time under this exact env, and waitForHealth() below times out — that failure
     // path doubles as a live-process B1/B2 regression guard, complementing (not replacing) the
     // static reflection test in v1-game-operations-worker.module.spec.ts.
-    const env = { ...process.env, NODE_ENV: 'production', WORKER_PORT: String(port) };
+    // Explicit NodeJS.ProcessEnv annotation is required here: TypeScript's inferred type for an
+    // object-literal spread of process.env collapses to just the two added literal keys
+    // (NODE_ENV/WORKER_PORT), discarding ProcessEnv's index signature — so `env.FRONTEND_URL`
+    // below would otherwise fail to type-check with "Property 'FRONTEND_URL' does not exist".
+    const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production', WORKER_PORT: String(port) };
     delete env.FRONTEND_URL;
 
     child = spawn(process.execPath, ['-r', 'ts-node/register/transpile-only', 'src/jobs/v1-game-operations-worker.main.ts'], {

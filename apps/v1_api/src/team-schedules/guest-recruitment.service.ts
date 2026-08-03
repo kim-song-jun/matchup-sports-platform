@@ -416,7 +416,7 @@ export class GuestRecruitmentService {
           ${applicationId}, ${recruitment.id}, ${user.id}, ${dto.displayName}, ${dto.note ?? null},
           'PENDING'::"V1GuestApplicationState", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
-        ON CONFLICT ON CONSTRAINT v1_schedule_guest_applications_recruitment_user_key DO NOTHING
+        ON CONFLICT (recruitment_id, user_id) DO NOTHING
         RETURNING id, state, display_name_snapshot, note
       `;
 

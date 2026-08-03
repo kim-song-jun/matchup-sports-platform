@@ -40,7 +40,10 @@ export class UpdateGuestRecruitmentDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  note?: string;
+  // `null` is meaningful here and distinct from omitting the field: updateRecruitment()
+  // hashes `note === undefined ? '__omitted__' : dto.note`, so "leave the note alone" and
+  // "clear the note" must not collapse to the same payload (P1-5).
+  note?: string | null;
 
   @IsOptional()
   @IsEnum(V1GuestRecruitmentVisibility)

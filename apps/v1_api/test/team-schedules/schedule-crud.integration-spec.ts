@@ -60,9 +60,9 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
       })),
     });
     const sport = await prisma.v1Sport.upsert({
-      where: { code: 'task12-schedule-crud-football' },
+      where: { code: 'football' },
       update: {},
-      create: { id: ids.sport, code: 'task12-schedule-crud-football', name: 'Task 12 Schedule CRUD Football' },
+      create: { id: ids.sport, code: 'football', name: 'Task 12 Schedule CRUD Football' },
       select: { id: true },
     });
     await prisma.v1Region.create({
@@ -230,6 +230,98 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     },
   );
 
+  // P1-10 regression: increasing capacity must promote the front of the WAITLISTED queue (and
+  // compact the rest) instead of leaving freed slots stranded behind whoever was already queued.
+  // If this fix is ever reverted, memberB/outsider below stay WAITLISTED at positions 1/2 forever.
+  it(
+    'P1-10 regression: increasing schedule capacity promotes the front of the WAITLISTED queue ' +
+      'and compacts the rest, bumping their version',
+    async () => {
+      const created = await service.create(authUser(ids.ownerA), ids.teamA, { ...baseDto(), capacity: 1 }, 'p1-10-increase-create-key');
+      const scheduleId = (created as { id: string }).id;
+
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.ownerA, status: 'GOING', version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberA, status: 'WAITLISTED', waitlistPosition: 1, version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberB, status: 'WAITLISTED', waitlistPosition: 2, version: 0 } });
+
+      const result = await service.update(
+        authUser(ids.ownerA),
+        ids.teamA,
+        scheduleId,
+        { expectedVersion: 0, capacity: 2 },
+        'p1-10-increase-key',
+      );
+      expect(result).toMatchObject({ capacity: 2, version: 1 });
+
+      const promoted = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId, userId: ids.memberA } },
+      });
+      expect(promoted).toMatchObject({ status: 'GOING', waitlistPosition: null, version: 1 });
+
+      const compacted = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId, userId: ids.memberB } },
+      });
+      expect(compacted).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1, version: 1 });
+    },
+  );
+
+  // P1-10 regression: decreasing capacity below the current GOING count must be rejected outright,
+  // never silently leave `goingCount > capacity`. If this fix is ever reverted, this call succeeds
+  // 200 and the schedule row's capacity ends up at 1 with 2 GOING attendees.
+  it(
+    'P1-10 regression: decreasing schedule capacity below the current GOING count is rejected and ' +
+      'mutates nothing',
+    async () => {
+      const created = await service.create(authUser(ids.ownerA), ids.teamA, { ...baseDto(), capacity: 2 }, 'p1-10-decrease-create-key');
+      const scheduleId = (created as { id: string }).id;
+
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.ownerA, status: 'GOING', version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberA, status: 'GOING', version: 0 } });
+
+      const error = await captureFailure(() =>
+        service.update(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 0, capacity: 1 }, 'p1-10-decrease-key'),
+      );
+      expectHttpCode(error, 409, 'SCHEDULE_CAPACITY_BELOW_GOING_COUNT');
+
+      const row = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
+      expect(row.capacity).toBe(2);
+      expect(row.version).toBe(0);
+    },
+  );
+
+  // P1-10 regression: removing the cap entirely (capacity -> null) must promote every remaining
+  // WAITLISTED attendee — nobody should be left queued on what is now an uncapped schedule.
+  it(
+    'P1-10 regression: removing schedule capacity entirely promotes every remaining WAITLISTED ' +
+      'attendee to GOING',
+    async () => {
+      const created = await service.create(authUser(ids.ownerA), ids.teamA, { ...baseDto(), capacity: 1 }, 'p1-10-uncap-create-key');
+      const scheduleId = (created as { id: string }).id;
+
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.ownerA, status: 'GOING', version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberA, status: 'WAITLISTED', waitlistPosition: 1, version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberB, status: 'WAITLISTED', waitlistPosition: 2, version: 0 } });
+
+      const result = await service.update(
+        authUser(ids.ownerA),
+        ids.teamA,
+        scheduleId,
+        { expectedVersion: 0, capacity: null } as never,
+        'p1-10-uncap-key',
+      );
+      expect(result).toMatchObject({ capacity: null, version: 1 });
+
+      const memberARow = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId, userId: ids.memberA } },
+      });
+      expect(memberARow).toMatchObject({ status: 'GOING', waitlistPosition: null, version: 1 });
+      const memberBRow = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId, userId: ids.memberB } },
+      });
+      expect(memberBRow).toMatchObject({ status: 'GOING', waitlistPosition: null, version: 1 });
+    },
+  );
+
   it('cancel is a state transition (never a delete) and closes an attached OPEN guest recruitment', async () => {
     const created = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'cancel-create-key');
     const scheduleId = (created as { id: string }).id;
@@ -253,12 +345,45 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     const recruitment = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId } });
     expect(recruitment.state).toBe('CLOSED');
 
-    // Already-terminal: a second cancel attempt (even with the original version) must reject,
-    // not delete or re-cancel.
+    // Already-terminal: a second cancel attempt must reject, not delete or re-cancel.
+    // This passes the CURRENT version (1, bumped by the cancel above) on purpose. The P1-9 fix
+    // made the optimistic-concurrency check run BEFORE the terminal-state check, so passing the
+    // now-stale original version 0 here would correctly answer 409 VERSION_CONFLICT and this test
+    // would no longer be exercising the terminal guard at all. Stale-version-wins-over-terminal is
+    // covered separately by the P1-9 regression test.
     const error = await captureFailure(() =>
-      service.cancel(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 0, cancelReason: 'again' }, 'cancel-key-2'),
+      service.cancel(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 1, cancelReason: 'again' }, 'cancel-key-2'),
     );
     expectHttpCode(error, 409, 'SCHEDULE_TERMINAL');
+  });
+
+  // P1-3 regression: cancel() (tested above) already closed an attached OPEN guest recruitment in
+  // the same transaction as the cancellation — complete() never had the equivalent statement. A
+  // schedule could reach COMPLETED while its recruitment stayed OPEN forever (new applications
+  // rejected only because the PARENT schedule was terminal, never surfaced as the recruitment's
+  // own state; GET kept showing OPEN; a still-pending guest_recruitment_close outbox reminder had
+  // no way to know its parent had ended). If this fix is ever reverted, the final
+  // `recruitment.state` assertion below fails back to 'OPEN'.
+  it('complete is a state transition (never a delete) and closes an attached OPEN guest recruitment', async () => {
+    const created = await service.create(
+      authUser(ids.ownerA),
+      ids.teamA,
+      { ...baseDto(), startAt: '2020-01-01T10:00:00.000Z', endAt: '2020-01-01T12:00:00.000Z' },
+      'complete-recruitment-create-key',
+    );
+    const scheduleId = (created as { id: string }).id;
+    await prisma.v1ScheduleGuestRecruitment.create({
+      data: { scheduleId, slots: 2, closesAt: new Date('2020-01-02T00:00:00.000Z'), state: 'OPEN' },
+    });
+
+    const result = await service.complete(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 0 }, 'complete-recruitment-key');
+    expect(result).toMatchObject({ state: 'completed', version: 1 });
+
+    const row = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
+    expect(row.state).toBe('COMPLETED');
+
+    const recruitment = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId } });
+    expect(recruitment.state).toBe('CLOSED');
   });
 
   it('cross-team access to a TEAM-visibility schedule 404s for a non-member, but PUBLIC is visible anonymously', async () => {
@@ -314,10 +439,71 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     );
 
     expect((first as { jobId: string }).jobId).toBe((second as { jobId: string }).jobId);
-    const outboxCount = await prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(*) AS count FROM v1_outbox_events WHERE business_key = ${`schedule:${scheduleId}:reminder:rsvp_deadline`}
+    // P1-2 fix: the business key now embeds the schedule's rsvpDeadlineAt value, so a genuinely
+    // rescheduled deadline gets its own outbox row instead of colliding with a stale key.
+    const outboxRows = await prisma.$queryRaw<Array<{ count: bigint; type: string; payload: unknown }>>`
+      SELECT COUNT(*) AS count, MIN(type::text) AS type, MIN(payload::text) AS payload
+      FROM v1_outbox_events WHERE business_key = ${`schedule:${scheduleId}:reminder:rsvp_deadline:2026-09-09T00:00:00.000Z`}
     `;
-    expect(Number(outboxCount[0].count)).toBe(1);
+    expect(Number(outboxRows[0].count)).toBe(1);
+    // FG-8 fix: the original assertions only checked jobId equality and row count — neither
+    // observes the outbox row's own `type` column, so swapping the
+    // rsvp_deadline/guest_recruitment_close -> outbox-type mapping in triggerReminder() would
+    // still pass every assertion here. Assert the actual persisted type and payload.
+    expect(outboxRows[0].type).toBe('SCHEDULE_RSVP_DEADLINE_REMINDER');
+    // P1-2 fix: payload now also carries `expectedRsvpDeadlineAt` — the worker handler
+    // (schedule-reminder.service.ts) reads it back to no-op a stale row if the schedule's
+    // rsvpDeadlineAt has since changed again past this row's own generation.
+    expect(JSON.parse(outboxRows[0].payload as string)).toEqual({
+      scheduleId,
+      kind: 'rsvp_deadline',
+      expectedRsvpDeadlineAt: '2026-09-09T00:00:00.000Z',
+    });
+  });
+
+  // FG-8 fix: the sibling "no recruitment attached" test below proves the 404 branch, but nothing
+  // in this file previously drove a SUCCESSFUL guest_recruitment_close trigger and inspected its
+  // outbox row — the rsvp_deadline positive-path test above and this one are what actually catch
+  // a swapped `rsvp_deadline -> SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER` /
+  // `guest_recruitment_close -> SCHEDULE_RSVP_DEADLINE_REMINDER` mapping regression.
+  it('triggers a guest_recruitment_close reminder and persists the correct outbox type/payload', async () => {
+    const created = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'reminder-guest-close-create-key');
+    const scheduleId = (created as { id: string }).id;
+    await prisma.v1ScheduleGuestRecruitment.create({
+      data: {
+        scheduleId,
+        slots: 2,
+        closesAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
+        state: 'OPEN',
+      },
+    });
+
+    const result = await service.triggerReminder(
+      authUser(ids.ownerA),
+      ids.teamA,
+      scheduleId,
+      { kind: 'guest_recruitment_close' },
+      'reminder-guest-close-key',
+    );
+    expect((result as { kind: string }).kind).toBe('guest_recruitment_close');
+
+    // P1-2 fix: the business key now embeds the recruitment's own `version` (freshly created here,
+    // so it is the schema default 0) instead of being permanently the same key for this schedule —
+    // a reopened/edited recruitment (whose version has since bumped) gets its own outbox row.
+    const businessKey = `schedule:${scheduleId}:reminder:guest_recruitment_close:0`;
+    const outboxRows = await prisma.$queryRaw<Array<{ count: bigint; type: string; payload: unknown }>>`
+      SELECT COUNT(*) AS count, MIN(type::text) AS type, MIN(payload::text) AS payload
+      FROM v1_outbox_events WHERE business_key = ${businessKey}
+    `;
+    expect(Number(outboxRows[0].count)).toBe(1);
+    expect(outboxRows[0].type).toBe('SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER');
+    // P1-2 fix: payload now also carries `expectedRecruitmentVersion` — the worker handler reads
+    // it back to no-op a stale row if the recruitment has since been mutated past this generation.
+    expect(JSON.parse(outboxRows[0].payload as string)).toEqual({
+      scheduleId,
+      kind: 'guest_recruitment_close',
+      expectedRecruitmentVersion: 0,
+    });
   });
 
   it('rejects a reminder trigger for guest_recruitment_close when no recruitment is attached', async () => {
@@ -382,8 +568,12 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
       expect((first as { replayed: boolean }).replayed).toBe(false);
 
       // Simulate the key's 30-day retention window having elapsed.
+      // P1-6 fix: the stored idempotency record's resourceId is now `teamId` (a stable value
+      // shared by every create attempt under this scope), not the freshly-created schedule's own
+      // id — see create()'s own P1-6 comment. `firstId` never appeared as a resourceId to begin
+      // with under the fixed code, so this lookup targets `ids.teamA` instead.
       await prisma.v1IdempotencyRecord.updateMany({
-        where: { action: 'SCHEDULE_CREATE', resourceType: 'V1_TEAM_SCHEDULE', resourceId: firstId, idempotencyKey: key },
+        where: { action: 'SCHEDULE_CREATE', resourceType: 'V1_TEAM_SCHEDULE', resourceId: ids.teamA, idempotencyKey: key },
         data: { expiresAt: new Date(Date.now() - 1_000) },
       });
 
@@ -400,6 +590,59 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
 
       const scheduleCount = await prisma.v1TeamSchedule.count({ where: { teamId: ids.teamA, title: dto.title } });
       expect(scheduleCount).toBe(2);
+    },
+  );
+
+  // P1-6 fix supersedes this test's original premise. It used to be named "CP2 regression" and
+  // seeded two ACTIVE (non-expired) idempotency records sharing one create scope but carrying two
+  // DIFFERENT, arbitrary `resourceId` values, to prove create()'s (now-removed) `createdAt DESC,
+  // resourceId DESC` tiebreak deterministically picked a winner among them. Under the P1-6 fix
+  // that scenario can no longer be constructed at all for SCHEDULE_CREATE: resourceId is now the
+  // real, stable `teamId` (see create()'s own P1-6 comment), so the composite unique index
+  // (actorUserId, action, resourceType, resourceId, idempotencyKey) forbids two rows from ever
+  // sharing an identical scope in the first place — there is no tie left to break, and create()'s
+  // replay lookup is a plain findUnique with no ordering at all. What P1-6 actually fixed, and
+  // what this test proves instead: the PRE-fix code used the constant RESOURCE_TYPE string as the
+  // advisory lock's resourceId (and dropped resourceId from the lookup's where-clause entirely),
+  // so the exact same (actor, key) pair collided across EVERY team that actor could create a
+  // schedule under. Two different teams, same actor, same Idempotency-Key must each get their own
+  // independent create — never a cross-team replay or payload conflict.
+  it(
+    'P1-6 regression: the same actor reusing one Idempotency-Key across two different teams gets ' +
+      'two independent creates, never a cross-team replay or payload collision',
+    async () => {
+      // teamB (unlike teamA) has no seeded membership in this suite's beforeAll — grant ownerA an
+      // owner membership on it here, scoped to this one test, so create() against teamB can pass
+      // its own manageable-team check.
+      await prisma.v1TeamMembership.create({
+        data: { teamId: ids.teamB, userId: ids.ownerA, role: 'owner', status: 'active' },
+      });
+
+      const key = 'p1-6-cross-team-key';
+      const dtoForTeamA = { ...baseDto(), title: 'P1-6 team A fixture' };
+      const dtoForTeamB = { ...baseDto(), title: 'P1-6 team B fixture' };
+
+      const createdA = await service.create(authUser(ids.ownerA), ids.teamA, dtoForTeamA, key);
+      expect((createdA as { replayed: boolean }).replayed).toBe(false);
+
+      // Same actor, same Idempotency-Key, a DIFFERENT team and a DIFFERENT payload. Before the
+      // fix, the advisory lock's scope was identical for both calls (RESOURCE_TYPE used as the
+      // lock's resourceId regardless of team), and the lookup never filtered on resourceId at
+      // all — this call could have replayed, or payload-conflicted against, team A's own record
+      // despite being a wholly unrelated team/schedule.
+      const createdB = await service.create(authUser(ids.ownerA), ids.teamB, dtoForTeamB, key);
+      expect((createdB as { replayed: boolean }).replayed).toBe(false);
+      expect((createdB as { id: string }).id).not.toBe((createdA as { id: string }).id);
+
+      const scheduleA = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: (createdA as { id: string }).id } });
+      const scheduleB = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: (createdB as { id: string }).id } });
+      expect(scheduleA.teamId).toBe(ids.teamA);
+      expect(scheduleB.teamId).toBe(ids.teamB);
+
+      // Retrying team A's own create with its own key/payload must still cleanly replay team A's
+      // own response — proving the fix's per-team scoping didn't break same-team replay.
+      const replayA = await service.create(authUser(ids.ownerA), ids.teamA, dtoForTeamA, key);
+      expect(replayA).toMatchObject({ id: (createdA as { id: string }).id, replayed: true });
     },
   );
 
@@ -501,6 +744,87 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     expect(records).toHaveLength(1);
     expect(records[0].expiresAt.getTime()).toBeGreaterThan(Date.now());
   });
+
+  // P1-9 regression: a stale expectedVersion must ALWAYS report VERSION_CONFLICT, even when the
+  // row has ALSO independently become terminal (or, for complete(), also hasn't ended yet) since
+  // the version the caller last saw. Before the fix, update()/cancel()/complete() all checked
+  // state (and complete() also checked endAt) BEFORE checking version, so a stale-version caller
+  // racing a terminal transition saw SCHEDULE_TERMINAL/SCHEDULE_NOT_YET_ENDED instead of
+  // VERSION_CONFLICT — violating the CAS contract that a stale version is unconditionally a
+  // version conflict, never masked by whatever else changed underneath it. Each case below drives
+  // a real, independent state/time change first (so the "terminal" or "not yet ended" condition
+  // is genuinely true), THEN reuses the ORIGINAL (now-stale) expectedVersion.
+  it(
+    'P1-9 regression: a stale expectedVersion reports VERSION_CONFLICT (never SCHEDULE_TERMINAL or ' +
+      'SCHEDULE_NOT_YET_ENDED) even when the row has independently become terminal in the meantime',
+    async () => {
+      // update(): schedule is cancelled (now terminal) by someone else; a stale-version PATCH must
+      // still 409 VERSION_CONFLICT, not SCHEDULE_TERMINAL.
+      const forUpdate = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'p1-9-update-create-key');
+      const forUpdateId = (forUpdate as { id: string }).id;
+      await service.cancel(
+        authUser(ids.ownerA),
+        ids.teamA,
+        forUpdateId,
+        { expectedVersion: 0, cancelReason: 'P1-9 fixture: make it terminal first' },
+        'p1-9-update-cancel-key',
+      );
+      const staleUpdateError = await captureFailure(() =>
+        service.update(authUser(ids.ownerA), ids.teamA, forUpdateId, { expectedVersion: 0, title: 'stale' }, 'p1-9-update-key'),
+      );
+      expectHttpCode(staleUpdateError, 409, 'VERSION_CONFLICT');
+
+      // cancel(): schedule is already completed by someone else; a stale-version cancel must
+      // still 409 VERSION_CONFLICT, not SCHEDULE_TERMINAL.
+      const forCancel = await service.create(
+        authUser(ids.ownerA),
+        ids.teamA,
+        { ...baseDto(), startAt: '2020-01-01T10:00:00.000Z', endAt: '2020-01-01T12:00:00.000Z' },
+        'p1-9-cancel-create-key',
+      );
+      const forCancelId = (forCancel as { id: string }).id;
+      await service.complete(authUser(ids.ownerA), ids.teamA, forCancelId, { expectedVersion: 0 }, 'p1-9-cancel-complete-key');
+      const staleCancelError = await captureFailure(() =>
+        service.cancel(authUser(ids.ownerA), ids.teamA, forCancelId, { expectedVersion: 0, cancelReason: 'stale' }, 'p1-9-cancel-key'),
+      );
+      expectHttpCode(staleCancelError, 409, 'VERSION_CONFLICT');
+
+      // complete(): schedule was cancelled by someone else AND hasn't ended yet — both the
+      // terminal-state and not-yet-ended conditions are true, but a stale-version complete() must
+      // still report VERSION_CONFLICT ahead of either.
+      const forComplete = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'p1-9-complete-create-key');
+      const forCompleteId = (forComplete as { id: string }).id;
+      await service.cancel(
+        authUser(ids.ownerA),
+        ids.teamA,
+        forCompleteId,
+        { expectedVersion: 0, cancelReason: 'P1-9 fixture: make it terminal (and still not-yet-ended)' },
+        'p1-9-complete-cancel-key',
+      );
+      const staleCompleteError = await captureFailure(() =>
+        service.complete(authUser(ids.ownerA), ids.teamA, forCompleteId, { expectedVersion: 0 }, 'p1-9-complete-key'),
+      );
+      expectHttpCode(staleCompleteError, 409, 'VERSION_CONFLICT');
+
+      // complete(), second shape: the schedule is still SCHEDULED (not terminal) and its endAt is
+      // still in the future (genuinely not-yet-ended) — only the version is stale. The old order
+      // checked endAt before version, so this specific combination (not terminal, not yet ended,
+      // but stale version) previously returned SCHEDULE_NOT_YET_ENDED instead of VERSION_CONFLICT.
+      const forCompleteNotEnded = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'p1-9-complete-not-ended-create-key');
+      const forCompleteNotEndedId = (forCompleteNotEnded as { id: string }).id;
+      await service.update(
+        authUser(ids.ownerA),
+        ids.teamA,
+        forCompleteNotEndedId,
+        { expectedVersion: 0, title: 'P1-9 fixture: advance version without ending or cancelling' },
+        'p1-9-complete-not-ended-update-key',
+      );
+      const staleNotYetEndedError = await captureFailure(() =>
+        service.complete(authUser(ids.ownerA), ids.teamA, forCompleteNotEndedId, { expectedVersion: 0 }, 'p1-9-complete-not-ended-key'),
+      );
+      expectHttpCode(staleNotYetEndedError, 409, 'VERSION_CONFLICT');
+    },
+  );
 
   // W10 regression: TeamSchedulesService.complete() is the only mechanism that makes COMPLETED
   // reachable. If this mutation were ever removed (reverting to the pre-W10 state where the

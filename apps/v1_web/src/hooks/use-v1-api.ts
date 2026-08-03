@@ -2530,6 +2530,38 @@ export function useV1AdminTournamentPlayers(registrationId: string) {
   });
 }
 
+/**
+ * 어드민이 팀 대신 명단에 선수를 추가·제거한다.
+ *
+ * 이 두 훅이 없던 동안 어드민 콘솔은 명단을 **볼 수만** 있었다. 팀장이 자리를 비웠거나
+ * 마감이 지난 뒤 운영 조정이 필요해도 손댈 방법이 없었고, 화면에서 시도해도 서버로
+ * 요청이 가지 않아 로그에 실패조차 남지 않았다(2026-08-03 실사고).
+ */
+export function useV1AdminAddPlayer(registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { userId: string; realName: string }) =>
+      v1Post(`/admin/registrations/${registrationId}/players`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: v1Keys.adminTournamentRoster(registrationId),
+      });
+    },
+  });
+}
+
+export function useV1AdminRemovePlayer(registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (playerId: string) => v1Delete(`/admin/players/${playerId}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: v1Keys.adminTournamentRoster(registrationId),
+      });
+    },
+  });
+}
+
 export function useV1AddPlayer(tournamentId: string, registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({

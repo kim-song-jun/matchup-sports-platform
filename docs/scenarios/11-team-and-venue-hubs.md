@@ -3,6 +3,28 @@
 > Status: Partial
 > team/venue hub read model, global affiliation context, tournaments surface는 구현됐고 API/runtime smoke까지 확인됐다. 다만 interactive browser QA와 owner-capability 편집 smoke는 follow-up이다.
 
+> **Stack scope note (Todo 26 reconciliation, 2026-08-04):** everything from `## Scenario Checklist` through `## Notes` below describes the **legacy** `apps/api` (port 8111) / `apps/web` (port 3003) stack — `GET /api/v1/teams/:id/hub`, `GET /api/v1/venues/:id/hub`, and the legacy `tournaments` list/detail/create surface all live in `apps/api`, not `apps/v1_api`. This is not stale prose about removed behavior; it is a different, still-live legacy stack from the one Tasks 12-24 shipped. **v1 has no hub concept at all**: `apps/v1_api/src/teams/teams.controller.ts` (verified directly, see `04-team-and-membership.md`'s v1 section) has no `/hub` route, no `goodsCount`/`passesCount`/`eventsCount` aggregation, and no image-upload slot. Do not read this file as coverage for v1 team/tournament detail pages. See `## v1 stack (Tasks 12-24)` below for the closest v1 equivalents.
+
+## v1 stack (Tasks 12-24)
+
+v1 has no single "hub" aggregation endpoint; the closest equivalents are separate, purpose-specific surfaces added across Tasks 12-24:
+
+| Legacy hub concept | v1 equivalent | Backend doc |
+|---|---|---|
+| Team hub `goods/passes/events` sections | Not present in v1. Team detail (`apps/v1_web/src/app/teams/[id]/page.tsx`) links to the Task 12 schedule list (`apps/v1_web/src/app/teams/[id]/schedules/**`, `GET /teams/:id/schedules`) and a records page (`apps/v1_web/src/app/teams/[id]/records/page.tsx`) | `docs/api/domains/team-schedules.md`, `docs/api/domains/public-records.md` |
+| Venue hub | Not present in v1 at all — no `apps/v1_api/src/venues/` module exists in this codebase (v1 has no venue domain; venues remain a legacy-stack-only concept). | n/a |
+| `tournaments` list/detail/create surface | Fully rebuilt: `apps/v1_web/src/app/tournaments/**` (list, detail, apply, schedule, results, bracket, awards, reviews) backed by `apps/v1_api/src/tournaments/**` — a materially larger surface than the legacy minimal list/detail/create described below (gender/quota wizard per `17-tournament-gender-wizard.md`, staff/fields/lineup/operations-board per Task 18, result review/officialize/void per Task 22, public schedule/match/team/player projections per Task 24) | `docs/api/domains/tournament-operations.md`, `docs/api/domains/tournament-operations-auth.md`, `docs/api/domains/public-records.md` |
+
+### Todo 26 E2E scenario ledger for this domain
+
+| ID | Covers | Primary spec |
+|---|---|---|
+| `E2E-PUBLIC-01` | Public visibility matrix (`hidden`/`status_only`/`live`/`official_only`) on `GET /tournaments/:id/schedule`, `GET /tournaments/:id/matches/:fixtureId`, `GET /teams/:id/records`, `GET /users/:id/records` (Task 24, see `docs/api/domains/public-records.md`), plus consent revoke/regrant hiding a previously-eligible participant's identity. | `e2e/v1-tests/tournament.spec.ts` |
+
+`e2e/v1-tests/tournament.spec.ts` today only asserts `/tournaments` list render and list→detail→`/apply` navigation for the `applicant` persona (verified by reading the spec file) — it does not exercise the public-records routes or the visibility/consent matrix at all. `E2E-PUBLIC-01` is a new ID as of this reconciliation; implementing it is out of this doc-reconciliation task's own scope. This row is `Unverified` — no Playwright coverage exists yet — not `Verified`.
+
+## Legacy stack (`apps/api` / `apps/web`) — Scenario Checklist
+
 ## Scenario Checklist
 
 - [x] HUB-001 팀 허브가 `overview / goods / passes / events` 구조와 honest empty state를 노출한다.
@@ -91,3 +113,4 @@
 
 - 2026-04-11: venue self-serve는 `VenueMembership`까지는 아니지만 `ownerId + admin override` 범위로만 열렸다.
 - 2026-04-11: browser MCP session이 끊겨 이번 round는 API/runtime smoke 중심으로 닫았고, full interactive browser smoke는 follow-up으로 남긴다.
+- 2026-08-04 (Todo 26): confirmed by directly reading `apps/v1_api/src/teams/teams.controller.ts` and grepping `apps/v1_api/src` for `venue` that v1 has no hub route and no venue domain at all (only tournament-venue *display* components exist under `apps/v1_web/src/components/tournaments/`, which read venue text/coordinates off a tournament, not a standalone venue entity). Added the `## v1 stack (Tasks 12-24)` section above mapping legacy hub concepts to their v1 equivalents and naming `E2E-PUBLIC-01`.

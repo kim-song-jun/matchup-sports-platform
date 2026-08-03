@@ -34,7 +34,13 @@ function isStableWarningCode(code: string): code is StableWarningCode {
 
 /** Recursively sorts object keys (alphabetically, `localeCompare`) so `JSON.stringify` of the
  * result is independent of the source's own key order -- mirrors `canonicalize()` in
- * `../../games/games.service.ts`. This matters specifically for `expectedScoreHash` below: Postgres
+ * `../../games/games.service.ts`. Exported (Task 26) so `CompareGameReadAuthorityService`
+ * (`compare-game-read-authority.service.ts`) recomputes `expectedScoreHash` with the IDENTICAL
+ * canonicalization this file uses, rather than carrying a second, independently-drifting
+ * implementation of a hash whose entire purpose is mismatch detection -- two copies of "the same"
+ * canonicalization that quietly diverge would make the read-authority check spuriously fire (or
+ * spuriously agree) on canonicalization differences instead of real data differences. This matters
+ * specifically for `expectedScoreHash` below: Postgres
  * `jsonb` normalizes key order on storage, so `row.game.currentOfficialRevision.score` read back
  * from the DB can have keys in a different order than whatever order the score was originally
  * written in. Hashing the raw (non-canonical) `JSON.stringify` of that value would make
@@ -42,7 +48,7 @@ function isStableWarningCode(code: string): code is StableWarningCode {
  * hash-stable-body guarantee -- silently depend on jsonb key ordering, which is not part of the
  * actual data contract (two reads of an UNCHANGED score must hash identically; changing only key
  * order is not a change). */
-function canonicalizeForHash(value: unknown): unknown {
+export function canonicalizeForHash(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(canonicalizeForHash);
   }

@@ -27,6 +27,13 @@ import {
   GameResultRecoveryDto,
   SubmitGameResultRevisionDto,
 } from './dto/game-result.dto';
+import {
+  AttestIdentityLinkDto,
+  GrantParticipantConsentDto,
+  RequestIdentityLinkDto,
+  RevokeIdentityLinkDto,
+  RevokeParticipantConsentDto,
+} from './dto/game-participant-identity.dto';
 import { GamesService } from './games.service';
 
 @Controller('games')
@@ -190,6 +197,94 @@ export class GamesController {
       user,
       gameId,
       revisionId,
+      idempotencyKey,
+      dto,
+    );
+  }
+
+  @Post(':gameId/participants/:participantId/identity-link-requests')
+  @UseGuards(V1AuthGuard)
+  requestIdentityLink(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Param('participantId') participantId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: RequestIdentityLinkDto,
+  ) {
+    return this.gamesService.requestIdentityLink(user, gameId, participantId, idempotencyKey, dto);
+  }
+
+  @Post(':gameId/participants/:participantId/identity-link-requests/:requestId/attest')
+  @UseGuards(V1AuthGuard)
+  attestIdentityLink(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Param('participantId') participantId: string,
+    @Param('requestId') requestId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: AttestIdentityLinkDto,
+  ) {
+    return this.gamesService.attestIdentityLink(
+      user,
+      gameId,
+      participantId,
+      requestId,
+      idempotencyKey,
+      dto,
+    );
+  }
+
+  @Post(':gameId/participants/:participantId/identity-links/:linkId/revoke')
+  @UseGuards(V1AuthGuard)
+  revokeIdentityLink(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Param('participantId') participantId: string,
+    @Param('linkId') linkId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: RevokeIdentityLinkDto,
+  ) {
+    return this.gamesService.revokeIdentityLink(
+      user,
+      gameId,
+      participantId,
+      linkId,
+      idempotencyKey,
+      dto,
+    );
+  }
+
+  @Post(':gameId/participants/:participantId/consents/grant')
+  @UseGuards(V1AuthGuard)
+  grantParticipantConsent(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Param('participantId') participantId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: GrantParticipantConsentDto,
+  ) {
+    return this.gamesService.grantParticipantConsent(
+      user,
+      gameId,
+      participantId,
+      idempotencyKey,
+      dto,
+    );
+  }
+
+  @Post(':gameId/participants/:participantId/consents/revoke')
+  @UseGuards(V1AuthGuard)
+  revokeParticipantConsent(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Param('participantId') participantId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: RevokeParticipantConsentDto,
+  ) {
+    return this.gamesService.revokeParticipantConsent(
+      user,
+      gameId,
+      participantId,
       idempotencyKey,
       dto,
     );

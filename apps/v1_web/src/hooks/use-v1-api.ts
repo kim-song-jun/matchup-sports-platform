@@ -4,6 +4,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
+import { randomUuid } from '@/lib/uuid';
 import type {
   ApiEnvelope,
   ApiErrorBody,
@@ -128,9 +129,20 @@ import type {
   V1TeamMatchApplicationsPage,
   V1TeamMatchEdit,
   V1TeamMatchEligibility,
+  V1TeamMatchLineup,
+  V1TeamMatchLineupChangeRequestResult,
+  V1TeamMatchLineupSavePayload,
+  V1TeamMatchLineupSaveResult,
+  V1TeamMatchLineupSubmitResult,
   V1TeamMatchMutationPayload,
   V1TeamMatchMutationResult,
   V1TeamMatchUpdatePayload,
+  V1Game,
+  V1GameResultRevision,
+  V1CreateGameResultRevisionPayload,
+  V1SubmitGameResultRevisionPayload,
+  V1DecideGameResultRevisionPayload,
+  V1GameRevisionMutationResult,
   V1TeamMutationPayload,
   V1TeamMutationResult,
   V1TeamUpdatePayload,
@@ -202,6 +214,13 @@ import type {
   V1IntegrationSettings,
   V1UpdateIntegrationSettingsPayload,
   V1PublicKakaoMapsKeyResponse,
+  V1TournamentOperationsBoardFilters,
+  V1TournamentOperationsBoardPage,
+  V1TournamentStaffListResponse,
+  V1TournamentStaffAssignment,
+  V1GrantTournamentStaffPayload,
+  V1RevokeTournamentStaffPayload,
+  V1TournamentFieldListResponse,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
@@ -1095,18 +1114,6 @@ export function useV1ReopenTeamMatch(teamMatchId: string) {
   });
 }
 
-export function useV1CompleteTeamMatch(teamMatchId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body?: { note?: string | null }) =>
-      v1Post<{ teamMatchId: string; status: string; completedAt: string | null; detailRoute: string }>(`/team-matches/${teamMatchId}/complete`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
-    },
-  });
-}
-
 export function useV1ApplyTeamMatch(teamMatchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1172,6 +1179,142 @@ export function useV1MyTeamMatches(filters?: ListFilters) {
   return useQuery({
     queryKey: [...v1Keys.all, 'me', 'team-matches', filters ?? {}] as const,
     queryFn: () => v1Get<CursorPage<V1MyTeamMatch>>('/me/team-matches', filters),
+  });
+}
+
+// ─── Task 17: Game/result-revision + team-match lineup (result entry/approval) ───
+
+// 새 Idempotency-Key(v4 UUID)를 만들고, games.md의 고정 계약대로 헤더와 바디의
+// clientCommandId를 항상 같은 값으로 묶는다 — 둘 중 하나만 다르면 서버가
+// 422 COMMAND_IDEMPOTENCY_KEY_MISMATCH로 거부한다.
+function withGameCommandId<T extends object>(body: T) {
+  const clientCommandId = randomUuid();
+  return { clientCommandId, body: { ...body, clientCommandId }, headers: { 'idempotency-key': clientCommandId } };
+}
+
+export function useV1Game(gameId: string | null | undefined, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.game(gameId ?? ''),
+    queryFn: () => v1Get<V1Game>(`/games/${gameId}`),
+    enabled: Boolean(gameId) && (options?.enabled ?? true),
+  });
+}
+
+export function useV1GameResultRevisions(gameId: string | null | undefined, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.gameResultRevisions(gameId ?? ''),
+    queryFn: () => v1Get<V1GameResultRevision[]>(`/games/${gameId}/result-revisions`),
+    enabled: Boolean(gameId) && (options?.enabled ?? true),
+  });
+}
+
+// ── 팀 매치 라인업 (Task 15) ──
+// GET은 호출자 소속 팀(내 팀) 쪽 사이드만 돌려준다 — 403/404는 재시도해도 같은 답이므로
+// retry: false (V1CheckEmail 등 다른 read 계열과 동일 컨벤션). 호출자 본인 팀(호스트 또는
+// 승인된 상대팀) 라인업만 반환된다 — Task 14 계약상 own-side 전용 라우트다.
+export function useV1TeamMatchLineup(teamMatchId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] as const,
+    queryFn: () => v1Get<V1TeamMatchLineup>(`/team-matches/${teamMatchId}/lineup`),
+    enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1CreateGameResultRevision(gameId: string, teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: V1CreateGameResultRevisionPayload) => {
+      const { body, headers } = withGameCommandId(input);
+      return v1Post<V1GameRevisionMutationResult>(`/games/${gameId}/result-revisions`, body, { headers });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.gameResultRevisions(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+    },
+  });
+}
+
+export function useV1SaveTeamMatchLineup(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; payload: V1TeamMatchLineupSavePayload }) =>
+      v1Put<V1TeamMatchLineupSaveResult>(`/team-matches/${teamMatchId}/lineup`, vars.payload, {
+        headers: { 'Idempotency-Key': vars.idempotencyKey },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+    },
+  });
+}
+
+export function useV1SubmitGameResultRevision(gameId: string, teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ revisionId, ...input }: V1SubmitGameResultRevisionPayload & { revisionId: string }) => {
+      const { body, headers } = withGameCommandId(input);
+      return v1Post<V1GameRevisionMutationResult>(
+        `/games/${gameId}/result-revisions/${revisionId}/submit`,
+        body,
+        { headers },
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.gameResultRevisions(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+      // 제출은 같은 트랜잭션에서 TeamMatch를 completed로 전이시키므로 상세도 함께 갱신한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+    },
+  });
+}
+
+export function useV1SubmitTeamMatchLineup(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; expectedVersion: number }) =>
+      v1Post<V1TeamMatchLineupSubmitResult>(
+        `/team-matches/${teamMatchId}/lineup/submit`,
+        { expectedVersion: vars.expectedVersion },
+        { headers: { 'Idempotency-Key': vars.idempotencyKey } },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+    },
+  });
+}
+
+export function useV1DecideGameResultRevision(gameId: string, teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ revisionId, ...input }: V1DecideGameResultRevisionPayload & { revisionId: string }) => {
+      const { body, headers } = withGameCommandId(input);
+      return v1Post<V1GameRevisionMutationResult>(
+        `/games/${gameId}/result-revisions/${revisionId}/decision`,
+        body,
+        { headers },
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.gameResultRevisions(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+    },
+  });
+}
+
+// 상대팀 라인업을 재작성(초안화)하라고 요청한다 — 대상은 항상 "내가 아닌 쪽" 사이드이며,
+// 그 사이드를 조회하는 API가 없어 내용은 볼 수 없고 사유만 남길 수 있는 blind 액션이다
+// (lineup-client.tsx의 안내 문구 참고). 성공해도 내 사이드 쿼리는 바뀌지 않으므로 invalidate하지 않는다.
+export function useV1RequestTeamMatchLineupChange(teamMatchId: string) {
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; expectedVersion: number; reason: string }) =>
+      v1Post<V1TeamMatchLineupChangeRequestResult>(
+        `/team-matches/${teamMatchId}/lineup/change-request`,
+        { expectedVersion: vars.expectedVersion, reason: vars.reason },
+        { headers: { 'Idempotency-Key': vars.idempotencyKey } },
+      ),
   });
 }
 
@@ -3365,5 +3508,105 @@ export function useV1DeleteAdminContentAsset() {
   return useMutation({
     mutationFn: (assetId: string) =>
       v1Delete<{ assetId: string; deleted: true }>(`/admin/content-assets/${assetId}`),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 대회 운영(tournament-ops) 셸/보드/스태프 (Task 19 — 백엔드는 Task 18)
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /tournament-ops/tournaments/:tournamentId/operations — 운영 보드 한 페이지.
+ * `refetchInterval`로 상단(현재 커서) 페이지를 주기적으로 재조회해 점진 업데이트를
+ * 지원한다 — `placeholderData: keepPreviousData`가 재조회 중 목록이 빈 화면으로
+ * 깜빡이는 것을 막아, 필터 입력 등 화면의 로컬 상태가 유지된다.
+ */
+export function useV1TournamentOperationsBoard(
+  tournamentId: string,
+  filters?: V1TournamentOperationsBoardFilters,
+  options?: QueryOptions,
+) {
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
+    queryFn: () =>
+      v1Get<V1TournamentOperationsBoardPage>(
+        `/tournament-ops/tournaments/${tournamentId}/operations`,
+        filters,
+      ),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+    placeholderData: keepPreviousData,
+    refetchInterval: 15_000,
+  });
+}
+
+/** "더 보기" 등 일회성 다음 페이지 조회용 — 폴링 대상이 아닌 과거 페이지는 훅 없이 직접 fetchQuery로 가져온다. */
+export function fetchV1TournamentOperationsBoardPage(
+  queryClient: QueryClient,
+  tournamentId: string,
+  filters: V1TournamentOperationsBoardFilters,
+) {
+  return queryClient.fetchQuery({
+    queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
+    queryFn: () =>
+      v1Get<V1TournamentOperationsBoardPage>(
+        `/tournament-ops/tournaments/${tournamentId}/operations`,
+        filters,
+      ),
+  });
+}
+
+/**
+ * GET /tournament-ops/tournaments/:tournamentId/staff — 대회 전체 스태프 배정 목록.
+ * `read` 액션은 platform_ops/tournament_director/support_readonly에게만 허용된다
+ * (field_operator는 항상 field/fixture 스코프가 있어 대회 전역 리소스로는 403) — 이 응답이
+ * 성공하면 셸 게이트가 여기서 내 역할을 함께 도출한다.
+ */
+export function useV1TournamentStaffAssignments(tournamentId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsStaff(tournamentId),
+    queryFn: () => v1Get<V1TournamentStaffListResponse>(`/tournament-ops/tournaments/${tournamentId}/staff`),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+  });
+}
+
+/** GET /tournament-ops/tournaments/:tournamentId/fields — 필터 드롭다운용 필드/코트 목록. */
+export function useV1TournamentFields(tournamentId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsFields(tournamentId),
+    queryFn: () => v1Get<V1TournamentFieldListResponse>(`/tournament-ops/tournaments/${tournamentId}/fields`),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+  });
+}
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff — 스태프 배정(관리자/대회 디렉터). */
+export function useV1GrantTournamentStaff(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1GrantTournamentStaffPayload) =>
+      v1Post<V1TournamentStaffAssignment>(`/tournament-ops/tournaments/${tournamentId}/staff`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsStaff(tournamentId) });
+    },
+  });
+}
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke — 스태프 배정 해제. */
+export function useV1RevokeTournamentStaff(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      assignmentId,
+      payload,
+    }: {
+      assignmentId: string;
+      payload: V1RevokeTournamentStaffPayload;
+    }) =>
+      v1Post<V1TournamentStaffAssignment>(
+        `/tournament-ops/tournaments/${tournamentId}/staff/${assignmentId}/revoke`,
+        payload,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsStaff(tournamentId) });
+    },
   });
 }

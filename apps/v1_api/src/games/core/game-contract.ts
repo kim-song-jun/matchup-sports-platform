@@ -54,6 +54,26 @@ const activeGameStates = new Set<V1GameState>([
   V1GameState.LIVE,
   V1GameState.PAUSED,
 ]);
+// TEAM_RESULT_SUBMISSION is legitimately called twice in the correction loop:
+// (1) the FIRST submission, which must move the Game out of an active state
+// and into ENDED — that transition is what "ending the match" means, so it
+// is restricted to activeGameStates exactly like before; and (2) a
+// RESUBMISSION of a corrected revision, which is only reachable after the
+// opponent has already put the first, already-ENDED game's revision into
+// CHANGE_REQUESTED (createResultRevision refuses to mint a new DRAFT unless
+// the latest revision for the game is CHANGE_REQUESTED — see its
+// RESULT_REVISION_ALREADY_EXISTS guard). In case (2) the Game is already
+// ENDED and stays ENDED; only the revision row's own state machine
+// (DRAFT -> SUBMITTED) and the Game's version actually change. Allowing
+// from === ENDED here therefore does not let anyone submit a "first" result
+// against an ended game out of thin air — a submit call always needs a real
+// revisionId already sitting in DRAFT, and a DRAFT can only exist post-ENDED
+// as the product of a real change-request. CANCELLED is deliberately left
+// out: cancellation is terminal and must never accept a result submission.
+const teamResultSubmittableStates = new Set<V1GameState>([
+  ...activeGameStates,
+  V1GameState.ENDED,
+]);
 const actorRoles = new Set([
   'team_manager',
   'team_owner',
@@ -109,7 +129,7 @@ export function assertGameLifecycleTransition(input: GameLifecycleTransitionInpu
     allowed =
       input.sourceType === V1GameSourceType.TEAM_MATCH &&
       input.to === V1GameState.ENDED &&
-      activeGameStates.has(input.from);
+      teamResultSubmittableStates.has(input.from);
   } else {
     allowed =
       input.to === V1GameState.CANCELLED &&

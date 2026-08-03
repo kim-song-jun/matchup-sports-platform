@@ -27,11 +27,11 @@ raw roster identity fields.
 | `POST` | `/api/v1/games/:gameId/events` | authenticated event actor with takeover token | `AppendGameEventDto`; appends one sequenced event. Terminal games reject mutation with `409 TERMINAL_GAME_IMMUTABLE`. |
 | `POST` | `/api/v1/games/:gameId/events/:eventId/reverse` | authenticated reverse actor with takeover token | `ReverseGameEventDto`; appends one `CORRECTION` event that references the original; it does not mutate or delete it. |
 | `GET` | `/api/v1/games/:gameId/lineups` | authenticated; source-scoped reader | Returns lineup revisions in side/revision order. |
-| `PUT` | `/api/v1/games/:gameId/lineups/:sideId` | authenticated lineup actor | `SaveGameLineupDto`; creates a new lineup revision and participant snapshots. |
-| `POST` | `/api/v1/games/:gameId/lineups/:lineupId/submit` | authenticated lineup actor | `SubmitGameLineupDto`; only a `DRAFT` lineup submits; tournament submission additionally needs takeover authority. |
+| `PUT` | `/api/v1/games/:gameId/lineups/:sideId` | authenticated lineup actor | `SaveGameLineupDto`; creates a new lineup revision and participant snapshots. Team-match use is `409 TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` (Task 14) — team matches manage lineups only through `/api/v1/team-matches/:teamMatchId/lineup`, which enforces roster size, duplicate jersey, single-goalkeeper, membership/attendance eligibility, and deadline invariants this generic route does not. |
+| `POST` | `/api/v1/games/:gameId/lineups/:lineupId/submit` | authenticated lineup actor | `SubmitGameLineupDto`; only a `DRAFT` lineup submits; tournament submission additionally needs takeover authority. Team-match use is `409 TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` (Task 14) for the same reason as the save route above. |
 | `GET` | `/api/v1/games/:gameId/result-revisions` | authenticated; source-scoped reader | Returns newest-first revision history with result participants. |
-| `POST` | `/api/v1/games/:gameId/result-revisions` | authenticated team result submitter | `CreateGameResultRevisionDto`; team-match only. Tournament sources return `409 TOURNAMENT_RESULT_DERIVED_ONLY` before creating a draft. |
-| `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/submit` | authenticated team result submitter | `SubmitGameResultRevisionDto`; team-match only. It atomically validates/submits the revision and moves `SCHEDULED`, `LIVE`, or `PAUSED` to `ENDED`. |
+| `POST` | `/api/v1/games/:gameId/result-revisions` | authenticated **host** team owner/manager only (Task 16) | `CreateGameResultRevisionDto`; team-match only. Tournament sources return `409 TOURNAMENT_RESULT_DERIVED_ONLY` before creating a draft. The opposing team's manager/owner gets `403 PERMISSION_DENIED` — their sole authority over the result is the decision route below, never drafting or submitting it. A team match whose status is neither `matched` nor `completed`, or that has no approved applicant team, returns `409 TEAM_MATCH_NOT_MATCHED` (Task 16) — its Game row exists from creation with a placeholder, teamId-less AWAY side, so there is no real opponent to draft a result against yet. `completed` is accepted alongside `matched` specifically so the correction loop stays reachable: the first submit below atomically completes the `V1TeamMatch`, and a later opponent change-request must still let the host draft a superseding revision against that now-`completed` match. |
+| `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/submit` | authenticated **host** team owner/manager only (Task 16) | `SubmitGameResultRevisionDto`; team-match only. Same `409 TEAM_MATCH_NOT_MATCHED` precondition as the draft route above. It atomically validates/submits the revision and moves `SCHEDULED`, `LIVE`, or `PAUSED` to `ENDED`; the same transaction also completes the linked `V1TeamMatch` (`status=completed`, `completedAt`) — idempotently, via a `status != completed` guard so a correction-loop resubmit is a no-op — and, on the first real transition only, writes a matching `V1StatusChangeLog` row (`team_match`, `matched → completed`) so review eligibility keeps working and the status history stays complete now that the old `POST /api/v1/team-matches/:teamMatchId/complete` shortcut is removed (Task 16 — that route bypassed all result validation and opponent approval and never was part of this frozen contract). |
 | `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/decision` | authenticated opposing team result decider | `DecideGameResultRevisionDto`; `approve` or `change_request` for a team-match revision. |
 
 ### Mutation, version, and history rules
@@ -55,6 +55,16 @@ persisted Game sides/participants and the pinned active competition configuratio
 scorer policy is required; the ordinary team-match policy permits a missing scorer only with its
 explicit warning marker. No fixture or game source may be created without an active immutable
 competition-config pin: `409 COMPETITION_CONFIG_REQUIRED` leaves no partial source/Game rows.
+
+**Task 17 note:** `POST /api/v1/games/:gameId/result-revisions` derives its score/goal/card cross-check
+purely from `V1GameEvent` rows (see the invariant paragraph above). `event_append`/`event_reverse`
+is authorized only for tournament staff (never for a team-match host/opponent), so a `TEAM_MATCH`
+game can never accumulate events. In the current contract this means any `score` other than
+`{home:0, away:0}` (or any nonzero `actualParticipants[].goals|cards`) fails
+`422 SCORE_EVENT_MISMATCH` for every team match, with no event-capture path to satisfy it. Task 16's
+own integration suite only ever submits `{home:0, away:0}`, so this was never exercised end to end.
+Closing this gap is a deliberate scope decision (team-match event-append allowance, or an
+invariant carve-out for `TEAM_MATCH` sources with zero events) that a future task must make.
 
 This is a real v1 persistence contract, not a mock-success flow. Fixture data is deterministic
 test data only and must not be rendered as verified player, score, or standings evidence.

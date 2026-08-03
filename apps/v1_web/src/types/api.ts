@@ -801,6 +801,194 @@ export type V1TeamMembersPage = {
   };
 };
 
+// ── Team schedules (Task 12 backend / Task 13 frontend) ──────────────────────
+// 서버 shipped Prisma enum이 canonical (docs/api/domains/team-schedules.md 참조) —
+// 문서의 예전 프로즈(attending|not_attending|undecided 등)가 아니라 아래 값이 실제 계약이다.
+
+export type V1ScheduleType = 'MATCH' | 'TRAINING' | 'EVENT';
+export type V1ScheduleVisibility = 'TEAM' | 'MEMBERS' | 'PUBLIC';
+export type V1ScheduleState = 'SCHEDULED' | 'CANCELLED' | 'COMPLETED';
+/** WAITLISTED는 서버가 용량 초과 시에만 부여하는 파생 상태 — 클라이언트가 직접 설정할 수 없다. */
+export type V1AttendanceStatus = 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED';
+export type V1ClientSettableAttendanceStatus = 'GOING' | 'MAYBE' | 'NOT_GOING';
+export type V1GuestRecruitmentVisibility = 'MEMBERS' | 'PUBLIC';
+/** FILLED은 approvedCount === slots일 때 서버가 파생하는 상태 — 클라이언트가 설정할 수 없다. */
+export type V1GuestRecruitmentState = 'OPEN' | 'CLOSED' | 'FILLED';
+export type V1GuestApplicationState = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+
+/** GET .../schedules 목록 항목, GET .../schedules/:id 상세의 공통 베이스 (TeamSchedulesService.toSummary) */
+export type V1TeamScheduleSummary = {
+  id: string;
+  title: string;
+  type: V1ScheduleType;
+  startAt: string;
+  endAt: string;
+  timezone: string;
+  capacity: number | null;
+  rsvpDeadlineAt: string | null;
+  visibility: V1ScheduleVisibility;
+  state: V1ScheduleState;
+  version: number;
+  teamMatchId: string | null;
+  goingCount: number;
+  waitlistedCount: number;
+};
+
+export type V1TeamSchedulesPage = {
+  items: V1TeamScheduleSummary[];
+  nextCursor: string | null;
+};
+
+export type V1ScheduleGuestRecruitmentView = {
+  id: string;
+  scheduleId: string;
+  slots: number;
+  closesAt: string;
+  note: string | null;
+  visibility: V1GuestRecruitmentVisibility;
+  state: V1GuestRecruitmentState;
+  version: number;
+  applicantCount: number;
+  approvedCount: number;
+};
+
+/** GET .../schedules/:scheduleId 상세 응답 (TeamSchedulesService.detail) */
+export type V1TeamScheduleDetail = V1TeamScheduleSummary & {
+  cancelReason: string | null;
+  cancelledAt: string | null;
+  guestRecruitment: V1ScheduleGuestRecruitmentView | null;
+  myAttendance: { status: V1AttendanceStatus; version: number; waitlistPosition: number | null } | null;
+};
+
+/** POST/PATCH .../schedules[/:id] 응답 (TeamSchedulesService.toDetailJson + replayed) */
+export type V1TeamScheduleMutationResult = {
+  id: string;
+  teamId: string;
+  title: string;
+  type: V1ScheduleType;
+  startAt: string;
+  endAt: string;
+  timezone: string;
+  capacity: number | null;
+  rsvpDeadlineAt: string | null;
+  visibility: V1ScheduleVisibility;
+  state: V1ScheduleState;
+  version: number;
+  teamMatchId: string | null;
+  replayed: boolean;
+};
+
+export type V1CreateScheduleDto = {
+  title: string;
+  type: V1ScheduleType;
+  startAt: string;
+  endAt: string;
+  timezone: string;
+  capacity?: number;
+  rsvpDeadlineAt?: string;
+  visibility?: V1ScheduleVisibility;
+  teamMatchId?: string;
+};
+
+export type V1UpdateScheduleDto = {
+  expectedVersion: number;
+  title?: string;
+  startAt?: string;
+  endAt?: string;
+  capacity?: number;
+  /** 명시적으로 null이면 서버가 SQL NULL로 지운다 — omit이면 기존 값 유지 */
+  rsvpDeadlineAt?: string | null;
+  visibility?: V1ScheduleVisibility;
+};
+
+export type V1CancelScheduleDto = {
+  expectedVersion: number;
+  cancelReason: string;
+};
+
+export type V1CancelScheduleResult = {
+  state: 'cancelled';
+  version: number;
+  cancelledAt: string;
+  replayed: boolean;
+};
+
+export type V1CompleteScheduleResult = {
+  state: 'completed';
+  version: number;
+  completedAt: string;
+  replayed: boolean;
+};
+
+export type V1TriggerScheduleReminderDto = {
+  kind: 'rsvp_deadline' | 'guest_recruitment_close';
+};
+
+export type V1TriggerScheduleReminderResult = {
+  jobId: string;
+  kind: 'rsvp_deadline' | 'guest_recruitment_close';
+  status: string;
+  replayed: boolean;
+};
+
+export type V1SetScheduleAttendanceDto = {
+  status: V1ClientSettableAttendanceStatus;
+  expectedVersion: number;
+};
+
+export type V1SetScheduleAttendanceResult = {
+  status: V1AttendanceStatus;
+  version: number;
+  waitlistPosition: number | null;
+  counts: { going: number; maybe: number; notGoing: number; waitlisted: number };
+  replayed: boolean;
+};
+
+export type V1CreateGuestRecruitmentDto = {
+  slots: number;
+  closesAt: string;
+  note?: string;
+  visibility?: V1GuestRecruitmentVisibility;
+};
+
+export type V1UpdateGuestRecruitmentDto = {
+  expectedVersion: number;
+  slots?: number;
+  closesAt?: string;
+  note?: string;
+  visibility?: V1GuestRecruitmentVisibility;
+  state?: 'open' | 'closed';
+};
+
+export type V1GuestRecruitmentMutationResult = V1ScheduleGuestRecruitmentView & { replayed: boolean };
+
+export type V1CreateGuestApplicationDto = {
+  displayName: string;
+  note?: string;
+};
+
+export type V1GuestApplicationResult = {
+  applicationId: string;
+  state: V1GuestApplicationState;
+  displayName: string;
+  note: string | null;
+  alreadyApplied: boolean;
+  replayed: boolean;
+};
+
+/** GET /me/schedule 항목 — TeamSchedulesService.mySchedule */
+export type V1MyScheduleItem = V1TeamScheduleSummary & {
+  teamId: string;
+  teamName: string | null;
+  myRole: string | null;
+  myAttendanceStatus: V1AttendanceStatus | null;
+};
+
+export type V1MySchedulePage = {
+  items: V1MyScheduleItem[];
+  nextCursor: string | null;
+};
+
 export type V1TeamMatch = V1Match & {
   teamMatchId?: string;
   sport?: { sportId: string; name: string };

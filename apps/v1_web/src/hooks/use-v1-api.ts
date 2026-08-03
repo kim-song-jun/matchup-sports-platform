@@ -4,6 +4,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
+import { randomUuid } from '@/lib/uuid';
 import type {
   ApiEnvelope,
   ApiErrorBody,
@@ -134,6 +135,24 @@ import type {
   V1TeamMutationPayload,
   V1TeamMutationResult,
   V1TeamUpdatePayload,
+  V1TeamSchedulesPage,
+  V1TeamScheduleDetail,
+  V1TeamScheduleMutationResult,
+  V1CreateScheduleDto,
+  V1UpdateScheduleDto,
+  V1CancelScheduleDto,
+  V1CancelScheduleResult,
+  V1CompleteScheduleResult,
+  V1TriggerScheduleReminderDto,
+  V1TriggerScheduleReminderResult,
+  V1SetScheduleAttendanceDto,
+  V1SetScheduleAttendanceResult,
+  V1CreateGuestRecruitmentDto,
+  V1UpdateGuestRecruitmentDto,
+  V1GuestRecruitmentMutationResult,
+  V1CreateGuestApplicationDto,
+  V1GuestApplicationResult,
+  V1MySchedulePage,
   V1UploadImagesResult,
   V1TournamentListPage,
   V1TournamentDetail,
@@ -1002,6 +1021,157 @@ export function useV1LeaveTeam(teamId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
     },
+  });
+}
+
+// ── Team schedules (Task 12 backend / Task 13 frontend) ──────────────────────
+// 프론트엔드에서 Idempotency-Key 를 보내는 첫 도메인 — 모든 스케줄 mutation은 얼어붙은
+// REST 계약(글로벌 계약 문서)에 따라 매 호출마다 새 키가 필요하다. 자동 재시도(react-query
+// mutation retry)를 켜지 않는 한 "한 번의 mutate() 호출 = 한 번의 사용자 의도 = 새 키"가
+// 안전한 기본값이다.
+function idempotencyInit(): RequestInit {
+  return { headers: { 'Idempotency-Key': randomUuid() } };
+}
+
+export function useV1TeamSchedules(teamId: string, filters?: ListFilters, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.teamSchedules(teamId, filters),
+    queryFn: () => v1Get<V1TeamSchedulesPage>(`/teams/${teamId}/schedules`, filters),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+    // 빠른 필터 전환(종류/상태 칩)에서 화면이 매번 깜빡이지 않도록 이전 페이지 데이터를
+    // 유지한 채 새 쿼리를 백그라운드에서 가져온다.
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useV1TeamSchedule(teamId: string, scheduleId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.teamSchedule(teamId, scheduleId),
+    queryFn: () => v1Get<V1TeamScheduleDetail>(`/teams/${teamId}/schedules/${scheduleId}`),
+    enabled: Boolean(teamId) && Boolean(scheduleId) && (options?.enabled ?? true),
+  });
+}
+
+export function useV1CreateTeamSchedule(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateScheduleDto) =>
+      v1Post<V1TeamScheduleMutationResult>(`/teams/${teamId}/schedules`, body, idempotencyInit()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+    },
+  });
+}
+
+export function useV1UpdateTeamSchedule(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateScheduleDto) =>
+      v1Patch<V1TeamScheduleMutationResult>(`/teams/${teamId}/schedules/${scheduleId}`, body, idempotencyInit()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+    },
+  });
+}
+
+export function useV1CancelTeamSchedule(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CancelScheduleDto) =>
+      v1Post<V1CancelScheduleResult>(`/teams/${teamId}/schedules/${scheduleId}/cancel`, body, idempotencyInit()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+    },
+  });
+}
+
+export function useV1CompleteTeamSchedule(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { expectedVersion: number }) =>
+      v1Post<V1CompleteScheduleResult>(`/teams/${teamId}/schedules/${scheduleId}/complete`, body, idempotencyInit()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+    },
+  });
+}
+
+export function useV1TriggerScheduleReminder(teamId: string, scheduleId: string) {
+  return useMutation({
+    mutationFn: (body: V1TriggerScheduleReminderDto) =>
+      v1Post<V1TriggerScheduleReminderResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/reminders`,
+        body,
+        idempotencyInit(),
+      ),
+  });
+}
+
+export function useV1SetMyScheduleAttendance(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1SetScheduleAttendanceDto) =>
+      v1Put<V1SetScheduleAttendanceResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/attendance/me`,
+        body,
+        idempotencyInit(),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+    },
+  });
+}
+
+export function useV1CreateGuestRecruitment(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateGuestRecruitmentDto) =>
+      v1Post<V1GuestRecruitmentMutationResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/guest-recruitment`,
+        body,
+        idempotencyInit(),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) }),
+  });
+}
+
+export function useV1UpdateGuestRecruitment(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateGuestRecruitmentDto) =>
+      v1Patch<V1GuestRecruitmentMutationResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/guest-recruitment`,
+        body,
+        idempotencyInit(),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) }),
+  });
+}
+
+export function useV1ApplyGuestRecruitment(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateGuestApplicationDto) =>
+      v1Post<V1GuestApplicationResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/guest-recruitment/applications`,
+        body,
+        idempotencyInit(),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) }),
+  });
+}
+
+export function useV1MySchedule(filters?: ListFilters) {
+  return useQuery({
+    queryKey: v1Keys.mySchedule(filters),
+    queryFn: () => v1Get<V1MySchedulePage>('/me/schedule', filters),
   });
 }
 

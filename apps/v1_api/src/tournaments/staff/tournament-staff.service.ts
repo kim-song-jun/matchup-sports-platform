@@ -53,6 +53,14 @@ export type RevokeTournamentStaffInput = {
   readonly assignmentId: string;
   readonly expectedVersion: number;
   readonly audit: TournamentStaffAuditContext;
+  /**
+   * Task 18 review P1-3: optional free-text revoke reason, persisted onto the SAME
+   * `tournament.staff.revoke` audit row this method writes inside its own transaction (via
+   * `writeAudit()`'s `reason` parameter) -- NOT as a separate follow-up write from an out-of-lane
+   * caller. See `writeAudit()`'s doc comment for why a follow-up write from a different
+   * transaction cannot be atomic with the revocation itself.
+   */
+  readonly reason?: string;
 };
 
 export type TournamentStaffAssignmentResult = {
@@ -278,6 +286,7 @@ export class TournamentStaffService {
           assignment: after,
           before: this.auditSnapshot(before),
           after: this.auditSnapshot(after),
+          reason: normalized.reason,
         });
         return this.result(after);
       },
@@ -476,6 +485,29 @@ export class TournamentStaffService {
     });
   }
 
+  /**
+   * Task 18 review P1-3: `mutation.reason` (when supplied) is written onto the SAME
+   * `V1OperationAudit` row this method creates, inside the SAME `tx` the caller's own
+   * revoke/grant/bootstrap mutation just committed to -- not as a separate follow-up
+   * `v1OperationAudit.create()` from a different transaction after this one has already
+   * committed.
+   *
+   * The reason travels in the shared `OperationAuditWriterService.create()` envelope, which now
+   * carries an optional `reason`. An earlier attempt at this fix instead created the row and then
+   * patched the reason on with `tx.v1OperationAudit.update()`; that can never work, because the
+   * `v1_operation_audits_append_only` trigger rejects EVERY update against this table with SQLSTATE
+   * 55000 -- so the whole transaction, revoke included, rolled back on any revoke that carried a
+   * reason. Writing it in the create keeps the atomicity guarantee without fighting the trigger:
+   * either the audit row lands complete alongside the revoke, or nothing does.
+   *
+   * This is the fix for the pre-fix behavior where
+   * `TournamentOperationsStaffService.revoke()` (a different lane's orchestration,
+   * apps/v1_api/src/tournament-operations/staff/) called `revokeStaff()` here to completion (this
+   * transaction already committed) and only THEN, in a wholly separate `prisma.v1OperationAudit.
+   * create()` call outside any transaction, tried to persist the reason -- a failure in that
+   * second, independent write left the assignment revoked with no reason recorded at all, with no
+   * way to retry just the reason (the revoke itself was already consumed).
+   */
   private async writeAudit(
     tx: StaffTransaction,
     principal: TournamentStaffPrincipal,
@@ -486,6 +518,7 @@ export class TournamentStaffService {
       readonly assignment: StaffAssignmentSnapshot;
       readonly before: ReturnType<TournamentStaffService['auditSnapshot']> | null;
       readonly after: ReturnType<TournamentStaffService['auditSnapshot']>;
+      readonly reason?: string;
     },
   ): Promise<void> {
     const auditClient: OperationAuditCreateClient = {
@@ -493,6 +526,9 @@ export class TournamentStaffService {
         create: ({ data }) => tx.v1OperationAudit.create({ data, select: { id: true } }),
       },
     };
+    // P1-3: the reason travels in the SAME create as the mutation it explains. It used to be
+    // patched on with a follow-up UPDATE, which `v1_operation_audits_append_only` rejects outright
+    // (SQLSTATE 55000) -- so the revocation could never be recorded with its reason at all.
     await this.auditWriter.create(auditClient, {
       actor: this.auditActor(principal),
       requestId: audit.requestId,
@@ -505,6 +541,7 @@ export class TournamentStaffService {
       after: mutation.after,
       tournamentId: mutation.assignment.tournamentId,
       fieldId: mutation.assignment.fieldId,
+      reason: mutation.reason ?? null,
     });
   }
 
@@ -599,6 +636,7 @@ export class TournamentStaffService {
       expectedVersion: input.expectedVersion,
       audit: this.auditContext(input.audit),
       occurredAt: this.now(),
+      reason: input.reason,
     };
   }
 

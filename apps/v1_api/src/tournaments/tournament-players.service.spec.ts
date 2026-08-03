@@ -156,7 +156,9 @@ describe('TournamentPlayersService', () => {
       v1TournamentRegistration: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentPlayer: {
         findMany: jest.fn(),
-        findFirst: jest.fn(),
+        // Prisma 는 못 찾으면 null 을 준다. 기본값을 undefined 로 두면 "찾았다" 로 읽히는
+        // 코드가 mock 에서만 다르게 동작한다.
+        findFirst: jest.fn().mockResolvedValue(null),
         // 재추가 시 기존 row(제외된 것 포함)를 확인하는 경로. 기본은 "처음 넣는 선수".
         findUnique: jest.fn().mockResolvedValue(null),
         findUniqueOrThrow: jest.fn(),
@@ -448,7 +450,9 @@ describe('TournamentPlayersService', () => {
 
   it('addPlayer: at maxPlayers cap → 409 ROSTER_FULL', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ maxPlayers: 3 }));
     prisma.v1TournamentPlayer.count.mockResolvedValue(3); // 이미 maxPlayers 도달
 

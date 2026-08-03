@@ -225,12 +225,6 @@ export class TournamentPlayersService {
       const activeCount = await tx.v1TournamentPlayer.count({
         where: { registrationId, removedAt: null },
       });
-      if (activeCount >= current.tournament.maxPlayers) {
-        throw new ConflictException({
-          code: 'ROSTER_FULL',
-          message: `최대 인원(${current.tournament.maxPlayers}명)을 초과할 수 없어요.`,
-        });
-      }
 
       // 멤버십 행을 먼저 잠근다. 안 잠그면 "탈퇴 트랜잭션이 멤버십을 끄고 로스터를 정리 →
       // 그 사이 추가 트랜잭션이 아직 활성으로 읽은 멤버십을 근거로 선수를 넣고 커밋" 순서가
@@ -258,54 +252,47 @@ export class TournamentPlayersService {
           },
         },
       });
-      if (!teamMembership) {
-        throw new BadRequestException({
-          code: 'USER_NOT_TEAM_MEMBER',
-          message: '해당 팀의 활성 멤버가 아니에요.',
-        });
-      }
-      const memberRealName = teamMembership.user.profile?.realName?.trim();
-      const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
-      const memberGender = normalizeGender(teamMembership.user.profile?.gender);
-      const memberPhone = teamMembership.user.phone?.trim();
-      const requiresGender = current.tournament.genderCategory === 'mixed';
-      if (!memberRealName || !memberBirthDate || !memberPhone || (requiresGender && !memberGender)) {
-        throw new BadRequestException({
-          code: 'PLAYER_REQUIRED_PROFILE_MISSING',
-          message: requiresGender
-            ? '실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.'
-            : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
-        });
-      }
-      // 남성부·여성부는 성별이 맞아야 한다. 지금까지는 mixed 일 때 "성별이 있는지" 만 보고
-      // male/female 대회에서는 아무 검사도 하지 않아, 여성부 대회에 남성을 넣을 수 있었다.
-      const requiredGender = genderRequiredByCategory(current.tournament.genderCategory);
-      if (requiredGender && memberGender !== requiredGender) {
-        throw new BadRequestException({
-          code: 'PLAYER_GENDER_MISMATCH',
-          message:
-            requiredGender === 'male'
-              ? '남성부 대회에는 남성 팀원만 등록할 수 있어요.'
-              : '여성부 대회에는 여성 팀원만 등록할 수 있어요.',
-        });
-      }
-      // 번호가 "적혀 있는지"만 보면 대회 명단이 약속하는 본인확인이 성립하지 않는다 —
-      // 실제로 그 번호의 소유자임을 확인한(phoneVerifiedAt) 팀원만 출전 명단에 올린다.
-      if (isPhoneVerificationEnforced() && !teamMembership.user.phoneVerifiedAt) {
-        throw new BadRequestException({
-          code: 'PLAYER_PHONE_NOT_VERIFIED',
-          message: '휴대폰 본인인증을 마친 팀원만 선수로 등록할 수 있어요.',
-        });
-      }
       const existingActive = await tx.v1TournamentPlayer.findFirst({
         where: { registrationId, userId: dto.userId, removedAt: null },
       });
-      if (existingActive) {
-        throw new ConflictException({
-          code: 'PLAYER_ALREADY_REGISTERED',
-          message: '이미 명단에 등록된 선수예요.',
-        });
+
+      // 후보 목록과 **같은 함수**로 판정한다. 조건이 여기와 목록에 따로 적혀 있던 탓에
+      // 정원·취소 신청·대회 상태·성별 구분이 한쪽에만 있는 채로 나간 적이 있다.
+      const block = evaluateRosterCandidate({
+        alreadyOnRoster: existingActive !== null,
+        // 잠금·마감과 달리 이 둘은 어드민도 못 넘긴다. lockAndLoadMutableRegistration 이
+        // 이미 같은 판정으로 던지므로 여기까지 오면 항상 true 지만, 조건 목록을 한 곳에
+        // 모아 두기 위해 함께 넘긴다.
+        tournamentMutable: isRosterMutableTournamentStatus(current.tournament.status),
+        registrationMutable:
+          current.registration.status !== 'cancel_requested' &&
+          current.registration.status !== 'cancelled',
+        rosterCount: activeCount,
+        maxPlayers: current.tournament.maxPlayers,
+        member: teamMembership
+          ? {
+              realName: teamMembership.user.profile?.realName?.trim() ?? null,
+              birthDate: teamMembership.user.profile?.birthDate?.trim() ?? null,
+              phone: teamMembership.user.phone?.trim() ?? null,
+              gender: normalizeGender(teamMembership.user.profile?.gender),
+              phoneVerifiedAt: teamMembership.user.phoneVerifiedAt,
+            }
+          : null,
+        genderCategory: current.tournament.genderCategory,
+        phoneEnforced: isPhoneVerificationEnforced(),
+      });
+      if (block) {
+        const payload = { code: block.code, message: block.message };
+        throw block.conflict
+          ? new ConflictException(payload)
+          : new BadRequestException(payload);
       }
+
+      // block 이 null 이면 위 판정이 멤버십과 프로필을 모두 통과시킨 것이다.
+      const member = teamMembership!.user;
+      const memberRealName = member.profile!.realName!.trim();
+      const memberBirthDate = member.profile!.birthDate!.trim();
+      const memberGender = normalizeGender(member.profile?.gender);
 
       // 제외했다 다시 넣으면 같은 row 가 되살아난다. 그 자리에서 자격을 needs_review 로
       // 되돌리고 메모를 지우면, 팀이 "제외 → 재추가" 두 번으로 어드민 심사를 무효화할 수
@@ -651,33 +638,26 @@ export class TournamentPlayersService {
       members: memberships
         .map(({ role, user: member }) => {
           const realName = member.profile?.realName?.trim() ?? null;
-          const birthDate = member.profile?.birthDate?.trim() ?? null;
-          const gender = normalizeGender(member.profile?.gender);
-          const phone = member.phone?.trim() ?? null;
 
-          // addPlayer 가 강제하는 **모든** 조건을 여기서도 본다 — 하나라도 빠지면 고를 수는
-          // 있는데 서버가 거절하는 폼이 된다. 다만 순서는 addPlayer 와 다르게 "그 사람에게
-          // 가장 구체적인 사유" 를 먼저 둔다(만석이면서 이미 명단에 있으면 '이미 명단'). 어차피
-          // 전부 선택 불가로 그려지므로 어느 사유를 보여주든 결과는 같고, 운영자에게는
-          // 개인 사유가 먼저 보이는 편이 조치하기 쉽다.
-          let ineligibleReason: string | null = null;
-          if (onRoster.has(member.id)) ineligibleReason = '이미 명단에 있어요';
-          else if (tournamentClosed) {
-            ineligibleReason = '종료되었거나 취소된 대회예요';
-          } else if (registrationCancelled) {
-            ineligibleReason = '취소된 신청이라 명단을 수정할 수 없어요';
-          } else if (rosterFull) {
-            ineligibleReason = `정원이 찼어요 (${activePlayers.length}/${maxPlayers}명)`;
-          } else if (!realName || !birthDate || !phone || (requiresGender && !gender)) {
-            ineligibleReason = requiresGender
-              ? '실명·생년월일·휴대폰·성별이 모두 필요해요'
-              : '실명·생년월일·휴대폰이 모두 필요해요';
-          } else if (requiredGender && gender !== requiredGender) {
-            ineligibleReason =
-              requiredGender === 'male' ? '남성부 대회예요' : '여성부 대회예요';
-          } else if (phoneEnforced && !member.phoneVerifiedAt) {
-            ineligibleReason = '휴대폰 본인인증이 필요해요';
-          }
+          // addPlayer 와 **같은 함수**로 판정한다 — 조건이 갈라지면 고를 수는 있는데 서버가
+          // 거절하는 폼이 되고, 그게 이 기능이 없애려던 상태다.
+          const block = evaluateRosterCandidate({
+            alreadyOnRoster: onRoster.has(member.id),
+            tournamentMutable: !tournamentClosed,
+            registrationMutable: !registrationCancelled,
+            rosterCount: activePlayers.length,
+            maxPlayers,
+            member: {
+              realName,
+              birthDate: member.profile?.birthDate?.trim() ?? null,
+              phone: member.phone?.trim() ?? null,
+              gender: normalizeGender(member.profile?.gender),
+              phoneVerifiedAt: member.phoneVerifiedAt,
+            },
+            genderCategory: registration.tournament.genderCategory,
+            phoneEnforced,
+          });
+          const ineligibleReason = block?.listReason ?? null;
 
           // 생년월일·성별은 판정에만 쓰고 응답에는 싣지 않는다 — 화면이 안 쓰는 PII 를
           // 명단 밖 팀원까지 포함해 내보낼 이유가 없다.
@@ -860,6 +840,128 @@ export class TournamentPlayersService {
 
 function normalizeGender(value: string | null | undefined): 'male' | 'female' | null {
   return value === 'male' || value === 'female' ? value : null;
+}
+
+/** 명단 후보의 프로필 사실. 멤버십이 없으면 null 을 넘긴다. */
+type RosterCandidateMember = {
+  realName: string | null;
+  birthDate: string | null;
+  phone: string | null;
+  gender: 'male' | 'female' | null;
+  phoneVerifiedAt: Date | null;
+};
+
+type RosterCandidateBlock = {
+  /** 서버 에러 코드. add 경로가 그대로 던진다. */
+  code: string;
+  /** 소비자용 에러 메시지. */
+  message: string;
+  /** 후보 드롭다운에 붙는 짧은 사유. */
+  listReason: string;
+  /** 409 인지 400 인지. */
+  conflict: boolean;
+};
+
+/**
+ * 이 사람을 지금 이 명단에 넣을 수 있는가. **추가 경로와 후보 목록이 이 함수 하나만 본다.**
+ *
+ * 원래는 같은 조건이 두 곳에 따로 적혀 있었고, 그래서 정원·취소 신청·대회 상태·성별 구분이
+ * 한쪽에만 있는 채로 나갔다 — 화면은 "선택 가능"이라 하고 서버는 거절하는, 이 기능이 없애려던
+ * 바로 그 상태다. 조건을 추가할 곳을 하나로 만들어 다시 갈라지지 않게 한다.
+ *
+ * 순서는 "그 사람에게 가장 구체적인 사유"부터다. 이미 명단에 있는 사람에게 정원이 찼다고
+ * 말해 봐야 조치할 수 없다.
+ */
+function evaluateRosterCandidate(input: {
+  alreadyOnRoster: boolean;
+  tournamentMutable: boolean;
+  registrationMutable: boolean;
+  rosterCount: number;
+  maxPlayers: number;
+  member: RosterCandidateMember | null;
+  genderCategory: V1TournamentGenderCategory | null;
+  phoneEnforced: boolean;
+}): RosterCandidateBlock | null {
+  if (input.alreadyOnRoster) {
+    return {
+      code: 'PLAYER_ALREADY_REGISTERED',
+      message: '이미 명단에 등록된 선수예요.',
+      listReason: '이미 명단에 있어요',
+      conflict: true,
+    };
+  }
+  if (!input.tournamentMutable) {
+    return {
+      code: 'TOURNAMENT_ROSTER_NOT_MUTABLE',
+      message: '종료되었거나 취소된 대회는 선수 명단을 수정할 수 없어요.',
+      listReason: '종료되었거나 취소된 대회예요',
+      conflict: true,
+    };
+  }
+  if (!input.registrationMutable) {
+    return {
+      code: 'REGISTRATION_ROSTER_NOT_MUTABLE',
+      message: '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.',
+      listReason: '취소된 신청이라 명단을 수정할 수 없어요',
+      conflict: true,
+    };
+  }
+  if (input.rosterCount >= input.maxPlayers) {
+    return {
+      code: 'ROSTER_FULL',
+      message: `최대 인원(${input.maxPlayers}명)을 초과할 수 없어요.`,
+      listReason: `정원이 찼어요 (${input.rosterCount}/${input.maxPlayers}명)`,
+      conflict: true,
+    };
+  }
+  if (!input.member) {
+    return {
+      code: 'USER_NOT_TEAM_MEMBER',
+      message: '해당 팀의 활성 멤버가 아니에요.',
+      listReason: '팀의 활성 멤버가 아니에요',
+      conflict: false,
+    };
+  }
+
+  const { realName, birthDate, phone, gender, phoneVerifiedAt } = input.member;
+  const requiresGender = input.genderCategory === 'mixed';
+  if (!realName || !birthDate || !phone || (requiresGender && !gender)) {
+    return {
+      code: 'PLAYER_REQUIRED_PROFILE_MISSING',
+      message: requiresGender
+        ? '실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.'
+        : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
+      listReason: requiresGender
+        ? '실명·생년월일·휴대폰·성별이 모두 필요해요'
+        : '실명·생년월일·휴대폰이 모두 필요해요',
+      conflict: false,
+    };
+  }
+  // 남성부·여성부는 성별이 맞아야 한다. 예전엔 mixed 일 때 "성별이 있는지" 만 보고
+  // male/female 대회에서는 아무 검사도 하지 않아, 여성부 대회에 남성을 넣을 수 있었다.
+  const requiredGender = genderRequiredByCategory(input.genderCategory);
+  if (requiredGender && gender !== requiredGender) {
+    return {
+      code: 'PLAYER_GENDER_MISMATCH',
+      message:
+        requiredGender === 'male'
+          ? '남성부 대회에는 남성 팀원만 등록할 수 있어요.'
+          : '여성부 대회에는 여성 팀원만 등록할 수 있어요.',
+      listReason: requiredGender === 'male' ? '남성부 대회예요' : '여성부 대회예요',
+      conflict: false,
+    };
+  }
+  // 번호가 "적혀 있는지"만 보면 대회 명단이 약속하는 본인확인이 성립하지 않는다 —
+  // 실제로 그 번호의 소유자임을 확인한(phoneVerifiedAt) 팀원만 출전 명단에 올린다.
+  if (input.phoneEnforced && !phoneVerifiedAt) {
+    return {
+      code: 'PLAYER_PHONE_NOT_VERIFIED',
+      message: '휴대폰 본인인증을 마친 팀원만 선수로 등록할 수 있어요.',
+      listReason: '휴대폰 본인인증이 필요해요',
+      conflict: false,
+    };
+  }
+  return null;
 }
 
 /**

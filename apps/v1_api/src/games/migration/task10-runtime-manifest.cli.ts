@@ -131,6 +131,46 @@
  *       setup for its own `supportUser`/`opsUser`. Nothing about the guard, the service, or the
  *       required-document set is bypassed or special-cased; the seeded user simply satisfies the
  *       same compliance check any real onboarded user would.
+ *   (e) MISSING GAME_READ/GAME_WRITE DEFAULT ROWS — `TournamentOperationsBoardService.list()`
+ *       (`tournament-operations-board.service.ts:486-489`) reads the `GAME_READ` flag via a plain
+ *       `tx.v1GameOperationFlag.findUnique()` and deliberately does NOT call
+ *       `GameOperationFlagsService.ensureDefaults()` (that service hard-gates to `platform_ops` via
+ *       `assertPlatformOps()`, which would wrongly 403 a `field_operator`/`support_readonly` board
+ *       viewer — see that service's own doc comment). `ensureDefaults()` is the ONLY place
+ *       `v1_game_operation_flags`/`v1_game_cutover_epochs` rows are ever created (confirmed: no
+ *       migration under `prisma/migrations` INSERTs either table — they are runtime-lazy by design),
+ *       and it only runs as the first line of `GameOperationFlagsService.getFlag()`/`patchFlag()`/
+ *       `tupleTransition()` (`game-operation-flags.ts:207,235,379,617`) — i.e. strictly AFTER the
+ *       `legacy` GET in `liveCutover()`'s own call order. This job's `Reset and migrate clean CLI
+ *       database` step drops and recreates the isolated database from scratch immediately before
+ *       this producer runs, so nothing has called `ensureDefaults()` yet by the time the `legacy` GET
+ *       fires, and the board fails closed with `500 GAME_READ_FLAG_MISSING` (P1-7 in that service's
+ *       own doc comment — a missing row is intentionally NOT defaulted to `'legacy'` silently). The
+ *       fix: this producer seeds the exact same default rows `ensureDefaults()` would (idempotent
+ *       upserts, byte-for-byte reusing `GAME_OPERATION_FLAG_DEFAULTS` exported from
+ *       `game-operation-flags.ts` rather than re-declaring the default value set here — so it can
+ *       never silently drift from Task 5's own source of truth), before the runtime manifest's
+ *       transitions (which themselves assume `GAME_READ`/`GAME_WRITE` both start at `version: 0`,
+ *       value `'legacy'`, exactly this default) are ever sent. `game-operation-flags.ts` itself is
+ *       untouched; a real `ensureDefaults()` call later in the same run (`transition-compare`'s
+ *       `patchFlag()`) sees its own `ON CONFLICT DO NOTHING` no-op against rows that already match.
+ *
+ *   KNOWN FURTHER GAP (out of scope for this file/verify script — NOT fixed here, flagged instead
+ *   of silently working around it): once `GAME_READ` reaches `'compare'` (`transition-compare`
+ *   above), `TournamentOperationsBoardService.list()` calls `GAME_READ_AUTHORITY.resolve()`
+ *   (`game-read-authority.port.ts`) for the seeded fixture's current official result on EVERY
+ *   subsequent `compare`/`mismatch` read. `app.module.ts:80` still binds
+ *   `TournamentOperationsBoardModule.register()` with no override, so the bound implementation is
+ *   `DirectGameReadAuthorityService` — which unconditionally throws
+ *   `500 GAME_READ_AUTHORITY_NOT_CONFIGURED` whenever actually invoked (by design — see that class's
+ *   own doc comment). No class anywhere in this tree implements `GameReadAuthorityPort` against the
+ *   real comparator in `compare-game-result-reads.ts` (that file only exports pure comparison
+ *   functions/types, e.g. `compareGameResultSnapshots()` — `CompareGameReadAuthorityService` is named
+ *   only in doc comments in `game-read-authority.port.ts` and
+ *   `tournament-operations-board.module.ts`, never defined). Wiring that service and its
+ *   `app.module.ts` registration is a production composition-root change outside this producer/verify
+ *   script's file scope (and outside `game-operation-flags.ts`'s invariants) — expect the `compare`
+ *   step of `liveCutover()` to fail next, with that exact 500, until that binding lands.
  */
 
 // Must be the first import — mirrors game-result-backfill.cli.ts's own
@@ -141,7 +181,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 import { createV1SessionToken } from '../../auth/v1-session';
-import { resolveGameOperationGateRoot } from '../../config/game-operation-flags';
+import {
+  GAME_OPERATION_FLAG_DEFAULTS,
+  resolveGameOperationGateRoot,
+  type GameOperationFlagKey,
+} from '../../config/game-operation-flags';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../terms/managed-terms-runtime.service';
 import { FOOTBALL_V1_CONFIG } from '../../tournaments/competition-config/competition-config';
@@ -396,6 +440,34 @@ async function seedOperationsBoardFixture(prisma: PrismaService): Promise<void> 
   await prisma.v1Game.update({
     where: { id: IDS.game },
     data: { currentOfficialRevisionId: IDS.revision },
+  });
+}
+
+// Blocker (e) in this file's header comment. Idempotent (ON-CONFLICT-safe upserts) — reuses
+// GAME_OPERATION_FLAG_DEFAULTS exported from game-operation-flags.ts (Task 5) rather than
+// re-declaring the default value set here, and reproduces exactly what that file's own
+// GameOperationFlagsService.ensureDefaults() would create (same version:0, same owner_actor,
+// same schema-level V1GameCutoverEpoch defaults) -- not a new or relaxed contract, just seeded
+// earlier than that lazy-on-first-mutation path would otherwise run. Safe to call unconditionally
+// on every invocation: a real ensureDefaults() call later in the same run (transition-compare's
+// patchFlag()) sees these rows already present and no-ops.
+async function seedGameOperationFlagDefaults(prisma: PrismaService): Promise<void> {
+  for (const key of Object.keys(GAME_OPERATION_FLAG_DEFAULTS) as GameOperationFlagKey[]) {
+    await prisma.v1GameOperationFlag.upsert({
+      where: { key },
+      update: {},
+      create: {
+        key,
+        value: GAME_OPERATION_FLAG_DEFAULTS[key],
+        version: 0,
+        ownerActor: 'platform_ops',
+      },
+    });
+  }
+  await prisma.v1GameCutoverEpoch.upsert({
+    where: { id: 'game-cutover' },
+    update: {},
+    create: { id: 'game-cutover', version: 0, writeMode: 'legacy' },
   });
 }
 
@@ -708,6 +780,7 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaService();
   try {
+    await seedGameOperationFlagDefaults(prisma);
     await seedOperationsBoardFixture(prisma);
   } finally {
     await prisma.$disconnect();

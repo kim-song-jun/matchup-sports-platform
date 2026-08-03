@@ -65,9 +65,9 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
       })),
     });
     const sport = await prisma.v1Sport.upsert({
-      where: { code: 'task12-final-football' },
+      where: { code: 'football' },
       update: {},
-      create: { id: ids.sport, code: 'task12-final-football', name: 'Task 12 Final Football' },
+      create: { id: ids.sport, code: 'football', name: 'Task 12 Final Football' },
       select: { id: true },
     });
     await prisma.v1Region.create({

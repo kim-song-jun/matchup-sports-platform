@@ -60,9 +60,9 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
       })),
     });
     const sport = await prisma.v1Sport.upsert({
-      where: { code: 'task12-schedule-crud-football' },
+      where: { code: 'football' },
       update: {},
-      create: { id: ids.sport, code: 'task12-schedule-crud-football', name: 'Task 12 Schedule CRUD Football' },
+      create: { id: ids.sport, code: 'football', name: 'Task 12 Schedule CRUD Football' },
       select: { id: true },
     });
     await prisma.v1Region.create({

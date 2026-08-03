@@ -673,6 +673,12 @@ describe('Task 10 legacy result migration contract', () => {
         code: 'VALIDATION_ERROR',
         message: '입력값을 다시 확인해 주세요.',
         details: expect.any(Array),
+        // HttpExceptionFilter puts `requestId: request.id` on every error
+        // envelope. pino-http assigns the default numeric request id (no
+        // custom genReqId is configured), so this is a number, not a string.
+        // The success envelope has no such field, which is why the assertions
+        // above and below do not carry it.
+        requestId: expect.any(Number),
         timestamp: expect.any(String),
       });
       expect(killSwitch.status).toBe(200);

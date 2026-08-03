@@ -190,11 +190,19 @@ resolve_alb_default_rule() {
 }
 
 maintenance_on() {
-  local body actions
+  local body actions body_bytes
   [[ -f "${MAINTENANCE_HTML}" ]] || fail "점검 안내 페이지가 없습니다: ${MAINTENANCE_HTML}"
   body="$(cat "${MAINTENANCE_HTML}")"
-  # ALB 고정응답 본문 한도는 1024 바이트다. 넘으면 modify-rule 이 거부한다.
-  (( ${#body} <= 1024 )) || fail "점검 페이지가 ALB 한도(1024바이트)를 넘습니다: ${#body}"
+
+  # ALB 고정응답 본문 한도는 1024 **바이트**다. 넘으면 modify-rule 이 거부한다.
+  #
+  # `${#body}` 로 세면 안 된다 — 그건 로케일에 따라 **문자 수**를 센다. 이 페이지는
+  # 한국어라 차이가 크다: 실측(2026-08-03) 750바이트짜리 페이지가 UTF-8 로케일에서는
+  # 669 로 나왔다. 즉 1024자(≈1800바이트)까지 이 검사를 통과하고 ALB 에서 거부당한다 —
+  # 한도를 넘었을 때 정작 침묵하는 가드가 된다. 바이트로 직접 센다.
+  body_bytes="$(printf '%s' "${body}" | wc -c)"
+  (( body_bytes <= 1024 )) \
+    || fail "점검 페이지가 ALB 한도(1024바이트)를 넘습니다: ${body_bytes}바이트"
 
   actions="$(jq -n --arg body "${body}" '[{
     Type: "fixed-response",

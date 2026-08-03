@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { applyLabel } from './matches.view-model';
+import { applyLabel, getMatchCreateViewModel } from './matches.view-model';
+
+describe('match create defaults', () => {
+  it('does not prefill a mock image before the user uploads one', () => {
+    expect(getMatchCreateViewModel('info').draft.image).toBe('');
+  });
+});
 
 /**
  * 회귀 가드: 백엔드 getReasonMessage('OK')가 '신청할 수 있습니다.'(합니다체)에서

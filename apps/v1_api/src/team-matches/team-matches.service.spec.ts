@@ -189,6 +189,60 @@ describe('TeamMatchesService', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
+  it('create: host team 종목과 다른 종목은 400 VALIDATION_FAILED', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({
+      id: 'mem-1',
+      team: { sportId: 'sport-football' },
+    });
+
+    await expect(
+      service.create(manager, {
+        hostTeamId: 'team-host',
+        sportId: 'sport-futsal',
+        regionId: 'region-1',
+        title: '다른 종목 팀매치',
+        startsAt: FUTURE.toISOString(),
+        manualPlaceName: '잠실',
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: {
+        code: 'VALIDATION_FAILED',
+        details: { field: 'sportId' },
+      },
+    });
+    expect(prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+  });
+
+  it('update: host team 종목과 다른 종목으로 변경할 수 없다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      teamMatchRow({ hostTeam: { sportId: 'sport-football' } }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({
+      id: 'mem-1',
+      team: { sportId: 'sport-football' },
+    });
+
+    await expect(
+      service.update(manager, 'tm-1', {
+        hostTeamId: 'team-host',
+        sportId: 'sport-futsal',
+        regionId: 'region-1',
+        title: '종목 변경 시도',
+        startsAt: FUTURE.toISOString(),
+        manualPlaceName: '잠실',
+        version: '2026-06-01T00:00:00.000Z',
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: {
+        code: 'VALIDATION_FAILED',
+        details: { field: 'sportId' },
+      },
+    });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
   // ─── cancel: 상태 머신 ────────────────────────────────────────────────────
 
   it('cancel: 이미 취소된 팀매치 재취소 → 409 ALREADY_PROCESSED', async () => {

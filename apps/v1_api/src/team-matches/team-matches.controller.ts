@@ -7,7 +7,6 @@ import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import {
   CancelTeamMatchDto,
   CloseTeamMatchDto,
-  CompleteTeamMatchDto,
   MutateTeamMatchDto,
   ReopenTeamMatchDto,
   UpdateTeamMatchDto,
@@ -107,16 +106,6 @@ export class TeamMatchesController {
     @Body() dto: ReopenTeamMatchDto,
   ) {
     return this.teamMatchesService.reopen(user, teamMatchId, dto);
-  }
-
-  @Post('team-matches/:teamMatchId/complete')
-  @UseGuards(V1AuthGuard)
-  complete(
-    @CurrentUser() user: V1AuthUser,
-    @Param('teamMatchId') teamMatchId: string,
-    @Body() dto: CompleteTeamMatchDto,
-  ) {
-    return this.teamMatchesService.complete(user, teamMatchId, dto);
   }
 
   @Post('team-matches/:teamMatchId/applications')

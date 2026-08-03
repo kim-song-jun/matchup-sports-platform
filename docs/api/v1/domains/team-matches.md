@@ -13,7 +13,6 @@
 | `POST` | `/api/v1/team-matches/:teamMatchId/close` | owner/manager of host team | `{ reason?: string | null }` | closed team match and expired pending applications |
 | `POST` | `/api/v1/team-matches/:teamMatchId/reopen` | owner/manager of host team | `{ reason?: string | null }` | reopened recruiting team match |
 | `POST` | `/api/v1/team-matches/:teamMatchId/cancel` | owner/manager of host team | `{ reason?: string | null }` | cancelled team match |
-| `POST` | `/api/v1/team-matches/:teamMatchId/complete` | owner/manager of host team | `{ note?: string | null }` | completed team match |
 | `POST` | `/api/v1/team-matches/:teamMatchId/applications` | owner/manager of applicant team | `{ applicantTeamId: uuid; message?: string | null }` | requested application |
 | `GET` | `/api/v1/team-matches/:teamMatchId/applications` | host team owner/manager | `status?`, `cursor?`, `limit?` | applications |
 | `POST` | `/api/v1/team-match-applications/:applicationId/withdraw` | applicant team owner/manager | `{ reason?: string | null }` | withdrawn application |
@@ -52,10 +51,10 @@ Optional fields include `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addr
 - Host team cannot apply to itself.
 - Approval locks and re-reads the team match before conditionally moving a still-`requested` application to `approved` and the team match to `matched`; concurrent approvals cannot approve more than one applicant team.
 - Applicant team owner/manager can withdraw only `requested` applications.
-- Host owner/manager can complete only `matched` team matches with an approved applicant team. Completion records `completedAt` and unlocks review surfaces.
+- **There is no standalone "complete" mutation on this domain (Task 16 removed it).** A `matched` team match becomes `completed` only as an atomic side effect of the host team owner/manager submitting a validated result revision — see `docs/api/domains/games.md`'s `POST /api/v1/games/:gameId/result-revisions/:revisionId/submit`. That route sets `completedAt` and unlocks review surfaces in the same transaction that ends the Game; the opposing team then approves or requests changes to the submitted result via `.../decision`.
 - Team match chat is available only after an applicant team has been approved/matched.
 - `costNote` is text-only. No payment API is called.
-- Notifications are emitted for application received, application withdrawn, approved, rejected, recruiting closed, match cancelled, and match completed events.
+- Notifications are emitted for application received, application withdrawn, approved, rejected, recruiting closed, and match cancelled events. (Match-completed review-nudge notifications are a known Task 16 gap — see the games contract doc note above; the completion write itself is unconditional and does not depend on any notification succeeding.)
 
 Primary tables:
 

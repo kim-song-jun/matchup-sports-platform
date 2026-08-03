@@ -137,6 +137,10 @@ describe('Task 6 L1 game lifecycle', () => {
         title: 'Task 6 L1 match',
         placeName: 'Task 6 ground',
         startAt: new Date('2026-08-01T00:00:00.000Z'),
+        // Task 16: result draft/submit now requires a real matched opponent (see
+        // GamesService.assertTeamMatchMatched) — status must agree with
+        // approvedApplicantTeamId exactly as the real approve-application flow leaves it.
+        status: 'matched',
         approvedApplicantTeamId: ids.opponentTeam,
         competitionConfigVersionId: configId,
       },

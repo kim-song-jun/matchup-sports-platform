@@ -29,7 +29,6 @@ import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRan
 import {
   CancelTeamMatchDto,
   CloseTeamMatchDto,
-  CompleteTeamMatchDto,
   MutateTeamMatchDto,
   ReopenTeamMatchDto,
   UpdateTeamMatchDto,
@@ -567,53 +566,6 @@ export class TeamMatchesService {
     return {
       teamMatchId: updated.id,
       status: updated.status,
-      detailRoute: `/team-matches/${teamMatch.id}`,
-    };
-  }
-
-  async complete(user: V1AuthUser, teamMatchId: string, dto: CompleteTeamMatchDto) {
-    this.assertActiveAccount(user);
-    const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
-    if (teamMatch.status === 'completed') {
-      throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Team match is already completed' });
-    }
-    if (teamMatch.status !== 'matched' || !teamMatch.approvedApplicantTeamId) {
-      throw stateConflict('Only matched team matches can be completed');
-    }
-    if (teamMatch.startAt > new Date()) {
-      throw stateConflict('Team match cannot be completed before it starts');
-    }
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const nextTeamMatch = await tx.v1TeamMatch.update({
-        where: { id: teamMatch.id },
-        data: { status: 'completed', completedAt: new Date() },
-      });
-      await tx.v1StatusChangeLog.create({
-        data: {
-          targetType: 'team_match',
-          targetId: teamMatch.id,
-          fromStatus: teamMatch.status,
-          toStatus: 'completed',
-          actorType: 'user',
-          actorUserId: user.id,
-          reason: dto.note ?? 'team_match_completed',
-        },
-      });
-      return nextTeamMatch;
-    });
-
-    this.emitNotificationToTeamManagers(
-      [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId],
-      'team_match_completed',
-      teamMatch.id,
-      `"${teamMatch.title}" 팀매치 리뷰를 남겨보세요.`,
-    );
-
-    return {
-      teamMatchId: updated.id,
-      status: updated.status,
-      completedAt: updated.completedAt,
       detailRoute: `/team-matches/${teamMatch.id}`,
     };
   }

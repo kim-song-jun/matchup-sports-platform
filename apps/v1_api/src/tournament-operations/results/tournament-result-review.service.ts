@@ -5,7 +5,13 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, V1GameEventType, V1GameResultRevisionState, V1GameSourceType } from '@prisma/client';
+import {
+  Prisma,
+  V1GameEventType,
+  V1GameResultRevisionState,
+  V1GameSourceType,
+  V1TournamentFixtureStatus,
+} from '@prisma/client';
 import { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
 import {
   canonicalGameCommandPayloadHash,
@@ -421,6 +427,23 @@ export class TournamentResultReviewService {
           where: { id: gameId },
           data: { version: { increment: 1 }, currentOfficialRevisionId: revision.id },
         });
+        // `GameResultBracketProjectionService.project` gates advancement on
+        // the source fixture's own `status` being 'completed' -- that
+        // column defaults to 'scheduled' and, per
+        // docs/api/domains/tournament-operations.md, no other writer ever
+        // advances it once the Game model became authoritative. Officialize
+        // is this fixture's authoritative "result decided" moment, so the
+        // fixture is marked completed in the *same* transaction as the
+        // official pointer swap: the async bracket projection (dispatched
+        // via the outbox event below) then always observes a consistent,
+        // already-committed 'completed' status with no eventual-consistency
+        // gap. Idempotent on repeat officialize (e.g. a later correction).
+        if (game.tournamentFixtureId !== null) {
+          await tx.v1TournamentFixture.update({
+            where: { id: game.tournamentFixtureId },
+            data: { status: V1TournamentFixtureStatus.completed },
+          });
+        }
         await this.writeOutbox(
           tx,
           `game:${gameId}:revision:${officialized.revision}:officialize`,

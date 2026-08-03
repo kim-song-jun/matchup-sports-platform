@@ -1,4 +1,3 @@
-import { createHash, randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { GameOperationHandler } from '../jobs/v1-game-operations-worker.service';
 import { GameResultProjectionWatermarkService } from './game-result-projection-watermark.service';
@@ -15,7 +14,6 @@ type LockedVoidRevisionRow = {
   tournamentFixtureId: string | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
-  visibility: string;
 };
 
 type SupersededRevisionRow = {
@@ -48,6 +46,17 @@ type FixtureSlotsRow = {
  * through `game.currentOfficialRevisionId` sees nothing for this game the
  * moment the pointer swaps to the void revision -- no fact deletion is
  * needed or wanted (facts stay append-only for audit).
+ *
+ * `hidePublicCache` only ever UPDATEs existing rows -- it never INSERTs a
+ * cache row keyed by the VOID revision's own id. The `v1_guard_game_
+ * official_result_cache` BEFORE INSERT trigger (an invariant, not owned by
+ * this lane) requires every inserted row's `revision_id` to reference a
+ * revision whose `state = 'OFFICIAL'`; a VOID revision can never satisfy
+ * that, so attempting such an insert always raises and rolls back the
+ * *entire* handler transaction, including the UPDATE that correctly hid the
+ * prior official row. "No OFFICIAL revision is current" is already fully
+ * represented by every existing row for this game having `is_current =
+ * false`; no additional marker row is needed or wanted.
  */
 export class GameResultVoidProjectionService {
   private readonly watermarks = new GameResultProjectionWatermarkService();
@@ -106,14 +115,12 @@ export class GameResultVoidProjectionService {
         fixture.tournament_id AS "tournamentId",
         fixture.id AS "tournamentFixtureId",
         home_side.team_id AS "homeTeamId",
-        away_side.team_id AS "awayTeamId",
-        COALESCE(policy.mode, 'HIDDEN'::"V1VisibilityMode")::text AS visibility
+        away_side.team_id AS "awayTeamId"
       FROM v1_game_result_revisions revision
       INNER JOIN v1_games game ON game.id = revision.game_id
       LEFT JOIN v1_tournament_fixtures fixture ON fixture.id = game.tournament_fixture_id
       LEFT JOIN v1_game_sides home_side ON home_side.game_id = game.id AND home_side.side_key = 'HOME'
       LEFT JOIN v1_game_sides away_side ON away_side.game_id = game.id AND away_side.side_key = 'AWAY'
-      LEFT JOIN v1_game_visibility_policies policy ON policy.game_id = game.id
       WHERE revision.id = ${revisionId}
       FOR UPDATE OF revision, game
     `;
@@ -132,30 +139,6 @@ export class GameResultVoidProjectionService {
       UPDATE v1_game_official_result_cache
       SET is_current = false, updated_at = CURRENT_TIMESTAMP
       WHERE game_id = ${revision.gameId} AND is_current
-    `;
-    const payload = {
-      gameId: revision.gameId,
-      revisionId: revision.revisionId,
-      revision: revision.revision,
-      state: 'VOID',
-    };
-    const payloadJson = JSON.stringify(payload);
-    const payloadHash = createHash('sha256').update(payloadJson).digest('hex');
-    await tx.$executeRaw`
-      INSERT INTO v1_game_official_result_cache (
-        id, revision_id, game_id, tournament_id, revision, visibility_mode,
-        is_current, source_hash, canonical_payload, payload_hash, cached_at, updated_at
-      ) VALUES (
-        ${randomUUID()}, ${revision.revisionId}, ${revision.gameId}, ${revision.tournamentId},
-        ${revision.revision}, ${revision.visibility}::"V1VisibilityMode", false,
-        ${revision.eventsHash}, ${payloadJson}::jsonb, ${payloadHash},
-        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-      )
-      ON CONFLICT (revision_id) DO UPDATE
-      SET is_current = false,
-          canonical_payload = EXCLUDED.canonical_payload,
-          payload_hash = EXCLUDED.payload_hash,
-          updated_at = CURRENT_TIMESTAMP
     `;
   }
 

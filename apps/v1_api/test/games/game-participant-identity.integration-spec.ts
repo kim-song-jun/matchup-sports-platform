@@ -2,6 +2,7 @@ import { HttpException } from '@nestjs/common';
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { validate as validateDto } from 'class-validator';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
+import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import { projectParticipantForPublic } from '../../src/games/core';
@@ -19,7 +20,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
 
 const authUser = (id: string) => ({
   id,

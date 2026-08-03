@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import request = require('supertest');
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
+import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService } from '../../src/games/games.service';
 import {
   GAME_OPERATION_RETRY_DELAYS_MS,
@@ -15,7 +16,7 @@ import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/com
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
 const runId = randomUUID();
 const prefix = `task9:${runId}`;
 let tournamentOutboxId = '';

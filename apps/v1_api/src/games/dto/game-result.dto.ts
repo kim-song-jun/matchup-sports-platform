@@ -110,3 +110,26 @@ export class DecideGameResultRevisionDto extends SubmitGameResultRevisionDto {
   @IsNotEmpty()
   reason?: string;
 }
+
+export class GameResultRecoveryDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  expectedVersion!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  clientCommandId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  takeoverToken!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  eventsHash!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+}

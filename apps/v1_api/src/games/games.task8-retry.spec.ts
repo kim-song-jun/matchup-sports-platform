@@ -10,6 +10,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppendGameEventDto } from './dto/game-event.dto';
+import { GameTakeoverService } from './game-takeover.service';
 import { canonicalGameCommandPayloadHash, GamesService } from './games.service';
 
 const reader: V1AuthUser = {
@@ -38,9 +39,41 @@ function immutableEvent(payload: Record<string, unknown>): ImmutableEvent {
     sideId: 'task8-side',
     period: 1,
     clockMs: 0,
-    occurredAt: '2026-08-01T00:00:00.000Z',
+    // Fresh, call-time occurredAt: this helper is only for events that go
+    // through the *live* appendEvent path, where Task 20's 30s server-clock
+    // drift guard legitimately requires the client clock to agree with the
+    // server right now.
+    occurredAt: new Date().toISOString(),
     payload,
   };
+}
+
+/**
+ * An event captured `minutesAgo` in the past and only ever submitted through
+ * retryEvent (offline rebase), never through the live appendEvent path. This
+ * simulates a genuine offline capture-then-sync gap: the client froze this
+ * event's occurredAt while offline and is only now (minutes later) able to
+ * reach the server. retryEvent must accept it -- the 30s clock-drift guard
+ * applies to live captures only, not to replay of an already-frozen,
+ * hash-pinned historical event.
+ */
+function offlineImmutableEvent(payload: Record<string, unknown>, minutesAgo = 5): ImmutableEvent {
+  return {
+    type: V1GameEventType.PERIOD_START,
+    sideId: 'task8-side',
+    period: 1,
+    clockMs: 0,
+    occurredAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+    payload,
+  };
+}
+
+async function grantTakeover(service: GamesService, gameId: string): Promise<string> {
+  const grant = await service.requestTakeover(reader, gameId, {
+    clientInstanceId: 'task8-retry-client',
+    lastSequence: 0,
+  });
+  return grant.takeoverToken;
 }
 
 function appendInput(
@@ -150,6 +183,9 @@ async function createTask8RetryService() {
       },
     },
     v1GameEvent: {
+      async findMany({ where }: { where: { gameId: string } }) {
+        return state.events.filter((event) => event.gameId === where.gameId);
+      },
       async create({
         data,
       }: {
@@ -233,6 +269,7 @@ async function createTask8RetryService() {
   const moduleRef = await Test.createTestingModule({
     providers: [
       GamesService,
+      GameTakeoverService,
       { provide: PrismaService, useValue: database },
       { provide: OperationAuditWriterService, useValue: new OperationAuditWriterService() },
     ],
@@ -249,7 +286,8 @@ describe('Task 8 offline event retry service contract', () => {
   it('Task 8 PIN replays an identical ordinary append once and conflicts on a changed payload', async () => {
     const fixture = await createTask8RetryService();
     const event = immutableEvent({ source: 'offline' });
-    const original = appendInput('task8-pin-client-event', event, 0, 'initial-token');
+    const initialToken = await grantTakeover(fixture.service, 'task8-retry-game');
+    const original = appendInput('task8-pin-client-event', event, 0, initialToken);
 
     try {
       const first = await fixture.service.appendEvent(
@@ -295,7 +333,8 @@ describe('Task 8 offline event retry service contract', () => {
   it('Task 8 RED replays an existing immutable offline event at the rebased version despite a fresh takeover token', async () => {
     const fixture = await createTask8RetryService();
     const event = immutableEvent({ source: 'offline' });
-    const original = appendInput('task8-retry-existing', event, 0, 'expired-token');
+    const initialToken = await grantTakeover(fixture.service, 'task8-retry-game');
+    const original = appendInput('task8-retry-existing', event, 0, initialToken);
 
     try {
       const initial = await fixture.service.appendEvent(
@@ -342,17 +381,21 @@ describe('Task 8 offline event retry service contract', () => {
     }
   });
 
-  it('Task 8 RED appends one unseen immutable offline event at the rebased version and replays its fresh-token retry', async () => {
+  it('Task 8 RED appends one unseen immutable offline event (captured minutes ago, a real offline gap) at the rebased version and replays its fresh-token retry', async () => {
     const fixture = await createTask8RetryService();
     const initialEvent = immutableEvent({ source: 'online' });
-    const unseenEvent = immutableEvent({ source: 'offline-unseen' });
+    // Captured 5 minutes before this retry -- a real offline gap, not a
+    // fresh call-time timestamp. This is the shape of a genuine offline
+    // recovery: the guard must not reject it (Task 20 regression coverage).
+    const unseenEvent = offlineImmutableEvent({ source: 'offline-unseen' }, 5);
+    const initialToken = await grantTakeover(fixture.service, 'task8-retry-game');
 
     try {
       await fixture.service.appendEvent(
         reader,
         'task8-retry-game',
         'task8-retry-preexisting',
-        appendInput('task8-retry-preexisting', initialEvent, 0, 'initial-token'),
+        appendInput('task8-retry-preexisting', initialEvent, 0, initialToken),
       );
       requireRetryEvent(fixture.service);
       await expect(
@@ -367,10 +410,11 @@ describe('Task 8 offline event retry service contract', () => {
       });
       expect(fixture.state.events.map((stored) => stored.sequence)).toEqual([1]);
       expect(fixture.state.game.version).toBe(1);
+      const rebasedToken = await grantTakeover(fixture.service, 'task8-retry-game');
       const firstRetry = await retryEvent(
         fixture.service,
         'task8-retry-game',
-        retryInput('task8-retry-unseen', unseenEvent, 1, 'fresh-token-one'),
+        retryInput('task8-retry-unseen', unseenEvent, 1, rebasedToken),
       );
       const replay = await retryEvent(
         fixture.service,
@@ -401,17 +445,48 @@ describe('Task 8 offline event retry service contract', () => {
     }
   });
 
+  it('Task 20 accepts a long-delayed offline replay: retryEvent must not reject an event whose occurredAt is minutes in the past', async () => {
+    // Regression for the Task 20 clock-drift guard being misapplied to
+    // retryEvent. If assertClockNotDrifted() is ever reintroduced against
+    // the immutable event's frozen occurredAt in retryEvent, this throws a
+    // 422 CLOCK_DRIFT here instead of succeeding, since 10 minutes exceeds
+    // the 30s live-capture tolerance -- offline recovery would be broken.
+    const fixture = await createTask8RetryService();
+    const capturedOffline = offlineImmutableEvent({ source: 'offline-recovery' }, 10);
+    const takeoverToken = await grantTakeover(fixture.service, 'task8-retry-game');
+
+    try {
+      const result = await retryEvent(
+        fixture.service,
+        'task8-retry-game',
+        retryInput('task8-offline-recovery', capturedOffline, 0, takeoverToken),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          clientEventId: 'task8-offline-recovery',
+          sequence: 1,
+          replayed: false,
+        }),
+      );
+      expect(fixture.state.events.map((stored) => stored.sequence)).toEqual([1]);
+    } finally {
+      await fixture.close();
+    }
+  });
+
   it('Task 8 RED rejects a changed event with the original hash as OFFLINE_EVENT_REBASE_CONFLICT without mutation', async () => {
     const fixture = await createTask8RetryService();
     const originalEvent = immutableEvent({ source: 'offline' });
     const changedEvent = immutableEvent({ source: 'tampered' });
+    const initialToken = await grantTakeover(fixture.service, 'task8-retry-game');
 
     try {
       await fixture.service.appendEvent(
         reader,
         'task8-retry-game',
         'task8-retry-conflict',
-        appendInput('task8-retry-conflict', originalEvent, 0, 'expired-token'),
+        appendInput('task8-retry-conflict', originalEvent, 0, initialToken),
       );
       const malformedRetry = retryInput(
         'task8-retry-conflict',

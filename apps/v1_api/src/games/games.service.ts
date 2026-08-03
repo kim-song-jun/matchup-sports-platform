@@ -28,6 +28,7 @@ import type {
 } from '../common/audit/operation-audit.contract';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { GameTakeoverService } from './game-takeover.service';
 import {
   decideTournamentStaffAccess,
   type TournamentStaffAction,
@@ -69,6 +70,7 @@ import type {
 import type {
   CreateGameResultRevisionDto,
   DecideGameResultRevisionDto,
+  GameResultRecoveryDto,
   SubmitGameResultRevisionDto,
 } from './dto/game-result.dto';
 import type {
@@ -200,6 +202,7 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
     case 'game_pause':
     case 'game_resume':
     case 'game_end':
+    case 'result_recovery_derive_and_submit':
       return 'tournament_command';
     case 'game_cancel':
       return 'cancel';
@@ -282,11 +285,24 @@ function scoreFromJson(value: Prisma.JsonValue): GameScore {
   };
 }
 
+const CLOCK_DRIFT_TOLERANCE_MS = 30_000;
+
+function assertClockNotDrifted(occurredAt: string): void {
+  const occurredAtMs = new Date(occurredAt).getTime();
+  if (!Number.isFinite(occurredAtMs) || Math.abs(Date.now() - occurredAtMs) > CLOCK_DRIFT_TOLERANCE_MS) {
+    throw new UnprocessableEntityException({
+      code: 'CLOCK_DRIFT',
+      message: 'occurredAt has drifted from server time by more than 30 seconds',
+    });
+  }
+}
+
 @Injectable()
 export class GamesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly operationAuditWriter: OperationAuditWriterService,
+    private readonly takeover: GameTakeoverService,
   ) {}
 
   async createFromSourceInTransaction(
@@ -566,7 +582,8 @@ export class GamesService {
             message: 'Team matches end only through validated result submission',
           });
         }
-        this.requireTakeover(context);
+        assertClockNotDrifted(dto.occurredAt);
+        this.requireTakeover(game.id, context);
         this.assertLifecycle(game.sourceType, 'TOURNAMENT_COMMAND', game.state, target);
         const updated = await tx.v1Game.update({
           where: { id: game.id },
@@ -676,7 +693,8 @@ export class GamesService {
         payload: immutableGameEventPayload(dto),
       },
       async (tx, game, context) => {
-        this.requireTakeover(context);
+        assertClockNotDrifted(dto.occurredAt);
+        this.requireTakeover(game.id, context);
         if (game.state === V1GameState.ENDED || game.state === V1GameState.CANCELLED) {
           throw new ConflictException({
             code: 'TERMINAL_GAME_IMMUTABLE',
@@ -809,7 +827,15 @@ export class GamesService {
             }
             throw error;
           }
-          this.requireTakeover(context);
+          // No assertClockNotDrifted() here: input.event.occurredAt is the
+          // immutable, hash-pinned capture time of an event that was already
+          // frozen (offline or otherwise) before this retry/rebase call. The
+          // drift guard exists to reject a *live* capture whose client clock
+          // disagrees with the server right now; a retry is historical by
+          // design and is legitimately allowed to arrive minutes after
+          // occurredAt (offline recovery). Payload-hash pinning above already
+          // guarantees occurredAt cannot be altered between capture and retry.
+          this.requireTakeover(gameId, context);
           const dto: AppendGameEventDto = {
             ...input.event,
             expectedVersion: input.rebasedExpectedVersion,
@@ -905,10 +931,20 @@ export class GamesService {
         payload: { eventId, ...dto },
       },
       async (tx, game, context) => {
-        this.requireTakeover(context);
+        this.requireTakeover(game.id, context);
         const target = await tx.v1GameEvent.findFirst({ where: { id: eventId, gameId } });
         if (target === null) {
           throw this.notFound('GAME_EVENT_NOT_FOUND');
+        }
+        const alreadyReversed = await tx.v1GameEvent.findFirst({
+          where: { gameId, reversesEventId: target.id },
+          select: { id: true },
+        });
+        if (alreadyReversed !== null) {
+          throw new ConflictException({
+            code: 'EVENT_ALREADY_REVERSED',
+            message: 'This event was already reversed once',
+          });
         }
         const sequence = game.lastSequence + 1;
         await tx.v1GameEvent.create({
@@ -1046,6 +1082,10 @@ export class GamesService {
         payload: { lineupId, ...dto },
       },
       async (tx, game, context) => {
+        // 두 가드는 서로 다른 sourceType을 다루므로 배타적이다 — 둘 다 유지한다.
+        // TEAM_MATCH 차단은 Task 16의 불변식(팀 매치 라인업은 로스터·자격·마감을
+        // 강제하는 전용 라우트로만 관리), TOURNAMENT_FIXTURE의 takeover 요구는
+        // Task 20의 불변식(라이브 대회 커맨드는 인계 토큰 없이는 실행 불가)이다.
         if (game.sourceType === V1GameSourceType.TEAM_MATCH) {
           throw new ConflictException({
             code: 'TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN',
@@ -1053,7 +1093,12 @@ export class GamesService {
               'Team matches manage lineups only through /team-matches/:teamMatchId/lineup, which enforces roster/eligibility/deadline invariants this generic route does not.',
           });
         }
-        this.requireTakeover(context);
+        if (game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
+          // Task 20이 requireTakeover에 gameId를 추가해 인계 토큰을 게임 단위로
+          // 검증하도록 좁혔다(2-arg). 통합 브랜치에 남아 있던 1-arg 호출은 그
+          // 시그니처 변경 이전 형태라 여기서 함께 정리한다.
+          this.requireTakeover(game.id, context);
+        }
         const lineup = await tx.v1GameLineup.findFirst({ where: { id: lineupId, gameId } });
         if (lineup === null) {
           throw this.notFound('GAME_LINEUP_NOT_FOUND');
@@ -2665,6 +2710,37 @@ export class GamesService {
         });
       }
     }
+    if (
+      dto.type === V1GameEventType.GOAL &&
+      dto.participantId === undefined &&
+      game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE
+    ) {
+      const config = await tx.v1CompetitionConfigVersion.findUnique({
+        where: { id: game.competitionConfigVersionId },
+        select: { result: true },
+      });
+      const resultConfig = config === null ? {} : jsonObject(config.result);
+      if (resultConfig.tournamentScorerPolicy === 'required') {
+        throw new UnprocessableEntityException({
+          code: 'SCORER_REQUIRED',
+          message: 'A scorer participant is required for goal events under this tournament policy',
+        });
+      }
+    }
+    const priorEvents = await tx.v1GameEvent.findMany({
+      where: { gameId: game.id },
+      select: { period: true },
+    });
+    const maxRecordedPeriod = priorEvents.reduce<number | null>(
+      (max, event) => (max === null || event.period > max ? event.period : max),
+      null,
+    );
+    if (maxRecordedPeriod !== null && dto.period < maxRecordedPeriod) {
+      throw new UnprocessableEntityException({
+        code: 'EVENT_LATE',
+        message: 'Event period cannot regress behind an already-recorded period',
+      });
+    }
   }
 
   private async resultInvariantInput(
@@ -2901,13 +2977,173 @@ export class GamesService {
     }
   }
 
-  private requireTakeover(context: GameCommandContext) {
-    if (context.takeoverToken === undefined || context.takeoverToken.trim().length === 0) {
+  private requireTakeover(gameId: string, context: GameCommandContext) {
+    const token = context.takeoverToken?.trim();
+    const authorizationSubject =
+      context.actor.actorType === 'USER' ? context.actor.authorizationSubject : undefined;
+    if (
+      token === undefined ||
+      token.length === 0 ||
+      authorizationSubject === undefined ||
+      !this.takeover.validate({ gameId, token, authorizationSubject })
+    ) {
       throw new ForbiddenException({
         code: 'TAKEOVER_TOKEN_EXPIRED',
         message: 'A valid exclusive takeover token is required',
       });
     }
+  }
+
+  /**
+   * Grants a fresh exclusive takeover token for a tournament-fixture game.
+   * Only actors with tournament command authority (field_operator,
+   * tournament_director, platform_ops) may hold the token; support_readonly
+   * and team-match actors are denied. Called from the realtime gateway's
+   * `game.takeover.request` handler.
+   */
+  async requestTakeover(
+    user: V1AuthUser,
+    gameId: string,
+    input: { clientInstanceId: string; lastSequence: number },
+  ): Promise<{
+    gameId: string;
+    takeoverToken: string;
+    version: number;
+    lastSequence: number;
+    expiresAt: string;
+  }> {
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'tournament_command');
+    if (actor.authorizationSubject === undefined) {
+      throw this.forbidden();
+    }
+    const grant = this.takeover.grant({
+      gameId,
+      authorizationSubject: actor.authorizationSubject,
+      clientInstanceId: input.clientInstanceId,
+      lastSequence: input.lastSequence,
+    });
+    const game = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { version: true, lastSequence: true },
+    });
+    if (game === null) {
+      throw this.notFound();
+    }
+    return {
+      gameId,
+      takeoverToken: grant.token,
+      version: game.version,
+      lastSequence: game.lastSequence,
+      expiresAt: new Date(grant.expiresAt).toISOString(),
+    };
+  }
+
+  /**
+   * Renews an already-held takeover token, extending its 90s expiry. Fails
+   * closed (TAKEOVER_TOKEN_EXPIRED) on any stale/foreign/expired token so a
+   * client must re-request a fresh grant instead of silently continuing.
+   */
+  async renewTakeover(
+    user: V1AuthUser,
+    gameId: string,
+    input: { takeoverToken: string; clientInstanceId: string },
+  ): Promise<{
+    gameId: string;
+    takeoverToken: string;
+    version: number;
+    lastSequence: number;
+    expiresAt: string;
+  }> {
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'tournament_command');
+    if (actor.authorizationSubject === undefined) {
+      throw this.forbidden();
+    }
+    const renewed = this.takeover.renew({
+      gameId,
+      token: input.takeoverToken,
+      authorizationSubject: actor.authorizationSubject,
+      clientInstanceId: input.clientInstanceId,
+    });
+    if (renewed === null) {
+      throw new ForbiddenException({
+        code: 'TAKEOVER_TOKEN_EXPIRED',
+        message: 'The takeover token could not be renewed',
+      });
+    }
+    const game = await this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: { version: true, lastSequence: true },
+    });
+    if (game === null) {
+      throw this.notFound();
+    }
+    return {
+      gameId,
+      takeoverToken: renewed.token,
+      version: game.version,
+      lastSequence: game.lastSequence,
+      expiresAt: new Date(renewed.expiresAt).toISOString(),
+    };
+  }
+
+  async resultRecoveryDeriveAndSubmit(
+    user: V1AuthUser,
+    gameId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: GameResultRecoveryDto,
+  ): Promise<GameRevisionMutationResult> {
+    return this.withCommand(
+      {
+        gameId,
+        action: 'result_recovery_derive_and_submit',
+        actor: await this.resolveActor(this.prisma, gameId, user.id, 'tournament_command'),
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientCommandId,
+        takeoverToken: dto.takeoverToken,
+        payload: { eventsHash: dto.eventsHash, reason: dto.reason },
+      },
+      async (tx, game, context) => {
+        if (game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE) {
+          throw new ConflictException({
+            code: 'RESULT_RECOVERY_NOT_REQUIRED',
+            message: 'Result recovery only applies to tournament fixtures',
+          });
+        }
+        // Result recovery is deliberately narrower than the generic
+        // tournament_command authority: field_operator may run live commands
+        // but must not derive/submit a recovered official result.
+        if (context.actor.actorType === 'USER' && context.actor.role === 'field_operator') {
+          throw this.forbidden();
+        }
+        this.requireTakeover(game.id, context);
+        if (game.state !== V1GameState.ENDED) {
+          throw new ConflictException({
+            code: 'RESULT_RECOVERY_NOT_REQUIRED',
+            message: 'Result recovery only applies to an already-ended game',
+          });
+        }
+        const existingRevisionCount = await tx.v1GameResultRevision.count({
+          where: { gameId: game.id },
+        });
+        if (existingRevisionCount > 0) {
+          throw new ConflictException({
+            code: 'RESULT_RECOVERY_NOT_REQUIRED',
+            message: 'A result revision already exists for this game',
+          });
+        }
+        // The game is already ENDED (that is the whole precondition for
+        // recovery), so no state transition happens here -- but every
+        // successful command still bumps the aggregate version exactly once,
+        // matching every other mutation path (submitResultRevision,
+        // decideResultRevision, appendEvent, ...).
+        const updated = await tx.v1Game.update({
+          where: { id: game.id },
+          data: { version: { increment: 1 } },
+        });
+        return this.deriveTournamentRevision(tx, { ...game, version: updated.version }, context);
+      },
+    );
   }
 
   private periodCount(periods: Prisma.JsonValue): number {

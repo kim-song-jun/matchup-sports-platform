@@ -45,6 +45,14 @@ type RetryGameEventInput = {
   readonly event: Record<string, unknown>;
 };
 
+type GameTakeoverGrantResult = {
+  readonly gameId: string;
+  readonly takeoverToken: string;
+  readonly version: number;
+  readonly lastSequence: number;
+  readonly expiresAt: string;
+};
+
 type GameRealtimeOperations = {
   listEvents(user: V1AuthUser, gameId: string, afterSequence: number): Promise<GameBackfill>;
   appendEvent(
@@ -58,6 +66,16 @@ type GameRealtimeOperations = {
     gameId: string,
     input: RetryGameEventInput,
   ): Promise<GameEventAppendResult>;
+  requestTakeover(
+    user: V1AuthUser,
+    gameId: string,
+    input: { clientInstanceId: string; lastSequence: number },
+  ): Promise<GameTakeoverGrantResult>;
+  renewTakeover(
+    user: V1AuthUser,
+    gameId: string,
+    input: { takeoverToken: string; clientInstanceId: string },
+  ): Promise<GameTakeoverGrantResult>;
 };
 
 type GameSubscriptionPayload = {
@@ -99,6 +117,23 @@ type GameEventCommandPayload = {
 type GameEventRetryPayload = Omit<GameEventCommandPayload, 'expectedVersion'> & {
   readonly rebasedExpectedVersion: number;
 };
+
+type GameTakeoverRequestPayload = {
+  readonly gameId: string;
+  readonly authorizationSubjectVersion: number;
+  readonly clientInstanceId: string;
+  readonly lastSequence: number;
+};
+
+type GameTakeoverRenewPayload = {
+  readonly gameId: string;
+  readonly takeoverToken: string;
+  readonly clientInstanceId: string;
+};
+
+type GameTakeoverResult =
+  | ({ readonly status: 'granted' } & GameTakeoverGrantResult)
+  | { readonly status: 'denied'; readonly code: 'STAFF_SCOPE_DENIED' | 'TAKEOVER_TOKEN_EXPIRED' | 'VALIDATION_ERROR' };
 
 type GameProtocolResult =
   | {
@@ -399,6 +434,73 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
   }
 
+  @SubscribeMessage('game.takeover.request')
+  async requestGameTakeover(
+    @ConnectedSocket() client: V1Socket,
+    @MessageBody() payload: unknown,
+  ): Promise<GameTakeoverResult> {
+    const input = parseGameTakeoverRequest(payload);
+    if (input === null) {
+      return { status: 'denied', code: 'VALIDATION_ERROR' };
+    }
+    const authUser = authenticatedSocketUser(client);
+    if (authUser === null) {
+      return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+    }
+    // Mirrors game.subscribe's staleness gate: a connection whose cached
+    // authorization-subject version no longer matches the version it is
+    // presenting must re-establish its session rather than take over a game.
+    if (client.data.authorizationSubjectVersion !== input.authorizationSubjectVersion) {
+      return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+    }
+    try {
+      const grant = await this.gamesService.requestTakeover(authUser, input.gameId, {
+        clientInstanceId: input.clientInstanceId,
+        lastSequence: input.lastSequence,
+      });
+      client.emit('game.takeover.granted', grant);
+      return { status: 'granted', ...grant };
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+      }
+      throw error;
+    }
+  }
+
+  @SubscribeMessage('game.takeover.renew')
+  async renewGameTakeover(
+    @ConnectedSocket() client: V1Socket,
+    @MessageBody() payload: unknown,
+  ): Promise<GameTakeoverResult> {
+    const input = parseGameTakeoverRenew(payload);
+    if (input === null) {
+      return { status: 'denied', code: 'VALIDATION_ERROR' };
+    }
+    const authUser = authenticatedSocketUser(client);
+    if (authUser === null) {
+      return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+    }
+    try {
+      const grant = await this.gamesService.renewTakeover(authUser, input.gameId, {
+        takeoverToken: input.takeoverToken,
+        clientInstanceId: input.clientInstanceId,
+      });
+      client.emit('game.takeover.granted', grant);
+      return { status: 'granted', ...grant };
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        const response = error.getResponse();
+        const code =
+          isRecord(response) && response.code === 'PERMISSION_DENIED'
+            ? 'STAFF_SCOPE_DENIED'
+            : 'TAKEOVER_TOKEN_EXPIRED';
+        return { status: 'denied', code };
+      }
+      throw error;
+    }
+  }
+
   @SubscribeMessage('game.unsubscribe')
   async unsubscribeFromGame(
     @ConnectedSocket() client: V1Socket,
@@ -679,6 +781,45 @@ function parseGameEventRetry(payload: unknown): GameEventRetryPayload | null {
         payloadHash: payload.payloadHash,
         event,
       };
+}
+
+function parseGameTakeoverRequest(payload: unknown): GameTakeoverRequestPayload | null {
+  if (
+    !isPlainObjectWithKeys(payload, [
+      'gameId',
+      'authorizationSubjectVersion',
+      'clientInstanceId',
+      'lastSequence',
+    ]) ||
+    !isNonemptyString(payload.gameId) ||
+    !isSafeNonnegative(payload.authorizationSubjectVersion) ||
+    !isNonemptyString(payload.clientInstanceId) ||
+    !isSafeNonnegative(payload.lastSequence)
+  ) {
+    return null;
+  }
+  return {
+    gameId: payload.gameId,
+    authorizationSubjectVersion: payload.authorizationSubjectVersion,
+    clientInstanceId: payload.clientInstanceId,
+    lastSequence: payload.lastSequence,
+  };
+}
+
+function parseGameTakeoverRenew(payload: unknown): GameTakeoverRenewPayload | null {
+  if (
+    !isPlainObjectWithKeys(payload, ['gameId', 'takeoverToken', 'clientInstanceId']) ||
+    !isNonemptyString(payload.gameId) ||
+    !isNonemptyString(payload.takeoverToken) ||
+    !isNonemptyString(payload.clientInstanceId)
+  ) {
+    return null;
+  }
+  return {
+    gameId: payload.gameId,
+    takeoverToken: payload.takeoverToken,
+    clientInstanceId: payload.clientInstanceId,
+  };
 }
 
 function parseGameEvent(payload: unknown): Record<string, unknown> | null {

@@ -13,6 +13,7 @@ import type { V1AuthUser } from '../../src/auth/v1-auth-user';
 import { V1AuthGuard } from '../../src/auth/v1-auth.guard';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import type { SaveGameLineupDto, SubmitGameLineupDto } from '../../src/games/dto/game-lineup.dto';
+import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService } from '../../src/games/games.service';
 import { PrismaModule } from '../../src/prisma/prisma.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -1835,6 +1836,10 @@ const lineupIds = {
 
 describe('Task 18 tournament fixture lineup capture and submit', () => {
   let lineupService: TournamentFixtureLineupService;
+  // Declared at describe scope, not inside beforeAll: the takeover tests below call
+  // gamesService.requestTakeover() directly. The merge that brought Task 18's P1-4 fix in narrowed
+  // this to a beforeAll-local const, which those tests cannot see.
+  let gamesService: GamesService;
   let gameId: string;
   let homeSideId: string;
   let lineupId: string;
@@ -1942,7 +1947,11 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       });
     });
 
-    const gamesService = new GamesService(lineupPrisma, new OperationAuditWriterService());
+    // Both sides of this merge widened a constructor: Task 20 added GameTakeoverService to
+    // GamesService, and Task 18's P1-4 fix added TournamentStaffAccessService to
+    // TournamentFixtureLineupService (so authorization runs before any fixture/game lookup).
+    // Both are required - the current signatures are 3-arg on each.
+    gamesService = new GamesService(lineupPrisma, new OperationAuditWriterService(), new GameTakeoverService());
     lineupService = new TournamentFixtureLineupService(
       lineupPrisma,
       gamesService,
@@ -2074,10 +2083,14 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
   });
 
   it('submits the lineup and idempotently replays the identical submit, without duplicating the persisted mutation or its durable idempotency record (regression for review finding #15: counting rows by lineup id alone cannot prove a replay did not silently duplicate a version bump or another durable side effect while the row count coincidentally stayed the same)', async () => {
+    const submitTakeover = await gamesService.requestTakeover(authUser(lineupIds.director), gameId, {
+      clientInstanceId: 'task18-submit-client',
+      lastSequence: 0,
+    });
     const dto: SubmitGameLineupDto = {
       expectedVersion: 1,
       clientCommandId: 'task18-submit',
-      takeoverToken: 'task18-submit-takeover',
+      takeoverToken: submitTakeover.takeoverToken,
     };
     const first = await lineupService.submitLineup(
       authUser(lineupIds.director),
@@ -2127,10 +2140,14 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
   });
 
   it('rejects a non-idempotent submit attempt against an already-submitted lineup', async () => {
+    const submitAgainTakeover = await gamesService.requestTakeover(authUser(lineupIds.director), gameId, {
+      clientInstanceId: 'task18-submit-again-client',
+      lastSequence: 0,
+    });
     const dto: SubmitGameLineupDto = {
       expectedVersion: 2,
       clientCommandId: 'task18-submit-again',
-      takeoverToken: 'task18-submit-again-takeover',
+      takeoverToken: submitAgainTakeover.takeoverToken,
     };
     const denied = await captureFailure(() =>
       lineupService.submitLineup(

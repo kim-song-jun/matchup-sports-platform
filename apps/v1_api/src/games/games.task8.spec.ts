@@ -12,6 +12,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppendGameEventDto, ListGameEventsQueryDto } from './dto/game-event.dto';
+import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
 
 const reader: V1AuthUser = {
@@ -45,7 +46,9 @@ function eventInput(clientEventId: string, payload: Record<string, unknown>): Ap
     sideId: 'task8-side',
     period: 1,
     clockMs: 0,
-    occurredAt: '2026-08-01T00:00:00.000Z',
+    // Computed at call time so Task 20's 30s server-clock-drift check
+    // always sees a fresh occurredAt rather than a stale fixed literal.
+    occurredAt: new Date().toISOString(),
     payload,
   };
 }
@@ -218,6 +221,7 @@ async function createTask8Service(initialSequences: readonly number[], lastSeque
   const moduleRef = await Test.createTestingModule({
     providers: [
       GamesService,
+      GameTakeoverService,
       { provide: PrismaService, useValue: database },
       { provide: OperationAuditWriterService, useValue: new OperationAuditWriterService() },
     ],
@@ -246,7 +250,11 @@ describe('Task 8 HTTP event backfill PIN and RED', () => {
 
   it('Task 8 PIN replays an identical clientEventId with one durable sequence and conflicts on changed payload', async () => {
     const fixture = await createTask8Service([], 0);
-    const original = eventInput('task8-client-event', { source: 'offline' });
+    const takeover = await fixture.service.requestTakeover(reader, 'task8-game', {
+      clientInstanceId: 'task8-client',
+      lastSequence: 0,
+    });
+    const original = { ...eventInput('task8-client-event', { source: 'offline' }), takeoverToken: takeover.takeoverToken };
 
     try {
       const first = await fixture.service.appendEvent(reader, 'task8-game', original.clientEventId, original);

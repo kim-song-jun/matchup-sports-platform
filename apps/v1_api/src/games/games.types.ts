@@ -164,6 +164,11 @@ export interface GameResultEvent {
 }
 
 export interface GameResultInvariantInput {
+  // Task 17: TEAM_MATCH games are self-reported (no live officiating), so
+  // validateGameResultInvariants exempts them from the event-vs-score
+  // cross-check below. TOURNAMENT_FIXTURE keeps the strict event-derived
+  // verification unchanged. See game-invariants.ts for the branch.
+  sourceType: GameSourceType;
   score: GameScore;
   sides: readonly GameResultSide[];
   participants: readonly GameResultParticipant[];

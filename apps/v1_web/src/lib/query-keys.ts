@@ -23,6 +23,9 @@ export const v1Keys = {
   teamSchedules: (teamId: string, filters?: Record<string, unknown>) => [...v1Keys.team(teamId), 'schedules', filters ?? {}] as const,
   teamSchedule: (teamId: string, scheduleId: string) => [...v1Keys.team(teamId), 'schedules', scheduleId] as const,
   mySchedule: (filters?: Record<string, unknown>) => [...v1Keys.all, 'me', 'schedule', filters ?? {}] as const,
+  teamMatchLineup: (teamMatchId: string) => [...v1Keys.teamMatch(teamMatchId), 'lineup'] as const,
+  game: (gameId: string) => [...v1Keys.all, 'games', gameId] as const,
+  gameResultRevisions: (gameId: string) => [...v1Keys.game(gameId), 'result-revisions'] as const,
   reviews: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', filters ?? {}] as const,
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,
@@ -96,6 +99,12 @@ export const v1Keys = {
   myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
+  tournamentOperationsBoard: (tournamentId: string, filters?: Record<string, unknown>) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'operations', filters ?? {}] as const,
+  tournamentOperationsStaff: (tournamentId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'staff'] as const,
+  tournamentOperationsFields: (tournamentId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'fields'] as const,
 };
 
 // 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아

@@ -37,11 +37,16 @@ export type NotificationEventType =
   | 'team_invitation_received'
   | 'team_invitation_accepted'
   | 'inquiry_answered'
-  // Task 12, guest-recruitment lane: fired directly from GuestRecruitmentService.createApplication
-  // (interactive path, not the durable-worker reminder path — see schedule-reminders for that).
-  | 'schedule_guest_application_received'
   // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
   // once the reminder's outbox row (inserted by TeamSchedulesService.triggerReminder) is claimed.
+  // (P1-4 fix: 'schedule_guest_application_received' — the interactive, GuestRecruitmentService-
+  // emitted sibling of these two — was removed from this union entirely. That event's own delivery
+  // moved to the same durable-outbox-worker pattern as these two (see
+  // guest-recruitment.service.ts's createApplication and schedule-reminder.service.ts's new
+  // guestApplicationManagerNotificationHandler), so nothing calls emitNotification*() with it
+  // anymore; keeping a permanently-unreachable literal (and its EVENT_TITLES/EVENT_BODIES/
+  // preferenceFieldForEvent/targetTypeForEvent entries) around would have been exactly the kind of
+  // tech debt this repo's Core Engineering Principle #1 forbids leaving behind.)
   | 'schedule_rsvp_deadline_reminder'
   | 'schedule_guest_recruitment_close_reminder';
 
@@ -82,7 +87,6 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'team_join_application_rejected' ||
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
-    type === 'schedule_guest_application_received' ||
     type === 'schedule_rsvp_deadline_reminder' ||
     type === 'schedule_guest_recruitment_close_reminder'
   ) {
@@ -131,7 +135,6 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'team_join_application_rejected' ||
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
-    type === 'schedule_guest_application_received' ||
     type === 'schedule_rsvp_deadline_reminder' ||
     type === 'schedule_guest_recruitment_close_reminder'
   ) {
@@ -180,13 +183,11 @@ function deepLinkForEvent(
   if (type === 'team_join_application_received' && targetId) {
     return `/teams/${targetId}/members`;
   }
-  // Task 12, guest-recruitment lane: targetId is the compound "${teamId}:${scheduleId}" string
-  // (see GuestRecruitmentService.createApplication) — parsed only here, never used for
-  // authorization anywhere in this service.
+  // Task 12, reminders lane: targetId is the compound "${teamId}:${scheduleId}" string (see
+  // schedule-reminder.service.ts) — parsed only here, never used for authorization anywhere in
+  // this service.
   if (
-    (type === 'schedule_guest_application_received' ||
-      type === 'schedule_rsvp_deadline_reminder' ||
-      type === 'schedule_guest_recruitment_close_reminder') &&
+    (type === 'schedule_rsvp_deadline_reminder' || type === 'schedule_guest_recruitment_close_reminder') &&
     targetId
   ) {
     const [teamId, scheduleId] = targetId.split(':');
@@ -222,7 +223,6 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_invitation_received: '팀 초대가 도착했어요',
   team_invitation_accepted: '팀 초대를 수락했어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
-  schedule_guest_application_received: '용병 모집에 신청이 도착했어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
 };
@@ -259,7 +259,6 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_invitation_received: '팀 초대를 확인해 보세요.',
   team_invitation_accepted: '팀 초대를 수락했어요.',
   inquiry_answered: '답변 내용을 확인해 주세요.',
-  schedule_guest_application_received: '용병 모집 신청을 확인해 주세요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
 };

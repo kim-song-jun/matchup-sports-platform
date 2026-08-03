@@ -991,6 +991,9 @@ export type V1MySchedulePage = {
 
 export type V1TeamMatch = V1Match & {
   teamMatchId?: string;
+  // Task 17: the Game backing this team match (see docs/api/v1/domains/team-matches.md) —
+  // the only client-facing way to reach `/api/v1/games/:gameId/result-revisions*`.
+  gameId?: string | null;
   sport?: { sportId: string; name: string };
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   place?: { name: string; addressText?: string | null };
@@ -1159,6 +1162,218 @@ export type V1MyTeamMatch = {
   applicationId: string | null;
   manageRoute: string | null;
   detailRoute: string;
+};
+
+// ─── Task 17: Game aggregate + team result revisions (docs/api/domains/games.md) ───
+
+export type V1GameSourceType = 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
+export type V1GameState = 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
+export type V1GameResultRevisionState =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'CHANGE_REQUESTED'
+  | 'SUPPLEMENT_REQUESTED'
+  | 'REJECTED'
+  | 'OFFICIAL'
+  | 'VOID';
+
+export type V1GameSide = {
+  id: string;
+  gameId: string;
+  sideKey: 'HOME' | 'AWAY';
+  teamId: string | null;
+  displayNameSnapshot: string;
+};
+
+export type V1GameLineupSummary = {
+  id: string;
+  gameId: string;
+  sideId: string;
+  revision: number;
+  state: string;
+  version: number;
+  submittedAt: string | null;
+  supersedesId: string | null;
+};
+
+export type V1Game = {
+  id: string;
+  sourceType: V1GameSourceType;
+  state: V1GameState;
+  version: number;
+  lastSequence: number;
+  competitionConfigVersionId: string;
+  currentOfficialRevisionId: string | null;
+  sides: V1GameSide[];
+  periods: unknown[];
+  lineups: V1GameLineupSummary[];
+  actorRole: string;
+};
+
+export type V1GameResultScore = {
+  home: number;
+  away: number;
+  penalties?: { home: number; away: number } | null;
+};
+
+export type V1GameResultCards = { yellow: number; red: number };
+
+export type V1GameResultParticipantRow = {
+  id: string;
+  resultRevisionId: string;
+  participantId: string;
+  sideId: string;
+  started: boolean;
+  minutesPlayed: number | null;
+  goals: number;
+  cards: V1GameResultCards;
+  goalkeeper: boolean;
+};
+
+export type V1GameResultRevision = {
+  id: string;
+  gameId: string;
+  revision: number;
+  state: V1GameResultRevisionState;
+  score: V1GameResultScore;
+  eventsHash: string;
+  missingScorer: boolean;
+  mvpParticipantId: string | null;
+  reason: string | null;
+  createdByActorType: 'USER' | 'SYSTEM';
+  createdByUserId: string | null;
+  createdBySystemActor: string | null;
+  supersedesId: string | null;
+  submittedAt: string | null;
+  officialAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resultParticipants: V1GameResultParticipantRow[];
+};
+
+export type V1GameResultParticipantInput = {
+  participantId: string;
+  sideId: string;
+  started: boolean;
+  minutesPlayed?: number;
+  goals: number;
+  cards: V1GameResultCards;
+  goalkeeper: boolean;
+};
+
+export type V1CreateGameResultRevisionPayload = {
+  expectedVersion: number;
+  score: V1GameResultScore;
+  actualParticipants: V1GameResultParticipantInput[];
+  eventsHash: string;
+  mvpParticipantId?: string;
+  reason?: string;
+};
+
+export type V1SubmitGameResultRevisionPayload = {
+  expectedVersion: number;
+};
+
+export type V1DecideGameResultRevisionPayload = {
+  expectedVersion: number;
+  decision: 'approve' | 'change_request';
+  reason?: string;
+};
+
+export type V1GameRevisionMutationResult = {
+  gameId: string;
+  state: V1GameState;
+  version: number;
+  durableCommandId: string;
+  replayed: boolean;
+  revisionId: string;
+  revision: number;
+  revisionState: V1GameResultRevisionState;
+};
+
+// ── 팀 매치 라인업 (Task 14/15) ──
+// GET .../lineup 은 호출자 소속 팀(내 팀) 쪽 사이드만 돌려준다 — 상대팀 라인업을 읽는
+// 엔드포인트는 없다(정정 요청은 내용을 보지 않고 사유만 남기는 blind 액션).
+export type V1TeamMatchLineupRole = 'team_owner' | 'team_manager';
+export type V1TeamMatchLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
+
+export type V1TeamMatchLineupStarter = {
+  // `V1GameParticipant.id` — Task 17의 결과 입력 폼이 골·카드를 특정 로스터 행에
+  // 귀속시키려면 반드시 필요하다(team-match-lineup.service.ts의 라인업 조회 매퍼가
+  // 이 값을 실어 보낸다). team-match-result.types.ts의 toResultRosterRows()가
+  // participantId로 그대로 사용하므로 지우면 귀속이 undefined가 된다.
+  id: string;
+  displayName: string;
+  jerseyNumber: number | null;
+  position: string | null;
+  goalkeeper: boolean;
+};
+
+export type V1TeamMatchLineupBenchEntry = {
+  id: string;
+  displayName: string;
+  jerseyNumber: number | null;
+};
+
+export type V1TeamMatchLineup = {
+  teamMatchId: string;
+  gameId: string;
+  sideId: string;
+  role: V1TeamMatchLineupRole;
+  lineupId: string | null;
+  // revision은 이 라인업 계보의 CAS 토큰(expectedVersion으로 그대로 재사용). 매 저장마다
+  // 새 행으로 supersede되므로 row 자체의 `version`과는 별개다 — team-match-lineup.service.ts 참조.
+  revision: number;
+  state: V1TeamMatchLineupState;
+  version: number;
+  publicLineupAt: string | null;
+  starters: V1TeamMatchLineupStarter[];
+  bench: V1TeamMatchLineupBenchEntry[];
+};
+
+// 저장 요청 한 명분 — userId(연동된 활성 팀원) 또는 displayName(비연동 게스트) 중 하나는
+// 반드시 있어야 한다(서버 XOR 검증, 프론트는 이 계약을 어기지 않도록 뷰모델에서 보장).
+export type V1TeamMatchLineupParticipantInput = {
+  userId?: string;
+  displayName?: string;
+  jerseyNumber?: number;
+  position?: string;
+  goalkeeper?: boolean;
+};
+
+// `formation`은 의도적으로 없다 — `V1GameLineup`에 저장할 컬럼이 없고, 이번 변경 범위에서는
+// 마이그레이션을 추가할 수 없어 받아도 버려질 뿐이다(Task 15 blocker-2 report 참고).
+export type V1TeamMatchLineupSavePayload = {
+  expectedVersion: number;
+  starters: V1TeamMatchLineupParticipantInput[];
+  bench: V1TeamMatchLineupParticipantInput[];
+};
+
+export type V1TeamMatchLineupSaveResult = {
+  teamMatchId: string;
+  gameId: string;
+  sideId: string;
+  lineupId: string;
+  revision: number;
+  state: V1TeamMatchLineupState;
+  version: number;
+  replayed: boolean;
+};
+
+export type V1TeamMatchLineupSubmitResult = V1TeamMatchLineupSaveResult & {
+  publicLineupAt: string | null;
+};
+
+export type V1TeamMatchLineupChangeRequestResult = {
+  teamMatchId: string;
+  gameId: string;
+  sideId: string;
+  lineupId: string;
+  revision: number;
+  state: 'change_requested';
+  version: number;
+  reason: string;
+  replayed: boolean;
 };
 
 export type V1ReviewSourceType = 'match' | 'team_match' | 'tournament_fixture';
@@ -3153,4 +3368,124 @@ export type V1UpdateIntegrationSettingsPayload = {
 /** GET /public/integrations/kakao-maps-key — 인증 불필요, 카카오맵 JS SDK 로드용 공개 키. */
 export type V1PublicKakaoMapsKeyResponse = {
   kakaoMapsJsKey: string | null;
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tournament operations shell/board (Task 19 — 백엔드는 Task 18 `tournament-ops/**`)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** V1Game.state — Task 18 board가 읽는 실제 상태 컬럼(V1TournamentFixture.status 아님). */
+export type V1GameState = 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
+
+export const V1_GAME_STATES: readonly V1GameState[] = ['SCHEDULED', 'LIVE', 'PAUSED', 'ENDED', 'CANCELLED'];
+
+/** 대회 운영 스태프 역할. `PLATFORM_OPS`는 배정 행이 아니라 어드민 테이블에서 유래한다. */
+export type V1TournamentStaffRole = 'PLATFORM_OPS' | 'TOURNAMENT_DIRECTOR' | 'FIELD_OPERATOR' | 'SUPPORT_READONLY';
+
+/**
+ * 운영 보드 경고 코드 — 순수 영속 상태 함수(페이지네이션 안정 스냅샷에 포함)와
+ * `now` 에도 의존하는 값(별도 `liveWarnings`)이 분리돼 있다. 백엔드 doc:
+ * apps/v1_api/src/tournament-operations/board/dto/list-operations-query.dto.ts
+ */
+export type V1TournamentStableWarningCode = 'NO_FIELD_ASSIGNED' | 'MISSING_SCORER' | 'RESULT_REVIEW_OVERDUE';
+export type V1TournamentTimeRelativeWarningCode = 'NO_STAFF_ASSIGNED' | 'LINEUP_NOT_SUBMITTED';
+export type V1TournamentOperationsWarningCode = V1TournamentStableWarningCode | V1TournamentTimeRelativeWarningCode;
+
+/** `?warning=` 필터는 안정(시간 무관) 코드만 받는다 — 서버가 시간 의존 코드는 400으로 거부한다. */
+export const V1_STABLE_WARNING_CODES: readonly V1TournamentStableWarningCode[] = [
+  'NO_FIELD_ASSIGNED',
+  'MISSING_SCORER',
+  'RESULT_REVIEW_OVERDUE',
+];
+
+/** GET /tournament-ops/tournaments/:tournamentId/operations 응답의 items[] 항목. */
+export type V1TournamentOperationsBoardItem = {
+  fixtureId: string;
+  tournamentId: string;
+  round: string;
+  fixtureNumber: number;
+  gameId: string | null;
+  gameState: V1GameState | null;
+  fieldId: string | null;
+  fieldName: string | null;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
+  scheduledAt: string | null;
+  /** V1GameResultRevision.score — 형태는 아직 확정되지 않았다(Task 20-22가 정의). 화면은 존재 여부만 사용한다. */
+  currentScore: unknown;
+  warnings: V1TournamentStableWarningCode[];
+  version: number | null;
+  revisionId: string | null;
+  stableRevision: string;
+};
+
+/** liveWarnings[] 항목 — 안정 스냅샷 밖, `now` 의존. fixtureId로 items[]와 매칭한다. */
+export type V1TournamentOperationsLiveWarning = {
+  fixtureId: string;
+  warnings: V1TournamentTimeRelativeWarningCode[];
+};
+
+/** GET /tournament-ops/tournaments/:tournamentId/operations 응답. */
+export type V1TournamentOperationsBoardPage = {
+  items: V1TournamentOperationsBoardItem[];
+  nextCursor: string | null;
+  watermark: string;
+  liveWarnings: V1TournamentOperationsLiveWarning[];
+};
+
+export type V1TournamentOperationsBoardFilters = {
+  cursor?: string;
+  status?: V1GameState;
+  fieldId?: string;
+  warning?: V1TournamentStableWarningCode;
+  limit?: number;
+};
+
+/** GET /tournament-ops/tournaments/:tournamentId/staff 응답의 items[] 항목. */
+export type V1TournamentStaffAssignment = {
+  id: string;
+  tournamentId: string;
+  userId: string;
+  role: V1TournamentStaffRole;
+  fieldId: string | null;
+  fixtureIds: string[];
+  version: number;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  grantedByUserId: string | null;
+  createdAt: string;
+};
+
+export type V1TournamentStaffListResponse = {
+  items: V1TournamentStaffAssignment[];
+};
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff 바디. `PLATFORM_OPS`는 배정 대상이 될 수 없다. */
+export type V1GrantTournamentStaffPayload = {
+  userId: string;
+  role: Exclude<V1TournamentStaffRole, 'PLATFORM_OPS'>;
+  fieldId?: string;
+  fixtureIds?: string[];
+  expiresAt?: string;
+};
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke 바디. */
+export type V1RevokeTournamentStaffPayload = {
+  expectedVersion: number;
+  reason: string;
+};
+
+/** GET /tournament-ops/tournaments/:tournamentId/fields 응답의 items[] 항목. */
+export type V1TournamentField = {
+  id: string;
+  tournamentId: string;
+  scopeKey: string;
+  name: string;
+  sortOrder: number;
+  active: boolean;
+  version: number;
+};
+
+export type V1TournamentFieldListResponse = {
+  items: V1TournamentField[];
 };

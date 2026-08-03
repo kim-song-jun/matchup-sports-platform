@@ -1728,6 +1728,10 @@ async function createFixture(): Promise<void> {
     data: {
       id: ids.lane4Match,
       hostTeamId: ids.lane4HostTeam,
+      // Task 16: result submit now requires a real matched opponent (see
+      // GamesService.assertTeamMatchMatched) — status must agree with
+      // approvedApplicantTeamId exactly as the real approve-application flow leaves it.
+      status: 'matched',
       approvedApplicantTeamId: ids.lane4OpponentTeam,
       createdByUserId: ids.hostUser,
       sportId: ids.sport,

@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { GameResultOfficialProjectionService } from '../game-operations/game-result-official-projection.service';
+import { GameResultVoidProjectionService } from '../game-operations/game-result-void-projection.service';
 import { GameResultSubmittedEscalationService } from './result-escalation/game-result-submitted-escalation.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -66,10 +67,19 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     }
     const officialProjection = new GameResultOfficialProjectionService();
     this.registerHandler('GAME_RESULT_OFFICIAL', officialProjection.handler);
+    const voidProjection = new GameResultVoidProjectionService();
+    this.registerHandler('GAME_RESULT_VOIDED', voidProjection.handler);
     const submittedEscalation = new GameResultSubmittedEscalationService();
     this.registerHandler('GAME_RESULT_SUBMITTED', submittedEscalation.handler);
     this.registerHandler('GAME_RESULT_REVIEW_REMINDER', submittedEscalation.reminderHandler);
     this.registerHandler('GAME_RESULT_REVIEW_ESCALATION', submittedEscalation.escalationHandler);
+    // reject/request_supplement close their own review SLA synchronously in
+    // the API command (TournamentResultReviewService.closeReviewSla, Task
+    // 22); the durable audit handler here only needs to make the outbox's
+    // own business key idempotently durable, exactly like the CAS/flag
+    // audit trail.
+    this.registerDurableAuditHandler('GAME_RESULT_REJECTED');
+    this.registerDurableAuditHandler('GAME_RESULT_SUPPLEMENT_REQUESTED');
   }
 
   registerHandler(type: string, handler: GameOperationHandler): void {

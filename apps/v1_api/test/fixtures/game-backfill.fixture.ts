@@ -104,6 +104,14 @@ export const gameBackfillFixture = {
     },
     completedTeamMatchDetail: {
       teamMatchId: id('000000000019'),
+      // Task 17 added `gameId` to the team-match detail response so the result
+      // UI can reach the game aggregate. This fixture row is legacy,
+      // pre-migration data with no V1Game, so the pinned value is null. The
+      // PIN assertion compares the whole object, so omitting the field made it
+      // fail once the "V1 API unit tests" job started running (Task 10 landing
+      // unblocked that gate) -- this is an intentional contract addition, not
+      // unintended drift.
+      gameId: null,
       title: 'Completed without a legacy score',
       description: null,
       imageUrl: null,

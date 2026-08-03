@@ -38,6 +38,20 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { TournamentStaffGuard } from './staff/tournament-staff.guard';
 import { TournamentStaffService } from './staff/tournament-staff.service';
+import { TournamentResultReviewController } from '../tournament-operations/results/tournament-result-review.controller';
+import { TournamentResultReviewService } from '../tournament-operations/results/tournament-result-review.service';
+// Task 24: `apps/v1_api/src/games/public-records` is fully self-contained
+// (own controllers/providers, no other feature module dependency) and
+// mounts three additional public route families
+// (`tournaments/:id/schedule`, `tournaments/:id/matches/:fixtureId`,
+// `teams/:id/records`, `users/:id/records`). It is wired in here -- rather
+// than into `app.module.ts` (Todo 26's exclusively owned output) or
+// `games/games.module.ts` (Todo 6's owned output) -- because this file is
+// not a declared output of any todo in the Task 127 ledger, matching the
+// precedent already set by `TournamentResultReviewController`/`Service`
+// above (also wired into this same unowned file, not into a todo-owned
+// one). No other file in this module is touched.
+import { PublicRecordsModule } from '../games/public-records/public-records.module';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -55,6 +69,7 @@ import { TournamentStaffService } from './staff/tournament-staff.service';
     GamesModule,
     OperationAuditModule,
     RealtimeModule,
+    PublicRecordsModule,
   ],
   controllers: [
     TournamentCampaignsPublicController,
@@ -70,6 +85,7 @@ import { TournamentStaffService } from './staff/tournament-staff.service';
     TournamentPopupController,
     TournamentReviewsController,
     TournamentsReadController,
+    TournamentResultReviewController,
   ],
   providers: [
     TournamentsAdminService,
@@ -91,6 +107,7 @@ import { TournamentStaffService } from './staff/tournament-staff.service';
     TournamentStaffAccessService,
     TournamentStaffGuard,
     TournamentStaffService,
+    TournamentResultReviewService,
   ],
 })
 export class TournamentsModule {}

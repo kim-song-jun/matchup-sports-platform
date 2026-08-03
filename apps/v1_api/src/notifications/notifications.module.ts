@@ -6,24 +6,29 @@ import { ResultEscalationAccessService } from '../game-operations/result-escalat
 import { ResultEscalationMutationService } from '../game-operations/result-escalation-mutation.service';
 import { ResultEscalationService } from '../game-operations/result-escalation.service';
 import { ResultEscalationValidationInterceptor } from '../game-operations/result-escalation-validation.interceptor';
-import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationsController } from './notifications.controller';
-import { NotificationsService } from './notifications.service';
+import { NotificationsServiceModule } from './notifications-service.module';
 import { WebPushController } from './web-push.controller';
-import { WebPushService } from './web-push.service';
 
+// NotificationsService/WebPushService are declared here (imported + re-exported from
+// NotificationsServiceModule) rather than directly in this module's own providers, so that this
+// module's HTTP-only surface (ResultEscalation* controllers/providers, NotificationsController,
+// WebPushController) stays separable from the notification-service pair itself. The standalone
+// v1-game-operations-worker (Task 12's schedule reminders) does NOT import this module or
+// NotificationsServiceModule — it has its own worker-only declaring module
+// (jobs/schedule-reminders/worker-notifications.module.ts) that provides the same
+// NotificationsService/WebPushService pair without this module's RealtimeModule/GamesModule
+// dependency. See notifications-service.module.ts's docblock for why that split is required.
 @Module({
-  imports: [RealtimeModule],
+  imports: [NotificationsServiceModule],
   controllers: [NotificationsController, WebPushController, ResultEscalationController, PlatformResultEscalationController],
   providers: [
-    NotificationsService,
-    WebPushService,
     ResultEscalationAccessService,
     ResultEscalationMutationService,
     ResultEscalationService,
     ResultEscalationValidationInterceptor,
     V1AuthGuard,
   ],
-  exports: [NotificationsService, WebPushService],
+  exports: [NotificationsServiceModule],
 })
 export class NotificationsModule {}

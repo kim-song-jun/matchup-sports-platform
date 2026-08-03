@@ -16,6 +16,8 @@ export const TOURNAMENT_STAFF_ACTIONS = [
   'event_reverse',
   'lineup_mutate',
   'cancel',
+  'result_review',
+  'result_officialize',
 ] as const;
 
 export type TournamentStaffAction = (typeof TOURNAMENT_STAFF_ACTIONS)[number];
@@ -139,6 +141,8 @@ function isAction(value: unknown): value is TournamentStaffAction {
     case 'event_reverse':
     case 'lineup_mutate':
     case 'cancel':
+    case 'result_review':
+    case 'result_officialize':
       return true;
     default:
       return false;

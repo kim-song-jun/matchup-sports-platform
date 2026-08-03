@@ -1,5 +1,6 @@
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
+import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type {
@@ -36,7 +37,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
 const authUser = (id: string) => ({
   id,
   email: `${id}@example.test`,

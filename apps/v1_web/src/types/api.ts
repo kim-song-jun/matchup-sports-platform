@@ -979,7 +979,9 @@ export type V1MyTeamMatch = {
 // ─── Task 17: Game aggregate + team result revisions (docs/api/domains/games.md) ───
 
 export type V1GameSourceType = 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
-export type V1GameState = 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
+// `V1GameState`는 아래 Task 18 블록에 `V1_GAME_STATES` 상수와 함께 선언돼 있다.
+// 머지 과정에서 양쪽 브랜치가 각각 같은 유니온을 추가해 중복 선언(TS2300)이
+// 발생했으므로, 문서 주석과 상수를 함께 갖춘 쪽만 단일 정의로 남긴다.
 export type V1GameResultRevisionState =
   | 'DRAFT'
   | 'SUBMITTED'

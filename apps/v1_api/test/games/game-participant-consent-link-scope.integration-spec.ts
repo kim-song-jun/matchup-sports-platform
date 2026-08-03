@@ -1,6 +1,7 @@
 import { HttpException } from '@nestjs/common';
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
+import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -37,7 +38,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
 
 const authUser = (id: string) => ({
   id,

@@ -30,6 +30,22 @@ dump_database() {
     return 1
   fi
 
+  # 정지된 컨테이너는 건너뛴다. `docker inspect` 는 정지된 컨테이너에도 성공하므로 위
+  # 검사만으로는 걸러지지 않고, 그 다음 `docker exec` 가 죽어서 백업 전체가 exit 1 이 된다.
+  #
+  # 2026-08-02 실제로 이렇게 됐다: 레거시 스택(teameet_postgres)이 정지된 뒤로 매일 밤
+  # "legacy: pg_dump 실패 → 일부 백업이 실패했습니다 → exit 1" 이 반복됐고, v1 덤프는
+  # 정상적으로 S3 에 올라갔는데도 **성공 하트비트가 발행되지 않았다**. 즉 백업은 되고 있는데
+  # 감시 지표만 죽어 있는, 가장 헷갈리는 상태였다.
+  #
+  # 정지된 DB 는 더 이상 변하지 않으므로 마지막 덤프가 곧 최종본이다 — 백업할 것이 없는 게
+  # 맞고, 이것을 실패로 볼 이유가 없다. 반대로 **실행 중인데** 덤프가 실패하면 그건 진짜
+  # 실패이므로 아래 경로에서 그대로 exit 1 이 된다.
+  if [[ "$(sudo docker inspect -f '{{.State.Running}}' "${container}")" != "true" ]]; then
+    log "${label}: 컨테이너 ${container} 가 정지 상태입니다 — 변경될 수 없으므로 건너뜁니다"
+    return 0
+  fi
+
   stamp="$(date -u +%Y/%m/%d/%Y%m%dT%H%M%SZ)"
   key="pg/${label}/${stamp}.sql.gz"
   tmp="$(mktemp)"

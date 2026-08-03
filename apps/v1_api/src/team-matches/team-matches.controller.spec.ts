@@ -4,6 +4,7 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { TeamMatchesController } from './team-matches.controller';
+import { TeamMatchLineupService } from './team-match-lineup.service';
 import { TeamMatchesService } from './team-matches.service';
 
 const user = {
@@ -14,6 +15,15 @@ const user = {
 };
 
 describe('TeamMatchesController', () => {
+  // Only the four methods team-matches.controller.ts actually delegates to
+  // (getLineup / saveLineup / submitLineup / requestChange).
+  const teamMatchLineupService = {
+    getLineup: jest.fn(),
+    saveLineup: jest.fn(),
+    submitLineup: jest.fn(),
+    requestChange: jest.fn(),
+  };
+
   const teamMatchesService = {
     list: jest.fn(),
     detail: jest.fn(),
@@ -42,6 +52,12 @@ describe('TeamMatchesController', () => {
       controllers: [TeamMatchesController],
       providers: [
         { provide: TeamMatchesService, useValue: teamMatchesService },
+        // Task 14 added TeamMatchLineupService as the controller's second
+        // constructor argument; without it Nest cannot instantiate the
+        // controller and every test in this file fails at compile(). This
+        // drift went undetected because the "V1 API unit tests" job was
+        // skipped on every branch until Task 10 landed.
+        { provide: TeamMatchLineupService, useValue: teamMatchLineupService },
         { provide: PrismaService, useValue: {} },
         { provide: OptionalV1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
         { provide: V1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },

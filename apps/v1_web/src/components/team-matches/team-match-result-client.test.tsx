@@ -21,6 +21,15 @@ const {
   decideMutateAsync: vi.fn(),
 }));
 
+// jsdom has no Next router, so `useSearchParams()` returns null and the first
+// `.get()` inside AppChrome throws "Cannot read properties of null". Mirrors
+// team-matches-client.test.tsx, which mounts the same chrome.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/team-matches/tm-1/result',
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatch: useV1TeamMatchMock,
   useV1Game: useV1GameMock,

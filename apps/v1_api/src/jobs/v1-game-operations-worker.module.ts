@@ -3,8 +3,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { AdminContextModule } from '../common/admin-context.module';
 import { buildPinoHttpOptions } from '../common/logging/pino-http.config';
-import { GameOperationFlagsController } from '../config/game-operation-flags.controller';
-import { GameOperationFlagsService } from '../config/game-operation-flags';
+import { GameOperationFlagsModule } from '../config/game-operation-flags.module';
 import { ResultEscalationController } from '../game-operations/result-escalation.controller';
 import { PlatformResultEscalationController } from '../game-operations/platform-result-escalation.controller';
 import { ResultEscalationAccessService } from '../game-operations/result-escalation-access.service';
@@ -45,28 +44,37 @@ import { V1GameOperationsWorkerService } from './v1-game-operations-worker.servi
   //      (Task 12 B2). WorkerNotificationsModule provides the same NotificationsService/
   //      WebPushService pair without importing realtime/ or games/ at all — see that module's
   //      docblock for the full rationale.
+  //
+  // `GameOperationFlagsModule` replaces this module's former direct
+  // registration of GameOperationFlagsController/Service (Task 10's refactor
+  // on the integration branch); the `exports` list below re-exports it. Both
+  // that refactor and the Logger/WorkerNotifications wiring above are
+  // load-bearing, so this merge keeps both rather than either side alone.
   imports: [
     PrismaModule,
     AdminContextModule,
     LoggerModule.forRoot({ pinoHttp: buildPinoHttpOptions() }),
     WorkerNotificationsModule,
+    GameOperationFlagsModule,
   ],
   controllers: [
     V1GameOperationsWorkerController,
     V1GameOperationsJobsController,
-    GameOperationFlagsController,
     ResultEscalationController,
     PlatformResultEscalationController,
   ],
   providers: [
     V1GameOperationsWorkerService,
-    GameOperationFlagsService,
     ResultEscalationAccessService,
     ResultEscalationMutationService,
     ResultEscalationService,
     ResultEscalationValidationInterceptor,
     V1AuthGuard,
   ],
-  exports: [V1GameOperationsWorkerService, GameOperationFlagsService, ResultEscalationService],
+  exports: [
+    V1GameOperationsWorkerService,
+    GameOperationFlagsModule,
+    ResultEscalationService,
+  ],
 })
 export class V1GameOperationsWorkerModule {}

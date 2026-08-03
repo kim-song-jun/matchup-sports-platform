@@ -472,6 +472,16 @@ jobs:
           node scripts/qa/verify-game-result-cutover.mjs --mode apply --fixture apps/v1_api/test/fixtures/game-backfill.fixture.ts --evidence-dir "${TASK10_EVIDENCE_DIR}"
           node scripts/qa/verify-game-result-cutover.mjs --mode apply --fixture apps/v1_api/test/fixtures/game-backfill.fixture.ts --evidence-dir "${TASK10_EVIDENCE_DIR}"
 
+      # Writes the runtime manifest verify-game-result-cutover.mjs's `--mode live`
+      # step reads from TASK10_RUNTIME_FILE (runtimeManifest(), ~line 700 of that
+      # file). Must run after the DB is migrated + seeded (above) and before the
+      # live stage boots the API (below) — see
+      # apps/v1_api/src/games/migration/task10-runtime-manifest.cli.ts's header
+      # comment for the full contract and known blockers.
+      - name: Produce Task 10 live cutover runtime manifest
+        working-directory: apps/v1_api
+        run: pnpm exec ts-node --transpile-only src/games/migration/task10-runtime-manifest.cli.ts
+
       - name: Live legacy compare mismatch and kill-switch proof
         timeout-minutes: 8
         run: >-

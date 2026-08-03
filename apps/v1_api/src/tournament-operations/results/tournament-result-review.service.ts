@@ -288,6 +288,13 @@ export class TournamentResultReviewService {
           }
           throw error;
         }
+        // The `v1_guard_result_participant_mutation` trigger (see
+        // prisma/migrations/20260729000100_v1_game_operations) only permits
+        // inserting `v1_game_result_participants` rows while the owning
+        // revision is still DRAFT. The successor must therefore be created
+        // in DRAFT (the schema default), get its participants attached, and
+        // only then transition to SUBMITTED -- creating it pre-SUBMITTED
+        // and attaching participants after would violate the trigger.
         const successor = await tx.v1GameResultRevision.create({
           data: {
             gameId,
@@ -300,8 +307,6 @@ export class TournamentResultReviewService {
             createdByActorType: 'USER',
             createdByUserId: user.id,
             supersedesId: base.id,
-            state: V1GameResultRevisionState.SUBMITTED,
-            submittedAt: new Date(),
           },
         });
         await tx.v1GameResultParticipant.createMany({
@@ -316,6 +321,15 @@ export class TournamentResultReviewService {
             goalkeeper: participant.goalkeeper,
           })),
         });
+        this.assertTransition({
+          from: successor.state,
+          to: V1GameResultRevisionState.SUBMITTED,
+          flow: 'STANDARD',
+        });
+        const submitted = await tx.v1GameResultRevision.update({
+          where: { id: successor.id },
+          data: { state: V1GameResultRevisionState.SUBMITTED, submittedAt: new Date() },
+        });
         const updated = await tx.v1Game.update({
           where: { id: gameId },
           data: { version: { increment: 1 } },
@@ -324,11 +338,11 @@ export class TournamentResultReviewService {
         // path -- the resubmission is a brand-new review, not a continuation.
         await this.writeOutbox(
           tx,
-          `game:${gameId}:revision:${successor.revision}:submitted`,
+          `game:${gameId}:revision:${submitted.revision}:submitted`,
           gameId,
           'GAME_RESULT_SUBMITTED',
-          { revisionId: successor.id },
-          successor.id,
+          { revisionId: submitted.id },
+          submitted.id,
         );
         return {
           gameId,
@@ -336,9 +350,9 @@ export class TournamentResultReviewService {
           version: updated.version,
           durableCommandId: context.durableCommandId,
           replayed: false,
-          revisionId: successor.id,
-          revision: successor.revision,
-          revisionState: successor.state,
+          revisionId: submitted.id,
+          revision: submitted.revision,
+          revisionState: submitted.state,
         };
       },
     );

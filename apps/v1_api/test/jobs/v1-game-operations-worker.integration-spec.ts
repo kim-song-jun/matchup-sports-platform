@@ -240,9 +240,13 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
 
   it('reports built-in handler readiness and poisoned queue health without leaking owner identity', async () => {
     const service = new V1GameOperationsWorkerService(prisma);
+    // Built-in handlers as of Task 22: GAME_RESULT_OFFICIAL, GAME_RESULT_VOIDED,
+    // GAME_RESULT_SUBMITTED, GAME_RESULT_REVIEW_REMINDER,
+    // GAME_RESULT_REVIEW_ESCALATION, and the two durable-audit-only handlers
+    // GAME_RESULT_REJECTED / GAME_RESULT_SUPPLEMENT_REQUESTED -- 7 total.
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 4,
+      registeredHandlers: 7,
       queue: {
         pending: 0,
         retry: 0,
@@ -255,7 +259,7 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     service.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 5,
+      registeredHandlers: 8,
     });
 
     await insertJob({ status: 'POISONED', attempts: 6 });

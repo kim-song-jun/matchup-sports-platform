@@ -1030,6 +1030,12 @@ export class TournamentResultReviewService {
       ...(participant.minutesPlayed === undefined ? {} : { minutesPlayed: participant.minutesPlayed }),
     }));
     return {
+      // Task 17이 GameResultInvariantInput에 sourceType을 필수로 추가했다
+      // (TEAM_MATCH는 자체 보고라 이벤트-스코어 교차검증에서 면제,
+      // TOURNAMENT_FIXTURE는 엄격 검증 유지 — game-invariants.ts 참조).
+      // 이 레인은 위 docblock대로 항상 TOURNAMENT_FIXTURE지만, 하드코딩 대신
+      // 잠근 게임의 실제 값을 넘겨 704행의 sourceType 가드와 단일 출처를 유지한다.
+      sourceType: game.sourceType,
       score: dto.score,
       sides: sides.map((side) => ({ id: side.id, sideKey: side.sideKey })),
       participants,

@@ -339,7 +339,7 @@ jobs:
           node scripts/qa/verify-game-result-cutover.mjs \
             --mode pin \
             --evidence-dir "${TASK10_EVIDENCE_DIR}"
-          pnpm --filter v1_api test:integration -- --runInBand --runTestsByPath test/games/game-backfill.integration-spec.ts -t "Task 10 PIN"
+          pnpm --filter v1_api exec jest --selectProjects integration --runInBand --runTestsByPath test/games/game-backfill.integration-spec.ts --testNamePattern="Task 10 PIN"
 
       - name: Reset isolated database after PIN
         env:

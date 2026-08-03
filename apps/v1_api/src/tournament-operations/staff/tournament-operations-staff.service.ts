@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma, V1OperationActorType, V1TournamentStaffRole } from '@prisma/client';
-import { maskSourceIp } from '../../common/audit/operation-audit.contract';
+import { V1TournamentStaffRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   TournamentStaffAccessService,
@@ -151,6 +150,17 @@ export class TournamentOperationsStaffService {
     });
   }
 
+  /**
+   * Task 18 review P1-3 (fix): the frozen contract requires `reason` in this endpoint's body, and
+   * it MUST be persisted atomically with the revocation itself -- not as a separate follow-up
+   * write after `revokeStaff()`'s own transaction has already committed (that was the pre-fix
+   * behavior here: a failure in the follow-up write left the assignment revoked with the
+   * contract-required reason silently lost, with no way to retry just the reason since the
+   * revocation itself was already consumed). `dto.reason` is now passed straight into
+   * `TournamentStaffService.revokeStaff()`, which writes it onto the SAME `V1OperationAudit` row
+   * as the revoke, inside the SAME transaction (see that method's `writeAudit()` doc comment) --
+   * this lane no longer performs its own separate `v1OperationAudit.create()` for it at all.
+   */
   async revoke(
     actorUserId: string,
     tournamentId: string,
@@ -158,43 +168,13 @@ export class TournamentOperationsStaffService {
     dto: RevokeTournamentStaffDto,
     audit: TournamentStaffAuditContext,
   ): Promise<TournamentStaffAssignmentResult> {
-    const result = await this.staffService.revokeStaff({
+    return this.staffService.revokeStaff({
       actorUserId,
       tournamentId,
       assignmentId,
       expectedVersion: dto.expectedVersion,
       audit,
+      reason: dto.reason,
     });
-
-    // TournamentStaffService.revokeStaff() (Task 7, apps/v1_api/src/tournaments/staff/,
-    // not this lane) has no parameter for a free-text reason -- its audit
-    // envelope cannot carry one. The frozen contract requires `reason` in
-    // this endpoint's body, so instead of validating and then silently
-    // dropping it (Task 18 review finding #11), persist it ourselves as a
-    // durable, queryable V1OperationAudit row scoped to the same assignment,
-    // using the table's own `reason` column (schema.prisma V1OperationAudit.reason)
-    // that the shared writer-service contract doesn't (yet) expose. This is a
-    // best-effort follow-up write (revokeStaff()'s own transaction has
-    // already committed by the time this runs, so it cannot be made atomic
-    // with the revocation itself without editing the out-of-lane service),
-    // but it means the reason is genuinely persisted and auditable instead
-    // of thrown away every single time.
-    await this.prisma.v1OperationAudit.create({
-      data: {
-        actorType: V1OperationActorType.USER,
-        actorUserId,
-        action: 'tournament.staff.revoke_reason',
-        resourceType: 'TOURNAMENT_STAFF_ASSIGNMENT',
-        resourceId: assignmentId,
-        requestId: audit.requestId,
-        maskedSourceIp: maskSourceIp(audit.sourceIp),
-        reason: dto.reason,
-        before: Prisma.JsonNull,
-        after: { reason: dto.reason },
-        tournamentId,
-      },
-    });
-
-    return result;
   }
 }

@@ -53,6 +53,14 @@ export type RevokeTournamentStaffInput = {
   readonly assignmentId: string;
   readonly expectedVersion: number;
   readonly audit: TournamentStaffAuditContext;
+  /**
+   * Task 18 review P1-3: optional free-text revoke reason, persisted onto the SAME
+   * `tournament.staff.revoke` audit row this method writes inside its own transaction (via
+   * `writeAudit()`'s `reason` parameter) -- NOT as a separate follow-up write from an out-of-lane
+   * caller. See `writeAudit()`'s doc comment for why a follow-up write from a different
+   * transaction cannot be atomic with the revocation itself.
+   */
+  readonly reason?: string;
 };
 
 export type TournamentStaffAssignmentResult = {
@@ -278,6 +286,7 @@ export class TournamentStaffService {
           assignment: after,
           before: this.auditSnapshot(before),
           after: this.auditSnapshot(after),
+          reason: normalized.reason,
         });
         return this.result(after);
       },
@@ -476,6 +485,24 @@ export class TournamentStaffService {
     });
   }
 
+  /**
+   * Task 18 review P1-3: `mutation.reason` (when supplied) is written onto the SAME
+   * `V1OperationAudit` row this method creates, inside the SAME `tx` the caller's own
+   * revoke/grant/bootstrap mutation just committed to -- not as a separate follow-up
+   * `v1OperationAudit.create()` from a different transaction after this one has already
+   * committed. `OperationAuditWriterService.create()`'s shared envelope has no `reason` field (it
+   * is a cross-lane contract used by several callers, not owned by this file), so this method
+   * issues one additional `tx.v1OperationAudit.update()` on the row `auditWriter.create()` just
+   * returned the id of -- still fully inside `tx`, so either both the audit row's core fields AND
+   * its `reason` persist together with the revoke, or (if anything here throws) the whole
+   * transaction rolls back together, INCLUDING the revoke itself. This is the fix for the pre-fix
+   * behavior where `TournamentOperationsStaffService.revoke()` (a different lane's orchestration,
+   * apps/v1_api/src/tournament-operations/staff/) called `revokeStaff()` here to completion (this
+   * transaction already committed) and only THEN, in a wholly separate `prisma.v1OperationAudit.
+   * create()` call outside any transaction, tried to persist the reason -- a failure in that
+   * second, independent write left the assignment revoked with no reason recorded at all, with no
+   * way to retry just the reason (the revoke itself was already consumed).
+   */
   private async writeAudit(
     tx: StaffTransaction,
     principal: TournamentStaffPrincipal,
@@ -486,6 +513,7 @@ export class TournamentStaffService {
       readonly assignment: StaffAssignmentSnapshot;
       readonly before: ReturnType<TournamentStaffService['auditSnapshot']> | null;
       readonly after: ReturnType<TournamentStaffService['auditSnapshot']>;
+      readonly reason?: string;
     },
   ): Promise<void> {
     const auditClient: OperationAuditCreateClient = {
@@ -493,7 +521,7 @@ export class TournamentStaffService {
         create: ({ data }) => tx.v1OperationAudit.create({ data, select: { id: true } }),
       },
     };
-    await this.auditWriter.create(auditClient, {
+    const created = await this.auditWriter.create(auditClient, {
       actor: this.auditActor(principal),
       requestId: audit.requestId,
       sourceIp: audit.sourceIp,
@@ -506,6 +534,12 @@ export class TournamentStaffService {
       tournamentId: mutation.assignment.tournamentId,
       fieldId: mutation.assignment.fieldId,
     });
+    if (mutation.reason !== undefined) {
+      await tx.v1OperationAudit.update({
+        where: { id: created.id },
+        data: { reason: mutation.reason },
+      });
+    }
   }
 
   private auditActor(principal: TournamentStaffPrincipal): OperationAuditActor {
@@ -599,6 +633,7 @@ export class TournamentStaffService {
       expectedVersion: input.expectedVersion,
       audit: this.auditContext(input.audit),
       occurredAt: this.now(),
+      reason: input.reason,
     };
   }
 

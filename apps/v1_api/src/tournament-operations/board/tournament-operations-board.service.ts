@@ -56,13 +56,73 @@ function canonicalizeForHash(value: unknown): unknown {
   return value;
 }
 
-/** Opaque keyset-cursor tuple. The *wire* shape of `cursor`/`nextCursor` is unchanged (a raw
- * `V1TournamentFixture.id`, per the frozen "returns a clean empty page... when the cursor value
- * does not match any existing fixture row" test) -- what changed (review finding #7) is that a
- * cursor whose underlying row belongs to a DIFFERENT tournament than the one being queried is now
- * rejected instead of silently being used as a foreign sort-position anchor. */
-interface CursorLookup {
+/**
+ * Opaque, self-describing keyset-cursor tuple (Task 18 review P1-1/P1-2 fix).
+ *
+ * The PRIOR cursor was a raw `V1TournamentFixture.id`, resolved back to its owning row (and
+ * `tournamentId`) via a `findUnique` on every page-2+ request. That design had two P1 defects:
+ *
+ * - P1-1 (existence oracle): a cursor id that matched no row at all fell through to a clean empty
+ *   page (200), while a cursor id that DID exist but belonged to a DIFFERENT tournament was
+ *   rejected with `400 OPERATIONS_BOARD_CURSOR_TOURNAMENT_MISMATCH` -- two different, distinguishable
+ *   responses that let a caller probe whether an arbitrary fixture id exists in some OTHER
+ *   (possibly private) tournament, just by comparing which of the two responses came back.
+ * - P1-2 (mutable/deletable anchor): resolving the cursor by re-reading the CURRENT row meant a
+ *   walk broke the instant that anchor row was deleted (or its own `round`/`fixtureNumber`
+ *   changed) between two page requests -- the next page's `findUnique` would find nothing, and
+ *   the walk silently lost every remaining row instead of continuing from where it left off.
+ *
+ * The fix: `cursor`/`nextCursor` now carry the full `(tournamentId, round, fixtureNumber, id)`
+ * sort-position tuple, opaque-encoded (base64url JSON) rather than embedded in a re-lookup-able
+ * row id. This makes the cursor durable against the anchor row being deleted or re-sorted (the
+ * NEXT page's WHERE predicate is built directly from the tuple the cursor carries, never by
+ * re-reading a row that may no longer exist or may no longer sort where it used to), and makes a
+ * cursor minted for one tournament INDISTINGUISHABLE, from the outside, from a cursor that never
+ * existed at all when reused against a different tournament -- both decode fine but fail the
+ * `tournamentId` check the same way, and BOTH are normalized to the exact same "clean empty page"
+ * response (see `list()`), never a distinguishing 400. A cursor that fails to decode at all
+ * (garbage/tampered string) is treated identically -- this is intentionally NOT a cryptographically
+ * signed token (nothing in the tuple is a secret; tournamentId/round/fixtureNumber/id are already
+ * visible in the very page whose `nextCursor` carries them), only a self-describing, opaque one.
+ */
+interface OperationsBoardCursorPayload {
   readonly tournamentId: string;
+  readonly round: string;
+  readonly fixtureNumber: number;
+  readonly id: string;
+}
+
+function encodeOperationsBoardCursor(payload: OperationsBoardCursorPayload): string {
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+}
+
+/** Returns `null` for ANY malformed/tampered/foreign-shape input -- never throws -- so every
+ * caller-supplied `cursor` that isn't a well-formed tuple this service itself minted is handled by
+ * the exact same "invalid cursor" branch in `list()`, regardless of WHY it failed to decode. */
+function decodeOperationsBoardCursor(raw: string): OperationsBoardCursorPayload | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== 'object') return null;
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    typeof candidate.tournamentId !== 'string' ||
+    typeof candidate.round !== 'string' ||
+    typeof candidate.fixtureNumber !== 'number' ||
+    !Number.isInteger(candidate.fixtureNumber) ||
+    typeof candidate.id !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    tournamentId: candidate.tournamentId,
+    round: candidate.round,
+    fixtureNumber: candidate.fixtureNumber,
+    id: candidate.id,
+  };
 }
 
 /**
@@ -126,7 +186,9 @@ interface CursorLookup {
  * - `items[].version`              <- `V1Game.version`
  * - `items[].revisionId`           <- `V1Game.currentOfficialRevisionId`
  * - `items[].stableRevision`       <- see "incremental key" section below (review finding #5)
- * - `nextCursor`                   <- `V1TournamentFixture.id` of the last page row (keyset cursor)
+ * - `nextCursor`                   <- opaque-encoded `(tournamentId, round, fixtureNumber, id)` of
+ *                                     the last page row (see `OperationsBoardCursorPayload`, Task
+ *                                     18 review P1-1/P1-2 fix -- no longer a bare fixture id)
  * - `watermark`                    <- hash of the page's ordered `(fixtureId, stableRevision)`
  *                                     pairs (see below) -- all persisted columns, no clock read
  *
@@ -167,28 +229,28 @@ interface CursorLookup {
  * `GamesService` never writes that column once the Game model became authoritative, so it is
  * dead/unmaintained and would silently under/over-match.
  *
- * ## Pagination (review finding #7)
- * Deterministic keyset cursor on `(round, fixtureNumber, id)` via Prisma's native unique-id
- * cursor (`cursor: { id }, skip: 1`) -- `id` is a total tie-breaker so the sort order itself is
- * total. The cursor's WIRE shape is unchanged (a raw fixture id) to stay compatible with the
- * existing "opaque token, garbage id -> clean empty page, never 500" contract. What changed:
- * before running the main page query, a supplied `cursor` is resolved to its owning
- * `tournamentId`; if that row exists AND belongs to a DIFFERENT tournament than the one being
- * queried, the request is now rejected (`BadRequestException`,
- * `OPERATIONS_BOARD_CURSOR_TOURNAMENT_MISMATCH`) instead of silently using a foreign row's sort
- * position as this query's page-2 anchor (previously: `where: { tournamentId }` would combine with
- * an unrelated row's `(round, fixtureNumber, id)` tuple with no validation at all). A cursor whose
- * row does not exist at all still yields a clean empty page (Prisma's cursor subquery finds no
- * anchor), matching the existing frozen test.
+ * ## Pagination (review finding #7, hardened again by Task 18 review P1-1/P1-2)
+ * Deterministic keyset cursor on `(round, fixtureNumber, id)` -- `id` is a total tie-breaker so
+ * the sort order itself is total. `cursor`/`nextCursor` carry an opaque-encoded
+ * `OperationsBoardCursorPayload` (`{tournamentId, round, fixtureNumber, id}, see that type's doc
+ * comment) rather than a bare `V1TournamentFixture.id`: the NEXT page's WHERE predicate is built
+ * directly from the tuple the cursor itself carries (`(round, fixtureNumber, id) > cursor tuple`,
+ * lexicographically), never by re-reading a row that may have been deleted or re-sorted since the
+ * cursor was minted (P1-2), and a cursor decoded for a DIFFERENT tournament than the one being
+ * queried is treated exactly the same as a cursor that fails to decode at all -- both collapse to
+ * the identical "clean empty page" response, never a distinguishing error that would leak whether
+ * some OTHER tournament's fixture exists (P1-1). See `list()`'s own handling of `cursorPayload`/
+ * `cursorInvalid` below.
  *
  * **What this pagination DOES and does NOT guarantee, stated precisely:** for any row already
  * emitted by a walk (or any row that existed, matched the filter, and had not yet been emitted at
  * the moment its page was queried), the walk will emit it exactly once, in total `(round,
  * fixtureNumber, id)` order, with no duplicates -- this holds even if OTHER rows are concurrently
- * inserted, updated, or deleted, and even if the cursor's own row is later deleted. It does NOT
- * guarantee that a row inserted (or mutated to newly match the filter) so that it sorts BEFORE the
- * walk's current position will be retroactively included in that same walk -- this is the standard,
- * expected trade-off of forward-only keyset pagination shared by this repo's other cursor-paginated
+ * inserted, updated, or deleted, and even if the cursor's own row is later deleted (P1-2: the
+ * cursor no longer needs that row to still exist at all). It does NOT guarantee that a row
+ * inserted (or mutated to newly match the filter) so that it sorts BEFORE the walk's current
+ * position will be retroactively included in that same walk -- this is the standard, expected
+ * trade-off of forward-only keyset pagination shared by this repo's other cursor-paginated
  * endpoints (docs/api/global-contract.md's "opaque cursor" contract) and not a defect specific to
  * this endpoint: a client that needs to observe such a row starts a new walk (`cursor` omitted).
  * `nextCursor`/`watermark` are unrelated concerns; a client that wants to detect ALL changes across
@@ -235,17 +297,22 @@ interface CursorLookup {
  * this fix, so consistency for THAT seam is instead provided by binding the authority call to
  * explicit expected values and re-verifying them fresh afterward -- see the port's doc comment.
  *
- * ## GAME_READ authority seam (P0 fix, review finding #4)
+ * ## GAME_READ authority seam (P0 fix, review finding #4; hardened again by Task 18 review P1-7)
  * The current `GAME_READ` value is read via a plain `findUnique` against the
  * `V1GameOperationFlag` Prisma model (mirrors the pattern already used in
  * games.service.ts:494 for `PUBLIC_LIVE`) -- NOT via `GameOperationFlagsService.getFlag()`,
  * which hard-gates to `platform_ops` (`assertPlatformOps`) and would wrongly 403 a
- * field_operator/support_readonly board viewer. A MISSING flag row still defaults to the
- * documented `'legacy'` (a fresh environment where `GameOperationFlagsService.ensureDefaults()`
- * has never run) -- but a flag row that EXISTS with a value other than exactly `'legacy'`,
- * `'compare'`, or `'new'` is no longer silently treated as non-compare: it now fails closed with
- * `InternalServerErrorException` (`GAME_READ_FLAG_INVALID`), since the board cannot determine
- * which mode was intended and must refuse rather than guess. Only when the (validated) mode is
+ * field_operator/support_readonly board viewer. A MISSING flag row now fails closed with
+ * `InternalServerErrorException` (`GAME_READ_FLAG_MISSING`) rather than silently defaulting to
+ * `'legacy'` -- P1-7: a missing row is indistinguishable at runtime from "an operator/bad
+ * migration deleted the row while GAME_READ=compare's mismatch protection was relied on", and a
+ * silent legacy fallback would disable that protection with no error and no signal anyone would
+ * ever see. `GameOperationFlagsService.ensureDefaults()`/its seed migration is relied upon to
+ * guarantee this row's presence; a fresh environment must seed it explicitly rather than lean on
+ * this method's runtime default. A flag row that EXISTS with a value other than exactly
+ * `'legacy'`, `'compare'`, or `'new'` is likewise fail-closed with `InternalServerErrorException`
+ * (`GAME_READ_FLAG_INVALID`), since the board cannot determine which mode was intended and must
+ * refuse rather than guess. Only when the (validated) mode is
  * `'compare'` does the board call `GAME_READ_AUTHORITY.resolve()` once per page row that has a
  * current/official result, bound to that row's exact `expectedGameVersion`/`expectedRevisionId`/
  * `expectedScoreHash`; on the first `'mismatch'` outcome (or a post-resolution CAS mismatch) it
@@ -325,69 +392,93 @@ export class TournamentOperationsBoardService {
         if (principal !== undefined) {
           await this.reverifyPrincipal(tx, tournamentId, principal, now);
         }
-        // Review finding #7: a cursor whose row belongs to a different tournament must not
-        // silently anchor this query's page. Resolved inside the same snapshot as the main page
-        // read so the check itself cannot race a concurrent cross-tournament mutation.
-        if (query.cursor !== undefined) {
-          const cursorRow: CursorLookup | null = await tx.v1TournamentFixture.findUnique({
-            where: { id: query.cursor },
-            select: { tournamentId: true },
-          });
-          if (cursorRow !== null && cursorRow.tournamentId !== tournamentId) {
-            throw new BadRequestException({
-              code: 'OPERATIONS_BOARD_CURSOR_TOURNAMENT_MISMATCH',
-              message: '다른 대회의 커서는 사용할 수 없어요. 처음부터 다시 조회해주세요.',
-            });
-          }
-          // cursorRow === null (garbage/non-existent id) falls through unchanged -- Prisma's
-          // cursor subquery below finds no anchor row and yields a clean empty page, matching the
-          // existing frozen "never a 500" test.
-        }
+        // Task 18 review P1-1/P1-2: decode the self-describing cursor tuple (if any) BEFORE
+        // running the main page query, entirely without touching the database -- see
+        // `OperationsBoardCursorPayload`'s doc comment above. A cursor that fails to decode and a
+        // cursor that decodes but names a DIFFERENT tournament are both `cursorInvalid`, and both
+        // collapse to the exact same "clean empty page" branch below -- there is no distinguishing
+        // response for a caller to use as a cross-tournament existence oracle.
+        const cursorPayload =
+          query.cursor !== undefined ? decodeOperationsBoardCursor(query.cursor) : undefined;
+        const cursorInvalid =
+          query.cursor !== undefined &&
+          (cursorPayload === null || cursorPayload.tournamentId !== tournamentId);
 
-        const rawRows = await tx.v1TournamentFixture.findMany({
-          where,
-          orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }, { id: 'asc' }],
-          take: limit + 1,
-          ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-          select: {
-            id: true,
-            tournamentId: true,
-            round: true,
-            fixtureNumber: true,
-            fieldId: true,
-            field: { select: { name: true, version: true } },
-            homeRegistrationId: true,
-            awayRegistrationId: true,
-            scheduledAt: true,
-            updatedAt: true,
-            game: {
+        const cursorPredicate: Prisma.V1TournamentFixtureWhereInput | undefined =
+          cursorPayload != null && !cursorInvalid
+            ? {
+                OR: [
+                  { round: { gt: cursorPayload.round } },
+                  { round: cursorPayload.round, fixtureNumber: { gt: cursorPayload.fixtureNumber } },
+                  {
+                    round: cursorPayload.round,
+                    fixtureNumber: cursorPayload.fixtureNumber,
+                    id: { gt: cursorPayload.id },
+                  },
+                ],
+              }
+            : undefined;
+
+        const rawRows = cursorInvalid
+          ? []
+          : await tx.v1TournamentFixture.findMany({
+              where: cursorPredicate === undefined ? where : { ...where, ...cursorPredicate },
+              orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }, { id: 'asc' }],
+              take: limit + 1,
               select: {
                 id: true,
-                state: true,
-                version: true,
+                tournamentId: true,
+                round: true,
+                fixtureNumber: true,
+                fieldId: true,
+                field: { select: { name: true, version: true } },
+                homeRegistrationId: true,
+                awayRegistrationId: true,
+                scheduledAt: true,
                 updatedAt: true,
-                currentOfficialRevisionId: true,
-                currentOfficialRevision: {
-                  select: { id: true, score: true, missingScorer: true },
+                game: {
+                  select: {
+                    id: true,
+                    state: true,
+                    version: true,
+                    updatedAt: true,
+                    currentOfficialRevisionId: true,
+                    currentOfficialRevision: {
+                      select: { id: true, score: true, missingScorer: true },
+                    },
+                  },
                 },
               },
-            },
-          },
-        });
+            });
 
         const hasNext = rawRows.length > limit;
         const pageRows = hasNext ? rawRows.slice(0, limit) : rawRows;
-        const nextCursor = hasNext ? pageRows[pageRows.length - 1].id : null;
+        const lastRow = pageRows[pageRows.length - 1];
+        const nextCursor = hasNext
+          ? encodeOperationsBoardCursor({
+              tournamentId,
+              round: lastRow.round,
+              fixtureNumber: lastRow.fixtureNumber,
+              id: lastRow.id,
+            })
+          : null;
 
         const gameIds = pageRows
           .map((row) => row.game?.id)
           .filter((gameId): gameId is string => gameId !== undefined);
+        // Task 18 review P1-6: bound the staff-coverage read to the CURRENT page's own
+        // fieldIds/fixtureIds instead of every active FIELD_OPERATOR assignment (and every one of
+        // its fixture scopes) in the whole tournament -- see `staffCoverage()`'s doc comment.
+        const pageFieldIds = [
+          ...new Set(pageRows.map((row) => row.fieldId).filter((id): id is string => id !== null)),
+        ];
+        const pageFixtureIds = pageRows.map((row) => row.id);
 
         const [lineupLatestBySideKey, escalationSummaryMap, staffCoverageResult, gameReadFlag] =
           await Promise.all([
             this.latestLineupStateBySide(tx, gameIds),
             this.escalationSummaryByGameId(tx, gameIds),
-            this.staffCoverage(tx, tournamentId, now),
+            this.staffCoverage(tx, tournamentId, now, pageFieldIds, pageFixtureIds),
             tx.v1GameOperationFlag.findUnique({
               where: { key: 'GAME_READ' },
               select: { value: true },
@@ -415,17 +506,34 @@ export class TournamentOperationsBoardService {
       gameReadFlag,
     } = snapshot;
 
-    // Review finding #4: a flag row that exists but holds an unrecognized value is a
-    // configuration defect, not a safe legacy fallback -- fail closed rather than guess. A
-    // genuinely MISSING row (fresh environment) still defaults to 'legacy'.
-    const rawGameReadValue = gameReadFlag?.value;
-    if (rawGameReadValue !== undefined && !(GAME_READ_MODES as readonly string[]).includes(rawGameReadValue)) {
+    // Task 18 review P1-7 (supersedes the prior "missing row defaults to legacy" design): a
+    // MISSING `GAME_READ` flag row is no longer treated as an implicit, safe 'legacy' default --
+    // it now fails closed with `500 GAME_READ_FLAG_MISSING`. The prior design reasoned that a
+    // missing row could only mean "a fresh environment where GameOperationFlagsService.
+    // ensureDefaults() has never run", and defaulted to legacy as a convenience for that case. The
+    // review correctly points out that reasoning conflates two indistinguishable-at-runtime
+    // situations: a genuinely fresh environment, and an operator (or a bad migration/rollback)
+    // having deleted this row by mistake in an environment that was previously running
+    // GAME_READ=compare -- in the SECOND case, silently falling back to 'legacy' silently
+    // DISABLES the compare-mode mismatch/staleness protection with no error, no log a caller would
+    // ever see, and no signal to the operator that the safety net is gone. A missing invariant row
+    // must fail loudly, exactly like an unrecognized value already does, rather than fail open.
+    // `GameOperationFlagsService.ensureDefaults()`/its seed migration is what is now relied on to
+    // guarantee this row's presence; a fresh environment must seed it explicitly.
+    if (gameReadFlag === null) {
+      throw new InternalServerErrorException({
+        code: 'GAME_READ_FLAG_MISSING',
+        message: '경기 결과 조회 모드 설정이 초기화되지 않았어요. 운영팀에 문의해주세요.',
+      });
+    }
+    const rawGameReadValue = gameReadFlag.value;
+    if (!(GAME_READ_MODES as readonly string[]).includes(rawGameReadValue)) {
       throw new InternalServerErrorException({
         code: 'GAME_READ_FLAG_INVALID',
         message: '경기 결과 조회 모드 설정값이 올바르지 않아요. 운영팀에 문의해주세요.',
       });
     }
-    const gameReadMode: GameReadMode = (rawGameReadValue as GameReadMode | undefined) ?? 'legacy';
+    const gameReadMode: GameReadMode = rawGameReadValue as GameReadMode;
     const isCompareMode = gameReadMode === 'compare';
 
     if (isCompareMode) {
@@ -787,54 +895,102 @@ export class TournamentOperationsBoardService {
    * for that game (open or not) -- the latter feeds `stableRevision` so a status transition that
    * doesn't flip the boolean (e.g. ACKNOWLEDGED -> RESOLVED while another escalation is still
    * open, or an escalation opening/closing on a fixture with no other warnings) still moves the
-   * item's incremental key. Single query, same query-count as the prior `overdueEscalationGameIds`
-   * it replaces. */
+   * item's incremental key.
+   *
+   * Task 18 review P1-6: this MUST consider every historical escalation for a game (see the
+   * `stableRevision` doc comment above -- an old, already-resolved escalation's own version bump
+   * still has to move the hash), so it cannot simply narrow WHICH rows are read the way
+   * `staffCoverage()` below narrows to the current page. What it CAN do is stop transferring every
+   * one of those rows to the application to fold in JS: `bool_or`/`MAX` are computed DATABASE-side
+   * with a single `GROUP BY r.game_id`, so the wire only ever carries one summary row per game in
+   * this page -- not one row per historical escalation. Same single-round-trip shape as the
+   * `findMany` it replaces, just no longer O(escalation history depth) in bytes transferred. */
   private async escalationSummaryByGameId(
     tx: Tx,
     gameIds: readonly string[],
   ): Promise<Map<string, { overdue: boolean; maxVersion: number; maxUpdatedAtMs: number }>> {
     const summary = new Map<string, { overdue: boolean; maxVersion: number; maxUpdatedAtMs: number }>();
     if (gameIds.length === 0) return summary;
-    const rows = await tx.v1ResultEscalation.findMany({
-      where: { resultRevision: { gameId: { in: [...gameIds] } } },
-      select: {
-        status: true,
-        version: true,
-        updatedAt: true,
-        resultRevision: { select: { gameId: true } },
-      },
-    });
+    const rows = await tx.$queryRaw<
+      { gameId: string; overdue: boolean; maxVersion: number; maxUpdatedAt: Date }[]
+    >`
+      SELECT
+        r.game_id AS "gameId",
+        bool_or(
+          e.status = 'PENDING'::"V1EscalationStatus"
+          OR e.status = 'ACKNOWLEDGED'::"V1EscalationStatus"
+        ) AS overdue,
+        MAX(e.version) AS "maxVersion",
+        MAX(e.updated_at) AS "maxUpdatedAt"
+      FROM v1_result_escalations e
+      JOIN v1_game_result_revisions r ON r.id = e.result_revision_id
+      WHERE r.game_id IN (${Prisma.join([...gameIds])})
+      GROUP BY r.game_id
+    `;
     for (const row of rows) {
-      const gameId = row.resultRevision.gameId;
-      const existing = summary.get(gameId) ?? { overdue: false, maxVersion: 0, maxUpdatedAtMs: 0 };
-      existing.maxVersion = Math.max(existing.maxVersion, row.version);
-      existing.maxUpdatedAtMs = Math.max(existing.maxUpdatedAtMs, row.updatedAt.getTime());
-      if (row.status === V1EscalationStatus.PENDING || row.status === V1EscalationStatus.ACKNOWLEDGED) {
-        existing.overdue = true;
-      }
-      summary.set(gameId, existing);
+      summary.set(row.gameId, {
+        overdue: row.overdue,
+        maxVersion: row.maxVersion,
+        maxUpdatedAtMs: row.maxUpdatedAt.getTime(),
+      });
     }
     return summary;
   }
 
+  /**
+   * Task 18 review P1-6: bounded to the CURRENT PAGE's own fieldIds/fixtureIds. Pre-fix, this
+   * fetched every active `FIELD_OPERATOR` assignment (and every one of ITS fixture scopes) for the
+   * WHOLE tournament regardless of which fixtures/fields are actually on this page -- a tournament
+   * with many field operators scoped to fixtures far outside this page's 20-100 rows still paid to
+   * transfer all of them every single call. Narrowing the `WHERE`/nested `fixtureScopes` filter to
+   * `pageFieldIds`/`pageFixtureIds` cannot change `isStaffCovered()`'s result for any row ON this
+   * page (an assignment scoped to a fixture/field NOT on this page could never have made
+   * `isStaffCovered()` return `true` for a page row anyway), so this is a pure bound on row
+   * transfer, not a behavior change.
+   */
   private async staffCoverage(
     tx: Tx,
     tournamentId: string,
     now: Date,
+    pageFieldIds: readonly string[],
+    pageFixtureIds: readonly string[],
   ): Promise<{ fieldIds: Set<string>; fixtureIds: Set<string> }> {
+    const fieldIds = new Set<string>();
+    const fixtureIds = new Set<string>();
+    if (pageFieldIds.length === 0 && pageFixtureIds.length === 0) {
+      // Empty page (no fixtures at all) -- nothing on it needs coverage, and an empty `OR: []`
+      // would otherwise match zero rows anyway. Short-circuit rather than issue the query.
+      return { fieldIds, fixtureIds };
+    }
     const assignments = await tx.v1TournamentStaffAssignment.findMany({
       where: {
         tournamentId,
         role: V1TournamentStaffRole.FIELD_OPERATOR,
         revokedAt: null,
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        AND: [
+          {
+            OR: [
+              ...(pageFieldIds.length > 0 ? [{ fieldId: { in: [...pageFieldIds] } }] : []),
+              ...(pageFixtureIds.length > 0
+                ? [{ fixtureScopes: { some: { fixtureId: { in: [...pageFixtureIds] } } } }]
+                : []),
+            ],
+          },
+        ],
       },
-      select: { fieldId: true, fixtureScopes: { select: { fixtureId: true } } },
+      select: {
+        fieldId: true,
+        fixtureScopes: {
+          where: pageFixtureIds.length > 0 ? { fixtureId: { in: [...pageFixtureIds] } } : undefined,
+          select: { fixtureId: true },
+        },
+      },
     });
-    const fieldIds = new Set<string>();
-    const fixtureIds = new Set<string>();
     for (const assignment of assignments) {
-      if (assignment.fieldId !== null) fieldIds.add(assignment.fieldId);
+      if (assignment.fieldId !== null && pageFieldIds.includes(assignment.fieldId)) {
+        fieldIds.add(assignment.fieldId);
+      }
       for (const scope of assignment.fixtureScopes) fixtureIds.add(scope.fixtureId);
     }
     return { fieldIds, fixtureIds };

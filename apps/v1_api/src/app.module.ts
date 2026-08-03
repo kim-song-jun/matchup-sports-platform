@@ -33,6 +33,11 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { LogsModule } from './logs/logs.module';
 import { ErrorLogsModule } from './error-logs/error-logs.module';
 import { GamesModule } from './games/games.module';
+import { GameOperationFlagsModule } from './config/game-operation-flags.module';
+import { TournamentFixtureLineupModule } from './tournament-operations/lineups/tournament-fixture-lineup.module';
+import { TournamentOperationsStaffModule } from './tournament-operations/staff/tournament-operations-staff.module';
+import { TournamentOperationsBoardModule } from './tournament-operations/board/tournament-operations-board.module';
+import { TournamentOperationsFieldsModule } from './tournament-operations/fields/tournament-operations-fields.module';
 
 @Module({
   imports: [
@@ -58,6 +63,7 @@ import { GamesModule } from './games/games.module';
     TeamMatchesModule,
     TeamSchedulesModule,
     GamesModule,
+    GameOperationFlagsModule,
     ChatModule,
     RealtimeModule,
     NotificationsModule,
@@ -70,6 +76,10 @@ import { GamesModule } from './games/games.module';
     VerificationModule,
     IntegrationsModule,
     LogsModule,
+    TournamentFixtureLineupModule,
+    TournamentOperationsStaffModule,
+    TournamentOperationsFieldsModule,
+    TournamentOperationsBoardModule.register(),
   ],
   providers: [
     { provide: APP_GUARD, useClass: V1ThrottlerGuard },

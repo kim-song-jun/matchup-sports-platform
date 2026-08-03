@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, Optional } from '@nestjs/common';
-import type { V1TournamentStaffRole } from '@prisma/client';
+import type { Prisma, V1TournamentStaffRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   decideTournamentStaffAccess,
@@ -63,9 +63,37 @@ export class TournamentStaffAccessService {
     this.now = now ?? (() => new Date());
   }
 
-  async assertAccess(input: TournamentStaffAccessInput): Promise<TournamentStaffPrincipal> {
+  /**
+   * `client` (Task 18 review P0-3): callers that immediately follow this check with a mutation
+   * inside their OWN `$transaction` (e.g. `TournamentOperationsFieldsService`) should pass that
+   * `tx` here instead of relying on the default (root `PrismaService`) client. Passing `tx` does
+   * two things a plain re-read on a separate connection cannot: (1) the admin/assignment reads
+   * below run on the SAME connection as the caller's subsequent write, and (2) this method takes a
+   * `FOR SHARE` row lock on the exact candidate admin/assignment row(s) BEFORE reading them, so a
+   * concurrent revoke's `UPDATE` (which needs an exclusive row lock on that same row) is forced to
+   * wait until the caller's transaction commits or rolls back -- it can no longer race the window
+   * between this decision and the caller's write with unordered outcomes. Either the revoke
+   * commits first (and this recheck's own read then sees it and denies), or this decision's lock
+   * is acquired first (and the concurrent revoke is correctly deferred to take effect only after
+   * this transaction finishes) -- never an in-between state where a write proceeds on
+   * authorization that was already revoked before that write's transaction committed.
+   *
+   * Only takes the lock when `client` is EXPLICITLY supplied: the guard's own single, standalone
+   * call (no caller transaction to protect) and this file's characterization unit tests (whose
+   * fake `PrismaService` stub does not implement `$queryRaw`) both omit it and are completely
+   * unaffected -- `db` still defaults to `this.prisma` and behaves exactly as before.
+   */
+  async assertAccess(
+    input: TournamentStaffAccessInput,
+    client?: Prisma.TransactionClient,
+  ): Promise<TournamentStaffPrincipal> {
     const now = this.now();
-    const admin = await this.prisma.v1AdminUser.findUnique({
+    const db = client ?? this.prisma;
+    if (client !== undefined) {
+      await client.$queryRaw`SELECT 1 FROM v1_admin_users WHERE user_id = ${input.userId} FOR SHARE`;
+      await client.$queryRaw`SELECT 1 FROM v1_tournament_staff_assignments WHERE tournament_id = ${input.resource.tournamentId} AND user_id = ${input.userId} FOR SHARE`;
+    }
+    const admin = await db.v1AdminUser.findUnique({
       where: { userId: input.userId },
       select: {
         adminRole: true,
@@ -100,7 +128,7 @@ export class TournamentStaffAccessService {
     }
 
     const assignments: readonly AssignmentRecord[] =
-      await this.prisma.v1TournamentStaffAssignment.findMany({
+      await db.v1TournamentStaffAssignment.findMany({
         where: {
           tournamentId: input.resource.tournamentId,
           userId: input.userId,

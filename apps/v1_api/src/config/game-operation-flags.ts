@@ -1565,7 +1565,19 @@ function stableStringify(value: unknown): string {
   }
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   const record = requireRecord(value, 'idempotency payload');
+  // class-transformer's ValidationPipe (transform: true) exposes every declared
+  // optional property on a nested DTO instance -- even ones absent from the
+  // request body -- as an own property explicitly set to `undefined` (e.g.
+  // ExpectedGameOperationFlagVersionsDto.PUBLIC_LIVE/DIRECTOR_OFFICIALIZE when
+  // only GAME_READ/GAME_WRITE were sent). Real `JSON.stringify` silently omits
+  // undefined-valued object properties instead of failing to serialize, so an
+  // object shaped this way *is* JSON serializable; only recursing into that
+  // `undefined` and treating it as a top-level unserializable value produced a
+  // false-positive INVALID_IDEMPOTENCY_PAYLOAD. Filtering keeps the hash
+  // identical to what a plain object literal with the same present keys would
+  // produce (e.g. a direct service-layer call bypassing the DTO transform).
   return `{${Object.keys(record)
+    .filter((key) => record[key] !== undefined)
     .sort()
     .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
     .join(',')}}`;

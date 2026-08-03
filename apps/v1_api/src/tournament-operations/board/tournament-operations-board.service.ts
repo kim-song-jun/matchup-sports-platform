@@ -30,6 +30,30 @@ function isStableWarningCode(code: string): code is StableWarningCode {
   return (STABLE_WARNING_CODES as readonly string[]).includes(code);
 }
 
+/** Recursively sorts object keys (alphabetically, `localeCompare`) so `JSON.stringify` of the
+ * result is independent of the source's own key order -- mirrors `canonicalize()` in
+ * `../../games/games.service.ts`. This matters specifically for `expectedScoreHash` below: Postgres
+ * `jsonb` normalizes key order on storage, so `row.game.currentOfficialRevision.score` read back
+ * from the DB can have keys in a different order than whatever order the score was originally
+ * written in. Hashing the raw (non-canonical) `JSON.stringify` of that value would make
+ * `expectedScoreHash` -- and therefore the GAME_READ=compare authority check and the board's own
+ * hash-stable-body guarantee -- silently depend on jsonb key ordering, which is not part of the
+ * actual data contract (two reads of an UNCHANGED score must hash identically; changing only key
+ * order is not a change). */
+function canonicalizeForHash(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalizeForHash);
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, nested]) => [key, canonicalizeForHash(nested)]),
+    );
+  }
+  return value;
+}
+
 /** Opaque keyset-cursor tuple. The *wire* shape of `cursor`/`nextCursor` is unchanged (a raw
  * `V1TournamentFixture.id`, per the frozen "returns a clean empty page... when the cursor value
  * does not match any existing fixture row" test) -- what changed (review finding #7) is that a
@@ -383,7 +407,7 @@ export class TournamentOperationsBoardService {
         const expectedGameVersion = row.game.version;
         const expectedRevisionId = row.game.currentOfficialRevisionId;
         const expectedScoreHash = createHash('sha256')
-          .update(JSON.stringify(row.game.currentOfficialRevision?.score ?? null))
+          .update(JSON.stringify(canonicalizeForHash(row.game.currentOfficialRevision?.score ?? null)))
           .digest('hex');
         const result = await this.readAuthority.resolve({
           gameId: row.game.id,

@@ -89,6 +89,18 @@ function hashBody(body: unknown): string {
   return createHash('sha256').update(JSON.stringify(normalized(body))).digest('hex');
 }
 
+/** Derives `expectedScoreHash` the same CANONICAL way
+ * `tournament-operations-board.service.ts`'s `canonicalizeForHash()` does (recursively sorted
+ * object keys before `JSON.stringify`) -- reusing this file's own `normalized()` above, which
+ * already sorts keys the same way. Deliberately NOT a pasted literal digest: this still derives
+ * the hash from the semantic score value, so the assertions below keep failing if production ever
+ * changes what it hashes or stops canonicalizing before hashing. The seeded DB score is a plain
+ * `{ home, away }` object with no `Date`, so `normalized()`'s extra `Date` handling is inert here
+ * and this is equivalent to calling the production canonicalizer directly. */
+function expectedScoreHashFor(score: unknown): string {
+  return createHash('sha256').update(JSON.stringify(normalized(score))).digest('hex');
+}
+
 /** The hash-stable body only -- `{items, nextCursor, watermark}` -- see
  * tournament-operations-board.service.ts's "Stable body vs. time-relative part" doc section. A
  * determinism/cutover oracle must compare exactly this slice, never the whole response (which
@@ -666,9 +678,7 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     // Before the fix, a board bug that called resolve() with a wrong gameId/tournamentFixtureId/
     // expectedGameVersion/expectedRevisionId/expectedScoreHash would have passed this test anyway,
     // because the fake ignored whatever it was given.
-    const expectedScoreHash = createHash('sha256')
-      .update(JSON.stringify({ home: 1, away: 0 }))
-      .digest('hex');
+    const expectedScoreHash = expectedScoreHashFor({ home: 1, away: 0 });
     expect(authority.calls).toEqual([
       {
         gameId: overdueGameId,
@@ -714,9 +724,7 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     expect((caught as ConflictException).getResponse()).toEqual(
       expect.objectContaining({ code: 'GAME_RESULT_READ_MISMATCH' }),
     );
-    const expectedScoreHash = createHash('sha256')
-      .update(JSON.stringify({ home: 1, away: 0 }))
-      .digest('hex');
+    const expectedScoreHash = expectedScoreHashFor({ home: 1, away: 0 });
     expect(mismatchAuthority.calls).toEqual([
       {
         gameId: overdueGameId,
@@ -1586,7 +1594,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       lineupIds.tournament,
       lineupIds.fixture,
       homeSideId,
-      undefined,
+      dto.clientCommandId,
       dto,
     );
     expect(saved).toEqual(expect.objectContaining({ gameId, lineupRevision: 1, replayed: false }));
@@ -1609,7 +1617,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
         lineupIds.tournament,
         lineupIds.fixture,
         lineupId,
-        undefined,
+        dto.clientCommandId,
         dto,
       ),
     );
@@ -1627,7 +1635,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       lineupIds.tournament,
       lineupIds.fixture,
       lineupId,
-      undefined,
+      dto.clientCommandId,
       dto,
     );
     expect(first).toEqual(expect.objectContaining({ lineupId, lineupState: 'SUBMITTED', replayed: false }));
@@ -1647,7 +1655,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       lineupIds.tournament,
       lineupIds.fixture,
       lineupId,
-      undefined,
+      dto.clientCommandId,
       dto,
     );
     expect(replay).toEqual(expect.objectContaining({ lineupId, lineupState: 'SUBMITTED', replayed: true }));
@@ -1681,7 +1689,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
         lineupIds.tournament,
         lineupIds.fixture,
         lineupId,
-        undefined,
+        dto.clientCommandId,
         dto,
       ),
     );
@@ -2223,12 +2231,12 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
     expect(queryLog).toHaveLength(6);
     expect([...queryLog].sort()).toEqual(
       [
-        'v1TournamentFixture.findMany',
-        'v1GameLineup.findMany',
-        'v1GameSide.findMany',
-        'v1ResultEscalation.findMany',
-        'v1TournamentStaffAssignment.findMany',
-        'v1GameOperationFlag.findUnique',
+        'V1TournamentFixture.findMany',
+        'V1GameLineup.findMany',
+        'V1GameSide.findMany',
+        'V1ResultEscalation.findMany',
+        'V1TournamentStaffAssignment.findMany',
+        'V1GameOperationFlag.findUnique',
       ].sort(),
     );
   });

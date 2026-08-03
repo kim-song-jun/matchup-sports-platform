@@ -4,8 +4,10 @@ import {
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { isUUID } from 'class-validator';
 import type { Request } from 'express';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import {
@@ -49,14 +51,42 @@ export class TournamentStaffGuard implements CanActivate {
       });
     }
 
+    // Guards run before pipes in the Nest request lifecycle, so a route-level `ParseUUIDPipe`
+    // on `:tournamentId` (etc.) never gets a chance to run if this guard reaches
+    // `TournamentStaffAccessService.assertAccess()` first with a syntactically invalid id --
+    // for platform_ops callers that service skips the per-tournament assignment lookup and
+    // instead runs the malformed id through `decideTournamentStaffAccess()`, which reports
+    // `INVALID_INPUT`, but `assertAccess()` maps every denial reason (including that one) to a
+    // blanket 403 `STAFF_SCOPE_DENIED` -- misreporting an input-validation failure as an
+    // authorization failure, and doing so before authorization has actually been evaluated.
+    // Reject a malformed id here, ahead of any authorization lookup, so the response is the
+    // same 422 for every caller regardless of role.
+    const resource = this.resource(request.params, requirement);
+    this.assertWellFormedResource(resource);
+
     const expectedAssignmentVersion = this.assignmentVersion(request);
     request.tournamentStaff = await this.access.assertAccess({
       userId: request.v1User.id,
       action: requirement.action,
-      resource: this.resource(request.params, requirement),
+      resource,
       ...(expectedAssignmentVersion === undefined ? {} : { expectedAssignmentVersion }),
     });
     return true;
+  }
+
+  private assertWellFormedResource(resource: TournamentStaffResource): void {
+    const ids: readonly (string | undefined)[] = [
+      resource.tournamentId,
+      resource.fixtureId,
+      resource.fieldId,
+      resource.courtId,
+    ];
+    if (ids.some((id) => id !== undefined && !isUUID(id))) {
+      throw new UnprocessableEntityException({
+        code: 'VALIDATION_ERROR',
+        message: 'Tournament operations route parameters must be valid UUIDs',
+      });
+    }
   }
 
   private resource(

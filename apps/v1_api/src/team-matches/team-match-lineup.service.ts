@@ -676,6 +676,10 @@ export class TeamMatchLineupService {
     const starters = participants
       .filter((participant) => participant.position !== BENCH_MARKER)
       .map((participant) => ({
+        // Task 17: the result-entry form needs the real `V1GameParticipant.id`
+        // to attribute a goal/card to a specific roster entry — this route was
+        // the only existing lineup read and previously erased the id.
+        id: participant.id,
         displayName: participant.displayNameSnapshot,
         jerseyNumber: participant.jerseyNumber,
         position: participant.position === GOALKEEPER_MARKER ? null : participant.position,
@@ -684,6 +688,7 @@ export class TeamMatchLineupService {
     const bench = participants
       .filter((participant) => participant.position === BENCH_MARKER)
       .map((participant) => ({
+        id: participant.id,
         displayName: participant.displayNameSnapshot,
         jerseyNumber: participant.jerseyNumber,
       }));

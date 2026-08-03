@@ -56,6 +56,16 @@ scorer policy is required; the ordinary team-match policy permits a missing scor
 explicit warning marker. No fixture or game source may be created without an active immutable
 competition-config pin: `409 COMPETITION_CONFIG_REQUIRED` leaves no partial source/Game rows.
 
+**Task 17 note:** `POST /api/v1/games/:gameId/result-revisions` derives its score/goal/card cross-check
+purely from `V1GameEvent` rows (see the invariant paragraph above). `event_append`/`event_reverse`
+is authorized only for tournament staff (never for a team-match host/opponent), so a `TEAM_MATCH`
+game can never accumulate events. In the current contract this means any `score` other than
+`{home:0, away:0}` (or any nonzero `actualParticipants[].goals|cards`) fails
+`422 SCORE_EVENT_MISMATCH` for every team match, with no event-capture path to satisfy it. Task 16's
+own integration suite only ever submits `{home:0, away:0}`, so this was never exercised end to end.
+Closing this gap is a deliberate scope decision (team-match event-append allowance, or an
+invariant carve-out for `TEAM_MATCH` sources with zero events) that a future task must make.
+
 This is a real v1 persistence contract, not a mock-success flow. Fixture data is deterministic
 test data only and must not be rendered as verified player, score, or standings evidence.
 

@@ -94,6 +94,10 @@ export type TeamMatchDetailViewModel = {
     pending?: boolean;
     onClick: () => void | Promise<unknown>;
   }>;
+  // Task 17: navigates to /team-matches/:id/result(/approval) — a matched/completed match
+  // no longer has a standalone "complete" mutation (Task 16 removed it); completion is now
+  // an atomic side effect of submitting a validated result revision on that screen.
+  resultAction?: { label: string; href: string; tone?: 'primary' | 'neutral' } | null;
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;

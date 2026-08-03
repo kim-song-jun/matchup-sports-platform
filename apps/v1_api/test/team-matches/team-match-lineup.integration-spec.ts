@@ -325,6 +325,11 @@ describe('Task 14 team-match lineup builder', () => {
     expect(view.starters.filter((starter) => starter.goalkeeper)).toHaveLength(1);
     expect(view.state).toBe('DRAFT');
     expect(view.version).toBe(saved.version);
+    // Task 17: the result-entry screen resolves a scorer/carded player by this
+    // real `V1GameParticipant.id` — a name-only lineup payload cannot build
+    // `actualParticipants[].participantId` for the result draft.
+    expect(view.starters.every((starter) => typeof starter.id === 'string' && starter.id.length > 0)).toBe(true);
+    expect(new Set(view.starters.map((starter) => starter.id)).size).toBe(view.starters.length);
 
     // Two concurrent submits racing against the SAME still-DRAFT revision,
     // each with its own Idempotency-Key (so neither is an idempotent replay

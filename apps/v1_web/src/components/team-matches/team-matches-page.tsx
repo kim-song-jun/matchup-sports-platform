@@ -299,6 +299,17 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               {/* P2: 능동형 카피 적용 */}
               {mode === 'pending' ? <StateCard tone="orange" title="신청을 접수했어요" body="홈팀이 검토를 마치면 알림으로 알려드릴게요." /> : null}
               {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." /> : null}
+              {/* Task 17: 경기 결과 입력/승인 진입점. mode에 따라 호스트는 결과 입력,
+                  상대팀은 결과 승인 화면으로 이동한다(모델이 라벨/링크를 결정). */}
+              {model.resultAction ? (
+                <Link
+                  className={`tm-btn tm-btn-md ${model.resultAction.tone === 'primary' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+                  href={model.resultAction.href}
+                  style={{ marginTop: 12, display: 'inline-flex' }}
+                >
+                  {model.resultAction.label}
+                </Link>
+              ) : null}
               {match.description ? (
                 <Card pad={16} style={{ marginTop: 10 }}>
                   <div className="tm-text-body-lg">설명</div>

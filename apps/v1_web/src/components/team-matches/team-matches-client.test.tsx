@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import type { V1TeamMatchViewerState } from '@/types/api';
 import type { TeamMatchDetailViewModel } from './team-matches.types';
 import { TeamMatchDetailPageClient } from './team-matches-client';
 
@@ -32,7 +33,6 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1RejectTeamMatchApplication: () => ({ mutate: vi.fn(), isPending: false }),
   useV1CloseTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ReopenTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1CompleteTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1CancelTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ResolveChatRoom: () => ({ mutate: vi.fn(), isPending: false }),
   useV1WithdrawTeamMatchApplication: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -42,6 +42,7 @@ vi.mock('./team-matches-page', () => ({
   TeamMatchDetailPageView: ({ model }: { model: TeamMatchDetailViewModel }) => (
     <div>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
+      {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
     </div>
   ),
   TeamMatchListPageView: () => null,
@@ -90,5 +91,72 @@ describe('TeamMatchDetailPageClient — GA events', () => {
       expect(applyTeamMatchMutateAsync).toHaveBeenCalledWith({ applicantTeamId: 'team-mine', message: null });
     });
     expect(trackEvent).toHaveBeenCalledWith('team_match_apply_complete', { teamMatchId: 'team-match-1' });
+  });
+});
+
+// Task 17: buildResultAction() is the sole routing gate between the host's
+// result-entry screen (/team-matches/:id/result) and the opponent's
+// approval screen (/team-matches/:id/result/approval). Only the destination
+// screens had coverage before this — nothing failed if the gate itself was
+// reverted (e.g. both roles routed to /result, or an unrelated viewer got a
+// CTA at all). These tests pin the three-way split directly against the
+// rendered CTA so a regression in buildResultAction's role/viewerState
+// branching trips a real assertion.
+describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', () => {
+  function mockMatchedTeamMatch(viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean }) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '서울 풋살장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        capacityText: '2/2',
+        displayState: 'matched',
+        status: 'matched',
+        viewer: { state: viewer.state, manageableHostTeam: viewer.manageableHostTeam ?? false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+      },
+      isError: false,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    applyTeamMatchMutateAsync.mockResolvedValue({ applicationId: 'app-1' });
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it('shows the host the result-entry CTA routed to /result', () => {
+    mockMatchedTeamMatch({ state: 'host_team', manageableHostTeam: true });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    const link = screen.getByRole('link', { name: '경기 결과 입력' });
+    expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result');
+    expect(screen.queryByText('경기 결과 대기')).not.toBeInTheDocument();
+    expect(screen.queryByText('경기 결과 확인/승인')).not.toBeInTheDocument();
+  });
+
+  it('shows the approved opponent the approval CTA routed to /result/approval, never the entry CTA', () => {
+    mockMatchedTeamMatch({ state: 'approved', manageableHostTeam: false });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    const link = screen.getByRole('link', { name: '경기 결과 대기' });
+    expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result/approval');
+    expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
+  });
+
+  it('shows an unrelated viewer neither the entry nor the approval CTA', () => {
+    mockMatchedTeamMatch({ state: 'none', manageableHostTeam: false });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '경기 결과 대기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '경기 결과 확인/승인' })).not.toBeInTheDocument();
   });
 });

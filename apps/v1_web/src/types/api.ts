@@ -803,6 +803,9 @@ export type V1TeamMembersPage = {
 
 export type V1TeamMatch = V1Match & {
   teamMatchId?: string;
+  // Task 17: the Game backing this team match (see docs/api/v1/domains/team-matches.md) —
+  // the only client-facing way to reach `/api/v1/games/:gameId/result-revisions*`.
+  gameId?: string | null;
   sport?: { sportId: string; name: string };
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   place?: { name: string; addressText?: string | null };
@@ -971,6 +974,161 @@ export type V1MyTeamMatch = {
   applicationId: string | null;
   manageRoute: string | null;
   detailRoute: string;
+};
+
+// ─── Task 17: Game aggregate + team result revisions (docs/api/domains/games.md) ───
+
+export type V1GameSourceType = 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
+export type V1GameState = 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
+export type V1GameResultRevisionState =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'CHANGE_REQUESTED'
+  | 'SUPPLEMENT_REQUESTED'
+  | 'REJECTED'
+  | 'OFFICIAL'
+  | 'VOID';
+
+export type V1GameSide = {
+  id: string;
+  gameId: string;
+  sideKey: 'HOME' | 'AWAY';
+  teamId: string | null;
+  displayNameSnapshot: string;
+};
+
+export type V1GameLineupSummary = {
+  id: string;
+  gameId: string;
+  sideId: string;
+  revision: number;
+  state: string;
+  version: number;
+  submittedAt: string | null;
+  supersedesId: string | null;
+};
+
+export type V1Game = {
+  id: string;
+  sourceType: V1GameSourceType;
+  state: V1GameState;
+  version: number;
+  lastSequence: number;
+  competitionConfigVersionId: string;
+  currentOfficialRevisionId: string | null;
+  sides: V1GameSide[];
+  periods: unknown[];
+  lineups: V1GameLineupSummary[];
+  actorRole: string;
+};
+
+export type V1GameResultScore = {
+  home: number;
+  away: number;
+  penalties?: { home: number; away: number } | null;
+};
+
+export type V1GameResultCards = { yellow: number; red: number };
+
+export type V1GameResultParticipantRow = {
+  id: string;
+  resultRevisionId: string;
+  participantId: string;
+  sideId: string;
+  started: boolean;
+  minutesPlayed: number | null;
+  goals: number;
+  cards: V1GameResultCards;
+  goalkeeper: boolean;
+};
+
+export type V1GameResultRevision = {
+  id: string;
+  gameId: string;
+  revision: number;
+  state: V1GameResultRevisionState;
+  score: V1GameResultScore;
+  eventsHash: string;
+  missingScorer: boolean;
+  mvpParticipantId: string | null;
+  reason: string | null;
+  createdByActorType: 'USER' | 'SYSTEM';
+  createdByUserId: string | null;
+  createdBySystemActor: string | null;
+  supersedesId: string | null;
+  submittedAt: string | null;
+  officialAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resultParticipants: V1GameResultParticipantRow[];
+};
+
+export type V1GameResultParticipantInput = {
+  participantId: string;
+  sideId: string;
+  started: boolean;
+  minutesPlayed?: number;
+  goals: number;
+  cards: V1GameResultCards;
+  goalkeeper: boolean;
+};
+
+export type V1CreateGameResultRevisionPayload = {
+  expectedVersion: number;
+  score: V1GameResultScore;
+  actualParticipants: V1GameResultParticipantInput[];
+  eventsHash: string;
+  mvpParticipantId?: string;
+  reason?: string;
+};
+
+export type V1SubmitGameResultRevisionPayload = {
+  expectedVersion: number;
+};
+
+export type V1DecideGameResultRevisionPayload = {
+  expectedVersion: number;
+  decision: 'approve' | 'change_request';
+  reason?: string;
+};
+
+export type V1GameRevisionMutationResult = {
+  gameId: string;
+  state: V1GameState;
+  version: number;
+  durableCommandId: string;
+  replayed: boolean;
+  revisionId: string;
+  revision: number;
+  revisionState: V1GameResultRevisionState;
+};
+
+export type V1TeamMatchLineupStarter = {
+  id: string;
+  displayName: string;
+  jerseyNumber: number | null;
+  position: string | null;
+  goalkeeper: boolean;
+};
+
+export type V1TeamMatchLineupBenchEntry = {
+  id: string;
+  displayName: string;
+  jerseyNumber: number | null;
+};
+
+export type V1TeamMatchLineup = {
+  teamMatchId: string;
+  gameId: string;
+  sideId: string;
+  role: 'team_owner' | 'team_manager';
+  lineupId: string | null;
+  revision: number;
+  state: string;
+  version: number;
+  publicLineupAt: string | null;
+  starters: V1TeamMatchLineupStarter[];
+  bench: V1TeamMatchLineupBenchEntry[];
 };
 
 export type V1ReviewSourceType = 'match' | 'team_match' | 'tournament_fixture';

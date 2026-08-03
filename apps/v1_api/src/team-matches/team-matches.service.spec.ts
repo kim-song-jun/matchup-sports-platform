@@ -440,6 +440,63 @@ describe('TeamMatchesService', () => {
     expect(result.status).toBe('expired');
   });
 
+  // Task 17: the result-entry/approval screens call `/games/:gameId/...` and
+  // have no other route to learn the Game id for a team match — detail() must
+  // surface it.
+  it('detail: 연결된 Game이 있으면 gameId를 응답에 포함한다', async () => {
+    const teamMatch = {
+      ...teamMatchRow({ status: 'matched', startAt: FUTURE }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: manager.id,
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: [],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+      game: { id: 'game-abc' },
+    };
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(null, 'tm-1');
+    expect(result.gameId).toBe('game-abc');
+  });
+
+  it('detail: 연결된 Game이 없으면 gameId는 null이다', async () => {
+    const teamMatch = {
+      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: manager.id,
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: [],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+      game: null,
+    };
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(null, 'tm-1');
+    expect(result.gameId).toBeNull();
+  });
+
   it('detail: 호스트팀 일반 멤버는 신청 관리 권한이 없으므로 host_team 상태가 아니다', async () => {
     const teamMatch = {
       ...teamMatchRow({ status: 'recruiting', startAt: FUTURE }),

@@ -58,6 +58,7 @@ type TeamMatchWithRelations = V1TeamMatch & {
   };
   approvedApplicantTeam: { id: string; name: string } | null;
   applications: Array<V1TeamMatchApplication & { applicantTeam: { id: string; name: string } }>;
+  game: { id: string } | null;
 };
 
 @Injectable()
@@ -122,6 +123,10 @@ export class TeamMatchesService {
 
     return {
       teamMatchId: teamMatch.id,
+      // Task 17: null only if a pre-Task-6 row somehow lacks a Game (creation
+      // always provisions one in the same transaction), never a legitimate
+      // steady-state value.
+      gameId: teamMatch.game?.id ?? null,
       title: teamMatch.title,
       description: teamMatch.description,
       imageUrl: teamMatch.imageUrl,
@@ -1015,6 +1020,11 @@ export class TeamMatchesService {
         include: { applicantTeam: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' },
       },
+      // Task 17: the result-entry/approval screens need the underlying Game id
+      // to call `/api/v1/games/:gameId/result-revisions*` — detail() is the
+      // only route the v1 web client already fetches for a team match, so we
+      // surface the 1:1 Game relation here instead of adding a new endpoint.
+      game: { select: { id: true } },
     } satisfies Prisma.V1TeamMatchInclude;
   }
 

@@ -51,6 +51,7 @@ export class OperationAuditWriterService {
         maskedSourceIp: envelope.maskedSourceIp,
         before: toFrozenPrismaJson(envelope.before),
         after: toFrozenPrismaJson(envelope.after),
+        reason: envelope.reason,
         tournamentId,
         fixtureId,
         fieldId,

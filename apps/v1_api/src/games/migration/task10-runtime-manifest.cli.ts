@@ -197,15 +197,20 @@ async function seedOperationsBoardFixture(prisma: PrismaService): Promise<void> 
   await prisma.v1AdminUser.create({
     data: { id: IDS.admin, userId: IDS.user, adminRole: 'ops', createdAt: CREATED_AT },
   });
-  await prisma.v1Sport.create({
-    data: {
+  // The `v1_competition_config_for_sport()` trigger accepts only
+  // 'soccer' | 'football' | 'futsal' as the sport CODE and rejects anything
+  // else with 23514 COMPETITION_CONFIG_SPORT_UNSUPPORTED, so only the display
+  // name may be task-scoped. But `V1Sport.code` is unique and the backfill
+  // fixture (`test/fixtures/game-backfill.fixture.ts`) has already seeded
+  // 'football' into this SAME isolated database by the time this CLI runs, so
+  // a plain create() fails on the unique constraint. Upsert on the code and
+  // use the RESOLVED id below -- the pre-existing row keeps its own id, which
+  // will not be `IDS.sport`.
+  const sport = await prisma.v1Sport.upsert({
+    where: { code: 'football' },
+    update: {},
+    create: {
       id: IDS.sport,
-      // The `v1_competition_config_for_sport()` trigger accepts only
-      // 'soccer' | 'football' | 'futsal' as the sport CODE and rejects
-      // anything else with 23514 COMPETITION_CONFIG_SPORT_UNSUPPORTED. Only
-      // the display name may be task-scoped; the code must be one of those
-      // three. This runs against its own isolated Task 10 database, so a
-      // shared code cannot collide with another suite's row.
       code: 'football',
       name: 'Task 10 Ops Football',
       createdAt: CREATED_AT,
@@ -242,7 +247,7 @@ async function seedOperationsBoardFixture(prisma: PrismaService): Promise<void> 
       {
         id: IDS.homeTeam,
         ownerUserId: IDS.user,
-        sportId: IDS.sport,
+        sportId: sport.id,
         regionId: IDS.region,
         name: 'Task 10 Ops Home',
         createdAt: CREATED_AT,
@@ -250,7 +255,7 @@ async function seedOperationsBoardFixture(prisma: PrismaService): Promise<void> 
       {
         id: IDS.awayTeam,
         ownerUserId: IDS.user,
-        sportId: IDS.sport,
+        sportId: sport.id,
         regionId: IDS.region,
         name: 'Task 10 Ops Away',
         createdAt: CREATED_AT,
@@ -260,7 +265,7 @@ async function seedOperationsBoardFixture(prisma: PrismaService): Promise<void> 
   await prisma.v1Tournament.create({
     data: {
       id: IDS.tournament,
-      sportId: IDS.sport,
+      sportId: sport.id,
       title: 'Task 10 Operations Board Tournament',
       competitionConfigVersionId: IDS.competitionConfigVersion,
       createdAt: CREATED_AT,

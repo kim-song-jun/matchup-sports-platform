@@ -16,7 +16,7 @@ interface AttendanceCounts {
   waitlisted: number;
 }
 
-interface SetAttendanceResponse {
+export interface SetAttendanceResponse {
   status: 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED';
   version: number;
   waitlistPosition: number | null;

@@ -14,7 +14,7 @@ const RECRUITMENT_RESOURCE_TYPE = 'V1_SCHEDULE_GUEST_RECRUITMENT';
 const APPLICATION_RESOURCE_TYPE = 'V1_SCHEDULE_GUEST_APPLICATION';
 const IDEMPOTENCY_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 
-interface RecruitmentView {
+export interface RecruitmentView {
   id: string;
   scheduleId: string;
   slots: number;
@@ -27,11 +27,11 @@ interface RecruitmentView {
   approvedCount: number;
 }
 
-interface RecruitmentResponse extends RecruitmentView {
+export interface RecruitmentResponse extends RecruitmentView {
   replayed: boolean;
 }
 
-interface ApplicationResponse {
+export interface ApplicationResponse {
   applicationId: string;
   state: string;
   displayName: string;
@@ -416,7 +416,7 @@ export class GuestRecruitmentService {
           ${applicationId}, ${recruitment.id}, ${user.id}, ${dto.displayName}, ${dto.note ?? null},
           'PENDING'::"V1GuestApplicationState", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
         )
-        ON CONFLICT ON CONSTRAINT v1_schedule_guest_applications_recruitment_user_key DO NOTHING
+        ON CONFLICT (recruitment_id, user_id) DO NOTHING
         RETURNING id, state, display_name_snapshot, note
       `;
 

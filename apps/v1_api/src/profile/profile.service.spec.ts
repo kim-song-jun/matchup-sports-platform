@@ -530,6 +530,32 @@ describe('ProfileService withdrawal admin lockout', () => {
     return prisma;
   }
 
+  // 순서가 뒤집히면(정리 → 멤버십 off) 그 사이에 다른 트랜잭션이 이 사람을 대회 명단에
+  // 추가할 수 있고, 그러면 탈퇴한 사람이 명단에 활성으로 남는다 — 2026-08-03 유령 명단
+  // 사고와 같은 상태다. 명단 추가 경로는 멤버십 행을 FOR UPDATE 로 잡지만, 정리가 먼저
+  // 돌면 그 시점엔 아무도 그 행을 잠그지 않아 lock 이 아무것도 막지 못한다.
+  it('탈퇴는 멤버십을 먼저 끄고 그다음 대회 명단을 정리한다', async () => {
+    const prisma = createPrisma(null);
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ id: 'membership-1', teamId: 'team-1' }]);
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([{ id: 'player-1' }]);
+    prisma.v1TournamentPlayer.updateMany.mockResolvedValue({ count: 1 });
+
+    const order: string[] = [];
+    prisma.v1TeamMembership.update.mockImplementation(async () => {
+      order.push('membership-off');
+      return {};
+    });
+    prisma.v1TournamentPlayer.updateMany.mockImplementation(async () => {
+      order.push('roster-cleanup');
+      return { count: 1 };
+    });
+
+    const service = new ProfileService(prisma as unknown as PrismaService);
+    await service.withdrawalRequest(user, { reason: 'leave' });
+
+    expect(order).toEqual(['membership-off', 'roster-cleanup']);
+  });
+
   it('fails closed with a stable error before mutating an active admin account', async () => {
     const prisma = createPrisma({ id: 'admin-record-1' });
     const service = new ProfileService(prisma as unknown as PrismaService);

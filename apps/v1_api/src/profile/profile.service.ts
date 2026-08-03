@@ -639,14 +639,14 @@ export class ProfileService {
         data: { accountStatus: 'withdrawal_pending' },
       });
 
-      // 탈퇴 신청 시점에 자리를 비운다. `withdrawal_pending` 이 되면 가드가 모든 요청을
-      // 막으므로 본인은 더 이상 아무것도 할 수 없는데, 대회 로스터와 팀 명단에는 그대로
-      // 남아 정원만 차지한다 — 2026-08-03 프로덕션에서 실제로 이렇게 됐다.
-      // 완료된 대회는 기록 보존을 위해 건드리지 않는다(roster-cleanup.ts 주석 참조).
-      const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, { at: withdrawnAt });
-
       // assertWithdrawable() 이 owner·manager 를 이미 막았으므로 여기 남는 것은 일반
       // 멤버십뿐이다. 추방(`removed`)이 아니라 본인 의사에 의한 이탈이므로 `left` 로 둔다.
+      //
+      // **멤버십을 먼저 끄고 그다음 로스터를 정리한다.** 순서가 반대면 "정리 → (그 사이 다른
+      // 트랜잭션이 이 사람을 명단에 추가) → 멤버십 off" 가 되어 탈퇴한 사람이 명단에 활성으로
+      // 남는다. 명단 추가 경로가 멤버십 행을 FOR UPDATE 로 잡는데, 정리가 먼저 돌면 그 시점엔
+      // 아직 아무도 그 행을 잠그지 않아 lock 이 아무것도 막지 못한다. 추방·자진탈퇴 경로는
+      // 이미 이 순서다(teams.service.ts removeMembership·leaveTeam).
       const memberships = await tx.v1TeamMembership.findMany({
         where: { userId: user.id, status: 'active' },
         select: { id: true, teamId: true },
@@ -661,6 +661,12 @@ export class ProfileService {
           data: { memberCount: { decrement: 1 } },
         });
       }
+
+      // 탈퇴 신청 시점에 자리를 비운다. `withdrawal_pending` 이 되면 가드가 모든 요청을
+      // 막으므로 본인은 더 이상 아무것도 할 수 없는데, 대회 로스터와 팀 명단에는 그대로
+      // 남아 정원만 차지한다 — 2026-08-03 프로덕션에서 실제로 이렇게 됐다.
+      // 완료된 대회는 기록 보존을 위해 건드리지 않는다(roster-cleanup.ts 주석 참조).
+      const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, { at: withdrawnAt });
 
       await tx.v1StatusChangeLog.create({
         data: {

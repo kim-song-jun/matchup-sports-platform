@@ -16,15 +16,13 @@ import { Prisma, V1TournamentStatus } from '@prisma/client';
 // 상태 컬럼 업데이트라서 cascade 가 발동하지 않는다. 그래서 애플리케이션 레벨에서
 // 명시적으로 정리한다.
 
-// 정리 대상이 되는 대회 상태. **완료된 대회는 제외한다** — 수상 내역·리뷰·기록이
-// 로스터를 참조하므로, 지난 대회에서 이름을 지우면 과거 기록이 깨진다. 아직 치르지
-// 않았거나 진행 중인 대회에서만 자리를 비운다.
-export const ROSTER_CLEANUP_TOURNAMENT_STATUSES = ['open', 'closed', 'in_progress'] as const;
-
 /**
- * 명단을 바꿔도 되는 대회 상태. 위 cleanup 집합과 **같은 이유로 같은 값**이다 — 완료·취소된
- * 대회의 명단을 건드리면 수상 내역·리뷰·기록이 가리키는 대상이 달라진다. 탈퇴 정리가 완료
- * 대회를 건너뛰는데 정작 추가·제거는 열려 있으면 그 보호가 반쪽짜리가 된다.
+ * 명단을 건드려도 되는 대회 상태. **정리(cleanup)와 수정(추가·제거)의 단일 출처다** —
+ * 둘은 같은 불변식의 양면이라 갈라 두면 한쪽만 바뀌어 드리프트한다.
+ *
+ * **완료·취소된 대회는 제외한다** — 수상 내역·리뷰·기록이 로스터를 참조하므로, 지난 대회에서
+ * 이름을 지우거나 넣으면 과거 기록이 가리키는 대상이 달라진다. 아직 치르지 않았거나 진행
+ * 중인 대회에서만 자리를 비우고, 또 그런 대회에서만 명단을 고칠 수 있다.
  *
  * `draft` 는 제외해도 안전하다 — 신청 생성이 `status !== 'open'` 을 막으므로(2026-08-04 확인,
  * tournament-registrations.service.ts:103) draft 대회에는 신청 자체가 존재할 수 없다.
@@ -62,7 +60,7 @@ export async function removeUserFromActiveRosters(
       registration: {
         ...(options.teamId ? { teamId: options.teamId } : {}),
         tournament: {
-          status: { in: [...ROSTER_CLEANUP_TOURNAMENT_STATUSES] },
+          status: { in: [...ROSTER_MUTABLE_TOURNAMENT_STATUSES] },
           deletedAt: null,
         },
       },

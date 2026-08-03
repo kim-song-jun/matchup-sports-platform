@@ -726,7 +726,14 @@ export function RosterModal({
             <button
               type="button"
               onClick={handleAddPlayer}
-              disabled={addPlayer.isPending || eligible.isFetching || !canAddSelectedMember}
+              // isError 도 막는다 — 재조회가 실패하면 React Query 는 직전 데이터를 그대로
+              // 들고 있어서, 아래에 에러가 떠 있는데도 옛 판정으로 추가가 가능해진다.
+              disabled={
+                addPlayer.isPending ||
+                eligible.isFetching ||
+                eligible.isError ||
+                !canAddSelectedMember
+              }
               className="h-[44px] shrink-0 rounded-xl bg-blue-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               {addPlayer.isPending ? '추가 중…' : '추가'}

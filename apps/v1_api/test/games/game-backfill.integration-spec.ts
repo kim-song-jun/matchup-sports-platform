@@ -597,8 +597,13 @@ describe('Task 10 legacy result migration contract', () => {
     });
   });
 
-  it('Task 10 RED live operation flags route exposes GET PATCH tuple and pre-latch compare kill-switch', async () => {
-    const gate = writeCompareToLegacyGate();
+  it('Task 10 RED live operation flags route exposes GET PATCH tuple and pre-latch authority rollback kill-switch', async () => {
+    // Pre-latch rollout state: GAME_WRITE already promoted to 'new' (writes go
+    // to the new path) while GAME_READ is still 'compare' (dual-read window).
+    // No write has landed on the new path yet (v1_game_cutover_epochs.first_new_write_at
+    // is null), so this is exactly the window in which a kill-switch must be
+    // able to roll BOTH authorities back atomically before the epoch latches.
+    const gate = writeAuthorityRollbackGate();
     try {
       await prisma.v1GameOperationFlag.upsert({
         where: { key: 'GAME_READ' },
@@ -621,12 +626,31 @@ describe('Task 10 legacy result migration contract', () => {
           rollbackValue: 'legacy',
         },
       });
+      await prisma.v1GameOperationFlag.upsert({
+        where: { key: 'GAME_WRITE' },
+        create: {
+          key: 'GAME_WRITE',
+          value: 'new',
+          version: 1,
+          ownerActor: 'platform_ops',
+          // GAME_WRITE moved forward FROM 'legacy', same seeding convention
+          // as GAME_READ above.
+          rollbackValue: 'legacy',
+        },
+        update: {
+          value: 'new',
+          version: 1,
+          ownerActor: 'platform_ops',
+          updatedByUserId: null,
+          rollbackValue: 'legacy',
+        },
+      });
       await prisma.v1GameCutoverEpoch.upsert({
         where: { id: 'game-cutover' },
-        create: { id: 'game-cutover', version: 0, writeMode: 'legacy' },
+        create: { id: 'game-cutover', version: 0, writeMode: 'new' },
         update: {
           version: 0,
-          writeMode: 'legacy',
+          writeMode: 'new',
           firstNewWriteAt: null,
           firstNewWriteResourceId: null,
         },
@@ -640,16 +664,38 @@ describe('Task 10 legacy result migration contract', () => {
         .set('x-v1-user-id', ids.user)
         .set('idempotency-key', 'task-10-tuple-route-contract')
         .send({});
-      const killSwitch = await request(app.getHttpServer())
+      // The single-flag PATCH path is a deliberate Task 7/8 safety invariant:
+      // GameOperationFlagsService.patchFlag's assertSingleTransition
+      // unconditionally rejects rolling GAME_READ backward outside the
+      // tuple-transition endpoint (apps/v1_api/src/config/game-operation-flags.ts
+      // ~L903-936), because rolling read authority back while write authority
+      // is still 'new' would desynchronize the two. This must stay a 409, not
+      // a 200 -- the gate bundle fields below are never read by production
+      // since the rejection happens before gate verification.
+      const singleFlagAttempt = await request(app.getHttpServer())
         .patch('/api/v1/tournament-ops/operation-flags/GAME_READ')
         .set('x-v1-user-id', ids.user)
-        .set('idempotency-key', 'task-10-compare-legacy-kill-switch')
+        .set('idempotency-key', 'task-10-single-flag-rollback-rejected')
         .send({
           expectedVersion: 1,
           value: 'legacy',
+          gateBundlePath: '/dev/null',
+          gateBundleHash: 'f'.repeat(64),
+          reason: 'Attempting an unsafe single-flag rollback',
+        });
+      const authorityRollback = await request(app.getHttpServer())
+        .post('/api/v1/tournament-ops/operation-flags/tuple-transition')
+        .set('x-v1-user-id', ids.user)
+        .set('idempotency-key', 'task-10-authority-rollback-kill-switch')
+        .send({
+          expectedVersions: { GAME_READ: 1, GAME_WRITE: 1 },
+          transitions: [
+            { key: 'GAME_READ', from: 'compare', to: 'legacy' },
+            { key: 'GAME_WRITE', from: 'new', to: 'legacy' },
+          ],
           gateBundlePath: gate.path,
           gateBundleHash: gate.sha256,
-          reason: 'Task 10 pre-latch compare-read kill-switch',
+          reason: 'Task 10 pre-latch authority rollback kill-switch',
         });
 
       expect(getFlag.status).toBe(200);
@@ -681,23 +727,71 @@ describe('Task 10 legacy result migration contract', () => {
         requestId: expect.any(Number),
         timestamp: expect.any(String),
       });
-      expect(killSwitch.status).toBe(200);
-      expect(killSwitch.body).toEqual({
+      expect(singleFlagAttempt.status).toBe(409);
+      expect(singleFlagAttempt.body).toEqual({
+        status: 'error',
+        statusCode: 409,
+        code: 'TUPLE_TRANSITION_REQUIRED',
+        message: 'Read/write authority rollback requires tuple-transition',
+        details: null,
+        requestId: expect.any(Number),
+        timestamp: expect.any(String),
+      });
+      // The rejected single-flag attempt must not have mutated anything.
+      await expect(
+        prisma.v1GameOperationFlag.findUniqueOrThrow({ where: { key: 'GAME_READ' } }),
+      ).resolves.toMatchObject({ value: 'compare', version: 1, rollbackValue: 'legacy' });
+
+      // @Post('tuple-transition') carries no @HttpCode override, so Nest's
+      // POST default (201 Created) applies -- unlike the PATCH endpoint,
+      // which defaults to 200.
+      expect(authorityRollback.status).toBe(201);
+      expect(authorityRollback.body).toEqual({
         status: 'success',
         data: {
-          key: 'GAME_READ',
-          value: 'legacy',
-          version: 2,
-          ownerActor: 'platform_ops',
-          updatedByUserId: ids.user,
-          rollbackValue: 'compare',
-          updatedAt: expect.any(String),
+          // GameOperationFlagsService.tupleTransition sorts both the
+          // normalized transitions and the final `updated` array by key, so
+          // GAME_READ always precedes GAME_WRITE regardless of request order.
+          flags: [
+            {
+              key: 'GAME_READ',
+              value: 'legacy',
+              version: 2,
+              ownerActor: 'platform_ops',
+              updatedByUserId: ids.user,
+              rollbackValue: 'compare',
+              updatedAt: expect.any(String),
+            },
+            {
+              key: 'GAME_WRITE',
+              value: 'legacy',
+              version: 2,
+              ownerActor: 'platform_ops',
+              updatedByUserId: ids.user,
+              rollbackValue: 'new',
+              updatedAt: expect.any(String),
+            },
+          ],
+          cutoverEpochVersion: 1,
         },
         timestamp: expect.any(String),
       });
+
+      // Post-rollback state, persisted (not just echoed in the response):
+      // both authorities are back to legacy, versions bumped, rollback
+      // values recorded, and -- the entire point of "pre-latch" -- the
+      // cutover epoch never saw a first new write, so it rolled back cleanly.
+      await expect(
+        prisma.v1GameOperationFlag.findUniqueOrThrow({ where: { key: 'GAME_READ' } }),
+      ).resolves.toMatchObject({ value: 'legacy', version: 2, rollbackValue: 'compare' });
+      await expect(
+        prisma.v1GameOperationFlag.findUniqueOrThrow({ where: { key: 'GAME_WRITE' } }),
+      ).resolves.toMatchObject({ value: 'legacy', version: 2, rollbackValue: 'new' });
       await expect(
         prisma.v1GameCutoverEpoch.findUniqueOrThrow({ where: { id: 'game-cutover' } }),
       ).resolves.toMatchObject({
+        version: 1,
+        writeMode: 'legacy',
         firstNewWriteAt: null,
         firstNewWriteResourceId: null,
       });
@@ -707,15 +801,27 @@ describe('Task 10 legacy result migration contract', () => {
   });
 });
 
-function writeCompareToLegacyGate() {
+// Builds a Phase C gate bundle for the atomic GAME_READ+GAME_WRITE tuple
+// rollback (the only route production allows for rolling read authority
+// backward once write authority has moved off 'legacy' -- see
+// GameOperationFlagsService.tupleTransition and assertSingleTransition in
+// apps/v1_api/src/config/game-operation-flags.ts). Mirrors the previous
+// single-flag gate builder's shape (verifyGateBundle's `kind: 'tuple'`
+// branch), but with tupleKeys/fromTuple/toTuple instead of key/from/to.
+function writeAuthorityRollbackGate() {
   const gateRoot = resolveGameOperationGateRoot();
   const attemptId = randomUUID();
-  const attemptRoot = join(gateRoot, `task10-${attemptId}`);
+  const attemptRoot = join(gateRoot, `task10-tuple-${attemptId}`);
   const baselineSHA = 'a'.repeat(40);
   const candidateSHA = 'b'.repeat(40);
   const planSHA = 'c'.repeat(64);
   mkdirSync(attemptRoot, { recursive: true, mode: 0o700 });
 
+  // requiredGatesFor('C', { kind: 'tuple', tupleKeys: ['GAME_READ', 'GAME_WRITE'], ... })
+  // resolves to exactly V10 and V25 for this pair (GAME_WRITE always needs
+  // both; GAME_READ needs both too since compare->legacy is not the
+  // legacy->compare fast path) -- the same prerequisite set the prior
+  // single-flag compare->legacy gate needed.
   const prerequisites = ['V10', 'V25'].map((gateId, index) => {
     const path = join(attemptRoot, `receipt-${index}-C-${gateId}.json`);
     const receipt = immutableJson(path, {
@@ -739,7 +845,8 @@ function writeCompareToLegacyGate() {
       verdict: 'accepted',
     };
   });
-  const transition = 'GAME_READ:compare->legacy';
+  const tupleKeys = ['GAME_READ', 'GAME_WRITE'];
+  const transition = 'GAME_READ+GAME_WRITE:pre-latch-authority-rollback';
   const path = join(
     gateRoot,
     `flag-gate-${attemptId}-C-${transition.replace(/[^A-Za-z0-9._-]+/g, '-')}.json`,
@@ -752,9 +859,15 @@ function writeCompareToLegacyGate() {
     candidateSHA,
     planSHA,
     transition,
-    key: 'GAME_READ',
-    from: { value: 'compare', version: 1 },
-    to: { value: 'legacy', version: 2 },
+    tupleKeys,
+    fromTuple: {
+      GAME_READ: { value: 'compare', version: 1 },
+      GAME_WRITE: { value: 'new', version: 1 },
+    },
+    toTuple: {
+      GAME_READ: { value: 'legacy', version: 2 },
+      GAME_WRITE: { value: 'legacy', version: 2 },
+    },
     prerequisites,
     createdAt: '2026-08-03T00:00:00.000Z',
   });

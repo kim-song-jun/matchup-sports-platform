@@ -2,6 +2,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   compareGameResultSnapshots,
+  type SnapshotPair,
   type GameResultComparison,
   type GameResultEntityType,
 } from './compare-game-result-reads';
@@ -316,7 +317,12 @@ function resultProjection(entry: ClassifiedSource): unknown {
   };
 }
 
-function buildComparisonPairs(entry: ClassifiedSource) {
+// Explicit return type on purpose. Without it TypeScript infers a union of two DIFFERENT array
+// types (the missing-projection shape and the projected shape), and `Array.flatMap`'s callback
+// signature wants `U | readonly U[]` - a union of two array types does not satisfy it (TS2345).
+// Annotating with the consumer's own SnapshotPair also makes the compiler enforce the contract
+// here at the producer rather than at the call site.
+function buildComparisonPairs(entry: ClassifiedSource): SnapshotPair[] {
   if (entry.bucket === 'quarantined') return [];
 
   if (!entry.persistedGame) {

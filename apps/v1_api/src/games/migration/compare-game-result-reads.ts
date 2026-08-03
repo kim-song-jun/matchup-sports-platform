@@ -22,7 +22,7 @@ export type GameResultComparison = {
   mismatches: GameResultMismatch[];
 };
 
-type SnapshotPair = {
+export type SnapshotPair = {
   identity: {
     entityType: GameResultEntityType;
     entityId: string;

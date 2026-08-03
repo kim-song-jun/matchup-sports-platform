@@ -2142,6 +2142,7 @@ model V1TournamentFixture {
   @@index([groupId])
   @@index([parentFixtureId])
   @@index([competitionConfigVersionId], map: "v1_tournament_fixtures_competition_config_idx")
+  @@index([status, id], map: "v1_tournament_fixtures_status_id_backfill_idx")
   @@map("v1_tournament_fixtures")
 }
 

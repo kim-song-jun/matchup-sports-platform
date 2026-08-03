@@ -54,7 +54,6 @@ import {
   useV1RosterDeadlineOverrideGrant,
   useV1RosterDeadlineOverrideRevoke,
   useV1ExportRosterCsv,
-  useV1TournamentPlayers,
   useV1AdminTournamentPlayers,
   useV1UpdatePlayerEligibility,
   useV1AdminBracket,
@@ -527,7 +526,7 @@ export function RosterModal({
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentPlayers(
     registration?.id ?? '',
   );
-  const updateEligibility = useV1UpdatePlayerEligibility();
+  const updateEligibility = useV1UpdatePlayerEligibility(registration?.id ?? '');
   const addPlayer = useV1AdminAddPlayer(registration?.id ?? '');
   const removePlayer = useV1AdminRemovePlayer(registration?.id ?? '');
 
@@ -4866,7 +4865,7 @@ function AwardsTab({
 }
 
 // ── AwardsTab 행 컴포넌트 ────────────────────────────────────────────────
-// 팀이 선택된 행만 useV1TournamentPlayers로 로스터를 조회해야 하므로(훅 규칙상
+// 팀이 선택된 행만 useV1AdminTournamentPlayers로 로스터를 조회해야 하므로(훅 규칙상
 // 조건/루프 내 훅 호출 금지) rows.map 내부가 아닌 별도 컴포넌트로 분리한다.
 function AwardRow({
   idx,
@@ -4889,10 +4888,11 @@ function AwardRow({
     : null;
   const selectedRegistrationId = selectedTeamItem?.id ?? '';
 
-  const { data: roster, isFetching: rosterFetching } = useV1TournamentPlayers(
-    tournamentId,
-    selectedRegistrationId,
-  );
+  // 어드민 화면이므로 어드민 엔드포인트를 쓴다. 소비자 엔드포인트는 "그 팀의 멤버인가" 를
+  // 검사하므로, 자기가 속하지 않은 참가팀을 고른 어드민에게는 403 이 떨어진다. 그런데 화면은
+  // 그 에러를 따로 보여주지 않고 빈 목록으로 처리해서 "명단에 선수가 없다" 처럼 보였다.
+  const { data: roster, isFetching: rosterFetching } =
+    useV1AdminTournamentPlayers(selectedRegistrationId);
   const playerItems: EntityPickerItem[] = (roster?.players ?? []).map((p) => ({
     id: p.id,
     label: p.realName,

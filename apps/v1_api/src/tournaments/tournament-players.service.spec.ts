@@ -81,6 +81,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     deletedAt: null,
     rosterDeadlineAt: null,
     genderCategory: null,
+    status: 'open',
     ...overrides,
   };
 }
@@ -133,13 +134,16 @@ describe('TournamentPlayersService', () => {
     v1TournamentPlayer: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
+      findUnique: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
       count: jest.Mock;
       create: jest.Mock;
       upsert: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     v1AdminUser: { findUnique: jest.Mock };
-    v1AdminActionLog: { create: jest.Mock };
+    v1AdminActionLog: { create: jest.Mock; findFirst: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
@@ -153,13 +157,21 @@ describe('TournamentPlayersService', () => {
       v1TournamentPlayer: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
+        // 재추가 시 기존 row(제외된 것 포함)를 확인하는 경로. 기본은 "처음 넣는 선수".
+        findUnique: jest.fn().mockResolvedValue(null),
+        findUniqueOrThrow: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn(),
         upsert: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       v1AdminUser: { findUnique: jest.fn() },
-      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
+      v1AdminActionLog: {
+        create: jest.fn().mockResolvedValue({ id: 'action-log-1' }),
+        // 기본은 "어드민이 아직 선출 여부를 확정하지 않음".
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue(undefined),
@@ -715,10 +727,9 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1TournamentPlayer.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'player-1' },
-        data: {
-          eligibilityStatus: 'pro',
-          eligibilityNote: null,
-        },
+        // 메모는 건드리지 않는다. 예전엔 eligibilityNote 를 null 로 덮어써서, 팀이 라디오를
+        // 한 번 누르면 어드민 심사 메모가 흔적 없이 사라졌다.
+        data: { eligibilityStatus: 'pro' },
       }),
     );
   });
@@ -739,10 +750,9 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1TournamentPlayer.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'player-1' },
-        data: {
-          eligibilityStatus: 'pro',
-          eligibilityNote: null,
-        },
+        // 메모는 건드리지 않는다. 예전엔 eligibilityNote 를 null 로 덮어써서, 팀이 라디오를
+        // 한 번 누르면 어드민 심사 메모가 흔적 없이 사라졌다.
+        data: { eligibilityStatus: 'pro' },
       }),
     );
   });
@@ -1050,6 +1060,7 @@ describe('TournamentPlayersService', () => {
         genderCategory: null,
         maxPlayers: 10,
         deletedAt: null,
+        status: 'open',
         ...(options.tournament ?? {}),
       },
       ...(options.registration ?? {}),
@@ -1194,6 +1205,187 @@ describe('TournamentPlayersService', () => {
     expect(member).not.toHaveProperty('gender');
     // 판정 자체는 계속 프로필을 읽어야 한다 — 값이 있으니 선택 가능이어야 맞다.
     expect(member.eligible).toBe(true);
+  });
+
+  // ─── 대회 상태 가드 (완료·취소 대회의 명단 동결) ──────────────────────────────
+  //
+  // 수상 내역·리뷰·기록이 명단을 참조하므로 지난 대회의 선수를 넣고 빼면 과거 기록이 가리키는
+  // 대상이 달라진다. 탈퇴 정리는 이미 완료 대회를 건너뛰는데(roster-cleanup.ts) 정작 추가·제거는
+  // 열려 있었다.
+
+  it.each(['completed', 'cancelled'])(
+    'addPlayer: %s 대회는 명단을 수정할 수 없다',
+    async (status) => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status }));
+
+      await expect(
+        service.addPlayer(manager, 'tournament-1', 'reg-1', {
+          userId: 'player-user-id',
+          realName: '홍길동',
+        }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_ROSTER_NOT_MUTABLE' } });
+      expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('removePlayer: 완료된 대회는 명단에서 선수를 뺄 수 없다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'completed' }));
+
+    await expect(
+      service.removePlayer(manager, 'tournament-1', 'reg-1', 'player-1'),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_ROSTER_NOT_MUTABLE' } });
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  it('addPlayer: 어드민 경로도 완료된 대회는 넘기지 못한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      tournamentId: 'tournament-1',
+    });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'completed' }));
+
+    await expect(
+      service.addPlayerForAdmin(adminUser, 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_ROSTER_NOT_MUTABLE' } });
+  });
+
+  it('listEligiblePlayersForAdmin: 완료된 대회는 후보도 추가 불가로 내려온다', async () => {
+    setupEligible({
+      members: [eligibleMembershipRow()],
+      tournament: { status: 'completed' },
+    });
+
+    const [member] = (await service.listEligiblePlayersForAdmin(adminUser, 'reg-1')).members;
+
+    expect(member).toMatchObject({
+      eligible: false,
+      ineligibleReason: '종료되었거나 취소된 대회예요',
+    });
+  });
+
+  // ─── 어드민 선출 심사 보호 ───────────────────────────────────────────────────
+  //
+  // 팀이 선출 여부를 신고하는 것 자체는 정상 흐름이다. 어드민이 확정한 **뒤에** 팀이 그걸
+  // 되돌리고 심사 메모까지 지우는 것이 문제다 — 감사 로그에도 남지 않는다.
+
+  it('updatePlayer: 어드민이 확정한 선출 여부는 팀이 되돌릴 수 없다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(
+      playerRow({ eligibilityStatus: 'pro', eligibilityNote: '2020 K3 출전 이력 확인' }),
+    );
+    prisma.v1AdminActionLog.findFirst.mockResolvedValue({ id: 'log-1' });
+
+    await expect(
+      service.updatePlayer(manager, 'tournament-1', 'reg-1', 'player-1', {
+        eligibilityStatus: 'non_pro',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'ELIGIBILITY_ADMIN_REVIEWED' } });
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  it('addPlayer: 제외했다 다시 넣어도 어드민 확정 결과가 초기화되지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+    // 제외돼 있던 기존 row + 어드민 확정 이력
+    prisma.v1TournamentPlayer.findUnique.mockResolvedValue({
+      id: 'player-1',
+      eligibilityStatus: 'pro',
+      eligibilityNote: '2020 K3 출전 이력 확인',
+    });
+    prisma.v1AdminActionLog.findFirst.mockResolvedValue({ id: 'log-1' });
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow({ eligibilityStatus: 'pro' }));
+
+    await service.addPlayer(manager, 'tournament-1', 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+      eligibilityStatus: 'non_pro',
+    });
+
+    // "제외 → 재추가" 두 번으로 심사를 무효화하는 문을 막는다.
+    expect(prisma.v1TournamentPlayer.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          eligibilityStatus: 'pro',
+          eligibilityNote: '2020 K3 출전 이력 확인',
+        }),
+      }),
+    );
+  });
+
+  // ─── 남성부·여성부 성별 일치 ────────────────────────────────────────────────
+
+  it('addPlayer: 여성부 대회에 남성 팀원은 등록할 수 없다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ genderCategory: 'female' }));
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PLAYER_GENDER_MISMATCH' } });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
+  it('listEligiblePlayersForAdmin: 남성부 대회에서 여성 팀원은 사유와 함께 잠긴다', async () => {
+    setupEligible({
+      members: [
+        eligibleMembershipRow({
+          user: {
+            profile: {
+              nickname: '길순',
+              realName: '홍길순',
+              birthDate: '1995-03-15',
+              gender: 'female',
+            },
+          },
+        }),
+      ],
+      tournament: { genderCategory: 'male' },
+    });
+
+    const [member] = (await service.listEligiblePlayersForAdmin(adminUser, 'reg-1')).members;
+
+    expect(member).toMatchObject({ eligible: false, ineligibleReason: '남성부 대회예요' });
+  });
+
+  // ─── 어드민 remove 멱등 ─────────────────────────────────────────────────────
+
+  it('removePlayerForAdmin: 이미 제외된 선수를 또 제외하면 404 — 감사 로그가 두 번 남지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue({
+      id: 'player-1',
+      registrationId: 'reg-1',
+      userId: 'player-user-id',
+      realName: '홍길동',
+      registration: { tournamentId: 'tournament-1' },
+    });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    // lock 을 잡는 사이 다른 요청이 먼저 제외를 끝냈다.
+    prisma.v1TournamentPlayer.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.removePlayerForAdmin(adminUser, 'player-1')).rejects.toMatchObject({
+      response: { code: 'PLAYER_NOT_FOUND' },
+    });
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
   });
 
   it('listEligiblePlayersForAdmin: 없는 신청이면 404', async () => {

@@ -5,7 +5,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1TournamentPlayer, V1TournamentRegistration } from '@prisma/client';
+import {
+  Prisma,
+  V1TournamentGenderCategory,
+  V1TournamentPlayer,
+  V1TournamentRegistration,
+  V1TournamentStatus,
+} from '@prisma/client';
+import { isRosterMutableTournamentStatus } from './roster-cleanup';
 import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
@@ -75,15 +82,49 @@ export class TournamentPlayersService {
     }
   }
 
+  /**
+   * 어드민이 이 선수의 선출 여부를 이미 확정했는가.
+   *
+   * 팀이 "선출 여부"를 스스로 신고하는 것은 정상 흐름이다(소비자 명단 화면의 라디오). 문제는
+   * 어드민이 심사해 결론을 낸 **뒤에도** 팀이 그걸 되돌릴 수 있고, 그 과정에서 어드민이 남긴
+   * 심사 메모(eligibilityNote)까지 지워진다는 것이다 — 흔적도 감사 로그도 남지 않는다.
+   *
+   * 확정 여부는 감사 로그로 판정한다. eligibilityNote 유무로는 판정할 수 없다 — 어드민이
+   * 메모 없이 확정하면(dto.note 미지정) note 가 null 이라 심사 전과 구분되지 않는다.
+   */
+  private async hasAdminEligibilityRuling(
+    tx: Prisma.TransactionClient,
+    playerId: string,
+  ): Promise<boolean> {
+    const ruling = await tx.v1AdminActionLog.findFirst({
+      where: {
+        action: 'player.eligibility',
+        targetType: 'tournament_player',
+        targetId: playerId,
+      },
+      select: { id: true },
+    });
+    return ruling !== null;
+  }
+
   private assertRosterMutable(
     registration: V1TournamentRegistration,
-    tournament: { rosterDeadlineAt: Date | null },
+    tournament: { rosterDeadlineAt: Date | null; status: V1TournamentStatus },
     // 어드민 경로 전용. 잠금(rosterLockedAt)과 마감(rosterDeadlineAt)은 **운영진이 풀라고
     // 있는 장치**이므로 어드민은 넘길 수 있다(이미 roster-lock / roster-deadline-override
     // 엔드포인트가 같은 목적으로 존재한다). 반면 취소된 신청은 어드민도 건드릴 수 없다 —
     // 그건 권한 문제가 아니라 "존재하지 않는 참가"에 선수를 넣는 것이라 의미가 없다.
     options: { allowLockedAndExpired?: boolean } = {},
   ) {
+    // 완료·취소된 대회의 명단은 누구도 못 바꾼다. 수상 내역·리뷰·기록이 이 명단을 참조하므로
+    // 지난 대회의 선수를 넣고 빼면 과거 기록이 가리키는 대상이 달라진다 — 탈퇴 정리가 완료
+    // 대회를 건너뛰는 것과 같은 불변식이다(roster-cleanup.ts 주석 참조).
+    if (!isRosterMutableTournamentStatus(tournament.status)) {
+      throw new ConflictException({
+        code: 'TOURNAMENT_ROSTER_NOT_MUTABLE',
+        message: '종료되었거나 취소된 대회는 선수 명단을 수정할 수 없어요.',
+      });
+    }
     if (!options.allowLockedAndExpired && registration.rosterLockedAt) {
       throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
     }
@@ -150,6 +191,7 @@ export class TournamentPlayersService {
         minPlayers: true,
         rosterDeadlineAt: true,
         genderCategory: true,
+        status: true,
       },
     });
     if (!tournament) {
@@ -190,6 +232,15 @@ export class TournamentPlayersService {
         });
       }
 
+      // 멤버십 행을 먼저 잠근다. 안 잠그면 "탈퇴 트랜잭션이 멤버십을 끄고 로스터를 정리 →
+      // 그 사이 추가 트랜잭션이 아직 활성으로 읽은 멤버십을 근거로 선수를 넣고 커밋" 순서가
+      // 가능해, 탈퇴한 사람이 명단에 되살아난다 — 2026-08-03 유령 명단 사고와 같은 상태다.
+      // registration → membership 순서로만 잠가 두 경로의 lock 순서를 고정한다(교착 방지).
+      await tx.$queryRaw`
+        SELECT id FROM "v1_team_memberships"
+        WHERE team_id = ${current.registration.teamId} AND user_id = ${dto.userId}
+        FOR UPDATE
+      `;
       const teamMembership = await tx.v1TeamMembership.findFirst({
         where: {
           teamId: current.registration.teamId,
@@ -226,6 +277,18 @@ export class TournamentPlayersService {
             : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
         });
       }
+      // 남성부·여성부는 성별이 맞아야 한다. 지금까지는 mixed 일 때 "성별이 있는지" 만 보고
+      // male/female 대회에서는 아무 검사도 하지 않아, 여성부 대회에 남성을 넣을 수 있었다.
+      const requiredGender = genderRequiredByCategory(current.tournament.genderCategory);
+      if (requiredGender && memberGender !== requiredGender) {
+        throw new BadRequestException({
+          code: 'PLAYER_GENDER_MISMATCH',
+          message:
+            requiredGender === 'male'
+              ? '남성부 대회에는 남성 팀원만 등록할 수 있어요.'
+              : '여성부 대회에는 여성 팀원만 등록할 수 있어요.',
+        });
+      }
       // 번호가 "적혀 있는지"만 보면 대회 명단이 약속하는 본인확인이 성립하지 않는다 —
       // 실제로 그 번호의 소유자임을 확인한(phoneVerifiedAt) 팀원만 출전 명단에 올린다.
       if (isPhoneVerificationEnforced() && !teamMembership.user.phoneVerifiedAt) {
@@ -244,6 +307,17 @@ export class TournamentPlayersService {
         });
       }
 
+      // 제외했다 다시 넣으면 같은 row 가 되살아난다. 그 자리에서 자격을 needs_review 로
+      // 되돌리고 메모를 지우면, 팀이 "제외 → 재추가" 두 번으로 어드민 심사를 무효화할 수
+      // 있다 — updatePlayer 를 막아도 이 문이 열려 있으면 소용없다.
+      const existingRow = await tx.v1TournamentPlayer.findUnique({
+        where: { registrationId_userId: { registrationId, userId: dto.userId } },
+        select: { id: true, eligibilityStatus: true, eligibilityNote: true },
+      });
+      const adminRuled = existingRow
+        ? await this.hasAdminEligibilityRuling(tx, existingRow.id)
+        : false;
+
       const saved = await tx.v1TournamentPlayer.upsert({
         where: { registrationId_userId: { registrationId, userId: dto.userId } },
         create: {
@@ -258,8 +332,10 @@ export class TournamentPlayersService {
           realName: memberRealName,
           birthDateSnapshot: memberBirthDate,
           genderSnapshot: memberGender,
-          eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
-          eligibilityNote: null,
+          eligibilityStatus: adminRuled
+            ? existingRow!.eligibilityStatus
+            : (dto.eligibilityStatus ?? 'needs_review'),
+          eligibilityNote: adminRuled ? existingRow!.eligibilityNote : null,
           removedAt: null,
           addedAt: new Date(),
         },
@@ -299,12 +375,15 @@ export class TournamentPlayersService {
 
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      select: { rosterDeadlineAt: true },
+      select: { rosterDeadlineAt: true, status: true },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
-    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament.rosterDeadlineAt });
+    this.assertRosterMutable(registration, {
+      rosterDeadlineAt: tournament.rosterDeadlineAt,
+      status: tournament.status,
+    });
 
     const removed = await this.prisma.$transaction(async (tx) => {
       await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId);
@@ -337,12 +416,15 @@ export class TournamentPlayersService {
 
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      select: { rosterDeadlineAt: true },
+      select: { rosterDeadlineAt: true, status: true },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
-    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament.rosterDeadlineAt });
+    this.assertRosterMutable(registration, {
+      rosterDeadlineAt: tournament.rosterDeadlineAt,
+      status: tournament.status,
+    });
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId);
@@ -352,12 +434,18 @@ export class TournamentPlayersService {
       if (!player) {
         throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
       }
+      // 어드민이 이미 확정했으면 팀이 되돌릴 수 없다. 여기까지 오면 심사 결론이 조용히
+      // 뒤집히고 심사 메모까지 지워지는데, 감사 로그에는 그 사실이 남지 않는다.
+      if (await this.hasAdminEligibilityRuling(tx, playerId)) {
+        throw new ConflictException({
+          code: 'ELIGIBILITY_ADMIN_REVIEWED',
+          message: '운영진이 확정한 선출 여부예요. 변경이 필요하면 운영진에게 문의해 주세요.',
+        });
+      }
       return tx.v1TournamentPlayer.update({
         where: { id: playerId },
-        data: {
-          eligibilityStatus: dto.eligibilityStatus,
-          eligibilityNote: null,
-        },
+        // 메모는 어드민만 쓴다 — 팀이 라디오를 바꿨다고 지울 이유가 없다.
+        data: { eligibilityStatus: dto.eligibilityStatus },
       });
     });
 
@@ -505,7 +593,9 @@ export class TournamentPlayersService {
       select: {
         teamId: true,
         status: true,
-        tournament: { select: { genderCategory: true, maxPlayers: true, deletedAt: true } },
+        tournament: {
+          select: { genderCategory: true, maxPlayers: true, deletedAt: true, status: true },
+        },
       },
     });
     // 삭제된 대회는 add 가 404 를 내므로 후보도 내려주지 않는다 — 안 막으면 지난 대회의
@@ -544,12 +634,14 @@ export class TournamentPlayersService {
 
     const onRoster = new Set(activePlayers.map((player) => player.userId));
     const requiresGender = registration.tournament.genderCategory === 'mixed';
+    const requiredGender = genderRequiredByCategory(registration.tournament.genderCategory);
     const phoneEnforced = isPhoneVerificationEnforced();
 
     // 명단 전체를 막는 사유. 개인 자격과 무관하게 추가 자체가 거부되므로 여기서 먼저 판정한다 —
     // 빼놓으면 모든 팀원이 "선택 가능" 으로 보이고 눌러야 409 를 받는다. 특히 정원이 찬 경우가
     // 그랬는데, 유령 명단 한 자리 때문에 팀이 선수를 못 넣던 2026-08-03 사고가 바로 이 모양이었다.
     // (잠금·마감은 어드민이 넘길 수 있으므로 여기서 막지 않는다 — assertRosterMutable 주석 참조.)
+    const tournamentClosed = !isRosterMutableTournamentStatus(registration.tournament.status);
     const registrationCancelled =
       registration.status === 'cancel_requested' || registration.status === 'cancelled';
     const maxPlayers = registration.tournament.maxPlayers;
@@ -570,7 +662,9 @@ export class TournamentPlayersService {
           // 개인 사유가 먼저 보이는 편이 조치하기 쉽다.
           let ineligibleReason: string | null = null;
           if (onRoster.has(member.id)) ineligibleReason = '이미 명단에 있어요';
-          else if (registrationCancelled) {
+          else if (tournamentClosed) {
+            ineligibleReason = '종료되었거나 취소된 대회예요';
+          } else if (registrationCancelled) {
             ineligibleReason = '취소된 신청이라 명단을 수정할 수 없어요';
           } else if (rosterFull) {
             ineligibleReason = `정원이 찼어요 (${activePlayers.length}/${maxPlayers}명)`;
@@ -578,6 +672,9 @@ export class TournamentPlayersService {
             ineligibleReason = requiresGender
               ? '실명·생년월일·휴대폰·성별이 모두 필요해요'
               : '실명·생년월일·휴대폰이 모두 필요해요';
+          } else if (requiredGender && gender !== requiredGender) {
+            ineligibleReason =
+              requiredGender === 'male' ? '남성부 대회예요' : '여성부 대회예요';
           } else if (phoneEnforced && !member.phoneVerifiedAt) {
             ineligibleReason = '휴대폰 본인인증이 필요해요';
           }
@@ -626,10 +723,17 @@ export class TournamentPlayersService {
         player.registrationId,
         { allowLockedAndExpired: true },
       );
-      const updated = await tx.v1TournamentPlayer.update({
-        where: { id: playerId },
+      // lock **이후에** 활성 상태를 다시 본다. 위 findFirst 는 lock 전에 읽으므로, 두 요청이
+      // 나란히 들어오면 둘 다 활성으로 읽고 둘 다 제거에 성공해 감사 로그가 두 번 남는다
+      // (소비자 remove 는 lock 뒤에 조회해서 이 문제가 없다).
+      const stillActive = await tx.v1TournamentPlayer.updateMany({
+        where: { id: playerId, removedAt: null },
         data: { removedAt: new Date() },
       });
+      if (stillActive.count === 0) {
+        throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      }
+      const updated = await tx.v1TournamentPlayer.findUniqueOrThrow({ where: { id: playerId } });
 
       // 추가와 같은 이유로 제거도 기록한다 — 명단 변경과 같은 트랜잭션에 넣어야 "명단은
       // 바뀌었는데 로그가 없는" 상태가 생기지 않는다.
@@ -730,6 +834,7 @@ export class TournamentPlayersService {
         minPlayers: true,
         rosterDeadlineAt: true,
         genderCategory: true,
+        status: true,
       },
     });
     if (!tournament) {
@@ -755,4 +860,14 @@ export class TournamentPlayersService {
 
 function normalizeGender(value: string | null | undefined): 'male' | 'female' | null {
   return value === 'male' || value === 'female' ? value : null;
+}
+
+/**
+ * 대회 성별 구분이 요구하는 선수 성별. `mixed`(혼성)와 미지정은 특정 성별을 요구하지 않는다 —
+ * 혼성은 "성별이 등록돼 있을 것"만 따로 검사한다.
+ */
+function genderRequiredByCategory(
+  category: V1TournamentGenderCategory | null,
+): 'male' | 'female' | null {
+  return category === 'male' || category === 'female' ? category : null;
 }

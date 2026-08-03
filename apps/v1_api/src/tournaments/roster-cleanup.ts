@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, V1TournamentStatus } from '@prisma/client';
 
 // 팀을 벗어나는 모든 경로에서 대회 로스터를 함께 정리하기 위한 공용 헬퍼.
 //
@@ -20,6 +20,21 @@ import { Prisma } from '@prisma/client';
 // 로스터를 참조하므로, 지난 대회에서 이름을 지우면 과거 기록이 깨진다. 아직 치르지
 // 않았거나 진행 중인 대회에서만 자리를 비운다.
 export const ROSTER_CLEANUP_TOURNAMENT_STATUSES = ['open', 'closed', 'in_progress'] as const;
+
+/**
+ * 명단을 바꿔도 되는 대회 상태. 위 cleanup 집합과 **같은 이유로 같은 값**이다 — 완료·취소된
+ * 대회의 명단을 건드리면 수상 내역·리뷰·기록이 가리키는 대상이 달라진다. 탈퇴 정리가 완료
+ * 대회를 건너뛰는데 정작 추가·제거는 열려 있으면 그 보호가 반쪽짜리가 된다.
+ *
+ * `draft` 는 제외해도 안전하다 — 신청 생성이 `status !== 'open'` 을 막으므로(2026-08-04 확인,
+ * tournament-registrations.service.ts:103) draft 대회에는 신청 자체가 존재할 수 없다.
+ */
+export const ROSTER_MUTABLE_TOURNAMENT_STATUSES = ['open', 'closed', 'in_progress'] as const;
+
+/** 위 집합에 속하는지. 리터럴 배열의 `includes` 는 인자 타입을 좁혀 버리므로 헬퍼로 감싼다. */
+export function isRosterMutableTournamentStatus(status: V1TournamentStatus): boolean {
+  return (ROSTER_MUTABLE_TOURNAMENT_STATUSES as readonly string[]).includes(status);
+}
 
 export type RosterCleanupOptions = {
   /** 특정 팀의 로스터만 정리한다. 생략하면 사용자의 모든 팀이 대상(회원 탈퇴). */

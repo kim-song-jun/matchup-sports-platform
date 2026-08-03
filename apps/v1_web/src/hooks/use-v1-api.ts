@@ -2951,7 +2951,12 @@ export function useV1ExportRosterCsv(registrationId: string) {
   });
 }
 
-export function useV1UpdatePlayerEligibility() {
+/**
+ * @param registrationId 자격을 바꾼 선수가 속한 신청. 명단 캐시 키가 registrationId 기준이라
+ *   이걸 모르면 방금 바꾼 자격이 화면에 반영되지 않는다 — 서버는 바뀌고 토스트도 뜨는데
+ *   행의 배지는 옛 값 그대로였다.
+ */
+export function useV1UpdatePlayerEligibility(registrationId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -2959,10 +2964,19 @@ export function useV1UpdatePlayerEligibility() {
       ...body
     }: { playerId: string } & V1UpdatePlayerEligibilityPayload) =>
       v1Patch<V1TournamentPlayer>(`/admin/players/${playerId}/eligibility`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
-      });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+        }),
+        ...(registrationId
+          ? [
+              queryClient.invalidateQueries({
+                queryKey: v1Keys.adminTournamentRoster(registrationId),
+              }),
+            ]
+          : []),
+      ]);
     },
   });
 }

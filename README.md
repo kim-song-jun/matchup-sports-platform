@@ -68,6 +68,13 @@
 
 ## Architecture
 
+> 이 절은 **처음 합류한 개발자**가 읽는 것을 기준으로 씁니다. 낯선 용어는 처음 나올 때 뜻을
+> 함께 적었습니다. 코드 구조는 [Project Structure](#project-structure), 인프라와 배포는
+> 아래 [인프라 구조](#인프라-구조--무엇이-어디서-도는가)와
+> [배포 파이프라인](#배포-파이프라인)을 보세요.
+
+### 애플리케이션 구조
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     Client Layer                        │
@@ -94,6 +101,197 @@ Client (Next.js) ──→ API (NestJS) ──→ PostgreSQL
        │                    │
        └── Socket.IO ──────→ Redis Pub/Sub
 ```
+
+---
+
+### 인프라 구조 — 무엇이 어디서 도는가
+
+살아 있는 환경은 **두 개**입니다. 둘은 서로 다른 EC2 인스턴스에서 돌지만, **로드밸런서는
+하나를 나눠 씁니다.**
+
+- **alpha** (`alpha.teameet.co.kr`) — `dev` 브랜치가 머지되면 자동으로 올라가는 검증용 환경
+- **production** (`teameet.co.kr`) — 실제 사용자가 쓰는 환경. `main` 브랜치 + 사람의 승인이 필요
+
+```mermaid
+graph TB
+    U["사용자 브라우저 · 모바일 앱"]
+    ALB["teameet-alb<br/>Application Load Balancer<br/>(인터넷에 노출된 유일한 입구)"]
+
+    U -->|HTTPS 443| ALB
+    ALB -->|"Host = alpha.teameet.co.kr<br/>(규칙 우선순위 10)"| A
+    ALB -->|"그 외 전부<br/>(기본 규칙)"| P
+
+    subgraph A["alpha · EC2 t3a.small · ap-northeast-2a"]
+        AN["nginx"] --> AW["v1_web (Next.js)"]
+        AN --> AA["v1_api (NestJS)"]
+        AA --> AP[("PostgreSQL 16<br/>컨테이너")]
+    end
+
+    subgraph P["production · EC2 t3a.small · ap-northeast-2a"]
+        PN["nginx"] --> PW["v1_web (Next.js)"]
+        PN --> PA["v1_api (NestJS)"]
+        PA --> PP[("PostgreSQL 16<br/>컨테이너")]
+    end
+```
+
+배포되는 스택(`deploy/docker-compose.prod.yml`)의 서비스는 **다섯 개**입니다.
+
+| 서비스 | 역할 |
+|---|---|
+| `nginx` | 앞단에서 요청을 웹/API로 분배 |
+| `v1_web` | Next.js 프론트엔드 (`apps/v1_web`) |
+| `v1_api` | NestJS 백엔드 (`apps/v1_api`) |
+| `v1_postgres` | PostgreSQL 16 |
+| `v1_uploads_init` | 업로드 디렉터리 권한을 맞추고 종료하는 **1회성 초기화 컨테이너** |
+
+> 📌 **헷갈리기 쉬운 점 1 — `apps/`에 앱이 네 벌 있습니다.**
+> `apps/v1_api`·`apps/v1_web`이 **지금 배포되는 것**이고, `apps/api`·`apps/web`은 이전 세대
+> 코드입니다. 위쪽 [애플리케이션 구조](#애플리케이션-구조) 다이어그램은 이전 세대 기준이라
+> Redis와 Socket.IO가 나오지만, **현재 배포 스택에는 Redis가 없습니다.**
+
+> 📌 **헷갈리기 쉬운 점 2 — 프로덕션 인스턴스에는 컨테이너가 8개 떠 있습니다.**
+> 그중 `teameet_web`·`teameet_api`·`teameet_postgres`·`teameet_redis` 네 개는
+> **2026-07에 아카이빙된 이전 세대 스택**이 아직 정리되지 않고 남아 있는 것입니다.
+> 실제 서비스는 `teameet_nginx`·`teameet_v1_web`·`teameet_v1_api`·`teameet_v1_postgres`
+> 네 개가 담당합니다.
+
+**로드밸런서(ALB)** 는 들어온 요청을 어느 서버로 보낼지 정하는 교통정리 담당입니다. 여기서는
+요청에 붙은 **호스트 이름**을 보고 나눕니다 — `alpha.teameet.co.kr`이면 alpha 인스턴스로,
+나머지는 프로덕션으로 보냅니다. 80(HTTP) 리스너는 443(HTTPS)으로 리다이렉트만 합니다.
+
+두 환경 모두 **애플리케이션은 Docker 컨테이너로** 돌고, 각 인스턴스 안의 **nginx 컨테이너가
+앞단**에서 웹(Next.js)과 API(NestJS)로 나눠 보냅니다.
+
+#### 두 환경 비교
+
+| | alpha | production |
+|---|---|---|
+| 도메인 | `alpha.teameet.co.kr` | `teameet.co.kr` |
+| 인스턴스 | `teameet-alpha-dev` · t3a.small | `matchup-production` · t3a.small |
+| 가용영역 | ap-northeast-2a | ap-northeast-2a |
+| 보안그룹 | `teameet-alpha-sg` | `matchup-sg` (인바운드 **80/443만**) |
+| 컨테이너 이미지 저장소 | `teameet-alpha-v1-{api,web}` | `teameet-prod-v1-{api,web}` |
+| 배포 소스 버킷 | `teameet-alpha-deploy-…` | `teameet-prod-deploy-…` |
+| DB 백업 | 없음 | `teameet-prod-backups-…` (일 1회) |
+| 런타임 비밀값 | 인스턴스의 `.env` (운영자가 직접 관리) | GitHub Secrets → **Parameter Store** → `.env` (배포마다 갱신) |
+| 배포 승인 | 없음 (자동) | **필요** (`environment: production`) |
+| 트리거 | `dev` 브랜치 push | `main` 브랜치 push |
+
+> ⚠️ **알아둘 차이**: 두 인스턴스는 같은 코드를 돌리지만 **호스트 환경이 미묘하게 다릅니다.**
+> 실제로 alpha에는 Docker Compose 플러그인이 있고 프로덕션에는 없어서, alpha에서 멀쩡히
+> 통과한 배포 스크립트가 프로덕션에서 처음 실행될 때 깨진 사고가 있었습니다.
+> **"alpha에서 됐으니 프로덕션도 된다"는 보장이 아닙니다.**
+
+#### 데이터베이스는 아직 인스턴스 안에 있습니다
+
+`PostgreSQL`은 관리형 서비스(RDS)가 아니라 **EC2 안의 컨테이너**로 돕니다. 데이터는 Docker
+볼륨(`deploy_v1_postgres_data`)에 저장됩니다.
+
+백업 구성과 복구 절차는 [`docs/ops/prod-backup.md`](docs/ops/prod-backup.md)에 있습니다.
+DB를 인스턴스 밖(RDS)으로 옮기는 계획은 `docs/ops/rds-migration-design.md`에 정리돼 있습니다.
+
+프로덕션 DB는 매일 두 겹으로 백업됩니다 — **논리 덤프**(02:30 KST, S3, 30일 보관)와
+**볼륨 스냅샷**(03:00 KST, 7일 보관). alpha에는 백업이 없습니다(검증용 환경이므로 의도된 것).
+
+---
+
+### 배포 파이프라인
+
+두 환경의 파이프라인은 **모양이 다릅니다.** alpha는 빠르게, 프로덕션은 여러 관문을 거칩니다.
+
+#### 전체 흐름 — 코드가 사용자에게 닿기까지
+
+```mermaid
+graph LR
+    F["작업 브랜치"] -->|PR| D["dev 브랜치"]
+    D -->|자동| AD["alpha 배포<br/>(승인 없음)"]
+    D -->|"PR (사람만 머지)"| M["main 브랜치"]
+    M -->|"승인 후"| PD["프로덕션 배포"]
+```
+
+**작업은 항상 `dev`에서 시작합니다.** `dev → main` 승격은 **사람이 GitHub에서 직접 머지**하는
+것이 유일한 경로입니다 — 자동으로 승격하는 워크플로는 없습니다.
+
+#### alpha 파이프라인 (`deploy-alpha.yml`)
+
+`dev`에 push되면 **job 하나**가 처음부터 끝까지 담당합니다.
+
+```mermaid
+graph TD
+    S["dev push"] --> W["① 같은 커밋의 CI 성공을 기다림"]
+    W --> V["② 릴리스 버전 계산 (Changesets)"]
+    V --> C["③ AWS 자격증명 (OIDC) · 대상 계정 검증"]
+    C --> B["④ 이미지 빌드 → ECR push"]
+    B --> G["⑤ 취약점 스캔 게이트"]
+    G --> M["⑥ 릴리스 매니페스트 생성 → S3"]
+    M --> D["⑦ SSM으로 인스턴스에 배포"]
+    D --> H["⑧ 공개 URL로 릴리스 신원 확인"]
+```
+
+①이 중요합니다 — alpha 워크플로는 **같은 커밋에 대한 CI(`deploy.yml`)가 성공할 때까지
+기다립니다.** 테스트가 깨진 코드가 alpha에 올라가지 않게 하는 장치입니다.
+
+#### 프로덕션 파이프라인 (`deploy.yml`)
+
+`main`에 push되면 **5개 job**이 순서대로 돕니다.
+
+```mermaid
+graph TD
+    S["main push"] --> G["Gates<br/>changeset · 보안 가드 · 계약 테스트"]
+    S --> A["API<br/>타입체크 · 마이그레이션 재생 · 단위 테스트"]
+    S --> W["Web<br/>lint · 타입체크 · 단위 테스트 · 빌드"]
+    G --> BI["Build images<br/>ECR push · 매니페스트 · S3 업로드"]
+    A --> BI
+    W --> BI
+    BI --> AP{"🛑 사람의 승인<br/>environment: production"}
+    AP -->|승인| DP["Deploy<br/>비밀값 동기화 → SSM 배포 → 헬스체크"]
+```
+
+`Gates` · `API` · `Web` 세 개는 **동시에** 돌고, 셋 다 통과해야 `Build images`로 넘어갑니다.
+그리고 **`Deploy` 앞에는 사람이 눌러야 하는 승인 버튼**이 있습니다. 승인 전까지 프로덕션은
+전혀 바뀌지 않습니다.
+
+`Deploy` job이 하는 일은 네 단계입니다.
+
+| 스텝 | 하는 일 |
+|---|---|
+| `Sync runtime env` | GitHub Secrets를 **Parameter Store**(암호화 저장소)에 올리고, 인스턴스가 그걸 받아 `.env`를 다시 만듭니다 |
+| `Run deploy-prod.sh` | S3에서 소스를 내려받아 해시를 대조하고, 새 컨테이너로 교체합니다 |
+| `Health check` | 인스턴스 내부 + **공개 URL**에서 응답 헤더의 커밋 SHA가 방금 배포한 것과 같은지 확인합니다 |
+
+> 💡 왜 비밀값을 Parameter Store를 거쳐 보낼까요? 인스턴스에 명령을 보내는 SSM은 **명령
+> 내용이 감사 로그(CloudTrail)에 남습니다.** 비밀번호를 명령에 직접 실으면 그대로 기록되므로,
+> 값은 암호화 저장소에 두고 명령에는 **경로만** 실어 보냅니다.
+
+#### 안전장치 — 왜 이렇게 복잡한가
+
+| 장치 | 막는 사고 |
+|---|---|
+| **불변 이미지 태그** (ECR `IMMUTABLE`) | 같은 태그로 다른 이미지를 덮어쓰는 것. 한 번 배포된 이미지는 내용이 바뀌지 않습니다 |
+| **다이제스트 고정** | 태그가 아니라 `sha256:…` 다이제스트로 배포 — "어제의 `latest`"와 "오늘의 `latest`"가 다른 문제를 없앱니다 |
+| **S3 + sha256 대조** | 전송 중 손상되거나 바꿔치기된 소스로 배포되는 것 |
+| **SSM (SSH 아님)** | 서버에 접속 포트를 열어 두는 것. 단기 자격증명만 쓰고 인바운드 포트가 필요 없습니다 |
+| **승인 게이트** (프로덕션만) | 머지가 곧바로 실사용자에게 나가는 것 |
+| **롤백 CAS** | 되돌리는 사이 다른 배포가 끼어드는 것 (되돌리기 전 현재 SHA를 입력해 대조) |
+| **changeset 게이트** | 무엇이 바뀌었는지 기록 없이 릴리스되는 것 |
+
+#### 되돌리기 (롤백)
+
+`rollback-alpha.yml` · `rollback-prod.yml`을 **수동 실행**합니다. 실행할 때 **지금 돌고 있다고
+알고 있는 커밋 SHA**를 입력해야 하며, 실제와 다르면 거부됩니다.
+
+되돌릴 대상은 인스턴스에 기록된 **직전 릴리스**입니다. 따라서 **성공한 배포가 2회 이상 쌓여야**
+롤백이 가능합니다(첫 배포 직후에는 되돌아갈 기준점이 없습니다).
+
+#### 워크플로 한눈에 보기
+
+| 파일 | 언제 도는가 | 무엇을 하는가 |
+|---|---|---|
+| `deploy.yml` | `main`/`dev` push, PR, 수동 | 검증(Gates·API·Web) + **`main`일 때만** 빌드·배포 |
+| `deploy-alpha.yml` | `dev` push, 수동 | alpha 빌드 + 배포 |
+| `rollback-alpha.yml` | 수동 | alpha를 직전 릴리스로 되돌리기 |
+| `rollback-prod.yml` | 수동 | 프로덕션을 직전 릴리스로 되돌리기 |
+| `release-main.yml` | 수동 | 검증된 alpha 버전을 기준으로 승격 PR 생성 |
 
 ---
 

@@ -136,9 +136,16 @@ Error: ENOENT: no such file or directory, open '.../apps/v1_api/CHANGELOG.md'
 
 3번은 릴리스 확정이므로 사용자 승인 후에 진행한다.
 
-### M5. prod는 장기 SSH 사설키, alpha는 OIDC — 미해결
+### M5. prod는 장기 SSH 사설키, alpha는 OIDC — **2026-08-02 해소**
 
 prod 배포는 `EC2_SSH_KEY`(장기 사설키)를 GitHub secret으로 들고 있고, alpha는 `id-token: write` + `configure-aws-credentials`로 OIDC 역할을 assume한다. 보안 모델이 프로덕션 쪽이 더 약하다. 전환에는 AWS IAM 역할·신뢰정책 생성이 필요하다.
+
+
+> **해소(2026-08-02)**: prod 배포 경로를 SSM 으로 옮겼다. 러너는 OIDC 로 단기 자격증명을
+> 얻어 S3 에 릴리스를 올리고 `aws ssm send-command` 로 EC2 에 명령한다. `deploy.yml` 과
+> `rollback-prod.yml` 에서 SSH 참조가 0 건이 됐고, `EC2_SSH_KEY` 는 프로덕션 배포에
+> 더 이상 쓰이지 않는다. 런타임 시크릿은 Parameter Store(SecureString) 를 거쳐 전달한다 —
+> SSM 명령 파라미터는 CloudTrail 에 남기 때문이다.
 
 ### M6. prod는 실사용자 트래픽을 받는 EC2에서 직접 빌드한다
 

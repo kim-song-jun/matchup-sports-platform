@@ -57,7 +57,7 @@ jobs:
           echo "Matching CI did not finish within 35 minutes" >&2
           exit 1
 
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ steps.release.outputs.sha }}
           fetch-depth: 0
@@ -75,7 +75,7 @@ jobs:
           echo "stable=$(jq -er '.stableVersion' <<< "${metadata}")" >> "${GITHUB_OUTPUT}"
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
         with:
           role-to-assume: ${{ vars.ALPHA_AWS_ROLE_ARN }}
           aws-region: ${{ vars.ALPHA_AWS_REGION }}
@@ -127,9 +127,12 @@ jobs:
           echo "api_exists=${api_exists}" >> "${GITHUB_OUTPUT}"
           echo "web_exists=${web_exists}" >> "${GITHUB_OUTPUT}"
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
       - name: Build and push immutable API image
         if: steps.images.outputs.api_exists != 'true'
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: deploy/Dockerfile.v1-api
@@ -137,10 +140,12 @@ jobs:
           tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.API_REPOSITORY }}:${{ steps.images.outputs.imageTag }}
           cache-from: type=gha,scope=alpha-v1-api
           cache-to: type=gha,mode=max,scope=alpha-v1-api
+          provenance: false
+          sbom: false
 
       - name: Build and push immutable Web image
         if: steps.images.outputs.web_exists != 'true'
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: deploy/Dockerfile.v1-web
@@ -154,6 +159,8 @@ jobs:
             NEXT_PUBLIC_GA_MEASUREMENT_ID=${{ secrets.GA_ALPHA }}
           cache-from: type=gha,scope=alpha-v1-web
           cache-to: type=gha,mode=max,scope=alpha-v1-web
+          provenance: false
+          sbom: false
 
       - name: Gate ECR critical findings
         env:

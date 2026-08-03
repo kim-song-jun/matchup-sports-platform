@@ -139,6 +139,19 @@ printf 'release-b\n' > "${source_b}/release.txt"
 
 prepare_alpha_release_source "${source_a}" "${SHA_A}" "${DIGEST_A#sha256:}"
 prepare_alpha_release_source "${source_a}" "${SHA_A}" "${DIGEST_A#sha256:}"
+
+# 디렉토리 mtime 이 어긋나도 내용이 같으면 재사용이 성립해야 한다.
+# prepare_alpha_release_source 는 rsync -a 로 복사한 뒤 deploy/ 안에 심볼릭 링크 3개를,
+# 루트에 .source-sha256 을 만든다 — 그 쓰기가 저장된 소스의 ./ 와 deploy/ mtime 을 원본과
+# 영구히 다르게 만든다. 같은 SHA 를 재배포하면(전송 실패 후 재시도 등) 항상 이 상태다.
+# 이 검사가 없던 동안 드리프트 판정이 시각차를 내용 변조로 오판해, 같은 초 안에 끝나지
+# 않은 실행마다 CI 가 조용히 깨졌다(60회 중 10회). 시각차를 명시적으로 벌려 고정한다.
+touch -t 202001010000 "${source_a}" "${source_a}/deploy"
+if ! prepare_alpha_release_source "${source_a}" "${SHA_A}" "${DIGEST_A#sha256:}"; then
+  echo "Unchanged source was rejected because directory mtimes differ" >&2
+  exit 1
+fi
+
 printf 'tampered\n' > "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}/release.txt"
 if prepare_alpha_release_source "${source_a}" "${SHA_A}" "${DIGEST_A#sha256:}"; then
   echo "Drifted immutable source directory was reused" >&2
@@ -158,5 +171,32 @@ activate_alpha_release_source "${SHA_B}"
 restore_legacy_alpha_source
 [[ ! -L "${ALPHA_LIVE_DIR}" ]]
 [[ "$(cat "${ALPHA_LIVE_DIR}/deploy/.env")" == 'protected=true' ]]
+
+readonly SHA_C=3333333333333333333333333333333333333333
+source_c="${TEST_ROOT}/source-c"
+mkdir -p "${source_c}/deploy"
+printf '#!/usr/bin/env bash\n' > "${source_c}/deploy/deploy-alpha.sh"
+printf 'release-c\n' > "${source_c}/release.txt"
+prepare_alpha_release_source "${source_c}" "${SHA_C}" "${DIGEST_A#sha256:}"
+mkdir -p "${ALPHA_SOURCE_RELEASES_DIR}/not-a-sha"
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}" ]]
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_B}" ]]
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_C}" ]]
+
+prune_stale_alpha_release_sources "${SHA_B}" "${SHA_A}"
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}" ]]
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_B}" ]]
+if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_C}" ]]; then
+  echo "Stale release source directory survived pruning" >&2
+  exit 1
+fi
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/not-a-sha" ]]
+
+prune_stale_alpha_release_sources "${SHA_B}" ""
+if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}" ]]; then
+  echo "Former previous release directory survived pruning after empty previous" >&2
+  exit 1
+fi
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_B}" ]]
 
 echo "[alpha-release-state] passed"

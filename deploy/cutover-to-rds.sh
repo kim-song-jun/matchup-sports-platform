@@ -215,7 +215,15 @@ maintenance_on() {
 
   aws elbv2 modify-rule --region "${AWS_REGION}" \
     --rule-arn "${ALB_RULE_ARN}" --actions "${actions}" >/dev/null
+  # 이 두 줄은 반드시 붙어 있어야 한다. 사용자 눈에 보이는 상태가 바뀐 순간이 바로 여기이고,
+  # 그 전에 실패한 것(페이지 부재·크기 초과·API 거부)은 되돌릴 것이 없다.
+  #
+  # DANGER_ZONE 을 호출부에서 maintenance_on 앞에 두면, 아직 아무것도 바꾸지 않은 실패까지
+  # "롤백 필요"로 분류해 앱 재기동과 실패 알림을 낸다. 반대로 maintenance_on 이 **반환한 뒤**
+  # 로 옮기면 더 나쁘다 — modify-rule 은 성공했는데 아래 503 검증에서 실패하는 경우 롤백이
+  # "영향 없음" 경로를 타서 **점검창이 켜진 채 남는다**. 그래서 여기가 유일하게 맞는 자리다.
   MAINTENANCE_ON=1
+  DANGER_ZONE=1
   log "점검창 ON"
 
   # 켜졌는지 확인한다. --no-keepalive 로 새 연결을 강제해야 기존 연결의 응답을 보지 않는다.
@@ -407,7 +415,7 @@ log "롤백 자산 확보: ${ENV_SNAPSHOT}, ${ALB_RULE_SNAPSHOT}"
 # ---------------------------------------------------------------------------
 
 if [[ "${MODE}" == "cutover" ]]; then
-  DANGER_ZONE=1
+  # DANGER_ZONE 은 maintenance_on() 안에서 ALB 를 실제로 바꾼 직후에 세운다 — 이유는 그 자리 주석 참조.
   maintenance_on
 
   # DB 컨테이너는 살려 둔다 — 이것이 롤백 경로 전체를 지탱한다.

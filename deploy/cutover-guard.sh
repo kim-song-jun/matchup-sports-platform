@@ -32,6 +32,17 @@ fi
 
 log "비정상 종료 감지 (SERVICE_RESULT=${SERVICE_RESULT:-unknown}, EXIT_STATUS=${EXIT_STATUS:-?}) — 잔여 상태를 점검합니다"
 
+# 여기서부터는 **best-effort** 다. errexit 을 끈다.
+#
+# 이 스크립트는 마지막 안전망인데, `set -e` 가 켜져 있으면 첫 실패에서 그대로 죽는다.
+# 예를 들어 점검창 해제(`aws elbv2 modify-rule`)가 스로틀링으로 한 번 실패하면 그 자리에서
+# 종료되고, 앱 복구도 SNS 알림도 시도조차 못 한다 — 정작 사람이 알아야 할 상황에서 침묵한다.
+# 안전망은 한 단계가 실패해도 나머지를 끝까지 시도해야 의미가 있다. (Copilot 리뷰 지적,
+# 2026-08-03 재현으로 확인.)
+#
+# nounset/pipefail 은 남겨 둔다 — 오타로 빈 변수를 쓰는 사고는 여전히 막아야 한다.
+set +e
+
 run_dir="$(find "${RUN_ROOT}" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort | tail -1)"
 if [[ -z "${run_dir}" ]]; then
   log "실행 디렉터리를 찾지 못했습니다 — 전환이 시작되기 전에 죽은 것으로 보입니다"
@@ -42,9 +53,8 @@ log "대상 실행 디렉터리: ${run_dir}"
 # --- 1. 점검창이 켜진 채 남아 있으면 끈다 ------------------------------------
 snapshot="${run_dir}/alb-default-rule.json"
 if [[ -f "${snapshot}" ]]; then
-  rule_arn="$(jq -r '.[0].RuleArn' "${snapshot}")"
-  target_group="$(jq -r '.[0].Actions[0].TargetGroupArn // empty' "${snapshot}")"
-  listener_arn="${rule_arn%/*}"
+  rule_arn="$(jq -r '.[0].RuleArn' "${snapshot}" 2>/dev/null)"
+  target_group="$(jq -r '.[0].Actions[0].TargetGroupArn // empty' "${snapshot}" 2>/dev/null)"
 
   current_type="$(aws elbv2 describe-rules --region "${AWS_REGION}" \
     --rule-arns "${rule_arn}" \
@@ -52,10 +62,18 @@ if [[ -f "${snapshot}" ]]; then
 
   if [[ "${current_type}" == "fixed-response" && -n "${target_group}" ]]; then
     log "점검창이 켜진 채 남아 있습니다 — 해제합니다"
-    aws elbv2 modify-rule --region "${AWS_REGION}" \
-      --rule-arn "${rule_arn}" \
-      --actions "Type=forward,TargetGroupArn=${target_group}" >/dev/null
-    log "점검창 해제 완료"
+    # 점검창이 남는 것이 이 작업의 최악 시나리오라, 한 번 실패했다고 포기하지 않는다.
+    for attempt in 1 2 3; do
+      if aws elbv2 modify-rule --region "${AWS_REGION}" \
+        --rule-arn "${rule_arn}" \
+        --actions "Type=forward,TargetGroupArn=${target_group}" >/dev/null 2>&1; then
+        log "점검창 해제 완료"
+        break
+      fi
+      log "점검창 해제 실패 (${attempt}/3)"
+      [[ "${attempt}" == 3 ]] && log "!!! 점검창이 켜진 채 남았습니다 — 즉시 사람이 해제해야 합니다"
+      sleep 5
+    done
   else
     log "점검창 상태 정상 (현재 액션: ${current_type})"
   fi
@@ -82,25 +100,27 @@ else
   guard_manifest="${run_dir}/guard-active-manifest.json"
   if extract_active_manifest "${guard_manifest}" && load_prod_release_manifest "${guard_manifest}"; then
     log "활성 릴리스 이미지 로드: ${PROD_RELEASE_VERSION}"
-  else
-    log "!!! 릴리스 매니페스트를 읽지 못했습니다 — 앱 재기동을 시도하지 않습니다(빈 이미지로 덮어쓰는 것이 더 위험)"
-    exit 1
-  fi
-  compose=(
-    sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE "${compose_binary[@]}"
-    --project-name deploy
-    -f "${COMPOSE_FILE}"
-    --env-file "${ENV_FILE}"
-  )
-  "${compose[@]}" up -d --no-deps v1_api v1_web || log "앱 재기동 실패 — 사람이 개입해야 합니다"
 
-  for _ in $(seq 1 24); do
-    if curl -fsS --max-time 10 "${INTERNAL_HEALTH_URL}" 2>/dev/null | jq -e '.data.checks.db == true' >/dev/null 2>&1; then
-      log "앱 복구 확인"
-      break
-    fi
-    sleep 5
-  done
+    compose=(
+      sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE "${compose_binary[@]}"
+      --project-name deploy
+      -f "${COMPOSE_FILE}"
+      --env-file "${ENV_FILE}"
+    )
+    "${compose[@]}" up -d --no-deps v1_api v1_web || log "앱 재기동 실패 — 사람이 개입해야 합니다"
+
+    for _ in $(seq 1 24); do
+      if curl -fsS --max-time 10 "${INTERNAL_HEALTH_URL}" 2>/dev/null | jq -e '.data.checks.db == true' >/dev/null 2>&1; then
+        log "앱 복구 확인"
+        break
+      fi
+      sleep 5
+    done
+  else
+    # 여기서 스크립트를 끝내면 안 된다. 앱 재기동은 포기하더라도 아래 SNS 알림은 반드시
+    # 나가야 한다 — 사람을 불러야 하는 상황이 바로 이 경우다.
+    log "!!! 릴리스 매니페스트를 읽지 못했습니다 — 앱 재기동은 건너뜁니다(빈 이미지로 덮어쓰는 것이 더 위험)"
+  fi
 fi
 
 code="$(curl -sS --no-keepalive -o /dev/null -w '%{http_code}' --max-time 15 "${PUBLIC_URL}" || echo 000)"

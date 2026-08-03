@@ -2966,3 +2966,123 @@ export type V1UpdateIntegrationSettingsPayload = {
 export type V1PublicKakaoMapsKeyResponse = {
   kakaoMapsJsKey: string | null;
 };
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tournament operations shell/board (Task 19 — 백엔드는 Task 18 `tournament-ops/**`)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** V1Game.state — Task 18 board가 읽는 실제 상태 컬럼(V1TournamentFixture.status 아님). */
+export type V1GameState = 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
+
+export const V1_GAME_STATES: readonly V1GameState[] = ['SCHEDULED', 'LIVE', 'PAUSED', 'ENDED', 'CANCELLED'];
+
+/** 대회 운영 스태프 역할. `PLATFORM_OPS`는 배정 행이 아니라 어드민 테이블에서 유래한다. */
+export type V1TournamentStaffRole = 'PLATFORM_OPS' | 'TOURNAMENT_DIRECTOR' | 'FIELD_OPERATOR' | 'SUPPORT_READONLY';
+
+/**
+ * 운영 보드 경고 코드 — 순수 영속 상태 함수(페이지네이션 안정 스냅샷에 포함)와
+ * `now` 에도 의존하는 값(별도 `liveWarnings`)이 분리돼 있다. 백엔드 doc:
+ * apps/v1_api/src/tournament-operations/board/dto/list-operations-query.dto.ts
+ */
+export type V1TournamentStableWarningCode = 'NO_FIELD_ASSIGNED' | 'MISSING_SCORER' | 'RESULT_REVIEW_OVERDUE';
+export type V1TournamentTimeRelativeWarningCode = 'NO_STAFF_ASSIGNED' | 'LINEUP_NOT_SUBMITTED';
+export type V1TournamentOperationsWarningCode = V1TournamentStableWarningCode | V1TournamentTimeRelativeWarningCode;
+
+/** `?warning=` 필터는 안정(시간 무관) 코드만 받는다 — 서버가 시간 의존 코드는 400으로 거부한다. */
+export const V1_STABLE_WARNING_CODES: readonly V1TournamentStableWarningCode[] = [
+  'NO_FIELD_ASSIGNED',
+  'MISSING_SCORER',
+  'RESULT_REVIEW_OVERDUE',
+];
+
+/** GET /tournament-ops/tournaments/:tournamentId/operations 응답의 items[] 항목. */
+export type V1TournamentOperationsBoardItem = {
+  fixtureId: string;
+  tournamentId: string;
+  round: string;
+  fixtureNumber: number;
+  gameId: string | null;
+  gameState: V1GameState | null;
+  fieldId: string | null;
+  fieldName: string | null;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
+  scheduledAt: string | null;
+  /** V1GameResultRevision.score — 형태는 아직 확정되지 않았다(Task 20-22가 정의). 화면은 존재 여부만 사용한다. */
+  currentScore: unknown;
+  warnings: V1TournamentStableWarningCode[];
+  version: number | null;
+  revisionId: string | null;
+  stableRevision: string;
+};
+
+/** liveWarnings[] 항목 — 안정 스냅샷 밖, `now` 의존. fixtureId로 items[]와 매칭한다. */
+export type V1TournamentOperationsLiveWarning = {
+  fixtureId: string;
+  warnings: V1TournamentTimeRelativeWarningCode[];
+};
+
+/** GET /tournament-ops/tournaments/:tournamentId/operations 응답. */
+export type V1TournamentOperationsBoardPage = {
+  items: V1TournamentOperationsBoardItem[];
+  nextCursor: string | null;
+  watermark: string;
+  liveWarnings: V1TournamentOperationsLiveWarning[];
+};
+
+export type V1TournamentOperationsBoardFilters = {
+  cursor?: string;
+  status?: V1GameState;
+  fieldId?: string;
+  warning?: V1TournamentStableWarningCode;
+  limit?: number;
+};
+
+/** GET /tournament-ops/tournaments/:tournamentId/staff 응답의 items[] 항목. */
+export type V1TournamentStaffAssignment = {
+  id: string;
+  tournamentId: string;
+  userId: string;
+  role: V1TournamentStaffRole;
+  fieldId: string | null;
+  fixtureIds: string[];
+  version: number;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  grantedByUserId: string | null;
+  createdAt: string;
+};
+
+export type V1TournamentStaffListResponse = {
+  items: V1TournamentStaffAssignment[];
+};
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff 바디. `PLATFORM_OPS`는 배정 대상이 될 수 없다. */
+export type V1GrantTournamentStaffPayload = {
+  userId: string;
+  role: Exclude<V1TournamentStaffRole, 'PLATFORM_OPS'>;
+  fieldId?: string;
+  fixtureIds?: string[];
+  expiresAt?: string;
+};
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke 바디. */
+export type V1RevokeTournamentStaffPayload = {
+  expectedVersion: number;
+  reason: string;
+};
+
+/** GET /tournament-ops/tournaments/:tournamentId/fields 응답의 items[] 항목. */
+export type V1TournamentField = {
+  id: string;
+  tournamentId: string;
+  scopeKey: string;
+  name: string;
+  sortOrder: number;
+  active: boolean;
+  version: number;
+};
+
+export type V1TournamentFieldListResponse = {
+  items: V1TournamentField[];
+};

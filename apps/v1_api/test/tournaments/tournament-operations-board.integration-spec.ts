@@ -1836,6 +1836,10 @@ const lineupIds = {
 
 describe('Task 18 tournament fixture lineup capture and submit', () => {
   let lineupService: TournamentFixtureLineupService;
+  // Declared at describe scope, not inside beforeAll: the takeover tests below call
+  // gamesService.requestTakeover() directly. The merge that brought Task 18's P1-4 fix in narrowed
+  // this to a beforeAll-local const, which those tests cannot see.
+  let gamesService: GamesService;
   let gameId: string;
   let homeSideId: string;
   let lineupId: string;
@@ -1947,7 +1951,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
     // GamesService, and Task 18's P1-4 fix added TournamentStaffAccessService to
     // TournamentFixtureLineupService (so authorization runs before any fixture/game lookup).
     // Both are required - the current signatures are 3-arg on each.
-    const gamesService = new GamesService(lineupPrisma, new OperationAuditWriterService(), new GameTakeoverService());
+    gamesService = new GamesService(lineupPrisma, new OperationAuditWriterService(), new GameTakeoverService());
     lineupService = new TournamentFixtureLineupService(
       lineupPrisma,
       gamesService,

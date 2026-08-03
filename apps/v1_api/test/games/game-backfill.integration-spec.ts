@@ -683,6 +683,20 @@ describe('Task 10 legacy result migration contract', () => {
           gateBundleHash: 'f'.repeat(64),
           reason: 'Attempting an unsafe single-flag rollback',
         });
+      // The rejected single-flag attempt must not have mutated anything.
+      // This has to be read *here* -- immediately after singleFlagAttempt
+      // resolves and before the authorityRollback request below fires --
+      // because authorityRollback is a legitimate, expected operation that
+      // *does* mutate GAME_READ (compare -> legacy, version 1 -> 2). Reading
+      // this state after authorityRollback (as a prior version of this test
+      // did) would observe the rollback's mutation instead of proving the
+      // rejected attempt's non-mutation, silently turning this into a
+      // tautology that passed regardless of whether the single-flag PATCH
+      // mutated anything.
+      await expect(
+        prisma.v1GameOperationFlag.findUniqueOrThrow({ where: { key: 'GAME_READ' } }),
+      ).resolves.toMatchObject({ value: 'compare', version: 1, rollbackValue: 'legacy' });
+
       const authorityRollback = await request(app.getHttpServer())
         .post('/api/v1/tournament-ops/operation-flags/tuple-transition')
         .set('x-v1-user-id', ids.user)
@@ -737,10 +751,9 @@ describe('Task 10 legacy result migration contract', () => {
         requestId: expect.any(Number),
         timestamp: expect.any(String),
       });
-      // The rejected single-flag attempt must not have mutated anything.
-      await expect(
-        prisma.v1GameOperationFlag.findUniqueOrThrow({ where: { key: 'GAME_READ' } }),
-      ).resolves.toMatchObject({ value: 'compare', version: 1, rollbackValue: 'legacy' });
+      // (No-mutation assertion for the rejected single-flag attempt lives
+      // above, right after that request resolves and before
+      // authorityRollback fires -- see the comment there.)
 
       // @Post('tuple-transition') carries no @HttpCode override, so Nest's
       // POST default (201 Created) applies -- unlike the PATCH endpoint,

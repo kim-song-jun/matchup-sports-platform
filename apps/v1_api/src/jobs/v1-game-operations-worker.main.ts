@@ -25,6 +25,14 @@ async function bootstrap(): Promise<void> {
     'SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER',
     scheduleReminders.guestRecruitmentCloseReminderHandler,
   );
+  // P1-4 fix: guest-recruitment.service.ts's createApplication() now records a durable outbox row
+  // (business key `guest-application:{applicationId}:manager-notification`) in the same
+  // transaction as the application insert, instead of a fire-and-forget NotificationsService call —
+  // this handler claims and delivers it.
+  worker.registerHandler(
+    'SCHEDULE_GUEST_APPLICATION_MANAGER_NOTIFICATION',
+    scheduleReminders.guestApplicationManagerNotificationHandler,
+  );
 
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({

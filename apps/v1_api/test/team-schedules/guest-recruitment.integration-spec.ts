@@ -1,7 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { GuestRecruitmentService } from '../../src/team-schedules/guest-recruitment.service';
-import { NotificationsService } from '../../src/notifications/notifications.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { holdRowLock, isStillPending } from './helpers/lock-barrier';
 
@@ -117,12 +116,12 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
       data: { teamId: ids.team, userId: ids.owner, role: 'owner', status: 'active' },
     });
 
+    // P1-4 fix: GuestRecruitmentService no longer injects NotificationsService — the new-guest-
+    // application manager notification is now a durable outbox row (see createApplication()'s own
+    // P1-4 comment), not an in-request NotificationsService call, so no mock provider is needed
+    // here anymore.
     moduleRef = await Test.createTestingModule({
-      providers: [
-        GuestRecruitmentService,
-        { provide: PrismaService, useValue: prisma },
-        { provide: NotificationsService, useValue: { emitToManyDeferred: jest.fn() } },
-      ],
+      providers: [GuestRecruitmentService, { provide: PrismaService, useValue: prisma }],
     }).compile();
     service = moduleRef.get(GuestRecruitmentService);
   });
@@ -163,6 +162,105 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
     expect(after.state).toBe('CLOSED');
     expect(after.version).toBe(closedRecruitment.version);
   });
+
+  // P1-5 regression: `note: dto.note ?? null` in the payload hash collapsed "omitted" (preserve
+  // the existing note, per nextNote's `dto.note === undefined ? recruitment.note : dto.note`) and
+  // an explicit `note: null` (clear the note) into the identical hash value. Two requests under
+  // the SAME idempotencyKey with genuinely different intent must never be treated as an identical
+  // replay — the second one here (note: null) must 409 IDEMPOTENCY_PAYLOAD_CONFLICT, never
+  // silently replay the first's "note preserved" response. If the hash fix is reverted to
+  // `dto.note ?? null`, this call incorrectly resolves 200 with `replayed: true` instead of 409.
+  it(
+    'P1-5 regression: reusing an Idempotency-Key with an explicit note:null is a payload conflict, ' +
+      'never a silent replay of an earlier omitted-note request',
+    async () => {
+      const { schedule } = await createScheduleWithRecruitment();
+      const key = 'p1-5-note-presence-key';
+
+      const first = await service.updateRecruitment(
+        authUser(ids.owner),
+        ids.team,
+        schedule.id,
+        { expectedVersion: 0, slots: 5 },
+        key,
+      );
+      expect(first).toMatchObject({ slots: 5, note: null, replayed: false });
+
+      const error = await captureFailure(() =>
+        service.updateRecruitment(authUser(ids.owner), ids.team, schedule.id, { expectedVersion: 0, slots: 5, note: null }, key),
+      );
+      expectHttpCode(error, 409, 'IDEMPOTENCY_PAYLOAD_CONFLICT');
+
+      // Nothing about the recruitment itself changed — the second call never got past the
+      // idempotency check.
+      const after = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId: schedule.id } });
+      expect(after).toMatchObject({ slots: 5, note: null, version: 1 });
+    },
+  );
+
+  // P1-10 regression: reducing `slots` below the current approvedCount must be rejected outright,
+  // never silently leave `approvedCount > slots` on record. If this fix is ever reverted, this call
+  // succeeds 200 and the recruitment row ends up with slots=1 against 2 APPROVED applicants.
+  it(
+    'P1-10 regression: reducing guest-recruitment slots below the current approved-applicant ' +
+      'count is rejected and mutates nothing',
+    async () => {
+      const { schedule, recruitment } = await createScheduleWithRecruitment();
+      await prisma.v1ScheduleGuestApplication.createMany({
+        data: [
+          { recruitmentId: recruitment.id, userId: ids.outsider, displayNameSnapshot: 'Approved A', state: 'APPROVED' },
+          { recruitmentId: recruitment.id, userId: ids.outsiderB, displayNameSnapshot: 'Approved B', state: 'APPROVED' },
+        ],
+      });
+
+      const error = await captureFailure(() =>
+        service.updateRecruitment(authUser(ids.owner), ids.team, schedule.id, { expectedVersion: 0, slots: 1 }, 'p1-10-slots-below-key'),
+      );
+      expectHttpCode(error, 409, 'GUEST_RECRUITMENT_SLOTS_BELOW_APPROVED_COUNT');
+
+      const after = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { id: recruitment.id } });
+      expect(after.slots).toBe(recruitment.slots);
+      expect(after.version).toBe(recruitment.version);
+      expect(after.state).toBe('OPEN');
+    },
+  );
+
+  // P1-10 regression: setting `slots` to exactly the current approvedCount must auto-transition the
+  // recruitment to FILLED (server-derived, per the DTO's own comment) instead of leaving it OPEN
+  // forever with no remaining room. If this fix is ever reverted, `after.state` below stays 'OPEN'.
+  it(
+    'P1-10 regression: setting guest-recruitment slots to exactly the approved-applicant count ' +
+      'auto-transitions state to FILLED',
+    async () => {
+      const { schedule, recruitment } = await createScheduleWithRecruitment();
+      await prisma.v1ScheduleGuestApplication.createMany({
+        data: [
+          { recruitmentId: recruitment.id, userId: ids.outsider, displayNameSnapshot: 'Approved A', state: 'APPROVED' },
+          { recruitmentId: recruitment.id, userId: ids.outsiderB, displayNameSnapshot: 'Approved B', state: 'APPROVED' },
+        ],
+      });
+
+      const result = await service.updateRecruitment(
+        authUser(ids.owner),
+        ids.team,
+        schedule.id,
+        { expectedVersion: 0, slots: 2 },
+        'p1-10-slots-filled-key',
+      );
+      expect(result).toMatchObject({ slots: 2, state: 'FILLED', approvedCount: 2 });
+
+      const after = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { id: recruitment.id } });
+      expect(after.state).toBe('FILLED');
+
+      // FILLED is already fully terminal (the pre-existing guard at the top of this method) — a
+      // further update attempt (even one that would free room again) must reject, not silently
+      // reopen it. This is an existing, unchanged contract this fix must not disturb.
+      const error = await captureFailure(() =>
+        service.updateRecruitment(authUser(ids.owner), ids.team, schedule.id, { expectedVersion: 1, slots: 5 }, 'p1-10-slots-refilled-key'),
+      );
+      expectHttpCode(error, 409, 'GUEST_RECRUITMENT_TERMINAL');
+    },
+  );
 
   // W2 regression: createApplication() now locks the schedule row FOR UPDATE (same order as
   // cancellation: schedule, then recruitment) before re-reading state. This test forces the exact
@@ -376,6 +474,62 @@ describe('Task 12 guest-recruitment lane — race regressions (W2/W3/W4)', () =>
       expect(result.response.alreadyApplied).toBe(true);
       expect(result.response.displayName).toBe('Already here (pre-seeded, no race needed)');
       expect(await prisma.v1ScheduleGuestApplication.count({ where: { recruitmentId: recruitment.id, userId: ids.outsiderB } })).toBe(1);
+    },
+  );
+
+  // P1-4 regression: a brand-new application must durably record its manager-notification outbox
+  // row in the SAME transaction as the application insert — not a fire-and-forget
+  // NotificationsService call racing the transaction's own commit. If this fix is reverted (back
+  // to the old detached `emitToManyDeferred` call), this test's outbox-row assertions fail: no row
+  // with this exact business key/type/payload will exist, since nothing writes it through `tx`.
+  it(
+    'P1-4 regression: a new guest application records a durable manager-notification outbox row ' +
+      'atomically with the application, keyed by applicationId',
+    async () => {
+      const { schedule, recruitment } = await createScheduleWithRecruitment();
+
+      const response = await service.createApplication(
+        authUser(ids.outsider),
+        ids.team,
+        schedule.id,
+        { displayName: 'P1-4 outbox regression applicant' },
+        'p1-4-outbox-key',
+      );
+      expect(response.alreadyApplied).toBe(false);
+
+      const businessKey = `guest-application:${response.applicationId}:manager-notification`;
+      const outboxRows = await prisma.$queryRaw<Array<{ count: bigint; type: string; payload: unknown }>>`
+        SELECT COUNT(*) AS count, MIN(type::text) AS type, MIN(payload::text) AS payload
+        FROM v1_outbox_events WHERE business_key = ${businessKey}
+      `;
+      expect(Number(outboxRows[0].count)).toBe(1);
+      expect(outboxRows[0].type).toBe('SCHEDULE_GUEST_APPLICATION_MANAGER_NOTIFICATION');
+      expect(JSON.parse(outboxRows[0].payload as string)).toEqual({
+        teamId: ids.team,
+        scheduleId: schedule.id,
+        displayName: 'P1-4 outbox regression applicant',
+      });
+
+      // A replay of the same application (alreadyApplied path) must never enqueue a second outbox
+      // row for the SAME applicationId — the manager was already durably queued for notification
+      // once, on the original insert.
+      const replay = await service.createApplication(
+        authUser(ids.outsider),
+        ids.team,
+        schedule.id,
+        { displayName: 'P1-4 outbox regression applicant' },
+        'p1-4-outbox-replay-key',
+      );
+      expect(replay.applicationId).toBe(response.applicationId);
+      expect(replay.alreadyApplied).toBe(true);
+      const outboxRowsAfterReplay = await prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*) AS count FROM v1_outbox_events WHERE business_key = ${businessKey}
+      `;
+      expect(Number(outboxRowsAfterReplay[0].count)).toBe(1);
+
+      // Sanity: the recruitment's applicant count reflects the one real application, confirming
+      // the outbox insert didn't somehow interfere with the application write itself.
+      expect(await prisma.v1ScheduleGuestApplication.count({ where: { recruitmentId: recruitment.id } })).toBe(1);
     },
   );
 

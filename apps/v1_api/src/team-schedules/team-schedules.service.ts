@@ -239,48 +239,32 @@ export class TeamSchedulesService {
     const payloadHash = canonicalGameCommandPayloadHash({ actorUserId: user.id, teamId, dto });
 
     return this.prisma.$transaction(async (tx) => {
-      await this.lockIdempotencyScope(tx, user.id, 'SCHEDULE_CREATE', RESOURCE_TYPE, idempotencyKey);
-
-      // Create-style replay: resourceId is omitted from the pre-creation lookup (mirrors
-      // team-matches.service.ts's create() findFirst pattern) since the resource does not
-      // exist yet on first attempt.
-      //
-      // W9 fix: this previously had no `expiresAt` filter and no `orderBy`, so once a key had
-      // legitimately been reused after expiry (creating a second schedule with a *different*
-      // resourceId — resourceId cannot be part of this lookup's where-clause since the resource
-      // doesn't exist yet on first attempt), an unordered findFirst() could nondeterministically
-      // return the stale expired row instead of the active one. Treating that stale row as "no
-      // existing record" on an immediate retry would create a third schedule instead of replaying
-      // the second. Restricting the lookup to non-expired rows and ordering by recency makes the
-      // active record the only, deterministic match; an expired row is now correctly
-      // indistinguishable from "no record" without ever being able to shadow the active one.
-      //
-      // CP2 fix: `createdAt: 'desc'` alone is not a *total* order — Postgres timestamp columns
-      // have finite (microsecond) resolution, so two rows could in principle tie. Selecting
-      // `resourceId` and adding it as a secondary, deterministic tiebreaker (rather than relying
-      // on whatever arbitrary order Postgres happens to return for tied rows) closes that gap:
-      // repeated identical queries against the same data now always resolve to the exact same
-      // "latest non-expired" row instead of one that can vary run to run.
-      const existing = await tx.v1IdempotencyRecord.findFirst({
-        where: {
-          actorUserId: user.id,
-          action: 'SCHEDULE_CREATE',
-          resourceType: RESOURCE_TYPE,
-          idempotencyKey,
-          expiresAt: { gt: new Date() },
-        },
-        orderBy: [{ createdAt: 'desc' }, { resourceId: 'desc' }],
-        select: { resourceId: true, payloadHash: true, responseBody: true, expiresAt: true },
-      });
-      if (existing !== null) {
-        if (existing.payloadHash !== payloadHash) {
-          throw new ConflictException({
-            code: 'IDEMPOTENCY_PAYLOAD_CONFLICT',
-            message: 'Idempotency key was already used with a different payload',
-          });
-        }
-        return { ...(existing.responseBody as Prisma.JsonObject), replayed: true };
-      }
+      // P1-6 fix: this transaction previously used THREE mismatched scopes for what is supposed to
+      // be one identity — the advisory lock passed the RESOURCE_TYPE constant string
+      // ('V1_TEAM_SCHEDULE') as its resourceId (so the lock was identical for every team the same
+      // actor+key ever created a schedule under — a global cross-team collision), the replay
+      // lookup below used to drop resourceId from its where-clause entirely (an unordered
+      // findFirst() across ALL of that actor's schedule creates, not just this team's, needing a
+      // CP2 `createdAt`/`resourceId` tiebreak to pick a winner among however many such rows had
+      // accumulated), and only the FINAL stored record used a real, but freshly-generated-every-
+      // attempt, resourceId (the new schedule's own id) — so the DB's own composite unique index
+      // could never actually deduplicate two creates sharing the same (actor, key): each attempt
+      // wrote a brand-new row with a brand-new resourceId. Scoping this identity to `teamId` — a
+      // value known before creation and stable across every attempt for the "same" logical create,
+      // exactly like guest-recruitment.service.ts's createRecruitment() already scopes on
+      // `scheduleId` — fixes all three at once: the lock now genuinely guards this exact (actor,
+      // team, key) identity, the lookup can reuse the same generic checkReplay()/
+      // storeIdempotency() helpers every other action in this file already uses (a single
+      // findUnique against the composite unique index, which can only ever match zero or one row —
+      // no tiebreak is needed or possible anymore), and the previously-possible cross-team
+      // collision ("동일 actor/key가 모든 팀 create에서 전역 충돌") is gone: two different teams created
+      // by the same actor under the same Idempotency-Key can never again replay or
+      // payload-conflict against each other. The created schedule's own id is still returned to
+      // the caller inside the response body — it simply no longer doubles as this record's
+      // resourceId.
+      await this.lockIdempotencyScope(tx, user.id, 'SCHEDULE_CREATE', teamId, idempotencyKey);
+      const replay = await this.checkReplay(tx, user.id, 'SCHEDULE_CREATE', teamId, idempotencyKey, payloadHash);
+      if (replay) return replay;
 
       await this.assertManageableTeam(tx, user, teamId);
 
@@ -318,19 +302,10 @@ export class TeamSchedulesService {
       });
 
       const response = { ...this.toDetailJson(created), replayed: false };
-      await tx.v1IdempotencyRecord.create({
-        data: {
-          actorUserId: user.id,
-          action: 'SCHEDULE_CREATE',
-          resourceType: RESOURCE_TYPE,
-          resourceId: created.id,
-          idempotencyKey,
-          payloadHash,
-          responseStatus: 201,
-          responseBody: JSON.parse(JSON.stringify(response)) as Prisma.InputJsonValue,
-          expiresAt: new Date(Date.now() + IDEMPOTENCY_RETENTION_MS),
-        },
-      });
+      // P1-6 fix: resourceId is `teamId` (matching the lock/lookup above), not `created.id` — see
+      // this method's own P1-6 comment above for why the created schedule's id must not double as
+      // this record's identity scope.
+      await this.storeIdempotency(tx, user.id, 'SCHEDULE_CREATE', teamId, idempotencyKey, payloadHash, 201, response);
       return response;
     });
   }
@@ -375,12 +350,37 @@ export class TeamSchedulesService {
             ? null
             : new Date(dto.rsvpDeadlineAt);
 
+      const nextCapacity = dto.capacity === undefined ? schedule.capacity : dto.capacity;
+
+      // P1-10 fix: this PATCH previously wrote a new `capacity` straight through with no regard
+      // for the derived GOING/WAITLISTED queue it governs. Decreasing capacity below the current
+      // GOING count left `goingCount > capacity` permanently — the exact invariant
+      // attendance.service.ts's setMyAttendance enforces on every single RSVP write, silently
+      // violated here instead. Increasing it (or removing the cap entirely) left newly-freed slots
+      // stranded behind whoever was already WAITLISTED, who would sit there forever unless they
+      // happened to resubmit an RSVP of their own. `goingCount` is read under the SAME schedule row
+      // lock (lockSchedule, above) that attendance.service.ts's setMyAttendance relies on for its
+      // own capacity/waitlist race-safety, so this can never race a concurrent RSVP write, and the
+      // reject-check below runs BEFORE the schedule UPDATE so a would-be-invalid decrease never
+      // partially mutates anything.
+      let goingCountForCapacityChange: number | null = null;
+      if (nextCapacity !== schedule.capacity) {
+        goingCountForCapacityChange = await tx.v1ScheduleAttendance.count({ where: { scheduleId, status: 'GOING' } });
+        if (nextCapacity !== null && nextCapacity < goingCountForCapacityChange) {
+          throw new ConflictException({
+            code: 'SCHEDULE_CAPACITY_BELOW_GOING_COUNT',
+            message: 'New capacity is lower than the current number of GOING attendees',
+            details: { capacity: nextCapacity, goingCount: goingCountForCapacityChange },
+          });
+        }
+      }
+
       const updated = await tx.$executeRaw`
         UPDATE v1_team_schedules
         SET title = ${dto.title ?? schedule.title},
             start_at = ${dto.startAt ? new Date(dto.startAt) : schedule.startAt},
             end_at = ${dto.endAt ? new Date(dto.endAt) : schedule.endAt},
-            capacity = ${dto.capacity === undefined ? schedule.capacity : dto.capacity},
+            capacity = ${nextCapacity},
             rsvp_deadline_at = ${nextRsvpDeadlineAt},
             visibility = ${(dto.visibility ?? schedule.visibility)}::"V1ScheduleVisibility",
             version = version + 1,
@@ -389,6 +389,57 @@ export class TeamSchedulesService {
       `;
       if (updated !== 1) {
         throw new ConflictException({ code: 'VERSION_CONFLICT', message: 'Schedule version changed during the write' });
+      }
+
+      // P1-10 fix (continued): capacity genuinely changed and already passed the reject-check
+      // above. Two sub-cases actually free slots and require promoting from the front of the
+      // waitlist; a decrease that still fits every current GOING attendee frees nothing and leaves
+      // the waitlist untouched (its relative order is still valid).
+      if (goingCountForCapacityChange !== null) {
+        if (nextCapacity === null) {
+          // Design decision (undocumented in the frozen contract, per the review — "capacity를
+          // 무제한으로 변경할 경우 waitlist 처리 정책 명시"): removing the cap entirely means nobody
+          // should be left WAITLISTED on what is now an uncapped schedule, so every waitlisted row
+          // is promoted.
+          await tx.$executeRaw`
+            UPDATE v1_schedule_attendance
+            SET status = 'GOING'::"V1AttendanceStatus",
+                waitlist_position = NULL,
+                version = version + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE schedule_id = ${scheduleId} AND status = 'WAITLISTED'::"V1AttendanceStatus"
+          `;
+        } else if (nextCapacity > goingCountForCapacityChange) {
+          const freedSlots = nextCapacity - goingCountForCapacityChange;
+          // Promote the front `freedSlots` WAITLISTED rows (lowest waitlistPosition first) to
+          // GOING — mirrors attendance.service.ts's single-slot vacancy-promotion, generalized to
+          // however many slots this capacity increase actually freed.
+          await tx.$executeRaw`
+            WITH promoted AS (
+              SELECT id FROM v1_schedule_attendance
+              WHERE schedule_id = ${scheduleId} AND status = 'WAITLISTED'::"V1AttendanceStatus"
+              ORDER BY waitlist_position ASC
+              LIMIT ${freedSlots}
+            )
+            UPDATE v1_schedule_attendance a
+            SET status = 'GOING'::"V1AttendanceStatus",
+                waitlist_position = NULL,
+                version = version + 1,
+                updated_at = CURRENT_TIMESTAMP
+            FROM promoted
+            WHERE a.id = promoted.id
+          `;
+          // Compact the remaining WAITLISTED rows (whatever wasn't promoted above) down by exactly
+          // `freedSlots`, keeping positions contiguous starting at 1 — same invariant
+          // attendance.service.ts's own departure-compaction maintains.
+          await tx.$executeRaw`
+            UPDATE v1_schedule_attendance
+            SET waitlist_position = waitlist_position - ${freedSlots},
+                version = version + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE schedule_id = ${scheduleId} AND status = 'WAITLISTED'::"V1AttendanceStatus"
+          `;
+        }
       }
 
       const after = await tx.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
@@ -522,6 +573,19 @@ export class TeamSchedulesService {
         throw new ConflictException({ code: 'VERSION_CONFLICT', message: 'Schedule version changed during the write' });
       }
 
+      // P1-3 fix: cancel() (above) closes any attached OPEN guest-recruitment in the same
+      // transaction as the cancellation; complete() never had the equivalent statement, so a
+      // schedule could reach COMPLETED while its recruitment stayed OPEN forever — new
+      // applications were rejected (the parent's own terminal check), but GET still displayed an
+      // OPEN recruitment, and a still-pending guest_recruitment_close outbox reminder had no
+      // signal that its parent had ended (see the matching fix in schedule-reminder.service.ts's
+      // guestRecruitmentCloseReminderHandler, which now also independently guards against this).
+      await tx.$executeRaw`
+        UPDATE v1_schedule_guest_recruitments
+        SET state = 'CLOSED'::"V1GuestRecruitmentState", version = version + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE schedule_id = ${scheduleId} AND state = 'OPEN'::"V1GuestRecruitmentState"
+      `;
+
       const after = await tx.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
       const response = {
         state: 'completed' as const,
@@ -581,9 +645,28 @@ export class TeamSchedulesService {
 
       let outboxType: string;
       let availableAt: Date;
+      // P1-2 fix: `generationKey` is folded into the outbox business key below, and the matching
+      // `expectedState` fields are folded into the outbox payload, so the worker handler
+      // (schedule-reminder.service.ts) can no-op a stale-but-still-pending row. Before this fix,
+      // the business key was permanently `schedule:{id}:reminder:{kind}` regardless of what the
+      // reminder was actually FOR — once any reminder of a given kind had ever been triggered for
+      // this schedule, every later trigger (even after the deadline/recruitment it targets had
+      // since changed) hit `ON CONFLICT (business_key) DO NOTHING` and silently did nothing: a
+      // rescheduled RSVP deadline could never get its own reminder (it would still fire, if at
+      // all, at the OLD deadline time), and a reopened/edited recruitment's close reminder could
+      // not be told apart from a stale one for a since-superseded closesAt. Scoping the key by the
+      // rsvpDeadlineAt value itself (rsvp_deadline) or the recruitment's own version
+      // (guest_recruitment_close, which bumps on every mutation of that row — see
+      // guest-recruitment.service.ts's updateRecruitment) makes each genuinely distinct
+      // deadline/generation get its own outbox row, and lets the handler recognize + skip a row
+      // whose generation the target has since moved past.
+      let generationKey: string;
+      let expectedState: Record<string, unknown>;
       if (dto.kind === 'rsvp_deadline') {
         outboxType = 'SCHEDULE_RSVP_DEADLINE_REMINDER';
         availableAt = schedule.rsvpDeadlineAt ?? new Date();
+        generationKey = schedule.rsvpDeadlineAt ? schedule.rsvpDeadlineAt.toISOString() : 'none';
+        expectedState = { expectedRsvpDeadlineAt: schedule.rsvpDeadlineAt ? schedule.rsvpDeadlineAt.toISOString() : null };
       } else {
         const recruitment = await tx.v1ScheduleGuestRecruitment.findUnique({ where: { scheduleId } });
         if (!recruitment) {
@@ -604,11 +687,13 @@ export class TeamSchedulesService {
         }
         outboxType = 'SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER';
         availableAt = recruitment.closesAt;
+        generationKey = String(recruitment.version);
+        expectedState = { expectedRecruitmentVersion: recruitment.version };
       }
 
-      const businessKey = `schedule:${scheduleId}:reminder:${dto.kind}`;
+      const businessKey = `schedule:${scheduleId}:reminder:${dto.kind}:${generationKey}`;
       const jobId = createHash('sha256').update(businessKey).digest('hex').slice(0, 32);
-      const outboxPayload = JSON.stringify({ scheduleId, kind: dto.kind });
+      const outboxPayload = JSON.stringify({ scheduleId, kind: dto.kind, ...expectedState });
 
       await tx.$executeRaw`
         INSERT INTO v1_outbox_events (

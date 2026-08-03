@@ -3,7 +3,6 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 import { Prisma, V1ScheduleGuestRecruitment } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateGuestApplicationDto, CreateGuestRecruitmentDto, UpdateGuestRecruitmentDto } from './dto/guest-recruitment.dto';
 
@@ -52,10 +51,7 @@ export interface ApplicationResponse {
  */
 @Injectable()
 export class GuestRecruitmentService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getRecruitment(user: V1AuthUser | null, teamId: string, scheduleId: string): Promise<RecruitmentView> {
     const schedule = await this.prisma.v1TeamSchedule.findFirst({
@@ -201,13 +197,29 @@ export class GuestRecruitmentService {
     return this.prisma.$transaction(async (tx) => {
       await this.lockIdempotencyScope(tx, user.id, UPDATE_ACTION, RECRUITMENT_RESOURCE_TYPE, scheduleId, idempotencyKey);
 
+      // P1-5 fix: `note`/`state` used `dto.field ?? null`, which collapses two DIFFERENT meanings
+      // into the identical hash value — an omitted field (`undefined`, meaning "preserve the
+      // existing value", per nextNote/nextState below) and an explicitly-supplied `null`/`'closed'`
+      // both hashed to `null`/whatever-that-branch-produces the same way. Two requests under the
+      // SAME idempotencyKey with genuinely different intent (e.g. `{expectedVersion:0}` vs
+      // `{expectedVersion:0, note:null}`) could therefore be silently treated as an identical
+      // replay instead of correctly 409ing IDEMPOTENCY_PAYLOAD_CONFLICT. `=== undefined` reads
+      // exactly the same condition nextNote/nextState use to decide "preserve" vs "apply verbatim"
+      // below, so this hash now tracks the same three-way distinction (omitted / null / value) the
+      // mutation itself makes. `state` can no longer actually be `null` by the time this runs (the
+      // DTO's own P1-5 fix 400s an explicit null before validation ever lets it reach here), but
+      // `=== undefined` is kept here too — for symmetry with `note`, and so this hash can never
+      // again silently reabsorb a null if that validation ever changes. `slots`/`closesAt` are
+      // unaffected: both fields already treat omitted and null identically end-to-end (see
+      // nextSlots/nextClosesAt below), so no behavioral distinction is being lost by hashing them
+      // with `?? null`.
       const payloadHash = canonicalGameCommandPayloadHash({
         expectedVersion: dto.expectedVersion,
         slots: dto.slots ?? null,
         closesAt: dto.closesAt ?? null,
-        note: dto.note ?? null,
+        note: dto.note === undefined ? '__omitted__' : dto.note,
         visibility: dto.visibility ?? null,
-        state: dto.state ?? null,
+        state: dto.state === undefined ? '__omitted__' : dto.state,
       });
       const replay = await this.findReplay(tx, user.id, UPDATE_ACTION, RECRUITMENT_RESOURCE_TYPE, scheduleId, idempotencyKey);
       if (replay !== null) {
@@ -265,8 +277,36 @@ export class GuestRecruitmentService {
       const nextVisibility = dto.visibility ?? recruitment.visibility;
       // Lowercase contract vocabulary (open|closed) mapped onto the shipped Prisma enum — see
       // dto/guest-recruitment.dto.ts. FILLED is never client-settable and is excluded from the
-      // DTO's allowlist entirely, so nextState can only ever resolve to OPEN or CLOSED here.
-      const nextState = dto.state === undefined ? recruitment.state : dto.state === 'open' ? 'OPEN' : 'CLOSED';
+      // DTO's allowlist entirely, and the guard just above this block already rejects ANY update
+      // once `recruitment.state === 'FILLED'` — so `requestedState` can only ever resolve to OPEN
+      // or CLOSED here (never FILLED, whether requested explicitly or inherited via omission).
+      const requestedState = dto.state === undefined ? recruitment.state : dto.state === 'open' ? 'OPEN' : 'CLOSED';
+
+      // P1-10 fix: this update previously wrote `slots` and `state` straight through with no
+      // regard for the approvedCount they derive against — the DTO's own comment says "FILLED is
+      // server-derived only (approvedCount === slots)", but nothing here ever actually checked
+      // that. Decreasing slots below the current approvedCount left an impossible
+      // `approvedCount > slots` state on record; leaving slots at exactly approvedCount kept the
+      // recruitment OPEN forever instead of transitioning it to FILLED like a freshly-filled
+      // recruitment created via the application-approval path would be. `approvedCount` is read
+      // fresh here, under the SAME recruitment row lock (`recruitmentLock`, above) this method
+      // already holds for its own CAS, so it reflects the current, consistent count for this exact
+      // mutation.
+      const approvedCount = await tx.v1ScheduleGuestApplication.count({
+        where: { recruitmentId: recruitment.id, state: 'APPROVED' },
+      });
+      if (nextSlots < approvedCount) {
+        throw new ConflictException({
+          code: 'GUEST_RECRUITMENT_SLOTS_BELOW_APPROVED_COUNT',
+          message: 'New slots is lower than the current number of approved applicants',
+          details: { slots: nextSlots, approvedCount },
+        });
+      }
+      // An explicit (or preserved) CLOSED always wins outright — closing means "no longer
+      // accepting applications" regardless of the slots/approvedCount arithmetic. Otherwise the
+      // final state is purely derived from slots vs. approvedCount, exactly as the DTO's own
+      // comment promises: exactly full becomes FILLED, anything with room left is OPEN.
+      const nextState = requestedState === 'CLOSED' ? 'CLOSED' : nextSlots === approvedCount ? 'FILLED' : 'OPEN';
 
       const updated = await tx.$executeRaw`
         UPDATE v1_schedule_guest_recruitments
@@ -489,19 +529,37 @@ export class GuestRecruitmentService {
         },
       });
 
-      // 알림: 팀 owner/manager에게 용병 신청 접수 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음).
-      this.notifications.emitToManyDeferred(
-        async () =>
-          (
-            await this.prisma.v1TeamMembership.findMany({
-              where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
-              select: { userId: true },
-            })
-          ).map((m) => m.userId),
-        'schedule_guest_application_received',
-        `${teamId}:${scheduleId}`,
-        `"${dto.displayName}"님이 용병 모집에 신청했어요.`,
-      );
+      // P1-4 fix: this used to be a fire-and-forget `NotificationsService.emitToManyDeferred(...)`
+      // call kicked off from inside this $transaction callback but never awaited by it, with its
+      // recipient lookup running through `this.prisma` (a separate connection from `tx`) — so the
+      // manager notification's own durability was entirely decoupled from this transaction's
+      // commit/rollback. A commit failure after that detached work had already run could notify
+      // managers about an application that was never actually persisted; a process crash between
+      // this transaction's commit and that detached promise's execution could lose the
+      // notification forever, with no retry path (and the old test suite never asserted the mock
+      // was even called, so deleting the whole side effect stayed green). Recording a durable
+      // outbox row in the SAME transaction that inserts the application (mirrors
+      // team-schedules.service.ts's triggerReminder — an identical INSERT INTO v1_outbox_events
+      // with a business key) makes the notification's existence atomic with the application it
+      // describes: if this transaction rolls back, the outbox row rolls back with it; if it
+      // commits, the durable worker handler
+      // (ScheduleReminderService.guestApplicationManagerNotificationHandler, registered in
+      // v1-game-operations-worker.main.ts) is guaranteed to eventually claim and deliver it,
+      // exactly like the existing reminder outbox events.
+      const managerNotificationBusinessKey = `guest-application:${response.applicationId}:manager-notification`;
+      const managerNotificationPayload = JSON.stringify({ teamId, scheduleId, displayName: dto.displayName });
+      await tx.$executeRaw`
+        INSERT INTO v1_outbox_events (
+          id, business_key, aggregate_type, aggregate_id, type, payload,
+          available_at, status, attempts, retry_generation, version, created_at, updated_at
+        ) VALUES (
+          ${randomUUID()}, ${managerNotificationBusinessKey}, 'V1_SCHEDULE_GUEST_APPLICATION',
+          ${response.applicationId}, 'SCHEDULE_GUEST_APPLICATION_MANAGER_NOTIFICATION',
+          ${managerNotificationPayload}::jsonb,
+          CURRENT_TIMESTAMP, 'PENDING'::"V1OutboxStatus", 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (business_key) DO NOTHING
+      `;
 
       return { ...response, replayed: false };
     });

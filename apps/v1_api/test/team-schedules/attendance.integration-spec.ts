@@ -296,7 +296,7 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
     expect(row.version).toBe(1);
   });
 
-  it('promotes the lowest-position WAITLISTED user to GOING when a GOING slot frees up', async () => {
+  it('promotes the lowest-position WAITLISTED user to GOING when a GOING slot frees up, and compacts the remaining waitlist with a version bump', async () => {
     const schedule = await createSchedule({ id: '6c000000-0000-4000-8000-000000000106', capacity: 1 });
     await service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'promo-a-key');
     const waitlistedB = await service.setMyAttendance(
@@ -307,6 +307,16 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
       'promo-b-key',
     );
     expect(waitlistedB).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1 });
+    // A second waitlister behind B — this row is the one the promotion-path compaction below must
+    // shift down, and whose version must bump as part of that shift (P1-1).
+    const waitlistedC = await service.setMyAttendance(
+      authUser(ids.userC),
+      ids.team,
+      schedule.id,
+      { status: 'GOING', expectedVersion: 0 },
+      'promo-c-key',
+    );
+    expect(waitlistedC).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 2 });
 
     await service.setMyAttendance(authUser(ids.userA), ids.team, schedule.id, { status: 'NOT_GOING', expectedVersion: 0 }, 'promo-a-vacate-key');
 
@@ -315,6 +325,24 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
     });
     expect(promoted.status).toBe('GOING');
     expect(promoted.waitlistPosition).toBeNull();
+
+    // P1-1 regression: C never made a request of its own here — its row is only ever touched by
+    // the promotion-path compaction UPDATE (attendance.service.ts, second waitlist-compaction
+    // block). Before the fix, that UPDATE rewrote waitlist_position without touching version/
+    // updated_at, so C's version stayed 0 even though its persisted state genuinely changed
+    // (position 2 -> 1). If that fix is reverted, this assertion fails back to version: 0.
+    const compacted = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+      where: { scheduleId_userId: { scheduleId: schedule.id, userId: ids.userC } },
+    });
+    expect(compacted).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1, version: 1 });
+
+    // A stale client holding C's pre-compaction snapshot (version 0, position 2) must now
+    // genuinely 409 — its expectedVersion no longer matches the row's real, bumped version. Before
+    // the fix this would have succeeded, since compaction never advanced the version.
+    const staleError = await captureFailure(() =>
+      service.setMyAttendance(authUser(ids.userC), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'promo-c-stale-key'),
+    );
+    expectHttpCode(staleError, 409, 'VERSION_CONFLICT');
   });
 
   // W6 regression: drives the reviewer's exact deterministic corruption scenario (A going, B
@@ -357,14 +385,31 @@ describe('Task 12 attendance lane — ScheduleAttendanceService', () => {
       expect(new Set(waitlistRows.map((r) => r.waitlistPosition)).size).toBe(waitlistRows.length);
       expect(waitlistRows.map((r) => r.userId)).toEqual([ids.userB, ids.userC]);
 
-      // A repeat GOING request from C (still WAITLISTED, schedule still full) under a fresh
-      // idempotency key must preserve C's existing position (1), never recompute/move it. Note:
-      // the waitlist-compaction UPDATE above is a raw SQL statement scoped to *other* rows'
-      // waitlist_position and does not touch C's own `version` column, so C's row is still at the
-      // version its own single prior write (w6-c-wait) left it at — 0 (a freshly-created row's
-      // version, per attendance.service.ts's create branch).
-      const cRepeat = await service.setMyAttendance(authUser(ids.userB), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'w6-c-repeat');
-      expect(cRepeat).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1 });
+      // P1-1 regression: before the fix, the departure-compaction UPDATE above (which shifted C's
+      // row from position 2 down to 1) rewrote waitlist_position WITHOUT touching C's own
+      // `version` column — C's row stayed at whatever its single prior write (w6-c-wait) had left
+      // it at (0), even though its persisted state genuinely changed. C's row was never mutated by
+      // C's own request here; this version bump is entirely a side effect of B's withdrawal, which
+      // is exactly the P1-1 defect (another user's write silently changing this row's state without
+      // advancing its optimistic-concurrency token).
+      const cRow = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId: schedule.id, userId: ids.userB } },
+      });
+      expect(cRow).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1, version: 1 });
+
+      // A repeat GOING request from C reusing its PRE-compaction version (0, a fresh idempotency
+      // key so this is not a replay) must now genuinely 409 — that version token no longer matches
+      // the row's real, compacted state. Before the fix this would have wrongly succeeded, since
+      // compaction never advanced the version and 0 was still "current".
+      const staleRepeatError = await captureFailure(() =>
+        service.setMyAttendance(authUser(ids.userB), ids.team, schedule.id, { status: 'GOING', expectedVersion: 0 }, 'w6-c-repeat-stale'),
+      );
+      expectHttpCode(staleRepeatError, 409, 'VERSION_CONFLICT');
+
+      // Retrying with C's actual current version (1, still WAITLISTED, schedule still full) must
+      // preserve C's existing position (1), never recompute/move it.
+      const cRepeat = await service.setMyAttendance(authUser(ids.userB), ids.team, schedule.id, { status: 'GOING', expectedVersion: 1 }, 'w6-c-repeat');
+      expect(cRepeat).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1, version: 2 });
     },
   );
 });

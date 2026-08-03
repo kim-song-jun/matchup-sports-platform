@@ -7,6 +7,9 @@ type LockedSchedule = {
   id: string;
   teamId: string;
   state: string;
+  // P1-2 fix: needed so rsvpDeadlineReminderHandler can compare it against the outbox payload's
+  // `expectedRsvpDeadlineAt` and no-op a row whose generation the schedule has since moved past.
+  rsvpDeadlineAt: Date | null;
 };
 
 type LockedRecruitment = {
@@ -14,6 +17,18 @@ type LockedRecruitment = {
   scheduleId: string;
   teamId: string;
   state: string;
+  // P1-2 fix: needed so guestRecruitmentCloseReminderHandler can compare it against the outbox
+  // payload's `expectedRecruitmentVersion` and no-op a stale generation.
+  version: number;
+  // P1-3 fix: needed so guestRecruitmentCloseReminderHandler can independently confirm the parent
+  // schedule is still SCHEDULED — see that handler's own P1-3 comment.
+  scheduleState: string;
+};
+
+type GuestApplicationNotificationPayload = {
+  teamId: string;
+  scheduleId: string;
+  displayName: string;
 };
 
 type ReminderEvent = {
@@ -37,6 +52,10 @@ const GUEST_RECRUITMENT_CLOSE_REMINDER_COPY = {
   title: '용병 모집이 곧 마감돼요',
   body: '모집 마감 전에 신청 현황을 확인해 주세요.',
 } as const;
+
+// P1-4 fix: title only — the body embeds the applicant's displayName, so it is built per-call
+// (see guestApplicationManagerNotificationHandler below) rather than as a static constant.
+const GUEST_APPLICATION_RECEIVED_TITLE = '용병 신청이 도착했어요';
 
 /**
  * Task 12 reminders lane — mirrors GameResultSubmittedEscalationService's shape (Task 9): each
@@ -87,6 +106,19 @@ export class ScheduleReminderService {
     const schedule = await this.lockSchedule(tx, scheduleId);
     if (schedule === null || schedule.state !== 'SCHEDULED') return;
 
+    // P1-2 fix: team-schedules.service.ts's triggerReminder() now folds the rsvpDeadlineAt value
+    // that was current at trigger-time into both the outbox business key AND this payload field
+    // (`expectedRsvpDeadlineAt`). A row enqueued from BEFORE this fix (or a genuinely different,
+    // still-pending row whose target schedule has been rescheduled again since) carries a
+    // generation this schedule has since moved past — firing it would notify with a deadline that
+    // no longer matches reality. `undefined` (the field is absent entirely, e.g. a pre-fix row)
+    // means "no expectation recorded" and is treated exactly like the pre-fix behavior: proceed.
+    const expectedRsvpDeadlineAt = this.expectedRsvpDeadlineAt(claim.payload);
+    if (expectedRsvpDeadlineAt !== undefined) {
+      const currentRsvpDeadlineAt = schedule.rsvpDeadlineAt === null ? null : schedule.rsvpDeadlineAt.toISOString();
+      if (currentRsvpDeadlineAt !== expectedRsvpDeadlineAt) return;
+    }
+
     const recipients = await this.activeTeamMemberIds(tx, schedule.teamId);
     if (recipients.length === 0) return;
 
@@ -102,6 +134,23 @@ export class ScheduleReminderService {
     const recruitment = await this.lockRecruitment(tx, scheduleId);
     if (recruitment === null || recruitment.state !== 'OPEN') return;
 
+    // P1-3 fix: this previously only checked the recruitment's own state. TeamSchedulesService's
+    // cancel() AND complete() both now close an attached OPEN recruitment in the same transaction
+    // as the schedule's own terminal transition (see each method's own P1-3 comment) — so in
+    // practice a terminal schedule's recruitment should already be unreachable here. This check is
+    // defense-in-depth against exactly the class of drift that fix closes: any other terminal
+    // transition (present or future) that forgets to also close the child recruitment must not
+    // let this handler notify managers about a "closing soon" recruitment on a schedule that has
+    // already ended.
+    if (recruitment.scheduleState !== 'SCHEDULED') return;
+
+    // P1-2 fix: same generation check as rsvpDeadlineReminderHandler above, scoped to the
+    // recruitment's own `version` (which bumps on every mutation of that row — see
+    // guest-recruitment.service.ts's updateRecruitment) instead of a specific field, since any
+    // mutation of the recruitment can invalidate a previously-scheduled close reminder.
+    const expectedRecruitmentVersion = this.expectedRecruitmentVersion(claim.payload);
+    if (expectedRecruitmentVersion !== undefined && recruitment.version !== expectedRecruitmentVersion) return;
+
     const recipients = await this.activeTeamMemberIds(tx, recruitment.teamId);
     if (recipients.length === 0) return;
 
@@ -109,6 +158,33 @@ export class ScheduleReminderService {
       targetId: `${recruitment.teamId}:${recruitment.scheduleId}`,
       deepLink: `/teams/${recruitment.teamId}/schedules/${recruitment.scheduleId}`,
       ...GUEST_RECRUITMENT_CLOSE_REMINDER_COPY,
+    });
+  };
+
+  /**
+   * P1-4 fix: guest-recruitment.service.ts's createApplication() used to notify managers via a
+   * fire-and-forget `NotificationsService.emitToManyDeferred(...)` call kicked off from inside its
+   * own `$transaction` callback but never awaited by it, with the recipient lookup running through
+   * `this.prisma` (a separate connection from that transaction's `tx`). The notification's own
+   * durability was entirely decoupled from the application-creation transaction's commit/rollback:
+   * a commit failure after that detached work had already run could notify managers about an
+   * application that was never actually persisted, and a process crash between commit and that
+   * detached promise's execution could lose the notification forever with no retry path.
+   * createApplication() now records a durable outbox row, in the SAME transaction as the
+   * application insert, with business key `guest-application:{applicationId}:manager-notification`
+   * — this handler claims and delivers it exactly like the two reminder handlers above, reusing
+   * the identical durable-notification-write pattern (`deliverDurableReminder`).
+   */
+  readonly guestApplicationManagerNotificationHandler: GameOperationHandler = async (claim, tx) => {
+    const payload = this.guestApplicationPayload(claim.payload);
+    const recipients = await this.activeManagerIds(tx, payload.teamId);
+    if (recipients.length === 0) return;
+
+    await this.deliverDurableReminder(tx, claim.id, recipients, {
+      targetId: `${payload.teamId}:${payload.scheduleId}`,
+      deepLink: `/teams/${payload.teamId}/schedules/${payload.scheduleId}`,
+      title: GUEST_APPLICATION_RECEIVED_TITLE,
+      body: `"${payload.displayName}"님이 용병 모집에 신청했어요.`,
     });
   };
 
@@ -208,9 +284,49 @@ export class ScheduleReminderService {
     return (payload as { scheduleId: string }).scheduleId.trim();
   }
 
+  // P1-2 fix: `undefined` means the field is absent entirely (a pre-fix outbox row, or any other
+  // payload shape that never set it) — callers treat that as "no expectation recorded" and proceed
+  // exactly like the pre-fix behavior. `null` is a real, valid expected value (no rsvp deadline).
+  private expectedRsvpDeadlineAt(payload: unknown): string | null | undefined {
+    if (typeof payload !== 'object' || payload === null || !('expectedRsvpDeadlineAt' in payload)) {
+      return undefined;
+    }
+    const value = (payload as { expectedRsvpDeadlineAt: unknown }).expectedRsvpDeadlineAt;
+    if (value === null || typeof value === 'string') return value;
+    throw new Error('Schedule reminder payload has an invalid expectedRsvpDeadlineAt');
+  }
+
+  // P1-2 fix: same "absent means no expectation, proceed" contract as expectedRsvpDeadlineAt above.
+  private expectedRecruitmentVersion(payload: unknown): number | undefined {
+    if (typeof payload !== 'object' || payload === null || !('expectedRecruitmentVersion' in payload)) {
+      return undefined;
+    }
+    const value = (payload as { expectedRecruitmentVersion: unknown }).expectedRecruitmentVersion;
+    if (typeof value !== 'number') {
+      throw new Error('Schedule reminder payload has an invalid expectedRecruitmentVersion');
+    }
+    return value;
+  }
+
+  private guestApplicationPayload(payload: unknown): GuestApplicationNotificationPayload {
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      typeof (payload as { teamId?: unknown }).teamId !== 'string' ||
+      (payload as { teamId: string }).teamId.trim().length === 0 ||
+      typeof (payload as { scheduleId?: unknown }).scheduleId !== 'string' ||
+      (payload as { scheduleId: string }).scheduleId.trim().length === 0 ||
+      typeof (payload as { displayName?: unknown }).displayName !== 'string' ||
+      (payload as { displayName: string }).displayName.trim().length === 0
+    ) {
+      throw new Error('Guest application notification payload requires teamId, scheduleId, and displayName');
+    }
+    return payload as GuestApplicationNotificationPayload;
+  }
+
   private async lockSchedule(tx: Prisma.TransactionClient, scheduleId: string): Promise<LockedSchedule | null> {
     const rows = await tx.$queryRaw<LockedSchedule[]>`
-      SELECT id, team_id AS "teamId", state::text AS state
+      SELECT id, team_id AS "teamId", state::text AS state, rsvp_deadline_at AS "rsvpDeadlineAt"
       FROM v1_team_schedules
       WHERE id = ${scheduleId}
       FOR UPDATE
@@ -224,7 +340,8 @@ export class ScheduleReminderService {
   ): Promise<LockedRecruitment | null> {
     const rows = await tx.$queryRaw<LockedRecruitment[]>`
       SELECT recruitment.id, recruitment.schedule_id AS "scheduleId", recruitment.state::text AS state,
-             schedule.team_id AS "teamId"
+             recruitment.version AS "version", schedule.team_id AS "teamId",
+             schedule.state::text AS "scheduleState"
       FROM v1_schedule_guest_recruitments recruitment
       INNER JOIN v1_team_schedules schedule ON schedule.id = recruitment.schedule_id
       WHERE recruitment.schedule_id = ${scheduleId}
@@ -242,6 +359,21 @@ export class ScheduleReminderService {
       INNER JOIN v1_users u ON u.id = membership.user_id
       WHERE membership.team_id = ${teamId}
         AND membership.status = 'active'
+        AND u.account_status = 'active'
+    `;
+    return rows.map((r) => r.userId);
+  }
+
+  // P1-4 fix: owner/manager only — mirrors the recipient set guest-recruitment.service.ts's
+  // createApplication() previously resolved inline via `this.prisma.v1TeamMembership.findMany`.
+  private async activeManagerIds(tx: Prisma.TransactionClient, teamId: string): Promise<string[]> {
+    const rows = await tx.$queryRaw<Array<{ userId: string }>>`
+      SELECT membership.user_id AS "userId"
+      FROM v1_team_memberships membership
+      INNER JOIN v1_users u ON u.id = membership.user_id
+      WHERE membership.team_id = ${teamId}
+        AND membership.status = 'active'
+        AND membership.role IN ('owner', 'manager')
         AND u.account_status = 'active'
     `;
     return rows.map((r) => r.userId);

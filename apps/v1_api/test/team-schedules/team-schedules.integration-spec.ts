@@ -617,7 +617,10 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
       .set('idempotency-key', idempotencyKey('reminder-before-cancel'))
       .send({ kind: 'rsvp_deadline' })
       .expect(200);
-    const businessKey = `schedule:${schedule.id}:reminder:rsvp_deadline`;
+    // P1-2 fix: the business key now embeds the schedule's rsvpDeadlineAt value (see
+    // team-schedules.service.ts's triggerReminder) so a genuinely rescheduled deadline gets its
+    // own outbox row instead of being silently swallowed by a stale key's `ON CONFLICT DO NOTHING`.
+    const businessKey = `schedule:${schedule.id}:reminder:rsvp_deadline:2026-09-09T00:00:00.000Z`;
     const outboxBefore = await prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*) AS count FROM v1_outbox_events WHERE business_key = ${businessKey}
     `;
@@ -717,6 +720,36 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
         SELECT COUNT(*) AS count FROM v1_outbox_events WHERE business_key = ${businessKeyClosed}
       `;
       expect(Number(outboxAfterClose[0].count)).toBe(0);
+    },
+  );
+
+  // P1-5 regression: `@IsOptional()` treats `null` exactly like an omitted field and skips every
+  // other validator on that property — so a real HTTP PATCH body carrying `{"state": null}`
+  // previously sailed straight through class-validator and was resolved server-side as CLOSED
+  // (`dto.state === undefined ? recruitment.state : dto.state === 'open' ? 'OPEN' : 'CLOSED'`).
+  // This drives an actual request through the real ValidationPipe (this file's whole reason to
+  // exist, per its own docblock) — the sibling `guest-recruitment.integration-spec.ts` calls
+  // GuestRecruitmentService directly and cannot observe DTO-level validation at all. If the DTO
+  // fix is ever reverted to plain `@IsOptional()`, this request stops 400ing and instead succeeds,
+  // silently closing the recruitment.
+  it(
+    'P1-5 regression: an explicit null `state` in a guest-recruitment PATCH is rejected 400, never ' +
+      'silently treated as CLOSED',
+    async () => {
+      const schedule = await createSchedule();
+      const recruitment = await createRecruitment(schedule.id);
+
+      const response = await request(app.getHttpServer())
+        .patch(`/api/v1/teams/${ids.teamA}/schedules/${schedule.id}/guest-recruitment`)
+        .set('x-v1-user-id', ids.ownerA)
+        .set('idempotency-key', idempotencyKey('p1-5-null-state'))
+        .send({ expectedVersion: 0, state: null })
+        .expect(400);
+      expect(response.body.code).toBe('VALIDATION_ERROR');
+
+      const after = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { id: recruitment.id } });
+      expect(after.state).toBe('OPEN');
+      expect(after.version).toBe(0);
     },
   );
 

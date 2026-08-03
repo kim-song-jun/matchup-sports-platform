@@ -246,9 +246,20 @@ export class ScheduleAttendanceService {
       // never vacated. This is unconditional on capacity because a row can only be WAITLISTED
       // in the first place on a capacity-bounded schedule.
       if (previousStatus === 'WAITLISTED' && nextStatus !== 'WAITLISTED' && previousWaitlistPosition !== null) {
+        // P1-1 fix: this UPDATE mutates OTHER users' rows (every WAITLISTED row behind the
+        // departed position) without bumping their own `version`/`updated_at` — so two genuinely
+        // different persisted states (pre- and post-compaction) shared the identical version
+        // number. A client holding a stale, pre-compaction snapshot of its own row (same version,
+        // different waitlistPosition) could submit that stale `expectedVersion` and have it
+        // silently accepted as current, defeating the whole point of the optimistic-concurrency
+        // token. Bumping version/updated_at here — exactly like every other mutation of this table
+        // already does — makes a compacted row's version genuinely reflect that its persisted
+        // state changed, so a caller's now-stale expectedVersion correctly 409s VERSION_CONFLICT.
         await tx.$executeRaw`
           UPDATE v1_schedule_attendance
-          SET waitlist_position = waitlist_position - 1
+          SET waitlist_position = waitlist_position - 1,
+              version = version + 1,
+              updated_at = CURRENT_TIMESTAMP
           WHERE schedule_id = ${scheduleId}
             AND status = 'WAITLISTED'::"V1AttendanceStatus"
             AND waitlist_position > ${previousWaitlistPosition}
@@ -271,9 +282,15 @@ export class ScheduleAttendanceService {
             where: { id: nextInLine.id },
             data: { status: 'GOING', waitlistPosition: null, version: { increment: 1 } },
           });
+          // P1-1 fix: same defect as the departure-compaction UPDATE above, same fix — every
+          // remaining WAITLISTED row shifted down by this promotion must also have its own
+          // version/updated_at bumped, not just have its waitlist_position silently rewritten
+          // underneath an unchanged version.
           await tx.$executeRaw`
             UPDATE v1_schedule_attendance
-            SET waitlist_position = waitlist_position - 1
+            SET waitlist_position = waitlist_position - 1,
+                version = version + 1,
+                updated_at = CURRENT_TIMESTAMP
             WHERE schedule_id = ${scheduleId}
               AND status = 'WAITLISTED'::"V1AttendanceStatus"
               AND waitlist_position > ${nextInLine.waitlistPosition}

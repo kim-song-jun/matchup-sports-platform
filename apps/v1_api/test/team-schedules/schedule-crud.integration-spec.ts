@@ -1,7 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TeamSchedulesService } from '../../src/team-schedules/team-schedules.service';
-import { canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 const ids = {
@@ -231,6 +230,98 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     },
   );
 
+  // P1-10 regression: increasing capacity must promote the front of the WAITLISTED queue (and
+  // compact the rest) instead of leaving freed slots stranded behind whoever was already queued.
+  // If this fix is ever reverted, memberB/outsider below stay WAITLISTED at positions 1/2 forever.
+  it(
+    'P1-10 regression: increasing schedule capacity promotes the front of the WAITLISTED queue ' +
+      'and compacts the rest, bumping their version',
+    async () => {
+      const created = await service.create(authUser(ids.ownerA), ids.teamA, { ...baseDto(), capacity: 1 }, 'p1-10-increase-create-key');
+      const scheduleId = (created as { id: string }).id;
+
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.ownerA, status: 'GOING', version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberA, status: 'WAITLISTED', waitlistPosition: 1, version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberB, status: 'WAITLISTED', waitlistPosition: 2, version: 0 } });
+
+      const result = await service.update(
+        authUser(ids.ownerA),
+        ids.teamA,
+        scheduleId,
+        { expectedVersion: 0, capacity: 2 },
+        'p1-10-increase-key',
+      );
+      expect(result).toMatchObject({ capacity: 2, version: 1 });
+
+      const promoted = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId, userId: ids.memberA } },
+      });
+      expect(promoted).toMatchObject({ status: 'GOING', waitlistPosition: null, version: 1 });
+
+      const compacted = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId, userId: ids.memberB } },
+      });
+      expect(compacted).toMatchObject({ status: 'WAITLISTED', waitlistPosition: 1, version: 1 });
+    },
+  );
+
+  // P1-10 regression: decreasing capacity below the current GOING count must be rejected outright,
+  // never silently leave `goingCount > capacity`. If this fix is ever reverted, this call succeeds
+  // 200 and the schedule row's capacity ends up at 1 with 2 GOING attendees.
+  it(
+    'P1-10 regression: decreasing schedule capacity below the current GOING count is rejected and ' +
+      'mutates nothing',
+    async () => {
+      const created = await service.create(authUser(ids.ownerA), ids.teamA, { ...baseDto(), capacity: 2 }, 'p1-10-decrease-create-key');
+      const scheduleId = (created as { id: string }).id;
+
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.ownerA, status: 'GOING', version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberA, status: 'GOING', version: 0 } });
+
+      const error = await captureFailure(() =>
+        service.update(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 0, capacity: 1 }, 'p1-10-decrease-key'),
+      );
+      expectHttpCode(error, 409, 'SCHEDULE_CAPACITY_BELOW_GOING_COUNT');
+
+      const row = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
+      expect(row.capacity).toBe(2);
+      expect(row.version).toBe(0);
+    },
+  );
+
+  // P1-10 regression: removing the cap entirely (capacity -> null) must promote every remaining
+  // WAITLISTED attendee — nobody should be left queued on what is now an uncapped schedule.
+  it(
+    'P1-10 regression: removing schedule capacity entirely promotes every remaining WAITLISTED ' +
+      'attendee to GOING',
+    async () => {
+      const created = await service.create(authUser(ids.ownerA), ids.teamA, { ...baseDto(), capacity: 1 }, 'p1-10-uncap-create-key');
+      const scheduleId = (created as { id: string }).id;
+
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.ownerA, status: 'GOING', version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberA, status: 'WAITLISTED', waitlistPosition: 1, version: 0 } });
+      await prisma.v1ScheduleAttendance.create({ data: { scheduleId, userId: ids.memberB, status: 'WAITLISTED', waitlistPosition: 2, version: 0 } });
+
+      const result = await service.update(
+        authUser(ids.ownerA),
+        ids.teamA,
+        scheduleId,
+        { expectedVersion: 0, capacity: null } as never,
+        'p1-10-uncap-key',
+      );
+      expect(result).toMatchObject({ capacity: null, version: 1 });
+
+      const memberARow = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId, userId: ids.memberA } },
+      });
+      expect(memberARow).toMatchObject({ status: 'GOING', waitlistPosition: null, version: 1 });
+      const memberBRow = await prisma.v1ScheduleAttendance.findUniqueOrThrow({
+        where: { scheduleId_userId: { scheduleId, userId: ids.memberB } },
+      });
+      expect(memberBRow).toMatchObject({ status: 'GOING', waitlistPosition: null, version: 1 });
+    },
+  );
+
   it('cancel is a state transition (never a delete) and closes an attached OPEN guest recruitment', async () => {
     const created = await service.create(authUser(ids.ownerA), ids.teamA, baseDto(), 'cancel-create-key');
     const scheduleId = (created as { id: string }).id;
@@ -264,6 +355,35 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
       service.cancel(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 1, cancelReason: 'again' }, 'cancel-key-2'),
     );
     expectHttpCode(error, 409, 'SCHEDULE_TERMINAL');
+  });
+
+  // P1-3 regression: cancel() (tested above) already closed an attached OPEN guest recruitment in
+  // the same transaction as the cancellation — complete() never had the equivalent statement. A
+  // schedule could reach COMPLETED while its recruitment stayed OPEN forever (new applications
+  // rejected only because the PARENT schedule was terminal, never surfaced as the recruitment's
+  // own state; GET kept showing OPEN; a still-pending guest_recruitment_close outbox reminder had
+  // no way to know its parent had ended). If this fix is ever reverted, the final
+  // `recruitment.state` assertion below fails back to 'OPEN'.
+  it('complete is a state transition (never a delete) and closes an attached OPEN guest recruitment', async () => {
+    const created = await service.create(
+      authUser(ids.ownerA),
+      ids.teamA,
+      { ...baseDto(), startAt: '2020-01-01T10:00:00.000Z', endAt: '2020-01-01T12:00:00.000Z' },
+      'complete-recruitment-create-key',
+    );
+    const scheduleId = (created as { id: string }).id;
+    await prisma.v1ScheduleGuestRecruitment.create({
+      data: { scheduleId, slots: 2, closesAt: new Date('2020-01-02T00:00:00.000Z'), state: 'OPEN' },
+    });
+
+    const result = await service.complete(authUser(ids.ownerA), ids.teamA, scheduleId, { expectedVersion: 0 }, 'complete-recruitment-key');
+    expect(result).toMatchObject({ state: 'completed', version: 1 });
+
+    const row = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
+    expect(row.state).toBe('COMPLETED');
+
+    const recruitment = await prisma.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId } });
+    expect(recruitment.state).toBe('CLOSED');
   });
 
   it('cross-team access to a TEAM-visibility schedule 404s for a non-member, but PUBLIC is visible anonymously', async () => {
@@ -319,9 +439,11 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     );
 
     expect((first as { jobId: string }).jobId).toBe((second as { jobId: string }).jobId);
+    // P1-2 fix: the business key now embeds the schedule's rsvpDeadlineAt value, so a genuinely
+    // rescheduled deadline gets its own outbox row instead of colliding with a stale key.
     const outboxRows = await prisma.$queryRaw<Array<{ count: bigint; type: string; payload: unknown }>>`
       SELECT COUNT(*) AS count, MIN(type::text) AS type, MIN(payload::text) AS payload
-      FROM v1_outbox_events WHERE business_key = ${`schedule:${scheduleId}:reminder:rsvp_deadline`}
+      FROM v1_outbox_events WHERE business_key = ${`schedule:${scheduleId}:reminder:rsvp_deadline:2026-09-09T00:00:00.000Z`}
     `;
     expect(Number(outboxRows[0].count)).toBe(1);
     // FG-8 fix: the original assertions only checked jobId equality and row count — neither
@@ -329,7 +451,14 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     // rsvp_deadline/guest_recruitment_close -> outbox-type mapping in triggerReminder() would
     // still pass every assertion here. Assert the actual persisted type and payload.
     expect(outboxRows[0].type).toBe('SCHEDULE_RSVP_DEADLINE_REMINDER');
-    expect(JSON.parse(outboxRows[0].payload as string)).toEqual({ scheduleId, kind: 'rsvp_deadline' });
+    // P1-2 fix: payload now also carries `expectedRsvpDeadlineAt` — the worker handler
+    // (schedule-reminder.service.ts) reads it back to no-op a stale row if the schedule's
+    // rsvpDeadlineAt has since changed again past this row's own generation.
+    expect(JSON.parse(outboxRows[0].payload as string)).toEqual({
+      scheduleId,
+      kind: 'rsvp_deadline',
+      expectedRsvpDeadlineAt: '2026-09-09T00:00:00.000Z',
+    });
   });
 
   // FG-8 fix: the sibling "no recruitment attached" test below proves the 404 branch, but nothing
@@ -358,14 +487,23 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     );
     expect((result as { kind: string }).kind).toBe('guest_recruitment_close');
 
-    const businessKey = `schedule:${scheduleId}:reminder:guest_recruitment_close`;
+    // P1-2 fix: the business key now embeds the recruitment's own `version` (freshly created here,
+    // so it is the schema default 0) instead of being permanently the same key for this schedule —
+    // a reopened/edited recruitment (whose version has since bumped) gets its own outbox row.
+    const businessKey = `schedule:${scheduleId}:reminder:guest_recruitment_close:0`;
     const outboxRows = await prisma.$queryRaw<Array<{ count: bigint; type: string; payload: unknown }>>`
       SELECT COUNT(*) AS count, MIN(type::text) AS type, MIN(payload::text) AS payload
       FROM v1_outbox_events WHERE business_key = ${businessKey}
     `;
     expect(Number(outboxRows[0].count)).toBe(1);
     expect(outboxRows[0].type).toBe('SCHEDULE_GUEST_RECRUITMENT_CLOSE_REMINDER');
-    expect(JSON.parse(outboxRows[0].payload as string)).toEqual({ scheduleId, kind: 'guest_recruitment_close' });
+    // P1-2 fix: payload now also carries `expectedRecruitmentVersion` — the worker handler reads
+    // it back to no-op a stale row if the recruitment has since been mutated past this generation.
+    expect(JSON.parse(outboxRows[0].payload as string)).toEqual({
+      scheduleId,
+      kind: 'guest_recruitment_close',
+      expectedRecruitmentVersion: 0,
+    });
   });
 
   it('rejects a reminder trigger for guest_recruitment_close when no recruitment is attached', async () => {
@@ -430,8 +568,12 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
       expect((first as { replayed: boolean }).replayed).toBe(false);
 
       // Simulate the key's 30-day retention window having elapsed.
+      // P1-6 fix: the stored idempotency record's resourceId is now `teamId` (a stable value
+      // shared by every create attempt under this scope), not the freshly-created schedule's own
+      // id — see create()'s own P1-6 comment. `firstId` never appeared as a resourceId to begin
+      // with under the fixed code, so this lookup targets `ids.teamA` instead.
       await prisma.v1IdempotencyRecord.updateMany({
-        where: { action: 'SCHEDULE_CREATE', resourceType: 'V1_TEAM_SCHEDULE', resourceId: firstId, idempotencyKey: key },
+        where: { action: 'SCHEDULE_CREATE', resourceType: 'V1_TEAM_SCHEDULE', resourceId: ids.teamA, idempotencyKey: key },
         data: { expiresAt: new Date(Date.now() - 1_000) },
       });
 
@@ -451,64 +593,56 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     },
   );
 
-  // FG-10 fix: the W9 create-expiry test above never forces the pre-fix unordered `findFirst()`
-  // to actually fail (it happens to still pick the active row today), and never exercises CP2's
-  // `resourceId DESC` secondary tiebreak at all (there is never a real `createdAt` tie in that
-  // test). This test seeds a genuine tie directly: two ACTIVE (non-expired) records in the exact
-  // same idempotency scope, identical `createdAt`, different `resourceId` — only the
-  // higher-`resourceId` row's stored `payloadHash` actually matches the dto below. If the ordering
-  // ever regresses to `createdAt DESC` alone (no deterministic secondary key), a real tie has no
-  // guaranteed winner — Postgres is free to return either row for logically identical repeated
-  // queries — and this test's repeated-lookup loop can intermittently select the lower-`resourceId`
-  // row instead, whose deliberately-mismatched `payloadHash` turns the call into a 409
-  // `IDEMPOTENCY_PAYLOAD_CONFLICT` instead of the correct replay.
+  // P1-6 fix supersedes this test's original premise. It used to be named "CP2 regression" and
+  // seeded two ACTIVE (non-expired) idempotency records sharing one create scope but carrying two
+  // DIFFERENT, arbitrary `resourceId` values, to prove create()'s (now-removed) `createdAt DESC,
+  // resourceId DESC` tiebreak deterministically picked a winner among them. Under the P1-6 fix
+  // that scenario can no longer be constructed at all for SCHEDULE_CREATE: resourceId is now the
+  // real, stable `teamId` (see create()'s own P1-6 comment), so the composite unique index
+  // (actorUserId, action, resourceType, resourceId, idempotencyKey) forbids two rows from ever
+  // sharing an identical scope in the first place — there is no tie left to break, and create()'s
+  // replay lookup is a plain findUnique with no ordering at all. What P1-6 actually fixed, and
+  // what this test proves instead: the PRE-fix code used the constant RESOURCE_TYPE string as the
+  // advisory lock's resourceId (and dropped resourceId from the lookup's where-clause entirely),
+  // so the exact same (actor, key) pair collided across EVERY team that actor could create a
+  // schedule under. Two different teams, same actor, same Idempotency-Key must each get their own
+  // independent create — never a cross-team replay or payload conflict.
   it(
-    'CP2 regression: a genuine createdAt tie between two active idempotency records for the same ' +
-      'create scope is broken deterministically by resourceId DESC, not an unspecified order',
+    'P1-6 regression: the same actor reusing one Idempotency-Key across two different teams gets ' +
+      'two independent creates, never a cross-team replay or payload collision',
     async () => {
-      const dto = { ...baseDto(), title: 'FG-10 CP2 tiebreak fixture' };
-      const key = 'fg10-cp2-tiebreak-key';
-      const matchingPayloadHash = canonicalGameCommandPayloadHash({ actorUserId: ids.ownerA, teamId: ids.teamA, dto });
-      const tiedCreatedAt = new Date('2026-01-01T00:00:00.000Z');
-      const higherResourceId = 'zzzzzzzz-0000-4000-8000-000000000fg1';
-      const lowerResourceId = 'aaaaaaaa-0000-4000-8000-000000000fg2';
-
-      await prisma.v1IdempotencyRecord.createMany({
-        data: [
-          {
-            actorUserId: ids.ownerA,
-            action: 'SCHEDULE_CREATE',
-            resourceType: 'V1_TEAM_SCHEDULE',
-            resourceId: higherResourceId,
-            idempotencyKey: key,
-            payloadHash: matchingPayloadHash,
-            responseStatus: 201,
-            responseBody: { id: higherResourceId, title: 'correct row (higher resourceId)' },
-            expiresAt: new Date(Date.now() + 1_000_000),
-            createdAt: tiedCreatedAt,
-          },
-          {
-            actorUserId: ids.ownerA,
-            action: 'SCHEDULE_CREATE',
-            resourceType: 'V1_TEAM_SCHEDULE',
-            resourceId: lowerResourceId,
-            idempotencyKey: key,
-            payloadHash: 'deliberately-mismatched-hash-for-the-lower-resourceId-row',
-            responseStatus: 201,
-            responseBody: { id: lowerResourceId, title: 'wrong row (lower resourceId)' },
-            expiresAt: new Date(Date.now() + 1_000_000),
-            createdAt: tiedCreatedAt,
-          },
-        ],
+      // teamB (unlike teamA) has no seeded membership in this suite's beforeAll — grant ownerA an
+      // owner membership on it here, scoped to this one test, so create() against teamB can pass
+      // its own manageable-team check.
+      await prisma.v1TeamMembership.create({
+        data: { teamId: ids.teamB, userId: ids.ownerA, role: 'owner', status: 'active' },
       });
 
-      // Repeated identical calls must all deterministically resolve to the higher-resourceId row
-      // (the one with the matching hash) and replay — never intermittently pick the other row and
-      // 409 on a payload-hash mismatch that was never actually caused by a different payload.
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const result = await service.create(authUser(ids.ownerA), ids.teamA, dto, key);
-        expect(result).toMatchObject({ id: higherResourceId, replayed: true });
-      }
+      const key = 'p1-6-cross-team-key';
+      const dtoForTeamA = { ...baseDto(), title: 'P1-6 team A fixture' };
+      const dtoForTeamB = { ...baseDto(), title: 'P1-6 team B fixture' };
+
+      const createdA = await service.create(authUser(ids.ownerA), ids.teamA, dtoForTeamA, key);
+      expect((createdA as { replayed: boolean }).replayed).toBe(false);
+
+      // Same actor, same Idempotency-Key, a DIFFERENT team and a DIFFERENT payload. Before the
+      // fix, the advisory lock's scope was identical for both calls (RESOURCE_TYPE used as the
+      // lock's resourceId regardless of team), and the lookup never filtered on resourceId at
+      // all — this call could have replayed, or payload-conflicted against, team A's own record
+      // despite being a wholly unrelated team/schedule.
+      const createdB = await service.create(authUser(ids.ownerA), ids.teamB, dtoForTeamB, key);
+      expect((createdB as { replayed: boolean }).replayed).toBe(false);
+      expect((createdB as { id: string }).id).not.toBe((createdA as { id: string }).id);
+
+      const scheduleA = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: (createdA as { id: string }).id } });
+      const scheduleB = await prisma.v1TeamSchedule.findUniqueOrThrow({ where: { id: (createdB as { id: string }).id } });
+      expect(scheduleA.teamId).toBe(ids.teamA);
+      expect(scheduleB.teamId).toBe(ids.teamB);
+
+      // Retrying team A's own create with its own key/payload must still cleanly replay team A's
+      // own response — proving the fix's per-team scoping didn't break same-team replay.
+      const replayA = await service.create(authUser(ids.ownerA), ids.teamA, dtoForTeamA, key);
+      expect(replayA).toMatchObject({ id: (createdA as { id: string }).id, replayed: true });
     },
   );
 

@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type {
   GameActorScope,
@@ -31,7 +32,15 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+
+async function grantTournamentTakeover(gameId: string, userId: string): Promise<string> {
+  const grant = await service.requestTakeover(authUser(userId), gameId, {
+    clientInstanceId: 'task6-l1-client',
+    lastSequence: 0,
+  });
+  return grant.takeoverToken;
+}
 const authUser = (id: string) => ({
   id,
   email: `${id}@example.test`,
@@ -255,6 +264,7 @@ describe('Task 6 L1 game lifecycle', () => {
         participants: [],
       },
     );
+    const lineupSubmitToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const submittedLineup = await service.submitLineup(
       authUser(ids.operatorUser),
       tournamentGameId,
@@ -263,7 +273,7 @@ describe('Task 6 L1 game lifecycle', () => {
       {
         expectedVersion: 1,
         clientCommandId: 'lineup-submit',
-        takeoverToken: 'exclusive-token',
+        takeoverToken: lineupSubmitToken,
       },
     );
     expect(submittedLineup).toEqual(expect.objectContaining({ lineupState: 'SUBMITTED', version: 2 }));
@@ -283,11 +293,12 @@ describe('Task 6 L1 game lifecycle', () => {
   });
 
   it('enforces header/body durable IDs, payload reuse, lifecycle, event append, and visibility', async () => {
+    const startToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const start = {
       expectedVersion: 2,
       clientCommandId: 'tournament-start',
-      takeoverToken: 'exclusive-token',
-      occurredAt: '2026-08-01T00:00:00.000Z',
+      takeoverToken: startToken,
+      occurredAt: new Date().toISOString(),
       payload: { period: 1 },
     };
     const started = await service.executeCommand(
@@ -329,15 +340,16 @@ describe('Task 6 L1 game lifecycle', () => {
     );
     expectHttpCode(changedPayload, 409, 'IDEMPOTENCY_PAYLOAD_CONFLICT');
 
+    const appendToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const append = {
       expectedVersion: 3,
       clientEventId: 'event-period-start',
-      takeoverToken: 'exclusive-token',
+      takeoverToken: appendToken,
       type: V1GameEventType.PERIOD_START,
       sideId: tournamentHomeSideId,
       period: 1,
       clockMs: 0,
-      occurredAt: '2026-08-01T00:00:01.000Z',
+      occurredAt: new Date().toISOString(),
       payload: { source: 'operator' },
     };
     const appended = await service.appendEvent(
@@ -374,11 +386,12 @@ describe('Task 6 L1 game lifecycle', () => {
   });
 
   it('derives tournament participants while draft and freezes only after the complete snapshot exists', async () => {
+    const endToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const endCommand = {
       expectedVersion: 4,
       clientCommandId: 'tournament-end',
-      takeoverToken: 'exclusive-token',
-      occurredAt: '2026-08-01T00:02:00.000Z',
+      takeoverToken: endToken,
+      occurredAt: new Date().toISOString(),
       payload: { reason: 'full-time' },
     };
     let endFailure: unknown = null;

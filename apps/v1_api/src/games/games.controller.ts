@@ -24,6 +24,7 @@ import { SaveGameLineupDto, SubmitGameLineupDto } from './dto/game-lineup.dto';
 import {
   CreateGameResultRevisionDto,
   DecideGameResultRevisionDto,
+  GameResultRecoveryDto,
   SubmitGameResultRevisionDto,
 } from './dto/game-result.dto';
 import { GamesService } from './games.service';
@@ -128,6 +129,17 @@ export class GamesController {
     @Body() dto: SubmitGameLineupDto,
   ) {
     return this.gamesService.submitLineup(user, gameId, lineupId, idempotencyKey, dto);
+  }
+
+  @Post(':gameId/result-recovery/derive-and-submit')
+  @UseGuards(V1AuthGuard)
+  resultRecoveryDeriveAndSubmit(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: GameResultRecoveryDto,
+  ) {
+    return this.gamesService.resultRecoveryDeriveAndSubmit(user, gameId, idempotencyKey, dto);
   }
 
   @Get(':gameId/result-revisions')

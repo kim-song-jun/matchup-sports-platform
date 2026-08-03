@@ -6,6 +6,7 @@ import {
   type Prisma,
 } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
+import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type {
   GameActorScope,
@@ -44,7 +45,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
 
 const authUser = (id: string) => ({
   id,
@@ -52,6 +53,14 @@ const authUser = (id: string) => ({
   accountStatus: 'active' as const,
   onboardingStatus: 'completed' as const,
 });
+
+async function grantTournamentTakeover(gameId: string, userId: string): Promise<string> {
+  const grant = await service.requestTakeover(authUser(userId), gameId, {
+    clientInstanceId: `task7-${userId}-client`,
+    lastSequence: 0,
+  });
+  return grant.takeoverToken;
+}
 
 function sourceContext(
   actor: GameActorScope,
@@ -452,16 +461,18 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
 
       const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId } });
       const eventId = `task7-${row.actor}-event`;
+      const takeoverToken =
+        row.mutation === 'allow' ? await grantTournamentTakeover(tournamentGameId, row.userId) : `task7-${row.actor}-takeover`;
       const mutation = () =>
         service.appendEvent(authUser(row.userId), tournamentGameId, eventId, {
           expectedVersion: current.version,
           clientEventId: eventId,
-          takeoverToken: `task7-${row.actor}-takeover`,
+          takeoverToken,
           type: V1GameEventType.PERIOD_START,
           sideId: tournamentHomeSideId,
           period: 1,
           clockMs: current.lastSequence * 1000,
-          occurredAt: new Date(Date.UTC(2026, 7, 1, 12, 0, current.lastSequence)).toISOString(),
+          occurredAt: new Date().toISOString(),
           payload: { actor: row.actor },
         });
       if (row.mutation === 'allow') {
@@ -615,16 +626,17 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
   it('revalidates the current assignment before replaying a privileged command', async () => {
     const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId } });
     const eventId = 'task7-revoke-between-commands';
+    const revokeToken = await grantTournamentTakeover(tournamentGameId, ids.fieldOperator);
     const operation = () =>
       service.appendEvent(authUser(ids.fieldOperator), tournamentGameId, eventId, {
         expectedVersion: current.version,
         clientEventId: eventId,
-        takeoverToken: 'task7-revoke-between-commands-takeover',
+        takeoverToken: revokeToken,
         type: V1GameEventType.PERIOD_START,
         sideId: tournamentHomeSideId,
         period: 1,
         clockMs: 11000,
-        occurredAt: '2026-08-01T12:00:11.000Z',
+        occurredAt: new Date().toISOString(),
         payload: { probe: 'revoke-between-commands' },
       });
 
@@ -676,6 +688,7 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
     `;
     const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId } });
     const before = await writeSnapshot(tournamentGameId);
+    const auditRollbackToken = await grantTournamentTakeover(tournamentGameId, ids.director);
     try {
       await expect(
         service.appendEvent(
@@ -685,12 +698,12 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
           {
             expectedVersion: current.version,
             clientEventId: 'task7-audit-rollback',
-            takeoverToken: 'task7-audit-rollback-takeover',
+            takeoverToken: auditRollbackToken,
             type: V1GameEventType.PERIOD_START,
             sideId: tournamentHomeSideId,
             period: 1,
             clockMs: 12000,
-            occurredAt: '2026-08-01T12:00:12.000Z',
+            occurredAt: new Date().toISOString(),
             payload: { probe: 'audit-rollback' },
           },
         ),

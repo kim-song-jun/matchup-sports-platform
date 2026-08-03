@@ -7,6 +7,7 @@ import {
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
 
 const reader: V1AuthUser = {
@@ -156,6 +157,7 @@ async function createSnapshotFixture(race: boolean): Promise<SnapshotFixture> {
   const moduleRef = await Test.createTestingModule({
     providers: [
       GamesService,
+      GameTakeoverService,
       { provide: PrismaService, useValue: database },
       { provide: OperationAuditWriterService, useValue: new OperationAuditWriterService() },
     ],

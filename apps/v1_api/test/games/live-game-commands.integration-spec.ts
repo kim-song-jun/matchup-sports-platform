@@ -367,9 +367,14 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     // reused to satisfy platform_ops's command, and vice versa -- each
     // exclusive holder must present its own grant.
     const directorToken = await grantTakeover(liveGameId, ids.director);
+    // Re-read the version: the successful append above bumped it, and withCommand evaluates the
+    // optimistic-concurrency check BEFORE requireTakeover. Reusing the stale `game.version` here
+    // answered 409 VERSION_CONFLICT and the subject-scoping guard this test exists to prove was
+    // never reached.
+    const afterOpsAppend = await prisma.v1Game.findUniqueOrThrow({ where: { id: liveGameId } });
     const crossSubject = await captureFailure(() =>
       service.appendEvent(authUser(ids.platformOps), liveGameId, 'task20-cross-subject', {
-        expectedVersion: game.version,
+        expectedVersion: afterOpsAppend.version,
         clientEventId: 'task20-cross-subject',
         takeoverToken: directorToken,
         type: V1GameEventType.PERIOD_START,

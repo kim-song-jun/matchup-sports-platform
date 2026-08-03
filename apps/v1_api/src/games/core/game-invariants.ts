@@ -1,4 +1,4 @@
-import { V1GameEventType } from '@prisma/client';
+import { V1GameEventType, V1GameSourceType } from '@prisma/client';
 import type {
   GameResultEvent,
   GameResultInvariantInput,
@@ -132,30 +132,59 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
     }
   }
 
-  if (eventScore.HOME !== input.score.home || eventScore.AWAY !== input.score.away) {
-    throw new GameContractError('SCORE_EVENT_MISMATCH', 'Score does not match active goal events');
-  }
-  for (const [participantId, goals] of participantGoals) {
-    if ((eventGoalsByParticipant.get(participantId) ?? 0) !== goals) {
+  // Task 17 (Option A): a TEAM_MATCH has no live officiating — the host
+  // self-reports the score and the opponent approves it — so in the ordinary
+  // flow it carries zero V1GameEvent rows. Cross-checking the submitted score
+  // against an empty event stream rejected every non-0:0 team-match result
+  // with SCORE_EVENT_MISMATCH, so for a team match with no events the
+  // SUBMITTED score is authoritative and these four event-derived checks are
+  // skipped.
+  //
+  // The exemption is deliberately gated on the events actually being absent,
+  // NOT on sourceType alone. An earlier draft assumed a team match "can never"
+  // carry events because resolveActor forbids event_append/event_reverse on
+  // that path — but that forbid is only reached by team members. An active
+  // non-support platform_ops admin hits an earlier unconditional early-return
+  // (games.service.ts, between the tournament-fixture block and
+  // `const match = game.teamMatch`), and POST /games/:gameId/events has no
+  // sourceType guard, so an admin CAN append real events to a team match.
+  // Skipping on sourceType alone would then let a submitted score silently
+  // contradict events someone deliberately recorded. If events exist, they are
+  // evidence and the score must agree with them.
+  //
+  // TOURNAMENT_FIXTURE keeps the exact event-based verification below
+  // unchanged. Every other invariant above (score sign, side topology,
+  // participant uniqueness/side membership, non-negative goals/cards/minutes,
+  // MVP referencing a real participant, event shape validation) stays in force
+  // for both source types because none of it depends on an event stream.
+  const teamMatchWithoutEvents =
+    input.sourceType === V1GameSourceType.TEAM_MATCH && input.events.length === 0;
+  if (!teamMatchWithoutEvents) {
+    if (eventScore.HOME !== input.score.home || eventScore.AWAY !== input.score.away) {
+      throw new GameContractError('SCORE_EVENT_MISMATCH', 'Score does not match active goal events');
+    }
+    for (const [participantId, goals] of participantGoals) {
+      if ((eventGoalsByParticipant.get(participantId) ?? 0) !== goals) {
+        throw new GameContractError(
+          'SCORE_EVENT_MISMATCH',
+          'Participant goal totals do not match active goal events',
+        );
+      }
+    }
+    for (const [participantId, cards] of participantCards) {
+      const eventCards = eventCardsByParticipant.get(participantId) ?? { yellow: 0, red: 0 };
+      if (eventCards.yellow !== cards.yellow || eventCards.red !== cards.red) {
+        throw new GameContractError(
+          'SCORE_EVENT_MISMATCH',
+          'Participant card totals do not match active card events',
+        );
+      }
+    }
+    if (input.missingScorer !== hasMissingScorer) {
       throw new GameContractError(
         'SCORE_EVENT_MISMATCH',
-        'Participant goal totals do not match active goal events',
+        'missingScorer must exactly reflect active goals without a participant',
       );
     }
-  }
-  for (const [participantId, cards] of participantCards) {
-    const eventCards = eventCardsByParticipant.get(participantId) ?? { yellow: 0, red: 0 };
-    if (eventCards.yellow !== cards.yellow || eventCards.red !== cards.red) {
-      throw new GameContractError(
-        'SCORE_EVENT_MISMATCH',
-        'Participant card totals do not match active card events',
-      );
-    }
-  }
-  if (input.missingScorer !== hasMissingScorer) {
-    throw new GameContractError(
-      'SCORE_EVENT_MISMATCH',
-      'missingScorer must exactly reflect active goals without a participant',
-    );
   }
 }

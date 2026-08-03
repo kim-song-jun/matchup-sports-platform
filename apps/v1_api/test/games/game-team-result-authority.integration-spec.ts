@@ -32,6 +32,15 @@ const ids = {
   correctionMatch: '64000000-0000-4000-8000-000000000033',
 } as const;
 
+// The v1_pin_sport_competition_config trigger (apps/v1_api/prisma/migrations/
+// 20260729000200_v1_competition_config/migration.sql) resolves the pinned
+// competition config from the sport's `code` column via
+// v1_competition_config_for_sport(), which only accepts 'soccer' | 'football' |
+// 'futsal'. Task-scoped codes (e.g. 'task16football') raise 23514
+// COMPETITION_CONFIG_SPORT_UNSUPPORTED. Other suites share a single 'football'
+// sport row via upsert; mirror that here instead of creating a unique code.
+let sportId: string;
+
 const prisma = new PrismaService();
 const service = new GamesService(prisma, new OperationAuditWriterService());
 const authUser = (id: string) => ({
@@ -76,7 +85,7 @@ async function createTeamMatchGame(
       id: teamMatchId,
       hostTeamId: ids.hostTeam,
       createdByUserId: ids.hostUser,
-      sportId: ids.sport,
+      sportId,
       regionId: ids.region,
       title: `Task 16 authority ${teamMatchId}`,
       placeName: 'Task 16 ground',
@@ -142,9 +151,13 @@ describe('Task 16 team result draft/submit authority and completion', () => {
         onboardingStatus: 'completed',
       })),
     });
-    await prisma.v1Sport.create({
-      data: { id: ids.sport, code: 'task16football', name: 'Task 16 Football' },
-    });
+    sportId = (
+      await prisma.v1Sport.upsert({
+        where: { code: 'football' },
+        create: { id: ids.sport, code: 'football', name: 'Task 16 Football' },
+        update: {},
+      })
+    ).id;
     await prisma.v1Region.create({
       data: { id: ids.region, code: 'TASK16_REGION', name: 'Task 16 Region', level: 1 },
     });
@@ -153,14 +166,14 @@ describe('Task 16 team result draft/submit authority and completion', () => {
         {
           id: ids.hostTeam,
           ownerUserId: ids.hostUser,
-          sportId: ids.sport,
+          sportId,
           regionId: ids.region,
           name: 'Task 16 Host',
         },
         {
           id: ids.opponentTeam,
           ownerUserId: ids.opponentUser,
-          sportId: ids.sport,
+          sportId,
           regionId: ids.region,
           name: 'Task 16 Opponent',
         },

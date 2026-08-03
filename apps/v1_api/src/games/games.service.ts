@@ -2720,6 +2720,7 @@ export class GamesService {
         : { minutesPlayed: participant.minutesPlayed }),
     }));
     return {
+      sourceType: game.sourceType,
       score: dto.score,
       sides: sides.map((side) => ({ id: side.id, sideKey: side.sideKey })),
       participants,

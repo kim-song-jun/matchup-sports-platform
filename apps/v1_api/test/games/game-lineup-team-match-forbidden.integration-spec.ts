@@ -17,9 +17,19 @@ import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup
  * TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` instead of quietly accepting an
  * invariant-violating payload.
  *
- * On revert of that fix, `saveLineupRejectsDuplicateJerseysAnyway` below would
- * actually persist a lineup with two players sharing jersey number 1 — proving
- * the bypass is real, not merely a documentation gap.
+ * On revert of that fix, the first `it` below would actually persist a new
+ * lineup with two players sharing jersey number 1 (and the second would
+ * flip a real DRAFT to SUBMITTED) - proving the bypass is real, not merely a
+ * documentation gap.
+ *
+ * Row-count baseline note: `GamesService.createFromSourceInTransaction`
+ * unconditionally seeds one empty (0-participant) revision-1 `v1GameLineup`
+ * per side at game creation - this is real production behavior (see
+ * `TeamMatchesService.teamMatchGameSourceInput`, which always creates the AWAY
+ * side with zero participants until an opponent is approved), not a test
+ * artifact. So a freshly created game already has 2 lineup rows before any
+ * save/submit call runs; the assertions below compare against that baseline
+ * rather than assuming a fresh game starts at 0.
  */
 
 const ids = {
@@ -153,6 +163,12 @@ describe('Task 14 generic Game lineup routes refuse TEAM_MATCH-sourced games', (
   });
 
   it('refuses PUT /games/:gameId/lineups/:sideId for a TEAM_MATCH game even with an invariant-violating payload', async () => {
+    // Baseline: the two empty per-side seed lineups from game creation (see
+    // the file-level comment above) - captured fresh rather than hardcoded so
+    // this assertion is about the refused call's effect, not the seed count.
+    const lineupCountBefore = await prisma.v1GameLineup.count({ where: { gameId } });
+    const participantCountBefore = await prisma.v1GameParticipant.count({ where: { gameId } });
+
     // Two starters sharing jersey number 1 violates Task 14's
     // LINEUP_DUPLICATE_JERSEY_NUMBER invariant. The generic route has no such
     // check at all, so if it were still reachable for a TEAM_MATCH game this
@@ -169,18 +185,33 @@ describe('Task 14 generic Game lineup routes refuse TEAM_MATCH-sourced games', (
     );
     expectHttpCode(error, 409, 'TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN');
 
-    // No lineup/participant rows were created by the refused call.
-    expect(await prisma.v1GameLineup.count({ where: { gameId } })).toBe(0);
-    expect(await prisma.v1GameParticipant.count({ where: { gameId } })).toBe(0);
+    // No lineup/participant rows were created by the refused call - counts
+    // are unchanged from the pre-existing seed.
+    expect(await prisma.v1GameLineup.count({ where: { gameId } })).toBe(lineupCountBefore);
+    expect(await prisma.v1GameParticipant.count({ where: { gameId } })).toBe(participantCountBefore);
   });
 
   it('refuses POST /games/:gameId/lineups/:lineupId/submit for a TEAM_MATCH game, leaving a real DRAFT lineup untouched', async () => {
     // Build a real, invariant-valid DRAFT lineup through the validated
-    // Task 14 path so there is a genuine lineupId to target.
+    // Task 14 path so there is a genuine lineupId to target. `expectedVersion`
+    // here is the team-match lineup chain's own `revision` CAS token (see the
+    // file-level comment: hostSideId already carries the empty revision-1
+    // seed lineup from game creation), so it must be read fresh rather than
+    // assumed to be 0 for "the first save". futsal-v1 also requires a
+    // minimum of 3 starters, so a single-player roster (which the seeded
+    // version-conflict masked from ever actually running) would fail
+    // LINEUP_SIZE_INVALID here too - pad out with unlinked guests, which
+    // resolveEntry allows without any extra membership/attendance fixtures.
+    const priorLineup = await prisma.v1GameLineup.findFirst({
+      where: { gameId, sideId: hostSideId },
+      orderBy: { revision: 'desc' },
+    });
     const saved = await lineups.saveLineup(authUser(ids.hostUser), ids.teamMatch, 'lineup-bypass-team-draft', {
-      expectedVersion: 0,
+      expectedVersion: priorLineup?.revision ?? 0,
       starters: [
         { userId: ids.hostUser, jerseyNumber: 1, goalkeeper: true },
+        { displayName: 'Bypass Guest 2', jerseyNumber: 2 },
+        { displayName: 'Bypass Guest 3', jerseyNumber: 3 },
       ],
       bench: [],
     });

@@ -1,8 +1,7 @@
 import { Module } from '@nestjs/common';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { AdminContextModule } from '../common/admin-context.module';
-import { GameOperationFlagsController } from '../config/game-operation-flags.controller';
-import { GameOperationFlagsService } from '../config/game-operation-flags';
+import { GameOperationFlagsModule } from '../config/game-operation-flags.module';
 import { ResultEscalationController } from '../game-operations/result-escalation.controller';
 import { PlatformResultEscalationController } from '../game-operations/platform-result-escalation.controller';
 import { ResultEscalationAccessService } from '../game-operations/result-escalation-access.service';
@@ -17,23 +16,25 @@ import {
 import { V1GameOperationsWorkerService } from './v1-game-operations-worker.service';
 
 @Module({
-  imports: [PrismaModule, AdminContextModule],
+  imports: [PrismaModule, AdminContextModule, GameOperationFlagsModule],
   controllers: [
     V1GameOperationsWorkerController,
     V1GameOperationsJobsController,
-    GameOperationFlagsController,
     ResultEscalationController,
     PlatformResultEscalationController,
   ],
   providers: [
     V1GameOperationsWorkerService,
-    GameOperationFlagsService,
     ResultEscalationAccessService,
     ResultEscalationMutationService,
     ResultEscalationService,
     ResultEscalationValidationInterceptor,
     V1AuthGuard,
   ],
-  exports: [V1GameOperationsWorkerService, GameOperationFlagsService, ResultEscalationService],
+  exports: [
+    V1GameOperationsWorkerService,
+    GameOperationFlagsModule,
+    ResultEscalationService,
+  ],
 })
 export class V1GameOperationsWorkerModule {}

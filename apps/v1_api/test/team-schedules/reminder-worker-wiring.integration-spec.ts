@@ -158,7 +158,11 @@ describe('Task 12 reminders — real worker composition root (T1 regression)', (
     // module-load time under this exact env, and waitForHealth() below times out — that failure
     // path doubles as a live-process B1/B2 regression guard, complementing (not replacing) the
     // static reflection test in v1-game-operations-worker.module.spec.ts.
-    const env = { ...process.env, NODE_ENV: 'production', WORKER_PORT: String(port) };
+    // Explicit NodeJS.ProcessEnv annotation is required here: TypeScript's inferred type for an
+    // object-literal spread of process.env collapses to just the two added literal keys
+    // (NODE_ENV/WORKER_PORT), discarding ProcessEnv's index signature — so `env.FRONTEND_URL`
+    // below would otherwise fail to type-check with "Property 'FRONTEND_URL' does not exist".
+    const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production', WORKER_PORT: String(port) };
     delete env.FRONTEND_URL;
 
     child = spawn(process.execPath, ['-r', 'ts-node/register/transpile-only', 'src/jobs/v1-game-operations-worker.main.ts'], {
@@ -273,9 +277,13 @@ describe('Task 12 reminders — real worker composition root (T1 regression)', (
       // proven against the REAL running worker (not a mock): reset the already-COMPLETED RSVP
       // outbox row back to PENDING (simulating an operational re-delivery/forced replay of the
       // same outbox id) and let the live worker re-claim and re-run it.
+      // `v1_outbox_version_cas` (a BEFORE UPDATE trigger on v1_outbox_events, migration
+      // 20260729000100 line 376) raises 40001 'version compare-and-swap required' unless every
+      // UPDATE sets version = OLD.version + 1. The production claim/complete paths already do this;
+      // this operational-replay simulation must obey the same contract rather than bypass it.
       await prisma.$executeRaw`
         UPDATE v1_outbox_events
-        SET status = 'PENDING'::"V1OutboxStatus", lease_owner = NULL, lease_until = NULL, available_at = CURRENT_TIMESTAMP
+        SET status = 'PENDING'::"V1OutboxStatus", lease_owner = NULL, lease_until = NULL, available_at = CURRENT_TIMESTAMP, version = version + 1
         WHERE id = ${rsvpOutboxId}
       `;
       await waitForOutboxCompletion(rsvpBusinessKey, 20_000);

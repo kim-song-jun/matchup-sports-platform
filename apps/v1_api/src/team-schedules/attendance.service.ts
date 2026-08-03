@@ -16,7 +16,7 @@ interface AttendanceCounts {
   waitlisted: number;
 }
 
-interface SetAttendanceResponse {
+export interface SetAttendanceResponse {
   status: 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED';
   version: number;
   waitlistPosition: number | null;
@@ -97,19 +97,24 @@ export class ScheduleAttendanceService {
       // distinct case handled below as 403 PERMISSION_DENIED per the frozen error contract for
       // this specific route (the contract lists PERMISSION_DENIED, not existence-hiding, for
       // "not an active team member" on this authenticated-only mutation route).
-      const team = await tx.v1Team.findFirst({
-        where: { id: teamId, status: 'active', deletedAt: null },
-        select: { id: true },
-      });
-      if (!team) {
+      //
+      // P1-8 fix: both reads below used to be plain (unlocked) Prisma queries. A concurrent,
+      // already-committed transaction revoking this exact membership row could commit in the gap
+      // between this check and the schedule row lock taken immediately after it (a few lines
+      // down) — an already-removed member's RSVP could still land. FOR SHARE on both rows, in the
+      // same team-then-membership order every other lane in this module uses, forces a concurrent
+      // revoke to serialize against this read instead.
+      const teamRows = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM v1_teams WHERE id = ${teamId} AND status = 'active' AND deleted_at IS NULL FOR SHARE
+      `;
+      if (teamRows.length === 0) {
         throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
       }
 
-      const membership = await tx.v1TeamMembership.findFirst({
-        where: { teamId, userId: user.id, status: 'active' },
-        select: { id: true },
-      });
-      if (!membership) {
+      const membershipRows = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM v1_team_memberships WHERE team_id = ${teamId} AND user_id = ${user.id} AND status = 'active' FOR SHARE
+      `;
+      if (membershipRows.length === 0) {
         throw new ForbiddenException({
           code: 'PERMISSION_DENIED',
           message: 'Only active team members can set attendance',
@@ -241,9 +246,20 @@ export class ScheduleAttendanceService {
       // never vacated. This is unconditional on capacity because a row can only be WAITLISTED
       // in the first place on a capacity-bounded schedule.
       if (previousStatus === 'WAITLISTED' && nextStatus !== 'WAITLISTED' && previousWaitlistPosition !== null) {
+        // P1-1 fix: this UPDATE mutates OTHER users' rows (every WAITLISTED row behind the
+        // departed position) without bumping their own `version`/`updated_at` — so two genuinely
+        // different persisted states (pre- and post-compaction) shared the identical version
+        // number. A client holding a stale, pre-compaction snapshot of its own row (same version,
+        // different waitlistPosition) could submit that stale `expectedVersion` and have it
+        // silently accepted as current, defeating the whole point of the optimistic-concurrency
+        // token. Bumping version/updated_at here — exactly like every other mutation of this table
+        // already does — makes a compacted row's version genuinely reflect that its persisted
+        // state changed, so a caller's now-stale expectedVersion correctly 409s VERSION_CONFLICT.
         await tx.$executeRaw`
           UPDATE v1_schedule_attendance
-          SET waitlist_position = waitlist_position - 1
+          SET waitlist_position = waitlist_position - 1,
+              version = version + 1,
+              updated_at = CURRENT_TIMESTAMP
           WHERE schedule_id = ${scheduleId}
             AND status = 'WAITLISTED'::"V1AttendanceStatus"
             AND waitlist_position > ${previousWaitlistPosition}
@@ -266,9 +282,15 @@ export class ScheduleAttendanceService {
             where: { id: nextInLine.id },
             data: { status: 'GOING', waitlistPosition: null, version: { increment: 1 } },
           });
+          // P1-1 fix: same defect as the departure-compaction UPDATE above, same fix — every
+          // remaining WAITLISTED row shifted down by this promotion must also have its own
+          // version/updated_at bumped, not just have its waitlist_position silently rewritten
+          // underneath an unchanged version.
           await tx.$executeRaw`
             UPDATE v1_schedule_attendance
-            SET waitlist_position = waitlist_position - 1
+            SET waitlist_position = waitlist_position - 1,
+                version = version + 1,
+                updated_at = CURRENT_TIMESTAMP
             WHERE schedule_id = ${scheduleId}
               AND status = 'WAITLISTED'::"V1AttendanceStatus"
               AND waitlist_position > ${nextInLine.waitlistPosition}

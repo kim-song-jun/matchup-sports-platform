@@ -3,7 +3,6 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 import { Prisma, V1ScheduleGuestRecruitment } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateGuestApplicationDto, CreateGuestRecruitmentDto, UpdateGuestRecruitmentDto } from './dto/guest-recruitment.dto';
 
@@ -14,7 +13,7 @@ const RECRUITMENT_RESOURCE_TYPE = 'V1_SCHEDULE_GUEST_RECRUITMENT';
 const APPLICATION_RESOURCE_TYPE = 'V1_SCHEDULE_GUEST_APPLICATION';
 const IDEMPOTENCY_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 
-interface RecruitmentView {
+export interface RecruitmentView {
   id: string;
   scheduleId: string;
   slots: number;
@@ -27,11 +26,11 @@ interface RecruitmentView {
   approvedCount: number;
 }
 
-interface RecruitmentResponse extends RecruitmentView {
+export interface RecruitmentResponse extends RecruitmentView {
   replayed: boolean;
 }
 
-interface ApplicationResponse {
+export interface ApplicationResponse {
   applicationId: string;
   state: string;
   displayName: string;
@@ -52,10 +51,7 @@ interface ApplicationResponse {
  */
 @Injectable()
 export class GuestRecruitmentService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getRecruitment(user: V1AuthUser | null, teamId: string, scheduleId: string): Promise<RecruitmentView> {
     const schedule = await this.prisma.v1TeamSchedule.findFirst({
@@ -89,13 +85,19 @@ export class GuestRecruitmentService {
       throw new NotFoundException({ code: 'GUEST_RECRUITMENT_NOT_FOUND', message: 'Guest recruitment was not found' });
     }
 
-    // recruitment.visibility gates independently from the schedule's own visibility: a PUBLIC
-    // schedule can still carry a MEMBERS-only recruitment. Use the same NOT_FOUND_OR_ARCHIVED
-    // code/message as the schedule-visibility gate above (not GUEST_RECRUITMENT_NOT_FOUND) so a
-    // non-member can never distinguish "schedule is private", "recruitment is members-only", and
-    // "no recruitment exists" from each other via the error code.
+    // P0-2 fix: the comment that used to sit here claimed a hidden MEMBERS recruitment threw the
+    // SAME code as the branch above ("Use the same NOT_FOUND_OR_ARCHIVED code/message... so a
+    // non-member can never distinguish..."), but the code directly below it actually threw
+    // NOT_FOUND_OR_ARCHIVED here while the "no recruitment" branch above throws
+    // GUEST_RECRUITMENT_NOT_FOUND — two different codes for the two cases a non-member must not be
+    // able to tell apart on an otherwise-visible (PUBLIC or member-visible) schedule: "no
+    // recruitment exists" vs "a recruitment exists but is MEMBERS-only". That mismatch let a
+    // non-member on a PUBLIC schedule learn "a hidden recruitment exists" purely from which 404
+    // code came back — the comment disagreed with the code it sat next to. Both branches now throw
+    // the identical GUEST_RECRUITMENT_NOT_FOUND code/message; only the schedule-visibility gate
+    // above (private/missing schedule) keeps its own, separately-collapsed NOT_FOUND_OR_ARCHIVED.
     if (recruitment.visibility === 'MEMBERS' && !isMember) {
-      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Guest recruitment was not found' });
+      throw new NotFoundException({ code: 'GUEST_RECRUITMENT_NOT_FOUND', message: 'Guest recruitment was not found' });
     }
 
     const counts = await this.countApplications(this.prisma, recruitment.id);
@@ -109,8 +111,6 @@ export class GuestRecruitmentService {
     dto: CreateGuestRecruitmentDto,
     idempotencyKey: string,
   ): Promise<RecruitmentResponse> {
-    await this.assertManagerOrOwner(user.id, teamId);
-
     return this.prisma.$transaction(async (tx) => {
       await this.lockIdempotencyScope(tx, user.id, CREATE_ACTION, RECRUITMENT_RESOURCE_TYPE, scheduleId, idempotencyKey);
 
@@ -130,6 +130,12 @@ export class GuestRecruitmentService {
         }
         return { ...(replay.responseBody as unknown as RecruitmentResponse), replayed: true };
       }
+
+      // P1-7/P1-8 fix: this was `await this.assertManagerOrOwner(user.id, teamId)`, called BEFORE
+      // this transaction even opened — see assertActiveManagerLocked's docblock for the two
+      // independent bugs that left (archived team stayed mutable; a concurrent revoke/demotion
+      // could commit in the unlocked gap between this check and the schedule mutation below).
+      await this.assertActiveManagerLocked(tx, user.id, teamId);
 
       const lock = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM v1_team_schedules WHERE id = ${scheduleId} AND team_id = ${teamId} FOR UPDATE
@@ -188,18 +194,32 @@ export class GuestRecruitmentService {
     dto: UpdateGuestRecruitmentDto,
     idempotencyKey: string,
   ): Promise<RecruitmentResponse> {
-    await this.assertManagerOrOwner(user.id, teamId);
-
     return this.prisma.$transaction(async (tx) => {
       await this.lockIdempotencyScope(tx, user.id, UPDATE_ACTION, RECRUITMENT_RESOURCE_TYPE, scheduleId, idempotencyKey);
 
+      // P1-5 fix: `note`/`state` used `dto.field ?? null`, which collapses two DIFFERENT meanings
+      // into the identical hash value — an omitted field (`undefined`, meaning "preserve the
+      // existing value", per nextNote/nextState below) and an explicitly-supplied `null`/`'closed'`
+      // both hashed to `null`/whatever-that-branch-produces the same way. Two requests under the
+      // SAME idempotencyKey with genuinely different intent (e.g. `{expectedVersion:0}` vs
+      // `{expectedVersion:0, note:null}`) could therefore be silently treated as an identical
+      // replay instead of correctly 409ing IDEMPOTENCY_PAYLOAD_CONFLICT. `=== undefined` reads
+      // exactly the same condition nextNote/nextState use to decide "preserve" vs "apply verbatim"
+      // below, so this hash now tracks the same three-way distinction (omitted / null / value) the
+      // mutation itself makes. `state` can no longer actually be `null` by the time this runs (the
+      // DTO's own P1-5 fix 400s an explicit null before validation ever lets it reach here), but
+      // `=== undefined` is kept here too — for symmetry with `note`, and so this hash can never
+      // again silently reabsorb a null if that validation ever changes. `slots`/`closesAt` are
+      // unaffected: both fields already treat omitted and null identically end-to-end (see
+      // nextSlots/nextClosesAt below), so no behavioral distinction is being lost by hashing them
+      // with `?? null`.
       const payloadHash = canonicalGameCommandPayloadHash({
         expectedVersion: dto.expectedVersion,
         slots: dto.slots ?? null,
         closesAt: dto.closesAt ?? null,
-        note: dto.note ?? null,
+        note: dto.note === undefined ? '__omitted__' : dto.note,
         visibility: dto.visibility ?? null,
-        state: dto.state ?? null,
+        state: dto.state === undefined ? '__omitted__' : dto.state,
       });
       const replay = await this.findReplay(tx, user.id, UPDATE_ACTION, RECRUITMENT_RESOURCE_TYPE, scheduleId, idempotencyKey);
       if (replay !== null) {
@@ -211,6 +231,11 @@ export class GuestRecruitmentService {
         }
         return { ...(replay.responseBody as unknown as RecruitmentResponse), replayed: true };
       }
+
+      // P1-7/P1-8 fix: see createRecruitment's identical fix above and assertActiveManagerLocked's
+      // docblock — this was `await this.assertManagerOrOwner(user.id, teamId)` outside the
+      // transaction entirely.
+      await this.assertActiveManagerLocked(tx, user.id, teamId);
 
       const teamLock = await tx.$queryRaw<Array<{ id: string; state: string }>>`
         SELECT id, state FROM v1_team_schedules WHERE id = ${scheduleId} AND team_id = ${teamId} FOR UPDATE
@@ -252,8 +277,36 @@ export class GuestRecruitmentService {
       const nextVisibility = dto.visibility ?? recruitment.visibility;
       // Lowercase contract vocabulary (open|closed) mapped onto the shipped Prisma enum — see
       // dto/guest-recruitment.dto.ts. FILLED is never client-settable and is excluded from the
-      // DTO's allowlist entirely, so nextState can only ever resolve to OPEN or CLOSED here.
-      const nextState = dto.state === undefined ? recruitment.state : dto.state === 'open' ? 'OPEN' : 'CLOSED';
+      // DTO's allowlist entirely, and the guard just above this block already rejects ANY update
+      // once `recruitment.state === 'FILLED'` — so `requestedState` can only ever resolve to OPEN
+      // or CLOSED here (never FILLED, whether requested explicitly or inherited via omission).
+      const requestedState = dto.state === undefined ? recruitment.state : dto.state === 'open' ? 'OPEN' : 'CLOSED';
+
+      // P1-10 fix: this update previously wrote `slots` and `state` straight through with no
+      // regard for the approvedCount they derive against — the DTO's own comment says "FILLED is
+      // server-derived only (approvedCount === slots)", but nothing here ever actually checked
+      // that. Decreasing slots below the current approvedCount left an impossible
+      // `approvedCount > slots` state on record; leaving slots at exactly approvedCount kept the
+      // recruitment OPEN forever instead of transitioning it to FILLED like a freshly-filled
+      // recruitment created via the application-approval path would be. `approvedCount` is read
+      // fresh here, under the SAME recruitment row lock (`recruitmentLock`, above) this method
+      // already holds for its own CAS, so it reflects the current, consistent count for this exact
+      // mutation.
+      const approvedCount = await tx.v1ScheduleGuestApplication.count({
+        where: { recruitmentId: recruitment.id, state: 'APPROVED' },
+      });
+      if (nextSlots < approvedCount) {
+        throw new ConflictException({
+          code: 'GUEST_RECRUITMENT_SLOTS_BELOW_APPROVED_COUNT',
+          message: 'New slots is lower than the current number of approved applicants',
+          details: { slots: nextSlots, approvedCount },
+        });
+      }
+      // An explicit (or preserved) CLOSED always wins outright — closing means "no longer
+      // accepting applications" regardless of the slots/approvedCount arithmetic. Otherwise the
+      // final state is purely derived from slots vs. approvedCount, exactly as the DTO's own
+      // comment promises: exactly full becomes FILLED, anything with room left is OPEN.
+      const nextState = requestedState === 'CLOSED' ? 'CLOSED' : nextSlots === approvedCount ? 'FILLED' : 'OPEN';
 
       const updated = await tx.$executeRaw`
         UPDATE v1_schedule_guest_recruitments
@@ -329,6 +382,19 @@ export class GuestRecruitmentService {
         return { ...(replay.responseBody as unknown as ApplicationResponse), replayed: true };
       }
 
+      // P1-7 fix: this method never checked the parent team's active/non-deleted status at all
+      // (only the schedule's own existence + team_id) — an archived or soft-deleted team's
+      // schedule stayed fully appliable by a guest. Lock the team row FOR SHARE first, matching
+      // the lock order (team -> membership-not-required-here -> schedule -> recruitment) used by
+      // assertActiveManagerLocked and mirroring attendance.service.ts's setMyAttendance, which
+      // already got the team-active check right.
+      const teamLock = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM v1_teams WHERE id = ${teamId} AND status = 'active' AND deleted_at IS NULL FOR SHARE
+      `;
+      if (teamLock.length === 0) {
+        throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
+      }
+
       // W2 fix: lock the schedule row FOR UPDATE *before* reading its state, using the same lock
       // order as cancellation (TeamSchedulesService.cancel -> lockSchedule) and updateRecruitment
       // above (schedule first, recruitment second). Without this lock, an application transaction
@@ -337,10 +403,25 @@ export class GuestRecruitmentService {
       // letting a PENDING application land on an already-terminal schedule. Taking the lock here
       // makes this transaction wait behind (or block) any concurrent cancel/update, so the state
       // re-read immediately below is always current.
-      const scheduleLock = await tx.$queryRaw<Array<{ id: string; state: string }>>`
-        SELECT id, state FROM v1_team_schedules WHERE id = ${scheduleId} AND team_id = ${teamId} FOR UPDATE
+      //
+      // P0-1 fix: this query previously selected only {id, state} — visibility was never read or
+      // checked anywhere in this method, even though the applicant need not be a team member (see
+      // this method's own docblock). That meant an outsider could POST an application to a
+      // private (non-PUBLIC) schedule's recruitment, or to a MEMBERS-only recruitment on an
+      // otherwise-PUBLIC schedule, even though the matching GET (getRecruitment(), above) 404s for
+      // both — a mutation-path bypass of the read-path's own visibility gate. Compute membership
+      // once and gate on it BEFORE any state/deadline/duplicate check below (a private/terminal
+      // schedule must 404, never leak SCHEDULE_TERMINAL or a deadline 409 to a caller who
+      // shouldn't even know the schedule exists).
+      const scheduleLock = await tx.$queryRaw<Array<{ id: string; state: string; visibility: string }>>`
+        SELECT id, state, visibility::text AS visibility
+        FROM v1_team_schedules WHERE id = ${scheduleId} AND team_id = ${teamId} FOR UPDATE
       `;
       if (scheduleLock.length === 0) {
+        throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Schedule was not found' });
+      }
+      const isMember = await this.hasActiveMembership(teamId, user.id);
+      if (scheduleLock[0].visibility !== 'PUBLIC' && !isMember) {
         throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Schedule was not found' });
       }
       if (scheduleLock[0].state !== 'SCHEDULED') {
@@ -350,10 +431,19 @@ export class GuestRecruitmentService {
       // Same fix, recruitment side: lock the recruitment row FOR UPDATE (second in lock order,
       // matching updateRecruitment) so a concurrent close (updateRecruitment) or cancellation
       // (which closes OPEN recruitment) cannot commit between this read and the insert below.
-      const recruitmentLock = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM v1_schedule_guest_recruitments WHERE schedule_id = ${scheduleId} FOR UPDATE
+      //
+      // P0-1/P0-2 fix: also read visibility here and gate it, using the exact same
+      // GUEST_RECRUITMENT_NOT_FOUND code/message getRecruitment() now uses uniformly for both "no
+      // recruitment" and "hidden MEMBERS recruitment" (see the P0-2 fix above) — a non-member can
+      // never distinguish the two through this endpoint either.
+      const recruitmentLock = await tx.$queryRaw<Array<{ id: string; visibility: string }>>`
+        SELECT id, visibility::text AS visibility
+        FROM v1_schedule_guest_recruitments WHERE schedule_id = ${scheduleId} FOR UPDATE
       `;
       if (recruitmentLock.length === 0) {
+        throw new NotFoundException({ code: 'GUEST_RECRUITMENT_NOT_FOUND', message: 'Guest recruitment was not found' });
+      }
+      if (recruitmentLock[0].visibility === 'MEMBERS' && !isMember) {
         throw new NotFoundException({ code: 'GUEST_RECRUITMENT_NOT_FOUND', message: 'Guest recruitment was not found' });
       }
       const recruitment = await tx.v1ScheduleGuestRecruitment.findUniqueOrThrow({ where: { scheduleId } });
@@ -396,45 +486,13 @@ export class GuestRecruitmentService {
       }
 
       // W3 fix: insert with `ON CONFLICT ... DO NOTHING RETURNING` instead of a Prisma
-      // .create() wrapped in a try/catch for P2002. The old code caught P2002 and then issued
-      // `findUniqueOrThrow()` on the *same* `tx` — but a statement error (including a unique
-      // violation) aborts the enclosing PostgreSQL transaction; every subsequent statement on
-      // that transaction, including the recovery SELECT, fails with
-      // "current transaction is aborted". The intended "alreadyApplied: true" recovery path was
-      // therefore unreachable for a genuine concurrent duplicate. `ON CONFLICT DO NOTHING` never
-      // raises a statement error, so the transaction stays healthy and the fallback SELECT below
-      // actually runs. (With the W2 locks above, two inserts for the same recruitment now also
-      // serialize behind the recruitment row's FOR UPDATE lock, but this fix is independently
-      // correct and does not rely on that serialization holding.)
-      const applicationId = randomUUID();
-      const insertedRows = await tx.$queryRaw<
-        Array<{ id: string; state: string; display_name_snapshot: string; note: string | null }>
-      >`
-        INSERT INTO v1_schedule_guest_applications (
-          id, recruitment_id, user_id, display_name_snapshot, note, state, created_at, updated_at
-        ) VALUES (
-          ${applicationId}, ${recruitment.id}, ${user.id}, ${dto.displayName}, ${dto.note ?? null},
-          'PENDING'::"V1GuestApplicationState", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        )
-        ON CONFLICT ON CONSTRAINT v1_schedule_guest_applications_recruitment_user_key DO NOTHING
-        RETURNING id, state, display_name_snapshot, note
-      `;
+      // .create() wrapped in a try/catch for P2002 — see insertApplicationOrRecoverDuplicate()'s
+      // docblock for the full reasoning and, per the FG-3 review finding, why that method is
+      // extracted out and directly unit-tested rather than only exercised through this one,
+      // fully-serialized public call path.
+      const { response, isNewInsert } = await this.insertApplicationOrRecoverDuplicate(tx, recruitment.id, user.id, dto);
 
-      if (insertedRows.length === 0) {
-        // A genuine concurrent duplicate: another transaction's insert won the race and committed
-        // between our duplicate check above and this insert. The transaction is still healthy, so
-        // this SELECT reliably returns the winner's row instead of throwing
-        // "transaction aborted".
-        const raceExisting = await tx.v1ScheduleGuestApplication.findUniqueOrThrow({
-          where: { recruitmentId_userId: { recruitmentId: recruitment.id, userId: user.id } },
-        });
-        const raceResponse: ApplicationResponse = {
-          applicationId: raceExisting.id,
-          state: raceExisting.state,
-          displayName: raceExisting.displayNameSnapshot,
-          note: raceExisting.note,
-          alreadyApplied: true,
-        };
+      if (!isNewInsert) {
         // CP3 fix: this branch previously returned without ever calling
         // v1IdempotencyRecord.create() for the current idempotencyKey, unlike every other return
         // path in this method. A client retry with the same key therefore never found a replay
@@ -450,21 +508,13 @@ export class GuestRecruitmentService {
             idempotencyKey,
             payloadHash,
             responseStatus: 200,
-            responseBody: raceResponse as unknown as Prisma.InputJsonValue,
+            responseBody: response as unknown as Prisma.InputJsonValue,
             expiresAt: new Date(Date.now() + IDEMPOTENCY_RETENTION_MS),
           },
         });
-        return { ...raceResponse, replayed: false };
+        return { ...response, replayed: false };
       }
 
-      const created = insertedRows[0];
-      const response: ApplicationResponse = {
-        applicationId: created.id,
-        state: created.state,
-        displayName: created.display_name_snapshot,
-        note: created.note,
-        alreadyApplied: false,
-      };
       await tx.v1IdempotencyRecord.create({
         data: {
           actorUserId: user.id,
@@ -479,22 +529,117 @@ export class GuestRecruitmentService {
         },
       });
 
-      // 알림: 팀 owner/manager에게 용병 신청 접수 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음).
-      this.notifications.emitToManyDeferred(
-        async () =>
-          (
-            await this.prisma.v1TeamMembership.findMany({
-              where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
-              select: { userId: true },
-            })
-          ).map((m) => m.userId),
-        'schedule_guest_application_received',
-        `${teamId}:${scheduleId}`,
-        `"${dto.displayName}"님이 용병 모집에 신청했어요.`,
-      );
+      // P1-4 fix: this used to be a fire-and-forget `NotificationsService.emitToManyDeferred(...)`
+      // call kicked off from inside this $transaction callback but never awaited by it, with its
+      // recipient lookup running through `this.prisma` (a separate connection from `tx`) — so the
+      // manager notification's own durability was entirely decoupled from this transaction's
+      // commit/rollback. A commit failure after that detached work had already run could notify
+      // managers about an application that was never actually persisted; a process crash between
+      // this transaction's commit and that detached promise's execution could lose the
+      // notification forever, with no retry path (and the old test suite never asserted the mock
+      // was even called, so deleting the whole side effect stayed green). Recording a durable
+      // outbox row in the SAME transaction that inserts the application (mirrors
+      // team-schedules.service.ts's triggerReminder — an identical INSERT INTO v1_outbox_events
+      // with a business key) makes the notification's existence atomic with the application it
+      // describes: if this transaction rolls back, the outbox row rolls back with it; if it
+      // commits, the durable worker handler
+      // (ScheduleReminderService.guestApplicationManagerNotificationHandler, registered in
+      // v1-game-operations-worker.main.ts) is guaranteed to eventually claim and deliver it,
+      // exactly like the existing reminder outbox events.
+      const managerNotificationBusinessKey = `guest-application:${response.applicationId}:manager-notification`;
+      const managerNotificationPayload = JSON.stringify({ teamId, scheduleId, displayName: dto.displayName });
+      await tx.$executeRaw`
+        INSERT INTO v1_outbox_events (
+          id, business_key, aggregate_type, aggregate_id, type, payload,
+          available_at, status, attempts, retry_generation, version, created_at, updated_at
+        ) VALUES (
+          ${randomUUID()}, ${managerNotificationBusinessKey}, 'V1_SCHEDULE_GUEST_APPLICATION',
+          ${response.applicationId}, 'SCHEDULE_GUEST_APPLICATION_MANAGER_NOTIFICATION',
+          ${managerNotificationPayload}::jsonb,
+          CURRENT_TIMESTAMP, 'PENDING'::"V1OutboxStatus", 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (business_key) DO NOTHING
+      `;
 
       return { ...response, replayed: false };
     });
+  }
+
+  /**
+   * FG-3 fix: extracted out of createApplication() specifically so it can be exercised directly
+   * by a test, without needing genuine concurrent connections. The review found that
+   * createApplication()'s own `insertedRows.length === 0` recovery branch is, today, unreachable
+   * through the public method — the W2 fix's schedule-then-recruitment `FOR UPDATE` locks fully
+   * serialize two concurrent createApplication() calls for the same recruitment, so a second
+   * caller's pre-insert `existingApplication` check always observes the first caller's
+   * already-committed row before ever reaching this INSERT. That makes the two existing
+   * concurrency tests in guest-recruitment.integration-spec.ts ("W3 observable contract" and "W3
+   * SQL contract") correct but insufficient: the former only proves the caller-facing contract via
+   * a path that never hits this method's 0-row branch, and the latter tests the raw SQL pattern
+   * directly against the DB without ever invoking this method at all. This method itself is
+   * insert-with-ON-CONFLICT-DO-NOTHING-RETURNING instead of a Prisma `.create()` wrapped in a
+   * try/catch for P2002: the old code caught P2002 and then issued `findUniqueOrThrow()` on the
+   * *same* `tx`, but a statement error (including a unique violation) aborts the enclosing
+   * PostgreSQL transaction — every subsequent statement on that transaction, including the
+   * recovery SELECT, fails with "current transaction is aborted". `ON CONFLICT DO NOTHING` never
+   * raises a statement error, so the transaction stays healthy and the fallback SELECT below
+   * actually runs — a property that does not depend on the W2 locking/serialization holding, and
+   * is exactly what schedule-reminders.service.spec.ts-style direct unit coverage
+   * (guest-recruitment.integration-spec.ts's dedicated FG-3 regression test) can prove by
+   * pre-seeding a genuine duplicate row and calling this method directly, deterministically
+   * hitting the 0-row branch without any timing-dependent race.
+   */
+  private async insertApplicationOrRecoverDuplicate(
+    tx: Prisma.TransactionClient,
+    recruitmentId: string,
+    userId: string,
+    dto: CreateGuestApplicationDto,
+  ): Promise<{ response: ApplicationResponse; isNewInsert: boolean }> {
+    const applicationId = randomUUID();
+    const insertedRows = await tx.$queryRaw<
+      Array<{ id: string; state: string; display_name_snapshot: string; note: string | null }>
+    >`
+      INSERT INTO v1_schedule_guest_applications (
+        id, recruitment_id, user_id, display_name_snapshot, note, state, created_at, updated_at
+      ) VALUES (
+        ${applicationId}, ${recruitmentId}, ${userId}, ${dto.displayName}, ${dto.note ?? null},
+        'PENDING'::"V1GuestApplicationState", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      )
+      ON CONFLICT (recruitment_id, user_id) DO NOTHING
+      RETURNING id, state, display_name_snapshot, note
+    `;
+
+    if (insertedRows.length === 0) {
+      // A genuine concurrent duplicate: another transaction's insert won the race and committed
+      // between the caller's duplicate check and this insert. The transaction is still healthy,
+      // so this SELECT reliably returns the winner's row instead of throwing
+      // "transaction aborted".
+      const raceExisting = await tx.v1ScheduleGuestApplication.findUniqueOrThrow({
+        where: { recruitmentId_userId: { recruitmentId, userId } },
+      });
+      return {
+        response: {
+          applicationId: raceExisting.id,
+          state: raceExisting.state,
+          displayName: raceExisting.displayNameSnapshot,
+          note: raceExisting.note,
+          alreadyApplied: true,
+        },
+        isNewInsert: false,
+      };
+    }
+
+    const created = insertedRows[0];
+    return {
+      response: {
+        applicationId: created.id,
+        state: created.state,
+        displayName: created.display_name_snapshot,
+        note: created.note,
+        alreadyApplied: false,
+      },
+      isNewInsert: true,
+    };
   }
 
   private async hasActiveMembership(teamId: string, userId: string): Promise<boolean> {
@@ -505,12 +650,35 @@ export class GuestRecruitmentService {
     return membership !== null;
   }
 
-  private async assertManagerOrOwner(userId: string, teamId: string): Promise<void> {
-    const membership = await this.prisma.v1TeamMembership.findFirst({
-      where: { teamId, userId, role: { in: ['owner', 'manager'] }, status: 'active' },
-      select: { id: true },
-    });
-    if (!membership) {
+  /**
+   * P1-7/P1-8 fix: replaces the old `assertManagerOrOwner()`, which had two independent bugs.
+   * (P1-7) It never checked the team's `status`/`deletedAt` at all — only the membership row —
+   * so an archived or soft-deleted team's guest recruitment stayed fully createable/mutable by
+   * its last-known manager. (P1-8) `createRecruitment`/`updateRecruitment` both called it
+   * entirely OUTSIDE their `$transaction`, and even inside a transaction a plain (unlocked)
+   * Prisma read does not stop a *concurrent, already-committed* transaction from revoking or
+   * demoting that exact membership row in the gap between this check and the schedule/recruitment
+   * mutation later in the same call — an already-permission-revoked actor's mutation could still
+   * land. Locking both rows FOR SHARE here, inside the transaction and before the schedule/
+   * recruitment locks that follow (team -> membership -> schedule -> recruitment, the same order
+   * every lane in this file uses), closes both: an archived team 404s before any further read, and
+   * a concurrent revoke/demotion is forced to serialize against this read via Postgres's own MVCC
+   * lock wait — the two can never interleave.
+   */
+  private async assertActiveManagerLocked(tx: Prisma.TransactionClient, userId: string, teamId: string): Promise<void> {
+    const teamRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM v1_teams WHERE id = ${teamId} AND status = 'active' AND deleted_at IS NULL FOR SHARE
+    `;
+    if (teamRows.length === 0) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
+    }
+
+    const membershipRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM v1_team_memberships
+      WHERE team_id = ${teamId} AND user_id = ${userId} AND status = 'active' AND role IN ('owner', 'manager')
+      FOR SHARE
+    `;
+    if (membershipRows.length === 0) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
         message: 'Only team owners or managers can manage guest recruitment',

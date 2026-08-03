@@ -143,7 +143,10 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
   it('호스트(owner)에게 결과 작성 폼과 라인업 선수를 보여준다', () => {
     render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
     expect(screen.getByText('결과 작성 완료')).toBeInTheDocument();
-    expect(screen.getByText('김민준')).toBeInTheDocument();
+    // The roster row renders the jersey number and the name as two sibling
+    // text nodes (`{'#7 '}{displayName}`), so an exact-string matcher never
+    // matches. Asserting on the combined label proves both are rendered.
+    expect(screen.getByText(/#7\s*김민준/)).toBeInTheDocument();
   });
 
   it('매니저 권한(manageableHostTeam)도 동일하게 결과 작성 폼을 볼 수 있다', () => {

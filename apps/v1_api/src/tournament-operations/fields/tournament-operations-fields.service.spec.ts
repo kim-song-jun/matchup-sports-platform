@@ -59,14 +59,38 @@ function createFakeTx(initialFixtureFieldId: string | null) {
         const record = idempotency.get(idempotencyKey(where.actorUserId_action_resourceType_resourceId_idempotencyKey));
         return record ?? null;
       }),
-      create: jest.fn(async ({ data }: { data: IdempotencyKeyParts & { payloadHash: string; responseBody: unknown; expiresAt: Date } }) => {
-        idempotency.set(idempotencyKey(data), {
-          payloadHash: data.payloadHash,
-          responseBody: data.responseBody,
-          expiresAt: data.expiresAt,
-        });
-        return { id: 'idem-1' };
-      }),
+      // `recordIdempotency()` calls upsert(), not create() -- a plain create()
+      // races two concurrent first-attempts of the same key into a unique
+      // violation. The stub mirrors real upsert semantics (update the existing
+      // row when the key is already present, otherwise insert) so a service
+      // that regressed back to create-only would fail here.
+      upsert: jest.fn(
+        async ({
+          where,
+          create,
+          update,
+        }: {
+          where: { actorUserId_action_resourceType_resourceId_idempotencyKey: IdempotencyKeyParts };
+          create: IdempotencyKeyParts & { payloadHash: string; responseBody: unknown; expiresAt: Date };
+          update: { payloadHash: string; responseBody: unknown; expiresAt: Date };
+        }) => {
+          const key = idempotencyKey(where.actorUserId_action_resourceType_resourceId_idempotencyKey);
+          const existing = idempotency.get(key);
+          const next = existing
+            ? {
+                payloadHash: update.payloadHash,
+                responseBody: update.responseBody,
+                expiresAt: update.expiresAt,
+              }
+            : {
+                payloadHash: create.payloadHash,
+                responseBody: create.responseBody,
+                expiresAt: create.expiresAt,
+              };
+          idempotency.set(key, next);
+          return { id: 'idem-1' };
+        },
+      ),
     },
     v1TournamentField: {
       create: jest.fn(async ({ data }: { data: { scopeKey: string; name: string; sortOrder: number } }) => ({

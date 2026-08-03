@@ -670,7 +670,11 @@ export class ProfileService {
           toStatus: 'withdrawal_pending',
           actorType: 'user',
           actorUserId: user.id,
-          reason: dto.reason ?? 'withdrawal_requested',
+          // 사용자가 사유를 안 적었으면 null 로 둔다. 예전에는 'withdrawal_requested'
+          // 를 채웠는데, 이 컬럼은 **사용자가 쓴 문장**을 담는 자리라서 어드민 화면의
+          // `reason || '별도 메시지를 남기지 않았어요'` 폴백이 발동하지 못하고 내부
+          // 문자열이 그대로 노출됐다. 무슨 일이 있었는지는 toStatus 가 이미 말해준다.
+          reason: dto.reason?.trim() || null,
         },
       });
       return { next, removedRosterCount, leftTeamCount: memberships.length };

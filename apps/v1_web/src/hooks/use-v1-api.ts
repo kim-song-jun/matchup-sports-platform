@@ -1852,7 +1852,11 @@ export function useV1DeleteAdminUser(userId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1AdminDeleteUserPayload) =>
-      v1Delete<V1AdminStatusChangeResult>(`/admin/users/${userId}`, { body: JSON.stringify(body) }),
+      // v1Delete 의 2번째 인자는 fetch 의 init 이 아니라 **body 그 자체**다. 여기서
+      // { body: JSON.stringify(body) } 를 넘기면 한 번 더 감싸져
+      // {"body":"{\"reason\":...}"} 가 전송되고, reason 이 없으니 서버가 400 을 낸다 —
+      // 프로덕션에서 어드민 사용자 삭제가 두 번 다 400 으로 실패한 원인이다(2026-08-03).
+      v1Delete<V1AdminStatusChangeResult>(`/admin/users/${userId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminUser(userId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'users'] });

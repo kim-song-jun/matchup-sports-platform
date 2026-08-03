@@ -2972,8 +2972,9 @@ export type V1AdminRosterEligibleMember = {
   nickname: string | null;
   realName: string | null;
   birthDate: string | null;
-  gender: string | null;
-  role: string;
+  /** 서버가 normalizeGender() 로 좁혀서 내려준다 — 그 밖의 값은 null 이 된다. */
+  gender: 'male' | 'female' | null;
+  role: 'owner' | 'manager' | 'member';
   alreadyOnRoster: boolean;
   eligible: boolean;
   /** 못 고르는 이유. 화면에 그대로 보여 준다 — 눌러 보고 400 을 받는 일이 없도록. */

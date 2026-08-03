@@ -200,7 +200,13 @@ async function seedOperationsBoardFixture(prisma: PrismaService): Promise<void> 
   await prisma.v1Sport.create({
     data: {
       id: IDS.sport,
-      code: 'task10-ops-football',
+      // The `v1_competition_config_for_sport()` trigger accepts only
+      // 'soccer' | 'football' | 'futsal' as the sport CODE and rejects
+      // anything else with 23514 COMPETITION_CONFIG_SPORT_UNSUPPORTED. Only
+      // the display name may be task-scoped; the code must be one of those
+      // three. This runs against its own isolated Task 10 database, so a
+      // shared code cannot collide with another suite's row.
+      code: 'football',
       name: 'Task 10 Ops Football',
       createdAt: CREATED_AT,
     },
@@ -217,7 +223,7 @@ async function seedOperationsBoardFixture(prisma: PrismaService): Promise<void> 
   await prisma.v1CompetitionConfigVersion.create({
     data: {
       id: IDS.competitionConfigVersion,
-      sportCode: 'task10-ops-football',
+      sportCode: 'football',
       name: 'task10-ops-football-v1',
       version: 1,
       status: 'ACTIVE',

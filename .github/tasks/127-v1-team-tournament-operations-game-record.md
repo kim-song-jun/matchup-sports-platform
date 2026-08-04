@@ -974,3 +974,39 @@ UI 의 "승인하기" 를 실제로 눌러 after 를 찍었다.
 `clientCommandId` 를 넣으면 거부된다(Idempotency-Key 헤더만 사용). 이걸 모르고 넣었더니
 신청이 조용히 실패했고, 이후 초안 생성이 `409 TEAM_MATCH_NOT_MATCHED` 로 막혀 원인을
 한 단계 늦게 알았다 — 가드 자체는 정상 동작이다.
+
+### E2E-CORR-01 — 차단 사유 정정 (2026-08-04)
+
+앞서 두 번 "DIRECTOR_OFFICIALIZE 게이트 증거 번들 생성기가 GitHub Actions 컨텍스트에
+묶여 로컬에서 만들 수 없다" 고 적었다. **코드를 읽어보니 틀렸다.** 정정한다.
+
+`apps/v1_api/src/config/game-operation-flags.ts` 실측:
+
+- `verifyRolloutReferences()` 는 `identity.phase !== 'R2'` 이면 `priorPhaseReceipt` /
+  `deploymentManifest` / `publicProof` 가 있으면 오히려 실패시킨다
+  ("Local gate bundle cannot mix rollout receipts"). 배포 매니페스트·public proof 는
+  **R2 + PUBLIC_LIVE 전용** 요건이었다.
+- 단일 키 전환은 `assertGatePhase()` 상 **phase 'C'** 를 요구한다. C 는 R2 가 아니므로
+  로컬 번들 자체는 구성 가능하다.
+
+**실제 차단 사유**는 `requiredGatesFor()` 다:
+
+```
+} else if (key === 'DIRECTOR_OFFICIALIZE') {
+  add('V7',  'V7');
+  add('V22', 'V22');
+  add('V23', 'V23');
+}
+```
+
+즉 이 전환은 선행 게이트 **V7 / V22 / V23** 의 영수증을 요구하고, 각각
+`phase` 일치 · `verdict === 'accepted'` · mode 0444 · sha256 고정 · 정규 증거 루트 경로를
+만족해야 한다(`readImmutableJson(..., requireGateRoot)` + `assertReceiptIdentity` +
+`verifyLifecycleReferences`). 증거 루트
+`/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1` 를 실사한 결과
+**V7/V22/V23 영수증이 하나도 없다.**
+
+따라서 유일한 정식 경로는 그 세 게이트를 실제로 통과시키는 것이다. 번들을 손으로 만들어도
+prerequisites 검증에서 막히고, 플래그 값을 DB 로 직접 바꾸면 전환 게이트 자체를 우회한다.
+
+영수증 v6(0444, sha256 `c058c973…`) 에 이 정정을 반영했다. F3 는 여전히 6/7 · REJECT.

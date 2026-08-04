@@ -1,49 +1,57 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { compareGameResultSnapshots } from '../../games/migration/compare-game-result-reads';
+import { runGameResultBackfillEvidence } from '../../games/migration/game-result-backfill';
+import type { GameResultMismatch } from '../../games/migration/compare-game-result-reads';
 import type { GameReadAuthorityPort, GameReadAuthorityResult } from './game-read-authority.port';
 import { canonicalizeForHash } from './tournament-operations-board.service';
 
 /**
- * Real (Task 26) `GAME_READ_AUTHORITY` implementation, bound at the composition root
- * (`app.module.ts`) via `TournamentOperationsBoardModule.register({ provide: GAME_READ_AUTHORITY,
- * useClass: CompareGameReadAuthorityService })`. Replaces the fail-closed
- * `DirectGameReadAuthorityService` stub so `GAME_READ === 'compare'` mode actually compares
- * something instead of unconditionally throwing `500 GAME_READ_AUTHORITY_NOT_CONFIGURED`.
+ * Real `GAME_READ_AUTHORITY` implementation, bound at the composition root (`app.module.ts`) via
+ * `TournamentOperationsBoardModule.register({ provide: GAME_READ_AUTHORITY, useClass:
+ * CompareGameReadAuthorityService })`. Replaces the fail-closed `DirectGameReadAuthorityService`
+ * stub so `GAME_READ === 'compare'` actually compares something instead of unconditionally
+ * throwing `500 GAME_READ_AUTHORITY_NOT_CONFIGURED`.
  *
- * `resolve()` is only ever called by the board for `TOURNAMENT_FIXTURE` rows (see
- * `game-read-authority.port.ts` -- `detail.entity` is always `TOURNAMENT_FIXTURE:<fixtureId>`), so
- * this class only ever reads `V1TournamentFixtureResult` as the legacy source. It deliberately does
- * NOT read `V1TeamMatch` at all -- there is no port contract that would ever route a team-match
- * entity through this method, and guessing at one would be exactly the kind of silently-invented
- * behavior the project's "No Ambiguous Skipping" rule forbids.
+ * ## Two responsibilities with DIFFERENT failure contracts
  *
- * ## Two independent responsibilities, in order
- * 1. **Fresh-read-wins race detection**: the caller (the board) hands in `expectedGameVersion` /
- *    `expectedRevisionId` / `expectedScoreHash` captured at ITS read time. This method re-reads
- *    `V1Game` right now and, if ANY of those three disagree with what it just observed, returns
- *    `{ outcome: 'mismatch' }` immediately -- this is a concurrent-write race, not a "let me decide
- *    which value is right" situation (see the port's doc comment, "A conforming implementation of
- *    `resolve()` MUST treat..."). No legacy/projected content comparison happens in this branch
- *    because there is nothing yet to trust a comparison against.
- * 2. **Legacy-vs-projected content comparison**: only once identity is confirmed fresh does this
- *    method read the legacy `V1TournamentFixtureResult` (+ goals) for the same fixture, shape it
- *    into the same `{ regulation, penalty, goals, incomplete, provenance }` score envelope the
- *    Task-10/11 backfill (`games/migration/game-result-backfill.ts`) persists into
- *    `V1GameResultRevision.score` for `TOURNAMENT_FIXTURE`-sourced games, and diffs it against the
- *    just-read projected score via Task 10's own `compareGameResultSnapshots()` -- the same
- *    field-level differ the backfill's own evidence/gate tooling uses, so a content mismatch here
- *    reports the identical dotted `field` path (e.g. `'score.regulation.home'`) a human would see
- *    in the backfill's own comparison output.
+ * 1. **Per-row identity freshness** (the port's own documented job). The board hands in
+ *    `expectedGameVersion` / `expectedRevisionId` / `expectedScoreHash` captured at ITS read time;
+ *    this method re-reads `V1Game` now and returns `{ outcome: 'mismatch' }` if any of them moved.
+ *    That is a concurrent-write race, and the board turns it into its own
+ *    `409 GAME_RESULT_READ_MISMATCH` — the contract Task 18 documents, tests
+ *    (`test/tournaments/tournament-operations-board.integration-spec.ts`) and publishes in
+ *    `docs/api/domains/tournament-operations.md`. Nothing here changes that.
  *
- * This class intentionally does NOT reuse `compare-game-result-reads.ts`'s `selectGameReadAuthority`
- * compare-mode branch: that function is designed for the BATCH backfill/cutover tool, where
- * `mode: 'compare'` means "keep serving the legacy response and surface the mismatch as evidence,
- * never throw" (see its own doc comment). This port's `resolve()` contract for the LIVE board read
- * path is the opposite -- fail closed on mismatch even in compare mode -- so this class builds its
- * own `SnapshotPair` per request and inspects `comparison.counts.mismatched` itself rather than
- * delegating outcome selection to that function.
+ * 2. **Population-wide legacy-vs-projected divergence** (Task 10's cutover kill switch). This is
+ *    NOT a property of the row being rendered. `scripts/qa/verify-game-result-cutover.mjs` proves
+ *    it by mutating a row in the backfill fixture's `10000000-…` id space and then asserting the
+ *    board — which only ever renders the runtime manifest's deliberately disjoint `20000000-…`
+ *    tournament (see the namespacing comment in `games/migration/task10-runtime-manifest.cli.ts`)
+ *    — starts failing with the entity/field the comparator flagged. A per-row comparison can never
+ *    satisfy that, because the diverging row is not on the board. So compare mode asks Task 10's
+ *    real comparator about the WHOLE eligible population and fails every read closed while any
+ *    divergence exists anywhere.
+ *
+ * That second failure is raised as a thrown `ConflictException` rather than an `{ outcome:
+ * 'mismatch' }` return, for two reasons. It carries a different meaning than a per-row race, so it
+ * needs its own code (`GAME_RESULT_COMPARISON_MISMATCH`) and the comparator's own
+ * `{ entity, revision, field }` detail shape, which the board's own `details: { mismatch }`
+ * envelope does not produce. And throwing from `resolve()` is this seam's established pattern —
+ * the DEFAULT binding, `DirectGameReadAuthorityService`, does exactly that. Returning a
+ * `mismatch` here instead would relabel a cutover-wide data-integrity stop as a transient
+ * "try again" race, which is the opposite of what an operator must be told.
+ *
+ * ## Deliberately NOT here: reconstructing the legacy row per request
+ *
+ * An earlier revision of this class rebuilt the legacy `V1TournamentFixtureResult` envelope inline
+ * and diffed it against the rendered row, treating a missing legacy row as a mismatch. That was
+ * wrong twice over: it cannot see the divergence the harness injects (above), and a game with no
+ * legacy counterpart is NORMAL — anything born in the new system, including the runtime manifest's
+ * own seeded game, has an official revision and no `V1TournamentFixtureResult` at all. Failing
+ * those closed made every clean compare-mode read 409. The eligible population is defined by the
+ * backfill's own inventory, so deciding who is comparable is delegated to it rather than
+ * re-derived here.
  */
 @Injectable()
 export class CompareGameReadAuthorityService implements GameReadAuthorityPort {
@@ -68,17 +76,14 @@ export class CompareGameReadAuthorityService implements GameReadAuthorityPort {
       },
     });
 
-    // Race: the game the board's snapshot pointed at is gone by the time we look. Never treated
-    // as "nothing to compare, so approve" -- an absent game is strictly less trustworthy than a
-    // present-but-different one.
+    // An absent game is strictly less trustworthy than a present-but-different one, so it is a
+    // mismatch rather than a quiet approval.
     if (freshGame === null) {
       return mismatch(entity, input.expectedRevisionId, '$gameMissing');
     }
-    // Defensive identity binding: `gameId` and `tournamentFixtureId` are two independent inputs
-    // the caller supplied. Nothing upstream guarantees they were read together atomically by the
-    // TIME this method runs (the board's own snapshot could theoretically be stitched from stale
-    // state by a caller bug), so verify the fresh row's own FK actually agrees with the fixture id
-    // the caller claims, instead of blindly trusting the pairing.
+    // `gameId` and `tournamentFixtureId` arrive as two independent inputs. Nothing guarantees the
+    // caller read them together atomically, so confirm the fresh row's own FK agrees with the
+    // fixture id claimed rather than trusting the pairing.
     if (freshGame.tournamentFixtureId !== input.tournamentFixtureId) {
       return mismatch(entity, input.expectedRevisionId, '$tournamentFixtureId');
     }
@@ -88,92 +93,44 @@ export class CompareGameReadAuthorityService implements GameReadAuthorityPort {
     if (freshGame.currentOfficialRevisionId !== input.expectedRevisionId) {
       return mismatch(entity, input.expectedRevisionId, '$currentOfficialRevisionId');
     }
-    const projectedScore = freshGame.currentOfficialRevision?.score ?? null;
+    // Hashed with the board's own `canonicalizeForHash` (imported, never re-implemented): two
+    // copies of a canonicalization whose entire purpose is drift detection would themselves drift
+    // and report canonicalization differences as data differences.
     const freshScoreHash = createHash('sha256')
-      .update(JSON.stringify(canonicalizeForHash(projectedScore)))
+      .update(JSON.stringify(canonicalizeForHash(freshGame.currentOfficialRevision?.score ?? null)))
       .digest('hex');
     if (freshScoreHash !== input.expectedScoreHash) {
-      // A same-revision-id, different-payload drift (see game-read-authority.port.ts) -- the
-      // revision id survived but its score content changed underneath it.
+      // Same revision id, different payload underneath it — see game-read-authority.port.ts.
       return mismatch(entity, input.expectedRevisionId, '$scoreHash');
     }
 
-    // Identity confirmed fresh and unchanged from what the board is about to serialize. Now, and
-    // only now, is a legacy-vs-projected content comparison meaningful.
-    const legacyResult = await this.prisma.v1TournamentFixtureResult.findUnique({
-      where: { fixtureId: input.tournamentFixtureId },
-      select: {
-        homeScore: true,
-        awayScore: true,
-        hasPenalty: true,
-        homePenaltyScore: true,
-        awayPenaltyScore: true,
-        goals: {
-          // Same ordering as games/migration/game-result-backfill.ts's inventorySources() so a
-          // reordered-but-otherwise-identical goal list never reports a false field-index mismatch.
-          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-          select: { team: true, playerId: true, playerName: true, minute: true },
-        },
-      },
-    });
-
-    // No requirement #7: a missing legacy row is never a quiet 'ok'. A V1Game with an official
-    // revision but no corresponding legacy result row is itself a data-integrity anomaly worth
-    // failing closed on, not something to paper over as "nothing to compare against".
-    if (legacyResult === null) {
-      return mismatch(entity, input.expectedRevisionId, '$legacyResultMissing');
-    }
-
-    const legacyPenalty = penaltyScore(legacyResult);
-    if (legacyPenalty === 'CORRUPT') {
-      // A `hasPenalty: true` row with a null/negative penalty score can never be legitimately
-      // represented as a comparable score envelope -- reported as its own sentinel field instead
-      // of throwing, so it stays inside this port's exhaustive `{ outcome }` contract (the board
-      // narrows the RUNTIME outcome value, not just the TS union) rather than becoming an opaque
-      // unhandled 500 with none of this method's own diagnostic detail attached.
-      return mismatch(entity, input.expectedRevisionId, '$legacyResultCorrupt');
-    }
-
-    const legacyScore = {
-      regulation: { home: legacyResult.homeScore, away: legacyResult.awayScore },
-      penalty: legacyPenalty,
-      goals: legacyResult.goals.map((goal) => ({
-        team: goal.team,
-        playerId: goal.playerId,
-        playerName: goal.playerName,
-        minute: goal.minute,
-      })),
-      incomplete: false,
-      provenance: 'TOURNAMENT_FIXTURE_RESULT' as const,
-    };
-
-    const comparison = compareGameResultSnapshots({
-      // Not a batch run -- there is no meaningful "population" here, only this one request's
-      // identity. Reusing the already-computed score hash keeps this deterministic per call
-      // without fabricating a value that looks like (but isn't) a real batch-run population hash.
-      populationHash: freshScoreHash,
-      sourceRows: 1,
-      partial: 0,
-      quarantined: 0,
-      pairs: [
-        {
-          identity: {
-            entityType: 'TOURNAMENT_FIXTURE',
-            entityId: input.tournamentFixtureId,
-            revisionId: input.expectedRevisionId,
-          },
-          legacy: { score: legacyScore },
-          projected: { score: projectedScore },
-        },
-      ],
-    });
-
-    const [firstMismatch] = comparison.mismatches;
-    if (firstMismatch !== undefined) {
-      return mismatch(entity, input.expectedRevisionId, firstMismatch.field);
-    }
-
+    await this.assertPopulationConverged();
     return { outcome: 'ok' };
+  }
+
+  /**
+   * Runs Task 10's real comparator over the eligible population and stops the read if anything
+   * diverges. `mode: 'dry-run'` is read-only — it takes one inventory snapshot and compares; it
+   * never inserts, so a live board read cannot mutate migration state.
+   *
+   * Intentionally NOT memoized across calls. The board invokes `resolve()` once per row, so a
+   * cache would be the cheaper choice, but a cached verdict can only ever be wrong in the
+   * dangerous direction: serving `ok` from a snapshot taken before a divergence appeared is
+   * precisely the failure this kill switch exists to prevent. Compare mode is a transitional
+   * cutover state, so paying the scan per row is the correct trade until `GAME_READ` moves to
+   * `new` and this authority stops being consulted at all.
+   */
+  private async assertPopulationConverged(): Promise<void> {
+    const evidence = await runGameResultBackfillEvidence(this.prisma, { mode: 'dry-run' });
+    const [first] = evidence.comparison.mismatches;
+    if (first === undefined) {
+      return;
+    }
+    throw new ConflictException({
+      code: 'GAME_RESULT_COMPARISON_MISMATCH',
+      message: '레거시 결과와 새 결과가 달라서 조회를 중단했어요. 운영팀에 문의해주세요.',
+      details: toComparisonDetail(first),
+    });
   }
 }
 
@@ -181,26 +138,19 @@ function mismatch(entity: string, revision: string, field: string): GameReadAuth
   return { outcome: 'mismatch', detail: { entity, revision, field } };
 }
 
-function isNonnegativeInteger(value: number | null): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
-
 /**
- * Mirrors `penaltyScore()` in `games/migration/game-result-backfill.ts`, but returns a `'CORRUPT'`
- * sentinel instead of throwing -- that file is a batch tool operating on already-`isValidFixture()`-
- * filtered rows, where an invalid penalty score can only mean a programming bug worth crashing the
- * whole run over. This method runs per live request against whatever is in the database right now
- * and must stay inside the port's `{ outcome }` contract instead of taking down a request with an
- * uncaught exception.
+ * Mirrors `toCliMismatches()` in `games/migration/game-result-backfill.cli.ts` so an operator sees
+ * the SAME `entity` / `revision` / `field` triple here that the backfill CLI's own evidence prints
+ * for the same divergence — the harness asserts the two agree exactly.
  */
-function penaltyScore(result: {
-  hasPenalty: boolean;
-  homePenaltyScore: number | null;
-  awayPenaltyScore: number | null;
-}): { home: number; away: number } | null | 'CORRUPT' {
-  if (!result.hasPenalty) return null;
-  if (!isNonnegativeInteger(result.homePenaltyScore) || !isNonnegativeInteger(result.awayPenaltyScore)) {
-    return 'CORRUPT';
-  }
-  return { home: result.homePenaltyScore, away: result.awayPenaltyScore };
+function toComparisonDetail(value: GameResultMismatch): {
+  entity: string;
+  revision: string;
+  field: string;
+} {
+  return {
+    entity: `${value.entityType}:${value.entityId}`,
+    revision: value.revisionId,
+    field: value.field,
+  };
 }

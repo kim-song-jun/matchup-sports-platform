@@ -33,7 +33,7 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
   "branch": "dev",
   "baselineSHA": "71f67b0d24e272eecd216cebb31eefbd66c9ca02",
   "planPath": ".omo/plans/teameet-team-tournament-operations-v1.md",
-  "planSHA": "dc4ecb2f76592799f8460135d9ea755a6e8fd768de17a29af7e61cf2b21508dd",
+  "planSHA": "108a6cf1e8a5bbacef86928d28be8f7867525460e0af91d5882d72723ca72b84",
   "cleanRestartAuthority": {
     "approvalReceipt": {
       "path": ".omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json",
@@ -1544,3 +1544,27 @@ The flag gate is an immutable phase-specific attempt-bound bundle, not an ad hoc
 - PDF artboards show tournament field operations under `/admin/**`; approved D-04 and the selected plan supersede only that route example with `/tournament-ops/**`. Existing global admin tournament management remains unchanged.
 - `T-08` and `P-03` intentionally resolve to the same public team-record route. They are distinct product entry/context IDs with one implementation owner, not duplicate ownership.
 - The v1 live-entry MVP is tournament-operations only. Tapping a player freezes that moment's server-synchronized game clock in an event draft; choosing `GOAL`, `YELLOW_CARD`, or `RED_CARD` submits the acknowledged event with that captured clock. `GOAL` requires the scorer and may include one optional assist. A generic `FOUL` event and an ordinary-team-match live console are deferred; team management uses the shared event/result contract through its post-match result workflow. Public live timelines render acknowledged events only.
+
+### `planSHA` 재결속 — 2026-08-04
+
+이 원장의 `planSHA` 는 `dc4ecb2f7659…` 였고, 살아 있는 플랜의 체크박스 정규화 SHA 는
+`108a6cf1e8a5…` 다. F4 의 `plan-sha-declared` 검사가 이 불일치를 `FINAL_SCOPE_DRIFT` 로
+잡아냈고(실행 관측), 앞선 두 건의 독립 리뷰도 같은 지점을 지적했다. 살아 있는 플랜에 맞춰
+재결속한다.
+
+**무엇이 바뀌었나.** 플랜 본문(체크박스가 아닌 서술)이 어느 시점에 바뀌면서 정규화 SHA 가
+`dc4ecb2f` → `108a6cf1` 로 이동했다. `dc4ecb2f` 시점의 플랜 텍스트는 어디에도 남아 있지
+않다 — 플랜 파일이 `.git/info/exclude` 로 untracked 라 git 이력이 0건이고, 저장소·워크트리·
+증거 디렉터리 전수 스캔에서 그 SHA 로 해시되는 사본을 찾지 못했다.
+
+**이 갱신이 주장하지 않는 것.** 이미 완료 처리된 todo 들이 `108a6cf1` 텍스트 기준으로
+검증됐다고 주장하지 않는다. 실제로는 각자 완료 시점의 플랜 텍스트 기준으로 검증됐고, 그중
+일부는 `dc4ecb2f` 시점이었다. 확인 가능한 범위는 이렇다 — `.omo/evidence/task-9-r8` 이후
+남아 있는 `CanonicalPlanSnapshot.md` 5개는 전부 `108a6cf1` 로 정규화되므로, r8(2026-08-03)
+이후 완료된 todo 들은 현재 텍스트 기준으로 검증됐다. 그 이전 것들은 대체된 텍스트 기준이며
+그 사실을 여기 남긴다.
+
+**같은 사유로 재발급된 것.** Task-1 권한 체인 4종(cursor / override / consumption /
+host-supervisor)도 사용자 명시 승인으로 `108a6cf1` 에 재결속해 재발급했다. 각 재발급본은
+자체 `reissue` 블록에 대체 대상·승인 시각·어떤 값이 과거 관측치를 그대로 옮긴 것인지를
+명시한다. 원본 `dc4ecb2f` 영수증들은 삭제하지 않고 그대로 남아 있다.

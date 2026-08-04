@@ -2109,3 +2109,42 @@ PASS  domain-serial-reviews
 PASS  legacy-writer-scan
 verdict APPROVE | blocking []
 ```
+
+## E2E-CORR-01 — 최종 결론 (2026-08-04): 미구현 기능이라 통과 불가
+
+이 여정의 차단 사유를 세 번에 걸쳐 좁혔고, 이번에 확정했다.
+
+1. (오류) "게이트 증거 번들 생성기가 GitHub Actions 에 묶여 있다" — `verifyRolloutReferences`
+   실측 결과 그 제약은 **R2 + PUBLIC_LIVE 전용**이었고 단일 키 전환(phase C)은 로컬 번들이 가능하다.
+2. (부분) "선행 게이트 V7/V22/V23 의 accepted 영수증이 없다" — 증거 루트 재귀 전수로 0건 확인.
+   하지만 *왜* 없는지가 빠져 있었다.
+3. **(확정)** `--task N` 이 gateId `V{N}` 을 만든다(`run-v1-task-verification.mjs:319`).
+   계획서 체크박스 실측:
+
+   ```
+   [x]  7. Implement scoped staff authorization, stable field/court scope, and actor-neutral audit
+   [ ] 22. Implement tournament result review, officialization, corrections, and next-fixture safety
+   [ ] 23. Build tournament result review and correction interfaces
+   ```
+
+   즉 **태스크 22·23 은 아직 구현되지 않았다.** 그 둘이 만드는 것이 바로 "대회 결과 검토·
+   officialization·정정" 이고, E2E-CORR-01 이 검증하려는 기능이다.
+
+따라서 `DIRECTOR_OFFICIALIZE` 전환 게이트가 V22/V23 영수증을 요구하는 것은 **시스템이 미구현
+기능의 활성화를 정확히 거부하고 있는 것**이다. 게이트 결함이 아니라 의도된 안전장치다.
+
+E2E-CORR-01 은 해당 기능이 구현되고 그 태스크 게이트가 통과한 뒤에야 수행할 수 있다. 이 세션에서
+통과시키는 유일한 방법은 플래그를 DB 로 직접 켜는 것뿐이고, 그건 게이트 자체의 무력화다.
+
+부수 관찰: 태스크 7 은 `[x]` 인데 증거 루트에 V7 영수증이 없다. 완료 표시와 바인딩된 영수증이
+어긋나 있으므로, DIRECTOR_OFFICIALIZE 를 켜려면 V7 도 다시 확보해야 한다.
+
+### F3 최종
+
+```
+PASS  gate-identity / lifecycle-receipt-bound / live-surface-reachable / qa-evidence-provided
+FAIL  qa-evidence-content-reviewed / manual-qa-journeys-performed   (6/7)
+```
+
+인프라 4체크는 모두 통과한다. 남은 1 여정은 **미구현 기능 대기**이므로 6/7 · REJECT 가 이 시점의
+정직한 최종 상태다.

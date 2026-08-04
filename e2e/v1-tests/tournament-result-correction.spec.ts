@@ -87,6 +87,21 @@ import { apiGet, apiPatch, unwrap } from './helpers/v1-http';
  *           Task 20). So a purely `request`-based Playwright spec cannot
  *           reach a SUBMITTED revision; this spec would need a real WS client
  *           holding a live takeover for the duration of the submit.
+ *         - and that WS client is ALSO out of reach for this harness, which
+ *           is the real reason this stays fixme. The gateway lives on the
+ *           `/game-operations` namespace and authenticates the handshake via
+ *           `resolveV1RequestIdentity` over the connection's cookie -- a
+ *           signed v1 session. Every dev-auth shape this harness can produce
+ *           was tried against a live server and all were rejected with
+ *           `SOCKET_AUTH_FAILED`: `extraHeaders`/`auth` carrying
+ *           `x-v1-user-email` or `x-v1-user-id`, over both `websocket` and
+ *           `polling`. `v1-tests/helpers/auth.ts`'s `loginAs()` injects
+ *           exactly that header dev-auth via `addInitScript`, so the whole v1
+ *           E2E suite shares this limitation -- it is not specific to this
+ *           spec. Unblocking it needs a real signed session token (the
+ *           `task10-runtime-manifest.cli.ts` mints one, but that producer is
+ *           hard-gated to GitHub Actions), i.e. a harness-level auth change,
+ *           not a change inside this file.
  *   (b) a REAL gate-evidence bundle for the flag toggle itself -- per point 2
  *       above, `PATCH .../DIRECTOR_OFFICIALIZE` requires a JSON document at
  *       a path under the API process's own OS temp dir

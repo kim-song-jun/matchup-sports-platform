@@ -1576,6 +1576,21 @@ E2E-CORR-01 의 핵심 경로(리뷰→officialize→correction 생성→correct
 
 따라서 F3 를 이 턴에서 7/7 로 승격하지 않는다 — **6/7 유지**, 단 "태스크 22·23 미구현" 이라는 차단 사유는 폐기한다. 다음 세션 진입점: (1) 정정 제출→officialize 까지 실제로 완주해 DB 레벨 포인터 스왑을 실측하고, (2) standings 충돌 감지 gap 이 E2E-CORR-01 통과에 필요한지 스펙 대조, (3) 필요하면 `game-operation-flags.ts`/`prisma/**` 를 건드리지 않는 범위에서 gap 2건(AC-7 standings, AC-8 감사) 을 별도 태스크로 구현.
 
+### E2E-CORR-01 완주 — 정정 제출→officialize→포인터 스왑을 DB 레벨로 실측 (2026-08-04, 같은 턴 후속)
+
+위에서 "다음 세션 진입점 (1)"로 미뤄뒀던 것을 같은 턴에서 마저 완료했다. `admin@teameet.v1`(대회 디렉터, tournament `2c493cbb…`)로 `/tournament-ops/tournaments/:id/records/corrections`에서 실제 시드 경기("강남 풋살 클럽 vs 성수 풋살 클럽", 기존 공식 결과 3:1 · 리비전 #1)를 대상으로:
+
+1. "정정 시작" → 홈 점수 3→4, 참가자 c42670 득점 0→1, 사유 입력 → "정정 제출" (초기엔 비활성, 사유 입력 후 활성화 — 유닛테스트 계약과 일치)
+2. 정정 초안 생성 확인: "정정 초안이 대기 중이에요", diff "이전 3:1 → 4:1" 표시, **기존 공식 결과(리비전 #1)는 여전히 "공식 확정"으로 authoritative 유지**(AC-2 실증)
+3. "정정 확정" → 확인 다이얼로그("4:1로 공식 결과를 정정해요") → 최종 확정
+4. UI 즉시 4:1로 갱신 확인(좌측 목록 + 상세 패널)
+
+DB 실측(`docker exec teameet_v1_pg_flow psql`):
+- `v1_game_result_revisions`: 리비전 #1(`111ff82c…`, score `{home:3,away:1}`) 과 #2(`44676f14…`, score `{home:4,away:1}`, `supersedes_id=111ff82c…`, `reason="심판 확인 결과…"`) 모두 `state=OFFICIAL`, `official_at` 각각 09:54:42 / 13:39:57 — 이 스키마는 리비전을 append-only 불변 원장으로 두고 "현재" 포인터를 별도 필드로 관리하는 설계였다(초반에 "리비전 상태가 안 바뀐다"고 오판할 뻔함).
+- **결정적 증거**: `v1_games.current_official_revision_id` 가 `111ff82c…`(#1) → `44676f14…`(#2) 로 정확히 스왑됨, `updated_at=13:39:57.442`(정정 확정 클릭 시각과 일치). 이 컬럼은 `v1_guard_game_revision_pointer()` **Postgres 트리거** + 복합 FK `(id, current_official_revision_id) → (game_id, id)` 로 가드된다 — 트리거를 우회하지 않고 애플리케이션 API 경로로만 통과시켰다.
+
+**E2E-CORR-01 의 핵심 경로(correction 생성 → 기존 포인터 authoritative 유지 → correction officialize → 원자적 포인터 스왑)는 이제 DB 레벨로 완전히 실증됐다.** 다만 이 턴에서 F3 영수증을 재발급하고 게이트를 재실행하지는 않았다 — `V1_CANDIDATE_RECEIPT_SHA`/candidate receipt 경로가 이번 턴에 새로 만든 커밋(`321fa7d2`)에 결속된 것인지 문서에 정확히 기록돼 있지 않아, 무리하게 추측한 값으로 게이트를 돌리면 잘못된 영수증을 만들 위험이 있었다. **다음 세션 진입점(갱신)**: (a) 현재 HEAD에 결속된 유효한 candidate receipt 확보(필요하면 V27 후보 재생성), (b) `f3-review-receipt-v7.json`(journeys 7개 전부 pass, 이번 E2E-CORR-01 실측을 근거로) 0444 발급, (c) `--qa-review-receipt`/`--qa-review-receipt-sha` 로 F3 게이트 재실행해 7/7 APPROVE 확인.
+
 ### `planSHA` 재결속 — 2026-08-04
 
 이 원장의 `planSHA` 는 `dc4ecb2f7659…` 였고, 살아 있는 플랜의 체크박스 정규화 SHA 는

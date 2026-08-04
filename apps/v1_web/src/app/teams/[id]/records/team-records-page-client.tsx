@@ -21,7 +21,7 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
 
   if (isLoading) {
     return (
-      <AppChrome title="팀 전적" backHref={`/teams/${teamId}`} activeTab="teams">
+      <AppChrome title="팀 전적" backHref={`/teams/${teamId}`} activeTab="teams" desktopHead>
         <RecordsSkeleton />
       </AppChrome>
     );
@@ -31,7 +31,7 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
   if (isError || !firstPage) {
     const msg = extractErrorMessage(error, '팀 전적을 불러오지 못했어요.');
     return (
-      <AppChrome title="팀 전적" backHref={`/teams/${teamId}`} activeTab="teams">
+      <AppChrome title="팀 전적" backHref={`/teams/${teamId}`} activeTab="teams" desktopHead>
         <div style={{ padding: '40px 20px' }}>
           <ErrorState message={msg} onRetry={() => void refetch()} />
         </div>
@@ -45,7 +45,7 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
   };
 
   return (
-    <AppChrome title="팀 전적" backHref={`/teams/${teamId}`} activeTab="teams">
+    <AppChrome title="팀 전적" backHref={`/teams/${teamId}`} activeTab="teams" desktopHead>
       <TeamRecordsContent
         data={combined}
         hasNextPage={hasNextPage}

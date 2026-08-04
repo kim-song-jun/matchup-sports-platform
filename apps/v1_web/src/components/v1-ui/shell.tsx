@@ -40,6 +40,17 @@ type AppChromeProps = {
   topbarActions?: ReactNode;
   bottomNav?: boolean;
   topBar?: boolean;
+  /**
+   * 데스크톱(≥1024px)에서 본문 상단에 페이지 헤더(뒤로가기 + 제목)를 렌더할지.
+   *
+   * 데스크톱에서는 모바일 `.tm-topbar` 가 숨겨지고(desktop/_shell.css:61) 각 페이지가
+   * `.tm-desktop-page-head` 를 직접 그리는 것이 이 저장소의 관례다. 그 관례를 안 따른
+   * 화면들(일정 생성·수정, 팀 전적, 라인업)은 데스크톱에서 제목도 뒤로가기도 없이
+   * 본문이 nav 바로 아래에서 시작했다 — 여정 검수에서 major 4건으로 확인됐다.
+   *
+   * 이미 자체 헤더를 그리는 페이지와 중복되지 않도록 기본값은 false(opt-in)다.
+   */
+  desktopHead?: boolean;
   backHref?: string;
   centerTitle?: boolean;
 };
@@ -57,6 +68,7 @@ export function AppChrome({
   topbarActions,
   bottomNav = true,
   topBar = true,
+  desktopHead = false,
   backHref,
   centerTitle = false,
 }: AppChromeProps) {
@@ -107,6 +119,16 @@ export function AppChrome({
         </header>
       ) : null}
       <main className="tm-scroll-area" style={{ paddingBottom: bottomNav ? 'var(--v1-shell-scroll-bottom-pad)' : 0 }}>
+        {desktopHead && title ? (
+          <div className="tm-desktop-page-head tm-show-desktop">
+            {backHref ? (
+              <AppBackLink className="tm-desktop-back" fallbackHref={backHref} aria-label="뒤로가기">
+                <ChevronLeftIcon size={22} strokeWidth={2.2} />
+              </AppBackLink>
+            ) : null}
+            <h1 className="tm-text-heading">{title}</h1>
+          </div>
+        ) : null}
         {children}
       </main>
       <DesktopFooter />

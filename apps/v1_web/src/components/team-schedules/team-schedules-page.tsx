@@ -511,7 +511,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
 
   if (model.forbidden) {
     return (
-      <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref}>
+      <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
         <EmptyState title="일정을 관리할 권한이 없어요" sub="팀장 또는 운영진만 일정을 만들거나 수정할 수 있어요." />
       </AppChrome>
     );
@@ -519,7 +519,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
 
   if (model.loadError) {
     return (
-      <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref}>
+      <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
         <ErrorState message="일정 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={model.onRetry} />
       </AppChrome>
     );
@@ -527,7 +527,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
 
   if (model.loading) {
     return (
-      <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref}>
+      <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -536,7 +536,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
   const { draft } = model;
 
   return (
-    <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref}>
+    <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
       <div className="tm-team-detail-section" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <TextField
           label="제목"

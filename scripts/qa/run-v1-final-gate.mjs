@@ -470,6 +470,179 @@ const DEBT_MARKER_PATTERN =
  */
 const DEBT_MARKER_CONVENTION_DOCS = new Set(['AGENTS.md', 'CLAUDE.md']);
 
+/**
+ * 결과 경로에 쓰는 Prisma 모델/테이블. 이 심볼을 mutate 하는 touched 파일이
+ * legacy-writer-scan 의 "후보" 다. grep 은 여기까지만 하고, 각 후보가 GAME_WRITE 게이트
+ * (`withNewWriteAuthority`)를 지나는지 여부는 사람이 진술서에서 판단한다.
+ */
+const RESULT_WRITE_MODELS = [
+  'v1GameResultRevision',
+  'v1GameResultParticipant',
+  'v1GameOfficialFact',
+  'v1GameOfficialResultCache',
+  'v1GameResultDecision',
+];
+const RESULT_WRITE_MUTATIONS = ['create', 'createMany', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany'];
+const RESULT_WRITE_PATTERN = new RegExp(
+  `(${RESULT_WRITE_MODELS.join('|')})\\s*\\.\\s*(${RESULT_WRITE_MUTATIONS.join('|')})\\s*\\(`,
+);
+/** 원시 SQL 로 같은 테이블을 건드리는 경우도 후보다. */
+const RESULT_WRITE_RAW_PATTERN =
+  /(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+"?v1_game_(result_revisions|result_participants|official_facts|official_result_cache|result_decisions)"?/i;
+
+/**
+ * 후보 판정 어휘. 표현할 수 없는 사실을 억지로 기존 라벨에 맞추게 하면 그 자체가
+ * 러버스탬프가 되므로, 실제로 존재하는 네 경우를 그대로 둔다.
+ *
+ * - `gated`              : `withNewWriteAuthority()` 를 통과해 쓴다
+ * - `new-path-canonical` : v1_game_* 신규 결과 테이블을 쓰는 정규 런타임 경로.
+ *                          GAME_WRITE 는 마이그레이션 CLI 의 이중쓰기 전환을 지배할 뿐
+ *                          이 경로를 게이트하지 않는다(우회가 아니라 애초에 대상이 아님)
+ * - `legacy-intentional` : 레거시 경로를 의도적으로 쓴다(마이그레이션/백필 등)
+ * - `not-a-writer`       : 테스트 픽스처·조회 등 프로덕션 쓰기 경로가 아니다
+ */
+const LEGACY_WRITER_DISPOSITIONS = new Set([
+  'gated',
+  'new-path-canonical',
+  'legacy-intentional',
+  'not-a-writer',
+]);
+
+function enumerateResultWriterCandidates(repoRoot, touchedFiles) {
+  const candidates = [];
+  for (const relPath of touchedFiles) {
+    if (!/\.(ts|tsx|mjs|js|sql)$/.test(relPath)) continue;
+    const abs = resolve(repoRoot, relPath);
+    if (!existsSync(abs)) continue;
+    let stat;
+    try {
+      stat = statSync(abs);
+    } catch {
+      continue;
+    }
+    if (!stat.isFile() || stat.size > 2 * 1024 * 1024) continue;
+    let text;
+    try {
+      text = readFileSync(abs, 'utf8');
+    } catch {
+      continue;
+    }
+    text.split('\n').forEach((line, index) => {
+      if (RESULT_WRITE_PATTERN.test(line) || RESULT_WRITE_RAW_PATTERN.test(line)) {
+        candidates.push(`${relPath}:${index + 1}`);
+      }
+    });
+  }
+  return candidates;
+}
+
+function legacyWriterScanCheck({ options, repoRoot, touchedFiles }) {
+  const id = 'legacy-writer-scan';
+  const description =
+    'No touched code bypasses the GAME_WRITE flag gate (withNewWriteAuthority) to write the game-result path directly';
+  const blockedCode = 'FINAL_CODE_LEGACY_WRITER_UNVERIFIED';
+
+  if (touchedFiles === null) {
+    return check(id, description, 'blocked', 'skipped: touched-file diff unavailable, candidates cannot be enumerated', blockedCode);
+  }
+
+  const candidates = enumerateResultWriterCandidates(repoRoot, touchedFiles);
+  const attestationPath = options['legacy-writer-attestation'];
+  const attestationSha = options['legacy-writer-attestation-sha'];
+
+  if (!attestationPath || !attestationSha) {
+    return check(
+      id,
+      description,
+      'blocked',
+      // 목록을 자르면 리뷰어가 볼 수 없는 지점이 생기고, 그러면 완전한 진술서를 쓸 수가 없다.
+      // 이 메시지는 진술서 작성용 입력이므로 전부 싣는다.
+      `${candidates.length} touched result-writer call site(s) enumerated; supply --legacy-writer-attestation/--legacy-writer-attestation-sha covering every one of them. Sites: ${candidates.join(', ') || '(none)'}`,
+      blockedCode,
+    );
+  }
+
+  // 리뷰 영수증과 동일한 불변성 계약: 0444 + sha256 고정. 진술서를 나중에 바꿔치기할 수 없다.
+  if (attestationPath === true || attestationSha === true) {
+    return check(id, description, 'fail', 'attestation path and sha256 must both be values', blockedCode);
+  }
+  if (!existsSync(attestationPath)) {
+    return check(id, description, 'fail', `attestation not found: ${attestationPath}`, blockedCode);
+  }
+  const attestationMode = (statSync(attestationPath).mode & 0o7777).toString(8).padStart(4, '0');
+  if (attestationMode !== '0444') {
+    return check(id, description, 'fail', `attestation must be immutable 0444, found ${attestationMode}`, blockedCode);
+  }
+  const attestationActualSha = sha256File(attestationPath);
+  if (attestationActualSha !== attestationSha) {
+    return check(id, description, 'fail', `attestation sha256 mismatch: expected ${attestationSha} actual ${attestationActualSha}`, blockedCode);
+  }
+  let attestation;
+  try {
+    attestation = JSON.parse(readFileSync(attestationPath, 'utf8'));
+  } catch (error) {
+    return check(id, description, 'fail', `attestation is not valid JSON: ${error.message}`, blockedCode);
+  }
+  if (attestation.schemaVersion !== 1 || attestation.receiptType !== 'v1-legacy-writer-attestation') {
+    return check(id, description, 'fail', 'attestation must be schemaVersion 1 / receiptType v1-legacy-writer-attestation', blockedCode);
+  }
+
+  const entries = Array.isArray(attestation.sites) ? attestation.sites : null;
+  if (entries === null) {
+    return check(id, description, 'fail', 'attestation.sites must be an array', blockedCode);
+  }
+
+  const covered = new Set();
+  for (const entry of entries) {
+    if (!entry || typeof entry.site !== 'string') {
+      return check(id, description, 'fail', 'every attestation site needs a string "site"', blockedCode);
+    }
+    if (!LEGACY_WRITER_DISPOSITIONS.has(entry.disposition)) {
+      return check(
+        id,
+        description,
+        'fail',
+        `site ${entry.site} has disposition ${JSON.stringify(entry.disposition)}; expected one of ${[...LEGACY_WRITER_DISPOSITIONS].join('|')}`,
+        blockedCode,
+      );
+    }
+    if (typeof entry.rationale !== 'string' || entry.rationale.trim().length < 12) {
+      return check(id, description, 'fail', `site ${entry.site} needs a substantive rationale`, blockedCode);
+    }
+    covered.add(entry.site);
+  }
+
+  // 완전성이 이 체크의 핵심이다. 후보 하나라도 진술서에 없으면 통과시키지 않는다 —
+  // 그렇지 않으면 "아무 것도 안 적은 진술서" 가 통과해 러버스탬프가 된다.
+  const missing = candidates.filter((site) => !covered.has(site));
+  if (missing.length > 0) {
+    return check(
+      id,
+      description,
+      'fail',
+      `attestation omits ${missing.length} enumerated call site(s): ${missing.slice(0, 20).join(', ')}`,
+      blockedCode,
+    );
+  }
+  const stale = [...covered].filter((site) => !candidates.includes(site));
+  if (stale.length > 0) {
+    return check(
+      id,
+      description,
+      'fail',
+      `attestation cites ${stale.length} site(s) not present in the touched diff: ${stale.slice(0, 20).join(', ')}`,
+      blockedCode,
+    );
+  }
+
+  return check(
+    id,
+    description,
+    'pass',
+    `${candidates.length} enumerated call site(s) all attested (${entries.map((e) => e.disposition).join(', ') || 'none'})`,
+  );
+}
+
 function runF2({ repoRoot, options }) {
   const checks = [];
   let ledger;
@@ -481,6 +654,9 @@ function runF2({ repoRoot, options }) {
     return checks;
   }
 
+  // diff 가 실패하면 null 로 남는다 — legacy-writer-scan 은 그 경우 후보를 열거할 수 없으므로
+  // 통과시키지 않고 blocked 로 떨어뜨린다(아래 legacyWriterScanCheck).
+  let touchedFiles = null;
   const diff = runGit(['diff', '--name-only', `${ledger.baselineSHA}..HEAD`], repoRoot);
   if (!diff.ok) {
     checks.push(check('touched-files-diff', 'git diff baselineSHA..HEAD resolves', 'blocked', diff.stderr || 'git diff failed', 'FINAL_CODE_DIFF_UNAVAILABLE'));
@@ -493,6 +669,7 @@ function runF2({ repoRoot, options }) {
     ));
   } else {
     const touched = diff.stdout.split('\n').map((s) => s.trim()).filter(Boolean);
+    touchedFiles = touched;
     checks.push(check('touched-files-diff', 'git diff baselineSHA..HEAD resolves', 'pass', `${touched.length} files changed since baselineSHA`));
 
     const hits = [];
@@ -541,18 +718,19 @@ function runF2({ repoRoot, options }) {
   }));
 
   // FINAL_CODE_LEGACY_WRITER (named by the orchestrator) needs to know which touched call
-  // sites bypass the GAME_WRITE flag gate (apps/v1_api/src/config/game-operation-flags.ts)
-  // to write the legacy result path directly. A grep-based heuristic here would either miss
-  // real bypasses (false negative -> silently approves a regression) or flag innocuous
-  // matches (false positive -> blocks good code) with no reliable way to tell them apart
-  // without tracing the call graph. Left unchecked rather than faked.
-  checks.push(check(
-    'legacy-writer-scan',
-    'No touched code bypasses the GAME_WRITE flag gate to write the legacy result path directly',
-    'blocked',
-    'Reliable detection requires tracing the GAME_WRITE flag call graph across touched files (apps/v1_api/src/config/game-operation-flags.ts); a grep heuristic risks false negatives on a scope-defining safety check, so this is left unchecked. Confirm apps/v1_api/src/games/adapters is the sole legacy/new write switch for touched files during domain review.',
-    'FINAL_CODE_LEGACY_WRITER_UNVERIFIED',
-  ));
+  // sites bypass the GAME_WRITE flag gate (apps/v1_api/src/config/game-operation-flags.ts,
+  // `withNewWriteAuthority`) to write the game-result path directly.
+  //
+  // 이 체크는 오래 하드코딩 'blocked' 이었다 — "grep 은 판단을 못 하니 가짜로 통과시키느니
+  // 막아두겠다" 는 이유였고, 그 판단 자체는 옳다. 문제는 도메인 리뷰에서 확인한 결과를
+  // 게이트에 되돌릴 방법이 없어 **어떤 경우에도 통과할 수 없었다**는 것이다.
+  //
+  // 해법은 역할을 나누는 것이다. grep 은 판단은 못 해도 **후보 열거**는 신뢰할 수 있다.
+  // 게이트가 touched 파일에서 결과 테이블 writer 후보를 기계적으로 뽑고, 첨부된 진술서가
+  // 그 후보를 **빠짐없이** 다루는지 대조한다. 각 지점의 판단(게이트 경유인지 의도된 레거시
+  // 경로인지)은 사람이 하고, 누락은 기계가 막는다. 단순 boolean 첨부(러버스탬프)와 다른 점은
+  // 진술서가 후보 목록을 덮지 못하면 통과할 수 없다는 것이다.
+  checks.push(legacyWriterScanCheck({ options, repoRoot, touchedFiles }));
 
   return checks;
 }

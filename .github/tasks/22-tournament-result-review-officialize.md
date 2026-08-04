@@ -186,9 +186,9 @@
 | ID | 내용 | 심각도 | 후속 트리거 |
 |---|---|---|---|
 | **G-1** | standings/ranking(tie-break) 충돌 감지 **미구현**. AC-7의 절반, QA Q-20이 대응 | **High** — Acceptance Criterion 미충족 | **T-A 동작 정의 확정 즉시** 착수. 정의 없이 추측 구현 금지 (CLAUDE.md 원칙 5) |
-| **G-2** | AC-4 "failure rolls back both"의 **성공 경로 실패 주입 테스트 없음**. 설계상은 단일 `$transaction`으로 충족되나 증명 부재 | Medium | T-B(Q-04)에서 해소 |
+| **G-2** | ~~AC-4 "failure rolls back both"의 성공 경로 실패 주입 테스트 없음~~ | ~~Medium~~ | **해소됨 (2026-08-04, 커밋 `b53c4385`, Q-04)**. `supersedeAndSubmit` 트랜잭션 마지막 statement에 실제 실패(outbox `business_key` 유니크 충돌)를 주입해 revision·participant·game version이 전부 롤백됨을 실측 — 트랜잭션 형태 검사가 아니라 실제 실패로 증명 |
 | **G-3** | ~~director 플래그 거부(403) 경로가 감사 레코드를 남기지 않고, 성공 감사도 결정 시점 플래그 값/버전을 담지 않음~~ | ~~Medium~~ | **해소됨 (2026-08-04, 커밋 `a4f35c68`)**. `readDirectorOfficializeFlagSnapshot()`이 `{value, version}`을 반환하도록 조회를 넓혔고, 거부 감사는 트랜잭션 롤백 이후 `catch` 블록에서 `this.prisma`로 별도 insert(인터랙티브 트랜잭션이 throw하면 콜백 내부에서 쓴 감사 행도 함께 롤백되는 버그를 구현 중 발견·수정). 신규 격리 테스트 2건(`tournament-officialize-edge.integration-spec.ts`, id 네임스페이스 `86000000-`)으로 거부/성공 양쪽 감사 행 검증. 기존 9개 회귀 없음. 오케스트레이터가 별도 격리 DB에서 11/11 통과 + tsc clean 독립 재검증 완료 |
-| **G-4** | 8개 QA scenario 미커버 (Q-02/04/07/08/11/13/**16/17 은 G-3 해소 과정에서 함께 커버됨**) | Medium (6개 잔여: Q-02/04/07/08/11/13) | T-B에서 해소 |
+| **G-4** | ~~8개 QA scenario 미커버~~ | ~~Medium~~ | **완전 해소 (2026-08-04, 커밋 `b53c4385`)**. Q-16/17은 G-3에서, 나머지 Q-02/04/07/08/11/13은 T-B에서 전부 커버. 테스트 작성 중 진짜 버그 3건 발견·수정(다른 describe 블록의 `V1Sport.upsert` id 재사용 오류, Q-04가 심은 충돌 outbox 행이 Q-13 워커 drain에 오염되던 문제, Q-13의 `availableAt` 타임스탬프 레이스 — 전부 테스트 코드 자체의 결함이었고 프로덕션 코드는 무관). Q-11은 Postgres 복합 FK(`v1_games_current_revision_fk`, `v1_result_revisions_supersedes_fk`)가 실제로 위반을 던지는 것을 증명(우회 없음). 오케스트레이터가 별도 격리 DB 2곳에서 8/8(신규 edge 전체) + 9/9(회귀) 독립 재검증, tsc clean, CI(수동 발동) 결과 대기 중 |
 | **G-5** | `service.ts:70-94`의 `jsonInput`/`canonicalize`/`jsonObject`가 `games.service.ts`의 비-export 헬퍼를 **의도적으로 복제**. 소유권 경계 때문에 불가피하며 `:62-68` 주석에 사유가 명시됨 | Low — **이연 정당** | `games.service.ts`가 이 헬퍼들을 export하는 별도 변경이 생기면 그 커밋에서 통합 |
 | **G-6** | `.omo/plans/…v1.md` 22번 체크박스 및 태스크 127 1119–1142행이 "미구현"으로 기록 → **이 세션에서 4번째 유사 오판을 유발한 원인** | **High (프로세스)** | T-D에서 즉시 정정 |
 

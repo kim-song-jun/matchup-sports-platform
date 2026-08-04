@@ -1876,3 +1876,30 @@ zip(`f3-qa-evidence-v2.zip`, 176 files, sha256 `ce7d4e1b…`)에 묶어 재발�
 - 수정 방향: `--lifecycle-owner outer` 이고 finalGate==='F3' 일 때 래퍼가 포트 확인 직후
   web/api 를 기동하고 종료 시 정리하며, 그 사실을 lifecycle 영수증에 남긴다. 이번 세션에서는
   컨텍스트 여유가 없어 착수하지 않고 진단만 박제한다 — 절반만 고쳐 하네스를 깨뜨리는 것보다 낫다.
+
+### 게이트 설계 결함 #4 — 해결 (2026-08-04)
+
+위에 진단만 박제했던 `live-surface-reachable` 도달 불가를 래퍼에서 해결했다.
+lifecycle 을 소유한 래퍼가 페이로드 직전에 web/api 를 기동하고 finally 로 내린다.
+
+구현 중 실제로 부딪힌 두 가지:
+- `pnpm` 에만 SIGTERM 을 보내면 `next-server` 손자가 살아남아 포트를 계속 물었다.
+  다음 실행이 `FOREIGN_PORT_OWNER` 로 막히는 것으로 발견 — `detached: true` 로
+  프로세스 그룹을 만들고 음수 pid 로 그룹째 종료, 포트가 풀릴 때까지 대기.
+- 메인 레포 `node_modules` 에 Prisma 클라이언트가 생성돼 있지 않아 API 가
+  `MODULE_NOT_FOUND: @prisma/client` 로 부팅 실패했고, 겉으로는 `8121:down` 만 남았다.
+  기동 전에 `prisma generate` 를 한 번 실행한다.
+
+실측 전후:
+
+| | live-surface-reachable |
+|---|---|
+| 수정 전 | BLOCKED `3013:up 8121:down` |
+| 수정 후 | **PASS** `3013:up 8121:up` (실행 종료 후 두 포트 자동 해제) |
+
+F3 의 인프라 체크 4개(gate-identity / lifecycle-receipt-bound / live-surface-reachable /
+qa-evidence-provided)가 모두 PASS 가 됐고, 남은 두 FAIL 은 5/7 이라는 **정직한 verdict**
+에서만 나온다. 즉 이제 F3 는 "여정을 실제로 다 통과시키면 통과하는" 게이트다.
+
+APPROVE 까지 남은 것: ① 팀매치 승인 대기 리비전을 정식 경로로 생성(E2E-TEAM-02)
+② DIRECTOR_OFFICIALIZE 게이트 증거 번들의 로컬 생성 경로(E2E-CORR-01).

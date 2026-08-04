@@ -43,14 +43,32 @@ import { apiGet, apiPatch, unwrap } from './helpers/v1-http';
  *       Prisma writes that bypass `TournamentBracketService.publishBracket`
  *       (the ONLY code path that calls `GamesService.createFromSourceInTransaction`
  *       for a tournament fixture) -- so no seeded tournament fixture has a
- *       backing `V1Game` at all. Provisioning one from scratch inside this
- *       spec requires the full admin bracket chain (`POST /admin/tournaments`
- *       -> competition-config version -> confirmed team registrations
- *       (`admin-registrations.controller.ts`, not read for this task) ->
- *       `POST .../groups` -> `.../group-teams` -> `.../fixtures` ->
- *       `POST .../publish-bracket`) plus a submitted+officialized result via
- *       the tournament result-review surface this same file documents --
- *       multiple DTOs this task's scout pass did not reach.
+ *       backing `V1Game` at all.
+ *
+ *       UPDATE (2026-08-04, verified against a live local stack): the admin
+ *       bracket chain is SHORTER than this note originally assumed, and it
+ *       does produce a real `TOURNAMENT_FIXTURE` `V1Game`. Confirmed team
+ *       registrations and `.../group-teams` are NOT required -- a fixture
+ *       with no teams attached is enough for `publishBracket` to create the
+ *       backing game. The verified minimum is four admin calls:
+ *         1. `POST /admin/tournaments`
+ *            `{ sportId, title, teamCount, registrationDeadlineAt,
+ *               rosterDeadlineAt, scheduledAt }`
+ *            (the field is `title`, not `name`; `teamCount` is required)
+ *         2. `POST /admin/tournaments/:id/groups` `{ name }`
+ *         3. `POST /admin/tournaments/:id/fixtures` `{ round, fixtureNumber }`
+ *         4. `POST /admin/tournaments/:id/publish-bracket` `{}`
+ *       -> `select count(*) from v1_games where source_type='TOURNAMENT_FIXTURE'`
+ *       goes 0 -> 1. Re-publishing after adding fixtures needs an
+ *       `unpublish-bracket` first (publish is idempotent per tournament).
+ *       The caller must also clear the terms re-consent gate once by clicking
+ *       "전체 동의" in the UI -- inserting consent rows directly does not work,
+ *       and every admin API call 403s with `TERMS_RECONSENT_REQUIRED` until
+ *       it is cleared.
+ *
+ *       What remains unreached for THIS spec is only the last leg: a
+ *       SUBMITTED (then officialized) result revision on that game, which
+ *       additionally needs a staff role grant and a submitted lineup.
  *   (b) a REAL gate-evidence bundle for the flag toggle itself -- per point 2
  *       above, `PATCH .../DIRECTOR_OFFICIALIZE` requires a JSON document at
  *       a path under the API process's own OS temp dir

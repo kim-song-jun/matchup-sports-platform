@@ -63,6 +63,49 @@ function resultErrorMessage(err: unknown): string {
   return extractErrorMessage(err, '처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
 }
 
+/**
+ * 확정된 결과에서 득점 타임라인을 보여준다.
+ *
+ * 예전에는 선수별 기록 블록이 SUBMITTED(승인 대기) 분기 안에만 있어서, 결과가 OFFICIAL 로
+ * 확정되는 순간 입력한 득점·카드가 화면에서 통째로 사라졌다 — 실측으로 확인했다(득점 4건·
+ * 경고 2건이 DB 와 API 에는 있는데 확정 화면에는 점수만 남음). 기록은 확정 이후에 더 오래
+ * 읽히는 값이라 확정 뷰에서 사라지면 안 된다.
+ *
+ * 득점자는 `score.goals` 에서 읽는다 — `resultParticipants` 행에는 participantId 만 있고
+ * 이름이 없어서 "득점 1 · 경고 0" 처럼 누구인지 알 수 없는 줄만 나온다.
+ */
+function GoalTimeline({ revision, homeName, awayName }: {
+  revision: V1GameResultRevision;
+  homeName: string;
+  awayName: string;
+}) {
+  const goals = revision.score?.goals ?? [];
+  if (goals.length === 0) return null;
+  return (
+    <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>득점 기록</div>
+      {goals
+        .slice()
+        .sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0))
+        .map((goal, index) => (
+          <div
+            key={`${goal.team}-${goal.playerName}-${goal.minute}-${index}`}
+            className="tm-text-caption"
+            style={{ display: 'flex', gap: 8 }}
+          >
+            <span style={{ minWidth: 44, color: 'var(--text-caption)' }}>
+              {goal.minute === null ? '-' : `${goal.minute}'`}
+            </span>
+            <span style={{ fontWeight: 600 }}>{goal.playerName}</span>
+            <span style={{ color: 'var(--text-caption)' }}>
+              {goal.team === 'home' ? homeName : awayName}
+            </span>
+          </div>
+        ))}
+    </div>
+  );
+}
+
 export function scoreLabel(revision: V1GameResultRevision): string {
   // 스코어는 score.regulation 아래에 있다. 예전에는 score.home 을 읽어서 화면에
   // "undefined : undefined" 가 그려졌다(타입이 실제 응답과 달라 tsc 가 못 잡았다).
@@ -255,6 +298,13 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         {latest?.state === 'OFFICIAL' ? (
           <Card pad={16}>
             <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
+            <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+            {latest.missingScorer ? (
+              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
+                일부 득점은 선수 지정 없이 기록됐어요.
+              </div>
+            ) : null}
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
               {/* Task 17 QA scenario: projection-pending state */}
               개인 기록·팀 전적 반영에는 잠시 시간이 걸릴 수 있어요. 아직 반영 전이어도 결과 자체는 확정된 상태예요.
@@ -524,17 +574,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
           <Card pad={16}>
             <div className="tm-text-body-lg">제출된 결과예요. 확인 후 승인해 주세요</div>
             <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
-            {latest.resultParticipants.length > 0 ? (
-              <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>
-                {latest.resultParticipants
-                  .filter((row) => row.goals > 0 || row.cards.yellow > 0 || row.cards.red > 0)
-                  .map((row) => (
-                    <div key={row.id} className="tm-text-caption">
-                      득점 {row.goals} · 경고 {row.cards.yellow} · 퇴장 {row.cards.red}
-                    </div>
-                  ))}
-              </div>
-            ) : null}
+            <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 일부 득점은 선수 지정 없이 기록됐어요.
@@ -581,6 +621,12 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
           <Card pad={16}>
             <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
             <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+            {latest.missingScorer ? (
+              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
+                일부 득점은 선수 지정 없이 기록됐어요.
+              </div>
+            ) : null}
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
               개인 기록·팀 전적 반영에는 잠시 시간이 걸릴 수 있어요.
             </div>

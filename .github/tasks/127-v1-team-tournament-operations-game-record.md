@@ -1903,3 +1903,24 @@ qa-evidence-provided)가 모두 PASS 가 됐고, 남은 두 FAIL 은 5/7 이라�
 
 APPROVE 까지 남은 것: ① 팀매치 승인 대기 리비전을 정식 경로로 생성(E2E-TEAM-02)
 ② DIRECTOR_OFFICIALIZE 게이트 증거 번들의 로컬 생성 경로(E2E-CORR-01).
+
+### E2E-TEAM-02 — 차단 사유 확정 (2026-08-04)
+
+"승인 대기 상태가 없다" 는 추정이었는데, 정식 API 로 만들어 보면서 확정했다.
+`POST /games/:id/result-revisions` 에 호스트(owner@teameet.v1) 자격으로 요청하자 도메인
+불변식 세 개가 순서대로 방어했다.
+
+| 시도 | 응답 | 의미 |
+|---|---|---|
+| 임의 스코어 3:2 | 422 `SCORE_EVENT_MISMATCH` — "Score does not match active goal events" | 스코어는 기록된 골 이벤트와 일치해야 한다 |
+| 이벤트 기준 3:1, 카드 0 | 422 `SCORE_EVENT_MISMATCH` — "Participant card totals do not match active card events" | 카드 합계도 이벤트와 일치해야 한다(CARD 이벤트 1건, payload `{"card":"YELLOW"}`) |
+| 골·카드 모두 이벤트에서 재집계 | 409 `RESULT_REVISION_ALREADY_EXISTS` — "A new draft requires a change-requested predecessor" | **새 초안은 직전 리비전이 보완 요청 상태여야만 만들 수 있다** |
+
+시드 팀매치(0304)의 리비전 3건이 전부 OFFICIAL 이므로 승인 대기를 만들 정식 경로가 없다.
+우회하려면 terminal 리비전을 직접 건드려야 해서 하지 않았다.
+
+**이 여정을 통과시키려면** 게임이 아직 ENDED 되지 않은 팀매치 픽스처가 필요하다 —
+대회 경기에서 확인했듯 `end` 커맨드가 SUBMITTED 리비전을 자동 생성하므로, 그 상태에서
+상대팀이 승인하면 된다. 현재 game 이 연결된 팀매치 4건은 모두 이미 ENDED 다.
+
+부수 소득: 결과 파이프라인의 무결성 규칙 3종이 실제로 작동함을 실행으로 확인했다.

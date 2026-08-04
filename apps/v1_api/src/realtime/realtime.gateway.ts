@@ -372,7 +372,14 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   ): Promise<GameProtocolResult> {
     const input = parseGameEventCommand(payload);
     if (input === null) {
-      return this.emitProtocolError(client, { code: 'VALIDATION_ERROR' });
+      // 파싱 실패라 검증된 입력은 없지만, 상관관계 필드까지 버리면 클라이언트가 어떤 큐
+      // 항목이 실패했는지 알 수 없어 재시도·표시를 붙이지 못한다(성공/도메인 실패 경로는
+      // protocolError 가 항상 실어 보낸다). 형식이 맞는 값만 그대로 되돌려 준다 —
+      // 그 값이 온전할 때가 정확히 상관관계를 지을 수 있는 경우다.
+      return this.emitProtocolError(client, {
+        code: 'VALIDATION_ERROR',
+        ...correlationEcho(payload),
+      });
     }
     const authUser = authenticatedSocketUser(client);
     if (authUser === null) {
@@ -719,6 +726,24 @@ function parseConnectionMetadata(payload: unknown): {
     clientInstanceId: payload.clientInstanceId,
     authorizationSubjectVersion: payload.authorizationSubjectVersion,
   };
+}
+
+/**
+ * 파싱에 실패한 payload 에서 상관관계 필드만 형식이 맞을 때 골라낸다.
+ *
+ * 검증을 통과하지 못한 입력이므로 의미를 신뢰하지 않는다 — 클라이언트가 자기가 보낸
+ * 큐 항목을 되찾는 데만 쓰는 값이라, 타입이 맞는 경우에만 그대로 되돌린다. 값이 없거나
+ * 형식이 어긋나면 아무 것도 싣지 않는다(잘못된 항목을 실패로 표시하게 만드느니 낫다).
+ */
+function correlationEcho(payload: unknown): {
+  clientEventId?: string;
+  expectedVersion?: number;
+} {
+  if (!isRecord(payload)) return {};
+  const echo: { clientEventId?: string; expectedVersion?: number } = {};
+  if (isNonemptyString(payload.clientEventId)) echo.clientEventId = payload.clientEventId;
+  if (isSafeNonnegative(payload.expectedVersion)) echo.expectedVersion = payload.expectedVersion;
+  return echo;
 }
 
 function parseGameEventCommand(payload: unknown): GameEventCommandPayload | null {

@@ -2148,3 +2148,28 @@ FAIL  qa-evidence-content-reviewed / manual-qa-journeys-performed   (6/7)
 
 인프라 4체크는 모두 통과한다. 남은 1 여정은 **미구현 기능 대기**이므로 6/7 · REJECT 가 이 시점의
 정직한 최종 상태다.
+
+## GATEWAY-APPEND-ERROR-CORRELATION 해소 (2026-08-04)
+
+F2 backend 도메인 리뷰에서 찾아 `open` 으로 남겼던 finding 을 닫았다. 찾아만 놓고 두는 것은
+기술부채라, 같은 라운드에서 해결한다.
+
+`appendGameEvent` 의 파싱 실패 경로만 `{code:'VALIDATION_ERROR'}` 를 그대로 반환해
+`clientEventId`/`expectedVersion` 이 빠져 있었다. 성공 경로와 도메인 실패 경로(`protocolError`)는
+항상 둘을 싣기 때문에, 클라이언트 큐는 **파싱 실패한 항목만** 어떤 것이 실패했는지 알 수 없어
+재시도·실패 표시를 붙이지 못한다. 이 세션에서 실제로 원인 추적이 한 단계 늦어졌다.
+
+검증을 통과하지 못한 입력이므로 의미는 신뢰하지 않는다 — 타입이 맞는 경우에만 그대로 되돌리고,
+어긋나면 싣지 않는다. 잘못된 큐 항목을 실패로 표시하게 만드는 것보다 안 싣는 편이 낫다.
+
+실측(웹소켓 ack 3케이스):
+
+| 입력 | ack |
+|---|---|
+| 상관관계 필드 온전 | `{"code":"VALIDATION_ERROR","clientEventId":"80d66af3…","expectedVersion":3}` |
+| `clientEventId` 가 숫자 | `{"code":"VALIDATION_ERROR","expectedVersion":3}` |
+| payload 가 객체 아님 | `{"code":"VALIDATION_ERROR"}` |
+
+커밋 후 F2 재실행 결과 **APPROVE 유지, blocking 0** — 새 커밋이 결과 테이블 writer 를 추가하지
+않아 legacy-writer 후보 35개와 진술서가 그대로 맞는다. 게이트가 커밋을 따라가면서도 통과한다는
+것을 확인한 셈이다.

@@ -574,3 +574,49 @@ The flag gate is an immutable phase-specific attempt-bound bundle, not an ad hoc
 host-supervisor)도 사용자 명시 승인으로 `108a6cf1` 에 재결속해 재발급했다. 각 재발급본은
 자체 `reissue` 블록에 대체 대상·승인 시각·어떤 값이 과거 관측치를 그대로 옮긴 것인지를
 명시한다. 원본 `dc4ecb2f` 영수증들은 삭제하지 않고 그대로 남아 있다.
+
+### F1~F4 실행 결과 — 2026-08-04
+
+게이트를 실제로 돌린 결과를 관측된 그대로 남긴다.
+
+**F1 — APPROVE.** 10개 검사 전부 pass: 화면 ID 18개(필드 완비), E2E 시나리오 ID 7개,
+D-01~D-12 결정표, `globalForbidden` 6 + ownership 27행, 플랜 SHA 일치, 수용 항목 27개,
+후보 영수증·소스 매니페스트 해시 결속. 증거: `<attemptDir>/final/F1.json`.
+
+**F2 — REJECT.** `debt-marker-scan` 은 오탐(mktemp `XXXXXX`, 규칙 정의 문서)을 제거한 뒤
+pass 로 전환됐다("206 touched files clean"). 남은 두 검사는 이 게이트가 스스로 수행할 수 없는
+판단이라 리뷰 영수증으로 넘겨받도록 입력 경로를 열었다 — 다만 불리언 플래그가 아니라 이 실행의
+후보 영수증 해시에 결속된 내용 주소화 영수증만 받는다. 부정 대조군으로 확인했다:
+미제공 → BLOCKED, 해시 불일치 → FAIL, 미결속 영수증 → FAIL, 후보에 결속 → PASS.
+
+**F3 — REJECT (정직한 거부).** 격리 DB 생성 + 마이그레이션 88개 적용까지 도달했고 cleanup
+누수는 0이었다. `gate-identity` / `lifecycle-receipt-bound` / `qa-evidence-provided` 통과.
+`qa-evidence-content-reviewed` 와 `manual-qa-journeys-performed` 는
+`verdict must be APPROVE, found REJECT` 로 실패했는데, 이는 게이트가 옳게 동작한 것이다 —
+발급한 리뷰 영수증이 7개 여정 중 3개만 실제로 수행됐다고 사실대로 기록했기 때문이다.
+
+| 여정 | 판정 | 사유 |
+|---|---|---|
+| E2E-TEAM-01 | pass | 팀장 8단계 전부 200, 라인업 11명·포지션·득점 타임라인 실렌더 확인 |
+| E2E-AUTH-01 | pass | 스태프 배정 REST 201, `_gate` 의 `deriveRole` 경로 통과 |
+| E2E-PUBLIC-01 | pass | 공개 4화면 3폭 200, 비로그인 데이터 렌더 |
+| E2E-TEAM-02 | fail | 승인 화면 렌더까지만. 승인/정정요청 액션 미수행 |
+| E2E-TOUR-01 | fail | 검토할 SUBMITTED 리비전 미도달 — 라인업 submit 이 WS takeover 토큰 요구 |
+| E2E-TOUR-02 | fail | 라이브 상태·takeover 미확보로 커맨드/이벤트 기록 미수행 |
+| E2E-CORR-01 | fail | `DIRECTOR_OFFICIALIZE` 전환이 CI 전용 생성기의 게이트 번들 요구 |
+
+`live-surface-reachable` 은 F3 가 3013/8121 을 자기 lifecycle 로 요구해 로컬 스택을 내린
+상태로 돌린 탓에 BLOCKED 였다 — F3 자신의 스택을 올린 실행은 아직 하지 않았다.
+
+**F4 — REJECT, dev 머지 종속.** 9개 검사 pass, 3개 fail. 실패 3건이 모두 같은 원인이다:
+후보가 `dev` HEAD 인데 그 브랜치에 이 플랜의 27개 태스크가 아직 없다.
+
+| 검사 | 상태 | 해소 조건 |
+|---|---|---|
+| `plan-sha-declared` | 수정됨 | 이 원장의 planSHA 를 살아 있는 리비전으로 재결속(위 절 참고) |
+| `docs-exist` | fail | `docs/api/v1/domains/tournaments.md` 등이 통합 브랜치에만 존재 → PR #249 머지 시 해소 |
+| `diff-within-ownership` | fail | `.changeset/*` 등이 머지 시 소유 경로로 편입 |
+| `unrelated-dirty-untouched` | fail | `AGENTS.md` 를 다른 세션이 수정 중 — 공유 워크트리 특성 |
+
+즉 F4 는 이 브랜치에서 고칠 수 있는 항목이 아니라 **`dev` 머지 이후에만 재평가 가능**하다.
+`dev → main` 승격과 마찬가지로 PR 머지는 사용자 권한이므로 여기서 멈춘다.

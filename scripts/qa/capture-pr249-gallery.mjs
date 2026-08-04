@@ -41,6 +41,28 @@ const ROUTES = [
   { slug: 'user-records', path: `/users/${USER}/records`, title: '선수 공식 기록' },
 ];
 
+/**
+ * 대회 운영 화면. 대회는 admin API(`POST /admin/tournaments`)로 만든다 — 저장소의 대회 시더 둘은
+ * 각각 alpha 이미지(`seed-alpha-tournament-qa.ts`)와 GitHub Actions(`task10-runtime-manifest.cli.ts`)
+ * 전용으로 하드 게이트돼 있어 로컬에서 못 쓴다. 게이트는 `_gate.tsx` 의 `deriveRole()` 이 배정 행이
+ * 없는 어드민을 PLATFORM_OPS 로 간주하므로 스태프 배정 없이 통과한다.
+ *
+ * 결과 검토·정정 두 화면은 `V1GameOperationFlag` 의 GAME_READ 행이 있어야 본문이 뜬다. 마이그레이션은
+ * 테이블만 만들고 행은 시드하지 않으며, 행을 만드는 유일한 경로인 tuple-transition 은 유효한
+ * 게이트 증거 번들(gateBundlePath/gateBundleHash)을 요구하고 그 번들 생성기가 CI 전용이다. 따라서
+ * 로컬 캡처에서는 "조회 모드 설정이 초기화되지 않았어요" 가드 화면이 찍히며, 그것이 신규 DB의 실제
+ * 상태다 — 번들을 위조해 통과시키지 않는다.
+ */
+const OPS_ROUTES = (tournamentId) => [
+  { slug: 'ops-operations', path: `/tournament-ops/tournaments/${tournamentId}/operations`, title: '운영 보드' },
+  { slug: 'ops-result-review', path: `/tournament-ops/tournaments/${tournamentId}/result-review`, title: '결과 검토' },
+  { slug: 'ops-corrections', path: `/tournament-ops/tournaments/${tournamentId}/records/corrections`, title: '결과 정정' },
+  { slug: 'ops-staff', path: `/tournament-ops/tournaments/${tournamentId}/staff`, title: '스태프 배정' },
+];
+if (process.env.CAPTURE_TOURNAMENT_ID) {
+  ROUTES.push(...OPS_ROUTES(process.env.CAPTURE_TOURNAMENT_ID));
+}
+
 const VIEWPORTS = [
   { name: 'mobile', width: 390, height: 844 },
   { name: 'tablet', width: 768, height: 1024 },

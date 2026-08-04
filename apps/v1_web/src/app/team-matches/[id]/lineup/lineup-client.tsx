@@ -364,9 +364,31 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         onChange={() => setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))}
                         aria-label={`${entry.displayName} 골키퍼로 지정`}
                       />
-                      <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>GK</span>
+                      {/* 이 "GK" 는 포지션 표시가 아니라 라디오 라벨(=골키퍼로 지정)이다.
+                          예전에는 선택 여부와 무관하게 모든 행에 같은 회색 글자로 붙어서
+                          11명 전원이 골키퍼인 것처럼 읽혔다. 선택된 행만 강조해 "지정됨" 과
+                          "지정 가능" 이 구분되게 한다. */}
+                      <span
+                        className="tm-text-micro"
+                        style={{
+                          color: entry.goalkeeper ? 'var(--blue500)' : 'var(--text-muted)',
+                          fontWeight: entry.goalkeeper ? 700 : 400,
+                        }}
+                      >
+                        GK
+                      </span>
                     </label>
-                    <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{entry.displayName}</span>
+                    <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>
+                      {entry.displayName}
+                      {entry.position ? (
+                        <span
+                          className="tm-text-micro"
+                          style={{ marginLeft: 6, color: 'var(--text-muted)', fontWeight: 400 }}
+                        >
+                          {entry.position}
+                        </span>
+                      ) : null}
+                    </span>
                     <input
                       type="number"
                       inputMode="numeric"

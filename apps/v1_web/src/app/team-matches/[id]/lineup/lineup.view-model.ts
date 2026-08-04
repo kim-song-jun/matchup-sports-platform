@@ -65,6 +65,10 @@ export type LineupEntryDraft = {
   displayName: string;
   jerseyNumber: number | null;
   goalkeeper: boolean;
+  /** 서버가 준 포지션(DF/MF/FW 등). GK 는 별도 `goalkeeper` 플래그로 오므로 여기선 null 이다.
+   * 예전에는 이 값을 수화 단계에서 버려서, 화면이 실제 포지션을 전혀 못 보여주고 모든 행에
+   * 붙은 "GK" 라디오 라벨만 남아 전원이 골키퍼인 것처럼 읽혔다. */
+  position: string | null;
 };
 
 export type LineupEditorState = {
@@ -89,6 +93,7 @@ function makeEntry(input: {
   displayName: string;
   jerseyNumber?: number | null;
   goalkeeper?: boolean;
+  position?: string | null;
 }): LineupEntryDraft {
   return {
     key: randomUuid(),
@@ -96,6 +101,7 @@ function makeEntry(input: {
     displayName: input.displayName,
     jerseyNumber: input.jerseyNumber ?? null,
     goalkeeper: input.goalkeeper ?? false,
+    position: input.position ?? null,
   };
 }
 
@@ -116,6 +122,7 @@ export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEdito
         displayName: starter.displayName,
         jerseyNumber: starter.jerseyNumber,
         goalkeeper: starter.goalkeeper,
+        position: starter.position,
       }),
     ),
     bench: lineup.bench.map((entry) => makeEntry({ displayName: entry.displayName, jerseyNumber: entry.jerseyNumber })),

@@ -29,6 +29,9 @@ const STAFF_LIST_SELECT = {
   grantedByUserId: true,
   createdAt: true,
   fixtureScopes: { select: { fixtureId: true }, orderBy: { fixtureId: 'asc' as const } },
+  // 표가 담당자를 userId 앞 8자로만 보여주고 있었다 — 누가 누구인지 알 수 없다는 뜻이다.
+  // 공개 신원으로 쓸 수 있는 값은 닉네임뿐이므로(D-03/D-11) 그것만 함께 읽는다.
+  user: { select: { profile: { select: { nickname: true } } } },
 } as const;
 
 /**
@@ -78,6 +81,7 @@ export class TournamentOperationsStaffService {
         revokedAt: assignment.revokedAt,
         grantedByUserId: assignment.grantedByUserId,
         createdAt: assignment.createdAt,
+        nickname: assignment.user?.profile?.nickname ?? null,
       })),
     };
   }

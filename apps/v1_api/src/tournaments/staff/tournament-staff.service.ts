@@ -73,6 +73,8 @@ export type TournamentStaffAssignmentResult = {
   readonly version: number;
   readonly expiresAt: Date | null;
   readonly revokedAt: Date | null;
+  /** 프로필이 없거나 닉네임 미설정이면 null — 호출부가 식별자로 대체하지 않고 그대로 다룬다. */
+  readonly nickname: string | null;
 };
 
 type StaffTransaction = Prisma.TransactionClient;
@@ -86,6 +88,7 @@ type StaffAssignmentSnapshot = {
   readonly expiresAt: Date | null;
   readonly revokedAt: Date | null;
   readonly fixtureScopes: readonly { readonly fixtureId: string }[];
+  readonly user?: { readonly profile: { readonly nickname: string | null } | null } | null;
 };
 
 const STABLE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -99,6 +102,10 @@ const ASSIGNMENT_SELECT = {
   expiresAt: true,
   revokedAt: true,
   fixtureScopes: { select: { fixtureId: true }, orderBy: { fixtureId: 'asc' as const } },
+  // 운영 화면이 담당자를 userId 앞 8자로만 보여주고 있었다 — 스태프 표에서 누가 누구인지
+  // 알 수 없다는 뜻이다. 공개 신원으로 쓸 수 있는 값은 닉네임뿐이므로(D-03/D-11) 그것만
+  // 함께 싣는다. 프로필이 없는 계정도 있으므로 optional 이다.
+  user: { select: { profile: { select: { nickname: true } } } },
 } as const;
 
 @Injectable()
@@ -576,6 +583,7 @@ export class TournamentStaffService {
       version: assignment.version,
       expiresAt: assignment.expiresAt,
       revokedAt: assignment.revokedAt,
+      nickname: assignment.user?.profile?.nickname ?? null,
     };
   }
 

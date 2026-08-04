@@ -1,14 +1,15 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { MatchCreateViewModel } from './matches.types';
-import { MatchCreatePageClient } from './matches-create-client';
+import { draftFromMatchEdit, MatchCreatePageClient } from './matches-create-client';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
-const { createMatchMutate, routerPush } = vi.hoisted(() => ({
+const { createMatchMutate, routerPush, uploadImagesMutateAsync } = vi.hoisted(() => ({
   createMatchMutate: vi.fn(),
   routerPush: vi.fn(),
+  uploadImagesMutateAsync: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -38,7 +39,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     ],
   }),
   useV1CreateMatch: () => ({ mutate: createMatchMutate, isPending: false }),
-  useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
 }));
 
 vi.mock('./matches-page', () => ({
@@ -59,6 +60,15 @@ vi.mock('./matches-page', () => ({
           value={model.draft.startTime}
           onChange={(event) => form.onFieldChange('startTime', event.target.value)}
         />
+        <label htmlFor="image">대표 이미지</label>
+        <input
+          id="image"
+          type="file"
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (file && form.uploadImage) form.onFieldChange('image', await form.uploadImage(file));
+          }}
+        />
         <button type="button" onClick={form.onSubmit}>
           매치 만들기
         </button>
@@ -68,12 +78,15 @@ vi.mock('./matches-page', () => ({
 }));
 
 describe('MatchCreatePageClient — GA events', () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
     createMatchMutate.mockImplementation((_payload, { onSuccess }) => {
       onSuccess({ matchId: 'match-new', detailRoute: '/matches/match-new' });
     });
+    uploadImagesMutateAsync.mockResolvedValue({ urls: ['/uploads/match-cover.webp'] });
   });
 
   it('fires match_create_complete with the selected sportType after a successful create', async () => {
@@ -93,6 +106,65 @@ describe('MatchCreatePageClient — GA events', () => {
     await waitFor(() => {
       expect(createMatchMutate).toHaveBeenCalled();
     });
+    expect(createMatchMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sportId: 'sport-futsal',
+        regionId: 'region-gangnam',
+        title: '주말 풋살 매치',
+        manualPlaceName: '한강 풋살장',
+        imageUrl: null,
+      }),
+      expect.any(Object),
+    );
     expect(trackEvent).toHaveBeenCalledWith('match_create_complete', { sportType: '풋살' });
+  });
+
+  it('submits the uploaded image URL instead of a fixed mock image', async () => {
+    render(<MatchCreatePageClient step="confirm" />);
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 7);
+
+    fireEvent.change(screen.getByLabelText('제목'), { target: { value: '이미지 매치' } });
+    fireEvent.change(screen.getByLabelText('장소'), { target: { value: '체육관' } });
+    fireEvent.change(screen.getByLabelText('날짜'), { target: { value: futureDate.toISOString().slice(0, 10) } });
+    fireEvent.change(screen.getByLabelText('시작 시간'), { target: { value: '18:00' } });
+    fireEvent.change(screen.getByLabelText('대표 이미지'), {
+      target: { files: [new File(['image'], 'cover.webp', { type: 'image/webp' })] },
+    });
+
+    await waitFor(() => expect(uploadImagesMutateAsync).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+
+    await waitFor(() => {
+      expect(createMatchMutate).toHaveBeenCalledWith(
+        expect.objectContaining({ imageUrl: '/uploads/match-cover.webp' }),
+        expect.any(Object),
+      );
+    });
+  });
+});
+
+describe('match edit hydration', () => {
+  it('keeps a persisted null image empty instead of injecting sample imagery', () => {
+    const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const draft = draftFromMatchEdit({
+      matchId: 'match-real',
+      editable: true,
+      lockedReason: null,
+      form: {
+        sportId: 'sport-futsal',
+        regionId: 'region-gangnam',
+        title: '실제 매치',
+        imageUrl: null,
+        startsAt,
+        capacity: 10,
+        manualPlaceName: '실제 장소',
+      },
+      status: 'recruiting',
+      participantCount: 1,
+      version: new Date().toISOString(),
+    });
+
+    expect(draft.image).toBe('');
   });
 });

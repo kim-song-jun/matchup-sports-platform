@@ -188,7 +188,7 @@ const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel
 const draft = {
   title: '',
   description: '',
-  image: '/mock/generated/futsal-rooftop.webp',
+  image: '',
   capacity: 10,
   actionLabel: '승인제 신청',
   minLevel: '입문',

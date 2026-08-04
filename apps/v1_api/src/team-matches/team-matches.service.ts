@@ -262,7 +262,10 @@ export class TeamMatchesService {
   ) {
     this.assertActiveAccount(user);
     await assertCreatorProfileComplete(this.prisma, user.id);
-    await this.assertCanManageTeam(user.id, dto.hostTeamId);
+    const hostMembership = await this.assertCanManageTeam(user.id, dto.hostTeamId);
+    if (hostMembership.team.sportId !== dto.sportId) {
+      throw validationError('sportId must match the host team sport', 'sportId');
+    }
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const dates = this.validateDates(dto);
     const payloadHash = canonicalGameCommandPayloadHash({
@@ -395,6 +398,9 @@ export class TeamMatchesService {
     if (teamMatch.updatedAt.toISOString() !== dto.version) throw stateConflict('Team match version is stale', 'VERSION_CONFLICT');
     if (teamMatch.status !== 'recruiting' || this.getApiStatus(teamMatch) === 'expired') throw stateConflict('Team match cannot be updated in current status');
     if (dto.hostTeamId !== teamMatch.hostTeamId) throw stateConflict('Host team cannot be changed');
+    if (dto.sportId !== teamMatch.hostTeam.sportId) {
+      throw validationError('sportId must match the host team sport', 'sportId');
+    }
     if (dto.sportId !== teamMatch.sportId) {
       throw stateConflict(
         'The sport cannot change after the Game competition config is pinned',
@@ -1124,6 +1130,7 @@ export class TeamMatchesService {
       include: {
         minSportLevel: { select: { code: true } },
         maxSportLevel: { select: { code: true } },
+        hostTeam: { select: { sportId: true } },
       },
     });
     if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
@@ -1166,9 +1173,10 @@ export class TeamMatchesService {
   private async assertCanManageTeam(userId: string, teamId: string) {
     const membership = await this.prisma.v1TeamMembership.findFirst({
       where: { teamId, userId, status: 'active', role: { in: ['owner', 'manager'] }, team: { status: 'active', deletedAt: null } },
-      select: { id: true },
+      select: { id: true, team: { select: { sportId: true } } },
     });
     if (!membership) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Only team owners or managers can manage team matches' });
+    return membership;
   }
 
   private teamMatchGameContext(

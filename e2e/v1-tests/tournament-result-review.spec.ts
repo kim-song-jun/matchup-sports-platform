@@ -37,12 +37,16 @@ import { apiPost, commandId } from './helpers/v1-http';
  * repo produces one -- `V1TournamentFixture` rows created via raw Prisma
  * writes in `seed-alpha-tournament-qa.ts` bypass
  * `TournamentBracketService.publishBracket`, the only code path that
- * creates the backing `V1Game`. Provisioning one from this spec requires
- * the full admin bracket chain plus a granted `tournament_director`/
- * `platform_ops` staff assignment and a submitted lineup+result, none of
- * which this task's scout pass reached far enough to construct correctly
- * (`admin-registrations.controller.ts` and the group/group-team/fixture DTOs
- * in `apps/v1_api/src/tournaments/dto/admin-bracket.dto.ts` were not read).
+ * creates the backing `V1Game`.
+ *
+ * UPDATE (2026-08-04): the bracket half of that chain is now verified and is
+ * only four admin calls -- see the step-by-step recipe in
+ * `tournament-result-correction.spec.ts`'s file doc. Team registrations and
+ * `.../group-teams` turned out to be unnecessary; a team-less fixture is
+ * enough for `publishBracket` to create the backing game. What is still
+ * missing for THIS spec is the leg after that: a granted
+ * `tournament_director`/`platform_ops` staff assignment plus a submitted
+ * lineup and a SUBMITTED result revision to review.
  *
  * `test.fixme()` marks the blocked business-logic assertions explicitly so
  * they show as a flagged, non-passing entry in the report rather than a

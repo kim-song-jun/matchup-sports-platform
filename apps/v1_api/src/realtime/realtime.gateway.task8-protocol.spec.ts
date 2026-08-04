@@ -476,4 +476,48 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(emitted).toEqual([]);
     expect(leaves).toEqual([]);
   });
+
+  // 파싱 실패 경로는 검증된 입력이 없다는 이유로 상관관계 필드를 통째로 버리고 있었다.
+  // 성공/도메인 실패 경로는 항상 싣기 때문에, 클라이언트 큐는 파싱 실패한 항목만 어떤 것이
+  // 실패했는지 알 수 없어 재시도·실패 표시를 붙이지 못했다. 이 계약이 되돌려지면 여기서 깨진다.
+  it('echoes clientEventId/expectedVersion on a parse failure so the client can correlate the queued item', async () => {
+    const client = socket();
+
+    const result = await task8Gateway(gateway).appendGameEvent(client, {
+      gameId: GAME_ID,
+      expectedVersion: 3,
+      clientEventId: 'event-42',
+      takeoverToken: 'nonempty-takeover-token',
+      payloadHash: 'sha256:stable-payload',
+      // `event` 누락 -> parseGameEventCommand 실패
+    });
+
+    expect(result).toEqual({
+      status: 'error',
+      code: 'VALIDATION_ERROR',
+      clientEventId: 'event-42',
+      expectedVersion: 3,
+    });
+    expect(gamesService.appendEvent).not.toHaveBeenCalled();
+  });
+
+  // 검증을 통과하지 못한 입력이므로 값을 신뢰하지 않는다 — 형식이 어긋난 상관관계 필드를
+  // 그대로 되돌리면 클라이언트가 엉뚱한 큐 항목을 실패로 표시하게 된다. 그럴 바엔 싣지 않는다.
+  it('omits malformed correlation fields instead of echoing them back', async () => {
+    const client = socket();
+
+    const malformedId = await task8Gateway(gateway).appendGameEvent(client, {
+      gameId: GAME_ID,
+      expectedVersion: 3,
+      clientEventId: 12_345, // 문자열이 아니다
+      takeoverToken: 'nonempty-takeover-token',
+      payloadHash: 'sha256:stable-payload',
+    });
+    expect(malformedId).toEqual({ status: 'error', code: 'VALIDATION_ERROR', expectedVersion: 3 });
+
+    const notAnObject = await task8Gateway(gateway).appendGameEvent(client, 'nonsense');
+    expect(notAnObject).toEqual({ status: 'error', code: 'VALIDATION_ERROR' });
+
+    expect(gamesService.appendEvent).not.toHaveBeenCalled();
+  });
 });

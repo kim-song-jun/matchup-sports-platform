@@ -63,7 +63,7 @@
 - [~] **visibility cleanup** — 명시적 `V1GameVisibilityPolicy` 조작 없음. void 시 공개 캐시 은닉은 async 워커(`GameResultVoidProjectionService.hidePublicCache`)가 수행. → Ambiguity A-2
 - [x] transactional outbox
 - [x] **next-fixture** conflict detection (`NEXT_FIXTURE_CONFLICT`)
-- [ ] **ranking(standings) conflict detection** — 코드 부재. `STANDINGS_CONFLICT`/`TIE_BREAK_CONFLICT`/`RANKING_CONFLICT` 어느 식별자도 `apps/v1_api`·`apps/v1_web`·`docs` 전역에 0건. → **Gap G-1**
+- [N/A] **ranking(standings) conflict detection** — 코드 부재였으나, 2026-08-05 조사로 **구현 대상 자체가 없음 확정**(G-1). `STANDINGS_CONFLICT`/`TIE_BREAK_CONFLICT`/`RANKING_CONFLICT` 어느 식별자도 여전히 0건이며 앞으로도 추가하지 않는다 — 그룹 순위를 하류에서 소비하는 코드 경로가 존재하지 않아 막을 대상이 없다
 - [x] projection preview (`projectionPreviewHash`)
 - [x] initial officialize/void scope = `platform_ops`, 감사된 플래그가 `tournament_director`를 개방
 - [x] 모든 result action이 idempotent + append-only
@@ -91,7 +91,7 @@
 | AC-4 | **failure rolls back both** | ✅ 충족(설계) / ⚠️ 미테스트 | 단일 `$transaction` + `Serializable` (`:689`, `:799`)이므로 mutate 콜백 내 어떤 예외든 리비전 전이·포인터 스왑·아웃박스를 함께 롤백. `P2034`/`P2002`는 `409 COMMAND_CONCURRENCY_CONFLICT`로 매핑(`:801-812`). "zero new rows" 롤백은 wrong-base 케이스만 테스트됨(`spec:317,329`, `:502,517`, `:564,573`) — **성공 경로 도중 실패 주입 테스트는 없음** → Gap G-2 |
 | AC-5 | correction **retains prior revision** through a **same-game supersedes constraint** | ✅ 충족 | DB 레벨 복합 FK: `V1GameResultRevision.supersedes @relation(fields:[gameId, supersedesId], references:[gameId, id], onDelete: Restrict)` + `@@unique([gameId, id])` (`prisma/schema.prisma`) — cross-game supersedes는 FK 위반으로 물리적으로 불가, `Restrict`가 선행 리비전 삭제를 차단. 서비스 레벨 중복 방어: `assertRevisionSupersession(purpose:'CORRECTION')` (`service.ts:613-628` → `games/core/revision-state-machine.ts:101-121`, `baseGameId !== successorGameId`면 throw) |
 | AC-6 | **every terminal revision is immutable** | ✅ 충족 | 3중 방어. ① DB 트리거 `v1_block_terminal_revision_mutation` (`prisma/migrations/20260729000100_v1_game_operations/migration.sql`) — `CHANGE_REQUESTED/SUPPLEMENT_REQUESTED/REJECTED/OFFICIAL/VOID` 행의 UPDATE·DELETE를 `ERRCODE 55000`으로 거부. ② 서비스 상태머신 `assertRevisionTransition` (`games/core/revision-state-machine.ts:50-78`) → `TERMINAL_REVISION_IMMUTABLE`. ③ 참가자 행 트리거 `v1_guard_result_participant_mutation` — DRAFT 리비전에만 participants 삽입 허용(그래서 `service.ts:304-338`·`:630-655`가 **DRAFT로 생성 → participants → SUBMITTED 전이** 순서를 지킴). 테스트: `spec:346-354`(reject 재시도), `:439-446`(중복 officialize) |
-| AC-7 | **standings**/next-fixture conflict blocks with **actionable code** | ⚠️ **절반 충족** | next-fixture: ✅ `service.ts:924-946` `assertNoLockedDownstreamFixture` — advancement edge의 타깃 fixture를 전부 `FOR UPDATE` 잠근 뒤 `status !== 'scheduled'`면 `409 NEXT_FIXTURE_CONFLICT`. void 경로에서 포인터 스왑 **전에** 호출(`:513-515`). 테스트: `spec:549-576`. **standings/ranking: ❌ 부재** — 서비스 전역에 standings 참조 0건, 에러코드 식별자 전역 0건 → **Gap G-1** |
+| AC-7 | **standings**/next-fixture conflict blocks with **actionable code** | ✅ **next-fixture 충족 / standings는 조사로 N/A 확정** | next-fixture: ✅ `service.ts:992-` `assertNoLockedDownstreamFixture` — advancement edge의 타깃 fixture를 전부 `FOR UPDATE` 잠근 뒤 `status !== 'scheduled'`면 `409 NEXT_FIXTURE_CONFLICT`. void 경로에서 포인터 스왑 **전에** 호출(`:526-528`). 테스트: `spec:549-576`. **standings/ranking**: 2026-08-05 조사(G-1)로 **구현 대상 자체가 없음 확정** — 그룹 순위(`V1TournamentStanding.position`)를 넉아웃 fixture 시딩·advancement edge 어디에서도 소비하지 않아 "이미 하류에 소비된 순위"라는 전제가 성립하지 않는다(근거: G-1 gap 행). 원문 AC의 "standings conflict" 절반은 **N/A로 재분류**, 신규 차단 코드 없음 |
 | AC-8 | **director flag is auditable** | ⚠️ **부분 충족** | 게이팅: `service.ts:722-724`, `:833-844` — `result_officialize` + `role === 'tournament_director'`일 때 매 호출마다 `v1_game_operation_flags`를 **라이브 조회**, `!== 'on'`이면 `403 DIRECTOR_OFFICIALIZE_DISABLED`. 성공 시 감사: `:780-796` `auditWriter.create(...)`가 `actor.role='tournament_director'`, `authorizationSubject`, `tournamentId`, `fixtureId`를 기록. 플래그 **전환 자체**의 감사는 Task 5 소유(`config/game-operation-flags.ts`). **미충족 부분**: 감사 레코드가 결정 시점의 **플래그 값/버전을 담지 않으며**, 거부(403) 경로는 커맨드 경계보다 앞서 throw되어 **감사 레코드를 남기지 않는다** → Gap G-3 |
 | AC-9 | (스펙 "What to do") **초기 scope = `platform_ops`**, 감사된 플래그가 `tournament_director` 개방 | ✅ 충족 | `tournaments/staff/tournament-staff-policy.ts:19-20`이 `result_review`/`result_officialize`를 액션 어휘에 추가, `:307-312` `allowsRoleAction`이 `platform_ops`/`tournament_director`만 허용. 그 위에 `result_officialize`는 director일 때만 플래그 게이트를 추가로 통과해야 함 → 기본값 `off`(`config/game-operation-flags.ts:35`)에서 실효 scope는 `platform_ops` 전용. 타 대회 director는 플래그 무관 `403 STAFF_SCOPE_DENIED`(테스트 `spec:616-626`) |
 
@@ -185,7 +185,7 @@
 
 | ID | 내용 | 심각도 | 후속 트리거 |
 |---|---|---|---|
-| **G-1** | standings/ranking(tie-break) 충돌 감지 **미구현**. AC-7의 절반, QA Q-20이 대응 | **High** — Acceptance Criterion 미충족 | **T-A 동작 정의 확정 즉시** 착수. 정의 없이 추측 구현 금지 (CLAUDE.md 원칙 5) |
+| **G-1** | ~~standings/ranking(tie-break) 충돌 감지 미구현~~ | ~~High~~ | **조사 완료·구현 안 함으로 확정 (2026-08-05)**. T-A 조사 결과: 그룹 순위(`V1TournamentStanding.position`)를 넉아웃 fixture 시딩에 자동 소비하는 코드 경로가 저장소에 **전혀 없다**. 근거: ① `V1TournamentFixtureAdvancementEdge`(`prisma/schema.prisma:2170-2188`)는 `sourceFixtureId`/`sourceOutcome(WINNER\|LOSER)`/`targetFixtureId`/`targetSide`만 가지며 `groupId`·`position`·`V1TournamentStanding` 참조가 전무 — 단일 fixture의 승/패만 다음 fixture로 전달. ② `GameResultBracketProjectionService.project()`(`apps/v1_api/src/game-operations/game-result-bracket-projection.service.ts:22-82`)와 대칭 로직 `GameResultVoidProjectionService.reverseBracketAdvancement()`(`.../game-result-void-projection.service.ts:145-199`) 둘 다 source fixture 자신의 score로 winner/loser를 정해 target 슬롯을 채울 뿐, standings를 읽지 않는다. ③ `TournamentBracketService.createFixture()`(`tournament-bracket.service.ts:227-274`)의 넉아웃 fixture `homeRegistrationId`/`awayRegistrationId`는 admin이 DTO로 **직접 지정**하는 값이고 `confirmed` registration 여부만 검증 — 그룹 순위·position을 기록/참조하지 않아 "이 슬롯이 어느 그룹 몇 위에서 왔는지" 시스템이 원천적으로 모른다. ④ `recalculateStandings()`/`getBracket()`(`:648-730`, `:758-826`)이 `V1TournamentStanding.position`을 쓰고 읽는 유일한 두 지점이나 서로 조인 없이 순수 집계·읽기전용 표시일 뿐. **결론**: "이미 하류에 소비된 그룹 순위"라는 전제 자체가 구조적으로 성립하지 않는다. 브리핑이 제시한 축소 대안("같은 그룹 내 completed fixture의 순위표 표시에만 영향 시 차단")도 검토했으나 그룹 내 2경기만 끝나도 거의 모든 정정에서 발동하는 근거 없는 과차단이 되어 R-2를 재현하므로 채택하지 않음. CLAUDE.md 원칙 5(존재하지 않는 위험을 추측으로 막지 않음)에 따라 **구현 착수하지 않고 스킵**. AC-7의 "standings conflict" 절반과 QA Q-20은 이 근거로 **N/A**로 재분류. |
 | **G-2** | ~~AC-4 "failure rolls back both"의 성공 경로 실패 주입 테스트 없음~~ | ~~Medium~~ | **해소됨 (2026-08-04, 커밋 `b53c4385`, Q-04)**. `supersedeAndSubmit` 트랜잭션 마지막 statement에 실제 실패(outbox `business_key` 유니크 충돌)를 주입해 revision·participant·game version이 전부 롤백됨을 실측 — 트랜잭션 형태 검사가 아니라 실제 실패로 증명 |
 | **G-3** | ~~director 플래그 거부(403) 경로가 감사 레코드를 남기지 않고, 성공 감사도 결정 시점 플래그 값/버전을 담지 않음~~ | ~~Medium~~ | **해소됨 (2026-08-04, 커밋 `a4f35c68`)**. `readDirectorOfficializeFlagSnapshot()`이 `{value, version}`을 반환하도록 조회를 넓혔고, 거부 감사는 트랜잭션 롤백 이후 `catch` 블록에서 `this.prisma`로 별도 insert(인터랙티브 트랜잭션이 throw하면 콜백 내부에서 쓴 감사 행도 함께 롤백되는 버그를 구현 중 발견·수정). 신규 격리 테스트 2건(`tournament-officialize-edge.integration-spec.ts`, id 네임스페이스 `86000000-`)으로 거부/성공 양쪽 감사 행 검증. 기존 9개 회귀 없음. 오케스트레이터가 별도 격리 DB에서 11/11 통과 + tsc clean 독립 재검증 완료 |
 | **G-4** | ~~8개 QA scenario 미커버~~ | ~~Medium~~ | **완전 해소 (2026-08-04, 커밋 `b53c4385`)**. Q-16/17은 G-3에서, 나머지 Q-02/04/07/08/11/13은 T-B에서 전부 커버. 테스트 작성 중 진짜 버그 3건 발견·수정(다른 describe 블록의 `V1Sport.upsert` id 재사용 오류, Q-04가 심은 충돌 outbox 행이 Q-13 워커 drain에 오염되던 문제, Q-13의 `availableAt` 타임스탬프 레이스 — 전부 테스트 코드 자체의 결함이었고 프로덕션 코드는 무관). Q-11은 Postgres 복합 FK(`v1_games_current_revision_fk`, `v1_result_revisions_supersedes_fk`)가 실제로 위반을 던지는 것을 증명(우회 없음). 오케스트레이터가 별도 격리 DB 2곳에서 8/8(신규 edge 전체) + 9/9(회귀) 독립 재검증, tsc clean, CI(수동 발동) 결과 대기 중 |
@@ -223,7 +223,7 @@
 | ID | 리스크 | 영향 | 대응 |
 |---|---|---|---|
 | R-1 | **문서 드리프트가 반복 오판을 만든다** — 이 세션에서만 유사 오판 4건 발생, 본 태스크가 5건째 | 높음. 이미 있는 기능을 재구현할 뻔했다 | T-D 즉시. 판단 근거를 체크박스가 아니라 **코드 실측**으로 고정 |
-| R-2 | G-1의 동작 정의가 스펙에 없음 | 높음. 추측 구현 시 잘못된 차단으로 정상 운영이 막힐 수 있음 | Ambiguity A-1로 에스컬레이션. 확정 전 착수 금지 |
+| R-2 | ~~G-1의 동작 정의가 스펙에 없음~~ | ~~높음~~ | **해소됨 (2026-08-05)**. 조사 결과 하류 소비 경로 부재로 구현 자체를 스킵 — 추측 구현으로 인한 과차단 리스크가 원천 제거됨 |
 | R-3 | 통합 테스트가 실 Postgres 의존 | 중간. `DATABASE_URL` 없으면 즉시 throw | 격리 DB 절차(`ulw_v1_integration_task27` + `prisma migrate deploy`)가 이미 검증됨 |
 | R-4 | 기존 629줄 스펙이 순차 의존 상태머신 한 줄기 | 중간. 중간에 테스트를 끼우면 뒤 테스트의 `expectedVersion`이 전부 어긋난다 | 신규 테스트는 **별도 파일 + 별도 id 네임스페이스**로 분리 |
 | R-5 | E2E-CORR-01 통과는 `DIRECTOR_OFFICIALIZE` 게이트 번들(V7/V22/V23 영수증)에 종속 | 중간 | 기능 구현과 무관한 **게이트 운영 이슈**. 플래그를 DB로 직접 켜는 우회는 금지(게이트 무력화) |
@@ -240,7 +240,7 @@
 
 | ID | 모호점 | 스펙이 말하는 전부 | 제안(확정 아님) |
 |---|---|---|---|
-| **A-1** | **"standings conflict" / "tie-break conflict"의 정확한 동작** — 무엇을 언제 차단하는가? | AC: "standings/next-fixture conflict blocks with **actionable code**". QA: "**tie-break conflict**". 그 이상 정의 없음. `calculateCompetitionStandings`(`competition-config/competition-standings.ts`)는 `seededDraw: 'sha256-v1'` 최종 타이브레이커가 있어 **순위가 미결정으로 남는 경우는 구조적으로 없다** → "해결 불가능한 동률"이라는 해석은 성립하지 않는다 | 유력 해석은 **"정정/무효화가 이미 하류에 소비된 그룹 순위를 뒤집는 경우 차단"**. 제안 설계: officialize(CORRECTION flow)/void 시 해당 fixture의 `groupId`를 찾아 ① 변경 전/후 standings를 dry-run 재계산, ② `position`이 바뀐 등록팀 중 하나라도 `scheduled`를 벗어난 하류 fixture나 확정 knockout 시드에 이미 참조돼 있으면 `409 STANDINGS_CONFLICT` (details에 `groupId`·바뀐 position 목록을 실어 actionable하게). **단, 그룹 순위 → 넉아웃 시드를 잇는 코드 경로가 현재 저장소에 존재하는지 자체가 불명**(advancement edge는 fixture-to-fixture만 연결) — 이 확인이 선행돼야 한다 |
+| **A-1** | ~~"standings conflict" / "tie-break conflict"의 정확한 동작~~ | AC: "standings/next-fixture conflict blocks with **actionable code**". QA: "**tie-break conflict**". 그 이상 정의 없음. `calculateCompetitionStandings`(`competition-config/competition-standings.ts`)는 `seededDraw: 'sha256-v1'` 최종 타이브레이커가 있어 **순위가 미결정으로 남는 경우는 구조적으로 없다** → "해결 불가능한 동률"이라는 해석은 성립하지 않는다 | **해소됨 (2026-08-05)**. 선행 확인 항목("그룹 순위 → 넉아웃 시드를 잇는 코드 경로가 존재하는지")을 조사한 결과 **존재하지 않음**을 확정(근거는 G-1 행 참조). advancement edge는 fixture-to-fixture(승/패)만 연결하며 그룹 순위(`V1TournamentStanding.position`)는 어떤 하류 코드에서도 소비되지 않는다. 따라서 "이미 하류에 소비된 그룹 순위를 뒤집는 경우 차단"이라는 유력 해석의 전제 자체가 성립하지 않아 **구현하지 않기로 확정**. 이 태스크에서 새 실패 시나리오/차단 코드를 만들지 않는다 |
 | **A-2** | **"visibility cleanup"의 대상** | "visibility/SLA cleanup". SLA는 명확(`closeReviewSla`)하나 visibility가 `V1GameVisibilityPolicy.mode`인지 `V1GameOfficialResultCache.is_current`인지 미지정 | 현재 구현은 후자(async 워커의 `hidePublicCache`)만 수행한다. 제안: **후자로 충족된 것으로 간주**. `V1GameVisibilityPolicy`는 라이브 중계 노출 정책이라 결과 리비전 생명주기와 축이 다르고, 정정/무효화가 그 정책을 바꿔야 할 근거가 스펙에 없다. 다르게 읽어야 한다면 확정 필요 |
 | **A-3** | **`request_supplement`의 재제출 기한/SLA 값** | 스펙에 시간값 없음. 현행은 `GameResultSubmittedEscalationService`의 24h 리마인더 / 48h 에스컬레이션을 재제출 시 그대로 새로 시작 | 제안: **현행 24h/48h 유지**. 대회 운영 특성상 별도 값이 필요하면 `V1CompetitionConfigVersion`에 두는 것이 일관되나, 스펙 근거 없이 추가하지 않는다 |
 | **A-4** | **correction `reason` 길이 제한** | 없음. 현행 DTO는 `@IsString() @IsNotEmpty()`만(`dto.ts:158-160`), 상한 없음 | 제안: `@MaxLength(1000)` — `game-operation-flags.ts:877-884`의 `assertReason`이 이미 1–1000자를 쓰므로 그 상수와 정합. **단 현행 무제한이 실제 문제를 일으킨 증거는 없어, 단독으로 바꿀 사유가 약하다** |
@@ -249,7 +249,7 @@
 
 ### Escalation
 
-- **A-1은 T-E(구현)의 차단 요인**이다. 확정 전 구현 착수 금지 — CLAUDE.md 원칙 5(모호함을 조용히 지나치지 않기) / 원칙 6(모호함 → 기획 재진입).
+- ~~A-1은 T-E(구현)의 차단 요인이다.~~ **해소됨 (2026-08-05)**: 조사 결과 하류 소비 경로 자체가 없어 T-E(구현)는 착수하지 않고 종료. CLAUDE.md 원칙 5 적용 사례로 기록.
 - A-2/A-3/A-4/A-5/A-6은 제안값으로 진행 가능하되, 리뷰에서 명시적으로 승인/기각을 받는다.
 
 ---
@@ -258,9 +258,9 @@
 
 | 구분 | 수치 |
 |---|---|
-| Acceptance Criteria | **9항목 중 6 완전 충족 / 2 부분 충족(AC-7·AC-8) / 1 설계충족·테스트미비(AC-4)** |
-| QA scenarios | **21항목 중 12 커버 / 9 미커버** |
-| 구현 gap (기능) | **1건 (G-1: standings/tie-break 충돌 감지)** |
+| Acceptance Criteria | **9항목 중 6 완전 충족 / AC-8 부분 충족 / AC-4 설계충족·테스트미비 / AC-7은 next-fixture 절반만 유효 목표 — standings 절반은 조사로 N/A 확정(G-1)** |
+| QA scenarios | **21항목 중 12 커버 / 9 미커버(Q-20은 구현 대상 자체가 없음이 확정되어 N/A로 재분류)** |
+| 구현 gap (기능) | **0건 (G-1: 조사 결과 하류 소비 경로 부재로 구현 대상 아님, 2026-08-05 확정)** |
 | 구현 gap (감사) | **1건 (G-3: 거부 경로 감사·플래그 스냅샷)** |
 | 테스트 gap | **8건 (Q-02/04/07/08/11/13/16/17)** |
 | 스키마 마이그레이션 필요 | **없음** |

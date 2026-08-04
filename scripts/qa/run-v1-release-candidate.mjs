@@ -25,27 +25,43 @@
 // -- do not confuse the two (see the CLI flag vs. the receipt field).
 //
 // Optional:
+//   --emit-source-manifest
+//     Generates the Task-1-bound source-manifest.json directly instead of requiring one produced
+//     elsewhere. Internally calls the wrapper's own createSourceSnapshot(repoRoot, ledger, 1,
+//     attemptId, receiptDir, /* candidateSHA */ null, /* headSHA */ TASK_ONE_RESTART_HEAD_SHA).
+//     The headSHA argument only pins the manifest's own `headSHA` field (and the `head` comparison
+//     column verifyCommittedSnapshot() recomputes from it) -- it does NOT touch the candidate side
+//     of the manifest. createSourceSnapshot() always derives the candidate slot from
+//     privateIndexTree()'s `git read-tree HEAD` + working-tree state of *this script's own*
+//     repoRoot (i.e. today's live checkout), a code path that is completely independent of the
+//     headSHA argument. That independence is what makes this safe: pinning headSHA to the frozen
+//     commit does not require actually checking that commit out, and cannot smuggle stale content
+//     into the candidate side of the receipt. Mutually exclusive with --source-manifest-path/
+//     --source-manifest-sha below (pick one manifest source, not both).
 //   --source-manifest-path <path> --source-manifest-sha <sha256>
 //     Explicit pointer to a pre-existing, Task-1-bound source-manifest.json to bind into the
-//     receipt. When omitted, this script auto-discovers one under
-//     <receipt-dir>/tree-sha256/*/attempt-*/source-manifest.json.
+//     receipt. When neither this nor --emit-source-manifest is given, this script auto-discovers
+//     one under <receipt-dir>/tree-sha256/*/attempt-*/source-manifest.json.
 //   --ledger <path>
 //     Overrides the Task127 ledger markdown (defaults to the wrapper's own DEFAULT_LEDGER).
 //
 // On the source manifest: the receipt's sourceManifestPath/sourceManifestSHA/sourceTreeSHA/
 // ownedPathBlobs fields all bind to a source-manifest.json whose own `headSHA` field must equal
 // the wrapper's hardcoded TASK_ONE_RESTART_HEAD_SHA (verifyCandidate() checks this literally) --
-// NOT today's live candidateSHA. That manifest can only be produced by createSourceSnapshot()
-// running with a repoRoot whose HEAD is checked out exactly at that frozen commit (it reads
-// `git rev-parse HEAD` of its repoRoot verbatim into the manifest's headSHA). This script's own
-// repoRoot is the live `dev` checkout, not that pinned commit, and the hard rules for this task
-// forbid creating any worktree/checkout to manufacture one. So this script never fabricates that
-// manifest -- it only validates and re-binds one someone else already produced, mirroring the
-// wrapper's own createCandidateSourceSnapshot() reuse pattern for already-verified candidates.
-// It then re-runs the wrapper's verifyCommittedSnapshot() against that manifest as a precondition,
-// so a manifest whose frozen headSHA content has since drifted from live HEAD (i.e. Task 1's
-// owned files were edited again after TASK_ONE_RESTART_HEAD_SHA landed) is rejected here, loudly,
-// instead of producing a receipt that would only fail much later inside verifyCandidate() itself.
+// NOT today's live candidateSHA. Before the wrapper's createSourceSnapshot() accepted an explicit
+// headSHA argument, the only way to produce such a manifest was a repoRoot whose HEAD was checked
+// out exactly at that frozen commit (it used to read `git rev-parse HEAD` of its repoRoot verbatim
+// into the manifest's headSHA), which this script's own repoRoot -- the live `dev`/integration-
+// branch checkout -- never is, and the hard rules for this task forbid creating any worktree/
+// checkout to manufacture one. Now that the argument exists (see --emit-source-manifest above),
+// this script can bind that field without a checkout; it still never invents the *candidate* side
+// of the receipt -- that always comes from this repoRoot's own live tree, mirroring the wrapper's
+// own createCandidateSourceSnapshot() reuse pattern for already-verified candidates. Either way
+// (emitted here, or supplied/discovered), the manifest is re-verified via the wrapper's own
+// verifyCommittedSnapshot() as a precondition, so a manifest whose frozen headSHA content has
+// since drifted from live HEAD (i.e. Task 1's owned files were edited again after
+// TASK_ONE_RESTART_HEAD_SHA landed) is rejected here, loudly, instead of producing a receipt that
+// would only fail much later inside verifyCandidate() itself.
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
@@ -59,6 +75,7 @@ import {
   TASK_ONE_RESTART_HEAD_SHA,
   TASK_ONE_WORKLOAD,
   createCandidateSourceSnapshot,
+  createSourceSnapshot,
   exactKeys,
   git,
   immutableWrite,
@@ -72,13 +89,30 @@ import {
   verifyOwnedPathsClean,
   verifyTaskOneDirty,
 } from './run-v1-task-verification.mjs';
+// createSourceSnapshot is the wrapper's write-side primitive for producing a Task-1-bound
+// source-manifest.json (see createCandidateSourceSnapshot's read-side counterpart above). It is
+// consumed here only under --emit-source-manifest, with its 7th (headSHA) argument pinned to
+// TASK_ONE_RESTART_HEAD_SHA -- see the file header for why that does not fabricate the candidate
+// side of the receipt. The wrapper must export it with that parameterized signature; this file
+// does not (and, per this task's hard rules, must not) redefine or re-derive it locally.
 
 // Mirrors the wrapper's own inline phase allow-list (main(), around the `phase` local) --
 // duplicated here as a plain literal because the wrapper does not export it as a named constant
 // and it is a one-line vocabulary check, not canonicalization/hashing/write logic.
 const PHASE_ALLOWLIST = new Set(['initial', 'clean-restart', 'standalone', 'candidate', 'local-precleanup']);
 
-const BOOLEAN_FLAGS = new Set(['capture-only']);
+// Which branches this generator may run from. Originally a bare literal-'dev' check. The F1-F4
+// headSHA-argument work (Todo 27) is actually driven from the pre-merge integration branch
+// codex/teameet-task9-ci, not dev itself -- receipts get produced and verified there before that
+// branch lands on dev. Widening this to "any branch" would defeat the whole point of the check
+// (refusing to mint release-candidate receipts from unvetted branches), so exactly these two
+// literal branch names are allowed and nothing else -- in particular this does NOT special-case
+// task-27's own working branch (codex/teameet-task27-release-gates); that branch still hits
+// BASELINE_INPUT_DRIFT below like any other non-listed branch, matching the design's rejection of
+// exempting it.
+const ALLOWED_RELEASE_CANDIDATE_BRANCHES = new Set(['dev', 'codex/teameet-task9-ci']);
+
+const BOOLEAN_FLAGS = new Set(['capture-only', 'emit-source-manifest']);
 const VALUE_FLAGS = new Set([
   'phase',
   'plan-sha',
@@ -161,8 +195,11 @@ function assertNoSymlinkAncestors(targetPath) {
 
 // Scans <receiptDirRoot>/tree-sha256/*/attempt-*/source-manifest.json for one that already
 // satisfies the Task-1/candidate binding checks verifyCandidate() applies (schemaVersion, task,
-// baselineSHA, headSHA, ownedPaths) -- see the file header for why this script cannot generate
-// one itself. Returns the newest qualifying manifest's path (by its own createdAt), or null.
+// baselineSHA, headSHA, ownedPaths). Only reached when the caller passed neither
+// --source-manifest-path nor --emit-source-manifest (see the file header for the full
+// precedence) -- e.g. reusing a manifest a previous --emit-source-manifest run already produced
+// under this same receiptDir, without regenerating it. Returns the newest qualifying manifest's
+// path (by its own createdAt), or null.
 function discoverQualifyingManifest(receiptDirRoot, ownedPaths) {
   const treeRoot = resolve(receiptDirRoot, 'tree-sha256');
   if (!existsSync(treeRoot)) return null;
@@ -233,6 +270,19 @@ async function main() {
       64,
     );
   }
+  // Two ways to bind a source manifest -- generate it here (--emit-source-manifest) or point at
+  // one already produced (--source-manifest-path/-sha) -- must not both be given: silently
+  // preferring one over the other would be exactly the kind of ambiguous-skipping this repo's
+  // engineering principles forbid, so reject the combination outright instead of guessing intent.
+  if (options['emit-source-manifest'] === true && options['source-manifest-path'] !== undefined) {
+    throw new HarnessError(
+      'MALFORMED_INPUT',
+      '--emit-source-manifest and --source-manifest-path/--source-manifest-sha are mutually '
+        + 'exclusive: the former generates a fresh Task-1-bound manifest, the latter binds an '
+        + 'already-produced one',
+      64,
+    );
+  }
 
   const receiptDir = resolve(options['receipt-dir'] ?? DEFAULT_EVIDENCE_ROOT);
   if (!isAbsolute(receiptDir)) {
@@ -252,10 +302,11 @@ async function main() {
 
   const repoRoot = process.cwd();
   const branch = git(['branch', '--show-current'], { cwd: repoRoot }).trim();
-  if (branch !== 'dev') {
+  if (!ALLOWED_RELEASE_CANDIDATE_BRANCHES.has(branch)) {
     throw new HarnessError(
       'BASELINE_INPUT_DRIFT',
-      `Release-candidate receipts may only be generated from the dev branch; observed ${branch}`,
+      'Release-candidate receipts may only be generated from '
+        + `${[...ALLOWED_RELEASE_CANDIDATE_BRANCHES].join(' or ')}; observed ${branch}`,
       68,
     );
   }
@@ -358,18 +409,40 @@ async function main() {
     );
   }
 
-  // Source manifest (see file header for why this can only be reused, never generated here).
+  // Source manifest (see file header for the --emit-source-manifest / discovery / explicit-path
+  // precedence and why binding headSHA here never fabricates the candidate side of the receipt).
   let manifestPath = options['source-manifest-path'];
   let manifestSHA = options['source-manifest-sha'];
+  if (!manifestPath && options['emit-source-manifest'] === true) {
+    // Direct generation: reuse the wrapper's own write primitive rather than hand-rolling a second
+    // manifest-shaping path here (same rationale as the file header gives for reusing its
+    // canonicalization/sha256/immutable-write primitives). candidateSHA stays null so
+    // privateIndexTree() keeps deriving the candidate slot from *this* repoRoot's live checkout;
+    // headSHA is pinned to TASK_ONE_RESTART_HEAD_SHA so the manifest's own headSHA field (and the
+    // `head` comparison column verifyCommittedSnapshot() below recomputes from it) match what
+    // verifyCandidate() requires downstream, without checking that frozen commit out anywhere.
+    const manifestAttemptId = randomUUID();
+    const generatedSnapshot = createSourceSnapshot(
+      repoRoot,
+      ledger,
+      1,
+      manifestAttemptId,
+      receiptDir,
+      null,
+      TASK_ONE_RESTART_HEAD_SHA,
+    );
+    manifestPath = generatedSnapshot.sourceManifestPath;
+    manifestSHA = generatedSnapshot.sourceManifestSHA;
+  }
   if (!manifestPath) {
     const discovered = discoverQualifyingManifest(receiptDir, ownedPaths);
     if (!discovered) {
       throw new HarnessError(
         'SOURCE_MANIFEST_MISSING',
         'No Task-1-bound source manifest (schemaVersion=2, task=1, headSHA='
-          + `${TASK_ONE_RESTART_HEAD_SHA}) found under ${receiptDir}/tree-sha256. One must be `
-          + 'produced first by a process whose repoRoot HEAD is checked out at that exact commit, '
-          + 'then passed via --source-manifest-path/--source-manifest-sha.',
+          + `${TASK_ONE_RESTART_HEAD_SHA}) found under ${receiptDir}/tree-sha256. Pass `
+          + '--emit-source-manifest to generate one now, or produce it elsewhere and pass it via '
+          + '--source-manifest-path/--source-manifest-sha.',
         67,
       );
     }

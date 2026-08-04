@@ -223,7 +223,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   if (teamMatchQuery.isLoading || lineupQuery.isLoading || myTeamsQuery.isLoading) {
     return (
-      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false}>
+      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -240,7 +240,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             ? '경기 정보가 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요.'
             : extractErrorMessage(lineupQuery.error, '라인업을 불러오지 못했어요.');
     return (
-      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false}>
+      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
         <div style={{ padding: '40px 20px' }}>
           <ErrorState
             message={message}
@@ -253,7 +253,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   if (!lineupQuery.data || !state || !phase) {
     return (
-      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false}>
+      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -280,7 +280,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   return (
-    <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false}>
+    <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
       <div style={{ padding: '16px 20px 168px' }}>
         {!isOnline ? (
           <div style={{ marginBottom: 12 }}>

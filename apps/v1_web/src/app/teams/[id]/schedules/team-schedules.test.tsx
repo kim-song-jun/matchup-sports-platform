@@ -186,6 +186,38 @@ describe('TeamSchedulesPage — 목록 라우트 권한 게이팅', () => {
     expect(screen.queryAllByRole('link', { name: '일정 만들기' })).toHaveLength(0);
   });
 
+  // 상태값이 평문으로 렌더돼 다른 메타(종류·시각·참석)와 구분되지 않던 것을 배지로 바꿨다.
+  // 이 저장소 규칙상 상태는 컬러만으로 전달하면 안 되므로, 배지 안에 텍스트 라벨이 남아야
+  // 한다 — 색만 남기고 라벨을 지우면 여기서 깨진다.
+  // 필터 칩도 .tm-badge 를 쓰므로 목록 컨테이너 안으로 범위를 좁힌다.
+  const listStateBadge = (container: HTMLElement) =>
+    container.querySelector('.tm-team-open-match-list .tm-badge');
+
+  it('목록의 상태값은 텍스트 라벨을 유지한 배지로 렌더된다', async () => {
+    const page = await TeamSchedulesPage({ params: Promise.resolve({ id: 'team-1' }) });
+    const { container } = render(page);
+
+    const badge = listStateBadge(container);
+    expect(badge).not.toBeNull();
+    expect(badge).toHaveTextContent('예정');
+  });
+
+  it('취소된 일정도 컬러가 아닌 텍스트로 상태를 알린다', async () => {
+    scheduleApiMocks.useV1TeamSchedules.mockReturnValue({
+      data: { items: [scheduleSummary({ state: 'CANCELLED' })], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    const page = await TeamSchedulesPage({ params: Promise.resolve({ id: 'team-1' }) });
+    const { container } = render(page);
+
+    const badge = listStateBadge(container);
+    expect(badge).not.toBeNull();
+    expect(badge).toHaveTextContent('취소됨');
+  });
+
   it('목록 조회 실패 시 재시도 가능한 에러 상태를 보여준다', async () => {
     const refetch = vi.fn();
     scheduleApiMocks.useV1TeamSchedules.mockReturnValue({

@@ -45,22 +45,26 @@ const TASK_ONE_PREDECESSOR_CHAIN = [
   'd444649adaf1ba88c3dddd755f6728135d8476b4',
   TASK_ONE_RESTART_HEAD_SHA,
 ];
+// 플랜 본문 리비전이 dc4ecb2f -> 108a6cf1 로 바뀌면서 승인/커서/오버라이드/소비 4종 영수증이
+// 새 리비전에 재결속되어 재발급됐다(사용자 명시 승인). 4종 모두 .omo/evidence/*-108a6cf1*.json 로
+// 디스크에 0444 로 이미 존재하며 아래 sha256 은 그 파일들과 실측 대조를 마쳤다. rollback 영수증은
+// 리비전과 무관한 별도 사건 기록이라 갱신 대상이 아니다.
 export const TASK_ONE_RECEIPTS = {
   approval: {
-    path: '.omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json',
-    sha256: 'd30d3688ef97b0cefabfad3e6deb8343bb9e8b8f017bae0ff91572be901527ae',
+    path: '.omo/evidence/approved-task-1-clean-restart-v0-108a6cf1.json',
+    sha256: '12fa590a1948fe57c52733fcd51efb262458a9cc67d5a207df469c02c25601ec',
   },
   cursor: {
-    path: '.omo/evidence/task-1-task127-clean-restart-cursor-dc4ecb2f.json',
-    sha256: '0946bd0170f9034fdc4c5d99803e2b0ecf7afb46344988e9903933bcee55d9a7',
+    path: '.omo/evidence/task-1-task127-clean-restart-cursor-108a6cf1.json',
+    sha256: '8eea308f19545ca64eb37281de5c4095e1f3612051ece9375c717d310e058083',
   },
   override: {
-    path: '.omo/evidence/task-1-host-pressure-override-dc4ecb2f-r2.json',
-    sha256: '84ab59119f5f83bcffed1478faa50b185b0c02bbb3ca5ecc37822a3c49e92748',
+    path: '.omo/evidence/task-1-host-pressure-override-108a6cf1-r2.json',
+    sha256: 'a817d610f746805059c324d1d92f673dc17ca06a2048fcaf62f0802f0727d154',
   },
   consumption: {
-    path: '.omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json',
-    sha256: '6cfd41dcbb56bbb07fe3dfb5eb208f2449b8dbb90cef6742618b75481d8ecac4',
+    path: '.omo/evidence/task-1-v0-execution-consumption-108a6cf1.json',
+    sha256: '03062a64f583f788f52e0da6653677be3dc00bf56432cbbee26ee708fbd3a6f3',
   },
   rollback: {
     path: '.omo/evidence/task-1-rollback-a-recovered.json',
@@ -1571,18 +1575,51 @@ function sourceEntries(repoRoot, sourceTreeSHA, ownedPaths, baselineSHA, headSHA
   });
 }
 
-function createSourceSnapshot(
+export function createSourceSnapshot(
   repoRoot,
   ledger,
   task,
   attemptId,
   evidenceRoot,
   candidateSHA = null,
+  headSHA = null,
 ) {
   const ownedPaths = task === null ? [] : ownershipRow(ledger, task).outputs;
   const privateIndex = privateIndexTree(repoRoot, ownedPaths);
   try {
-    const headSHA = git(['rev-parse', 'HEAD'], { cwd: repoRoot }).trim();
+    // headSHA 인자화는 baseline 슬롯이 이미 쓰던 패턴(ledger.baselineSHA 를 임의 과거 SHA 로
+    // 받아 treePathIdentity 로 체크아웃 없이 읽는 것)을 head 슬롯에 대칭 적용한 것이다.
+    // candidate 슬롯(entry.candidate, privateIndexTree 의 read-tree HEAD + 워킹트리 결과)은
+    // 이 인자와 독립이라 오염되지 않는다.
+    //
+    // 다만 인자화 자체는 공짜가 아니다. 이 인자가 없던 시절 headSHA 는 `git rev-parse HEAD`
+    // 로만 나왔으므로 "이 스냅샷은 실제로 그 커밋에서 떴다"가 위조 불가능한 사실이었다.
+    // 인자를 열면 그 사실이 호출자의 *주장*으로 격하된다 — verifyCommittedSnapshot 의 head
+    // 검사는 snapshot.headSHA 를 기준으로 entry.head 를 재계산해 대조하는 자기참조라 어떤
+    // 값을 넣어도 통과하고, 유일한 소비자 검사(verifyCandidate 의
+    // `headSHA !== TASK_ONE_RESTART_HEAD_SHA`)도 하드코딩 상수와만 비교할 뿐 라이브 HEAD 와
+    // 교차검증하지 않는다. 즉 제약 없이 열면 "승인된 클린 리스타트 커밋에서 캡처됐다"가
+    // 주장만으로 성립한다.
+    //
+    // 그래서 명시 headSHA 는 **라이브 HEAD 의 조상**일 때만 받는다. 이러면 "지금 트리가 그
+    // 앵커에서 뻗어 나왔다"는, 원래 담보하려던 관계가 git 오브젝트 그래프로 증명된다 —
+    // 무관한 커밋이나 다른 갈래의 커밋을 앵커라고 주장할 수 없다. 인자를 안 주면(null)
+    // 종전과 완전히 동일하게 실제 HEAD 를 쓴다.
+    const resolvedHeadSHA = git(['rev-parse', headSHA ?? 'HEAD'], { cwd: repoRoot }).trim();
+    if (headSHA !== null) {
+      const liveHeadSHA = git(['rev-parse', 'HEAD'], { cwd: repoRoot }).trim();
+      if (resolvedHeadSHA !== liveHeadSHA) {
+        try {
+          git(['merge-base', '--is-ancestor', resolvedHeadSHA, liveHeadSHA], { cwd: repoRoot });
+        } catch {
+          throw new HarnessError(
+            'SOURCE_MANIFEST_HEAD_NOT_ANCESTOR',
+            `Explicit source-manifest headSHA ${resolvedHeadSHA} is neither live HEAD nor an ancestor of it`,
+            68,
+          );
+        }
+      }
+    }
     const attemptDir = resolve(
       evidenceRoot,
       candidateSHA ? 'commit-sha256' : 'tree-sha256',
@@ -1595,14 +1632,14 @@ function createSourceSnapshot(
       privateIndex.sourceTreeSHA,
       ownedPaths,
       ledger.baselineSHA,
-      headSHA,
+      resolvedHeadSHA,
     );
     const manifest = {
       schemaVersion: 2,
       attemptId,
       task,
       baselineSHA: ledger.baselineSHA,
-      headSHA,
+      headSHA: resolvedHeadSHA,
       sourceTreeSHA: privateIndex.sourceTreeSHA,
       ownedPaths,
       entries,
@@ -1629,7 +1666,7 @@ function createSourceSnapshot(
       temporaryIndexPath: privateIndex.temporaryIndexPath,
       ownedPaths,
       baselineSHA: ledger.baselineSHA,
-      headSHA,
+      headSHA: resolvedHeadSHA,
       entries,
     };
   } finally {
@@ -3237,6 +3274,13 @@ async function runTaskOneCleanRestart({
         1,
         attemptId,
         evidenceRoot,
+        null,
+        // dev HEAD 는 이미 a4823d2f 를 지나쳤으므로 headSHA 기본값('HEAD')으로는
+        // sourceManifest.receipt.headSHA === TASK_ONE_RESTART_HEAD_SHA 검사(verifyCandidate)를
+        // 영구히 만족할 수 없다. a4823d2f 는 이 저장소의 조상 커밋으로 로컬에 이미 존재하며
+        // git ls-tree/cat-file 은 체크아웃 없이도 그 트리를 읽으므로 여기서 고정 승인 시점을
+        // 명시적으로 지정한다.
+        TASK_ONE_RESTART_HEAD_SHA,
       );
   const image = verificationImage(repoRoot);
   const source = prepareSnapshotExecution(snapshot, repoRoot, false);

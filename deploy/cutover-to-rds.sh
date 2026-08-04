@@ -86,6 +86,7 @@ MAINTENANCE_ON=0
 ENV_SNAPSHOT=""
 ALB_RULE_SNAPSHOT=""
 ALB_RULE_ARN=""
+ALB_LISTENER_ARN=""
 ALB_TARGET_GROUP=""
 
 # ---------------------------------------------------------------------------
@@ -148,6 +149,28 @@ upload_log() {
     || log "로그 S3 업로드 실패"
 }
 
+# aws elbv2 modify-listener 는 API 가 성공을 반환해도 실제 트래픽 경로에 반영되기까지
+# 지연이 있다 — 2026-08-04 이 계정/리전에서 격리 실측 시 최대 약 37초(1회 즉시 확인으로는
+# 항상 놓치는 수준). 단발성 확인은 두 가지로 위험하다: maintenance_on 에서 쓰면 점검창이
+# 실제로는 켜지는 중인데 "실패"로 오판해 불필요한 롤백을 트리거하고, 9단계 최종 확인에서
+# 쓰면 **전환 자체는 성공했는데** 점검 해제 반영이 늦었다는 이유만으로 성공한 전환을
+# 되돌린다. 그래서 짧은 간격으로 관대하게 재시도한다.
+wait_for_public_status() {
+  local url="$1" expected="$2" timeout_s="${3:-90}" interval_s="${4:-3}"
+  local elapsed=0 code="000"
+  while (( elapsed < timeout_s )); do
+    code="$(curl -sS --no-keepalive -o /dev/null -w '%{http_code}' --max-time 10 "${url}" || echo 000)"
+    if [[ "${code}" == "${expected}" ]]; then
+      log "${url} → ${code} 확인 (${elapsed}초 소요)"
+      return 0
+    fi
+    sleep "${interval_s}"
+    elapsed=$(( elapsed + interval_s ))
+  done
+  log "${url} 이 ${timeout_s}초 안에 ${expected} 로 확인되지 않았습니다 (마지막 응답: ${code})"
+  return 1
+}
+
 # 새벽 무인 실행이라 사람이 화면을 보고 있지 않다. 결과는 반드시 밖으로 나가야 한다.
 # SNS 의 Subject 는 ASCII 만 받으므로 제목은 영문으로 쓰고 본문에 한국어를 담는다.
 notify() {
@@ -173,6 +196,9 @@ resolve_alb_default_rule() {
     --load-balancer-arn "${lb_arn}" \
     --query 'Listeners[?Port==`443`].ListenerArn' --output text)"
   [[ -n "${listener_arn}" && "${listener_arn}" != "None" ]] || fail "443 리스너를 찾을 수 없습니다"
+  ALB_LISTENER_ARN="${listener_arn}"
+  # 가드(cutover-guard.sh)는 별도 프로세스라 run_dir 파일로만 이 값을 받을 수 있다.
+  printf '%s' "${listener_arn}" > "${RUN_DIR}/alb-listener-arn.txt"
 
   ALB_RULE_SNAPSHOT="${RUN_DIR}/alb-default-rule.json"
   aws elbv2 describe-rules --region "${AWS_REGION}" \
@@ -194,7 +220,7 @@ maintenance_on() {
   [[ -f "${MAINTENANCE_HTML}" ]] || fail "점검 안내 페이지가 없습니다: ${MAINTENANCE_HTML}"
   body="$(cat "${MAINTENANCE_HTML}")"
 
-  # ALB 고정응답 본문 한도는 1024 **바이트**다. 넘으면 modify-rule 이 거부한다.
+  # ALB 고정응답 본문 한도는 1024 **바이트**다. 넘으면 modify-listener 가 거부한다.
   #
   # `${#body}` 로 세면 안 된다 — 그건 로케일에 따라 **문자 수**를 센다. 이 페이지는
   # 한국어라 차이가 크다: 실측(2026-08-03) 750바이트짜리 페이지가 UTF-8 로케일에서는
@@ -213,33 +239,37 @@ maintenance_on() {
     }
   }]')"
 
-  aws elbv2 modify-rule --region "${AWS_REGION}" \
-    --rule-arn "${ALB_RULE_ARN}" --actions "${actions}" >/dev/null
+  # ELBv2 는 리스너의 **기본 규칙**을 modify-rule 대상으로 허용하지 않는다
+  # (`OperationNotPermitted: Default rule ... cannot be modified`, 2026-08-04 실측). 기본
+  # 액션을 바꾸려면 modify-listener 로 리스너 자체를 대상으로 해야 한다 — IAM 정책도
+  # 리스너 ARN 에 ModifyListener 로 함께 바꿨다(TeameetProdMaintenanceWindow).
+  aws elbv2 modify-listener --region "${AWS_REGION}" \
+    --listener-arn "${ALB_LISTENER_ARN}" --default-actions "${actions}" >/dev/null
   # 이 두 줄은 반드시 붙어 있어야 한다. 사용자 눈에 보이는 상태가 바뀐 순간이 바로 여기이고,
   # 그 전에 실패한 것(페이지 부재·크기 초과·API 거부)은 되돌릴 것이 없다.
   #
   # DANGER_ZONE 을 호출부에서 maintenance_on 앞에 두면, 아직 아무것도 바꾸지 않은 실패까지
   # "롤백 필요"로 분류해 앱 재기동과 실패 알림을 낸다. 반대로 maintenance_on 이 **반환한 뒤**
-  # 로 옮기면 더 나쁘다 — modify-rule 은 성공했는데 아래 503 검증에서 실패하는 경우 롤백이
+  # 로 옮기면 더 나쁘다 — modify-listener 는 성공했는데 아래 503 검증에서 실패하는 경우 롤백이
   # "영향 없음" 경로를 타서 **점검창이 켜진 채 남는다**. 그래서 여기가 유일하게 맞는 자리다.
   MAINTENANCE_ON=1
   DANGER_ZONE=1
   log "점검창 ON"
 
-  # 켜졌는지 확인한다. --no-keepalive 로 새 연결을 강제해야 기존 연결의 응답을 보지 않는다.
-  local code
-  code="$(curl -sS --no-keepalive -o /dev/null -w '%{http_code}' --max-time 15 "${PUBLIC_URL}" || echo 000)"
-  [[ "${code}" == "503" ]] || fail "점검창을 켰는데 ${PUBLIC_URL} 이 ${code} 입니다"
+  # 켜졌는지 확인한다. ALB 전파 지연을 버텨야 하므로 즉시 1회가 아니라 폴링한다.
+  wait_for_public_status "${PUBLIC_URL}" 503 \
+    || fail "점검창을 켰는데 ${PUBLIC_URL} 이 확인 시간 안에 503 이 되지 않았습니다"
   # alpha 는 우선순위 10 규칙이 따로 처리하므로 계속 살아 있어야 한다.
+  local code
   code="$(curl -sS --no-keepalive -o /dev/null -w '%{http_code}' --max-time 15 "${ALPHA_URL}" || echo 000)"
   [[ "${code}" == "200" ]] || log "경고: alpha 가 ${code} 입니다 — 점검창이 alpha 까지 덮었을 수 있습니다"
 }
 
 maintenance_off() {
   (( MAINTENANCE_ON == 1 )) || return 0
-  aws elbv2 modify-rule --region "${AWS_REGION}" \
-    --rule-arn "${ALB_RULE_ARN}" \
-    --actions "Type=forward,TargetGroupArn=${ALB_TARGET_GROUP}" >/dev/null
+  aws elbv2 modify-listener --region "${AWS_REGION}" \
+    --listener-arn "${ALB_LISTENER_ARN}" \
+    --default-actions "Type=forward,TargetGroupArn=${ALB_TARGET_GROUP}" >/dev/null
   MAINTENANCE_ON=0
   log "점검창 OFF"
 }
@@ -294,6 +324,14 @@ $(tail -20 "${LOG_FILE}")"
   "${compose[@]}" up -d --no-deps v1_api v1_web
   log "롤백: 앱 재기동(컨테이너 DB 기준)"
 
+  # --no-deps 로 v1_api/v1_web 만 재생성하면 새 컨테이너가 새 내부 IP 를 받는다. nginx 는
+  # 건드리지 않아 업스트림 IP 를 예전 값으로 계속 붙잡는다 — 내부 헬스체크(포트 8121 직접
+  # 접속)는 nginx 를 거치지 않아 통과하지만, 공개 URL 은 "Host is unreachable" 502 로 계속
+  # 막힌다(2026-08-04 실제 장애로 확인, 수동 `nginx -s reload` 로 복구). 그래서 컨테이너
+  # 재기동 직후 반드시 nginx 를 리로드한다.
+  "${compose[@]}" exec -T nginx nginx -s reload 2>&1 | while IFS= read -r line; do log "nginx reload: ${line}"; done
+  log "롤백: nginx 리로드(새 컨테이너 IP 반영)"
+
   local ok=1
   for _ in $(seq 1 36); do
     if curl -fsS --max-time 10 "${INTERNAL_HEALTH_URL}" | jq -e '.data.checks.db == true' >/dev/null 2>&1; then
@@ -310,8 +348,14 @@ $(tail -20 "${LOG_FILE}")"
 
   maintenance_off
 
+  # ALB 전파 지연을 감안해 폴링한다 — 실패로 로그해도 이 지점은 이미 exit 을 앞두고
+  # 있어 fail() 로 다시 걸지는 않는다(무한 재귀 방지), 대신 SNS 본문을 정확히 남긴다.
   local code
-  code="$(curl -sS --no-keepalive -o /dev/null -w '%{http_code}' --max-time 15 "${PUBLIC_URL}")"
+  if wait_for_public_status "${PUBLIC_URL}" 200; then
+    code=200
+  else
+    code="$(curl -sS --no-keepalive -o /dev/null -w '%{http_code}' --max-time 15 "${PUBLIC_URL}" || echo 000)"
+  fi
   log "롤백 후 공개 응답: ${code}"
 
   publish_metric 0
@@ -551,6 +595,13 @@ log "compose 해석 결과가 RDS 를 가리킴을 확인"
 "${compose[@]}" up -d --no-deps v1_api v1_web
 log "앱 기동"
 
+# --no-deps 로 재생성된 컨테이너는 새 내부 IP 를 받는다 — nginx 를 리로드하지 않으면
+# 업스트림이 예전 IP 를 계속 붙잡아 공개 URL 이 "Host is unreachable" 502 를 낸다
+# (2026-08-04 롤백 경로에서 실제 장애로 확인, 성공 경로도 같은 코드로 컨테이너를
+# 재기동하므로 동일하게 필요하다).
+"${compose[@]}" exec -T nginx nginx -s reload 2>&1 | while IFS= read -r line; do log "nginx reload: ${line}"; done
+log "nginx 리로드(새 컨테이너 IP 반영)"
+
 # ---------------------------------------------------------------------------
 # 9단계 — 검증
 # ---------------------------------------------------------------------------
@@ -580,8 +631,13 @@ log "RDS 측 앱 커넥션 수: ${conn_count}"
 
 maintenance_off
 
-code="$(curl -sS --no-keepalive -o /dev/null -w '%{http_code}' --max-time 15 "${PUBLIC_URL}")"
-[[ "${code}" == "200" ]] || fail "점검 해제 후 ${PUBLIC_URL} 이 ${code} 입니다"
+# 전환 자체는 이미 끝났다 — 여기서 ALB 전파 지연 때문에 fail() 하면 **성공한 전환을
+# 불필요하게 되돌린다.** 그래서 폴링으로 확인한다.
+wait_for_public_status "${PUBLIC_URL}" 200 \
+  || fail "점검 해제 후 ${PUBLIC_URL} 이 확인 시간 안에 200 이 되지 않았습니다 — 전환 자체는 끝났으니 ALB 상태를 직접 확인하세요"
+# 아래 완료 알림(notify)의 "공개 응답" 문구가 이 값을 쓴다. wait_for_public_status 는
+# 성공 여부만 반환하므로, 여기서 통과했다는 사실 자체가 200 이 확인됐다는 뜻이다.
+code=200
 log "공개 검증 통과: ${PUBLIC_URL} → 200"
 
 # ---------------------------------------------------------------------------

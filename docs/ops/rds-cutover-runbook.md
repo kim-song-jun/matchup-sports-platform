@@ -7,10 +7,21 @@
 사람 없이 되돌린다. 이 문서는 그 스크립트가 무엇을 보장하고 무엇을 보장하지 않는지,
 그리고 사람이 해야 하는 일이 무엇인지를 적는다.
 
-## 예약된 실행 (2026-08-04 04:07 KST)
+## 전환 완료 (2026-08-04 01:44 KST, 실행 ID `20260804T014414Z`)
+
+수동 트리거로 실제 전환을 완료했다. 72개 테이블 행 수 전부 일치, `.env` 의
+`V1_DB_HOST` 가 RDS 를 가리키는 채로 유지, 실행 중인 `teameet_v1_api` 컨테이너의
+`DATABASE_URL` 과 RDS 측 직접 조회(`v1_users` 213행) 로 이중 확인했다. 컨테이너
+Postgres 는 롤백 창(최소 7일)으로 그대로 켜 둔 상태다.
+
+이 시도 전까지 같은 밤에 3번 실패했고, 그 과정에서 발견·수정한 결함 4건은 아래
+"2026-08-04 실전 첫 실행" 절과 "unbound variable" 절에 각각 남겨 둔다 — 전부 정적
+검토로는 안 보이고 실제로 실행해야만 드러난 것들이다.
+
+## 예약된 실행 (해제됨 — 완료로 목적 소진)
 
 ```
-systemd timer  teameet-rds-cutover.timer   OnCalendar=2026-08-04 04:07:00 Asia/Seoul
+systemd timer  teameet-rds-cutover.timer   OnCalendar=<재사용 시 날짜 재설정> Asia/Seoul
       └─ service  teameet-rds-cutover.service
             ├─ ExecStart      /usr/local/bin/teameet-cutover-to-rds.sh --cutover
             └─ ExecStopPost   /usr/local/bin/teameet-cutover-guard.sh
@@ -18,6 +29,8 @@ systemd timer  teameet-rds-cutover.timer   OnCalendar=2026-08-04 04:07:00 Asia/S
 
 `Persistent=false` 다. 인스턴스가 그 시각에 꺼져 있었다면 **부팅 후 따라잡지 않는다** —
 점검창을 동반하는 작업이 낮 트래픽 한가운데에서 시작되는 것이 더 나쁘기 때문이다.
+전환 자체는 위에서 완료했으므로 이 타이머는 현재 미사용(비활성) — 향후 다른 환경/재전환에
+재사용할 경우에만 날짜를 새로 설정해 활성화한다.
 
 ## 전제조건 — 이게 없으면 스크립트가 스스로 거부한다
 
@@ -103,13 +116,66 @@ sudo /usr/local/bin/teameet-cutover-to-rds.sh --rehearse
 
 정직하게 적어 둔다. `--rehearse` 는 아래를 **돌리지 않는다.**
 
-- 점검창 ON/OFF (ALB `modify-rule`)
+- 점검창 ON/OFF (ALB `modify-listener`)
 - `.env` 교체와 그 결과의 `compose config`
 - 앱 정지·재기동과 헬스 대기
 - RDS 측 커넥션 확인
 
 이 중 점검창 실패는 안전하다 — `maintenance_on` 은 켠 직후 503 을 직접 확인하고, 실패하면
 앱을 정지하기 전에 멈춘다. 나머지는 배포 스크립트가 매 배포마다 쓰는 것과 같은 명령이다.
+
+### 2026-08-04 실전 첫 실행 — 점검창 토글이 여기서 걸렸다
+
+리허설이 못 돌리는 바로 그 구간(점검창 ON)에서 실제로 막혔다. `aws elbv2 modify-rule`
+을 리스너의 **기본 규칙**에 썼는데, ELBv2 는 기본 규칙을 `modify-rule` 대상으로 허용하지
+않는다(`OperationNotPermitted: Default rule ... cannot be modified`). 기본 액션을 바꾸려면
+`modify-listener --default-actions` 로 리스너 자체를 대상으로 해야 한다.
+
+실패는 프리플라이트 통과 **직후, ALB 를 아직 바꾸기 전**이라 사용자 영향은 0 이었다
+(컨테이너 재시작 없음·`.env` 미변경·health 정상, 독립적으로 재확인함). `maintenance_on`
+과 `maintenance_off`, 그리고 `cutover-guard.sh` 의 안전망 해제 로직을 모두 `modify-listener`
+로 바꿨고, 가드는 별도 프로세스라 리스너 ARN을 `${run_dir}/alb-listener-arn.txt` 로 받는다.
+IAM 정책도 함께 바꿨다(아래 표).
+
+### 2번째 시도 — ALB 전파 지연이 즉시 확인을 이긴다
+
+`modify-listener` 는 고쳤지만 켠 직후 1회 즉시 확인(`curl` 한 번)이 여전히 남아 있었다.
+격리 실측(앱·DB 안 건드리고 ALB 토글만 단독 실행) 결과 이 계정/리전에서 기본 액션 변경이
+**최대 약 37초** 지연 전파됐다 — 그 사이 공개 응답은 계속 이전 상태를 보여준다. 1회 확인은
+이 지연을 못 버텨 "점검창을 켰는데 200" 으로 오판 → 정상적으로 자동 롤백(영향 없음, 앱
+재시작만 발생). 이 격리 측정 자체가 원복 반영이 늦어지며 **실사용자에게 약 30~50초 503
+을 노출**시켰다 — 즉 진단 행위 자체도 실제 프로덕션에 영향을 준다는 교훈.
+
+고침: 공유 `wait_for_public_status()` 헬퍼로 최대 90초(3초 간격) 폴링하도록 3곳을 모두
+바꿨다 — 점검창 ON 확인(실패 시 fail), 롤백 후 확인(로그용, non-fatal), **9단계 최종 확인
+(실패 시 fail)**. 마지막 자리가 특히 위험했다 — 여기서 잘못 fail 하면 **전환 자체는
+성공했는데 ALB 확인이 늦었다는 이유만으로 성공한 전환을 되돌린다.**
+
+### 3번째 시도 — nginx 가 재생성된 컨테이너의 옛 IP 를 붙잡는다
+
+ALB 문제는 둘 다 고쳤는데도 롤백 뒤 공개 URL 이 여전히 502 였다(`nginx/1.29.8` 배너,
+`connect() failed (113: Host is unreachable)`). 원인: 롤백/9단계 모두 `docker compose up
+-d --no-deps v1_api v1_web` 로 앱만 재생성하는데, 이러면 컨테이너가 **새 내부 IP** 를
+받는다. `nginx` 컨테이너는 손대지 않으므로 업스트림을 예전(이제 존재하지 않는) IP 로 계속
+붙잡아 "Host is unreachable" 502 를 낸다. 내부 헬스체크(포트 8121 직접 접속)는 nginx 를
+거치지 않아 이 문제를 못 잡는다 — 오직 공개 URL 경로에서만 드러난다.
+
+이건 실제로 몇 분간 진짜 장애였다(수동 `docker exec teameet_nginx nginx -s reload` 로
+복구). 고침: 두 `up -d --no-deps` 호출 직후 `"${compose[@]}" exec -T nginx nginx -s
+reload` 를 추가했다 — 내부 헬스체크 대기 **전에** 리로드해서, 재생성된 컨테이너가 아직
+뜨는 중이라도 nginx 가 최소한 올바른(새) IP 를 보게 한다.
+
+### 4번째 시도 — 실제로 성공, 완료 알림 코드에 별개 버그
+
+전환 자체는 끝까지 통과했다(72개 테이블 행 수 일치 · `.env` 전환 · RDS 커넥션 확인 ·
+공개 200 확인 · "전환 완료" 로그). 그런데 `trap - ERR` 로 롤백 트랩을 이미 해제한
+**완료 섹션**에서 `notify()` 호출이 `${code}` 를 참조했는데, 그 변수를 채우던 대입문을
+2번째 시도 수정에서 `wait_for_public_status()` 폴링으로 바꾸면서 실수로 지워
+`set -u` 의 "unbound variable" 로 스크립트가 exit 1 로 죽었다. **trap 해제 이후라
+롤백은 걸리지 않았다** — `.env`·컨테이너 DATABASE_URL·RDS 쪽 직접 조회로 세 번 독립
+확인해 전환이 그대로 유지됐음을 검증했다. 다만 SNS 성공 알림은 이 크래시 때문에
+발송되지 못해 수동으로 보완 발송했다. 고침: `wait_for_public_status` 통과 직후
+`code=200` 을 명시적으로 다시 채운다.
 
 ## 필요한 IAM (인스턴스 롤 `teameet-certbot-route53`)
 
@@ -118,7 +184,7 @@ sudo /usr/local/bin/teameet-cutover-to-rds.sh --rehearse
 | Sid | Action | Resource |
 |---|---|---|
 | ReadListenerConfiguration | `elasticloadbalancing:Describe{LoadBalancers,Listeners,Rules}` | `*` (ELBv2 Describe 는 리소스 스코프 미지원) |
-| ToggleMaintenanceOnDefaultRuleOnly | `elasticloadbalancing:ModifyRule` | **기본 규칙 1개 ARN만** |
+| ToggleMaintenanceOnListenerDefaultAction | `elasticloadbalancing:ModifyListener` | **443 리스너 ARN 1개만**(2026-08-04 정정 — 기본 규칙은 `ModifyRule` 대상이 될 수 없어 리스너 자체로 스코프를 옮겼다) |
 | PublishCutoverHeartbeat | `cloudwatch:PutMetricData` | 네임스페이스 `Teameet/Cutover` 조건 |
 | NotifyOpsOnCutoverOutcome | `sns:Publish` | `teameet-prod-ops-alerts` |
 

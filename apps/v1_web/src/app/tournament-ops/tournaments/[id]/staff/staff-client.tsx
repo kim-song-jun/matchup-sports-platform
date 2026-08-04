@@ -205,7 +205,14 @@ export function StaffClient({ tournamentId }: Props) {
                       <tr key={assignment.id}>
                         <td className="px-4 py-3 align-middle">
                           <p className="font-medium text-gray-900 dark:text-white">{staffRoleLabel(assignment.role)}</p>
-                          <p className="text-[12px] text-gray-400 tabular-nums">{assignment.userId.slice(0, 8)}…</p>
+                          {/* 담당자를 userId 앞 8자로만 보여주면 표에서 누가 누구인지 알 수 없다.
+                              닉네임이 있으면 그것을 보여주고, 없을 때만 종전 식별자 조각으로 남긴다 —
+                              닉네임이 공개 신원으로 쓸 수 있는 유일한 값이다(D-03/D-11). */}
+                          {assignment.nickname ? (
+                            <p className="text-[12px] text-gray-500 dark:text-gray-400">{assignment.nickname}</p>
+                          ) : (
+                            <p className="text-[12px] text-gray-400 tabular-nums">{assignment.userId.slice(0, 8)}…</p>
+                          )}
                         </td>
                         <td className="px-4 py-3 align-middle">
                           {assignment.fieldId
@@ -261,7 +268,12 @@ export function StaffClient({ tournamentId }: Props) {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900 dark:text-white">{staffRoleLabel(assignment.role)}</p>
-                      <p className="text-[12px] text-gray-400 tabular-nums">{assignment.userId.slice(0, 8)}…</p>
+                      {/* 데스크톱 표와 같은 규칙 — 닉네임이 있으면 이름, 없을 때만 식별자 조각. */}
+                      {assignment.nickname ? (
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400">{assignment.nickname}</p>
+                      ) : (
+                        <p className="text-[12px] text-gray-400 tabular-nums">{assignment.userId.slice(0, 8)}…</p>
+                      )}
                     </div>
                     <span
                       className={[
@@ -315,7 +327,11 @@ export function StaffClient({ tournamentId }: Props) {
         open={revokeTarget !== null}
         onClose={() => setRevokeTarget(null)}
         onSubmit={handleRevokeSubmit}
-        targetLabel={revokeTarget ? `${staffRoleLabel(revokeTarget.role)} (${revokeTarget.userId.slice(0, 8)}…)` : ''}
+        targetLabel={
+          revokeTarget
+            ? `${staffRoleLabel(revokeTarget.role)} (${revokeTarget.nickname ?? `${revokeTarget.userId.slice(0, 8)}…`})`
+            : ''
+        }
         pending={revoke.isPending}
         errorMessage={revokeError}
       />

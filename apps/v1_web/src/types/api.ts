@@ -3473,6 +3473,8 @@ export type V1TournamentStaffAssignment = {
   revokedAt: string | null;
   grantedByUserId: string | null;
   createdAt: string;
+  /** 프로필이 없거나 닉네임 미설정이면 null — 그때는 식별자로 대체하지 않는다. */
+  nickname?: string | null;
 };
 
 export type V1TournamentStaffListResponse = {

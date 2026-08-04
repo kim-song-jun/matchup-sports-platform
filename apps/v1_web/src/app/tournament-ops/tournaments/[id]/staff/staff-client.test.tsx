@@ -26,6 +26,7 @@ const DIRECTOR_ROW: V1TournamentStaffAssignment = {
   revokedAt: null,
   grantedByUserId: null,
   createdAt: '2026-08-01T00:00:00.000Z',
+  nickname: '디렉터윤',
 };
 
 const FIELD_OPERATOR_ROW: V1TournamentStaffAssignment = {
@@ -68,6 +69,26 @@ describe('StaffClient', () => {
     mocks.useTournamentOpsRole.mockReset();
     mocks.grantMutate.mockReset();
     mocks.revokeMutate.mockReset();
+  });
+
+  // 표가 담당자를 userId 앞 8자로만 보여줘 누가 누구인지 알 수 없었다. 닉네임이 있으면
+  // 그것을 보여주고, 없을 때만 종전 식별자 조각으로 남긴다 — 닉네임이 공개 신원으로 쓸 수
+  // 있는 유일한 값이므로 다른 값으로 대체하지 않는다.
+  it('shows the staff nickname when the profile has one', () => {
+    setRole('TOURNAMENT_DIRECTOR');
+    render(<StaffClient tournamentId="t-1" />);
+
+    // 모바일 카드와 데스크톱 표 두 경로가 같은 행을 그린다 — 둘 다 이름을 보여야 한다.
+    expect(screen.getAllByText('디렉터윤')).toHaveLength(2);
+    expect(screen.queryByText('director…')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the identifier fragment when no nickname exists', () => {
+    setRole('TOURNAMENT_DIRECTOR');
+    render(<StaffClient tournamentId="t-1" />);
+
+    // FIELD_OPERATOR_ROW 에는 nickname 이 없다 -> 두 경로 모두 userId 앞 8자로 남는다
+    expect(screen.getAllByText('field-op…')).toHaveLength(2);
   });
 
   it('hides the grant button and every revoke action for a read-only support role', () => {

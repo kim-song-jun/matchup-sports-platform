@@ -848,3 +848,37 @@ REJECT 를 유지한다. 통과시키려면 (a) 선발 명단 시드, (b) 승인
   동의를 요구 — 시드 선수는 동의 이력 없음).
 - 플래그 조작: `PUBLIC_LIVE` off → on (DB 데이터. 소유 코드 파일
   `game-operation-flags.ts` 는 건드리지 않음), `v1_game_visibility_policies.lineup_at` 설정.
+
+## F3 재실행 결과 (2026-08-04, 갱신)
+
+takeover 수정 이후 막혀 있던 여정을 실제로 밟아 **3/7 → 5/7** 로 올렸다.
+
+| 여정 | 이전 | 현재 | 근거 |
+|---|---|---|---|
+| E2E-AUTH-01 | pass | pass | 스태프 배정 201, 화면 렌더 |
+| E2E-TEAM-01 | pass | pass | 8단계 200, 결과 3:1 + 득점 타임라인 렌더 |
+| E2E-TEAM-02 | fail | **fail** | 시드 팀매치 리비전 3건이 전부 OFFICIAL → 승인 대기 없음. 대기 상태를 만들려면 정정 경로(DIRECTOR_OFFICIALIZE 차단) 또는 terminal 불변식 우회가 필요해 수행 안 함 |
+| E2E-TOUR-01 | fail | **pass** | 경기 종료 → rev1 SUBMITTED 자동 생성 → 결과 검토에서 승인 → DB `OFFICIAL` 확인, 큐 비워짐 |
+| E2E-TOUR-02 | fail | **pass** | `경기 시작` → LIVE → 골 4건 ack → `경기 종료` → ENDED v6 |
+| E2E-CORR-01 | fail | fail | DIRECTOR_OFFICIALIZE 게이트 증거 번들 생성기가 GitHub Actions 컨텍스트 종속. 플래그를 DB로 직접 바꾸면 게이트 자체를 우회하므로 안 함 |
+| E2E-PUBLIC-01 | pass | pass | 공개 4화면 3폭 200, PUBLIC_LIVE on 에서 골 4건 노출 |
+
+영수증 `f3-review-receipt-v3.json`(0444, sha256 `d34e0c6b…`)을 이번 라운드 증거
+zip(`f3-qa-evidence-v2.zip`, 176 files, sha256 `ce7d4e1b…`)에 묶어 재발급.
+게이트 실행 결과 `qa-evidence-provided` 는 **PASS 로 전환**됐고, 나머지 두 FAIL 은
+5/7 이라는 정직한 verdict(REJECT)에서 나온 것이다.
+
+### 게이트 설계 결함 #4 — F3 `live-surface-reachable` 는 현재 도달 불가
+
+- 게이트는 3013/8121 을 **수동 probe** 만 한다("this gate never starts these services itself").
+- 래퍼는 `--lifecycle-owner outer` 일 때 **포트가 비어 있을 것을 강제**한다
+  (`FOREIGN_PORT_OWNER`, line 1277).
+- 그런데 래퍼에는 web/api 를 기동하는 코드가 없다 — `pnpm` spawn 0건, `dockerRequired`
+  11건으로 Docker/DB 만 관리한다.
+- 결과: 포트를 비우면 probe 가 down, 스택을 띄우면 래퍼가 FOREIGN_PORT_OWNER 로 거부.
+  **어느 쪽이든 `live-surface-reachable` 은 통과할 수 없다.**
+- 앞서 "게이트는 포트 free 를 요구하고 캡처는 스택을 요구한다" 고 적었던 것은 F2 기준의
+  부분적 서술이었다. F3 에서는 래퍼가 서비스를 띄워야 하는데 그 구현이 없는 것이 정확한 진단이다.
+- 수정 방향: `--lifecycle-owner outer` 이고 finalGate==='F3' 일 때 래퍼가 포트 확인 직후
+  web/api 를 기동하고 종료 시 정리하며, 그 사실을 lifecycle 영수증에 남긴다. 이번 세션에서는
+  컨텍스트 여유가 없어 착수하지 않고 진단만 박제한다 — 절반만 고쳐 하네스를 깨뜨리는 것보다 낫다.

@@ -159,6 +159,17 @@ async function clearTermsGate(page) {
   return true;
 }
 
+/**
+ * Next 개발 서버가 주입하는 Dev Tools 인디케이터(좌하단 어두운 원)를 캡처에서만 숨긴다.
+ * 앱 UI 가 아니라 프레임워크의 dev-only chrome 이라 갤러리에 남으면 제품 결함처럼 읽힌다
+ * — 실제로 이 세션에서 "플로팅 버튼이 잘린다" 는 오진을 만들었다. next.config 에서 전역으로
+ * 끄면 이 저장소의 모든 개발자가 그 도구를 잃으므로, 캡처하는 쪽에서만 가린다.
+ */
+const HIDE_DEV_INDICATOR = `
+  nextjs-portal, [data-nextjs-dev-tools-button], #next-logo,
+  [data-next-badge-root], [data-nextjs-toast] { display: none !important; }
+`;
+
 const records = [];
 const browser = await chromium.launch();
 
@@ -170,6 +181,17 @@ try {
         viewport: { width: vp.width, height: vp.height },
         deviceScaleFactor: 2,
       });
+      // addStyleTag 는 about:blank 에 붙어 goto 하면 사라진다 — 문서마다 실행되는
+      // initScript 로 넣어야 실제 화면에 적용된다.
+      await context.addInitScript((css) => {
+        const apply = () => {
+          const style = document.createElement('style');
+          style.textContent = css;
+          document.head?.appendChild(style);
+        };
+        if (document.head) apply();
+        else document.addEventListener('DOMContentLoaded', apply);
+      }, HIDE_DEV_INDICATOR);
       const page = await context.newPage();
       const consoleErrors = [];
       const pageErrors = [];

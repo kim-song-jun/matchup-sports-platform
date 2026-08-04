@@ -44,7 +44,9 @@ export function ScheduleListPageView({ model }: { model: ScheduleListViewModel }
         ) : null}
       </div>
 
-      <div className="tm-team-list" style={{ gap: 12 }}>
+      {/* .tm-team-list 는 padding만 정의된 block 컨테이너라 gap이 무시됐다 —
+          flex column으로 만들어 토글/필터/목록 사이 12px 간격이 실제로 적용되게 한다. */}
+      <div className="tm-team-list" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div role="tablist" aria-label="보기 방식" style={{ display: 'flex', gap: 8 }}>
           <button
             type="button"
@@ -104,7 +106,13 @@ export function ScheduleListPageView({ model }: { model: ScheduleListViewModel }
                 href={item.href}
                 title={item.title}
                 sub={`${item.typeLabel} · ${item.dateTimeLabel} · ${item.attendanceSummary}`}
-                trailing={item.stateLabel}
+                // 컬러만으로 상태를 구분하지 않도록 텍스트(stateLabel)를 유지한 채 배지로 감싼다 —
+                // 상세 페이지(line 257 부근)와 동일하게 stateTone(색 계산은 이미 view-model에 있었음)을 소비.
+                trailing={
+                  <span className={`tm-badge ${item.stateTone === 'default' ? 'tm-badge-blue' : 'tm-badge-grey'}`}>
+                    {item.stateLabel}
+                  </span>
+                }
                 chev
               />
             ))}

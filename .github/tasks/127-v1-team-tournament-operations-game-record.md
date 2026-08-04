@@ -930,3 +930,28 @@ APPROVE 까지 남은 것: ① 팀매치 승인 대기 리비전을 정식 경�
 상대팀이 승인하면 된다. 현재 game 이 연결된 팀매치 4건은 모두 이미 ENDED 다.
 
 부수 소득: 결과 파이프라인의 무결성 규칙 3종이 실제로 작동함을 실행으로 확인했다.
+
+### E2E-TEAM-02 — 통과 (2026-08-04). F3 5/7 → 6/7
+
+앞 절에서 "시드 픽스처로는 불가" 로 확정했던 여정을, **정식 경로로 픽스처를 새로 만들어**
+처음부터 끝까지 밟았다. 기존 팀매치를 건드리거나 terminal 리비전을 우회하지 않았다.
+
+1. `POST /team-matches` — 팀매치 생성 시 game 이 함께 생성된다(`createFromSourceInTransaction`).
+   → teamMatch `3a014d13-…`, game `a83b4514-…`, status `recruiting`, game `SCHEDULED v0`
+2. 상대팀(0102, owner=host@teameet.v1) `POST /team-matches/:id/applications` → `requested`
+3. 호스트 `POST /team-match-applications/:id/approve` → `approved`, teamMatch `matched`
+4. 호스트 `POST /games/:id/result-revisions` → `DRAFT rev1`
+5. 호스트 `POST /games/:id/result-revisions/:rev/submit` → **`SUBMITTED rev1`** (승인 대기)
+6. 상대팀 `POST /games/:id/result-revisions/:rev/decision {decision:'approve'}`
+   → **`OFFICIAL rev1`**, `current_official_revision_id` 포인터 설정(DB 실측)
+
+도중에 확인한 사실:
+- 팀매치 게임은 `game.takeover.request` 로 잡을 수 없다 — owner 도 admin(platform_ops) 도
+  `STAFF_SCOPE_DENIED`. takeover 는 `resolveActor(..., 'tournament_command')` 를 쓰므로
+  **대회 경기 전용 경로**이고, 팀매치는 호스트가 결과 리비전을 직접 올리는 별도 경로다.
+- `regionId` 는 UUID 여야 한다. 시드의 `region-seoul-gangnam` 같은 슬러그 id 는 거부된다.
+- 결과 결정 라우트는 `/decision` 이다(`/decide` 아님).
+
+F3 영수증 v5(0444, sha256 `60d88f39…`) 로 갱신. **6/7**, verdict 는 여전히 REJECT —
+남은 E2E-CORR-01 이 게이트 증거 번들 부재로 막혀 있기 때문이다.
+게이트 재실행 결과 인프라 4체크 PASS 유지, 실행 후 포트 자동 정리 확인.

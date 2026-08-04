@@ -3,7 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ClipboardList, LayoutDashboard, Menu, ShieldCheck, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ClipboardCheck,
+  ClipboardList,
+  LayoutDashboard,
+  Menu,
+  PencilLine,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
 import type { V1TournamentStaffRole } from '@/types/api';
 import { staffRoleLabel } from './badges';
 
@@ -17,20 +26,42 @@ interface NavItem {
 /**
  * 배정 인식 내비게이션(assignment-aware navigation) — 이 셸에 진입할 수 있는 역할은
  * platform_ops/tournament_director/support_readonly뿐이다(field_operator는 대회 전역
- * 리소스 read 권한이 없어 게이트에서 걸러진다. `_gate.tsx` 참고). 두 라우트 모두
- * 세 역할 전부 조회는 가능하고, 스태프 관리(배정/해제) 조작만 role에 따라 화면 내부에서
- * 추가로 숨긴다 — 링크 자체를 role별로 다르게 보여줄 필요는 없다.
+ * 리소스 read 권한이 없어 게이트에서 걸러진다. `_gate.tsx` 참고).
+ *
+ * 운영 보드·스태프는 세 역할 전부 조회 가능하므로 항상 노출한다. 결과 검토·결과 정정은
+ * 원장(screens A-03/A-04)이 tournament_director / platform_ops 로 제한하므로 그 두 역할에만
+ * 노출한다 — support_readonly 에게 열어두면 열자마자 막히는 링크가 된다.
+ *
+ * 이 두 항목은 원래 여기 없었다. 라우트는 존재하는데 진입 링크가 어디에도 없어 URL 을 직접
+ * 아는 사람만 갈 수 있는 고아 라우트였다(여정 검수 major 2건). 화면을 만들 때 셸의 nav 를
+ * 함께 갱신하지 않으면 같은 일이 반복되므로, 라우트를 추가하는 쪽에서 이 목록도 같이 본다.
  */
-function buildNavItems(tournamentId: string): NavItem[] {
+function buildNavItems(tournamentId: string, role: V1TournamentStaffRole): NavItem[] {
+  const base = `/tournament-ops/tournaments/${tournamentId}`;
+  const canManageResults = role === 'TOURNAMENT_DIRECTOR' || role === 'PLATFORM_OPS';
   return [
     {
       label: '운영 보드',
-      href: `/tournament-ops/tournaments/${tournamentId}/operations`,
+      href: `${base}/operations`,
       icon: <LayoutDashboard size={18} aria-hidden="true" />,
     },
+    ...(canManageResults
+      ? [
+          {
+            label: '결과 검토',
+            href: `${base}/result-review`,
+            icon: <ClipboardCheck size={18} aria-hidden="true" />,
+          },
+          {
+            label: '결과 정정',
+            href: `${base}/records/corrections`,
+            icon: <PencilLine size={18} aria-hidden="true" />,
+          },
+        ]
+      : []),
     {
       label: '스태프',
-      href: `/tournament-ops/tournaments/${tournamentId}/staff`,
+      href: `${base}/staff`,
       icon: <ShieldCheck size={18} aria-hidden="true" />,
     },
   ];
@@ -61,7 +92,7 @@ interface DrawerProps {
 
 function Drawer({ open, onClose, tournamentId, tournamentTitle, role, pathname, triggerRef }: DrawerProps) {
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(tournamentId);
+  const navItems = buildNavItems(tournamentId, role);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -216,7 +247,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, role, pathname, 
 export function TournamentOpsShell({ children, tournamentId, tournamentTitle, role }: TournamentOpsShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(tournamentId);
+  const navItems = buildNavItems(tournamentId, role);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
 

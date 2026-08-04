@@ -331,7 +331,11 @@ export function useV1GameOperationsConsole(
             assignmentVersion: myAssignment.data?.version ?? 0,
           });
         } else {
-          dispatchTakeover({ type: 'DENIED', code: result.code ?? 'STAFF_SCOPE_DENIED' });
+          // 서버가 코드를 주지 않은 경우까지 STAFF_SCOPE_DENIED 로 뭉뚱그리면 안 된다.
+          // 소켓이 연결/인증에 실패해 응답이 비어 있어도 화면은 "권한이 없어요" 라고 말하게 되고,
+          // 운영자는 실제 원인(세션·연결)이 아니라 권한 요청이라는 엉뚱한 경로로 간다.
+          // 서버가 명시한 거부만 그 코드로 남기고, 나머지는 원인 미상으로 구분한다.
+          dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_UNAVAILABLE' });
         }
       },
     );
@@ -507,6 +511,8 @@ function gameOperationsErrorMessage(code: string): string {
       return '운영 권한 토큰이 만료됐어요. 다시 가져오는 중이에요.';
     case 'STAFF_SCOPE_DENIED':
       return '이 경기를 운영할 권한이 없어요.';
+    case 'TAKEOVER_UNAVAILABLE':
+      return '실시간 연결이 끊겨 경기 운영을 시작하지 못했어요. 새로고침 후 다시 시도해 주세요.';
     case 'VERSION_CONFLICT':
       return '경기 상태가 변경되어 다시 시도해주세요.';
     case 'CLOCK_DRIFT':

@@ -2324,3 +2324,50 @@ Task 22 전체 gap 해소 후, 같은 세션 초반에 "Task 23도 유사하게 
 - 결론: Task 23는 실측 기준으로 **실질적으로 완성**돼 있고 명백한 gap은 없다. 위 2건은
   깊은 결함이라기보다 검증 방식의 한계이므로, 필요하면 후속 세션에서 라이브 스크린샷으로
   마저 확인하면 된다.
+
+## PR #249 — dev 머지 충돌 해소 + 자기 정정 기록 (2026-08-05)
+
+Task 22·23 검증 완료 후 PR #249 상태를 재확인하다 `mergeable: CONFLICTING`을 발견했다.
+`dev`가 이 브랜치(`codex/teameet-task9-ci`)의 merge-base 대비 1커밋(`47c39098 fix(v1/matches):
+harden create and edit contracts`) 앞서 있었고, `apps/v1_api/src/team-matches/team-matches.service.ts`
+에서 실제 비즈니스 로직이 텍스트 충돌했다.
+
+### 해소한 진짜 충돌
+dev의 신규 검증("sportId는 host team의 실제 sport와 일치해야 함", create+update 양쪽)과
+이 브랜치의 기존 불변식("Game 경쟁설정이 pin된 이후 sportId 변경 자체 금지",
+`COMPETITION_CONFIG_IMMUTABLE`)이 `update()`에서 충돌했다. 단순히 순서를 정하는 문제가
+아니라 dev가 새로 추가한 테스트("host team 종목과 다른 종목으로 변경할 수 없다")가 어느
+체크가 먼저 발화해야 하는지 실제로 명시하고 있었다 — **host-team 일치 체크를 먼저**, pin
+불변식을 그 뒤에 두도록 정했다. 기존 pin 불변식 테스트는 `hostTeam` mock이 아예 없어
+재정렬 즉시 `TypeError`로 깨졌던 것을 발견해 mock을 보정했다(`hostTeam.sportId`를 시도하는
+`dto.sportId`와 일치시켜 host-team 체크를 조용히 통과시키고 순수하게 pin 규칙만 검증).
+
+검증: 격리 임시 worktree(`/tmp`, 기존 worktree 어디도 건드리지 않음)에서 정확히 이 병합
+트리를 체크아웃해 `tsc --noEmit` clean, `apps/v1_api` 유닛 테스트 전체 **1499/1499 통과**
+(129 스위트) 확인. `git merge-base`/private index(`GIT_INDEX_FILE`)로 실제 워킹트리·인덱스는
+전혀 건드리지 않고 처리했다. 병합 커밋 `bdec5b90`(부모: task9-ci tip + dev tip) →
+`codex/teameet-task9-ci`에 직접 push, PR #249 `mergeable: MERGEABLE`로 복구 확인.
+
+### 자기 정정 — cwd 드리프트로 인한 오판 (교훈)
+충돌 조사 중 "`complete()` 팀매치 완료 메서드 전체가 오늘 회귀로 사라졌고 프론트는 여전히
+호출 중이라 지금 깨져 있다"고 잘못 결론 내리고 **사용자에게 복구 승인까지 받았다.** 이후
+`git show <ref>:<path>`(cwd 무관, 항상 정확)로 재검증하자 실제로는 정반대였다 — 프론트
+코드(`team-matches-client.tsx`)에 `// Task 16 removed the standalone "complete" mutation —
+completion is now an atomic side effect of the host submitting a validated result revision`
+라는 명시적 주석이 있었다. **Task 16이 의도적으로 재설계**한 것이었고 프론트는 이미 새
+설계를 따르고 있어 아무것도 깨져 있지 않았다.
+
+원인: 셸 cwd가 어느 시점에 `task-27` 워크트리에서 **메인 체크아웃 루트**로 흘러갔고
+(이 저장소는 태스크마다 별도 워크트리 30여 개를 쓰는 구조), 그 이후 `git status`/
+`git log`(ref 미지정, `HEAD` 암묵 참조)/상대경로 `grep` 같은 **cwd-종속 명령**이 task-27이
+아니라 메인 체크아웃의 다른 브랜치를 가리켜 "task-27 vs task9-ci 비교"가 실제로는
+"[메인 체크아웃의 현재 브랜치] vs task9-ci 비교"로 뒤바뀌었다. `git show ref:path`처럼
+**ref를 명시하는 명령은 cwd와 무관해 전 과정에서 정확**했다 — 그래서 dev-merge-conflict
+본 조사(전부 `git show`/`git diff <ref1> <ref2>` 기반)는 오염되지 않았고, complete() 관련
+지엽 조사(순수 `grep`/`git status`/`HEAD` 암묵 참조)만 오염됐다.
+
+**교훈**: 30여 개 worktree가 공존하는 이 저장소에서는 상대경로·`HEAD` 암묵 참조·
+`git status`처럼 **cwd에 의존하는 명령을 쓰기 전 반드시 `pwd`로 위치를 확인**한다. 사실관계
+확인이 필요하면 `git show <구체적 ref>:<path>` 형태를 기본으로 쓴다. 오판을 발견한 즉시
+사용자에게 승인 자체가 잘못된 전제에 기반했음을 정정하고, 실행하지 않았다(전역 규칙: 사용자
+승인이 있어도 그 전제가 무너지면 재확인 없이 진행하지 않는다).

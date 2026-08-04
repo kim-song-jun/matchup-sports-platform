@@ -330,7 +330,17 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                   {manage.completePending ? '처리 중…' : '완료 처리'}
                 </button>
               ) : null}
-              <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={manage.cancelPending} onClick={manage.onCancel}>
+              {/* 취소는 이 카드에서 유일한 파괴적 액션인데 ghost(배경 없음)라 평문처럼 보여
+                  형제 버튼들보다 오히려 덜 눌러 보였다. 테두리를 줘 버튼임이 드러나게 하되,
+                  꽉 찬 danger 로 만들면 수정·완료 처리보다 시선을 끌어 잘못 유도하므로
+                  outline 에 위험 색만 얹는다. */}
+              <button
+                type="button"
+                className="tm-btn tm-btn-sm tm-btn-outline"
+                style={{ color: 'var(--red500)' }}
+                disabled={manage.cancelPending}
+                onClick={manage.onCancel}
+              >
                 일정 취소
               </button>
               {manage.reminders.filter((reminder) => reminder.visible).map((reminder) => (

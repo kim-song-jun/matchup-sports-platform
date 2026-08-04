@@ -37,6 +37,7 @@ leader/member role distribution without opening detail.
 
 `GET /admin/users/:userId` returns the list row fields plus:
 
+- admin-only contact and profile fields: `phone`, email/phone verification timestamps, `birthDate`, `displayRegion`, and `bio`
 - `deletedAt`
 - `withdrawalRequest: { reason, requestedAt } | null`
 - `teamRoleCounts: { owner, manager, member }`
@@ -44,6 +45,8 @@ leader/member role distribution without opening detail.
 - recent `hostedMatches[]`
 - owned `ownedTeams[]`
 - optional `reputationSummary`
+
+`GET /admin/teams/:teamId` additionally returns active `members[]` with membership/user IDs, role, join date, private name/nickname, email, and phone. These fields remain confined to the admin-guarded detail route and are not added to public team responses.
 
 `withdrawalRequest.reason` is the message the user submitted when requesting account withdrawal.
 

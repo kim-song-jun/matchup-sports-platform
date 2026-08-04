@@ -18,6 +18,7 @@ import { RichTextEditor } from '@/components/content/rich-text-editor';
 import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import {
   useV1AdminMe,
+  useV1AdminTournaments,
   useV1AdminPopupDetail,
   useV1AdminPopups,
   useV1CreateAdminPopup,
@@ -26,7 +27,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
 import { extractErrorMessage } from '@/lib/error-message';
-import { isSafePopupLink, POPUP_TARGET_LABELS, POPUP_TARGET_OPTIONS } from '@/lib/popup-targets';
+import { isSafePopupLink, isSafePopupTargetPath, POPUP_TARGET_LABELS, POPUP_TARGET_OPTIONS } from '@/lib/popup-targets';
 import { EMPTY_RICH_CONTENT, isRichContentEmpty, resolveRichContent, richContentPlainText } from '@/lib/rich-content';
 import type {
   AdminListFilters,
@@ -94,7 +95,9 @@ function formatDisplayWindow(start: string | null | undefined, end: string | nul
 }
 
 function formatTargetScreens(targetScreens: V1PopupTargetScreen[]) {
-  return targetScreens.map((screen) => POPUP_TARGET_LABELS[screen]).join(', ');
+  return targetScreens.length > 0
+    ? targetScreens.map((screen) => POPUP_TARGET_LABELS[screen]).join(', ')
+    : '화면 그룹 없음';
 }
 
 const PAGE_SIZE = 20;
@@ -111,6 +114,7 @@ export default function AdminPopupsPage() {
   const [content, setContent] = useState(EMPTY_RICH_CONTENT);
   const [status, setStatus] = useState<V1AdminPopupStatus>('published');
   const [targetScreens, setTargetScreens] = useState<V1PopupTargetScreen[]>(['home']);
+  const [targetPath, setTargetPath] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
   const [displayStartAt, setDisplayStartAt] = useState('');
@@ -145,6 +149,7 @@ export default function AdminPopupsPage() {
   const createPopup = useV1CreateAdminPopup();
   const updatePopup = useV1UpdateAdminPopup();
   const deletePopup = useV1DeleteAdminPopup();
+  const tournamentsQuery = useV1AdminTournaments({ limit: 50 });
   const contentAssets = useTemporaryContentAssets();
   const isSaving = createPopup.isPending || updatePopup.isPending;
   const isMutating = isSaving || deletePopup.isPending;
@@ -172,6 +177,7 @@ export default function AdminPopupsPage() {
     setContent(EMPTY_RICH_CONTENT);
     setStatus('published');
     setTargetScreens(['home']);
+    setTargetPath('');
     setLinkUrl('');
     setLinkLabel('');
     setDisplayStartAt('');
@@ -186,6 +192,7 @@ export default function AdminPopupsPage() {
     setContent(resolveRichContent(row.content, row.body));
     setStatus(row.status);
     setTargetScreens(row.targetScreens);
+    setTargetPath(row.targetPaths?.[0] ?? '');
     setLinkUrl(row.linkUrl ?? '');
     setLinkLabel(row.linkLabel ?? '');
     setDisplayStartAt(toDateTimeLocal(row.displayStartAt));
@@ -209,6 +216,7 @@ export default function AdminPopupsPage() {
       title: title.trim(),
       content,
       targetScreens,
+      targetPaths: targetPath.trim() ? [targetPath.trim()] : [],
       linkUrl: linkUrl.trim() || null,
       linkLabel: linkLabel.trim() || null,
       status,
@@ -219,8 +227,12 @@ export default function AdminPopupsPage() {
       showToast('제목과 본문을 입력해 주세요.', 'error');
       return;
     }
-    if (targetScreens.length === 0) {
-      showToast('노출할 화면을 하나 이상 선택해 주세요.', 'error');
+    if (targetScreens.length === 0 && !targetPath.trim()) {
+      showToast('노출할 화면 그룹이나 정확한 경로를 하나 이상 설정해 주세요.', 'error');
+      return;
+    }
+    if (targetPath.trim() && !isSafePopupTargetPath(targetPath.trim())) {
+      showToast('정확한 경로는 /로 시작하는 안전한 사용자 화면 경로여야 해요.', 'error');
       return;
     }
     if (payload.linkLabel && !payload.linkUrl) {
@@ -388,6 +400,8 @@ export default function AdminPopupsPage() {
               content={content}
               status={status}
               targetScreens={targetScreens}
+              targetPath={targetPath}
+              tournaments={tournamentsQuery.data?.items ?? []}
               linkUrl={linkUrl}
               linkLabel={linkLabel}
               displayStartAt={displayStartAt}
@@ -401,6 +415,7 @@ export default function AdminPopupsPage() {
               onUploadImage={contentAssets.uploadImage}
               onStatusChange={setStatus}
               onTargetScreensChange={setTargetScreens}
+              onTargetPathChange={setTargetPath}
               onLinkUrlChange={setLinkUrl}
               onLinkLabelChange={setLinkLabel}
               onDisplayStartAtChange={setDisplayStartAt}
@@ -462,6 +477,7 @@ function PopupDetail({
         <div><dt className="text-xs text-gray-400">수정일</dt><dd className="mt-1 text-gray-700">{formatDateTime(popup.updatedAt)}</dd></div>
         <div className="col-span-2"><dt className="text-xs text-gray-400">노출 기간</dt><dd className="mt-1 text-gray-700">{formatDisplayWindow(popup.displayStartAt, popup.displayEndAt)}</dd></div>
         <div className="col-span-2"><dt className="text-xs text-gray-400">노출 화면</dt><dd className="mt-1 text-gray-700">{formatTargetScreens(popup.targetScreens)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-gray-400">정확한 경로</dt><dd className="mt-1 break-all text-gray-700">{popup.targetPaths?.length ? popup.targetPaths.join(', ') : '없음'}</dd></div>
         <div className="col-span-2"><dt className="text-xs text-gray-400">이동 링크</dt><dd className="mt-1 break-all text-gray-700">{popup.linkUrl ? `${popup.linkLabel ?? '자세히 보기'} · ${popup.linkUrl}` : '없음'}</dd></div>
       </dl>
       <div className="mt-4 max-h-[440px] overflow-y-auto rounded-xl border border-gray-100 p-4 text-sm leading-7 text-gray-700">
@@ -482,6 +498,8 @@ function PopupForm({
   content,
   status,
   targetScreens,
+  targetPath,
+  tournaments,
   linkUrl,
   linkLabel,
   displayStartAt,
@@ -493,6 +511,7 @@ function PopupForm({
   onUploadImage,
   onStatusChange,
   onTargetScreensChange,
+  onTargetPathChange,
   onLinkUrlChange,
   onLinkLabelChange,
   onDisplayStartAtChange,
@@ -505,6 +524,8 @@ function PopupForm({
   content: V1RichContentDocument;
   status: V1AdminPopupStatus;
   targetScreens: V1PopupTargetScreen[];
+  targetPath: string;
+  tournaments: Array<{ id: string; title: string }>;
   linkUrl: string;
   linkLabel: string;
   displayStartAt: string;
@@ -516,6 +537,7 @@ function PopupForm({
   onUploadImage: (file: File) => Promise<import('@/types/api').V1AdminContentAsset>;
   onStatusChange: (value: V1AdminPopupStatus) => void;
   onTargetScreensChange: (value: V1PopupTargetScreen[]) => void;
+  onTargetPathChange: (value: string) => void;
   onLinkUrlChange: (value: string) => void;
   onLinkLabelChange: (value: string) => void;
   onDisplayStartAtChange: (value: string) => void;
@@ -559,6 +581,33 @@ function PopupForm({
               );
             })}
           </div>
+        </fieldset>
+        <fieldset className="rounded-xl border border-gray-200 p-3">
+          <legend className="px-1 text-sm font-semibold text-gray-700">정확한 화면 <span className="font-normal text-gray-400">(선택)</span></legend>
+          <p className="mb-3 text-xs leading-5 text-gray-500">설정하면 해당 경로에서 화면 그룹 팝업보다 먼저 노출돼요. 대회를 선택하면 상세 경로가 자동으로 입력됩니다.</p>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-gray-700">특정 대회 상세</span>
+            <select
+              value={targetPath.startsWith('/tournaments/') ? targetPath.slice('/tournaments/'.length) : ''}
+              onChange={(event) => onTargetPathChange(event.target.value ? `/tournaments/${event.target.value}` : '')}
+              disabled={!canWrite || saving}
+              className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50"
+            >
+              <option value="">선택하지 않음</option>
+              {tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.title}</option>)}
+            </select>
+          </label>
+          <label className="mt-3 flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-gray-700">정확한 내부 경로</span>
+            <input
+              value={targetPath}
+              onChange={(event) => onTargetPathChange(event.target.value)}
+              maxLength={500}
+              disabled={!canWrite || saving}
+              className="h-[44px] rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50"
+              placeholder="/tournaments/대회-id"
+            />
+          </label>
         </fieldset>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">이동 링크 <span className="font-normal text-gray-400">(선택)</span></span><input value={linkUrl} onChange={(event) => onLinkUrlChange(event.target.value)} maxLength={500} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="/matches 또는 https://..." /></label>

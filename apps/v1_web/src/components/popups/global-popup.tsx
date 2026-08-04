@@ -8,7 +8,7 @@ import { resolvePopupTargetScreen } from '@/lib/popup-targets';
 export function GlobalPopup() {
   const pathname = usePathname();
   const screen = resolvePopupTargetScreen(pathname);
-  const popupQuery = useV1ActivePopup(screen);
+  const popupQuery = useV1ActivePopup(screen, pathname);
   const popup = popupQuery.data?.popup;
 
   return (

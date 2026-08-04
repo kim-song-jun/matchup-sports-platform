@@ -3174,19 +3174,6 @@ export type V1CreateFixturePayload = {
   venue?: string;
 };
 
-export type V1RecordResultPayload = {
-  homeScore: number;
-  awayScore: number;
-  hasPenalty?: boolean;
-  homePenaltyScore?: number;
-  awayPenaltyScore?: number;
-  note?: string;
-  /** 전달 시 replace-all — 생략하면 기존 영상 목록 유지 */
-  videos?: { title?: string; url: string }[];
-  /** 전달 시 replace-all — 생략하면 기존 득점 기록 유지 */
-  goals?: { team: 'home' | 'away'; playerId?: string; playerName: string; minute?: number }[];
-};
-
 export type V1CreateAnnouncementPayload = {
   title: string;
   body: string;

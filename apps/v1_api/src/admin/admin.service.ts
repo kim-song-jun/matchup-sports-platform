@@ -463,6 +463,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const admin = await this.getMutationAdmin(user.id);
     const target = await this.prisma.v1TeamMatch.findUnique({ where: { id: teamMatchId } });
     if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
+    // Task 25: `completed` now flows exclusively through the Game result-official
+    // transaction (games.service.ts), which also writes the status-change log and
+    // keeps the review/projection surface consistent. An admin-driven direct flip
+    // to `completed` would bypass that transaction and produce a completed match
+    // with no game, no official revision, and no projection — reject it here
+    // rather than letting this route re-open the legacy write path.
+    if (dto.status === 'completed') {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_COMPLETION_ADMIN_FORBIDDEN',
+        message: '팀 매칭 완료 처리는 관리자 화면이 아니라 경기 결과 확정 절차를 통해서만 가능해요.',
+      });
+    }
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(

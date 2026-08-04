@@ -2464,6 +2464,110 @@ async function applyMigrationSnapshot(snapshotRoot, childEnv, lifecycle, repoRoo
   });
 }
 
+/**
+ * F3 는 살아 있는 화면(3013/8121)을 요구하지만, 게이트 자체는 수동 probe 만 하고
+ * ("this gate never starts these services itself") 이 래퍼는 lifecycle 시작 전에
+ * 포트가 비어 있기를 강제한다(assertPortsFree). 즉 서비스를 실제로 띄우는 주체가
+ * 어디에도 없어 `live-surface-reachable` 은 구조적으로 통과할 수 없었다 — 포트를
+ * 비우면 probe 가 down 이고, 미리 띄우면 래퍼가 FOREIGN_PORT_OWNER 로 거부한다.
+ *
+ * lifecycle 을 소유한 쪽이 띄우는 것이 맞으므로, 페이로드 직전에 여기서 기동하고
+ * 직후에 반드시 내린다. 남겨두면 다음 실행이 자신의 포트 검사에 걸린다.
+ */
+const LIVE_SURFACE_PROBES = [
+  { port: 8121, url: 'http://127.0.0.1:8121/api/v1/health', filter: 'v1_api' },
+  { port: 3013, url: 'http://127.0.0.1:3013/', filter: 'v1_web' },
+];
+
+async function probeHttpOk(url) {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    return response.status === 200;
+  } catch {
+    return false;
+  }
+}
+
+async function startLiveSurface(repoRoot, childEnv, timeoutMs = 240_000) {
+  const env = {
+    ...childEnv,
+    V1_ALLOW_HEADER_AUTH: 'true',
+    V1_API_PORT: '8121',
+    PORT: '8121',
+    NEXT_PUBLIC_V1_API_BASE_URL: 'http://localhost:8121',
+  };
+  // stdio 를 버리면 기동 실패 원인을 밖에서 알 수 없어 "8121:down" 이라는 결과만 남는다.
+  // 서비스별 마지막 출력을 조금 들고 있다가 결과에 실어 보낸다.
+  // Prisma 클라이언트는 생성물이라 체크아웃/워크트리마다 있을 수도 없을 수도 있다.
+  // 없으면 API 가 `MODULE_NOT_FOUND: @prisma/client` 로 부팅에 실패하고, 겉으로는
+  // "8121:down" 이라는 결과만 남아 원인을 알기 어렵다(실제로 이 경로로 한 번 헤맸다).
+  // 기동 전에 한 번 생성해 두면 이미 있는 경우에도 사실상 무해하다.
+  spawnSync('pnpm', ['--filter', 'v1_api', 'exec', 'prisma', 'generate'], {
+    cwd: repoRoot,
+    env,
+    stdio: 'ignore',
+  });
+
+  const tails = new Map();
+  // detached: true 로 각 서비스에 자기 프로세스 그룹을 준다. pnpm 은 next dev 를, next dev 는
+  // next-server 를 다시 낳기 때문에 pnpm 프로세스에만 SIGTERM 을 보내면 손자가 살아남아
+  // 포트를 계속 물고 있고, 다음 실행이 FOREIGN_PORT_OWNER 로 막힌다(실제로 겪었다).
+  // 그룹째 죽여야 정리가 끝난다.
+  const children = [
+    spawn('pnpm', ['--filter', 'v1_api', 'dev'], { cwd: repoRoot, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true }),
+    spawn('pnpm', ['--filter', 'v1_web', 'dev', '-p', '3013'], { cwd: repoRoot, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true }),
+  ];
+  LIVE_SURFACE_PROBES.forEach((probe, index) => {
+    tails.set(probe.filter, '');
+    for (const stream of [children[index].stdout, children[index].stderr]) {
+      stream?.on('data', (chunk) => {
+        tails.set(probe.filter, `${tails.get(probe.filter)}${chunk}`.slice(-1500));
+      });
+    }
+  });
+  const deadline = Date.now() + timeoutMs;
+  let ready = false;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(LIVE_SURFACE_PROBES.map((probe) => probeHttpOk(probe.url)));
+    if (states.every(Boolean)) {
+      ready = true;
+      break;
+    }
+    await new Promise((done) => setTimeout(done, 3000));
+  }
+  const states = await Promise.all(LIVE_SURFACE_PROBES.map((probe) => probeHttpOk(probe.url)));
+  return {
+    children,
+    ready,
+    detail: LIVE_SURFACE_PROBES.map((probe, index) => `${probe.port}:${states[index] ? 'up' : 'down'}`).join(' '),
+    tails: Object.fromEntries(
+      LIVE_SURFACE_PROBES.filter((probe, index) => !states[index]).map((probe) => [probe.filter, tails.get(probe.filter) ?? '']),
+    ),
+  };
+}
+
+async function stopLiveSurface(handle) {
+  if (!handle) return;
+  const signalGroup = (child, signal) => {
+    try {
+      // 음수 pid = 프로세스 그룹 전체. detached 로 띄웠으므로 손자까지 함께 받는다.
+      if (child.pid) process.kill(-child.pid, signal);
+    } catch {
+      // 이미 죽은 그룹은 무시한다 — 정리 실패로 게이트 결과를 뒤집지 않는다.
+    }
+  };
+  for (const child of handle.children) signalGroup(child, 'SIGTERM');
+  // 포트가 실제로 풀릴 때까지 기다린다. 여기서 성급히 반환하면 다음 실행이
+  // 자기 assertPortsFree 에 걸려 원인을 알기 어려운 FOREIGN_PORT_OWNER 가 된다.
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const states = await Promise.all(LIVE_SURFACE_PROBES.map((probe) => probeHttpOk(probe.url)));
+    if (states.every((up) => !up)) return;
+    await new Promise((done) => setTimeout(done, 1000));
+  }
+  for (const child of handle.children) signalGroup(child, 'SIGKILL');
+}
+
 async function runCommands(
   options,
   payload,
@@ -2505,13 +2609,35 @@ async function runCommands(
       if (result.code !== 0) break;
     }
   } else {
-    const result = await runChild(payload[0], payload.slice(1), {
-      cwd,
-      env: childEnv,
-      lifecycle,
-      ports: options.browser === 'headed' ? TARGET_PORTS : [],
-    });
-    results.push({ kind: 'payload', command: payload, ...result });
+    // F3 만 살아 있는 화면을 요구한다. 다른 게이트에서 서비스를 띄우면 자기 포트
+    // 검사와 충돌하므로 조건을 넓히지 않는다.
+    const needsLiveSurface = options['final-gate'] === 'F3';
+    let liveSurface = null;
+    if (needsLiveSurface) {
+      liveSurface = await startLiveSurface(executionRoot, childEnv);
+      results.push({
+        kind: 'live-surface',
+        command: ['pnpm', '--filter', 'v1_api|v1_web', 'dev'],
+        code: liveSurface.ready ? 0 : 1,
+        output: {
+          stdout: liveSurface.detail,
+          stderr: Object.entries(liveSurface.tails)
+            .map(([name, tail]) => `--- ${name} ---\n${tail}`)
+            .join('\n'),
+        },
+      });
+    }
+    try {
+      const result = await runChild(payload[0], payload.slice(1), {
+        cwd,
+        env: childEnv,
+        lifecycle,
+        ports: options.browser === 'headed' ? TARGET_PORTS : [],
+      });
+      results.push({ kind: 'payload', command: payload, ...result });
+    } finally {
+      await stopLiveSurface(liveSurface);
+    }
   }
   return results;
 }

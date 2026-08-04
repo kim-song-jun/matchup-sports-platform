@@ -63,8 +63,13 @@ function resultErrorMessage(err: unknown): string {
   return extractErrorMessage(err, '처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
 }
 
-function scoreLabel(revision: V1GameResultRevision): string {
-  return `${revision.score.home} : ${revision.score.away}`;
+export function scoreLabel(revision: V1GameResultRevision): string {
+  // 스코어는 score.regulation 아래에 있다. 예전에는 score.home 을 읽어서 화면에
+  // "undefined : undefined" 가 그려졌다(타입이 실제 응답과 달라 tsc 가 못 잡았다).
+  // regulation 은 미완 결과에서 null 이므로 그때는 점수 대신 상태를 보여준다.
+  const regulation = revision.score?.regulation;
+  if (!regulation) return '기록 없음';
+  return `${regulation.home} : ${regulation.away}`;
 }
 
 function formatDateTime(value: string | null): string {

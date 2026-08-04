@@ -1020,7 +1020,15 @@ export const v1MswHandlers = [
       gameId: v1GameFixture.id,
       revision: v1GameResultRevisions.length + 1,
       state: 'DRAFT',
-      score: body.score,
+      // 서버는 제출받은 평평한 {home,away} 를 그대로 돌려주지 않고 스냅샷으로 감싼다.
+      // 예전에는 이 목이 입력을 그대로 되돌려줘서, 실제로는 화면이 읽지 못하는 형태인데도
+      // 테스트가 통과했다.
+      score: {
+        regulation: { home: body.score.home, away: body.score.away },
+        penalty: null,
+        goals: [],
+        incomplete: false,
+      },
       eventsHash: body.eventsHash,
       missingScorer: false,
       mvpParticipantId: body.mvpParticipantId ?? null,

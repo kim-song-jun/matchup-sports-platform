@@ -12,7 +12,10 @@ import {
   V1GameSourceType,
   V1TournamentFixtureStatus,
 } from '@prisma/client';
-import { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
+import {
+  OperationAuditWriterService,
+  type CreateOperationAuditInput,
+} from '../../common/audit/operation-audit-writer.service';
 import {
   canonicalGameCommandPayloadHash,
   gameOperationAuditActor,
@@ -58,6 +61,16 @@ type LockedTournamentGame = {
   currentOfficialRevisionId: string | null;
   competitionConfigVersionId: string;
 };
+
+/**
+ * The `V1GameOperationFlag` row's decision-relevant fields at the exact
+ * moment `DIRECTOR_OFFICIALIZE` gated (or would have gated) a command. Both
+ * the grant and denial audit rows for a director officialize/void carry this
+ * so a later flag rollback/rollforward can never make an already-decided
+ * command's audit trail look inconsistent with what actually gated it --
+ * see G-3 in `.github/tasks/22-tournament-result-review-officialize.md`.
+ */
+type DirectorOfficializeFlagSnapshot = { value: string | null; version: number | null };
 
 /**
  * Same shape as `GamesService`'s local `jsonInput`: strips `undefined` so a
@@ -685,6 +698,15 @@ export class TournamentResultReviewService {
     input: ResultCommandBoundaryInput,
     mutate: (tx: Transaction, game: LockedTournamentGame, context: GameCommandContext) => Promise<T>,
   ): Promise<T & { replayed: boolean }> {
+    // Populated only on the DIRECTOR_OFFICIALIZE denial path below, then
+    // written *after* the `catch` observes the transaction has rolled back.
+    // An interactive `$transaction` callback that throws rolls back every
+    // write the callback made -- including an audit row inserted moments
+    // before the throw -- so the denial audit cannot be written with `tx`
+    // inside the same callback that then denies the command; it must be
+    // written as its own, separate statement once the callback's rollback
+    // has already happened.
+    let deniedAuditInput: CreateOperationAuditInput | null = null;
     try {
       return await this.prisma.$transaction(
         async (tx) => {
@@ -719,9 +741,6 @@ export class TournamentResultReviewService {
             },
             tx,
           );
-          if (input.staffAction === 'result_officialize' && principal.role === 'tournament_director') {
-            await this.assertDirectorOfficializeEnabled(tx);
-          }
           const actor: GameActorScope = {
             actorType: 'USER',
             actorUserId: input.userId,
@@ -739,6 +758,43 @@ export class TournamentResultReviewService {
             bodyClientCommandId: input.bodyCommandId,
             payloadHash,
           });
+          // The DIRECTOR_OFFICIALIZE gate is evaluated only after the command
+          // context exists so both the grant and a denial can carry the same
+          // stable `requestId` (the durable command ID) an eventual success
+          // audit would use. A rejected officialize/void attempt is itself
+          // security-relevant (director privilege-escalation probing) and
+          // must leave the same kind of append-only `V1OperationAudit` trail
+          // a successful command does -- not just a bare 403 with nothing
+          // written. `directorOfficializeFlag` is the flag's exact
+          // value/version *at the moment this command evaluated it*.
+          let directorOfficializeFlag: DirectorOfficializeFlagSnapshot | null = null;
+          if (input.staffAction === 'result_officialize' && principal.role === 'tournament_director') {
+            directorOfficializeFlag = await this.readDirectorOfficializeFlagSnapshot(tx);
+            if (directorOfficializeFlag.value !== 'on') {
+              deniedAuditInput = {
+                actor: gameOperationAuditActor(actor),
+                requestId: context.durableCommandId,
+                action: `${input.action.toUpperCase()}_DENIED`,
+                targetType: 'GAME',
+                targetId: input.gameId,
+                occurredAt: new Date(),
+                before: { version: game.version, state: game.state },
+                after: {
+                  denied: true,
+                  code: 'DIRECTOR_OFFICIALIZE_DISABLED',
+                  actorRole: principal.role,
+                  authorizationSubject: principal.authorizationSubject,
+                  directorOfficializeFlag,
+                },
+                tournamentId: fixture.tournamentId,
+                fixtureId: game.tournamentFixtureId,
+              };
+              throw new ForbiddenException({
+                code: 'DIRECTOR_OFFICIALIZE_DISABLED',
+                message: 'Director officialize/void is not enabled for this tournament',
+              });
+            }
+          }
           const existing = await tx.v1IdempotencyRecord.findUnique({
             where: {
               actorUserId_action_resourceType_resourceId_idempotencyKey: {
@@ -790,6 +846,9 @@ export class TournamentResultReviewService {
               revision: response.revision,
               revisionState: response.revisionState,
               version: response.version,
+              actorRole: principal.role,
+              authorizationSubject: principal.authorizationSubject,
+              ...(directorOfficializeFlag === null ? {} : { directorOfficializeFlag }),
             },
             tournamentId: fixture.tournamentId,
             fixtureId: game.tournamentFixtureId,
@@ -799,6 +858,12 @@ export class TournamentResultReviewService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
     } catch (error) {
+      if (deniedAuditInput !== null) {
+        // The rollback described above has already happened by this point,
+        // so this write uses `this.prisma` directly (a fresh statement, not
+        // `tx`) and is the *only* place the denial audit is ever persisted.
+        await this.auditWriter.create(this.prisma, deniedAuditInput);
+      }
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         (error.code === 'P2034' || error.code === 'P2002')
@@ -830,17 +895,20 @@ export class TournamentResultReviewService {
     }
   }
 
-  private async assertDirectorOfficializeEnabled(tx: Transaction): Promise<void> {
+  /**
+   * Reads the DIRECTOR_OFFICIALIZE flag's current `{ value, version }` with
+   * no caching -- callers re-evaluate this on every command, exactly as the
+   * gate this replaces did (`assertDirectorOfficializeEnabled` originally),
+   * so a flag rollback takes effect on the very next call.
+   */
+  private async readDirectorOfficializeFlagSnapshot(
+    tx: Transaction,
+  ): Promise<DirectorOfficializeFlagSnapshot> {
     const flag = await tx.v1GameOperationFlag.findUnique({
       where: { key: 'DIRECTOR_OFFICIALIZE' },
-      select: { value: true },
+      select: { value: true, version: true },
     });
-    if (flag?.value !== 'on') {
-      throw new ForbiddenException({
-        code: 'DIRECTOR_OFFICIALIZE_DISABLED',
-        message: 'Director officialize/void is not enabled for this tournament',
-      });
-    }
+    return { value: flag?.value ?? null, version: flag?.version ?? null };
   }
 
   private assertTransition(input: { from: V1GameResultRevisionState; to: V1GameResultRevisionState; flow: RevisionFlow }): void {

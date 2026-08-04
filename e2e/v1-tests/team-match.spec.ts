@@ -2,6 +2,16 @@ import { test, expect } from '@playwright/test';
 import { loginAs } from './helpers/auth';
 import { personas } from './personas';
 
+function futureDate(daysFromNow: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromNow);
+  return date.toISOString().slice(0, 10);
+}
+
+function envelopeData<T>(body: { data?: T } | T): T {
+  return body && typeof body === 'object' && 'data' in body ? (body.data as T) : (body as T);
+}
+
 /**
  * 페르소나: host(호스트민) — 팀매치 주최자.
  * 플로우:
@@ -43,5 +53,107 @@ test.describe('[host] 팀매치 목록 플로우', () => {
     if (testInfo.project.name === 'desktop') {
       await expect(desktopCta).toBeVisible();
     }
+  });
+
+  test('권한 있는 실제 팀 ID와 업로드 이미지로 생성하고 같은 엔티티를 수정한다', async ({ page }) => {
+    const title = `E2E 팀매치 계약 ${Date.now()}`;
+    const updatedTitle = `${title} 수정`;
+    const matchDate = futureDate(8);
+
+    await page.goto('/team-matches/new/team', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: '어떤 팀의 매치인가요?' })).toBeVisible();
+    const creatableTeam = page.locator('main button[aria-pressed]:not([disabled])').first();
+    await expect(creatableTeam).toBeVisible();
+    await creatableTeam.click();
+    await expect(creatableTeam).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+
+    await expect(page.getByRole('heading', { name: '어떤 종목인가요?' })).toBeVisible();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+
+    await expect(page.getByRole('heading', { name: '매치 정보' })).toBeVisible();
+    await page.getByLabel('매치 제목').fill(title);
+    await page.getByLabel('설명').fill('팀매치 생성·수정 계약을 검증합니다.');
+    const uploadResponsePromise = page.waitForResponse(
+      (response) => response.url().includes('/api/v1/uploads') && response.request().method() === 'POST',
+    );
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'team-match-contract.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    });
+    const uploadResponse = await uploadResponsePromise;
+    expect(uploadResponse.ok()).toBeTruthy();
+    const uploadedImageUrl = envelopeData<{ urls: string[] }>(await uploadResponse.json()).urls[0];
+    expect(uploadedImageUrl).toMatch(/^\/uploads\//);
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+
+    await expect(page.getByRole('heading', { name: '경기조건' })).toBeVisible();
+    await page.getByLabel('실력등급').fill('B');
+    await page.getByLabel('경기방식').fill('5:5 풋살');
+    await page.getByLabel('경기 스타일').fill('친선');
+    await page.getByLabel('유니폼 색상').fill('파랑');
+    await page.getByLabel('총비용').fill('100000');
+    await page.getByLabel('상대팀 부담금').fill('50000');
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+
+    await expect(page.getByRole('heading', { name: '장소와 시간' })).toBeVisible();
+    await page.getByLabel('상세 주소').fill('서울 E2E 팀매치 구장');
+    await page.getByLabel('날짜').fill(matchDate);
+    await page.getByLabel('시작 시간').fill('19:00');
+    await page.getByLabel('종료 시간').fill('21:00');
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const raw = window.localStorage.getItem('teameet:v1:team-match-draft:v3');
+          return raw ? (JSON.parse(raw) as { date?: string; startTime?: string; endTime?: string }) : null;
+        }),
+      )
+      .toMatchObject({ date: matchDate, startTime: '19:00', endTime: '21:00' });
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+
+    await expect(page.getByRole('heading', { name: '입력한 내용을 확인해 주세요' })).toBeVisible();
+    const createResponsePromise = page.waitForResponse(
+      (response) => response.url().endsWith('/api/v1/team-matches') && response.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: '팀매치 만들기', exact: true }).click();
+    const createResponse = await createResponsePromise;
+    expect(createResponse.ok()).toBeTruthy();
+    const createPayload = createResponse.request().postDataJSON() as Record<string, unknown>;
+    expect(createPayload).toMatchObject({ title, imageUrl: uploadedImageUrl });
+    expect(createPayload.hostTeamId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(createPayload.sportId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(createPayload.regionId).toMatch(/^[0-9a-f-]{36}$/i);
+
+    const created = envelopeData<{ teamMatchId: string }>(await createResponse.json());
+    await page.waitForURL(new RegExp(`/team-matches/${created.teamMatchId}$`));
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+
+    await page.goto(`/team-matches/${created.teamMatchId}/edit`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: '매치 정보' })).toBeVisible();
+    await expect(page.getByLabel('매치 제목')).toHaveValue(title);
+    await expect(page.locator('.tm-create-image-preview')).toHaveAttribute(
+      'style',
+      new RegExp(uploadedImageUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+    );
+    await page.getByLabel('매치 제목').fill(updatedTitle);
+    const updateResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/v1/team-matches/${created.teamMatchId}`) &&
+        response.request().method() === 'PATCH',
+    );
+    await page.getByRole('button', { name: '변경사항 저장', exact: true }).click();
+    const updateResponse = await updateResponsePromise;
+    expect(updateResponse.ok()).toBeTruthy();
+    expect(updateResponse.request().postDataJSON()).toMatchObject({
+      title: updatedTitle,
+      imageUrl: uploadedImageUrl,
+      version: expect.any(String),
+    });
+    await page.waitForURL(new RegExp(`/team-matches/${created.teamMatchId}$`));
+    await expect(page.getByRole('heading', { name: updatedTitle })).toBeVisible();
   });
 });

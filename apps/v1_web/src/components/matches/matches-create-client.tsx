@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter } from 'next/navigation';
 import {
@@ -307,22 +307,33 @@ function buildCreateModel({
 
 function usePersistedDraft() {
   const [draft, setDraft] = useState<MatchDraft>(() => buildDefaultDraft());
+  const draftRef = useRef(draft);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(storageKey);
     if (!stored) return;
     try {
-      setDraft({ ...buildDefaultDraft(), ...normalizeStoredDraft(JSON.parse(stored) as Partial<MatchDraft>) });
+      const hydrated = {
+        ...buildDefaultDraft(),
+        ...normalizeStoredDraft(JSON.parse(stored) as Partial<MatchDraft>),
+      };
+      draftRef.current = hydrated;
+      setDraft(hydrated);
     } catch {
       window.localStorage.removeItem(storageKey);
     }
   }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(draft));
-  }, [draft]);
+  const setPersistedDraft = (action: SetStateAction<MatchDraft>) => {
+    const next = typeof action === 'function' ? action(draftRef.current) : action;
+    // React state updater도 route 이동 뒤로 지연될 수 있으므로 ref에서 즉시 계산·저장한 뒤
+    // 화면 상태를 갱신한다. 그래야 마지막 입력 직후 다음 step으로 이동해도 값이 보존된다.
+    draftRef.current = next;
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    setDraft(next);
+  };
 
-  return [draft, setDraft] as const;
+  return [draft, setPersistedDraft] as const;
 }
 
 function buildDefaultDraft(): MatchDraft {
@@ -349,6 +360,18 @@ function normalizeStoredDraft(stored: Partial<MatchDraft>): Partial<MatchDraft> 
     minLevel: '초보',
     maxLevel: '중수',
   };
+
+  const isLegacySample =
+    stored.title === oldDefaults.title &&
+    stored.description === oldDefaults.description &&
+    stored.rules === oldDefaults.rules &&
+    stored.venue === oldDefaults.venue &&
+    stored.address === oldDefaults.address &&
+    stored.date === oldDefaults.date &&
+    stored.startTime === oldDefaults.startTime &&
+    stored.endTime === oldDefaults.endTime;
+
+  if (!isLegacySample) return stored;
 
   return {
     ...stored,

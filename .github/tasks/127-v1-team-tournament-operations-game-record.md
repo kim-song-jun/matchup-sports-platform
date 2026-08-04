@@ -1614,3 +1614,40 @@ pass 로 전환됐다("206 touched files clean"). 남은 두 검사는 이 게�
 
 즉 F4 는 이 브랜치에서 고칠 수 있는 항목이 아니라 **`dev` 머지 이후에만 재평가 가능**하다.
 `dev → main` 승격과 마찬가지로 PR 머지는 사용자 권한이므로 여기서 멈춘다.
+
+### 배포 전 차단 항목 — `20260729000200` 마이그레이션이 alpha 배포를 중단시킬 수 있다
+
+**증상.** `apps/v1_api/prisma/migrations/20260729000200_v1_competition_config/migration.sql:128-155`
+의 DO 블록이 축구·풋살(soccer/football/futsal) 이 아닌 종목을 쓰는 기존
+`v1_tournaments` / `v1_team_matches` 행을 하나라도 발견하면
+`RAISE EXCEPTION 'COMPETITION_CONFIG_SOURCE_UNSUPPORTED'` 로 마이그레이션 전체를 중단한다.
+`dev` push 는 `deploy-alpha.sh` 의 `prisma migrate deploy` 로 **라이브 alpha DB** 에 즉시
+적용되므로, 그런 행이 있으면 배포가 중단된다.
+
+**재현으로 확인한 것(추정 아님).**
+- `v1_sports` 에 `running` · `swimming` 이 존재하고 **둘 다 `is_active=true`** 다(로컬 시드 실측).
+- 팀 매치 생성 경로의 `validateMasterRefs`(`team-matches.service.ts:1457-1461`)는 종목이
+  **존재하고 활성인지만** 검사한다. 축구/풋살 제한은 `1226-1229` 의 Game 생성 경로에만 있다.
+  즉 러닝·수영 팀 매치 생성이 계약상 허용된다.
+- 비축구 행이 0건인 현재 DB 에서 위 가드 블록을 그대로 실행하면 통과한다(기준선 확인).
+  행이 하나라도 생기면 같은 블록이 `23514` 로 중단시킨다.
+
+**왜 CI 가 못 잡는가.** `.github/workflows/deploy.yml` 의 "V1 migration replay + drift gate" 는
+**빈 DB** 에 체인을 재생한다. 빈 DB 에는 비축구 행이 없으므로 이 분기는 절대 실행되지 않는다.
+CI green 과 alpha 실배포 성공이 별개라는 뜻이다 — 이 저장소가 2026-07-12 에 겪은 사고
+(마이그레이션 누락으로 prod `migrate deploy` 중단)와 같은 계열이다.
+
+**여기서 고치지 않은 이유.** 해소하려면 셋 중 하나를 골라야 하는데 전부 제품 결정이다.
+(a) 팀 매치 생성을 축구·풋살로 제한한다 — 기존 러닝/수영 팀 매치의 처리 방침이 필요하다.
+(b) 미지원 종목 행에 competition config 를 부여한다 — 어떤 설정을 줄지 정의가 없다.
+(c) `competition_config_version_id` 를 nullable 로 두고 축구/풋살 경로에서만 강제한다 —
+    같은 마이그레이션의 `SET NOT NULL`(178-180행)과 트리거 설계를 바꿔야 한다.
+게이트를 통과시키려고 가드를 완화하는 것은 이 항목의 해결이 아니다.
+
+**배포 전 반드시 확인할 것.** alpha DB 에서 아래를 실행해 0 이 아니면 위 결정을 먼저 내려야 한다.
+
+```sql
+SELECT count(*) FROM v1_team_matches m
+LEFT JOIN v1_sports s ON s.id = m.sport_id
+WHERE s.code IS NULL OR lower(s.code) NOT IN ('soccer','football','futsal');
+```

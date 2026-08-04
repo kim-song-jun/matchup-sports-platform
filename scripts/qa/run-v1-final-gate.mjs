@@ -358,7 +358,27 @@ function runF1({ repoRoot, options, env }) {
 // F2 - code quality review
 // ---------------------------------------------------------------------------
 
-const DEBT_MARKER_PATTERN = /(TODO|FIXME|HACK|XXX|eslint-disable|@ts-ignore|\.only\(|\.skip\()/;
+/**
+ * 부채 마커 스캔.
+ *
+ * 맨단어 마커(TODO/FIXME/HACK/XXX)에는 단어 경계를 건다. 경계가 없으면 `mktemp` 템플릿의
+ * `candidate.XXXXXX` 같은 문자열이 `XXX` 로 걸린다 — 실측으로 deploy/alpha-release-common.sh
+ * 4곳과 deploy/rollback-alpha.sh 2곳이 전부 이 오탐이었다. `\bXXX\b` 는 XXXXXX 안에서
+ * 3번째 X 뒤에 단어 경계가 없어 매칭되지 않는다.
+ *
+ * 나머지(eslint-disable/@ts-ignore/.only(/.skip()는 그 자체가 구분되는 토큰이라 경계 불필요.
+ */
+const DEBT_MARKER_PATTERN =
+  /(\bTODO\b|\bFIXME\b|\bHACK\b|\bXXX\b|eslint-disable|@ts-ignore|\.only\(|\.skip\()/;
+
+/**
+ * 이 규칙 자체를 문서화하는 파일들. 마커 이름을 본문에 적을 수밖에 없으므로 구조적으로 항상
+ * 걸린다(실측: AGENTS.md:179 는 "TODO, FIXME, HACK, XXX 를 확인하고" 라는 규칙 서술,
+ * CLAUDE.md:45 는 "작업 범위 안의 TODO, hack, workaround 는 같은 변경에서 고친다" 라는 원칙).
+ * 규칙을 적어둔 것을 부채로 세면 게이트가 영구히 red 라 스캔 대상에서 뺀다. 다른 문서의
+ * 진짜 TODO 는 그대로 잡힌다.
+ */
+const DEBT_MARKER_CONVENTION_DOCS = new Set(['AGENTS.md', 'CLAUDE.md']);
 
 function runF2({ repoRoot, options }) {
   const checks = [];
@@ -387,6 +407,7 @@ function runF2({ repoRoot, options }) {
 
     const hits = [];
     for (const relPath of touched) {
+      if (DEBT_MARKER_CONVENTION_DOCS.has(relPath)) continue; // 규칙 정의 문서 — 위 주석 참고
       const abs = resolve(repoRoot, relPath);
       if (!existsSync(abs)) continue; // deleted between baseline and HEAD
       let stat;

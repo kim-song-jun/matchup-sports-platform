@@ -44,8 +44,15 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
     items: data.pages.flatMap((page) => page.items),
   };
 
+  // 공유 링크로 들어온 방문자에게 "팀 전적"만 보여주면 어느 팀인지 알 수 없다.
+  // 로딩·에러 분기에는 아직 팀명이 없으므로 그때는 종전 문구를 그대로 쓴다.
   return (
-    <AppChrome title="팀 전적" backHref={`/teams/${teamId}`} activeTab="teams" desktopHead>
+    <AppChrome
+      title={combined.teamName ? `${combined.teamName} 전적` : '팀 전적'}
+      backHref={`/teams/${teamId}`}
+      activeTab="teams"
+      desktopHead
+    >
       <TeamRecordsContent
         data={combined}
         hasNextPage={hasNextPage}

@@ -5,7 +5,7 @@ import { WifiOff, Wifi } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { useV1FixtureLineup, useV1Game, postV1GameCommand } from '@/hooks/use-v1-game-operations';
-import { useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
+import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
 import { isTakeoverHeld } from '@/lib/game-operations-queue';
 import { freezeCapture, type FrozenEventCapture } from '@/lib/game-operations-clock';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -226,7 +226,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           <Banner tone="warning">운영 권한을 다시 가져오는 중이에요…</Banner>
         )}
         {ops.takeover.status === 'denied' && (
-          <Banner tone="danger">이 경기를 운영할 권한이 없어요. ({ops.takeover.code})</Banner>
+          /* 거부 사유와 무관하게 "권한이 없어요" 로 고정돼 있었다 — 서버가 실제로는
+             granted 를 준 경우까지 권한 문제로 보여, 운영자를 엉뚱한 대응으로 보냈다.
+             코드별 문구를 쓰고 코드 자체는 운영 문의용으로 괄호에 남긴다. */
+          <Banner tone="danger">
+            {gameOperationsErrorMessage(ops.takeover.code)} ({ops.takeover.code})
+          </Banner>
         )}
         {ops.sync.status === 'gap' && (
           <Banner tone="info">누락된 기록을 다시 불러오는 중이에요…</Banner>

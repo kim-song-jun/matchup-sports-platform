@@ -27,7 +27,22 @@ import { medianOffsetMs, pushClockSample, type ClockPingPong } from '@/lib/game-
 import { getV1GameOperationsSocket, setGameOperationsAuthorizationSubjectVersion } from '@/lib/v1-game-operations-socket';
 import { randomUuid } from '@/lib/uuid';
 import { v1Keys } from '@/lib/query-keys';
-import type { GameEventRecord, GameEventType, GameState } from '@/types/game-operations';
+import type { GameEventRecord, GameEventType, GameState, GameTakeoverGrant } from '@/types/game-operations';
+
+/**
+ * `game.takeover.request` / `game.takeover.renew` 의 ack 응답.
+ *
+ * 서버(RealtimeGateway)는 `{ status: 'granted', ...GameTakeoverGrant }` 를 보낸다 —
+ * 토큰 필드 이름은 `takeoverToken` 이다. 예전에는 이 콜백 인자를
+ * `{ status: string; token?: string; ... }` 라는 인라인 리터럴로 적어 두었는데,
+ * ack 콜백은 socket.io 쪽에서 타입이 강제되지 않으므로 tsc 가 이 불일치를 잡지 못했다.
+ * 그 결과 서버가 granted 를 줘도 `result.token` 이 undefined 라 항상 denied 로 떨어졌고,
+ * 화면에는 "이 경기를 운영할 권한이 없어요" 가 떴다(대회 디렉터가 경기를 운영하지 못함).
+ * 공유 타입에서 파생시켜 필드가 다시 갈라지면 컴파일이 깨지게 한다.
+ */
+type GameTakeoverAck =
+  | ({ status: 'granted' } & GameTakeoverGrant)
+  | { status: 'denied'; code?: string };
 
 const CLOCK_PING_INTERVAL_MS = 15_000;
 const TAKEOVER_RENEW_INTERVAL_MS = 20_000; // < the 30s server-enforced minimum renewal spacing
@@ -322,21 +337,24 @@ export function useV1GameOperationsConsole(
         clientInstanceId: clientInstanceIdRef.current,
         lastSequence: sync.lastSequence,
       },
-      (result: { status: string; token?: string; expiresAt?: string; code?: string }) => {
-        if (result.status === 'granted' && result.token && result.expiresAt) {
-          dispatchTakeover({
-            type: 'GRANTED',
-            token: result.token,
-            expiresAtMs: new Date(result.expiresAt).getTime(),
-            assignmentVersion: myAssignment.data?.version ?? 0,
-          });
-        } else {
-          // 서버가 코드를 주지 않은 경우까지 STAFF_SCOPE_DENIED 로 뭉뚱그리면 안 된다.
-          // 소켓이 연결/인증에 실패해 응답이 비어 있어도 화면은 "권한이 없어요" 라고 말하게 되고,
-          // 운영자는 실제 원인(세션·연결)이 아니라 권한 요청이라는 엉뚱한 경로로 간다.
-          // 서버가 명시한 거부만 그 코드로 남기고, 나머지는 원인 미상으로 구분한다.
+      (result: GameTakeoverAck) => {
+        // 서버가 코드를 주지 않은 경우까지 STAFF_SCOPE_DENIED 로 뭉뚱그리면 안 된다.
+        // 운영자가 실제 원인이 아니라 권한 요청이라는 엉뚱한 경로로 가기 때문이다.
+        // 서버가 명시한 거부만 그 코드로 남기고, 나머지는 원인 미상으로 구분한다.
+        if (result.status !== 'granted') {
           dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_UNAVAILABLE' });
+          return;
         }
+        if (!result.takeoverToken || !result.expiresAt) {
+          dispatchTakeover({ type: 'DENIED', code: 'TAKEOVER_UNAVAILABLE' });
+          return;
+        }
+        dispatchTakeover({
+          type: 'GRANTED',
+          token: result.takeoverToken,
+          expiresAtMs: new Date(result.expiresAt).getTime(),
+          assignmentVersion: myAssignment.data?.version ?? 0,
+        });
       },
     );
   }, [gameId, myAssignment.data, myAssignment.isLoading, sync.lastSequence]);
@@ -353,17 +371,21 @@ export function useV1GameOperationsConsole(
       socket.emit(
         'game.takeover.renew',
         { gameId, takeoverToken: takeover.token, clientInstanceId: clientInstanceIdRef.current },
-        (result: { status: string; token?: string; expiresAt?: string; code?: string }) => {
-          if (result.status === 'granted' && result.token && result.expiresAt) {
-            dispatchTakeover({
-              type: 'GRANTED',
-              token: result.token,
-              expiresAtMs: new Date(result.expiresAt).getTime(),
-              assignmentVersion: takeover.assignmentVersion,
-            });
-          } else {
+        (result: GameTakeoverAck) => {
+          if (result.status !== 'granted') {
             dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_TOKEN_EXPIRED' });
+            return;
           }
+          if (!result.takeoverToken || !result.expiresAt) {
+            dispatchTakeover({ type: 'DENIED', code: 'TAKEOVER_TOKEN_EXPIRED' });
+            return;
+          }
+          dispatchTakeover({
+            type: 'GRANTED',
+            token: result.takeoverToken,
+            expiresAtMs: new Date(result.expiresAt).getTime(),
+            assignmentVersion: takeover.assignmentVersion,
+          });
         },
       );
     }, TAKEOVER_RENEW_INTERVAL_MS);
@@ -505,14 +527,17 @@ export function useV1GameOperationsConsole(
   };
 }
 
-function gameOperationsErrorMessage(code: string): string {
+export function gameOperationsErrorMessage(code: string): string {
   switch (code) {
     case 'TAKEOVER_TOKEN_EXPIRED':
       return '운영 권한 토큰이 만료됐어요. 다시 가져오는 중이에요.';
     case 'STAFF_SCOPE_DENIED':
       return '이 경기를 운영할 권한이 없어요.';
     case 'TAKEOVER_UNAVAILABLE':
-      return '실시간 연결이 끊겨 경기 운영을 시작하지 못했어요. 새로고침 후 다시 시도해 주세요.';
+      // 서버가 거부 사유 코드를 주지 않은 경우만 여기로 온다. 연결 자체는 살아 있을 수
+      // 있으므로(실제로 "실시간 연결됨" 상태에서 이 코드가 뜬 사례가 있었다) 원인을
+      // 단정하지 않는다.
+      return '경기 운영 권한을 가져오지 못했어요. 새로고침 후 다시 시도해 주세요.';
     case 'VERSION_CONFLICT':
       return '경기 상태가 변경되어 다시 시도해주세요.';
     case 'CLOCK_DRIFT':

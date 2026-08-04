@@ -436,7 +436,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
           ) : (
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              {locked ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.' : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
+              {/* 이미 소속된 멤버·운영진에게 "신청 전에…" 라고 말하면 안 된다 — 본문은 운영
+                  메뉴를 보여주는데 사이드바만 비멤버 문구를 유지해 역할이 어긋나 있었다. */}
+              {mode === 'mine'
+                ? '이미 이 팀의 멤버예요. 운영 메뉴에서 팀을 관리해요.'
+                : locked
+                  ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.'
+                  : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
             </div>
           )}
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}

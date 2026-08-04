@@ -551,6 +551,37 @@ The flag gate is an immutable phase-specific attempt-bound bundle, not an ad hoc
 - `T-08` and `P-03` intentionally resolve to the same public team-record route. They are distinct product entry/context IDs with one implementation owner, not duplicate ownership.
 - The v1 live-entry MVP is tournament-operations only. Tapping a player freezes that moment's server-synchronized game clock in an event draft; choosing `GOAL`, `YELLOW_CARD`, or `RED_CARD` submits the acknowledged event with that captured clock. `GOAL` requires the scorer and may include one optional assist. A generic `FOUL` event and an ordinary-team-match live console are deferred; team management uses the shared event/result contract through its post-match result workflow. Public live timelines render acknowledged events only.
 
+## 정정한 오판 5건째 (2026-08-04): 태스크 22·23 은 "미구현" 이 아니라 이미 구현돼 있었다
+
+이전 세션이 E2E-CORR-01 을 "태스크 22·23 미구현" 으로 결론 낸 것 자체가 오판이었다. `.omo/plans/teameet-team-tournament-operations-v1.md` 의 `[ ] 22.`/`[ ] 23.` 체크박스만 갱신이 안 됐을 뿐, 코드는 실제로 존재하고 배선돼 있었다.
+
+### 실측으로 확인한 것
+
+- **백엔드**: `apps/v1_api/src/tournament-operations/results/tournament-result-review.{controller,service,dto}.ts` — 스펙이 요구한 5개 엔드포인트(`review-decision`/`supersede-and-submit`/`officialize`/`void`/`corrections`) 전부 존재, `tournaments.module.ts` 에 정상 등록. 구현 커밋 `8f9b2ee7`(+후속 fix 3건)은 이미 현재 HEAD 의 조상(`git merge-base --is-ancestor` 로 확인).
+- **백엔드 테스트**: `apps/v1_api/test/tournaments/tournament-officialize.integration-spec.ts`(629줄, 9개 테스트)를 신규 격리 DB(`ulw_v1_integration_task27`, `teameet_v1_pg_flow:5442` 에 생성 후 `prisma migrate deploy`)에서 직접 실행 — **9/9 통과**. reject/supersede/stale-hash 거부/officialize+중복거부/correction+포인터 스왑/stale correction 거부/void+중복거부/`NEXT_FIXTURE_CONFLICT`/`DIRECTOR_OFFICIALIZE` 라이브 게이팅까지 실제로 검증됨.
+- **프론트엔드**: `apps/v1_web/src/app/tournament-ops/tournaments/[id]/result-review/`, `.../records/corrections/` 가 이미 존재(커밋 `b40a0efb` "add tournament result review and correction console (Task 23)"). `src/app/tournament-ops/result-review.test.tsx`(579줄, 22개 테스트) 전부 통과.
+- **라이브 화면 검증**(Read 로 직접 스크린샷 확인, `/private/tmp/teameet-ulw-evidence/task22-23-live-verify/`): `admin@teameet.v1`(대회 디렉터, tournament `2c493cbb…`)로 `/tournament-ops/tournaments/:id/records/corrections` 접속 → 실제 시드 경기("강남 풋살 클럽 vs 성수 풋살 클럽 3:1", 리비전 #1 공식 확정 이력) 렌더 확인 → "정정 시작" 클릭 → 참가자별 득점/경고/퇴장/선발/골키퍼 입력 폼이 실제 6명 선수 ID로 렌더, 사유 미입력 상태에서 "정정 제출" 버튼 비활성(유닛테스트 계약과 일치) 확인. 실제 제출은 하지 않음(다른 QA 상태 보존).
+
+### 그럼에도 진짜로 남은 gap — `tech-planner` 대조 검증 결과
+
+Task 22 원 스펙의 Acceptance Criteria 9개 중 **6개 완전충족 · 2개 부분 gap · 1개 설계충족·테스트미비**:
+
+| 항목 | 상태 | 내용 |
+|---|---|---|
+| AC-7 (standings/next-fixture 충돌) | **부분 gap** | next-fixture 쪽은 `NEXT_FIXTURE_CONFLICT` 로 충족. **standings/tie-break 충돌 감지는 구현 자체가 없음** — `STANDINGS_CONFLICT` 계열 식별자 전역 0건 |
+| AC-8 (director flag 감사) | **부분 gap** | 플래그 라이브 재조회·성공 감사는 있음. **403 거부 경로는 감사 레코드를 남기지 않고, 감사에 플래그 값/버전 스냅샷이 없음** |
+| AC-4 (원자 롤백) | 설계충족·테스트미비 | 단일 `$transaction` 이라 설계상 충족이나 실패 주입 테스트가 없음 |
+
+QA scenarios 21개 중 **12개 커버 / 9개 미커버**(supplement 재제출, atomic rollback 주입, supplement/change-request 터미널 거부, cross-game 손상, projection failure, director void 거부/성공, tie-break 충돌). 스키마 마이그레이션은 불필요(기존 트리거·복합 FK 가 불변식을 이미 강제). 상세 대조표는 `.github/tasks/22-tournament-result-review-officialize.md`.
+
+### F3 상태 재평가
+
+E2E-CORR-01 의 핵심 경로(리뷰→officialize→correction 생성→correction officialize 로 포인터 스왑)는 백엔드 통합테스트 9/9 + 라이브 화면 검증으로 **동작이 실증됐다**. 다만:
+- 이번 턴에서 브라우저로 정정을 실제 제출·확정까지 밀어붙이지는 않았다(폼 렌더·비활성 상태 확인까지).
+- standings/tie-break 충돌 감지 gap 은 E2E-CORR-01 시나리오 자체가 요구하는 범위인지 원 스펙 QA scenario 목록 재확인이 아직 필요하다.
+
+따라서 F3 를 이 턴에서 7/7 로 승격하지 않는다 — **6/7 유지**, 단 "태스크 22·23 미구현" 이라는 차단 사유는 폐기한다. 다음 세션 진입점: (1) 정정 제출→officialize 까지 실제로 완주해 DB 레벨 포인터 스왑을 실측하고, (2) standings 충돌 감지 gap 이 E2E-CORR-01 통과에 필요한지 스펙 대조, (3) 필요하면 `game-operation-flags.ts`/`prisma/**` 를 건드리지 않는 범위에서 gap 2건(AC-7 standings, AC-8 감사) 을 별도 태스크로 구현.
+
 ### `planSHA` 재결속 — 2026-08-04
 
 이 원장의 `planSHA` 는 `dc4ecb2f7659…` 였고, 살아 있는 플랜의 체크박스 정규화 SHA 는

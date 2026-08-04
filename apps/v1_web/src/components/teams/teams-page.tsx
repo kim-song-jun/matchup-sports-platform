@@ -521,7 +521,16 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       <div className="tm-fixed-cta tm-hide-desktop">
         {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하므로 같은 말을 반복하지 않는다. */}
         {mode === 'pending' ? null : (
-          <div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>
+          <div className="tm-text-caption" style={{ marginBottom: 8 }}>
+            {/* mode==='mine' 은 이미 이 팀 소속(CTA 가 "팀 관리")인데, 예전에는 locked 여부로만
+                문구를 갈라서 팀장·매니저에게도 "신청 전 ... 확인해 주세요" 라는 비회원 안내가
+                그대로 나갔다. 이미 들어와 있는 사람에게 가입 안내를 하지 않는다. */}
+            {mode === 'mine'
+              ? '팀 정보와 멤버를 관리할 수 있어요.'
+              : locked
+                ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.'
+                : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
+          </div>
         )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
         {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}

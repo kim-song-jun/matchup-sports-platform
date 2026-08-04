@@ -1010,3 +1010,58 @@ UI 의 "승인하기" 를 실제로 눌러 after 를 찍었다.
 prerequisites 검증에서 막히고, 플래그 값을 DB 로 직접 바꾸면 전환 게이트 자체를 우회한다.
 
 영수증 v6(0444, sha256 `c058c973…`) 에 이 정정을 반영했다. F3 는 여전히 6/7 · REJECT.
+
+## F2 재실행 — domain-serial-reviews 통과 (2026-08-04)
+
+미수행이던 **backend 도메인 리뷰를 실제로 수행**하고 migration 판정을 정정해 영수증 v2
+(0444, sha256 `b1a43722…`)를 발급했다. 게이트 결과 `domain-serial-reviews` 가
+**FAIL → PASS**, blocking 코드가 2개에서 1개로 줄었다.
+
+### backend 리뷰 (수행함)
+
+결과 파이프라인 무결성 3종을 정식 API 호출로 실행 검증:
+`SCORE_EVENT_MISMATCH`(스코어↔골 이벤트), `SCORE_EVENT_MISMATCH`(카드 합계↔카드 이벤트),
+`RESULT_REVISION_ALREADY_EXISTS`(새 초안은 change-requested 선행 리비전 필요).
+권한 경계: `game.takeover` 는 `resolveActor(...,'tournament_command')` 이므로 팀매치 게임에는
+팀 owner·platform_ops 모두 접근 불가 — 팀매치는 호스트 결과 리비전 경로로 분리돼 있다.
+상대팀 승인 여정을 정식 API 로 완주(OFFICIAL + 포인터 확인).
+
+발견 1건 — **GATEWAY-APPEND-ERROR-CORRELATION(minor)**: `appendGameEvent` 의 파싱 실패
+경로가 `emitProtocolError(client, {code:'VALIDATION_ERROR'})` 로 `clientEventId`/
+`expectedVersion` 없이 응답한다. 성공·도메인 실패 경로(`protocolError`)는 항상 넣으므로
+클라이언트가 어떤 큐 항목이 실패했는지 상관지을 수 없다.
+
+### migration 판정 정정
+
+앞선 영수증의 "비축구 종목 행 때문에 alpha 배포가 무조건 중단된다" 는 **과장이었다**.
+가드(DO 블록)가 기존 행을 스캔해 RAISE 하는 것은 사실이나, **API 계층이 같은 제약을 이미
+강제한다** — running 종목 팀매치 생성을 실제로 시도하니 `409 COMPETITION_CONFIG_REQUIRED`
+로 차단됐고(실측), 대회도 `competitionConfigVersionId` 핀을 요구한다. 새 위반 행은 생길 수
+없고 dev DB 위반 행 수는 0. 남는 위험은 가드 도입 이전 레거시 행뿐이며 대상 환경에서만
+확인 가능하므로 **배포 전 점검 항목**으로 남겼다(finding MIGRATION-LEGACY-ROW-PREDEPLOY-CHECK,
+쿼리 포함).
+
+### 게이트 설계 결함 #5 — legacy-writer-scan 은 통과 불가
+
+`run-v1-final-gate.mjs:549` 의 `legacy-writer-scan` 은 **입력 경로 없이 하드코딩
+`'blocked'`** 다("Left unchecked rather than faked"). 주석은 도메인 리뷰에서
+"`apps/v1_api/src/games/adapters` 가 유일한 legacy/new 쓰기 스위치임을 확인하라" 고 하지만,
+그 확인 결과를 게이트에 전달할 방법이 없다.
+
+주석이 요구한 추적을 실제로 수행한 결과:
+
+| 플래그 | 런타임 소비처 |
+|---|---|
+| `PUBLIC_LIVE` | `games.service.ts:550`, `public-tournament-records.service.ts:304` |
+| `DIRECTOR_OFFICIALIZE` | `tournament-result-review.service.ts:834` |
+| **`GAME_WRITE`** | **`games/migration/game-result-backfill.cli.ts` 뿐** — 요청 처리 경로 없음 |
+| `apps/v1_api/src/games/adapters` | **존재하지 않음** |
+
+즉 요청 경로에 GAME_WRITE 로 분기하는 쓰기 경로가 아예 없어 게이트가 상정한 "우회" 가
+성립하지 않는다. 주석이 지목한 스위치 디렉터리도 만들어진 적이 없다.
+
+수정 방향(미착수): grep 은 판단은 못 해도 **후보 열거**는 할 수 있다. `--legacy-writer-attestation`
+입력을 받되 게이트가 "touched files 중 legacy 쓰기 심볼을 참조하는 파일 목록"을 grep 으로
+뽑아 **첨부된 진술이 그 목록을 빠짐없이 덮는지** 대조하면, 사람이 각 지점을 판단하되 누락은
+기계가 막는다. 단순 boolean 첨부(러버스탬프)와 다르다. 이번 세션에서는 컨텍스트가 부족해
+설계만 남긴다.

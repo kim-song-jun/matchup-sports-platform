@@ -207,6 +207,16 @@ describe('lineup.view-model', () => {
     expect(resolveOwnTeamId(teamMatch, undefined)).toBeNull();
   });
 
+  it('accepts the paginated { items } shape useV1MyTeams actually returns', () => {
+    // GET /me/teams 는 배열이 아니라 { items: [...] } 를 돌려준다. 이걸 언랩하지 않고 넘기면
+    // 예전 구현은 `myTeams.find is not a function` 으로 라인업/팀매치 화면 전체를 죽였다.
+    const teamMatch = { hostTeamId: 'team-host', approvedOpponentTeam: { teamId: 'team-away' } };
+    expect(
+      resolveOwnTeamId(teamMatch, { items: [{ teamId: 'team-host', role: 'owner' }] }),
+    ).toBe('team-host');
+    expect(resolveOwnTeamId(teamMatch, { items: [] })).toBeNull();
+  });
+
   it('isRosterMemberPlaced matches deriveLineupCounts waiting logic', () => {
     let state = createEmptyLineupEditorState(0);
     state = addRosterMemberToStarters(state, rosterMember);

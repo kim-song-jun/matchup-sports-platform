@@ -31,15 +31,24 @@ export type RosterOption = {
  * 동일한 방식으로 여기서 재현한다: 이 매치의 호스트팀/승인된 상대팀 중 내가 owner·manager로
  * 속한 쪽이 "내 팀"이다.
  */
+type MyTeamRow = { teamId: string; role: 'owner' | 'manager' | 'member' };
+
 export function resolveOwnTeamId(
   teamMatch: { hostTeamId?: string; approvedOpponentTeam?: { teamId: string } | null } | undefined,
-  myTeams: Array<{ teamId: string; role: 'owner' | 'manager' | 'member' }> | undefined,
+  /**
+   * `useV1MyTeams()`가 주는 값을 그대로 받는다. 이 엔드포인트는 `{ items: [...] }`로 감싼
+   * 페이지네이션 응답을 돌려주므로 호출부에서 언랩을 잊으면 `.find is not a function`으로
+   * 페이지 전체가 죽는다 — 실제로 라인업/팀매치 두 화면이 그렇게 깨졌다. 언랩을 호출부에
+   * 맡기지 않고 여기서 흡수해 같은 실수가 되풀이될 수 없게 한다.
+   */
+  myTeams: MyTeamRow[] | { items: MyTeamRow[] } | undefined,
 ): string | null {
-  if (!teamMatch || !myTeams) return null;
+  const rows = Array.isArray(myTeams) ? myTeams : myTeams?.items;
+  if (!teamMatch || !rows) return null;
   const candidateTeamIds = [teamMatch.hostTeamId, teamMatch.approvedOpponentTeam?.teamId].filter(
     (id): id is string => Boolean(id),
   );
-  const match = myTeams.find(
+  const match = rows.find(
     (team) => candidateTeamIds.includes(team.teamId) && (team.role === 'owner' || team.role === 'manager'),
   );
   return match?.teamId ?? null;

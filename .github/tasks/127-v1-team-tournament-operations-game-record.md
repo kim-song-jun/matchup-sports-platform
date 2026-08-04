@@ -1065,3 +1065,53 @@ prerequisites 검증에서 막히고, 플래그 값을 DB 로 직접 바꾸면 �
 뽑아 **첨부된 진술이 그 목록을 빠짐없이 덮는지** 대조하면, 사람이 각 지점을 판단하되 누락은
 기계가 막는다. 단순 boolean 첨부(러버스탬프)와 다르다. 이번 세션에서는 컨텍스트가 부족해
 설계만 남긴다.
+
+## F2 통과 (2026-08-04) — 게이트 설계 결함 #5 해결
+
+`legacy-writer-scan` 을 통과 가능한 검사로 바꾸고 진술서를 발급해 **F2 verdict APPROVE,
+blocking 0** 을 받았다.
+
+### 무엇이 문제였나
+
+이 체크는 입력 경로 없이 하드코딩 `'blocked'` 이었다. 주석의 이유("grep 은 판단을 못 하니
+가짜로 통과시키느니 막아두겠다")는 옳지만, 도메인 리뷰 결과를 게이트에 되돌릴 방법이 없어
+**어떤 경우에도 통과할 수 없었다** — `live-surface-reachable`(결함 #4)과 같은 형태다.
+
+### 해법 — 역할 분리
+
+grep 은 판단은 못 해도 **후보 열거**는 신뢰할 수 있다. 게이트가 touched 파일에서 결과 테이블
+writer 후보를 Prisma 모델 mutation + 원시 SQL 로 열거하고, 첨부 진술서가 그 후보를 **빠짐없이**
+덮는지 대조한다. 각 지점 판단은 사람이, 누락은 기계가 막는다. 진술서는 리뷰 영수증과 같은
+불변성 계약(0444 + sha256 고정)을 지고 항목마다 disposition + 실질 rationale 을 요구한다.
+
+### 실측 (부정 대조군 포함)
+
+| 입력 | 결과 |
+|---|---|
+| 진술서 없음 | BLOCKED, 후보 **35개** 열거 |
+| **1개 누락 진술서** | **FAIL** — `attestation omits 1 enumerated call site(s): apps/v1_api/test/team-matches/team-match-game-adapter.integration-spec.ts:511` |
+| 완전한 진술서(35개) | **PASS** — `35 enumerated call site(s) all attested` |
+
+누락본이 통과했다면 이 검사는 무의미했다. 정확히 그 한 곳을 지목하며 막았다.
+
+### 판정 결과 — new-path-canonical 11 / not-a-writer 24
+
+프로덕션 writer 11곳(`games.service.ts` 8, `game-result-public-cache.service.ts` 2,
+`game-result-official-facts.service.ts` 1)은 전부 신규 `v1_game_*` 테이블을 쓰며
+`withNewWriteAuthority` 호출 0회다. **이는 우회가 아니라 대상이 아니기 때문** — GAME_WRITE 는
+`game-result-backfill.cli.ts` 의 legacy/new 이중쓰기 전환만 지배한다. 나머지 24곳은 통합 테스트
+픽스처다.
+
+분류 어휘에 `new-path-canonical` 을 추가했다. 기존 3종(`gated`/`legacy-intentional`/
+`not-a-writer`)으로는 위 사실을 표현할 수 없어 억지 라벨링을 강요했고, 그 강요가 곧
+러버스탬프다. 후보 목록 절단(slice 30)도 제거했다 — 리뷰어가 볼 수 없는 지점이 있으면 완전한
+진술서를 쓸 수 없다.
+
+### F2 최종
+
+```
+PASS  gate-identity / ledger-parses / touched-files-diff / debt-marker-scan
+PASS  domain-serial-reviews
+PASS  legacy-writer-scan
+verdict APPROVE | blocking []
+```

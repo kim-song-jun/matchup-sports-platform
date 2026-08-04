@@ -13,6 +13,7 @@ import { randomUuid } from '@/lib/uuid';
 import { LineupGrid } from './lineup-grid';
 import { EventCaptureModal, type EventCaptureCommitInput } from './event-capture-modal';
 import { QueueStatusPanel } from './queue-status-panel';
+import { RecordedEventList } from './recorded-event-list';
 import type { GameCommandName, GameLineupParticipant, GameState } from '@/types/game-operations';
 
 export interface OperateConsoleProps {
@@ -249,10 +250,22 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         />
       </div>
 
+      {/* "기록한 이벤트" 라는 제목 아래에 로컬 전송 큐만 그리고 있었다. 큐는 이번 세션에
+          내가 올린 것만 담으므로, 새로고침하거나 다른 운영자가 넘겨받으면 골이 4개
+          기록된 경기도 "기록된 이벤트가 아직 없어요" 로 보였다 — 화면이 실제 기록을
+          부정하는 상태다. 서버에 확정된 이벤트 로그를 먼저 보여주고, 큐는 아직 전송되지
+          않았거나 실패한 것만 따로 세운다(둘은 다른 것을 뜻한다). */}
       <section className="px-4">
-        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">기록한 이벤트</h3>
-        <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} />
+        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">기록된 이벤트</h3>
+        <RecordedEventList events={ops.liveEvents} sides={sides} lineups={lineups} />
       </section>
+
+      {ops.queue.items.length > 0 && (
+        <section className="px-4">
+          <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">전송 상태</h3>
+          <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} />
+        </section>
+      )}
 
       {selected && (
         <EventCaptureModal

@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1GameResultRevision } from '@/types/api';
-import { TeamMatchResultApprovalPageClient, TeamMatchResultPageClient } from './team-match-result-client';
+import {
+  TeamMatchResultApprovalPageClient,
+  TeamMatchResultPageClient,
+  scoreLabel,
+} from './team-match-result-client';
 
 const {
   useV1TeamMatchMock,
@@ -111,7 +115,7 @@ function revision(overrides: Partial<V1GameResultRevision> = {}): V1GameResultRe
     gameId: 'game-1',
     revision: 1,
     state: 'DRAFT',
-    score: { home: 0, away: 0 },
+    score: { regulation: { home: 0, away: 0 }, penalty: null, goals: [], incomplete: false },
     eventsHash: 'hash',
     missingScorer: false,
     mvpParticipantId: null,
@@ -211,7 +215,7 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
 
   it('DRAFT 상태에서는 재작성 폼 대신 제출 확인 카드를 보여주고, 제출하면 submitRevision을 호출한다', async () => {
     useV1GameResultRevisionsMock.mockReturnValue(
-      settledQuery<V1GameResultRevision[]>([revision({ state: 'DRAFT', score: { home: 0, away: 0 } })]),
+      settledQuery<V1GameResultRevision[]>([revision({ state: 'DRAFT', score: { regulation: { home: 0, away: 0 }, penalty: null, goals: [], incomplete: false } })]),
     );
     submitMutateAsync.mockResolvedValue({});
     render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
@@ -238,7 +242,7 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
   it('제출된 결과가 있으면 승인/정정 요청 버튼을 보여준다', () => {
     useV1GameResultRevisionsMock.mockReturnValue(
       settledQuery<V1GameResultRevision[]>([
-        revision({ state: 'SUBMITTED', score: { home: 2, away: 1 }, submittedAt: '2026-08-01T00:00:00.000Z' }),
+        revision({ state: 'SUBMITTED', score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false }, submittedAt: '2026-08-01T00:00:00.000Z' }),
       ]),
     );
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
@@ -261,7 +265,7 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
 
   it('409 race: 승인 처리 중 그새 바뀐 버전 충돌을 actionable 메시지로 보여준다', async () => {
     useV1GameResultRevisionsMock.mockReturnValue(
-      settledQuery<V1GameResultRevision[]>([revision({ state: 'SUBMITTED', score: { home: 2, away: 1 } })]),
+      settledQuery<V1GameResultRevision[]>([revision({ state: 'SUBMITTED', score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false } })]),
     );
     decideRevisionRejects({ code: 'VERSION_CONFLICT', message: 'stale' });
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
@@ -273,7 +277,7 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
 
   it('정정 요청은 사유 입력 전에는 비활성화, 입력 후 전송된다', async () => {
     useV1GameResultRevisionsMock.mockReturnValue(
-      settledQuery<V1GameResultRevision[]>([revision({ state: 'SUBMITTED', score: { home: 2, away: 1 } })]),
+      settledQuery<V1GameResultRevision[]>([revision({ state: 'SUBMITTED', score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false } })]),
     );
     decideMutateAsync.mockResolvedValue({});
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
@@ -293,7 +297,7 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
   it('공식 확정(OFFICIAL) 상태에서는 기록 반영 지연 안내를 보여준다', () => {
     useV1GameResultRevisionsMock.mockReturnValue(
       settledQuery<V1GameResultRevision[]>([
-        revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-08-01T01:00:00.000Z' }),
+        revision({ state: 'OFFICIAL', score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false }, officialAt: '2026-08-01T01:00:00.000Z' }),
       ]),
     );
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
@@ -304,3 +308,24 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
 function decideRevisionRejects(error: unknown) {
   decideMutateAsync.mockRejectedValue(error);
 }
+
+describe('scoreLabel', () => {
+  // 스코어는 score.regulation 아래에 있다. 예전 구현은 score.home 을 읽어서 화면에
+  // "undefined : undefined" 를 그렸는데, 목이 같은 잘못된 형태를 쓰고 있어 테스트는 초록이었다.
+  // 이 테스트는 서버가 실제로 보내는 스냅샷 형태를 그대로 넣는다 — 되돌리면 반드시 깨진다.
+  const snapshot = (regulation: { home: number; away: number } | null): V1GameResultRevision =>
+    ({
+      score: { regulation, penalty: null, goals: [], incomplete: regulation === null },
+    }) as unknown as V1GameResultRevision;
+
+  it('renders the regulation score from the response snapshot shape', () => {
+    expect(scoreLabel(snapshot({ home: 2, away: 1 }))).toBe('2 : 1');
+    expect(scoreLabel(snapshot({ home: 0, away: 0 }))).toBe('0 : 0');
+  });
+
+  it('never renders undefined when regulation is absent', () => {
+    const label = scoreLabel(snapshot(null));
+    expect(label).not.toContain('undefined');
+    expect(label).toBe('기록 없음');
+  });
+});

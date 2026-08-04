@@ -1212,10 +1212,29 @@ export type V1Game = {
   actorRole: string;
 };
 
+/**
+ * `V1GameResultRevision.score` 의 실제 응답 구조.
+ *
+ * 이전 정의는 `{ home, away, penalties? }` 로 한 단계 평평했는데 서버가 보내는 것은
+ * `{ regulation, penalty, goals, incomplete, provenance }` 다(백엔드 canonical 정의:
+ * `apps/v1_api/src/games/migration/game-result-backfill.ts` 의 ScoreSnapshot).
+ * 타입이 실제와 달라 `revision.score.home` 이 컴파일은 통과하고 런타임에만 undefined 가
+ * 되어, 경기 결과 화면이 스코어 대신 "undefined : undefined" 를 그렸다.
+ *
+ * `regulation` 은 미완 결과(TEAM_MATCH_COMPLETION_ONLY 등)에서 null 이 될 수 있으므로
+ * 읽는 쪽에서 반드시 분기해야 한다.
+ */
 export type V1GameResultScore = {
-  home: number;
-  away: number;
-  penalties?: { home: number; away: number } | null;
+  regulation: { home: number; away: number } | null;
+  penalty: { home: number; away: number } | null;
+  goals: Array<{
+    team: 'home' | 'away';
+    playerId: string | null;
+    playerName: string;
+    minute: number | null;
+  }>;
+  incomplete: boolean;
+  provenance?: string;
 };
 
 export type V1GameResultCards = { yellow: number; red: number };
@@ -1263,9 +1282,20 @@ export type V1GameResultParticipantInput = {
   goalkeeper: boolean;
 };
 
+/**
+ * 결과 제출 시 **보내는** 스코어. 서버가 돌려주는 스냅샷(`V1GameResultScore`)과 형태가 다르다 —
+ * 보낼 때는 정규시간 점수만 평평하게 보내고, 서버가 regulation/penalty/goals/incomplete 로
+ * 감싼 스냅샷을 만들어 돌려준다. 예전에는 두 방향이 한 타입을 공유해서 읽기 쪽 형태가 틀린 채로
+ * 컴파일을 통과했다.
+ */
+export type V1GameResultScoreInput = {
+  home: number;
+  away: number;
+};
+
 export type V1CreateGameResultRevisionPayload = {
   expectedVersion: number;
-  score: V1GameResultScore;
+  score: V1GameResultScoreInput;
   actualParticipants: V1GameResultParticipantInput[];
   eventsHash: string;
   mvpParticipantId?: string;

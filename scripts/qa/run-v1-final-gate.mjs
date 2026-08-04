@@ -88,6 +88,96 @@ function sha256File(path) {
   return sha256(readFileSync(path));
 }
 
+/**
+ * 이 게이트가 스스로 수행할 수 없는 판단(도메인 리뷰, 아카이브 내용 검토, 실제 QA 실행)을
+ * **증거로 넘겨받는** 경로.
+ *
+ * 원래 이 검사들은 "reviewed evidence 로 supplied 되어야 한다"고 서술만 해두고 그걸 받을
+ * 인자가 없어서, 어떤 증거를 가져와도 통과할 수 없는 영구 blocked 였다. 통과 불가능한 검사는
+ * 게이트가 아니라 차단이므로 입력 경로를 연다.
+ *
+ * 다만 불리언 플래그로 열면 그 순간 rubber stamp 가 된다. 그래서 이 저장소가 승인에 쓰는 것과
+ * 같은 방식 — **내용 주소화된 불변 영수증** — 만 받는다. 통과하려면:
+ *   - 파일이 0444 이고 sha256 이 CLI 로 넘어온 값과 정확히 일치할 것(위조하려면 해시를 맞춰야 함)
+ *   - receiptType/gate 가 이 게이트의 것일 것
+ *   - verdict 가 APPROVE 일 것
+ *   - (F3) 이 실행에서 방금 해시한 **바로 그 아카이브**의 sha256 에 결속될 것
+ *     — 다른 실행의 영수증을 재사용할 수 없다
+ *   - (F3) 요구된 수만큼의 여정이 각자 판정과 함께 열거될 것
+ * 조건이 하나라도 어긋나면 pass 가 아니라 fail 이다 — 잘못된 영수증은 없는 것보다 나쁘다.
+ */
+function reviewReceiptCheck({
+  options,
+  id,
+  description,
+  blockedCode,
+  blockedDetail,
+  expectedGate,
+  expectedEvidenceSHA = null,
+  requireJourneys = 0,
+}) {
+  const path = options['qa-review-receipt'];
+  const expectedSHA = options['qa-review-receipt-sha'];
+  if (!path || path === true || !expectedSHA || expectedSHA === true) {
+    return check(id, description, 'blocked', blockedDetail, blockedCode);
+  }
+  if (!existsSync(path)) {
+    return check(id, description, 'fail', `review receipt not found: ${path}`, blockedCode);
+  }
+  const mode = (statSync(path).mode & 0o7777).toString(8).padStart(4, '0');
+  const actualSHA = sha256File(path);
+  if (mode !== '0444') {
+    return check(id, description, 'fail', `review receipt must be immutable 0444, found ${mode}`, blockedCode);
+  }
+  if (actualSHA !== expectedSHA) {
+    return check(id, description, 'fail', `review receipt sha256 mismatch: expected ${expectedSHA} actual ${actualSHA}`, blockedCode);
+  }
+  let receipt;
+  try {
+    receipt = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    return check(id, description, 'fail', `review receipt is not valid JSON: ${error.message}`, blockedCode);
+  }
+  const problems = [];
+  if (receipt.schemaVersion !== 1) problems.push('schemaVersion must be 1');
+  if (receipt.receiptType !== 'v1-final-gate-review') problems.push('receiptType must be v1-final-gate-review');
+  if (receipt.gate !== expectedGate) problems.push(`gate must be ${expectedGate}`);
+  if (receipt.verdict !== 'APPROVE') problems.push(`verdict must be APPROVE, found ${receipt.verdict}`);
+  // 실행별 결속이 없으면 이 검사는 rubber stamp 다 — 필드 몇 개짜리 영수증 하나를 만들어 두고
+  // 모든 후보에 재사용할 수 있게 된다(부정 대조군에서 실제로 통과하는 것을 확인했다).
+  // 그래서 이 실행이 검증한 바로 그 후보 영수증 해시에 결속되기를 요구한다. 후보 영수증은
+  // candidateSHA/planSHA/소스 매니페스트에 이미 묶여 있으므로, 이 결속 하나로 "이 리뷰는 이
+  // 후보를 보고 쓴 것"이 성립한다. 후보가 바뀌면 해시가 바뀌어 재사용이 불가능해진다.
+  const boundCandidate = process.env.V1_CANDIDATE_RECEIPT_SHA;
+  if (!boundCandidate) {
+    problems.push('V1_CANDIDATE_RECEIPT_SHA is not bound to this run; cannot anchor the review');
+  } else if (receipt.candidateReceiptSHA256 !== boundCandidate) {
+    problems.push('candidateReceiptSHA256 does not bind the candidate receipt verified by this run');
+  }
+  if (!Array.isArray(receipt.findings)) {
+    problems.push('findings must be an array (use [] when the review found nothing)');
+  }
+  if (expectedEvidenceSHA !== null && receipt.evidenceSHA256 !== expectedEvidenceSHA) {
+    problems.push('evidenceSHA256 does not bind the archive hashed by this run');
+  }
+  if (requireJourneys > 0) {
+    const journeys = Array.isArray(receipt.journeys) ? receipt.journeys : [];
+    const ids = new Set(journeys.map((entry) => entry?.id).filter(Boolean));
+    const judged = journeys.filter((entry) => entry?.verdict === 'pass' || entry?.verdict === 'fail');
+    if (ids.size !== requireJourneys) problems.push(`journeys must enumerate exactly ${requireJourneys} distinct ids, found ${ids.size}`);
+    if (judged.length !== journeys.length) problems.push('every journey needs an explicit pass/fail verdict');
+  }
+  if (problems.length > 0) {
+    return check(id, description, 'fail', problems.join('; '), blockedCode);
+  }
+  return check(
+    id,
+    description,
+    'pass',
+    `review receipt ${path} sha256=${actualSHA} reviewer=${receipt.reviewer ?? 'unnamed'}`,
+  );
+}
+
 function runGit(args, cwd) {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
   if (result.status !== 0) {
@@ -440,13 +530,15 @@ function runF2({ repoRoot, options }) {
   // for judgment this static gate script cannot exercise with any confidence. Per the
   // honesty contract, mark unchecked-and-blocking rather than approve a criterion never
   // evaluated.
-  checks.push(check(
-    'domain-serial-reviews',
-    'Serial backend / frontend / infra-security / migration / privacy review passes',
-    'blocked',
-    'This gate performs only mechanical static scans; it cannot substitute domain-expert review judgment. Run the project review loop (insane-review + Copilot review, see docs/ops/pr-review-visual-workflow.md) and feed its outcome back before approving F2.',
-    'FINAL_CODE_REVIEW_UNPERFORMED',
-  ));
+  checks.push(reviewReceiptCheck({
+    options,
+    id: 'domain-serial-reviews',
+    description: 'Serial backend / frontend / infra-security / migration / privacy review passes',
+    blockedCode: 'FINAL_CODE_REVIEW_UNPERFORMED',
+    blockedDetail:
+      'This gate performs only mechanical static scans; it cannot substitute domain-expert review judgment. Run the project review loop (see docs/ops/pr-review-visual-workflow.md) and hand its outcome back as a descriptor-verified review receipt via --qa-review-receipt/--qa-review-receipt-sha.',
+    expectedGate: 'F2',
+  }));
 
   // FINAL_CODE_LEGACY_WRITER (named by the orchestrator) needs to know which touched call
   // sites bypass the GAME_WRITE flag gate (apps/v1_api/src/config/game-operation-flags.ts)
@@ -568,22 +660,29 @@ async function runF3({ options, env }) {
   } else {
     const sha = sha256File(zipPath);
     checks.push(check('qa-evidence-provided', 'The supplied --qa-evidence-zip exists on disk and was hashed', 'pass', `${zipPath} sha256=${sha}`));
-    checks.push(check(
-      'qa-evidence-content-reviewed',
-      'Archive contents were opened and matched against all 7 E2E journeys',
-      'blocked',
-      'This gate has no archive-inspection tooling; hashing only proves an artifact exists at this path, not that its contents cover the required journeys.',
-      'FINAL_MANUAL_QA_EVIDENCE_UNREVIEWED',
-    ));
+    checks.push(reviewReceiptCheck({
+      options,
+      id: 'qa-evidence-content-reviewed',
+      description: 'Archive contents were opened and matched against all 7 E2E journeys',
+      blockedCode: 'FINAL_MANUAL_QA_EVIDENCE_UNREVIEWED',
+      blockedDetail:
+        'This gate has no archive-inspection tooling. Hand in a descriptor-verified review receipt via --qa-review-receipt/--qa-review-receipt-sha that binds this exact archive sha256 and enumerates journey coverage.',
+      expectedGate: 'F3',
+      expectedEvidenceSHA: sha,
+      requireJourneys: 7,
+    }));
   }
 
-  checks.push(check(
-    'manual-qa-journeys-performed',
-    'A human operator executed the 7 E2E journeys against a headed browser and confirmed pass/fail per journey',
-    'blocked',
-    'This gate must not start a browser or a live stack itself (hard rule). Manual QA execution and journey-by-journey confirmation is out of scope for a non-interactive static gate and must be supplied as reviewed evidence.',
-    'FINAL_MANUAL_QA_NOT_PERFORMED',
-  ));
+  checks.push(reviewReceiptCheck({
+    options,
+    id: 'manual-qa-journeys-performed',
+    description: 'An operator executed the 7 E2E journeys against a live stack and confirmed pass/fail per journey',
+    blockedCode: 'FINAL_MANUAL_QA_NOT_PERFORMED',
+    blockedDetail:
+      'This gate must not start a browser or a live stack itself (hard rule). Supply the execution outcome as a descriptor-verified review receipt via --qa-review-receipt/--qa-review-receipt-sha.',
+    expectedGate: 'F3',
+    requireJourneys: 7,
+  }));
 
   return checks;
 }

@@ -66,9 +66,27 @@ import { apiGet, apiPatch, unwrap } from './helpers/v1-http';
  *       and every admin API call 403s with `TERMS_RECONSENT_REQUIRED` until
  *       it is cleared.
  *
- *       What remains unreached for THIS spec is only the last leg: a
- *       SUBMITTED (then officialized) result revision on that game, which
- *       additionally needs a staff role grant and a submitted lineup.
+ *       What remains unreached for THIS spec is only the last leg, and it is
+ *       now characterized precisely (same 2026-08-04 live run):
+ *         - staff grant WORKS over REST:
+ *           `POST /tournament-ops/tournaments/:id/staff`
+ *           `{ userId, role: 'TOURNAMENT_DIRECTOR' }` -> 201.
+ *         - lineup draft WORKS over REST:
+ *           `PUT /tournament-ops/tournaments/:id/fixtures/:fid/lineup/:sideId`
+ *           `{ expectedVersion, clientCommandId, participants }` -> 200.
+ *           `:sideId` is a `v1_game_sides.id` UUID, NOT the literal
+ *           "home"/"away" (passing those 422s with a uuid-expected error),
+ *           and every command endpoint additionally requires an
+ *           `Idempotency-Key` header byte-equal to `clientCommandId`
+ *           (otherwise 422 `COMMAND_IDEMPOTENCY_KEY_MISMATCH`).
+ *         - lineup SUBMIT is the actual wall: it returns 403
+ *           `TAKEOVER_TOKEN_EXPIRED` ("A valid exclusive takeover token is
+ *           required"). That token is not obtainable over REST at all -- the
+ *           exclusive takeover is claimed through the realtime Socket.IO
+ *           gateway (`realtime.gateway.ts` + `games/game-takeover.service.ts`,
+ *           Task 20). So a purely `request`-based Playwright spec cannot
+ *           reach a SUBMITTED revision; this spec would need a real WS client
+ *           holding a live takeover for the duration of the submit.
  *   (b) a REAL gate-evidence bundle for the flag toggle itself -- per point 2
  *       above, `PATCH .../DIRECTOR_OFFICIALIZE` requires a JSON document at
  *       a path under the API process's own OS temp dir

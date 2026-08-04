@@ -1308,3 +1308,25 @@ CI: `codex/teameet-task9-ci` head `a571d96d` 에서 run 30906890972 **success**
 `use-v1-game-operations-console.ts`(공유 타입 파생이 컴파일 타임 가드)와 `scripts/qa/*.mjs`
 3개(부정 대조군 실행으로 검증)다. 모든 신규 테스트는 부정 대조군으로 "되돌리면 깨지는지" 를
 확인했다 — 구현을 되읊는 테스트를 넣지 않기 위해서다.
+
+## Task 23 경량 감사 (2026-08-05) — 호스트 swap 압박으로 가벼운 방식 선택
+
+Task 22 전체 gap 해소 후, 같은 세션 초반에 "Task 23도 유사하게 이미 존재하나 별도 검증
+중"으로 남겨뒀던 것을 스팟체크했다. 이 시점 호스트 swap이 11.7GB/12.3GB(여유 599MB)까지
+찬 상태였고 내 세션이 만든 잔존 프로세스·DB는 없어(다른 세션들의 부하로 추정) 격리 DB를
+새로 만드는 무거운 서브에이전트 디스패치 대신 **직접 읽기 전용으로** 점검했다.
+
+- `apps/v1_web/src/components/tournament-result-review/*`(8개 컴포넌트) 중 전용 단위 테스트
+  파일은 0개지만, `apps/v1_web/src/app/tournament-ops/result-review.test.tsx`(579줄, 22
+  테스트, 이전 턴에 22/22 통과 실측)가 페이지 레벨 통합 테스트로 이 컴포넌트들을 실제
+  사용자 흐름 그대로 묶어서 검증한다.
+- 스펙 QA scenario(플랫폼운영자/디렉터/운영자 visibility, approve/reject/correction,
+  director void hidden/disabled↔visible+confirmed 플래그 게이팅, permission revoke)는
+  22개 테스트와 거의 1:1로 대응 — 파일:설명 대조는 이전 턴 grep 결과 참조.
+- **미확인 2건**: ① "projection failure remains pending/retryable"의 정확한 시나리오 매칭
+  여부(유사한 "VERSION_CONFLICT retryable" 테스트는 있으나 이름이 다름), ② "tablet/desktop
+  focus and sticky context"는 Vitest(jsdom)로는 원천적으로 검증 불가능한 반응형/시각 항목 —
+  원 스펙상 별도 V26 게이트(헤디드 768×1024/1440×900) 소관이라 이 세션 범위 밖으로 남긴다.
+- 결론: Task 23는 실측 기준으로 **실질적으로 완성**돼 있고 명백한 gap은 없다. 위 2건은
+  깊은 결함이라기보다 검증 방식의 한계이므로, 필요하면 후속 세션에서 라이브 스크린샷으로
+  마저 확인하면 된다.

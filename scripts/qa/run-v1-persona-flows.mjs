@@ -17,7 +17,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const WEB = process.env.FLOW_WEB_BASE ?? 'http://localhost:3013';
-const OUT = process.env.FLOW_OUT_DIR ?? 'scripts/qa/persona-flows';
+// 증거는 레포 트리 밖에 쓴다. 기본값이 scripts/qa/persona-flows 였을 때, 공유 워크트리를
+// 쓰는 다른 세션의 정리 과정에서 검수 도중 디렉터리가 통째로 사라져 리뷰어가 스크린샷
+// 8장만 보고 중단한 사고가 있었다. 트리 안에 두면 git 노이즈이기도 하고(Copilot 300파일
+// 한도), 어차피 갤러리는 커밋된 PNG가 아니라 별도 업로드로 게시한다.
+const OUT = process.env.FLOW_OUT_DIR ?? '/private/tmp/teameet-ulw-evidence/persona-flows';
 
 const ID = {
   team: process.env.FLOW_TEAM ?? '',
@@ -170,12 +174,22 @@ const HIDE_DEV_INDICATOR = `
   [data-next-badge-root], [data-nextjs-toast] { display: none !important; }
 `;
 
+// 수정 하나를 확인하려고 9페르소나 41단계를 다시 걷는 것은 낭비다. FLOW_ONLY 에
+// 페르소나 키를 쉼표로 넘기면 그 여정만 걷는다(미지정이면 전부). 오타로 조용히 0건을
+// 걷는 일이 없도록 매칭되는 페르소나가 없으면 즉시 실패시킨다.
+const ONLY = (process.env.FLOW_ONLY ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+const SELECTED = ONLY.length ? FLOWS.filter((f) => ONLY.includes(f.persona)) : FLOWS;
+if (ONLY.length && SELECTED.length !== ONLY.length) {
+  const known = FLOWS.map((f) => f.persona).join(', ');
+  throw new Error(`FLOW_ONLY 에 알 수 없는 페르소나가 있어요: ${ONLY.join(', ')} (가능: ${known})`);
+}
+
 const records = [];
 const browser = await chromium.launch();
 
 try {
   for (const vp of VIEWPORTS) {
-    for (const flow of FLOWS) {
+    for (const flow of SELECTED) {
       // 여정은 한 컨텍스트 안에서 이어 걷는다 — 단계마다 새 세션을 만들면 그건 여정이 아니다.
       const context = await browser.newContext({
         viewport: { width: vp.width, height: vp.height },

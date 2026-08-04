@@ -15,6 +15,7 @@ import {
   readFileSync,
   readSync,
   readlinkSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -23,25 +24,28 @@ import {
 import { cpus, loadavg, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, parse, resolve, sep } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { descriptorRead } from './verify-team-tournament-bound-sources.mjs';
 
-const DEFAULT_LEDGER = '.github/tasks/127-v1-team-tournament-operations-game-record.md';
-const DEFAULT_EVIDENCE_ROOT =
+export { descriptorRead };
+
+export const DEFAULT_LEDGER = '.github/tasks/127-v1-team-tournament-operations-game-record.md';
+export const DEFAULT_EVIDENCE_ROOT =
   '/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1';
 const PLAN_PATH = '.omo/plans/teameet-team-tournament-operations-v1.md';
 const SCRIPT_PATH = 'scripts/qa/run-v1-task-verification.mjs';
 const VERIFICATION_DOCKERFILE = 'deploy/Dockerfile.v1-verification';
 const VERIFICATION_IMAGE = 'teameet-v1-verification:node22-pnpm9.15.4';
-const TASK_ONE_WORKLOAD = 'task-1-host-supervisor-v1';
-const TASK_ONE_BASELINE_SHA = '71f67b0d24e272eecd216cebb31eefbd66c9ca02';
-const TASK_ONE_RESTART_HEAD_SHA = 'a4823d2f575d9396323421024a81a63dacf0cf67';
+export const TASK_ONE_WORKLOAD = 'task-1-host-supervisor-v1';
+export const TASK_ONE_BASELINE_SHA = '71f67b0d24e272eecd216cebb31eefbd66c9ca02';
+export const TASK_ONE_RESTART_HEAD_SHA = 'a4823d2f575d9396323421024a81a63dacf0cf67';
 const TASK_ONE_PREDECESSOR_CHAIN = [
   TASK_ONE_BASELINE_SHA,
   'a84a6e5277c4d29f9281140dca6a630fb5a2ca15',
   'd444649adaf1ba88c3dddd755f6728135d8476b4',
   TASK_ONE_RESTART_HEAD_SHA,
 ];
-const TASK_ONE_RECEIPTS = {
+export const TASK_ONE_RECEIPTS = {
   approval: {
     path: '.omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json',
     sha256: 'd30d3688ef97b0cefabfad3e6deb8343bb9e8b8f017bae0ff91572be901527ae',
@@ -199,7 +203,7 @@ const VALUE_OPTIONS = new Set([
 ]);
 const TARGET_PORTS = [3013, 8121];
 
-class HarnessError extends Error {
+export class HarnessError extends Error {
   constructor(code, message, exitCode = 70) {
     super(message);
     this.code = code;
@@ -207,11 +211,11 @@ class HarnessError extends Error {
   }
 }
 
-function sha256(value) {
+export function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function stable(value) {
+export function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
@@ -219,7 +223,7 @@ function stable(value) {
   return value;
 }
 
-function canonicalBytes(value) {
+export function canonicalBytes(value) {
   return Buffer.from(`${JSON.stringify(stable(value))}\n`);
 }
 
@@ -311,7 +315,7 @@ function parseIdentity(options) {
   return { gateId: `V${task}`, task, finalGate: null };
 }
 
-function parseLedger(filePath) {
+export function parseLedger(filePath) {
   const markdown = readFileSync(filePath, 'utf8');
   const start = markdown.indexOf(BEGIN);
   const end = markdown.indexOf(END);
@@ -330,7 +334,7 @@ function parseLedger(filePath) {
   }
 }
 
-function git(args, { cwd = process.cwd(), encoding = 'utf8', env = process.env } = {}) {
+export function git(args, { cwd = process.cwd(), encoding = 'utf8', env = process.env } = {}) {
   const result = spawnSync('git', args, {
     cwd,
     env,
@@ -347,7 +351,7 @@ function git(args, { cwd = process.cwd(), encoding = 'utf8', env = process.env }
   return result.stdout;
 }
 
-function readPlan(repoRoot) {
+export function readPlan(repoRoot) {
   const bytes = readFileSync(resolve(repoRoot, PLAN_PATH));
   const rawSHA = sha256(bytes);
   const normalized = bytes.toString('utf8').replace(
@@ -381,7 +385,7 @@ function verifyPlanBinding(options, repoRoot, task) {
   return { ...plan, selectedSHA: selected };
 }
 
-function secureImmutableDescriptor(
+export function secureImmutableDescriptor(
   filePath,
   expectedSHA,
   code,
@@ -1305,7 +1309,7 @@ function pathWithin(candidate, ownerPath) {
   return candidate === ownerPath || candidate.startsWith(`${ownerPath}/`);
 }
 
-function ownershipRow(ledger, task) {
+export function ownershipRow(ledger, task) {
   const row = ledger.ownership.find((entry) => entry.todo === task);
   if (!row) {
     throw new HarnessError('OWNERSHIP_MANIFEST_MISSING', `No ownership row for Task ${task}`, 68);
@@ -1345,7 +1349,7 @@ function validateDirtyScope(repoRoot, ledger, task) {
   }
 }
 
-function verifyTaskOneDirty(repoRoot, ledger) {
+export function verifyTaskOneDirty(repoRoot, ledger) {
   const taskOnePaths = ownershipRow(ledger, 1).outputs;
   const expected = ledger.unrelatedDirty.paths;
   const expectedPaths = new Set(expected.map(({ path }) => path));
@@ -1453,7 +1457,7 @@ function privateIndexTree(repoRoot, ownedPaths) {
   }
 }
 
-function immutableWrite(filePath, value) {
+export function immutableWrite(filePath, value) {
   mkdirSync(dirname(filePath), { recursive: true });
   const bytes = Buffer.isBuffer(value) ? value : canonicalBytes(value);
   let descriptor;
@@ -1484,7 +1488,7 @@ function immutableWrite(filePath, value) {
   return { path: filePath, sha256: sha256(bytes) };
 }
 
-function immutableWriteOrReuse(filePath, value) {
+export function immutableWriteOrReuse(filePath, value) {
   const bytes = Buffer.isBuffer(value) ? value : canonicalBytes(value);
   if (!existsSync(filePath)) return immutableWrite(filePath, bytes);
   const stat = lstatSync(filePath);
@@ -1633,7 +1637,7 @@ function createSourceSnapshot(
   }
 }
 
-function createCandidateSourceSnapshot(
+export function createCandidateSourceSnapshot(
   repoRoot,
   candidate,
   attemptId,
@@ -1667,7 +1671,7 @@ function createCandidateSourceSnapshot(
   };
 }
 
-function verifyCommittedSnapshot(repoRoot, snapshot) {
+export function verifyCommittedSnapshot(repoRoot, snapshot) {
   if (
     !Array.isArray(snapshot.ownedPaths) ||
     !Array.isArray(snapshot.entries) ||
@@ -1739,7 +1743,7 @@ function verifyCommittedSnapshot(repoRoot, snapshot) {
   }
 }
 
-function exactKeys(value, expected) {
+export function exactKeys(value, expected) {
   return (
     value &&
     typeof value === 'object' &&
@@ -1748,7 +1752,7 @@ function exactKeys(value, expected) {
   );
 }
 
-function verifyOwnedPathsClean(repoRoot, ownedPaths) {
+export function verifyOwnedPathsClean(repoRoot, ownedPaths) {
   const status = git(
     ['status', '--porcelain=v2', '-z', '--untracked-files=all', '--', ...ownedPaths],
     { cwd: repoRoot, encoding: null },
@@ -4036,8 +4040,27 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  const code = error instanceof HarnessError ? error.code : 'V1_TASK_VERIFICATION_CRASH';
-  process.stderr.write(`${code}: ${error.message}\n`);
-  process.exitCode = error instanceof HarnessError ? error.exitCode : 70;
-});
+// `import.meta.url` is always the REAL path, while `process.argv[1]` is whatever the caller typed.
+// Comparing them raw makes an invocation through a symlink look like an import and silently skips
+// main() -- the CLI would exit 0 having done nothing, which is the worst possible failure for a
+// verification harness. realpathSync on argv[1] collapses that difference. It is wrapped because
+// argv[1] can name a path that no longer exists, and a guard that throws is no better than one
+// that under-fires.
+function isDirectCliInvocation() {
+  const entry = process.argv[1];
+  if (entry === undefined) return false;
+  if (import.meta.url === pathToFileURL(entry).href) return true;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(entry)).href;
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectCliInvocation()) {
+  main().catch((error) => {
+    const code = error instanceof HarnessError ? error.code : 'V1_TASK_VERIFICATION_CRASH';
+    process.stderr.write(`${code}: ${error.message}\n`);
+    process.exitCode = error instanceof HarnessError ? error.exitCode : 70;
+  });
+}

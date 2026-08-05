@@ -366,16 +366,20 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       />
                       {/* 이 "GK" 는 포지션 표시가 아니라 라디오 라벨(=골키퍼로 지정)이다.
                           예전에는 선택 여부와 무관하게 모든 행에 같은 회색 글자로 붙어서
-                          11명 전원이 골키퍼인 것처럼 읽혔다. 선택된 행만 강조해 "지정됨" 과
-                          "지정 가능" 이 구분되게 한다. */}
+                          11명 전원이 골키퍼인 것처럼 읽혔다. 색·굵기만 다르게 하는 정도로는
+                          작은 화면에서 다시 같은 착시가 재현돼(QA 재확인) 텍스트 자체를
+                          지정된 한 명에게만 남긴다 — 미지정 행은 빈 라디오만 보인다. 폭은
+                          고정해 등번호 칸이 행마다 밀리지 않게 한다. */}
                       <span
                         className="tm-text-micro"
                         style={{
-                          color: entry.goalkeeper ? 'var(--blue500)' : 'var(--text-muted)',
-                          fontWeight: entry.goalkeeper ? 700 : 400,
+                          display: 'inline-block',
+                          minWidth: 20,
+                          color: 'var(--blue500)',
+                          fontWeight: 700,
                         }}
                       >
-                        GK
+                        {entry.goalkeeper ? 'GK' : ''}
                       </span>
                     </label>
                     <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>

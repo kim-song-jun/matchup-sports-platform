@@ -143,7 +143,12 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
 
   return (
     <TournamentOpsRoleProvider role={role}>
-      <TournamentOpsShell tournamentId={tournamentId} role={role} tournamentTitle={tournament.data?.title}>
+      <TournamentOpsShell
+        tournamentId={tournamentId}
+        role={role}
+        tournamentTitle={tournament.data?.title}
+        tournamentCoverImageUrl={tournament.data?.coverImageUrl}
+      >
         {children}
       </TournamentOpsShell>
     </TournamentOpsRoleProvider>

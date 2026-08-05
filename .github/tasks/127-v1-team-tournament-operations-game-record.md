@@ -1710,3 +1710,59 @@ difflib로 원본(HEAD)과 대조해 내용이 같은 줄은 원래 개행을 �
 정확히 이 두 파일(padding 수정 + globals.css)만 반영하는 커밋(`730759fb`)을
 별도로 만들어 직접 push. `gh pr view 249 --json headRefOid`로 PR 헤드가
 `730759fb`로 갱신됐음을 확인.
+
+## desktopHead B/C그룹 — 이전 패스가 놓친 loading/error 분기 2건 + 배지 누락 1건 (2026-08-05)
+
+사용자가 "desktopHead B/C그룹 진행"을 승인해 재검토했으나, 문서를 끝까지
+읽어보니 "37개 후보 일괄 수정" 절에서 이미 **16개 수정 + 21개 결함
+아님으로 확정 = 37개 전부 처리 완료**였다. 애초 AskUserQuestion에서
+"~30개 파일 남음"으로 잘못 프레이밍했던 것을 정정한다 — B/C그룹
+자체는 이미 끝난 작업이었다.
+
+대신 그 회귀 감사 과정에서 **다른 층위의 진짜 결함 2건**을 새로 찾았다:
+같은 컴포넌트 안에서 성공 분기는 desktopHead(또는 자체 헤더)를 갖췄지만
+**loading/error 조기 반환 분기는 빠져 있는** 케이스. `AppChrome` 호출을
+파일당 단위로만 세던 이전 감사(37개 후보 분류)가 "분기별" 단위까지는
+못 본 사각지대다.
+
+**수정 2건**:
+- `ScheduleDetailPageView`(team-schedules-page.tsx) error/loading 분기
+- `TournamentDetailPageClient`(tournament-detail-client.tsx) isLoading/
+  isError 분기
+
+**전수 확인 방법**: 정적 grep(파일 단위 카운트)이 아니라, 같은 함수
+안에서 여러 `<AppChrome>` 호출 각각이 desktopHead 또는 자체 헤더 마커를
+갖는지 개별 판정하는 python 스크립트로 재스캔 — 53개 AppChrome 사용
+파일 전체를 훑어 이 2건 외 다른 불일치는 없음을 확인(오탐 다수는
+`tm-desktop-page-head`가 자식 컴포넌트 안 더 깊은 곳에 있어 짧은
+lookahead 창에 안 걸린 것들 — 하나씩 직접 열어 실제로는 문제없음
+확인: community-page.tsx 3분기, matches/applications/client.tsx,
+my-page.tsx, search-experience.tsx).
+
+**겸사겸사 발견**: `MySchedulePageView`("내 일정" 목록)의 상태 뱃지가
+`item.stateLabel` 평문이었다 — 같은 파일 `ScheduleListPageView`("팀
+일정 목록", member-03에서 이미 고친 화면)는 `tm-badge`로 감쌌는데 이
+화면만 빠져 있었다. `scheduleStateTone()`(기존 헬퍼 재사용)로
+`stateTone`을 계산해 동일한 배지 처리를 적용했다.
+
+**검증**: `tsc --noEmit` 0 errors(단, 도중 발견한 무관 사고 — 아래
+참고), 관련 vitest 71/71 통과. Playwright 라이브: 일정 상세 에러
+분기(1440px)에서 `.tm-desktop-page-head`가 `display:flex`로 렌더됨을
+`getComputedStyle`로 확인 + 스크린샷, "내 일정" 배지가 `tm-badge
+tm-badge-blue`로 렌더됨을 확인 + 스크린샷. `tournament-detail-client.tsx`
+의 isLoading/isError 분기는 서버 컴포넌트(`page.tsx`)가 존재하지 않는
+ID를 `notFound()`로 먼저 차단해 클라이언트 쪽 로딩/에러 상태는 일반적인
+URL 조작으로 재현되지 않는다(클라이언트 refetch 실패 등 레이스 상황에서만
+발생) — 코드 대칭성(이미 살아있는 동일 패턴 재사용) + tsc + 기존 48개
+테스트로만 검증했고 라이브 재현은 못 함, **PARTIAL로 기록**.
+
+**부수적으로 발견한 로컬 워크트리 stale 파일 4건**: `handlers.ts`,
+`types/api.ts`, `admin/popups/page.tsx`, `lib/popup-targets.ts` — 전부
+dev 머지(PR #266, popup targetPaths 기능)가 이미 `origin/codex/teameet-task9-ci`
+에 반영됐는데 이 워크트리의 로컬 미커밋 상태만 그 이전 버전에 머물러
+있었다. tsc가 `targetPaths` 관련 타입 에러로 감지 → origin 기준으로
+동기화(코드 변경 아님, 이미 병합된 내용 복원). 한 번은 `git show ... >
+file` 리다이렉트가 이유 불명으로 조용히 실패해(파일 내용 그대로,
+에러 메시지 없음) 첫 시도가 무효였다 — `/tmp` 경유 `cp`로 재시도해
+해결. 원인 미상이라 재발 시 참고: git-show 직접 리다이렉트가 실패하면
+`git show ref:path > /tmp/x && cp /tmp/x path`로 우회.

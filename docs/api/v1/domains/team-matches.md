@@ -46,6 +46,8 @@ Optional fields include `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addr
 - Host owner/manager can close recruiting. Closing moves the team match to `closed`, rejects new applications, and marks pending applications `expired`.
 - Host owner/manager can reopen `closed` team matches before `startAt`; expired applications are not auto-restored.
 - Create UI must source host team choices from the current user's active owner/manager teams. Member-only teams are not valid host team options.
+- The requested `sportId` must equal the selected host team's `sportId`; mismatches return `400 VALIDATION_FAILED`.
+- Create/edit image upload uses the root-relative `/uploads/...` URL returned by `POST /uploads`; an empty image remains `null` and must not be replaced by sample data.
 - Applicant is a team, not a user.
 - Applicant team must be managed by the acting user.
 - Host team cannot apply to itself.

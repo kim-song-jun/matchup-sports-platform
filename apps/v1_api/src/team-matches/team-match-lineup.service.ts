@@ -121,6 +121,7 @@ export class TeamMatchLineupService {
               sideId: context.ownSideId,
               revision: (previous?.revision ?? 0) + 1,
               supersedesId: previous?.id,
+              formation: dto.formation,
             },
           });
           await tx.v1GameParticipant.createMany({
@@ -131,6 +132,8 @@ export class TeamMatchLineupService {
               displayNameSnapshot: entry.displayNameSnapshot,
               jerseyNumber: entry.jerseyNumber ?? null,
               position: entry.position,
+              positionX: entry.positionX ?? null,
+              positionY: entry.positionY ?? null,
             })),
           });
           return {
@@ -277,6 +280,7 @@ export class TeamMatchLineupService {
               sideId: context.opponentSideId,
               revision: target.revision + 1,
               supersedesId: target.id,
+              formation: target.formation,
             },
           });
           if (existingParticipants.length > 0) {
@@ -288,6 +292,8 @@ export class TeamMatchLineupService {
                 displayNameSnapshot: participant.displayNameSnapshot,
                 jerseyNumber: participant.jerseyNumber,
                 position: participant.position,
+                positionX: participant.positionX,
+                positionY: participant.positionY,
               })),
             });
           }
@@ -611,7 +617,13 @@ export class TeamMatchLineupService {
     context: TeamMatchLineupContext,
     entry: TeamMatchLineupParticipantDto,
     position: string | null,
-  ): Promise<{ displayNameSnapshot: string; jerseyNumber?: number; position: string | null }> {
+  ): Promise<{
+    displayNameSnapshot: string;
+    jerseyNumber?: number;
+    position: string | null;
+    positionX?: number;
+    positionY?: number;
+  }> {
     if (entry.userId === undefined) {
       const displayName = entry.displayName?.trim();
       if (displayName === undefined || displayName.length === 0) {
@@ -620,7 +632,13 @@ export class TeamMatchLineupService {
           message: '연결된 선수의 userId 또는 게스트 이름 중 하나는 반드시 입력해야 해요.',
         });
       }
-      return { displayNameSnapshot: displayName, jerseyNumber: entry.jerseyNumber, position };
+      return {
+        displayNameSnapshot: displayName,
+        jerseyNumber: entry.jerseyNumber,
+        position,
+        positionX: entry.positionX,
+        positionY: entry.positionY,
+      };
     }
     const membership = await tx.v1TeamMembership.findFirst({
       where: { teamId: context.ownTeamId, userId: entry.userId, status: 'active' },
@@ -656,7 +674,13 @@ export class TeamMatchLineupService {
       membership.user.profile?.nickname ||
       membership.user.profile?.displayName ||
       '팀원';
-    return { displayNameSnapshot, jerseyNumber: entry.jerseyNumber, position };
+    return {
+      displayNameSnapshot,
+      jerseyNumber: entry.jerseyNumber,
+      position,
+      positionX: entry.positionX,
+      positionY: entry.positionY,
+    };
   }
 
   private parseLineupConfig(value: Prisma.JsonValue | null): {
@@ -680,7 +704,13 @@ export class TeamMatchLineupService {
   private async serializeLineup(
     tx: Transaction,
     context: TeamMatchLineupContext,
-    lineup: { id: string; revision: number; state: V1GameLineupState; version: number } | null,
+    lineup: {
+      id: string;
+      revision: number;
+      state: V1GameLineupState;
+      version: number;
+      formation: string | null;
+    } | null,
     publicLineupAt: Date | null,
   ) {
     const participants =
@@ -701,6 +731,8 @@ export class TeamMatchLineupService {
         jerseyNumber: participant.jerseyNumber,
         position: participant.position === GOALKEEPER_MARKER ? null : participant.position,
         goalkeeper: participant.position === GOALKEEPER_MARKER,
+        positionX: participant.positionX,
+        positionY: participant.positionY,
       }));
     const bench = participants
       .filter((participant) => participant.position === BENCH_MARKER)
@@ -718,6 +750,7 @@ export class TeamMatchLineupService {
       revision: lineup?.revision ?? 0,
       state: lineup?.state ?? V1GameLineupState.DRAFT,
       version: lineup?.revision ?? 0,
+      formation: lineup?.formation ?? null,
       publicLineupAt: publicLineupAt?.toISOString() ?? null,
       starters,
       bench,

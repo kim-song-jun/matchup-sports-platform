@@ -261,6 +261,7 @@ export type V1Popup = {
   content?: V1RichContentDocument | null;
   contentVersion?: number;
   targetScreens: V1PopupTargetScreen[];
+  targetPaths?: string[];
   linkUrl: string | null;
   linkLabel: string | null;
   publishedAt: string | null;
@@ -852,12 +853,23 @@ export type V1ScheduleGuestRecruitmentView = {
   approvedCount: number;
 };
 
+/** GET .../schedules/:scheduleId 참가자 명단 항목 — 팀원(멤버)에게만 노출됨 */
+export type V1ScheduleAttendeeView = {
+  userId: string;
+  nickname: string;
+  profileImageUrl: string | null;
+  status: V1AttendanceStatus | 'NO_RESPONSE';
+  waitlistPosition: number | null;
+};
+
 /** GET .../schedules/:scheduleId 상세 응답 (TeamSchedulesService.detail) */
 export type V1TeamScheduleDetail = V1TeamScheduleSummary & {
   cancelReason: string | null;
   cancelledAt: string | null;
   guestRecruitment: V1ScheduleGuestRecruitmentView | null;
   myAttendance: { status: V1AttendanceStatus; version: number; waitlistPosition: number | null } | null;
+  /** 활성 팀원 전체 명단(응답자+미응답자). 비멤버/공개 열람자에게는 null. */
+  attendees: V1ScheduleAttendeeView[] | null;
 };
 
 /** POST/PATCH .../schedules[/:id] 응답 (TeamSchedulesService.toDetailJson + replayed) */
@@ -1339,6 +1351,9 @@ export type V1TeamMatchLineupStarter = {
   jerseyNumber: number | null;
   position: string | null;
   goalkeeper: boolean;
+  // 피치 배치 좌표, 0~100 퍼센트(자기 진영 기준: y=0 골라인, y=100 하프라인). 둘 다 있거나 둘 다 없다.
+  positionX: number | null;
+  positionY: number | null;
 };
 
 export type V1TeamMatchLineupBenchEntry = {
@@ -1358,6 +1373,8 @@ export type V1TeamMatchLineup = {
   revision: number;
   state: V1TeamMatchLineupState;
   version: number;
+  // 포메이션 프리셋 라벨("4-4-2" 등), null이면 자유 배치.
+  formation: string | null;
   publicLineupAt: string | null;
   starters: V1TeamMatchLineupStarter[];
   bench: V1TeamMatchLineupBenchEntry[];
@@ -1371,12 +1388,15 @@ export type V1TeamMatchLineupParticipantInput = {
   jerseyNumber?: number;
   position?: string;
   goalkeeper?: boolean;
+  positionX?: number;
+  positionY?: number;
 };
 
-// `formation`은 의도적으로 없다 — `V1GameLineup`에 저장할 컬럼이 없고, 이번 변경 범위에서는
-// 마이그레이션을 추가할 수 없어 받아도 버려질 뿐이다(Task 15 blocker-2 report 참고).
+// Task 15 blocker-2가 막았던 `formation` — V1GameLineup.formation 마이그레이션이
+// 추가돼 이제 저장·응답 모두 반영된다.
 export type V1TeamMatchLineupSavePayload = {
   expectedVersion: number;
+  formation?: string;
   starters: V1TeamMatchLineupParticipantInput[];
   bench: V1TeamMatchLineupParticipantInput[];
 };
@@ -1997,6 +2017,7 @@ export type V1AdminPopupRow = {
   content: V1RichContentDocument;
   contentVersion: number;
   targetScreens: V1PopupTargetScreen[];
+  targetPaths?: string[];
   linkUrl: string | null;
   linkLabel: string | null;
   status: V1AdminPopupStatus;
@@ -2014,6 +2035,7 @@ export type V1AdminPopupCreatePayload = {
   body?: string;
   content: V1RichContentDocument;
   targetScreens: V1PopupTargetScreen[];
+  targetPaths: string[];
   linkUrl?: string | null;
   linkLabel?: string | null;
   status: V1AdminPopupStatus;
@@ -2106,6 +2128,12 @@ export type V1AdminUserRow = {
 };
 
 export type V1AdminUserDetail = V1AdminUserRow & {
+  phone: string | null;
+  emailVerifiedAt: string | null;
+  phoneVerifiedAt: string | null;
+  birthDate: string | null;
+  displayRegion: string | null;
+  bio: string | null;
   deletedAt: string | null;
   withdrawalRequest: {
     reason: string | null;
@@ -2177,6 +2205,16 @@ export type V1AdminTeamDetail = V1AdminTeamRow & {
     calculatedAt: string | null;
   } | null;
   recentHostedTeamMatches: { teamMatchId: string; title: string; status: string; startAt: string }[];
+  members: {
+    membershipId: string;
+    userId: string;
+    name: string | null;
+    nickname: string | null;
+    email: string | null;
+    phone: string | null;
+    role: 'owner' | 'manager' | 'member';
+    joinedAt: string | null;
+  }[];
 };
 
 export type V1AdminTeamMatchRow = {

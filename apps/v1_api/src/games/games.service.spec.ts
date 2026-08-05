@@ -20,6 +20,8 @@ function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
     displayNameSnapshot: 'Player',
     jerseyNumber: null,
     position: null,
+    positionX: null,
+    positionY: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,

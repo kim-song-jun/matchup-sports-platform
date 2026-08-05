@@ -2395,6 +2395,9 @@ model V1GameLineup {
   version      Int               @default(0)
   submittedAt  DateTime?         @map("submitted_at")
   supersedesId String?           @map("supersedes_id")
+  /// 포메이션 프리셋 라벨(예: "4-4-2"). null이면 자유 배치. 실제 좌표는
+  /// V1GameParticipant.positionX/Y에 저장되고 이 값은 프리셋 선택 UI 복원용 힌트일 뿐이다.
+  formation    String?
   createdAt    DateTime          @default(now()) @map("created_at")
   updatedAt    DateTime          @updatedAt @map("updated_at")
   game         V1Game            @relation(fields: [gameId], references: [id], onDelete: Cascade, map: "v1_game_lineups_game_fk")
@@ -2412,6 +2415,11 @@ model V1GameParticipant {
   displayNameSnapshot String   @map("display_name_snapshot")
   jerseyNumber        Int?     @map("jersey_number")
   position            String?
+  /// 피치 위 배치 좌표, 0~100 퍼센트(자기 진영 기준: y=0 골라인, y=100 하프라인).
+  /// 둘 다 있거나 둘 다 없어야 한다(서비스 계층에서 검증) — 좌표 없이 배치만 표시하는
+  /// 화면은 없으므로 부분 좌표를 허용하면 렌더링이 조용히 깨진다.
+  positionX           Float?   @map("position_x")
+  positionY           Float?   @map("position_y")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
   game                V1Game   @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_participants_game_fk")

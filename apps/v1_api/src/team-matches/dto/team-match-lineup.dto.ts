@@ -9,6 +9,7 @@ import {
   IsUUID,
   Max,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -47,6 +48,20 @@ export class TeamMatchLineupParticipantDto {
   @IsOptional()
   @IsBoolean()
   goalkeeper?: boolean;
+
+  // 피치 배치 좌표 — 0(자기 진영 골라인)~100(하프라인) 퍼센트. 둘 다 있거나 둘 다 없어야
+  // 한다: 한쪽만 오면 렌더링이 조용히 깨지므로 ValidateIf로 짝을 강제한다.
+  @ValidateIf((o) => o.positionY !== undefined)
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  positionX?: number;
+
+  @ValidateIf((o) => o.positionX !== undefined)
+  @Type(() => Number)
+  @Min(0)
+  @Max(100)
+  positionY?: number;
 }
 
 export class SaveTeamMatchLineupDto {
@@ -55,10 +70,11 @@ export class SaveTeamMatchLineupDto {
   @Min(0)
   expectedVersion!: number;
 
-  // `formation`은 의도적으로 없다: `V1GameLineup`에 이를 저장할 컬럼이 없고, 이번 변경
-  // 범위에서는 마이그레이션을 추가할 수 없어 받아도 저장·응답 어디에도 반영할 방법이
-  // 없다 — 검증만 통과시키고 조용히 버리는 필드를 DTO에 남겨두지 않는다
-  // (Task 15 blocker-2 report 참고).
+  // Task 15 blocker-2가 막았던 `formation` — V1GameLineup.formation 마이그레이션이
+  // 추가돼 이제 저장·응답 모두 반영된다.
+  @IsOptional()
+  @IsString()
+  formation?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

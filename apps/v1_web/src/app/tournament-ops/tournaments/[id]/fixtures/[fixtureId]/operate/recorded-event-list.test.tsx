@@ -35,6 +35,7 @@ function lineup(sideId: string, participants: Array<{ id: string; name: string; 
     version: 1,
     submittedAt: '2026-08-04T00:00:00.000Z',
     supersedesId: null,
+    formation: null,
     createdAt: '2026-08-04T00:00:00.000Z',
     updatedAt: '2026-08-04T00:00:00.000Z',
     participants: participants.map((p) => ({
@@ -45,6 +46,8 @@ function lineup(sideId: string, participants: Array<{ id: string; name: string; 
       displayNameSnapshot: p.name,
       jerseyNumber: p.jersey,
       position: null,
+      positionX: null,
+      positionY: null,
       createdAt: '2026-08-04T00:00:00.000Z',
       updatedAt: '2026-08-04T00:00:00.000Z',
     })),

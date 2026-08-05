@@ -11,11 +11,10 @@ import type {
  * 직접 배열을 뒤섞지 않는다 — 중복 배치 방지·CAS 토큰 관리가 전부 여기 모여 있어야
  * 컴포넌트가 실수로 규칙을 깨뜨릴 수 없다.
  *
- * 포메이션(formation) 입력은 이 편집기에 없다 — `V1GameLineup`에 이를 저장할 컬럼이 없고
- * (Task 14 스키마), 이번 변경 범위에서는 마이그레이션을 추가할 수 없어(hard constraint)
- * 저장도 되지 않는데 입력만 받는 "눈속임 필드"를 만들지 않기 위해 DTO·타입·UI에서 전부
- * 제거했다. 저장하려면 별도 태스크로 `V1GameLineup.formation` 컬럼을 추가하는 마이그레이션이
- * 필요하다(Task 15 blocker-2 report 참고).
+ * 포메이션(formation) 입력 — `V1GameLineup.formation` + `V1GameParticipant.positionX/Y`
+ * 컬럼이 추가되어(Task 15 blocker-2 해소) 이제 저장·응답 모두 반영된다. 좌표는 자기 진영
+ * 기준 0~100 퍼센트(x: 좌우, y=0 골라인 ~ y=100 하프라인)이며 선발(starter)에만 있다 —
+ * 후보는 피치 위에 없으므로 좌표 개념 자체가 없다.
  */
 
 export type RosterOption = {
@@ -69,6 +68,10 @@ export type LineupEntryDraft = {
    * 예전에는 이 값을 수화 단계에서 버려서, 화면이 실제 포지션을 전혀 못 보여주고 모든 행에
    * 붙은 "GK" 라디오 라벨만 남아 전원이 골키퍼인 것처럼 읽혔다. */
   position: string | null;
+  /** 피치 배치 좌표, 0~100 퍼센트. 둘 다 있거나 둘 다 null — 배치 안 된 선발은 아직
+   * 피치에 없는 것으로 렌더링된다(사이드바 대기열에 남는다). 후보(bench)는 항상 null. */
+  positionX: number | null;
+  positionY: number | null;
 };
 
 export type LineupEditorState = {
@@ -76,6 +79,9 @@ export type LineupEditorState = {
   bench: LineupEntryDraft[];
   /** 다음 저장/제출에 실어 보낼 expectedVersion(=서버의 lineup revision). */
   baseRevision: number;
+  /** 포메이션 프리셋 라벨(예: "4-4-2"). 자유 배치면 null — 프리셋 선택 UI 복원용 힌트일 뿐,
+   * 실제 좌표는 각 entry의 positionX/Y가 진실이다. */
+  formation: string | null;
   /** 마지막으로 서버에 반영된(ack된) 상태와 로컬 상태가 다른지 — true일 때만 자동저장을 예약한다. */
   dirty: boolean;
 };
@@ -94,6 +100,8 @@ function makeEntry(input: {
   jerseyNumber?: number | null;
   goalkeeper?: boolean;
   position?: string | null;
+  positionX?: number | null;
+  positionY?: number | null;
 }): LineupEntryDraft {
   return {
     key: randomUuid(),
@@ -102,11 +110,13 @@ function makeEntry(input: {
     jerseyNumber: input.jerseyNumber ?? null,
     goalkeeper: input.goalkeeper ?? false,
     position: input.position ?? null,
+    positionX: input.positionX ?? null,
+    positionY: input.positionY ?? null,
   };
 }
 
 export function createEmptyLineupEditorState(baseRevision: number): LineupEditorState {
-  return { starters: [], bench: [], baseRevision, dirty: false };
+  return { starters: [], bench: [], baseRevision, formation: null, dirty: false };
 }
 
 /** GET 응답으로부터 편집기 상태를 새로 만든다 — 페이지 최초 진입, 그리고 버전 충돌 시
@@ -123,10 +133,13 @@ export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEdito
         jerseyNumber: starter.jerseyNumber,
         goalkeeper: starter.goalkeeper,
         position: starter.position,
+        positionX: starter.positionX,
+        positionY: starter.positionY,
       }),
     ),
     bench: lineup.bench.map((entry) => makeEntry({ displayName: entry.displayName, jerseyNumber: entry.jerseyNumber })),
     baseRevision: lineup.revision,
+    formation: lineup.formation,
     dirty: false,
   };
 }
@@ -211,19 +224,104 @@ export function removeEntry(state: LineupEditorState, slot: LineupSlot, key: str
   return { ...state, [field]: next, dirty: true };
 }
 
-/** 선발 ↔ 후보 이동. 골키퍼 표시는 후보로 내려가면 항상 해제한다(후보는 골키퍼가 될 수
- * 없다는 서버 규칙, LINEUP_GOALKEEPER_INVALID와 동일한 전제를 프론트에서도 유지). */
+/** 선발 ↔ 후보 이동. 골키퍼 표시·피치 좌표는 후보로 내려가면 항상 해제한다(후보는
+ * 골키퍼가 될 수 없다는 서버 규칙과 동일한 전제, 그리고 피치 위에 없으므로 좌표도 무의미). */
 export function moveEntry(state: LineupEditorState, from: LineupSlot, key: string, to: LineupSlot): LineupEditorState {
   if (from === to) return state;
   const fromField = slotKey(from);
   const toField = slotKey(to);
   const entry = state[fromField].find((item) => item.key === key);
   if (!entry) return state;
-  const moved = to === 'bench' ? { ...entry, goalkeeper: false } : entry;
+  const moved = to === 'bench' ? { ...entry, goalkeeper: false, positionX: null, positionY: null } : entry;
   return {
     ...state,
     [fromField]: state[fromField].filter((item) => item.key !== key),
     [toField]: [...state[toField], moved],
+    dirty: true,
+  };
+}
+
+/** 선발 한 명의 피치 좌표를 설정한다(드래그·탭 배치 둘 다 이 함수 하나로 귀결). 0~100
+ * 밖의 값은 호출부(포메이션 에디터)가 clamp해서 넘기므로 여기서는 그대로 저장한다. */
+export function setPlayerPosition(
+  state: LineupEditorState,
+  key: string,
+  positionX: number,
+  positionY: number,
+): LineupEditorState {
+  return {
+    ...state,
+    starters: state.starters.map((entry) => (entry.key === key ? { ...entry, positionX, positionY } : entry)),
+    dirty: true,
+  };
+}
+
+/** 선발 한 명을 피치에서 다시 대기 상태로 되돌린다(좌표만 지움, 선발 목록에는 남는다) —
+ * "배치 취소"와 "후보로 내리기"는 다른 동작이라 구분한다. */
+export function clearPlayerPosition(state: LineupEditorState, key: string): LineupEditorState {
+  return {
+    ...state,
+    starters: state.starters.map((entry) => (entry.key === key ? { ...entry, positionX: null, positionY: null } : entry)),
+    dirty: true,
+  };
+}
+
+/** "N-N-N" 형태(예: "4-4-2")의 포메이션 프리셋을 좌표로 펼친다. 라인 수만큼 y축을 균등
+ * 분할하고(공격 방향 = y 증가), 각 라인 안에서는 x축을 균등 분할한다. 골키퍼는 항상
+ * (50, 6) 고정이라 이 함수는 필드 플레이어 좌표만 만든다. `outfieldCount`(골키퍼 제외
+ * 선발 수)와 프리셋 합이 다르면 null — 호출부가 "이 인원수엔 안 맞는 포메이션"으로 걸러낸다. */
+export function computeFormationPositions(
+  formation: string,
+  outfieldCount: number,
+): Array<{ positionX: number; positionY: number }> | null {
+  const rows = formation.split('-').map((token) => Number.parseInt(token, 10));
+  if (rows.length === 0 || rows.some((count) => !Number.isInteger(count) || count <= 0)) return null;
+  const total = rows.reduce((sum, count) => sum + count, 0);
+  if (total !== outfieldCount) return null;
+  const positions: Array<{ positionX: number; positionY: number }> = [];
+  rows.forEach((count, rowIndex) => {
+    const positionY = 18 + ((rowIndex + 1) * 74) / (rows.length + 1);
+    for (let i = 0; i < count; i++) {
+      const positionX = count === 1 ? 50 : (100 / (count + 1)) * (i + 1);
+      positions.push({ positionX, positionY });
+    }
+  });
+  return positions;
+}
+
+/** 필드 인원수(골키퍼 제외)에 맞는 추천 포메이션 프리셋 목록. 흔한 값만 큐레이션했다 —
+ * 대응하지 않는 인원수는 빈 배열을 돌려주고, 화면은 그럴 때 드래그 자유 배치만 안내한다. */
+export function suggestedFormations(outfieldCount: number): string[] {
+  const table: Record<number, string[]> = {
+    4: ['2-2', '1-2-1', '3-1'],
+    5: ['2-2-1', '3-1-1', '1-3-1'],
+    6: ['3-2-1', '2-3-1'],
+    9: ['4-4-1', '4-3-2', '3-4-2'],
+    10: ['4-4-2', '4-3-3', '3-5-2', '4-5-1'],
+  };
+  return table[outfieldCount] ?? [];
+}
+
+/** 포메이션 프리셋을 적용한다 — 골키퍼 좌표(50,6) + 프리셋 좌표를 선발 순서대로 배정한다.
+ * 프리셋이 이 선발 인원수와 안 맞으면(예: 벤치에서 방금 올려서 인원이 바뀜) 좌표를 건드리지
+ * 않고 formation 라벨만 갱신한다 — 잘못된 좌표를 억지로 채우는 것보다 안전하다. */
+export function applyFormation(state: LineupEditorState, formation: string): LineupEditorState {
+  const goalkeeperKey = state.starters.find((entry) => entry.goalkeeper)?.key ?? null;
+  const outfield = state.starters.filter((entry) => entry.key !== goalkeeperKey);
+  const positions = computeFormationPositions(formation, outfield.length);
+  if (positions === null) {
+    return { ...state, formation, dirty: true };
+  }
+  let cursor = 0;
+  return {
+    ...state,
+    formation,
+    starters: state.starters.map((entry) => {
+      if (entry.key === goalkeeperKey) return { ...entry, positionX: 50, positionY: 6 };
+      const next = positions[cursor];
+      cursor += 1;
+      return next ? { ...entry, positionX: next.positionX, positionY: next.positionY } : entry;
+    }),
     dirty: true,
   };
 }
@@ -293,12 +391,16 @@ function toParticipantInput(entry: LineupEntryDraft): V1TeamMatchLineupParticipa
     displayName: entry.displayName,
     ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
     ...(entry.goalkeeper ? { goalkeeper: true } : {}),
+    ...(entry.positionX !== null && entry.positionY !== null
+      ? { positionX: entry.positionX, positionY: entry.positionY }
+      : {}),
   };
 }
 
 export function buildSavePayload(state: LineupEditorState) {
   return {
     expectedVersion: state.baseRevision,
+    ...(state.formation !== null ? { formation: state.formation } : {}),
     starters: state.starters.map(toParticipantInput),
     bench: state.bench.map(toParticipantInput),
   };

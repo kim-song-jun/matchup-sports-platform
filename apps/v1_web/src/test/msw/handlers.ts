@@ -275,6 +275,13 @@ function scheduleSummary() {
   };
 }
 
+const v1ScheduleAttendeesFixture: V1TeamScheduleDetail['attendees'] = [
+  { userId: 'user-owner', nickname: '팀장원', profileImageUrl: null, status: 'GOING', waitlistPosition: null },
+  { userId: 'user-manager', nickname: '매니저준', profileImageUrl: null, status: 'GOING', waitlistPosition: null },
+  { userId: 'user-member', nickname: '멤버현', profileImageUrl: null, status: 'MAYBE', waitlistPosition: null },
+  { userId: 'user-host', nickname: '호스트민', profileImageUrl: null, status: 'NO_RESPONSE', waitlistPosition: null },
+];
+
 function scheduleDetail(): V1TeamScheduleDetail {
   return {
     ...scheduleSummary(),
@@ -284,6 +291,7 @@ function scheduleDetail(): V1TeamScheduleDetail {
     myAttendance: v1MyAttendance.status
       ? { status: v1MyAttendance.status, version: v1MyAttendance.version, waitlistPosition: v1MyAttendance.waitlistPosition }
       : null,
+    attendees: v1ScheduleAttendeesFixture,
   };
 }
 
@@ -338,10 +346,11 @@ let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
   revision: 1,
   state: 'DRAFT',
   version: 1,
+  formation: '2-2',
   publicLineupAt: null,
   starters: [
-    { id: 'participant-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false },
-    { id: 'participant-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true },
+    { id: 'participant-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
+    { id: 'participant-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
   ],
   bench: [{ id: 'participant-3', displayName: '이하늘', jerseyNumber: 11 }],
 };
@@ -413,8 +422,13 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/home`, () => ok(v1HomeFixture)),
   http.get(`${api}/popups/active`, ({ request }) => {
-    const screen = new URL(request.url).searchParams.get('screen');
-    const row = v1AdminPopupsFixture.find((popup) =>
+    const url = new URL(request.url);
+    const screen = url.searchParams.get('screen');
+    const path = url.searchParams.get('path');
+    const exactRow = path ? v1AdminPopupsFixture.find((popup) =>
+      popup.status === 'published' && popup.targetPaths?.includes(path),
+    ) : undefined;
+    const row = exactRow ?? v1AdminPopupsFixture.find((popup) =>
       popup.status === 'published' && Boolean(screen) && popup.targetScreens.includes(screen as never),
     );
     return ok({
@@ -423,6 +437,7 @@ export const v1MswHandlers = [
         title: row.title,
         body: row.body,
         targetScreens: row.targetScreens,
+        targetPaths: row.targetPaths ?? [],
         linkUrl: row.linkUrl,
         linkLabel: row.linkLabel,
         publishedAt: row.publishedAt,
@@ -677,6 +692,7 @@ export const v1MswHandlers = [
       content: body.content,
       contentVersion: 1,
       targetScreens: body.targetScreens,
+      targetPaths: body.targetPaths,
       linkUrl: body.linkUrl ?? null,
       linkLabel: body.linkLabel ?? null,
       status: body.status,
@@ -1119,12 +1135,15 @@ export const v1MswHandlers = [
       ...v1TeamMatchLineupFixture,
       revision: v1TeamMatchLineupFixture.revision + 1,
       version: v1TeamMatchLineupFixture.version + 1,
+      formation: body.formation ?? null,
       starters: body.starters.map((participant, index) => ({
         id: participant.userId ?? `guest-participant-${index + 1}`,
         displayName: participant.displayName ?? '이름 미확인',
         jerseyNumber: participant.jerseyNumber ?? null,
         position: participant.position ?? null,
         goalkeeper: participant.goalkeeper ?? false,
+        positionX: participant.positionX ?? null,
+        positionY: participant.positionY ?? null,
       })),
       bench: body.bench.map((participant, index) => ({
         id: participant.userId ?? `guest-bench-${index + 1}`,

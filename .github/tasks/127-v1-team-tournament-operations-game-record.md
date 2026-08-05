@@ -2547,3 +2547,11 @@ bodyText가 mobile/tablet엔 "경기 기록" 타이틀을 포함하는데 deskto
 `AppChrome desktopHead` 부재 = 자동으로 결함이 아니라는 것이 이번 재현으로
 재확인됐다(owner-04 스크린샷 오독 교훈과 같은 계열: 정적 신호만으로 결함을
 단정하지 말 것).
+
+**`public-profile-client.tsx` 라이브 재현 결과(2026-08-05)**: `/users/:id`
+데스크톱 접속 시 닉네임("팀장원")이 상단 검은 카드에 이미 크게 렌더돼 "누구
+프로필인지" 식별 문제는 없다 — tournament-detail과 같은 패턴. 다만 **명시적
+뒤로가기 버튼/링크가 DOM에 아예 없다**(`document.querySelectorAll('a')`로
+`backHref="/teams"`에 해당하는 뒤로가기 링크를 찾았으나 없고, 잡힌 건 상단 nav의
+"팀" 탭뿐). 대상 식별 문제는 아니지만 다른 desktopHead 페이지들과 네비게이션
+일관성이 없는 경미한 결함 — **코드 변경 안 함**, 우선순위 낮음으로 B그룹에 남김.

@@ -26,6 +26,9 @@ export const v1Keys = {
   teamMatchLineup: (teamMatchId: string) => [...v1Keys.teamMatch(teamMatchId), 'lineup'] as const,
   game: (gameId: string) => [...v1Keys.all, 'games', gameId] as const,
   gameResultRevisions: (gameId: string) => [...v1Keys.game(gameId), 'result-revisions'] as const,
+  gameLineups: (gameId: string) => [...v1Keys.game(gameId), 'lineups'] as const,
+  fixtureLineupAccess: (tournamentId: string, fixtureId: string) =>
+    [...v1Keys.all, 'tournaments', tournamentId, 'fixtures', fixtureId, 'lineup-access'] as const,
   reviews: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', filters ?? {}] as const,
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,

@@ -5,6 +5,7 @@ import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1D
 import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
+import type { GameLineup } from '@/types/game-operations';
 import type {
   V1AdminRosterEligibleMembersResponse,
   ApiEnvelope,
@@ -1413,6 +1414,91 @@ export function useV1SaveTeamMatchLineup(teamMatchId: string) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+    },
+  });
+}
+
+// ── 대회 경기(tournament fixture) 라인업 — 참가팀 자기 서비스 ──
+// team-match와 달리 범용 games 라우트(/games/:gameId/lineups/*)를 그대로 쓴다 —
+// resolveActor의 TOURNAMENT_FIXTURE 팀 액터 분기(games.service.ts)가 참가팀
+// owner/manager만 자기 사이드에 read/write 하도록 이미 인가를 강제한다.
+
+export type V1FixtureLineupAccess = {
+  gameId: string;
+  mySideId: string | null;
+  isStaff: boolean;
+  scheduledAt: string | null;
+  homeSideId: string | null;
+  homeTeamName: string | null;
+  awaySideId: string | null;
+  awayTeamName: string | null;
+};
+
+export function useV1FixtureLineupAccess(tournamentId: string, fixtureId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.fixtureLineupAccess(tournamentId, fixtureId),
+    queryFn: () => v1Get<V1FixtureLineupAccess>(`/tournaments/${tournamentId}/fixtures/${fixtureId}/lineup-access`),
+    enabled: Boolean(tournamentId) && Boolean(fixtureId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1GameLineups(gameId: string | null, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.gameLineups(gameId ?? ''),
+    queryFn: () => v1Get<GameLineup[]>(`/games/${gameId}/lineups`),
+    enabled: Boolean(gameId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export type V1SaveGameLineupPayload = {
+  expectedVersion: number;
+  formation?: string;
+  participants: Array<{
+    displayNameSnapshot: string;
+    jerseyNumber?: number;
+    position?: string;
+    positionX?: number;
+    positionY?: number;
+    started: boolean;
+  }>;
+};
+
+export type V1GameLineupMutationResult = {
+  gameId: string;
+  lineupId: string;
+  lineupRevision: number;
+  state: string;
+  version: number;
+};
+
+export function useV1SaveGameLineup(gameId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { sideId: string; payload: V1SaveGameLineupPayload }) => {
+      const { body, headers } = withGameCommandId(vars.payload);
+      return v1Put<V1GameLineupMutationResult>(`/games/${gameId}/lineups/${vars.sideId}`, body, { headers });
+    },
+    onSuccess: () => {
+      if (gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameLineups(gameId) });
+    },
+  });
+}
+
+export function useV1SubmitGameLineup(gameId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { lineupId: string; expectedVersion: number }) => {
+      const { body, headers } = withGameCommandId({ expectedVersion: vars.expectedVersion });
+      return v1Post<V1GameLineupMutationResult & { lineupState: string }>(
+        `/games/${gameId}/lineups/${vars.lineupId}/submit`,
+        body,
+        { headers },
+      );
+    },
+    onSuccess: () => {
+      if (gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameLineups(gameId) });
     },
   });
 }

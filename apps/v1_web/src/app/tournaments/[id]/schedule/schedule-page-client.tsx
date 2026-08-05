@@ -21,7 +21,7 @@ export function SchedulePageClient({ tournamentId }: { tournamentId: string }) {
 
   if (isLoading) {
     return (
-      <AppChrome title="경기 일정" backHref={`/tournaments/${tournamentId}`} activeTab="tournaments">
+      <AppChrome title="경기 일정" backHref={`/tournaments/${tournamentId}`} activeTab="tournaments" desktopHead>
         <ScheduleSkeleton />
       </AppChrome>
     );
@@ -31,7 +31,7 @@ export function SchedulePageClient({ tournamentId }: { tournamentId: string }) {
   if (isError || !firstPage) {
     const msg = extractErrorMessage(error, '경기 일정을 불러오지 못했어요.');
     return (
-      <AppChrome title="경기 일정" backHref={`/tournaments/${tournamentId}`} activeTab="tournaments">
+      <AppChrome title="경기 일정" backHref={`/tournaments/${tournamentId}`} activeTab="tournaments" desktopHead>
         <div style={{ padding: '40px 20px' }}>
           <ErrorState message={msg} onRetry={() => void refetch()} />
         </div>
@@ -47,11 +47,14 @@ export function SchedulePageClient({ tournamentId }: { tournamentId: string }) {
   // 공유 링크로 바로 들어온 방문자는 "경기 일정" 만으로는 어느 대회인지 알 수 없다.
   // page.tsx 의 metadata.title 은 이미 대회명을 붙이고 있는데 화면 헤더만 제네릭이었다.
   // 로딩·에러 분기에는 아직 대회명이 없으므로 그때는 종전 문구를 그대로 쓴다.
+  // desktopHead 가 없으면 데스크톱에서 이 title(h1)이 아예 렌더되지 않아 대회명이
+  // 화면 어디에도 안 보였다(2026-08-05 페르소나 검수 visitor-03에서 확인) — 3개 분기 모두에 추가.
   return (
     <AppChrome
       title={combined.tournamentTitle ? `${combined.tournamentTitle} 경기 일정` : '경기 일정'}
       backHref={`/tournaments/${tournamentId}`}
       activeTab="tournaments"
+      desktopHead
     >
       <ScheduleContent
         tournamentId={tournamentId}

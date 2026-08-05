@@ -62,7 +62,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
 
 export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewModel }) {
   return (
-    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/team-matches">
+    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/team-matches" desktopHead>
       <div className="tm-match-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
@@ -450,7 +450,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
   const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
   const secondaryAction = model.form?.onBack;
   return (
-    <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="matches" bottomNav={false} backHref={model.backHref ?? '/team-matches'}>
+    <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="matches" bottomNav={false} backHref={model.backHref ?? '/team-matches'} desktopHead>
       <div className={`tm-create-shell ${edit ? 'tm-create-shell-edit' : ''}`}>
         <CreateProgress step={step} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
@@ -773,7 +773,7 @@ function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
   };
 
   return (
-    <AppChrome title="팀매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/team-matches">
+    <AppChrome title="팀매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/team-matches" desktopHead>
       <div className="tm-create-shell">
         {/* P2: 완료 지점에 .tm-complete-check 마이크로인터랙션 (globals.css 키프레임, reduced-motion 안전) */}
         <div className="tm-complete-check">

@@ -39,7 +39,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
 
   if (profile.isLoading) {
     return (
-      <AppChrome title="프로필" activeTab="teams" bottomNav={false} backHref="/teams">
+      <AppChrome title="프로필" activeTab="teams" bottomNav={false} backHref="/teams" desktopHead>
         <div className="tm-my-shell" aria-busy="true" aria-label="프로필 불러오는 중">
           <div className="tm-review-skeleton" style={{ minHeight: 156, borderRadius: 16 }} />
           <div className="tm-review-skeleton" style={{ minHeight: 112, borderRadius: 16, marginTop: 12 }} />
@@ -51,7 +51,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
 
   if (profile.isError || !profile.data) {
     return (
-      <AppChrome title="프로필" activeTab="teams" bottomNav={false} backHref="/teams">
+      <AppChrome title="프로필" activeTab="teams" bottomNav={false} backHref="/teams" desktopHead>
         <ErrorState
           title="프로필을 불러오지 못했어요"
           message="사용자를 찾을 수 없거나 잠시 후 다시 확인이 필요해요."
@@ -71,7 +71,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
     : null;
 
   return (
-    <AppChrome title="프로필" activeTab="teams" bottomNav={false} backHref="/teams">
+    <AppChrome title="프로필" activeTab="teams" bottomNav={false} backHref="/teams" desktopHead>
       <div className="tm-my-shell">
         {/* 헤더 — 아바타 + 이름 */}
         <section className="tm-my-profile-head" aria-label="사용자 정보">

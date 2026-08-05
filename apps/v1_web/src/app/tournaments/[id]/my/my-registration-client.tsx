@@ -1386,7 +1386,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
 
   if (isLoading) {
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
         <div aria-busy="true" aria-label="신청 정보 불러오는 중" style={{ padding: '0 20px', marginTop: 24 }}>
           {[1, 2, 3].map((i) => (
             <div
@@ -1403,7 +1403,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   if (registrationsError) {
     const msg = extractErrorMessage(registrationsErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
         <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner message={msg} />
           <Link
@@ -1420,7 +1420,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
 
   if (!tournament) {
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
         <TeamRegistrationHub
           tournamentId={tournamentId}
           tournamentSportId={null}
@@ -1441,7 +1441,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
       (team) => eligibleTeams.includes(team) || registrationTeamIds.has(team.teamId),
     );
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
         <TeamRegistrationHub
           tournamentId={tournamentId}
           tournamentSportId={tournament.sportId}
@@ -1459,7 +1459,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   const canManageSelectedRegistration = selectedTeam?.role === 'owner' || selectedTeam?.role === 'manager';
 
   return (
-    <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+    <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
       <RegistrationDetailView
         tournamentId={tournamentId}
         tournament={{

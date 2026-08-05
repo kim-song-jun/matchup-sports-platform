@@ -17,9 +17,12 @@ function MatchSkeleton() {
   );
 }
 
-/** 참가팀 매니저에게만 보이는 라인업 관리 CTA. 공개 기록(usePublicMatch)은
- * visibilityPolicy(공개 시점) 이전엔 404를 던지므로 — 팀은 공개 시점 전에
- * 라인업을 미리 준비하고 싶을 수 있어 그 성패와 무관하게 항상 시도한다.
+/** 참가팀 매니저에게만 보이는 라인업 관리 CTA. 이 화면은 공개 기록 페이지라
+ * 히든/존재하지 않는 픽스처를 동일한 404로 처리해야 하는 계약(부모 page.tsx의
+ * notFound(), public-game-records.test.tsx가 고정) 때문에 공개 시점 이전에는
+ * 이 CTA 자체가 렌더될 기회가 없다 — 공개 이후에만 여기서 보인다. 공개 시점
+ * 전 사전 준비는 /tournaments/:id/matches/:fixtureId/lineup 을 직접 아는
+ * 경로로만 가능하다(후속 작업: 대회 "내 경기" 목록에서 바로 진입).
  * 403(비참가자)이면 조용히 아무것도 렌더하지 않는다. */
 function LineupManagementCta({ tournamentId, fixtureId }: { tournamentId: string; fixtureId: string }) {
   const access = useV1FixtureLineupAccess(tournamentId, fixtureId);

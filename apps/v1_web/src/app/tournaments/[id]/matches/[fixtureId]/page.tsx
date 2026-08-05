@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { MatchPageClient } from './match-page-client';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
@@ -35,10 +36,12 @@ export default async function TournamentMatchPage({
   params: Promise<{ id: string; fixtureId: string }>;
 }) {
   const { id, fixtureId } = await params;
-  // 예전엔 여기서 공개 조회가 실패하면(공개 시점 이전 등) 서버가 바로 notFound()로
-  // 404를 냈다 — 참가팀 매니저가 공개 시점 전에 자기 라인업을 미리 준비하러
-  // 들어와도 이 화면 자체를 못 봤다(대회 경기 라인업 자기 서비스 기능 추가로
-  // 발견). 이제 항상 클라이언트로 렌더해서 MatchPageClient가 공개 기록 조회
-  // 실패와 무관하게 라인업 관리 CTA(참가팀 전용)를 시도할 수 있게 한다.
+  // 히든 픽스처와 실제로 존재하지 않는 픽스처가 동일한 404를 내려야 한다는
+  // 계약(존재 여부를 캐는 오라클 방지, public-game-records.test.tsx가 고정)이라
+  // 이 서버 게이트는 되돌린다 — 참가팀이 공개 시점 전에 라인업을 준비하는 경로는
+  // /tournaments/:id/matches/:fixtureId/lineup 을 이 route와 별개로 뒀다(이
+  // 페이지의 notFound()를 거치지 않는다). 이 경로에서는 공개된 이후에만
+  // 라인업 CTA가 보인다 — 사전 준비 진입점은 후속 작업(대회 "내 경기" 목록 등).
+  if (!(await loadMatch(id, fixtureId))) notFound();
   return <MatchPageClient tournamentId={id} fixtureId={fixtureId} />;
 }

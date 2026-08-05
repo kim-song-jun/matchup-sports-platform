@@ -442,7 +442,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                 aria-hidden="true"
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }}
               >
-                <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, minWidth: 42 }}>
+                <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, minWidth: 44 }}>
                   GK
                 </span>
                 <span className="tm-text-micro" style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -465,33 +465,32 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 44 }}>
-                      <input
-                        type="radio"
-                        name="lineup-goalkeeper"
-                        checked={entry.goalkeeper}
-                        disabled={!editable}
-                        onChange={() => setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))}
-                        aria-label={`${entry.displayName} 골키퍼로 지정`}
-                      />
-                      {/* 이 "GK" 는 포지션 표시가 아니라 라디오 라벨(=골키퍼로 지정)이다.
-                          예전에는 선택 여부와 무관하게 모든 행에 같은 회색 글자로 붙어서
-                          11명 전원이 골키퍼인 것처럼 읽혔다. 색·굵기만 다르게 하는 정도로는
-                          작은 화면에서 다시 같은 착시가 재현돼(QA 재확인) 텍스트 자체를
-                          지정된 한 명에게만 남긴다 — 미지정 행은 빈 라디오만 보인다. 폭은
-                          고정해 등번호 칸이 행마다 밀리지 않게 한다. */}
-                      <span
-                        className="tm-text-micro"
-                        style={{
-                          display: 'inline-block',
-                          minWidth: 20,
-                          color: 'var(--blue500)',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {entry.goalkeeper ? 'GK' : ''}
-                      </span>
-                    </label>
+                    {/* 예전엔 네이티브 라디오 + "선택됐을 때만 보이는 GK 텍스트"였는데, 브라우저
+                        기본 라디오가 작고(터치 타겟 미달) 밋밋해서 "이게 뭘 누르는 버튼인지"
+                        한눈에 안 읽힌다는 지적(QA)을 받았다. 항상 "GK" 글자가 보이는 토글 칩으로
+                        바꿔 미지정 상태도 눈에 띄게 하고, 색은 피치 배치 화면의 골키퍼 토큰 색
+                        (--orange500)과 맞춰 두 화면에서 같은 의미가 같은 색으로 읽히게 한다. */}
+                    <button
+                      type="button"
+                      aria-pressed={entry.goalkeeper}
+                      disabled={!editable}
+                      onClick={() => setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))}
+                      aria-label={`${entry.displayName}${entry.goalkeeper ? ', 골키퍼로 지정됨' : '을 골키퍼로 지정'}`}
+                      style={{
+                        flexShrink: 0,
+                        minWidth: 44,
+                        minHeight: 44,
+                        borderRadius: 999,
+                        border: entry.goalkeeper ? '1.5px solid var(--orange500)' : '1px solid var(--border)',
+                        background: entry.goalkeeper ? 'var(--orange50)' : 'var(--card-surface)',
+                        color: entry.goalkeeper ? 'var(--orange500)' : 'var(--text-muted)',
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: editable ? 'pointer' : 'default',
+                      }}
+                    >
+                      GK
+                    </button>
                     <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>
                       {entry.displayName}
                       {entry.position ? (

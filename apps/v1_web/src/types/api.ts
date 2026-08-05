@@ -1225,29 +1225,38 @@ export type V1Game = {
 };
 
 /**
- * `V1GameResultRevision.score` 의 실제 응답 구조.
+ * `V1GameResultRevision.score` 의 실제 응답 구조 — 두 형태가 실제로 공존한다.
  *
- * 이전 정의는 `{ home, away, penalties? }` 로 한 단계 평평했는데 서버가 보내는 것은
- * `{ regulation, penalty, goals, incomplete, provenance }` 다(백엔드 canonical 정의:
- * `apps/v1_api/src/games/migration/game-result-backfill.ts` 의 ScoreSnapshot).
- * 타입이 실제와 달라 `revision.score.home` 이 컴파일은 통과하고 런타임에만 undefined 가
- * 되어, 경기 결과 화면이 스코어 대신 "undefined : undefined" 를 그렸다.
+ * (a) 레거시 백필(`apps/v1_api/src/games/migration/game-result-backfill.ts` 의
+ *     ScoreSnapshot)로 들어온 경기는 `{ regulation, penalty, goals, incomplete, provenance }`
+ *     로 감싸여 있다.
+ * (b) 이 화면(team-match 결과 입력, `createResultRevision`)이 새로 만드는 경기는
+ *     `CreateGameResultRevisionDto.score`(`GameScoreDto`, `apps/v1_api/src/games/dto/game-result.dto.ts`)를
+ *     가공 없이 그대로 저장해 `{ home, away, penalties? }` 로 평평하다. 라이브 DB 확인 결과
+ *     실제로 `{"away":1,"home":3}` 형태로 저장되어 있었다 — (a)만 가정하고 `score.regulation`을
+ *     읽던 이전 버전은 이 경로에서 언제나 undefined가 되어 "기록 없음"만 표시했다(실제 버그,
+ *     2026-08 QA 재현).
  *
- * `regulation` 은 미완 결과(TEAM_MATCH_COMPLETION_ONLY 등)에서 null 이 될 수 있으므로
- * 읽는 쪽에서 반드시 분기해야 한다.
+ * 읽는 쪽은 반드시 `'regulation' in score` 로 분기해야 한다(`scoreLabel`/`GoalTimeline` 참고).
  */
-export type V1GameResultScore = {
-  regulation: { home: number; away: number } | null;
-  penalty: { home: number; away: number } | null;
-  goals: Array<{
-    team: 'home' | 'away';
-    playerId: string | null;
-    playerName: string;
-    minute: number | null;
-  }>;
-  incomplete: boolean;
-  provenance?: string;
-};
+export type V1GameResultScore =
+  | {
+      regulation: { home: number; away: number } | null;
+      penalty: { home: number; away: number } | null;
+      goals: Array<{
+        team: 'home' | 'away';
+        playerId: string | null;
+        playerName: string;
+        minute: number | null;
+      }>;
+      incomplete: boolean;
+      provenance?: string;
+    }
+  | {
+      home: number;
+      away: number;
+      penalties?: { home: number; away: number };
+    };
 
 export type V1GameResultCards = { yellow: number; red: number };
 

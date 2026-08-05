@@ -76,13 +76,18 @@ function resultErrorMessage(err: unknown): string {
  *
  * 득점자는 `score.goals` 에서 읽는다 — `resultParticipants` 행에는 participantId 만 있고
  * 이름이 없어서 "득점 1 · 경고 0" 처럼 누구인지 알 수 없는 줄만 나온다.
+ *
+ * `score.goals` 는 레거시 백필 스냅샷(`{regulation, goals, ...}`) 에만 존재한다 — 이 화면이
+ * 직접 만든 결과의 `score`는 `{home, away}` 로 평평해 `goals` 필드 자체가 없다(타입 정의 참고,
+ * `types/api.ts`의 `V1GameResultScore`). 그 경로에서는 타임라인 없이 스코어만 보여주면 된다.
  */
 function GoalTimeline({ revision, homeName, awayName }: {
   revision: V1GameResultRevision;
   homeName: string;
   awayName: string;
 }) {
-  const goals = revision.score?.goals ?? [];
+  const score = revision.score;
+  const goals = score && 'goals' in score ? score.goals ?? [] : [];
   if (goals.length === 0) return null;
   return (
     <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>
@@ -110,12 +115,18 @@ function GoalTimeline({ revision, homeName, awayName }: {
 }
 
 export function scoreLabel(revision: V1GameResultRevision): string {
-  // 스코어는 score.regulation 아래에 있다. 예전에는 score.home 을 읽어서 화면에
-  // "undefined : undefined" 가 그려졌다(타입이 실제 응답과 달라 tsc 가 못 잡았다).
-  // regulation 은 미완 결과에서 null 이므로 그때는 점수 대신 상태를 보여준다.
-  const regulation = revision.score?.regulation;
-  if (!regulation) return '기록 없음';
-  return `${regulation.home} : ${regulation.away}`;
+  // 스코어 응답은 두 형태가 실제로 공존한다(types/api.ts의 V1GameResultScore 참고) —
+  // 레거시 백필 경기는 score.regulation 아래, 이 화면이 만든 team-match 결과는
+  // score.home/score.away 로 평평하다. regulation만 가정하면 새로 작성한 결과가 실제
+  // DB에 점수가 있는데도 "기록 없음"으로 보였다(2026-08 QA에서 3:1 저장 확인, 실제 버그).
+  const score = revision.score;
+  if (!score) return '기록 없음';
+  if ('regulation' in score) {
+    // 미완 결과(TEAM_MATCH_COMPLETION_ONLY 등)는 regulation이 null일 수 있다.
+    if (!score.regulation) return '기록 없음';
+    return `${score.regulation.home} : ${score.regulation.away}`;
+  }
+  return `${score.home} : ${score.away}`;
 }
 
 function formatDateTime(value: string | null): string {
@@ -305,7 +316,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
   return (
     <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
-      <div style={{ display: 'grid', gap: 14, padding: '0 16px 24px' }}>
+      {/* 상단 여백이 0이라 헤더 바로 아래 카드가 붙어 답답해 보인다는 지적(QA) — 다른
+          화면(예: 라인업 페이지)의 16px 20px 관례를 그대로 맞춘다. */}
+      <div style={{ display: 'grid', gap: 14, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
             {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
@@ -430,9 +443,14 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                   <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                     {homeGoals.map((goal, index) => (
                       <div key={goal.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span className="tm-text-label" style={{ minWidth: 52 }}>{index + 1}번 골</span>
+                        {/* 프로젝트 컨벤션(label htmlFor + input id)에 맞춘다 — 예전엔 시각 라벨(span)과
+                            select가 접근성 이름만 aria-label로 따로 갖고 있어 스크린리더용 이름과
+                            눈에 보이는 텍스트가 서로 다른 엘리먼트였다(QA 지적). */}
+                        <label htmlFor={`goal-scorer-${goal.key}`} className="tm-text-label" style={{ minWidth: 52 }}>
+                          {index + 1}번 골
+                        </label>
                         <select
-                          aria-label={`${index + 1}번 골 득점자`}
+                          id={`goal-scorer-${goal.key}`}
                           className="tm-input"
                           style={{ flex: 1 }}
                           value={goal.participantId ?? ''}
@@ -455,8 +473,11 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                   {cardDrafts.map((card) => (
                     <div key={card.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label htmlFor={`card-player-${card.key}`} className="sr-only">
+                        카드 대상 선수
+                      </label>
                       <select
-                        aria-label="카드 대상 선수"
+                        id={`card-player-${card.key}`}
                         className="tm-input"
                         style={{ flex: 1 }}
                         value={card.participantId}
@@ -469,8 +490,11 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                           </option>
                         ))}
                       </select>
+                      <label htmlFor={`card-type-${card.key}`} className="sr-only">
+                        카드 종류
+                      </label>
                       <select
-                        aria-label="카드 종류"
+                        id={`card-type-${card.key}`}
                         className="tm-input"
                         style={{ width: 96 }}
                         value={card.type}
@@ -499,9 +523,11 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                   </button>
                 </div>
 
-                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>4. MVP</div>
+                <label htmlFor="result-mvp-select" className="tm-text-body-lg" style={{ display: 'block', marginTop: 20 }}>
+                  4. MVP
+                </label>
                 <select
-                  aria-label="MVP 선택"
+                  id="result-mvp-select"
                   className="tm-input"
                   style={{ marginTop: 10, width: '100%' }}
                   value={mvpParticipantId}
@@ -621,7 +647,9 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
 
   return (
     <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
-      <div style={{ display: 'grid', gap: 14, padding: '0 16px 24px' }}>
+      {/* 상단 여백이 0이라 헤더 바로 아래 카드가 붙어 답답해 보인다는 지적(QA) — 다른
+          화면(예: 라인업 페이지)의 16px 20px 관례를 그대로 맞춘다. */}
+      <div style={{ display: 'grid', gap: 14, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
             {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>

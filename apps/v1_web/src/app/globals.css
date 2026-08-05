@@ -125,6 +125,11 @@
   /* 대회 상금 / 보조 색 */
   --prize-gold: #ffd84d;
   --orange600: #f08a00;
+  /* orange500(#fe9800) 배경 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 ~2.16:1) — 피치 배치
+     골키퍼 마커(pitch-formation-editor.tsx)의 등번호 텍스트에서 실제로 미달을 확인했다
+     (2026-08 QA). blue700(#1b64da, ~5.41:1)과 짝을 맞춰 orange 쪽에도 4.5:1을 넘는
+     진한 변형을 추가한다(~4.92:1). */
+  --orange700: #a36100;
   /* ── 타입 스케일 토큰 — desktop/tournaments.css 대진표·라운드 카드 타이포 ── */
   --font-size-micro: 11px;
   --font-size-caption: 12px;

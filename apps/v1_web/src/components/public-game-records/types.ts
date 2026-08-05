@@ -154,6 +154,7 @@ export interface PublicMatchDetail {
 
 export interface PublicTeamRecordItem {
   readonly gameId: string;
+  readonly teamMatchId: string | null;
   readonly tournamentId: string | null;
   readonly tournamentTitle: string | null;
   readonly opponentTeamId: string | null;

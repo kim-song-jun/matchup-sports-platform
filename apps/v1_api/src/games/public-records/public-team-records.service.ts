@@ -15,7 +15,7 @@ interface TeamRecordFactRow {
   readonly officialAt: Date;
   readonly resultRevision: {
     readonly supersedesId: string | null;
-    readonly game: { readonly currentOfficialRevisionId: string | null };
+    readonly game: { readonly currentOfficialRevisionId: string | null; readonly teamMatchId: string | null };
   };
 }
 
@@ -75,6 +75,9 @@ export class PublicTeamRecordsService {
 
     const items = currentRows.map((row) => ({
       gameId: row.gameId,
+      // exactly-one-source: a game is either tournament-sourced (tournamentId set) or
+      // team-match-sourced (teamMatchId set), never both -- see V1Game's CHECK constraint.
+      teamMatchId: row.resultRevision.game.teamMatchId,
       tournamentId: row.tournamentId,
       tournamentTitle: row.tournamentId === null ? null : (tournamentTitleById.get(row.tournamentId) ?? null),
       opponentTeamId: row.opponentTeamId,
@@ -135,7 +138,7 @@ export class PublicTeamRecordsService {
         resultRevision: {
           select: {
             supersedesId: true,
-            game: { select: { currentOfficialRevisionId: true } },
+            game: { select: { currentOfficialRevisionId: true, teamMatchId: true } },
           },
         },
       },

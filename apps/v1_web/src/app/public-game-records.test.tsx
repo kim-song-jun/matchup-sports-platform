@@ -195,6 +195,7 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
     items: [
       {
         gameId: 'game-1',
+        teamMatchId: null,
         tournamentId: 'tournament-1',
         tournamentTitle: '테스트 대회',
         opponentTeamId: 'team-away',

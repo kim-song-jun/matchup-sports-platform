@@ -20,7 +20,7 @@ export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: str
 
   if (isLoading) {
     return (
-      <AppChrome title="경기 기록" backHref={`/tournaments/${tournamentId}/schedule`} activeTab="tournaments">
+      <AppChrome title="경기 기록" backHref={`/tournaments/${tournamentId}/schedule`} activeTab="tournaments" desktopHead>
         <MatchSkeleton />
       </AppChrome>
     );
@@ -29,7 +29,7 @@ export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: str
   if (isError || !data) {
     const msg = extractErrorMessage(error, '경기 정보를 찾을 수 없어요.');
     return (
-      <AppChrome title="경기 기록" backHref={`/tournaments/${tournamentId}/schedule`} activeTab="tournaments">
+      <AppChrome title="경기 기록" backHref={`/tournaments/${tournamentId}/schedule`} activeTab="tournaments" desktopHead>
         <div style={{ padding: '40px 20px' }}>
           <ErrorState message={msg} onRetry={() => void refetch()} />
         </div>
@@ -38,7 +38,7 @@ export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: str
   }
 
   return (
-    <AppChrome title="경기 기록" backHref={`/tournaments/${tournamentId}/schedule`} activeTab="tournaments">
+    <AppChrome title="경기 기록" backHref={`/tournaments/${tournamentId}/schedule`} activeTab="tournaments" desktopHead>
       <MatchDetailContent data={data} />
     </AppChrome>
   );

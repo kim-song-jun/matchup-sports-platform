@@ -2442,3 +2442,33 @@ visitor·host(5)/manager(1) = 18건의 finding을 냈다. 오탐 제거를 맡�
 꽉 채우지 않고 outline만 주는 의도적 절제). 압축된 스크린샷에서 연한 회색 테두리가
 거의 안 보여 "테두리 없음"으로 오독한 것 — **코드 변경 없음**. computed style 확인
 없이 스크린샷만으로 "결함 확정" 판단하지 않는다는 교훈.
+
+## 환경 이슈로 미검증이었던 3건 재검수 + owner-08 실결함 추가 발견 (2026-08-05)
+
+18건 재검수 완료 보고 이후, `run-v1-persona-flows.mjs`의 기본 출력 경로가 이미
+`/private/tmp/teameet-ulw-evidence/persona-flows`(레포 밖, 공유 워크트리 정리에도
+안전)로 바뀌어 있고 그 경로에 8/4 캡처본이 온전히 남아있는 것을 발견했다. 이걸로
+직접 Read해서 host-01~04, visitor 전체 tablet, owner-08 미검증 3건을 마저 검수했다.
+
+**host-01~04**: 전부 정상(FULL 상태, 헤더·데이터 정상 렌더). 결함 없음.
+
+**visitor tablet 전체(01~06)**: 전부 정상. visitor-03(대회 일정) tablet은 원래도
+헤더가 정상이었다 — 이번에 고친 desktop 전용 결함이었음을 재확인. visitor-06(하단
+탭 불일치 주장)도 tablet에서 재확인 결과 오탐 그대로.
+
+**owner-08(경기 결과 입력) — 실결함 추가 발견**: `flow-observations.json`의
+`bodyText`를 뷰포트별로 비교하니 mobile/tablet엔 "경기 결과 입력" 타이틀 텍스트가
+포함되는데 desktop bodyText엔 아예 없었다. 라이브 재현(`/team-matches/304/result`)
+으로 확인 — desktop에서 뒤로가기+제목 헤더가 렌더되지 않고 nav바 바로 아래 콘텐츠가
+시작됨. 원인은 `team-match-result-client.tsx`의 `AppChrome` 호출 9개(입력 5분기 +
+승인 4분기) 전부에 `desktopHead`가 빠져 있던 것 — visitor-03과 동일 패턴. 9개 전부
+수정, `team-match-result-client.test.tsx` 17/17 통과, tsc 0, 라이브 스크린샷으로
+헤더 표시 확인, PR #249에 갤러리 게시.
+
+**부수 발견(코드 결함 아님, 문서화만)**: 팀매치 목록 필터 탭에 "Football"(영문,
+미번역)이 섞여 있다. 원인: `game-result-backfill.cli.ts:153`이 **격리된 DB**에서
+쓰라고 `code: 'football', name: 'Football'`을 하드코딩하는데, 이 CLI가 공유 dev
+DB(`teameet_v1_pg_flow`)에 실행되면서 그 시드 행이 실사용자 화면에 노출됐다. 실제
+팀 2개·팀매치 2개·대회 1개가 이 sport row를 참조 중이라 삭제하면 FK가 깨진다 — DB
+조작 금지 원칙에 따라 데이터는 건드리지 않고 원인만 기록한다. 프로덕션/격리된
+seed에서는 재현되지 않는 dev-DB 오염이다.

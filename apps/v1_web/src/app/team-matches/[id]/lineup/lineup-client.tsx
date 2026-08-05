@@ -351,9 +351,15 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               선발 명단이 비어 있어요.
             </p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-              {state.starters.map((entry) => (
-                <Card key={entry.key} pad={12}>
+            <Card pad={0} style={{ marginTop: 8 }}>
+              {state.starters.map((entry, index) => (
+                <div
+                  key={entry.key}
+                  style={{
+                    padding: 12,
+                    ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}),
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 44 }}>
                       <input
@@ -434,9 +440,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       </>
                     ) : null}
                   </div>
-                </Card>
+                </div>
               ))}
-            </div>
+            </Card>
           )}
         </section>
 
@@ -447,9 +453,15 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               후보 명단이 비어 있어요.
             </p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-              {state.bench.map((entry) => (
-                <Card key={entry.key} pad={12}>
+            <Card pad={0} style={{ marginTop: 8 }}>
+              {state.bench.map((entry, index) => (
+                <div
+                  key={entry.key}
+                  style={{
+                    padding: 12,
+                    ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}),
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{entry.displayName}</span>
                     <input
@@ -493,9 +505,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       </>
                     ) : null}
                   </div>
-                </Card>
+                </div>
               ))}
-            </div>
+            </Card>
           )}
         </section>
 

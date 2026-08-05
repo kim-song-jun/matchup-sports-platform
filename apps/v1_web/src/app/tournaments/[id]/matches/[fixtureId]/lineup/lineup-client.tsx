@@ -260,9 +260,11 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                               minWidth: 44,
                               minHeight: 44,
                               borderRadius: 999,
-                              border: entry.goalkeeper ? '1.5px solid var(--orange500)' : '1px solid var(--border)',
+                              // orange50 배경 위 orange500 텍스트는 대비 ~1.97:1로 WCAG AA
+                              // 크게 미달(2026-08 QA 실측) — orange700(~4.92:1)으로 교체.
+                              border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1px solid var(--border)',
                               background: entry.goalkeeper ? 'var(--orange50)' : 'var(--card-surface)',
-                              color: entry.goalkeeper ? 'var(--orange500)' : 'var(--text-muted)',
+                              color: entry.goalkeeper ? 'var(--orange700)' : 'var(--text-muted)',
                               fontSize: 12,
                               fontWeight: 800,
                               cursor: editable ? 'pointer' : 'default',

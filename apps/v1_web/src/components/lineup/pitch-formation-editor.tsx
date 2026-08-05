@@ -305,12 +305,17 @@ function FormationControls({
                   style={{
                     fontSize: 12,
                     fontWeight: 800,
-                    color: entry.goalkeeper ? 'var(--orange500)' : 'var(--text-strong)',
+                    // orange500(#fe9800)은 밝은 배경 위 텍스트로는 대비 ~2.16:1로 WCAG AA
+                    // 미달(2026-08 QA 실측) — orange700(~4.92:1)으로 교체.
+                    color: entry.goalkeeper ? 'var(--orange700)' : 'var(--text-strong)',
                   }}
                 >
                   {entry.jerseyNumber ?? '-'}
                 </span>
                 <span className="tm-text-caption" style={{ fontWeight: 600 }}>
+                  {/* GK 여부를 색(orange)에만 기대지 않고 텍스트로도 병기 — 색맹 사용자도
+                      대기 목록에서 골키퍼를 식별할 수 있어야 한다. */}
+                  {entry.goalkeeper ? 'GK · ' : ''}
                   {entry.displayName}
                 </span>
               </button>
@@ -519,6 +524,29 @@ function PlayerToken({
       >
         {entry.jerseyNumber ?? '-'}
       </button>
+      {/* GK 여부를 배경색(orange700)에만 기대지 않고 별도 텍스트 배지로도 병기한다 —
+          색맹 사용자도 등번호를 가리지 않고 피치 위에서 바로 골키퍼를 식별할 수 있어야
+          한다("컬러만으로 정보 전달 금지" 프로젝트 규칙). */}
+      {entry.goalkeeper ? (
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: -4,
+            left: -4,
+            fontSize: 8,
+            fontWeight: 800,
+            lineHeight: 1,
+            color: '#fff',
+            background: 'var(--orange700)',
+            border: '1px solid #fff',
+            borderRadius: 4,
+            padding: '2px 3px',
+          }}
+        >
+          GK
+        </span>
+      ) : null}
       {/* 라벨은 토큰 폭(36~46px)에 종속되지 않도록 독립적으로 위치·폭을 잡는다 —
           이름이 길면(예: "중흥의푸른오른발") 부모 폭(TOKEN_SIZE_PCT)에 맞춰
           block으로 렌더하면 글자가 토큰 밖으로 넘쳐 다른 토큰과 겹친다.

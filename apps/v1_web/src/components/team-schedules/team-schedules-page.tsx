@@ -243,7 +243,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
         <h1 className="tm-text-heading">{model.title}</h1>
       </div>
 
-      <div className="tm-team-detail-section">
+      <div className="tm-team-detail-section" style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
         {model.conflictBanner ? (
           <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
@@ -650,6 +650,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
           나눴었지만, 그러면 흰 배경 위에 흰 카드가 세 번 반복돼 카드 자체가 하나의
           빈 여백 상자처럼 보인다(DESIGN.md: 카드마다 개별 보더 금지). 일정 상세 화면과
           같은 관례로 카드 하나 + 내부 구분선으로 합친다. */}
+      <div style={{ padding: '16px 20px 40px' }}>
       <Card>
         <div>
           <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>기본 정보</div>
@@ -755,6 +756,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
         >
           {model.submitting ? '저장하는 중…' : model.mode === 'edit' ? '저장' : '일정 만들기'}
         </button>
+      </div>
       </div>
     </AppChrome>
   );

@@ -96,6 +96,8 @@ export interface GameLineupParticipant {
   /** 피치 배치 좌표, 0~100 퍼센트(자기 진영 기준: y=0 골라인, y=100 하프라인). 둘 다 있거나 둘 다 없다. */
   positionX: number | null;
   positionY: number | null;
+  /** 선발(true)/후보(false). 새로고침 시 후보 상태가 소실되던 결함을 고치는 컬럼(2026-08). */
+  started: boolean;
   createdAt: string;
   updatedAt: string;
 }

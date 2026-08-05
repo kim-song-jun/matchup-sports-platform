@@ -48,6 +48,7 @@ function lineup(sideId: string, participants: Array<{ id: string; name: string; 
       position: null,
       positionX: null,
       positionY: null,
+      started: true,
       createdAt: '2026-08-04T00:00:00.000Z',
       updatedAt: '2026-08-04T00:00:00.000Z',
     })),

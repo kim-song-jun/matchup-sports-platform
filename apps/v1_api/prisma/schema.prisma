@@ -2422,6 +2422,13 @@ model V1GameParticipant {
   /// 화면은 없으므로 부분 좌표를 허용하면 렌더링이 조용히 깨진다.
   positionX           Float?   @map("position_x")
   positionY           Float?   @map("position_y")
+  /// 선발(true)/후보(false) 여부. GamesService.saveLineup()의 범용 경로(대회 경기 등)가
+  /// 쓰는 실제 컬럼 — SaveGameLineupDto.participants[].started를 그대로 저장한다.
+  /// 예전엔 이 컬럼이 없어 새로고침(재수화) 시 후보를 구분할 방법이 없어 전원 선발로
+  /// 합쳐졌다(대회 경기 라인업 화면 실사용 QA에서 재현). team-match 전용 라인업
+  /// 서비스(team-match-lineup.service.ts)는 이 컬럼과 무관하게 자체 position='BENCH'
+  /// 관례를 그대로 쓴다 — 이미 정상 동작하는 별도 경로라 여기서는 건드리지 않는다.
+  started             Boolean  @default(true) @map("started")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
   game                V1Game   @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_participants_game_fk")

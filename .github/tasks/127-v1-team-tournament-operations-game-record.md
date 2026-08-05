@@ -1590,3 +1590,68 @@ title` 조건부 블록(`.tm-desktop-page-head.tm-show-desktop`, 뒤로가기 `A
 다음 세션에서 진행한다면: B그룹 목록(위 "37개 후보 1차 분류" 절)부터 시작해
 각 페이지에 `desktopHead` 추가 → 해당 테스트 실행 → tsc → 대표 1~2개 라이브
 스크린샷 검증 → 일괄 또는 소규모 배치 커밋.
+
+## desktopHead 37개 후보 일괄 수정 — 사용자 승인 후 진행 (2026-08-05)
+
+사용자가 "파일 수정 진행 승인"이라고 명시적으로 승인해 진행했다. 결과: **16개
+파일만 실제로 고쳤고, 나머지 21개는 코드 변경 없이 그대로 뒀다** — "37개 전부
+결함"이라던 앞선 가정이 절반 이상 틀렸다는 게 이 과정에서 드러났다.
+
+### 자동화 시도 2건이 실제로 파일을 손상시킬 뻔한 사고 (교훈)
+
+1. **정규식 기반 일괄 삽입**(`<AppChrome ... >`를 정규식으로 찾아 `desktopHead`
+   삽입)이 중첩 JSX(`floatingSlot={<ApplyCTA .../>}`)를 오파싱해 `ApplyCTA`의
+   닫는 `/>`를 `AppChrome`의 닫는 태그로 착각, `floatingSlot` 속성 안에
+   `desktopHead`를 삽입해버렸다(`tournament-detail-client.tsx`). **즉시 diff로
+   발견해 되돌렸다** — 커밋 전이었기에 피해 없음. 이후 "같은 줄 안에 다른 `<`가
+   없는" 경우만 자동 처리하도록 안전 조건을 추가하고, 나머지는 전부 수동
+   `Edit`으로 처리했다.
+2. **더 심각한 발견**: `matches-page.tsx`의 4개 분기는 desktopHead를 추가하기
+   전부터 이미 컴포넌트 children 안에 **자체 커스텀 데스크톱 헤더**
+   (`tm-desktop-page-head tm-show-desktop` + 수동 뒤로가기 `Link`)를 구현해
+   놓은 상태였다. `desktopHead`를 추가하면 이 자체 헤더 위에 AppChrome의
+   `desktopHead` 블록이 하나 더 렌더돼 **헤더가 중복**된다. `git diff`로
+   커밋 직전에 발견해 되돌렸다.
+
+이 두 사고 이후, "AppChrome 호출에 desktopHead가 없다"는 정적 신호만으로
+결함이라 단정하지 않고, **children 안에 이미 자체 데스크톱 헤더 구현이
+있는지**(`DesktopPageHead`류 서브컴포넌트 호출, `tm-desktop-page-head`/
+`tm-desktop-back`/`tm-show-desktop` 클래스)를 파일마다 개별로 확인하는
+절차로 전환했다.
+
+### 최종 결과 — 16개 수정 / 21개 결함 아님으로 확정
+
+**수정한 16개**(자체 헤더 없음 확인, desktopHead 추가가 정당):
+`tournament-apply-client.tsx`, `awards-page-client.tsx`,
+`bracket-page-client.tsx`, `tournaments/[id]/loading.tsx`,
+`my-registration-client.tsx`, `tournament-roster-client.tsx`,
+`results-page-client.tsx`, `reviews-page-client.tsx`(대회 하위),
+`campaigns/[slug]/not-found.tsx`, `campaigns/[slug]/page.tsx`,
+`phone-verify-page-client.tsx`, `my-api-clients.tsx`(프로필수정/알림설정의
+로딩·에러 분기만, 성공 분기는 자체 헤더 있어 제외), `my-inquiries-client.tsx`,
+`reviews-page.tsx`(마이 리뷰), `team-matches-page.tsx`(상태/생성/완료 뷰만,
+상세 뷰는 자체 헤더 있어 제외), `public-profile-client.tsx`.
+
+**결함 아님으로 확정, 코드 변경 없음(21개)**: `teams-page.tsx` 전체(6개
+AppChrome, 전부 자체 헤더 또는 목록 최상위),
+`team-matches-page.tsx`의 상세 뷰(자체 헤더),
+`matches-page.tsx` 전체(4개, 전부 자체 헤더),
+`my-page.tsx` 전체(9개, 전부 자체 헤더 또는 최상위 마이페이지),
+`notices-page.tsx`(2개, 전부 자체 헤더),
+`community-page.tsx`(3개, 채팅 목록/채팅방/알림 전부 자체 데스크톱
+워크스페이스·헤더 있음), `tournament-detail-client.tsx`(성공 분기에 이미
+"← 대회 상세" 자체 헤더 완비 — 애초에 결함이 아니었음), 나머지 A그룹
+목록/로딩 페이지들.
+
+**검증**: 관련 단위테스트 11개 파일 54/54 통과, 전체 v1_web 스위트 157개
+파일 980/980 통과, `tsc --noEmit` 0 errors, 라이브 스크린샷 3건(순위·브래킷,
+내 문의, 내 신청)으로 헤더 정상 렌더·중복 없음 확인. 커밋
+`211e870c` → `codex/teameet-task9-ci` 머지 → CI.
+
+**교훈**: "정적 패턴 매칭으로 결함 후보를 추린 것"과 "그 후보가 실제
+결함인지"는 별개다 — 이번처럼 같은 문제를 다른 세션/개발자가 이미
+독립적으로(그것도 여러 다른 방식으로: prop 옵션 vs 수동 JSX 구현) 해결해
+놓았을 수 있다는 걸 전제하고, 반드시 각 파일의 실제 렌더 결과(children
+내부)까지 확인한 뒤 수정해야 한다. 대량 기계적 변경은 정규식 자동화보다
+"안전 조건에 안 걸리면 수동 처리"가 낫다 — 자동화가 편집 범위를 오인식하면
+피해가 조용히 커밋될 수 있다.

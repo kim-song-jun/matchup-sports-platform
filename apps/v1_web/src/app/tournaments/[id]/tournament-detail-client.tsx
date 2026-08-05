@@ -357,7 +357,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
 
   if (isLoading) {
     return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments">
+      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments" desktopHead>
         <TournamentDetailSkeleton />
       </AppChrome>
     );
@@ -366,7 +366,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments">
+      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments" desktopHead>
         <div style={{ padding: '48px 20px 0' }}>
           <ErrorState
             message={msg}

@@ -228,6 +228,8 @@ export type MyScheduleItemModel = {
   title: string;
   typeLabel: string;
   stateLabel: string;
+  /** 취소/완료는 muted, 예정은 default — 배지 색 결정에 사용 (ScheduleListItemModel과 동일 관례) */
+  stateTone: 'default' | 'muted';
   dateTimeLabel: string;
   myAttendanceLabel: string | null;
   href: string;

@@ -46,6 +46,10 @@ function formatGender(gender: V1AdminUserDetail['gender']) {
   return '성별 미등록';
 }
 
+function formatVerification(value: string | null) {
+  return value ? `인증 · ${formatDateTime(value)}` : '미인증';
+}
+
 
 function formatAuthProviders(providers: V1AdminUserDetail['authProviders']) {
   const labels = { kakao: '카카오', naver: '네이버', email: '이메일' } as const;
@@ -178,14 +182,26 @@ export default function AdminUserDetailPage() {
               <DetailRow label="회원 ID" value={user.userId} />
               <DetailRow label="이름" value={user.displayName} />
               <DetailRow label="닉네임" value={user.nickname} />
+              <DetailRow label="이메일" value={user.email} />
+              <DetailRow label="이메일 인증" value={formatVerification(user.emailVerifiedAt)} />
+              <DetailRow label="전화번호" value={user.phone} />
+              <DetailRow label="전화번호 인증" value={formatVerification(user.phoneVerifiedAt)} />
               <DetailRow label="성별" value={formatGender(user.gender)} />
-<DetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
+              <DetailRow label="생년월일" value={user.birthDate} />
+              <DetailRow label="활동 지역" value={user.displayRegion} />
+              <DetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
               <DetailRow label="온보딩" value={user.onboardingStatus} />
               <DetailRow label="가입일" value={formatDateTime(user.createdAt)} />
               <DetailRow label="최근 로그인" value={formatDateTime(user.lastLoginAt)} />
               <DetailRow label="삭제일" value={formatDateTime(user.deletedAt)} />
               <DetailRow label="관리자 권한" value={user.adminRole ?? '없음'} />
             </dl>
+            {user.bio ? (
+              <div className="mt-3 rounded-xl bg-gray-50 px-4 py-3">
+                <p className="text-xs font-semibold text-gray-400">소개</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-900">{user.bio}</p>
+              </div>
+            ) : null}
           </article>
 
           {user.withdrawalRequest ? (

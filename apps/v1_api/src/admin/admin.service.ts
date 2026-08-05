@@ -15,7 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { isSafePopupLink } from '../popups/popup-screen';
+import { isSafePopupLink, isSafePopupTargetPath } from '../popups/popup-screen';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
@@ -673,12 +673,25 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       select: {
         id: true,
         email: true,
+        phone: true,
+        emailVerifiedAt: true,
+        phoneVerifiedAt: true,
         accountStatus: true,
         onboardingStatus: true,
         lastLoginAt: true,
         createdAt: true,
         deletedAt: true,
-        profile: { select: { nickname: true, displayName: true, realName: true, gender: true } },
+        profile: {
+          select: {
+            nickname: true,
+            displayName: true,
+            realName: true,
+            gender: true,
+            birthDate: true,
+            displayRegion: true,
+            bio: true,
+          },
+        },
         authIdentities: {
           where: { status: 'active' },
           select: { provider: true },
@@ -742,11 +755,17 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       nickname: row.profile?.nickname ?? null,
       displayName: row.profile?.realName ?? row.profile?.displayName ?? null,
       email: row.email ?? null,
+      phone: row.phone ?? null,
+      emailVerifiedAt: row.emailVerifiedAt,
+      phoneVerifiedAt: row.phoneVerifiedAt,
       authProviders: row.authIdentities.map((identity) => identity.provider),
       accountStatus: row.accountStatus,
       onboardingStatus: row.onboardingStatus,
       lastLoginAt: row.lastLoginAt,
       gender: normalizeProfileGender(row.profile?.gender),
+      birthDate: row.profile?.birthDate ?? null,
+      displayRegion: row.profile?.displayRegion ?? null,
+      bio: row.profile?.bio ?? null,
       createdAt: row.createdAt,
       deletedAt: row.deletedAt,
       hostedMatchCount: row._count.hostedMatches,
@@ -1010,6 +1029,23 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           orderBy: { createdAt: 'desc' },
           select: { id: true, title: true, status: true, startAt: true },
         },
+        memberships: {
+          where: { status: 'active' },
+          orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+          select: {
+            id: true,
+            role: true,
+            joinedAt: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                phone: true,
+                profile: { select: { nickname: true, realName: true, displayName: true } },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -1041,6 +1077,16 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         title: tm.title,
         status: tm.status,
         startAt: tm.startAt,
+      })),
+      members: row.memberships.map((membership) => ({
+        membershipId: membership.id,
+        userId: membership.user.id,
+        name: membership.user.profile?.realName ?? membership.user.profile?.displayName ?? null,
+        nickname: membership.user.profile?.nickname ?? null,
+        email: membership.user.email ?? null,
+        phone: membership.user.phone ?? null,
+        role: membership.role,
+        joinedAt: membership.joinedAt,
       })),
     };
   }
@@ -1108,7 +1154,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const publishedAt = dto.status === 'published' ? now : null;
     const archivedAt = dto.status === 'archived' ? now : null;
     const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
-    const { targetScreens, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
+    const { targetScreens, targetPaths, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
     const content = normalizeRichContent(dto.content, dto.body);
 
     const row = await this.prisma.$transaction(async (tx) => {
@@ -1120,6 +1166,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           contentJson: content.document as Prisma.InputJsonValue,
           contentVersion: 1,
           targetScreens,
+          targetPaths,
           linkUrl,
           linkLabel,
           status: dto.status,
@@ -1145,6 +1192,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
             audience: popup.audience,
             status: popup.status,
             targetScreens: popup.targetScreens,
+            targetPaths: popup.targetPaths,
             linkUrl: popup.linkUrl,
             linkLabel: popup.linkLabel,
             displayStartAt: popup.displayStartAt?.toISOString() ?? null,
@@ -1173,7 +1221,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const publishedAt = dto.status === 'published' ? existing.publishedAt ?? now : null;
     const archivedAt = dto.status === 'archived' ? existing.archivedAt ?? now : null;
     const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
-    const { targetScreens, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
+    const { targetScreens, targetPaths, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
     const content = normalizeRichContent(dto.content, dto.body ?? existing.body);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -1186,6 +1234,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           contentJson: content.document as Prisma.InputJsonValue,
           contentVersion: { increment: 1 },
           targetScreens,
+          targetPaths,
           linkUrl,
           linkLabel,
           status: dto.status,
@@ -1210,6 +1259,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
             audience: existing.audience,
             status: existing.status,
             targetScreens: existing.targetScreens,
+            targetPaths: existing.targetPaths,
             linkUrl: existing.linkUrl,
             linkLabel: existing.linkLabel,
             displayStartAt: existing.displayStartAt?.toISOString() ?? null,
@@ -1220,6 +1270,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
             audience: popup.audience,
             status: popup.status,
             targetScreens: popup.targetScreens,
+            targetPaths: popup.targetPaths,
             linkUrl: popup.linkUrl,
             linkLabel: popup.linkLabel,
             displayStartAt: popup.displayStartAt?.toISOString() ?? null,
@@ -2374,10 +2425,17 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   private parsePopupTargeting(dto: CreateAdminPopupDto) {
     const targetScreens = [...new Set(dto.targetScreens)];
-    if (targetScreens.length === 0) {
+    const targetPaths = [...new Set((dto.targetPaths ?? []).map((path) => path.trim()))];
+    if (targetScreens.length === 0 && targetPaths.length === 0) {
       throw new BadRequestException({
         code: 'POPUP_TARGET_REQUIRED',
-        message: 'At least one popup target screen is required',
+        message: 'At least one popup target screen or exact path is required',
+      });
+    }
+    if (targetPaths.some((path) => !isSafePopupTargetPath(path))) {
+      throw new BadRequestException({
+        code: 'INVALID_POPUP_TARGET_PATH',
+        message: 'Popup target paths must be safe exact internal paths',
       });
     }
 
@@ -2396,7 +2454,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    return { targetScreens, linkUrl, linkLabel };
+    return { targetScreens, targetPaths, linkUrl, linkLabel };
   }
 
   private toAdminPopupRow(row: {
@@ -2407,6 +2465,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     contentJson: Prisma.JsonValue | null;
     contentVersion: number;
     targetScreens: string[];
+    targetPaths?: string[];
     linkUrl: string | null;
     linkLabel: string | null;
     status: string;
@@ -2425,6 +2484,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       content: row.contentJson,
       contentVersion: row.contentVersion,
       targetScreens: row.targetScreens,
+      targetPaths: row.targetPaths ?? [],
       linkUrl: row.linkUrl,
       linkLabel: row.linkLabel,
       status: row.status,

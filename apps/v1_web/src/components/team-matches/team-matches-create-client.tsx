@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter } from 'next/navigation';
 import {
@@ -372,22 +372,30 @@ function buildCreateModel({
 
 function usePersistedDraft() {
   const [draft, setDraft] = useState<TeamMatchDraft>(() => buildDefaultDraft());
+  const draftRef = useRef(draft);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(storageKey);
     if (!stored) return;
     try {
-      setDraft(normalizeDraftDate({ ...buildDefaultDraft(), ...JSON.parse(stored) }));
+      const hydrated = normalizeDraftDate({ ...buildDefaultDraft(), ...JSON.parse(stored) });
+      draftRef.current = hydrated;
+      setDraft(hydrated);
     } catch {
       window.localStorage.removeItem(storageKey);
     }
   }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(draft));
-  }, [draft]);
+  const setPersistedDraft = (action: SetStateAction<TeamMatchDraft>) => {
+    const next = typeof action === 'function' ? action(draftRef.current) : action;
+    // React state updater도 route 이동 뒤로 지연될 수 있으므로 ref에서 즉시 계산·저장한 뒤
+    // 화면 상태를 갱신한다. 그래야 마지막 입력 직후 다음 step으로 이동해도 값이 보존된다.
+    draftRef.current = next;
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    setDraft(next);
+  };
 
-  return [draft, setDraft] as const;
+  return [draft, setPersistedDraft] as const;
 }
 
 function buildDefaultDraft(): TeamMatchDraft {

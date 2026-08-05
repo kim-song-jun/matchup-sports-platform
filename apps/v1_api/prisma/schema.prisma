@@ -738,6 +738,7 @@ model V1Popup {
   contentJson    Json?            @map("content_json")
   contentVersion Int              @default(1) @map("content_version")
   targetScreens  String[]         @default(["home"]) @map("target_screens")
+  targetPaths    String[]         @default([]) @map("target_paths")
   linkUrl        String?          @map("link_url")
   linkLabel      String?          @map("link_label")
   status         V1NoticeStatus   @default(draft)
@@ -753,6 +754,7 @@ model V1Popup {
   @@index([audience, status, displayStartAt, displayEndAt, publishedAt], map: "v1_popups_active_window_idx")
   @@index([createdAt])
   @@index([targetScreens], type: Gin, map: "v1_popups_target_screens_idx")
+  @@index([targetPaths], type: Gin, map: "v1_popups_target_paths_idx")
   @@map("v1_popups")
 }
 

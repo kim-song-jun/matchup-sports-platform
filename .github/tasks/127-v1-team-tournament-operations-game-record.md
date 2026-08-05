@@ -1501,3 +1501,43 @@ bodyText가 mobile/tablet엔 "경기 기록" 타이틀을 포함하는데 deskto
 후보 파일 37개는 이 세션 로그에 grep 명령으로 재생성 가능:
 `grep -rln "<AppChrome" apps/v1_web/src --include="*.tsx" | grep -v "\.test\."` 후
 파일별 `<AppChrome` 개수와 `desktopHead` 개수를 비교.
+
+### 37개 후보 1차 분류 (코드 변경 없이 조사만, 2026-08-05)
+
+각 파일의 `AppChrome title="..."` 값을 뽑아 세 그룹으로 나눴다. 아직 하나도 라이브
+재현하지 않았다 — 이건 우선순위 후보일 뿐, 확정된 결함이 아니다.
+
+**A그룹 — 목록/로딩/404류, desktopHead 불필요 가능성 높음(nav 탭 자체가 컨텍스트)**:
+`home/loading.tsx`, `not-found.tsx`, `matches/loading.tsx`, `team-matches/loading.tsx`,
+`teams/loading.tsx`, `tournaments/loading.tsx`, `tournaments/page.tsx`,
+`tournaments/[id]/loading.tsx`, `home-page.tsx`, `matches-page.tsx`,
+`team-matches-page.tsx`, `teams-page.tsx`, `notices-page.tsx`, `community-page.tsx`
+— title이 전부 고정 제네릭 텍스트("매치"/"팀"/"공지사항" 등)이고 그 자체가 목록
+페이지의 정체성이라 대상 식별 문제가 원천적으로 없을 가능성이 높다.
+
+**B그룹 — 공유 링크로 들어올 수 있는 개체 상세/기록형, 결함 가능성 높음(우선 확인 대상)**:
+- `tournaments/[id]/tournament-detail-client.tsx` — title이 "대회 상세"로 고정된
+  제네릭 문자열이다. visitor-03/owner-08/public_records-02와 정확히 같은 패턴
+  (대회 상세 페이지인데 대회명이 title에 없음)일 가능성이 가장 높다 — 1순위 확인
+  대상.
+- `public-profile-client.tsx` — title이 "프로필"로 고정. 특정 사용자의 공개
+  프로필인데 닉네임이 title에 없다 — 2순위 확인 대상.
+- `matches/[id]/applications/client.tsx`("신청자 관리"), `tournaments/[id]/apply/...`
+  ("참가 팀 선택"), `.../my/my-registration-client.tsx`("선수 명단"),
+  `.../awards/awards-page-client.tsx`("시상·리뷰"),
+  `.../registrations/[registrationId]/roster/...`("선수 명단"),
+  `.../bracket/bracket-page-client.tsx`("순위·브래킷"),
+  `.../reviews/reviews-page-client.tsx`("참가팀 후기"),
+  `.../results/results-page-client.tsx` — 전부 특정 대회/매치에 종속된 하위
+  페이지라 상위 tournament-detail과 같은 원인(대회명 누락)을 공유할 가능성이 있다.
+
+**C그룹 — 본인 전용(my/설정) 페이지, 낮은 우선순위**: `my-page.tsx`,
+`my-inquiries-client.tsx`, `my-api-clients.tsx`, `search-experience.tsx`,
+`phone-verify-page-client.tsx`, `reviews-page.tsx`, `events/page.tsx` — 본인만
+보는 화면이라 "공유 링크로 들어온 제3자가 대상을 모른다"는 문제가 상대적으로
+약하다.
+
+**다음 세션 제안 순서**: B그룹부터, 특히 `tournament-detail-client.tsx`를 라이브
+재현한 뒤 실제 결함이면 나머지 B그룹 하위 페이지들이 같은 원인을 공유하는지
+함께 확인 — 이번 3건과 동일하게 개별 커밋·테스트·라이브 검증·갤러리 게시로
+진행.

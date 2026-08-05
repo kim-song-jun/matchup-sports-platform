@@ -1021,9 +1021,16 @@ export class GamesService {
    * returned is unchanged, `participants` is a new array appended per row.
    */
   async listLineups(user: V1AuthUser, gameId: string) {
-    await this.resolveActor(this.prisma, gameId, user.id, 'read');
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
+    // 참가팀 액터는 상대팀 라인업을 미리 볼 수 없다 — team-match 전용 라인업
+    // 서비스(getLineup)가 항상 ownSideId로만 조회하는 것과 동일한 공정성 원칙을
+    // 여기서도 지킨다. 스태프/platform_ops는 기존대로 양쪽 다 본다.
+    const ownSideId =
+      actor.role === 'team_manager' || actor.role === 'team_owner'
+        ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
+        : null;
     const lineups = await this.prisma.v1GameLineup.findMany({
-      where: { gameId },
+      where: { gameId, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
       orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
     });
     const participants = await this.prisma.v1GameParticipant.findMany({
@@ -1065,6 +1072,16 @@ export class GamesService {
         const side = await tx.v1GameSide.findFirst({ where: { id: sideId, gameId } });
         if (side === null) {
           throw this.notFound('GAME_SIDE_NOT_FOUND');
+        }
+        // 참가팀 액터(team_manager/team_owner)는 자기 팀 사이드만 쓸 수 있다 — 스태프/
+        // platform_ops는 sideId 제한 없이 어느 팀 라인업이든 대신 입력할 수 있어야 하므로
+        // 팀 액터일 때만 검사한다.
+        if (
+          context.actor.actorType === 'USER' &&
+          (context.actor.role === 'team_manager' || context.actor.role === 'team_owner') &&
+          context.actor.teamId !== side.teamId
+        ) {
+          throw this.forbidden();
         }
         const previous = await tx.v1GameLineup.findFirst({
           where: { gameId, sideId },
@@ -1140,15 +1157,33 @@ export class GamesService {
               'Team matches manage lineups only through /team-matches/:teamMatchId/lineup, which enforces roster/eligibility/deadline invariants this generic route does not.',
           });
         }
-        if (game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
+        const actorIsStaff =
+          context.actor.actorType === 'USER' &&
+          (context.actor.role === 'platform_ops' ||
+            context.actor.role === 'tournament_director' ||
+            context.actor.role === 'field_operator' ||
+            context.actor.role === 'support_readonly');
+        if (game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE && actorIsStaff) {
           // Task 20이 requireTakeover에 gameId를 추가해 인계 토큰을 게임 단위로
           // 검증하도록 좁혔다(2-arg). 통합 브랜치에 남아 있던 1-arg 호출은 그
           // 시그니처 변경 이전 형태라 여기서 함께 정리한다.
+          // 참가팀(team_manager/team_owner)의 사전 라인업 제출은 이 불변식 대상이
+          // 아니다 — takeover는 "현장 기기가 이 경기를 배타적으로 장악 중"이라는
+          // 라이브 운영 개념이라 경기 전 로스터 준비와는 무관하다(Task 27 후속).
           this.requireTakeover(game.id, context);
         }
         const lineup = await tx.v1GameLineup.findFirst({ where: { id: lineupId, gameId } });
         if (lineup === null) {
           throw this.notFound('GAME_LINEUP_NOT_FOUND');
+        }
+        if (
+          context.actor.actorType === 'USER' &&
+          (context.actor.role === 'team_manager' || context.actor.role === 'team_owner')
+        ) {
+          const lineupSide = await tx.v1GameSide.findUnique({ where: { id: lineup.sideId } });
+          if (lineupSide === null || lineupSide.teamId !== context.actor.teamId) {
+            throw this.forbidden();
+          }
         }
         if (lineup.state !== V1GameLineupState.DRAFT) {
           throw new ConflictException({
@@ -1180,6 +1215,50 @@ export class GamesService {
         };
       },
     );
+  }
+
+  /**
+   * 참가팀이 대회 경기(fixture) 라인업을 다루기 전에 gameId·자기 sideId를 알아내는
+   * 진입점. 공개 기록 엔드포인트(/tournaments/:id/matches/:fixtureId)는 공개 시점
+   * 정책(visibilityPolicy)에 걸려 있어 팀이 사전에 라인업을 준비하는 용도로 못 쓴다
+   * — 이건 그 정책과 무관하게 참가팀 매니저/오너(또는 스태프)에게만 열리는 별도 경로다.
+   * 인가는 resolveActor('read')를 그대로 재사용해 team-match/tournament-fixture
+   * 분기 로직을 여기서 다시 만들지 않는다.
+   */
+  async resolveFixtureLineupAccess(user: V1AuthUser, tournamentId: string, fixtureId: string) {
+    const fixture = await this.prisma.v1TournamentFixture.findUnique({
+      where: { tournamentId_id: { tournamentId, id: fixtureId } },
+      select: {
+        scheduledAt: true,
+        game: { select: { id: true } },
+        homeRegistration: { select: { teamId: true, team: { select: { name: true } } } },
+        awayRegistration: { select: { teamId: true, team: { select: { name: true } } } },
+      },
+    });
+    if (fixture === null || fixture.game === null) {
+      throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
+    }
+    const gameId = fixture.game.id;
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
+    const sides = await this.prisma.v1GameSide.findMany({ where: { gameId } });
+    const homeTeamId = fixture.homeRegistration?.teamId ?? null;
+    const awayTeamId = fixture.awayRegistration?.teamId ?? null;
+    const homeSide = sides.find((side) => side.teamId === homeTeamId) ?? null;
+    const awaySide = sides.find((side) => side.teamId === awayTeamId) ?? null;
+    const mySideId =
+      actor.role === 'team_manager' || actor.role === 'team_owner'
+        ? (sides.find((side) => side.teamId === actor.teamId)?.id ?? null)
+        : null;
+    return {
+      gameId,
+      mySideId,
+      isStaff: actor.role !== 'team_manager' && actor.role !== 'team_owner',
+      scheduledAt: fixture.scheduledAt,
+      homeSideId: homeSide?.id ?? null,
+      homeTeamName: fixture.homeRegistration?.team.name ?? null,
+      awaySideId: awaySide?.id ?? null,
+      awayTeamName: fixture.awayRegistration?.team.name ?? null,
+    };
   }
 
   async listResultRevisions(user: V1AuthUser, gameId: string) {
@@ -2449,7 +2528,15 @@ export class GamesService {
         teamMatch: {
           select: { hostTeamId: true, approvedApplicantTeamId: true },
         },
-        tournamentFixture: { select: { id: true, tournamentId: true, fieldId: true } },
+        tournamentFixture: {
+          select: {
+            id: true,
+            tournamentId: true,
+            fieldId: true,
+            homeRegistration: { select: { teamId: true } },
+            awayRegistration: { select: { teamId: true } },
+          },
+        },
       },
     });
     if (game === null) {
@@ -2592,6 +2679,34 @@ export class GamesService {
             tournamentId: fixture.tournamentId,
             fixtureId: fixture.id,
             authorizationSubject,
+          };
+        }
+      }
+      // 참가팀 자체 라인업 제출(Task 27 후속): 스태프/관리자가 아니어도 이 fixture의
+      // 홈/원정 등록팀 매니저·오너 본인은 자기 팀 라인업을 읽고(read) 수정(lineup_mutate)
+      // 할 수 있다 — team-match 분기의 hostMembership/opponentMembership 패턴을 그대로
+      // 재현한다. 그 외 액션(tournament_command/event_append/event_reverse/cancel)은
+      // 여전히 스태프 전용으로 남긴다(tournamentAction 화이트리스트에는 있지만 여기서
+      // 팀 액터에게는 열지 않음).
+      if (tournamentAction === 'read' || tournamentAction === 'lineup_mutate') {
+        const fixtureTeamIds = [
+          fixture.homeRegistration?.teamId ?? null,
+          fixture.awayRegistration?.teamId ?? null,
+        ].filter((teamId): teamId is string => teamId !== null);
+        const teamMemberships = await tx.v1TeamMembership.findMany({
+          where: { userId, teamId: { in: fixtureTeamIds }, status: 'active' },
+        });
+        const teamMembership = teamMemberships.find(
+          (membership) => membership.role === 'owner' || membership.role === 'manager',
+        );
+        if (teamMembership !== undefined) {
+          return {
+            actorType: 'USER',
+            actorUserId: userId,
+            role: teamMembership.role === 'owner' ? 'team_owner' : 'team_manager',
+            tournamentId: fixture.tournamentId,
+            fixtureId: fixture.id,
+            teamId: teamMembership.teamId,
           };
         }
       }

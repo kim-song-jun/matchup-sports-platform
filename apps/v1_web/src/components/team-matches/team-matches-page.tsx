@@ -299,37 +299,58 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               {/* P2: 능동형 카피 적용 */}
               {mode === 'pending' ? <StateCard tone="orange" title="신청을 접수했어요" body="홈팀이 검토를 마치면 알림으로 알려드릴게요." /> : null}
               {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." /> : null}
-              {/* Task 17: 경기 결과 입력/승인 진입점. mode에 따라 호스트는 결과 입력,
-                  상대팀은 결과 승인 화면으로 이동한다(모델이 라벨/링크를 결정). */}
-              {model.resultAction ? (
-                <Link
-                  className={`tm-btn tm-btn-md ${model.resultAction.tone === 'primary' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-                  href={model.resultAction.href}
-                  style={{ marginTop: 12, display: 'inline-flex' }}
-                >
-                  {model.resultAction.label}
-                </Link>
-              ) : null}
               {match.description ? (
                 <Card pad={16} style={{ marginTop: 10 }}>
                   <div className="tm-text-body-lg">설명</div>
                   <div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)' }}>{match.description}</div>
                 </Card>
               ) : null}
-              {/* 라인업 CTA(Task 15): 호스트팀/승인된 상대팀 매니저에게만 노출된다 —
-                  model.lineupHref는 team-matches-client.tsx가 그 조건일 때만 설정한다. */}
-              {model.lineupHref ? (
+              {/* 매치 관리: 라인업(Task 15)과 경기 결과(Task 17) CTA를 한 카드로 묶는다 —
+                  예전엔 결과 입력 버튼이 카드 없이 붕 떠서 라인업 카드와 시각적으로
+                  분리돼 보였다(QA 지적). model.lineupHref/resultAction은
+                  team-matches-client.tsx가 권한 조건일 때만 설정한다. */}
+              {model.lineupHref || model.resultAction ? (
                 <Card pad={16} style={{ marginTop: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="tm-text-body-lg">라인업</div>
-                      <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-                        선발·후보 명단을 작성하고 제출하세요.
+                  <div className="tm-text-body-lg">매치 관리</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+                    {model.lineupHref ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div className="tm-text-label" style={{ fontWeight: 600 }}>라인업</div>
+                          <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
+                            선발·후보 명단을 작성하고 제출하세요.
+                          </div>
+                        </div>
+                        <Link className="tm-btn tm-btn-sm tm-btn-primary" href={model.lineupHref} style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+                          라인업 관리
+                        </Link>
                       </div>
-                    </div>
-                    <Link className="tm-btn tm-btn-sm tm-btn-primary" href={model.lineupHref} style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
-                      라인업 관리
-                    </Link>
+                    ) : null}
+                    {model.resultAction ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          ...(model.lineupHref ? { borderTop: '1px solid var(--border)', paddingTop: 12 } : {}),
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div className="tm-text-label" style={{ fontWeight: 600 }}>경기 결과</div>
+                          <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
+                            경기 결과를 기록하거나 확인하세요.
+                          </div>
+                        </div>
+                        <Link
+                          className={`tm-btn tm-btn-sm ${model.resultAction.tone === 'primary' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+                          href={model.resultAction.href}
+                          style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+                        >
+                          {model.resultAction.label}
+                        </Link>
+                      </div>
+                    ) : null}
                   </div>
                 </Card>
               ) : null}

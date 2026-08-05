@@ -26,17 +26,15 @@ export const gameSchemaFixture = {
   now: new Date('2026-07-29T00:00:00.000Z'),
 } as const;
 
-// Re-pinned after merging origin/dev (PR #266) into this branch. The schema
-// hash covers apps/v1_api/prisma/schema.prisma, whose only change since the
-// previous pin is dev's popup targeting addition on V1Popup:
-//   targetPaths String[] @default([]) @map("target_paths")
-//   @@index([targetPaths], type: Gin, map: "v1_popups_target_paths_idx")
-// backing migration 20260804140000_v1_popup_exact_target_paths, unrelated to
-// the game-operations tables. The migration hash below is UNCHANGED, which
-// proves the bound Task 6 migration (20260729000100_v1_game_operations) was
-// not touched.
+// Re-pinned for the lineup formation/pitch-position feature. The schema hash
+// covers apps/v1_api/prisma/schema.prisma, whose only change since the
+// previous pin is three additive fields backing migration
+// 20260805000100_v1_game_lineup_formation_positions:
+//   V1GameLineup.formation, V1GameParticipant.positionX/positionY
+// The migration hash below is UNCHANGED, which proves the bound Task 6
+// migration (20260729000100_v1_game_operations) was not touched.
 export const gameSchemaSourceManifest = {
-  schema: '3de32bbcefeb259a6afb3596d1ed2636bf515992e8d6df8f821957994dd582bc',
+  schema: '5020bd920891c8efb772fd789c1d4e3bb882360a11682b5c6b4b63578dbc62a3',
   migration: 'bda8608ee5b4498939eea0b68ac837612338e781e09a16a41f7325ff971110d7',
 } as const;
 

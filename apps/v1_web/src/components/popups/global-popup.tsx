@@ -8,7 +8,10 @@ import { resolvePopupTargetScreen } from '@/lib/popup-targets';
 export function GlobalPopup() {
   const pathname = usePathname();
   const screen = resolvePopupTargetScreen(pathname);
-  const popupQuery = useV1ActivePopup(screen, pathname);
+  // TODO: exact-path 타겟팅(V1Popup.targetPaths)이 아직 findActive()에서 안 쓰여서
+  // pathname을 넘겨도 백엔드가 무시한다 — 완성되면 useV1ActivePopup에 두 번째
+  // 인자로 pathname을 추가하고 여기서도 넘긴다.
+  const popupQuery = useV1ActivePopup(screen);
   const popup = popupQuery.data?.popup;
 
   return (

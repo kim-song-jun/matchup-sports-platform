@@ -270,93 +270,110 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           {model.capacityLabel ? <div className="tm-text-caption" style={{ marginTop: 6 }}>{model.capacityLabel}</div> : null}
         </Card>
 
-        {model.history.length > 0 ? (
-          <Card pad={16} style={{ marginTop: 12 }}>
-            <div className="tm-text-label" style={{ marginBottom: 8 }}>변경 이력</div>
-            {model.history.map((entry, index) => (
-              <div key={`${entry.label}-${index}`} className="tm-text-caption" style={{ marginBottom: 4 }}>
-                {entry.label}{entry.detail ? ` · ${entry.detail}` : ''}
+        {/* 변경 이력·내 참석·용병 모집·운영 관리를 카드마다 따로 감싸면 화면이 상자
+            더미로 보인다(DESIGN.md: 카드 구분은 배경색 대비로, 카드마다 개별 보더 금지).
+            팀/유저 공개 기록 화면(team-records-content.tsx)이 이미 쓰는 "카드 하나 +
+            내부 구분선" 관례를 그대로 따른다. */}
+        {(() => {
+          const sections = [
+            model.history.length > 0 ? (
+              <div key="history">
+                <div className="tm-text-label" style={{ marginBottom: 8 }}>변경 이력</div>
+                {model.history.map((entry, index) => (
+                  <div key={`${entry.label}-${index}`} className="tm-text-caption" style={{ marginBottom: 4 }}>
+                    {entry.label}{entry.detail ? ` · ${entry.detail}` : ''}
+                  </div>
+                ))}
               </div>
-            ))}
-          </Card>
-        ) : null}
-
-        {attendance.visible ? (
-          <Card pad={16} style={{ marginTop: 12 }}>
-            <div className="tm-text-label" style={{ marginBottom: 8 }}>내 참석</div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              {(['GOING', 'MAYBE', 'NOT_GOING'] as const).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  aria-pressed={attendance.myStatus === status}
-                  disabled={attendance.disabled || attendance.pending}
-                  className={`tm-btn tm-btn-sm ${attendance.myStatus === status ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-                  style={{ minHeight: 44 }}
-                  onClick={() => attendance.onSetStatus(status)}
-                >
-                  {status === 'GOING' ? '참석' : status === 'MAYBE' ? '미정' : '불참'}
-                </button>
-              ))}
-            </div>
-            {attendance.myStatus === 'WAITLISTED' ? (
-              <div className="tm-text-caption" role="status">대기 {attendance.waitlistPosition}번째예요.</div>
-            ) : null}
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              참석 {attendance.counts.going}명
-              {attendance.counts.waitlisted > 0 ? ` · 대기 ${attendance.counts.waitlisted}명` : ''}
-            </div>
-            {attendance.deadlineLabel ? (
-              <div className="tm-text-caption" style={{ marginTop: 4, color: attendance.deadlinePassed ? 'var(--red500)' : undefined }}>
-                {attendance.deadlineLabel}
+            ) : null,
+            attendance.visible ? (
+              <div key="attendance">
+                <div className="tm-text-label" style={{ marginBottom: 8 }}>내 참석</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  {(['GOING', 'MAYBE', 'NOT_GOING'] as const).map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      aria-pressed={attendance.myStatus === status}
+                      disabled={attendance.disabled || attendance.pending}
+                      className={`tm-btn tm-btn-sm ${attendance.myStatus === status ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+                      style={{ minHeight: 44 }}
+                      onClick={() => attendance.onSetStatus(status)}
+                    >
+                      {status === 'GOING' ? '참석' : status === 'MAYBE' ? '미정' : '불참'}
+                    </button>
+                  ))}
+                </div>
+                {attendance.myStatus === 'WAITLISTED' ? (
+                  <div className="tm-text-caption" role="status">대기 {attendance.waitlistPosition}번째예요.</div>
+                ) : null}
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>
+                  참석 {attendance.counts.going}명
+                  {attendance.counts.waitlisted > 0 ? ` · 대기 ${attendance.counts.waitlisted}명` : ''}
+                </div>
+                {attendance.deadlineLabel ? (
+                  <div className="tm-text-caption" style={{ marginTop: 4, color: attendance.deadlinePassed ? 'var(--red500)' : undefined }}>
+                    {attendance.deadlineLabel}
+                  </div>
+                ) : null}
+                {attendance.disabledReason ? (
+                  <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{attendance.disabledReason}</div>
+                ) : null}
+                {attendance.error ? <div style={{ marginTop: 8 }}><AlertBanner tone="error" message={attendance.error} /></div> : null}
               </div>
-            ) : null}
-            {attendance.disabledReason ? (
-              <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{attendance.disabledReason}</div>
-            ) : null}
-            {attendance.error ? <div style={{ marginTop: 8 }}><AlertBanner tone="error" message={attendance.error} /></div> : null}
-          </Card>
-        ) : null}
+            ) : null,
+            guestRecruitment.visible || guestRecruitment.manage ? (
+              <GuestRecruitmentSection key="guest" model={guestRecruitment} />
+            ) : null,
+            manage.visible ? (
+              <div key="manage">
+                <div className="tm-text-label" style={{ marginBottom: 8 }}>운영 관리</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={manage.editHref}>일정 수정</Link>
+                  {manage.canComplete ? (
+                    <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" disabled={manage.completePending} onClick={manage.onComplete}>
+                      {manage.completePending ? '처리 중…' : '완료 처리'}
+                    </button>
+                  ) : null}
+                  {/* 취소는 이 카드에서 유일한 파괴적 액션인데 ghost(배경 없음)라 평문처럼 보여
+                      형제 버튼들보다 오히려 덜 눌러 보였다. 테두리를 줘 버튼임이 드러나게 하되,
+                      꽉 찬 danger 로 만들면 수정·완료 처리보다 시선을 끌어 잘못 유도하므로
+                      outline 에 위험 색만 얹는다. */}
+                  <button
+                    type="button"
+                    className="tm-btn tm-btn-sm tm-btn-outline"
+                    style={{ color: 'var(--red500)' }}
+                    disabled={manage.cancelPending}
+                    onClick={manage.onCancel}
+                  >
+                    일정 취소
+                  </button>
+                  {manage.reminders.filter((reminder) => reminder.visible).map((reminder) => (
+                    <button
+                      key={reminder.kind}
+                      type="button"
+                      className="tm-btn tm-btn-sm tm-btn-neutral"
+                      disabled={reminder.pending}
+                      onClick={reminder.onTrigger}
+                    >
+                      {reminder.pending ? '전송 중…' : reminder.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null,
+          ].filter(Boolean);
 
-        <GuestRecruitmentCard model={guestRecruitment} />
-
-        {manage.visible ? (
-          <Card pad={16} style={{ marginTop: 12 }}>
-            <div className="tm-text-label" style={{ marginBottom: 8 }}>운영 관리</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={manage.editHref}>일정 수정</Link>
-              {manage.canComplete ? (
-                <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" disabled={manage.completePending} onClick={manage.onComplete}>
-                  {manage.completePending ? '처리 중…' : '완료 처리'}
-                </button>
-              ) : null}
-              {/* 취소는 이 카드에서 유일한 파괴적 액션인데 ghost(배경 없음)라 평문처럼 보여
-                  형제 버튼들보다 오히려 덜 눌러 보였다. 테두리를 줘 버튼임이 드러나게 하되,
-                  꽉 찬 danger 로 만들면 수정·완료 처리보다 시선을 끌어 잘못 유도하므로
-                  outline 에 위험 색만 얹는다. */}
-              <button
-                type="button"
-                className="tm-btn tm-btn-sm tm-btn-outline"
-                style={{ color: 'var(--red500)' }}
-                disabled={manage.cancelPending}
-                onClick={manage.onCancel}
-              >
-                일정 취소
-              </button>
-              {manage.reminders.filter((reminder) => reminder.visible).map((reminder) => (
-                <button
-                  key={reminder.kind}
-                  type="button"
-                  className="tm-btn tm-btn-sm tm-btn-neutral"
-                  disabled={reminder.pending}
-                  onClick={reminder.onTrigger}
-                >
-                  {reminder.pending ? '전송 중…' : reminder.label}
-                </button>
+          return sections.length > 0 ? (
+            <Card pad={16} style={{ marginTop: 12 }}>
+              {sections.map((section, index) => (
+                <div key={index} style={index > 0 ? { marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' } : undefined}>
+                  {section}
+                </div>
               ))}
-            </div>
-          </Card>
-        ) : null}
+            </Card>
+          ) : null;
+        })()}
 
         {model.cancelModal.open ? (
           <Card pad={16} style={{ marginTop: 12 }}>
@@ -390,11 +407,11 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
   );
 }
 
-function GuestRecruitmentCard({ model }: { model: ScheduleDetailViewModel['guestRecruitment'] }) {
+function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['guestRecruitment'] }) {
   if (!model.visible && !model.manage) return null;
 
   return (
-    <Card pad={16} style={{ marginTop: 12 }}>
+    <div>
       <div className="tm-text-label" style={{ marginBottom: 8 }}>용병 모집</div>
       {model.visible ? (
         <>
@@ -510,7 +527,7 @@ function GuestRecruitmentCard({ model }: { model: ScheduleDetailViewModel['guest
           ) : null}
         </div>
       ) : null}
-    </Card>
+    </div>
   );
 }
 

@@ -646,11 +646,12 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
 
   return (
     <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
-      {/* 필드를 나열만 하던 화면에서 "기본 정보 / 일정 / 공개 설정" 세 카드로 묶었다.
-          한 화면 안에 성격이 다른 결정(뭘 하는지 · 언제인지 · 누구에게 보이는지)이
-          섞여 있어서 구분 없이 늘어놓으면 화면이 팀·대회 톤과 무관하게 붕 떠 보였다. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Card>
+      {/* 필드를 나열만 하던 화면에서 "기본 정보 / 일정 / 공개 설정" 세 개의 별도 카드로
+          나눴었지만, 그러면 흰 배경 위에 흰 카드가 세 번 반복돼 카드 자체가 하나의
+          빈 여백 상자처럼 보인다(DESIGN.md: 카드마다 개별 보더 금지). 일정 상세 화면과
+          같은 관례로 카드 하나 + 내부 구분선으로 합친다. */}
+      <Card>
+        <div>
           <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>기본 정보</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <TextField
@@ -686,9 +687,9 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
               )}
             </div>
           </div>
-        </Card>
+        </div>
 
-        <Card>
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
           <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>일정</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <TextField
@@ -722,9 +723,9 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
               onChange={(e) => model.onFieldChange('rsvpDeadlineAt', e.target.value)}
             />
           </div>
-        </Card>
+        </div>
 
-        <Card>
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
           <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>공개 설정</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {model.visibilityOptions.map((option) => (
@@ -740,8 +741,10 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
               </button>
             ))}
           </div>
-        </Card>
+        </div>
+      </Card>
 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
         {model.error ? <AlertBanner tone="error" message={model.error} /> : null}
 
         <button

@@ -91,801 +91,64 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
     "every ownership output not listed in the active todo row"
   ],
   "screens": [
-    {
-      "id": "T-01",
-      "route": "/teams/:teamId",
-      "actorShell": "authenticated team shell; team_owner|team_manager operations block",
-      "backendContract": "GET /api/v1/teams/:teamId/operations-summary plus team schedule/game projections",
-      "wave": 2,
-      "scenario": "E2E-TEAM-01",
-      "ownerTodo": 13
-    },
-    {
-      "id": "T-02",
-      "route": "/teams/:teamId/schedules",
-      "actorShell": "authenticated team shell; member read, team_owner|team_manager manage",
-      "backendContract": "GET|POST /api/v1/teams/:teamId/schedules",
-      "wave": 2,
-      "scenario": "E2E-TEAM-01",
-      "ownerTodo": 13
-    },
-    {
-      "id": "T-03",
-      "route": "/teams/:teamId/schedules/new and /teams/:teamId/schedules/:scheduleId/edit",
-      "actorShell": "authenticated team shell; team_owner|team_manager",
-      "backendContract": "POST /api/v1/teams/:teamId/schedules; PATCH /api/v1/teams/:teamId/schedules/:scheduleId",
-      "wave": 2,
-      "scenario": "E2E-TEAM-01",
-      "ownerTodo": 13
-    },
-    {
-      "id": "T-04",
-      "route": "/teams/:teamId/schedules/:scheduleId",
-      "actorShell": "authenticated team shell; member|team_owner|team_manager",
-      "backendContract": "GET|PATCH schedule; PUT attendance/me; POST reminders; guest-recruitment contracts",
-      "wave": 2,
-      "scenario": "E2E-TEAM-01",
-      "ownerTodo": 13
-    },
-    {
-      "id": "T-05",
-      "route": "/team-matches/:teamMatchId/lineup",
-      "actorShell": "authenticated team-match shell; team_owner|team_manager",
-      "backendContract": "GET|PUT /api/v1/team-matches/:teamMatchId/lineup; POST .../submit|change-request",
-      "wave": 3,
-      "scenario": "E2E-TEAM-01",
-      "ownerTodo": 15
-    },
-    {
-      "id": "T-06",
-      "route": "/team-matches/:teamMatchId/result",
-      "actorShell": "authenticated team-match shell; host team_owner|team_manager",
-      "backendContract": "GET|POST /api/v1/games/:gameId/result-revisions; POST .../:revisionId/submit",
-      "wave": 3,
-      "scenario": "E2E-TEAM-01|E2E-TEAM-02",
-      "ownerTodo": 17
-    },
-    {
-      "id": "T-07",
-      "route": "/team-matches/:teamMatchId/result/approval",
-      "actorShell": "authenticated team-match shell; opponent_manager",
-      "backendContract": "POST /api/v1/games/:gameId/result-revisions/:revisionId/decision",
-      "wave": 3,
-      "scenario": "E2E-TEAM-01|E2E-TEAM-02",
-      "ownerTodo": 17
-    },
-    {
-      "id": "T-08",
-      "route": "/teams/:teamId/records",
-      "actorShell": "public team profile shell with scoped team management context",
-      "backendContract": "GET /api/v1/teams/:teamId/records",
-      "wave": 5,
-      "scenario": "E2E-TEAM-01|E2E-CORR-01",
-      "ownerTodo": 24
-    },
-    {
-      "id": "T-09",
-      "route": "/my/schedule",
-      "actorShell": "authenticated member shell",
-      "backendContract": "GET /api/v1/me/schedule; PUT schedule attendance/me",
-      "wave": 2,
-      "scenario": "E2E-TEAM-01",
-      "ownerTodo": 13
-    },
-    {
-      "id": "A-01",
-      "route": "/tournament-ops/tournaments/:tournamentId/operations",
-      "actorShell": "scoped tournament-operations shell; assigned staff",
-      "backendContract": "GET /api/v1/tournament-ops/tournaments/:tournamentId/operations",
-      "wave": 4,
-      "scenario": "E2E-TOUR-01|E2E-TOUR-02",
-      "ownerTodo": 19
-    },
-    {
-      "id": "A-02",
-      "route": "/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/operate",
-      "actorShell": "scoped tournament-operations shell; assigned field_operator|tournament_director",
-      "backendContract": "game commands/events/realtime takeover and backfill contracts",
-      "wave": 4,
-      "scenario": "E2E-TOUR-01|E2E-TOUR-02|E2E-AUTH-01",
-      "ownerTodo": 21
-    },
-    {
-      "id": "A-03",
-      "route": "/tournament-ops/tournaments/:tournamentId/result-review",
-      "actorShell": "scoped tournament-operations shell; tournament_director read/review, platform_ops officialize",
-      "backendContract": "review-decision, supersede-and-submit, officialize, projection preview",
-      "wave": 4,
-      "scenario": "E2E-TOUR-01|E2E-CORR-01",
-      "ownerTodo": 23
-    },
-    {
-      "id": "A-04",
-      "route": "/tournament-ops/tournaments/:tournamentId/records/corrections",
-      "actorShell": "scoped tournament-operations shell; tournament_director|platform_ops",
-      "backendContract": "POST /api/v1/games/:gameId/corrections and flag-gated void",
-      "wave": 5,
-      "scenario": "E2E-CORR-01",
-      "ownerTodo": 23
-    },
-    {
-      "id": "A-05",
-      "route": "/tournament-ops/tournaments/:tournamentId/staff",
-      "actorShell": "scoped tournament-operations shell; tournament_director|platform_ops",
-      "backendContract": "GET|POST staff; POST staff/:assignmentId/revoke",
-      "wave": 4,
-      "scenario": "E2E-AUTH-01",
-      "ownerTodo": 19
-    },
-    {
-      "id": "P-01",
-      "route": "/tournaments/:tournamentId/schedule",
-      "actorShell": "public tournament shell",
-      "backendContract": "GET /api/v1/tournaments/:tournamentId/schedule",
-      "wave": 5,
-      "scenario": "E2E-TOUR-01|E2E-PUBLIC-01",
-      "ownerTodo": 24
-    },
-    {
-      "id": "P-02",
-      "route": "/tournaments/:tournamentId/matches/:fixtureId",
-      "actorShell": "public tournament shell",
-      "backendContract": "GET /api/v1/tournaments/:tournamentId/matches/:fixtureId",
-      "wave": 5,
-      "scenario": "E2E-TOUR-01|E2E-PUBLIC-01|E2E-CORR-01",
-      "ownerTodo": 24
-    },
-    {
-      "id": "P-03",
-      "route": "/teams/:teamId/records",
-      "actorShell": "public team profile shell",
-      "backendContract": "GET /api/v1/teams/:teamId/records",
-      "wave": 5,
-      "scenario": "E2E-TEAM-01|E2E-PUBLIC-01|E2E-CORR-01",
-      "ownerTodo": 24
-    },
-    {
-      "id": "P-04",
-      "route": "/users/:userId/records",
-      "actorShell": "public nickname-only user profile shell",
-      "backendContract": "GET /api/v1/users/:userId/records",
-      "wave": 5,
-      "scenario": "E2E-TEAM-01|E2E-PUBLIC-01|E2E-CORR-01",
-      "ownerTodo": 24
-    }
+    {"id":"T-01","route":"/teams/:teamId","actorShell":"authenticated team shell; team_owner|team_manager operations block","backendContract":"GET /api/v1/teams/:teamId/operations-summary plus team schedule/game projections","wave":2,"scenario":"E2E-TEAM-01","ownerTodo":13},
+    {"id":"T-02","route":"/teams/:teamId/schedules","actorShell":"authenticated team shell; member read, team_owner|team_manager manage","backendContract":"GET|POST /api/v1/teams/:teamId/schedules","wave":2,"scenario":"E2E-TEAM-01","ownerTodo":13},
+    {"id":"T-03","route":"/teams/:teamId/schedules/new and /teams/:teamId/schedules/:scheduleId/edit","actorShell":"authenticated team shell; team_owner|team_manager","backendContract":"POST /api/v1/teams/:teamId/schedules; PATCH /api/v1/teams/:teamId/schedules/:scheduleId","wave":2,"scenario":"E2E-TEAM-01","ownerTodo":13},
+    {"id":"T-04","route":"/teams/:teamId/schedules/:scheduleId","actorShell":"authenticated team shell; member|team_owner|team_manager","backendContract":"GET|PATCH schedule; PUT attendance/me; POST reminders; guest-recruitment contracts","wave":2,"scenario":"E2E-TEAM-01","ownerTodo":13},
+    {"id":"T-05","route":"/team-matches/:teamMatchId/lineup","actorShell":"authenticated team-match shell; team_owner|team_manager","backendContract":"GET|PUT /api/v1/team-matches/:teamMatchId/lineup; POST .../submit|change-request","wave":3,"scenario":"E2E-TEAM-01","ownerTodo":15},
+    {"id":"T-06","route":"/team-matches/:teamMatchId/result","actorShell":"authenticated team-match shell; host team_owner|team_manager","backendContract":"GET|POST /api/v1/games/:gameId/result-revisions; POST .../:revisionId/submit","wave":3,"scenario":"E2E-TEAM-01|E2E-TEAM-02","ownerTodo":17},
+    {"id":"T-07","route":"/team-matches/:teamMatchId/result/approval","actorShell":"authenticated team-match shell; opponent_manager","backendContract":"POST /api/v1/games/:gameId/result-revisions/:revisionId/decision","wave":3,"scenario":"E2E-TEAM-01|E2E-TEAM-02","ownerTodo":17},
+    {"id":"T-08","route":"/teams/:teamId/records","actorShell":"public team profile shell with scoped team management context","backendContract":"GET /api/v1/teams/:teamId/records","wave":5,"scenario":"E2E-TEAM-01|E2E-CORR-01","ownerTodo":24},
+    {"id":"T-09","route":"/my/schedule","actorShell":"authenticated member shell","backendContract":"GET /api/v1/me/schedule; PUT schedule attendance/me","wave":2,"scenario":"E2E-TEAM-01","ownerTodo":13},
+    {"id":"A-01","route":"/tournament-ops/tournaments/:tournamentId/operations","actorShell":"scoped tournament-operations shell; assigned staff","backendContract":"GET /api/v1/tournament-ops/tournaments/:tournamentId/operations","wave":4,"scenario":"E2E-TOUR-01|E2E-TOUR-02","ownerTodo":19},
+    {"id":"A-02","route":"/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/operate","actorShell":"scoped tournament-operations shell; assigned field_operator|tournament_director","backendContract":"game commands/events/realtime takeover and backfill contracts","wave":4,"scenario":"E2E-TOUR-01|E2E-TOUR-02|E2E-AUTH-01","ownerTodo":21},
+    {"id":"A-03","route":"/tournament-ops/tournaments/:tournamentId/result-review","actorShell":"scoped tournament-operations shell; tournament_director read/review, platform_ops officialize","backendContract":"review-decision, supersede-and-submit, officialize, projection preview","wave":4,"scenario":"E2E-TOUR-01|E2E-CORR-01","ownerTodo":23},
+    {"id":"A-04","route":"/tournament-ops/tournaments/:tournamentId/records/corrections","actorShell":"scoped tournament-operations shell; tournament_director|platform_ops","backendContract":"POST /api/v1/games/:gameId/corrections and flag-gated void","wave":5,"scenario":"E2E-CORR-01","ownerTodo":23},
+    {"id":"A-05","route":"/tournament-ops/tournaments/:tournamentId/staff","actorShell":"scoped tournament-operations shell; tournament_director|platform_ops","backendContract":"GET|POST staff; POST staff/:assignmentId/revoke","wave":4,"scenario":"E2E-AUTH-01","ownerTodo":19},
+    {"id":"P-01","route":"/tournaments/:tournamentId/schedule","actorShell":"public tournament shell","backendContract":"GET /api/v1/tournaments/:tournamentId/schedule","wave":5,"scenario":"E2E-TOUR-01|E2E-PUBLIC-01","ownerTodo":24},
+    {"id":"P-02","route":"/tournaments/:tournamentId/matches/:fixtureId","actorShell":"public tournament shell","backendContract":"GET /api/v1/tournaments/:tournamentId/matches/:fixtureId","wave":5,"scenario":"E2E-TOUR-01|E2E-PUBLIC-01|E2E-CORR-01","ownerTodo":24},
+    {"id":"P-03","route":"/teams/:teamId/records","actorShell":"public team profile shell","backendContract":"GET /api/v1/teams/:teamId/records","wave":5,"scenario":"E2E-TEAM-01|E2E-PUBLIC-01|E2E-CORR-01","ownerTodo":24},
+    {"id":"P-04","route":"/users/:userId/records","actorShell":"public nickname-only user profile shell","backendContract":"GET /api/v1/users/:userId/records","wave":5,"scenario":"E2E-TEAM-01|E2E-PUBLIC-01|E2E-CORR-01","ownerTodo":24}
   ],
   "classifications": [
-    {
-      "path": ".github/tasks/79-team-match-management-history-contracts.md",
-      "classification": "stale",
-      "reason": "Its verified evidence and owned paths are legacy apps/api and apps/web, so it cannot define v1 Game/Record behavior.",
-      "supersededBy": ".github/tasks/127-v1-team-tournament-operations-game-record.md"
-    },
-    {
-      "path": ".github/tasks/109-v1-tournament-team-ops-batch.md",
-      "classification": "extend",
-      "reason": "Keep verified v1 tournament/team capabilities and extend only the Game/Record and field-operations gaps.",
-      "supersededBy": null
-    },
-    {
-      "path": ".github/tasks/119-v1-admin-bracket-layout.md",
-      "classification": "keep",
-      "reason": "The existing admin bracket layout remains valid; field operations are added in a separate scoped shell.",
-      "supersededBy": null
-    },
-    {
-      "path": ".github/tasks/123-admin-owner-access-invariant.md",
-      "classification": "keep",
-      "reason": "The platform admin owner invariant remains authoritative and does not grant field staff global admin access.",
-      "supersededBy": null
-    },
-    {
-      "path": "docs/scenarios/index.md",
-      "classification": "extend",
-      "reason": "Extend the scenario hub with the seven Task 127 E2E journeys in Todo 26.",
-      "supersededBy": null
-    },
-    {
-      "path": "docs/scenarios/04-team-and-membership.md",
-      "classification": "extend",
-      "reason": "Preserve membership contracts and add schedule/lineup actor coverage.",
-      "supersededBy": null
-    },
-    {
-      "path": "docs/scenarios/05-team-match-flows.md",
-      "classification": "extend",
-      "reason": "Preserve current v1 team-match lifecycle coverage and replace mutable result behavior with append-only revisions.",
-      "supersededBy": null
-    },
-    {
-      "path": "docs/scenarios/11-team-and-venue-hubs.md",
-      "classification": "extend",
-      "reason": "Preserve public tournament/team hub coverage and add official record projections.",
-      "supersededBy": null
-    },
-    {
-      "path": "docs/scenarios/17-tournament-gender-wizard.md",
-      "classification": "keep",
-      "reason": "Competition roster and gender rules remain prerequisites for lineup eligibility.",
-      "supersededBy": null
-    }
+    {"path":".github/tasks/79-team-match-management-history-contracts.md","classification":"stale","reason":"Its verified evidence and owned paths are legacy apps/api and apps/web, so it cannot define v1 Game/Record behavior.","supersededBy":".github/tasks/127-v1-team-tournament-operations-game-record.md"},
+    {"path":".github/tasks/109-v1-tournament-team-ops-batch.md","classification":"extend","reason":"Keep verified v1 tournament/team capabilities and extend only the Game/Record and field-operations gaps.","supersededBy":null},
+    {"path":".github/tasks/119-v1-admin-bracket-layout.md","classification":"keep","reason":"The existing admin bracket layout remains valid; field operations are added in a separate scoped shell.","supersededBy":null},
+    {"path":".github/tasks/123-admin-owner-access-invariant.md","classification":"keep","reason":"The platform admin owner invariant remains authoritative and does not grant field staff global admin access.","supersededBy":null},
+    {"path":"docs/scenarios/index.md","classification":"extend","reason":"Extend the scenario hub with the seven Task 127 E2E journeys in Todo 26.","supersededBy":null},
+    {"path":"docs/scenarios/04-team-and-membership.md","classification":"extend","reason":"Preserve membership contracts and add schedule/lineup actor coverage.","supersededBy":null},
+    {"path":"docs/scenarios/05-team-match-flows.md","classification":"extend","reason":"Preserve current v1 team-match lifecycle coverage and replace mutable result behavior with append-only revisions.","supersededBy":null},
+    {"path":"docs/scenarios/11-team-and-venue-hubs.md","classification":"extend","reason":"Preserve public tournament/team hub coverage and add official record projections.","supersededBy":null},
+    {"path":"docs/scenarios/17-tournament-gender-wizard.md","classification":"keep","reason":"Competition roster and gender rules remain prerequisites for lineup eligibility.","supersededBy":null}
   ],
   "ownership": [
-    {
-      "todo": 1,
-      "inputs": "bound PDF/preview/design hashes; named task/scenario docs; root Node/pnpm contract; existing v1 Docker/deploy patterns",
-      "outputs": [
-        ".github/tasks/127-v1-team-tournament-operations-game-record.md",
-        "scripts/qa/validate-team-tournament-ledger.mjs",
-        "scripts/qa/run-v1-task-verification.mjs",
-        "scripts/qa/run-v1-task-verification.contract.test.mjs",
-        "scripts/qa/verify-team-tournament-bound-sources.mjs",
-        "deploy/Dockerfile.v1-verification"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 2,
-      "inputs": "Todo-1 ledger; named v1 auth/schema/admin-shell files",
-      "outputs": [
-        ".github/tasks/127-v1-team-tournament-operations-game-record.md",
-        "scripts/qa/validate-game-record-adrs.mjs"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 3,
-      "inputs": "named baseline API indexes/contracts",
-      "outputs": [
-        "docs/api/README.md",
-        "docs/api/global-contract.md",
-        "docs/api/domains/games.md",
-        "docs/api/domains/team-schedules.md",
-        "docs/api/domains/tournament-operations.md",
-        "docs/api/domains/tournament-operations-auth.md",
-        "docs/api/domains/tournament-operations-escalations.md",
-        "docs/api/domains/game-realtime.md",
-        "docs/api/domains/game-migration.md",
-        "docs/api/domains/public-records.md",
-        "docs/api/domains/tournaments.md",
-        "docs/api/v1/domains/tournaments.md",
-        "docs/api/v1/domains/deferred-boundaries.md",
-        "docs/api/v1/domains/admin-audit.md",
-        "scripts/docs/check-api-contract-tree.mjs"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 4,
-      "inputs": "`apps/v1_api/prisma/schema.prisma`; named baseline migrations",
-      "outputs": [
-        "apps/v1_api/prisma/schema.prisma",
-        "apps/v1_api/prisma/migrations/20260729000100_v1_game_operations",
-        "apps/v1_api/test/games/game-schema.integration-spec.ts",
-        "apps/v1_api/test/fixtures/game-schema.fixture.ts"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 5,
-      "inputs": "Todo-4 schema; named realtime/deploy files",
-      "outputs": [
-        "apps/v1_api/src/jobs/v1-game-operations-worker.module.ts",
-        "apps/v1_api/src/jobs/v1-game-operations-worker.service.ts",
-        "apps/v1_api/src/jobs/v1-game-operations-worker.controller.ts",
-        "apps/v1_api/src/jobs/v1-game-operations-worker.service.spec.ts",
-        "apps/v1_api/src/jobs/v1-game-operations-worker.main.ts",
-        "apps/v1_api/src/config/game-operation-flags.ts",
-        "apps/v1_api/src/config/game-operation-flags.controller.ts",
-        "apps/v1_api/test/jobs/game-operations-control.integration-spec.ts",
-        "deploy/v1-game-operations-worker.Dockerfile",
-        "deploy/docker-compose.alpha.yml"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 6,
-      "inputs": "Todo-3 contracts; Todo-4 schema; Todo-11 preset/pinning receipt",
-      "outputs": [
-        "apps/v1_api/src/games/core",
-        "apps/v1_api/src/games/games.module.ts",
-        "apps/v1_api/src/games/games.controller.ts",
-        "apps/v1_api/src/games/games.service.ts",
-        "apps/v1_api/src/games/games.service.spec.ts",
-        "apps/v1_api/test/games/game-lifecycle.integration-spec.ts",
-        "apps/v1_api/src/team-matches/team-matches.service.ts",
-        "apps/v1_api/src/tournaments/tournament-bracket.service.ts",
-        "docs/api/domains/games.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 7,
-      "inputs": "canonical actor matrix; named admin context",
-      "outputs": [
-        "apps/v1_api/src/games/auth",
-        "apps/v1_api/test/games/tournament-staff-auth.integration-spec.ts",
-        "docs/api/domains/tournament-operations-auth.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 8,
-      "inputs": "frozen realtime contract; Todo-5/7 outputs",
-      "outputs": [
-        "apps/v1_api/src/games/realtime",
-        "apps/v1_api/test/games/game-realtime.integration-spec.ts",
-        "docs/api/domains/game-realtime.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 9,
-      "inputs": "Todo-5/6/7/11 outputs; approved Task-9 tuple `records=A, escalation=A, bracket=A, identity=A`",
-      "outputs": [
-        "apps/v1_api/prisma/schema.prisma",
-        "apps/v1_api/prisma/migrations/20260802000100_v1_game_projections_escalations",
-        "apps/v1_api/prisma/migrations/20260802000200_v1_team_record_facts",
-        "apps/v1_api/src/game-operations",
-        "apps/v1_api/src/games/projections",
-        "apps/v1_api/src/jobs/result-escalation",
-        "apps/v1_api/src/jobs/v1-game-operations-worker.module.ts",
-        "apps/v1_api/src/jobs/v1-game-operations-worker.service.ts",
-        "apps/v1_api/src/jobs/v1-game-operations-worker.main.ts",
-        "apps/v1_api/src/games/games.service.ts",
-        "apps/v1_api/src/notifications/notifications.module.ts",
-        "apps/v1_api/src/notifications/notifications.service.ts",
-        "apps/v1_api/src/tournaments/tournament-bracket.service.ts",
-        "apps/v1_api/test/games/game-projection.integration-spec.ts",
-        "docs/api/domains/games.md",
-        "docs/api/domains/tournaments.md",
-        "docs/api/domains/tournament-operations-escalations.md",
-        "apps/v1_api/prisma/migrations/20260802000300_v1_result_escalation_lifecycle",
-        "docs/api/global-contract.md",
-        "docs/api/domains/tournament-operations-auth.md",
-        "apps/v1_api/prisma/migrations/20260802000400_v1_public_official_result_cache",
-        "apps/v1_api/test/games/game-lifecycle.integration-spec.ts",
-        "apps/v1_api/test/games/game-schema.integration-spec.ts",
-        "apps/v1_api/test/integration/tournament-campaign.e2e-spec.ts",
-        "apps/v1_api/test/fixtures/game-schema.fixture.ts",
-        "apps/v1_api/src/jobs/v1-game-operations-worker.service.spec.ts",
-        "apps/v1_api/test/jobs/v1-game-operations-worker.integration-spec.ts",
-        "apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts",
-        "apps/v1_api/src/admin/admin-terms.service.spec.ts",
-        "apps/v1_api/jest.config.ts",
-        "apps/v1_api/src/config/game-operation-flags.ts",
-        "apps/v1_api/src/config/game-operation-flags.spec.ts",
-        "apps/v1_api/test/jobs/game-operations-control.integration-spec.ts"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 10,
-      "inputs": "named current result services/migrations; Todo-11 source pin receipt",
-      "outputs": [
-        "apps/v1_api/src/games/migration",
-        "apps/v1_api/test/games/game-backfill.integration-spec.ts",
-        "apps/v1_api/test/fixtures/game-backfill.fixture.ts",
-        "scripts/qa/verify-game-result-cutover.mjs",
-        "docs/api/domains/game-migration.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 11,
-      "inputs": "Todo-4 schema; baseline standings service; D-07–D-09 table",
-      "outputs": [
-        "apps/v1_api/prisma/schema.prisma",
-        "apps/v1_api/src/tournaments/competition-config",
-        "apps/v1_api/src/tournaments/tournament-bracket.service.ts",
-        "apps/v1_api/src/tournaments/tournament-bracket.controller.ts",
-        "apps/v1_api/prisma/migrations/20260729000200_v1_competition_config",
-        "apps/v1_api/test/tournaments/competition-config.integration-spec.ts",
-        "apps/v1_api/test/fixtures/competition-config.fixture.ts",
-        "docs/api/domains/tournaments.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 12,
-      "inputs": "named team/team-match modules",
-      "outputs": [
-        "apps/v1_api/src/team-schedules",
-        "apps/v1_api/test/teams/team-schedules.integration-spec.ts",
-        "docs/api/domains/team-schedules.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 13,
-      "inputs": "canonical design; named team components/hooks",
-      "outputs": [
-        "apps/v1_web/src/app/teams/[id]/schedules",
-        "apps/v1_web/src/app/my/schedule",
-        "apps/v1_web/src/components/team-schedules",
-        "apps/v1_web/src/hooks/use-team-schedules.ts",
-        "apps/v1_web/src/types/team-schedules.ts"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 14,
-      "inputs": "named membership/player services; consent table",
-      "outputs": [
-        "apps/v1_api/src/games/lineups",
-        "apps/v1_api/test/games/game-lineups.integration-spec.ts",
-        "docs/api/domains/games.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 15,
-      "inputs": "Todo-14 contract; canonical design",
-      "outputs": [
-        "apps/v1_web/src/app/team-matches/[id]/lineup",
-        "apps/v1_web/src/components/game-lineup",
-        "apps/v1_web/src/hooks/use-game-lineup.ts"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 16,
-      "inputs": "Todo-6/9/12/14 outputs; named team-match service",
-      "outputs": [
-        "apps/v1_api/src/games/team-results",
-        "apps/v1_api/src/team-matches/team-matches.service.ts",
-        "apps/v1_api/src/team-matches/team-matches.controller.ts",
-        "apps/v1_api/test/games/team-result-approval.integration-spec.ts",
-        "docs/api/domains/games.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 17,
-      "inputs": "Todo-16 contract; canonical design",
-      "outputs": [
-        "apps/v1_web/src/app/team-matches/[id]/result",
-        "apps/v1_web/src/app/team-matches/[id]/result/approval",
-        "apps/v1_web/src/components/game-results",
-        "apps/v1_web/src/hooks/use-game-results.ts"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 18,
-      "inputs": "Todo-7/8/9/11 outputs; named tournament module",
-      "outputs": [
-        "apps/v1_api/src/tournament-operations/board",
-        "apps/v1_api/src/tournament-operations/staff",
-        "apps/v1_api/src/tournament-operations/fields",
-        "apps/v1_api/src/tournament-operations/lineups",
-        "apps/v1_api/test/tournaments/tournament-operations-board.integration-spec.ts",
-        "docs/api/domains/tournament-operations.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 19,
-      "inputs": "Todo-18 API; baseline admin-shell files; canonical design",
-      "outputs": [
-        "apps/v1_web/src/app/tournament-ops/tournaments/[id]/operations",
-        "apps/v1_web/src/app/tournament-ops/tournaments/[id]/staff",
-        "apps/v1_web/src/app/tournament-ops/layout.tsx",
-        "apps/v1_web/src/components/tournament-operations",
-        "apps/v1_web/src/hooks/use-tournament-operations.ts",
-        "apps/v1_web/src/app/tournament-ops/tournament-ops-shell.test.tsx"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 20,
-      "inputs": "Todo-8/11/18 outputs",
-      "outputs": [
-        "apps/v1_api/src/games/live-commands",
-        "apps/v1_api/test/games/live-game-commands.integration-spec.ts",
-        "docs/api/domains/game-realtime.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 21,
-      "inputs": "Todo-19/20 outputs; canonical design",
-      "outputs": [
-        "apps/v1_web/src/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate",
-        "apps/v1_web/src/components/game-live-console",
-        "apps/v1_web/src/hooks/use-game-live-console.ts",
-        "apps/v1_web/src/app/tournament-ops/live-console.test.tsx"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 22,
-      "inputs": "Todo-9/11/18/20 outputs; named bracket service",
-      "outputs": [
-        "apps/v1_api/src/tournament-operations/results",
-        "apps/v1_api/src/tournaments/tournament-bracket.service.ts",
-        "apps/v1_api/src/tournaments/tournament-bracket.controller.ts",
-        "apps/v1_api/test/tournaments/tournament-officialize.integration-spec.ts",
-        "docs/api/domains/tournament-operations.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 23,
-      "inputs": "Todo-19/22 outputs; canonical design",
-      "outputs": [
-        "apps/v1_web/src/app/tournament-ops/tournaments/[id]/result-review",
-        "apps/v1_web/src/app/tournament-ops/tournaments/[id]/records/corrections",
-        "apps/v1_web/src/components/tournament-result-review",
-        "apps/v1_web/src/hooks/use-tournament-result-review.ts",
-        "apps/v1_web/src/app/tournament-ops/result-review.test.tsx"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 24,
-      "inputs": "Todo-9/11/14/16/22 outputs; baseline public routes",
-      "outputs": [
-        "apps/v1_api/src/games/public-records",
-        "apps/v1_api/test/games/public-records-privacy.integration-spec.ts",
-        "apps/v1_web/src/app/tournaments/[id]/schedule",
-        "apps/v1_web/src/app/tournaments/[id]/matches/[fixtureId]",
-        "apps/v1_web/src/app/teams/[id]/records",
-        "apps/v1_web/src/app/users/[id]/records",
-        "apps/v1_web/src/components/public-game-records",
-        "apps/v1_web/src/app/public-game-records.test.tsx",
-        "docs/api/domains/public-records.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 25,
-      "inputs": "Todo-1 caller ledger; Todo-6/16 callers",
-      "outputs": [
-        "apps/v1_api/src/games/adapters",
-        "apps/v1_api/test/games/game-cutover.integration-spec.ts",
-        "apps/v1_api/src/tournaments/tournament-bracket.service.ts",
-        "apps/v1_api/src/tournaments/tournament-bracket.controller.ts",
-        "apps/v1_api/src/team-matches/team-matches.service.ts",
-        "apps/v1_api/src/team-matches/team-matches.controller.ts",
-        "apps/v1_web/src/hooks/use-v1-api.ts",
-        "apps/v1_web/src/types/api.ts",
-        "apps/v1_web/src/test/msw/handlers.ts",
-        "scripts/qa/verify-game-result-cutover.mjs",
-        "docs/api/domains/game-migration.md"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 26,
-      "inputs": "baseline scenarios/fixtures; prior contracts",
-      "outputs": [
-        "apps/v1_api/src/app.module.ts",
-        "docs/scenarios/04-team-and-membership.md",
-        "docs/scenarios/05-team-match-flows.md",
-        "docs/scenarios/11-team-and-venue-hubs.md",
-        "docs/scenarios/17-tournament-gender-wizard.md",
-        "docs/scenarios/18-team-tournament-operations.md",
-        "docs/scenarios/index.md",
-        "e2e/v1-tests/team-tournament-operations.spec.ts",
-        "e2e/fixtures/team-tournament-operations.ts",
-        "e2e/fixtures/runtime.ts",
-        "e2e/fixtures/sessions.ts",
-        "e2e/fixtures/api-helpers.ts",
-        "apps/v1_api/test/fixtures/team-tournament-operations.ts",
-        "apps/v1_api/prisma/seed.ts",
-        "apps/v1_web/src/test/msw/team-tournament-operations.ts",
-        "apps/v1_web/src/test/msw/handlers.ts",
-        "apps/v1_web/src/types/api.ts",
-        "apps/v1_web/src/hooks/use-v1-api.ts"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    },
-    {
-      "todo": 27,
-      "inputs": "Todo-25/26 candidate; baseline load/deploy inputs",
-      "outputs": [
-        "infra/load/v1-game-operations.js",
-        "infra/load/fixtures/v1-game-operations.json",
-        "scripts/qa/run-v1-game-operations-load.mjs",
-        "scripts/qa/run-v1-release-candidate.mjs",
-        "scripts/qa/run-v1-final-gate.mjs",
-        "scripts/qa/run-v1-alpha-cutover.mjs",
-        "deploy/runbooks/v1-game-operations-alpha.md",
-        "deploy/runbooks/v1-game-operations-compatibility-removal.json",
-        "deploy/runbooks/v1-game-operations-r3-registry.json"
-      ],
-      "forbidden": [
-        ".env*",
-        "apps/api/**",
-        "apps/web/**",
-        "docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html",
-        "unrelatedDirty.paths[*]",
-        "every ownership output not listed in the active todo row"
-      ]
-    }
+    {"todo":1,"inputs":"bound PDF/preview/design hashes; named task/scenario docs; root Node/pnpm contract; existing v1 Docker/deploy patterns","outputs":[".github/tasks/127-v1-team-tournament-operations-game-record.md","scripts/qa/validate-team-tournament-ledger.mjs","scripts/qa/run-v1-task-verification.mjs","scripts/qa/run-v1-task-verification.contract.test.mjs","scripts/qa/verify-team-tournament-bound-sources.mjs","deploy/Dockerfile.v1-verification"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":2,"inputs":"Todo-1 ledger; named v1 auth/schema/admin-shell files","outputs":[".github/tasks/127-v1-team-tournament-operations-game-record.md","scripts/qa/validate-game-record-adrs.mjs"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":3,"inputs":"named baseline API indexes/contracts","outputs":["docs/api/README.md","docs/api/global-contract.md","docs/api/domains/games.md","docs/api/domains/team-schedules.md","docs/api/domains/tournament-operations.md","docs/api/domains/tournament-operations-auth.md","docs/api/domains/tournament-operations-escalations.md","docs/api/domains/game-realtime.md","docs/api/domains/game-migration.md","docs/api/domains/public-records.md","docs/api/domains/tournaments.md","docs/api/v1/domains/tournaments.md","docs/api/v1/domains/deferred-boundaries.md","docs/api/v1/domains/admin-audit.md","scripts/docs/check-api-contract-tree.mjs"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":4,"inputs":"`apps/v1_api/prisma/schema.prisma`; named baseline migrations","outputs":["apps/v1_api/prisma/schema.prisma","apps/v1_api/prisma/migrations/20260729000100_v1_game_operations","apps/v1_api/test/games/game-schema.integration-spec.ts","apps/v1_api/test/fixtures/game-schema.fixture.ts"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":5,"inputs":"Todo-4 schema; named realtime/deploy files","outputs":["apps/v1_api/src/jobs/v1-game-operations-worker.module.ts","apps/v1_api/src/jobs/v1-game-operations-worker.service.ts","apps/v1_api/src/jobs/v1-game-operations-worker.controller.ts","apps/v1_api/src/jobs/v1-game-operations-worker.service.spec.ts","apps/v1_api/src/jobs/v1-game-operations-worker.main.ts","apps/v1_api/src/config/game-operation-flags.ts","apps/v1_api/src/config/game-operation-flags.controller.ts","apps/v1_api/test/jobs/game-operations-control.integration-spec.ts","deploy/v1-game-operations-worker.Dockerfile","deploy/docker-compose.alpha.yml"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":6,"inputs":"Todo-3 contracts; Todo-4 schema; Todo-11 preset/pinning receipt","outputs":["apps/v1_api/src/games/core","apps/v1_api/src/games/games.module.ts","apps/v1_api/src/games/games.controller.ts","apps/v1_api/src/games/games.service.ts","apps/v1_api/src/games/games.service.spec.ts","apps/v1_api/test/games/game-lifecycle.integration-spec.ts","apps/v1_api/src/team-matches/team-matches.service.ts","apps/v1_api/src/tournaments/tournament-bracket.service.ts","docs/api/domains/games.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":7,"inputs":"canonical actor matrix; named admin context","outputs":["apps/v1_api/src/games/auth","apps/v1_api/test/games/tournament-staff-auth.integration-spec.ts","docs/api/domains/tournament-operations-auth.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":8,"inputs":"frozen realtime contract; Todo-5/7 outputs","outputs":["apps/v1_api/src/games/realtime","apps/v1_api/test/games/game-realtime.integration-spec.ts","docs/api/domains/game-realtime.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":9,"inputs":"Todo-5/6/7/11 outputs; approved Task-9 tuple `records=A, escalation=A, bracket=A, identity=A`","outputs":["apps/v1_api/prisma/schema.prisma","apps/v1_api/prisma/migrations/20260802000100_v1_game_projections_escalations","apps/v1_api/prisma/migrations/20260802000200_v1_team_record_facts","apps/v1_api/src/game-operations","apps/v1_api/src/games/projections","apps/v1_api/src/jobs/result-escalation","apps/v1_api/src/jobs/v1-game-operations-worker.module.ts","apps/v1_api/src/jobs/v1-game-operations-worker.service.ts","apps/v1_api/src/jobs/v1-game-operations-worker.main.ts","apps/v1_api/src/games/games.service.ts","apps/v1_api/src/notifications/notifications.module.ts","apps/v1_api/src/notifications/notifications.service.ts","apps/v1_api/src/tournaments/tournament-bracket.service.ts","apps/v1_api/test/games/game-projection.integration-spec.ts","docs/api/domains/games.md","docs/api/domains/tournaments.md","docs/api/domains/tournament-operations-escalations.md","apps/v1_api/prisma/migrations/20260802000300_v1_result_escalation_lifecycle","docs/api/global-contract.md","docs/api/domains/tournament-operations-auth.md","apps/v1_api/prisma/migrations/20260802000400_v1_public_official_result_cache","apps/v1_api/test/games/game-lifecycle.integration-spec.ts","apps/v1_api/test/games/game-schema.integration-spec.ts","apps/v1_api/test/integration/tournament-campaign.e2e-spec.ts","apps/v1_api/test/fixtures/game-schema.fixture.ts","apps/v1_api/src/jobs/v1-game-operations-worker.service.spec.ts","apps/v1_api/test/jobs/v1-game-operations-worker.integration-spec.ts","apps/v1_api/src/tournaments/tournament-bracket.service.spec.ts","apps/v1_api/src/admin/admin-terms.service.spec.ts","apps/v1_api/jest.config.ts","apps/v1_api/src/config/game-operation-flags.ts","apps/v1_api/src/config/game-operation-flags.spec.ts","apps/v1_api/test/jobs/game-operations-control.integration-spec.ts"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":10,"inputs":"named current result services/migrations; Todo-11 source pin receipt","outputs":["apps/v1_api/src/games/migration","apps/v1_api/test/games/game-backfill.integration-spec.ts","apps/v1_api/test/fixtures/game-backfill.fixture.ts","scripts/qa/verify-game-result-cutover.mjs","docs/api/domains/game-migration.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":11,"inputs":"Todo-4 schema; baseline standings service; D-07–D-09 table","outputs":["apps/v1_api/prisma/schema.prisma","apps/v1_api/src/tournaments/competition-config","apps/v1_api/src/tournaments/tournament-bracket.service.ts","apps/v1_api/src/tournaments/tournament-bracket.controller.ts","apps/v1_api/prisma/migrations/20260729000200_v1_competition_config","apps/v1_api/test/tournaments/competition-config.integration-spec.ts","apps/v1_api/test/fixtures/competition-config.fixture.ts","docs/api/domains/tournaments.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":12,"inputs":"named team/team-match modules","outputs":["apps/v1_api/src/team-schedules","apps/v1_api/test/teams/team-schedules.integration-spec.ts","docs/api/domains/team-schedules.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":13,"inputs":"canonical design; named team components/hooks","outputs":["apps/v1_web/src/app/teams/[id]/schedules","apps/v1_web/src/app/my/schedule","apps/v1_web/src/components/team-schedules","apps/v1_web/src/hooks/use-team-schedules.ts","apps/v1_web/src/types/team-schedules.ts"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":14,"inputs":"named membership/player services; consent table","outputs":["apps/v1_api/src/games/lineups","apps/v1_api/test/games/game-lineups.integration-spec.ts","docs/api/domains/games.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":15,"inputs":"Todo-14 contract; canonical design","outputs":["apps/v1_web/src/app/team-matches/[id]/lineup","apps/v1_web/src/components/game-lineup","apps/v1_web/src/hooks/use-game-lineup.ts"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":16,"inputs":"Todo-6/9/12/14 outputs; named team-match service","outputs":["apps/v1_api/src/games/team-results","apps/v1_api/src/team-matches/team-matches.service.ts","apps/v1_api/src/team-matches/team-matches.controller.ts","apps/v1_api/test/games/team-result-approval.integration-spec.ts","docs/api/domains/games.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":17,"inputs":"Todo-16 contract; canonical design","outputs":["apps/v1_web/src/app/team-matches/[id]/result","apps/v1_web/src/app/team-matches/[id]/result/approval","apps/v1_web/src/components/game-results","apps/v1_web/src/hooks/use-game-results.ts"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":18,"inputs":"Todo-7/8/9/11 outputs; named tournament module","outputs":["apps/v1_api/src/tournament-operations/board","apps/v1_api/src/tournament-operations/staff","apps/v1_api/src/tournament-operations/fields","apps/v1_api/src/tournament-operations/lineups","apps/v1_api/test/tournaments/tournament-operations-board.integration-spec.ts","docs/api/domains/tournament-operations.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":19,"inputs":"Todo-18 API; baseline admin-shell files; canonical design","outputs":["apps/v1_web/src/app/tournament-ops/tournaments/[id]/operations","apps/v1_web/src/app/tournament-ops/tournaments/[id]/staff","apps/v1_web/src/app/tournament-ops/layout.tsx","apps/v1_web/src/components/tournament-operations","apps/v1_web/src/hooks/use-tournament-operations.ts","apps/v1_web/src/app/tournament-ops/tournament-ops-shell.test.tsx"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":20,"inputs":"Todo-8/11/18 outputs","outputs":["apps/v1_api/src/games/live-commands","apps/v1_api/test/games/live-game-commands.integration-spec.ts","docs/api/domains/game-realtime.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":21,"inputs":"Todo-19/20 outputs; canonical design","outputs":["apps/v1_web/src/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate","apps/v1_web/src/components/game-live-console","apps/v1_web/src/hooks/use-game-live-console.ts","apps/v1_web/src/app/tournament-ops/live-console.test.tsx"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":22,"inputs":"Todo-9/11/18/20 outputs; named bracket service","outputs":["apps/v1_api/src/tournament-operations/results","apps/v1_api/src/tournaments/tournament-bracket.service.ts","apps/v1_api/src/tournaments/tournament-bracket.controller.ts","apps/v1_api/test/tournaments/tournament-officialize.integration-spec.ts","docs/api/domains/tournament-operations.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":23,"inputs":"Todo-19/22 outputs; canonical design","outputs":["apps/v1_web/src/app/tournament-ops/tournaments/[id]/result-review","apps/v1_web/src/app/tournament-ops/tournaments/[id]/records/corrections","apps/v1_web/src/components/tournament-result-review","apps/v1_web/src/hooks/use-tournament-result-review.ts","apps/v1_web/src/app/tournament-ops/result-review.test.tsx"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":24,"inputs":"Todo-9/11/14/16/22 outputs; baseline public routes","outputs":["apps/v1_api/src/games/public-records","apps/v1_api/test/games/public-records-privacy.integration-spec.ts","apps/v1_web/src/app/tournaments/[id]/schedule","apps/v1_web/src/app/tournaments/[id]/matches/[fixtureId]","apps/v1_web/src/app/teams/[id]/records","apps/v1_web/src/app/users/[id]/records","apps/v1_web/src/components/public-game-records","apps/v1_web/src/app/public-game-records.test.tsx","docs/api/domains/public-records.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":25,"inputs":"Todo-1 caller ledger; Todo-6/16 callers","outputs":["apps/v1_api/src/games/adapters","apps/v1_api/test/games/game-cutover.integration-spec.ts","apps/v1_api/src/tournaments/tournament-bracket.service.ts","apps/v1_api/src/tournaments/tournament-bracket.controller.ts","apps/v1_api/src/team-matches/team-matches.service.ts","apps/v1_api/src/team-matches/team-matches.controller.ts","apps/v1_web/src/hooks/use-v1-api.ts","apps/v1_web/src/types/api.ts","apps/v1_web/src/test/msw/handlers.ts","scripts/qa/verify-game-result-cutover.mjs","docs/api/domains/game-migration.md"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":26,"inputs":"baseline scenarios/fixtures; prior contracts","outputs":["apps/v1_api/src/app.module.ts","docs/scenarios/04-team-and-membership.md","docs/scenarios/05-team-match-flows.md","docs/scenarios/11-team-and-venue-hubs.md","docs/scenarios/17-tournament-gender-wizard.md","docs/scenarios/18-team-tournament-operations.md","docs/scenarios/index.md","e2e/v1-tests/team-tournament-operations.spec.ts","e2e/fixtures/team-tournament-operations.ts","e2e/fixtures/runtime.ts","e2e/fixtures/sessions.ts","e2e/fixtures/api-helpers.ts","apps/v1_api/test/fixtures/team-tournament-operations.ts","apps/v1_api/prisma/seed.ts","apps/v1_web/src/test/msw/team-tournament-operations.ts","apps/v1_web/src/test/msw/handlers.ts","apps/v1_web/src/types/api.ts","apps/v1_web/src/hooks/use-v1-api.ts"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":27,"inputs":"Todo-25/26 candidate; baseline load/deploy inputs","outputs":["infra/load/v1-game-operations.js","infra/load/fixtures/v1-game-operations.json","scripts/qa/run-v1-game-operations-load.mjs","scripts/qa/run-v1-release-candidate.mjs","scripts/qa/run-v1-final-gate.mjs","scripts/qa/run-v1-alpha-cutover.mjs","deploy/runbooks/v1-game-operations-alpha.md","deploy/runbooks/v1-game-operations-compatibility-removal.json","deploy/runbooks/v1-game-operations-r3-registry.json"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]}
   ],
   "unrelatedDirty": {
     "schemaVersion": 1,
@@ -903,238 +166,16 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
       "? scripts/qa/AGENTS.md"
     ],
     "paths": [
-      {
-        "path": ".claude/agents/AGENTS.md",
-        "index": {
-          "state": "present",
-          "entries": [
-            {
-              "mode": "100644",
-              "blob": "8de5b09f8141db229849d67b57288f650ed0ad1b",
-              "stage": 0,
-              "path": ".claude/agents/AGENTS.md"
-            }
-          ]
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 2539,
-          "sha256": "553706186cf93532a1717965c25fdc2d0edc3541f5c0375ae4ece763bef6429f"
-        }
-      },
-      {
-        "path": ".github/tasks/15-bootstrap-codex-agent-config.md",
-        "index": {
-          "state": "present",
-          "entries": [
-            {
-              "mode": "100644",
-              "blob": "bda941f56efacaf2ec3b5ae8a8ef66b0205f876b",
-              "stage": 0,
-              "path": ".github/tasks/15-bootstrap-codex-agent-config.md"
-            }
-          ]
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 5468,
-          "sha256": "860666caf77de5e4d32bac004cb7b83fc3214bdad54b323c19b29bae5c8f6b2a"
-        }
-      },
-      {
-        "path": "AGENTS.md",
-        "index": {
-          "state": "present",
-          "entries": [
-            {
-              "mode": "100644",
-              "blob": "58f8b04625acd66436f414ce26301bdbd88aa27c",
-              "stage": 0,
-              "path": "AGENTS.md"
-            }
-          ]
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 43899,
-          "sha256": "1071cc5f9b8a340292dba7fc80d4e0f995578799c4985c7ceb9be16d794b5fbf"
-        }
-      },
-      {
-        "path": "apps/v1_api/AGENTS.md",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 3090,
-          "sha256": "a0e32acf1e840bae5c8de66c23e28b1189bfa30d174cb7a6ddabc83ae1e017d6"
-        }
-      },
-      {
-        "path": "apps/v1_api/prisma/AGENTS.md",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 4184,
-          "sha256": "fc7ad4dae06f6bcdab2c10338ff7f2304bc179fc3c28e61a4cb6d14b571e79bd"
-        }
-      },
-      {
-        "path": "apps/v1_api/src/AGENTS.md",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 4652,
-          "sha256": "3df97552673576770e0a0ac36c5c21fd7f381095ef544ffa4998ed5ccb14d2a8"
-        }
-      },
-      {
-        "path": "apps/v1_web/AGENTS.md",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 3465,
-          "sha256": "f32f686603bc5efe8f3f9e781b4f436276d8138002977528ac682f57553a7b7a"
-        }
-      },
-      {
-        "path": "apps/v1_web/src/AGENTS.md",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 4375,
-          "sha256": "ed3b5deb07ad0f6fb05894b86e6486a2235072edab680e4dd8232fd6a63666b1"
-        }
-      },
-      {
-        "path": "desktop-top.png",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 137920,
-          "sha256": "fafd0158917643d3eb1b9097d8836c6bd53c5fec43d1139125df7bd38c575cb8"
-        }
-      },
-      {
-        "path": "e2e/AGENTS.md",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 4186,
-          "sha256": "a06ccff3a77f4cf337f6ee99a1974836ee5669f6366e4fe9385b4173aa98c1fa"
-        }
-      },
-      {
-        "path": "screenshots/admin-roster-modal-local/roster-modal_desktop1440.png",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 141520,
-          "sha256": "582092ade921539c995a03b1123dce2a7b8c89c4fd9778895a2119110306cdd5"
-        }
-      },
-      {
-        "path": "screenshots/admin-roster-modal-local/roster-modal_mobile390.png",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 58817,
-          "sha256": "5a5f10963774c2cc3d4571b465625aada7c3c86be1f84ee01eaa06aabd6910fc"
-        }
-      },
-      {
-        "path": "screenshots/admin-roster-modal-local/roster-modal_tablet768.png",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 105149,
-          "sha256": "5ffd803c6c1f6858350374421ebe540ba2adddb2192bd2e27d2880e5e1360715"
-        }
-      },
-      {
-        "path": "scripts/capture_admin_roster_modal.js",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 3757,
-          "sha256": "2d80b810ff902a74c1937fe138ebc120aba57b5f40acdcb265fac670ecbda1f8"
-        }
-      },
-      {
-        "path": "scripts/capture_admin_roster_modal_local.js",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 3893,
-          "sha256": "fd1075c985a38954dbf0a9f57fa10b642172493eb8f40f3b1107fcad7f19b6b3"
-        }
-      },
-      {
-        "path": "scripts/qa/AGENTS.md",
-        "index": {
-          "state": "absent"
-        },
-        "worktree": {
-          "state": "present",
-          "type": "regular",
-          "mode": "0644",
-          "size": 4748,
-          "sha256": "a43d9170c70b1bf888b9c851c9953b1859210694fe2033390f95228b3a29490a"
-        }
-      }
+      {"path":".claude/agents/AGENTS.md","index":{"state":"present","entries":[{"mode":"100644","blob":"8de5b09f8141db229849d67b57288f650ed0ad1b","stage":0,"path":".claude/agents/AGENTS.md"}]},"worktree":{"state":"present","type":"regular","mode":"0644","size":2539,"sha256":"553706186cf93532a1717965c25fdc2d0edc3541f5c0375ae4ece763bef6429f"}},
+      {"path":".github/tasks/15-bootstrap-codex-agent-config.md","index":{"state":"present","entries":[{"mode":"100644","blob":"bda941f56efacaf2ec3b5ae8a8ef66b0205f876b","stage":0,"path":".github/tasks/15-bootstrap-codex-agent-config.md"}]},"worktree":{"state":"present","type":"regular","mode":"0644","size":5468,"sha256":"860666caf77de5e4d32bac004cb7b83fc3214bdad54b323c19b29bae5c8f6b2a"}},
+      {"path":"AGENTS.md","index":{"state":"present","entries":[{"mode":"100644","blob":"237f89f9928dda4fd3932ab4400cc8e5ceed97ef","stage":0,"path":"AGENTS.md"}]},"worktree":{"state":"present","type":"regular","mode":"0644","size":42733,"sha256":"09175f55bf08e97a1e503de1ffd4033ff0e3f544f62883c1374f818ca7bfb8bc"}},
+      {"path":"apps/v1_api/AGENTS.md","index":{"state":"absent","entries":[]},"worktree":{"state":"present","type":"regular","mode":"0644","size":3090,"sha256":"a0e32acf1e840bae5c8de66c23e28b1189bfa30d174cb7a6ddabc83ae1e017d6"}},
+      {"path":"apps/v1_api/prisma/AGENTS.md","index":{"state":"absent","entries":[]},"worktree":{"state":"present","type":"regular","mode":"0644","size":4184,"sha256":"fc7ad4dae06f6bcdab2c10338ff7f2304bc179fc3c28e61a4cb6d14b571e79bd"}},
+      {"path":"apps/v1_api/src/AGENTS.md","index":{"state":"absent","entries":[]},"worktree":{"state":"present","type":"regular","mode":"0644","size":4652,"sha256":"3df97552673576770e0a0ac36c5c21fd7f381095ef544ffa4998ed5ccb14d2a8"}},
+      {"path":"apps/v1_web/AGENTS.md","index":{"state":"absent","entries":[]},"worktree":{"state":"present","type":"regular","mode":"0644","size":3465,"sha256":"f32f686603bc5efe8f3f9e781b4f436276d8138002977528ac682f57553a7b7a"}},
+      {"path":"apps/v1_web/src/AGENTS.md","index":{"state":"absent","entries":[]},"worktree":{"state":"present","type":"regular","mode":"0644","size":4375,"sha256":"ed3b5deb07ad0f6fb05894b86e6486a2235072edab680e4dd8232fd6a63666b1"}},
+      {"path":"e2e/AGENTS.md","index":{"state":"absent","entries":[]},"worktree":{"state":"present","type":"regular","mode":"0644","size":4186,"sha256":"a06ccff3a77f4cf337f6ee99a1974836ee5669f6366e4fe9385b4173aa98c1fa"}},
+      {"path":"scripts/qa/AGENTS.md","index":{"state":"absent","entries":[]},"worktree":{"state":"present","type":"regular","mode":"0644","size":4748,"sha256":"a43d9170c70b1bf888b9c851c9953b1859210694fe2033390f95228b3a29490a"}}
     ],
     "fingerprintSHA256": "02f9e070b8a68419ff620af3943bfc638a8ab4a896c24d977384beacb77b81c7"
   }
@@ -1186,41 +227,6 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
 - The immutable relative-growth continuation receipt is `.omo/evidence/task-1-relative-growth-override-dc4ecb2f.json` (`2a1b41aedcece05f389e53fc639d732d6e01c2b886a9762286f3c0a66de7ca36`). It supersedes the Node/MCP-only receipt for Task 1 preflight relative-growth checks only; load, Docker, ports, browser absolute cap, in-run growth, source/candidate identity, and cleanup gates remain hard failures.
 - PIN/RED/GREEN, source-manifest, clean-restart, candidate-receipt, and terminal V1 artifacts are bound by exact path and SHA in the durable start-work ledger outside this tracked document. Evidence from a prior source revision is historical and must not be reused for changed bytes.
 - Terminal V1 paths and SHAs are intentionally not embedded here because changing this file creates a new source blob; the immutable ledger binding is the non-self-referential authority.
-
-### `unrelatedDirty` re-freeze — 2026-08-04
-
-`unrelatedDirty` was re-captured against the live working tree on 2026-08-04, growing from 10 paths
-to 16. **This is a deliberate, disclosed weakening of one evidence binding. Read what it costs
-before relying on F1-F4 output.**
-
-Why it was unavoidable. The original freeze recorded `AGENTS.md` as an *uncommitted* modification
-(`sha256 09175f55…`). A concurrent session edited that file again afterwards. An uncommitted state
-is stored nowhere in git, so the frozen bytes were searched for and not found in any of the 24
-commits touching `AGENTS.md`, nor in any of the 4 stash entries. `verifyTaskOneDirty()` compares the
-recorded `sha256` byte-for-byte and is called inside `verifyCandidate()`, which every `--final-gate`
-run reaches — so F1-F4 had become permanently unsatisfiable, and no amount of working-tree cleanup
-could restore them.
-
-What the re-freeze does NOT do: it does not recover the Todo-1 binding. Nothing can. The chain from
-this plan's start to its final gates is broken and stays broken.
-
-What F1-F4 therefore prove, and only this: that nothing drifted between candidate-receipt creation
-and gate execution — which is what the plan's own F4 text compares against ("the normalized
-unrelated-dirty status/index/worktree fingerprint **to the receipt**"). They do NOT prove that
-nothing unrelated changed since Todo 1.
-
-The 6 added paths are another session's artifacts, not this plan's outputs, and remain excluded from
-every ownership row:
-
-```
-desktop-top.png
-screenshots/admin-roster-modal-local/roster-modal_{desktop1440,mobile390,tablet768}.png
-scripts/capture_admin_roster_modal.js
-scripts/capture_admin_roster_modal_local.js
-```
-
-Because the re-freeze pins those foreign paths by content hash, a later edit to any of them breaks
-the fingerprint again. F1-F4 must run against the same working tree that produced this record.
 
 <!-- TASK127_GAME_RECORD_ADR_METADATA_BEGIN -->
 ```json
@@ -2662,136 +1668,45 @@ files (300)"로 거부됐다. `git diff --stat origin/dev...origin/codex/teameet
 이번 세션 지시 범위를 크게 벗어나는 구조적 결정이라 진행하지 않았다 —
 F2/F3와 마찬가지로 기술적으로 차단된 것으로 기록만 남긴다.
 
-## dev와의 병합 충돌 + game-schema drift 수정 (2026-08-05)
+## 일정 상세·생성 화면 모바일 좌우 여백 0 버그 수정 (2026-08-05)
 
-CI 완료 확인 대기 중 `gh pr view 249`가 `mergeStateStatus: DIRTY` /
-`mergeable: CONFLICTING`로 전환된 것을 발견 — dev가 이 브랜치의
-merge-base 이후 PR #266(`audit/v1-match-create-edit-contracts`)로
-진전해 있었다.
+사용자가 "모바일에서 여백이 좌우 없다고 카드밖에"로 지적한 문제를 실측으로
+근본원인까지 추적했다. 처음엔 카드/배경 색 대비 문제(둘 다 `--bg` 흰색이라
+카드 경계가 안 보임)로 판단했으나, `getBoundingClientRect()` 측정 결과
+`.tm-card`가 390px 뷰포트에서 `left: 0, right: 390`으로 화면 양쪽에
+완전히 붙어 있음을 확인 — 색 대비가 아니라 **진짜 padding 0**이었다.
 
-**충돌 1건**: `docs/api/v1/domains/admin-audit.md`. 이 브랜치에서는 해당
-문서를 이미 "Superseded" 스텁으로 바꾸고 정본 계약을
-`docs/api/domains/tournament-operations-auth.md`의 "Migrated general
-admin and audit surface" 섹션으로 이관해 둔 상태였는데, dev의 PR #266은
-이관 전 구버전 문서에 신규 계약 2건(관리자 전용 연락처/프로필 필드
-`phone`/인증 타임스탬프/`birthDate`/`displayRegion`/`bio`, `GET
-/admin/teams/:teamId`의 `members[]` 필드)을 추가했다. `git merge-tree
---write-tree`로 충돌만 국소 확인 후, 스텁은 유지하고 두 신규 계약을
-정본 이관 문서 쪽에 병합해 정보 손실 없이 해결 — `git read-tree` +
-`update-index --cacheinfo` + `write-tree` + `commit-tree`(두 부모)
-플럼빙으로 워킹트리 체크아웃 없이 병합 커밋(`d5e9d5f9`)을 만들어 push.
+**근본원인**: `team-schedules-page.tsx`의 `ScheduleDetailPageView`가 감싸는
+`<div className="tm-team-detail-section">`이 어떤 CSS 파일에도 정의돼
+있지 않은 클래스였다(전역 grep으로 globals.css + 모든 `.module.css` 확인).
+이 클래스명은 원래 `components/teams/team-detail-sections.tsx`가 쓰던
+것인데, 그 파일은 `grep -rln "from '@/components/teams/team-detail-sections'"`
+결과 **아무 데서도 import되지 않는 죽은 코드**였다 — 즉 실제 스타일을
+전혀 제공하지 못하는 이름만 남은 클래스에 기대고 있었다. `ScheduleFormPageView`
+(일정 생성/수정 폼)는 아예 padding 래퍼 자체가 없어 같은 증상이었다.
 
-**CI 실패 1건 (진짜 회귀, 우회 없이 근본 수정)**: 병합 직후 CI에서 API
-job의 "V1 migration replay + drift gate" 스텝이
-`test/games/game-schema.integration-spec.ts`의 "refuses source snapshot
-mutation before migration verification" 테스트에서
-`SOURCE_SNAPSHOT_DRIFT: schema bytes differ from bound source snapshot`로
-실패. 원인 추적: `apps/v1_api/prisma/schema.prisma`의 SHA-256을
-`test/fixtures/game-schema.fixture.ts`의 `gameSchemaSourceManifest.schema`에
-고정해 게임 운영 스키마 표면의 무단 drift를 막는 감사 게이트인데,
-병합으로 dev의 `V1Popup.targetPaths` 필드 + GIN 인덱스(migration
-`20260804140000_v1_popup_exact_target_paths`)가 스키마 파일에 섞여
-들어오며 바이트가 바뀐 것. 직접 바이트 비교로 검증: (a) 병합 전
-`ddae9ee4`의 schema.prisma 해시는 핀과 정확히 일치, (b) 병합 후 diff는
-정확히 그 2줄(필드 선언 + 인덱스)뿐, (c) 게임 운영 스키마에 바인딩된
-migration 해시(`20260729000100_v1_game_operations/migration.sql`)는
-병합 전후 완전히 동일 — Task 6 게임 운영 스키마 자체는 건드리지 않았음을
-증명. 이 정보로 `gameSchemaSourceManifest.schema`를 새 해시로 재고정하고
-주석을 실제 변경 내용으로 갱신 — 테스트를 삭제·완화하거나 우회하지 않고
-근본 원인(정당한 드리프트)을 확인한 뒤 정식으로 재핀. 동일 플럼빙 방식으로
-커밋(`b4f3098f`) 생성 후 push.
+**수정**: 두 화면 모두 다른 화면들의 관례(`padding: '16px 20px 40px'`,
+`team-records-content.tsx` 등에서 확립된 패턴)를 따르는 padding 래퍼를
+추가했다. 겸사겸사 `--card-surface`를 `var(--bg)`(페이지와 동일)에서
+명시적 `#ffffff`로, `.tm-app-frame` 배경을 `var(--grey50)`로 분리해
+카드/배경 대비도 DESIGN.md 원칙("카드는 배경색 차이로 구분한다")에 맞게
+개선했다 — 이건 별개의 진짜 문제였고 padding 버그와 상호보완적이다.
 
-두 커밋 모두 pathspec 없이 전체 트리를 다루는 대신 `git read-tree` +
-`update-index`로 변경 대상 파일만 국소 교체했으므로, 다른 세션의
-미커밋 변경을 건드릴 위험이 없다(공유 트리 git 안전 규칙 준수 — 이
-worktree의 HEAD는 어느 시점에도 체크아웃 전환하지 않았다).
+**검증**: `tsc --noEmit` 0 errors, 관련 vitest 17/17 통과, Playwright로
+390px 라이브 측정 — 수정 전 `left:0, right:390`(여백 0) → 수정 후
+`left:20, right:370`(양쪽 20px 여백) 확인. 스크린샷으로 일정 상세·
+일정 생성 두 화면 모두 시각 확인.
 
-## F2/F3 착수 시도 → F1 선행 조건 발견으로 사용자가 전체 보류 지시 (2026-08-05)
+**globals.css EOL 함정 재확인**: 이 세션에서도 `[[globals-css-mixed-eol-trap]]`
+(메모리 기록)이 재현됐다 — Edit 2건(코멘트 교체, `background` 값 변경)만
+했는데 `git diff --stat`에 1215줄 변경으로 잡혔다(전체 CRLF 정규화).
+difflib로 원본(HEAD)과 대조해 내용이 같은 줄은 원래 개행을 복원하는
+방식으로 복구 → 실제 diff 13줄로 축소 확인 후 커밋.
 
-사용자 지시로 F2("F2 + F3 전체 수행")를 실제로 착수. `scripts/qa/run-v1-final-gate.mjs`를
-끝까지 읽어 이전 세션의 "플래그 이름 불일치로 차단" 판단을 정정 —
-`--candidate-receipt`/`--candidate-receipt-sha`(바깥 wrapper
-`run-v1-task-verification.mjs` 인자)와 `--qa-review-receipt`/`--qa-review-receipt-sha`(그
-안쪽 `--` 뒤 payload 인자)는 상충이 아니라 한 커맨드라인 안에 같이 쓰이는 2단 구조였음.
-
-다만 실제 요구사항을 확인하니 자체 발급 가능한 수준이 아니었음: F2는
-backend/frontend/infra-security/migration/privacy 5개 도메인 개별 리뷰 + GAME_WRITE 플래그
-우회 후보 전건에 대한 legacy-writer attestation을 요구하고, F3는 라이브 QA 실행에서 방금
-해시한 증거 아카이브 결속 + 9페르소나 여정 7개 판정을 요구함. 스크립트 자체 주석이 "잘못된
-영수증은 없는 것보다 나쁘다"며 셀프 승인을 명시적으로 경계하므로, 사용자에게 F2만/F2+F3
-전체/보류 중 선택을 요청 — "F2 + F3 전체 수행" 응답.
-
-착수 준비 단계(Task 1: 사전 상태 확인)에서 진행을 막는 진짜 선행 조건을 발견:
-
-- v1 스택(DB 5442/API 8121/Web 3013)은 이미 정상 기동 중, load 10.09/12코어로 여유 — 새로
-  띄울 필요 없었음.
-- 태스크127 렛저의 `planSHA`(`108a6cf1...`)가 `.omo/plans/teameet-team-tournament-operations-v1.md`의
-  **현재 실제 SHA-256(`2cce1970...`)과 불일치**. `.omo`는 이 저장소의 `.git/info/exclude`(로컬
-  전용, 커밋되지 않음)로 제외된 미버전관리 공유 파일이라 git log/blame으로 누가 언제 왜
-  바꿨는지 추적 불가 — 파일 메타데이터(생성 7/29 02:38, 최종수정 8/3 08:00)와 같은 날짜대의
-  `task-9-r7-*-20260803T*` evidence 존재로 미루어 다른 세션의 인접 작업(Task 9 R7) 중 갱신됐을
-  개연성만 있고 확정할 근거는 없음. 예전 내용(옛 해시에 대응하는 바이트)의 백업도 전무 —
-  되돌리기 자체가 불가능.
-- `run-v1-final-gate.mjs`의 `planShaOk` 체크(`ledger.planSHA === env.OMO_SELECTED_PLAN_SHA`)가
-  이 drift를 하드 차단하며, `OMO_SELECTED_PLAN_SHA`는 임의로 넣을 수 있는 값이 아니라 F1의
-  "V0-approval" 상위 프로토콜(RFC-8785 정규 JSON, `O_CREAT|O_EXCL` 불변 영수증, **독립 리뷰어
-  2인 정족수**, PDF/preview/design 해시 고정, 호스트 압력 게이트) 전체를 통과해야 발급됨 — F2/F3
-  선택 당시 상정했던 범위를 훨씬 넘어서는 새로운 사전 조건.
-
-사용자에게 (a) 여기서 종료 (b) drift 원인 조사 두 옵션을 제시 → "drift 원인부터 조사" 선택.
-`.omo`가 로컬 전용 미버전관리 디렉터리라 결정적 원인 규명이 불가능함을 확인 후, 다시 (a) 여기서
-종료 (b) planSHA 핀을 직접 우회 수정 두 옵션을 제시 → 사용자가 **"그냥 저 검증내용을 패스해
-앞으로필요없는거니까"**로 F1/F2/F3 게이트 실행 자체를 더 이상 필요 없는 것으로 확정, 전체 보류.
-
-**결론**: F1/F2/F3는 이 태스크 범위에서 더 이상 추진하지 않는다(사용자 확정). PR #249는 CI
-green(`df31f834`) / MERGEABLE / CLEAN 상태로 이 항목과 무관하게 완결. F4는 기존대로 dev 머지
-종속 사유만 기록된 상태 유지.
-
-## 15개 화면 진입 경로 전수 감사 → 10개 고아 라우트 발견·수정 (2026-08-05)
-
-사용자가 "일정 상세/일정 만들기가 왜 필요한지 모르겠다"고 지적한 것을 계기로 실제 진입
-버튼이 있는지 확인한 결과, `/teams/:teamId/schedules`(01) 자체가 앱 어디에도 링크되지 않은
-고아 라우트임을 발견. 이를 계기로 아티팩트 리포트의 15개 화면 전체를 동일한 방식(코드
-전수 grep + 라이브 캡처 교차검증)으로 감사 — **15개 중 10개가 고아 라우트**였다.
-
-**고아 확정(진입 버튼 0)**: 01 팀 일정 목록, 02/03(01 경유만 가능해 연쇄 고아), 07 스태프
-배정, 08 운영 보드, 09 경기 운영 콘솔(가장 치명적 — 실제 경기 커맨드/이벤트 입력 화면),
-12 대회 일정(공개), 13(12 경유만 가능해 연쇄 고아), 14 팀 전적(공개), 15 선수 활동
-기록(공개).
-
-**정상 확인(실제 버튼 체인 존재)**: 04 라인업 편성·05 경기 결과 입력·06 결과 승인 —
-매치탭→팀매치 목록→카드→상세→버튼. 10 결과 검토·11 결과 정정 — 관리자 콘솔→대회
-상세→버튼.
-
-**검증 방법**: 각 라우트를 템플릿 리터럴/정적 문자열/router.push 등 여러 grep 패턴으로
-전수 검색, 애매한 건 실제 화면(팀 상세, 마이팀 상세 운영메뉴 등) 캡처로 교차 확인.
-
-**수정(사용자 승인 후 즉시 전체 진행)**:
-- `components/teams/teams-page.tsx`: "이 팀의 열린 매치" 섹션 옆에 "팀 전적"(공개, 무조건
-  노출)과 "팀 일정"(`mode==='mine'`일 때만) 카드 추가. `ChevronRightIcon` import 추가.
-- `app/admin/tournaments/[id]/tournament-detail-client.tsx`: 탭 바 아래 "스태프 배정
-  콘솔"/"운영 보드" 바로가기 행 추가(기존 결과검토/정정 딥링크 옆).
-- `app/tournament-ops/tournaments/[id]/operations/operations-board-client.tsx`: 대진
-  행(데스크톱 표 + 모바일 카드 둘 다)에 "운영 콘솔" 버튼 추가. `Link` import 추가.
-- `app/tournaments/[id]/tournament-detail-client.tsx`: 대회 상태(모집중/진행중/종료)
-  무관하게 항상 보이는 "전체 경기 일정 보기" 링크를 상단 CTA 직후에 추가.
-- `components/users/public-profile-client.tsx`: "활동 요약" 카드 아래 "활동 기록 전체
-  보기" 링크 추가. `Link`, `ChevronRight` import 추가.
-
-**되돌린 편집(죽은 코드 발견)**: `/my/teams/:teamId`의 운영 메뉴(`my-api-clients.tsx`
-`actions` 배열)에도 "팀 일정" 항목을 먼저 추가했으나, `app/my/teams/[id]/page.tsx`가
-`redirect(/teams/${id})`로 **항상** 무조건 리다이렉트한다는 걸 뒤늦게 발견 — 즉
-`MyTeamDetailPageClient`/`MyTeamDetailPageView`는 어떤 라우트로도 렌더되지 않는 죽은
-코드였다. 실제로 렌더되는 페이지는 이미 고친 `/teams/:teamId`이므로 이 편집은 무의미해
-`my-page.tsx`(Calendar 아이콘 import 포함)·`my-api-clients.tsx` 둘 다 완전히 원상복구.
-
-**검증**: 신규 링크 6개 전부 Playwright로 실제 클릭·이동 확인(manager/admin 페르소나).
-`tsc --noEmit` 0 errors. 타깃 테스트 36개 파일/224개 전부 통과. 대표 화면(팀 상세) 3폭
-갤러리 PR #249에 게시.
-
-**교훈**: 리포트 문서에 "이 화면은 왜 필요한가"만 적혀 있고 "어디서 들어가는가"가
-비어 있던 게 우연이 아니었다 — 실제로 들어갈 방법이 없었다. UI 화면 목록을 만들 때는
-기능 설명뿐 아니라 실제 진입 경로(어느 버튼)까지 함께 검증해야 이런 고아 라우트를
-조기에 잡을 수 있다. 또한 `redirect()`로 무조건 우회되는 라우트가 있으면 그 라우트가
-가리키는 컴포넌트는 죽은 코드일 수 있다는 걸 놓치지 않아야 한다 — grep만으로는
-"컴포넌트가 import된다"는 사실과 "실제로 렌더된다"는 사실을 구분하지 못한다.
+**커밋 경로**: 로컬 워크트리 브랜치(`codex/teameet-task27-release-gates`)에
+일반 커밋(`9414cf10`, 이 브랜치의 그동안 누적된 미커밋 변경—용병모집 참석자
+로스터·라인업/일정폼 카드 병합·팀전적 재설계—을 함께 포함) 후, PR #249의
+실제 헤드인 `codex/teameet-task9-ci`(원격 tip `c83fac8d`) 위에 git plumbing으로
+정확히 이 두 파일(padding 수정 + globals.css)만 반영하는 커밋(`730759fb`)을
+별도로 만들어 직접 push. `gh pr view 249 --json headRefOid`로 PR 헤드가
+`730759fb`로 갱신됐음을 확인.

@@ -584,7 +584,7 @@ function PopupForm({
         </fieldset>
         <fieldset className="rounded-xl border border-gray-200 p-3">
           <legend className="px-1 text-sm font-semibold text-gray-700">정확한 화면 <span className="font-normal text-gray-400">(선택)</span></legend>
-          <p className="mb-3 text-xs leading-5 text-gray-500">설정하면 해당 경로에서 화면 그룹 팝업보다 먼저 노출돼요. 대회를 선택하면 상세 경로가 자동으로 입력됩니다.</p>
+          <p className="mb-3 text-xs leading-5 text-gray-500">설정하면 해당 경로에서 화면 그룹 팝업보다 먼저 노출돼요. 대회를 선택하면 상세 경로가 자동으로 입력돼요.</p>
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-semibold text-gray-700">특정 대회 상세</span>
             <select

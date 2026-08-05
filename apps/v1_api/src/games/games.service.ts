@@ -1107,6 +1107,7 @@ export class GamesService {
               position: participant.position,
               positionX: participant.positionX,
               positionY: participant.positionY,
+              started: participant.started,
             },
           });
         }

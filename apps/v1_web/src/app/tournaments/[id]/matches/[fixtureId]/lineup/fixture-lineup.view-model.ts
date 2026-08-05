@@ -52,11 +52,10 @@ export function hydrateFixtureLineupState(
       positionX: participant.positionX,
       positionY: participant.positionY,
     };
-    // started 여부는 저장 시점 DTO에만 있고 GET 응답 참여자 스냅샷(V1GameParticipant)에는
-    // 컬럼 자체가 없다 — 그래서 다시 불러오면 전원 선발로 취급한다(후보를 저장해도
-    // 새로고침하면 선발 목록에 합쳐진다). TODO: 후보를 살리려면 백엔드
-    // V1GameParticipant에 started 컬럼을 추가하고 listLineups 응답에 실어야 한다.
-    starters.push(entry);
+    // V1GameParticipant.started 컬럼(2026-08 추가)으로 선발/후보를 그대로 되살린다 —
+    // 예전엔 이 컬럼이 없어 새로고침하면 후보가 전원 선발로 합쳐졌다(실사용 QA 재현).
+    if (participant.started) starters.push(entry);
+    else bench.push(entry);
   }
   return {
     starters,

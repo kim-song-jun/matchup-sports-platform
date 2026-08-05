@@ -1655,3 +1655,15 @@ AppChrome, 전부 자체 헤더 또는 목록 최상위),
 내부)까지 확인한 뒤 수정해야 한다. 대량 기계적 변경은 정규식 자동화보다
 "안전 조건에 안 걸리면 수동 처리"가 낫다 — 자동화가 편집 범위를 오인식하면
 피해가 조용히 커밋될 수 있다.
+
+## Copilot 리뷰 요청 — 300파일 한도로 거부됨 (2026-08-05)
+
+이번 세션 마무리 시점에 관례대로 Copilot 리뷰를 요청했으나 "Copilot wasn't
+able to review this pull request because it exceeds the maximum number of
+files (300)"로 거부됐다. `git diff --stat origin/dev...origin/codex/teameet-task9-ci`
+확인 결과 **392개 파일**(96,833 insertions) — 갤러리 PNG는 이번 세션 내내
+매번 커밋 직후 `git rm`으로 정리했으니 원인이 아니다. 이 PR(#249)이 Task 9
+전체를 아우르는 장기 CI 브랜치라 누적 diff 자체가 300개 한도를 넘긴
+구조적 문제다. 300개 이하로 줄이려면 PR을 여러 개로 쪼개야 하는데, 이건
+이번 세션 지시 범위를 크게 벗어나는 구조적 결정이라 진행하지 않았다 —
+F2/F3와 마찬가지로 기술적으로 차단된 것으로 기록만 남긴다.

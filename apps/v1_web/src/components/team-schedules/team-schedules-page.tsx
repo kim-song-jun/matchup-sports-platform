@@ -218,7 +218,7 @@ function ScheduleCalendarGrid({ model }: { model: ScheduleListViewModel }) {
 export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewModel }) {
   if (model.error) {
     return (
-      <AppChrome title="일정 상세" activeTab="teams" bottomNav={false} backHref={model.backHref}>
+      <AppChrome title="일정 상세" activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
         <ErrorState message="일정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={model.onRetry} />
       </AppChrome>
     );
@@ -226,7 +226,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
 
   if (model.loading) {
     return (
-      <AppChrome title="일정 상세" activeTab="teams" bottomNav={false} backHref={model.backHref}>
+      <AppChrome title="일정 상세" activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -791,7 +791,11 @@ export function MySchedulePageView({ model }: { model: MyScheduleViewModel }) {
                 href={item.href}
                 title={item.title}
                 sub={`${item.teamName} · ${item.typeLabel} · ${item.dateTimeLabel}${item.myAttendanceLabel ? ` · ${item.myAttendanceLabel}` : ''}`}
-                trailing={item.stateLabel}
+                trailing={
+                  <span className={`tm-badge ${item.stateTone === 'default' ? 'tm-badge-blue' : 'tm-badge-grey'}`}>
+                    {item.stateLabel}
+                  </span>
+                }
                 chev
               />
             ))}

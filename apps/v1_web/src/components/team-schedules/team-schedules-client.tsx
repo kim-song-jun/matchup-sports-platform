@@ -50,6 +50,7 @@ import {
   scheduleRsvpDeadlineLabel,
   scheduleStateFilterOptions,
   scheduleStateLabel,
+  scheduleStateTone,
   scheduleTypeFilterOptions,
   scheduleTypeLabel,
   scheduleVisibilityLabel,
@@ -313,6 +314,20 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       error: attendanceError,
       onSetStatus,
     },
+    attendees: {
+      visible: Boolean(schedule?.attendees),
+      items: (schedule?.attendees ?? []).map((attendee) => ({
+        userId: attendee.userId,
+        nickname: attendee.nickname,
+        profileImageUrl: attendee.profileImageUrl,
+        status: attendee.status,
+      })),
+      counts: {
+        all: schedule?.attendees?.length ?? 0,
+        going: schedule?.attendees?.filter((attendee) => attendee.status === 'GOING').length ?? 0,
+        noResponse: schedule?.attendees?.filter((attendee) => attendee.status === 'NO_RESPONSE').length ?? 0,
+      },
+    },
     guestRecruitment: {
       visible: Boolean(recruitment),
       slots: recruitment?.slots ?? 0,
@@ -568,6 +583,7 @@ export function MySchedulePageClient() {
       title: item.title,
       typeLabel: scheduleTypeLabel(item.type),
       stateLabel: scheduleStateLabel(item.state),
+      stateTone: scheduleStateTone(item.state),
       dateTimeLabel: formatTournamentDateRangeWithTime(item.startAt, item.endAt) ?? '일정 미정',
       myAttendanceLabel: item.myAttendanceStatus ? attendanceStatusLabel(item.myAttendanceStatus) : null,
       href: `/teams/${item.teamId}/schedules/${item.id}`,

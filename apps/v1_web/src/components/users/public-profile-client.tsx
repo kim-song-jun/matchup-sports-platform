@@ -1,10 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1PublicProfile } from '@/hooks/use-v1-api';
 import { cssUrl } from '@/lib/assets';
-import { ShieldCheck, TrendingUp, Activity, Star, AlertCircle } from 'lucide-react';
+import { ShieldCheck, TrendingUp, Activity, Star, AlertCircle, ChevronRight } from 'lucide-react';
 import type { TrustState } from '@/types/api';
 
 function trustConfig(trustState: TrustState) {
@@ -183,6 +184,29 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
             </p>
           </Card>
         )}
+
+        <Link
+          href={`/users/${userId}/records`}
+          className="tm-pressable"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+            border: '1px solid var(--border)',
+            borderRadius: 14,
+            padding: '14px 16px',
+            background: 'var(--bg)',
+            textDecoration: 'none',
+            color: 'inherit',
+          }}
+        >
+          <div>
+            <div className="tm-text-label">활동 기록 전체 보기</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>참여한 경기와 결과 기록을 자세히 확인해요.</div>
+          </div>
+          <ChevronRight size={18} aria-hidden="true" />
+        </Link>
       </div>
     </AppChrome>
   );

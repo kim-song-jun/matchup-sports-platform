@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
-import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -371,6 +371,52 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
           </Card>
           <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+          <Link
+            className="tm-pressable"
+            href={`/teams/${team.id}/records`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              border: '1px solid var(--border)',
+              borderRadius: 14,
+              padding: '14px 16px',
+              background: 'var(--bg)',
+              textDecoration: 'none',
+              color: 'inherit',
+            }}
+          >
+            <div>
+              <div className="tm-text-label">팀 전적</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>승·무·패와 경기별 기록을 확인해요.</div>
+            </div>
+            <ChevronRightIcon size={18} aria-hidden="true" />
+          </Link>
+          {mode === 'mine' ? (
+            <Link
+              className="tm-pressable"
+              href={`/teams/${team.id}/schedules`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                padding: '14px 16px',
+                background: 'var(--bg)',
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
+            >
+              <div>
+                <div className="tm-text-label">팀 일정</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>훈련·경기·이벤트 일정을 보고 참석을 체크해요.</div>
+              </div>
+              <ChevronRightIcon size={18} aria-hidden="true" />
+            </Link>
+          ) : null}
           <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
           <Card pad={16}>
             <InfoRow label="팀명" value={team.name} />

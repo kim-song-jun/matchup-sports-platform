@@ -1042,6 +1042,27 @@ export function TournamentDetailView({
       {/* ── 상단 CTA: 히어로 직후 첫 번째로 보이는 진입점 (모바일) ── */}
       {topCTA}
 
+      {/* 전체 경기 일정: 상태(모집중/진행중/종료) 무관하게 항상 노출되는 유일한 진입점이라
+          어느 status 분기에도 속하지 않은 이 자리에 둔다. */}
+      <div style={{ padding: '0 20px 4px' }}>
+        <Link
+          href={`/tournaments/${tournament.id}/schedule`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 4px',
+            color: 'var(--blue500)',
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          전체 경기 일정 보기
+          <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+        </Link>
+      </div>
+
       <div className="tm-tournament-detail-grid">
         {/* Left column: header + metrics + prize + rules + standings + group fixtures */}
         <div className="tm-match-detail-body">

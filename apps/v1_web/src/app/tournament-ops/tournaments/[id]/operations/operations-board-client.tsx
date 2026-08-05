@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
@@ -296,6 +297,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                     <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
                       경고
                     </th>
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                      운영
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-white/5">
@@ -320,6 +324,14 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                             rowWarnings(item).map((code) => <WarningBadge key={code} code={code} />)
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <Link
+                          href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                          className="inline-flex items-center min-h-[36px] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                        >
+                          운영 콘솔
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -353,6 +365,12 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                     ))}
                   </div>
                 )}
+                <Link
+                  href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                  className="mt-2 inline-flex items-center min-h-[36px] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  운영 콘솔로 이동
+                </Link>
               </li>
             ))}
           </ul>

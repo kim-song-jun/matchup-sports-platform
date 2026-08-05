@@ -2705,3 +2705,44 @@ migration 해시(`20260729000100_v1_game_operations/migration.sql`)는
 `update-index`로 변경 대상 파일만 국소 교체했으므로, 다른 세션의
 미커밋 변경을 건드릴 위험이 없다(공유 트리 git 안전 규칙 준수 — 이
 worktree의 HEAD는 어느 시점에도 체크아웃 전환하지 않았다).
+
+## F2/F3 착수 시도 → F1 선행 조건 발견으로 사용자가 전체 보류 지시 (2026-08-05)
+
+사용자 지시로 F2("F2 + F3 전체 수행")를 실제로 착수. `scripts/qa/run-v1-final-gate.mjs`를
+끝까지 읽어 이전 세션의 "플래그 이름 불일치로 차단" 판단을 정정 —
+`--candidate-receipt`/`--candidate-receipt-sha`(바깥 wrapper
+`run-v1-task-verification.mjs` 인자)와 `--qa-review-receipt`/`--qa-review-receipt-sha`(그
+안쪽 `--` 뒤 payload 인자)는 상충이 아니라 한 커맨드라인 안에 같이 쓰이는 2단 구조였음.
+
+다만 실제 요구사항을 확인하니 자체 발급 가능한 수준이 아니었음: F2는
+backend/frontend/infra-security/migration/privacy 5개 도메인 개별 리뷰 + GAME_WRITE 플래그
+우회 후보 전건에 대한 legacy-writer attestation을 요구하고, F3는 라이브 QA 실행에서 방금
+해시한 증거 아카이브 결속 + 9페르소나 여정 7개 판정을 요구함. 스크립트 자체 주석이 "잘못된
+영수증은 없는 것보다 나쁘다"며 셀프 승인을 명시적으로 경계하므로, 사용자에게 F2만/F2+F3
+전체/보류 중 선택을 요청 — "F2 + F3 전체 수행" 응답.
+
+착수 준비 단계(Task 1: 사전 상태 확인)에서 진행을 막는 진짜 선행 조건을 발견:
+
+- v1 스택(DB 5442/API 8121/Web 3013)은 이미 정상 기동 중, load 10.09/12코어로 여유 — 새로
+  띄울 필요 없었음.
+- 태스크127 렛저의 `planSHA`(`108a6cf1...`)가 `.omo/plans/teameet-team-tournament-operations-v1.md`의
+  **현재 실제 SHA-256(`2cce1970...`)과 불일치**. `.omo`는 이 저장소의 `.git/info/exclude`(로컬
+  전용, 커밋되지 않음)로 제외된 미버전관리 공유 파일이라 git log/blame으로 누가 언제 왜
+  바꿨는지 추적 불가 — 파일 메타데이터(생성 7/29 02:38, 최종수정 8/3 08:00)와 같은 날짜대의
+  `task-9-r7-*-20260803T*` evidence 존재로 미루어 다른 세션의 인접 작업(Task 9 R7) 중 갱신됐을
+  개연성만 있고 확정할 근거는 없음. 예전 내용(옛 해시에 대응하는 바이트)의 백업도 전무 —
+  되돌리기 자체가 불가능.
+- `run-v1-final-gate.mjs`의 `planShaOk` 체크(`ledger.planSHA === env.OMO_SELECTED_PLAN_SHA`)가
+  이 drift를 하드 차단하며, `OMO_SELECTED_PLAN_SHA`는 임의로 넣을 수 있는 값이 아니라 F1의
+  "V0-approval" 상위 프로토콜(RFC-8785 정규 JSON, `O_CREAT|O_EXCL` 불변 영수증, **독립 리뷰어
+  2인 정족수**, PDF/preview/design 해시 고정, 호스트 압력 게이트) 전체를 통과해야 발급됨 — F2/F3
+  선택 당시 상정했던 범위를 훨씬 넘어서는 새로운 사전 조건.
+
+사용자에게 (a) 여기서 종료 (b) drift 원인 조사 두 옵션을 제시 → "drift 원인부터 조사" 선택.
+`.omo`가 로컬 전용 미버전관리 디렉터리라 결정적 원인 규명이 불가능함을 확인 후, 다시 (a) 여기서
+종료 (b) planSHA 핀을 직접 우회 수정 두 옵션을 제시 → 사용자가 **"그냥 저 검증내용을 패스해
+앞으로필요없는거니까"**로 F1/F2/F3 게이트 실행 자체를 더 이상 필요 없는 것으로 확정, 전체 보류.
+
+**결론**: F1/F2/F3는 이 태스크 범위에서 더 이상 추진하지 않는다(사용자 확정). PR #249는 CI
+green(`df31f834`) / MERGEABLE / CLEAN 상태로 이 항목과 무관하게 완결. F4는 기존대로 dev 머지
+종속 사유만 기록된 상태 유지.

@@ -1478,3 +1478,26 @@ DB(`teameet_v1_pg_flow`)에 실행되면서 그 시드 행이 실사용자 화�
 팀 2개·팀매치 2개·대회 1개가 이 sport row를 참조 중이라 삭제하면 FK가 깨진다 — DB
 조작 금지 원칙에 따라 데이터는 건드리지 않고 원인만 기록한다. 프로덕션/격리된
 seed에서는 재현되지 않는 dev-DB 오염이다.
+
+## `AppChrome desktopHead` 누락 패턴 — 3번째 재현 + 전역 스캔 (2026-08-05)
+
+owner-08을 고친 직후, 같은 저장소의 다른 F3 하네스(`run-v1-f3-manual-qa.mjs`)가 만든
+`public_records-*` 캡처(18건 목록 밖, 화면 단위 증거)도 겸사겸사 열어보다가 세 번째
+재현을 찾았다: **public_records-02(공개 대회 경기 상세)** — `flow-observations.json`
+bodyText가 mobile/tablet엔 "경기 기록" 타이틀을 포함하는데 desktop만 없었다. 라이브
+재현 후 `match-page-client.tsx`의 `AppChrome` 3개 분기 전부에 `desktopHead`가 빠진
+것을 확인, 추가·검증(`public-game-records.test.tsx` 23/23, tsc 0, 라이브 스크린샷)·
+커밋·머지·갤러리 게시까지 완료.
+
+같은 패턴이 3번(visitor-03, owner-08, public_records-02) 나온 시점에 전역 스캔을
+돌렸다: `<AppChrome` 호출 대비 `desktopHead` 개수가 다른 파일이 **37개** 더 있다
+(`grep -c` 파일 단위 비교, `.github/tasks` 아님 — 정확한 목록은 이 세션의 스캔
+로그 참고). 다만 이 37개를 전부 "동일 결함"으로 단정하지 않았다 — `home/loading.tsx`,
+`not-found.tsx`처럼 애초에 데스크톱 h1 타이틀이 필요 없는 페이지도 섞여 있고,
+어떤 페이지가 "공유 링크로 바로 들어왔을 때 대상 식별이 안 되는" 진짜 결함인지는
+페이지별 UX 판단이 필요하다. **이번 세션 범위(18건 재검수 + 사용자가 지목한 화면)를
+벗어나는 별도 스코프**로 판단해 지금 전부 고치지 않았다 — 전역 규칙 13(scope 자율
+확장 금지)에 따라 사용자 확인 후 진행할지 결정한다. 다음 세션/사용자 지시 시 참고할
+후보 파일 37개는 이 세션 로그에 grep 명령으로 재생성 가능:
+`grep -rln "<AppChrome" apps/v1_web/src --include="*.tsx" | grep -v "\.test\."` 후
+파일별 `<AppChrome` 개수와 `desktopHead` 개수를 비교.

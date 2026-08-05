@@ -224,6 +224,23 @@ export function removeEntry(state: LineupEditorState, slot: LineupSlot, key: str
   return { ...state, [field]: next, dirty: true };
 }
 
+/** removeEntry로 지운 엔트리를 원래 슬롯의 원래 인덱스에 되돌린다 — 실행취소(undo).
+ * 등번호·GK 지정·피치 좌표까지 포함한 엔트리 전체를 그대로 복원하므로 "제거" 버튼이
+ * 실제로는 완전 삭제(선발↔후보 이동인 moveEntry와 달리)라는 점을 되돌릴 수 있게 해준다.
+ * index가 현재 배열 길이를 넘으면(그 사이 다른 편집으로 배열이 짧아졌을 때) 맨 끝에 붙인다. */
+export function restoreEntry(
+  state: LineupEditorState,
+  slot: LineupSlot,
+  entry: LineupEntryDraft,
+  index: number,
+): LineupEditorState {
+  const field = slotKey(slot);
+  const list = state[field];
+  const clampedIndex = Math.max(0, Math.min(index, list.length));
+  const next = [...list.slice(0, clampedIndex), entry, ...list.slice(clampedIndex)];
+  return { ...state, [field]: next, dirty: true };
+}
+
 /** 선발 ↔ 후보 이동. 골키퍼 표시·피치 좌표는 후보로 내려가면 항상 해제한다(후보는
  * 골키퍼가 될 수 없다는 서버 규칙과 동일한 전제, 그리고 피치 위에 없으므로 좌표도 무의미). */
 export function moveEntry(state: LineupEditorState, from: LineupSlot, key: string, to: LineupSlot): LineupEditorState {

@@ -138,7 +138,13 @@ export function PitchFormationEditor({
         overflow: 'hidden',
         background: `${TURF_STRIPES}, #1f8a4c`,
         cursor: editable && selectedWaitingKey !== null ? 'crosshair' : 'default',
-        touchAction: 'none',
+        // 피치 전체를 'none'으로 막으면 모바일에서 세로 스와이프(페이지 스크롤)가
+        // 죽는다 — 드래그가 필요한 건 선수 토큰뿐이지 피치 빈 공간이 아니다.
+        // 'pan-y'로 세로 스와이프는 브라우저 기본 스크롤에 맡기고, 토큰 자체
+        // (PlayerToken 버튼)에만 별도로 touchAction: 'none'을 적용해 드래그를
+        // 보장한다. 탭 배치(handlePitchClick)는 클릭 이벤트라 이 설정과 무관하게
+        // 계속 동작한다.
+        touchAction: 'pan-y',
         flexShrink: 0,
         // 탭 배치 대기 상태(선수를 골라 다음 탭을 기다리는 중)를 테두리로도 드러낸다 —
         // 커서 모양(crosshair)만으로는 모바일 터치 환경에서 아무 신호도 안 보인다.
@@ -576,22 +582,29 @@ function PlayerToken({
         {entry.displayName}
       </span>
       {editable ? (
+        // 배치취소(×) 버튼 — 피치의 handlePitchClick(대기 선수 선택 상태에서 피치를
+        // 클릭하면 그 자리에 배치)으로 클릭이 버블링되면, 기존 토큰을 배치취소한
+        // 같은 탭이 방금 고른 대기 선수를 그 자리에 자동 배치해버려 사용자가 의도하지
+        // 않은 "교체"가 일어난다 — stopPropagation으로 차단한다.
+        // 시각 크기는 기존 18px을 유지하되, 실제 히트 영역은 36px(터치 타겟 최소 기준
+        // 안쪽)로 넓힌다 — 바깥쪽 버튼은 투명하고 안쪽 span만 보이는 원으로 그려,
+        // 인접한 등번호 원·GK 배지와 겹치지 않으면서도 누르기 쉬운 영역을 확보한다.
         <button
           type="button"
-          onClick={onUnplace}
+          onClick={(event) => {
+            event.stopPropagation();
+            onUnplace();
+          }}
           aria-label={`${entry.displayName} 배치 취소`}
           style={{
             position: 'absolute',
-            top: -6,
-            right: -6,
-            width: 18,
-            height: 18,
+            top: -15,
+            right: -15,
+            width: 36,
+            height: 36,
             borderRadius: '50%',
-            border: '1px solid var(--border)',
-            background: '#fff',
-            color: 'var(--text-strong)',
-            fontSize: 11,
-            lineHeight: 1,
+            border: 'none',
+            background: 'transparent',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -599,7 +612,24 @@ function PlayerToken({
             padding: 0,
           }}
         >
-          ×
+          <span
+            aria-hidden="true"
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              border: '1px solid var(--border)',
+              background: '#fff',
+              color: 'var(--text-strong)',
+              fontSize: 11,
+              lineHeight: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            ×
+          </span>
         </button>
       ) : null}
     </div>

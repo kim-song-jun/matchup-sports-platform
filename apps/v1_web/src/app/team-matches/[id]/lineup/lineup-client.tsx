@@ -19,7 +19,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { randomUuid } from '@/lib/uuid';
-import type { LineupEditorState, LineupSlot, RosterOption } from './lineup.view-model';
+import type { LineupEditorState, LineupEntryDraft, LineupSlot, RosterOption } from './lineup.view-model';
 import {
   addGuestToBench,
   addGuestToStarters,
@@ -39,6 +39,7 @@ import {
   moveEntry,
   removeEntry,
   resolveOwnTeamId,
+  restoreEntry,
   setGoalkeeper,
   setJerseyNumber,
   setPlayerPosition,
@@ -136,6 +137,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }, [editable]);
   const saveInFlightRef = useRef(false);
   const saveQueuedRef = useRef(false);
+  // 제출 버튼을 눌렀는데 아직 dirty(또는 저장이 진행 중)면, 자동저장 디바운스(900ms)를
+  // 수동으로 기다리게 하지 않고 곧바로 저장을 한 번 밀어넣은 뒤 그 ack로 받은 revision으로
+  // 이어서 제출한다("flush-then-submit" — insane review P0-1 완전판, 아래 handleSubmit 참고).
+  // ref는 비동기 콜백(onSuccess/onError) 안에서 재진입 여부를 동기적으로 판정하는 용도,
+  // submitFlowPending(state)은 버튼 disabled/라벨을 렌더링하는 용도 — 항상 같이 갱신한다.
+  const pendingSubmitRef = useRef(false);
+  const [submitFlowPending, setSubmitFlowPending] = useState(false);
 
   function runQueuedSave() {
     const current = latestStateRef.current;
@@ -151,6 +159,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       { idempotencyKey: randomUuid(), payload: buildSavePayload(current) },
       {
         onSuccess: (result) => {
+          // 이 저장이 서버로 나가 있는 동안 사용자가 더 편집했는지는 setState 콜백(비동기
+          // 스케줄링) 안이 아니라 latestStateRef로 지금 바로 동기적으로 판정한다 — ack가
+          // 온 시점엔 그 사이의 모든 렌더·effect가 이미 커밋된 뒤이므로 안전하다.
+          const editedDuringSave = latestStateRef.current !== current;
           setState((prev) => {
             if (!prev) return prev;
             const updated = applySaveResult(prev, result);
@@ -161,13 +173,31 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             return prev === current ? updated : { ...updated, dirty: true };
           });
           setSaveStatus('saved');
+          if (pendingSubmitRef.current) {
+            if (editedDuringSave) {
+              // 방금 저장에 실리지 못한 편집이 남아 있다 — 디바운스를 기다리지 않고
+              // onSettled가 곧장 한 번 더 저장을 밀어넣도록 예약한다(사용자는 지금
+              // 제출을 기다리고 있다).
+              saveQueuedRef.current = true;
+            } else {
+              pendingSubmitRef.current = false;
+              setSubmitFlowPending(false);
+              submitWithVersion(result.revision);
+            }
+          }
         },
         onError: (error) => {
           if (error instanceof V1ApiError && error.code === 'VERSION_CONFLICT') {
             setConflict(true);
           }
           setSaveStatus('error');
-          setSaveErrorMessage(extractErrorMessage(error, '변경사항을 저장하지 못했어요.'));
+          if (pendingSubmitRef.current) {
+            pendingSubmitRef.current = false;
+            setSubmitFlowPending(false);
+            setSaveErrorMessage('변경사항을 저장하지 못해 라인업을 제출할 수 없어요. 다시 시도해 주세요.');
+          } else {
+            setSaveErrorMessage(extractErrorMessage(error, '변경사항을 저장하지 못했어요.'));
+          }
         },
         onSettled: () => {
           saveInFlightRef.current = false;
@@ -175,6 +205,22 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             saveQueuedRef.current = false;
             runQueuedSave();
           }
+        },
+      },
+    );
+  }
+
+  /** 저장이 이미 최신 상태로 끝난 뒤에만 호출되는 실제 제출 실행부 — expectedVersion은
+   * 항상 방금 ack된(또는 애초에 dirty가 아니었던) baseRevision이다. */
+  function submitWithVersion(expectedVersion: number) {
+    submitMutation.mutate(
+      { idempotencyKey: randomUuid(), expectedVersion },
+      {
+        onError: (error) => {
+          if (error instanceof V1ApiError && error.code === 'VERSION_CONFLICT') {
+            setConflict(true);
+          }
+          setSaveErrorMessage(extractErrorMessage(error, '라인업을 제출하지 못했어요.'));
         },
       },
     );
@@ -204,6 +250,47 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const [changeRequestOpen, setChangeRequestOpen] = useState(false);
   const [changeRequestReason, setChangeRequestReason] = useState('');
   const [changeRequestError, setChangeRequestError] = useState<string | null>(null);
+
+  // insane review(P1-3, 2026-08 GPT Pro): "제외" 버튼은 실제로는 완전 삭제(moveEntry의
+  // 선발↔후보 이동과 다르다) — 등번호·GK 지정·피치 좌표가 전부 소실되고, 재수화된 뒤라면
+  // (userId가 없으므로) 다시 팀원 목록에서 찾지도 못해 처음부터 재입력해야 했다. 확인
+  // 모달 대신 5초 실행취소 토스트로 되돌릴 수 있게 한다 — pendingRemoval이 지운 엔트리
+  // 전체(등번호·GK·좌표 포함)와 원래 슬롯·인덱스를 들고 있다가, 실행취소 시 그 자리에
+  // 그대로 복원한다(restoreEntry).
+  const [pendingRemoval, setPendingRemoval] = useState<{ entry: LineupEntryDraft; slot: LineupSlot; index: number } | null>(
+    null,
+  );
+  const pendingRemovalTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (pendingRemovalTimerRef.current !== null) {
+        window.clearTimeout(pendingRemovalTimerRef.current);
+      }
+    };
+  }, []);
+
+  function handleRemoveEntry(slot: LineupSlot, entry: LineupEntryDraft, index: number) {
+    setState((prev) => (prev ? removeEntry(prev, slot, entry.key) : prev));
+    if (pendingRemovalTimerRef.current !== null) {
+      window.clearTimeout(pendingRemovalTimerRef.current);
+    }
+    setPendingRemoval({ entry, slot, index });
+    pendingRemovalTimerRef.current = window.setTimeout(() => {
+      setPendingRemoval(null);
+      pendingRemovalTimerRef.current = null;
+    }, 5000);
+  }
+
+  function handleUndoRemoval() {
+    if (!pendingRemoval) return;
+    const { entry, slot, index } = pendingRemoval;
+    setState((prev) => (prev ? restoreEntry(prev, slot, entry, index) : prev));
+    if (pendingRemovalTimerRef.current !== null) {
+      window.clearTimeout(pendingRemovalTimerRef.current);
+      pendingRemovalTimerRef.current = null;
+    }
+    setPendingRemoval(null);
+  }
 
   function submitChangeRequest() {
     const reason = changeRequestReason.trim();
@@ -281,19 +368,26 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const validationErrors = validateLineupForSubmit(state);
   const publicationLabel = describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
 
+  // insane review(P0-1, 2026-08 GPT Pro): 제출은 항상 서버에 마지막 저장된 revision만 실어
+  // 보내야 한다. 자동저장은 900ms 디바운스 뒤에야 실행되므로, 방금 입력을 마치자마자 제출을
+  // 누르면 그 입력이 저장되기 전에 구버전 초안이 제출·잠금될 수 있었다 — 그래서 버튼을
+  // dirty일 때 비활성화하는 것만으로는 부족하다("저장 진행 중 편집"까지는 못 막는다). 여기서는
+  // 직렬 상태 머신으로 만든다: dirty거나 저장이 진행 중이면 디바운스를 기다리지 않고 곧장
+  // 저장을 밀어넣고(runQueuedSave), 그 ack로 받은 새 revision으로만 제출한다. 저장이
+  // 실패하거나 버전 충돌이면 제출 자체를 하지 않고 이유를 보여준다(runQueuedSave의
+  // onError/pendingSubmitRef 분기).
   function handleSubmit() {
     if (!state) return;
-    submitMutation.mutate(
-      { idempotencyKey: randomUuid(), expectedVersion: state.baseRevision },
-      {
-        onError: (error) => {
-          if (error instanceof V1ApiError && error.code === 'VERSION_CONFLICT') {
-            setConflict(true);
-          }
-          setSaveErrorMessage(extractErrorMessage(error, '라인업을 제출하지 못했어요.'));
-        },
-      },
-    );
+    if (pendingSubmitRef.current) return; // 이미 flush 진행 중 — 중복 클릭 무시
+    if (state.dirty || saveInFlightRef.current) {
+      pendingSubmitRef.current = true;
+      setSubmitFlowPending(true);
+      if (!saveInFlightRef.current) {
+        runQueuedSave();
+      }
+      return;
+    }
+    submitWithVersion(state.baseRevision);
   }
 
   return (
@@ -316,6 +410,19 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               </p>
               <button type="button" className="tm-btn tm-btn-sm tm-btn-primary" onClick={handleConflictReload}>
                 새로고침
+              </button>
+            </Card>
+          </div>
+        ) : null}
+
+        {pendingRemoval ? (
+          <div style={{ marginBottom: 12 }}>
+            <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <p role="status" aria-live="polite" className="tm-text-caption" style={{ color: 'var(--text-muted)', flex: 1, margin: 0 }}>
+                {pendingRemoval.entry.displayName} 선수를 명단에서 제거했어요.
+              </p>
+              <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={handleUndoRemoval}>
+                실행 취소
               </button>
             </Card>
           </div>
@@ -406,13 +513,17 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               </p>
             ) : (
               <div style={{ marginTop: 8 }}>
+                {/* insane review(P1-2, 2026-08 GPT Pro): 명단 편집은 `editable`(phase.editable &&
+                    isOnline)로 잠기는데, 여기는 phase.editable만 봐서 오프라인 배너가 떠도
+                    피치에서는 선수 이동·배치취소·포메이션 변경이 계속 됐다 — 위에서 이미 정의한
+                    `editable` 상수를 그대로 재사용해 두 뷰가 같은 규칙을 따르게 한다. */}
                 <PitchFormationEditor
                   starters={state.starters}
                   formation={state.formation}
                   suggestedFormations={suggestedFormations(
                     state.starters.filter((entry) => !entry.goalkeeper).length,
                   )}
-                  editable={phase?.editable ?? false}
+                  editable={editable}
                   onSelectFormation={(formation) =>
                     setState((prev) => (prev ? applyFormation(prev, formation) : prev))
                   }
@@ -537,10 +648,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         <button
                           type="button"
                           className="tm-btn tm-btn-sm tm-btn-ghost"
-                          aria-label={`${entry.displayName} 선발에서 제외`}
-                          onClick={() => setState((prev) => (prev ? removeEntry(prev, 'starter', entry.key) : prev))}
+                          aria-label={`${entry.displayName} 선발 명단에서 제거`}
+                          onClick={() => handleRemoveEntry('starter', entry, index)}
                         >
-                          제외
+                          명단에서 제거
                         </button>
                       </>
                     ) : null}
@@ -618,10 +729,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         <button
                           type="button"
                           className="tm-btn tm-btn-sm tm-btn-ghost"
-                          aria-label={`${entry.displayName} 후보에서 제외`}
-                          onClick={() => setState((prev) => (prev ? removeEntry(prev, 'bench', entry.key) : prev))}
+                          aria-label={`${entry.displayName} 후보 명단에서 제거`}
+                          onClick={() => handleRemoveEntry('bench', entry, index)}
                         >
-                          제외
+                          명단에서 제거
                         </button>
                       </>
                     ) : null}
@@ -746,13 +857,28 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
       {editable ? (
         <div className="tm-fixed-cta">
+          {/* insane review(P0-1, 2026-08 GPT Pro): 편집 중(dirty)에는 버튼을 그냥 막지 않는다
+              — 자동저장이 900ms 뒤에야 도는데 그동안 무작정 비활성화만 하면 사용자는 자기가
+              막 끝낸 편집이 저장될 때까지 그냥 기다렸다가 다시 눌러야 한다. 대신 클릭 자체를
+              "flush-then-submit" 트리거로 쓴다: handleSubmit이 dirty를 보면 디바운스를
+              기다리지 않고 즉시 저장을 밀어넣고, 그 ack로 받은 새 revision으로 이어서
+              제출한다(submitFlowPending이 true인 동안). 버튼은 그 진행 중에만, 그리고 실제
+              제출 mutation이 나가 있는 동안만 비활성화한다 — validationErrors/일반 dirty와는
+              분리된 상태라서 "편집 후 방금 클릭"과 "지금 flush 진행 중이라 중복 클릭 막아야
+              함"을 구분할 수 있다. 저장이 실패·충돌하면 submitFlowPending이 즉시 풀리고
+              제출은 나가지 않는다(runQueuedSave의 onError 참고) — saveErrorMessage로 이유를
+              보여준다. */}
           <button
             type="button"
             className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
-            disabled={validationErrors.length > 0 || submitMutation.isPending}
+            disabled={validationErrors.length > 0 || submitMutation.isPending || submitFlowPending}
             onClick={handleSubmit}
           >
-            {submitMutation.isPending ? '제출 중…' : '라인업 제출하기'}
+            {submitMutation.isPending
+              ? '제출 중…'
+              : submitFlowPending
+                ? '변경사항 저장 중…'
+                : '라인업 제출하기'}
           </button>
         </div>
       ) : null}

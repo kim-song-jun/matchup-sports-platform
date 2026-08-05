@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, TextField } from '@/components/v1-ui/primitives';
@@ -22,12 +22,13 @@ import type {
   V1TeamMatch,
   V1TeamMatchApiStatus,
 } from '@/types/api';
-import { RESULT_REVISION_STATE_LABEL, hashResultPayload, toResultRosterRows } from './team-match-result.types';
-
-/** 득점 이벤트 한 건 — participantId가 null이면 "미지정"(누가 넣었는지 특정하지 않음). */
-type GoalDraft = { key: string; participantId: string | null };
-/** 카드 이벤트 한 건. */
-type CardDraft = { key: string; participantId: string; type: 'yellow' | 'red' };
+import {
+  RESULT_REVISION_STATE_LABEL,
+  hashResultPayload,
+  hydrateResultFormFromRevision,
+  toResultRosterRows,
+} from './team-match-result.types';
+import type { CardDraft, GoalDraft, ResultRosterRow } from './team-match-result.types';
 
 // team-matches-client.tsx의 getStatus()와 동일한 캐스팅 관례 — 백엔드 detail()은
 // 실제로 V1TeamMatchApiStatus 값을 내려주지만, 공용 V1Match.status는 개인 매치용
@@ -166,6 +167,146 @@ function retryAll(...queries: Array<{ refetch: () => unknown }>) {
   queries.forEach((query) => query.refetch());
 }
 
+/**
+ * P0-4: 상대팀 승인 화면에서 득점자·카드·MVP를 보여준다.
+ *
+ * `resultParticipants`에는 이름이 없다(participantId만 있음, `V1GameResultParticipantRow`
+ * 참고) — 그리고 승인 화면은 애초에 이름을 가져올 방법이 없다. `TeamMatchLineupService.getLineup`도
+ * `GamesService.listLineups`도 참가팀 액터에게는 항상 자기 팀(ownSideId) 라인업만 돌려주고,
+ * 상대팀(호스트) 라인업을 조회하는 엔드포인트는 존재하지 않는다(공정성 원칙 — 정정 요청은
+ * blind action). 그래서 이름 대신 participantId 앞 8자를 노출한다 — "완전히 안 보이는 것"보다는
+ * 선수를 구분할 수 있는 만큼은 낫다.
+ */
+function ApprovalParticipantSummary({
+  resultParticipants,
+  mvpParticipantId,
+}: {
+  resultParticipants: V1GameResultRevision['resultParticipants'];
+  mvpParticipantId: string | null;
+}) {
+  const scorers = resultParticipants.filter((row) => row.goals > 0);
+  const carded = resultParticipants.filter((row) => row.cards.yellow > 0 || row.cards.red > 0);
+  if (scorers.length === 0 && carded.length === 0 && !mvpParticipantId) return null;
+
+  const label = (participantId: string) => `선수 #${participantId.slice(0, 8)}`;
+
+  return (
+    <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+      {scorers.length > 0 ? (
+        <div>
+          <div className="tm-text-label">득점자</div>
+          <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
+            {scorers.map((row) => (
+              <div key={row.id} className="tm-text-caption">{label(row.participantId)} · {row.goals}골</div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {carded.length > 0 ? (
+        <div>
+          <div className="tm-text-label">경고·퇴장</div>
+          <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
+            {carded.map((row) => (
+              <div key={row.id} className="tm-text-caption">
+                {label(row.participantId)}
+                {row.cards.yellow > 0 ? ` · 경고 ${row.cards.yellow}` : ''}
+                {row.cards.red > 0 ? ` · 퇴장 ${row.cards.red}` : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {mvpParticipantId ? (
+        <div>
+          <div className="tm-text-label">MVP</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>{label(mvpParticipantId)}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * 호스트의 "제출 전 검토" 단계에서 보여주는 요약 — 스코어 · 골별 득점자 · 경고/퇴장 ·
+ * MVP · 메모를 한 화면에 모아서, 제출 직전에 되돌아가 고칠 수 있게 한다(P0-3).
+ *
+ * `roster`(호스트 자신의 라인업)로 participantId -> 이름을 그대로 매핑할 수 있다 —
+ * 상대팀 승인 화면과 달리 호스트는 자기 팀 라인업을 항상 조회할 수 있기 때문이다.
+ */
+function ResultDraftSummary({
+  roster,
+  homeGoals,
+  cardDrafts,
+  mvpParticipantId,
+  reason,
+  hostName,
+  awayGoals,
+  opponentName,
+}: {
+  roster: ResultRosterRow[];
+  homeGoals: GoalDraft[];
+  cardDrafts: CardDraft[];
+  mvpParticipantId: string;
+  reason: string;
+  hostName: string;
+  awayGoals: number;
+  opponentName: string;
+}) {
+  function nameFor(participantId: string | null): string {
+    if (!participantId) return '미지정';
+    const row = roster.find((r) => r.participantId === participantId);
+    if (!row) return participantId;
+    return `${row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}${row.displayName}`;
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 14, marginTop: 12 }}>
+      <div>
+        <div className="tm-text-label">스코어</div>
+        <div className="tm-text-subhead" style={{ marginTop: 4, fontWeight: 700 }}>
+          {hostName} {homeGoals.length} : {Math.max(0, awayGoals)} {opponentName}
+        </div>
+      </div>
+      {homeGoals.length > 0 ? (
+        <div>
+          <div className="tm-text-label">득점자</div>
+          <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
+            {homeGoals.map((goal, index) => (
+              <div key={goal.key} className="tm-text-caption">
+                {index + 1}번 골 · {nameFor(goal.participantId)}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {cardDrafts.length > 0 ? (
+        <div>
+          <div className="tm-text-label">경고·퇴장</div>
+          <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
+            {cardDrafts.map((card) => (
+              <div key={card.key} className="tm-text-caption">
+                {nameFor(card.participantId)} · {card.type === 'yellow' ? '경고' : '퇴장'}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <div>
+        <div className="tm-text-label">MVP</div>
+        <div className="tm-text-caption" style={{ marginTop: 6 }}>
+          {mvpParticipantId ? nameFor(mvpParticipantId) : '선택 안 함'}
+        </div>
+      </div>
+      {reason.trim() ? (
+        <div>
+          <div className="tm-text-label">메모</div>
+          <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{reason.trim()}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Host: entry + draft + submit
 // ─────────────────────────────────────────────────────────────────────────────
@@ -188,27 +329,102 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const [mvpParticipantId, setMvpParticipantId] = useState('');
   const [reason, setReason] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  // P0-3: "결과 작성 완료"는 더 이상 그 자리에서 서버에 DRAFT를 만들지 않는다 — 로컬
+  // 단계만 'reviewing'으로 넘어가고, 실제 제출(createRevision -> submitRevision 순차 호출)은
+  // 검토 화면의 "제출하기"를 눌러야 일어난다. 그래야 득점자를 잘못 골랐을 때 "수정하기"로
+  // 언제든 되돌아갈 수 있다(예전에는 서버에 DRAFT가 생기는 순간 입력 폼이 통째로 사라졌다).
+  const [stage, setStage] = useState<'editing' | 'reviewing'>('editing');
+  // P0-2: 스코어 입력창은 이제 실제 득점자 배열(homeGoals)과 분리된 로컬 문자열 버퍼를 가진다.
+  // 그래야 입력 도중(백스페이스로 잠깐 ''가 되는 순간 등) 배열이 즉시 잘려나가지 않는다.
+  const [homeGoalsInput, setHomeGoalsInput] = useState('0');
+  const [awayGoalsInput, setAwayGoalsInput] = useState('0');
+  // 골 수를 줄였다가 다시 늘리는 흔한 케이스(오타 정정 등)에서 방금 지운 득점자 선택이
+  // 그대로 복원되도록 하는 버퍼. 완벽한 undo는 아니고, "줄였다 다시 늘리면 원래대로"만 보장한다.
+  const removedGoalsRef = useRef<GoalDraft[]>([]);
+  // 같은 CHANGE_REQUESTED revision을 두 번 재수화하지 않기 위한 가드 — 없으면 사용자가
+  // 폼을 고치는 중에도 매 렌더(revisions.data 참조가 바뀔 때마다)마다 서버 값으로 덮어써버린다.
+  const hydratedRevisionIdRef = useRef<string | null>(null);
 
-  function setHomeGoalCount(count: number) {
+  // 상대팀이 정정을 요청하면(state가 CHANGE_REQUESTED로 바뀌면) 이전 세션에서 검토 단계에
+  // 머물러 있던 상태가 그대로 남아있으면 안 되므로 입력 단계로 되돌린다. 같은 세션에서 방금
+  // "결과 작성 완료"를 누른 경우라면 로컬 state가 이미 값을 갖고 있으니 재수화가 필요 없지만,
+  // 새로고침 후 재진입한 경우(로컬 state는 비어있고 서버에만 정정요청 revision이 있는 경우)엔
+  // hydrateResultFormFromRevision으로 이전에 작성했던 득점자·카드·MVP·메모를 복원한다.
+  useEffect(() => {
+    const rev = revisions.data?.[0];
+    if (!rev || rev.state !== 'CHANGE_REQUESTED') return;
+    setStage('editing');
+    if (hydratedRevisionIdRef.current === rev.id) return;
+    hydratedRevisionIdRef.current = rev.id;
+    const hydrated = hydrateResultFormFromRevision(rev);
+    setHomeGoals(hydrated.homeGoals);
+    setHomeGoalsInput(String(hydrated.homeGoals.length));
+    setAwayGoals(hydrated.awayGoals);
+    setAwayGoalsInput(String(hydrated.awayGoals));
+    setCardDrafts(hydrated.cardDrafts);
+    setMvpParticipantId(hydrated.mvpParticipantId);
+    setReason(hydrated.reason);
+    removedGoalsRef.current = [];
+  }, [revisions.data]);
+
+  function commitHomeGoalCount(count: number) {
     const clamped = Math.max(0, Math.min(99, count));
-    setHomeGoals((prev) => {
-      if (clamped === prev.length) return prev;
-      if (clamped > prev.length) {
-        return [
-          ...prev,
-          ...Array.from({ length: clamped - prev.length }, () => ({ key: randomUuid(), participantId: null })),
-        ];
+    if (clamped > homeGoals.length) {
+      const need = clamped - homeGoals.length;
+      const restored: GoalDraft[] = [];
+      for (let i = 0; i < need; i += 1) {
+        const fromBuffer = removedGoalsRef.current.shift();
+        restored.push(fromBuffer ?? { key: randomUuid(), participantId: null });
       }
-      return prev.slice(0, clamped);
-    });
+      setHomeGoals([...homeGoals, ...restored]);
+    } else if (clamped < homeGoals.length) {
+      const removed = homeGoals.slice(clamped);
+      removedGoalsRef.current = [...removedGoalsRef.current, ...removed];
+      setHomeGoals(homeGoals.slice(0, clamped));
+    }
+    setHomeGoalsInput(String(clamped));
+  }
+
+  function handleHomeGoalsInputChange(value: string) {
+    setHomeGoalsInput(value);
+    // 빈 문자열(백스페이스로 지우는 중)이나 아직 완결되지 않은 입력은 커밋하지 않는다 —
+    // 여기서 즉시 0으로 확정해버리면 지정해둔 득점자가 전부 사라진다(P0-2 재현 조건).
+    if (value.trim() === '') return;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    commitHomeGoalCount(parsed);
+  }
+
+  function handleHomeGoalsBlur() {
+    const parsed = Number(homeGoalsInput);
+    commitHomeGoalCount(Number.isFinite(parsed) ? parsed : 0);
+  }
+
+  function handleAwayGoalsInputChange(value: string) {
+    setAwayGoalsInput(value);
+    if (value.trim() === '') return;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    setAwayGoals(Math.max(0, parsed));
+  }
+
+  function handleAwayGoalsBlur() {
+    const parsed = Number(awayGoalsInput);
+    const safe = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    setAwayGoals(safe);
+    setAwayGoalsInput(String(safe));
   }
 
   function setGoalScorer(key: string, participantId: string | null) {
     setHomeGoals((prev) => prev.map((goal) => (goal.key === key ? { ...goal, participantId } : goal)));
   }
 
-  function addCard(firstParticipantId: string) {
-    setCardDrafts((prev) => [...prev, { key: randomUuid(), participantId: firstParticipantId, type: 'yellow' }]);
+  // P1: 카드는 "누구 카드인지" 실수로 잘못 고르는 게 득점자 미지정보다 더 위험하다(경고 누적
+  // 퇴장·다음 경기 출전정지 같은 실제 페널티로 이어짐) — 그래서 첫 번째 선수를 자동 선택하지
+  // 않고 미지정(participantId: '') placeholder로 추가한다. 제출 시점에 이 상태가 남아있으면
+  // handleReviewClick에서 막는다.
+  function addCard() {
+    setCardDrafts((prev) => [...prev, { key: randomUuid(), participantId: '', type: 'yellow' }]);
   }
 
   function updateCard(key: string, patch: Partial<Pick<CardDraft, 'participantId' | 'type'>>) {
@@ -266,7 +482,10 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const canDraft = latest === null || latest.state === 'CHANGE_REQUESTED';
   const canSubmit = latest?.state === 'DRAFT';
 
-  async function handleCreateDraft() {
+  // P0-3: 검토 화면의 "제출하기"에서만 호출된다 — createRevision과 submitRevision을
+  // 순차로 호출해, 사용자 입장에서는 "제출"이라는 단일 액션으로 끝난다. 그 전까지는
+  // 서버에 아무것도 만들어지지 않으므로 "수정하기"로 몇 번이든 되돌아갈 수 있다.
+  async function handleConfirmSubmit() {
     if (!homeSide || !awaySide || !game.data) return;
     setFormError(null);
     try {
@@ -291,7 +510,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         cards: cardsByParticipant.get(row.participantId) ?? { yellow: 0, red: 0 },
         goalkeeper: row.goalkeeper,
       }));
-      await createRevision.mutateAsync({
+      const created = await createRevision.mutateAsync({
         expectedVersion: game.data.version,
         score,
         actualParticipants,
@@ -299,11 +518,15 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         ...(mvpParticipantId ? { mvpParticipantId } : {}),
         ...(reason.trim() ? { reason: reason.trim() } : {}),
       });
+      await submitRevision.mutateAsync({ revisionId: created.revisionId, expectedVersion: created.version });
     } catch (err) {
       setFormError(resultErrorMessage(err));
     }
   }
 
+  // 드물게(제출 순차 호출 중 두 번째 단계인 submit만 실패하는 등) 서버에 DRAFT가 이미
+  // 만들어진 채로 화면을 다시 열게 되는 경우에 대비한 재제출 경로 — 새로 만들지 않고
+  // 이미 있는 DRAFT를 그대로 제출한다.
   async function handleSubmit() {
     if (!latest || !game.data) return;
     setFormError(null);
@@ -377,6 +600,41 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
           <Card pad={16}>
             <div className="tm-text-body-lg">작성한 결과를 확인해 주세요</div>
             <div className="tm-text-label" style={{ marginTop: 10 }}>스코어 {scoreLabel(latest)}</div>
+            {latest.resultParticipants.length > 0 ? (
+              <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+                {latest.resultParticipants.some((row) => row.goals > 0) ? (
+                  <div>
+                    <div className="tm-text-label">득점자</div>
+                    <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
+                      {latest.resultParticipants
+                        .filter((row) => row.goals > 0)
+                        .map((row) => {
+                          const rosterRow = roster.find((r) => r.participantId === row.participantId);
+                          const name = rosterRow
+                            ? `${rosterRow.jerseyNumber ? `#${rosterRow.jerseyNumber} ` : ''}${rosterRow.displayName}`
+                            : row.participantId;
+                          return (
+                            <div key={row.id} className="tm-text-caption">{name} · {row.goals}골</div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ) : null}
+                {latest.mvpParticipantId ? (
+                  <div>
+                    <div className="tm-text-label">MVP</div>
+                    <div className="tm-text-caption" style={{ marginTop: 4 }}>
+                      {(() => {
+                        const rosterRow = roster.find((r) => r.participantId === latest.mvpParticipantId);
+                        return rosterRow
+                          ? `${rosterRow.jerseyNumber ? `#${rosterRow.jerseyNumber} ` : ''}${rosterRow.displayName}`
+                          : latest.mvpParticipantId;
+                      })()}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {latest.reason ? (
               <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{latest.reason}</div>
             ) : null}
@@ -396,7 +654,48 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
           </Card>
         ) : null}
 
-        {canDraft ? (
+        {canDraft && stage === 'reviewing' ? (
+          <Card pad={16}>
+            <div className="tm-text-body-lg">작성한 결과를 확인해 주세요</div>
+            <ResultDraftSummary
+              roster={roster}
+              homeGoals={homeGoals}
+              cardDrafts={cardDrafts}
+              mvpParticipantId={mvpParticipantId}
+              reason={reason}
+              hostName={hostName}
+              awayGoals={awayGoals}
+              opponentName={opponentName}
+            />
+            <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-caption)' }}>
+              제출하면 되돌릴 수 없어요. {opponentName}이(가) 확인 후 승인하거나 정정을 요청할 수 있어요.
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={createRevision.isPending || submitRevision.isPending}
+                onClick={() => {
+                  setFormError(null);
+                  setStage('editing');
+                }}
+              >
+                수정하기
+              </Button>
+              <Button
+                variant="primary"
+                size="lg"
+                style={{ flex: 1 }}
+                loading={createRevision.isPending || submitRevision.isPending}
+                onClick={handleConfirmSubmit}
+              >
+                제출하기
+              </Button>
+            </div>
+          </Card>
+        ) : null}
+
+        {canDraft && stage === 'editing' ? (
           <Card pad={16}>
             {latest?.state === 'CHANGE_REQUESTED' && latest.reason ? (
               <AlertBanner tone="warning" message={`상대팀 정정 요청: ${latest.reason}`} />
@@ -410,8 +709,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 type="number"
                 min={0}
                 inputMode="numeric"
-                value={String(homeGoals.length)}
-                onChange={(event) => setHomeGoalCount(Number(event.target.value) || 0)}
+                value={homeGoalsInput}
+                onChange={(event) => handleHomeGoalsInputChange(event.target.value)}
+                onBlur={handleHomeGoalsBlur}
                 fieldId="result-home-score"
               />
               <TextField
@@ -419,8 +719,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 type="number"
                 min={0}
                 inputMode="numeric"
-                value={String(awayGoals)}
-                onChange={(event) => setAwayGoals(Math.max(0, Number(event.target.value) || 0))}
+                value={awayGoalsInput}
+                onChange={(event) => handleAwayGoalsInputChange(event.target.value)}
+                onBlur={handleAwayGoalsBlur}
                 fieldId="result-away-score"
               />
             </div>
@@ -483,6 +784,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                         value={card.participantId}
                         onChange={(event) => updateCard(card.key, { participantId: event.target.value })}
                       >
+                        <option value="">선수를 선택해 주세요</option>
                         {roster.map((row) => (
                           <option key={row.participantId} value={row.participantId}>
                             {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}
@@ -517,7 +819,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                     type="button"
                     className="tm-btn tm-btn-sm tm-btn-outline"
                     style={{ justifySelf: 'start' }}
-                    onClick={() => addCard(roster[0].participantId)}
+                    onClick={() => addCard()}
                   >
                     + 카드 추가
                   </button>
@@ -561,8 +863,14 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               size="lg"
               block
               style={{ marginTop: 16 }}
-              loading={createRevision.isPending}
-              onClick={handleCreateDraft}
+              onClick={() => {
+                if (cardDrafts.some((card) => card.participantId === '')) {
+                  setFormError('카드 기록에 아직 선수를 선택하지 않은 항목이 있어요.');
+                  return;
+                }
+                setFormError(null);
+                setStage('reviewing');
+              }}
             >
               결과 작성 완료
             </Button>
@@ -586,6 +894,10 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   const decideRevision = useV1DecideGameResultRevision(gameId ?? '', teamMatchId);
   const [changeReason, setChangeReason] = useState('');
   const [showChangeForm, setShowChangeForm] = useState(false);
+  // P0-4: 승인은 원클릭이 아니라 확인 단계를 한 번 거친다 — 이 화면은 상대팀 라인업을
+  // 조회할 방법이 없어(TeamMatchLineupService.getLineup은 항상 ownSideId만 조회) 선수 이름을
+  // 보여줄 수 없다. participantId라도 노출해 "스코어만 보고 원클릭 승인"을 막는다.
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const isOpponent = teamMatch.data?.viewer?.state === 'approved';
@@ -667,22 +979,14 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
             <div className="tm-text-body-lg">제출된 결과예요. 확인 후 승인해 주세요</div>
             <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+            <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} />
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 일부 득점은 선수 지정 없이 기록됐어요.
               </div>
             ) : null}
 
-            {!showChangeForm ? (
-              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                <Button variant="primary" size="lg" loading={decideRevision.isPending} onClick={handleApprove}>
-                  승인하기
-                </Button>
-                <Button variant="outline" size="lg" onClick={() => setShowChangeForm(true)} disabled={decideRevision.isPending}>
-                  정정 요청
-                </Button>
-              </div>
-            ) : (
+            {showChangeForm ? (
               <div style={{ marginTop: 16 }}>
                 <TextField
                   label="정정 요청 사유"
@@ -706,6 +1010,35 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
                     취소
                   </Button>
                 </div>
+              </div>
+            ) : showApproveConfirm ? (
+              <div style={{ marginTop: 16 }}>
+                <AlertBanner
+                  tone="warning"
+                  message={`${scoreLabel(latest)} 결과와 선수 기록을 공식 기록으로 승인할까요? 승인 후에는 직접 수정할 수 없어요.`}
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <Button variant="primary" size="lg" loading={decideRevision.isPending} onClick={handleApprove}>
+                    승인 확정
+                  </Button>
+                  <Button
+                    variant="neutral"
+                    size="lg"
+                    onClick={() => setShowApproveConfirm(false)}
+                    disabled={decideRevision.isPending}
+                  >
+                    취소
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <Button variant="primary" size="lg" onClick={() => setShowApproveConfirm(true)}>
+                  승인하기
+                </Button>
+                <Button variant="outline" size="lg" onClick={() => setShowChangeForm(true)}>
+                  정정 요청
+                </Button>
               </div>
             )}
           </Card>

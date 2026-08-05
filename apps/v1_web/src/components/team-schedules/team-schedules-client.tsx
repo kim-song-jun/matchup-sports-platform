@@ -446,7 +446,10 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
       endAt: toDatetimeLocalValue(detail.data.endAt),
       capacity: detail.data.capacity != null ? String(detail.data.capacity) : '',
       rsvpDeadlineAt: toDatetimeLocalValue(detail.data.rsvpDeadlineAt),
-      visibility: detail.data.visibility,
+      // MEMBERS는 폼 선택지에서 뺐다(TEAM과 백엔드 동작이 동일 — scheduleVisibilityOptions()
+      // 주석 참고). 레거시로 MEMBERS가 저장된 일정을 열면 TEAM으로 정규화해 토글에 항상
+      // 선택된 버튼이 보이게 한다. 실제 접근 범위는 바뀌지 않는다.
+      visibility: detail.data.visibility === 'MEMBERS' ? 'TEAM' : detail.data.visibility,
     });
     setHydrated(true);
   }, [mode, detail.data, hydrated]);

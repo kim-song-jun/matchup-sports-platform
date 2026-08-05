@@ -264,10 +264,17 @@ export function scheduleCreatableTypeOptions(): Array<{ value: V1ScheduleType; l
   ];
 }
 
+/**
+ * "팀 전용"/"멤버 전용" 2개를 노출했었으나, 백엔드가 둘 다 "활성 멤버십 필요"로
+ * 동일하게 처리한다(team-schedules.service.ts의 assertManageableTeam 부근 주석 —
+ * "향후 세분화를 위해 2단계 enum을 스키마에 남겨둠"). 사용자에게는 구분되지 않는
+ * 가짜 선택지였다(2026-08-05 지적) — 실제로 구분이 필요해지기 전까지 하나로
+ * 합친다. `MEMBERS` 값 자체는 스키마/DTO에서 지우지 않았다(기존에 MEMBERS로
+ * 저장된 일정이 있으면 여전히 유효해야 함) — UI 선택지에서만 뺐다.
+ */
 export function scheduleVisibilityOptions(): Array<{ value: 'TEAM' | 'MEMBERS' | 'PUBLIC'; label: string }> {
   return [
     { value: 'TEAM', label: '팀 전용' },
-    { value: 'MEMBERS', label: '멤버 전용' },
     { value: 'PUBLIC', label: '전체 공개' },
   ];
 }

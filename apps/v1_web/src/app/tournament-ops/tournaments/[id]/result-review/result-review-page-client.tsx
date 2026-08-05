@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { ErrorState } from '@/components/v1-ui/primitives';
+import { useV1Tournament } from '@/hooks/use-v1-api';
 import { useTournamentEndedFixtures, type TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
 import { FixturePickerList } from '@/components/tournament-result-review/fixture-picker-list';
 import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
@@ -21,6 +22,7 @@ import { ResultReviewGridStyles } from '@/components/tournament-result-review/re
  * implies once Task 19 ships.
  */
 export function ResultReviewPageClient({ tournamentId }: { tournamentId: string }) {
+  const tournament = useV1Tournament(tournamentId);
   const boardQuery = useTournamentEndedFixtures(tournamentId);
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null);
   const panelHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -43,6 +45,11 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
         <AppBackLink className="tm-text-label" fallbackHref={`/tournaments/${encodeURIComponent(tournamentId)}`}>
           ← 대회로
         </AppBackLink>
+        {/* 소비자용 대회 화면(대회 상세·순위/브래킷)과 이질감이 있다는 지적(2026-08-05)을
+            반영해, 그 화면들이 이미 쓰는 eyebrow(파란 대회명)+제목 톤을 맞췄다. */}
+        <p className="text-[11px] md:text-[12px] font-semibold text-blue-500 tracking-normal">
+          {tournament.data?.title ?? '대회 운영'}
+        </p>
         <h1 className="tm-text-heading">결과 검토</h1>
 
         {boardQuery.isPending ? <p className="tm-text-label">불러오는 중…</p> : null}

@@ -2661,3 +2661,47 @@ files (300)"로 거부됐다. `git diff --stat origin/dev...origin/codex/teameet
 구조적 문제다. 300개 이하로 줄이려면 PR을 여러 개로 쪼개야 하는데, 이건
 이번 세션 지시 범위를 크게 벗어나는 구조적 결정이라 진행하지 않았다 —
 F2/F3와 마찬가지로 기술적으로 차단된 것으로 기록만 남긴다.
+
+## dev와의 병합 충돌 + game-schema drift 수정 (2026-08-05)
+
+CI 완료 확인 대기 중 `gh pr view 249`가 `mergeStateStatus: DIRTY` /
+`mergeable: CONFLICTING`로 전환된 것을 발견 — dev가 이 브랜치의
+merge-base 이후 PR #266(`audit/v1-match-create-edit-contracts`)로
+진전해 있었다.
+
+**충돌 1건**: `docs/api/v1/domains/admin-audit.md`. 이 브랜치에서는 해당
+문서를 이미 "Superseded" 스텁으로 바꾸고 정본 계약을
+`docs/api/domains/tournament-operations-auth.md`의 "Migrated general
+admin and audit surface" 섹션으로 이관해 둔 상태였는데, dev의 PR #266은
+이관 전 구버전 문서에 신규 계약 2건(관리자 전용 연락처/프로필 필드
+`phone`/인증 타임스탬프/`birthDate`/`displayRegion`/`bio`, `GET
+/admin/teams/:teamId`의 `members[]` 필드)을 추가했다. `git merge-tree
+--write-tree`로 충돌만 국소 확인 후, 스텁은 유지하고 두 신규 계약을
+정본 이관 문서 쪽에 병합해 정보 손실 없이 해결 — `git read-tree` +
+`update-index --cacheinfo` + `write-tree` + `commit-tree`(두 부모)
+플럼빙으로 워킹트리 체크아웃 없이 병합 커밋(`d5e9d5f9`)을 만들어 push.
+
+**CI 실패 1건 (진짜 회귀, 우회 없이 근본 수정)**: 병합 직후 CI에서 API
+job의 "V1 migration replay + drift gate" 스텝이
+`test/games/game-schema.integration-spec.ts`의 "refuses source snapshot
+mutation before migration verification" 테스트에서
+`SOURCE_SNAPSHOT_DRIFT: schema bytes differ from bound source snapshot`로
+실패. 원인 추적: `apps/v1_api/prisma/schema.prisma`의 SHA-256을
+`test/fixtures/game-schema.fixture.ts`의 `gameSchemaSourceManifest.schema`에
+고정해 게임 운영 스키마 표면의 무단 drift를 막는 감사 게이트인데,
+병합으로 dev의 `V1Popup.targetPaths` 필드 + GIN 인덱스(migration
+`20260804140000_v1_popup_exact_target_paths`)가 스키마 파일에 섞여
+들어오며 바이트가 바뀐 것. 직접 바이트 비교로 검증: (a) 병합 전
+`ddae9ee4`의 schema.prisma 해시는 핀과 정확히 일치, (b) 병합 후 diff는
+정확히 그 2줄(필드 선언 + 인덱스)뿐, (c) 게임 운영 스키마에 바인딩된
+migration 해시(`20260729000100_v1_game_operations/migration.sql`)는
+병합 전후 완전히 동일 — Task 6 게임 운영 스키마 자체는 건드리지 않았음을
+증명. 이 정보로 `gameSchemaSourceManifest.schema`를 새 해시로 재고정하고
+주석을 실제 변경 내용으로 갱신 — 테스트를 삭제·완화하거나 우회하지 않고
+근본 원인(정당한 드리프트)을 확인한 뒤 정식으로 재핀. 동일 플럼빙 방식으로
+커밋(`b4f3098f`) 생성 후 push.
+
+두 커밋 모두 pathspec 없이 전체 트리를 다루는 대신 `git read-tree` +
+`update-index`로 변경 대상 파일만 국소 교체했으므로, 다른 세션의
+미커밋 변경을 건드릴 위험이 없다(공유 트리 git 안전 규칙 준수 — 이
+worktree의 HEAD는 어느 시점에도 체크아웃 전환하지 않았다).

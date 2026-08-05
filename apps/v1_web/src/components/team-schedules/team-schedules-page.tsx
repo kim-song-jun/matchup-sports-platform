@@ -547,69 +547,86 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
 
   return (
     <AppChrome title={title} activeTab="teams" bottomNav={false} backHref={model.backHref} desktopHead>
-      <div className="tm-team-detail-section" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <TextField
-          label="제목"
-          value={draft.title}
-          onChange={(e) => model.onFieldChange('title', e.target.value)}
-          maxLength={120}
-        />
+      {/* 필드를 나열만 하던 화면에서 "기본 정보 / 일정 / 공개 설정" 세 카드로 묶었다.
+          한 화면 안에 성격이 다른 결정(뭘 하는지 · 언제인지 · 누구에게 보이는지)이
+          섞여 있어서 구분 없이 늘어놓으면 화면이 팀·대회 톤과 무관하게 붕 떠 보였다. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Card>
+          <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>기본 정보</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <TextField
+              label="제목"
+              value={draft.title}
+              onChange={(e) => model.onFieldChange('title', e.target.value)}
+              maxLength={120}
+              placeholder="예: 주말 정기 훈련"
+            />
 
-        <div>
-          <div className="tm-text-label" style={{ marginBottom: 6 }}>종류</div>
-          {model.typeEditable ? (
-            <div style={{ display: 'flex', gap: 6 }}>
-              {model.typeOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-pressed={draft.type === option.value}
-                  className={`tm-badge ${draft.type === option.value ? 'tm-badge-blue' : 'tm-badge-grey'}`}
-                  style={{ border: 'none', cursor: 'pointer' }}
-                  onClick={() => model.onFieldChange('type', option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <div>
+              <div className="tm-text-label" style={{ marginBottom: 6 }}>종류</div>
+              {model.typeEditable ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {model.typeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={draft.type === option.value}
+                      className={`tm-badge ${draft.type === option.value ? 'tm-badge-blue' : 'tm-badge-grey'}`}
+                      style={{ border: 'none', cursor: 'pointer' }}
+                      onClick={() => model.onFieldChange('type', option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="tm-text-body">
+                  {scheduleTypeLabel(draft.type)}
+                  <span className="tm-text-caption" style={{ marginLeft: 6 }}>(종류는 만든 뒤 바꿀 수 없어요)</span>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="tm-text-body">
-              {scheduleTypeLabel(draft.type)}
-              <span className="tm-text-caption" style={{ marginLeft: 6 }}>(종류는 만든 뒤 바꿀 수 없어요)</span>
-            </div>
-          )}
-        </div>
+          </div>
+        </Card>
 
-        <TextField
-          label="시작 시각"
-          type="datetime-local"
-          value={draft.startAt}
-          onChange={(e) => model.onFieldChange('startAt', e.target.value)}
-        />
-        <TextField
-          label="종료 시각"
-          type="datetime-local"
-          value={draft.endAt}
-          onChange={(e) => model.onFieldChange('endAt', e.target.value)}
-        />
-        <TextField
-          label="정원"
-          optional
-          type="number"
-          min={1}
-          value={draft.capacity}
-          onChange={(e) => model.onFieldChange('capacity', e.target.value)}
-        />
-        <TextField
-          label="RSVP 마감"
-          optional
-          type="datetime-local"
-          value={draft.rsvpDeadlineAt}
-          onChange={(e) => model.onFieldChange('rsvpDeadlineAt', e.target.value)}
-        />
+        <Card>
+          <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>일정</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <TextField
+              label="시작 시각"
+              type="datetime-local"
+              value={draft.startAt}
+              onChange={(e) => model.onFieldChange('startAt', e.target.value)}
+            />
+            <TextField
+              label="종료 시각"
+              type="datetime-local"
+              value={draft.endAt}
+              onChange={(e) => model.onFieldChange('endAt', e.target.value)}
+            />
+            <TextField
+              label="정원"
+              optional
+              type="number"
+              min={1}
+              inputMode="numeric"
+              placeholder="예: 12"
+              value={draft.capacity}
+              onChange={(e) => model.onFieldChange('capacity', e.target.value)}
+              action={draft.capacity ? <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>명</span> : undefined}
+            />
+            <TextField
+              label="RSVP 마감"
+              optional
+              type="datetime-local"
+              value={draft.rsvpDeadlineAt}
+              onChange={(e) => model.onFieldChange('rsvpDeadlineAt', e.target.value)}
+            />
+          </div>
+        </Card>
 
-        <div>
-          <div className="tm-text-label" style={{ marginBottom: 6 }}>공개 범위</div>
+        <Card>
+          <div className="tm-text-label" style={{ marginBottom: 14, color: 'var(--text-muted)' }}>공개 설정</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {model.visibilityOptions.map((option) => (
               <button
@@ -624,7 +641,7 @@ export function ScheduleFormPageView({ model }: { model: ScheduleFormViewModel }
               </button>
             ))}
           </div>
-        </div>
+        </Card>
 
         {model.error ? <AlertBanner tone="error" message={model.error} /> : null}
 

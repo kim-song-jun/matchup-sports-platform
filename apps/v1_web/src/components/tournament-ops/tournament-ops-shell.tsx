@@ -6,7 +6,6 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ChevronLeft,
   ClipboardCheck,
-  ClipboardList,
   LayoutDashboard,
   Menu,
   PencilLine,
@@ -15,6 +14,76 @@ import {
 } from 'lucide-react';
 import type { V1TournamentStaffRole } from '@/types/api';
 import { staffRoleLabel } from './badges';
+
+// ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
+/**
+ * 셸 전체가 대회마다 똑같이 생긴 문제(고정된 파란 클립보드 아이콘 + 작은 텍스트뿐)를
+ * 고친다. 커버 이미지가 있으면 그대로 쓰고, 없으면 대회 id를 해시해 고정된 색상 +
+ * 이니셜을 보여준다 — 같은 대회는 새로고침해도 항상 같은 색이 나오고, 대회가
+ * 바뀌면 다른 색이 나와서 "지금 어느 대회 안에 있는지"가 사이드바 색만 봐도 구분된다.
+ */
+const IDENTITY_PALETTE = [
+  { bg: '#EAF2FF', fg: '#1B64DA' },
+  { bg: '#FDF0E7', fg: '#B4530A' },
+  { bg: '#EAF9F1', fg: '#0F8A56' },
+  { bg: '#F5EEFB', fg: '#7C3FC9' },
+  { bg: '#FDEEF0', fg: '#C23A56' },
+  { bg: '#EAF6FA', fg: '#0B7A94' },
+];
+
+function hashToIndex(id: string, size: number): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return hash % size;
+}
+
+function TournamentEmblem({
+  tournamentId,
+  coverImageUrl,
+  title,
+  size = 32,
+}: {
+  tournamentId: string;
+  coverImageUrl?: string | null;
+  title?: string;
+  size?: number;
+}) {
+  if (coverImageUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- 대회 커버는 외부 업로드 URL, next/image 도메인 화이트리스트 밖일 수 있어 원본 태그를 유지한다.
+      <img
+        src={coverImageUrl}
+        alt=""
+        aria-hidden="true"
+        width={size}
+        height={size}
+        style={{ width: size, height: size, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+      />
+    );
+  }
+  const palette = IDENTITY_PALETTE[hashToIndex(tournamentId, IDENTITY_PALETTE.length)];
+  const initial = title?.trim()?.[0] ?? '대';
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 8,
+        background: palette.bg,
+        color: palette.fg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: size * 0.45,
+        fontWeight: 700,
+        flexShrink: 0,
+      }}
+    >
+      {initial}
+    </span>
+  );
+}
 
 // ── Nav ───────────────────────────────────────────────────────────────────
 interface NavItem {
@@ -76,6 +145,7 @@ interface TournamentOpsShellProps {
   children: ReactNode;
   tournamentId: string;
   tournamentTitle?: string;
+  tournamentCoverImageUrl?: string | null;
   role: V1TournamentStaffRole;
 }
 
@@ -85,12 +155,13 @@ interface DrawerProps {
   onClose: () => void;
   tournamentId: string;
   tournamentTitle?: string;
+  tournamentCoverImageUrl?: string | null;
   role: V1TournamentStaffRole;
   pathname: string;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
-function Drawer({ open, onClose, tournamentId, tournamentTitle, role, pathname, triggerRef }: DrawerProps) {
+function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, triggerRef }: DrawerProps) {
   const isActive = useIsActive(pathname);
   const navItems = buildNavItems(tournamentId, role);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -178,13 +249,16 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, role, pathname, 
         ].join(' ')}
       >
         <div className="flex items-center justify-between px-4 h-[52px] border-b border-gray-100 dark:border-white/10 shrink-0">
-          <div className="flex flex-col min-w-0">
-            <span className="text-[13px] font-bold text-gray-900 dark:text-white truncate">
-              {tournamentTitle ?? '대회 운영'}
-            </span>
-            <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/15 rounded-full px-1.5 py-0.5 w-fit mt-0.5">
-              {staffRoleLabel(role)}
-            </span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={28} />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[13px] font-bold text-gray-900 dark:text-white truncate">
+                {tournamentTitle ?? '대회 운영'}
+              </span>
+              <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/15 rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+                {staffRoleLabel(role)}
+              </span>
+            </div>
           </div>
           <button
             ref={closeButtonRef}
@@ -244,7 +318,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, role, pathname, 
  * `/admin`과 완전히 분리된 별도 인증 경로다 — admin이 아닌 tournament_director/
  * support_readonly/platform_ops(대회 스코프)가 대상이다.
  */
-export function TournamentOpsShell({ children, tournamentId, tournamentTitle, role }: TournamentOpsShellProps) {
+export function TournamentOpsShell({ children, tournamentId, tournamentTitle, tournamentCoverImageUrl, role }: TournamentOpsShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
   const navItems = buildNavItems(tournamentId, role);
@@ -267,8 +341,8 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, ro
         className="hidden lg:flex w-[240px] min-h-screen bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-white/10 flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
         aria-label="대회 운영 사이드바"
       >
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 min-h-[64px]">
-          <ClipboardList size={18} className="text-blue-500 shrink-0" aria-hidden="true" />
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2.5 min-h-[64px]">
+          <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={34} />
           <div className="flex flex-col min-w-0">
             <span className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight truncate">
               {tournamentTitle ?? '대회 운영'}
@@ -322,6 +396,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, ro
           onClose={closeDrawer}
           tournamentId={tournamentId}
           tournamentTitle={tournamentTitle}
+          tournamentCoverImageUrl={tournamentCoverImageUrl}
           role={role}
           pathname={pathname}
           triggerRef={hamburgerRef}

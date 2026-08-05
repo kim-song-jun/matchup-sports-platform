@@ -56,6 +56,15 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
         {boardQuery.isSuccess ? (
           <>
           <ResultReviewGridStyles />
+          {/* 검토 대기가 0건이어도 "이 대회 얘기"라는 감각이 남게 진행 요약을 항상 보여준다.
+              전에는 범용 EmptyState만 떠 있어서, 대기가 0건인 게 대회가 순조로운 건지
+              화면이 아예 로딩이 덜 된 건지 구분이 안 됐다. */}
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            종료 {boardQuery.data.items.length}경기 · 검토 대기{' '}
+            <strong style={{ color: needsReview.length > 0 ? 'var(--blue500)' : 'var(--text-muted)' }}>
+              {needsReview.length}건
+            </strong>
+          </p>
           <div className="tm-result-review-grid">
             <FixturePickerList
               items={needsReview}
@@ -65,7 +74,11 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
                 setTimeout(() => panelHeadingRef.current?.focus(), 0);
               }}
               emptyTitle="검토할 결과가 없어요"
-              emptySub="종료된 경기 중 결과 승인이 필요한 항목이 없어요."
+              emptySub={
+                boardQuery.data.items.length > 0
+                  ? '종료된 경기는 있지만 승인이 필요한 항목은 없어요.'
+                  : '아직 종료된 경기가 없어요.'
+              }
             />
 
             {selectedItem && selectedItem.gameId ? (

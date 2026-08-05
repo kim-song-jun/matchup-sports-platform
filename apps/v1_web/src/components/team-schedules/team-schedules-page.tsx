@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
@@ -322,6 +323,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                 {attendance.error ? <div style={{ marginTop: 8 }}><AlertBanner tone="error" message={attendance.error} /></div> : null}
               </div>
             ) : null,
+            model.attendees.visible ? <ScheduleAttendeeSection key="attendees" model={model.attendees} /> : null,
             guestRecruitment.visible || guestRecruitment.manage ? (
               <GuestRecruitmentSection key="guest" model={guestRecruitment} />
             ) : null,
@@ -404,6 +406,86 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
         ) : null}
       </div>
     </AppChrome>
+  );
+}
+
+const ATTENDEE_STATUS_LABEL: Record<string, string> = {
+  GOING: '참석',
+  MAYBE: '미정',
+  NOT_GOING: '불참',
+  WAITLISTED: '대기',
+  NO_RESPONSE: '미응답',
+};
+
+const ATTENDEE_STATUS_BADGE_CLASS: Record<string, string> = {
+  GOING: 'tm-badge-green',
+  MAYBE: 'tm-badge-grey',
+  NOT_GOING: 'tm-badge-grey',
+  WAITLISTED: 'tm-badge-blue',
+  NO_RESPONSE: 'tm-badge-orange',
+};
+
+/** 원본 목업(preview.html "02 · 일정 상세와 참석 현황")의 전체/참석/미응답 탭 명단 —
+ * 매니저가 "누가 오는지"를 한 명씩 보고 미응답자를 식별할 수 있어야 한다는 설계였는데,
+ * 실제 구현은 그동안 goingCount 등 집계 숫자와 내 참석 여부만 보여줬다. */
+function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['attendees'] }) {
+  const [tab, setTab] = useState<'all' | 'going' | 'no_response'>('all');
+  if (!model.visible) return null;
+
+  const filtered =
+    tab === 'going'
+      ? model.items.filter((item) => item.status === 'GOING')
+      : tab === 'no_response'
+        ? model.items.filter((item) => item.status === 'NO_RESPONSE')
+        : model.items;
+
+  return (
+    <div>
+      <div className="tm-text-label" style={{ marginBottom: 8 }}>참석 현황</div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        <button type="button" className={`tm-btn tm-btn-sm ${tab === 'all' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('all')}>
+          전체 {model.counts.all}
+        </button>
+        <button type="button" className={`tm-btn tm-btn-sm ${tab === 'going' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('going')}>
+          참석 {model.counts.going}
+        </button>
+        <button type="button" className={`tm-btn tm-btn-sm ${tab === 'no_response' ? 'tm-btn-primary' : 'tm-btn-neutral'}`} onClick={() => setTab('no_response')}>
+          미응답 {model.counts.noResponse}
+        </button>
+      </div>
+      {filtered.length === 0 ? (
+        <div className="tm-text-caption">해당하는 팀원이 없어요.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {filtered.map((item) => (
+            <div key={item.userId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
+              <div
+                aria-hidden="true"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: 'var(--grey100)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: 'var(--text-muted)',
+                  flexShrink: 0,
+                }}
+              >
+                {item.nickname.slice(0, 1)}
+              </div>
+              <div className="tm-text-body" style={{ flex: 1, minWidth: 0 }}>{item.nickname}</div>
+              <span className={`tm-badge ${ATTENDEE_STATUS_BADGE_CLASS[item.status] ?? 'tm-badge-grey'}`}>
+                {ATTENDEE_STATUS_LABEL[item.status] ?? item.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

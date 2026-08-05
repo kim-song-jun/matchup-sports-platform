@@ -121,6 +121,7 @@ function scheduleDetail(overrides: Partial<V1TeamScheduleDetail> = {}): V1TeamSc
     cancelledAt: null,
     guestRecruitment: null,
     myAttendance: null,
+    attendees: null,
     ...overrides,
   };
 }

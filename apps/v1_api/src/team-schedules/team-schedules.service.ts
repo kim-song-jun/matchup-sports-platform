@@ -115,6 +115,35 @@ export class TeamSchedulesService {
     }
 
     const myAttendance = user ? schedule.attendance.find((row) => row.userId === user.id) ?? null : null;
+
+    // 원본 목업(preview.html "02 · 일정 상세와 참석 현황")은 매니저가 참석/미응답 명단을
+    // 탭으로 필터링해 한 명씩 보는 화면으로 설계됐지만, 그동안 이 응답은 goingCount 등
+    // 집계 숫자와 본인 행(myAttendance)만 내려줘 "누가 왔는지" 자체를 볼 방법이 없었다.
+    // 비멤버/공개 열람자에게 팀원 실명 성격의 닉네임 목록을 노출하지 않도록
+    // guestRecruitment의 MEMBERS 가시성 게이트와 동일하게 isMember로만 제한한다.
+    const attendees = isMember
+      ? await (async () => {
+          const memberships = await this.prisma.v1TeamMembership.findMany({
+            where: { teamId, status: 'active', user: { accountStatus: 'active' } },
+            select: {
+              userId: true,
+              user: { select: { profile: { select: { nickname: true, profileImageUrl: true } } } },
+            },
+          });
+          const attendanceByUser = new Map(schedule.attendance.map((row) => [row.userId, row]));
+          return memberships.map((membership) => {
+            const row = attendanceByUser.get(membership.userId);
+            return {
+              userId: membership.userId,
+              nickname: membership.user.profile?.nickname ?? '알 수 없음',
+              profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
+              status: row?.status ?? ('NO_RESPONSE' as const),
+              waitlistPosition: row?.waitlistPosition ?? null,
+            };
+          });
+        })()
+      : null;
+
     const recruitment = schedule.guestRecruitment;
     // W8-A fix: schedule detail must not leak a MEMBERS-only recruitment to a caller who could
     // not read it through the dedicated guest-recruitment endpoint (GuestRecruitmentService's own
@@ -145,6 +174,7 @@ export class TeamSchedulesService {
       myAttendance: myAttendance
         ? { status: myAttendance.status, version: myAttendance.version, waitlistPosition: myAttendance.waitlistPosition }
         : null,
+      attendees,
     };
   }
 

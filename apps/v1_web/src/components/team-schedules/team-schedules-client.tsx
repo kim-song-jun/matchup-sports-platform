@@ -313,6 +313,20 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       error: attendanceError,
       onSetStatus,
     },
+    attendees: {
+      visible: Boolean(schedule?.attendees),
+      items: (schedule?.attendees ?? []).map((attendee) => ({
+        userId: attendee.userId,
+        nickname: attendee.nickname,
+        profileImageUrl: attendee.profileImageUrl,
+        status: attendee.status,
+      })),
+      counts: {
+        all: schedule?.attendees?.length ?? 0,
+        going: schedule?.attendees?.filter((attendee) => attendee.status === 'GOING').length ?? 0,
+        noResponse: schedule?.attendees?.filter((attendee) => attendee.status === 'NO_RESPONSE').length ?? 0,
+      },
+    },
     guestRecruitment: {
       visible: Boolean(recruitment),
       slots: recruitment?.slots ?? 0,

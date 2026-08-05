@@ -126,6 +126,21 @@ export type ScheduleAttendanceModel = {
   onSetStatus: (status: 'GOING' | 'MAYBE' | 'NOT_GOING') => void;
 };
 
+export type ScheduleAttendeeItem = {
+  userId: string;
+  nickname: string;
+  profileImageUrl: string | null;
+  status: 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED' | 'NO_RESPONSE';
+};
+
+/** 원본 목업(preview.html "02 · 일정 상세와 참석 현황")의 전체/참석/미응답 탭 명단.
+ * 비멤버/공개 열람자에게는 서버가 attendees=null을 내려주므로 visible=false다. */
+export type ScheduleAttendeeListModel = {
+  visible: boolean;
+  items: ScheduleAttendeeItem[];
+  counts: { all: number; going: number; noResponse: number };
+};
+
 export type ScheduleManageActionsModel = {
   visible: boolean;
   editHref: string;
@@ -158,6 +173,7 @@ export type ScheduleDetailViewModel = {
   onDismissConflict: () => void;
   history: ScheduleHistoryEntry[];
   attendance: ScheduleAttendanceModel;
+  attendees: ScheduleAttendeeListModel;
   guestRecruitment: ScheduleGuestRecruitmentModel;
   manage: ScheduleManageActionsModel;
   cancelModal: {

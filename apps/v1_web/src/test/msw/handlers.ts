@@ -275,6 +275,13 @@ function scheduleSummary() {
   };
 }
 
+const v1ScheduleAttendeesFixture: V1TeamScheduleDetail['attendees'] = [
+  { userId: 'user-owner', nickname: '팀장원', profileImageUrl: null, status: 'GOING', waitlistPosition: null },
+  { userId: 'user-manager', nickname: '매니저준', profileImageUrl: null, status: 'GOING', waitlistPosition: null },
+  { userId: 'user-member', nickname: '멤버현', profileImageUrl: null, status: 'MAYBE', waitlistPosition: null },
+  { userId: 'user-host', nickname: '호스트민', profileImageUrl: null, status: 'NO_RESPONSE', waitlistPosition: null },
+];
+
 function scheduleDetail(): V1TeamScheduleDetail {
   return {
     ...scheduleSummary(),
@@ -284,6 +291,7 @@ function scheduleDetail(): V1TeamScheduleDetail {
     myAttendance: v1MyAttendance.status
       ? { status: v1MyAttendance.status, version: v1MyAttendance.version, waitlistPosition: v1MyAttendance.waitlistPosition }
       : null,
+    attendees: v1ScheduleAttendeesFixture,
   };
 }
 

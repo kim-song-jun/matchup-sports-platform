@@ -853,12 +853,23 @@ export type V1ScheduleGuestRecruitmentView = {
   approvedCount: number;
 };
 
+/** GET .../schedules/:scheduleId 참가자 명단 항목 — 팀원(멤버)에게만 노출됨 */
+export type V1ScheduleAttendeeView = {
+  userId: string;
+  nickname: string;
+  profileImageUrl: string | null;
+  status: V1AttendanceStatus | 'NO_RESPONSE';
+  waitlistPosition: number | null;
+};
+
 /** GET .../schedules/:scheduleId 상세 응답 (TeamSchedulesService.detail) */
 export type V1TeamScheduleDetail = V1TeamScheduleSummary & {
   cancelReason: string | null;
   cancelledAt: string | null;
   guestRecruitment: V1ScheduleGuestRecruitmentView | null;
   myAttendance: { status: V1AttendanceStatus; version: number; waitlistPosition: number | null } | null;
+  /** 활성 팀원 전체 명단(응답자+미응답자). 비멤버/공개 열람자에게는 null. */
+  attendees: V1ScheduleAttendeeView[] | null;
 };
 
 /** POST/PATCH .../schedules[/:id] 응답 (TeamSchedulesService.toDetailJson + replayed) */

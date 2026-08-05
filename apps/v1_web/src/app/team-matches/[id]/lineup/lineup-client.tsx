@@ -434,7 +434,28 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               선발 명단이 비어 있어요.
             </p>
           ) : (
-            <Card pad={0} style={{ marginTop: 8 }}>
+            <>
+              {/* 행마다 숫자만 덩그러니 보이면 등번호인지 알 수 없다(QA 지적) — 열 이름을
+                  붙여 시각적으로만 표시한다. 스크린리더는 각 행의 aria-label(예: "영동
+                  등번호")로 이미 문맥을 얻으므로 헤더 자체는 장식으로 숨긴다. */}
+              <div
+                aria-hidden="true"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }}
+              >
+                <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, minWidth: 42 }}>
+                  GK
+                </span>
+                <span className="tm-text-micro" style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 600 }}>
+                  이름
+                </span>
+                <span
+                  className="tm-text-micro"
+                  style={{ width: 56, textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}
+                >
+                  등번호
+                </span>
+              </div>
+              <Card pad={0} style={{ marginTop: 4 }}>
               {state.starters.map((entry, index) => (
                 <div
                   key={entry.key}
@@ -525,7 +546,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                   </div>
                 </div>
               ))}
-            </Card>
+              </Card>
+            </>
           )}
         </section>
 
@@ -536,7 +558,22 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               후보 명단이 비어 있어요.
             </p>
           ) : (
-            <Card pad={0} style={{ marginTop: 8 }}>
+            <>
+              <div
+                aria-hidden="true"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }}
+              >
+                <span className="tm-text-micro" style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 600 }}>
+                  이름
+                </span>
+                <span
+                  className="tm-text-micro"
+                  style={{ width: 56, textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}
+                >
+                  등번호
+                </span>
+              </div>
+              <Card pad={0} style={{ marginTop: 4 }}>
               {state.bench.map((entry, index) => (
                 <div
                   key={entry.key}
@@ -590,7 +627,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                   </div>
                 </div>
               ))}
-            </Card>
+              </Card>
+            </>
           )}
         </section>
 

@@ -233,7 +233,7 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
 
     fireEvent.change(screen.getByLabelText('호스트팀 (홈)'), { target: { value: '2' } });
-    const scorerSelects = screen.getAllByLabelText(/번 골 득점자/);
+    const scorerSelects = screen.getAllByLabelText(/번 골$/);
     expect(scorerSelects).toHaveLength(2);
     fireEvent.change(scorerSelects[0], { target: { value: 'p-1' } });
     // 두 번째 골은 미지정(기본값)으로 남겨둔다 — 득점자 특정 없이도 제출 가능해야 한다.
@@ -254,7 +254,7 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
 
     fireEvent.click(screen.getByText('+ 카드 추가'));
     fireEvent.change(screen.getByLabelText('카드 종류'), { target: { value: 'yellow' } });
-    fireEvent.change(screen.getByLabelText('MVP 선택'), { target: { value: 'p-1' } });
+    fireEvent.change(screen.getByLabelText('4. MVP'), { target: { value: 'p-1' } });
 
     fireEvent.click(screen.getByText('결과 작성 완료'));
 
@@ -367,5 +367,15 @@ describe('scoreLabel', () => {
     const label = scoreLabel(snapshot(null));
     expect(label).not.toContain('undefined');
     expect(label).toBe('기록 없음');
+  });
+
+  // team-match 결과 입력 화면(이 파일)이 만든 결과는 백엔드가 score를 감싸지 않고
+  // {home, away} 그대로 저장/반환한다(CreateGameResultRevisionDto.score, 라이브 DB에서
+  // {"away":1,"home":3} 형태로 확인, 2026-08 QA 재현). regulation만 읽던 이전 구현은 이
+  // 경로에서 실제로 저장된 점수가 있어도 "기록 없음"을 표시했다 — 이 테스트는 그 실사고를
+  // 재현한다.
+  it('renders the flat {home, away} shape this screen\'s own submissions actually produce', () => {
+    const flatRevision = { score: { home: 3, away: 1 } } as unknown as V1GameResultRevision;
+    expect(scoreLabel(flatRevision)).toBe('3 : 1');
   });
 });

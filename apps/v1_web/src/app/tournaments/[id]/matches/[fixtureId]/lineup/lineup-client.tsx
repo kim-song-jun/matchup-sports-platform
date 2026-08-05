@@ -12,6 +12,7 @@ import {
   useV1GameLineups,
   useV1SaveGameLineup,
   useV1SubmitGameLineup,
+  useV1Tournament,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
@@ -47,6 +48,17 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const lineupsQuery = useV1GameLineups(gameId, { enabled: gameId !== null });
   const saveMutation = useV1SaveGameLineup(gameId);
   const submitMutation = useV1SubmitGameLineup(gameId);
+  // 피치 배치(코트 도형)는 지금은 축구/풋살 코트 모양(PitchFormationEditor)만 구현돼 있다
+  // — team-matches/[id]/lineup/lineup-client.tsx 와 동일한 화이트리스트 판단(그 파일의
+  // formationSupported 주석 참고, TODO: 종목별 코트 컴포넌트 후속 작업). fixture-lineup
+  // access/game 응답에는 sport 정보가 없어(V1FixtureLineupAccess/V1Game 어디에도 없음)
+  // tournamentId로 대회 상세를 별도 조회해 sport.name을 가져온다 — 그 결과, 이 가드가
+  // 아예 없던 이전 버전은 배드민턴·농구 등 비축구 대회 경기에서도 축구 피치 도형을
+  // 조건 없이 그렸다(2026-08 QA 지적, 실제 버그).
+  const tournamentQuery = useV1Tournament(tournamentId);
+  const formationSupportedSportName = tournamentQuery.data?.sport?.name ?? null;
+  const formationSupported =
+    formationSupportedSportName !== null && ['축구', '풋살'].includes(formationSupportedSportName);
 
   const [state, setState] = useState<FixtureLineupState | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -168,7 +180,12 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
         {activeView === 'pitch' ? (
           <section aria-labelledby="fixture-lineup-pitch-heading">
             <SectionTitle id="fixture-lineup-pitch-heading" title="피치 배치" />
-            {state.starters.length === 0 ? (
+            {!formationSupported ? (
+              <EmptyState
+                title="이 종목은 피치 배치를 아직 지원하지 않아요"
+                sub={`${formationSupportedSportName ?? '이 종목'}은 축구·풋살과 코트 모양·포지션 개념이 달라 준비 중이에요. 명단 탭에서 선발·후보는 그대로 관리할 수 있어요.`}
+              />
+            ) : state.starters.length === 0 ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
                 먼저 명단에서 선발을 등록해야 피치에 배치할 수 있어요.
               </p>
@@ -224,7 +241,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               ) : (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }} aria-hidden="true">
-                    <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, minWidth: 42 }}>GK</span>
+                    <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, minWidth: 44 }}>GK</span>
                     <span className="tm-text-micro" style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 600 }}>이름</span>
                     <span className="tm-text-micro" style={{ width: 56, textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>등번호</span>
                   </div>
@@ -232,19 +249,27 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                     {state.starters.map((entry, index) => (
                       <div key={entry.key} style={{ padding: 12, ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}) }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 42 }}>
-                            <input
-                              type="radio"
-                              name="fixture-lineup-goalkeeper"
-                              checked={entry.goalkeeper}
-                              disabled={!editable}
-                              onChange={() => setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))}
-                              aria-label={`${entry.displayName} 골키퍼로 지정`}
-                            />
-                            <span className="tm-text-micro" style={{ color: 'var(--blue500)', fontWeight: 700 }}>
-                              {entry.goalkeeper ? 'GK' : ''}
-                            </span>
-                          </label>
+                          <button
+                            type="button"
+                            aria-pressed={entry.goalkeeper}
+                            disabled={!editable}
+                            onClick={() => setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))}
+                            aria-label={`${entry.displayName}${entry.goalkeeper ? ', 골키퍼로 지정됨' : '을 골키퍼로 지정'}`}
+                            style={{
+                              flexShrink: 0,
+                              minWidth: 44,
+                              minHeight: 44,
+                              borderRadius: 999,
+                              border: entry.goalkeeper ? '1.5px solid var(--orange500)' : '1px solid var(--border)',
+                              background: entry.goalkeeper ? 'var(--orange50)' : 'var(--card-surface)',
+                              color: entry.goalkeeper ? 'var(--orange500)' : 'var(--text-muted)',
+                              fontSize: 12,
+                              fontWeight: 800,
+                              cursor: editable ? 'pointer' : 'default',
+                            }}
+                          >
+                            GK
+                          </button>
                           <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{entry.displayName}</span>
                           <input
                             type="number"

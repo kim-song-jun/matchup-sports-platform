@@ -54,6 +54,16 @@ export function PitchFormationEditor({
 
   const placed = starters.filter((entry) => entry.positionX !== null && entry.positionY !== null);
   const waiting = starters.filter((entry) => entry.positionX === null || entry.positionY === null);
+  const selectedWaitingEntry = waiting.find((entry) => entry.key === selectedWaitingKey) ?? null;
+
+  // 모바일 하단 드로어에서 선수를 고르면 그 즉시 드로어를 닫아 피치가 바로 보이게 한다 —
+  // 예전엔 선택 후에도 드로어가 열려 있어 "선수는 골랐는데 피치가 안 보여서 다음에
+  // 뭘 해야 할지 모르겠다"는 게 가장 큰 혼란 포인트였다(QA 지적). 데스크톱 사이드
+  // 패널은 애초에 피치 옆에 항상 떠 있어 닫을 드로어가 없다.
+  function selectWaiting(key: string, options?: { closeSheetAfter?: boolean }) {
+    setSelectedWaitingKey((current) => (current === key ? null : key));
+    if (options?.closeSheetAfter) setSheetOpen(false);
+  }
 
   function clampPct(value: number): number {
     return Math.min(100, Math.max(0, value));
@@ -96,17 +106,19 @@ export function PitchFormationEditor({
     setDraggingKey(null);
   }
 
-  const controls = (
-    <FormationControls
-      formation={formation}
-      suggestedFormations={suggestedFormations}
-      waiting={waiting}
-      editable={editable}
-      selectedWaitingKey={selectedWaitingKey}
-      onSelectFormation={onSelectFormation}
-      onSelectWaiting={(key) => setSelectedWaitingKey((current) => (current === key ? null : key))}
-    />
-  );
+  function controlsFor(closeSheetAfterSelect: boolean) {
+    return (
+      <FormationControls
+        formation={formation}
+        suggestedFormations={suggestedFormations}
+        waiting={waiting}
+        editable={editable}
+        selectedWaitingKey={selectedWaitingKey}
+        onSelectFormation={onSelectFormation}
+        onSelectWaiting={(key) => selectWaiting(key, { closeSheetAfter: closeSheetAfterSelect })}
+      />
+    );
+  }
 
   const pitch = (
     <div
@@ -128,6 +140,10 @@ export function PitchFormationEditor({
         cursor: editable && selectedWaitingKey !== null ? 'crosshair' : 'default',
         touchAction: 'none',
         flexShrink: 0,
+        // 탭 배치 대기 상태(선수를 골라 다음 탭을 기다리는 중)를 테두리로도 드러낸다 —
+        // 커서 모양(crosshair)만으로는 모바일 터치 환경에서 아무 신호도 안 보인다.
+        boxShadow: editable && selectedWaitingKey !== null ? '0 0 0 3px var(--blue500)' : 'none',
+        transition: 'box-shadow 120ms ease',
       }}
     >
       <PitchLines />
@@ -146,6 +162,20 @@ export function PitchFormationEditor({
     </div>
   );
 
+  // 상황별 안내 문구 하나로 "지금 뭘 해야 하는지"를 항상 눈에 보이는 자리(피치 바로 위)에
+  // 둔다 — 예전엔 이 설명이 사이드 패널/드로어 안(대기 목록 위)에만 있어서, 모바일에서는
+  // 드로어를 열어야만 보였고 데스크톱에서도 피치와 시선이 멀었다("이해하기 어렵다" QA
+  // 지적). 선수를 고른 직후(탭 배치 대기 상태)에는 이름까지 짚어 다음 행동을 명시한다.
+  const guidance = !editable
+    ? null
+    : selectedWaitingEntry !== null
+      ? { text: `${selectedWaitingEntry.displayName} 선수를 배치할 위치를 피치에서 탭하세요`, active: true }
+      : waiting.length > 0
+        ? { text: '선수를 드래그하거나, 아래 목록에서 선수를 고른 뒤 피치를 탭해 배치하세요', active: false }
+        : placed.length > 0
+          ? { text: '토큰을 끌어 위치를 옮기거나, 토큰 위 × 버튼으로 배치를 취소할 수 있어요', active: false }
+          : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* 모바일: "배치 설정" 버튼 → 하단 드로어. 데스크톱에서는 숨긴다(사이드 패널이 항상 보임). */}
@@ -157,8 +187,32 @@ export function PitchFormationEditor({
           aria-haspopup="dialog"
         >
           배치 설정{formation ? ` · ${formation}` : ''}
+          {waiting.length > 0 ? ` · 대기 ${waiting.length}명` : ''}
         </button>
       </div>
+
+      {guidance ? (
+        <div
+          role={guidance.active ? 'status' : undefined}
+          className="tm-text-caption"
+          style={{
+            color: guidance.active ? 'var(--blue500)' : 'var(--text-muted)',
+            fontWeight: guidance.active ? 700 : 400,
+          }}
+        >
+          {guidance.text}
+          {guidance.active ? (
+            <button
+              type="button"
+              onClick={() => setSelectedWaitingKey(null)}
+              className="tm-btn tm-btn-ghost"
+              style={{ marginLeft: 8, padding: '2px 8px', minHeight: 'auto', fontSize: 'inherit' }}
+            >
+              선택 취소
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', justifyContent: 'center', flexWrap: 'wrap' }}>
         {pitch}
@@ -166,18 +220,12 @@ export function PitchFormationEditor({
             카드(.tm-card) 배경·테두리를 둬야 옆에 뭔가 있다는 게 눈에 보인다 —
             배경 없는 텍스트만 있으면 실제 화면에서는 "아무것도 없는 것"처럼 보인다. */}
         <Card pad={16} className="tm-show-desktop" style={{ width: 260, flexShrink: 0 }}>
-          {controls}
+          {controlsFor(false)}
         </Card>
       </div>
 
-      {placed.length > 0 && editable ? (
-        <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-          토큰을 끌어 위치를 옮기거나, 토큰 위 × 버튼으로 배치를 취소할 수 있어요.
-        </div>
-      ) : null}
-
       <FormationSheet open={sheetOpen} onClose={() => setSheetOpen(false)}>
-        {controls}
+        {controlsFor(true)}
       </FormationSheet>
     </div>
   );
@@ -453,7 +501,11 @@ function PlayerToken({
           minHeight: 36,
           borderRadius: '50%',
           border: '2px solid #fff',
-          background: entry.goalkeeper ? 'var(--orange500)' : 'var(--blue500)',
+          // blue500/orange500 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 blue500 ~3.71:1,
+          // orange500 ~2.16:1, 2026-08 QA) — 등번호 텍스트가 여기서 유일하게 흰 배경 위
+          // 흰 글씨가 아니라 색 배경 위 흰 글씨라 대비가 그대로 노출된다. blue700/orange700
+          // (둘 다 4.5:1 이상)로 교체한다.
+          background: entry.goalkeeper ? 'var(--orange700)' : 'var(--blue700)',
           color: '#fff',
           display: 'flex',
           alignItems: 'center',

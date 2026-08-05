@@ -93,6 +93,9 @@ export interface GameLineupParticipant {
   displayNameSnapshot: string;
   jerseyNumber: number | null;
   position: string | null;
+  /** 피치 배치 좌표, 0~100 퍼센트(자기 진영 기준: y=0 골라인, y=100 하프라인). 둘 다 있거나 둘 다 없다. */
+  positionX: number | null;
+  positionY: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -108,6 +111,8 @@ export interface GameLineup {
   version: number;
   submittedAt: string | null;
   supersedesId: string | null;
+  /** 포메이션 프리셋 라벨("4-4-2" 등), null이면 자유 배치. */
+  formation: string | null;
   createdAt: string;
   updatedAt: string;
   participants: GameLineupParticipant[];

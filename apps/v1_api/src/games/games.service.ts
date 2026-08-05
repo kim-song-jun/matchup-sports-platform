@@ -1076,6 +1076,7 @@ export class GamesService {
             sideId,
             revision: (previous?.revision ?? 0) + 1,
             supersedesId: previous?.id,
+            formation: dto.formation,
           },
         });
         for (const participant of dto.participants) {
@@ -1087,6 +1088,8 @@ export class GamesService {
               displayNameSnapshot: participant.displayNameSnapshot,
               jerseyNumber: participant.jerseyNumber,
               position: participant.position,
+              positionX: participant.positionX,
+              positionY: participant.positionY,
             },
           });
         }

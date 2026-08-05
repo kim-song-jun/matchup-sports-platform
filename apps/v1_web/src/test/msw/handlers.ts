@@ -346,10 +346,11 @@ let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
   revision: 1,
   state: 'DRAFT',
   version: 1,
+  formation: '2-2',
   publicLineupAt: null,
   starters: [
-    { id: 'participant-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false },
-    { id: 'participant-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true },
+    { id: 'participant-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
+    { id: 'participant-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
   ],
   bench: [{ id: 'participant-3', displayName: '이하늘', jerseyNumber: 11 }],
 };
@@ -1134,12 +1135,15 @@ export const v1MswHandlers = [
       ...v1TeamMatchLineupFixture,
       revision: v1TeamMatchLineupFixture.revision + 1,
       version: v1TeamMatchLineupFixture.version + 1,
+      formation: body.formation ?? null,
       starters: body.starters.map((participant, index) => ({
         id: participant.userId ?? `guest-participant-${index + 1}`,
         displayName: participant.displayName ?? '이름 미확인',
         jerseyNumber: participant.jerseyNumber ?? null,
         position: participant.position ?? null,
         goalkeeper: participant.goalkeeper ?? false,
+        positionX: participant.positionX ?? null,
+        positionY: participant.positionY ?? null,
       })),
       bench: body.bench.map((participant, index) => ({
         id: participant.userId ?? `guest-bench-${index + 1}`,

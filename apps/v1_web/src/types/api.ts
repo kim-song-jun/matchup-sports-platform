@@ -1351,6 +1351,9 @@ export type V1TeamMatchLineupStarter = {
   jerseyNumber: number | null;
   position: string | null;
   goalkeeper: boolean;
+  // 피치 배치 좌표, 0~100 퍼센트(자기 진영 기준: y=0 골라인, y=100 하프라인). 둘 다 있거나 둘 다 없다.
+  positionX: number | null;
+  positionY: number | null;
 };
 
 export type V1TeamMatchLineupBenchEntry = {
@@ -1370,6 +1373,8 @@ export type V1TeamMatchLineup = {
   revision: number;
   state: V1TeamMatchLineupState;
   version: number;
+  // 포메이션 프리셋 라벨("4-4-2" 등), null이면 자유 배치.
+  formation: string | null;
   publicLineupAt: string | null;
   starters: V1TeamMatchLineupStarter[];
   bench: V1TeamMatchLineupBenchEntry[];
@@ -1383,12 +1388,15 @@ export type V1TeamMatchLineupParticipantInput = {
   jerseyNumber?: number;
   position?: string;
   goalkeeper?: boolean;
+  positionX?: number;
+  positionY?: number;
 };
 
-// `formation`은 의도적으로 없다 — `V1GameLineup`에 저장할 컬럼이 없고, 이번 변경 범위에서는
-// 마이그레이션을 추가할 수 없어 받아도 버려질 뿐이다(Task 15 blocker-2 report 참고).
+// Task 15 blocker-2가 막았던 `formation` — V1GameLineup.formation 마이그레이션이
+// 추가돼 이제 저장·응답 모두 반영된다.
 export type V1TeamMatchLineupSavePayload = {
   expectedVersion: number;
+  formation?: string;
   starters: V1TeamMatchLineupParticipantInput[];
   bench: V1TeamMatchLineupParticipantInput[];
 };

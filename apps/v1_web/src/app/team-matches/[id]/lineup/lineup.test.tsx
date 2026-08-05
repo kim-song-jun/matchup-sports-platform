@@ -7,9 +7,12 @@ import {
   addGuestToStarters,
   addRosterMemberToBench,
   addRosterMemberToStarters,
+  applyFormation,
   applySaveResult,
   applyVersionConflictReload,
   buildSavePayload,
+  clearPlayerPosition,
+  computeFormationPositions,
   createEmptyLineupEditorState,
   deriveLineupCounts,
   describeLineupPhase,
@@ -22,6 +25,8 @@ import {
   resolveOwnTeamId,
   setGoalkeeper,
   setJerseyNumber,
+  setPlayerPosition,
+  suggestedFormations,
   validateLineupForSubmit,
 } from './lineup.view-model';
 
@@ -35,7 +40,7 @@ const rosterMember2 = { userId: 'user-2', displayName: '김철수', role: 'membe
 describe('lineup.view-model', () => {
   it('creates an empty editable state pinned to the given base revision', () => {
     const state = createEmptyLineupEditorState(3);
-    expect(state).toEqual({ starters: [], bench: [], baseRevision: 3, dirty: false });
+    expect(state).toEqual({ starters: [], bench: [], baseRevision: 3, formation: null, dirty: false });
   });
 
   it('hydrates from a server lineup without leaking a userId (server never echoes it back)', () => {
@@ -49,7 +54,8 @@ describe('lineup.view-model', () => {
       state: 'DRAFT',
       version: 2,
       publicLineupAt: null,
-      starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true }],
+      formation: null,
+      starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
       bench: [{ id: 'participant-bench-1', displayName: '게스트', jerseyNumber: null }],
     };
     const state = hydrateLineupEditorState(lineup);
@@ -170,6 +176,7 @@ describe('lineup.view-model', () => {
       state: 'DRAFT',
       version: 5,
       publicLineupAt: null,
+      formation: null,
       starters: [],
       bench: [],
     };
@@ -243,7 +250,8 @@ describe('lineup.view-model', () => {
       state: 'DRAFT',
       version: 3,
       publicLineupAt: null,
-      starters: [{ id: 'participant-2', displayName: rosterMember.displayName, jerseyNumber: 7, position: null, goalkeeper: true }],
+      formation: null,
+      starters: [{ id: 'participant-2', displayName: rosterMember.displayName, jerseyNumber: 7, position: null, goalkeeper: true, positionX: null, positionY: null }],
       bench: [],
     };
     let state = hydrateLineupEditorState(lineup);
@@ -268,6 +276,74 @@ describe('lineup.view-model', () => {
     // A genuinely different roster member is unaffected and can still be added.
     state = addRosterMemberToStarters(state, rosterMember2);
     expect(state.starters).toHaveLength(2);
+  });
+
+  it('computeFormationPositions spreads rows evenly and rejects a headcount mismatch', () => {
+    const positions = computeFormationPositions('2-2', 4);
+    expect(positions).toHaveLength(4);
+    // Two rows: first row (defense) has a lower y than the second (attack).
+    expect(positions![0].positionY).toBeLessThan(positions![2].positionY);
+    // Within a row of 2, the two x values are symmetric around 50.
+    expect(positions![0].positionX + positions![1].positionX).toBeCloseTo(100, 5);
+
+    // "4-4-2" sums to 10 outfield players — asking for 4 is a mismatch, not a crash.
+    expect(computeFormationPositions('4-4-2', 4)).toBeNull();
+    // Malformed tokens fail closed instead of producing NaN coordinates.
+    expect(computeFormationPositions('a-b', 4)).toBeNull();
+  });
+
+  it('suggestedFormations only offers presets for curated headcounts', () => {
+    expect(suggestedFormations(4)).toEqual(['2-2', '1-2-1', '3-1']);
+    expect(suggestedFormations(10)).toContain('4-4-2');
+    expect(suggestedFormations(7)).toEqual([]);
+  });
+
+  it('applyFormation places the goalkeeper fixed and spreads outfield starters by preset', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addRosterMemberToStarters(state, rosterMember);
+    state = addRosterMemberToStarters(state, rosterMember2);
+    state = setGoalkeeper(state, state.starters[0].key);
+    // 2 starters total, 1 is GK → 1 outfield player. "1-2-1" doesn't match (sums to 4),
+    // so applyFormation should still set the label without touching coordinates.
+    const mismatched = applyFormation(state, '1-2-1');
+    expect(mismatched.formation).toBe('1-2-1');
+    expect(mismatched.starters.every((entry) => entry.positionX === null)).toBe(true);
+
+    // Add two more outfield players so the outfield count (3) matches "3".
+    let matched = addRosterMemberToStarters(state, { userId: 'user-3', displayName: '이영희', role: 'member' });
+    matched = addRosterMemberToStarters(matched, { userId: 'user-4', displayName: '박민수', role: 'member' });
+    const applied = applyFormation(matched, '3');
+    expect(applied.formation).toBe('3');
+    const goalkeeper = applied.starters.find((entry) => entry.goalkeeper);
+    expect(goalkeeper).toMatchObject({ positionX: 50, positionY: 6 });
+    expect(applied.starters.filter((entry) => !entry.goalkeeper).every((entry) => entry.positionX !== null)).toBe(
+      true,
+    );
+  });
+
+  it('setPlayerPosition/clearPlayerPosition edit one starter without touching the rest', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addRosterMemberToStarters(state, rosterMember);
+    state = addRosterMemberToStarters(state, rosterMember2);
+    const [first, second] = state.starters;
+
+    const placed = setPlayerPosition(state, first.key, 42, 63);
+    expect(placed.starters.find((entry) => entry.key === first.key)).toMatchObject({ positionX: 42, positionY: 63 });
+    expect(placed.starters.find((entry) => entry.key === second.key)!.positionX).toBeNull();
+
+    const cleared = clearPlayerPosition(placed, first.key);
+    expect(cleared.starters.find((entry) => entry.key === first.key)).toMatchObject({
+      positionX: null,
+      positionY: null,
+    });
+  });
+
+  it('moving a positioned starter to the bench clears its pitch coordinates', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addRosterMemberToStarters(state, rosterMember);
+    state = setPlayerPosition(state, state.starters[0].key, 30, 70);
+    state = moveEntry(state, 'starter', state.starters[0].key, 'bench');
+    expect(state.bench[0]).toMatchObject({ positionX: null, positionY: null });
   });
 });
 
@@ -337,6 +413,7 @@ function baseLineup(overrides: Partial<V1TeamMatchLineup> = {}): V1TeamMatchLine
     state: 'DRAFT',
     version: 0,
     publicLineupAt: null,
+      formation: null,
     starters: [],
     bench: [],
     ...overrides,
@@ -402,7 +479,7 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 0,
-        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true }],
+        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
       }),
       isLoading: false,
       isError: false,

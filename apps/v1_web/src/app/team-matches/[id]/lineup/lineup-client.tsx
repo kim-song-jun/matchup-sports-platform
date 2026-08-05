@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
+import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
 import {
@@ -24,9 +25,11 @@ import {
   addGuestToStarters,
   addRosterMemberToBench,
   addRosterMemberToStarters,
+  applyFormation,
   applySaveResult,
   applyVersionConflictReload,
   buildSavePayload,
+  clearPlayerPosition,
   deriveLineupCounts,
   describeLineupPhase,
   describePublicationCountdown,
@@ -38,6 +41,8 @@ import {
   resolveOwnTeamId,
   setGoalkeeper,
   setJerseyNumber,
+  setPlayerPosition,
+  suggestedFormations,
   validateLineupForSubmit,
 } from './lineup.view-model';
 
@@ -89,6 +94,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }, []);
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  // 명단(선발·후보·추가 가능한 팀원 편집)과 피치 배치(포메이션 시각화)는 같은 화면
+  // 두 가지 뷰다 — 기본은 명단(기존 화면과 동일한 첫인상 유지), 사용자가 "피치 배치"를
+  // 눌러야 전환된다.
+  const [activeView, setActiveView] = useState<'roster' | 'pitch'>('roster');
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const saveMutation = useV1SaveTeamMatchLineup(teamMatchId);
@@ -344,6 +353,61 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           ) : null}
         </div>
 
+        <div
+          role="tablist"
+          aria-label="라인업 뷰 전환"
+          style={{ display: 'flex', gap: 8, marginBottom: 16 }}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'roster'}
+            className={`tm-btn tm-btn-sm ${activeView === 'roster' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+            onClick={() => setActiveView('roster')}
+          >
+            명단
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'pitch'}
+            className={`tm-btn tm-btn-sm ${activeView === 'pitch' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+            onClick={() => setActiveView('pitch')}
+          >
+            피치 배치
+          </button>
+        </div>
+
+        {activeView === 'pitch' ? (
+          <section aria-labelledby="lineup-pitch-heading" style={{ marginBottom: 16 }}>
+            <SectionTitle id="lineup-pitch-heading" title="피치 배치" />
+            {state.starters.length === 0 ? (
+              <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
+                먼저 명단에서 선발을 등록해야 피치에 배치할 수 있어요.
+              </p>
+            ) : (
+              <div style={{ marginTop: 8 }}>
+                <PitchFormationEditor
+                  starters={state.starters}
+                  formation={state.formation}
+                  suggestedFormations={suggestedFormations(
+                    state.starters.filter((entry) => !entry.goalkeeper).length,
+                  )}
+                  editable={phase?.editable ?? false}
+                  onSelectFormation={(formation) =>
+                    setState((prev) => (prev ? applyFormation(prev, formation) : prev))
+                  }
+                  onPlacePlayer={(key, x, y) =>
+                    setState((prev) => (prev ? setPlayerPosition(prev, key, x, y) : prev))
+                  }
+                  onUnplacePlayer={(key) => setState((prev) => (prev ? clearPlayerPosition(prev, key) : prev))}
+                />
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        <div style={{ display: activeView === 'roster' ? 'contents' : 'none' }}>
         <section aria-labelledby="lineup-starters-heading" style={{ marginBottom: 16 }}>
           <SectionTitle id="lineup-starters-heading" title={`선발 (${counts.starterCount})`} />
           {state.starters.length === 0 ? (
@@ -601,6 +665,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             </Card>
           </section>
         ) : null}
+        </div>
 
         <section aria-labelledby="lineup-change-request-heading" style={{ marginBottom: 16 }}>
           <SectionTitle id="lineup-change-request-heading" title="상대팀 라인업 정정 요청" />

@@ -1667,3 +1667,46 @@ files (300)"로 거부됐다. `git diff --stat origin/dev...origin/codex/teameet
 구조적 문제다. 300개 이하로 줄이려면 PR을 여러 개로 쪼개야 하는데, 이건
 이번 세션 지시 범위를 크게 벗어나는 구조적 결정이라 진행하지 않았다 —
 F2/F3와 마찬가지로 기술적으로 차단된 것으로 기록만 남긴다.
+
+## 일정 상세·생성 화면 모바일 좌우 여백 0 버그 수정 (2026-08-05)
+
+사용자가 "모바일에서 여백이 좌우 없다고 카드밖에"로 지적한 문제를 실측으로
+근본원인까지 추적했다. 처음엔 카드/배경 색 대비 문제(둘 다 `--bg` 흰색이라
+카드 경계가 안 보임)로 판단했으나, `getBoundingClientRect()` 측정 결과
+`.tm-card`가 390px 뷰포트에서 `left: 0, right: 390`으로 화면 양쪽에
+완전히 붙어 있음을 확인 — 색 대비가 아니라 **진짜 padding 0**이었다.
+
+**근본원인**: `team-schedules-page.tsx`의 `ScheduleDetailPageView`가 감싸는
+`<div className="tm-team-detail-section">`이 어떤 CSS 파일에도 정의돼
+있지 않은 클래스였다(전역 grep으로 globals.css + 모든 `.module.css` 확인).
+이 클래스명은 원래 `components/teams/team-detail-sections.tsx`가 쓰던
+것인데, 그 파일은 `grep -rln "from '@/components/teams/team-detail-sections'"`
+결과 **아무 데서도 import되지 않는 죽은 코드**였다 — 즉 실제 스타일을
+전혀 제공하지 못하는 이름만 남은 클래스에 기대고 있었다. `ScheduleFormPageView`
+(일정 생성/수정 폼)는 아예 padding 래퍼 자체가 없어 같은 증상이었다.
+
+**수정**: 두 화면 모두 다른 화면들의 관례(`padding: '16px 20px 40px'`,
+`team-records-content.tsx` 등에서 확립된 패턴)를 따르는 padding 래퍼를
+추가했다. 겸사겸사 `--card-surface`를 `var(--bg)`(페이지와 동일)에서
+명시적 `#ffffff`로, `.tm-app-frame` 배경을 `var(--grey50)`로 분리해
+카드/배경 대비도 DESIGN.md 원칙("카드는 배경색 차이로 구분한다")에 맞게
+개선했다 — 이건 별개의 진짜 문제였고 padding 버그와 상호보완적이다.
+
+**검증**: `tsc --noEmit` 0 errors, 관련 vitest 17/17 통과, Playwright로
+390px 라이브 측정 — 수정 전 `left:0, right:390`(여백 0) → 수정 후
+`left:20, right:370`(양쪽 20px 여백) 확인. 스크린샷으로 일정 상세·
+일정 생성 두 화면 모두 시각 확인.
+
+**globals.css EOL 함정 재확인**: 이 세션에서도 `[[globals-css-mixed-eol-trap]]`
+(메모리 기록)이 재현됐다 — Edit 2건(코멘트 교체, `background` 값 변경)만
+했는데 `git diff --stat`에 1215줄 변경으로 잡혔다(전체 CRLF 정규화).
+difflib로 원본(HEAD)과 대조해 내용이 같은 줄은 원래 개행을 복원하는
+방식으로 복구 → 실제 diff 13줄로 축소 확인 후 커밋.
+
+**커밋 경로**: 로컬 워크트리 브랜치(`codex/teameet-task27-release-gates`)에
+일반 커밋(`9414cf10`, 이 브랜치의 그동안 누적된 미커밋 변경—용병모집 참석자
+로스터·라인업/일정폼 카드 병합·팀전적 재설계—을 함께 포함) 후, PR #249의
+실제 헤드인 `codex/teameet-task9-ci`(원격 tip `c83fac8d`) 위에 git plumbing으로
+정확히 이 두 파일(padding 수정 + globals.css)만 반영하는 커밋(`730759fb`)을
+별도로 만들어 직접 push. `gh pr view 249 --json headRefOid`로 PR 헤드가
+`730759fb`로 갱신됐음을 확인.

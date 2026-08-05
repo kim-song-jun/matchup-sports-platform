@@ -103,6 +103,49 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
   );
 }
 
+const MEMBER_ROLE_LABEL: Record<V1AdminTeamDetail['members'][number]['role'], string> = {
+  owner: '팀장',
+  manager: '운영진',
+  member: '멤버',
+};
+
+function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-5" aria-label="팀원 목록">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[17px] font-bold text-gray-900">팀원</h2>
+        <span className="text-sm font-semibold tabular-nums text-gray-500">{team.members.length}명</span>
+      </div>
+      {team.members.length > 0 ? (
+        <ol className="mt-4 grid gap-3 sm:grid-cols-2">
+          {team.members.map((member) => (
+            <li key={member.membershipId} className="min-w-0 rounded-xl bg-gray-50 px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <Link href={`/admin/users/${member.userId}`} className="break-words text-sm font-bold text-gray-900 hover:text-blue-600">
+                    {member.name ?? member.nickname ?? member.email ?? member.userId}
+                  </Link>
+                  {member.name && member.nickname ? <p className="mt-1 text-xs text-gray-500">{member.nickname}</p> : null}
+                </div>
+                <span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-semibold text-gray-600">
+                  {MEMBER_ROLE_LABEL[member.role]}
+                </span>
+              </div>
+              <dl className="mt-3 grid gap-1.5 text-xs">
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">이메일</dt><dd className="min-w-0 break-all text-gray-700">{member.email ?? '미등록'}</dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">전화번호</dt><dd className="min-w-0 break-all text-gray-700">{member.phone ?? '미등록'}</dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">가입일</dt><dd className="min-w-0 text-gray-700">{formatDateTime(member.joinedAt)}</dd></div>
+              </dl>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <div className="mt-4 rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">활성 팀원이 없어요.</div>
+      )}
+    </section>
+  );
+}
+
 export default function AdminTeamDetailPage() {
   const params = useParams<{ id: string }>();
   const teamId = params.id;
@@ -171,6 +214,7 @@ export default function AdminTeamDetailPage() {
             </dl>
           </article>
 
+          <TeamMembers team={team} />
           <RecentTeamMatches team={team} />
         </section>
 

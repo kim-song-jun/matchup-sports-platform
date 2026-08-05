@@ -142,6 +142,38 @@ describe('MatchCreatePageClient — GA events', () => {
       );
     });
   });
+
+  it('keeps legitimate date and time values that happen to match old sample defaults', async () => {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 7);
+    const date = futureDate.toISOString().slice(0, 10);
+    window.localStorage.setItem(
+      'teameet:v1:match-draft',
+      JSON.stringify({
+        title: '사용자가 직접 작성한 매치',
+        venue: '사용자가 선택한 체육관',
+        date,
+        startTime: '18:00',
+        endTime: '20:00',
+      }),
+    );
+
+    render(<MatchCreatePageClient step="confirm" />);
+
+    await waitFor(() => expect(screen.getByLabelText('날짜')).toHaveValue(date));
+    expect(screen.getByLabelText('시작 시간')).toHaveValue('18:00');
+    fireEvent.click(screen.getByRole('button', { name: '매치 만들기' }));
+
+    await waitFor(() => {
+      expect(createMatchMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: '사용자가 직접 작성한 매치',
+          manualPlaceName: '사용자가 선택한 체육관',
+        }),
+        expect.any(Object),
+      );
+    });
+  });
 });
 
 describe('match edit hydration', () => {

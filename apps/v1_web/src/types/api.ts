@@ -261,6 +261,7 @@ export type V1Popup = {
   content?: V1RichContentDocument | null;
   contentVersion?: number;
   targetScreens: V1PopupTargetScreen[];
+  targetPaths?: string[];
   linkUrl: string | null;
   linkLabel: string | null;
   publishedAt: string | null;
@@ -1997,6 +1998,7 @@ export type V1AdminPopupRow = {
   content: V1RichContentDocument;
   contentVersion: number;
   targetScreens: V1PopupTargetScreen[];
+  targetPaths?: string[];
   linkUrl: string | null;
   linkLabel: string | null;
   status: V1AdminPopupStatus;
@@ -2014,6 +2016,7 @@ export type V1AdminPopupCreatePayload = {
   body?: string;
   content: V1RichContentDocument;
   targetScreens: V1PopupTargetScreen[];
+  targetPaths: string[];
   linkUrl?: string | null;
   linkLabel?: string | null;
   status: V1AdminPopupStatus;
@@ -2106,6 +2109,12 @@ export type V1AdminUserRow = {
 };
 
 export type V1AdminUserDetail = V1AdminUserRow & {
+  phone: string | null;
+  emailVerifiedAt: string | null;
+  phoneVerifiedAt: string | null;
+  birthDate: string | null;
+  displayRegion: string | null;
+  bio: string | null;
   deletedAt: string | null;
   withdrawalRequest: {
     reason: string | null;
@@ -2177,6 +2186,16 @@ export type V1AdminTeamDetail = V1AdminTeamRow & {
     calculatedAt: string | null;
   } | null;
   recentHostedTeamMatches: { teamMatchId: string; title: string; status: string; startAt: string }[];
+  members: {
+    membershipId: string;
+    userId: string;
+    name: string | null;
+    nickname: string | null;
+    email: string | null;
+    phone: string | null;
+    role: 'owner' | 'manager' | 'member';
+    joinedAt: string | null;
+  }[];
 };
 
 export type V1AdminTeamMatchRow = {

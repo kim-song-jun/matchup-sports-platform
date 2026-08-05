@@ -544,10 +544,13 @@ export function useV1Home(filters?: ListFilters) {
   });
 }
 
-export function useV1ActivePopup(screen: V1PopupTargetScreen | null) {
+export function useV1ActivePopup(screen: V1PopupTargetScreen | null, path?: string | null) {
   return useQuery({
-    queryKey: v1Keys.activePopup(screen),
-    queryFn: () => v1Get<V1ActivePopupResponse>('/popups/active', { screen: screen ?? undefined }),
+    queryKey: v1Keys.activePopup(screen, path),
+    queryFn: () => v1Get<V1ActivePopupResponse>('/popups/active', {
+      screen: screen ?? undefined,
+      path: path ?? undefined,
+    }),
     enabled: Boolean(screen),
   });
 }

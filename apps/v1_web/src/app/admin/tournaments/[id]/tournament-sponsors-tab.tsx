@@ -7,10 +7,12 @@ import {
   useV1CreateTournamentSponsor,
   useV1DeactivateTournamentSponsor,
   useV1UpdateTournamentSponsor,
+  useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentSponsorForm } from './tournament-sponsors-form';
+import { TournamentSponsorsPreview } from './tournament-sponsors-preview';
 import {
   emptySponsorForm,
   formFromSponsor,
@@ -28,10 +30,12 @@ export function TournamentSponsorsTab({
 }) {
   const [form, setForm] = useState<SponsorForm>(emptySponsorForm);
   const [editingSponsorId, setEditingSponsorId] = useState<string | null>(null);
+  const [logoUploadError, setLogoUploadError] = useState('');
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentSponsors(tournamentId);
   const createSponsor = useV1CreateTournamentSponsor(tournamentId);
   const updateSponsor = useV1UpdateTournamentSponsor(tournamentId);
   const deactivateSponsor = useV1DeactivateTournamentSponsor(tournamentId);
+  const uploadImages = useV1UploadImages();
   const sponsors = data?.items ?? [];
   const formMode = editingSponsorId ? 'update' : 'create';
   const formPending = createSponsor.isPending || updateSponsor.isPending;
@@ -43,6 +47,19 @@ export function TournamentSponsorsTab({
   const resetForm = () => {
     setForm(emptySponsorForm);
     setEditingSponsorId(null);
+    setLogoUploadError('');
+  };
+
+  const handleSelectLogo = async (file: File) => {
+    setLogoUploadError('');
+    try {
+      const result = await uploadImages.mutateAsync([file]);
+      const uploadedUrl = result.urls[0];
+      if (!uploadedUrl) throw new Error('업로드된 로고 주소를 받지 못했어요.');
+      setField('logoUrl', uploadedUrl);
+    } catch (err) {
+      setLogoUploadError(extractErrorMessage(err, '로고 이미지를 업로드하지 못했어요.'));
+    }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -102,6 +119,9 @@ export function TournamentSponsorsTab({
         form={form}
         mode={formMode}
         pending={formPending}
+        uploadingLogo={uploadImages.isPending}
+        logoUploadError={logoUploadError}
+        onSelectLogo={(file) => void handleSelectLogo(file)}
         setField={setField}
         onSubmit={handleSubmit}
         onCancel={editingSponsorId ? resetForm : undefined}
@@ -173,6 +193,8 @@ export function TournamentSponsorsTab({
           ))}
         </div>
       )}
+
+      {!isPending && !isError ? <TournamentSponsorsPreview sponsors={sponsors} /> : null}
     </div>
   );
 }

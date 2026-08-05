@@ -8,6 +8,6 @@ export class PopupsController {
 
   @Get('active')
   async getActive(@Query() query: ActivePopupQueryDto) {
-    return { popup: await this.popupsService.findActive(query.screen) };
+    return { popup: await this.popupsService.findActive(query.screen, query.path) };
   }
 }

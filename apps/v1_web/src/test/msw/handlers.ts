@@ -413,8 +413,13 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/home`, () => ok(v1HomeFixture)),
   http.get(`${api}/popups/active`, ({ request }) => {
-    const screen = new URL(request.url).searchParams.get('screen');
-    const row = v1AdminPopupsFixture.find((popup) =>
+    const url = new URL(request.url);
+    const screen = url.searchParams.get('screen');
+    const path = url.searchParams.get('path');
+    const exactRow = path ? v1AdminPopupsFixture.find((popup) =>
+      popup.status === 'published' && popup.targetPaths?.includes(path),
+    ) : undefined;
+    const row = exactRow ?? v1AdminPopupsFixture.find((popup) =>
       popup.status === 'published' && Boolean(screen) && popup.targetScreens.includes(screen as never),
     );
     return ok({
@@ -423,6 +428,7 @@ export const v1MswHandlers = [
         title: row.title,
         body: row.body,
         targetScreens: row.targetScreens,
+        targetPaths: row.targetPaths ?? [],
         linkUrl: row.linkUrl,
         linkLabel: row.linkLabel,
         publishedAt: row.publishedAt,
@@ -677,6 +683,7 @@ export const v1MswHandlers = [
       content: body.content,
       contentVersion: 1,
       targetScreens: body.targetScreens,
+      targetPaths: body.targetPaths,
       linkUrl: body.linkUrl ?? null,
       linkLabel: body.linkLabel ?? null,
       status: body.status,

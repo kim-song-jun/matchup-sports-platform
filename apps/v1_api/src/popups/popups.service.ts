@@ -6,30 +6,46 @@ import { PopupTargetScreen } from './popup-screen';
 export class PopupsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findActive(screen: PopupTargetScreen) {
+  async findActive(screen: PopupTargetScreen, path?: string) {
     const now = new Date();
-    const popup = await this.prisma.v1Popup.findFirst({
+    const activeWindow = {
+      status: 'published' as const,
+      audience: 'public' as const,
+      AND: [
+        { OR: [{ displayStartAt: null }, { displayStartAt: { lte: now } }] },
+        { OR: [{ displayEndAt: null }, { displayEndAt: { gt: now } }] },
+      ],
+    };
+    const select = {
+      id: true,
+      title: true,
+      body: true,
+      contentJson: true,
+      contentVersion: true,
+      targetScreens: true,
+      targetPaths: true,
+      linkUrl: true,
+      linkLabel: true,
+      publishedAt: true,
+    };
+    const orderBy = [{ publishedAt: 'desc' as const }, { createdAt: 'desc' as const }];
+
+    const exactPopup = path ? await this.prisma.v1Popup.findFirst({
       where: {
-        status: 'published',
-        audience: 'public',
+        ...activeWindow,
+        targetPaths: { has: path },
+      },
+      orderBy,
+      select,
+    }) : null;
+
+    const popup = exactPopup ?? await this.prisma.v1Popup.findFirst({
+      where: {
+        ...activeWindow,
         targetScreens: { has: screen },
-        AND: [
-          { OR: [{ displayStartAt: null }, { displayStartAt: { lte: now } }] },
-          { OR: [{ displayEndAt: null }, { displayEndAt: { gt: now } }] },
-        ],
       },
-      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
-      select: {
-        id: true,
-        title: true,
-        body: true,
-        contentJson: true,
-        contentVersion: true,
-        targetScreens: true,
-        linkUrl: true,
-        linkLabel: true,
-        publishedAt: true,
-      },
+      orderBy,
+      select,
     });
 
     return popup
@@ -40,6 +56,7 @@ export class PopupsService {
           content: popup.contentJson,
           contentVersion: popup.contentVersion,
           targetScreens: popup.targetScreens,
+          targetPaths: popup.targetPaths,
           linkUrl: popup.linkUrl,
           linkLabel: popup.linkLabel,
           publishedAt: popup.publishedAt,

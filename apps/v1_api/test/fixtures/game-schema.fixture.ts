@@ -26,15 +26,15 @@ export const gameSchemaFixture = {
   now: new Date('2026-07-29T00:00:00.000Z'),
 } as const;
 
-// Re-pinned for Task 10. The schema hash covers apps/v1_api/prisma/schema.prisma,
-// whose only change since the previous pin is one additive line on
-// V1TournamentFixture:
-//   @@index([status, id], map: "v1_tournament_fixtures_status_id_backfill_idx")
-// backing migration 20260803000100_v1_task10_game_result_backfill. The migration
-// hash below is UNCHANGED, which proves the bound Task 6 migration
-// (20260729000100_v1_game_operations) was not touched.
+// Re-pinned for the lineup formation/pitch-position feature. The schema hash
+// covers apps/v1_api/prisma/schema.prisma, whose only change since the
+// previous pin is three additive fields backing migration
+// 20260805000100_v1_game_lineup_formation_positions:
+//   V1GameLineup.formation, V1GameParticipant.positionX/positionY
+// The migration hash below is UNCHANGED, which proves the bound Task 6
+// migration (20260729000100_v1_game_operations) was not touched.
 export const gameSchemaSourceManifest = {
-  schema: '18d15547682a98e0af3845cd354f3fe45059dbfb21d4071c89eb53f56c24318f',
+  schema: '5020bd920891c8efb772fd789c1d4e3bb882360a11682b5c6b4b63578dbc62a3',
   migration: 'bda8608ee5b4498939eea0b68ac837612338e781e09a16a41f7325ff971110d7',
 } as const;
 

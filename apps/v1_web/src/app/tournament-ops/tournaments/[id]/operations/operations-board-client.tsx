@@ -15,6 +15,7 @@ import { formatAdminDateTime } from '@/lib/date-utils';
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
 import { GameStateBadge, WarningBadge } from '@/components/tournament-ops/badges';
+import { TournamentProgressStepper, buildTournamentStages } from '@/components/tournaments/tournament-progress-stepper';
 import type {
   V1GameState,
   V1TournamentOperationsBoardItem,
@@ -87,6 +88,12 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     }
     return map;
   }, [tournament.data?.fixtures]);
+
+  /* 소비자용 순위·브래킷 화면(/tournaments/:id/bracket)은 이미 이 스테퍼로 대회
+   * 진행 단계를 보여준다. 운영 보드에는 같은 정보가 표에 흩어져 있어서 스태프가
+   * "지금 대회가 어느 단계인지"를 표를 다 훑어야 알 수 있었다 — 소비자 화면과
+   * 데이터 소스가 같으므로(둘 다 useV1Tournament) 새 API 호출 없이 재사용한다. */
+  const stages = useMemo(() => (tournament.data ? buildTournamentStages(tournament.data) : []), [tournament.data]);
 
   const liveWarningsByFixtureId = useMemo(() => {
     const map = new Map<string, readonly V1TournamentOperationsWarningCode[]>();
@@ -176,6 +183,12 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           <RefreshCw size={18} aria-hidden="true" className={board.isFetching ? 'animate-spin' : ''} />
         </button>
       </div>
+
+      {stages.length > 0 ? (
+        <div className="border-y border-gray-100 dark:border-white/10 py-3 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8">
+          <TournamentProgressStepper stages={stages} />
+        </div>
+      ) : null}
 
       {/* ── 필터 ─────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="운영 보드 필터">

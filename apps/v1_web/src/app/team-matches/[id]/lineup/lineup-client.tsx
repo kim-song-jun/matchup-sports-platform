@@ -98,6 +98,14 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   // 두 가지 뷰다 — 기본은 명단(기존 화면과 동일한 첫인상 유지), 사용자가 "피치 배치"를
   // 눌러야 전환된다.
   const [activeView, setActiveView] = useState<'roster' | 'pitch'>('roster');
+  // 피치 배치(코트 위 포지션 시각화)는 지금은 축구/풋살 코트 도형(PitchFormationEditor)만
+  // 구현돼 있다. 농구·배드민턴·아이스하키 등은 코트 모양·포지션 개념이 아예 다르므로
+  // 이 컴포넌트를 그대로 재사용할 수 없다 — TODO: 종목별 코트 배치 컴포넌트를 추가하고
+  // 이 allowlist를 확장한다. team-match 응답이 안정적인 sport.code를 아직 노출하지
+  // 않아 한글 이름으로 매칭한다(코드가 추가되면 교체).
+  const formationSupportedSportName = teamMatchQuery.data?.sport?.name ?? null;
+  const formationSupported =
+    formationSupportedSportName !== null && ['축구', '풋살'].includes(formationSupportedSportName);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const saveMutation = useV1SaveTeamMatchLineup(teamMatchId);
@@ -379,9 +387,20 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         </div>
 
         {activeView === 'pitch' ? (
-          <section aria-labelledby="lineup-pitch-heading" style={{ marginBottom: 16 }}>
+          <section
+            aria-labelledby="lineup-pitch-heading"
+            // 편집 가능한 상태에서는 화면 하단에 고정된 "라인업 제출하기" 바(.tm-fixed-cta)가
+            // 겹칠 수 있는 여유 공간을 아래에 둔다 — 안 그러면 피치 하단(자기 진영 골대 쪽,
+            // 골키퍼 토큰 위치)이 고정 바에 가려 보이지 않는다(실제 화면 확인으로 발견).
+            style={{ marginBottom: phase?.editable ? 112 : 16 }}
+          >
             <SectionTitle id="lineup-pitch-heading" title="피치 배치" />
-            {state.starters.length === 0 ? (
+            {!formationSupported ? (
+              <EmptyState
+                title="이 종목은 피치 배치를 아직 지원하지 않아요"
+                sub={`${formationSupportedSportName ?? '이 종목'}은 축구·풋살과 코트 모양·포지션 개념이 달라 준비 중이에요. 명단 탭에서 선발·후보는 그대로 관리할 수 있어요.`}
+              />
+            ) : state.starters.length === 0 ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
                 먼저 명단에서 선발을 등록해야 피치에 배치할 수 있어요.
               </p>

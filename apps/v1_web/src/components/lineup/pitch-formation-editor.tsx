@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { Card } from '@/components/v1-ui/primitives';
 import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 
 /**
@@ -123,7 +124,7 @@ export function PitchFormationEditor({
         aspectRatio: `1 / ${1 / PITCH_ASPECT}`,
         borderRadius: 12,
         overflow: 'hidden',
-        background: '#1f8a4c',
+        background: `${TURF_STRIPES}, #1f8a4c`,
         cursor: editable && selectedWaitingKey !== null ? 'crosshair' : 'default',
         touchAction: 'none',
         flexShrink: 0,
@@ -159,12 +160,14 @@ export function PitchFormationEditor({
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', justifyContent: 'center', flexWrap: 'wrap' }}>
         {pitch}
-        {/* 데스크톱 전용 사이드 패널 — 모바일에서는 숨기고 하단 드로어로 대체한다. */}
-        <div className="tm-show-desktop" style={{ width: 260, flexShrink: 0 }}>
+        {/* 데스크톱 전용 사이드 패널 — 모바일에서는 숨기고 하단 드로어로 대체한다.
+            카드(.tm-card) 배경·테두리를 둬야 옆에 뭔가 있다는 게 눈에 보인다 —
+            배경 없는 텍스트만 있으면 실제 화면에서는 "아무것도 없는 것"처럼 보인다. */}
+        <Card pad={16} className="tm-show-desktop" style={{ width: 260, flexShrink: 0 }}>
           {controls}
-        </div>
+        </Card>
       </div>
 
       {placed.length > 0 && editable ? (
@@ -364,6 +367,11 @@ function FormationSheet({
   );
 }
 
+/** 잔디 결(터프 스트라이프) — 실제 구장처럼 밝기가 다른 가로 띠를 교대로 깐다.
+ * 순수 CSS 그라디언트라 SVG 라인 렌더링과 분리해 배경으로만 쓴다. */
+const TURF_STRIPES =
+  'repeating-linear-gradient(180deg, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 8%, rgba(0,0,0,0.04) 8%, rgba(0,0,0,0.04) 16%)';
+
 function PitchLines() {
   return (
     <svg
@@ -375,16 +383,25 @@ function PitchLines() {
       {/* 우리 팀 진영 절반만 그린다(전체 축구장이 아님). 골대는 화면 아래쪽(own goal),
           하프라인은 위쪽 — 좌표계가 y=0(골라인)을 CSS top:100%(피치 하단)로, y=100(하프
           라인)을 top:0%로 매핑하므로(PlayerToken의 topPct = 100 - positionY) 그림도
-          같은 방향으로 맞춰야 골키퍼 좌표(y≈6)가 실제 골대 옆에 표시된다. */}
-      <rect x={2} y={2} width={96} height={96} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={0.6} />
-      {/* 하프라인 + 센터 서클의 절반(우리 진영 쪽으로 내려오는 호) */}
-      <line x1={2} y1={2} x2={98} y2={2} stroke="rgba(255,255,255,0.85)" strokeWidth={0.8} />
-      <path d="M 38 2 A 12 12 0 0 0 62 2" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={0.5} />
-      {/* 골라인 근처 페널티 박스 · 골에어리어 · 골대 */}
-      <rect x={28} y={82} width={44} height={16} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={0.6} />
-      <rect x={38} y={91} width={24} height={7} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={0.6} />
-      <path d="M 38 82 A 12 12 0 0 1 62 82" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={0.5} />
-      <rect x={44} y={97} width={12} height={3} fill="rgba(255,255,255,0.5)" />
+          같은 방향으로 맞춰야 골키퍼 좌표(y≈6)가 실제 골대 옆에 표시된다.
+          박스 비율은 실제 축구장 규격(페널티박스 40.3m×16.5m, 골에어리어 18.3m×5.5m를
+          코트 폭 68m·하프라인까지 거리 기준으로 환산)에 맞춰 그린다 — 이전 버전은
+          임의 수치라 폭이 좁고 깊이가 얕아 "대충 그린" 느낌이 났다. */}
+      <rect x={2} y={2} width={96} height={96} rx={1.5} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={0.7} />
+      {/* 하프라인 + 센터 서클의 절반(우리 진영 쪽으로 내려오는 호) + 센터 스폿 */}
+      <line x1={2} y1={2} x2={98} y2={2} stroke="rgba(255,255,255,0.9)" strokeWidth={0.9} />
+      <path d="M 34.5 2 A 15.5 15.5 0 0 0 65.5 2" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth={0.55} />
+      <circle cx={50} cy={2} r={0.6} fill="rgba(255,255,255,0.85)" />
+      {/* 페널티 박스 · 골에어리어 · 페널티 스폿 · 페널티 아크 */}
+      <rect x={20.5} y={70} width={59} height={28} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={0.7} />
+      <rect x={36.5} y={88} width={27} height={10} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth={0.7} />
+      <circle cx={50} cy={80} r={0.7} fill="rgba(255,255,255,0.85)" />
+      <path d="M 38 70 A 12.5 12.5 0 0 1 62 70" fill="none" stroke="rgba(255,255,255,0.65)" strokeWidth={0.55} />
+      {/* 코너 아크(양쪽) */}
+      <path d="M 2 94.5 A 3.5 3.5 0 0 0 5.5 98" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={0.5} />
+      <path d="M 98 94.5 A 3.5 3.5 0 0 1 94.5 98" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={0.5} />
+      {/* 골대 — 골라인 바로 바깥(y>98)에 살짝 걸치는 프레임으로 표현 */}
+      <rect x={42.5} y={98} width={15} height={2.6} fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth={0.8} />
     </svg>
   );
 }
@@ -450,19 +467,30 @@ function PlayerToken({
       >
         {entry.jerseyNumber ?? '-'}
       </button>
+      {/* 라벨은 토큰 폭(36~46px)에 종속되지 않도록 독립적으로 위치·폭을 잡는다 —
+          이름이 길면(예: "중흥의푸른오른발") 부모 폭(TOKEN_SIZE_PCT)에 맞춰
+          block으로 렌더하면 글자가 토큰 밖으로 넘쳐 다른 토큰과 겹친다.
+          absolute + 고정 maxWidth + ellipsis로 항상 토큰 중심 아래에 조용히 잘려 보인다. */}
       <span
+        title={entry.displayName}
         aria-hidden="true"
         style={{
-          display: 'block',
+          position: 'absolute',
+          top: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          marginTop: 3,
+          maxWidth: 84,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
           textAlign: 'center',
-          marginTop: 2,
           fontSize: 10,
           fontWeight: 600,
           color: '#fff',
-          background: 'rgba(0,0,0,0.55)',
-          padding: '1px 5px',
+          background: 'rgba(0,0,0,0.6)',
+          padding: '1px 6px',
           borderRadius: 6,
-          whiteSpace: 'nowrap',
         }}
       >
         {entry.displayName}

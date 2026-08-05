@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '@playwright/test';
-import { apiPost, commandId } from './helpers/v1-http';
+import { apiGet, apiPost, commandId, unwrap } from './helpers/v1-http';
+import {
+  createTournamentFixtureGame,
+  endGameToSubmittedRevision,
+} from './helpers/tournament-fixture';
 
 /**
  * E2E-TOUR-01 -- tournament result review: reject / request_supplement /
@@ -24,33 +28,32 @@ import { apiPost, commandId } from './helpers/v1-http';
  *     wired end-to-end through `TournamentResultReviewController` into the
  *     service, not merely that a guard exists).
  *
- * ## What is genuinely blocked, and why (not silently passed)
+ * PLUS (2026-08-05, previously blocked, now unblocked -- see
+ * `helpers/tournament-fixture.ts` and `helpers/ws-takeover.ts` for the full
+ * provisioning chain) the scenario's actual subject on a real
+ * `TOURNAMENT_FIXTURE` game carrying a real result revision:
+ *   - `review-decision` `reject` on a SUBMITTED revision -> REJECTED.
+ *   - `supersede-and-submit` against a base that is NOT REJECTED/
+ *     SUPPLEMENT_REQUESTED (still SUBMITTED) -> 409
+ *     `RESULT_RESUBMISSION_NOT_ALLOWED`, the "wrong-base rejection".
+ *   - `supersede-and-submit` with a stale `expectedVersion` against an
+ *     otherwise-eligible REJECTED base -> 409 `VERSION_CONFLICT`, and the
+ *     revision list is unchanged afterward (no orphan DRAFT successor row) --
+ *     the "atomic successor rollback" (`assertGameCommandContext`'s CAS check
+ *     runs and throws before `withResultCommand`'s `mutate()` callback ever
+ *     creates the successor row, and the whole command runs inside one
+ *     `$transaction`, so a mid-callback throw would roll back any partial
+ *     write just the same).
+ *   - `supersede-and-submit` with the correct `expectedVersion` against the
+ *     REJECTED base -> a new SUBMITTED successor revision (resubmission).
+ *   - `review-decision` `request_supplement` on that successor ->
+ *     SUPPLEMENT_REQUESTED.
  *
- * The scenario's actual subject -- a director/platform_ops actually
- * rejecting or requesting supplement on a SUBMITTED tournament result,
- * resubmitting via supersede-and-submit, rejecting a supersede against the
- * wrong base revision, and observing the atomic successor rollback on a
- * failed CAS -- requires a real `V1Game` with `sourceType =
- * TOURNAMENT_FIXTURE` carrying an actual SUBMITTED `V1GameResultRevision`.
- * As documented in detail in `tournament-result-correction.spec.ts`'s file
- * doc (E2E-CORR-01, same underlying precondition), no seed script in this
- * repo produces one -- `V1TournamentFixture` rows created via raw Prisma
- * writes in `seed-alpha-tournament-qa.ts` bypass
- * `TournamentBracketService.publishBracket`, the only code path that
- * creates the backing `V1Game`.
- *
- * UPDATE (2026-08-04): the bracket half of that chain is now verified and is
- * only four admin calls -- see the step-by-step recipe in
- * `tournament-result-correction.spec.ts`'s file doc. Team registrations and
- * `.../group-teams` turned out to be unnecessary; a team-less fixture is
- * enough for `publishBracket` to create the backing game. What is still
- * missing for THIS spec is the leg after that: a granted
- * `tournament_director`/`platform_ops` staff assignment plus a submitted
- * lineup and a SUBMITTED result revision to review.
- *
- * `test.fixme()` marks the blocked business-logic assertions explicitly so
- * they show as a flagged, non-passing entry in the report rather than a
- * spec that "passes" without ever exercising review-decision/supersede.
+ * Every mutation reuses the same all-zero score (`{home:0,away:0}`) the
+ * `end` command derives from an empty event log -- `supersede-and-submit`'s
+ * `validateGameResultInvariants` 422s `SCORE_EVENT_MISMATCH` against any
+ * score that doesn't match the actually-appended goal events, and these
+ * specs never append any.
  */
 test.describe('[E2E-TOUR-01] 대회 결과 검토 (반려/보완요청/재제출)', () => {
   test('미인증은 401, 존재하지 않는 gameId는 404 -- review-decision/supersede-and-submit 공통 경계', async ({
@@ -95,20 +98,127 @@ test.describe('[E2E-TOUR-01] 대회 결과 검토 (반려/보완요청/재제출
     }
   });
 
-  // MUST stay `test.fixme(title, body)` (a DECLARED fixme test), never the bare
-  // `test.fixme(true, description)` modifier. Verified against Playwright 1.58.2's runtime
-  // (`common/testType.js:_modifier` -> `suite._staticAnnotations`, applied in
-  // `common/suiteUtils.js` by walking each test's parent chain AFTER the file finishes loading):
-  // the boolean-condition form called in a describe body annotates the WHOLE suite, so the
-  // passing boundary test above would silently become `expectedStatus: 'skipped'` too --
-  // declaration order does not protect it. Confirmed empirically with `playwright test --list`.
-  test.fixme(
-    'reject/request_supplement 결정, supersede-and-submit 재제출, wrong-base 거부, 원자적 후속 롤백',
-    async () => {
-      // BLOCKED: every assertion here needs a live TOURNAMENT_FIXTURE Game carrying a real
-      // SUBMITTED result revision, reachable only through the full admin bracket-publish chain --
-      // see the file-level doc comment above and tournament-result-correction.spec.ts
-      // (E2E-CORR-01) for the exact precondition and why this harness cannot provision it.
-    },
-  );
+  test('reject/request_supplement 결정, supersede-and-submit 재제출, wrong-base 거부, 원자적 후속 롤백', async ({
+    request,
+  }) => {
+    const email = 'admin@teameet.v1';
+    const { gameId } = await createTournamentFixtureGame(request, { titlePrefix: 'E2E-TOUR-01' });
+    const submitted = await endGameToSubmittedRevision(request, { gameId, email });
+
+    // wrong-base rejection: the base is still SUBMITTED, not REJECTED/SUPPLEMENT_REQUESTED.
+    const wrongBaseId = commandId();
+    const wrongBase = await apiPost(
+      request,
+      `/api/v1/games/${gameId}/result-revisions/${submitted.revisionId}/supersede-and-submit`,
+      {
+        email,
+        idempotencyKey: wrongBaseId,
+        data: {
+          expectedVersion: submitted.gameVersion,
+          clientCommandId: wrongBaseId,
+          score: { home: 0, away: 0 },
+          actualParticipants: [],
+          eventsHash: submitted.eventsHash,
+          reason: 'wrong-base probe',
+        },
+      },
+    );
+    expect(wrongBase.status, JSON.stringify(wrongBase.body)).toBe(409);
+    expect((wrongBase.body as { code?: string }).code).toBe('RESULT_RESUBMISSION_NOT_ALLOWED');
+
+    // reject the SUBMITTED revision.
+    const rejectId = commandId();
+    const rejected = await apiPost(
+      request,
+      `/api/v1/games/${gameId}/result-revisions/${submitted.revisionId}/review-decision`,
+      {
+        email,
+        idempotencyKey: rejectId,
+        data: {
+          expectedVersion: submitted.gameVersion,
+          clientCommandId: rejectId,
+          decision: 'reject',
+          reason: 'missing scorer detail',
+        },
+      },
+    );
+    const rejectedData = unwrap<{ version: number; revisionState: string }>(rejected);
+    expect(rejectedData.revisionState).toBe('REJECTED');
+    const gameVersionAfterReject = rejectedData.version;
+
+    // atomic successor rollback: supersede-and-submit with a STALE expectedVersion against the
+    // now-eligible REJECTED base must fail closed and create zero new rows.
+    const staleId = commandId();
+    const staleAttempt = await apiPost(
+      request,
+      `/api/v1/games/${gameId}/result-revisions/${submitted.revisionId}/supersede-and-submit`,
+      {
+        email,
+        idempotencyKey: staleId,
+        data: {
+          expectedVersion: gameVersionAfterReject - 1,
+          clientCommandId: staleId,
+          score: { home: 0, away: 0 },
+          actualParticipants: [],
+          eventsHash: submitted.eventsHash,
+          reason: 'stale version probe',
+        },
+      },
+    );
+    expect(staleAttempt.status, JSON.stringify(staleAttempt.body)).toBe(409);
+    expect((staleAttempt.body as { code?: string }).code).toBe('VERSION_CONFLICT');
+
+    const revisionsAfterStaleAttempt = unwrap<unknown[]>(
+      await apiGet(request, `/api/v1/games/${gameId}/result-revisions`, { email }),
+    );
+    expect(revisionsAfterStaleAttempt).toHaveLength(1);
+
+    // resubmission: supersede-and-submit with the CORRECT expectedVersion succeeds.
+    const resubmitId = commandId();
+    const resubmitted = await apiPost(
+      request,
+      `/api/v1/games/${gameId}/result-revisions/${submitted.revisionId}/supersede-and-submit`,
+      {
+        email,
+        idempotencyKey: resubmitId,
+        data: {
+          expectedVersion: gameVersionAfterReject,
+          clientCommandId: resubmitId,
+          score: { home: 0, away: 0 },
+          actualParticipants: [],
+          eventsHash: submitted.eventsHash,
+          reason: 'resubmit after reject',
+        },
+      },
+    );
+    const resubmittedData = unwrap<{ version: number; revisionId: string; revisionState: string }>(
+      resubmitted,
+    );
+    expect(resubmittedData.revisionState).toBe('SUBMITTED');
+    expect(resubmittedData.revisionId).not.toBe(submitted.revisionId);
+
+    const revisionsAfterResubmit = unwrap<unknown[]>(
+      await apiGet(request, `/api/v1/games/${gameId}/result-revisions`, { email }),
+    );
+    expect(revisionsAfterResubmit).toHaveLength(2);
+
+    // request_supplement on the new SUBMITTED successor.
+    const supplementId = commandId();
+    const supplemented = await apiPost(
+      request,
+      `/api/v1/games/${gameId}/result-revisions/${resubmittedData.revisionId}/review-decision`,
+      {
+        email,
+        idempotencyKey: supplementId,
+        data: {
+          expectedVersion: resubmittedData.version,
+          clientCommandId: supplementId,
+          decision: 'request_supplement',
+          reason: 'need lineup detail',
+        },
+      },
+    );
+    const supplementedData = unwrap<{ revisionState: string }>(supplemented);
+    expect(supplementedData.revisionState).toBe('SUPPLEMENT_REQUESTED');
+  });
 });

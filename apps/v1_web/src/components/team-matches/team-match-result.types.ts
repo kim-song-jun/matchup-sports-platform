@@ -1,4 +1,15 @@
-import type { V1GameResultRevisionState, V1TeamMatchLineupBenchEntry, V1TeamMatchLineupStarter } from '@/types/api';
+import { randomUuid } from '@/lib/uuid';
+import type {
+  V1GameResultRevision,
+  V1GameResultRevisionState,
+  V1TeamMatchLineupBenchEntry,
+  V1TeamMatchLineupStarter,
+} from '@/types/api';
+
+/** 득점 이벤트 한 건 — participantId가 null이면 "미지정"(누가 넣었는지 특정하지 않음). */
+export type GoalDraft = { key: string; participantId: string | null };
+/** 카드 이벤트 한 건. participantId가 ''이면 아직 선수를 고르지 않은 상태(제출 차단 대상). */
+export type CardDraft = { key: string; participantId: string; type: 'yellow' | 'red' };
 
 /** One roster row the host can attribute goals/cards to on the result form. */
 export type ResultRosterRow = {
@@ -52,6 +63,73 @@ export function hashResultPayload(payload: unknown): string {
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * `V1GameResultRevision.score` 에서 정규시간 홈/원정 점수만 뽑아낸다 — 두 응답 형태
+ * (`{regulation, goals, ...}` 레거시 백필 / `{home, away}` 이 화면이 만든 결과)를 모두
+ * 처리한다. `scoreLabel`(`team-match-result-client.tsx`)과 같은 분기 로직이지만 그쪽은
+ * 문자열 렌더링용이고 이쪽은 폼 재구성(재수화)용이라 별도 함수로 둔다 — 하나로 합치면
+ * 렌더링 전용 컴포넌트가 폼 상태 재구성 책임까지 지게 돼 테스트 안전성이 떨어진다.
+ */
+export function revisionScoreHome(revision: V1GameResultRevision): number {
+  const score = revision.score;
+  if (!score) return 0;
+  if ('regulation' in score) return score.regulation?.home ?? 0;
+  return score.home;
+}
+
+export function revisionScoreAway(revision: V1GameResultRevision): number {
+  const score = revision.score;
+  if (!score) return 0;
+  if ('regulation' in score) return score.regulation?.away ?? 0;
+  return score.away;
+}
+
+/**
+ * "수정하기" 클릭 시 로컬 폼을 서버에 이미 존재하는 DRAFT/SUBMITTED revision 내용으로
+ * 되살린다. 같은 세션에서 "결과 작성 완료"를 누른 직후라면 로컬 state가 이미 이 값들을
+ * 그대로 갖고 있어 이 함수가 필요 없지만(그 경로는 절대 값을 초기화하지 않는다), 새로고침
+ * 후 "수정하기"를 누르는 경우(로컬 state는 비어 있고 서버에만 DRAFT가 있는 경우) 이 함수
+ * 없이는 빈 폼이 뜬다.
+ *
+ * `resultParticipants` 에는 선수별 goals/cards **합계**만 있고 "몇 번째 골을 누가
+ * 넣었는지" 순서 정보는 없다 — 재구성 시 한 선수의 goals=2면 그 선수를 득점자로 지정한
+ * 골 슬롯 2개를 만든다. missingScorer 로 인해 참가자 합계보다 총 스코어가 크면(득점자를
+ * 지정하지 않은 골이 있었던 경우) 남는 슬롯은 미지정(participantId: null)으로 채운다.
+ */
+export function hydrateResultFormFromRevision(revision: V1GameResultRevision): {
+  homeGoals: GoalDraft[];
+  awayGoals: number;
+  cardDrafts: CardDraft[];
+  mvpParticipantId: string;
+  reason: string;
+} {
+  const homeGoals: GoalDraft[] = [];
+  const cardDrafts: CardDraft[] = [];
+  for (const row of revision.resultParticipants) {
+    for (let i = 0; i < row.goals; i += 1) {
+      homeGoals.push({ key: randomUuid(), participantId: row.participantId });
+    }
+    for (let i = 0; i < row.cards.yellow; i += 1) {
+      cardDrafts.push({ key: randomUuid(), participantId: row.participantId, type: 'yellow' });
+    }
+    for (let i = 0; i < row.cards.red; i += 1) {
+      cardDrafts.push({ key: randomUuid(), participantId: row.participantId, type: 'red' });
+    }
+  }
+  const homeScore = revisionScoreHome(revision);
+  while (homeGoals.length < homeScore) {
+    homeGoals.push({ key: randomUuid(), participantId: null });
+  }
+
+  return {
+    homeGoals,
+    awayGoals: revisionScoreAway(revision),
+    cardDrafts,
+    mvpParticipantId: revision.mvpParticipantId ?? '',
+    reason: revision.reason ?? '',
+  };
 }
 
 export const RESULT_REVISION_STATE_LABEL: Record<V1GameResultRevisionState, string> = {

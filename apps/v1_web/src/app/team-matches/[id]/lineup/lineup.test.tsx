@@ -609,4 +609,128 @@ describe('TeamMatchLineupPageClient', () => {
       vi.useRealTimers();
     }
   });
+
+  // ── P0-1 regression (insane review, 2026-08 GPT Pro): flush-then-submit ──
+  // Before this fix, clicking "라인업 제출하기" always submitted with state.baseRevision
+  // regardless of dirty — a jersey number entered right before the click could be submitted
+  // as the stale server revision because autosave only fires 900ms after the last edit. The
+  // fix makes handleSubmit a serial state machine: while dirty, a click flushes a save
+  // immediately (no debounce wait) and only submits once that save acks with a fresh
+  // revision. Reverting to `submitMutation.mutate({ expectedVersion: state.baseRevision })`
+  // unconditionally makes this fail — the submit would fire before the save.
+  it('flush-then-submit: clicking submit while dirty flushes the pending save first, then submits with the fresh revision', () => {
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        revision: 3,
+        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [{ membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active' }] },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    // 대기 팀원을 선발로 추가 → dirty=true. 자동저장 디바운스(900ms)는 아직 돌지 않았다.
+    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
+
+    // 곧바로 제출 버튼을 누른다 — 디바운스를 기다리지 않고 저장이 먼저 나가야 한다.
+    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+    expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
+    // 저장이 아직 ack되지 않았다 — 옛 revision(3)이 실린 채 제출이 나가면 안 된다.
+    expect(hoisted.submitMutate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '변경사항 저장 중…' })).toBeDisabled();
+
+    // 저장 ack(새 revision 5)가 오면, 그 사이 추가 편집이 없었으므로 곧장 그 revision으로
+    // 제출이 이어진다.
+    act(() => {
+      hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 5 });
+    });
+    expect(hoisted.submitMutate).toHaveBeenCalledTimes(1);
+    expect(hoisted.submitMutate.mock.calls[0][0]).toMatchObject({ expectedVersion: 5 });
+  });
+
+  // 저장이 실패하면 제출로 이어지지 않는다 — "저장 실패 시 제출 중단"을 명시적으로 검증한다.
+  it('flush-then-submit: a save failure aborts the pending submit instead of continuing with stale data', () => {
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        revision: 3,
+        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [{ membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active' }] },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+    expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      hoisted.saveMutate.mock.calls[0][1].onError(
+        new V1ApiError({
+          status: 'error',
+          statusCode: 500,
+          code: 'INTERNAL_ERROR',
+          message: '저장 실패',
+          timestamp: '2026-08-01T00:00:00.000Z',
+        }),
+      );
+    });
+
+    expect(hoisted.submitMutate).not.toHaveBeenCalled();
+    expect(
+      screen.getByText('변경사항을 저장하지 못해 라인업을 제출할 수 없어요. 다시 시도해 주세요.'),
+    ).toBeInTheDocument();
+    // 버튼이 다시 눌러볼 수 있는 상태로 돌아온다(제출 대기 상태에 갇히지 않는다).
+    expect(screen.getByRole('button', { name: '라인업 제출하기' })).toBeInTheDocument();
+  });
+
+  // ── P1-3 regression (insane review, 2026-08 GPT Pro): 제외 == 완전 삭제, undo 필요 ──
+  // "제외"(현재 "명단에서 제거")는 moveEntry(선발↔후보)와 달리 완전 삭제라 등번호·GK
+  // 지정이 통째로 사라졌었다. 5초 실행취소 토스트가 원래 자리에 원래 값 그대로 복원하는지
+  // 검증한다.
+  it('undo removal: restores the removed entry (jersey number + GK flag) at its original slot', () => {
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        revision: 0,
+        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 9, position: null, goalkeeper: true, positionX: null, positionY: null }],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText('선발 (1)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 선발 명단에서 제거' }));
+
+    expect(screen.getByText('선발 (0)')).toBeInTheDocument();
+    expect(screen.getByText('홍길동 선수를 명단에서 제거했어요.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '실행 취소' }));
+
+    expect(screen.getByText('선발 (1)')).toBeInTheDocument();
+    expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(9);
+    expect(screen.getByRole('button', { name: '홍길동, 골키퍼로 지정됨' })).toBeInTheDocument();
+    expect(screen.queryByText('홍길동 선수를 명단에서 제거했어요.')).not.toBeInTheDocument();
+  });
 });

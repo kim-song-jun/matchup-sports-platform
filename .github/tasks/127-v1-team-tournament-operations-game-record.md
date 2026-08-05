@@ -1377,3 +1377,74 @@ completion is now an atomic side effect of the host submitting a validated resul
 확인이 필요하면 `git show <구체적 ref>:<path>` 형태를 기본으로 쓴다. 오판을 발견한 즉시
 사용자에게 승인 자체가 잘못된 전제에 기반했음을 정정하고, 실행하지 않았다(전역 규칙: 사용자
 승인이 있어도 그 전제가 무너지면 재확인 없이 진행하지 않는다).
+
+## 페르소나 여정 1차 검수 18건 재검수 (2026-08-05) — verify 단계 세션 한도 미완료분 대체 수행
+
+1차 여정 검수 워크플로(`wf_ec5745c6-7bb`)가 owner(7)/platform_ops·tournament_director(5)/
+visitor·host(5)/manager(1) = 18건의 finding을 냈다. 오탐 제거를 맡은 verify 에이전트가
+세션 한도로 `result` 없이 중단됐다(`journal.jsonl`에 `started`만 있고 `result` 없음).
+직접 Read/라이브 재현으로 18건 전건을 재검수했다.
+
+### 확정된 실결함 — 1건 수정, 1건 문서화
+
+- **visitor-03(공개 대회 경기 일정 페이지, desktop)** — `AppChrome`에 `desktopHead`가
+  빠져 있어 대회명을 포함한 `title`(h1)이 데스크톱에서 아예 렌더되지 않고, 화면엔 콘텐츠
+  내부의 "경기 일정" 섹션 라벨(제네릭, 대회명 없음)만 보였다. 공유 링크로 바로 들어온
+  방문자가 화면만 보고는 어느 대회인지 알 수 없었다. **수정 완료**
+  (`apps/v1_web/src/app/tournaments/[id]/schedule/schedule-page-client.tsx`,
+  로딩/에러/성공 3개 분기 모두에 `desktopHead` 추가, 라이브 스크린샷으로 대회명 표시 확인,
+  `public-game-records.test.tsx` 23/23 통과, tsc 0).
+- **(신규 발견, 문서화만)** 대회 운영 보드(`/tournament-ops/tournaments/:id/operations`)의
+  경기 행이 클릭 불가능하다 — 실제 경기 운영 콘솔(`/fixtures/:fixtureId/operate`)로 가는
+  진입 경로가 UI 어디에도 없고 직접 URL 입력만 가능하다. tournament_director-02를
+  재현하려다 발견. 라우팅/온보딩 설계 판단이 필요해 이번 세션에서는 고치지 않고 기록만 남긴다.
+
+### 오탐(재현 안 됨) — 10건
+
+- **owner-03/05/06/07(major, header 없음 주장 4건)** — 일정 만들기·수정·팀 전적·라인업
+  desktop 스크린샷 전부에서 "← 타이틀" 헤더가 명확히 존재. 라이브 재현 시도 결과
+  4건 모두 오탐(원 검수가 참조한 캡처가 손상/오염됐을 가능성 — 아래 환경 이슈 참고).
+- **tournament_director-02(TAKEOVER_UNAVAILABLE)** — 원 finding이 지목한 "Task 10
+  Home vs Task 10 Away" 경기와 별도의 종료된 경기 콘솔 2곳 모두에서 재현 안 됨(둘 다
+  "종료"+"실시간 연결됨" 정상 표시, 에러 배너 없음). medium confidence였고 재현 실패.
+- **platform_ops-03/04(결과 검토·결과 정정 = 고아 라우트 주장)** — 사이드바에 "결과 검토"
+  "결과 정정" 링크가 실제로 존재(`/result-review`, `/records/corrections`). 오탐.
+- **platform_ops-01(하단 아바타가 "서비스로 돌아가기" 텍스트를 가림)** — `document.querySelector`로
+  실제 DOM 검사 결과 그 링크는 아이콘(chevron-left)+텍스트만 있고 아바타 요소가 없다.
+  겹쳐 보인 원형 "N" 아바타는 **캡처에 쓰인 브라우저 자동화 도구 자체의 오버레이**이지
+  제품 UI가 아니다 — 이 세션 전체에서 찍은 모든 스크린샷에 동일 위치·동일 문자로
+  나타나 페르소나·페이지와 무관함을 확인.
+- **visitor-06(팀 전적/선수 기록 모바일 셸 불일치)** — 두 페이지 모두 동일한 셸
+  (뒤로가기+제목+벨 아이콘 헤더, 하단 플로팅 탭바)을 사용. 라이브 재캡처로 불일치 없음 확인.
+- **manager-01("신청 전..." 배너가 이미 활성 매니저에게 노출)** — 현재는
+  "이미 이 팀의 멤버예요. 운영 메뉴에서 팀을 관리해요." + "팀 채팅" CTA로 역할 인지형
+  문구가 정상 노출됨. 재현 안 됨.
+
+### 정상 설계로 확인(결함 아님) — 2건
+
+- **owner-07(minor, 라인업 편집 불가)** — "경기가 시작되어 라인업이 잠겼어요" +
+  "잠김" 배지 재현됨. 원 finding도 이미 low confidence로 "QA 픽스처가 이미 종료된
+  매치를 대상으로 잡았을 가능성"을 자체 표시했고, 실제로 이미 시작된 경기의 라인업을
+  잠그는 것은 의도된 동작이다.
+- **visitor-04(경기 상세 스코어보드에 "Task 10 Home"/"Task 10 Away" 영어 이름)** —
+  tournament_director-02 재현 과정에서 동일 이름이 실제로 나타나는 걸 확인. Task 10
+  백필 시드 데이터의 fixture 아티팩트이며 원 finding도 low confidence로 이 가능성을
+  자체 표시했다. 프로덕션 버그 아님.
+
+### 환경 이슈로 미검증 — 3건(그대로 유지)
+
+- **host-01(host 페르소나 0/4, 3개 뷰포트 전부)**, **visitor-01(tablet 전체 + mobile
+  일부)**, **owner-08(경기 결과 입력)** — 세 건 모두 검수 도중 공유 워크트리에서
+  `scripts/qa/persona-flows` 디렉터리 전체가 사라졌다는 동일 원인(다른 세션의 캡처
+  스크립트 재실행 추정). 이번 세션에서 그 디렉터리를 재확인했으나 여전히 없음
+  (`No such file or directory`) — 재캡처 없이는 검증 불가능한 순수 도구/환경 이슈이며
+  UI 결함이 아니다. 재캡처 후 재검수 필요.
+
+### owner-04 — 최초 "확정" 판단을 스크린샷 오독으로 재정정
+
+`computeStyle`로 실제 DOM 검사 전에는 "일정 취소" 버튼에 테두리가 없다고 오판했다.
+`getComputedStyle` 결과 `border: 1px solid rgb(229, 232, 235)`(연한 회색)가 실제로
+적용돼 있었고, 코드에도 이미 이 배색 선택 이유를 설명하는 주석이 있었다(danger 색을
+꽉 채우지 않고 outline만 주는 의도적 절제). 압축된 스크린샷에서 연한 회색 테두리가
+거의 안 보여 "테두리 없음"으로 오독한 것 — **코드 변경 없음**. computed style 확인
+없이 스크린샷만으로 "결함 확정" 판단하지 않는다는 교훈.

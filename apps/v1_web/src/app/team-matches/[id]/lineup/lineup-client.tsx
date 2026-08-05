@@ -468,8 +468,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                     {/* 예전엔 네이티브 라디오 + "선택됐을 때만 보이는 GK 텍스트"였는데, 브라우저
                         기본 라디오가 작고(터치 타겟 미달) 밋밋해서 "이게 뭘 누르는 버튼인지"
                         한눈에 안 읽힌다는 지적(QA)을 받았다. 항상 "GK" 글자가 보이는 토글 칩으로
-                        바꿔 미지정 상태도 눈에 띄게 하고, 색은 피치 배치 화면의 골키퍼 토큰 색
-                        (--orange500)과 맞춰 두 화면에서 같은 의미가 같은 색으로 읽히게 한다. */}
+                        바꿔 미지정 상태도 눈에 띄게 하고, 색은 피치 배치 화면의 골키퍼 토큰 색과
+                        맞춰 두 화면에서 같은 의미가 같은 색으로 읽히게 한다. orange50 배경 위
+                        orange500 텍스트는 대비 ~1.97:1로 WCAG AA 크게 미달(2026-08 QA 실측) —
+                        orange700(~4.92:1)으로 교체. */}
                     <button
                       type="button"
                       aria-pressed={entry.goalkeeper}
@@ -481,9 +483,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         minWidth: 44,
                         minHeight: 44,
                         borderRadius: 999,
-                        border: entry.goalkeeper ? '1.5px solid var(--orange500)' : '1px solid var(--border)',
+                        border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1px solid var(--border)',
                         background: entry.goalkeeper ? 'var(--orange50)' : 'var(--card-surface)',
-                        color: entry.goalkeeper ? 'var(--orange500)' : 'var(--text-muted)',
+                        color: entry.goalkeeper ? 'var(--orange700)' : 'var(--text-muted)',
                         fontSize: 12,
                         fontWeight: 800,
                         cursor: editable ? 'pointer' : 'default',

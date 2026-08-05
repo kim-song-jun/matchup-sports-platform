@@ -1,9 +1,4 @@
-import type {
-  V1GameResultCards,
-  V1GameResultRevisionState,
-  V1TeamMatchLineupBenchEntry,
-  V1TeamMatchLineupStarter,
-} from '@/types/api';
+import type { V1GameResultRevisionState, V1TeamMatchLineupBenchEntry, V1TeamMatchLineupStarter } from '@/types/api';
 
 /** One roster row the host can attribute goals/cards to on the result form. */
 export type ResultRosterRow = {
@@ -12,12 +7,6 @@ export type ResultRosterRow = {
   jerseyNumber: number | null;
   goalkeeper: boolean;
   started: boolean;
-};
-
-export type ResultRosterEntryDraft = {
-  participantId: string;
-  goals: number;
-  cards: V1GameResultCards;
 };
 
 export function toResultRosterRows(

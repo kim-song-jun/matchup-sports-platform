@@ -225,6 +225,46 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
       expect(submitMutateAsync).toHaveBeenCalledWith({ revisionId: 'rev-1', expectedVersion: 3 }),
     );
   });
+
+  // 재설계된 흐름: 홈 점수 입력 -> 그 개수만큼 득점자 드롭다운 -> 제출 시 선수별
+  // goals/cards 합계로 접혀서 기존 백엔드 계약(actualParticipants)에 실린다.
+  it('홈 점수를 2로 입력하면 득점자 드롭다운이 2개 생기고, 득점자를 지정한 뒤 제출하면 선수별 합계로 접혀서 전송된다', async () => {
+    createMutateAsync.mockResolvedValue({});
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+    fireEvent.change(screen.getByLabelText('호스트팀 (홈)'), { target: { value: '2' } });
+    const scorerSelects = screen.getAllByLabelText(/번 골 득점자/);
+    expect(scorerSelects).toHaveLength(2);
+    fireEvent.change(scorerSelects[0], { target: { value: 'p-1' } });
+    // 두 번째 골은 미지정(기본값)으로 남겨둔다 — 득점자 특정 없이도 제출 가능해야 한다.
+
+    fireEvent.click(screen.getByText('결과 작성 완료'));
+
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+    const payload = createMutateAsync.mock.calls[0][0];
+    expect(payload.score).toEqual({ home: 2, away: 0 });
+    expect(payload.actualParticipants).toEqual([
+      { participantId: 'p-1', sideId: 'side-home', started: true, goals: 1, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+    ]);
+  });
+
+  it('카드를 추가해 경고를 기록하고 MVP를 지정하면 제출 payload에 반영된다', async () => {
+    createMutateAsync.mockResolvedValue({});
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+    fireEvent.click(screen.getByText('+ 카드 추가'));
+    fireEvent.change(screen.getByLabelText('카드 종류'), { target: { value: 'yellow' } });
+    fireEvent.change(screen.getByLabelText('MVP 선택'), { target: { value: 'p-1' } });
+
+    fireEvent.click(screen.getByText('결과 작성 완료'));
+
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+    const payload = createMutateAsync.mock.calls[0][0];
+    expect(payload.mvpParticipantId).toBe('p-1');
+    expect(payload.actualParticipants).toEqual([
+      { participantId: 'p-1', sideId: 'side-home', started: true, goals: 0, cards: { yellow: 1, red: 0 }, goalkeeper: false },
+    ]);
+  });
 });
 
 describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청', () => {

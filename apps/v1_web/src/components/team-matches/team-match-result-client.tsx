@@ -15,18 +15,19 @@ import {
   useV1TeamMatchLineup,
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import { randomUuid } from '@/lib/uuid';
 import type {
   V1GameResultParticipantInput,
   V1GameResultRevision,
   V1TeamMatch,
   V1TeamMatchApiStatus,
 } from '@/types/api';
-import {
-  RESULT_REVISION_STATE_LABEL,
-  hashResultPayload,
-  toResultRosterRows,
-  type ResultRosterEntryDraft,
-} from './team-match-result.types';
+import { RESULT_REVISION_STATE_LABEL, hashResultPayload, toResultRosterRows } from './team-match-result.types';
+
+/** 득점 이벤트 한 건 — participantId가 null이면 "미지정"(누가 넣었는지 특정하지 않음). */
+type GoalDraft = { key: string; participantId: string | null };
+/** 카드 이벤트 한 건. */
+type CardDraft = { key: string; participantId: string; type: 'yellow' | 'red' };
 
 // team-matches-client.tsx의 getStatus()와 동일한 캐스팅 관례 — 백엔드 detail()은
 // 실제로 V1TeamMatchApiStatus 값을 내려주지만, 공용 V1Match.status는 개인 매치용
@@ -50,11 +51,13 @@ const RESULT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PARTICIPANT_INVALID: '참가자 정보가 올바르지 않아요. 명단을 다시 확인해 주세요.',
   PERMISSION_DENIED: '이 작업을 수행할 권한이 없어요.',
   COMMAND_IDEMPOTENCY_KEY_MISMATCH: '요청이 중복 처리됐어요. 새로고침 후 다시 시도해 주세요.',
-  // Task 17 known gap (docs/api/domains/games.md) — no team match can ever accumulate
-  // events, so any nonzero score currently fails this invariant. We surface the real
-  // limitation instead of a generic error so the host isn't left guessing.
-  SCORE_EVENT_MISMATCH:
-    '지금은 무승부(0:0) 기록만 지원돼요. 득점·카드 기록 기능은 곧 추가될 예정이니 잠시만 기다려 주세요.',
+  // game-invariants.ts가 이벤트 없는 팀 매치(TEAM_MATCH, events.length===0)는 이
+  // 교차검증 자체를 건너뛰도록 예외 처리를 이미 갖고 있어(팀 매치는 라이브 심판 기록이
+  // 없어 이벤트 스트림이 원래 비어 있다) 정상적인 결과 제출에서는 이 에러가 나지 않는다
+  // — "0:0만 지원" 메시지는 그 예외가 생기기 전 상태를 설명한 옛 문구였다(실제로는
+  // 안 나는데도 사용자에게 거짓 제약을 안내하고 있었음). 이 에러가 실제로 뜬다면
+  // 진짜 다른 결함(예: 관리자가 별도로 기록한 이벤트와 불일치)이라 일반 메시지로 안내한다.
+  SCORE_EVENT_MISMATCH: '결과 내용에 문제가 있어 저장하지 못했어요. 입력한 득점·카드를 다시 확인해 주세요.',
 };
 
 function resultErrorMessage(err: unknown): string {
@@ -162,11 +165,48 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   });
   const createRevision = useV1CreateGameResultRevision(gameId ?? '', teamMatchId);
   const submitRevision = useV1SubmitGameResultRevision(gameId ?? '', teamMatchId);
-  const [entries, setEntries] = useState<Record<string, ResultRosterEntryDraft>>({});
+  // 점수 먼저 입력 -> 그 개수만큼 득점자 드롭다운이 생기는 흐름(QA 지적으로 재설계) —
+  // 선수 11명 전원에게 득점/카드 숫자칸을 하나씩 주는 대신, "몇 골 넣었는지"를 먼저
+  // 정하고 그 골 하나하나에 누가 넣었는지(미지정 허용)를 드롭다운으로 배정한다.
+  // 카드도 동일하게 "카드 추가" 버튼으로 [선수, 경고/퇴장] 행을 늘려가는 방식이다.
+  // 제출 시점에 이 이벤트 목록을 선수별 합계(goals/cards)로 접어서 기존 백엔드
+  // 계약(actualParticipants)에 그대로 실어 보낸다 — 백엔드 변경은 없다.
+  const [homeGoals, setHomeGoals] = useState<GoalDraft[]>([]);
+  const [cardDrafts, setCardDrafts] = useState<CardDraft[]>([]);
   const [awayGoals, setAwayGoals] = useState(0);
   const [mvpParticipantId, setMvpParticipantId] = useState('');
   const [reason, setReason] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+
+  function setHomeGoalCount(count: number) {
+    const clamped = Math.max(0, Math.min(99, count));
+    setHomeGoals((prev) => {
+      if (clamped === prev.length) return prev;
+      if (clamped > prev.length) {
+        return [
+          ...prev,
+          ...Array.from({ length: clamped - prev.length }, () => ({ key: randomUuid(), participantId: null })),
+        ];
+      }
+      return prev.slice(0, clamped);
+    });
+  }
+
+  function setGoalScorer(key: string, participantId: string | null) {
+    setHomeGoals((prev) => prev.map((goal) => (goal.key === key ? { ...goal, participantId } : goal)));
+  }
+
+  function addCard(firstParticipantId: string) {
+    setCardDrafts((prev) => [...prev, { key: randomUuid(), participantId: firstParticipantId, type: 'yellow' }]);
+  }
+
+  function updateCard(key: string, patch: Partial<Pick<CardDraft, 'participantId' | 'type'>>) {
+    setCardDrafts((prev) => prev.map((card) => (card.key === key ? { ...card, ...patch } : card)));
+  }
+
+  function removeCard(key: string) {
+    setCardDrafts((prev) => prev.filter((card) => card.key !== key));
+  }
 
   const isHost = teamMatch.data?.viewer?.manageableHostTeam === true;
 
@@ -215,30 +255,29 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const canDraft = latest === null || latest.state === 'CHANGE_REQUESTED';
   const canSubmit = latest?.state === 'DRAFT';
 
-  function updateEntry(participantId: string, patch: Partial<ResultRosterEntryDraft>) {
-    setEntries((prev) => ({
-      ...prev,
-      [participantId]: {
-        participantId,
-        goals: prev[participantId]?.goals ?? 0,
-        cards: prev[participantId]?.cards ?? { yellow: 0, red: 0 },
-        ...patch,
-      },
-    }));
-  }
-
   async function handleCreateDraft() {
     if (!homeSide || !awaySide || !game.data) return;
     setFormError(null);
     try {
-      const homeGoals = roster.reduce((sum, row) => sum + (entries[row.participantId]?.goals ?? 0), 0);
-      const score = { home: homeGoals, away: Math.max(0, awayGoals) };
+      const score = { home: homeGoals.length, away: Math.max(0, awayGoals) };
+      const goalsByParticipant = new Map<string, number>();
+      for (const goal of homeGoals) {
+        if (goal.participantId === null) continue;
+        goalsByParticipant.set(goal.participantId, (goalsByParticipant.get(goal.participantId) ?? 0) + 1);
+      }
+      const cardsByParticipant = new Map<string, { yellow: number; red: number }>();
+      for (const card of cardDrafts) {
+        const current = cardsByParticipant.get(card.participantId) ?? { yellow: 0, red: 0 };
+        if (card.type === 'yellow') current.yellow += 1;
+        else current.red += 1;
+        cardsByParticipant.set(card.participantId, current);
+      }
       const actualParticipants: V1GameResultParticipantInput[] = roster.map((row) => ({
         participantId: row.participantId,
         sideId: homeSide.id,
         started: row.started,
-        goals: entries[row.participantId]?.goals ?? 0,
-        cards: entries[row.participantId]?.cards ?? { yellow: 0, red: 0 },
+        goals: goalsByParticipant.get(row.participantId) ?? 0,
+        cards: cardsByParticipant.get(row.participantId) ?? { yellow: 0, red: 0 },
         goalkeeper: row.goalkeeper,
       }));
       await createRevision.mutateAsync({
@@ -350,7 +389,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               <AlertBanner tone="warning" message={`상대팀 정정 요청: ${latest.reason}`} />
             ) : null}
             <div className="tm-text-body-lg" style={{ marginTop: latest?.state === 'CHANGE_REQUESTED' ? 12 : 0 }}>
-              스코어
+              1. 스코어
             </div>
             <div style={{ display: 'flex', gap: 12, marginTop: 8, alignItems: 'flex-end' }}>
               <TextField
@@ -358,8 +397,8 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 type="number"
                 min={0}
                 inputMode="numeric"
-                value={String(roster.reduce((sum, row) => sum + (entries[row.participantId]?.goals ?? 0), 0))}
-                readOnly
+                value={String(homeGoals.length)}
+                onChange={(event) => setHomeGoalCount(Number(event.target.value) || 0)}
                 fieldId="result-home-score"
               />
               <TextField
@@ -373,85 +412,110 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               />
             </div>
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
-              {opponentName}의 득점은 선수 지정 없이 합계로만 기록돼요. 우리 팀 선수 기록은 아래에서 입력해 주세요.
+              {opponentName}의 득점은 선수 지정 없이 합계로만 기록돼요.
             </div>
 
-            <div className="tm-text-body-lg" style={{ marginTop: 20 }}>우리 팀 선수 기록</div>
             {roster.length === 0 ? (
-              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
-                제출된 라인업이 없어요. 라인업을 먼저 등록하면 선수별 득점/카드를 기록할 수 있어요.
+              <div className="tm-text-caption" style={{ marginTop: 20, color: 'var(--text-muted)' }}>
+                제출된 라인업이 없어요. 라인업을 먼저 등록하면 득점자·카드를 기록할 수 있어요.
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
-                {roster.map((row) => (
-                  <div key={row.participantId} style={{ border: '1px solid var(--grey100)', borderRadius: 12, padding: '10px 12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div className="tm-text-label">
-                        {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}
-                        {row.displayName}
-                        {row.goalkeeper ? <span className="tm-badge tm-badge-grey" style={{ marginLeft: 6 }}>GK</span> : null}
-                        {!row.started ? <span className="tm-badge tm-badge-grey" style={{ marginLeft: 6 }}>후보</span> : null}
-                      </div>
-                      <label className="tm-text-micro" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <input
-                          type="radio"
-                          name="result-mvp"
-                          checked={mvpParticipantId === row.participantId}
-                          onChange={() => setMvpParticipantId(row.participantId)}
-                        />
-                        MVP
-                      </label>
-                    </div>
-                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                      <TextField
-                        label="득점"
-                        type="number"
-                        min={0}
-                        inputMode="numeric"
-                        value={String(entries[row.participantId]?.goals ?? 0)}
-                        onChange={(event) =>
-                          updateEntry(row.participantId, { goals: Math.max(0, Number(event.target.value) || 0) })
-                        }
-                        fieldId={`result-goals-${row.participantId}`}
-                      />
-                      <TextField
-                        label="경고"
-                        type="number"
-                        min={0}
-                        max={2}
-                        inputMode="numeric"
-                        value={String(entries[row.participantId]?.cards.yellow ?? 0)}
-                        onChange={(event) =>
-                          updateEntry(row.participantId, {
-                            cards: {
-                              yellow: Math.max(0, Number(event.target.value) || 0),
-                              red: entries[row.participantId]?.cards.red ?? 0,
-                            },
-                          })
-                        }
-                        fieldId={`result-yellow-${row.participantId}`}
-                      />
-                      <TextField
-                        label="퇴장"
-                        type="number"
-                        min={0}
-                        max={1}
-                        inputMode="numeric"
-                        value={String(entries[row.participantId]?.cards.red ?? 0)}
-                        onChange={(event) =>
-                          updateEntry(row.participantId, {
-                            cards: {
-                              yellow: entries[row.participantId]?.cards.yellow ?? 0,
-                              red: Math.max(0, Number(event.target.value) || 0),
-                            },
-                          })
-                        }
-                        fieldId={`result-red-${row.participantId}`}
-                      />
-                    </div>
+              <>
+                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>2. 득점자</div>
+                {homeGoals.length === 0 ? (
+                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                    위에서 홈 득점 수를 입력하면 골마다 득점자를 고를 수 있어요.
                   </div>
-                ))}
-              </div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                    {homeGoals.map((goal, index) => (
+                      <div key={goal.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span className="tm-text-label" style={{ minWidth: 52 }}>{index + 1}번 골</span>
+                        <select
+                          aria-label={`${index + 1}번 골 득점자`}
+                          className="tm-input"
+                          style={{ flex: 1 }}
+                          value={goal.participantId ?? ''}
+                          onChange={(event) => setGoalScorer(goal.key, event.target.value === '' ? null : event.target.value)}
+                        >
+                          <option value="">미지정</option>
+                          {roster.map((row) => (
+                            <option key={row.participantId} value={row.participantId}>
+                              {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}
+                              {row.displayName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>3. 경고·퇴장</div>
+                <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                  {cardDrafts.map((card) => (
+                    <div key={card.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <select
+                        aria-label="카드 대상 선수"
+                        className="tm-input"
+                        style={{ flex: 1 }}
+                        value={card.participantId}
+                        onChange={(event) => updateCard(card.key, { participantId: event.target.value })}
+                      >
+                        {roster.map((row) => (
+                          <option key={row.participantId} value={row.participantId}>
+                            {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}
+                            {row.displayName}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="카드 종류"
+                        className="tm-input"
+                        style={{ width: 96 }}
+                        value={card.type}
+                        onChange={(event) => updateCard(card.key, { type: event.target.value as 'yellow' | 'red' })}
+                      >
+                        <option value="yellow">경고</option>
+                        <option value="red">퇴장</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="tm-btn tm-btn-sm tm-btn-outline"
+                        aria-label="이 카드 기록 제거"
+                        onClick={() => removeCard(card.key)}
+                      >
+                        제거
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="tm-btn tm-btn-sm tm-btn-outline"
+                    style={{ justifySelf: 'start' }}
+                    onClick={() => addCard(roster[0].participantId)}
+                  >
+                    + 카드 추가
+                  </button>
+                </div>
+
+                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>4. MVP</div>
+                <select
+                  aria-label="MVP 선택"
+                  className="tm-input"
+                  style={{ marginTop: 10, width: '100%' }}
+                  value={mvpParticipantId}
+                  onChange={(event) => setMvpParticipantId(event.target.value)}
+                >
+                  <option value="">선택 안 함</option>
+                  {roster.map((row) => (
+                    <option key={row.participantId} value={row.participantId}>
+                      {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}
+                      {row.displayName}
+                    </option>
+                  ))}
+                </select>
+              </>
             )}
 
             <div style={{ marginTop: 16 }}>

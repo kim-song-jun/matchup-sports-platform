@@ -172,7 +172,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
   if (isError) {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`}>
+      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
         <ErrorState
           message="결과 정보를 불러오지 못했어요."
           onRetry={() => retryAll(teamMatch, game, revisions, lineup)}
@@ -183,7 +183,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
   if (isLoading || !teamMatch.data) {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`}>
+      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -191,7 +191,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
   if (!isHost) {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`}>
+      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
         <EmptyState title="호스트만 결과를 입력할 수 있어요" sub="상대팀은 제출된 결과를 승인하거나 정정을 요청할 수 있어요." />
       </AppChrome>
     );
@@ -200,7 +200,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const status = teamMatchStatus(teamMatch.data);
   if (status !== 'matched' && status !== 'completed') {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`}>
+      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
         <EmptyState title="아직 결과를 입력할 수 없어요" sub="상대팀이 정해진 이후(매칭 완료)부터 결과를 입력할 수 있어요." />
       </AppChrome>
     );
@@ -265,7 +265,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   return (
-    <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`}>
+    <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
       <div style={{ display: 'grid', gap: 14, padding: '0 16px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
@@ -502,7 +502,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
 
   if (isError) {
     return (
-      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`}>
+      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
         <ErrorState message="결과 정보를 불러오지 못했어요." onRetry={() => retryAll(teamMatch, game, revisions)} />
       </AppChrome>
     );
@@ -510,7 +510,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
 
   if (isLoading || !teamMatch.data) {
     return (
-      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`}>
+      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -518,7 +518,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
 
   if (!isOpponent) {
     return (
-      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`}>
+      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
         <EmptyState title="상대팀만 결과를 승인할 수 있어요" sub="결과 작성/제출은 홈팀 담당자만 할 수 있어요." />
       </AppChrome>
     );
@@ -556,7 +556,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   }
 
   return (
-    <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`}>
+    <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
       <div style={{ display: 'grid', gap: 14, padding: '0 16px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">

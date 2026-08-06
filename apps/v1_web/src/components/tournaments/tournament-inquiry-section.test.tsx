@@ -98,9 +98,9 @@ describe('TournamentInquirySection', () => {
   it('하단에 하드코딩된 인스타그램과 이메일 문의 연락처를 제공한다', () => {
     renderSection();
 
-    expect(screen.getByRole('link', { name: /인스타그램.*@teameet\.sports/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /인스타그램.*@teameet_official/ })).toHaveAttribute(
       'href',
-      'https://www.instagram.com/teameet.sports/',
+      'https://www.instagram.com/teameet_official/',
     );
     expect(screen.getByRole('link', { name: /이메일.*teameetsports@naver\.com/ })).toHaveAttribute(
       'href',

@@ -1152,6 +1152,7 @@ model V1TeamMatch {
   placeAddress            String?           @map("place_address")
   startAt                 DateTime          @map("start_at")
   endAt                   DateTime?         @map("end_at")
+  deadlineAt              DateTime?         @map("deadline_at")
   formatNote              String?           @map("format_note")
   minSportLevelId         String?           @map("min_sport_level_id")
   maxSportLevelId         String?           @map("max_sport_level_id")

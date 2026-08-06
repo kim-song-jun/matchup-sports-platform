@@ -302,6 +302,7 @@ function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchMod
     ...fallback,
     id: match.teamMatchId ?? match.id ?? fallback.id,
     title: match.title,
+    imageUrl: match.imageUrl ?? fallback.imageUrl,
     sport: match.sport?.name ?? match.sportName ?? fallback.sport,
     hostTeam: match.hostTeam?.name ?? match.hostTeamName ?? fallback.hostTeam,
     venue: match.place?.name ?? match.placeName ?? fallback.venue,
@@ -473,15 +474,15 @@ function getViewerState(match: V1TeamMatch): V1TeamMatchViewerState {
 function statusToCardStatus(status: V1TeamMatchApiStatus, viewerState: V1TeamMatchViewerState = 'none'): TeamMatchModel['status'] {
   if (viewerState === 'host_team') return 'mine';
   if (viewerState === 'requested') return 'pending';
-  if (viewerState === 'approved' || status === 'matched') return 'approved';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired') return 'closed';
+  if (viewerState === 'approved') return 'approved';
+  if (status === 'matched' || status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired') return 'closed';
   return 'open';
 }
 
 function toDetailMode(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus): TeamMatchDetailViewModel['mode'] {
   if (viewerState === 'host_team') return 'mine';
   if (viewerState === 'requested') return 'pending';
-  if (viewerState === 'approved' || status === 'matched') return 'approved';
+  if (viewerState === 'approved') return 'approved';
   return 'default';
 }
 
@@ -494,7 +495,7 @@ function applyLabel(
 ) {
   if (viewerState === 'host_team') return '매치 관리';
   if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') return '신청 취소';
-  if (viewerState === 'approved' || status === 'matched') return '승인 완료';
+  if (viewerState === 'approved') return '승인 완료';
   if (status !== 'recruiting') return '신청 불가';
   // 비인증 사용자: 로그인 유도 (#13)
   if (isGuest) return '로그인하고 신청하기';
@@ -507,7 +508,8 @@ function applyLabel(
 function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus) {
   if (viewerState === 'host_team') return '내가 만든 팀매치';
   if (viewerState === 'requested') return '승인 대기';
-  if (viewerState === 'approved' || status === 'matched') return '승인 완료';
+  if (viewerState === 'approved') return '승인 완료';
+  if (status === 'matched') return '상대팀 확정';
   if (status !== 'recruiting') return '신청 마감';
   return '신청 가능';
 }

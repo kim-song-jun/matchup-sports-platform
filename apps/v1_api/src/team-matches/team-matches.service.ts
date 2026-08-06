@@ -116,7 +116,7 @@ export class TeamMatchesService {
       place: { name: teamMatch.placeName, addressText: teamMatch.placeAddress },
       startsAt: teamMatch.startAt,
       endsAt: teamMatch.endAt,
-      deadlineAt: null,
+      deadlineAt: teamMatch.deadlineAt,
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
       costNote: teamMatch.costNote,
@@ -261,6 +261,7 @@ export class TeamMatchesService {
           placeAddress: dto.addressText ?? null,
           startAt: dates.startsAt,
           endAt: dates.endsAt,
+          deadlineAt: dates.deadlineAt,
           formatNote: dto.rulesText ?? null,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
@@ -309,7 +310,7 @@ export class TeamMatchesService {
         imageUrl: teamMatch.imageUrl,
         startsAt: teamMatch.startAt,
         endsAt: teamMatch.endAt,
-        deadlineAt: null,
+        deadlineAt: teamMatch.deadlineAt,
         manualPlaceName: teamMatch.placeName,
         addressText: teamMatch.placeAddress,
         costNote: teamMatch.costNote,
@@ -348,6 +349,7 @@ export class TeamMatchesService {
         placeAddress: dto.addressText ?? null,
         startAt: dates.startsAt,
         endAt: dates.endsAt,
+        deadlineAt: dates.deadlineAt,
         formatNote: dto.rulesText ?? null,
         minSportLevelId: levelRange.minSportLevelId,
         maxSportLevelId: levelRange.maxSportLevelId,
@@ -569,17 +571,28 @@ export class TeamMatchesService {
 
     const result = await this.prisma.$transaction(async (tx) => {
       const nextApplication = application
-        ? await tx.v1TeamMatchApplication.update({
-            where: { id: application.id },
-            data: {
-              status: 'requested',
+        ? await (async () => {
+            const transition = await tx.v1TeamMatchApplication.updateMany({
+              where: { id: application.id, status: application.status },
+              data: {
+                status: 'requested',
+                appliedByUserId: user.id,
+                message: dto.message ?? null,
+                reviewedByUserId: null,
+                reviewedAt: null,
+                withdrawnAt: null,
+              },
+            });
+            if (transition.count !== 1) {
+              throw stateConflict('Team match application state changed before it could be resubmitted');
+            }
+            return {
+              ...application,
+              status: 'requested' as const,
               appliedByUserId: user.id,
               message: dto.message ?? null,
-              reviewedByUserId: null,
-              reviewedAt: null,
-              withdrawnAt: null,
-            },
-          })
+            };
+          })()
         : await tx.v1TeamMatchApplication.create({
             data: {
               teamMatchId: teamMatch.id,
@@ -721,10 +734,16 @@ export class TeamMatchesService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const nextApplication = await tx.v1TeamMatchApplication.update({
-        where: { id: application.id },
+      const transition = await tx.v1TeamMatchApplication.updateMany({
+        where: { id: application.id, status: 'requested' },
         data: { status: 'withdrawn', withdrawnAt: new Date() },
       });
+      if (transition.count !== 1) {
+        throw new ConflictException({
+          code: 'ALREADY_PROCESSED',
+          message: 'Only requested team match applications can be withdrawn',
+        });
+      }
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match_application',
@@ -736,7 +755,7 @@ export class TeamMatchesService {
           reason: dto.reason ?? 'applicant_team_withdrawn',
         },
       });
-      return nextApplication;
+      return { ...application, status: 'withdrawn' as const };
     });
 
     this.emitNotificationToTeamManagers(
@@ -766,7 +785,11 @@ export class TeamMatchesService {
     if (application.status !== 'requested') {
       throw stateConflict('Only requested team match applications can be approved');
     }
-    if (application.teamMatch.status !== 'recruiting' || application.teamMatch.startAt < new Date()) {
+    if (
+      application.teamMatch.status !== 'recruiting' ||
+      application.teamMatch.startAt < new Date() ||
+      (application.teamMatch.deadlineAt && application.teamMatch.deadlineAt < new Date())
+    ) {
       throw stateConflict('Team match is not recruiting');
     }
 
@@ -774,16 +797,26 @@ export class TeamMatchesService {
       await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${application.teamMatchId} FOR UPDATE`;
       const currentTeamMatch = await tx.v1TeamMatch.findFirst({
         where: { id: application.teamMatchId, deletedAt: null },
-        select: { status: true, startAt: true, approvedApplicantTeamId: true },
+        select: { status: true, startAt: true, deadlineAt: true, approvedApplicantTeamId: true },
       });
       if (
         !currentTeamMatch ||
         currentTeamMatch.status !== 'recruiting' ||
         currentTeamMatch.startAt < new Date() ||
+        (currentTeamMatch.deadlineAt && currentTeamMatch.deadlineAt < new Date()) ||
         currentTeamMatch.approvedApplicantTeamId
       ) {
         throw stateConflict('Team match is not recruiting');
       }
+
+      const otherRequestedApplications = await tx.v1TeamMatchApplication.findMany({
+        where: {
+          teamMatchId: application.teamMatchId,
+          status: 'requested',
+          id: { not: application.id },
+        },
+        select: { id: true, applicantTeamId: true },
+      });
 
       const transition = await tx.v1TeamMatchApplication.updateMany({
         where: { id: application.id, status: 'requested' },
@@ -827,6 +860,15 @@ export class TeamMatchesService {
             actorUserId: user.id,
             reason: 'team_match_application_approved',
           },
+          ...otherRequestedApplications.map((otherApplication) => ({
+            targetType: 'team_match_application' as const,
+            targetId: otherApplication.id,
+            fromStatus: 'requested' as const,
+            toStatus: 'rejected' as const,
+            actorType: 'user' as const,
+            actorUserId: user.id,
+            reason: 'another_team_match_application_approved',
+          })),
         ],
       });
       return {
@@ -837,6 +879,7 @@ export class TeamMatchesService {
           status: 'approved' as const,
         },
         updatedTeamMatch,
+        autoRejectedApplicantTeamIds: otherRequestedApplications.map((item) => item.applicantTeamId),
       };
     });
 
@@ -846,6 +889,12 @@ export class TeamMatchesService {
       'team_match_application_approved',
       application.teamMatchId,
       `"${application.teamMatch.title}" 팀매치 신청이 승인됐어요.`,
+    );
+    this.emitNotificationToTeamManagers(
+      result.autoRejectedApplicantTeamIds,
+      'team_match_application_rejected',
+      application.teamMatchId,
+      `"${application.teamMatch.title}" 팀매치의 상대팀이 확정되어 신청이 종료됐어요.`,
     );
 
     return {
@@ -872,10 +921,13 @@ export class TeamMatchesService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const nextApplication = await tx.v1TeamMatchApplication.update({
-        where: { id: application.id },
+      const transition = await tx.v1TeamMatchApplication.updateMany({
+        where: { id: application.id, status: 'requested' },
         data: { status: 'rejected', reviewedByUserId: user.id, reviewedAt: new Date() },
       });
+      if (transition.count !== 1) {
+        throw stateConflict('Only requested team match applications can be rejected');
+      }
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match_application',
@@ -887,7 +939,7 @@ export class TeamMatchesService {
           reason: dto.reason ?? 'team_match_application_rejected',
         },
       });
-      return nextApplication;
+      return { ...application, status: 'rejected' as const };
     });
 
     // 알림: 신청팀 owner/manager에게 거절 안내 (fire-and-forget)
@@ -1006,7 +1058,7 @@ export class TeamMatchesService {
       region: { regionId: teamMatch.region.id, name: teamMatch.region.name },
       place: { name: teamMatch.placeName, addressText: teamMatch.placeAddress },
       startsAt: teamMatch.startAt,
-      deadlineAt: null,
+      deadlineAt: teamMatch.deadlineAt,
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
       hostTeam: {
@@ -1192,7 +1244,11 @@ function getEligibilityReason(
   if (application?.status === 'requested') return 'ALREADY_REQUESTED';
   if (application?.status === 'approved') return 'ALREADY_APPROVED';
   if (teamMatch.status === 'matched') return 'MATCHED_ALREADY';
-  if (teamMatch.status !== 'recruiting' || teamMatch.startAt < new Date()) return 'NOT_RECRUITING';
+  if (
+    teamMatch.status !== 'recruiting' ||
+    teamMatch.startAt < new Date() ||
+    (teamMatch.deadlineAt && teamMatch.deadlineAt < new Date())
+  ) return 'NOT_RECRUITING';
   return 'OK';
 }
 

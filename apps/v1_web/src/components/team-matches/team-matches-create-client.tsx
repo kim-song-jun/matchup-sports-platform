@@ -205,6 +205,9 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
 export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }) {
   const router = useRouter();
   const editQuery = useV1TeamMatchEdit(teamMatchId);
+  const teams = useV1MyTeams();
+  const sports = useV1MasterSports();
+  const regions = useV1MasterRegions();
   const updateTeamMatch = useV1UpdateTeamMatch(teamMatchId);
   const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
   const uploadImages = useV1UploadImages();
@@ -214,6 +217,27 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   const [regionId, setRegionId] = useState('');
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const myTeams = normalizeMyTeams(teams.data) ?? [];
+  const currentTeam = myTeams.find((team) => team.teamId === editQuery.data?.form.hostTeamId);
+  const teamOptions = editQuery.data
+    ? [{
+        id: editQuery.data.form.hostTeamId,
+        name: currentTeam?.name ?? '현재 팀',
+        sport: currentTeam?.sport.name ?? '현재 종목',
+        members: currentTeam?.memberCount ?? 0,
+        role: currentTeam?.role === 'owner' ? '팀장' : '관리자',
+      }]
+    : [];
+  const sportOptions = sports.data
+    ?.filter((sport) => sport.id === editQuery.data?.form.sportId)
+    .map((sport) => ({ id: sport.id, name: sport.name }))
+    ?? (editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : []);
+  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
+  const editRegionOptions = regionOptions.length > 0
+    ? regionOptions
+    : editQuery.data
+      ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }]
+      : [];
 
   useEffect(() => {
     if (!editQuery.data) return;
@@ -230,9 +254,9 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     selectedTeamId,
     selectedSportId,
     regionId,
-    teams: editQuery.data ? [{ id: editQuery.data.form.hostTeamId, name: '현재 팀', sport: '팀매치', members: 0, role: '관리 권한' }] : [],
-    sports: editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : [],
-    regions: editQuery.data ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }] : [],
+    teams: teamOptions,
+    sports: sportOptions,
+    regions: editRegionOptions,
     error: editQuery.isError ? '수정 권한이 없거나 팀매치를 불러오지 못했어요.' : error,
     lockedReason: editQuery.data?.editable === false
       ? lockedReasonLabel(editQuery.data.lockedReason ?? '')
@@ -427,6 +451,7 @@ function normalizeDraftDate(draft: TeamMatchDraft): TeamMatchDraft {
 export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
   const start = new Date(edit.form.startsAt);
   const end = edit.form.endsAt ? new Date(edit.form.endsAt) : null;
+  const deadline = edit.form.deadlineAt ? new Date(edit.form.deadlineAt) : null;
   const parsed = parseNotes(edit.form.rulesText, edit.form.costNote);
 
   return {
@@ -441,11 +466,13 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     imageUrl: edit.form.imageUrl ?? '',
     cost: parsed.cost,
     opponentCost: parsed.opponentCost,
-    venue: edit.form.addressText ?? edit.form.manualPlaceName,
-    address: '',
+    venue: edit.form.manualPlaceName,
+    address: edit.form.addressText ?? '',
     date: start.toISOString().slice(0, 10),
     startTime: start.toTimeString().slice(0, 5),
     endTime: end ? end.toTimeString().slice(0, 5) : start.toTimeString().slice(0, 5),
+    deadlineDate: deadline ? deadline.toISOString().slice(0, 10) : '',
+    deadlineTime: deadline ? deadline.toTimeString().slice(0, 5) : '',
   };
 }
 
@@ -461,7 +488,11 @@ export function buildTeamMatchMutationPayload(draft: TeamMatchDraft, hostTeamId:
   if (!hostTeamId || !sportId || !regionId || !draft.title.trim() || !draft.venue.trim() || !draft.date || !draft.startTime) return null;
   const startsAt = new Date(`${draft.date}T${draft.startTime}:00`);
   const endsAt = draft.endTime ? new Date(`${draft.date}T${draft.endTime}:00`) : null;
+  const deadlineAt = draft.deadlineDate && draft.deadlineTime
+    ? new Date(`${draft.deadlineDate}T${draft.deadlineTime}:00`)
+    : null;
   if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) return null;
+  if (deadlineAt && (Number.isNaN(deadlineAt.getTime()) || deadlineAt >= startsAt)) return null;
 
   return {
     hostTeamId,
@@ -471,10 +502,10 @@ export function buildTeamMatchMutationPayload(draft: TeamMatchDraft, hostTeamId:
     description: draft.description.trim() || null,
     startsAt: startsAt.toISOString(),
     endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
-    deadlineAt: null,
+    deadlineAt: deadlineAt?.toISOString() ?? null,
     imageUrl: draft.imageUrl.trim() || null,
     manualPlaceName: draft.venue.trim(),
-    addressText: draft.venue.trim() || null,
+    addressText: draft.address.trim() || null,
     costNote: draft.cost || draft.opponentCost ? `총 ${draft.cost.toLocaleString('ko-KR')}원 · 상대팀 ${draft.opponentCost.toLocaleString('ko-KR')}원` : null,
     rulesText: [draft.grade, draft.format, draft.style, draft.uniform].filter(Boolean).join(' · ') || null,
     minLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,

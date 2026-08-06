@@ -70,7 +70,8 @@ export type MatchDetailViewModel = {
     description: string;
     address: string;
     rules: string[];
-    manageHref?: string;
+    editHref?: string;
+    applicationsHref?: string;
     participants: Array<{
       name: string;
       meta: string;

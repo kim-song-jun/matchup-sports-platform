@@ -25,37 +25,22 @@
   flex-shrink: 0;
 }
 
-/* ─── 생성폼 date / time 네이티브 인풋 (1) ───────────────────────────────────
- * appearance:none 은 globals.css .tm-create-native-input 에 없어 OS 스타일이 노출됨.
- * - ::-webkit-calendar-picker-indicator  → 달력/시계 아이콘 제거
- * - ::-webkit-inner-spin-button          → AM/PM·숫자 스피너 제거
- * - ::-webkit-clear-button               → ×(지우기) 버튼 제거
- * - appearance:none / -webkit-appearance:none → OS 테마 인풋 모양 제거
- * 결과: 토큰 기반 .tm-create-input 컨테이너 스타일만 보임(Toss 인풋 동일 외관).
+/* ─── 생성폼 date / time 네이티브 선택기 ────────────────────────────────────
+ * 달력/시계 indicator를 유지해 날짜와 시간을 직접 선택할 수 있음을 명확히 한다.
+ * 외곽 surface는 부모 .tm-create-input이 담당하므로 input 자체 border는 globals.css에서
+ * 계속 제거한다.
  */
 
 .tm-create-native-input[type="date"],
 .tm-create-native-input[type="time"] {
-  appearance: none;
-  -webkit-appearance: none;
-  /* 한국 포맷(yyyy-mm-dd / HH:MM)은 lang="ko" + value 포맷이 우선.
-     width:100%는 부모 .tm-create-input flex 기준으로 꽉 채운다. */
   width: 100%;
-  cursor: text;
+  cursor: pointer;
 }
 
 .tm-create-native-input[type="date"]::-webkit-calendar-picker-indicator,
 .tm-create-native-input[type="time"]::-webkit-calendar-picker-indicator {
-  display: none;
-  -webkit-appearance: none;
-}
-
-.tm-create-native-input[type="date"]::-webkit-inner-spin-button,
-.tm-create-native-input[type="time"]::-webkit-inner-spin-button,
-.tm-create-native-input[type="date"]::-webkit-clear-button,
-.tm-create-native-input[type="time"]::-webkit-clear-button {
-  display: none;
-  -webkit-appearance: none;
+  cursor: pointer;
+  opacity: 0.72;
 }
 
 /* ─── List /matches ──────────────────────────────────────────────────────────
@@ -320,6 +305,7 @@
     bottom: auto;
     left: auto;
     right: auto;
+    transform: none;
     width: auto;
     max-width: 600px;
     margin-left: auto;

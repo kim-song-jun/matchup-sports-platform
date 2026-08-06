@@ -41,6 +41,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
 vi.mock('./team-matches-page', () => ({
   TeamMatchDetailPageView: ({ model }: { model: TeamMatchDetailViewModel }) => (
     <div>
+      <span data-testid="team-match-image">{model.match.imageUrl}</span>
+      <span data-testid="team-match-mode">{model.mode}</span>
+      <span data-testid="team-match-status-label">{model.statusLabel}</span>
+      <span data-testid="team-match-apply-label">{model.applyLabel}</span>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
     </div>
   ),
@@ -56,6 +60,7 @@ describe('TeamMatchDetailPageClient — GA events', () => {
         id: 'team-match-1',
         teamMatchId: 'team-match-1',
         title: '풋살 팀매치',
+        imageUrl: '/uploads/team-match-cover.webp',
         sportName: '풋살',
         sport: { sportId: 'sport-futsal', name: '풋살' },
         placeName: '서울 풋살장',
@@ -90,5 +95,46 @@ describe('TeamMatchDetailPageClient — GA events', () => {
       expect(applyTeamMatchMutateAsync).toHaveBeenCalledWith({ applicantTeamId: 'team-mine', message: null });
     });
     expect(trackEvent).toHaveBeenCalledWith('team_match_apply_complete', { teamMatchId: 'team-match-1' });
+  });
+
+  it('maps the API image URL into the detail view model', () => {
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-image')).toHaveTextContent('/uploads/team-match-cover.webp');
+  });
+
+  it('does not present an unrelated viewer as approved after another team is matched', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        placeName: '서울 풋살장',
+        startsAt: '2026-08-10T10:00:00.000Z',
+        status: 'matched',
+        viewerState: 'rejected',
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+      },
+      isError: false,
+    });
+    useV1TeamMatchEligibilityMock.mockReturnValue({
+      data: {
+        teamMatchId: 'team-match-1',
+        requiresApproval: true,
+        requiresPayment: false,
+        teams: [
+          { teamId: 'team-mine', name: '내 팀', role: 'owner', eligible: false, reasonCode: 'MATCHED_ALREADY', applicationId: 'app-rejected' },
+        ],
+      },
+      isSuccess: true,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-mode')).toHaveTextContent('default');
+    expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('상대팀 확정');
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
+    expect(screen.queryByText('승인 완료')).not.toBeInTheDocument();
   });
 });

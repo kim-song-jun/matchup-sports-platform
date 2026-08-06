@@ -322,6 +322,16 @@ describe('MatchesService', () => {
     expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
   });
 
+  it('rejectApplication: 신청 취소와 경쟁해 requested 전이가 실패하면 거절 성공으로 보고하지 않는다', async () => {
+    prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.rejectApplication(host, 'app-1', {})).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
+    });
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+  });
+
   // ─── 7. 타인 신청 철회 → 403 PERMISSION_DENIED ───────────────────────────
 
   it('withdrawApplication: 본인이 아닌 사용자가 철회하면 403 PERMISSION_DENIED를 던진다', async () => {

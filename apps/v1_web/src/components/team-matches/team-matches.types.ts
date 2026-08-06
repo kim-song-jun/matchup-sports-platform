@@ -1,6 +1,7 @@
 export type TeamMatchModel = {
   id: string;
   title: string;
+  imageUrl: string;
   sport: string;
   hostTeam: string;
   venue: string;
@@ -129,6 +130,8 @@ export type TeamMatchCreateViewModel = {
     date: string;
     startTime: string;
     endTime: string;
+    deadlineDate: string;
+    deadlineTime: string;
   };
   form?: {
     selectedTeamId: string;

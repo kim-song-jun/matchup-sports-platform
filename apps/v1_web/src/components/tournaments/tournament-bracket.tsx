@@ -11,6 +11,7 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { Trophy } from 'lucide-react';
+import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /* ── 라운드 그룹핑 (기존 pure logic 유지) ── */
@@ -344,6 +345,8 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
   const pk = penaltyText(fixture);
   const isLive = fixture.status === 'in_progress';
   const isDone = fixture.status === 'completed';
+  const timeLabel = formatTournamentDateTimeShort(fixture.scheduledAt);
+  const showBadgeRow = Boolean(timeLabel) || isLive || (isDone && Boolean(pk));
 
   return (
     <div
@@ -360,13 +363,11 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
         name={fixture.awayTeamName} score={hasResult ? fixture.result!.awayScore : null}
         isWinner={winner === 'away'} isLoser={isDone && winner === 'home'}
       />
-      {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}
-      {isDone && pk && <div className="tm-bk2-badge">{pk}</div>}
-      {!isDone && !isLive && fixture.scheduledAt && (
-        <div className="tm-bk2-badge tm-bk2-badge-time">
-          {new Date(fixture.scheduledAt).toLocaleDateString('ko-KR', {
-            month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-          })}
+      {showBadgeRow && (
+        <div className="tm-bk2-badge-row">
+          {timeLabel && <div className="tm-bk2-badge tm-bk2-badge-time">{timeLabel}</div>}
+          {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}
+          {isDone && pk && <div className="tm-bk2-badge">{pk}</div>}
         </div>
       )}
     </div>

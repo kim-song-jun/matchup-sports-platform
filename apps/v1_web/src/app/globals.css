@@ -5858,6 +5858,17 @@ button:disabled {
 .tm-bk2-badge-live { background: #fff0f0; color: #d9363e; font-weight: 800; }
 .tm-bk2-badge-time { font-size: 10px; color: var(--text-muted); }
 
+/* 뱃지 줄 — 시각 배지가 LIVE/PK 배지와 함께 표시될 수 있다 (D-12).
+   .tm-bk2-badge 자체는 손대지 않는다 — AggregateMatchCard/.tm-bk2-third가
+   이 클래스를 단독 block 배지로 그대로 쓰고 있어서다. */
+.tm-bk2-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 /* 챔피언 슬롯 */
 .tm-bk2-champ {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

@@ -7,6 +7,7 @@ import { ShieldOff } from 'lucide-react';
 import { useV1AuthMe, useV1Tournament, useV1TournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { getTournamentOpsOrigin, saveTournamentOpsOrigin } from '@/lib/session-storage';
+import { isTournamentStaffScopeNotYetSupported, tournamentStaffDenialReasonCode } from '@/lib/tournament-ops-access';
 import type { V1TournamentStaffRole } from '@/types/api';
 import { TournamentOpsShell } from '@/components/tournament-ops/tournament-ops-shell';
 import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-context';
@@ -34,20 +35,6 @@ function deriveRole(
       (item.expiresAt === null || new Date(item.expiresAt).getTime() > now),
   );
   return myActiveRow?.role ?? 'PLATFORM_OPS';
-}
-
-/** 필드/기구 스코프가 필요한 화면(아직 미구현) 때문에 막힌 경우를 일반 "권한 없음"과 구분한다. */
-const SCOPE_NOT_YET_SUPPORTED_REASONS = new Set([
-  'FIXTURE_SCOPE_REQUIRED',
-  'FIELD_SCOPE_REQUIRED',
-  'FIXTURE_SCOPE_DENIED',
-  'FIELD_SCOPE_DENIED',
-]);
-
-function denialReason(error: unknown): string | undefined {
-  if (!(error instanceof V1ApiError)) return undefined;
-  const details = error.details as { reason?: unknown } | undefined;
-  return typeof details?.reason === 'string' ? details.reason : undefined;
 }
 
 // ── 화면 ──────────────────────────────────────────────────────────────────
@@ -145,8 +132,8 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
   if (staff.isError || !staff.data) {
     const isAuthz = staff.error instanceof V1ApiError && staff.error.statusCode === 403;
     if (isAuthz) {
-      const reason = denialReason(staff.error);
-      return <AccessDenied scopeNotYetSupported={reason !== undefined && SCOPE_NOT_YET_SUPPORTED_REASONS.has(reason)} />;
+      const reason = tournamentStaffDenialReasonCode(staff.error);
+      return <AccessDenied scopeNotYetSupported={isTournamentStaffScopeNotYetSupported(reason)} />;
     }
     return <GateErrorScreen onRetry={() => void staff.refetch()} />;
   }

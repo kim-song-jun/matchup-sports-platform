@@ -16,16 +16,21 @@ export type GamePeriodState = 'SCHEDULED' | 'LIVE' | 'ENDED';
 export type GameLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
 
 /**
- * The October minimum event set is GOAL/CARD; SUBSTITUTION and the
- * PERIOD_START / PERIOD_END / PAUSE / RESUME lifecycle markers are
- * backend-emitted, not operator-composed from this console. (Written out
- * rather than as a `PERIOD_*` glob on purpose: the `*` followed by `/` would
- * close this block comment early and everything below it would parse as code.)
- * CORRECTION is reused (per the
- * `V1GameEventType` enum — there is no dedicated FOUL type and the schema is
- * frozen, see Task 4) as the extensible bucket for a foul note: it is
- * captured for the record but is NOT read by `deriveTournamentRevision()`'s
- * score/card tally, unlike GOAL/CARD.
+ * PERIOD_START/PERIOD_END/PAUSE/RESUME are declared here for schema
+ * completeness (`V1GameEventType`) but this console never emits them and
+ * nothing else in the codebase does either — see T1-0's fix to
+ * `apps/v1_api/src/games/games.service.ts` (`executeCommand`'s `start`/
+ * `next_period`/`end`) for what actually now drives `V1GamePeriod.state`/
+ * `startedAt`/`endedAt`. (A prior version of this comment claimed these were
+ * "backend-emitted" — that was never true; nothing in the API wrote a
+ * `PERIOD_START`/`PERIOD_END` V1GameEvent row, which is exactly why every
+ * captured event used to freeze at `clockMs=0`.)
+ *
+ * CORRECTION is reused (per the `V1GameEventType` enum — there is no
+ * dedicated FOUL type and the schema is frozen, see Task 4) as the
+ * extensible bucket for a foul note: it is captured for the record but is
+ * NOT read by `deriveTournamentRevision()`'s score/card tally, unlike
+ * GOAL/CARD.
  *
  * Known debt (Task 21 review): this reuse is real wire-level overload, not
  * just a UI label choice. `GamesService.reverseEvent()` (the only OTHER
@@ -173,7 +178,7 @@ export interface GameEventsBackfill {
   gap: GameEventGap | null;
 }
 
-export type GameCommandName = 'start' | 'pause' | 'resume' | 'end';
+export type GameCommandName = 'start' | 'pause' | 'resume' | 'end' | 'next-period';
 
 export interface GameCommandRequest {
   expectedVersion: number;

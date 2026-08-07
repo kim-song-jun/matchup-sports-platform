@@ -29,20 +29,26 @@ const STATE_LABEL: Record<GameState, string> = {
   CANCELLED: '취소됨',
 };
 
-const AVAILABLE_COMMANDS: Record<GameState, readonly GameCommandName[]> = {
-  SCHEDULED: ['start'],
-  LIVE: ['pause', 'end'],
-  PAUSED: ['resume', 'end'],
-  ENDED: [],
-  CANCELLED: [],
-};
-
-const COMMAND_LABEL: Record<GameCommandName, string> = {
+const COMMAND_LABEL: Record<Exclude<GameCommandName, 'next-period'>, string> = {
   start: '경기 시작',
   pause: '일시 중지',
   resume: '재개',
   end: '경기 종료',
 };
+
+/** `next-period`는 고정 라벨이 없다 — 축구/풋살 모두 정확히 2피리어드(전반/후반,
+ * `competition-config.presets.ts`)라 1→2 전이는 항상 "전반 종료"다. 그 이상(향후
+ * 다른 종목 config, T1-5 범위)은 잘못된 전/후반 라벨 대신 번호 기반 폴백을 쓴다. */
+function nextPeriodCommandLabel(currentPeriodNumber: number): string {
+  return currentPeriodNumber === 1 ? '전반 종료' : `${currentPeriodNumber}피리어드 종료`;
+}
+
+function commandLabel(command: GameCommandName, currentPeriodNumber: number | null): string {
+  if (command === 'next-period') {
+    return nextPeriodCommandLabel(currentPeriodNumber ?? 1);
+  }
+  return COMMAND_LABEL[command];
+}
 
 interface SelectedPlayer {
   readonly sideId: string;
@@ -73,25 +79,47 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const gameState = ops.gameSnapshot?.state ?? gameDetail.data?.state ?? null;
   const gameVersion = ops.gameSnapshot?.version ?? gameDetail.data?.version ?? 0;
 
+  // T1-0: a period only counts as "current" once the server has marked it
+  // LIVE (via executeCommand's start/next_period). Falling back to "the
+  // highest period number" was the root cause of every captured event
+  // landing on the last period at clockMs 0 — see the design doc's §2.8.
   const currentPeriod = useMemo(() => {
     const periods = gameDetail.data?.periods ?? [];
-    const live = periods.find((period) => period.state === 'LIVE');
-    if (live) return live;
-    return periods.reduce<typeof periods[number] | null>(
-      (latest, period) => (latest === null || period.number > latest.number ? period : latest),
-      null,
-    );
+    return periods.find((period) => period.state === 'LIVE') ?? null;
   }, [gameDetail.data?.periods]);
+
+  const hasNextPeriod = useMemo(() => {
+    if (currentPeriod === null) return false;
+    const periods = gameDetail.data?.periods ?? [];
+    return periods.some((period) => period.number === currentPeriod.number + 1);
+  }, [currentPeriod, gameDetail.data?.periods]);
+
+  const availableCommands: readonly GameCommandName[] = useMemo(() => {
+    switch (gameState) {
+      case 'SCHEDULED':
+        return ['start'];
+      case 'LIVE':
+        return hasNextPeriod ? ['pause', 'next-period', 'end'] : ['pause', 'end'];
+      case 'PAUSED':
+        return ['resume', 'end'];
+      default:
+        return [];
+    }
+  }, [gameState, hasNextPeriod]);
 
   const handleSelectPlayer = useCallback(
     (input: { sideId: string; participant: GameLineupParticipant }) => {
-      const periodStartedAtMs = currentPeriod?.startedAt
-        ? new Date(currentPeriod.startedAt).getTime()
-        : Date.now();
+      // T1-0: no LIVE period means there is no server-anchored start time to
+      // freeze a capture against. This used to silently fall back to
+      // Date.now(), which is exactly why every captured event read
+      // clockMs≈0. The persistent "경기를 시작해 주세요." banner already
+      // explains why the tap did nothing, so this guard needs no message.
+      if (currentPeriod === null || currentPeriod.startedAt === null) return;
+      const periodStartedAtMs = new Date(currentPeriod.startedAt).getTime();
       const frozen = freezeCapture({
         clientNowMs: Date.now(),
         offsetMs: ops.clockOffsetMs,
-        period: currentPeriod?.number ?? 1,
+        period: currentPeriod.number,
         periodStartedAtMs,
       });
       setSelected({ sideId: input.sideId, participant: input.participant, frozen });
@@ -168,7 +196,6 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const sides = gameDetail.data?.sides ?? [];
   const lineups = fixtureLineup.data?.lineups ?? [];
-  const availableCommands = gameState ? AVAILABLE_COMMANDS[gameState] : [];
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-24">
@@ -208,7 +235,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 loading={commandPending}
                 onClick={() => handleRunCommand(command)}
               >
-                {COMMAND_LABEL[command]}
+                {commandLabel(command, currentPeriod?.number ?? null)}
               </Button>
             ))}
           </div>
@@ -218,6 +245,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {/* Banners — never silently swallowed; each condition is its own
           visible, dismissable-by-recovery state. */}
       <div className="flex flex-col gap-2 px-4" aria-live="polite">
+        {currentPeriod === null && gameState !== 'ENDED' && gameState !== 'CANCELLED' && (
+          <Banner tone="info">경기를 시작해 주세요.</Banner>
+        )}
         {ops.takeover.status === 'revoked' && (
           <Banner tone="warning">
             운영 권한이 해제됐어요. 다른 운영자가 이 경기를 담당하고 있어요.
@@ -246,7 +276,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           sides={sides}
           lineups={lineups}
           onSelectPlayer={handleSelectPlayer}
-          disabled={!isTakeoverHeld(ops.takeover)}
+          disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
         />
       </div>
 

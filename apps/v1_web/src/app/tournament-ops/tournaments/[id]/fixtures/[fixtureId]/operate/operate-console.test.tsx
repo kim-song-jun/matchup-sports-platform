@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
@@ -29,7 +29,40 @@ vi.mock('@/hooks/use-v1-game-operations-console', () => ({
   useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
   gameOperationsErrorMessage: (code: string) => `오류(${code})`,
 }));
-vi.mock('./lineup-grid', () => ({ LineupGrid: () => <div data-testid="lineup-grid" /> }));
+vi.mock('./lineup-grid', () => ({
+  LineupGrid: ({
+    disabled,
+    onSelectPlayer,
+  }: {
+    disabled?: boolean;
+    onSelectPlayer: (input: {
+      sideId: string;
+      participant: {
+        id: string; gameId: string; sideId: string; lineupId: string;
+        displayNameSnapshot: string; jerseyNumber: number | null; position: string | null;
+        createdAt: string; updatedAt: string;
+      };
+    }) => void;
+  }) => (
+    <div data-testid="lineup-grid" data-disabled={disabled ? 'true' : 'false'}>
+      <button
+        type="button"
+        onClick={() =>
+          onSelectPlayer({
+            sideId: 'side-home',
+            participant: {
+              id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
+              displayNameSnapshot: '정우진', jerseyNumber: 10, position: null,
+              createdAt: '', updatedAt: '',
+            },
+          })
+        }
+      >
+        select-player
+      </button>
+    </div>
+  ),
+}));
 
 const SIDE_ID = 'side-home';
 
@@ -132,5 +165,93 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
     expect(screen.getByText('전송 상태')).toBeInTheDocument();
     // 서버 로그는 그대로 남아 있어야 한다 — 큐가 그것을 대체하지 않는다.
     expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
+  });
+});
+
+describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
+  beforeEach(() => {
+    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: {
+        gameId: 'game-1',
+        lineups: [{
+          sideId: 'side-home',
+          participants: [{
+            id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
+            displayNameSnapshot: '정우진', jerseyNumber: 10, position: null,
+            createdAt: '', updatedAt: '',
+          }],
+        }],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  function gameWithPeriods(
+    state: 'SCHEDULED' | 'LIVE',
+    periods: Array<{ number: number; state: string; startedAt: string | null; endedAt: string | null }>,
+  ) {
+    mocks.useV1Game.mockReturnValue({
+      data: {
+        id: 'game-1', state, version: 2, lastSequence: 1,
+        periods: periods.map((period) => ({ id: `period-${period.number}`, gameId: 'game-1', ...period })),
+        sides: [{
+          id: 'side-home', gameId: 'game-1', sideKey: 'HOME', teamId: null,
+          displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '',
+        }],
+        lineups: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state } }));
+  }
+
+  it('진행 중인 피리어드가 없으면 선수 탭을 막고 안내 문구를 보여준다', () => {
+    gameWithPeriods('SCHEDULED', [
+      { number: 1, state: 'SCHEDULED', startedAt: null, endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('경기를 시작해 주세요.')).toBeInTheDocument();
+    expect(screen.getByTestId('lineup-grid')).toHaveAttribute('data-disabled', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'select-player' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('1피리어드가 진행 중이고 다음 피리어드가 있으면 "전반 종료" 버튼을 보여주고 선수 탭을 허용한다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
+    expect(screen.getByRole('button', { name: '전반 종료' })).toBeInTheDocument();
+    expect(screen.getByTestId('lineup-grid')).toHaveAttribute('data-disabled', 'false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'select-player' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('마지막 피리어드가 진행 중이면 다음 피리어드 버튼이 보이지 않는다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
+    ]);
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
+    expect(screen.queryByText('전반 종료')).toBeNull();
+    expect(screen.queryByText('2피리어드 종료')).toBeNull();
   });
 });

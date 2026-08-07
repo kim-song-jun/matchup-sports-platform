@@ -7,6 +7,8 @@
  * 대회(Tournament) 날짜 표기 기준:
  *   - compact 슬롯 (홈 티저 · 목록 카드): formatTournamentDateShort  → 'M/D (요일)'
  *   - compact 범위 슬롯:                 formatTournamentDateRangeShort → 'M/D (요일)~M/D (요일)'
+ *   - compact 단일 시각 슬롯 (경기 일정 목록 · 결선 대진표 카드): formatTournamentDateTimeShort
+ *     → 'M/D (요일) HH:MM'
  *   - 상세 슬롯 (대회 상세 페이지):        formatTournamentDateLong   → 'YYYY년 M월 D일 (요일)'
  *   - 상세 일시 슬롯 (마감 안내):          formatTournamentDateTimeLong → 'YYYY년 M월 D일 (요일) 오후 H:mm'
  *   - 상세 범위 슬롯:                    formatTournamentDateRangeLong
@@ -45,6 +47,20 @@ export function formatTournamentDateRangeShort(
   const end = formatTournamentDateShort(endStr);
   if (!end || end === start) return start;
   return `${start}~${end}`;
+}
+
+/**
+ * 목록/브래킷 슬롯용 짧은 날짜+시각: 'M/D (요일) HH:MM'
+ * 경기 일정 목록 · 결선 대진표 카드처럼 한 줄에 날짜와 시각을 함께 보여줘야 하는
+ * compact 슬롯에서 사용해요. dateStr 이 없거나 invalid 이면 null 반환.
+ */
+export function formatTournamentDateTimeShort(dateStr: string | null | undefined): string | null {
+  const dateLabel = formatTournamentDateShort(dateStr);
+  if (!dateLabel) return null;
+  const d = new Date(dateStr as string);
+  const hour = String(d.getHours()).padStart(2, '0');
+  const minute = String(d.getMinutes()).padStart(2, '0');
+  return `${dateLabel} ${hour}:${minute}`;
 }
 
 /**

@@ -26,14 +26,19 @@ export const gameSchemaFixture = {
   now: new Date('2026-07-29T00:00:00.000Z'),
 } as const;
 
-// Re-pinned for the started-flag persistence fix. The schema hash covers
-// apps/v1_api/prisma/schema.prisma, whose only change since the previous pin
-// is one additive field backing migration
-// 20260806020000_v1_game_participant_started: V1GameParticipant.started.
+// Re-pinned for the origin/dev merge. The schema hash covers
+// apps/v1_api/prisma/schema.prisma, whose only changes since the previous pin
+// are (1) one additive field from dev backing migration
+// 20260806235000_v1_team_match_deadline_at: V1TeamMatch.deadlineAt, and
+// (2) pure `prisma format` whitespace realignment in the V1User and
+// V1Tournament relation blocks — this branch had added relation fields
+// (officialResultCaches, acknowledged/resolvedResultEscalations) without
+// re-running the formatter, so the columns were left un-aligned. No model,
+// field, type, attribute, or index changed in (2).
 // The migration hash below is UNCHANGED, which proves the bound Task 6
 // migration (20260729000100_v1_game_operations) was not touched.
 export const gameSchemaSourceManifest = {
-  schema: '1ba07dcf2ac769ef9859274067cbcc0cd94ef17cff37dd17224b7aa39f315791',
+  schema: '4ad48c2c5064e5218ec8c0d26ca9112465f3ab5e37e793f99fd5e974f0b38645',
   migration: 'bda8608ee5b4498939eea0b68ac837612338e781e09a16a41f7325ff971110d7',
 } as const;
 

@@ -1,10 +1,12 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldOff } from 'lucide-react';
 import { useV1AuthMe, useV1Tournament, useV1TournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
+import { getTournamentOpsOrigin, saveTournamentOpsOrigin } from '@/lib/session-storage';
 import type { V1TournamentStaffRole } from '@/types/api';
 import { TournamentOpsShell } from '@/components/tournament-ops/tournament-ops-shell';
 import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-context';
@@ -120,6 +122,16 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
   // 공개 대회 상세(제목 표시용)는 셸 진입 가능 여부와 무관하다 — 실패해도 게이트를 막지 않고
   // 셸이 fallback 제목("대회 운영")으로 조용히 대체한다.
   const tournament = useV1Tournament(tournamentId);
+  const searchParams = useSearchParams();
+
+  // T6-2: `?from=admin`은 admin 화면이 명시적으로 실어 보내는 진입 의도다
+  // (referrer는 신뢰하지 않는다 — 계획 문서 "설계 노트" 참고). 첫 진입 시
+  // sessionStorage에 대회 단위로 박제해 셸 안 다른 nav로 이동한 뒤에도 유지한다.
+  const cameFromAdmin = searchParams.get('from') === 'admin';
+  useEffect(() => {
+    if (cameFromAdmin) saveTournamentOpsOrigin(tournamentId, 'admin');
+  }, [cameFromAdmin, tournamentId]);
+  const origin = cameFromAdmin ? 'admin' : getTournamentOpsOrigin(tournamentId);
 
   if (authMe.isPending || staff.isPending) {
     return <GateLoadingScreen />;
@@ -148,8 +160,7 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
         role={role}
         tournamentTitle={tournament.data?.title}
         tournamentCoverImageUrl={tournament.data?.coverImageUrl}
-        // T6-5: 임시값 — Task 6에서 `?from=admin` 감지 기반 실제 origin으로 교체한다.
-        origin="home"
+        origin={origin}
       >
         {children}
       </TournamentOpsShell>

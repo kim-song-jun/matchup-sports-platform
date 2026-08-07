@@ -540,8 +540,8 @@ model V1User {
   verificationTokens             V1VerificationToken[]
   inquiries                      V1Inquiry[]
   uploadAssets                   V1UploadAsset[]
-  acknowledgedResultEscalations V1ResultEscalation[]          @relation("V1EscalationAcknowledgedBy")
-  resolvedResultEscalations     V1ResultEscalation[]          @relation("V1EscalationResolvedBy")
+  acknowledgedResultEscalations  V1ResultEscalation[]          @relation("V1EscalationAcknowledgedBy")
+  resolvedResultEscalations      V1ResultEscalation[]          @relation("V1EscalationResolvedBy")
 
   @@index([accountStatus])
   @@index([onboardingStatus])
@@ -1341,6 +1341,7 @@ model V1TeamMatch {
   placeAddress               String?           @map("place_address")
   startAt                    DateTime          @map("start_at")
   endAt                      DateTime?         @map("end_at")
+  deadlineAt                 DateTime?         @map("deadline_at")
   formatNote                 String?           @map("format_note")
   minSportLevelId            String?           @map("min_sport_level_id")
   maxSportLevelId            String?           @map("max_sport_level_id")
@@ -1899,22 +1900,22 @@ model V1Tournament {
   deletedAt                  DateTime?                   @map("deleted_at")
   competitionConfigVersionId String                      @default(dbgenerated("v1_default_competition_config_version()")) @map("competition_config_version_id")
 
-  sport             V1Sport                              @relation(fields: [sportId], references: [id], onDelete: Restrict)
-  competitionConfig V1CompetitionConfigVersion           @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
-  createdByAdmin    V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
-  registrations     V1TournamentRegistration[]
-  groups            V1TournamentGroup[]
-  fixtures          V1TournamentFixture[]
-  announcements     V1TournamentAnnouncement[]
-  sponsors          V1TournamentSponsor[]
-  reviews           V1TournamentReview[]
-  awards            V1TournamentAward[]
-  campaign          V1TournamentCampaign?
-  popups            V1TournamentPopup[]
-  fields            V1TournamentField[]
-  staffAssignments  V1TournamentStaffAssignment[]
-  operationAudits   V1OperationAudit[]
-  advancementEdges  V1TournamentFixtureAdvancementEdge[]
+  sport                V1Sport                              @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  competitionConfig    V1CompetitionConfigVersion           @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
+  createdByAdmin       V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+  registrations        V1TournamentRegistration[]
+  groups               V1TournamentGroup[]
+  fixtures             V1TournamentFixture[]
+  announcements        V1TournamentAnnouncement[]
+  sponsors             V1TournamentSponsor[]
+  reviews              V1TournamentReview[]
+  awards               V1TournamentAward[]
+  campaign             V1TournamentCampaign?
+  popups               V1TournamentPopup[]
+  fields               V1TournamentField[]
+  staffAssignments     V1TournamentStaffAssignment[]
+  operationAudits      V1OperationAudit[]
+  advancementEdges     V1TournamentFixtureAdvancementEdge[]
   officialResultCaches V1GameOfficialResultCache[]
 
   @@index([status, scheduledAt])
@@ -2327,29 +2328,29 @@ model V1IntegrationSettings {
 }
 
 model V1Game {
-  id                         String                     @id @default(uuid())
-  sourceType                 V1GameSourceType           @map("source_type")
-  teamMatchId                String?                    @unique @map("team_match_id")
-  tournamentFixtureId        String?                    @unique @map("tournament_fixture_id")
-  state                      V1GameState                @default(SCHEDULED)
-  version                    Int                        @default(0)
-  lastSequence               Int                        @default(0) @map("last_sequence")
-  currentOfficialRevisionId  String?                    @map("current_official_revision_id")
-  competitionConfigVersionId String                     @map("competition_config_version_id")
-  createdAt                  DateTime                   @default(now()) @map("created_at")
-  updatedAt                  DateTime                   @updatedAt @map("updated_at")
-  teamMatch                  V1TeamMatch?               @relation("V1GameTeamMatch", fields: [teamMatchId], references: [id], onDelete: Restrict)
-  tournamentFixture          V1TournamentFixture?       @relation("V1GameTournamentFixture", fields: [tournamentFixtureId], references: [id], onDelete: Restrict)
-  currentOfficialRevision    V1GameResultRevision?      @relation("V1CurrentOfficialRevision", fields: [id, currentOfficialRevisionId], references: [gameId, id], onDelete: Restrict, map: "v1_games_current_revision_fk")
+  id                         String                      @id @default(uuid())
+  sourceType                 V1GameSourceType            @map("source_type")
+  teamMatchId                String?                     @unique @map("team_match_id")
+  tournamentFixtureId        String?                     @unique @map("tournament_fixture_id")
+  state                      V1GameState                 @default(SCHEDULED)
+  version                    Int                         @default(0)
+  lastSequence               Int                         @default(0) @map("last_sequence")
+  currentOfficialRevisionId  String?                     @map("current_official_revision_id")
+  competitionConfigVersionId String                      @map("competition_config_version_id")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @updatedAt @map("updated_at")
+  teamMatch                  V1TeamMatch?                @relation("V1GameTeamMatch", fields: [teamMatchId], references: [id], onDelete: Restrict)
+  tournamentFixture          V1TournamentFixture?        @relation("V1GameTournamentFixture", fields: [tournamentFixtureId], references: [id], onDelete: Restrict)
+  currentOfficialRevision    V1GameResultRevision?       @relation("V1CurrentOfficialRevision", fields: [id, currentOfficialRevisionId], references: [gameId, id], onDelete: Restrict, map: "v1_games_current_revision_fk")
   sides                      V1GameSide[]
   periods                    V1GamePeriod[]
   lineups                    V1GameLineup[]
   participants               V1GameParticipant[]
   events                     V1GameEvent[]
-  resultRevisions            V1GameResultRevision[]     @relation("V1GameResultRevisions")
+  resultRevisions            V1GameResultRevision[]      @relation("V1GameResultRevisions")
   visibilityPolicy           V1GameVisibilityPolicy?
   officialResultCaches       V1GameOfficialResultCache[]
-  competitionConfig          V1CompetitionConfigVersion @relation("V1GameCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_games_competition_config_fk")
+  competitionConfig          V1CompetitionConfigVersion  @relation("V1GameCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_games_competition_config_fk")
 
   @@unique([id, currentOfficialRevisionId], map: "v1_games_id_current_official_revision_key")
   @@index([state, updatedAt])
@@ -2511,27 +2512,27 @@ model V1GameEvent {
 }
 
 model V1GameResultRevision {
-  id                   String                    @id @default(uuid())
-  gameId               String                    @map("game_id")
+  id                   String                     @id @default(uuid())
+  gameId               String                     @map("game_id")
   revision             Int
-  state                V1GameResultRevisionState @default(DRAFT)
+  state                V1GameResultRevisionState  @default(DRAFT)
   score                Json
-  eventsHash           String                    @map("events_hash")
-  missingScorer        Boolean                   @default(false) @map("missing_scorer")
-  mvpParticipantId     String?                   @map("mvp_participant_id")
+  eventsHash           String                     @map("events_hash")
+  missingScorer        Boolean                    @default(false) @map("missing_scorer")
+  mvpParticipantId     String?                    @map("mvp_participant_id")
   reason               String?
-  createdByActorType   V1IdentityActorType       @map("created_by_actor_type")
-  createdByUserId      String?                   @map("created_by_user_id")
-  createdBySystemActor String?                   @map("created_by_system_actor")
-  supersedesId         String?                   @map("supersedes_id")
-  submittedAt          DateTime?                 @map("submitted_at")
-  officialAt           DateTime?                 @map("official_at")
-  createdAt            DateTime                  @default(now()) @map("created_at")
-  updatedAt            DateTime                  @updatedAt @map("updated_at")
-  game                 V1Game                    @relation("V1GameResultRevisions", fields: [gameId], references: [id], onDelete: Restrict, map: "v1_result_revisions_game_fk")
-  supersedes           V1GameResultRevision?     @relation("V1RevisionSupersedes", fields: [gameId, supersedesId], references: [gameId, id], onDelete: Restrict, map: "v1_result_revisions_supersedes_fk")
-  supersededBy         V1GameResultRevision[]    @relation("V1RevisionSupersedes")
-  currentGames         V1Game[]                  @relation("V1CurrentOfficialRevision")
+  createdByActorType   V1IdentityActorType        @map("created_by_actor_type")
+  createdByUserId      String?                    @map("created_by_user_id")
+  createdBySystemActor String?                    @map("created_by_system_actor")
+  supersedesId         String?                    @map("supersedes_id")
+  submittedAt          DateTime?                  @map("submitted_at")
+  officialAt           DateTime?                  @map("official_at")
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt            DateTime                   @updatedAt @map("updated_at")
+  game                 V1Game                     @relation("V1GameResultRevisions", fields: [gameId], references: [id], onDelete: Restrict, map: "v1_result_revisions_game_fk")
+  supersedes           V1GameResultRevision?      @relation("V1RevisionSupersedes", fields: [gameId, supersedesId], references: [gameId, id], onDelete: Restrict, map: "v1_result_revisions_supersedes_fk")
+  supersededBy         V1GameResultRevision[]     @relation("V1RevisionSupersedes")
+  currentGames         V1Game[]                   @relation("V1CurrentOfficialRevision")
   resultParticipants   V1GameResultParticipant[]
   officialFact         V1GameOfficialFact?
   teamRecordFacts      V1TeamRecordFact[]
@@ -2864,17 +2865,17 @@ model V1CompetitionConfigVersion {
 }
 
 model V1ResultEscalation {
-  id               String             @id @default(uuid())
-  resultRevisionId String             @map("result_revision_id")
+  id               String               @id @default(uuid())
+  resultRevisionId String               @map("result_revision_id")
   kind             V1EscalationKind
-  dueAt            DateTime           @map("due_at")
-  status           V1EscalationStatus @default(PENDING)
-  ackByUserId      String?            @map("ack_by_user_id")
-  resolvedByUserId String?            @map("resolved_by_user_id")
+  dueAt            DateTime             @map("due_at")
+  status           V1EscalationStatus   @default(PENDING)
+  ackByUserId      String?              @map("ack_by_user_id")
+  resolvedByUserId String?              @map("resolved_by_user_id")
   reason           String?
-  version          Int                @default(0)
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
+  version          Int                  @default(0)
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
   resultRevision   V1GameResultRevision @relation(fields: [resultRevisionId], references: [id], onDelete: Restrict, map: "v1_result_escalations_revision_fk")
   acknowledgedBy   V1User?              @relation("V1EscalationAcknowledgedBy", fields: [ackByUserId], references: [id], onDelete: Restrict, map: "v1_result_escalations_ack_user_fk")
   resolvedBy       V1User?              @relation("V1EscalationResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: Restrict, map: "v1_result_escalations_resolved_user_fk")

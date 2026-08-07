@@ -158,6 +158,8 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
   const editQuery = useV1MatchEdit(matchId);
+  const sports = useV1MasterSports();
+  const regions = useV1MasterRegions();
   const updateMatch = useV1UpdateMatch(matchId);
   const cancelMatch = useV1CancelMatch(matchId);
   const uploadImages = useV1UploadImages();
@@ -166,6 +168,14 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const [regionId, setRegionId] = useState('');
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const sportOptions = sports.data?.map((sport) => ({ id: sport.id, name: sport.name }))
+    ?? (editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : []);
+  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
+  const editRegionOptions = regionOptions.length > 0
+    ? regionOptions
+    : editQuery.data?.form.regionId
+      ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }]
+      : [];
 
   useEffect(() => {
     if (!editQuery.data) return;
@@ -182,12 +192,15 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     draft,
     selectedSportId,
     regionId,
-    sports: editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : [],
-    regions: editQuery.data?.form.regionId ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }] : [],
+    sports: sportOptions,
+    regions: editRegionOptions,
     error: editQuery.isError ? '수정 권한이 없거나 매치를 불러오지 못했어요.' : error,
     lockedReason: editQuery.data?.editable === false ? lockedReasonLabel(editQuery.data.lockedReason ?? '') : null,
     submitting: updateMatch.isPending || cancelMatch.isPending || editQuery.isLoading,
-    onSelectSport: () => undefined,
+    onSelectSport: (sportName) => {
+      const sport = sportOptions.find((item) => item.name === sportName);
+      if (sport) setSelectedSportId(sport.id);
+    },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
     onRegionChange: setRegionId,
     onBack: () => router.push(`/matches/${matchId}`),

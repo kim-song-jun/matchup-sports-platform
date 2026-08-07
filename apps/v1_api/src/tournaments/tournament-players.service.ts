@@ -634,7 +634,7 @@ export class TournamentPlayersService {
     return {
       members: memberships
         .map(({ role, user: member }) => {
-          const realName = member.profile?.realName?.trim() ?? null;
+          const realName = member.profile?.realName?.trim() || null;
 
           // addPlayer 와 **같은 함수**로 판정한다 — 조건이 갈라지면 고를 수는 있는데 서버가
           // 거절하는 폼이 되고, 그게 이 기능이 없애려던 상태다.

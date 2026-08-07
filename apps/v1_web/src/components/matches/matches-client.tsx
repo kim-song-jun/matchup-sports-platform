@@ -186,7 +186,8 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
           description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
           address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
           rules: query.data.rulesText ? [query.data.rulesText] : fallback.match.rules,
-          manageHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
+          editHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
+          applicationsHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
           participants: toParticipants(
             query.data,
             fallback.match.participants,

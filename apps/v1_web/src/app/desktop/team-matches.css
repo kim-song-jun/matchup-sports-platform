@@ -294,6 +294,20 @@
     margin-left: auto;
     margin-right: auto;
   }
+
+  /* Team-match wizard CTA follows the centered form in document flow. */
+  .tm-team-match-create-shell + .tm-create-fixed-cta {
+    position: static;
+    inset: auto;
+    transform: none;
+    width: auto;
+    max-width: 560px;
+    margin: 16px auto 0;
+    padding: 0 0 env(safe-area-inset-bottom, 0px);
+    border-top: 0;
+    background: transparent;
+    box-shadow: none;
+  }
 }
 
 

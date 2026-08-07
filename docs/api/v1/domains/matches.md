@@ -66,7 +66,7 @@
 - `deadlineAt` is persisted and returned on list/detail/edit responses. Once it passes, application eligibility returns `DEADLINE_PASSED` and the display state is treated as closed for CTA purposes.
 - Apply creates a `requested` application. There is no payment or checkout step.
 - Host approval creates or activates a participant and updates capacity-derived CTA state.
-- Approval locks and re-reads the match before capacity and status checks, then conditionally moves only a still-`requested` application to `approved`. Withdrawal uses the same expected-status transition, so concurrent approval, withdrawal, and cancellation cannot leave an active participant attached to a contradictory terminal state.
+- Approval locks and re-reads the match before capacity and status checks, then conditionally moves only a still-`requested` application to `approved`. Withdrawal and rejection use the same expected-status transition, and resubmission only replaces the previously observed terminal state, so concurrent approval, withdrawal, rejection, resubmission, and cancellation cannot report contradictory success.
 - Withdraw/reject/cancel preserve history through application/status rows.
 - Host-only manage actions must reject non-host users.
 

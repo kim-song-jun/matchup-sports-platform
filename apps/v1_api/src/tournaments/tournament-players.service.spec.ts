@@ -1400,4 +1400,28 @@ describe('TournamentPlayersService', () => {
       service.listEligiblePlayersForAdmin(adminUser, 'ghost-reg'),
     ).rejects.toMatchObject({ response: { code: 'REGISTRATION_NOT_FOUND' } });
   });
+
+  it('listEligiblePlayersForAdmin: whitespace-only names become null instead of empty options', async () => {
+    setupEligible({
+      members: [
+        eligibleMembershipRow({
+          user: {
+            profile: {
+              nickname: 'blank-name',
+              realName: '   ',
+              birthDate: '1995-03-15',
+              gender: 'male',
+            },
+          },
+        }),
+      ],
+    });
+
+    const [member] = (await service.listEligiblePlayersForAdmin(adminUser, 'reg-1')).members;
+
+    expect(member).toMatchObject({
+      realName: null,
+      eligible: false,
+    });
+  });
 });

@@ -10,8 +10,8 @@ import { TournamentInquiryModal } from './tournament-inquiry-modal';
 import styles from './tournament-inquiry-section.module.css';
 
 const TOURNAMENT_CONTACT = {
-  instagramHandle: '@teameet.sports',
-  instagramUrl: 'https://www.instagram.com/teameet.sports/',
+  instagramHandle: '@teameet_official',
+  instagramUrl: 'https://www.instagram.com/teameet_official/',
   email: 'teameetsports@naver.com',
 } as const;
 

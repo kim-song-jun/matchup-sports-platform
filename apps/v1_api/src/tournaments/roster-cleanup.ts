@@ -72,10 +72,13 @@ export async function removeUserFromActiveRosters(
     return 0;
   }
 
-  await tx.v1TournamentPlayer.updateMany({
-    where: { id: { in: targets.map((target) => target.id) } },
+  const updated = await tx.v1TournamentPlayer.updateMany({
+    where: {
+      id: { in: targets.map((target) => target.id) },
+      removedAt: null,
+    },
     data: { removedAt: options.at ?? new Date() },
   });
 
-  return targets.length;
+  return updated.count;
 }

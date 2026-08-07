@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { TeamMatchCreateViewModel } from './team-matches.types';
-import { draftFromTeamMatchEdit, TeamMatchCreatePageClient } from './team-matches-create-client';
+import { buildTeamMatchMutationPayload, draftFromTeamMatchEdit, TeamMatchCreatePageClient } from './team-matches-create-client';
+import { getTeamMatchCreateViewModel } from './team-matches.view-model';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
@@ -192,5 +193,68 @@ describe('team match edit hydration', () => {
     });
 
     expect(draft.imageUrl).toBe('');
+  });
+
+  it('keeps the stored image, place, address, and deadline in the edit payload', () => {
+    const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    startsAt.setHours(19, 0, 0, 0);
+    const deadlineAt = new Date(startsAt.getTime() - 24 * 60 * 60 * 1000);
+    const edit = {
+      teamMatchId: 'team-match-image', editable: true, lockedReason: null,
+      form: {
+        hostTeamId: 'team-1', sportId: 'sport-futsal', regionId: 'region-gangnam',
+        title: '이미지 팀매치', imageUrl: '/uploads/team-match-cover.webp',
+        startsAt: startsAt.toISOString(), deadlineAt: deadlineAt.toISOString(),
+        manualPlaceName: '잠실 풋살파크', addressText: '서울 송파구 올림픽로 25',
+      },
+      status: 'recruiting' as const, version: new Date().toISOString(),
+    };
+    const draft = draftFromTeamMatchEdit(edit);
+    const payload = buildTeamMatchMutationPayload(draft, 'team-1', 'sport-futsal', 'region-gangnam');
+
+    expect(draft).toMatchObject({
+      imageUrl: '/uploads/team-match-cover.webp',
+      venue: '잠실 풋살파크',
+      address: '서울 송파구 올림픽로 25',
+    });
+    expect(payload).toMatchObject({
+      imageUrl: '/uploads/team-match-cover.webp',
+      manualPlaceName: '잠실 풋살파크',
+      addressText: '서울 송파구 올림픽로 25',
+      deadlineAt: deadlineAt.toISOString(),
+    });
+  });
+
+  it('maps a removed edit image to null instead of a fallback image', () => {
+    const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const draft = { ...getTeamMatchCreateViewModel('edit').draft, title: '이미지 제거', imageUrl: '', venue: '잠실', date: startsAt.toISOString().slice(0, 10), startTime: '19:00' };
+
+    expect(buildTeamMatchMutationPayload(draft, 'team-1', 'sport-futsal', 'region-gangnam')?.imageUrl).toBeNull();
+  });
+});
+
+describe('team-match deadline payload', () => {
+  it('sends the selected application deadline before the match start', () => {
+    const draft = getTeamMatchCreateViewModel('place-time').draft;
+    const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    start.setHours(18, 0, 0, 0);
+    const deadline = new Date(start.getTime() - 24 * 60 * 60 * 1000);
+    const payload = buildTeamMatchMutationPayload(
+      {
+        ...draft,
+        title: '마감 시간이 있는 팀매치',
+        venue: '한강 풋살장',
+        date: start.toISOString().slice(0, 10),
+        startTime: '18:00',
+        endTime: '20:00',
+        deadlineDate: deadline.toISOString().slice(0, 10),
+        deadlineTime: '18:00',
+      },
+      'team-1',
+      'sport-futsal',
+      'region-gangnam',
+    );
+
+    expect(payload?.deadlineAt).toBe(deadline.toISOString());
   });
 });

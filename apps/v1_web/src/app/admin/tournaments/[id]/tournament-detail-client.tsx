@@ -123,6 +123,7 @@ import {
   type TournamentPromoCardValue,
 } from '@/components/admin/tournaments/promo-card-fields';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
+import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -3538,24 +3539,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       </div>
 
       {/* ── Tournament-ops quick links: 이 관리자 콘솔 탭들과 별개인 대회 현장 운영
-          콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다 — 별도 탭
-          패널을 새로 만들 정도는 아니라 가벼운 바로가기 행으로 연결한다. */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Link
-          href={`/tournament-ops/tournaments/${encodeURIComponent(id)}/staff`}
-          className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          스태프 배정 콘솔
-          <ChevronRight size={12} aria-hidden="true" />
-        </Link>
-        <Link
-          href={`/tournament-ops/tournaments/${encodeURIComponent(id)}/operations`}
-          className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          운영 보드
-          <ChevronRight size={12} aria-hidden="true" />
-        </Link>
-      </div>
+          콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다. T6-5(D-16):
+          권한이 없으면 숨기지 않고 비활성 + 사유로 보여준다. */}
+      <TournamentOpsQuickLinks tournamentId={id} />
 
       {/* ── Tab panels ────────────────────────────────────────────────── */}
       <div

@@ -87,3 +87,24 @@ export function getLoginPathForRedirect(target: string) {
   const redirect = sanitizeRedirectPath(target);
   return redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login';
 }
+
+// T6-2: 대회별 tournament-ops 진입 출처. `_gate.tsx`가 `?from=admin` 쿼리를
+// 감지한 첫 진입 시점에 기록해 두면, 셸 안에서 다른 nav 항목(결과 검토/스태프
+// 등)으로 이동해 쿼리가 사라진 뒤에도 "돌아가기" 목적지가 유지된다.
+// sessionStorage를 쓰는 이유는 탭을 닫으면 자연히 사라져야 하기 때문 —
+// 다른 대회의 admin 화면을 나중에 열었을 때 엉뚱한 출처가 남아있으면 안 된다.
+const TOURNAMENT_OPS_ORIGIN_PREFIX = 'teameet.v1.tournamentOpsOrigin.';
+
+export type TournamentOpsOrigin = 'admin' | 'home';
+
+export function saveTournamentOpsOrigin(tournamentId: string, origin: 'admin') {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(`${TOURNAMENT_OPS_ORIGIN_PREFIX}${tournamentId}`, origin);
+}
+
+export function getTournamentOpsOrigin(tournamentId: string): TournamentOpsOrigin {
+  if (typeof window === 'undefined') return 'home';
+  return window.sessionStorage.getItem(`${TOURNAMENT_OPS_ORIGIN_PREFIX}${tournamentId}`) === 'admin'
+    ? 'admin'
+    : 'home';
+}

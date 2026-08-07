@@ -25,6 +25,9 @@
 - PR #264 is mergeable but unstable because two jobs hit a transient GitHub Actions outage and two real Copilot review threads remain unresolved.
 - Pending release contract: 26 Changesets; package versions are `0.2.0`, so direct promotion would reuse the current production display version `0.2.1`.
 - Local verification: 69 targeted Jest tests pass; v1 API `tsc --noEmit` passes after regenerating the Prisma client.
+- Changesets PR #267 consumed the initial 26 release notes and merged as `021be76bbb3b54a08dde792f67102ed79c0c2cb7`.
+- The resulting PR #264 run exposed a gate contradiction: a fully released `dev -> main` diff had behavior files but no pending Changesets. The gate now requires the exact promotion refs, both fixed app version bumps, both changelogs, no pending Changesets, and consumed Changeset paths.
+- Release-policy tests: 17/17 pass. Production deploy security tests: 18/18 pass. Production security and v1 DB guardrails pass.
 
 ## Ambiguity Log
 

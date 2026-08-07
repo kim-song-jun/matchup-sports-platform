@@ -2,6 +2,10 @@
 
 import { readFileSync } from 'node:fs';
 
+export function normalizeWorkflowSource(source) {
+  return source.replace(/\r\n/g, '\n');
+}
+
 // SSH alias 잔재 탐지. 테스트(scripts/qa/prod-deploy-security-guard.test.mjs)에서 직접
 // 호출할 수 있도록 export 한다 — 이 가드 자체가 약해서 놓친 전례가 있어(2026-08-02,
 // `ssh -o ... ec2` 미탐 + 인라인 주석 오탐) 동작을 테스트로 고정한다.
@@ -91,7 +95,7 @@ export function findJobsMissingRunnerPrereqs(workflow) {
 }
 
 const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
-const workflow = readFileSync(workflowPath, 'utf8');
+const workflow = normalizeWorkflowSource(readFileSync(workflowPath, 'utf8'));
 const errors = [];
 
 for (const problem of findJobsMissingRunnerPrereqs(workflow)) {

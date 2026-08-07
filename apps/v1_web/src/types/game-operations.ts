@@ -18,12 +18,14 @@ export type GameLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
 /**
  * PERIOD_START/PERIOD_END/PAUSE/RESUME are declared here for schema
  * completeness (`V1GameEventType`) but this console never emits them and
- * nothing else in the codebase does either — see T1-0's fix to
+ * no production runtime flow does either. (Tests may directly call the
+ * generic `appendEvent()` to construct these rows for verification, but
+ * the ops console itself doesn't.) See T1-0's fix to
  * `apps/v1_api/src/games/games.service.ts` (`executeCommand`'s `start`/
- * `next_period`/`end`) for what actually now drives `V1GamePeriod.state`/
+ * `next-period`/`end`) for what actually now drives `V1GamePeriod.state`/
  * `startedAt`/`endedAt`. (A prior version of this comment claimed these were
- * "backend-emitted" — that was never true; nothing in the API wrote a
- * `PERIOD_START`/`PERIOD_END` V1GameEvent row, which is exactly why every
+ * "backend-emitted" — that was never true; no production flow wrote a
+ * `PERIOD_START`/`PERIOD_END` V1GameEvent row automatically, which is exactly why every
  * captured event used to freeze at `clockMs=0`.)
  *
  * CORRECTION is reused (per the `V1GameEventType` enum — there is no

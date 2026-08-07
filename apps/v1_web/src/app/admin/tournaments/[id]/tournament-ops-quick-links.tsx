@@ -39,7 +39,7 @@ export function TournamentOpsQuickLinks({ tournamentId }: { tournamentId: string
             className="inline-flex flex-col items-start min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap text-gray-400 bg-gray-100 cursor-not-allowed text-left"
           >
             <span>{link.label}</span>
-            <span className="text-[10px] font-normal text-gray-400">{reasonLabel}</span>
+            <span className="text-[var(--font-size-micro)] font-normal text-gray-400">{reasonLabel}</span>
           </button>
         ) : (
           <Link

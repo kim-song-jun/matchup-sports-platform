@@ -160,7 +160,7 @@ function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean })
       <span className="flex flex-col items-start">
         <span>{item.label}</span>
         {item.disabledReason ? (
-          <span className="text-[11px] font-normal text-gray-400 dark:text-gray-500">{item.disabledReason}</span>
+          <span className="text-[var(--font-size-micro)] font-normal text-gray-400 dark:text-gray-500">{item.disabledReason}</span>
         ) : null}
       </span>
     </button>
@@ -184,7 +184,7 @@ interface TournamentOpsShellProps {
 
 /** T6-2 — 진입 출처별 복귀 목적지. `_gate.tsx`가 계산한 `origin`을 그대로 받는다. */
 const RETURN_TARGET: Record<TournamentOpsOrigin, (tournamentId: string) => { href: string; label: string }> = {
-  admin: (tournamentId) => ({ href: `/admin/tournaments/${tournamentId}`, label: '대회 관리로 돌아가기' }),
+  admin: (tournamentId) => ({ href: `/admin/tournaments/${encodeURIComponent(tournamentId)}`, label: '대회 관리로 돌아가기' }),
   home: () => ({ href: '/home', label: '서비스로 돌아가기' }),
 };
 

@@ -41,9 +41,15 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
 
   // T6-2: 딥링크로 들어왔는데 목록이 로드된 뒤에도 해당 fixture가 없으면(아직 공식
   // 결과가 확정되지 않은 경우) 조용히 미선택 상태로 두지 않고 안내한다.
+  // Fix round 1 — `useTournamentEndedFixtures`는 staleTime: 15_000(창 포커스 등으로
+  // 백그라운드 refetch됨)이라, 안내를 띄운 뒤 refetch로 그 fixture가 목록에
+  // 들어오면 selectedItem이 truthy가 되는데 deepLinkNotFound는 계속 true로
+  // 남아 배너와 패널이 동시에 보이는 버그가 있었다. selectedItem이 다시
+  // truthy가 되면 배너를 명시적으로 내린다.
   useEffect(() => {
     if (!boardQuery.isSuccess || !deepLinkFixtureId) return;
     if (selectedItem) {
+      setDeepLinkNotFound(false);
       setTimeout(() => panelHeadingRef.current?.focus(), 0);
       return;
     }

@@ -71,4 +71,31 @@ describe('ResultReviewPageClient fixtureId 딥링크 (T6-1)', () => {
     render(<ResultReviewPageClient tournamentId="t-1" />);
     expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
   });
+
+  // Fix round 1 — `useTournamentEndedFixtures`는 staleTime: 15_000이라 창 포커스 등으로
+  // 백그라운드 refetch가 돈다. 딥링크 진입 시점엔 목록에 없어 "검토 목록에 없어요" 배너가
+  // 뜬 뒤, refetch로 그 fixture가 목록에 들어오면 배너가 사라지고 패널만 남아야 한다
+  // (예전엔 deepLinkNotFound가 한번 true가 되면 안 돌아와 배너+패널이 동시에 보였다).
+  it('목록에 없어 안내가 뜬 뒤, refetch로 항목이 들어오면 안내가 사라지고 패널만 남는다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-3'));
+    mocks.useTournamentEndedFixtures.mockReturnValue({
+      isPending: false, isSuccess: true, isError: false, data: { items: ITEMS }, refetch: vi.fn(),
+    });
+    const { rerender } = render(<ResultReviewPageClient tournamentId="t-1" />);
+    expect(screen.getByText(/검토 목록에 없어요/)).toBeInTheDocument();
+    expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
+
+    // 백그라운드 refetch로 fx-3가 검토 대상 목록에 들어온 상황을 시뮬레이션.
+    mocks.useTournamentEndedFixtures.mockReturnValue({
+      isPending: false,
+      isSuccess: true,
+      isError: false,
+      data: { items: [...ITEMS, ITEM('fx-3', 'game-3', 3)] },
+      refetch: vi.fn(),
+    });
+    rerender(<ResultReviewPageClient tournamentId="t-1" />);
+
+    expect(screen.queryByText(/검토 목록에 없어요/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-3');
+  });
 });

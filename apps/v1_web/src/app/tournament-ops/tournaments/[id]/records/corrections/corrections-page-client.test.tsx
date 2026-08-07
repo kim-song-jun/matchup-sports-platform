@@ -69,4 +69,32 @@ describe('CorrectionsPageClient fixtureId 딥링크 (T6-2)', () => {
     render(<CorrectionsPageClient tournamentId="t-1" />);
     expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
   });
+
+  // Fix round 1 — `useTournamentEndedFixtures`는 staleTime: 15_000이라 창 포커스 등으로
+  // 백그라운드 refetch가 돈다. 딥링크 진입 시점엔 공식 결과가 없어 "정정 목록에 없어요"
+  // 배너가 뜬 뒤, refetch로 공식 결과가 확정되면(revisionId 채워짐) 배너가 사라지고
+  // 패널만 남아야 한다(예전엔 deepLinkNotFound가 한번 true가 되면 안 돌아와 배너+패널이
+  // 동시에 보였다).
+  it('공식 결과가 없어 안내가 뜬 뒤, refetch로 공식 결과가 확정되면 안내가 사라지고 패널만 남는다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-2'));
+    mocks.useTournamentEndedFixtures.mockReturnValue({
+      isPending: false, isSuccess: true, isError: false, data: { items: ITEMS }, refetch: vi.fn(),
+    });
+    const { rerender } = render(<CorrectionsPageClient tournamentId="t-1" />);
+    expect(screen.getByText(/정정 목록에 없어요/)).toBeInTheDocument();
+    expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
+
+    // 백그라운드 refetch로 fx-2의 공식 결과가 확정된 상황을 시뮬레이션.
+    mocks.useTournamentEndedFixtures.mockReturnValue({
+      isPending: false,
+      isSuccess: true,
+      isError: false,
+      data: { items: [ITEM('fx-1', 'game-1', 1, 'rev-1'), ITEM('fx-2', 'game-2', 2, 'rev-2')] },
+      refetch: vi.fn(),
+    });
+    rerender(<CorrectionsPageClient tournamentId="t-1" />);
+
+    expect(screen.queryByText(/정정 목록에 없어요/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-2');
+  });
 });

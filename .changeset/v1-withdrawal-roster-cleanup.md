@@ -9,6 +9,8 @@ A member requested withdrawal, the owner removed them from the team, and they st
 
 All three ways out of a team ignored the roster — `withdrawalRequest`, `removeMembership` (the path this incident took), and `leaveTeam`. Prisma's `onDelete` cannot cover this: every "delete" in the domain is a status-column update, so no cascade ever fires. The cleanup is now explicit and shared by all three, and withdrawal additionally releases team memberships as `left`.
 
+The cleanup update rechecks `removedAt` so a concurrent removal is not overwritten, and audit counts report only rows actually changed.
+
 Completed tournaments are deliberately excluded. Awards, reviews and standings reference the roster, so removing a name from a finished tournament would rewrite history to fix a capacity problem that only exists for upcoming ones.
 
 Admin deactivation (`changeUserStatus`, `deleteUser`) now refuses a user who still holds team ownership, the same rule self-withdrawal already enforced. Without it an admin could deactivate an owner and leave the team `active` with `ownerUserId` pointing at a dead account — self-withdrawal blocked that, the admin path did not.

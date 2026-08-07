@@ -11,6 +11,8 @@ The admin roster form shipped asking for a "사용자 ID" — a UUID the operato
 
 Computing eligibility server-side keeps one source of truth. Deciding it in the browser would drift from the service checks and produce a form that offers a member the API then rejects.
 
+Whitespace-only real names normalize to `null`, so incomplete profiles stay visibly ineligible instead of producing a blank selectable label.
+
 Reviewing that claim against `insertPlayerIntoRoster` turned up conditions the list did not carry, so the same defect existed inside the fix: a full roster, a cancelled registration, a finished tournament, and a deleted one all left every member selectable. The roster-full case is the shape of the 2026-08-03 incident itself — a ghost roster entry held the last slot and the screen showed nothing wrong until the operator clicked. Each now reads as a reason on the option.
 
 The audit that followed closed integrity gaps in the paths this list feeds, all of which predate it:

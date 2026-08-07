@@ -299,10 +299,16 @@ export class CreateAdminPopupDto {
   content?: Record<string, unknown>;
 
   @IsArray()
-  @ArrayMinSize(1)
   @ArrayMaxSize(POPUP_TARGET_SCREENS.length)
   @IsIn(POPUP_TARGET_SCREENS, { each: true })
   targetScreens!: PopupTargetScreen[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(500, { each: true })
+  targetPaths?: string[];
 
   @IsOptional()
   @IsString()

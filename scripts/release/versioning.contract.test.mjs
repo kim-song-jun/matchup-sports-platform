@@ -249,6 +249,104 @@ test('a half-bumped release commit does not get the release exemption', () => {
   }
 });
 
+function runPromotionPolicy(root, changedFiles, baseVersion = '0.1.0') {
+  return runNode(policyPath, [
+    '--repo',
+    root,
+    '--changed-files-file',
+    changedFiles,
+    '--release-promotion',
+    'true',
+    '--base-ref',
+    'main',
+    '--head-ref',
+    'dev',
+    '--base-api-version',
+    baseVersion,
+    '--base-web-version',
+    baseVersion,
+  ]);
+}
+
+test('a fully versioned dev-to-main promotion may include released behavior changes', () => {
+  const root = createFixture({ apiVersion: '0.2.0', webVersion: '0.2.0' });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(
+      changedFiles,
+      [
+        'apps/v1_api/src/main.ts',
+        'apps/v1_api/package.json',
+        'apps/v1_web/package.json',
+        'apps/v1_api/CHANGELOG.md',
+        'apps/v1_web/CHANGELOG.md',
+        '.changeset/consumed-one.md',
+      ].join('\n'),
+    );
+
+    const result = runPromotionPolicy(root, changedFiles);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /verified dev -> main release promotion/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('dev-to-main promotion rejects pending unreleased Changesets', () => {
+  const root = createFixture({
+    apiVersion: '0.2.0',
+    webVersion: '0.2.0',
+    changesets: [[{ packageName: 'v1_api', bump: 'patch' }]],
+  });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(
+      changedFiles,
+      [
+        'apps/v1_api/src/main.ts',
+        'apps/v1_api/package.json',
+        'apps/v1_web/package.json',
+        'apps/v1_api/CHANGELOG.md',
+        'apps/v1_web/CHANGELOG.md',
+        '.changeset/consumed-one.md',
+      ].join('\n'),
+    );
+
+    const result = runPromotionPolicy(root, changedFiles);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /must not contain unreleased Changesets/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('dev-to-main promotion rejects a version that did not advance', () => {
+  const root = createFixture({ apiVersion: '0.2.0', webVersion: '0.2.0' });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(
+      changedFiles,
+      [
+        'apps/v1_api/src/main.ts',
+        'apps/v1_api/package.json',
+        'apps/v1_web/package.json',
+        'apps/v1_api/CHANGELOG.md',
+        'apps/v1_web/CHANGELOG.md',
+        '.changeset/consumed-one.md',
+      ].join('\n'),
+    );
+
+    const result = runPromotionPolicy(root, changedFiles, '0.2.0');
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /must advance the fixed package version/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('resolver still labels an alpha build after every changeset has been released', () => {
   // 릴리스 직후 상태: changeset 0개 + 버전이 이미 올라간 package.json.
   // deploy-alpha.yml 은 이 리졸버를 가드 없이 호출하므로, 여기서 실패하면 릴리스를 한

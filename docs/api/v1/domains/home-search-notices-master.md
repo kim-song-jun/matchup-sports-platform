@@ -18,7 +18,9 @@
 | DELETE | /api/v1/admin/notices/:noticeId | owner/ops | path id | { noticeId, deleted: true } |
 | GET | /api/v1/admin/popups | active admin | status?, q?, cursor?, limit? | popup cursor page |
 | GET | /api/v1/admin/popups/:popupId | active admin | path id | popup detail |
-| POST | /api/v1/admin/popups | owner/ops | { audience, title, content, status, targetScreens[], linkUrl?, linkLabel?, displayStartAt?, displayEndAt? } | created popup with content + derived body |
+| POST | /api/v1/admin/popups | owner/ops | { audience, title, content, status, targetScreens[], targetPaths[], linkUrl?, linkLabel?, displayStartAt?, displayEndAt? } | created popup with content + derived body |
+
+`GET /api/v1/popups/active?screen={screen}&path={exactPath}`는 활성 exact-path 팝업을 우선하고, 없으면 기존 screen 팝업을 반환한다. `path`는 query/hash 없는 내부 사용자 경로만 허용한다.
 | PATCH | /api/v1/admin/popups/:popupId | owner/ops | same popup payload | updated popup |
 | DELETE | /api/v1/admin/popups/:popupId | owner/ops | path id | { popupId, deleted: true } |
 

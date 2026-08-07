@@ -1,13 +1,17 @@
 import type { Page } from '@playwright/test';
 
 /**
- * v1 dev-auth: 프론트 api-client가 localStorage `teameet.v1.userEmail`(+옵션 userId)을 읽어
- * x-v1-user-email / x-v1-user-id 헤더로 전송. 백엔드 V1AuthGuard가 userId 우선, 없으면 email로
- * 유저를 resolve(apps/v1_api/src/auth/v1-auth.guard.ts). email만 주입하면 해당 seed 유저로 로그인.
+ * v1 dev-auth: 개발 Web은 localStorage `teameet.v1.userEmail`(+옵션 userId)을 읽어
+ * x-v1-user-email / x-v1-user-id 헤더로 전송한다. QA Web은 production build라 클라이언트가
+ * dev header를 만들지 않으므로 Playwright context에도 같은 header를 직접 설정한다.
+ * 백엔드 V1AuthGuard는 userId 우선, 없으면 email로 seed 유저를 resolve한다.
  *
  * addInitScript는 모든 네비게이션 직전에 실행되므로 페이지 로드 전에 인증이 보장된다.
  */
 export async function loginAs(page: Page, email: string): Promise<void> {
+  await page.context().setExtraHTTPHeaders({
+    'x-v1-user-email': email,
+  });
   await page.addInitScript((userEmail) => {
     try {
       window.localStorage.setItem('teameet.v1.userEmail', userEmail);
@@ -25,6 +29,7 @@ export async function loginAs(page: Page, email: string): Promise<void> {
  * sessionStorage sentinel로 최초 1회만 제거 → 이후 앱이 세션을 저장하면 보존된다.
  */
 export async function logout(page: Page): Promise<void> {
+  await page.context().setExtraHTTPHeaders({});
   await page.addInitScript(() => {
     try {
       if (window.sessionStorage.getItem('__e2e_logged_out__')) return;

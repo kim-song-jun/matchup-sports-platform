@@ -47,11 +47,15 @@ Optional fields include `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addr
 - Host owner/manager can close recruiting. Closing moves the team match to `closed`, rejects new applications, and marks pending applications `expired`.
 - Host owner/manager can reopen `closed` team matches before `startAt`; expired applications are not auto-restored.
 - Create UI must source host team choices from the current user's active owner/manager teams. Member-only teams are not valid host team options.
+- The requested `sportId` must equal the selected host team's `sportId`; mismatches return `400 VALIDATION_FAILED`.
+- Create/edit image upload uses the root-relative `/uploads/...` URL returned by `POST /uploads`; an empty image remains `null` and must not be replaced by sample data.
 - Applicant is a team, not a user.
 - Applicant team must be managed by the acting user.
 - Host team cannot apply to itself.
-- Approval locks and re-reads the team match before conditionally moving a still-`requested` application to `approved` and the team match to `matched`; concurrent approvals cannot approve more than one applicant team.
-- Applicant team owner/manager can withdraw only `requested` applications.
+- `deadlineAt` is enforced for both new applications and host approval. Once the deadline passes, the application eligibility response is `NOT_RECRUITING` and a pending application can no longer be approved.
+- Approval locks and re-reads the team match before conditionally moving a still-`requested` application to `approved` and the team match to `matched`; concurrent approvals cannot approve more than one applicant team. Remaining requested applications are atomically rejected, receive individual status-change logs, and notify their applicant-team managers.
+- Applicant team owner/manager can withdraw only `requested` applications. Withdraw, reject, and resubmit use expected-status transitions so a concurrent terminal action cannot be overwritten or reported as a second success.
+- `matched` is a match-level state, not proof that the current viewer's team was approved. Only `viewer.state = approved` receives approved UI and chat affordances.
 - Host owner/manager can complete only `matched` team matches with an approved applicant team. Completion records `completedAt` and unlocks review surfaces.
 - Team match chat is available only after an applicant team has been approved/matched.
 - `costNote` is text-only. No payment API is called.

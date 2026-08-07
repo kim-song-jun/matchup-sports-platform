@@ -37,7 +37,7 @@ log "비정상 종료 감지 (SERVICE_RESULT=${SERVICE_RESULT:-unknown}, EXIT_ST
 # 여기서부터는 **best-effort** 다. errexit 을 끈다.
 #
 # 이 스크립트는 마지막 안전망인데, `set -e` 가 켜져 있으면 첫 실패에서 그대로 죽는다.
-# 예를 들어 점검창 해제(`aws elbv2 modify-rule`)가 스로틀링으로 한 번 실패하면 그 자리에서
+# 예를 들어 점검창 해제(`aws elbv2 modify-listener`)가 스로틀링으로 한 번 실패하면 그 자리에서
 # 종료되고, 앱 복구도 SNS 알림도 시도조차 못 한다 — 정작 사람이 알아야 할 상황에서 침묵한다.
 # 안전망은 한 단계가 실패해도 나머지를 끝까지 시도해야 의미가 있다. (Copilot 리뷰 지적,
 # 2026-08-03 재현으로 확인.)
@@ -54,28 +54,36 @@ log "대상 실행 디렉터리: ${run_dir}"
 
 # --- 1. 점검창이 켜진 채 남아 있으면 끈다 ------------------------------------
 snapshot="${run_dir}/alb-default-rule.json"
+listener_arn_file="${run_dir}/alb-listener-arn.txt"
 if [[ -f "${snapshot}" ]]; then
   rule_arn="$(jq -r '.[0].RuleArn' "${snapshot}" 2>/dev/null)"
   target_group="$(jq -r '.[0].Actions[0].TargetGroupArn // empty' "${snapshot}" 2>/dev/null)"
+  listener_arn="$(cat "${listener_arn_file}" 2>/dev/null)"
 
   current_type="$(aws elbv2 describe-rules --region "${AWS_REGION}" \
     --rule-arns "${rule_arn}" \
     --query 'Rules[0].Actions[0].Type' --output text 2>/dev/null || echo unknown)"
 
   if [[ "${current_type}" == "fixed-response" && -n "${target_group}" ]]; then
-    log "점검창이 켜진 채 남아 있습니다 — 해제합니다"
-    # 점검창이 남는 것이 이 작업의 최악 시나리오라, 한 번 실패했다고 포기하지 않는다.
-    for attempt in 1 2 3; do
-      if aws elbv2 modify-rule --region "${AWS_REGION}" \
-        --rule-arn "${rule_arn}" \
-        --actions "Type=forward,TargetGroupArn=${target_group}" >/dev/null 2>&1; then
-        log "점검창 해제 완료"
-        break
-      fi
-      log "점검창 해제 실패 (${attempt}/3)"
-      [[ "${attempt}" == 3 ]] && log "!!! 점검창이 켜진 채 남았습니다 — 즉시 사람이 해제해야 합니다"
-      sleep 5
-    done
+    if [[ -z "${listener_arn}" ]]; then
+      log "!!! 리스너 ARN 을 못 읽었습니다(${listener_arn_file}) — 점검창을 해제할 수 없습니다. 즉시 사람이 해제해야 합니다"
+    else
+      log "점검창이 켜진 채 남아 있습니다 — 해제합니다"
+      # 점검창이 남는 것이 이 작업의 최악 시나리오라, 한 번 실패했다고 포기하지 않는다.
+      # ELBv2 는 기본 규칙을 modify-rule 대상으로 허용하지 않는다 — modify-listener 로
+      # 리스너 자체의 기본 액션을 바꾼다(2026-08-04 실측, cutover-to-rds.sh 와 같은 이유).
+      for attempt in 1 2 3; do
+        if aws elbv2 modify-listener --region "${AWS_REGION}" \
+          --listener-arn "${listener_arn}" \
+          --default-actions "Type=forward,TargetGroupArn=${target_group}" >/dev/null 2>&1; then
+          log "점검창 해제 완료"
+          break
+        fi
+        log "점검창 해제 실패 (${attempt}/3)"
+        [[ "${attempt}" == 3 ]] && log "!!! 점검창이 켜진 채 남았습니다 — 즉시 사람이 해제해야 합니다"
+        sleep 5
+      done
+    fi
   else
     log "점검창 상태 정상 (현재 액션: ${current_type})"
   fi

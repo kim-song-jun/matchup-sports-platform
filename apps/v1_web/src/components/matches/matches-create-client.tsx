@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter } from 'next/navigation';
 import {
@@ -113,7 +113,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
       // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
       if (createMatch.isPending) return;
       setError(null);
-      const payload = buildPayload(draft, selectedSportId, regionId);
+      const payload = buildMatchMutationPayload(draft, selectedSportId, regionId);
       if (!payload) {
         setError('종목, 지역, 제목, 장소, 날짜를 모두 입력해 주세요.');
         return;
@@ -158,6 +158,8 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
   const editQuery = useV1MatchEdit(matchId);
+  const sports = useV1MasterSports();
+  const regions = useV1MasterRegions();
   const updateMatch = useV1UpdateMatch(matchId);
   const cancelMatch = useV1CancelMatch(matchId);
   const uploadImages = useV1UploadImages();
@@ -166,10 +168,18 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const [regionId, setRegionId] = useState('');
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const sportOptions = sports.data?.map((sport) => ({ id: sport.id, name: sport.name }))
+    ?? (editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : []);
+  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
+  const editRegionOptions = regionOptions.length > 0
+    ? regionOptions
+    : editQuery.data?.form.regionId
+      ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }]
+      : [];
 
   useEffect(() => {
     if (!editQuery.data) return;
-    const hydrated = draftFromEdit(editQuery.data);
+    const hydrated = draftFromMatchEdit(editQuery.data);
     setDraft(hydrated);
     setSelectedSportId(editQuery.data.form.sportId);
     setRegionId(editQuery.data.form.regionId ?? '');
@@ -182,12 +192,15 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     draft,
     selectedSportId,
     regionId,
-    sports: editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : [],
-    regions: editQuery.data?.form.regionId ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }] : [],
+    sports: sportOptions,
+    regions: editRegionOptions,
     error: editQuery.isError ? '수정 권한이 없거나 매치를 불러오지 못했어요.' : error,
     lockedReason: editQuery.data?.editable === false ? lockedReasonLabel(editQuery.data.lockedReason ?? '') : null,
     submitting: updateMatch.isPending || cancelMatch.isPending || editQuery.isLoading,
-    onSelectSport: () => undefined,
+    onSelectSport: (sportName) => {
+      const sport = sportOptions.find((item) => item.name === sportName);
+      if (sport) setSelectedSportId(sport.id);
+    },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
     onRegionChange: setRegionId,
     onBack: () => router.push(`/matches/${matchId}`),
@@ -204,7 +217,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
       if (updateMatch.isPending || cancelMatch.isPending) return;
       setError(null);
-      const payload = buildPayload(draft, selectedSportId, regionId);
+      const payload = buildMatchMutationPayload(draft, selectedSportId, regionId);
       if (!payload || !version) {
         setError('수정에 필요한 정보가 빠져 있어요. 다시 확인해 주세요.');
         return;
@@ -276,8 +289,8 @@ function buildCreateModel({
   submitLabel?: string;
 }): MatchCreateViewModel {
   const fallback = getMatchCreateViewModel(step);
-  const sportNames = sports.length ? sports.map((sport) => sport.name) : fallback.sports;
-  const selectedSport = sports.find((sport) => sport.id === selectedSportId)?.name ?? fallback.selectedSport;
+  const sportNames = sports.map((sport) => sport.name);
+  const selectedSport = sports.find((sport) => sport.id === selectedSportId)?.name ?? '';
 
   return {
     ...fallback,
@@ -307,22 +320,33 @@ function buildCreateModel({
 
 function usePersistedDraft() {
   const [draft, setDraft] = useState<MatchDraft>(() => buildDefaultDraft());
+  const draftRef = useRef(draft);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(storageKey);
     if (!stored) return;
     try {
-      setDraft({ ...buildDefaultDraft(), ...normalizeStoredDraft(JSON.parse(stored) as Partial<MatchDraft>) });
+      const hydrated = {
+        ...buildDefaultDraft(),
+        ...normalizeStoredDraft(JSON.parse(stored) as Partial<MatchDraft>),
+      };
+      draftRef.current = hydrated;
+      setDraft(hydrated);
     } catch {
       window.localStorage.removeItem(storageKey);
     }
   }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(draft));
-  }, [draft]);
+  const setPersistedDraft = (action: SetStateAction<MatchDraft>) => {
+    const next = typeof action === 'function' ? action(draftRef.current) : action;
+    // React state updater도 route 이동 뒤로 지연될 수 있으므로 ref에서 즉시 계산·저장한 뒤
+    // 화면 상태를 갱신한다. 그래야 마지막 입력 직후 다음 step으로 이동해도 값이 보존된다.
+    draftRef.current = next;
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    setDraft(next);
+  };
 
-  return [draft, setDraft] as const;
+  return [draft, setPersistedDraft] as const;
 }
 
 function buildDefaultDraft(): MatchDraft {
@@ -350,6 +374,18 @@ function normalizeStoredDraft(stored: Partial<MatchDraft>): Partial<MatchDraft> 
     maxLevel: '중수',
   };
 
+  const isLegacySample =
+    stored.title === oldDefaults.title &&
+    stored.description === oldDefaults.description &&
+    stored.rules === oldDefaults.rules &&
+    stored.venue === oldDefaults.venue &&
+    stored.address === oldDefaults.address &&
+    stored.date === oldDefaults.date &&
+    stored.startTime === oldDefaults.startTime &&
+    stored.endTime === oldDefaults.endTime;
+
+  if (!isLegacySample) return stored;
+
   return {
     ...stored,
     title: stored.title === oldDefaults.title ? '' : stored.title,
@@ -365,7 +401,7 @@ function normalizeStoredDraft(stored: Partial<MatchDraft>): Partial<MatchDraft> 
   };
 }
 
-function draftFromEdit(edit: V1MatchEdit): MatchDraft {
+export function draftFromMatchEdit(edit: V1MatchEdit): MatchDraft {
   const start = new Date(edit.form.startsAt);
   const end = edit.form.endsAt ? new Date(edit.form.endsAt) : null;
   const deadline = edit.form.deadlineAt ? new Date(edit.form.deadlineAt) : null;
@@ -390,7 +426,7 @@ function draftFromEdit(edit: V1MatchEdit): MatchDraft {
   };
 }
 
-function buildPayload(draft: MatchDraft, sportId: string, regionId: string): V1MatchMutationPayload | null {
+export function buildMatchMutationPayload(draft: MatchDraft, sportId: string, regionId: string): V1MatchMutationPayload | null {
   if (!sportId || !regionId || !draft.title.trim() || !draft.venue.trim() || !draft.date || !draft.startTime) return null;
 
   const startsAt = new Date(`${draft.date}T${draft.startTime}:00`);

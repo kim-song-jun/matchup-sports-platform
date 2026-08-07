@@ -337,7 +337,10 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Button>
               ) : null}
               {mode === 'mine' ? (
-                <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
+                <>
+                  <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
+                  <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link>
+                </>
               ) : (
                 <Button
                   disabled={!canRunAction}
@@ -401,14 +404,17 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
           <span className="tm-text-label">{model.statusLabel ?? match.actionLabel}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: showChat ? '104px 1fr' : '1fr', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: showChat || mode === 'mine' ? '1fr 1fr' : '1fr', gap: 8 }}>
           {showChat ? (
             <Button loading={model.chatPending} disabled={!model.onChat} onClick={model.onChat} size="lg" type="button" variant="neutral">
               {model.chatLabel ?? '채팅'}
             </Button>
           ) : null}
           {mode === 'mine' ? (
-            <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
+            <>
+              <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
+              <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link>
+            </>
           ) : (
             <Button
               disabled={!canRunAction}
@@ -739,6 +745,7 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
   return (
     <div>
       <h1 className="tm-text-heading">매치 정보</h1>
+      {edit ? <CreateSelect label="종목" value={model.selectedSport} options={model.sports} onChange={model.form?.onSelectSport} /> : null}
       <CreateField label="제목" value={draft.title} placeholder="예: 주말 저녁 풋살 멤버 모집" onChange={(value) => model.form?.onFieldChange('title', value)} />
       <CreateField label="설명" value={draft.description} placeholder="예: 초보도 편하게 참여할 수 있는 친선 매치예요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
       <ImageUploadField image={draft.image} onChange={(value) => model.form?.onFieldChange('image', value)} onUpload={model.form?.uploadImage} />
@@ -746,6 +753,12 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
       <LevelRangeField levels={model.levels} minLevel={draft.minLevel} maxLevel={draft.maxLevel} onChange={(field, value) => model.form?.onFieldChange(field, value)} />
       <GenderRuleSelector value={draft.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} />
       <CreateField label="규칙" value={draft.rules} placeholder="예: 풋살화 착용, 지각 시 미리 연락" multiline onChange={(value) => model.form?.onFieldChange('rules', value)} />
+      {edit ? (
+        <>
+          <h2 className="tm-text-subhead" style={{ marginTop: 28 }}>장소와 시간</h2>
+          <PlaceTimeFields model={model} />
+        </>
+      ) : null}
       {edit ? <StateCard tone="orange" title="변경사항 저장" body="저장에 실패하면 입력한 내용을 유지한 채 다시 시도할 수 있어요." /> : null}
     </div>
   );
@@ -790,9 +803,9 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
           <input className="sr-only" type="file" accept="image/*" disabled={uploading} onChange={handleChange} />
         </label>
         {uploadError ? <div className="tm-text-caption" role="alert" style={{ marginTop: 8, color: 'var(--orange500)' }}>{uploadError}</div> : null}
-        {fileName && !uploading ? (
+        {image && !uploading ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 10 }}>
-            <span className="tm-text-caption" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
+            <span className="tm-text-caption" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName || '현재 대표 이미지'}</span>
             <button className="tm-btn tm-btn-sm tm-btn-ghost" type="button" onClick={() => { setFileName(''); onChange?.(''); }}>제거</button>
           </div>
         ) : null}
@@ -802,8 +815,8 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
 }
 
 function CapacityField({ value, onChange }: { value: number; onChange?: (value: number) => void }) {
-  const options = Array.from({ length: 29 }, (_, index) => index + 2);
-  const normalized = Math.min(30, Math.max(2, Number(value) || 2));
+  const options = Array.from({ length: 99 }, (_, index) => index + 2);
+  const normalized = Math.min(100, Math.max(2, Number(value) || 2));
 
   return (
     <div className="tm-create-field">
@@ -813,7 +826,7 @@ function CapacityField({ value, onChange }: { value: number; onChange?: (value: 
         <select className="tm-create-input tm-create-select-control" value={normalized} aria-label="최대 인원 선택" onChange={(event) => onChange?.(Number(event.target.value))}>
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>
-        <button className="tm-create-stepper-button" type="button" aria-label="인원 늘리기" onClick={() => onChange?.(Math.min(30, normalized + 1))}>+</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="인원 늘리기" onClick={() => onChange?.(Math.min(100, normalized + 1))}>+</button>
       </div>
     </div>
   );
@@ -862,7 +875,7 @@ function CreateSelect({ label, value, options, onChange }: { label: string; valu
   return (
     <label className="tm-create-field">
       <div className="tm-text-label">{label}</div>
-      <select className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}>
+      <select aria-label={label} className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}>
         {options.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
     </label>
@@ -870,10 +883,18 @@ function CreateSelect({ label, value, options, onChange }: { label: string; valu
 }
 
 function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
-  const draft = model.draft;
   return (
     <div>
       <h1 className="tm-text-heading">장소와 시간</h1>
+      <PlaceTimeFields model={model} />
+    </div>
+  );
+}
+
+function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
+  const draft = model.draft;
+  return (
+    <>
       <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} />
       <CreateField label="장소" value={draft.venue} placeholder="예: 한강공원 축구장, 동네 체육관 등" onChange={(value) => model.form?.onFieldChange('venue', value)} />
       <CreateField label="상세 주소" value={draft.address} placeholder="예: 서울 영등포구 여의동로 330" onChange={(value) => model.form?.onFieldChange('address', value)} />
@@ -887,7 +908,7 @@ function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
         <CreateField label="신청 마감시간" value={draft.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
       </div>
       <div className="tm-text-caption" style={{ marginTop: 6 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
-    </div>
+    </>
   );
 }
 
@@ -895,7 +916,7 @@ function RegionSelect({ value, regions, onChange }: { value: string; regions: Ar
   return (
     <label className="tm-create-field">
       <div className="tm-text-label">지역</div>
-      <select className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}>
+      <select aria-label="지역" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}>
         <option value="">시/군/구 선택</option>
         {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
       </select>

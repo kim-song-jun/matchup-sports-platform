@@ -10,7 +10,7 @@ export const v1Keys = {
   masterSports: () => [...v1Keys.all, 'master', 'sports'] as const,
   masterRegions: () => [...v1Keys.all, 'master', 'regions'] as const,
   home: (filters?: Record<string, unknown>) => [...v1Keys.all, 'home', filters ?? {}] as const,
-  activePopup: (screen: string | null) => [...v1Keys.all, 'popups', 'active', screen] as const,
+  activePopup: (screen: string | null, path?: string | null) => [...v1Keys.all, 'popups', 'active', screen, path ?? null] as const,
   recentSearches: () => [...v1Keys.all, 'search', 'recent'] as const,
   notices: (filters?: Record<string, unknown>) => [...v1Keys.all, 'notices', filters ?? {}] as const,
   notice: (noticeId: string) => [...v1Keys.all, 'notices', noticeId] as const,
@@ -80,6 +80,8 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'registrations', filters ?? {}] as const,
   adminTournamentRoster: (registrationId: string) =>
     [...v1Keys.all, 'admin', 'registrations', registrationId, 'players'] as const,
+  adminRosterEligibleMembers: (registrationId: string) =>
+    [...v1Keys.all, 'admin', 'registrations', registrationId, 'eligible-players'] as const,
   adminTournamentBracket: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'bracket'] as const,
   adminTournamentAnnouncements: (tournamentId: string) =>

@@ -136,3 +136,10 @@ mutation.
   proven; fail-closed target verification remains intact. An AWS administrator
   must run `scripts/infra/provision-alpha-immutable-deploy.sh` with the pinned
   alpha variables before rerunning Deploy Alpha.
+- 2026-07-31: AWS administrator provisioning converged both canonical inline
+  policies and rerun attempt 2 passed target verification, ECR login, and
+  versioned source upload. Rollback-base validation then found five historical
+  migrations modified after the active alpha SHA by reintroducing
+  `IF NOT EXISTS`. Restored all five files byte-for-byte to their deployed
+  migration history so the immutable checksum and expand/contract gates can
+  evaluate only newly appended migrations.

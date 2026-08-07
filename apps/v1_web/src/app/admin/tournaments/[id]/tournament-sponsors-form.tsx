@@ -1,7 +1,9 @@
 'use client';
 
+import Image from 'next/image';
 import type { FormEvent, ReactNode } from 'react';
-import { Plus, Save, X } from 'lucide-react';
+import { ImagePlus, Plus, Save, Trash2, X } from 'lucide-react';
+import { publicAssetPath } from '@/lib/assets';
 import type { SponsorForm } from './tournament-sponsors-admin-model';
 
 const inputCls = [
@@ -29,6 +31,9 @@ export function TournamentSponsorForm({
   form,
   mode,
   pending,
+  uploadingLogo,
+  logoUploadError,
+  onSelectLogo,
   onCancel,
   onSubmit,
   setField,
@@ -36,6 +41,9 @@ export function TournamentSponsorForm({
   readonly form: SponsorForm;
   readonly mode: 'create' | 'update';
   readonly pending: boolean;
+  readonly uploadingLogo: boolean;
+  readonly logoUploadError?: string;
+  readonly onSelectLogo: (file: File) => void;
   readonly onCancel?: () => void;
   readonly onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   readonly setField: (field: keyof SponsorForm, value: string | boolean) => void;
@@ -89,17 +97,16 @@ export function TournamentSponsorForm({
           />
         </Field>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="로고 URL">
-            <input
-              type="url"
-              value={form.logoUrl}
-              onChange={(event) => setField('logoUrl', event.target.value)}
-              disabled={pending}
-              placeholder="https://"
-              className={inputCls}
-            />
-          </Field>
+        <SponsorLogoUploader
+          value={form.logoUrl}
+          disabled={pending}
+          uploading={uploadingLogo}
+          error={logoUploadError}
+          onSelectFile={onSelectLogo}
+          onClear={() => setField('logoUrl', '')}
+        />
+
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="홈페이지">
             <input
               type="url"
@@ -200,7 +207,7 @@ export function TournamentSponsorForm({
         </label>
 
         <div className="flex flex-col gap-2 sm:flex-row">
-          <button type="submit" disabled={!form.name.trim() || pending} className={primaryBtnCls}>
+          <button type="submit" disabled={!form.name.trim() || pending || uploadingLogo} className={primaryBtnCls}>
             {mode === 'update' ? <Save size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}
             {pending ? '저장 중…' : mode === 'update' ? '수정 저장' : '협찬 추가'}
           </button>
@@ -211,6 +218,72 @@ export function TournamentSponsorForm({
           ) : null}
         </div>
       </form>
+    </div>
+  );
+}
+
+function SponsorLogoUploader({
+  value,
+  disabled,
+  uploading,
+  error,
+  onSelectFile,
+  onClear,
+}: {
+  readonly value: string;
+  readonly disabled: boolean;
+  readonly uploading: boolean;
+  readonly error?: string;
+  readonly onSelectFile: (file: File) => void;
+  readonly onClear: () => void;
+}) {
+  const locked = disabled || uploading;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[13px] text-gray-900">협찬사 로고</span>
+      <div className="grid gap-3 sm:grid-cols-[112px_1fr] sm:items-center">
+        <div className="relative grid aspect-square place-items-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+          {value ? (
+            <Image
+              src={publicAssetPath(value)}
+              alt="선택한 협찬사 로고 미리보기"
+              fill
+              sizes="112px"
+              className="object-contain p-3"
+              unoptimized
+            />
+          ) : (
+            <ImagePlus size={28} className="text-gray-300" aria-hidden="true" />
+          )}
+        </div>
+        <div className="flex flex-col items-start gap-2">
+          <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-50 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+            <ImagePlus size={16} aria-hidden="true" />
+            {uploading ? '업로드 중…' : value ? '로고 변경' : '로고 선택'}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              aria-label="협찬사 로고 파일 선택"
+              className="sr-only"
+              disabled={locked}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) onSelectFile(file);
+                event.target.value = '';
+              }}
+            />
+          </label>
+          {value ? (
+            <button type="button" onClick={onClear} disabled={locked} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 text-sm font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50">
+              <Trash2 size={16} aria-hidden="true" />
+              로고 제거
+            </button>
+          ) : null}
+          <p className="text-xs leading-5 text-gray-500">JPG, PNG, WebP · 최대 10MB. 정사각형 또는 가로형 로고를 권장해요.</p>
+          {error ? <p role="alert" className="text-xs text-red-600">{error}</p> : null}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "mobile",
+    "width": 390,
+    "file": "docs\\visual-qa\\pr266-popup-exact-path\\mobile-390.png",
+    "targetPath": "/tournaments/11111111-1111-4111-8111-111111111111",
+    "overflow": 0,
+    "unexpectedConsoleErrors": [],
+    "unexpectedHttpErrors": [],
+    "knownPreviewDiagnostics": [
+      "Refused to display 'http://localhost:3013/' in a frame because it set 'X-Frame-Options' to 'deny'."
+    ]
+  },
+  {
+    "name": "tablet",
+    "width": 768,
+    "file": "docs\\visual-qa\\pr266-popup-exact-path\\tablet-768.png",
+    "targetPath": "/tournaments/11111111-1111-4111-8111-111111111111",
+    "overflow": 0,
+    "unexpectedConsoleErrors": [],
+    "unexpectedHttpErrors": [],
+    "knownPreviewDiagnostics": [
+      "Refused to display 'http://localhost:3013/' in a frame because it set 'X-Frame-Options' to 'deny'."
+    ]
+  },
+  {
+    "name": "desktop",
+    "width": 1440,
+    "file": "docs\\visual-qa\\pr266-popup-exact-path\\desktop-1440.png",
+    "targetPath": "/tournaments/11111111-1111-4111-8111-111111111111",
+    "overflow": 0,
+    "unexpectedConsoleErrors": [],
+    "unexpectedHttpErrors": [],
+    "knownPreviewDiagnostics": [
+      "Refused to display 'http://localhost:3013/' in a frame because it set 'X-Frame-Options' to 'deny'."
+    ]
+  }
+]

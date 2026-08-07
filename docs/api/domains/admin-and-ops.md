@@ -26,14 +26,14 @@
 | `GET` | `/api/v1/admin/action-logs` | `AdminLogsQueryDto` | active admin | 관리자 액션 로그 |
 | `GET` | `/api/v1/admin/status-change-logs` | `AdminLogsQueryDto` | active admin | 상태 변경 로그 |
 | `GET` | `/api/v1/admin/users` | `AdminUserListQueryDto` | active admin | 사용자 목록 |
-| `GET` | `/api/v1/admin/users/:userId` | - | active admin | 사용자 상세·탈퇴 사유·팀 역할 요약 |
+| `GET` | `/api/v1/admin/users/:userId` | - | active admin | 사용자 상세·연락처·인증 상태·프로필·탈퇴 사유·팀 역할 요약 |
 | `POST` | `/api/v1/admin/users/:userId/status` | `ChangeUserStatusDto` | owner/ops | 사용자 상태 변경 |
 | `DELETE` | `/api/v1/admin/users/:userId` | `DeleteAdminUserDto` | owner/ops | 사용자 삭제 처리 |
 | `GET` | `/api/v1/admin/matches` | `AdminMatchListQueryDto` | active admin | 매치 목록 |
 | `GET` | `/api/v1/admin/matches/:matchId` | - | active admin | 매치 상세 |
 | `POST` | `/api/v1/admin/matches/:matchId/status` | `ChangeMatchStatusDto` | owner/ops | 매치 상태 변경 |
 | `GET` | `/api/v1/admin/teams` | `AdminTeamListQueryDto` | active admin | 팀 목록 |
-| `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세 |
+| `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세·활성 팀원 연락처/역할 목록 |
 | `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
 | `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 팀 매치 상태 변경 |
@@ -175,8 +175,10 @@ type AdminListSummary = {
 
 ## 팝업 계약
 
-- 생성·수정 body: `audience=public|users|admins`, `title`(max 120), `body`(max 5000), `targetScreens`(1개 이상), `status=draft|published|archived`, 선택 `linkUrl`, `linkLabel`, `displayStartAt`, `displayEndAt`.
+- 생성·수정 body: `audience=public|users|admins`, `title`(max 120), `body`(max 5000), `targetScreens[]`, `targetPaths[]`, `status=draft|published|archived`, 선택 `linkUrl`, `linkLabel`, `displayStartAt`, `displayEndAt`.
 - `targetScreens`: `home`, `matches`, `team_matches`, `teams`, `tournaments`, `lessons`, `marketplace`, `mercenary`, `venues`, `community`, `chat`, `notifications`, `profile`, `my`.
+- `targetPaths`: query/hash 없는 정확한 내부 사용자 경로만 허용한다. `/admin`, 외부 URL, 공백, 역슬래시는 거부한다. `targetScreens`와 `targetPaths` 중 하나 이상이 필요하다.
+- 활성 팝업 조회는 `path` 정확 일치를 먼저 찾고, 없을 때 `screen` 대상 최신 팝업으로 fallback한다. 따라서 특정 대회 상세와 `tournaments` 화면 그룹 팝업이 동시에 활성화돼도 한 건만 반환한다.
 - `linkUrl`은 `/`로 시작하는 내부 경로 또는 `https://` URL만 허용한다. `linkLabel`만 보내면 `400 INVALID_POPUP_LINK`다.
 - 노출 종료 시각은 시작 시각보다 늦어야 한다. 위반하면 `400 INVALID_DISPLAY_WINDOW`다.
 - 팝업은 공지의 고정 category가 아니라 독립 `v1_popups` 계약이다.

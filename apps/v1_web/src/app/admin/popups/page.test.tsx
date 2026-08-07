@@ -19,6 +19,7 @@ const popup: V1AdminPopupRow = {
   },
   contentVersion: 1,
   targetScreens: ['home', 'matches'],
+  targetPaths: [],
   linkUrl: '/matches',
   linkLabel: '매치 보기',
   status: 'published' as const,
@@ -32,6 +33,10 @@ const popup: V1AdminPopupRow = {
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
+  useV1AdminTournaments: () => ({
+    data: { items: [{ id: 'tournament-1', title: '서울 풋살 챔피언십' }] },
+    isPending: false,
+  }),
   useV1AdminPopups: () => ({
     data: {
       items: [popup],
@@ -131,8 +136,26 @@ describe('AdminPopupsPage', () => {
     await user.click(screen.getByRole('checkbox', { name: /개인 매치/ }));
     await user.click(screen.getByRole('button', { name: '수정 저장' }));
 
-    expect(screen.getByText('노출할 화면을 하나 이상 선택해 주세요.')).toBeInTheDocument();
+    expect(screen.getByText('노출할 화면 그룹이나 정확한 경로를 하나 이상 설정해 주세요.')).toBeInTheDocument();
     expect(updateMutate).not.toHaveBeenCalled();
+  });
+
+  it('targets one tournament detail with an exact generated path', async () => {
+    const user = userEvent.setup();
+    render(<AdminPopupsPage />);
+
+    await user.click(screen.getAllByRole('button', { name: '수정' })[0]);
+    await user.selectOptions(screen.getByLabelText('특정 대회 상세'), 'tournament-1');
+
+    expect(screen.getByLabelText('정확한 내부 경로')).toHaveValue('/tournaments/tournament-1');
+    await user.click(screen.getByRole('button', { name: '수정 저장' }));
+
+    expect(updateMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({ targetPaths: ['/tournaments/tournament-1'] }),
+      }),
+      expect.any(Object),
+    );
   });
 
   it('does not submit when the display end is not later than the start', async () => {

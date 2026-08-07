@@ -89,4 +89,32 @@ export class TournamentPlayersAdminController {
   ) {
     return this.playersService.updateEligibility(user, playerId, dto);
   }
+
+  /**
+   * 어드민 명단 추가·제거. 이 두 라우트가 없어서 어드민 콘솔에서는 명단을 볼 수만 있고
+   * 고칠 수 없었다 — 팀장이 없거나 마감이 지난 뒤 운영 조정이 필요한 상황을 손댈 방법이
+   * 없었다는 뜻이다(2026-08-03 실사고).
+   */
+  /** 명단에 올릴 수 있는 팀원 목록. 어드민이 UUID 를 직접 알아낼 필요를 없앤다. */
+  @Get('registrations/:registrationId/eligible-players')
+  listEligiblePlayers(
+    @CurrentUser() user: V1AuthUser,
+    @Param('registrationId') registrationId: string,
+  ) {
+    return this.playersService.listEligiblePlayersForAdmin(user, registrationId);
+  }
+
+  @Post('registrations/:registrationId/players')
+  addPlayer(
+    @CurrentUser() user: V1AuthUser,
+    @Param('registrationId') registrationId: string,
+    @Body() dto: AddPlayerDto,
+  ) {
+    return this.playersService.addPlayerForAdmin(user, registrationId, dto);
+  }
+
+  @Delete('players/:playerId')
+  removePlayer(@CurrentUser() user: V1AuthUser, @Param('playerId') playerId: string) {
+    return this.playersService.removePlayerForAdmin(user, playerId);
+  }
 }

@@ -220,6 +220,7 @@ export const v1AdminPopupsFixture: V1AdminPopupRow[] = [{
   },
   contentVersion: 1,
   targetScreens: ['home', 'matches'],
+  targetPaths: [],
   linkUrl: '/matches',
   linkLabel: '매치 보기',
   status: 'published',

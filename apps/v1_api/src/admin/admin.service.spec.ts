@@ -43,6 +43,10 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
     v1StatusChangeLog: { create: jest.Mock };
     v1AuthIdentity: { findMany: jest.Mock; update: jest.Mock };
     v1UserProfile: { updateMany: jest.Mock };
+    // 계정 비활성화 시 팀 권한 검사·명단 정리가 이 모델들을 쓴다.
+    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
+    v1TournamentPlayer: { findMany: jest.Mock; updateMany: jest.Mock };
+    v1Team: { update: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
@@ -61,6 +65,16 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       v1AuthIdentity: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
       v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1TeamMembership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      v1TournamentPlayer: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      v1Team: { update: jest.fn().mockResolvedValue({}) },
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
@@ -71,7 +85,7 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
         cb: (
           tx: Pick<
             typeof p,
-            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | '$queryRaw'
+            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw'
           >,
         ) => Promise<unknown>,
       ) =>
@@ -82,6 +96,9 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
           v1StatusChangeLog: p.v1StatusChangeLog,
           v1AuthIdentity: p.v1AuthIdentity,
           v1UserProfile: p.v1UserProfile,
+          v1TeamMembership: p.v1TeamMembership,
+          v1Team: p.v1Team,
+          v1TournamentPlayer: p.v1TournamentPlayer,
           $queryRaw: p.$queryRaw,
         }),
     );
@@ -188,6 +205,10 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
     v1StatusChangeLog: { create: jest.Mock };
     v1AuthIdentity: { findMany: jest.Mock; update: jest.Mock };
     v1UserProfile: { updateMany: jest.Mock };
+    // 계정 비활성화 시 팀 권한 검사·명단 정리가 이 모델들을 쓴다.
+    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
+    v1TournamentPlayer: { findMany: jest.Mock; updateMany: jest.Mock };
+    v1Team: { update: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
@@ -206,6 +227,16 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       v1AuthIdentity: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
       v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1TeamMembership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      v1TournamentPlayer: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      v1Team: { update: jest.fn().mockResolvedValue({}) },
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
@@ -216,7 +247,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
         cb: (
           tx: Pick<
             typeof p,
-            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | '$queryRaw'
+            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw'
           >,
         ) => Promise<unknown>,
       ) =>
@@ -227,6 +258,9 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
           v1StatusChangeLog: p.v1StatusChangeLog,
           v1AuthIdentity: p.v1AuthIdentity,
           v1UserProfile: p.v1UserProfile,
+          v1TeamMembership: p.v1TeamMembership,
+          v1Team: p.v1Team,
+          v1TournamentPlayer: p.v1TournamentPlayer,
           $queryRaw: p.$queryRaw,
         }),
     );

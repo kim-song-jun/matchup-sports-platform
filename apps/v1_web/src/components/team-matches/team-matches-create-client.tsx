@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter } from 'next/navigation';
 import {
@@ -69,10 +69,8 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       stored.teamId && creatableTeams.some((team) => team.teamId === stored.teamId)
         ? stored.teamId
         : creatableTeams[0]?.teamId ?? '';
-    const sportId =
-      stored.sportId && sports.data.some((item) => item.id === stored.sportId)
-        ? stored.sportId
-        : sports.data[0]?.id ?? '';
+    const selectedTeam = creatableTeams.find((team) => team.teamId === teamId);
+    const sportId = selectedTeam?.sport.sportId ?? '';
     const regionId =
       stored.regionId && regionOptions.some((item) => item.id === stored.regionId)
         ? stored.regionId
@@ -84,10 +82,18 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   // 선택한 팀이 더 이상 생성 가능 팀이 아니면 첫 creatable 팀으로 교정(원래 가드 보존).
   useEffect(() => {
     if (!selectionHydrated) return;
-    if (selection.teamId && !creatableTeams.some((team) => team.teamId === selection.teamId)) {
-      setSelection((current) => ({ ...current, teamId: creatableTeams[0]?.teamId ?? '' }));
+    const selectedTeam = creatableTeams.find((team) => team.teamId === selection.teamId);
+    if (!selectedTeam && selection.teamId) {
+      const fallbackTeam = creatableTeams[0];
+      setSelection((current) => ({
+        ...current,
+        teamId: fallbackTeam?.teamId ?? '',
+        sportId: fallbackTeam?.sport.sportId ?? '',
+      }));
+    } else if (selectedTeam && selection.sportId !== selectedTeam.sport.sportId) {
+      setSelection((current) => ({ ...current, sportId: selectedTeam.sport.sportId }));
     }
-  }, [selectionHydrated, creatableTeams, selection.teamId]);
+  }, [selectionHydrated, creatableTeams, selection.teamId, selection.sportId]);
 
   // hydrate 이후 선택 변경을 영속(다음 step 재마운트에서 복원).
   useEffect(() => {
@@ -121,7 +127,9 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       role: team.role === 'owner' ? '팀장' : team.role === 'manager' ? '관리자' : '멤버',
       disabled: !team.canCreateTeamMatch,
     })),
-    sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
+    sports: sports.data
+      ?.filter((sport) => sport.id === creatableTeams.find((team) => team.teamId === selectedTeamId)?.sport.sportId)
+      .map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
     regions: regionOptions,
     error,
     submitting: createTeamMatch.isPending,
@@ -133,7 +141,13 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     },
     onSelectTeam: (teamName) => {
       const team = myTeams?.find((item) => item.name === teamName);
-      if (team) updateSelection((current) => ({ ...current, teamId: team.teamId }));
+      if (team?.canCreateTeamMatch) {
+        updateSelection((current) => ({
+          ...current,
+          teamId: team.teamId,
+          sportId: team.sport.sportId,
+        }));
+      }
     },
     onSelectSport: (sportName) => {
       const sport = sports.data?.find((item) => item.name === sportName);
@@ -149,7 +163,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
       if (createTeamMatch.isPending) return;
       setError(null);
-      const payload = buildPayload(draft, selectedTeamId, selectedSportId, regionId);
+      const payload = buildTeamMatchMutationPayload(draft, selectedTeamId, selectedSportId, regionId);
       if (!payload) {
         setError('팀, 종목, 지역, 제목, 상세주소, 날짜와 시간을 확인해 주세요.');
         return;
@@ -191,6 +205,9 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
 export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }) {
   const router = useRouter();
   const editQuery = useV1TeamMatchEdit(teamMatchId);
+  const teams = useV1MyTeams();
+  const sports = useV1MasterSports();
+  const regions = useV1MasterRegions();
   const updateTeamMatch = useV1UpdateTeamMatch(teamMatchId);
   const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
   const uploadImages = useV1UploadImages();
@@ -200,10 +217,31 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   const [regionId, setRegionId] = useState('');
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const myTeams = normalizeMyTeams(teams.data) ?? [];
+  const currentTeam = myTeams.find((team) => team.teamId === editQuery.data?.form.hostTeamId);
+  const teamOptions = editQuery.data
+    ? [{
+        id: editQuery.data.form.hostTeamId,
+        name: currentTeam?.name ?? '현재 팀',
+        sport: currentTeam?.sport.name ?? '현재 종목',
+        members: currentTeam?.memberCount ?? 0,
+        role: currentTeam?.role === 'owner' ? '팀장' : '관리자',
+      }]
+    : [];
+  const sportOptions = sports.data
+    ?.filter((sport) => sport.id === editQuery.data?.form.sportId)
+    .map((sport) => ({ id: sport.id, name: sport.name }))
+    ?? (editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : []);
+  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
+  const editRegionOptions = regionOptions.length > 0
+    ? regionOptions
+    : editQuery.data
+      ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }]
+      : [];
 
   useEffect(() => {
     if (!editQuery.data) return;
-    setDraft(draftFromEdit(editQuery.data));
+    setDraft(draftFromTeamMatchEdit(editQuery.data));
     setSelectedTeamId(editQuery.data.form.hostTeamId);
     setSelectedSportId(editQuery.data.form.sportId);
     setRegionId(editQuery.data.form.regionId);
@@ -216,9 +254,9 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     selectedTeamId,
     selectedSportId,
     regionId,
-    teams: editQuery.data ? [{ id: editQuery.data.form.hostTeamId, name: '현재 팀', sport: '팀매치', members: 0, role: '관리 권한' }] : [],
-    sports: editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : [],
-    regions: editQuery.data ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }] : [],
+    teams: teamOptions,
+    sports: sportOptions,
+    regions: editRegionOptions,
     error: editQuery.isError ? '수정 권한이 없거나 팀매치를 불러오지 못했어요.' : error,
     lockedReason: editQuery.data?.editable === false
       ? lockedReasonLabel(editQuery.data.lockedReason ?? '')
@@ -242,7 +280,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
       if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
       setError(null);
-      const payload = buildPayload(draft, selectedTeamId, selectedSportId, regionId);
+      const payload = buildTeamMatchMutationPayload(draft, selectedTeamId, selectedSportId, regionId);
       if (!payload || !version) {
         setError('수정에 필요한 팀매치 정보를 확인해 주세요.');
         return;
@@ -328,11 +366,11 @@ function buildCreateModel({
   return {
     ...fallback,
     backHref,
-    selectedTeam: selectedTeam?.name ?? fallback.selectedTeam,
-    selectedSport: selectedSport?.name ?? fallback.selectedSport,
+    selectedTeam: selectedTeam?.name ?? '',
+    selectedSport: selectedSport?.name ?? '',
     isLoadingTeams,
     teams: teams.map((team) => ({ name: team.name, sport: team.sport, members: team.members, role: team.role, selected: team.id === selectedTeamId, disabled: team.disabled })),
-    sports: sports.length ? sports.map((sport) => sport.name) : fallback.sports,
+    sports: sports.map((sport) => sport.name),
     draft,
     form: {
       selectedTeamId,
@@ -358,22 +396,30 @@ function buildCreateModel({
 
 function usePersistedDraft() {
   const [draft, setDraft] = useState<TeamMatchDraft>(() => buildDefaultDraft());
+  const draftRef = useRef(draft);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(storageKey);
     if (!stored) return;
     try {
-      setDraft(normalizeDraftDate({ ...buildDefaultDraft(), ...JSON.parse(stored) }));
+      const hydrated = normalizeDraftDate({ ...buildDefaultDraft(), ...JSON.parse(stored) });
+      draftRef.current = hydrated;
+      setDraft(hydrated);
     } catch {
       window.localStorage.removeItem(storageKey);
     }
   }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(draft));
-  }, [draft]);
+  const setPersistedDraft = (action: SetStateAction<TeamMatchDraft>) => {
+    const next = typeof action === 'function' ? action(draftRef.current) : action;
+    // React state updater도 route 이동 뒤로 지연될 수 있으므로 ref에서 즉시 계산·저장한 뒤
+    // 화면 상태를 갱신한다. 그래야 마지막 입력 직후 다음 step으로 이동해도 값이 보존된다.
+    draftRef.current = next;
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    setDraft(next);
+  };
 
-  return [draft, setDraft] as const;
+  return [draft, setPersistedDraft] as const;
 }
 
 function buildDefaultDraft(): TeamMatchDraft {
@@ -402,9 +448,10 @@ function normalizeDraftDate(draft: TeamMatchDraft): TeamMatchDraft {
   };
 }
 
-function draftFromEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
+export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
   const start = new Date(edit.form.startsAt);
   const end = edit.form.endsAt ? new Date(edit.form.endsAt) : null;
+  const deadline = edit.form.deadlineAt ? new Date(edit.form.deadlineAt) : null;
   const parsed = parseNotes(edit.form.rulesText, edit.form.costNote);
 
   return {
@@ -419,11 +466,13 @@ function draftFromEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     imageUrl: edit.form.imageUrl ?? '',
     cost: parsed.cost,
     opponentCost: parsed.opponentCost,
-    venue: edit.form.addressText ?? edit.form.manualPlaceName,
-    address: '',
+    venue: edit.form.manualPlaceName,
+    address: edit.form.addressText ?? '',
     date: start.toISOString().slice(0, 10),
     startTime: start.toTimeString().slice(0, 5),
     endTime: end ? end.toTimeString().slice(0, 5) : start.toTimeString().slice(0, 5),
+    deadlineDate: deadline ? deadline.toISOString().slice(0, 10) : '',
+    deadlineTime: deadline ? deadline.toTimeString().slice(0, 5) : '',
   };
 }
 
@@ -435,11 +484,15 @@ function levelCodeToDraftGrade(code?: string | null) {
   return null;
 }
 
-function buildPayload(draft: TeamMatchDraft, hostTeamId: string, sportId: string, regionId: string): V1TeamMatchMutationPayload | null {
+export function buildTeamMatchMutationPayload(draft: TeamMatchDraft, hostTeamId: string, sportId: string, regionId: string): V1TeamMatchMutationPayload | null {
   if (!hostTeamId || !sportId || !regionId || !draft.title.trim() || !draft.venue.trim() || !draft.date || !draft.startTime) return null;
   const startsAt = new Date(`${draft.date}T${draft.startTime}:00`);
   const endsAt = draft.endTime ? new Date(`${draft.date}T${draft.endTime}:00`) : null;
+  const deadlineAt = draft.deadlineDate && draft.deadlineTime
+    ? new Date(`${draft.deadlineDate}T${draft.deadlineTime}:00`)
+    : null;
   if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) return null;
+  if (deadlineAt && (Number.isNaN(deadlineAt.getTime()) || deadlineAt >= startsAt)) return null;
 
   return {
     hostTeamId,
@@ -449,10 +502,10 @@ function buildPayload(draft: TeamMatchDraft, hostTeamId: string, sportId: string
     description: draft.description.trim() || null,
     startsAt: startsAt.toISOString(),
     endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
-    deadlineAt: null,
+    deadlineAt: deadlineAt?.toISOString() ?? null,
     imageUrl: draft.imageUrl.trim() || null,
     manualPlaceName: draft.venue.trim(),
-    addressText: draft.venue.trim() || null,
+    addressText: draft.address.trim() || null,
     costNote: draft.cost || draft.opponentCost ? `총 ${draft.cost.toLocaleString('ko-KR')}원 · 상대팀 ${draft.opponentCost.toLocaleString('ko-KR')}원` : null,
     rulesText: [draft.grade, draft.format, draft.style, draft.uniform].filter(Boolean).join(' · ') || null,
     minLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,

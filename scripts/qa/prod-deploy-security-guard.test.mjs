@@ -7,6 +7,7 @@ import {
   findJobsMissingRunnerPrereqs,
   findUnwiredComposeVariables,
   findUnreadRuntimeEnvVariables,
+  normalizeWorkflowSource,
 } from './check-production-deploy-security.mjs';
 
 // 이 가드는 "prod 배포 스크립트에 SSH alias 잔재가 없는가" 를 지킨다. 그런데 가드 자체가
@@ -33,6 +34,13 @@ const MUST_IGNORE = [
   ['토큰 중간 #', 'echo "sha256#abc"  # 해시 출력'],
   ['유사 단어', 'ssh_helper ec2_thing'],
 ];
+
+test('workflow security checks normalize Windows line endings', () => {
+  assert.equal(
+    normalizeWorkflowSource('permissions:\r\n  contents: read\r\n'),
+    'permissions:\n  contents: read\n',
+  );
+});
 
 test('SSH alias 잔재를 형태와 무관하게 탐지한다', () => {
   for (const [label, line] of MUST_DETECT) {

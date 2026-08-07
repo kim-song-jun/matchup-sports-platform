@@ -15,10 +15,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { isSafePopupLink } from '../popups/popup-screen';
+import { isSafePopupLink, isSafePopupTargetPath } from '../popups/popup-screen';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
+import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import {
   AdminListQueryDto,
   AdminLogsQueryDto,
@@ -242,7 +243,23 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
+      // 계정을 비활성화하는 전이는 본인 탈퇴와 같은 제약을 받아야 한다. 본인 탈퇴는
+      // assertWithdrawable() 이 owner·manager 를 막는데(WITHDRAWAL_BLOCKED_TEAM_AUTHORITY)
+      // 관리자 경로에는 그 가드가 없어서, 운영자가 팀 owner 를 비활성화하면 **주인 없는
+      // 팀이 정상 운영 중인 것처럼 남는다**(V1Team.ownerUserId 는 그대로, 팀은 active).
+      // 소유권을 먼저 넘기게 하고 여기서 멈춘다.
+      if (dto.status !== 'active') {
+        await this.assertNoTeamAuthority(tx, userId);
+      }
+
       const updated = await tx.v1User.update({ where: { id: userId }, data: { accountStatus: dto.status } });
+
+      // 비활성화 전이는 진행 중·예정 대회의 로스터와 팀 명단에서도 빼 준다. 남겨 두면
+      // 정원만 차지하고 대회 당일 출전 자격 문제가 된다(2026-08-03 프로덕션 사고).
+      if (dto.status !== 'active') {
+        await this.detachUserFromActiveCommitments(tx, userId, admin.userId, dto.reason);
+      }
+
       return this.writeAdminStatusLogs(
         admin,
         {
@@ -307,6 +324,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         });
       }
 
+      // changeUserStatus 와 같은 이유로 소유권을 먼저 넘기게 한다 — 삭제는 되돌릴 수
+      // 없으므로 여기서 막는 것이 더 중요하다.
+      await this.assertNoTeamAuthority(tx, userId);
+
       const updated = await tx.v1User.update({
         where: { id: userId },
         data: {
@@ -318,6 +339,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           phoneVerifiedAt: null,
         },
       });
+
+      await this.detachUserFromActiveCommitments(tx, userId, admin.userId, dto.reason, deletedAt);
       const identities = await tx.v1AuthIdentity.findMany({
         where: { userId },
         select: { id: true, provider: true },
@@ -650,12 +673,25 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       select: {
         id: true,
         email: true,
+        phone: true,
+        emailVerifiedAt: true,
+        phoneVerifiedAt: true,
         accountStatus: true,
         onboardingStatus: true,
         lastLoginAt: true,
         createdAt: true,
         deletedAt: true,
-        profile: { select: { nickname: true, displayName: true, realName: true, gender: true } },
+        profile: {
+          select: {
+            nickname: true,
+            displayName: true,
+            realName: true,
+            gender: true,
+            birthDate: true,
+            displayRegion: true,
+            bio: true,
+          },
+        },
         authIdentities: {
           where: { status: 'active' },
           select: { provider: true },
@@ -719,11 +755,17 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       nickname: row.profile?.nickname ?? null,
       displayName: row.profile?.realName ?? row.profile?.displayName ?? null,
       email: row.email ?? null,
+      phone: row.phone ?? null,
+      emailVerifiedAt: row.emailVerifiedAt,
+      phoneVerifiedAt: row.phoneVerifiedAt,
       authProviders: row.authIdentities.map((identity) => identity.provider),
       accountStatus: row.accountStatus,
       onboardingStatus: row.onboardingStatus,
       lastLoginAt: row.lastLoginAt,
       gender: normalizeProfileGender(row.profile?.gender),
+      birthDate: row.profile?.birthDate ?? null,
+      displayRegion: row.profile?.displayRegion ?? null,
+      bio: row.profile?.bio ?? null,
       createdAt: row.createdAt,
       deletedAt: row.deletedAt,
       hostedMatchCount: row._count.hostedMatches,
@@ -987,6 +1029,23 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           orderBy: { createdAt: 'desc' },
           select: { id: true, title: true, status: true, startAt: true },
         },
+        memberships: {
+          where: { status: 'active' },
+          orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+          select: {
+            id: true,
+            role: true,
+            joinedAt: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                phone: true,
+                profile: { select: { nickname: true, realName: true, displayName: true } },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -1018,6 +1077,16 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         title: tm.title,
         status: tm.status,
         startAt: tm.startAt,
+      })),
+      members: row.memberships.map((membership) => ({
+        membershipId: membership.id,
+        userId: membership.user.id,
+        name: membership.user.profile?.realName ?? membership.user.profile?.displayName ?? null,
+        nickname: membership.user.profile?.nickname ?? null,
+        email: membership.user.email ?? null,
+        phone: membership.user.phone ?? null,
+        role: membership.role,
+        joinedAt: membership.joinedAt,
       })),
     };
   }
@@ -1085,7 +1154,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const publishedAt = dto.status === 'published' ? now : null;
     const archivedAt = dto.status === 'archived' ? now : null;
     const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
-    const { targetScreens, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
+    const { targetScreens, targetPaths, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
     const content = normalizeRichContent(dto.content, dto.body);
 
     const row = await this.prisma.$transaction(async (tx) => {
@@ -1097,6 +1166,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           contentJson: content.document as Prisma.InputJsonValue,
           contentVersion: 1,
           targetScreens,
+          targetPaths,
           linkUrl,
           linkLabel,
           status: dto.status,
@@ -1122,6 +1192,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
             audience: popup.audience,
             status: popup.status,
             targetScreens: popup.targetScreens,
+            targetPaths: popup.targetPaths,
             linkUrl: popup.linkUrl,
             linkLabel: popup.linkLabel,
             displayStartAt: popup.displayStartAt?.toISOString() ?? null,
@@ -1150,7 +1221,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const publishedAt = dto.status === 'published' ? existing.publishedAt ?? now : null;
     const archivedAt = dto.status === 'archived' ? existing.archivedAt ?? now : null;
     const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
-    const { targetScreens, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
+    const { targetScreens, targetPaths, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
     const content = normalizeRichContent(dto.content, dto.body ?? existing.body);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -1163,6 +1234,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           contentJson: content.document as Prisma.InputJsonValue,
           contentVersion: { increment: 1 },
           targetScreens,
+          targetPaths,
           linkUrl,
           linkLabel,
           status: dto.status,
@@ -1187,6 +1259,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
             audience: existing.audience,
             status: existing.status,
             targetScreens: existing.targetScreens,
+            targetPaths: existing.targetPaths,
             linkUrl: existing.linkUrl,
             linkLabel: existing.linkLabel,
             displayStartAt: existing.displayStartAt?.toISOString() ?? null,
@@ -1197,6 +1270,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
             audience: popup.audience,
             status: popup.status,
             targetScreens: popup.targetScreens,
+            targetPaths: popup.targetPaths,
             linkUrl: popup.linkUrl,
             linkLabel: popup.linkLabel,
             displayStartAt: popup.displayStartAt?.toISOString() ?? null,
@@ -2048,6 +2122,75 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     return admin;
   }
 
+  // 본인 탈퇴의 assertWithdrawable() 과 같은 규칙을 관리자 경로에도 적용한다.
+  // 팀 owner·manager 를 비활성화하면 그 팀은 운영자 없이 active 로 남는다.
+  private async assertNoTeamAuthority(tx: Prisma.TransactionClient, userId: string) {
+    const authority = await tx.v1TeamMembership.findFirst({
+      where: {
+        userId,
+        status: 'active',
+        role: { in: ['owner', 'manager'] },
+        team: { status: 'active', deletedAt: null },
+      },
+      select: { team: { select: { id: true, name: true } }, role: true },
+    });
+    if (authority) {
+      throw new ConflictException({
+        code: 'USER_HAS_TEAM_AUTHORITY',
+        message: `이 사용자는 '${authority.team.name}' 팀의 ${authority.role === 'owner' ? '소유자' : '매니저'}예요. 팀 권한을 다른 멤버에게 넘긴 뒤 다시 시도해주세요.`,
+      });
+    }
+  }
+
+  // 계정이 비활성화되면 진행 중·예정 대회의 로스터와 팀 명단에서도 빠져야 한다.
+  // 남겨 두면 대회 정원만 차지하고, 출전 자격 문제가 된다(2026-08-03 프로덕션 사고).
+  // 완료된 대회는 기록 보존을 위해 건드리지 않는다 — roster-cleanup.ts 주석 참조.
+  private async detachUserFromActiveCommitments(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    actorUserId: string,
+    reason: string | undefined,
+    at: Date = new Date(),
+  ) {
+    const removedRosterCount = await removeUserFromActiveRosters(tx, userId, { at });
+
+    const memberships = await tx.v1TeamMembership.findMany({
+      where: { userId, status: 'active' },
+      select: { id: true, teamId: true, role: true },
+    });
+    for (const membership of memberships) {
+      await tx.v1TeamMembership.update({
+        where: { id: membership.id },
+        data: { status: 'removed', removedByUserId: actorUserId, leftAt: at },
+      });
+      await tx.v1Team.update({
+        where: { id: membership.teamId },
+        data: {
+          memberCount: { decrement: 1 },
+          ...(membership.role === 'manager' ? { managerCount: { decrement: 1 } } : {}),
+        },
+      });
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'team_membership',
+          targetId: membership.id,
+          fromStatus: 'active',
+          toStatus: 'removed',
+          actorType: 'admin',
+          actorUserId,
+          reason: reason ?? 'admin_account_deactivated',
+        },
+      });
+    }
+
+    if (removedRosterCount > 0 || memberships.length > 0) {
+      this.logger?.info(
+        { userId, rosters: removedRosterCount, teams: memberships.length },
+        '계정 비활성화에 따른 대회 명단·팀 멤버십 정리',
+      );
+    }
+  }
+
   private async getTransactionMutationAdmin(tx: Prisma.TransactionClient, userId: string): Promise<ActiveAdmin> {
     const admin = await this.getTransactionActiveAdmin(tx, userId);
     if (admin.adminRole === 'support') {
@@ -2282,10 +2425,17 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   private parsePopupTargeting(dto: CreateAdminPopupDto) {
     const targetScreens = [...new Set(dto.targetScreens)];
-    if (targetScreens.length === 0) {
+    const targetPaths = [...new Set((dto.targetPaths ?? []).map((path) => path.trim()))];
+    if (targetScreens.length === 0 && targetPaths.length === 0) {
       throw new BadRequestException({
         code: 'POPUP_TARGET_REQUIRED',
-        message: 'At least one popup target screen is required',
+        message: 'At least one popup target screen or exact path is required',
+      });
+    }
+    if (targetPaths.some((path) => !isSafePopupTargetPath(path))) {
+      throw new BadRequestException({
+        code: 'INVALID_POPUP_TARGET_PATH',
+        message: 'Popup target paths must be safe exact internal paths',
       });
     }
 
@@ -2304,7 +2454,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    return { targetScreens, linkUrl, linkLabel };
+    return { targetScreens, targetPaths, linkUrl, linkLabel };
   }
 
   private toAdminPopupRow(row: {
@@ -2315,6 +2465,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     contentJson: Prisma.JsonValue | null;
     contentVersion: number;
     targetScreens: string[];
+    targetPaths?: string[];
     linkUrl: string | null;
     linkLabel: string | null;
     status: string;
@@ -2333,6 +2484,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       content: row.contentJson,
       contentVersion: row.contentVersion,
       targetScreens: row.targetScreens,
+      targetPaths: row.targetPaths ?? [],
       linkUrl: row.linkUrl,
       linkLabel: row.linkLabel,
       status: row.status,

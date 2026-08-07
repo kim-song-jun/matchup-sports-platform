@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { ErrorState } from '@/components/v1-ui/primitives';
@@ -21,7 +22,10 @@ import { ResultReviewGridStyles } from '@/components/tournament-result-review/re
 export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }) {
   const tournament = useV1Tournament(tournamentId);
   const boardQuery = useTournamentEndedFixtures(tournamentId);
-  const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const deepLinkFixtureId = searchParams.get('fixtureId');
+  const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(() => deepLinkFixtureId);
+  const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
   const panelHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const hasOfficialResult = useMemo(
@@ -35,6 +39,17 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
 
   const selectedItem = hasOfficialResult.find((item) => item.fixtureId === selectedFixtureId) ?? null;
 
+  // T6-2: 딥링크로 들어왔는데 목록이 로드된 뒤에도 해당 fixture가 없으면(아직 공식
+  // 결과가 확정되지 않은 경우) 조용히 미선택 상태로 두지 않고 안내한다.
+  useEffect(() => {
+    if (!boardQuery.isSuccess || !deepLinkFixtureId) return;
+    if (selectedItem) {
+      setTimeout(() => panelHeadingRef.current?.focus(), 0);
+      return;
+    }
+    setDeepLinkNotFound(true);
+  }, [boardQuery.isSuccess, deepLinkFixtureId, selectedItem]);
+
   return (
     <RequireAuth>
       <main style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960, margin: '0 auto' }}>
@@ -47,6 +62,12 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
           {tournament.data?.title ?? '대회 운영'}
         </p>
         <h1 className="tm-text-heading">결과 정정</h1>
+
+        {deepLinkNotFound ? (
+          <p className="tm-text-caption" role="status" style={{ color: 'var(--text-muted)' }}>
+            전달받은 경기는 지금 정정 목록에 없어요. 아직 공식 결과가 확정되지 않았을 수 있어요.
+          </p>
+        ) : null}
 
         {boardQuery.isPending ? <p className="tm-text-label">불러오는 중…</p> : null}
         {boardQuery.isError ? (

@@ -18,6 +18,7 @@ import { PopupsModule } from './popups/popups.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
+import { TeamSchedulesModule } from './team-schedules/team-schedules.module';
 import { ChatModule } from './chat/chat.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -31,6 +32,14 @@ import { VerificationModule } from './verification/verification.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { LogsModule } from './logs/logs.module';
 import { ErrorLogsModule } from './error-logs/error-logs.module';
+import { GamesModule } from './games/games.module';
+import { GameOperationFlagsModule } from './config/game-operation-flags.module';
+import { TournamentFixtureLineupModule } from './tournament-operations/lineups/tournament-fixture-lineup.module';
+import { TournamentOperationsStaffModule } from './tournament-operations/staff/tournament-operations-staff.module';
+import { TournamentOperationsBoardModule } from './tournament-operations/board/tournament-operations-board.module';
+import { TournamentOperationsFieldsModule } from './tournament-operations/fields/tournament-operations-fields.module';
+import { GAME_READ_AUTHORITY } from './tournament-operations/board/game-read-authority.port';
+import { CompareGameReadAuthorityService } from './tournament-operations/board/compare-game-read-authority.service';
 
 @Module({
   imports: [
@@ -54,6 +63,9 @@ import { ErrorLogsModule } from './error-logs/error-logs.module';
     NoticesModule,
     TeamsModule,
     TeamMatchesModule,
+    TeamSchedulesModule,
+    GamesModule,
+    GameOperationFlagsModule,
     ChatModule,
     RealtimeModule,
     NotificationsModule,
@@ -66,6 +78,18 @@ import { ErrorLogsModule } from './error-logs/error-logs.module';
     VerificationModule,
     IntegrationsModule,
     LogsModule,
+    TournamentFixtureLineupModule,
+    TournamentOperationsStaffModule,
+    TournamentOperationsFieldsModule,
+    // Task 26: swap the fail-closed DirectGameReadAuthorityService stub for the real
+    // Task-10-backed comparator so GAME_READ=compare mode actually compares legacy vs projected
+    // results instead of unconditionally throwing 500 GAME_READ_AUTHORITY_NOT_CONFIGURED. See
+    // tournament-operations-board.module.ts's `register()` doc comment and
+    // compare-game-read-authority.service.ts for the full contract.
+    TournamentOperationsBoardModule.register({
+      provide: GAME_READ_AUTHORITY,
+      useClass: CompareGameReadAuthorityService,
+    }),
   ],
   providers: [
     { provide: APP_GUARD, useClass: V1ThrottlerGuard },

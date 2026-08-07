@@ -95,12 +95,19 @@ export type TeamMatchDetailViewModel = {
     pending?: boolean;
     onClick: () => void | Promise<unknown>;
   }>;
+  // Task 17: navigates to /team-matches/:id/result(/approval) — a matched/completed match
+  // no longer has a standalone "complete" mutation (Task 16 removed it); completion is now
+  // an atomic side effect of submitting a validated result revision on that screen.
+  resultAction?: { label: string; href: string; tone?: 'primary' | 'neutral' } | null;
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;
   onChat?: () => void;
   onShare?: () => void;
   onNotify?: () => void;
+  /** 라인업 관리 화면(Task 15) 링크. 내가 owner/manager로 속한 팀(호스트팀 또는 승인된
+   * 상대팀)이 이 매치에 관여할 때만 설정된다 — 그 외에는 undefined라 CTA 자체가 안 보인다. */
+  lineupHref?: string;
 };
 
 export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'place-time' | 'confirm' | 'complete' | 'edit';

@@ -10,7 +10,7 @@ export const v1Keys = {
   masterSports: () => [...v1Keys.all, 'master', 'sports'] as const,
   masterRegions: () => [...v1Keys.all, 'master', 'regions'] as const,
   home: (filters?: Record<string, unknown>) => [...v1Keys.all, 'home', filters ?? {}] as const,
-  activePopup: (screen: string | null, path?: string | null) => [...v1Keys.all, 'popups', 'active', screen, path ?? null] as const,
+  activePopup: (screen: string | null) => [...v1Keys.all, 'popups', 'active', screen] as const,
   recentSearches: () => [...v1Keys.all, 'search', 'recent'] as const,
   notices: (filters?: Record<string, unknown>) => [...v1Keys.all, 'notices', filters ?? {}] as const,
   notice: (noticeId: string) => [...v1Keys.all, 'notices', noticeId] as const,
@@ -20,6 +20,15 @@ export const v1Keys = {
   team: (teamId: string) => [...v1Keys.all, 'teams', teamId] as const,
   teamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'team-matches', filters ?? {}] as const,
   teamMatch: (teamMatchId: string) => [...v1Keys.all, 'team-matches', teamMatchId] as const,
+  teamSchedules: (teamId: string, filters?: Record<string, unknown>) => [...v1Keys.team(teamId), 'schedules', filters ?? {}] as const,
+  teamSchedule: (teamId: string, scheduleId: string) => [...v1Keys.team(teamId), 'schedules', scheduleId] as const,
+  mySchedule: (filters?: Record<string, unknown>) => [...v1Keys.all, 'me', 'schedule', filters ?? {}] as const,
+  teamMatchLineup: (teamMatchId: string) => [...v1Keys.teamMatch(teamMatchId), 'lineup'] as const,
+  game: (gameId: string) => [...v1Keys.all, 'games', gameId] as const,
+  gameResultRevisions: (gameId: string) => [...v1Keys.game(gameId), 'result-revisions'] as const,
+  gameLineups: (gameId: string) => [...v1Keys.game(gameId), 'lineups'] as const,
+  fixtureLineupAccess: (tournamentId: string, fixtureId: string) =>
+    [...v1Keys.all, 'tournaments', tournamentId, 'fixtures', fixtureId, 'lineup-access'] as const,
   reviews: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', filters ?? {}] as const,
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,
@@ -95,6 +104,18 @@ export const v1Keys = {
   myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
+  // Task 21: live tournament operations console (fixture lineup + event backfill).
+  // `game`은 위쪽에 이미 선언돼 있어 여기서 다시 정의하지 않는다 — 양쪽 브랜치가
+  // 동일한 정의를 각각 추가해 머지 시 중복 키가 될 뻔했다.
+  gameEvents: (gameId: string) => [...v1Keys.game(gameId), 'events'] as const,
+  fixtureLineup: (tournamentId: string, fixtureId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'fixtures', fixtureId, 'lineup'] as const,
+  tournamentOperationsBoard: (tournamentId: string, filters?: Record<string, unknown>) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'operations', filters ?? {}] as const,
+  tournamentOperationsStaff: (tournamentId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'staff'] as const,
+  tournamentOperationsFields: (tournamentId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'fields'] as const,
 };
 
 // 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아

@@ -324,7 +324,8 @@ export function SectionTitle({ title, sub, action, actionHref, id }: SectionTitl
 type ListItemProps = {
   title: string;
   sub?: string;
-  trailing?: string;
+  /** 문자열 외에 배지 등 ReactNode도 허용(상태 표시는 컬러만이 아니라 배지 형태로도 구분) */
+  trailing?: ReactNode;
   chev?: boolean;
   href?: string;
 };

@@ -125,6 +125,11 @@
   /* 대회 상금 / 보조 색 */
   --prize-gold: #ffd84d;
   --orange600: #f08a00;
+  /* orange500(#fe9800) 배경 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 ~2.16:1) — 피치 배치
+     골키퍼 마커(pitch-formation-editor.tsx)의 등번호 텍스트에서 실제로 미달을 확인했다
+     (2026-08 QA). blue700(#1b64da, ~5.41:1)과 짝을 맞춰 orange 쪽에도 4.5:1을 넘는
+     진한 변형을 추가한다(~4.92:1). */
+  --orange700: #a36100;
   /* ── 타입 스케일 토큰 — desktop/tournaments.css 대진표·라운드 카드 타이포 ── */
   --font-size-micro: 11px;
   --font-size-caption: 12px;
@@ -161,9 +166,12 @@
   --button-fill-danger:         var(--red500);
   --button-text-primary:        var(--static-white);
   --button-text-neutral:        var(--text-strong);
-  /* Card */
+  /* Card
+   * 카드 배경을 페이지 배경(--bg)에 물리지 않고 흰색으로 고정한다 — 페이지 배경이
+   * grey50으로 바뀌어도(.tm-app-frame 참고) 카드는 항상 흰 카드로 남아 대비가 유지된다.
+   * DESIGN.md: "카드는 배경색 차이로 구분한다: 흰 카드 on gray-50 배경". */
   --card-border:                var(--border);
-  --card-surface:               var(--bg);
+  --card-surface:               #ffffff;
   --card-radius:                16px;
   /* List row — 원래 시각(grey50 bg / grey100 border) 유지 (component 토큰 계층만 정리) */
   --list-row-bg:                var(--grey50);
@@ -288,7 +296,11 @@ button:disabled {
   width: min(100%, var(--v1-app-chrome-frame-width));
   height: 100dvh;
   margin: 0 auto;
-  background: var(--bg);
+  /* 페이지 배경 = grey50, 카드(--card-surface) = 흰색으로 고정해 대비를 준다 — 이전엔
+     둘 다 --bg(흰색)라 카드와 배경이 시각적으로 구분되지 않았다. 별개로 일정 상세/
+     생성 화면은 실제로 좌우 padding이 0인 버그(죽은 CSS 클래스 `.tm-team-detail-section`)도
+     있었다 — 그건 team-schedules-page.tsx에서 따로 고쳤다. */
+  background: var(--grey50);
   font-family: var(--font);
   overflow: hidden;
   position: relative;

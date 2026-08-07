@@ -109,16 +109,21 @@ pull_release_images() {
 assert_running_release_digests() {
   local api_container
   local web_container
+  local worker_container
   local running_api_image
   local running_web_image
+  local running_worker_image
 
   api_container="$("${compose[@]}" ps -q v1_api)" || return 1
   web_container="$("${compose[@]}" ps -q v1_web)" || return 1
-  [[ -n "${api_container}" && -n "${web_container}" ]] || return 1
+  worker_container="$("${compose[@]}" ps -q v1_game_operations_worker)" || return 1
+  [[ -n "${api_container}" && -n "${web_container}" && -n "${worker_container}" ]] || return 1
   running_api_image="$(docker inspect --format '{{.Config.Image}}' "${api_container}")" || return 1
   running_web_image="$(docker inspect --format '{{.Config.Image}}' "${web_container}")" || return 1
+  running_worker_image="$(docker inspect --format '{{.Config.Image}}' "${worker_container}")" || return 1
   [[ "${running_api_image}" == "${ALPHA_API_IMAGE}" ]] || return 1
   [[ "${running_web_image}" == "${ALPHA_WEB_IMAGE}" ]] || return 1
+  [[ "${running_worker_image}" == "${ALPHA_API_IMAGE}" ]] || return 1
 }
 
 check_alpha_health_contract() {
@@ -168,7 +173,8 @@ restore_active_release() {
   load_alpha_release_manifest "${active_tmp}" || return 1
   pull_release_images || return 1
   write_release_metadata "${active_tmp}" || return 1
-  "${compose[@]}" up -d --no-deps v1_api v1_web || return 1
+  "${compose[@]}" up -d --force-recreate --no-deps \
+    v1_api v1_web v1_game_operations_worker || return 1
   "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
   wait_for_alpha_health_contract || return 1
   assert_running_release_digests || return 1

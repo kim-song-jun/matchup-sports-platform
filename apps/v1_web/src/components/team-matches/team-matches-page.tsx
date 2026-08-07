@@ -71,7 +71,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
 
 export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewModel }) {
   return (
-    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/team-matches">
+    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/team-matches" desktopHead>
       <div className="tm-match-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
@@ -314,6 +314,55 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)' }}>{match.description}</div>
                 </Card>
               ) : null}
+              {/* 매치 관리: 라인업(Task 15)과 경기 결과(Task 17) CTA를 한 카드로 묶는다 —
+                  예전엔 결과 입력 버튼이 카드 없이 붕 떠서 라인업 카드와 시각적으로
+                  분리돼 보였다(QA 지적). model.lineupHref/resultAction은
+                  team-matches-client.tsx가 권한 조건일 때만 설정한다. */}
+              {model.lineupHref || model.resultAction ? (
+                <Card pad={16} style={{ marginTop: 10 }}>
+                  <div className="tm-text-body-lg">매치 관리</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+                    {model.lineupHref ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div className="tm-text-label" style={{ fontWeight: 600 }}>라인업</div>
+                          <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
+                            선발·후보 명단을 작성하고 제출하세요.
+                          </div>
+                        </div>
+                        <Link className="tm-btn tm-btn-sm tm-btn-primary" href={model.lineupHref} style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+                          라인업 관리
+                        </Link>
+                      </div>
+                    ) : null}
+                    {model.resultAction ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          ...(model.lineupHref ? { borderTop: '1px solid var(--border)', paddingTop: 12 } : {}),
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div className="tm-text-label" style={{ fontWeight: 600 }}>경기 결과</div>
+                          <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
+                            경기 결과를 기록하거나 확인하세요.
+                          </div>
+                        </div>
+                        <Link
+                          className={`tm-btn tm-btn-sm ${model.resultAction.tone === 'primary' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+                          href={model.resultAction.href}
+                          style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+                        >
+                          {model.resultAction.label}
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
+                </Card>
+              ) : null}
               {/* 홈팀 카드: 모바일은 왼쪽 컬럼 하단, 데스크톱은 우측 컬럼(tm-hide-desktop)으로 이동 */}
               <div className="tm-hide-desktop" style={{ marginTop: 14 }}>{hostTeamCard}</div>
               {mode === 'mine' ? (
@@ -431,7 +480,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
   const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
   const secondaryAction = model.form?.onBack;
   return (
-    <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="matches" bottomNav={false} backHref={model.backHref ?? '/team-matches'}>
+    <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="matches" bottomNav={false} backHref={model.backHref ?? '/team-matches'} desktopHead>
       <div className={`tm-create-shell tm-team-match-create-shell ${edit ? 'tm-create-shell-edit' : ''}`}>
         <CreateProgress step={step} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
@@ -792,7 +841,7 @@ function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
   };
 
   return (
-    <AppChrome title="팀매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/team-matches">
+    <AppChrome title="팀매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/team-matches" desktopHead>
       <div className="tm-create-shell">
         {/* P2: 완료 지점에 .tm-complete-check 마이크로인터랙션 (globals.css 키프레임, reduced-motion 안전) */}
         <div className="tm-complete-check">

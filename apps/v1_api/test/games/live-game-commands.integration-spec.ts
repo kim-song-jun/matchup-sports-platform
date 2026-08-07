@@ -448,9 +448,22 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     expect(withScorer.replayed).toBe(false);
   });
 
-  it('rejects an event whose period regresses behind an already-recorded period with 422 EVENT_LATE', async () => {
+  it('rejects an event whose period regresses behind an already-recorded period with 409 PERIOD_ALREADY_ENDED', async () => {
     const advanceToken = await grantTakeover(liveGameId, ids.director);
     let game = await prisma.v1Game.findUniqueOrThrow({ where: { id: liveGameId } });
+    // T1-0: period 2 must actually be LIVE (via next-period) before it can
+    // receive any event -- appending a PERIOD_START marker directly used to
+    // be how this suite advanced "the current period" for EVENT_LATE
+    // purposes, but that bypassed V1GamePeriod.state entirely (see the T1-0
+    // design doc's §2.8 diagnosis). This is the real transition now.
+    await service.executeCommand(authUser(ids.director), liveGameId, 'next-period', 'task20-period-2-advance-command', {
+      expectedVersion: game.version,
+      clientCommandId: 'task20-period-2-advance-command',
+      takeoverToken: advanceToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
+    game = await prisma.v1Game.findUniqueOrThrow({ where: { id: liveGameId } });
     await service.appendEvent(authUser(ids.director), liveGameId, 'task20-period-2-advance', {
       expectedVersion: game.version,
       clientEventId: 'task20-period-2-advance',
@@ -478,7 +491,11 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
         payload: {},
       }),
     );
-    expectHttpCode(denied, 422, 'EVENT_LATE');
+    // T1-0: period 1 is now genuinely V1GamePeriodState.ENDED (closed by the
+    // next-period transition above), which is a stronger, more specific
+    // signal than the old event-history-derived EVENT_LATE heuristic --
+    // assertEventReferences's period-state gate rejects it first.
+    expectHttpCode(denied, 409, 'PERIOD_ALREADY_ENDED');
     expect(
       await prisma.v1GameEvent.count({ where: { gameId: liveGameId, clientEventId: 'task20-late-period-1' } }),
     ).toBe(0);

@@ -14,6 +14,7 @@ export enum GameCommandName {
   pause = 'pause',
   resume = 'resume',
   end = 'end',
+  next_period = 'next-period',
 }
 
 export class GameCommandDto {

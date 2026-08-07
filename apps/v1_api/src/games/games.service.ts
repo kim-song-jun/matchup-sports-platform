@@ -11,6 +11,7 @@ import {
   V1ConsentState,
   V1GameEventType,
   V1GameLineupState,
+  V1GamePeriodState,
   V1GameResultRevisionState,
   V1GameSourceType,
   V1GameState,
@@ -203,6 +204,7 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
     case 'game_pause':
     case 'game_resume':
     case 'game_end':
+    case 'game_next_period':
     case 'result_recovery_derive_and_submit':
       return 'tournament_command';
     case 'game_cancel':
@@ -579,20 +581,14 @@ export class GamesService {
   async executeCommand(
     user: V1AuthUser,
     gameId: string,
-    command: 'start' | 'pause' | 'resume' | 'end',
+    command: 'start' | 'pause' | 'resume' | 'end' | 'next-period',
     headerIdempotencyKey: string | undefined,
     dto: GameCommandDto,
   ): Promise<GameMutationResult | GameRevisionMutationResult> {
-    const target = {
-      start: V1GameState.LIVE,
-      pause: V1GameState.PAUSED,
-      resume: V1GameState.LIVE,
-      end: V1GameState.ENDED,
-    }[command];
     return this.withCommand<GameMutationResult | GameRevisionMutationResult>(
       {
         gameId,
-        action: `game_${command}`,
+        action: command === 'next-period' ? 'game_next_period' : `game_${command}`,
         actor: await this.resolveActor(this.prisma, gameId, user.id, 'tournament_command'),
         expectedVersion: dto.expectedVersion,
         headerIdempotencyKey,
@@ -609,12 +605,38 @@ export class GamesService {
         }
         assertClockNotDrifted(dto.occurredAt);
         this.requireTakeover(game.id, context);
+
+        if (command === 'next-period') {
+          return this.advancePeriod(tx, game, context);
+        }
+
+        const target: V1GameState = {
+          start: V1GameState.LIVE,
+          pause: V1GameState.PAUSED,
+          resume: V1GameState.LIVE,
+          end: V1GameState.ENDED,
+        }[command];
         this.assertLifecycle(game.sourceType, 'TOURNAMENT_COMMAND', game.state, target);
+        const now = new Date();
         const updated = await tx.v1Game.update({
           where: { id: game.id },
           data: { state: target, version: { increment: 1 } },
         });
+        // T1-0 (design doc §2.8): `start` used to only flip V1Game.state,
+        // leaving V1GamePeriod.startedAt null forever — this is the root
+        // cause every captured event froze at clockMs≈0. Period 1 now goes
+        // LIVE in the same transaction as the game.
+        if (command === 'start') {
+          await tx.v1GamePeriod.updateMany({
+            where: { gameId: game.id, number: 1 },
+            data: { state: V1GamePeriodState.LIVE, startedAt: now },
+          });
+        }
         if (target === V1GameState.ENDED) {
+          await tx.v1GamePeriod.updateMany({
+            where: { gameId: game.id, state: V1GamePeriodState.LIVE },
+            data: { state: V1GamePeriodState.ENDED, endedAt: now },
+          });
           return this.deriveTournamentRevision(tx, updated, context);
         }
         return {
@@ -626,6 +648,67 @@ export class GamesService {
         };
       },
     );
+  }
+
+  /**
+   * `next_period` (T1-0) — closes whichever `V1GamePeriod` is currently LIVE
+   * and opens the following period number, both server-timestamped in the
+   * same transaction as the version bump. Reaches here only for
+   * TOURNAMENT_FIXTURE games (TEAM_MATCH is rejected above, before this is
+   * called). Rejecting while the game itself is not LIVE (e.g. PAUSED) is
+   * deliberate — advancing a period mid-pause is not part of the D-13 button
+   * flow (start → 전반 종료/후반 시작 → 경기 종료), those buttons are only
+   * ever shown while the game is LIVE.
+   */
+  private async advancePeriod(
+    tx: Transaction,
+    game: LockedGame,
+    context: GameCommandContext,
+  ): Promise<GameMutationResult> {
+    if (game.state !== V1GameState.LIVE) {
+      throw new ConflictException({
+        code: 'PERIOD_NOT_STARTED',
+        message: '경기가 진행 중이어야 다음 피리어드로 넘어갈 수 있어요',
+      });
+    }
+    const current = await tx.v1GamePeriod.findFirst({
+      where: { gameId: game.id, state: V1GamePeriodState.LIVE },
+    });
+    if (current === null) {
+      throw new ConflictException({
+        code: 'PERIOD_NOT_STARTED',
+        message: '진행 중인 피리어드가 없어요',
+      });
+    }
+    const next = await tx.v1GamePeriod.findFirst({
+      where: { gameId: game.id, number: current.number + 1 },
+    });
+    if (next === null) {
+      throw new ConflictException({
+        code: 'NO_NEXT_PERIOD',
+        message: '마지막 피리어드예요',
+      });
+    }
+    const now = new Date();
+    await tx.v1GamePeriod.update({
+      where: { id: current.id },
+      data: { state: V1GamePeriodState.ENDED, endedAt: now },
+    });
+    await tx.v1GamePeriod.update({
+      where: { id: next.id },
+      data: { state: V1GamePeriodState.LIVE, startedAt: now },
+    });
+    const updated = await tx.v1Game.update({
+      where: { id: game.id },
+      data: { version: { increment: 1 } },
+    });
+    return {
+      gameId: updated.id,
+      state: updated.state,
+      version: updated.version,
+      durableCommandId: context.durableCommandId,
+      replayed: false,
+    };
   }
 
   async cancel(
@@ -1422,6 +1505,20 @@ export class GamesService {
         const updated = await tx.v1Game.update({
           where: { id: gameId },
           data: { state: V1GameState.ENDED, version: { increment: 1 } },
+        });
+        // T1-0: team matches never call the tournament `end` command (see
+        // TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN above) -- this submission is
+        // the only place a team-match game's aggregate reaches ENDED, so
+        // whichever period is still LIVE at that moment must close here too,
+        // mirroring what `executeCommand('end')` does for tournament
+        // fixtures. This is a defensive no-op today: nothing yet opens a
+        // team-match period into LIVE (see the design doc's T1-0 decision
+        // note) -- it exists so a later period-opening path for team
+        // matches closes correctly without this submission path needing to
+        // change again.
+        await tx.v1GamePeriod.updateMany({
+          where: { gameId, state: V1GamePeriodState.LIVE },
+          data: { state: V1GamePeriodState.ENDED, endedAt: new Date() },
         });
         if (game.teamMatchId !== null) {
           // Task 16: submission is the literal end-of-match boundary for a team
@@ -2851,6 +2948,21 @@ export class GamesService {
       throw new UnprocessableEntityException({
         code: 'EVENT_INVALID',
         message: 'Event period is not configured for this game',
+      });
+    }
+    // T1-0: only the currently-LIVE period may receive events. Before this,
+    // `V1GamePeriod.state` was never checked here at all, and nothing ever
+    // set it past SCHEDULED -- see the design doc's §2.8 diagnosis.
+    if (period.state === V1GamePeriodState.SCHEDULED) {
+      throw new ConflictException({
+        code: 'PERIOD_NOT_STARTED',
+        message: '아직 시작하지 않은 피리어드예요',
+      });
+    }
+    if (period.state === V1GamePeriodState.ENDED) {
+      throw new ConflictException({
+        code: 'PERIOD_ALREADY_ENDED',
+        message: '이미 종료된 피리어드예요',
       });
     }
     if (dto.sideId !== undefined) {

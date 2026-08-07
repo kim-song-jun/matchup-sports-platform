@@ -62,9 +62,7 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
           {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
         </span>
         <span style={{ fontSize: 11, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
-          {/* display:contents — getByText가 매칭할 수 있게 시각 텍스트만 별도 노드로 감싸되,
-              박스를 만들지 않아 " · 상태" 와의 원래 붙은 간격을 그대로 보존한다. */}
-          <span style={{ display: 'contents' }}>{dateLabel ?? '일정 미정'}</span> · {fixtureStatusLabel(entry.status)}
+          {dateLabel ?? '일정 미정'} · {fixtureStatusLabel(entry.status)}
           <ScheduleResultBadge entry={entry} />
         </span>
       </div>

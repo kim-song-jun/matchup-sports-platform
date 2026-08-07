@@ -358,7 +358,7 @@ describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여
       ],
     });
     render(<ScheduleContent tournamentId="tournament-1" data={data} />);
-    expect(screen.getByText('8/7 (금) 20:00')).toBeInTheDocument();
+    expect(screen.getByText(/8\/7 \(금\) 20:00/)).toBeInTheDocument();
     expect(screen.getByText('잠실종합운동장 (A구장)')).toBeInTheDocument();
   });
 

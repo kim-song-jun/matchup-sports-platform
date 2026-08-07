@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import type { V1TournamentStaffRole } from '@/types/api';
+import type { TournamentOpsOrigin } from '@/lib/session-storage';
 import { staffRoleLabel } from './badges';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
@@ -147,7 +148,15 @@ interface TournamentOpsShellProps {
   tournamentTitle?: string;
   tournamentCoverImageUrl?: string | null;
   role: V1TournamentStaffRole;
+  /** T6-2 — admin에서 들어왔으면 복귀 링크가 그리로 향한다(`_gate.tsx`가 계산해 내려준다). */
+  origin: TournamentOpsOrigin;
 }
+
+/** T6-2 — 진입 출처별 복귀 목적지. `_gate.tsx`가 계산한 `origin`을 그대로 받는다. */
+const RETURN_TARGET: Record<TournamentOpsOrigin, (tournamentId: string) => { href: string; label: string }> = {
+  admin: (tournamentId) => ({ href: `/admin/tournaments/${tournamentId}`, label: '대회 관리로 돌아가기' }),
+  home: () => ({ href: '/home', label: '서비스로 돌아가기' }),
+};
 
 // ── Mobile drawer ─────────────────────────────────────────────────────────
 interface DrawerProps {
@@ -159,9 +168,11 @@ interface DrawerProps {
   role: V1TournamentStaffRole;
   pathname: string;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
+  returnHref: string;
+  returnLabel: string;
 }
 
-function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, triggerRef }: DrawerProps) {
+function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, triggerRef, returnHref, returnLabel }: DrawerProps) {
   const isActive = useIsActive(pathname);
   const navItems = buildNavItems(tournamentId, role);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -298,12 +309,12 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
 
         <div className="px-4 py-4 border-t border-gray-100 dark:border-white/10 shrink-0">
           <Link
-            href="/home"
+            href={returnHref}
             onClick={onClose}
             className="flex items-center gap-1.5 text-[13px] text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
-            서비스로 돌아가기
+            {returnLabel}
           </Link>
         </div>
       </div>
@@ -318,12 +329,13 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
  * `/admin`과 완전히 분리된 별도 인증 경로다 — admin이 아닌 tournament_director/
  * support_readonly/platform_ops(대회 스코프)가 대상이다.
  */
-export function TournamentOpsShell({ children, tournamentId, tournamentTitle, tournamentCoverImageUrl, role }: TournamentOpsShellProps) {
+export function TournamentOpsShell({ children, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, origin }: TournamentOpsShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
   const navItems = buildNavItems(tournamentId, role);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const returnTarget = RETURN_TARGET[origin](tournamentId);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -380,11 +392,11 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
 
         <div className="px-4 py-4 border-t border-gray-100 dark:border-white/10 shrink-0">
           <Link
-            href="/home"
+            href={returnTarget.href}
             className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
-            서비스로 돌아가기
+            {returnTarget.label}
           </Link>
         </div>
       </aside>
@@ -400,6 +412,8 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
           role={role}
           pathname={pathname}
           triggerRef={hamburgerRef}
+          returnHref={returnTarget.href}
+          returnLabel={returnTarget.label}
         />
       </div>
 

@@ -148,6 +148,8 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
         role={role}
         tournamentTitle={tournament.data?.title}
         tournamentCoverImageUrl={tournament.data?.coverImageUrl}
+        // T6-5: 임시값 — Task 6에서 `?from=admin` 감지 기반 실제 origin으로 교체한다.
+        origin="home"
       >
         {children}
       </TournamentOpsShell>

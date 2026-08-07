@@ -5,9 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldOff } from 'lucide-react';
 import { useV1AuthMe, useV1Tournament, useV1TournamentStaffAssignments } from '@/hooks/use-v1-api';
-import { V1ApiError } from '@/lib/api-client';
 import { getTournamentOpsOrigin, saveTournamentOpsOrigin } from '@/lib/session-storage';
-import { isTournamentStaffScopeNotYetSupported, tournamentStaffDenialReasonCode } from '@/lib/tournament-ops-access';
+import { classifyTournamentStaffAccessError, isTournamentStaffScopeNotYetSupported } from '@/lib/tournament-ops-access';
 import type { V1TournamentStaffRole } from '@/types/api';
 import { TournamentOpsShell } from '@/components/tournament-ops/tournament-ops-shell';
 import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-context';
@@ -130,10 +129,9 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
   }
 
   if (staff.isError || !staff.data) {
-    const isAuthz = staff.error instanceof V1ApiError && staff.error.statusCode === 403;
-    if (isAuthz) {
-      const reason = tournamentStaffDenialReasonCode(staff.error);
-      return <AccessDenied scopeNotYetSupported={isTournamentStaffScopeNotYetSupported(reason)} />;
+    const denial = classifyTournamentStaffAccessError(staff.error);
+    if (denial.isAuthDenied) {
+      return <AccessDenied scopeNotYetSupported={isTournamentStaffScopeNotYetSupported(denial.reasonCode)} />;
     }
     return <GateErrorScreen onRetry={() => void staff.refetch()} />;
   }

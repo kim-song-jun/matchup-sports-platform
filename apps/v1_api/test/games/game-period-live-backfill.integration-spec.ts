@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
+import { V1GameEventType, V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
@@ -13,6 +13,15 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  * 남아있어 이벤트를 영원히 못 받는다. 이 스위트는 마이그레이션 SQL 파일 자체를
  * (prisma migrate가 아니라) 직접 읽어 실행해, 그 SQL이 실제로 이 상태를
  * 고치는지와 idempotent한지를 증명한다.
+ *
+ * Fix round 1: 코디네이터 리뷰에서 발견 — 구코드에서는 `start`와 `pause` 둘 다
+ * `V1GamePeriod`를 건드리지 않았다(`games.service.ts`의 `v1GamePeriod.update*` 호출
+ * 지점 5곳 전수 확인: 629·636·693·697·1519 — `resume`은 그중 어디에도 없다). 그래서
+ * "구코드에서 start → pause 한 경기"(`V1Game.state='PAUSED'`, period 전부 SCHEDULED)도
+ * `state='LIVE'` 게임과 완전히 같은 문제를 가지는데, 백필의 첫 버전은 `state='LIVE'`만
+ * 매칭해 이 케이스를 놓쳤다. 그 경기는 배포 후 `resume`을 눌러도(=`resume`도 T1-0
+ * 이후 코드에서 period를 건드리지 않으므로) period가 계속 SCHEDULED로 남아 이벤트를
+ * 영원히 못 받는다 — 아래 "PAUSED 경기" 테스트가 이 시나리오를 재현·검증한다.
  */
 const migrationSql = readFileSync(
   resolve(__dirname, '../../prisma/migrations/20260807000000_v1_period_live_backfill/migration.sql'),
@@ -29,10 +38,18 @@ const ids = {
   fixtureLiveEligible: '67000000-0000-4000-8000-000000000040',
   fixtureScheduled: '67000000-0000-4000-8000-000000000041',
   fixtureAlreadyLive: '67000000-0000-4000-8000-000000000042',
+  fixturePausedEligible: '67000000-0000-4000-8000-000000000043',
 } as const;
 
 const prisma = new PrismaService();
 const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+
+const authUser = (id: string) => ({
+  id,
+  email: `${id}@task-t1-0-backfill.example.test`,
+  accountStatus: 'active' as const,
+  onboardingStatus: 'completed' as const,
+});
 
 function sourceContext(actor: GameActorScope, commandId: string, payload: unknown): GameCommandContext {
   return {
@@ -127,7 +144,16 @@ describe('D-21 period-live backfill migration — one-time repair for games left
         { id: ids.fixtureLiveEligible, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: configId },
         { id: ids.fixtureScheduled, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: configId },
         { id: ids.fixtureAlreadyLive, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, competitionConfigVersionId: configId },
+        { id: ids.fixturePausedEligible, tournamentId: ids.tournament, round: 'group', fixtureNumber: 4, competitionConfigVersionId: configId },
       ],
+    });
+    await prisma.v1TournamentStaffAssignment.create({
+      data: {
+        tournamentId: ids.tournament,
+        userId: ids.director,
+        role: 'TOURNAMENT_DIRECTOR',
+        grantedByUserId: ids.director,
+      },
     });
   });
 
@@ -195,5 +221,59 @@ describe('D-21 period-live backfill migration — one-time repair for games left
 
     const period1 = await prisma.v1GamePeriod.findFirstOrThrow({ where: { gameId, number: 1 } });
     expect(period1.startedAt!.getTime()).toBe(realStartedAt.getTime());
+  });
+
+  it('배포 순간 PAUSED였지만 period가 전부 SCHEDULED인 경기(구코드의 start→pause)도 백필하고, resume 후 실제로 이벤트를 받을 수 있다', async () => {
+    // 구코드 재현: start도 pause도 V1GamePeriod를 건드리지 않던 시절 — 게임을
+    // PAUSED로 raw 업데이트하고 period는 손대지 않는다 (LIVE 케이스와 동일한
+    // "period 전부 SCHEDULED" 상태이지만 V1Game.state가 다르다는 게 이 케이스의 핵심).
+    const gameId = await createGame(ids.fixturePausedEligible);
+    await prisma.v1Game.update({ where: { id: gameId }, data: { state: 'PAUSED' } });
+
+    const before = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
+    expect(before.every((period) => period.state === 'SCHEDULED' && period.startedAt === null)).toBe(true);
+
+    await prisma.$executeRawUnsafe(migrationSql);
+
+    const after = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
+    expect(after[0]).toEqual(expect.objectContaining({ number: 1, state: 'LIVE' }));
+    expect(after[0].startedAt).not.toBeNull();
+    expect(after[1]).toEqual(expect.objectContaining({ number: 2, state: 'SCHEDULED', startedAt: null }));
+
+    // 백필만으로 끝이 아니라, 실제 운영 흐름(resume → 이벤트 기록)이 다시 살아나는지까지
+    // 증명한다 — resume 자체는(T1-0 이후에도) V1GamePeriod를 건드리지 않으므로, 이
+    // 검증이 통과하는 건 순전히 백필이 미리 period 1을 LIVE로 되돌려 놨기 때문이다.
+    const home = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.HOME } });
+    const takeoverToken = (
+      await service.requestTakeover(authUser(ids.director), gameId, {
+        clientInstanceId: 't1-0-backfill-paused-client',
+        lastSequence: 0,
+      })
+    ).takeoverToken;
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+
+    await service.executeCommand(authUser(ids.director), gameId, 'resume', 't1-0-backfill-resume', {
+      expectedVersion: game.version,
+      clientCommandId: 't1-0-backfill-resume',
+      takeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
+
+    const resumed = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    expect(resumed.state).toBe('LIVE');
+
+    const appended = await service.appendEvent(authUser(ids.director), gameId, 't1-0-backfill-paused-event', {
+      expectedVersion: resumed.version,
+      clientEventId: 't1-0-backfill-paused-event',
+      takeoverToken,
+      type: V1GameEventType.CORRECTION,
+      sideId: home.id,
+      period: 1,
+      clockMs: 0,
+      occurredAt: new Date().toISOString(),
+      payload: { kind: 'NOTE', note: 't1-0 backfill regression check' },
+    });
+    expect(appended.sequence).toBe(1);
   });
 });

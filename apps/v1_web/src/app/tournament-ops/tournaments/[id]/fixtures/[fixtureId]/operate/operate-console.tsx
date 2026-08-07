@@ -202,7 +202,16 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {/* Sticky context header — tablet 768×1024 / desktop 1280+ keep this
           visible while scrolling the lineup/queue below. */}
       <header className="sticky top-0 z-10 -mx-4 border-b border-gray-100 bg-white/95 px-4 py-3 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/95">
-        <div className="flex items-center justify-between gap-2">
+        {/* T1-0: next-period 버튼이 추가되며 LIVE 상태의 버튼이 최대 3개(일시
+            중지/전반 종료/경기 종료)가 됐다. 기존 "한 줄에 타이틀+뱃지+버튼"
+            레이아웃은 390px 모바일에서 버튼 3개가 shrink-0로 자기 너비를 그대로
+            차지해 왼쪽 뱃지·연결상태 영역이 극단적으로 좁아져 "진행 중" 뱃지가
+            글자 단위로 세로 줄바꿈되는 회귀를 만들었다(2버튼 상태에서는 재현 안
+            됨 — 실측 스크린샷으로 확인). 모바일에서는 타이틀 행과 버튼 행을
+            세로로 분리하고, 버튼 행은 필요시 자체적으로 줄바꿈하도록 바꿔
+            타이틀/뱃지 쪽 공간을 압박하지 않는다. sm(640px) 이상은 기존 한 줄
+            레이아웃을 유지한다(768/1440에서는 문제없이 확인됨). */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-gray-900 dark:text-white">
               {sides.map((side) => side.displayNameSnapshot).join(' vs ') || '경기 운영'}
@@ -225,7 +234,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               </span>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          <div className="flex flex-wrap gap-1.5 sm:shrink-0 sm:justify-end">
             {availableCommands.map((command) => (
               <Button
                 key={command}

@@ -91,7 +91,12 @@ interface NavItem {
   label: string;
   href: string;
   icon: ReactNode;
+  /** D-16 — 숨기지 않고 비활성 + 사유로 보여줄 때만 채운다. */
+  disabled?: boolean;
+  disabledReason?: string;
 }
+
+const RESULT_MANAGEMENT_DISABLED_REASON = '결과 검토·정정은 대회 운영자(디렉터)·플랫폼 운영자만 이용할 수 있어요.';
 
 /**
  * 배정 인식 내비게이션(assignment-aware navigation) — 이 셸에 진입할 수 있는 역할은
@@ -100,7 +105,8 @@ interface NavItem {
  *
  * 운영 보드·스태프는 세 역할 전부 조회 가능하므로 항상 노출한다. 결과 검토·결과 정정은
  * 원장(screens A-03/A-04)이 tournament_director / platform_ops 로 제한하므로 그 두 역할에만
- * 노출한다 — support_readonly 에게 열어두면 열자마자 막히는 링크가 된다.
+ * 활성 링크로 노출한다. T6-5(D-16): support_readonly 에게 이 항목을 통째로 숨기는 대신
+ * "보여주되 비활성 + 이유"로 통일한다 — admin 대회 상세의 바로가기(D-16)와 같은 원칙이다.
  *
  * 이 두 항목은 원래 여기 없었다. 라우트는 존재하는데 진입 링크가 어디에도 없어 URL 을 직접
  * 아는 사람만 갈 수 있는 고아 라우트였다(여정 검수 major 2건). 화면을 만들 때 셸의 nav 를
@@ -109,32 +115,56 @@ interface NavItem {
 function buildNavItems(tournamentId: string, role: V1TournamentStaffRole): NavItem[] {
   const base = `/tournament-ops/tournaments/${tournamentId}`;
   const canManageResults = role === 'TOURNAMENT_DIRECTOR' || role === 'PLATFORM_OPS';
+  const resultGate = canManageResults ? {} : { disabled: true, disabledReason: RESULT_MANAGEMENT_DISABLED_REASON };
   return [
     {
       label: '운영 보드',
       href: `${base}/operations`,
       icon: <LayoutDashboard size={18} aria-hidden="true" />,
     },
-    ...(canManageResults
-      ? [
-          {
-            label: '결과 검토',
-            href: `${base}/result-review`,
-            icon: <ClipboardCheck size={18} aria-hidden="true" />,
-          },
-          {
-            label: '결과 정정',
-            href: `${base}/records/corrections`,
-            icon: <PencilLine size={18} aria-hidden="true" />,
-          },
-        ]
-      : []),
+    {
+      label: '결과 검토',
+      href: `${base}/result-review`,
+      icon: <ClipboardCheck size={18} aria-hidden="true" />,
+      ...resultGate,
+    },
+    {
+      label: '결과 정정',
+      href: `${base}/records/corrections`,
+      icon: <PencilLine size={18} aria-hidden="true" />,
+      ...resultGate,
+    },
     {
       label: '스태프',
       href: `${base}/staff`,
       icon: <ShieldCheck size={18} aria-hidden="true" />,
     },
   ];
+}
+
+// 공용 비활성 행 — Drawer/데스크톱 사이드바 둘 다에서 쓴다.
+function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean }) {
+  return (
+    <button
+      type="button"
+      disabled
+      aria-disabled="true"
+      title={item.disabledReason}
+      className={[
+        'flex w-full items-center gap-3 px-4 min-h-[44px] text-sm text-left border-l-2 border-transparent',
+        'text-gray-300 dark:text-gray-600 cursor-not-allowed',
+        dense ? 'py-3' : 'py-2.5',
+      ].join(' ')}
+    >
+      <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">{item.icon}</span>
+      <span className="flex flex-col items-start">
+        <span>{item.label}</span>
+        {item.disabledReason ? (
+          <span className="text-[11px] font-normal text-gray-400 dark:text-gray-500">{item.disabledReason}</span>
+        ) : null}
+      </span>
+    </button>
+  );
 }
 
 function useIsActive(pathname: string) {
@@ -284,6 +314,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
         <nav className="flex-1 py-1.5 overflow-y-auto" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
+            if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} dense />;
             return (
               <Link
                 key={item.href}
@@ -368,6 +399,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         <nav className="flex-1 py-1.5" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
+            if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} />;
             return (
               <Link
                 key={item.href}

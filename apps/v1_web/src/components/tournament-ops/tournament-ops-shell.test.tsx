@@ -27,3 +27,29 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
     for (const link of links) expect(link).toHaveAttribute('href', '/home');
   });
 });
+
+describe('TournamentOpsShell nav 항목 (T6-5, D-16)', () => {
+  it('SUPPORT_READONLY도 결과 검토/정정이 보인다 — 숨기지 않고 비활성 + 사유', () => {
+    render(
+      <TournamentOpsShell tournamentId="t-1" role="SUPPORT_READONLY" origin="home">
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    expect(screen.queryByRole('link', { name: /결과 검토/ })).not.toBeInTheDocument();
+    const reviewLabels = screen.getAllByText('결과 검토');
+    expect(reviewLabels.length).toBeGreaterThan(0);
+    expect(reviewLabels[0].closest('button')).toBeDisabled();
+    expect(screen.getAllByText(/결과 검토·정정은/).length).toBeGreaterThan(0);
+  });
+
+  it('TOURNAMENT_DIRECTOR는 결과 검토/정정이 활성 링크로 보인다', () => {
+    render(
+      <TournamentOpsShell tournamentId="t-1" role="TOURNAMENT_DIRECTOR" origin="home">
+        <div>content</div>
+      </TournamentOpsShell>,
+    );
+    const links = screen.getAllByRole('link', { name: /결과 검토/ });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link).toHaveAttribute('href', expect.stringContaining('/result-review'));
+  });
+});

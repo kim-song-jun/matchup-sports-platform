@@ -346,7 +346,15 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
   const isLive = fixture.status === 'in_progress';
   const isDone = fixture.status === 'completed';
   const timeLabel = formatTournamentDateTimeShort(fixture.scheduledAt);
-  const showBadgeRow = Boolean(timeLabel) || isLive || (isDone && Boolean(pk));
+
+  // 배지가 1개뿐이면(가장 흔한 케이스 — 시각만 있는 "예정" 카드, 혹은 예전부터 있던
+  // LIVE-only·PK-only 단독 케이스) D-12 이전과 동일하게 카드 폭을 꽉 채우는 block 배지를
+  // 그대로 유지한다. 2개 이상 동시에 있을 때만(D-12 가 새로 허용한 조합) flex pill row로
+  // 감싼다 — 리뷰에서 단일 배지 케이스의 폭 축소가 의도치 않은 회귀로 지적되어 조건부 처리.
+  const badges: { key: string; className: string; label: string }[] = [];
+  if (timeLabel) badges.push({ key: 'time', className: 'tm-bk2-badge tm-bk2-badge-time', label: timeLabel });
+  if (isLive) badges.push({ key: 'live', className: 'tm-bk2-badge tm-bk2-badge-live', label: '● LIVE' });
+  if (isDone && pk) badges.push({ key: 'pk', className: 'tm-bk2-badge', label: pk });
 
   return (
     <div
@@ -363,11 +371,12 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
         name={fixture.awayTeamName} score={hasResult ? fixture.result!.awayScore : null}
         isWinner={winner === 'away'} isLoser={isDone && winner === 'home'}
       />
-      {showBadgeRow && (
+      {badges.length === 1 && <div className={badges[0].className}>{badges[0].label}</div>}
+      {badges.length > 1 && (
         <div className="tm-bk2-badge-row">
-          {timeLabel && <div className="tm-bk2-badge tm-bk2-badge-time">{timeLabel}</div>}
-          {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}
-          {isDone && pk && <div className="tm-bk2-badge">{pk}</div>}
+          {badges.map((b) => (
+            <div key={b.key} className={b.className}>{b.label}</div>
+          ))}
         </div>
       )}
     </div>

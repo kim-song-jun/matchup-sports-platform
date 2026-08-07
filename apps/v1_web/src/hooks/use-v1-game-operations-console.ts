@@ -544,6 +544,22 @@ export function gameOperationsErrorMessage(code: string): string {
       return '기기 시각이 서버와 많이 달라요. 시간을 확인해주세요.';
     case 'OFFLINE_EVENT_REBASE_CONFLICT':
       return '오프라인 동안 기록한 이벤트를 다시 확인해주세요.';
+    // T1-0 fix round 2: this event path goes through the Socket.IO gateway
+    // (game.error), NOT extractErrorMessage -- the design doc assumed the
+    // server message would show as-is, but it never reaches this console
+    // without an explicit case here. Before this, all four fell to the
+    // default "다시 시도해주세요", which is actively wrong for every one of
+    // them: none of these are transient and retrying the exact same request
+    // fails the exact same way every time until the operator does something
+    // different (start the game, refresh, or end it).
+    case 'PERIOD_NOT_STARTED':
+      return '경기가 진행 중이 아니에요. 경기를 먼저 시작해 주세요.';
+    case 'PERIOD_ALREADY_ENDED':
+      return '이미 종료된 피리어드예요. 새로고침 후 다시 확인해주세요.';
+    case 'NO_NEXT_PERIOD':
+      return '마지막 피리어드예요. 경기를 종료해 주세요.';
+    case 'EVENT_LATE':
+      return '기록하려는 시점이 이미 지난 피리어드예요. 새로고침 후 다시 확인해주세요.';
     default:
       return '이벤트를 기록하지 못했어요. 다시 시도해주세요.';
   }

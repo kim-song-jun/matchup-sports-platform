@@ -22,6 +22,17 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  * 매칭해 이 케이스를 놓쳤다. 그 경기는 배포 후 `resume`을 눌러도(=`resume`도 T1-0
  * 이후 코드에서 period를 건드리지 않으므로) period가 계속 SCHEDULED로 남아 이벤트를
  * 영원히 못 받는다 — 아래 "PAUSED 경기" 테스트가 이 시나리오를 재현·검증한다.
+ *
+ * Fix round 2: 태스크 리뷰에서 발견 — 구코드의 콘솔은 LIVE 피리어드가 하나도 없으면
+ * "번호가 가장 큰 피리어드"로 대체했다(T1-0 이전 `operate-console.tsx`). 즉 2피리어드
+ * 종목에서는 배포 전 캡처된 이벤트가 전부 period=2로 남아있다. 백필의 첫 버전은
+ * 무조건 period 1을 여는데, `assertEventReferences`의 **기존(T1-0이 건드리지 않은)**
+ * `EVENT_LATE` 체크(`dto.period < maxRecordedPeriod`)가 이미 period=2로 기록된 게임에
+ * period=1로 열린 채로 다음 이벤트를 보내면 그대로 걸린다 — 백필이 구제하려던 경기가
+ * 여전히 기록 불가로 남는다. 마이그레이션이 이제 `MAX(그 게임의 v1_game_events.period)`
+ * (이벤트가 없으면 1)를 열도록 고쳐 이 연속성을 지킨다 — 아래 "사전 이벤트가 있는 경기"
+ * 테스트가 이 상호작용을 재현·검증한다(이전까지는 어떤 테스트도 백필 실행 전에 이벤트를
+ * 하나도 만들지 않아 이 상호작용 자체가 검증되지 않았다).
  */
 const migrationSql = readFileSync(
   resolve(__dirname, '../../prisma/migrations/20260807000000_v1_period_live_backfill/migration.sql'),
@@ -39,6 +50,7 @@ const ids = {
   fixtureScheduled: '67000000-0000-4000-8000-000000000041',
   fixtureAlreadyLive: '67000000-0000-4000-8000-000000000042',
   fixturePausedEligible: '67000000-0000-4000-8000-000000000043',
+  fixtureLiveWithPriorEvents: '67000000-0000-4000-8000-000000000044',
 } as const;
 
 const prisma = new PrismaService();
@@ -145,6 +157,7 @@ describe('D-21 period-live backfill migration — one-time repair for games left
         { id: ids.fixtureScheduled, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: configId },
         { id: ids.fixtureAlreadyLive, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, competitionConfigVersionId: configId },
         { id: ids.fixturePausedEligible, tournamentId: ids.tournament, round: 'group', fixtureNumber: 4, competitionConfigVersionId: configId },
+        { id: ids.fixtureLiveWithPriorEvents, tournamentId: ids.tournament, round: 'group', fixtureNumber: 5, competitionConfigVersionId: configId },
       ],
     });
     await prisma.v1TournamentStaffAssignment.create({
@@ -275,5 +288,74 @@ describe('D-21 period-live backfill migration — one-time repair for games left
       payload: { kind: 'NOTE', note: 't1-0 backfill regression check' },
     });
     expect(appended.sequence).toBe(1);
+  });
+
+  it('사전에 period=2로 기록된 이벤트가 있는 경기는 period 1이 아니라 period 2를 백필하고, 그 경기가 실제로 다음 이벤트를 받을 수 있다 (fix round 2 exit proof)', async () => {
+    const gameId = await createGame(ids.fixtureLiveWithPriorEvents);
+    await prisma.v1Game.update({ where: { id: gameId }, data: { state: 'LIVE' } });
+    const home = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.HOME } });
+
+    // 구코드 재현: 배포 전 캡처된 이벤트는 (LIVE 피리어드가 하나도 없어 콘솔이
+    // "번호가 가장 큰 피리어드"로 대체했으므로) 전부 period=2로 기록됐다. 이 행은
+    // GamesService.appendEvent()가 아니라 raw insert로 만든다 — 지금 서비스는
+    // (period 1이 아직 SCHEDULED이므로) 이 요청 자체를 PERIOD_NOT_STARTED로
+    // 거부하기 때문에, "배포 전에 이미 DB에 존재하던 레거시 행"을 정확히 재현하려면
+    // 서비스를 우회해야 한다.
+    await prisma.v1GameEvent.create({
+      data: {
+        gameId,
+        sequence: 1,
+        clientEventId: 't1-0-backfill-historical-event',
+        payloadHash: 'legacy-pre-deploy-event-hash',
+        type: V1GameEventType.CORRECTION,
+        sideId: home.id,
+        period: 2,
+        clockMs: 0, // 이 clockMs=0 자체가 T1-0이 고치는 그 버그다.
+        occurredAt: new Date(),
+        actorUserId: ids.director,
+        payload: { kind: 'NOTE', note: 'legacy pre-deploy event, always recorded at the last period' },
+      },
+    });
+    await prisma.v1Game.update({
+      where: { id: gameId },
+      data: { lastSequence: 1, version: { increment: 1 } },
+    });
+
+    const before = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
+    expect(before.every((period) => period.state === 'SCHEDULED' && period.startedAt === null)).toBe(true);
+
+    await prisma.$executeRawUnsafe(migrationSql);
+
+    // Exit proof 1/2: period 1이 아니라 이미 기록된 period 2가 LIVE로 열려야 한다.
+    // period 1을 열었다면 PERIOD_NOT_STARTED는 통과하겠지만, 그 아래 살아있는(T1-0이
+    // 건드리지 않은) EVENT_LATE 체크가 "period 1 < 이미 기록된 maxRecordedPeriod 2"로
+    // 다음 이벤트를 다시 막아 백필이 구제하려던 경기가 여전히 기록 불가로 남는다.
+    const after = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
+    expect(after[0]).toEqual(expect.objectContaining({ number: 1, state: 'SCHEDULED', startedAt: null }));
+    expect(after[1]).toEqual(expect.objectContaining({ number: 2, state: 'LIVE' }));
+    expect(after[1].startedAt).not.toBeNull();
+
+    // Exit proof 2/2: period 상태만 확인하고 끝내지 않는다 — 실제 서비스 경로로 다음
+    // 이벤트를 진짜로 기록할 수 있어야 한다(이게 "구제"의 실질적 의미다).
+    const takeoverToken = (
+      await service.requestTakeover(authUser(ids.director), gameId, {
+        clientInstanceId: 't1-0-backfill-continuity-client',
+        lastSequence: 1,
+      })
+    ).takeoverToken;
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+
+    const appended = await service.appendEvent(authUser(ids.director), gameId, 't1-0-backfill-continuity-event', {
+      expectedVersion: game.version,
+      clientEventId: 't1-0-backfill-continuity-event',
+      takeoverToken,
+      type: V1GameEventType.CORRECTION,
+      sideId: home.id,
+      period: 2,
+      clockMs: 5000,
+      occurredAt: new Date().toISOString(),
+      payload: { kind: 'NOTE', note: 't1-0 fix round 2 continuity check' },
+    });
+    expect(appended.sequence).toBe(2);
   });
 });

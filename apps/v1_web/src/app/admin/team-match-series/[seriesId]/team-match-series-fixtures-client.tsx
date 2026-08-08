@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AdminPageHeader, AdminDataTable, AdminStatusPill, AdminToasts, useAdminToast } from '@/components/admin';
 import { useV1AdminTeamMatchSeries, useV1GenerateSeriesFixtures, useV1UpdateSeriesFixture } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import type { V1SeriesFixture } from '@/types/team-match-series';
 
 const inputClass =
@@ -74,10 +75,11 @@ export default function TeamMatchSeriesFixturesClient({ seriesId }: { seriesId: 
                 <input
                   type="datetime-local"
                   aria-label={`${row.title} 일시`}
-                  defaultValue={row.startAt.slice(0, 16)}
+                  defaultValue={toDatetimeLocalValue(row.startAt)}
                   onBlur={(e) => {
-                    if (!e.target.value) return;
-                    onFieldBlur(row, { startsAt: new Date(e.target.value).toISOString() });
+                    const startsAt = fromDatetimeLocalValue(e.target.value);
+                    if (!startsAt) return;
+                    onFieldBlur(row, { startsAt });
                   }}
                   className={inputClass}
                 />

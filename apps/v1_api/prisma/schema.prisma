@@ -839,6 +839,7 @@ model V1Sport {
   teams           V1Team[]
   teamMatches     V1TeamMatch[]
   tournaments     V1Tournament[]
+  teamMatchSeries V1TeamMatchSeries[]
 
   @@index([isActive, sortOrder])
   @@map("v1_sports")
@@ -888,6 +889,7 @@ model V1Region {
   matches     V1Match[]
   teams       V1Team[]
   teamMatches V1TeamMatch[]
+  teamMatchSeries V1TeamMatchSeries[]
 
   @@index([parentId])
   @@index([level, isActive, sortOrder])
@@ -1144,6 +1146,7 @@ model V1Team {
   postEventReviewsWritten      V1PostEventReview[]        @relation("V1PostEventReviewReviewerTeam")
   postEventTeamReviewsReceived V1PostEventReview[]        @relation("V1PostEventReviewTargetTeam")
   tournamentRegistrations      V1TournamentRegistration[]
+  teamMatchSeriesEntries       V1TeamMatchSeriesTeam[]
 
   @@index([ownerUserId])
   @@index([sportId, regionId, status])
@@ -1361,6 +1364,7 @@ model V1TeamMatch {
   // 20260729000100_v1_game_operations while this column was still nullable
   // there too), so `competitionConfig` stays a real relation, just optional.
   competitionConfigVersionId String?           @map("competition_config_version_id")
+  seriesId                   String?           @map("series_id")
 
   hostTeam              V1Team                     @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
   createdByUser         V1User                     @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -1373,6 +1377,7 @@ model V1TeamMatch {
   chatRoom              V1ChatRoom?
   game                  V1Game?                    @relation("V1GameTeamMatch")
   competitionConfig     V1CompetitionConfigVersion? @relation("V1TeamMatchCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_team_matches_competition_config_fk")
+  series                V1TeamMatchSeries?         @relation("V1TeamMatchSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_team_matches_series_fk")
 
   @@index([hostTeamId])
   @@index([createdByUserId])
@@ -1384,6 +1389,7 @@ model V1TeamMatch {
   @@index([startAt])
   @@index([createdAt])
   @@index([competitionConfigVersionId], map: "v1_team_matches_competition_config_idx")
+  @@index([seriesId, startAt], map: "v1_team_matches_series_start_at_idx")
   @@map("v1_team_matches")
 }
 
@@ -1411,6 +1417,49 @@ model V1TeamMatchApplication {
   @@index([status])
   @@index([createdAt])
   @@map("v1_team_match_applications")
+}
+
+enum V1TeamMatchSeriesState {
+  draft
+  active
+  completed
+}
+
+model V1TeamMatchSeries {
+  id                   String                 @id @default(uuid())
+  title                String
+  sportId              String                 @map("sport_id")
+  regionId             String                 @map("region_id")
+  createdByAdminUserId String                 @map("created_by_admin_user_id")
+  startsOn             DateTime               @map("starts_on")
+  endsOn               DateTime               @map("ends_on")
+  tieBreakJson         Json                   @map("tie_break_json")
+  state                V1TeamMatchSeriesState @default(draft)
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+
+  sport          V1Sport                 @relation(fields: [sportId], references: [id], onDelete: Restrict, map: "v1_team_match_series_sport_fk")
+  region         V1Region                @relation(fields: [regionId], references: [id], onDelete: Restrict, map: "v1_team_match_series_region_fk")
+  createdByAdmin V1AdminUser             @relation(fields: [createdByAdminUserId], references: [id], onDelete: Restrict, map: "v1_team_match_series_admin_fk")
+  teams          V1TeamMatchSeriesTeam[]
+  teamMatches    V1TeamMatch[]           @relation("V1TeamMatchSeries")
+
+  @@index([sportId, state])
+  @@map("v1_team_match_series")
+}
+
+model V1TeamMatchSeriesTeam {
+  id        String   @id @default(uuid())
+  seriesId  String   @map("series_id")
+  teamId    String   @map("team_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  series V1TeamMatchSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade, map: "v1_team_match_series_teams_series_fk")
+  team   V1Team            @relation(fields: [teamId], references: [id], onDelete: Restrict, map: "v1_team_match_series_teams_team_fk")
+
+  @@unique([seriesId, teamId])
+  @@index([teamId])
+  @@map("v1_team_match_series_teams")
 }
 
 model V1ChatRoom {
@@ -1656,6 +1705,7 @@ model V1AdminUser {
   recordedTournamentResults        V1TournamentFixtureResult[] @relation("V1TournamentFixtureResultRecordedByAdmin")
   inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
   contentAssets                    V1ContentAsset[]
+  createdTeamMatchSeries           V1TeamMatchSeries[]
 
   @@index([adminRole, status])
   @@index([grantedByAdminUserId])

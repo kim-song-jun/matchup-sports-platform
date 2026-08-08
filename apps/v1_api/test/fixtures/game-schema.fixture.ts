@@ -48,8 +48,14 @@ export const gameSchemaFixture = {
 //   which scripts/qa/check-expand-contract-migrations.mjs rejected as
 //   non-additive on a pre-existing type. No table, column, index, or FK in
 //   this migration changed shape.
+// Re-pinned for T4 (team-match-series). Additive only: V1TeamMatchSeriesState enum,
+// V1TeamMatchSeries/V1TeamMatchSeriesTeam models, V1TeamMatch.seriesId + its index,
+// and back-relation array fields on V1Sport/V1Region/V1AdminUser/V1Team. No existing
+// field/type/attribute was modified. The migration hash below is UNCHANGED — this
+// branch adds a new migration file, it does not edit the bound
+// 20260729000100_v1_game_operations migration.
 export const gameSchemaSourceManifest = {
-  schema: 'af1276e862aa4a1baff1113a13932a05fd84f3b8bd0faee8e53a6624271941bf',
+  schema: '6eb54997b1802a1995c147d172f6faf60c931b2e30b158f1001cf2718181072b',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

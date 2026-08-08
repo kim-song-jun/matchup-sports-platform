@@ -180,11 +180,35 @@ load_average="$(awk '{ print $1 }' /proc/loadavg)"
 memory_available_kib="$(awk '$1 == "MemAvailable:" { print $2 }' /proc/meminfo)"
 swap_free_kib="$(awk '$1 == "SwapFree:" { print $2 }' /proc/meminfo)"
 container_count="$(docker ps -q | wc -l | tr -d ' ')"
-printf '[alpha-deploy] preflight cpu=%s load=%s mem_available_kib=%s swap_free_kib=%s containers=%s\n' \
-  "${cpu_count}" "${load_average}" "${memory_available_kib}" "${swap_free_kib}" "${container_count}"
+# 이번 이미지 GC(요구사항 1) 를 넣게 된 원인 사고 그 자체: EC2 루트 볼륨이 배포를 거듭할수록
+# 차서(dangling 이미지 방치, 2026-08 실측 28G/30G) 결국 pull 도, 심지어 실패 시 복구용
+# restore_active_release 재-pull 조차 "no space left on device" 로 실패했다. GC 를 넣어도
+# legacy 태그 이미지처럼 GC 대상이 아닌 것들은 계속 쌓일 수 있으므로, 재발을 배포가 실패로
+# 끝나기 전에(사후 로그 뒤지기 전에) 조기에 알 수 있게 여기서 함께 찍는다.
+disk_available_kib="$(df -Pk "${LIVE_DIR}" | awk 'NR == 2 { print $4 }')"
+printf '[alpha-deploy] preflight cpu=%s load=%s mem_available_kib=%s swap_free_kib=%s containers=%s disk_available_kib=%s\n' \
+  "${cpu_count}" "${load_average}" "${memory_available_kib}" "${swap_free_kib}" "${container_count}" "${disk_available_kib}"
 
 if (( memory_available_kib < 131072 || swap_free_kib < 131072 )); then
   echo "[alpha-deploy] Host memory or swap headroom is too low" >&2
+  false
+fi
+
+# 임계값 3GiB: 이번 배포가 새로 pull 하는 이미지(api ~1.2G + web ~0.3G, 실측치) 두 벌 몫의
+# 여유로 삼기엔 넉넉하고, 사고 당시의 여유(2.8G, 28G/30G 사용)보다는 위이며 GC 로 정상
+# 회복된 상태(18G~19G 여유)보다는 한참 아래다 — 정상 배포 흐름에서는 거의 걸리지 않고,
+# GC 가 실패했거나 태그 있는(legacy) 이미지가 다시 쌓이는 이상 징후일 때만 걸린다.
+#
+# 여기서 배포를 막기로 판단한 이유: 이 preflight 시점은 이미 activate_alpha_release_source
+# 로 소스가 전환된 뒤(runtime_mutated=true)라 ERR 트랩(restore_active_release /
+# restore_legacy_runtime)이 정상 동작해 안전하게 되감아진다 — 즉 막아도 롤백 경로 자체가
+# 막히지 않는다. 반대로 여기서 통과시키면 디스크가 이미 위험 수준인 채로 이미지 pull ·
+# postgres 볼륨 쓰기까지 진행하다 더 나쁜 지점에서 실패할 수 있고, 그 실패 지점이 하필
+# 복구용 재-pull 도 실패시켰던 바로 그 사고 패턴이다(디스크 부족은 복구 시도 자체를
+# 무력화한다는 게 이 사고의 핵심 교훈). 긴급 배포를 막을 위험은 있지만, 그 대가는
+# 운영자가 이 로그를 보고 즉시 수동 정리 후 재실행하면 되는 정도다.
+if (( disk_available_kib < 3145728 )); then
+  echo "[alpha-deploy] Host disk headroom is too low (available_kib=${disk_available_kib}); GC 또는 legacy 이미지 정리가 필요합니다" >&2
   false
 fi
 
@@ -241,5 +265,15 @@ prune_stale_alpha_release_sources \
   echo "[alpha-deploy] WARNING: stale release source prune failed" >&2
 if ! write_legacy_release_state; then
   echo "[alpha-deploy] WARNING: canonical state is active but legacy receipt could not be written" >&2
+fi
+# 디스크 정리. 근거·안전성 판단은 prune_stale_alpha_images() 정의부(alpha-release-common.sh)
+# 주석 참조 — 요약하면 alpha 롤백은 로컬 이미지 캐시가 아니라 ECR 재-pull 에 의존하므로
+# dangling 전용 정리는 롤백 안전성을 해치지 않는다.
+#
+# 실패해도 배포를 실패시키지 않는다(deploy-prod.sh:372 와 동일 정책) — 여기는 이미
+# assert_running_release_digests 로 새 릴리스가 healthy 임을 확인하고 promote 까지 끝낸
+# 뒤라, 디스크 정리 실패가 릴리스 자체의 건전성에 영향을 주지 않는다.
+if ! prune_stale_alpha_images >/dev/null 2>&1; then
+  echo "[alpha-deploy] WARNING: docker image prune failed (디스크 정리만 실패, 릴리스는 정상)" >&2
 fi
 echo "[alpha-deploy] ${ALPHA_RELEASE_VERSION} (${ALPHA_RELEASE_SHA}) is healthy"

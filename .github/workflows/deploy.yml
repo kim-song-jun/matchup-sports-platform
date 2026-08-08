@@ -104,6 +104,14 @@ jobs:
       - name: Alpha release-state contract tests
         run: bash scripts/qa/test-alpha-release-state.sh
 
+      # alpha 는 로컬 이미지 GC 가 없어 dangling 이미지가 배포마다 쌓였고, 실제로 EC2
+      # 디스크가 28G/30G 까지 차서 배포와 롤백이 함께 "no space left on device" 로 실패했다
+      # (2026-08). 이 테스트는 그 재발 방지 로직(prune_stale_alpha_images)이 정확히 어떤
+      # 이미지를 지우고 어떤 이미지를 살리는지, 그리고 deploy-alpha.sh 안에서 healthy 확인
+      # 뒤에만 호출되는지를 매 push 마다 고정한다.
+      - name: Alpha image GC contract tests
+        run: bash scripts/qa/test-alpha-image-gc.sh
+
       # prod 배포 경로는 main push 때만 도는 탓에 몇 주씩 검증되지 않는다 — 그래서
       # prune_stale_release_tags 의 빈 입력 버그가 2026-08-01 배포에서야 터졌다(#220).
       # 이번 변경으로 EC2 가 더 이상 로컬 docker build 를 하지 않고 ECR digest 를 pull 만

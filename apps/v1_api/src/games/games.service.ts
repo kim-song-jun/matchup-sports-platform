@@ -616,7 +616,9 @@ export class GamesService {
         payload: { command, ...dto },
       },
       async (tx, game, context) => {
-        if (game.sourceType === V1GameSourceType.TEAM_MATCH) {
+        // T3(기록 UX) 추가: 팀매치도 피리어드를 시작/전환해야 이벤트 시각이 찍힌다(T1-0).
+        // 끝맺음만 검증된 결과 제출 경로를 거쳐야 하므로 `end`만 계속 막는다.
+        if (game.sourceType === V1GameSourceType.TEAM_MATCH && command === 'end') {
           throw new ConflictException({
             code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN',
             message: 'Team matches end only through validated result submission',
@@ -2873,11 +2875,18 @@ export class GamesService {
         teamId: match.approvedApplicantTeamId ?? undefined,
       };
     }
-    if (action === 'team_result_submit') {
+    if (action === 'team_result_submit' || action === 'tournament_command') {
       // Task 16: draft creation and submission are host-only. The opponent side's
       // sole authority over the result is the decision surface above
       // (approve/change_request) — an opponent manager must never be able to draft
       // or submit the result their own team is being evaluated against.
+      //
+      // D-20(B6, T3 추가): tournament_command(start/pause/resume/next-period)도
+      // 같은 이유로 호스트 전용이다. 이 분기를 타지 않으면 아래쪽 공용 fallback
+      // (managerRole(hostMembership) ?? managerRole(opponentMembership))
+      // 로 양쪽을 합쳐버려서, 상대팀 매니저가 서버 API를 직접 호출해 경기
+      // 시작/일시정지/재개/피리어드 전환을 조작할 수 있었다 — 프론트의 isHost
+      // 게이트는 클라이언트 체크라 우회 가능하므로 여기서 막아야 실제 방어가 된다.
       const hostRole = managerRole(hostMembership);
       if (hostRole === null) {
         throw this.forbidden();

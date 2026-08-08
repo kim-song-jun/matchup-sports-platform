@@ -167,8 +167,9 @@ export async function seedCompetitionConfigFixture(
   // docs/ops/task9-competition-config-contract-phase.md). Run the same
   // production backfill CLI here so this fixture's tournament/fixtures end
   // up pinned exactly the way they will be in production once the backfill
-  // CLI has run — seeding is idempotent (upsert) so this is safe even if the
-  // v1_competition_config_versions rows already exist from a prior seed.
+  // CLI has run — seeding creates the canonical v1_competition_config_versions
+  // rows only when missing and otherwise verifies them by content hash, so
+  // this is safe even if a prior seed already created them.
   await runCompetitionConfigContractPhaseBackfill(prisma);
 }
 

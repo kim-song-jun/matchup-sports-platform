@@ -10,6 +10,7 @@ import {
   FUTSAL_V1_CONFIG,
   validateCompetitionConfig,
 } from '../../src/tournaments/competition-config/competition-config';
+import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
 import {
   baselineStandingExpectation,
   competitionConfigFixture,
@@ -290,5 +291,35 @@ describe('Task 11 competition configuration', () => {
       currentCompetitionConfigVersionId: result.preview.requestedCompetitionConfigVersionId,
     });
     expect(result.topPoints).toEqual([5, 5]);
+  });
+
+  // The backfill CLI is documented as safe to re-run right before the
+  // contract-phase migration. If a canonical row had drifted from the
+  // registry constants, a re-run that silently skipped it would let that
+  // migration pin NOT NULL/FK constraints onto a config nobody intended.
+  // The futsal row is used here because nothing in this fixture pins it —
+  // the football row is already in use and the
+  // COMPETITION_CONFIG_VERSION_IN_USE trigger would reject the update.
+  it('refuses to re-seed when a canonical config row has drifted from the registry constants', async () => {
+    const canonicalHash = competitionConfigContentHash(FUTSAL_V1_CONFIG);
+    const futsalVersionId = '22222222-2222-4222-8222-222222222222';
+    await prisma.v1CompetitionConfigVersion.update({
+      where: { id: futsalVersionId },
+      data: { contentHash: 'drifted-away-from-canonical' },
+    });
+
+    try {
+      await expect(seedCompetitionConfigVersions(prisma)).rejects.toThrow(
+        'COMPETITION_CONFIG_SEED_DRIFT',
+      );
+    } finally {
+      await prisma.v1CompetitionConfigVersion.update({
+        where: { id: futsalVersionId },
+        data: { contentHash: canonicalHash },
+      });
+    }
+
+    // Restored to canonical: re-running is a no-op that creates nothing.
+    await expect(seedCompetitionConfigVersions(prisma)).resolves.toBe(0);
   });
 });

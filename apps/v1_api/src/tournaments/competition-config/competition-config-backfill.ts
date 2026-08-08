@@ -21,8 +21,9 @@ import {
  * the apps/v1_api/prisma/migrations/20260803000100_v1_task10_game_result_backfill
  * + apps/v1_api/src/games/migration/game-result-backfill.ts precedent.
  *
- * Every step here is idempotent (safe to re-run): the seed is an upsert by
- * primary key, the guard only reads, and every backfill UPDATE only touches
+ * Every step here is idempotent (safe to re-run): the seed creates the two
+ * canonical rows only when missing and otherwise verifies them by content
+ * hash, the guard only reads, and every backfill UPDATE only touches
  * rows whose competition_config_version_id is still NULL. This must be
  * re-run once immediately before the deferred contract-phase migration
  * (SET NOT NULL/SET DEFAULT/FK on v1_tournaments/v1_pin_*_competition_config
@@ -44,14 +45,44 @@ export type CompetitionConfigBackfillCounts = {
   operationAuditSourceIpsMasked: number;
 };
 
+export class CompetitionConfigSeedDriftError extends Error {
+  constructor(
+    public readonly drifted: Array<{
+      id: string;
+      name: string;
+      expectedContentHash: string;
+      actualContentHash: string;
+    }>,
+  ) {
+    super(
+      `COMPETITION_CONFIG_SEED_DRIFT: ${drifted.length} canonical competition config row(s) no longer match the registry constants: ${drifted
+        .map((row) => `${row.name} (${row.id}) expected ${row.expectedContentHash} but found ${row.actualContentHash}`)
+        .join(', ')}. Tournaments, team matches and fixtures already pin these ids, so silently rewriting the rows would change how already-played games are scored. Resolve manually — publish a new config version and repoint, or restore the row to the canonical content — then re-run.`,
+    );
+    this.name = 'CompetitionConfigSeedDriftError';
+  }
+}
+
 /**
- * Upserts the two well-known ACTIVE competition config rows
- * (v1_competition_config_for_sport() in the expand-phase migration hardcodes
- * these same two UUIDs, so the ids here are not incidental — they must match
- * exactly). Uses the canonical FOOTBALL_V1_CONFIG/FUTSAL_V1_CONFIG +
- * competitionConfigContentHash() from ./competition-config as the single
- * source of truth instead of re-transcribing the JSON, so this can never
- * drift from what CompetitionConfigRegistry itself would produce.
+ * Creates the two well-known ACTIVE competition config rows if they are
+ * missing (v1_competition_config_for_sport() in the expand-phase migration
+ * hardcodes these same two UUIDs, so the ids here are not incidental — they
+ * must match exactly). Uses the canonical FOOTBALL_V1_CONFIG/FUTSAL_V1_CONFIG
+ * + competitionConfigContentHash() from ./competition-config as the single
+ * source of truth instead of re-transcribing the JSON, so what this writes
+ * can never diverge from what CompetitionConfigRegistry itself would produce.
+ *
+ * Re-running is safe but not a blind no-op. A row that already exists is
+ * compared against the canonical contentHash, and any mismatch throws
+ * CompetitionConfigSeedDriftError rather than being skipped: this CLI is
+ * meant to be re-run immediately before the contract-phase migration, and a
+ * drifted row that passes silently would let that migration pin NOT NULL/FK
+ * constraints onto a config nobody intended. It deliberately does not
+ * overwrite — v1_tournaments/v1_team_matches/v1_tournament_fixtures already
+ * reference these ids, so rewriting their content in place would
+ * retroactively change the scoring rules of finished competitions.
+ *
+ * Returns the number of rows actually created, so a second run reports 0.
  */
 export async function seedCompetitionConfigVersions(
   prisma: PrismaClient,
@@ -60,11 +91,27 @@ export async function seedCompetitionConfigVersions(
     { id: FOOTBALL_COMPETITION_CONFIG_ID, sportCode: 'football', name: 'football-v1', config: FOOTBALL_V1_CONFIG },
     { id: FUTSAL_COMPETITION_CONFIG_ID, sportCode: 'futsal', name: 'futsal-v1', config: FUTSAL_V1_CONFIG },
   ];
+  const drifted: Array<{ id: string; name: string; expectedContentHash: string; actualContentHash: string }> = [];
   let seeded = 0;
   for (const row of rows) {
-    await prisma.v1CompetitionConfigVersion.upsert({
+    const contentHash = competitionConfigContentHash(row.config);
+    const existing = await prisma.v1CompetitionConfigVersion.findUnique({
       where: { id: row.id },
-      create: {
+      select: { contentHash: true },
+    });
+    if (existing !== null) {
+      if (existing.contentHash !== contentHash) {
+        drifted.push({
+          id: row.id,
+          name: row.name,
+          expectedContentHash: contentHash,
+          actualContentHash: existing.contentHash,
+        });
+      }
+      continue;
+    }
+    await prisma.v1CompetitionConfigVersion.create({
+      data: {
         id: row.id,
         sportCode: row.sportCode,
         name: row.name,
@@ -76,11 +123,13 @@ export async function seedCompetitionConfigVersions(
         result: row.config.result as unknown as Prisma.InputJsonValue,
         tieBreak: row.config.tieBreak as unknown as Prisma.InputJsonValue,
         visibility: row.config.visibility as unknown as Prisma.InputJsonValue,
-        contentHash: competitionConfigContentHash(row.config),
+        contentHash,
       },
-      update: {},
     });
     seeded += 1;
+  }
+  if (drifted.length > 0) {
+    throw new CompetitionConfigSeedDriftError(drifted);
   }
   return seeded;
 }

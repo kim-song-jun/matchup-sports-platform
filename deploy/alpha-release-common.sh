@@ -166,11 +166,16 @@ wait_for_alpha_health_contract() {
 #
 # rollback/restore 경로에서는 호출하지 않는다: 워커가 깨진 구버전으로 되돌리는
 # 것 자체를 막아버리면 장애 대응 경로가 사라진다.
+# 대기 시간은 compose 의 워커 healthcheck 가 스스로 실패를 확정하는 창보다 반드시 길어야 한다.
+# docker-compose.alpha.yml 기준: start_period 20s + interval 10s * retries 12 = 140s.
+# 그보다 짧으면 늦게 뜨는(그러나 결국 정상인) 워커를 docker 가 아직 'starting' 으로 보고 있는
+# 사이에 이 게이트가 먼저 배포를 실패시킨다. 36 * 5s = 180s 로 여유를 둔다.
+# compose 의 healthcheck 값을 바꾸면 이 숫자도 함께 올려야 한다.
 wait_for_alpha_worker_healthy() {
   local worker_container
   local worker_health
 
-  for attempt in $(seq 1 24); do
+  for attempt in $(seq 1 36); do
     worker_container="$("${compose[@]}" ps -q v1_game_operations_worker)"
     if [[ -n "${worker_container}" ]]; then
       worker_health="$(docker inspect --format '{{.State.Health.Status}}' "${worker_container}" 2>/dev/null || true)"
@@ -178,7 +183,7 @@ wait_for_alpha_worker_healthy() {
         return
       fi
     fi
-    if [[ "${attempt}" -eq 24 ]]; then
+    if [[ "${attempt}" -eq 36 ]]; then
       echo "[alpha-release] game operations worker never became healthy (last=${worker_health:-<none>})" >&2
       "${compose[@]}" logs --tail 30 v1_game_operations_worker >&2 || true
       return 1

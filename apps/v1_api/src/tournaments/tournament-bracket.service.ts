@@ -330,6 +330,18 @@ export class TournamentBracketService {
           },
         }));
 
+      // fixture may be a pre-existing row created before this fixture's own
+      // competitionConfigVersionId was backfilled (that column is nullable
+      // until the deferred contract-phase migration lands — see
+      // docs/ops/task9-competition-config-contract-phase.md); pinnedTournament
+      // having one above does not guarantee this specific fixture row does.
+      if (!fixture.competitionConfigVersionId) {
+        throw new ConflictException({
+          code: 'COMPETITION_CONFIG_REQUIRED',
+          message: '대회 경기에는 활성 경기 규칙 버전이 필요해요.',
+        });
+      }
+
       const registrationIds = [fixture.homeRegistrationId, fixture.awayRegistrationId].filter(
         (registrationId): registrationId is string => registrationId !== null,
       );
@@ -658,6 +670,24 @@ export class TournamentBracketService {
       });
     }
     const config = validateCompetitionConfig(tournament.competitionConfig);
+    // validateCompetitionConfig() above already throws when
+    // tournament.competitionConfig is null, and competitionConfig/
+    // competitionConfigVersionId are always set together — this guard just
+    // gives TypeScript the same narrowing (the column is nullable until the
+    // deferred contract-phase migration lands; see
+    // docs/ops/task9-competition-config-contract-phase.md) without a
+    // non-null assertion.
+    if (!tournament.competitionConfigVersionId) {
+      throw new ConflictException({
+        code: 'COMPETITION_CONFIG_REQUIRED',
+        message: '대회 경기에는 활성 경기 규칙 버전이 필요해요.',
+      });
+    }
+    // Narrowed into a local binding rather than relying on
+    // tournament.competitionConfigVersionId directly, since TypeScript does
+    // not carry a property-access narrowing into the $transaction callback
+    // closure below.
+    const competitionConfigVersionId = tournament.competitionConfigVersionId;
 
     const groups = await this.prisma.v1TournamentGroup.findMany({
       where: { tournamentId, phase: 'group' },
@@ -677,7 +707,7 @@ export class TournamentBracketService {
       for (const group of groups) {
         const standings = calculateCompetitionStandings({
           tournamentId,
-          configVersionId: tournament.competitionConfigVersionId,
+          configVersionId: competitionConfigVersionId,
           registrationIds: group.groupTeams.map((team) => team.registrationId),
           fixtures: group.fixtures.flatMap((fixture) => {
             if (!fixture.result || !fixture.homeRegistrationId || !fixture.awayRegistrationId) {
@@ -738,7 +768,7 @@ export class TournamentBracketService {
           afterJson: {
             groupCount: groups.length,
             recalculatedAt: now.toISOString(),
-            competitionConfigVersionId: tournament.competitionConfigVersionId,
+            competitionConfigVersionId,
           },
         },
         tx,
@@ -748,7 +778,7 @@ export class TournamentBracketService {
     return {
       tournamentId,
       groupCount: groups.length,
-      competitionConfigVersionId: tournament.competitionConfigVersionId,
+      competitionConfigVersionId,
       recalculatedAt: now.toISOString(),
     };
   }

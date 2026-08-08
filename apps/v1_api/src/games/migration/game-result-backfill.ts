@@ -593,7 +593,11 @@ async function inventorySources(client: MigrationReadClient): Promise<Inventory>
       });
       continue;
     }
-    if (!validConfigIds.has(fixture.competitionConfigVersionId) || !isValidFixture(fixture)) {
+    if (
+      fixture.competitionConfigVersionId === null ||
+      !validConfigIds.has(fixture.competitionConfigVersionId) ||
+      !isValidFixture(fixture)
+    ) {
       classified.push({
         bucket: 'quarantined',
         quarantine: {
@@ -677,7 +681,11 @@ async function inventorySources(client: MigrationReadClient): Promise<Inventory>
       });
       continue;
     }
-    if (!validConfigIds.has(teamMatch.competitionConfigVersionId) || sourceTimestamp === null) {
+    if (
+      teamMatch.competitionConfigVersionId === null ||
+      !validConfigIds.has(teamMatch.competitionConfigVersionId) ||
+      sourceTimestamp === null
+    ) {
       classified.push({
         bucket: 'quarantined',
         quarantine: {

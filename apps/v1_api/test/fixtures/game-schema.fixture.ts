@@ -26,20 +26,31 @@ export const gameSchemaFixture = {
   now: new Date('2026-07-29T00:00:00.000Z'),
 } as const;
 
-// Re-pinned for the origin/dev merge. The schema hash covers
-// apps/v1_api/prisma/schema.prisma, whose only changes since the previous pin
-// are (1) one additive field from dev backing migration
-// 20260806235000_v1_team_match_deadline_at: V1TeamMatch.deadlineAt, and
-// (2) pure `prisma format` whitespace realignment in the V1User and
-// V1Tournament relation blocks — this branch had added relation fields
-// (officialResultCaches, acknowledged/resolvedResultEscalations) without
-// re-running the formatter, so the columns were left un-aligned. No model,
-// field, type, attribute, or index changed in (2).
-// The migration hash below is UNCHANGED, which proves the bound Task 6
-// migration (20260729000100_v1_game_operations) was not touched.
+// Re-pinned for the expand/contract migration-gate split
+// (fix/v1-expand-contract-split). Both hashes changed this time:
+// - schema: competitionConfigVersionId went from required-with-@default to
+//   optional/no-default on V1TeamMatch/V1Tournament/V1TournamentFixture
+//   (their `competitionConfig` relations became optional to match) — that
+//   column's SET NOT NULL/SET DEFAULT moved to a deferred contract-phase
+//   migration; see docs/ops/task9-competition-config-contract-phase.md.
+//   V1Notification.businessKey keeps its `@unique` (deferring
+//   v1_notifications_business_key_key turned out to be unsafe, not just a
+//   gate nuance — game-result-submitted-escalation.service.ts's
+//   notifyReviewer() relies on `INSERT ... ON CONFLICT (business_key)`
+//   against an index that must actually exist, confirmed by running the
+//   Task 22 result-review integration suite against a build that deferred
+//   it), so schema.prisma's byte diff from the previous pin is narrower
+//   than the first draft of this comment described.
+// - migration (20260729000100_v1_game_operations): "V1EscalationKind" is now
+//   created directly as ('ESCALATION', 'REMINDER') — its final order —
+//   instead of ('REMINDER', 'ESCALATION') + a later rename/recreate/
+//   alter-column/drop dance in 20260802000300_v1_result_escalation_lifecycle,
+//   which scripts/qa/check-expand-contract-migrations.mjs rejected as
+//   non-additive on a pre-existing type. No table, column, index, or FK in
+//   this migration changed shape.
 export const gameSchemaSourceManifest = {
-  schema: '4ad48c2c5064e5218ec8c0d26ca9112465f3ab5e37e793f99fd5e974f0b38645',
-  migration: 'bda8608ee5b4498939eea0b68ac837612338e781e09a16a41f7325ff971110d7',
+  schema: 'af1276e862aa4a1baff1113a13932a05fd84f3b8bd0faee8e53a6624271941bf',
+  migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 
 type GameSchemaSourcePaths = {

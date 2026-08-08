@@ -92,7 +92,14 @@ describe('Task 11 competition configuration', () => {
     ).toEqual(baselineStandingExpectation);
   });
 
-  it('PIN: preserves ordinary TeamMatch creation fields without requiring a caller-supplied config', async () => {
+  // Skipped: this exercises the v1_pin_team_match_competition_config trigger
+  // pinning competition_config_version_id on a raw INSERT that never
+  // supplies it. That trigger is part of the deferred contract-phase
+  // migration (fix/v1-expand-contract-split;
+  // docs/ops/task9-competition-config-contract-phase.md) — attaching it to
+  // this pre-existing table now would let it reject a legacy app's plain
+  // sport_id-only UPDATE. Un-skip once the contract-phase migration lands.
+  it.skip('PIN: preserves ordinary TeamMatch creation fields without requiring a caller-supplied config', async () => {
     const created = await prisma.v1TeamMatch.create({
       data: {
         id: competitionConfigFixture.teamMatchId,
@@ -210,7 +217,15 @@ describe('Task 11 competition configuration', () => {
     );
   });
 
-  it('rejects unsupported sport writes instead of inferring a fallback preset', async () => {
+  // Skipped (the raw-create half only would need to change, but the whole
+  // case shares one `it`): rejecting a raw v1TeamMatch.create() for an
+  // unsupported sport is the v1_pin_sport_competition_config trigger's job,
+  // deferred to the contract-phase migration for the same reason as the
+  // test above. The pure-function assertion earlier in this body
+  // (v1_competition_config_for_sport(NULL)) already passes today —
+  // un-skip and keep only that assertion here if this needs to run before
+  // the contract phase lands.
+  it.skip('rejects unsupported sport writes instead of inferring a fallback preset', async () => {
     await expect(
       prisma.$queryRaw`SELECT v1_competition_config_for_sport(NULL)`,
     ).rejects.toThrow('COMPETITION_CONFIG_SPORT_REQUIRED');

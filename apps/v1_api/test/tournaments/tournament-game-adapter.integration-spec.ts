@@ -7,6 +7,7 @@ import { GamesService } from '../../src/games/games.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config';
+import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
 
 const ids = {
   user: '66000000-0000-4000-8000-000000000001',
@@ -120,6 +121,18 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
         },
       ],
     });
+    // ids.tournament above is created without an explicit
+    // competitionConfigVersionId — the v1_pin_tournament_competition_config
+    // trigger used to fill it in automatically (soccer -> the seeded
+    // football-v1 config), but that trigger is part of the deferred
+    // contract-phase migration; see
+    // docs/ops/task9-competition-config-contract-phase.md. Run the same
+    // production backfill CLI here (idempotent) so this fixture's tournament
+    // ends up pinned exactly the way it will be in production once the
+    // backfill CLI has run. ids.invalidTournament is deliberately left
+    // pinned to the explicit RETIRED config above — the backfill only fills
+    // in NULL values, so it will not touch that row.
+    await runCompetitionConfigContractPhaseBackfill(prisma);
     await prisma.v1TournamentGroup.create({
       data: { id: ids.group, tournamentId: ids.tournament, name: 'A', phase: 'group' },
     });

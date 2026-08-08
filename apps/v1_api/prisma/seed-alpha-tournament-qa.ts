@@ -799,10 +799,11 @@ async function teardownGamesForTournaments(
   // draft, it is the permanent record of a played match (the same guarantee
   // the Restrict FK on v1_games itself exists for). If the QA seed's fixed
   // scenario IDs ever end up wired to a game whose result went past DRAFT,
-  // failing loudly here — before touching anything — is correct: silently
-  // leaving the tournament in place is safer than either corrupting a
-  // real result record or crashing mid-transaction on a bare Postgres
-  // trigger error with no context.
+  // failing loudly here — before deleting anything (the currentOfficialRevisionId
+  // null-out above rolls back with the rest of the transaction) — is
+  // correct: silently leaving the tournament in place is safer than either
+  // corrupting a real result record or crashing mid-transaction on a bare
+  // Postgres trigger error with no context.
   const nonDraftRevision = revisions.find((revision) => revision.state !== 'DRAFT');
   if (nonDraftRevision) {
     throw new Error(

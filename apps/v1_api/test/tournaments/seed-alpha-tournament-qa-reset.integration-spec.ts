@@ -1,5 +1,6 @@
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { resetAlphaTournamentScenarios } from '../../prisma/seed-alpha-tournament-qa';
+import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
 
 /**
  * Alpha deploy incident (2026-08-06/07): every alpha deploy re-seeds
@@ -75,8 +76,14 @@ const ids = {
 const prisma = new PrismaService();
 
 async function loadFootballConfigId(): Promise<string> {
+  // Seeds the canonical football-v1/futsal-v1 ACTIVE config rows if they
+  // aren't already present — idempotent, mirrors what the CI migration gate
+  // and an alpha deploy both do — so this suite doesn't depend on another
+  // suite (or a manual CLI run) having populated them first.
+  await runCompetitionConfigContractPhaseBackfill(prisma);
   const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
     where: { name: 'football-v1', status: 'ACTIVE' },
+    orderBy: { version: 'desc' },
   });
   return config.id;
 }

@@ -1448,6 +1448,8 @@ export class GamesService {
             started: participant.started,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
+            assists: participant.assists ?? 0,
+            fouls: participant.fouls ?? 0,
             cards: jsonInput(participant.cards),
             goalkeeper: participant.goalkeeper,
           })),
@@ -3102,6 +3104,9 @@ export class GamesService {
         type: event.type,
         ...(event.sideId === null ? {} : { sideId: event.sideId }),
         ...(event.participantId === null ? {} : { participantId: event.participantId }),
+        ...(event.assistParticipantId === null
+          ? {}
+          : { assistParticipantId: event.assistParticipantId }),
         period: event.period,
         clockMs: event.clockMs,
         reversed: reversedIds.has(event.id),
@@ -3126,6 +3131,8 @@ export class GamesService {
       sideId: participant.sideId,
       goals: participant.goals,
       cards: participant.cards,
+      ...(participant.assists === undefined ? {} : { assists: participant.assists }),
+      ...(participant.fouls === undefined ? {} : { fouls: participant.fouls }),
       ...(participant.minutesPlayed === undefined
         ? {}
         : { minutesPlayed: participant.minutesPlayed }),
@@ -3171,7 +3178,15 @@ export class GamesService {
     });
     const goalCount = new Map<string, number>();
     const cardCount = new Map<string, { yellow: number; red: number }>();
+    const assistCount = new Map<string, number>();
+    const foulCount = new Map<string, number>();
     for (const event of events) {
+      if (event.type === V1GameEventType.GOAL && event.assistParticipantId !== null) {
+        assistCount.set(
+          event.assistParticipantId,
+          (assistCount.get(event.assistParticipantId) ?? 0) + 1,
+        );
+      }
       if (event.participantId === null) {
         continue;
       }
@@ -3188,6 +3203,9 @@ export class GamesService {
         }
         cardCount.set(event.participantId, cards);
       }
+      if (event.type === V1GameEventType.FOUL) {
+        foulCount.set(event.participantId, (foulCount.get(event.participantId) ?? 0) + 1);
+      }
     }
     await tx.v1GameResultParticipant.createMany({
       data: participants.map((participant) => ({
@@ -3196,6 +3214,8 @@ export class GamesService {
         sideId: participant.sideId,
         started: true,
         goals: goalCount.get(participant.id) ?? 0,
+        assists: assistCount.get(participant.id) ?? 0,
+        fouls: foulCount.get(participant.id) ?? 0,
         cards: jsonInput(cardCount.get(participant.id) ?? { yellow: 0, red: 0 }),
         goalkeeper: false,
       })),

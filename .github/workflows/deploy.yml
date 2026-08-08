@@ -187,13 +187,19 @@ jobs:
           # here so `test:integration` sees the same DB state.
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/tournaments/competition-config/competition-config-backfill.cli.ts
-          # 게임 운영 플래그 불변 행 시드 — 같은 이유로 마이그레이션이 아니라 앱 CLI 다.
-          # 이게 없으면 갓 배포된 환경의 대회 운영 보드가 500 GAME_READ_FLAG_MISSING 으로
-          # 죽는다. alpha 배포 경로(deploy/deploy-alpha.sh)와 같은 스텝을 여기서도 돌려
-          # test:integration 이 실제 배포와 동일한 DB 상태를 보게 한다.
+          DATABASE_URL="$MIGRATE_URL" pnpm test:integration
+          # 게임 운영 플래그 불변 행 시드 CLI 가 실제로 기동하는지 확인한다
+          # (배포 경로 deploy/deploy-alpha.sh 가 migrate deploy 직후 돌리는 그 CLI).
+          # 잘못된 경로·깨진 import 처럼 "코드는 있는데 배선이 안 되는" 결함은 유닛
+          # 테스트가 못 잡는다 — 워커 entrypoint 가 정확히 그렇게 몇 달을 죽어 있었다.
+          #
+          # 반드시 test:integration **뒤에** 둔다. 격리 스위트는 이 DB 를 템플릿으로
+          # 클론하므로, 앞에 두면 시드된 행이 모든 클론에 전파돼
+          # test/games/game-schema.integration-spec.ts 의 raw INSERT(GAME_READ)가
+          # 23505 로 깨진다. 시드 로직 자체의 계약은 전용 통합 스펙
+          # (test/tournaments/game-operation-flag-seed.integration-spec.ts)이 검증한다.
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/config/game-operation-flags-seed.cli.ts
-          DATABASE_URL="$MIGRATE_URL" pnpm test:integration
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 
       - name: V1 API unit tests

@@ -493,12 +493,19 @@ describe('Task 6 L1 game lifecycle', () => {
       )
     ).gameId;
 
+    // D-20/B6 (this PR) narrowed the TEAM_MATCH generic-command gate to block only
+    // 'end' -- start/pause/resume/next-period now fall through to the tournament
+    // lifecycle contract instead of this gate (see live-game-commands
+    // .integration-spec.ts's "TEAM_MATCH sourced games allow lifecycle commands
+    // other than end" describe block for that coverage). Assert against 'end',
+    // the one command this gate still guarantees, with a live occurredAt so this
+    // doesn't regress into a false CLOCK_DRIFT 422 next time the calendar moves.
     const genericCommand = await captureFailure(() =>
-      service.executeCommand(authUser(ids.hostUser), teamGameId, 'start', 'team-start', {
+      service.executeCommand(authUser(ids.hostUser), teamGameId, 'end', 'team-end', {
         expectedVersion: 0,
-        clientCommandId: 'team-start',
+        clientCommandId: 'team-end',
         takeoverToken: 'not-applicable',
-        occurredAt: '2026-08-01T00:00:00.000Z',
+        occurredAt: new Date().toISOString(),
         payload: {},
       }),
     );

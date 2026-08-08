@@ -39,23 +39,30 @@ export class TeamMatchSeriesAdminService {
       });
     }
 
-    const series = await this.prisma.v1TeamMatchSeries.create({
-      data: {
-        title: dto.title,
-        sportId: dto.sportId,
-        regionId: dto.regionId,
-        createdByAdminUserId: admin.id,
-        startsOn: new Date(dto.startsOn),
-        endsOn: new Date(dto.endsOn),
-        tieBreakJson: { order: DEFAULT_TIE_BREAK_ORDER },
-        teams: { createMany: { data: uniqueTeamIds.map((teamId) => ({ teamId })) } },
-      },
-    });
-    await this.adminContext.logAdminAction(admin, {
-      action: 'team_match_series.create',
-      targetType: 'team_match_series',
-      targetId: series.id,
-      afterJson: { title: series.title, teamIds: uniqueTeamIds },
+    const series = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.v1TeamMatchSeries.create({
+        data: {
+          title: dto.title,
+          sportId: dto.sportId,
+          regionId: dto.regionId,
+          createdByAdminUserId: admin.id,
+          startsOn: new Date(dto.startsOn),
+          endsOn: new Date(dto.endsOn),
+          tieBreakJson: { order: DEFAULT_TIE_BREAK_ORDER },
+          teams: { createMany: { data: uniqueTeamIds.map((teamId) => ({ teamId })) } },
+        },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'team_match_series.create',
+          targetType: 'team_match_series',
+          targetId: created.id,
+          afterJson: { title: created.title, teamIds: uniqueTeamIds },
+        },
+        tx,
+      );
+      return created;
     });
     return { seriesId: series.id, title: series.title, state: series.state };
   }
@@ -193,15 +200,19 @@ export class TeamMatchSeriesAdminService {
       if (ids.length > 0) {
         await tx.v1TeamMatchSeries.update({ where: { id: series.id }, data: { state: 'active' } });
       }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'team_match_series.generate_fixtures',
+          targetType: 'team_match_series',
+          targetId: seriesId,
+          afterJson: { teamMatchIds: ids, weeksCount: dto.weeksCount },
+        },
+        tx,
+      );
       return ids;
     });
 
-    await this.adminContext.logAdminAction(admin, {
-      action: 'team_match_series.generate_fixtures',
-      targetType: 'team_match_series',
-      targetId: seriesId,
-      afterJson: { teamMatchIds: createdIds, weeksCount: dto.weeksCount },
-    });
     return { seriesId, createdCount: createdIds.length, teamMatchIds: createdIds };
   }
 
@@ -211,19 +222,26 @@ export class TeamMatchSeriesAdminService {
     if (teamMatch === null) {
       throw new NotFoundException({ code: 'SERIES_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
     }
-    const updated = await this.prisma.v1TeamMatch.update({
-      where: { id: teamMatchId },
-      data: {
-        ...(dto.startsAt === undefined ? {} : { startAt: new Date(dto.startsAt) }),
-        ...(dto.placeName === undefined ? {} : { placeName: dto.placeName }),
-        ...(dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
-      },
-    });
-    await this.adminContext.logAdminAction(admin, {
-      action: 'team_match_series.update_fixture',
-      targetType: 'team_match',
-      targetId: teamMatchId,
-      afterJson: { startAt: updated.startAt.toISOString(), placeName: updated.placeName },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.v1TeamMatch.update({
+        where: { id: teamMatchId },
+        data: {
+          ...(dto.startsAt === undefined ? {} : { startAt: new Date(dto.startsAt) }),
+          ...(dto.placeName === undefined ? {} : { placeName: dto.placeName }),
+          ...(dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
+        },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'team_match_series.update_fixture',
+          targetType: 'team_match',
+          targetId: teamMatchId,
+          afterJson: { startAt: result.startAt.toISOString(), placeName: result.placeName },
+        },
+        tx,
+      );
+      return result;
     });
     return { teamMatchId: updated.id, startAt: updated.startAt, placeName: updated.placeName, placeAddress: updated.placeAddress };
   }

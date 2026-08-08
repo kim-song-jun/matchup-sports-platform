@@ -79,8 +79,8 @@ describe('AdminTeamMatchSeriesNewPage', () => {
       title: '가을 풋살 리그',
       sportId: 'sport-futsal',
       regionId: 'region-1',
-      startsOn: new Date('2026-09-01').toISOString(),
-      endsOn: new Date('2026-10-20').toISOString(),
+      startsOn: new Date('2026-09-01T00:00:00').toISOString(),
+      endsOn: new Date('2026-10-20T23:59:59.999').toISOString(),
       teamIds: ['team-a', 'team-b'],
     }));
   });

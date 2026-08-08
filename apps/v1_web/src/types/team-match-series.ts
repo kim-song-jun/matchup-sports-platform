@@ -71,6 +71,7 @@ export interface V1UpdateSeriesFixtureResult {
 
 export interface V1SeriesStandingRow {
   teamId: string;
+  teamName: string;
   played: number;
   wins: number;
   draws: number;

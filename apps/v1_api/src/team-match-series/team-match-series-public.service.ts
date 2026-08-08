@@ -75,8 +75,10 @@ export class TeamMatchSeriesPublicService {
       'points', 'goalDifference', 'goalsFor', 'headToHead',
     ];
     const standings = calculateSeriesStandings({ teamIds, fixtures: confirmedFixtures, tieBreakOrder });
+    const teamNameById = new Map(series.teams.map((entry) => [entry.teamId, entry.team.name]));
+    const standingsWithTeamName = standings.map((row) => ({ ...row, teamName: teamNameById.get(row.teamId) ?? '' }));
 
-    return { seriesId: series.id, tieBreakOrder, standings, pendingFixtures };
+    return { seriesId: series.id, tieBreakOrder, standings: standingsWithTeamName, pendingFixtures };
   }
 
   // NOTE: assists is intentionally out of scope here. V1GameResultParticipant.assists
@@ -127,7 +129,10 @@ export class TeamMatchSeriesPublicService {
   }
 
   private async loadSeries(seriesId: string) {
-    const series = await this.prisma.v1TeamMatchSeries.findUnique({ where: { id: seriesId }, include: { teams: { select: { teamId: true } } } });
+    const series = await this.prisma.v1TeamMatchSeries.findUnique({
+      where: { id: seriesId },
+      include: { teams: { select: { teamId: true, team: { select: { name: true } } } } },
+    });
     if (series === null) {
       throw new NotFoundException({ code: 'SERIES_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }

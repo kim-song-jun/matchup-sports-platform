@@ -1,6 +1,6 @@
 'use client';
 
-import { useV1Team, useV1TeamMatchSeries, useV1TeamMatchSeriesPlayerRecords, useV1TeamMatchSeriesStandings } from '@/hooks/use-v1-api';
+import { useV1TeamMatchSeries, useV1TeamMatchSeriesPlayerRecords, useV1TeamMatchSeriesStandings } from '@/hooks/use-v1-api';
 import { EmptyState } from '@/components/v1-ui/primitives';
 
 const TIE_BREAK_LABELS: Record<string, string> = {
@@ -9,11 +9,6 @@ const TIE_BREAK_LABELS: Record<string, string> = {
   goalsFor: '다득점',
   headToHead: '승자승',
 };
-
-function SeriesTeamName({ teamId }: { teamId: string }) {
-  const { data: team } = useV1Team(teamId);
-  return <>{team?.name ?? '팀 정보 불러오는 중'}</>;
-}
 
 export default function TeamMatchSeriesStandingsClient({ seriesId }: { seriesId: string }) {
   const { data: series } = useV1TeamMatchSeries(seriesId);
@@ -61,7 +56,7 @@ export default function TeamMatchSeriesStandingsClient({ seriesId }: { seriesId:
                 {standings.standings.map((row) => (
                   <tr key={row.teamId} className="border-t border-gray-100 dark:border-gray-800">
                     <td className="py-2 text-gray-900 dark:text-white">{row.position}</td>
-                    <td className="text-gray-900 dark:text-white"><SeriesTeamName teamId={row.teamId} /></td>
+                    <td className="text-gray-900 dark:text-white">{row.teamName}</td>
                     <td>{row.played}</td>
                     <td>{row.points}</td>
                     <td>{row.goalsFor}-{row.goalsAgainst}</td>

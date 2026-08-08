@@ -15,12 +15,20 @@ describe('calculateSeriesStandings', () => {
 
   it('승점·골득실·다득점이 모두 같으면 맞대결(승자승)로 갈린다', () => {
     const fixtures = [
-      { homeTeamId: 'A', awayTeamId: 'B', homeScore: 3, awayScore: 1 }, // A 승
-      { homeTeamId: 'B', awayTeamId: 'C', homeScore: 3, awayScore: 1 }, // B 승
-      { homeTeamId: 'C', awayTeamId: 'A', homeScore: 1, awayScore: 3 }, // A 승
+      { homeTeamId: 'A', awayTeamId: 'B', homeScore: 2, awayScore: 0 }, // A 승 (h2h 1차전)
+      { homeTeamId: 'B', awayTeamId: 'A', homeScore: 1, awayScore: 1 }, // 무 (h2h 2차전)
+      { homeTeamId: 'A', awayTeamId: 'C', homeScore: 0, awayScore: 2 }, // A 패
+      { homeTeamId: 'B', awayTeamId: 'C', homeScore: 2, awayScore: 0 }, // B 승
     ];
-    // A: 2승 6점 GF6/GA2, B: 1승1패 3점 GF4/GA4, C: 2패 0점 — h2h를 안 타도 이미 갈림
+    // A: 승1무1패1 4점 GF3/GA3, B: 승1무1패1 4점 GF3/GA3 — 승점·골득실·다득점이
+    // 완전히 동률이라 headToHead까지 내려가야 한다. A·B의 맞대결 2경기만 놓고
+    // 보면 A가 3+1=4점, B가 0+1=1점으로 A가 우위.
     const result = calculateSeriesStandings({ teamIds: ['A', 'B', 'C'], fixtures, tieBreakOrder: ORDER });
+    const a = result.find((r) => r.teamId === 'A')!;
+    const b = result.find((r) => r.teamId === 'B')!;
+    expect(a.points).toBe(b.points);
+    expect(a.goalsFor - a.goalsAgainst).toBe(b.goalsFor - b.goalsAgainst);
+    expect(a.goalsFor).toBe(b.goalsFor);
     expect(result.map((r) => r.teamId)).toEqual(['A', 'B', 'C']);
   });
 

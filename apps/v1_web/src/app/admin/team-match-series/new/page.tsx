@@ -49,8 +49,11 @@ export default function AdminTeamMatchSeriesNewPage() {
         title,
         sportId,
         regionId,
-        startsOn: new Date(startsOn).toISOString(),
-        endsOn: new Date(endsOn).toISOString(),
+        // `type="date"` 값(YYYY-MM-DD)에 시각을 붙이지 않고 new Date()에 바로
+        // 넘기면 UTC 자정으로 파싱돼 KST 기준 날짜가 하루 앞으로 밀린다.
+        // 시각을 명시해 로컬 타임존으로 파싱한다.
+        startsOn: new Date(`${startsOn}T00:00:00`).toISOString(),
+        endsOn: new Date(`${endsOn}T23:59:59.999`).toISOString(),
         teamIds: selectedTeams.map((t) => t.id),
       });
       showToast('리그를 만들었어요.', 'success');

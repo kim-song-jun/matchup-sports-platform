@@ -6,7 +6,9 @@ export type EscalationRow = {
   id: string;
   resultRevisionId: string;
   gameId: string;
-  tournamentId: string;
+  tournamentId: string | null;
+  teamMatchId: string | null;
+  seriesId: string | null;
   kind: 'REMINDER' | 'ESCALATION';
   dueAt: Date;
   status: V1EscalationStatus;
@@ -24,6 +26,8 @@ export function escalationView(row: EscalationRow) {
     resultRevisionId: row.resultRevisionId,
     gameId: row.gameId,
     tournamentId: row.tournamentId,
+    teamMatchId: row.teamMatchId,
+    seriesId: row.seriesId,
     kind: row.kind,
     dueAt: row.dueAt,
     status: row.status,
@@ -44,6 +48,8 @@ export function escalationAuditValue(
     resultRevisionId: value.resultRevisionId,
     gameId: value.gameId,
     tournamentId: value.tournamentId,
+    teamMatchId: value.teamMatchId,
+    seriesId: value.seriesId,
     kind: value.kind,
     dueAt: value.dueAt.toISOString(),
     status: value.status,

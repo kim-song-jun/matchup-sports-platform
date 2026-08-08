@@ -5,6 +5,7 @@ import {
   createCompetitionData,
 } from '../../prisma/seed-alpha-tournament-qa';
 import { parseCampaignContentJson } from './tournament-campaign-content';
+import { FUTSAL_COMPETITION_CONFIG_ID } from './competition-config/competition-config-backfill';
 
 describe('alpha tournament QA campaign content', () => {
   it('satisfies the persisted campaign contract used by the public event hub', () => {
@@ -29,15 +30,19 @@ describe('alpha tournament QA campaign content', () => {
 
   it('creates completed knockout rounds so final rankings and videos are reachable', async () => {
     const rounds: string[] = [];
+    const fixtureConfigIds: Array<string | undefined> = [];
     const tx = {
       v1TournamentGroup: { create: jest.fn().mockResolvedValue({ id: 'group-a' }) },
       v1TournamentGroupTeam: { create: jest.fn().mockResolvedValue({}) },
       v1TournamentStanding: { create: jest.fn().mockResolvedValue({}) },
       v1TournamentFixture: {
-        create: jest.fn().mockImplementation(({ data }: { data: { round: string } }) => {
+        create: jest.fn().mockImplementation(
+          ({ data }: { data: { round: string; competitionConfigVersionId?: string } }) => {
           rounds.push(data.round);
+          fixtureConfigIds.push(data.competitionConfigVersionId);
           return Promise.resolve({ id: `fixture-${rounds.length}`, round: data.round });
-        }),
+          },
+        ),
       },
       v1TournamentFixtureResult: { create: jest.fn().mockResolvedValue({}) },
     } as unknown as Parameters<typeof createCompetitionData>[0];
@@ -54,9 +59,14 @@ describe('alpha tournament QA campaign content', () => {
       completedScenario,
       registrations,
       new Date('2026-07-04T01:00:00.000Z'),
+      FUTSAL_COMPETITION_CONFIG_ID,
     );
 
     expect(rounds).toEqual(expect.arrayContaining(['semi', 'final', 'third_place']));
+    // 픽스처마다 config 가 박히지 않으면 fixture-game 백필이 CONFIG_MISSING 으로 격리해
+    // 공개 대회 일정이 통째로 비어버린다(2026-08-09 alpha 실측). 그 계약을 여기서 고정한다.
+    expect(fixtureConfigIds.length).toBeGreaterThan(0);
+    expect(fixtureConfigIds.every((value) => value === FUTSAL_COMPETITION_CONFIG_ID)).toBe(true);
     expect(fixtures.find((fixture) => fixture.round === 'final')).toBeDefined();
   });
 

@@ -5,6 +5,7 @@ import {
   V1TournamentRegistrationStatus,
   V1TournamentStatus,
 } from '@prisma/client';
+import { FUTSAL_COMPETITION_CONFIG_ID } from '../src/tournaments/competition-config/competition-config-backfill';
 
 const ALPHA_QA_ORIGIN = 'https://alpha.teameet.co.kr';
 const ALPHA_QA_DATABASE_HOST = 'v1_postgres';
@@ -459,6 +460,7 @@ export async function createCompetitionData(
   scenario: TournamentScenario,
   registrations: Awaited<ReturnType<typeof createRegistrations>>,
   scheduledAt: Date,
+  competitionConfigVersionId: string,
 ) {
   const group = await tx.v1TournamentGroup.create({
     data: {
@@ -525,6 +527,7 @@ export async function createCompetitionData(
         groupId: group.id,
         round: 'group',
         fixtureNumber: index + 1,
+        competitionConfigVersionId,
         homeRegistrationId: registrations[homeIndex].id,
         awayRegistrationId: registrations[awayIndex].id,
         scheduledAt: new Date(scheduledAt.getTime() + index * 90 * 60 * 1000),
@@ -558,6 +561,7 @@ export async function createCompetitionData(
           tournamentId: scenario.id,
           round: plan.round,
           fixtureNumber: plan.fixtureNumber,
+          competitionConfigVersionId,
           homeRegistrationId: registrations[plan.homeIndex].id,
           awayRegistrationId: registrations[plan.awayIndex].id,
           scheduledAt: new Date(scheduledAt.getTime() + (pairings.length + index) * 90 * 60 * 1000),
@@ -586,6 +590,7 @@ async function createScenario(
   teams: Awaited<ReturnType<typeof ensureTeamRoster>>,
   adminUserId: string | null,
   now: Date,
+  competitionConfigVersionId: string,
 ) {
   const marketing = scenario.marketing ?? FEATURED_QA_DEFAULT_MARKETING;
   const scheduledAt = scenario.status === V1TournamentStatus.in_progress
@@ -605,6 +610,7 @@ async function createScenario(
       title: scenario.title,
       status: scenario.status,
       format: 'group_knockout',
+      competitionConfigVersionId,
       registrationDeadlineAt,
       rosterDeadlineAt: scenarioDate(now, scenario.startsInDays - 3, 14),
       bracketPublishedAt:
@@ -706,7 +712,13 @@ async function createScenario(
     V1TournamentRegistrationStatus.confirmed,
     scenario.entryFee,
   );
-  const fixtures = await createCompetitionData(tx, scenario, registrations, scheduledAt);
+  const fixtures = await createCompetitionData(
+    tx,
+    scenario,
+    registrations,
+    scheduledAt,
+    competitionConfigVersionId,
+  );
   if (scenario.status !== V1TournamentStatus.completed) return;
   const finalFixture = fixtures.find((fixture) => fixture.round === 'final');
   if (!finalFixture) throw new Error('Completed alpha tournament requires a final fixture.');
@@ -874,6 +886,32 @@ async function main() {
     if (!sport) throw new Error('Active futsal sport is required for alpha tournament QA data.');
     if (!region) throw new Error('Active seoul-songpa region is required for alpha tournament QA data.');
 
+    // 시드가 만드는 대회·픽스처에 canonical 풋살 config 를 직접 박는다.
+    //
+    // 왜: `fixture-game-backfill` 은 `competitionConfigVersionId` 가 없는 픽스처를
+    // `CONFIG_MISSING` 으로 격리한다. 예전에는 `competition-config-backfill` CLI 가 나중에
+    // 그 값을 채워줬지만, 그 CLI 는 canonical config 행이 코드 상수와 다르면
+    // `COMPETITION_CONFIG_SEED_DRIFT` 로 하드 실패한다 — 그래서 드리프트가 있는 동안
+    // 배포마다 공개 대회 일정이 통째로 비어 있었다(2026-08-09 alpha 실측: 일정 0건).
+    // 값을 아는 쪽(시드)이 만들 때 바로 넣으면 그 의존 자체가 사라진다.
+    const competitionConfig = await prisma.v1CompetitionConfigVersion.findUnique({
+      where: { id: FUTSAL_COMPETITION_CONFIG_ID },
+      select: { id: true, status: true },
+    });
+    if (!competitionConfig) {
+      throw new Error(
+        `Canonical futsal competition config (${FUTSAL_COMPETITION_CONFIG_ID}) is required for alpha ` +
+          'tournament QA data. Run src/tournaments/competition-config/competition-config-backfill.cli.ts first.',
+      );
+    }
+    if (competitionConfig.status !== 'ACTIVE') {
+      throw new Error(
+        `Canonical futsal competition config (${FUTSAL_COMPETITION_CONFIG_ID}) is ${competitionConfig.status}, ` +
+          'not ACTIVE — alpha QA tournaments would pin a retired config.',
+      );
+    }
+    const competitionConfigVersionId = competitionConfig.id;
+
     const summary = await prisma.$transaction(async (tx) => {
       const tournamentIds = ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.id);
       await resetAlphaTournamentScenarios(tx, tournamentIds);
@@ -898,7 +936,15 @@ async function main() {
       const now = new Date();
       for (const scenario of ALPHA_TOURNAMENT_SCENARIOS) {
         const teams = scenario.marketing ? featuredTeams : qaTeams;
-        await createScenario(tx, scenario, sport.id, teams, admin?.id ?? null, now);
+        await createScenario(
+          tx,
+          scenario,
+          sport.id,
+          teams,
+          admin?.id ?? null,
+          now,
+          competitionConfigVersionId,
+        );
       }
       return {
         tournaments: ALPHA_TOURNAMENT_SCENARIOS.length,

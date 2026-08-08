@@ -2,6 +2,11 @@
 
 import { execFileSync } from 'node:child_process';
 
+// Declared here rather than beside parseStatements because selfTest() runs
+// during module evaluation, before a class declaration further down the file
+// would have left its temporal dead zone.
+class UnparsableSqlError extends Error {}
+
 const [baseSha, headSha] = process.argv.slice(2);
 if (baseSha === '--self-test') {
   selfTest();
@@ -25,7 +30,12 @@ for (const line of changes.split('\n').filter(Boolean)) {
 
 const statements = addedFiles.flatMap((file) => {
   const sql = runGit(['show', `${headSha}:${file}`]);
-  return parseStatements(sql).map((statement) => ({ file, statement }));
+  try {
+    return parseStatements(sql, file).map((statement) => ({ file, statement }));
+  } catch (error) {
+    if (error instanceof UnparsableSqlError) fail(error.message);
+    throw error;
+  }
 });
 const baseFunctionNames = collectBaseFunctionNames(baseSha);
 runAdditivityCheck(statements, baseFunctionNames, fail);
@@ -40,7 +50,7 @@ console.log(`[expand-contract-sql-v1] ${baseSha} -> ${headSha} passed`);
 // splitter treats `$$...$$` / `$tag$...$tag$` spans and `'...'` string
 // literals as opaque so semicolons inside them are not treated as statement
 // terminators.
-function parseStatements(sql) {
+function parseStatements(sql, source = 'migration SQL') {
   const stripped = sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--.*$/gm, ' ');
   const statements = [];
   let current = '';
@@ -51,13 +61,22 @@ function parseStatements(sql) {
     if (dollarQuote) {
       const tag = dollarQuote[0];
       const closeAt = stripped.indexOf(tag, i + tag.length);
-      const end = closeAt === -1 ? n : closeAt + tag.length;
+      // Never fall back to "consume to EOF". An unterminated delimiter would
+      // silently swallow every following statement into this one, and the
+      // additivity check would then judge one giant blob instead of the real
+      // statements — a gate that reports "passed" while having inspected
+      // almost nothing. Refuse to guess.
+      if (closeAt === -1) {
+        throw new UnparsableSqlError(`unterminated dollar-quoted block opened with ${tag} in ${source}`);
+      }
+      const end = closeAt + tag.length;
       current += stripped.slice(i, end);
       i = end;
       continue;
     }
     if (stripped[i] === "'") {
       let j = i + 1;
+      let closed = false;
       while (j < n) {
         if (stripped[j] === "'") {
           if (stripped[j + 1] === "'") {
@@ -65,9 +84,13 @@ function parseStatements(sql) {
             continue;
           }
           j += 1;
+          closed = true;
           break;
         }
         j += 1;
+      }
+      if (!closed) {
+        throw new UnparsableSqlError(`unterminated string literal in ${source}`);
       }
       current += stripped.slice(i, j);
       i = j;
@@ -201,7 +224,14 @@ function collectBaseFunctionNames(sha) {
   const names = new Set();
   for (const file of files) {
     const sql = runGit(['show', `${sha}:${file}`]);
-    for (const statement of parseStatements(sql)) {
+    let baseStatements;
+    try {
+      baseStatements = parseStatements(sql, `${file} (at base ${sha})`);
+    } catch (error) {
+      if (error instanceof UnparsableSqlError) fail(error.message);
+      throw error;
+    }
+    for (const statement of baseStatements) {
       const name = functionName(statement);
       if (name) names.add(name);
     }
@@ -357,6 +387,25 @@ function selfTest() {
     const failuresForCase = [];
     runAdditivityCheck([{ file: 'unsafe.sql', statement }], baseFunctionNames, (message) => failuresForCase.push(message));
     if (failuresForCase.length === 0) fail(`unsafe fixture accepted: ${statement}`);
+  }
+
+  // Negative controls for the splitter itself. An unterminated delimiter used
+  // to be absorbed to EOF, which folds every following statement into one blob
+  // — the additivity check then inspects that blob instead of the real
+  // statements and can report "passed" having verified almost nothing. Both
+  // shapes must stop the gate outright.
+  const unparsableCases = [
+    ['an unterminated dollar-quoted block', 'CREATE FUNCTION f() RETURNS trigger AS $$ BEGIN RETURN NEW; END;'],
+    ['an unterminated string literal', "INSERT INTO \"User\" (\"name\") VALUES ('never closed;"],
+  ];
+  for (const [label, sql] of unparsableCases) {
+    let refused = false;
+    try {
+      parseStatements(sql, 'selftest.sql');
+    } catch (error) {
+      refused = error instanceof UnparsableSqlError;
+    }
+    if (!refused) fail(`splitter swallowed ${label} instead of refusing to parse it`);
   }
 
   // A FK on an existing table's column is additive only while that column

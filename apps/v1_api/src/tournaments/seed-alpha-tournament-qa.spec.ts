@@ -1,5 +1,8 @@
 import { Prisma, V1TournamentStatus } from '@prisma/client';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
+  ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID,
   ALPHA_TOURNAMENT_SCENARIOS,
   buildAlphaTournamentCampaignContent,
   createCompetitionData,
@@ -59,15 +62,36 @@ describe('alpha tournament QA campaign content', () => {
       completedScenario,
       registrations,
       new Date('2026-07-04T01:00:00.000Z'),
-      FUTSAL_COMPETITION_CONFIG_ID,
+      ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID,
     );
 
     expect(rounds).toEqual(expect.arrayContaining(['semi', 'final', 'third_place']));
     // 픽스처마다 config 가 박히지 않으면 fixture-game 백필이 CONFIG_MISSING 으로 격리해
     // 공개 대회 일정이 통째로 비어버린다(2026-08-09 alpha 실측). 그 계약을 여기서 고정한다.
     expect(fixtureConfigIds.length).toBeGreaterThan(0);
-    expect(fixtureConfigIds.every((value) => value === FUTSAL_COMPETITION_CONFIG_ID)).toBe(true);
+    expect(fixtureConfigIds.every((value) => value === ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID)).toBe(true);
     expect(fixtures.find((fixture) => fixture.round === 'final')).toBeDefined();
+  });
+
+  it('시드의 canonical 풋살 config id 가 레지스트리 상수와 일치한다', () => {
+    // 시드는 배포 이미지 안에서 도는 탓에 `../src/...` 를 import 할 수 없어 값을 복제한다.
+    // 그 복제본이 어긋나면 시드가 존재하지 않는 config 를 픽스처에 박게 되므로 여기서 고정한다.
+    expect(ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID).toBe(FUTSAL_COMPETITION_CONFIG_ID);
+  });
+
+  it('배포 이미지 안에서 실행되는 prisma 스크립트는 src/ 를 import 하지 않는다', () => {
+    // alpha 배포는 `ts-node prisma/seed-alpha-tournament-qa.ts` 를 API 프로덕션 이미지
+    // 안에서 실행하는데, 그 이미지에는 `src/` 가 없다(dist/·prisma/·node_modules 만 COPY).
+    // 실제로 `../src/...` import 하나 때문에 2026-08-09 배포가 MODULE_NOT_FOUND 로 죽었고,
+    // CI 는 src/ 가 존재하는 레포에서 돌아 잡지 못했다. 그래서 소스 텍스트로 고정한다.
+    const seedSource = readFileSync(
+      resolve(__dirname, '../../prisma/seed-alpha-tournament-qa.ts'),
+      'utf8',
+    );
+    const srcImports = seedSource
+      .split('\n')
+      .filter((line) => /^\s*import[^;]*from\s+['"]\.\.\/src\//.test(line));
+    expect(srcImports).toEqual([]);
   });
 
   it('seeds one non-QA "featured" completed scenario with real-looking marketing copy', () => {

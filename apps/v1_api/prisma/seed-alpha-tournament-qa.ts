@@ -5,7 +5,19 @@ import {
   V1TournamentRegistrationStatus,
   V1TournamentStatus,
 } from '@prisma/client';
-import { FUTSAL_COMPETITION_CONFIG_ID } from '../src/tournaments/competition-config/competition-config-backfill';
+
+// canonical 풋살 competition config 의 id.
+//
+// **여기서 `../src/...` 를 import 하면 안 된다.** 이 파일은 alpha 배포 중 API 프로덕션
+// 이미지 안에서 `ts-node prisma/seed-alpha-tournament-qa.ts` 로 실행되는데, 그 이미지에는
+// `src/` 가 들어있지 않다(`dist/`·`prisma/`·`node_modules` 만 COPY 된다). 실제로 그렇게
+// import 했다가 2026-08-09 배포가 `MODULE_NOT_FOUND` 로 죽었다. CI 는 `src/` 가 있는
+// 레포에서 돌기 때문에 이 결함을 잡지 못한다.
+//
+// 값이 `competition-config-backfill.ts` 의 `FUTSAL_COMPETITION_CONFIG_ID` 와 어긋나지
+// 않는지는 `src/tournaments/seed-alpha-tournament-qa.spec.ts` 가 단언한다(그 스펙은
+// 이미지 밖에서 돌기 때문에 양쪽을 다 import 할 수 있다).
+export const ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID = '22222222-2222-4222-8222-222222222222';
 
 const ALPHA_QA_ORIGIN = 'https://alpha.teameet.co.kr';
 const ALPHA_QA_DATABASE_HOST = 'v1_postgres';
@@ -895,18 +907,18 @@ async function main() {
     // 배포마다 공개 대회 일정이 통째로 비어 있었다(2026-08-09 alpha 실측: 일정 0건).
     // 값을 아는 쪽(시드)이 만들 때 바로 넣으면 그 의존 자체가 사라진다.
     const competitionConfig = await prisma.v1CompetitionConfigVersion.findUnique({
-      where: { id: FUTSAL_COMPETITION_CONFIG_ID },
+      where: { id: ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID },
       select: { id: true, status: true },
     });
     if (!competitionConfig) {
       throw new Error(
-        `Canonical futsal competition config (${FUTSAL_COMPETITION_CONFIG_ID}) is required for alpha ` +
+        `Canonical futsal competition config (${ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID}) is required for alpha ` +
           'tournament QA data. Run src/tournaments/competition-config/competition-config-backfill.cli.ts first.',
       );
     }
     if (competitionConfig.status !== 'ACTIVE') {
       throw new Error(
-        `Canonical futsal competition config (${FUTSAL_COMPETITION_CONFIG_ID}) is ${competitionConfig.status}, ` +
+        `Canonical futsal competition config (${ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID}) is ${competitionConfig.status}, ` +
           'not ACTIVE — alpha QA tournaments would pin a retired config.',
       );
     }

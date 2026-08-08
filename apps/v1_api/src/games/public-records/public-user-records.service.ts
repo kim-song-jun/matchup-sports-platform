@@ -14,6 +14,8 @@ interface EligibleResultRow {
   readonly tournamentFixtureId: string | null;
   readonly sideId: string;
   readonly goals: number;
+  readonly assists: number;
+  readonly fouls: number;
   readonly cardsYellow: number;
   readonly cardsRed: number;
   readonly minutesPlayed: number | null;
@@ -67,6 +69,8 @@ export class PublicUserRecordsService {
     const summary = {
       appearances: eligibleRows.length,
       goals: eligibleRows.reduce((sum, row) => sum + row.goals, 0),
+      assists: eligibleRows.reduce((sum, row) => sum + row.assists, 0),
+      fouls: eligibleRows.reduce((sum, row) => sum + row.fouls, 0),
       yellowCards: eligibleRows.reduce((sum, row) => sum + row.cardsYellow, 0),
       redCards: eligibleRows.reduce((sum, row) => sum + row.cardsRed, 0),
       mvpCount: eligibleRows.filter((row) => row.isMvp).length,
@@ -104,6 +108,8 @@ export class PublicUserRecordsService {
         started: true,
         minutesPlayed: true,
         goals: true,
+        assists: true,
+        fouls: true,
         cards: true,
         goalkeeper: true,
         resultRevision: {
@@ -146,6 +152,8 @@ export class PublicUserRecordsService {
         tournamentFixtureId: revision.game.tournamentFixtureId,
         sideId: row.sideId,
         goals: row.goals,
+        assists: row.assists,
+        fouls: row.fouls,
         cardsYellow: cards.yellow,
         cardsRed: cards.red,
         minutesPlayed: row.minutesPlayed,

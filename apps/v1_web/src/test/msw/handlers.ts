@@ -1065,6 +1065,8 @@ export const v1MswHandlers = [
         started: participant.started,
         minutesPlayed: participant.minutesPlayed ?? null,
         goals: participant.goals,
+        assists: participant.assists,
+        fouls: participant.fouls,
         cards: participant.cards,
         goalkeeper: participant.goalkeeper,
       })),

@@ -63,6 +63,8 @@ export type GameResultParticipantRecord = {
   started: boolean;
   minutesPlayed: number | null;
   goals: number;
+  assists: number;
+  fouls: number;
   cards: GameResultCards;
   goalkeeper: boolean;
 };

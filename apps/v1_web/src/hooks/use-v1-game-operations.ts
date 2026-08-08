@@ -7,6 +7,7 @@ import type {
   GameCommandRequest,
   GameDetail,
   GameEventsBackfill,
+  GameLineup,
   GameMutationResult,
   GameRevisionMutationResult,
 } from '@/types/game-operations';
@@ -46,6 +47,20 @@ export function useV1GameEventsBackfill(gameId: string | null, afterSequence: nu
     queryKey: [...v1Keys.gameEvents(gameId ?? ''), afterSequence] as const,
     queryFn: () =>
       v1Get<GameEventsBackfill>(`/games/${gameId}/events`, { afterSequence }),
+    enabled: Boolean(gameId),
+    retry: retryTransientFailure,
+  });
+}
+
+/**
+ * T3 추가 — 양쪽 사이드 라이브 라인업. 대회 콘솔이 쓰는 useV1FixtureLineup과
+ * 달리 tournamentId/fixtureId가 필요 없다(gameId만으로 조회, GamesService.
+ * listOperationsLineups). 팀매치 경량 콘솔(Task 10)이 소비한다.
+ */
+export function useV1GameOperationsLineup(gameId: string | null) {
+  return useQuery({
+    queryKey: v1Keys.gameOperationsLineup(gameId ?? ''),
+    queryFn: () => v1Get<GameLineup[]>(`/games/${gameId}/operations-lineup`),
     enabled: Boolean(gameId),
     retry: retryTransientFailure,
   });

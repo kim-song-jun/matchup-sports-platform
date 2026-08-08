@@ -1268,6 +1268,8 @@ export type V1GameResultParticipantRow = {
   started: boolean;
   minutesPlayed: number | null;
   goals: number;
+  assists: number;
+  fouls: number;
   cards: V1GameResultCards;
   goalkeeper: boolean;
 };

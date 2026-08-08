@@ -26,6 +26,16 @@ import type {
 // V1GameEvent rows ever created. If the TEAM_MATCH exemption in
 // game-invariants.ts is reverted, `createResultRevision` below throws 422
 // SCORE_EVENT_MISMATCH and this test fails.
+//
+// Task T1-1 update: resolveActor's unconditional forbid described above was
+// narrowed to opponent-only — the host team's owner/manager can now append
+// and reverse real V1GameEvent rows (see
+// game-team-match-event-authority.integration-spec.ts). This spec's own
+// "zero V1GameEvent rows ever created" case above still exercises and pins
+// the TEAM_MATCH-without-events exemption in game-invariants.ts; the
+// opposite boundary — a team match that DOES have real events, where the
+// submitted score must agree with them — is covered by
+// game-team-match-event-score-mismatch.integration-spec.ts.
 const ids = {
   hostUser: '85000000-0000-4000-8000-000000000001',
   opponentUser: '85000000-0000-4000-8000-000000000002',

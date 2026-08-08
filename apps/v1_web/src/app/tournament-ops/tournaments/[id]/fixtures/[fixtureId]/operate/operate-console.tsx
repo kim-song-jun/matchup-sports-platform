@@ -14,7 +14,9 @@ import { LineupGrid } from './lineup-grid';
 import { EventCaptureModal, type EventCaptureCommitInput } from './event-capture-modal';
 import { QueueStatusPanel } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
-import type { GameCommandName, GameLineupParticipant, GameState } from '@/types/game-operations';
+import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
+import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
+import type { GameCommandName, GameEventRecord, GameLineupParticipant, GameState } from '@/types/game-operations';
 
 export interface OperateConsoleProps {
   readonly tournamentId: string;
@@ -127,19 +129,26 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     [ops.clockOffsetMs, currentPeriod],
   );
 
-  const teammates = useMemo(() => {
-    if (!selected) return [];
-    const lineups = fixtureLineup.data?.lineups ?? [];
-    const lineup = lineups.find((row) => row.sideId === selected.sideId);
-    return (lineup?.participants ?? []).filter((participant) => participant.id !== selected.participant.id);
-  }, [selected, fixtureLineup.data?.lineups]);
+  const { toasts, showToast, dismiss } = useEventToast();
+  const [assistTarget, setAssistTarget] = useState<{ event: GameEventRecord } | null>(null);
 
   const handleCommit = useCallback(
     (input: EventCaptureCommitInput) => {
       void ops.submitEvent(input);
       setSelected(null);
+      if (input.type === 'GOAL') {
+        showToast('골을 기록했어요', {
+          action: {
+            label: '어시스트 추가',
+            onClick: () => {
+              const match = findRecentGoalEvent(ops.liveEvents, input);
+              if (match) setAssistTarget({ event: match });
+            },
+          },
+        });
+      }
     },
-    [ops],
+    [ops, showToast],
   );
 
   const handleRunCommand = useCallback(
@@ -312,11 +321,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           sideId={selected.sideId}
           player={selected.participant}
           frozen={selected.frozen}
-          teammates={teammates}
           onCommit={handleCommit}
           onCancel={() => setSelected(null)}
         />
       )}
+      <EventToasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }

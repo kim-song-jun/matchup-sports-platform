@@ -159,6 +159,34 @@ wait_for_alpha_health_contract() {
   done
 }
 
+# 전진 배포 전용 게이트. assert_running_release_digests 는 .Config.Image 만 읽어서
+# 재시작 루프에 빠진 컨테이너를 정상으로 통과시킨다 — 실제로 워커가 잘못된
+# entrypoint 로 한 번도 뜨지 못한 채 배포가 계속 "성공"으로 보고된 전례가 있다.
+# 크래시 루프 컨테이너는 healthcheck 를 통과할 수 없으므로 health 를 직접 본다.
+#
+# rollback/restore 경로에서는 호출하지 않는다: 워커가 깨진 구버전으로 되돌리는
+# 것 자체를 막아버리면 장애 대응 경로가 사라진다.
+wait_for_alpha_worker_healthy() {
+  local worker_container
+  local worker_health
+
+  for attempt in $(seq 1 24); do
+    worker_container="$("${compose[@]}" ps -q v1_game_operations_worker)"
+    if [[ -n "${worker_container}" ]]; then
+      worker_health="$(docker inspect --format '{{.State.Health.Status}}' "${worker_container}" 2>/dev/null || true)"
+      if [[ "${worker_health}" == "healthy" ]]; then
+        return
+      fi
+    fi
+    if [[ "${attempt}" -eq 24 ]]; then
+      echo "[alpha-release] game operations worker never became healthy (last=${worker_health:-<none>})" >&2
+      "${compose[@]}" logs --tail 30 v1_game_operations_worker >&2 || true
+      return 1
+    fi
+    sleep 5
+  done
+}
+
 restore_active_release() {
   local active_tmp
   local active_sha

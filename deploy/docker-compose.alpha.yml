@@ -7,12 +7,14 @@ services:
     environment:
       V1_RELEASE: ${ALPHA_RELEASE_VERSION:-}
 
+  # 워커는 전용 이미지를 빌드하지 않고 API 이미지를 그대로 재사용한다
+  # (alpha-release-common.sh 의 assert_running_release_digests 가
+  #  running_worker_image == ALPHA_API_IMAGE 를 단언한다). 따라서 entrypoint 는
+  #  API 이미지의 레이아웃(dist/src/...)을 따라야 한다 — Dockerfile.v1-api 의
+  #  CMD ["node", "dist/src/main.js"] 와 같은 규칙이다.
   v1_game_operations_worker:
-    build:
-      context: ..
-      dockerfile: deploy/v1-game-operations-worker.Dockerfile
     image: ${ALPHA_API_IMAGE:?ALPHA_API_IMAGE must be an ECR digest URI}
-    command: ["node", "dist/jobs/v1-game-operations-worker.main.js"]
+    command: ["node", "dist/src/jobs/v1-game-operations-worker.main.js"]
     restart: always
     environment:
       DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_PASSWORD:-${DB_PASSWORD}}@v1_postgres:5432/${V1_DB_NAME:-teameet_v1}

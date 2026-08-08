@@ -209,6 +209,13 @@ done
 
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
+# 게임 운영 플래그 불변 행 시드. 마이그레이션에 DML 을 넣을 수 없고(expand-contract 게이트)
+# GameOperationFlagsService.ensureDefaults() 는 platform_ops 가 플래그 API 를 호출할 때만
+# 돌기 때문에, 이걸 안 돌리면 갓 배포된 환경의 대회 운영 보드가 500 GAME_READ_FLAG_MISSING
+# 으로 죽는다(실제로 alpha 가 그 상태였다 — v1_game_operation_flags 0행).
+# 멱등하며 운영자가 바꾼 값을 되돌리지 않는다.
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/config/game-operation-flags-seed.cli.js'
 "${compose[@]}" exec -T v1_postgres \
   psql -v ON_ERROR_STOP=1 \
   -U "${V1_DB_USER:-teameet_v1}" \

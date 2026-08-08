@@ -187,6 +187,12 @@ jobs:
           # here so `test:integration` sees the same DB state.
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/tournaments/competition-config/competition-config-backfill.cli.ts
+          # 게임 운영 플래그 불변 행 시드 — 같은 이유로 마이그레이션이 아니라 앱 CLI 다.
+          # 이게 없으면 갓 배포된 환경의 대회 운영 보드가 500 GAME_READ_FLAG_MISSING 으로
+          # 죽는다. alpha 배포 경로(deploy/deploy-alpha.sh)와 같은 스텝을 여기서도 돌려
+          # test:integration 이 실제 배포와 동일한 DB 상태를 보게 한다.
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
+            src/config/game-operation-flags-seed.cli.ts
           DATABASE_URL="$MIGRATE_URL" pnpm test:integration
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 

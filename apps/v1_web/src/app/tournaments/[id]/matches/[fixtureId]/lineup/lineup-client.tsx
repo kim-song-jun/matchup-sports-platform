@@ -5,7 +5,11 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
+import {
+  buildFormationPresets, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
+} from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
+import { matchSlotsToEntries } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import {
   useV1FixtureLineupAccess,
   useV1Game,
@@ -17,18 +21,19 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   addPlayer,
-  applyFormation,
   buildSavePayload,
   clearPlayerPosition,
   createEmptyFixtureLineupState,
   hydrateFixtureLineupState,
   moveToBench,
   moveToStarters,
+  placeInSlot,
   removePlayer,
+  selectFormation,
   setGoalkeeper,
   setJerseyNumber,
   setPlayerPosition,
-  suggestedFormations,
+  unplaceFromSlot,
   type FixtureLineupState,
 } from './fixture-lineup.view-model';
 
@@ -105,6 +110,22 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
   const mySideId = access.data.mySideId;
   const editable = state.lineupState === null || state.lineupState === 'DRAFT';
+  // D-17: 포메이션·포지션 데이터는 gameQuery(GET /games/:gameId, T1-5)의 lineupConfig에서만
+  // 온다. formationSupported(위에서 이미 선언됨)는 별개로 "피치 SVG 모양이 축구/풋살만
+  // 구현돼 있다"는 프론트 표시 제약일 뿐이다.
+  const sportCatalog: FormationPreset[] = gameQuery.data?.lineupConfig
+    ? buildFormationPresets(gameQuery.data.lineupConfig.positions, gameQuery.data.lineupConfig.formations)
+    : [];
+  const outfieldCount = state.starters.filter((entry) => !entry.goalkeeper).length;
+  const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
+  const outfieldGuidance =
+    formationSupported && formationOptions.length === 0 && outfieldCount > 0
+      ? `현재 선발 ${outfieldCount}명 — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
+      : null;
+  const selectedPreset = state.formation !== null ? formationOptions.find((preset) => preset.code === state.formation) ?? null : null;
+  const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;
+  const emptySlotCount =
+    activeSlots !== null ? matchSlotsToEntries(activeSlots, state.starters).filter((row) => row.entry === null).length : 0;
 
   async function handleSave() {
     if (state === null) return;
@@ -194,11 +215,15 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                 <PitchFormationEditor
                   starters={state.starters}
                   formation={state.formation}
-                  suggestedFormations={suggestedFormations(state.starters.filter((entry) => !entry.goalkeeper).length)}
+                  formationOptions={formationOptions}
+                  slots={activeSlots}
+                  outfieldGuidance={outfieldGuidance}
                   editable={editable}
-                  onSelectFormation={(formation) => setState((prev) => (prev ? applyFormation(prev, formation) : prev))}
+                  onSelectFormation={(formation) => setState((prev) => (prev ? selectFormation(prev, formation) : prev))}
                   onPlacePlayer={(key, x, y) => setState((prev) => (prev ? setPlayerPosition(prev, key, x, y) : prev))}
                   onUnplacePlayer={(key) => setState((prev) => (prev ? clearPlayerPosition(prev, key) : prev))}
+                  onPlaceInSlot={(key, slot) => setState((prev) => (prev ? placeInSlot(prev, key, slot) : prev))}
+                  onUnplaceFromSlot={(key) => setState((prev) => (prev ? unplaceFromSlot(prev, key) : prev))}
                 />
               </div>
             )}
@@ -394,10 +419,14 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               <button
                 type="button"
                 className="tm-btn tm-btn-lg tm-btn-primary"
-                disabled={submitMutation.isPending || state.dirty}
+                disabled={submitMutation.isPending || state.dirty || emptySlotCount > 0}
                 onClick={handleSubmit}
               >
-                {submitMutation.isPending ? '제출 중…' : '라인업 제출하기'}
+                {submitMutation.isPending
+                  ? '제출 중…'
+                  : emptySlotCount > 0
+                    ? `포지션 자리 ${emptySlotCount}개가 비어 있어요`
+                    : '라인업 제출하기'}
               </button>
             ) : null}
           </div>

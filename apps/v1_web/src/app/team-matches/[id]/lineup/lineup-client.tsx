@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
+import {
+  buildFormationPresets, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
+} from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
@@ -25,7 +28,6 @@ import {
   addGuestToStarters,
   addRosterMemberToBench,
   addRosterMemberToStarters,
-  applyFormation,
   applySaveResult,
   applyVersionConflictReload,
   buildSavePayload,
@@ -37,13 +39,15 @@ import {
   hydrateLineupEditorState,
   isRosterMemberPlaced,
   moveEntry,
+  placeInSlot,
   removeEntry,
   resolveOwnTeamId,
   restoreEntry,
+  selectFormation,
   setGoalkeeper,
   setJerseyNumber,
   setPlayerPosition,
-  suggestedFormations,
+  unplaceFromSlot,
   validateLineupForSubmit,
 } from './lineup.view-model';
 
@@ -365,7 +369,21 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   const counts = deriveLineupCounts(state, rosterPool);
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
-  const validationErrors = validateLineupForSubmit(state);
+  // D-17: 종목별 포메이션·포지션 사전은 서버 lineupConfig가 유일한 출처다 — 종목명으로
+  // 하드코딩 카탈로그를 스위치하지 않는다. lineupConfig가 아직 없는(구버전 응답) 경우
+  // sportCatalog는 빈 배열이 되고, formationOptions도 자연히 비어 "자유 배치"만 남는다.
+  const sportCatalog: FormationPreset[] = lineupQuery.data.lineupConfig
+    ? buildFormationPresets(lineupQuery.data.lineupConfig.positions, lineupQuery.data.lineupConfig.formations)
+    : [];
+  const outfieldCount = state.starters.filter((entry) => !entry.goalkeeper).length;
+  const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
+  const outfieldGuidance =
+    formationSupported && formationOptions.length === 0 && outfieldCount > 0
+      ? `현재 선발 ${outfieldCount}명 — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
+      : null;
+  const selectedPreset = state.formation !== null ? formationOptions.find((preset) => preset.code === state.formation) ?? null : null;
+  const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;
+  const validationErrors = validateLineupForSubmit(state, activeSlots);
   const publicationLabel = describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
 
   // insane review(P0-1, 2026-08 GPT Pro): 제출은 항상 서버에 마지막 저장된 revision만 실어
@@ -520,17 +538,19 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                 <PitchFormationEditor
                   starters={state.starters}
                   formation={state.formation}
-                  suggestedFormations={suggestedFormations(
-                    state.starters.filter((entry) => !entry.goalkeeper).length,
-                  )}
+                  formationOptions={formationOptions}
+                  slots={activeSlots}
+                  outfieldGuidance={outfieldGuidance}
                   editable={editable}
                   onSelectFormation={(formation) =>
-                    setState((prev) => (prev ? applyFormation(prev, formation) : prev))
+                    setState((prev) => (prev ? selectFormation(prev, formation) : prev))
                   }
                   onPlacePlayer={(key, x, y) =>
                     setState((prev) => (prev ? setPlayerPosition(prev, key, x, y) : prev))
                   }
                   onUnplacePlayer={(key) => setState((prev) => (prev ? clearPlayerPosition(prev, key) : prev))}
+                  onPlaceInSlot={(key, slot) => setState((prev) => (prev ? placeInSlot(prev, key, slot) : prev))}
+                  onUnplaceFromSlot={(key) => setState((prev) => (prev ? unplaceFromSlot(prev, key) : prev))}
                 />
               </div>
             )}

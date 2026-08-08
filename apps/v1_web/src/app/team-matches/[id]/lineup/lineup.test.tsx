@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1TeamMatchLineup } from '@/types/api';
@@ -754,5 +754,77 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(9);
     expect(screen.getByRole('button', { name: '홍길동, 골키퍼로 지정됨' })).toBeInTheDocument();
     expect(screen.queryByText('홍길동 선수를 명단에서 제거했어요.')).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchLineupPageClient — pitch tab wiring (D-17: consumes server lineupConfig, no hardcoded catalog)', () => {
+  it('passes formationOptions/slots built from lineupQuery.data.lineupConfig', async () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'team-1', role: 'owner' }] }, isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: {
+        teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-1', role: 'team_manager', lineupId: 'lineup-1',
+        revision: 1, state: 'DRAFT', version: 1, publicLineupAt: null, formation: null,
+        // 4명 모두 필드 플레이어(비-골키퍼)로 둔다 — 아래 formations는 outfield: 4라
+        // outfieldCount가 실제로 4와 맞아야 formationOptions에 뜬다(D-17 헤드카운트 필터).
+        starters: [
+          { id: 'p1', displayName: '선수1', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null },
+          { id: 'p2', displayName: '선수2', jerseyNumber: 2, position: null, goalkeeper: false, positionX: null, positionY: null },
+          { id: 'p3', displayName: '선수3', jerseyNumber: 3, position: null, goalkeeper: false, positionX: null, positionY: null },
+          { id: 'p4', displayName: '선수4', jerseyNumber: 4, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+        bench: [],
+        lineupConfig: {
+          minPlayers: 3, maxPlayers: 5, substitutions: 'rolling', maxSubstitutions: null,
+          positions: [
+            { code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true },
+            { code: 'FIXO', label: '픽소', short: 'FX' },
+            { code: 'ALA', label: '아라', short: 'AL' },
+            { code: 'PIVO', label: '피보', short: 'PV' },
+          ],
+          formations: [
+            { code: '2-2', label: '박스', outfield: 4, slots: [
+              { position: 'FIXO', x: 28, y: 38 }, { position: 'FIXO', x: 72, y: 38 },
+              { position: 'PIVO', x: 28, y: 76 }, { position: 'PIVO', x: 72, y: 76 },
+            ] },
+            { code: '1-2-1', label: '다이아몬드', outfield: 4, slots: [
+              { position: 'FIXO', x: 50, y: 35 }, { position: 'ALA', x: 20, y: 58 },
+              { position: 'ALA', x: 80, y: 58 }, { position: 'PIVO', x: 50, y: 83 },
+            ] },
+          ],
+        },
+      },
+      isLoading: false, isError: false, refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
+    expect(screen.getByRole('group', { name: '포메이션 프리셋' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2-2 · 박스' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '1-2-1 · 다이아몬드' })).toBeInTheDocument();
+  });
+
+  it('renders zero formation chips (only 자유 배치) when lineupConfig is absent — proves there is no hardcoded fallback catalog', async () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'team-1', role: 'owner' }] }, isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: {
+        teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-1', role: 'team_manager', lineupId: 'lineup-1',
+        revision: 1, state: 'DRAFT', version: 1, publicLineupAt: null, formation: null,
+        starters: [{ id: 'p1', displayName: '선수1', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null }],
+        bench: [],
+        // lineupConfig 없음(구버전 응답 흉내) — 이전 초안이라면 FUTSAL_FORMATION_PRESETS로
+        // 폴백해 이 상황에서도 "2-2 · 박스" 칩이 보였을 것이다.
+      },
+      isLoading: false, isError: false, refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
+    // "포메이션 프리셋" 그룹 안을 좁혀서 본다 — 페이지 전체를 대상으로 하면 모바일 드로어
+    // 토글 버튼("배치 설정 · 대기 1명")도 " · "를 포함해 오탐을 낼 수 있다.
+    const formationGroup = screen.getByRole('group', { name: '포메이션 프리셋' });
+    expect(within(formationGroup).getAllByRole('button')).toHaveLength(1);
+    expect(within(formationGroup).getByRole('button', { name: '자유 배치' })).toBeInTheDocument();
   });
 });

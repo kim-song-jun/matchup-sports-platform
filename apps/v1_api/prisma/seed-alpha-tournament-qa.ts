@@ -745,6 +745,106 @@ async function createScenario(
   });
 }
 
+/**
+ * QA 시드가 소유한 대회를 지우기 전에, 그 대회의 fixture 에 매달린 V1Game 집합체를
+ * FK 안전 순서로 먼저 걷어낸다.
+ *
+ * 왜 필요한가: `V1Game.tournamentFixture` 는 `onDelete: Restrict` 다. Game 도메인이
+ * 올라오기 전에는 alpha 에 Game 행이 하나도 없어서 `v1Tournament.deleteMany()` 가
+ * 그냥 통과했지만, 대진표 생성/백필로 Game 이 생긴 뒤로는 **매 배포마다** 시드가
+ * `Foreign key constraint violated on: v1_games_tournament_fixture_id_fkey` 로 죽는다.
+ * 배포 스크립트는 이 시드를 매번 돌리므로 alpha 배포가 영구 차단된다(실제로 그렇게 됐다).
+ *
+ * 삭제 순서는 스키마의 Restrict 그래프를 그대로 따른다. Cascade 인 것(Side/Period/Lineup)은
+ * Game 삭제 시 자동으로 지워지므로 여기서 다루지 않는다. 자기참조 FK 두 개
+ * (`V1Game.currentOfficialRevisionId`, `V1GameResultRevision.supersedesId`)는 삭제 전에
+ * null 로 끊어야 한다 — 둘 다 Restrict 라 그대로 두면 revision 을 지울 수 없다.
+ *
+ * 범위는 **인자로 받은 대회들** 로 한정된다. 다른 대회나 팀매치의 Game 은 건드리지 않는다.
+ */
+export async function purgeTournamentGameAggregates(
+  tx: Prisma.TransactionClient,
+  tournamentIds: readonly string[],
+): Promise<{ games: number; fixtures: number }> {
+  if (tournamentIds.length === 0) {
+    return { games: 0, fixtures: 0 };
+  }
+
+  const fixtures = await tx.v1TournamentFixture.findMany({
+    where: { tournamentId: { in: [...tournamentIds] } },
+    select: { id: true },
+  });
+  const fixtureIds = fixtures.map((fixture) => fixture.id);
+  if (fixtureIds.length === 0) {
+    return { games: 0, fixtures: 0 };
+  }
+
+  const games = await tx.v1Game.findMany({
+    where: { tournamentFixtureId: { in: fixtureIds } },
+    select: { id: true },
+  });
+  const gameIds = games.map((game) => game.id);
+
+  if (gameIds.length > 0) {
+    // 공식 결과는 DB 가 불변으로 잠가둔다 — `v1_block_terminal_revision_mutation` 트리거가
+    // terminal 상태 revision 의 UPDATE 와 DELETE 를 **둘 다** 거부한다. 그 보호를 우회하지 않고,
+    // 조용히 넘어가지도 않는다. QA 리셋이 불가능한 상황임을 운영자가 바로 알 수 있게 죽인다.
+    const terminalRevisions = await tx.v1GameResultRevision.findMany({
+      where: {
+        gameId: { in: gameIds },
+        state: { in: ['CHANGE_REQUESTED', 'SUPPLEMENT_REQUESTED', 'REJECTED', 'OFFICIAL', 'VOID'] },
+      },
+      select: { id: true, gameId: true, state: true },
+    });
+    if (terminalRevisions.length > 0) {
+      const detail = terminalRevisions
+        .map((row) => `${row.gameId}:${row.id}(${row.state})`)
+        .join(', ');
+      throw new Error(
+        'alpha QA 시드가 대회를 리셋할 수 없습니다: 확정된 공식 결과(terminal result revision)가 ' +
+          `있는 경기가 ${terminalRevisions.length}건 있습니다. 공식 결과는 DB 트리거로 불변이라 ` +
+          '시드가 지울 수 없고, 지워서도 안 됩니다. 해당 대회를 QA 시드 시나리오에서 제외하거나 ' +
+          `운영자가 명시적으로 처리해야 합니다. 대상: ${detail}`,
+      );
+    }
+
+    // 자기참조 FK 를 먼저 끊는다 (둘 다 Restrict). 위 가드를 통과했으므로 남은 revision 은
+    // 전부 non-terminal 이라 UPDATE 가 허용된다.
+    await tx.v1Game.updateMany({
+      where: { id: { in: gameIds } },
+      data: { currentOfficialRevisionId: null },
+    });
+    await tx.v1GameResultRevision.updateMany({
+      where: { gameId: { in: gameIds } },
+      data: { supersedesId: null },
+    });
+
+    // revision 을 막는 것들.
+    await tx.v1GameOfficialResultCache.deleteMany({ where: { gameId: { in: gameIds } } });
+    await tx.v1GameOfficialFact.deleteMany({ where: { gameId: { in: gameIds } } });
+    await tx.v1TeamRecordFact.deleteMany({ where: { gameId: { in: gameIds } } });
+    await tx.v1GameResultParticipant.deleteMany({
+      where: { resultRevision: { gameId: { in: gameIds } } },
+    });
+    await tx.v1ResultEscalation.deleteMany({
+      where: { resultRevision: { gameId: { in: gameIds } } },
+    });
+    await tx.v1GameResultRevision.deleteMany({ where: { gameId: { in: gameIds } } });
+
+    // game 을 막는 것들. Side/Period/Lineup 은 Cascade 라 아래 delete 에서 함께 지워진다.
+    await tx.v1GameEvent.deleteMany({ where: { gameId: { in: gameIds } } });
+    await tx.v1GameParticipant.deleteMany({ where: { gameId: { in: gameIds } } });
+    await tx.v1GameVisibilityPolicy.deleteMany({ where: { gameId: { in: gameIds } } });
+    await tx.v1Game.deleteMany({ where: { id: { in: gameIds } } });
+  }
+
+  // fixture 를 막는 나머지 (Restrict).
+  await tx.v1TournamentStaffFixtureScope.deleteMany({ where: { fixtureId: { in: fixtureIds } } });
+  await tx.v1OperationAudit.deleteMany({ where: { tournamentId: { in: [...tournamentIds] } } });
+
+  return { games: gameIds.length, fixtures: fixtureIds.length };
+}
+
 async function main() {
   assertAlphaSeedAllowed(process.env);
   const prisma = new PrismaClient();
@@ -759,6 +859,7 @@ async function main() {
 
     const summary = await prisma.$transaction(async (tx) => {
       const tournamentIds = ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.id);
+      const purged = await purgeTournamentGameAggregates(tx, tournamentIds);
       await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId: { in: tournamentIds } } });
       await tx.v1Tournament.deleteMany({ where: { id: { in: tournamentIds } } });
       const qaTeams = await ensureTeamRoster(
@@ -785,6 +886,8 @@ async function main() {
         await createScenario(tx, scenario, sport.id, teams, admin?.id ?? null, now);
       }
       return {
+        purgedGames: purged.games,
+        purgedFixtures: purged.fixtures,
         tournaments: ALPHA_TOURNAMENT_SCENARIOS.length,
         campaigns: ALPHA_TOURNAMENT_SCENARIOS.filter((scenario) => scenario.hasCampaign).length,
         statuses: ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.status),

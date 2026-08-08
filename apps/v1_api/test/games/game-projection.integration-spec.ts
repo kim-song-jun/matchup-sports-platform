@@ -1252,6 +1252,13 @@ describe('Task 9 game projection real-database contract', () => {
           select: { action: true, resourceId: true, tournamentId: true },
         });
 
+        // T4(리그) 이후 이 전역 관리자 큐는 tournament fixture 뿐 아니라 team-match/시리즈
+        // 소스 게임의 due escalation도 포함하도록 LEFT JOIN으로 넓어졌다(result-escalation-
+        // access.service.ts의 selectRows()) — 다른 describe 블록(예: AC6 재배정 테스트)이
+        // 같은 파일 격리 DB 클론 안에 남겨둔 team-match 기반 escalation도 이제 이 큐에
+        // 정당하게 나타날 수 있다. 그래서 "정확히 이 두 건만" 대신 "이 두 건을 포함"으로
+        // 완화한다 — 실제로 검증하려는 것(ack/resolve/audit가 정확한 대상에 적용되는지)은
+        // 그대로 유지된다.
         const observable = {
           list: {
             status: list.status,
@@ -1264,11 +1271,11 @@ describe('Task 9 game projection real-database contract', () => {
         };
         process.stdout.write(`TASK9_AC6_GLOBAL_QUEUE=${JSON.stringify(observable)}\n`);
 
-        expect(observable).toEqual({
-          list: {
-            status: 200,
-            escalationIds: [primary.escalationId, secondary.escalationId].sort(),
-          },
+        expect(observable.list.status).toBe(200);
+        expect(observable.list.escalationIds).toEqual(
+          expect.arrayContaining([primary.escalationId, secondary.escalationId]),
+        );
+        expect(observable).toMatchObject({
           detail: { status: 200, id: primary.escalationId },
           acknowledged: { status: 200, state: 'ACKNOWLEDGED' },
           resolved: { status: 200, state: 'RESOLVED' },

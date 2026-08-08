@@ -3864,3 +3864,89 @@ export function useV1RevokeTournamentStaff(tournamentId: string) {
     },
   });
 }
+
+import type {
+  V1AdminSeriesDetail,
+  V1AdminSeriesListItem,
+  V1CreateSeriesPayload,
+  V1CreateSeriesResult,
+  V1GenerateSeriesFixturesPayload,
+  V1GenerateSeriesFixturesResult,
+  V1PublicSeriesDetail,
+  V1SeriesPlayerRecordsResponse,
+  V1SeriesStandingsResponse,
+  V1UpdateSeriesFixturePayload,
+  V1UpdateSeriesFixtureResult,
+} from '@/types/team-match-series';
+
+export function useV1AdminTeamMatchSeriesList() {
+  return useQuery({
+    queryKey: v1Keys.adminTeamMatchSeriesList(),
+    queryFn: () => v1Get<{ items: V1AdminSeriesListItem[] }>('/admin/team-match-series'),
+  });
+}
+
+export function useV1AdminTeamMatchSeries(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTeamMatchSeries(seriesId),
+    queryFn: () => v1Get<V1AdminSeriesDetail>(`/admin/team-match-series/${seriesId}`),
+    enabled: Boolean(seriesId),
+  });
+}
+
+export function useV1CreateTeamMatchSeries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateSeriesPayload) => v1Post<V1CreateSeriesResult>('/admin/team-match-series', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeriesList() });
+    },
+  });
+}
+
+export function useV1GenerateSeriesFixtures(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1GenerateSeriesFixturesPayload) =>
+      v1Post<V1GenerateSeriesFixturesResult>(`/admin/team-match-series/${seriesId}/fixtures`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeries(seriesId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeriesList() });
+    },
+  });
+}
+
+export function useV1UpdateSeriesFixture(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1UpdateSeriesFixturePayload }) =>
+      v1Patch<V1UpdateSeriesFixtureResult>(`/admin/team-match-series/${seriesId}/fixtures/${teamMatchId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeries(seriesId) });
+    },
+  });
+}
+
+export function useV1TeamMatchSeries(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamMatchSeries(seriesId),
+    queryFn: () => v1Get<V1PublicSeriesDetail>(`/team-match-series/${seriesId}`),
+    enabled: Boolean(seriesId),
+  });
+}
+
+export function useV1TeamMatchSeriesStandings(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamMatchSeriesStandings(seriesId),
+    queryFn: () => v1Get<V1SeriesStandingsResponse>(`/team-match-series/${seriesId}/standings`),
+    enabled: Boolean(seriesId),
+  });
+}
+
+export function useV1TeamMatchSeriesPlayerRecords(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamMatchSeriesPlayerRecords(seriesId),
+    queryFn: () => v1Get<V1SeriesPlayerRecordsResponse>(`/team-match-series/${seriesId}/player-records`),
+    enabled: Boolean(seriesId),
+  });
+}

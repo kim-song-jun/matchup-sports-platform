@@ -23,6 +23,7 @@ import type {
 } from '../games/games.types';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
@@ -1255,11 +1256,8 @@ export class TeamMatchesService {
     sportId: string,
     actorUserId: string,
   ) {
-    const [sport, hostTeam] = await Promise.all([
-      tx.v1Sport.findFirst({
-        where: { id: sportId, isActive: true },
-        select: { code: true },
-      }),
+    const [competitionConfig, hostTeam] = await Promise.all([
+      resolveTeamMatchCompetitionConfig(tx, sportId),
       tx.v1Team.findFirst({
         where: { id: hostTeamId, status: 'active', deletedAt: null },
         select: {
@@ -1282,24 +1280,6 @@ export class TeamMatchesService {
         },
       }),
     ]);
-    const competitionSportCode =
-      sport?.code.toLowerCase() === 'soccer' || sport?.code.toLowerCase() === 'football'
-        ? 'football'
-        : sport?.code.toLowerCase() === 'futsal'
-          ? 'futsal'
-          : null;
-    const competitionConfig =
-      competitionSportCode === null
-        ? null
-        : await tx.v1CompetitionConfigVersion.findFirst({
-            where: {
-              sportCode: competitionSportCode,
-              name: `${competitionSportCode}-v1`,
-              status: 'ACTIVE',
-            },
-            orderBy: { version: 'desc' },
-            select: { id: true },
-          });
     if (competitionConfig === null || hostTeam === null) {
       throw new ConflictException({
         code: 'COMPETITION_CONFIG_REQUIRED',

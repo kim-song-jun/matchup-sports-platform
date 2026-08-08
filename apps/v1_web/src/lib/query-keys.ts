@@ -100,6 +100,11 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'sponsors'] as const,
   adminTournamentPopups: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'popups'] as const,
+  adminTeamMatchSeriesList: () => [...v1Keys.all, 'admin', 'team-match-series'] as const,
+  adminTeamMatchSeries: (seriesId: string) => [...v1Keys.all, 'admin', 'team-match-series', seriesId] as const,
+  teamMatchSeries: (seriesId: string) => [...v1Keys.all, 'team-match-series', seriesId] as const,
+  teamMatchSeriesStandings: (seriesId: string) => [...v1Keys.teamMatchSeries(seriesId), 'standings'] as const,
+  teamMatchSeriesPlayerRecords: (seriesId: string) => [...v1Keys.teamMatchSeries(seriesId), 'player-records'] as const,
   teamInvitations: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'invitations'] as const,
   receivedInvitations: () => [...v1Keys.all, 'me', 'invitations'] as const,
   myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,

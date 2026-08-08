@@ -145,23 +145,17 @@ export class ResultEscalationAccessService {
   private selectRows(): Prisma.Sql {
     return Prisma.sql`
       SELECT
-        escalation.id,
-        escalation.result_revision_id AS "resultRevisionId",
-        revision.game_id AS "gameId",
-        fixture.tournament_id AS "tournamentId",
-        escalation.kind::text AS kind,
-        escalation.due_at AS "dueAt",
-        escalation.status,
-        escalation.ack_by_user_id AS "ackByUserId",
-        escalation.resolved_by_user_id AS "resolvedByUserId",
-        escalation.reason,
-        escalation.version,
-        escalation.created_at AS "createdAt",
-        escalation.updated_at AS "updatedAt"
+        escalation.id, escalation.result_revision_id AS "resultRevisionId",
+        revision.game_id AS "gameId", fixture.tournament_id AS "tournamentId",
+        team_match.id AS "teamMatchId", team_match.series_id AS "seriesId",
+        escalation.kind::text AS kind, escalation.due_at AS "dueAt", escalation.status,
+        escalation.ack_by_user_id AS "ackByUserId", escalation.resolved_by_user_id AS "resolvedByUserId",
+        escalation.reason, escalation.version, escalation.created_at AS "createdAt", escalation.updated_at AS "updatedAt"
       FROM v1_result_escalations escalation
       INNER JOIN v1_game_result_revisions revision ON revision.id = escalation.result_revision_id
       INNER JOIN v1_games game ON game.id = revision.game_id
-      INNER JOIN v1_tournament_fixtures fixture ON fixture.id = game.tournament_fixture_id
+      LEFT JOIN v1_tournament_fixtures fixture ON fixture.id = game.tournament_fixture_id
+      LEFT JOIN v1_team_matches team_match ON team_match.id = game.team_match_id
     `;
   }
 }

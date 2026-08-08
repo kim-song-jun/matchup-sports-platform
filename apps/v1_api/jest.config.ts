@@ -33,6 +33,11 @@ const config: Config = {
         // gate" step runs exactly that command, so they would silently never execute despite
         // existing on disk. Added while writing the HTTP contract spec for this reason.
         '<rootDir>/test/team-schedules/**/*.integration-spec.ts',
+        // T4 (team-match-series): same silent-omission trap as team-schedules above —
+        // without this glob, `jest --selectProjects integration` never selects
+        // test/team-match-series/**, so the admin/public HTTP contract specs would exist
+        // on disk but never run in CI's migration replay + drift gate.
+        '<rootDir>/test/team-match-series/**/*.integration-spec.ts',
       ],
     },
     {

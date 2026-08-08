@@ -55,8 +55,26 @@ export const gameSchemaFixture = {
 // this task's migration is a new file
 // (20260807090000_v1_game_assist_foul_columns), not an edit to the bound
 // 20260729000100_v1_game_operations migration.
+// Re-pinned for T4 (team-match-series). Additive only: V1TeamMatchSeriesState enum,
+// V1TeamMatchSeries/V1TeamMatchSeriesTeam models, V1TeamMatch.seriesId + its index,
+// and back-relation array fields on V1Sport/V1Region/V1AdminUser/V1Team. No existing
+// field/type/attribute was modified. The migration hash below is UNCHANGED — this
+// branch adds a new migration file, it does not edit the bound
+// 20260729000100_v1_game_operations migration.
+// Re-pinned again (same T4 branch, CI-fixed): V1TeamMatchSeriesTeam's
+// @@unique([seriesId, teamId]) got an explicit map: to match the committed
+// migration's constraint name (v1_team_match_series_teams_series_team_key)
+// instead of Prisma's default name — the migrate-diff zero-drift gate was
+// failing on that rename. No shape change; migration hash still unchanged.
+//
+// Re-pinned once more when T1-2 (assist/foul) and T4 (series) met on dev. Each
+// branch had pinned the hash of its own schema.prisma, so the two pins collided
+// here while schema.prisma itself merged cleanly. The value below is the sha256
+// of the MERGED file, computed with `shasum -a 256` — it is not either branch's
+// value. Both sets of changes are present and both are additive; the bound
+// migration is untouched, so `migration` stays as it was.
 export const gameSchemaSourceManifest = {
-  schema: '88c506a5ab907b8ef3cc6db3e8ebbbd45d722f68451aa481d59b558dbd944a05',
+  schema: '01d94a57567728f69b001e3384d1e5559f29ba2d77a9e0dac88ad5c1f1d59ca4',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

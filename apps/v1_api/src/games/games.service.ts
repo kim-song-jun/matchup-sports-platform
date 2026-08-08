@@ -1150,6 +1150,39 @@ export class GamesService {
     }));
   }
 
+  /**
+   * T3(기록 입력 UX) 추가 — 라이브 기록 콘솔 전용 읽기 경로. `listLineups()`와
+   * 달리 `team_manager`/`team_owner` 액터에게도 양쪽 사이드를 모두 돌려준다:
+   * 기록자는 상대팀 선수도 탭해서 카드/파울을 남겨야 한다. 사전 라인업 비공개
+   * 원칙(listLineups의 ownSideId 제한)은 "SCHEDULED 상태에서는 여전히 자기
+   * 사이드만" 으로 대체 보존한다 — 킥오프 전 상대 전술을 미리 볼 수 없게.
+   */
+  async listOperationsLineups(user: V1AuthUser, gameId: string) {
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
+    const game = await this.prisma.v1Game.findUnique({ where: { id: gameId }, select: { state: true } });
+    if (game === null) {
+      throw this.notFound();
+    }
+    const ownSideId =
+      game.state === V1GameState.SCHEDULED &&
+      (actor.role === 'team_manager' || actor.role === 'team_owner')
+        ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
+        : null;
+    const lineups = await this.prisma.v1GameLineup.findMany({
+      where: { gameId, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
+      orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
+    });
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { lineupId: { in: lineups.map((lineup) => lineup.id) } },
+      orderBy: [{ jerseyNumber: 'asc' }, { createdAt: 'asc' }],
+    });
+    const participantsByLineupId = groupParticipantsByLineupId(participants);
+    return lineups.map((lineup) => ({
+      ...lineup,
+      participants: participantsByLineupId.get(lineup.id) ?? [],
+    }));
+  }
+
   async saveLineup(
     user: V1AuthUser,
     gameId: string,

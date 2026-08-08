@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fetchPublicV1 } from '@/lib/seo';
 import {
   formatScoreline,
@@ -321,6 +321,51 @@ describe('ScheduleContent — hidden 픽스처는 목록 자체에 나타나지 
     render(<ScheduleContent tournamentId="tournament-1" data={makeSchedule({ bracketPublished: false, items: [] })} />);
     expect(screen.getByText('대진표가 아직 공개되지 않았어요')).toBeInTheDocument();
     expect(screen.queryByText('무효 처리')).not.toBeInTheDocument();
+  });
+});
+
+describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여준다 (D-12)', () => {
+  const originalTz = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = 'Asia/Seoul';
+  });
+  afterAll(() => {
+    process.env.TZ = originalTz;
+  });
+
+  it('scheduledAt은 M/D (요일) HH:MM 형식으로, venue·fieldName은 별도 줄로 보여준다', () => {
+    const data = makeSchedule({
+      items: [
+        {
+          fixtureId: 'fixture-2',
+          round: '조별 A',
+          fixtureNumber: 1,
+          legNumber: 1,
+          groupId: 'group-a',
+          groupName: '조별 A',
+          scheduledAt: '2026-08-07T11:00:00.000Z',
+          venue: '잠실종합운동장',
+          fieldName: 'A구장',
+          home: { registrationId: 'reg-home', teamId: 'team-home', teamName: '서울 유나이티드' },
+          away: { registrationId: 'reg-away', teamId: 'team-away', teamName: '부산 FC' },
+          visibilityMode: 'official_only',
+          status: 'scheduled',
+          resultState: 'pending',
+          scoreStatus: 'unavailable',
+          score: null,
+          hasVideo: false,
+        },
+      ],
+    });
+    render(<ScheduleContent tournamentId="tournament-1" data={data} />);
+    expect(screen.getByText(/8\/7 \(금\) 20:00/)).toBeInTheDocument();
+    expect(screen.getByText('잠실종합운동장 (A구장)')).toBeInTheDocument();
+  });
+
+  it('venue·fieldName이 모두 없으면 null/undefined 문자열을 노출하지 않는다', () => {
+    // 기본 factory 항목(makeSchedule())은 venue: null, fieldName: null 이다.
+    render(<ScheduleContent tournamentId="tournament-1" data={makeSchedule()} />);
+    expect(screen.queryByText(/null|undefined/i)).not.toBeInTheDocument();
   });
 });
 

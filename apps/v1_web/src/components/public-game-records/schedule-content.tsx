@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
-import { formatTournamentDateShort } from '@/lib/date-utils';
+import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import {
   fixtureStatusLabel,
   formatScoreline,
@@ -35,8 +35,15 @@ function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
   );
 }
 
+function venueLabel(entry: PublicScheduleEntry): string | null {
+  if (!entry.venue && !entry.fieldName) return null;
+  if (entry.venue && entry.fieldName) return `${entry.venue} (${entry.fieldName})`;
+  return entry.venue ?? entry.fieldName;
+}
+
 function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: PublicScheduleEntry }) {
-  const dateLabel = formatTournamentDateShort(entry.scheduledAt);
+  const dateLabel = formatTournamentDateTimeShort(entry.scheduledAt);
+  const venue = venueLabel(entry);
   return (
     <Link
       href={`/tournaments/${tournamentId}/matches/${entry.fixtureId}`}
@@ -82,6 +89,9 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
           {sideLabel(entry.away)}
         </span>
       </div>
+      {venue ? (
+        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-caption)' }}>{venue}</div>
+      ) : null}
     </Link>
   );
 }

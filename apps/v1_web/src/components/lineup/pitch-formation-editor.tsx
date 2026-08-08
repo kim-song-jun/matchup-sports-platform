@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
-import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import { matchSlotsToEntries, type LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import type { FormationPreset, FormationSlot } from './formation-slots';
 
 /**
@@ -50,26 +50,6 @@ export type PitchFormationEditorProps = {
   onPlaceInSlot: (key: string, slot: FormationSlot) => void;
   onUnplaceFromSlot: (key: string) => void;
 };
-
-/** 슬롯 하나에 어느 선발이 채워져 있는지 짝짓는다. lineup.view-model.ts의
- * matchSlotsToEntries와 완전히 동일한 로직 — 렌더링은 여기서, 제출 검증은 그쪽에서
- * 각자 필요해 두 곳에 있지만, "positionCode로 매칭·GK는 goalkeeper 플래그로 매칭·
- * 선착순 소비" 세 규칙은 항상 같은 형태로 유지해야 한다. */
-function matchSlotsToEntries(
-  slots: FormationSlot[],
-  starters: LineupEntryDraft[],
-): Array<{ slot: FormationSlot; entry: LineupEntryDraft | null }> {
-  const consumed = new Set<string>();
-  return slots.map((slot) => {
-    const match = starters.find((entry) => {
-      if (consumed.has(entry.key)) return false;
-      if (slot.positionCode === 'GK') return entry.goalkeeper;
-      return !entry.goalkeeper && entry.position === slot.positionCode;
-    });
-    if (match) consumed.add(match.key);
-    return { slot, entry: match ?? null };
-  });
-}
 
 export function PitchFormationEditor({
   starters,

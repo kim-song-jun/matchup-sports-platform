@@ -238,6 +238,31 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, editable]);
 
+  // D-17: 종목별 포메이션·포지션 사전은 서버 lineupConfig가 유일한 출처다 — 종목명으로
+  // 하드코딩 카탈로그를 스위치하지 않는다. lineupConfig가 아직 없는(구버전 응답) 경우
+  // sportCatalog는 빈 배열이 되고, formationOptions도 자연히 비어 "자유 배치"만 남는다.
+  const sportCatalog: FormationPreset[] = lineupQuery.data?.lineupConfig
+    ? buildFormationPresets(lineupQuery.data.lineupConfig.positions, lineupQuery.data.lineupConfig.formations)
+    : [];
+  const outfieldCount = state?.starters.filter((entry) => !entry.goalkeeper).length ?? 0;
+  const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
+
+  // Copilot review finding (PR #277): 선발/골키퍼 변경으로 outfieldCount가 바뀌어 지금
+  // 선택된 formation이 더 이상 formationOptions에 없으면(예: 5명→4명으로 줄어 "1-1-2"
+  // 프리셋이 사라짐) 자유 배치로 되돌린다. 그대로 두면 화면은 이전 formation 라벨을
+  // 계속 보여주면서도 슬롯 모드는 이미 꺼져(selectedPreset=null → activeSlots=null)
+  // 제출 검증이 빈 슬롯 체크를 건너뛰고, 저장 페이로드에도 더 이상 유효하지 않은
+  // formation 코드가 그대로 실릴 수 있었다.
+  useEffect(() => {
+    if (state && state.formation !== null && !formationOptions.some((preset) => preset.code === state.formation)) {
+      setState((prev) => (prev ? selectFormation(prev, null) : prev));
+    }
+    // formationOptions/starters 참조가 바뀔 때마다(포메이션 프리셋 목록이 재계산될 때마다)
+    // 다시 검사한다 — state 전체를 deps에 넣으면 selectFormation 자체가 새 state를 만들어
+    // 무한 루프가 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formationOptions, state?.formation, state?.starters]);
+
   function handleConflictReload() {
     lineupQuery.refetch().then((result) => {
       if (result.data) {
@@ -369,14 +394,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   const counts = deriveLineupCounts(state, rosterPool);
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
-  // D-17: 종목별 포메이션·포지션 사전은 서버 lineupConfig가 유일한 출처다 — 종목명으로
-  // 하드코딩 카탈로그를 스위치하지 않는다. lineupConfig가 아직 없는(구버전 응답) 경우
-  // sportCatalog는 빈 배열이 되고, formationOptions도 자연히 비어 "자유 배치"만 남는다.
-  const sportCatalog: FormationPreset[] = lineupQuery.data.lineupConfig
-    ? buildFormationPresets(lineupQuery.data.lineupConfig.positions, lineupQuery.data.lineupConfig.formations)
-    : [];
-  const outfieldCount = state.starters.filter((entry) => !entry.goalkeeper).length;
-  const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
   const outfieldGuidance =
     formationSupported && formationOptions.length === 0 && outfieldCount > 0
       ? `현재 선발 ${outfieldCount}명 — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`

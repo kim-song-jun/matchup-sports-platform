@@ -29,14 +29,30 @@ export function parseLineupCatalog(
   );
 
   const rawFormations = Array.isArray(lineup.formations) ? lineup.formations : [];
-  const formations = rawFormations.filter(
-    (formation): formation is CompetitionConfig['lineup']['formations'][number] =>
-      isRecord(formation) &&
-      typeof formation.code === 'string' &&
-      typeof formation.label === 'string' &&
-      Number.isInteger(formation.outfield) &&
-      Array.isArray(formation.slots),
-  );
+  const formations = rawFormations
+    .filter(
+      (formation): formation is CompetitionConfig['lineup']['formations'][number] =>
+        isRecord(formation) &&
+        typeof formation.code === 'string' &&
+        typeof formation.label === 'string' &&
+        Number.isInteger(formation.outfield) &&
+        Array.isArray(formation.slots),
+    )
+    // Copilot review finding (PR #277): a legacy row could have `slots` be an
+    // array without each element actually being `{ position, x, y }` — the
+    // frontend's buildFormationPresets() reads slot.position/x/y unguarded,
+    // so a malformed element would throw at render time instead of just
+    // being dropped here. Validate every slot's shape, not only that the
+    // container is an array.
+    .filter((formation) =>
+      formation.slots.every(
+        (slot) =>
+          isRecord(slot) &&
+          typeof slot.position === 'string' &&
+          typeof slot.x === 'number' &&
+          typeof slot.y === 'number',
+      ),
+    );
 
   return { positions, formations };
 }

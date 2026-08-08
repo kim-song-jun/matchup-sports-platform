@@ -225,13 +225,20 @@ done
   -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
   v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-tournament-qa.ts'
-# QA 시드가 매 배포마다 대회를 리셋하므로, 공개 일정을 채우는 백필은 반드시 QA 시드 뒤에
-# 돌아야 한다(앞에 두면 QA 시드가 만든 픽스처를 못 보고 무의미하다). 순서도 중요하다:
-# competition-config 백필이 먼저 돌아 v1_tournaments/v1_team_matches/v1_tournament_fixtures 의
-# competitionConfigVersionId 를 채워야, fixture-game 백필이 그 값을 요구하는 픽스처를
-# CONFIG_MISSING 으로 격리하지 않는다(실측 확인됨).
-"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
-  'cd /app/apps/v1_api && node dist/src/tournaments/competition-config/competition-config-backfill.cli.js'
+# QA 시드가 매 배포마다 대회를 리셋하므로, 공개 일정을 채우는 fixture-game 백필은 반드시
+# QA 시드 뒤에 돌아야 한다(앞에 두면 QA 시드가 만든 픽스처를 못 보고 무의미하다).
+#
+# competition-config 백필은 **의도적으로 여기 넣지 않는다.** 그 CLI 는 canonical config 행이
+# 현재 코드의 레지스트리 상수와 다르면 COMPETITION_CONFIG_SEED_DRIFT 로 하드 실패하는데,
+# 그 가드는 옳지만 이 자리에 두면 드리프트가 존재하는 동안 **모든 alpha 배포가 실패**한다.
+# 실제로 2026-08-09 alpha 가 그 상태였다 — #277 이 lineup.positions/formations 를 추가했고
+# DB 행은 이전 내용이라 CLI 가 거부했다(실측). 배포 파이프라인이 그런 운영 판단
+# ("새 버전 발행 후 repoint" vs "행 복원")을 대신 내릴 수는 없으므로, config 채우기는
+# QA 시드가 픽스처 생성 시점에 직접 하고(seed-alpha-tournament-qa.ts) 이 CLI 는 운영자가
+# 필요할 때 수동으로 돌린다.
+#
+# fixture-game 백필은 config 가 없는 픽스처를 **격리(quarantine)만 하고 실패하지 않으므로**
+# 배포를 깨뜨리지 않는다 — 그래서 이 자리에 두어도 안전하다.
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/games/migration/fixture-game-backfill.cli.js'
 

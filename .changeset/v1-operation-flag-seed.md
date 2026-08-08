@@ -32,27 +32,31 @@ DML 은 additive 가 아니다). 그래서 새로 provisioning 된 환경은 누
 ## 추가 — 공개 대회 일정 백필을 alpha 배포 경로에 배선
 
 `deploy/deploy-alpha.sh` 는 매 배포마다 QA 시드를 돌려 대회 데이터를 리셋한다. 새로 생기는
-QA 픽스처에는 `V1Game`이 없어 배포 직후 공개 대회 일정이 항상 빈 목록이었다(운영자가 수동으로
-백필 CLI 를 돌려야만 복구됐다). QA 시드 실행 **직후**에 아래 두 CLI 를 순서대로 추가했다:
+QA 픽스처에는 `V1Game` 이 없어 배포 직후 공개 대회 일정이 항상 빈 목록이었다(운영자가 수동으로
+백필 CLI 를 돌려야만 복구됐다). QA 시드 실행 **직후**에 `games/migration/fixture-game-backfill.cli.ts`
+를 추가해, 픽스처에 대응하는 `V1Game` 을 미러링 생성하도록 했다.
 
-1. `tournaments/competition-config/competition-config-backfill.cli.ts` —
-   `v1_tournaments`/`v1_team_matches`/`v1_tournament_fixtures.competitionConfigVersionId` 를 채운다.
-2. `games/migration/fixture-game-backfill.cli.ts` — `scheduled`/`in_progress`/`completed`
-   픽스처에 대응하는 `V1Game`을 미러링해 생성/보강한다.
+**`competition-config-backfill.cli.ts` 는 의도적으로 배포 경로에 넣지 않았다.** 그 CLI 는
+canonical config 행이 현재 코드의 레지스트리 상수와 content hash 가 다르면
+`COMPETITION_CONFIG_SEED_DRIFT` 로 하드 실패한다. 가드 자체는 옳다 — 이미 대회가 참조 중인
+config 의 내용이 바뀐 채로 진행하면 끝난 경기의 채점 규칙이 조용히 바뀔 수 있다. 그러나 그
+CLI 를 배포 경로에 두면 **드리프트가 존재하는 동안 모든 alpha 배포가 실패한다.**
 
-순서가 중요하다: fixture-game 백필은 `competitionConfigVersionId` 가 없는 픽스처를
-`CONFIG_MISSING` 으로 격리한다. competition-config 백필을 먼저 돌려 그 값을 채워 두지 않으면
-방금 QA 시드가 만든 픽스처 전부가 격리돼 백필이 무의미해진다(실측 확인됨).
+이건 가정이 아니라 실측이다. 2026-08-09 시점 alpha 가 정확히 그 상태였다 — #277 이
+`lineup.positions`/`lineup.formations` 를 프리셋에 추가했는데 DB 의 canonical 행은 이전 내용이라
+CLI 가 거부했다:
 
-**`COMPETITION_CONFIG_SEED_DRIFT` 는 의도적으로 배포를 막는다.** competition-config 백필은
-canonical config 행(`v1_competition_config_version`, football/futsal 각 1행)이 이미 존재하는데
-현재 코드의 레지스트리 상수와 content hash 가 다르면 예외를 던진다. 이 두 행은 alpha 의 QA
-시드/sanitize 어느 쪽도 건드리지 않는 테이블이라(첫 백필 실행 이후로는) 배포 사이에 그대로
-남는다 — 즉 정상적인 반복 배포에서는 드리프트가 발생하지 않는다. 드리프트가 발생하는 유일한
-경로는 이미 대회들이 참조 중인 canonical config 의 **내용**을 코드에서 바꿔놓고 새 버전 행을
-만들지 않은 경우인데, 그 상태로 배포를 계속 진행하면 이미 끝난 경기의 채점 규칙이 조용히
-바뀔 수 있다 — 바로 이 가드가 막으려는 사고다. `deploy-alpha.sh` 는 `set -Eeuo pipefail` +
-`trap ERR` 로 이미 모든 단계에 fail-fast 이므로, 이 CLI 가 비정상 종료하면 배포는 자동으로
-직전 정상 릴리스로 롤백된다. 이 가드를 무력화하거나 우회하지 않았다 — 코드 자체의 주석이
-"resolve manually... then re-run" 을 요구하는 설계이므로, alpha 라는 자동배포 환경에서도
-그 요구를 그대로 존중하는 것이 맞다고 판단했다.
+```
+COMPETITION_CONFIG_SEED_DRIFT: football-v1 expected b442845d… but found 60b7ecf9…,
+                               futsal-v1   expected 2d4bf6fb… but found 769fa5d3…
+```
+
+게다가 in-place 복구도 불가능하다 — `v1_block_used_config_mutation` 트리거(라이브 정의 확인)가
+`v1_games`/`v1_tournaments`/`v1_team_matches`/`v1_tournament_fixtures` 중 하나라도 그 config 를
+참조하면 UPDATE·DELETE 를 거부한다(실측 참조 수: 대회 4 · 픽스처 10 · 게임 4 · 팀매치 1).
+즉 "새 config 버전 발행 후 repoint" 라는 운영 판단이 필요한데, **배포 파이프라인이 그 판단을
+대신 내릴 수는 없다.**
+
+그래서 config 채우기는 CLI 가 아니라 **QA 시드가 픽스처를 만드는 시점에 직접** 하도록 하고
+(별도 PR), 이 CLI 는 운영자가 필요할 때 수동으로 돌린다. `fixture-game-backfill` 은 config 가
+없는 픽스처를 **격리(quarantine)만 하고 실패하지 않으므로** 배포 경로에 두어도 안전하다.

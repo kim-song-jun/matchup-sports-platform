@@ -79,7 +79,7 @@ echo "실제 사고 시나리오(가짜 docker 로 삭제 대상 시뮬레이션
 # ── ③ 무엇이 지워지고 무엇이 살아남는가 ────────────────────────────────────
 # 2026-08-09 alpha 호스트 실측 그대로: dangling 필터엔 4개(active 2 + previous 2)가
 # 걸리지만, 실제 prune 삭제 로직은 컨테이너 참조를 스킵하므로 previous 2개만 지워진다.
-# 태그 붙은 legacy 이미지 4개는애초에 dangling 이 아니라 prune -f 의 대상이 아니다.
+# 태그 붙은 legacy 이미지 4개는 애초에 dangling 이 아니라 prune -f 의 대상이 아니다.
 WORLD="${WORK}/world.txt"
 cat > "${WORLD}" <<'IMAGES'
 active_api|dangling|referenced
@@ -137,8 +137,11 @@ echo
 echo "deploy-alpha.sh 안에서의 호출 순서:"
 
 # ── ④ prune 호출이 healthy 확인(assert_running_release_digests) 뒤에 오는가 ──
+# 실제 호출문만 앵커링한다 — 호출부 위의 설명 주석("근거·안전성 판단은
+# prune_stale_alpha_images() 정의부..." 등)도 함수 이름을 언급하므로, 느슨한 grep 은 주석
+# 줄을 "호출 위치"로 오인해 실제 순서가 뒤집혀도 통과시킬 수 있다(Copilot 리뷰 지적).
 health_line="$(grep -n '^assert_running_release_digests$' "${DEPLOY_SCRIPT}" | head -n1 | cut -d: -f1)"
-prune_line="$(grep -n 'prune_stale_alpha_images' "${DEPLOY_SCRIPT}" | head -n1 | cut -d: -f1)"
+prune_line="$(grep -nE '^\s*(if\s+!\s+)?prune_stale_alpha_images\b' "${DEPLOY_SCRIPT}" | head -n1 | cut -d: -f1)"
 if [[ -z "${health_line}" ]]; then
   fail "deploy-alpha.sh 에서 assert_running_release_digests 호출을 찾지 못했다"
 elif [[ -z "${prune_line}" ]]; then

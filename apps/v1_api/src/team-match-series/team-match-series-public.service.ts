@@ -81,39 +81,34 @@ export class TeamMatchSeriesPublicService {
     return { seriesId: series.id, tieBreakOrder, standings: standingsWithTeamName, pendingFixtures };
   }
 
-  // NOTE: assists is intentionally out of scope here. V1GameResultParticipant.assists
-  // ships from the parallel T1 track (feat/v1-wave-b-recording) and isn't on this
-  // branch's schema yet — selecting/reading it doesn't compile. Once T1 merges,
-  // extend this method (and the response shape) to add an `assists` leaderboard
-  // the same way `goals` is built below. Do not re-add an `assists` select/read
-  // without first confirming `assists` exists on V1GameResultParticipant here.
   async playerRecords(seriesId: string) {
     const series = await this.loadSeries(seriesId);
     const teamMatchIds = (await this.prisma.v1TeamMatch.findMany({ where: { seriesId }, select: { id: true } })).map((tm) => tm.id);
-    if (teamMatchIds.length === 0) return { seriesId: series.id, goals: [] };
+    if (teamMatchIds.length === 0) return { seriesId: series.id, goals: [], assists: [] };
 
     const games = await this.prisma.v1Game.findMany({
       where: { teamMatchId: { in: teamMatchIds }, currentOfficialRevisionId: { not: null } },
       select: { currentOfficialRevisionId: true },
     });
     const revisionIds = games.map((g) => g.currentOfficialRevisionId!).filter(Boolean);
-    if (revisionIds.length === 0) return { seriesId: series.id, goals: [] };
+    if (revisionIds.length === 0) return { seriesId: series.id, goals: [], assists: [] };
 
     const participantRows = await this.prisma.v1GameResultParticipant.findMany({
       where: { resultRevisionId: { in: revisionIds } },
-      select: { participantId: true, goals: true, resultRevision: { select: { officialAt: true } } },
+      select: { participantId: true, goals: true, assists: true, resultRevision: { select: { officialAt: true } } },
     });
 
     const eligibility = await loadParticipantConsentEligibility(this.prisma, participantRows.map((row) => row.participantId));
-    const totalsByUserId = new Map<string, { goals: number }>();
+    const totalsByUserId = new Map<string, { goals: number; assists: number }>();
     for (const row of participantRows) {
       const eligibilityRow = eligibility.get(row.participantId);
       if (eligibilityRow === undefined) continue;
       const officialAt = row.resultRevision.officialAt;
       if (officialAt === null || !isParticipantPubliclyEligible(eligibilityRow, officialAt)) continue;
       const userId = eligibilityRow.linkedUserId!;
-      const current = totalsByUserId.get(userId) ?? { goals: 0 };
+      const current = totalsByUserId.get(userId) ?? { goals: 0, assists: 0 };
       current.goals += row.goals;
+      current.assists += row.assists;
       totalsByUserId.set(userId, current);
     }
 
@@ -125,6 +120,7 @@ export class TeamMatchSeriesPublicService {
     return {
       seriesId: series.id,
       goals: [...rows].sort((a, b) => b.goals - a.goals).slice(0, PLAYER_RECORDS_LIMIT),
+      assists: [...rows].sort((a, b) => b.assists - a.assists).slice(0, PLAYER_RECORDS_LIMIT),
     };
   }
 

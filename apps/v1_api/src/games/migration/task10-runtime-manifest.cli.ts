@@ -181,11 +181,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 import { createV1SessionToken } from '../../auth/v1-session';
-import {
-  GAME_OPERATION_FLAG_DEFAULTS,
-  resolveGameOperationGateRoot,
-  type GameOperationFlagKey,
-} from '../../config/game-operation-flags';
+import { resolveGameOperationGateRoot } from '../../config/game-operation-flags';
+import { seedGameOperationFlagDefaults } from '../../config/game-operation-flags-seed';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../terms/managed-terms-runtime.service';
 import { FOOTBALL_V1_CONFIG } from '../../tournaments/competition-config/competition-config';
@@ -443,33 +440,13 @@ async function seedOperationsBoardFixture(prisma: PrismaService): Promise<void> 
   });
 }
 
-// Blocker (e) in this file's header comment. Idempotent (ON-CONFLICT-safe upserts) — reuses
-// GAME_OPERATION_FLAG_DEFAULTS exported from game-operation-flags.ts (Task 5) rather than
-// re-declaring the default value set here, and reproduces exactly what that file's own
-// GameOperationFlagsService.ensureDefaults() would create (same version:0, same owner_actor,
-// same schema-level V1GameCutoverEpoch defaults) -- not a new or relaxed contract, just seeded
-// earlier than that lazy-on-first-mutation path would otherwise run. Safe to call unconditionally
-// on every invocation: a real ensureDefaults() call later in the same run (transition-compare's
-// patchFlag()) sees these rows already present and no-ops.
-async function seedGameOperationFlagDefaults(prisma: PrismaService): Promise<void> {
-  for (const key of Object.keys(GAME_OPERATION_FLAG_DEFAULTS) as GameOperationFlagKey[]) {
-    await prisma.v1GameOperationFlag.upsert({
-      where: { key },
-      update: {},
-      create: {
-        key,
-        value: GAME_OPERATION_FLAG_DEFAULTS[key],
-        version: 0,
-        ownerActor: 'platform_ops',
-      },
-    });
-  }
-  await prisma.v1GameCutoverEpoch.upsert({
-    where: { id: 'game-cutover' },
-    update: {},
-    create: { id: 'game-cutover', version: 0, writeMode: 'legacy' },
-  });
-}
+// Blocker (e) in this file's header comment is now handled by the shared
+// `config/game-operation-flags-seed.ts` module, which this file imports rather than
+// re-implementing (the local copy that used to live here was byte-equivalent). That module is
+// also what the deploy path runs after `prisma migrate deploy`, so CI and a real deployment seed
+// the exact same rows. Safe to call unconditionally on every invocation: a real ensureDefaults()
+// call later in the same run (transition-compare's patchFlag()) sees these rows already present
+// and no-ops.
 
 // ---------------------------------------------------------------------------
 // Real gate-bundle evidence (blocker (c)).

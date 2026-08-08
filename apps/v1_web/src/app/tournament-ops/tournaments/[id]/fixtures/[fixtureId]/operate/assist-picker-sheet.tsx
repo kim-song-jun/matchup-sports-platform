@@ -25,6 +25,18 @@ export function AssistPickerSheet({ open, event, scorerName, teammates, onAttach
   const [error, setError] = useState<string | null>(null);
   if (!open) return null;
 
+  // Copilot review (PR #276): the parent conditionally renders this sheet
+  // (`{assistTarget ? <AssistPickerSheet ... /> : null}`), so calling
+  // onClose() actually unmounts it, not just hides it. attachAssist() is a
+  // two-step reverse-then-resubmit -- if the backdrop/X close it while pick()
+  // is still awaiting onAttach, the finally/catch below would setState on an
+  // unmounted component and, worse, any failure after the sheet is gone
+  // never reaches the user even though the goal may already have been
+  // reversed. Block the close paths while a pick is in flight instead.
+  const closeIfIdle = () => {
+    if (pending === null) onClose();
+  };
+
   const pick = async (teammate: GameLineupParticipant) => {
     setPending(teammate.id);
     setError(null);
@@ -42,7 +54,7 @@ export function AssistPickerSheet({ open, event, scorerName, teammates, onAttach
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 sm:items-center sm:p-4"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) closeIfIdle();
       }}
     >
       <div
@@ -57,9 +69,10 @@ export function AssistPickerSheet({ open, event, scorerName, teammates, onAttach
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeIfIdle}
+            disabled={pending !== null}
             aria-label="닫기"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-700"
           >
             <X size={18} aria-hidden="true" />
           </button>

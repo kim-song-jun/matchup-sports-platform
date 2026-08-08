@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { WifiOff, Wifi } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
@@ -140,6 +140,18 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const { toasts, showToast, dismiss } = useEventToast();
   const [assistTarget, setAssistTarget] = useState<{ event: GameEventRecord } | null>(null);
 
+  // Copilot review (PR #276): the toast's action.onClick used to close over
+  // `ops.liveEvents` from the render that submitted the GOAL -- before the
+  // websocket/query round-trip lands that event in liveEvents. The toast
+  // itself is never re-created once shown, so that closure stayed stale for
+  // its whole 5s lifetime and findRecentGoalEvent almost always returned
+  // undefined ("어시스트 추가" silently did nothing). A ref kept in sync via
+  // effect lets the onClick read the live value at click time instead.
+  const liveEventsRef = useRef(ops.liveEvents);
+  useEffect(() => {
+    liveEventsRef.current = ops.liveEvents;
+  }, [ops.liveEvents]);
+
   const handleCommit = useCallback(
     (input: EventCaptureCommitInput) => {
       void ops.submitEvent(input);
@@ -149,7 +161,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           action: {
             label: '어시스트 추가',
             onClick: () => {
-              const match = findRecentGoalEvent(ops.liveEvents, input);
+              const match = findRecentGoalEvent(liveEventsRef.current, input);
               if (match) setAssistTarget({ event: match });
             },
           },

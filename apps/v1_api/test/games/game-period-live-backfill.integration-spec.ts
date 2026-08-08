@@ -1,18 +1,17 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { V1GameEventType, V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type { GameActorScope, GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
+import { runGamePeriodLiveBackfill } from '../../src/games/migration/game-period-live-backfill';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
  * D-21 / Task 1의 blocker B7 — Task 1이 심는 PERIOD_NOT_STARTED 가드가 배포되는
  * 순간, 그 이전까지 V1Game.state='LIVE'였던 경기는 period가 전부 SCHEDULED로
- * 남아있어 이벤트를 영원히 못 받는다. 이 스위트는 마이그레이션 SQL 파일 자체를
- * (prisma migrate가 아니라) 직접 읽어 실행해, 그 SQL이 실제로 이 상태를
- * 고치는지와 idempotent한지를 증명한다.
+ * 남아있어 이벤트를 영원히 못 받는다. 이 스위트는 production 백필 로직
+ * (`runGamePeriodLiveBackfill`)을 실제로 호출해, 그게 이 상태를 고치는지와
+ * idempotent한지를 증명한다.
  *
  * Fix round 1: 코디네이터 리뷰에서 발견 — 구코드에서는 `start`와 `pause` 둘 다
  * `V1GamePeriod`를 건드리지 않았다(`games.service.ts`의 `v1GamePeriod.update*` 호출
@@ -29,15 +28,23 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  * 무조건 period 1을 여는데, `assertEventReferences`의 **기존(T1-0이 건드리지 않은)**
  * `EVENT_LATE` 체크(`dto.period < maxRecordedPeriod`)가 이미 period=2로 기록된 게임에
  * period=1로 열린 채로 다음 이벤트를 보내면 그대로 걸린다 — 백필이 구제하려던 경기가
- * 여전히 기록 불가로 남는다. 마이그레이션이 이제 `MAX(그 게임의 v1_game_events.period)`
+ * 여전히 기록 불가로 남는다. 백필이 이제 `MAX(그 게임의 v1_game_events.period)`
  * (이벤트가 없으면 1)를 열도록 고쳐 이 연속성을 지킨다 — 아래 "사전 이벤트가 있는 경기"
  * 테스트가 이 상호작용을 재현·검증한다(이전까지는 어떤 테스트도 백필 실행 전에 이벤트를
  * 하나도 만들지 않아 이 상호작용 자체가 검증되지 않았다).
+ *
+ * Fix round 4: 이 백필은 원래 `prisma/migrations/20260807000000_v1_period_live_backfill`의
+ * `migration.sql` UPDATE 문이었다 — 이 스위트도 그 파일을 직접 읽어
+ * `$executeRawUnsafe`로 돌렸다. `deploy-alpha.yml`의 expand-contract 게이트
+ * (`scripts/qa/check-expand-contract-migrations.mjs`)가 새로 추가되는 마이그레이션의
+ * 모든 SQL 문이 additive여야 한다고 강제하는데 UPDATE는 그 조건을 절대 만족할 수
+ * 없어, 이 마이그레이션이 dev에 올라가는 순간 매 alpha 배포가 영구히 막힌다. Task
+ * 10의 game-result-backfill.ts/.cli.ts가 이미 세운 것과 같은 분리를 따라 SQL 로직을
+ * `game-period-live-backfill.ts`의 `runGamePeriodLiveBackfill()`로 옮겼다(스키마
+ * 마이그레이션은 additive-only로 유지, 1회성 데이터 복구는 배포 후 CLI로 분리). 이
+ * 스위트도 같은 이유로 마이그레이션 파일을 읽지 않고 그 함수를 직접 호출하도록
+ * 다시 썼다 — 검증하는 SQL 술어 자체는 그대로다.
  */
-const migrationSql = readFileSync(
-  resolve(__dirname, '../../prisma/migrations/20260807000000_v1_period_live_backfill/migration.sql'),
-  'utf8',
-);
 
 const ids = {
   director: '67000000-0000-4000-8000-000000000001',
@@ -190,7 +197,7 @@ describe('D-21 period-live backfill migration — one-time repair for games left
     const before = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
     expect(before.every((period) => period.state === 'SCHEDULED' && period.startedAt === null)).toBe(true);
 
-    await prisma.$executeRawUnsafe(migrationSql);
+    await runGamePeriodLiveBackfill(prisma, { dryRun: false });
 
     const after = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
     expect(after[0]).toEqual(expect.objectContaining({ number: 1, state: 'LIVE' }));
@@ -206,7 +213,7 @@ describe('D-21 period-live backfill migration — one-time repair for games left
     expect(period1Before.state).toBe('LIVE');
     const startedAtBefore = period1Before.startedAt!.getTime();
 
-    await prisma.$executeRawUnsafe(migrationSql);
+    await runGamePeriodLiveBackfill(prisma, { dryRun: false });
 
     const period1After = await prisma.v1GamePeriod.findFirstOrThrow({ where: { gameId, number: 1 } });
     expect(period1After.startedAt!.getTime()).toBe(startedAtBefore);
@@ -215,7 +222,7 @@ describe('D-21 period-live backfill migration — one-time repair for games left
   it('아직 시작 안 한 SCHEDULED 경기는 건드리지 않는다', async () => {
     const gameId = await createGame(ids.fixtureScheduled);
 
-    await prisma.$executeRawUnsafe(migrationSql);
+    await runGamePeriodLiveBackfill(prisma, { dryRun: false });
 
     const periods = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
     expect(periods.every((period) => period.state === 'SCHEDULED' && period.startedAt === null)).toBe(true);
@@ -230,7 +237,7 @@ describe('D-21 period-live backfill migration — one-time repair for games left
       data: { state: 'LIVE', startedAt: realStartedAt },
     });
 
-    await prisma.$executeRawUnsafe(migrationSql);
+    await runGamePeriodLiveBackfill(prisma, { dryRun: false });
 
     const period1 = await prisma.v1GamePeriod.findFirstOrThrow({ where: { gameId, number: 1 } });
     expect(period1.startedAt!.getTime()).toBe(realStartedAt.getTime());
@@ -246,7 +253,7 @@ describe('D-21 period-live backfill migration — one-time repair for games left
     const before = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
     expect(before.every((period) => period.state === 'SCHEDULED' && period.startedAt === null)).toBe(true);
 
-    await prisma.$executeRawUnsafe(migrationSql);
+    await runGamePeriodLiveBackfill(prisma, { dryRun: false });
 
     const after = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
     expect(after[0]).toEqual(expect.objectContaining({ number: 1, state: 'LIVE' }));
@@ -324,7 +331,7 @@ describe('D-21 period-live backfill migration — one-time repair for games left
     const before = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
     expect(before.every((period) => period.state === 'SCHEDULED' && period.startedAt === null)).toBe(true);
 
-    await prisma.$executeRawUnsafe(migrationSql);
+    await runGamePeriodLiveBackfill(prisma, { dryRun: false });
 
     // Exit proof 1/2: period 1이 아니라 이미 기록된 period 2가 LIVE로 열려야 한다.
     // period 1을 열었다면 PERIOD_NOT_STARTED는 통과하겠지만, 그 아래 살아있는(T1-0이

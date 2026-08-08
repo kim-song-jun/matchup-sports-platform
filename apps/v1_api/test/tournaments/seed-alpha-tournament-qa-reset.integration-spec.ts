@@ -20,10 +20,11 @@ import { resetAlphaTournamentScenarios } from '../../prisma/seed-alpha-tournamen
  *      produces (a Game with no result at all) and for a Game whose result
  *      never left DRAFT,
  *   3. it refuses — loudly, and without deleting anything — the moment a
- *      Game's result has actually gone OFFICIAL, because at that point
- *      Postgres triggers make the result rows permanently undeletable by
- *      design (the same "never lose a played match" guarantee the FK
- *      itself encodes),
+ *      Game's result has actually gone OFFICIAL, or carries an orphan
+ *      V1TeamRecordFact row (append-only the instant it's written,
+ *      regardless of revision state), because at that point Postgres
+ *      triggers make those rows permanently undeletable by design (the same
+ *      "never lose a played match" guarantee the FK itself encodes),
  *   4. it never touches a tournament outside the given ID list.
  */
 
@@ -48,6 +49,14 @@ const ids = {
   draftParticipant: id('000000000034'),
   draftLineupId: id('000000000035'),
   draftSideId: id('000000000036'),
+
+  // A Game whose result is still DRAFT but carries an orphan V1TeamRecordFact
+  // (append-only from the moment it's written, regardless of revision state)
+  // — must also block the reset entirely.
+  orphanFactTournament: id('000000000050'),
+  orphanFactFixture: id('000000000051'),
+  orphanFactGame: id('000000000052'),
+  orphanFactRevision: id('000000000053'),
 
   // A Game whose result has gone OFFICIAL — must block the reset entirely.
   officialTournament: id('000000000040'),
@@ -117,6 +126,56 @@ async function seedDraftResultGame(params: {
   });
   await prisma.v1GameResultDecision.create({
     data: { revisionId, decision: 'HOLD', actorType: 'SYSTEM', actorUserId: ids.user },
+  });
+}
+
+/**
+ * A DRAFT-revision Game carrying an orphan V1TeamRecordFact — a real,
+ * trigger-permitted shape: unlike V1GameOfficialFact / V1GameOfficialResultCache,
+ * nothing gates INSERT on v1_team_record_facts by revision state, but
+ * `v1_block_team_record_fact_mutation` blocks its own UPDATE **and DELETE**
+ * unconditionally. Once such a row exists, it can never be deleted by app
+ * code — DRAFT or not.
+ */
+async function seedDraftResultGameWithOrphanTeamRecordFact(params: {
+  readonly gameId: string;
+  readonly fixtureId: string;
+  readonly revisionId: string;
+  readonly configId: string;
+}) {
+  const { gameId, fixtureId, revisionId, configId } = params;
+  await prisma.v1Game.create({
+    data: {
+      id: gameId,
+      sourceType: 'TOURNAMENT_FIXTURE',
+      tournamentFixtureId: fixtureId,
+      competitionConfigVersionId: configId,
+      state: 'LIVE',
+    },
+  });
+  await prisma.v1GameResultRevision.create({
+    data: {
+      id: revisionId,
+      gameId,
+      revision: 1,
+      state: 'DRAFT',
+      score: { home: 1, away: 0 },
+      eventsHash: 'orphan-fact-events-hash',
+      createdByActorType: 'SYSTEM',
+      createdBySystemActor: 'seed-reset-test',
+    },
+  });
+  await prisma.v1TeamRecordFact.create({
+    data: {
+      revisionId,
+      gameId,
+      teamId: ids.sport,
+      result: 'DRAWN',
+      goalsFor: 1,
+      goalsAgainst: 1,
+      sourceHash: 'draft-orphan-source-hash',
+      officialAt: new Date('2026-08-01T09:00:00.000Z'),
+    },
   });
 }
 
@@ -272,6 +331,19 @@ describe('resetAlphaTournamentScenarios — tears down the Game graph before del
     });
 
     await prisma.v1Tournament.create({
+      data: { id: ids.orphanFactTournament, sportId: ids.sport, title: 'Orphan Team Record Fact Tournament' },
+    });
+    await prisma.v1TournamentFixture.create({
+      data: { id: ids.orphanFactFixture, tournamentId: ids.orphanFactTournament, round: 'group', fixtureNumber: 1 },
+    });
+    await seedDraftResultGameWithOrphanTeamRecordFact({
+      gameId: ids.orphanFactGame,
+      fixtureId: ids.orphanFactFixture,
+      revisionId: ids.orphanFactRevision,
+      configId: footballConfigId,
+    });
+
+    await prisma.v1Tournament.create({
       data: { id: ids.officialTournament, sportId: ids.sport, title: 'Official Result Tournament' },
     });
     await prisma.v1TournamentFixture.create({
@@ -345,6 +417,22 @@ describe('resetAlphaTournamentScenarios — tears down the Game graph before del
     await expect(
       prisma.v1GameResultDecision.findMany({ where: { revisionId: ids.draftRevision } }),
     ).resolves.toHaveLength(0);
+  });
+
+  it('refuses a DRAFT-revision Game carrying an orphan team record fact, deleting nothing, because that fact is append-only by design regardless of revision state', async () => {
+    await expect(
+      prisma.$transaction((tx) => resetAlphaTournamentScenarios(tx, [ids.orphanFactTournament])),
+    ).rejects.toThrow(/team record fact/);
+
+    // The whole transaction rolled back — every row this scenario owns is still there.
+    await expect(prisma.v1Tournament.findUniqueOrThrow({ where: { id: ids.orphanFactTournament } })).resolves.toBeDefined();
+    await expect(prisma.v1Game.findUniqueOrThrow({ where: { id: ids.orphanFactGame } })).resolves.toBeDefined();
+    await expect(
+      prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: ids.orphanFactRevision } }),
+    ).resolves.toBeDefined();
+    await expect(
+      prisma.v1TeamRecordFact.findFirstOrThrow({ where: { revisionId: ids.orphanFactRevision } }),
+    ).resolves.toBeDefined();
   });
 
   it('refuses a Game whose result went OFFICIAL, deleting nothing, because that result is permanently append-only by design', async () => {

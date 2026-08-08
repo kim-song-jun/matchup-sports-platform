@@ -813,16 +813,29 @@ async function teardownGamesForTournaments(
   }
   const revisionIds = revisions.map((revision) => revision.id);
 
-  // Everything below is a Restrict child of either V1Game directly or of one
-  // of its V1GameResultRevision rows — every model in schema.prisma with a
-  // `references: [id] ... onDelete: Restrict` edge onto those two tables is
-  // covered here (verified against schema.prisma at the time of writing).
-  // V1GameOfficialFact / V1GameOfficialResultCache / V1TeamRecordFact are
-  // deliberately not deleted here: their own insert guards require the
-  // owning revision to already be OFFICIAL, which the check above has just
-  // ruled out for every revision still in scope — they can never have rows
-  // for a DRAFT-only revision.
+  // v1_team_record_facts is a special case: unlike V1GameOfficialFact /
+  // V1GameOfficialResultCache (each gated on INSERT by a BEFORE INSERT
+  // trigger requiring their revision to already be OFFICIAL — structurally
+  // unreachable once the check above has ruled out every non-DRAFT
+  // revision), nothing gates its INSERT at all, so a row can exist against
+  // a still-DRAFT revision. And `v1_block_team_record_fact_mutation` blocks
+  // its own UPDATE **and DELETE** unconditionally (no state check) — once
+  // written, a team record fact can never be deleted by app code, DRAFT or
+  // not. Attempting the delete would always fail; check for it and refuse
+  // loudly instead (Copilot review, PR #281).
   if (revisionIds.length > 0) {
+    const orphanTeamRecordFact = await tx.v1TeamRecordFact.findFirst({
+      where: { revisionId: { in: revisionIds } },
+      select: { id: true, revisionId: true },
+    });
+    if (orphanTeamRecordFact) {
+      throw new Error(
+        `Alpha QA reset refused: result revision ${orphanTeamRecordFact.revisionId} has a team record ` +
+          `fact (${orphanTeamRecordFact.id}), which is append-only and can never be deleted — the QA ` +
+          'scenario tournament that owns it cannot be reseeded.',
+      );
+    }
+
     await tx.v1GameResultParticipant.deleteMany({ where: { resultRevisionId: { in: revisionIds } } });
     await tx.v1ResultEscalation.deleteMany({ where: { resultRevisionId: { in: revisionIds } } });
     // No FK constraint backs v1_game_result_decisions.revision_id (checked

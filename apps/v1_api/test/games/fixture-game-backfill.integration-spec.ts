@@ -1,7 +1,10 @@
+import { V1GameSideKey, V1VisibilityMode } from '@prisma/client';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { PublicTournamentRecordsService } from '../../src/games/public-records/public-tournament-records.service';
 import {
+  createScheduledGame,
   runFixtureGameBackfill,
+  type CreateCandidate,
   type FixtureGameBackfillResult,
 } from '../../src/games/migration/fixture-game-backfill';
 import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
@@ -61,6 +64,8 @@ const ids = {
   bareGame: id('000000000051'),
 
   fixtureConfigMissing: id('000000000060'),
+
+  fixtureInvariantViolation: id('000000000070'),
 } as const;
 
 const prisma = new PrismaService();
@@ -68,6 +73,7 @@ const publicRecords = new PublicTournamentRecordsService(prisma);
 
 describe('fixture-game-backfill — repairs the "public schedule always empty" bug', () => {
   let applyResult: FixtureGameBackfillResult;
+  let footballConfigId: string;
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
@@ -96,7 +102,7 @@ describe('fixture-game-backfill — repairs the "public schedule always empty" b
     const footballConfig = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
       where: { name: 'football-v1', status: 'ACTIVE' },
     });
-    const footballConfigId = footballConfig.id;
+    footballConfigId = footballConfig.id;
 
     await prisma.v1Tournament.create({
       data: {
@@ -224,6 +230,25 @@ describe('fixture-game-backfill — repairs the "public schedule always empty" b
           status: 'scheduled',
           scheduledAt: new Date('2026-08-10T12:00:00.000Z'),
           competitionConfigVersionId: null,
+        },
+        {
+          // status: 'completed' is deliberate, not incidental: it keeps this
+          // fixture OUTSIDE runFixtureGameBackfill()'s own
+          // collectCandidates() toCreate bucket (that query only selects
+          // status IN ('scheduled','in_progress')), so the "apply" test
+          // below can never race ahead and create a real Game for it first.
+          // This fixture exists only so createScheduledGame() (called
+          // directly, further down) has a real, gameless fixture row to
+          // satisfy the tournamentFixtureId FK when it creates the Game and
+          // its first side, before the deliberately malformed candidate's
+          // participant loop is reached.
+          id: ids.fixtureInvariantViolation,
+          tournamentId: ids.tournament,
+          round: 'group',
+          fixtureNumber: 7,
+          status: 'completed',
+          scheduledAt: new Date('2026-08-10T13:00:00.000Z'),
+          competitionConfigVersionId: footballConfigId,
         },
       ],
     });
@@ -358,6 +383,44 @@ describe('fixture-game-backfill — repairs the "public schedule always empty" b
     expect(periods).toHaveLength(2);
     const policy = await prisma.v1GameVisibilityPolicy.findUniqueOrThrow({ where: { gameId: ids.bareGame } });
     expect(policy.mode).toBe('LIVE');
+  });
+
+  it('createScheduledGame() throws instead of silently skipping a participant whose side is missing from the candidate, and leaves no partial Game behind (Copilot PR #274 finding 1)', async () => {
+    // collectCandidates() always builds `sides` with both HOME and AWAY, so
+    // this guard is unreachable through runFixtureGameBackfill() itself.
+    // Exercising createScheduledGame() directly with a hand-built,
+    // deliberately malformed candidate is the only way to prove the guard
+    // fires. Against the pre-fix code (`if (side === undefined) continue;`)
+    // this test fails: no error is thrown, and a Game/side/period/policy row
+    // would be left behind for a participant that was silently dropped —
+    // exactly the "partially built but reported successful" failure mode
+    // this guard exists to prevent.
+    const malformedCandidate: CreateCandidate = {
+      fixtureId: ids.fixtureInvariantViolation,
+      configId: footballConfigId,
+      visibilityMode: V1VisibilityMode.LIVE,
+      periodCount: 2,
+      sides: [{ sideKey: V1GameSideKey.HOME, teamId: null, displayNameSnapshot: 'Only Home' }],
+      participants: [{ sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Orphan Away Participant' }],
+    };
+
+    await expect(
+      prisma.$transaction((tx) => createScheduledGame(tx, malformedCandidate)),
+    ).rejects.toEqual(
+      expect.objectContaining({
+        name: 'GameContractError',
+        code: 'PARTICIPANT_INVALID',
+        details: { fixtureId: ids.fixtureInvariantViolation, sideKey: V1GameSideKey.AWAY },
+      }),
+    );
+
+    // The whole write must have rolled back with the transaction — no Game
+    // (and therefore no side, period, or policy either) may survive for
+    // this fixture.
+    const survivingGame = await prisma.v1Game.findUnique({
+      where: { tournamentFixtureId: ids.fixtureInvariantViolation },
+    });
+    expect(survivingGame).toBeNull();
   });
 
   it('running apply again writes nothing new (idempotent) — the config-missing fixture is still reported as quarantined every run, which is a read-only classification, not a write', async () => {

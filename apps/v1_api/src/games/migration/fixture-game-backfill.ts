@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, V1GameSideKey, V1GameSourceType, V1VisibilityMode } from '@prisma/client';
+import { GameContractError } from '../core';
 import { computePeriodCount, jsonObject } from '../games.service';
 
 /**
@@ -90,7 +91,14 @@ type ConfigRow = {
   visibility: Prisma.JsonValue;
 };
 
-type CreateCandidate = {
+// Exported so fixture-game-backfill.integration-spec.ts can drive
+// createScheduledGame() directly with a deliberately malformed candidate
+// (a participant referencing a sideKey missing from `sides`) to prove the
+// PARTICIPANT_INVALID guard below actually throws instead of silently
+// dropping the participant -- collectCandidates() itself always builds
+// `sides` with both HOME and AWAY, so that guard is unreachable through the
+// normal candidate-building path and can only be exercised this way.
+export type CreateCandidate = {
   fixtureId: string;
   configId: string;
   visibilityMode: V1VisibilityMode;
@@ -141,8 +149,24 @@ async function collectCandidates(client: MigrationReadClient): Promise<Candidate
     },
   });
 
+  // Narrowed at the DB level to exactly the games this module could still
+  // have work to do for -- `periods: { none: {} }` is Prisma's relation
+  // filter for "zero related V1GamePeriod rows" (equivalent to the
+  // `_count.periods === 0` check below, just evaluated in SQL instead of
+  // pulling every TOURNAMENT_FIXTURE game into memory to filter there) and
+  // `visibilityPolicy: null` is the same "no related row" filter already
+  // used above for `game: null` on the optional 1-1 relation. A game
+  // matching neither has nothing left for this module to backfill, so it
+  // can never appear in `periodBackfill`/`policyBackfill` below regardless
+  // of whether it is excluded here in SQL or in the JS loop -- this WHERE
+  // only removes rows the loop would discard anyway (proven by
+  // fixture-game-backfill.integration-spec.ts's bare-Game-backfill and
+  // idempotency tests still passing unchanged against this narrower query).
   const existingGames = await client.v1Game.findMany({
-    where: { sourceType: V1GameSourceType.TOURNAMENT_FIXTURE },
+    where: {
+      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      OR: [{ periods: { none: {} } }, { visibilityPolicy: null }],
+    },
     orderBy: { id: 'asc' },
     select: {
       id: true,
@@ -277,7 +301,7 @@ function toResult(candidates: Candidates): FixtureGameBackfillResult {
  * exists for live user commands, not a one-time data repair — following the
  * same choice game-result-backfill.ts's createImportedGame() already made.
  */
-async function createScheduledGame(tx: Prisma.TransactionClient, candidate: CreateCandidate): Promise<void> {
+export async function createScheduledGame(tx: Prisma.TransactionClient, candidate: CreateCandidate): Promise<void> {
   const game = await tx.v1Game.create({
     data: {
       sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
@@ -304,9 +328,22 @@ async function createScheduledGame(tx: Prisma.TransactionClient, candidate: Crea
 
   for (const participant of candidate.participants) {
     const side = sideByKey.get(participant.sideKey);
-    // Structurally unreachable: `candidate.sides` above always contains both
-    // HOME and AWAY, so every participant's sideKey resolves.
-    if (side === undefined) continue;
+    if (side === undefined) {
+      // `candidate.sides` is built a few lines above to always contain both
+      // HOME and AWAY, so this should be unreachable — but an unreachable
+      // invariant is only real if violating it is impossible, not just
+      // undocumented. Mirrors the exact failure games.service.ts's own
+      // source-create path uses for this same condition
+      // (createFromSourceInTransaction's participant loop): same error type,
+      // same code, same message. Throwing here (instead of silently
+      // `continue`-ing past the participant) aborts and rolls back this
+      // candidate's transaction rather than persisting a partially-built
+      // Game that looks like a successful backfill.
+      throw new GameContractError('PARTICIPANT_INVALID', 'Participant side is missing', {
+        fixtureId: candidate.fixtureId,
+        sideKey: participant.sideKey,
+      });
+    }
     await tx.v1GameParticipant.create({
       data: {
         gameId: game.id,

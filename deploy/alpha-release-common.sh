@@ -214,6 +214,29 @@ restore_active_release() {
   rm -f "${active_tmp}" || return 1
 }
 
+# 배포마다 이전 릴리스의 dangling(태그 없는) 이미지가 로컬에 쌓인다 — alpha 는 ECR 에서
+# digest 로 pull 하므로(alpha-manifest-common.sh 의 images.*.uri 가 'repo@sha256:...') 로컬
+# 저장소에는 태그가 붙지 않는다. 이 저장소에는 정리 스텝이 없어 EC2 디스크가 배포를 거듭할수록
+# 찼다(2026-08 실측: 28G/30G 까지 차서 배포와 롤백 둘 다 "no space left on device" 로 실패).
+#
+# `docker image prune -f`(비-a, dangling 전용)로 충분히 안전한 이유 — 롤백이 로컬 이미지
+# 캐시를 전혀 참조하지 않기 때문이다: 자동 실패 복구 경로(restore_active_release)와 수동
+# rollback-alpha.sh 둘 다 첫 스텝으로 pull_release_images() 를 호출해 ECR 에서 해당 digest 를
+# 무조건 재-pull 한다. dangling 필터는 태그 유무만 보고 컨테이너 참조 여부는 반영하지 않아
+# 지금 running 중인 active 이미지도 목록엔 함께 잡히지만, `docker image prune` 의 실제 삭제
+# 로직은 컨테이너가 참조 중인 이미지를 건너뛴다(2026-08-09 alpha 호스트 실측: dangling
+# 목록엔 4개가 잡히지만 컨테이너가 물고 있는 active 2개는 생존하고, 참조가 끊긴 previous
+# 릴리스 이미지 2개만 실제로 삭제됨 — state.json 의 .previous.images.*.digest 와 일치 확인).
+# `-a`(태그 있는 미사용 이미지까지)는 쓰지 않는다 — legacy 태그 이미지(예:
+# teameet-v1-web:0.1.0-alpha.*, dangling 아님이라 -f 로는 애초에 안 지워짐) 정리는 이 함수
+# 범위 밖의 별도 파괴적 결정이다.
+#
+# 실패해도 배포를 실패시키지 않는다(deploy-prod.sh 와 동일 정책) — 호출부에서 논-fatal 로
+# 감싼다. 이 함수 자체는 성공/실패만 반환한다.
+prune_stale_alpha_images() {
+  docker image prune -f
+}
+
 write_legacy_release_state() {
   local state_tmp
 

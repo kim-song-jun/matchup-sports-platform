@@ -98,4 +98,27 @@ describe('validateCompetitionConfig — lineup.positions/formations (T1-5)', () 
       'lineup.formations',
     );
   });
+
+  // Copilot review finding (PR #277): validateCompetitionConfig() is not only
+  // a write-time guard — tournament-bracket.service.ts#recalculateStandings
+  // re-runs it against an already-stored V1CompetitionConfigVersion row on
+  // every standings recalculation. A row created before T1-5 simply has no
+  // positions/formations key at all, so this must degrade to "no formation
+  // catalog" rather than throw and break standings recalculation for
+  // tournaments that already exist.
+  it('accepts a legacy lineup with no positions/formations keys at all (config row predates T1-5) and normalizes them to empty arrays', () => {
+    const config = validateCompetitionConfig(baseConfig({ positions: undefined, formations: undefined }));
+    expect(config.lineup.positions).toEqual([]);
+    expect(config.lineup.formations).toEqual([]);
+  });
+
+  it('still rejects a lineup where positions is explicitly present but malformed, even without formations', () => {
+    expectInvalid(
+      () =>
+        validateCompetitionConfig(
+          baseConfig({ positions: [{ code: 'FIXO', label: '픽소', short: 'FX' }], formations: undefined }),
+        ),
+      'lineup.positions',
+    );
+  });
 });

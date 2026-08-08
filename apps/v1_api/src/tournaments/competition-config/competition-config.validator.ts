@@ -72,22 +72,38 @@ export function validateCompetitionConfig(value: unknown): CompetitionConfig {
   ) {
     invalidConfig('lineup의 인원 또는 교체 규칙이 올바르지 않아요.');
   }
-  const positions = isRecord(lineup) ? lineup.positions : null;
+  // T1-5 added `positions`/`formations` to lineup — `validateCompetitionConfig`
+  // is not only a write-time guard (competition-config-registry.ts) but is
+  // also re-run against already-stored rows on read paths (e.g.
+  // tournament-bracket.service.ts#recalculateStandings re-validates the
+  // tournament's active config version). A stored row from before T1-5
+  // simply has no `positions`/`formations` key at all — that must not throw
+  // here and break standings recalculation for tournaments created earlier;
+  // it degrades to the same "no formation catalog" state
+  // parseLineupCatalog() already treats as normal. A key that IS present but
+  // malformed is a genuine validation failure (covers new/edited writes,
+  // which always go through competition-config.presets.ts and therefore
+  // always include both keys).
+  const positionsProvided = isRecord(lineup) && lineup.positions !== undefined;
+  const positions = positionsProvided ? lineup.positions : [];
   if (
-    !Array.isArray(positions) ||
-    positions.length === 0 ||
-    positions.some(
-      (position) =>
-        !isRecord(position) ||
-        typeof position.code !== 'string' ||
-        position.code.length === 0 ||
-        typeof position.label !== 'string' ||
-        position.label.length === 0 ||
-        typeof position.short !== 'string' ||
-        position.short.length === 0 ||
-        (position.goalkeeper !== undefined && position.goalkeeper !== true),
-    ) ||
-    positions.filter((position) => isRecord(position) && position.goalkeeper === true).length !== 1
+    positionsProvided &&
+    (
+      !Array.isArray(positions) ||
+      positions.length === 0 ||
+      positions.some(
+        (position) =>
+          !isRecord(position) ||
+          typeof position.code !== 'string' ||
+          position.code.length === 0 ||
+          typeof position.label !== 'string' ||
+          position.label.length === 0 ||
+          typeof position.short !== 'string' ||
+          position.short.length === 0 ||
+          (position.goalkeeper !== undefined && position.goalkeeper !== true),
+      ) ||
+      positions.filter((position) => isRecord(position) && position.goalkeeper === true).length !== 1
+    )
   ) {
     invalidConfig('lineup.positions에는 골키퍼 하나를 포함한 포지션 사전이 필요해요.');
   }
@@ -97,32 +113,36 @@ export function validateCompetitionConfig(value: unknown): CompetitionConfig {
       .map((position) => position.code),
   );
 
-  const formations = isRecord(lineup) ? lineup.formations : null;
+  const formationsProvided = isRecord(lineup) && lineup.formations !== undefined;
+  const formations = formationsProvided ? lineup.formations : [];
   if (
-    !Array.isArray(formations) ||
-    formations.some(
-      (formation) =>
-        !isRecord(formation) ||
-        typeof formation.code !== 'string' ||
-        formation.code.length === 0 ||
-        typeof formation.label !== 'string' ||
-        formation.label.length === 0 ||
-        !Number.isInteger(formation.outfield) ||
-        Number(formation.outfield) <= 0 ||
-        !Array.isArray(formation.slots) ||
-        formation.slots.length !== formation.outfield ||
-        formation.slots.some(
-          (slot) =>
-            !isRecord(slot) ||
-            typeof slot.position !== 'string' ||
-            !positionCodes.has(slot.position) ||
-            typeof slot.x !== 'number' ||
-            slot.x < 0 ||
-            slot.x > 100 ||
-            typeof slot.y !== 'number' ||
-            slot.y < 0 ||
-            slot.y > 100,
-        ),
+    formationsProvided &&
+    (
+      !Array.isArray(formations) ||
+      formations.some(
+        (formation) =>
+          !isRecord(formation) ||
+          typeof formation.code !== 'string' ||
+          formation.code.length === 0 ||
+          typeof formation.label !== 'string' ||
+          formation.label.length === 0 ||
+          !Number.isInteger(formation.outfield) ||
+          Number(formation.outfield) <= 0 ||
+          !Array.isArray(formation.slots) ||
+          formation.slots.length !== formation.outfield ||
+          formation.slots.some(
+            (slot) =>
+              !isRecord(slot) ||
+              typeof slot.position !== 'string' ||
+              !positionCodes.has(slot.position) ||
+              typeof slot.x !== 'number' ||
+              slot.x < 0 ||
+              slot.x > 100 ||
+              typeof slot.y !== 'number' ||
+              slot.y < 0 ||
+              slot.y > 100,
+          ),
+      )
     )
   ) {
     invalidConfig('lineup.formations의 슬롯 구성이 올바르지 않아요.');
@@ -164,7 +184,14 @@ export function validateCompetitionConfig(value: unknown): CompetitionConfig {
   ) {
     invalidConfig('visibility는 live와 official 상태를 지원해야 해요.');
   }
-  return value as CompetitionConfig;
+  // positions/formations는 legacy row에서 키 자체가 없을 수 있으므로(위 참고), 반환값은
+  // 항상 CompetitionConfig 타입 계약대로 배열을 채워서 내보낸다 — 그렇지 않으면 이 함수를
+  // 호출하는 쪽(tournament-bracket.service.ts 등)이 타입은 배열을 약속받았는데 런타임엔
+  // undefined를 받는 모순이 생긴다.
+  return {
+    ...value,
+    lineup: { ...(lineup as Record<string, unknown>), positions, formations },
+  } as CompetitionConfig;
 }
 
 function canonicalize(value: unknown): string {

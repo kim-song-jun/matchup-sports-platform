@@ -1354,7 +1354,13 @@ model V1TeamMatch {
   createdAt                  DateTime          @default(now()) @map("created_at")
   updatedAt                  DateTime          @updatedAt @map("updated_at")
   deletedAt                  DateTime?         @map("deleted_at")
-  competitionConfigVersionId String            @default(dbgenerated("v1_default_competition_config_version()")) @map("competition_config_version_id")
+  // Nullable / no default until the deferred contract-phase migration adds
+  // SET NOT NULL + SET DEFAULT — see
+  // docs/ops/task9-competition-config-contract-phase.md. The FK constraint
+  // itself (v1_team_matches_competition_config_fk) already exists (added by
+  // 20260729000100_v1_game_operations while this column was still nullable
+  // there too), so `competitionConfig` stays a real relation, just optional.
+  competitionConfigVersionId String?           @map("competition_config_version_id")
 
   hostTeam              V1Team                     @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
   createdByUser         V1User                     @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -1366,7 +1372,7 @@ model V1TeamMatch {
   applications          V1TeamMatchApplication[]
   chatRoom              V1ChatRoom?
   game                  V1Game?                    @relation("V1GameTeamMatch")
-  competitionConfig     V1CompetitionConfigVersion @relation("V1TeamMatchCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_team_matches_competition_config_fk")
+  competitionConfig     V1CompetitionConfigVersion? @relation("V1TeamMatchCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_team_matches_competition_config_fk")
 
   @@index([hostTeamId])
   @@index([createdByUserId])
@@ -1898,10 +1904,16 @@ model V1Tournament {
   createdAt                  DateTime                    @default(now()) @map("created_at")
   updatedAt                  DateTime                    @updatedAt @map("updated_at")
   deletedAt                  DateTime?                   @map("deleted_at")
-  competitionConfigVersionId String                      @default(dbgenerated("v1_default_competition_config_version()")) @map("competition_config_version_id")
+  // Nullable / no default until the deferred contract-phase migration adds
+  // SET NOT NULL + SET DEFAULT — see
+  // docs/ops/task9-competition-config-contract-phase.md. The FK constraint
+  // itself (v1_tournaments_competition_config_fk) already exists (added by
+  // 20260729000200_v1_competition_config while this column was still
+  // nullable), so `competitionConfig` stays a real relation, just optional.
+  competitionConfigVersionId String?                     @map("competition_config_version_id")
 
   sport                V1Sport                              @relation(fields: [sportId], references: [id], onDelete: Restrict)
-  competitionConfig    V1CompetitionConfigVersion           @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
+  competitionConfig    V1CompetitionConfigVersion?          @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
   createdByAdmin       V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
   registrations        V1TournamentRegistration[]
   groups               V1TournamentGroup[]
@@ -2122,7 +2134,14 @@ model V1TournamentFixture {
   status                     V1TournamentFixtureStatus @default(scheduled)
   createdAt                  DateTime                  @default(now()) @map("created_at")
   updatedAt                  DateTime                  @updatedAt @map("updated_at")
-  competitionConfigVersionId String                    @default(dbgenerated("v1_default_competition_config_version()")) @map("competition_config_version_id")
+  // Nullable / no default until the deferred contract-phase migration adds
+  // SET NOT NULL + SET DEFAULT — see
+  // docs/ops/task9-competition-config-contract-phase.md. The FK constraint
+  // itself (v1_tournament_fixtures_competition_config_fk) already exists
+  // (added by 20260729000100_v1_game_operations while this column was still
+  // nullable there too), so `competitionConfig` stays a real relation, just
+  // optional.
+  competitionConfigVersionId String?                   @map("competition_config_version_id")
 
   tournament         V1Tournament                         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   group              V1TournamentGroup?                   @relation(fields: [groupId], references: [id], onDelete: SetNull)
@@ -2133,7 +2152,7 @@ model V1TournamentFixture {
   result             V1TournamentFixtureResult?
   videos             V1TournamentFixtureVideo[]
   game               V1Game?                              @relation("V1GameTournamentFixture")
-  competitionConfig  V1CompetitionConfigVersion           @relation("V1FixtureCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_fixtures_competition_config_fk")
+  competitionConfig  V1CompetitionConfigVersion?          @relation("V1FixtureCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_fixtures_competition_config_fk")
   field              V1TournamentField?                   @relation(fields: [tournamentId, fieldId], references: [tournamentId, id], onDelete: Restrict, map: "v1_tournament_fixtures_field_fk")
   staffScopes        V1TournamentStaffFixtureScope[]
   operationAudits    V1OperationAudit[]

@@ -151,6 +151,7 @@ function immutableGameEventPayload(dto: AppendGameEventDto): ImmutableGameEventI
     type: dto.type,
     ...(dto.sideId === undefined ? {} : { sideId: dto.sideId }),
     ...(dto.participantId === undefined ? {} : { participantId: dto.participantId }),
+    ...(dto.assistParticipantId === undefined ? {} : { assistParticipantId: dto.assistParticipantId }),
     period: dto.period,
     clockMs: dto.clockMs,
     occurredAt: dto.occurredAt,
@@ -838,6 +839,7 @@ export class GamesService {
             type: dto.type,
             sideId: dto.sideId,
             participantId: dto.participantId,
+            assistParticipantId: dto.assistParticipantId ?? null,
             period: dto.period,
             clockMs: dto.clockMs,
             occurredAt: new Date(dto.occurredAt),
@@ -979,6 +981,7 @@ export class GamesService {
               type: input.event.type,
               sideId: input.event.sideId,
               participantId: input.event.participantId,
+              assistParticipantId: input.event.assistParticipantId ?? null,
               period: input.event.period,
               clockMs: input.event.clockMs,
               occurredAt: new Date(input.event.occurredAt),
@@ -3016,6 +3019,29 @@ export class GamesService {
         throw new UnprocessableEntityException({
           code: 'PARTICIPANT_SIDE_MISMATCH',
           message: 'Event participant and side do not agree',
+        });
+      }
+    }
+    if (dto.assistParticipantId !== undefined && dto.assistParticipantId !== null) {
+      if (dto.type !== V1GameEventType.GOAL) {
+        throw new UnprocessableEntityException({
+          code: 'ASSIST_INVALID',
+          message: 'An assist can only be recorded on a GOAL event',
+        });
+      }
+      if (dto.assistParticipantId === dto.participantId) {
+        throw new UnprocessableEntityException({
+          code: 'ASSIST_INVALID',
+          message: 'A scorer cannot be credited with their own assist',
+        });
+      }
+      const assistParticipant = await tx.v1GameParticipant.findFirst({
+        where: { gameId: game.id, id: dto.assistParticipantId },
+      });
+      if (assistParticipant === null || assistParticipant.sideId !== dto.sideId) {
+        throw new UnprocessableEntityException({
+          code: 'ASSIST_INVALID',
+          message: 'Assist participant must belong to the scoring side',
         });
       }
     }

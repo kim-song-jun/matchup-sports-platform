@@ -852,7 +852,7 @@ function parseGameEvent(payload: unknown): Record<string, unknown> | null {
     return null;
   }
   const requiredKeys = ['type', 'period', 'clockMs', 'occurredAt', 'payload'];
-  const allowedKeys = [...requiredKeys, 'sideId', 'participantId'];
+  const allowedKeys = [...requiredKeys, 'sideId', 'participantId', 'assistParticipantId'];
   if (
     !requiredKeys.every((key) => Object.hasOwn(payload, key)) ||
     !Object.keys(payload).every((key) => allowedKeys.includes(key)) ||
@@ -863,7 +863,10 @@ function parseGameEvent(payload: unknown): Record<string, unknown> | null {
     !Number.isFinite(Date.parse(payload.occurredAt)) ||
     !isRecord(payload.payload) ||
     (payload.sideId !== undefined && !isNonemptyString(payload.sideId)) ||
-    (payload.participantId !== undefined && !isNonemptyString(payload.participantId))
+    (payload.participantId !== undefined && !isNonemptyString(payload.participantId)) ||
+    (payload.assistParticipantId !== undefined &&
+      payload.assistParticipantId !== null &&
+      !isNonemptyString(payload.assistParticipantId))
   ) {
     return null;
   }

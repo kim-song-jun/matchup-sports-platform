@@ -21,6 +21,7 @@ export interface HashableGameEvent {
   readonly type: GameEventType;
   readonly sideId?: string;
   readonly participantId?: string;
+  readonly assistParticipantId?: string | null;
   readonly period: number;
   readonly clockMs: number;
   readonly occurredAt: string;

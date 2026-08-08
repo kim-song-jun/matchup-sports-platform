@@ -16,42 +16,20 @@ export type GamePeriodState = 'SCHEDULED' | 'LIVE' | 'ENDED';
 export type GameLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
 
 /**
- * PERIOD_START/PERIOD_END/PAUSE/RESUME are declared here for schema
- * completeness (`V1GameEventType`) but this console never emits them and
- * no production runtime flow does either. (Tests may directly call the
- * generic `appendEvent()` to construct these rows for verification, but
- * the ops console itself doesn't.) See T1-0's fix to
- * `apps/v1_api/src/games/games.service.ts` (`executeCommand`'s `start`/
- * `next-period`/`end`) for what actually now drives `V1GamePeriod.state`/
- * `startedAt`/`endedAt`. (A prior version of this comment claimed these were
- * "backend-emitted" — that was never true; no production flow wrote a
- * `PERIOD_START`/`PERIOD_END` V1GameEvent row automatically, which is exactly why every
- * captured event used to freeze at `clockMs=0`.)
- *
- * CORRECTION is reused (per the `V1GameEventType` enum — there is no
- * dedicated FOUL type and the schema is frozen, see Task 4) as the
- * extensible bucket for a foul note: it is captured for the record but is
- * NOT read by `deriveTournamentRevision()`'s score/card tally, unlike
- * GOAL/CARD.
- *
- * Known debt (Task 21 review): this reuse is real wire-level overload, not
- * just a UI label choice. `GamesService.reverseEvent()` (the only OTHER
- * writer of `CORRECTION`) always sets `reversesEventId` to the event it
- * undoes; a foul note sent from this console goes through the generic
- * `appendEvent()`/`POST /games/:gameId/events` path instead, so its
- * `reversesEventId` is always `null`. The two are told apart ONLY by
- * `payload.kind === 'FOUL'` (see `EventCaptureModal.commitFoul` and
- * `queue-status-panel.tsx`'s `eventLabel()`) — any future code that reads a
- * game's raw event stream (audit, export, a correction/reversal review UI)
- * MUST check `payload.kind`, never assume `type === 'CORRECTION'` means a
- * real reversal. The correct fix is a dedicated `V1GameEventType.FOUL` enum
- * value, which needs a Prisma migration; that is out of this task's scope
- * (the plan's own Task 20 text calls FOUL a "next enabled type" once schema
- * work adds it) and is not done here.
+ * The October minimum event set is GOAL/CARD/FOUL; SUBSTITUTION and the
+ * PERIOD_START/PERIOD_END/PAUSE/RESUME lifecycle markers are recorded by
+ * explicit operator commands (see T1-0's `next_period` command and the
+ * live console's period start/end buttons), not auto-emitted by the
+ * backend. FOUL is a first-class `V1GameEventType` value (Task T1-3) —
+ * it is no longer disguised as a `CORRECTION` event with
+ * `payload.kind === 'FOUL'`. `CORRECTION` is reserved exclusively for
+ * `GamesService.reverseEvent()`'s real reversal/undo path, which always
+ * sets `reversesEventId`.
  */
 export type GameEventType =
   | 'GOAL'
   | 'CARD'
+  | 'FOUL'
   | 'SUBSTITUTION'
   | 'PERIOD_START'
   | 'PERIOD_END'
@@ -160,6 +138,7 @@ export interface GameEventRecord {
   type: GameEventType;
   sideId: string | null;
   participantId: string | null;
+  assistParticipantId: string | null;
   period: number;
   clockMs: number;
   occurredAt: string;
@@ -213,6 +192,7 @@ export interface GameEventAppendInput {
   type: GameEventType;
   sideId?: string;
   participantId?: string;
+  assistParticipantId?: string | null;
   period: number;
   clockMs: number;
   occurredAt: string;

@@ -68,6 +68,7 @@ export interface QueuedGameEventInput {
   readonly type: string;
   readonly sideId?: string;
   readonly participantId?: string;
+  readonly assistParticipantId?: string | null;
   readonly period: number;
   readonly clockMs: number;
   readonly occurredAt: string;

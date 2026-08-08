@@ -93,6 +93,7 @@ export interface SubmitEventInput {
   readonly type: GameEventType;
   readonly sideId?: string;
   readonly participantId?: string;
+  readonly assistParticipantId?: string | null;
   readonly period: number;
   readonly clockMs: number;
   readonly occurredAt: string;
@@ -477,6 +478,7 @@ export function useV1GameOperationsConsole(
         type: input.type,
         sideId: input.sideId,
         participantId: input.participantId,
+        assistParticipantId: input.assistParticipantId,
         period: input.period,
         clockMs: input.clockMs,
         occurredAt: input.occurredAt,
@@ -490,6 +492,7 @@ export function useV1GameOperationsConsole(
           type: input.type,
           sideId: input.sideId,
           participantId: input.participantId,
+          assistParticipantId: input.assistParticipantId,
           period: input.period,
           clockMs: input.clockMs,
           occurredAt: input.occurredAt,

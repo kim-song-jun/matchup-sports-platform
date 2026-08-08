@@ -17,6 +17,8 @@ import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
+import { deriveFoulCounts } from '@/lib/team-foul-counter';
+import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
 import type { GameCommandName, GameEventRecord, GameLineup, GameLineupParticipant, GameState } from '@/types/game-operations';
 
 export interface OperateConsoleProps {
@@ -109,6 +111,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         return [];
     }
   }, [gameState, hasNextPeriod]);
+
+  const foulCounts = useMemo(
+    () => deriveFoulCounts(ops.liveEvents, currentPeriod?.number ?? 1),
+    [ops.liveEvents, currentPeriod?.number],
+  );
 
   const handleSelectPlayer = useCallback(
     (input: { sideId: string; participant: GameLineupParticipant }) => {
@@ -306,6 +313,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {ops.bannerMessage && <Banner tone="danger">{ops.bannerMessage}</Banner>}
         {commandError && <Banner tone="danger">{commandError}</Banner>}
       </div>
+
+      <TeamFoulCounterBar sides={sides} counts={foulCounts} period={currentPeriod?.number ?? 1} />
 
       <div className="px-4">
         <LineupGrid

@@ -40,6 +40,7 @@ import { TournamentOperationsBoardModule } from './tournament-operations/board/t
 import { TournamentOperationsFieldsModule } from './tournament-operations/fields/tournament-operations-fields.module';
 import { GAME_READ_AUTHORITY } from './tournament-operations/board/game-read-authority.port';
 import { CompareGameReadAuthorityService } from './tournament-operations/board/compare-game-read-authority.service';
+import { TeamMatchSeriesModule } from './team-match-series/team-match-series.module';
 
 @Module({
   imports: [
@@ -75,6 +76,7 @@ import { CompareGameReadAuthorityService } from './tournament-operations/board/c
     ReviewsModule,
     UploadsModule,
     TournamentsModule,
+    TeamMatchSeriesModule,
     VerificationModule,
     IntegrationsModule,
     LogsModule,

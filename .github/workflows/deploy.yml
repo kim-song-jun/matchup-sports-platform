@@ -179,6 +179,14 @@ jobs:
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/prisma migrate deploy
           ./node_modules/.bin/prisma migrate diff \
             --from-url "$MIGRATE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+          # Task 9 competition-config expand/contract split
+          # (docs/ops/task9-competition-config-contract-phase.md): seeding and
+          # backfill moved out of migration.sql (DML is never additive under
+          # the expand-contract gate) into an app-level CLI. Mirrors what an
+          # alpha deploy must also do after `prisma migrate deploy` — run it
+          # here so `test:integration` sees the same DB state.
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
+            src/tournaments/competition-config/competition-config-backfill.cli.ts
           DATABASE_URL="$MIGRATE_URL" pnpm test:integration
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 

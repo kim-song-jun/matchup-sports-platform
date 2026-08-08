@@ -1,3 +1,22 @@
+-- Expand phase only. This migration used to also seed config rows, backfill
+-- competition_config_version_id on existing v1_tournaments/v1_team_matches/
+-- v1_tournament_fixtures rows, SET NOT NULL/SET DEFAULT on that column, add
+-- the v1_tournaments FK, and attach v1_pin_*_competition_config triggers to
+-- those three pre-existing tables in one shot. That combination is rejected
+-- by scripts/qa/check-expand-contract-migrations.mjs (the alpha rollback
+-- compatibility gate) because a legacy app instance rolled back onto this
+-- DB state would have its plain `UPDATE ... SET sport_id = ...` calls
+-- rejected by the new pin triggers, and its INSERTs would violate the new
+-- NOT NULL constraint. See docs/ops/task9-competition-config-contract-phase.md
+-- for exactly what moved out, where it went, and when it is safe to apply
+-- the deferred contract-phase migration.
+--
+-- Seeding + backfill now lives in
+-- apps/v1_api/src/tournaments/competition-config/competition-config-backfill.ts
+-- (run via .cli.ts), matching the apps/v1_api/prisma/migrations/
+-- 20260803000100_v1_task10_game_result_backfill precedent of keeping DML out
+-- of migration.sql entirely.
+
 BEGIN;
 
 CREATE OR REPLACE FUNCTION v1_validate_competition_config() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -70,45 +89,6 @@ CREATE TRIGGER v1_validate_competition_config
 BEFORE INSERT OR UPDATE ON v1_competition_config_versions
 FOR EACH ROW EXECUTE FUNCTION v1_validate_competition_config();
 
-INSERT INTO v1_competition_config_versions (
-  id, sport_code, name, version, status, periods, events, lineup, result,
-  tie_break, visibility, content_hash, created_by_user_id, created_at, updated_at
-) VALUES
-(
-  '11111111-1111-4111-8111-111111111111',
-  'football',
-  'football-v1',
-  1,
-  'ACTIVE',
-  '[{"code":"FIRST_HALF","label":"전반","durationMinutes":45,"extraTime":false},{"code":"SECOND_HALF","label":"후반","durationMinutes":45,"extraTime":false}]',
-  '["GOAL","OWN_GOAL","YELLOW_CARD","RED_CARD","SUBSTITUTION"]',
-  '{"minPlayers":7,"maxPlayers":11,"substitutions":"limited","maxSubstitutions":5}',
-  '{"tournamentScorerPolicy":"required","teamMatchScorerPolicy":"optional_with_warning","mvpMin":0,"mvpMax":1}',
-  '{"points":{"win":3,"draw":1,"loss":0},"order":["points","head_to_head","goal_difference","goals_for","fair_play","seeded_draw"],"seededDraw":"sha256-v1"}',
-  '{"default":"live","allowed":["live","official"]}',
-  '60b7ecf936bc02ede713b204bef345ceab57188aad50271f56c5f6ca1957b31c',
-  NULL,
-  CURRENT_TIMESTAMP,
-  CURRENT_TIMESTAMP
-),
-(
-  '22222222-2222-4222-8222-222222222222',
-  'futsal',
-  'futsal-v1',
-  1,
-  'ACTIVE',
-  '[{"code":"FIRST_HALF","label":"전반","durationMinutes":20,"extraTime":false},{"code":"SECOND_HALF","label":"후반","durationMinutes":20,"extraTime":false}]',
-  '["GOAL","OWN_GOAL","YELLOW_CARD","RED_CARD","SUBSTITUTION","TEAM_FOUL"]',
-  '{"minPlayers":3,"maxPlayers":5,"substitutions":"rolling","maxSubstitutions":null}',
-  '{"tournamentScorerPolicy":"required","teamMatchScorerPolicy":"optional_with_warning","mvpMin":0,"mvpMax":1}',
-  '{"points":{"win":3,"draw":1,"loss":0},"order":["points","head_to_head","goal_difference","goals_for","fair_play","seeded_draw"],"seededDraw":"sha256-v1"}',
-  '{"default":"live","allowed":["live","official"]}',
-  '769fa5d3ddb9284e98b53ef368f46be75004ae1a06c1039486cdc494eaa648d8',
-  NULL,
-  CURRENT_TIMESTAMP,
-  CURRENT_TIMESTAMP
-);
-
 ALTER TABLE v1_tournaments ADD COLUMN competition_config_version_id TEXT;
 
 CREATE OR REPLACE FUNCTION v1_assert_competition_config_source_supported(
@@ -126,76 +106,10 @@ BEGIN
   END IF;
 END $$;
 
-DO $$
-DECLARE
-  unsupported record;
-BEGIN
-  SELECT source_type, source_id, sport_code
-  INTO unsupported
-  FROM (
-    SELECT 'tournament' AS source_type, tournament.id AS source_id, sport.code AS sport_code
-    FROM v1_tournaments tournament
-    LEFT JOIN v1_sports sport ON sport.id = tournament.sport_id
-    WHERE sport.code IS NULL OR lower(sport.code) NOT IN ('soccer', 'football', 'futsal')
-    UNION ALL
-    SELECT 'team_match', team_match.id, sport.code
-    FROM v1_team_matches team_match
-    LEFT JOIN v1_sports sport ON sport.id = team_match.sport_id
-    WHERE sport.code IS NULL OR lower(sport.code) NOT IN ('soccer', 'football', 'futsal')
-  ) invalid_source
-  LIMIT 1;
-
-  IF FOUND THEN
-    PERFORM v1_assert_competition_config_source_supported(
-      unsupported.source_type,
-      unsupported.source_id,
-      unsupported.sport_code
-    );
-  END IF;
-END $$;
-
-UPDATE v1_tournaments tournament
-SET competition_config_version_id = CASE
-  WHEN lower(sport.code) IN ('soccer', 'football') THEN '11111111-1111-4111-8111-111111111111'
-  WHEN lower(sport.code) = 'futsal' THEN '22222222-2222-4222-8222-222222222222'
-END
-FROM v1_sports sport
-WHERE sport.id = tournament.sport_id;
-
-UPDATE v1_team_matches team_match
-SET competition_config_version_id = CASE
-  WHEN lower(sport.code) IN ('soccer', 'football') THEN '11111111-1111-4111-8111-111111111111'
-  WHEN lower(sport.code) = 'futsal' THEN '22222222-2222-4222-8222-222222222222'
-END
-FROM v1_sports sport
-WHERE sport.id = team_match.sport_id;
-
-UPDATE v1_tournament_fixtures fixture
-SET competition_config_version_id = tournament.competition_config_version_id
-FROM v1_tournaments tournament
-WHERE tournament.id = fixture.tournament_id;
-
-ALTER TABLE v1_tournaments ALTER COLUMN competition_config_version_id SET NOT NULL;
-ALTER TABLE v1_team_matches ALTER COLUMN competition_config_version_id SET NOT NULL;
-ALTER TABLE v1_tournament_fixtures ALTER COLUMN competition_config_version_id SET NOT NULL;
-
 CREATE OR REPLACE FUNCTION v1_default_competition_config_version() RETURNS TEXT
 LANGUAGE sql IMMUTABLE AS $$
   SELECT '00000000-0000-0000-0000-000000000000'::text
 $$;
-
-ALTER TABLE v1_tournaments
-  ALTER COLUMN competition_config_version_id SET DEFAULT v1_default_competition_config_version();
-ALTER TABLE v1_team_matches
-  ALTER COLUMN competition_config_version_id SET DEFAULT v1_default_competition_config_version();
-ALTER TABLE v1_tournament_fixtures
-  ALTER COLUMN competition_config_version_id SET DEFAULT v1_default_competition_config_version();
-
-ALTER TABLE v1_tournaments
-  ADD CONSTRAINT v1_tournaments_competition_config_fk
-  FOREIGN KEY (competition_config_version_id)
-  REFERENCES v1_competition_config_versions(id)
-  ON DELETE RESTRICT ON UPDATE CASCADE;
 
 CREATE INDEX v1_tournaments_competition_config_idx
   ON v1_tournaments(competition_config_version_id);
@@ -228,6 +142,16 @@ BEGIN
   RETURN config_id;
 END $$;
 
+-- v1_pin_sport_competition_config()/v1_pin_fixture_competition_config() are
+-- defined here (harmless — defining a function does not run it) but the
+-- CREATE TRIGGER statements that attach them to v1_tournaments/
+-- v1_team_matches/v1_tournament_fixtures are part of the deferred
+-- contract-phase migration: those triggers intercept
+-- `UPDATE OF sport_id`/`UPDATE OF tournament_id`, which pre-existing
+-- (legacy) app code already performs on these tables today, and would
+-- start rejecting an old app instance's plain sport_id-only update with
+-- COMPETITION_CONFIG_SPORT_MISMATCH if attached before every existing row
+-- has a valid competition_config_version_id.
 CREATE OR REPLACE FUNCTION v1_pin_sport_competition_config() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -254,14 +178,6 @@ BEGIN
   RETURN NEW;
 END $$;
 
-CREATE TRIGGER v1_pin_tournament_competition_config
-BEFORE INSERT OR UPDATE OF sport_id, competition_config_version_id ON v1_tournaments
-FOR EACH ROW EXECUTE FUNCTION v1_pin_sport_competition_config();
-
-CREATE TRIGGER v1_pin_team_match_competition_config
-BEFORE INSERT OR UPDATE OF sport_id, competition_config_version_id ON v1_team_matches
-FOR EACH ROW EXECUTE FUNCTION v1_pin_sport_competition_config();
-
 CREATE OR REPLACE FUNCTION v1_pin_fixture_competition_config() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -286,9 +202,18 @@ BEGIN
   RETURN NEW;
 END $$;
 
-CREATE TRIGGER v1_pin_fixture_competition_config
-BEFORE INSERT OR UPDATE OF tournament_id, competition_config_version_id ON v1_tournament_fixtures
-FOR EACH ROW EXECUTE FUNCTION v1_pin_fixture_competition_config();
+-- v1_tournaments_competition_config_fk is safe to add here (unlike the
+-- SET NOT NULL/SET DEFAULT/pin-trigger statements above) because
+-- competition_config_version_id is still nullable at this point in the
+-- migration (its SET NOT NULL was moved to the contract-phase migration) —
+-- Postgres FK checks never reject a NULL referencing column, so no
+-- pre-existing row (which is NULL here until the backfill CLI runs) can
+-- violate it.
+ALTER TABLE v1_tournaments
+  ADD CONSTRAINT v1_tournaments_competition_config_fk
+  FOREIGN KEY (competition_config_version_id)
+  REFERENCES v1_competition_config_versions(id)
+  ON DELETE RESTRICT ON UPDATE CASCADE;
 
 CREATE OR REPLACE FUNCTION v1_block_used_config_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN

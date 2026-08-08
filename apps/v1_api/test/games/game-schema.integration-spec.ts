@@ -247,9 +247,16 @@ describe('v1 game operations schema', () => {
         AND table_name IN ('v1_team_matches', 'v1_tournament_fixtures')
       ORDER BY table_name
     `;
+    // Nullable, not 'NO', until the deferred contract-phase migration adds
+    // SET NOT NULL to these two pre-existing tables — see
+    // docs/ops/task9-competition-config-contract-phase.md
+    // (fix/v1-expand-contract-split). v1_games.competition_config_version_id
+    // itself (a brand-new column on a brand-new table) is unaffected and
+    // stays NOT NULL; this assertion only ever covered the two source
+    // tables' pinned copies.
     expect(sourceConfigPins).toEqual([
-      { table_name: 'v1_team_matches', column_name: 'competition_config_version_id', is_nullable: 'NO' },
-      { table_name: 'v1_tournament_fixtures', column_name: 'competition_config_version_id', is_nullable: 'NO' },
+      { table_name: 'v1_team_matches', column_name: 'competition_config_version_id', is_nullable: 'YES' },
+      { table_name: 'v1_tournament_fixtures', column_name: 'competition_config_version_id', is_nullable: 'YES' },
     ]);
 
     const uniqueIndexes = await prisma.$queryRaw<Array<{ indexname: string }>>`

@@ -1457,7 +1457,7 @@ model V1TeamMatchSeriesTeam {
   series V1TeamMatchSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade, map: "v1_team_match_series_teams_series_fk")
   team   V1Team            @relation(fields: [teamId], references: [id], onDelete: Restrict, map: "v1_team_match_series_teams_team_fk")
 
-  @@unique([seriesId, teamId])
+  @@unique([seriesId, teamId], map: "v1_team_match_series_teams_series_team_key")
   @@index([teamId])
   @@map("v1_team_match_series_teams")
 }

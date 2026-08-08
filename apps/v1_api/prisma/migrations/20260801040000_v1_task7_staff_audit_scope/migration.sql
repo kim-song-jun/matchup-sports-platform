@@ -29,6 +29,16 @@ ALTER TABLE "v1_operation_audits"
 
 -- The existing source_ip column is retained for SQL compatibility, but its
 -- persistence contract is masked-only (/24 for IPv4 and /64 for IPv6).
+-- v1_operation_audits is itself a brand-new table introduced by this same
+-- migration batch (see 20260729000100_v1_game_operations), so there is no
+-- legacy data to mask on first apply; the one-time masking UPDATE that used
+-- to live here moved to
+-- apps/v1_api/src/tournaments/competition-config/competition-config-backfill.ts
+-- (run via .cli.ts) alongside the competition-config backfill — DML is never
+-- additive under scripts/qa/check-expand-contract-migrations.mjs regardless
+-- of whether the target table happens to be new, so it does not belong in a
+-- migration file. Re-run the CLI after any future migration adds another
+-- unmasked write path to this column.
 CREATE OR REPLACE FUNCTION v1_mask_audit_source_ip(value TEXT)
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -45,10 +55,6 @@ EXCEPTION
     RETURN NULL;
 END;
 $function$;
-
-UPDATE "v1_operation_audits"
-SET "source_ip" = v1_mask_audit_source_ip("source_ip")
-WHERE "source_ip" IS NOT NULL;
 
 ALTER TABLE "v1_operation_audits"
   ADD CONSTRAINT "v1_operation_audits_masked_source_ip_ck"

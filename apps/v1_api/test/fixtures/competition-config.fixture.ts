@@ -5,6 +5,7 @@ import {
   FOOTBALL_V1_CONFIG,
   validateCompetitionConfig,
 } from '../../src/tournaments/competition-config/competition-config';
+import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
 
 export const competitionConfigFixture = {
   now: new Date('2026-07-29T12:00:00.000Z'),
@@ -158,6 +159,18 @@ export async function seedCompetitionConfigFixture(
       },
     });
   }
+
+  // The tournament above is created without an explicit
+  // competitionConfigVersionId — the v1_pin_tournament_competition_config
+  // trigger used to fill it in automatically, but that trigger is part of
+  // the deferred contract-phase migration (see
+  // docs/ops/task9-competition-config-contract-phase.md). Run the same
+  // production backfill CLI here so this fixture's tournament/fixtures end
+  // up pinned exactly the way they will be in production once the backfill
+  // CLI has run — seeding creates the canonical v1_competition_config_versions
+  // rows only when missing and otherwise verifies them by content hash, so
+  // this is safe even if a prior seed already created them.
+  await runCompetitionConfigContractPhaseBackfill(prisma);
 }
 
 export function deterministicStandingOrder() {

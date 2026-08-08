@@ -16,6 +16,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
+import { countMissingAssists } from '@/lib/result-review-warnings';
 import type {
   V1GameResultParticipantInput,
   V1GameResultRevision,
@@ -585,6 +586,11 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 일부 득점은 선수 지정 없이 기록됐어요.
               </div>
             ) : null}
+            {countMissingAssists(latest.resultParticipants) > 0 ? (
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+                어시스트 미기입 {countMissingAssists(latest.resultParticipants)}건 — 확정에는 영향 없어요.
+              </div>
+            ) : null}
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
               {/* Task 17 QA scenario: projection-pending state */}
               개인 기록·팀 전적 반영에는 잠시 시간이 걸릴 수 있어요. 아직 반영 전이어도 결과 자체는 확정된 상태예요.
@@ -990,6 +996,11 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
                 일부 득점은 선수 지정 없이 기록됐어요.
               </div>
             ) : null}
+            {countMissingAssists(latest.resultParticipants) > 0 ? (
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+                어시스트 미기입 {countMissingAssists(latest.resultParticipants)}건 — 승인에는 영향 없어요.
+              </div>
+            ) : null}
 
             {showChangeForm ? (
               <div style={{ marginTop: 16 }}>
@@ -1055,6 +1066,11 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 일부 득점은 선수 지정 없이 기록됐어요.
+              </div>
+            ) : null}
+            {countMissingAssists(latest.resultParticipants) > 0 ? (
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+                어시스트 미기입 {countMissingAssists(latest.resultParticipants)}건 — 확정에는 영향 없어요.
               </div>
             ) : null}
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>

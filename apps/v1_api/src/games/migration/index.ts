@@ -10,6 +10,8 @@ export type {
   GameBackfillQuarantine,
   GameBackfillRunResult,
 } from './game-result-backfill';
+export { runGamePeriodLiveBackfill } from './game-period-live-backfill';
+export type { GamePeriodLiveBackfillResult } from './game-period-live-backfill';
 export {
   compareGameResultSnapshots,
   evaluateConsecutiveZeroGate,

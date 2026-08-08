@@ -412,6 +412,33 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
       })
     ).id;
 
+    // T1-0 fix round 3: this PIN's subject is the six-persona authorization
+    // matrix (read/mutation allow-deny, cross-scope/revoked/expired/stale
+    // denial, audit atomicity) -- it is NOT about period lifecycle. But
+    // T1-0 made "a LIVE period exists" a precondition every appendEvent call
+    // must satisfy before authorization-adjacent behavior is even
+    // observable, and this fixture never started the game, so every
+    // "allow" mutation below used to reach `assertEventReferences` with
+    // period 1 still SCHEDULED and got rejected by the new
+    // PERIOD_NOT_STARTED gate before ever reaching the matrix behavior the
+    // PIN exists to freeze. Starting the game here satisfies that
+    // precondition without touching what the PIN actually asserts: `start`
+    // only requires tournament_command authority (platform_ops qualifies,
+    // same actor that created the game above), and every assertion below
+    // already re-fetches `current.version`/`current.lastSequence` fresh
+    // before each mutation rather than hardcoding them, so this extra
+    // version bump changes no expected values. It is audited under
+    // `GAME_START`, not `EVENT_APPEND`, so it cannot inflate the
+    // `successfulAudits` count the next test asserts on.
+    const setupTakeoverToken = await grantTournamentTakeover(tournamentGameId, ids.platformOps);
+    await service.executeCommand(authUser(ids.platformOps), tournamentGameId, 'start', 'task7-tournament-game-start', {
+      expectedVersion: 0,
+      clientCommandId: 'task7-tournament-game-start',
+      takeoverToken: setupTakeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
+
     const teamInput: GameSourceCreationInput = {
       sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.teamMatch,

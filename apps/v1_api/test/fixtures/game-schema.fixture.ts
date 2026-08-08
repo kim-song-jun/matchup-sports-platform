@@ -54,8 +54,13 @@ export const gameSchemaFixture = {
 // field/type/attribute was modified. The migration hash below is UNCHANGED — this
 // branch adds a new migration file, it does not edit the bound
 // 20260729000100_v1_game_operations migration.
+// Re-pinned again (same T4 branch, CI-fixed): V1TeamMatchSeriesTeam's
+// @@unique([seriesId, teamId]) got an explicit map: to match the committed
+// migration's constraint name (v1_team_match_series_teams_series_team_key)
+// instead of Prisma's default name — the migrate-diff zero-drift gate was
+// failing on that rename. No shape change; migration hash still unchanged.
 export const gameSchemaSourceManifest = {
-  schema: '6eb54997b1802a1995c147d172f6faf60c931b2e30b158f1001cf2718181072b',
+  schema: 'ded90711d7bf4729c1d44be2a965ec5c9bd1abc1f05f3e576aec1584964e7aa8',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

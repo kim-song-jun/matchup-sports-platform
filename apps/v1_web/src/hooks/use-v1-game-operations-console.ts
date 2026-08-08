@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { v1Get } from '@/lib/api-client';
+import { v1Get, v1Post } from '@/lib/api-client';
 import {
   assertQueueable,
   canAppendWhileSyncing,
@@ -76,11 +76,13 @@ interface MyStaffAssignment {
  * doc comment in `RealtimeGateway`). `null` (no row found) is correct and
  * expected for a `platform_ops` admin-bypass actor -- the gateway only
  * enforces this check `when principal.assignmentVersion !== null`. */
-function useMyTournamentStaffAssignmentVersion(tournamentId: string, myUserId: string | undefined) {
+function useMyTournamentStaffAssignmentVersion(tournamentId: string | null, myUserId: string | undefined) {
   return useQuery({
-    queryKey: [...v1Keys.all, 'tournament-ops', tournamentId, 'staff'] as const,
+    queryKey: [...v1Keys.all, 'tournament-ops', tournamentId ?? '', 'staff'] as const,
     queryFn: () =>
       v1Get<{ items: MyStaffAssignment[] }>(`/tournament-ops/tournaments/${tournamentId}/staff`),
+    // 팀매치(tournamentId===null)는 스태프 배정 개념이 없다 — 쿼리 자체를 스킵하고
+    // 아래 효과가 항상 0을 기록/전송하게 둔다(그래도 self-consistency 체크는 통과한다).
     enabled: Boolean(tournamentId) && Boolean(myUserId),
     staleTime: 15_000,
     select: (data) => data.items.find((item) => item.userId === myUserId) ?? null,
@@ -101,7 +103,10 @@ export interface SubmitEventInput {
 }
 
 export interface UseV1GameOperationsConsoleOptions {
-  readonly tournamentId: string;
+  // T3 추가: 팀매치는 tournamentId/스태프 배정 개념이 없다 — null이면 아래
+  // useMyTournamentStaffAssignmentVersion 쿼리가 스킵되고 버전은 항상 0으로
+  // 고정된다(팀매치는 배정 handshake가 필요 없어 언제나 self-consistent하다).
+  readonly tournamentId: string | null;
   readonly gameId: string | null;
   readonly myUserId: string | undefined;
   readonly initialLastSequence: number;
@@ -119,6 +124,9 @@ export interface UseV1GameOperationsConsoleResult {
   submitEvent(input: SubmitEventInput): Promise<void>;
   retryFailedEvent(clientEventId: string): void;
   requestTakeover(): void;
+  /** T3 추가 — 큐를 거치지 않는 온라인 전용 되돌리기(D-10과 같은 이유로 절대
+   * 오프라인 큐에 들어가지 않는다). 사후 어시스트 부착(reverse+re-append)에 쓰인다. */
+  reverseEvent(input: { eventId: string; reason: string }): Promise<void>;
 }
 
 /**
@@ -515,6 +523,31 @@ export function useV1GameOperationsConsole(
     dispatchQueue({ type: 'RETRY', clientEventId });
   }, []);
 
+  // T3 추가 — 큐를 거치지 않는 온라인 전용 REST 호출. assertQueueable을 굳이
+  // 부르지 않는다(큐에 절대 안 넣으니 필요 없다) — 대신 이 함수 자체가 "온라인일
+  // 때만 호출 가능"을 문서화한다.
+  const reverseEvent = useCallback(
+    async (input: { eventId: string; reason: string }) => {
+      if (!gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
+        throw new Error('경기 운영 권한이 없어 되돌릴 수 없어요.');
+      }
+      const clientEventId = randomUuid();
+      const result = await v1Post<{ gameId: string; state: GameState; version: number }>(
+        `/games/${gameId}/events/${input.eventId}/reverse`,
+        {
+          expectedVersion: gameSnapshot.version,
+          clientEventId,
+          takeoverToken: takeover.token,
+          reason: input.reason,
+        },
+        { headers: { 'Idempotency-Key': clientEventId } },
+      );
+      setGameSnapshot((current) => (current ? { ...current, version: result.version } : current));
+      void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+    },
+    [gameId, gameSnapshot, takeover, queryClient],
+  );
+
   return {
     connectionStatus,
     sync,
@@ -527,6 +560,7 @@ export function useV1GameOperationsConsole(
     submitEvent,
     retryFailedEvent,
     requestTakeover,
+    reverseEvent,
   };
 }
 

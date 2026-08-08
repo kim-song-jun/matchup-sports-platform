@@ -622,7 +622,7 @@ export class GamesService {
           });
         }
         assertClockNotDrifted(dto.occurredAt);
-        this.requireTakeover(game.id, context);
+        this.requireTakeover(game.id, game.sourceType, context);
 
         if (command === 'next-period') {
           return this.advancePeriod(tx, game, context);
@@ -820,7 +820,7 @@ export class GamesService {
       },
       async (tx, game, context) => {
         assertClockNotDrifted(dto.occurredAt);
-        this.requireTakeover(game.id, context);
+        this.requireTakeover(game.id, game.sourceType, context);
         if (game.state === V1GameState.ENDED || game.state === V1GameState.CANCELLED) {
           throw new ConflictException({
             code: 'TERMINAL_GAME_IMMUTABLE',
@@ -961,7 +961,7 @@ export class GamesService {
           // design and is legitimately allowed to arrive minutes after
           // occurredAt (offline recovery). Payload-hash pinning above already
           // guarantees occurredAt cannot be altered between capture and retry.
-          this.requireTakeover(gameId, context);
+          this.requireTakeover(gameId, game.sourceType, context);
           const dto: AppendGameEventDto = {
             ...input.event,
             expectedVersion: input.rebasedExpectedVersion,
@@ -1057,7 +1057,7 @@ export class GamesService {
         payload: { eventId, ...dto },
       },
       async (tx, game, context) => {
-        this.requireTakeover(game.id, context);
+        this.requireTakeover(game.id, game.sourceType, context);
         const target = await tx.v1GameEvent.findFirst({ where: { id: eventId, gameId } });
         if (target === null) {
           throw this.notFound('GAME_EVENT_NOT_FOUND');
@@ -1272,7 +1272,7 @@ export class GamesService {
           // 참가팀(team_manager/team_owner)의 사전 라인업 제출은 이 불변식 대상이
           // 아니다 — takeover는 "현장 기기가 이 경기를 배타적으로 장악 중"이라는
           // 라이브 운영 개념이라 경기 전 로스터 준비와는 무관하다(Task 27 후속).
-          this.requireTakeover(game.id, context);
+          this.requireTakeover(game.id, game.sourceType, context);
         }
         const lineup = await tx.v1GameLineup.findFirst({ where: { id: lineupId, gameId } });
         if (lineup === null) {
@@ -2884,6 +2884,26 @@ export class GamesService {
         teamId: match.hostTeamId,
       };
     }
+    if (action === 'event_append' || action === 'event_reverse') {
+      // Task T1-1: only the host team's owner/manager may record or reverse
+      // live game events for a team match. This must NOT fall through to the
+      // generic `managerRole(hostMembership) ?? managerRole(opponentMembership)`
+      // merge below — that merge would let an opponent manager pass once the
+      // event_append/event_reverse forbid further down is removed. A second,
+      // uncoordinated recorder on the opponent side would race sequence
+      // numbers against the host; disputes belong to the existing result
+      // approve/change_request decision surface, not a second event writer.
+      const hostRole = managerRole(hostMembership);
+      if (hostRole === null) {
+        throw this.forbidden();
+      }
+      return {
+        actorType: 'USER',
+        actorUserId: userId,
+        role: hostRole,
+        teamId: match.hostTeamId,
+      };
+    }
     const role = managerRole(hostMembership) ?? managerRole(opponentMembership);
     // `participant_identity` (Task 14 identity-link/consent mutations) is
     // deliberately as permissive as `read` here: the actor only needs to be
@@ -2899,11 +2919,7 @@ export class GamesService {
         teamId: hostMembership?.teamId ?? opponentMembership?.teamId,
       };
     }
-    if (
-      role === null ||
-      action === 'event_append' ||
-      action === 'event_reverse'
-    ) {
+    if (role === null) {
       throw this.forbidden();
     }
     return {
@@ -3270,7 +3286,17 @@ export class GamesService {
     }
   }
 
-  private requireTakeover(gameId: string, context: GameCommandContext) {
+  private requireTakeover(gameId: string, sourceType: V1GameSourceType, context: GameCommandContext) {
+    // Task T1-1: the exclusive takeover token exists to arbitrate between
+    // multiple tournament staff devices contending for control of the same
+    // physical live console (see requestTakeover's doc comment). A team
+    // match has exactly one writer role (the host team owner/manager,
+    // enforced in resolveActor) and no staff handoff concept — team-match
+    // actors can never obtain an authorizationSubject (see resolveActor) and
+    // would otherwise be permanently locked out of event_append/event_reverse.
+    if (sourceType === V1GameSourceType.TEAM_MATCH) {
+      return;
+    }
     const token = context.takeoverToken?.trim();
     const authorizationSubject =
       context.actor.actorType === 'USER' ? context.actor.authorizationSubject : undefined;
@@ -3409,7 +3435,7 @@ export class GamesService {
         if (context.actor.actorType === 'USER' && context.actor.role === 'field_operator') {
           throw this.forbidden();
         }
-        this.requireTakeover(game.id, context);
+        this.requireTakeover(game.id, game.sourceType, context);
         if (game.state !== V1GameState.ENDED) {
           throw new ConflictException({
             code: 'RESULT_RECOVERY_NOT_REQUIRED',

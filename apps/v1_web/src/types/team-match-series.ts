@@ -106,11 +106,5 @@ export interface V1SeriesPlayerRecordRow {
 export interface V1SeriesPlayerRecordsResponse {
   seriesId: string;
   goals: V1SeriesPlayerRecordRow[];
-  // NOTE(deviation from plan): the backend (feat/v1-wave-b-series,
-  // team-match-series-public.service.ts) intentionally omits `assists`
-  // entirely until the T1 track's V1GameResultParticipant.assists column
-  // lands on this branch — the response is `{ seriesId, goals }` only, with
-  // no `assists` key at all (not even an empty array). Keep this optional
-  // and guard every read with `?? []` until that backend field ships.
-  assists?: V1SeriesPlayerRecordRow[];
+  assists: V1SeriesPlayerRecordRow[];
 }

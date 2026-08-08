@@ -17,14 +17,6 @@ export default function TeamMatchSeriesStandingsClient({ seriesId }: { seriesId:
 
   if (series === undefined) return null;
 
-  // NOTE(deviation from plan): the backend intentionally omits `assists`
-  // from GET /team-match-series/:seriesId/player-records until the parallel
-  // T1 track's V1GameResultParticipant.assists column lands on this branch
-  // (see apps/v1_api/src/team-match-series/team-match-series-public.service.ts
-  // NOTE above playerRecords()). `records.assists` may be `undefined`, not an
-  // empty array — always fall back to `[]` before reading `.length`/`.map`.
-  const assistRows = records?.assists ?? [];
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="text-xl font-bold text-gray-900 dark:text-white">{series.title}</h1>
@@ -97,11 +89,11 @@ export default function TeamMatchSeriesStandingsClient({ seriesId }: { seriesId:
 
       <section className="mt-8">
         <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">도움 순위</h2>
-        {assistRows.length === 0 ? (
+        {records === undefined || records.assists.length === 0 ? (
           <EmptyState title="아직 기록이 없어요" sub="확정된 경기 결과가 쌓이면 도움 순위가 나타나요." />
         ) : (
           <ol className="space-y-1">
-            {assistRows.map((row, index) => (
+            {records.assists.map((row, index) => (
               <li key={row.userId} className="flex justify-between text-sm text-gray-900 dark:text-white">
                 <span>{index + 1}. {row.nickname ?? '선수'}</span>
                 <span>{row.assists}도움</span>

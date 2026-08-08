@@ -1,3 +1,4 @@
+import type { FormationSlot } from '@/components/lineup/formation-slots';
 import { randomUuid } from '@/lib/uuid';
 import type {
   V1TeamMatchLineup,
@@ -283,64 +284,73 @@ export function clearPlayerPosition(state: LineupEditorState, key: string): Line
   };
 }
 
-/** "N-N-N" 형태(예: "4-4-2")의 포메이션 프리셋을 좌표로 펼친다. 라인 수만큼 y축을 균등
- * 분할하고(공격 방향 = y 증가), 각 라인 안에서는 x축을 균등 분할한다. 골키퍼는 항상
- * (50, 6) 고정이라 이 함수는 필드 플레이어 좌표만 만든다. `outfieldCount`(골키퍼 제외
- * 선발 수)와 프리셋 합이 다르면 null — 호출부가 "이 인원수엔 안 맞는 포메이션"으로 걸러낸다. */
-export function computeFormationPositions(
-  formation: string,
-  outfieldCount: number,
-): Array<{ positionX: number; positionY: number }> | null {
-  const rows = formation.split('-').map((token) => Number.parseInt(token, 10));
-  if (rows.length === 0 || rows.some((count) => !Number.isInteger(count) || count <= 0)) return null;
-  const total = rows.reduce((sum, count) => sum + count, 0);
-  if (total !== outfieldCount) return null;
-  const positions: Array<{ positionX: number; positionY: number }> = [];
-  rows.forEach((count, rowIndex) => {
-    const positionY = 18 + ((rowIndex + 1) * 74) / (rows.length + 1);
-    for (let i = 0; i < count; i++) {
-      const positionX = count === 1 ? 50 : (100 / (count + 1)) * (i + 1);
-      positions.push({ positionX, positionY });
-    }
-  });
-  return positions;
+/** 포메이션 라벨만 바꾼다 — 이미 배치된 선수의 좌표는 건드리지 않는다(D-8). "포메이션
+ * 선택"과 "선수 배치"는 분리된 두 단계다: 선택은 빈 슬롯(포지션 라벨)을 노출할 뿐이고,
+ * 실제 배치는 placeInSlot으로 한 명씩 이뤄진다. null은 "자유 배치"(슬롯 없음)로의 전환. */
+export function selectFormation(state: LineupEditorState, formation: string | null): LineupEditorState {
+  return { ...state, formation, dirty: true };
 }
 
-/** 필드 인원수(골키퍼 제외)에 맞는 추천 포메이션 프리셋 목록. 흔한 값만 큐레이션했다 —
- * 대응하지 않는 인원수는 빈 배열을 돌려주고, 화면은 그럴 때 드래그 자유 배치만 안내한다. */
-export function suggestedFormations(outfieldCount: number): string[] {
-  const table: Record<number, string[]> = {
-    4: ['2-2', '1-2-1', '3-1'],
-    5: ['2-2-1', '3-1-1', '1-3-1'],
-    6: ['3-2-1', '2-3-1'],
-    9: ['4-4-1', '4-3-2', '3-4-2'],
-    10: ['4-4-2', '4-3-3', '3-5-2', '4-5-1'],
-  };
-  return table[outfieldCount] ?? [];
-}
-
-/** 포메이션 프리셋을 적용한다 — 골키퍼 좌표(50,6) + 프리셋 좌표를 선발 순서대로 배정한다.
- * 프리셋이 이 선발 인원수와 안 맞으면(예: 벤치에서 방금 올려서 인원이 바뀜) 좌표를 건드리지
- * 않고 formation 라벨만 갱신한다 — 잘못된 좌표를 억지로 채우는 것보다 안전하다. */
-export function applyFormation(state: LineupEditorState, formation: string): LineupEditorState {
-  const goalkeeperKey = state.starters.find((entry) => entry.goalkeeper)?.key ?? null;
-  const outfield = state.starters.filter((entry) => entry.key !== goalkeeperKey);
-  const positions = computeFormationPositions(formation, outfield.length);
-  if (positions === null) {
-    return { ...state, formation, dirty: true };
-  }
-  let cursor = 0;
+/** 빈 슬롯에 대기 중인 선수 한 명을 채운다. 골키퍼 슬롯이면 이 선수를 골키퍼로 지정하고
+ * (다른 선발의 골키퍼 표시는 setGoalkeeper와 동일한 라디오 의미론으로 해제한다), 아니면
+ * 슬롯의 positionCode를 그대로 옮겨 담는다. */
+export function placeInSlot(state: LineupEditorState, key: string, slot: FormationSlot): LineupEditorState {
+  const isGoalkeeperSlot = slot.positionCode === 'GK';
   return {
     ...state,
-    formation,
     starters: state.starters.map((entry) => {
-      if (entry.key === goalkeeperKey) return { ...entry, positionX: 50, positionY: 6 };
-      const next = positions[cursor];
-      cursor += 1;
-      return next ? { ...entry, positionX: next.positionX, positionY: next.positionY } : entry;
+      if (entry.key !== key) {
+        return isGoalkeeperSlot && entry.goalkeeper ? { ...entry, goalkeeper: false } : entry;
+      }
+      return {
+        ...entry,
+        positionX: slot.x,
+        positionY: slot.y,
+        position: isGoalkeeperSlot ? null : slot.positionCode,
+        goalkeeper: isGoalkeeperSlot,
+      };
     }),
     dirty: true,
   };
+}
+
+/** 슬롯에서 선수를 빼낸다 — 좌표뿐 아니라 positionCode·골키퍼 지정까지 함께 지워 "완전한
+ * 대기 상태"로 되돌린다. 좌표만 지우는 clearPlayerPosition(자유 배치 전용, 아래 그대로
+ * 유지)과 의도적으로 다르다: 슬롯 모드에서 좌표만 지우면 positionCode가 남아
+ * matchSlotsToEntries가 엉뚱한 슬롯을 이미 채운 것으로 오인할 수 있다. */
+export function unplaceFromSlot(state: LineupEditorState, key: string): LineupEditorState {
+  return {
+    ...state,
+    starters: state.starters.map((entry) =>
+      entry.key === key
+        ? { ...entry, positionX: null, positionY: null, position: null, goalkeeper: false }
+        : entry,
+    ),
+    dirty: true,
+  };
+}
+
+/** 슬롯 하나에 어느 선발이 채워져 있는지 짝짓는다. 좌표가 아니라 positionCode로 매칭해서
+ * 드래그로 좌표가 슬롯 원위치에서 벗어나도("배치 후 드래그로 좌표만 변경, positionCode
+ * 유지") 여전히 그 슬롯을 채운 것으로 인식한다. 골키퍼 슬롯은 entry.goalkeeper 플래그로
+ * 매칭한다(이 앱 전체가 GK를 그렇게 식별하는 기존 관례와 동일). 같은 코드의 슬롯이
+ * 여럿이면(예: FIXO×2) 먼저 나온 슬롯부터 순서대로 소비한다. 컴포넌트(렌더링)·
+ * validateLineupForSubmit(제출 검증)·fixture 화면(대회 fixture 라인업, 상태 타입은 달라도
+ * starters: LineupEntryDraft[]는 동일해 그대로 재사용) 세 곳이 공유하는 단일 진실 공급원. */
+export function matchSlotsToEntries(
+  slots: FormationSlot[],
+  starters: LineupEntryDraft[],
+): Array<{ slot: FormationSlot; entry: LineupEntryDraft | null }> {
+  const consumed = new Set<string>();
+  return slots.map((slot) => {
+    const match = starters.find((entry) => {
+      if (consumed.has(entry.key)) return false;
+      if (slot.positionCode === 'GK') return entry.goalkeeper;
+      return !entry.goalkeeper && entry.position === slot.positionCode;
+    });
+    if (match) consumed.add(match.key);
+    return { slot, entry: match ?? null };
+  });
 }
 
 export function setJerseyNumber(state: LineupEditorState, slot: LineupSlot, key: string, value: number | null): LineupEditorState {
@@ -378,7 +388,10 @@ export function deriveLineupCounts(state: LineupEditorState, rosterPool: RosterO
  * 있는 것만 검사한다 — 종목별 최소/최대 인원(V1CompetitionConfigVersion.lineup)은 프론트에
  * 노출되는 계약이 없어 여기서 하드코딩하지 않고 서버의 422 LINEUP_SIZE_INVALID 메시지를
  * 그대로 보여주는 쪽을 택했다(잘못된 상수를 만드는 것보다 정직하다). */
-export function validateLineupForSubmit(state: LineupEditorState): string[] {
+export function validateLineupForSubmit(
+  state: LineupEditorState,
+  activeSlots: FormationSlot[] | null,
+): string[] {
   const errors: string[] = [];
   if (state.starters.length === 0) {
     errors.push('선발 명단을 최소 한 명 이상 등록해 주세요.');
@@ -399,6 +412,12 @@ export function validateLineupForSubmit(state: LineupEditorState): string[] {
   if (emptyNames) {
     errors.push('이름이 비어 있는 선수가 있어요.');
   }
+  if (activeSlots !== null) {
+    const emptySlotCount = matchSlotsToEntries(activeSlots, state.starters).filter((row) => row.entry === null).length;
+    if (emptySlotCount > 0) {
+      errors.push(`아직 채우지 않은 포지션 자리가 ${emptySlotCount}개 있어요.`);
+    }
+  }
   return errors;
 }
 
@@ -408,6 +427,9 @@ function toParticipantInput(entry: LineupEntryDraft): V1TeamMatchLineupParticipa
     displayName: entry.displayName,
     ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
     ...(entry.goalkeeper ? { goalkeeper: true } : {}),
+    // 정찰에서 발견한 기존 버그: DTO엔 position 필드가 있는데 여기서 빠져 있어 슬롯
+    // 배치의 positionCode가 저장 즉시 사라졌다.
+    ...(entry.position !== null ? { position: entry.position } : {}),
     ...(entry.positionX !== null && entry.positionY !== null
       ? { positionX: entry.positionX, positionY: entry.positionY }
       : {}),

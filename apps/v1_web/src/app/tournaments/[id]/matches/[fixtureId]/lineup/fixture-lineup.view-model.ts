@@ -1,9 +1,8 @@
+import type { FormationSlot } from '@/components/lineup/formation-slots';
 import { randomUuid } from '@/lib/uuid';
-import { computeFormationPositions, suggestedFormations, type LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import type { GameLineup } from '@/types/game-operations';
 import type { V1SaveGameLineupPayload } from '@/hooks/use-v1-api';
-
-export { computeFormationPositions, suggestedFormations };
 
 /**
  * 대회 경기(tournament fixture) 라인업 편집기 상태 — team-match 쪽
@@ -136,26 +135,40 @@ export function clearPlayerPosition(state: FixtureLineupState, key: string): Fix
   };
 }
 
-/** team-match 쪽 applyFormation(lineup.view-model.ts)과 로직은 같지만 상태 타입이
- * 달라(gameVersion vs baseRevision) 그대로 재사용할 수 없다 — computeFormationPositions는
- * 순수 함수라 그대로 재사용하고, 상태 조립만 여기서 다시 한다. */
-export function applyFormation(state: FixtureLineupState, formation: string): FixtureLineupState {
-  const goalkeeperKey = state.starters.find((entry) => entry.goalkeeper)?.key ?? null;
-  const outfield = state.starters.filter((entry) => entry.key !== goalkeeperKey);
-  const positions = computeFormationPositions(formation, outfield.length);
-  if (positions === null) {
-    return { ...state, formation, dirty: true };
-  }
-  let cursor = 0;
+/** team-match 쪽 selectFormation(lineup.view-model.ts)과 로직은 같지만 상태 타입이
+ * 달라(gameVersion vs baseRevision) 그대로 재사용할 수 없다. */
+export function selectFormation(state: FixtureLineupState, formation: string | null): FixtureLineupState {
+  return { ...state, formation, dirty: true };
+}
+
+export function placeInSlot(state: FixtureLineupState, key: string, slot: FormationSlot): FixtureLineupState {
+  const isGoalkeeperSlot = slot.positionCode === 'GK';
   return {
     ...state,
-    formation,
     starters: state.starters.map((entry) => {
-      if (entry.key === goalkeeperKey) return { ...entry, positionX: 50, positionY: 6 };
-      const next = positions[cursor];
-      cursor += 1;
-      return next ? { ...entry, positionX: next.positionX, positionY: next.positionY } : entry;
+      if (entry.key !== key) {
+        return isGoalkeeperSlot && entry.goalkeeper ? { ...entry, goalkeeper: false } : entry;
+      }
+      return {
+        ...entry,
+        positionX: slot.x,
+        positionY: slot.y,
+        position: isGoalkeeperSlot ? null : slot.positionCode,
+        goalkeeper: isGoalkeeperSlot,
+      };
     }),
+    dirty: true,
+  };
+}
+
+export function unplaceFromSlot(state: FixtureLineupState, key: string): FixtureLineupState {
+  return {
+    ...state,
+    starters: state.starters.map((entry) =>
+      entry.key === key
+        ? { ...entry, positionX: null, positionY: null, position: null, goalkeeper: false }
+        : entry,
+    ),
     dirty: true,
   };
 }

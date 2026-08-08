@@ -1,18 +1,17 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1TeamMatchLineup } from '@/types/api';
+import type { FormationSlot } from '@/components/lineup/formation-slots';
 import {
   addGuestToBench,
   addGuestToStarters,
   addRosterMemberToBench,
   addRosterMemberToStarters,
-  applyFormation,
   applySaveResult,
   applyVersionConflictReload,
   buildSavePayload,
   clearPlayerPosition,
-  computeFormationPositions,
   createEmptyLineupEditorState,
   deriveLineupCounts,
   describeLineupPhase,
@@ -20,13 +19,16 @@ import {
   extractConflictCurrentVersion,
   hydrateLineupEditorState,
   isRosterMemberPlaced,
+  matchSlotsToEntries,
   moveEntry,
+  placeInSlot,
   removeEntry,
   resolveOwnTeamId,
+  selectFormation,
   setGoalkeeper,
   setJerseyNumber,
   setPlayerPosition,
-  suggestedFormations,
+  unplaceFromSlot,
   validateLineupForSubmit,
 } from './lineup.view-model';
 
@@ -126,7 +128,7 @@ describe('lineup.view-model', () => {
   });
 
   it('flags a lineup with no goalkeeper, duplicate jersey numbers, or an empty roster', () => {
-    expect(validateLineupForSubmit(createEmptyLineupEditorState(0))).toContain(
+    expect(validateLineupForSubmit(createEmptyLineupEditorState(0), null)).toContain(
       '선발 명단을 최소 한 명 이상 등록해 주세요.',
     );
 
@@ -135,12 +137,12 @@ describe('lineup.view-model', () => {
     state = addRosterMemberToStarters(state, rosterMember2);
     state = setJerseyNumber(state, 'starter', state.starters[0].key, 7);
     state = setJerseyNumber(state, 'starter', state.starters[1].key, 7);
-    const errors = validateLineupForSubmit(state);
+    const errors = validateLineupForSubmit(state, null);
     expect(errors).toContain('선발 라인업에 골키퍼를 한 명 지정해 주세요.');
     expect(errors).toContain('등번호가 중복돼요. 등번호는 서로 달라야 해요.');
 
     state = setGoalkeeper(state, state.starters[0].key);
-    expect(validateLineupForSubmit(state)).not.toContain('선발 라인업에 골키퍼를 한 명 지정해 주세요.');
+    expect(validateLineupForSubmit(state, null)).not.toContain('선발 라인업에 골키퍼를 한 명 지정해 주세요.');
   });
 
   it('builds a save payload carrying userId only for linked entries', () => {
@@ -278,47 +280,67 @@ describe('lineup.view-model', () => {
     expect(state.starters).toHaveLength(2);
   });
 
-  it('computeFormationPositions spreads rows evenly and rejects a headcount mismatch', () => {
-    const positions = computeFormationPositions('2-2', 4);
-    expect(positions).toHaveLength(4);
-    // Two rows: first row (defense) has a lower y than the second (attack).
-    expect(positions![0].positionY).toBeLessThan(positions![2].positionY);
-    // Within a row of 2, the two x values are symmetric around 50.
-    expect(positions![0].positionX + positions![1].positionX).toBeCloseTo(100, 5);
-
-    // "4-4-2" sums to 10 outfield players — asking for 4 is a mismatch, not a crash.
-    expect(computeFormationPositions('4-4-2', 4)).toBeNull();
-    // Malformed tokens fail closed instead of producing NaN coordinates.
-    expect(computeFormationPositions('a-b', 4)).toBeNull();
+  it('selectFormation only relabels the formation — it never moves an already-placed starter', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addRosterMemberToStarters(state, rosterMember);
+    state = setPlayerPosition(state, state.starters[0].key, 42, 63);
+    const next = selectFormation(state, '2-2');
+    expect(next.formation).toBe('2-2');
+    expect(next.starters[0]).toMatchObject({ positionX: 42, positionY: 63 });
   });
 
-  it('suggestedFormations only offers presets for curated headcounts', () => {
-    expect(suggestedFormations(4)).toEqual(['2-2', '1-2-1', '3-1']);
-    expect(suggestedFormations(10)).toContain('4-4-2');
-    expect(suggestedFormations(7)).toEqual([]);
-  });
-
-  it('applyFormation places the goalkeeper fixed and spreads outfield starters by preset', () => {
+  it('placeInSlot assigns the slot coordinates and positionCode, and enforces one goalkeeper (radio semantics)', () => {
     let state = createEmptyLineupEditorState(0);
     state = addRosterMemberToStarters(state, rosterMember);
     state = addRosterMemberToStarters(state, rosterMember2);
     state = setGoalkeeper(state, state.starters[0].key);
-    // 2 starters total, 1 is GK → 1 outfield player. "1-2-1" doesn't match (sums to 4),
-    // so applyFormation should still set the label without touching coordinates.
-    const mismatched = applyFormation(state, '1-2-1');
-    expect(mismatched.formation).toBe('1-2-1');
-    expect(mismatched.starters.every((entry) => entry.positionX === null)).toBe(true);
+    const gkSlot: FormationSlot = { positionCode: 'GK', label: 'GK', x: 50, y: 6 };
+    const next = placeInSlot(state, state.starters[1].key, gkSlot);
+    expect(next.starters[0].goalkeeper).toBe(false);
+    expect(next.starters[1]).toMatchObject({ goalkeeper: true, positionX: 50, positionY: 6, position: null });
 
-    // Add two more outfield players so the outfield count (3) matches "3".
-    let matched = addRosterMemberToStarters(state, { userId: 'user-3', displayName: '이영희', role: 'member' });
-    matched = addRosterMemberToStarters(matched, { userId: 'user-4', displayName: '박민수', role: 'member' });
-    const applied = applyFormation(matched, '3');
-    expect(applied.formation).toBe('3');
-    const goalkeeper = applied.starters.find((entry) => entry.goalkeeper);
-    expect(goalkeeper).toMatchObject({ positionX: 50, positionY: 6 });
-    expect(applied.starters.filter((entry) => !entry.goalkeeper).every((entry) => entry.positionX !== null)).toBe(
-      true,
-    );
+    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
+    const withOutfield = placeInSlot(next, next.starters[0].key, fixoSlot);
+    expect(withOutfield.starters[0]).toMatchObject({ position: 'FIXO', positionX: 33, positionY: 43, goalkeeper: false });
+  });
+
+  it('unplaceFromSlot clears coordinates, positionCode, and goalkeeper together (not just coordinates)', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addRosterMemberToStarters(state, rosterMember);
+    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
+    state = placeInSlot(state, state.starters[0].key, fixoSlot);
+    const cleared = unplaceFromSlot(state, state.starters[0].key);
+    expect(cleared.starters[0]).toMatchObject({ position: null, positionX: null, positionY: null, goalkeeper: false });
+  });
+
+  it('matchSlotsToEntries matches by positionCode (not coordinates) so a dragged token still counts its slot as filled', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addRosterMemberToStarters(state, rosterMember);
+    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
+    state = placeInSlot(state, state.starters[0].key, fixoSlot);
+    state = setPlayerPosition(state, state.starters[0].key, 61, 12); // 배치 후 드래그로 좌표만 변경
+    const matched = matchSlotsToEntries([fixoSlot], state.starters);
+    expect(matched[0].entry?.key).toBe(state.starters[0].key);
+  });
+
+  it('validateLineupForSubmit reports unfilled slots only when a slot preset is active', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addRosterMemberToStarters(state, rosterMember);
+    const slots: FormationSlot[] = [
+      { positionCode: 'GK', label: 'GK', x: 50, y: 6 },
+      { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 },
+    ];
+    expect(validateLineupForSubmit(state, null)).not.toContain('아직 채우지 않은 포지션 자리가 2개 있어요.');
+    expect(validateLineupForSubmit(state, slots)).toContain('아직 채우지 않은 포지션 자리가 2개 있어요.');
+  });
+
+  it("buildSavePayload includes each starter's positionCode — a real bug where it was silently dropped from the save request", () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addRosterMemberToStarters(state, rosterMember);
+    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
+    state = placeInSlot(state, state.starters[0].key, fixoSlot);
+    const payload = buildSavePayload(state);
+    expect(payload.starters[0]).toMatchObject({ position: 'FIXO', positionX: 33, positionY: 43 });
   });
 
   it('setPlayerPosition/clearPlayerPosition edit one starter without touching the rest', () => {
@@ -732,5 +754,77 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(9);
     expect(screen.getByRole('button', { name: '홍길동, 골키퍼로 지정됨' })).toBeInTheDocument();
     expect(screen.queryByText('홍길동 선수를 명단에서 제거했어요.')).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchLineupPageClient — pitch tab wiring (D-17: consumes server lineupConfig, no hardcoded catalog)', () => {
+  it('passes formationOptions/slots built from lineupQuery.data.lineupConfig', async () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'team-1', role: 'owner' }] }, isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: {
+        teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-1', role: 'team_manager', lineupId: 'lineup-1',
+        revision: 1, state: 'DRAFT', version: 1, publicLineupAt: null, formation: null,
+        // 4명 모두 필드 플레이어(비-골키퍼)로 둔다 — 아래 formations는 outfield: 4라
+        // outfieldCount가 실제로 4와 맞아야 formationOptions에 뜬다(D-17 헤드카운트 필터).
+        starters: [
+          { id: 'p1', displayName: '선수1', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null },
+          { id: 'p2', displayName: '선수2', jerseyNumber: 2, position: null, goalkeeper: false, positionX: null, positionY: null },
+          { id: 'p3', displayName: '선수3', jerseyNumber: 3, position: null, goalkeeper: false, positionX: null, positionY: null },
+          { id: 'p4', displayName: '선수4', jerseyNumber: 4, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+        bench: [],
+        lineupConfig: {
+          minPlayers: 3, maxPlayers: 5, substitutions: 'rolling', maxSubstitutions: null,
+          positions: [
+            { code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true },
+            { code: 'FIXO', label: '픽소', short: 'FX' },
+            { code: 'ALA', label: '아라', short: 'AL' },
+            { code: 'PIVO', label: '피보', short: 'PV' },
+          ],
+          formations: [
+            { code: '2-2', label: '박스', outfield: 4, slots: [
+              { position: 'FIXO', x: 28, y: 38 }, { position: 'FIXO', x: 72, y: 38 },
+              { position: 'PIVO', x: 28, y: 76 }, { position: 'PIVO', x: 72, y: 76 },
+            ] },
+            { code: '1-2-1', label: '다이아몬드', outfield: 4, slots: [
+              { position: 'FIXO', x: 50, y: 35 }, { position: 'ALA', x: 20, y: 58 },
+              { position: 'ALA', x: 80, y: 58 }, { position: 'PIVO', x: 50, y: 83 },
+            ] },
+          ],
+        },
+      },
+      isLoading: false, isError: false, refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
+    expect(screen.getByRole('group', { name: '포메이션 프리셋' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2-2 · 박스' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '1-2-1 · 다이아몬드' })).toBeInTheDocument();
+  });
+
+  it('renders zero formation chips (only 자유 배치) when lineupConfig is absent — proves there is no hardcoded fallback catalog', async () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'team-1', role: 'owner' }] }, isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: {
+        teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-1', role: 'team_manager', lineupId: 'lineup-1',
+        revision: 1, state: 'DRAFT', version: 1, publicLineupAt: null, formation: null,
+        starters: [{ id: 'p1', displayName: '선수1', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null }],
+        bench: [],
+        // lineupConfig 없음(구버전 응답 흉내) — 이전 초안이라면 FUTSAL_FORMATION_PRESETS로
+        // 폴백해 이 상황에서도 "2-2 · 박스" 칩이 보였을 것이다.
+      },
+      isLoading: false, isError: false, refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
+    // "포메이션 프리셋" 그룹 안을 좁혀서 본다 — 페이지 전체를 대상으로 하면 모바일 드로어
+    // 토글 버튼("배치 설정 · 대기 1명")도 " · "를 포함해 오탐을 낼 수 있다.
+    const formationGroup = screen.getByRole('group', { name: '포메이션 프리셋' });
+    expect(within(formationGroup).getAllByRole('button')).toHaveLength(1);
+    expect(within(formationGroup).getByRole('button', { name: '자유 배치' })).toBeInTheDocument();
   });
 });

@@ -18,6 +18,18 @@ export type CompetitionConfig = {
     maxPlayers: number;
     substitutions: 'limited' | 'rolling';
     maxSubstitutions: number | null;
+    positions: Array<{
+      code: string;
+      label: string;
+      short: string;
+      goalkeeper?: true;
+    }>;
+    formations: Array<{
+      code: string;
+      label: string;
+      outfield: number;
+      slots: Array<{ position: string; x: number; y: number }>;
+    }>;
   };
   result: {
     tournamentScorerPolicy: 'required' | 'optional';

@@ -30,6 +30,7 @@ import type {
 } from '../common/audit/operation-audit.contract';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
 import { GameTakeoverService } from './game-takeover.service';
 import {
   decideTournamentStaffAccess,
@@ -544,7 +545,18 @@ export class GamesService {
       if (game === null) {
         throw this.notFound();
       }
-      return { ...game, actorRole: actor.role };
+      // T1-5: the pitch-placement screen (D-17) needs the sport's formation
+      // preset catalog to build slot-based placement — this is the single
+      // server source of truth (apps/v1_web/src/components/lineup/formation-slots.ts).
+      const config = await tx.v1CompetitionConfigVersion.findUnique({
+        where: { id: game.competitionConfigVersionId },
+        select: { lineup: true },
+      });
+      return {
+        ...game,
+        actorRole: actor.role,
+        lineupConfig: parseLineupCatalog(config?.lineup ?? null),
+      };
     });
   }
 

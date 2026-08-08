@@ -1222,6 +1222,7 @@ export type V1Game = {
   periods: unknown[];
   lineups: V1GameLineupSummary[];
   actorRole: string;
+  lineupConfig?: V1LineupConfig;
 };
 
 /**
@@ -1375,6 +1376,28 @@ export type V1TeamMatchLineupBenchEntry = {
   jerseyNumber: number | null;
 };
 
+// 서버 `V1CompetitionConfigVersion.lineup`이 라인업 응답에 실어 내려주는 종목별
+// 포지션·포메이션 사전(T1-5). 프론트에는 하드코딩 카탈로그를 두지 않는다(D-17) —
+// apps/v1_web/src/components/lineup/formation-slots.ts가 이 shape의 단일 소비처다.
+export type V1LineupConfigPosition = {
+  code: string;
+  label: string;
+  short: string;
+  goalkeeper?: boolean;
+};
+
+export type V1LineupConfigFormation = {
+  code: string;
+  label: string;
+  outfield: number;
+  slots: Array<{ position: string; x: number; y: number }>;
+};
+
+export type V1LineupConfig = {
+  positions: V1LineupConfigPosition[];
+  formations: V1LineupConfigFormation[];
+};
+
 export type V1TeamMatchLineup = {
   teamMatchId: string;
   gameId: string;
@@ -1391,6 +1414,7 @@ export type V1TeamMatchLineup = {
   publicLineupAt: string | null;
   starters: V1TeamMatchLineupStarter[];
   bench: V1TeamMatchLineupBenchEntry[];
+  lineupConfig?: V1LineupConfig;
 };
 
 // 저장 요청 한 명분 — userId(연동된 활성 팀원) 또는 displayName(비연동 게스트) 중 하나는

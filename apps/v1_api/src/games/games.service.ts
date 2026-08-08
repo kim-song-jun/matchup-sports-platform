@@ -30,6 +30,7 @@ import type {
 } from '../common/audit/operation-audit.contract';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
 import { GameTakeoverService } from './game-takeover.service';
 import {
   decideTournamentStaffAccess,
@@ -151,6 +152,7 @@ function immutableGameEventPayload(dto: AppendGameEventDto): ImmutableGameEventI
     type: dto.type,
     ...(dto.sideId === undefined ? {} : { sideId: dto.sideId }),
     ...(dto.participantId === undefined ? {} : { participantId: dto.participantId }),
+    ...(dto.assistParticipantId === undefined ? {} : { assistParticipantId: dto.assistParticipantId }),
     period: dto.period,
     clockMs: dto.clockMs,
     occurredAt: dto.occurredAt,
@@ -543,7 +545,18 @@ export class GamesService {
       if (game === null) {
         throw this.notFound();
       }
-      return { ...game, actorRole: actor.role };
+      // T1-5: the pitch-placement screen (D-17) needs the sport's formation
+      // preset catalog to build slot-based placement — this is the single
+      // server source of truth (apps/v1_web/src/components/lineup/formation-slots.ts).
+      const config = await tx.v1CompetitionConfigVersion.findUnique({
+        where: { id: game.competitionConfigVersionId },
+        select: { lineup: true },
+      });
+      return {
+        ...game,
+        actorRole: actor.role,
+        lineupConfig: parseLineupCatalog(config?.lineup ?? null),
+      };
     });
   }
 
@@ -615,14 +628,16 @@ export class GamesService {
         payload: { command, ...dto },
       },
       async (tx, game, context) => {
-        if (game.sourceType === V1GameSourceType.TEAM_MATCH) {
+        // T3(기록 UX) 추가: 팀매치도 피리어드를 시작/전환해야 이벤트 시각이 찍힌다(T1-0).
+        // 끝맺음만 검증된 결과 제출 경로를 거쳐야 하므로 `end`만 계속 막는다.
+        if (game.sourceType === V1GameSourceType.TEAM_MATCH && command === 'end') {
           throw new ConflictException({
             code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN',
             message: 'Team matches end only through validated result submission',
           });
         }
         assertClockNotDrifted(dto.occurredAt);
-        this.requireTakeover(game.id, context);
+        this.requireTakeover(game.id, game.sourceType, context);
 
         if (command === 'next-period') {
           return this.advancePeriod(tx, game, context);
@@ -820,7 +835,7 @@ export class GamesService {
       },
       async (tx, game, context) => {
         assertClockNotDrifted(dto.occurredAt);
-        this.requireTakeover(game.id, context);
+        this.requireTakeover(game.id, game.sourceType, context);
         if (game.state === V1GameState.ENDED || game.state === V1GameState.CANCELLED) {
           throw new ConflictException({
             code: 'TERMINAL_GAME_IMMUTABLE',
@@ -838,6 +853,7 @@ export class GamesService {
             type: dto.type,
             sideId: dto.sideId,
             participantId: dto.participantId,
+            assistParticipantId: dto.assistParticipantId ?? null,
             period: dto.period,
             clockMs: dto.clockMs,
             occurredAt: new Date(dto.occurredAt),
@@ -961,7 +977,7 @@ export class GamesService {
           // design and is legitimately allowed to arrive minutes after
           // occurredAt (offline recovery). Payload-hash pinning above already
           // guarantees occurredAt cannot be altered between capture and retry.
-          this.requireTakeover(gameId, context);
+          this.requireTakeover(gameId, game.sourceType, context);
           const dto: AppendGameEventDto = {
             ...input.event,
             expectedVersion: input.rebasedExpectedVersion,
@@ -979,6 +995,7 @@ export class GamesService {
               type: input.event.type,
               sideId: input.event.sideId,
               participantId: input.event.participantId,
+              assistParticipantId: input.event.assistParticipantId ?? null,
               period: input.event.period,
               clockMs: input.event.clockMs,
               occurredAt: new Date(input.event.occurredAt),
@@ -1057,7 +1074,7 @@ export class GamesService {
         payload: { eventId, ...dto },
       },
       async (tx, game, context) => {
-        this.requireTakeover(game.id, context);
+        this.requireTakeover(game.id, game.sourceType, context);
         const target = await tx.v1GameEvent.findFirst({ where: { id: eventId, gameId } });
         if (target === null) {
           throw this.notFound('GAME_EVENT_NOT_FOUND');
@@ -1128,6 +1145,39 @@ export class GamesService {
     // 여기서도 지킨다. 스태프/platform_ops는 기존대로 양쪽 다 본다.
     const ownSideId =
       actor.role === 'team_manager' || actor.role === 'team_owner'
+        ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
+        : null;
+    const lineups = await this.prisma.v1GameLineup.findMany({
+      where: { gameId, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
+      orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
+    });
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { lineupId: { in: lineups.map((lineup) => lineup.id) } },
+      orderBy: [{ jerseyNumber: 'asc' }, { createdAt: 'asc' }],
+    });
+    const participantsByLineupId = groupParticipantsByLineupId(participants);
+    return lineups.map((lineup) => ({
+      ...lineup,
+      participants: participantsByLineupId.get(lineup.id) ?? [],
+    }));
+  }
+
+  /**
+   * T3(기록 입력 UX) 추가 — 라이브 기록 콘솔 전용 읽기 경로. `listLineups()`와
+   * 달리 `team_manager`/`team_owner` 액터에게도 양쪽 사이드를 모두 돌려준다:
+   * 기록자는 상대팀 선수도 탭해서 카드/파울을 남겨야 한다. 사전 라인업 비공개
+   * 원칙(listLineups의 ownSideId 제한)은 "SCHEDULED 상태에서는 여전히 자기
+   * 사이드만" 으로 대체 보존한다 — 킥오프 전 상대 전술을 미리 볼 수 없게.
+   */
+  async listOperationsLineups(user: V1AuthUser, gameId: string) {
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
+    const game = await this.prisma.v1Game.findUnique({ where: { id: gameId }, select: { state: true } });
+    if (game === null) {
+      throw this.notFound();
+    }
+    const ownSideId =
+      game.state === V1GameState.SCHEDULED &&
+      (actor.role === 'team_manager' || actor.role === 'team_owner')
         ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
         : null;
     const lineups = await this.prisma.v1GameLineup.findMany({
@@ -1272,7 +1322,7 @@ export class GamesService {
           // 참가팀(team_manager/team_owner)의 사전 라인업 제출은 이 불변식 대상이
           // 아니다 — takeover는 "현장 기기가 이 경기를 배타적으로 장악 중"이라는
           // 라이브 운영 개념이라 경기 전 로스터 준비와는 무관하다(Task 27 후속).
-          this.requireTakeover(game.id, context);
+          this.requireTakeover(game.id, game.sourceType, context);
         }
         const lineup = await tx.v1GameLineup.findFirst({ where: { id: lineupId, gameId } });
         if (lineup === null) {
@@ -1445,6 +1495,8 @@ export class GamesService {
             started: participant.started,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
+            assists: participant.assists ?? 0,
+            fouls: participant.fouls ?? 0,
             cards: jsonInput(participant.cards),
             goalkeeper: participant.goalkeeper,
           })),
@@ -2868,11 +2920,38 @@ export class GamesService {
         teamId: match.approvedApplicantTeamId ?? undefined,
       };
     }
-    if (action === 'team_result_submit') {
+    if (action === 'team_result_submit' || action === 'tournament_command') {
       // Task 16: draft creation and submission are host-only. The opponent side's
       // sole authority over the result is the decision surface above
       // (approve/change_request) — an opponent manager must never be able to draft
       // or submit the result their own team is being evaluated against.
+      //
+      // D-20(B6, T3 추가): tournament_command(start/pause/resume/next-period)도
+      // 같은 이유로 호스트 전용이다. 이 분기를 타지 않으면 아래쪽 공용 fallback
+      // (managerRole(hostMembership) ?? managerRole(opponentMembership))
+      // 로 양쪽을 합쳐버려서, 상대팀 매니저가 서버 API를 직접 호출해 경기
+      // 시작/일시정지/재개/피리어드 전환을 조작할 수 있었다 — 프론트의 isHost
+      // 게이트는 클라이언트 체크라 우회 가능하므로 여기서 막아야 실제 방어가 된다.
+      const hostRole = managerRole(hostMembership);
+      if (hostRole === null) {
+        throw this.forbidden();
+      }
+      return {
+        actorType: 'USER',
+        actorUserId: userId,
+        role: hostRole,
+        teamId: match.hostTeamId,
+      };
+    }
+    if (action === 'event_append' || action === 'event_reverse') {
+      // Task T1-1: only the host team's owner/manager may record or reverse
+      // live game events for a team match. This must NOT fall through to the
+      // generic `managerRole(hostMembership) ?? managerRole(opponentMembership)`
+      // merge below — that merge would let an opponent manager pass once the
+      // event_append/event_reverse forbid further down is removed. A second,
+      // uncoordinated recorder on the opponent side would race sequence
+      // numbers against the host; disputes belong to the existing result
+      // approve/change_request decision surface, not a second event writer.
       const hostRole = managerRole(hostMembership);
       if (hostRole === null) {
         throw this.forbidden();
@@ -2899,11 +2978,7 @@ export class GamesService {
         teamId: hostMembership?.teamId ?? opponentMembership?.teamId,
       };
     }
-    if (
-      role === null ||
-      action === 'event_append' ||
-      action === 'event_reverse'
-    ) {
+    if (role === null) {
       throw this.forbidden();
     }
     return {
@@ -3003,6 +3078,29 @@ export class GamesService {
         });
       }
     }
+    if (dto.assistParticipantId !== undefined && dto.assistParticipantId !== null) {
+      if (dto.type !== V1GameEventType.GOAL) {
+        throw new UnprocessableEntityException({
+          code: 'ASSIST_INVALID',
+          message: 'An assist can only be recorded on a GOAL event',
+        });
+      }
+      if (dto.assistParticipantId === dto.participantId) {
+        throw new UnprocessableEntityException({
+          code: 'ASSIST_INVALID',
+          message: 'A scorer cannot be credited with their own assist',
+        });
+      }
+      const assistParticipant = await tx.v1GameParticipant.findFirst({
+        where: { gameId: game.id, id: dto.assistParticipantId },
+      });
+      if (assistParticipant === null || assistParticipant.sideId !== dto.sideId) {
+        throw new UnprocessableEntityException({
+          code: 'ASSIST_INVALID',
+          message: 'Assist participant must belong to the scoring side',
+        });
+      }
+    }
     if (
       dto.type === V1GameEventType.GOAL &&
       dto.participantId === undefined &&
@@ -3060,6 +3158,9 @@ export class GamesService {
         type: event.type,
         ...(event.sideId === null ? {} : { sideId: event.sideId }),
         ...(event.participantId === null ? {} : { participantId: event.participantId }),
+        ...(event.assistParticipantId === null
+          ? {}
+          : { assistParticipantId: event.assistParticipantId }),
         period: event.period,
         clockMs: event.clockMs,
         reversed: reversedIds.has(event.id),
@@ -3084,6 +3185,8 @@ export class GamesService {
       sideId: participant.sideId,
       goals: participant.goals,
       cards: participant.cards,
+      ...(participant.assists === undefined ? {} : { assists: participant.assists }),
+      ...(participant.fouls === undefined ? {} : { fouls: participant.fouls }),
       ...(participant.minutesPlayed === undefined
         ? {}
         : { minutesPlayed: participant.minutesPlayed }),
@@ -3129,7 +3232,15 @@ export class GamesService {
     });
     const goalCount = new Map<string, number>();
     const cardCount = new Map<string, { yellow: number; red: number }>();
+    const assistCount = new Map<string, number>();
+    const foulCount = new Map<string, number>();
     for (const event of events) {
+      if (event.type === V1GameEventType.GOAL && event.assistParticipantId !== null) {
+        assistCount.set(
+          event.assistParticipantId,
+          (assistCount.get(event.assistParticipantId) ?? 0) + 1,
+        );
+      }
       if (event.participantId === null) {
         continue;
       }
@@ -3146,6 +3257,9 @@ export class GamesService {
         }
         cardCount.set(event.participantId, cards);
       }
+      if (event.type === V1GameEventType.FOUL) {
+        foulCount.set(event.participantId, (foulCount.get(event.participantId) ?? 0) + 1);
+      }
     }
     await tx.v1GameResultParticipant.createMany({
       data: participants.map((participant) => ({
@@ -3154,6 +3268,8 @@ export class GamesService {
         sideId: participant.sideId,
         started: true,
         goals: goalCount.get(participant.id) ?? 0,
+        assists: assistCount.get(participant.id) ?? 0,
+        fouls: foulCount.get(participant.id) ?? 0,
         cards: jsonInput(cardCount.get(participant.id) ?? { yellow: 0, red: 0 }),
         goalkeeper: false,
       })),
@@ -3270,7 +3386,17 @@ export class GamesService {
     }
   }
 
-  private requireTakeover(gameId: string, context: GameCommandContext) {
+  private requireTakeover(gameId: string, sourceType: V1GameSourceType, context: GameCommandContext) {
+    // Task T1-1: the exclusive takeover token exists to arbitrate between
+    // multiple tournament staff devices contending for control of the same
+    // physical live console (see requestTakeover's doc comment). A team
+    // match has exactly one writer role (the host team owner/manager,
+    // enforced in resolveActor) and no staff handoff concept — team-match
+    // actors can never obtain an authorizationSubject (see resolveActor) and
+    // would otherwise be permanently locked out of event_append/event_reverse.
+    if (sourceType === V1GameSourceType.TEAM_MATCH) {
+      return;
+    }
     const token = context.takeoverToken?.trim();
     const authorizationSubject =
       context.actor.actorType === 'USER' ? context.actor.authorizationSubject : undefined;
@@ -3409,7 +3535,7 @@ export class GamesService {
         if (context.actor.actorType === 'USER' && context.actor.role === 'field_operator') {
           throw this.forbidden();
         }
-        this.requireTakeover(game.id, context);
+        this.requireTakeover(game.id, game.sourceType, context);
         if (game.state !== V1GameState.ENDED) {
           throw new ConflictException({
             code: 'RESULT_RECOVERY_NOT_REQUIRED',

@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
-import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import { matchSlotsToEntries, type LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import type { FormationPreset, FormationSlot } from './formation-slots';
 
 /**
  * 피치 위에 선발 선수를 아이콘으로 배치하는 에디터(FIFA 온라인 스타일). 순수 SVG로 그린
@@ -27,31 +28,54 @@ import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.vie
 
 const PITCH_ASPECT = 68 / 105; // FIFA 규격 축구장 비율(가로 105m : 세로 68m)을 세로로 세운 형태
 const TOKEN_SIZE_PCT = 11; // 피치 너비 대비 토큰 지름 비율
+/** 인터랙티브 요소 최소 터치 타겟(프로젝트 규칙). 기존 PlayerToken은 36px이었다 — 이번
+ * 슬롯 UX 작업 범위 안에서 함께 44px로 올린다(같은 파일을 손대는 김에 기술부채 해결). */
+const TOUCH_TARGET_PX = 44;
 
 export type PitchFormationEditorProps = {
   starters: LineupEntryDraft[];
   formation: string | null;
-  suggestedFormations: string[];
+  /** 지금 인원수(outfieldCount)에 맞는 프리셋 목록 — presetsForOutfieldCount의 결과를
+   * 그대로 받는다. 비어 있으면 "자유 배치"만 칩으로 남는다(D-17: 하드코딩 없음). */
+  formationOptions: FormationPreset[];
+  /** 선택된 프리셋의 slotsWithGoalkeeper() 결과, 또는 자유 배치 모드일 때 null. */
+  slots: FormationSlot[] | null;
+  /** formationOptions가 비었을 때 보여줄 안내 문구 — 프리셋 섹션을 숨기지 않고 이
+   * 문구 + "자유 배치" 칩을 함께 보여준다. */
+  outfieldGuidance: string | null;
   editable: boolean;
-  onSelectFormation: (formation: string) => void;
+  onSelectFormation: (formation: string | null) => void;
   onPlacePlayer: (key: string, positionX: number, positionY: number) => void;
   onUnplacePlayer: (key: string) => void;
+  onPlaceInSlot: (key: string, slot: FormationSlot) => void;
+  onUnplaceFromSlot: (key: string) => void;
 };
 
 export function PitchFormationEditor({
   starters,
   formation,
-  suggestedFormations,
+  formationOptions,
+  slots,
+  outfieldGuidance,
   editable,
   onSelectFormation,
   onPlacePlayer,
   onUnplacePlayer,
+  onPlaceInSlot,
+  onUnplaceFromSlot,
 }: PitchFormationEditorProps) {
   const pitchRef = useRef<HTMLDivElement>(null);
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const [selectedWaitingKey, setSelectedWaitingKey] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [activeSlotTarget, setActiveSlotTarget] = useState<FormationSlot | null>(null);
 
+  const slotMode = slots !== null;
+  const matched = slotMode ? matchSlotsToEntries(slots, starters) : [];
+  const matchedKeys = new Set(matched.map((row) => row.entry?.key).filter((key): key is string => key !== undefined));
+  const slotWaiting = slotMode ? starters.filter((entry) => !matchedKeys.has(entry.key)) : [];
+
+  // 자유 배치 모드: 예전 그대로 좌표 유무로 placed/waiting을 가른다.
   const placed = starters.filter((entry) => entry.positionX !== null && entry.positionY !== null);
   const waiting = starters.filter((entry) => entry.positionX === null || entry.positionY === null);
   const selectedWaitingEntry = waiting.find((entry) => entry.key === selectedWaitingKey) ?? null;
@@ -79,7 +103,7 @@ export function PitchFormationEditor({
   }
 
   function handlePitchClick(event: React.MouseEvent<HTMLDivElement>) {
-    if (!editable || selectedWaitingKey === null) return;
+    if (slotMode || !editable || selectedWaitingKey === null) return;
     const point = pointToPitchPct(event.clientX, event.clientY);
     if (point === null) return;
     onPlacePlayer(selectedWaitingKey, point.x, point.y);
@@ -110,8 +134,10 @@ export function PitchFormationEditor({
     return (
       <FormationControls
         formation={formation}
-        suggestedFormations={suggestedFormations}
-        waiting={waiting}
+        formationOptions={formationOptions}
+        outfieldGuidance={outfieldGuidance}
+        waiting={slotMode ? slotWaiting : waiting}
+        slotMode={slotMode}
         editable={editable}
         selectedWaitingKey={selectedWaitingKey}
         onSelectFormation={onSelectFormation}
@@ -137,7 +163,7 @@ export function PitchFormationEditor({
         borderRadius: 12,
         overflow: 'hidden',
         background: `${TURF_STRIPES}, #1f8a4c`,
-        cursor: editable && selectedWaitingKey !== null ? 'crosshair' : 'default',
+        cursor: !slotMode && editable && selectedWaitingKey !== null ? 'crosshair' : 'default',
         // 피치 전체를 'none'으로 막으면 모바일에서 세로 스와이프(페이지 스크롤)가
         // 죽는다 — 드래그가 필요한 건 선수 토큰뿐이지 피치 빈 공간이 아니다.
         // 'pan-y'로 세로 스와이프는 브라우저 기본 스크롤에 맡기고, 토큰 자체
@@ -148,23 +174,40 @@ export function PitchFormationEditor({
         flexShrink: 0,
         // 탭 배치 대기 상태(선수를 골라 다음 탭을 기다리는 중)를 테두리로도 드러낸다 —
         // 커서 모양(crosshair)만으로는 모바일 터치 환경에서 아무 신호도 안 보인다.
-        boxShadow: editable && selectedWaitingKey !== null ? '0 0 0 3px var(--blue500)' : 'none',
+        boxShadow: !slotMode && editable && selectedWaitingKey !== null ? '0 0 0 3px var(--blue500)' : 'none',
         transition: 'box-shadow 120ms ease',
       }}
     >
       <PitchLines />
-      {placed.map((entry) => (
-        <PlayerToken
-          key={entry.key}
-          entry={entry}
-          editable={editable}
-          dragging={draggingKey === entry.key}
-          onPointerDown={handleTokenPointerDown(entry.key)}
-          onPointerMove={handleTokenPointerMove}
-          onPointerUp={handleTokenPointerUp}
-          onUnplace={() => onUnplacePlayer(entry.key)}
-        />
-      ))}
+      {slotMode
+        ? matched.map(({ slot, entry }, index) =>
+            entry ? (
+              <PlayerToken
+                key={entry.key} entry={entry} editable={editable}
+                dragging={draggingKey === entry.key}
+                onPointerDown={handleTokenPointerDown(entry.key)}
+                onPointerMove={handleTokenPointerMove}
+                onPointerUp={handleTokenPointerUp}
+                onUnplace={() => onUnplaceFromSlot(entry.key)}
+              />
+            ) : (
+              <EmptySlotMarker
+                key={`${slot.positionCode}-${slot.x}-${slot.y}-${index}`}
+                slot={slot} editable={editable}
+                onSelect={() => setActiveSlotTarget(slot)}
+              />
+            ),
+          )
+        : placed.map((entry) => (
+            <PlayerToken
+              key={entry.key} entry={entry} editable={editable}
+              dragging={draggingKey === entry.key}
+              onPointerDown={handleTokenPointerDown(entry.key)}
+              onPointerMove={handleTokenPointerMove}
+              onPointerUp={handleTokenPointerUp}
+              onUnplace={() => onUnplacePlayer(entry.key)}
+            />
+          ))}
     </div>
   );
 
@@ -174,13 +217,17 @@ export function PitchFormationEditor({
   // 지적). 선수를 고른 직후(탭 배치 대기 상태)에는 이름까지 짚어 다음 행동을 명시한다.
   const guidance = !editable
     ? null
-    : selectedWaitingEntry !== null
-      ? { text: `${selectedWaitingEntry.displayName} 선수를 배치할 위치를 피치에서 탭하세요`, active: true }
-      : waiting.length > 0
-        ? { text: '선수를 드래그하거나, 아래 목록에서 선수를 고른 뒤 피치를 탭해 배치하세요', active: false }
-        : placed.length > 0
-          ? { text: '토큰을 끌어 위치를 옮기거나, 토큰 위 × 버튼으로 배치를 취소할 수 있어요', active: false }
-          : null;
+    : slotMode
+      ? slotWaiting.length > 0
+        ? { text: '빈 자리를 탭해 선수를 채우세요', active: false }
+        : { text: '모든 자리가 채워졌어요. 토큰을 끌어 위치를 미세조정할 수 있어요', active: false }
+      : selectedWaitingEntry !== null
+        ? { text: `${selectedWaitingEntry.displayName} 선수를 배치할 위치를 피치에서 탭하세요`, active: true }
+        : waiting.length > 0
+          ? { text: '선수를 드래그하거나, 아래 목록에서 선수를 고른 뒤 피치를 탭해 배치하세요', active: false }
+          : placed.length > 0
+            ? { text: '토큰을 끌어 위치를 옮기거나, 토큰 위 × 버튼으로 배치를 취소할 수 있어요', active: false }
+            : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -193,7 +240,9 @@ export function PitchFormationEditor({
           aria-haspopup="dialog"
         >
           배치 설정{formation ? ` · ${formation}` : ''}
-          {waiting.length > 0 ? ` · 대기 ${waiting.length}명` : ''}
+          {(slotMode ? slotWaiting.length : waiting.length) > 0
+            ? ` · 대기 ${slotMode ? slotWaiting.length : waiting.length}명`
+            : ''}
         </button>
       </div>
 
@@ -233,6 +282,18 @@ export function PitchFormationEditor({
       <FormationSheet open={sheetOpen} onClose={() => setSheetOpen(false)}>
         {controlsFor(true)}
       </FormationSheet>
+
+      {activeSlotTarget ? (
+        <SlotPlayerPickerSheet
+          slot={activeSlotTarget}
+          waiting={slotWaiting}
+          onSelect={(key) => {
+            onPlaceInSlot(key, activeSlotTarget);
+            setActiveSlotTarget(null);
+          }}
+          onClose={() => setActiveSlotTarget(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -241,47 +302,67 @@ export function PitchFormationEditor({
  * 그대로 재사용한다 — 내용은 하나, 배치만 호출부가 다르게 감싼다. */
 function FormationControls({
   formation,
-  suggestedFormations,
+  formationOptions,
+  outfieldGuidance,
   waiting,
+  slotMode,
   editable,
   selectedWaitingKey,
   onSelectFormation,
   onSelectWaiting,
 }: {
   formation: string | null;
-  suggestedFormations: string[];
+  formationOptions: FormationPreset[];
+  outfieldGuidance: string | null;
   waiting: LineupEntryDraft[];
+  slotMode: boolean;
   editable: boolean;
   selectedWaitingKey: string | null;
-  onSelectFormation: (formation: string) => void;
+  onSelectFormation: (formation: string | null) => void;
   onSelectWaiting: (key: string) => void;
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {suggestedFormations.length > 0 ? (
-        <div>
-          <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 6 }}>
-            포메이션
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="포메이션 프리셋">
-            {suggestedFormations.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                disabled={!editable}
-                aria-pressed={formation === preset}
-                className={`tm-badge ${formation === preset ? 'tm-badge-blue' : 'tm-badge-grey'}`}
-                style={{ border: 'none', cursor: editable ? 'pointer' : 'default' }}
-                onClick={() => onSelectFormation(preset)}
-              >
-                {preset}
-              </button>
-            ))}
-          </div>
+      <div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 6 }}>
+          포메이션
         </div>
-      ) : null}
+        {outfieldGuidance ? (
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.5 }}>
+            {outfieldGuidance}
+          </p>
+        ) : null}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="포메이션 프리셋">
+          {formationOptions.map((preset) => (
+            <button
+              key={preset.code} type="button" disabled={!editable}
+              aria-pressed={formation === preset.code}
+              className={`tm-badge ${formation === preset.code ? 'tm-badge-blue' : 'tm-badge-grey'}`}
+              style={{ border: 'none', cursor: editable ? 'pointer' : 'default' }}
+              onClick={() => onSelectFormation(preset.code)}
+            >
+              {preset.code} · {preset.label}
+            </button>
+          ))}
+          <button
+            type="button" disabled={!editable}
+            aria-pressed={formation === null}
+            className={`tm-badge ${formation === null ? 'tm-badge-blue' : 'tm-badge-grey'}`}
+            style={{ border: 'none', cursor: editable ? 'pointer' : 'default' }}
+            onClick={() => onSelectFormation(null)}
+          >
+            자유 배치
+          </button>
+        </div>
+      </div>
 
-      {waiting.length > 0 ? (
+      {slotMode ? (
+        <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+          {waiting.length > 0
+            ? `대기 ${waiting.length}명 — 피치에서 빈 자리를 탭해 채우세요.`
+            : '모든 선발이 배치됐어요.'}
+        </p>
+      ) : waiting.length > 0 ? (
         <div>
           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 6 }}>
             대기 중 — 선수를 고른 뒤 피치를 탭해 배치하세요
@@ -328,13 +409,9 @@ function FormationControls({
             ))}
           </div>
         </div>
-      ) : null}
-
-      {suggestedFormations.length === 0 && waiting.length === 0 ? (
-        <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-          모든 선발이 배치됐어요.
-        </p>
-      ) : null}
+      ) : (
+        <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>모든 선발이 배치됐어요.</p>
+      )}
     </div>
   );
 }
@@ -465,6 +542,101 @@ function PitchLines() {
   );
 }
 
+/** 포지션 라벨이 붙은 빈 슬롯 — 탭하면 채울 선수를 고르는 시트가 열린다. 44px 터치
+ * 타겟을 확보하고, aria-label에 포지션 이름과 "비어 있음" 상태를 함께 담는다. */
+function EmptySlotMarker({ slot, editable, onSelect }: { slot: FormationSlot; editable: boolean; onSelect: () => void }) {
+  const topPct = 100 - slot.y;
+  return (
+    <button
+      type="button"
+      onClick={(event) => { event.stopPropagation(); if (editable) onSelect(); }}
+      disabled={!editable}
+      aria-label={`${slot.label} 자리, 비어 있음${editable ? ' — 탭해서 선수 채우기' : ''}`}
+      style={{
+        position: 'absolute', left: `${slot.x}%`, top: `${topPct}%`, transform: 'translate(-50%, -50%)',
+        width: TOUCH_TARGET_PX, height: TOUCH_TARGET_PX, borderRadius: '50%',
+        border: '2px dashed rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.14)', color: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
+        cursor: editable ? 'pointer' : 'default',
+      }}
+    >
+      {slot.label}
+    </button>
+  );
+}
+
+/** 빈 슬롯을 탭했을 때 뜨는 "이 자리에 채울 선수 고르기" 시트 — FormationSheet와 같은
+ * a11y 패턴(role=dialog, ESC, backdrop, 포커스 복원)을 쓰되 목적이 달라 컴포넌트를 분리한다. */
+function SlotPlayerPickerSheet({
+  slot, waiting, onSelect, onClose,
+}: {
+  slot: FormationSlot;
+  waiting: LineupEntryDraft[];
+  onSelect: (key: string) => void;
+  onClose: () => void;
+}) {
+  const idPrefix = useId();
+  const titleId = `${idPrefix}-slot-picker-title`;
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement;
+    document.body.style.overflow = 'hidden';
+    sheetRef.current?.focus();
+    function handleKeyDown(event: KeyboardEvent) { if (event.key === 'Escape') onClose(); }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleKeyDown);
+      const el = previousFocusRef.current;
+      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
+    };
+  }, [onClose]);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 70 }}>
+      <div aria-hidden="true" onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
+      <div
+        ref={sheetRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
+        style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '70vh', overflowY: 'auto',
+          background: 'var(--card-surface)', borderRadius: '16px 16px 0 0',
+          padding: '16px 20px calc(20px + env(safe-area-inset-bottom))', boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
+        }}
+      >
+        <div aria-hidden="true" style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--grey100)', margin: '0 auto 14px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <h3 id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>{slot.label} 자리에 채울 선수</h3>
+          <button type="button" onClick={onClose} aria-label="닫기" className="tm-btn tm-btn-icon tm-btn-ghost">×</button>
+        </div>
+        {waiting.length === 0 ? (
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            배치할 수 있는 대기 선수가 없어요. 명단 탭에서 선발을 먼저 등록해 주세요.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {waiting.map((entry) => (
+              <button
+                key={entry.key} type="button" onClick={() => onSelect(entry.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', minHeight: TOUCH_TARGET_PX,
+                  borderRadius: 10, border: '1px solid var(--border)', background: 'var(--card-surface)', textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-strong)', minWidth: 24 }}>
+                  {entry.jerseyNumber ?? '-'}
+                </span>
+                <span className="tm-text-label" style={{ fontWeight: 600 }}>{entry.displayName}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PlayerToken({
   entry,
   editable,
@@ -493,7 +665,7 @@ function PlayerToken({
         top: `${topPct}%`,
         transform: 'translate(-50%, -50%)',
         width: `${TOKEN_SIZE_PCT}%`,
-        minWidth: 36,
+        minWidth: TOUCH_TARGET_PX,
         zIndex: dragging ? 2 : 1,
       }}
     >
@@ -508,8 +680,8 @@ function PlayerToken({
           position: 'relative',
           width: '100%',
           aspectRatio: '1 / 1',
-          minWidth: 36,
-          minHeight: 36,
+          minWidth: TOUCH_TARGET_PX,
+          minHeight: TOUCH_TARGET_PX,
           borderRadius: '50%',
           border: '2px solid #fff',
           // blue500/orange500 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 blue500 ~3.71:1,
@@ -598,10 +770,10 @@ function PlayerToken({
           aria-label={`${entry.displayName} 배치 취소`}
           style={{
             position: 'absolute',
-            top: -15,
-            right: -15,
-            width: 36,
-            height: 36,
+            top: -17,
+            right: -17,
+            width: TOUCH_TARGET_PX,
+            height: TOUCH_TARGET_PX,
             borderRadius: '50%',
             border: 'none',
             background: 'transparent',

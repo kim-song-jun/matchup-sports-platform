@@ -347,6 +347,7 @@ enum V1GameEventType {
   PAUSE
   RESUME
   CORRECTION
+  FOUL
 }
 
 enum V1GameResultRevisionState {
@@ -2565,6 +2566,7 @@ model V1GameEvent {
   type            V1GameEventType
   sideId          String?         @map("side_id")
   participantId   String?         @map("participant_id")
+  assistParticipantId String?     @map("assist_participant_id")
   period          Int
   clockMs         Int             @map("clock_ms")
   occurredAt      DateTime        @map("occurred_at")
@@ -2691,6 +2693,8 @@ model V1GameResultParticipant {
   started          Boolean              @default(false)
   minutesPlayed    Int?                 @map("minutes_played")
   goals            Int                  @default(0)
+  assists          Int                  @default(0)
+  fouls            Int                  @default(0)
   cards            Json
   goalkeeper       Boolean              @default(false)
   createdAt        DateTime             @default(now()) @map("created_at")

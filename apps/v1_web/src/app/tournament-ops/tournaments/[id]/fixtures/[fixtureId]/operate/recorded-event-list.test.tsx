@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { RecordedEventList } from './recorded-event-list';
 import type { GameEventRecord, GameLineup, GameSide } from '@/types/game-operations';
 
@@ -65,13 +65,15 @@ function goal(sequence: number, sideId: string, participantId: string | null, cl
     type: 'GOAL',
     sideId,
     participantId,
+    assistParticipantId: null,
     period: 2,
     clockMs,
     occurredAt: '2026-08-04T00:00:00.000Z',
     receivedAt: '2026-08-04T00:00:00.000Z',
     actorUserId: 'actor-1',
     reversesEventId: null,
-  } as GameEventRecord;
+    payload: {},
+  };
 }
 
 const SIDES = [side(HOME_SIDE_ID, '강남 풋살 클럽'), side(AWAY_SIDE_ID, '성수 풋살 클럽')];
@@ -123,5 +125,29 @@ describe('RecordedEventList', () => {
 
     expect(screen.queryByRole('list', { name: '기록된 이벤트 목록' })).toBeNull();
     expect(screen.getByText('아직 기록된 이벤트가 없어요.')).toBeInTheDocument();
+  });
+
+  it('CARD 이벤트는 payload.card 색으로 옐로/레드를 구분해 렌더한다 — 죽은 스위치 분기 회귀 방지', () => {
+    const yellowCard = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 60000),
+      type: 'CARD' as const,
+      payload: { card: 'YELLOW' },
+    };
+    render(<RecordedEventList events={[yellowCard]} sides={SIDES} lineups={LINEUPS} />);
+    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toHaveTextContent('옐로카드');
+  });
+
+  it('assistParticipantId가 없는 GOAL 이벤트에는 "+ 어시스트" 버튼이 뜬다', () => {
+    const onAttachAssist = vi.fn();
+    const bareGoal = { ...goal(1, HOME_SIDE_ID, 'p-jung', 60000), assistParticipantId: null };
+    render(<RecordedEventList events={[bareGoal]} sides={SIDES} lineups={LINEUPS} onAttachAssist={onAttachAssist} />);
+    expect(screen.getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
+  });
+
+  it('이미 assistParticipantId가 있는 GOAL 이벤트에는 "+ 어시스트" 버튼이 없다', () => {
+    const onAttachAssist = vi.fn();
+    const assistedGoal = { ...goal(1, HOME_SIDE_ID, 'p-jung', 60000), assistParticipantId: 'p-cho' };
+    render(<RecordedEventList events={[assistedGoal]} sides={SIDES} lineups={LINEUPS} onAttachAssist={onAttachAssist} />);
+    expect(screen.queryByRole('button', { name: /어시스트/ })).toBeNull();
   });
 });

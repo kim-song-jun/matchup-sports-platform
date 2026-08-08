@@ -128,6 +128,8 @@ function buildRevision(
         started: true,
         minutesPlayed: 90,
         goals: 2,
+        assists: 1,
+        fouls: 0,
         cards: { yellow: 0, red: 0 },
         goalkeeper: false,
       },

@@ -5,7 +5,11 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
+import {
+  buildFormationPresets, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
+} from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
+import { matchSlotsToEntries } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import {
   useV1FixtureLineupAccess,
   useV1Game,
@@ -17,18 +21,19 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   addPlayer,
-  applyFormation,
   buildSavePayload,
   clearPlayerPosition,
   createEmptyFixtureLineupState,
   hydrateFixtureLineupState,
   moveToBench,
   moveToStarters,
+  placeInSlot,
   removePlayer,
+  selectFormation,
   setGoalkeeper,
   setJerseyNumber,
   setPlayerPosition,
-  suggestedFormations,
+  unplaceFromSlot,
   type FixtureLineupState,
 } from './fixture-lineup.view-model';
 
@@ -73,6 +78,27 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     setHydrated(true);
   }, [hydrated, gameQuery.data, lineupsQuery.data, access.data?.mySideId]);
 
+  // D-17: 포메이션·포지션 데이터는 gameQuery(GET /games/:gameId, T1-5)의 lineupConfig에서만
+  // 온다. formationSupported(위에서 이미 선언됨)는 별개로 "피치 SVG 모양이 축구/풋살만
+  // 구현돼 있다"는 프론트 표시 제약일 뿐이다.
+  const sportCatalog: FormationPreset[] = gameQuery.data?.lineupConfig
+    ? buildFormationPresets(gameQuery.data.lineupConfig.positions, gameQuery.data.lineupConfig.formations)
+    : [];
+  const outfieldCount = state?.starters.filter((entry) => !entry.goalkeeper).length ?? 0;
+  const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
+
+  // Copilot review finding (PR #277): 선발/골키퍼 변경으로 outfieldCount가 바뀌어 지금
+  // 선택된 formation이 더 이상 formationOptions에 없으면 자유 배치로 되돌린다 — team-match
+  // 라인업 화면(lineup-client.tsx)과 동일한 정리. 그대로 두면 슬롯 모드는 이미 꺼졌는데
+  // (activeSlots=null → emptySlotCount=0) formation 라벨만 남아, 제출 게이트가 풀리고
+  // 저장 페이로드에 더 이상 유효하지 않은 formation 코드가 실릴 수 있었다.
+  useEffect(() => {
+    if (state && state.formation !== null && !formationOptions.some((preset) => preset.code === state.formation)) {
+      setState((prev) => (prev ? selectFormation(prev, null) : prev));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formationOptions, state?.formation, state?.starters]);
+
   if (access.isError) {
     return (
       <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
@@ -105,6 +131,14 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
   const mySideId = access.data.mySideId;
   const editable = state.lineupState === null || state.lineupState === 'DRAFT';
+  const outfieldGuidance =
+    formationSupported && formationOptions.length === 0 && outfieldCount > 0
+      ? `현재 선발 ${outfieldCount}명 — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
+      : null;
+  const selectedPreset = state.formation !== null ? formationOptions.find((preset) => preset.code === state.formation) ?? null : null;
+  const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;
+  const emptySlotCount =
+    activeSlots !== null ? matchSlotsToEntries(activeSlots, state.starters).filter((row) => row.entry === null).length : 0;
 
   async function handleSave() {
     if (state === null) return;
@@ -194,11 +228,15 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                 <PitchFormationEditor
                   starters={state.starters}
                   formation={state.formation}
-                  suggestedFormations={suggestedFormations(state.starters.filter((entry) => !entry.goalkeeper).length)}
+                  formationOptions={formationOptions}
+                  slots={activeSlots}
+                  outfieldGuidance={outfieldGuidance}
                   editable={editable}
-                  onSelectFormation={(formation) => setState((prev) => (prev ? applyFormation(prev, formation) : prev))}
+                  onSelectFormation={(formation) => setState((prev) => (prev ? selectFormation(prev, formation) : prev))}
                   onPlacePlayer={(key, x, y) => setState((prev) => (prev ? setPlayerPosition(prev, key, x, y) : prev))}
                   onUnplacePlayer={(key) => setState((prev) => (prev ? clearPlayerPosition(prev, key) : prev))}
+                  onPlaceInSlot={(key, slot) => setState((prev) => (prev ? placeInSlot(prev, key, slot) : prev))}
+                  onUnplaceFromSlot={(key) => setState((prev) => (prev ? unplaceFromSlot(prev, key) : prev))}
                 />
               </div>
             )}
@@ -394,10 +432,14 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               <button
                 type="button"
                 className="tm-btn tm-btn-lg tm-btn-primary"
-                disabled={submitMutation.isPending || state.dirty}
+                disabled={submitMutation.isPending || state.dirty || emptySlotCount > 0}
                 onClick={handleSubmit}
               >
-                {submitMutation.isPending ? '제출 중…' : '라인업 제출하기'}
+                {submitMutation.isPending
+                  ? '제출 중…'
+                  : emptySlotCount > 0
+                    ? `포지션 자리 ${emptySlotCount}개가 비어 있어요`
+                    : '라인업 제출하기'}
               </button>
             ) : null}
           </div>

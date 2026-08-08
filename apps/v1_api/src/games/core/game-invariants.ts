@@ -11,6 +11,7 @@ const sideScopedEventTypes = new Set<V1GameEventType>([
   V1GameEventType.GOAL,
   V1GameEventType.CARD,
   V1GameEventType.SUBSTITUTION,
+  V1GameEventType.FOUL,
 ]);
 
 function assertNonNegativeInteger(value: number, label: string): void {
@@ -47,6 +48,12 @@ function validateEventShape(event: GameResultEvent): void {
   ) {
     throw new GameContractError('EVENT_INVALID', 'Card event requires a participant and card color');
   }
+  if (event.type === V1GameEventType.FOUL && event.participantId === undefined) {
+    throw new GameContractError('EVENT_INVALID', 'Foul event requires a participant');
+  }
+  if (event.assistParticipantId !== undefined && event.type !== V1GameEventType.GOAL) {
+    throw new GameContractError('EVENT_INVALID', 'Assist can only be recorded on a GOAL event');
+  }
 }
 
 export function validateGameResultInvariants(input: GameResultInvariantInput): void {
@@ -61,6 +68,8 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
   const participantById = new Map<string, (typeof input.participants)[number]>();
   const participantGoals = new Map<string, number>();
   const participantCards = new Map<string, { yellow: number; red: number }>();
+  const participantAssists = new Map<string, number>();
+  const participantFouls = new Map<string, number>();
   for (const participant of input.participants) {
     if (participantById.has(participant.id) || !sideById.has(participant.sideId)) {
       throw new GameContractError('PARTICIPANT_INVALID', 'Participants must be unique and belong to a side');
@@ -70,6 +79,14 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
     assertNonNegativeInteger(participant.cards.red, 'participant red cards');
     if (participant.minutesPlayed !== undefined) {
       assertNonNegativeInteger(participant.minutesPlayed, 'participant minutes');
+    }
+    if (participant.assists !== undefined) {
+      assertNonNegativeInteger(participant.assists, 'participant assists');
+      participantAssists.set(participant.id, participant.assists);
+    }
+    if (participant.fouls !== undefined) {
+      assertNonNegativeInteger(participant.fouls, 'participant fouls');
+      participantFouls.set(participant.id, participant.fouls);
     }
     participantById.set(participant.id, participant);
     participantGoals.set(participant.id, participant.goals);
@@ -83,6 +100,8 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
   const eventScore = { HOME: 0, AWAY: 0 };
   const eventGoalsByParticipant = new Map<string, number>();
   const eventCardsByParticipant = new Map<string, { yellow: number; red: number }>();
+  const eventAssistsByParticipant = new Map<string, number>();
+  const eventFoulsByParticipant = new Map<string, number>();
   let hasMissingScorer = false;
   for (const event of input.events) {
     validateEventShape(event);
@@ -129,6 +148,22 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
         cards.red += 1;
       }
       eventCardsByParticipant.set(participant.id, cards);
+    }
+    if (event.type === V1GameEventType.GOAL && event.assistParticipantId !== undefined) {
+      const assistParticipant = participantById.get(event.assistParticipantId);
+      if (assistParticipant === undefined) {
+        throw new GameContractError('PARTICIPANT_INVALID', 'Assist participant does not belong to the game');
+      }
+      if (side !== undefined && assistParticipant.sideId !== side.id) {
+        throw new GameContractError('PARTICIPANT_SIDE_MISMATCH', 'Assist participant and side do not agree');
+      }
+      eventAssistsByParticipant.set(
+        event.assistParticipantId,
+        (eventAssistsByParticipant.get(event.assistParticipantId) ?? 0) + 1,
+      );
+    }
+    if (event.type === V1GameEventType.FOUL && participant !== undefined) {
+      eventFoulsByParticipant.set(participant.id, (eventFoulsByParticipant.get(participant.id) ?? 0) + 1);
     }
   }
 
@@ -178,6 +213,16 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
           'SCORE_EVENT_MISMATCH',
           'Participant card totals do not match active card events',
         );
+      }
+    }
+    for (const [participantId, assists] of participantAssists) {
+      if ((eventAssistsByParticipant.get(participantId) ?? 0) !== assists) {
+        throw new GameContractError('SCORE_EVENT_MISMATCH', 'Participant assist totals do not match active assist events');
+      }
+    }
+    for (const [participantId, fouls] of participantFouls) {
+      if ((eventFoulsByParticipant.get(participantId) ?? 0) !== fouls) {
+        throw new GameContractError('SCORE_EVENT_MISMATCH', 'Participant foul totals do not match active foul events');
       }
     }
     if (input.missingScorer !== hasMissingScorer) {

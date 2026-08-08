@@ -114,6 +114,12 @@ export class GamesController {
     return this.gamesService.listLineups(user, gameId);
   }
 
+  @Get(':gameId/operations-lineup')
+  @UseGuards(V1AuthGuard)
+  operationsLineup(@CurrentUser() user: V1AuthUser, @Param('gameId') gameId: string) {
+    return this.gamesService.listOperationsLineups(user, gameId);
+  }
+
   @Put(':gameId/lineups/:sideId')
   @UseGuards(V1AuthGuard)
   saveLineup(

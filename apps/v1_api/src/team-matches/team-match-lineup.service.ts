@@ -10,6 +10,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
 import {
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
@@ -57,7 +58,17 @@ export class TeamMatchLineupService {
       const visibility = await tx.v1GameVisibilityPolicy.findUnique({
         where: { gameId: context.gameId },
       });
-      return this.serializeLineup(tx, context, lineup, visibility?.lineupAt ?? null);
+      // T1-5: the pitch-placement screen (D-17) needs the sport's formation
+      // preset catalog to build slot-based placement — this is the single
+      // server source of truth (apps/v1_web/src/components/lineup/formation-slots.ts).
+      const config = await tx.v1CompetitionConfigVersion.findUnique({
+        where: { id: context.gameCompetitionConfigVersionId },
+        select: { lineup: true },
+      });
+      return {
+        ...(await this.serializeLineup(tx, context, lineup, visibility?.lineupAt ?? null)),
+        lineupConfig: parseLineupCatalog(config?.lineup ?? null),
+      };
     });
   }
 

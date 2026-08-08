@@ -224,6 +224,7 @@ done
   v1_api v1_web v1_game_operations_worker
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 wait_for_alpha_health_contract
+wait_for_alpha_worker_healthy
 assert_running_release_digests
 
 if [[ "${had_active}" == true ]] &&

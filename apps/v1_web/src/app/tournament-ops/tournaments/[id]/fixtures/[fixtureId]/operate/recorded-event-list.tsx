@@ -1,5 +1,6 @@
 'use client';
 
+import { Handshake } from 'lucide-react';
 import type { GameEventRecord, GameLineup, GameSide } from '@/types/game-operations';
 
 /**
@@ -16,10 +17,12 @@ export function RecordedEventList({
   events,
   sides,
   lineups,
+  onAttachAssist,
 }: {
   readonly events: readonly GameEventRecord[];
   readonly sides: readonly GameSide[];
   readonly lineups: readonly GameLineup[];
+  readonly onAttachAssist?: (event: GameEventRecord) => void;
 }) {
   if (events.length === 0) {
     return (
@@ -38,47 +41,73 @@ export function RecordedEventList({
       ]),
     ),
   );
+  // reverseEvent로 이미 되돌려진 이벤트는 목록에서 흐리게 표시할 필요는 없다(서버가
+  // 새 CORRECTION 행만 추가할 뿐 원본을 지우지 않으므로) — 다만 되돌려진 GOAL에는
+  // "+ 어시스트"를 붙이지 않는다(더는 유효한 득점이 아니다).
+  const reversedIds = new Set(
+    events.filter((event) => event.reversesEventId !== null).map((event) => event.reversesEventId),
+  );
 
   return (
     <ul className="flex flex-col gap-1.5" aria-label="기록된 이벤트 목록">
-      {events.map((event) => (
-        <li
-          key={event.id}
-          className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-medium tabular-nums text-gray-600 dark:bg-white/10 dark:text-gray-300">
-              {event.period}P {Math.floor(event.clockMs / 60000)}&apos;
-            </span>
-            <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-              {eventTypeLabel(event.type)}
-              {event.participantId && playerName.has(event.participantId)
-                ? ` · ${playerName.get(event.participantId)}`
-                : ''}
-            </p>
-          </div>
-          <span className="shrink-0 text-2xs text-gray-500 dark:text-gray-400">
-            {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
-          </span>
-        </li>
-      ))}
+      {events.map((event) => {
+        const canAttachAssist =
+          onAttachAssist !== undefined &&
+          event.type === 'GOAL' &&
+          event.assistParticipantId === null &&
+          event.participantId !== null &&
+          !reversedIds.has(event.id);
+        return (
+          <li
+            key={event.id}
+            className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-medium tabular-nums text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                {event.period}P {Math.floor(event.clockMs / 60000)}&apos;
+              </span>
+              <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                {eventTypeLabel(event)}
+                {event.participantId && playerName.has(event.participantId)
+                  ? ` · ${playerName.get(event.participantId)}`
+                  : ''}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {canAttachAssist ? (
+                <button
+                  type="button"
+                  onClick={() => onAttachAssist(event)}
+                  className="flex min-h-[32px] items-center gap-1 rounded-lg border border-blue-200 px-2 text-2xs font-semibold text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-blue-500/30 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                >
+                  <Handshake size={12} aria-hidden="true" />
+                  어시스트
+                </button>
+              ) : null}
+              <span className="text-2xs text-gray-500 dark:text-gray-400">
+                {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
+              </span>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-function eventTypeLabel(type: string): string {
-  switch (type) {
+function eventTypeLabel(event: GameEventRecord): string {
+  switch (event.type) {
     case 'GOAL':
       return '골';
-    case 'YELLOW_CARD':
-      return '옐로카드';
-    case 'RED_CARD':
-      return '레드카드';
+    case 'CARD':
+      return event.payload.card === 'RED' ? '레드카드' : '옐로카드';
+    case 'FOUL':
+      return '파울';
     case 'SUBSTITUTION':
       return '교체';
     case 'CORRECTION':
       return '정정';
     default:
-      return type;
+      return event.type;
   }
 }

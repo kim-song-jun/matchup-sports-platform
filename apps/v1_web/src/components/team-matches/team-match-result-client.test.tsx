@@ -282,6 +282,8 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
               started: true,
               minutesPlayed: null,
               goals: 1,
+              assists: 0,
+              fouls: 0,
               cards: { yellow: 0, red: 0 },
               goalkeeper: false,
             },
@@ -332,7 +334,7 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     const payload = createMutateAsync.mock.calls[0][0];
     expect(payload.score).toEqual({ home: 2, away: 0 });
     expect(payload.actualParticipants).toEqual([
-      { participantId: 'p-1', sideId: 'side-home', started: true, goals: 1, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+      { participantId: 'p-1', sideId: 'side-home', started: true, goals: 1, assists: 0, fouls: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
     ]);
     await waitFor(() =>
       expect(submitMutateAsync).toHaveBeenCalledWith({ revisionId: 'rev-new', expectedVersion: 4 }),
@@ -356,7 +358,7 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     const payload = createMutateAsync.mock.calls[0][0];
     expect(payload.mvpParticipantId).toBe('p-1');
     expect(payload.actualParticipants).toEqual([
-      { participantId: 'p-1', sideId: 'side-home', started: true, goals: 0, cards: { yellow: 1, red: 0 }, goalkeeper: false },
+      { participantId: 'p-1', sideId: 'side-home', started: true, goals: 0, assists: 0, fouls: 0, cards: { yellow: 1, red: 0 }, goalkeeper: false },
     ]);
   });
 
@@ -450,6 +452,8 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
               started: true,
               minutesPlayed: null,
               goals: 1,
+              assists: 0,
+              fouls: 0,
               cards: { yellow: 0, red: 0 },
               goalkeeper: false,
             },

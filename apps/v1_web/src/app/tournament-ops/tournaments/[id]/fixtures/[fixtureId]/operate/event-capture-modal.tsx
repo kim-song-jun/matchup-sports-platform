@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Goal, AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import type { FrozenEventCapture } from '@/lib/game-operations-clock';
 import type { GameCardColor, GameEventType, GameLineupParticipant } from '@/types/game-operations';
@@ -24,9 +24,6 @@ export interface EventCaptureModalProps {
    * lifetime (see this task's freeze requirement); this component never
    * re-derives it. */
   readonly frozen: FrozenEventCapture;
-  /** Same-side teammates, for the optional assist picker — excludes the
-   * scorer themself. */
-  readonly teammates: readonly GameLineupParticipant[];
   readonly onCommit: (input: EventCaptureCommitInput) => void;
   readonly onCancel: () => void;
 }
@@ -38,37 +35,15 @@ function formatClock(clockMs: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-type Step = { readonly kind: 'primary' } | { readonly kind: 'assist' };
-
 /**
- * Task 21 — the freeze-on-tap event capture step. Goal/Yellow/Red are the
- * prominent, always-visible primary actions (October minimum). Assist and a
- * foul note are extensible secondary actions surfaced in a visible
- * disclosure section — not literally hidden behind a menu, but deliberately
- * not competing with the primary three for visual weight, and never
- * blocking/delaying committing a goal or card.
+ * D-9 — 골/카드/파울 모두 탭 즉시 확정한다. 어시스트는 여기서 묻지 않는다
+ * (토스트의 "어시스트 추가" 액션 또는 기록된 이벤트 목록의 "+ 어시스트"에서
+ * 사후 부착 — recorded-event-list.tsx / event-toast.tsx 참고).
  */
-export function EventCaptureModal({
-  open,
-  sideId,
-  player,
-  frozen,
-  teammates,
-  onCommit,
-  onCancel,
-}: EventCaptureModalProps) {
-  const [step, setStep] = useState<Step>({ kind: 'primary' });
-  const [foulNote, setFoulNote] = useState('');
+export function EventCaptureModal({ open, sideId, player, frozen, onCommit, onCancel }: EventCaptureModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const firstFocusableRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setStep({ kind: 'primary' });
-      setFoulNote('');
-    }
-  }, [open, player.id]);
 
   useEffect(() => {
     if (open) {
@@ -99,7 +74,7 @@ export function EventCaptureModal({
     if (!open) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const focusableSelectors = 'a[href], button:not([disabled]), textarea, input, [tabindex]:not([tabindex="-1"])';
+    const focusableSelectors = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
@@ -120,39 +95,20 @@ export function EventCaptureModal({
     return () => document.removeEventListener('keydown', trap);
   }, [open]);
 
-  const base = useMemo(
-    () => ({
-      participantId: player.id,
-      sideId,
-      period: frozen.period,
-      clockMs: frozen.clockMs,
-      occurredAt: frozen.occurredAt,
-    }),
-    [player.id, sideId, frozen],
-  );
-
   if (!open) return null;
 
-  const commitGoal = (assistParticipantId: string | null) => {
-    onCommit({
-      ...base,
-      type: 'GOAL',
-      payload: assistParticipantId ? { assistParticipantId } : {},
-    });
+  const base = {
+    participantId: player.id,
+    sideId,
+    period: frozen.period,
+    clockMs: frozen.clockMs,
+    occurredAt: frozen.occurredAt,
   };
 
-  const commitCard = (card: GameCardColor) => {
-    onCommit({ ...base, type: 'CARD', payload: { card } });
+  const commit = (type: GameEventType, payload: Record<string, unknown> = {}) => {
+    onCommit({ ...base, type, payload });
   };
-
-  const commitFoul = () => {
-    const trimmed = foulNote.trim();
-    onCommit({
-      ...base,
-      type: 'CORRECTION',
-      payload: { kind: 'FOUL', ...(trimmed ? { note: trimmed } : {}) },
-    });
-  };
+  const commitCard = (card: GameCardColor) => commit('CARD', { card });
 
   return (
     <div
@@ -173,10 +129,7 @@ export function EventCaptureModal({
             <h2 id="event-capture-title" className="text-base font-bold text-gray-900 dark:text-white">
               {player.displayNameSnapshot}
             </h2>
-            <p
-              className="mt-0.5 text-2xs font-medium tabular-nums text-blue-600 dark:text-blue-400"
-              aria-live="polite"
-            >
+            <p className="mt-0.5 text-2xs font-medium tabular-nums text-blue-600 dark:text-blue-400" aria-live="polite">
               {frozen.period}피리어드 · {formatClock(frozen.clockMs)} 시점 기록 (고정됨)
             </p>
           </div>
@@ -190,91 +143,24 @@ export function EventCaptureModal({
           </button>
         </div>
 
-        {step.kind === 'primary' ? (
-          <div className="flex flex-col gap-4 px-5 py-5">
-            <div className="grid grid-cols-3 gap-2">
-              <Button
-                ref={firstFocusableRef}
-                size="lg"
-                variant="success"
-                className="h-16 flex-col gap-1"
-                onClick={() => setStep({ kind: 'assist' })}
-              >
-                <span aria-hidden="true">⚽</span>
-                골
-              </Button>
-              <Button
-                size="lg"
-                variant="warning"
-                className="h-16 flex-col gap-1"
-                onClick={() => commitCard('YELLOW')}
-              >
-                <span aria-hidden="true" className="block h-4 w-3 rounded-[2px] bg-yellow-300" />
-                옐로카드
-              </Button>
-              <Button
-                size="lg"
-                variant="danger"
-                className="h-16 flex-col gap-1"
-                onClick={() => commitCard('RED')}
-              >
-                <span aria-hidden="true" className="block h-4 w-3 rounded-[2px] bg-red-200" />
-                레드카드
-              </Button>
-            </div>
-
-            <details className="rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700">
-              <summary className="cursor-pointer text-2xs font-semibold text-gray-500 dark:text-gray-400">
-                파울 기록 (선택)
-              </summary>
-              <div className="mt-2 flex flex-col gap-2">
-                <label htmlFor="foul-note" className="sr-only">
-                  파울 메모
-                </label>
-                <textarea
-                  id="foul-note"
-                  rows={2}
-                  value={foulNote}
-                  onChange={(event) => setFoulNote(event.target.value)}
-                  placeholder="메모 (선택)"
-                  className="rounded-lg border border-gray-200 px-2.5 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                />
-                <Button size="md" variant="neutral" onClick={commitFoul}>
-                  파울 기록하기
-                </Button>
-              </div>
-            </details>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3 px-5 py-5">
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-              어시스트한 선수가 있나요? (선택)
-            </p>
-            <div className="flex max-h-56 flex-col gap-1.5 overflow-y-auto" role="list">
-              <button
-                type="button"
-                onClick={() => commitGoal(null)}
-                className="flex min-h-[44px] items-center rounded-lg px-3 text-left text-sm font-medium text-gray-600 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-gray-300 dark:hover:bg-gray-700"
-              >
-                어시스트 없음
-              </button>
-              {teammates.map((teammate) => (
-                <button
-                  key={teammate.id}
-                  type="button"
-                  onClick={() => commitGoal(teammate.id)}
-                  className="flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-left text-sm font-medium text-gray-900 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-white dark:hover:bg-blue-500/10"
-                >
-                  <span className="tabular-nums text-gray-400">{teammate.jerseyNumber ?? '-'}</span>
-                  {teammate.displayNameSnapshot}
-                </button>
-              ))}
-            </div>
-            <Button size="md" variant="outline" onClick={() => setStep({ kind: 'primary' })}>
-              뒤로
-            </Button>
-          </div>
-        )}
+        <div className="grid grid-cols-2 gap-2 px-5 py-5 sm:grid-cols-4">
+          <Button ref={firstFocusableRef} size="lg" variant="success" className="h-16 flex-col gap-1" onClick={() => commit('GOAL')}>
+            <Goal size={18} aria-hidden="true" />
+            골
+          </Button>
+          <Button size="lg" variant="warning" className="h-16 flex-col gap-1" onClick={() => commitCard('YELLOW')}>
+            <span aria-hidden="true" className="block h-4 w-3 rounded-[2px] bg-yellow-300" />
+            옐로카드
+          </Button>
+          <Button size="lg" variant="danger" className="h-16 flex-col gap-1" onClick={() => commitCard('RED')}>
+            <span aria-hidden="true" className="block h-4 w-3 rounded-[2px] bg-red-200" />
+            레드카드
+          </Button>
+          <Button size="lg" variant="neutral" className="h-16 flex-col gap-1" onClick={() => commit('FOUL')}>
+            <AlertTriangle size={18} aria-hidden="true" />
+            파울
+          </Button>
+        </div>
       </div>
     </div>
   );

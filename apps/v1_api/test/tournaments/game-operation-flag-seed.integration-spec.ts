@@ -28,6 +28,13 @@ const FLAG_KEYS = Object.keys(GAME_OPERATION_FLAG_DEFAULTS) as Array<
 >;
 
 describe('game operation flag deploy seed', () => {
+  beforeAll(async () => {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required for the game-operation-flag-seed integration spec');
+    }
+    await prisma.$connect();
+  });
+
   beforeEach(async () => {
     await prisma.v1GameCutoverEpoch.deleteMany({});
     await prisma.v1GameOperationFlag.deleteMany({});

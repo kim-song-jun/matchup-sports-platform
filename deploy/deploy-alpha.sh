@@ -225,6 +225,15 @@ done
   -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
   v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-tournament-qa.ts'
+# QA 시드가 매 배포마다 대회를 리셋하므로, 공개 일정을 채우는 백필은 반드시 QA 시드 뒤에
+# 돌아야 한다(앞에 두면 QA 시드가 만든 픽스처를 못 보고 무의미하다). 순서도 중요하다:
+# competition-config 백필이 먼저 돌아 v1_tournaments/v1_team_matches/v1_tournament_fixtures 의
+# competitionConfigVersionId 를 채워야, fixture-game 백필이 그 값을 요구하는 픽스처를
+# CONFIG_MISSING 으로 격리하지 않는다(실측 확인됨).
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/tournaments/competition-config/competition-config-backfill.cli.js'
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/games/migration/fixture-game-backfill.cli.js'
 
 "${compose[@]}" up -d
 "${compose[@]}" up -d --force-recreate --no-deps \

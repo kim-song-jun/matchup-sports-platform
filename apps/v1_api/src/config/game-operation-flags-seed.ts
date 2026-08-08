@@ -21,9 +21,10 @@
  * and the migration-replay gate in `.github/workflows/deploy.yml`) right after
  * `prisma migrate deploy`.
  *
- * **Idempotent and non-clobbering**: `update: {}` means a re-run never resets a
- * value an operator has since changed (e.g. `PUBLIC_LIVE: off -> on`). This
- * matters because the deploy path runs it on *every* deploy.
+ * **Idempotent and non-clobbering**: uses `createMany({ skipDuplicates: true })`, not `upsert`,
+ * so there is no update path at all — an existing row is left untouched and simply skipped by
+ * the unique constraint. A re-run can never reset a value an operator has since changed (e.g.
+ * `PUBLIC_LIVE: off -> on`). This matters because the deploy path runs it on *every* deploy.
  */
 import { PrismaClient, V1GameWriteMode } from '@prisma/client';
 

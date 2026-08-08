@@ -34,16 +34,8 @@ function eventLabel(item: QueuedGameEvent): string {
     const card = item.event.payload.card;
     return card === 'RED' ? '레드카드' : '옐로카드';
   }
-  if (item.event.type === 'CORRECTION') {
-    // This console only ever queues a CORRECTION-typed event as the FOUL
-    // secondary action's ad hoc payload marker (see EventCaptureModal /
-    // types/game-operations.ts's `GameEventType` doc comment) -- it never
-    // exposes a real reversal/undo action, so every item this queue ever
-    // sees here is a foul note, never a genuine `reverseEvent()` correction.
-    // Label off the discriminator, not the wire type, so this stays correct
-    // if a real correction/reversal action is ever added to this console.
-    return item.event.payload.kind === 'FOUL' ? '파울' : '정정';
-  }
+  if (item.event.type === 'FOUL') return '파울';
+  if (item.event.type === 'CORRECTION') return '정정';
   return item.event.type;
 }
 

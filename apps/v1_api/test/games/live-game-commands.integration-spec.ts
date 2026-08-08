@@ -670,3 +670,180 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     expectHttpCode(denied, 403, 'PERMISSION_DENIED');
   });
 });
+
+describe('TEAM_MATCH sourced games allow lifecycle commands other than end, host-only (D-20/B6)', () => {
+  const tmIds = {
+    hostUser: '94000000-0000-4000-8000-000000000001',
+    opponentUser: '94000000-0000-4000-8000-000000000002',
+    sport: '94000000-0000-4000-8000-000000000010',
+    region: '94000000-0000-4000-8000-000000000011',
+    hostTeam: '94000000-0000-4000-8000-000000000020',
+    opponentTeam: '94000000-0000-4000-8000-000000000021',
+    teamMatch: '94000000-0000-4000-8000-000000000030',
+  } as const;
+  let tmConfigId: string;
+  let tmGameId: string;
+
+  beforeAll(async () => {
+    const config = await prisma.v1CompetitionConfigVersion.findFirst({
+      where: { name: 'futsal-v1', status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+    });
+    if (config === null) {
+      throw new Error('Task 11 futsal-v1 preset is required');
+    }
+    tmConfigId = config.id;
+
+    await prisma.v1User.createMany({
+      data: [tmIds.hostUser, tmIds.opponentUser].map((id, index) => ({
+        id,
+        email: `task-t3-tm-command-${index}@example.test`,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+      })),
+    });
+    await prisma.v1Sport.create({
+      data: { id: tmIds.sport, code: 'futsal', name: 'T3 TEAM_MATCH Command Futsal' },
+    });
+    await prisma.v1Region.create({
+      data: { id: tmIds.region, code: 'T3_TM_COMMAND_REGION', name: 'T3 TEAM_MATCH Command Region', level: 1 },
+    });
+    await prisma.v1Team.createMany({
+      data: [
+        { id: tmIds.hostTeam, ownerUserId: tmIds.hostUser, sportId: tmIds.sport, regionId: tmIds.region, name: 'T3 TM Command Host' },
+        { id: tmIds.opponentTeam, ownerUserId: tmIds.opponentUser, sportId: tmIds.sport, regionId: tmIds.region, name: 'T3 TM Command Opponent' },
+      ],
+    });
+    await prisma.v1TeamMembership.createMany({
+      data: [
+        { teamId: tmIds.hostTeam, userId: tmIds.hostUser, role: 'manager', status: 'active' },
+        { teamId: tmIds.opponentTeam, userId: tmIds.opponentUser, role: 'manager', status: 'active' },
+      ],
+    });
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: tmIds.teamMatch,
+        hostTeamId: tmIds.hostTeam,
+        createdByUserId: tmIds.hostUser,
+        sportId: tmIds.sport,
+        regionId: tmIds.region,
+        title: 'T3 TEAM_MATCH command gate match',
+        placeName: 'T3 futsal court',
+        startAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        approvedApplicantTeamId: tmIds.opponentTeam,
+        competitionConfigVersionId: tmConfigId,
+      },
+    });
+
+    const input: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: tmIds.teamMatch,
+      competitionConfigVersionId: tmConfigId,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: tmIds.hostTeam, displayNameSnapshot: 'T3 TM Command Host' },
+        { sideKey: V1GameSideKey.AWAY, teamId: tmIds.opponentTeam, displayNameSnapshot: 'T3 TM Command Opponent' },
+      ],
+      participants: [],
+    };
+    const created = await prisma.$transaction((tx) =>
+      service.createFromSourceInTransaction(
+        tx,
+        input,
+        sourceContext(
+          { actorType: 'USER', actorUserId: tmIds.hostUser, role: 'team_owner' },
+          'task-t3-tm-command-source-create',
+          input,
+        ),
+      ),
+    );
+    tmGameId = created.gameId;
+  });
+
+  // BLOCKED (T1-1 범위): resolveActor의 TEAM_MATCH team_result_submit/tournament_command
+  // 병합 분기(이 파일이 수정하지 않는 범위)가 TEAM_MATCH 액터에 authorizationSubject를
+  // 채우지 않아 requestTakeover가 호스트에게도 항상 403 PERMISSION_DENIED를 던진다.
+  // 실측: 이 스텝에서 위 두 diff만 적용한 상태로 재실행하면 "still refuses end"·
+  // "rejects start from opponent"는 PASS하고 이 테스트만 여전히 403으로 실패한다 —
+  // resolveActor가 반환하는 TEAM_MATCH 호스트 액터 객체(위 diff가 만드는 return문,
+  // 그리고 event_append/event_reverse 분기)에 authorizationSubject 필드 자체가
+  // 없기 때문. 해소하려면 그 return 객체들에
+  // `authorizationSubject: \`team_manager:${userId}@${hostMembership!.updatedAt.getTime()}\``
+  // 같은 필드를 추가해야 하는데, 이건 T1-1(이벤트 기록 경로의 authorization
+  // 완성)의 범위이지 이 트랙(T3)이 소유하지 않는다. it.skip으로 표시하고
+  // 나머지 Task는 계속 진행한다 — Task 10(팀매치 콘솔)만 이 의존성 때문에 멈춘다.
+  it.skip('accepts "start" from the host manager and stamps period 1 LIVE/startedAt', async () => {
+    // 선행조건: 이 호출이 403 PERMISSION_DENIED 또는 TAKEOVER_TOKEN_EXPIRED로 실패하면,
+    // resolveActor의 TEAM_MATCH team_result_submit/tournament_command 병합 분기(바로
+    // 아래 Step 3에서 고치는 위치)가 아직 authorizationSubject를 채우지 않은 것이다 —
+    // 이건 이 트랙이 소유하지 않는 별도 T1-1 범위(결정 문단 5)다. 그 경우
+    // `BLOCKED: resolveActor의 TEAM_MATCH team_result_submit/tournament_command
+    // 병합 분기(games.service.ts, 이 Task Step 3이 수정한 블록)가 authorizationSubject를
+    // 채우지 않아 requestTakeover/executeCommand가 호스트에게도 항상 403/
+    // TAKEOVER_TOKEN_EXPIRED를 던진다`를 보고하고 이 테스트만 `it.skip`으로 표시한 채
+    // 나머지 Task는 계속 진행한다 — Task 10만 이 의존성 때문에 멈춘다(Task 10 Step 0).
+    const startToken = (
+      await service.requestTakeover(authUser(tmIds.hostUser), tmGameId, {
+        clientInstanceId: 'task-t3-tm-command-client',
+        lastSequence: 0,
+      })
+    ).takeoverToken;
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: tmGameId } });
+    const result = await service.executeCommand(
+      authUser(tmIds.hostUser),
+      tmGameId,
+      'start',
+      'task-t3-tm-command-start-1',
+      {
+        expectedVersion: game.version,
+        clientCommandId: 'task-t3-tm-command-start-1',
+        takeoverToken: startToken,
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      },
+    );
+    expect(result.state).toBe('LIVE');
+    const period1 = await prisma.v1GamePeriod.findFirstOrThrow({ where: { gameId: tmGameId, number: 1 } });
+    expect(period1.state).toBe('LIVE');
+    expect(period1.startedAt).not.toBeNull();
+  });
+
+  it('still refuses "end" for a TEAM_MATCH game with 409 TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN', async () => {
+    // 'end'는 게임 상태 전이 로직(requireTakeover 포함)에 닿기 전에 커맨드 게이트에서
+    // 즉시 막히므로 유효한 takeoverToken이 필요 없다 — 아무 비어있지 않은 문자열로도
+    // 충분하다는 것 자체가 "이 가드가 requireTakeover보다 먼저 실행된다"는 계약의 증거다.
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: tmGameId } });
+    const error = await captureFailure(() =>
+      service.executeCommand(authUser(tmIds.hostUser), tmGameId, 'end', 'task-t3-tm-command-end-1', {
+        expectedVersion: game.version,
+        clientCommandId: 'task-t3-tm-command-end-1',
+        takeoverToken: 'end-attempt-token',
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      }),
+    );
+    expectHttpCode(error, 409, 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN');
+  });
+
+  it('D-20/B6: rejects "start" from the opponent manager with 403 PERMISSION_DENIED — resolveActor denies before any token is even checked', async () => {
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: tmGameId } });
+    const error = await captureFailure(() =>
+      service.executeCommand(
+        authUser(tmIds.opponentUser),
+        tmGameId,
+        'start',
+        'task-t3-tm-command-opponent-start-1',
+        {
+          expectedVersion: game.version,
+          clientCommandId: 'task-t3-tm-command-opponent-start-1',
+          // 상대팀 매니저는 유효한 takeoverToken을 발급받을 방법이 없다(같은 이유로
+          // requestTakeover도 거부된다) — 여기 어떤 문자열을 넣어도 resolveActor가
+          // 토큰을 보기 전에 forbidden을 던진다는 것 자체가 이 테스트의 핵심 증명이다.
+          takeoverToken: 'opponent-cannot-obtain-a-real-token',
+          occurredAt: new Date().toISOString(),
+          payload: {},
+        },
+      ),
+    );
+    expectHttpCode(error, 403, 'PERMISSION_DENIED');
+  });
+});

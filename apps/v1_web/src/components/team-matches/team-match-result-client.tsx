@@ -16,6 +16,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
+import { countMissingAssists } from '@/lib/result-review-warnings';
 import type {
   V1GameResultParticipantInput,
   V1GameResultRevision,
@@ -507,6 +508,11 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         sideId: homeSide.id,
         started: row.started,
         goals: goalsByParticipant.get(row.participantId) ?? 0,
+        // 이 자가 제출 폼은 아직 선수별 도움/파울 입력을 받지 않는다(라이브 기록
+        // 콘솔에서만 수집 — T3). 이벤트가 없는 팀매치는 game-invariants.ts의
+        // teamMatchWithoutEvents 예외로 검증이 스킵되므로 0으로 보내도 안전하다.
+        assists: 0,
+        fouls: 0,
         cards: cardsByParticipant.get(row.participantId) ?? { yellow: 0, red: 0 },
         goalkeeper: row.goalkeeper,
       }));
@@ -578,6 +584,11 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 일부 득점은 선수 지정 없이 기록됐어요.
+              </div>
+            ) : null}
+            {countMissingAssists(latest.resultParticipants) > 0 ? (
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+                어시스트 미기입 {countMissingAssists(latest.resultParticipants)}건 — 확정에는 영향 없어요.
               </div>
             ) : null}
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
@@ -985,6 +996,11 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
                 일부 득점은 선수 지정 없이 기록됐어요.
               </div>
             ) : null}
+            {countMissingAssists(latest.resultParticipants) > 0 ? (
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+                어시스트 미기입 {countMissingAssists(latest.resultParticipants)}건 — 승인에는 영향 없어요.
+              </div>
+            ) : null}
 
             {showChangeForm ? (
               <div style={{ marginTop: 16 }}>
@@ -1050,6 +1066,11 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 일부 득점은 선수 지정 없이 기록됐어요.
+              </div>
+            ) : null}
+            {countMissingAssists(latest.resultParticipants) > 0 ? (
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+                어시스트 미기입 {countMissingAssists(latest.resultParticipants)}건 — 확정에는 영향 없어요.
               </div>
             ) : null}
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>

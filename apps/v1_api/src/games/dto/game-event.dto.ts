@@ -67,6 +67,10 @@ export class AppendGameEventDto {
   @IsUUID()
   participantId?: string;
 
+  @IsOptional()
+  @IsUUID()
+  assistParticipantId?: string | null;
+
   @Type(() => Number)
   @IsInt()
   @Min(1)

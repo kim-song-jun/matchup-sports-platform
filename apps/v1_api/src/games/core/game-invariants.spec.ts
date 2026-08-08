@@ -197,3 +197,97 @@ describe('validateGameResultInvariants — Task 17 TEAM_MATCH event-vs-score exe
     ).toThrow(expect.objectContaining({ code: 'SCORE_EVENT_MISMATCH' }));
   });
 });
+
+describe('validateGameResultInvariants — assist/foul cross-check (T1-4)', () => {
+  const twoSides = [
+    { id: 'side-home', sideKey: 'HOME' as const },
+    { id: 'side-away', sideKey: 'AWAY' as const },
+  ];
+
+  it('rejects a submitted assist total that does not match active assist events', () => {
+    expect(() =>
+      validateGameResultInvariants({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        score: { home: 1, away: 0 },
+        sides: twoSides,
+        participants: [
+          { id: 'scorer', sideId: 'side-home', goals: 1, cards: { yellow: 0, red: 0 }, assists: 0, fouls: 0 },
+          { id: 'assister', sideId: 'side-home', goals: 0, cards: { yellow: 0, red: 0 }, assists: 2, fouls: 0 },
+        ],
+        events: [
+          { type: V1GameEventType.GOAL, sideId: 'side-home', participantId: 'scorer', assistParticipantId: 'assister', period: 1, clockMs: 1000 },
+        ],
+        scorerPolicy: 'required',
+        missingScorer: false,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'SCORE_EVENT_MISMATCH' }));
+  });
+
+  it('accepts a submitted assist total that matches the one real assist event', () => {
+    expect(() =>
+      validateGameResultInvariants({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        score: { home: 1, away: 0 },
+        sides: twoSides,
+        participants: [
+          { id: 'scorer', sideId: 'side-home', goals: 1, cards: { yellow: 0, red: 0 }, assists: 0, fouls: 0 },
+          { id: 'assister', sideId: 'side-home', goals: 0, cards: { yellow: 0, red: 0 }, assists: 1, fouls: 0 },
+        ],
+        events: [
+          { type: V1GameEventType.GOAL, sideId: 'side-home', participantId: 'scorer', assistParticipantId: 'assister', period: 1, clockMs: 1000 },
+        ],
+        scorerPolicy: 'required',
+        missingScorer: false,
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects a submitted foul total that does not match active FOUL events', () => {
+    expect(() =>
+      validateGameResultInvariants({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        score: { home: 0, away: 0 },
+        sides: twoSides,
+        participants: [{ id: 'fouler', sideId: 'side-home', goals: 0, cards: { yellow: 0, red: 0 }, assists: 0, fouls: 2 }],
+        events: [
+          { type: 'FOUL' as V1GameEventType, sideId: 'side-home', participantId: 'fouler', period: 1, clockMs: 500 },
+        ],
+        scorerPolicy: 'required',
+        missingScorer: false,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'SCORE_EVENT_MISMATCH' }));
+  });
+
+  it('rejects an assist recorded on a non-GOAL event as a shape violation', () => {
+    expect(() =>
+      validateGameResultInvariants({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        score: { home: 0, away: 0 },
+        sides: twoSides,
+        participants: [
+          { id: 'p1', sideId: 'side-home', goals: 0, cards: { yellow: 0, red: 0 } },
+          { id: 'p2', sideId: 'side-home', goals: 0, cards: { yellow: 0, red: 0 } },
+        ],
+        events: [
+          { type: 'FOUL' as V1GameEventType, sideId: 'side-home', participantId: 'p1', assistParticipantId: 'p2', period: 1, clockMs: 500 },
+        ],
+        scorerPolicy: 'required',
+        missingScorer: false,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'EVENT_INVALID' }));
+  });
+
+  it('rejects a FOUL event with no participant as a shape violation', () => {
+    expect(() =>
+      validateGameResultInvariants({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        score: { home: 0, away: 0 },
+        sides: twoSides,
+        participants: [],
+        events: [{ type: 'FOUL' as V1GameEventType, sideId: 'side-home', period: 1, clockMs: 500 }],
+        scorerPolicy: 'required',
+        missingScorer: false,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'EVENT_INVALID' }));
+  });
+});

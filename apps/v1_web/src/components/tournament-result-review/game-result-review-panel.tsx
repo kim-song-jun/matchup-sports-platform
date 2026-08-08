@@ -11,6 +11,7 @@ import {
   type GameResultRevision,
 } from '@/hooks/use-tournament-result-review';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
+import { countMissingAssists } from '@/lib/result-review-warnings';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { RevisionTimeline } from './revision-timeline';
@@ -113,9 +114,14 @@ export function GameResultReviewPanel({
     );
   }
 
+  const missingAssists = latest ? countMissingAssists(latest.resultParticipants) : 0;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <GameSummaryHeader game={game} currentRevision={currentOfficial ?? null} />
+
+      {missingAssists > 0 ? (
+        <AlertBanner tone="info" message={`어시스트 미기입 ${missingAssists}건 — 확정에는 영향 없어요.`} />
+      ) : null}
 
       {readOnly ? (
         <AlertBanner tone="info" message="이 화면에서는 결과를 볼 수만 있어요. 검토·확정 권한이 없어요." />

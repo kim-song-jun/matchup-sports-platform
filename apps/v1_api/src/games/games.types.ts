@@ -150,6 +150,8 @@ export interface GameResultParticipant {
     yellow: number;
     red: number;
   };
+  assists?: number;
+  fouls?: number;
   minutesPlayed?: number;
 }
 
@@ -157,6 +159,7 @@ export interface GameResultEvent {
   type: GameEventType | string;
   sideId?: string;
   participantId?: string;
+  assistParticipantId?: string;
   period: number;
   clockMs: number;
   reversed?: boolean;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { WifiOff, Wifi } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
@@ -14,7 +14,12 @@ import { LineupGrid } from './lineup-grid';
 import { EventCaptureModal, type EventCaptureCommitInput } from './event-capture-modal';
 import { QueueStatusPanel } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
-import type { GameCommandName, GameLineupParticipant, GameState } from '@/types/game-operations';
+import { AssistPickerSheet } from './assist-picker-sheet';
+import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
+import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
+import { deriveFoulCounts } from '@/lib/team-foul-counter';
+import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
+import type { GameCommandName, GameEventRecord, GameLineup, GameLineupParticipant, GameState } from '@/types/game-operations';
 
 export interface OperateConsoleProps {
   readonly tournamentId: string;
@@ -107,6 +112,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     }
   }, [gameState, hasNextPeriod]);
 
+  const foulCounts = useMemo(
+    () => deriveFoulCounts(ops.liveEvents, currentPeriod?.number ?? 1),
+    [ops.liveEvents, currentPeriod?.number],
+  );
+
   const handleSelectPlayer = useCallback(
     (input: { sideId: string; participant: GameLineupParticipant }) => {
       // T1-0: no LIVE period means there is no server-anchored start time to
@@ -127,17 +137,53 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     [ops.clockOffsetMs, currentPeriod],
   );
 
-  const teammates = useMemo(() => {
-    if (!selected) return [];
-    const lineups = fixtureLineup.data?.lineups ?? [];
-    const lineup = lineups.find((row) => row.sideId === selected.sideId);
-    return (lineup?.participants ?? []).filter((participant) => participant.id !== selected.participant.id);
-  }, [selected, fixtureLineup.data?.lineups]);
+  const { toasts, showToast, dismiss } = useEventToast();
+  const [assistTarget, setAssistTarget] = useState<{ event: GameEventRecord } | null>(null);
+
+  // Copilot review (PR #276): the toast's action.onClick used to close over
+  // `ops.liveEvents` from the render that submitted the GOAL -- before the
+  // websocket/query round-trip lands that event in liveEvents. The toast
+  // itself is never re-created once shown, so that closure stayed stale for
+  // its whole 5s lifetime and findRecentGoalEvent almost always returned
+  // undefined ("어시스트 추가" silently did nothing). A ref kept in sync via
+  // effect lets the onClick read the live value at click time instead.
+  const liveEventsRef = useRef(ops.liveEvents);
+  useEffect(() => {
+    liveEventsRef.current = ops.liveEvents;
+  }, [ops.liveEvents]);
 
   const handleCommit = useCallback(
     (input: EventCaptureCommitInput) => {
       void ops.submitEvent(input);
       setSelected(null);
+      if (input.type === 'GOAL') {
+        showToast('골을 기록했어요', {
+          action: {
+            label: '어시스트 추가',
+            onClick: () => {
+              const match = findRecentGoalEvent(liveEventsRef.current, input);
+              if (match) setAssistTarget({ event: match });
+            },
+          },
+        });
+      }
+    },
+    [ops, showToast],
+  );
+
+  const attachAssist = useCallback(
+    async (event: GameEventRecord, assistParticipantId: string) => {
+      await ops.reverseEvent({ eventId: event.id, reason: '어시스트 사후 기록' });
+      await ops.submitEvent({
+        type: 'GOAL',
+        sideId: event.sideId ?? undefined,
+        participantId: event.participantId ?? undefined,
+        assistParticipantId,
+        period: event.period,
+        clockMs: event.clockMs,
+        occurredAt: event.occurredAt,
+        payload: {},
+      });
     },
     [ops],
   );
@@ -280,6 +326,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {commandError && <Banner tone="danger">{commandError}</Banner>}
       </div>
 
+      <TeamFoulCounterBar sides={sides} counts={foulCounts} period={currentPeriod?.number ?? 1} />
+
       <div className="px-4">
         <LineupGrid
           sides={sides}
@@ -296,7 +344,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           않았거나 실패한 것만 따로 세운다(둘은 다른 것을 뜻한다). */}
       <section className="px-4">
         <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">기록된 이벤트</h3>
-        <RecordedEventList events={ops.liveEvents} sides={sides} lineups={lineups} />
+        <RecordedEventList
+          events={ops.liveEvents}
+          sides={sides}
+          lineups={lineups}
+          onAttachAssist={(event) => setAssistTarget({ event })}
+        />
       </section>
 
       {ops.queue.items.length > 0 && (
@@ -312,13 +365,42 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           sideId={selected.sideId}
           player={selected.participant}
           frozen={selected.frozen}
-          teammates={teammates}
           onCommit={handleCommit}
           onCancel={() => setSelected(null)}
         />
       )}
+      {assistTarget ? (
+        <AssistPickerSheet
+          open
+          event={assistTarget.event}
+          scorerName={playerLabel(assistTarget.event.participantId, lineups)}
+          teammates={teammatesForSide(assistTarget.event.sideId, lineups, assistTarget.event.participantId)}
+          onAttach={(assistParticipantId) => attachAssist(assistTarget.event, assistParticipantId)}
+          onClose={() => setAssistTarget(null)}
+        />
+      ) : null}
+      <EventToasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );
+}
+
+function playerLabel(participantId: string | null, lineups: readonly GameLineup[]): string {
+  if (participantId === null) return '선수';
+  for (const lineup of lineups) {
+    const participant = lineup.participants.find((row) => row.id === participantId);
+    if (participant) return participant.displayNameSnapshot;
+  }
+  return '선수';
+}
+
+function teammatesForSide(
+  sideId: string | null,
+  lineups: readonly GameLineup[],
+  excludeParticipantId: string | null,
+): readonly GameLineupParticipant[] {
+  if (sideId === null) return [];
+  const lineup = lineups.find((row) => row.sideId === sideId);
+  return (lineup?.participants ?? []).filter((participant) => participant.id !== excludeParticipantId);
 }
 
 function Banner({ tone, children }: { tone: 'info' | 'warning' | 'danger'; children: ReactNode }) {

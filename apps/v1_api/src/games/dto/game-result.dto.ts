@@ -50,6 +50,18 @@ export class GameResultParticipantDto {
   @Min(0)
   goals!: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  assists?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  fouls?: number;
+
   @IsObject()
   cards!: { yellow: number; red: number };
 

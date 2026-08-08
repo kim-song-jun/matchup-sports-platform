@@ -48,8 +48,15 @@ export const gameSchemaFixture = {
 //   which scripts/qa/check-expand-contract-migrations.mjs rejected as
 //   non-additive on a pre-existing type. No table, column, index, or FK in
 //   this migration changed shape.
+// Re-pinned for Task T1-2 (assist column, FOUL event type, result
+// aggregation columns). Only apps/v1_api/prisma/schema.prisma changed:
+// V1GameEventType.FOUL, V1GameEvent.assistParticipantId,
+// V1GameResultParticipant.assists/fouls. The migration hash is UNCHANGED —
+// this task's migration is a new file
+// (20260807090000_v1_game_assist_foul_columns), not an edit to the bound
+// 20260729000100_v1_game_operations migration.
 export const gameSchemaSourceManifest = {
-  schema: 'af1276e862aa4a1baff1113a13932a05fd84f3b8bd0faee8e53a6624271941bf',
+  schema: '88c506a5ab907b8ef3cc6db3e8ebbbd45d722f68451aa481d59b558dbd944a05',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

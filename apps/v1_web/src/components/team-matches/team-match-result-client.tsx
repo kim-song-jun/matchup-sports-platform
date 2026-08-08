@@ -507,6 +507,11 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         sideId: homeSide.id,
         started: row.started,
         goals: goalsByParticipant.get(row.participantId) ?? 0,
+        // 이 자가 제출 폼은 아직 선수별 도움/파울 입력을 받지 않는다(라이브 기록
+        // 콘솔에서만 수집 — T3). 이벤트가 없는 팀매치는 game-invariants.ts의
+        // teamMatchWithoutEvents 예외로 검증이 스킵되므로 0으로 보내도 안전하다.
+        assists: 0,
+        fouls: 0,
         cards: cardsByParticipant.get(row.participantId) ?? { yellow: 0, red: 0 },
         goalkeeper: row.goalkeeper,
       }));

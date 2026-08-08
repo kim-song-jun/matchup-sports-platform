@@ -1299,6 +1299,8 @@ export type V1GameResultParticipantInput = {
   started: boolean;
   minutesPlayed?: number;
   goals: number;
+  assists: number;
+  fouls: number;
   cards: V1GameResultCards;
   goalkeeper: boolean;
 };

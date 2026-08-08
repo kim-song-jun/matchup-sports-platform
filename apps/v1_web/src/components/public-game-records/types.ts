@@ -210,6 +210,8 @@ export interface PublicUserRecordItem {
 export interface PublicUserRecordsSummary {
   readonly appearances: number;
   readonly goals: number;
+  readonly assists: number;
+  readonly fouls: number;
   readonly yellowCards: number;
   readonly redCards: number;
   readonly mvpCount: number;

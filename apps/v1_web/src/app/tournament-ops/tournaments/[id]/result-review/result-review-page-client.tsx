@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { ErrorState } from '@/components/v1-ui/primitives';
@@ -24,7 +25,10 @@ import { ResultReviewGridStyles } from '@/components/tournament-result-review/re
 export function ResultReviewPageClient({ tournamentId }: { tournamentId: string }) {
   const tournament = useV1Tournament(tournamentId);
   const boardQuery = useTournamentEndedFixtures(tournamentId);
-  const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const deepLinkFixtureId = searchParams.get('fixtureId');
+  const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(() => deepLinkFixtureId);
+  const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
   const panelHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const needsReview = useMemo(
@@ -39,6 +43,23 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
   const selectedItem = needsReview.find((item) => item.fixtureId === selectedFixtureId) ?? null;
   const correctionsHref = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/records/corrections`;
 
+  // T6-1: 딥링크로 들어왔는데 목록이 로드된 뒤에도 해당 fixture가 없으면(아직
+  // 종료 전이거나 이미 처리됨) 조용히 미선택 상태로 두지 않고 안내한다.
+  // Fix round 1 — `useTournamentEndedFixtures`는 staleTime: 15_000(창 포커스 등으로
+  // 백그라운드 refetch됨)이라, 안내를 띄운 뒤 refetch로 그 fixture가 목록에
+  // 들어오면 selectedItem이 truthy가 되는데 deepLinkNotFound는 계속 true로
+  // 남아 배너와 패널이 동시에 보이는 버그가 있었다. selectedItem이 다시
+  // truthy가 되면 배너를 명시적으로 내린다.
+  useEffect(() => {
+    if (!boardQuery.isSuccess || !deepLinkFixtureId) return;
+    if (selectedItem) {
+      setDeepLinkNotFound(false);
+      setTimeout(() => panelHeadingRef.current?.focus(), 0);
+      return;
+    }
+    setDeepLinkNotFound(true);
+  }, [boardQuery.isSuccess, deepLinkFixtureId, selectedItem]);
+
   return (
     <RequireAuth>
       <main style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960, margin: '0 auto' }}>
@@ -51,6 +72,12 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
           {tournament.data?.title ?? '대회 운영'}
         </p>
         <h1 className="tm-text-heading">결과 검토</h1>
+
+        {deepLinkNotFound ? (
+          <p className="tm-text-caption" role="status" style={{ color: 'var(--text-muted)' }}>
+            전달받은 경기는 지금 검토 목록에 없어요. 아직 종료되지 않았거나 이미 처리됐을 수 있어요.
+          </p>
+        ) : null}
 
         {boardQuery.isPending ? <p className="tm-text-label">불러오는 중…</p> : null}
         {boardQuery.isError ? (

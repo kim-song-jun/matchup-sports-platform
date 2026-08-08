@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   useV1AuthMe: vi.fn(),
   useV1Tournament: vi.fn(),
   useV1TournamentStaffAssignments: vi.fn(),
+  useSearchParams: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -15,11 +16,15 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1TournamentStaffAssignments: (...args: unknown[]) => mocks.useV1TournamentStaffAssignments(...args),
 }));
 
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => mocks.useSearchParams(),
+}));
+
 // 셸 자체의 반응형/드로어 로직은 이 게이트 테스트의 관심사가 아니다 — 게이트가 도출한
-// role/children을 정확히 전달하는지만 확인할 수 있게 얇게 대체한다.
+// role/origin/children을 정확히 전달하는지만 확인할 수 있게 얇게 대체한다.
 vi.mock('@/components/tournament-ops/tournament-ops-shell', () => ({
-  TournamentOpsShell: ({ children, role }: { children: React.ReactNode; role: string }) => (
-    <div data-testid="shell" data-role={role}>
+  TournamentOpsShell: ({ children, role, origin }: { children: React.ReactNode; role: string; origin: string }) => (
+    <div data-testid="shell" data-role={role} data-origin={origin}>
       {children}
     </div>
   ),
@@ -43,8 +48,10 @@ describe('TournamentOpsGate', () => {
     mocks.useV1AuthMe.mockReset();
     mocks.useV1Tournament.mockReset();
     mocks.useV1TournamentStaffAssignments.mockReset();
+    mocks.useSearchParams.mockReset();
     mocks.useV1AuthMe.mockReturnValue({ isPending: false, isError: false, data: AUTH_ME, refetch: vi.fn() });
     mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 풋살 대회' } });
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
   });
 
   it('shows a loading screen while auth/staff queries are pending', () => {
@@ -173,5 +180,48 @@ describe('TournamentOpsGate', () => {
 
     expect(screen.getByText('잠시 문제가 생겼어요')).toBeInTheDocument();
     expect(screen.queryByText('대회 운영자 권한이 필요해요')).not.toBeInTheDocument();
+  });
+});
+
+describe('TournamentOpsGate 진입 출처 (T6-2)', () => {
+  beforeEach(() => {
+    mocks.useV1TournamentStaffAssignments.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { items: [{ userId: 'user-me', role: 'PLATFORM_OPS', revokedAt: null, expiresAt: null }] },
+    });
+    window.sessionStorage.clear();
+  });
+
+  it('?from=admin이면 origin="admin"으로 셸에 전달하고 sessionStorage에 기록한다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('from=admin'));
+    render(
+      <TournamentOpsGate tournamentId="t-1">
+        <div>x</div>
+      </TournamentOpsGate>,
+    );
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'admin');
+    expect(window.sessionStorage.getItem('teameet.v1.tournamentOpsOrigin.t-1')).toBe('admin');
+  });
+
+  it('쿼리 없이 다시 렌더돼도(nav 안에서 딴 화면으로 이동) sessionStorage 기록으로 origin이 유지된다', () => {
+    window.sessionStorage.setItem('teameet.v1.tournamentOpsOrigin.t-1', 'admin');
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    render(
+      <TournamentOpsGate tournamentId="t-1">
+        <div>x</div>
+      </TournamentOpsGate>,
+    );
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'admin');
+  });
+
+  it('한 번도 admin에서 온 적 없으면 origin="home"이다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    render(
+      <TournamentOpsGate tournamentId="t-1">
+        <div>x</div>
+      </TournamentOpsGate>,
+    );
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'home');
   });
 });

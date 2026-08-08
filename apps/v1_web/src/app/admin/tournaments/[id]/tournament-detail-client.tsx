@@ -123,6 +123,7 @@ import {
   type TournamentPromoCardValue,
 } from '@/components/admin/tournaments/promo-card-fields';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
+import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -2375,14 +2376,21 @@ export function BracketTab({
             renderActions={(f) => {
               // 결과 기록·정정은 이제 Game result-revision 플로우로만 이뤄진다 — 레거시
               // POST/DELETE .../result 는 서버에서 409 TOURNAMENT_RESULT_DERIVED_ONLY로
-              // 항상 막혀 있다(tournament-bracket.service.ts). 이 행은 그 콘솔로 안내만
-              // 한다: 이미 결과가 있으면(레거시 읽기 전용 표시, '결과' 컬럼 참고) 정정
-              // 화면으로, 아직 없으면 검토 화면으로 — 두 화면 다 fixtureId 딥링크를
-              // 지원하지 않아(useTournamentEndedFixtures 기반 목록+선택형 UI) 대회
-              // 단위 콘솔로 보낸다.
+              // 항상 막혀 있다(tournament-bracket.service.ts). 이 행은 그 콘솔로 안내한다:
+              // 이미 결과가 있으면(레거시 읽기 전용 표시, '결과' 컬럼 참고) 정정 화면으로,
+              // 아직 없으면 검토 화면으로 — T6-1(2026-08-07)부터 두 화면 다 `?fixtureId=`
+              // 딥링크를 받아 그 경기를 바로 선택된 상태로 연다. `from=admin`은 T6-2 복귀
+              // 경로 판별용 — ops 셸이 이 파라미터를 세션에 기록해 "서비스로 돌아가기"를
+              // "대회 관리로 돌아가기"로 바꾼다.
+              const opsQuery = `fixtureId=${encodeURIComponent(f.id)}&from=admin`;
               const resultConsoleHref = f.result
-                ? `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/records/corrections`
-                : `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/result-review`;
+                ? `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/records/corrections?${opsQuery}`
+                : `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/result-review?${opsQuery}`;
+              const resultConsoleLabel = f.result ? '결과 정정하러 가기' : '결과 검토하러 가기';
+              // T6-4: 아직 뛰고 있거나 곧 시작할 경기는 결과 검토보다 라이브 운영 콘솔이
+              // 우선이다 — 같은 자리에 "운영 콘솔 열기"를 추가로 노출한다.
+              const canOperate = f.status === 'scheduled' || f.status === 'in_progress';
+              const operateHref = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(f.id)}/operate?from=admin`;
               return (
                 <span className="inline-flex items-center gap-1.5">
                   <button
@@ -2399,14 +2407,27 @@ export function BracketTab({
                   >
                     <Pencil size={12} aria-hidden="true" /> 수정
                   </button>
+                  {canOperate && (
+                    <Link
+                      href={operateHref}
+                      aria-label={`${f.round} ${f.fixtureNumber}번 경기 운영 콘솔 열기`}
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-green-600 bg-green-50 hover:bg-green-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    >
+                      운영 콘솔 열기
+                      <ChevronRight size={12} aria-hidden="true" />
+                    </Link>
+                  )}
                   {/* 결과 입력·수정·삭제 세 버튼이 하나로 합쳐진 자리라, 폭을 좁은 아이콘
-                      버튼이 아니라 라벨이 있는 CTA로 채워 행의 시각적 무게를 유지한다. */}
+                      버튼이 아니라 라벨이 있는 CTA로 채워 행의 시각적 무게를 유지한다.
+                      aria-label은 시각 텍스트와 동일한 문구를 담는다(WCAG 2.5.3 Label in
+                      Name) — 예전엔 "…콘솔로 이동"으로 시각 텍스트와 달라 스크린리더
+                      사용자가 음성 명령("결과 검토하러 가기 클릭")으로 못 찾는 문제가 있었다. */}
                   <Link
                     href={resultConsoleHref}
-                    aria-label={`${f.round} ${f.fixtureNumber}번 결과 ${f.result ? '정정' : '검토'} 콘솔로 이동`}
+                    aria-label={`${f.round} ${f.fixtureNumber}번 경기 ${resultConsoleLabel}`}
                     className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
-                    {f.result ? '결과 정정하러 가기' : '결과 검토하러 가기'}
+                    {resultConsoleLabel}
                     <ChevronRight size={12} aria-hidden="true" />
                   </Link>
                   {!f.result && (
@@ -3518,24 +3539,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       </div>
 
       {/* ── Tournament-ops quick links: 이 관리자 콘솔 탭들과 별개인 대회 현장 운영
-          콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다 — 별도 탭
-          패널을 새로 만들 정도는 아니라 가벼운 바로가기 행으로 연결한다. */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Link
-          href={`/tournament-ops/tournaments/${encodeURIComponent(id)}/staff`}
-          className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          스태프 배정 콘솔
-          <ChevronRight size={12} aria-hidden="true" />
-        </Link>
-        <Link
-          href={`/tournament-ops/tournaments/${encodeURIComponent(id)}/operations`}
-          className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          운영 보드
-          <ChevronRight size={12} aria-hidden="true" />
-        </Link>
-      </div>
+          콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다. T6-5(D-16):
+          권한이 없으면 숨기지 않고 비활성 + 사유로 보여준다. */}
+      <TournamentOpsQuickLinks tournamentId={id} />
 
       {/* ── Tab panels ────────────────────────────────────────────────── */}
       <div

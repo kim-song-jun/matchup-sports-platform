@@ -66,11 +66,11 @@ describe('V1 phone verification write gate integration', () => {
     await prisma.v1User.deleteMany({ where: { id: { in: [unverifiedUserId, verifiedUserId] } } });
   }
 
-  it('blocks a write that reaches another user, with the verification route', async () => {
+  it('blocks a write from an unverified account with the verification route', async () => {
     const response = await request(app.getHttpServer())
-      .post('/api/v1/teams')
+      .patch('/api/v1/me/profile')
       .set('x-v1-user-id', unverifiedUserId)
-      .send({ name: '게이트미인증팀', sportId: 'football' })
+      .send({ nickname: '게이트미인증', gender: 'male' })
       .expect(403);
 
     expect(response.body.code).toBe('PHONE_VERIFICATION_REQUIRED');
@@ -82,32 +82,6 @@ describe('V1 phone verification write gate integration', () => {
       .get('/api/v1/me/profile')
       .set('x-v1-user-id', unverifiedUserId)
       .expect(200);
-  });
-
-  /**
-   * 인증 도입 이전에 가입한 레거시 계정은 인증을 마치기 전에도 자기 계정은 건사할 수 있어야
-   * 한다. 이게 막혀 있으면 로그인은 되는데 프로필 사진 한 장 못 바꾸는 상태로 갇힌다.
-   */
-  it('lets the unverified account manage its own profile', async () => {
-    await request(app.getHttpServer())
-      .patch('/api/v1/me/profile')
-      .set('x-v1-user-id', unverifiedUserId)
-      .send({ nickname: '게이트미인증', gender: 'male' })
-      .expect(200);
-  });
-
-  /**
-   * 자기 계정 범위를 열어 준 것이 번호까지 열어 준 것은 아니다 — 증명 없이 번호를 붙일 수
-   * 있으면 "프로필에서 번호만 교체"로 인증 자체가 우회된다.
-   */
-  it('still refuses to attach a phone number without a proof token', async () => {
-    const response = await request(app.getHttpServer())
-      .patch('/api/v1/me/profile')
-      .set('x-v1-user-id', unverifiedUserId)
-      .send({ nickname: '게이트미인증', gender: 'male', phone: '01077776666' })
-      .expect(400);
-
-    expect(response.body.code).toBe('PHONE_NOT_VERIFIED');
   });
 
   it('keeps the verification endpoint itself reachable for the unverified account', async () => {

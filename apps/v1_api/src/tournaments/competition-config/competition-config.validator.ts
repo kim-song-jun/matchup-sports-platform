@@ -72,6 +72,62 @@ export function validateCompetitionConfig(value: unknown): CompetitionConfig {
   ) {
     invalidConfig('lineup의 인원 또는 교체 규칙이 올바르지 않아요.');
   }
+  const positions = isRecord(lineup) ? lineup.positions : null;
+  if (
+    !Array.isArray(positions) ||
+    positions.length === 0 ||
+    positions.some(
+      (position) =>
+        !isRecord(position) ||
+        typeof position.code !== 'string' ||
+        position.code.length === 0 ||
+        typeof position.label !== 'string' ||
+        position.label.length === 0 ||
+        typeof position.short !== 'string' ||
+        position.short.length === 0 ||
+        (position.goalkeeper !== undefined && position.goalkeeper !== true),
+    ) ||
+    positions.filter((position) => isRecord(position) && position.goalkeeper === true).length !== 1
+  ) {
+    invalidConfig('lineup.positions에는 골키퍼 하나를 포함한 포지션 사전이 필요해요.');
+  }
+  const positionCodes = new Set(
+    (positions as Array<{ code: string; goalkeeper?: boolean }>)
+      .filter((position) => position.goalkeeper !== true)
+      .map((position) => position.code),
+  );
+
+  const formations = isRecord(lineup) ? lineup.formations : null;
+  if (
+    !Array.isArray(formations) ||
+    formations.some(
+      (formation) =>
+        !isRecord(formation) ||
+        typeof formation.code !== 'string' ||
+        formation.code.length === 0 ||
+        typeof formation.label !== 'string' ||
+        formation.label.length === 0 ||
+        !Number.isInteger(formation.outfield) ||
+        Number(formation.outfield) <= 0 ||
+        !Array.isArray(formation.slots) ||
+        formation.slots.length !== formation.outfield ||
+        formation.slots.some(
+          (slot) =>
+            !isRecord(slot) ||
+            typeof slot.position !== 'string' ||
+            !positionCodes.has(slot.position) ||
+            typeof slot.x !== 'number' ||
+            slot.x < 0 ||
+            slot.x > 100 ||
+            typeof slot.y !== 'number' ||
+            slot.y < 0 ||
+            slot.y > 100,
+        ),
+    )
+  ) {
+    invalidConfig('lineup.formations의 슬롯 구성이 올바르지 않아요.');
+  }
+
   const result = value.result;
   if (
     !isRecord(result) ||

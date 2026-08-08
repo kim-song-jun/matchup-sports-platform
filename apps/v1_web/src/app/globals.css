@@ -4548,6 +4548,10 @@ button:disabled {
   border-right: 1px solid var(--border);
 }
 
+.tm-my-monthly > div:nth-child(2n) {
+  border-right: 0;
+}
+
 .tm-my-monthly > div:last-child {
   border-right: 0;
 }

@@ -1052,6 +1052,7 @@ export function TournamentDetailView({
             alignItems: 'center',
             gap: 6,
             padding: '8px 4px',
+            minHeight: 44,
             color: 'var(--blue500)',
             fontSize: 13,
             fontWeight: 600,

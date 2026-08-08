@@ -745,6 +745,123 @@ async function createScenario(
   });
 }
 
+// The QA seed re-runs on every alpha deploy and always tears its own fixed
+// scenario IDs down before recreating them. That teardown used to be a bare
+// `v1TournamentCampaign.deleteMany` + `v1Tournament.deleteMany`, which is
+// only safe as long as nothing outside the tournament/fixture Cascade chain
+// references these rows. Once anything creates a V1Game against one of these
+// fixtures (e.g. an ops-run fixture-game-backfill), `v1_games_tournament_
+// fixture_id_fkey` is `onDelete: Restrict` — by design, a Game is the record
+// of a played match and must never silently vanish because its tournament
+// got deleted — so the plain tournament delete starts failing with a
+// foreign-key violation and the whole alpha deploy aborts. Every table that
+// carries a Restrict edge back to V1Game/V1GameResultRevision must be
+// cleared first, in dependency order, for exactly the Game rows attached to
+// these tournaments' fixtures — never a wider set.
+async function teardownGamesForTournaments(
+  tx: Prisma.TransactionClient,
+  tournamentIds: readonly string[],
+): Promise<void> {
+  const fixtures = await tx.v1TournamentFixture.findMany({
+    where: { tournamentId: { in: [...tournamentIds] } },
+    select: { id: true },
+  });
+  if (fixtures.length === 0) return;
+  const fixtureIds = fixtures.map((fixture) => fixture.id);
+
+  const games = await tx.v1Game.findMany({
+    where: { tournamentFixtureId: { in: fixtureIds } },
+    select: { id: true },
+  });
+  if (games.length === 0) return;
+  const gameIds = games.map((game) => game.id);
+
+  // V1Game.currentOfficialRevisionId is a self-referencing Restrict edge onto
+  // V1GameResultRevision — it must be nulled before any revision can be
+  // deleted, regardless of whether one was ever set.
+  await tx.v1Game.updateMany({
+    where: { id: { in: gameIds } },
+    data: { currentOfficialRevisionId: null },
+  });
+
+  const revisions = await tx.v1GameResultRevision.findMany({
+    where: { gameId: { in: gameIds } },
+    select: { id: true, gameId: true, state: true },
+  });
+
+  // `v1_block_terminal_revision_mutation` makes a revision permanently
+  // undeletable the moment it leaves DRAFT (CHANGE_REQUESTED,
+  // SUPPLEMENT_REQUESTED, REJECTED, OFFICIAL and VOID are all terminal), and
+  // `v1_guard_result_participant_mutation` refuses to delete a single
+  // V1GameResultParticipant row unless its revision is still DRAFT. Together
+  // that means a submitted result can never be torn down by app code at
+  // all — which is exactly the point: once a game's result has moved past a
+  // draft, it is the permanent record of a played match (the same guarantee
+  // the Restrict FK on v1_games itself exists for). If the QA seed's fixed
+  // scenario IDs ever end up wired to a game whose result went past DRAFT,
+  // failing loudly here — before deleting anything (the currentOfficialRevisionId
+  // null-out above rolls back with the rest of the transaction) — is
+  // correct: silently leaving the tournament in place is safer than either
+  // corrupting a real result record or crashing mid-transaction on a bare
+  // Postgres trigger error with no context.
+  const nonDraftRevision = revisions.find((revision) => revision.state !== 'DRAFT');
+  if (nonDraftRevision) {
+    throw new Error(
+      `Alpha QA reset refused: game ${nonDraftRevision.gameId} has a ${nonDraftRevision.state} ` +
+        `result revision (${nonDraftRevision.id}). Once a game result leaves DRAFT it is permanently ` +
+        'append-only and cannot be deleted — the QA scenario tournament that owns it cannot be reseeded.',
+    );
+  }
+  const revisionIds = revisions.map((revision) => revision.id);
+
+  // v1_team_record_facts is a special case: unlike V1GameOfficialFact /
+  // V1GameOfficialResultCache (each gated on INSERT by a BEFORE INSERT
+  // trigger requiring their revision to already be OFFICIAL — structurally
+  // unreachable once the check above has ruled out every non-DRAFT
+  // revision), nothing gates its INSERT at all, so a row can exist against
+  // a still-DRAFT revision. And `v1_block_team_record_fact_mutation` blocks
+  // its own UPDATE **and DELETE** unconditionally (no state check) — once
+  // written, a team record fact can never be deleted by app code, DRAFT or
+  // not. Attempting the delete would always fail; check for it and refuse
+  // loudly instead (Copilot review, PR #281).
+  if (revisionIds.length > 0) {
+    const orphanTeamRecordFact = await tx.v1TeamRecordFact.findFirst({
+      where: { revisionId: { in: revisionIds } },
+      select: { id: true, revisionId: true },
+    });
+    if (orphanTeamRecordFact) {
+      throw new Error(
+        `Alpha QA reset refused: result revision ${orphanTeamRecordFact.revisionId} has a team record ` +
+          `fact (${orphanTeamRecordFact.id}), which is append-only and can never be deleted — the QA ` +
+          'scenario tournament that owns it cannot be reseeded.',
+      );
+    }
+
+    await tx.v1GameResultParticipant.deleteMany({ where: { resultRevisionId: { in: revisionIds } } });
+    await tx.v1ResultEscalation.deleteMany({ where: { resultRevisionId: { in: revisionIds } } });
+    // No FK constraint backs v1_game_result_decisions.revision_id (checked
+    // against the migrations), but leaving decisions for a revision that is
+    // about to be deleted is still orphaned QA garbage — clear it too.
+    await tx.v1GameResultDecision.deleteMany({ where: { revisionId: { in: revisionIds } } });
+  }
+  await tx.v1GameResultRevision.deleteMany({ where: { gameId: { in: gameIds } } });
+  await tx.v1GameParticipant.deleteMany({ where: { gameId: { in: gameIds } } });
+  await tx.v1GameEvent.deleteMany({ where: { gameId: { in: gameIds } } });
+  await tx.v1GameVisibilityPolicy.deleteMany({ where: { gameId: { in: gameIds } } });
+  // V1GameSide, V1GamePeriod and V1GameLineup all Cascade off V1Game, so this
+  // final delete takes them with it.
+  await tx.v1Game.deleteMany({ where: { id: { in: gameIds } } });
+}
+
+export async function resetAlphaTournamentScenarios(
+  tx: Prisma.TransactionClient,
+  tournamentIds: readonly string[],
+): Promise<void> {
+  await teardownGamesForTournaments(tx, tournamentIds);
+  await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId: { in: [...tournamentIds] } } });
+  await tx.v1Tournament.deleteMany({ where: { id: { in: [...tournamentIds] } } });
+}
+
 async function main() {
   assertAlphaSeedAllowed(process.env);
   const prisma = new PrismaClient();
@@ -759,8 +876,7 @@ async function main() {
 
     const summary = await prisma.$transaction(async (tx) => {
       const tournamentIds = ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.id);
-      await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId: { in: tournamentIds } } });
-      await tx.v1Tournament.deleteMany({ where: { id: { in: tournamentIds } } });
+      await resetAlphaTournamentScenarios(tx, tournamentIds);
       const qaTeams = await ensureTeamRoster(
         tx,
         sport.id,

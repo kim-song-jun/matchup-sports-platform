@@ -14,9 +14,10 @@ import { LineupGrid } from './lineup-grid';
 import { EventCaptureModal, type EventCaptureCommitInput } from './event-capture-modal';
 import { QueueStatusPanel } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
+import { AssistPickerSheet } from './assist-picker-sheet';
 import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
-import type { GameCommandName, GameEventRecord, GameLineupParticipant, GameState } from '@/types/game-operations';
+import type { GameCommandName, GameEventRecord, GameLineup, GameLineupParticipant, GameState } from '@/types/game-operations';
 
 export interface OperateConsoleProps {
   readonly tournamentId: string;
@@ -149,6 +150,23 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       }
     },
     [ops, showToast],
+  );
+
+  const attachAssist = useCallback(
+    async (event: GameEventRecord, assistParticipantId: string) => {
+      await ops.reverseEvent({ eventId: event.id, reason: '어시스트 사후 기록' });
+      await ops.submitEvent({
+        type: 'GOAL',
+        sideId: event.sideId ?? undefined,
+        participantId: event.participantId ?? undefined,
+        assistParticipantId,
+        period: event.period,
+        clockMs: event.clockMs,
+        occurredAt: event.occurredAt,
+        payload: {},
+      });
+    },
+    [ops],
   );
 
   const handleRunCommand = useCallback(
@@ -305,7 +323,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           않았거나 실패한 것만 따로 세운다(둘은 다른 것을 뜻한다). */}
       <section className="px-4">
         <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">기록된 이벤트</h3>
-        <RecordedEventList events={ops.liveEvents} sides={sides} lineups={lineups} />
+        <RecordedEventList
+          events={ops.liveEvents}
+          sides={sides}
+          lineups={lineups}
+          onAttachAssist={(event) => setAssistTarget({ event })}
+        />
       </section>
 
       {ops.queue.items.length > 0 && (
@@ -325,9 +348,38 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           onCancel={() => setSelected(null)}
         />
       )}
+      {assistTarget ? (
+        <AssistPickerSheet
+          open
+          event={assistTarget.event}
+          scorerName={playerLabel(assistTarget.event.participantId, lineups)}
+          teammates={teammatesForSide(assistTarget.event.sideId, lineups, assistTarget.event.participantId)}
+          onAttach={(assistParticipantId) => attachAssist(assistTarget.event, assistParticipantId)}
+          onClose={() => setAssistTarget(null)}
+        />
+      ) : null}
       <EventToasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );
+}
+
+function playerLabel(participantId: string | null, lineups: readonly GameLineup[]): string {
+  if (participantId === null) return '선수';
+  for (const lineup of lineups) {
+    const participant = lineup.participants.find((row) => row.id === participantId);
+    if (participant) return participant.displayNameSnapshot;
+  }
+  return '선수';
+}
+
+function teammatesForSide(
+  sideId: string | null,
+  lineups: readonly GameLineup[],
+  excludeParticipantId: string | null,
+): readonly GameLineupParticipant[] {
+  if (sideId === null) return [];
+  const lineup = lineups.find((row) => row.sideId === sideId);
+  return (lineup?.participants ?? []).filter((participant) => participant.id !== excludeParticipantId);
 }
 
 function Banner({ tone, children }: { tone: 'info' | 'warning' | 'danger'; children: ReactNode }) {

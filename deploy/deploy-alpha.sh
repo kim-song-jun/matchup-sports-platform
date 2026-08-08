@@ -212,6 +212,17 @@ if (( disk_available_kib < 3145728 )); then
   false
 fi
 
+# 위 3GiB 는 "이미 위험하니 막는다" 선이라, 그것만 두면 운영자가 받는 첫 신호가 '배포 실패'다
+# — 리드타임이 0 이고, 이번 사고가 정확히 그렇게 났다(아무도 디스크가 차는 걸 보지 못한 채
+# 91% 에서 배포와 복구가 동시에 막혔다). 그래서 한 단계 앞에 경고선을 둔다.
+#
+# 임계값 8GiB: GC 가 정상 동작하는 상태의 여유(18G~19G 실측)에서는 안 걸리고, 거기서 절반
+# 넘게 줄어들었을 때만 걸린다 — 즉 "차오르고 있다"를 아직 배포가 성공하는 동안 알려준다.
+# 차단선(3GiB)까지는 5GiB 남아 있어 배포 몇 번의 여유가 있다. 경고일 뿐이므로 배포는 계속한다.
+if (( disk_available_kib < 8388608 )); then
+  echo "[alpha-deploy] WARNING: disk headroom shrinking (available_kib=${disk_available_kib}, warn<8GiB, block<3GiB) — 이미지 GC 상태와 legacy 태그 이미지를 점검하세요" >&2
+fi
+
 aws ecr get-login-password --region "${ALPHA_AWS_REGION}" |
   docker login --username AWS --password-stdin "${ALPHA_ECR_REGISTRY}"
 

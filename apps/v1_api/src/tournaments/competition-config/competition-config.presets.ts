@@ -40,7 +40,7 @@ export const FUTSAL_V1_CONFIG: CompetitionConfig = {
     { code: 'FIRST_HALF', label: '전반', durationMinutes: 20, extraTime: false },
     { code: 'SECOND_HALF', label: '후반', durationMinutes: 20, extraTime: false },
   ],
-  events: ['GOAL', 'OWN_GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION', 'TEAM_FOUL'],
+  events: ['GOAL', 'OWN_GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION', 'FOUL'],
   lineup: {
     minPlayers: 3,
     maxPlayers: 5,

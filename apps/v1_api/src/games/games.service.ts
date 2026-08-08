@@ -273,11 +273,29 @@ function jsonInput(value: unknown): Prisma.InputJsonValue {
   return canonicalize(value) as Prisma.InputJsonValue;
 }
 
-function jsonObject(value: Prisma.JsonValue): Record<string, unknown> {
+export function jsonObject(value: Prisma.JsonValue): Record<string, unknown> {
   if (value === null || Array.isArray(value) || typeof value !== 'object') {
     return {};
   }
   return value as Record<string, unknown>;
+}
+
+/**
+ * Pure period-count derivation extracted from `GamesService.periodCount()` so
+ * the fixture-game-backfill migration (apps/v1_api/src/games/migration/
+ * fixture-game-backfill.ts) can reuse the EXACT same derivation instead of
+ * re-transcribing it — a transcribed copy could silently drift from this one
+ * if either changed independently, and a backfilled game's period count is
+ * the kind of thing that only shows up as a fresh bug when someone starts a
+ * legacy game with the wrong number of halves.
+ */
+export function computePeriodCount(periods: Prisma.JsonValue): number {
+  if (Array.isArray(periods)) {
+    return Math.max(1, periods.length);
+  }
+  const config = jsonObject(periods);
+  const count = config.count;
+  return typeof count === 'number' && Number.isSafeInteger(count) && count > 0 ? count : 2;
 }
 
 function scoreFromJson(value: Prisma.JsonValue): GameScore {
@@ -3422,12 +3440,7 @@ export class GamesService {
   }
 
   private periodCount(periods: Prisma.JsonValue): number {
-    if (Array.isArray(periods)) {
-      return Math.max(1, periods.length);
-    }
-    const config = jsonObject(periods);
-    const count = config.count;
-    return typeof count === 'number' && Number.isSafeInteger(count) && count > 0 ? count : 2;
+    return computePeriodCount(periods);
   }
 
   private async writeAudit(

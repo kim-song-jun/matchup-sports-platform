@@ -538,16 +538,35 @@ function parseCostNote(costNote?: string | null) {
 }
 
 // 레거시 폴백 전용: 백필 CLI 실행 전, 구조화 컬럼이 비어 있는 미마이그레이션 row의 rulesText를
-// create-client의 예전 [grade, format, style, uniform].join(' · ') 순서 관례대로 되짚는다.
+// create-client의 예전 [grade, format, style, uniform].filter(Boolean).join(' · ') 관례대로
+// 되짚는다.
+//
+// 그 예전 저장 로직은 filter(Boolean)으로 빈 필드를 건너뛰고 이어붙였다 — 네 필드 중 어느 것이든
+// 비워두면 join 결과에서 그냥 빠질 뿐 빈 자리로 남지 않아서, 빈 필드 뒤의 모든 값이 한 칸씩
+// 당겨진다. 그래서 세그먼트 개수만으로는 위치를 신뢰할 수 없다 — 예를 들어 'B · 친선 · 파랑'은
+// [grade,format,uniform](style을 비움)일 수도, [grade,style,uniform](format을 비움)일 수도 있어
+// 구분할 방법이 없다. 원래 4필드가 모두 채워져 있었다는 게 확실한 경우(세그먼트 4개)에만
+// [grade, format, style, uniform] 위치 매핑을 신뢰하고, 그 외에는 값을 잃지도 틀린 칸에
+// 잘못 배정하지도 않도록 전부 style 배열에 그대로 담는다
+// (team-match-conditions-backfill.ts의 동일한 판단 근거 참고 — 서버 백필도 같은 규칙을 쓴다).
 function parseLegacyConditions(rulesText?: string | null) {
-  const rules = rulesText?.split(' · ') ?? [];
+  const rules = (rulesText ?? '').split(' · ').map((part) => part.trim()).filter(Boolean);
   const fallback = buildDefaultDraft();
 
+  if (rules.length === 4) {
+    return {
+      grade: rules[0] || fallback.grade,
+      format: rules[1] || fallback.format,
+      style: rules[2] ? [rules[2]] : fallback.style,
+      uniform: rules[3] || fallback.uniform,
+    };
+  }
+
   return {
-    grade: rules[0] ?? fallback.grade,
-    format: rules[1] ?? fallback.format,
-    style: rules[2] ? [rules[2]] : fallback.style,
-    uniform: rules[3] ?? fallback.uniform,
+    grade: fallback.grade,
+    format: fallback.format,
+    style: rules.length ? rules : fallback.style,
+    uniform: fallback.uniform,
   };
 }
 

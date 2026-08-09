@@ -55,21 +55,58 @@ describe('backfillTeamMatchConditions', () => {
     ]);
   });
 
-  it('handles a row with only some segments present (partial legacy write)', async () => {
+  // Regression for the review finding: the old write path joined
+  // [grade, format, style, uniform].filter(Boolean) — any field left blank at creation
+  // time is dropped, not left as an empty slot, so every field after it shifts left by
+  // one. A row with only 2 segments could be [grade,format] (style+uniform blank) just as
+  // easily as [style,uniform] (grade+format blank) or [grade,uniform] (format+style
+  // blank) — the count alone can't tell them apart. Only when every one of the 4 original
+  // fields was filled (4 segments survive) does the position mapping hold, because then
+  // nothing was dropped to begin with.
+  it('does not guess positions for a partial segment count — keeps everything in matchStyle instead of mislabeling a value as format', async () => {
     const { prisma, updates } = fakePrisma([
-      { id: 'tm-legacy-2', formatNote: 'A · 11:11' }, // no style/uniform segment at all
+      // Originally grade='B', format='' (blank, dropped), style='친선', uniform='파랑'.
+      // A naive [grade,format,style] index mapping would wrongly read '친선' as the
+      // match format and '파랑' as the style, losing the real uniform color entirely.
+      { id: 'tm-legacy-mid-blank', formatNote: 'B · 친선 · 파랑' },
+    ]);
+
+    const counts = await backfillTeamMatchConditions(prisma);
+
+    expect(counts).toEqual({ candidates: 1, updated: 1 });
+    expect(updates).toEqual([
+      { id: 'tm-legacy-mid-blank', data: { matchFormat: null, matchStyle: ['B', '친선', '파랑'], uniformColor: null } },
+    ]);
+  });
+
+  it('handles a row with only some segments present (partial legacy write) without asserting which fields they were', async () => {
+    const { prisma, updates } = fakePrisma([
+      { id: 'tm-legacy-2', formatNote: 'A · 11:11' }, // 2 segments: could be [grade,format] or [style,uniform] etc — ambiguous
     ]);
 
     await backfillTeamMatchConditions(prisma);
 
     expect(updates).toEqual([
-      { id: 'tm-legacy-2', data: { matchFormat: '11:11', matchStyle: [], uniformColor: null } },
+      { id: 'tm-legacy-2', data: { matchFormat: null, matchStyle: ['A', '11:11'], uniformColor: null } },
     ]);
   });
 
-  it('skips a row when every parsed segment is empty (nothing worth writing)', async () => {
+  it('writes a single ambiguous token to matchStyle instead of silently dropping it', async () => {
     const { prisma, updates } = fakePrisma([
-      { id: 'tm-legacy-3', formatNote: 'ㄷㄷ' }, // only a grade-position token, matches the real alpha QA-noise row
+      { id: 'tm-legacy-3', formatNote: 'ㄷㄷ' }, // matches the real alpha QA-noise row; position unknown, so kept rather than guessed away as grade
+    ]);
+
+    const counts = await backfillTeamMatchConditions(prisma);
+
+    expect(counts).toEqual({ candidates: 1, updated: 1 });
+    expect(updates).toEqual([
+      { id: 'tm-legacy-3', data: { matchFormat: null, matchStyle: ['ㄷㄷ'], uniformColor: null } },
+    ]);
+  });
+
+  it('skips a row whose formatNote has no non-empty segments at all (nothing worth writing)', async () => {
+    const { prisma, updates } = fakePrisma([
+      { id: 'tm-legacy-empty', formatNote: '' },
     ]);
 
     const counts = await backfillTeamMatchConditions(prisma);

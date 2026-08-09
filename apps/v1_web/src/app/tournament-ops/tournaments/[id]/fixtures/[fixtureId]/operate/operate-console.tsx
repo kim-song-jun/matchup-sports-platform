@@ -498,17 +498,25 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             {/* UX 감사 item 3 — "경기 종료"는 되돌릴 수 없는데 나머지 명령과
                 6px(gap-1.5)로 붙어 있어 오탭 위험이 컸다. 되돌릴 수 있는
                 명령들과 별도 그룹으로 묶고 구분선을 둬 시각적·물리적으로
-                떼어낸다. */}
+                떼어낸다.
+                R-K5 CTA 위계 재설계 — LIVE + 다음 피리어드가 있는 상태에서는
+                이 그룹에 "일시 중지"·"전반 종료" 둘 다 들어오는데, 예전엔
+                둘 다 variant="primary"(파란 배경)라 동급 CTA 2개가 나란히
+                있었다("주요 CTA는 화면당 최대 1개"). 이 그룹의 첫 명령만
+                주요(파란 배경)로 두고 — 실사용에서 더 자주 누르는 건
+                "일시 중지"다(피리어드 종료는 절반의 경기 시간에 한 번뿐,
+                일시 중지는 파울·부상 등으로 언제든 필요) — 나머지는 보조
+                (outline)로 후퇴시킨다. */}
             <div className="flex flex-wrap items-center justify-end gap-1.5">
               {availableCommands
                 .filter((command) => command !== 'end')
-                .map((command) => {
+                .map((command, index) => {
                   const Icon = COMMAND_ICON[command];
                   return (
                     <Button
                       key={command}
                       size="sm"
-                      variant="primary"
+                      variant={index === 0 ? 'primary' : 'outline'}
                       disabled={
                         !isTakeoverHeld(ops.takeover) ||
                         commandPending ||
@@ -648,25 +656,26 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           정확히 이 위치를 차지해야 한다 — 그래서 선수 그리드가 아니라 액션 버튼이
           이 자리를 채운다(요소를 없앤 게 아니라 같은 자리의 진입점을 바꾼 것).
           "누구"를 고르는 단계는 `ActionTargetPicker` 모달에서 처리한다. */}
-      {/* 액션 버튼 그리드 정리 — 5개(골/옐로/레드/파울/교체)가 2열(모바일)/4열
-          (sm+)로 나뉘면 마지막 한 개가 다음 줄에 혼자 남아 절반이 빈 채로
-          어색하게 줄바꿈됐다. sm 이상은 5열 한 줄로 펴서 아예 줄바꿈이
-          안 생기게 하고, 모바일 2열에서는 마지막 버튼(교체)만 두 칸을 차지해
-          그 줄을 꽉 채운다 — 잘린 게 아니라 의도된 강조로 읽힌다. */}
+      {/* 액션 버튼 그리드 — R-C1/R-C2 재설계: 예전엔 골=초록/옐로=주황/
+          레드=빨강 배경으로 버튼 전체를 의미색으로 채웠다("의미색은 상태
+          배지 전용, 장식 금지"를 어긴 자리 — 배지가 아니라 액션 버튼인데
+          배지처럼 배경 전체를 칠했다). 다섯 버튼 전부 같은 중립(outline)
+          배경으로 통일하고, 의미는 아이콘·스와치 색 하나로만 좁혀
+          전달한다(R-C3: 색+라벨 텍스트 병행은 그대로 유지). 그 결과 한
+          화면에서 "배경이 꽉 찬 유채색 강조"는 0개가 되고, 색은 작은
+          지시자로만 남는다 — 나머지(버튼 배경·테두리·라벨)는 후퇴시켜
+          강조가 뭉개지지 않게 한다(R-D2).
+          레이아웃: 5개(골/옐로/레드/파울/교체)가 2열(모바일)/4열(sm+)로
+          나뉘면 마지막 한 개가 다음 줄에 혼자 남아 절반이 빈 채로 어색하게
+          줄바꿈됐다. sm 이상은 5열 한 줄로 펴서 아예 줄바꿈이 안 생기게
+          하고, 모바일 2열에서는 마지막 버튼(교체)만 두 칸을 차지해 그
+          줄을 꽉 채운다 — 잘린 게 아니라 의도된 강조로 읽힌다. */}
       <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-5">
         {ACTION_BUTTONS.map((button, index) => (
           <Button
             key={`${button.type}-${button.cardColor ?? index}`}
             size="lg"
-            variant={
-              button.type === 'GOAL'
-                ? 'success'
-                : button.cardColor === 'YELLOW'
-                  ? 'warning'
-                  : button.cardColor === 'RED'
-                    ? 'danger'
-                    : 'neutral'
-            }
+            variant="outline"
             className={`h-16 flex-col gap-1${
               index === ACTION_BUTTONS.length - 1 ? ' col-span-2 sm:col-span-1' : ''
             }`}
@@ -674,15 +683,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             onClick={() => handleSelectAction(button)}
           >
             {button.type === 'GOAL' ? (
-              <Goal size={18} aria-hidden="true" />
+              <Goal size={18} aria-hidden="true" className="text-green-600 dark:text-green-400" />
             ) : button.type === 'FOUL' ? (
-              <AlertTriangle size={18} aria-hidden="true" />
+              <AlertTriangle size={18} aria-hidden="true" className="text-gray-500 dark:text-gray-400" />
             ) : button.type === 'SUBSTITUTION' ? (
-              <ArrowLeftRight size={18} aria-hidden="true" />
+              <ArrowLeftRight size={18} aria-hidden="true" className="text-blue-600 dark:text-blue-400" />
             ) : (
               <span
                 aria-hidden="true"
-                className={`block h-4 w-3 rounded-[2px] ${button.cardColor === 'RED' ? 'bg-red-200' : 'bg-yellow-300'}`}
+                className={`block h-4 w-3 rounded-[2px] ${button.cardColor === 'RED' ? 'bg-red-500' : 'bg-yellow-300'}`}
               />
             )}
             {button.label}

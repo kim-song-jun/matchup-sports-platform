@@ -761,8 +761,11 @@ const MATCH_STYLE_OPTIONS = ['친선', '매너 중시', '교환매치', '실력 
 const MATCH_STYLE_MAX_ITEMS = 3;
 const UNIFORM_COLOR_OPTIONS = ['흰색', '검정', '빨강', '파랑', '노랑', '초록', '주황', '남색'] as const;
 
-function matchFormatOptionsForSport(sportName: string): readonly string[] {
-  return sportName.includes('풋살') ? MATCH_FORMAT_OPTIONS_FUTSAL : MATCH_FORMAT_OPTIONS_SOCCER;
+// 표시 이름과 id 를 모두 받는다. 이름만 보고 분기하면 로케일이나 표기가 바뀌는 순간 조용히
+// 축구 쪽으로 떨어져, 풋살 경기에 11:11 같은 선택지가 뜨는데도 아무도 눈치채지 못한다.
+function matchFormatOptionsForSport(sportNameOrId: string): readonly string[] {
+  const isFutsal = sportNameOrId.includes('풋살') || sportNameOrId.toLowerCase().includes('futsal');
+  return isFutsal ? MATCH_FORMAT_OPTIONS_FUTSAL : MATCH_FORMAT_OPTIONS_SOCCER;
 }
 
 function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {

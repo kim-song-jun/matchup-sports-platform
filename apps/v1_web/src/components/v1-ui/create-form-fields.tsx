@@ -395,7 +395,10 @@ export function MultiPresetChipSelector({
   onChange: (values: string[]) => void;
 }) {
   const presetSet = new Set(options);
-  const customValue = values.find((item) => !presetSet.has(item)) ?? '';
+  // 비프리셋 값을 전부 이어 보여준다. 예전에는 find() 로 첫 번째만 표시했는데, 레거시
+  // rulesText 를 파싱해 넘어온 값처럼 비프리셋 토큰이 둘 이상이면 나머지가 화면에서 사라져
+  // 사용자에게는 값이 없어진 것처럼 보이고, 그 상태로 저장하면 실제로 없어진다.
+  const customValue = values.filter((item) => !presetSet.has(item)).join(', ');
   const atLimit = maxItems !== undefined && values.length >= maxItems;
   const [limitMessage, setLimitMessage] = useState<string | null>(null);
 

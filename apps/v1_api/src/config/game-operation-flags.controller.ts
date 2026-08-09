@@ -180,7 +180,7 @@ export class GameOperationFlagsController {
   }
 
   // Non-production admin fast path -- see `isSimplifiedOperationFlagGateEnabled`'s doc comment in
-  // ../config/game-operation-flags.ts for why this cannot activate in production.
+  // ./game-operation-flags.ts for why this cannot activate in production.
   @Patch(':key/simplified-toggle')
   simplifiedPatchFlag(
     @CurrentUser() user: V1AuthUser,

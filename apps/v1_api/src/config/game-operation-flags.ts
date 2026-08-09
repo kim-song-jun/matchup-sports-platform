@@ -101,9 +101,10 @@ export function resolveGameOperationGateRoot(
  * `NODE_ENV=production` (alpha's compose file is loaded as an overlay ON TOP of the prod compose,
  * see `deploy/deploy-alpha.sh`), so a `NODE_ENV`-keyed gate would either allow the shortcut on both
  * or block it on both. This dedicated variable is therefore the only environment signal, set to
- * `"true"` only in `deploy/docker-compose.alpha.yml`'s `v1_api`/`v1_game_operations_worker`
- * environment blocks and left unset in `deploy/docker-compose.prod.yml` (and in every other
- * runtime), mirroring the existing `V1_ALLOW_HEADER_AUTH` opt-in pattern in `auth/v1-session.ts`.
+ * `"true"` only in `deploy/docker-compose.alpha.yml`'s `v1_api` environment block (this HTTP
+ * controller is the only consumer -- the game operations worker never calls this path) and left
+ * unset in `deploy/docker-compose.prod.yml` (and in every other runtime), mirroring the existing
+ * `V1_ALLOW_HEADER_AUTH` opt-in pattern in `auth/v1-session.ts`.
  */
 export const SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR =
   'V1_ALLOW_SIMPLIFIED_OPERATION_FLAG_GATE';

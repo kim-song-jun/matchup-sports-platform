@@ -234,7 +234,7 @@
  * 남은 작업으로 PR 본문에 기록한다. tournament-ops(운영 콘솔)는 이미 Tailwind
  * `dark:` 클래스를 전면 사용 중이라 이 토큰과 무관하게 별도로 대응돼 있다.
  * `@theme` 안이 아니라 `:root`를 오버라이드하므로 Tailwind 유틸리티가 아니라
- * var(--token)을 직접 참조하는 컴포넌트 스타일에 적용된다. */
+ * CSS 커스텀 프로퍼티를 직접 참조하는 컴포넌트 스타일에 적용된다. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;

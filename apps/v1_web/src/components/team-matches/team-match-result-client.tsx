@@ -24,6 +24,7 @@ import type {
   V1TeamMatchApiStatus,
 } from '@/types/api';
 import {
+  CARD_TYPE_LABEL,
   RESULT_REVISION_STATE_LABEL,
   hashResultPayload,
   hydrateResultFormFromRevision,
@@ -205,13 +206,13 @@ function ApprovalParticipantSummary({
       ) : null}
       {carded.length > 0 ? (
         <div>
-          <div className="tm-text-label">경고·퇴장</div>
+          <div className="tm-text-label">옐로카드·레드카드</div>
           <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
             {carded.map((row) => (
               <div key={row.id} className="tm-text-caption">
                 {label(row.participantId)}
-                {row.cards.yellow > 0 ? ` · 경고 ${row.cards.yellow}` : ''}
-                {row.cards.red > 0 ? ` · 퇴장 ${row.cards.red}` : ''}
+                {row.cards.yellow > 0 ? ` · ${CARD_TYPE_LABEL.yellow} ${row.cards.yellow}` : ''}
+                {row.cards.red > 0 ? ` · ${CARD_TYPE_LABEL.red} ${row.cards.red}` : ''}
               </div>
             ))}
           </div>
@@ -282,11 +283,11 @@ function ResultDraftSummary({
       ) : null}
       {cardDrafts.length > 0 ? (
         <div>
-          <div className="tm-text-label">경고·퇴장</div>
+          <div className="tm-text-label">옐로카드·레드카드</div>
           <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
             {cardDrafts.map((card) => (
               <div key={card.key} className="tm-text-caption">
-                {nameFor(card.participantId)} · {card.type === 'yellow' ? '경고' : '퇴장'}
+                {nameFor(card.participantId)} · {CARD_TYPE_LABEL[card.type]}
               </div>
             ))}
           </div>
@@ -781,7 +782,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                   </div>
                 )}
 
-                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>3. 경고·퇴장</div>
+                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>3. 옐로카드·레드카드</div>
                 <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                   {cardDrafts.map((card) => (
                     <div key={card.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -809,12 +810,12 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                       <select
                         id={`card-type-${card.key}`}
                         className="tm-input"
-                        style={{ width: 96 }}
+                        style={{ width: 116 }}
                         value={card.type}
                         onChange={(event) => updateCard(card.key, { type: event.target.value as 'yellow' | 'red' })}
                       >
-                        <option value="yellow">경고</option>
-                        <option value="red">퇴장</option>
+                        <option value="yellow">{CARD_TYPE_LABEL.yellow}</option>
+                        <option value="red">{CARD_TYPE_LABEL.red}</option>
                       </select>
                       <button
                         type="button"

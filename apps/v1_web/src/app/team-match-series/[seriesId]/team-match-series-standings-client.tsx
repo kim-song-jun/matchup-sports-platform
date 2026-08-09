@@ -2,6 +2,7 @@
 
 import { useV1TeamMatchSeries, useV1TeamMatchSeriesPlayerRecords, useV1TeamMatchSeriesStandings } from '@/hooks/use-v1-api';
 import { EmptyState } from '@/components/v1-ui/primitives';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 
 const TIE_BREAK_LABELS: Record<string, string> = {
   points: '승점',
@@ -48,7 +49,12 @@ export default function TeamMatchSeriesStandingsClient({ seriesId }: { seriesId:
                 {standings.standings.map((row) => (
                   <tr key={row.teamId} className="border-t border-gray-100 dark:border-gray-800">
                     <td className="py-2 text-gray-900 dark:text-white">{row.position}</td>
-                    <td className="text-gray-900 dark:text-white">{row.teamName}</td>
+                    <td className="text-gray-900 dark:text-white">
+                      <span className="flex items-center gap-2">
+                        <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
+                        <span>{row.teamName}</span>
+                      </span>
+                    </td>
                     <td>{row.played}</td>
                     <td>{row.points}</td>
                     <td>{row.goalsFor}-{row.goalsAgainst}</td>

@@ -2652,6 +2652,7 @@ export type V1TournamentStanding = {
   registrationId: string;
   teamId: string;
   teamName: string;
+  teamLogoUrl: string | null;
   position: number;
   points: number;
   wins: number;
@@ -2709,9 +2710,13 @@ export type V1TournamentFixture = {
   venue: string | null;
   status: string;
   homeRegistrationId: string | null;
+  homeTeamId: string | null;
   homeTeamName: string;
+  homeTeamLogoUrl: string | null;
   awayRegistrationId: string | null;
+  awayTeamId: string | null;
   awayTeamName: string;
+  awayTeamLogoUrl: string | null;
   result: V1TournamentFixtureResult | null;
   videos: V1TournamentFixtureVideo[];
 };

@@ -159,6 +159,7 @@ export interface PublicTeamRecordItem {
   readonly tournamentTitle: string | null;
   readonly opponentTeamId: string | null;
   readonly opponentTeamName: string | null;
+  readonly opponentTeamLogoUrl: string | null;
   /** `WON | DRAWN | LOST` (`V1TeamRecordResult`), kept as `string` to avoid a `@prisma/client` import. */
   readonly result: string;
   readonly goalsFor: number;
@@ -180,6 +181,7 @@ export interface PublicTeamRecordsSummary {
 export interface PublicTeamRecordsResponse {
   readonly teamId: string;
   readonly teamName: string;
+  readonly teamLogoUrl: string | null;
   readonly summary: PublicTeamRecordsSummary;
   readonly items: readonly PublicTeamRecordItem[];
   readonly nextCursor: string | null;

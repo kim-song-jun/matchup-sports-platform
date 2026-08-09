@@ -24,7 +24,7 @@ function recordHref(item: PublicTeamRecordItem): string | null {
 /** 05/06번 팀매치 결과 화면이 쓰는 "팀 로고 · 점수 · 팀 로고" 스코어박스 톤을 그대로
  * 가져왔다 — 이전엔 텍스트 한 줄(결과·상대팀명·점수)뿐이라 같은 데이터인데도 대회/매치
  * 상세보다 훨씬 밋밋해 보였다. */
-function TeamRecordRow({ item, teamId, teamName }: { item: PublicTeamRecordItem; teamId: string; teamName: string }) {
+function TeamRecordRow({ item, teamId, teamName, teamLogoUrl }: { item: PublicTeamRecordItem; teamId: string; teamName: string; teamLogoUrl: string | null }) {
   return (
     <div style={{ padding: '14px 16px', borderTop: '1px solid var(--grey100)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -57,7 +57,7 @@ function TeamRecordRow({ item, teamId, teamName }: { item: PublicTeamRecordItem;
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <TeamAvatar seed={teamId} name={teamName} size="sm" />
+          <TeamAvatar seed={teamId} name={teamName} logoUrl={teamLogoUrl} size="sm" />
           <span
             className="tm-text-caption"
             style={{ fontWeight: 600, color: 'var(--text-strong)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
@@ -69,7 +69,7 @@ function TeamRecordRow({ item, teamId, teamName }: { item: PublicTeamRecordItem;
           {item.goalsFor} : {item.goalsAgainst}
         </span>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <TeamAvatar seed={item.opponentTeamId ?? item.gameId} name={item.opponentTeamName ?? '상대 미상'} size="sm" />
+          <TeamAvatar seed={item.opponentTeamId ?? item.gameId} name={item.opponentTeamName ?? '상대 미상'} logoUrl={item.opponentTeamLogoUrl} size="sm" />
           <span
             className="tm-text-caption"
             style={{ fontWeight: 600, color: 'var(--text-strong)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
@@ -117,11 +117,11 @@ export function TeamRecordsContent({
                   href={href}
                   style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
                 >
-                  <TeamRecordRow item={item} teamId={data.teamId} teamName={data.teamName} />
+                  <TeamRecordRow item={item} teamId={data.teamId} teamName={data.teamName} teamLogoUrl={data.teamLogoUrl} />
                 </Link>
               ) : (
                 <div key={item.gameId}>
-                  <TeamRecordRow item={item} teamId={data.teamId} teamName={data.teamName} />
+                  <TeamRecordRow item={item} teamId={data.teamId} teamName={data.teamName} teamLogoUrl={data.teamLogoUrl} />
                 </div>
               );
             })}

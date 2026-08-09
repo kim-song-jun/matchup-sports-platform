@@ -4,6 +4,14 @@ import { SchedulePageClient } from './schedule-page-client';
 import { buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
 import type { V1TournamentDetail } from '@/types/api';
 
+// 이 라우트를 요청마다 동적 렌더로 강제한다. 없는 대회에서 not-found UI·noindex 는 정상인데 HTTP
+// 상태만 200 이던 결함(#298·#302·#305 로도 안 잡힘, 2026-08-09 alpha 실측)의 유력 원인은, 이 세그먼트가
+// 빌드타임에 부분적으로 static 최적화되며 notFound() 렌더가 static 200 으로 구워지는 것이다(형제
+// results 는 동일 코드인데 dynamic 이라 런타임 notFound → 404). force-dynamic 으로 static 최적화를
+// 배제해 notFound() 가 항상 런타임에 평가되도록 한다. 실 일정 데이터는 어차피 클라이언트가 가져오므로
+// 정적 이점을 포기해도 손해가 없다.
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   // 없는 대회는 **generateMetadata 단계에서** notFound() 를 던진다 — 이게 이 라우트의 실제 fix 다.

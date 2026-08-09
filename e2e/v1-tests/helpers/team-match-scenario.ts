@@ -20,8 +20,9 @@ import { apiGet, apiPost, apiPut, commandId, unwrap } from './v1-http';
  *   only as part of a MIGRATION (`20260729000200_v1_competition_config`),
  *   not seed data — so they exist in every environment regardless of which
  *   seed script ran. `futsal-v1`'s `lineup` config is `{minPlayers:3,
- *   maxPlayers:5, substitutions:'rolling'}`, the smallest roster requirement
- *   of the two, which is why futsal is selected below.
+ *   maxPlayers:6, substitutions:'rolling'}` (6 matches the '6:6' match-format
+ *   preset — see competition-config.presets.ts), the smallest `minPlayers`
+ *   requirement of the two, which is why futsal is selected below.
  * - The host team must have >=3 ACTIVE members to satisfy futsal's
  *   `minPlayers`. Per `apps/v1_api/prisma/seed.ts`, the team owned by
  *   `owner@teameet.v1` ("ownerTeam") has 4 active members (owner, manager,

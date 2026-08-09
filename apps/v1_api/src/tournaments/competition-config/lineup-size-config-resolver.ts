@@ -91,7 +91,11 @@ export class LineupSizeConfigResolver {
       // 이 분기 자체가 없으면 바로 다음 "제한인데 개수가 없다" 에러가 무제한 요청에도
       // 잘못 발화한다.
       targetMaxSubstitutions = null;
-    } else if (overrides.maxSubstitutions !== undefined) {
+    } else if (typeof overrides.maxSubstitutions === 'number') {
+      // `!== undefined` 로 받으면 null 이 통과한다 — 그러면 "제한형인데 상한 null"
+      // (= 사실상 무제한)이 조용히 저장돼 교체 횟수 제한이 무력화된다. 무제한은 위의
+      // rolling 분기로만 표현되어야 하므로, 여기서는 실제 숫자일 때만 채택하고 null 은
+      // "개수를 안 준 것"과 동일하게 아래 분기(canonical 기본값 또는 명확한 에러)로 흘린다.
       targetMaxSubstitutions = overrides.maxSubstitutions;
     } else if (canonical.lineup.substitutions === 'limited') {
       // 개수를 안 줬지만 canonical 자체가 제한형이면(football) 그 기본 횟수를 쓴다.

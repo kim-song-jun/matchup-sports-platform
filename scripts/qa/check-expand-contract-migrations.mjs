@@ -7,6 +7,42 @@ import { execFileSync } from 'node:child_process';
 // would have left its temporal dead zone.
 class UnparsableSqlError extends Error {}
 
+// ─── reviewed non-additive escape hatch ────────────────────────────────────
+//
+// Declared up here (not beside runAdditivityCheck) for the same reason as the
+// class above: selfTest() calls runAdditivityCheck during module evaluation,
+// and its `reviewed = REVIEWED_NON_ADDITIVE` default would hit the const's
+// temporal dead zone if this lived further down.
+//
+// The additivity rules below are conservative by construction: they can only
+// PROVE a statement additive, never that a genuinely non-additive one is
+// nonetheless rollback-safe in this codebase's specific data/app reality. That
+// last mile is a human judgement, and this is where it is recorded — auditable,
+// in git, one entry per statement, each justifying WHY the rolling-deploy risk
+// the gate exists to catch does not apply. Keep this list SHORT: every entry
+// weakens the gate for exactly one (file, statement) pair and nothing else.
+const REVIEWED_NON_ADDITIVE = [
+  {
+    file: 'apps/v1_api/prisma/migrations/20260809133000_v1_team_schedule_match_unique/migration.sql',
+    statement:
+      'CREATE UNIQUE INDEX "v1_team_schedules_team_match_unique" ON "v1_team_schedules"("team_id", "team_match_id")',
+    reason:
+      'team_match_id is NULL for ordinary TRAINING/EVENT schedules, which Postgres never treats as ' +
+      'colliding, so only MATCH schedules are constrained. Duplicate (team, match) schedules are already ' +
+      'prevented by app-level idempotency (the per-team lock + transactional invariant in ' +
+      "team-schedules.service.ts); this index is the author's last-resort DB defense (#296), not a new " +
+      'shape old writers can trip. Alpha currently holds 0 rows with a non-NULL team_match_id. Reviewed 2026-08-09.',
+  },
+];
+
+const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();
+
+function reviewedAcknowledgement(file, statement, reviewed) {
+  return reviewed.find(
+    (entry) => entry.file === file && normalizeStatementText(entry.statement) === normalizeStatementText(statement),
+  );
+}
+
 const [baseSha, headSha] = process.argv.slice(2);
 if (baseSha === '--self-test') {
   selfTest();
@@ -241,7 +277,7 @@ function collectBaseFunctionNames(sha) {
 
 // ─── additivity ──────────────────────────────────────────────────────────────
 
-function runAdditivityCheck(statements, baseFunctionNames, onFail) {
+function runAdditivityCheck(statements, baseFunctionNames, onFail, reviewed = REVIEWED_NON_ADDITIVE) {
   const newTables = new Set(
     statements.map(({ statement }) => tableCreatedBy(statement)).filter(Boolean),
   );
@@ -262,7 +298,12 @@ function runAdditivityCheck(statements, baseFunctionNames, onFail) {
 
   for (const { file, statement } of statements) {
     if (!isAdditiveStatement(statement, { newTables, nullableNewColumnsByTable, baseFunctionNames })) {
-      onFail(`non-additive migration statement in ${file}: ${statement}`);
+      const acknowledged = reviewedAcknowledgement(file, statement, reviewed);
+      if (acknowledged) {
+        console.log(`[expand-contract-sql-v1] reviewed non-additive accepted in ${file}: ${acknowledged.reason}`);
+      } else {
+        onFail(`non-additive migration statement in ${file}: ${statement}`);
+      }
     }
     // Statement-order-sensitive bookkeeping happens *after* the additivity
     // check so a statement is judged against the state that existed
@@ -471,6 +512,30 @@ function selfTest() {
     !uniqueIndexAfterNotNullFailures.some((message) => message.includes('User_referralCode_key3'))
   ) {
     fail('unique-index-after-SET-NOT-NULL must be rejected once nullability is revoked');
+  }
+
+  // The reviewed-non-additive escape hatch accepts EXACTLY one (file, statement)
+  // pair and nothing else: a statement not on the list, the same statement in a
+  // different file, and a different statement in the same file must all still be
+  // rejected. Whitespace differences must not defeat the match.
+  const reviewedAllow = [
+    { file: 'reviewed.sql', statement: 'CREATE UNIQUE INDEX "X_a_b_key" ON "X"("a", "b")', reason: 'test' },
+  ];
+  const runReviewed = (input) => {
+    const messages = [];
+    runAdditivityCheck(input, baseFunctionNames, (message) => messages.push(message), reviewedAllow);
+    return messages;
+  };
+  if (
+    runReviewed([{ file: 'reviewed.sql', statement: 'CREATE UNIQUE INDEX  "X_a_b_key"  ON "X"("a", "b")' }]).length !== 0
+  ) {
+    fail('a reviewed-allowlisted non-additive statement must be accepted (whitespace-insensitively)');
+  }
+  if (runReviewed([{ file: 'reviewed.sql', statement: 'CREATE UNIQUE INDEX "X_c_key" ON "X"("c")' }]).length !== 1) {
+    fail('a non-additive statement absent from the allowlist must still be rejected');
+  }
+  if (runReviewed([{ file: 'other.sql', statement: 'CREATE UNIQUE INDEX "X_a_b_key" ON "X"("a", "b")' }]).length !== 1) {
+    fail('the allowlist must be scoped to its exact file, not match the same statement elsewhere');
   }
 
   console.log('[expand-contract-sql-v1] negative controls passed');

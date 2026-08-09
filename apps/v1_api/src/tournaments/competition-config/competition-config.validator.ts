@@ -6,6 +6,24 @@ import {
   CompetitionConfig,
 } from './competition-config.types';
 
+/**
+ * `normalizeCompetitionSportCode()`의 non-throwing 짝 — "이 sportCode가 경기 설정
+ * 카탈로그에 있는지"를 확인만 하고 싶은 호출부(예: 아직 지원하지 않는 종목이면 그
+ * 종목의 대회는 competitionConfigVersionId를 그냥 null로 두는 TournamentsAdminService,
+ * 또는 관리자 화면에 "이 종목은 출전 인원 설정을 아직 지원하지 않아요"를 보여줘야 하는
+ * lineup-size-options 조회)가 이 값을 쓴다. 두 함수가 문자열 매칭을 각자 따로 하면
+ * 종목을 하나 늘릴 때 한쪽만 고치는 드리프트가 생기므로, 매칭 로직은 여기 하나뿐이다.
+ */
+export function tryNormalizeCompetitionSportCode(
+  value: string | null | undefined,
+): 'football' | 'futsal' | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'soccer' || normalized === 'football') return 'football';
+  if (normalized === 'futsal') return 'futsal';
+  return null;
+}
+
 export function normalizeCompetitionSportCode(value: string | null | undefined) {
   if (!value) {
     throw new UnprocessableEntityException({
@@ -13,13 +31,14 @@ export function normalizeCompetitionSportCode(value: string | null | undefined) 
       message: '경기 설정에 사용할 종목이 필요해요.',
     });
   }
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'soccer' || normalized === 'football') return 'football';
-  if (normalized === 'futsal') return 'futsal';
-  throw new UnprocessableEntityException({
-    code: COMPETITION_CONFIG_CODES.UNSUPPORTED_SPORT,
-    message: `지원하지 않는 경기 설정 종목이에요: ${value}`,
-  });
+  const normalized = tryNormalizeCompetitionSportCode(value);
+  if (normalized === null) {
+    throw new UnprocessableEntityException({
+      code: COMPETITION_CONFIG_CODES.UNSUPPORTED_SPORT,
+      message: `지원하지 않는 경기 설정 종목이에요: ${value}`,
+    });
+  }
+  return normalized;
 }
 
 function invalidConfig(message: string): never {

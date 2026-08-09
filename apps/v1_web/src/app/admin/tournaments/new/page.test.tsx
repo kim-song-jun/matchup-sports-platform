@@ -5,6 +5,7 @@ import {
   useV1ActivePopup,
   useV1AdminTournaments,
   useV1CreateTournament,
+  useV1LineupSizeOptions,
   useV1MasterSports,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
@@ -30,6 +31,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
   useV1AdminTournaments: vi.fn(),
   useV1CreateTournament: vi.fn(),
+  useV1LineupSizeOptions: vi.fn(),
   useV1MasterSports: vi.fn(),
   useV1UploadImages: vi.fn(),
 }));
@@ -37,6 +39,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1AdminTournamentsMock = vi.mocked(useV1AdminTournaments, { partial: true });
 const useV1CreateTournamentMock = vi.mocked(useV1CreateTournament, { partial: true });
+const useV1LineupSizeOptionsMock = vi.mocked(useV1LineupSizeOptions, { partial: true });
 const useV1MasterSportsMock = vi.mocked(useV1MasterSports, { partial: true });
 const useV1UploadImagesMock = vi.mocked(useV1UploadImages, { partial: true });
 const createMutate = vi.fn();
@@ -62,6 +65,10 @@ function previousTournament(): V1Tournament {
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
+    competitionConfigVersionId: null,
+    lineupMaxPlayers: null,
+    lineupMinPlayers: null,
+    lineupSizeOptions: [],
     genderCategory: 'mixed',
     genderMinMale: null,
     genderMaxMale: null,
@@ -150,6 +157,10 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
     useV1CreateTournamentMock.mockReturnValue({
       mutate: createMutate,
+      isPending: false,
+    });
+    useV1LineupSizeOptionsMock.mockReturnValue({
+      data: { sportId: 'sport-futsal', supported: true, options: [5, 6], defaultMaxPlayers: 6 },
       isPending: false,
     });
     uploadMutateAsync.mockResolvedValue({ urls: ['/uploads/cover-test.webp'] });

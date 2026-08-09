@@ -204,6 +204,7 @@ import type {
   V1Tournament,
   V1CreateTournamentPayload,
   V1UpdateTournamentPayload,
+  V1LineupSizeOptions,
   V1ChangeTournamentStatusPayload,
   V1CreateRegistrationPayload,
   V1SubmitRegistrationPayload,
@@ -3065,6 +3066,20 @@ export function useV1AdminTournament(id: string) {
     queryKey: v1Keys.adminTournament(id),
     queryFn: () => v1Get<V1Tournament>(`/admin/tournaments/${id}`),
     enabled: !!id,
+  });
+}
+
+/**
+ * "출전 인원"(라인업 상한) 선택지 — 대회 생성/수정 화면이 선택된 sportId로 조회한다.
+ * D-17과 같은 원칙(카탈로그 단일 출처는 서버): FUTSAL_FORMATIONS/축구 포메이션이 실제로
+ * 지원하는 인원수는 서버(competition-config.presets.ts)만 알고 있으므로 프론트는 절대
+ * 후보 목록을 하드코딩하지 않는다.
+ */
+export function useV1LineupSizeOptions(sportId: string | null) {
+  return useQuery({
+    queryKey: v1Keys.adminLineupSizeOptions(sportId ?? ''),
+    queryFn: () => v1Get<V1LineupSizeOptions>('/admin/competition-configs/lineup-size-options', { sportId }),
+    enabled: !!sportId,
   });
 }
 

@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy } from 'lucide-react';
-import { useReducer, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import {
   useV1AdminTournaments,
   useV1CreateTournament,
+  useV1LineupSizeOptions,
   useV1MasterSports,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
@@ -597,6 +598,24 @@ function ParticipationStep({
   dispatch: React.Dispatch<TournamentCreateAction>;
   showToast: (message: string, variant?: 'success' | 'error') => void;
 }) {
+  const { data: lineupSizeOptions, isPending: lineupSizeOptionsPending } = useV1LineupSizeOptions(
+    state.sportId || null,
+  );
+
+  // 종목의 선택지가 로드되면, 관리자가 아직 아무것도 고르지 않았을 때만 canonical
+  // 기본값을 자동으로 채워 넣는다 — 값을 이미 골랐거나 다시 비운(종목 변경) 상태를
+  // 덮어쓰지 않는다. dispatch는 useReducer가 주는 안정적인 참조라 매 렌더 재실행을
+  // 걱정할 필요가 없다(setField는 매 렌더 새로 만들어져 effect 의존성으로 쓰기 부적절).
+  useEffect(() => {
+    if (state.lineupMaxPlayers !== '') return;
+    if (!lineupSizeOptions?.supported || lineupSizeOptions.defaultMaxPlayers === null) return;
+    dispatch({
+      type: 'set-field',
+      field: 'lineupMaxPlayers',
+      value: String(lineupSizeOptions.defaultMaxPlayers),
+    });
+  }, [state.lineupMaxPlayers, lineupSizeOptions, dispatch]);
+
   return (
     <div className="grid gap-6">
       <div className="grid gap-4 sm:grid-cols-3">
@@ -613,7 +632,7 @@ function ParticipationStep({
         />
         <NumberField
           id="min-players"
-          label="최소 선수 수"
+          label="최소 선수 수 (등록 명단)"
           value={state.minPlayers}
           onChange={(value) => setField('minPlayers', value)}
           min={1}
@@ -624,7 +643,7 @@ function ParticipationStep({
         />
         <NumberField
           id="max-players"
-          label="최대 선수 수"
+          label="최대 선수 수 (등록 명단)"
           value={state.maxPlayers}
           onChange={(value) => setField('maxPlayers', value)}
           min={1}
@@ -634,6 +653,42 @@ function ParticipationStep({
           required
         />
       </div>
+
+      <Field
+        id="lineup-max-players"
+        label="출전 인원"
+        hint="경기장에 실제로 서는 라인업 인원(골키퍼 포함)이에요. 위 선수 수(등록 명단)와는 달라요 — 등록 명단 중 이 인원만 한 경기에 출전할 수 있어요."
+      >
+        {lineupSizeOptionsPending ? (
+          <p className="text-xs text-[var(--text-caption)]">선택지를 불러오는 중이에요…</p>
+        ) : !lineupSizeOptions?.supported ? (
+          <p className="text-xs text-[var(--text-caption)]">
+            이 종목은 아직 출전 인원을 선택할 수 없어요. 기본 규칙을 그대로 적용해요.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2" role="group" aria-label="출전 인원 선택">
+            {lineupSizeOptions.options.map((option) => {
+              const selected = state.lineupMaxPlayers === String(option);
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => setField('lineupMaxPlayers', String(option))}
+                  aria-pressed={selected}
+                  className={`h-[40px] rounded-xl border px-4 text-sm font-semibold transition-colors disabled:opacity-50 ${
+                    selected
+                      ? 'border-blue-500 bg-blue-500 text-white'
+                      : 'border-[var(--border)] bg-white text-[var(--text-body)] hover:border-blue-500'
+                  }`}
+                >
+                  {option}명
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Field>
 
       {state.genderCategory === 'mixed' ? (
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">

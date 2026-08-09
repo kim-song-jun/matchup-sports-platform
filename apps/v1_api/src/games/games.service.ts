@@ -31,7 +31,7 @@ import type {
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
-import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
+import { parseLineupCatalog, parseLineupLimits } from '../tournaments/competition-config/competition-config.parse';
 import { GameTakeoverService } from './game-takeover.service';
 import {
   decideTournamentStaffAccess,
@@ -1296,6 +1296,26 @@ export class GamesService {
           context.actor.teamId !== side.teamId
         ) {
           throw this.forbidden();
+        }
+        // team-match-lineup.service.ts#resolveEntries enforces this same gate for the
+        // team-match lineup path (LINEUP_SIZE_INVALID against the pinned
+        // V1CompetitionConfigVersion.lineup.{min,max}Players) — this generic
+        // tournament-fixture route had no equivalent check at all, so a director/staff
+        // caller could save a roster of any size regardless of what the tournament's
+        // competition config (and, since Task N, the admin's chosen "출전 인원") actually
+        // allows. Only starters count toward the cap, matching resolveEntries' contract
+        // (bench size is a separate, unrelated concern this route doesn't otherwise gate).
+        const startedCount = dto.participants.filter((participant) => participant.started).length;
+        const config = await tx.v1CompetitionConfigVersion.findUnique({
+          where: { id: game.competitionConfigVersionId },
+          select: { lineup: true },
+        });
+        const lineupLimits = parseLineupLimits(config?.lineup ?? null);
+        if (startedCount < lineupLimits.minPlayers || startedCount > lineupLimits.maxPlayers) {
+          throw new UnprocessableEntityException({
+            code: 'LINEUP_SIZE_INVALID',
+            message: `선발 인원은 ${lineupLimits.minPlayers}명 이상 ${lineupLimits.maxPlayers}명 이하여야 해요.`,
+          });
         }
         const previous = await tx.v1GameLineup.findFirst({
           where: { gameId, sideId },

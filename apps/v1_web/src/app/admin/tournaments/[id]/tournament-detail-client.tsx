@@ -33,6 +33,7 @@ import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import {
   useV1AdminTournament,
+  useV1LineupSizeOptions,
   useV1MasterSports,
   useV1AdminMe,
   useV1ChangeTournamentStatus,
@@ -2919,6 +2920,16 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [editTeamCount, setEditTeamCount] = useState('');
   const [editMinPlayers, setEditMinPlayers] = useState('');
   const [editMaxPlayers, setEditMaxPlayers] = useState('');
+  /** "출전 인원"(라인업 상한) — 위 editMinPlayers/editMaxPlayers(등록 명단 크기)와 다른 값.
+   * 빈 문자열이면 변경하지 않는다는 뜻(payload에서 제외). */
+  const [editLineupMaxPlayers, setEditLineupMaxPlayers] = useState('');
+  // "출전 인원" 선택지 — 종목 변경과 동시에는 못 바꾸므로(서버가
+  // TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT로 막음) 편집 폼에서 종목이 바뀌지
+  // 않았을 때만(editSportId가 비었거나 tournament.sportId와 같을 때) 조회한다.
+  const lineupSizeSportId =
+    editSportId && editSportId !== tournament?.sportId ? null : (tournament?.sportId ?? null);
+  const { data: lineupSizeOptions, isPending: lineupSizeOptionsPending } =
+    useV1LineupSizeOptions(lineupSizeSportId);
   const [editGenderCategory, setEditGenderCategory] =
     useState<V1TournamentGenderCategory | ''>('');
   const [editGenderMinMale, setEditGenderMinMale] = useState('');
@@ -2971,6 +2982,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     setEditTeamCount(String(tournament.teamCount));
     setEditMinPlayers(String(tournament.minPlayers));
     setEditMaxPlayers(String(tournament.maxPlayers));
+    // 빈 문자열로 시작 — "아직 안 바꿈"을 뜻하며, 선택지 그룹은 tournament.lineupMaxPlayers를
+    // 선택된 값으로 보여준다(아래 JSX). 사용자가 명시적으로 다른 값을 고를 때만 payload에
+    // lineupMaxPlayers가 실린다.
+    setEditLineupMaxPlayers('');
     setEditGenderCategory(tournament.genderCategory ?? '');
     setEditGenderMinMale(
       tournament.genderMinMale === null ? '' : String(tournament.genderMinMale),
@@ -3105,6 +3120,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     if (teamCount !== tournament.teamCount) payload.teamCount = teamCount;
     if (minPlayers !== tournament.minPlayers) payload.minPlayers = minPlayers;
     if (maxPlayers !== tournament.maxPlayers) payload.maxPlayers = maxPlayers;
+    // "출전 인원" — editLineupMaxPlayers가 빈 문자열이면(아직 안 고름) payload에서 아예
+    // 뺀다. 서버는 이 필드가 없으면 기존 값을 그대로 둔다(update()는 partial PATCH).
+    if (editLineupMaxPlayers !== '' && Number(editLineupMaxPlayers) !== tournament.lineupMaxPlayers) {
+      payload.lineupMaxPlayers = Number(editLineupMaxPlayers);
+    }
     if (editGenderCategory && editGenderCategory !== (tournament.genderCategory ?? '')) {
       payload.genderCategory = editGenderCategory;
     }
@@ -3357,7 +3377,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
           {[
             { label: '참가비', value: formatCurrency(tournament.entryFee) },
             { label: '팀 수', value: `${tournament.teamCount}팀` },
-            { label: '선수 수', value: `${tournament.minPlayers}~${tournament.maxPlayers}명` },
+            { label: '선수 수 (등록 명단)', value: `${tournament.minPlayers}~${tournament.maxPlayers}명` },
+            {
+              label: '출전 인원',
+              value: tournament.lineupMaxPlayers !== null ? `${tournament.lineupMaxPlayers}명` : '미지정',
+            },
             { label: '신청 수', value: `${tournament.registrationCount}팀` },
             { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
             { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
@@ -3802,7 +3826,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="edit-min-players" className="text-[13px] text-gray-900">최소 선수</label>
+              <label htmlFor="edit-min-players" className="text-[13px] text-gray-900">최소 선수 (등록 명단)</label>
               <input
                 id="edit-min-players"
                 type="number"
@@ -3815,7 +3839,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="edit-max-players" className="text-[13px] text-gray-900">최대 선수</label>
+              <label htmlFor="edit-max-players" className="text-[13px] text-gray-900">최대 선수 (등록 명단)</label>
               <input
                 id="edit-max-players"
                 type="number"
@@ -3827,6 +3851,51 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                 className={inputCls}
               />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] text-gray-900">출전 인원</span>
+            <p className="text-[12px] text-gray-500">
+              경기장에 실제로 서는 라인업 인원(골키퍼 포함)이에요. 위 등록 명단 인원과는 달라요.
+            </p>
+            {tournament.status === 'in_progress' || tournament.status === 'completed' ? (
+              <p className="text-[12px] text-amber-600">
+                대회가 시작된 이후에는 출전 인원을 바꿀 수 없어요.
+                {tournament.lineupMaxPlayers !== null ? ` 현재 ${tournament.lineupMaxPlayers}명이에요.` : ''}
+              </p>
+            ) : editSportId && editSportId !== tournament.sportId ? (
+              <p className="text-[12px] text-gray-500">
+                종목을 바꾸는 중에는 출전 인원을 함께 바꿀 수 없어요. 종목을 먼저 저장한 뒤 다시 편집해 주세요.
+              </p>
+            ) : lineupSizeOptionsPending ? (
+              <p className="text-[12px] text-gray-500">선택지를 불러오는 중이에요…</p>
+            ) : !lineupSizeOptions?.supported ? (
+              <p className="text-[12px] text-gray-500">이 종목은 아직 출전 인원을 선택할 수 없어요.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="출전 인원 선택">
+                {lineupSizeOptions.options.map((option) => {
+                  const currentValue =
+                    editLineupMaxPlayers !== '' ? editLineupMaxPlayers : String(tournament.lineupMaxPlayers ?? '');
+                  const selected = currentValue === String(option);
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      disabled={updateTournament.isPending}
+                      onClick={() => setEditLineupMaxPlayers(String(option))}
+                      aria-pressed={selected}
+                      className={`h-[36px] rounded-xl border px-3.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
+                        selected
+                          ? 'border-blue-500 bg-blue-500 text-white'
+                          : 'border-[var(--border)] bg-white text-gray-900 hover:border-blue-500'
+                      }`}
+                    >
+                      {option}명
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -4227,7 +4296,11 @@ function InfoTab({
         <InfoRow label="명단 마감" value={formatDate(tournament.rosterDeadlineAt)} />
         <InfoRow label="참가비" value={formatCurrency(tournament.entryFee)} />
         <InfoRow label="팀 수" value={`${tournament.teamCount}팀`} />
-        <InfoRow label="선수 구성" value={`${tournament.minPlayers}~${tournament.maxPlayers}명`} />
+        <InfoRow label="선수 구성 (등록 명단)" value={`${tournament.minPlayers}~${tournament.maxPlayers}명`} />
+        <InfoRow
+          label="출전 인원"
+          value={tournament.lineupMaxPlayers !== null ? `${tournament.lineupMaxPlayers}명` : '미지정'}
+        />
         <InfoRow label="입금 계좌" value={tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount ?? ''}` : '미등록'} />
       </dl>
 

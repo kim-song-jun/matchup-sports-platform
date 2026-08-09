@@ -358,8 +358,12 @@ export class PublicTournamentRecordsService {
     if (liveFixtures.length === 0) return new Map();
 
     const gameIds = liveFixtures.map((fixture) => fixture.game.id);
+    // 스코어 집계에 필요한 건 GOAL 과 "무언가를 되돌린 이벤트" 둘뿐이다
+    // (tallyLiveScore 는 reversesEventId 로 취소된 골을 빼고 GOAL 만 센다).
+    // 관전자 폴링으로 반복 호출되는 경로라 카드·교체·파울까지 전부 읽으면
+    // 그만큼 DB/네트워크 비용이 그대로 쌓인다.
     const events = await this.prisma.v1GameEvent.findMany({
-      where: { gameId: { in: gameIds } },
+      where: { gameId: { in: gameIds }, OR: [{ type: 'GOAL' }, { reversesEventId: { not: null } }] },
       select: { id: true, gameId: true, type: true, sideId: true, reversesEventId: true },
     });
     const eventsByGame = new Map<string, typeof events>();
@@ -383,7 +387,9 @@ export class PublicTournamentRecordsService {
     sides: readonly { id: string; sideKey: 'HOME' | 'AWAY' }[],
   ): Promise<GameScore> {
     const events = await this.prisma.v1GameEvent.findMany({
-      where: { gameId },
+      // loadLiveScores 와 같은 이유로 범위를 좁힌다 — 단일 경기 조회라도 관전자
+      // 폴링으로 반복 호출된다.
+      where: { gameId, OR: [{ type: 'GOAL' }, { reversesEventId: { not: null } }] },
       select: { id: true, type: true, sideId: true, reversesEventId: true },
     });
     const sideKeyById = new Map(sides.map((side) => [side.id, side.sideKey] as const));

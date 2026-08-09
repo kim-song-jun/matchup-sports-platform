@@ -43,9 +43,16 @@ export interface ScheduleFilters {
  * `docs/api/domains/public-records.md`'s "Lane 1 addition" section). Only
  * polls while the currently-loaded page actually contains a `status ===
  * 'live'` fixture/match, so an idle spectator on a fully-scheduled or
- * fully-completed tournament page never polls at all, and load scales with
- * concurrently active matches, never with spectator count (every viewer
- * reads the same `react-query` cache independently).
+ * fully-completed tournament page never polls at all.
+ *
+ * Load model, stated accurately: `react-query`'s cache is per-browser, so it
+ * does NOT dedupe requests across spectators. Server load is roughly
+ * (spectators watching a live page) x (1 / interval) -- it DOES scale with
+ * viewers. What this design buys is bounding *when* that cost is paid: no
+ * polling at all unless the loaded page actually holds a live fixture, and
+ * an 8s floor per viewer. If viewer counts grow past what that supports, the
+ * next step is a shared cache (CDN/edge or server-side) or a real public
+ * broadcast channel -- not a shorter interval.
  */
 const LIVE_POLL_INTERVAL_MS = 8_000;
 

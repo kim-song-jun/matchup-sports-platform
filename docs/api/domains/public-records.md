@@ -152,10 +152,16 @@ operations console's authenticated realtime socket/takeover channel
 (`apps/v1_api/src/realtime/realtime.gateway.ts`) -- that channel is scoped to
 one authorized operator per game, not an unauthenticated fan-out audience,
 and standing up a new public broadcast channel is out of this lane's scope.
-Polling bounds server load to (concurrently live fixtures) x (poll interval)
-regardless of spectator count, since every viewer's request lands on the
-same cached-by-`react-query` data independently -- it does not scale with
-viewers, only with active matches.
+Load model (stated accurately -- an earlier draft of this section claimed
+polling load was independent of spectator count, which is wrong):
+`react-query`'s cache lives in each viewer's browser and does not dedupe
+requests across viewers, so server load is roughly
+(spectators on a page holding a live fixture) x (1 / poll interval) and
+**does** scale with viewers. What the design bounds is when that cost is
+paid: a page with no live fixture never polls, and each viewer is floored at
+an 8s interval. Past what that supports, the next step is a shared cache
+(CDN/edge or server-side) or a real public broadcast channel -- not a
+shorter interval.
 
 ### Known scope trims (documented, not silently dropped)
 

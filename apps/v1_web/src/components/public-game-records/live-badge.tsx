@@ -37,9 +37,9 @@ export function LiveBadge({ clock }: { clock: PublicGameClock | null }) {
           width: 6,
           height: 6,
           borderRadius: '50%',
-          background: clock?.isPaused ? 'var(--grey400)' : '#EF4444',
+          background: clock?.isPaused ? 'var(--grey400)' : 'var(--red500)',
           flexShrink: 0,
-          boxShadow: clock?.isPaused ? 'none' : '0 0 0 2px rgba(239,68,68,0.25)',
+          boxShadow: clock?.isPaused ? 'none' : '0 0 0 2px color-mix(in srgb, var(--red500) 25%, transparent)',
         }}
       />
       <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--red500)', letterSpacing: '0.02em' }}>

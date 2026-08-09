@@ -23,6 +23,11 @@ import type {
 } from '../games/games.types';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  cascadeCancelTeamMatchSchedulesInTx,
+  createTeamMatchScheduleInTx,
+  syncTeamMatchScheduleInTx,
+} from '../team-schedules/team-schedules.service';
 import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -339,6 +344,12 @@ export class TeamMatchesService {
         this.teamMatchGameSourceInput(created.id, source),
         this.teamMatchGameContext(user, source.actorRole, commandId, payloadHash),
       );
+      // 매치 ↔ 팀일정 연동(레인 schedule): "매치가 곧 팀일정" — 호스트는 장소·시간을 이미 확보한
+      // 상태이므로 상대팀 확정 여부와 무관하게 캘린더에 존재해야 한다. 같은 트랜잭션 안에서 호스트
+      // 팀에 가확정(SCHEDULED, 상대팀 모집 중) 스케줄 1건을 만든다. idempotency replay 분기(위
+      // existingCommand !== null 케이스)는 이 블록을 지나지 않으므로 재시도가 스케줄을 중복 생성하지
+      // 않는다 — @@unique([teamId, teamMatchId])가 그래도 마지막 방어선이다.
+      await createTeamMatchScheduleInTx(tx, dto.hostTeamId, created.id, dto.title, dates.startsAt, dates.endsAt);
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match',
@@ -413,25 +424,32 @@ export class TeamMatchesService {
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
     const dates = this.validateDates(dto);
 
-    const updated = await this.prisma.v1TeamMatch.update({
-      where: { id: teamMatch.id },
-      data: {
-        sportId: dto.sportId,
-        regionId: dto.regionId,
-        title: dto.title,
-        description: dto.description ?? null,
-        imageUrl: dto.imageUrl ?? null,
-        placeName: dto.manualPlaceName,
-        placeAddress: dto.addressText ?? null,
-        startAt: dates.startsAt,
-        endAt: dates.endsAt,
-        deadlineAt: dates.deadlineAt,
-        formatNote: dto.rulesText ?? null,
-        minSportLevelId: levelRange.minSportLevelId,
-        maxSportLevelId: levelRange.maxSportLevelId,
-        genderRule: dto.genderRule ?? null,
-        costNote: dto.costNote ?? null,
-      },
+    // 매치 ↔ 팀일정 연동(레인 schedule): 매치 제목/시간이 바뀌면 호스트 스케줄도 같은 트랜잭션 안에서
+    // 동기화해야 캘린더가 실제와 어긋나지 않는다 — 이 메서드를 트랜잭션으로 승격한다(다른 4개
+    // 메서드와 달리 여기만 단일 update() 호출이었다).
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const teamMatchUpdated = await tx.v1TeamMatch.update({
+        where: { id: teamMatch.id },
+        data: {
+          sportId: dto.sportId,
+          regionId: dto.regionId,
+          title: dto.title,
+          description: dto.description ?? null,
+          imageUrl: dto.imageUrl ?? null,
+          placeName: dto.manualPlaceName,
+          placeAddress: dto.addressText ?? null,
+          startAt: dates.startsAt,
+          endAt: dates.endsAt,
+          deadlineAt: dates.deadlineAt,
+          formatNote: dto.rulesText ?? null,
+          minSportLevelId: levelRange.minSportLevelId,
+          maxSportLevelId: levelRange.maxSportLevelId,
+          genderRule: dto.genderRule ?? null,
+          costNote: dto.costNote ?? null,
+        },
+      });
+      await syncTeamMatchScheduleInTx(tx, teamMatch.id, dto.title, dates.startsAt, dates.endsAt);
+      return teamMatchUpdated;
     });
 
     return {
@@ -462,6 +480,9 @@ export class TeamMatchesService {
         where: { teamMatchId: teamMatch.id, status: 'requested' },
         data: { status: 'rejected', reviewedByUserId: user.id, reviewedAt: new Date() },
       });
+      // 매치 ↔ 팀일정 연동(레인 schedule): teamMatchId로 연결된 SCHEDULED 스케줄(호스트/상대 최대
+      // 2건)을 같은 트랜잭션 안에서 CANCELLED로 cascade한다 — row는 삭제하지 않는다.
+      await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatch.id, dto.reason ?? 'host_cancelled');
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match',
@@ -865,6 +886,18 @@ export class TeamMatchesService {
         tx,
         application.teamMatchId,
         application.applicantTeamId,
+      );
+      // 매치 ↔ 팀일정 연동(레인 schedule): 승인된 상대팀에게도 같은 트랜잭션 안에서 스케줄을
+      // 만든다 — approveApplication은 "승인된 팀은 정확히 1개"를 이미 보장하므로(바로 아래 나머지
+      // requested 신청 자동 rejected 처리) 이 지점에서만 만들면 확정된 팀에게만 정확히 1건이
+      // 자동으로 보장된다. 이 시점엔 이미 확정 상태라 상대팀은 '가확정' 단계를 볼 일이 없다.
+      await createTeamMatchScheduleInTx(
+        tx,
+        application.applicantTeamId,
+        application.teamMatchId,
+        application.teamMatch.title,
+        application.teamMatch.startAt,
+        application.teamMatch.endAt,
       );
       await tx.v1TeamMatchApplication.updateMany({
         where: {

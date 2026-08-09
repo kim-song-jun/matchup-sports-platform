@@ -102,6 +102,11 @@ describe('TeamMatchesService', () => {
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TeamMatchApplication: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
+    // 매치 ↔ 팀일정 연동(레인 schedule): create()/approveApplication()/cancel()/update()가 같은
+    // 트랜잭션 안에서 team-schedules.service.ts의 평문 함수(createTeamMatchScheduleInTx 등)를
+    // 호출하며 이 tx 프록시(=prisma 목)를 그대로 넘긴다. v1TeamSchedule 델리게이트가 없으면
+    // "Cannot read properties of undefined"로 깨진다.
+    v1TeamSchedule: { create: jest.Mock; findMany: jest.Mock; updateMany: jest.Mock };
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
     v1Team: { findFirst: jest.Mock; findMany: jest.Mock };
@@ -124,6 +129,11 @@ describe('TeamMatchesService', () => {
       v1User: { findUnique: jest.fn().mockResolvedValue({ phone: '01012345678', profile: { realName: '매니저 실명', gender: 'male' } }) },
       v1TeamMembership: { findFirst: jest.fn(), findMany: jest.fn() },
       v1TeamMatch: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1TeamSchedule: {
+        create: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       v1TeamMatchApplication: {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),

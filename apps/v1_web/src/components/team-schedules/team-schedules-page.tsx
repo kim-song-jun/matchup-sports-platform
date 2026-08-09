@@ -115,6 +115,10 @@ export function ScheduleListPageView({ model }: { model: ScheduleListViewModel }
                   </span>
                 }
                 chev
+                // 매치 ↔ 팀일정 연동: 가확정(상대팀 미확정) MATCH 카드는 반투명 처리 — 캘린더
+                // 그리드의 "이번 달이 아닌 날"과 같은 opacity 값을 재사용한다(위 191행 부근).
+                // 색만으로 정보를 전달하지 않도록 위 trailing 배지 텍스트가 항상 함께 있다.
+                style={item.isTentative ? { opacity: 0.35 } : undefined}
               />
             ))}
           </div>
@@ -263,7 +267,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
         <Card pad={16}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
             <span className="tm-badge tm-badge-blue">{model.typeLabel}</span>
-            <span className={`tm-badge ${model.state === 'SCHEDULED' ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{model.stateLabel}</span>
+            <span className={`tm-badge ${model.stateTone === 'default' ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{model.stateLabel}</span>
             <span className="tm-badge tm-badge-grey">{model.visibilityLabel}</span>
           </div>
           <div className="tm-text-body-lg" style={{ marginBottom: 4 }}>{model.title}</div>
@@ -797,6 +801,7 @@ export function MySchedulePageView({ model }: { model: MyScheduleViewModel }) {
                   </span>
                 }
                 chev
+                style={item.isTentative ? { opacity: 0.35 } : undefined}
               />
             ))}
           </div>

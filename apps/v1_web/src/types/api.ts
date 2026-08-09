@@ -831,6 +831,12 @@ export type V1TeamScheduleSummary = {
   state: V1ScheduleState;
   version: number;
   teamMatchId: string | null;
+  /**
+   * 매치 ↔ 팀일정 연동: type이 'MATCH'일 때만 유효한 파생 필드 — TeamMatch.approvedApplicantTeamId
+   * 유무로 매 조회 시점 계산된다(false=가확정/상대팀 모집 중, true=확정). MATCH가 아닌 스케줄은
+   * 항상 null.
+   */
+  matchConfirmed: boolean | null;
   goingCount: number;
   waitlistedCount: number;
 };
@@ -887,9 +893,13 @@ export type V1TeamScheduleMutationResult = {
   state: V1ScheduleState;
   version: number;
   teamMatchId: string | null;
+  matchConfirmed: boolean | null;
   replayed: boolean;
 };
 
+// 매치 ↔ 팀일정 연동: MATCH 타입 스케줄은 이제 TeamMatchesService가 트랜잭션 안에서만 만든다 —
+// 이 공개 create 경로는 teamMatchId를 더 이상 받지 않는다(백엔드 CreateScheduleDto와 대칭,
+// team-schedules.service.ts의 SCHEDULE_MATCH_TYPE_SYSTEM_ONLY 참고).
 export type V1CreateScheduleDto = {
   title: string;
   type: V1ScheduleType;
@@ -899,7 +909,6 @@ export type V1CreateScheduleDto = {
   capacity?: number;
   rsvpDeadlineAt?: string;
   visibility?: V1ScheduleVisibility;
-  teamMatchId?: string;
 };
 
 export type V1UpdateScheduleDto = {

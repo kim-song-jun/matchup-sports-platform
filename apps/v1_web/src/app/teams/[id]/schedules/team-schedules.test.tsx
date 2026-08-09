@@ -108,6 +108,7 @@ function scheduleSummary(overrides: Partial<V1TeamScheduleSummary> = {}): V1Team
     state: 'SCHEDULED',
     version: 0,
     teamMatchId: null,
+    matchConfirmed: null,
     goingCount: 5,
     waitlistedCount: 2,
     ...overrides,

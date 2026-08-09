@@ -213,6 +213,7 @@ let v1ScheduleFixture = {
   state: 'SCHEDULED' as 'SCHEDULED' | 'CANCELLED' | 'COMPLETED',
   version: 1,
   teamMatchId: null as string | null,
+  matchConfirmed: null as boolean | null,
   cancelReason: null as string | null,
   cancelledAt: null as string | null,
 };
@@ -270,6 +271,7 @@ function scheduleSummary() {
     state: v1ScheduleFixture.state,
     version: v1ScheduleFixture.version,
     teamMatchId: v1ScheduleFixture.teamMatchId,
+    matchConfirmed: v1ScheduleFixture.matchConfirmed,
     goingCount: v1ScheduleAttendanceCounts.going,
     waitlistedCount: v1ScheduleAttendanceCounts.waitlisted,
   };
@@ -310,6 +312,7 @@ function scheduleMutationResult(replayed = false) {
     state: v1ScheduleFixture.state,
     version: v1ScheduleFixture.version,
     teamMatchId: v1ScheduleFixture.teamMatchId,
+    matchConfirmed: v1ScheduleFixture.matchConfirmed,
     replayed,
   };
 }
@@ -893,7 +896,10 @@ export const v1MswHandlers = [
       capacity: body.capacity ?? null,
       rsvpDeadlineAt: body.rsvpDeadlineAt ?? null,
       visibility: body.visibility ?? 'TEAM',
-      teamMatchId: body.teamMatchId ?? null,
+      // 매치 ↔ 팀일정 연동: teamMatchId는 V1CreateScheduleDto에서 제거됐다 — MATCH 타입
+      // 스케줄은 이제 TeamMatchesService가 시스템으로만 만든다. 이 mock 경로는 항상 TRAINING/
+      // EVENT만 받으므로 teamMatchId/matchConfirmed는 v1ScheduleFixture의 기존 값(null)을
+      // 그대로 spread로 물려받는다.
       state: 'SCHEDULED',
       version: 1,
       cancelReason: null,

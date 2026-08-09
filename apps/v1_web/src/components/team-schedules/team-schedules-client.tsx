@@ -46,11 +46,10 @@ import {
   isScheduleMemberRole,
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
+  matchScheduleDisplay,
   scheduleCreatableTypeOptions,
   scheduleRsvpDeadlineLabel,
   scheduleStateFilterOptions,
-  scheduleStateLabel,
-  scheduleStateTone,
   scheduleTypeFilterOptions,
   scheduleTypeLabel,
   scheduleVisibilityLabel,
@@ -280,13 +279,16 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     history.push({ label: '완료 처리됨', detail: null });
   }
 
+  const matchDisplay = schedule ? matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed) : null;
+
   const model: ScheduleDetailViewModel = {
     teamId,
     scheduleId,
     backHref,
     title: schedule?.title ?? '불러오는 중…',
     typeLabel: schedule ? scheduleTypeLabel(schedule.type) : '',
-    stateLabel: schedule ? scheduleStateLabel(schedule.state) : '',
+    stateLabel: matchDisplay?.stateLabel ?? '',
+    stateTone: matchDisplay?.stateTone ?? 'default',
     state: schedule?.state ?? 'SCHEDULED',
     dateTimeLabel: schedule ? formatTournamentDateRangeWithTime(schedule.startAt, schedule.endAt) ?? '일정 미정' : '',
     visibilityLabel: schedule ? scheduleVisibilityLabel(schedule.visibility) : '',
@@ -576,18 +578,22 @@ export function MySchedulePageClient() {
       { value: 'cancelled', label: '취소됨' },
       { value: 'completed', label: '완료' },
     ],
-    items: (query.data?.items ?? []).map((item) => ({
-      id: item.id,
-      teamId: item.teamId,
-      teamName: item.teamName ?? '팀',
-      title: item.title,
-      typeLabel: scheduleTypeLabel(item.type),
-      stateLabel: scheduleStateLabel(item.state),
-      stateTone: scheduleStateTone(item.state),
-      dateTimeLabel: formatTournamentDateRangeWithTime(item.startAt, item.endAt) ?? '일정 미정',
-      myAttendanceLabel: item.myAttendanceStatus ? attendanceStatusLabel(item.myAttendanceStatus) : null,
-      href: `/teams/${item.teamId}/schedules/${item.id}`,
-    })),
+    items: (query.data?.items ?? []).map((item) => {
+      const display = matchScheduleDisplay(item.type, item.state, item.matchConfirmed);
+      return {
+        id: item.id,
+        teamId: item.teamId,
+        teamName: item.teamName ?? '팀',
+        title: item.title,
+        typeLabel: scheduleTypeLabel(item.type),
+        stateLabel: display.stateLabel,
+        stateTone: display.stateTone,
+        isTentative: display.isTentative,
+        dateTimeLabel: formatTournamentDateRangeWithTime(item.startAt, item.endAt) ?? '일정 미정',
+        myAttendanceLabel: item.myAttendanceStatus ? attendanceStatusLabel(item.myAttendanceStatus) : null,
+        href: `/teams/${item.teamId}/schedules/${item.id}`,
+      };
+    }),
     loading: query.isLoading,
     error: query.isError,
     onRetry: () => void query.refetch(),

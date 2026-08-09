@@ -328,9 +328,15 @@ type ListItemProps = {
   trailing?: ReactNode;
   chev?: boolean;
   href?: string;
+  /**
+   * "덜 강조" 처리(예: 가확정 매치 카드의 반투명)를 위한 선택적 style 전달 — 기본값 없음, 넘기지
+   * 않으면 기존 렌더링과 완전히 동일하다. 색/투명도만으로 정보를 전달하면 안 되므로 항상 trailing
+   * 배지 텍스트와 함께 쓴다(호출부 책임).
+   */
+  style?: CSSProperties;
 };
 
-export function ListItem({ title, sub, trailing, chev, href }: ListItemProps) {
+export function ListItem({ title, sub, trailing, chev, href, style }: ListItemProps) {
   const content = (
     <>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -346,11 +352,11 @@ export function ListItem({ title, sub, trailing, chev, href }: ListItemProps) {
   );
 
   return href ? (
-    <Link className="tm-list-row tm-pressable" href={href}>
+    <Link className="tm-list-row tm-pressable" href={href} style={style}>
       {content}
     </Link>
   ) : (
-    <div className="tm-list-row">
+    <div className="tm-list-row" style={style}>
       {content}
     </div>
   );

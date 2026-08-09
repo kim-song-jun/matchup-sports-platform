@@ -222,7 +222,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
           router.push(result.detailRoute || `/team-matches/${result.teamMatchId}`);
         },
         onError: (err) => {
-          const prompt = getCreatorProfilePrompt(err, '팀 매치');
+          const prompt = getCreatorProfilePrompt(err, '팀매치');
           if (prompt) {
             setError(prompt);
             void confirm({

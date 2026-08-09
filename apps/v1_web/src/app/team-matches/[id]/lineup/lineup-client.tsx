@@ -368,7 +368,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       code === 'PERMISSION_DENIED'
         ? '팀장 또는 매니저만 라인업을 관리할 수 있어요.'
         : code === 'TEAM_MATCH_NOT_FOUND'
-          ? '팀 매치를 찾을 수 없어요.'
+          ? '팀매치를 찾을 수 없어요.'
           : code === 'TEAM_MATCH_GAME_REQUIRED'
             ? '경기 정보가 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요.'
             : extractErrorMessage(lineupQuery.error, '라인업을 불러오지 못했어요.');
@@ -437,7 +437,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         {conflict ? (
           <div style={{ marginBottom: 12 }}>
             <Card pad={14} style={{ background: 'var(--red50)' }}>
-              <p className="tm-text-label" style={{ color: 'var(--red600, #c0392b)', fontWeight: 700, marginBottom: 8 }}>
+              <p className="tm-text-label" style={{ color: 'var(--red700)', fontWeight: 700, marginBottom: 8 }}>
                 라인업이 그새 변경됐어요.
               </p>
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 12 }}>
@@ -466,7 +466,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         <Card pad={16} style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <div className="tm-text-body-lg" style={{ fontWeight: 700 }}>
-              {teamMatchQuery.data?.title ?? '팀 매치'}
+              {teamMatchQuery.data?.title ?? '팀매치'}
             </div>
             <span className={`tm-badge ${phase.editable ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{phase.label}</span>
           </div>

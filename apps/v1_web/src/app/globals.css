@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Tailwind v4 커스텀 폰트 크기 유틸리티 — @theme 블록 안에서 정의해야 text-2xs 등의
+ * 클래스가 실제 CSS로 생성된다(v3의 tailwind.config.js theme.extend 대응).
+ * --font-size-micro(11px, :root 아래)와 값을 맞춘다. */
+@theme {
+  --text-2xs: 11px;
+  --text-2xs--line-height: 14px;
+}
+
 @font-face {
   font-family: "Pretendard Variable";
   src: url("/fonts/PretendardVariable.woff2") format("woff2");
@@ -218,6 +226,37 @@
      거의 안 보였다. 4/1로 완화해 세로 가시 영역을 넓혀 사진 하단부가 안정적으로
      드러나도록 함(1440px 데스크톱 실측: 라이브 스크린샷으로 확인 완료). */
   --tm-tournament-banner-ratio: 4 / 1;
+}
+
+/* ── [레인 C] 핵심 다크모드 토큰 ────────────────────────────────────────────
+ * team-schedules / team-matches 화면은 여기까지만 커버(토큰 참조 소비처에 자동
+ * 전파). 개별 화면의 하드코딩 색(Tailwind gray-*, 인라인 hex 등)은 이번 범위 밖 —
+ * 남은 작업으로 PR 본문에 기록한다. tournament-ops(운영 콘솔)는 이미 Tailwind
+ * `dark:` 클래스를 전면 사용 중이라 이 토큰과 무관하게 별도로 대응돼 있다.
+ * `@theme` 안이 아니라 `:root`를 오버라이드하므로 Tailwind 유틸리티가 아니라
+ * var(--token)을 직접 참조하는 컴포넌트 스타일에 적용된다. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #121317;
+    --background: var(--bg);
+    --surface: #1c1e24;
+    --surface-soft: #24262d;
+    --foreground: #f2f4f6;
+    --text-strong: #f2f4f6;
+    --text: #d1d6db;
+    --text-body: #d1d6db;
+    --text-muted: #9aa4b2;
+    --text-caption: #9aa4b2;
+    --muted: var(--text-muted);
+    --border: #333a45;
+    --border-strong: #4e5968;
+    --line: var(--border);
+    --card-surface: #1c1e24;
+    --list-row-bg: #1a1c22;
+    --list-row-border: #262932;
+    --input-surface: var(--surface);
+  }
 }
 
 * {

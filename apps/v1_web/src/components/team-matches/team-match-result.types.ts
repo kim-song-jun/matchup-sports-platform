@@ -132,6 +132,13 @@ export function hydrateResultFormFromRevision(revision: V1GameResultRevision): {
   };
 }
 
+/** 운영 콘솔(tournament-ops)과 같은 카드 판정 용어로 통일 — "경고"/"퇴장" 대신
+ * "옐로카드"/"레드카드"를 쓴다(같은 사건을 화면마다 다른 단어로 부르지 않기 위함). */
+export const CARD_TYPE_LABEL: Record<'yellow' | 'red', string> = {
+  yellow: '옐로카드',
+  red: '레드카드',
+};
+
 export const RESULT_REVISION_STATE_LABEL: Record<V1GameResultRevisionState, string> = {
   DRAFT: '작성 중',
   SUBMITTED: '상대팀 승인 대기',

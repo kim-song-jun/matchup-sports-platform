@@ -533,7 +533,7 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
       ) : null}
 
       {model.manage?.editPanel?.open ? (
-        <div style={{ marginTop: 12, borderTop: '1px solid var(--border-subtle, #eee)', paddingTop: 12 }}>
+        <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
           <TextField
             label="모집 인원"
             type="number"
@@ -571,7 +571,7 @@ function GuestRecruitmentSection({ model }: { model: ScheduleDetailViewModel['gu
       ) : null}
 
       {model.applicationForm ? (
-        <div style={{ marginTop: 12, borderTop: '1px solid var(--border-subtle, #eee)', paddingTop: 12 }}>
+        <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
           {/* successMessage는 visible(=아직 미신청) 게이트 밖에 둔다 — 신청 성공 직후
               visible이 false로 바뀌어도 "신청했어요" 확인 메시지는 계속 보여야 한다. */}
           {model.applicationForm.successMessage ? (

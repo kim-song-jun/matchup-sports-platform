@@ -33,6 +33,26 @@ const REVIEWED_NON_ADDITIVE = [
       "team-schedules.service.ts); this index is the author's last-resort DB defense (#296), not a new " +
       'shape old writers can trip. Alpha currently holds 0 rows with a non-NULL team_match_id. Reviewed 2026-08-09.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260809140000_v1_tournament_group_natural_key/migration.sql',
+    statement:
+      'CREATE UNIQUE INDEX "v1_tournament_groups_tournament_id_name_key" ON "v1_tournament_groups"("tournament_id", "name")',
+    reason:
+      'Natural-key unique that lets the alpha QA seed upsert tournament groups instead of delete-recreate ' +
+      '(Part 2 of the append-only-audit deadlock fix). The QA seed already creates exactly one group per ' +
+      '(tournament, name); no other writer creates tournament groups. Verified 0 duplicate (tournament_id, ' +
+      'name) rows on alpha AND prod before adding. Reviewed 2026-08-09.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260809140100_v1_tournament_fixture_natural_key/migration.sql',
+    statement:
+      'CREATE UNIQUE INDEX "v1_tournament_fixtures_tournament_round_number_leg_key" ON "v1_tournament_fixtures"("tournament_id", "round", "fixture_number", "leg_number")',
+    reason:
+      'Natural-key unique that lets the alpha QA seed upsert fixtures instead of delete-recreate (Part 2). ' +
+      'Fixtures are deterministic per (tournament, round, fixture_number, leg_number) in both the QA seed and ' +
+      'the bracket generator. Verified 0 duplicate rows on that key on alpha AND prod (prod has 0 fixtures) ' +
+      'before adding. Reviewed 2026-08-09.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

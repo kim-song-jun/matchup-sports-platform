@@ -2153,6 +2153,7 @@ model V1TournamentGroup {
   fixtures   V1TournamentFixture[]
   standings  V1TournamentStanding[]
 
+  @@unique([tournamentId, name], map: "v1_tournament_groups_tournament_id_name_key")
   @@index([tournamentId, phase, sortOrder])
   @@map("v1_tournament_groups")
 }
@@ -2214,6 +2215,7 @@ model V1TournamentFixture {
   advancementTargets V1TournamentFixtureAdvancementEdge[] @relation("V1FixtureAdvancementTarget")
 
   @@unique([tournamentId, id], map: "v1_tournament_fixtures_tournament_id_id_key")
+  @@unique([tournamentId, round, fixtureNumber, legNumber], map: "v1_tournament_fixtures_tournament_round_number_leg_key")
   @@index([tournamentId, round, fixtureNumber])
   @@index([groupId])
   @@index([parentFixtureId])

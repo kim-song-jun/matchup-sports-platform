@@ -91,8 +91,22 @@ export const gameSchemaFixture = {
 // Every one of these migrations is a new file; the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration`
 // stays as it was.
+// Re-pinned for the tournament natural-key lane (Part 2 upsert foundation):
+// V1TournamentGroup gained @@unique([tournamentId, name]) and
+// V1TournamentFixture gained @@unique([tournamentId, round, fixtureNumber,
+// legNumber]) — the natural keys the alpha QA seed will upsert on instead of
+// delete-then-recreate. Additive-only index attributes; no column/type/FK
+// changed shape. Two new migration files back them
+// (20260809140000_v1_tournament_group_natural_key,
+// 20260809140100_v1_tournament_fixture_natural_key); the bound
+// 20260729000100_v1_game_operations migration is untouched.
+//
+// The natural-key lane and the pause-aware clock met here: each had pinned the
+// hash of its own schema.prisma while schema.prisma itself merged cleanly. The
+// value below is the sha256 of the MERGED file, produced by running
+// `shasum -a 256` against it — neither branch's standalone value.
 export const gameSchemaSourceManifest = {
-  schema: '56c2e2bae5de12c745b43128d425e301d7e81ff929f189e61e8fca49fbfb1d11',
+  schema: 'a291d5f4fa84d6b11e31ee83972e1c83f8116e9e1ada00aacb3f023d2a7fd5a2',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -120,7 +120,7 @@ export function SignupClient() {
   useEffect(() => {
     const documentIds = readSignupTermsDocumentIds();
     if (documentIds.length === 0) {
-      router.replace('/terms');
+      router.replace('/terms?mode=signup');
       return;
     }
     setAcceptedTermsDocumentIds(documentIds);
@@ -233,7 +233,7 @@ export function SignupClient() {
       advanceTimerRef.current = null;
     }
     if (step === 'account') {
-      router.push('/terms');
+      router.push('/terms?mode=signup');
       return;
     }
     // 인증 단계로 되돌아와도 이미 받은 증명은 유지한다 — 되돌아왔다는 이유로 재인증을 시키면
@@ -357,7 +357,7 @@ export function SignupClient() {
         return;
       }
       if (nextError instanceof V1ApiError && (nextError.code === 'TERMS_REQUIRED' || nextError.code === 'TERMS_DOCUMENT_STALE')) {
-        router.replace('/terms');
+        router.replace('/terms?mode=signup');
         return;
       }
       setError(nextError instanceof Error ? nextError.message : '회원가입에 실패했어요.');
@@ -406,11 +406,11 @@ export function SignupClient() {
   return (
     <AuthFrame
       // 이 화면만 상단바 없이 렌더돼 회원가입을 시작하면 빠져나갈 컨트롤이 없었다.
-      // 뒤로가기 목적지는 이미 getSignupFormViewModel().backHref 로 선언돼 있던 '/terms'
+      // 뒤로가기 목적지는 이미 getSignupFormViewModel().backHref 로 선언돼 있던 '/terms?mode=signup'
       // (직전 단계)를 그대로 쓴다 — 약관 화면에 다시 /login 으로 나가는 뒤로가기가 있어
       // /signup → /terms → /login 으로 로그인 화면까지 이어진다.
       topTitle="회원가입"
-      backHref="/terms"
+      backHref="/terms?mode=signup"
       fixedAction={
         <>
           <button

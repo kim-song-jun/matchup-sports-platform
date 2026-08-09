@@ -2398,6 +2398,11 @@ button:disabled {
   background: var(--blue500);
 }
 
+/* 레인 wizard/A: 이미 지나온 스텝인데 필수 필드가 채워졌으면 green으로 "완료" 표시 */
+.tm-create-bars span[data-complete="true"] {
+  background: var(--green500);
+}
+
 .tm-create-sport-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2509,6 +2514,20 @@ button:disabled {
   min-height: 72px;
   align-items: flex-start;
   padding-top: 12px;
+}
+
+/* 레인 wizard/A: 스텝 게이팅·결측 필드 인라인 에러 — 색상 단독 전달 금지, 아이콘+문구 병행 */
+.tm-create-input-error {
+  border-color: var(--orange500);
+}
+
+.tm-create-field-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  color: var(--orange500);
+  font-size: var(--font-size-caption);
 }
 
 .tm-team-description-input {

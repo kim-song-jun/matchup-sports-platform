@@ -195,6 +195,39 @@ export class MatchesService {
     };
   }
 
+  /**
+   * #3 1단계: 새 Venue 테이블 없이, 이 사용자가 과거에 실제로 입력했던 장소를
+   * 최근 것부터 최대 5개 돌려준다. 위저드의 장소 입력창 포커스 시 칩으로
+   * 노출해 탭 한 번으로 채울 수 있게 한다.
+   *
+   * Prisma `distinct`는 Postgres `DISTINCT ON`으로 컴파일되는데, 이때
+   * `orderBy`가 distinct 필드로 시작해야 한다 — `distinct: ['placeName']` +
+   * `orderBy: { createdAt: 'desc' }` 조합은 "최근순 distinct 장소"라는 의도와
+   * 어긋난다(team-match-series-admin.service.ts의 loadRecentVenues와 동일한
+   * 이유로, 넉넉히 가져온 뒤 애플리케이션에서 dedup한다).
+   */
+  async recentVenues(user: V1AuthUser) {
+    const rows = await this.prisma.v1Match.findMany({
+      where: { hostUserId: user.id, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: { placeName: true, placeAddress: true },
+    });
+    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(team-match-series-admin
+    // .service.ts의 loadRecentVenues와 동일한 방어) — 안 하면 공백만 다른 "중복" 장소가
+    // 서로 다른 칩으로 뜨거나, 공백뿐인 값이 빈 칩으로 렌더될 수 있다.
+    const seen = new Set<string>();
+    const items: { placeName: string; addressText: string | null }[] = [];
+    for (const row of rows) {
+      const placeName = row.placeName.trim();
+      if (!placeName || seen.has(placeName)) continue;
+      seen.add(placeName);
+      items.push({ placeName, addressText: row.placeAddress });
+      if (items.length >= 5) break;
+    }
+    return { items };
+  }
+
   async applicationEligibility(user: V1AuthUser, matchId: string) {
     const match = await this.prisma.v1Match.findFirst({
       where: { id: matchId, deletedAt: null },

@@ -5,6 +5,7 @@ import { AdminPageHeader, AdminDataTable, AdminStatusPill, AdminToasts, useAdmin
 import { useV1AdminTeamMatchSeries, useV1GenerateSeriesFixtures, useV1UpdateSeriesFixture } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
+import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import type { V1SeriesFixture } from '@/types/team-match-series';
 
 const inputClass =
@@ -122,28 +123,11 @@ export default function TeamMatchSeriesFixturesClient({ seriesId }: { seriesId: 
               라운드로빈 대진 생성
             </button>
           </div>
-          {(series.recentVenues ?? []).length > 0 && (
-            <div>
-              <span className="mb-1 block text-sm font-medium text-gray-900">최근 사용한 장소</span>
-              <div className="flex flex-wrap gap-2">
-                {(series.recentVenues ?? []).map((venue) => (
-                  <button
-                    key={venue}
-                    type="button"
-                    onClick={() => setPlaceName(venue)}
-                    aria-pressed={placeName === venue}
-                    className={`flex min-h-[44px] items-center rounded-full border px-3 text-sm transition-colors ${
-                      placeName === venue
-                        ? 'border-blue-300 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700'
-                    }`}
-                  >
-                    {venue}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <RecentVenueChips
+            items={(series.recentVenues ?? []).map((venue) => ({ placeName: venue }))}
+            selectedValue={placeName}
+            onSelect={(venue) => setPlaceName(venue.placeName)}
+          />
           <p className="text-xs text-gray-500">
             요일·시각을 정하면 매주 그 요일 그 시각으로 채워요. 비워두면 시작일 그대로 매주 반복돼요.
             생성 후 특정 주만 다르면 아래 표에서 개별 수정하면 돼요.

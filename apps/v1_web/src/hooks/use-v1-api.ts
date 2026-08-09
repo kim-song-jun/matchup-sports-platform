@@ -91,6 +91,7 @@ import type {
   V1MatchUpdatePayload,
   V1MyActivitySummary,
   V1MyJoinApplicationsPage,
+  V1RecentVenue,
   V1MyRegionUpdateResult,
   V1MyTeamsResponse,
   V1MyTeamMatch,
@@ -626,6 +627,19 @@ export function useV1MatchEdit(matchId: string) {
   });
 }
 
+/**
+ * #3 1단계: 개인 매치 위저드의 장소 입력창 포커스 시 보여줄 최근 사용 장소 칩.
+ * 로그인 사용자만 호출 가능(서버가 hostUserId=현재 사용자로 조회) — 위저드는 항상
+ * 로그인 상태에서만 진입하므로 별도 enabled 게이트가 필요 없다.
+ */
+export function useV1MyRecentVenues() {
+  return useQuery({
+    queryKey: v1Keys.myRecentVenues(),
+    queryFn: () => v1Get<{ items: V1RecentVenue[] }>('/matches/me/recent-venues'),
+    staleTime: 60_000,
+  });
+}
+
 export function useV1MatchApplicationEligibility(matchId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: [...v1Keys.match(matchId), 'application-eligibility'] as const,
@@ -770,6 +784,20 @@ export function useV1Teams(filters?: ListFilters, options?: QueryOptions) {
     queryKey: v1Keys.teams(filters),
     queryFn: () => v1Get<CursorPage<V1Team>>('/teams', filters),
     enabled: options?.enabled,
+  });
+}
+
+/**
+ * #3 1단계: 팀매치 위저드의 장소 입력창 포커스 시 보여줄, 이 팀이 호스트로 과거에
+ * 실제로 입력했던 장소 칩. team 스텝에서 팀을 고르기 전에는 teamId가 비어 있어
+ * enabled=false로 대기한다.
+ */
+export function useV1TeamRecentVenues(teamId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamRecentVenues(teamId),
+    queryFn: () => v1Get<{ items: V1RecentVenue[] }>(`/teams/${teamId}/recent-venues`),
+    enabled: Boolean(teamId),
+    staleTime: 60_000,
   });
 }
 

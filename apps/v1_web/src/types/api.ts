@@ -409,6 +409,9 @@ export type V1Match = {
   ctaState?: string;
 };
 
+/** #3 1단계: 위저드 장소 입력창 포커스 시 노출하는 최근 사용 장소 칩. */
+export type V1RecentVenue = { placeName: string; addressText: string | null };
+
 export type V1MatchEdit = {
   matchId: string;
   editable: boolean;

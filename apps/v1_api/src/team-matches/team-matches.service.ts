@@ -83,12 +83,17 @@ export class TeamMatchesService {
         ...(query.teamId ? { hostTeamId: query.teamId } : {}),
         ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
         ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
+        // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
+        // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
+        // 경기가 0건으로 나왔다.
         ...(query.query
           ? {
               OR: [
                 { title: { contains: query.query, mode: 'insensitive' } },
                 { description: { contains: query.query, mode: 'insensitive' } },
                 { placeName: { contains: query.query, mode: 'insensitive' } },
+                { hostTeam: { name: { contains: query.query, mode: 'insensitive' } } },
+                { region: { name: { contains: query.query, mode: 'insensitive' } } },
               ],
             }
           : {}),
@@ -166,6 +171,41 @@ export class TeamMatchesService {
           : null,
       viewer,
     };
+  }
+
+  /**
+   * #3 1단계: 새 Venue 테이블 없이, 이 팀이 호스트로 과거에 실제로 입력했던 장소를
+   * 최근 것부터 최대 5개 돌려준다. 위저드의 장소 입력창 포커스 시 칩으로
+   * 노출해 탭 한 번으로 채울 수 있게 한다. 팀 관리자만 조회할 수 있게
+   * assertCanManageTeam로 게이팅(생성 권한과 동일한 기준).
+   *
+   * Prisma `distinct`는 Postgres `DISTINCT ON`으로 컴파일되는데, 이때
+   * `orderBy`가 distinct 필드로 시작해야 한다 — `distinct: ['placeName']` +
+   * `orderBy: { createdAt: 'desc' }` 조합은 "최근순 distinct 장소"라는 의도와
+   * 어긋난다(team-match-series-admin.service.ts의 loadRecentVenues와 동일한
+   * 이유로, 넉넉히 가져온 뒤 애플리케이션에서 dedup한다).
+   */
+  async recentVenues(user: V1AuthUser, teamId: string) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const rows = await this.prisma.v1TeamMatch.findMany({
+      where: { hostTeamId: teamId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: { placeName: true, placeAddress: true },
+    });
+    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(team-match-series-admin
+    // .service.ts의 loadRecentVenues와 동일한 방어) — 안 하면 공백만 다른 "중복" 장소가
+    // 서로 다른 칩으로 뜨거나, 공백뿐인 값이 빈 칩으로 렌더될 수 있다.
+    const seen = new Set<string>();
+    const items: { placeName: string; addressText: string | null }[] = [];
+    for (const row of rows) {
+      const placeName = row.placeName.trim();
+      if (!placeName || seen.has(placeName)) continue;
+      seen.add(placeName);
+      items.push({ placeName, addressText: row.placeAddress });
+      if (items.length >= 5) break;
+    }
+    return { items };
   }
 
   async applicationEligibility(

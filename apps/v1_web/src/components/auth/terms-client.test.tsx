@@ -140,7 +140,9 @@ describe('TermsClient GA events (email signup)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
-    searchParamsValue = new URLSearchParams();
+    // 이메일 가입 흐름은 /terms?mode=signup 으로 들어온다 — 쿼리 없는 /terms 는 이제
+    // 읽으러 온 방문자의 이용약관 화면이다.
+    searchParamsValue = new URLSearchParams('mode=signup');
     currentTermsValue = currentTerms();
   });
 
@@ -294,5 +296,54 @@ describe('TermsClient existing-user renewal contract', () => {
       '',
       window.location.href,
     );
+  });
+});
+
+/**
+ * 쿼리 없는 /terms 는 외부 유입(북마크·검색엔진·공유 링크)의 도착지다. 예전에는 여기서
+ * 가입 동의 게이트가 떠서 이용약관 본문에 도달할 방법이 없었다 — alpha 실측으로 본문
+ * 290자(제1조 없음) vs `?document=terms` 1910자였다.
+ *
+ * 가입 진입은 ?mode=signup 으로 명시됐으므로, 아래 세 갈래가 서로를 침범하지 않아야 한다.
+ */
+describe('TermsClient entry routing contract', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    currentTermsValue = currentTerms();
+  });
+
+  it('shows the service terms document when /terms is opened with no query', () => {
+    searchParamsValue = new URLSearchParams();
+
+    render(<TermsClient />);
+
+    expect(screen.getByRole('heading', { name: '서비스 이용약관' })).toBeInTheDocument();
+    // 동의 게이트가 아니어야 한다 — 읽으러 온 사람에게 체크박스를 들이밀지 않는다.
+    // '전체 동의'는 게이트가 렌더되면 동의 여부와 무관하게 항상 있는 컨트롤이다
+    // (하단 CTA 라벨은 '필수 약관에 동의해 주세요' ↔ '동의하고 회원가입하기'로 바뀌어
+    // 게이트 존재 여부를 판정하는 기준으로는 쓸 수 없다).
+    expect(screen.queryByRole('button', { name: /전체 동의/ })).toBeNull();
+  });
+
+  it('still shows the consent gate for the signup entry', () => {
+    searchParamsValue = new URLSearchParams('mode=signup');
+
+    render(<TermsClient />);
+
+    expect(screen.getByRole('button', { name: /전체 동의/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '서비스 이용약관' })).toBeNull();
+  });
+
+  it('keeps the re-consent gate on bare /terms for a non-compliant account', () => {
+    // pending-social-signup-gate 는 /terms 에서 리다이렉트를 걸지 않는다(무한 루프 방지).
+    // 그래서 재동의 대상은 쿼리가 없어도 이 화면이 직접 막아야 한다 — 여기서 본문을
+    // 보여주면 재동의를 건너뛰게 된다.
+    searchParamsValue = new URLSearchParams();
+    currentTermsValue = { ...currentTerms(), compliance: { compliant: false } };
+
+    render(<TermsClient />);
+
+    expect(screen.queryByRole('heading', { name: '서비스 이용약관' })).toBeNull();
   });
 });

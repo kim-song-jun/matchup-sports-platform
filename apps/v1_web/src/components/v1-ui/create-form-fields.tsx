@@ -358,6 +358,7 @@ export function PresetChipSelector({
         <input
           className="tm-create-native-input"
           style={{ marginTop: 8, width: '100%' }}
+          aria-label={`${label} 직접입력`}
           value={value}
           placeholder={freeTextPlaceholder}
           onChange={(event) => onChange(event.target.value)}
@@ -453,6 +454,7 @@ export function MultiPresetChipSelector({
         <input
           className="tm-create-native-input"
           style={{ marginTop: 8, width: '100%' }}
+          aria-label={`${label} 직접입력`}
           value={customValue}
           placeholder={freeTextPlaceholder}
           onChange={(event) => applyCustom(event.target.value)}

@@ -346,6 +346,53 @@ describe('TeamMatchesService', () => {
     });
   });
 
+  // Copilot 리뷰 finding(PR #295): matchFormat/matchStyle/uniformColor를 dto 값 그대로
+  // (trim 없이) 저장하면 공백뿐인 문자열이 남아, "구조화 필드가 채워져 있다"는 잘못된
+  // 판정(hasStructuredConditions)으로 이어질 수 있다. 저장 직전에 항상 trim되는지 검증한다.
+  it('create: matchFormat/matchStyle/uniformColor 공백을 trim하고, 공백뿐인 항목은 제거한다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({
+      id: 'mem-1',
+      team: { sportId: 'sport-1' },
+    });
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Team.findFirst.mockResolvedValue({
+      id: 'team-host',
+      name: 'Host Team',
+      memberships: [{ id: 'mem-1', userId: manager.id, role: 'owner', user: { profile: { nickname: '매니저', displayName: null } } }],
+    });
+    prisma.v1TeamMatch.create.mockResolvedValue(teamMatchRow());
+    prisma.v1StatusChangeLog.create.mockResolvedValue({});
+    games.createFromSourceInTransaction.mockResolvedValue({
+      gameId: 'game-1',
+      sourceType: 'TEAM_MATCH',
+      sourceId: 'tm-1',
+      competitionConfigVersionId: 'config-1',
+      state: 'SCHEDULED',
+      version: 0,
+    });
+
+    await service.create(manager, {
+      hostTeamId: 'team-host',
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '경기조건 trim 검증 팀매치',
+      startsAt: FUTURE.toISOString(),
+      manualPlaceName: '잠실',
+      matchFormat: '  6:6  ',
+      matchStyle: ['  친선  ', '   ', '매너 중시'],
+      uniformColor: '  ',
+    });
+
+    expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        matchFormat: '6:6',
+        matchStyle: ['친선', '매너 중시'],
+        uniformColor: null,
+      }),
+    });
+  });
+
   it('update: host team 종목과 다른 종목으로 변경할 수 없다', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(
       teamMatchRow({ hostTeam: { sportId: 'sport-football' } }),

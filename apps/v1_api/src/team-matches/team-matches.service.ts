@@ -304,6 +304,18 @@ export class TeamMatchesService {
     };
   }
 
+  // Copilot 리뷰 finding(PR #295): matchFormat/matchStyle/uniformColor를 dto 값 그대로
+  // (trim 없이) 저장하면 공백뿐인 문자열이 DB에 남을 수 있다 — 그러면
+  // hasStructuredConditions(team-matches-create-client.tsx) 판정이 "구조화 필드가 채워져
+  // 있다"고 잘못 보고, 정작 표시할 값은 없는 채로 레거시 formatNote 폴백이 영구히 막힌다.
+  // create/update 양쪽에서 같은 정규화를 쓰도록 한 곳에 모은다.
+  private normalizeMatchConditionFields(dto: MutateTeamMatchDto) {
+    const matchFormat = dto.matchFormat?.trim() || null;
+    const matchStyle = (dto.matchStyle ?? []).map((item) => item.trim()).filter(Boolean);
+    const uniformColor = dto.uniformColor?.trim() || null;
+    return { matchFormat, matchStyle, uniformColor };
+  }
+
   async create(
     user: V1AuthUser,
     dto: MutateTeamMatchDto,
@@ -359,6 +371,7 @@ export class TeamMatchesService {
         user.id,
       );
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
+      const conditionFields = this.normalizeMatchConditionFields(dto);
       const created = await tx.v1TeamMatch.create({
         data: {
           hostTeamId: dto.hostTeamId,
@@ -374,9 +387,9 @@ export class TeamMatchesService {
           endAt: dates.endsAt,
           deadlineAt: dates.deadlineAt,
           formatNote: dto.rulesText ?? null,
-          matchFormat: dto.matchFormat ?? null,
-          matchStyle: dto.matchStyle ?? [],
-          uniformColor: dto.uniformColor ?? null,
+          matchFormat: conditionFields.matchFormat,
+          matchStyle: conditionFields.matchStyle,
+          uniformColor: conditionFields.uniformColor,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
@@ -478,6 +491,7 @@ export class TeamMatchesService {
     // 메서드와 달리 여기만 단일 update() 호출이었다). 경기조건 구조화 필드(matchFormat/matchStyle/
     // uniformColor)는 이 트랜잭션 승격과 별개로 함께 저장해야 한다 — 둘 중 하나만 반영하면
     // 일정 동기화가 빠지거나 새 경기조건 저장이 무효화된다.
+    const conditionFields = this.normalizeMatchConditionFields(dto);
     const updated = await this.prisma.$transaction(async (tx) => {
       const teamMatchUpdated = await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
@@ -493,9 +507,9 @@ export class TeamMatchesService {
           endAt: dates.endsAt,
           deadlineAt: dates.deadlineAt,
           formatNote: dto.rulesText ?? null,
-          matchFormat: dto.matchFormat ?? null,
-          matchStyle: dto.matchStyle ?? [],
-          uniformColor: dto.uniformColor ?? null,
+          matchFormat: conditionFields.matchFormat,
+          matchStyle: conditionFields.matchStyle,
+          uniformColor: conditionFields.uniformColor,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,

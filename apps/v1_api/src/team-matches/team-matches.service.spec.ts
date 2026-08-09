@@ -222,6 +222,19 @@ describe('TeamMatchesService', () => {
     );
   });
 
+  it('recentVenues: 앞뒤 공백만 다른 레거시 값은 trim 후 같은 장소로 dedup되고, 공백뿐인 값은 제외한다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      { placeName: '  ', placeAddress: null }, // 공백뿐 — 제외
+      { placeName: '풋살파크 강서 ', placeAddress: '주소1' }, // trim 전 다른 문자열
+      { placeName: '풋살파크 강서', placeAddress: '주소2' }, // trim 후 위와 동일 장소
+    ]);
+
+    await expect(service.recentVenues(manager, 'team-host')).resolves.toEqual({
+      items: [{ placeName: '풋살파크 강서', addressText: '주소1' }],
+    });
+  });
+
   // ─── create: guard tests ───────────────────────────────────────────────────
 
   it('create: 정지된 계정은 403 PERMISSION_DENIED', async () => {

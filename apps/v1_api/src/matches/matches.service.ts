@@ -213,12 +213,16 @@ export class MatchesService {
       take: 30,
       select: { placeName: true, placeAddress: true },
     });
+    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(team-match-series-admin
+    // .service.ts의 loadRecentVenues와 동일한 방어) — 안 하면 공백만 다른 "중복" 장소가
+    // 서로 다른 칩으로 뜨거나, 공백뿐인 값이 빈 칩으로 렌더될 수 있다.
     const seen = new Set<string>();
     const items: { placeName: string; addressText: string | null }[] = [];
     for (const row of rows) {
-      if (seen.has(row.placeName)) continue;
-      seen.add(row.placeName);
-      items.push({ placeName: row.placeName, addressText: row.placeAddress });
+      const placeName = row.placeName.trim();
+      if (!placeName || seen.has(placeName)) continue;
+      seen.add(placeName);
+      items.push({ placeName, addressText: row.placeAddress });
       if (items.length >= 5) break;
     }
     return { items };

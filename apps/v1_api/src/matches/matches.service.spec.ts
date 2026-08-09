@@ -216,6 +216,18 @@ describe('MatchesService', () => {
     );
   });
 
+  it('recentVenues: 앞뒤 공백만 다른 레거시 값은 trim 후 같은 장소로 dedup되고, 공백뿐인 값은 제외한다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([
+      { placeName: '  ', placeAddress: null }, // 공백뿐 — 제외
+      { placeName: '한강공원 축구장 ', placeAddress: '주소1' }, // trim 전 다른 문자열
+      { placeName: '한강공원 축구장', placeAddress: '주소2' }, // trim 후 위와 동일 장소
+    ]);
+
+    await expect(service.recentVenues(host)).resolves.toEqual({
+      items: [{ placeName: '한강공원 축구장', addressText: '주소1' }],
+    });
+  });
+
   // ─── 1. 비-호스트 취소 → 403 ──────────────────────────────────────────────
 
   it('cancel: 호스트가 아닌 사용자가 취소하면 403 PERMISSION_DENIED를 던진다', async () => {

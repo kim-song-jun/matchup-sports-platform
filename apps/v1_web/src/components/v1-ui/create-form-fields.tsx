@@ -119,8 +119,12 @@ export function CreateField({
   const isDateLike = type === 'date' || type === 'time';
   const errorId = id && error ? `${id}-error` : undefined;
   return (
-    <label className="tm-create-field">
-      <div className="tm-text-label">{label}</div>
+    // div(label 아님): children(RecentVenueChips 등)에 버튼이 섞여 들어올 수 있는데,
+    // <label>이 연결 대상 컨트롤 외의 labelable 요소(button)까지 감싸면 유효하지 않은
+    // 마크업이 되어 클릭 시 예기치 않게 포커스/클릭이 전파될 수 있다 — 텍스트 라벨만
+    // htmlFor로 명시 연결한다.
+    <div className="tm-create-field">
+      <label htmlFor={id} className="tm-text-label">{label}</label>
       <div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''} ${error ? 'tm-create-input-error' : ''}`}>
         {onChange ? (
           multiline ? (
@@ -162,7 +166,7 @@ export function CreateField({
           <span>{error}</span>
         </div>
       ) : null}
-    </label>
+    </div>
   );
 }
 
@@ -208,11 +212,13 @@ export function RecentVenueChips({
     <div role="group" aria-label="최근 사용한 장소" style={{ marginTop: 8 }}>
       <div className="tm-text-caption" style={{ marginBottom: 6 }}>최근 사용한 장소</div>
       <div className="tm-team-form-chip-row">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const isSelected = selectedValue !== undefined && selectedValue === item.placeName;
           return (
             <button
-              key={item.placeName}
+              // index를 섞는다: placeName 단독 key는 items에 동일 placeName이 중복될 때
+              // (백엔드 dedup 전제가 깨지는 극단 상황) key 충돌로 리렌더·선택 상태가 꼬인다.
+              key={`${item.placeName}-${index}`}
               type="button"
               className={`tm-chip ${isSelected ? 'tm-chip-active' : ''}`}
               aria-pressed={isSelected}

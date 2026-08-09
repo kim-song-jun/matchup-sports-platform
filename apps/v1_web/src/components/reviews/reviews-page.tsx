@@ -50,7 +50,7 @@ export function ReviewsPageView({
   const hasLegacyContent = loading || Boolean(errorMessage) || receivedModel.userGroups.length > 0 || receivedModel.teamGroups.length > 0;
 
   return (
-    <AppChrome title="리뷰" activeTab="my" backHref="/my">
+    <AppChrome title="리뷰" activeTab="my" backHref="/my" desktopHead>
       <div className="tm-review-shell">
         <ReviewTabs active={model.tab} onChange={onTabChange} />
         {isReceivedTab ? (
@@ -158,7 +158,7 @@ export function ReviewSourcePageView({
   const canSubmit = pendingTargets.some((target) => drafts[targetKey(target.targetType, target.targetUserId, target.targetTeamId)]?.tagCodes.length > 0);
 
   return (
-    <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews">
+    <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
       <div className="tm-review-shell tm-review-compose-shell">
         {loading ? <ReviewSkeleton count={3} /> : null}
         {!loading && errorMessage ? <ReviewNotice title="리뷰 대상을 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
@@ -236,7 +236,7 @@ export function ReviewsReceivedPageView({
   const hasLegacyContent = loading || Boolean(errorMessage) || model.userGroups.length > 0 || model.teamGroups.length > 0;
   return (
     // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
-    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received">
+    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received" desktopHead>
       <div className="tm-review-shell">
         <div>
           <div className="tm-my-section-label">내가 받은 리뷰 집계</div>
@@ -270,7 +270,7 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
   const remaining = Math.max(0, model.targets.length - reviewed);
 
   return (
-    <AppChrome title="" activeTab="my" bottomNav={false} backHref="/my/reviews">
+    <AppChrome title="" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
       <div className="tm-review-complete">
         <div className="tm-review-complete-icon">✓</div>
         <div className="tm-text-heading" style={{ marginTop: 22 }}>리뷰를 보냈어요</div>

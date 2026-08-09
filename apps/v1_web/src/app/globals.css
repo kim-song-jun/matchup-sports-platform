@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Tailwind v4 커스텀 폰트 크기 유틸리티 — @theme 블록 안에서 정의해야 text-2xs 등의
+ * 클래스가 실제 CSS로 생성된다(v3의 tailwind.config.js theme.extend 대응).
+ * --font-size-micro(11px, :root 아래)와 값을 맞춘다. */
+@theme {
+  --text-2xs: 11px;
+  --text-2xs--line-height: 14px;
+}
+
 @font-face {
   font-family: "Pretendard Variable";
   src: url("/fonts/PretendardVariable.woff2") format("woff2");
@@ -125,6 +133,11 @@
   /* 대회 상금 / 보조 색 */
   --prize-gold: #ffd84d;
   --orange600: #f08a00;
+  /* orange500(#fe9800) 배경 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 ~2.16:1) — 피치 배치
+     골키퍼 마커(pitch-formation-editor.tsx)의 등번호 텍스트에서 실제로 미달을 확인했다
+     (2026-08 QA). blue700(#1b64da, ~5.41:1)과 짝을 맞춰 orange 쪽에도 4.5:1을 넘는
+     진한 변형을 추가한다(~4.92:1). */
+  --orange700: #a36100;
   /* ── 타입 스케일 토큰 — desktop/tournaments.css 대진표·라운드 카드 타이포 ── */
   --font-size-micro: 11px;
   --font-size-caption: 12px;
@@ -161,9 +174,12 @@
   --button-fill-danger:         var(--red500);
   --button-text-primary:        var(--static-white);
   --button-text-neutral:        var(--text-strong);
-  /* Card */
+  /* Card
+   * 카드 배경을 페이지 배경(--bg)에 물리지 않고 흰색으로 고정한다 — 페이지 배경이
+   * grey50으로 바뀌어도(.tm-app-frame 참고) 카드는 항상 흰 카드로 남아 대비가 유지된다.
+   * DESIGN.md: "카드는 배경색 차이로 구분한다: 흰 카드 on gray-50 배경". */
   --card-border:                var(--border);
-  --card-surface:               var(--bg);
+  --card-surface:               #ffffff;
   --card-radius:                16px;
   /* List row — 원래 시각(grey50 bg / grey100 border) 유지 (component 토큰 계층만 정리) */
   --list-row-bg:                var(--grey50);
@@ -210,6 +226,54 @@
      거의 안 보였다. 4/1로 완화해 세로 가시 영역을 넓혀 사진 하단부가 안정적으로
      드러나도록 함(1440px 데스크톱 실측: 라이브 스크린샷으로 확인 완료). */
   --tm-tournament-banner-ratio: 4 / 1;
+}
+
+/* ── [레인 C] 핵심 다크모드 토큰 ────────────────────────────────────────────
+ * team-schedules / team-matches 화면은 여기까지만 커버(토큰 참조 소비처에 자동
+ * 전파). 개별 화면의 하드코딩 색(Tailwind gray-*, 인라인 hex 등)은 이번 범위 밖 —
+ * 남은 작업으로 PR 본문에 기록한다. tournament-ops(운영 콘솔)는 이미 Tailwind
+ * `dark:` 클래스를 전면 사용 중이라 이 토큰과 무관하게 별도로 대응돼 있다.
+ * `@theme` 안이 아니라 `:root`를 오버라이드하므로 Tailwind 유틸리티가 아니라
+ * CSS 커스텀 프로퍼티를 직접 참조하는 컴포넌트 스타일에 적용된다. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    /* 그레이 스케일도 명도를 반전해 함께 뒤집는다 — .tm-app-frame 같은 공유 셸이
+     * 세만틱 토큰이 아니라 --grey50/100 원시값을 페이지 배경/보더로 직접 참조하는
+     * 경우가 많아(R-X4 위반이지만 기존 코드), 이 스케일을 그대로 두면 텍스트
+     * 토큰만 밝게 뒤집혀 옅은 회색 배경 위에 거의 안 보이는 텍스트가 되는 실측
+     * 대비 회귀가 있었다(스크린샷으로 확인). --border/--list-row-* 등 이미 다크
+     * 값을 가진 시맨틱 토큰과 동일한 명도 지점에 맞춰 매핑한다. */
+    --grey50: #1a1c22;
+    --grey100: #1c1e24;
+    --grey150: #20222a;
+    --grey200: #262932;
+    --grey300: #333a45;
+    --grey400: #4e5968;
+    --grey500: #6b7684;
+    --grey600: #8b95a1;
+    --grey700: #9aa4b2;
+    --grey800: #d1d6db;
+    --grey900: #f2f4f6;
+    --bg: #121317;
+    --background: var(--bg);
+    --surface: #1c1e24;
+    --surface-soft: #24262d;
+    --foreground: #f2f4f6;
+    --text-strong: #f2f4f6;
+    --text: #d1d6db;
+    --text-body: #d1d6db;
+    --text-muted: #9aa4b2;
+    --text-caption: #9aa4b2;
+    --muted: var(--text-muted);
+    --border: #333a45;
+    --border-strong: #4e5968;
+    --line: var(--border);
+    --card-surface: #1c1e24;
+    --list-row-bg: #1a1c22;
+    --list-row-border: #262932;
+    --input-surface: var(--surface);
+  }
 }
 
 * {
@@ -288,7 +352,11 @@ button:disabled {
   width: min(100%, var(--v1-app-chrome-frame-width));
   height: 100dvh;
   margin: 0 auto;
-  background: var(--bg);
+  /* 페이지 배경 = grey50, 카드(--card-surface) = 흰색으로 고정해 대비를 준다 — 이전엔
+     둘 다 --bg(흰색)라 카드와 배경이 시각적으로 구분되지 않았다. 별개로 일정 상세/
+     생성 화면은 실제로 좌우 padding이 0인 버그(죽은 CSS 클래스 `.tm-team-detail-section`)도
+     있었다 — 그건 team-schedules-page.tsx에서 따로 고쳤다. */
+  background: var(--grey50);
   font-family: var(--font);
   overflow: hidden;
   position: relative;
@@ -1581,6 +1649,15 @@ button:disabled {
   outline-offset: 2px;
 }
 
+/* MultiPresetChipSelector 다중선택 상한 도달 시 미선택 칩(예: 경기 스타일 3개 제한) —
+ * 색상 단독 전달 금지: 불투명도 + not-allowed 커서로 "지금은 못 고름"을 함께 표시한다.
+ * disabled 속성은 쓰지 않는다 — 클릭을 막으면 limitMessage(왜 안 되는지)를 띄울 방법이
+ * 없어진다. */
+.tm-chip[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .tm-chip-active {
   border-color: var(--blue500);
   background: var(--blue500);
@@ -2386,6 +2463,11 @@ button:disabled {
   background: var(--blue500);
 }
 
+/* 레인 wizard/A: 이미 지나온 스텝인데 필수 필드가 채워졌으면 green으로 "완료" 표시 */
+.tm-create-bars span[data-complete="true"] {
+  background: var(--green500);
+}
+
 .tm-create-sport-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2497,6 +2579,20 @@ button:disabled {
   min-height: 72px;
   align-items: flex-start;
   padding-top: 12px;
+}
+
+/* 레인 wizard/A: 스텝 게이팅·결측 필드 인라인 에러 — 색상 단독 전달 금지, 아이콘+문구 병행 */
+.tm-create-input-error {
+  border-color: var(--orange500);
+}
+
+.tm-create-field-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  color: var(--orange500);
+  font-size: var(--font-size-caption);
 }
 
 .tm-team-description-input {
@@ -4536,6 +4632,10 @@ button:disabled {
   border-right: 1px solid var(--border);
 }
 
+.tm-my-monthly > div:nth-child(2n) {
+  border-right: 0;
+}
+
 .tm-my-monthly > div:last-child {
   border-right: 0;
 }
@@ -5845,6 +5945,17 @@ button:disabled {
 }
 .tm-bk2-badge-live { background: #fff0f0; color: #d9363e; font-weight: 800; }
 .tm-bk2-badge-time { font-size: 10px; color: var(--text-muted); }
+
+/* 뱃지 줄 — 시각 배지가 LIVE/PK 배지와 함께 표시될 수 있다 (D-12).
+   .tm-bk2-badge 자체는 손대지 않는다 — AggregateMatchCard/.tm-bk2-third가
+   이 클래스를 단독 block 배지로 그대로 쓰고 있어서다. */
+.tm-bk2-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 
 /* 챔피언 슬롯 */
 .tm-bk2-champ {

@@ -53,9 +53,13 @@ function makeFixture(
     venue: null,
     status: 'scheduled',
     homeRegistrationId: null,
+    homeTeamId: null,
     homeTeamName: 'Home',
+    homeTeamLogoUrl: null,
     awayRegistrationId: null,
+    awayTeamId: null,
     awayTeamName: 'Away',
+    awayTeamLogoUrl: null,
     result: null,
     videos: [],
     ...overrides,
@@ -676,11 +680,11 @@ describe('getCompletedChampionName', () => {
       phase: 'group',
       standings: [
         {
-          registrationId: 'r2', teamId: 'team-2', teamName: '2위팀', position: 2,
+          registrationId: 'r2', teamId: 'team-2', teamName: '2위팀', teamLogoUrl: null, position: 2,
           points: 10, wins: 3, draws: 1, losses: 1, goalsFor: 8, goalsAgainst: 5, recalculatedAt: null,
         },
         {
-          registrationId: 'r1', teamId: 'team-1', teamName: '1위팀', position: 1,
+          registrationId: 'r1', teamId: 'team-1', teamName: '1위팀', teamLogoUrl: null, position: 1,
           points: 13, wins: 4, draws: 1, losses: 0, goalsFor: 12, goalsAgainst: 3, recalculatedAt: null,
         },
       ],

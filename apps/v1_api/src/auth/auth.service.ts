@@ -768,6 +768,21 @@ export class AuthService {
     };
   }
 
+  /**
+   * `/auth/dev-session` — mints a real signed session cookie for a caller who is
+   * ALREADY authenticated by `V1AuthGuard` (production refuses header/email
+   * identity there, so this reaches Prisma only when a valid signed cookie was
+   * already presented, or outside production). It grants no capability beyond
+   * what `V1AuthGuard` already granted the caller — it only upgrades an
+   * already-established identity into the same signed cookie `login()` issues,
+   * via the same `sessionResponse()` + `V1SessionCookieInterceptor` path. Exists
+   * so E2E can obtain a production-shaped session (rather than relying solely on
+   * dev header auth) without a password, which most seeded personas don't have.
+   */
+  async devSession(userId: string, userEmail: string | null) {
+    return this.sessionResponse(userId, userEmail);
+  }
+
   private assertNotWithdrawalPending(accountStatus: V1AccountStatus) {
     if (accountStatus === 'withdrawal_pending') {
       throw new ForbiddenException({

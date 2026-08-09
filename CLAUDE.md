@@ -26,8 +26,21 @@
   실배포 게이트로 취급한다.
 - **`main`에 dev에 없는 커밋이 생겼다면 `origin/main → dev` 방향으로 흡수한다.** 반대 방향으로
   dev 내용을 main 기준에 맞춰 되돌리지 않는다.
-- **`main`에는 브랜치 보호가 없다**(2026-07-31 확인, `404 Branch not protected`). PR을 거치지
-  않은 직접 push도 막히지 않고 그대로 프로덕션 배포로 이어진다 — 관례로만 지켜지는 상태다.
+- **`main`에는 classic branch protection은 없지만 ruleset이 걸려 있다**(2026-08-09 실측 정정).
+  `branches/main/protection`은 여전히 `404 Branch not protected`라 "보호 없음"으로 오해하기 쉬운데,
+  **repository ruleset "Copilot review for default branch"(id 15258451, enforcement=active)가
+  default 브랜치에 `deletion`·`non_fast_forward`·`copilot_code_review` 세 가지를 강제한다.**
+  즉 main으로의 force-push와 브랜치 삭제는 실제로 막힌다 — 2026-07-31 #231 사고 때 되돌리기
+  force-push가 `non_fast_forward`로 거부돼 `git revert`로 우회해야 했던 것이 이 ruleset 때문이다.
+  일반 fast-forward push 자체는 막지 않으므로 PR 없는 직접 push는 여전히 가능하고 그대로
+  프로덕션 배포로 이어진다. **확인 명령**: `gh api repos/<owner>/<repo>/rulesets` (classic
+  protection API만 보면 실상을 놓친다).
+- **머지·push 전에 항상 `baseRefName`(대상 브랜치)을 확인한다.** 2026-08-09에 dev용 PR을
+  `mergeable`/CI만 보고 머지했다가 **base가 main이라 프로덕션 브랜치에 머지된 사고**가 있었다
+  (`gh pr merge`는 PR에 설정된 base로 머지하지, 내가 의도한 곳으로 머지하지 않는다). 머지 직전
+  `gh pr view <N> --json baseRefName`으로 `dev`임을 확인하고, 아니면 `gh pr edit <N> --base dev`로
+  먼저 재타깃한다. main은 위 ruleset 때문에 force-push 롤백이 안 되므로 이 사고는 `git revert`로만
+  수습 가능하다 — 사전 확인이 유일한 값싼 방어다.
 - **worktree는 항상 최신 `dev`를 fetch한 직후에 만든다.** 새 작업(기능/수정)을 시작할 때 `git worktree add <path> -b <branch> origin/dev` 직전에 반드시 `git fetch origin dev`를 먼저 실행해서 base를 최신으로 맞춘다 — 캐시된(오래된) ref에서 분기하면 나중에 `dev`와의 diff가 불필요하게 커지고, changeset 정책 체크 등 CI 게이트가 실제로는 이미 해결된 옛 상태를 기준으로 오판할 수 있다. dev push = 자동 실배포이므로, 오래된 base에서 분기해 뒤늦게 머지하면 검증 시점과 실제 배포 시점의 코드가 어긋날 위험도 커진다.
   - **로컬 `dev` 브랜치를 직접 체크아웃해서 base로 쓰지 않는다.** git은 같은 브랜치를 두 worktree에 동시 체크아웃할 수 없다 — 이 저장소는 여러 세션이 각자 `.claude/worktrees/*`를 쓰는 공유 환경이라, 로컬 `dev`가 이미 다른 worktree(예: `dev-verify`류)에 uncommitted 상태로 체크아웃돼 있을 수 있다. 그 worktree를 임의로 건드리거나(pull/checkout/reset) 새 작업의 base로 재사용하지 말 것 — 대신 매번 `git fetch origin dev` 후 **원격 ref `origin/dev`**를 base로 분기한다(로컬 `dev` 브랜치 자체는 만들지 않는다). 이렇게 하면 항상 최신이면서도 다른 세션과 절대 충돌하지 않는다.
 
@@ -556,6 +569,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 4. **시각 검증/스크린샷 — UI 변경 PR은 예외 없이 필수**: 화면 마크업·레이아웃·스타일이 조금이라도 바뀐 PR은 **반드시** 📱mobile 390 / 📲tablet 768 / 🖥desktop 1440 3폭 스크린샷 갤러리를 PR 코멘트로 첨부한다 — "커밋만 하고 스크린샷은 생략"은 완료가 아니다(로직/백엔드 전용 PR은 대상 아님). v1 스택 기동(DB `teameet_v1_pg`:5432 + `apps/v1_api`:8121 + web:3013) 후 **헤더 dev 인증**(localStorage `teameet.v1.userId`/`userEmail` → `x-v1-user-*` 헤더)으로 Playwright 캡처. **캡처 스크립트는 `scripts/` 내부**(`/tmp`는 모듈 해석 실패). 갤러리는 페이지별 **📱mobile 390 / 📲tablet 768 / 🖥desktop 1440** 3열 + raw URL 200 확인 후 코멘트 게시. PR을 이미 올린 뒤 UI 변경을 뒤늦게 인지했다면 그 PR에 갤러리 코멘트를 추가로 게시해 채운다.
 5. **전체 검수/피드백**은 built-in `Workflow`(ultracode) 8차원 적대 검증으로(= evidence-producing; `/agent-all`은 본 레포 Phase 0 전제 미충족). 모델 배정은 글로벌 규칙 11(결정=opus/fable, 실행=sonnet).
 6. **CI flake**(Postgres `40P01 deadlock` 등)는 내 변경과 무관함 확인 후 `gh run rerun <id> --failed`. 머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass.
+7. **런타임·환경 의존 동작은 로컬 포렌식에 매몰되지 말고 alpha 배포로 검증한다(Critical — 2026-08-09 실사고).** SSR 상태코드·스트리밍·프로덕션 렌더처럼 **환경에 따라 달라지는 동작**을 진단할 때, 로컬 `next start`/`next build` 반복 실험에 세션을 통째로 태우지 말 것. dev 머지 = 즉시 alpha 실배포이므로 **fix 후보를 dev에 머지해 alpha에서 직접 재측정**하는 것이 이 레포의 검증 루프이자 ground truth다. 실사고: schedule 라우트의 not-found HTTP 200 결함을 로컬에서 파다가 (a) `next start` 좀비 서버가 옛 빌드를 서빙해 거짓 결론을 냈고(`kill $SRV`가 래퍼만 죽이고 next-server 자식이 포트 점유 → 이후 측정이 stale 빌드를 때림), (b) 병렬 세션의 `next dev` 와 겹쳐 결과가 뒤엉켰다 — 몇 시간·수십 빌드를 태우고도 못 고쳤다. **불가피하게 로컬 prod 렌더로 검증해야 하면**: `next start` 대신 `node .next/standalone/apps/v1_web/server.js`(alpha 실런타임)를 쓰고, 매 측정마다 fresh 포트 + `lsof -tnP -iTCP:<port>` 로 실제 리스너 PID 를 확인해 그 PID 로 종료하며, 측정 전 좀비 next-server 를 전수 확인한다. 그래도 **1순위는 alpha 배포-측정**이다.
 
 ## Agent Team 운영
 

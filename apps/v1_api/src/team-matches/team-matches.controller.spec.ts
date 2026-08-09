@@ -4,6 +4,7 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { TeamMatchesController } from './team-matches.controller';
+import { TeamMatchLineupService } from './team-match-lineup.service';
 import { TeamMatchesService } from './team-matches.service';
 
 const user = {
@@ -14,9 +15,19 @@ const user = {
 };
 
 describe('TeamMatchesController', () => {
+  // Only the four methods team-matches.controller.ts actually delegates to
+  // (getLineup / saveLineup / submitLineup / requestChange).
+  const teamMatchLineupService = {
+    getLineup: jest.fn(),
+    saveLineup: jest.fn(),
+    submitLineup: jest.fn(),
+    requestChange: jest.fn(),
+  };
+
   const teamMatchesService = {
     list: jest.fn(),
     detail: jest.fn(),
+    recentVenues: jest.fn(),
     applicationEligibility: jest.fn(),
     myTeamMatches: jest.fn(),
     create: jest.fn(),
@@ -25,7 +36,6 @@ describe('TeamMatchesController', () => {
     cancel: jest.fn(),
     close: jest.fn(),
     reopen: jest.fn(),
-    complete: jest.fn(),
     createApplication: jest.fn(),
     applications: jest.fn(),
     withdrawApplication: jest.fn(),
@@ -42,6 +52,12 @@ describe('TeamMatchesController', () => {
       controllers: [TeamMatchesController],
       providers: [
         { provide: TeamMatchesService, useValue: teamMatchesService },
+        // Task 14 added TeamMatchLineupService as the controller's second
+        // constructor argument; without it Nest cannot instantiate the
+        // controller and every test in this file fails at compile(). This
+        // drift went undetected because the "V1 API unit tests" job was
+        // skipped on every branch until Task 10 landed.
+        { provide: TeamMatchLineupService, useValue: teamMatchLineupService },
         { provide: PrismaService, useValue: {} },
         { provide: OptionalV1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
         { provide: V1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
@@ -74,6 +90,17 @@ describe('TeamMatchesController', () => {
       teamMatchId: 'team-match-1',
       viewer: { state: 'guest' },
     });
+  });
+
+  it('returns recent venues for a host team', async () => {
+    teamMatchesService.recentVenues.mockResolvedValue({
+      items: [{ placeName: '풋살파크 강서', addressText: '서울 강서구' }],
+    });
+
+    await expect(controller.recentVenues(user, 'team-1')).resolves.toEqual({
+      items: [{ placeName: '풋살파크 강서', addressText: '서울 강서구' }],
+    });
+    expect(teamMatchesService.recentVenues).toHaveBeenCalledWith(user, 'team-1');
   });
 
   it('returns application eligibility', async () => {
@@ -184,20 +211,6 @@ describe('TeamMatchesController', () => {
     await expect(controller.reopen(user, 'team-match-1', { reason: '추가 모집' })).resolves.toEqual({
       teamMatchId: 'team-match-1',
       status: 'recruiting',
-    });
-  });
-
-  it('completes a team match', async () => {
-    teamMatchesService.complete.mockResolvedValue({
-      teamMatchId: 'team-match-1',
-      status: 'completed',
-      completedAt: '2026-05-18T12:00:00.000Z',
-    });
-
-    await expect(controller.complete(user, 'team-match-1', { note: '경기 완료' })).resolves.toEqual({
-      teamMatchId: 'team-match-1',
-      status: 'completed',
-      completedAt: '2026-05-18T12:00:00.000Z',
     });
   });
 

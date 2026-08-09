@@ -20,6 +20,10 @@ import {
   TournamentStatus,
   UpdateTournamentDto,
 } from './dto/admin-tournament.dto';
+import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode } from './competition-config/competition-config';
+import { parseLineupLimits } from './competition-config/competition-config.parse';
+import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
+import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 
 /**
  * 대회 status 전이 규칙. completed/cancelled는 종착(이후 전이 없음).
@@ -46,12 +50,17 @@ function nullableText(value: string | null | undefined): string | null | undefin
 @Injectable()
 export class TournamentsAdminService {
   private readonly logger = new Logger(TournamentsAdminService.name);
+  private readonly lineupSizeConfigResolver: LineupSizeConfigResolver;
+  private readonly tournamentCompetitionConfig: TournamentCompetitionConfig;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
     private readonly kakaoGeocoding: KakaoGeocodingService,
-  ) {}
+  ) {
+    this.lineupSizeConfigResolver = new LineupSizeConfigResolver(prisma, adminContext);
+    this.tournamentCompetitionConfig = new TournamentCompetitionConfig(prisma, adminContext);
+  }
 
   async list(user: V1AuthUser, query: AdminTournamentListQueryDto) {
     await this.adminContext.getActiveAdmin(user.id);
@@ -115,16 +124,57 @@ export class TournamentsAdminService {
     await this.adminContext.getActiveAdmin(user.id);
     const row = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      include: { _count: { select: { registrations: true, fixtures: true, announcements: true } } },
+      include: {
+        _count: { select: { registrations: true, fixtures: true, announcements: true } },
+        sport: { select: { code: true } },
+      },
     });
     if (!row) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
-    return this.serialize(row, row._count.registrations, {
-      registrations: row._count.registrations,
-      fixtures: row._count.fixtures,
-      announcements: row._count.announcements,
+    // row.sport는 스키마상 항상 존재해야 하는 필수 relation(V1Tournament.sportId가
+    // required)이지만, 옵셔널 체이닝으로 방어해 둔다 — 이 relation을 모르는(추가 전부터
+    // 있던) 다른 테스트의 얕은 목이 undefined를 줘도 loadLineupInfo가 "종목 정보 없음"으로
+    // 안전하게 degrade하지, 여기서 크래시하지 않는다.
+    const lineup = await this.loadLineupInfo(row.sport?.code, row.competitionConfigVersionId);
+    return this.serialize(
+      row,
+      row._count.registrations,
+      {
+        registrations: row._count.registrations,
+        fixtures: row._count.fixtures,
+        announcements: row._count.announcements,
+      },
+      lineup,
+    );
+  }
+
+  /**
+   * `get()` 전용 — 대회 상세/수정 화면이 "출전 인원" 선택지와 현재 pin된 값을 함께
+   * 보여주는 데 쓴다. `sportCode`가 경기 설정 카탈로그에 없는 종목이면 `sizeOptions`는
+   * 빈 배열이고(선택지를 지어내지 않는다), `competitionConfigVersionId`가 아직 null이면
+   * `pinned`도 null이다(아직 어떤 값도 pin되지 않음 — 미지원 종목이거나 레거시 대회).
+   */
+  private async loadLineupInfo(
+    sportCode: string | null | undefined,
+    competitionConfigVersionId: string | null,
+  ): Promise<{ pinned: { maxPlayers: number; minPlayers: number } | null; sizeOptions: number[] }> {
+    const normalizedSportCode = tryNormalizeCompetitionSportCode(sportCode);
+    const sizeOptions = normalizedSportCode
+      ? this.lineupSizeConfigResolver.selectableLineupSizesForSportCode(normalizedSportCode)
+      : [];
+    if (!competitionConfigVersionId) {
+      return { pinned: null, sizeOptions };
+    }
+    const config = await this.prisma.v1CompetitionConfigVersion.findUnique({
+      where: { id: competitionConfigVersionId },
+      select: { lineup: true },
     });
+    if (!config) {
+      return { pinned: null, sizeOptions };
+    }
+    const limits = parseLineupLimits(config.lineup);
+    return { pinned: { maxPlayers: limits.maxPlayers, minPlayers: limits.minPlayers }, sizeOptions };
   }
 
   async create(user: V1AuthUser, dto: CreateTournamentDto) {
@@ -164,11 +214,21 @@ export class TournamentsAdminService {
     // 실패해도(키 미설정 포함) venue 저장 자체는 절대 막지 않는다(좌표만 null).
     const coordinates = dto.venue ? await this.geocodeVenueSafe(dto.venue) : null;
 
+    // "출전 인원"(V1CompetitionConfigVersion.lineup.maxPlayers) 을 위 minPlayers/maxPlayers
+    // (대회 "등록" 로스터 크기)와 절대 섞지 않는다 — resolveLineupConfigVersionId()가
+    // find-or-create로 별도 버전 행을 만들어 tournament.competitionConfigVersionId에만 연결한다.
+    const competitionConfigVersionId = await this.resolveLineupConfigVersionId(
+      user,
+      sport.code,
+      dto.lineupMaxPlayers,
+    );
+
     const created = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.create({
         data: {
           sportId: dto.sportId,
           title: dto.title,
+          competitionConfigVersionId,
           format: dto.format ?? 'group_knockout',
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
           rosterDeadlineAt: dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null,
@@ -239,6 +299,28 @@ export class TournamentsAdminService {
     });
     if (!existing) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+
+    if (dto.lineupMaxPlayers !== undefined) {
+      // 종목과 출전 인원을 한 번에 바꾸면 어느 종목 기준으로 인원 후보를 검증해야 할지
+      // (변경 전/후 종목 모두 CAS 창 안에서 유효한 후보 세트가 다르다) 모호해진다 —
+      // 두 단계로 나눠 받는다: 종목을 먼저 바꾸고, 그 다음 요청에서 출전 인원을 정한다.
+      if (dto.sportId !== undefined && dto.sportId !== existing.sportId) {
+        throw new BadRequestException({
+          code: 'TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT',
+          message: '종목과 출전 인원은 한 번에 함께 변경할 수 없어요. 종목을 먼저 변경한 뒤 출전 인원을 설정해 주세요.',
+        });
+      }
+      // "이미 시작/완료된 대회의 설정 변경은 막는다"(권장안) — 진행 중/종료된 대회의 출전
+      // 인원을 바꾸면 이미 뛴 경기와 앞으로 뛸 경기가 서로 다른 규칙을 갖게 될 위험이 크다.
+      // TournamentCompetitionConfig.change()가 미완료 픽스처만 리포인트하고 완료된 경기는
+      // 그대로 두는 것과 같은 원칙을, 여기서는 아예 진입 자체를 막는 더 안전한 쪽으로 적용한다.
+      if (existing.status === 'in_progress' || existing.status === 'completed') {
+        throw new ConflictException({
+          code: 'TOURNAMENT_LINEUP_SIZE_LOCKED',
+          message: '대회가 시작된 이후에는 출전 인원을 변경할 수 없어요.',
+        });
+      }
     }
 
     // 변경 후 최종 min/max 기준으로 검증(둘 중 하나만 들어와도 일관성 보장).
@@ -368,6 +450,40 @@ export class TournamentsAdminService {
     if (dto.promoListLocationText !== undefined) data.promoListLocationText = nullableText(dto.promoListLocationText);
     if (dto.promoListPrizeText !== undefined) data.promoListPrizeText = nullableText(dto.promoListPrizeText);
     if (dto.promoListPriority !== undefined) data.promoListPriority = dto.promoListPriority;
+
+    // 출전 인원 변경은 다른 필드들과 별도 트랜잭션으로 처리한다 —
+    // TournamentCompetitionConfig.change()가 자기 CAS(expectedVersion)와 미완료 픽스처
+    // 리포인트, 감사 로그를 이미 원자적으로 다 갖고 있어 여기서 재구현하지 않는다. CAS는
+    // 이 메서드가 시작할 때 읽은 existing.updatedAt을 그대로 쓴다 — 아래 필드 업데이트
+    // 트랜잭션이 아직 실행되기 전이라 여전히 유효하다.
+    if (dto.lineupMaxPlayers !== undefined) {
+      const sport = await this.prisma.v1Sport.findUnique({ where: { id: existing.sportId } });
+      if (!sport) {
+        throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
+      }
+      const resolved = await this.lineupSizeConfigResolver.resolveVersionForLineupSize(
+        user,
+        normalizeCompetitionSportCode(sport.code),
+        dto.lineupMaxPlayers,
+      );
+      if (resolved.id !== existing.competitionConfigVersionId) {
+        const changeResult = await this.tournamentCompetitionConfig.change(user, tournamentId, {
+          competitionConfigVersionId: resolved.id,
+          expectedVersion: existing.updatedAt.toISOString(),
+        });
+        // change()는 완료된 픽스처/순위가 있어 소급 영향이 있을 때만 confirmationRequired를
+        // 반환하며, 그 경우 아무것도 쓰지 않고 그대로 리턴한다(non-mutating). 이 출전 인원
+        // 편집 폼에는 confirmRecalculation을 넘길 방법이 없으므로(위 상태 가드가 대부분
+        // 걸러내지만, status가 아직 in_progress/completed로 안 바뀐 채로 결과가 먼저 기록된
+        // 드문 경우를 대비한 방어) 그대로 진행하는 대신 명확한 에러로 막는다.
+        if (changeResult.confirmationRequired) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_LINEUP_SIZE_LOCKED',
+            message: '이미 기록된 경기 결과가 있어 출전 인원을 변경할 수 없어요.',
+          });
+        }
+      }
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.update({ where: { id: tournamentId }, data });
@@ -642,6 +758,42 @@ export class TournamentsAdminService {
     }
   }
 
+  /**
+   * 대회 생성 시 "출전 인원"의 V1CompetitionConfigVersion을 find-or-create로 정한다.
+   *
+   * - `lineupMaxPlayers`를 명시했는데 그 종목이 아직 경기 설정 카탈로그에 없으면(football/
+   *   futsal 둘뿐, `normalizeCompetitionSportCode` 참고) 진짜 사용자 오류이므로 그대로
+   *   던진다 — 관리자가 지원 안 되는 종목에 출전 인원을 지정하려 한 것.
+   * - 생략했고 그 종목도 카탈로그에 없으면 조용히 null을 돌려준다 — 오늘 이 배포 이전과
+   *   동일한 동작(그 종목은 애초에 competitionConfigVersionId를 전혀 안 쓴다)을 그대로
+   *   유지하는 의도적 분기다(`tryNormalizeCompetitionSportCode`의 non-throwing 결과를
+   *   직접 분기하는 것이라 예상 못 한 에러를 삼키는 catch가 아니다).
+   * - 생략했지만 카탈로그에 있는 종목이면 canonical 기본값(football 11명/futsal 6명)으로
+   *   자동 설정한다 — 이렇게 해야 새 대회가 대진(픽스처) 생성 단계에서
+   *   COMPETITION_CONFIG_REQUIRED로 막히는 기존 운영 공백이 사라진다
+   *   (tournament-bracket.service.ts#createFixture 참고).
+   */
+  private async resolveLineupConfigVersionId(
+    user: V1AuthUser,
+    sportCode: string | null | undefined,
+    lineupMaxPlayers: number | undefined,
+  ): Promise<string | null> {
+    const normalizedSportCode = tryNormalizeCompetitionSportCode(sportCode);
+    if (normalizedSportCode === null) {
+      // 관리자가 명시적으로 출전 인원을 지정했는데 종목이 카탈로그에 없다면 진짜 오류다 —
+      // normalizeCompetitionSportCode()의 표준 에러(MISSING_SPORT/UNSUPPORTED_SPORT)를
+      // 그대로 던져서 관리자에게 이유를 보여준다. 생략했을 때만 null로 조용히 넘어간다.
+      if (lineupMaxPlayers !== undefined) normalizeCompetitionSportCode(sportCode);
+      return null;
+    }
+    const resolved = await this.lineupSizeConfigResolver.resolveVersionForLineupSize(
+      user,
+      normalizedSportCode,
+      lineupMaxPlayers,
+    );
+    return resolved.id;
+  }
+
   private assertPlayerRange(min: number | undefined, max: number | undefined) {
     if (min !== undefined && max !== undefined && min > max) {
       throw new BadRequestException({
@@ -733,6 +885,7 @@ export class TournamentsAdminService {
     row: V1Tournament,
     registrationCount: number,
     operationCounts?: { registrations: number; fixtures: number; announcements: number },
+    lineup?: { pinned: { maxPlayers: number; minPlayers: number } | null; sizeOptions: number[] },
   ) {
     return {
       id: row.id,
@@ -754,6 +907,14 @@ export class TournamentsAdminService {
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,
+      // "출전 인원"(라인업 상한) — 위 minPlayers/maxPlayers("등록" 로스터 크기)와는 다른
+      // 값이다. competitionConfigVersionId는 목록/생성 응답에도 항상 있는 스칼라라 비용
+      // 없이 노출하지만, lineupMaxPlayers/lineupMinPlayers/lineupSizeOptions는 조인이
+      // 필요해 get()(대회 상세·수정 화면)에서만 채운다 — 그 외에는 null/[]로 둔다.
+      competitionConfigVersionId: row.competitionConfigVersionId,
+      lineupMaxPlayers: lineup?.pinned?.maxPlayers ?? null,
+      lineupMinPlayers: lineup?.pinned?.minPlayers ?? null,
+      lineupSizeOptions: lineup?.sizeOptions ?? [],
       genderCategory: row.genderCategory,
       genderMinMale: row.genderMinMale,
       genderMaxMale: row.genderMaxMale,

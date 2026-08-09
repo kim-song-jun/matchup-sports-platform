@@ -95,12 +95,19 @@ export type TeamMatchDetailViewModel = {
     pending?: boolean;
     onClick: () => void | Promise<unknown>;
   }>;
+  // Task 17: navigates to /team-matches/:id/result(/approval) — a matched/completed match
+  // no longer has a standalone "complete" mutation (Task 16 removed it); completion is now
+  // an atomic side effect of submitting a validated result revision on that screen.
+  resultAction?: { label: string; href: string; tone?: 'primary' | 'neutral' } | null;
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;
   onChat?: () => void;
   onShare?: () => void;
   onNotify?: () => void;
+  /** 라인업 관리 화면(Task 15) 링크. 내가 owner/manager로 속한 팀(호스트팀 또는 승인된
+   * 상대팀)이 이 매치에 관여할 때만 설정된다 — 그 외에는 undefined라 CTA 자체가 안 보인다. */
+  lineupHref?: string;
 };
 
 export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'place-time' | 'confirm' | 'complete' | 'edit';
@@ -119,7 +126,7 @@ export type TeamMatchCreateViewModel = {
     description: string;
     grade: string;
     format: string;
-    style: string;
+    style: string[];
     uniform: string;
     gender: string;
     imageUrl: string;
@@ -140,16 +147,28 @@ export type TeamMatchCreateViewModel = {
     regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
     onSelectTeam: (teamName: string) => void;
     onSelectSport: (sportName: string) => void;
-    onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number) => void;
+    onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number | string[]) => void;
     onRegionChange: (regionId: string) => void;
     uploadImage?: (file: File) => Promise<string>;
     onBack: () => void;
     onNext: () => void;
     onSubmit: () => void;
+    /** 진행 표시줄 클릭 이동. target 이전 스텝이 모두 유효할 때만 target으로 이동하고,
+     * 그렇지 않으면 첫 번째 무효 스텝으로 되돌린다(team-matches.validation의
+     * firstIncompleteTeamMatchStep). edit 화면은 스텝 구분이 없어 설정하지 않는다. */
+    onGoToStep?: (step: TeamMatchCreateStep) => void;
     onCancel?: () => void;
     submitLabel?: string;
     submitting?: boolean;
     error?: string | null;
     lockedReason?: string | null;
+    /** 현재 스텝(또는 edit 화면 전체)에서 "다음"/"저장"을 시도한 뒤에만 채워지는 필드별 에러 문구. */
+    fieldErrors?: Partial<Record<string, string>>;
+    /** 최종 제출(confirm/edit)에서 실제로 비어 있는 필드 목록 — 각 항목은 해당 스텝으로 이동할 수 있다. */
+    missingFields?: Array<{ field: string; label: string; step: TeamMatchCreateStep }>;
+    /** CreateProgress 배지: 지나온 스텝 중 필수 필드를 전부 채운 스텝(체크 표시용). */
+    completeSteps?: TeamMatchCreateStep[];
+    /** #3 1단계: 이 팀이 호스트로 과거에 실제로 입력했던 장소 — 장소 입력창 포커스 시 칩으로 노출. */
+    recentVenues?: Array<{ placeName: string; addressText: string | null }>;
   };
 };

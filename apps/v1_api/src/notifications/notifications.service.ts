@@ -1,14 +1,14 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, V1NotificationTargetType } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
-import { RealtimeGateway } from '../realtime/realtime.gateway';
 import {
   NotificationsQueryDto,
   ReadAllNotificationsDto,
   UpdateNotificationPreferencesDto,
 } from './dto/notifications.dto';
+import { REALTIME_NOTIFIER, RealtimeNotifierPort } from './realtime-notifier.port';
 import { WebPushService } from './web-push.service';
 
 /** Notification event types emitted by domain services. */
@@ -36,7 +36,19 @@ export type NotificationEventType =
   | 'tournament_announcement_published'
   | 'team_invitation_received'
   | 'team_invitation_accepted'
-  | 'inquiry_answered';
+  | 'inquiry_answered'
+  // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
+  // once the reminder's outbox row (inserted by TeamSchedulesService.triggerReminder) is claimed.
+  // (P1-4 fix: 'schedule_guest_application_received' — the interactive, GuestRecruitmentService-
+  // emitted sibling of these two — was removed from this union entirely. That event's own delivery
+  // moved to the same durable-outbox-worker pattern as these two (see
+  // guest-recruitment.service.ts's createApplication and schedule-reminder.service.ts's new
+  // guestApplicationManagerNotificationHandler), so nothing calls emitNotification*() with it
+  // anymore; keeping a permanently-unreachable literal (and its EVENT_TITLES/EVENT_BODIES/
+  // preferenceFieldForEvent/targetTypeForEvent entries) around would have been exactly the kind of
+  // tech debt this repo's Core Engineering Principle #1 forbids leaving behind.)
+  | 'schedule_rsvp_deadline_reminder'
+  | 'schedule_guest_recruitment_close_reminder';
 
 /** V1NotificationPreference 컬럼 중 이벤트 발송을 게이트하는 필드들. */
 type NotificationPrefField = keyof Pick<
@@ -74,7 +86,9 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'team_join_application_accepted' ||
     type === 'team_join_application_rejected' ||
     type === 'team_invitation_received' ||
-    type === 'team_invitation_accepted'
+    type === 'team_invitation_accepted' ||
+    type === 'schedule_rsvp_deadline_reminder' ||
+    type === 'schedule_guest_recruitment_close_reminder'
   ) {
     return 'teamEnabled';
   }
@@ -120,7 +134,9 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'team_join_application_accepted' ||
     type === 'team_join_application_rejected' ||
     type === 'team_invitation_received' ||
-    type === 'team_invitation_accepted'
+    type === 'team_invitation_accepted' ||
+    type === 'schedule_rsvp_deadline_reminder' ||
+    type === 'schedule_guest_recruitment_close_reminder'
   ) {
     return 'team';
   }
@@ -167,6 +183,18 @@ function deepLinkForEvent(
   if (type === 'team_join_application_received' && targetId) {
     return `/teams/${targetId}/members`;
   }
+  // Task 12, reminders lane: targetId is the compound "${teamId}:${scheduleId}" string (see
+  // schedule-reminder.service.ts) — parsed only here, never used for authorization anywhere in
+  // this service.
+  if (
+    (type === 'schedule_rsvp_deadline_reminder' || type === 'schedule_guest_recruitment_close_reminder') &&
+    targetId
+  ) {
+    const [teamId, scheduleId] = targetId.split(':');
+    if (teamId && scheduleId) {
+      return `/teams/${teamId}/schedules/${scheduleId}`;
+    }
+  }
   return deepLinkForTarget(targetType, targetId);
 }
 
@@ -195,6 +223,8 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_invitation_received: '팀 초대가 도착했어요',
   team_invitation_accepted: '팀 초대를 수락했어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
+  schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
+  schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
 };
 
 /**
@@ -229,13 +259,15 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_invitation_received: '팀 초대를 확인해 보세요.',
   team_invitation_accepted: '팀 초대를 수락했어요.',
   inquiry_answered: '답변 내용을 확인해 주세요.',
+  schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
+  schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
 };
 
 @Injectable()
 export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly realtimeGateway: RealtimeGateway,
+    @Inject(REALTIME_NOTIFIER) private readonly realtimeNotifier: RealtimeNotifierPort,
     private readonly webPushService: WebPushService,
     @InjectPinoLogger(NotificationsService.name) private readonly logger: PinoLogger,
   ) {}
@@ -353,8 +385,10 @@ export class NotificationsService {
 
     // emitToUser와 sendToUser는 서로 독립적인 채널이다 — 하나가 던져도 다른 하나의
     // 시도는 계속되어야 한다(ChatService.sendMessage의 개별 try/catch 격리 패턴과 동일).
+    // realtimeNotifier는 REALTIME_NOTIFIER 포트(realtime-notifier.port.ts)를 통해 주입되며,
+    // 구현체는 호출 측(HTTP 앱 vs 워커)마다 다르다 — 자세한 내용은 그 파일 참조.
     try {
-      this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
+      this.realtimeNotifier.emitToUser(userId, 'notification:new', notification);
     } catch (err) {
       this.logger.warn({ userId, targetType, targetId, err }, '실시간 알림 전송 실패');
     }

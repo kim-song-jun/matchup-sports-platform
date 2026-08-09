@@ -10,23 +10,38 @@ import {
   useV1MasterSports,
   useV1MyTeams,
   useV1TeamMatchEdit,
+  useV1TeamRecentVenues,
   useV1UpdateTeamMatch,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
-import { labelToLevelCode } from '@/lib/v1-levels';
+import { labelToLevelCode, levelCodeToLabel, V1_LEVELS, type V1LevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
-import type { V1MyTeam, V1TeamMatchEdit, V1TeamMatchMutationPayload } from '@/types/api';
+import type { V1MyTeam, V1TeamMatchEdit } from '@/types/api';
 import { TeamMatchCreatePageView } from './team-matches-page';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
+import { teamMatchStepHref } from './team-matches.routes';
+import {
+  buildTeamMatchPayloadResult,
+  firstIncompleteTeamMatchStep,
+  getCompleteTeamMatchSteps,
+  getTeamMatchMissingFields,
+  getTeamMatchStepErrors,
+  normalizeGenderRule,
+  toFieldErrorMap,
+} from './team-matches.validation';
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
+
+const CREATE_STEP_ORDER: TeamMatchCreateStep[] = ['team', 'sport', 'info', 'condition', 'place-time'];
+// 진행 표시줄 클릭 이동에서 앞/뒤 판정에 쓴다 — confirm은 필수 필드가 없어
+// CREATE_STEP_ORDER(스텝 게이팅 대상)에는 없지만 이동 순서상 마지막 스텝이다.
+const FULL_STEP_ORDER: TeamMatchCreateStep[] = [...CREATE_STEP_ORDER, 'confirm'];
 
 const storageKey = 'teameet:v1:team-match-draft:v3';
 const selectionKey = 'teameet:v1:team-match-selection';
-const defaultGenderRule = '성별 무관';
 
 type TeamMatchDraft = TeamMatchCreateViewModel['draft'];
 type TeamMatchSelection = { teamId: string; sportId: string; regionId: string };
@@ -50,6 +65,10 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   });
   const [selectionHydrated, setSelectionHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "다음"/"팀매치 만들기"를 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다 — 진입하자마자
+  // 빈 칸을 전부 orange로 물들이지 않기 위함(스텝별로 별도 라우트라 매 스텝 마운트 시 초기화됨).
+  const [attempted, setAttempted] = useState(false);
+  const [pendingFocusField, setPendingFocusField] = useState<string | null>(null);
   const myTeams = normalizeMyTeams(teams.data);
   const allMyTeams = myTeams ?? [];
   const creatableTeams = allMyTeams.filter((team) => team.canCreateTeamMatch);
@@ -104,12 +123,43 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const selectedTeamId = selection.teamId;
   const selectedSportId = selection.sportId;
   const regionId = selection.regionId;
+  // #3 1단계: 이 팀이 확정되기 전(team 스텝 hydrate 이전)엔 훅 내부 enabled 게이트로 대기.
+  const recentVenues = useV1TeamRecentVenues(selectedTeamId);
   const updateSelection = (updater: (current: TeamMatchSelection) => TeamMatchSelection) => {
     setSelection((current) => {
       const next = updater(current);
       window.localStorage.setItem(selectionKey, JSON.stringify(next));
       return next;
     });
+  };
+
+  // #1·#2 결정의 공유 소스: 이 ctx로 스텝 게이팅과 최종 제출 결측 필드 안내를 둘 다 계산한다.
+  const validationCtx = { hostTeamId: selectedTeamId, sportId: selectedSportId, regionId, draft };
+  const fieldErrors = attempted ? getTeamMatchStepErrors(validationCtx, step) : {};
+  const missingFields = attempted && step === 'confirm' ? getTeamMatchMissingFields(validationCtx) : [];
+  const completeSteps = getCompleteTeamMatchSteps(validationCtx, CREATE_STEP_ORDER);
+
+  useEffect(() => {
+    if (!pendingFocusField) return;
+    const el = document.getElementById(`field-${pendingFocusField}`);
+    el?.focus();
+    setPendingFocusField(null);
+  }, [pendingFocusField]);
+
+  // 진행 표시줄 클릭 이동. 뒤로 가는 이동(target <= current)은 항상 허용한다. 앞으로 가는
+  // 이동은 target 이전의 모든 스텝을 검증해, 문제가 있으면 target 대신 첫 번째 무효
+  // 스텝으로 landing시킨다 — 검증 없이 아무 스텝이나 건너뛸 수 있으면 "다음"을 막는 의미가
+  // 없어진다.
+  const handleGoToStep = (target: TeamMatchCreateStep) => {
+    const targetIndex = FULL_STEP_ORDER.indexOf(target);
+    const currentIndex = FULL_STEP_ORDER.indexOf(step);
+    if (targetIndex <= currentIndex) {
+      router.push(teamMatchStepHref(target));
+      return;
+    }
+    const stepsBeforeTarget = CREATE_STEP_ORDER.slice(0, targetIndex);
+    const blockedStep = firstIncompleteTeamMatchStep(validationCtx, stepsBeforeTarget);
+    router.push(teamMatchStepHref(blockedStep ?? target));
   };
 
   const model = buildCreateModel({
@@ -132,6 +182,10 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       .map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
     regions: regionOptions,
     error,
+    fieldErrors,
+    missingFields: missingFields.length > 0 ? missingFields : undefined,
+    completeSteps,
+    recentVenues: recentVenues.data?.items,
     submitting: createTeamMatch.isPending,
     uploadImage: async (file) => {
       const result = await uploadImages.mutateAsync([file]);
@@ -156,19 +210,33 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
     onRegionChange: (value) => updateSelection((current) => ({ ...current, regionId: value })),
     onBack: () => router.push(previousHref(step)),
-    onNext: () => router.push(nextHref(step)),
+    onGoToStep: handleGoToStep,
+    onNext: () => {
+      // #1: "다음"은 절대 disabled 처리하지 않는다 — 대신 클릭 시 이 스텝의 필수 필드만 로컬
+      // 검증해 비어 있으면 이동을 막고, 인라인 에러 + 첫 invalid 필드로 focus를 옮긴다.
+      const errors = getTeamMatchStepErrors(validationCtx, step);
+      const firstInvalidField = Object.keys(errors)[0];
+      if (firstInvalidField) {
+        setAttempted(true);
+        setPendingFocusField(firstInvalidField);
+        return;
+      }
+      router.push(nextHref(step));
+    },
     onSubmit: () => {
       // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
       // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
       // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
       if (createTeamMatch.isPending) return;
       setError(null);
-      const payload = buildTeamMatchMutationPayload(draft, selectedTeamId, selectedSportId, regionId);
-      if (!payload) {
-        setError('팀, 종목, 지역, 제목, 상세주소, 날짜와 시간을 확인해 주세요.');
+      const payloadResult = buildTeamMatchPayloadResult(draft, selectedTeamId, selectedSportId, regionId);
+      if (payloadResult.missingFields) {
+        // #2: 하드코딩된 고정 문구 대신 실제 결측 필드만 지목 — model.form.missingFields로 전달되고
+        // ConfirmStep이 각 항목을 해당 스텝 링크와 함께 렌더링한다.
+        setAttempted(true);
         return;
       }
-      createTeamMatch.mutate(payload, {
+      createTeamMatch.mutate(payloadResult.payload, {
         onSuccess: (result) => {
           window.localStorage.removeItem(storageKey);
           window.localStorage.removeItem(selectionKey);
@@ -176,7 +244,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
           router.push(result.detailRoute || `/team-matches/${result.teamMatchId}`);
         },
         onError: (err) => {
-          const prompt = getCreatorProfilePrompt(err, '팀 매치');
+          const prompt = getCreatorProfilePrompt(err, '팀매치');
           if (prompt) {
             setError(prompt);
             void confirm({
@@ -217,6 +285,8 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   const [regionId, setRegionId] = useState('');
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // "변경사항 저장"을 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다(#1과 동일한 UX 원칙).
+  const [editAttempted, setEditAttempted] = useState(false);
   const myTeams = normalizeMyTeams(teams.data) ?? [];
   const currentTeam = myTeams.find((team) => team.teamId === editQuery.data?.form.hostTeamId);
   const teamOptions = editQuery.data
@@ -248,6 +318,12 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     setVersion(editQuery.data.version);
   }, [editQuery.data]);
 
+  // #2: edit 화면은 스텝 구분이 없는 한 화면이라 getTeamMatchMissingFields 를 그대로
+  // 평탄화(toFieldErrorMap)해서 각 CreateField 아래 인라인 에러로 붙인다.
+  const editCtx = { hostTeamId: selectedTeamId, sportId: selectedSportId, regionId, draft };
+  const editMissingFields = editAttempted ? getTeamMatchMissingFields(editCtx) : [];
+  const editFieldErrors = toFieldErrorMap(editMissingFields);
+
   const model = buildCreateModel({
     step: 'edit',
     draft,
@@ -262,6 +338,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       ? lockedReasonLabel(editQuery.data.lockedReason ?? '')
       : null,
     submitting: editQuery.isLoading || updateTeamMatch.isPending || cancelTeamMatch.isPending,
+    fieldErrors: editFieldErrors,
     uploadImage: async (file) => {
       const result = await uploadImages.mutateAsync([file]);
       const url = result.urls[0];
@@ -280,13 +357,20 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
       if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
       setError(null);
-      const payload = buildTeamMatchMutationPayload(draft, selectedTeamId, selectedSportId, regionId);
-      if (!payload || !version) {
-        setError('수정에 필요한 팀매치 정보를 확인해 주세요.');
+      const payloadResult = buildTeamMatchPayloadResult(draft, selectedTeamId, selectedSportId, regionId);
+      if (payloadResult.missingFields || !version) {
+        // #2: 실제 결측 필드만 지목 — 각 CreateField 아래 인라인 에러로 표시되고,
+        // 상단 배너는 몇 개가 비어 있는지만 간단히 안내한다(중복 문구 방지).
+        setEditAttempted(true);
+        setError(
+          payloadResult.missingFields
+            ? `${payloadResult.missingFields.length}개 항목을 확인해 주세요.`
+            : '수정에 필요한 팀매치 정보를 확인해 주세요.',
+        );
         return;
       }
       updateTeamMatch.mutate(
-        { ...payload, version },
+        { ...payloadResult.payload, version },
         {
           onSuccess: (result) => router.push(result.detailRoute || `/team-matches/${teamMatchId}`),
           onError: (err) => setError(extractErrorMessage(err, '팀매치를 수정할 수 없어요. 다시 시도해 주세요.')),
@@ -330,10 +414,15 @@ function buildCreateModel({
   onRegionChange,
   onBack,
   onNext,
+  onGoToStep,
   onSubmit,
   onCancel,
   submitLabel,
   backHref,
+  fieldErrors,
+  missingFields,
+  completeSteps,
+  recentVenues,
 }: {
   step: TeamMatchCreateStep;
   draft: TeamMatchDraft;
@@ -350,14 +439,23 @@ function buildCreateModel({
   uploadImage?: (file: File) => Promise<string>;
   onSelectTeam: (teamName: string) => void;
   onSelectSport: (sportName: string) => void;
-  onFieldChange: (field: keyof TeamMatchDraft, value: string | number) => void;
+  onFieldChange: (field: keyof TeamMatchDraft, value: string | number | string[]) => void;
   onRegionChange: (regionId: string) => void;
   onBack: () => void;
   onNext: () => void;
+  onGoToStep?: (step: TeamMatchCreateStep) => void;
   onSubmit: () => void;
   onCancel?: () => void;
   submitLabel?: string;
   backHref?: string;
+  /** #1·#2: 스텝별 즉시 검증(create)과 결측 필드 안내(create/edit)가 공유하는 필드 → 문구 맵. */
+  fieldErrors?: Partial<Record<string, string>>;
+  /** #2: confirm(create)/edit 제출 시도에서 실제로 비어 있는 필드 — ConfirmStep 배너가 렌더. */
+  missingFields?: NonNullable<TeamMatchCreateViewModel['form']>['missingFields'];
+  /** CreateProgress 체크 배지 — 이 스텝들의 필수 필드는 이미 다 채워졌다는 뜻. */
+  completeSteps?: TeamMatchCreateStep[];
+  /** #3 1단계: 장소 입력창 포커스 시 칩으로 노출할, 이 팀이 호스트로 쓴 최근 장소. */
+  recentVenues?: NonNullable<TeamMatchCreateViewModel['form']>['recentVenues'];
 }): TeamMatchCreateViewModel {
   const fallback = getTeamMatchCreateViewModel(step);
   const selectedTeam = teams.find((team) => team.id === selectedTeamId);
@@ -383,6 +481,7 @@ function buildCreateModel({
       onRegionChange,
       onBack,
       onNext,
+      onGoToStep,
       onSubmit,
       onCancel,
       submitLabel,
@@ -390,6 +489,10 @@ function buildCreateModel({
       uploadImage,
       error,
       lockedReason,
+      fieldErrors,
+      missingFields,
+      completeSteps,
+      recentVenues,
     },
   };
 }
@@ -452,20 +555,25 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
   const start = new Date(edit.form.startsAt);
   const end = edit.form.endsAt ? new Date(edit.form.endsAt) : null;
   const deadline = edit.form.deadlineAt ? new Date(edit.form.deadlineAt) : null;
-  const parsed = parseNotes(edit.form.rulesText, edit.form.costNote);
+  const costs = parseCostNote(edit.form.costNote);
+  const hasStructuredConditions =
+    Boolean(edit.form.matchFormat) || (edit.form.matchStyle?.length ?? 0) > 0 || Boolean(edit.form.uniformColor);
+  // 레거시 폴백: 구조화 컬럼 3종이 전부 비어 있는 미백필 row(예전 rulesText 자유텍스트만
+  // 있던 row)만 rulesText를 다시 파싱한다. 백필 CLI 실행 후에는 이 분기를 타지 않는다.
+  const legacy = hasStructuredConditions ? null : parseLegacyConditions(edit.form.rulesText);
 
   return {
     ...buildDefaultDraft(),
     title: edit.form.title,
     description: edit.form.description ?? '',
-    grade: levelCodeToDraftGrade(edit.form.minLevelCode) ?? parsed.grade,
-    format: parsed.format,
-    style: parsed.style,
-    uniform: parsed.uniform,
+    grade: levelCodeToDraftGrade(edit.form.minLevelCode) ?? legacy?.grade ?? '',
+    format: edit.form.matchFormat ?? legacy?.format ?? '',
+    style: edit.form.matchStyle?.length ? edit.form.matchStyle : legacy?.style ?? [],
+    uniform: edit.form.uniformColor ?? legacy?.uniform ?? '',
     gender: normalizeGenderRule(edit.form.genderRule),
     imageUrl: edit.form.imageUrl ?? '',
-    cost: parsed.cost,
-    opponentCost: parsed.opponentCost,
+    cost: costs.cost,
+    opponentCost: costs.opponentCost,
     venue: edit.form.manualPlaceName,
     address: edit.form.addressText ?? '',
     date: start.toISOString().slice(0, 10),
@@ -477,60 +585,55 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
 }
 
 function levelCodeToDraftGrade(code?: string | null) {
-  if (code === 'advanced') return 'A';
-  if (code === 'intermediate') return 'B';
-  if (code === 'novice') return 'C';
-  if (code === 'beginner') return 'D';
-  return null;
+  if (!code) return null;
+  const isKnownCode = V1_LEVELS.some((level) => level.code === code);
+  return isKnownCode ? levelCodeToLabel(code as V1LevelCode) : null;
 }
 
-export function buildTeamMatchMutationPayload(draft: TeamMatchDraft, hostTeamId: string, sportId: string, regionId: string): V1TeamMatchMutationPayload | null {
-  if (!hostTeamId || !sportId || !regionId || !draft.title.trim() || !draft.venue.trim() || !draft.date || !draft.startTime) return null;
-  const startsAt = new Date(`${draft.date}T${draft.startTime}:00`);
-  const endsAt = draft.endTime ? new Date(`${draft.date}T${draft.endTime}:00`) : null;
-  const deadlineAt = draft.deadlineDate && draft.deadlineTime
-    ? new Date(`${draft.deadlineDate}T${draft.deadlineTime}:00`)
-    : null;
-  if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) return null;
-  if (deadlineAt && (Number.isNaN(deadlineAt.getTime()) || deadlineAt >= startsAt)) return null;
-
-  return {
-    hostTeamId,
-    sportId,
-    regionId,
-    title: draft.title.trim(),
-    description: draft.description.trim() || null,
-    startsAt: startsAt.toISOString(),
-    endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
-    deadlineAt: deadlineAt?.toISOString() ?? null,
-    imageUrl: draft.imageUrl.trim() || null,
-    manualPlaceName: draft.venue.trim(),
-    addressText: draft.address.trim() || null,
-    costNote: draft.cost || draft.opponentCost ? `총 ${draft.cost.toLocaleString('ko-KR')}원 · 상대팀 ${draft.opponentCost.toLocaleString('ko-KR')}원` : null,
-    rulesText: [draft.grade, draft.format, draft.style, draft.uniform].filter(Boolean).join(' · ') || null,
-    minLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,
-    maxLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,
-    genderRule: normalizeGenderRule(draft.gender),
-  };
-}
-
-function normalizeGenderRule(value?: string | null) {
-  if (value === '남' || value === '여') return value;
-  return defaultGenderRule;
-}
-
-function parseNotes(rulesText?: string | null, costNote?: string | null) {
-  const rules = rulesText?.split(' · ') ?? [];
+// buildTeamMatchMutationPayload는 team-matches.validation.ts의 buildTeamMatchPayloadResult로
+// 이관됐다(위저드 스텝 게이팅 리팩터, PR #293) — matchFormat/matchStyle/uniformColor 구조화
+// 컬럼 기록은 그 함수에 포팅돼 있다. normalizeGenderRule도 같은 파일에서 import해 쓴다
+// (defaultGenderRule은 이제 이 파일이 아니라 team-matches.validation.ts가 소유).
+function parseCostNote(costNote?: string | null) {
   const amounts = costNote?.match(/\d[\d,]*/g)?.map((value) => Number(value.replace(/,/g, ''))) ?? [];
   const fallback = buildDefaultDraft();
 
   return {
-    grade: rules[0] ?? fallback.grade,
-    format: rules[1] ?? fallback.format,
-    style: rules[2] ?? fallback.style,
-    uniform: rules[3] ?? fallback.uniform,
     cost: amounts[0] ?? fallback.cost,
     opponentCost: amounts[1] ?? fallback.opponentCost,
+  };
+}
+
+// 레거시 폴백 전용: 백필 CLI 실행 전, 구조화 컬럼이 비어 있는 미마이그레이션 row의 rulesText를
+// create-client의 예전 [grade, format, style, uniform].filter(Boolean).join(' · ') 관례대로
+// 되짚는다.
+//
+// 그 예전 저장 로직은 filter(Boolean)으로 빈 필드를 건너뛰고 이어붙였다 — 네 필드 중 어느 것이든
+// 비워두면 join 결과에서 그냥 빠질 뿐 빈 자리로 남지 않아서, 빈 필드 뒤의 모든 값이 한 칸씩
+// 당겨진다. 그래서 세그먼트 개수만으로는 위치를 신뢰할 수 없다 — 예를 들어 'B · 친선 · 파랑'은
+// [grade,format,uniform](style을 비움)일 수도, [grade,style,uniform](format을 비움)일 수도 있어
+// 구분할 방법이 없다. 원래 4필드가 모두 채워져 있었다는 게 확실한 경우(세그먼트 4개)에만
+// [grade, format, style, uniform] 위치 매핑을 신뢰하고, 그 외에는 값을 잃지도 틀린 칸에
+// 잘못 배정하지도 않도록 전부 style 배열에 그대로 담는다
+// (team-match-conditions-backfill.ts의 동일한 판단 근거 참고 — 서버 백필도 같은 규칙을 쓴다).
+function parseLegacyConditions(rulesText?: string | null) {
+  const rules = (rulesText ?? '').split(' · ').map((part) => part.trim()).filter(Boolean);
+  const fallback = buildDefaultDraft();
+
+  if (rules.length === 4) {
+    return {
+      grade: rules[0] || fallback.grade,
+      format: rules[1] || fallback.format,
+      style: rules[2] ? [rules[2]] : fallback.style,
+      uniform: rules[3] || fallback.uniform,
+    };
+  }
+
+  return {
+    grade: fallback.grade,
+    format: fallback.format,
+    style: rules.length ? rules : fallback.style,
+    uniform: fallback.uniform,
   };
 }
 

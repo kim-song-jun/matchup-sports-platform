@@ -83,7 +83,8 @@ pull_release_images
 activate_alpha_release_source "${previous_sha}"
 write_release_metadata "${PREVIOUS_MANIFEST}"
 
-"${compose[@]}" up -d --no-deps v1_api v1_web
+"${compose[@]}" up -d --force-recreate --no-deps \
+  v1_api v1_web v1_game_operations_worker
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 wait_for_alpha_health_contract
 assert_running_release_digests

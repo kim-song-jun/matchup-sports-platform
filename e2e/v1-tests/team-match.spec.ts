@@ -92,10 +92,16 @@ test.describe('[host] 팀매치 목록 플로우', () => {
     await page.getByRole('button', { name: '다음', exact: true }).click();
 
     await expect(page.getByRole('heading', { name: '경기조건' })).toBeVisible();
-    await page.getByLabel('실력등급').fill('B');
-    await page.getByLabel('경기방식').fill('5:5 풋살');
-    await page.getByLabel('경기 스타일').fill('친선');
-    await page.getByLabel('유니폼 색상').fill('파랑');
+    // 경기조건 필드는 이제 선택식 칩(PresetChipSelector/MultiPresetChipSelector)이라
+    // getByLabel().fill()이 아니라 칩 클릭으로 값을 고른다. 경기방식은 종목별로 프리셋
+    // 목록이 달라(축구 11:11.. / 풋살 6:6..) 어떤 팀이 선택됐는지에 test가 의존하지
+    // 않도록 "직접입력" 경로로 값을 넣는다.
+    await page.getByRole('group', { name: '실력등급' }).getByRole('button', { name: '중수' }).click();
+    const formatField = page.locator('.tm-create-field').filter({ has: page.getByRole('group', { name: '경기방식' }) });
+    await formatField.getByRole('button', { name: '직접입력' }).click();
+    await formatField.locator('input.tm-create-native-input').fill('5:5 풋살');
+    await page.getByRole('group', { name: '경기 스타일' }).getByRole('button', { name: '친선', exact: true }).click();
+    await page.getByRole('group', { name: '유니폼 색상' }).getByRole('button', { name: '파랑', exact: true }).click();
     await page.getByLabel('총비용').fill('100000');
     await page.getByLabel('상대팀 부담금').fill('50000');
     await page.getByRole('button', { name: '다음', exact: true }).click();

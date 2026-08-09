@@ -156,6 +156,20 @@ export class CreateTournamentDto {
   @Max(50, { message: '여성 최대 인원은 50명을 넘을 수 없어요.' })
   genderMaxFemale?: number;
 
+  /**
+   * "출전 인원"(경기장에 서는 라인업 상한, GK 포함) — `V1CompetitionConfigVersion.lineup.maxPlayers`로
+   * 옮겨진다. 위 `minPlayers`/`maxPlayers`(대회 "등록" 로스터 크기)와는 완전히 다른 값이니
+   * 혼동하지 말 것. 생략하면 종목의 canonical 기본값을 그대로 쓴다(football 11명 / futsal 6명).
+   * 선택 가능한 값은 종목마다 다르며 `LineupSizeConfigResolver`가 서버에서 검증한다
+   * (지원하지 않는 값은 422 LINEUP_SIZE_UNSUPPORTED).
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '출전 인원은 정수여야 해요.' })
+  @Min(1, { message: '출전 인원은 1명 이상이어야 해요.' })
+  @Max(50, { message: '출전 인원은 50명을 넘을 수 없어요.' })
+  lineupMaxPlayers?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '참가비는 정수여야 해요.' })
@@ -409,6 +423,20 @@ export class UpdateTournamentDto {
   @Min(0, { message: '여성 최대 인원은 0명 이상이어야 해요.' })
   @Max(50, { message: '여성 최대 인원은 50명을 넘을 수 없어요.' })
   genderMaxFemale?: number | null;
+
+  /**
+   * "출전 인원"(라인업 상한) 변경. 대회에 아직 완료되지 않은 픽스처만 있고 status가
+   * in_progress/completed가 아닐 때만 허용된다 — TournamentsAdminService.update()가
+   * TournamentCompetitionConfig.change()(기존 repoint 경로)를 그대로 재사용해 CAS +
+   * "완료된 경기는 소급하지 않는다" 불변식을 지킨다. 자세한 제약은 CreateTournamentDto의
+   * 같은 필드 주석 참고.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '출전 인원은 정수여야 해요.' })
+  @Min(1, { message: '출전 인원은 1명 이상이어야 해요.' })
+  @Max(50, { message: '출전 인원은 50명을 넘을 수 없어요.' })
+  lineupMaxPlayers?: number;
 
   @IsOptional()
   @Type(() => Number)

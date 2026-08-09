@@ -10,7 +10,7 @@ export function getLoginViewModel(redirectPath?: string | null): LoginViewModel 
     heroSub: 'Teameet에 오신 걸 환영해요',
     emailHref,
     guestHref: '/home',
-    signupHref: '/terms',
+    signupHref: '/terms?mode=signup',
     providers: [
       { label: '카카오', background: 'var(--kakao-yellow)', foreground: 'var(--static-black)', ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref },
       { label: '네이버', background: 'var(--naver-green)', foreground: 'var(--static-white)', disabled: true },
@@ -64,7 +64,7 @@ export function getEmailLoginViewModel(): EmailLoginViewModel {
     ],
     primary: { label: '로그인', tone: 'primary' },
     forgot: { label: '비밀번호 찾기', href: '/auth/password-reset', tone: 'neutral' },
-    signupHref: '/terms',
+    signupHref: '/terms?mode=signup',
     notice: undefined,
   };
 }
@@ -166,7 +166,7 @@ export function getTermsViewModel(): TermsViewModel {
 
 export function getSignupFormViewModel(): SignupFormViewModel {
   return {
-    backHref: '/terms',
+    backHref: '/terms?mode=signup',
     title: '계정을 만들고\n운동 설정을 이어가요',
     sub: '가입 후 종목, 실력, 지역을 설정하면 딱 맞는 매치를 추천받을 수 있어요.',
     fields: [

@@ -361,8 +361,17 @@ The sections below fill project-specific gaps while preserving curated content a
   알리고 멈춘다. 사용자가 GitHub에서 PR을 머지하는 것이 유일한 승격 경로이고, 자동으로 승격하는
   워크플로는 없다(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이다).
 - **`main`에 dev에 없는 커밋이 생겼다면** `origin/main → dev` 방향으로만 흡수한다.
-- **`main`에는 브랜치 보호가 없다**(2026-07-31 확인). 직접 push도 막히지 않고 그대로 프로덕션
-  배포로 이어진다 — 관례로만 지켜지는 상태이므로 더 조심한다.
+- **`main`에는 classic branch protection은 없지만 ruleset이 걸려 있다**(2026-08-09 실측 정정).
+  `branches/main/protection`은 `404 Branch not protected`지만, ruleset "Copilot review for
+  default branch"(active)가 `deletion`·`non_fast_forward`·`copilot_code_review`를 강제한다 —
+  main으로의 force-push·삭제는 실제로 막힌다(#231 롤백이 `git revert`로만 가능했던 이유).
+  일반 fast-forward 직접 push는 여전히 가능해 그대로 프로덕션 배포로 이어지므로 더 조심한다.
+  확인은 `gh api repos/<owner>/<repo>/rulesets`(classic protection API만 보면 놓친다).
+- **머지·push 전에 항상 `baseRefName`을 확인한다.** dev용 PR을 `mergeable`/CI만 보고 머지했다가
+  base가 main이라 프로덕션에 머지된 사고가 있었다(2026-08-09). `gh pr merge`는 PR의 base로
+  머지하니, 직전에 `gh pr view <N> --json baseRefName`으로 `dev`임을 확인하고 아니면
+  `gh pr edit <N> --base dev`로 재타깃한다. main은 ruleset 때문에 force-push 롤백이 안 돼
+  `git revert`로만 수습되므로 사전 확인이 유일한 값싼 방어다.
 - **dev push = alpha 자동 실배포.** `deploy-alpha.yml`이 승인 게이트 없이
   alpha.teameet.co.kr에 배포한다 → **dev 머지 전 검증(테스트·tsc·lint)을 실배포
   게이트로 취급하라.**
@@ -439,6 +448,13 @@ The sections below fill project-specific gaps while preserving curated content a
   `gh run rerun <id> --failed`.
 - **로컬 tsc 통과 ≠ CI 빌드 통과.** 공유 트리의 로컬 검사는 *미커밋 워킹트리*(타 세션 것 포함)를
   보지만 CI는 **커밋본**을 빌드한다. push 전 커밋본 기준으로 확인하라.
+- **런타임·환경 의존 동작은 로컬 포렌식 말고 alpha 배포로 검증한다(Critical, 2026-08-09 실사고).**
+  SSR 상태코드·스트리밍·프로덕션 렌더처럼 환경에 따라 달라지는 동작은 로컬 `next start`/`next build`
+  반복 실험에 세션을 태우지 말고, **fix 후보를 dev 머지해 alpha 실배포에서 직접 재측정**하라(이 레포의
+  ground truth). 실사고: schedule not-found HTTP 200 을 로컬에서 파다 좀비 next-server(`kill`이 래퍼만
+  죽여 자식이 포트 점유 → stale 빌드 서빙)와 병렬 `next dev` 로 거짓 결론을 냈다. 불가피하게 로컬 prod
+  렌더가 필요하면 `next start` 대신 `node .next/standalone/apps/v1_web/server.js` + fresh 포트 + `lsof`
+  로 실제 PID 확인·종료. 그래도 1순위는 alpha 배포-측정.
 
 ## S7) 로컬 dev 서버 · 호스트 부하
 

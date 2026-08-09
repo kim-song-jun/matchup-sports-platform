@@ -31,6 +31,9 @@ export type TournamentCreateState = {
   teamCount: string;
   minPlayers: string;
   maxPlayers: string;
+  /** "출전 인원"(라인업 상한) — 위 minPlayers/maxPlayers(등록 로스터 크기)와 다른 값.
+   * 빈 문자열이면 아직 안 골랐거나 종목의 canonical 기본값을 그대로 쓴다는 뜻이다. */
+  lineupMaxPlayers: string;
   genderMinMale: string;
   genderMaxMale: string;
   genderMinFemale: string;
@@ -78,6 +81,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   teamCount: '8',
   minPlayers: '6',
   maxPlayers: '10',
+  lineupMaxPlayers: '',
   genderMinMale: '',
   genderMaxMale: '',
   genderMinFemale: '',
@@ -128,6 +132,12 @@ export function tournamentCreateReducer(
     case 'set-step':
       return { ...state, step: Math.max(0, Math.min(TOURNAMENT_CREATE_STEPS.length - 1, action.step)) };
     case 'set-field':
+      // 종목이 바뀌면 이전 종목 기준으로 고른 출전 인원은 더 이상 유효한 선택지가
+      // 아닐 수 있다(예: 풋살 6명 → 축구로 바꾸면 6명은 선택 불가) — 함께 초기화해
+      // 새 종목의 선택지 목록이 로드되면 컴포넌트가 canonical 기본값으로 다시 채운다.
+      if (action.field === 'sportId' && action.value !== state.sportId) {
+        return { ...state, sportId: action.value as string, lineupMaxPlayers: '' };
+      }
       return { ...state, [action.field]: action.value };
     case 'set-scheduled-at': {
       const registrationDeadlineAt = state.registrationDeadlineDirty
@@ -300,6 +310,7 @@ export function buildTournamentCreatePayload(
     teamCount: Number(state.teamCount),
     minPlayers: Number(state.minPlayers),
     maxPlayers: Number(state.maxPlayers),
+    lineupMaxPlayers: state.lineupMaxPlayers ? Number(state.lineupMaxPlayers) : undefined,
     entryFee: Number(state.entryFee || '0'),
     bankName: state.bankName.trim() || undefined,
     bankAccount: state.bankAccount.trim() || undefined,

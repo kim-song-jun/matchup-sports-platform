@@ -28,37 +28,51 @@ function git(args, options = {}) {
   }).trim();
 }
 
-function changedFilesForRange() {
+function resolveCommitRange() {
   const head = process.env.GITHUB_SHA || 'HEAD';
-  const files = new Set();
-
   const before = process.env.GITHUB_EVENT_BEFORE;
   if (before && !/^0+$/.test(before)) {
-    for (const file of git(['diff', '--name-only', before, head]).split(/\r?\n/).filter(Boolean)) {
-      files.add(file);
-    }
-    return files;
+    return { base: before, head };
   }
 
   const baseRef = process.env.GITHUB_BASE_REF;
   if (baseRef) {
     try {
       git(['fetch', '--no-tags', '--depth=1', 'origin', baseRef], { allowFailure: true });
-      for (const file of git(['diff', '--name-only', `origin/${baseRef}...${head}`]).split(/\r?\n/).filter(Boolean)) {
-        files.add(file);
-      }
-      return files;
+      git(['rev-parse', '--verify', `origin/${baseRef}`]);
+      return { base: `origin/${baseRef}`, head, mergeBase: true };
     } catch {
-      // Fall through to local diff.
+      // Fall through to the local commit range.
     }
   }
 
   try {
-    for (const file of git(['diff', '--name-only', 'HEAD~1', head]).split(/\r?\n/).filter(Boolean)) {
-      files.add(file);
-    }
+    git(['rev-parse', '--verify', 'HEAD~1']);
+    return { base: 'HEAD~1', head };
   } catch {
-    // A first commit or shallow local checkout can lack HEAD~1.
+    return null;
+  }
+}
+
+function gitDiffArgs(range, extraArgs) {
+  if (range.mergeBase) {
+    return ['diff', ...extraArgs, `${range.base}...${range.head}`];
+  }
+  return ['diff', ...extraArgs, range.base, range.head];
+}
+
+function changedFilesForRange() {
+  const files = new Set();
+  const range = resolveCommitRange();
+  if (range) {
+    try {
+      for (const file of git(gitDiffArgs(range, ['--name-only'])).split(/\r?\n/).filter(Boolean)) {
+        files.add(file);
+      }
+      return files;
+    } catch {
+      // Fall through to local diff when the configured range is unavailable.
+    }
   }
 
   for (const file of git(['diff', '--name-only']).split(/\r?\n/).filter(Boolean)) {
@@ -72,6 +86,208 @@ function changedFilesForRange() {
   }
 
   return files;
+}
+
+function schemaDiffForRange() {
+  const range = resolveCommitRange();
+  if (!range) {
+    return null;
+  }
+
+  try {
+    const args = range.mergeBase
+      ? ['diff', '--unified=0', '--no-ext-diff', `${range.base}...${range.head}`]
+      : ['diff', '--unified=0', '--no-ext-diff', range.base, range.head];
+    return git([...args, '--', 'apps/v1_api/prisma/schema.prisma']);
+  } catch {
+    return null;
+  }
+}
+
+function extractRelationMapAdditions(schemaDiff) {
+  if (!schemaDiff) {
+    return null;
+  }
+
+  const additions = [];
+  const hunks = schemaDiff.split(/^@@/m).slice(1);
+  if (hunks.length === 0) {
+    return null;
+  }
+
+  for (const hunk of hunks) {
+    const removed = [];
+    const added = [];
+    for (const line of hunk.split(/\r?\n/)) {
+      if (line.startsWith('-') && !line.startsWith('---')) {
+        removed.push(line.slice(1));
+      } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        added.push(line.slice(1));
+      }
+    }
+
+    if (removed.length !== 1 || added.length !== 1) {
+      return null;
+    }
+
+    const [beforeLine] = removed;
+    const [afterLine] = added;
+    if (!beforeLine.includes('@relation(') || beforeLine.includes('map:')) {
+      return null;
+    }
+
+    const beforeClosingParen = beforeLine.lastIndexOf(')');
+    if (beforeClosingParen !== beforeLine.length - 1) {
+      return null;
+    }
+
+    const relationMapAddition = new RegExp(
+      `^${escapeRegExp(beforeLine.slice(0, -1))}, map: "([A-Za-z_][A-Za-z0-9_]*)"\\)$`,
+    );
+    const match = afterLine.match(relationMapAddition);
+    if (!match) {
+      return null;
+    }
+
+    additions.push({ constraintName: match[1], afterLine });
+  }
+
+  return additions.length > 0 ? additions : null;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function parsePrismaIdentifierList(value) {
+  const names = value.split(',').map((name) => name.trim());
+  if (names.length === 0 || names.some((name) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) {
+    return null;
+  }
+  return names;
+}
+
+function parseQuotedSqlColumns(value) {
+  const columns = value.split(',').map((column) => column.trim().match(/^"([^"]+)"$/)?.[1]);
+  return columns.every(Boolean) ? columns : null;
+}
+
+function parsePrismaModels(schema) {
+  const models = new Map();
+  let currentModel = null;
+
+  for (const line of schema.split(/\r?\n/)) {
+    const modelStart = line.match(/^model\s+([A-Za-z_][A-Za-z0-9_]*)\s+\{$/);
+    if (modelStart) {
+      currentModel = { name: modelStart[1], table: modelStart[1], fields: new Map(), relationLines: new Map() };
+      models.set(currentModel.name, currentModel);
+      continue;
+    }
+
+    if (currentModel && line === '}') {
+      currentModel = null;
+      continue;
+    }
+
+    if (!currentModel) {
+      continue;
+    }
+
+    const tableMap = line.match(/^\s*@@map\("([^"]+)"\)/);
+    if (tableMap) {
+      currentModel.table = tableMap[1];
+      continue;
+    }
+
+    const field = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\[\]|\?)?/);
+    if (!field) {
+      continue;
+    }
+
+    const [, fieldName, fieldType] = field;
+    const columnMap = line.match(/@map\("([^"]+)"\)/)?.[1] || fieldName;
+    currentModel.fields.set(fieldName, columnMap);
+    if (line.includes('@relation(')) {
+      currentModel.relationLines.set(line, { fieldName, targetModel: fieldType });
+    }
+  }
+
+  return models;
+}
+
+function relationShapeForMapAddition(schema, afterLine) {
+  const models = parsePrismaModels(schema);
+  for (const model of models.values()) {
+    const relation = model.relationLines.get(afterLine);
+    if (!relation) {
+      continue;
+    }
+
+    const relationArguments = afterLine.match(/@relation\((.*)\)$/)?.[1];
+    const fieldsMatch = relationArguments?.match(/(?:^|,\s*)fields:\s*\[([^\]]+)\]/);
+    const referencesMatch = relationArguments?.match(/(?:^|,\s*)references:\s*\[([^\]]+)\]/);
+    if (!fieldsMatch || !referencesMatch) {
+      return null;
+    }
+
+    const fields = parsePrismaIdentifierList(fieldsMatch[1]);
+    const references = parsePrismaIdentifierList(referencesMatch[1]);
+    const targetModel = models.get(relation.targetModel);
+    if (!fields || !references || fields.length !== references.length || !targetModel) {
+      return null;
+    }
+
+    const sourceColumns = fields.map((field) => model.fields.get(field));
+    const targetColumns = references.map((field) => targetModel.fields.get(field));
+    if (sourceColumns.some((column) => !column) || targetColumns.some((column) => !column)) {
+      return null;
+    }
+
+    return { sourceTable: model.table, sourceColumns, targetTable: targetModel.table, targetColumns };
+  }
+
+  return null;
+}
+
+function migrationContainsMatchingForeignKey(constraintName, relationShape) {
+  const migrationFiles = git(['ls-files', 'apps/v1_api/prisma/migrations']).split(/\r?\n/).filter(Boolean);
+  const constraintPattern = new RegExp(
+    `CONSTRAINT\\s+"${escapeRegExp(constraintName)}"\\s+FOREIGN\\s+KEY\\s*\\(([^)]*)\\)\\s+REFERENCES\\s+"([^"]+)"\\s*\\(([^)]*)\\)`,
+    'gi',
+  );
+
+  for (const migrationFile of migrationFiles) {
+    const sql = readFileSync(migrationFile, 'utf8');
+    for (const match of sql.matchAll(constraintPattern)) {
+      const sourceTableMatches = [...sql.slice(0, match.index).matchAll(/CREATE\s+TABLE\s+"([^"]+)"\s*\(/gi)];
+      const sourceTable = sourceTableMatches.at(-1)?.[1];
+      const sourceColumns = parseQuotedSqlColumns(match[1]);
+      const targetColumns = parseQuotedSqlColumns(match[3]);
+      if (
+        sourceTable === relationShape.sourceTable
+        && match[2] === relationShape.targetTable
+        && JSON.stringify(sourceColumns) === JSON.stringify(relationShape.sourceColumns)
+        && JSON.stringify(targetColumns) === JSON.stringify(relationShape.targetColumns)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function isExistingForeignKeyMapAlignment() {
+  const additions = extractRelationMapAdditions(schemaDiffForRange());
+  if (!additions) {
+    return false;
+  }
+
+  const schema = readFileSync('apps/v1_api/prisma/schema.prisma', 'utf8');
+  return additions.every((addition) => {
+    const relationShape = relationShapeForMapAddition(schema, addition.afterLine);
+    return relationShape && migrationContainsMatchingForeignKey(addition.constraintName, relationShape);
+  });
 }
 
 function checkForbiddenDeployPatterns(errors) {
@@ -95,7 +311,7 @@ function checkSchemaMigrationPair(errors) {
   const schemaChanged = changed.has('apps/v1_api/prisma/schema.prisma');
   const migrationChanged = [...changed].some((file) => file.startsWith('apps/v1_api/prisma/migrations/'));
 
-  if (schemaChanged && !migrationChanged) {
+  if (schemaChanged && !migrationChanged && !isExistingForeignKeyMapAlignment()) {
     errors.push(
       [
         'apps/v1_api/prisma/schema.prisma changed without a matching migration under apps/v1_api/prisma/migrations/.',

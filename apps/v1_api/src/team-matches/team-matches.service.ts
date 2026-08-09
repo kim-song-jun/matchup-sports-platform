@@ -5,17 +5,36 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1TeamMatch, V1TeamMatchApplication } from '@prisma/client';
+import {
+  Prisma,
+  V1GameSideKey,
+  V1GameSourceType,
+  V1TeamMatch,
+  V1TeamMatchApplication,
+} from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import {
+  canonicalGameCommandPayloadHash,
+  GamesService,
+} from '../games/games.service';
+import type {
+  GameCommandContext,
+  GameSourceCreationInput,
+} from '../games/games.types';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  cascadeCancelTeamMatchSchedulesInTx,
+  createTeamMatchScheduleInTx,
+  syncTeamMatchScheduleInTx,
+} from '../team-schedules/team-schedules.service';
+import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   CancelTeamMatchDto,
   CloseTeamMatchDto,
-  CompleteTeamMatchDto,
   MutateTeamMatchDto,
   ReopenTeamMatchDto,
   UpdateTeamMatchDto,
@@ -45,6 +64,7 @@ type TeamMatchWithRelations = V1TeamMatch & {
   };
   approvedApplicantTeam: { id: string; name: string } | null;
   applications: Array<V1TeamMatchApplication & { applicantTeam: { id: string; name: string } }>;
+  game: { id: string } | null;
 };
 
 @Injectable()
@@ -52,6 +72,7 @@ export class TeamMatchesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly games: GamesService,
   ) {}
 
   async list(user: V1AuthUser | null, query: TeamMatchesQueryDto) {
@@ -67,12 +88,17 @@ export class TeamMatchesService {
         ...(query.teamId ? { hostTeamId: query.teamId } : {}),
         ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
         ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
+        // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
+        // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
+        // 경기가 0건으로 나왔다.
         ...(query.query
           ? {
               OR: [
                 { title: { contains: query.query, mode: 'insensitive' } },
                 { description: { contains: query.query, mode: 'insensitive' } },
                 { placeName: { contains: query.query, mode: 'insensitive' } },
+                { hostTeam: { name: { contains: query.query, mode: 'insensitive' } } },
+                { region: { name: { contains: query.query, mode: 'insensitive' } } },
               ],
             }
           : {}),
@@ -108,6 +134,10 @@ export class TeamMatchesService {
 
     return {
       teamMatchId: teamMatch.id,
+      // Task 17: null only if a pre-Task-6 row somehow lacks a Game (creation
+      // always provisions one in the same transaction), never a legitimate
+      // steady-state value.
+      gameId: teamMatch.game?.id ?? null,
       title: teamMatch.title,
       description: teamMatch.description,
       imageUrl: teamMatch.imageUrl,
@@ -123,8 +153,11 @@ export class TeamMatchesService {
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
-      rulesText: [teamMatch.formatNote, teamMatch.genderRule].filter(Boolean).join(' · ') || null,
+      rulesText: this.formatMatchConditionsRulesText(teamMatch),
       genderRule: teamMatch.genderRule,
+      matchFormat: teamMatch.matchFormat,
+      matchStyle: teamMatch.matchStyle,
+      uniformColor: teamMatch.uniformColor,
       paymentRequired: false,
       hostTeam: {
         teamId: teamMatch.hostTeam.id,
@@ -143,6 +176,41 @@ export class TeamMatchesService {
           : null,
       viewer,
     };
+  }
+
+  /**
+   * #3 1단계: 새 Venue 테이블 없이, 이 팀이 호스트로 과거에 실제로 입력했던 장소를
+   * 최근 것부터 최대 5개 돌려준다. 위저드의 장소 입력창 포커스 시 칩으로
+   * 노출해 탭 한 번으로 채울 수 있게 한다. 팀 관리자만 조회할 수 있게
+   * assertCanManageTeam로 게이팅(생성 권한과 동일한 기준).
+   *
+   * Prisma `distinct`는 Postgres `DISTINCT ON`으로 컴파일되는데, 이때
+   * `orderBy`가 distinct 필드로 시작해야 한다 — `distinct: ['placeName']` +
+   * `orderBy: { createdAt: 'desc' }` 조합은 "최근순 distinct 장소"라는 의도와
+   * 어긋난다(team-match-series-admin.service.ts의 loadRecentVenues와 동일한
+   * 이유로, 넉넉히 가져온 뒤 애플리케이션에서 dedup한다).
+   */
+  async recentVenues(user: V1AuthUser, teamId: string) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const rows = await this.prisma.v1TeamMatch.findMany({
+      where: { hostTeamId: teamId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: { placeName: true, placeAddress: true },
+    });
+    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(team-match-series-admin
+    // .service.ts의 loadRecentVenues와 동일한 방어) — 안 하면 공백만 다른 "중복" 장소가
+    // 서로 다른 칩으로 뜨거나, 공백뿐인 값이 빈 칩으로 렌더될 수 있다.
+    const seen = new Set<string>();
+    const items: { placeName: string; addressText: string | null }[] = [];
+    for (const row of rows) {
+      const placeName = row.placeName.trim();
+      if (!placeName || seen.has(placeName)) continue;
+      seen.add(placeName);
+      items.push({ placeName, addressText: row.placeAddress });
+      if (items.length >= 5) break;
+    }
+    return { items };
   }
 
   async applicationEligibility(
@@ -236,7 +304,23 @@ export class TeamMatchesService {
     };
   }
 
-  async create(user: V1AuthUser, dto: MutateTeamMatchDto) {
+  // Copilot 리뷰 finding(PR #295): matchFormat/matchStyle/uniformColor를 dto 값 그대로
+  // (trim 없이) 저장하면 공백뿐인 문자열이 DB에 남을 수 있다 — 그러면
+  // hasStructuredConditions(team-matches-create-client.tsx) 판정이 "구조화 필드가 채워져
+  // 있다"고 잘못 보고, 정작 표시할 값은 없는 채로 레거시 formatNote 폴백이 영구히 막힌다.
+  // create/update 양쪽에서 같은 정규화를 쓰도록 한 곳에 모은다.
+  private normalizeMatchConditionFields(dto: MutateTeamMatchDto) {
+    const matchFormat = dto.matchFormat?.trim() || null;
+    const matchStyle = (dto.matchStyle ?? []).map((item) => item.trim()).filter(Boolean);
+    const uniformColor = dto.uniformColor?.trim() || null;
+    return { matchFormat, matchStyle, uniformColor };
+  }
+
+  async create(
+    user: V1AuthUser,
+    dto: MutateTeamMatchDto,
+    durableCommandId?: string,
+  ) {
     this.assertActiveAccount(user);
     await assertCreatorProfileComplete(this.prisma, user.id);
     const hostMembership = await this.assertCanManageTeam(user.id, dto.hostTeamId);
@@ -245,9 +329,49 @@ export class TeamMatchesService {
     }
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const dates = this.validateDates(dto);
+    const payloadHash = canonicalGameCommandPayloadHash({
+      actorUserId: user.id,
+      dto,
+    });
+    const commandId = durableCommandId?.trim() || payloadHash;
 
-    const teamMatch = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`team-match-create:${user.id}:${commandId}`}, 0))`;
+      const existingCommand = await tx.v1IdempotencyRecord.findFirst({
+        where: {
+          actorUserId: user.id,
+          action: 'source_create',
+          resourceType: V1GameSourceType.TEAM_MATCH,
+          idempotencyKey: commandId,
+        },
+        select: { resourceId: true },
+      });
+      if (existingCommand !== null) {
+        const existingTeamMatch = await tx.v1TeamMatch.findUniqueOrThrow({
+          where: { id: existingCommand.resourceId },
+        });
+        const actorRole = await this.resolveTeamGameActorRole(
+          tx,
+          existingTeamMatch.hostTeamId,
+          user.id,
+        );
+        const input = await this.loadPersistedGameSourceInput(tx, existingTeamMatch.id);
+        const game = await this.games.createFromSourceInTransaction(
+          tx,
+          input,
+          this.teamMatchGameContext(user, actorRole, commandId, payloadHash),
+        );
+        return { teamMatch: existingTeamMatch, game };
+      }
+
+      const source = await this.loadTeamMatchCreationSource(
+        tx,
+        dto.hostTeamId,
+        dto.sportId,
+        user.id,
+      );
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
+      const conditionFields = this.normalizeMatchConditionFields(dto);
       const created = await tx.v1TeamMatch.create({
         data: {
           hostTeamId: dto.hostTeamId,
@@ -263,13 +387,28 @@ export class TeamMatchesService {
           endAt: dates.endsAt,
           deadlineAt: dates.deadlineAt,
           formatNote: dto.rulesText ?? null,
+          matchFormat: conditionFields.matchFormat,
+          matchStyle: conditionFields.matchStyle,
+          uniformColor: conditionFields.uniformColor,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
           costNote: dto.costNote ?? null,
           status: 'recruiting',
+          competitionConfigVersionId: source.competitionConfigVersionId,
         },
       });
+      const game = await this.games.createFromSourceInTransaction(
+        tx,
+        this.teamMatchGameSourceInput(created.id, source),
+        this.teamMatchGameContext(user, source.actorRole, commandId, payloadHash),
+      );
+      // 매치 ↔ 팀일정 연동(레인 schedule): "매치가 곧 팀일정" — 호스트는 장소·시간을 이미 확보한
+      // 상태이므로 상대팀 확정 여부와 무관하게 캘린더에 존재해야 한다. 같은 트랜잭션 안에서 호스트
+      // 팀에 가확정(SCHEDULED, 상대팀 모집 중) 스케줄 1건을 만든다. idempotency replay 분기(위
+      // existingCommand !== null 케이스)는 이 블록을 지나지 않으므로 재시도가 스케줄을 중복 생성하지
+      // 않는다 — @@unique([teamId, teamMatchId])가 그래도 마지막 방어선이다.
+      await createTeamMatchScheduleInTx(tx, dto.hostTeamId, created.id, dto.title, dates.startsAt, dates.endsAt);
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match',
@@ -281,15 +420,16 @@ export class TeamMatchesService {
           reason: 'team_match_created',
         },
       });
-      return created;
+      return { teamMatch: created, game };
     });
 
     return {
-      teamMatchId: teamMatch.id,
-      status: teamMatch.status,
-      hostTeamId: teamMatch.hostTeamId,
-      detailRoute: `/team-matches/${teamMatch.id}`,
-      manageRoute: `/team-matches/${teamMatch.id}/manage`,
+      teamMatchId: result.teamMatch.id,
+      gameId: result.game.gameId,
+      status: result.teamMatch.status,
+      hostTeamId: result.teamMatch.hostTeamId,
+      detailRoute: `/team-matches/${result.teamMatch.id}`,
+      manageRoute: `/team-matches/${result.teamMatch.id}/manage`,
     };
   }
 
@@ -318,6 +458,9 @@ export class TeamMatchesService {
         minLevelCode: teamMatch.minSportLevel?.code ?? null,
         maxLevelCode: teamMatch.maxSportLevel?.code ?? null,
         genderRule: teamMatch.genderRule,
+        matchFormat: teamMatch.matchFormat,
+        matchStyle: teamMatch.matchStyle,
+        uniformColor: teamMatch.uniformColor,
       },
       status: apiStatus,
       version: teamMatch.updatedAt.toISOString(),
@@ -333,29 +476,48 @@ export class TeamMatchesService {
     if (dto.sportId !== teamMatch.hostTeam.sportId) {
       throw validationError('sportId must match the host team sport', 'sportId');
     }
+    if (dto.sportId !== teamMatch.sportId) {
+      throw stateConflict(
+        'The sport cannot change after the Game competition config is pinned',
+        'COMPETITION_CONFIG_IMMUTABLE',
+      );
+    }
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
     const dates = this.validateDates(dto);
 
-    const updated = await this.prisma.v1TeamMatch.update({
-      where: { id: teamMatch.id },
-      data: {
-        sportId: dto.sportId,
-        regionId: dto.regionId,
-        title: dto.title,
-        description: dto.description ?? null,
-        imageUrl: dto.imageUrl ?? null,
-        placeName: dto.manualPlaceName,
-        placeAddress: dto.addressText ?? null,
-        startAt: dates.startsAt,
-        endAt: dates.endsAt,
-        deadlineAt: dates.deadlineAt,
-        formatNote: dto.rulesText ?? null,
-        minSportLevelId: levelRange.minSportLevelId,
-        maxSportLevelId: levelRange.maxSportLevelId,
-        genderRule: dto.genderRule ?? null,
-        costNote: dto.costNote ?? null,
-      },
+    // 매치 ↔ 팀일정 연동(레인 schedule): 매치 제목/시간이 바뀌면 호스트 스케줄도 같은 트랜잭션 안에서
+    // 동기화해야 캘린더가 실제와 어긋나지 않는다 — 이 메서드를 트랜잭션으로 승격한다(다른 4개
+    // 메서드와 달리 여기만 단일 update() 호출이었다). 경기조건 구조화 필드(matchFormat/matchStyle/
+    // uniformColor)는 이 트랜잭션 승격과 별개로 함께 저장해야 한다 — 둘 중 하나만 반영하면
+    // 일정 동기화가 빠지거나 새 경기조건 저장이 무효화된다.
+    const conditionFields = this.normalizeMatchConditionFields(dto);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const teamMatchUpdated = await tx.v1TeamMatch.update({
+        where: { id: teamMatch.id },
+        data: {
+          sportId: dto.sportId,
+          regionId: dto.regionId,
+          title: dto.title,
+          description: dto.description ?? null,
+          imageUrl: dto.imageUrl ?? null,
+          placeName: dto.manualPlaceName,
+          placeAddress: dto.addressText ?? null,
+          startAt: dates.startsAt,
+          endAt: dates.endsAt,
+          deadlineAt: dates.deadlineAt,
+          formatNote: dto.rulesText ?? null,
+          matchFormat: conditionFields.matchFormat,
+          matchStyle: conditionFields.matchStyle,
+          uniformColor: conditionFields.uniformColor,
+          minSportLevelId: levelRange.minSportLevelId,
+          maxSportLevelId: levelRange.maxSportLevelId,
+          genderRule: dto.genderRule ?? null,
+          costNote: dto.costNote ?? null,
+        },
+      });
+      await syncTeamMatchScheduleInTx(tx, teamMatch.id, dto.title, dates.startsAt, dates.endsAt);
+      return teamMatchUpdated;
     });
 
     return {
@@ -386,6 +548,9 @@ export class TeamMatchesService {
         where: { teamMatchId: teamMatch.id, status: 'requested' },
         data: { status: 'rejected', reviewedByUserId: user.id, reviewedAt: new Date() },
       });
+      // 매치 ↔ 팀일정 연동(레인 schedule): teamMatchId로 연결된 SCHEDULED 스케줄(호스트/상대 최대
+      // 2건)을 같은 트랜잭션 안에서 CANCELLED로 cascade한다 — row는 삭제하지 않는다.
+      await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatch.id, dto.reason ?? 'host_cancelled');
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match',
@@ -504,53 +669,6 @@ export class TeamMatchesService {
     return {
       teamMatchId: updated.id,
       status: updated.status,
-      detailRoute: `/team-matches/${teamMatch.id}`,
-    };
-  }
-
-  async complete(user: V1AuthUser, teamMatchId: string, dto: CompleteTeamMatchDto) {
-    this.assertActiveAccount(user);
-    const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
-    if (teamMatch.status === 'completed') {
-      throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Team match is already completed' });
-    }
-    if (teamMatch.status !== 'matched' || !teamMatch.approvedApplicantTeamId) {
-      throw stateConflict('Only matched team matches can be completed');
-    }
-    if (teamMatch.startAt > new Date()) {
-      throw stateConflict('Team match cannot be completed before it starts');
-    }
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const nextTeamMatch = await tx.v1TeamMatch.update({
-        where: { id: teamMatch.id },
-        data: { status: 'completed', completedAt: new Date() },
-      });
-      await tx.v1StatusChangeLog.create({
-        data: {
-          targetType: 'team_match',
-          targetId: teamMatch.id,
-          fromStatus: teamMatch.status,
-          toStatus: 'completed',
-          actorType: 'user',
-          actorUserId: user.id,
-          reason: dto.note ?? 'team_match_completed',
-        },
-      });
-      return nextTeamMatch;
-    });
-
-    this.emitNotificationToTeamManagers(
-      [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId],
-      'team_match_completed',
-      teamMatch.id,
-      `"${teamMatch.title}" 팀매치 리뷰를 남겨보세요.`,
-    );
-
-    return {
-      teamMatchId: updated.id,
-      status: updated.status,
-      completedAt: updated.completedAt,
       detailRoute: `/team-matches/${teamMatch.id}`,
     };
   }
@@ -832,6 +950,23 @@ export class TeamMatchesService {
           approvedApplicantTeamId: application.applicantTeamId,
         },
       });
+      await this.hydrateApprovedAwaySnapshot(
+        tx,
+        application.teamMatchId,
+        application.applicantTeamId,
+      );
+      // 매치 ↔ 팀일정 연동(레인 schedule): 승인된 상대팀에게도 같은 트랜잭션 안에서 스케줄을
+      // 만든다 — approveApplication은 "승인된 팀은 정확히 1개"를 이미 보장하므로(바로 아래 나머지
+      // requested 신청 자동 rejected 처리) 이 지점에서만 만들면 확정된 팀에게만 정확히 1건이
+      // 자동으로 보장된다. 이 시점엔 이미 확정 상태라 상대팀은 '가확정' 단계를 볼 일이 없다.
+      await createTeamMatchScheduleInTx(
+        tx,
+        application.applicantTeamId,
+        application.teamMatchId,
+        application.teamMatch.title,
+        application.teamMatch.startAt,
+        application.teamMatch.endAt,
+      );
       await tx.v1TeamMatchApplication.updateMany({
         where: {
           teamMatchId: application.teamMatchId,
@@ -1045,6 +1180,11 @@ export class TeamMatchesService {
         include: { applicantTeam: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' },
       },
+      // Task 17: the result-entry/approval screens need the underlying Game id
+      // to call `/api/v1/games/:gameId/result-revisions*` — detail() is the
+      // only route the v1 web client already fetches for a team match, so we
+      // surface the 1:1 Game relation here instead of adding a new endpoint.
+      game: { select: { id: true } },
     } satisfies Prisma.V1TeamMatchInclude;
   }
 
@@ -1071,8 +1211,11 @@ export class TeamMatchesService {
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
-      rulesText: [teamMatch.formatNote, teamMatch.genderRule].filter(Boolean).join(' · ') || null,
+      rulesText: this.formatMatchConditionsRulesText(teamMatch),
       genderRule: teamMatch.genderRule,
+      matchFormat: teamMatch.matchFormat,
+      matchStyle: teamMatch.matchStyle,
+      uniformColor: teamMatch.uniformColor,
       paymentRequired: false,
       viewerState: this.getViewerState(teamMatch, user),
     };
@@ -1193,6 +1336,254 @@ export class TeamMatchesService {
     return membership;
   }
 
+  private teamMatchGameContext(
+    user: V1AuthUser,
+    role: 'team_owner' | 'team_manager',
+    durableCommandId: string,
+    payloadHash: string,
+  ): GameCommandContext {
+    return {
+      actor: {
+        actorType: 'USER',
+        actorUserId: user.id,
+        role,
+      },
+      expectedVersion: 0,
+      durableCommandId,
+      payloadHash,
+    };
+  }
+
+  private async loadTeamMatchCreationSource(
+    tx: Prisma.TransactionClient,
+    hostTeamId: string,
+    sportId: string,
+    actorUserId: string,
+  ) {
+    const [competitionConfig, hostTeam] = await Promise.all([
+      resolveTeamMatchCompetitionConfig(tx, sportId),
+      tx.v1Team.findFirst({
+        where: { id: hostTeamId, status: 'active', deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          memberships: {
+            where: { status: 'active' },
+            orderBy: { id: 'asc' },
+            select: {
+              id: true,
+              userId: true,
+              role: true,
+              user: {
+                select: {
+                  profile: { select: { nickname: true, displayName: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    if (competitionConfig === null || hostTeam === null) {
+      throw new ConflictException({
+        code: 'COMPETITION_CONFIG_REQUIRED',
+        message: 'Team match creation requires an active competition config preset',
+      });
+    }
+    const actorMembership = hostTeam.memberships.find(
+      (membership) => membership.userId === actorUserId,
+    );
+    if (
+      actorMembership === undefined ||
+      (actorMembership.role !== 'owner' && actorMembership.role !== 'manager')
+    ) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'Only team owners or managers can create a team match game',
+      });
+    }
+    return {
+      hostTeam,
+      competitionConfigVersionId: competitionConfig.id,
+      actorRole:
+        actorMembership.role === 'owner'
+          ? ('team_owner' as const)
+          : ('team_manager' as const),
+    };
+  }
+
+  private async resolveTeamGameActorRole(
+    tx: Prisma.TransactionClient,
+    teamId: string,
+    actorUserId: string,
+  ): Promise<'team_owner' | 'team_manager'> {
+    const membership = await tx.v1TeamMembership.findFirst({
+      where: {
+        teamId,
+        userId: actorUserId,
+        status: 'active',
+        role: { in: ['owner', 'manager'] },
+      },
+      select: { role: true },
+    });
+    if (membership === null) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'Only team owners or managers can replay a team match command',
+      });
+    }
+    return membership.role === 'owner' ? 'team_owner' : 'team_manager';
+  }
+
+  private teamMatchGameSourceInput(
+    teamMatchId: string,
+    source: Awaited<ReturnType<TeamMatchesService['loadTeamMatchCreationSource']>>,
+  ): GameSourceCreationInput {
+    return {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: teamMatchId,
+      competitionConfigVersionId: source.competitionConfigVersionId,
+      sides: [
+        {
+          sideKey: V1GameSideKey.HOME,
+          teamId: source.hostTeam.id,
+          displayNameSnapshot: source.hostTeam.name,
+        },
+        {
+          sideKey: V1GameSideKey.AWAY,
+          teamId: null,
+          displayNameSnapshot: '상대 팀 미정',
+        },
+      ],
+      participants: source.hostTeam.memberships.map((membership) => ({
+        sourceParticipantId: membership.id,
+        sideKey: V1GameSideKey.HOME,
+        displayNameSnapshot:
+          membership.user.profile?.nickname ??
+          membership.user.profile?.displayName ??
+          '팀원',
+      })),
+    };
+  }
+
+  private async loadPersistedGameSourceInput(
+    tx: Prisma.TransactionClient,
+    teamMatchId: string,
+  ): Promise<GameSourceCreationInput> {
+    const game = await tx.v1Game.findUnique({
+      where: { teamMatchId },
+      include: {
+        sides: { orderBy: { sideKey: 'asc' } },
+        participants: true,
+      },
+    });
+    if (game === null) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_GAME_REQUIRED',
+        message: 'The durable TeamMatch command has no committed Game',
+      });
+    }
+    const sideKeyById = new Map(game.sides.map((side) => [side.id, side.sideKey]));
+    const participants = game.participants.map((participant) => {
+      const sideKey = sideKeyById.get(participant.sideId);
+      if (sideKey === undefined) {
+        throw new ConflictException({
+          code: 'TEAM_MATCH_GAME_REQUIRED',
+          message: 'A persisted Game participant has no source side',
+        });
+      }
+      return {
+        sourceParticipantId: participant.id,
+        sideKey,
+        displayNameSnapshot: participant.displayNameSnapshot,
+        ...(participant.jerseyNumber === null
+          ? {}
+          : { jerseyNumber: participant.jerseyNumber }),
+        ...(participant.position === null ? {} : { position: participant.position }),
+      };
+    });
+    return {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: teamMatchId,
+      competitionConfigVersionId: game.competitionConfigVersionId,
+      sides: game.sides.map((side) => ({
+        sideKey: side.sideKey,
+        teamId: side.teamId,
+        displayNameSnapshot: side.displayNameSnapshot,
+      })),
+      participants,
+    };
+  }
+
+  private async hydrateApprovedAwaySnapshot(
+    tx: Prisma.TransactionClient,
+    teamMatchId: string,
+    awayTeamId: string,
+  ) {
+    const [game, awayTeam] = await Promise.all([
+      tx.v1Game.findUnique({
+        where: { teamMatchId },
+        include: {
+          sides: true,
+          lineups: { where: { revision: 1 } },
+        },
+      }),
+      tx.v1Team.findFirst({
+        where: { id: awayTeamId, status: 'active', deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          memberships: {
+            where: { status: 'active' },
+            orderBy: { id: 'asc' },
+            select: {
+              user: {
+                select: {
+                  profile: { select: { nickname: true, displayName: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    if (game === null || awayTeam === null) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_GAME_REQUIRED',
+        message: 'Approved TeamMatch requires its atomically created Game',
+      });
+    }
+    const awaySide = game.sides.find((side) => side.sideKey === V1GameSideKey.AWAY);
+    const awayLineup = game.lineups.find((lineup) => lineup.sideId === awaySide?.id);
+    if (awaySide === undefined || awayLineup === undefined) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_GAME_REQUIRED',
+        message: 'Approved TeamMatch requires an AWAY side and lineup',
+      });
+    }
+    if (awaySide.teamId !== null && awaySide.teamId !== awayTeam.id) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_GAME_REQUIRED',
+        message: 'The AWAY side is already pinned to another team',
+      });
+    }
+    await tx.v1GameSide.update({
+      where: { id: awaySide.id },
+      data: { teamId: awayTeam.id, displayNameSnapshot: awayTeam.name },
+    });
+    await tx.v1GameParticipant.createMany({
+      data: awayTeam.memberships.map((membership) => ({
+        gameId: game.id,
+        sideId: awaySide.id,
+        lineupId: awayLineup.id,
+        displayNameSnapshot:
+          membership.user.profile?.nickname ??
+          membership.user.profile?.displayName ??
+          '팀원',
+      })),
+    });
+  }
+
   private assertActiveAccount(user: V1AuthUser) {
     if (user.accountStatus !== 'active') throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Account cannot mutate team matches' });
   }
@@ -1212,6 +1603,30 @@ export class TeamMatchesService {
     if (!sport) throw validationError('sportId is invalid or inactive', 'sportId');
     const region = await this.prisma.v1Region.findFirst({ where: { id: regionId, isActive: true, level: 2 }, select: { id: true } });
     if (!region) throw validationError('regionId must be an active district region', 'regionId');
+  }
+
+  /**
+   * 표시용 rulesText 파생값. 구조화 필드(matchFormat/matchStyle/uniformColor)가 진실이고
+   * rulesText는 그 값들을 이어붙인 표시 전용 문자열일 뿐, 다시 파싱되지 않는다.
+   * formatNote로의 폴백은 구조화 컬럼 3종이 전부 비어 있는 미백필 row(백필 CLI 실행 전
+   * 레거시 데이터)만을 위한 것 — 백필 완료 후에는 이 분기를 타지 않는다.
+   */
+  private formatMatchConditionsRulesText(teamMatch: {
+    formatNote: string | null;
+    matchFormat: string | null;
+    matchStyle: string[];
+    uniformColor: string | null;
+    genderRule: string | null;
+    minSportLevel: { name: string } | null;
+    maxSportLevel: { name: string } | null;
+  }) {
+    const levelLabel = formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, null);
+    const hasStructuredConditions =
+      Boolean(teamMatch.matchFormat) || teamMatch.matchStyle.length > 0 || Boolean(teamMatch.uniformColor);
+    const conditionText = hasStructuredConditions
+      ? [teamMatch.matchFormat, teamMatch.matchStyle.join(' · ') || null, teamMatch.uniformColor].filter(Boolean).join(' · ') || null
+      : teamMatch.formatNote;
+    return [levelLabel, conditionText, teamMatch.genderRule].filter(Boolean).join(' · ') || null;
   }
 
   private getApiStatus(teamMatch: V1TeamMatch) {

@@ -48,6 +48,13 @@ const config: Config = {
         // 되살리면 CI가 이 PR과 무관한 이유로 깨지므로, 새로 추가한 이 레인의
         // team-match-schedule-link.integration-spec.ts 하나만 명시 경로로 등록한다.
         '<rootDir>/test/team-matches/team-match-schedule-link.integration-spec.ts',
+        // Copilot review finding (PR #306): a lineup-cap change with no CI-run
+        // regression test doesn't actually catch a future regression. This
+        // spec has its own minimal, guest-only fixture (no dependency on the
+        // Idempotency-Key/LOCKED-state bit rot in the rest of
+        // test/team-matches/ noted above) so it can be registered without
+        // reviving the other 6 pre-existing, unrelated failures.
+        '<rootDir>/test/team-matches/team-match-lineup-size.integration-spec.ts',
       ],
     },
     {

@@ -170,19 +170,40 @@ describe('ProfileEditPageClient 번호 변경 본인인증 게이트', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
-  it('미인증 계정은 번호를 안 바꿔도 authed 인증 카드가 뜨고, 인증 전에는 저장하지 않는다', () => {
-    // 미인증 계정은 PATCH /me/profile 자체가 서버 게이트(PHONE_VERIFICATION_REQUIRED)에 막힌다.
-    // proofToken 만 받는 public 흐름으로는 저장이 끝나지 않으므로 authed 카드를 띄워야 한다.
+  it('미인증 계정도 번호를 안 바꾸면 인증 없이 프로필을 저장한다', () => {
+    // 인증 도입 이전에 가입한 레거시 계정이 프로필조차 못 고치면, 로그인은 되는데 아무것도
+    // 못 하는 상태로 갇힌다. 서버의 쓰기 게이트도 /me 를 열어 두므로 여기서 막지 않는다.
+    hooks.authMe.mockReturnValue({ data: { verification: { phoneVerified: false } } });
+
+    renderWithClient(<ProfileEditPageClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '프로필 저장' }));
+
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mutateAsync.mock.calls[0][0]).not.toHaveProperty('phoneProofToken', expect.anything());
+  });
+
+  it('미인증 계정에는 이 자리에서 인증을 끝낼 수 있는 authed 카드를 띄운다', () => {
+    // 저장을 막는 장치가 아니라, 팀·대회·채팅을 쓰려면 필요한 인증을 여기서 끝내라는 안내다.
     hooks.authMe.mockReturnValue({ data: { verification: { phoneVerified: false } } });
 
     renderWithClient(<ProfileEditPageClient />);
 
     expect(screen.getByRole('button', { name: 'stub-인증완료(authed)' })).toBeInTheDocument();
+  });
 
+  it('미인증 계정이라도 번호를 바꾸면 증명 없이는 저장하지 않는다', () => {
+    // 자기 계정 범위를 열어 준 것이 번호까지 열어 준 것은 아니다 — 증명 없이 번호를 붙일 수
+    // 있으면 "프로필에서 번호만 교체"로 인증 자체가 우회된다. 서버도 400 으로 다시 막는다.
+    hooks.authMe.mockReturnValue({ data: { verification: { phoneVerified: false } } });
+
+    renderWithClient(<ProfileEditPageClient />);
+
+    changePhoneTo('010-7777-6666');
     fireEvent.click(screen.getByRole('button', { name: '프로필 저장' }));
 
     expect(mutateAsync).not.toHaveBeenCalled();
-    expect(screen.getByText('휴대폰 본인인증을 먼저 완료해 주세요.')).toBeInTheDocument();
+    expect(screen.getByText('변경한 번호로 본인인증을 완료해 주세요.')).toBeInTheDocument();
   });
 
   it('미인증 계정이 이 화면에서 인증을 끝내면 증명 토큰 없이 저장된다', () => {

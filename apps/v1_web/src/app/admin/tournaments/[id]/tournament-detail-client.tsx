@@ -150,6 +150,21 @@ const GENDER_LABEL: Record<string, string> = {
 
 const PHONE_LABEL = '휴대폰';
 
+/**
+ * 교체 정책 표시 문구. `limited` 인데 횟수가 없는 레거시/비정상 데이터가 들어오면
+ * 그대로 템플릿에 넣을 경우 화면에 `제한 null회` 가 노출된다(parseLineupLimits 는
+ * 숫자가 아니면 null 로 내려보낸다) — 관리자에게는 깨진 값으로 보이므로 그 경우를
+ * 따로 처리한다. 표시하는 모든 자리가 같은 판단을 하도록 한 곳으로 모은다.
+ */
+function substitutionPolicyLabel(
+  mode: 'limited' | 'rolling' | null,
+  maxSubstitutions: number | null,
+): string {
+  if (mode === null) return '미지정';
+  if (mode === 'rolling') return '무제한(롤링)';
+  return typeof maxSubstitutions === 'number' ? `제한 ${maxSubstitutions}회` : '제한 (횟수 미설정)';
+}
+
 function formatPhoneNumber(phone: string | null): string {
   if (!phone) return '미등록';
   const digits = phone.replace(/\D/g, '');
@@ -3408,11 +3423,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             {
               label: '교체 방식',
               value:
-                tournament.substitutionMode === null
-                  ? '미지정'
-                  : tournament.substitutionMode === 'rolling'
-                    ? '무제한(롤링)'
-                    : `제한 ${tournament.maxSubstitutions}회`,
+                substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions),
             },
             { label: '신청 수', value: `${tournament.registrationCount}팀` },
             { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
@@ -3946,7 +3957,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               <p className="text-[12px] text-amber-600">
                 대회가 시작된 이후에는 교체 방식을 바꿀 수 없어요.
                 {tournament.substitutionMode !== null
-                  ? ` 현재 ${tournament.substitutionMode === 'limited' ? `제한 ${tournament.maxSubstitutions}회` : '무제한'}이에요.`
+                  ? ` 현재 ${substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions)}이에요.`
                   : ''}
               </p>
             ) : editSportId && editSportId !== tournament.sportId ? (
@@ -3959,7 +3970,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               <p className="text-[12px] text-[var(--red500)]">
                 교체 방식 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
                 {tournament.substitutionMode !== null
-                  ? ` 현재 설정은 ${tournament.substitutionMode === 'limited' ? `제한 ${tournament.maxSubstitutions}회` : '무제한'}이에요.`
+                  ? ` 현재 설정은 ${substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions)}이에요.`
                   : ''}
               </p>
             ) : !lineupSizeOptions.supported ? (
@@ -4425,7 +4436,7 @@ function InfoTab({
               ? '미지정'
               : tournament.substitutionMode === 'rolling'
                 ? '무제한(롤링)'
-                : `제한 ${tournament.maxSubstitutions}회`
+                : substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions)
           }
         />
         <InfoRow label="입금 계좌" value={tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount ?? ''}` : '미등록'} />

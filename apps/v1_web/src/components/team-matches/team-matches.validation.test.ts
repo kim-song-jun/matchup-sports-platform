@@ -123,8 +123,9 @@ describe('firstIncompleteTeamMatchStep — 진행 표시줄 클릭 이동 가드
   });
 
   it('검사 범위를 좁히면(steps 목록) 그 범위 밖 결측은 무시한다', () => {
-    // place-time으로 가려는 클릭은 team/sport/info/condition만 검사하면 된다 — title이
-    // 비어 있어도 place-time 자신의 결측은 이 판정 대상이 아니다.
+    // info로 가려는 클릭은 그 앞 단계(team/sport)만 검사하면 된다 — venue는
+    // place-time 스텝의 필드라 검사 범위 밖이고, 비어 있어도 이 판정을 막지 않는다.
+    // (범위를 place-time까지 넓히면 같은 ctx가 'place-time'을 반환한다 — 위 105행 케이스.)
     const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });
     expect(firstIncompleteTeamMatchStep(ctx, ['team', 'sport'])).toBeNull();
   });

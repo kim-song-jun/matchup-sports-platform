@@ -19,6 +19,7 @@ import type {
   TeamMatchModel,
   TeamMatchStateViewModel,
 } from './team-matches.types';
+import { teamMatchStepHref } from './team-matches.routes';
 
 const TEAM_MATCH_IMAGE_FALLBACK = '/mock/generated/team-huddle.webp';
 
@@ -1107,13 +1108,6 @@ function CreateProgress({
       ) : null}
     </div>
   );
-}
-
-/* #2: MissingFieldsBanner가 각 결측 필드를 그 필드가 실제로 사는 스텝으로 링크할 때 쓴다.
- * team-matches.validation.ts의 RULES가 참조하는 step 값은 항상 그 스텝의 라우트 세그먼트와
- * 동일한 문자열이라 템플릿 하나로 전 스텝을 커버한다. */
-function teamMatchStepHref(step: TeamMatchCreateViewModel['step']) {
-  return `/team-matches/new/${step}`;
 }
 
 function stepToNumber(step: TeamMatchCreateViewModel['step']) {

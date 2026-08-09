@@ -23,6 +23,7 @@ import { lockedReasonLabel } from '@/lib/v1-status-labels';
 import type { V1MyTeam, V1TeamMatchEdit } from '@/types/api';
 import { TeamMatchCreatePageView } from './team-matches-page';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
+import { teamMatchStepHref } from './team-matches.routes';
 import {
   buildTeamMatchPayloadResult,
   firstIncompleteTeamMatchStep,
@@ -651,13 +652,6 @@ function nextHref(step: TeamMatchCreateStep) {
   if (step === 'info') return '/team-matches/new/condition';
   if (step === 'condition') return '/team-matches/new/place-time';
   return '/team-matches/new/confirm';
-}
-
-// team-matches-page.tsx의 teamMatchStepHref와 동일한 규칙(모든 스텝이 /team-matches/new/<step>) —
-// 진행 표시줄 클릭 이동은 임의의 스텝으로 바로 갈 수 있어 이전/다음 한 칸 이동 전용인
-// nextHref/previousHref로는 표현할 수 없다.
-function teamMatchStepHref(step: TeamMatchCreateStep) {
-  return `/team-matches/new/${step}`;
 }
 
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] | undefined {

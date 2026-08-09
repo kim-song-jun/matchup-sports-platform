@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTeamMatchPayloadResult,
+  firstIncompleteTeamMatchStep,
   getCompleteTeamMatchSteps,
   getTeamMatchMissingFields,
   getTeamMatchStepErrors,
@@ -106,6 +107,26 @@ describe('getCompleteTeamMatchSteps — CreateProgress 체크 배지 판정', ()
 
     expect(complete).toEqual(expect.arrayContaining(['team', 'sport', 'info', 'condition']));
     expect(complete).not.toContain('place-time');
+  });
+});
+
+describe('firstIncompleteTeamMatchStep — 진행 표시줄 클릭 이동 가드', () => {
+  const order: Array<'team' | 'sport' | 'info' | 'condition' | 'place-time'> = ['team', 'sport', 'info', 'condition', 'place-time'];
+
+  it('모든 이전 단계가 유효하면 null을 반환한다(target으로 자유 이동)', () => {
+    expect(firstIncompleteTeamMatchStep(baseCtx(), order)).toBeNull();
+  });
+
+  it('중간 단계가 비어 있으면 그 단계를 반환한다(더 뒤 단계로 건너뛰지 못하게)', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, title: '' } });
+    expect(firstIncompleteTeamMatchStep(ctx, order)).toBe('info');
+  });
+
+  it('검사 범위를 좁히면(steps 목록) 그 범위 밖 결측은 무시한다', () => {
+    // place-time으로 가려는 클릭은 team/sport/info/condition만 검사하면 된다 — title이
+    // 비어 있어도 place-time 자신의 결측은 이 판정 대상이 아니다.
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });
+    expect(firstIncompleteTeamMatchStep(ctx, ['team', 'sport'])).toBeNull();
   });
 });
 

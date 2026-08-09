@@ -25,6 +25,7 @@ import { TeamMatchCreatePageView } from './team-matches-page';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
 import {
   buildTeamMatchPayloadResult,
+  firstIncompleteTeamMatchStep,
   getCompleteTeamMatchSteps,
   getTeamMatchMissingFields,
   getTeamMatchStepErrors,
@@ -34,6 +35,9 @@ import {
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
 
 const CREATE_STEP_ORDER: TeamMatchCreateStep[] = ['team', 'sport', 'info', 'condition', 'place-time'];
+// 진행 표시줄 클릭 이동에서 앞/뒤 판정에 쓴다 — confirm은 필수 필드가 없어
+// CREATE_STEP_ORDER(스텝 게이팅 대상)에는 없지만 이동 순서상 마지막 스텝이다.
+const FULL_STEP_ORDER: TeamMatchCreateStep[] = [...CREATE_STEP_ORDER, 'confirm'];
 
 const storageKey = 'teameet:v1:team-match-draft:v3';
 const selectionKey = 'teameet:v1:team-match-selection';
@@ -141,6 +145,22 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     setPendingFocusField(null);
   }, [pendingFocusField]);
 
+  // 진행 표시줄 클릭 이동. 뒤로 가는 이동(target <= current)은 항상 허용한다. 앞으로 가는
+  // 이동은 target 이전의 모든 스텝을 검증해, 문제가 있으면 target 대신 첫 번째 무효
+  // 스텝으로 landing시킨다 — 검증 없이 아무 스텝이나 건너뛸 수 있으면 "다음"을 막는 의미가
+  // 없어진다.
+  const handleGoToStep = (target: TeamMatchCreateStep) => {
+    const targetIndex = FULL_STEP_ORDER.indexOf(target);
+    const currentIndex = FULL_STEP_ORDER.indexOf(step);
+    if (targetIndex <= currentIndex) {
+      router.push(teamMatchStepHref(target));
+      return;
+    }
+    const stepsBeforeTarget = CREATE_STEP_ORDER.slice(0, targetIndex);
+    const blockedStep = firstIncompleteTeamMatchStep(validationCtx, stepsBeforeTarget);
+    router.push(teamMatchStepHref(blockedStep ?? target));
+  };
+
   const model = buildCreateModel({
     step,
     draft,
@@ -189,6 +209,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
     onRegionChange: (value) => updateSelection((current) => ({ ...current, regionId: value })),
     onBack: () => router.push(previousHref(step)),
+    onGoToStep: handleGoToStep,
     onNext: () => {
       // #1: "다음"은 절대 disabled 처리하지 않는다 — 대신 클릭 시 이 스텝의 필수 필드만 로컬
       // 검증해 비어 있으면 이동을 막고, 인라인 에러 + 첫 invalid 필드로 focus를 옮긴다.
@@ -392,6 +413,7 @@ function buildCreateModel({
   onRegionChange,
   onBack,
   onNext,
+  onGoToStep,
   onSubmit,
   onCancel,
   submitLabel,
@@ -420,6 +442,7 @@ function buildCreateModel({
   onRegionChange: (regionId: string) => void;
   onBack: () => void;
   onNext: () => void;
+  onGoToStep?: (step: TeamMatchCreateStep) => void;
   onSubmit: () => void;
   onCancel?: () => void;
   submitLabel?: string;
@@ -457,6 +480,7 @@ function buildCreateModel({
       onRegionChange,
       onBack,
       onNext,
+      onGoToStep,
       onSubmit,
       onCancel,
       submitLabel,
@@ -627,6 +651,13 @@ function nextHref(step: TeamMatchCreateStep) {
   if (step === 'info') return '/team-matches/new/condition';
   if (step === 'condition') return '/team-matches/new/place-time';
   return '/team-matches/new/confirm';
+}
+
+// team-matches-page.tsx의 teamMatchStepHref와 동일한 규칙(모든 스텝이 /team-matches/new/<step>) —
+// 진행 표시줄 클릭 이동은 임의의 스텝으로 바로 갈 수 있어 이전/다음 한 칸 이동 전용인
+// nextHref/previousHref로는 표현할 수 없다.
+function teamMatchStepHref(step: TeamMatchCreateStep) {
+  return `/team-matches/new/${step}`;
 }
 
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] | undefined {

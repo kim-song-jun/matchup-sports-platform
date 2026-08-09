@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   elapsedMatchMs,
   formatMatchClock,
+  formatStopwatchClock,
   freezeCapture,
   isClockDrifted,
   medianOffsetMs,
@@ -280,5 +281,28 @@ describe('formatMatchClock', () => {
 
   it('음수는 0으로 클램프한다', () => {
     expect(formatMatchClock(-500)).toBe('0:00');
+  });
+});
+
+describe('formatStopwatchClock', () => {
+  // 실사고: "전반 584:23"처럼 분이 무한히 커져 9시간 44분을 나타내는데도
+  // 스톱워치로 못 읽혔다. 60분을 넘으면 시:분:초로 롤오버해야 한다.
+  it('60분을 넘으면 시:분:초로 롤오버한다', () => {
+    expect(formatStopwatchClock(35_063_000)).toBe('9:44:23'); // 584분23초
+  });
+
+  it('60분 미만은 분을 2자리로 0을 채운 mm:ss다', () => {
+    expect(formatStopwatchClock(0)).toBe('00:00');
+    expect(formatStopwatchClock(65_000)).toBe('01:05');
+    expect(formatStopwatchClock(8 * 60_000)).toBe('08:00');
+    expect(formatStopwatchClock(59 * 60_000 + 59_000)).toBe('59:59');
+  });
+
+  it('정확히 60분이면 1:00:00으로 롤오버한다', () => {
+    expect(formatStopwatchClock(60 * 60_000)).toBe('1:00:00');
+  });
+
+  it('음수는 0으로 클램프한다', () => {
+    expect(formatStopwatchClock(-500)).toBe('00:00');
   });
 });

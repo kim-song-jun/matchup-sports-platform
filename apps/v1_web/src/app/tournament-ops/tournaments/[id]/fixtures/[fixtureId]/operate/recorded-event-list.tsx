@@ -69,56 +69,63 @@ export function RecordedEventList({
         return (
           <li
             key={event.id}
-            className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
+            className="flex flex-col gap-1.5 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
           >
-            <div className="flex min-w-0 items-center gap-2">
-              {/* clockMs 는 항상 정상이었다 — 표시만 분 단위(`m'`)로 뭉개서 같은 분에
-                  찍힌 여러 이벤트를 구분할 수 없었다(실측 사고 사후조사에서 확인:
-                  645886/649891/652602/655603ms 가 전부 "10'"로 보였다). 초까지 보여
-                  구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
-                  충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
-              <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-medium tabular-nums text-gray-600 dark:bg-white/10 dark:text-gray-300">
-                {periodLabel(event.period)} {formatMatchClock(event.clockMs)}
-              </span>
-              <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                {eventTypeLabel(event)}
-                {event.type === 'SUBSTITUTION'
-                  ? substitutionDetailSuffix(event, playerName)
-                  : event.participantId && playerName.has(event.participantId)
-                    ? ` · ${playerName.get(event.participantId)}`
-                    : ''}
-              </p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                {/* clockMs 는 항상 정상이었다 — 표시만 분 단위(`m'`)로 뭉개서 같은 분에
+                    찍힌 여러 이벤트를 구분할 수 없었다(실측 사고 사후조사에서 확인:
+                    645886/649891/652602/655603ms 가 전부 "10'"로 보였다). 초까지 보여
+                    구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
+                    충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
+                <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-medium tabular-nums text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                  {periodLabel(event.period)} {formatMatchClock(event.clockMs)}
+                </span>
+                <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                  {eventTypeLabel(event)}
+                  {event.type === 'SUBSTITUTION'
+                    ? substitutionDetailSuffix(event, playerName)
+                    : event.participantId && playerName.has(event.participantId)
+                      ? ` · ${playerName.get(event.participantId)}`
+                      : ''}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {/* 44px 최소 터치 타깃(WCAG 2.5.5 유사 기준) — 이 콘솔의 실사용
+                    맥락은 경기장에서 한 손으로 급하게 조작하는 것이라, 반복
+                    눌리는 CTA가 44px 미만이면 오탭 위험이 커진다(Copilot 리뷰
+                    지적: 되돌리기 32px). */}
+                {canReverseSubstitution ? (
+                  <button
+                    type="button"
+                    onClick={() => onReverseSubstitution(event)}
+                    className="flex min-h-[44px] items-center gap-1 rounded-lg border border-gray-200 px-2 text-2xs font-semibold text-gray-500 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+                  >
+                    <Undo2 size={12} aria-hidden="true" />
+                    되돌리기
+                  </button>
+                ) : null}
+                <span className="text-2xs text-gray-500 dark:text-gray-400">
+                  {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
+                </span>
+              </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {/* 44px 최소 터치 타깃(WCAG 2.5.5 유사 기준) — 이 콘솔의 실사용
-                  맥락은 경기장에서 한 손으로 급하게 조작하는 것이라, 반복
-                  눌리는 CTA가 44px 미만이면 오탭 위험이 커진다(Copilot 리뷰
-                  지적: 되돌리기 32px). 바로 옆 어시스트 버튼도 같은 문제라
-                  함께 맞춘다 — 한 행에 44px/32px가 섞이면 그 자체로 불일치. */}
-              {canAttachAssist ? (
-                <button
-                  type="button"
-                  onClick={() => onAttachAssist(event)}
-                  className="flex min-h-[44px] items-center gap-1 rounded-lg border border-blue-200 px-2 text-2xs font-semibold text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-blue-500/30 dark:text-blue-400 dark:hover:bg-blue-500/10"
-                >
-                  <Handshake size={12} aria-hidden="true" />
-                  어시스트
-                </button>
-              ) : null}
-              {canReverseSubstitution ? (
-                <button
-                  type="button"
-                  onClick={() => onReverseSubstitution(event)}
-                  className="flex min-h-[44px] items-center gap-1 rounded-lg border border-gray-200 px-2 text-2xs font-semibold text-gray-500 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
-                >
-                  <Undo2 size={12} aria-hidden="true" />
-                  되돌리기
-                </button>
-              ) : null}
-              <span className="text-2xs text-gray-500 dark:text-gray-400">
-                {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
-              </span>
-            </div>
+            {/* 어시스트 재설계 — 예전엔 행 중간에 침입한 파란 테두리 칩이었다.
+                지금은 골 커밋 직후 토스트("골을 기록했어요 · 어시스트 추가")가
+                1차 경로이고, 이 줄은 그 토스트를 놓쳤을 때만 쓰는 2차 경로다.
+                그래서 행의 일부처럼 보이는 전체 폭 이어붙임 줄로 바꿔 "이 골의
+                자연스러운 다음 단계"로 읽히게 한다(끼워 넣은 게 아니라 이어지는
+                것으로). */}
+            {canAttachAssist ? (
+              <button
+                type="button"
+                onClick={() => onAttachAssist(event)}
+                className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-blue-50 text-2xs font-semibold text-blue-600 hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20"
+              >
+                <Handshake size={12} aria-hidden="true" />
+                어시스트가 없어요 · 추가하기
+              </button>
+            ) : null}
           </li>
         );
       })}

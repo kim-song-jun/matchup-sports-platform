@@ -184,3 +184,24 @@ export function formatMatchClock(clockMs: number): string {
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
+
+/**
+ * 운영 콘솔 헤더의 큰 스톱워치 표시 *전용* 포맷터 — alpha 실측 사고("전반
+ * 584:23"처럼 분이 무한히 커져 9시간 44분을 나타내는데도 스톱워치로 못
+ * 읽힘) 대응. `formatMatchClock`(위)은 이벤트 캡처 모달·기록된 이벤트
+ * 목록처럼 "특정 순간에 찍힌 값"을 보여주는 다른 자리들이 공유하는
+ * 계약이라 그대로 두고, 이 함수는 그 계약을 재사용하지 않는 새 표시
+ * 계층이다(같은 `clockMs`를 입력받지만 출력 포맷만 다르다).
+ *
+ * 분을 2자리로 고정 패딩하고, 60분을 넘으면 시:분:초로 롤오버한다 —
+ * 자릿수가 흔들리지 않아야 흘끗 봐도 스톱워치로 읽힌다.
+ */
+export function formatStopwatchClock(clockMs: number): string {
+  const totalSeconds = Math.floor(Math.max(0, clockMs) / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const mm = String(minutes).padStart(2, '0');
+  const ss = String(seconds).padStart(2, '0');
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}

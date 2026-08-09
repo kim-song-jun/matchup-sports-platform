@@ -286,6 +286,11 @@ export function EntityPicker({
                     id={`${menuId}-opt-${idx}`}
                     aria-selected={highlighted}
                     aria-disabled={item.disabled || undefined}
+                    // 네이티브 disabled도 함께 건다 — aria-disabled만으론 보조기기·이벤트
+                    // 시스템에 따라 "실제로는 클릭 가능한 버튼"으로 인식될 수 있다. 가상
+                    // 하이라이트는 DOM focus가 아니라 CSS 클래스로만 표시하므로(위 주석 참고)
+                    // disabled 버튼이어도 화살표 키 하이라이트 표시에는 영향이 없다.
+                    disabled={item.disabled}
                     tabIndex={-1}
                     onClick={() => commitEntry(entry)}
                     className={[

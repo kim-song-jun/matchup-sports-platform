@@ -295,7 +295,9 @@ export class TeamMatchSeriesAdminService {
     const distinct: string[] = [];
     for (const row of rows) {
       const trimmed = row.placeName?.trim();
-      if (trimmed && !distinct.includes(trimmed)) distinct.push(trimmed);
+      // DB 필터는 trim 전 원문 기준이라, '장소 미정 '처럼 trim하면 기본값과 같아지는
+      // 레거시 값은 여기서 한 번 더 걸러야 한다.
+      if (trimmed && trimmed !== DEFAULT_FIXTURE_PLACE_NAME && !distinct.includes(trimmed)) distinct.push(trimmed);
       if (distinct.length >= 5) break;
     }
     return distinct;

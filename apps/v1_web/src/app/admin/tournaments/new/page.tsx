@@ -598,9 +598,11 @@ function ParticipationStep({
   dispatch: React.Dispatch<TournamentCreateAction>;
   showToast: (message: string, variant?: 'success' | 'error') => void;
 }) {
-  const { data: lineupSizeOptions, isPending: lineupSizeOptionsPending } = useV1LineupSizeOptions(
-    state.sportId || null,
-  );
+  const {
+    data: lineupSizeOptions,
+    isPending: lineupSizeOptionsPending,
+    isError: lineupSizeOptionsFailed,
+  } = useV1LineupSizeOptions(state.sportId || null);
 
   // 종목의 선택지가 로드되면, 관리자가 아직 아무것도 고르지 않았을 때만 canonical
   // 기본값을 자동으로 채워 넣는다 — 값을 이미 골랐거나 다시 비운(종목 변경) 상태를
@@ -661,7 +663,15 @@ function ParticipationStep({
       >
         {lineupSizeOptionsPending ? (
           <p className="text-xs text-[var(--text-caption)]">선택지를 불러오는 중이에요…</p>
-        ) : !lineupSizeOptions?.supported ? (
+        ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
+          // 조회 실패를 "미지원 종목"으로 뭉뚱그리면 실제 오류가 숨겨진다(Copilot 리뷰
+          // 지적). 이 경우 서버 canonical 기본값이 그대로 적용되긴 하지만, 관리자가
+          // 선택하지 못한 이유가 "종목이 원래 안 되는 것"인지 "지금 못 불러온 것"인지
+          // 구분되어야 한다.
+          <p className="text-xs text-[var(--red500)]">
+            출전 인원 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요. 그대로 저장하면 종목 기본값이 적용돼요.
+          </p>
+        ) : !lineupSizeOptions.supported ? (
           <p className="text-xs text-[var(--text-caption)]">
             이 종목은 아직 출전 인원을 선택할 수 없어요. 기본 규칙을 그대로 적용해요.
           </p>

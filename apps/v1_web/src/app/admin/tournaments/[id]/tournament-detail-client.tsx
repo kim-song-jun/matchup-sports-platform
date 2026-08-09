@@ -2928,8 +2928,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   // 않았을 때만(editSportId가 비었거나 tournament.sportId와 같을 때) 조회한다.
   const lineupSizeSportId =
     editSportId && editSportId !== tournament?.sportId ? null : (tournament?.sportId ?? null);
-  const { data: lineupSizeOptions, isPending: lineupSizeOptionsPending } =
-    useV1LineupSizeOptions(lineupSizeSportId);
+  const {
+    data: lineupSizeOptions,
+    isPending: lineupSizeOptionsPending,
+    isError: lineupSizeOptionsFailed,
+  } = useV1LineupSizeOptions(lineupSizeSportId);
   const [editGenderCategory, setEditGenderCategory] =
     useState<V1TournamentGenderCategory | ''>('');
   const [editGenderMinMale, setEditGenderMinMale] = useState('');
@@ -3869,7 +3872,14 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               </p>
             ) : lineupSizeOptionsPending ? (
               <p className="text-[12px] text-gray-500">선택지를 불러오는 중이에요…</p>
-            ) : !lineupSizeOptions?.supported ? (
+            ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
+              // 조회 실패를 "미지원 종목"과 같은 문구로 뭉뚱그리면 실제 오류가 숨겨진다
+              // (Copilot 리뷰 지적). 현재 pin된 값은 아래 안내로 그대로 보여준다.
+              <p className="text-[12px] text-[var(--red500)]">
+                출전 인원 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
+                {tournament.lineupMaxPlayers !== null ? ` 현재 설정은 ${tournament.lineupMaxPlayers}명이에요.` : ''}
+              </p>
+            ) : !lineupSizeOptions.supported ? (
               <p className="text-[12px] text-gray-500">이 종목은 아직 출전 인원을 선택할 수 없어요.</p>
             ) : (
               <div className="flex flex-wrap gap-2" role="group" aria-label="출전 인원 선택">

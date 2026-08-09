@@ -83,12 +83,17 @@ export class TeamMatchesService {
         ...(query.teamId ? { hostTeamId: query.teamId } : {}),
         ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
         ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
+        // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
+        // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
+        // 경기가 0건으로 나왔다.
         ...(query.query
           ? {
               OR: [
                 { title: { contains: query.query, mode: 'insensitive' } },
                 { description: { contains: query.query, mode: 'insensitive' } },
                 { placeName: { contains: query.query, mode: 'insensitive' } },
+                { hostTeam: { name: { contains: query.query, mode: 'insensitive' } } },
+                { region: { name: { contains: query.query, mode: 'insensitive' } } },
               ],
             }
           : {}),

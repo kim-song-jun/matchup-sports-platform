@@ -1,7 +1,7 @@
 'use client';
 
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangleIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
@@ -117,19 +117,25 @@ export function CreateField({
   // CSS(.tm-create-native-input[type="date" i] 등)에서 appearance:none +
   // ::-webkit-calendar-picker-indicator 처리로 OS 스피너/아이콘을 제거한다.
   const isDateLike = type === 'date' || type === 'time';
-  const errorId = id && error ? `${id}-error` : undefined;
+  // id는 옵션(스텝 게이팅 focus-scroll anchor 용도라 호출부 상당수가 생략한다) — 생략돼도
+  // <label htmlFor>가 매달릴 곳 없이 undefined가 되면 라벨-입력 연결이 완전히 끊긴다
+  // (Testing Library getByLabelText 실패로 CI에서 실측: "종료 시간" 등 id 없는 필드).
+  // useId()로 항상 유효한 id를 보장한다.
+  const autoId = useId();
+  const fieldId = id ?? autoId;
+  const errorId = error ? `${fieldId}-error` : undefined;
   return (
     // div(label 아님): children(RecentVenueChips 등)에 버튼이 섞여 들어올 수 있는데,
     // <label>이 연결 대상 컨트롤 외의 labelable 요소(button)까지 감싸면 유효하지 않은
     // 마크업이 되어 클릭 시 예기치 않게 포커스/클릭이 전파될 수 있다 — 텍스트 라벨만
     // htmlFor로 명시 연결한다.
     <div className="tm-create-field">
-      <label htmlFor={id} className="tm-text-label">{label}</label>
+      <label htmlFor={fieldId} className="tm-text-label">{label}</label>
       <div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''} ${error ? 'tm-create-input-error' : ''}`}>
         {onChange ? (
           multiline ? (
             <textarea
-              id={id}
+              id={fieldId}
               className="tm-create-native-input"
               value={value ?? ''}
               placeholder={placeholder}
@@ -141,7 +147,7 @@ export function CreateField({
             />
           ) : (
             <input
-              id={id}
+              id={fieldId}
               className="tm-create-native-input"
               type={type}
               lang={isDateLike ? 'ko' : undefined}

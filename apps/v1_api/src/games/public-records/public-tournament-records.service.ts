@@ -160,7 +160,12 @@ export class PublicTournamentRecordsService {
     // Lane 1 fix -- one batched query for every currently-LIVE/PAUSED game on
     // this page (both cursor-paginated and unscheduled), never a per-fixture
     // query. See `loadLiveScores` below.
-    const liveScoreByGameId = await this.loadLiveScores([...pageFixtures, ...rawUnscheduled]);
+    // PUBLIC_LIVE 가 꺼져 있으면 effectivePublicVisibilityMode() 가 live 를
+    // status_only 로 강등해 이 값이 어차피 화면에 안 나간다 — 그런데도 매 요청마다
+    // 이벤트를 긁어오면 관전자 트래픽만큼 헛일이 쌓인다. 플래그가 켜졌을 때만 읽는다.
+    const liveScoreByGameId = publicLiveEnabled
+      ? await this.loadLiveScores([...pageFixtures, ...rawUnscheduled])
+      : new Map<string, GameScore>();
     const now = new Date();
 
     const items = pageFixtures

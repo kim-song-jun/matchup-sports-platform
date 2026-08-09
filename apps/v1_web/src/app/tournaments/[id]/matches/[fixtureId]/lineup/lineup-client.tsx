@@ -137,8 +137,9 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   }
 
   if (gameQuery.isError || lineupsQuery.isError) {
-    // useV1Game/useV1GameLineups도 retry:false라(use-v1-api.ts) 실패 즉시 isLoading이
-    // false로 떨어진다. 이걸 여기서 잡지 않으면 70~79행 hydrate useEffect가
+    // useV1GameLineups는 retry:false, useV1Game은 전역 기본값(retry:1)이라 재시도
+    // 횟수는 다르지만 — 둘 다 실패가 확정되면 결국 isLoading이 false로 떨어진다
+    // (use-v1-api.ts). 이걸 여기서 잡지 않으면 70~79행 hydrate useEffect가
     // gameQuery.data===undefined일 때 아무것도 하지 않아 state가 계속 null로 남고,
     // 바로 아래 `state === null` 스켈레톤 분기가 영원히 참이 돼 PageSkeleton에 갇힌다.
     const error = gameQuery.error ?? lineupsQuery.error;

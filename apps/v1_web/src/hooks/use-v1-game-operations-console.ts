@@ -589,9 +589,46 @@ export function useV1GameOperationsConsole(
     [gameId, gameSnapshot],
   );
 
-  const retryFailedEvent = useCallback((clientEventId: string) => {
-    dispatchQueue({ type: 'RETRY', clientEventId });
-  }, []);
+  const retryFailedEvent = useCallback(
+    async (clientEventId: string) => {
+      // alpha 실사고(2026-08) 구제: `medianOffsetMs()`를 고치기 전에 이미
+      // 캡처된 항목은 `event.clockMs`가 소수(.5 등)일 수 있다 — 그대로
+      // 재전송하면 서버 `parseGameEvent`(`Number.isSafeInteger` 요구)에
+      // 똑같이 막혀 "다시 시도"가 영원히 무의미한 루프가 된다. 여기서만
+      // 1ms 미만으로 반올림해 보정한다(이벤트가 실제로 벌어진 시각 자체는
+      // 절대 바꾸지 않는다 — occurredAt은 그대로 둔다). 서버는 payloadHash를
+      // event 내용으로 재계산해 대조하므로(`GamesService.retryEvent`) clockMs만
+      // 고치고 hash를 그대로 두면 `OFFLINE_EVENT_REBASE_CONFLICT`로 또 실패한다
+      // — 그래서 항상 짝지어 다시 계산한다.
+      const item = queue.items.find((candidate) => candidate.clientEventId === clientEventId);
+      if (item && !Number.isSafeInteger(item.event.clockMs)) {
+        const repairedEvent = { ...item.event, clockMs: Math.round(item.event.clockMs) };
+        try {
+          const repairedHash = await canonicalGameEventPayloadHash({
+            type: repairedEvent.type as GameEventType,
+            sideId: repairedEvent.sideId,
+            participantId: repairedEvent.participantId,
+            assistParticipantId: repairedEvent.assistParticipantId,
+            period: repairedEvent.period,
+            clockMs: repairedEvent.clockMs,
+            occurredAt: repairedEvent.occurredAt,
+            payload: repairedEvent.payload,
+          });
+          dispatchQueue({
+            type: 'RETRY',
+            clientEventId,
+            repairedEvent: { event: repairedEvent, payloadHash: repairedHash },
+          });
+          return;
+        } catch {
+          // Web Crypto를 쓸 수 없는 극단적 환경 등 — 보정 없이 원래 값으로
+          // 재시도한다(이 픽스 이전과 동일하게 동작, 새 결함을 만들지 않는다).
+        }
+      }
+      dispatchQueue({ type: 'RETRY', clientEventId });
+    },
+    [queue.items],
+  );
 
   // T3 추가 — 큐를 거치지 않는 온라인 전용 REST 호출. assertQueueable을 굳이
   // 부르지 않는다(큐에 절대 안 넣으니 필요 없다) — 대신 이 함수 자체가 "온라인일
@@ -649,14 +686,17 @@ export function gameOperationsErrorMessage(code: string): string {
       return '경기 상태가 변경되어 다시 시도해주세요.';
     case 'CLOCK_DRIFT':
       return '기기 시각이 서버와 많이 달라요. 시간을 확인해주세요.';
-    // alpha 실사고(2026-08): 옐로카드/파울 기록이 이 코드로 거부됐는데 매핑이
-    // 없어 default("이벤트를 기록하지 못했어요")로 뭉개졌다 — EVENT_INVALID(REST
-    // 경로의 형식 오류)와 정확히 같은 성격의 실패다(소켓 게이트웨이가 payload
-    // whitelist 통과 전에 거부한 것). 같은 payload를 그대로 다시 보내는 재시도는
-    // 항상 같은 이유로 다시 실패하므로 NON_RETRYABLE에도 넣는다 — 재시도 버튼
-    // 대신 새로고침 후 다시 캡처하라고 안내한다.
+    // alpha 실사고(2026-08) 근본 원인: 옐로카드/파울 기록이 이 코드로 거부됐는데
+    // 매핑이 없어 default("이벤트를 기록하지 못했어요")로 뭉개졌다. 실제 원인은
+    // `medianOffsetMs()`가 소수(.5) offset을 반환해 `clockMs`가 정수가 아니게
+    // 되고, 서버 `parseGameEvent`(`Number.isSafeInteger` 요구)가 거부한 것—
+    // `game-operations-clock.ts`에서 고쳤다(새 캡처는 항상 정수). 다만 이 픽스
+    // 이전에 이미 큐에 저장된 항목은 여전히 소수 clockMs를 갖고 있을 수 있어
+    // NON_RETRYABLE로 두지 않는다 — `retryFailedEvent`가 재시도 시점에 정수로
+    // 보정하고 payloadHash를 다시 계산해 함께 보내므로(아래 구현) 재시도가
+    // 실제로 복구 경로가 된다.
     case 'VALIDATION_ERROR':
-      return '이벤트 형식에 문제가 있어 기록하지 못했어요. 새로고침 후 다시 기록해주세요.';
+      return '이벤트 형식에 문제가 있어 기록하지 못했어요. 다시 시도해주세요.';
     // UX 감사 CRITICAL — 서버가 ack를 끝내 보내지 않아 'sending'에 고착되던
     // 상태를 클라이언트 타임아웃으로 감지한 경우에만 붙는 코드(서버가 던지는
     // 코드가 아니다). 네트워크가 끊겼거나 응답이 느린 경우가 대부분이라
@@ -748,7 +788,6 @@ const NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES = new Set<string>([
   'NO_NEXT_PERIOD',
   'EVENT_LATE',
   'EVENT_INVALID',
-  'VALIDATION_ERROR',
   'PARTICIPANT_SIDE_MISMATCH',
   'SCORER_REQUIRED',
   'SUBSTITUTION_INVALID',

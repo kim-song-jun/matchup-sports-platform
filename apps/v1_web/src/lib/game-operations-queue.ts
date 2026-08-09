@@ -110,7 +110,24 @@ export type GameOperationsQueueAction =
       readonly clientEventId: string;
       readonly error: { readonly code: string; readonly message: string };
     }
-  | { readonly type: 'RETRY'; readonly clientEventId: string }
+  | {
+      readonly type: 'RETRY';
+      readonly clientEventId: string;
+      /** alpha 실사고(2026-08) 구제 경로 — 이 픽스 이전에 캡처된 항목은
+       * `event.clockMs`가 소수(`.5` 등)일 수 있고, 그대로 재전송하면 서버
+       * `parseGameEvent`(`Number.isSafeInteger` 요구)에 매번 똑같이 막힌다
+       * (재시도가 무의미한 무한 루프). 호출자(`use-v1-game-operations-console.
+       * ts`)가 정수로 보정한 event와 그에 맞춰 다시 계산한 payloadHash를 함께
+       * 주면, 재시도가 'queued'로 돌아갈 때 이 값으로 교체한다 — 서버는
+       * `payloadHash`를 event 내용으로 재계산해 대조하므로(`retryEvent`의
+       * `OFFLINE_EVENT_REBASE_CONFLICT`) 둘을 반드시 짝지어 바꿔야 한다.
+       * 이벤트 시각(occurredAt)은 절대 바꾸지 않는다 — clockMs만 1ms 미만
+       * 반올림한다. */
+      readonly repairedEvent?: {
+        readonly event: QueuedGameEventInput;
+        readonly payloadHash: string;
+      };
+    }
   | { readonly type: 'CLEAR_ACKED' };
 
 function mapItem(
@@ -181,7 +198,15 @@ export function gameOperationsQueueReducer(
     case 'RETRY':
       return mapItem(state, action.clientEventId, (item) =>
         item.status === 'failed'
-          ? { ...item, status: 'queued', attempts: item.attempts + 1, lastError: null }
+          ? {
+              ...item,
+              ...(action.repairedEvent
+                ? { event: action.repairedEvent.event, payloadHash: action.repairedEvent.payloadHash }
+                : {}),
+              status: 'queued',
+              attempts: item.attempts + 1,
+              lastError: null,
+            }
           : item,
       );
 

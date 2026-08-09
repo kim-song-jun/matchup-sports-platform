@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import Link from 'next/link';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 
 /**
@@ -31,12 +33,22 @@ export interface LineupGridProps {
    * renders. Used by the "들어올 선수" step, which is scoped to the outgoing
    * player's own side. */
   readonly restrictSideId?: string;
+  /** UX 감사 item 2 — 제공되면 "제출된 선발 명단이 없어요" 빈 상태에 그 사이드의
+   * 라인업 화면으로 가는 링크를 함께 보여준다. 라인업 없이 이미 LIVE가 된
+   * 경기(막다른 길)도 이 자리에서 바로 복구할 수 있게 하기 위함이다. 둘 다
+   * 없으면(예: 팀매치 경량 콘솔, 기존 테스트) 링크 없이 문구만 보여준다. */
+  readonly tournamentId?: string;
+  readonly fixtureId?: string;
 }
 
 /** The latest lineup for a side is the highest `revision` row among
  * `SUBMITTED`/`LOCKED` states — a `DRAFT` still belongs to the lineup
- * builder (Task 15), not to live operation. */
-function latestOperableLineup(lineups: readonly GameLineup[], sideId: string): GameLineup | null {
+ * builder (Task 15), not to live operation. Exported so the console
+ * (operate-console.tsx) can reuse the exact same "has this side actually
+ * submitted a lineup?" check when it decides whether `start` is available
+ * (UX audit item 2) — a second, slightly different definition of "submitted"
+ * would silently drift from what this grid itself shows as empty. */
+export function latestOperableLineup(lineups: readonly GameLineup[], sideId: string): GameLineup | null {
   const candidates = lineups.filter(
     (lineup) => lineup.sideId === sideId && (lineup.state === 'SUBMITTED' || lineup.state === 'LOCKED'),
   );
@@ -51,75 +63,124 @@ export function LineupGrid({
   disabled = false,
   filterParticipantIds,
   restrictSideId,
+  tournamentId,
+  fixtureId,
 }: LineupGridProps) {
   const visibleSides = restrictSideId === undefined ? sides : sides.filter((side) => side.id === restrictSideId);
+  // 모바일(390px)에서는 두 사이드가 세로로 쌓여, 원정팀을 보려면 홈팀 전체를
+  // 스크롤해야 했다(UX 감사 item 5) — sm(640px) 이상은 이미 2열이라 둘 다 한
+  // 화면에 보이므로 탭은 모바일에서만 의미가 있다. 탭을 눌러도 두 sections는
+  // 여전히 각자의 팀명 헤더를 유지한다 — "어느 팀 선수인지 헷갈리지 않는다"는
+  // 기존 보장(좌우 분리 + 팀명 헤더)은 그대로 두고, 모바일에서 안 보이는 쪽만
+  // `hidden`으로 감춘다(sm 이상에서는 항상 둘 다 보인다).
+  const [selectedMobileSideId, setSelectedMobileSideId] = useState<string | null>(null);
+  const activeMobileSideId = selectedMobileSideId ?? visibleSides[0]?.id ?? null;
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {visibleSides.map((side) => {
-        const lineup = latestOperableLineup(lineups, side.id);
-        const participants = (lineup?.participants ?? []).filter(
-          (participant) => filterParticipantIds === undefined || filterParticipantIds.has(participant.id),
-        );
-        return (
-          <section
-            key={side.id}
-            aria-labelledby={`lineup-side-${side.id}-heading`}
-            className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
-          >
-            <h3
-              id={`lineup-side-${side.id}-heading`}
-              className="mb-2 text-sm font-semibold text-gray-900 dark:text-white"
+    <div>
+      {visibleSides.length > 1 ? (
+        <div role="tablist" aria-label="팀 선택" className="mb-3 flex gap-1 rounded-lg bg-gray-100 p-1 sm:hidden dark:bg-gray-800">
+          {visibleSides.map((side) => (
+            <button
+              key={side.id}
+              type="button"
+              role="tab"
+              aria-selected={activeMobileSideId === side.id}
+              onClick={() => setSelectedMobileSideId(side.id)}
+              className={[
+                'min-h-[44px] flex-1 rounded-md px-2 text-sm font-semibold transition-colors',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+                activeMobileSideId === side.id
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400',
+              ].join(' ')}
             >
               {side.displayNameSnapshot}
-              <span className="ml-1.5 text-2xs font-normal text-gray-400 dark:text-gray-500">
+              <span className="ml-1 text-2xs font-normal opacity-70">
                 {side.sideKey === 'HOME' ? '홈' : '원정'}
               </span>
-            </h3>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {visibleSides.map((side) => {
+          const lineup = latestOperableLineup(lineups, side.id);
+          const participants = (lineup?.participants ?? []).filter(
+            (participant) => filterParticipantIds === undefined || filterParticipantIds.has(participant.id),
+          );
+          const isActiveOnMobile = visibleSides.length <= 1 || activeMobileSideId === side.id;
+          return (
+            <section
+              key={side.id}
+              aria-labelledby={`lineup-side-${side.id}-heading`}
+              className={`rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800 ${isActiveOnMobile ? '' : 'hidden sm:block'}`}
+            >
+              <h3
+                id={`lineup-side-${side.id}-heading`}
+                className="mb-2 text-sm font-semibold text-gray-900 dark:text-white"
+              >
+                {side.displayNameSnapshot}
+                <span className="ml-1.5 text-2xs font-normal text-gray-400 dark:text-gray-500">
+                  {side.sideKey === 'HOME' ? '홈' : '원정'}
+                </span>
+              </h3>
 
-            {lineup === null || participants.length === 0 ? (
-              <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                {lineup === null ? '제출된 선발 명단이 없어요.' : '표시할 선수가 없어요.'}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-1.5" role="list">
-                {participants.map((participant) => (
-                  <li key={participant.id}>
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => onSelectPlayer({ sideId: side.id, participant })}
-                      aria-label={`${participant.displayNameSnapshot} 선수 이벤트 기록`}
-                      className={[
-                        'flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
-                        'hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
-                        'dark:hover:bg-blue-500/10',
-                        disabled ? 'cursor-not-allowed opacity-50' : '',
-                      ].join(' ')}
+              {lineup === null || participants.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {lineup === null ? '제출된 선발 명단이 없어요.' : '표시할 선수가 없어요.'}
+                  </p>
+                  {lineup === null && tournamentId !== undefined && fixtureId !== undefined ? (
+                    <Link
+                      href={`/tournaments/${tournamentId}/matches/${fixtureId}/lineup`}
+                      className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-blue-400 dark:hover:bg-blue-500/10"
                     >
-                      <span
-                        aria-hidden="true"
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-2xs font-bold tabular-nums text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                      라인업 제출하러 가기
+                    </Link>
+                  ) : null}
+                </div>
+              ) : (
+                <ul className="flex flex-col gap-1.5" role="list">
+                  {participants.map((participant) => (
+                    <li key={participant.id}>
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => onSelectPlayer({ sideId: side.id, participant })}
+                        aria-label={`${participant.displayNameSnapshot} 선수 이벤트 기록`}
+                        className={[
+                          'flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
+                          'hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
+                          'dark:hover:bg-blue-500/10',
+                          disabled ? 'cursor-not-allowed opacity-50' : '',
+                        ].join(' ')}
                       >
-                        {participant.jerseyNumber ?? '-'}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-gray-900 dark:text-white">
-                          {participant.displayNameSnapshot}
+                        <span
+                          aria-hidden="true"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-2xs font-bold tabular-nums text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                        >
+                          {participant.jerseyNumber ?? '-'}
                         </span>
-                        {participant.position ? (
-                          <span className="block text-2xs text-gray-400 dark:text-gray-500">
-                            {participant.position}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-gray-900 dark:text-white">
+                            {participant.displayNameSnapshot}
                           </span>
-                        ) : null}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        );
-      })}
+                          {participant.position ? (
+                            <span className="block text-2xs text-gray-400 dark:text-gray-500">
+                              {participant.position}
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

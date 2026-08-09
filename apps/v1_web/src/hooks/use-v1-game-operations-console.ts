@@ -47,6 +47,21 @@ type GameTakeoverAck =
 const CLOCK_PING_INTERVAL_MS = 15_000;
 const TAKEOVER_RENEW_INTERVAL_MS = 20_000; // < the 30s server-enforced minimum renewal spacing
 const TAKEOVER_EXPIRY_CHECK_INTERVAL_MS = 2_000;
+/**
+ * UX audit item 1 (CRITICAL, 2026-08): `socket.emit(event, payload, ackHandler)`
+ * has no built-in timeout — if the socket disconnects (or the server hangs)
+ * after the emit but before the ack, `ackHandler` may simply never fire.
+ * Before this constant existed, that meant the queue item sat in `sending`
+ * forever: `nextQueuedItem()` only ever re-sends `queued` items, so a
+ * mid-flight event an operator captured (a goal, a card) could look
+ * permanently "전송 중" with no retry button and no way to tell whether it
+ * actually landed — recoverable only by a full page reload (which
+ * `hydrateAfterReload` resets `sending` → `queued` for). This timeout is the
+ * in-session escape hatch: if no ack arrives within this window, the item is
+ * force-FAILed with a retryable error code, which surfaces the existing
+ * `QueueStatusPanel` retry affordance instead of a silent, permanent stall.
+ */
+export const SEND_ACK_TIMEOUT_MS = 10_000;
 
 function queueStorageKey(gameId: string): string {
   return `teameet.v1.gameOps.queue.${gameId}`;
@@ -157,6 +172,15 @@ export function useV1GameOperationsConsole(
 
   const myAssignment = useMyTournamentStaffAssignmentVersion(tournamentId, myUserId);
   const clientInstanceIdRef = useRef<string | null>(null);
+  // 언마운트 후 SEND_ACK_TIMEOUT_MS 타이머가 뒤늦게 발화해 dispatch하는 것을
+  // 막는다 — 화면을 떠난 뒤의 상태 갱신은 의미가 없다.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // ── Queue: hydrate once per gameId, persist on every change ───────────────
   useEffect(() => {
@@ -433,7 +457,21 @@ export function useV1GameOperationsConsole(
       // OFFLINE_EVENT_REBASE_CONFLICT it failed with the first time, since
       // nothing ever advanced the version the retry presented.
       const isRetry = item.attempts > 0;
+      // 이 emit의 ack가 SEND_ACK_TIMEOUT_MS 안에 오지 않으면(소켓이 응답 없이
+      // 끊기면 콜백 자체가 영영 안 온다) 'sending'에 갇히지 않도록 FAIL로
+      // 전환한다. ackHandler가 먼저 불리면 이 타이머는 취소된다 — 반대로
+      // 타이머가 먼저 발화한 뒤 ack가 뒤늦게 와도 ACK 리듀서는 'failed'
+      // 상태를 정상적으로 덮어쓰므로 늦은 성공 응답도 버려지지 않는다.
+      const ackTimeoutId = setTimeout(() => {
+        if (!isMountedRef.current) return;
+        dispatchQueue({
+          type: 'FAIL',
+          clientEventId: item.clientEventId,
+          error: { code: 'SEND_TIMEOUT', message: gameOperationsErrorMessage('SEND_TIMEOUT') },
+        });
+      }, SEND_ACK_TIMEOUT_MS);
       const ackHandler = (result: { status: string; sequence?: number; version?: number; code?: string }) => {
+        clearTimeout(ackTimeoutId);
         if (result.status === 'ack' && result.sequence !== undefined && result.version !== undefined) {
           dispatchQueue({
             type: 'ACK',
@@ -611,6 +649,21 @@ export function gameOperationsErrorMessage(code: string): string {
       return '경기 상태가 변경되어 다시 시도해주세요.';
     case 'CLOCK_DRIFT':
       return '기기 시각이 서버와 많이 달라요. 시간을 확인해주세요.';
+    // alpha 실사고(2026-08): 옐로카드/파울 기록이 이 코드로 거부됐는데 매핑이
+    // 없어 default("이벤트를 기록하지 못했어요")로 뭉개졌다 — EVENT_INVALID(REST
+    // 경로의 형식 오류)와 정확히 같은 성격의 실패다(소켓 게이트웨이가 payload
+    // whitelist 통과 전에 거부한 것). 같은 payload를 그대로 다시 보내는 재시도는
+    // 항상 같은 이유로 다시 실패하므로 NON_RETRYABLE에도 넣는다 — 재시도 버튼
+    // 대신 새로고침 후 다시 캡처하라고 안내한다.
+    case 'VALIDATION_ERROR':
+      return '이벤트 형식에 문제가 있어 기록하지 못했어요. 새로고침 후 다시 기록해주세요.';
+    // UX 감사 CRITICAL — 서버가 ack를 끝내 보내지 않아 'sending'에 고착되던
+    // 상태를 클라이언트 타임아웃으로 감지한 경우에만 붙는 코드(서버가 던지는
+    // 코드가 아니다). 네트워크가 끊겼거나 응답이 느린 경우가 대부분이라
+    // 재시도로 풀릴 수 있다 — NON_RETRYABLE 목록에 없으므로 기본값대로
+    // 재시도 가능으로 분류된다.
+    case 'SEND_TIMEOUT':
+      return '서버 응답을 받지 못했어요. 네트워크를 확인하고 다시 시도해주세요.';
     case 'OFFLINE_EVENT_REBASE_CONFLICT':
       return '오프라인 동안 기록한 이벤트를 다시 확인해주세요.';
     // T1-0 fix round 2: this event path goes through the Socket.IO gateway
@@ -695,6 +748,7 @@ const NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES = new Set<string>([
   'NO_NEXT_PERIOD',
   'EVENT_LATE',
   'EVENT_INVALID',
+  'VALIDATION_ERROR',
   'PARTICIPANT_SIDE_MISMATCH',
   'SCORER_REQUIRED',
   'SUBSTITUTION_INVALID',

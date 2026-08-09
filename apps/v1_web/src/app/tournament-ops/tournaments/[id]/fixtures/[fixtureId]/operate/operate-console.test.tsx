@@ -1,4 +1,4 @@
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
@@ -17,13 +17,14 @@ const mocks = vi.hoisted(() => ({
   useV1FixtureLineup: vi.fn(),
   useV1Game: vi.fn(),
   useV1GameOperationsConsole: vi.fn(),
+  postV1GameCommand: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({ useV1AuthMe: () => mocks.useV1AuthMe() }));
 vi.mock('@/hooks/use-v1-game-operations', () => ({
   useV1FixtureLineup: () => mocks.useV1FixtureLineup(),
   useV1Game: () => mocks.useV1Game(),
-  postV1GameCommand: vi.fn(),
+  postV1GameCommand: (...args: unknown[]) => mocks.postV1GameCommand(...args),
 }));
 vi.mock('@/hooks/use-v1-game-operations-console', () => ({
   useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
@@ -42,6 +43,20 @@ vi.mock('@/hooks/use-v1-game-operations-console', () => ({
 // (validateSubstitution이 거부하는 상태)과 모순되는 입력을 "정상"으로
 // 통과시켰다(Copilot 리뷰 지적).
 vi.mock('./lineup-grid', () => ({
+  // operate-console.tsx가 "라인업 없이 시작 막기"(UX 감사 item 2) 판정에
+  // 실제 구현과 동일한 로직을 쓴다 — 목도 같은 판정을 하도록 실제 함수와
+  // 동일하게 둔다(다르게 두면 이 파일의 다른 테스트가 실제로는 없던 라인업을
+  // "있다"고 오판하게 된다).
+  latestOperableLineup: (
+    lineups: Array<{ sideId: string; state?: string; revision: number }>,
+    sideId: string,
+  ) => {
+    const candidates = lineups.filter(
+      (l) => l.sideId === sideId && (l.state === 'SUBMITTED' || l.state === 'LOCKED'),
+    );
+    if (candidates.length === 0) return null;
+    return candidates.reduce((latest, current) => (current.revision > latest.revision ? current : latest));
+  },
   LineupGrid: ({
     onSelectPlayer,
     restrictSideId,
@@ -189,6 +204,12 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         gameId: 'game-1',
         lineups: [{
           sideId: 'side-home',
+          // 이 describe는 라인업 게이트(UX 감사 item 2)가 아니라 피리어드
+          // 생명주기를 검증한다 — 제출된 라인업이 있는 정상 상태를 기본값으로
+          // 둔다(없으면 SCHEDULED 테스트에서 "경기를 시작해 주세요." 대신
+          // "라인업을 제출해야" 배너가 대신 뜬다).
+          state: 'SUBMITTED',
+          revision: 1,
           participants: [{
             id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
             displayNameSnapshot: '정우진', jerseyNumber: 10, position: null,
@@ -370,5 +391,194 @@ describe('OperateConsole — 선수 교체', () => {
     // 선발(started: true)인 정우진만 지정 가능한 목록에 보이고, 벤치(이민호)는 안 보인다.
     expect(screen.getByRole('button', { name: /정우진/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /이민호/ })).toBeNull();
+  });
+});
+
+const HOME_AWAY_SIDES = [
+  { id: 'side-home', gameId: 'game-1', sideKey: 'HOME' as const, teamId: null, displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '' },
+  { id: 'side-away', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: null, displayNameSnapshot: '성수 풋살 클럽', createdAt: '', updatedAt: '' },
+];
+
+// UX 감사 item 2 — 라인업 없이 경기 시작 가능 → 복구 불가능한 막다른 길.
+describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
+  function setup(lineups: Array<{ sideId: string; state: string; revision: number }>) {
+    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: { gameId: 'game-1', lineups: lineups.map((l) => ({ ...l, participants: [] })) },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.useV1Game.mockReturnValue({
+      data: {
+        id: 'game-1', state: 'SCHEDULED', version: 1, lastSequence: 0,
+        periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'SCHEDULED', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null }],
+        sides: HOME_AWAY_SIDES,
+        lineups: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
+  }
+
+  it('한쪽 팀만 라인업을 제출했으면 "경기 시작"이 비활성이고 사유·복구 링크가 뜬다', () => {
+    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 1 }]);
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
+    expect(screen.getByText(/성수 풋살 클럽.*선발 명단을 제출해야 경기를 시작할 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '라인업 제출하러 가기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/matches/f-1/lineup',
+    );
+  });
+
+  it('양 팀 모두 라인업을 제출하면 "경기 시작"이 활성화되고 배너가 없다', () => {
+    setup([
+      { sideId: 'side-home', state: 'SUBMITTED', revision: 1 },
+      { sideId: 'side-away', state: 'LOCKED', revision: 1 },
+    ]);
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: '경기 시작' })).not.toBeDisabled();
+    expect(screen.queryByText(/선발 명단을 제출해야/)).toBeNull();
+  });
+});
+
+// UX 감사 item 3 — "경기 종료"가 확인 없이 즉시 실행됐다(되돌릴 수 없는 동작).
+describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
+  beforeEach(() => {
+    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: { gameId: 'game-1', lineups: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.useV1Game.mockReturnValue({
+      data: {
+        id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1,
+        periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null, pausedTotalMs: 0, pausedAt: null }],
+        sides: [HOME_AWAY_SIDES[0]],
+        lineups: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' } }));
+    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
+  });
+
+  it('"경기 종료"를 눌러도 확인 전에는 실행되지 않고, 취소하면 아무 일도 일어나지 않는다', async () => {
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+  });
+
+  it('확인하면 그때 종료 명령이 실행된다', async () => {
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
+
+    await waitFor(() =>
+      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything()),
+    );
+  });
+});
+
+// UX 감사 item 4 — takeover.status가 'none'/'requesting'인 동안 명령 버튼·
+// LineupGrid가 전부 비활성인데 이유가 화면에 없었다.
+describe('OperateConsole — 운영 권한 요청 중 배너 (UX 감사 item 4)', () => {
+  beforeEach(() => {
+    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: { gameId: 'game-1', lineups: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.useV1Game.mockReturnValue({
+      data: {
+        id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1, periods: [],
+        sides: [HOME_AWAY_SIDES[0]],
+        lineups: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  it.each(['none', 'requesting'] as const)(
+    'takeover.status가 %s이면 권한을 가져오는 중이라는 배너를 보여준다',
+    (status) => {
+      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ takeover: { status } }));
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByText('경기 운영 권한을 가져오는 중이에요…')).toBeInTheDocument();
+    },
+  );
+
+  it('권한을 보유하면(held) 배너가 사라진다', () => {
+    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState());
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByText('경기 운영 권한을 가져오는 중이에요…')).toBeNull();
+  });
+});
+
+// UX 감사 item 6 — 실시간 점수가 표시되지 않았다. 되돌려진(reversed) 이벤트는
+// 제외하고 확정 이벤트에서만 파생해야 한다(`on-pitch-state.ts`와 동일한 규칙).
+describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
+  beforeEach(() => {
+    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: { gameId: 'game-1', lineups: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.useV1Game.mockReturnValue({
+      data: {
+        id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1,
+        periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null, pausedTotalMs: 0, pausedAt: null }],
+        sides: HOME_AWAY_SIDES,
+        lineups: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('되돌려진 골은 빼고, 나머지 확정 골만으로 사이드별 점수를 센다', () => {
+    const homeGoalA = { ...goal(1), id: 'e1', sideId: 'side-home' };
+    const homeGoalReversed = { ...goal(2), id: 'e2', sideId: 'side-home' };
+    const reversal = { ...goal(3), id: 'e3', type: 'CORRECTION' as const, sideId: 'side-home', reversesEventId: 'e2' };
+    const homeGoalB = { ...goal(4), id: 'e4', sideId: 'side-home' };
+    const awayGoal = { ...goal(5), id: 'e5', sideId: 'side-away' };
+
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ liveEvents: [homeGoalA, homeGoalReversed, reversal, homeGoalB, awayGoal] }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    // 강남(홈) 3골 중 1골이 되돌려져 2, 성수(원정) 1골 → "2 : 1"
+    expect(screen.getByText('2 : 1')).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
-import { IsArray, IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsDateString, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class CreateTeamMatchSeriesDto {
   @IsString()
@@ -27,11 +28,35 @@ export class CreateTeamMatchSeriesDto {
   teamIds!: string[];
 }
 
+export class SeriesFixtureScheduleDto {
+  /** 0(일)~6(토), KST 기준 요일. */
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  dayOfWeek!: number;
+
+  /** 'HH:mm', KST 기준 24시간제 시각. */
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'time은 HH:mm 형식이어야 해요.' })
+  time!: string;
+}
+
 export class GenerateSeriesFixturesDto {
   @IsInt()
   @Min(1)
   @Max(52)
   weeksCount!: number;
+
+  // 지정하지 않으면 기존 동작(시작일 그대로 매주 반복)을 유지한다 — 하위 호환.
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SeriesFixtureScheduleDto)
+  schedule?: SeriesFixtureScheduleDto;
+
+  // 지정하지 않으면 서비스가 기존 기본값('장소 미정')을 사용한다.
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  placeName?: string;
 }
 
 export class UpdateSeriesFixtureDto {

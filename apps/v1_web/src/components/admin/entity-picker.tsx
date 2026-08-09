@@ -8,6 +8,10 @@ export interface EntityPickerItem {
   id: string;
   label: string;
   description?: string;
+  /** true면 목록엔 보이되(숨기지 않고) 회색으로 표시하고 클릭/Enter로 선택할 수 없다. */
+  disabled?: boolean;
+  /** disabled일 때 항목 아래 표시할 "왜 선택할 수 없는지" 문구 — 컬러만으로 정보를 전달하지 않기 위해 항상 함께 노출한다. */
+  disabledReason?: string;
 }
 
 interface EntityPickerProps {
@@ -27,6 +31,12 @@ interface EntityPickerProps {
   emptyText?: string;
   /** 전달 시 목록 최상단에 "선택 해제" 옵션 노출 → onChange(null) */
   clearLabel?: string;
+  /**
+   * 서버 모드(onSearch 전달)에서도 검색어가 비어 있을 때 items를 그대로 보여준다.
+   * 호출자가 포커스만으로도 기본 후보(예: 최근 팀)를 미리 fetch해둔 경우에 켠다.
+   * 로컬 모드는 이미 기본으로 이렇게 동작해서 영향 없다.
+   */
+  showResultsWithoutQuery?: boolean;
 }
 
 type MenuEntry = { kind: 'clear' } | { kind: 'item'; item: EntityPickerItem };
@@ -44,6 +54,7 @@ export function EntityPicker({
   allowFreeText = false,
   emptyText = '검색 결과가 없어요',
   clearLabel,
+  showResultsWithoutQuery = false,
 }: EntityPickerProps) {
   const [inputValue, setInputValue] = useState('');
   const [debouncedValue, setDebouncedValue] = useState('');
@@ -97,7 +108,7 @@ export function EntityPicker({
   ];
 
   const hasQuery = debouncedValue.length > 0;
-  const showMenu = open && (hasQuery || !isServerMode || !!clearLabel);
+  const showMenu = open && (hasQuery || !isServerMode || !!clearLabel || (isServerMode && showResultsWithoutQuery));
   const safeHighlightIdx = highlightIdx >= 0 && highlightIdx < menuEntries.length ? highlightIdx : -1;
 
   // 가상 하이라이트: DOM focus를 옮기면 input blur → closeMenu로 메뉴가
@@ -122,6 +133,9 @@ export function EntityPicker({
   }
 
   function commitEntry(entry: MenuEntry) {
+    // disabled 항목은 목록에서 숨기지 않되(왜 안 되는지 항상 같이 보여줌) 선택은 막는다.
+    // 메뉴는 열어둬서 사용자가 다른 항목을 마저 고를 수 있게 한다.
+    if (entry.kind === 'item' && entry.item.disabled) return;
     onChange(entry.kind === 'clear' ? null : entry.item);
     setInputValue('');
     setDebouncedValue('');
@@ -271,20 +285,27 @@ export function EntityPicker({
                     role="option"
                     id={`${menuId}-opt-${idx}`}
                     aria-selected={highlighted}
+                    aria-disabled={item.disabled || undefined}
                     tabIndex={-1}
                     onClick={() => commitEntry(entry)}
                     className={[
-                      'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left',
-                      'hover:bg-blue-50 transition-colors',
+                      'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left transition-colors',
+                      item.disabled
+                        ? 'cursor-not-allowed opacity-60'
+                        : ['hover:bg-blue-50', highlighted ? 'bg-blue-50' : ''].join(' '),
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                      highlighted ? 'bg-blue-50' : '',
                     ].join(' ')}
                   >
-                    <span className="text-[var(--font-size-label)] font-semibold text-gray-900">
+                    <span
+                      className={`text-[var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-gray-900'}`}
+                    >
                       {item.label}
                     </span>
-                    {item.description && (
+                    {item.description && !item.disabled && (
                       <span className="text-[var(--font-size-caption)] text-gray-400">{item.description}</span>
+                    )}
+                    {item.disabled && item.disabledReason && (
+                      <span className="text-[var(--font-size-caption)] text-gray-400">{item.disabledReason}</span>
                     )}
                   </button>
                 );

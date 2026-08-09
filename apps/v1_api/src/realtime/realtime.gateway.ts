@@ -1,4 +1,5 @@
 import { ForbiddenException, HttpException, Inject } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import {
   ConnectedSocket,
   MessageBody,
@@ -383,11 +384,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
     const authUser = authenticatedSocketUser(client);
     if (authUser === null) {
-      return this.emitProtocolError(client, {
-        code: 'STAFF_SCOPE_DENIED',
-        clientEventId: input.clientEventId,
-        expectedVersion: input.expectedVersion,
-      });
+      return this.emitProtocolError(
+        client,
+        {
+          code: 'STAFF_SCOPE_DENIED',
+          clientEventId: input.clientEventId,
+          expectedVersion: input.expectedVersion,
+        },
+        { gameId: input.gameId },
+      );
     }
     try {
       const dto = appendEventDto(input);
@@ -399,7 +404,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       );
       return this.acknowledgeGameEvent(client, input.gameId, input.event, result);
     } catch (error) {
-      return this.emitProtocolError(client, protocolError(error, input));
+      return this.emitProtocolError(client, protocolError(error, input), {
+        gameId: input.gameId,
+        actorId: authUser.id,
+      });
     }
   }
 
@@ -414,11 +422,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
     const authUser = authenticatedSocketUser(client);
     if (authUser === null) {
-      return this.emitProtocolError(client, {
-        code: 'STAFF_SCOPE_DENIED',
-        clientEventId: input.clientEventId,
-        expectedVersion: input.rebasedExpectedVersion,
-      });
+      return this.emitProtocolError(
+        client,
+        {
+          code: 'STAFF_SCOPE_DENIED',
+          clientEventId: input.clientEventId,
+          expectedVersion: input.rebasedExpectedVersion,
+        },
+        { gameId: input.gameId },
+      );
     }
     try {
       const result = await this.gamesService.retryEvent(
@@ -434,10 +446,14 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       );
       return this.acknowledgeGameEvent(client, input.gameId, input.event, result);
     } catch (error) {
-      return this.emitProtocolError(client, {
-        ...protocolError(error, input),
-        expectedVersion: input.rebasedExpectedVersion,
-      });
+      return this.emitProtocolError(
+        client,
+        {
+          ...protocolError(error, input),
+          expectedVersion: input.rebasedExpectedVersion,
+        },
+        { gameId: input.gameId, actorId: authUser.id },
+      );
     }
   }
 
@@ -604,11 +620,38 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     };
   }
 
+  /**
+   * Single choke point for every `game.event.append`/`game.event.retry`
+   * rejection (validation failure, auth denial, domain error, unexpected
+   * exception). Before this, none of these ever reached the PinoLogger the
+   * gateway already has injected — a rejected command left zero trace
+   * anywhere (client saw a generic banner, server logs stayed silent, and
+   * the failed command's own DB write was rolled back by `withCommand`'s
+   * transaction) — so an operator-visible failure could never be diagnosed
+   * after the fact. This must stay failure-only: the ack path
+   * (`acknowledgeGameEvent`) does not log, and must not start to.
+   *
+   * `context.actorId` is hashed (never logged raw) to match this repo's
+   * existing PII-masking convention for user identifiers in logs (see
+   * `admin-ops.service.ts`'s `userIdHash`).
+   */
   private emitProtocolError(
     client: V1Socket,
     error: Omit<Extract<GameProtocolResult, { status: 'error' }>, 'status'>,
+    context?: { readonly gameId?: string; readonly actorId?: string },
   ): Extract<GameProtocolResult, { status: 'error' }> {
     const payload = { status: 'error' as const, ...error };
+    const logPayload = {
+      code: error.code,
+      clientEventId: error.clientEventId,
+      gameId: context?.gameId,
+      actorIdHash: context?.actorId === undefined ? undefined : hashForLog(context.actorId),
+    };
+    if (error.code === 'INTERNAL_ERROR') {
+      this.logger.error(logPayload, 'Rejected a game operations command');
+    } else {
+      this.logger.warn(logPayload, 'Rejected a game operations command');
+    }
     client.emit('game.error', error);
     return payload;
   }
@@ -933,6 +976,13 @@ function isSafePositive(value: unknown): value is number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+// Same short-sha256 masking convention `admin-ops.service.ts` uses for
+// `userIdHash` — logs must correlate an actor across events without ever
+// printing a raw user id.
+function hashForLog(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 8);
 }
 
 function isPlainObjectWithKeys(

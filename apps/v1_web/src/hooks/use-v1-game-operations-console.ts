@@ -420,42 +420,74 @@ export function useV1GameOperationsConsole(
       if (Date.now() >= takeover.expiresAtMs) return; // CHECK_EXPIRY's poll will flip status to 'expired' shortly; do not send meanwhile.
       const socket = getV1GameOperationsSocket();
       dispatchQueue({ type: 'MARK_SENDING', clientEventId: item.clientEventId });
-      socket.emit(
-        'game.event.append',
-        {
-          gameId,
-          expectedVersion: item.expectedVersion,
-          clientEventId: item.clientEventId,
-          takeoverToken: takeover.token,
-          payloadHash: item.payloadHash,
-          event: item.event,
-        },
-        (result: { status: string; sequence?: number; version?: number; code?: string }) => {
-          if (result.status === 'ack' && result.sequence !== undefined && result.version !== undefined) {
-            dispatchQueue({
-              type: 'ACK',
-              clientEventId: item.clientEventId,
-              sequence: result.sequence,
-              version: result.version,
-            });
-            // Advances local sync state for THIS device's own committed
-            // event — `onCommitted` only fires for OTHER clients' broadcasts
-            // (see that handler's own comment), so this device's own sends
-            // must independently keep `lastSequenceRef`/`sync` current.
-            dispatchSync({ type: 'BACKFILLED', lastSequence: result.sequence });
-            setGameSnapshot((current) => (current ? { ...current, version: result.version! } : current));
-            void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
-          } else {
-            dispatchQueue({
-              type: 'FAIL',
-              clientEventId: item.clientEventId,
-              error: { code: result.code ?? 'INTERNAL_ERROR', message: gameOperationsErrorMessage(result.code ?? 'INTERNAL_ERROR') },
-            });
-          }
-        },
-      );
+      // `attempts > 0` means this item already failed once and is being
+      // resent via `retryFailedEvent`/the RETRY action — the backend already
+      // has a dedicated rebase path for exactly this (`game.event.retry` →
+      // `GamesService.retryEvent`), which re-validates against the CURRENT
+      // game version instead of the stale `item.expectedVersion` captured at
+      // enqueue time and skips the live clock-drift check (the event's
+      // `occurredAt` is immutable/hash-pinned and legitimately historical by
+      // now). Before this branch, EVERY retry re-emitted `game.event.append`
+      // with the original stale `expectedVersion` — which is structurally
+      // guaranteed to fail again with the exact same VERSION_CONFLICT /
+      // OFFLINE_EVENT_REBASE_CONFLICT it failed with the first time, since
+      // nothing ever advanced the version the retry presented.
+      const isRetry = item.attempts > 0;
+      const ackHandler = (result: { status: string; sequence?: number; version?: number; code?: string }) => {
+        if (result.status === 'ack' && result.sequence !== undefined && result.version !== undefined) {
+          dispatchQueue({
+            type: 'ACK',
+            clientEventId: item.clientEventId,
+            sequence: result.sequence,
+            version: result.version,
+          });
+          // Advances local sync state for THIS device's own committed
+          // event — `onCommitted` only fires for OTHER clients' broadcasts
+          // (see that handler's own comment), so this device's own sends
+          // must independently keep `lastSequenceRef`/`sync` current.
+          dispatchSync({ type: 'BACKFILLED', lastSequence: result.sequence });
+          setGameSnapshot((current) => (current ? { ...current, version: result.version! } : current));
+          void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+        } else {
+          dispatchQueue({
+            type: 'FAIL',
+            clientEventId: item.clientEventId,
+            error: { code: result.code ?? 'INTERNAL_ERROR', message: gameOperationsErrorMessage(result.code ?? 'INTERNAL_ERROR') },
+          });
+        }
+      };
+      if (isRetry) {
+        socket.emit(
+          'game.event.retry',
+          {
+            gameId,
+            // Rebase onto the freshest version this device knows about
+            // rather than the (by definition, already-rejected) version the
+            // item was originally enqueued with.
+            rebasedExpectedVersion: gameSnapshot?.version ?? item.expectedVersion,
+            clientEventId: item.clientEventId,
+            takeoverToken: takeover.token,
+            payloadHash: item.payloadHash,
+            event: item.event,
+          },
+          ackHandler,
+        );
+      } else {
+        socket.emit(
+          'game.event.append',
+          {
+            gameId,
+            expectedVersion: item.expectedVersion,
+            clientEventId: item.clientEventId,
+            takeoverToken: takeover.token,
+            payloadHash: item.payloadHash,
+            event: item.event,
+          },
+          ackHandler,
+        );
+      }
     },
-    [gameId, takeover, sync, queryClient],
+    [gameId, takeover, sync, queryClient, gameSnapshot],
   );
 
   useEffect(() => {
@@ -597,7 +629,65 @@ export function gameOperationsErrorMessage(code: string): string {
       return '마지막 피리어드예요. 경기를 종료해 주세요.';
     case 'EVENT_LATE':
       return '기록하려는 시점이 이미 지난 피리어드예요. 새로고침 후 다시 확인해주세요.';
+    // 실측 사고(6건 시도 중 2건 실패) 사후조사에서 드러난 미매핑 코드 9개 — 서버는 이미
+    // 이 코드들을 던질 수 있었는데(games.service.ts) 콘솔이 전부 default 로 뭉개
+    // "다시 시도해주세요" 를 보여주고 있었다. 아래는 재시도로 풀리는지 여부에 따라
+    // 문구를 나눴다 — `isRetryableGameOperationsErrorCode()` 의 판정과 반드시 짝을
+    // 맞춰야 한다(둘이 갈라지면 "다시 시도해주세요" 인데 버튼이 없거나, 재시도해도
+    // 안 되는데 버튼만 있는 모순이 생긴다).
+    case 'TERMINAL_GAME_IMMUTABLE':
+      return '이미 종료 처리된 경기라 더 이상 이벤트를 기록할 수 없어요.';
+    case 'EVENT_INVALID':
+      return '이벤트 정보가 올바르지 않아요. 새로고침 후 다시 기록해주세요.';
+    case 'PARTICIPANT_SIDE_MISMATCH':
+      return '선택한 선수가 해당 팀 소속이 아니에요. 새로고침 후 다시 기록해주세요.';
+    case 'SCORER_REQUIRED':
+      return '이 대회는 득점자를 반드시 선택해야 해요. 새로고침 후 다시 기록해주세요.';
+    case 'COMMAND_IDEMPOTENCY_KEY_MISMATCH':
+    case 'IDEMPOTENCY_PAYLOAD_CONFLICT':
+      return '같은 요청 번호로 다른 내용이 이미 처리됐어요. 새로고침 후 다시 기록해주세요.';
+    case 'INVALID_ACTOR_SCOPE':
+      return '이 작업을 수행할 권한이 없어요.';
+    case 'COMMAND_CONCURRENCY_CONFLICT':
+      return '다른 운영자가 동시에 처리하고 있어요. 잠시 후 다시 시도해주세요.';
+    case 'INTERNAL_ERROR':
+      // 사용자가 고칠 수 있는 게 없다 — 입력을 바꾸라고 하지 않는다. 재시도는 여전히
+      // 유효한 선택지다(원인이 payload 가 아니라 일시적 서버 오류일 수 있으므로) — 그래서
+      // isRetryableGameOperationsErrorCode 는 이 코드를 재시도 가능으로 둔다.
+      return '일시적인 오류로 이벤트를 기록하지 못했어요. 다시 시도해도 계속되면 관리자에게 알려주세요.';
     default:
-      return '이벤트를 기록하지 못했어요. 다시 시도해주세요.';
+      // 위 어디에도 없는, 서버가 새로 추가했을 수 있는 코드 — "다시 시도해주세요" 를
+      // 단정하지 않는다(그 코드가 재시도로 풀리는지 여기서는 알 수 없다).
+      return '이벤트를 기록하지 못했어요.';
   }
+}
+
+/**
+ * 코드별로 재시도(다시 보내기)가 의미 있는지 — `QueueStatusPanel` 이 이 값으로
+ * "다시 시도" 버튼 자체를 숨긴다(비활성화가 아니라 숨김: 눌러도 매번 똑같이
+ * 실패할 게 확실한 코드에서 버튼을 살려 두면 운영자가 실패 루프에 갇힌다).
+ *
+ * 재시도 가능 = "정확히 같은 이벤트를 다시 보내면, 조건이 바뀐 뒤엔 성공할 수 있다"
+ * (버전 충돌 재베이스, 권한 토큰 재발급, 서버 일시 오류, 동시성 충돌, 아직 시작 안 한
+ * 피리어드가 나중에 시작되는 경우 등). 재시도 불가능 = "같은 payload 는 조건이 무엇이든
+ * 항상 같은 이유로 거부된다" — 이런 코드는 재전송이 아니라 다른 행동(새로고침, 다시
+ * 캡처, 관리자 문의)이 필요하므로, 그 안내는 `gameOperationsErrorMessage` 문구 자체가
+ * 이미 담고 있다.
+ */
+const NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES = new Set<string>([
+  'STAFF_SCOPE_DENIED',
+  'INVALID_ACTOR_SCOPE',
+  'TERMINAL_GAME_IMMUTABLE',
+  'PERIOD_ALREADY_ENDED',
+  'NO_NEXT_PERIOD',
+  'EVENT_LATE',
+  'EVENT_INVALID',
+  'PARTICIPANT_SIDE_MISMATCH',
+  'SCORER_REQUIRED',
+  'COMMAND_IDEMPOTENCY_KEY_MISMATCH',
+  'IDEMPOTENCY_PAYLOAD_CONFLICT',
+]);
+
+export function isRetryableGameOperationsErrorCode(code: string): boolean {
+  return !NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES.has(code);
 }

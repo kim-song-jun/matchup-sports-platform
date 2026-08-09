@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { WifiOff, Wifi } from 'lucide-react';
+import { WifiOff, Wifi, Goal, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { useV1FixtureLineup, useV1Game, postV1GameCommand } from '@/hooks/use-v1-game-operations';
@@ -10,8 +10,8 @@ import { isTakeoverHeld } from '@/lib/game-operations-queue';
 import { freezeCapture, type FrozenEventCapture } from '@/lib/game-operations-clock';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
-import { LineupGrid } from './lineup-grid';
-import { EventCaptureModal, type EventCaptureCommitInput } from './event-capture-modal';
+import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
+import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
@@ -19,7 +19,15 @@ import { useEventToast, EventToasts } from '@/components/game-operations/event-t
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
 import { deriveFoulCounts } from '@/lib/team-foul-counter';
 import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
-import type { GameCommandName, GameEventRecord, GameLineup, GameLineupParticipant, GameState } from '@/types/game-operations';
+import type {
+  GameCardColor,
+  GameCommandName,
+  GameEventRecord,
+  GameEventType,
+  GameLineup,
+  GameLineupParticipant,
+  GameState,
+} from '@/types/game-operations';
 
 export interface OperateConsoleProps {
   readonly tournamentId: string;
@@ -55,11 +63,34 @@ function commandLabel(command: GameCommandName, currentPeriodNumber: number | nu
   return COMMAND_LABEL[command];
 }
 
-interface SelectedPlayer {
-  readonly sideId: string;
-  readonly participant: GameLineupParticipant;
+/**
+ * 액션 우선 리오더 — 예전엔 "선수 탭"이 이 상태를 만들었다(선수+시각 고정).
+ * 지금은 "액션 탭"이 만든다: 액션과 시각이 먼저 고정되고, 그다음 화면
+ * (`ActionTargetPicker`)에서 "누구"를 고른다. `frozen`은 액션을 누른 그 순간
+ * 값이고, 선수를 고르는 동안 다시 얼리지 않는다 — 그게 이 리오더의 요건이다.
+ */
+interface PendingAction {
+  readonly actionType: GameEventType;
+  readonly actionLabel: string;
+  readonly cardColor?: GameCardColor;
+  /** FOUL만 선수 없이 팀 단위로 기록하는 경로를 연다 — GOAL은 대회의
+   * `tournamentScorerPolicy`에 따라 득점자가 강제될 수 있어(백엔드
+   * `SCORER_REQUIRED`) 프런트가 임의로 "선수 없이" 옵션을 주면 안 된다. */
+  readonly allowTeamOnly: boolean;
   readonly frozen: FrozenEventCapture;
 }
+
+const ACTION_BUTTONS: ReadonlyArray<{
+  readonly type: GameEventType;
+  readonly label: string;
+  readonly cardColor?: GameCardColor;
+  readonly allowTeamOnly: boolean;
+}> = [
+  { type: 'GOAL', label: '골', allowTeamOnly: false },
+  { type: 'CARD', label: '옐로카드', cardColor: 'YELLOW', allowTeamOnly: false },
+  { type: 'CARD', label: '레드카드', cardColor: 'RED', allowTeamOnly: false },
+  { type: 'FOUL', label: '파울', allowTeamOnly: true },
+];
 
 export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps) {
   const authMe = useV1AuthMe();
@@ -77,9 +108,17 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     initialLastSequence: gameDetail.data?.lastSequence ?? 0,
   });
 
-  const [selected, setSelected] = useState<SelectedPlayer | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
+  // "재개/경기종료할 때 얼마나 걸렸는지" — 실측 사고에서 나온 요구. 명령 왕복
+  // 지연은 커맨드마다 눈에 띄게 다를 수 있고(네트워크/DB 락 경합), 평소엔
+  // 보이지 않던 값이라 ms 단위로 보여줄 가치가 있다 — `formatMatchClock`이
+  // 초 단위로 고정한 매치 클록/이벤트 목록과는 다른 결의 숫자라 여기서만 ms를 쓴다.
+  const [lastCommandFeedback, setLastCommandFeedback] = useState<{
+    readonly label: string;
+    readonly durationMs: number;
+  } | null>(null);
 
   const gameState = ops.gameSnapshot?.state ?? gameDetail.data?.state ?? null;
   const gameVersion = ops.gameSnapshot?.version ?? gameDetail.data?.version ?? 0;
@@ -117,8 +156,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     [ops.liveEvents, currentPeriod?.number],
   );
 
-  const handleSelectPlayer = useCallback(
-    (input: { sideId: string; participant: GameLineupParticipant }) => {
+  const handleSelectAction = useCallback(
+    (button: (typeof ACTION_BUTTONS)[number]) => {
       // T1-0: no LIVE period means there is no server-anchored start time to
       // freeze a capture against. This used to silently fall back to
       // Date.now(), which is exactly why every captured event read
@@ -126,13 +165,21 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       // explains why the tap did nothing, so this guard needs no message.
       if (currentPeriod === null || currentPeriod.startedAt === null) return;
       const periodStartedAtMs = new Date(currentPeriod.startedAt).getTime();
+      // 액션 우선 리오더의 핵심: 여기서 얼린다 — "누구"를 고르는 다음 화면이
+      // 아무리 오래 열려 있어도 이 값은 다시 계산되지 않는다.
       const frozen = freezeCapture({
         clientNowMs: Date.now(),
         offsetMs: ops.clockOffsetMs,
         period: currentPeriod.number,
         periodStartedAtMs,
       });
-      setSelected({ sideId: input.sideId, participant: input.participant, frozen });
+      setPendingAction({
+        actionType: button.type,
+        actionLabel: button.label,
+        cardColor: button.cardColor,
+        allowTeamOnly: button.allowTeamOnly,
+        frozen,
+      });
     },
     [ops.clockOffsetMs, currentPeriod],
   );
@@ -155,13 +202,19 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const handleCommit = useCallback(
     (input: EventCaptureCommitInput) => {
       void ops.submitEvent(input);
-      setSelected(null);
-      if (input.type === 'GOAL') {
+      setPendingAction(null);
+      // GOAL은 이 콘솔에서 항상 참가자를 선택해 커밋한다(`ActionTargetPicker`가
+      // GOAL에는 `allowTeamOnly`를 열어주지 않는다) — `participantId`가 정말 없는
+      // 경우는 findRecentGoalEvent 자체가 매칭할 수 없으므로 어시스트 추가 액션을
+      // 달지 않는다(고아 토스트 액션을 만들지 않기 위한 방어적 가드).
+      if (input.type === 'GOAL' && input.participantId !== undefined) {
+        const participantId = input.participantId;
+        const clockMs = input.clockMs;
         showToast('골을 기록했어요', {
           action: {
             label: '어시스트 추가',
             onClick: () => {
-              const match = findRecentGoalEvent(liveEventsRef.current, input);
+              const match = findRecentGoalEvent(liveEventsRef.current, { participantId, clockMs });
               if (match) setAssistTarget({ event: match });
             },
           },
@@ -193,6 +246,13 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       if (!gameId || !isTakeoverHeld(ops.takeover)) return;
       setCommandPending(true);
       setCommandError(null);
+      setLastCommandFeedback(null);
+      // 라벨은 실행 "전" currentPeriod 기준으로 미리 굳혀둔다 — next-period 명령이
+      // 성공하면 refetch 후 currentPeriod가 바로 다음 피리어드로 바뀌어서, 완료 후에
+      // 다시 계산하면 "방금 무엇을 끝냈는지"가 아니라 "다음에 뭘 할 수 있는지"로
+      // 라벨이 뒤바뀐다.
+      const label = commandLabel(command, currentPeriod?.number ?? null);
+      const startedAtMs = performance.now();
       try {
         await postV1GameCommand(gameId, command, {
           expectedVersion: gameVersion,
@@ -202,13 +262,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           payload: {},
         });
         await gameDetail.refetch();
+        setLastCommandFeedback({ label, durationMs: Math.round(performance.now() - startedAtMs) });
       } catch (error) {
         setCommandError(extractErrorMessage(error, '명령을 처리하지 못했어요. 다시 시도해주세요.'));
       } finally {
         setCommandPending(false);
       }
     },
-    [gameId, ops, gameVersion, gameDetail],
+    [gameId, ops, gameVersion, gameDetail, currentPeriod],
   );
 
   if (fixtureLineup.isLoading || (gameId && gameDetail.isLoading)) {
@@ -280,21 +341,40 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-1.5 sm:shrink-0 sm:justify-end">
-            {availableCommands.map((command) => (
-              <Button
-                key={command}
-                size="sm"
-                variant={command === 'end' ? 'danger' : 'primary'}
-                disabled={!isTakeoverHeld(ops.takeover) || commandPending}
-                loading={commandPending}
-                onClick={() => handleRunCommand(command)}
-              >
-                {commandLabel(command, currentPeriod?.number ?? null)}
-              </Button>
-            ))}
+          <div className="flex flex-col items-end gap-1 sm:shrink-0">
+            <div className="flex flex-wrap justify-end gap-1.5">
+              {availableCommands.map((command) => (
+                <Button
+                  key={command}
+                  size="sm"
+                  variant={command === 'end' ? 'danger' : 'primary'}
+                  disabled={!isTakeoverHeld(ops.takeover) || commandPending}
+                  loading={commandPending}
+                  onClick={() => handleRunCommand(command)}
+                >
+                  {commandLabel(command, currentPeriod?.number ?? null)}
+                </Button>
+              ))}
+            </div>
+            {/* "재개/경기종료할 때 얼마나 걸렸는지" — 실측 사고에서 나온 요구.
+                방금 실행한 명령에만 붙는 일회성 피드백이라 다음 명령을 누르는
+                순간(`setLastCommandFeedback(null)`) 사라진다. */}
+            {lastCommandFeedback ? (
+              <p className="text-2xs tabular-nums text-gray-400 dark:text-gray-500" aria-live="polite">
+                {lastCommandFeedback.label} 완료 · {lastCommandFeedback.durationMs}ms
+              </p>
+            ) : null}
           </div>
         </div>
+        {currentPeriod && currentPeriod.startedAt ? (
+          <div className="mt-2">
+            <ElapsedMatchClock
+              periodNumber={currentPeriod.number}
+              periodStartedAtMs={new Date(currentPeriod.startedAt).getTime()}
+              offsetMs={ops.clockOffsetMs}
+            />
+          </div>
+        ) : null}
       </header>
 
       {/* Banners — never silently swallowed; each condition is its own
@@ -328,13 +408,42 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
       <TeamFoulCounterBar sides={sides} counts={foulCounts} period={currentPeriod?.number ?? 1} />
 
-      <div className="px-4">
-        <LineupGrid
-          sides={sides}
-          lineups={lineups}
-          onSelectPlayer={handleSelectPlayer}
-          disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
-        />
+      {/* 액션 우선 리오더: 이 자리는 예전엔 탭 가능한 선수 그리드였다(선수 먼저 →
+          액션). 지금은 액션이 먼저이므로, 그 다음 조작이 실제로 일어나는 자리가
+          정확히 이 위치를 차지해야 한다 — 그래서 선수 그리드가 아니라 액션 버튼이
+          이 자리를 채운다(요소를 없앤 게 아니라 같은 자리의 진입점을 바꾼 것).
+          "누구"를 고르는 단계는 `ActionTargetPicker` 모달에서 처리한다. */}
+      <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-4">
+        {ACTION_BUTTONS.map((button, index) => (
+          <Button
+            key={`${button.type}-${button.cardColor ?? index}`}
+            size="lg"
+            variant={
+              button.type === 'GOAL'
+                ? 'success'
+                : button.cardColor === 'YELLOW'
+                  ? 'warning'
+                  : button.cardColor === 'RED'
+                    ? 'danger'
+                    : 'neutral'
+            }
+            className="h-16 flex-col gap-1"
+            disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
+            onClick={() => handleSelectAction(button)}
+          >
+            {button.type === 'GOAL' ? (
+              <Goal size={18} aria-hidden="true" />
+            ) : button.type === 'FOUL' ? (
+              <AlertTriangle size={18} aria-hidden="true" />
+            ) : (
+              <span
+                aria-hidden="true"
+                className={`block h-4 w-3 rounded-[2px] ${button.cardColor === 'RED' ? 'bg-red-200' : 'bg-yellow-300'}`}
+              />
+            )}
+            {button.label}
+          </Button>
+        ))}
       </div>
 
       {/* "기록한 이벤트" 라는 제목 아래에 로컬 전송 큐만 그리고 있었다. 큐는 이번 세션에
@@ -359,14 +468,18 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         </section>
       )}
 
-      {selected && (
-        <EventCaptureModal
+      {pendingAction && (
+        <ActionTargetPicker
           open
-          sideId={selected.sideId}
-          player={selected.participant}
-          frozen={selected.frozen}
+          actionLabel={pendingAction.actionLabel}
+          actionType={pendingAction.actionType}
+          cardColor={pendingAction.cardColor}
+          frozen={pendingAction.frozen}
+          sides={sides}
+          lineups={lineups}
+          allowTeamOnly={pendingAction.allowTeamOnly}
           onCommit={handleCommit}
-          onCancel={() => setSelected(null)}
+          onCancel={() => setPendingAction(null)}
         />
       )}
       {assistTarget ? (

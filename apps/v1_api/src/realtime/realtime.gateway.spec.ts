@@ -105,7 +105,7 @@ describe('RealtimeGateway', () => {
     socketsLeave: jest.fn(),
     disconnectSockets: jest.fn(),
   };
-  const logger = { debug: jest.fn(), error: jest.fn() };
+  const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   const staffAccess = { assertAccess: jest.fn() };
 
   beforeEach(async () => {

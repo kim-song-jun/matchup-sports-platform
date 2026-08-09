@@ -58,7 +58,7 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
   };
   const prisma = { v1Game: { findUnique: jest.fn() }, v1User: { findFirst: jest.fn() } };
   const staffAccess = { assertAccess: jest.fn() };
-  const logger = { debug: jest.fn(), error: jest.fn() };
+  const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();

@@ -28,13 +28,15 @@ vi.mock('@/hooks/use-v1-game-operations', () => ({
 vi.mock('@/hooks/use-v1-game-operations-console', () => ({
   useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
   gameOperationsErrorMessage: (code: string) => `오류(${code})`,
+  isRetryableGameOperationsErrorCode: () => true,
 }));
+// action-target-picker.tsx가 그대로 import하는 './lineup-grid'와 같은 상대
+// 경로라 여기서 목을 걸면 (모달이 열렸을 때) 그 안에서 렌더되는 실제
+// LineupGrid도 이 목으로 대체된다.
 vi.mock('./lineup-grid', () => ({
   LineupGrid: ({
-    disabled,
     onSelectPlayer,
   }: {
-    disabled?: boolean;
     onSelectPlayer: (input: {
       sideId: string;
       participant: {
@@ -44,7 +46,7 @@ vi.mock('./lineup-grid', () => ({
       };
     }) => void;
   }) => (
-    <div data-testid="lineup-grid" data-disabled={disabled ? 'true' : 'false'}>
+    <div data-testid="lineup-grid">
       <button
         type="button"
         onClick={() =>
@@ -211,7 +213,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state } }));
   }
 
-  it('진행 중인 피리어드가 없으면 선수 탭을 막고 안내 문구를 보여준다', () => {
+  it('진행 중인 피리어드가 없으면 액션 버튼을 막고 안내 문구를 보여준다', () => {
     gameWithPeriods('SCHEDULED', [
       { number: 1, state: 'SCHEDULED', startedAt: null, endedAt: null },
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
@@ -220,13 +222,16 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.getByText('경기를 시작해 주세요.')).toBeInTheDocument();
-    expect(screen.getByTestId('lineup-grid')).toHaveAttribute('data-disabled', 'true');
+    // 액션 우선 리오더: 골/카드/파울 버튼이 곧 예전 "선수 탭" 진입점의 자리를
+    // 대신한다 — 여전히 진행 중인 피리어드가 없으면 막혀야 한다.
+    const goalButton = screen.getByRole('button', { name: /^골/ });
+    expect(goalButton).toBeDisabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'select-player' }));
+    fireEvent.click(goalButton);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('1피리어드가 진행 중이고 다음 피리어드가 있으면 "전반 종료" 버튼을 보여주고 선수 탭을 허용한다', () => {
+  it('1피리어드가 진행 중이고 다음 피리어드가 있으면 "전반 종료" 버튼을 보여주고 액션을 허용한다', () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
@@ -236,10 +241,20 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
     expect(screen.getByRole('button', { name: '전반 종료' })).toBeInTheDocument();
-    expect(screen.getByTestId('lineup-grid')).toHaveAttribute('data-disabled', 'false');
+    const goalButton = screen.getByRole('button', { name: /^골/ });
+    expect(goalButton).not.toBeDisabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'select-player' }));
+    // 액션(골)을 먼저 탭하면 "누구인가요" 선택 모달이 뜬다 — 선수를 먼저 고르던
+    // 예전 흐름의 정반대다.
+    fireEvent.click(goalButton);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // 모달 안에서 선수를 고르면 submitEvent가 골 이벤트로 호출되고 모달이 닫힌다.
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+    expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'GOAL', participantId: 'p-1', sideId: 'side-home' }),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('마지막 피리어드가 진행 중이면 다음 피리어드 버튼이 보이지 않는다', () => {

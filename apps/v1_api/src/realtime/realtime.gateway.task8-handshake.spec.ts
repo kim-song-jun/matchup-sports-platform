@@ -80,7 +80,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
   };
   const gamesService = { listEvents: jest.fn() };
   const staffAccess = { assertAccess: jest.fn() };
-  const logger = { debug: jest.fn(), error: jest.fn() };
+  const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   const server = { use: jest.fn<void, [SocketMiddleware]>() };
   const originalNodeEnv = process.env.NODE_ENV;
   const originalSessionSecret = process.env.V1_SESSION_SECRET;

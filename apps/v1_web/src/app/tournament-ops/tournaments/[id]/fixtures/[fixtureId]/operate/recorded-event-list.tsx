@@ -1,6 +1,7 @@
 'use client';
 
 import { Handshake } from 'lucide-react';
+import { formatMatchClock } from '@/lib/game-operations-clock';
 import type { GameEventRecord, GameLineup, GameSide } from '@/types/game-operations';
 
 /**
@@ -63,8 +64,13 @@ export function RecordedEventList({
             className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
           >
             <div className="flex min-w-0 items-center gap-2">
+              {/* clockMs 는 항상 정상이었다 — 표시만 분 단위(`m'`)로 뭉개서 같은 분에
+                  찍힌 여러 이벤트를 구분할 수 없었다(실측 사고 사후조사에서 확인:
+                  645886/649891/652602/655603ms 가 전부 "10'"로 보였다). 초까지 보여
+                  구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
+                  충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
               <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-medium tabular-nums text-gray-600 dark:bg-white/10 dark:text-gray-300">
-                {event.period}P {Math.floor(event.clockMs / 60000)}&apos;
+                {event.period}P {formatMatchClock(event.clockMs)}
               </span>
               <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
                 {eventTypeLabel(event)}

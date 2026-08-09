@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/v1-ui/button';
+import { isRetryableGameOperationsErrorCode } from '@/hooks/use-v1-game-operations-console';
 import type { QueuedGameEvent, QueuedEventStatus } from '@/lib/game-operations-queue';
 
 /**
@@ -59,9 +60,13 @@ export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
             <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
               {eventLabel(item)}
             </p>
-            {item.status === 'failed' && item.lastError ? (
+            {/* lastError 가 없는 실패도 사유 자리를 비워두지 않는다. 예전 스키마로 저장된
+                로컬스토리지 항목은 status 만 'failed' 이고 lastError 가 없을 수 있는데,
+                그때 아래 재시도 버튼은 뜨면서 이유는 안 보이면 운영자는 무엇이 왜 실패했는지
+                모른 채 버튼만 누르게 된다. */}
+            {item.status === 'failed' ? (
               <p className="text-2xs text-red-500" role="alert">
-                {item.lastError.message}
+                {item.lastError?.message ?? '실패 사유를 확인할 수 없어요. 다시 시도해 보고, 계속 실패하면 새로고침해 주세요.'}
               </p>
             ) : null}
           </div>
@@ -70,7 +75,12 @@ export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
           >
             {STATUS_LABEL[item.status]}
           </span>
-          {item.status === 'failed' ? (
+          {/* 실패 사유가 재시도로 풀리지 않는 코드(권한 없음/이미 종료된 경기/무효한
+              payload 등)면 버튼을 아예 숨긴다 — 눌러도 항상 같은 이유로 다시 실패할 게
+              확실한 버튼을 살려 두면 운영자가 실패 루프에 갇힌다. 그 대신 위의
+              `item.lastError.message` 문구가 무엇을 해야 하는지(새로고침/관리자 문의
+              등) 직접 안내한다. */}
+          {item.status === 'failed' && (item.lastError === null || isRetryableGameOperationsErrorCode(item.lastError.code)) ? (
             <Button size="sm" variant="outline" onClick={() => onRetry(item.clientEventId)}>
               다시 시도
             </Button>

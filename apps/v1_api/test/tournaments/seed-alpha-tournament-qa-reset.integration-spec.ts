@@ -71,6 +71,18 @@ const ids = {
   otherTournament: id('000000000020'),
   otherFixture: id('000000000021'),
   otherGame: id('000000000022'),
+
+  // A tournament pinned by an append-only v1_operation_audits row that references
+  // both the tournament and one of its fixtures — the exact 2026-08-09 deploy
+  // blocker. GamesService.writeAudit() leaves these while processing tournament
+  // games; the trigger v1_operation_audits_append_only makes them undeletable, so
+  // the tournament delete fails with P2003 and the reset must SKIP this one only.
+  auditTournament: id('000000000060'),
+  auditFixture: id('000000000061'),
+
+  // A plain deletable tournament used alongside auditTournament to prove one gets
+  // skipped while the other still resets in the same transaction.
+  auditSurvivorTournament: id('000000000070'),
 } as const;
 
 const prisma = new PrismaService();
@@ -383,6 +395,33 @@ describe('resetAlphaTournamentScenarios — tears down the Game graph before del
         state: 'SCHEDULED',
       },
     });
+
+    // A tournament + fixture pinned by an append-only operation_audit. INSERT is
+    // always allowed (the trigger only blocks DELETE/UPDATE), so this sets up the
+    // exact undeletable state without touching the trigger.
+    await prisma.v1Tournament.create({
+      data: { id: ids.auditTournament, sportId: ids.sport, title: 'Operation Audit Pinned Tournament' },
+    });
+    await prisma.v1TournamentFixture.create({
+      data: { id: ids.auditFixture, tournamentId: ids.auditTournament, round: 'group', fixtureNumber: 1 },
+    });
+    await prisma.v1OperationAudit.create({
+      data: {
+        actorType: 'SYSTEM',
+        systemActor: 'seed-reset-test',
+        action: 'GAME_RESULT_OFFICIAL',
+        resourceType: 'game',
+        resourceId: 'seed-reset-audit-resource',
+        requestId: 'seed-reset-audit-request',
+        tournamentId: ids.auditTournament,
+        fixtureId: ids.auditFixture,
+      },
+    });
+
+    // A plain deletable tournament seeded alongside the pinned one.
+    await prisma.v1Tournament.create({
+      data: { id: ids.auditSurvivorTournament, sportId: ids.sport, title: 'Audit Test Survivor Tournament' },
+    });
   });
 
   afterAll(async () => {
@@ -465,8 +504,53 @@ describe('resetAlphaTournamentScenarios — tears down the Game graph before del
   });
 
   it('is idempotent — running it again on already-deleted scenarios is a no-op, not an error', async () => {
+    const summary = await prisma.$transaction((tx) =>
+      resetAlphaTournamentScenarios(tx, [ids.bareTournament, ids.draftTournament]),
+    );
+    // Already gone → the per-tournament deletes are no-ops but still "succeed" (no
+    // Restrict FK left to hit), so both count as reset, none skipped.
+    expect(summary.skipped).toEqual([]);
+    expect(summary.reset).toEqual(expect.arrayContaining([ids.bareTournament, ids.draftTournament]));
+  });
+
+  // ── Part 1: append-only operation_audit deadlock (2026-08-09 deploy blocker) ──
+
+  it('SKIPS a tournament pinned by an append-only operation_audit instead of failing the whole reset (proves the FK violation surfaces as Prisma P2003 and is caught)', async () => {
+    const summary = await prisma.$transaction((tx) =>
+      resetAlphaTournamentScenarios(tx, [ids.auditTournament]),
+    );
+
+    // Not thrown — the pinned tournament is skipped, not fatal.
+    expect(summary.reset).toEqual([]);
+    expect(summary.skipped).toHaveLength(1);
+    expect(summary.skipped[0].tournamentId).toBe(ids.auditTournament);
+    // meta.field_name from Prisma names the constraint that blocked the delete —
+    // asserting it is non-empty confirms the P2003 path (not some other error) ran.
+    expect(summary.skipped[0].blockedBy).toBeTruthy();
+
+    // The pinned tournament, its fixture, and the audit row are all untouched.
+    await expect(prisma.v1Tournament.findUniqueOrThrow({ where: { id: ids.auditTournament } })).resolves.toBeDefined();
+    await expect(prisma.v1TournamentFixture.findUniqueOrThrow({ where: { id: ids.auditFixture } })).resolves.toBeDefined();
     await expect(
-      prisma.$transaction((tx) => resetAlphaTournamentScenarios(tx, [ids.bareTournament, ids.draftTournament])),
-    ).resolves.toBeUndefined();
+      prisma.v1OperationAudit.findFirstOrThrow({ where: { tournamentId: ids.auditTournament } }),
+    ).resolves.toBeDefined();
+  });
+
+  it('resets the deletable tournaments in the same call while skipping the pinned one, and the transaction stays usable after the savepoint rollback', async () => {
+    const summary = await prisma.$transaction(async (tx) => {
+      const result = await resetAlphaTournamentScenarios(tx, [ids.auditTournament, ids.auditSurvivorTournament]);
+      // The savepoint rollback must leave the transaction in a good state — this
+      // query would throw "current transaction is aborted" if it didn't.
+      const stillThere = await tx.v1Tournament.count({ where: { id: ids.auditTournament } });
+      return { result, stillThere };
+    });
+
+    expect(summary.result.skipped.map((s) => s.tournamentId)).toEqual([ids.auditTournament]);
+    expect(summary.result.reset).toEqual([ids.auditSurvivorTournament]);
+    expect(summary.stillThere).toBe(1);
+
+    // Pinned one survives; the plain one was actually deleted.
+    await expect(prisma.v1Tournament.findUniqueOrThrow({ where: { id: ids.auditTournament } })).resolves.toBeDefined();
+    await expect(prisma.v1Tournament.findUnique({ where: { id: ids.auditSurvivorTournament } })).resolves.toBeNull();
   });
 });

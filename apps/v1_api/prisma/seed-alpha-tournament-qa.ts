@@ -877,13 +877,61 @@ async function teardownGamesForTournaments(
   await tx.v1Game.deleteMany({ where: { id: { in: gameIds } } });
 }
 
+export interface AlphaTournamentResetSummary {
+  /** 실제로 지워져 재생성 대상이 되는 대회 ID */
+  readonly reset: string[];
+  /** append-only 데이터가 참조를 못박아 이번 배포에선 그대로 둔 대회 */
+  readonly skipped: { tournamentId: string; blockedBy: string }[];
+}
+
 export async function resetAlphaTournamentScenarios(
   tx: Prisma.TransactionClient,
   tournamentIds: readonly string[],
-): Promise<void> {
-  await teardownGamesForTournaments(tx, tournamentIds);
-  await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId: { in: [...tournamentIds] } } });
-  await tx.v1Tournament.deleteMany({ where: { id: { in: [...tournamentIds] } } });
+): Promise<AlphaTournamentResetSummary> {
+  const reset: string[] = [];
+  const skipped: { tournamentId: string; blockedBy: string }[] = [];
+
+  for (const tournamentId of tournamentIds) {
+    // 대회 하나씩 SAVEPOINT 로 감싸 실제로 지워 본다. append-only `v1_operation_audits`
+    // (게임 커맨드마다 쌓이는 삭제 불가 로그)가 이 대회/픽스처를 Restrict FK 로 못박고
+    // 있으면 v1Tournament.deleteMany 가 Postgres 23503 → Prisma P2003 으로 실패하는데,
+    // 그때 이 대회분만 롤백하고 건너뛴다(다른 대회 재생성은 계속). 트리거는 절대 끄지
+    // 않는다 — append-only 무결성과 "삭제 불가 데이터는 사람이 처리"라는 기존 정책
+    // (teardownGamesForTournaments 의 nonDraftRevision/orphanTeamRecordFact 가드)을 그대로 지킨다.
+    // 그 가드들은 일반 Error 를 던지므로 P2003 캐치에 안 걸려 전체 트랜잭션을 그대로 중단시킨다.
+    const savepoint = `qa_reset_${tournamentId.replace(/-/g, '')}`;
+    await tx.$executeRawUnsafe(`SAVEPOINT "${savepoint}"`);
+    try {
+      await teardownGamesForTournaments(tx, [tournamentId]);
+      await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId } });
+      await tx.v1Tournament.deleteMany({ where: { id: tournamentId } });
+      await tx.$executeRawUnsafe(`RELEASE SAVEPOINT "${savepoint}"`);
+      reset.push(tournamentId);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        // 이 대회분만 되돌린다. ROLLBACK TO SAVEPOINT 는 savepoint 를 소멸시키지 않으므로
+        // 뒤이어 RELEASE 로 정리해야 트랜잭션 상태가 깨끗하게 남는다.
+        await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT "${savepoint}"`);
+        await tx.$executeRawUnsafe(`RELEASE SAVEPOINT "${savepoint}"`);
+        // alpha 실측(2026-08-09): 이 시나리오에서 Prisma 는 meta.field_name 을 채우지 않는다.
+        // 대신 메시지 본문의 "constraint: `xxx`" 에서 실제 FK 이름을 뽑아 로그를 쓸모 있게 한다.
+        const fromMeta = typeof error.meta?.field_name === 'string' ? error.meta.field_name : null;
+        const fromMessage = error.message.match(/constraint:?\s*`?([\w-]+)`?/i)?.[1] ?? null;
+        const blockedBy = fromMeta ?? fromMessage ?? 'unknown FK constraint';
+        console.warn(
+          `[seed-alpha-tournament-qa] Skipping reset for tournament ${tournamentId}: blocked by a ` +
+            `Restrict FK (${blockedBy}) whose referencing rows this seed cannot delete (append-only). ` +
+            'Leaving that tournament as-is from the previous deploy — it will not receive fresh QA ' +
+            'content until the delete-based reset is retired (see Part 2 of the deadlock design).',
+        );
+        skipped.push({ tournamentId, blockedBy });
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return { reset, skipped };
 }
 
 async function main() {
@@ -926,7 +974,12 @@ async function main() {
 
     const summary = await prisma.$transaction(async (tx) => {
       const tournamentIds = ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.id);
-      await resetAlphaTournamentScenarios(tx, tournamentIds);
+      const { reset, skipped } = await resetAlphaTournamentScenarios(tx, tournamentIds);
+      // 스킵된 대회는 지워지지 않았으므로 다시 만들지 않는다(고정 ID 라 재생성하면 충돌).
+      // createScenario 를 안 부르면 그 대회의 leaf 엔티티(공지·시상·후기·스폰서)도 자동으로
+      // 이전 배포 상태 그대로 보존된다 — 별도 필터링 로직이 필요 없다.
+      const resetIds = new Set(reset);
+      const scenariosToSeed = ALPHA_TOURNAMENT_SCENARIOS.filter((scenario) => resetIds.has(scenario.id));
       const qaTeams = await ensureTeamRoster(
         tx,
         sport.id,
@@ -946,7 +999,7 @@ async function main() {
         '팀밋 정식 매치·대회에 참가하는 활동 팀입니다.',
       );
       const now = new Date();
-      for (const scenario of ALPHA_TOURNAMENT_SCENARIOS) {
+      for (const scenario of scenariosToSeed) {
         const teams = scenario.marketing ? featuredTeams : qaTeams;
         await createScenario(
           tx,
@@ -959,10 +1012,12 @@ async function main() {
         );
       }
       return {
-        tournaments: ALPHA_TOURNAMENT_SCENARIOS.length,
-        campaigns: ALPHA_TOURNAMENT_SCENARIOS.filter((scenario) => scenario.hasCampaign).length,
-        statuses: ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.status),
+        tournaments: scenariosToSeed.length,
+        campaigns: scenariosToSeed.filter((scenario) => scenario.hasCampaign).length,
+        statuses: scenariosToSeed.map((scenario) => scenario.status),
         completedIncludes: ['results', 'videos', 'reviews', 'awards'],
+        // 조용한 스킵 방지 — 배포 로그(stdout JSON)에 항상 노출된다(CLAUDE.md 규칙 5).
+        skipped: skipped.map((s) => ({ tournamentId: s.tournamentId, blockedBy: s.blockedBy })),
       };
     });
     process.stdout.write(`${JSON.stringify({ status: 'ok', ...summary })}\n`);

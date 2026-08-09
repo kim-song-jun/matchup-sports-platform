@@ -379,6 +379,7 @@ export function MultiPresetChipSelector({
   values,
   allowFreeText,
   freeTextPlaceholder,
+  maxItems,
   onChange,
 }: {
   label: string;
@@ -386,35 +387,67 @@ export function MultiPresetChipSelector({
   values: string[];
   allowFreeText?: boolean;
   freeTextPlaceholder?: string;
+  /** 설정하면 총 선택 개수를 이 값으로 제한한다(예: 경기 스타일 최대 3개 — 서로 상충하는
+   * 조합·배지 난립을 막으려는 사용자 확정 결정). 조용히 무시하는 대신 초과 시도를
+   * limitMessage로 즉시 안내한다. */
+  maxItems?: number;
   onChange: (values: string[]) => void;
 }) {
   const presetSet = new Set(options);
   const customValue = values.find((item) => !presetSet.has(item)) ?? '';
+  const atLimit = maxItems !== undefined && values.length >= maxItems;
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);
+
+  // 선택 해제 등으로 한도 아래로 내려가면 이전 안내 문구를 치운다 — 더 이상 사실이 아닌
+  // 경고가 화면에 남아있지 않도록.
+  useEffect(() => {
+    if (!atLimit) setLimitMessage(null);
+  }, [atLimit]);
 
   const toggleOption = (option: string) => {
-    onChange(values.includes(option) ? values.filter((item) => item !== option) : [...values, option]);
+    const isSelected = values.includes(option);
+    if (!isSelected && atLimit) {
+      setLimitMessage(`최대 ${maxItems}개까지 선택할 수 있어요. 다른 항목을 선택 해제한 뒤 다시 선택해 주세요.`);
+      return;
+    }
+    setLimitMessage(null);
+    onChange(isSelected ? values.filter((item) => item !== option) : [...values, option]);
   };
 
   const applyCustom = (text: string) => {
     const withoutOldCustom = values.filter((item) => presetSet.has(item));
-    onChange(text.trim() ? [...withoutOldCustom, text.trim()] : withoutOldCustom);
+    const trimmed = text.trim();
+    if (trimmed && maxItems !== undefined && withoutOldCustom.length >= maxItems) {
+      setLimitMessage(`최대 ${maxItems}개까지 선택할 수 있어요. 다른 항목을 선택 해제한 뒤 다시 입력해 주세요.`);
+      return;
+    }
+    setLimitMessage(null);
+    onChange(trimmed ? [...withoutOldCustom, trimmed] : withoutOldCustom);
   };
 
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">{label}</div>
       <div className="tm-team-form-chip-row" role="group" aria-label={label}>
-        {options.map((option) => (
-          <button
-            key={option}
-            type="button"
-            className={`tm-chip ${values.includes(option) ? 'tm-chip-active' : ''}`}
-            aria-pressed={values.includes(option)}
-            onClick={() => toggleOption(option)}
-          >
-            {option}
-          </button>
-        ))}
+        {options.map((option) => {
+          const isSelected = values.includes(option);
+          // 색상 단독 전달 금지: 한도 도달 시 미선택 칩은 aria-disabled + 낮은 불투명도로도
+          // 표시한다. 다만 클릭은 계속 받는다 — disabled로 막으면 "왜 안 눌리지?"에 답할
+          // 방법이 없어진다(눌러야 limitMessage가 뜬다).
+          const softDisabled = !isSelected && atLimit;
+          return (
+            <button
+              key={option}
+              type="button"
+              className={`tm-chip ${isSelected ? 'tm-chip-active' : ''}`}
+              aria-pressed={isSelected}
+              aria-disabled={softDisabled || undefined}
+              onClick={() => toggleOption(option)}
+            >
+              {option}
+            </button>
+          );
+        })}
       </div>
       {allowFreeText ? (
         <input
@@ -425,6 +458,7 @@ export function MultiPresetChipSelector({
           onChange={(event) => applyCustom(event.target.value)}
         />
       ) : null}
+      <FieldErrorText message={limitMessage ?? undefined} />
     </div>
   );
 }

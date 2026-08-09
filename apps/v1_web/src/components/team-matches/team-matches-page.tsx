@@ -755,6 +755,10 @@ const GRADE_OPTIONS = ['입문', '초보', '중수', '고수'] as const;
 const MATCH_FORMAT_OPTIONS_SOCCER = ['11:11', '9:9', '8:8', '7:7'] as const;
 const MATCH_FORMAT_OPTIONS_FUTSAL = ['6:6', '5:5', '4:4'] as const;
 const MATCH_STYLE_OPTIONS = ['친선', '매너 중시', '교환매치', '실력 중심', '초보 환영', '기타'] as const;
+// 최대 3개(사용자 확정 결정) — apps/v1_api/src/team-matches/team-match-conditions.constants.ts의
+// MATCH_STYLE_MAX_ITEMS와 값을 맞춘다(별도 앱이라 상수 자체는 공유하지 못한다). 서버 DTO가
+// 최종 방어선이고, 이 값은 4번째 선택 시 조용히 막히지 않고 이유를 안내하기 위한 프론트 표시용.
+const MATCH_STYLE_MAX_ITEMS = 3;
 const UNIFORM_COLOR_OPTIONS = ['흰색', '검정', '빨강', '파랑', '노랑', '초록', '주황', '남색'] as const;
 
 function matchFormatOptionsForSport(sportName: string): readonly string[] {
@@ -768,7 +772,7 @@ function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
 function ConditionFields({ model }: { model: TeamMatchCreateViewModel }) {
   const d = model.draft;
   const formatOptions = matchFormatOptionsForSport(model.selectedSport);
-  return <><PresetChipSelector label="실력등급" options={GRADE_OPTIONS} value={d.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><PresetChipSelector label="경기방식" options={formatOptions} value={d.format} allowFreeText freeTextPlaceholder="예: 10:10, 3:3" onChange={(value) => model.form?.onFieldChange('format', value)} /><MultiPresetChipSelector label="경기 스타일" options={MATCH_STYLE_OPTIONS} values={d.style} allowFreeText freeTextPlaceholder="목록에 없으면 직접 입력해 주세요" onChange={(value) => model.form?.onFieldChange('style', value)} /><PresetChipSelector label="유니폼 색상" options={UNIFORM_COLOR_OPTIONS} value={d.uniform} allowFreeText freeTextPlaceholder="예: 줄무늬 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div></>;
+  return <><PresetChipSelector label="실력등급" options={GRADE_OPTIONS} value={d.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><PresetChipSelector label="경기방식" options={formatOptions} value={d.format} allowFreeText freeTextPlaceholder="예: 10:10, 3:3" onChange={(value) => model.form?.onFieldChange('format', value)} /><MultiPresetChipSelector label="경기 스타일" options={MATCH_STYLE_OPTIONS} values={d.style} allowFreeText freeTextPlaceholder="목록에 없으면 직접 입력해 주세요" maxItems={MATCH_STYLE_MAX_ITEMS} onChange={(value) => model.form?.onFieldChange('style', value)} /><PresetChipSelector label="유니폼 색상" options={UNIFORM_COLOR_OPTIONS} value={d.uniform} allowFreeText freeTextPlaceholder="예: 줄무늬 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div></>;
 }
 
 function PlaceTimeStep({ model }: { model: TeamMatchCreateViewModel }) {

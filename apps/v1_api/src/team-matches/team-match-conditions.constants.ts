@@ -18,6 +18,10 @@ export const MATCH_STYLE_OPTIONS = ['친선', '매너 중시', '교환매치', '
 export const UNIFORM_COLOR_OPTIONS = ['흰색', '검정', '빨강', '파랑', '노랑', '초록', '주황', '남색'] as const;
 
 export const MATCH_FORMAT_MAX_LENGTH = 20;
-export const MATCH_STYLE_MAX_ITEMS = 6;
+// 3개로 제한한다(사용자 확정 결정) — 무제한이면 '매너 중시'+'실력 중심'처럼 서로 상충하는
+// 조합이 그대로 저장되고, 목록/상세 배지도 무한정 늘어나 지저분해진다. 프론트
+// MultiPresetChipSelector(create-form-fields.tsx)가 4번째 선택 시 조용히 무시하지 않고
+// 이유를 안내하며 같은 상수를 쓴다(apps/v1_web은 별도 앱이라 값만 동일하게 맞춰 중복 선언).
+export const MATCH_STYLE_MAX_ITEMS = 3;
 export const MATCH_STYLE_ITEM_MAX_LENGTH = 20;
 export const UNIFORM_COLOR_MAX_LENGTH = 20;

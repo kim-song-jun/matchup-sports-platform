@@ -144,8 +144,22 @@ describe('POST /admin/team-match-series + fixtures', () => {
   it(
     '대진을 아직 안 만든 새 리그를 조회하면, 같은 팀들이 과거에 뛴 다른 리그의 장소가 최근 사용 장소로 내려온다',
     async () => {
-      // 앞선 '템플릿 리그' 테스트에서 teamA/teamB가 '상암 풋살파크'에서 이미 대진을 치렀다 —
-      // 이번엔 그 두 팀으로 새 리그(대진 미생성)를 만들어 그 이력이 넘어오는지 본다.
+      // 다른 테스트의 실행 순서에 기대지 않도록, teamA/teamB가 '상암 풋살파크'에서 이미
+      // 뛴 이력을 이 테스트 안에서 직접 만든다.
+      await prisma.v1TeamMatch.create({
+        data: {
+          hostTeamId: teamAId,
+          approvedApplicantTeamId: teamBId,
+          createdByUserId: ownerUserId,
+          sportId,
+          regionId,
+          title: `과거 대진-${suiteId}`,
+          placeName: '상암 풋살파크',
+          startAt: new Date('2026-07-01T09:00:00.000Z'),
+          status: 'completed',
+        },
+      });
+
       const createRes = await request(app.getHttpServer())
         .post('/api/v1/admin/team-match-series')
         .set('x-v1-user-id', ownerUserId)

@@ -32,8 +32,8 @@ export default function AdminTeamMatchSeriesNewPage() {
 
   const { data: sports } = useV1MasterSports();
   const { data: regions } = useV1MasterRegions();
-  // 팀 최소 2개를 고르기 전까지는(= 아직 종목이 잠기기 전까지는) 검색을 종목으로
-  // 막지 않는다 — 검색어가 있으면 전체 종목에서 이름으로 찾고(다른 종목도 안 숨김,
+  // 첫 팀을 고르기 전까지는(= 아직 종목이 잠기기 전까지는) 검색을 종목으로 막지
+  // 않는다 — 검색어가 있으면 전체 종목에서 이름으로 찾고(다른 종목도 안 숨김,
   // 회색으로 보여주고 이유를 알려준다), 검색어가 없을 때만 기본 후보를 sportId로 좁힌다.
   const trimmedTeamSearch = teamSearch.trim();
   const teamsQuery = useV1Teams(

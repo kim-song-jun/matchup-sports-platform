@@ -237,11 +237,14 @@ export class TeamMatchSeriesAdminService {
       throw new NotFoundException({ code: 'SERIES_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
     }
     const updated = await this.prisma.$transaction(async (tx) => {
+      // generateFixtures와 동일하게: 빈/공백 문자열로 지우는 요청은 "미지정"으로 되돌린다 —
+      // 그대로 저장하면 loadRecentVenues distinct 집계에서 조용히 빠지는 값이 남는다.
+      const trimmedPlaceName = dto.placeName === undefined ? undefined : dto.placeName.trim();
       const result = await tx.v1TeamMatch.update({
         where: { id: teamMatchId },
         data: {
           ...(dto.startsAt === undefined ? {} : { startAt: new Date(dto.startsAt) }),
-          ...(dto.placeName === undefined ? {} : { placeName: dto.placeName }),
+          ...(trimmedPlaceName === undefined ? {} : { placeName: trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME }),
           ...(dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
         },
       });
@@ -285,9 +288,12 @@ export class TeamMatchSeriesAdminService {
       select: { placeName: true },
       take: 30,
     });
+    // 쓰기 경로는 이제 trim+폴백을 하지만, 그 이전에 만들어진 레거시 행에 앞뒤 공백이
+    // 섞여 있을 수 있어 읽기 시점에도 한 번 더 trim한다(방어적 이중 처리).
     const distinct: string[] = [];
     for (const row of rows) {
-      if (row.placeName && !distinct.includes(row.placeName)) distinct.push(row.placeName);
+      const trimmed = row.placeName?.trim();
+      if (trimmed && !distinct.includes(trimmed)) distinct.push(trimmed);
       if (distinct.length >= 5) break;
     }
     return distinct;

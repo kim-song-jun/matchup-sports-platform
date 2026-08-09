@@ -618,6 +618,24 @@ function ParticipationStep({
     });
   }, [state.lineupMaxPlayers, lineupSizeOptions, dispatch]);
 
+  // 교체 방식/횟수도 같은 원칙으로 canonical 기본값을 자동 채운다.
+  useEffect(() => {
+    if (state.substitutionMode !== '') return;
+    if (!lineupSizeOptions?.supported || lineupSizeOptions.defaultSubstitutionMode === null) return;
+    dispatch({
+      type: 'set-field',
+      field: 'substitutionMode',
+      value: lineupSizeOptions.defaultSubstitutionMode,
+    });
+    if (lineupSizeOptions.defaultSubstitutionMode === 'limited' && lineupSizeOptions.defaultMaxSubstitutions !== null) {
+      dispatch({
+        type: 'set-field',
+        field: 'maxSubstitutions',
+        value: String(lineupSizeOptions.defaultMaxSubstitutions),
+      });
+    }
+  }, [state.substitutionMode, lineupSizeOptions, dispatch]);
+
   return (
     <div className="grid gap-6">
       <div className="grid gap-4 sm:grid-cols-3">
@@ -696,6 +714,61 @@ function ParticipationStep({
                 </button>
               );
             })}
+          </div>
+        )}
+      </Field>
+
+      <Field
+        id="substitution-mode"
+        label="교체 방식"
+        hint="경기 중 후보 선수를 주전과 몇 번까지 바꿀 수 있는지예요. 무제한(롤링)은 이미 나갔던 선수도 다시 투입할 수 있어요."
+        error={errors.maxSubstitutions}
+      >
+        {lineupSizeOptionsPending ? (
+          <p className="text-xs text-[var(--text-caption)]">선택지를 불러오는 중이에요…</p>
+        ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
+          <p className="text-xs text-[var(--red500)]">
+            교체 방식 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요. 그대로 저장하면 종목 기본값이 적용돼요.
+          </p>
+        ) : !lineupSizeOptions.supported ? (
+          <p className="text-xs text-[var(--text-caption)]">
+            이 종목은 아직 교체 방식을 선택할 수 없어요. 기본 규칙을 그대로 적용해요.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="교체 방식 선택">
+              {lineupSizeOptions.substitutionModes.map((mode) => {
+                const selected = state.substitutionMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => setField('substitutionMode', mode)}
+                    aria-pressed={selected}
+                    className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
+                      selected
+                        ? 'border-blue-500 bg-blue-500 text-white'
+                        : 'border-[var(--border)] bg-white text-[var(--text-body)] hover:border-blue-500'
+                    }`}
+                  >
+                    {mode === 'limited' ? '제한' : '무제한(롤링)'}
+                  </button>
+                );
+              })}
+            </div>
+            {state.substitutionMode === 'limited' ? (
+              <NumberField
+                id="max-substitutions"
+                label="허용 교체 횟수"
+                value={state.maxSubstitutions}
+                onChange={(value) => setField('maxSubstitutions', value)}
+                min={0}
+                max={50}
+                disabled={pending}
+                error={errors.maxSubstitutions}
+              />
+            ) : null}
           </div>
         )}
       </Field>

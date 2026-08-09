@@ -2923,6 +2923,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   /** "출전 인원"(라인업 상한) — 위 editMinPlayers/editMaxPlayers(등록 명단 크기)와 다른 값.
    * 빈 문자열이면 변경하지 않는다는 뜻(payload에서 제외). */
   const [editLineupMaxPlayers, setEditLineupMaxPlayers] = useState('');
+  /** "교체 방식/횟수" — 위 editLineupMaxPlayers와 같은 V1CompetitionConfigVersion.lineup에
+   * 함께 pin되지만 다른 관심사다. 빈 문자열이면 변경하지 않는다는 뜻(payload에서 제외). */
+  const [editSubstitutionMode, setEditSubstitutionMode] = useState<'' | 'limited' | 'rolling'>('');
+  const [editMaxSubstitutions, setEditMaxSubstitutions] = useState('');
   // "출전 인원" 선택지 — 종목 변경과 동시에는 못 바꾸므로(서버가
   // TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT로 막음) 편집 폼에서 종목이 바뀌지
   // 않았을 때만(editSportId가 비었거나 tournament.sportId와 같을 때) 조회한다.
@@ -2989,6 +2993,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     // 선택된 값으로 보여준다(아래 JSX). 사용자가 명시적으로 다른 값을 고를 때만 payload에
     // lineupMaxPlayers가 실린다.
     setEditLineupMaxPlayers('');
+    // 교체 방식/횟수도 같은 원칙 — 빈 값으로 시작하고, 선택지 그룹은
+    // tournament.substitutionMode/maxSubstitutions를 선택된 값으로 보여준다(아래 JSX).
+    setEditSubstitutionMode('');
+    setEditMaxSubstitutions('');
     setEditGenderCategory(tournament.genderCategory ?? '');
     setEditGenderMinMale(
       tournament.genderMinMale === null ? '' : String(tournament.genderMinMale),
@@ -3127,6 +3135,18 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     // 뺀다. 서버는 이 필드가 없으면 기존 값을 그대로 둔다(update()는 partial PATCH).
     if (editLineupMaxPlayers !== '' && Number(editLineupMaxPlayers) !== tournament.lineupMaxPlayers) {
       payload.lineupMaxPlayers = Number(editLineupMaxPlayers);
+    }
+    // "교체 방식/횟수" — editSubstitutionMode가 빈 문자열이면(아직 안 고름) payload에서
+    // 아예 뺀다. 'rolling'을 고르면 횟수는 함께 보내지 않는다(서버가 400으로 거절한다).
+    if (editSubstitutionMode !== '' && editSubstitutionMode !== tournament.substitutionMode) {
+      payload.substitutionMode = editSubstitutionMode;
+    }
+    if (
+      editSubstitutionMode === 'limited' &&
+      editMaxSubstitutions !== '' &&
+      Number(editMaxSubstitutions) !== tournament.maxSubstitutions
+    ) {
+      payload.maxSubstitutions = Number(editMaxSubstitutions);
     }
     if (editGenderCategory && editGenderCategory !== (tournament.genderCategory ?? '')) {
       payload.genderCategory = editGenderCategory;
@@ -3384,6 +3404,15 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             {
               label: '출전 인원',
               value: tournament.lineupMaxPlayers !== null ? `${tournament.lineupMaxPlayers}명` : '미지정',
+            },
+            {
+              label: '교체 방식',
+              value:
+                tournament.substitutionMode === null
+                  ? '미지정'
+                  : tournament.substitutionMode === 'rolling'
+                    ? '무제한(롤링)'
+                    : `제한 ${tournament.maxSubstitutions}회`,
             },
             { label: '신청 수', value: `${tournament.registrationCount}팀` },
             { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
@@ -3909,6 +3938,84 @@ export default function TournamentDetailClient({ id }: { id: string }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] text-gray-900">교체 방식</span>
+            <p className="text-[12px] text-gray-500">
+              경기 중 후보 선수를 주전과 몇 번까지 바꿀 수 있는지예요. 무제한(롤링)은 이미 나갔던 선수도 다시 투입할 수 있어요.
+            </p>
+            {tournament.status === 'in_progress' || tournament.status === 'completed' ? (
+              <p className="text-[12px] text-amber-600">
+                대회가 시작된 이후에는 교체 방식을 바꿀 수 없어요.
+                {tournament.substitutionMode !== null
+                  ? ` 현재 ${tournament.substitutionMode === 'limited' ? `제한 ${tournament.maxSubstitutions}회` : '무제한'}이에요.`
+                  : ''}
+              </p>
+            ) : editSportId && editSportId !== tournament.sportId ? (
+              <p className="text-[12px] text-gray-500">
+                종목을 바꾸는 중에는 교체 방식을 함께 바꿀 수 없어요. 종목을 먼저 저장한 뒤 다시 편집해 주세요.
+              </p>
+            ) : lineupSizeOptionsPending ? (
+              <p className="text-[12px] text-gray-500">선택지를 불러오는 중이에요…</p>
+            ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
+              <p className="text-[12px] text-[var(--red500)]">
+                교체 방식 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
+                {tournament.substitutionMode !== null
+                  ? ` 현재 설정은 ${tournament.substitutionMode === 'limited' ? `제한 ${tournament.maxSubstitutions}회` : '무제한'}이에요.`
+                  : ''}
+              </p>
+            ) : !lineupSizeOptions.supported ? (
+              <p className="text-[12px] text-gray-500">이 종목은 아직 교체 방식을 선택할 수 없어요.</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="교체 방식 선택">
+                  {lineupSizeOptions.substitutionModes.map((mode) => {
+                    const currentValue =
+                      editSubstitutionMode !== '' ? editSubstitutionMode : (tournament.substitutionMode ?? '');
+                    const selected = currentValue === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        disabled={updateTournament.isPending}
+                        onClick={() => setEditSubstitutionMode(mode)}
+                        aria-pressed={selected}
+                        className={`inline-flex min-h-[44px] items-center rounded-xl border px-3.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
+                          selected
+                            ? 'border-blue-500 bg-blue-500 text-white'
+                            : 'border-[var(--border)] bg-white text-gray-900 hover:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white'
+                        }`}
+                      >
+                        {mode === 'limited' ? '제한' : '무제한(롤링)'}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(editSubstitutionMode || tournament.substitutionMode) === 'limited' ? (
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="edit-max-substitutions" className="text-[13px] text-gray-900">
+                      허용 교체 횟수
+                    </label>
+                    <input
+                      id="edit-max-substitutions"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={50}
+                      value={
+                        editMaxSubstitutions !== ''
+                          ? editMaxSubstitutions
+                          : String(tournament.maxSubstitutions ?? '')
+                      }
+                      onChange={(e) => setEditMaxSubstitutions(e.target.value)}
+                      disabled={updateTournament.isPending}
+                      className={inputCls}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <label htmlFor="edit-gender-category" className="text-[13px] text-gray-900">
               성별 카테고리
             </label>
@@ -4310,6 +4417,16 @@ function InfoTab({
         <InfoRow
           label="출전 인원"
           value={tournament.lineupMaxPlayers !== null ? `${tournament.lineupMaxPlayers}명` : '미지정'}
+        />
+        <InfoRow
+          label="교체 방식"
+          value={
+            tournament.substitutionMode === null
+              ? '미지정'
+              : tournament.substitutionMode === 'rolling'
+                ? '무제한(롤링)'
+                : `제한 ${tournament.maxSubstitutions}회`
+          }
         />
         <InfoRow label="입금 계좌" value={tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount ?? ''}` : '미등록'} />
       </dl>

@@ -34,6 +34,10 @@ export type TournamentCreateState = {
   /** "출전 인원"(라인업 상한) — 위 minPlayers/maxPlayers(등록 로스터 크기)와 다른 값.
    * 빈 문자열이면 아직 안 골랐거나 종목의 canonical 기본값을 그대로 쓴다는 뜻이다. */
   lineupMaxPlayers: string;
+  /** "교체 방식" — 빈 문자열이면 아직 안 골랐거나 종목의 canonical 기본값을 그대로 쓴다. */
+  substitutionMode: '' | 'limited' | 'rolling';
+  /** "교체 횟수" — substitutionMode가 'limited'일 때만 의미가 있다. */
+  maxSubstitutions: string;
   genderMinMale: string;
   genderMaxMale: string;
   genderMinFemale: string;
@@ -82,6 +86,8 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   minPlayers: '6',
   maxPlayers: '10',
   lineupMaxPlayers: '',
+  substitutionMode: '',
+  maxSubstitutions: '',
   genderMinMale: '',
   genderMaxMale: '',
   genderMinFemale: '',
@@ -217,6 +223,12 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     } else if (minPlayers !== null && minPlayers > maxPlayers) {
       errors.maxPlayers = '최대 선수 수는 최소 선수 수보다 작을 수 없어요.';
     }
+    if (state.substitutionMode === 'limited' && state.maxSubstitutions.trim() !== '') {
+      const maxSubstitutions = numeric(state.maxSubstitutions);
+      if (maxSubstitutions === null || !Number.isInteger(maxSubstitutions) || maxSubstitutions < 0 || maxSubstitutions > 50) {
+        errors.maxSubstitutions = '교체 횟수는 0~50회 사이의 정수여야 해요.';
+      }
+    }
     if (
       entryFee === null ||
       !Number.isInteger(entryFee) ||
@@ -311,6 +323,12 @@ export function buildTournamentCreatePayload(
     minPlayers: Number(state.minPlayers),
     maxPlayers: Number(state.maxPlayers),
     lineupMaxPlayers: state.lineupMaxPlayers ? Number(state.lineupMaxPlayers) : undefined,
+    substitutionMode: state.substitutionMode || undefined,
+    // 'rolling'을 고르면 횟수는 의미가 없다(서버가 함께 오면 400으로 거절) — 안 보낸다.
+    maxSubstitutions:
+      state.substitutionMode === 'limited' && state.maxSubstitutions
+        ? Number(state.maxSubstitutions)
+        : undefined,
     entryFee: Number(state.entryFee || '0'),
     bankName: state.bankName.trim() || undefined,
     bankAccount: state.bankAccount.trim() || undefined,

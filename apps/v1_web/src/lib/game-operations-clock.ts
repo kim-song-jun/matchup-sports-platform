@@ -40,13 +40,37 @@ export function pushClockSample(
   return next.length > SAMPLE_CAP ? next.slice(next.length - SAMPLE_CAP) : next;
 }
 
+/**
+ * alpha 실사고(2026-08): 옐로카드/파울 기록이 원인 불명의 `VALIDATION_ERROR`로
+ * 거부되던 근본 원인이 이 함수였다. `sampleOffsetMs()`는 서버 처리 시간이
+ * 홀수 ms면 `.5`를 낳고, 짝수 개 샘플의 중앙값(두 값의 평균)도 `.5`를 낳는다 —
+ * 그 소수가 `serverAlignedNowMs` → `elapsedMatchMs` → `freezeCapture()`의
+ * `clockMs`까지 그대로 전파돼, 서버 `parseGameEvent`의
+ * `isSafeNonnegative`(`Number.isSafeInteger` 요구, `realtime.gateway.ts`)에
+ * 걸려 거부됐다. 간헐적(왕복 지연의 홀짝에 좌우)이고, 큐에 이미 저장된 소수
+ * `clockMs`는 재시도해도 똑같이 다시 실패해 "다시 시도"가 무의미했던 이유도
+ * 이것이다.
+ *
+ * 이 함수의 반환값이 `clockOffsetMs`로 앱 코드에서 실제로 쓰이는 유일한
+ * 지점이다 — `sampleOffsetMs`도 `export`돼 있지만 현재 소비자는 테스트뿐이고,
+ * 앱 코드(`use-v1-game-operations-console.ts`)는 항상 `medianOffsetMs`의
+ * 반환값만 읽는다 — 그래서 정수로 반올림하는 경계를 정확히 여기 하나로 몬다.
+ * `freezeCapture()`(clockMs를 만드는 쪽)와 `ElapsedMatchClock`(표시하는 쪽)
+ * 양쪽이 각자 반올림하면
+ * 표시값과 저장값이 조용히 갈라진다 — `elapsedMatchMs`를 두 곳이 공유하게 만든
+ * 것과 동일한 이유(그 함수의 docstring 참고)로, 새 반올림도 두 번 만들지
+ * 않는다. `serverAlignedNowMs`(occurredAt 계산)와 `elapsedMatchMs`(clockMs
+ * 계산)가 여기서 정수가 된 같은 offsetMs를 그대로 받으므로 둘은 항상 같은
+ * 기준을 본다.
+ */
 export function medianOffsetMs(samples: readonly ClockPingPong[]): number {
   if (samples.length === 0) return 0;
   const offsets = samples.map(sampleOffsetMs).sort((left, right) => left - right);
   const midIndex = Math.floor(offsets.length / 2);
-  return offsets.length % 2 === 0
+  const median = offsets.length % 2 === 0
     ? (offsets[midIndex - 1] + offsets[midIndex]) / 2
     : offsets[midIndex];
+  return Math.round(median);
 }
 
 /** The server-aligned "now" — the value the console treats as authoritative

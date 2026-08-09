@@ -312,4 +312,34 @@ describe('queue introspection helpers', () => {
     });
     expect(retried.items[0]).toMatchObject({ status: 'queued', attempts: 1, lastError: null });
   });
+
+  // alpha 실사고(2026-08) 구제 경로: 이 픽스 이전에 캡처된 항목은 소수
+  // clockMs를 가질 수 있어 그대로 재시도하면 서버가 매번 같은 이유로 다시
+  // 거부한다(무의미한 재시도 루프). RETRY가 `repairedEvent`를 받으면 큐에
+  // 저장된 event/payloadHash 자체를 그걸로 교체해야 한다 — 그래야 다음
+  // 전송이 보정된 값을 쓴다.
+  it('RETRY에 repairedEvent가 실리면 큐 항목의 event/payloadHash를 그것으로 교체한다', () => {
+    const failed = queuedEvent({
+      status: 'failed',
+      lastError: { code: 'VALIDATION_ERROR', message: 'x' },
+      event: { type: 'CARD', sideId: 'side-home', participantId: 'p-1', period: 2, clockMs: 60_000.5, occurredAt: '2026-08-09T00:00:00.000Z', payload: { card: 'YELLOW' } },
+      payloadHash: 'hash-with-fractional-clock',
+    });
+    const state: GameOperationsQueueState = { items: [failed] };
+
+    const repairedEvent = { ...failed.event, clockMs: 60_000 };
+    const retried = gameOperationsQueueReducer(state, {
+      type: 'RETRY',
+      clientEventId: failed.clientEventId,
+      repairedEvent: { event: repairedEvent, payloadHash: 'hash-with-integer-clock' },
+    });
+
+    expect(retried.items[0]).toMatchObject({
+      status: 'queued',
+      attempts: 1,
+      lastError: null,
+      event: repairedEvent,
+      payloadHash: 'hash-with-integer-clock',
+    });
+  });
 });

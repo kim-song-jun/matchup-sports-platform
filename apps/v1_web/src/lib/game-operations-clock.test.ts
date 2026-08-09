@@ -59,6 +59,32 @@ describe('medianOffsetMs', () => {
     const samples = [sample(100), sample(110), sample(105), sample(95), sample(100_000)];
     expect(medianOffsetMs(samples)).toBeCloseTo(105, 5);
   });
+
+  // alpha 실사고(2026-08) 근본 원인 재현: 서버 처리시간이 홀수 ms면
+  // `sampleOffsetMs`가 `.5`를 낳고, 그 소수가 `serverAlignedNowMs` →
+  // `elapsedMatchMs` → `freezeCapture()`의 `clockMs`까지 그대로 전파돼 서버
+  // `parseGameEvent`(`Number.isSafeInteger` 요구, `realtime.gateway.ts`)에
+  // `VALIDATION_ERROR`로 거부됐다 — 옐로카드/파울 기록이 원인 불명으로 실패한
+  // 정체. 이 함수의 반환값이 앱 전체로 나가는 유일한 지점이므로 여기서
+  // 정수임을 못박는다.
+  it('서버 처리시간이 홀수 ms라 소수 offset이 나와도 정수로 반올림한다', () => {
+    // clientSentAt=0, clientReceivedAt=80 (왕복 80ms, 짝수라 그 자체는 소수를
+    // 안 만든다) — serverReceivedAt=1000, serverSentAt=1001(처리시간 1ms,
+    // 홀수) → 서버 중간점 1000.5 → offset = 1000.5 - 40 = 960.5.
+    const oddServerProcessing: ClockPingPong = {
+      clientSentAt: 0,
+      clientReceivedAt: 80,
+      serverReceivedAt: 1_000,
+      serverSentAt: 1_001,
+    };
+    expect(Number.isInteger(sampleOffsetMs(oddServerProcessing))).toBe(false); // 전제: 실제로 소수다
+    expect(Number.isSafeInteger(medianOffsetMs([oddServerProcessing]))).toBe(true);
+  });
+
+  it('짝수 개 샘플의 중앙값(두 값의 평균)이 소수여도 정수로 반올림한다', () => {
+    const samples = [sample(100), sample(101)]; // 중앙값 = (100+101)/2 = 100.5
+    expect(Number.isSafeInteger(medianOffsetMs(samples))).toBe(true);
+  });
 });
 
 describe('serverAlignedNowMs', () => {
@@ -202,6 +228,24 @@ describe('freezeCapture', () => {
       pausedAtMs: 6_000,
     });
     expect(capture.clockMs).toBe(6_000);
+  });
+
+  // alpha 실사고(2026-08): offsetMs가 소수면 이 값(서버로 전송되는 clockMs)도
+  // 소수가 되고, 서버는 `Number.isSafeInteger`를 요구해 거부한다
+  // (`realtime.gateway.ts`의 `isSafeNonnegative`). `medianOffsetMs()`가 이제
+  // 항상 정수를 돌려주므로(위 describe 참고) 여기 들어오는 offsetMs는
+  // 실전에서 항상 정수지만, 이 테스트는 그 계약을 "clockMs 자체가 정수인가"
+  // 라는 실제 증상 수준에서 한 번 더 못박는다.
+  it('정수 offsetMs가 들어오면 clockMs도 항상 safe integer다(서버 계약)', () => {
+    const capture = freezeCapture({
+      clientNowMs: 1_754_600_000_000,
+      offsetMs: 960, // medianOffsetMs가 반올림해 돌려주는 형태(정수)
+      period: 2,
+      periodStartedAtMs: 1_754_573_000_500, // 서버가 준 시각도 정수 ms
+      pausedTotalMs: 12_345,
+      pausedAtMs: null,
+    });
+    expect(Number.isSafeInteger(capture.clockMs)).toBe(true);
   });
 });
 

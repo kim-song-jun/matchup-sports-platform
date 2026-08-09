@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import { WifiOff, Wifi, Goal, AlertTriangle, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { useV1FixtureLineup, useV1Game, postV1GameCommand } from '@/hooks/use-v1-game-operations';
 import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
@@ -11,6 +13,7 @@ import { freezeCapture, type FrozenEventCapture } from '@/lib/game-operations-cl
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
+import { latestOperableLineup } from './lineup-grid';
 import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
@@ -183,6 +186,38 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   }, [gameDetail.data?.sides, ops.liveEvents]);
   const [quickSubstitutionMode, setQuickSubstitutionMode] = useState(false);
 
+  // UX 감사 item 2 — 라인업 없이 경기를 시작하면 복구 불가능한 막다른 길이
+  // 된다(시작 후에는 LineupGrid가 "제출된 선발 명단이 없어요"만 보여줄 뿐
+  // 되돌릴 수단이 없었다). `latestOperableLineup`은 `LineupGrid`가 빈 상태를
+  // 판정하는 것과 정확히 같은 기준(SUBMITTED/LOCKED)이다 — 여기서 다시
+  // 구현하면 두 판정이 갈릴 수 있다.
+  const sidesMissingLineup = useMemo(() => {
+    const sidesList = gameDetail.data?.sides ?? [];
+    const lineupsList = fixtureLineup.data?.lineups ?? [];
+    return sidesList.filter((side) => latestOperableLineup(lineupsList, side.id) === null);
+  }, [gameDetail.data?.sides, fixtureLineup.data?.lineups]);
+
+  // UX 감사 item 6 — 경기장에서 가장 먼저 봐야 할 정보 중 하나인데도 헤더에
+  // 점수가 아예 없었다. 확정 이벤트에서 파생하되, `on-pitch-state.ts`가 쓰는
+  // 것과 동일한 규칙으로 되돌려진(reversed) 이벤트는 제외한다 — 서버
+  // `scoreFromEvents`(games.service.ts)와 같은 정의다(어시스트 사후 기록이
+  // GOAL을 되돌렸다 재기록하는 동안 잠깐 스코어가 흔들리지 않아야 한다는
+  // 요건과도 맞는다).
+  const scoreBySideId = useMemo(() => {
+    const sidesList = gameDetail.data?.sides ?? [];
+    const reversedIds = new Set(
+      ops.liveEvents.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
+    );
+    const score = new Map<string, number>(sidesList.map((side) => [side.id, 0]));
+    for (const event of ops.liveEvents) {
+      if (event.type !== 'GOAL' || event.sideId === null || reversedIds.has(event.id)) continue;
+      score.set(event.sideId, (score.get(event.sideId) ?? 0) + 1);
+    }
+    return score;
+  }, [gameDetail.data?.sides, ops.liveEvents]);
+
+  const { confirm, ConfirmModal: endGameConfirmModal } = useConfirm();
+
   const handleSelectAction = useCallback(
     (button: (typeof ACTION_BUTTONS)[number]) => {
       // T1-0: no LIVE period means there is no server-anchored start time to
@@ -319,6 +354,18 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const handleRunCommand = useCallback(
     async (command: GameCommandName) => {
       if (!gameId || !isTakeoverHeld(ops.takeover)) return;
+      // UX 감사 item 3 — "경기 종료"는 되돌릴 수 없는데 확인 단계 없이 즉시
+      // 실행됐다. 다른 명령(일시중지/재개/전반종료)은 되돌릴 수 있으니 그대로
+      // 즉시 실행한다 — 종료만 확인을 거친다.
+      if (command === 'end') {
+        const confirmed = await confirm({
+          title: '경기를 종료할까요?',
+          message: '종료하면 되돌릴 수 없어요. 기록한 골·카드·교체를 먼저 확인해주세요.',
+          confirmLabel: '경기 종료',
+          tone: 'danger',
+        });
+        if (!confirmed) return;
+      }
       setCommandPending(true);
       setCommandError(null);
       setLastCommandFeedback(null);
@@ -344,7 +391,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         setCommandPending(false);
       }
     },
-    [gameId, ops, gameVersion, gameDetail, currentPeriod],
+    [gameId, ops, gameVersion, gameDetail, currentPeriod, confirm],
   );
 
   if (fixtureLineup.isLoading || (gameId && gameDetail.isLoading)) {
@@ -417,19 +464,47 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             </div>
           </div>
           <div className="flex flex-col items-end gap-1 sm:shrink-0">
-            <div className="flex flex-wrap justify-end gap-1.5">
-              {availableCommands.map((command) => (
-                <Button
-                  key={command}
-                  size="sm"
-                  variant={command === 'end' ? 'danger' : 'primary'}
-                  disabled={!isTakeoverHeld(ops.takeover) || commandPending}
-                  loading={commandPending}
-                  onClick={() => handleRunCommand(command)}
-                >
-                  {commandLabel(command, currentPeriod?.number ?? null)}
-                </Button>
-              ))}
+            {/* UX 감사 item 3 — "경기 종료"는 되돌릴 수 없는데 나머지 명령과
+                6px(gap-1.5)로 붙어 있어 오탭 위험이 컸다. 되돌릴 수 있는
+                명령들과 별도 그룹으로 묶고 구분선을 둬 시각적·물리적으로
+                떼어낸다. */}
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              {availableCommands
+                .filter((command) => command !== 'end')
+                .map((command) => (
+                  <Button
+                    key={command}
+                    size="sm"
+                    variant="primary"
+                    disabled={
+                      !isTakeoverHeld(ops.takeover) ||
+                      commandPending ||
+                      // UX 감사 item 2 — 라인업 없이 시작하면 되돌릴 수단이
+                      // 없는 막다른 길이 된다. 버튼을 숨기지 않고 비활성 +
+                      // 아래 배너의 사유로 설명한다(감사의 반복 패턴 ①).
+                      (command === 'start' && sidesMissingLineup.length > 0)
+                    }
+                    loading={commandPending}
+                    onClick={() => handleRunCommand(command)}
+                  >
+                    {commandLabel(command, currentPeriod?.number ?? null)}
+                  </Button>
+                ))}
+              {availableCommands.includes('end') ? (
+                <>
+                  <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-gray-200 dark:bg-gray-700" />
+                  <Button
+                    key="end"
+                    size="sm"
+                    variant="danger"
+                    disabled={!isTakeoverHeld(ops.takeover) || commandPending}
+                    loading={commandPending}
+                    onClick={() => handleRunCommand('end')}
+                  >
+                    {commandLabel('end', currentPeriod?.number ?? null)}
+                  </Button>
+                </>
+              ) : null}
             </div>
             {/* "재개/경기종료할 때 얼마나 걸렸는지" — 실측 사고에서 나온 요구.
                 방금 실행한 명령에만 붙는 일회성 피드백이라 다음 명령을 누르는
@@ -441,15 +516,31 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             ) : null}
           </div>
         </div>
-        {currentPeriod && currentPeriod.startedAt ? (
-          <div className="mt-2">
-            <ElapsedMatchClock
-              periodNumber={currentPeriod.number}
-              periodStartedAtMs={new Date(currentPeriod.startedAt).getTime()}
-              offsetMs={ops.clockOffsetMs}
-              pausedTotalMs={currentPeriod.pausedTotalMs}
-              pausedAtMs={currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime()}
-            />
+        {/* UX 감사 item 6 — 경기장에서 가장 먼저 봐야 할 정보 중 하나인데 헤더에
+            점수가 아예 없었다. 경과시간과 같은 위계(text-2xl font-bold)로,
+            같은 행에 나란히 둔다. sides 배열 순서를 그대로 써서 위 제목
+            줄("A vs B")과 좌우 순서가 반드시 일치한다 — 홈/원정을 임의로
+            가정하지 않는다. */}
+        {sides.length > 0 ? (
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="flex items-baseline gap-1.5">
+              <span className="text-2xs font-semibold text-gray-400 dark:text-gray-500">스코어</span>
+              <span
+                className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white"
+                aria-label={`스코어 ${sides.map((side) => `${side.displayNameSnapshot} ${scoreBySideId.get(side.id) ?? 0}점`).join(', ')}`}
+              >
+                {sides.map((side) => scoreBySideId.get(side.id) ?? 0).join(' : ')}
+              </span>
+            </p>
+            {currentPeriod && currentPeriod.startedAt ? (
+              <ElapsedMatchClock
+                periodNumber={currentPeriod.number}
+                periodStartedAtMs={new Date(currentPeriod.startedAt).getTime()}
+                offsetMs={ops.clockOffsetMs}
+                pausedTotalMs={currentPeriod.pausedTotalMs}
+                pausedAtMs={currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime()}
+              />
+            ) : null}
           </div>
         ) : null}
       </header>
@@ -457,9 +548,34 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {/* Banners — never silently swallowed; each condition is its own
           visible, dismissable-by-recovery state. */}
       <div className="flex flex-col gap-2 px-4" aria-live="polite">
-        {currentPeriod === null && gameState !== 'ENDED' && gameState !== 'CANCELLED' && (
-          <Banner tone="info">경기를 시작해 주세요.</Banner>
+        {/* UX 감사 item 4 — takeover.status가 'none'/'requesting'인 동안(마운트 시
+            자동 요청, 매번 콘솔을 열 때마다 거치는 구간) 명령 버튼과
+            LineupGrid가 전부 비활성인데 이유를 알려주는 배너가 없었다(감사의
+            반복 패턴 ①). */}
+        {(ops.takeover.status === 'none' || ops.takeover.status === 'requesting') && (
+          <Banner tone="info">경기 운영 권한을 가져오는 중이에요…</Banner>
         )}
+        {/* UX 감사 item 2 — 라인업 없이 시작하면 복구 불가능한 막다른 길이 된다.
+            버튼이 비활성인 이유를 여기서 설명하고, 바로 제출하러 갈 수 있는
+            링크를 함께 준다. */}
+        {gameState === 'SCHEDULED' && sidesMissingLineup.length > 0 && (
+          <Banner tone="warning">
+            {sidesMissingLineup.map((side) => side.displayNameSnapshot).join(', ')} 팀의 선발 명단을 제출해야
+            경기를 시작할 수 있어요.{' '}
+            <Link
+              href={`/tournaments/${tournamentId}/matches/${fixtureId}/lineup`}
+              className="font-semibold underline underline-offset-2"
+            >
+              라인업 제출하러 가기
+            </Link>
+          </Banner>
+        )}
+        {currentPeriod === null &&
+          gameState !== 'ENDED' &&
+          gameState !== 'CANCELLED' &&
+          !(gameState === 'SCHEDULED' && sidesMissingLineup.length > 0) && (
+            <Banner tone="info">경기를 시작해 주세요.</Banner>
+          )}
         {ops.takeover.status === 'revoked' && (
           <Banner tone="warning">
             운영 권한이 해제됐어요. 다른 운영자가 이 경기를 담당하고 있어요.
@@ -580,6 +696,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {pendingAction && (
         <ActionTargetPicker
           open
+          tournamentId={tournamentId}
+          fixtureId={fixtureId}
           actionLabel={pendingAction.actionLabel}
           actionType={pendingAction.actionType}
           cardColor={pendingAction.cardColor}
@@ -605,6 +723,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         />
       ) : null}
       <EventToasts toasts={toasts} onDismiss={dismiss} />
+      {endGameConfirmModal}
     </div>
   );
 }

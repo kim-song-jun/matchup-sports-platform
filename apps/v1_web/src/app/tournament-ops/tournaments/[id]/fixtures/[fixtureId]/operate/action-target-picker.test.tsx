@@ -84,8 +84,11 @@ describe('ActionTargetPicker — 액션 우선(액션 먼저, 대상은 나중)'
     );
 
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('강남 풋살 클럽', { exact: false })).toBeInTheDocument();
-    expect(within(dialog).getByText('성수 풋살 클럽', { exact: false })).toBeInTheDocument();
+    // 모바일 팀 전환 탭(UX 감사 item 5)이 팀명을 탭 라벨로도 보여주므로,
+    // 텍스트만으로 찾으면 섹션 헤딩과 탭 버튼 둘 다 매칭돼 모호해진다 —
+    // 섹션 헤딩(role="heading")으로 좁혀서 찾는다.
+    expect(within(dialog).getByRole('heading', { name: /강남 풋살 클럽/ })).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: /성수 풋살 클럽/ })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /조현우/ }));
 

@@ -136,6 +136,19 @@ type GameTakeoverResult =
   | ({ readonly status: 'granted' } & GameTakeoverGrantResult)
   | { readonly status: 'denied'; readonly code: 'STAFF_SCOPE_DENIED' | 'TAKEOVER_TOKEN_EXPIRED' | 'VALIDATION_ERROR' };
 
+/**
+ * UX 감사 추가(alpha 실사고, 2026-08): 옐로카드/파울 기록이 `VALIDATION_ERROR`로
+ * 거부됐는데 로그·클라이언트 응답 어디에도 "어느 필드가 왜" 틀렸는지가 없어
+ * 원인을 확정할 수 없었다(`docker logs`에는 `code`/`clientEventId`뿐). 이 타입은
+ * 그 진단을 필드 "이름"만으로 싣는다 — 선수명 등 실제 값은 절대 담지 않는다
+ * (`actorId`를 해시해서만 로그에 남기는 이 파일의 기존 관례와 동일한 이유).
+ */
+type FieldValidationFailure = {
+  readonly missingKeys: readonly string[];
+  readonly unknownKeys: readonly string[];
+  readonly invalidFields: readonly string[];
+};
+
 type GameProtocolResult =
   | {
       readonly status: 'ack';
@@ -148,6 +161,8 @@ type GameProtocolResult =
       readonly code: string;
       readonly clientEventId?: string;
       readonly expectedVersion?: number;
+      /** `VALIDATION_ERROR`에서만 채워진다. */
+      readonly validation?: FieldValidationFailure;
     };
 
 // main.ts computes this identically at bootstrap for the REST app's CORS —
@@ -355,7 +370,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   ): Promise<unknown> {
     const serverReceivedAt = Date.now();
     if (!isPlainObjectWithKeys(payload, ['clientSentAt']) || !isSafeNonnegative(payload.clientSentAt)) {
-      return this.emitProtocolError(client, { code: 'VALIDATION_ERROR' });
+      // alpha 실사고 조사에서 clientEventId 없는 VALIDATION_ERROR 3건이 연달아
+      // 찍힌 걸 봤다 — 이 핑 경로가 같은 코드로 거부되는 경로일 가능성이
+      // 있다고 지목됐다(그렇다면 시계 오프셋 동기화가 끊긴다). 확정하지 못한
+      // 채로 남겨두지 않고 여기도 같은 진단을 남긴다.
+      return this.emitProtocolError(client, { code: 'VALIDATION_ERROR', validation: diagnoseClockPing(payload) });
     }
     const pong = {
       clientSentAt: payload.clientSentAt,
@@ -379,6 +398,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       // 그 값이 온전할 때가 정확히 상관관계를 지을 수 있는 경우다.
       return this.emitProtocolError(client, {
         code: 'VALIDATION_ERROR',
+        validation: diagnoseGameEventCommand(payload),
         ...correlationEcho(payload),
       });
     }
@@ -418,7 +438,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   ): Promise<GameProtocolResult> {
     const input = parseGameEventRetry(payload);
     if (input === null) {
-      return this.emitProtocolError(client, { code: 'VALIDATION_ERROR' });
+      return this.emitProtocolError(client, {
+        code: 'VALIDATION_ERROR',
+        validation: diagnoseGameEventRetry(payload),
+        ...correlationEcho(payload),
+      });
     }
     const authUser = authenticatedSocketUser(client);
     if (authUser === null) {
@@ -646,6 +670,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       clientEventId: error.clientEventId,
       gameId: context?.gameId,
       actorIdHash: context?.actorId === undefined ? undefined : hashForLog(context.actorId),
+      // alpha 실사고: 필드 이름만(값은 절대 포함 안 함) — 이게 없어서 VALIDATION_ERROR의
+      // 실제 원인을 로그만으로는 확정할 수 없었다.
+      validation: error.validation,
     };
     if (error.code === 'INTERNAL_ERROR') {
       this.logger.error(logPayload, 'Rejected a game operations command');
@@ -785,7 +812,18 @@ function correlationEcho(payload: unknown): {
   if (!isRecord(payload)) return {};
   const echo: { clientEventId?: string; expectedVersion?: number } = {};
   if (isNonemptyString(payload.clientEventId)) echo.clientEventId = payload.clientEventId;
-  if (isSafeNonnegative(payload.expectedVersion)) echo.expectedVersion = payload.expectedVersion;
+  // Copilot 리뷰: `game.event.append`의 파싱 실패 payload는 `expectedVersion`
+  // 필드를 쓰지만, `game.event.retry`의 파싱 실패 payload는 같은 자리를
+  // `rebasedExpectedVersion`으로 부른다(`protocolError()`의 성공 경로가 이미
+  // 같은 매핑을 한다 — `'expectedVersion' in input ? ... : input.
+  // rebasedExpectedVersion`). 이 폴백이 없으면 retry 파싱 실패에서는 버전
+  // 상관관계 정보가 통째로 빠져 클라이언트/로그가 어떤 큐 항목이 실패했는지
+  // 더 부정확하게 추적한다.
+  if (isSafeNonnegative(payload.expectedVersion)) {
+    echo.expectedVersion = payload.expectedVersion;
+  } else if (isSafeNonnegative(payload.rebasedExpectedVersion)) {
+    echo.expectedVersion = payload.rebasedExpectedVersion;
+  }
   return echo;
 }
 
@@ -914,6 +952,123 @@ function parseGameEvent(payload: unknown): Record<string, unknown> | null {
     return null;
   }
   return payload;
+}
+
+const GAME_EVENT_COMMAND_KEYS = [
+  'gameId',
+  'expectedVersion',
+  'clientEventId',
+  'takeoverToken',
+  'payloadHash',
+  'event',
+] as const;
+const GAME_EVENT_RETRY_KEYS = [
+  'gameId',
+  'rebasedExpectedVersion',
+  'clientEventId',
+  'takeoverToken',
+  'payloadHash',
+  'event',
+] as const;
+
+/**
+ * `parseGameEventCommand`/`parseGameEventRetry`가 null을 돌려준 뒤에만 호출되는
+ * 진단 전용 경로 — 어느 필드가 missing/unknown/invalid인지 "이름"만 만든다(값은
+ * 절대 포함하지 않는다). 두 envelope은 버전 필드 이름(`expectedVersion` vs
+ * `rebasedExpectedVersion`)만 다르므로 하나의 함수를 공유한다.
+ */
+function diagnoseGameEventEnvelope(
+  payload: unknown,
+  requiredKeys: readonly string[],
+): FieldValidationFailure {
+  if (!isRecord(payload)) {
+    return { missingKeys: [], unknownKeys: [], invalidFields: ['(payload는 object가 아님)'] };
+  }
+  const missingKeys = requiredKeys.filter((key) => !Object.hasOwn(payload, key));
+  const unknownKeys = Object.keys(payload).filter((key) => !requiredKeys.includes(key));
+  const invalidFields: string[] = [];
+  if (Object.hasOwn(payload, 'gameId') && !isNonemptyString(payload.gameId)) {
+    invalidFields.push('gameId');
+  }
+  const versionKey = requiredKeys.includes('expectedVersion') ? 'expectedVersion' : 'rebasedExpectedVersion';
+  if (Object.hasOwn(payload, versionKey) && !isSafeNonnegative(payload[versionKey])) {
+    invalidFields.push(versionKey);
+  }
+  if (Object.hasOwn(payload, 'clientEventId') && !isNonemptyString(payload.clientEventId)) {
+    invalidFields.push('clientEventId');
+  }
+  if (Object.hasOwn(payload, 'takeoverToken') && !isNonemptyString(payload.takeoverToken)) {
+    invalidFields.push('takeoverToken');
+  }
+  if (Object.hasOwn(payload, 'payloadHash') && !isNonemptyString(payload.payloadHash)) {
+    invalidFields.push('payloadHash');
+  }
+  if (Object.hasOwn(payload, 'event')) {
+    const nested = diagnoseGameEvent(payload.event);
+    return {
+      missingKeys: [...missingKeys, ...nested.missingKeys.map((key) => `event.${key}`)],
+      unknownKeys: [...unknownKeys, ...nested.unknownKeys.map((key) => `event.${key}`)],
+      invalidFields: [...invalidFields, ...nested.invalidFields.map((key) => `event.${key}`)],
+    };
+  }
+  return { missingKeys, unknownKeys, invalidFields };
+}
+
+function diagnoseGameEventCommand(payload: unknown): FieldValidationFailure {
+  return diagnoseGameEventEnvelope(payload, GAME_EVENT_COMMAND_KEYS);
+}
+
+function diagnoseGameEventRetry(payload: unknown): FieldValidationFailure {
+  return diagnoseGameEventEnvelope(payload, GAME_EVENT_RETRY_KEYS);
+}
+
+/** `parseGameEvent`의 진단 전용 짝 — 같은 규칙(requiredKeys/allowedKeys)을
+ * 그대로 미러링하되 첫 위반에서 멈추지 않고 전부 모은다. */
+function diagnoseGameEvent(payload: unknown): FieldValidationFailure {
+  if (!isRecord(payload)) {
+    return { missingKeys: [], unknownKeys: [], invalidFields: ['(event은 object가 아님)'] };
+  }
+  const requiredKeys = ['type', 'period', 'clockMs', 'occurredAt', 'payload'];
+  const allowedKeys = [...requiredKeys, 'sideId', 'participantId', 'assistParticipantId'];
+  const missingKeys = requiredKeys.filter((key) => !Object.hasOwn(payload, key));
+  const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.includes(key));
+  const invalidFields: string[] = [];
+  if (Object.hasOwn(payload, 'type') && !isNonemptyString(payload.type)) invalidFields.push('type');
+  if (Object.hasOwn(payload, 'period') && !isSafePositive(payload.period)) invalidFields.push('period');
+  if (Object.hasOwn(payload, 'clockMs') && !isSafeNonnegative(payload.clockMs)) invalidFields.push('clockMs');
+  if (
+    Object.hasOwn(payload, 'occurredAt') &&
+    (!isNonemptyString(payload.occurredAt) || !Number.isFinite(Date.parse(payload.occurredAt as string)))
+  ) {
+    invalidFields.push('occurredAt');
+  }
+  if (Object.hasOwn(payload, 'payload') && !isRecord(payload.payload)) invalidFields.push('payload');
+  if (payload.sideId !== undefined && !isNonemptyString(payload.sideId)) invalidFields.push('sideId');
+  if (payload.participantId !== undefined && !isNonemptyString(payload.participantId)) {
+    invalidFields.push('participantId');
+  }
+  if (
+    payload.assistParticipantId !== undefined &&
+    payload.assistParticipantId !== null &&
+    !isNonemptyString(payload.assistParticipantId)
+  ) {
+    invalidFields.push('assistParticipantId');
+  }
+  return { missingKeys, unknownKeys, invalidFields };
+}
+
+/** `pingGameTime`의 진단 전용 짝 — payload가 단일 필드라 별도 envelope 헬퍼 없이
+ * 직접 만든다. */
+function diagnoseClockPing(payload: unknown): FieldValidationFailure {
+  if (!isRecord(payload)) {
+    return { missingKeys: [], unknownKeys: [], invalidFields: ['(payload는 object가 아님)'] };
+  }
+  const requiredKeys = ['clientSentAt'];
+  const missingKeys = requiredKeys.filter((key) => !Object.hasOwn(payload, key));
+  const unknownKeys = Object.keys(payload).filter((key) => !requiredKeys.includes(key));
+  const invalidFields =
+    Object.hasOwn(payload, 'clientSentAt') && !isSafeNonnegative(payload.clientSentAt) ? ['clientSentAt'] : [];
+  return { missingKeys, unknownKeys, invalidFields };
 }
 
 function appendEventDto(input: GameEventCommandPayload): AppendGameEventDto {

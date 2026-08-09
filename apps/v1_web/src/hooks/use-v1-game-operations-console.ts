@@ -47,6 +47,21 @@ type GameTakeoverAck =
 const CLOCK_PING_INTERVAL_MS = 15_000;
 const TAKEOVER_RENEW_INTERVAL_MS = 20_000; // < the 30s server-enforced minimum renewal spacing
 const TAKEOVER_EXPIRY_CHECK_INTERVAL_MS = 2_000;
+/**
+ * UX audit item 1 (CRITICAL, 2026-08): `socket.emit(event, payload, ackHandler)`
+ * has no built-in timeout — if the socket disconnects (or the server hangs)
+ * after the emit but before the ack, `ackHandler` may simply never fire.
+ * Before this constant existed, that meant the queue item sat in `sending`
+ * forever: `nextQueuedItem()` only ever re-sends `queued` items, so a
+ * mid-flight event an operator captured (a goal, a card) could look
+ * permanently "전송 중" with no retry button and no way to tell whether it
+ * actually landed — recoverable only by a full page reload (which
+ * `hydrateAfterReload` resets `sending` → `queued` for). This timeout is the
+ * in-session escape hatch: if no ack arrives within this window, the item is
+ * force-FAILed with a retryable error code, which surfaces the existing
+ * `QueueStatusPanel` retry affordance instead of a silent, permanent stall.
+ */
+export const SEND_ACK_TIMEOUT_MS = 10_000;
 
 function queueStorageKey(gameId: string): string {
   return `teameet.v1.gameOps.queue.${gameId}`;
@@ -157,6 +172,15 @@ export function useV1GameOperationsConsole(
 
   const myAssignment = useMyTournamentStaffAssignmentVersion(tournamentId, myUserId);
   const clientInstanceIdRef = useRef<string | null>(null);
+  // 언마운트 후 SEND_ACK_TIMEOUT_MS 타이머가 뒤늦게 발화해 dispatch하는 것을
+  // 막는다 — 화면을 떠난 뒤의 상태 갱신은 의미가 없다.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // ── Queue: hydrate once per gameId, persist on every change ───────────────
   useEffect(() => {
@@ -433,7 +457,21 @@ export function useV1GameOperationsConsole(
       // OFFLINE_EVENT_REBASE_CONFLICT it failed with the first time, since
       // nothing ever advanced the version the retry presented.
       const isRetry = item.attempts > 0;
+      // 이 emit의 ack가 SEND_ACK_TIMEOUT_MS 안에 오지 않으면(소켓이 응답 없이
+      // 끊기면 콜백 자체가 영영 안 온다) 'sending'에 갇히지 않도록 FAIL로
+      // 전환한다. ackHandler가 먼저 불리면 이 타이머는 취소된다 — 반대로
+      // 타이머가 먼저 발화한 뒤 ack가 뒤늦게 와도 ACK 리듀서는 'failed'
+      // 상태를 정상적으로 덮어쓰므로 늦은 성공 응답도 버려지지 않는다.
+      const ackTimeoutId = setTimeout(() => {
+        if (!isMountedRef.current) return;
+        dispatchQueue({
+          type: 'FAIL',
+          clientEventId: item.clientEventId,
+          error: { code: 'SEND_TIMEOUT', message: gameOperationsErrorMessage('SEND_TIMEOUT') },
+        });
+      }, SEND_ACK_TIMEOUT_MS);
       const ackHandler = (result: { status: string; sequence?: number; version?: number; code?: string }) => {
+        clearTimeout(ackTimeoutId);
         if (result.status === 'ack' && result.sequence !== undefined && result.version !== undefined) {
           dispatchQueue({
             type: 'ACK',
@@ -551,9 +589,46 @@ export function useV1GameOperationsConsole(
     [gameId, gameSnapshot],
   );
 
-  const retryFailedEvent = useCallback((clientEventId: string) => {
-    dispatchQueue({ type: 'RETRY', clientEventId });
-  }, []);
+  const retryFailedEvent = useCallback(
+    async (clientEventId: string) => {
+      // alpha 실사고(2026-08) 구제: `medianOffsetMs()`를 고치기 전에 이미
+      // 캡처된 항목은 `event.clockMs`가 소수(.5 등)일 수 있다 — 그대로
+      // 재전송하면 서버 `parseGameEvent`(`Number.isSafeInteger` 요구)에
+      // 똑같이 막혀 "다시 시도"가 영원히 무의미한 루프가 된다. 여기서만
+      // 1ms 미만으로 반올림해 보정한다(이벤트가 실제로 벌어진 시각 자체는
+      // 절대 바꾸지 않는다 — occurredAt은 그대로 둔다). 서버는 payloadHash를
+      // event 내용으로 재계산해 대조하므로(`GamesService.retryEvent`) clockMs만
+      // 고치고 hash를 그대로 두면 `OFFLINE_EVENT_REBASE_CONFLICT`로 또 실패한다
+      // — 그래서 항상 짝지어 다시 계산한다.
+      const item = queue.items.find((candidate) => candidate.clientEventId === clientEventId);
+      if (item && !Number.isSafeInteger(item.event.clockMs)) {
+        const repairedEvent = { ...item.event, clockMs: Math.round(item.event.clockMs) };
+        try {
+          const repairedHash = await canonicalGameEventPayloadHash({
+            type: repairedEvent.type as GameEventType,
+            sideId: repairedEvent.sideId,
+            participantId: repairedEvent.participantId,
+            assistParticipantId: repairedEvent.assistParticipantId,
+            period: repairedEvent.period,
+            clockMs: repairedEvent.clockMs,
+            occurredAt: repairedEvent.occurredAt,
+            payload: repairedEvent.payload,
+          });
+          dispatchQueue({
+            type: 'RETRY',
+            clientEventId,
+            repairedEvent: { event: repairedEvent, payloadHash: repairedHash },
+          });
+          return;
+        } catch {
+          // Web Crypto를 쓸 수 없는 극단적 환경 등 — 보정 없이 원래 값으로
+          // 재시도한다(이 픽스 이전과 동일하게 동작, 새 결함을 만들지 않는다).
+        }
+      }
+      dispatchQueue({ type: 'RETRY', clientEventId });
+    },
+    [queue.items],
+  );
 
   // T3 추가 — 큐를 거치지 않는 온라인 전용 REST 호출. assertQueueable을 굳이
   // 부르지 않는다(큐에 절대 안 넣으니 필요 없다) — 대신 이 함수 자체가 "온라인일
@@ -611,6 +686,24 @@ export function gameOperationsErrorMessage(code: string): string {
       return '경기 상태가 변경되어 다시 시도해주세요.';
     case 'CLOCK_DRIFT':
       return '기기 시각이 서버와 많이 달라요. 시간을 확인해주세요.';
+    // alpha 실사고(2026-08) 근본 원인: 옐로카드/파울 기록이 이 코드로 거부됐는데
+    // 매핑이 없어 default("이벤트를 기록하지 못했어요")로 뭉개졌다. 실제 원인은
+    // `medianOffsetMs()`가 소수(.5) offset을 반환해 `clockMs`가 정수가 아니게
+    // 되고, 서버 `parseGameEvent`(`Number.isSafeInteger` 요구)가 거부한 것—
+    // `game-operations-clock.ts`에서 고쳤다(새 캡처는 항상 정수). 다만 이 픽스
+    // 이전에 이미 큐에 저장된 항목은 여전히 소수 clockMs를 갖고 있을 수 있어
+    // NON_RETRYABLE로 두지 않는다 — `retryFailedEvent`가 재시도 시점에 정수로
+    // 보정하고 payloadHash를 다시 계산해 함께 보내므로(아래 구현) 재시도가
+    // 실제로 복구 경로가 된다.
+    case 'VALIDATION_ERROR':
+      return '이벤트 형식에 문제가 있어 기록하지 못했어요. 다시 시도해주세요.';
+    // UX 감사 CRITICAL — 서버가 ack를 끝내 보내지 않아 'sending'에 고착되던
+    // 상태를 클라이언트 타임아웃으로 감지한 경우에만 붙는 코드(서버가 던지는
+    // 코드가 아니다). 네트워크가 끊겼거나 응답이 느린 경우가 대부분이라
+    // 재시도로 풀릴 수 있다 — NON_RETRYABLE 목록에 없으므로 기본값대로
+    // 재시도 가능으로 분류된다.
+    case 'SEND_TIMEOUT':
+      return '서버 응답을 받지 못했어요. 네트워크를 확인하고 다시 시도해주세요.';
     case 'OFFLINE_EVENT_REBASE_CONFLICT':
       return '오프라인 동안 기록한 이벤트를 다시 확인해주세요.';
     // T1-0 fix round 2: this event path goes through the Socket.IO gateway

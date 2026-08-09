@@ -11,6 +11,7 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { Trophy } from 'lucide-react';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
@@ -123,7 +124,11 @@ function penaltyText(fixture: V1TournamentFixture): string {
 interface AggregateMatchup {
   id: string;
   homeTeamName: string;
+  homeTeamId: string | null;
+  homeTeamLogoUrl: string | null;
   awayTeamName: string;
+  awayTeamId: string | null;
+  awayTeamLogoUrl: string | null;
   homeAggScore: number;
   awayAggScore: number;
   hasPK: boolean;
@@ -157,7 +162,11 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
         return {
           id: leg1.id,
           homeTeamName: leg1.homeTeamName,
+          homeTeamId: leg1.homeTeamId,
+          homeTeamLogoUrl: leg1.homeTeamLogoUrl,
           awayTeamName: leg1.awayTeamName,
+          awayTeamId: leg1.awayTeamId,
+          awayTeamLogoUrl: leg1.awayTeamLogoUrl,
           homeAggScore: leg1.result?.homeScore ?? 0,
           awayAggScore: leg1.result?.awayScore ?? 0,
           hasPK: leg1.result?.hasPenalty ?? false,
@@ -220,7 +229,11 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
       return {
         id: leg1.id,
         homeTeamName: leg1Home,
+        homeTeamId: leg1.homeTeamId,
+        homeTeamLogoUrl: leg1.homeTeamLogoUrl,
         awayTeamName: leg1Away,
+        awayTeamId: leg1.awayTeamId,
+        awayTeamLogoUrl: leg1.awayTeamLogoUrl,
         homeAggScore: homeAgg,
         awayAggScore: awayAgg,
         hasPK: !!pkLeg,
@@ -240,13 +253,10 @@ function isMultiLeg(fixtures: V1TournamentFixture[]): boolean {
 
 /* ── 합산 매치 카드 ── */
 function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
-  const { homeTeamName, awayTeamName, homeAggScore, awayAggScore, winner, status, pkInfo, legs } = matchup;
+  const { homeTeamId, homeTeamName, homeTeamLogoUrl, awayTeamId, awayTeamName, awayTeamLogoUrl, homeAggScore, awayAggScore, winner, status, pkInfo, legs } = matchup;
   const isLive = status === 'in_progress';
   const isDone = status === 'completed';
   const isMulti = legs.length > 1;
-
-  const homeInitial = homeTeamName?.trim().charAt(0) || '?';
-  const awayInitial = awayTeamName?.trim().charAt(0) || '?';
 
   return (
     <div
@@ -259,7 +269,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-winner={winner === 'home' ? 'true' : undefined}
         data-loser={isDone && winner === 'away' ? 'true' : undefined}
       >
-        <span className="tm-bk2-avatar" aria-hidden="true">{homeInitial}</span>
+        <TeamAvatar seed={homeTeamId ?? homeTeamName} name={homeTeamName} logoUrl={homeTeamLogoUrl} size="sm" />
         <span className="tm-bk2-name">{homeTeamName}</span>
         <span className="tm-bk2-score tab-num">{homeAggScore}</span>
       </div>
@@ -269,7 +279,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-winner={winner === 'away' ? 'true' : undefined}
         data-loser={isDone && winner === 'home' ? 'true' : undefined}
       >
-        <span className="tm-bk2-avatar" aria-hidden="true">{awayInitial}</span>
+        <TeamAvatar seed={awayTeamId ?? awayTeamName} name={awayTeamName} logoUrl={awayTeamLogoUrl} size="sm" />
         <span className="tm-bk2-name">{awayTeamName}</span>
         <span className="tm-bk2-score tab-num">{awayAggScore}</span>
       </div>
@@ -318,11 +328,10 @@ function slotCY(i: number) {
 
 /* ── 팀 행 ── */
 function MatchTeamRow({
-  name, score, isWinner, isLoser,
+  teamId, name, logoUrl, score, isWinner, isLoser,
 }: {
-  name: string; score: number | null; isWinner: boolean; isLoser: boolean;
+  teamId: string | null; name: string; logoUrl: string | null; score: number | null; isWinner: boolean; isLoser: boolean;
 }) {
-  const initial = name?.trim().charAt(0) || '?';
   const decided = (name?.trim().length ?? 0) > 0;
   return (
     <div
@@ -330,7 +339,7 @@ function MatchTeamRow({
       data-winner={isWinner ? 'true' : undefined}
       data-loser={isLoser ? 'true' : undefined}
     >
-      <span className="tm-bk2-avatar" aria-hidden="true">{decided ? initial : '?'}</span>
+      <TeamAvatar seed={teamId ?? name} name={decided ? name : '미정'} logoUrl={logoUrl} size="sm" />
       <span className="tm-bk2-name">{decided ? name : '미정'}</span>
       {score !== null && <span className="tm-bk2-score tab-num">{score}</span>}
       {score === null && decided && <span className="tm-bk2-score" style={{ opacity: 0.25 }}>-</span>}
@@ -363,11 +372,13 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
       aria-label={`${fixture.homeTeamName || '미정'} 대 ${fixture.awayTeamName || '미정'}`}
     >
       <MatchTeamRow
+        teamId={fixture.homeTeamId} logoUrl={fixture.homeTeamLogoUrl}
         name={fixture.homeTeamName} score={hasResult ? fixture.result!.homeScore : null}
         isWinner={winner === 'home'} isLoser={isDone && winner === 'away'}
       />
       <div className="tm-bk2-divider" aria-hidden="true" />
       <MatchTeamRow
+        teamId={fixture.awayTeamId} logoUrl={fixture.awayTeamLogoUrl}
         name={fixture.awayTeamName} score={hasResult ? fixture.result!.awayScore : null}
         isWinner={winner === 'away'} isLoser={isDone && winner === 'home'}
       />

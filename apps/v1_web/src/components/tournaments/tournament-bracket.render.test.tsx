@@ -14,9 +14,13 @@ function makeFixture(
     venue: null,
     status: 'scheduled',
     homeRegistrationId: null,
+    homeTeamId: null,
     homeTeamName: '레드FC',
+    homeTeamLogoUrl: null,
     awayRegistrationId: null,
+    awayTeamId: null,
     awayTeamName: '블루FC',
+    awayTeamLogoUrl: null,
     result: null,
     videos: [],
     ...overrides,
@@ -30,6 +34,27 @@ describe('MatchCard — 진행 중·종료 경기도 시각을 유지한다 (D-1
   });
   afterAll(() => {
     process.env.TZ = originalTz;
+  });
+
+  it('저장된 홈·원정 팀 로고를 대진표 슬롯에 표시한다', () => {
+    const { container } = render(
+      <TournamentBracket
+        fixtures={[
+          makeFixture({
+            id: 'fixture-logo',
+            fixtureNumber: 1,
+            homeTeamId: 'team-home',
+            homeTeamLogoUrl: '/uploads/teams/home.png',
+            awayTeamId: 'team-away',
+            awayTeamLogoUrl: '/uploads/teams/away.png',
+          }),
+        ]}
+        groups={[]}
+      />,
+    );
+
+    expect(container.querySelector('img[src="/uploads/teams/home.png"]')).toBeInTheDocument();
+    expect(container.querySelector('img[src="/uploads/teams/away.png"]')).toBeInTheDocument();
   });
 
   it('진행 중(LIVE) 경기는 LIVE 배지와 예정 시각을 함께 보여준다', () => {

@@ -48,7 +48,7 @@ existing file changed.
 |---|---|---|
 | `GET /tournaments/:id/schedule` | `cursor?`, `limit? (1-100, default 20)`, `round?`, `groupId?` | `{ tournamentId, tournamentTitle, bracketPublished, items[], unscheduled[], standings[], nextCursor }` |
 | `GET /tournaments/:id/matches/:fixtureId` | -- | one match projection (see below) |
-| `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, summary, items[], nextCursor }` |
+| `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, items[] (including opponentTeamLogoUrl), nextCursor }` |
 | `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, items[], nextCursor }` |
 
 `cursor` is opaque (base64url JSON `{key,id}`); never construct it

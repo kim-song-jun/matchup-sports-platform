@@ -12,6 +12,10 @@ Tournament list/detail reads are public. Clients may call them without a stored 
 
 Public list/detail items include `campaignSlug` only while the related campaign is `published`; otherwise the field is `null`. The slug endpoint also requires a published campaign and a non-deleted tournament in `open`, `closed`, `in_progress`, or `completed`. Its tournament projection contains display facts, rules/refund policy, active sponsors, confirmed count, and public confirmed/waitlisted team summaries. It never returns bank account fields, player/contact PII, creator/admin identity, or deleted-row metadata.
 
+After bracket publication, each public `groups[].standings[]` row includes nullable `teamLogoUrl` from the registered team's current profile. Tournament detail and bracket clients render it through the shared team-avatar fallback contract, so a missing or failed image remains distinguishable without replacing valid saved logos.
+
+Published `fixtures[]` also includes nullable `homeTeamId`, `homeTeamLogoUrl`, `awayTeamId`, and `awayTeamLogoUrl`. Bracket match cards use these identity fields for saved team logos and reserve the generated fallback only for missing, undecided, or failed images.
+
 ## Tournament staff runtime boundary
 
 Task 7 wires the scoped tournament-staff access, guard, and management services into

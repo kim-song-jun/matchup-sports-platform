@@ -35,7 +35,7 @@ export class PublicTeamRecordsService {
   async getRecords(teamId: string, query: PublicRecordsQueryDto) {
     const team = await this.prisma.v1Team.findUnique({
       where: { id: teamId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, profile: { select: { logoUrl: true } } },
     });
     if (team === null) {
       throw new NotFoundException({ code: 'TEAM_NOT_FOUND', message: 'Team was not found' });
@@ -65,12 +65,16 @@ export class PublicTeamRecordsService {
     const [opponentTeams, tournaments] = await Promise.all([
       opponentTeamIds.length === 0
         ? []
-        : this.prisma.v1Team.findMany({ where: { id: { in: opponentTeamIds } }, select: { id: true, name: true } }),
+        : this.prisma.v1Team.findMany({
+            where: { id: { in: opponentTeamIds } },
+            select: { id: true, name: true, profile: { select: { logoUrl: true } } },
+          }),
       tournamentIds.length === 0
         ? []
         : this.prisma.v1Tournament.findMany({ where: { id: { in: tournamentIds } }, select: { id: true, title: true } }),
     ]);
     const opponentNameById = new Map(opponentTeams.map((row) => [row.id, row.name]));
+    const opponentLogoById = new Map(opponentTeams.map((row) => [row.id, row.profile?.logoUrl ?? null]));
     const tournamentTitleById = new Map(tournaments.map((row) => [row.id, row.title]));
 
     const items = currentRows.map((row) => ({
@@ -82,6 +86,7 @@ export class PublicTeamRecordsService {
       tournamentTitle: row.tournamentId === null ? null : (tournamentTitleById.get(row.tournamentId) ?? null),
       opponentTeamId: row.opponentTeamId,
       opponentTeamName: row.opponentTeamId === null ? null : (opponentNameById.get(row.opponentTeamId) ?? null),
+      opponentTeamLogoUrl: row.opponentTeamId === null ? null : (opponentLogoById.get(row.opponentTeamId) ?? null),
       result: row.result,
       goalsFor: row.goalsFor,
       goalsAgainst: row.goalsAgainst,
@@ -98,6 +103,7 @@ export class PublicTeamRecordsService {
     return {
       teamId: team.id,
       teamName: team.name,
+      teamLogoUrl: team.profile?.logoUrl ?? null,
       summary,
       items,
       nextCursor,

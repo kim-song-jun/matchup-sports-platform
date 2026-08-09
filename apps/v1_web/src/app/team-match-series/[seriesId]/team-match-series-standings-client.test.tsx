@@ -21,6 +21,30 @@ const useV1TeamMatchSeriesStandingsMock = vi.mocked(useV1TeamMatchSeriesStanding
 const useV1TeamMatchSeriesPlayerRecordsMock = vi.mocked(useV1TeamMatchSeriesPlayerRecords, { partial: true });
 
 describe('TeamMatchSeriesStandingsClient', () => {
+  it('순위표에서 저장된 팀 로고를 표시한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1TeamMatchSeriesMock.mockReturnValue({
+      data: { seriesId: 'series-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+    } as never);
+    useV1TeamMatchSeriesStandingsMock.mockReturnValue({
+      data: {
+        seriesId: 'series-1',
+        tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: '/uploads/teams/seongsu.png', position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, points: 3 }],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1TeamMatchSeriesPlayerRecordsMock.mockReturnValue({ data: { seriesId: 'series-1', goals: [], assists: [] } } as never);
+
+    const { container } = render(
+      <Providers>
+        <TeamMatchSeriesStandingsClient seriesId="series-1" />
+      </Providers>,
+    );
+
+    await waitFor(() => expect(container.querySelector('img[src="/uploads/teams/seongsu.png"]')).toBeInTheDocument());
+  });
+
   it('미확정 경기가 있으면 순위표 대신 확인 중 안내를 보여준다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1TeamMatchSeriesMock.mockReturnValue({

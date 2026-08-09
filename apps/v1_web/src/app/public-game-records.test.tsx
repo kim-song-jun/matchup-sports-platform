@@ -191,6 +191,7 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
   return {
     teamId: 'team-1',
     teamName: '서울 유나이티드',
+    teamLogoUrl: '/uploads/teams/seoul.png',
     summary: { played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 2, goalsAgainst: 1 },
     items: [
       {
@@ -200,6 +201,7 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         tournamentTitle: '테스트 대회',
         opponentTeamId: 'team-away',
         opponentTeamName: '부산 FC',
+        opponentTeamLogoUrl: '/uploads/teams/busan.png',
         result: 'WON',
         goalsFor: 2,
         goalsAgainst: 1,
@@ -213,6 +215,13 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
 }
 
 describe('TeamRecordsContent — 정정 배지', () => {
+  it('현재 팀과 상대 팀의 저장된 로고를 표시한다', () => {
+    const { container } = render(<TeamRecordsContent data={makeTeamRecords()} />);
+
+    expect(container.querySelector('img[src="/uploads/teams/seoul.png"]')).toBeInTheDocument();
+    expect(container.querySelector('img[src="/uploads/teams/busan.png"]')).toBeInTheDocument();
+  });
+
   it('isCorrected=true인 행은 정정됨 배지를 보여준다', () => {
     render(<TeamRecordsContent data={makeTeamRecords()} />);
     expect(screen.getByText('정정됨')).toBeInTheDocument();

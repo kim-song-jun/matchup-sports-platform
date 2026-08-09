@@ -89,11 +89,16 @@ export function RecordedEventList({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {/* 44px 최소 터치 타깃(WCAG 2.5.5 유사 기준) — 이 콘솔의 실사용
+                  맥락은 경기장에서 한 손으로 급하게 조작하는 것이라, 반복
+                  눌리는 CTA가 44px 미만이면 오탭 위험이 커진다(Copilot 리뷰
+                  지적: 되돌리기 32px). 바로 옆 어시스트 버튼도 같은 문제라
+                  함께 맞춘다 — 한 행에 44px/32px가 섞이면 그 자체로 불일치. */}
               {canAttachAssist ? (
                 <button
                   type="button"
                   onClick={() => onAttachAssist(event)}
-                  className="flex min-h-[32px] items-center gap-1 rounded-lg border border-blue-200 px-2 text-2xs font-semibold text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-blue-500/30 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                  className="flex min-h-[44px] items-center gap-1 rounded-lg border border-blue-200 px-2 text-2xs font-semibold text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-blue-500/30 dark:text-blue-400 dark:hover:bg-blue-500/10"
                 >
                   <Handshake size={12} aria-hidden="true" />
                   어시스트
@@ -103,7 +108,7 @@ export function RecordedEventList({
                 <button
                   type="button"
                   onClick={() => onReverseSubstitution(event)}
-                  className="flex min-h-[32px] items-center gap-1 rounded-lg border border-gray-200 px-2 text-2xs font-semibold text-gray-500 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+                  className="flex min-h-[44px] items-center gap-1 rounded-lg border border-gray-200 px-2 text-2xs font-semibold text-gray-500 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
                 >
                   <Undo2 size={12} aria-hidden="true" />
                   되돌리기

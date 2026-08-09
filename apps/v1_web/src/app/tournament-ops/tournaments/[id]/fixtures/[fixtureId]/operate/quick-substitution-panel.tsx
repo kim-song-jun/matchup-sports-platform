@@ -87,11 +87,15 @@ export function QuickSubstitutionPanel({
           <span className="text-sm font-semibold">
             {armed.participant.displayNameSnapshot} 나가는 중 · 들어올 선수를 탭하세요
           </span>
+          {/* 44px 최소 터치 타깃 — 이 콘솔은 경기장에서 한 손으로 급하게
+              조작한다는 실사용 맥락이라, 지정을 취소하는 버튼이 작으면
+              오탭으로 지정이 풀려 다시 처음부터 해야 하는 상황이 잦아진다
+              (Copilot 리뷰 지적: 32px). */}
           <button
             type="button"
             onClick={() => setArmed(null)}
             aria-label="교체 지정 취소"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
           >
             <X size={14} aria-hidden="true" />
           </button>
@@ -135,7 +139,12 @@ export function QuickSubstitutionPanel({
                           }
                         }}
                         className={[
-                          'flex min-h-[36px] items-center gap-1 rounded-full border px-2.5 text-2xs font-medium transition-colors',
+                          // 44px 최소 터치 타깃 — 이 칩이 바로 "지정" 또는
+                          // (지정 중일 때는) "즉시 확정" 액션이다. 확정 칩을
+                          // 36px로 두면 경기장에서 급하게 조작하다 옆 선수를
+                          // 잘못 눌러 엉뚱한 교체가 그대로 기록되는 사고로
+                          // 이어진다(Copilot 리뷰 지적).
+                          'flex min-h-[44px] items-center gap-1 rounded-full border px-2.5 text-2xs font-medium transition-colors',
                           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                           disabled ? 'cursor-not-allowed opacity-50' : '',
                           armed !== null

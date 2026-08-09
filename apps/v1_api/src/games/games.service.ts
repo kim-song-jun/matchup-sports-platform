@@ -3270,9 +3270,15 @@ export class GamesService {
     dto: AppendGameEventDto,
   ): Promise<{ position: string | null; positionX: number | null; positionY: number | null }> {
     if (dto.sideId === undefined) {
+      // Copilot review: this used to fall through to the generic
+      // EVENT_INVALID (English message) — a contract mismatch with the rest
+      // of this method, which always answers a missing SUBSTITUTION field
+      // with SUBSTITUTION_INVALID + a Korean message (and the frontend's
+      // gameOperationsErrorMessage() maps SUBSTITUTION_INVALID specifically,
+      // not the generic EVENT_INVALID bucket).
       throw new UnprocessableEntityException({
-        code: 'EVENT_INVALID',
-        message: 'SUBSTITUTION requires a side',
+        code: 'SUBSTITUTION_INVALID',
+        message: '팀 정보를 확인할 수 없어요. 새로고침 후 다시 시도해주세요.',
       });
     }
     if (dto.participantId === undefined) {

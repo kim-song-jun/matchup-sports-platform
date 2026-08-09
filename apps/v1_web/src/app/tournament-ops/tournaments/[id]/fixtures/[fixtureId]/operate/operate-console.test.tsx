@@ -33,9 +33,18 @@ vi.mock('@/hooks/use-v1-game-operations-console', () => ({
 // action-target-picker.tsx가 그대로 import하는 './lineup-grid'와 같은 상대
 // 경로라 여기서 목을 걸면 (모달이 열렸을 때) 그 안에서 렌더되는 실제
 // LineupGrid도 이 목으로 대체된다.
+//
+// SUBSTITUTION은 이 안에서 LineupGrid를 두 번 렌더한다 — 1단계("나갈 선수")와
+// 2단계("들어올 선수"). 실제 ActionTargetPicker 구현은 2단계에만
+// `restrictSideId`를 넘긴다(같은 팀 벤치로 좁히기 위해) — 이 prop 유무로 두
+// 단계를 구분해 서로 다른 참가자를 돌려준다. 예전엔 항상 같은 p-1을 돌려줘서
+// SUBSTITUTION 테스트가 "나가는 선수 == 들어오는 선수"라는, 실제 계약
+// (validateSubstitution이 거부하는 상태)과 모순되는 입력을 "정상"으로
+// 통과시켰다(Copilot 리뷰 지적).
 vi.mock('./lineup-grid', () => ({
   LineupGrid: ({
     onSelectPlayer,
+    restrictSideId,
   }: {
     onSelectPlayer: (input: {
       sideId: string;
@@ -45,25 +54,27 @@ vi.mock('./lineup-grid', () => ({
         createdAt: string; updatedAt: string;
       };
     }) => void;
-  }) => (
-    <div data-testid="lineup-grid">
-      <button
-        type="button"
-        onClick={() =>
-          onSelectPlayer({
-            sideId: 'side-home',
-            participant: {
-              id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
-              displayNameSnapshot: '정우진', jerseyNumber: 10, position: null,
-              createdAt: '', updatedAt: '',
-            },
-          })
+    restrictSideId?: string;
+  }) => {
+    const participant = restrictSideId
+      ? {
+          id: 'p-2', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
+          displayNameSnapshot: '이민호', jerseyNumber: 7, position: null,
+          createdAt: '', updatedAt: '',
         }
-      >
-        select-player
-      </button>
-    </div>
-  ),
+      : {
+          id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
+          displayNameSnapshot: '정우진', jerseyNumber: 10, position: null,
+          createdAt: '', updatedAt: '',
+        };
+    return (
+      <div data-testid="lineup-grid">
+        <button type="button" onClick={() => onSelectPlayer({ sideId: 'side-home', participant })}>
+          select-player
+        </button>
+      </div>
+    );
+  },
 }));
 
 const SIDE_ID = 'side-home';
@@ -327,12 +338,16 @@ describe('OperateConsole — 선수 교체', () => {
     fireEvent.click(screen.getByRole('button', { name: /^교체/ }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    // 1단계(나갈 선수), 2단계(들어올 선수) 둘 다 (모킹된) LineupGrid를 거친다.
+    // 1단계(나갈 선수 — p-1)를 고르면 2단계(들어올 선수)로 넘어간다. 목킹된
+    // LineupGrid는 실제 컴포넌트처럼 2단계에만 restrictSideId를 받으므로
+    // 그때는 다른 참가자(p-2)를 돌려준다 — 나가는/들어오는 선수가 같아지는
+    // 걸 이 테스트 수준에서도 막는다(실제 계약: validateSubstitution은 둘이
+    // 같으면 거부한다).
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
 
     expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'SUBSTITUTION', participantId: 'p-1', sideId: 'side-home', payload: { outParticipantId: 'p-1' } }),
+      expect.objectContaining({ type: 'SUBSTITUTION', participantId: 'p-2', sideId: 'side-home', payload: { outParticipantId: 'p-1' } }),
     );
     expect(screen.queryByRole('dialog')).toBeNull();
   });

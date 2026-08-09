@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { WifiOff, Wifi, Goal, AlertTriangle } from 'lucide-react';
+import { WifiOff, Wifi, Goal, AlertTriangle, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { useV1FixtureLineup, useV1Game, postV1GameCommand } from '@/hooks/use-v1-game-operations';
@@ -15,9 +15,12 @@ import { ElapsedMatchClock } from './elapsed-match-clock';
 import { QueueStatusPanel } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
+import { QuickSubstitutionPanel } from './quick-substitution-panel';
 import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
+import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
 import { deriveFoulCounts } from '@/lib/team-foul-counter';
+import { deriveOnPitchParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
 import type {
   GameCardColor,
@@ -90,6 +93,10 @@ const ACTION_BUTTONS: ReadonlyArray<{
   { type: 'CARD', label: '옐로카드', cardColor: 'YELLOW', allowTeamOnly: false },
   { type: 'CARD', label: '레드카드', cardColor: 'RED', allowTeamOnly: false },
   { type: 'FOUL', label: '파울', allowTeamOnly: true },
+  // 선수 교체 — allowTeamOnly는 항상 false다: 나갈 선수/들어올 선수 둘 다
+  // 반드시 지정해야 하고(백엔드 assertSubstitution이 강제), "선수 지정 없이"
+  // 경로는 이 이벤트 타입에 의미가 없다.
+  { type: 'SUBSTITUTION', label: '교체', allowTeamOnly: false },
 ];
 
 export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps) {
@@ -155,6 +162,26 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     () => deriveFoulCounts(ops.liveEvents, currentPeriod?.number ?? 1),
     [ops.liveEvents, currentPeriod?.number],
   );
+
+  // 선수 교체: "지금 피치 위" 는 저장된 컬럼이 아니라 started + 확정 SUBSTITUTION
+  // 이벤트를 접은 파생값이다(요건 3) — ActionTargetPicker의 1단계(나갈 선수)/
+  // 2단계(들어올 선수) 필터와 빠른 교체 모드 양쪽이 이 하나의 계산을 공유한다.
+  const allParticipants = useMemo(
+    () => (fixtureLineup.data?.lineups ?? []).flatMap((lineup) => lineup.participants),
+    [fixtureLineup.data?.lineups],
+  );
+  const onPitchParticipantIds = useMemo(
+    () => deriveOnPitchParticipantIds(allParticipants, ops.liveEvents),
+    [allParticipants, ops.liveEvents],
+  );
+  const substitutionUsedBySideId = useMemo(() => {
+    const bySide: Record<string, number> = {};
+    for (const side of gameDetail.data?.sides ?? []) {
+      bySide[side.id] = countActiveSubstitutions(side.id, ops.liveEvents);
+    }
+    return bySide;
+  }, [gameDetail.data?.sides, ops.liveEvents]);
+  const [quickSubstitutionMode, setQuickSubstitutionMode] = useState(false);
 
   const handleSelectAction = useCallback(
     (button: (typeof ACTION_BUTTONS)[number]) => {
@@ -241,6 +268,52 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       });
     },
     [ops],
+  );
+
+  // 빠른 교체 모드의 단일 확정 탭 — QuickSubstitutionPanel은 "지정 후 탭"
+  // 두 단계를 거쳐서만 이 콜백을 부르므로(오조작 방지 설계는 그 컴포넌트
+  // 문서 참고), 여기서는 시각을 이 탭 순간에 얼리고 바로 커밋한 뒤 되돌리기
+  // 액션이 달린 확인 토스트를 띄운다 — 기존 `ops.reverseEvent`(CORRECTION)
+  // 경로를 그대로 재사용한다(새 되돌리기 API를 만들지 않는다).
+  const handleQuickSubstitute = useCallback(
+    (input: { sideId: string; outParticipant: GameLineupParticipant; inParticipant: GameLineupParticipant }) => {
+      if (currentPeriod === null || currentPeriod.startedAt === null) return;
+      const periodStartedAtMs = new Date(currentPeriod.startedAt).getTime();
+      const frozen = freezeCapture({
+        clientNowMs: Date.now(),
+        offsetMs: ops.clockOffsetMs,
+        period: currentPeriod.number,
+        periodStartedAtMs,
+        pausedTotalMs: currentPeriod.pausedTotalMs,
+        pausedAtMs: currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime(),
+      });
+      void ops.submitEvent({
+        type: 'SUBSTITUTION',
+        participantId: input.inParticipant.id,
+        sideId: input.sideId,
+        period: frozen.period,
+        clockMs: frozen.clockMs,
+        occurredAt: frozen.occurredAt,
+        payload: { outParticipantId: input.outParticipant.id },
+      });
+      const outParticipantId = input.outParticipant.id;
+      const inParticipantId = input.inParticipant.id;
+      const clockMs = frozen.clockMs;
+      showToast(`${input.outParticipant.displayNameSnapshot} → ${input.inParticipant.displayNameSnapshot} 교체 기록됨`, {
+        action: {
+          label: '되돌리기',
+          onClick: () => {
+            const match = findRecentSubstitutionEvent(liveEventsRef.current, {
+              inParticipantId,
+              outParticipantId,
+              clockMs,
+            });
+            if (match) void ops.reverseEvent({ eventId: match.id, reason: '빠른 교체 되돌리기' });
+          },
+        },
+      });
+    },
+    [currentPeriod, ops, showToast],
   );
 
   const handleRunCommand = useCallback(
@@ -439,6 +512,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               <Goal size={18} aria-hidden="true" />
             ) : button.type === 'FOUL' ? (
               <AlertTriangle size={18} aria-hidden="true" />
+            ) : button.type === 'SUBSTITUTION' ? (
+              <ArrowLeftRight size={18} aria-hidden="true" />
             ) : (
               <span
                 aria-hidden="true"
@@ -449,6 +524,35 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           </Button>
         ))}
       </div>
+
+      {/* 풋살 등 롤링 교체 종목 전용 — 하드코딩된 종목명이 아니라
+          `substitutionPolicy.mode`(config 값)로만 노출 여부를 판단한다(요건 B).
+          기본 `교체` 액션(액션 우선 2단계)은 이 종목에서도 항상 그대로 쓸 수
+          있다 — 이 토글은 그 위에 얹는 선택적 빠른 경로다. */}
+      {gameDetail.data?.substitutionPolicy?.mode === 'rolling' && (
+        <div className="flex flex-col gap-2 px-4">
+          <Button
+            size="sm"
+            variant={quickSubstitutionMode ? 'primary' : 'outline'}
+            className="self-start"
+            disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
+            onClick={() => setQuickSubstitutionMode((current) => !current)}
+            aria-pressed={quickSubstitutionMode}
+          >
+            <ArrowLeftRight size={14} aria-hidden="true" />
+            빠른 교체 모드 {quickSubstitutionMode ? '끄기' : '켜기'}
+          </Button>
+          {quickSubstitutionMode && (
+            <QuickSubstitutionPanel
+              sides={sides}
+              lineups={lineups}
+              onPitchParticipantIds={onPitchParticipantIds}
+              disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
+              onSubstitute={handleQuickSubstitute}
+            />
+          )}
+        </div>
+      )}
 
       {/* "기록한 이벤트" 라는 제목 아래에 로컬 전송 큐만 그리고 있었다. 큐는 이번 세션에
           내가 올린 것만 담으므로, 새로고침하거나 다른 운영자가 넘겨받으면 골이 4개
@@ -462,6 +566,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           sides={sides}
           lineups={lineups}
           onAttachAssist={(event) => setAssistTarget({ event })}
+          onReverseSubstitution={(event) => void ops.reverseEvent({ eventId: event.id, reason: '교체 되돌리기' })}
         />
       </section>
 
@@ -482,6 +587,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           sides={sides}
           lineups={lineups}
           allowTeamOnly={pendingAction.allowTeamOnly}
+          onPitchParticipantIds={onPitchParticipantIds}
+          substitutionPolicy={gameDetail.data?.substitutionPolicy ?? null}
+          substitutionUsedBySideId={substitutionUsedBySideId}
           onCommit={handleCommit}
           onCancel={() => setPendingAction(null)}
         />

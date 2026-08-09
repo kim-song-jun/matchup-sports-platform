@@ -122,6 +122,15 @@ export interface FixtureLineupResponse {
   lineups: GameLineup[];
 }
 
+/** `lineup.substitutions`/`lineup.maxSubstitutions` from the game's pinned
+ * competition config (`apps/v1_api/.../competition-config.types.ts`),
+ * resolved server-side — the console decides whether to surface the rolling
+ * quick-substitution mode from `mode`, never from a hardcoded sport name. */
+export interface GameSubstitutionPolicy {
+  mode: 'limited' | 'rolling';
+  maxSubstitutions: number | null;
+}
+
 export interface GameDetail {
   id: string;
   sourceType: GameSourceType;
@@ -134,6 +143,7 @@ export interface GameDetail {
   periods: GamePeriod[];
   lineups: GameLineup[];
   actorRole: GameActorRole;
+  substitutionPolicy: GameSubstitutionPolicy;
 }
 
 export interface GameEventRecord {

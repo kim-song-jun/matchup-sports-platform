@@ -36,6 +36,7 @@ function eventLabel(item: QueuedGameEvent): string {
     return card === 'RED' ? '레드카드' : '옐로카드';
   }
   if (item.event.type === 'FOUL') return '파울';
+  if (item.event.type === 'SUBSTITUTION') return '교체';
   if (item.event.type === 'CORRECTION') return '정정';
   return item.event.type;
 }

@@ -283,3 +283,77 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(screen.queryByText('2피리어드 종료')).toBeNull();
   });
 });
+
+describe('OperateConsole — 선수 교체', () => {
+  const LIVE_PERIOD = { id: 'period-1', gameId: 'game-1', number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null, pausedTotalMs: 0, pausedAt: null };
+  const SUB_SIDES = [{ id: 'side-home', gameId: 'game-1', sideKey: 'HOME', teamId: null, displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '' }];
+
+  beforeEach(() => {
+    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: {
+        gameId: 'game-1',
+        lineups: [{
+          sideId: 'side-home',
+          state: 'SUBMITTED',
+          revision: 1,
+          participants: [
+            { id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1', displayNameSnapshot: '정우진', jerseyNumber: 10, position: null, positionX: null, positionY: null, started: true, createdAt: '', updatedAt: '' },
+            { id: 'p-2', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1', displayNameSnapshot: '이민호', jerseyNumber: 7, position: null, positionX: null, positionY: null, started: false, createdAt: '', updatedAt: '' },
+          ],
+        }],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  function gameWithSubstitutionPolicy(substitutionPolicy: { mode: 'limited' | 'rolling'; maxSubstitutions: number | null }) {
+    mocks.useV1Game.mockReturnValue({
+      data: { id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1, periods: [LIVE_PERIOD], sides: SUB_SIDES, lineups: [], substitutionPolicy },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents: [] }));
+  }
+
+  it('"교체" 액션 버튼이 있고, 2단계(나갈 선수 → 들어올 선수)를 거쳐 SUBSTITUTION 이벤트를 제출한다', () => {
+    gameWithSubstitutionPolicy({ mode: 'limited', maxSubstitutions: 5 });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^교체/ }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // 1단계(나갈 선수), 2단계(들어올 선수) 둘 다 (모킹된) LineupGrid를 거친다.
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+
+    expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SUBSTITUTION', participantId: 'p-1', sideId: 'side-home', payload: { outParticipantId: 'p-1' } }),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('substitutions === "rolling"일 때만 빠른 교체 모드 토글이 보인다', () => {
+    gameWithSubstitutionPolicy({ mode: 'limited', maxSubstitutions: 5 });
+    const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    expect(screen.queryByRole('button', { name: /빠른 교체 모드/ })).toBeNull();
+
+    gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null });
+    rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    expect(screen.getByRole('button', { name: /빠른 교체 모드 켜기/ })).toBeInTheDocument();
+  });
+
+  it('빠른 교체 모드를 켜면 실제 라인업 데이터로 피치 위 선수만 지정 가능한 목록이 뜬다', () => {
+    gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /빠른 교체 모드 켜기/ }));
+    // 선발(started: true)인 정우진만 지정 가능한 목록에 보이고, 벤치(이민호)는 안 보인다.
+    expect(screen.getByRole('button', { name: /정우진/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /이민호/ })).toBeNull();
+  });
+});

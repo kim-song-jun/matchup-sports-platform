@@ -104,4 +104,127 @@ describe('TeamMatchSeriesFixturesClient', () => {
       expect.anything(),
     ));
   });
+
+  it('대진이 없으면 요일/시각/장소를 선택하지 않아도 주차 수만으로 생성할 수 있다(기존 동작 보존)', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminTeamMatchSeriesMock.mockReturnValue({
+      data: { seriesId: 'series-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn().mockResolvedValue({ seriesId: 'series-1', createdCount: 7, teamMatchIds: [] });
+    useV1GenerateSeriesFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateSeriesFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <TeamMatchSeriesFixturesClient seriesId="series-1" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ weeksCount: 7 }));
+  });
+
+  it('요일·시각·장소를 채우고 생성하면 schedule과 placeName을 함께 전달한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminTeamMatchSeriesMock.mockReturnValue({
+      data: { seriesId: 'series-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn().mockResolvedValue({ seriesId: 'series-1', createdCount: 7, teamMatchIds: [] });
+    useV1GenerateSeriesFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateSeriesFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <TeamMatchSeriesFixturesClient seriesId="series-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText('시각'), { target: { value: '19:30' } });
+    fireEvent.change(screen.getByLabelText('기본 장소'), { target: { value: '상암 풋살파크' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
+      weeksCount: 7,
+      schedule: { dayOfWeek: 6, time: '19:30' },
+      placeName: '상암 풋살파크',
+    }));
+  });
+
+  it('요일을 고르고 시각을 비우면 서버 400 대신 안내 토스트를 보여주고 제출하지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminTeamMatchSeriesMock.mockReturnValue({
+      data: { seriesId: 'series-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn().mockResolvedValue({ seriesId: 'series-1', createdCount: 7, teamMatchIds: [] });
+    useV1GenerateSeriesFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateSeriesFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <TeamMatchSeriesFixturesClient seriesId="series-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText('시각'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() => expect(screen.getByText('요일을 골랐으면 시각도 입력해 주세요.')).toBeInTheDocument());
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('최근 사용한 장소 칩을 누르면 기본 장소 입력에 그 값이 채워진다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminTeamMatchSeriesMock.mockReturnValue({
+      data: {
+        seriesId: 'series-1',
+        title: '가을 풋살 리그',
+        state: 'draft',
+        teamIds: ['t1', 't2'],
+        fixtures: [],
+        recentVenues: ['상암 풋살파크', '잠실 종합운동장'],
+      },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn().mockResolvedValue({ seriesId: 'series-1', createdCount: 7, teamMatchIds: [] });
+    useV1GenerateSeriesFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateSeriesFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <TeamMatchSeriesFixturesClient seriesId="series-1" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '잠실 종합운동장' }));
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
+      weeksCount: 7,
+      placeName: '잠실 종합운동장',
+    }));
+  });
+
+  it('최근 사용한 장소가 없으면 칩 영역을 렌더링하지 않는다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminTeamMatchSeriesMock.mockReturnValue({
+      data: { seriesId: 'series-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [], recentVenues: [] },
+      isPending: false,
+    } as never);
+    useV1GenerateSeriesFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateSeriesFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <TeamMatchSeriesFixturesClient seriesId="series-1" />
+      </Providers>,
+    );
+
+    expect(screen.queryByText('최근 사용한 장소')).not.toBeInTheDocument();
+  });
 });

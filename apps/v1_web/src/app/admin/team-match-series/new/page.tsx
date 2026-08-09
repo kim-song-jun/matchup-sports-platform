@@ -15,6 +15,9 @@ import { extractErrorMessage } from '@/lib/error-message';
 const inputClass =
   'h-[44px] w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
+/** 페이지 로컬 팀 선택 상태 — EntityPickerItem에 종목 판정에 필요한 필드만 얹는다. */
+type SeriesTeamPick = EntityPickerItem & { sportId: string };
+
 export default function AdminTeamMatchSeriesNewPage() {
   const router = useRouter();
   const { toasts, showToast } = useAdminToast();
@@ -23,15 +26,42 @@ export default function AdminTeamMatchSeriesNewPage() {
   const [regionId, setRegionId] = useState('');
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
-  const [selectedTeams, setSelectedTeams] = useState<EntityPickerItem[]>([]);
+  const [selectedTeams, setSelectedTeams] = useState<SeriesTeamPick[]>([]);
   const [pickerValue, setPickerValue] = useState<EntityPickerItem | null>(null);
+  const [teamSearch, setTeamSearch] = useState('');
 
   const { data: sports } = useV1MasterSports();
   const { data: regions } = useV1MasterRegions();
-  const teamsQuery = useV1Teams({ sportId, limit: 50 }, { enabled: Boolean(sportId) });
+  // 첫 팀을 고르기 전까지는(= 아직 종목이 잠기기 전까지는) 검색을 종목으로 막지
+  // 않는다 — 검색어가 있으면 전체 종목에서 이름으로 찾고(다른 종목도 안 숨김,
+  // 회색으로 보여주고 이유를 알려준다), 검색어가 없을 때만 기본 후보를 sportId로 좁힌다.
+  const trimmedTeamSearch = teamSearch.trim();
+  const teamsQuery = useV1Teams(
+    trimmedTeamSearch ? { query: trimmedTeamSearch, limit: 20 } : sportId ? { sportId, limit: 20 } : { limit: 20 },
+  );
+  // team.sport 가 응답에 없는 극단 상황(V1Team.sport 는 optional 타입)에서 sportId 가 끝내
+  // ''로 남으면, selectedTeams.length 만으로 잠그면 종목 select 가 빈 값인 채 비활성화되어
+  // 화면이 막힌다 — sportId 가 실제로 정해진 경우에만 잠근다.
+  const isSportLocked = selectedTeams.length > 0 && sportId !== '';
+  const lockedSportName = sports?.find((s) => s.id === sportId)?.name;
   const teamItems: EntityPickerItem[] = (teamsQuery.data?.items ?? [])
     .filter((team) => !selectedTeams.some((selected) => selected.id === team.id))
-    .map((team) => ({ id: team.id, label: team.name, description: team.regionName }));
+    .map((team) => {
+      const teamSportId = team.sport?.sportId ?? '';
+      const crossSport = sportId !== '' && teamSportId !== sportId;
+      return {
+        id: team.id,
+        label: team.name,
+        description: `${team.sportName} · ${team.regionName}`,
+        disabled: crossSport,
+        disabledReason: crossSport
+          ? lockedSportName
+            ? `이 리그는 ${lockedSportName} 종목이라 ${team.sportName} 팀은 선택할 수 없어요`
+            : `다른 종목(${team.sportName}) 팀이라 선택할 수 없어요`
+          : undefined,
+        sportId: teamSportId,
+      } satisfies SeriesTeamPick;
+    });
   const createSeries = useV1CreateTeamMatchSeries();
 
   const canSubmit =
@@ -39,8 +69,13 @@ export default function AdminTeamMatchSeriesNewPage() {
 
   const addTeam = (item: EntityPickerItem | null) => {
     if (item === null) return;
-    setSelectedTeams((prev) => (prev.some((t) => t.id === item.id) ? prev : [...prev, item]));
+    const picked = item as SeriesTeamPick;
+    setSelectedTeams((prev) => (prev.some((t) => t.id === picked.id) ? prev : [...prev, picked]));
+    // 종목을 아직 안 골랐으면 첫 팀의 종목으로 자동 채운다 — 이후 addTeam은 이미 sportId가
+    // 있으니(잠긴 상태) 여기 안 걸린다.
+    if (sportId === '' && picked.sportId) setSportId(picked.sportId);
     setPickerValue(null);
+    setTeamSearch('');
   };
 
   const submit = async () => {
@@ -79,7 +114,8 @@ export default function AdminTeamMatchSeriesNewPage() {
             <select
               id="series-sport"
               value={sportId}
-              onChange={(e) => { setSportId(e.target.value); setSelectedTeams([]); }}
+              onChange={(e) => setSportId(e.target.value)}
+              disabled={isSportLocked}
               className={inputClass}
             >
               <option value="">종목 선택</option>
@@ -87,6 +123,9 @@ export default function AdminTeamMatchSeriesNewPage() {
                 <option key={sport.id} value={sport.id}>{sport.name}</option>
               ))}
             </select>
+            {isSportLocked && (
+              <p className="mt-1 text-xs text-gray-500">자동 설정됨 · 변경하려면 선택한 팀을 모두 지우세요</p>
+            )}
           </div>
           <div>
             <label htmlFor="series-region" className="mb-1 block text-sm font-medium text-gray-900">지역</label>
@@ -117,9 +156,10 @@ export default function AdminTeamMatchSeriesNewPage() {
             value={pickerValue}
             onChange={addTeam}
             items={teamItems}
+            onSearch={setTeamSearch}
+            showResultsWithoutQuery
             loading={teamsQuery.isFetching}
-            placeholder={sportId === '' ? '종목을 먼저 선택해 주세요' : '팀 이름으로 검색'}
-            disabled={sportId === ''}
+            placeholder="팀 이름으로 검색"
             emptyText="검색 결과가 없어요"
           />
           <ul className="mt-2 flex flex-wrap gap-2">

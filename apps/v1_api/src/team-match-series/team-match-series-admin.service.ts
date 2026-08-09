@@ -5,11 +5,11 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.se
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { resolveTeamMatchCompetitionConfig } from '../team-matches/resolve-team-match-competition-config';
-import { generateRoundRobinFixtures } from './round-robin-schedule';
+import { generateRoundRobinFixtures, resolveFixtureStartAt } from './round-robin-schedule';
 import { CreateTeamMatchSeriesDto, GenerateSeriesFixturesDto, UpdateSeriesFixtureDto } from './dto/team-match-series.dto';
 
 const DEFAULT_TIE_BREAK_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
-const WEEK_MS = 7 * 24 * 60 * 60 * 1_000;
+const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
 
 @Injectable()
 export class TeamMatchSeriesAdminService {
@@ -89,16 +89,21 @@ export class TeamMatchSeriesAdminService {
   async detail(user: V1AuthUser, seriesId: string) {
     await this.adminContext.getActiveAdmin(user.id);
     const series = await this.loadSeries(seriesId);
+    const teamIds = series.teams.map((entry) => entry.teamId);
     const fixtures = await this.prisma.v1TeamMatch.findMany({
       where: { seriesId },
       orderBy: { startAt: 'asc' },
       select: { id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, startAt: true, placeName: true, status: true },
     });
+    // 대진을 아직 안 만든 리그에서만 필요하다(일괄 생성 폼의 "기본 장소" 추천용) —
+    // 이미 대진이 있으면 관리자는 개별 행을 고치므로 이 쿼리를 건너뛴다.
+    const recentVenues = fixtures.length === 0 ? await this.loadRecentVenues(teamIds) : [];
     return {
       seriesId: series.id,
       title: series.title,
       state: series.state,
-      teamIds: series.teams.map((entry) => entry.teamId),
+      teamIds,
+      recentVenues,
       fixtures: fixtures.map((fixture) => ({
         teamMatchId: fixture.id,
         title: fixture.title,
@@ -134,11 +139,15 @@ export class TeamMatchSeriesAdminService {
         throw new ConflictException({ code: 'SERIES_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
       }
       const teamsById = await this.loadTeamsWithMembers(tx, teamIds);
+      // 빈 문자열/공백만 있는 placeName 도 "미지정"으로 취급한다 — DTO 는 @IsOptional 문자열이라
+      // 통과하고, ?? 는 ''를 대체하지 않아 그대로면 recentVenues 집계에서 조용히 빠지는 값이 저장된다.
+      const trimmedPlaceName = dto.placeName?.trim();
+      const placeName = trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME;
       const ids: string[] = [];
       for (const fixture of schedule) {
         const home = teamsById.get(fixture.homeTeamId)!;
         const away = teamsById.get(fixture.awayTeamId)!;
-        const startAt = new Date(series.startsOn.getTime() + (fixture.round - 1) * WEEK_MS);
+        const startAt = resolveFixtureStartAt(series.startsOn, fixture.round, dto.schedule);
         const teamMatch = await tx.v1TeamMatch.create({
           data: {
             hostTeamId: home.id,
@@ -146,7 +155,7 @@ export class TeamMatchSeriesAdminService {
             sportId: series.sportId,
             regionId: series.regionId,
             title: `${series.title} ${fixture.round}주차`,
-            placeName: '장소 미정',
+            placeName,
             startAt,
             status: 'matched',
             approvedApplicantTeamId: away.id,
@@ -206,7 +215,14 @@ export class TeamMatchSeriesAdminService {
           action: 'team_match_series.generate_fixtures',
           targetType: 'team_match_series',
           targetId: seriesId,
-          afterJson: { teamMatchIds: ids, weeksCount: dto.weeksCount },
+          afterJson: {
+            teamMatchIds: ids,
+            weeksCount: dto.weeksCount,
+            schedule: dto.schedule ? { dayOfWeek: dto.schedule.dayOfWeek, time: dto.schedule.time } : null,
+            // dto.placeName이 아니라 trim+기본값 폴백을 거쳐 실제로 저장된 placeName을 남긴다 —
+            // 감사 로그가 요청 원문이 아니라 실제 결과와 일치해야 디버깅 시 혼선이 없다.
+            placeName,
+          },
         },
         tx,
       );
@@ -223,11 +239,14 @@ export class TeamMatchSeriesAdminService {
       throw new NotFoundException({ code: 'SERIES_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
     }
     const updated = await this.prisma.$transaction(async (tx) => {
+      // generateFixtures와 동일하게: 빈/공백 문자열로 지우는 요청은 "미지정"으로 되돌린다 —
+      // 그대로 저장하면 loadRecentVenues distinct 집계에서 조용히 빠지는 값이 남는다.
+      const trimmedPlaceName = dto.placeName === undefined ? undefined : dto.placeName.trim();
       const result = await tx.v1TeamMatch.update({
         where: { id: teamMatchId },
         data: {
           ...(dto.startsAt === undefined ? {} : { startAt: new Date(dto.startsAt) }),
-          ...(dto.placeName === undefined ? {} : { placeName: dto.placeName }),
+          ...(trimmedPlaceName === undefined ? {} : { placeName: trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME }),
           ...(dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
         },
       });
@@ -255,6 +274,33 @@ export class TeamMatchSeriesAdminService {
       throw new NotFoundException({ code: 'SERIES_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
     }
     return series;
+  }
+
+  // 참가 팀들이 (이 리그든 다른 리그든, 일반 팀매치든) 과거에 실제로 썼던 장소를
+  // 최신순으로 모아 distinct 5개까지 돌려준다 — 일괄 생성 폼의 "기본 장소" 추천 칩용.
+  // v1_team_match는 리그 대진과 일반 팀매치가 같은 테이블이라 별도 이력 저장소가 필요 없다.
+  private async loadRecentVenues(teamIds: string[]): Promise<string[]> {
+    if (teamIds.length === 0) return [];
+    const rows = await this.prisma.v1TeamMatch.findMany({
+      where: {
+        OR: [{ hostTeamId: { in: teamIds } }, { approvedApplicantTeamId: { in: teamIds } }],
+        placeName: { notIn: ['', DEFAULT_FIXTURE_PLACE_NAME] },
+      },
+      orderBy: { startAt: 'desc' },
+      select: { placeName: true },
+      take: 30,
+    });
+    // 쓰기 경로는 이제 trim+폴백을 하지만, 그 이전에 만들어진 레거시 행에 앞뒤 공백이
+    // 섞여 있을 수 있어 읽기 시점에도 한 번 더 trim한다(방어적 이중 처리).
+    const distinct: string[] = [];
+    for (const row of rows) {
+      const trimmed = row.placeName?.trim();
+      // DB 필터는 trim 전 원문 기준이라, '장소 미정 '처럼 trim하면 기본값과 같아지는
+      // 레거시 값은 여기서 한 번 더 걸러야 한다.
+      if (trimmed && trimmed !== DEFAULT_FIXTURE_PLACE_NAME && !distinct.includes(trimmed)) distinct.push(trimmed);
+      if (distinct.length >= 5) break;
+    }
+    return distinct;
   }
 
   private async loadTeamsWithMembers(tx: Prisma.TransactionClient, teamIds: string[]) {

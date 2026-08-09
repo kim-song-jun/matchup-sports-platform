@@ -50,8 +50,8 @@ describe('AdminTeamMatchSeriesNewPage', () => {
     useV1MasterRegionsMock.mockReturnValue({ data: [{ id: 'region-1', name: '서울', parentId: null }] } as never);
     useV1TeamsMock.mockReturnValue({
       data: { items: [
-        { id: 'team-a', name: '팀A', sportName: '풋살', regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },
-        { id: 'team-b', name: '팀B', sportName: '풋살', regionName: '서울', memberCount: 9, trustState: 'none', joinPolicy: 'approval_required' },
+        { id: 'team-a', name: '팀A', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },
+        { id: 'team-b', name: '팀B', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 9, trustState: 'none', joinPolicy: 'approval_required' },
       ], nextCursor: null },
       isFetching: false,
     } as never);
@@ -83,5 +83,71 @@ describe('AdminTeamMatchSeriesNewPage', () => {
       endsOn: new Date('2026-10-20T23:59:59.999').toISOString(),
       teamIds: ['team-a', 'team-b'],
     }));
+  });
+
+  it('종목을 먼저 고르지 않아도 팀을 검색·선택할 수 있고, 첫 팀을 고르면 그 팀의 종목으로 종목 select가 자동 채워지고 잠긴다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1CreateTeamMatchSeriesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1MasterSportsMock.mockReturnValue({ data: [{ id: 'sport-futsal', name: '풋살', levels: [] }] } as never);
+    useV1MasterRegionsMock.mockReturnValue({ data: [{ id: 'region-1', name: '서울', parentId: null }] } as never);
+    useV1TeamsMock.mockReturnValue({
+      data: { items: [
+        { id: 'team-a', name: '팀A', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },
+      ], nextCursor: null },
+      isFetching: false,
+    } as never);
+
+    renderPage();
+
+    // 종목 select를 건드리지 않은 채로 팀 검색창은 처음부터 활성화돼 있어야 한다.
+    const sportSelect = screen.getByLabelText('종목') as HTMLSelectElement;
+    expect(sportSelect).not.toBeDisabled();
+    const teamPicker = screen.getByLabelText('참가 팀 추가 (최소 2팀)');
+    expect(teamPicker).not.toBeDisabled();
+
+    fireEvent.focus(teamPicker);
+    fireEvent.change(teamPicker, { target: { value: '팀A' } });
+    fireEvent.click(await screen.findByText('팀A'));
+
+    await waitFor(() => expect(sportSelect.value).toBe('sport-futsal'));
+    expect(sportSelect).toBeDisabled();
+    expect(screen.getByText('자동 설정됨 · 변경하려면 선택한 팀을 모두 지우세요')).toBeInTheDocument();
+  });
+
+  it('종목이 잠긴 뒤 다른 종목 팀이 검색되면 숨기지 않고 회색으로 표시하며 이유를 보여주고, 클릭해도 선택되지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1CreateTeamMatchSeriesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1MasterSportsMock.mockReturnValue({
+      data: [{ id: 'sport-futsal', name: '풋살', levels: [] }, { id: 'sport-soccer', name: '축구', levels: [] }],
+    } as never);
+    useV1MasterRegionsMock.mockReturnValue({ data: [{ id: 'region-1', name: '서울', parentId: null }] } as never);
+    useV1TeamsMock.mockReturnValue({
+      data: { items: [
+        { id: 'team-a', name: '팀A', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },
+        { id: 'team-soccer', name: '축구팀', sportName: '축구', sport: { sportId: 'sport-soccer', name: '축구' }, regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },
+      ], nextCursor: null },
+      isFetching: false,
+    } as never);
+
+    renderPage();
+
+    const teamPicker = screen.getByLabelText('참가 팀 추가 (최소 2팀)');
+    fireEvent.focus(teamPicker);
+    fireEvent.change(teamPicker, { target: { value: '팀A' } });
+    fireEvent.click(await screen.findByText('팀A'));
+
+    const teamPickerAgain = screen.getByLabelText('참가 팀 추가 (최소 2팀)');
+    fireEvent.focus(teamPickerAgain);
+    fireEvent.change(teamPickerAgain, { target: { value: '축구' } });
+
+    const crossSportOption = await screen.findByText('축구팀');
+    expect(screen.getByText('이 리그는 풋살 종목이라 축구 팀은 선택할 수 없어요')).toBeInTheDocument();
+    // disabled 항목이라도 description(종목·지역)은 계속 보여야 한다 — disabledReason은
+    // "왜 안 되는지" 추가 정보이지 description을 대체하는 게 아니다.
+    expect(screen.getByText('축구 · 서울')).toBeInTheDocument();
+    fireEvent.click(crossSportOption);
+
+    // 선택 칩 목록에 축구팀이 추가되지 않아야 한다(클릭이 무시됨).
+    expect(screen.queryByLabelText('축구팀 제거')).not.toBeInTheDocument();
   });
 });

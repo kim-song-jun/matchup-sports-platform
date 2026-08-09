@@ -19,7 +19,7 @@ import type {
   PublicTournamentScheduleResponse,
   PublicUserRecordsResponse,
 } from '@/components/public-game-records/types';
-import TournamentSchedulePage from './tournaments/[id]/schedule-view/page';
+import TournamentSchedulePage from './tournaments/[id]/schedule/page';
 import TournamentMatchPage from './tournaments/[id]/matches/[fixtureId]/page';
 import TeamRecordsPage from './teams/[id]/records/page';
 import UserRecordsPage from './users/[id]/records/page';
@@ -38,7 +38,7 @@ vi.mock('@/lib/seo', async (importOriginal) => {
   };
 });
 
-vi.mock('./tournaments/[id]/schedule-view/schedule-page-client', () => ({
+vi.mock('./tournaments/[id]/schedule/schedule-page-client', () => ({
   SchedulePageClient: () => null,
 }));
 vi.mock('./tournaments/[id]/matches/[fixtureId]/match-page-client', () => ({

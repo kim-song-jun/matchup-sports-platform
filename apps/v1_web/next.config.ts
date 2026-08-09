@@ -79,15 +79,6 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        // 대회 경기 일정 라우트는 세그먼트 이름을 `schedule-view` 로 두고, 공개 URL
-        // `/tournaments/:id/schedule` 은 rewrite 로 그 라우트에 연결한다. 없는 대회에서 이 라우트만
-        // HTTP 200 을 반환하던 결함이 `schedule` **경로 자체**에 묶여 있었고(#298·#302·#305·#307·#312
-        // 로 page.tsx 를 형제와 코드-동일하게 만들어도 alpha 에서 200 유지 — 코드 원인 아님이 확정),
-        // 라우트를 다른 세그먼트로 옮기면 형제처럼 정상 404 가 된다. 사용자 URL 은 `/schedule` 그대로.
-        source: '/tournaments/:id/schedule',
-        destination: '/tournaments/:id/schedule-view',
-      },
-      {
         source: '/api/:path*',
         destination: `${internalApiOrigin}/api/:path*`,
       },

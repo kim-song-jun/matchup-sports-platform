@@ -3,7 +3,7 @@ import TournamentAwardsPage from './awards/page';
 import TournamentBracketPage from './bracket/page';
 import TournamentResultsPage from './results/page';
 import TournamentReviewsPage from './reviews/page';
-import TournamentSchedulePage from './schedule-view/page';
+import TournamentSchedulePage from './schedule/page';
 import { fetchPublicV1 } from '@/lib/seo';
 
 vi.mock('next/navigation', () => ({
@@ -36,7 +36,7 @@ vi.mock('./reviews/reviews-page-client', () => ({
   TournamentReviewsPageClient: () => null,
 }));
 
-vi.mock('./schedule-view/schedule-page-client', () => ({
+vi.mock('./schedule/schedule-page-client', () => ({
   SchedulePageClient: () => null,
 }));
 

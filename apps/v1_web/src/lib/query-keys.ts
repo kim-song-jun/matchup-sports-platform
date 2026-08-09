@@ -86,6 +86,8 @@ export const v1Keys = {
     [...v1Keys.all, 'tournaments', tournamentId, 'registrations', registrationId, 'players'] as const,
   adminTournaments: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'tournaments', filters ?? {}] as const,
   adminTournament: (id: string) => [...v1Keys.all, 'admin', 'tournaments', id] as const,
+  adminLineupSizeOptions: (sportId: string) =>
+    [...v1Keys.all, 'admin', 'competition-configs', 'lineup-size-options', sportId] as const,
   adminTournamentCampaign: (id: string) =>
     [...v1Keys.all, 'admin', 'tournaments', id, 'campaign'] as const,
   adminTournamentRegistrations: (tournamentId: string, filters?: Record<string, unknown>) =>

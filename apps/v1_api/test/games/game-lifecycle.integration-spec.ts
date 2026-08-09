@@ -265,7 +265,16 @@ describe('Task 6 L1 game lifecycle', () => {
         expectedVersion: 0,
         clientCommandId: 'lineup-save',
         formation: '1-0',
-        participants: [],
+        // football-v1 pins minPlayers:7/maxPlayers:11 (added lineup-size gate on
+        // this generic saveLineup route — previously unvalidated, an empty
+        // roster was silently accepted). This test is about lifecycle
+        // mechanics (idempotent replay, submit flow), not roster sizing, so a
+        // minimal-but-valid 7-player roster keeps that unrelated behavior
+        // exercised without tripping the new invariant.
+        participants: Array.from({ length: 7 }, (_, index) => ({
+          displayNameSnapshot: `Lifecycle Player ${index + 1}`,
+          started: true,
+        })),
       },
     );
     const lineupSubmitToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
@@ -432,7 +441,10 @@ describe('Task 6 L1 game lifecycle', () => {
       gameState: V1GameState.ENDED,
       gameVersion: 5,
       revisionStates: [V1GameResultRevisionState.SUBMITTED],
-      participantCounts: [1],
+      // 1 game-creation-time participant ("Host One") + the 7-player SUBMITTED
+      // lineup roster added above (the lineup-size gate now requires a
+      // football-v1-valid 7..11-player roster, not the previously-empty one).
+      participantCounts: [8],
     });
 
     const replay = await service.executeCommand(

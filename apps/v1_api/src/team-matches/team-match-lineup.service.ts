@@ -10,7 +10,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
+import { parseLineupCatalog, parseLineupLimits } from '../tournaments/competition-config/competition-config.parse';
 import {
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
@@ -555,7 +555,7 @@ export class TeamMatchLineupService {
       where: { id: context.gameCompetitionConfigVersionId },
       select: { lineup: true },
     });
-    const lineupConfig = this.parseLineupConfig(config?.lineup ?? null);
+    const lineupConfig = parseLineupLimits(config?.lineup ?? null);
 
     if (dto.starters.length < lineupConfig.minPlayers || dto.starters.length > lineupConfig.maxPlayers) {
       throw new UnprocessableEntityException({
@@ -692,24 +692,6 @@ export class TeamMatchLineupService {
       positionX: entry.positionX,
       positionY: entry.positionY,
     };
-  }
-
-  private parseLineupConfig(value: Prisma.JsonValue | null): {
-    minPlayers: number;
-    maxPlayers: number;
-    substitutions: 'limited' | 'rolling';
-    maxSubstitutions: number | null;
-  } {
-    const record =
-      value !== null && typeof value === 'object' && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : {};
-    const minPlayers = typeof record.minPlayers === 'number' ? record.minPlayers : 1;
-    const maxPlayers = typeof record.maxPlayers === 'number' ? record.maxPlayers : 11;
-    const substitutions = record.substitutions === 'rolling' ? 'rolling' : 'limited';
-    const maxSubstitutions =
-      typeof record.maxSubstitutions === 'number' ? record.maxSubstitutions : null;
-    return { minPlayers, maxPlayers, substitutions, maxSubstitutions };
   }
 
   private async serializeLineup(

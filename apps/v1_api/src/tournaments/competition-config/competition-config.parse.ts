@@ -56,3 +56,26 @@ export function parseLineupCatalog(
 
   return { positions, formations };
 }
+
+/**
+ * Reads `lineup.{minPlayers,maxPlayers,substitutions,maxSubstitutions}` back out of a
+ * stored CompetitionConfig JSON blob for lineup-size validation. Shared by every write
+ * path that must enforce the roster cap so the cap has exactly one parser — before this
+ * was extracted, `team-match-lineup.service.ts` carried a private copy and
+ * `games.service.ts#saveLineup` had no equivalent check at all (never validated the
+ * generic tournament-fixture lineup save path against the pinned config's roster size).
+ * Same tolerant-defaults contract as `parseLineupCatalog` above: a malformed/legacy value
+ * degrades to safe fallbacks (minPlayers 1, maxPlayers 11, substitutions 'limited',
+ * maxSubstitutions null) instead of throwing — this is a read-path helper, not the
+ * write-time validator (`validateCompetitionConfig` owns rejecting bad writes).
+ */
+export function parseLineupLimits(
+  value: Prisma.JsonValue | null | undefined,
+): Pick<CompetitionConfig['lineup'], 'minPlayers' | 'maxPlayers' | 'substitutions' | 'maxSubstitutions'> {
+  const lineup = isRecord(value) ? value : {};
+  const minPlayers = typeof lineup.minPlayers === 'number' ? lineup.minPlayers : 1;
+  const maxPlayers = typeof lineup.maxPlayers === 'number' ? lineup.maxPlayers : 11;
+  const substitutions = lineup.substitutions === 'rolling' ? 'rolling' : 'limited';
+  const maxSubstitutions = typeof lineup.maxSubstitutions === 'number' ? lineup.maxSubstitutions : null;
+  return { minPlayers, maxPlayers, substitutions, maxSubstitutions };
+}

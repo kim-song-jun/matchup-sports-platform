@@ -2050,7 +2050,15 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
     const dto: SaveGameLineupDto = {
       expectedVersion: 0,
       clientCommandId: 'task18-lineup-save',
-      participants: [{ displayNameSnapshot: 'Player One', started: true }],
+      // football-v1 pins minPlayers:7/maxPlayers:11 (this route now enforces the
+      // roster-size gate, mirroring team-match-lineup.service.ts#resolveEntries —
+      // previously unvalidated here, a single-player roster was silently
+      // accepted). A minimal-but-valid 7-player roster keeps this test's actual
+      // subject (draft capture + listLineups projection) exercised.
+      participants: Array.from({ length: 7 }, (_, index) => ({
+        displayNameSnapshot: `Player ${index + 1}`,
+        started: true,
+      })),
     };
     const saved = await lineupService.saveLineup(
       authUser(lineupIds.director),
@@ -3602,7 +3610,14 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
       .send({
         expectedVersion: 0,
         clientCommandId,
-        participants: [{ displayNameSnapshot: 'HTTP Player', started: true }],
+        // football-v1 pins minPlayers:7/maxPlayers:11 — this route now enforces
+        // the roster-size gate (previously unvalidated). A minimal-but-valid
+        // 7-player roster keeps this HTTP-contract test's actual subject
+        // (200 + envelope shape + Idempotency-Key header) exercised.
+        participants: Array.from({ length: 7 }, (_, index) => ({
+          displayNameSnapshot: `HTTP Player ${index + 1}`,
+          started: true,
+        })),
       })
       .expect(200);
     expect(res.body).toEqual(

@@ -2596,6 +2596,16 @@ export type V1Tournament = {
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
+  /**
+   * 위 minPlayers/maxPlayers("등록" 로스터 크기, 성별 쿼터가 묶이는 값)와는 완전히 다른
+   * 값 — "출전 인원"(경기장에 서는 라인업 상한, GK 포함). `GET /admin/tournaments/:id`
+   * 응답에만 채워진다(목록/생성 응답은 null/[]) — 조인이 필요해서 상세 화면에서만 계산한다.
+   */
+  competitionConfigVersionId: string | null;
+  lineupMaxPlayers: number | null;
+  lineupMinPlayers: number | null;
+  /** 이 대회 종목에서 선택 가능한 출전 인원 후보(오름차순). 카탈로그가 없는 종목이면 []. */
+  lineupSizeOptions: number[];
   genderCategory: V1TournamentGenderCategory | null;
   genderMinMale: number | null;
   genderMaxMale: number | null;
@@ -3142,6 +3152,16 @@ export type V1AdminRegistrationListPage = {
 
 // Request payload types
 
+/** GET /admin/competition-configs/lineup-size-options?sportId=... 응답 */
+export type V1LineupSizeOptions = {
+  sportId: string;
+  /** false면 이 종목은 아직 경기 설정 카탈로그가 없다(football/futsal 외) — options는 항상 []. */
+  supported: boolean;
+  /** 선택 가능한 출전 인원(GK 포함) 오름차순. */
+  options: number[];
+  defaultMaxPlayers: number | null;
+};
+
 export type V1CreateTournamentPayload = {
   sportId: string;
   title: string;
@@ -3156,6 +3176,9 @@ export type V1CreateTournamentPayload = {
   teamCount?: number;
   minPlayers?: number;
   maxPlayers?: number;
+  /** "출전 인원"(라인업 상한, GK 포함) — 위 minPlayers/maxPlayers(등록 로스터 크기)와 다른 값.
+   * 생략하면 종목의 canonical 기본값을 쓴다. */
+  lineupMaxPlayers?: number;
   genderCategory?: V1TournamentGenderCategory;
   genderMinMale?: number;
   genderMaxMale?: number;

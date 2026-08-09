@@ -26,6 +26,7 @@ import {
   CompetitionConfigListQueryDto,
   CreateCompetitionConfigDto,
   CreateCompetitionConfigVersionDto,
+  LineupSizeOptionsQueryDto,
 } from './competition-config/competition-config.dto';
 
 /**
@@ -45,6 +46,19 @@ export class TournamentBracketController {
     @Query() query: CompetitionConfigListQueryDto,
   ) {
     return this.bracketService.listCompetitionConfigs(user, query);
+  }
+
+  /**
+   * GET /admin/competition-configs/lineup-size-options?sportId=...
+   * 대회 생성/수정 화면의 "출전 인원" 선택지. `admin/competition-configs/:configId/versions`와
+   * 세그먼트 수가 달라(1개 vs 2개) 라우트 충돌이 없다.
+   */
+  @Get('admin/competition-configs/lineup-size-options')
+  getLineupSizeOptions(
+    @CurrentUser() user: V1AuthUser,
+    @Query() query: LineupSizeOptionsQueryDto,
+  ) {
+    return this.bracketService.getLineupSizeOptions(user, query);
   }
 
   @Post('admin/competition-configs')

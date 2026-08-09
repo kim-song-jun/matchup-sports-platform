@@ -31,12 +31,16 @@ import {
   CompetitionConfigListQueryDto,
   CreateCompetitionConfigDto,
   CreateCompetitionConfigVersionDto,
+  LineupSizeOptionsQueryDto,
 } from './competition-config/competition-config.dto';
 import {
   calculateCompetitionStandings,
+  tryNormalizeCompetitionSportCode,
   validateCompetitionConfig,
 } from './competition-config/competition-config';
 import { CompetitionConfigRegistry } from './competition-config/competition-config-registry';
+import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
+import { canonicalCompetitionConfigForSport } from './competition-config/lineup-size';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
 
@@ -44,6 +48,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.se
 export class TournamentBracketService {
   private readonly competitionConfigs: CompetitionConfigRegistry;
   private readonly tournamentCompetitionConfig: TournamentCompetitionConfig;
+  private readonly lineupSizeConfigResolver: LineupSizeConfigResolver;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -52,6 +57,7 @@ export class TournamentBracketService {
   ) {
     this.competitionConfigs = new CompetitionConfigRegistry(prisma, adminContext);
     this.tournamentCompetitionConfig = new TournamentCompetitionConfig(prisma, adminContext);
+    this.lineupSizeConfigResolver = new LineupSizeConfigResolver(prisma, adminContext);
   }
 
   // ─── helpers ──────────────────────────────────────────────────────────────
@@ -102,6 +108,30 @@ export class TournamentBracketService {
     dto: ChangeTournamentCompetitionConfigDto,
   ) {
     return this.tournamentCompetitionConfig.change(user, tournamentId, dto);
+  }
+
+  /**
+   * 대회 생성/수정 화면의 "출전 인원" 선택지 조회. sportId가 아직 경기 설정 카탈로그에
+   * 없는 종목(football/futsal 외)이면 `supported: false` + 빈 options를 돌려준다 — 없는
+   * 대형을 지어내지 않고, 프론트는 이 값을 보고 선택지 UI 자체를 숨긴다.
+   */
+  async getLineupSizeOptions(user: V1AuthUser, query: LineupSizeOptionsQueryDto) {
+    await this.adminContext.getActiveAdmin(user.id);
+    const sport = await this.prisma.v1Sport.findUnique({ where: { id: query.sportId } });
+    if (!sport) {
+      throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
+    }
+    const normalizedSportCode = tryNormalizeCompetitionSportCode(sport.code);
+    if (normalizedSportCode === null) {
+      return { sportId: query.sportId, supported: false, options: [], defaultMaxPlayers: null };
+    }
+    const canonical = canonicalCompetitionConfigForSport(normalizedSportCode);
+    return {
+      sportId: query.sportId,
+      supported: true,
+      options: this.lineupSizeConfigResolver.selectableLineupSizesForSportCode(normalizedSportCode),
+      defaultMaxPlayers: canonical.lineup.maxPlayers,
+    };
   }
 
   // ─── group ────────────────────────────────────────────────────────────────

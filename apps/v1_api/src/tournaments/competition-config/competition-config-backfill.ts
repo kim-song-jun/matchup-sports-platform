@@ -57,7 +57,7 @@ export class CompetitionConfigSeedDriftError extends Error {
     super(
       `COMPETITION_CONFIG_SEED_DRIFT: ${drifted.length} canonical competition config row(s) no longer match the registry constants: ${drifted
         .map((row) => `${row.name} (${row.id}) expected ${row.expectedContentHash} but found ${row.actualContentHash}`)
-        .join(', ')}. Tournaments, team matches and fixtures already pin these ids, so silently rewriting the rows would change how already-played games are scored. Resolve manually — publish a new config version and repoint, or restore the row to the canonical content — then re-run.`,
+        .join(', ')}. Tournaments, team matches and fixtures already pin these ids, so silently rewriting the rows would change how already-played games are scored. Resolve it with competition-config-version-repoint.cli.ts, which publishes a canonical-matching successor version and repoints active tournaments/team matches away from the drifted row. Editing the drifted row in place is only possible while nothing references it — once anything does, the v1_block_used_config_mutation trigger rejects the UPDATE with COMPETITION_CONFIG_VERSION_IN_USE. Then re-run.`,
     );
     this.name = 'CompetitionConfigSeedDriftError';
   }
@@ -83,6 +83,12 @@ export class CompetitionConfigSeedDriftError extends Error {
  * retroactively change the scoring rules of finished competitions.
  *
  * Returns the number of rows actually created, so a second run reports 0.
+ *
+ * A mismatch is not immediately fatal, though: see driftIsResolvedBySuccessor()
+ * below for the one case it is allowed to wave through instead of throwing —
+ * a prior competition-config-version-repoint.cli.ts run that already
+ * published a canonical-matching successor and moved every still-mutable
+ * referrer off the drifted row.
  */
 export async function seedCompetitionConfigVersions(
   prisma: PrismaClient,
@@ -97,10 +103,13 @@ export async function seedCompetitionConfigVersions(
     const contentHash = competitionConfigContentHash(row.config);
     const existing = await prisma.v1CompetitionConfigVersion.findUnique({
       where: { id: row.id },
-      select: { contentHash: true },
+      select: { version: true, contentHash: true },
     });
     if (existing !== null) {
-      if (existing.contentHash !== contentHash) {
+      if (
+        existing.contentHash !== contentHash &&
+        !(await driftIsResolvedBySuccessor(prisma, { ...row, version: existing.version }, contentHash))
+      ) {
         drifted.push({
           id: row.id,
           name: row.name,
@@ -132,6 +141,57 @@ export async function seedCompetitionConfigVersions(
     throw new CompetitionConfigSeedDriftError(drifted);
   }
   return seeded;
+}
+
+/**
+ * A drifted seed row can never be rewritten in place once anything ever
+ * references it — v1_block_used_config_mutation rejects the UPDATE, and
+ * completed fixtures/team matches deliberately keep referencing it forever
+ * (moving them would retroactively change how an already-played game was
+ * scored — see tournament-competition-config.ts's `change()`). So "the drift
+ * is resolved" can never mean "row.id's own content matches canonical" once
+ * the row has been used for anything real; it has to mean "a newer version in
+ * the SAME (sportCode, name) lineage already carries the canonical content,
+ * AND nothing still-mutable is pinned to this specific drifted row anymore"
+ * (only completed/historical fixtures and team matches, which stay on it by
+ * design, plus possibly nothing at all).
+ *
+ * Requiring the successor to be a strictly NEWER version in the same lineage
+ * (not just "any row anywhere already matches canonical") is deliberate: an
+ * admin can freely publish other, deliberately different config versions for
+ * one specific tournament through the ordinary product API
+ * (CompetitionConfigRegistry.createVersion) — those must never be mistaken
+ * for "the fix" just because they happen to exist. Only
+ * competition-config-version-repoint.ts's own publish-then-repoint sequence
+ * (or an equivalent manual fix that leaves the same trail: a newer
+ * canonical-matching version, with every active referrer moved onto it)
+ * satisfies this.
+ *
+ * Read-only — makes no writes, only decides whether to still raise
+ * CompetitionConfigSeedDriftError for `row`.
+ */
+async function driftIsResolvedBySuccessor(
+  prisma: PrismaClient,
+  row: { id: string; sportCode: string; name: string; version: number },
+  canonicalContentHash: string,
+): Promise<boolean> {
+  const successor = await prisma.v1CompetitionConfigVersion.findFirst({
+    where: {
+      sportCode: row.sportCode,
+      name: row.name,
+      contentHash: canonicalContentHash,
+      version: { gt: row.version },
+    },
+    select: { id: true },
+  });
+  if (!successor) return false;
+
+  const [activeTournaments, activeTeamMatches, activeFixtures] = await Promise.all([
+    prisma.v1Tournament.count({ where: { competitionConfigVersionId: row.id, deletedAt: null } }),
+    prisma.v1TeamMatch.count({ where: { competitionConfigVersionId: row.id, status: { not: 'completed' } } }),
+    prisma.v1TournamentFixture.count({ where: { competitionConfigVersionId: row.id, status: { not: 'completed' } } }),
+  ]);
+  return activeTournaments === 0 && activeTeamMatches === 0 && activeFixtures === 0;
 }
 
 export class CompetitionConfigSourceUnsupportedError extends Error {

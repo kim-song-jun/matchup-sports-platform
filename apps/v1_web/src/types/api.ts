@@ -2410,6 +2410,39 @@ export type V1AdminErrorLogFilters = {
 };
 
 // ---------------------------------------------------------------------------
+// Admin — game operation flags (PUBLIC_LIVE / DIRECTOR_OFFICIALIZE admin toggle)
+// ---------------------------------------------------------------------------
+
+export type V1GameOperationFlagKey =
+  | 'GAME_WRITE'
+  | 'GAME_READ'
+  | 'PUBLIC_LIVE'
+  | 'DIRECTOR_OFFICIALIZE';
+
+export type V1GameOperationFlagValue = 'legacy' | 'compare' | 'new' | 'off' | 'on';
+
+export type V1GameOperationFlag = {
+  key: V1GameOperationFlagKey;
+  value: V1GameOperationFlagValue;
+  version: number;
+  ownerActor: string;
+  updatedByUserId: string | null;
+  rollbackValue: string | null;
+  updatedAt: string;
+};
+
+/** 이 환경에서 게이트 번들 없이 켜고 끄는 간소 경로가 열려 있는지. 프로덕션에서는 항상 false. */
+export type V1SimplifiedOperationFlagGateStatus = {
+  enabled: boolean;
+};
+
+export type V1SimplifiedOperationFlagTogglePayload = {
+  expectedVersion: number;
+  value: 'off' | 'on';
+  reason: string;
+};
+
+// ---------------------------------------------------------------------------
 // Admin — manual web push send
 // ---------------------------------------------------------------------------
 

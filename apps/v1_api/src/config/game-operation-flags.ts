@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -85,6 +86,49 @@ export function resolveGameOperationGateRoot(
     GATE_EVIDENCE_ATTEMPT,
   );
 }
+
+/**
+ * Non-production admin fast path (owner request: "admin on/off").
+ *
+ * The literal gate bundle (docs/api/domains/game-migration.md) exists because promoting
+ * `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` off->on is irreversible in effect ("public exposure can't
+ * be un-seen") -- it deliberately costs a 14-day, twice-7x24h-signed ceremony. That ceremony stays
+ * mandatory wherever this flag is unset. It is opt-in, not opt-out, and defaults to disabled so a
+ * freshly provisioned environment (including production) never accidentally exposes the shortcut.
+ *
+ * `NODE_ENV` cannot distinguish alpha from real production here -- both
+ * `deploy/docker-compose.alpha.yml` and `deploy/docker-compose.prod.yml` hardcode
+ * `NODE_ENV=production` (alpha's compose file is loaded as an overlay ON TOP of the prod compose,
+ * see `deploy/deploy-alpha.sh`), so a `NODE_ENV`-keyed gate would either allow the shortcut on both
+ * or block it on both. This dedicated variable is therefore the only environment signal, set to
+ * `"true"` only in `deploy/docker-compose.alpha.yml`'s `v1_api`/`v1_game_operations_worker`
+ * environment blocks and left unset in `deploy/docker-compose.prod.yml` (and in every other
+ * runtime), mirroring the existing `V1_ALLOW_HEADER_AUTH` opt-in pattern in `auth/v1-session.ts`.
+ */
+export const SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR =
+  'V1_ALLOW_SIMPLIFIED_OPERATION_FLAG_GATE';
+
+export function isSimplifiedOperationFlagGateEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env[SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR] === 'true';
+}
+
+/**
+ * Only boolean, always-rollback-able flags may use the simplified path. `GAME_WRITE`/`GAME_READ`
+ * carry an irreversible latch (`v1_game_cutover_epochs.first_new_write_at`) once new-authority
+ * writes begin, and must keep going through the fully gated `patchFlag`/`tupleTransition` path.
+ */
+export const SIMPLIFIED_GATE_ALLOWED_KEYS: readonly GameOperationFlagKey[] = [
+  'PUBLIC_LIVE',
+  'DIRECTOR_OFFICIALIZE',
+];
+
+export type SimplifiedPatchGameOperationFlagInput = {
+  expectedVersion: number;
+  value: string;
+  reason: string;
+};
 
 export type PatchGameOperationFlagInput = {
   expectedVersion: number;
@@ -345,6 +389,135 @@ export class GameOperationFlagsService {
             gateBundleHash: gate.hash,
             gatePhase: gate.phase,
             gateAttemptId: gate.attemptId,
+          },
+        );
+        return presentFlag(updated);
+      },
+    );
+  }
+
+  /** Whether the caller's environment has the simplified (non-gate-bundle) admin toggle enabled. */
+  async getSimplifiedGateStatus(userId: string) {
+    await this.assertPlatformOps(userId);
+    return { enabled: isSimplifiedOperationFlagGateEnabled() };
+  }
+
+  /**
+   * Non-production admin fast path for `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` only -- see
+   * `isSimplifiedOperationFlagGateEnabled`'s doc comment for why this cannot run in production.
+   *
+   * Everything except the immutable gate-bundle evidence ceremony is identical to `patchFlag`:
+   * same admin permission level (`assertPlatformOps`), same CAS on `expectedVersion`, same
+   * `assertSingleTransition` (only off<->on), same `assertFrozenForwardOrder` (an off->on
+   * promotion still requires `GAME_WRITE=new` and `GAME_READ=new` -- that invariant protects data
+   * consistency, not just gate-bundle paperwork, so this path does not relax it), same mandatory
+   * `reason` + `Idempotency-Key`, same `V1OperationAudit`/outbox write. The audit `after` payload
+   * is marked `gateMode: 'simplified'` so the trail records which path was used.
+   */
+  async simplifiedPatchFlag(
+    userId: string,
+    key: string,
+    input: SimplifiedPatchGameOperationFlagInput,
+    idempotencyKey: string | undefined,
+  ) {
+    if (!isSimplifiedOperationFlagGateEnabled()) {
+      throw new ForbiddenException({
+        code: 'SIMPLIFIED_GATE_DISABLED',
+        message: 'The simplified operation flag toggle is disabled in this environment',
+      });
+    }
+    await this.assertPlatformOps(userId);
+    const normalizedKey = parseFlagKey(key);
+    if (!SIMPLIFIED_GATE_ALLOWED_KEYS.includes(normalizedKey)) {
+      throw new BadRequestException({
+        code: 'SIMPLIFIED_GATE_KEY_NOT_ALLOWED',
+        message: `${normalizedKey} must use the fully gated operation flag path`,
+      });
+    }
+    const normalizedIdempotencyKey = requireIdempotencyKey(idempotencyKey);
+    const nextValue = parseFlagValue(normalizedKey, input.value);
+    assertReason(input.reason);
+    assertVersion(input.expectedVersion);
+    await this.ensureDefaults();
+    const requestPayload = {
+      key: normalizedKey,
+      expectedVersion: input.expectedVersion,
+      value: nextValue,
+      reason: input.reason,
+      gateMode: 'simplified' as const,
+    };
+    const replay = await this.findIdempotencyReplay(
+      userId,
+      'operation_flag.simplified_patch',
+      'operation_flag',
+      normalizedKey,
+      normalizedIdempotencyKey,
+      requestPayload,
+    );
+    if (replay.found) return replay.response;
+
+    const currentRows = await this.prisma.$queryRaw<FlagRow[]>`
+      SELECT key, value, version, owner_actor, updated_by_user_id, rollback_value, updated_at
+      FROM v1_game_operation_flags
+      WHERE key = ${normalizedKey}::"V1GameOperationFlagKey"
+    `;
+    const current = currentRows[0];
+    if (!current) {
+      throw new NotFoundException({
+        code: 'OPERATION_FLAG_NOT_FOUND',
+        message: 'Operation flag was not found',
+      });
+    }
+    assertSingleTransition(normalizedKey, current.value, nextValue);
+
+    return this.withIdempotency(
+      userId,
+      'operation_flag.simplified_patch',
+      'operation_flag',
+      normalizedKey,
+      normalizedIdempotencyKey,
+      requestPayload,
+      async (tx) => {
+        const lockedRows = await this.lockAllFlags(tx);
+        const locked = requireFlagRow(lockedRows, normalizedKey);
+        if (
+          locked.version !== input.expectedVersion ||
+          locked.value !== current.value
+        ) {
+          throw versionConflict(normalizedKey, locked);
+        }
+        assertSingleTransition(normalizedKey, locked.value, nextValue);
+        assertFrozenForwardOrder(normalizedKey, locked.value, nextValue, lockedRows);
+
+        const updatedRows = await tx.$queryRaw<FlagRow[]>`
+          UPDATE v1_game_operation_flags
+          SET value = ${nextValue},
+              version = version + 1,
+              owner_actor = 'platform_ops',
+              updated_by_user_id = ${userId},
+              rollback_value = ${locked.value},
+              updated_at = CURRENT_TIMESTAMP
+          WHERE key = ${normalizedKey}::"V1GameOperationFlagKey"
+            AND version = ${input.expectedVersion}
+            AND value = ${locked.value}
+          RETURNING key, value, version, owner_actor, updated_by_user_id, rollback_value, updated_at
+        `;
+        const updated = updatedRows[0];
+        if (!updated) {
+          throw versionConflict(normalizedKey, locked);
+        }
+        await this.writeControlEffect(
+          tx,
+          normalizedIdempotencyKey,
+          'OPERATION_FLAG_CHANGED',
+          'GAME_OPERATION_FLAG_CHANGED',
+          'operation_flag',
+          normalizedKey,
+          input.reason,
+          flagAuditState(locked),
+          {
+            ...flagAuditState(updated),
+            gateMode: 'simplified',
           },
         );
         return presentFlag(updated);

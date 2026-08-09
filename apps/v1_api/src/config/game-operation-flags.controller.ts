@@ -62,6 +62,22 @@ export class PatchGameOperationFlagDto {
   reason!: string;
 }
 
+export class SimplifiedPatchGameOperationFlagDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  expectedVersion!: number;
+
+  @IsString()
+  @IsIn(['off', 'on'])
+  value!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1_000)
+  reason!: string;
+}
+
 export class GameOperationFlagTransitionDto {
   @IsString()
   @IsIn(FLAG_KEYS)
@@ -143,6 +159,11 @@ export class GameOperationFlagsController {
     return this.flags.tupleTransition(user.id, dto, idempotencyKey);
   }
 
+  @Get('simplified-gate/status')
+  getSimplifiedGateStatus(@CurrentUser() user: V1AuthUser) {
+    return this.flags.getSimplifiedGateStatus(user.id);
+  }
+
   @Get(':key')
   getFlag(@CurrentUser() user: V1AuthUser, @Param('key') key: string) {
     return this.flags.getFlag(user.id, key);
@@ -156,5 +177,17 @@ export class GameOperationFlagsController {
     @Body() dto: PatchGameOperationFlagDto,
   ) {
     return this.flags.patchFlag(user.id, key, dto, idempotencyKey);
+  }
+
+  // Non-production admin fast path -- see `isSimplifiedOperationFlagGateEnabled`'s doc comment in
+  // ../config/game-operation-flags.ts for why this cannot activate in production.
+  @Patch(':key/simplified-toggle')
+  simplifiedPatchFlag(
+    @CurrentUser() user: V1AuthUser,
+    @Param('key') key: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: SimplifiedPatchGameOperationFlagDto,
+  ) {
+    return this.flags.simplifiedPatchFlag(user.id, key, dto, idempotencyKey);
   }
 }

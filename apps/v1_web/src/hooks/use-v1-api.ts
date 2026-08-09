@@ -52,6 +52,10 @@ import type {
   V1AdminErrorLogFilters,
   V1AdminPushSendPayload,
   V1AdminPushSendResult,
+  V1GameOperationFlag,
+  V1GameOperationFlagKey,
+  V1SimplifiedOperationFlagGateStatus,
+  V1SimplifiedOperationFlagTogglePayload,
   V1AdminMatchDetail,
   V1AdminMatchRow,
   V1AdminMe,
@@ -2493,6 +2497,44 @@ export function useV1AdminSendPush() {
       v1Post<V1AdminPushSendResult>('/admin/ops/push-send', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — game operation flags (PUBLIC_LIVE / DIRECTOR_OFFICIALIZE 관리자 토글)
+// ---------------------------------------------------------------------------
+
+/** 이 환경(NODE_ENV=production 만으로는 alpha/실프로덕션이 구분되지 않아 별도 서버측 신호를
+ * 쓴다 — apps/v1_api 의 isSimplifiedOperationFlagGateEnabled 참고)에서 게이트 번들 없이
+ * 켜고 끄는 간소 경로가 열려 있는지. */
+export function useV1SimplifiedOperationFlagGateStatus() {
+  return useQuery({
+    queryKey: v1Keys.adminOperationFlagsSimplifiedGateStatus(),
+    queryFn: () =>
+      v1Get<V1SimplifiedOperationFlagGateStatus>('/tournament-ops/operation-flags/simplified-gate/status'),
+  });
+}
+
+export function useV1OperationFlag(key: V1GameOperationFlagKey) {
+  return useQuery({
+    queryKey: v1Keys.adminOperationFlag(key),
+    queryFn: () => v1Get<V1GameOperationFlag>(`/tournament-ops/operation-flags/${key}`),
+  });
+}
+
+/** PUBLIC_LIVE/DIRECTOR_OFFICIALIZE 만 허용 — 서버가 다른 키는 거부한다. */
+export function useV1SimplifiedToggleOperationFlag(key: V1GameOperationFlagKey) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1SimplifiedOperationFlagTogglePayload) =>
+      v1Patch<V1GameOperationFlag>(
+        `/tournament-ops/operation-flags/${key}/simplified-toggle`,
+        payload,
+        { headers: { 'idempotency-key': randomUuid() } },
+      ),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminOperationFlag(key), data);
     },
   });
 }

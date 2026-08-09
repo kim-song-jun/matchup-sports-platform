@@ -23,7 +23,21 @@ const SERVICE_DOCUMENT_ID = '11111111-1111-4111-8111-111111111111';
 const NEW_DOCUMENT_ID = '22222222-2222-4222-8222-222222222222';
 const OPTIONAL_DOCUMENT_ID = '33333333-3333-4333-8333-333333333333';
 
-function currentTerms(renewal = false) {
+function currentTerms(renewal = false): {
+  ready: boolean;
+  compliance?: { compliant: boolean };
+  items: Array<{
+    documentId: string;
+    title: string;
+    version: string;
+    content: string;
+    subtitle: string;
+    changeSummary: string | null;
+    requirement: string;
+    accepted: boolean;
+    requiresAction: boolean;
+  }>;
+} {
   return {
     ready: true,
     items: [

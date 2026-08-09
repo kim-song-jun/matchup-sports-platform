@@ -46,11 +46,23 @@ case "${mode}" in
     esac
     ;;
   empty_findings)
-    # 라이브에서 관측된 모양: 상태 조회는 되는데 findings 가 빈 응답.
+    # 라이브에서 관측된 모양: 스캔은 COMPLETE 이고 describe 도 exit 0 인데 findings 가 빈 출력.
+    # AWS CLI 는 --query 결과가 없을 때 이렇게 준다 = 취약점 0건. 통과해야 한다.
     case "${args}" in
       *imageScanStatus.status*) emit_status; exit 0 ;;
       *wait*) exit 0 ;;
       *findingSeverityCounts*) printf ''; exit 0 ;;
+    esac
+    ;;
+  findings_always_crash)
+    # 진짜 fail-open 회귀: 상태는 읽히는데 findings 조회가 재시도를 다 써도 계속 실패.
+    # 예전 구현은 exit code 를 안 보고 빈 문자열을 0 으로 취급해 조용히 통과했다.
+    case "${args}" in
+      *imageScanStatus.status*) emit_status; exit 0 ;;
+      *wait*) exit 0 ;;
+      *findingSeverityCounts*)
+        echo "aws: [ERROR]: 'NoneType' object does not support item assignment" >&2
+        exit 1 ;;
     esac
     ;;
   incomplete)
@@ -107,7 +119,8 @@ run_case() {
 echo "[image-scan-gate] contract"
 run_case "취약점 0건이면 통과한다"                        clean            pass
 run_case "CRITICAL 이 있으면 막는다"                       critical         fail
-run_case "findings 를 못 읽으면 막는다 (fail-open 방지)"   empty_findings   fail
+run_case "COMPLETE + 빈 findings 는 0건으로 통과한다"      empty_findings   pass
+run_case "findings 조회가 계속 실패하면 막는다 (fail-open 방지)" findings_always_crash fail
 run_case "스캔이 COMPLETE 가 아니면 막는다"                incomplete       fail
 run_case "일시적 CLI 내부 오류는 재시도로 넘어간다"        transient_then_ok pass
 run_case "권한 오류는 재시도하지 않고 막는다"              denied           fail

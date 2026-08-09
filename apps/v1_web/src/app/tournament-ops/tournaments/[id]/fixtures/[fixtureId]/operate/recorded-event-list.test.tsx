@@ -95,7 +95,10 @@ describe('RecordedEventList', () => {
 
     const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent('2P 6');
+    // UX 감사 item 4 — "N피리어드/전반/후반/P" 세 가지 표기가 섞여 있던 걸
+    // "전반/후반"으로 통일했다(`period-label.ts`). 이 헬퍼는 period: 2로
+    // 고정돼 있으므로 "후반"으로 보여야 한다.
+    expect(rows[0]).toHaveTextContent('후반 6');
     expect(rows[0]).toHaveTextContent('골 · 10 정우진');
     expect(rows[0]).toHaveTextContent('강남 풋살 클럽');
     expect(rows[1]).toHaveTextContent('골 · 9 조현우');

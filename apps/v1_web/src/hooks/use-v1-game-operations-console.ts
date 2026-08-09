@@ -124,6 +124,20 @@ export interface UseV1GameOperationsConsoleOptions {
   readonly tournamentId: string | null;
   readonly gameId: string | null;
   readonly myUserId: string | undefined;
+  /**
+   * 페이지가 REST로 미리 읽어온(`useV1Game`) `gameDetail.data.lastSequence`.
+   * **이 값은 소켓 최초 구독의 `afterSequence`로 쓰이면 안 된다** — 이전엔
+   * 그렇게 썼고, 그게 alpha 실사고(2026-08)의 원인이었다: 서버에 이미
+   * 기록된 이벤트가 있어도(예: 5건) 클라이언트는 그 이벤트를 한 번도 받은
+   * 적이 없는데 "거기까지는 이미 안다"고 서버에 알리는 셈이라 서버가 빈
+   * 배열을 돌려줬다("아직 기록된 이벤트가 없어요"로 보임, 스코어도 0:0
+   * 고정). 최초 구독은 항상 `afterSequence: 0`으로 전체 이력을 받는다(아래
+   * 소켓 라이프사이클 effect 참고) — 재연결/갭 복구에서만 `lastSequenceRef`를
+   * 쓴다. 이 값이 실제로 쓰이는 곳은 두 군데뿐이다: (1) 마운트 시
+   * `sync.lastSequence`의 초기값(첫 스냅숏이 도착하기 전 화면에 잠깐 보일 수
+   * 있는 값), (2) `requestTakeover`가 서버에 보내는 `lastSequence` 필드
+   * (참고용 — 서버가 게이팅에 쓰지 않는다, `GamesService.requestTakeover`).
+   */
   readonly initialLastSequence: number;
 }
 
@@ -142,6 +156,20 @@ export interface UseV1GameOperationsConsoleResult {
   /** T3 추가 — 큐를 거치지 않는 온라인 전용 되돌리기(D-10과 같은 이유로 절대
    * 오프라인 큐에 들어가지 않는다). 사후 어시스트 부착(reverse+re-append)에 쓰인다. */
   reverseEvent(input: { eventId: string; reason: string }): Promise<void>;
+  /**
+   * UX 감사 — `start`/`pause`/`resume`/`end`/`next-period` 커맨드는 항상 REST로만
+   * 처리되고(D-10) 성공해도 게이트웨이가 아무 것도 브로드캐스트하지 않는다
+   * (`RealtimeGateway`에 커맨드 성공 emit이 없다 — 이벤트 append만
+   * `game.event.committed`를 쏜다). 그래서 명령이 성공해도 `gameSnapshot`은
+   * 다음 이벤트 커밋이나 재구독 전까지 그대로였다: alpha 실측(2026-08)에서
+   * "재개 완료 · 167ms" 피드백은 떴는데 화면은 계속 "일시 중지"로 남았고
+   * 새로고침해야 풀렸다 — `gameState = ops.gameSnapshot?.state ??
+   * gameDetail.data?.state`가 gameSnapshot을 우선하므로 REST
+   * `gameDetail.refetch()`가 최신 state를 받아와도 화면엔 반영되지 않았다.
+   * 호출부는 커맨드 REST 응답(`{ state, version }`)을 받은 즉시 이걸 불러
+   * gameSnapshot을 그 자리에서 갱신해야 한다.
+   */
+  applyCommandResult(result: { state: GameState; version: number }): void;
 }
 
 /**
@@ -215,6 +243,15 @@ export function useV1GameOperationsConsole(
 
     const socket = getV1GameOperationsSocket();
     let cancelled = false;
+    // 이 소켓 구독 세션(=이 gameId의 effect 인스턴스) 안에서 서버로부터 진짜
+    // 스냅숏을 한 번이라도 받았는지 — 받기 전까지는 이 클라이언트가 실제로
+    // "아는" 이벤트가 하나도 없다는 뜻이다(REST로 미리 읽은
+    // `initialLastSequence`가 있어도 마찬가지 — 그건 숫자만 알 뿐 이벤트
+    // 본문을 받은 적이 없다). ack 콜백 안에서 성공한 경우에만 true로
+    // 올린다 — emit 시점에 미리 올려두면 최초 구독이 denied 등으로 실패한
+    // 뒤 재연결이 왔을 때도 "이미 안다"고 착각해 여전히 빈 배열을 받는
+    // 문제가 재현된다.
+    let hasReceivedSnapshot = false;
 
     type SubscribeAck = {
       status: string;
@@ -234,12 +271,20 @@ export function useV1GameOperationsConsole(
     };
 
     const resubscribeFromLastKnownSequence = () => {
+      // 최초 구독은 항상 0부터(전체 이력) — 재연결/갭 복구에서만
+      // `lastSequenceRef`를 써 이미 받은 이벤트를 다시 받지 않는다. 서버
+      // `GamesService.listEvents`는 페이징이 없어(games.service.ts) 전체
+      // 이력을 한 번에 돌려주는데, 대회 경기 하나의 이벤트 수는 골/카드/
+      // 파울/교체 합쳐 수십 건 규모라 이 규모에서는 안전하다 — 수천 건
+      // 단위가 되면 페이징이 필요하지만 지금 범위는 아니다.
+      const afterSequence = hasReceivedSnapshot ? lastSequenceRef.current : 0;
       socket.emit(
         'game.subscribe',
-        { gameId, afterSequence: lastSequenceRef.current },
+        { gameId, afterSequence },
         (result: SubscribeAck) => {
           if (cancelled) return;
           if (result.status === 'subscribed' && result.snapshot) {
+            hasReceivedSnapshot = true;
             applySnapshot(result.snapshot);
           } else if (result.status === 'denied') {
             setBannerMessage('운영 권한이 없어 이 경기를 조회할 수 없어요. 새로고침 후 다시 시도해주세요.');
@@ -255,6 +300,10 @@ export function useV1GameOperationsConsole(
     const onDisconnect = () => setConnectionStatus('disconnected');
     const onSnapshot = (snapshot: { version: number; state: GameState; lastSequence: number; events: readonly GameEventRecord[] }) => {
       if (cancelled) return;
+      // 서버는 구독 처리 중 이 이벤트도 함께 쏘고(`subscribeToGame`,
+      // realtime.gateway.ts) 그 응답을 ack 콜백으로도 돌려준다 — 어느 쪽이
+      // 먼저 도착해도 `hasReceivedSnapshot`이 올라가도록 여기서도 표시한다.
+      hasReceivedSnapshot = true;
       applySnapshot(snapshot);
     };
     const onGap = (gap: { expectedSequence: number; availableFrom: number }) => {
@@ -433,9 +482,28 @@ export function useV1GameOperationsConsole(
     return () => clearInterval(interval);
   }, []);
 
+  // UX 감사 — 주기적 renew(위 effect)가 실패하면 'denied'로 떨어지는데,
+  // renew가 실패하는 흔한 이유는 (진짜 권한 상실이 아니라) 토큰 자체가
+  // 서버에서 만료돼 renew 창을 놓친 경우다(게이트웨이가 `renewTakeover`
+  // 실패를 거의 항상 `TAKEOVER_TOKEN_EXPIRED`로 매핑한다 —
+  // `RealtimeGateway.renewGameTakeover`, `PERMISSION_DENIED`가 아닌 모든
+  // ForbiddenException이 이 코드로 온다). 배너 문구
+  // (`gameOperationsErrorMessage('TAKEOVER_TOKEN_EXPIRED')`)는 이미
+  // "다시 가져오는 중이에요"라고 말하지만, 이전엔 자동 재요청 effect가
+  // `status === 'expired'`(자연 만료, `CHECK_EXPIRY`)만 지켜봐서 실제로는
+  // 아무것도 다시 가져오지 않았다 — alpha 실측(2026-08): 배너가 뜬 채 8초를
+  // 기다려도 회복되지 않고 새로고침해야 풀렸다. `game.takeover.request`(재요청,
+  // renew가 아니다)는 이 코드를 절대 돌려주지 않으므로(요청 경로는
+  // STAFF_SCOPE_DENIED/VALIDATION_ERROR/granted만 가능) 이 재시도가 같은
+  // 이유로 계속 실패하며 도는 tight loop이 될 수 없다. STAFF_SCOPE_DENIED 등
+  // 진짜 권한 거부는 그대로 'denied'에 남아 재시도하지 않는다(D-10 취지 —
+  // 같은 이유로 확실히 또 실패할 요청을 자동으로 반복하지 않는다).
+  const deniedCode = takeover.status === 'denied' ? takeover.code : null;
   useEffect(() => {
-    if (takeover.status === 'expired') requestTakeover();
-  }, [takeover.status, requestTakeover]);
+    if (takeover.status === 'expired' || (takeover.status === 'denied' && deniedCode === 'TAKEOVER_TOKEN_EXPIRED')) {
+      requestTakeover();
+    }
+  }, [takeover.status, deniedCode, requestTakeover]);
 
   // ── Event send / durable-queue flush ────────────────────────────────────────
   const sendQueuedItem = useCallback(
@@ -655,6 +723,15 @@ export function useV1GameOperationsConsole(
     [gameId, gameSnapshot, takeover, queryClient],
   );
 
+  // UX 감사 — REST 커맨드(start/pause/resume/end/next-period) 성공 응답을
+  // 그 자리에서 gameSnapshot에 반영한다. 자세한 이유는
+  // `UseV1GameOperationsConsoleResult.applyCommandResult` 문서 참고.
+  const applyCommandResult = useCallback((result: { state: GameState; version: number }) => {
+    setGameSnapshot((current) =>
+      current ? { ...current, state: result.state, version: result.version } : current,
+    );
+  }, []);
+
   return {
     connectionStatus,
     sync,
@@ -668,6 +745,7 @@ export function useV1GameOperationsConsole(
     retryFailedEvent,
     requestTakeover,
     reverseEvent,
+    applyCommandResult,
   };
 }
 

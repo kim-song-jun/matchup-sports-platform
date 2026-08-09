@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { AlertBanner, Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
 import {
@@ -18,6 +18,7 @@ import {
   useV1SubmitGameLineup,
   useV1Tournament,
 } from '@/hooks/use-v1-api';
+import { V1ApiError } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   addPlayer,
@@ -100,12 +101,59 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   }, [formationOptions, state?.formation, state?.starters]);
 
   if (access.isError) {
+    // 접근권한 조회는 retry:false라 네트워크 일시 오류도 즉시 isError=true가 된다
+    // (use-v1-api.ts의 useV1FixtureLineupAccess). 진짜 403(PERMISSION_DENIED)과
+    // 그 외 원인(대상 없음·네트워크·서버 오류)을 구분하지 않으면 일시 오류에도 항상
+    // "권한 없음" 문구가 뜨고 재시도할 방법도 없다 — team-matches/[id]/lineup의
+    // lineupQuery.isError 분기(lineup-client.tsx)와 동일한 코드 분기 패턴을 따른다.
+    const code = access.error instanceof V1ApiError ? access.error.code : null;
+    if (code === 'PERMISSION_DENIED') {
+      return (
+        <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+          <EmptyState
+            title="라인업을 관리할 수 없어요"
+            sub="이 경기에 참가하는 팀의 매니저·오너만 라인업을 관리할 수 있어요."
+          />
+        </AppChrome>
+      );
+    }
+    if (code === 'GAME_NOT_FOUND' || code === 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND') {
+      return (
+        <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+          <EmptyState title="경기를 찾을 수 없어요" sub="대회 경기 정보가 삭제됐거나 아직 준비되지 않았어요." />
+        </AppChrome>
+      );
+    }
     return (
       <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
-        <EmptyState
-          title="라인업을 관리할 수 없어요"
-          sub="이 경기에 참가하는 팀의 매니저·오너만 라인업을 관리할 수 있어요."
-        />
+        <div style={{ padding: '40px 20px' }}>
+          <ErrorState
+            message={extractErrorMessage(access.error, '접근 권한을 불러오지 못했어요.')}
+            onRetry={() => void access.refetch()}
+          />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  if (gameQuery.isError || lineupsQuery.isError) {
+    // useV1GameLineups는 retry:false, useV1Game은 전역 기본값(retry:1)이라 재시도
+    // 횟수는 다르지만 — 둘 다 실패가 확정되면 결국 isLoading이 false로 떨어진다
+    // (use-v1-api.ts). 이걸 여기서 잡지 않으면 70~79행 hydrate useEffect가
+    // gameQuery.data===undefined일 때 아무것도 하지 않아 state가 계속 null로 남고,
+    // 바로 아래 `state === null` 스켈레톤 분기가 영원히 참이 돼 PageSkeleton에 갇힌다.
+    const error = gameQuery.error ?? lineupsQuery.error;
+    return (
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+        <div style={{ padding: '40px 20px' }}>
+          <ErrorState
+            message={extractErrorMessage(error, '라인업 정보를 불러오지 못했어요.')}
+            onRetry={() => {
+              if (gameQuery.isError) void gameQuery.refetch();
+              if (lineupsQuery.isError) void lineupsQuery.refetch();
+            }}
+          />
+        </div>
       </AppChrome>
     );
   }
@@ -437,9 +485,11 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               >
                 {submitMutation.isPending
                   ? '제출 중…'
-                  : emptySlotCount > 0
-                    ? `포지션 자리 ${emptySlotCount}개가 비어 있어요`
-                    : '라인업 제출하기'}
+                  : state.dirty
+                    ? '저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요'
+                    : emptySlotCount > 0
+                      ? `포지션 자리 ${emptySlotCount}개가 비어 있어요`
+                      : '라인업 제출하기'}
               </button>
             ) : null}
           </div>

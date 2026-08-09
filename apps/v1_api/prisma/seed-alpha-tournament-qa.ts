@@ -193,17 +193,17 @@ const FEATURED_QA_DEFAULT_MARKETING: TournamentMarketingCopy = {
   },
 };
 
-type PersonaSeed = { readonly id: string; readonly email: string; readonly phone: string; readonly nickname: string; readonly realName: string; readonly gender: string };
-type TeamSeed = { readonly id: string; readonly name: string };
+export type PersonaSeed = { readonly id: string; readonly email: string; readonly phone: string; readonly nickname: string; readonly realName: string; readonly gender: string };
+export type TeamSeed = { readonly id: string; readonly name: string };
 
-const PERSONAS: readonly PersonaSeed[] = [
+export const PERSONAS: readonly PersonaSeed[] = [
   { id: 'aa200000-0000-4000-8000-000000000001', email: 'alpha.qa.red@teameet.test', phone: '01001000001', nickname: '알파레드', realName: '김알파', gender: 'male' },
   { id: 'aa200000-0000-4000-8000-000000000002', email: 'alpha.qa.blue@teameet.test', phone: '01001000002', nickname: '알파블루', realName: '이테스트', gender: 'female' },
   { id: 'aa200000-0000-4000-8000-000000000003', email: 'alpha.qa.green@teameet.test', phone: '01001000003', nickname: '알파그린', realName: '박경기', gender: 'male' },
   { id: 'aa200000-0000-4000-8000-000000000004', email: 'alpha.qa.gold@teameet.test', phone: '01001000004', nickname: '알파골드', realName: '최완료', gender: 'female' },
 ] as const;
 
-const TEAMS: readonly TeamSeed[] = [
+export const TEAMS: readonly TeamSeed[] = [
   { id: 'aa300000-0000-4000-8000-000000000001', name: '알파 레드 FC' },
   { id: 'aa300000-0000-4000-8000-000000000002', name: '알파 블루 FC' },
   { id: 'aa300000-0000-4000-8000-000000000003', name: '알파 그린 FC' },
@@ -307,7 +307,7 @@ export function buildAlphaTournamentCampaignContent(
   };
 }
 
-async function ensureTeamRoster(
+export async function ensureTeamRoster(
   tx: Prisma.TransactionClient,
   sportId: string,
   regionId: string,
@@ -474,14 +474,18 @@ export async function createCompetitionData(
   scheduledAt: Date,
   competitionConfigVersionId: string,
 ) {
-  const group = await tx.v1TournamentGroup.create({
-    data: {
+  // 그룹은 자연키 (tournamentId, name) 로 upsert — 절대 삭제하지 않는다. 픽스처가 groupId 로
+  // 참조하는 스켈레톤이므로 삭제-재생성 대신 upsert 로 같은 행을 유지한다(id 안정).
+  const group = await tx.v1TournamentGroup.upsert({
+    where: { tournamentId_name: { tournamentId: scenario.id, name: 'A조' } },
+    create: {
       tournamentId: scenario.id,
       name: 'A조',
       phase: 'group',
       sortOrder: 0,
       advanceCount: 2,
     },
+    update: { phase: 'group', sortOrder: 0, advanceCount: 2 },
   });
   for (let index = 0; index < registrations.length; index += 1) {
     await tx.v1TournamentGroupTeam.create({
@@ -533,28 +537,39 @@ export async function createCompetitionData(
   const fixtures = [];
   for (let index = 0; index < pairings.length; index += 1) {
     const [homeIndex, awayIndex] = pairings[index];
-    const fixture = await tx.v1TournamentFixture.create({
-      data: {
-        tournamentId: scenario.id,
-        groupId: group.id,
-        round: 'group',
-        fixtureNumber: index + 1,
-        competitionConfigVersionId,
-        homeRegistrationId: registrations[homeIndex].id,
-        awayRegistrationId: registrations[awayIndex].id,
-        scheduledAt: new Date(scheduledAt.getTime() + index * 90 * 60 * 1000),
-        venue: `서울 송파 풋살파크 ${index + 1}구장`,
-        status: fixtureStatuses[index],
+    // 픽스처는 자연키 (tournamentId, round, fixtureNumber, legNumber=1) 로 upsert — 절대 삭제하지
+    // 않는다(V1Game·operation_audit 가 Restrict 로 못박는 스켈레톤). 같은 행을 유지해 id 가 안정적이고
+    // 붙어 있는 V1Game 은 건드리지 않는다. 등록 참조는 매 배포 새 registration id 로 update 로 갱신.
+    const groupFixtureData = {
+      groupId: group.id,
+      competitionConfigVersionId,
+      homeRegistrationId: registrations[homeIndex].id,
+      awayRegistrationId: registrations[awayIndex].id,
+      scheduledAt: new Date(scheduledAt.getTime() + index * 90 * 60 * 1000),
+      venue: `서울 송파 풋살파크 ${index + 1}구장`,
+      status: fixtureStatuses[index],
+    };
+    const fixture = await tx.v1TournamentFixture.upsert({
+      where: {
+        tournamentId_round_fixtureNumber_legNumber: {
+          tournamentId: scenario.id, round: 'group', fixtureNumber: index + 1, legNumber: 1,
+        },
       },
+      create: { tournamentId: scenario.id, round: 'group', fixtureNumber: index + 1, ...groupFixtureData },
+      update: groupFixtureData,
     });
     if (fixtureStatuses[index] === V1TournamentFixtureStatus.completed) {
-      await tx.v1TournamentFixtureResult.create({
-        data: {
-          fixtureId: fixture.id,
-          homeScore: index === 0 ? 3 : 2,
-          awayScore: index === 0 ? 1 : 2,
-          note: 'ALPHA QA 경기 결과',
-        },
+      // 결과는 fixtureId(@unique) 로 upsert — 삭제하지 않는다. V1TournamentFixtureGoal 이
+      // fixtureResult 를 Cascade 로 참조하므로 삭제-재생성 대신 upsert 로 같은 결과 행을 유지한다.
+      const groupResultData = {
+        homeScore: index === 0 ? 3 : 2,
+        awayScore: index === 0 ? 1 : 2,
+        note: 'ALPHA QA 경기 결과',
+      };
+      await tx.v1TournamentFixtureResult.upsert({
+        where: { fixtureId: fixture.id },
+        create: { fixtureId: fixture.id, ...groupResultData },
+        update: groupResultData,
       });
     }
     fixtures.push(fixture);
@@ -568,26 +583,32 @@ export async function createCompetitionData(
     ] as const;
     for (let index = 0; index < knockoutPlans.length; index += 1) {
       const plan = knockoutPlans[index];
-      const fixture = await tx.v1TournamentFixture.create({
-        data: {
-          tournamentId: scenario.id,
-          round: plan.round,
-          fixtureNumber: plan.fixtureNumber,
-          competitionConfigVersionId,
-          homeRegistrationId: registrations[plan.homeIndex].id,
-          awayRegistrationId: registrations[plan.awayIndex].id,
-          scheduledAt: new Date(scheduledAt.getTime() + (pairings.length + index) * 90 * 60 * 1000),
-          venue: '서울 송파 풋살파크 결선구장',
-          status: V1TournamentFixtureStatus.completed,
+      const knockoutFixtureData = {
+        competitionConfigVersionId,
+        homeRegistrationId: registrations[plan.homeIndex].id,
+        awayRegistrationId: registrations[plan.awayIndex].id,
+        scheduledAt: new Date(scheduledAt.getTime() + (pairings.length + index) * 90 * 60 * 1000),
+        venue: '서울 송파 풋살파크 결선구장',
+        status: V1TournamentFixtureStatus.completed,
+      };
+      const fixture = await tx.v1TournamentFixture.upsert({
+        where: {
+          tournamentId_round_fixtureNumber_legNumber: {
+            tournamentId: scenario.id, round: plan.round, fixtureNumber: plan.fixtureNumber, legNumber: 1,
+          },
         },
+        create: { tournamentId: scenario.id, round: plan.round, fixtureNumber: plan.fixtureNumber, ...knockoutFixtureData },
+        update: knockoutFixtureData,
       });
-      await tx.v1TournamentFixtureResult.create({
-        data: {
-          fixtureId: fixture.id,
-          homeScore: plan.homeScore,
-          awayScore: plan.awayScore,
-          note: 'ALPHA QA 결선 결과',
-        },
+      const knockoutResultData = {
+        homeScore: plan.homeScore,
+        awayScore: plan.awayScore,
+        note: 'ALPHA QA 결선 결과',
+      };
+      await tx.v1TournamentFixtureResult.upsert({
+        where: { fixtureId: fixture.id },
+        create: { fixtureId: fixture.id, ...knockoutResultData },
+        update: knockoutResultData,
       });
       fixtures.push(fixture);
     }
@@ -595,7 +616,7 @@ export async function createCompetitionData(
   return fixtures;
 }
 
-async function createScenario(
+export async function createScenario(
   tx: Prisma.TransactionClient,
   scenario: TournamentScenario,
   sportId: string,
@@ -615,67 +636,77 @@ async function createScenario(
     scenario.status === V1TournamentStatus.completed
     ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
     : scenarioDate(now, scenario.startsInDays - 7, 14);
-  await tx.v1Tournament.create({
-    data: {
-      id: scenario.id,
-      sportId,
-      title: scenario.title,
-      status: scenario.status,
-      format: 'group_knockout',
-      competitionConfigVersionId,
-      registrationDeadlineAt,
-      rosterDeadlineAt: scenarioDate(now, scenario.startsInDays - 3, 14),
-      bracketPublishedAt:
-        scenario.status === V1TournamentStatus.closed ||
-        scenario.status === V1TournamentStatus.in_progress ||
-        scenario.status === V1TournamentStatus.completed
-          ? registrationDeadlineAt
-          : null,
-      scheduledAt,
-      scheduledEndAt,
-      venue: '서울 송파 풋살파크',
-      latitude: 37.5145,
-      longitude: 127.1066,
-      coverImageUrl: COVER_IMAGE_URL,
-      teamCount: 4,
-      minPlayers: 1,
-      maxPlayers: 12,
-      genderCategory: 'mixed',
-      genderMinMale: 1,
-      genderMaxMale: 8,
-      genderMinFemale: 1,
-      genderMaxFemale: 8,
-      entryFee: scenario.entryFee,
-      prizePool: 500_000,
-      prizeSummary: '우승 30만원 · 준우승 15만원 · MVP 5만원',
-      prizeBreakdown: '1위 300000\n2위 150000\nMVP 50000',
-      promoHomeEnabled: scenario.hasCampaign,
-      promoHomeTitle: scenario.title,
-      promoHomeSubtitle: marketing.promoHomeSubtitle,
-      promoHomeImageUrl: COVER_IMAGE_URL,
-      promoHomeBadgeText: scenario.status,
-      promoHomeDateText: scheduledAt.toISOString().slice(0, 10),
-      promoHomeTeamsText: '4개 팀',
-      promoHomeLocationText: '서울 송파',
-      promoHomePrizeText: '총상금 50만원',
-      promoHomePriority: scenario.promoPriority,
-      promoListEnabled: scenario.hasCampaign,
-      promoListTitle: scenario.title,
-      promoListSubtitle: '신청부터 결과·영상·시상까지 확인하세요',
-      promoListImageUrl: COVER_IMAGE_URL,
-      promoListBadgeText: scenario.status,
-      promoListDateText: scheduledAt.toISOString().slice(0, 10),
-      promoListTeamsText: '4개 팀',
-      promoListLocationText: '서울 송파',
-      promoListPrizeText: '총상금 50만원',
-      promoListPriority: scenario.promoPriority,
-      bankName: marketing.bankName,
-      bankAccount: marketing.bankAccount,
-      bankHolder: marketing.bankHolder,
-      rulesText: marketing.rulesText,
-      refundPolicyText: marketing.refundPolicyText,
-      createdByAdminUserId: adminUserId,
-    },
+  // 이 시나리오가 소유한 leaf 행(등록·명단·순위·픽스처 결과/영상·시상·후기·스폰서·공지·캠페인)을
+  // 먼저 정리한다. 대회·그룹·픽스처·V1Game 은 절대 지우지 않고 upsert/보존하므로 append-only
+  // (operation_audit)·V1Game Restrict FK 가 걸릴 일이 없다 — leaf 는 그 append-only 참조 대상이
+  // 아니라서 안전하게 삭제-재생성한다. 이게 delete→upsert 전환의 핵심: 데드락이 구조적으로 사라진다.
+  await clearScenarioLeaves(tx, scenario.id);
+
+  // 대회는 고정 id 로 upsert — 절대 삭제하지 않는다(operation_audit 가 Restrict 로 못박는 스켈레톤).
+  // create/update 공통 필드는 하나의 객체로 둔다(id 는 create 에만).
+  const tournamentData = {
+    sportId,
+    title: scenario.title,
+    status: scenario.status,
+    format: 'group_knockout',
+    competitionConfigVersionId,
+    registrationDeadlineAt,
+    rosterDeadlineAt: scenarioDate(now, scenario.startsInDays - 3, 14),
+    bracketPublishedAt:
+      scenario.status === V1TournamentStatus.closed ||
+      scenario.status === V1TournamentStatus.in_progress ||
+      scenario.status === V1TournamentStatus.completed
+        ? registrationDeadlineAt
+        : null,
+    scheduledAt,
+    scheduledEndAt,
+    venue: '서울 송파 풋살파크',
+    latitude: 37.5145,
+    longitude: 127.1066,
+    coverImageUrl: COVER_IMAGE_URL,
+    teamCount: 4,
+    minPlayers: 1,
+    maxPlayers: 12,
+    genderCategory: 'mixed',
+    genderMinMale: 1,
+    genderMaxMale: 8,
+    genderMinFemale: 1,
+    genderMaxFemale: 8,
+    entryFee: scenario.entryFee,
+    prizePool: 500_000,
+    prizeSummary: '우승 30만원 · 준우승 15만원 · MVP 5만원',
+    prizeBreakdown: '1위 300000\n2위 150000\nMVP 50000',
+    promoHomeEnabled: scenario.hasCampaign,
+    promoHomeTitle: scenario.title,
+    promoHomeSubtitle: marketing.promoHomeSubtitle,
+    promoHomeImageUrl: COVER_IMAGE_URL,
+    promoHomeBadgeText: scenario.status,
+    promoHomeDateText: scheduledAt.toISOString().slice(0, 10),
+    promoHomeTeamsText: '4개 팀',
+    promoHomeLocationText: '서울 송파',
+    promoHomePrizeText: '총상금 50만원',
+    promoHomePriority: scenario.promoPriority,
+    promoListEnabled: scenario.hasCampaign,
+    promoListTitle: scenario.title,
+    promoListSubtitle: '신청부터 결과·영상·시상까지 확인하세요',
+    promoListImageUrl: COVER_IMAGE_URL,
+    promoListBadgeText: scenario.status,
+    promoListDateText: scheduledAt.toISOString().slice(0, 10),
+    promoListTeamsText: '4개 팀',
+    promoListLocationText: '서울 송파',
+    promoListPrizeText: '총상금 50만원',
+    promoListPriority: scenario.promoPriority,
+    bankName: marketing.bankName,
+    bankAccount: marketing.bankAccount,
+    bankHolder: marketing.bankHolder,
+    rulesText: marketing.rulesText,
+    refundPolicyText: marketing.refundPolicyText,
+    createdByAdminUserId: adminUserId,
+  } satisfies Omit<Prisma.V1TournamentUncheckedCreateInput, 'id'>;
+  await tx.v1Tournament.upsert({
+    where: { id: scenario.id },
+    create: { id: scenario.id, ...tournamentData },
+    update: tournamentData,
   });
   if (scenario.hasCampaign) {
     await tx.v1TournamentCampaign.create({
@@ -769,169 +800,53 @@ async function createScenario(
   });
 }
 
-// The QA seed re-runs on every alpha deploy and always tears its own fixed
-// scenario IDs down before recreating them. That teardown used to be a bare
-// `v1TournamentCampaign.deleteMany` + `v1Tournament.deleteMany`, which is
-// only safe as long as nothing outside the tournament/fixture Cascade chain
-// references these rows. Once anything creates a V1Game against one of these
-// fixtures (e.g. an ops-run fixture-game-backfill), `v1_games_tournament_
-// fixture_id_fkey` is `onDelete: Restrict` — by design, a Game is the record
-// of a played match and must never silently vanish because its tournament
-// got deleted — so the plain tournament delete starts failing with a
-// foreign-key violation and the whole alpha deploy aborts. Every table that
-// carries a Restrict edge back to V1Game/V1GameResultRevision must be
-// cleared first, in dependency order, for exactly the Game rows attached to
-// these tournaments' fixtures — never a wider set.
-async function teardownGamesForTournaments(
+// alpha 배포마다 재실행되는 QA 시드는 예전엔 고정 시나리오 대회를 통째로 삭제-재생성했다. 그런데
+// append-only `v1_operation_audits`(게임 커맨드마다 쌓이는 삭제 불가 로그)와 `V1Game`(Restrict FK)이
+// 그 대회/픽스처를 못박으면 v1Tournament.deleteMany 가 P2003 으로 실패해 배포가 중단됐다(#297 은
+// 대회별 SAVEPOINT 로 그 대회만 건너뛰는 우회였고 — 그 대회는 매 배포 stale 로 남았다).
+//
+// Part 2(delete→upsert 근본 해소): **대회·그룹·픽스처·V1Game 은 절대 삭제하지 않고 upsert/보존**한다.
+// 그러면 append-only·Restrict 참조 대상이 사라지지 않으므로 데드락이 구조적으로 없어진다. 아래 함수는
+// 그 대신 **시나리오가 소유한 leaf 행만** tournament scope 로 지운다 — leaf 는 어떤 append-only 트리거·
+// Restrict FK 의 대상도 아니라서(schema 실측) 항상 안전하게 삭제-재생성된다. 게임은 시드가 만들지도,
+// 지우지도 않는다(fixture-game-backfill 같은 ops 소유). 그래서 teardownGamesForTournaments·
+// nonDraftRevision·orphanTeamRecordFact·SAVEPOINT 우회가 통째로 불필요해졌다.
+async function clearScenarioLeaves(
   tx: Prisma.TransactionClient,
-  tournamentIds: readonly string[],
+  tournamentId: string,
 ): Promise<void> {
   const fixtures = await tx.v1TournamentFixture.findMany({
-    where: { tournamentId: { in: [...tournamentIds] } },
+    where: { tournamentId },
     select: { id: true },
   });
-  if (fixtures.length === 0) return;
   const fixtureIds = fixtures.map((fixture) => fixture.id);
+  if (fixtureIds.length > 0) {
+    // 영상은 leaf(참조받는 것 없음)라 삭제-재생성한다. 결과(V1TournamentFixtureResult)는 여기서
+    // 지우지 않는다 — V1TournamentFixtureGoal 이 Cascade 로 참조하므로 createCompetitionData 에서
+    // fixtureId(@unique) upsert 로 유지한다.
+    await tx.v1TournamentFixtureVideo.deleteMany({ where: { fixtureId: { in: fixtureIds } } });
+  }
 
-  const games = await tx.v1Game.findMany({
-    where: { tournamentFixtureId: { in: fixtureIds } },
+  const groups = await tx.v1TournamentGroup.findMany({
+    where: { tournamentId },
     select: { id: true },
   });
-  if (games.length === 0) return;
-  const gameIds = games.map((game) => game.id);
-
-  // V1Game.currentOfficialRevisionId is a self-referencing Restrict edge onto
-  // V1GameResultRevision — it must be nulled before any revision can be
-  // deleted, regardless of whether one was ever set.
-  await tx.v1Game.updateMany({
-    where: { id: { in: gameIds } },
-    data: { currentOfficialRevisionId: null },
-  });
-
-  const revisions = await tx.v1GameResultRevision.findMany({
-    where: { gameId: { in: gameIds } },
-    select: { id: true, gameId: true, state: true },
-  });
-
-  // `v1_block_terminal_revision_mutation` makes a revision permanently
-  // undeletable the moment it leaves DRAFT (CHANGE_REQUESTED,
-  // SUPPLEMENT_REQUESTED, REJECTED, OFFICIAL and VOID are all terminal), and
-  // `v1_guard_result_participant_mutation` refuses to delete a single
-  // V1GameResultParticipant row unless its revision is still DRAFT. Together
-  // that means a submitted result can never be torn down by app code at
-  // all — which is exactly the point: once a game's result has moved past a
-  // draft, it is the permanent record of a played match (the same guarantee
-  // the Restrict FK on v1_games itself exists for). If the QA seed's fixed
-  // scenario IDs ever end up wired to a game whose result went past DRAFT,
-  // failing loudly here — before deleting anything (the currentOfficialRevisionId
-  // null-out above rolls back with the rest of the transaction) — is
-  // correct: silently leaving the tournament in place is safer than either
-  // corrupting a real result record or crashing mid-transaction on a bare
-  // Postgres trigger error with no context.
-  const nonDraftRevision = revisions.find((revision) => revision.state !== 'DRAFT');
-  if (nonDraftRevision) {
-    throw new Error(
-      `Alpha QA reset refused: game ${nonDraftRevision.gameId} has a ${nonDraftRevision.state} ` +
-        `result revision (${nonDraftRevision.id}). Once a game result leaves DRAFT it is permanently ` +
-        'append-only and cannot be deleted — the QA scenario tournament that owns it cannot be reseeded.',
-    );
-  }
-  const revisionIds = revisions.map((revision) => revision.id);
-
-  // v1_team_record_facts is a special case: unlike V1GameOfficialFact /
-  // V1GameOfficialResultCache (each gated on INSERT by a BEFORE INSERT
-  // trigger requiring their revision to already be OFFICIAL — structurally
-  // unreachable once the check above has ruled out every non-DRAFT
-  // revision), nothing gates its INSERT at all, so a row can exist against
-  // a still-DRAFT revision. And `v1_block_team_record_fact_mutation` blocks
-  // its own UPDATE **and DELETE** unconditionally (no state check) — once
-  // written, a team record fact can never be deleted by app code, DRAFT or
-  // not. Attempting the delete would always fail; check for it and refuse
-  // loudly instead (Copilot review, PR #281).
-  if (revisionIds.length > 0) {
-    const orphanTeamRecordFact = await tx.v1TeamRecordFact.findFirst({
-      where: { revisionId: { in: revisionIds } },
-      select: { id: true, revisionId: true },
-    });
-    if (orphanTeamRecordFact) {
-      throw new Error(
-        `Alpha QA reset refused: result revision ${orphanTeamRecordFact.revisionId} has a team record ` +
-          `fact (${orphanTeamRecordFact.id}), which is append-only and can never be deleted — the QA ` +
-          'scenario tournament that owns it cannot be reseeded.',
-      );
-    }
-
-    await tx.v1GameResultParticipant.deleteMany({ where: { resultRevisionId: { in: revisionIds } } });
-    await tx.v1ResultEscalation.deleteMany({ where: { resultRevisionId: { in: revisionIds } } });
-    // No FK constraint backs v1_game_result_decisions.revision_id (checked
-    // against the migrations), but leaving decisions for a revision that is
-    // about to be deleted is still orphaned QA garbage — clear it too.
-    await tx.v1GameResultDecision.deleteMany({ where: { revisionId: { in: revisionIds } } });
-  }
-  await tx.v1GameResultRevision.deleteMany({ where: { gameId: { in: gameIds } } });
-  await tx.v1GameParticipant.deleteMany({ where: { gameId: { in: gameIds } } });
-  await tx.v1GameEvent.deleteMany({ where: { gameId: { in: gameIds } } });
-  await tx.v1GameVisibilityPolicy.deleteMany({ where: { gameId: { in: gameIds } } });
-  // V1GameSide, V1GamePeriod and V1GameLineup all Cascade off V1Game, so this
-  // final delete takes them with it.
-  await tx.v1Game.deleteMany({ where: { id: { in: gameIds } } });
-}
-
-export interface AlphaTournamentResetSummary {
-  /** 실제로 지워져 재생성 대상이 되는 대회 ID */
-  readonly reset: string[];
-  /** append-only 데이터가 참조를 못박아 이번 배포에선 그대로 둔 대회 */
-  readonly skipped: { tournamentId: string; blockedBy: string }[];
-}
-
-export async function resetAlphaTournamentScenarios(
-  tx: Prisma.TransactionClient,
-  tournamentIds: readonly string[],
-): Promise<AlphaTournamentResetSummary> {
-  const reset: string[] = [];
-  const skipped: { tournamentId: string; blockedBy: string }[] = [];
-
-  for (const tournamentId of tournamentIds) {
-    // 대회 하나씩 SAVEPOINT 로 감싸 실제로 지워 본다. append-only `v1_operation_audits`
-    // (게임 커맨드마다 쌓이는 삭제 불가 로그)가 이 대회/픽스처를 Restrict FK 로 못박고
-    // 있으면 v1Tournament.deleteMany 가 Postgres 23503 → Prisma P2003 으로 실패하는데,
-    // 그때 이 대회분만 롤백하고 건너뛴다(다른 대회 재생성은 계속). 트리거는 절대 끄지
-    // 않는다 — append-only 무결성과 "삭제 불가 데이터는 사람이 처리"라는 기존 정책
-    // (teardownGamesForTournaments 의 nonDraftRevision/orphanTeamRecordFact 가드)을 그대로 지킨다.
-    // 그 가드들은 일반 Error 를 던지므로 P2003 캐치에 안 걸려 전체 트랜잭션을 그대로 중단시킨다.
-    const savepoint = `qa_reset_${tournamentId.replace(/-/g, '')}`;
-    await tx.$executeRawUnsafe(`SAVEPOINT "${savepoint}"`);
-    try {
-      await teardownGamesForTournaments(tx, [tournamentId]);
-      await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId } });
-      await tx.v1Tournament.deleteMany({ where: { id: tournamentId } });
-      await tx.$executeRawUnsafe(`RELEASE SAVEPOINT "${savepoint}"`);
-      reset.push(tournamentId);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-        // 이 대회분만 되돌린다. ROLLBACK TO SAVEPOINT 는 savepoint 를 소멸시키지 않으므로
-        // 뒤이어 RELEASE 로 정리해야 트랜잭션 상태가 깨끗하게 남는다.
-        await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT "${savepoint}"`);
-        await tx.$executeRawUnsafe(`RELEASE SAVEPOINT "${savepoint}"`);
-        // alpha 실측(2026-08-09): 이 시나리오에서 Prisma 는 meta.field_name 을 채우지 않는다.
-        // 대신 메시지 본문의 "constraint: `xxx`" 에서 실제 FK 이름을 뽑아 로그를 쓸모 있게 한다.
-        const fromMeta = typeof error.meta?.field_name === 'string' ? error.meta.field_name : null;
-        const fromMessage = error.message.match(/constraint:?\s*`?([\w-]+)`?/i)?.[1] ?? null;
-        const blockedBy = fromMeta ?? fromMessage ?? 'unknown FK constraint';
-        console.warn(
-          `[seed-alpha-tournament-qa] Skipping reset for tournament ${tournamentId}: blocked by a ` +
-            `Restrict FK (${blockedBy}) whose referencing rows this seed cannot delete (append-only). ` +
-            'Leaving that tournament as-is from the previous deploy — it will not receive fresh QA ' +
-            'content until the delete-based reset is retired (see Part 2 of the deadlock design).',
-        );
-        skipped.push({ tournamentId, blockedBy });
-        continue;
-      }
-      throw error;
-    }
+  const groupIds = groups.map((group) => group.id);
+  if (groupIds.length > 0) {
+    await tx.v1TournamentStanding.deleteMany({ where: { groupId: { in: groupIds } } });
+    await tx.v1TournamentGroupTeam.deleteMany({ where: { groupId: { in: groupIds } } });
   }
 
-  return { reset, skipped };
+  // 등록 삭제는 player·payment(및 남은 standing/groupTeam)를 Cascade 로 함께 지운다. 픽스처의
+  // home/awayRegistrationId 는 SetNull 로 비워지고, 곧 새 등록 id 로 다시 upsert 되며 재연결된다.
+  // 등록·명단·순위는 어떤 append-only 참조 대상도 아니라 안전하다.
+  await tx.v1TournamentRegistration.deleteMany({ where: { tournamentId } });
+
+  await tx.v1TournamentAward.deleteMany({ where: { tournamentId } });
+  await tx.v1TournamentReview.deleteMany({ where: { tournamentId } });
+  await tx.v1TournamentSponsor.deleteMany({ where: { tournamentId } });
+  await tx.v1TournamentAnnouncement.deleteMany({ where: { tournamentId } });
+  await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId } });
 }
 
 async function main() {
@@ -973,13 +888,9 @@ async function main() {
     const competitionConfigVersionId = competitionConfig.id;
 
     const summary = await prisma.$transaction(async (tx) => {
-      const tournamentIds = ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.id);
-      const { reset, skipped } = await resetAlphaTournamentScenarios(tx, tournamentIds);
-      // 스킵된 대회는 지워지지 않았으므로 다시 만들지 않는다(고정 ID 라 재생성하면 충돌).
-      // createScenario 를 안 부르면 그 대회의 leaf 엔티티(공지·시상·후기·스폰서)도 자동으로
-      // 이전 배포 상태 그대로 보존된다 — 별도 필터링 로직이 필요 없다.
-      const resetIds = new Set(reset);
-      const scenariosToSeed = ALPHA_TOURNAMENT_SCENARIOS.filter((scenario) => resetIds.has(scenario.id));
+      // Part 2: reset(삭제)/skip 단계가 사라졌다. createScenario 가 대회·그룹·픽스처를 upsert 하고
+      // leaf 만 삭제-재생성하므로 append-only 데드락이 구조적으로 없다 → 매 배포 전 시나리오를 예외
+      // 없이 시드한다(예전엔 append-only 가 못박은 대회가 skip 되어 stale 로 남았다).
       const qaTeams = await ensureTeamRoster(
         tx,
         sport.id,
@@ -999,7 +910,7 @@ async function main() {
         '팀밋 정식 매치·대회에 참가하는 활동 팀입니다.',
       );
       const now = new Date();
-      for (const scenario of scenariosToSeed) {
+      for (const scenario of ALPHA_TOURNAMENT_SCENARIOS) {
         const teams = scenario.marketing ? featuredTeams : qaTeams;
         await createScenario(
           tx,
@@ -1012,12 +923,10 @@ async function main() {
         );
       }
       return {
-        tournaments: scenariosToSeed.length,
-        campaigns: scenariosToSeed.filter((scenario) => scenario.hasCampaign).length,
-        statuses: scenariosToSeed.map((scenario) => scenario.status),
+        tournaments: ALPHA_TOURNAMENT_SCENARIOS.length,
+        campaigns: ALPHA_TOURNAMENT_SCENARIOS.filter((scenario) => scenario.hasCampaign).length,
+        statuses: ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.status),
         completedIncludes: ['results', 'videos', 'reviews', 'awards'],
-        // 조용한 스킵 방지 — 배포 로그(stdout JSON)에 항상 노출된다(CLAUDE.md 규칙 5).
-        skipped: skipped.map((s) => ({ tournamentId: s.tournamentId, blockedBy: s.blockedBy })),
       };
     });
     process.stdout.write(`${JSON.stringify({ status: 'ok', ...summary })}\n`);

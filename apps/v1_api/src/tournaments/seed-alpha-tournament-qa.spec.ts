@@ -34,20 +34,22 @@ describe('alpha tournament QA campaign content', () => {
   it('creates completed knockout rounds so final rankings and videos are reachable', async () => {
     const rounds: string[] = [];
     const fixtureConfigIds: Array<string | undefined> = [];
+    // Part 2: createCompetitionData 는 group·fixture·fixtureResult 를 자연키/유니크로 upsert 한다
+    // (삭제-재생성 대신 유지). round·config 는 upsert 의 `create` 절에서 읽는다.
     const tx = {
-      v1TournamentGroup: { create: jest.fn().mockResolvedValue({ id: 'group-a' }) },
+      v1TournamentGroup: { upsert: jest.fn().mockResolvedValue({ id: 'group-a' }) },
       v1TournamentGroupTeam: { create: jest.fn().mockResolvedValue({}) },
       v1TournamentStanding: { create: jest.fn().mockResolvedValue({}) },
       v1TournamentFixture: {
-        create: jest.fn().mockImplementation(
-          ({ data }: { data: { round: string; competitionConfigVersionId?: string } }) => {
-          rounds.push(data.round);
-          fixtureConfigIds.push(data.competitionConfigVersionId);
-          return Promise.resolve({ id: `fixture-${rounds.length}`, round: data.round });
+        upsert: jest.fn().mockImplementation(
+          ({ create }: { create: { round: string; competitionConfigVersionId?: string } }) => {
+          rounds.push(create.round);
+          fixtureConfigIds.push(create.competitionConfigVersionId);
+          return Promise.resolve({ id: `fixture-${rounds.length}`, round: create.round });
           },
         ),
       },
-      v1TournamentFixtureResult: { create: jest.fn().mockResolvedValue({}) },
+      v1TournamentFixtureResult: { upsert: jest.fn().mockResolvedValue({}) },
     } as unknown as Parameters<typeof createCompetitionData>[0];
     const registrations = Array.from({ length: 4 }, (_, index) => ({
       id: `registration-${index + 1}`,

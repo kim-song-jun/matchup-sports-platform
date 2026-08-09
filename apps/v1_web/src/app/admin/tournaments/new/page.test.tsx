@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
@@ -179,6 +179,50 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(screen.getByLabelText(/종목/)).toHaveValue('sport-futsal');
     expect(screen.getByLabelText(/대회명/)).toHaveValue('2026 서울 풋살 오픈');
     expect(screen.getByLabelText('혼성')).toBeChecked();
+  });
+
+  // "출전 인원"(라인업 상한) 선택지 — 서버가 종목의 canonical 포메이션에서 파생해
+  // 내려주는 값이라 프론트는 후보를 하드코딩하지 않는다. 아래 세 케이스는 각각 다른
+  // 실패 모드를 잡는다: 정상 렌더/자동 기본값, 미지원 종목, 그리고 조회 실패.
+  it('출전 인원: 서버가 준 후보를 칩으로 렌더하고 canonical 기본값을 자동 선택한다', async () => {
+    renderPage();
+    goToParticipationStep();
+
+    const group = await screen.findByRole('group', { name: '출전 인원 선택' });
+    const chips = within(group).getAllByRole('button');
+    expect(chips.map((c) => c.textContent)).toEqual(['5명', '6명']);
+    // defaultMaxPlayers=6 이 자동 선택돼야 한다(관리자가 아무것도 안 골라도 pin 가능).
+    expect(within(group).getByRole('button', { name: '6명' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(group).getByRole('button', { name: '5명' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('출전 인원: 카탈로그가 없는 종목이면 선택지를 지어내지 않고 안내만 보여준다', () => {
+    useV1LineupSizeOptionsMock.mockReturnValue({
+      data: { sportId: 'sport-futsal', supported: false, options: [], defaultMaxPlayers: null },
+      isPending: false,
+    });
+    renderPage();
+    goToParticipationStep();
+
+    expect(screen.queryByRole('group', { name: '출전 인원 선택' })).toBeNull();
+    expect(screen.getByText(/이 종목은 아직 출전 인원을 선택할 수 없어요/)).toBeInTheDocument();
+  });
+
+  // Copilot 리뷰(2라운드, suppressed) 지적: 조회가 "실패"했을 때도 data 가 undefined 라
+  // `!data?.supported` 한 줄로 묶으면 미지원 종목과 똑같은 문구가 떠서 진짜 오류가 숨는다.
+  // 이 테스트가 깨지면 그 잘못된 안내가 되돌아온 것이다.
+  it('출전 인원: 선택지 조회가 실패하면 "미지원 종목"이 아니라 오류 안내를 보여준다', () => {
+    useV1LineupSizeOptionsMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+    });
+    renderPage();
+    goToParticipationStep();
+
+    expect(screen.getByText(/불러오지 못했어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/이 종목은 아직 출전 인원을 선택할 수 없어요/)).toBeNull();
+    expect(screen.queryByRole('group', { name: '출전 인원 선택' })).toBeNull();
   });
 
   it('T2 proposes D-3 registration and D-7 roster deadlines without overwriting manual edits', () => {

@@ -885,6 +885,23 @@ export const v1MswHandlers = [
   http.get(`${api}/teams/:teamId/schedules/:scheduleId`, () => ok(scheduleDetail())),
   http.post(`${api}/teams/:teamId/schedules`, async ({ params, request }) => {
     const body = await request.json() as V1CreateScheduleDto;
+    // 서버 계약을 그대로 흉내낸다. 이 mock 이 MATCH 나 teamMatchId 를 받아주면, 프로덕션에서
+    // 422/400 으로 실패할 호출이 테스트에서는 조용히 통과한다 — mock 이 서버보다 관대하면
+    // 테스트가 거짓말을 한다. 이전에는 "이 경로는 항상 TRAINING/EVENT 만 받는다" 를 주석으로만
+    // 주장했고 코드로 강제하지 않았다.
+    const raw = body as Record<string, unknown>;
+    if (raw.type === 'MATCH') {
+      return HttpResponse.json(
+        { status: 'error', code: 'SCHEDULE_MATCH_TYPE_SYSTEM_ONLY', message: 'MATCH 일정은 시스템만 만들 수 있어요.' },
+        { status: 422 },
+      );
+    }
+    if ('teamMatchId' in raw) {
+      return HttpResponse.json(
+        { status: 'error', code: 'BAD_REQUEST', message: 'property teamMatchId should not exist' },
+        { status: 400 },
+      );
+    }
     v1ScheduleFixture = {
       ...v1ScheduleFixture,
       teamId: String(params.teamId),

@@ -487,6 +487,14 @@ export function TeamScheduleFormPageClient({ teamId, scheduleId }: { teamId: str
     const rsvpDeadlineIso = fromDatetimeLocalValue(draft.rsvpDeadlineAt);
 
     if (mode === 'create') {
+      // MATCH 일정은 팀매치가 시스템으로만 만든다(서버가 SCHEDULE_MATCH_TYPE_SYSTEM_ONLY 로 거부).
+      // draft.type 은 수정 모드에서 기존 일정 값을 그대로 받아오므로 MATCH 가 될 수 있는데,
+      // 그 값이 생성 경로로 새면 서버에서 422 로 떨어진다. 조용히 다른 타입으로 바꾸면 사용자가
+      // 의도하지 않은 일정이 만들어지므로, 만들지 않고 이유를 알린다.
+      if (draft.type === 'MATCH') {
+        setError('매치 일정은 매치를 만들면 자동으로 생겨요. 여기서는 훈련이나 이벤트만 만들 수 있어요.');
+        return;
+      }
       const payload: V1CreateScheduleDto = {
         title: draft.title.trim(),
         type: draft.type,

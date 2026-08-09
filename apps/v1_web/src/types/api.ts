@@ -900,9 +900,12 @@ export type V1TeamScheduleMutationResult = {
 // 매치 ↔ 팀일정 연동: MATCH 타입 스케줄은 이제 TeamMatchesService가 트랜잭션 안에서만 만든다 —
 // 이 공개 create 경로는 teamMatchId를 더 이상 받지 않는다(백엔드 CreateScheduleDto와 대칭,
 // team-schedules.service.ts의 SCHEDULE_MATCH_TYPE_SYSTEM_ONLY 참고).
+// `type` 은 V1ScheduleType 전체가 아니라 MATCH 를 뺀 것이다. 전체를 쓰면 서버가 422
+// (SCHEDULE_MATCH_TYPE_SYSTEM_ONLY)로 거부할 payload 를 프런트가 타입 검사 통과시킨 채
+// 만들어낼 수 있다 — 계약 불일치를 컴파일 시점에 막는다.
 export type V1CreateScheduleDto = {
   title: string;
-  type: V1ScheduleType;
+  type: Exclude<V1ScheduleType, 'MATCH'>;
   startAt: string;
   endAt: string;
   timezone: string;

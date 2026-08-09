@@ -9,9 +9,15 @@ export type ScheduleListItemModel = {
   type: V1ScheduleType;
   typeLabel: string;
   state: V1ScheduleState;
+  /**
+   * MATCH 타입 SCHEDULED 카드는 matchConfirmed에 따라 "상대팀 모집 중"/"상대팀 확정"으로
+   * 오버라이드된다 — 그 외(TRAINING/EVENT, 또는 CANCELLED/COMPLETED)는 제네릭 라벨 그대로.
+   */
   stateLabel: string;
-  /** 취소/완료는 muted, 예정은 default — 배지 색 결정에 사용 */
+  /** 취소/완료는 muted, 예정은 default — 배지 색 결정에 사용(가확정 MATCH도 muted로 오버라이드) */
   stateTone: 'default' | 'muted';
+  /** MATCH 타입이 아직 가확정(상대팀 미확정) 상태일 때만 true — 카드 반투명 처리 트리거 */
+  isTentative: boolean;
   /** 캘린더 그루핑용 로컬 날짜 키 (YYYY-MM-DD) */
   dateKey: string;
   dateTimeLabel: string;
@@ -164,6 +170,8 @@ export type ScheduleDetailViewModel = {
   title: string;
   typeLabel: string;
   stateLabel: string;
+  /** 취소/완료는 muted, 예정은 default — 배지 색 결정에 사용 (가확정 MATCH는 muted로 오버라이드) */
+  stateTone: 'default' | 'muted';
   state: V1ScheduleState;
   dateTimeLabel: string;
   visibilityLabel: string;
@@ -230,6 +238,8 @@ export type MyScheduleItemModel = {
   stateLabel: string;
   /** 취소/완료는 muted, 예정은 default — 배지 색 결정에 사용 (ScheduleListItemModel과 동일 관례) */
   stateTone: 'default' | 'muted';
+  /** MATCH 타입이 아직 가확정(상대팀 미확정) 상태일 때만 true — 카드 반투명 처리 트리거 */
+  isTentative: boolean;
   dateTimeLabel: string;
   myAttendanceLabel: string | null;
   href: string;

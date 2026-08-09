@@ -30,12 +30,13 @@ const ids = {
   sport: 'task12-final-sport',
   region: 'task12-final-region',
   teamA: 'task12-final-team-a',
-  teamB: 'task12-final-team-b',
   ownerA: 'task12-final-owner-a',
   managerA: 'task12-final-manager-a',
   outsider: 'task12-final-outsider',
+  // 매치 ↔ 팀일정 연동(레인 schedule) 이후 이 스케줄 create() 경로는 teamMatchId가 어느 팀
+  // 소유든 상관없이 항상 거부한다 — 아래 "rejects every direct MATCH-type schedule creation
+  // attempt" 테스트가 이 id를 payload에 실어 그 거부를 증명하는 용도로만 쓴다.
   teamMatchForTeamA: '12000000-0000-4000-8000-000000000030',
-  teamMatchForTeamB: '12000000-0000-4000-8000-000000000031',
 } as const;
 
 function idempotencyKey(label: string): string {
@@ -103,17 +104,15 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
     await prisma.v1Team.create({
       data: { id: ids.teamA, ownerUserId: ids.ownerA, sportId: sport.id, regionId: ids.region, name: 'Task 12 Final Team A' },
     });
-    // Same physical user owns both teams — only hostTeamId/approvedApplicantTeamId matter for the
-    // cross-team teamMatchId ownership check, so a second distinct owner persona isn't needed.
-    await prisma.v1Team.create({
-      data: { id: ids.teamB, ownerUserId: ids.ownerA, sportId: sport.id, regionId: ids.region, name: 'Task 12 Final Team B' },
-    });
     await prisma.v1TeamMembership.createMany({
       data: [
         { teamId: ids.teamA, userId: ids.ownerA, role: 'owner', status: 'active' },
         { teamId: ids.teamA, userId: ids.managerA, role: 'manager', status: 'active' },
       ],
     });
+    // 매치 ↔ 팀일정 연동(레인 schedule) 이후 이 스케줄 create() 경로는 teamMatchId를 아예 읽지
+    // 않으므로 소유권 검증용 fixture는 더 이상 필요 없다 — teamMatchForTeamA는 payload에 실어
+    // "어떤 teamMatchId를 보내도 거부된다"는 것만 증명하는 용도로 남긴다.
     await prisma.v1TeamMatch.create({
       data: {
         id: ids.teamMatchForTeamA,
@@ -123,20 +122,6 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
         regionId: ids.region,
         title: 'Task 12 final team A match',
         placeName: 'Task 12 final ground A',
-        startAt: new Date('2026-09-01T00:00:00.000Z'),
-      },
-    });
-    // Unrelated to teamA on both hostTeamId and approvedApplicantTeamId — the fixture for the
-    // TEAM_MATCH_NOT_FOUND_FOR_TEAM cross-team ownership check.
-    await prisma.v1TeamMatch.create({
-      data: {
-        id: ids.teamMatchForTeamB,
-        hostTeamId: ids.teamB,
-        createdByUserId: ids.ownerA,
-        sportId: sport.id,
-        regionId: ids.region,
-        title: 'Task 12 final team B match',
-        placeName: 'Task 12 final ground B',
         startAt: new Date('2026-09-01T00:00:00.000Z'),
       },
     });
@@ -753,7 +738,12 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
     },
   );
 
-  it('rejects a MATCH-type schedule missing its team-match source and one referencing an unrelated team, then never creates a V1Game row for a properly-sourced one', async () => {
+  // 매치 ↔ 팀일정 연동(레인 schedule): MATCH 타입 스케줄은 이제 TeamMatchesService가 트랜잭션
+  // 안에서만 만든다 — 이 공개 POST 경로로는 MATCH 타입 자체가 항상 거부되고(SCHEDULE_MATCH_TYPE_
+  // SYSTEM_ONLY), teamMatchId 필드는 CreateScheduleDto에서 아예 제거돼 어떤 요청에 실려 있든
+  // forbidNonWhitelisted에 의해 400으로 거부된다. 이전에 이 자리에 있던 "제대로 소싱된 MATCH는
+  // 201로 성공한다" 시나리오는 더 이상 성립하지 않는다.
+  it('rejects every direct MATCH-type schedule creation attempt (system-only) and any teamMatchId field on the payload, and never creates a V1Game row', async () => {
     // T2 regression: the total v1Game count is captured up front (not filtered to one
     // teamMatchId) so the assertion at the end genuinely proves "this request created no Game
     // anywhere", not just "no Game happens to carry this one specific teamMatchId" — a regression
@@ -773,47 +763,27 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
         timezone: 'Asia/Seoul',
       })
       .expect(422);
-    expect(noSource.body.code).toBe('SCHEDULE_MATCH_SOURCE_REQUIRED');
+    expect(noSource.body.code).toBe('SCHEDULE_MATCH_TYPE_SYSTEM_ONLY');
 
-    const crossTeam = await request(app.getHttpServer())
+    const withTeamMatchId = await request(app.getHttpServer())
       .post(`/api/v1/teams/${ids.teamA}/schedules`)
       .set('x-v1-user-id', ids.ownerA)
-      .set('idempotency-key', idempotencyKey('match-cross-team'))
+      .set('idempotency-key', idempotencyKey('match-with-team-match-id'))
       .send({
-        title: 'Task 12 final MATCH cross-team',
-        type: 'MATCH',
-        startAt: '2026-09-10T10:00:00.000Z',
-        endAt: '2026-09-10T12:00:00.000Z',
-        timezone: 'Asia/Seoul',
-        teamMatchId: ids.teamMatchForTeamB,
-      })
-      .expect(404);
-    expect(crossTeam.body.code).toBe('TEAM_MATCH_NOT_FOUND_FOR_TEAM');
-
-    const sourced = await request(app.getHttpServer())
-      .post(`/api/v1/teams/${ids.teamA}/schedules`)
-      .set('x-v1-user-id', ids.ownerA)
-      .set('idempotency-key', idempotencyKey('match-sourced'))
-      .send({
-        title: 'Task 12 final MATCH properly sourced',
+        title: 'Task 12 final MATCH with a teamMatchId payload field',
         type: 'MATCH',
         startAt: '2026-09-10T10:00:00.000Z',
         endAt: '2026-09-10T12:00:00.000Z',
         timezone: 'Asia/Seoul',
         teamMatchId: ids.teamMatchForTeamA,
       })
-      .expect(201);
-    expect(sourced.body.data.teamMatchId).toBe(ids.teamMatchForTeamA);
+      .expect(400);
+    expect(withTeamMatchId.body.code).toBe('VALIDATION_ERROR');
 
-    // T2 regression: the scenario the comment actually names — "internal scrimmage" — is a
-    // TRAINING-type schedule with no teamMatchId at all, never a MATCH-type schedule (which the
-    // three requests above already cover). Drive that exact shape for real, then assert the
-    // GLOBAL v1Game count is unchanged across this entire test (not just "no Game happens to
-    // reference teamMatchForTeamA") — this is what actually proves the reviewer's invariant:
-    // creating any Task 12 schedule, of any type, never silently creates a Game through any
-    // linkage. A regression that created a Game via, say, `teamMatchId: null` or an unrelated
-    // aggregate would previously have slipped past a count filtered to one specific
-    // teamMatchId; it cannot slip past a global before/after count.
+    // The scenario the T2 regression comment actually names — "internal scrimmage" — is a
+    // TRAINING-type schedule with no teamMatchId at all. Drive that exact shape for real, then
+    // assert the GLOBAL v1Game count is unchanged across this entire test — this is what proves
+    // the invariant: creating any Task 12 schedule never silently creates a Game.
     const internalScrimmage = await request(app.getHttpServer())
       .post(`/api/v1/teams/${ids.teamA}/schedules`)
       .set('x-v1-user-id', ids.ownerA)
@@ -833,7 +803,7 @@ describe('Task 12 team schedules — HTTP contract (guest-recruitment identity/d
 
     // Belt-and-suspenders on the one relation a Game can ever carry (`teamMatchId`, the schema's
     // only schedule-adjacent linkage — V1Game has no direct scheduleId at all): still explicitly
-    // confirm no Game references the specific team match this test's MATCH-type schedule used.
+    // confirm no Game references the team match this test tried (and failed) to source from.
     expect(await prisma.v1Game.count({ where: { teamMatchId: ids.teamMatchForTeamA } })).toBe(0);
   });
 

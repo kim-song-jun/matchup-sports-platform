@@ -11,6 +11,7 @@ import {
   isScheduleMemberRole,
   isScheduleStaleConflict,
   mapScheduleErrorMessage,
+  matchScheduleDisplay,
   scheduleRsvpDeadlineLabel,
   scheduleStateLabel,
   scheduleTypeLabel,
@@ -32,6 +33,7 @@ function schedule(overrides: Partial<V1TeamScheduleSummary> = {}): V1TeamSchedul
     state: 'SCHEDULED',
     version: 0,
     teamMatchId: null,
+    matchConfirmed: null,
     goingCount: 5,
     waitlistedCount: 0,
     ...overrides,
@@ -137,6 +139,57 @@ describe('team-schedules view-model — list item / labels', () => {
     expect(attendanceSummaryText(18, 0, 20)).toBe('참석 18/20명');
     expect(attendanceSummaryText(20, 3, 20)).toBe('참석 20/20명 · 대기 3명');
     expect(attendanceSummaryText(4, 0, null)).toBe('참석 4명');
+  });
+});
+
+// 매치 ↔ 팀일정 연동(레인 schedule): "가확정(상대팀 모집 중, 반투명) vs 확정(상대팀 확정)"은
+// type==='MATCH' && state==='SCHEDULED'인 스케줄에만 적용되는 파생 라벨/톤 오버라이드다.
+describe('team-schedules view-model — match schedule confirmation display', () => {
+  it('shows the tentative label/tone/opacity trigger for an unconfirmed MATCH schedule', () => {
+    const display = matchScheduleDisplay('MATCH', 'SCHEDULED', false);
+    expect(display.stateLabel).toBe('상대팀 모집 중');
+    expect(display.stateTone).toBe('muted');
+    expect(display.isTentative).toBe(true);
+  });
+
+  it('shows the confirmed label/tone with no opacity trigger once the opponent is locked in', () => {
+    const display = matchScheduleDisplay('MATCH', 'SCHEDULED', true);
+    expect(display.stateLabel).toBe('상대팀 확정');
+    expect(display.stateTone).toBe('default');
+    expect(display.isTentative).toBe(false);
+  });
+
+  it('falls back to the generic state label for a non-MATCH schedule regardless of matchConfirmed', () => {
+    const display = matchScheduleDisplay('TRAINING', 'SCHEDULED', false);
+    expect(display.stateLabel).toBe(scheduleStateLabel('SCHEDULED'));
+    expect(display.stateTone).toBe('default');
+    expect(display.isTentative).toBe(false);
+  });
+
+  it('falls back to the generic terminal label for a CANCELLED/COMPLETED MATCH schedule (confirmation is moot once terminal)', () => {
+    expect(matchScheduleDisplay('MATCH', 'CANCELLED', false)).toEqual({
+      stateLabel: scheduleStateLabel('CANCELLED'),
+      stateTone: 'muted',
+      isTentative: false,
+    });
+    expect(matchScheduleDisplay('MATCH', 'COMPLETED', true)).toEqual({
+      stateLabel: scheduleStateLabel('COMPLETED'),
+      stateTone: 'muted',
+      isTentative: false,
+    });
+  });
+
+  it('falls back to the generic label for a MATCH schedule whose confirmation could not be resolved (matchConfirmed: null)', () => {
+    const display = matchScheduleDisplay('MATCH', 'SCHEDULED', null);
+    expect(display.stateLabel).toBe(scheduleStateLabel('SCHEDULED'));
+    expect(display.isTentative).toBe(false);
+  });
+
+  it('threads the tentative flag through toScheduleListItemModel for an unconfirmed MATCH schedule', () => {
+    const item = toScheduleListItemModel(schedule({ type: 'MATCH', matchConfirmed: false }), 'team-1');
+    expect(item.stateLabel).toBe('상대팀 모집 중');
+    expect(item.stateTone).toBe('muted');
+    expect(item.isTentative).toBe(true);
   });
 });
 

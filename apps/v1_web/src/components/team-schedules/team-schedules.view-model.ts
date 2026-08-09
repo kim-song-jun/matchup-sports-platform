@@ -48,6 +48,29 @@ export function scheduleStateTone(state: V1ScheduleState): 'default' | 'muted' {
   return state === 'SCHEDULED' ? 'default' : 'muted';
 }
 
+/**
+ * 매치 ↔ 팀일정 연동: "가확정(상대팀 모집 중) vs 확정(상대팀 확정)"은 type==='MATCH' &&
+ * state==='SCHEDULED'인 스케줄에만 적용되는 오버라이드다 — 둘 다 이미 이 코드베이스에 쓰이는
+ * 기존 카피(search-experience.tsx의 '상대팀 모집 중', team-matches-client.tsx의 '상대팀 확정').
+ * CANCELLED/COMPLETED나 MATCH가 아닌 스케줄은 제네릭 라벨을 그대로 쓴다 — 그 두 상태는 확정
+ * 여부와 무관하게 이미 명확하기 때문. 톤도 기존 관례를 그대로 따른다: 가확정은 '덜 중요한 상태'
+ * 톤(muted→tm-badge-grey), 확정은 SCHEDULED와 동일한 톤(default→tm-badge-blue).
+ * isTentative는 카드 반투명(opacity) 처리 트리거 — 색만으로 정보를 전달하지 않도록 항상
+ * stateLabel 텍스트와 함께 쓴다(호출부 책임).
+ */
+export function matchScheduleDisplay(
+  type: V1ScheduleType,
+  state: V1ScheduleState,
+  matchConfirmed: boolean | null,
+): { stateLabel: string; stateTone: 'default' | 'muted'; isTentative: boolean } {
+  if (type === 'MATCH' && state === 'SCHEDULED' && matchConfirmed !== null) {
+    return matchConfirmed
+      ? { stateLabel: '상대팀 확정', stateTone: 'default', isTentative: false }
+      : { stateLabel: '상대팀 모집 중', stateTone: 'muted', isTentative: true };
+  }
+  return { stateLabel: scheduleStateLabel(state), stateTone: scheduleStateTone(state), isTentative: false };
+}
+
 const SCHEDULE_VISIBILITY_LABELS: Record<V1ScheduleVisibility, string> = {
   PUBLIC: '전체 공개',
   TEAM: '팀 전용',
@@ -134,14 +157,16 @@ export function dateKeyOf(iso: string): string {
 }
 
 export function toScheduleListItemModel(schedule: V1TeamScheduleSummary, teamId: string): ScheduleListItemModel {
+  const display = matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed);
   return {
     id: schedule.id,
     title: schedule.title,
     type: schedule.type,
     typeLabel: scheduleTypeLabel(schedule.type),
     state: schedule.state,
-    stateLabel: scheduleStateLabel(schedule.state),
-    stateTone: scheduleStateTone(schedule.state),
+    stateLabel: display.stateLabel,
+    stateTone: display.stateTone,
+    isTentative: display.isTentative,
     dateKey: dateKeyOf(schedule.startAt),
     dateTimeLabel: formatTournamentDateRangeWithTime(schedule.startAt, schedule.endAt) ?? '일정 미정',
     attendanceSummary: attendanceSummaryText(schedule.goingCount, schedule.waitlistedCount, schedule.capacity),

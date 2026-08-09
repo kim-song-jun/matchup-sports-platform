@@ -1032,12 +1032,18 @@ const CREATE_PROGRESS_STEPS: Array<{ key: TeamMatchCreateViewModel['step']; labe
 
 /** 받침 유무에 따라 "으로"/"로"를 고른다 — aria-label에 라벨을 이어붙일 때 "선택로"처럼
  * 어색한 조사가 나오는 것을 막는다(예: 팀 선택→으로, 매치 정보→로). */
+/** 한글 종성 분해에서 ㄹ의 인덱스. 받침이 ㄹ이면 "으로"가 아니라 "로"를 쓴다
+ *  ("이메일로", "서울로" — "이메일으로"는 비문). 받침 유무만 보면 이 예외를
+ *  놓친다. */
+const JONGSEONG_RIEUL = 8;
+
 function withDestinationParticle(label: string) {
   const trimmed = label.trim();
   const lastChar = trimmed.charCodeAt(trimmed.length - 1);
   const isHangulSyllable = lastChar >= 0xac00 && lastChar <= 0xd7a3;
-  const hasBatchim = isHangulSyllable && (lastChar - 0xac00) % 28 !== 0;
-  return `${label}${hasBatchim ? '으로' : '로'}`;
+  const jongseong = isHangulSyllable ? (lastChar - 0xac00) % 28 : 0;
+  const needsEuro = jongseong !== 0 && jongseong !== JONGSEONG_RIEUL;
+  return `${label}${needsEuro ? '으로' : '로'}`;
 }
 
 function CreateProgress({

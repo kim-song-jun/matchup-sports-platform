@@ -185,33 +185,44 @@ export function FieldErrorText({ id, message }: { id?: string; message?: string 
 /**
  * #3 1단계: 장소 입력창 포커스 시 이 팀(팀매치)·나(개인매치)가 과거에 실제로 입력했던
  * 장소를 칩으로 보여주고 탭 한 번으로 채운다. 새 Venue 테이블 없이 과거 입력값
- * distinct 조회 결과를 그대로 쓴다(백엔드: matches/team-matches recentVenues).
- * 칩 버튼에 onMouseDown preventDefault를 걸어 클릭이 입력창 blur보다 먼저
- * 처리되게 한다 — EntityPicker 드롭다운과 동일한 패턴.
+ * distinct 조회 결과를 그대로 쓴다(백엔드: matches/team-matches recentVenues,
+ * team-match-series recentVenues). 칩 버튼에 onMouseDown preventDefault를 걸어
+ * 클릭이 입력창 blur보다 먼저 처리되게 한다 — EntityPicker 드롭다운과 동일한 패턴.
+ *
+ * 개인/팀매치 생성 위저드와 리그 대진 일괄생성 폼(관리자) 양쪽이 공유한다 — 두 화면
+ * 모두 tm-chip 토큰을 쓰고, 선택 상태를 aria-pressed와 tm-chip-active(채움+테두리색,
+ * 컬러 단독 아님) 양쪽으로 표시한다.
  */
 export function RecentVenueChips({
   items,
+  selectedValue,
   onSelect,
 }: {
-  items: Array<{ placeName: string; addressText: string | null }>;
-  onSelect: (venue: { placeName: string; addressText: string | null }) => void;
+  items: Array<{ placeName: string; addressText?: string | null }>;
+  /** 현재 입력창 값. items 중 placeName이 이 값과 같은 칩을 선택 상태로 강조한다. */
+  selectedValue?: string;
+  onSelect: (venue: { placeName: string; addressText?: string | null }) => void;
 }) {
   if (items.length === 0) return null;
   return (
     <div role="group" aria-label="최근 사용한 장소" style={{ marginTop: 8 }}>
       <div className="tm-text-caption" style={{ marginBottom: 6 }}>최근 사용한 장소</div>
       <div className="tm-team-form-chip-row">
-        {items.map((item) => (
-          <button
-            key={item.placeName}
-            type="button"
-            className="tm-chip"
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => onSelect(item)}
-          >
-            {item.placeName}
-          </button>
-        ))}
+        {items.map((item) => {
+          const isSelected = selectedValue !== undefined && selectedValue === item.placeName;
+          return (
+            <button
+              key={item.placeName}
+              type="button"
+              className={`tm-chip ${isSelected ? 'tm-chip-active' : ''}`}
+              aria-pressed={isSelected}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onSelect(item)}
+            >
+              {item.placeName}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

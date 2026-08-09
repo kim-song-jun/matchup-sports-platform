@@ -782,6 +782,7 @@ function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
         {venueFocused ? (
           <RecentVenueChips
             items={recentVenues}
+            selectedValue={d.venue}
             onSelect={(venue) => {
               model.form?.onFieldChange('venue', venue.placeName);
               model.form?.onFieldChange('address', venue.addressText ?? '');

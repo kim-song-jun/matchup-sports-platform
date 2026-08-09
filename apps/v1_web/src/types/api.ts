@@ -2606,6 +2606,17 @@ export type V1Tournament = {
   lineupMinPlayers: number | null;
   /** 이 대회 종목에서 선택 가능한 출전 인원 후보(오름차순). 카탈로그가 없는 종목이면 []. */
   lineupSizeOptions: number[];
+  /**
+   * "교체 방식/횟수" — 위 lineupMaxPlayers/lineupMinPlayers와 같은
+   * V1CompetitionConfigVersion.lineup에 함께 저장되지만 다른 관심사(경기 중 후보→주전
+   * 교체를 몇 번까지 허용할지)다. pin된 값이 없으면(미지원 종목/레거시 대회) 둘 다 null.
+   */
+  substitutionMode: V1SubstitutionMode | null;
+  /** substitutionMode가 'rolling'이면 항상 null(무제한). */
+  maxSubstitutions: number | null;
+  /** 선택 가능한 교체 방식 — 종목·pin 여부와 무관하게 항상 ['limited','rolling'] 두 값
+   *  (TournamentsAdminService#loadLineupInfo). 출전 인원 후보와 달리 빈 배열이 되지 않는다. */
+  substitutionModeOptions: V1SubstitutionMode[];
   genderCategory: V1TournamentGenderCategory | null;
   genderMinMale: number | null;
   genderMaxMale: number | null;
@@ -3155,12 +3166,20 @@ export type V1AdminRegistrationListPage = {
 /** GET /admin/competition-configs/lineup-size-options?sportId=... 응답 */
 export type V1LineupSizeOptions = {
   sportId: string;
-  /** false면 이 종목은 아직 경기 설정 카탈로그가 없다(football/futsal 외) — options는 항상 []. */
+  /** false면 이 종목은 아직 경기 설정 카탈로그가 없다(football/futsal 외) — options/substitutionModes는 항상 []. */
   supported: boolean;
   /** 선택 가능한 출전 인원(GK 포함) 오름차순. */
   options: number[];
   defaultMaxPlayers: number | null;
+  /** 선택 가능한 교체 방식 — 항상 두 값 모두(제한/무제한), 종목 무관 공통. */
+  substitutionModes: V1SubstitutionMode[];
+  defaultSubstitutionMode: V1SubstitutionMode | null;
+  /** canonical 기본 교체 횟수 — substitutionMode가 'rolling'이면 항상 null. */
+  defaultMaxSubstitutions: number | null;
 };
+
+/** "교체 방식" — 후보→주전 교체를 제한할지(limited), 무제한 롤링으로 둘지(rolling). */
+export type V1SubstitutionMode = 'limited' | 'rolling';
 
 export type V1CreateTournamentPayload = {
   sportId: string;
@@ -3179,6 +3198,11 @@ export type V1CreateTournamentPayload = {
   /** "출전 인원"(라인업 상한, GK 포함) — 위 minPlayers/maxPlayers(등록 로스터 크기)와 다른 값.
    * 생략하면 종목의 canonical 기본값을 쓴다. */
   lineupMaxPlayers?: number;
+  /** "교체 방식" — 생략하면 종목의 canonical 기본값을 쓴다. */
+  substitutionMode?: V1SubstitutionMode;
+  /** "교체 횟수" — substitutionMode가 'limited'일 때만 의미가 있다. 'rolling'과 함께 보내면
+   * 400으로 거절된다. */
+  maxSubstitutions?: number;
   genderCategory?: V1TournamentGenderCategory;
   genderMinMale?: number;
   genderMaxMale?: number;

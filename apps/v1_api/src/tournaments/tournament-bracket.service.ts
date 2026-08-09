@@ -111,9 +111,10 @@ export class TournamentBracketService {
   }
 
   /**
-   * 대회 생성/수정 화면의 "출전 인원" 선택지 조회. sportId가 아직 경기 설정 카탈로그에
-   * 없는 종목(football/futsal 외)이면 `supported: false` + 빈 options를 돌려준다 — 없는
-   * 대형을 지어내지 않고, 프론트는 이 값을 보고 선택지 UI 자체를 숨긴다.
+   * 대회 생성/수정 화면의 "출전 인원"·"교체 방식/횟수" 선택지 조회. sportId가 아직 경기
+   * 설정 카탈로그에 없는 종목(football/futsal 외)이면 `supported: false` + 빈
+   * options/substitutionModes를 돌려준다 — 없는 대형·모드를 지어내지 않고, 프론트는 이
+   * 값을 보고 선택지 UI 자체를 숨긴다.
    */
   async getLineupSizeOptions(user: V1AuthUser, query: LineupSizeOptionsQueryDto) {
     await this.adminContext.getActiveAdmin(user.id);
@@ -123,7 +124,15 @@ export class TournamentBracketService {
     }
     const normalizedSportCode = tryNormalizeCompetitionSportCode(sport.code);
     if (normalizedSportCode === null) {
-      return { sportId: query.sportId, supported: false, options: [], defaultMaxPlayers: null };
+      return {
+        sportId: query.sportId,
+        supported: false,
+        options: [],
+        defaultMaxPlayers: null,
+        substitutionModes: [],
+        defaultSubstitutionMode: null,
+        defaultMaxSubstitutions: null,
+      };
     }
     const canonical = canonicalCompetitionConfigForSport(normalizedSportCode);
     return {
@@ -131,6 +140,9 @@ export class TournamentBracketService {
       supported: true,
       options: this.lineupSizeConfigResolver.selectableLineupSizesForSportCode(normalizedSportCode),
       defaultMaxPlayers: canonical.lineup.maxPlayers,
+      substitutionModes: this.lineupSizeConfigResolver.selectableSubstitutionModes(),
+      defaultSubstitutionMode: canonical.lineup.substitutions,
+      defaultMaxSubstitutions: canonical.lineup.maxSubstitutions,
     };
   }
 

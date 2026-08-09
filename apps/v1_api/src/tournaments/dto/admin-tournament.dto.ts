@@ -170,6 +170,32 @@ export class CreateTournamentDto {
   @Max(50, { message: '출전 인원은 50명을 넘을 수 없어요.' })
   lineupMaxPlayers?: number;
 
+  /**
+   * "교체 방식"(후보 → 주전 교체를 제한할지, 무제한 롤링으로 둘지) —
+   * `V1CompetitionConfigVersion.lineup.substitutions`로 옮겨진다. 생략하면 종목의
+   * canonical 기본값을 그대로 쓴다(football: 제한 5회 / futsal: 무제한). 두 값 모두 모든
+   * 종목에서 항상 선택 가능하다(`LineupSizeConfigResolver.selectableSubstitutionModes()`)
+   * — 라인업 인원처럼 종목마다 후보가 달라지지 않는다.
+   */
+  @IsOptional()
+  @IsIn(['limited', 'rolling'], { message: '교체 방식은 limited 또는 rolling이어야 해요.' })
+  substitutionMode?: 'limited' | 'rolling';
+
+  /**
+   * "교체 횟수" — `substitutionMode`가 'limited'일 때만 의미가 있다. 'rolling'과 함께
+   * 보내면 400으로 거절된다(TournamentsAdminService#assertSubstitutionPolicyPair).
+   * 'limited'인데 이 값을 생략하면 canonical이 이미 제한형인 종목(football)만 그 기본
+   * 횟수를 쓰고, canonical이 무제한인 종목(futsal)을 제한형으로 바꾸려면 반드시 함께
+   * 보내야 한다(422 SUBSTITUTION_LIMIT_REQUIRED) — 라인업 인원과 달리 파생시킬 실제
+   * 후보 카탈로그가 없어 지어내지 않는다.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '교체 횟수는 정수여야 해요.' })
+  @Min(0, { message: '교체 횟수는 0회 이상이어야 해요.' })
+  @Max(50, { message: '교체 횟수는 50회를 넘을 수 없어요.' })
+  maxSubstitutions?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '참가비는 정수여야 해요.' })
@@ -437,6 +463,24 @@ export class UpdateTournamentDto {
   @Min(1, { message: '출전 인원은 1명 이상이어야 해요.' })
   @Max(50, { message: '출전 인원은 50명을 넘을 수 없어요.' })
   lineupMaxPlayers?: number;
+
+  /**
+   * "교체 방식" 변경. 대회에 아직 완료되지 않은 픽스처만 있고 status가
+   * in_progress/completed가 아닐 때만 허용된다(위 lineupMaxPlayers와 동일한 잠금 정책 —
+   * 같은 화면의 두 설정이 서로 다른 규칙을 갖지 않게 한다). 자세한 제약은
+   * CreateTournamentDto의 같은 필드 주석 참고.
+   */
+  @IsOptional()
+  @IsIn(['limited', 'rolling'], { message: '교체 방식은 limited 또는 rolling이어야 해요.' })
+  substitutionMode?: 'limited' | 'rolling';
+
+  /** "교체 횟수" 변경. 제약은 CreateTournamentDto의 같은 필드 주석 참고. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '교체 횟수는 정수여야 해요.' })
+  @Min(0, { message: '교체 횟수는 0회 이상이어야 해요.' })
+  @Max(50, { message: '교체 횟수는 50회를 넘을 수 없어요.' })
+  maxSubstitutions?: number;
 
   @IsOptional()
   @Type(() => Number)

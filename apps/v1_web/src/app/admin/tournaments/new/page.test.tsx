@@ -69,6 +69,9 @@ function previousTournament(): V1Tournament {
     lineupMaxPlayers: null,
     lineupMinPlayers: null,
     lineupSizeOptions: [],
+    substitutionMode: null,
+    maxSubstitutions: null,
+    substitutionModeOptions: [],
     genderCategory: 'mixed',
     genderMinMale: null,
     genderMaxMale: null,
@@ -160,7 +163,15 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       isPending: false,
     });
     useV1LineupSizeOptionsMock.mockReturnValue({
-      data: { sportId: 'sport-futsal', supported: true, options: [5, 6], defaultMaxPlayers: 6 },
+      data: {
+        sportId: 'sport-futsal',
+        supported: true,
+        options: [5, 6],
+        defaultMaxPlayers: 6,
+        substitutionModes: ['limited', 'rolling'],
+        defaultSubstitutionMode: 'rolling',
+        defaultMaxSubstitutions: null,
+      },
       isPending: false,
     });
     uploadMutateAsync.mockResolvedValue({ urls: ['/uploads/cover-test.webp'] });
@@ -198,7 +209,15 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
 
   it('출전 인원: 카탈로그가 없는 종목이면 선택지를 지어내지 않고 안내만 보여준다', () => {
     useV1LineupSizeOptionsMock.mockReturnValue({
-      data: { sportId: 'sport-futsal', supported: false, options: [], defaultMaxPlayers: null },
+      data: {
+        sportId: 'sport-futsal',
+        supported: false,
+        options: [],
+        defaultMaxPlayers: null,
+        substitutionModes: [],
+        defaultSubstitutionMode: null,
+        defaultMaxSubstitutions: null,
+      },
       isPending: false,
     });
     renderPage();
@@ -220,7 +239,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     renderPage();
     goToParticipationStep();
 
-    expect(screen.getByText(/불러오지 못했어요/)).toBeInTheDocument();
+    // 출전 인원 카드와 교체 방식 카드 둘 다 같은 조회 실패를 각자 안내한다(문구 두 개).
+    expect(screen.getAllByText(/불러오지 못했어요/).length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText(/이 종목은 아직 출전 인원을 선택할 수 없어요/)).toBeNull();
     expect(screen.queryByRole('group', { name: '출전 인원 선택' })).toBeNull();
   });
@@ -346,6 +366,30 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       promoHomeEnabled: true,
       promoHomeTitle: '이번 주 추천 대회',
     });
+  });
+
+  it('T6b serializes "제한" substitution mode with its count, but omits the count entirely for "무제한"', () => {
+    const limited = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-football',
+      title: 'x',
+      substitutionMode: 'limited',
+      maxSubstitutions: '5',
+    });
+    expect(limited.substitutionMode).toBe('limited');
+    expect(limited.maxSubstitutions).toBe(5);
+
+    // "무제한"을 고르면 남아 있는 maxSubstitutions 입력값(예: 종목 전환 전 입력)이 있어도
+    // payload에 실리면 안 된다 — 서버가 rolling+개수 조합을 400으로 거절한다.
+    const rolling = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-futsal',
+      title: 'x',
+      substitutionMode: 'rolling',
+      maxSubstitutions: '5',
+    });
+    expect(rolling.substitutionMode).toBe('rolling');
+    expect(rolling.maxSubstitutions).toBeUndefined();
   });
 
   it('blocks moving forward and shows the current step validation error', async () => {

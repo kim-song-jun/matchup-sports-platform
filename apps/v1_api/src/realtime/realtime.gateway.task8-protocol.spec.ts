@@ -263,6 +263,31 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(client.emit).toHaveBeenCalledWith('game.event.committed', expect.objectContaining({ gameId: GAME_ID, sequence: 4, version: 5 }));
   });
 
+  // Copilot 리뷰 지적: retry payload는 `expectedVersion`이 아니라
+  // `rebasedExpectedVersion`을 쓴다 — correlationEcho가 그 필드를 몰랐을 때는
+  // 파싱 실패 시 버전 상관관계 정보가 통째로 빠졌다.
+  it('retry 파싱 실패 시 rebasedExpectedVersion을 expectedVersion으로 에코한다', async () => {
+    const client = socket();
+
+    const result = await task8Gateway(gateway).retryGameEvent(client, {
+      gameId: GAME_ID,
+      rebasedExpectedVersion: 7,
+      clientEventId: 'event-retry-42',
+      takeoverToken: 'nonempty-takeover-token',
+      payloadHash: 'sha256:stable-payload',
+      // `event` 누락 -> parseGameEventRetry 실패
+    });
+
+    expect(result).toEqual({
+      status: 'error',
+      code: 'VALIDATION_ERROR',
+      clientEventId: 'event-retry-42',
+      expectedVersion: 7,
+      validation: { missingKeys: ['event'], unknownKeys: [], invalidFields: [] },
+    });
+    expect(gamesService.retryEvent).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['empty takeover token', { expectedVersion: 4, clientEventId: 'event-1', takeoverToken: '', event: {} }],
     ['empty client event id', { expectedVersion: 4, clientEventId: '', takeoverToken: 'takeover', event: {} }],

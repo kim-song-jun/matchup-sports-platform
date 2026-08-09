@@ -120,8 +120,11 @@ describe('useV1GameOperationsConsole — ack가 영원히 오지 않아도 sendi
     expect(result.current.queue.items[0]?.lastError?.code).toBe('SEND_TIMEOUT');
 
     const clientEventId = result.current.queue.items[0]!.clientEventId;
-    act(() => {
-      result.current.retryFailedEvent(clientEventId);
+    // Copilot 리뷰: retryFailedEvent는 async(clockMs 보정을 위해 await가 낄
+    // 수 있다) — act() 밖에서 그 Promise가 settle되면 state update가
+    // act 경고/플레이키의 원인이 된다. 반환된 Promise를 반드시 await한다.
+    await act(async () => {
+      await result.current.retryFailedEvent(clientEventId);
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);

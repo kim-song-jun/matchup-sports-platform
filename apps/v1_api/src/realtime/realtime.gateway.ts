@@ -812,7 +812,18 @@ function correlationEcho(payload: unknown): {
   if (!isRecord(payload)) return {};
   const echo: { clientEventId?: string; expectedVersion?: number } = {};
   if (isNonemptyString(payload.clientEventId)) echo.clientEventId = payload.clientEventId;
-  if (isSafeNonnegative(payload.expectedVersion)) echo.expectedVersion = payload.expectedVersion;
+  // Copilot 리뷰: `game.event.append`의 파싱 실패 payload는 `expectedVersion`
+  // 필드를 쓰지만, `game.event.retry`의 파싱 실패 payload는 같은 자리를
+  // `rebasedExpectedVersion`으로 부른다(`protocolError()`의 성공 경로가 이미
+  // 같은 매핑을 한다 — `'expectedVersion' in input ? ... : input.
+  // rebasedExpectedVersion`). 이 폴백이 없으면 retry 파싱 실패에서는 버전
+  // 상관관계 정보가 통째로 빠져 클라이언트/로그가 어떤 큐 항목이 실패했는지
+  // 더 부정확하게 추적한다.
+  if (isSafeNonnegative(payload.expectedVersion)) {
+    echo.expectedVersion = payload.expectedVersion;
+  } else if (isSafeNonnegative(payload.rebasedExpectedVersion)) {
+    echo.expectedVersion = payload.rebasedExpectedVersion;
+  }
   return echo;
 }
 

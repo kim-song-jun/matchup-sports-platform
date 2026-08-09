@@ -1,30 +1,19 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { SchedulePageClient } from './schedule-page-client';
-import { buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
 import type { V1TournamentDetail } from '@/types/api';
 
-// 이 라우트를 요청마다 동적 렌더로 강제한다. 없는 대회에서 not-found UI·noindex 는 정상인데 HTTP
-// 상태만 200 이던 결함(#298·#302·#305 로도 안 잡힘, 2026-08-09 alpha 실측)의 유력 원인은, 이 세그먼트가
-// 빌드타임에 부분적으로 static 최적화되며 notFound() 렌더가 static 200 으로 구워지는 것이다(형제
-// results 는 동일 코드인데 dynamic 이라 런타임 notFound → 404). force-dynamic 으로 static 최적화를
-// 배제해 notFound() 가 항상 런타임에 평가되도록 한다. 실 일정 데이터는 어차피 클라이언트가 가져오므로
-// 정적 이점을 포기해도 손해가 없다.
-export const dynamic = 'force-dynamic';
-
+// 없는 대회에서 이 라우트만 HTTP 200 을 반환하던 결함 — #298·#302·#305·#307 이 엔드포인트·notFound
+// 위치·force-dynamic 가설로 다 실패했다. 이번엔 그 추가 장치(force-dynamic·generateMetadata 내
+// notFound throw)를 모두 걷어내고, 정상 404 인 형제 라우트(results/bracket/awards/reviews)와
+// **구조적으로 동일**하게 되돌린다: force-dynamic 없음, generateMetadata 는 없는 대회에서 notFound()
+// 를 던지지 않고 noindex 메타를 반환하며, 존재 게이트는 페이지 컴포넌트의 notFound() 하나로 둔다.
+// 200→404 실제 해소는 프로덕션 런타임 동작이라 배포 후 alpha 재측정으로 확정한다.
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  // 없는 대회는 **generateMetadata 단계에서** notFound() 를 던진다 — 이게 이 라우트의 실제 fix 다.
-  // #298(페이지 게이트 정렬)·#302(generateMetadata 를 형제와 같은 엔드포인트로) 둘 다 alpha 배포 후에도
-  // schedule 만 없는 대회에서 HTTP 200 을 반환했다(2026-08-09 실측: not-found UI 는 정상 렌더 + robots
-  // noindex 까지 걸리는데 상태코드만 200). 원인은 엔드포인트가 아니라 **Next.js 스트리밍 status-commit
-  // 타이밍**이었다: 페이지 컴포넌트에서만 notFound() 를 부르면(형제 패턴) 이 라우트는 loading.tsx
-  // Suspense 경계 밖 셸이 200 으로 먼저 flush 된 뒤 notFound 가 도달해, not-found UI 는 렌더되지만
-  // 상태가 200 에 박힌다(형제는 타이밍상 우연히 flush 전에 notFound 가 도달해 404). generateMetadata 는
-  // 스트리밍 셸보다 먼저 await 되므로 여기서 던지면 타이밍과 무관하게 404 가 확정된다. not-found.tsx 가
-  // 자체 noindex 메타('대회 일정을 찾을 수 없어요')를 가지므로 여기서 noindex 메타를 따로 낼 필요가 없다.
   const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`);
-  if (!tournament) notFound();
+  if (!tournament) return buildNoIndexMetadata('대회 일정을 찾을 수 없어요');
   return buildPublicMetadata({
     title: `${tournament.title} 경기 일정`,
     description: `${tournament.title}의 경기 일정과 조별 순위를 확인하세요.`,
@@ -39,10 +28,7 @@ export default async function TournamentSchedulePage({
 }) {
   const { id } = await params;
   // 대회 존재 여부로 게이트한다 — 형제 라우트(bracket/results/reviews/detail)와 동일 패턴.
-  // 예전엔 하위 엔드포인트 `/tournaments/:id/schedule` 로 게이트했는데, 그 비대칭 탓에 없는
-  // 대회에서도 이 라우트만 HTTP 200 을 반환했다(형제 4개는 정확히 404. 2026-08-09 alpha 실측).
-  // 대회가 존재하면 일정이 비어 있어도 페이지는 존재해야 하므로 의미상으로도 이쪽이 맞다 —
-  // 실제 일정 데이터는 SchedulePageClient 가 클라이언트에서 가져온다.
+  // 실제 일정 데이터는 존재하는 대회에 대해 SchedulePageClient 가 클라이언트에서 가져온다.
   if (!(await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`))) {
     notFound();
   }

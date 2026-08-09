@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { WifiOff, Wifi, Goal, AlertTriangle, ArrowLeftRight } from 'lucide-react';
+import {
+  WifiOff,
+  Wifi,
+  Goal,
+  AlertTriangle,
+  ArrowLeftRight,
+  Pause,
+  Play,
+  SkipForward,
+  Square,
+} from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
@@ -19,6 +29,7 @@ import { QueueStatusPanel } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { QuickSubstitutionPanel } from './quick-substitution-panel';
+import { RestTimer } from './rest-timer';
 import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
 import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
@@ -69,6 +80,18 @@ function commandLabel(command: GameCommandName, currentPeriodNumber: number | nu
   }
   return COMMAND_LABEL[command];
 }
+
+/** 명령 버튼 재설계 — 색 하나로만 구분되던 걸(전부 알약 3개) 아이콘까지
+ * 더해 한눈에 "무슨 동작인지"를 알 수 있게 한다. 위험도(경기 종료) 자체의
+ * 구분은 아이콘이 아니라 색+구분선(아래 렌더 부분)이 계속 맡는다 — 아이콘은
+ * 여기서 "정지/재생/다음/멈춤"의 의미만 보탠다. */
+const COMMAND_ICON: Record<GameCommandName, typeof Pause> = {
+  start: Play,
+  pause: Pause,
+  resume: Play,
+  'next-period': SkipForward,
+  end: Square,
+};
 
 /**
  * 액션 우선 리오더 — 예전엔 "선수 탭"이 이 상태를 만들었다(선수+시각 고정).
@@ -479,25 +502,29 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             <div className="flex flex-wrap items-center justify-end gap-1.5">
               {availableCommands
                 .filter((command) => command !== 'end')
-                .map((command) => (
-                  <Button
-                    key={command}
-                    size="sm"
-                    variant="primary"
-                    disabled={
-                      !isTakeoverHeld(ops.takeover) ||
-                      commandPending ||
-                      // UX 감사 item 2 — 라인업 없이 시작하면 되돌릴 수단이
-                      // 없는 막다른 길이 된다. 버튼을 숨기지 않고 비활성 +
-                      // 아래 배너의 사유로 설명한다(감사의 반복 패턴 ①).
-                      (command === 'start' && sidesMissingLineup.length > 0)
-                    }
-                    loading={commandPending}
-                    onClick={() => handleRunCommand(command)}
-                  >
-                    {commandLabel(command, currentPeriod?.number ?? null)}
-                  </Button>
-                ))}
+                .map((command) => {
+                  const Icon = COMMAND_ICON[command];
+                  return (
+                    <Button
+                      key={command}
+                      size="sm"
+                      variant="primary"
+                      disabled={
+                        !isTakeoverHeld(ops.takeover) ||
+                        commandPending ||
+                        // UX 감사 item 2 — 라인업 없이 시작하면 되돌릴 수단이
+                        // 없는 막다른 길이 된다. 버튼을 숨기지 않고 비활성 +
+                        // 아래 배너의 사유로 설명한다(감사의 반복 패턴 ①).
+                        (command === 'start' && sidesMissingLineup.length > 0)
+                      }
+                      loading={commandPending}
+                      onClick={() => handleRunCommand(command)}
+                    >
+                      {!commandPending ? <Icon size={14} aria-hidden="true" /> : null}
+                      {commandLabel(command, currentPeriod?.number ?? null)}
+                    </Button>
+                  );
+                })}
               {availableCommands.includes('end') ? (
                 <>
                   <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-gray-200 dark:bg-gray-700" />
@@ -509,6 +536,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                     loading={commandPending}
                     onClick={() => handleRunCommand('end')}
                   >
+                    {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
                     {commandLabel('end', currentPeriod?.number ?? null)}
                   </Button>
                 </>
@@ -607,6 +635,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {commandError && <Banner tone="danger">{commandError}</Banner>}
       </div>
 
+      {/* 휴식 타이머(하프타임·부상 중단) — 경기가 SCHEDULED 이전(아직 시작 전)이나
+          이미 ENDED/CANCELLED된 뒤에는 의미가 없으므로 LIVE/PAUSED에서만 보여준다.
+          "다음 피리어드가 없을 때"로 좁히지 않는 이유: 부상 중단은 어느 피리어드
+          중에도 필요하다. */}
+      {(gameState === 'LIVE' || gameState === 'PAUSED') && <RestTimer />}
+
       <TeamFoulCounterBar sides={sides} counts={foulCounts} period={currentPeriod?.number ?? 1} />
 
       {/* 액션 우선 리오더: 이 자리는 예전엔 탭 가능한 선수 그리드였다(선수 먼저 →
@@ -614,7 +648,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           정확히 이 위치를 차지해야 한다 — 그래서 선수 그리드가 아니라 액션 버튼이
           이 자리를 채운다(요소를 없앤 게 아니라 같은 자리의 진입점을 바꾼 것).
           "누구"를 고르는 단계는 `ActionTargetPicker` 모달에서 처리한다. */}
-      <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-4">
+      {/* 액션 버튼 그리드 정리 — 5개(골/옐로/레드/파울/교체)가 2열(모바일)/4열
+          (sm+)로 나뉘면 마지막 한 개가 다음 줄에 혼자 남아 절반이 빈 채로
+          어색하게 줄바꿈됐다. sm 이상은 5열 한 줄로 펴서 아예 줄바꿈이
+          안 생기게 하고, 모바일 2열에서는 마지막 버튼(교체)만 두 칸을 차지해
+          그 줄을 꽉 채운다 — 잘린 게 아니라 의도된 강조로 읽힌다. */}
+      <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-5">
         {ACTION_BUTTONS.map((button, index) => (
           <Button
             key={`${button.type}-${button.cardColor ?? index}`}
@@ -628,7 +667,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                     ? 'danger'
                     : 'neutral'
             }
-            className="h-16 flex-col gap-1"
+            className={`h-16 flex-col gap-1${
+              index === ACTION_BUTTONS.length - 1 ? ' col-span-2 sm:col-span-1' : ''
+            }`}
             disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
             onClick={() => handleSelectAction(button)}
           >

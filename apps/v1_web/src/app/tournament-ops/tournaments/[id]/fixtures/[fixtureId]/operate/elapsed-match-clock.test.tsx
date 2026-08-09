@@ -66,7 +66,23 @@ describe('ElapsedMatchClock — 경과 시간 표시', () => {
         pausedAtMs={null}
       />,
     );
-    expect(screen.getByText('8:00')).toBeInTheDocument();
+    // 스톱워치 표시는 분을 2자리로 고정 패딩한다(formatStopwatchClock).
+    expect(screen.getByText('08:00')).toBeInTheDocument();
+  });
+
+  it('60분을 넘으면 시:분:초로 롤오버해 보여준다 — alpha 실측("전반 584:23") 회귀 방지', () => {
+    render(
+      <ElapsedMatchClock
+        periodNumber={1}
+        // 65분 경과: 시:분:초로 롤오버해야 한다(00:65:00처럼 분이 60을
+        // 넘겨 그대로 표시되면 안 된다).
+        periodStartedAtMs={new Date('2026-08-07T23:05:00.000Z').getTime()}
+        offsetMs={0}
+        pausedTotalMs={0}
+        pausedAtMs={null}
+      />,
+    );
+    expect(screen.getByText('1:05:00')).toBeInTheDocument();
   });
 
   it('일시정지 중(pausedAtMs 설정)에는 시계가 실제로 멈춘다 — 매초 tick이 와도 값이 그대로다', () => {

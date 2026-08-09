@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { RecordedEventList } from './recorded-event-list';
 import type { GameEventRecord, GameLineup, GameSide } from '@/types/game-operations';
@@ -149,5 +150,69 @@ describe('RecordedEventList', () => {
     const assistedGoal = { ...goal(1, HOME_SIDE_ID, 'p-jung', 60000), assistParticipantId: 'p-cho' };
     render(<RecordedEventList events={[assistedGoal]} sides={SIDES} lineups={LINEUPS} onAttachAssist={onAttachAssist} />);
     expect(screen.queryByRole('button', { name: /어시스트/ })).toBeNull();
+  });
+
+  it('SUBSTITUTION 이벤트는 나가는 선수 → 들어오는 선수를 함께 보여준다', () => {
+    const substitution = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 300000),
+      type: 'SUBSTITUTION' as const,
+      payload: { outParticipantId: 'p-cho' },
+    };
+    render(
+      <RecordedEventList
+        events={[substitution]}
+        sides={SIDES}
+        lineups={[
+          ...LINEUPS,
+          // p-cho도 홈팀 벤치였다고 가정 — 이름 조회만 검증하면 되므로 sideId는 표시에 영향 없다.
+        ]}
+      />,
+    );
+    const row = screen.getByRole('list', { name: '기록된 이벤트 목록' });
+    expect(row).toHaveTextContent('교체');
+    expect(row).toHaveTextContent('9 조현우 → 10 정우진');
+  });
+
+  it('되돌리지 않은 SUBSTITUTION 이벤트에는 "되돌리기" 버튼이 뜨고, 누르면 콜백을 부른다', async () => {
+    const onReverseSubstitution = vi.fn();
+    const substitution = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 300000),
+      type: 'SUBSTITUTION' as const,
+      payload: { outParticipantId: 'p-cho' },
+    };
+    render(
+      <RecordedEventList
+        events={[substitution]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onReverseSubstitution={onReverseSubstitution}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /되돌리기/ }));
+    expect(onReverseSubstitution).toHaveBeenCalledWith(substitution);
+  });
+
+  it('이미 되돌려진 SUBSTITUTION 이벤트에는 "되돌리기" 버튼이 없다', () => {
+    const onReverseSubstitution = vi.fn();
+    const substitution = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 300000),
+      type: 'SUBSTITUTION' as const,
+      payload: { outParticipantId: 'p-cho' },
+    };
+    const correction = {
+      ...goal(2, HOME_SIDE_ID, null, 300000),
+      type: 'CORRECTION' as const,
+      reversesEventId: 'event-1',
+      payload: { reason: '오조작' },
+    };
+    render(
+      <RecordedEventList
+        events={[substitution, correction]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onReverseSubstitution={onReverseSubstitution}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /되돌리기/ })).toBeNull();
   });
 });

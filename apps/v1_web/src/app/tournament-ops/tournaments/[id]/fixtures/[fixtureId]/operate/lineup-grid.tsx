@@ -20,6 +20,17 @@ export interface LineupGridProps {
     readonly participant: GameLineupParticipant;
   }) => void;
   readonly disabled?: boolean;
+  /** Live-substitution addition — when set, only participants whose id is in
+   * this set render (both sections still keep their empty-state message when
+   * everyone on that side is filtered out). Used by `ActionTargetPicker`'s
+   * substitution step to show "나갈 선수" as on-pitch-only, then "들어올 선수"
+   * as bench-only, without changing this component's default (unfiltered)
+   * behavior for every other caller. */
+  readonly filterParticipantIds?: ReadonlySet<string>;
+  /** Live-substitution addition — when set, only this one side's section
+   * renders. Used by the "들어올 선수" step, which is scoped to the outgoing
+   * player's own side. */
+  readonly restrictSideId?: string;
 }
 
 /** The latest lineup for a side is the highest `revision` row among
@@ -33,11 +44,22 @@ function latestOperableLineup(lineups: readonly GameLineup[], sideId: string): G
   return candidates.reduce((latest, current) => (current.revision > latest.revision ? current : latest));
 }
 
-export function LineupGrid({ sides, lineups, onSelectPlayer, disabled = false }: LineupGridProps) {
+export function LineupGrid({
+  sides,
+  lineups,
+  onSelectPlayer,
+  disabled = false,
+  filterParticipantIds,
+  restrictSideId,
+}: LineupGridProps) {
+  const visibleSides = restrictSideId === undefined ? sides : sides.filter((side) => side.id === restrictSideId);
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {sides.map((side) => {
+      {visibleSides.map((side) => {
         const lineup = latestOperableLineup(lineups, side.id);
+        const participants = (lineup?.participants ?? []).filter(
+          (participant) => filterParticipantIds === undefined || filterParticipantIds.has(participant.id),
+        );
         return (
           <section
             key={side.id}
@@ -54,13 +76,13 @@ export function LineupGrid({ sides, lineups, onSelectPlayer, disabled = false }:
               </span>
             </h3>
 
-            {lineup === null || lineup.participants.length === 0 ? (
+            {lineup === null || participants.length === 0 ? (
               <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                제출된 선발 명단이 없어요.
+                {lineup === null ? '제출된 선발 명단이 없어요.' : '표시할 선수가 없어요.'}
               </p>
             ) : (
               <ul className="flex flex-col gap-1.5" role="list">
-                {lineup.participants.map((participant) => (
+                {participants.map((participant) => (
                   <li key={participant.id}>
                     <button
                       type="button"

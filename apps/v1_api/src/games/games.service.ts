@@ -48,6 +48,7 @@ import {
   resolveGameIdempotency,
   serializeGameVisibility,
   validateGameResultInvariants,
+  validateSubstitution,
   type PublicParticipantProjection,
 } from './core';
 import type {
@@ -261,7 +262,11 @@ export function toGameHttpException(error: GameContractError): HttpException {
     error.code === 'PARTICIPANT_INVALID' ||
     error.code === 'PARTICIPANT_SIDE_MISMATCH' ||
     error.code === 'SCORE_EVENT_MISMATCH' ||
-    error.code === 'SCORE_INVALID'
+    error.code === 'SCORE_INVALID' ||
+    error.code === 'SUBSTITUTION_INVALID' ||
+    error.code === 'SUBSTITUTION_OUT_NOT_ON_PITCH' ||
+    error.code === 'SUBSTITUTION_IN_ALREADY_ON_PITCH' ||
+    error.code === 'SUBSTITUTION_LIMIT_REACHED'
   ) {
     return new UnprocessableEntityException(body);
   }
@@ -553,10 +558,22 @@ export class GamesService {
         where: { id: game.competitionConfigVersionId },
         select: { lineup: true },
       });
+      const lineup = config === null ? {} : jsonObject(config.lineup);
       return {
         ...game,
         actorRole: actor.role,
         lineupConfig: parseLineupCatalog(config?.lineup ?? null),
+        // Live-substitution addition: the console needs this to decide
+        // whether to surface the rolling quick-substitution mode (config-
+        // driven, never a hardcoded sport name) and to show a remaining-
+        // substitutions count for `limited` sports. `assertSubstitution`
+        // reads the same two config keys server-side as the authoritative
+        // enforcement gate — this is only what the UI needs to render ahead
+        // of a submit.
+        substitutionPolicy: {
+          mode: lineup.substitutions === 'rolling' ? 'rolling' : 'limited',
+          maxSubstitutions: typeof lineup.maxSubstitutions === 'number' ? lineup.maxSubstitutions : null,
+        } as const,
       };
     });
   }
@@ -905,7 +922,7 @@ export class GamesService {
             message: 'Terminal games reject event mutation',
           });
         }
-        await this.assertEventReferences(tx, game, dto);
+        const references = await this.assertEventReferences(tx, game, dto);
         const sequence = game.lastSequence + 1;
         await tx.v1GameEvent.create({
           data: {
@@ -924,6 +941,17 @@ export class GamesService {
             payload: jsonInput(dto.payload),
           },
         });
+        // Live-substitution addition: the incoming participant inherits the
+        // outgoing participant's last-known pitch placement, so the roster
+        // still reflects "who is where" after the swap. `dto.participantId`
+        // is guaranteed defined here — `assertSubstitution` already rejected
+        // an undefined one before this point could ever be reached.
+        if (references.substitutionInheritedPlacement && dto.participantId !== undefined) {
+          await tx.v1GameParticipant.update({
+            where: { id: dto.participantId },
+            data: references.substitutionInheritedPlacement,
+          });
+        }
         const updated = await tx.v1Game.update({
           where: { id: gameId },
           data: { lastSequence: sequence, version: { increment: 1 } },
@@ -1047,7 +1075,7 @@ export class GamesService {
             clientEventId: input.clientEventId,
             takeoverToken: input.takeoverToken,
           };
-          await this.assertEventReferences(tx, game, dto);
+          const references = await this.assertEventReferences(tx, game, dto);
           const sequence = game.lastSequence + 1;
           await tx.v1GameEvent.create({
             data: {
@@ -1066,6 +1094,14 @@ export class GamesService {
               payload: jsonInput(input.event.payload),
             },
           });
+          // See the matching comment in appendEvent() — same inheritance,
+          // same guarantee that a SUBSTITUTION's participantId is defined.
+          if (references.substitutionInheritedPlacement && input.event.participantId !== undefined) {
+            await tx.v1GameParticipant.update({
+              where: { id: input.event.participantId },
+              data: references.substitutionInheritedPlacement,
+            });
+          }
           const updated = await tx.v1Game.update({
             where: { id: gameId },
             data: { lastSequence: sequence, version: { increment: 1 } },
@@ -3097,11 +3133,23 @@ export class GamesService {
     }
   }
 
+  /**
+   * Live-substitution addition: on top of the existing shape/reference
+   * checks, a SUBSTITUTION event also needs to know what pitch placement to
+   * carry onto the incoming participant's row (`V1GameParticipant.position*`
+   * — see `validateSubstitution`'s doc comment for why that is a plain copy,
+   * not a derived value). Returning it here — instead of re-querying inside
+   * `appendEvent`/`retryEvent` — keeps this the single place that reads
+   * participants/events/config for a SUBSTITUTION, so both call sites stay
+   * exactly as cheap as every other event type.
+   */
   private async assertEventReferences(
     tx: Transaction,
     game: LockedGame,
     dto: AppendGameEventDto,
-  ) {
+  ): Promise<{
+    substitutionInheritedPlacement?: { position: string | null; positionX: number | null; positionY: number | null };
+  }> {
     const period = await tx.v1GamePeriod.findFirst({
       where: { gameId: game.id, number: dto.period },
     });
@@ -3199,6 +3247,95 @@ export class GamesService {
         code: 'EVENT_LATE',
         message: 'Event period cannot regress behind an already-recorded period',
       });
+    }
+    if (dto.type === V1GameEventType.SUBSTITUTION) {
+      return { substitutionInheritedPlacement: await this.assertSubstitution(tx, game, dto) };
+    }
+    return {};
+  }
+
+  /**
+   * SUBSTITUTION-specific reference checks, split out of
+   * `assertEventReferences` because it needs its own bounded participants/
+   * events/config reads (nothing else here does). `dto.sideId`/`participantId`
+   * (the INCOMING participant) are already confirmed non-undefined and
+   * side-matched by the generic checks above this call, so this only adds
+   * what is genuinely SUBSTITUTION-specific: the OUTGOING participant
+   * (`payload.outParticipantId`), on-pitch/off-pitch membership, and the
+   * `substitutions: 'limited'` cap.
+   */
+  private async assertSubstitution(
+    tx: Transaction,
+    game: LockedGame,
+    dto: AppendGameEventDto,
+  ): Promise<{ position: string | null; positionX: number | null; positionY: number | null }> {
+    if (dto.sideId === undefined) {
+      // Copilot review: this used to fall through to the generic
+      // EVENT_INVALID (English message) — a contract mismatch with the rest
+      // of this method, which always answers a missing SUBSTITUTION field
+      // with SUBSTITUTION_INVALID + a Korean message (and the frontend's
+      // gameOperationsErrorMessage() maps SUBSTITUTION_INVALID specifically,
+      // not the generic EVENT_INVALID bucket).
+      throw new UnprocessableEntityException({
+        code: 'SUBSTITUTION_INVALID',
+        message: '팀 정보를 확인할 수 없어요. 새로고침 후 다시 시도해주세요.',
+      });
+    }
+    if (dto.participantId === undefined) {
+      throw new UnprocessableEntityException({
+        code: 'SUBSTITUTION_INVALID',
+        message: '들어오는 선수를 지정해주세요',
+      });
+    }
+    const outParticipantId = dto.payload.outParticipantId;
+    if (typeof outParticipantId !== 'string' || outParticipantId.trim().length === 0) {
+      throw new UnprocessableEntityException({
+        code: 'SUBSTITUTION_INVALID',
+        message: '나가는 선수를 지정해주세요',
+      });
+    }
+    const [participants, events, config] = await Promise.all([
+      tx.v1GameParticipant.findMany({
+        where: { gameId: game.id },
+        select: { id: true, sideId: true, started: true, position: true, positionX: true, positionY: true },
+      }),
+      tx.v1GameEvent.findMany({
+        where: { gameId: game.id },
+        select: { id: true, sequence: true, type: true, sideId: true, participantId: true, reversesEventId: true, payload: true },
+      }),
+      tx.v1CompetitionConfigVersion.findUnique({
+        where: { id: game.competitionConfigVersionId },
+        select: { lineup: true },
+      }),
+    ]);
+    const lineup = config === null ? {} : jsonObject(config.lineup);
+    // Fail closed on an unrecognized/missing mode: cap enforcement, not
+    // unlimited substitutions, is the safe default for a malformed config.
+    const substitutionMode: 'limited' | 'rolling' = lineup.substitutions === 'rolling' ? 'rolling' : 'limited';
+    const maxSubstitutions = typeof lineup.maxSubstitutions === 'number' ? lineup.maxSubstitutions : null;
+    try {
+      return validateSubstitution({
+        sideId: dto.sideId,
+        inParticipantId: dto.participantId,
+        outParticipantId,
+        participants,
+        priorEvents: events.map((event) => ({
+          id: event.id,
+          sequence: event.sequence,
+          type: event.type,
+          sideId: event.sideId,
+          participantId: event.participantId,
+          reversesEventId: event.reversesEventId,
+          payload: jsonObject(event.payload),
+        })),
+        substitutionMode,
+        maxSubstitutions,
+      });
+    } catch (error) {
+      if (error instanceof GameContractError) {
+        throw toGameHttpException(error);
+      }
+      throw error;
     }
   }
 

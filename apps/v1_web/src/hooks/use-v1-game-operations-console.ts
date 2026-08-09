@@ -643,6 +643,19 @@ export function gameOperationsErrorMessage(code: string): string {
       return '선택한 선수가 해당 팀 소속이 아니에요. 새로고침 후 다시 기록해주세요.';
     case 'SCORER_REQUIRED':
       return '이 대회는 득점자를 반드시 선택해야 해요. 새로고침 후 다시 기록해주세요.';
+    // 라이브 선수 교체(교체 액션 + 풋살 빠른 교체 모드) — 서버가 던질 수 있는
+    // SUBSTITUTION 전용 코드. 화면단 필터가 애초에 무효한 대상을 보여주지
+    // 않으므로 실제로는 동시성(다른 운영자가 먼저 기록)으로만 도달할 가능성이
+    // 크지만, 그 경우에도 "다시 시도해주세요"는 오해를 준다 — 새로고침 후
+    // 현재 피치 상태를 다시 확인하라고 안내한다.
+    case 'SUBSTITUTION_INVALID':
+      return '교체 정보가 올바르지 않아요. 새로고침 후 다시 기록해주세요.';
+    case 'SUBSTITUTION_OUT_NOT_ON_PITCH':
+      return '나가는 선수가 이미 피치를 떠났어요. 새로고침 후 다시 확인해주세요.';
+    case 'SUBSTITUTION_IN_ALREADY_ON_PITCH':
+      return '들어오는 선수가 이미 피치 위에 있어요. 새로고침 후 다시 확인해주세요.';
+    case 'SUBSTITUTION_LIMIT_REACHED':
+      return '이 대회의 교체 횟수를 모두 사용했어요.';
     case 'COMMAND_IDEMPOTENCY_KEY_MISMATCH':
     case 'IDEMPOTENCY_PAYLOAD_CONFLICT':
       return '같은 요청 번호로 다른 내용이 이미 처리됐어요. 새로고침 후 다시 기록해주세요.';
@@ -684,6 +697,10 @@ const NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES = new Set<string>([
   'EVENT_INVALID',
   'PARTICIPANT_SIDE_MISMATCH',
   'SCORER_REQUIRED',
+  'SUBSTITUTION_INVALID',
+  'SUBSTITUTION_OUT_NOT_ON_PITCH',
+  'SUBSTITUTION_IN_ALREADY_ON_PITCH',
+  'SUBSTITUTION_LIMIT_REACHED',
   'COMMAND_IDEMPOTENCY_KEY_MISMATCH',
   'IDEMPOTENCY_PAYLOAD_CONFLICT',
 ]);

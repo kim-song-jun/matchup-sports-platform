@@ -299,9 +299,12 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   return <TeamMatchDetailPageView model={model} />;
 }
 
+// 경기조건은 이제 구조화 필드(matchFormat/matchStyle/uniformColor, levelLabel)가 진실이고
+// rulesText는 표시 전용 파생 문자열(서버가 만든 것)이라 다시 파싱하지 않는다 — 예전엔 여기서
+// rulesText를 ' · '로 재-split해 재구성했지만(parseRules), 그건 서버가 이미 구조화해서 내려주는
+// 값을 문자열 왕복으로 다시 추측하는 두 번째 파싱 지점이었다.
 function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
   const status = statusToCardStatus(getStatus(match), getViewerState(match));
-  const rules = parseRules(match.rulesText, fallback);
   const costs = parseCosts(match.costNote, fallback);
 
   return {
@@ -316,12 +319,12 @@ function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchMod
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
     endTime: match.endsAt ? formatTime(match.endsAt) : undefined,
-    grade: rules.grade || match.levelLabel || fallback.grade,
-    format: rules.format || fallback.format,
-    style: rules.style || fallback.style,
+    grade: match.levelLabel || fallback.grade,
+    format: match.matchFormat || fallback.format,
+    style: match.matchStyle?.length ? match.matchStyle.join(' · ') : fallback.style,
     cost: costs.cost,
     opponentCost: costs.opponentCost,
-    uniform: rules.uniform || fallback.uniform,
+    uniform: match.uniformColor || fallback.uniform,
     gender: match.genderRule ?? fallback.gender,
     status,
   };
@@ -649,16 +652,6 @@ function reasonLabel(reasonCode?: string) {
   if (reasonCode === 'NOT_RECRUITING') return '신청 마감된 매치예요';
   // 팀이 없는 경우 → 팀 만들기 유도
   return '팀을 만들고 신청할 수 있어요';
-}
-
-function parseRules(value: string | null | undefined, fallback: TeamMatchModel) {
-  const [grade, format, style, uniform] = value?.split(' · ').map((item) => item.trim()).filter(Boolean) ?? [];
-  return {
-    grade: grade ?? fallback.grade,
-    format: format ?? fallback.format,
-    style: style ?? fallback.style,
-    uniform: uniform ?? fallback.uniform,
-  };
 }
 
 function parseCosts(value: string | null | undefined, fallback: TeamMatchModel) {

@@ -73,8 +73,13 @@ export const gameSchemaFixture = {
 // of the MERGED file, computed with `shasum -a 256` — it is not either branch's
 // value. Both sets of changes are present and both are additive; the bound
 // migration is untouched, so `migration` stays as it was.
+// Re-pinned for the match-conditions lane: V1TeamMatch gained matchFormat/
+// matchStyle/uniformColor (additive, nullable/default-[]). New migration file
+// 20260809000100_v1_team_match_structured_conditions; the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration`
+// stays as it was. `schema` recomputed with `shasum -a 256`.
 export const gameSchemaSourceManifest = {
-  schema: '01d94a57567728f69b001e3384d1e5559f29ba2d77a9e0dac88ad5c1f1d59ca4',
+  schema: '1d51176acc0114177adfb327d28032721ac62b003b6913d69a1c3b04c9970a96',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

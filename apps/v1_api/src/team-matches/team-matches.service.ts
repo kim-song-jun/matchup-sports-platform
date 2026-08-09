@@ -143,8 +143,11 @@ export class TeamMatchesService {
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
-      rulesText: [teamMatch.formatNote, teamMatch.genderRule].filter(Boolean).join(' · ') || null,
+      rulesText: this.formatMatchConditionsRulesText(teamMatch),
       genderRule: teamMatch.genderRule,
+      matchFormat: teamMatch.matchFormat,
+      matchStyle: teamMatch.matchStyle,
+      uniformColor: teamMatch.uniformColor,
       paymentRequired: false,
       hostTeam: {
         teamId: teamMatch.hostTeam.id,
@@ -326,6 +329,9 @@ export class TeamMatchesService {
           endAt: dates.endsAt,
           deadlineAt: dates.deadlineAt,
           formatNote: dto.rulesText ?? null,
+          matchFormat: dto.matchFormat ?? null,
+          matchStyle: dto.matchStyle ?? [],
+          uniformColor: dto.uniformColor ?? null,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
@@ -388,6 +394,9 @@ export class TeamMatchesService {
         minLevelCode: teamMatch.minSportLevel?.code ?? null,
         maxLevelCode: teamMatch.maxSportLevel?.code ?? null,
         genderRule: teamMatch.genderRule,
+        matchFormat: teamMatch.matchFormat,
+        matchStyle: teamMatch.matchStyle,
+        uniformColor: teamMatch.uniformColor,
       },
       status: apiStatus,
       version: teamMatch.updatedAt.toISOString(),
@@ -427,6 +436,9 @@ export class TeamMatchesService {
         endAt: dates.endsAt,
         deadlineAt: dates.deadlineAt,
         formatNote: dto.rulesText ?? null,
+        matchFormat: dto.matchFormat ?? null,
+        matchStyle: dto.matchStyle ?? [],
+        uniformColor: dto.uniformColor ?? null,
         minSportLevelId: levelRange.minSportLevelId,
         maxSportLevelId: levelRange.maxSportLevelId,
         genderRule: dto.genderRule ?? null,
@@ -1110,8 +1122,11 @@ export class TeamMatchesService {
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
-      rulesText: [teamMatch.formatNote, teamMatch.genderRule].filter(Boolean).join(' · ') || null,
+      rulesText: this.formatMatchConditionsRulesText(teamMatch),
       genderRule: teamMatch.genderRule,
+      matchFormat: teamMatch.matchFormat,
+      matchStyle: teamMatch.matchStyle,
+      uniformColor: teamMatch.uniformColor,
       paymentRequired: false,
       viewerState: this.getViewerState(teamMatch, user),
     };
@@ -1499,6 +1514,30 @@ export class TeamMatchesService {
     if (!sport) throw validationError('sportId is invalid or inactive', 'sportId');
     const region = await this.prisma.v1Region.findFirst({ where: { id: regionId, isActive: true, level: 2 }, select: { id: true } });
     if (!region) throw validationError('regionId must be an active district region', 'regionId');
+  }
+
+  /**
+   * 표시용 rulesText 파생값. 구조화 필드(matchFormat/matchStyle/uniformColor)가 진실이고
+   * rulesText는 그 값들을 이어붙인 표시 전용 문자열일 뿐, 다시 파싱되지 않는다.
+   * formatNote로의 폴백은 구조화 컬럼 3종이 전부 비어 있는 미백필 row(백필 CLI 실행 전
+   * 레거시 데이터)만을 위한 것 — 백필 완료 후에는 이 분기를 타지 않는다.
+   */
+  private formatMatchConditionsRulesText(teamMatch: {
+    formatNote: string | null;
+    matchFormat: string | null;
+    matchStyle: string[];
+    uniformColor: string | null;
+    genderRule: string | null;
+    minSportLevel: { name: string } | null;
+    maxSportLevel: { name: string } | null;
+  }) {
+    const levelLabel = formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, null);
+    const hasStructuredConditions =
+      Boolean(teamMatch.matchFormat) || teamMatch.matchStyle.length > 0 || Boolean(teamMatch.uniformColor);
+    const conditionText = hasStructuredConditions
+      ? [teamMatch.matchFormat, teamMatch.matchStyle.join(' · ') || null, teamMatch.uniformColor].filter(Boolean).join(' · ') || null
+      : teamMatch.formatNote;
+    return [levelLabel, conditionText, teamMatch.genderRule].filter(Boolean).join(' · ') || null;
   }
 
   private getApiStatus(teamMatch: V1TeamMatch) {

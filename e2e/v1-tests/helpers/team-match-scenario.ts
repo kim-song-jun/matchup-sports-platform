@@ -16,10 +16,17 @@ import { apiGet, apiPost, apiPut, commandId, unwrap } from './v1-http';
  * - `POST /team-matches` only accepts `sportId`s whose code resolves to
  *   `football`/`soccer`/`futsal` (`loadTeamMatchCreationSource`) — every
  *   other sport 409s `COMPETITION_CONFIG_REQUIRED` because only
- *   `football-v1`/`futsal-v1` `V1CompetitionConfigVersion` rows exist, and
- *   only as part of a MIGRATION (`20260729000200_v1_competition_config`),
- *   not seed data — so they exist in every environment regardless of which
- *   seed script ran. `futsal-v1`'s `lineup` config is `{minPlayers:3,
+ *   `football-v1`/`futsal-v1` `V1CompetitionConfigVersion` rows exist.
+ *   Copilot review finding (PR #306): this used to say they're created by
+ *   migration `20260729000200_v1_competition_config` DML and therefore exist
+ *   regardless of which seed script ran — that stopped being true once Task 9's
+ *   expand/contract split moved seeding out of migration.sql (DML is never
+ *   additive under the alpha rollback gate) into
+ *   `competition-config-backfill.cli.ts`'s `seedCompetitionConfigVersions()`.
+ *   These rows exist here only because whatever stood up the target API
+ *   server already ran that CLI (CI's migration replay gate does; alpha's
+ *   `seed-alpha-tournament-qa.ts` does too) — not automatically from any
+ *   seed script. `futsal-v1`'s `lineup` config is `{minPlayers:3,
  *   maxPlayers:6, substitutions:'rolling'}` (6 matches the '6:6' match-format
  *   preset — see competition-config.presets.ts), the smallest `minPlayers`
  *   requirement of the two, which is why futsal is selected below.

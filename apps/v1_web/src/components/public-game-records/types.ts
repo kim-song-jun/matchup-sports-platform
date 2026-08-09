@@ -22,6 +22,18 @@ export interface PublicScore {
   readonly away: number;
 }
 
+/**
+ * Lane 1 addition -- the pause-aware elapsed clock of whichever period is
+ * currently live (`resolveLiveClock`, `apps/v1_api/src/games/public-records/public-clock.ts`).
+ * `null` before kickoff, during a between-periods break, or once the match
+ * has ended -- never a stale/frozen number.
+ */
+export interface PublicGameClock {
+  readonly periodNumber: number;
+  readonly elapsedMs: number;
+  readonly isPaused: boolean;
+}
+
 export interface PublicSideSummary {
   readonly registrationId: string;
   readonly teamId: string;
@@ -46,6 +58,7 @@ export interface PublicScheduleEntry {
   readonly resultState: PublicResultState;
   readonly scoreStatus: PublicScoreStatus;
   readonly score: PublicScore | null;
+  readonly clock: PublicGameClock | null;
   readonly hasVideo: boolean;
 }
 
@@ -143,6 +156,7 @@ export interface PublicMatchDetail {
   readonly resultState: PublicResultState;
   readonly scoreStatus: PublicScoreStatus;
   readonly score: PublicScore | null;
+  readonly clock: PublicGameClock | null;
   readonly lineup: PublicLineup | null;
   readonly events: readonly PublicMatchEvent[];
   readonly mvp: PublicMatchMvp | null;

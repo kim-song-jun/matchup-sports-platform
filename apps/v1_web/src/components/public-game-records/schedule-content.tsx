@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { LiveBadge } from './live-badge';
 import {
   fixtureStatusLabel,
   formatScoreline,
@@ -62,7 +63,8 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
           {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
         </span>
         <span style={{ fontSize: 11, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
-          {dateLabel ?? '일정 미정'} · {fixtureStatusLabel(entry.status)}
+          {dateLabel ?? '일정 미정'}
+          {entry.status === 'live' ? <LiveBadge clock={entry.clock} /> : ` · ${fixtureStatusLabel(entry.status)}`}
           <ScheduleResultBadge entry={entry} />
         </span>
       </div>

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma, V1GameEventType, V1GameResultRevisionState, V1VisibilityMode } from '@prisma/client';
+import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { isBracketPublished } from '../../tournaments/tournament-detail.presenter';
 import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
@@ -8,6 +9,8 @@ import {
   loadParticipantConsentEligibility,
   type ParticipantConsentEligibility,
 } from './public-consent';
+import { resolveLiveClock, type PublicGameClock } from './public-clock';
+import { tallyLiveScore } from './public-live-score';
 import { effectivePublicVisibilityMode, isLineupPublished, publicFixtureStatus, resolveResultState } from './public-visibility';
 import type { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
 
@@ -42,6 +45,11 @@ const FIXTURE_SCHEDULE_SELECT = {
       state: true,
       visibilityPolicy: { select: { mode: true, lineupAt: true } },
       currentOfficialRevision: { select: { state: true, supersedesId: true, officialAt: true, score: true } },
+      // Lane 1 addition -- `sides`/`periods` back the live-score tally and the
+      // elapsed-clock projection for a fixture that is genuinely LIVE and has
+      // no official revision yet (see `public-live-score.ts`/`public-clock.ts`).
+      sides: { select: { id: true, sideKey: true } },
+      periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
     },
   },
 } satisfies Prisma.V1TournamentFixtureSelect;
@@ -77,6 +85,8 @@ const FIXTURE_MATCH_SELECT = {
       currentOfficialRevision: {
         select: { state: true, supersedesId: true, officialAt: true, score: true, mvpParticipantId: true },
       },
+      // Lane 1 addition -- see FIXTURE_SCHEDULE_SELECT above.
+      periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
     },
   },
 } satisfies Prisma.V1TournamentFixtureSelect;
@@ -136,10 +146,6 @@ export class PublicTournamentRecordsService {
     const hasMore = rawFixtures.length > limit;
     const pageFixtures = rawFixtures.slice(0, limit);
 
-    const items = pageFixtures
-      .map((fixture) => presentScheduleEntry(fixture, publicLiveEnabled))
-      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-
     const rawUnscheduled = await this.prisma.v1TournamentFixture.findMany({
       where: {
         tournamentId,
@@ -150,8 +156,19 @@ export class PublicTournamentRecordsService {
       orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }],
       select: FIXTURE_SCHEDULE_SELECT,
     });
+
+    // Lane 1 fix -- one batched query for every currently-LIVE/PAUSED game on
+    // this page (both cursor-paginated and unscheduled), never a per-fixture
+    // query. See `loadLiveScores` below.
+    const liveScoreByGameId = await this.loadLiveScores([...pageFixtures, ...rawUnscheduled]);
+    const now = new Date();
+
+    const items = pageFixtures
+      .map((fixture) => presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, now))
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
     const unscheduled = rawUnscheduled
-      .map((fixture) => presentScheduleEntry(fixture, publicLiveEnabled))
+      .map((fixture) => presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, now))
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
     const standings = await this.prisma.v1TournamentStanding.findMany({
@@ -237,12 +254,21 @@ export class PublicTournamentRecordsService {
     const officialScore = parseScore(fixture.game?.currentOfficialRevision?.score);
     const officialAt = fixture.game?.currentOfficialRevision?.officialAt ?? null;
     const showOfficialResult = currentRevisionState === 'OFFICIAL' && officialScore !== null && officialAt !== null;
+    // Lane 1 fix (관중 라이브 스코어): see `presentScheduleEntry`'s twin comment
+    // -- `currentOfficialRevision` alone silently hides the score for the
+    // entire duration a tournament fixture is actually being played.
+    const liveScore =
+      !showOfficialResult && mode === 'live' && status === 'live' && fixture.game !== null
+        ? await this.computeLiveScore(fixture.game.id, fixture.game.sides)
+        : null;
     const scoreStatus: 'unavailable' | 'live' | 'official' = showOfficialResult
       ? 'official'
-      : status === 'live'
+      : liveScore !== null
         ? 'live'
         : 'unavailable';
-    const score = mode === 'status_only' ? null : showOfficialResult ? officialScore : null;
+    const score = mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScore;
+    const clock: PublicGameClock | null =
+      mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], new Date()) : null;
 
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
     const consentMap = await loadParticipantConsentEligibility(this.prisma, participantIds);
@@ -283,6 +309,7 @@ export class PublicTournamentRecordsService {
       resultState,
       scoreStatus,
       score,
+      clock,
       lineup,
       events,
       mvp,
@@ -305,6 +332,57 @@ export class PublicTournamentRecordsService {
       select: { value: true },
     });
     return flag?.value === 'on';
+  }
+
+  /**
+   * Lane 1 (관중 라이브 스코어) -- one batched `V1GameEvent` query for every
+   * fixture on this page whose game is currently `LIVE`/`PAUSED`, never a
+   * per-fixture query (a schedule page can list dozens of fixtures; only a
+   * handful are ever concurrently live). Fixtures whose game has already
+   * ended or hasn't started are skipped entirely -- `presentScheduleEntry`
+   * only consults this map while `status === 'live'` anyway, so scoring them
+   * here would be wasted work. See `public-live-score.ts`.
+   */
+  private async loadLiveScores(
+    fixtures: readonly FixtureScheduleRow[],
+  ): Promise<ReadonlyMap<string, GameScore>> {
+    const liveFixtures = fixtures.filter(
+      (fixture): fixture is FixtureScheduleRow & { game: NonNullable<FixtureScheduleRow['game']> } =>
+        fixture.game !== null && (fixture.game.state === 'LIVE' || fixture.game.state === 'PAUSED'),
+    );
+    if (liveFixtures.length === 0) return new Map();
+
+    const gameIds = liveFixtures.map((fixture) => fixture.game.id);
+    const events = await this.prisma.v1GameEvent.findMany({
+      where: { gameId: { in: gameIds } },
+      select: { id: true, gameId: true, type: true, sideId: true, reversesEventId: true },
+    });
+    const eventsByGame = new Map<string, typeof events>();
+    for (const event of events) {
+      const list = eventsByGame.get(event.gameId) ?? [];
+      list.push(event);
+      eventsByGame.set(event.gameId, list);
+    }
+
+    const scores = new Map<string, GameScore>();
+    for (const fixture of liveFixtures) {
+      const sideKeyById = new Map(fixture.game.sides.map((side) => [side.id, side.sideKey] as const));
+      scores.set(fixture.game.id, tallyLiveScore(eventsByGame.get(fixture.game.id) ?? [], sideKeyById));
+    }
+    return scores;
+  }
+
+  /** Single-match twin of `loadLiveScores` above, for `getMatch`'s one fixture. */
+  private async computeLiveScore(
+    gameId: string,
+    sides: readonly { id: string; sideKey: 'HOME' | 'AWAY' }[],
+  ): Promise<GameScore> {
+    const events = await this.prisma.v1GameEvent.findMany({
+      where: { gameId },
+      select: { id: true, type: true, sideId: true, reversesEventId: true },
+    });
+    const sideKeyById = new Map(sides.map((side) => [side.id, side.sideKey] as const));
+    return tallyLiveScore(events, sideKeyById);
   }
 
   private async buildEvents(
@@ -394,7 +472,12 @@ function presentSide(
   return { registrationId, teamId: registration.team.id, teamName: registration.team.name };
 }
 
-function presentScheduleEntry(fixture: FixtureScheduleRow, publicLiveEnabled: boolean) {
+function presentScheduleEntry(
+  fixture: FixtureScheduleRow,
+  publicLiveEnabled: boolean,
+  liveScoreByGameId: ReadonlyMap<string, GameScore>,
+  now: Date,
+) {
   const policyMode: V1VisibilityMode = fixture.game?.visibilityPolicy?.mode ?? 'HIDDEN';
   const mode = effectivePublicVisibilityMode(policyMode, publicLiveEnabled);
   if (mode === 'hidden') return null;
@@ -403,11 +486,23 @@ function presentScheduleEntry(fixture: FixtureScheduleRow, publicLiveEnabled: bo
   const officialScore = parseScore(fixture.game?.currentOfficialRevision?.score);
   const showOfficialResult = currentRevisionState === 'OFFICIAL' && officialScore !== null;
   const status = publicFixtureStatus({ gameState: fixture.game?.state ?? null, fixtureStatus: fixture.status });
+  // Lane 1 fix (관중 라이브 스코어): while genuinely LIVE and no official
+  // revision exists yet, use the GOAL-event tally instead of leaving the score
+  // null -- see `public-live-score.ts`'s doc comment for why
+  // `currentOfficialRevision` alone silently hid every in-progress score.
+  // Gated to `mode === 'live'` only: `official_only` deliberately withholds any
+  // numeric score before officialization (frozen visibility matrix).
+  const liveScore =
+    !showOfficialResult && mode === 'live' && status === 'live' && fixture.game !== null
+      ? (liveScoreByGameId.get(fixture.game.id) ?? null)
+      : null;
   const scoreStatus: 'unavailable' | 'live' | 'official' = showOfficialResult
     ? 'official'
-    : status === 'live'
+    : liveScore !== null
       ? 'live'
       : 'unavailable';
+  const clock: PublicGameClock | null =
+    mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], now) : null;
 
   return {
     fixtureId: fixture.id,
@@ -428,7 +523,8 @@ function presentScheduleEntry(fixture: FixtureScheduleRow, publicLiveEnabled: bo
       supersedesId: fixture.game?.currentOfficialRevision?.supersedesId ?? null,
     }),
     scoreStatus,
-    score: mode === 'status_only' ? null : showOfficialResult ? officialScore : null,
+    score: mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScore,
+    clock,
     hasVideo: fixture.videos.length > 0,
   };
 }

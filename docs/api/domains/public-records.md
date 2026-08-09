@@ -108,6 +108,55 @@ disappear the instant the pointer swaps without any row being deleted.
 correction) -- this contains no participant identity, so it is shown under
 every non-hidden visibility mode.
 
+### Lane 1 addition -- live score/clock for an in-progress fixture (2026-08)
+
+Root cause found and fixed: for a `TOURNAMENT_FIXTURE` game,
+`GamesService.deriveTournamentRevision` creates `V1GameResultRevision` (the
+only thing `currentOfficialRevision.score` ever reads) exactly once, the
+instant the game reaches `ENDED`. So every public read here returned
+`score: null` for the *entire duration a fixture was actually being played*
+-- silently breaking the frozen matrix's own "`live` exposes policy-eligible
+lineup/score/events" row (`docs/api/domains/games.md` D-06) for precisely the
+state a spectator most wants the score for, even though the operations
+console showed the real score the whole time (it reads its own captured
+event list directly, never `currentOfficialRevision`).
+
+Fix: `score`/`scoreStatus`/a new `clock` field fall back to a live
+projection, computed only when there is no official revision yet:
+
+- `score` -- a GOAL-event tally (`tallyLiveScore`, `public-live-score.ts`),
+  gated to **`mode === 'live'` and `status === 'live'` only** -- the same
+  restriction `official_only` already implied ("official numeric only") is
+  preserved unchanged; `status_only` still never gets a score. `scoreStatus`
+  reports `'live'` whenever this tally is used.
+- `clock` -- `{ periodNumber, elapsedMs, isPaused } | null`
+  (`resolveLiveClock`, `public-clock.ts`), the pause-aware elapsed time of
+  whichever `V1GamePeriod` row is currently `LIVE`, gated the same way as
+  `score` above. `null` before kickoff, during a between-periods break, or
+  once the game has ended.
+
+Neither field is a new privacy tier: both are derived purely from data the
+`live` mode already exposes elsewhere on the same response (`events[]`
+already lists every GOAL; a running tally of the same GOALs reveals nothing
+new). `GET /tournaments/:id/schedule` batches this into a single extra
+`V1GameEvent` query per page (grouped by `gameId`, only for fixtures whose
+game is currently `LIVE`/`PAUSED`) rather than one query per fixture --
+`PublicTournamentRecordsService.loadLiveScores`.
+
+The frontend (`apps/v1_web/src/components/public-game-records/**`) polls
+`GET /tournaments/:id/schedule` and `GET /tournaments/:id/matches/:fixtureId`
+on a fixed interval *only* while the currently-loaded page has at least one
+`status === 'live'` entry (`use-public-game-records.ts`). A public,
+potentially-hundreds-of-viewers surface deliberately does not reuse the
+operations console's authenticated realtime socket/takeover channel
+(`apps/v1_api/src/realtime/realtime.gateway.ts`) -- that channel is scoped to
+one authorized operator per game, not an unauthenticated fan-out audience,
+and standing up a new public broadcast channel is out of this lane's scope.
+Polling bounds server load to (concurrently live fixtures) x (poll interval)
+regardless of spectator count, since every viewer's request lands on the
+same cached-by-`react-query` data independently -- it does not scale with
+viewers, only with active matches.
+
 ### Known scope trims (documented, not silently dropped)
 
 - The schedule list only cursor-paginates fixtures that already have a

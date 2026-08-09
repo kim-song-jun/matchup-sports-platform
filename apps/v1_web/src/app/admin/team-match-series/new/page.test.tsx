@@ -142,6 +142,9 @@ describe('AdminTeamMatchSeriesNewPage', () => {
 
     const crossSportOption = await screen.findByText('축구팀');
     expect(screen.getByText('이 리그는 풋살 종목이라 축구 팀은 선택할 수 없어요')).toBeInTheDocument();
+    // disabled 항목이라도 description(종목·지역)은 계속 보여야 한다 — disabledReason은
+    // "왜 안 되는지" 추가 정보이지 description을 대체하는 게 아니다.
+    expect(screen.getByText('축구 · 서울')).toBeInTheDocument();
     fireEvent.click(crossSportOption);
 
     // 선택 칩 목록에 축구팀이 추가되지 않아야 한다(클릭이 무시됨).

@@ -290,9 +290,10 @@ export function EntityPicker({
                     onClick={() => commitEntry(entry)}
                     className={[
                       'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left transition-colors',
-                      item.disabled
-                        ? 'cursor-not-allowed opacity-60'
-                        : ['hover:bg-blue-50', highlighted ? 'bg-blue-50' : ''].join(' '),
+                      item.disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-blue-50',
+                      // disabled 항목도 화살표 키로 하이라이트될 수 있다 — 선택은 막되(no-op),
+                      // 지금 어디에 있는지는 키보드 사용자에게도 보여야 한다.
+                      highlighted ? 'bg-blue-50' : '',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                     ].join(' ')}
                   >
@@ -301,7 +302,7 @@ export function EntityPicker({
                     >
                       {item.label}
                     </span>
-                    {item.description && !item.disabled && (
+                    {item.description && (
                       <span className="text-[var(--font-size-caption)] text-gray-400">{item.description}</span>
                     )}
                     {item.disabled && item.disabledReason && (

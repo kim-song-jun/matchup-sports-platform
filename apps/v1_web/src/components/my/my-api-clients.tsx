@@ -404,7 +404,7 @@ export function ProfileEditPageClient() {
 
   if (profile.isPending) {
     return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -412,7 +412,7 @@ export function ProfileEditPageClient() {
 
   if (profile.isError || !profile.data) {
     return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
         <div className="tm-my-shell">
           <ErrorState
             message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
@@ -1328,7 +1328,7 @@ export function NotificationSettingsPageClient() {
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
     return (
-      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
         <div className="tm-my-shell">
           <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
         </div>

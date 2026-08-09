@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSafePopupLink, resolvePopupTargetScreen } from './popup-targets';
+import { isSafePopupLink, isSafePopupTargetPath, resolvePopupTargetScreen } from './popup-targets';
 
 describe('resolvePopupTargetScreen', () => {
   it('maps list, detail, and account routes to supported popup screens', () => {
@@ -25,5 +25,13 @@ describe('resolvePopupTargetScreen', () => {
     expect(isSafePopupLink('https://teameet.co.kr/matches')).toBe(true);
     expect(isSafePopupLink('//evil.example')).toBe(false);
     expect(isSafePopupLink('javascript:alert(1)')).toBe(false);
+  });
+
+  it('accepts exact user paths while rejecting admin, query, hash, and malformed targets', () => {
+    expect(isSafePopupTargetPath('/tournaments/tournament-1')).toBe(true);
+    expect(isSafePopupTargetPath('/admin/tournaments/tournament-1')).toBe(false);
+    expect(isSafePopupTargetPath('/tournaments/tournament-1?tab=results')).toBe(false);
+    expect(isSafePopupTargetPath('/tournaments/tournament-1#results')).toBe(false);
+    expect(isSafePopupTargetPath('//evil.example')).toBe(false);
   });
 });

@@ -1,8 +1,16 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, V1AuthProvider } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
+import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import {
@@ -15,6 +23,8 @@ import {
 
 @Injectable()
 export class ProfileService {
+  private readonly logger = new Logger(ProfileService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async me(user: V1AuthUser) {
@@ -598,6 +608,8 @@ export class ProfileService {
   async withdrawalRequest(user: V1AuthUser, dto: WithdrawalRequestDto) {
     this.assertMutableAccount(user);
     await this.assertWithdrawable(user.id);
+    // 상태 전이·로스터 제거·팀 이탈이 같은 시각을 갖도록 트랜잭션 밖에서 한 번만 만든다.
+    const withdrawnAt = new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM "v1_users" WHERE id = ${user.id} FOR UPDATE
@@ -626,6 +638,36 @@ export class ProfileService {
         where: { id: user.id },
         data: { accountStatus: 'withdrawal_pending' },
       });
+
+      // assertWithdrawable() 이 owner·manager 를 이미 막았으므로 여기 남는 것은 일반
+      // 멤버십뿐이다. 추방(`removed`)이 아니라 본인 의사에 의한 이탈이므로 `left` 로 둔다.
+      //
+      // **멤버십을 먼저 끄고 그다음 로스터를 정리한다.** 순서가 반대면 "정리 → (그 사이 다른
+      // 트랜잭션이 이 사람을 명단에 추가) → 멤버십 off" 가 되어 탈퇴한 사람이 명단에 활성으로
+      // 남는다. 명단 추가 경로가 멤버십 행을 FOR UPDATE 로 잡는데, 정리가 먼저 돌면 그 시점엔
+      // 아직 아무도 그 행을 잠그지 않아 lock 이 아무것도 막지 못한다. 추방·자진탈퇴 경로는
+      // 이미 이 순서다(teams.service.ts removeMembership·leaveTeam).
+      const memberships = await tx.v1TeamMembership.findMany({
+        where: { userId: user.id, status: 'active' },
+        select: { id: true, teamId: true },
+      });
+      for (const membership of memberships) {
+        await tx.v1TeamMembership.update({
+          where: { id: membership.id },
+          data: { status: 'left', leftAt: withdrawnAt },
+        });
+        await tx.v1Team.update({
+          where: { id: membership.teamId },
+          data: { memberCount: { decrement: 1 } },
+        });
+      }
+
+      // 탈퇴 신청 시점에 자리를 비운다. `withdrawal_pending` 이 되면 가드가 모든 요청을
+      // 막으므로 본인은 더 이상 아무것도 할 수 없는데, 대회 로스터와 팀 명단에는 그대로
+      // 남아 정원만 차지한다 — 2026-08-03 프로덕션에서 실제로 이렇게 됐다.
+      // 완료된 대회는 기록 보존을 위해 건드리지 않는다(roster-cleanup.ts 주석 참조).
+      const removedRosterCount = await removeUserFromActiveRosters(tx, user.id, { at: withdrawnAt });
+
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'user',
@@ -634,12 +676,27 @@ export class ProfileService {
           toStatus: 'withdrawal_pending',
           actorType: 'user',
           actorUserId: user.id,
-          reason: dto.reason ?? 'withdrawal_requested',
+          // 사용자가 사유를 안 적었으면 null 로 둔다. 예전에는 'withdrawal_requested'
+          // 를 채웠는데, 이 컬럼은 **사용자가 쓴 문장**을 담는 자리라서 어드민 화면의
+          // `reason || '별도 메시지를 남기지 않았어요'` 폴백이 발동하지 못하고 내부
+          // 문자열이 그대로 노출됐다. 무슨 일이 있었는지는 toStatus 가 이미 말해준다.
+          reason: dto.reason?.trim() || null,
         },
       });
-      return next;
+      return { next, removedRosterCount, leftTeamCount: memberships.length };
     });
-    return { userId: updated.id, accountStatus: updated.accountStatus, requestedAt: updated.updatedAt };
+
+    if (updated.removedRosterCount > 0 || updated.leftTeamCount > 0) {
+      this.logger.log(
+        `withdrawal cleanup user=${user.id} rosters=${updated.removedRosterCount} teams=${updated.leftTeamCount}`,
+      );
+    }
+
+    return {
+      userId: updated.next.id,
+      accountStatus: updated.next.accountStatus,
+      requestedAt: updated.next.updatedAt,
+    };
   }
 
   private async getUserSnapshot(userId: string) {

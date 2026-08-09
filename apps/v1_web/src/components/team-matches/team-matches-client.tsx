@@ -7,8 +7,8 @@ import {
   useV1ApproveTeamMatchApplication,
   useV1CancelTeamMatch,
   useV1CloseTeamMatch,
-  useV1CompleteTeamMatch,
   useV1MasterSports,
+  useV1MyTeams,
   useV1RecentSearches,
   useV1RecordSearch,
   useV1RejectTeamMatchApplication,
@@ -26,6 +26,10 @@ import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/l
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-storage';
+// 호스트팀뿐 아니라 승인된 상대팀 매니저도 자기 사이드 라인업을 관리할 수 있다 — 이 판단은
+// team-match-lineup.service.ts의 loadContext()와 완전히 동일한 규칙이라 그 규칙을 그대로
+// 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
+import { resolveOwnTeamId } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import {
@@ -188,7 +192,6 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const rejectApplication = useV1RejectTeamMatchApplication(teamMatchId);
   const closeTeamMatch = useV1CloseTeamMatch(teamMatchId);
   const reopenTeamMatch = useV1ReopenTeamMatch(teamMatchId);
-  const completeTeamMatch = useV1CompleteTeamMatch(teamMatchId);
   const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
   const [actionError, setActionError] = useState<string | null>(null);
   const resolveChatRoom = useV1ResolveChatRoom();
@@ -198,6 +201,12 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const hasNoTeam = !isGuest && eligibility.isSuccess && eligibility.data.teams.length === 0;
   const withdrawTeamMatch = useV1WithdrawTeamMatchApplication(teamMatchId, selectedEligibility?.applicationId);
   const fallback = getTeamMatchDetailViewModel();
+
+  // 라인업 CTA(Task 15 blocker-3): 호스트팀 매니저뿐 아니라 승인된 상대팀 매니저도 자기
+  // 사이드 라인업을 관리하므로, canManageHostTeam 하나만으로는 판단할 수 없다.
+  // resolveOwnTeamId가 라인업 페이지 자체의 권한 판정과 동일한 규칙으로 "내 팀"을 고른다.
+  const myTeamsQuery = useV1MyTeams();
+  const ownTeamId = useMemo(() => resolveOwnTeamId(query.data, myTeamsQuery.data), [query.data, myTeamsQuery.data]);
 
   useEffect(() => {
     if (!query.data || !canOpenTeamMatchChat(viewerState, getStatus(query.data)) || autoResolvedChatRef.current === teamMatchId) return;
@@ -251,15 +260,11 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
               status: getStatus(query.data),
               closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),
               reopenTeamMatch: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
-              completeTeamMatch: () => completeTeamMatch.mutateAsync({ note: 'host_completed_from_v1_web' }),
               cancelTeamMatch: () => cancelTeamMatch.mutateAsync({ reason: 'host_cancelled_from_v1_web' }),
-              pending:
-                closeTeamMatch.isPending ||
-                reopenTeamMatch.isPending ||
-                completeTeamMatch.isPending ||
-                cancelTeamMatch.isPending,
+              pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending,
             })
           : undefined,
+        resultAction: buildResultAction(teamMatchId, viewerState, getStatus(query.data), canManageHostTeam),
         statusLabel: statusLabel(viewerState, getStatus(query.data)),
         chatLabel: chatLabel(viewerState, getStatus(query.data)),
         chatPending: resolveChatRoom.isPending,
@@ -271,6 +276,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           : undefined,
         onShare: () => shareTeamMatch(query.data),
         onNotify: () => router.push('/notifications'),
+        lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
         onApply: getApplyAction({
           viewerState,
           selectedTeamId: selectedEligibility?.teamId,
@@ -302,6 +308,7 @@ function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchMod
     ...fallback,
     id: match.teamMatchId ?? match.id ?? fallback.id,
     title: match.title,
+    imageUrl: match.imageUrl ?? fallback.imageUrl,
     sport: match.sport?.name ?? match.sportName ?? fallback.sport,
     hostTeam: match.hostTeam?.name ?? match.hostTeamName ?? fallback.hostTeam,
     venue: match.place?.name ?? match.placeName ?? fallback.venue,
@@ -473,15 +480,15 @@ function getViewerState(match: V1TeamMatch): V1TeamMatchViewerState {
 function statusToCardStatus(status: V1TeamMatchApiStatus, viewerState: V1TeamMatchViewerState = 'none'): TeamMatchModel['status'] {
   if (viewerState === 'host_team') return 'mine';
   if (viewerState === 'requested') return 'pending';
-  if (viewerState === 'approved' || status === 'matched') return 'approved';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired') return 'closed';
+  if (viewerState === 'approved') return 'approved';
+  if (status === 'matched' || status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired') return 'closed';
   return 'open';
 }
 
 function toDetailMode(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus): TeamMatchDetailViewModel['mode'] {
   if (viewerState === 'host_team') return 'mine';
   if (viewerState === 'requested') return 'pending';
-  if (viewerState === 'approved' || status === 'matched') return 'approved';
+  if (viewerState === 'approved') return 'approved';
   return 'default';
 }
 
@@ -494,7 +501,7 @@ function applyLabel(
 ) {
   if (viewerState === 'host_team') return '매치 관리';
   if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') return '신청 취소';
-  if (viewerState === 'approved' || status === 'matched') return '승인 완료';
+  if (viewerState === 'approved') return '승인 완료';
   if (status !== 'recruiting') return '신청 불가';
   // 비인증 사용자: 로그인 유도 (#13)
   if (isGuest) return '로그인하고 신청하기';
@@ -507,7 +514,8 @@ function applyLabel(
 function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus) {
   if (viewerState === 'host_team') return '내가 만든 팀매치';
   if (viewerState === 'requested') return '승인 대기';
-  if (viewerState === 'approved' || status === 'matched') return '승인 완료';
+  if (viewerState === 'approved') return '승인 완료';
+  if (status === 'matched') return '상대팀 확정';
   if (status !== 'recruiting') return '신청 마감';
   return '신청 가능';
 }
@@ -524,14 +532,12 @@ function buildHostActions({
   status,
   closeTeamMatch,
   reopenTeamMatch,
-  completeTeamMatch,
   cancelTeamMatch,
   pending,
 }: {
   status: V1TeamMatchApiStatus;
   closeTeamMatch: () => Promise<unknown>;
   reopenTeamMatch: () => Promise<unknown>;
-  completeTeamMatch: () => Promise<unknown>;
   cancelTeamMatch: () => Promise<unknown>;
   pending: boolean;
 }): TeamMatchDetailViewModel['hostActions'] {
@@ -548,12 +554,41 @@ function buildHostActions({
     ];
   }
   if (status === 'matched') {
-    return [
-      { label: '경기 완료', tone: 'primary', pending, onClick: completeTeamMatch },
-      { label: '팀매치 취소', tone: 'danger', pending, onClick: cancelTeamMatch },
-    ];
+    // Task 16 removed the standalone "complete" mutation — completion is now an
+    // atomic side effect of the host submitting a validated result revision on
+    // /team-matches/:id/result (see buildResultAction below), so cancel is the
+    // only remaining direct mutation here.
+    return [{ label: '팀매치 취소', tone: 'danger', pending, onClick: cancelTeamMatch }];
   }
   return [];
+}
+
+// Task 17: entry point into /team-matches/:id/result(/approval). Host drafts/submits
+// the result; the opponent manager only ever approves or requests a change — never
+// drafts or submits (see docs/api/domains/games.md's team_result_submit/opponent_result_decide
+// actor split), so the two viewer roles get distinct destinations.
+function buildResultAction(
+  teamMatchId: string,
+  viewerState: V1TeamMatchViewerState,
+  status: V1TeamMatchApiStatus,
+  canManageHostTeam: boolean,
+): TeamMatchDetailViewModel['resultAction'] {
+  if (status !== 'matched' && status !== 'completed') return null;
+  if (canManageHostTeam) {
+    return {
+      label: status === 'completed' ? '경기 결과 보기' : '경기 결과 입력',
+      href: `/team-matches/${teamMatchId}/result`,
+      tone: 'primary',
+    };
+  }
+  if (viewerState === 'approved') {
+    return {
+      label: status === 'completed' ? '경기 결과 확인/승인' : '경기 결과 대기',
+      href: `/team-matches/${teamMatchId}/result/approval`,
+      tone: status === 'completed' ? 'primary' : 'neutral',
+    };
+  }
+  return null;
 }
 
 async function shareTeamMatch(match: V1TeamMatch) {

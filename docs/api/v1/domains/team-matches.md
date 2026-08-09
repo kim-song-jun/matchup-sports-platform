@@ -13,7 +13,6 @@
 | `POST` | `/api/v1/team-matches/:teamMatchId/close` | owner/manager of host team | `{ reason?: string | null }` | closed team match and expired pending applications |
 | `POST` | `/api/v1/team-matches/:teamMatchId/reopen` | owner/manager of host team | `{ reason?: string | null }` | reopened recruiting team match |
 | `POST` | `/api/v1/team-matches/:teamMatchId/cancel` | owner/manager of host team | `{ reason?: string | null }` | cancelled team match |
-| `POST` | `/api/v1/team-matches/:teamMatchId/complete` | owner/manager of host team | `{ note?: string | null }` | completed team match |
 | `POST` | `/api/v1/team-matches/:teamMatchId/applications` | owner/manager of applicant team | `{ applicantTeamId: uuid; message?: string | null }` | requested application |
 | `GET` | `/api/v1/team-matches/:teamMatchId/applications` | host team owner/manager | `status?`, `cursor?`, `limit?` | applications |
 | `POST` | `/api/v1/team-match-applications/:applicationId/withdraw` | applicant team owner/manager | `{ reason?: string | null }` | withdrawn application |
@@ -47,15 +46,21 @@ Optional fields include `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addr
 - Host owner/manager can close recruiting. Closing moves the team match to `closed`, rejects new applications, and marks pending applications `expired`.
 - Host owner/manager can reopen `closed` team matches before `startAt`; expired applications are not auto-restored.
 - Create UI must source host team choices from the current user's active owner/manager teams. Member-only teams are not valid host team options.
+- The requested `sportId` must equal the selected host team's `sportId`; mismatches return `400 VALIDATION_FAILED`.
+- Create/edit image upload uses the root-relative `/uploads/...` URL returned by `POST /uploads`; an empty image remains `null` and must not be replaced by sample data.
 - Applicant is a team, not a user.
 - Applicant team must be managed by the acting user.
 - Host team cannot apply to itself.
-- Approval locks and re-reads the team match before conditionally moving a still-`requested` application to `approved` and the team match to `matched`; concurrent approvals cannot approve more than one applicant team.
-- Applicant team owner/manager can withdraw only `requested` applications.
-- Host owner/manager can complete only `matched` team matches with an approved applicant team. Completion records `completedAt` and unlocks review surfaces.
+- `deadlineAt` is enforced for both new applications and host approval. Once the deadline passes, the application eligibility response is `NOT_RECRUITING` and a pending application can no longer be approved.
+- Approval locks and re-reads the team match before conditionally moving a still-`requested` application to `approved` and the team match to `matched`; concurrent approvals cannot approve more than one applicant team. Remaining requested applications are atomically rejected, receive individual status-change logs, and notify their applicant-team managers.
+- Applicant team owner/manager can withdraw only `requested` applications. Withdraw, reject, and resubmit use expected-status transitions so a concurrent terminal action cannot be overwritten or reported as a second success.
+- `matched` is a match-level state, not proof that the current viewer's team was approved. Only `viewer.state = approved` receives approved UI and chat affordances.
+- **There is no standalone "complete" mutation on this domain (Task 16 removed it).** A `matched` team match becomes `completed` only as an atomic side effect of the host team owner/manager submitting a validated result revision — see `docs/api/domains/games.md`'s `POST /api/v1/games/:gameId/result-revisions/:revisionId/submit`. That route sets `completedAt` and unlocks review surfaces in the same transaction that ends the Game; the opposing team then approves or requests changes to the submitted result via `.../decision`.
+- **Task 17 (result entry/approval UI):** `GET /api/v1/team-matches/:teamMatchId` now includes `gameId` (the 1:1 `V1Game.id`, `null` only if a row somehow predates Game provisioning) — this is the only client-facing way to learn the Game id needed to call `/api/v1/games/:gameId/result-revisions*`. `GET /api/v1/team-matches/:teamMatchId/lineup` starters/bench entries now also include the real `V1GameParticipant.id` alongside `displayName`/`jerseyNumber`, so the host can attribute a goal/card to a specific own-side roster entry when drafting a result. Both additions are additive fields on existing responses; no path, DTO, or auth rule changed.
+- **Known gap carried into Task 17, not fixed there:** `POST /api/v1/games/:gameId/result-revisions` cross-checks `score`/`actualParticipants[].goals|cards` against the game's `V1GameEvent` rows (see `docs/api/domains/games.md`), but `event_append`/`event_reverse` is unconditionally forbidden for `TEAM_MATCH` source games (only tournament staff may append events). No team match can ever have events, so the invariant check always requires `score = {home:0, away:0}` with zero goals/cards; any nonzero score submission returns `422 SCORE_EVENT_MISMATCH`. Task 16's own test suite only exercises `{home:0, away:0}`. Fixing this needs a scoped decision (either a team-match event-append allowance, or relaxing the invariant for `TEAM_MATCH` sources with no events) that is out of Task 17's frontend scope.
 - Team match chat is available only after an applicant team has been approved/matched.
 - `costNote` is text-only. No payment API is called.
-- Notifications are emitted for application received, application withdrawn, approved, rejected, recruiting closed, match cancelled, and match completed events.
+- Notifications are emitted for application received, application withdrawn, approved, rejected, recruiting closed, and match cancelled events. (Match-completed review-nudge notifications are a known Task 16 gap — see the games contract doc note above; the completion write itself is unconditional and does not depend on any notification succeeding.)
 
 Primary tables:
 

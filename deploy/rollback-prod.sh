@@ -49,8 +49,16 @@ set +a
 # export 하는데 이 호스트는 `Defaults env_reset` 이라 sudo 가 그걸 떨군다.
 # 롤백에서는 특히 중요하다 — 이 배열은 load_prod_release_manifest() 보다 **먼저** 정의되므로
 # 배열에 값을 박아 넣으면 항상 빈 문자열이 굳는다.
+# compose 호출 형태는 호스트마다 다르다 — 판정 근거는 resolve_compose_binary() 주석 참조.
+# 롤백에서 특히 중요하다: 이 배열이 틀리면 되돌릴 수단 자체가 없다.
+compose_binary=()
+while IFS= read -r compose_token; do
+  compose_binary+=("${compose_token}")
+done < <(resolve_compose_binary)
+[[ ${#compose_binary[@]} -gt 0 ]] || exit 1
+
 compose=(
-  sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE docker compose
+  sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE "${compose_binary[@]}"
   --project-name deploy
   -f "${COMPOSE_PROD}"
   --env-file "${ENV_FILE}"
@@ -98,6 +106,9 @@ restore_current_on_failure() {
 trap 'restore_current_on_failure' ERR
 
 load_prod_release_manifest "${PREVIOUS_MANIFEST}"
+# 매니페스트 로드 뒤에 검사한다 — V1_*_IMAGE 는 여기서 export 되므로 그 전에 부르면
+# 이미지 변수까지 미설정으로 잡힌다. 롤백에서 빈 비밀키로 되살아나는 것도 똑같이 막아야 한다.
+assert_compose_variables_resolve "${compose[@]}"
 pull_release_images
 activate_prod_release_source "${previous_sha}"
 write_release_metadata "${PREVIOUS_MANIFEST}"

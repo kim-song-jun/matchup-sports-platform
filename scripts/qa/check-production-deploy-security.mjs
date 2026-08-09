@@ -2,6 +2,10 @@
 
 import { readFileSync } from 'node:fs';
 
+export function normalizeWorkflowSource(source) {
+  return source.replace(/\r\n/g, '\n');
+}
+
 // SSH alias 잔재 탐지. 테스트(scripts/qa/prod-deploy-security-guard.test.mjs)에서 직접
 // 호출할 수 있도록 export 한다 — 이 가드 자체가 약해서 놓친 전례가 있어(2026-08-02,
 // `ssh -o ... ec2` 미탐 + 인라인 주석 오탐) 동작을 테스트로 고정한다.
@@ -24,9 +28,79 @@ export function usesSshAlias(body) {
   return sshAlias.test(code) || scpAlias.test(code) || rsyncSsh.test(code);
 }
 
+// 워크플로를 job 블록으로 쪼갠다. 아래 전제조건 검사는 반드시 **job 단위**여야 한다 —
+// 파일 전체에서 grep 하면 다른 job 이 갖춘 것을 이 job 도 가진 것으로 착각한다.
+export function splitJobs(workflow) {
+  const lines = workflow.split('\n');
+  const jobs = [];
+  let current = null;
+  let inJobs = false;
+  for (const line of lines) {
+    if (/^jobs:\s*$/.test(line)) { inJobs = true; continue; }
+    if (!inJobs) continue;
+    // 최상위 키(들여쓰기 0)를 만나면 jobs: 섹션이 끝난 것이다.
+    if (/^\S/.test(line)) { inJobs = false; continue; }
+    const header = line.match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
+    if (header) {
+      current = { name: header[1], body: [] };
+      jobs.push(current);
+      continue;
+    }
+    if (current) current.body.push(line);
+  }
+  return jobs.map((j) => ({ name: j.name, body: j.body.join('\n') }));
+}
+
+// 러너에서 무언가를 실행하려면 그 job 자신이 준비물을 갖춰야 한다.
+//  - 리포 스크립트를 돌린다  → actions/checkout 이 그 job 안에 있어야 한다
+//  - aws CLI 를 호출한다     → 자격증명 스텝 + id-token: write 가 그 job 안에 있어야 한다
+// 2026-08-02 실사고: SSH → SSM 전환에서 deploy job 의 checkout 과 AWS 자격증명 스텝이 함께
+// 사라졌는데, 가드가 파일 전체를 grep 했기 때문에 build-images 의 것을 보고 green 을 냈다.
+// 첫 승인 배포가 `sync-prod-runtime-env.sh: No such file or directory`(127) 로 죽었다.
+export function findJobsMissingRunnerPrereqs(workflow) {
+  const problems = [];
+  // 워크플로 레벨 permissions 는 모든 job 이 상속한다 — 여기서 id-token: write 를 주면
+  // job 블록에 다시 적을 필요가 없다(deploy-alpha.yml 이 그 형태다). jobs: 이전 구간만 본다.
+  const preamble = workflow.split(/^jobs:\s*$/m)[0] ?? '';
+  const inheritsIdToken = /^permissions:\s*$[\s\S]*?^\s+id-token:\s*write\s*$/m.test(preamble);
+  for (const { name, body } of splitJobs(workflow)) {
+    const code = body
+      .split('\n')
+      .filter((line) => !/^\s*#/.test(line))
+      .map((line) => line.replace(/\s#.*$/, ''))
+      .join('\n');
+    const usesAwsCli = /\baws\s+(?:ssm|s3|ecr|sts|ec2|elbv2)\b/.test(code);
+    const runsRepoScript = /\b(?:bash|sh|node)\s+scripts\//.test(code);
+    if (!usesAwsCli && !runsRepoScript) continue;
+
+    if (!/uses:\s*actions\/checkout@/.test(code)) {
+      problems.push(
+        `job '${name}': 리포 스크립트/aws 호출이 있는데 actions/checkout 스텝이 없습니다 ` +
+          '(러너에 리포가 없어 첫 실행에서 exit 127 로 죽는다)',
+      );
+    }
+    if (usesAwsCli && !/uses:\s*aws-actions\/configure-aws-credentials@/.test(code)) {
+      problems.push(
+        `job '${name}': aws CLI 를 호출하는데 configure-aws-credentials 스텝이 없습니다`,
+      );
+    }
+    if (usesAwsCli && !inheritsIdToken && !/id-token:\s*write/.test(code)) {
+      problems.push(
+        `job '${name}': aws CLI 를 호출하는데 job 레벨 id-token: write 가 없습니다 ` +
+          '(워크플로 기본값은 contents: read 뿐이라 OIDC 토큰을 못 받는다)',
+      );
+    }
+  }
+  return problems;
+}
+
 const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
-const workflow = readFileSync(workflowPath, 'utf8');
+const workflow = normalizeWorkflowSource(readFileSync(workflowPath, 'utf8'));
 const errors = [];
+
+for (const problem of findJobsMissingRunnerPrereqs(workflow)) {
+  errors.push(`${workflowPath}: ${problem}`);
+}
 
 // deploy.yml 이 SSH 를 안 쓰게 됐어도, **그 워크플로가 호출하는 스크립트**가 여전히
 // `ssh ec2` 를 쓰면 배포는 첫 실행에서 죽는다 — alias 를 만들던 "Setup SSH" 스텝이
@@ -83,6 +157,123 @@ const errors = [];
       'deploy/prod-manifest-common.sh: load_prod_release_manifest must assert that ' +
         'V1_API_IMAGE / V1_WEB_IMAGE are ECR digest URIs',
     );
+  }
+}
+
+// prod 배포/롤백 스크립트는 compose 호출 형태를 하드코딩하면 안 된다. 프로덕션 인스턴스에는
+// v2 플러그인이 없고 standalone `docker-compose` 만 있는데(2026-08-02 실측), 스크립트가
+// `docker compose` 를 박아 두는 바람에 첫 실배포가 `unknown flag: --project-name` 으로 죽었고
+// **레거시 복구 경로도 같은 배열을 써서 함께 실패**했다. alpha 인스턴스에는 플러그인이 있어
+// alpha 검증으로는 잡히지 않는다 — 호스트 차이 그 자체가 원인이므로 코드로 막는다.
+{
+  for (const rel of ['deploy/deploy-prod.sh', 'deploy/rollback-prod.sh']) {
+    let body = '';
+    try {
+      body = readFileSync(rel, 'utf8');
+    } catch {
+      errors.push(`${rel}: 파일을 읽을 수 없습니다`);
+      continue;
+    }
+    const code = body
+      .split('\n')
+      .filter((line) => !/^\s*#/.test(line))
+      .join('\n');
+    // compose=( ... ) 배열은 여러 줄에 걸쳐 있으므로 블록 단위로 본다 — 한 줄 정규식은
+    // 실제 코드 형태를 못 잡아 조용히 통과한다(그런 검사는 없는 것만 못하다).
+    const composeArray = code.match(/compose=\([\s\S]*?\n\)/)?.[0] ?? '';
+    if (/\bdocker(?:\s+compose|-compose)\b/.test(composeArray)) {
+      errors.push(
+        `${rel}: compose 호출 형태를 하드코딩했습니다 — resolve_compose_binary() 로 해석해야 합니다 ` +
+          '(프로덕션 호스트에는 docker compose 플러그인이 없고 standalone docker-compose 만 있다)',
+      );
+    }
+    if (!/resolve_compose_binary/.test(code)) {
+      errors.push(
+        `${rel}: resolve_compose_binary() 를 거치지 않습니다 — 호스트마다 compose 호출 형태가 다릅니다`,
+      );
+    }
+  }
+}
+
+// compose 가 **기본값 없이** 참조하는 변수(`${VAR}`)는 값이 없으면 빈 문자열로 조용히
+// 치환된다. 2026-08-02 배포에서 DB_PASSWORD / JWT_SECRET 이 그랬고, 중첩 기본값
+// `${V1_JWT_SECRET:-${JWT_SECRET}}` 때문에 빈 JWT 서명 비밀키까지 번질 뻔했다.
+// deploy-prod.sh 의 런타임 preflight 가 최종 방어선이지만, 그건 배포가 시작돼야 발화한다 —
+// 여기서는 "compose 에 새 무기본값 변수를 추가했는데 배포 경로에 배선하지 않은" 경우를
+// CI 에서 먼저 잡는다.
+export function findUnwiredComposeVariables(compose, workflow) {
+  const bare = new Set([...compose.matchAll(/\$\{([A-Z][A-Z0-9_]*)\}/g)].map((m) => m[1]));
+  // 릴리스 매니페스트가 export 하는 이미지 변수는 .env 가 아니라
+  // load_prod_release_manifest() 가 채우고, 거기서 digest 형식까지 검증한다.
+  const fromManifest = new Set(['V1_API_IMAGE', 'V1_WEB_IMAGE']);
+  const wired = new Set(
+    [...workflow.matchAll(/SECRET_([A-Z][A-Z0-9_]*)\s*:/g)].map((m) => m[1]),
+  );
+  return [...bare]
+    .filter((name) => !fromManifest.has(name) && !wired.has(name))
+    .sort();
+}
+
+{
+  let compose = '';
+  try {
+    compose = readFileSync('deploy/docker-compose.prod.yml', 'utf8');
+  } catch {
+    compose = '';
+  }
+  if (compose) {
+    for (const name of findUnwiredComposeVariables(compose, workflow)) {
+      errors.push(
+        `${workflowPath}: compose 가 기본값 없이 참조하는 ${name} 가 Sync runtime env 에 없습니다 — ` +
+          `SECRET_${name} 를 추가하세요 (없으면 compose 가 빈 문자열로 치환해 빈 비밀키로 배포될 수 있다)`,
+      );
+    }
+  }
+}
+
+// 배포 스크립트가 `.env` 를 더 이상 `source` 하지 않으므로, 셸에서 봐야 하는 값은
+// env_value() 로 **명시적으로 읽어야만** 들어온다. 읽는 걸 빠뜨리면 변수는 조용히
+// 미설정으로 남고, `${VAR:-기본값}` 형태의 분기는 언제나 기본값 쪽으로만 간다.
+//
+// 실제로 그렇게 됐다: V1_DB_HOST 를 읽지 않아 "외부 DB 면 로컬 Postgres 기동을 건너뛴다"
+// 분기가 **한 번도 실행될 수 없는 죽은 코드**였다(.env 가 RDS 엔드포인트를 가리켜도
+// 로컬 컨테이너를 띄우고 기다렸다). 이 저장소에서 "발화하지 않는 가드"가 나온 세 번째
+// 사례라서, 다음번에는 사람이 아니라 CI 가 잡도록 여기에 둔다.
+export function findUnreadRuntimeEnvVariables(script) {
+  // 주석 안의 `${V1_...}` 는 코드가 아니다. 이 파일의 주석은 전부 `#` 또는 ` # ` 형태다.
+  const code = script
+    .split('\n')
+    .map((line) => line.replace(/^\s*#.*$/, '').replace(/\s#\s.*$/, ''))
+    .join('\n');
+
+  const referenced = new Set(
+    [...code.matchAll(/\$\{(V1_[A-Z0-9_]+)(?::-[^}]*)?\}/g)].map((m) => m[1]),
+  );
+  const assigned = new Set(
+    [...code.matchAll(/^\s*(V1_[A-Z0-9_]+)=/gm)].map((m) => m[1]),
+  );
+  // 이미지 변수만 예외다 — .env 가 아니라 load_prod_release_manifest() 가 export 한다.
+  const fromManifest = new Set(['V1_API_IMAGE', 'V1_WEB_IMAGE']);
+
+  return [...referenced]
+    .filter((name) => !fromManifest.has(name) && !assigned.has(name))
+    .sort();
+}
+
+{
+  let deployScript = '';
+  try {
+    deployScript = readFileSync('deploy/deploy-prod.sh', 'utf8');
+  } catch {
+    deployScript = '';
+  }
+  if (deployScript) {
+    for (const name of findUnreadRuntimeEnvVariables(deployScript)) {
+      errors.push(
+        `deploy/deploy-prod.sh: ${name} 를 참조하지만 env_value() 로 읽지 않습니다 — ` +
+          `.env 를 source 하지 않으므로 셸에서는 항상 미설정이고, 이 변수로 갈리는 분기는 죽은 코드가 됩니다`,
+      );
+    }
   }
 }
 

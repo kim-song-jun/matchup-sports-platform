@@ -6,6 +6,19 @@ import {
   V1TournamentStatus,
 } from '@prisma/client';
 
+// canonical 풋살 competition config 의 id.
+//
+// **여기서 `../src/...` 를 import 하면 안 된다.** 이 파일은 alpha 배포 중 API 프로덕션
+// 이미지 안에서 `ts-node prisma/seed-alpha-tournament-qa.ts` 로 실행되는데, 그 이미지에는
+// `src/` 가 들어있지 않다(`dist/`·`prisma/`·`node_modules` 만 COPY 된다). 실제로 그렇게
+// import 했다가 2026-08-09 배포가 `MODULE_NOT_FOUND` 로 죽었다. CI 는 `src/` 가 있는
+// 레포에서 돌기 때문에 이 결함을 잡지 못한다.
+//
+// 값이 `competition-config-backfill.ts` 의 `FUTSAL_COMPETITION_CONFIG_ID` 와 어긋나지
+// 않는지는 `src/tournaments/seed-alpha-tournament-qa.spec.ts` 가 단언한다(그 스펙은
+// 이미지 밖에서 돌기 때문에 양쪽을 다 import 할 수 있다).
+export const ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID = '22222222-2222-4222-8222-222222222222';
+
 const ALPHA_QA_ORIGIN = 'https://alpha.teameet.co.kr';
 const ALPHA_QA_DATABASE_HOST = 'v1_postgres';
 const ALPHA_QA_DATABASE_NAME = 'teameet_alpha';
@@ -459,6 +472,7 @@ export async function createCompetitionData(
   scenario: TournamentScenario,
   registrations: Awaited<ReturnType<typeof createRegistrations>>,
   scheduledAt: Date,
+  competitionConfigVersionId: string,
 ) {
   const group = await tx.v1TournamentGroup.create({
     data: {
@@ -525,6 +539,7 @@ export async function createCompetitionData(
         groupId: group.id,
         round: 'group',
         fixtureNumber: index + 1,
+        competitionConfigVersionId,
         homeRegistrationId: registrations[homeIndex].id,
         awayRegistrationId: registrations[awayIndex].id,
         scheduledAt: new Date(scheduledAt.getTime() + index * 90 * 60 * 1000),
@@ -558,6 +573,7 @@ export async function createCompetitionData(
           tournamentId: scenario.id,
           round: plan.round,
           fixtureNumber: plan.fixtureNumber,
+          competitionConfigVersionId,
           homeRegistrationId: registrations[plan.homeIndex].id,
           awayRegistrationId: registrations[plan.awayIndex].id,
           scheduledAt: new Date(scheduledAt.getTime() + (pairings.length + index) * 90 * 60 * 1000),
@@ -586,6 +602,7 @@ async function createScenario(
   teams: Awaited<ReturnType<typeof ensureTeamRoster>>,
   adminUserId: string | null,
   now: Date,
+  competitionConfigVersionId: string,
 ) {
   const marketing = scenario.marketing ?? FEATURED_QA_DEFAULT_MARKETING;
   const scheduledAt = scenario.status === V1TournamentStatus.in_progress
@@ -605,6 +622,7 @@ async function createScenario(
       title: scenario.title,
       status: scenario.status,
       format: 'group_knockout',
+      competitionConfigVersionId,
       registrationDeadlineAt,
       rosterDeadlineAt: scenarioDate(now, scenario.startsInDays - 3, 14),
       bracketPublishedAt:
@@ -706,7 +724,13 @@ async function createScenario(
     V1TournamentRegistrationStatus.confirmed,
     scenario.entryFee,
   );
-  const fixtures = await createCompetitionData(tx, scenario, registrations, scheduledAt);
+  const fixtures = await createCompetitionData(
+    tx,
+    scenario,
+    registrations,
+    scheduledAt,
+    competitionConfigVersionId,
+  );
   if (scenario.status !== V1TournamentStatus.completed) return;
   const finalFixture = fixtures.find((fixture) => fixture.round === 'final');
   if (!finalFixture) throw new Error('Completed alpha tournament requires a final fixture.');
@@ -745,6 +769,123 @@ async function createScenario(
   });
 }
 
+// The QA seed re-runs on every alpha deploy and always tears its own fixed
+// scenario IDs down before recreating them. That teardown used to be a bare
+// `v1TournamentCampaign.deleteMany` + `v1Tournament.deleteMany`, which is
+// only safe as long as nothing outside the tournament/fixture Cascade chain
+// references these rows. Once anything creates a V1Game against one of these
+// fixtures (e.g. an ops-run fixture-game-backfill), `v1_games_tournament_
+// fixture_id_fkey` is `onDelete: Restrict` — by design, a Game is the record
+// of a played match and must never silently vanish because its tournament
+// got deleted — so the plain tournament delete starts failing with a
+// foreign-key violation and the whole alpha deploy aborts. Every table that
+// carries a Restrict edge back to V1Game/V1GameResultRevision must be
+// cleared first, in dependency order, for exactly the Game rows attached to
+// these tournaments' fixtures — never a wider set.
+async function teardownGamesForTournaments(
+  tx: Prisma.TransactionClient,
+  tournamentIds: readonly string[],
+): Promise<void> {
+  const fixtures = await tx.v1TournamentFixture.findMany({
+    where: { tournamentId: { in: [...tournamentIds] } },
+    select: { id: true },
+  });
+  if (fixtures.length === 0) return;
+  const fixtureIds = fixtures.map((fixture) => fixture.id);
+
+  const games = await tx.v1Game.findMany({
+    where: { tournamentFixtureId: { in: fixtureIds } },
+    select: { id: true },
+  });
+  if (games.length === 0) return;
+  const gameIds = games.map((game) => game.id);
+
+  // V1Game.currentOfficialRevisionId is a self-referencing Restrict edge onto
+  // V1GameResultRevision — it must be nulled before any revision can be
+  // deleted, regardless of whether one was ever set.
+  await tx.v1Game.updateMany({
+    where: { id: { in: gameIds } },
+    data: { currentOfficialRevisionId: null },
+  });
+
+  const revisions = await tx.v1GameResultRevision.findMany({
+    where: { gameId: { in: gameIds } },
+    select: { id: true, gameId: true, state: true },
+  });
+
+  // `v1_block_terminal_revision_mutation` makes a revision permanently
+  // undeletable the moment it leaves DRAFT (CHANGE_REQUESTED,
+  // SUPPLEMENT_REQUESTED, REJECTED, OFFICIAL and VOID are all terminal), and
+  // `v1_guard_result_participant_mutation` refuses to delete a single
+  // V1GameResultParticipant row unless its revision is still DRAFT. Together
+  // that means a submitted result can never be torn down by app code at
+  // all — which is exactly the point: once a game's result has moved past a
+  // draft, it is the permanent record of a played match (the same guarantee
+  // the Restrict FK on v1_games itself exists for). If the QA seed's fixed
+  // scenario IDs ever end up wired to a game whose result went past DRAFT,
+  // failing loudly here — before deleting anything (the currentOfficialRevisionId
+  // null-out above rolls back with the rest of the transaction) — is
+  // correct: silently leaving the tournament in place is safer than either
+  // corrupting a real result record or crashing mid-transaction on a bare
+  // Postgres trigger error with no context.
+  const nonDraftRevision = revisions.find((revision) => revision.state !== 'DRAFT');
+  if (nonDraftRevision) {
+    throw new Error(
+      `Alpha QA reset refused: game ${nonDraftRevision.gameId} has a ${nonDraftRevision.state} ` +
+        `result revision (${nonDraftRevision.id}). Once a game result leaves DRAFT it is permanently ` +
+        'append-only and cannot be deleted — the QA scenario tournament that owns it cannot be reseeded.',
+    );
+  }
+  const revisionIds = revisions.map((revision) => revision.id);
+
+  // v1_team_record_facts is a special case: unlike V1GameOfficialFact /
+  // V1GameOfficialResultCache (each gated on INSERT by a BEFORE INSERT
+  // trigger requiring their revision to already be OFFICIAL — structurally
+  // unreachable once the check above has ruled out every non-DRAFT
+  // revision), nothing gates its INSERT at all, so a row can exist against
+  // a still-DRAFT revision. And `v1_block_team_record_fact_mutation` blocks
+  // its own UPDATE **and DELETE** unconditionally (no state check) — once
+  // written, a team record fact can never be deleted by app code, DRAFT or
+  // not. Attempting the delete would always fail; check for it and refuse
+  // loudly instead (Copilot review, PR #281).
+  if (revisionIds.length > 0) {
+    const orphanTeamRecordFact = await tx.v1TeamRecordFact.findFirst({
+      where: { revisionId: { in: revisionIds } },
+      select: { id: true, revisionId: true },
+    });
+    if (orphanTeamRecordFact) {
+      throw new Error(
+        `Alpha QA reset refused: result revision ${orphanTeamRecordFact.revisionId} has a team record ` +
+          `fact (${orphanTeamRecordFact.id}), which is append-only and can never be deleted — the QA ` +
+          'scenario tournament that owns it cannot be reseeded.',
+      );
+    }
+
+    await tx.v1GameResultParticipant.deleteMany({ where: { resultRevisionId: { in: revisionIds } } });
+    await tx.v1ResultEscalation.deleteMany({ where: { resultRevisionId: { in: revisionIds } } });
+    // No FK constraint backs v1_game_result_decisions.revision_id (checked
+    // against the migrations), but leaving decisions for a revision that is
+    // about to be deleted is still orphaned QA garbage — clear it too.
+    await tx.v1GameResultDecision.deleteMany({ where: { revisionId: { in: revisionIds } } });
+  }
+  await tx.v1GameResultRevision.deleteMany({ where: { gameId: { in: gameIds } } });
+  await tx.v1GameParticipant.deleteMany({ where: { gameId: { in: gameIds } } });
+  await tx.v1GameEvent.deleteMany({ where: { gameId: { in: gameIds } } });
+  await tx.v1GameVisibilityPolicy.deleteMany({ where: { gameId: { in: gameIds } } });
+  // V1GameSide, V1GamePeriod and V1GameLineup all Cascade off V1Game, so this
+  // final delete takes them with it.
+  await tx.v1Game.deleteMany({ where: { id: { in: gameIds } } });
+}
+
+export async function resetAlphaTournamentScenarios(
+  tx: Prisma.TransactionClient,
+  tournamentIds: readonly string[],
+): Promise<void> {
+  await teardownGamesForTournaments(tx, tournamentIds);
+  await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId: { in: [...tournamentIds] } } });
+  await tx.v1Tournament.deleteMany({ where: { id: { in: [...tournamentIds] } } });
+}
+
 async function main() {
   assertAlphaSeedAllowed(process.env);
   const prisma = new PrismaClient();
@@ -757,10 +898,35 @@ async function main() {
     if (!sport) throw new Error('Active futsal sport is required for alpha tournament QA data.');
     if (!region) throw new Error('Active seoul-songpa region is required for alpha tournament QA data.');
 
+    // 시드가 만드는 대회·픽스처에 canonical 풋살 config 를 직접 박는다.
+    //
+    // 왜: `fixture-game-backfill` 은 `competitionConfigVersionId` 가 없는 픽스처를
+    // `CONFIG_MISSING` 으로 격리한다. 예전에는 `competition-config-backfill` CLI 가 나중에
+    // 그 값을 채워줬지만, 그 CLI 는 canonical config 행이 코드 상수와 다르면
+    // `COMPETITION_CONFIG_SEED_DRIFT` 로 하드 실패한다 — 그래서 드리프트가 있는 동안
+    // 배포마다 공개 대회 일정이 통째로 비어 있었다(2026-08-09 alpha 실측: 일정 0건).
+    // 값을 아는 쪽(시드)이 만들 때 바로 넣으면 그 의존 자체가 사라진다.
+    const competitionConfig = await prisma.v1CompetitionConfigVersion.findUnique({
+      where: { id: ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID },
+      select: { id: true, status: true },
+    });
+    if (!competitionConfig) {
+      throw new Error(
+        `Canonical futsal competition config (${ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID}) is required for alpha ` +
+          'tournament QA data. Run src/tournaments/competition-config/competition-config-backfill.cli.ts first.',
+      );
+    }
+    if (competitionConfig.status !== 'ACTIVE') {
+      throw new Error(
+        `Canonical futsal competition config (${ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID}) is ${competitionConfig.status}, ` +
+          'not ACTIVE — alpha QA tournaments would pin a retired config.',
+      );
+    }
+    const competitionConfigVersionId = competitionConfig.id;
+
     const summary = await prisma.$transaction(async (tx) => {
       const tournamentIds = ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.id);
-      await tx.v1TournamentCampaign.deleteMany({ where: { tournamentId: { in: tournamentIds } } });
-      await tx.v1Tournament.deleteMany({ where: { id: { in: tournamentIds } } });
+      await resetAlphaTournamentScenarios(tx, tournamentIds);
       const qaTeams = await ensureTeamRoster(
         tx,
         sport.id,
@@ -782,7 +948,15 @@ async function main() {
       const now = new Date();
       for (const scenario of ALPHA_TOURNAMENT_SCENARIOS) {
         const teams = scenario.marketing ? featuredTeams : qaTeams;
-        await createScenario(tx, scenario, sport.id, teams, admin?.id ?? null, now);
+        await createScenario(
+          tx,
+          scenario,
+          sport.id,
+          teams,
+          admin?.id ?? null,
+          now,
+          competitionConfigVersionId,
+        );
       }
       return {
         tournaments: ALPHA_TOURNAMENT_SCENARIOS.length,

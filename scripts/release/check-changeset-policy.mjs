@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { assertReleaseChangeset } from './changeset-contract.mjs';
+import { assertReleaseChangeset, loadReleaseContract } from './changeset-contract.mjs';
 
 function parseArguments(argv) {
   const values = new Map();
@@ -19,7 +19,27 @@ function parseArguments(argv) {
   if (!repo || !changedFilesFile) {
     throw new Error('Expected --repo and --changed-files-file arguments');
   }
-  return { repo: resolve(repo), changedFilesFile: resolve(changedFilesFile) };
+  const releasePromotion =
+    values.get('--release-promotion') === 'true' || process.env.RELEASE_PROMOTION === 'true';
+  const baseRef = values.get('--base-ref') ?? process.env.BASE_REF;
+  const headRef = values.get('--head-ref') ?? process.env.HEAD_REF;
+  const baseApiVersion = values.get('--base-api-version') ?? process.env.BASE_API_VERSION;
+  const baseWebVersion = values.get('--base-web-version') ?? process.env.BASE_WEB_VERSION;
+  if (
+    releasePromotion &&
+    (!baseRef || !headRef || !baseApiVersion || !baseWebVersion)
+  ) {
+    throw new Error('Release promotion checks require base/head refs and both base versions');
+  }
+  return {
+    repo: resolve(repo),
+    changedFilesFile: resolve(changedFilesFile),
+    releasePromotion,
+    baseRef,
+    headRef,
+    baseApiVersion,
+    baseWebVersion,
+  };
 }
 
 function isTestOrDocumentation(path) {
@@ -80,14 +100,79 @@ function isChangesetsReleaseCommit(changedFiles, releaseFiles) {
   return consumesChangesets && onlyVersionManifests && bumpsEveryFixedApp;
 }
 
+const RELEASE_PROMOTION_REQUIRED_FILES = [
+  ...RELEASE_COMMIT_MANIFESTS,
+  'apps/v1_api/CHANGELOG.md',
+  'apps/v1_web/CHANGELOG.md',
+];
+
+function compareVersions(left, right) {
+  const parse = (value) => {
+    const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(value ?? '');
+    if (!match) throw new Error(`Invalid stable version: ${value}`);
+    return match.slice(1).map(Number);
+  };
+  const leftParts = parse(left);
+  const rightParts = parse(right);
+  for (let index = 0; index < leftParts.length; index += 1) {
+    if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+  }
+  return 0;
+}
+
+function isDevToMainReleasePromotion({
+  repo,
+  changedFiles,
+  baseRef,
+  headRef,
+  baseApiVersion,
+  baseWebVersion,
+}) {
+  if (baseRef !== 'main' || headRef !== 'dev') return false;
+
+  const contract = loadReleaseContract(repo);
+  if (contract.changesets.length > 0) {
+    throw new Error('dev -> main promotion must not contain unreleased Changesets');
+  }
+  if (!RELEASE_PROMOTION_REQUIRED_FILES.every((path) => changedFiles.includes(path))) {
+    throw new Error('dev -> main promotion must include both app versions and changelogs');
+  }
+
+  const consumedChangesets = changedFiles.filter(
+    (path) =>
+      /^\.changeset\/[^/]+\.md$/.test(path) &&
+      path !== '.changeset/README.md' &&
+      !existsSync(resolve(repo, path)),
+  );
+  if (consumedChangesets.length === 0) {
+    throw new Error('dev -> main promotion must include consumed Changesets');
+  }
+  if (baseApiVersion !== baseWebVersion) {
+    throw new Error('Base fixed package versions must match for promotion');
+  }
+  if (compareVersions(contract.baseVersion, baseApiVersion) <= 0) {
+    throw new Error('dev -> main promotion must advance the fixed package version');
+  }
+  return true;
+}
+
 try {
-  const { repo, changedFilesFile } = parseArguments(process.argv.slice(2));
+  const options = parseArguments(process.argv.slice(2));
+  const { repo, changedFilesFile } = options;
   const changedFiles = readFileSync(changedFilesFile, 'utf8')
     .split(/\r?\n/)
     .map((path) => path.trim())
     .filter(Boolean);
   const releaseFiles = changedFiles.filter(affectsRelease);
-  if (releaseFiles.length > 0 && isChangesetsReleaseCommit(changedFiles, releaseFiles)) {
+  if (
+    releaseFiles.length > 0 &&
+    options.releasePromotion &&
+    isDevToMainReleasePromotion({ ...options, changedFiles })
+  ) {
+    process.stdout.write(
+      'Verified dev -> main release promotion (version bump + changelogs + consumed Changesets)\n',
+    );
+  } else if (releaseFiles.length > 0 && isChangesetsReleaseCommit(changedFiles, releaseFiles)) {
     process.stdout.write(
       'Changesets release commit detected (version bump + consumed Changesets); changeset not required\n',
     );

@@ -67,6 +67,10 @@ Optional level fields:
 Rules:
 
 - `hostTeamId`에 대해 요청자는 `manager+`여야 한다
+- 생성자는 `realName`, `phone`, `gender`가 모두 있는 creator profile을 가져야 한다.
+- `sportId`는 host team의 단일 `sportId`와 같아야 하며, 다르면 `400 VALIDATION_FAILED`를 반환한다.
+- `imageUrl`은 선택 사항이다. web create/edit는 `/uploads`가 반환한 루트 상대 URL만 저장하고, 미선택 상태를 `null`로 보낸다.
+- `deadlineAt`은 선택 사항이며 `startsAt`보다 빨라야 한다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
 
 ## PATCH /team-matches/:id
 
@@ -83,6 +87,7 @@ Supported behaviors:
 대표 수정 필드:
 
 - `title`, `description`
+- `imageUrl` (업로드 URL 또는 제거 시 `null`)
 - `startsAt`, `endsAt`, `deadlineAt`
 - `manualPlaceName`, `addressText`
 - `costNote`, `rulesText`, `genderRule`

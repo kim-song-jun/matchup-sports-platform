@@ -26,4 +26,15 @@ describe('AdminShell nav', () => {
       expect(link).toHaveAttribute('href', '/admin/ops/push-failures');
     }
   });
+
+  it('renders a reachable sidebar link to the tournament-ops picker page (T6-3)', () => {
+    render(
+      <AdminShell>
+        <div>content</div>
+      </AdminShell>,
+    );
+    const links = screen.getAllByRole('link', { name: /대회 현장 운영/ });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link).toHaveAttribute('href', '/admin/ops/tournaments');
+  });
 });

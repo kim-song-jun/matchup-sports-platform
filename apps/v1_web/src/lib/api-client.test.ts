@@ -132,4 +132,25 @@ describe('v1Api error reporting', () => {
 
     await expect(v1Delete('/notifications/push-unsubscribe', { endpoint: 'https://push.example/abc' })).resolves.toBeUndefined();
   });
+
+  // v1Delete 의 2번째 인자는 fetch 의 init 이 아니라 body 다. 이 구분을 놓쳐서
+  // { body: JSON.stringify(payload) } 를 넘긴 호출부가 있었고, 값이 한 겹 더 감싸진 채
+  // 전송돼 어드민 사용자 삭제가 프로덕션에서 계속 400 을 받았다(2026-08-03, 두 번 다 실패).
+  // 타입이 unknown 이라 컴파일러가 잡아 주지 못하므로 전송되는 바이트로 못박아 둔다.
+  it('두 번째 인자를 그대로 JSON body 로 보낸다 — 한 겹 더 감싸지 않는다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'success', data: { ok: true } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await v1Delete('/admin/users/user-1', { reason: '이용약관 위반' });
+
+    const sent = fetchMock.mock.calls[0][1];
+    expect(sent.method).toBe('DELETE');
+    expect(JSON.parse(sent.body as string)).toEqual({ reason: '이용약관 위반' });
+    // 회귀 형태를 직접 배제한다 — 감싸졌다면 최상위 키가 body 하나뿐이었을 것이다.
+    expect(Object.keys(JSON.parse(sent.body as string))).not.toContain('body');
+  });
 });

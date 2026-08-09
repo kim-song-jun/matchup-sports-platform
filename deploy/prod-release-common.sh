@@ -12,6 +12,66 @@
 # 변경에서 청소한다). 대신 이 파일은 alpha 와 동일한 candidate→promote 원자 승격 상태
 # 기계장치를 담당한다.
 
+# Compose 를 어떻게 부를지는 **호스트마다 다르다**. 이 계열 스크립트는 v2 플러그인 문법
+# (`docker compose`)을 하드코딩하고 있었는데, 프로덕션 인스턴스에는 그 플러그인이 없고
+# standalone 바이너리(`/usr/local/bin/docker-compose`)만 있다 — cli-plugins 에는
+# docker-buildx 뿐이다(2026-08-02 실측). 그래서 첫 실배포에서 docker 가 `compose` 를
+# 서브커맨드로 인식하지 못해 `--project-name` 을 **docker 전역 플래그**로 파싱했고,
+# `unknown flag: --project-name` 으로 죽었다. 더 나쁜 건 레거시 복구 경로도 같은 배열을
+# 써서 함께 실패했다는 점이다("CRITICAL: legacy runtime restore failed").
+#
+# alpha 인스턴스에는 플러그인이 있어서 alpha 검증으로는 절대 잡히지 않는다 — 두 호스트가
+# 다르다는 사실 자체가 이 결함의 원인이다. deploy/setup-ec2.sh 는 이미 같은 분기를 갖고
+# 있었으므로(118-121행) 그 판정을 여기로 끌어와 공유한다.
+#
+# 판정은 **실제로 실행할 형태 그대로**(sudo 포함) 해야 한다. 플러그인은 사용자별
+# ~/.docker/cli-plugins 에 설치될 수 있어 root 와 일반 사용자가 다를 수 있다.
+resolve_compose_binary() {
+  if sudo docker compose version >/dev/null 2>&1; then
+    printf 'docker\ncompose\n'
+    return 0
+  fi
+  if sudo docker-compose version >/dev/null 2>&1; then
+    printf 'docker-compose\n'
+    return 0
+  fi
+  echo "[${0##*/}] 이 호스트에서 docker compose 도 docker-compose 도 실행할 수 없습니다" >&2
+  return 1
+}
+
+# compose 는 값을 못 찾은 변수를 **빈 문자열로 조용히 치환**하고 경고만 남긴다. 그래서
+# 런타임 .env 에 키가 빠져 있어도 배포가 그대로 진행된다 — 2026-08-02 배포에서 DB_PASSWORD 와
+# JWT_SECRET 이 빠진 채로 컨테이너가 떴고, DB 인증 실패(P1000)로 죽었다. 더 위험한 건 그
+# 인증 실패가 없었다면 API 가 **빈 JWT 서명 비밀키와 빈 세션 비밀키**로 프로덕션에 떴으리라는
+# 점이다(JWT_SECRET: ${V1_JWT_SECRET:-${JWT_SECRET}} 형태의 중첩 기본값 때문에 뿌리 변수가
+# 비면 전부 빈 문자열이 된다).
+#
+# 변수 해석 규칙을 여기서 다시 구현하면 compose 와 어긋난다 — `config` 로 compose 자신에게
+# 물어보고 미설정 경고가 하나라도 있으면 **컨테이너를 건드리기 전에** 멈춘다.
+assert_compose_variables_resolve() {
+  local stderr_file status unset_vars
+  stderr_file="$(mktemp)"
+  # `config` 의 **종료 상태**를 먼저 본다. 첫 버전은 stderr 를 grep 에 바로 물려서, 경고
+  # 문구가 없는 실패(YAML 문법 오류, `${VAR:?}` 미충족, compose 파일 부재)는 grep 이 빈
+  # 결과를 내고 `|| true` 가 실패를 삼켜 **성공으로 통과**했다. 실측(2026-08-03): 문법이
+  # 깨진 파일과 필수 변수 미충족 파일이 정상 파일과 똑같이 return 0 을 받았다.
+  # 빈 값을 막으려고 만든 가드가 정작 compose 가 통째로 깨진 경우를 놓치고 있었다.
+  if ! "$@" config >/dev/null 2>"${stderr_file}"; then
+    echo "[${0##*/}] compose 설정을 해석할 수 없어 배포를 중단합니다:" >&2
+    cat "${stderr_file}" >&2
+    rm -f "${stderr_file}"
+    return 1
+  fi
+  unset_vars="$(grep -F 'variable is not set' "${stderr_file}" | sort -u || true)"
+  rm -f "${stderr_file}"
+  if [[ -n "${unset_vars}" ]]; then
+    echo "[${0##*/}] 런타임 .env 에 값이 없는 변수가 있어 배포를 중단합니다:" >&2
+    echo "${unset_vars}" >&2
+    echo "[${0##*/}] compose 는 이런 변수를 빈 문자열로 치환합니다 — 빈 비밀키로 배포되는 것을 막기 위해 여기서 멈춥니다." >&2
+    return 1
+  fi
+}
+
 PROD_HOME_DIR="${PROD_HOME_DIR:-/home/ec2-user}"
 PROD_LIVE_DIR="${PROD_LIVE_DIR:-${PROD_HOME_DIR}/teameet}"
 PROD_RELEASE_STATE_DIR="${PROD_RELEASE_STATE_DIR:-${PROD_HOME_DIR}/.teameet-prod-releases}"

@@ -107,6 +107,20 @@
 - `arrive`: 이미 도착 인증이면 실패
 - `cancel`/`complete`: 이미 종료 상태면 실패
 
+## Task 6 Game source boundary
+
+This document's `/matches` routes are player-match routes and are unchanged by Task 6. The
+separate `/api/v1/team-matches` source flow creates one pinned `TEAM_MATCH` Game in the same
+transaction; the Team Match module obtains `GamesService` from `GamesModule`, rather than
+duplicating Game persistence. Its source must resolve an active immutable competition
+configuration, otherwise it returns `409 COMPETITION_CONFIG_REQUIRED` with no orphan Team Match
+or Game. See [Games](./games.md#current-task-6-runtime-surface) for the resulting Game routes,
+idempotency rules, result DTOs, and the ordinary-team-match result-submit transition to `ENDED`.
+
+Task 6 does not add a generic `/matches` result endpoint and does not turn fixture data into a
+verified record. Any sample or fixture result remains explicitly non-verified until the Game
+revision flow has produced the applicable persisted result state.
+
 ## Frontend Mapping Notes
 
 - `useV1Matches`, `useV1Match`, `useV1CreateMatch`, `useV1UpdateMatch` 사용

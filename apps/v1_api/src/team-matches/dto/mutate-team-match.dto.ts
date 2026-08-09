@@ -94,10 +94,3 @@ export class ReopenTeamMatchDto {
   @MaxLength(500)
   reason?: string | null;
 }
-
-export class CompleteTeamMatchDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  note?: string | null;
-}

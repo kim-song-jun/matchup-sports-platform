@@ -48,12 +48,15 @@ function makeUserRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'u-1',
     email: 'host@teameet.v1',
+    phone: '01012345678',
+    emailVerifiedAt: new Date('2026-05-18T00:00:00.000Z'),
+    phoneVerifiedAt: new Date('2026-05-18T00:00:00.000Z'),
     accountStatus: 'active',
     onboardingStatus: 'completed',
     lastLoginAt: null,
     createdAt: new Date('2026-05-18T00:00:00.000Z'),
     deletedAt: null,
-    profile: { nickname: '호스트민', displayName: '호스트민', realName: '호스트민', gender: 'male' },
+    profile: { nickname: '호스트민', displayName: '호스트민', realName: '호스트민', gender: 'male', birthDate: '1990-01-02', displayRegion: '서울', bio: '풋살을 좋아해요.' },
     authIdentities: [{ provider: 'kakao' }],
     adminUser: null,
     teamMemberships: [{ role: 'owner' }, { role: 'member' }],
@@ -90,6 +93,7 @@ function makeTeamRow(overrides: Record<string, unknown> = {}) {
     ownerUserId: 'u-1',
     sport: { name: '러닝' },
     ownerUser: { profile: { nickname: '팀장원' } },
+    memberships: [],
     ...overrides,
   };
 }
@@ -340,6 +344,13 @@ describe('AdminService — list/detail endpoints', () => {
       const result = await service.getUser(adminAuthUser, 'u-1');
 
       expect(result.gender).toBe('male');
+      expect(result).toMatchObject({
+        phone: '01012345678',
+        birthDate: '1990-01-02',
+        displayRegion: '서울',
+        bio: '풋살을 좋아해요.',
+      });
+      expect(result.phoneVerifiedAt).toEqual(new Date('2026-05-18T00:00:00.000Z'));
       expect(result.authProviders).toEqual(['kakao']);
       expect(result.reputationSummary).not.toBeNull();
       expect(result.reputationSummary?.trustState).toBe('estimated');
@@ -601,6 +612,19 @@ describe('AdminService — list/detail endpoints', () => {
         hostedTeamMatches: [
           { id: 'tm-1', title: '토요일 풋살', status: 'recruiting', startAt: new Date('2026-05-23T05:00:00.000Z') },
         ],
+        memberships: [
+          {
+            id: 'membership-1',
+            role: 'owner',
+            joinedAt: new Date('2026-05-18T00:00:00.000Z'),
+            user: {
+              id: 'u-1',
+              email: 'owner@teameet.v1',
+              phone: '01012345678',
+              profile: { nickname: '팀장원', realName: '김팀장', displayName: null },
+            },
+          },
+        ],
       });
 
       const result = await service.getTeam(adminAuthUser, 't-1');
@@ -610,6 +634,17 @@ describe('AdminService — list/detail endpoints', () => {
       expect(result.trustScore?.matchCount).toBe(8);
       expect(result.recentHostedTeamMatches).toHaveLength(1);
       expect(result.recentHostedTeamMatches[0]).toMatchObject({ teamMatchId: 'tm-1' });
+      expect(result.members).toEqual([
+        expect.objectContaining({
+          membershipId: 'membership-1',
+          userId: 'u-1',
+          name: '김팀장',
+          nickname: '팀장원',
+          email: 'owner@teameet.v1',
+          phone: '01012345678',
+          role: 'owner',
+        }),
+      ]);
     });
 
     it('recalculates trustState/mannerScore live from submitted reviews instead of trusting the stale cache', async () => {

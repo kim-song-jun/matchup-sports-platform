@@ -45,3 +45,10 @@ export function isSafePopupLink(value: string) {
     return false;
   }
 }
+
+export function isSafePopupTargetPath(value: string) {
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return false;
+  if (value.startsWith('/admin')) return false;
+  if (value.includes('?') || value.includes('#')) return false;
+  return !Array.from(value).some((character) => character.trim() === '');
+}

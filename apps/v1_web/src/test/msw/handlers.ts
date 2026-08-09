@@ -14,7 +14,25 @@ import type {
   V1AdminPopupCreatePayload,
   V1AdminPopupRow,
   V1AdminPopupUpdatePayload,
+  V1CancelScheduleDto,
+  V1CreateGameResultRevisionPayload,
+  V1CreateGuestApplicationDto,
+  V1CreateGuestRecruitmentDto,
+  V1CreateScheduleDto,
+  V1DecideGameResultRevisionPayload,
+  V1GameResultRevision,
+  V1GameState,
+  V1GrantTournamentStaffPayload,
   V1Inquiry,
+  V1SetScheduleAttendanceDto,
+  V1TeamMatchLineup,
+  V1TeamMatchLineupSavePayload,
+  V1TeamScheduleDetail,
+  V1TournamentOperationsBoardItem,
+  V1TournamentStaffAssignment,
+  V1TriggerScheduleReminderDto,
+  V1UpdateGuestRecruitmentDto,
+  V1UpdateScheduleDto,
 } from '@/types/api';
 import {
   v1AdminLogsFixture,
@@ -176,6 +194,212 @@ function teamDetail(teamId: string) {
   };
 }
 
+// ── Team schedules mock state (Task 12 backend / Task 13 frontend) ─────────
+// Single mutable schedule keeps GET (list/detail/me-schedule) and every mutation
+// (create/update/cancel/complete/attendance/guest-recruitment) cross-consistent —
+// tests exercising one mutation observe it on the very next GET, matching the
+// server's read-your-write contract for a single-user MSW harness.
+let v1ScheduleFixture = {
+  id: 'schedule-1',
+  teamId: 'team-1',
+  title: '주말 정기 훈련',
+  type: 'TRAINING' as 'MATCH' | 'TRAINING' | 'EVENT',
+  startAt: '2026-05-24T09:00:00.000Z',
+  endAt: '2026-05-24T11:00:00.000Z',
+  timezone: 'Asia/Seoul',
+  capacity: 16 as number | null,
+  rsvpDeadlineAt: '2026-05-23T15:00:00.000Z' as string | null,
+  visibility: 'TEAM' as 'TEAM' | 'MEMBERS' | 'PUBLIC',
+  state: 'SCHEDULED' as 'SCHEDULED' | 'CANCELLED' | 'COMPLETED',
+  version: 1,
+  teamMatchId: null as string | null,
+  cancelReason: null as string | null,
+  cancelledAt: null as string | null,
+};
+
+let v1ScheduleAttendanceCounts = { going: 10, maybe: 2, notGoing: 1, waitlisted: 0 };
+
+let v1MyAttendance: {
+  status: 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED' | null;
+  version: number;
+  waitlistPosition: number | null;
+} = { status: 'GOING', version: 1, waitlistPosition: null };
+
+let v1GuestRecruitmentFixture: {
+  id: string;
+  scheduleId: string;
+  slots: number;
+  closesAt: string;
+  note: string | null;
+  visibility: 'MEMBERS' | 'PUBLIC';
+  state: 'OPEN' | 'CLOSED' | 'FILLED';
+  version: number;
+  applicantCount: number;
+  approvedCount: number;
+} | null = {
+  id: 'guest-rec-1',
+  scheduleId: 'schedule-1',
+  slots: 3,
+  closesAt: '2026-05-23T12:00:00.000Z',
+  note: '포지션 무관 환영해요',
+  visibility: 'MEMBERS',
+  state: 'OPEN',
+  version: 1,
+  applicantCount: 1,
+  approvedCount: 0,
+};
+
+let v1GuestApplications: Array<{
+  applicationId: string;
+  state: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+  displayName: string;
+  note: string | null;
+}> = [{ applicationId: 'guest-app-1', state: 'PENDING', displayName: '게스트1', note: null }];
+
+function scheduleSummary() {
+  return {
+    id: v1ScheduleFixture.id,
+    title: v1ScheduleFixture.title,
+    type: v1ScheduleFixture.type,
+    startAt: v1ScheduleFixture.startAt,
+    endAt: v1ScheduleFixture.endAt,
+    timezone: v1ScheduleFixture.timezone,
+    capacity: v1ScheduleFixture.capacity,
+    rsvpDeadlineAt: v1ScheduleFixture.rsvpDeadlineAt,
+    visibility: v1ScheduleFixture.visibility,
+    state: v1ScheduleFixture.state,
+    version: v1ScheduleFixture.version,
+    teamMatchId: v1ScheduleFixture.teamMatchId,
+    goingCount: v1ScheduleAttendanceCounts.going,
+    waitlistedCount: v1ScheduleAttendanceCounts.waitlisted,
+  };
+}
+
+const v1ScheduleAttendeesFixture: V1TeamScheduleDetail['attendees'] = [
+  { userId: 'user-owner', nickname: '팀장원', profileImageUrl: null, status: 'GOING', waitlistPosition: null },
+  { userId: 'user-manager', nickname: '매니저준', profileImageUrl: null, status: 'GOING', waitlistPosition: null },
+  { userId: 'user-member', nickname: '멤버현', profileImageUrl: null, status: 'MAYBE', waitlistPosition: null },
+  { userId: 'user-host', nickname: '호스트민', profileImageUrl: null, status: 'NO_RESPONSE', waitlistPosition: null },
+];
+
+function scheduleDetail(): V1TeamScheduleDetail {
+  return {
+    ...scheduleSummary(),
+    cancelReason: v1ScheduleFixture.cancelReason,
+    cancelledAt: v1ScheduleFixture.cancelledAt,
+    guestRecruitment: v1GuestRecruitmentFixture,
+    myAttendance: v1MyAttendance.status
+      ? { status: v1MyAttendance.status, version: v1MyAttendance.version, waitlistPosition: v1MyAttendance.waitlistPosition }
+      : null,
+    attendees: v1ScheduleAttendeesFixture,
+  };
+}
+
+function scheduleMutationResult(replayed = false) {
+  return {
+    id: v1ScheduleFixture.id,
+    teamId: v1ScheduleFixture.teamId,
+    title: v1ScheduleFixture.title,
+    type: v1ScheduleFixture.type,
+    startAt: v1ScheduleFixture.startAt,
+    endAt: v1ScheduleFixture.endAt,
+    timezone: v1ScheduleFixture.timezone,
+    capacity: v1ScheduleFixture.capacity,
+    rsvpDeadlineAt: v1ScheduleFixture.rsvpDeadlineAt,
+    visibility: v1ScheduleFixture.visibility,
+    state: v1ScheduleFixture.state,
+    version: v1ScheduleFixture.version,
+    teamMatchId: v1ScheduleFixture.teamMatchId,
+    replayed,
+  };
+}
+
+// ── Task 17: game + team-match lineup mock state ────────────────────────────
+// gameId 'game-1' cross-references v1TeamMatchesFixture's 'team-match-1' (fixtures.ts
+// leaves V1TeamMatch.gameId undefined — this file cannot touch fixtures.ts, so the
+// cross-reference lives here only) and v1TournamentOperationsBoardItems below.
+let v1GameFixture = {
+  id: 'game-1',
+  sourceType: 'TEAM_MATCH' as 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE',
+  state: 'SCHEDULED' as V1GameState,
+  version: 1,
+  lastSequence: 0,
+  competitionConfigVersionId: 'competition-config-v1',
+  currentOfficialRevisionId: null as string | null,
+  sides: [
+    { id: 'side-home-1', gameId: 'game-1', sideKey: 'HOME' as const, teamId: 'team-1', displayNameSnapshot: '성수 볼러즈' },
+    { id: 'side-away-1', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: 'team-2', displayNameSnapshot: '마포 FC' },
+  ],
+  periods: [] as unknown[],
+  lineups: [] as { id: string; gameId: string; sideId: string; revision: number; state: string; version: number; submittedAt: string | null; supersedesId: string | null }[],
+  actorRole: 'team_owner',
+};
+
+let v1GameResultRevisions: V1GameResultRevision[] = [];
+
+let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
+  teamMatchId: 'team-match-1',
+  gameId: 'game-1',
+  sideId: 'side-home-1',
+  role: 'team_owner',
+  lineupId: 'lineup-1',
+  revision: 1,
+  state: 'DRAFT',
+  version: 1,
+  formation: '2-2',
+  publicLineupAt: null,
+  starters: [
+    { id: 'participant-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
+    { id: 'participant-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
+  ],
+  bench: [{ id: 'participant-3', displayName: '이하늘', jerseyNumber: 11 }],
+};
+
+// ── Tournament operations mock state (Task 18/19 backend, Task 19 frontend) ─
+let v1TournamentOperationsBoardItems: V1TournamentOperationsBoardItem[] = [
+  {
+    fixtureId: 'fixture-1',
+    tournamentId: 'tournament-1',
+    round: '8강',
+    fixtureNumber: 1,
+    gameId: 'game-1',
+    gameState: 'SCHEDULED',
+    fieldId: 'field-1',
+    fieldName: '1번 코트',
+    homeRegistrationId: 'registration-1',
+    awayRegistrationId: 'registration-2',
+    scheduledAt: '2026-05-25T09:00:00.000Z',
+    currentScore: null,
+    warnings: [],
+    version: 1,
+    revisionId: null,
+    stableRevision: 'stable-1',
+  },
+];
+
+let v1TournamentStaffAssignments: V1TournamentStaffAssignment[] = [
+  {
+    id: 'staff-1',
+    tournamentId: 'tournament-1',
+    userId: 'user-2',
+    role: 'FIELD_OPERATOR',
+    fieldId: 'field-1',
+    fixtureIds: [],
+    version: 1,
+    expiresAt: null,
+    revokedAt: null,
+    grantedByUserId: 'user-1',
+    createdAt: '2026-05-18T00:00:00.000Z',
+  },
+];
+
+// 필드 목록은 GET만 훅이 있다(useV1TournamentFields) — POST/PATCH/DELETE 필드 mutation은
+// use-v1-api.ts 어디에도 소비자가 없어 핸들러를 만들지 않는다(하단 리포트 참고).
+const v1TournamentFields = [
+  { id: 'field-1', tournamentId: 'tournament-1', scopeKey: 'court-1', name: '1번 코트', sortOrder: 1, active: true, version: 1 },
+  { id: 'field-2', tournamentId: 'tournament-1', scopeKey: 'court-2', name: '2번 코트', sortOrder: 2, active: true, version: 1 },
+];
+
 export const v1MswHandlers = [
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
@@ -198,8 +422,13 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/home`, () => ok(v1HomeFixture)),
   http.get(`${api}/popups/active`, ({ request }) => {
-    const screen = new URL(request.url).searchParams.get('screen');
-    const row = v1AdminPopupsFixture.find((popup) =>
+    const url = new URL(request.url);
+    const screen = url.searchParams.get('screen');
+    const path = url.searchParams.get('path');
+    const exactRow = path ? v1AdminPopupsFixture.find((popup) =>
+      popup.status === 'published' && popup.targetPaths?.includes(path),
+    ) : undefined;
+    const row = exactRow ?? v1AdminPopupsFixture.find((popup) =>
       popup.status === 'published' && Boolean(screen) && popup.targetScreens.includes(screen as never),
     );
     return ok({
@@ -208,6 +437,7 @@ export const v1MswHandlers = [
         title: row.title,
         body: row.body,
         targetScreens: row.targetScreens,
+        targetPaths: row.targetPaths ?? [],
         linkUrl: row.linkUrl,
         linkLabel: row.linkLabel,
         publishedAt: row.publishedAt,
@@ -462,6 +692,7 @@ export const v1MswHandlers = [
       content: body.content,
       contentVersion: 1,
       targetScreens: body.targetScreens,
+      targetPaths: body.targetPaths,
       linkUrl: body.linkUrl ?? null,
       linkLabel: body.linkLabel ?? null,
       status: body.status,
@@ -642,6 +873,364 @@ export const v1MswHandlers = [
     v1AdminNoticesFixture.splice(index, 1);
     return ok({ noticeId: params.noticeId, deleted: true });
   }),
+
+  // ── Team schedules (Task 12/13) ───────────────────────────────────────────
+  http.get(`${api}/teams/:teamId/schedules`, ({ params }) => {
+    const items = params.teamId === v1ScheduleFixture.teamId ? [scheduleSummary()] : [];
+    return ok({ items, nextCursor: null });
+  }),
+  http.get(`${api}/teams/:teamId/schedules/:scheduleId`, () => ok(scheduleDetail())),
+  http.post(`${api}/teams/:teamId/schedules`, async ({ params, request }) => {
+    const body = await request.json() as V1CreateScheduleDto;
+    v1ScheduleFixture = {
+      ...v1ScheduleFixture,
+      teamId: String(params.teamId),
+      title: body.title,
+      type: body.type,
+      startAt: body.startAt,
+      endAt: body.endAt,
+      timezone: body.timezone,
+      capacity: body.capacity ?? null,
+      rsvpDeadlineAt: body.rsvpDeadlineAt ?? null,
+      visibility: body.visibility ?? 'TEAM',
+      teamMatchId: body.teamMatchId ?? null,
+      state: 'SCHEDULED',
+      version: 1,
+      cancelReason: null,
+      cancelledAt: null,
+    };
+    return ok(scheduleMutationResult());
+  }),
+  http.patch(`${api}/teams/:teamId/schedules/:scheduleId`, async ({ request }) => {
+    const body = await request.json() as V1UpdateScheduleDto;
+    if (body.title !== undefined) v1ScheduleFixture.title = body.title;
+    if (body.startAt !== undefined) v1ScheduleFixture.startAt = body.startAt;
+    if (body.endAt !== undefined) v1ScheduleFixture.endAt = body.endAt;
+    if (body.capacity !== undefined) v1ScheduleFixture.capacity = body.capacity;
+    if (body.rsvpDeadlineAt !== undefined) v1ScheduleFixture.rsvpDeadlineAt = body.rsvpDeadlineAt;
+    if (body.visibility !== undefined) v1ScheduleFixture.visibility = body.visibility;
+    v1ScheduleFixture.version += 1;
+    return ok(scheduleMutationResult());
+  }),
+  http.post(`${api}/teams/:teamId/schedules/:scheduleId/cancel`, async ({ request }) => {
+    const body = await request.json() as V1CancelScheduleDto;
+    const cancelledAt = new Date().toISOString();
+    v1ScheduleFixture.state = 'CANCELLED';
+    v1ScheduleFixture.cancelReason = body.cancelReason;
+    v1ScheduleFixture.cancelledAt = cancelledAt;
+    v1ScheduleFixture.version += 1;
+    return ok({ state: 'cancelled' as const, version: v1ScheduleFixture.version, cancelledAt, replayed: false });
+  }),
+  http.post(`${api}/teams/:teamId/schedules/:scheduleId/complete`, () => {
+    const completedAt = new Date().toISOString();
+    v1ScheduleFixture.state = 'COMPLETED';
+    v1ScheduleFixture.version += 1;
+    return ok({ state: 'completed' as const, version: v1ScheduleFixture.version, completedAt, replayed: false });
+  }),
+  http.post(`${api}/teams/:teamId/schedules/:scheduleId/reminders`, async ({ request }) => {
+    const body = await request.json() as V1TriggerScheduleReminderDto;
+    return ok({ jobId: `reminder-job-${Date.now()}`, kind: body.kind, status: 'queued', replayed: false });
+  }),
+  http.put(`${api}/teams/:teamId/schedules/:scheduleId/attendance/me`, async ({ request }) => {
+    const body = await request.json() as V1SetScheduleAttendanceDto;
+    const previous = v1MyAttendance.status;
+    if (previous === 'GOING') v1ScheduleAttendanceCounts.going = Math.max(0, v1ScheduleAttendanceCounts.going - 1);
+    if (previous === 'MAYBE') v1ScheduleAttendanceCounts.maybe = Math.max(0, v1ScheduleAttendanceCounts.maybe - 1);
+    if (previous === 'NOT_GOING') v1ScheduleAttendanceCounts.notGoing = Math.max(0, v1ScheduleAttendanceCounts.notGoing - 1);
+    if (previous === 'WAITLISTED') v1ScheduleAttendanceCounts.waitlisted = Math.max(0, v1ScheduleAttendanceCounts.waitlisted - 1);
+    const capacity = v1ScheduleFixture.capacity;
+    // 서버는 GOING이 정원을 채우면 WAITLISTED로 파생시킨다 — 클라이언트는 GOING/MAYBE/NOT_GOING만
+    // 보낼 수 있다(V1ClientSettableAttendanceStatus), WAITLISTED 승격은 이 목만 유일한 경로.
+    const isFull = body.status === 'GOING' && capacity !== null && v1ScheduleAttendanceCounts.going >= capacity;
+    const nextStatus = isFull ? 'WAITLISTED' : body.status;
+    if (nextStatus === 'GOING') v1ScheduleAttendanceCounts.going += 1;
+    if (nextStatus === 'MAYBE') v1ScheduleAttendanceCounts.maybe += 1;
+    if (nextStatus === 'NOT_GOING') v1ScheduleAttendanceCounts.notGoing += 1;
+    if (nextStatus === 'WAITLISTED') v1ScheduleAttendanceCounts.waitlisted += 1;
+    v1MyAttendance = {
+      status: nextStatus,
+      version: v1MyAttendance.version + 1,
+      waitlistPosition: nextStatus === 'WAITLISTED' ? v1ScheduleAttendanceCounts.waitlisted : null,
+    };
+    return ok({
+      status: v1MyAttendance.status,
+      version: v1MyAttendance.version,
+      waitlistPosition: v1MyAttendance.waitlistPosition,
+      counts: { ...v1ScheduleAttendanceCounts },
+      replayed: false,
+    });
+  }),
+  http.post(`${api}/teams/:teamId/schedules/:scheduleId/guest-recruitment`, async ({ params, request }) => {
+    const body = await request.json() as V1CreateGuestRecruitmentDto;
+    v1GuestRecruitmentFixture = {
+      id: 'guest-rec-1',
+      scheduleId: String(params.scheduleId),
+      slots: body.slots,
+      closesAt: body.closesAt,
+      note: body.note ?? null,
+      visibility: body.visibility ?? 'MEMBERS',
+      state: 'OPEN',
+      version: 1,
+      applicantCount: 0,
+      approvedCount: 0,
+    };
+    v1GuestApplications = [];
+    return ok({ ...v1GuestRecruitmentFixture, replayed: false });
+  }),
+  http.patch(`${api}/teams/:teamId/schedules/:scheduleId/guest-recruitment`, async ({ request }) => {
+    const body = await request.json() as V1UpdateGuestRecruitmentDto;
+    if (!v1GuestRecruitmentFixture) return notFound('Guest recruitment was not found');
+    if (body.slots !== undefined) v1GuestRecruitmentFixture.slots = body.slots;
+    if (body.closesAt !== undefined) v1GuestRecruitmentFixture.closesAt = body.closesAt;
+    if (body.note !== undefined) v1GuestRecruitmentFixture.note = body.note;
+    if (body.visibility !== undefined) v1GuestRecruitmentFixture.visibility = body.visibility;
+    if (body.state !== undefined) v1GuestRecruitmentFixture.state = body.state === 'open' ? 'OPEN' : 'CLOSED';
+    v1GuestRecruitmentFixture.version += 1;
+    return ok({ ...v1GuestRecruitmentFixture, replayed: false });
+  }),
+  http.post(`${api}/teams/:teamId/schedules/:scheduleId/guest-recruitment/applications`, async ({ request }) => {
+    const body = await request.json() as V1CreateGuestApplicationDto;
+    const existing = v1GuestApplications.find((item) => item.displayName === body.displayName);
+    if (existing) {
+      return ok({
+        applicationId: existing.applicationId,
+        state: existing.state,
+        displayName: existing.displayName,
+        note: existing.note,
+        alreadyApplied: true,
+        replayed: false,
+      });
+    }
+    const application = {
+      applicationId: `guest-app-${v1GuestApplications.length + 1}`,
+      state: 'PENDING' as const,
+      displayName: body.displayName,
+      note: body.note ?? null,
+    };
+    v1GuestApplications.push(application);
+    if (v1GuestRecruitmentFixture) v1GuestRecruitmentFixture.applicantCount += 1;
+    return ok({ ...application, alreadyApplied: false, replayed: false });
+  }),
+  http.get(`${api}/me/schedule`, () => ok({
+    items: [
+      {
+        ...scheduleSummary(),
+        teamId: v1ScheduleFixture.teamId,
+        teamName: '성수 볼러즈',
+        myRole: 'owner',
+        myAttendanceStatus: v1MyAttendance.status,
+      },
+    ],
+    nextCursor: null,
+  })),
+
+  // ── Task 17: games / result revisions / team-match lineup ─────────────────
+  http.get(`${api}/games/:gameId`, () => ok(v1GameFixture)),
+  http.get(`${api}/games/:gameId/result-revisions`, () => ok(v1GameResultRevisions)),
+  http.post(`${api}/games/:gameId/result-revisions`, async ({ request }) => {
+    const body = await request.json() as V1CreateGameResultRevisionPayload;
+    const now = new Date().toISOString();
+    const revisionId = `revision-${v1GameResultRevisions.length + 1}`;
+    const revision: V1GameResultRevision = {
+      id: revisionId,
+      gameId: v1GameFixture.id,
+      revision: v1GameResultRevisions.length + 1,
+      state: 'DRAFT',
+      // 서버는 제출받은 평평한 {home,away} 를 그대로 돌려주지 않고 스냅샷으로 감싼다.
+      // 예전에는 이 목이 입력을 그대로 되돌려줘서, 실제로는 화면이 읽지 못하는 형태인데도
+      // 테스트가 통과했다.
+      score: {
+        regulation: { home: body.score.home, away: body.score.away },
+        penalty: null,
+        goals: [],
+        incomplete: false,
+      },
+      eventsHash: body.eventsHash,
+      missingScorer: false,
+      mvpParticipantId: body.mvpParticipantId ?? null,
+      reason: body.reason ?? null,
+      createdByActorType: 'USER',
+      createdByUserId: 'user-1',
+      createdBySystemActor: null,
+      supersedesId: null,
+      submittedAt: null,
+      officialAt: null,
+      createdAt: now,
+      updatedAt: now,
+      resultParticipants: body.actualParticipants.map((participant, index) => ({
+        id: `result-participant-${index + 1}`,
+        resultRevisionId: revisionId,
+        participantId: participant.participantId,
+        sideId: participant.sideId,
+        started: participant.started,
+        minutesPlayed: participant.minutesPlayed ?? null,
+        goals: participant.goals,
+        assists: participant.assists,
+        fouls: participant.fouls,
+        cards: participant.cards,
+        goalkeeper: participant.goalkeeper,
+      })),
+    };
+    v1GameResultRevisions.unshift(revision);
+    v1GameFixture.version += 1;
+    return ok({
+      gameId: v1GameFixture.id,
+      state: v1GameFixture.state,
+      version: v1GameFixture.version,
+      durableCommandId: `command-${Date.now()}`,
+      replayed: false,
+      revisionId: revision.id,
+      revision: revision.revision,
+      revisionState: revision.state,
+    });
+  }),
+  http.post(`${api}/games/:gameId/result-revisions/:revisionId/submit`, ({ params }) => {
+    const revision = v1GameResultRevisions.find((item) => item.id === params.revisionId) ?? v1GameResultRevisions[0];
+    const now = new Date().toISOString();
+    if (revision) {
+      revision.state = 'SUBMITTED';
+      revision.submittedAt = now;
+      revision.updatedAt = now;
+    }
+    v1GameFixture.version += 1;
+    return ok({
+      gameId: v1GameFixture.id,
+      state: v1GameFixture.state,
+      version: v1GameFixture.version,
+      durableCommandId: `command-${Date.now()}`,
+      replayed: false,
+      revisionId: revision?.id ?? String(params.revisionId),
+      revision: revision?.revision ?? 1,
+      revisionState: revision?.state ?? 'SUBMITTED',
+    });
+  }),
+  http.post(`${api}/games/:gameId/result-revisions/:revisionId/decision`, async ({ params, request }) => {
+    const body = await request.json() as V1DecideGameResultRevisionPayload;
+    const revision = v1GameResultRevisions.find((item) => item.id === params.revisionId) ?? v1GameResultRevisions[0];
+    const now = new Date().toISOString();
+    if (revision) {
+      revision.state = body.decision === 'approve' ? 'OFFICIAL' : 'CHANGE_REQUESTED';
+      revision.officialAt = body.decision === 'approve' ? now : revision.officialAt;
+      revision.reason = body.decision === 'change_request' ? body.reason ?? null : revision.reason;
+      revision.updatedAt = now;
+      if (revision.state === 'OFFICIAL') {
+        v1GameFixture.currentOfficialRevisionId = revision.id;
+        v1GameFixture.state = 'ENDED';
+      }
+    }
+    v1GameFixture.version += 1;
+    return ok({
+      gameId: v1GameFixture.id,
+      state: v1GameFixture.state,
+      version: v1GameFixture.version,
+      durableCommandId: `command-${Date.now()}`,
+      replayed: false,
+      revisionId: revision?.id ?? String(params.revisionId),
+      revision: revision?.revision ?? 1,
+      revisionState: revision?.state ?? 'CHANGE_REQUESTED',
+    });
+  }),
+  http.get(`${api}/team-matches/:teamMatchId/lineup`, () => ok(v1TeamMatchLineupFixture)),
+  http.put(`${api}/team-matches/:teamMatchId/lineup`, async ({ request }) => {
+    const body = await request.json() as V1TeamMatchLineupSavePayload;
+    v1TeamMatchLineupFixture = {
+      ...v1TeamMatchLineupFixture,
+      revision: v1TeamMatchLineupFixture.revision + 1,
+      version: v1TeamMatchLineupFixture.version + 1,
+      formation: body.formation ?? null,
+      starters: body.starters.map((participant, index) => ({
+        id: participant.userId ?? `guest-participant-${index + 1}`,
+        displayName: participant.displayName ?? '이름 미확인',
+        jerseyNumber: participant.jerseyNumber ?? null,
+        position: participant.position ?? null,
+        goalkeeper: participant.goalkeeper ?? false,
+        positionX: participant.positionX ?? null,
+        positionY: participant.positionY ?? null,
+      })),
+      bench: body.bench.map((participant, index) => ({
+        id: participant.userId ?? `guest-bench-${index + 1}`,
+        displayName: participant.displayName ?? '이름 미확인',
+        jerseyNumber: participant.jerseyNumber ?? null,
+      })),
+    };
+    return ok({
+      teamMatchId: v1TeamMatchLineupFixture.teamMatchId,
+      gameId: v1TeamMatchLineupFixture.gameId,
+      sideId: v1TeamMatchLineupFixture.sideId,
+      lineupId: v1TeamMatchLineupFixture.lineupId ?? 'lineup-1',
+      revision: v1TeamMatchLineupFixture.revision,
+      state: v1TeamMatchLineupFixture.state,
+      version: v1TeamMatchLineupFixture.version,
+      replayed: false,
+    });
+  }),
+  http.post(`${api}/team-matches/:teamMatchId/lineup/submit`, () => {
+    v1TeamMatchLineupFixture.state = 'SUBMITTED';
+    v1TeamMatchLineupFixture.version += 1;
+    const publicLineupAt = new Date().toISOString();
+    v1TeamMatchLineupFixture.publicLineupAt = publicLineupAt;
+    return ok({
+      teamMatchId: v1TeamMatchLineupFixture.teamMatchId,
+      gameId: v1TeamMatchLineupFixture.gameId,
+      sideId: v1TeamMatchLineupFixture.sideId,
+      lineupId: v1TeamMatchLineupFixture.lineupId ?? 'lineup-1',
+      revision: v1TeamMatchLineupFixture.revision,
+      state: v1TeamMatchLineupFixture.state,
+      version: v1TeamMatchLineupFixture.version,
+      replayed: false,
+      publicLineupAt,
+    });
+  }),
+  http.post(`${api}/team-matches/:teamMatchId/lineup/change-request`, async ({ request }) => {
+    const body = await request.json() as { expectedVersion: number; reason: string };
+    v1TeamMatchLineupFixture.version += 1;
+    return ok({
+      teamMatchId: v1TeamMatchLineupFixture.teamMatchId,
+      gameId: v1TeamMatchLineupFixture.gameId,
+      sideId: v1TeamMatchLineupFixture.sideId,
+      lineupId: v1TeamMatchLineupFixture.lineupId ?? 'lineup-1',
+      revision: v1TeamMatchLineupFixture.revision,
+      state: 'change_requested' as const,
+      version: v1TeamMatchLineupFixture.version,
+      reason: body.reason,
+      replayed: false,
+    });
+  }),
+
+  // ── Tournament operations board/staff/fields (Task 18/19) ─────────────────
+  http.get(`${api}/tournament-ops/tournaments/:tournamentId/operations`, () => ok({
+    items: v1TournamentOperationsBoardItems,
+    nextCursor: null,
+    watermark: '2026-05-18T00:00:00.000Z',
+    liveWarnings: [],
+  })),
+  http.get(`${api}/tournament-ops/tournaments/:tournamentId/staff`, () => ok({ items: v1TournamentStaffAssignments })),
+  http.post(`${api}/tournament-ops/tournaments/:tournamentId/staff`, async ({ params, request }) => {
+    const body = await request.json() as V1GrantTournamentStaffPayload;
+    const assignment: V1TournamentStaffAssignment = {
+      id: `staff-${v1TournamentStaffAssignments.length + 1}`,
+      tournamentId: String(params.tournamentId),
+      userId: body.userId,
+      role: body.role,
+      fieldId: body.fieldId ?? null,
+      fixtureIds: body.fixtureIds ?? [],
+      version: 1,
+      expiresAt: body.expiresAt ?? null,
+      revokedAt: null,
+      grantedByUserId: 'user-1',
+      createdAt: new Date().toISOString(),
+    };
+    v1TournamentStaffAssignments.push(assignment);
+    return ok(assignment);
+  }),
+  http.post(`${api}/tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke`, ({ params }) => {
+    const assignment = v1TournamentStaffAssignments.find((item) => item.id === params.assignmentId);
+    if (!assignment) return notFound('Staff assignment was not found');
+    assignment.revokedAt = new Date().toISOString();
+    assignment.version += 1;
+    return ok(assignment);
+  }),
+  http.get(`${api}/tournament-ops/tournaments/:tournamentId/fields`, () => ok({ items: v1TournamentFields })),
 ];
 
 const levelOrder = ['beginner', 'novice', 'intermediate', 'advanced'];

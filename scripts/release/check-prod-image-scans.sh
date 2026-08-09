@@ -3,34 +3,8 @@
 set -Eeuo pipefail
 : "${IMAGE_TAG:?IMAGE_TAG is required}"
 
-# ECR does not register a scan for a just-pushed digest instantaneously; the
-# wait subcommand's ScanNotFoundException acceptor fails immediately instead
-# of retrying, so poll for the scan to exist before handing off to it.
-wait_for_scan_registration() {
-  local repository="$1" attempt error
-  for attempt in $(seq 1 12); do
-    if error="$(aws ecr describe-image-scan-findings --repository-name "${repository}" \
-      --image-id "imageTag=${IMAGE_TAG}" --query 'imageScanStatus.status' --output text 2>&1)"; then
-      return 0
-    fi
-    [[ "${error}" == *ScanNotFoundException* ]] || { echo "${error}" >&2; return 1; }
-    sleep 5
-  done
-  echo "Image scan for ${repository}:${IMAGE_TAG} did not register within 60s" >&2
-  return 1
-}
+# 공통 로직은 image-scan-common.sh 에 있다 — alpha/prod 가 3줄만 다른 복사본이었고 그 중복
+# 때문에 재시도 부재와 fail-open 이 양쪽에 똑같이 존재했다. 자세한 내용은 그 파일의 헤더 참조.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/image-scan-common.sh"
 
-for repository in teameet-prod-v1-api teameet-prod-v1-web; do
-  wait_for_scan_registration "${repository}"
-  aws ecr wait image-scan-complete --repository-name "${repository}" \
-    --image-id "imageTag=${IMAGE_TAG}"
-  findings="$(aws ecr describe-image-scan-findings --repository-name "${repository}" \
-    --image-id "imageTag=${IMAGE_TAG}" --query 'imageScanFindings.findingSeverityCounts' --output json)"
-  critical="$(jq -r '.CRITICAL // 0' <<< "${findings}")"
-  high="$(jq -r '.HIGH // 0' <<< "${findings}")"
-  echo "[prod-scan] ${repository} critical=${critical} high=${high}"
-  (( critical == 0 )) || {
-    echo "Critical ECR findings block production deployment" >&2
-    exit 1
-  }
-done
+assert_no_critical_image_findings prod-scan teameet-prod-v1-api teameet-prod-v1-web

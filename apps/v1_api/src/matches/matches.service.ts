@@ -471,16 +471,22 @@ export class MatchesService {
     const existing = match.applications[0] ?? null;
     const application = await this.prisma.$transaction(async (tx) => {
       const nextApplication = existing
-        ? await tx.v1MatchApplication.update({
-            where: { id: existing.id },
-            data: {
-              status: 'requested',
-              message: dto.message ?? null,
-              reviewedByUserId: null,
-              reviewedAt: null,
-              withdrawnAt: null,
-            },
-          })
+        ? await (async () => {
+            const transition = await tx.v1MatchApplication.updateMany({
+              where: { id: existing.id, status: existing.status },
+              data: {
+                status: 'requested',
+                message: dto.message ?? null,
+                reviewedByUserId: null,
+                reviewedAt: null,
+                withdrawnAt: null,
+              },
+            });
+            if (transition.count !== 1) {
+              throw stateConflict('Application state changed before it could be resubmitted');
+            }
+            return { ...existing, status: 'requested' as const, message: dto.message ?? null };
+          })()
         : await tx.v1MatchApplication.create({
             data: {
               matchId: match.id,
@@ -750,14 +756,17 @@ export class MatchesService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const nextApplication = await tx.v1MatchApplication.update({
-        where: { id: application.id },
+      const transition = await tx.v1MatchApplication.updateMany({
+        where: { id: application.id, status: 'requested' },
         data: {
           status: 'rejected',
           reviewedByUserId: user.id,
           reviewedAt: new Date(),
         },
       });
+      if (transition.count !== 1) {
+        throw stateConflict('Only requested applications can be rejected');
+      }
 
       await tx.v1StatusChangeLog.create({
         data: {
@@ -771,7 +780,7 @@ export class MatchesService {
         },
       });
 
-      return nextApplication;
+      return { ...application, status: 'rejected' as const };
     });
 
     // 알림: 신청자에게 거절 안내 (fire-and-forget)

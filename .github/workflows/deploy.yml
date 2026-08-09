@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -37,12 +37,19 @@ jobs:
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          BASE_REF: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
+          HEAD_REF: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
         run: |
           set -Eeuo pipefail
           if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || [[ "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
             BASE_SHA="$(git merge-base origin/main "${HEAD_SHA}")"
           fi
           git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > /tmp/teameet-changed-files.txt
+          if [[ ${BASE_REF} == main && ${HEAD_REF} == dev ]]; then
+            export RELEASE_PROMOTION=true
+            export BASE_API_VERSION=$(git show ${BASE_SHA}:apps/v1_api/package.json | jq -er .version)
+            export BASE_WEB_VERSION=$(git show ${BASE_SHA}:apps/v1_web/package.json | jq -er .version)
+          fi
           node scripts/release/check-changeset-policy.mjs \
             --repo . \
             --changed-files-file /tmp/teameet-changed-files.txt
@@ -66,9 +73,9 @@ jobs:
             echo "No unreleased Changesets; planned release validation skipped"
           fi
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -96,6 +103,25 @@ jobs:
 
       - name: Alpha release-state contract tests
         run: bash scripts/qa/test-alpha-release-state.sh
+
+      # alpha 는 로컬 이미지 GC 가 없어 dangling 이미지가 배포마다 쌓였고, 실제로 EC2
+      # 디스크가 28G/30G 까지 차서 배포와 롤백이 함께 "no space left on device" 로 실패했다
+      # (2026-08). 이 테스트는 그 재발 방지 로직(prune_stale_alpha_images)이 정확히 어떤
+      # 이미지를 지우고 어떤 이미지를 살리는지, 그리고 deploy-alpha.sh 안에서 healthy 확인
+      # 뒤에만 호출되는지를 매 push 마다 고정한다.
+      - name: Alpha image GC contract tests
+        run: bash scripts/qa/test-alpha-image-gc.sh
+
+      # 이미지 스캔 게이트는 배포 job 안에서만 도는 탓에 두 결함이 오래 살아남았다.
+      # (1) 일시적 AWS CLI 내부 오류('NoneType' object does not support item assignment)에
+      #     재시도가 없어 배포가 그대로 죽었다 — 2026-08-08~09 alpha 에서만 3회.
+      # (2) 더 심각하게, findings 를 못 읽으면 critical="" 이 되고 bash 산술이 빈 값을 0 으로
+      #     취급해 **게이트가 조용히 통과**했다(fail-open). 실제 배포 로그에 그 흔적이 있다:
+      #     `[alpha-scan] teameet-alpha-v1-api critical= high=`.
+      # 두 결함 모두 alpha/prod 복사본에 똑같이 있었다. 이 테스트는 가짜 aws 로 그 시나리오를
+      # 재현해 매 push 마다 고정한다 — 수정 전 스크립트로 돌리면 3건이 실패한다.
+      - name: Image scan gate contract tests
+        run: bash scripts/qa/test-image-scan-gate.sh
 
       # prod 배포 경로는 main push 때만 도는 탓에 몇 주씩 검증되지 않는다 — 그래서
       # prune_stale_release_tags 의 빈 입력 버그가 2026-08-01 배포에서야 터졌다(#220).
@@ -141,11 +167,11 @@ jobs:
       NODE_ENV: test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -172,7 +198,27 @@ jobs:
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/prisma migrate deploy
           ./node_modules/.bin/prisma migrate diff \
             --from-url "$MIGRATE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+          # Task 9 competition-config expand/contract split
+          # (docs/ops/task9-competition-config-contract-phase.md): seeding and
+          # backfill moved out of migration.sql (DML is never additive under
+          # the expand-contract gate) into an app-level CLI. Mirrors what an
+          # alpha deploy must also do after `prisma migrate deploy` — run it
+          # here so `test:integration` sees the same DB state.
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
+            src/tournaments/competition-config/competition-config-backfill.cli.ts
           DATABASE_URL="$MIGRATE_URL" pnpm test:integration
+          # 게임 운영 플래그 불변 행 시드 CLI 가 실제로 기동하는지 확인한다
+          # (배포 경로 deploy/deploy-alpha.sh 가 migrate deploy 직후 돌리는 그 CLI).
+          # 잘못된 경로·깨진 import 처럼 "코드는 있는데 배선이 안 되는" 결함은 유닛
+          # 테스트가 못 잡는다 — 워커 entrypoint 가 정확히 그렇게 몇 달을 죽어 있었다.
+          #
+          # 반드시 test:integration **뒤에** 둔다. 격리 스위트는 이 DB 를 템플릿으로
+          # 클론하므로, 앞에 두면 시드된 행이 모든 클론에 전파돼
+          # test/games/game-schema.integration-spec.ts 의 raw INSERT(GAME_READ)가
+          # 23505 로 깨진다. 시드 로직 자체의 계약은 전용 통합 스펙
+          # (test/tournaments/game-operation-flag-seed.integration-spec.ts)이 검증한다.
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
+            src/config/game-operation-flags-seed.cli.ts
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 
       - name: V1 API unit tests
@@ -180,6 +226,21 @@ jobs:
 
       - name: V1 API build check
         run: pnpm --filter v1_api build
+
+      - name: Task 9 literal HTTP and DB manual QA
+        timeout-minutes: 8
+        run: >-
+          node scripts/qa/task9-ci-manual-http.mjs
+          --output-dir "${{ runner.temp }}/task9-ci-manual-http"
+
+      - name: Upload Task 9 literal HTTP and DB evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task9-ci-manual-http-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/task9-ci-manual-http
+          if-no-files-found: error
+          retention-days: 14
 
   # ── Web: 린트·타입·유닛·빌드 ────────────────────────────────────────────────
   # v1_web 은 Prisma 클라이언트도 Postgres도 쓰지 않으므로 DB 서비스를 붙이지 않는다.
@@ -192,11 +253,11 @@ jobs:
       NODE_ENV: test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -215,6 +276,323 @@ jobs:
       # 캐시 키에 커밋 SHA 가 들어가 커밋마다 빈 엔트리를 만들었다(233개 누적).
       - name: V1 web build check
         run: pnpm --filter v1_web build
+
+  # Task 10 is intentionally a feature-branch workflow_dispatch RED gate. It is
+  # isolated from production deploys and becomes GREEN only when the additive
+  # game-result migration, fixture, integration test, and backfill CLI all exist.
+  task10-game-result-cutover:
+    name: Task 10 game-result cutover (PIN / RED)
+    needs: [gates, api, web]
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'branch' &&
+      github.ref_name != 'main' &&
+      github.ref_name != 'dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: task10_ci
+          POSTGRES_PASSWORD: task10_ci
+          POSTGRES_DB: task10_admin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U task10_ci -d task10_admin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      CI: true
+      NODE_ENV: test
+      JWT_SECRET: task10-ci-isolated-secret
+
+    steps:
+      - name: Check out exact candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Initialize Task 10 runner paths
+        run: |
+          set -Eeuo pipefail
+          printf '%s\n' "TASK10_EVIDENCE_DIR=${RUNNER_TEMP}/task10" >> "${GITHUB_ENV}"
+          printf '%s\n' "TASK10_RUNTIME_FILE=${RUNNER_TEMP}/task10-runtime-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json" >> "${GITHUB_ENV}"
+
+      - name: Fail closed on prerequisite outcomes
+        env:
+          GATES_RESULT: ${{ needs.gates.result }}
+          API_RESULT: ${{ needs.api.result }}
+          WEB_RESULT: ${{ needs.web.result }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "${TASK10_EVIDENCE_DIR}"
+          if [[ "${GATES_RESULT}" != "success" || "${WEB_RESULT}" != "success" ]]; then
+            printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"not-evaluated"}\n' \
+              "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" \
+              > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
+            echo "Task 10 prerequisites failed closed: gates=${GATES_RESULT} web=${WEB_RESULT}" >&2
+            exit 1
+          fi
+          if [[ "${API_RESULT}" != "success" && "${API_RESULT}" != "failure" ]]; then
+            printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"unexpected"}\n' \
+              "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" \
+              > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
+            echo "Task 10 API prerequisite did not complete: api=${API_RESULT}" >&2
+            exit 1
+          fi
+          api_disposition="success"
+          if [[ "${API_RESULT}" == "failure" ]]; then
+            api_disposition="pending-task10-red-signature"
+          fi
+          printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"%s"}\n' \
+            "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" "${api_disposition}" \
+            > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
+
+      - name: Verify immutable clean candidate
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate V1 Prisma client
+        run: pnpm --filter v1_api exec prisma generate
+
+      - name: Create isolated Task 10 database
+        env:
+          PGPASSWORD: task10_ci
+        run: |
+          set -Eeuo pipefail
+          database_name="ulw_v1_integration_task10_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          if [[ ! "${database_name}" =~ ^ulw_v1_integration_task10_ci_[1-9][0-9]*_[1-9][0-9]*$ ]] || (( ${#database_name} > 63 )); then
+            echo "Unsafe Task 10 database identifier" >&2
+            exit 1
+          fi
+          exists="$(psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -Atc "SELECT COUNT(*) FROM pg_database WHERE datname = '${database_name}'")"
+          if [[ "${exists}" != "0" ]]; then
+            echo "Refusing stale Task 10 database" >&2
+            exit 1
+          fi
+          psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${database_name}\";"
+          printf '%s\n' "TASK10_DATABASE_NAME=${database_name}" >> "${GITHUB_ENV}"
+          printf '%s\n' "DATABASE_URL=postgresql://task10_ci:task10_ci@127.0.0.1:5432/${database_name}" >> "${GITHUB_ENV}"
+          : > "${RUNNER_TEMP}/task10-db-created"
+
+      - name: Replay frozen migrations
+        working-directory: apps/v1_api
+        run: pnpm exec prisma migrate deploy
+
+      - name: Build V1 API for live surface RED
+        run: pnpm --filter v1_api build
+
+      - name: PIN current Task 10 DB and service behavior
+        run: |
+          set -Eeuo pipefail
+          node scripts/qa/verify-game-result-cutover.mjs \
+            --mode pin \
+            --evidence-dir "${TASK10_EVIDENCE_DIR}"
+          pnpm --filter v1_api exec jest --selectProjects integration --runInBand --runTestsByPath test/games/game-backfill.integration-spec.ts --testNamePattern="Task 10 PIN"
+
+      - name: Reset isolated database after PIN
+        env:
+          PGPASSWORD: task10_ci
+        run: |
+          set -Eeuo pipefail
+          psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -v ON_ERROR_STOP=1 \
+            -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${TASK10_DATABASE_NAME}' AND pid <> pg_backend_pid();"
+          psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -v ON_ERROR_STOP=1 \
+            -c "DROP DATABASE \"${TASK10_DATABASE_NAME}\";"
+          psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -v ON_ERROR_STOP=1 \
+            -c "CREATE DATABASE \"${TASK10_DATABASE_NAME}\";"
+          pnpm --filter v1_api exec prisma migrate deploy
+
+      - name: Live operation-flag route surface RED
+        id: task10-route-preflight
+        continue-on-error: true
+        run: >-
+          node scripts/qa/verify-game-result-cutover.mjs
+          --mode route-preflight
+          --evidence-dir "${TASK10_EVIDENCE_DIR}"
+
+      - name: Task 10 RED boundary and full integration test
+        id: task10-boundary-test
+        continue-on-error: true
+        run: |
+          set -Euo pipefail
+          boundary_log="${RUNNER_TEMP}/task10-boundary-red.log"
+          jest_log="${RUNNER_TEMP}/task10-jest-red.log"
+          trap 'rm -f "${boundary_log}" "${jest_log}"' EXIT
+
+          set +e
+          node scripts/qa/verify-game-result-cutover.mjs \
+            --mode red \
+            --evidence-dir "${TASK10_EVIDENCE_DIR}" >"${boundary_log}" 2>&1
+          boundary_exit=$?
+          pnpm --filter v1_api exec jest --selectProjects integration --runInBand --runTestsByPath test/games/game-backfill.integration-spec.ts >"${jest_log}" 2>&1
+          jest_exit=$?
+          set -e
+
+          boundary_expected=false
+          jest_expected=false
+          if (( boundary_exit != 0 )) && grep -q 'TASK10_IMPLEMENTATION_MISSING' "${boundary_log}"; then
+            boundary_expected=true
+          fi
+          if (( jest_exit != 0 )) && grep -Eq "Cannot find module .*src/games/migration|Task 10 migration boundary" "${jest_log}"; then
+            jest_expected=true
+          fi
+          printf '{"schemaVersion":1,"boundaryExit":%d,"boundaryExpected":%s,"jestExit":%d,"jestExpected":%s}\n' \
+            "${boundary_exit}" "${boundary_expected}" "${jest_exit}" "${jest_expected}" \
+            > "${TASK10_EVIDENCE_DIR}/task10-red-exit-codes.json"
+
+          if (( boundary_exit == 0 && jest_exit == 0 )); then
+            echo "Task 10 implementation boundary and RED suite are GREEN"
+            exit 0
+          fi
+          if [[ "${boundary_expected}" == "true" && "${jest_expected}" == "true" ]]; then
+            echo "TASK10_IMPLEMENTATION_MISSING: boundary and full RED suite failed as expected" >&2
+            exit 1
+          fi
+          echo "Task 10 RED probes returned inconsistent or unexpected failures: boundary=${boundary_exit}/${boundary_expected} jest=${jest_exit}/${jest_expected}" >&2
+          exit 1
+
+      - name: Enforce Task 10 RED or continue GREEN path
+        env:
+          API_RESULT: ${{ needs.api.result }}
+          GATES_RESULT: ${{ needs.gates.result }}
+          ROUTE_OUTCOME: ${{ steps.task10-route-preflight.outcome }}
+          BOUNDARY_OUTCOME: ${{ steps.task10-boundary-test.outcome }}
+          WEB_RESULT: ${{ needs.web.result }}
+        run: |
+          set -Eeuo pipefail
+          boundary_expected=false
+          jest_expected=false
+          if grep -q '"boundaryExpected":true' "${TASK10_EVIDENCE_DIR}/task10-red-exit-codes.json"; then
+            boundary_expected=true
+          fi
+          if grep -q '"jestExpected":true' "${TASK10_EVIDENCE_DIR}/task10-red-exit-codes.json"; then
+            jest_expected=true
+          fi
+          api_disposition="success"
+          if [[ "${API_RESULT}" == "failure" ]]; then
+            if [[ "${boundary_expected}" != "true" || "${jest_expected}" != "true" ]]; then
+              printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"unexpected-failure","boundaryExpected":%s,"jestExpected":%s}\n' \
+                "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" "${boundary_expected}" "${jest_expected}" \
+                > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
+              echo "API failure did not reproduce both Task 10 RED signatures" >&2
+              exit 1
+            fi
+            api_disposition="expected-task10-red"
+          fi
+          printf '{"schemaVersion":1,"gates":"%s","api":"%s","web":"%s","apiDisposition":"%s","boundaryExpected":%s,"jestExpected":%s}\n' \
+            "${GATES_RESULT}" "${API_RESULT}" "${WEB_RESULT}" "${api_disposition}" "${boundary_expected}" "${jest_expected}" \
+            > "${TASK10_EVIDENCE_DIR}/task10-dependency-outcomes.json"
+          if [[ "${ROUTE_OUTCOME}" != "success" || "${BOUNDARY_OUTCOME}" != "success" ]]; then
+            echo "TASK10_IMPLEMENTATION_MISSING: route=${ROUTE_OUTCOME} boundary=${BOUNDARY_OUTCOME}" >&2
+            exit 1
+          fi
+
+      - name: Reset and migrate clean CLI database
+        env:
+          PGPASSWORD: task10_ci
+        run: |
+          set -Eeuo pipefail
+          psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -v ON_ERROR_STOP=1 \
+            -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${TASK10_DATABASE_NAME}' AND pid <> pg_backend_pid();"
+          psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -v ON_ERROR_STOP=1 \
+            -c "DROP DATABASE \"${TASK10_DATABASE_NAME}\";"
+          psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -v ON_ERROR_STOP=1 \
+            -c "CREATE DATABASE \"${TASK10_DATABASE_NAME}\";"
+          pnpm --filter v1_api exec prisma migrate deploy
+
+      - name: Seed fresh deterministic CLI fixture
+        run: >-
+          node scripts/qa/verify-game-result-cutover.mjs
+          --mode seed
+          --fixture apps/v1_api/test/fixtures/game-backfill.fixture.ts
+          --evidence-dir "${TASK10_EVIDENCE_DIR}"
+
+      - name: Inventory deterministic legacy results
+        run: >-
+          node scripts/qa/verify-game-result-cutover.mjs
+          --mode inventory
+          --fixture apps/v1_api/test/fixtures/game-backfill.fixture.ts
+          --evidence-dir "${TASK10_EVIDENCE_DIR}"
+
+      - name: Apply deterministic backfill twice
+        run: |
+          set -Eeuo pipefail
+          node scripts/qa/verify-game-result-cutover.mjs --mode apply --fixture apps/v1_api/test/fixtures/game-backfill.fixture.ts --evidence-dir "${TASK10_EVIDENCE_DIR}"
+          node scripts/qa/verify-game-result-cutover.mjs --mode apply --fixture apps/v1_api/test/fixtures/game-backfill.fixture.ts --evidence-dir "${TASK10_EVIDENCE_DIR}"
+
+      # Writes the runtime manifest verify-game-result-cutover.mjs's `--mode live`
+      # step reads from TASK10_RUNTIME_FILE (runtimeManifest(), ~line 700 of that
+      # file). Must run after the DB is migrated + seeded (above) and before the
+      # live stage boots the API (below) — see
+      # apps/v1_api/src/games/migration/task10-runtime-manifest.cli.ts's header
+      # comment for the full contract and known blockers.
+      - name: Produce Task 10 live cutover runtime manifest
+        working-directory: apps/v1_api
+        run: pnpm exec ts-node --transpile-only src/games/migration/task10-runtime-manifest.cli.ts
+
+      - name: Live legacy compare mismatch and kill-switch proof
+        timeout-minutes: 8
+        run: >-
+          node scripts/qa/verify-game-result-cutover.mjs
+          --mode live
+          --evidence-dir "${TASK10_EVIDENCE_DIR}"
+
+      - name: Drop isolated database and clean owned runtime
+        if: always()
+        env:
+          PGPASSWORD: task10_ci
+        run: |
+          set -Euo pipefail
+          cleanup_status=0
+          database_dropped=false
+          if [[ -f "${RUNNER_TEMP}/task10-db-created" ]]; then
+            psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -v ON_ERROR_STOP=1 \
+              -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${TASK10_DATABASE_NAME}' AND pid <> pg_backend_pid();" || cleanup_status=$?
+            if (( cleanup_status == 0 )); then
+              psql -X -h 127.0.0.1 -U task10_ci -d task10_admin -v ON_ERROR_STOP=1 \
+                -c "DROP DATABASE IF EXISTS \"${TASK10_DATABASE_NAME}\";" || cleanup_status=$?
+            fi
+            if (( cleanup_status == 0 )); then
+              rm -f "${RUNNER_TEMP}/task10-db-created"
+              database_dropped=true
+            fi
+          else
+            database_dropped=true
+          fi
+          TASK10_DATABASE_DROPPED="${database_dropped}" node scripts/qa/verify-game-result-cutover.mjs \
+            --mode cleanup \
+            --evidence-dir "${TASK10_EVIDENCE_DIR}" || cleanup_status=$?
+          exit "${cleanup_status}"
+
+      - name: Upload Task 10 RED and cutover evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task10-game-result-cutover-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/task10
+          if-no-files-found: error
+          retention-days: 14
 
   # ── Build images: 승인 게이트 앞에서 프로덕션 이미지를 만들어 둔다 ──────────
   # 승인 대기가 배포 시간의 대부분이었다(실측 29분). 빌드를 게이트 앞으로 옮기면
@@ -255,12 +633,12 @@ jobs:
       # check-expand-contract-migrations.sh 는 migration_base_sha(수 커밋 전일 수 있음)와
       # 현재 SHA 사이 git history 를 직접 walk 한다. 얕은 checkout 이면 "unknown revision"
       # 으로 실패한다(alpha 의 deploy-alpha.yml 이 이미 동일한 이유로 fetch-depth: 0 사용).
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
         with:
           role-to-assume: ${{ vars.PROD_AWS_ROLE_ARN }}
           aws-region: ${{ vars.PROD_AWS_REGION }}
@@ -321,7 +699,7 @@ jobs:
 
       - name: Build and push immutable API image
         if: steps.images.outputs.api_exists != 'true'
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: deploy/Dockerfile.v1-api
@@ -365,7 +743,7 @@ jobs:
 
       - name: Build and push immutable Web image
         if: steps.images.outputs.web_exists != 'true'
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: deploy/Dockerfile.v1-web
@@ -484,8 +862,25 @@ jobs:
     concurrency:
       group: deploy-production
       cancel-in-progress: false
+    # 이 job 의 세 스텝은 전부 aws CLI(ssm put-parameter / send-command)를 호출한다.
+    # 워크플로 기본값은 contents: read 뿐이라 여기서 OIDC 토큰을 따로 요청해야 한다.
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
+      # SSH → SSM 전환에서 "Setup SSH" 스텝을 걷어낼 때 checkout 과 AWS 자격증명 스텝이
+      # 함께 빠졌다. 그 결과 첫 승인 배포가 "sync-prod-runtime-env.sh: No such file or
+      # directory"(exit 127) 로 죽었다 — 이 job 은 러너에 리포도, 자격증명도 없이 시작한다.
+      # build-images 와 달리 git history 를 walk 하는 스크립트가 없으므로 얕은 checkout 으로
+      # 충분하다(여기서 도는 스크립트는 S3 에 올라간 소스를 SSM 으로 내려받게 시킬 뿐이다).
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        with:
+          role-to-assume: ${{ vars.PROD_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.PROD_AWS_REGION }}
 
       # 런타임 시크릿은 Parameter Store(SecureString) 를 거쳐 전달한다.
       # SSM send-command 의 파라미터는 CloudTrail 과 명령 이력에 남으므로 시크릿을 명령
@@ -495,6 +890,15 @@ jobs:
         env:
           INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
           AWS_REGION: ${{ vars.PROD_AWS_REGION }}
+          # compose 가 기본값 없이 참조하는 뿌리 변수 두 개. 값이 없으면 compose 는 빈
+          # 문자열로 치환하고 ${V1_JWT_SECRET:-${JWT_SECRET}} 같은 중첩 기본값까지 전부
+          # 비어서, 빈 JWT 서명 비밀키로 배포될 수 있다(2026-08-02 실사고 — DB 인증 실패가
+          # 먼저 나서 그 상태로 뜨지는 않았다). 지금은 Parameter Store 에만 값이 있는데,
+          # 여기에 걸어 두면 시크릿을 등록하는 순간 GitHub 이 단일 출처가 된다.
+          # 등록 전이라도 안전하다 — sync 스크립트는 빈 값을 건너뛰므로(빈 값이라 건너뜀
+          # 카운터) 기존 Parameter Store 값을 지우지 않는다.
+          SECRET_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SECRET_JWT_SECRET: ${{ secrets.JWT_SECRET }}
           SECRET_KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
           SECRET_KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           SECRET_KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}

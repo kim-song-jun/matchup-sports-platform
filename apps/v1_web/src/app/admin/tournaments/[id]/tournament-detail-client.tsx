@@ -19,10 +19,6 @@ import {
   Users,
   User,
   Clock,
-  Clapperboard,
-  Trophy,
-  ChevronUp,
-  ChevronDown,
   ChevronRight,
   AlertCircle,
   Undo2,
@@ -35,7 +31,6 @@ import { publicAssetPath } from '@/lib/assets';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
-import { extractYoutubeVideoId, youtubeThumbnailUrl } from '@/lib/video-utils';
 import {
   useV1AdminTournament,
   useV1MasterSports,
@@ -54,18 +49,15 @@ import {
   useV1RosterDeadlineOverrideGrant,
   useV1RosterDeadlineOverrideRevoke,
   useV1ExportRosterCsv,
-  useV1TournamentPlayers,
   useV1AdminTournamentPlayers,
   useV1UpdatePlayerEligibility,
   useV1AdminBracket,
   useV1CreateGroup,
   useV1AssignGroupTeam,
   useV1CreateFixture,
-  useV1RecordResult,
   useV1RecalculateStandings,
   useV1UpdateFixture,
   useV1DeleteFixture,
-  useV1DeleteFixtureResult,
   useV1UpdateGroup,
   useV1DeleteGroup,
   useV1RemoveGroupTeam,
@@ -75,12 +67,14 @@ import {
   useV1PublishAnnouncement,
   useV1UpdateAnnouncement,
   useV1UploadImages,
-  useV1UploadVideo,
   useV1AdminTournamentAwards,
   useV1SetTournamentAwards,
   useV1AdminTournamentReviews,
   useV1HideReview,
   useV1UnhideReview,
+  useV1AdminAddPlayer,
+  useV1AdminRemovePlayer,
+  useV1AdminRosterEligibleMembers,
 } from '@/hooks/use-v1-api';
 import type {
   V1TournamentStatus,
@@ -129,6 +123,7 @@ import {
   type TournamentPromoCardValue,
 } from '@/components/admin/tournaments/promo-card-fields';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
+import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -524,11 +519,79 @@ export function RosterModal({
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentPlayers(
     registration?.id ?? '',
   );
-  const updateEligibility = useV1UpdatePlayerEligibility();
+  const updateEligibility = useV1UpdatePlayerEligibility(registration?.id ?? '');
+  const addPlayer = useV1AdminAddPlayer(registration?.id ?? '');
+  const removePlayer = useV1AdminRemovePlayer(registration?.id ?? '');
+
+  // 팀의 활성 멤버를 불러와 고르게 한다. 예전에는 userId 를 직접 입력받았는데, 운영자가
+  // UUID 를 얻을 경로가 화면에 없어 사실상 쓸 수 없었다(2026-08-04 alpha UI 검수).
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
+  const eligible = useV1AdminRosterEligibleMembers(registration?.id ?? '', open && canWrite);
+  const members = eligible.data?.members ?? [];
+  // 멤버는 있는데 전원 자격 미달인 경우(정원 초과·취소된 신청 등)를 "멤버 0명" 과 구분한다.
+  const hasEligibleMember = members.some((m) => m.eligible);
+  const selectedMember = members.find((m) => m.userId === selectedUserId) ?? null;
+  // 버튼은 "무언가 골랐는지" 가 아니라 "그게 지금도 추가 가능한지" 를 봐야 한다. 목록이
+  // 갱신되는 사이(다른 운영자가 먼저 추가, 팀 탈퇴 등) 고른 사람이 자격을 잃을 수 있다.
+  const canAddSelectedMember = !!selectedMember?.eligible && !!selectedMember.realName?.trim();
+
+  // 다른 신청으로 모달을 다시 열면 앞선 선택이 남는다 — RosterModal 은 항상 마운트돼 있고
+  // 숨겨질 뿐이라 useState 가 초기화되지 않는다. 같은 사람이 두 팀에 속하면 이전 팀에서
+  // 고른 userId 가 새 팀에서도 유효한 선택으로 보인다.
+  useEffect(() => {
+    setSelectedUserId('');
+    setAddError(null);
+  }, [registration?.id, open]);
+
+  // 고른 팀원이 목록에서 사라지거나 자격을 잃으면 선택을 비운다 — select 는 없는 값을 못
+  // 그려 빈칸이 되는데, 상태만 남아 있으면 화면과 어긋난다.
+  useEffect(() => {
+    if (!selectedUserId || !eligible.data) return;
+    const still = eligible.data.members.find((m) => m.userId === selectedUserId);
+    if (!still || !still.eligible) setSelectedUserId('');
+  }, [eligible.data, selectedUserId]);
 
   const players = [...(data?.players ?? [])].sort(
     (left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain),
   );
+
+  const handleAddPlayer = () => {
+    if (!selectedMember) {
+      setAddError('추가할 팀원을 선택해주세요.');
+      return;
+    }
+    // 버튼이 열려 있어도 마지막에 한 번 더 본다 — 목록 갱신과 클릭이 겹치면 버튼 상태가
+    // 한 박자 늦을 수 있다.
+    if (!selectedMember.eligible) {
+      setAddError(selectedMember.ineligibleReason ?? '지금은 추가할 수 없는 팀원이에요.');
+      return;
+    }
+    // 실명은 서버가 팀원 프로필에서 다시 읽지만, DTO 가 필수로 받으므로 함께 보낸다.
+    const realName = selectedMember.realName?.trim();
+    if (!realName) {
+      setAddError('실명이 등록되지 않은 팀원이에요.');
+      return;
+    }
+    setAddError(null);
+    addPlayer.mutate(
+      { userId: selectedMember.userId, realName },
+      {
+        onSuccess: () => {
+          setSelectedUserId('');
+          showToast('선수를 명단에 추가했어요.', 'success');
+        },
+        onError: (err) => setAddError(extractErrorMessage(err, '선수를 추가하지 못했어요.')),
+      },
+    );
+  };
+
+  const handleRemovePlayer = (playerId: string, realName: string) => {
+    removePlayer.mutate(playerId, {
+      onSuccess: () => showToast(`${realName} 선수를 명단에서 제외했어요.`, 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '선수를 제외하지 못했어요.'), 'error'),
+    });
+  };
 
   const handleEligibilityChange = (playerId: string, status: string) => {
     updateEligibility.mutate(
@@ -595,10 +658,92 @@ export function RosterModal({
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={() => handleRemovePlayer(p.id, p.realName)}
+                disabled={!canWrite || removePlayer.isPending}
+                aria-label={`${p.realName} 선수를 명단에서 제외`}
+                className="h-[44px] shrink-0 rounded-xl border border-gray-200 px-3 text-[13px] font-semibold text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-red-950/30"
+              >
+                제외
+              </button>
             </li>
           ))}
         </ul>
       )}
+      {canWrite ? (
+        <div className="mt-4 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+          <p className="text-[13px] font-semibold text-gray-900 dark:text-white">선수 추가</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            팀의 활성 멤버만 추가할 수 있어요. 명단 잠금과 제출 마감은 운영자 권한으로 넘어갑니다.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <div className="flex-1">
+              <label htmlFor="admin-roster-member" className="sr-only">
+                추가할 팀원
+              </label>
+              <select
+                id="admin-roster-member"
+                value={selectedUserId}
+                onChange={(e) => {
+                  setSelectedUserId(e.target.value);
+                  setAddError(null);
+                }}
+                disabled={eligible.isPending || members.length === 0}
+                className="h-[44px] w-full rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="">
+                  {/* 조회 실패를 "멤버 없음" 으로 말하지 않는다 — 목록이 비어 있는 이유가
+                      다르면 운영자가 팀 구성을 의심하며 엉뚱한 데를 찾게 된다. */}
+                  {eligible.isPending
+                    ? '팀원 불러오는 중…'
+                    : eligible.isError
+                      ? '팀원 목록을 불러오지 못했어요'
+                      : members.length === 0
+                        ? '팀에 활성 멤버가 없어요'
+                        : hasEligibleMember
+                          ? '팀원 선택'
+                          : '추가할 수 있는 팀원이 없어요'}
+                </option>
+                {members.map((m) => (
+                  // 못 고르는 팀원도 이유와 함께 보여 준다 — 목록에서 지워 버리면 운영자가
+                  // "왜 이 사람이 없지?" 를 화면 밖에서 찾아야 한다.
+                  <option key={m.userId} value={m.userId} disabled={!m.eligible}>
+                    {(m.realName ?? m.nickname ?? m.userId.slice(0, 8))}
+                    {m.role === 'owner' ? ' (팀장)' : m.role === 'manager' ? ' (매니저)' : ''}
+                    {m.eligible ? '' : ` — ${m.ineligibleReason}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={handleAddPlayer}
+              // isError 도 막는다 — 재조회가 실패하면 React Query 는 직전 데이터를 그대로
+              // 들고 있어서, 아래에 에러가 떠 있는데도 옛 판정으로 추가가 가능해진다.
+              disabled={
+                addPlayer.isPending ||
+                eligible.isFetching ||
+                eligible.isError ||
+                !canAddSelectedMember
+              }
+              className="h-[44px] shrink-0 rounded-xl bg-blue-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              {addPlayer.isPending ? '추가 중…' : '추가'}
+            </button>
+          </div>
+          {eligible.isError ? (
+            <p role="alert" className="mt-2 text-xs text-red-600">
+              {extractErrorMessage(eligible.error, '팀원 목록을 불러오지 못했어요.')}
+            </p>
+          ) : null}
+          {addError ? (
+            <p role="alert" className="mt-2 text-xs text-red-600">
+              {addError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <button
         type="button"
         onClick={onClose}
@@ -1190,11 +1335,9 @@ export function BracketTab({
   const createGroup = useV1CreateGroup(tournamentId);
   const assignGroupTeam = useV1AssignGroupTeam(tournamentId);
   const createFixture = useV1CreateFixture(tournamentId);
-  const recordResult = useV1RecordResult(tournamentId);
   const recalculate = useV1RecalculateStandings(tournamentId);
   const updateFixture = useV1UpdateFixture(tournamentId);
   const deleteFixture = useV1DeleteFixture(tournamentId);
-  const deleteFixtureResult = useV1DeleteFixtureResult(tournamentId);
   const updateGroup = useV1UpdateGroup(tournamentId);
   const deleteGroup = useV1DeleteGroup(tournamentId);
   const publishBracket = useV1PublishTournamentBracket(tournamentId);
@@ -1234,32 +1377,6 @@ export function BracketTab({
   const [autoGenGroupId, setAutoGenGroupId] = useState('');
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
   const { confirm: confirmModal, ConfirmModal } = useConfirm();
-
-  // ── Record result state ─────────────────────────────────────────────
-  const [resultFixture, setResultFixture] = useState<V1AdminBracketFixture | null>(null);
-  const [resultOpen, setResultOpen] = useState(false);
-  const [homeScore, setHomeScore] = useState('0');
-  const [awayScore, setAwayScore] = useState('0');
-  const [hasPenalty, setHasPenalty] = useState(false);
-  const [homePenalty, setHomePenalty] = useState('0');
-  const [awayPenalty, setAwayPenalty] = useState('0');
-  // 경기 영상 목록 편집 상태 — 저장 시 replace-all 로 전송한다
-  const [resultVideos, setResultVideos] = useState<{ title: string; url: string }[]>([]);
-  const uploadVideo = useV1UploadVideo();
-  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
-  const videoFileInputRef = useRef<HTMLInputElement>(null);
-  // 득점자 목록 편집 상태 — 저장 시 replace-all 로 전송한다
-  const [resultGoals, setResultGoals] = useState<
-    { team: 'home' | 'away'; playerId: string; playerName: string; minute: string }[]
-  >([]);
-  const { data: resultHomeRoster } = useV1AdminTournamentPlayers(
-    resultOpen ? resultFixture?.homeRegistrationId ?? '' : '',
-  );
-  const { data: resultAwayRoster } = useV1AdminTournamentPlayers(
-    resultOpen ? resultFixture?.awayRegistrationId ?? '' : '',
-  );
-  const resultHomePlayers = resultHomeRoster?.players ?? [];
-  const resultAwayPlayers = resultAwayRoster?.players ?? [];
 
   const confirmedRegistrations = registrations.filter((r) => r.status === 'confirmed');
   // EntityPicker 어댑터 — 팀 select 자리에 쓸 아이템 목록(제출 payload는 계속 registrationId 문자열)
@@ -1304,20 +1421,6 @@ export function BracketTab({
     deleteFixture.mutate(f.id, {
       onSuccess: () => showToast('경기를 삭제했어요.', 'success'),
       onError: (err) => showToast(extractErrorMessage(err, '경기 삭제에 실패했어요.'), 'error'),
-    });
-  };
-
-  const handleDeleteResult = async (f: V1AdminBracketFixture) => {
-    const ok = await confirmModal({
-      title: '결과 삭제',
-      message: `${f.homeTeamName} vs ${f.awayTeamName} 결과를 삭제할까요? 경기는 예정 상태로 돌아가요. (영상은 유지)`,
-      confirmLabel: '결과 삭제',
-      tone: 'danger',
-    });
-    if (!ok) return;
-    deleteFixtureResult.mutate(f.id, {
-      onSuccess: () => showToast('결과를 삭제했어요. 경기가 예정 상태로 돌아갔어요.', 'success'),
-      onError: (err) => showToast(extractErrorMessage(err, '결과 삭제에 실패했어요.'), 'error'),
     });
   };
 
@@ -1525,53 +1628,6 @@ export function BracketTab({
     }
   };
 
-  const handleRecordResult = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resultFixture) return;
-    // AGF-2/AGF-4: 버튼 disabled로 1차 차단, 폼 submit 이중 방어
-    const hs = parseInt(homeScore, 10);
-    const as_ = parseInt(awayScore, 10);
-    const hp = parseInt(homePenalty, 10);
-    const ap = parseInt(awayPenalty, 10);
-    const draw = !Number.isNaN(hs) && !Number.isNaN(as_) && hs === as_;
-    if (hasPenalty && !draw) return; // 정규 동점 아닐 때 승부차기 차단
-    if (hasPenalty && !Number.isNaN(hp) && !Number.isNaN(ap) && hp === ap) return; // 승부차기 동점 차단
-    recordResult.mutate(
-      {
-        fixtureId: resultFixture.id,
-        homeScore: parseInt(homeScore, 10),
-        awayScore: parseInt(awayScore, 10),
-        ...(hasPenalty
-          ? {
-              hasPenalty: true,
-              homePenaltyScore: parseInt(homePenalty, 10),
-              awayPenaltyScore: parseInt(awayPenalty, 10),
-            }
-          : { hasPenalty: false }),
-        // 편집기가 목록의 단일 소스 — 빈 배열이면 기존 영상 전체 삭제 (replace-all)
-        videos: resultVideos
-          .filter((v) => v.url.trim().length > 0)
-          .map((v) => ({ ...(v.title.trim() ? { title: v.title.trim() } : {}), url: v.url.trim() })),
-        // 편집기가 목록의 단일 소스 — 빈 배열이면 기존 득점 기록 전체 삭제 (replace-all)
-        goals: resultGoals
-          .filter((g) => g.playerName.trim().length > 0)
-          .map((g) => ({
-            team: g.team,
-            ...(g.playerId ? { playerId: g.playerId } : {}),
-            playerName: g.playerName.trim(),
-            ...(g.minute.trim() ? { minute: parseInt(g.minute, 10) } : {}),
-          })),
-      },
-      {
-        onSuccess: () => {
-          setResultOpen(false);
-          showToast('결과를 입력했어요.', 'success');
-        },
-        onError: (err) => showToast(extractErrorMessage(err, '결과 입력에 실패했어요.'), 'error'),
-      },
-    );
-  };
-
   const handleRecalculate = () => {
     recalculate.mutate(undefined, {
       onSuccess: () => showToast('순위를 재계산했어요.', 'success'),
@@ -1594,28 +1650,6 @@ export function BracketTab({
 
   const groups: V1AdminBracketGroup[] = bracket?.groups ?? [];
   const fixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
-
-  // AGF-2/AGF-4: 결과 입력 인라인 유효성 검사 (groups 선언 이후 계산)
-  const _rhs = parseInt(homeScore, 10);
-  const _ras = parseInt(awayScore, 10);
-  const _rhp = parseInt(homePenalty, 10);
-  const _rap = parseInt(awayPenalty, 10);
-  const isRegularDraw = !Number.isNaN(_rhs) && !Number.isNaN(_ras) && _rhs === _ras;
-  const isPenaltyDraw = hasPenalty && !Number.isNaN(_rhp) && !Number.isNaN(_rap) && _rhp === _rap;
-  // 승부차기 체크 시 정규 동점이 아니면 에러
-  const penaltyWithoutDraw = hasPenalty && !isRegularDraw;
-  // 녹아웃 경기 여부: resultFixture의 groupId로 group 조회
-  const resultFixtureGroup = resultFixture?.groupId
-    ? groups.find((g) => g.id === resultFixture.groupId)
-    : undefined;
-  const isKnockoutFixture =
-    resultFixtureGroup?.phase === 'semi' ||
-    resultFixtureGroup?.phase === 'final' ||
-    resultFixtureGroup?.phase === 'third_place';
-  // 녹아웃인데 정규 동점이고 승부차기 미입력 → 에러
-  const knockoutNeedsWinner = isKnockoutFixture && isRegularDraw && !hasPenalty;
-  // 저장 차단 조건
-  const resultFormBlocked = penaltyWithoutDraw || isPenaltyDraw || knockoutNeedsWinner;
 
   const hasData = groups.length > 0 || fixtures.length > 0;
 
@@ -2340,11 +2374,23 @@ export function BracketTab({
             rows={fixtures}
             keyExtractor={(f) => f.id}
             renderActions={(f) => {
-              // AGF-1: 결과 입력은 home·away 모두 배정된 경우에만 활성
-              const bothAssigned = !!f.homeRegistrationId && !!f.awayRegistrationId;
-              const disabledTitle = !bothAssigned
-                ? '홈·어웨이 팀이 모두 배정되어야 결과를 입력할 수 있어요'
-                : undefined;
+              // 결과 기록·정정은 이제 Game result-revision 플로우로만 이뤄진다 — 레거시
+              // POST/DELETE .../result 는 서버에서 409 TOURNAMENT_RESULT_DERIVED_ONLY로
+              // 항상 막혀 있다(tournament-bracket.service.ts). 이 행은 그 콘솔로 안내한다:
+              // 이미 결과가 있으면(레거시 읽기 전용 표시, '결과' 컬럼 참고) 정정 화면으로,
+              // 아직 없으면 검토 화면으로 — T6-1(2026-08-07)부터 두 화면 다 `?fixtureId=`
+              // 딥링크를 받아 그 경기를 바로 선택된 상태로 연다. `from=admin`은 T6-2 복귀
+              // 경로 판별용 — ops 셸이 이 파라미터를 세션에 기록해 "서비스로 돌아가기"를
+              // "대회 관리로 돌아가기"로 바꾼다.
+              const opsQuery = `fixtureId=${encodeURIComponent(f.id)}&from=admin`;
+              const resultConsoleHref = f.result
+                ? `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/records/corrections?${opsQuery}`
+                : `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/result-review?${opsQuery}`;
+              const resultConsoleLabel = f.result ? '결과 정정하러 가기' : '결과 검토하러 가기';
+              // T6-4: 아직 뛰고 있거나 곧 시작할 경기는 결과 검토보다 라이브 운영 콘솔이
+              // 우선이다 — 같은 자리에 "운영 콘솔 열기"를 추가로 노출한다.
+              const canOperate = f.status === 'scheduled' || f.status === 'in_progress';
+              const operateHref = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(f.id)}/operate?from=admin`;
               return (
                 <span className="inline-flex items-center gap-1.5">
                   <button
@@ -2361,45 +2407,30 @@ export function BracketTab({
                   >
                     <Pencil size={12} aria-hidden="true" /> 수정
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!bothAssigned) return;
-                      setResultFixture(f);
-                      setHomeScore(String(f.result?.homeScore ?? 0));
-                      setAwayScore(String(f.result?.awayScore ?? 0));
-                      setHasPenalty(f.result?.hasPenalty ?? false);
-                      setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
-                      setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
-                      setResultVideos(f.videos.map((v) => ({ title: v.title ?? '', url: v.url })));
-                      setResultGoals(
-                        (f.result?.goals ?? []).map((g) => ({
-                          team: g.team,
-                          playerId: g.playerId ?? '',
-                          playerName: g.playerName,
-                          minute: g.minute != null ? String(g.minute) : '',
-                        })),
-                      );
-                      setResultOpen(true);
-                    }}
-                    disabled={!bothAssigned}
-                    aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
-                    title={disabledTitle}
-                    aria-disabled={!bothAssigned}
-                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {f.result ? '결과 수정' : '결과 입력'}
-                  </button>
-                  {f.result ? (
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteResult(f)}
-                      aria-label={`${f.round} ${f.fixtureNumber}번 결과 삭제`}
-                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-red-500 bg-red-50 hover:bg-red-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  {canOperate && (
+                    <Link
+                      href={operateHref}
+                      aria-label={`${f.round} ${f.fixtureNumber}번 경기 운영 콘솔 열기`}
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-green-600 bg-green-50 hover:bg-green-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
-                      결과 삭제
-                    </button>
-                  ) : (
+                      운영 콘솔 열기
+                      <ChevronRight size={12} aria-hidden="true" />
+                    </Link>
+                  )}
+                  {/* 결과 입력·수정·삭제 세 버튼이 하나로 합쳐진 자리라, 폭을 좁은 아이콘
+                      버튼이 아니라 라벨이 있는 CTA로 채워 행의 시각적 무게를 유지한다.
+                      aria-label은 시각 텍스트와 동일한 문구를 담는다(WCAG 2.5.3 Label in
+                      Name) — 예전엔 "…콘솔로 이동"으로 시각 텍스트와 달라 스크린리더
+                      사용자가 음성 명령("결과 검토하러 가기 클릭")으로 못 찾는 문제가 있었다. */}
+                  <Link
+                    href={resultConsoleHref}
+                    aria-label={`${f.round} ${f.fixtureNumber}번 경기 ${resultConsoleLabel}`}
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
+                    {resultConsoleLabel}
+                    <ChevronRight size={12} aria-hidden="true" />
+                  </Link>
+                  {!f.result && (
                     <button
                       type="button"
                       onClick={() => void handleDeleteFixture(f)}
@@ -2537,353 +2568,6 @@ export function BracketTab({
             </button>
             <button type="submit" disabled={updateGroup.isPending || !editGroupName.trim()} className={'flex-1 ' + submitBtnCls}>
               {updateGroup.isPending ? '저장 중…' : '저장'}
-            </button>
-          </div>
-        </form>
-      </SimpleModal>
-
-      {/* ── Result input modal ────────────────────────────────────────── */}
-      <SimpleModal
-        open={resultOpen}
-        title="결과 입력"
-        onClose={() => setResultOpen(false)}
-        pending={recordResult.isPending}
-      >
-        <form onSubmit={handleRecordResult} noValidate className="flex flex-col gap-4">
-          {/* f14: fixed labels '홈'/'어웨이' + identifier as small caption */}
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col gap-1 flex-1">
-              <label htmlFor="home-score" className="text-[13px] text-gray-900">
-                홈
-              </label>
-              {(resultFixture?.homeTeamName ?? resultFixture?.homeRegistrationId) && (
-                <p className="text-xs text-gray-500 truncate max-w-[140px]">
-                  {resultFixture?.homeTeamName ?? resultFixture?.homeRegistrationId}
-                </p>
-              )}
-              <input
-                id="home-score"
-                type="number"
-                min="0"
-                value={homeScore}
-                onChange={(e) => setHomeScore(e.target.value)}
-                disabled={recordResult.isPending}
-                className={inputCls}
-              />
-            </div>
-            <span className="text-xl font-bold text-gray-500 mt-5" aria-hidden="true">:</span>
-            <div className="flex flex-col gap-1 flex-1">
-              <label htmlFor="away-score" className="text-[13px] text-gray-900">
-                어웨이
-              </label>
-              {(resultFixture?.awayTeamName ?? resultFixture?.awayRegistrationId) && (
-                <p className="text-xs text-gray-500 truncate max-w-[140px]">
-                  {resultFixture?.awayTeamName ?? resultFixture?.awayRegistrationId}
-                </p>
-              )}
-              <input
-                id="away-score"
-                type="number"
-                min="0"
-                value={awayScore}
-                onChange={(e) => setAwayScore(e.target.value)}
-                disabled={recordResult.isPending}
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          {/* AGF-4: 녹아웃 경기 정규 동점 → 승부차기 필요 경고 */}
-          {knockoutNeedsWinner && (
-            <p className="text-xs text-red-500" role="alert" aria-live="polite">
-              녹아웃 경기는 승자가 필요해요. 승부차기를 입력해 주세요.
-            </p>
-          )}
-
-          <label className="flex items-center gap-2 text-[13px] text-gray-900 cursor-pointer min-h-[44px]">
-            <input
-              type="checkbox"
-              checked={hasPenalty}
-              onChange={(e) => setHasPenalty(e.target.checked)}
-              disabled={recordResult.isPending}
-              className="w-4 h-4 rounded accent-blue-500"
-            />
-            승부차기 있음
-          </label>
-
-          {/* AGF-2: 승부차기 체크 시 정규 동점 아니면 에러 */}
-          {penaltyWithoutDraw && (
-            <p className="text-xs text-red-500" role="alert" aria-live="polite">
-              정규 경기가 동점일 때만 승부차기를 입력할 수 있어요.
-            </p>
-          )}
-
-          {hasPenalty && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1 flex-1">
-                  <label htmlFor="home-penalty" className="text-[13px] text-gray-900">홈 PK</label>
-                  <input id="home-penalty" type="number" min="0" value={homePenalty} onChange={(e) => setHomePenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
-                </div>
-                <span className="text-xl font-bold text-gray-500 mt-5" aria-hidden="true">:</span>
-                <div className="flex flex-col gap-1 flex-1">
-                  <label htmlFor="away-penalty" className="text-[13px] text-gray-900">어웨이 PK</label>
-                  <input id="away-penalty" type="number" min="0" value={awayPenalty} onChange={(e) => setAwayPenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
-                </div>
-              </div>
-              {/* AGF-2: 승부차기 점수 동일 차단 */}
-              {isPenaltyDraw && (
-                <p className="text-xs text-red-500" role="alert" aria-live="polite">
-                  승부차기 점수가 같으면 승자를 가릴 수 없어요.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
-            <span className="text-[13px] text-gray-900">득점자 (선택 · 최대 50명)</span>
-            {resultGoals.map((g, i) => {
-              const roster = g.team === 'home' ? resultHomePlayers : resultAwayPlayers;
-              const isFreeText = g.playerId === '';
-              return (
-                <div key={i} className="flex items-center gap-2">
-                  <select
-                    value={g.team}
-                    onChange={(e) =>
-                      setResultGoals((prev) =>
-                        prev.map((row, j) =>
-                          j === i
-                            ? { ...row, team: e.target.value as 'home' | 'away', playerId: '', playerName: '' }
-                            : row,
-                        ),
-                      )
-                    }
-                    disabled={recordResult.isPending}
-                    aria-label={`득점자 ${i + 1} 팀`}
-                    className={inputCls + ' w-[84px] shrink-0'}
-                  >
-                    <option value="home">{resultFixture?.homeTeamName ?? '홈'}</option>
-                    <option value="away">{resultFixture?.awayTeamName ?? '어웨이'}</option>
-                  </select>
-                  <select
-                    value={g.playerId}
-                    onChange={(e) => {
-                      const selectedId = e.target.value;
-                      const selected = roster.find((p) => p.id === selectedId);
-                      setResultGoals((prev) =>
-                        prev.map((row, j) =>
-                          j === i
-                            ? {
-                                ...row,
-                                playerId: selectedId,
-                                playerName: selected ? selected.realName : row.playerName,
-                              }
-                            : row,
-                        ),
-                      );
-                    }}
-                    disabled={recordResult.isPending}
-                    aria-label={`득점자 ${i + 1} 명단 선택`}
-                    className={inputCls + ' flex-1 min-w-0'}
-                  >
-                    <option value="">명단에 없음 (직접 입력)</option>
-                    {roster.map((p) => (
-                      <option key={p.id} value={p.id}>{p.realName}</option>
-                    ))}
-                  </select>
-                  {isFreeText && (
-                    <input
-                      type="text"
-                      value={g.playerName}
-                      onChange={(e) =>
-                        setResultGoals((prev) =>
-                          prev.map((row, j) => (j === i ? { ...row, playerName: e.target.value } : row)),
-                        )
-                      }
-                      disabled={recordResult.isPending}
-                      maxLength={60}
-                      placeholder="선수 이름"
-                      aria-label={`득점자 ${i + 1} 이름 직접 입력`}
-                      className={inputCls + ' flex-1 min-w-0'}
-                    />
-                  )}
-                  <input
-                    type="number"
-                    min="0"
-                    max="200"
-                    value={g.minute}
-                    onChange={(e) =>
-                      setResultGoals((prev) =>
-                        prev.map((row, j) => (j === i ? { ...row, minute: e.target.value } : row)),
-                      )
-                    }
-                    disabled={recordResult.isPending}
-                    placeholder="분"
-                    aria-label={`득점자 ${i + 1} 득점 시각(분)`}
-                    className={inputCls + ' w-[64px] shrink-0'}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setResultGoals((prev) => prev.filter((_, j) => j !== i))}
-                    disabled={recordResult.isPending}
-                    aria-label={`득점자 ${i + 1} 삭제`}
-                    className="inline-flex items-center justify-center w-[36px] h-[36px] shrink-0 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                  >
-                    <X size={15} aria-hidden="true" />
-                  </button>
-                </div>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() =>
-                setResultGoals((prev) => [...prev, { team: 'home', playerId: '', playerName: '', minute: '' }])
-              }
-              disabled={recordResult.isPending || resultGoals.length >= 50}
-              className="inline-flex items-center gap-1 self-start min-h-[36px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
-            >
-              <Plus size={13} aria-hidden="true" /> 득점자 추가
-            </button>
-            <p className="text-[11px] text-gray-400">
-              팀 명단에 없는 선수(비회원·대타 등)는 &quot;명단에 없음&quot;을 선택하고 이름을 직접 입력해요. 저장 시 목록 전체가 반영돼요.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <span className="text-[13px] text-gray-900">경기 영상 (선택 · 최대 10개)</span>
-            {resultVideos.map((v, i) => (
-              <div key={i} className="flex items-center gap-2">
-                {/* 신뢰된 YouTube video ID로 만든 썸네일만 미리 표시한다. 사용자가 입력한
-                    직접 영상 URL은 저장 전 DOM media source로 재해석하지 않는다. */}
-                <span className="relative w-[56px] h-[32px] shrink-0 rounded-md overflow-hidden bg-gray-800 grid place-items-center text-gray-400" aria-hidden="true">
-                  <Clapperboard size={13} />
-                  {v.url.trim() && extractYoutubeVideoId(v.url) ? (
-                    <img src={youtubeThumbnailUrl(extractYoutubeVideoId(v.url)!)} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                  ) : null}
-                </span>
-                <input
-                  type="text"
-                  value={v.title}
-                  onChange={(e) =>
-                    setResultVideos((prev) => prev.map((row, j) => (j === i ? { ...row, title: e.target.value } : row)))
-                  }
-                  disabled={recordResult.isPending}
-                  maxLength={80}
-                  placeholder={`제목 (예: 전반 하이라이트)`}
-                  aria-label={`영상 ${i + 1} 제목`}
-                  className={inputCls + ' flex-1 min-w-0'}
-                />
-                <input
-                  type="url"
-                  value={v.url}
-                  onChange={(e) =>
-                    setResultVideos((prev) => prev.map((row, j) => (j === i ? { ...row, url: e.target.value } : row)))
-                  }
-                  disabled={recordResult.isPending}
-                  maxLength={1000}
-                  placeholder="https://youtu.be/… 또는 업로드"
-                  aria-label={`영상 ${i + 1} URL`}
-                  className={inputCls + ' flex-[1.4] min-w-0'}
-                />
-                <span className="flex flex-col shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setResultVideos((prev) => {
-                      const next = [...prev];
-                      [next[i - 1], next[i]] = [next[i], next[i - 1]];
-                      return next;
-                    })}
-                    disabled={recordResult.isPending || i === 0}
-                    aria-label={`영상 ${i + 1} 위로`}
-                    className="inline-flex items-center justify-center w-[28px] h-[18px] rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 transition-colors"
-                  >
-                    <ChevronUp size={13} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setResultVideos((prev) => {
-                      const next = [...prev];
-                      [next[i], next[i + 1]] = [next[i + 1], next[i]];
-                      return next;
-                    })}
-                    disabled={recordResult.isPending || i === resultVideos.length - 1}
-                    aria-label={`영상 ${i + 1} 아래로`}
-                    className="inline-flex items-center justify-center w-[28px] h-[18px] rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 transition-colors"
-                  >
-                    <ChevronDown size={13} aria-hidden="true" />
-                  </button>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setResultVideos((prev) => prev.filter((_, j) => j !== i))}
-                  disabled={recordResult.isPending}
-                  aria-label={`영상 ${i + 1} 삭제`}
-                  className="inline-flex items-center justify-center w-[36px] h-[36px] shrink-0 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                >
-                  <X size={15} aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setResultVideos((prev) => [...prev, { title: '', url: '' }])}
-                disabled={recordResult.isPending || resultVideos.length >= 10}
-                className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
-              >
-                <Plus size={13} aria-hidden="true" /> 링크 추가
-              </button>
-              <button
-                type="button"
-                onClick={() => videoFileInputRef.current?.click()}
-                disabled={recordResult.isPending || uploadVideo.isPending || resultVideos.length >= 10}
-                className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
-              >
-                <Clapperboard size={13} aria-hidden="true" />
-                {uploadVideo.isPending ? `업로드 중… ${uploadPercent ?? 0}%` : '영상 파일 업로드'}
-              </button>
-              <input
-                ref={videoFileInputRef}
-                type="file"
-                accept="video/mp4,video/webm,video/quicktime"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (!file) return;
-                  setUploadPercent(0);
-                  try {
-                    const { urls } = await uploadVideo.mutateAsync({ file, onProgress: setUploadPercent });
-                    setResultVideos((prev) => [...prev, { title: '', url: urls[0] }]);
-                    showToast('영상을 업로드했어요. 제목을 입력하고 저장해 주세요.', 'success');
-                  } catch (err) {
-                    showToast(extractErrorMessage(err, '영상 업로드에 실패했어요.'), 'error');
-                  } finally {
-                    setUploadPercent(null);
-                  }
-                }}
-              />
-            </div>
-            <p className="text-[11px] text-gray-400">
-              유튜브 링크는 썸네일 카드로, 업로드 파일(mp4·webm·mov, 최대 200MB)은 페이지 내 플레이어로 재생돼요. 저장 시 목록 전체가 반영돼요.
-            </p>
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => setResultOpen(false)}
-              disabled={recordResult.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[13px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={recordResult.isPending || resultFormBlocked}
-              className={'flex-1 ' + submitBtnCls}
-            >
-              {recordResult.isPending ? '저장 중…' : '저장'}
             </button>
           </div>
         </form>
@@ -3854,6 +3538,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         })}
       </div>
 
+      {/* ── Tournament-ops quick links: 이 관리자 콘솔 탭들과 별개인 대회 현장 운영
+          콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다. T6-5(D-16):
+          권한이 없으면 숨기지 않고 비활성 + 사유로 보여준다. */}
+      <TournamentOpsQuickLinks tournamentId={id} />
+
       {/* ── Tab panels ────────────────────────────────────────────────── */}
       <div
         id="panel-info"
@@ -4720,7 +4409,7 @@ function AwardsTab({
 }
 
 // ── AwardsTab 행 컴포넌트 ────────────────────────────────────────────────
-// 팀이 선택된 행만 useV1TournamentPlayers로 로스터를 조회해야 하므로(훅 규칙상
+// 팀이 선택된 행만 useV1AdminTournamentPlayers로 로스터를 조회해야 하므로(훅 규칙상
 // 조건/루프 내 훅 호출 금지) rows.map 내부가 아닌 별도 컴포넌트로 분리한다.
 function AwardRow({
   idx,
@@ -4743,10 +4432,11 @@ function AwardRow({
     : null;
   const selectedRegistrationId = selectedTeamItem?.id ?? '';
 
-  const { data: roster, isFetching: rosterFetching } = useV1TournamentPlayers(
-    tournamentId,
-    selectedRegistrationId,
-  );
+  // 어드민 화면이므로 어드민 엔드포인트를 쓴다. 소비자 엔드포인트는 "그 팀의 멤버인가" 를
+  // 검사하므로, 자기가 속하지 않은 참가팀을 고른 어드민에게는 403 이 떨어진다. 그런데 화면은
+  // 그 에러를 따로 보여주지 않고 빈 목록으로 처리해서 "명단에 선수가 없다" 처럼 보였다.
+  const { data: roster, isFetching: rosterFetching } =
+    useV1AdminTournamentPlayers(selectedRegistrationId);
   const playerItems: EntityPickerItem[] = (roster?.players ?? []).map((p) => ({
     id: p.id,
     label: p.realName,

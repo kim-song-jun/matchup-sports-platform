@@ -357,7 +357,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
 
   if (isLoading) {
     return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments">
+      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments" desktopHead>
         <TournamentDetailSkeleton />
       </AppChrome>
     );
@@ -366,7 +366,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments">
+      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments" desktopHead>
         <div style={{ padding: '48px 20px 0' }}>
           <ErrorState
             message={msg}
@@ -1041,6 +1041,28 @@ export function TournamentDetailView({
           Mobile: single-column, no grid applied. */}
       {/* ── 상단 CTA: 히어로 직후 첫 번째로 보이는 진입점 (모바일) ── */}
       {topCTA}
+
+      {/* 전체 경기 일정: 상태(모집중/진행중/종료) 무관하게 항상 노출되는 유일한 진입점이라
+          어느 status 분기에도 속하지 않은 이 자리에 둔다. */}
+      <div style={{ padding: '0 20px 4px' }}>
+        <Link
+          href={`/tournaments/${tournament.id}/schedule`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 4px',
+            minHeight: 44,
+            color: 'var(--blue500)',
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          전체 경기 일정 보기
+          <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+        </Link>
+      </div>
 
       <div className="tm-tournament-detail-grid">
         {/* Left column: header + metrics + prize + rules + standings + group fixtures */}

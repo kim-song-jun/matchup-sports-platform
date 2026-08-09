@@ -79,6 +79,13 @@ export function getMatchMissingFields(ctx: MatchValidationContext): MatchMissing
   return RULES.filter((rule) => !rule.isSatisfied(ctx)).map(({ field, label, step }) => ({ field, label, step }));
 }
 
+/** RULES에서 특정 필드의 (첫) label/step을 찾는다 — 결측 필드 안내 문구를 한 곳에서만 관리. */
+function missingFieldFor(field: MatchFieldKey): MatchMissingField {
+  const rule = RULES.find((r) => r.field === field);
+  if (!rule) throw new Error(`No validation rule registered for field: ${field}`);
+  return { field: rule.field, label: rule.label, step: rule.step };
+}
+
 export function getMatchStepErrors(ctx: MatchValidationContext, step: MatchCreateStep): Partial<Record<MatchFieldKey, string>> {
   const errors: Partial<Record<MatchFieldKey, string>> = {};
   for (const missing of getMatchMissingFields(ctx)) {
@@ -111,7 +118,13 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
   const missingFields = getMatchMissingFields(ctx);
   if (missingFields.length > 0) return { missingFields };
 
-  const startsAt = parseStartsAt(draft) as Date;
+  const startsAt = parseStartsAt(draft);
+  if (!startsAt) {
+    // RULES의 'date'/'startTime' 존재 검사(빈 문자열 아님)는 통과했지만 실제로는
+    // new Date(...)가 실패하는 값 — 예: localStorage에서 복원된 손상된 draft.
+    // 단언 후 크래시 대신 결측 필드로 되돌려 상위 UI가 그 스텝으로 안내하게 한다.
+    return { missingFields: [missingFieldFor('date'), missingFieldFor('startTime')] };
+  }
   const endsAt = draft.endTime ? new Date(`${draft.date}T${draft.endTime}:00`) : null;
   const deadlineAt = parseDeadlineAt(draft);
 

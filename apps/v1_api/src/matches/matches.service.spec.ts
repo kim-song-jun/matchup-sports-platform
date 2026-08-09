@@ -190,9 +190,14 @@ describe('MatchesService', () => {
 
   // ─── 9. #3 최근 장소 조회 ────────────────────────────────────────────────
 
-  it('recentVenues: 호출자 소유 매치만 distinct placeName으로 최신순 5개까지 조회한다', async () => {
+  it('recentVenues: 호출자 소유 매치만 최신순으로 조회하고 placeName을 애플리케이션에서 dedup한다', async () => {
+    // 같은 placeName이 여러 행(가장 최근 것이 먼저)으로 섞여 와도 최초 1개만 남아야 한다 —
+    // Prisma `distinct` + `orderBy: createdAt`은 Postgres DISTINCT ON 규칙상
+    // orderBy가 distinct 필드로 시작하지 않으면 의도한 순서를 보장 못 해 서비스가
+    // 직접 dedup한다(회귀 방지).
     prisma.v1Match.findMany.mockResolvedValue([
       { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330' },
+      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330(구주소)' },
       { placeName: '강남역', placeAddress: null },
     ]);
 
@@ -205,9 +210,8 @@ describe('MatchesService', () => {
     expect(prisma.v1Match.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { hostUserId: host.id, deletedAt: null },
-        distinct: ['placeName'],
         orderBy: { createdAt: 'desc' },
-        take: 5,
+        take: 30,
       }),
     );
   });

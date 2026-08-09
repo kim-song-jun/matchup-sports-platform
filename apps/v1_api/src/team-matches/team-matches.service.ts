@@ -167,20 +167,33 @@ export class TeamMatchesService {
 
   /**
    * #3 1단계: 새 Venue 테이블 없이, 이 팀이 호스트로 과거에 실제로 입력했던 장소를
-   * distinct로 최근 것부터 최대 5개 돌려준다. 위저드의 장소 입력창 포커스 시
-   * 칩으로 노출해 탭 한 번으로 채울 수 있게 한다. 팀 관리자만 조회할 수 있게
+   * 최근 것부터 최대 5개 돌려준다. 위저드의 장소 입력창 포커스 시 칩으로
+   * 노출해 탭 한 번으로 채울 수 있게 한다. 팀 관리자만 조회할 수 있게
    * assertCanManageTeam로 게이팅(생성 권한과 동일한 기준).
+   *
+   * Prisma `distinct`는 Postgres `DISTINCT ON`으로 컴파일되는데, 이때
+   * `orderBy`가 distinct 필드로 시작해야 한다 — `distinct: ['placeName']` +
+   * `orderBy: { createdAt: 'desc' }` 조합은 "최근순 distinct 장소"라는 의도와
+   * 어긋난다(team-match-series-admin.service.ts의 loadRecentVenues와 동일한
+   * 이유로, 넉넉히 가져온 뒤 애플리케이션에서 dedup한다).
    */
   async recentVenues(user: V1AuthUser, teamId: string) {
     await this.assertCanManageTeam(user.id, teamId);
     const rows = await this.prisma.v1TeamMatch.findMany({
       where: { hostTeamId: teamId, deletedAt: null },
-      distinct: ['placeName'],
       orderBy: { createdAt: 'desc' },
-      take: 5,
+      take: 30,
       select: { placeName: true, placeAddress: true },
     });
-    return { items: rows.map((row) => ({ placeName: row.placeName, addressText: row.placeAddress })) };
+    const seen = new Set<string>();
+    const items: { placeName: string; addressText: string | null }[] = [];
+    for (const row of rows) {
+      if (seen.has(row.placeName)) continue;
+      seen.add(row.placeName);
+      items.push({ placeName: row.placeName, addressText: row.placeAddress });
+      if (items.length >= 5) break;
+    }
+    return { items };
   }
 
   async applicationEligibility(

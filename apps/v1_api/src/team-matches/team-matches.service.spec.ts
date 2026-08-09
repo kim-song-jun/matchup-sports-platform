@@ -195,21 +195,29 @@ describe('TeamMatchesService', () => {
     expect(prisma.v1TeamMatch.findMany).not.toHaveBeenCalled();
   });
 
-  it('recentVenues: 이 팀이 호스트인 팀매치만 distinct placeName으로 최신순 5개까지 조회한다', async () => {
+  it('recentVenues: 이 팀이 호스트인 팀매치만 최신순으로 조회하고 placeName을 애플리케이션에서 dedup한다', async () => {
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    // 같은 placeName이 여러 행(가장 최근 것이 먼저)으로 섞여 와도 최초 1개만 남아야 한다 —
+    // Prisma `distinct` + `orderBy: createdAt`은 Postgres DISTINCT ON 규칙상
+    // orderBy가 distinct 필드로 시작하지 않으면 의도한 순서를 보장 못 해 서비스가
+    // 직접 dedup한다(회귀 방지).
     prisma.v1TeamMatch.findMany.mockResolvedValue([
       { placeName: '풋살파크 강서', placeAddress: '서울 강서구' },
+      { placeName: '풋살파크 강서', placeAddress: '서울 강서구(구주소)' },
+      { placeName: '잠실 풋살장', placeAddress: null },
     ]);
 
     await expect(service.recentVenues(manager, 'team-host')).resolves.toEqual({
-      items: [{ placeName: '풋살파크 강서', addressText: '서울 강서구' }],
+      items: [
+        { placeName: '풋살파크 강서', addressText: '서울 강서구' },
+        { placeName: '잠실 풋살장', addressText: null },
+      ],
     });
     expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { hostTeamId: 'team-host', deletedAt: null },
-        distinct: ['placeName'],
         orderBy: { createdAt: 'desc' },
-        take: 5,
+        take: 30,
       }),
     );
   });

@@ -87,6 +87,13 @@ export function getTeamMatchMissingFields(ctx: TeamMatchValidationContext): Team
   return RULES.filter((rule) => !rule.isSatisfied(ctx)).map(({ field, label, step }) => ({ field, label, step }));
 }
 
+/** RULES에서 특정 필드의 (첫) label/step을 찾는다 — 결측 필드 안내 문구를 한 곳에서만 관리. */
+function missingFieldFor(field: TeamMatchFieldKey): TeamMatchMissingField {
+  const rule = RULES.find((r) => r.field === field);
+  if (!rule) throw new Error(`No validation rule registered for field: ${field}`);
+  return { field: rule.field, label: rule.label, step: rule.step };
+}
+
 /** 특정 스텝에 속한 필드만 골라 field → 문구 맵으로 변환한다(CreateField의 error prop에 바로 꽂는 용도). */
 export function getTeamMatchStepErrors(ctx: TeamMatchValidationContext, step: TeamMatchCreateStep): Partial<Record<TeamMatchFieldKey, string>> {
   const errors: Partial<Record<TeamMatchFieldKey, string>> = {};
@@ -120,8 +127,13 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
   const missingFields = getTeamMatchMissingFields(ctx);
   if (missingFields.length > 0) return { missingFields };
 
-  // RULES를 전부 만족했으므로 date/startTime 파싱은 항상 성공한다.
-  const startsAt = parseStartsAt(draft) as Date;
+  const startsAt = parseStartsAt(draft);
+  if (!startsAt) {
+    // RULES의 'date'/'startTime' 존재 검사(빈 문자열 아님)는 통과했지만 실제로는
+    // new Date(...)가 실패하는 값 — 예: localStorage에서 복원된 손상된 draft.
+    // 단언 후 크래시 대신 결측 필드로 되돌려 상위 UI가 그 스텝으로 안내하게 한다.
+    return { missingFields: [missingFieldFor('date'), missingFieldFor('startTime')] };
+  }
   const endsAt = draft.endTime ? new Date(`${draft.date}T${draft.endTime}:00`) : null;
   const deadlineAt = parseDeadlineAt(draft);
 

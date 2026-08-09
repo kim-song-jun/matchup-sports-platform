@@ -131,4 +131,18 @@ describe('buildTeamMatchPayloadResult — payload | missingFields 분기', () =>
       manualPlaceName: '잠실 풋살파크',
     });
   });
+
+  it('date가 빈 문자열은 아니지만 파싱 불가능한 값(손상된 draft)이면 크래시 대신 missingFields를 반환한다', () => {
+    // RULES의 presence 검사(Boolean(draft.date))는 통과하지만 new Date(...)가 NaN이 되는 값 —
+    // localStorage에서 복원된 draft가 깨진 경우를 흉내낸다. 예전엔 `parseStartsAt(draft) as Date`
+    // 단언 후 startsAt.toISOString()을 호출해 여기서 TypeError로 죽었다.
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, date: 'not-a-date' } });
+
+    expect(() => buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId)).not.toThrow();
+    const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
+    expect(result.payload).toBeUndefined();
+    const fields = result.missingFields?.map((item) => item.field);
+    expect(fields).toContain('date');
+    expect(fields).toContain('startTime');
+  });
 });

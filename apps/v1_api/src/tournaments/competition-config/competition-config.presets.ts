@@ -138,7 +138,17 @@ export const FUTSAL_V1_CONFIG: CompetitionConfig = {
   events: ['GOAL', 'OWN_GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION', 'FOUL'],
   lineup: {
     minPlayers: 3,
-    maxPlayers: 5,
+    // team-match-conditions.constants.ts의 futsal 경기방식 프리셋(6:6/5:5/4:4)이 이미
+    // '6:6'을 제안하는데 이 값이 5면 6:6으로 만든 매치의 라인업 저장이 항상
+    // LINEUP_SIZE_INVALID로 막힌다 — 실사용자가 부딪히는 버그였다. 6으로 올리면
+    // FUTSAL_FORMATIONS의 outfield:5 대형(2-2-1/1-3-1/3-1-1, 이미 존재 — 새로 만들지
+    // 않음)이 GK 1명과 합쳐 정확히 6명을 채운다. 이 숫자 자체는 여전히 하나의 기본값일
+    // 뿐 — 실제 상한 조정은 CompetitionConfigRegistry.createVersion()(POST
+    // /admin/competition-configs/:configId/versions)이 관리자가 이미 쓸 수 있는
+    // 정식 경로다: 새 버전 행은 V1CompetitionConfigVersion.status가 스키마 기본값으로
+    // ACTIVE라 team-match 쪽은 만들자마자 자동으로 이 값을 따라가고, tournament 쪽은
+    // TournamentCompetitionConfig.change()로 특정 버전에 명시적으로 pin할 수 있다.
+    maxPlayers: 6,
     substitutions: 'rolling',
     maxSubstitutions: null,
     positions: FUTSAL_POSITIONS,

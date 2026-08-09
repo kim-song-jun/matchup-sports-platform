@@ -256,35 +256,49 @@ describe('Task 14 team-match lineup builder', () => {
   });
 
   // 라인업 상한이 하드코딩이 아니라 pin된 V1CompetitionConfigVersion.lineup(여기서는
-  // 실제 futsal-v1 프리셋: minPlayers 3 / maxPlayers 5)을 그대로 따르는지 검증한다 —
-  // 이 값이 다른 곳(예: football의 7~11)으로 하드코딩돼 있었다면 6명 로스터가 통과하거나
-  // 에러 메시지의 숫자가 달라져 이 테스트가 깨진다. 부족한 실 팀원 수를 보충하려고
-  // 게스트(unlinked, userId 없음)를 섞어 6명을 채운다 — 게스트는 팀 소속·참석 여부
-  // 검사를 타지 않으므로 인원 상한 검증만 격리해서 확인할 수 있다.
-  it('rejects a roster larger than the pinned competition config maxPlayers (futsal-v1: 5)', async () => {
+  // 실제 futsal-v1 프리셋: minPlayers 3 / maxPlayers 6 — 6:6 경기방식 프리셋과 맞춘 값,
+  // team-match-conditions.constants.ts 참고)을 그대로 따르는지 두 경계 모두에서
+  // 검증한다 — 이 값이 다른 곳(예: football의 7~11)으로 하드코딩돼 있었다면 상한에서
+  // 통과해야 할 6명 로스터가 거부되거나, 상한을 넘는 7명 로스터가 통과하거나, 에러
+  // 메시지의 숫자가 달라져 이 테스트가 깨진다. 부족한 실 팀원 수를 보충하려고
+  // 게스트(unlinked, userId 없음)를 섞어 채운다 — 게스트는 팀 소속·참석 여부 검사를
+  // 타지 않으므로 인원 상한 검증만 격리해서 확인할 수 있다.
+  it('accepts a roster exactly at the pinned maxPlayers and rejects one more (futsal-v1: 6)', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
+    const atCap = [
+      { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
+      { userId: ids.hostP2, jerseyNumber: 2 },
+      { userId: ids.hostP3, jerseyNumber: 3 },
+      { displayName: 'Task 14 guest 4', jerseyNumber: 4 },
+      { displayName: 'Task 14 guest 5', jerseyNumber: 5 },
+      { displayName: 'Task 14 guest 6', jerseyNumber: 6 },
+    ];
+    const saved = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-at-cap', {
+      expectedVersion: version,
+      starters: atCap,
+      bench: [],
+    });
+    expect(saved).toEqual(
+      expect.objectContaining({ teamMatchId: ids.futureMatch, state: 'DRAFT', version: version + 1 }),
+    );
+    const atCapView = await service.getLineup(authUser(ids.hostOwner), ids.futureMatch);
+    expect(atCapView.starters).toHaveLength(6);
+
     const tooMany = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, undefined, {
-        expectedVersion: version,
-        starters: [
-          { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
-          { userId: ids.hostP2, jerseyNumber: 2 },
-          { userId: ids.hostP3, jerseyNumber: 3 },
-          { displayName: 'Task 14 guest 4', jerseyNumber: 4 },
-          { displayName: 'Task 14 guest 5', jerseyNumber: 5 },
-          { displayName: 'Task 14 guest 6', jerseyNumber: 6 },
-        ],
+      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-over-cap', {
+        expectedVersion: saved.version,
+        starters: [...atCap, { displayName: 'Task 14 guest 7', jerseyNumber: 7 }],
         bench: [],
       }),
     );
     expectHttpCode(tooMany, 422, 'LINEUP_SIZE_INVALID');
     expect((tooMany as HttpException).getResponse()).toEqual(
-      expect.objectContaining({ message: expect.stringContaining('5명 이하') }),
+      expect.objectContaining({ message: expect.stringContaining('6명 이하') }),
     );
 
-    // The rejected attempt must not have created a new revision.
-    expect(await currentVersion(ids.hostOwner, ids.futureMatch)).toBe(version);
+    // The rejected attempt must not have created a new revision beyond the at-cap save.
+    expect(await currentVersion(ids.hostOwner, ids.futureMatch)).toBe(saved.version);
   });
 
   // Task 15 blocker-1 regression: the client used to lose a placed roster member's userId on

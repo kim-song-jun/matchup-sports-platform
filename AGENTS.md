@@ -448,6 +448,13 @@ The sections below fill project-specific gaps while preserving curated content a
   `gh run rerun <id> --failed`.
 - **로컬 tsc 통과 ≠ CI 빌드 통과.** 공유 트리의 로컬 검사는 *미커밋 워킹트리*(타 세션 것 포함)를
   보지만 CI는 **커밋본**을 빌드한다. push 전 커밋본 기준으로 확인하라.
+- **런타임·환경 의존 동작은 로컬 포렌식 말고 alpha 배포로 검증한다(Critical, 2026-08-09 실사고).**
+  SSR 상태코드·스트리밍·프로덕션 렌더처럼 환경에 따라 달라지는 동작은 로컬 `next start`/`next build`
+  반복 실험에 세션을 태우지 말고, **fix 후보를 dev 머지해 alpha 실배포에서 직접 재측정**하라(이 레포의
+  ground truth). 실사고: schedule not-found HTTP 200 을 로컬에서 파다 좀비 next-server(`kill`이 래퍼만
+  죽여 자식이 포트 점유 → stale 빌드 서빙)와 병렬 `next dev` 로 거짓 결론을 냈다. 불가피하게 로컬 prod
+  렌더가 필요하면 `next start` 대신 `node .next/standalone/apps/v1_web/server.js` + fresh 포트 + `lsof`
+  로 실제 PID 확인·종료. 그래도 1순위는 alpha 배포-측정.
 
 ## S7) 로컬 dev 서버 · 호스트 부하
 

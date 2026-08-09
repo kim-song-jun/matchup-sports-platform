@@ -194,12 +194,25 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
   function gameWithPeriods(
     state: 'SCHEDULED' | 'LIVE',
-    periods: Array<{ number: number; state: string; startedAt: string | null; endedAt: string | null }>,
+    periods: Array<{
+      number: number;
+      state: string;
+      startedAt: string | null;
+      endedAt: string | null;
+      pausedTotalMs?: number;
+      pausedAt?: string | null;
+    }>,
   ) {
     mocks.useV1Game.mockReturnValue({
       data: {
         id: 'game-1', state, version: 2, lastSequence: 1,
-        periods: periods.map((period) => ({ id: `period-${period.number}`, gameId: 'game-1', ...period })),
+        periods: periods.map((period) => ({
+          id: `period-${period.number}`,
+          gameId: 'game-1',
+          pausedTotalMs: 0,
+          pausedAt: null,
+          ...period,
+        })),
         sides: [{
           id: 'side-home', gameId: 'game-1', sideKey: 'HOME', teamId: null,
           displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '',

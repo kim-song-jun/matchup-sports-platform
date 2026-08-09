@@ -68,6 +68,13 @@ export interface GamePeriod {
   state: GamePeriodState;
   startedAt: string | null;
   endedAt: string | null;
+  /** 이 피리어드가 지금까지 완료된 모든 일시정지 구간에서 쓴 누적 ms
+   * (`resume`이 여러 번 접히며 쌓인다). 경과 시간 계산은 항상
+   * `elapsedMatchMs()`(`@/lib/game-operations-clock`)를 거친다 — 화면 표시와
+   * `freezeCapture()`가 각자 계산하면 반드시 어긋난다. */
+  pausedTotalMs: number;
+  /** 지금 열려 있는 일시정지 구간의 시작 시각, 일시정지 중이 아니면 null. */
+  pausedAt: string | null;
 }
 
 export interface GameLineupParticipant {

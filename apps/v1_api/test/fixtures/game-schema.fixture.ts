@@ -76,17 +76,21 @@ export const gameSchemaFixture = {
 // Re-pinned for 레인 schedule (매치 ↔ 팀일정 연동): V1TeamSchedule gained
 // `@@unique([teamId, teamMatchId])` (belt-and-suspenders against a duplicate
 // system-generated schedule for the same team+match). Additive-only index
-// change, no column/type/FK touched. The migration hash is UNCHANGED — this
-// task's migration is a new file (20260809133000_v1_team_schedule_match_unique),
-// not an edit to the bound 20260729000100_v1_game_operations migration.
+// change, no column/type/FK touched.
 // Re-pinned for the match-conditions lane: V1TeamMatch gained matchFormat/
-// matchStyle/uniformColor (additive, nullable/default-[]). New migration file
-// 20260809000100_v1_team_match_structured_conditions; the bound
+// matchStyle/uniformColor (additive, nullable/default-[]).
+// Re-pinned for the pause-aware clock fix (2026-08): V1GamePeriod gained
+// `pausedTotalMs`/`pausedAt` (both additive — Int default 0, nullable
+// DateTime) so `pause`/`resume` can exclude a stoppage from the elapsed-time
+// display and `freezeCapture()`'s `clockMs` instead of both ticking through it.
+//
+// All three arrived in the same merge, each having pinned the hash of its own
+// schema.prisma while schema.prisma itself merged cleanly. The value below is
+// the sha256 of the MERGED file — no branch's standalone value — computed by
+// running `shasum -a 256` against it, not carried over from a review comment.
+// Every one of these migrations is a new file; the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration`
-// stays as it was. Both this pin and the schedule pin above landed in the same
-// merge — `schema` below is recomputed with `shasum -a 256` against the
-// MERGED schema.prisma (both sets of changes present), not either branch's
-// standalone value.
+// stays as it was.
 // Re-pinned for the tournament natural-key lane (Part 2 upsert foundation):
 // V1TournamentGroup gained @@unique([tournamentId, name]) and
 // V1TournamentFixture gained @@unique([tournamentId, round, fixtureNumber,
@@ -95,10 +99,14 @@ export const gameSchemaFixture = {
 // changed shape. Two new migration files back them
 // (20260809140000_v1_tournament_group_natural_key,
 // 20260809140100_v1_tournament_fixture_natural_key); the bound
-// 20260729000100_v1_game_operations migration is untouched, so `migration`
-// stays as it was and only `schema` is recomputed with `shasum -a 256`.
+// 20260729000100_v1_game_operations migration is untouched.
+//
+// The natural-key lane and the pause-aware clock met here: each had pinned the
+// hash of its own schema.prisma while schema.prisma itself merged cleanly. The
+// value below is the sha256 of the MERGED file, produced by running
+// `shasum -a 256` against it — neither branch's standalone value.
 export const gameSchemaSourceManifest = {
-  schema: '2e13fff34e9d8bbd488f973f03373846cb967020e7079d2e04be7eb315856fa3',
+  schema: 'a291d5f4fa84d6b11e31ee83972e1c83f8116e9e1ada00aacb3f023d2a7fd5a2',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -87,8 +87,16 @@ export function elapsedMatchMs(input: {
   readonly pausedTotalMs: number;
   readonly pausedAtMs: number | null;
 }): number {
-  const openPauseMs = input.pausedAtMs === null ? 0 : Math.max(0, input.referenceNowMs - input.pausedAtMs);
-  const raw = input.referenceNowMs - input.periodStartedAtMs - input.pausedTotalMs - openPauseMs;
+  // While paused, the elapsed time is whatever it was at the instant of the
+  // pause — measured from `pausedAtMs`, not from now. Subtracting an open-pause
+  // span from `now` instead looks equivalent but is not: if `referenceNowMs`
+  // trails `pausedAtMs` (the client's server-offset estimate lags, or the clock
+  // steps back), that span clamps to zero and the reading creeps upward while
+  // the match is stopped. Anchoring to `pausedAtMs` cannot drift.
+  const effectiveNowMs = input.pausedAtMs === null
+    ? input.referenceNowMs
+    : Math.min(input.referenceNowMs, input.pausedAtMs);
+  const raw = effectiveNowMs - input.periodStartedAtMs - input.pausedTotalMs;
   return Math.max(0, raw);
 }
 

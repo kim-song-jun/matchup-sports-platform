@@ -737,7 +737,13 @@ export class GamesService {
     now: Date,
   ): { pausedTotalMs: number; pausedAt: null } | null {
     if (period.pausedAt === null) return null;
-    return { pausedTotalMs: period.pausedTotalMs + (now.getTime() - period.pausedAt.getTime()), pausedAt: null };
+    // Clamp at zero. `pausedTotalMs` only ever accumulates, so a backwards
+    // server clock (NTP step, VM migration) must not be able to subtract from
+    // it — a negative delta here would silently shrink the total and inflate
+    // every subsequent elapsed reading, including the clockMs written onto
+    // recorded events.
+    const segmentMs = Math.max(0, now.getTime() - period.pausedAt.getTime());
+    return { pausedTotalMs: period.pausedTotalMs + segmentMs, pausedAt: null };
   }
 
   /**

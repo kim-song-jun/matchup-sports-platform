@@ -84,7 +84,7 @@ describe('Team match search scope integration contract', () => {
 
   async function searchIds(query: string): Promise<string[]> {
     const result = await service.list(null, { query } as TeamMatchesQueryDto);
-    return result.items.map((item) => item.id);
+    return result.items.map((item) => item.teamMatchId);
   }
 
   it('finds the match by host team name — the placeholder promises 팀 이름', async () => {

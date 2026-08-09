@@ -73,13 +73,22 @@ export const gameSchemaFixture = {
 // of the MERGED file, computed with `shasum -a 256` — it is not either branch's
 // value. Both sets of changes are present and both are additive; the bound
 // migration is untouched, so `migration` stays as it was.
+// Re-pinned for 레인 schedule (매치 ↔ 팀일정 연동): V1TeamSchedule gained
+// `@@unique([teamId, teamMatchId])` (belt-and-suspenders against a duplicate
+// system-generated schedule for the same team+match). Additive-only index
+// change, no column/type/FK touched. The migration hash is UNCHANGED — this
+// task's migration is a new file (20260809133000_v1_team_schedule_match_unique),
+// not an edit to the bound 20260729000100_v1_game_operations migration.
 // Re-pinned for the match-conditions lane: V1TeamMatch gained matchFormat/
 // matchStyle/uniformColor (additive, nullable/default-[]). New migration file
 // 20260809000100_v1_team_match_structured_conditions; the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration`
-// stays as it was. `schema` recomputed with `shasum -a 256`.
+// stays as it was. Both this pin and the schedule pin above landed in the same
+// merge — `schema` below is recomputed with `shasum -a 256` against the
+// MERGED schema.prisma (both sets of changes present), not either branch's
+// standalone value.
 export const gameSchemaSourceManifest = {
-  schema: '1d51176acc0114177adfb327d28032721ac62b003b6913d69a1c3b04c9970a96',
+  schema: '24246c2cfe8f17faa9bca55d16624ff35efb1ee3a03384342762e2a7db65c36e',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

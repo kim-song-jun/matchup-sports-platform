@@ -2808,6 +2808,7 @@ model V1TeamSchedule {
   attendance       V1ScheduleAttendance[]
   guestRecruitment V1ScheduleGuestRecruitment?
 
+  @@unique([teamId, teamMatchId], map: "v1_team_schedules_team_match_unique")
   @@index([teamId, startAt], map: "v1_team_schedules_team_start_idx")
   @@index([teamMatchId], map: "v1_team_schedules_team_match_idx")
   @@map("v1_team_schedules")

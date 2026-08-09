@@ -387,6 +387,13 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       },
       onComplete,
       canComplete: Boolean(schedule && schedule.state === 'SCHEDULED' && new Date(schedule.endAt).getTime() <= Date.now()),
+      completeDisabledReason: !schedule
+        ? null
+        : schedule.state !== 'SCHEDULED'
+          ? '이미 종료되었거나 취소된 일정이에요.'
+          : new Date(schedule.endAt).getTime() > Date.now()
+            ? '경기가 끝난 뒤에 완료 처리할 수 있어요.'
+            : null,
       cancelPending: cancelSchedule.isPending,
       completePending: completeSchedule.isPending,
       reminders: [

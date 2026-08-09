@@ -153,6 +153,9 @@ export type ScheduleManageActionsModel = {
   onCancel: () => void;
   onComplete: () => void;
   canComplete: boolean;
+  /** canComplete가 false일 때 버튼을 disabled로 계속 보여주면서 그 사유를 알려준다
+   * (attendance.disabledReason과 동일한 관례). canComplete가 true면 null. */
+  completeDisabledReason: string | null;
   cancelPending: boolean;
   completePending: boolean;
   reminders: Array<{ kind: 'rsvp_deadline' | 'guest_recruitment_close'; label: string; onTrigger: () => void; pending: boolean; visible: boolean }>;

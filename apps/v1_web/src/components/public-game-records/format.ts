@@ -76,3 +76,25 @@ export function formatClock(clockMs: number | null): string {
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
+
+/**
+ * Lane 1 -- period label for the public match/schedule clock. Mirrors the
+ * operations console's own convention (`period-label.ts`, `tournament-ops`)
+ * without importing it: that file lives under a directory this lane must
+ * not couple to, and the rule is three lines. "전반"/"후반" for football's
+ * always-exactly-2-period games; a numbered fallback once a sport/format
+ * has more periods than that.
+ */
+export function periodLabel(periodNumber: number): string {
+  if (periodNumber === 1) return '전반';
+  if (periodNumber === 2) return '후반';
+  return `${periodNumber}피리어드`;
+}
+
+/** `m:ss` elapsed-time display for the public live clock -- same precision as `formatClock`. */
+export function formatElapsedClock(elapsedMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}

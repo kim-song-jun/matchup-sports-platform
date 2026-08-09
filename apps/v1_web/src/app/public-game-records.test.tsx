@@ -116,6 +116,7 @@ function makeMatch(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDetai
     resultState: 'official',
     scoreStatus: 'official',
     score: { home: 2, away: 1 },
+    clock: null,
     lineup: {
       home: [{ participantId: 'p-1', displayName: null, jerseyNumber: 7, position: 'FW' }],
       away: [{ participantId: 'p-2', displayName: '이몽룡', jerseyNumber: 10, position: 'MF' }],
@@ -308,6 +309,7 @@ function makeSchedule(overrides: Partial<PublicTournamentScheduleResponse> = {})
         resultState: 'void',
         scoreStatus: 'unavailable',
         score: null,
+        clock: null,
         hasVideo: false,
       },
     ],
@@ -362,6 +364,7 @@ describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여
           resultState: 'pending',
           scoreStatus: 'unavailable',
           score: null,
+          clock: null,
           hasVideo: false,
         },
       ],
@@ -375,6 +378,88 @@ describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여
     // 기본 factory 항목(makeSchedule())은 venue: null, fieldName: null 이다.
     render(<ScheduleContent tournamentId="tournament-1" data={makeSchedule()} />);
     expect(screen.queryByText(/null|undefined/i)).not.toBeInTheDocument();
+  });
+});
+
+/* ── Lane 1: 진행 중 경기의 실시간 스코어/경과 시간 ──
+ * 알파 그린 FC 실사고(2026-08) 재현: 진행 중 경기는 공식 확정 전이라도
+ * scoreStatus='live' + 숫자 스코어 + LIVE 배지 + 경과 시간이 함께 보여야 한다.
+ * 이 테스트가 깨지면 "진행 중인데 스코어가 - : - 로 보인다" 회귀를 잡는다. */
+describe('ScheduleContent — 진행 중 경기의 라이브 스코어/경과 시간', () => {
+  const liveEntry = {
+    fixtureId: 'fixture-live',
+    round: '결승',
+    fixtureNumber: 1,
+    legNumber: 1,
+    groupId: null,
+    groupName: null,
+    scheduledAt: '2026-08-10T09:00:00.000Z',
+    venue: null,
+    fieldName: null,
+    home: { registrationId: 'reg-home', teamId: 'team-home', teamName: '알파 그린 FC' },
+    away: { registrationId: 'reg-away', teamId: 'team-away', teamName: '알파 블루 FC' },
+    visibilityMode: 'live' as const,
+    status: 'live',
+    resultState: 'pending' as const,
+    scoreStatus: 'live' as const,
+    score: { home: 2, away: 0 },
+    clock: { periodNumber: 2, elapsedMs: 23 * 60_000, isPaused: false },
+    hasVideo: false,
+  };
+
+  it('공식 결과 확정 전이라도 진행 중이면 실시간 스코어를 숫자로 보여준다', () => {
+    render(<ScheduleContent tournamentId="tournament-1" data={makeSchedule({ items: [liveEntry] })} />);
+    expect(screen.getByText('2 : 0')).toBeInTheDocument();
+  });
+
+  it('LIVE 배지와 현재 피리어드·경과 시간을 함께 보여준다', () => {
+    render(<ScheduleContent tournamentId="tournament-1" data={makeSchedule({ items: [liveEntry] })} />);
+    expect(screen.getByText('LIVE')).toBeInTheDocument();
+    expect(screen.getByText('후반 23:00')).toBeInTheDocument();
+  });
+
+  it('일시 중지 중이면 LIVE 대신 일시중지 상태를 보여준다', () => {
+    render(
+      <ScheduleContent
+        tournamentId="tournament-1"
+        data={makeSchedule({
+          items: [{ ...liveEntry, clock: { periodNumber: 2, elapsedMs: 23 * 60_000, isPaused: true } }],
+        })}
+      />,
+    );
+    expect(screen.getByText('일시중지')).toBeInTheDocument();
+    expect(screen.queryByText('LIVE')).not.toBeInTheDocument();
+  });
+
+  it('경과 시간 정보가 없으면(clock=null) 배지만 보여주고 시간은 생략한다', () => {
+    render(
+      <ScheduleContent
+        tournamentId="tournament-1"
+        data={makeSchedule({ items: [{ ...liveEntry, clock: null }] })}
+      />,
+    );
+    expect(screen.getByText('LIVE')).toBeInTheDocument();
+    expect(screen.queryByText(/후반|전반/)).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchDetailContent — 진행 중 경기의 라이브 스코어/경과 시간', () => {
+  it('scoreStatus가 live이면 숫자 스코어와 LIVE 배지·경과 시간을 함께 보여준다', () => {
+    render(
+      <MatchDetailContent
+        data={makeMatch({
+          visibilityMode: 'live',
+          status: 'live',
+          resultState: 'pending',
+          scoreStatus: 'live',
+          score: { home: 1, away: 0 },
+          clock: { periodNumber: 1, elapsedMs: 12 * 60_000 + 30_000, isPaused: false },
+        })}
+      />,
+    );
+    expect(screen.getByText('1 : 0')).toBeInTheDocument();
+    expect(screen.getByText('LIVE')).toBeInTheDocument();
+    expect(screen.getByText('전반 12:30')).toBeInTheDocument();
   });
 });
 

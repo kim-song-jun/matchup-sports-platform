@@ -33,6 +33,30 @@ export interface ScheduleFilters {
 }
 
 /**
+ * Lane 1 (관중 라이브 스코어) -- how a spectator page finds out the score
+ * changed without a manual refresh. Deliberately plain polling, not the
+ * operations console's authenticated realtime socket/takeover channel
+ * (`apps/v1_api/src/realtime/realtime.gateway.ts`): that channel is scoped to
+ * one authorized operator per game, and standing up a new public broadcast
+ * channel for a potentially-hundreds-of-viewers, unauthenticated audience is
+ * out of this lane's scope (rationale spelled out in
+ * `docs/api/domains/public-records.md`'s "Lane 1 addition" section). Only
+ * polls while the currently-loaded page actually contains a `status ===
+ * 'live'` fixture/match, so an idle spectator on a fully-scheduled or
+ * fully-completed tournament page never polls at all.
+ *
+ * Load model, stated accurately: `react-query`'s cache is per-browser, so it
+ * does NOT dedupe requests across spectators. Server load is roughly
+ * (spectators watching a live page) x (1 / interval) -- it DOES scale with
+ * viewers. What this design buys is bounding *when* that cost is paid: no
+ * polling at all unless the loaded page actually holds a live fixture, and
+ * an 8s floor per viewer. If viewer counts grow past what that supports, the
+ * next step is a shared cache (CDN/edge or server-side) or a real public
+ * broadcast channel -- not a shorter interval.
+ */
+const LIVE_POLL_INTERVAL_MS = 8_000;
+
+/**
  * `GET /tournaments/:id/schedule` -- cursor-paginated fixture list.
  * `tournamentTitle`/`bracketPublished`/`unscheduled`/`standings` are
  * identical on every page (the server always returns them in full), so
@@ -51,6 +75,10 @@ export function usePublicTournamentSchedule(tournamentId: string, filters: Sched
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: Boolean(tournamentId),
     retry: false,
+    refetchInterval: (query) => {
+      const hasLive = query.state.data?.pages.some((page) => page.items.some((item) => item.status === 'live'));
+      return hasLive === true ? LIVE_POLL_INTERVAL_MS : false;
+    },
   });
 }
 
@@ -66,6 +94,7 @@ export function usePublicMatch(tournamentId: string, fixtureId: string) {
     queryFn: () => v1Get<PublicMatchDetail>(`/tournaments/${tournamentId}/matches/${fixtureId}`),
     enabled: Boolean(tournamentId) && Boolean(fixtureId),
     retry: false,
+    refetchInterval: (query) => (query.state.data?.status === 'live' ? LIVE_POLL_INTERVAL_MS : false),
   });
 }
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { LiveBadge } from './live-badge';
 import {
   fixtureStatusLabel,
   formatClock,
@@ -190,10 +191,25 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
               {sideLabel(data.away)}
             </span>
           </div>
-          <div style={{ textAlign: 'center', marginTop: 10, fontSize: 12, color: 'var(--text-caption)' }}>
-            {data.scheduledAt ? formatTournamentDateTimeLong(data.scheduledAt) : '일정 미정'} · {fixtureStatusLabel(data.status)}
-            {data.venue ? ` · ${data.venue}` : ''}
-            {data.fieldName ? ` (${data.fieldName})` : ''}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 6,
+              marginTop: 10,
+              fontSize: 12,
+              color: 'var(--text-caption)',
+            }}
+          >
+            <span>
+              {data.scheduledAt ? formatTournamentDateTimeLong(data.scheduledAt) : '일정 미정'}
+              {data.status !== 'live' ? ` · ${fixtureStatusLabel(data.status)}` : ''}
+              {data.venue ? ` · ${data.venue}` : ''}
+              {data.fieldName ? ` (${data.fieldName})` : ''}
+            </span>
+            {data.status === 'live' ? <LiveBadge clock={data.clock} /> : null}
           </div>
           {data.pendingProjection ? (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--blue500)', textAlign: 'center' }}>

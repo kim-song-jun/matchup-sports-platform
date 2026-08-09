@@ -3884,10 +3884,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                       disabled={updateTournament.isPending}
                       onClick={() => setEditLineupMaxPlayers(String(option))}
                       aria-pressed={selected}
-                      className={`h-[36px] rounded-xl border px-3.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
+                      className={`inline-flex min-h-[44px] items-center rounded-xl border px-3.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
                         selected
                           ? 'border-blue-500 bg-blue-500 text-white'
-                          : 'border-[var(--border)] bg-white text-gray-900 hover:border-blue-500'
+                          : 'border-[var(--border)] bg-white text-gray-900 hover:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white'
                       }`}
                     >
                       {option}명

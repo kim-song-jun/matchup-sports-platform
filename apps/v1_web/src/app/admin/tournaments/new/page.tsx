@@ -676,7 +676,7 @@ function ParticipationStep({
                   disabled={pending}
                   onClick={() => setField('lineupMaxPlayers', String(option))}
                   aria-pressed={selected}
-                  className={`h-[40px] rounded-xl border px-4 text-sm font-semibold transition-colors disabled:opacity-50 ${
+                  className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
                     selected
                       ? 'border-blue-500 bg-blue-500 text-white'
                       : 'border-[var(--border)] bg-white text-[var(--text-body)] hover:border-blue-500'

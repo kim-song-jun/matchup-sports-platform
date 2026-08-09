@@ -60,9 +60,13 @@ export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
             <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
               {eventLabel(item)}
             </p>
-            {item.status === 'failed' && item.lastError ? (
+            {/* lastError 가 없는 실패도 사유 자리를 비워두지 않는다. 예전 스키마로 저장된
+                로컬스토리지 항목은 status 만 'failed' 이고 lastError 가 없을 수 있는데,
+                그때 아래 재시도 버튼은 뜨면서 이유는 안 보이면 운영자는 무엇이 왜 실패했는지
+                모른 채 버튼만 누르게 된다. */}
+            {item.status === 'failed' ? (
               <p className="text-2xs text-red-500" role="alert">
-                {item.lastError.message}
+                {item.lastError?.message ?? '실패 사유를 확인할 수 없어요. 다시 시도해 보고, 계속 실패하면 새로고침해 주세요.'}
               </p>
             ) : null}
           </div>

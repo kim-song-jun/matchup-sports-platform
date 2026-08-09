@@ -186,6 +186,55 @@ describe('TeamMatchesService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  // ─── #3 최근 장소 조회 ──────────────────────────────────────────────────────
+
+  it('recentVenues: owner/manager 권한 없는 사용자는 403 PERMISSION_DENIED (조회 자체 미실행)', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(null); // not a manager
+
+    await expect(service.recentVenues(manager, 'team-host')).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1TeamMatch.findMany).not.toHaveBeenCalled();
+  });
+
+  it('recentVenues: 이 팀이 호스트인 팀매치만 최신순으로 조회하고 placeName을 애플리케이션에서 dedup한다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    // 같은 placeName이 여러 행(가장 최근 것이 먼저)으로 섞여 와도 최초 1개만 남아야 한다 —
+    // Prisma `distinct` + `orderBy: createdAt`은 Postgres DISTINCT ON 규칙상
+    // orderBy가 distinct 필드로 시작하지 않으면 의도한 순서를 보장 못 해 서비스가
+    // 직접 dedup한다(회귀 방지).
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      { placeName: '풋살파크 강서', placeAddress: '서울 강서구' },
+      { placeName: '풋살파크 강서', placeAddress: '서울 강서구(구주소)' },
+      { placeName: '잠실 풋살장', placeAddress: null },
+    ]);
+
+    await expect(service.recentVenues(manager, 'team-host')).resolves.toEqual({
+      items: [
+        { placeName: '풋살파크 강서', addressText: '서울 강서구' },
+        { placeName: '잠실 풋살장', addressText: null },
+      ],
+    });
+    expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { hostTeamId: 'team-host', deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      }),
+    );
+  });
+
+  it('recentVenues: 앞뒤 공백만 다른 레거시 값은 trim 후 같은 장소로 dedup되고, 공백뿐인 값은 제외한다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      { placeName: '  ', placeAddress: null }, // 공백뿐 — 제외
+      { placeName: '풋살파크 강서 ', placeAddress: '주소1' }, // trim 전 다른 문자열
+      { placeName: '풋살파크 강서', placeAddress: '주소2' }, // trim 후 위와 동일 장소
+    ]);
+
+    await expect(service.recentVenues(manager, 'team-host')).resolves.toEqual({
+      items: [{ placeName: '풋살파크 강서', addressText: '주소1' }],
+    });
+  });
+
   // ─── create: guard tests ───────────────────────────────────────────────────
 
   it('create: 정지된 계정은 403 PERMISSION_DENIED', async () => {

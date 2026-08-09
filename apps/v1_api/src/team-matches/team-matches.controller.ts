@@ -46,6 +46,12 @@ export class TeamMatchesController {
     return this.teamMatchesService.create(user, dto);
   }
 
+  @Get('teams/:teamId/recent-venues')
+  @UseGuards(V1AuthGuard)
+  recentVenues(@CurrentUser() user: V1AuthUser, @Param('teamId') teamId: string) {
+    return this.teamMatchesService.recentVenues(user, teamId);
+  }
+
   @Get('team-matches/:teamMatchId/edit')
   @UseGuards(V1AuthGuard)
   edit(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {

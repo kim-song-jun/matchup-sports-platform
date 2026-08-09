@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { TeamMatchCreateViewModel } from './team-matches.types';
-import { buildTeamMatchMutationPayload, draftFromTeamMatchEdit, TeamMatchCreatePageClient } from './team-matches-create-client';
+import { draftFromTeamMatchEdit, TeamMatchCreatePageClient } from './team-matches-create-client';
+import { buildTeamMatchPayloadResult } from './team-matches.validation';
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
@@ -60,6 +61,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   }),
   useV1CreateTeamMatch: () => ({ mutate: createTeamMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
+  useV1TeamRecentVenues: () => ({ data: undefined }),
 }));
 
 vi.mock('./team-matches-page', () => ({
@@ -210,7 +212,7 @@ describe('team match edit hydration', () => {
       status: 'recruiting' as const, version: new Date().toISOString(),
     };
     const draft = draftFromTeamMatchEdit(edit);
-    const payload = buildTeamMatchMutationPayload(draft, 'team-1', 'sport-futsal', 'region-gangnam');
+    const payload = buildTeamMatchPayloadResult(draft, 'team-1', 'sport-futsal', 'region-gangnam').payload;
 
     expect(draft).toMatchObject({
       imageUrl: '/uploads/team-match-cover.webp',
@@ -229,7 +231,7 @@ describe('team match edit hydration', () => {
     const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const draft = { ...getTeamMatchCreateViewModel('edit').draft, title: '이미지 제거', imageUrl: '', venue: '잠실', date: startsAt.toISOString().slice(0, 10), startTime: '19:00' };
 
-    expect(buildTeamMatchMutationPayload(draft, 'team-1', 'sport-futsal', 'region-gangnam')?.imageUrl).toBeNull();
+    expect(buildTeamMatchPayloadResult(draft, 'team-1', 'sport-futsal', 'region-gangnam').payload?.imageUrl).toBeNull();
   });
 });
 
@@ -239,7 +241,7 @@ describe('team-match deadline payload', () => {
     const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     start.setHours(18, 0, 0, 0);
     const deadline = new Date(start.getTime() - 24 * 60 * 60 * 1000);
-    const payload = buildTeamMatchMutationPayload(
+    const payload = buildTeamMatchPayloadResult(
       {
         ...draft,
         title: '마감 시간이 있는 팀매치',
@@ -253,7 +255,7 @@ describe('team-match deadline payload', () => {
       'team-1',
       'sport-futsal',
       'region-gangnam',
-    );
+    ).payload;
 
     expect(payload?.deadlineAt).toBe(deadline.toISOString());
   });

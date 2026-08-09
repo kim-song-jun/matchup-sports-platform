@@ -194,7 +194,13 @@ export function validateCompetitionConfig(value: unknown): CompetitionConfig {
   } as CompetitionConfig;
 }
 
-function canonicalize(value: unknown): string {
+// Exported so competition-config-version-repoint.ts can diff individual
+// CompetitionConfig sections (periods/events/lineup/result/tieBreak/
+// visibility) between a drifted stored row and the canonical preset with the
+// exact same key-order-independent equality competitionConfigContentHash()
+// below already uses for the whole document, instead of re-implementing a
+// second, possibly-divergent deep-equality check.
+export function canonicalize(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`;
   if (isRecord(value)) {
     return `{${Object.keys(value)

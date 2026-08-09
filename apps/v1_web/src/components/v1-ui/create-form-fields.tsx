@@ -2,7 +2,10 @@
 
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { AlertTriangleIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
+import { Card } from '@/components/v1-ui/primitives';
 
 /**
  * matches-page.tsx / team-matches-page.tsx 생성 위저드에서 공유하는 필드 컴포넌트.
@@ -86,6 +89,8 @@ export function CreateField({
   multiline,
   type = 'text',
   onChange,
+  id,
+  error,
 }: {
   label: string;
   value?: string;
@@ -94,26 +99,42 @@ export function CreateField({
   multiline?: boolean;
   type?: string;
   onChange?: (value: string) => void;
+  /** 스텝 게이팅·결측 필드 안내(#1·#2)가 오류 발생 시 이 필드로 focus를 옮기는 데 쓰는 anchor. */
+  id?: string;
+  /** 설정되면 입력창을 orange로 강조하고 아래에 아이콘+문구를 병행 표시한다(색상 단독 전달 금지). */
+  error?: string;
 }) {
   // date/time 인풋은 lang="ko"를 부여해 OS locale에 상관없이
   // 가능한 경우 한국어 포맷(yyyy.mm.dd 또는 HH:MM)으로 표시를 유도한다.
   // CSS(.tm-create-native-input[type="date" i] 등)에서 appearance:none +
   // ::-webkit-calendar-picker-indicator 처리로 OS 스피너/아이콘을 제거한다.
   const isDateLike = type === 'date' || type === 'time';
+  const errorId = id && error ? `${id}-error` : undefined;
   return (
     <label className="tm-create-field">
       <div className="tm-text-label">{label}</div>
-      <div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>
+      <div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''} ${error ? 'tm-create-input-error' : ''}`}>
         {onChange ? (
           multiline ? (
-            <textarea className="tm-create-native-input" value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+            <textarea
+              id={id}
+              className="tm-create-native-input"
+              value={value ?? ''}
+              placeholder={placeholder}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={errorId}
+              onChange={(event) => onChange(event.target.value)}
+            />
           ) : (
             <input
+              id={id}
               className="tm-create-native-input"
               type={type}
               lang={isDateLike ? 'ko' : undefined}
               value={value ?? ''}
               placeholder={placeholder}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={errorId}
               onChange={(event) => onChange(event.target.value)}
             />
           )
@@ -122,7 +143,67 @@ export function CreateField({
         )}
         {suffix ? <span className="tm-text-caption">{suffix}</span> : null}
       </div>
+      {error ? (
+        <div id={errorId} className="tm-create-field-error" role="alert">
+          <AlertTriangleIcon size={14} aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      ) : null}
     </label>
+  );
+}
+
+/**
+ * CreateField가 아닌 선택 그룹(팀 카드, 종목 카드, 지역 select)에 쓰는 인라인 에러 —
+ * CreateField 내부의 error 렌더와 같은 마크업(아이콘+문구, 색상 단독 전달 금지)을 공유한다.
+ * id를 주면 스텝 게이팅의 focus-scroll anchor로도 쓸 수 있다(비-focusable 요소는 focus는
+ * 실패해도 scrollIntoView는 동작).
+ */
+export function FieldErrorText({ id, message }: { id?: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <div id={id} className="tm-create-field-error" role="alert" tabIndex={-1}>
+      <AlertTriangleIcon size={14} aria-hidden="true" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+/**
+ * #2: ConfirmStep(또는 edit 화면)에서 실제 결측 필드만 지목하는 배너. 이전에는 payload
+ * 빌더가 null이면 "종목, 지역, 제목, 장소, 날짜를 모두 입력해 주세요" 같은 고정 문구를
+ * 무조건 보여줬다(사용자가 겪은 사고의 직접 원인) — 이제는 buildXPayloadResult가 반환한
+ * missingFields를 그대로 나열하고, 각 항목은 실제로 비어 있는 그 스텝으로 이동한다.
+ */
+export function MissingFieldsBanner<Step extends string>({
+  missingFields,
+  stepHref,
+}: {
+  missingFields: Array<{ field: string; label: string; step: Step }>;
+  stepHref: (step: Step) => string;
+}) {
+  if (missingFields.length === 0) return null;
+  return (
+    <Card pad={14} style={{ marginTop: 14, background: 'var(--tint-orange)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <AlertTriangleIcon size={16} aria-hidden="true" />
+        <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장할 수 없어요</div>
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 5 }}>다음 항목을 채워야 만들 수 있어요.</div>
+      <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+        {missingFields.map((item) => (
+          <Link
+            key={`${item.step}:${item.field}`}
+            className="tm-btn tm-btn-sm tm-btn-neutral"
+            href={stepHref(item.step)}
+            style={{ justifyContent: 'space-between' }}
+          >
+            {item.label}
+            <ChevronRightIcon size={14} aria-hidden="true" />
+          </Link>
+        ))}
+      </div>
+    </Card>
   );
 }
 

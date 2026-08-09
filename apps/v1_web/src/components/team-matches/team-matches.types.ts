@@ -158,5 +158,11 @@ export type TeamMatchCreateViewModel = {
     submitting?: boolean;
     error?: string | null;
     lockedReason?: string | null;
+    /** 현재 스텝(또는 edit 화면 전체)에서 "다음"/"저장"을 시도한 뒤에만 채워지는 필드별 에러 문구. */
+    fieldErrors?: Partial<Record<string, string>>;
+    /** 최종 제출(confirm/edit)에서 실제로 비어 있는 필드 목록 — 각 항목은 해당 스텝으로 이동할 수 있다. */
+    missingFields?: Array<{ field: string; label: string; step: TeamMatchCreateStep }>;
+    /** CreateProgress 배지: 지나온 스텝 중 필수 필드를 전부 채운 스텝(체크 표시용). */
+    completeSteps?: TeamMatchCreateStep[];
   };
 };

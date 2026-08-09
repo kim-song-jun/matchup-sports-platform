@@ -130,7 +130,20 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
  * carry a real participantId or the append itself is rejected. */
 async function endWithOneHomeGoal(gameId: string): Promise<{ homeSideId: string; scorerId: string }> {
   const home = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.HOME } });
+  const away = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.AWAY } });
   const scorer = await prisma.v1GameParticipant.findFirstOrThrow({ where: { gameId, sideId: home.id } });
+  // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+  // lineup on every side before `start` is allowed. createFromSourceInTransaction
+  // already creates a DRAFT revision-1 lineup per side at game creation, so
+  // flip those straight to SUBMITTED here (bypassing
+  // GamesService.saveLineup/submitLineup) rather than routing through the
+  // command path and perturbing every expectedVersion literal that follows
+  // `start` in this file. This helper only cares about driving the lifecycle
+  // to ENDED with one goal, not roster content or command versioning.
+  await prisma.v1GameLineup.updateMany({
+    where: { gameId, sideId: { in: [home.id, away.id] }, revision: 1 },
+    data: { state: 'SUBMITTED' },
+  });
   const startToken = await grantTakeover(gameId, ids.platformOps, `start-${gameId}`);
   await games.executeCommand(authUser(ids.platformOps), gameId, 'start', `task22-start-${gameId}`, {
     expectedVersion: 0,

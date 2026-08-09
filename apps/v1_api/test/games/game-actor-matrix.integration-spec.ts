@@ -411,6 +411,26 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
         where: { gameId: tournamentGameId, sideKey: V1GameSideKey.HOME },
       })
     ).id;
+    const tournamentAwaySideId = (
+      await prisma.v1GameSide.findFirstOrThrow({
+        where: { gameId: tournamentGameId, sideKey: V1GameSideKey.AWAY },
+      })
+    ).id;
+    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+    // lineup on every side before `start` is allowed. createFromSourceInTransaction
+    // already creates a DRAFT revision-1 lineup per side at game creation, so
+    // flip those straight to SUBMITTED (bypassing
+    // GamesService.saveLineup/submitLineup) -- see the version-bump comment
+    // above `start` below: this is fixture setup only, not part of what the
+    // PIN below asserts.
+    await prisma.v1GameLineup.updateMany({
+      where: {
+        gameId: tournamentGameId,
+        sideId: { in: [tournamentHomeSideId, tournamentAwaySideId] },
+        revision: 1,
+      },
+      data: { state: 'SUBMITTED' },
+    });
 
     // T1-0 fix round 3: this PIN's subject is the six-persona authorization
     // matrix (read/mutation allow-deny, cross-scope/revoked/expired/stale

@@ -109,6 +109,15 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     const homeParticipant = await prisma.v1GameParticipant.findFirstOrThrow({
       where: { gameId: created.gameId, sideId: home.id },
     });
+    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+    // lineup on every side before `start` is allowed. createFromSourceInTransaction
+    // already creates a DRAFT revision-1 lineup per side at game creation, so
+    // flip those straight to SUBMITTED (bypassing
+    // GamesService.saveLineup/submitLineup, which would consume `version`).
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId: created.gameId, revision: 1 },
+      data: { state: 'SUBMITTED' },
+    });
     return { gameId: created.gameId, homeSideId: home.id, homeParticipantId: homeParticipant.id };
   }
 

@@ -107,7 +107,18 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
 async function buildOfficialGame(fixtureId: string): Promise<{ gameId: string; officialRevisionId: string }> {
   const gameId = await buildTournamentGame(fixtureId);
   const home = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.HOME } });
+  const away = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.AWAY } });
   const scorer = await prisma.v1GameParticipant.findFirstOrThrow({ where: { gameId, sideId: home.id } });
+  // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+  // lineup on every side before `start` is allowed. createFromSourceInTransaction
+  // already creates a DRAFT revision-1 lineup per side at game creation, so
+  // flip those straight to SUBMITTED (bypassing
+  // GamesService.saveLineup/submitLineup) rather than perturbing every
+  // expectedVersion literal in this helper's callers.
+  await prisma.v1GameLineup.updateMany({
+    where: { gameId, sideId: { in: [home.id, away.id] }, revision: 1 },
+    data: { state: 'SUBMITTED' },
+  });
   const startToken = await grantTakeover(gameId, ids.platformOps, `start-${gameId}`);
   await games.executeCommand(authUser(ids.platformOps), gameId, 'start', `task22g3-start-${gameId}`, {
     expectedVersion: 0,
@@ -374,7 +385,18 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
    * producing exactly one auto-derived SUBMITTED revision scored 1-0. */
   async function endGameWithHomeGoal(gameId: string): Promise<{ homeSideId: string; scorerId: string }> {
     const home = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.HOME } });
+    const away = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.AWAY } });
     const scorer = await prisma.v1GameParticipant.findFirstOrThrow({ where: { gameId, sideId: home.id } });
+    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+    // lineup on every side before `start` is allowed. createFromSourceInTransaction
+    // already creates a DRAFT revision-1 lineup per side at game creation, so
+    // flip those straight to SUBMITTED (bypassing
+    // GamesService.saveLineup/submitLineup) rather than perturbing every
+    // expectedVersion literal in this helper's callers.
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId, sideId: { in: [home.id, away.id] }, revision: 1 },
+      data: { state: 'SUBMITTED' },
+    });
     const startToken = await grantTakeover(gameId, ids.platformOps, `start-${gameId}`);
     await games.executeCommand(authUser(ids.platformOps), gameId, 'start', `task22tb-start-${gameId}`, {
       expectedVersion: 0,

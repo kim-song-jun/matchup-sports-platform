@@ -163,6 +163,16 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
       data: { position: 'FW', positionX: 50, positionY: 80 },
     });
 
+    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+    // lineup on every side before `start` is allowed. createFromSourceInTransaction
+    // already creates a DRAFT revision-1 lineup per side at game creation, so
+    // flip those straight to SUBMITTED -- fixture setup, same rationale as the
+    // direct participant.started write above.
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId, revision: 1 },
+      data: { state: 'SUBMITTED' },
+    });
+
     const startToken = (await service.requestTakeover(authUser(ids.operator), gameId, { clientInstanceId: 'substitution-client', lastSequence: 0 })).takeoverToken;
     await service.executeCommand(authUser(ids.operator), gameId, 'start', 'substitution-start', {
       expectedVersion: 0,

@@ -72,6 +72,15 @@ describe('deriveTournamentRevision — assist/foul aggregation (T1-4)', () => {
     assisterId = persisted.participants.find((p) => p.displayNameSnapshot === 'Assister')!.id;
     foulerId = persisted.participants.find((p) => p.displayNameSnapshot === 'Fouler')!.id;
 
+    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+    // lineup on every side before `start` is allowed. createFromSourceInTransaction
+    // already creates a DRAFT revision-1 lineup per side at game creation, so
+    // flip those straight to SUBMITTED (bypassing
+    // GamesService.saveLineup/submitLineup, which would consume `version`).
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId, revision: 1 },
+      data: { state: 'SUBMITTED' },
+    });
     const startToken = (await service.requestTakeover(authUser(ids.operator), gameId, { clientInstanceId: 'record-client', lastSequence: 0 })).takeoverToken;
     await service.executeCommand(authUser(ids.operator), gameId, 'start', 'record-start', {
       expectedVersion: 0, clientCommandId: 'record-start', takeoverToken: startToken, occurredAt: new Date().toISOString(), payload: {},

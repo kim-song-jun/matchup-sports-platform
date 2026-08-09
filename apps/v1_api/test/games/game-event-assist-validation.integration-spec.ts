@@ -104,6 +104,15 @@ describe('POST /games/:gameId/events — ASSIST_INVALID (T1-2)', () => {
     homeTeammateId = persisted.participants.find((p) => p.displayNameSnapshot === 'Teammate')!.id;
     awayParticipantId = persisted.participants.find((p) => p.displayNameSnapshot === 'Away Player')!.id;
 
+    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+    // lineup on every side before `start` is allowed. createFromSourceInTransaction
+    // already creates a DRAFT revision-1 lineup per side at game creation, so
+    // flip those straight to SUBMITTED (bypassing
+    // GamesService.saveLineup/submitLineup, which would consume `version`).
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId, revision: 1 },
+      data: { state: 'SUBMITTED' },
+    });
     const startToken = (await service.requestTakeover(authUser(ids.operator), gameId, { clientInstanceId: 'assist-client', lastSequence: 0 })).takeoverToken;
     await service.executeCommand(authUser(ids.operator), gameId, 'start', 'assist-start', {
       expectedVersion: 0,

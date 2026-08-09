@@ -10,7 +10,7 @@ import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon 
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner } from '@/components/v1-ui/create-form-fields';
+import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { cssUrl } from '@/lib/assets';
 import type {
   TeamMatchCreateViewModel,
@@ -762,7 +762,47 @@ function PlaceTimeStep({ model }: { model: TeamMatchCreateViewModel }) {
 function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
   const d = model.draft;
   const errors = model.form?.fieldErrors;
-  return <><RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} error={errors?.regionId} /><CreateField id="field-venue" error={errors?.venue} label="장소" value={d.venue} placeholder="예: 잠실 풋살파크 A구장" onChange={(value) => model.form?.onFieldChange('venue', value)} /><CreateField label="상세 주소" value={d.address} placeholder="예: 서울 송파구 올림픽로 25, 3층 2번 코트" onChange={(value) => model.form?.onFieldChange('address', value)} /><CreateField id="field-date" error={errors?.date} label="날짜" value={d.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} /><div className="tm-create-two-col"><CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={d.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} /><CreateField label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} /></div><div className="tm-create-two-col"><CreateField label="신청 마감일" value={d.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} /><CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={d.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} /></div><div className="tm-text-caption" style={{ marginTop: 6 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div></>;
+  const recentVenues = model.form?.recentVenues ?? [];
+  // #3 1단계: matches-page.tsx의 PlaceTimeFields와 동일한 focus/blur 칩 패턴 —
+  // 팀이 호스트로 과거에 실제로 쓴 장소를 재사용할 수 있게 한다.
+  const [venueFocused, setVenueFocused] = useState(false);
+  return (
+    <>
+      <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} error={errors?.regionId} />
+      <CreateField
+        id="field-venue"
+        error={errors?.venue}
+        label="장소"
+        value={d.venue}
+        placeholder="예: 잠실 풋살파크 A구장"
+        onChange={(value) => model.form?.onFieldChange('venue', value)}
+        onFocus={() => setVenueFocused(true)}
+        onBlur={() => setVenueFocused(false)}
+      >
+        {venueFocused ? (
+          <RecentVenueChips
+            items={recentVenues}
+            onSelect={(venue) => {
+              model.form?.onFieldChange('venue', venue.placeName);
+              model.form?.onFieldChange('address', venue.addressText ?? '');
+              setVenueFocused(false);
+            }}
+          />
+        ) : null}
+      </CreateField>
+      <CreateField label="상세 주소" value={d.address} placeholder="예: 서울 송파구 올림픽로 25, 3층 2번 코트" onChange={(value) => model.form?.onFieldChange('address', value)} />
+      <CreateField id="field-date" error={errors?.date} label="날짜" value={d.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
+      <div className="tm-create-two-col">
+        <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={d.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
+        <CreateField label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
+      </div>
+      <div className="tm-create-two-col">
+        <CreateField label="신청 마감일" value={d.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
+        <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={d.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 6 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
+    </>
+  );
 }
 
 function RegionSelect({ value, regions, onChange, error }: { value: string; regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>; onChange?: (regionId: string) => void; error?: string }) {

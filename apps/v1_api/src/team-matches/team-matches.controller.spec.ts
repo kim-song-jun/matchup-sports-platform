@@ -27,6 +27,7 @@ describe('TeamMatchesController', () => {
   const teamMatchesService = {
     list: jest.fn(),
     detail: jest.fn(),
+    recentVenues: jest.fn(),
     applicationEligibility: jest.fn(),
     myTeamMatches: jest.fn(),
     create: jest.fn(),
@@ -89,6 +90,17 @@ describe('TeamMatchesController', () => {
       teamMatchId: 'team-match-1',
       viewer: { state: 'guest' },
     });
+  });
+
+  it('returns recent venues for a host team', async () => {
+    teamMatchesService.recentVenues.mockResolvedValue({
+      items: [{ placeName: '풋살파크 강서', addressText: '서울 강서구' }],
+    });
+
+    await expect(controller.recentVenues(user, 'team-1')).resolves.toEqual({
+      items: [{ placeName: '풋살파크 강서', addressText: '서울 강서구' }],
+    });
+    expect(teamMatchesService.recentVenues).toHaveBeenCalledWith(user, 'team-1');
   });
 
   it('returns application eligibility', async () => {

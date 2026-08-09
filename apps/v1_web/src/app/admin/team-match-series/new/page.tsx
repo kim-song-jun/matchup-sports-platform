@@ -28,19 +28,38 @@ export default function AdminTeamMatchSeriesNewPage() {
 
   const { data: sports } = useV1MasterSports();
   const { data: regions } = useV1MasterRegions();
-  const teamsQuery = useV1Teams({ sportId, limit: 50 }, { enabled: Boolean(sportId) });
+  // #5: 서버는 sportId 없이도 이름 검색을 지원한다 — 종목을 고르기 전에도 팀 검색을
+  // 항상 켜 둔다. 종목으로 좁히는 건 서버 필터가 아니라 아래 disabled 표시로 한다.
+  const teamsQuery = useV1Teams({ limit: 50 }, { enabled: true });
+  const lockedSportName = sportId ? (sports ?? []).find((sport) => sport.id === sportId)?.name : undefined;
   const teamItems: EntityPickerItem[] = (teamsQuery.data?.items ?? [])
     .filter((team) => !selectedTeams.some((selected) => selected.id === team.id))
-    .map((team) => ({ id: team.id, label: team.name, description: team.regionName }));
+    .map((team) => {
+      const teamSportId = team.sport?.sportId;
+      const mismatched = sportId !== '' && teamSportId !== undefined && teamSportId !== sportId;
+      return {
+        id: team.id,
+        label: team.name,
+        description: `${team.sportName} · ${team.regionName}`,
+        disabled: mismatched,
+        disabledReason: mismatched && lockedSportName ? `${lockedSportName} 리그라 ${team.sportName} 팀은 선택할 수 없어요` : undefined,
+      };
+    });
   const createSeries = useV1CreateTeamMatchSeries();
 
   const canSubmit =
     title.trim().length > 0 && sportId !== '' && regionId !== '' && startsOn !== '' && endsOn !== '' && selectedTeams.length >= 2;
 
   const addTeam = (item: EntityPickerItem | null) => {
-    if (item === null) return;
+    if (item === null || item.disabled) return;
     setSelectedTeams((prev) => (prev.some((t) => t.id === item.id) ? prev : [...prev, item]));
     setPickerValue(null);
+    // #5: 첫 팀을 고르는 순간 그 팀의 종목으로 상단 종목 select를 자동 채우고 잠근다.
+    if (sportId === '') {
+      const pickedTeam = teamsQuery.data?.items.find((team) => team.id === item.id);
+      const inferredSportId = pickedTeam?.sport?.sportId;
+      if (inferredSportId) setSportId(inferredSportId);
+    }
   };
 
   const submit = async () => {
@@ -80,6 +99,7 @@ export default function AdminTeamMatchSeriesNewPage() {
               id="series-sport"
               value={sportId}
               onChange={(e) => { setSportId(e.target.value); setSelectedTeams([]); }}
+              disabled={selectedTeams.length > 0}
               className={inputClass}
             >
               <option value="">종목 선택</option>
@@ -87,6 +107,9 @@ export default function AdminTeamMatchSeriesNewPage() {
                 <option key={sport.id} value={sport.id}>{sport.name}</option>
               ))}
             </select>
+            {selectedTeams.length > 0 ? (
+              <p className="mt-1 text-xs text-gray-500">자동 설정됨 · 변경하려면 선택한 팀을 모두 지우세요</p>
+            ) : null}
           </div>
           <div>
             <label htmlFor="series-region" className="mb-1 block text-sm font-medium text-gray-900">지역</label>
@@ -118,8 +141,7 @@ export default function AdminTeamMatchSeriesNewPage() {
             onChange={addTeam}
             items={teamItems}
             loading={teamsQuery.isFetching}
-            placeholder={sportId === '' ? '종목을 먼저 선택해 주세요' : '팀 이름으로 검색'}
-            disabled={sportId === ''}
+            placeholder="팀 이름으로 검색"
             emptyText="검색 결과가 없어요"
           />
           <ul className="mt-2 flex flex-wrap gap-2">

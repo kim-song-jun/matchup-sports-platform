@@ -10,7 +10,7 @@ import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon 
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { cssUrl } from '@/lib/assets';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
-import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner } from '@/components/v1-ui/create-form-fields';
+import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import type {
   MatchCardModel,
   MatchCreateViewModel,
@@ -898,10 +898,35 @@ function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
 function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
   const errors = model.form?.fieldErrors;
+  const recentVenues = model.form?.recentVenues ?? [];
+  // #3 1단계: 장소 입력창이 focus를 갖고 있는 동안만 최근 사용 장소 칩을 보여준다.
+  // 칩 버튼은 onMouseDown preventDefault로 이 blur보다 클릭이 먼저 처리되게 한다
+  // (EntityPicker 드롭다운과 동일한 패턴) — 그래서 탭 한 번으로 안전하게 채워진다.
+  const [venueFocused, setVenueFocused] = useState(false);
   return (
     <>
       <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} error={errors?.regionId} />
-      <CreateField id="field-venue" error={errors?.venue} label="장소" value={draft.venue} placeholder="예: 한강공원 축구장, 동네 체육관 등" onChange={(value) => model.form?.onFieldChange('venue', value)} />
+      <CreateField
+        id="field-venue"
+        error={errors?.venue}
+        label="장소"
+        value={draft.venue}
+        placeholder="예: 한강공원 축구장, 동네 체육관 등"
+        onChange={(value) => model.form?.onFieldChange('venue', value)}
+        onFocus={() => setVenueFocused(true)}
+        onBlur={() => setVenueFocused(false)}
+      >
+        {venueFocused ? (
+          <RecentVenueChips
+            items={recentVenues}
+            onSelect={(venue) => {
+              model.form?.onFieldChange('venue', venue.placeName);
+              model.form?.onFieldChange('address', venue.addressText ?? '');
+              setVenueFocused(false);
+            }}
+          />
+        ) : null}
+      </CreateField>
       <CreateField label="상세 주소" value={draft.address} placeholder="예: 서울 영등포구 여의동로 330" onChange={(value) => model.form?.onFieldChange('address', value)} />
       <CreateField id="field-date" error={errors?.date} label="날짜" value={draft.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
       <div className="tm-create-two-col">

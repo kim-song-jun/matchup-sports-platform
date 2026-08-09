@@ -9,6 +9,7 @@ import {
   useV1MasterRegions,
   useV1MasterSports,
   useV1MatchEdit,
+  useV1MyRecentVenues,
   useV1UpdateMatch,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
@@ -44,6 +45,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   const regions = useV1MasterRegions();
   const createMatch = useV1CreateMatch();
   const uploadImages = useV1UploadImages();
+  const recentVenues = useV1MyRecentVenues();
   const [draft, setDraft] = usePersistedDraft();
   // 위저드 step이 각각 별도 라우트라 step 이동 시 이 컴포넌트가 재마운트된다. 종목/지역 선택을
   // 로컬 useState에만 두면 매 step 첫 항목으로 리셋돼(풋살 선택→다음 step에서 축구로 소실)
@@ -123,6 +125,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     fieldErrors,
     missingFields: missingFields.length > 0 ? missingFields : undefined,
     completeSteps,
+    recentVenues: recentVenues.data?.items,
     submitting: createMatch.isPending,
     onSelectSport: (sportName) => {
       const sport = sports.data?.find((item) => item.name === sportName);
@@ -330,6 +333,7 @@ function buildCreateModel({
   fieldErrors,
   missingFields,
   completeSteps,
+  recentVenues,
 }: {
   step: MatchCreateStep;
   matchId?: string;
@@ -356,6 +360,8 @@ function buildCreateModel({
   missingFields?: NonNullable<MatchCreateViewModel['form']>['missingFields'];
   /** CreateProgress 체크 배지 — 이 스텝들의 필수 필드는 이미 다 채워졌다는 뜻. */
   completeSteps?: MatchCreateStep[];
+  /** #3 1단계: 장소 입력창 포커스 시 칩으로 노출할 최근 사용 장소. */
+  recentVenues?: NonNullable<MatchCreateViewModel['form']>['recentVenues'];
 }): MatchCreateViewModel {
   const fallback = getMatchCreateViewModel(step);
   const sportNames = sports.map((sport) => sport.name);
@@ -386,6 +392,7 @@ function buildCreateModel({
       fieldErrors,
       missingFields,
       completeSteps,
+      recentVenues,
     },
   };
 }

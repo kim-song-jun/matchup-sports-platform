@@ -10,6 +10,7 @@ import {
   useV1MasterSports,
   useV1MyTeams,
   useV1TeamMatchEdit,
+  useV1TeamRecentVenues,
   useV1UpdateTeamMatch,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
@@ -116,6 +117,8 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const selectedTeamId = selection.teamId;
   const selectedSportId = selection.sportId;
   const regionId = selection.regionId;
+  // #3 1단계: 이 팀이 확정되기 전(team 스텝 hydrate 이전)엔 훅 내부 enabled 게이트로 대기.
+  const recentVenues = useV1TeamRecentVenues(selectedTeamId);
   const updateSelection = (updater: (current: TeamMatchSelection) => TeamMatchSelection) => {
     setSelection((current) => {
       const next = updater(current);
@@ -160,6 +163,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     fieldErrors,
     missingFields: missingFields.length > 0 ? missingFields : undefined,
     completeSteps,
+    recentVenues: recentVenues.data?.items,
     submitting: createTeamMatch.isPending,
     uploadImage: async (file) => {
       const result = await uploadImages.mutateAsync([file]);
@@ -394,6 +398,7 @@ function buildCreateModel({
   fieldErrors,
   missingFields,
   completeSteps,
+  recentVenues,
 }: {
   step: TeamMatchCreateStep;
   draft: TeamMatchDraft;
@@ -424,6 +429,8 @@ function buildCreateModel({
   missingFields?: NonNullable<TeamMatchCreateViewModel['form']>['missingFields'];
   /** CreateProgress 체크 배지 — 이 스텝들의 필수 필드는 이미 다 채워졌다는 뜻. */
   completeSteps?: TeamMatchCreateStep[];
+  /** #3 1단계: 장소 입력창 포커스 시 칩으로 노출할, 이 팀이 호스트로 쓴 최근 장소. */
+  recentVenues?: NonNullable<TeamMatchCreateViewModel['form']>['recentVenues'];
 }): TeamMatchCreateViewModel {
   const fallback = getTeamMatchCreateViewModel(step);
   const selectedTeam = teams.find((team) => team.id === selectedTeamId);
@@ -459,6 +466,7 @@ function buildCreateModel({
       fieldErrors,
       missingFields,
       completeSteps,
+      recentVenues,
     },
   };
 }

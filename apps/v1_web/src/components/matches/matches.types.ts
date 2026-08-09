@@ -143,5 +143,7 @@ export type MatchCreateViewModel = {
     missingFields?: Array<{ field: string; label: string; step: MatchCreateStep }>;
     /** CreateProgress 배지: 지나온 스텝 중 필수 필드를 전부 채운 스텝(체크 표시용). */
     completeSteps?: MatchCreateStep[];
+    /** #3 1단계: 이 사용자가 과거에 실제로 입력했던 장소 — 장소 입력창 포커스 시 칩으로 노출. */
+    recentVenues?: Array<{ placeName: string; addressText: string | null }>;
   };
 };

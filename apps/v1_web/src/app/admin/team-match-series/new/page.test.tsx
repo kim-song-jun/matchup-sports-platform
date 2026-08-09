@@ -84,4 +84,56 @@ describe('AdminTeamMatchSeriesNewPage', () => {
       teamIds: ['team-a', 'team-b'],
     }));
   });
+
+  // #5: 종목을 먼저 고르지 않아도 팀 검색이 항상 켜져 있고, 첫 팀을 고르면 그 팀의
+  // 종목으로 상단 select가 자동 채워지며, 다른 종목 팀은 숨기지 않고 이유와 함께 회색 처리된다.
+  it('종목 선택 없이도 팀 검색이 열려 있고, 첫 팀 선택 시 종목이 자동 설정되며 다른 종목 팀은 이유와 함께 비활성 표시된다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1CreateTeamMatchSeriesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1MasterSportsMock.mockReturnValue({
+      data: [
+        { id: 'sport-futsal', name: '풋살', levels: [] },
+        { id: 'sport-soccer', name: '축구', levels: [] },
+      ],
+    } as never);
+    useV1MasterRegionsMock.mockReturnValue({ data: [{ id: 'region-1', name: '서울', parentId: null }] } as never);
+    useV1TeamsMock.mockReturnValue({
+      data: {
+        items: [
+          { id: 'team-a', name: '팀A', sportName: '풋살', sport: { sportId: 'sport-futsal', name: '풋살' }, regionName: '서울', memberCount: 8, trustState: 'none', joinPolicy: 'approval_required' },
+          { id: 'team-c', name: '팀C', sportName: '축구', sport: { sportId: 'sport-soccer', name: '축구' }, regionName: '서울', memberCount: 11, trustState: 'none', joinPolicy: 'approval_required' },
+        ],
+        nextCursor: null,
+      },
+      isFetching: false,
+    } as never);
+
+    renderPage();
+
+    // 종목을 아직 고르지 않았는데도 팀 검색창이 바로 활성화돼 있다.
+    const teamPicker = screen.getByLabelText('참가 팀 추가 (최소 2팀)');
+    expect(teamPicker).not.toBeDisabled();
+    expect(teamPicker).toHaveAttribute('placeholder', '팀 이름으로 검색');
+
+    fireEvent.focus(teamPicker);
+    fireEvent.change(teamPicker, { target: { value: '팀' } });
+
+    // 축구팀(팀C)이 목록에서 숨겨지지 않고, 아직 종목이 안 잠겼으니 비활성 이유도 없다.
+    expect(await screen.findByText('팀C')).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByText('팀A'));
+
+    // 첫 팀(풋살) 선택으로 종목 select가 자동으로 풋살로 채워지고 잠긴다.
+    await waitFor(() => expect(screen.getByLabelText('종목')).toHaveValue('sport-futsal'));
+    expect(screen.getByLabelText('종목')).toBeDisabled();
+    expect(screen.getByText('자동 설정됨 · 변경하려면 선택한 팀을 모두 지우세요')).toBeInTheDocument();
+
+    // 종목이 풋살로 잠긴 뒤에는 축구팀(팀C)이 이유와 함께 회색으로 남아 있고, 클릭해도 선택되지 않는다.
+    const teamPickerAgain = screen.getByLabelText('참가 팀 추가 (최소 2팀)');
+    fireEvent.focus(teamPickerAgain);
+    fireEvent.change(teamPickerAgain, { target: { value: '팀' } });
+    expect(await screen.findByText('풋살 리그라 축구 팀은 선택할 수 없어요')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('팀C'));
+    expect(screen.queryByLabelText('팀C 제거')).not.toBeInTheDocument();
+  });
 });

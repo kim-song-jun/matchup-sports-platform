@@ -188,6 +188,30 @@ describe('MatchesService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  // ─── 9. #3 최근 장소 조회 ────────────────────────────────────────────────
+
+  it('recentVenues: 호출자 소유 매치만 distinct placeName으로 최신순 5개까지 조회한다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([
+      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330' },
+      { placeName: '강남역', placeAddress: null },
+    ]);
+
+    await expect(service.recentVenues(host)).resolves.toEqual({
+      items: [
+        { placeName: '한강공원 축구장', addressText: '서울 영등포구 여의동로 330' },
+        { placeName: '강남역', addressText: null },
+      ],
+    });
+    expect(prisma.v1Match.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { hostUserId: host.id, deletedAt: null },
+        distinct: ['placeName'],
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+    );
+  });
+
   // ─── 1. 비-호스트 취소 → 403 ──────────────────────────────────────────────
 
   it('cancel: 호스트가 아닌 사용자가 취소하면 403 PERMISSION_DENIED를 던진다', async () => {

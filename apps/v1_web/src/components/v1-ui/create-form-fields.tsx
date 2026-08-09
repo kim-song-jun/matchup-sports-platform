@@ -91,6 +91,9 @@ export function CreateField({
   onChange,
   id,
   error,
+  onFocus,
+  onBlur,
+  children,
 }: {
   label: string;
   value?: string;
@@ -103,6 +106,11 @@ export function CreateField({
   id?: string;
   /** 설정되면 입력창을 orange로 강조하고 아래에 아이콘+문구를 병행 표시한다(색상 단독 전달 금지). */
   error?: string;
+  /** #3: 포커스 시 최근 사용 장소 칩(RecentVenueChips) 등 보조 UI를 열고 싶을 때. */
+  onFocus?: () => void;
+  onBlur?: () => void;
+  /** 입력창 아래·에러 위에 끼워 넣는 보조 UI(예: RecentVenueChips). */
+  children?: ReactNode;
 }) {
   // date/time 인풋은 lang="ko"를 부여해 OS locale에 상관없이
   // 가능한 경우 한국어 포맷(yyyy.mm.dd 또는 HH:MM)으로 표시를 유도한다.
@@ -124,6 +132,8 @@ export function CreateField({
               aria-invalid={error ? true : undefined}
               aria-describedby={errorId}
               onChange={(event) => onChange(event.target.value)}
+              onFocus={onFocus}
+              onBlur={onBlur}
             />
           ) : (
             <input
@@ -136,6 +146,8 @@ export function CreateField({
               aria-invalid={error ? true : undefined}
               aria-describedby={errorId}
               onChange={(event) => onChange(event.target.value)}
+              onFocus={onFocus}
+              onBlur={onBlur}
             />
           )
         ) : (
@@ -143,6 +155,7 @@ export function CreateField({
         )}
         {suffix ? <span className="tm-text-caption">{suffix}</span> : null}
       </div>
+      {children}
       {error ? (
         <div id={errorId} className="tm-create-field-error" role="alert">
           <AlertTriangleIcon size={14} aria-hidden="true" />
@@ -165,6 +178,41 @@ export function FieldErrorText({ id, message }: { id?: string; message?: string 
     <div id={id} className="tm-create-field-error" role="alert" tabIndex={-1}>
       <AlertTriangleIcon size={14} aria-hidden="true" />
       <span>{message}</span>
+    </div>
+  );
+}
+
+/**
+ * #3 1단계: 장소 입력창 포커스 시 이 팀(팀매치)·나(개인매치)가 과거에 실제로 입력했던
+ * 장소를 칩으로 보여주고 탭 한 번으로 채운다. 새 Venue 테이블 없이 과거 입력값
+ * distinct 조회 결과를 그대로 쓴다(백엔드: matches/team-matches recentVenues).
+ * 칩 버튼에 onMouseDown preventDefault를 걸어 클릭이 입력창 blur보다 먼저
+ * 처리되게 한다 — EntityPicker 드롭다운과 동일한 패턴.
+ */
+export function RecentVenueChips({
+  items,
+  onSelect,
+}: {
+  items: Array<{ placeName: string; addressText: string | null }>;
+  onSelect: (venue: { placeName: string; addressText: string | null }) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div role="group" aria-label="최근 사용한 장소" style={{ marginTop: 8 }}>
+      <div className="tm-text-caption" style={{ marginBottom: 6 }}>최근 사용한 장소</div>
+      <div className="tm-team-form-chip-row">
+        {items.map((item) => (
+          <button
+            key={item.placeName}
+            type="button"
+            className="tm-chip"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onSelect(item)}
+          >
+            {item.placeName}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

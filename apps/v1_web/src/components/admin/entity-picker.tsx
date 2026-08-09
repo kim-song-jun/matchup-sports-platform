@@ -8,6 +8,10 @@ export interface EntityPickerItem {
   id: string;
   label: string;
   description?: string;
+  /** #5: 조건에 맞지 않아 선택할 수 없는 후보 — 목록에서 숨기지 않고 회색으로 보여준 뒤
+   * disabledReason으로 "왜 안 되는지"를 병기한다(색상만으로 상태를 전달하지 않기 위함). */
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 interface EntityPickerProps {
@@ -122,6 +126,9 @@ export function EntityPicker({
   }
 
   function commitEntry(entry: MenuEntry) {
+    // 비활성 후보(다른 종목 팀 등)는 목록에 계속 보이되 선택은 no-op — 목록에서 숨기면
+    // "왜 안 보이지?"가 되고, 여기서 조용히 선택되면 잘못된 팀으로 제출될 수 있다.
+    if (entry.kind === 'item' && entry.item.disabled) return;
     onChange(entry.kind === 'clear' ? null : entry.item);
     setInputValue('');
     setDebouncedValue('');
@@ -271,21 +278,26 @@ export function EntityPicker({
                     role="option"
                     id={`${menuId}-opt-${idx}`}
                     aria-selected={highlighted}
+                    aria-disabled={item.disabled ? true : undefined}
                     tabIndex={-1}
                     onClick={() => commitEntry(entry)}
                     className={[
-                      'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left',
-                      'hover:bg-blue-50 transition-colors',
+                      'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left transition-colors',
+                      item.disabled
+                        ? 'cursor-not-allowed opacity-60'
+                        : 'hover:bg-blue-50',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                      highlighted ? 'bg-blue-50' : '',
+                      highlighted && !item.disabled ? 'bg-blue-50' : '',
                     ].join(' ')}
                   >
-                    <span className="text-[var(--font-size-label)] font-semibold text-gray-900">
+                    <span className={`text-[var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-gray-900'}`}>
                       {item.label}
                     </span>
-                    {item.description && (
+                    {item.disabled && item.disabledReason ? (
+                      <span className="text-[var(--font-size-caption)] text-orange-500">{item.disabledReason}</span>
+                    ) : item.description ? (
                       <span className="text-[var(--font-size-caption)] text-gray-400">{item.description}</span>
-                    )}
+                    ) : null}
                   </button>
                 );
               })}

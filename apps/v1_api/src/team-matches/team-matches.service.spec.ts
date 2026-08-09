@@ -186,6 +186,34 @@ describe('TeamMatchesService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  // ─── #3 최근 장소 조회 ──────────────────────────────────────────────────────
+
+  it('recentVenues: owner/manager 권한 없는 사용자는 403 PERMISSION_DENIED (조회 자체 미실행)', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(null); // not a manager
+
+    await expect(service.recentVenues(manager, 'team-host')).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1TeamMatch.findMany).not.toHaveBeenCalled();
+  });
+
+  it('recentVenues: 이 팀이 호스트인 팀매치만 distinct placeName으로 최신순 5개까지 조회한다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      { placeName: '풋살파크 강서', placeAddress: '서울 강서구' },
+    ]);
+
+    await expect(service.recentVenues(manager, 'team-host')).resolves.toEqual({
+      items: [{ placeName: '풋살파크 강서', addressText: '서울 강서구' }],
+    });
+    expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { hostTeamId: 'team-host', deletedAt: null },
+        distinct: ['placeName'],
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+    );
+  });
+
   // ─── create: guard tests ───────────────────────────────────────────────────
 
   it('create: 정지된 계정은 403 PERMISSION_DENIED', async () => {

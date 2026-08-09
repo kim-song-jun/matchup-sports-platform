@@ -165,6 +165,24 @@ export class TeamMatchesService {
     };
   }
 
+  /**
+   * #3 1단계: 새 Venue 테이블 없이, 이 팀이 호스트로 과거에 실제로 입력했던 장소를
+   * distinct로 최근 것부터 최대 5개 돌려준다. 위저드의 장소 입력창 포커스 시
+   * 칩으로 노출해 탭 한 번으로 채울 수 있게 한다. 팀 관리자만 조회할 수 있게
+   * assertCanManageTeam로 게이팅(생성 권한과 동일한 기준).
+   */
+  async recentVenues(user: V1AuthUser, teamId: string) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const rows = await this.prisma.v1TeamMatch.findMany({
+      where: { hostTeamId: teamId, deletedAt: null },
+      distinct: ['placeName'],
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { placeName: true, placeAddress: true },
+    });
+    return { items: rows.map((row) => ({ placeName: row.placeName, addressText: row.placeAddress })) };
+  }
+
   async applicationEligibility(
     user: V1AuthUser,
     teamMatchId: string,

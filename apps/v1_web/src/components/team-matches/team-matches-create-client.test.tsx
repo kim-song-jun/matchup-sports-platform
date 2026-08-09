@@ -61,6 +61,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   }),
   useV1CreateTeamMatch: () => ({ mutate: createTeamMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
+  useV1TeamRecentVenues: () => ({ data: undefined }),
 }));
 
 vi.mock('./team-matches-page', () => ({

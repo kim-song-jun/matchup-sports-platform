@@ -30,6 +30,7 @@ import type {
 } from '../common/audit/operation-audit.contract';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
 import { GameTakeoverService } from './game-takeover.service';
 import {
@@ -1678,6 +1679,11 @@ export class GamesService {
                 reason: 'team_match_result_submitted',
               },
             });
+            // 매치 ↔ 팀일정 연동(레인 schedule): 결과 제출이 팀 매치의 실질적 종료 시점이라는
+            // 바로 위 근거를 그대로 이어받아, 같은 트랜잭션 안에서 연결된 SCHEDULED 팀일정도
+            // COMPLETED로 cascade한다. `completion.count === 1` 가드 덕분에 이 블록도 재제출/
+            // 정정 루프에서 이미 완료 처리된 것을 다시 건드리지 않는다(자연히 idempotent).
+            await cascadeCompleteTeamMatchSchedulesInTx(tx, game.teamMatchId);
           }
         }
         await this.writeOutbox(

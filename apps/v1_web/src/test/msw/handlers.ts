@@ -213,6 +213,7 @@ let v1ScheduleFixture = {
   state: 'SCHEDULED' as 'SCHEDULED' | 'CANCELLED' | 'COMPLETED',
   version: 1,
   teamMatchId: null as string | null,
+  matchConfirmed: null as boolean | null,
   cancelReason: null as string | null,
   cancelledAt: null as string | null,
 };
@@ -270,6 +271,7 @@ function scheduleSummary() {
     state: v1ScheduleFixture.state,
     version: v1ScheduleFixture.version,
     teamMatchId: v1ScheduleFixture.teamMatchId,
+    matchConfirmed: v1ScheduleFixture.matchConfirmed,
     goingCount: v1ScheduleAttendanceCounts.going,
     waitlistedCount: v1ScheduleAttendanceCounts.waitlisted,
   };
@@ -310,6 +312,7 @@ function scheduleMutationResult(replayed = false) {
     state: v1ScheduleFixture.state,
     version: v1ScheduleFixture.version,
     teamMatchId: v1ScheduleFixture.teamMatchId,
+    matchConfirmed: v1ScheduleFixture.matchConfirmed,
     replayed,
   };
 }
@@ -882,6 +885,23 @@ export const v1MswHandlers = [
   http.get(`${api}/teams/:teamId/schedules/:scheduleId`, () => ok(scheduleDetail())),
   http.post(`${api}/teams/:teamId/schedules`, async ({ params, request }) => {
     const body = await request.json() as V1CreateScheduleDto;
+    // 서버 계약을 그대로 흉내낸다. 이 mock 이 MATCH 나 teamMatchId 를 받아주면, 프로덕션에서
+    // 422/400 으로 실패할 호출이 테스트에서는 조용히 통과한다 — mock 이 서버보다 관대하면
+    // 테스트가 거짓말을 한다. 이전에는 "이 경로는 항상 TRAINING/EVENT 만 받는다" 를 주석으로만
+    // 주장했고 코드로 강제하지 않았다.
+    const raw = body as Record<string, unknown>;
+    if (raw.type === 'MATCH') {
+      return HttpResponse.json(
+        { status: 'error', code: 'SCHEDULE_MATCH_TYPE_SYSTEM_ONLY', message: 'MATCH 일정은 시스템만 만들 수 있어요.' },
+        { status: 422 },
+      );
+    }
+    if ('teamMatchId' in raw) {
+      return HttpResponse.json(
+        { status: 'error', code: 'BAD_REQUEST', message: 'property teamMatchId should not exist' },
+        { status: 400 },
+      );
+    }
     v1ScheduleFixture = {
       ...v1ScheduleFixture,
       teamId: String(params.teamId),
@@ -893,7 +913,10 @@ export const v1MswHandlers = [
       capacity: body.capacity ?? null,
       rsvpDeadlineAt: body.rsvpDeadlineAt ?? null,
       visibility: body.visibility ?? 'TEAM',
-      teamMatchId: body.teamMatchId ?? null,
+      // 매치 ↔ 팀일정 연동: teamMatchId는 V1CreateScheduleDto에서 제거됐다 — MATCH 타입
+      // 스케줄은 이제 TeamMatchesService가 시스템으로만 만든다. 이 mock 경로는 항상 TRAINING/
+      // EVENT만 받으므로 teamMatchId/matchConfirmed는 v1ScheduleFixture의 기존 값(null)을
+      // 그대로 spread로 물려받는다.
       state: 'SCHEDULED',
       version: 1,
       cancelReason: null,

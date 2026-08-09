@@ -6,7 +6,6 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -41,6 +40,10 @@ export class ScheduleListQueryDto {
   state?: V1ScheduleState;
 }
 
+// 매치 ↔ 팀일정 연동(레인 schedule): `type: MATCH`는 TeamMatchesService가 트랜잭션 안에서만 만들 수
+// 있다(TeamSchedulesService.create()가 SCHEDULE_MATCH_TYPE_SYSTEM_ONLY로 거부). 이 DTO는 이제
+// MATCH 스케줄을 절대 만들지 못하므로 `teamMatchId` 필드는 두지 않는다 — 남겨두면 어떤 값을 넣어도
+// 항상 거부만 되는 죽은 입력 경로가 된다.
 export class CreateScheduleDto {
   @IsString()
   @MaxLength(120)
@@ -72,10 +75,6 @@ export class CreateScheduleDto {
   @IsOptional()
   @IsEnum(V1ScheduleVisibility)
   visibility?: V1ScheduleVisibility;
-
-  @IsOptional()
-  @IsUUID()
-  teamMatchId?: string;
 }
 
 export class UpdateScheduleDto {

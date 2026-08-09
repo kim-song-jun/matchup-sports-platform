@@ -126,7 +126,7 @@ export type TeamMatchCreateViewModel = {
     description: string;
     grade: string;
     format: string;
-    style: string;
+    style: string[];
     uniform: string;
     gender: string;
     imageUrl: string;
@@ -147,7 +147,7 @@ export type TeamMatchCreateViewModel = {
     regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
     onSelectTeam: (teamName: string) => void;
     onSelectSport: (sportName: string) => void;
-    onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number) => void;
+    onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number | string[]) => void;
     onRegionChange: (regionId: string) => void;
     uploadImage?: (file: File) => Promise<string>;
     onBack: () => void;

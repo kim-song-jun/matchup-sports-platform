@@ -91,6 +91,11 @@ export function ActionTargetPicker({
     const dialog = dialogRef.current;
     if (!dialog) return;
     const focusableSelectors = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    // 열릴 때 포커스를 다이얼로그 안으로 옮긴다. 아래 트랩은 activeElement 가 first/last 일 때만
+    // 순환시키므로, 포커스가 오버레이 바깥에 남아 있으면 트랩이 아예 걸리지 않고 키보드 사용자는
+    // 보이지 않는 배경 요소들을 훑게 된다.
+    const initial = dialog.querySelector<HTMLElement>(focusableSelectors);
+    initial?.focus();
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));

@@ -61,7 +61,7 @@ const draft = {
   description: '',
   grade: '',
   format: '',
-  style: '',
+  style: [] as string[],
   uniform: '',
   gender: '성별 무관',
   imageUrl: '',

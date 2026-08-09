@@ -38,6 +38,16 @@ const config: Config = {
         // test/team-match-series/**, so the admin/public HTTP contract specs would exist
         // on disk but never run in CI's migration replay + drift gate.
         '<rootDir>/test/team-match-series/**/*.integration-spec.ts',
+        // 레인 schedule (매치 ↔ 팀일정 연동) 작업 중 발견: test/team-matches/** 도 같은
+        // silent-omission 함정에 걸려 있다 — 그 디렉터리의 기존 두 스펙
+        // (team-match-lineup.integration-spec.ts, team-match-game-adapter.integration-spec.ts)은
+        // 디스크에 존재하지만 `jest --selectProjects integration`(CI의 migration replay +
+        // drift gate가 그대로 호출)로 한 번도 선택된 적이 없어 이후 코드 변화(Idempotency-Key
+        // 필수화, LOCKED 상태 리네이밍 등)에 이미 bit-rot됐다(이번에 처음 실행해보니 7건 실패 —
+        // 이 레인과 무관한 Task 14/Task 6 영역이라 여기서 고치지 않는다). 그 두 파일까지 와일드카드로
+        // 되살리면 CI가 이 PR과 무관한 이유로 깨지므로, 새로 추가한 이 레인의
+        // team-match-schedule-link.integration-spec.ts 하나만 명시 경로로 등록한다.
+        '<rootDir>/test/team-matches/team-match-schedule-link.integration-spec.ts',
       ],
     },
     {

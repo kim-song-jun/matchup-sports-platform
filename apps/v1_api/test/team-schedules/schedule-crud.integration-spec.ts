@@ -13,7 +13,6 @@ const ids = {
   memberA: '6d000000-0000-4000-8000-000000000003',
   memberB: '6d000000-0000-4000-8000-000000000004',
   outsider: '6d000000-0000-4000-8000-000000000005',
-  otherTeamMatch: '6d000000-0000-4000-8000-000000000030',
 } as const;
 
 const prisma = new PrismaService();
@@ -81,20 +80,6 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
         { teamId: ids.teamA, userId: ids.memberA, role: 'member', status: 'active' },
       ],
     });
-    // teamMatch hosted by teamB, unrelated to teamA — used for the cross-team ownership check.
-    await prisma.v1TeamMatch.create({
-      data: {
-        id: ids.otherTeamMatch,
-        hostTeamId: ids.teamB,
-        createdByUserId: ids.ownerA,
-        sportId: sport.id,
-        regionId: ids.region,
-        title: 'Task 12 unrelated team match',
-        placeName: 'Task 12 ground',
-        startAt: new Date('2026-09-01T00:00:00.000Z'),
-      },
-    });
-
     moduleRef = await Test.createTestingModule({
       providers: [TeamSchedulesService, { provide: PrismaService, useValue: prisma }],
     }).compile();
@@ -114,23 +99,16 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     timezone: 'Asia/Seoul',
   });
 
-  it('rejects a MATCH-type schedule with no teamMatchId', async () => {
+  // 매치 ↔ 팀일정 연동(레인 schedule): MATCH 타입은 이제 TeamMatchesService가 트랜잭션 안에서
+  // createTeamMatchScheduleInTx()로만 만든다. 이 공개 create() 경로로는 teamMatchId 유무와
+  // 무관하게 항상 거부돼야 한다 — 이전에 이 자리에 있던 "no teamMatchId"/"cross-team teamMatchId"
+  // 두 시나리오는 CreateScheduleDto에서 teamMatchId 필드 자체를 제거하며 함께 정리했다(그
+  // 검증 코드는 더 이상 존재하지 않는다).
+  it('rejects a MATCH-type schedule created directly, regardless of any teamMatchId on the payload', async () => {
     const error = await captureFailure(() =>
       service.create(authUser(ids.ownerA), ids.teamA, { ...baseDto(), type: 'MATCH' } as never, 'match-source-key'),
     );
-    expectHttpCode(error, 422, 'SCHEDULE_MATCH_SOURCE_REQUIRED');
-  });
-
-  it('rejects a teamMatchId that does not belong to this team', async () => {
-    const error = await captureFailure(() =>
-      service.create(
-        authUser(ids.ownerA),
-        ids.teamA,
-        { ...baseDto(), type: 'MATCH', teamMatchId: ids.otherTeamMatch } as never,
-        'match-cross-team-key',
-      ),
-    );
-    expectHttpCode(error, 404, 'TEAM_MATCH_NOT_FOUND_FOR_TEAM');
+    expectHttpCode(error, 422, 'SCHEDULE_MATCH_TYPE_SYSTEM_ONLY');
   });
 
   it('rejects a plain member updating a schedule and leaves the row unchanged', async () => {
@@ -522,31 +500,12 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
     expectHttpCode(error, 404, 'GUEST_RECRUITMENT_NOT_FOUND');
   });
 
-  // W7 regression: teamMatchId previously bypassed cross-team ownership validation for every
-  // non-MATCH type (the check only ran `if (dto.type === 'MATCH' && dto.teamMatchId)`). If that
-  // guard is ever reverted, this call would silently persist a TRAINING schedule carrying team
-  // B's teamMatchId (201) instead of rejecting it — this test fails on the `expectHttpCode` call
-  // and/or the row-count assertion in that case.
-  it(
-    'W7 regression: rejects teamMatchId on a non-MATCH schedule type outright (cross-team ' +
-      'ownership validation must never be skippable via type) and creates no row',
-    async () => {
-      const before = await prisma.v1TeamSchedule.count({ where: { teamId: ids.teamA } });
-
-      const error = await captureFailure(() =>
-        service.create(
-          authUser(ids.ownerA),
-          ids.teamA,
-          { ...baseDto(), type: 'TRAINING', teamMatchId: ids.otherTeamMatch } as never,
-          'w7-non-match-team-match-id-key',
-        ),
-      );
-      expectHttpCode(error, 422, 'SCHEDULE_TEAM_MATCH_NOT_ALLOWED');
-
-      const after = await prisma.v1TeamSchedule.count({ where: { teamId: ids.teamA } });
-      expect(after).toBe(before);
-    },
-  );
+  // 매치 ↔ 팀일정 연동(레인 schedule): teamMatchId 필드 자체가 CreateScheduleDto에서 제거됐으므로
+  // (위 "rejects a MATCH-type schedule created directly" 테스트 참고), 이전에 여기 있던 W7
+  // regression("non-MATCH + teamMatchId cross-team 우회") 시나리오는 그 코드 경로가 통째로 사라져
+  // 더 이상 재현할 수 없다 — 삭제하지 않고 이 테스트를 유지했다면, 서비스가 더 이상 읽지 않는
+  // teamMatchId 프로퍼티를 무시한 채 TRAINING 스케줄을 성공적으로 만들어 원래 의도(거부 확인)와
+  // 반대로 통과해버렸을 것이다.
 
   // W9 regression (schedule creation, the "unordered findFirst can select the stale expired row"
   // shape): create with key K, expire K's record, legitimately reuse K once (creates a second,

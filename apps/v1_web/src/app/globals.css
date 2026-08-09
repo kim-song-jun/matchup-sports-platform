@@ -1593,6 +1593,15 @@ button:disabled {
   outline-offset: 2px;
 }
 
+/* MultiPresetChipSelector 다중선택 상한 도달 시 미선택 칩(예: 경기 스타일 3개 제한) —
+ * 색상 단독 전달 금지: 불투명도 + not-allowed 커서로 "지금은 못 고름"을 함께 표시한다.
+ * disabled 속성은 쓰지 않는다 — 클릭을 막으면 limitMessage(왜 안 되는지)를 띄울 방법이
+ * 없어진다. */
+.tm-chip[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .tm-chip-active {
   border-color: var(--blue500);
   background: var(--blue500);

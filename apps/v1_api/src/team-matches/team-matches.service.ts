@@ -23,6 +23,11 @@ import type {
 } from '../games/games.types';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  cascadeCancelTeamMatchSchedulesInTx,
+  createTeamMatchScheduleInTx,
+  syncTeamMatchScheduleInTx,
+} from '../team-schedules/team-schedules.service';
 import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -148,8 +153,11 @@ export class TeamMatchesService {
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
-      rulesText: [teamMatch.formatNote, teamMatch.genderRule].filter(Boolean).join(' · ') || null,
+      rulesText: this.formatMatchConditionsRulesText(teamMatch),
       genderRule: teamMatch.genderRule,
+      matchFormat: teamMatch.matchFormat,
+      matchStyle: teamMatch.matchStyle,
+      uniformColor: teamMatch.uniformColor,
       paymentRequired: false,
       hostTeam: {
         teamId: teamMatch.hostTeam.id,
@@ -296,6 +304,18 @@ export class TeamMatchesService {
     };
   }
 
+  // Copilot 리뷰 finding(PR #295): matchFormat/matchStyle/uniformColor를 dto 값 그대로
+  // (trim 없이) 저장하면 공백뿐인 문자열이 DB에 남을 수 있다 — 그러면
+  // hasStructuredConditions(team-matches-create-client.tsx) 판정이 "구조화 필드가 채워져
+  // 있다"고 잘못 보고, 정작 표시할 값은 없는 채로 레거시 formatNote 폴백이 영구히 막힌다.
+  // create/update 양쪽에서 같은 정규화를 쓰도록 한 곳에 모은다.
+  private normalizeMatchConditionFields(dto: MutateTeamMatchDto) {
+    const matchFormat = dto.matchFormat?.trim() || null;
+    const matchStyle = (dto.matchStyle ?? []).map((item) => item.trim()).filter(Boolean);
+    const uniformColor = dto.uniformColor?.trim() || null;
+    return { matchFormat, matchStyle, uniformColor };
+  }
+
   async create(
     user: V1AuthUser,
     dto: MutateTeamMatchDto,
@@ -351,6 +371,7 @@ export class TeamMatchesService {
         user.id,
       );
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
+      const conditionFields = this.normalizeMatchConditionFields(dto);
       const created = await tx.v1TeamMatch.create({
         data: {
           hostTeamId: dto.hostTeamId,
@@ -366,6 +387,9 @@ export class TeamMatchesService {
           endAt: dates.endsAt,
           deadlineAt: dates.deadlineAt,
           formatNote: dto.rulesText ?? null,
+          matchFormat: conditionFields.matchFormat,
+          matchStyle: conditionFields.matchStyle,
+          uniformColor: conditionFields.uniformColor,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
@@ -379,6 +403,12 @@ export class TeamMatchesService {
         this.teamMatchGameSourceInput(created.id, source),
         this.teamMatchGameContext(user, source.actorRole, commandId, payloadHash),
       );
+      // 매치 ↔ 팀일정 연동(레인 schedule): "매치가 곧 팀일정" — 호스트는 장소·시간을 이미 확보한
+      // 상태이므로 상대팀 확정 여부와 무관하게 캘린더에 존재해야 한다. 같은 트랜잭션 안에서 호스트
+      // 팀에 가확정(SCHEDULED, 상대팀 모집 중) 스케줄 1건을 만든다. idempotency replay 분기(위
+      // existingCommand !== null 케이스)는 이 블록을 지나지 않으므로 재시도가 스케줄을 중복 생성하지
+      // 않는다 — @@unique([teamId, teamMatchId])가 그래도 마지막 방어선이다.
+      await createTeamMatchScheduleInTx(tx, dto.hostTeamId, created.id, dto.title, dates.startsAt, dates.endsAt);
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match',
@@ -428,6 +458,9 @@ export class TeamMatchesService {
         minLevelCode: teamMatch.minSportLevel?.code ?? null,
         maxLevelCode: teamMatch.maxSportLevel?.code ?? null,
         genderRule: teamMatch.genderRule,
+        matchFormat: teamMatch.matchFormat,
+        matchStyle: teamMatch.matchStyle,
+        uniformColor: teamMatch.uniformColor,
       },
       status: apiStatus,
       version: teamMatch.updatedAt.toISOString(),
@@ -453,25 +486,38 @@ export class TeamMatchesService {
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
     const dates = this.validateDates(dto);
 
-    const updated = await this.prisma.v1TeamMatch.update({
-      where: { id: teamMatch.id },
-      data: {
-        sportId: dto.sportId,
-        regionId: dto.regionId,
-        title: dto.title,
-        description: dto.description ?? null,
-        imageUrl: dto.imageUrl ?? null,
-        placeName: dto.manualPlaceName,
-        placeAddress: dto.addressText ?? null,
-        startAt: dates.startsAt,
-        endAt: dates.endsAt,
-        deadlineAt: dates.deadlineAt,
-        formatNote: dto.rulesText ?? null,
-        minSportLevelId: levelRange.minSportLevelId,
-        maxSportLevelId: levelRange.maxSportLevelId,
-        genderRule: dto.genderRule ?? null,
-        costNote: dto.costNote ?? null,
-      },
+    // 매치 ↔ 팀일정 연동(레인 schedule): 매치 제목/시간이 바뀌면 호스트 스케줄도 같은 트랜잭션 안에서
+    // 동기화해야 캘린더가 실제와 어긋나지 않는다 — 이 메서드를 트랜잭션으로 승격한다(다른 4개
+    // 메서드와 달리 여기만 단일 update() 호출이었다). 경기조건 구조화 필드(matchFormat/matchStyle/
+    // uniformColor)는 이 트랜잭션 승격과 별개로 함께 저장해야 한다 — 둘 중 하나만 반영하면
+    // 일정 동기화가 빠지거나 새 경기조건 저장이 무효화된다.
+    const conditionFields = this.normalizeMatchConditionFields(dto);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const teamMatchUpdated = await tx.v1TeamMatch.update({
+        where: { id: teamMatch.id },
+        data: {
+          sportId: dto.sportId,
+          regionId: dto.regionId,
+          title: dto.title,
+          description: dto.description ?? null,
+          imageUrl: dto.imageUrl ?? null,
+          placeName: dto.manualPlaceName,
+          placeAddress: dto.addressText ?? null,
+          startAt: dates.startsAt,
+          endAt: dates.endsAt,
+          deadlineAt: dates.deadlineAt,
+          formatNote: dto.rulesText ?? null,
+          matchFormat: conditionFields.matchFormat,
+          matchStyle: conditionFields.matchStyle,
+          uniformColor: conditionFields.uniformColor,
+          minSportLevelId: levelRange.minSportLevelId,
+          maxSportLevelId: levelRange.maxSportLevelId,
+          genderRule: dto.genderRule ?? null,
+          costNote: dto.costNote ?? null,
+        },
+      });
+      await syncTeamMatchScheduleInTx(tx, teamMatch.id, dto.title, dates.startsAt, dates.endsAt);
+      return teamMatchUpdated;
     });
 
     return {
@@ -502,6 +548,9 @@ export class TeamMatchesService {
         where: { teamMatchId: teamMatch.id, status: 'requested' },
         data: { status: 'rejected', reviewedByUserId: user.id, reviewedAt: new Date() },
       });
+      // 매치 ↔ 팀일정 연동(레인 schedule): teamMatchId로 연결된 SCHEDULED 스케줄(호스트/상대 최대
+      // 2건)을 같은 트랜잭션 안에서 CANCELLED로 cascade한다 — row는 삭제하지 않는다.
+      await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatch.id, dto.reason ?? 'host_cancelled');
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match',
@@ -906,6 +955,18 @@ export class TeamMatchesService {
         application.teamMatchId,
         application.applicantTeamId,
       );
+      // 매치 ↔ 팀일정 연동(레인 schedule): 승인된 상대팀에게도 같은 트랜잭션 안에서 스케줄을
+      // 만든다 — approveApplication은 "승인된 팀은 정확히 1개"를 이미 보장하므로(바로 아래 나머지
+      // requested 신청 자동 rejected 처리) 이 지점에서만 만들면 확정된 팀에게만 정확히 1건이
+      // 자동으로 보장된다. 이 시점엔 이미 확정 상태라 상대팀은 '가확정' 단계를 볼 일이 없다.
+      await createTeamMatchScheduleInTx(
+        tx,
+        application.applicantTeamId,
+        application.teamMatchId,
+        application.teamMatch.title,
+        application.teamMatch.startAt,
+        application.teamMatch.endAt,
+      );
       await tx.v1TeamMatchApplication.updateMany({
         where: {
           teamMatchId: application.teamMatchId,
@@ -1150,8 +1211,11 @@ export class TeamMatchesService {
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
-      rulesText: [teamMatch.formatNote, teamMatch.genderRule].filter(Boolean).join(' · ') || null,
+      rulesText: this.formatMatchConditionsRulesText(teamMatch),
       genderRule: teamMatch.genderRule,
+      matchFormat: teamMatch.matchFormat,
+      matchStyle: teamMatch.matchStyle,
+      uniformColor: teamMatch.uniformColor,
       paymentRequired: false,
       viewerState: this.getViewerState(teamMatch, user),
     };
@@ -1539,6 +1603,30 @@ export class TeamMatchesService {
     if (!sport) throw validationError('sportId is invalid or inactive', 'sportId');
     const region = await this.prisma.v1Region.findFirst({ where: { id: regionId, isActive: true, level: 2 }, select: { id: true } });
     if (!region) throw validationError('regionId must be an active district region', 'regionId');
+  }
+
+  /**
+   * 표시용 rulesText 파생값. 구조화 필드(matchFormat/matchStyle/uniformColor)가 진실이고
+   * rulesText는 그 값들을 이어붙인 표시 전용 문자열일 뿐, 다시 파싱되지 않는다.
+   * formatNote로의 폴백은 구조화 컬럼 3종이 전부 비어 있는 미백필 row(백필 CLI 실행 전
+   * 레거시 데이터)만을 위한 것 — 백필 완료 후에는 이 분기를 타지 않는다.
+   */
+  private formatMatchConditionsRulesText(teamMatch: {
+    formatNote: string | null;
+    matchFormat: string | null;
+    matchStyle: string[];
+    uniformColor: string | null;
+    genderRule: string | null;
+    minSportLevel: { name: string } | null;
+    maxSportLevel: { name: string } | null;
+  }) {
+    const levelLabel = formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, null);
+    const hasStructuredConditions =
+      Boolean(teamMatch.matchFormat) || teamMatch.matchStyle.length > 0 || Boolean(teamMatch.uniformColor);
+    const conditionText = hasStructuredConditions
+      ? [teamMatch.matchFormat, teamMatch.matchStyle.join(' · ') || null, teamMatch.uniformColor].filter(Boolean).join(' · ') || null
+      : teamMatch.formatNote;
+    return [levelLabel, conditionText, teamMatch.genderRule].filter(Boolean).join(' · ') || null;
   }
 
   private getApiStatus(teamMatch: V1TeamMatch) {

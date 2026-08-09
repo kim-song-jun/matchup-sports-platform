@@ -10,7 +10,7 @@ import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon 
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
+import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { cssUrl } from '@/lib/assets';
 import type {
   TeamMatchCreateViewModel,
@@ -746,13 +746,36 @@ function ImmutableMatchContext({ team, sport }: { team: string; sport: string })
   );
 }
 
+// 경기조건 프리셋 보기. grade는 apps/v1_web/src/lib/v1-levels.ts의 V1_LEVELS(4단계)가
+// 유일한 진실이라 자유입력을 허용하지 않는다(allowsFreeText=false) — 이미 팀/매치 매칭·
+// 검색이 이 4단계 폐쇄형 체계에 의존하므로 자유입력을 열면 매칭 근거가 깨진다.
+// format/style/uniform은 자유입력을 함께 허용한다(구장 크기별 변형, 줄무늬 등 프리셋이
+// 못 덮는 값이 실제로 흔함).
+const GRADE_OPTIONS = ['입문', '초보', '중수', '고수'] as const;
+const MATCH_FORMAT_OPTIONS_SOCCER = ['11:11', '9:9', '8:8', '7:7'] as const;
+const MATCH_FORMAT_OPTIONS_FUTSAL = ['6:6', '5:5', '4:4'] as const;
+const MATCH_STYLE_OPTIONS = ['친선', '매너 중시', '교환매치', '실력 중심', '초보 환영', '기타'] as const;
+// 최대 3개(사용자 확정 결정) — apps/v1_api/src/team-matches/team-match-conditions.constants.ts의
+// MATCH_STYLE_MAX_ITEMS와 값을 맞춘다(별도 앱이라 상수 자체는 공유하지 못한다). 서버 DTO가
+// 최종 방어선이고, 이 값은 4번째 선택 시 조용히 막히지 않고 이유를 안내하기 위한 프론트 표시용.
+const MATCH_STYLE_MAX_ITEMS = 3;
+const UNIFORM_COLOR_OPTIONS = ['흰색', '검정', '빨강', '파랑', '노랑', '초록', '주황', '남색'] as const;
+
+// 표시 이름과 id 를 모두 받는다. 이름만 보고 분기하면 로케일이나 표기가 바뀌는 순간 조용히
+// 축구 쪽으로 떨어져, 풋살 경기에 11:11 같은 선택지가 뜨는데도 아무도 눈치채지 못한다.
+function matchFormatOptionsForSport(sportNameOrId: string): readonly string[] {
+  const isFutsal = sportNameOrId.includes('풋살') || sportNameOrId.toLowerCase().includes('futsal');
+  return isFutsal ? MATCH_FORMAT_OPTIONS_FUTSAL : MATCH_FORMAT_OPTIONS_SOCCER;
+}
+
 function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
   return <div><h1 className="tm-text-heading">경기조건</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대팀이 신청 전에 확인할 등급, 방식, 비용 조건을 입력해 주세요.</p><ConditionFields model={model} /><Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}><div className="tm-text-label">무료초청 표시</div><div className="tm-text-caption" style={{ marginTop: 5 }}>상대팀 부담금이 0원이면 목록과 상세에 '무료초청' 배지가 표시돼요.</div></Card></div>;
 }
 
 function ConditionFields({ model }: { model: TeamMatchCreateViewModel }) {
   const d = model.draft;
-  return <><CreateField label="실력등급" value={d.grade} placeholder="예: B, 중급, 생활체육" onChange={(value) => model.form?.onFieldChange('grade', value)} /><CreateField label="경기방식" value={d.format} placeholder="예: 5:5 풋살, 11:11 축구" onChange={(value) => model.form?.onFieldChange('format', value)} /><CreateField label="경기 스타일" value={d.style} placeholder="예: 친선 · 매너 중시" onChange={(value) => model.form?.onFieldChange('style', value)} /><CreateField label="유니폼 색상" value={d.uniform} placeholder="예: 흰색 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div></>;
+  const formatOptions = matchFormatOptionsForSport(model.selectedSport);
+  return <><PresetChipSelector label="실력등급" options={GRADE_OPTIONS} value={d.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><PresetChipSelector label="경기방식" options={formatOptions} value={d.format} allowFreeText freeTextPlaceholder="예: 10:10, 3:3" onChange={(value) => model.form?.onFieldChange('format', value)} /><MultiPresetChipSelector label="경기 스타일" options={MATCH_STYLE_OPTIONS} values={d.style} allowFreeText freeTextPlaceholder="목록에 없으면 직접 입력해 주세요" maxItems={MATCH_STYLE_MAX_ITEMS} onChange={(value) => model.form?.onFieldChange('style', value)} /><PresetChipSelector label="유니폼 색상" options={UNIFORM_COLOR_OPTIONS} value={d.uniform} allowFreeText freeTextPlaceholder="예: 줄무늬 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div></>;
 }
 
 function PlaceTimeStep({ model }: { model: TeamMatchCreateViewModel }) {
@@ -860,7 +883,8 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
   const deadlineText = d.deadlineDate && d.deadlineTime ? `${d.deadlineDate} ${d.deadlineTime}` : '경기 시작 전까지';
   // 상대팀 부담금 0원일 때만 '무료초청' 뱃지 표시 (목록·상세와 동일 조건 #20)
   const isFreeInvite = d.opponentCost === 0;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format} · ${d.style}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${d.cost.toLocaleString('ko-KR')}원 · 상대팀 ${d.opponentCost.toLocaleString('ko-KR')}원`} /><InfoRow label="일시" value={`${d.date} ${d.startTime}-${d.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="상세 주소" value={d.venue} /></Card></div>;
+  const styleText = d.style.join(' · ');
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${d.cost.toLocaleString('ko-KR')}원 · 상대팀 ${d.opponentCost.toLocaleString('ko-KR')}원`} /><InfoRow label="일시" value={`${d.date} ${d.startTime}-${d.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="상세 주소" value={d.venue} /></Card></div>;
 }
 
 function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {

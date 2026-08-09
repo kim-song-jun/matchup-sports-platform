@@ -834,6 +834,12 @@ export type V1TeamScheduleSummary = {
   state: V1ScheduleState;
   version: number;
   teamMatchId: string | null;
+  /**
+   * 매치 ↔ 팀일정 연동: type이 'MATCH'일 때만 유효한 파생 필드 — TeamMatch.approvedApplicantTeamId
+   * 유무로 매 조회 시점 계산된다(false=가확정/상대팀 모집 중, true=확정). MATCH가 아닌 스케줄은
+   * 항상 null.
+   */
+  matchConfirmed: boolean | null;
   goingCount: number;
   waitlistedCount: number;
 };
@@ -890,19 +896,25 @@ export type V1TeamScheduleMutationResult = {
   state: V1ScheduleState;
   version: number;
   teamMatchId: string | null;
+  matchConfirmed: boolean | null;
   replayed: boolean;
 };
 
+// 매치 ↔ 팀일정 연동: MATCH 타입 스케줄은 이제 TeamMatchesService가 트랜잭션 안에서만 만든다 —
+// 이 공개 create 경로는 teamMatchId를 더 이상 받지 않는다(백엔드 CreateScheduleDto와 대칭,
+// team-schedules.service.ts의 SCHEDULE_MATCH_TYPE_SYSTEM_ONLY 참고).
+// `type` 은 V1ScheduleType 전체가 아니라 MATCH 를 뺀 것이다. 전체를 쓰면 서버가 422
+// (SCHEDULE_MATCH_TYPE_SYSTEM_ONLY)로 거부할 payload 를 프런트가 타입 검사 통과시킨 채
+// 만들어낼 수 있다 — 계약 불일치를 컴파일 시점에 막는다.
 export type V1CreateScheduleDto = {
   title: string;
-  type: V1ScheduleType;
+  type: Exclude<V1ScheduleType, 'MATCH'>;
   startAt: string;
   endAt: string;
   timezone: string;
   capacity?: number;
   rsvpDeadlineAt?: string;
   visibility?: V1ScheduleVisibility;
-  teamMatchId?: string;
 };
 
 export type V1UpdateScheduleDto = {
@@ -1018,6 +1030,9 @@ export type V1TeamMatch = V1Match & {
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
   genderRule?: string | null;
+  matchFormat?: string | null;
+  matchStyle?: string[];
+  uniformColor?: string | null;
   paymentRequired?: boolean;
   hostTeamId?: string;
   hostTeamName?: string;
@@ -1066,6 +1081,9 @@ export type V1TeamMatchMutationPayload = {
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
   genderRule?: string | null;
+  matchFormat?: string | null;
+  matchStyle?: string[];
+  uniformColor?: string | null;
 };
 
 export type V1TeamMatchUpdatePayload = V1TeamMatchMutationPayload & {
@@ -1103,6 +1121,9 @@ export type V1TeamMatchEdit = {
     minLevelCode?: string | null;
     maxLevelCode?: string | null;
     genderRule?: string | null;
+    matchFormat?: string | null;
+    matchStyle?: string[];
+    uniformColor?: string | null;
   };
   status: V1TeamMatchApiStatus;
   version: string;

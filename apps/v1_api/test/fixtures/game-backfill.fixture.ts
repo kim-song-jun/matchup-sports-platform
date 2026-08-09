@@ -129,6 +129,13 @@ export const gameBackfillFixture = {
       maxLevel: null,
       rulesText: null,
       genderRule: null,
+      // v1-team-match-structured-conditions added these three columns to the detail()
+      // response; this fixture row has no legacy formatNote and predates the backfill,
+      // so all three stay at their unset defaults, same as levelLabel/minLevel/maxLevel
+      // above.
+      matchFormat: null,
+      matchStyle: [],
+      uniformColor: null,
       paymentRequired: false,
       hostTeam: {
         teamId: id('000000000005'),

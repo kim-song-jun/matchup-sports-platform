@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, V1ScheduleState, V1ScheduleVisibility } from '@prisma/client';
+import { Prisma, V1ScheduleState, V1ScheduleType, V1ScheduleVisibility } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,8 +18,132 @@ import { CreateScheduleDto, ScheduleListQueryDto, UpdateScheduleDto } from './dt
 
 const RESOURCE_TYPE = 'V1_TEAM_SCHEDULE';
 const IDEMPOTENCY_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+const MATCH_SCHEDULE_DEFAULT_DURATION_MS = 2 * 60 * 60 * 1_000;
 
 type Tx = Prisma.TransactionClient;
+
+/**
+ * 매치 ↔ 팀일정 연동(레인 schedule). TeamMatchesService(create/approveApplication/cancel/update)와
+ * GamesService(submitResultRevision의 결과확정 트랜잭션)가 같은 트랜잭션 안에서 호출하는 내부 전용
+ * 진입점 — NestJS DI로 TeamSchedulesService를 주입받는 대신 games.service.ts가 이미 export하는
+ * `canonicalGameCommandPayloadHash`와 동일하게 평범한 함수로 export한다. 이 파일의 클래스 메서드가
+ * 갖는 상태(PrismaService 등)가 전혀 필요 없는 순수 tx 연산이라 DI가 불필요하고, GamesService를
+ * `new GamesService(prisma, ...)`로 직접 생성하는 기존 통합테스트 26개·TeamMatchesService를 직접
+ * 생성하는 테스트가 모두 이 함수 시그니처와 무관하게 그대로 컴파일된다(설계 문서는 모듈 DI wiring을
+ * 제안했지만, 그 블라스트 반경을 확인한 뒤 이 파일 자체가 이미 쓰고 있는 평문 함수 컨벤션으로
+ * 구현 방식만 바꿨다 — 동작·트랜잭션 경계·호출 시점은 설계 그대로).
+ */
+
+/**
+ * TeamMatch 생성/신청 승인 시점에 "매치가 곧 팀일정"이라는 설계를 구현한다 — endAt이 없으면
+ * (팀매치는 endAt이 optional) startAt+2시간을 기본값으로 쓴다(mock 4건 전부 정확히 2시간 창을
+ * 쓰는 게 근거, team-matches.view-model.ts).
+ */
+export async function createTeamMatchScheduleInTx(
+  tx: Tx,
+  teamId: string,
+  teamMatchId: string,
+  title: string,
+  startAt: Date,
+  endAt: Date | null,
+): Promise<void> {
+  const resolvedEndAt = endAt ?? new Date(startAt.getTime() + MATCH_SCHEDULE_DEFAULT_DURATION_MS);
+  await tx.v1TeamSchedule.create({
+    data: {
+      teamId,
+      teamMatchId,
+      title,
+      type: V1ScheduleType.MATCH,
+      startAt,
+      endAt: resolvedEndAt,
+      timezone: 'Asia/Seoul',
+      visibility: V1ScheduleVisibility.TEAM,
+      state: V1ScheduleState.SCHEDULED,
+      version: 0,
+    },
+  });
+}
+
+/**
+ * TeamMatch 수정(recruiting 단계에서만 허용)이 호스트 스케줄의 title/startAt/endAt을 같은
+ * 트랜잭션 안에서 동기화한다. recruiting 단계에는 호스트 스케줄 1건만 존재하므로(상대팀 스케줄은
+ * approveApplication에서만 생기고, 그 시점 이후 update()는 status!=='recruiting'로 막힌다)
+ * `teamMatchId + state=SCHEDULED` 조건이 정확히 그 1건만 갱신한다.
+ */
+export async function syncTeamMatchScheduleInTx(
+  tx: Tx,
+  teamMatchId: string,
+  title: string,
+  startAt: Date,
+  endAt: Date | null,
+): Promise<void> {
+  const resolvedEndAt = endAt ?? new Date(startAt.getTime() + MATCH_SCHEDULE_DEFAULT_DURATION_MS);
+  await tx.v1TeamSchedule.updateMany({
+    where: { teamMatchId, state: V1ScheduleState.SCHEDULED },
+    data: { title, startAt, endAt: resolvedEndAt, version: { increment: 1 } },
+  });
+}
+
+/**
+ * TeamMatch 취소가 연결된 SCHEDULED 스케줄(호스트/상대 최대 2건)을 CANCELLED로 cascade한다.
+ * TeamSchedulesService.cancel()이 하는 3단계(state+cancelReason+version 증가, 연결된 OPEN
+ * guest-recruitment를 CLOSED로 닫기)를 그대로 복제한다 — row는 절대 삭제하지 않는다("never
+ * deletes", docs/api/global-contract.md:15). guest-recruitment를 안 닫으면 complete()의 P1-3
+ * fix(이 파일 위쪽 주석 참고)와 같은 버그 클래스가 재발한다.
+ */
+export async function cascadeCancelTeamMatchSchedulesInTx(
+  tx: Tx,
+  teamMatchId: string,
+  cancelReason: string,
+): Promise<void> {
+  const schedules = await tx.v1TeamSchedule.findMany({
+    where: { teamMatchId, state: V1ScheduleState.SCHEDULED },
+    select: { id: true },
+  });
+  for (const schedule of schedules) {
+    await tx.$executeRaw`
+      UPDATE v1_team_schedules
+      SET state = 'CANCELLED'::"V1ScheduleState",
+          cancel_reason = ${cancelReason},
+          version = version + 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${schedule.id} AND state = 'SCHEDULED'::"V1ScheduleState"
+    `;
+    await tx.$executeRaw`
+      UPDATE v1_schedule_guest_recruitments
+      SET state = 'CLOSED'::"V1GuestRecruitmentState", version = version + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE schedule_id = ${schedule.id} AND state = 'OPEN'::"V1GuestRecruitmentState"
+    `;
+  }
+}
+
+/**
+ * games.service.ts의 submitResultRevision()이 TeamMatch를 completed로 전이하는 같은 트랜잭션
+ * 안에서 호출한다 — 결과 제출이 팀 매치의 실질적 종료 시점이라는 근거(Task 16)를 그대로 이어받아,
+ * TeamSchedulesService.complete()의 수동 경로가 요구하는 endAt 경과 가드를 이 시스템 cascade는
+ * 우회한다(결과가 실제로 제출됐다는 사실 자체가 더 강한 증거). 매니저가 직접 누르는 수동 complete()
+ * 액션의 가드는 그대로 유지된다.
+ */
+export async function cascadeCompleteTeamMatchSchedulesInTx(tx: Tx, teamMatchId: string): Promise<void> {
+  const schedules = await tx.v1TeamSchedule.findMany({
+    where: { teamMatchId, state: V1ScheduleState.SCHEDULED },
+    select: { id: true },
+  });
+  for (const schedule of schedules) {
+    await tx.$executeRaw`
+      UPDATE v1_team_schedules
+      SET state = 'COMPLETED'::"V1ScheduleState",
+          version = version + 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${schedule.id} AND state = 'SCHEDULED'::"V1ScheduleState"
+    `;
+    await tx.$executeRaw`
+      UPDATE v1_schedule_guest_recruitments
+      SET state = 'CLOSED'::"V1GuestRecruitmentState", version = version + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE schedule_id = ${schedule.id} AND state = 'OPEN'::"V1GuestRecruitmentState"
+    `;
+  }
+}
 
 /**
  * Owns exactly the "schedule CRUD / versioned mutate / cancel / complete / reminder-trigger /
@@ -76,9 +200,10 @@ export class TeamSchedulesService {
     });
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+    const matchConfirmedByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
 
     return {
-      items: pageItems.map((row) => this.toSummary(row)),
+      items: pageItems.map((row) => this.toSummary(row, matchConfirmedByTeamMatchId)),
       nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
     };
   }
@@ -151,9 +276,10 @@ export class TeamSchedulesService {
     // visibility check (above) is not sufficient — a PUBLIC schedule can still carry a MEMBERS
     // recruitment, so the child's own visibility must be re-checked here independently.
     const canSeeRecruitment = recruitment !== null && (isMember || recruitment.visibility === 'PUBLIC');
+    const matchConfirmedByTeamMatchId = await this.loadMatchConfirmationMap([schedule]);
 
     return {
-      ...this.toSummary(schedule),
+      ...this.toSummary(schedule, matchConfirmedByTeamMatchId),
       cancelReason: schedule.cancelReason,
       cancelledAt: schedule.state === V1ScheduleState.CANCELLED ? schedule.updatedAt : null,
       guestRecruitment:
@@ -226,13 +352,14 @@ export class TeamSchedulesService {
     });
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+    const matchConfirmedByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
 
     return {
       items: pageItems.map((row) => {
         const info = infoByTeam.get(row.teamId);
         const mine = row.attendance.find((a) => a.userId === user.id) ?? null;
         return {
-          ...this.toSummary(row),
+          ...this.toSummary(row, matchConfirmedByTeamMatchId),
           teamId: row.teamId,
           teamName: info?.teamName ?? null,
           myRole: info?.role ?? null,
@@ -249,20 +376,17 @@ export class TeamSchedulesService {
 
   async create(user: V1AuthUser, teamId: string, dto: CreateScheduleDto, idempotencyKey: string) {
     this.assertActiveAccount(user);
-    if (dto.type === 'MATCH' && !dto.teamMatchId) {
+    // 매치 ↔ 팀일정 연동(레인 schedule): MATCH 타입 스케줄은 TeamMatchesService가 트랜잭션 안에서
+    // createTeamMatchScheduleInTx()로만 만든다(생명주기: TeamMatch 생성/신청 승인 시점). 이 공개
+    // API로 사용자가 MATCH 타입을 직접 만들 길을 열어두면 매니저가 실수로 두 번째 매치 스케줄을
+    // 손으로 또 만들 수 있어 명시적으로 거부한다 — 프론트는 이미 생성 폼에서 MATCH를 뺐다
+    // (team-schedules.view-model.ts 주석), 백엔드도 동일하게 조인다. 이전에 여기 있던
+    // teamMatchId 소유권 검증(W7 fix)은 CreateScheduleDto에서 teamMatchId 필드 자체를 제거하며
+    // 함께 정리했다 — 이제 이 필드로 도달할 수 있는 코드 경로가 아예 없다.
+    if (dto.type === V1ScheduleType.MATCH) {
       throw new UnprocessableEntityException({
-        code: 'SCHEDULE_MATCH_SOURCE_REQUIRED',
-        message: 'A MATCH-type schedule must reference an existing team match',
-      });
-    }
-    // W7 fix: teamMatchId previously bypassed cross-team ownership validation for every
-    // non-MATCH type (the check below only ran `if (dto.type === 'MATCH' && dto.teamMatchId)`),
-    // so a TRAINING/EVENT schedule could carry another team's teamMatchId undetected. Reject the
-    // field outright for non-MATCH types instead of silently persisting an unvalidated relation.
-    if (dto.type !== 'MATCH' && dto.teamMatchId) {
-      throw new UnprocessableEntityException({
-        code: 'SCHEDULE_TEAM_MATCH_NOT_ALLOWED',
-        message: 'teamMatchId is only allowed for MATCH-type schedules',
+        code: 'SCHEDULE_MATCH_TYPE_SYSTEM_ONLY',
+        message: 'MATCH-type schedules are created automatically from team matches and cannot be created directly',
       });
     }
 
@@ -298,26 +422,9 @@ export class TeamSchedulesService {
 
       await this.assertManageableTeam(tx, user, teamId);
 
-      // dto.teamMatchId is only ever set here for type === 'MATCH' (enforced above), but we
-      // validate ownership whenever the field is present rather than re-branching on type, so
-      // this check can never again be silently skipped for a type that admits the field.
-      if (dto.teamMatchId) {
-        const teamMatch = await tx.v1TeamMatch.findUnique({
-          where: { id: dto.teamMatchId },
-          select: { hostTeamId: true, approvedApplicantTeamId: true },
-        });
-        if (!teamMatch || (teamMatch.hostTeamId !== teamId && teamMatch.approvedApplicantTeamId !== teamId)) {
-          throw new NotFoundException({
-            code: 'TEAM_MATCH_NOT_FOUND_FOR_TEAM',
-            message: 'The referenced team match does not belong to this team',
-          });
-        }
-      }
-
       const created = await tx.v1TeamSchedule.create({
         data: {
           teamId,
-          teamMatchId: dto.teamMatchId ?? null,
           title: dto.title,
           type: dto.type,
           startAt: new Date(dto.startAt),
@@ -473,7 +580,18 @@ export class TeamSchedulesService {
       }
 
       const after = await tx.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
-      const response = { ...this.toDetailJson(after), replayed: false };
+      // 매치 ↔ 팀일정 연동(레인 schedule): 이 PATCH가 MATCH 타입 스케줄(capacity/visibility 등)을
+      // 건드릴 수도 있으므로, 응답의 matchConfirmed도 최신 상태로 계산해 돌려준다.
+      const matchConfirmed =
+        after.type === V1ScheduleType.MATCH && after.teamMatchId
+          ? (
+              await tx.v1TeamMatch.findUnique({
+                where: { id: after.teamMatchId },
+                select: { approvedApplicantTeamId: true },
+              })
+            )?.approvedApplicantTeamId != null
+          : null;
+      const response = { ...this.toDetailJson(after, matchConfirmed), replayed: false };
       await this.storeIdempotency(tx, user.id, 'SCHEDULE_UPDATE', scheduleId, idempotencyKey, payloadHash, 200, response);
       return response;
     });
@@ -760,21 +878,24 @@ export class TeamSchedulesService {
   // Shared helpers
   // ---------------------------------------------------------------------------------------
 
-  private toSummary(row: {
-    id: string;
-    title: string;
-    type: string;
-    startAt: Date;
-    endAt: Date;
-    timezone: string;
-    capacity: number | null;
-    rsvpDeadlineAt: Date | null;
-    visibility: string;
-    state: string;
-    version: number;
-    teamMatchId: string | null;
-    attendance?: Array<{ status: string }>;
-  }) {
+  private toSummary(
+    row: {
+      id: string;
+      title: string;
+      type: string;
+      startAt: Date;
+      endAt: Date;
+      timezone: string;
+      capacity: number | null;
+      rsvpDeadlineAt: Date | null;
+      visibility: string;
+      state: string;
+      version: number;
+      teamMatchId: string | null;
+      attendance?: Array<{ status: string }>;
+    },
+    matchConfirmedByTeamMatchId: Map<string, boolean> = new Map(),
+  ) {
     const attendance = row.attendance ?? [];
     return {
       id: row.id,
@@ -789,26 +910,37 @@ export class TeamSchedulesService {
       state: row.state,
       version: row.version,
       teamMatchId: row.teamMatchId,
+      // 매치 ↔ 팀일정 연동(레인 schedule): "가확정(상대팀 모집 중) vs 확정(상대팀 확정)"은 순수
+      // 파생값이다 — V1ScheduleState는 건드리지 않고, type===MATCH일 때만 연결된 TeamMatch의
+      // approvedApplicantTeamId 유무로 매 조회 시점마다 새로 계산한다(levelLabel이 FK에서 파생
+      // 계산되는 것과 같은 원칙). MATCH가 아닌 스케줄은 이 개념 자체가 없으므로 항상 null.
+      matchConfirmed:
+        row.type === V1ScheduleType.MATCH && row.teamMatchId
+          ? matchConfirmedByTeamMatchId.get(row.teamMatchId) ?? null
+          : null,
       goingCount: attendance.filter((a) => a.status === 'GOING').length,
       waitlistedCount: attendance.filter((a) => a.status === 'WAITLISTED').length,
     };
   }
 
-  private toDetailJson(row: {
-    id: string;
-    teamId: string;
-    title: string;
-    type: string;
-    startAt: Date;
-    endAt: Date;
-    timezone: string;
-    capacity: number | null;
-    rsvpDeadlineAt: Date | null;
-    visibility: string;
-    state: string;
-    version: number;
-    teamMatchId: string | null;
-  }) {
+  private toDetailJson(
+    row: {
+      id: string;
+      teamId: string;
+      title: string;
+      type: string;
+      startAt: Date;
+      endAt: Date;
+      timezone: string;
+      capacity: number | null;
+      rsvpDeadlineAt: Date | null;
+      visibility: string;
+      state: string;
+      version: number;
+      teamMatchId: string | null;
+    },
+    matchConfirmed: boolean | null = null,
+  ) {
     return {
       id: row.id,
       teamId: row.teamId,
@@ -823,7 +955,31 @@ export class TeamSchedulesService {
       state: row.state,
       version: row.version,
       teamMatchId: row.teamMatchId,
+      matchConfirmed: row.type === V1ScheduleType.MATCH && row.teamMatchId ? matchConfirmed : null,
     };
+  }
+
+  /**
+   * 매치 ↔ 팀일정 연동(레인 schedule): list()/detail()/mySchedule()이 페이지에 등장하는 MATCH 타입
+   * 스케줄들의 teamMatchId를 배치 1회 조회해 확정 여부 맵을 만든다(N+1 방지 — computeRevealedTeamTrustBatch
+   * 가 team-matches.service.ts에서 이미 쓰는 것과 같은 배치 패턴).
+   */
+  private async loadMatchConfirmationMap(
+    rows: Array<{ type: string; teamMatchId: string | null }>,
+  ): Promise<Map<string, boolean>> {
+    const teamMatchIds = [
+      ...new Set(
+        rows
+          .filter((row): row is { type: string; teamMatchId: string } => row.type === V1ScheduleType.MATCH && row.teamMatchId !== null)
+          .map((row) => row.teamMatchId),
+      ),
+    ];
+    if (teamMatchIds.length === 0) return new Map();
+    const matches = await this.prisma.v1TeamMatch.findMany({
+      where: { id: { in: teamMatchIds } },
+      select: { id: true, approvedApplicantTeamId: true },
+    });
+    return new Map(matches.map((match) => [match.id, match.approvedApplicantTeamId !== null]));
   }
 
   private async isActiveMember(teamId: string, userId: string): Promise<boolean> {

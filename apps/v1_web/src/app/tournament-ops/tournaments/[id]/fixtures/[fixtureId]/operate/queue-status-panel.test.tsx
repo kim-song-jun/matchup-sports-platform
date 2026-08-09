@@ -42,3 +42,32 @@ describe('QueueStatusPanel — 이벤트 라벨', () => {
     expect(screen.queryByText('FOUL')).toBeNull();
   });
 });
+
+/**
+ * 재시도로 풀리지 않는 코드(권한 없음 등)에서 "다시 시도" 버튼을 살려 두면
+ * 운영자가 실패 루프에 갇힌다 — `isRetryableGameOperationsErrorCode`의 판정을
+ * 그대로 따라야 한다는 계약을 UI 레벨에서 검증한다.
+ */
+describe('QueueStatusPanel — 재시도 버튼 게이팅', () => {
+  it('재시도로 풀리는 코드(VERSION_CONFLICT)에서는 "다시 시도" 버튼을 보여준다', () => {
+    const failed: QueuedGameEvent = {
+      ...queuedEvent(),
+      status: 'failed',
+      lastError: { code: 'VERSION_CONFLICT', message: '경기 상태가 변경되어 다시 시도해주세요.' },
+    };
+    render(<QueueStatusPanel items={[failed]} onRetry={vi.fn()} />);
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+  });
+
+  it('재시도로 풀리지 않는 코드(STAFF_SCOPE_DENIED)에서는 "다시 시도" 버튼을 숨긴다', () => {
+    const failed: QueuedGameEvent = {
+      ...queuedEvent(),
+      status: 'failed',
+      lastError: { code: 'STAFF_SCOPE_DENIED', message: '이 경기를 운영할 권한이 없어요.' },
+    };
+    render(<QueueStatusPanel items={[failed]} onRetry={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+    // 버튼 대신 무엇을 해야 하는지 안내하는 문구는 그대로 보인다.
+    expect(screen.getByText('이 경기를 운영할 권한이 없어요.')).toBeInTheDocument();
+  });
+});

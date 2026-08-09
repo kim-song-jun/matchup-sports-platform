@@ -16,7 +16,7 @@ export interface AssistPickerSheetProps {
 }
 
 /**
- * event-capture-modal.tsx의 예전 assist step과 동일한 시각 언어를 재사용하되,
+ * action-target-picker.tsx의 시각 언어를 재사용하되,
  * "이미 확정된 GOAL을 되돌리고 어시스트를 넣어 재기록한다"는 두 단계 조작을
  * 사용자에게는 한 번의 선택으로 보여준다.
  */

@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/v1-ui/button';
+import { isRetryableGameOperationsErrorCode } from '@/hooks/use-v1-game-operations-console';
 import type { QueuedGameEvent, QueuedEventStatus } from '@/lib/game-operations-queue';
 
 /**
@@ -70,7 +71,12 @@ export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
           >
             {STATUS_LABEL[item.status]}
           </span>
-          {item.status === 'failed' ? (
+          {/* 실패 사유가 재시도로 풀리지 않는 코드(권한 없음/이미 종료된 경기/무효한
+              payload 등)면 버튼을 아예 숨긴다 — 눌러도 항상 같은 이유로 다시 실패할 게
+              확실한 버튼을 살려 두면 운영자가 실패 루프에 갇힌다. 그 대신 위의
+              `item.lastError.message` 문구가 무엇을 해야 하는지(새로고침/관리자 문의
+              등) 직접 안내한다. */}
+          {item.status === 'failed' && (item.lastError === null || isRetryableGameOperationsErrorCode(item.lastError.code)) ? (
             <Button size="sm" variant="outline" onClick={() => onRetry(item.clientEventId)}>
               다시 시도
             </Button>

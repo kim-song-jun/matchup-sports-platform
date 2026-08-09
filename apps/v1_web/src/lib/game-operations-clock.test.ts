@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatMatchClock,
   freezeCapture,
   isClockDrifted,
   medianOffsetMs,
@@ -112,5 +113,25 @@ describe('isClockDrifted', () => {
 
   it('treats an unparsable timestamp as drifted', () => {
     expect(isClockDrifted('not-a-date', Date.now())).toBe(true);
+  });
+});
+
+describe('formatMatchClock', () => {
+  // 실측 사고 사후조사에서 확인된 회귀: 645886/649891/652602/655603ms(전부
+  // 같은 "10분대") 가 분 단위 표시("10'")로는 서로 구분되지 않았다. 초 단위로
+  // 바꾸면 구분된다.
+  it('구분되지 않던 같은 분대의 ms 값들을 초 단위로는 구분해서 보여준다', () => {
+    const rendered = new Set([645886, 649891, 652602, 655603].map(formatMatchClock));
+    expect(rendered.size).toBe(4);
+  });
+
+  it('m:ss로 포맷하고 초는 두 자리로 0을 채운다', () => {
+    expect(formatMatchClock(0)).toBe('0:00');
+    expect(formatMatchClock(65_000)).toBe('1:05');
+    expect(formatMatchClock(600_000)).toBe('10:00');
+  });
+
+  it('음수는 0으로 클램프한다', () => {
+    expect(formatMatchClock(-500)).toBe('0:00');
   });
 });

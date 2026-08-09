@@ -109,7 +109,7 @@ describe('Task 8 game-operations realtime protocol', () => {
     retryEvent: jest.fn(),
   };
   const staffAccess = { assertAccess: jest.fn() };
-  const logger = { debug: jest.fn(), error: jest.fn() };
+  const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -313,6 +313,42 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(client.emit).toHaveBeenCalledWith('game.error', expect.objectContaining({ code: 'EVENT_INVALID', clientEventId: 'event-invalid', expectedVersion: 4 }));
     expect(client.emit).not.toHaveBeenCalledWith('game.event.ack', expect.anything());
     expect(client.emit).not.toHaveBeenCalledWith('game.event.committed', expect.anything());
+    // 실측 사고(alpha, 6건 기록 시도 중 2건 실패) 사후조사에서 드러난 결함:
+    // appendGameEvent의 catch가 실패를 PinoLogger에 전혀 남기지 않아, 사후에
+    // 어떤 코드로 왜 거부됐는지 재구성할 수 없었다. 도메인 실패(EVENT_INVALID)는
+    // 원인 파악이 가능한 정상 거부이므로 error가 아니라 warn으로 남아야 한다
+    // (INTERNAL_ERROR만 error 레벨 — 아래 별도 테스트).
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'EVENT_INVALID', clientEventId: 'event-invalid', gameId: GAME_ID }),
+      expect.any(String),
+    );
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('원인 불명의 예외는 INTERNAL_ERROR로 응답하고 error 레벨로 남긴다 — actorId는 원문이 아니라 해시로', async () => {
+    const client = socket();
+    gamesService.appendEvent.mockRejectedValue(new Error('unexpected db failure'));
+    const payload = {
+      gameId: GAME_ID,
+      expectedVersion: 4,
+      clientEventId: 'event-internal',
+      takeoverToken: 'nonempty-takeover-token',
+      payloadHash: 'sha256:internal',
+      event: { type: 'SCORE', period: 1, clockMs: 12_000, occurredAt: '2026-08-01T10:00:00.000Z', payload: {} },
+    };
+
+    const result = await task8Gateway(gateway).appendGameEvent(client, payload);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'error', code: 'INTERNAL_ERROR', clientEventId: 'event-internal' }));
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'INTERNAL_ERROR', clientEventId: 'event-internal', gameId: GAME_ID }),
+      expect.any(String),
+    );
+    const [logPayload] = logger.error.mock.calls[0] as [Record<string, unknown>, string];
+    // PII 마스킹 관례(admin-ops.service.ts의 userIdHash)를 따른다 — 실제
+    // userId 문자열이 로그 payload 어디에도 그대로 나타나면 안 된다.
+    expect(JSON.stringify(logPayload)).not.toContain(USER.id);
+    expect(logPayload.actorIdHash).toEqual(expect.any(String));
   });
 
   it('Task 8 permission revoked RED emits each matching game event before room leave and preserves nonmatching subscriptions', async () => {

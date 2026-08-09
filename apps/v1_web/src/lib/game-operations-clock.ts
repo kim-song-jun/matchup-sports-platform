@@ -101,3 +101,21 @@ export function isClockDrifted(occurredAtIso: string, serverAlignedNowMsValue: n
     Math.abs(serverAlignedNowMsValue - occurredAtMs) > CLOCK_DRIFT_TOLERANCE_MS
   );
 }
+
+/**
+ * `m:ss` match-clock formatting, shared by every place that renders a
+ * captured/recorded event's `clockMs` (the event-capture modal, the
+ * recorded-event list, the live elapsed-time display). Second precision —
+ * NOT millisecond: this is the match clock an operator reads at a glance,
+ * and sub-second digits here would just be visual noise nobody can act on.
+ * (Millisecond precision belongs to a different, narrower place: command
+ * round-trip latency feedback for start/pause/resume/end, which is
+ * genuinely useful to see and is surfaced separately in
+ * `operate-console.tsx`'s command-duration banner, not here.)
+ */
+export function formatMatchClock(clockMs: number): string {
+  const totalSeconds = Math.floor(Math.max(0, clockMs) / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}

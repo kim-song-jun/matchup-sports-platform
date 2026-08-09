@@ -154,6 +154,30 @@ describe('TeamMatchSeriesFixturesClient', () => {
     }));
   });
 
+  it('요일을 고르고 시각을 비우면 서버 400 대신 안내 토스트를 보여주고 제출하지 않는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminTeamMatchSeriesMock.mockReturnValue({
+      data: { seriesId: 'series-1', title: '가을 풋살 리그', state: 'draft', teamIds: ['t1', 't2'], fixtures: [] },
+      isPending: false,
+    } as never);
+    const mutateAsync = vi.fn().mockResolvedValue({ seriesId: 'series-1', createdCount: 7, teamMatchIds: [] });
+    useV1GenerateSeriesFixturesMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    useV1UpdateSeriesFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <TeamMatchSeriesFixturesClient seriesId="series-1" />
+      </Providers>,
+    );
+
+    fireEvent.change(screen.getByLabelText('요일'), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText('시각'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '라운드로빈 대진 생성' }));
+
+    await waitFor(() => expect(screen.getByText('요일을 골랐으면 시각도 입력해 주세요.')).toBeInTheDocument());
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
   it('최근 사용한 장소 칩을 누르면 기본 장소 입력에 그 값이 채워진다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminTeamMatchSeriesMock.mockReturnValue({

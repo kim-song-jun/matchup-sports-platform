@@ -33,6 +33,12 @@ export default function TeamMatchSeriesFixturesClient({ seriesId }: { seriesId: 
   if (isPending || series === undefined) return null;
 
   const onGenerate = async () => {
+    // 요일은 골랐는데 time input(type="time")을 비워 지운 상태로 제출하면 서버가 형식
+    // 오류로 400을 내려 사용자는 이유를 모른 채 막힌다 — 제출 전에 여기서 먼저 알려준다.
+    if (dayOfWeek !== '' && time.trim() === '') {
+      showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
+      return;
+    }
     try {
       const result = await generateFixtures.mutateAsync({
         weeksCount,

@@ -219,7 +219,9 @@ export class TeamMatchSeriesAdminService {
             teamMatchIds: ids,
             weeksCount: dto.weeksCount,
             schedule: dto.schedule ? { dayOfWeek: dto.schedule.dayOfWeek, time: dto.schedule.time } : null,
-            placeName: dto.placeName ?? null,
+            // dto.placeName이 아니라 trim+기본값 폴백을 거쳐 실제로 저장된 placeName을 남긴다 —
+            // 감사 로그가 요청 원문이 아니라 실제 결과와 일치해야 디버깅 시 혼선이 없다.
+            placeName,
           },
         },
         tx,

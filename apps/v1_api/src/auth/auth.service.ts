@@ -287,7 +287,23 @@ export class AuthService {
 
     if (existingIdentity) {
       if (isExpiredSocialSignup(existingIdentity.user)) {
-        await this.prisma.v1User.delete({ where: { id: existingIdentity.user.id } });
+        await this.prisma.$transaction([
+          this.prisma.v1AuthIdentity.update({
+            where: { id: existingIdentity.id },
+            data: { email: profile.email, lastLoginAt: now },
+          }),
+          this.prisma.v1User.update({
+            where: { id: existingIdentity.user.id },
+            data: { onboardingStatus: 'social_terms_required', lastLoginAt: now },
+          }),
+          this.prisma.v1UserOnboardingProgress.upsert({
+            where: { userId: existingIdentity.user.id },
+            update: { currentStep: 'terms' },
+            create: { userId: existingIdentity.user.id, currentStep: 'terms' },
+          }),
+        ]);
+
+        return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
       } else {
         if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
           this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
@@ -451,7 +467,7 @@ export class AuthService {
     }
 
     if (isExpiredSocialSignup(user)) {
-      await this.prisma.v1User.delete({ where: { id: userId } });
+      await this.resetExpiredSocialSignup(userId);
       throw new UnauthorizedException({
         code: 'SOCIAL_SIGNUP_EXPIRED',
         message: 'Social signup session expired. Please sign in again.',
@@ -573,7 +589,7 @@ export class AuthService {
     }
 
     if (isExpiredSocialSignup(user)) {
-      await this.prisma.v1User.delete({ where: { id: userId } });
+      await this.resetExpiredSocialSignup(userId);
       throw new UnauthorizedException({
         code: 'SOCIAL_SIGNUP_EXPIRED',
         message: 'Social signup session expired. Please sign in again.',
@@ -766,6 +782,20 @@ export class AuthService {
         trustState: user.reputationSummary?.trustState ?? 'none',
       },
     };
+  }
+
+  private async resetExpiredSocialSignup(userId: string) {
+    await this.prisma.$transaction([
+      this.prisma.v1User.update({
+        where: { id: userId },
+        data: { onboardingStatus: 'social_terms_required' },
+      }),
+      this.prisma.v1UserOnboardingProgress.upsert({
+        where: { userId },
+        update: { currentStep: 'terms' },
+        create: { userId, currentStep: 'terms' },
+      }),
+    ]);
   }
 
   private assertNotWithdrawalPending(accountStatus: V1AccountStatus) {

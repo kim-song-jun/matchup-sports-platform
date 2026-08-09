@@ -227,6 +227,42 @@ describe('team match edit hydration', () => {
     });
   });
 
+  // Regression: the legacy formatNote write used
+  // [grade, format, style, uniform].filter(Boolean).join(' · ') — a blank field is
+  // dropped, not left as an empty slot, so every later field shifts left by one. A
+  // 3-segment rulesText can't be trusted to be [grade,format,style] just because it has
+  // 3 parts; it's just as likely [grade,style,uniform] (format left blank at creation).
+  // Reading it positionally anyway would put a style/uniform value under the wrong label
+  // (e.g. show '친선' as the match format when it was actually the style).
+  it('does not misassign an ambiguous legacy rulesText onto format/uniform — keeps it under style instead', () => {
+    const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const draft = draftFromTeamMatchEdit({
+      teamMatchId: 'team-match-legacy-mid-blank',
+      editable: true,
+      lockedReason: null,
+      form: {
+        hostTeamId: 'team-real',
+        sportId: 'sport-futsal',
+        regionId: 'region-gangnam',
+        title: '레거시 팀매치',
+        startsAt,
+        manualPlaceName: '레거시 장소',
+        // 원래 grade='B', format=''(비움), style='친선', uniform='파랑'으로 저장됐던 row —
+        // 구조화 컬럼(matchFormat/matchStyle/uniformColor)은 모두 비어 있어 legacy 분기를 탄다.
+        rulesText: 'B · 친선 · 파랑',
+      },
+      status: 'recruiting',
+      version: new Date().toISOString(),
+    });
+
+    // format/uniform은 실제로 무엇이었는지 알 수 없으므로 값을 지어내지 않는다 —
+    // '친선'이 경기방식으로, '파랑'이 스타일로 잘못 배정되면 안 된다.
+    expect(draft.format).toBe('');
+    expect(draft.uniform).toBe('');
+    // 대신 원본 세그먼트를 전부 style에 그대로 보존한다.
+    expect(draft.style).toEqual(['B', '친선', '파랑']);
+  });
+
   it('maps a removed edit image to null instead of a fallback image', () => {
     const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const draft = { ...getTeamMatchCreateViewModel('edit').draft, title: '이미지 제거', imageUrl: '', venue: '잠실', date: startsAt.toISOString().slice(0, 10), startTime: '19:00' };

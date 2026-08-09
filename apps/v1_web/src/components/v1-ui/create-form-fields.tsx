@@ -1,7 +1,7 @@
 'use client';
 
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangleIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
@@ -289,6 +289,181 @@ export function GenderRuleSelector({ value, onChange }: { value: string; onChang
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * 단일선택 보기(칩) + 선택적 "직접입력" 자유텍스트. 경기조건 필드들(경기방식/유니폼 색상)이
+ * 자유 입력으로 방치돼 있던 걸(피드백 1) 성별 조건(GenderRuleSelector)과 같은 방식으로
+ * 구조화하되, 프리셋이 못 덮는 값(구장 크기별 변형, 줄무늬 등)은 여전히 받을 수 있어야 해서
+ * allowFreeText 옵션을 둔다. grade처럼 닫힌 보기가 필요하면 allowFreeText를 생략한다.
+ */
+export function PresetChipSelector({
+  label,
+  options,
+  value,
+  allowFreeText,
+  freeTextPlaceholder,
+  onChange,
+}: {
+  label: string;
+  options: readonly string[];
+  value: string;
+  allowFreeText?: boolean;
+  freeTextPlaceholder?: string;
+  onChange: (value: string) => void;
+}) {
+  const isPreset = options.includes(value);
+  const [customMode, setCustomMode] = useState(Boolean(allowFreeText) && value !== '' && !isPreset);
+
+  // 외부에서(예: 수정 화면 hydrate) value가 프리셋 값으로 바뀌면 직접입력 모드를 풀어준다.
+  useEffect(() => {
+    if (isPreset) setCustomMode(false);
+  }, [isPreset]);
+
+  return (
+    <div className="tm-create-field">
+      <div className="tm-text-label">{label}</div>
+      <div className="tm-team-form-chip-row" role="group" aria-label={label}>
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={`tm-chip ${!customMode && value === option ? 'tm-chip-active' : ''}`}
+            aria-pressed={!customMode && value === option}
+            onClick={() => {
+              setCustomMode(false);
+              onChange(option);
+            }}
+          >
+            {option}
+          </button>
+        ))}
+        {allowFreeText ? (
+          <button
+            type="button"
+            className={`tm-chip ${customMode ? 'tm-chip-active' : ''}`}
+            aria-pressed={customMode}
+            onClick={() => {
+              setCustomMode(true);
+              if (isPreset) onChange('');
+            }}
+          >
+            직접입력
+          </button>
+        ) : null}
+      </div>
+      {allowFreeText && customMode ? (
+        <input
+          className="tm-create-native-input"
+          style={{ marginTop: 8, width: '100%' }}
+          aria-label={`${label} 직접입력`}
+          value={value}
+          placeholder={freeTextPlaceholder}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * 다중선택 보기(칩) + 선택적 "직접입력" 자유텍스트 한 칸. 경기 스타일처럼 여러 값을 동시에
+ * 고를 수 있어야 하는 필드용(친선이면서 매너 중시를 동시에 원하는 팀이 있을 수 있음).
+ * 프리셋 밖 값은 텍스트 입력 한 칸에 몰아 저장한다 — 프리셋 다중선택 + 커스텀 항목 여러 개를
+ * 동시에 받는 UI는 이 화면 규모에 비해 과한 복잡도라 커스텀은 1건으로 스코프를 좁혔다.
+ */
+export function MultiPresetChipSelector({
+  label,
+  options,
+  values,
+  allowFreeText,
+  freeTextPlaceholder,
+  maxItems,
+  onChange,
+}: {
+  label: string;
+  options: readonly string[];
+  values: string[];
+  allowFreeText?: boolean;
+  freeTextPlaceholder?: string;
+  /** 설정하면 총 선택 개수를 이 값으로 제한한다(예: 경기 스타일 최대 3개 — 서로 상충하는
+   * 조합·배지 난립을 막으려는 사용자 확정 결정). 조용히 무시하는 대신 초과 시도를
+   * limitMessage로 즉시 안내한다. */
+  maxItems?: number;
+  onChange: (values: string[]) => void;
+}) {
+  const presetSet = new Set(options);
+  // 비프리셋 값을 전부 이어 보여준다. 예전에는 find() 로 첫 번째만 표시했는데, 레거시
+  // rulesText 를 파싱해 넘어온 값처럼 비프리셋 토큰이 둘 이상이면 나머지가 화면에서 사라져
+  // 사용자에게는 값이 없어진 것처럼 보이고, 그 상태로 저장하면 실제로 없어진다.
+  const customValue = values.filter((item) => !presetSet.has(item)).join(', ');
+  const atLimit = maxItems !== undefined && values.length >= maxItems;
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);
+
+  // 선택 해제 등으로 한도 아래로 내려가면 이전 안내 문구를 치운다 — 더 이상 사실이 아닌
+  // 경고가 화면에 남아있지 않도록.
+  useEffect(() => {
+    if (!atLimit) setLimitMessage(null);
+  }, [atLimit]);
+
+  const toggleOption = (option: string) => {
+    const isSelected = values.includes(option);
+    if (!isSelected && atLimit) {
+      setLimitMessage(`최대 ${maxItems}개까지 선택할 수 있어요. 다른 항목을 선택 해제한 뒤 다시 선택해 주세요.`);
+      return;
+    }
+    setLimitMessage(null);
+    onChange(isSelected ? values.filter((item) => item !== option) : [...values, option]);
+  };
+
+  const applyCustom = (text: string) => {
+    const withoutOldCustom = values.filter((item) => presetSet.has(item));
+    const trimmed = text.trim();
+    if (trimmed && maxItems !== undefined && withoutOldCustom.length >= maxItems) {
+      setLimitMessage(`최대 ${maxItems}개까지 선택할 수 있어요. 다른 항목을 선택 해제한 뒤 다시 입력해 주세요.`);
+      return;
+    }
+    setLimitMessage(null);
+    onChange(trimmed ? [...withoutOldCustom, trimmed] : withoutOldCustom);
+  };
+
+  return (
+    <div className="tm-create-field">
+      <div className="tm-text-label">{label}</div>
+      <div className="tm-team-form-chip-row" role="group" aria-label={label}>
+        {options.map((option) => {
+          const isSelected = values.includes(option);
+          // 색상 단독 전달 금지: 한도 도달 시 미선택 칩은 aria-disabled + 낮은 불투명도로도
+          // 표시한다. 다만 클릭은 계속 받는다 — disabled로 막으면 "왜 안 눌리지?"에 답할
+          // 방법이 없어진다(눌러야 limitMessage가 뜬다).
+          const softDisabled = !isSelected && atLimit;
+          return (
+            <button
+              key={option}
+              type="button"
+              className={`tm-chip ${isSelected ? 'tm-chip-active' : ''}`}
+              aria-pressed={isSelected}
+              aria-disabled={softDisabled || undefined}
+              onClick={() => toggleOption(option)}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+      {allowFreeText ? (
+        <input
+          className="tm-create-native-input"
+          style={{ marginTop: 8, width: '100%' }}
+          aria-label={`${label} 직접입력`}
+          value={customValue}
+          placeholder={freeTextPlaceholder}
+          onChange={(event) => applyCustom(event.target.value)}
+        />
+      ) : null}
+      <FieldErrorText message={limitMessage ?? undefined} />
     </div>
   );
 }

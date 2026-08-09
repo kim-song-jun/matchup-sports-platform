@@ -1030,6 +1030,9 @@ export type V1TeamMatch = V1Match & {
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
   genderRule?: string | null;
+  matchFormat?: string | null;
+  matchStyle?: string[];
+  uniformColor?: string | null;
   paymentRequired?: boolean;
   hostTeamId?: string;
   hostTeamName?: string;
@@ -1078,6 +1081,9 @@ export type V1TeamMatchMutationPayload = {
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
   genderRule?: string | null;
+  matchFormat?: string | null;
+  matchStyle?: string[];
+  uniformColor?: string | null;
 };
 
 export type V1TeamMatchUpdatePayload = V1TeamMatchMutationPayload & {
@@ -1115,6 +1121,9 @@ export type V1TeamMatchEdit = {
     minLevelCode?: string | null;
     maxLevelCode?: string | null;
     genderRule?: string | null;
+    matchFormat?: string | null;
+    matchStyle?: string[];
+    uniformColor?: string | null;
   };
   status: V1TeamMatchApiStatus;
   version: string;

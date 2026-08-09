@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
-import type { V1TeamMatchViewerState } from '@/types/api';
-import type { TeamMatchDetailViewModel } from './team-matches.types';
-import { TeamMatchDetailPageClient } from './team-matches-client';
+import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
+import type { TeamMatchDetailViewModel, TeamMatchModel } from './team-matches.types';
+import { TeamMatchDetailPageClient, toTeamMatch } from './team-matches-client';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
@@ -206,5 +206,82 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
     expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '경기 결과 대기' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '경기 결과 확인/승인' })).not.toBeInTheDocument();
+  });
+});
+
+// Regression for the review finding: toTeamMatch used to fall back to
+// team-matches.view-model.ts's hardcoded skeleton mock (a fixed, unrelated match's
+// grade/format/style/uniform, e.g. "A"/"11:11"/"친선"/"빨강") whenever a real team match's
+// structured condition columns were empty — showing fabricated conditions on a real card,
+// not the real (possibly legacy, possibly genuinely-unset) data.
+describe('toTeamMatch — legacy/unmigrated condition fields never show mock data', () => {
+  // Deliberately mirrors team-matches.view-model.ts's mock shape so a regression (mock
+  // leaking through) would make these assertions fail loudly instead of silently.
+  const mockFallback: TeamMatchModel = {
+    id: 'team-match-1', title: 'FC 발빠른놈들 vs 상대팀 구합니다', imageUrl: '/mock/generated/team-huddle.webp',
+    sport: '축구', hostTeam: 'FC 발빠른놈들', venue: '상암 월드컵 A구장', region: '서울 마포',
+    date: '5월 11일 일', time: '09:00', endTime: '11:00',
+    format: '11:11', grade: 'A', style: '친선', cost: 280000, opponentCost: 140000, uniform: '빨강',
+    gender: '성별 무관', manner: 4.8, wins: 23, status: 'open',
+  };
+
+  function realMatch(overrides: Partial<V1TeamMatch>): V1TeamMatch {
+    return {
+      id: 'real-team-match-9',
+      title: '실제 팀매치',
+      sportName: '풋살',
+      placeName: '진짜 경기장',
+      startsAt: '2026-09-01T10:00:00.000Z',
+      capacityText: '1/2',
+      status: 'open',
+      ...overrides,
+    };
+  }
+
+  it('shows real matchFormat/matchStyle/uniformColor when structured columns are populated (post-backfill)', () => {
+    const model = toTeamMatch(
+      realMatch({ matchFormat: '6:6', matchStyle: ['교환매치'], uniformColor: '검정', levelLabel: 'C등급' }),
+      mockFallback,
+    );
+
+    expect(model.format).toBe('6:6');
+    expect(model.style).toBe('교환매치');
+    expect(model.uniform).toBe('검정');
+    expect(model.grade).toBe('C등급');
+  });
+
+  it('never shows the mock fallback grade/format/style/uniform for a real match with empty structured fields', () => {
+    const model = toTeamMatch(
+      realMatch({ matchFormat: null, matchStyle: [], uniformColor: null, levelLabel: null }),
+      mockFallback,
+    );
+
+    expect(model.grade).not.toBe(mockFallback.grade);
+    expect(model.format).not.toBe(mockFallback.format);
+    expect(model.style).not.toBe(mockFallback.style);
+    expect(model.uniform).not.toBe(mockFallback.uniform);
+    expect(model.format).toBe('');
+    expect(model.uniform).toBe('');
+  });
+
+  it('shows the server-derived rulesText as a display fallback for a pre-backfill legacy row instead of mock data', () => {
+    const model = toTeamMatch(
+      realMatch({
+        matchFormat: null,
+        matchStyle: [],
+        uniformColor: null,
+        levelLabel: '중급~고급',
+        // 서버의 formatMatchConditionsRulesText가 미백필 row에 대해 내려주는 실제 값 모양
+        // (levelLabel · formatNote 원문 · genderRule을 이어붙인 표시 전용 파생 문자열).
+        rulesText: '중급~고급 · 5:5 친선전 · 남',
+        genderRule: '남',
+      }),
+      mockFallback,
+    );
+
+    expect(model.style).toBe('중급~고급 · 5:5 친선전 · 남');
+    expect(model.style).not.toBe(mockFallback.style);
+    expect(model.format).toBe('');
+    expect(model.uniform).toBe('');
   });
 });

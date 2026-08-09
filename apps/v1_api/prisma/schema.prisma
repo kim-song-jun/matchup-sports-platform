@@ -884,12 +884,12 @@ model V1Region {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  parent      V1Region?      @relation("V1RegionTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children    V1Region[]     @relation("V1RegionTree")
-  userRegions V1UserRegion[]
-  matches     V1Match[]
-  teams       V1Team[]
-  teamMatches V1TeamMatch[]
+  parent          V1Region?           @relation("V1RegionTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children        V1Region[]          @relation("V1RegionTree")
+  userRegions     V1UserRegion[]
+  matches         V1Match[]
+  teams           V1Team[]
+  teamMatches     V1TeamMatch[]
   teamMatchSeries V1TeamMatchSeries[]
 
   @@index([parentId])
@@ -1347,6 +1347,9 @@ model V1TeamMatch {
   endAt                      DateTime?         @map("end_at")
   deadlineAt                 DateTime?         @map("deadline_at")
   formatNote                 String?           @map("format_note")
+  matchFormat                String?           @map("match_format")
+  matchStyle                 String[]          @default([]) @map("match_style")
+  uniformColor               String?           @map("uniform_color")
   minSportLevelId            String?           @map("min_sport_level_id")
   maxSportLevelId            String?           @map("max_sport_level_id")
   genderRule                 String?           @map("gender_rule")
@@ -1367,18 +1370,18 @@ model V1TeamMatch {
   competitionConfigVersionId String?           @map("competition_config_version_id")
   seriesId                   String?           @map("series_id")
 
-  hostTeam              V1Team                     @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
-  createdByUser         V1User                     @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  sport                 V1Sport                    @relation(fields: [sportId], references: [id], onDelete: Restrict)
-  minSportLevel         V1SportLevel?              @relation("V1TeamMatchMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
-  maxSportLevel         V1SportLevel?              @relation("V1TeamMatchMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
-  region                V1Region                   @relation(fields: [regionId], references: [id], onDelete: Restrict)
-  approvedApplicantTeam V1Team?                    @relation("V1ApprovedApplicantTeam", fields: [approvedApplicantTeamId], references: [id], onDelete: SetNull)
+  hostTeam              V1Team                      @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
+  createdByUser         V1User                      @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  sport                 V1Sport                     @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  minSportLevel         V1SportLevel?               @relation("V1TeamMatchMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
+  maxSportLevel         V1SportLevel?               @relation("V1TeamMatchMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
+  region                V1Region                    @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  approvedApplicantTeam V1Team?                     @relation("V1ApprovedApplicantTeam", fields: [approvedApplicantTeamId], references: [id], onDelete: SetNull)
   applications          V1TeamMatchApplication[]
   chatRoom              V1ChatRoom?
-  game                  V1Game?                    @relation("V1GameTeamMatch")
+  game                  V1Game?                     @relation("V1GameTeamMatch")
   competitionConfig     V1CompetitionConfigVersion? @relation("V1TeamMatchCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_team_matches_competition_config_fk")
-  series                V1TeamMatchSeries?         @relation("V1TeamMatchSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_team_matches_series_fk")
+  series                V1TeamMatchSeries?          @relation("V1TeamMatchSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_team_matches_series_fk")
 
   @@index([hostTeamId])
   @@index([createdByUserId])
@@ -2558,23 +2561,23 @@ model V1ParticipantConsentSnapshot {
 }
 
 model V1GameEvent {
-  id              String          @id @default(uuid())
-  gameId          String          @map("game_id")
-  sequence        Int
-  clientEventId   String          @map("client_event_id")
-  payloadHash     String          @map("payload_hash")
-  type            V1GameEventType
-  sideId          String?         @map("side_id")
-  participantId   String?         @map("participant_id")
-  assistParticipantId String?     @map("assist_participant_id")
-  period          Int
-  clockMs         Int             @map("clock_ms")
-  occurredAt      DateTime        @map("occurred_at")
-  receivedAt      DateTime        @default(now()) @map("received_at")
-  actorUserId     String          @map("actor_user_id")
-  reversesEventId String?         @unique @map("reverses_event_id")
-  payload         Json
-  game            V1Game          @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_events_game_fk")
+  id                  String          @id @default(uuid())
+  gameId              String          @map("game_id")
+  sequence            Int
+  clientEventId       String          @map("client_event_id")
+  payloadHash         String          @map("payload_hash")
+  type                V1GameEventType
+  sideId              String?         @map("side_id")
+  participantId       String?         @map("participant_id")
+  assistParticipantId String?         @map("assist_participant_id")
+  period              Int
+  clockMs             Int             @map("clock_ms")
+  occurredAt          DateTime        @map("occurred_at")
+  receivedAt          DateTime        @default(now()) @map("received_at")
+  actorUserId         String          @map("actor_user_id")
+  reversesEventId     String?         @unique @map("reverses_event_id")
+  payload             Json
+  game                V1Game          @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_events_game_fk")
 
   @@unique([gameId, sequence], map: "v1_game_events_game_sequence_key")
   @@unique([gameId, clientEventId], map: "v1_game_events_game_client_event_key")

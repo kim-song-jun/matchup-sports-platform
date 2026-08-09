@@ -151,10 +151,16 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
       manualPlaceName: draft.venue.trim(),
       addressText: draft.address.trim() || null,
       costNote: draft.cost || draft.opponentCost ? `총 ${draft.cost.toLocaleString('ko-KR')}원 · 상대팀 ${draft.opponentCost.toLocaleString('ko-KR')}원` : null,
-      rulesText: [draft.grade, draft.format, draft.style, draft.uniform].filter(Boolean).join(' · ') || null,
+      // rulesText는 더 이상 쓰기 대상이 아니다 — 경기조건은 matchFormat/matchStyle/uniformColor
+      // 구조화 컬럼으로만 쓴다(team-matches-create-client.tsx의 원래 buildTeamMatchMutationPayload
+      // 설계를 그대로 따른다 — 위저드 단계 게이팅 리팩터로 이 파일에 옮겨오며 함께 이관).
+      rulesText: null,
       minLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,
       maxLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,
       genderRule: normalizeGenderRule(draft.gender),
+      matchFormat: draft.format.trim() || null,
+      matchStyle: draft.style.map((item) => item.trim()).filter(Boolean),
+      uniformColor: draft.uniform.trim() || null,
     },
   };
 }

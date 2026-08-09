@@ -299,10 +299,26 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   return <TeamMatchDetailPageView model={model} />;
 }
 
-function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
+// 경기조건은 구조화 필드(matchFormat/matchStyle/uniformColor, levelLabel)가 진실이다. `fallback`은
+// 화면 스켈레톤용 하드코딩 목업(team-matches.view-model.ts)일 뿐 이 매치의 실제 조건이 아니므로
+// grade/format/style/uniform에는 쓰지 않는다 — 실제 매치에 다른 매치의 목업 문구("A등급",
+// "11:11" 등)를 그대로 노출하는 회귀였다(리뷰 지적).
+//
+// 백필 CLI 실행 전(구조화 컬럼 3종이 전부 비어 있는) 레거시 row는 서버가 만든 표시 전용 파생값인
+// rulesText(formatMatchConditionsRulesText, team-matches.service.ts 참고 — 그 케이스에서는
+// formatNote 원문을 그대로 담아 내려준다)를 style 한 칸에 그대로 보여준다. rulesText를 ' · '로
+// 재-split해 grade/format/style/uniform 네 칸에 다시 배정하지는 않는다(예전 parseRules가 이
+// 방식이었다) — 원래 저장 로직이 filter(Boolean)으로 빈 필드를 건너뛰고 이어붙여 위치를 보존하지
+// 않았기 때문에 재분해는 값을 엉뚱한 칸에 잘못 배정할 수 있다(team-match-conditions-backfill.ts
+// 문서 주석 참고, 동일한 근거). style 한 칸에 그대로 두면 값을 잃지도, 틀린 라벨을 붙이지도 않는다.
+// exported for direct unit coverage (see team-matches-client.test.tsx) — a pure mapping
+// function, cheaper to test directly than by plumbing new testids through the mocked
+// page-view component tree.
+export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
   const status = statusToCardStatus(getStatus(match), getViewerState(match));
-  const rules = parseRules(match.rulesText, fallback);
   const costs = parseCosts(match.costNote, fallback);
+  const hasStructuredConditions = Boolean(match.matchFormat) || (match.matchStyle?.length ?? 0) > 0 || Boolean(match.uniformColor);
+  const legacyNote = !hasStructuredConditions ? match.rulesText ?? '' : '';
 
   return {
     ...fallback,
@@ -316,12 +332,12 @@ function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchMod
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
     endTime: match.endsAt ? formatTime(match.endsAt) : undefined,
-    grade: rules.grade || match.levelLabel || fallback.grade,
-    format: rules.format || fallback.format,
-    style: rules.style || fallback.style,
+    grade: match.levelLabel || '',
+    format: match.matchFormat || '',
+    style: match.matchStyle?.length ? match.matchStyle.join(' · ') : legacyNote,
     cost: costs.cost,
     opponentCost: costs.opponentCost,
-    uniform: rules.uniform || fallback.uniform,
+    uniform: match.uniformColor || '',
     gender: match.genderRule ?? fallback.gender,
     status,
   };
@@ -649,16 +665,6 @@ function reasonLabel(reasonCode?: string) {
   if (reasonCode === 'NOT_RECRUITING') return '신청 마감된 매치예요';
   // 팀이 없는 경우 → 팀 만들기 유도
   return '팀을 만들고 신청할 수 있어요';
-}
-
-function parseRules(value: string | null | undefined, fallback: TeamMatchModel) {
-  const [grade, format, style, uniform] = value?.split(' · ').map((item) => item.trim()).filter(Boolean) ?? [];
-  return {
-    grade: grade ?? fallback.grade,
-    format: format ?? fallback.format,
-    style: style ?? fallback.style,
-    uniform: uniform ?? fallback.uniform,
-  };
 }
 
 function parseCosts(value: string | null | undefined, fallback: TeamMatchModel) {

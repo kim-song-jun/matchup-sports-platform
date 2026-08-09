@@ -17,6 +17,7 @@ import {
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
+import { labelToLevelCode, levelCodeToLabel, V1_LEVELS, type V1LevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
 import type { V1MyTeam, V1TeamMatchEdit } from '@/types/api';
@@ -415,7 +416,7 @@ function buildCreateModel({
   uploadImage?: (file: File) => Promise<string>;
   onSelectTeam: (teamName: string) => void;
   onSelectSport: (sportName: string) => void;
-  onFieldChange: (field: keyof TeamMatchDraft, value: string | number) => void;
+  onFieldChange: (field: keyof TeamMatchDraft, value: string | number | string[]) => void;
   onRegionChange: (regionId: string) => void;
   onBack: () => void;
   onNext: () => void;
@@ -529,20 +530,25 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
   const start = new Date(edit.form.startsAt);
   const end = edit.form.endsAt ? new Date(edit.form.endsAt) : null;
   const deadline = edit.form.deadlineAt ? new Date(edit.form.deadlineAt) : null;
-  const parsed = parseNotes(edit.form.rulesText, edit.form.costNote);
+  const costs = parseCostNote(edit.form.costNote);
+  const hasStructuredConditions =
+    Boolean(edit.form.matchFormat) || (edit.form.matchStyle?.length ?? 0) > 0 || Boolean(edit.form.uniformColor);
+  // 레거시 폴백: 구조화 컬럼 3종이 전부 비어 있는 미백필 row(예전 rulesText 자유텍스트만
+  // 있던 row)만 rulesText를 다시 파싱한다. 백필 CLI 실행 후에는 이 분기를 타지 않는다.
+  const legacy = hasStructuredConditions ? null : parseLegacyConditions(edit.form.rulesText);
 
   return {
     ...buildDefaultDraft(),
     title: edit.form.title,
     description: edit.form.description ?? '',
-    grade: levelCodeToDraftGrade(edit.form.minLevelCode) ?? parsed.grade,
-    format: parsed.format,
-    style: parsed.style,
-    uniform: parsed.uniform,
+    grade: levelCodeToDraftGrade(edit.form.minLevelCode) ?? legacy?.grade ?? '',
+    format: edit.form.matchFormat ?? legacy?.format ?? '',
+    style: edit.form.matchStyle?.length ? edit.form.matchStyle : legacy?.style ?? [],
+    uniform: edit.form.uniformColor ?? legacy?.uniform ?? '',
     gender: normalizeGenderRule(edit.form.genderRule),
     imageUrl: edit.form.imageUrl ?? '',
-    cost: parsed.cost,
-    opponentCost: parsed.opponentCost,
+    cost: costs.cost,
+    opponentCost: costs.opponentCost,
     venue: edit.form.manualPlaceName,
     address: edit.form.addressText ?? '',
     date: start.toISOString().slice(0, 10),
@@ -554,25 +560,55 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
 }
 
 function levelCodeToDraftGrade(code?: string | null) {
-  if (code === 'advanced') return 'A';
-  if (code === 'intermediate') return 'B';
-  if (code === 'novice') return 'C';
-  if (code === 'beginner') return 'D';
-  return null;
+  if (!code) return null;
+  const isKnownCode = V1_LEVELS.some((level) => level.code === code);
+  return isKnownCode ? levelCodeToLabel(code as V1LevelCode) : null;
 }
 
-function parseNotes(rulesText?: string | null, costNote?: string | null) {
-  const rules = rulesText?.split(' · ') ?? [];
+// buildTeamMatchMutationPayload는 team-matches.validation.ts의 buildTeamMatchPayloadResult로
+// 이관됐다(위저드 스텝 게이팅 리팩터, PR #293) — matchFormat/matchStyle/uniformColor 구조화
+// 컬럼 기록은 그 함수에 포팅돼 있다. normalizeGenderRule도 같은 파일에서 import해 쓴다
+// (defaultGenderRule은 이제 이 파일이 아니라 team-matches.validation.ts가 소유).
+function parseCostNote(costNote?: string | null) {
   const amounts = costNote?.match(/\d[\d,]*/g)?.map((value) => Number(value.replace(/,/g, ''))) ?? [];
   const fallback = buildDefaultDraft();
 
   return {
-    grade: rules[0] ?? fallback.grade,
-    format: rules[1] ?? fallback.format,
-    style: rules[2] ?? fallback.style,
-    uniform: rules[3] ?? fallback.uniform,
     cost: amounts[0] ?? fallback.cost,
     opponentCost: amounts[1] ?? fallback.opponentCost,
+  };
+}
+
+// 레거시 폴백 전용: 백필 CLI 실행 전, 구조화 컬럼이 비어 있는 미마이그레이션 row의 rulesText를
+// create-client의 예전 [grade, format, style, uniform].filter(Boolean).join(' · ') 관례대로
+// 되짚는다.
+//
+// 그 예전 저장 로직은 filter(Boolean)으로 빈 필드를 건너뛰고 이어붙였다 — 네 필드 중 어느 것이든
+// 비워두면 join 결과에서 그냥 빠질 뿐 빈 자리로 남지 않아서, 빈 필드 뒤의 모든 값이 한 칸씩
+// 당겨진다. 그래서 세그먼트 개수만으로는 위치를 신뢰할 수 없다 — 예를 들어 'B · 친선 · 파랑'은
+// [grade,format,uniform](style을 비움)일 수도, [grade,style,uniform](format을 비움)일 수도 있어
+// 구분할 방법이 없다. 원래 4필드가 모두 채워져 있었다는 게 확실한 경우(세그먼트 4개)에만
+// [grade, format, style, uniform] 위치 매핑을 신뢰하고, 그 외에는 값을 잃지도 틀린 칸에
+// 잘못 배정하지도 않도록 전부 style 배열에 그대로 담는다
+// (team-match-conditions-backfill.ts의 동일한 판단 근거 참고 — 서버 백필도 같은 규칙을 쓴다).
+function parseLegacyConditions(rulesText?: string | null) {
+  const rules = (rulesText ?? '').split(' · ').map((part) => part.trim()).filter(Boolean);
+  const fallback = buildDefaultDraft();
+
+  if (rules.length === 4) {
+    return {
+      grade: rules[0] || fallback.grade,
+      format: rules[1] || fallback.format,
+      style: rules[2] ? [rules[2]] : fallback.style,
+      uniform: rules[3] || fallback.uniform,
+    };
+  }
+
+  return {
+    grade: fallback.grade,
+    format: fallback.format,
+    style: rules.length ? rules : fallback.style,
+    uniform: fallback.uniform,
   };
 }
 

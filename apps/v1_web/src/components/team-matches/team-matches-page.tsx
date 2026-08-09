@@ -652,10 +652,12 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
 
 /**
  * CreateField/FieldErrorText 곁에 두는 "필수 입력" 안내 — 실제 제출 로직(RULES 테이블)이
- * 필수로 판정한 필드에만 붙인다. 에러가 없을 때만 보이고, 에러가 뜨면(에러 문구가 이미
- * "왜 안 되는지"를 설명하므로) 자리를 비켜준다. CreateField 자체는 라벨 텍스트만 받아
- * required 마커를 넣을 수 없어(v1-ui/create-form-fields.tsx는 여러 화면이 공유하는 컴포넌트라
- * 여기서 수정하지 않는다) 필드 바깥의 별도 안내로 대신한다.
+ * 필수로 판정한 필드에만 붙인다. 호출부가 "값이 비어 있고 + 아직 에러도 없을 때"만
+ * shown=true를 넘긴다 — 값을 채우면 즉시 사라지고(붉은 별표처럼 다 채워도 남아 있는
+ * 표시가 아니다), 에러가 뜨면(에러 문구가 이미 "왜 안 되는지"를 설명하므로) 자리를
+ * 비켜준다. CreateField 자체는 라벨 텍스트만 받아 required 마커를 넣을 수 없어
+ * (v1-ui/create-form-fields.tsx는 여러 화면이 공유하는 컴포넌트라 여기서 수정하지 않는다)
+ * 필드 바깥의 별도 안내로 대신한다.
  */
 function RequiredHint({ shown }: { shown: boolean }) {
   if (!shown) return null;
@@ -731,7 +733,7 @@ function InfoStep({ model, edit }: { model: TeamMatchCreateViewModel; edit: bool
       <h1 className="tm-text-heading">매치 정보</h1>
       {edit ? <ImmutableMatchContext team={model.selectedTeam} sport={model.selectedSport} /> : null}
       <CreateField id="field-title" error={model.form?.fieldErrors?.title} label="매치 제목" value={d.title} placeholder="예: 토요일 저녁 풋살 상대팀 구합니다" onChange={(value) => model.form?.onFieldChange('title', value)} />
-      <RequiredHint shown={!model.form?.fieldErrors?.title} />
+      <RequiredHint shown={!model.form?.fieldErrors?.title && !d.title.trim()} />
       <CreateField label="설명" value={d.description} placeholder="예: 친선 위주로 즐겁게 경기할 팀을 찾고 있어요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
       <ImageUploadField image={d.imageUrl} onChange={(value) => model.form?.onFieldChange('imageUrl', value)} onUpload={model.form?.uploadImage} />
       {edit ? (
@@ -827,14 +829,14 @@ function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
           />
         ) : null}
       </CreateField>
-      <RequiredHint shown={!errors?.venue} />
+      <RequiredHint shown={!errors?.venue && !d.venue.trim()} />
       <CreateField label="상세 주소" value={d.address} placeholder="예: 서울 송파구 올림픽로 25, 3층 2번 코트" onChange={(value) => model.form?.onFieldChange('address', value)} />
       <CreateField id="field-date" error={errors?.date} label="날짜" value={d.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
-      <RequiredHint shown={!errors?.date} />
+      <RequiredHint shown={!errors?.date && !d.date} />
       <div className="tm-create-two-col">
         <div>
           <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={d.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
-          <RequiredHint shown={!errors?.startTime} />
+          <RequiredHint shown={!errors?.startTime && !d.startTime} />
         </div>
         <CreateField label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
@@ -858,7 +860,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
   }, [selectedRegion?.parentName]);
 
   if (parentNames.length === 0) {
-    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div><FieldErrorText message={error} /><RequiredHint shown={!error} /></label>;
+    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div><FieldErrorText message={error} /><RequiredHint shown={!error && !value} /></label>;
   }
 
   return (
@@ -891,7 +893,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
       </div>
       <div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div>
       <FieldErrorText message={error} />
-      <RequiredHint shown={!error} />
+      <RequiredHint shown={!error && !value} />
     </div>
   );
 }

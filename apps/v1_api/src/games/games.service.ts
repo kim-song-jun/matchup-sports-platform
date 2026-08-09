@@ -668,6 +668,9 @@ export class GamesService {
           end: V1GameState.ENDED,
         }[command];
         this.assertLifecycle(game.sourceType, 'TOURNAMENT_COMMAND', game.state, target);
+        if (command === 'start') {
+          await this.assertLineupsSubmittedForStart(tx, game.id);
+        }
         const now = new Date();
         const updated = await tx.v1Game.update({
           where: { id: game.id },
@@ -3608,6 +3611,37 @@ export class GamesService {
         throw toGameHttpException(error);
       }
       throw error;
+    }
+  }
+
+  /**
+   * `start` used to only call `assertLifecycle` — a valid SCHEDULED→LIVE
+   * state transition was enough, even with zero lineups submitted on either
+   * side. That left an operator with a LIVE game and no participants to
+   * record events against (`LineupGrid` would show "제출된 선발 명단이
+   * 없어요" with no way back). PR #316 added a client-side gate
+   * (`sidesMissingLineup` in operate-console.tsx, built on
+   * `latestOperableLineup` in lineup-grid.tsx), but that only blocks the
+   * button — calling this API directly still skipped the check entirely.
+   * This mirrors the exact same rule server-side so the API itself refuses
+   * the transition: every `V1GameSide` on the game needs at least one
+   * lineup in SUBMITTED or LOCKED state (a newer DRAFT revision on top
+   * doesn't retract an earlier submission — same semantics as
+   * `latestOperableLineup`, which only ever looks at SUBMITTED/LOCKED rows).
+   */
+  private async assertLineupsSubmittedForStart(tx: Transaction, gameId: string): Promise<void> {
+    const sides = await tx.v1GameSide.findMany({ where: { gameId } });
+    const operableLineups = await tx.v1GameLineup.findMany({
+      where: { gameId, state: { in: [V1GameLineupState.SUBMITTED, V1GameLineupState.LOCKED] } },
+      select: { sideId: true },
+    });
+    const sideIdsWithOperableLineup = new Set(operableLineups.map((lineup) => lineup.sideId));
+    const missingSides = sides.filter((side) => !sideIdsWithOperableLineup.has(side.id));
+    if (missingSides.length > 0) {
+      throw new ConflictException({
+        code: 'LINEUP_NOT_SUBMITTED',
+        message: `${missingSides.map((side) => side.displayNameSnapshot).join(', ')} 팀의 선발 명단을 제출해야 경기를 시작할 수 있어요.`,
+      });
     }
   }
 

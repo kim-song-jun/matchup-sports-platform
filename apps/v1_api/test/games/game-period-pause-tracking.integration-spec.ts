@@ -138,6 +138,15 @@ describe('game period pause tracking — pausedTotalMs/pausedAt survive multiple
       service.createFromSourceInTransaction(tx, input, sourceContext(actor, 'pause-tracking-create', input)),
     );
     gameId = created.gameId;
+    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+    // lineup on every side before `start` is allowed. createFromSourceInTransaction
+    // already creates a DRAFT revision-1 lineup per side at game creation, so
+    // flip those straight to SUBMITTED (bypassing
+    // GamesService.saveLineup/submitLineup, which would consume `version`).
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId, revision: 1 },
+      data: { state: 'SUBMITTED' },
+    });
     takeoverToken = (
       await service.requestTakeover(authUser(ids.director), gameId, {
         clientInstanceId: 'pause-tracking-client',

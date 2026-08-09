@@ -341,6 +341,15 @@ describe('Task 24 public tournament schedule/match and team/player record projec
   /** Drives SCHEDULED -> LIVE -> ENDED, appending one GOAL per given participant. */
   async function driveToLive(gameId: string, scorers: readonly string[]): Promise<void> {
     const home = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.HOME } });
+    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+    // lineup on every side before `start` is allowed. createFromSourceInTransaction
+    // already creates a DRAFT revision-1 lineup per side at game creation, so
+    // flip those straight to SUBMITTED (bypassing
+    // GamesService.saveLineup/submitLineup, which would consume `version`).
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId, revision: 1 },
+      data: { state: 'SUBMITTED' },
+    });
     let version = 0;
     const startToken = await grantTakeover(gameId, `start-${gameId}`);
     await games.executeCommand(authUser(ids.platformOps), gameId, 'start', `task24-start-${gameId}`, {

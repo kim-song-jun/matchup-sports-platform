@@ -156,6 +156,15 @@ describe('T1-0 period lifecycle — start/next_period/end drive V1GamePeriod, no
     homeSideId = home.id;
     const homeParticipant = await prisma.v1GameParticipant.findFirstOrThrow({ where: { gameId, sideId: home.id } });
     homeParticipantId = homeParticipant.id;
+    // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
+    // lineup on every side before `start` is allowed. createFromSourceInTransaction
+    // already creates a DRAFT revision-1 lineup per side at game creation, so
+    // flip those straight to SUBMITTED (bypassing
+    // GamesService.saveLineup/submitLineup, which would consume `version`).
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId, revision: 1 },
+      data: { state: 'SUBMITTED' },
+    });
     takeoverToken = (
       await service.requestTakeover(authUser(ids.director), gameId, { clientInstanceId: 't1-0-client', lastSequence: 0 })
     ).takeoverToken;

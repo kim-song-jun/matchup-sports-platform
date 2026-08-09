@@ -107,11 +107,20 @@ assert_no_critical_image_findings() {
       return 1
     }
 
-    # 여기서부터는 스캔이 COMPLETE 임이 확정됐다. 취약점 0건이면 `{}` 또는 `null` 이 정상이다.
+    # 여기까지 왔다는 것은 ① describe 호출이 exit 0 이었고 ② 스캔 상태가 COMPLETE 라는 뜻이다.
+    # 그 두 조건이 "스캔을 읽어냈다"의 증거다. 그 상태에서 findings 가 비어 있으면(`` / `null` / `{}`)
+    # 그건 읽기 실패가 아니라 **취약점 0건**이다 — AWS CLI 는 --query 결과가 없을 때 빈 출력을 준다.
+    # 게이트를 지키는 것은 emptiness 검사가 아니라 위의 exit-status·status 검사다. 원래의 fail-open 은
+    # 호출이 **실패**했는데 exit code 를 안 보고 빈 문자열을 0 으로 취급한 것이었고, 그건 scan_aws_retry
+    # 가 non-zero 를 반환하며 이미 막는다.
+    if [[ -z "${findings//[[:space:]]/}" ]]; then
+      findings='{}'
+    fi
+
     critical="$(jq -r 'if . == null then 0 else (.CRITICAL // 0) end' <<< "${findings}")"
     high="$(jq -r 'if . == null then 0 else (.HIGH // 0) end' <<< "${findings}")"
 
-    # 빈 값이 산술에서 0 으로 취급돼 게이트가 열리던 경로를 명시적으로 막는다.
+    # 그래도 숫자가 아니면(응답이 예상 밖 모양) 산술에서 0 으로 뭉개지지 않게 명시적으로 막는다.
     if ! [[ "${critical}" =~ ^[0-9]+$ && "${high}" =~ ^[0-9]+$ ]]; then
       echo "[${label}] ${repository}: unparsable severity counts (critical='${critical}' high='${high}') — refusing to pass the gate" >&2
       return 1

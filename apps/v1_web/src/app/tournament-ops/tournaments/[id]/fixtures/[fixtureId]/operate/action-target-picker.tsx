@@ -6,6 +6,7 @@ import { Button } from '@/components/v1-ui/button';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import type { FrozenEventCapture } from '@/lib/game-operations-clock';
 import { LineupGrid } from './lineup-grid';
+import { periodLabel } from './period-label';
 import type {
   GameCardColor,
   GameEventType,
@@ -246,7 +247,7 @@ export function ActionTargetPicker({
             ) : null}
             {/* 액션 탭 시점을 얼린 값 — 선수를 고르는 동안 흘러가지 않는다. */}
             <p className="mt-0.5 text-2xs font-medium tabular-nums text-blue-600 dark:text-blue-400" aria-live="polite">
-              {frozen.period}피리어드 · {formatMatchClock(frozen.clockMs)} 시점 기록 (고정됨)
+              {periodLabel(frozen.period)} · {formatMatchClock(frozen.clockMs)} 시점 기록 (고정됨)
             </p>
           </div>
           <button

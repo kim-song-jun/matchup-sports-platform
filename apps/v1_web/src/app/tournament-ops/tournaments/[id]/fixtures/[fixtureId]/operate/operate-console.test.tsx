@@ -126,6 +126,8 @@ function consoleState(overrides: Record<string, unknown> = {}) {
     submitEvent: vi.fn(),
     retryFailedEvent: vi.fn(),
     requestTakeover: vi.fn(),
+    reverseEvent: vi.fn(),
+    applyCommandResult: vi.fn(),
     ...overrides,
   };
 }
@@ -312,7 +314,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
     expect(screen.queryByText('전반 종료')).toBeNull();
-    expect(screen.queryByText('2피리어드 종료')).toBeNull();
+    expect(screen.queryByText('후반 종료')).toBeNull();
   });
 });
 
@@ -495,6 +497,18 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
 
     await waitFor(() =>
       expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything()),
+    );
+
+    // UX 감사 — 명령 응답이 그 자리에서 gameSnapshot에 반영돼야 한다.
+    // 이게 빠지면 REST는 성공해도 화면은 다음 이벤트 커밋/재구독 전까지
+    // 이전 상태(예: "일시 중지")를 계속 보여준다(alpha 실측, 2026-08:
+    // 새로고침해야만 반영됨).
+    await waitFor(() =>
+      expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith({
+        gameId: 'game-1',
+        state: 'ENDED',
+        version: 3,
+      }),
     );
   });
 });

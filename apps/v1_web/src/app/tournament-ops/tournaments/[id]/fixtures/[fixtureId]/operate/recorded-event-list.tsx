@@ -2,6 +2,7 @@
 
 import { Handshake, Undo2 } from 'lucide-react';
 import { formatMatchClock } from '@/lib/game-operations-clock';
+import { periodLabel } from './period-label';
 import type { GameEventRecord, GameLineup, GameSide } from '@/types/game-operations';
 
 /**
@@ -77,7 +78,7 @@ export function RecordedEventList({
                   구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
                   충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
               <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-medium tabular-nums text-gray-600 dark:bg-white/10 dark:text-gray-300">
-                {event.period}P {formatMatchClock(event.clockMs)}
+                {periodLabel(event.period)} {formatMatchClock(event.clockMs)}
               </span>
               <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
                 {eventTypeLabel(event)}

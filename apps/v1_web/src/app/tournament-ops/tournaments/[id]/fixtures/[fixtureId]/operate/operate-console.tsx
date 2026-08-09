@@ -25,6 +25,7 @@ import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-even
 import { deriveFoulCounts } from '@/lib/team-foul-counter';
 import { deriveOnPitchParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
+import { periodLabel } from './period-label';
 import type {
   GameCardColor,
   GameCommandName,
@@ -55,11 +56,11 @@ const COMMAND_LABEL: Record<Exclude<GameCommandName, 'next-period'>, string> = {
   end: '경기 종료',
 };
 
-/** `next-period`는 고정 라벨이 없다 — 축구/풋살 모두 정확히 2피리어드(전반/후반,
- * `competition-config.presets.ts`)라 1→2 전이는 항상 "전반 종료"다. 그 이상(향후
- * 다른 종목 config, T1-5 범위)은 잘못된 전/후반 라벨 대신 번호 기반 폴백을 쓴다. */
+/** `next-period`는 고정 라벨이 없다 — 화면 전체가 공유하는 `periodLabel`(UX
+ * 감사 item 4)을 그대로 써서 "전반 종료"/"후반 종료"/"N피리어드 종료"를
+ * 만든다. */
 function nextPeriodCommandLabel(currentPeriodNumber: number): string {
-  return currentPeriodNumber === 1 ? '전반 종료' : `${currentPeriodNumber}피리어드 종료`;
+  return `${periodLabel(currentPeriodNumber)} 종료`;
 }
 
 function commandLabel(command: GameCommandName, currentPeriodNumber: number | null): string {
@@ -376,13 +377,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       const label = commandLabel(command, currentPeriod?.number ?? null);
       const startedAtMs = performance.now();
       try {
-        await postV1GameCommand(gameId, command, {
+        const result = await postV1GameCommand(gameId, command, {
           expectedVersion: gameVersion,
           clientCommandId: randomUuid(),
           takeoverToken: ops.takeover.token,
           occurredAt: new Date(Date.now() + ops.clockOffsetMs).toISOString(),
           payload: {},
         });
+        // UX 감사 — 커맨드 성공은 소켓으로 브로드캐스트되지 않는다(REST
+        // 전용, D-10). `gameState`는 `ops.gameSnapshot?.state`를
+        // `gameDetail.data?.state`보다 우선하므로, 아래 refetch만으로는
+        // 화면이 안 바뀐다(alpha 실측: "재개 완료"는 떴는데 계속 "일시
+        // 중지"로 보임, 새로고침해야 풀림) — REST 응답을 그 자리에서
+        // gameSnapshot에 반영해야 헤더/버튼이 즉시 갱신된다.
+        ops.applyCommandResult(result);
         await gameDetail.refetch();
         setLastCommandFeedback({ label, durationMs: Math.round(performance.now() - startedAtMs) });
       } catch (error) {

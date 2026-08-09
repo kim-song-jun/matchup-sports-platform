@@ -533,6 +533,9 @@ describe('Task 8 game-operations realtime protocol', () => {
       code: 'VALIDATION_ERROR',
       clientEventId: 'event-42',
       expectedVersion: 3,
+      // alpha 실사고(2026-08) 이후 추가 — `event` 키 자체가 payload에 없으니
+      // missingKeys에 그 이름만 남고(값은 없다), 나머지는 전부 유효하다.
+      validation: { missingKeys: ['event'], unknownKeys: [], invalidFields: [] },
     });
     expect(gamesService.appendEvent).not.toHaveBeenCalled();
   });
@@ -549,11 +552,86 @@ describe('Task 8 game-operations realtime protocol', () => {
       takeoverToken: 'nonempty-takeover-token',
       payloadHash: 'sha256:stable-payload',
     });
-    expect(malformedId).toEqual({ status: 'error', code: 'VALIDATION_ERROR', expectedVersion: 3 });
+    expect(malformedId).toEqual({
+      status: 'error',
+      code: 'VALIDATION_ERROR',
+      expectedVersion: 3,
+      // clientEventId는 타입이 틀려 invalidFields로, event는 키 자체가 없어
+      // missingKeys로 — 서로 다른 실패 종류가 섞여도 정확히 구분된다.
+      validation: { missingKeys: ['event'], unknownKeys: [], invalidFields: ['clientEventId'] },
+    });
 
     const notAnObject = await task8Gateway(gateway).appendGameEvent(client, 'nonsense');
-    expect(notAnObject).toEqual({ status: 'error', code: 'VALIDATION_ERROR' });
+    expect(notAnObject).toEqual({
+      status: 'error',
+      code: 'VALIDATION_ERROR',
+      validation: { missingKeys: [], unknownKeys: [], invalidFields: ['(payload는 object가 아님)'] },
+    });
 
     expect(gamesService.appendEvent).not.toHaveBeenCalled();
+  });
+
+  // alpha 실사고(2026-08): 옐로카드/파울 기록이 VALIDATION_ERROR로 거부됐는데
+  // "어느 필드가 왜"가 로그·응답 어디에도 없어 원인을 확정할 수 없었다. 이 두
+  // 케이스는 실제 콘솔 코드(action-target-picker.tsx의 commitPlayer/
+  // commitTeamOnly → use-v1-game-operations-console.ts의 submitEvent)가 만드는
+  // 것과 정확히 같은 모양을 구성하고, socket.io가 실제로 하는 것과 동일하게
+  // JSON 왕복(undefined 값 키는 직렬화 중 사라진다)까지 거친 뒤 게이트웨이에
+  // 넣는다 — 두 경로 모두 이 화이트리스트를 그대로 통과한다는 걸 실측으로
+  // 고정한다(그렇다면 실사고의 원인은 이 파싱 계층이 아니라는 뜻이고, 앞으로
+  // 이 계약이 깨지면 — 예: 클라이언트가 새 필드를 이벤트에 얹었는데 게이트웨이
+  // 화이트리스트를 안 넓히면 — 여기서 바로 잡힌다).
+  it.each([
+    [
+      '옐로카드(선수 지정, assistParticipantId 없음)',
+      {
+        type: 'CARD',
+        sideId: 'side-home',
+        participantId: 'participant-1',
+        assistParticipantId: undefined,
+        period: 1,
+        clockMs: 60_000,
+        occurredAt: '2026-08-08T00:00:00.000Z',
+        payload: { card: 'YELLOW' },
+      },
+    ],
+    [
+      '팀 단위 파울(선수 미지정)',
+      {
+        type: 'FOUL',
+        sideId: 'side-home',
+        participantId: undefined,
+        assistParticipantId: undefined,
+        period: 1,
+        clockMs: 60_000,
+        occurredAt: '2026-08-08T00:00:00.000Z',
+        payload: {},
+      },
+    ],
+  ])('실제 콘솔이 만드는 %s 이벤트는 게이트웨이 화이트리스트를 통과한다', async (_label, eventShape) => {
+    const client = socket();
+    gamesService.appendEvent.mockResolvedValue({
+      clientEventId: 'reproduction-event',
+      sequence: 5,
+      version: 6,
+      replayed: false,
+    });
+    const wirePayload = JSON.parse(
+      JSON.stringify({
+        gameId: GAME_ID,
+        expectedVersion: 4,
+        clientEventId: 'reproduction-event',
+        takeoverToken: 'nonempty-takeover-token',
+        payloadHash: 'sha256:reproduction',
+        event: eventShape,
+      }),
+    ) as unknown;
+
+    const result = await task8Gateway(gateway).appendGameEvent(client, wirePayload);
+
+    expect(result).toEqual(
+      expect.objectContaining({ status: 'ack', clientEventId: 'reproduction-event', sequence: 5, version: 6 }),
+    );
+    expect(gamesService.appendEvent).toHaveBeenCalled();
   });
 });

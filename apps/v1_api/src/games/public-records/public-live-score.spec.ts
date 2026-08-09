@@ -35,7 +35,14 @@ describe('tallyLiveScore', () => {
   });
 
   it('정정으로 취소(reversesEventId)된 골은 집계에서 빠진다', () => {
-    const events = [goal('g1', homeId), goal('g2', homeId), goal('g3', homeId, 'g2')];
+    // 되돌리기 이벤트는 실제 시스템에서 항상 CORRECTION 타입이다
+    // (GamesService.reverseEvent 가 `type: V1GameEventType.CORRECTION` 으로 만든다).
+    // 이걸 GOAL 로 만들면 취소 이벤트 자신이 골로 세어져 현실에 없는 상태를 검증하게 된다.
+    const events = [
+      goal('g1', homeId),
+      goal('g2', homeId),
+      { id: 'g3', type: 'CORRECTION' as const, sideId: homeId, reversesEventId: 'g2' },
+    ];
     // g3 정정 이벤트가 g2를 취소 -- 최종 스코어는 g1만 유효
     expect(tallyLiveScore(events, sideKeyById)).toEqual({ home: 1, away: 0 });
   });

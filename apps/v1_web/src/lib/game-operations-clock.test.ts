@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  elapsedMatchMs,
   formatMatchClock,
   freezeCapture,
   isClockDrifted,
@@ -67,6 +68,62 @@ describe('serverAlignedNowMs', () => {
   });
 });
 
+describe('elapsedMatchMs', () => {
+  it('with no pause, matches plain now-minus-start', () => {
+    expect(
+      elapsedMatchMs({ referenceNowMs: 10_500, periodStartedAtMs: 5_000, pausedTotalMs: 0, pausedAtMs: null }),
+    ).toBe(5_500);
+  });
+
+  it('subtracts a single completed pause segment (pausedTotalMs)', () => {
+    // Period ran 0 -> 10_000, but 3_000 of that was a completed pause.
+    expect(
+      elapsedMatchMs({ referenceNowMs: 10_000, periodStartedAtMs: 0, pausedTotalMs: 3_000, pausedAtMs: null }),
+    ).toBe(7_000);
+  });
+
+  it('a currently-open pause segment (pausedAtMs set) freezes the elapsed time — it does not keep growing as referenceNowMs advances', () => {
+    const periodStartedAtMs = 0;
+    const pausedAtMs = 6_000; // paused at the 6s mark
+    const atPauseStart = elapsedMatchMs({ referenceNowMs: 6_000, periodStartedAtMs, pausedTotalMs: 0, pausedAtMs });
+    const fiveSecondsIntoPause = elapsedMatchMs({
+      referenceNowMs: 11_000,
+      periodStartedAtMs,
+      pausedTotalMs: 0,
+      pausedAtMs,
+    });
+    expect(atPauseStart).toBe(6_000);
+    expect(fiveSecondsIntoPause).toBe(6_000);
+  });
+
+  it('multiple pause/resume cycles accumulate additively — not just the most recent one', () => {
+    // Cycle 1: paused 0..2_000 (2_000ms), folded into pausedTotalMs on resume.
+    // Cycle 2: paused 5_000..7_000 (2_000ms), folded into pausedTotalMs on resume.
+    // Total paused = 4_000ms across TWO completed cycles. A bug that only
+    // remembered the last cycle (overwrite instead of increment) would give
+    // 2_000 here instead of 4_000.
+    const pausedTotalMsAfterBothCycles = 2_000 + 2_000;
+    expect(
+      elapsedMatchMs({
+        referenceNowMs: 10_000,
+        periodStartedAtMs: 0,
+        pausedTotalMs: pausedTotalMsAfterBothCycles,
+        pausedAtMs: null,
+      }),
+    ).toBe(10_000 - 4_000);
+  });
+
+  it('clamps to 0 instead of going negative', () => {
+    expect(
+      elapsedMatchMs({ referenceNowMs: 1_000, periodStartedAtMs: 5_000, pausedTotalMs: 0, pausedAtMs: null }),
+    ).toBe(0);
+    // Pathological: pausedTotalMs alone would overshoot past referenceNowMs - start.
+    expect(
+      elapsedMatchMs({ referenceNowMs: 10_000, periodStartedAtMs: 0, pausedTotalMs: 50_000, pausedAtMs: null }),
+    ).toBe(0);
+  });
+});
+
 describe('freezeCapture', () => {
   it('computes elapsed period time from the server-aligned instant', () => {
     const capture = freezeCapture({
@@ -74,6 +131,8 @@ describe('freezeCapture', () => {
       offsetMs: 500,
       period: 1,
       periodStartedAtMs: 5_000,
+      pausedTotalMs: 0,
+      pausedAtMs: null,
     });
     // serverNow = 10_000 + 500 = 10_500; elapsed = 10_500 - 5_000 = 5_500
     expect(capture.clockMs).toBe(5_500);
@@ -87,6 +146,8 @@ describe('freezeCapture', () => {
       offsetMs: -2_000, // server-aligned now is BEFORE the period start
       period: 1,
       periodStartedAtMs: 5_000,
+      pausedTotalMs: 0,
+      pausedAtMs: null,
     });
     expect(capture.clockMs).toBe(0);
   });
@@ -96,9 +157,51 @@ describe('freezeCapture', () => {
     // again with a LATER clientNowMs produces a DIFFERENT value. It is the
     // caller's responsibility to call it once per tap and hold the result
     // ("frozen") until commit/cancel, not to keep re-deriving it.
-    const first = freezeCapture({ clientNowMs: 10_000, offsetMs: 0, period: 1, periodStartedAtMs: 0 });
-    const second = freezeCapture({ clientNowMs: 12_000, offsetMs: 0, period: 1, periodStartedAtMs: 0 });
+    const first = freezeCapture({
+      clientNowMs: 10_000,
+      offsetMs: 0,
+      period: 1,
+      periodStartedAtMs: 0,
+      pausedTotalMs: 0,
+      pausedAtMs: null,
+    });
+    const second = freezeCapture({
+      clientNowMs: 12_000,
+      offsetMs: 0,
+      period: 1,
+      periodStartedAtMs: 0,
+      pausedTotalMs: 0,
+      pausedAtMs: null,
+    });
     expect(first.clockMs).not.toBe(second.clockMs);
+  });
+
+  it('excludes a completed pause segment from the captured clockMs — the display and the write use the same math', () => {
+    const capture = freezeCapture({
+      clientNowMs: 10_000,
+      offsetMs: 0,
+      period: 1,
+      periodStartedAtMs: 0,
+      pausedTotalMs: 3_000,
+      pausedAtMs: null,
+    });
+    expect(capture.clockMs).toBe(7_000);
+  });
+
+  it('captured while still paused (pausedAtMs set) reads the frozen-at-pause value, not the live clock', () => {
+    // Paused at the 6s mark; tapping an action button 4s after that (still
+    // paused, e.g. recording a card during a stoppage) must freeze at 6s,
+    // not 10s -- confirming operators can capture events mid-pause without
+    // the paused stretch leaking into clockMs.
+    const capture = freezeCapture({
+      clientNowMs: 10_000,
+      offsetMs: 0,
+      period: 1,
+      periodStartedAtMs: 0,
+      pausedTotalMs: 0,
+      pausedAtMs: 6_000,
+    });
+    expect(capture.clockMs).toBe(6_000);
   });
 });
 

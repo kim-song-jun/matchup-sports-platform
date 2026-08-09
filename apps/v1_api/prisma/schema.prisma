@@ -2450,6 +2450,18 @@ model V1GamePeriod {
   state     V1GamePeriodState @default(SCHEDULED)
   startedAt DateTime?         @map("started_at")
   endedAt   DateTime?         @map("ended_at")
+  /// Pause-aware clock (경과 시간 일시정지 반영, 2026-08): cumulative milliseconds
+  /// this period has spent PAUSED across every completed pause/resume cycle so
+  /// far. `resume` folds the just-closed segment in here (increment, never
+  /// overwrite) so repeated pause/resume within one period accumulates
+  /// correctly instead of only remembering the most recent pause.
+  pausedTotalMs Int           @default(0) @map("paused_total_ms")
+  /// Start of the CURRENTLY OPEN pause segment, or null when not paused right
+  /// now. `pause` sets this; `resume` (and `end` while paused) folds
+  /// `now - pausedAt` into `pausedTotalMs` and clears it back to null — so at
+  /// most one of "currently paused" (`pausedAt` set) or "between pauses"
+  /// (`pausedAt` null) is ever true, never both partially.
+  pausedAt  DateTime?         @map("paused_at")
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
   game      V1Game            @relation(fields: [gameId], references: [id], onDelete: Cascade, map: "v1_game_periods_game_fk")

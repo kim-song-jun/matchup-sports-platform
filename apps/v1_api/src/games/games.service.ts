@@ -665,11 +665,48 @@ export class GamesService {
             data: { state: V1GamePeriodState.LIVE, startedAt: now },
           });
         }
-        if (target === V1GameState.ENDED) {
-          await tx.v1GamePeriod.updateMany({
+        // Pause-aware clock (경과 시간 일시정지 반영, 2026-08): `pause`/`resume`
+        // used to touch only V1Game.state, so the live elapsed-time display
+        // and freezeCapture() had no way to exclude a paused stretch — the
+        // console clock kept ticking through a stoppage. `pause` opens a
+        // segment on the currently-LIVE period; `resume` folds it (additive
+        // increment, never an overwrite) into `pausedTotalMs` and clears
+        // `pausedAt`, so any number of pause/resume cycles within one period
+        // accumulate correctly instead of only the last one surviving.
+        if (command === 'pause') {
+          const livePeriod = await tx.v1GamePeriod.findFirst({
             where: { gameId: game.id, state: V1GamePeriodState.LIVE },
-            data: { state: V1GamePeriodState.ENDED, endedAt: now },
           });
+          if (livePeriod !== null && livePeriod.pausedAt === null) {
+            await tx.v1GamePeriod.update({ where: { id: livePeriod.id }, data: { pausedAt: now } });
+          }
+        }
+        if (command === 'resume') {
+          const livePeriod = await tx.v1GamePeriod.findFirst({
+            where: { gameId: game.id, state: V1GamePeriodState.LIVE },
+          });
+          const resolved = livePeriod === null ? null : this.resolveOpenPause(livePeriod, now);
+          if (livePeriod !== null && resolved !== null) {
+            await tx.v1GamePeriod.update({ where: { id: livePeriod.id }, data: resolved });
+          }
+        }
+        if (target === V1GameState.ENDED) {
+          // An operator can press "경기 종료" while the game is PAUSED (the
+          // console's PAUSED state offers exactly `resume`/`end`) — the period
+          // being closed here may still have an open pause segment. Fold it
+          // the same way `resume` would, so a period that ends mid-pause
+          // never leaves a dangling `pausedAt` and its final `pausedTotalMs`
+          // still excludes that last stoppage.
+          const livePeriods = await tx.v1GamePeriod.findMany({
+            where: { gameId: game.id, state: V1GamePeriodState.LIVE },
+          });
+          for (const period of livePeriods) {
+            const resolved = this.resolveOpenPause(period, now);
+            await tx.v1GamePeriod.update({
+              where: { id: period.id },
+              data: { state: V1GamePeriodState.ENDED, endedAt: now, ...(resolved ?? {}) },
+            });
+          }
           return this.deriveTournamentRevision(tx, updated, context);
         }
         return {
@@ -681,6 +718,25 @@ export class GamesService {
         };
       },
     );
+  }
+
+  /**
+   * Pause-aware clock (경과 시간 일시정지 반영, 2026-08): if `period.pausedAt`
+   * is set, returns the patch that folds `now - pausedAt` into
+   * `pausedTotalMs` and clears `pausedAt` — this is an INCREMENT relative to
+   * whatever `pausedTotalMs` already holds, never an overwrite, which is
+   * exactly what makes repeated pause/resume cycles within one period
+   * accumulate instead of only remembering the most recent one. Returns
+   * `null` (no-op) when the period is not currently paused, so both call
+   * sites (`resume`, and `end` while paused) can spread the result
+   * unconditionally without a separate null-check branch at the call site.
+   */
+  private resolveOpenPause(
+    period: { pausedTotalMs: number; pausedAt: Date | null },
+    now: Date,
+  ): { pausedTotalMs: number; pausedAt: null } | null {
+    if (period.pausedAt === null) return null;
+    return { pausedTotalMs: period.pausedTotalMs + (now.getTime() - period.pausedAt.getTime()), pausedAt: null };
   }
 
   /**

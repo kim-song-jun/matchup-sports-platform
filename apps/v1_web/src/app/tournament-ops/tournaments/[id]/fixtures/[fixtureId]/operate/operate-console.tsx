@@ -172,6 +172,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         offsetMs: ops.clockOffsetMs,
         period: currentPeriod.number,
         periodStartedAtMs,
+        pausedTotalMs: currentPeriod.pausedTotalMs,
+        pausedAtMs: currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime(),
       });
       setPendingAction({
         actionType: button.type,
@@ -372,6 +374,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               periodNumber={currentPeriod.number}
               periodStartedAtMs={new Date(currentPeriod.startedAt).getTime()}
               offsetMs={ops.clockOffsetMs}
+              pausedTotalMs={currentPeriod.pausedTotalMs}
+              pausedAtMs={currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime()}
             />
           </div>
         ) : null}

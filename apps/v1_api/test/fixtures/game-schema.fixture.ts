@@ -73,8 +73,16 @@ export const gameSchemaFixture = {
 // of the MERGED file, computed with `shasum -a 256` — it is not either branch's
 // value. Both sets of changes are present and both are additive; the bound
 // migration is untouched, so `migration` stays as it was.
+// Re-pinned for the pause-aware clock fix (2026-08): V1GamePeriod gained
+// `pausedTotalMs`/`pausedAt` (both additive — Int default 0, nullable
+// DateTime) so `pause`/`resume` can exclude a stoppage from the elapsed-time
+// display and `freezeCapture()`'s `clockMs` instead of both ticking through
+// it. Only schema.prisma changed; the migration is a NEW file
+// (20260809080000_v1_game_period_pause_tracking), not an edit to the bound
+// 20260729000100_v1_game_operations migration, so `migration` is unchanged —
+// verified with `shasum -a 256` against the bound file, not assumed.
 export const gameSchemaSourceManifest = {
-  schema: '01d94a57567728f69b001e3384d1e5559f29ba2d77a9e0dac88ad5c1f1d59ca4',
+  schema: 'dfe424530b26c7e2e7c07597c2c6bb2f6dac85d13274af57f2d58dc1db2356d5',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

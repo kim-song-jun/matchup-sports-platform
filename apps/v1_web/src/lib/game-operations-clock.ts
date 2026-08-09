@@ -67,6 +67,32 @@ export interface FrozenEventCapture {
 }
 
 /**
+ * Pause-aware elapsed-time math (경과 시간 일시정지 반영, 2026-08). Shared by
+ * BOTH `freezeCapture()` (what gets written to `clockMs`) and
+ * `ElapsedMatchClock` (what the operator reads on screen) — see that
+ * component's doc comment for why implementing this twice is exactly how
+ * the two silently drift apart. `pausedTotalMs` is the sum of every
+ * COMPLETED pause segment for this period (`V1GamePeriod.pausedTotalMs`);
+ * `pausedAtMs` is the start of the CURRENTLY OPEN segment (server-aligned
+ * ms, from `V1GamePeriod.pausedAt`) or `null` when not paused right now —
+ * mirrors the backend's `pause`/`resume` fold in `games.service.ts`'s
+ * `resolveOpenPause()` exactly, including the "any number of pause/resume
+ * cycles accumulate" property (each completed cycle is already baked into
+ * `pausedTotalMs`; only the open one, if any, is computed here relative to
+ * `referenceNowMs`).
+ */
+export function elapsedMatchMs(input: {
+  readonly referenceNowMs: number;
+  readonly periodStartedAtMs: number;
+  readonly pausedTotalMs: number;
+  readonly pausedAtMs: number | null;
+}): number {
+  const openPauseMs = input.pausedAtMs === null ? 0 : Math.max(0, input.referenceNowMs - input.pausedAtMs);
+  const raw = input.referenceNowMs - input.periodStartedAtMs - input.pausedTotalMs - openPauseMs;
+  return Math.max(0, raw);
+}
+
+/**
  * Captures the exact instant a player was tapped, server-time-aligned. The
  * CALLER is responsible for freezing this — i.e. storing the returned value
  * in component state and rendering FROM that state, not calling this again
@@ -78,9 +104,16 @@ export function freezeCapture(input: {
   readonly offsetMs: number;
   readonly period: number;
   readonly periodStartedAtMs: number;
+  readonly pausedTotalMs: number;
+  readonly pausedAtMs: number | null;
 }): FrozenEventCapture {
   const serverNowMs = serverAlignedNowMs(input.clientNowMs, input.offsetMs);
-  const clockMs = Math.max(0, serverNowMs - input.periodStartedAtMs);
+  const clockMs = elapsedMatchMs({
+    referenceNowMs: serverNowMs,
+    periodStartedAtMs: input.periodStartedAtMs,
+    pausedTotalMs: input.pausedTotalMs,
+    pausedAtMs: input.pausedAtMs,
+  });
   return {
     period: input.period,
     clockMs,

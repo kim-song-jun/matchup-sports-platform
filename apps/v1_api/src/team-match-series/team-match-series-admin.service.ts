@@ -139,6 +139,10 @@ export class TeamMatchSeriesAdminService {
         throw new ConflictException({ code: 'SERIES_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
       }
       const teamsById = await this.loadTeamsWithMembers(tx, teamIds);
+      // 빈 문자열/공백만 있는 placeName 도 "미지정"으로 취급한다 — DTO 는 @IsOptional 문자열이라
+      // 통과하고, ?? 는 ''를 대체하지 않아 그대로면 recentVenues 집계에서 조용히 빠지는 값이 저장된다.
+      const trimmedPlaceName = dto.placeName?.trim();
+      const placeName = trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME;
       const ids: string[] = [];
       for (const fixture of schedule) {
         const home = teamsById.get(fixture.homeTeamId)!;
@@ -151,7 +155,7 @@ export class TeamMatchSeriesAdminService {
             sportId: series.sportId,
             regionId: series.regionId,
             title: `${series.title} ${fixture.round}주차`,
-            placeName: dto.placeName ?? DEFAULT_FIXTURE_PLACE_NAME,
+            placeName,
             startAt,
             status: 'matched',
             approvedApplicantTeamId: away.id,

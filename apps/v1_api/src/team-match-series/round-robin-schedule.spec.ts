@@ -77,8 +77,15 @@ describe('resolveFixtureStartAt', () => {
   });
 
   it('시작일의 KST 요일이 target과 같으면 같은 날로 채운다(0일 뒤로 미루지 않음)', () => {
-    const seriesStartsOn = new Date('2026-08-10T00:00:00.000Z'); // KST 월요일
+    const seriesStartsOn = new Date('2026-08-10T00:00:00.000Z'); // KST 월요일 09:00
     const result = resolveFixtureStartAt(seriesStartsOn, 1, { dayOfWeek: 1, time: '20:00' });
     expect(result.toISOString()).toBe('2026-08-10T11:00:00.000Z'); // 8/10 20:00 KST = 11:00 UTC
+  });
+
+  it('시작일과 같은 요일이지만 template.time이 시작일의 실제 시각보다 이르면 한 주 뒤로 민다(시작일 이전 반환 금지)', () => {
+    const seriesStartsOn = new Date('2026-08-10T00:00:00.000Z'); // KST 월요일 09:00
+    const result = resolveFixtureStartAt(seriesStartsOn, 1, { dayOfWeek: 1, time: '08:00' }); // 09:00보다 이른 08:00 KST
+    expect(result.toISOString()).toBe('2026-08-16T23:00:00.000Z'); // 8/17(월) 08:00 KST = 8/16 23:00 UTC
+    expect(result.getTime()).toBeGreaterThan(seriesStartsOn.getTime());
   });
 });

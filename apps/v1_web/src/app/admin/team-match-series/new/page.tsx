@@ -39,7 +39,10 @@ export default function AdminTeamMatchSeriesNewPage() {
   const teamsQuery = useV1Teams(
     trimmedTeamSearch ? { query: trimmedTeamSearch, limit: 20 } : sportId ? { sportId, limit: 20 } : { limit: 20 },
   );
-  const isSportLocked = selectedTeams.length > 0;
+  // team.sport 가 응답에 없는 극단 상황(V1Team.sport 는 optional 타입)에서 sportId 가 끝내
+  // ''로 남으면, selectedTeams.length 만으로 잠그면 종목 select 가 빈 값인 채 비활성화되어
+  // 화면이 막힌다 — sportId 가 실제로 정해진 경우에만 잠근다.
+  const isSportLocked = selectedTeams.length > 0 && sportId !== '';
   const lockedSportName = sports?.find((s) => s.id === sportId)?.name;
   const teamItems: EntityPickerItem[] = (teamsQuery.data?.items ?? [])
     .filter((team) => !selectedTeams.some((selected) => selected.id === team.id))

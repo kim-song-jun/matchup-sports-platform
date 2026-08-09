@@ -71,7 +71,13 @@ export function resolveFixtureStartAt(
     hours,
     minutes,
   );
-  const firstOccurrenceUtcMs = firstOccurrenceKstWallClockMs - KST_OFFSET_MS;
+  let firstOccurrenceUtcMs = firstOccurrenceKstWallClockMs - KST_OFFSET_MS;
+  // daysUntilTarget이 0(시작일과 같은 요일)이면서 template.time이 시작일 당일의 실제 시각보다
+  // 이르면, 위 계산은 "시작일 이후 첫 occurrence"라는 계약을 어기고 시작일보다 과거 시각을
+  // 반환한다 — 그 경우 한 주 뒤로 민다.
+  if (firstOccurrenceUtcMs < seriesStartsOn.getTime()) {
+    firstOccurrenceUtcMs += WEEK_MS;
+  }
   return new Date(firstOccurrenceUtcMs + (round - 1) * WEEK_MS);
 }
 

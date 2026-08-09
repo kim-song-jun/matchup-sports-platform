@@ -37,7 +37,15 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
         orderBy: { position: 'asc' },
         include: {
           registration: {
-            include: { team: { select: { id: true, name: true } } },
+            include: {
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                  profile: { select: { logoUrl: true } },
+                },
+              },
+            },
           },
         },
       },
@@ -47,10 +55,10 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
     orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }],
     include: {
       homeRegistration: {
-        include: { team: { select: { id: true, name: true } } },
+        include: { team: { select: { id: true, name: true, profile: { select: { logoUrl: true } } } } },
       },
       awayRegistration: {
-        include: { team: { select: { id: true, name: true } } },
+        include: { team: { select: { id: true, name: true, profile: { select: { logoUrl: true } } } } },
       },
       result: { include: { goals: { orderBy: { createdAt: 'asc' } } } },
       videos: { orderBy: { sortOrder: 'asc' } },

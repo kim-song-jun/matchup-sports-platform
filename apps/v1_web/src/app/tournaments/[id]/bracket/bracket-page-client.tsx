@@ -12,6 +12,7 @@ import {
   buildTournamentStages,
 } from '@/components/tournaments/tournament-progress-stepper';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { partitionTournamentSections } from '@/app/tournaments/[id]/tournament-detail-client';
 import type {
   V1TournamentDetail,
@@ -98,9 +99,7 @@ function GroupStandingsSection({ group }: { group: V1TournamentGroup }) {
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="tm-team-avatar" aria-hidden="true">
-                          {s.teamName.charAt(0)}
-                        </span>
+                        <TeamAvatar seed={s.teamId} name={s.teamName} logoUrl={s.teamLogoUrl} size="sm" />
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
                           {s.teamName}
                         </span>
@@ -159,9 +158,7 @@ function LeagueStandingsSection({ standings }: { standings: V1TournamentStanding
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="tm-team-avatar" aria-hidden="true">
-                          {s.teamName.charAt(0)}
-                        </span>
+                        <TeamAvatar seed={s.teamId} name={s.teamName} logoUrl={s.teamLogoUrl} size="sm" />
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
                           {s.teamName}
                         </span>

@@ -1869,7 +1869,12 @@ function StandingRow({
       </td>
       <td style={{ padding: '8px 4px', maxWidth: 160 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <TeamAvatar seed={standing.teamId} name={standing.teamName} size="sm" />
+          <TeamAvatar
+            seed={standing.teamId}
+            name={standing.teamName}
+            logoUrl={standing.teamLogoUrl}
+            size="sm"
+          />
           <span
             className="tm-text-label"
             style={{ color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}

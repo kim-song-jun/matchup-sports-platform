@@ -45,7 +45,14 @@ function parseArgs(argv: string[]): { dryRun: boolean; actorEmail: string | null
     const arg = argv[i];
     if (arg === '--dry-run') continue;
     if (arg === '--actor-email') {
-      actorEmail = argv[i + 1] ?? null;
+      // Validate the value here rather than only at the apply-mode check below.
+      // `--dry-run --actor-email` (flag with no value) otherwise parsed clean and
+      // the typo stayed invisible until someone re-ran it without --dry-run.
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith('--')) {
+        throw new Error('--actor-email requires a value, e.g. --actor-email admin@example.com');
+      }
+      actorEmail = value;
       i += 1;
       continue;
     }

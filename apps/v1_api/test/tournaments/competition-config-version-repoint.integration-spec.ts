@@ -357,6 +357,7 @@ describe('competition-config-version-repoint', () => {
         published: true,
         tournamentsRepointed: 1,
         teamMatchesRepointed: 1,
+        skippedDeletedTournaments: 0,
         tournamentIds: [REPOINT_TOURNAMENT_ID],
       },
     ]);
@@ -383,6 +384,7 @@ describe('competition-config-version-repoint', () => {
       published: true,
       tournamentsRepointed: 1,
       teamMatchesRepointed: 1,
+      skippedDeletedTournaments: 0,
       tournamentIds: [REPOINT_TOURNAMENT_ID],
     });
     const newVersionId = outcome.newVersionId as string;
@@ -556,6 +558,7 @@ describe('competition-config-version-repoint', () => {
       published: false,
       tournamentsRepointed: 1,
       teamMatchesRepointed: 0,
+      skippedDeletedTournaments: 0,
       tournamentIds: [REUSE_TOURNAMENT_ID],
     };
 

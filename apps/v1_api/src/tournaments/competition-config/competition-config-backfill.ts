@@ -57,7 +57,7 @@ export class CompetitionConfigSeedDriftError extends Error {
     super(
       `COMPETITION_CONFIG_SEED_DRIFT: ${drifted.length} canonical competition config row(s) no longer match the registry constants: ${drifted
         .map((row) => `${row.name} (${row.id}) expected ${row.expectedContentHash} but found ${row.actualContentHash}`)
-        .join(', ')}. Tournaments, team matches and fixtures already pin these ids, so silently rewriting the rows would change how already-played games are scored. Resolve it with competition-config-version-repoint.cli.ts (publishes a canonical-matching successor version and repoints active tournaments/team matches away from the drifted row), or restore the row to the canonical content directly — then re-run.`,
+        .join(', ')}. Tournaments, team matches and fixtures already pin these ids, so silently rewriting the rows would change how already-played games are scored. Resolve it with competition-config-version-repoint.cli.ts, which publishes a canonical-matching successor version and repoints active tournaments/team matches away from the drifted row. Editing the drifted row in place is only possible while nothing references it — once anything does, the v1_block_used_config_mutation trigger rejects the UPDATE with COMPETITION_CONFIG_VERSION_IN_USE. Then re-run.`,
     );
     this.name = 'CompetitionConfigSeedDriftError';
   }

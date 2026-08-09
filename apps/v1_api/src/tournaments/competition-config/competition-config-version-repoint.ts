@@ -136,6 +136,9 @@ export type CompetitionConfigVersionRepointOutcome =
       published: boolean;
       tournamentsRepointed: number;
       teamMatchesRepointed: number;
+      // Soft-deleted between planning and applying, so no longer a target.
+      // Surfaced so a run that repoints fewer rows than planned explains itself.
+      skippedDeletedTournaments: number;
       tournamentIds: string[];
     };
 
@@ -316,6 +319,9 @@ async function processSeed(
       published: willPublish,
       tournamentsRepointed: tournamentIds.length,
       teamMatchesRepointed: teamMatchCandidateCount,
+      // Dry-run plans against the current snapshot; nothing can be soft-deleted
+      // mid-run because nothing is applied. Only the apply path can observe this.
+      skippedDeletedTournaments: 0,
       tournamentIds,
     };
   }
@@ -339,12 +345,27 @@ async function processSeed(
 
   const tournamentCompetitionConfig = new TournamentCompetitionConfig(prisma, adminContext);
   let tournamentsRepointed = 0;
+  // Tournaments that were soft-deleted between the collection query and the
+  // re-fetch below. Counted rather than silently dropped so a run that repoints
+  // fewer rows than it planned says why.
+  let skippedDeletedTournaments = 0;
   for (const tournamentId of tournamentIds) {
     // Re-fetch immediately before mutating to minimize the optimistic-lock
     // race window between the read above and this call — change() itself
     // still CAS-checks against `updatedAt`, this just avoids a spurious
     // conflict against a read that is now stale for an unrelated reason.
-    const fresh = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId } });
+    //
+    // The `deletedAt: null` filter has to match the collection query above.
+    // Without it a tournament soft-deleted inside that race window would still
+    // be returned here, and change() — which does filter on deletedAt — would
+    // then throw NOT_FOUND and abort the whole run over a row that is no
+    // longer a repoint target at all. A row that disappeared from the target
+    // set is not an error; skip it and account for it.
+    const fresh = await prisma.v1Tournament.findFirst({ where: { id: tournamentId, deletedAt: null } });
+    if (fresh === null) {
+      skippedDeletedTournaments += 1;
+      continue;
+    }
     if (fresh.competitionConfigVersionId === targetVersionId) continue;
     const request = {
       competitionConfigVersionId: targetVersionId,
@@ -396,6 +417,7 @@ async function processSeed(
     newVersionId: targetVersionId,
     newVersion: targetVersion,
     published,
+    skippedDeletedTournaments,
     tournamentsRepointed,
     teamMatchesRepointed,
     tournamentIds,

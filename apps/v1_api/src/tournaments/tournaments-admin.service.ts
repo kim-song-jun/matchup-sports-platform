@@ -873,6 +873,18 @@ export class TournamentsAdminService {
         message: '무제한 교체는 허용 횟수를 함께 지정할 수 없어요.',
       });
     }
+    // 'limited' + 명시적 null 은 여기서 막는다. 리졸버까지 내려가면 그 계층은 이 입력을
+    // "이미 pin된 레거시 설정(개수 없는 limited)을 그대로 이어받는 중"과 구분할 수 없어
+    // 통과시키고, 결과적으로 "제한형인데 상한 없음"(= 사실상 무제한)이 저장돼 관리자가
+    // 건 교체 횟수 제한이 조용히 무력화된다. 의도를 아는 곳은 dto 를 보는 여기뿐이다.
+    // (개수를 아예 생략한 undefined 는 그대로 리졸버로 흘린다 — 생성 시 canonical
+    // 기본값으로 채워지는 정상 경로이고, 못 채우면 SUBSTITUTION_LIMIT_REQUIRED 가 난다.)
+    if (substitutionMode === 'limited' && maxSubstitutions === null) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_SUBSTITUTION_POLICY_INVALID',
+        message: '교체 횟수를 제한하려면 허용 횟수를 함께 입력해 주세요.',
+      });
+    }
   }
 
   private assertPlayerRange(min: number | undefined, max: number | undefined) {

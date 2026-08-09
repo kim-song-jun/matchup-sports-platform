@@ -17,7 +17,7 @@ describe('auth view models', () => {
 
     expect(model.emailHref).toBe('/login/email');
     expect(model.guestHref).toBe('/home');
-    expect(model.signupHref).toBe('/terms');
+    expect(model.signupHref).toBe('/terms?mode=signup');
     expect(model.providers.map(({ label, disabled }) => ({ label, disabled }))).toEqual([
       { label: '카카오', disabled: true },
       { label: '네이버', disabled: true },

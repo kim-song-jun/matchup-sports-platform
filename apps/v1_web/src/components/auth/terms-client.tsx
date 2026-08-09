@@ -28,8 +28,14 @@ export function TermsClient() {
   const mode = searchParams.get('mode');
   const document = searchParams.get('document');
   const isSocialMode = mode === 'social';
+  // 쿼리가 하나도 없는 /terms 는 외부 유입(북마크·검색엔진·공유 링크)의 도착지다.
+  // 가입 동의 단계는 ?mode=signup 으로 명시하므로, mode 도 document 도 없으면 이 화면은
+  // 읽으러 온 사람의 것이다.
+  const wantsPublicDocument = !document && !mode;
   const currentTerms = useV1CurrentSignupTerms({ enabled: !document });
-  const footerTerms = useV1CurrentTerms('footer', { enabled: Boolean(document) });
+  const footerTerms = useV1CurrentTerms('footer', {
+    enabled: Boolean(document) || wantsPublicDocument,
+  });
   const isRenewalMode = mode === 'renewal'
     || (!isSocialMode && currentTerms.data?.compliance?.compliant === false);
   const [checkedByDocumentId, setCheckedByDocumentId] = useState<Record<string, boolean>>({});
@@ -168,7 +174,13 @@ export function TermsClient() {
     router.push('/signup');
   };
 
-  const legalDocument = resolveLegalDocument(document);
+  // 재동의 대상(compliance=false)은 예외로 남긴다 — pending-social-signup-gate 는 /terms 에서
+  // 리다이렉트를 걸지 않으므로(무한 루프 방지) 이 화면이 재동의 게이트를 직접 맡는다.
+  // 로딩 중에는 compliant 가 undefined 라 본문을 먼저 보여주고, 비준수로 확인되면 게이트로
+  // 넘어간다 — 흔한 쪽(읽으러 온 방문자)을 기다리게 하지 않기 위해서다.
+  const showPublicTerms =
+    wantsPublicDocument && currentTerms.data?.compliance?.compliant !== false;
+  const legalDocument = resolveLegalDocument(document ?? (showPublicTerms ? 'terms' : null));
   if (legalDocument) {
     const codeByDocument: Record<LegalDocumentKey, string> = {
       terms: 'footer_service_terms',

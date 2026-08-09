@@ -6,9 +6,11 @@ import {
   V1_USER_ID_KEY,
   clearStoredV1Session,
   dismissPushNudge,
+  getTournamentOpsOrigin,
   hasStoredV1Session,
   sanitizeRedirectPath,
   saveStoredV1Session,
+  saveTournamentOpsOrigin,
   shouldProbeV1Session,
   shouldShowPushNudge,
 } from './session-storage';
@@ -82,5 +84,21 @@ describe('push nudge visibility', () => {
     saveStoredV1Session({ userId: 'user-1', userEmail: 'user@example.com' });
 
     expect(shouldShowPushNudge()).toBe(true);
+  });
+});
+
+describe('tournament-ops 진입 출처 (T6-2)', () => {
+  it('기록한 적 없으면 home을 기본값으로 반환한다', () => {
+    expect(getTournamentOpsOrigin('t-1')).toBe('home');
+  });
+
+  it('admin으로 기록하면 그대로 조회된다', () => {
+    saveTournamentOpsOrigin('t-1', 'admin');
+    expect(getTournamentOpsOrigin('t-1')).toBe('admin');
+  });
+
+  it('대회 id별로 독립적으로 기록된다', () => {
+    saveTournamentOpsOrigin('t-1', 'admin');
+    expect(getTournamentOpsOrigin('t-2')).toBe('home');
   });
 });

@@ -40,6 +40,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   }),
   useV1CreateMatch: () => ({ mutate: createMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
+  useV1MyRecentVenues: () => ({ data: undefined }),
 }));
 
 vi.mock('./matches-page', () => ({

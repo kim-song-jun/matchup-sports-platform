@@ -19,6 +19,7 @@ describe('MatchesController', () => {
     create: jest.fn(),
     edit: jest.fn(),
     detail: jest.fn(),
+    recentVenues: jest.fn(),
     applicationEligibility: jest.fn(),
     update: jest.fn(),
     cancel: jest.fn(),
@@ -103,6 +104,17 @@ describe('MatchesController', () => {
       title: '러닝 매치',
       viewer: { state: 'guest' },
     });
+  });
+
+  it('returns recent venues for the current user', async () => {
+    matchesService.recentVenues.mockResolvedValue({
+      items: [{ placeName: '한강공원 축구장', addressText: '서울 영등포구 여의동로 330' }],
+    });
+
+    await expect(controller.recentVenues(user)).resolves.toEqual({
+      items: [{ placeName: '한강공원 축구장', addressText: '서울 영등포구 여의동로 330' }],
+    });
+    expect(matchesService.recentVenues).toHaveBeenCalledWith(user);
   });
 
   it('returns application eligibility', async () => {

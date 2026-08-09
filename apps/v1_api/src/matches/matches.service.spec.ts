@@ -188,6 +188,46 @@ describe('MatchesService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  // ─── 9. #3 최근 장소 조회 ────────────────────────────────────────────────
+
+  it('recentVenues: 호출자 소유 매치만 최신순으로 조회하고 placeName을 애플리케이션에서 dedup한다', async () => {
+    // 같은 placeName이 여러 행(가장 최근 것이 먼저)으로 섞여 와도 최초 1개만 남아야 한다 —
+    // Prisma `distinct` + `orderBy: createdAt`은 Postgres DISTINCT ON 규칙상
+    // orderBy가 distinct 필드로 시작하지 않으면 의도한 순서를 보장 못 해 서비스가
+    // 직접 dedup한다(회귀 방지).
+    prisma.v1Match.findMany.mockResolvedValue([
+      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330' },
+      { placeName: '한강공원 축구장', placeAddress: '서울 영등포구 여의동로 330(구주소)' },
+      { placeName: '강남역', placeAddress: null },
+    ]);
+
+    await expect(service.recentVenues(host)).resolves.toEqual({
+      items: [
+        { placeName: '한강공원 축구장', addressText: '서울 영등포구 여의동로 330' },
+        { placeName: '강남역', addressText: null },
+      ],
+    });
+    expect(prisma.v1Match.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { hostUserId: host.id, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      }),
+    );
+  });
+
+  it('recentVenues: 앞뒤 공백만 다른 레거시 값은 trim 후 같은 장소로 dedup되고, 공백뿐인 값은 제외한다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([
+      { placeName: '  ', placeAddress: null }, // 공백뿐 — 제외
+      { placeName: '한강공원 축구장 ', placeAddress: '주소1' }, // trim 전 다른 문자열
+      { placeName: '한강공원 축구장', placeAddress: '주소2' }, // trim 후 위와 동일 장소
+    ]);
+
+    await expect(service.recentVenues(host)).resolves.toEqual({
+      items: [{ placeName: '한강공원 축구장', addressText: '주소1' }],
+    });
+  });
+
   // ─── 1. 비-호스트 취소 → 403 ──────────────────────────────────────────────
 
   it('cancel: 호스트가 아닌 사용자가 취소하면 403 PERMISSION_DENIED를 던진다', async () => {

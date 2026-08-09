@@ -6,6 +6,8 @@ import { createV1IntegrationApp } from './integration-app';
 
 const unverifiedUserId = 'integration-write-gate-unverified';
 const verifiedUserId = 'integration-write-gate-verified';
+const unverifiedAdminUserId = 'integration-write-gate-unverified-admin';
+const revokedAdminUserId = 'integration-write-gate-revoked-admin';
 
 /**
  * 휴대폰 미인증 계정의 쓰기 차단 — 실 DB + 실 HTTP end-to-end.
@@ -37,6 +39,24 @@ describe('V1 phone verification write gate integration', () => {
           phone: '01099998888',
           phoneVerifiedAt: new Date('2026-07-01T00:00:00.000Z'),
         },
+        {
+          id: unverifiedAdminUserId,
+          email: 'write-gate-unverified-admin@integration.test',
+          onboardingStatus: 'completed',
+        },
+        {
+          id: revokedAdminUserId,
+          email: 'write-gate-revoked-admin@integration.test',
+          onboardingStatus: 'completed',
+        },
+      ],
+    });
+
+    // 운영자는 휴대폰 미인증이어도 운영 콘솔을 써야 한다. 회수(revoked)된 관리자는 아니다.
+    await prisma.v1AdminUser.createMany({
+      data: [
+        { userId: unverifiedAdminUserId, adminRole: 'ops', status: 'active' },
+        { userId: revokedAdminUserId, adminRole: 'ops', status: 'revoked' },
       ],
     });
 
@@ -50,6 +70,8 @@ describe('V1 phone verification write gate integration', () => {
     await Promise.all([
       termsService.acceptSignupTerms(unverifiedUserId, requiredDocumentIds),
       termsService.acceptSignupTerms(verifiedUserId, requiredDocumentIds),
+      termsService.acceptSignupTerms(unverifiedAdminUserId, requiredDocumentIds),
+      termsService.acceptSignupTerms(revokedAdminUserId, requiredDocumentIds),
     ]);
   });
 
@@ -60,10 +82,10 @@ describe('V1 phone verification write gate integration', () => {
 
   async function cleanupFixtures() {
     if (!prisma) return;
-    await prisma.v1ManagedTermsConsentEvent.deleteMany({
-      where: { userId: { in: [unverifiedUserId, verifiedUserId] } },
-    });
-    await prisma.v1User.deleteMany({ where: { id: { in: [unverifiedUserId, verifiedUserId] } } });
+    const ids = [unverifiedUserId, verifiedUserId, unverifiedAdminUserId, revokedAdminUserId];
+    await prisma.v1ManagedTermsConsentEvent.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.v1AdminUser.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.v1User.deleteMany({ where: { id: { in: ids } } });
   }
 
   it('blocks a write from an unverified account with the verification route', async () => {
@@ -92,6 +114,38 @@ describe('V1 phone verification write gate integration', () => {
       .send({ phone: '01055556666' });
 
     expect(response.status).not.toBe(403);
+  });
+
+  /**
+   * 아래 두 케이스는 **`/teams` 로** 때린다. `/me` 가 아니다.
+   *
+   * 자기 계정 범위(`/me`)는 미인증 계정 전체에 열려 있으므로, 거기서는 관리자든 아니든 통과한다
+   * — 즉 `/me` 로는 면제 배선을 증명할 수도, 회수된 관리자가 막히는지 확인할 수도 없다. 면제가
+   * 통째로 죽어도 두 테스트가 green 이 되어 버린다. `POST /teams` 는 이 파일 위쪽에서 미인증
+   * 계정에 403 임이 이미 증명된 경로라, 신분 차이만이 결과를 가른다.
+   */
+  it('lets an unverified platform admin write — the ops console must stay usable', async () => {
+    // 운영 콘솔의 쓰기는 대부분 /games/* 로 나가는데 그 경로는 일반 사용자의 신원연동·동의
+    // 쓰기와 섞여 있어 경로 허용목록으로 열 수 없다. 그래서 면제는 신분 기준이어야 하고,
+    // 이 케이스가 그 배선이 실제 요청 경로에서 동작하는지를 확인한다.
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/teams')
+      .set('x-v1-user-id', unverifiedAdminUserId)
+      .send({ name: '운영자미인증팀', sportId: 'football' });
+
+    // 팀 생성 자체의 인가·검증 결과는 여기서 다루지 않는다 — 휴대폰 게이트에 걸리지
+    // 않았는지만 본다.
+    expect(response.body.code).not.toBe('PHONE_VERIFICATION_REQUIRED');
+  });
+
+  it('still blocks a revoked admin — the live grant is what carries the trust', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/teams')
+      .set('x-v1-user-id', revokedAdminUserId)
+      .send({ name: '회수된관리자팀', sportId: 'football' })
+      .expect(403);
+
+    expect(response.body.code).toBe('PHONE_VERIFICATION_REQUIRED');
   });
 
   it('lets a verified account write', async () => {

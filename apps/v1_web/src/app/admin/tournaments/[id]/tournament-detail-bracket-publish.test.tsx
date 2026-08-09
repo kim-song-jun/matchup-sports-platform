@@ -14,16 +14,13 @@ import {
   useV1CreateFixture,
   useV1CreateGroup,
   useV1DeleteFixture,
-  useV1DeleteFixtureResult,
   useV1DeleteGroup,
   useV1PublishTournamentBracket,
   useV1UnpublishTournamentBracket,
   useV1RecalculateStandings,
-  useV1RecordResult,
   useV1RemoveGroupTeam,
   useV1UpdateFixture,
   useV1UpdateGroup,
-  useV1UploadVideo,
 } from '@/hooks/use-v1-api';
 import { BracketTab } from './tournament-detail-client';
 
@@ -33,17 +30,14 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateGroup: vi.fn(),
   useV1AssignGroupTeam: vi.fn(),
   useV1CreateFixture: vi.fn(),
-  useV1RecordResult: vi.fn(),
   useV1RecalculateStandings: vi.fn(),
   useV1UpdateFixture: vi.fn(),
   useV1DeleteFixture: vi.fn(),
-  useV1DeleteFixtureResult: vi.fn(),
   useV1UpdateGroup: vi.fn(),
   useV1DeleteGroup: vi.fn(),
   useV1PublishTournamentBracket: vi.fn(),
   useV1UnpublishTournamentBracket: vi.fn(),
   useV1RemoveGroupTeam: vi.fn(),
-  useV1UploadVideo: vi.fn(),
 }));
 
 function noopMutationHook<T>(): T {
@@ -93,15 +87,12 @@ describe('BracketTab — 대진표 전체 공개', () => {
     vi.mocked(useV1CreateGroup).mockReturnValue(noopMutationHook());
     vi.mocked(useV1AssignGroupTeam).mockReturnValue(noopMutationHook());
     vi.mocked(useV1CreateFixture).mockReturnValue(noopMutationHook());
-    vi.mocked(useV1RecordResult).mockReturnValue(noopMutationHook());
     vi.mocked(useV1RecalculateStandings).mockReturnValue(noopMutationHook());
     vi.mocked(useV1UpdateFixture).mockReturnValue(noopMutationHook());
     vi.mocked(useV1DeleteFixture).mockReturnValue(noopMutationHook());
-    vi.mocked(useV1DeleteFixtureResult).mockReturnValue(noopMutationHook());
     vi.mocked(useV1UpdateGroup).mockReturnValue(noopMutationHook());
     vi.mocked(useV1DeleteGroup).mockReturnValue(noopMutationHook());
     vi.mocked(useV1RemoveGroupTeam).mockReturnValue(noopMutationHook());
-    vi.mocked(useV1UploadVideo).mockReturnValue(noopMutationHook());
     vi.mocked(useV1UnpublishTournamentBracket).mockReturnValue(noopMutationHook());
   });
 

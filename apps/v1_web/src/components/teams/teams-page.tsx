@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
-import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -371,6 +371,52 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
           </Card>
           <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+          <Link
+            className="tm-pressable"
+            href={`/teams/${team.id}/records`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              border: '1px solid var(--border)',
+              borderRadius: 14,
+              padding: '14px 16px',
+              background: 'var(--bg)',
+              textDecoration: 'none',
+              color: 'inherit',
+            }}
+          >
+            <div>
+              <div className="tm-text-label">팀 전적</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>승·무·패와 경기별 기록을 확인해요.</div>
+            </div>
+            <ChevronRightIcon size={18} aria-hidden="true" />
+          </Link>
+          {mode === 'mine' ? (
+            <Link
+              className="tm-pressable"
+              href={`/teams/${team.id}/schedules`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                padding: '14px 16px',
+                background: 'var(--bg)',
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
+            >
+              <div>
+                <div className="tm-text-label">팀 일정</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>훈련·경기·이벤트 일정을 보고 참석을 체크해요.</div>
+              </div>
+              <ChevronRightIcon size={18} aria-hidden="true" />
+            </Link>
+          ) : null}
           <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
           <Card pad={16}>
             <InfoRow label="팀명" value={team.name} />
@@ -436,7 +482,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
           ) : (
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              {locked ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.' : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
+              {/* 이미 소속된 멤버·운영진에게 "신청 전에…" 라고 말하면 안 된다 — 본문은 운영
+                  메뉴를 보여주는데 사이드바만 비멤버 문구를 유지해 역할이 어긋나 있었다. */}
+              {mode === 'mine'
+                ? '이미 이 팀의 멤버예요. 운영 메뉴에서 팀을 관리해요.'
+                : locked
+                  ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.'
+                  : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
             </div>
           )}
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
@@ -521,7 +573,16 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       <div className="tm-fixed-cta tm-hide-desktop">
         {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하므로 같은 말을 반복하지 않는다. */}
         {mode === 'pending' ? null : (
-          <div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>
+          <div className="tm-text-caption" style={{ marginBottom: 8 }}>
+            {/* mode==='mine' 은 이미 이 팀 소속(CTA 가 "팀 관리")인데, 예전에는 locked 여부로만
+                문구를 갈라서 팀장·매니저에게도 "신청 전 ... 확인해 주세요" 라는 비회원 안내가
+                그대로 나갔다. 이미 들어와 있는 사람에게 가입 안내를 하지 않는다. */}
+            {mode === 'mine'
+              ? '팀 정보와 멤버를 관리할 수 있어요.'
+              : locked
+                ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.'
+                : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
+          </div>
         )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
         {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}

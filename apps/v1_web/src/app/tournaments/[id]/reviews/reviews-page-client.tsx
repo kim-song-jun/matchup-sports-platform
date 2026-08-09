@@ -180,6 +180,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
       title="참가팀 후기"
       backHref={`/tournaments/${tournamentId}/awards`}
       activeTab="tournaments"
+      desktopHead
     >
       <div className="tm-tourn-sub-page">
         <h1 className="sr-only">대회 참가팀 후기</h1>

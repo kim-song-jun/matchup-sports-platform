@@ -29,3 +29,9 @@
 - [ ] QA가 만든 대회·등록·선수·감사 로그만 exact cleanup하고 기존 row는 보존한다.
 
 검증 전 `uptime`, CPU/memory/swap, Node/브라우저 수, Docker와 3013/8121 상태를 확인한다. 검증은 직렬·최소 범위로 실행하고 이 작업이 시작한 PID만 정리한다.
+
+## Related (Todo 26 reconciliation, 2026-08-04)
+
+이 파일은 이미 v1 스택(`3013`/`8121`) 기준이며 Tasks 12-24와 stack이 어긋나지 않는다. 다만 범위가 대회 생성 마법사와 성별 쿼터로 좁아, 관리자/스태프 **actor 권한 행렬**(director/field_operator/support_readonly/platform_ops)은 이 파일이 다루지 않는다. 그 행렬은 `docs/api/domains/tournament-operations-auth.md`가 계약을 정의하고, `E2E-AUTH-01`(Todo 26이 새로 명명한 시나리오 ID, `docs/scenarios/index.md`의 "v1 Team & Tournament Operations Scenario Ledger" 참조)가 그 계약의 E2E 검증을 담당한다. `E2E-AUTH-01`은 `e2e/v1-tests/tournament.spec.ts`에 아직 구현되지 않았다 — 이 파일의 체크리스트(전부 `[ ]`)와 마찬가지로 미검증 상태이며, 이번 재조정 라운드에서 fabricate하지 않는다.
+
+이 파일의 다른 어떤 문장도 Tasks 12-24 소스(`apps/v1_api/src/tournaments/**`, `apps/v1_api/src/tournament-operations/**`)와 상충하는 것으로 확인되지 않았다 — 대회 마법사/쿼터 범위는 이번 재조정에서 정정할 false claim이 없었다.

@@ -1,0 +1,1 @@
+ALTER TABLE "v1_game_participants" ADD COLUMN IF NOT EXISTS "started" BOOLEAN NOT NULL DEFAULT true;

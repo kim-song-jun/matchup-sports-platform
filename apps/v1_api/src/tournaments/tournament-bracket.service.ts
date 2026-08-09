@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  V1GameSideKey,
+  V1GameSourceType,
   V1TournamentFixture,
   V1TournamentFixtureGoal,
   V1TournamentFixtureResult,
@@ -24,13 +26,39 @@ import {
   UpdateFixtureDto,
   UpdateGroupDto,
 } from './dto/admin-bracket.dto';
+import {
+  ChangeTournamentCompetitionConfigDto,
+  CompetitionConfigListQueryDto,
+  CreateCompetitionConfigDto,
+  CreateCompetitionConfigVersionDto,
+  LineupSizeOptionsQueryDto,
+} from './competition-config/competition-config.dto';
+import {
+  calculateCompetitionStandings,
+  tryNormalizeCompetitionSportCode,
+  validateCompetitionConfig,
+} from './competition-config/competition-config';
+import { CompetitionConfigRegistry } from './competition-config/competition-config-registry';
+import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
+import { canonicalCompetitionConfigForSport } from './competition-config/lineup-size';
+import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
+import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
 
 @Injectable()
 export class TournamentBracketService {
+  private readonly competitionConfigs: CompetitionConfigRegistry;
+  private readonly tournamentCompetitionConfig: TournamentCompetitionConfig;
+  private readonly lineupSizeConfigResolver: LineupSizeConfigResolver;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
-  ) {}
+    private readonly games: GamesService,
+  ) {
+    this.competitionConfigs = new CompetitionConfigRegistry(prisma, adminContext);
+    this.tournamentCompetitionConfig = new TournamentCompetitionConfig(prisma, adminContext);
+    this.lineupSizeConfigResolver = new LineupSizeConfigResolver(prisma, adminContext);
+  }
 
   // ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -52,6 +80,58 @@ export class TournamentBracketService {
       throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     }
     return fixture;
+  }
+
+  async listCompetitionConfigs(user: V1AuthUser, query: CompetitionConfigListQueryDto) {
+    return this.competitionConfigs.list(user, query);
+  }
+
+  async listCompetitionConfigVersions(user: V1AuthUser, configId: string) {
+    return this.competitionConfigs.listVersions(user, configId);
+  }
+
+  async createCompetitionConfig(user: V1AuthUser, dto: CreateCompetitionConfigDto) {
+    return this.competitionConfigs.create(user, dto);
+  }
+
+  async createCompetitionConfigVersion(
+    user: V1AuthUser,
+    configId: string,
+    dto: CreateCompetitionConfigVersionDto,
+  ) {
+    return this.competitionConfigs.createVersion(user, configId, dto);
+  }
+
+  async changeTournamentCompetitionConfig(
+    user: V1AuthUser,
+    tournamentId: string,
+    dto: ChangeTournamentCompetitionConfigDto,
+  ) {
+    return this.tournamentCompetitionConfig.change(user, tournamentId, dto);
+  }
+
+  /**
+   * 대회 생성/수정 화면의 "출전 인원" 선택지 조회. sportId가 아직 경기 설정 카탈로그에
+   * 없는 종목(football/futsal 외)이면 `supported: false` + 빈 options를 돌려준다 — 없는
+   * 대형을 지어내지 않고, 프론트는 이 값을 보고 선택지 UI 자체를 숨긴다.
+   */
+  async getLineupSizeOptions(user: V1AuthUser, query: LineupSizeOptionsQueryDto) {
+    await this.adminContext.getActiveAdmin(user.id);
+    const sport = await this.prisma.v1Sport.findUnique({ where: { id: query.sportId } });
+    if (!sport) {
+      throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
+    }
+    const normalizedSportCode = tryNormalizeCompetitionSportCode(sport.code);
+    if (normalizedSportCode === null) {
+      return { sportId: query.sportId, supported: false, options: [], defaultMaxPlayers: null };
+    }
+    const canonical = canonicalCompetitionConfigForSport(normalizedSportCode);
+    return {
+      sportId: query.sportId,
+      supported: true,
+      options: this.lineupSizeConfigResolver.selectableLineupSizesForSportCode(normalizedSportCode),
+      defaultMaxPlayers: canonical.lineup.maxPlayers,
+    };
   }
 
   // ─── group ────────────────────────────────────────────────────────────────
@@ -208,22 +288,168 @@ export class TournamentBracketService {
       });
     }
 
+    const legNumber = dto.legNumber ?? 1;
+    const commandPayload = {
+      tournamentId,
+      groupId: dto.groupId ?? null,
+      round: dto.round,
+      fixtureNumber: dto.fixtureNumber,
+      legNumber,
+      parentFixtureId: dto.parentFixtureId ?? null,
+      homeRegistrationId: dto.homeRegistrationId ?? null,
+      awayRegistrationId: dto.awayRegistrationId ?? null,
+      scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt).toISOString() : null,
+      venue: dto.venue ?? null,
+    };
+    const durableCommandId = `tournament-fixture:${tournamentId}:${dto.round}:${dto.fixtureNumber}:${legNumber}`;
+    const payloadHash = canonicalGameCommandPayloadHash(commandPayload);
+
     const created = await this.prisma.$transaction(async (tx) => {
-      const fixture = await tx.v1TournamentFixture.create({
-        data: {
-          tournamentId,
-          groupId: dto.groupId ?? null,
-          round: dto.round,
-          fixtureNumber: dto.fixtureNumber,
-          legNumber: dto.legNumber ?? 1,
-          parentFixtureId: dto.parentFixtureId ?? null,
-          homeRegistrationId: dto.homeRegistrationId ?? null,
-          awayRegistrationId: dto.awayRegistrationId ?? null,
-          scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
-          venue: dto.venue ?? null,
-          status: 'scheduled',
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${durableCommandId}, 0))`;
+      const pinnedTournament = await tx.v1Tournament.findFirst({
+        where: { id: tournamentId, deletedAt: null },
+        select: { competitionConfigVersionId: true },
+      });
+      if (!pinnedTournament?.competitionConfigVersionId) {
+        throw new ConflictException({
+          code: 'COMPETITION_CONFIG_REQUIRED',
+          message: '대회 경기에는 활성 경기 규칙 버전이 필요해요.',
+        });
+      }
+
+      const existing = await tx.v1TournamentFixture.findFirst({
+        where: { tournamentId, round: dto.round, fixtureNumber: dto.fixtureNumber, legNumber },
+      });
+      if (existing) {
+        const existingPayload = {
+          tournamentId: existing.tournamentId,
+          groupId: existing.groupId,
+          round: existing.round,
+          fixtureNumber: existing.fixtureNumber,
+          legNumber: existing.legNumber,
+          parentFixtureId: existing.parentFixtureId,
+          homeRegistrationId: existing.homeRegistrationId,
+          awayRegistrationId: existing.awayRegistrationId,
+          scheduledAt: existing.scheduledAt?.toISOString() ?? null,
+          venue: existing.venue,
+        };
+        if (canonicalGameCommandPayloadHash(existingPayload) !== payloadHash) {
+          throw new ConflictException({
+            code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE',
+            message: '같은 경기 생성 키를 다른 내용으로 다시 사용할 수 없어요.',
+          });
+        }
+      }
+
+      const fixture =
+        existing ??
+        (await tx.v1TournamentFixture.create({
+          data: {
+            tournamentId,
+            groupId: dto.groupId ?? null,
+            round: dto.round,
+            fixtureNumber: dto.fixtureNumber,
+            legNumber,
+            parentFixtureId: dto.parentFixtureId ?? null,
+            homeRegistrationId: dto.homeRegistrationId ?? null,
+            awayRegistrationId: dto.awayRegistrationId ?? null,
+            scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+            venue: dto.venue ?? null,
+            status: 'scheduled',
+            competitionConfigVersionId: pinnedTournament.competitionConfigVersionId,
+          },
+        }));
+
+      // fixture may be a pre-existing row created before this fixture's own
+      // competitionConfigVersionId was backfilled (that column is nullable
+      // until the deferred contract-phase migration lands — see
+      // docs/ops/task9-competition-config-contract-phase.md); pinnedTournament
+      // having one above does not guarantee this specific fixture row does.
+      if (!fixture.competitionConfigVersionId) {
+        throw new ConflictException({
+          code: 'COMPETITION_CONFIG_REQUIRED',
+          message: '대회 경기에는 활성 경기 규칙 버전이 필요해요.',
+        });
+      }
+
+      const registrationIds = [fixture.homeRegistrationId, fixture.awayRegistrationId].filter(
+        (registrationId): registrationId is string => registrationId !== null,
+      );
+      const registrations = await tx.v1TournamentRegistration.findMany({
+        where: { id: { in: registrationIds }, tournamentId, status: 'confirmed' },
+        include: {
+          team: { select: { id: true, name: true } },
+          players: {
+            where: { removedAt: null },
+            select: { id: true, realName: true, registrationId: true },
+            orderBy: { id: 'asc' },
+          },
         },
       });
+      const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
+      const home = fixture.homeRegistrationId
+        ? registrationById.get(fixture.homeRegistrationId)
+        : undefined;
+      const away = fixture.awayRegistrationId
+        ? registrationById.get(fixture.awayRegistrationId)
+        : undefined;
+      if (fixture.homeRegistrationId && !home) {
+        throw new BadRequestException({
+          code: 'HOME_REGISTRATION_INVALID',
+          message: '홈 팀 신청이 해당 대회에 존재하지 않거나 확정되지 않았어요.',
+        });
+      }
+      if (fixture.awayRegistrationId && !away) {
+        throw new BadRequestException({
+          code: 'AWAY_REGISTRATION_INVALID',
+          message: '어웨이 팀 신청이 해당 대회에 존재하지 않거나 확정되지 않았어요.',
+        });
+      }
+
+      await this.games.createFromSourceInTransaction(
+        tx,
+        {
+          sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+          sourceId: fixture.id,
+          competitionConfigVersionId: fixture.competitionConfigVersionId,
+          sides: [
+            {
+              sideKey: V1GameSideKey.HOME,
+              teamId: home?.team.id ?? null,
+              displayNameSnapshot: home?.team.name ?? '홈 팀 미정',
+            },
+            {
+              sideKey: V1GameSideKey.AWAY,
+              teamId: away?.team.id ?? null,
+              displayNameSnapshot: away?.team.name ?? '어웨이 팀 미정',
+            },
+          ],
+          participants: [
+            ...(home?.players ?? []).map((player) => ({
+              sourceParticipantId: player.id,
+              sideKey: V1GameSideKey.HOME,
+              displayNameSnapshot: player.realName,
+            })),
+            ...(away?.players ?? []).map((player) => ({
+              sourceParticipantId: player.id,
+              sideKey: V1GameSideKey.AWAY,
+              displayNameSnapshot: player.realName,
+            })),
+          ],
+        },
+        {
+          actor: {
+            actorType: 'USER',
+            actorUserId: user.id,
+            role: 'platform_ops',
+            tournamentId,
+            fixtureId: fixture.id,
+          },
+          expectedVersion: 0,
+          durableCommandId,
+          payloadHash,
+        },
+      );
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -349,40 +575,12 @@ export class TournamentBracketService {
     return { deleted: true };
   }
 
-  /** 결과 삭제(오입력 복구) — 경기 상태를 scheduled로 되돌린다. 영상은 경기 소속이라 유지. */
-  async deleteFixtureResult(user: V1AuthUser, fixtureId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
-    const fixture = await this.prisma.v1TournamentFixture.findUnique({
-      where: { id: fixtureId },
-      include: { result: true },
+  async deleteFixtureResult(user: V1AuthUser, _fixtureId: string) {
+    await this.adminContext.getMutationAdmin(user.id);
+    throw new ConflictException({
+      code: 'TOURNAMENT_RESULT_DERIVED_ONLY',
+      message: '대회 결과는 삭제할 수 없고 Game 결과 리비전으로만 정정할 수 있어요.',
     });
-    if (!fixture) {
-      throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
-    }
-    if (!fixture.result) {
-      throw new NotFoundException({ code: 'RESULT_NOT_FOUND', message: '기록된 결과가 없어요.' });
-    }
-    await this.prisma.$transaction(async (tx) => {
-      await tx.v1TournamentFixtureResult.delete({ where: { fixtureId } });
-      await tx.v1TournamentFixture.update({ where: { id: fixtureId }, data: { status: 'scheduled' } });
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'tournament.bracket.result.delete',
-          targetType: 'tournament_fixture',
-          targetId: fixtureId,
-          beforeJson: {
-            homeScore: fixture.result!.homeScore,
-            awayScore: fixture.result!.awayScore,
-            hasPenalty: fixture.result!.hasPenalty,
-          },
-          fromStatus: fixture.status,
-          toStatus: 'scheduled',
-        },
-        tx,
-      );
-    });
-    return { deleted: true };
   }
 
   /** 조 이름·진출 팀 수 수정. */
@@ -482,213 +680,45 @@ export class TournamentBracketService {
 
   // ─── result ───────────────────────────────────────────────────────────────
 
-  async recordResult(user: V1AuthUser, fixtureId: string, dto: RecordResultDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
-    const fixture = await this.loadFixture(fixtureId);
-
-    // AGF-1: 양 팀이 배정된 경기만 결과 입력 가능
-    if (!fixture.homeRegistrationId || !fixture.awayRegistrationId) {
-      throw new BadRequestException({
-        code: 'FIXTURE_TEAMS_UNASSIGNED',
-        message: '양 팀이 배정된 경기만 결과를 입력할 수 있어요.',
-      });
-    }
-
-    // 승부차기(hasPenalty) 시 penalty 점수 양쪽 모두 필수
-    if (dto.hasPenalty) {
-      if (dto.homePenaltyScore === undefined || dto.awayPenaltyScore === undefined) {
-        throw new BadRequestException({
-          code: 'PENALTY_SCORES_REQUIRED',
-          message: '승부차기를 선택하면 양 팀 승부차기 점수를 모두 입력해야 해요.',
-        });
-      }
-      // AGF-2: 승부차기는 정규 스코어 동점일 때만 허용
-      if (dto.homeScore !== dto.awayScore) {
-        throw new BadRequestException({
-          code: 'PENALTY_REQUIRES_DRAW',
-          message: '승부차기는 정규 점수가 동점일 때만 입력할 수 있어요.',
-        });
-      }
-      // AGF-2: 승부차기 점수는 서로 달라야 함
-      if (dto.homePenaltyScore === dto.awayPenaltyScore) {
-        throw new BadRequestException({
-          code: 'PENALTY_SCORES_MUST_DIFFER',
-          message: '승부차기 점수는 서로 달라야 해요.',
-        });
-      }
-    }
-
-    // AGF-4: 녹아웃 라운드 동점 + 승부차기 없음 → 거부.
-    // fixture.round 는 표시 라벨이라 정식 영문 키('semi'/'final'/'third_place')와 어드민 자동생성·
-    // 시드가 쓰는 한글 라벨('4강'/'결승'/'3·4위전')이 모두 존재 → 둘 다 매칭해야 실데이터에서 동작한다.
-    // (group-stage round 는 'group_a'·'조별 N라운드'라 아래 라벨과 겹치지 않아 오탐 없음)
-    const knockoutLabels = ['semi', 'final', 'third_place', '4강', '결승', '3·4위전'];
-    const isKnockout =
-      fixture.round != null && knockoutLabels.some((r) => fixture.round!.includes(r));
-    if (isKnockout && dto.homeScore === dto.awayScore && !dto.hasPenalty) {
-      throw new BadRequestException({
-        code: 'KNOCKOUT_REQUIRES_WINNER',
-        message: '토너먼트 경기는 승자가 필요해요. 동점이면 승부차기 점수를 입력해 주세요.',
-      });
-    }
-
-    if (dto.goals?.some((goal) => goal.playerName.trim().length === 0)) {
-      throw new BadRequestException({
-        code: 'GOAL_PLAYER_NAME_REQUIRED',
-        message: '득점자 이름을 입력해 주세요.',
-      });
-    }
-
-    // goals에서 playerId가 지정된 경우, 해당 선수가 실제로 이 경기의 팀(홈/원정) 명단에
-    // 속해 있는지 검증한다 — 다른 팀·다른 대회 선수를 오기록하는 사고를 원천 차단.
-    if (dto.goals !== undefined && dto.goals.length > 0) {
-      const playerIds = dto.goals
-        .map((g) => g.playerId)
-        .filter((id): id is string => id != null);
-      if (playerIds.length > 0) {
-        const players = await this.prisma.v1TournamentPlayer.findMany({
-          where: { id: { in: playerIds } },
-          select: { id: true, registrationId: true },
-        });
-        const playerById = new Map(players.map((p) => [p.id, p]));
-        for (const goal of dto.goals) {
-          if (!goal.playerId) continue;
-          const player = playerById.get(goal.playerId);
-          const expectedRegistrationId =
-            goal.team === 'home' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
-          if (!player || player.registrationId !== expectedRegistrationId) {
-            throw new BadRequestException({
-              code: 'GOAL_PLAYER_NOT_IN_TEAM',
-              message: '득점자가 해당 팀 명단에 없어요.',
-            });
-          }
-        }
-      }
-    }
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      // V1TournamentFixtureResult upsert (fixtureId unique)
-      const fixtureResult = await tx.v1TournamentFixtureResult.upsert({
-        where: { fixtureId },
-        create: {
-          fixtureId,
-          homeScore: dto.homeScore,
-          awayScore: dto.awayScore,
-          hasPenalty: dto.hasPenalty ?? false,
-          homePenaltyScore: dto.hasPenalty ? (dto.homePenaltyScore ?? null) : null,
-          awayPenaltyScore: dto.hasPenalty ? (dto.awayPenaltyScore ?? null) : null,
-          note: dto.note ?? null,
-          recordedByAdminUserId: admin.id,
-          recordedAt: new Date(),
-        },
-        update: {
-          homeScore: dto.homeScore,
-          awayScore: dto.awayScore,
-          hasPenalty: dto.hasPenalty ?? false,
-          homePenaltyScore: dto.hasPenalty ? (dto.homePenaltyScore ?? null) : null,
-          awayPenaltyScore: dto.hasPenalty ? (dto.awayPenaltyScore ?? null) : null,
-          note: dto.note ?? null,
-          recordedByAdminUserId: admin.id,
-          recordedAt: new Date(),
-        },
-      });
-
-      // 영상 목록은 replace-all — dto.videos 생략(undefined) 시 기존 목록 유지
-      if (dto.videos !== undefined) {
-        await tx.v1TournamentFixtureVideo.deleteMany({ where: { fixtureId } });
-        const videoRows = dto.videos
-          .map((v, i) => ({
-            fixtureId,
-            title: v.title?.trim() || null,
-            url: v.url.trim(),
-            sortOrder: i,
-          }))
-          .filter((v) => v.url.length > 0);
-        if (videoRows.length > 0) {
-          await tx.v1TournamentFixtureVideo.createMany({ data: videoRows });
-        }
-      }
-
-      // 득점자 목록은 replace-all — dto.goals 생략(undefined) 시 기존 기록 유지
-      if (dto.goals !== undefined) {
-        await tx.v1TournamentFixtureGoal.deleteMany({
-          where: { fixtureResultId: fixtureResult.id },
-        });
-        const goalRows = dto.goals
-          .map((g) => ({
-            fixtureResultId: fixtureResult.id,
-            team: g.team,
-            playerId: g.playerId ?? null,
-            playerName: g.playerName.trim(),
-            minute: g.minute ?? null,
-          }));
-        if (goalRows.length > 0) {
-          await tx.v1TournamentFixtureGoal.createMany({ data: goalRows });
-        }
-      }
-
-      // fixture.status → completed
-      await tx.v1TournamentFixture.update({
-        where: { id: fixtureId },
-        data: { status: 'completed' },
-      });
-
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'tournament.bracket.result.record',
-          targetType: 'tournament_fixture',
-          targetId: fixtureId,
-          afterJson: {
-            homeScore: dto.homeScore,
-            awayScore: dto.awayScore,
-            hasPenalty: dto.hasPenalty ?? false,
-          },
-          toStatus: 'completed',
-          fromStatus: fixture.status,
-        },
-        tx,
-      );
-
-      return fixtureResult;
+  async recordResult(user: V1AuthUser, _fixtureId: string, _dto: RecordResultDto) {
+    await this.adminContext.getMutationAdmin(user.id);
+    throw new ConflictException({
+      code: 'TOURNAMENT_RESULT_DERIVED_ONLY',
+      message: '대회 결과는 Game 종료 명령과 결과 리비전으로만 기록할 수 있어요.',
     });
-
-    const [videos, goals] = await Promise.all([
-      this.prisma.v1TournamentFixtureVideo.findMany({
-        where: { fixtureId },
-        orderBy: { sortOrder: 'asc' },
-      }),
-      this.prisma.v1TournamentFixtureGoal.findMany({
-        where: { fixtureResultId: result.id },
-        orderBy: { createdAt: 'asc' },
-      }),
-    ]);
-    return {
-      ...this.serializeResult(result),
-      videos: videos.map((v) => this.serializeVideo(v)),
-      goals: goals.map((g) => this.serializeGoal(g)),
-    };
   }
-
-  // ─── standings recalculate ────────────────────────────────────────────────
-
-  /**
-   * 해당 tournament의 phase='group' 그룹들에 대해 완료된 픽스처 결과를 집계해
-   * V1TournamentStanding을 upsert한다.
-   *
-   * 집계 규칙:
-   *   - 승 = 3점, 무 = 1점, 패 = 0점
-   *   - 정규 스코어 기준으로 집계 (hasPenalty 경기는 정규 스코어 동점 → 무승부로 취급)
-   *   - 순위 정렬: 승점 desc → 골득실(goalsFor - goalsAgainst) desc → goalsFor desc
-   *
-   * NOTE: 4강/결승 합산(non-group phase) 은 이 메서드의 대상이 아님.
-   *       어드민이 단계별 수동 recordResult로 처리한다.
-   */
   async recalculateStandings(user: V1AuthUser, tournamentId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    await this.loadTournament(tournamentId);
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+      include: { competitionConfig: true },
+    });
+    if (!tournament) {
+      throw new NotFoundException({
+        code: 'TOURNAMENT_NOT_FOUND',
+        message: '대회를 찾을 수 없어요.',
+      });
+    }
+    const config = validateCompetitionConfig(tournament.competitionConfig);
+    // validateCompetitionConfig() above already throws when
+    // tournament.competitionConfig is null, and competitionConfig/
+    // competitionConfigVersionId are always set together — this guard just
+    // gives TypeScript the same narrowing (the column is nullable until the
+    // deferred contract-phase migration lands; see
+    // docs/ops/task9-competition-config-contract-phase.md) without a
+    // non-null assertion.
+    if (!tournament.competitionConfigVersionId) {
+      throw new ConflictException({
+        code: 'COMPETITION_CONFIG_REQUIRED',
+        message: '대회 경기에는 활성 경기 규칙 버전이 필요해요.',
+      });
+    }
+    // Narrowed into a local binding rather than relying on
+    // tournament.competitionConfigVersionId directly, since TypeScript does
+    // not carry a property-access narrowing into the $transaction callback
+    // closure below.
+    const competitionConfigVersionId = tournament.competitionConfigVersionId;
 
-    // phase='group' 그룹만 대상
     const groups = await this.prisma.v1TournamentGroup.findMany({
       where: { tournamentId, phase: 'group' },
       include: {
@@ -701,114 +731,58 @@ export class TournamentBracketService {
         },
       },
     });
-
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
       for (const group of groups) {
-        // 각 registration별 누적 집계 맵
-        const statsMap = new Map<
-          string,
-          {
-            points: number;
-            wins: number;
-            draws: number;
-            losses: number;
-            goalsFor: number;
-            goalsAgainst: number;
-          }
-        >();
-
-        // 그룹 소속 팀 초기화
-        for (const gt of group.groupTeams) {
-          statsMap.set(gt.registrationId, {
-            points: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0,
-          });
-        }
-
-        // completed 픽스처 결과 집계
-        for (const fixture of group.fixtures) {
-          const res = fixture.result;
-          if (!res) continue;
-          if (!fixture.homeRegistrationId || !fixture.awayRegistrationId) continue;
-
-          const homeId = fixture.homeRegistrationId;
-          const awayId = fixture.awayRegistrationId;
-
-          // 양 팀 통계가 맵에 없으면 skip (그룹에 미등록된 팀)
-          if (!statsMap.has(homeId) || !statsMap.has(awayId)) continue;
-
-          const homeStats = statsMap.get(homeId)!;
-          const awayStats = statsMap.get(awayId)!;
-
-          const homeGoals = res.homeScore;
-          const awayGoals = res.awayScore;
-
-          // 승부차기(hasPenalty)는 조별리그 집계에서 정규 스코어 기준 무승부로 취급.
-          // (정규 스코어가 동점이 아닌 경우도 정규 결과 그대로 적용한다.)
-          // NOTE: 토너먼트 운영 정책상 조별리그에서 승부차기는 통상 없으나,
-          //       데이터 일관성을 위해 hasPenalty 여부와 무관하게 정규 스코어만 사용.
-          if (homeGoals > awayGoals) {
-            homeStats.points += 3;
-            homeStats.wins += 1;
-            awayStats.losses += 1;
-          } else if (homeGoals < awayGoals) {
-            awayStats.points += 3;
-            awayStats.wins += 1;
-            homeStats.losses += 1;
-          } else {
-            // 동점 (승부차기 결과 무시 — 조별리그 집계 무승부 처리)
-            homeStats.points += 1;
-            homeStats.draws += 1;
-            awayStats.points += 1;
-            awayStats.draws += 1;
-          }
-
-          homeStats.goalsFor += homeGoals;
-          homeStats.goalsAgainst += awayGoals;
-          awayStats.goalsFor += awayGoals;
-          awayStats.goalsAgainst += homeGoals;
-        }
-
-        // 순위 정렬: 승점 desc → 골득실 desc → 다득점 desc → registrationId asc (완전 동점 결정키)
-        const sorted = Array.from(statsMap.entries()).sort(([regIdA, a], [regIdB, b]) => {
-          const pointsDiff = b.points - a.points;
-          if (pointsDiff !== 0) return pointsDiff;
-          const gdA = a.goalsFor - a.goalsAgainst;
-          const gdB = b.goalsFor - b.goalsAgainst;
-          const gdDiff = gdB - gdA;
-          if (gdDiff !== 0) return gdDiff;
-          const gfDiff = b.goalsFor - a.goalsFor;
-          if (gfDiff !== 0) return gfDiff;
-          // 완전 동점 결정키: registrationId asc (안정적 순위 보장)
-          return regIdA < regIdB ? -1 : regIdA > regIdB ? 1 : 0;
+        const standings = calculateCompetitionStandings({
+          tournamentId,
+          configVersionId: competitionConfigVersionId,
+          registrationIds: group.groupTeams.map((team) => team.registrationId),
+          fixtures: group.fixtures.flatMap((fixture) => {
+            if (!fixture.result || !fixture.homeRegistrationId || !fixture.awayRegistrationId) {
+              return [];
+            }
+            return [
+              {
+                homeRegistrationId: fixture.homeRegistrationId,
+                awayRegistrationId: fixture.awayRegistrationId,
+                homeScore: fixture.result.homeScore,
+                awayScore: fixture.result.awayScore,
+              },
+            ];
+          }),
+          config,
         });
 
-        // upsert (groupId + registrationId unique)
-        for (let i = 0; i < sorted.length; i++) {
-          const [registrationId, stats] = sorted[i];
+        for (const standing of standings) {
           await tx.v1TournamentStanding.upsert({
-            where: { groupId_registrationId: { groupId: group.id, registrationId } },
+            where: {
+              groupId_registrationId: {
+                groupId: group.id,
+                registrationId: standing.registrationId,
+              },
+            },
             create: {
               groupId: group.id,
-              registrationId,
-              points: stats.points,
-              wins: stats.wins,
-              draws: stats.draws,
-              losses: stats.losses,
-              goalsFor: stats.goalsFor,
-              goalsAgainst: stats.goalsAgainst,
-              position: i + 1,
+              registrationId: standing.registrationId,
+              points: standing.points,
+              wins: standing.wins,
+              draws: standing.draws,
+              losses: standing.losses,
+              goalsFor: standing.goalsFor,
+              goalsAgainst: standing.goalsAgainst,
+              position: standing.position,
               recalculatedAt: now,
             },
             update: {
-              points: stats.points,
-              wins: stats.wins,
-              draws: stats.draws,
-              losses: stats.losses,
-              goalsFor: stats.goalsFor,
-              goalsAgainst: stats.goalsAgainst,
-              position: i + 1,
+              points: standing.points,
+              wins: standing.wins,
+              draws: standing.draws,
+              losses: standing.losses,
+              goalsFor: standing.goalsFor,
+              goalsAgainst: standing.goalsAgainst,
+              position: standing.position,
               recalculatedAt: now,
             },
           });
@@ -821,7 +795,11 @@ export class TournamentBracketService {
           action: 'tournament.bracket.standings.recalculate',
           targetType: 'tournament',
           targetId: tournamentId,
-          afterJson: { groupCount: groups.length, recalculatedAt: now.toISOString() },
+          afterJson: {
+            groupCount: groups.length,
+            recalculatedAt: now.toISOString(),
+            competitionConfigVersionId,
+          },
         },
         tx,
       );
@@ -830,6 +808,7 @@ export class TournamentBracketService {
     return {
       tournamentId,
       groupCount: groups.length,
+      competitionConfigVersionId,
       recalculatedAt: now.toISOString(),
     };
   }

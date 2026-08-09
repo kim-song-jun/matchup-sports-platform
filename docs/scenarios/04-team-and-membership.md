@@ -1,6 +1,39 @@
 # Team And Membership Scenarios
 
-## Coverage Summary
+> **Stack scope note (Todo 26 reconciliation, 2026-08-04):** everything below `## Coverage Summary` through `## Notes` describes the **legacy** `apps/api` (port 8111) / `apps/web` (port 3003) stack and its `e2e/tests/*` Playwright suite. That stack's `TeamMembership`/role model is a different implementation from the v1 stack (`apps/v1_api`, `apps/v1_web`) that Tasks 12-24 shipped against. It is not stale in the sense of describing removed behavior — `apps/api`'s `teams.controller.ts` still has the routes this file names — but it is a different runtime than the one Task 26 is reconciling, so it must not be read as coverage for v1 team membership. See `## v1 stack (Tasks 12-24)` below for the current, verified v1 surface.
+
+## v1 stack (Tasks 12-24)
+
+v1 team membership lives entirely in `apps/v1_api/src/teams/teams.controller.ts` (`TeamsController`) and has **no relation** to the legacy `TeamMembership`/`/teams/:id/hub` model described in `11-team-and-venue-hubs.md`'s legacy section or in the rest of this file below. The routes that exist today (verified by reading the controller, not by running it):
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/teams` | list, `OptionalV1AuthGuard` |
+| `GET` | `/teams/:teamId` | detail, `OptionalV1AuthGuard` |
+| `POST` | `/teams` | create, `V1AuthGuard` + `CreatorProfileGuard` |
+| `PATCH` | `/teams/:teamId` | update |
+| `GET` | `/teams/:teamId/join-eligibility` | pre-apply eligibility check |
+| `GET` | `/teams/:teamId/members` | member list, `OptionalV1AuthGuard` |
+| `POST` | `/teams/:teamId/leave` | self-leave |
+| `POST` / `GET` | `/teams/:teamId/join-applications` | apply / list applications (host view) |
+| `GET` | `/me/join-applications` | applicant's own applications |
+| `GET` | `/me/teams` | my teams |
+| `PATCH` | `/team-memberships/:membershipId/role` | role change |
+| `POST` | `/team-memberships/:membershipId/remove` | kick |
+| `POST` | `/team-join-applications/:applicationId/withdraw\|approve\|reject` | application lifecycle |
+| `POST` | `/teams/:teamId/invitations`, `GET .../invitations`, `POST .../invitations/:id/cancel` | invitation lifecycle |
+| `GET` | `/me/invitations`, `POST /team-invitations/:id/accept\|decline` | invitee-side lifecycle |
+
+There is **no** `/teams/:id/hub`, `/teams/:id/schedules`-adjacent "goods/passes/events" aggregation, and no image-upload slot concept in this controller — those are legacy-stack-only concepts (see the stack-scope note above and `11-team-and-venue-hubs.md`). v1 team detail instead links into the Task 12 schedule surface (`docs/api/domains/team-schedules.md`, screens at `apps/v1_web/src/app/teams/[id]/schedules/**`) and a `records` surface (`apps/v1_web/src/app/teams/[id]/records/page.tsx`, backed by the Task 24 `GET /teams/:id/records` public-records route — see `docs/api/domains/public-records.md`).
+
+Playwright coverage for this v1 surface lives under `e2e/v1-tests/` (config `e2e/v1.config.ts`, distinct from the legacy `e2e/playwright.config.ts` harness the rest of this file assumes):
+
+- `e2e/v1-tests/team-join.spec.ts` — `[applicant]` persona: `/teams` list render, team card presence, detail CTA render.
+- `e2e/v1-tests/team-management.spec.ts` — `[owner]` persona: `/my/teams` list, owner-only "멤버 관리" menu on `/my/teams/:id`, member/join-application tabs on `/my/teams/:id/members`.
+
+Both specs assert DOM/route presence (render + CTA visibility) against seeded fixtures; neither currently drives a full apply→accept→role-change→remove round trip end to end, so that deeper v1 join/role-management flow (the v1 equivalent of legacy `TEAM-002`/`TEAM-005`) remains **unverified** here — it is not part of the Todo 26 scope of new E2E IDs (`E2E-TEAM-01`/`E2E-TEAM-02`, defined in `05-team-match-flows.md`, cover team-**match** opponent/lineup authorization, not team join/role membership). If a future task adds v1 team join/role-management E2E coverage, it should extend `team-management.spec.ts`/`team-join.spec.ts` and be logged back into this section rather than opening a new scenario file.
+
+## Legacy stack (`apps/api` / `apps/web`) — Coverage Summary
 
 - Primary personas: `팀장오너E2E`, `매니저E2E`, `일반팀원E2E`
 - Automation status: Team/Membership core contracts are automated in Playwright with scenario IDs.
@@ -177,3 +210,4 @@
 - 2026-04-10: 같은 Playwright 실행 파일 묶음에는 다른 도메인 smoke인 `TM-SMOKE-001 /team-matches/new`도 포함되어 있어 전체 터미널 결과는 `10 passed / 1 skipped`로 기록됐다.
 - 2026-06-06: Task 92 validation completed. apps/v1_web tsc --noEmit passed; responsive smoke included /teams/team-1 and /teams/new across 320/390/430 with 0 issues. Report: output/playwright/v1-responsive-smoke/task92-team-polish-smoke/report.md.
 - 2026-06-29: Team detail/my-team detail was unified around `/teams/:id`. `/my/teams` cards now open the canonical detail, direct `/my/teams/:id` visits redirect to `/teams/:id`, and owner/manager operations for edit + member management are exposed from the canonical detail.
+- 2026-08-04 (Todo 26): this file previously had no v1-stack section at all and read as if `apps/v1_api`/`apps/v1_web` inherited the legacy `TeamMembership`/hub model. Added the `## v1 stack (Tasks 12-24)` section above with the actual `TeamsController` route table (verified against `apps/v1_api/src/teams/teams.controller.ts`) and its `e2e/v1-tests` coverage. No claim below the stack-scope note was found to be factually false for the legacy stack it describes, so the legacy `TEAM-00x` scenario matrix and Playwright references below are left unchanged.

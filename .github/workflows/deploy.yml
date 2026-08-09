@@ -112,6 +112,17 @@ jobs:
       - name: Alpha image GC contract tests
         run: bash scripts/qa/test-alpha-image-gc.sh
 
+      # 이미지 스캔 게이트는 배포 job 안에서만 도는 탓에 두 결함이 오래 살아남았다.
+      # (1) 일시적 AWS CLI 내부 오류('NoneType' object does not support item assignment)에
+      #     재시도가 없어 배포가 그대로 죽었다 — 2026-08-08~09 alpha 에서만 3회.
+      # (2) 더 심각하게, findings 를 못 읽으면 critical="" 이 되고 bash 산술이 빈 값을 0 으로
+      #     취급해 **게이트가 조용히 통과**했다(fail-open). 실제 배포 로그에 그 흔적이 있다:
+      #     `[alpha-scan] teameet-alpha-v1-api critical= high=`.
+      # 두 결함 모두 alpha/prod 복사본에 똑같이 있었다. 이 테스트는 가짜 aws 로 그 시나리오를
+      # 재현해 매 push 마다 고정한다 — 수정 전 스크립트로 돌리면 3건이 실패한다.
+      - name: Image scan gate contract tests
+        run: bash scripts/qa/test-image-scan-gate.sh
+
       # prod 배포 경로는 main push 때만 도는 탓에 몇 주씩 검증되지 않는다 — 그래서
       # prune_stale_release_tags 의 빈 입력 버그가 2026-08-01 배포에서야 터졌다(#220).
       # 이번 변경으로 EC2 가 더 이상 로컬 docker build 를 하지 않고 ECR digest 를 pull 만

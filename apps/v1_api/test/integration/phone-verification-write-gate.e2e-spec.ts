@@ -88,11 +88,11 @@ describe('V1 phone verification write gate integration', () => {
     await prisma.v1User.deleteMany({ where: { id: { in: ids } } });
   }
 
-  it('blocks a write from an unverified account with the verification route', async () => {
+  it('blocks a write that reaches another user, with the verification route', async () => {
     const response = await request(app.getHttpServer())
-      .patch('/api/v1/me/profile')
+      .post('/api/v1/teams')
       .set('x-v1-user-id', unverifiedUserId)
-      .send({ nickname: '게이트미인증', gender: 'male' })
+      .send({ name: '게이트미인증팀', sportId: 'football' })
       .expect(403);
 
     expect(response.body.code).toBe('PHONE_VERIFICATION_REQUIRED');
@@ -106,6 +106,32 @@ describe('V1 phone verification write gate integration', () => {
       .expect(200);
   });
 
+  /**
+   * 인증 도입 이전에 가입한 레거시 계정은 인증을 마치기 전에도 자기 계정은 건사할 수 있어야
+   * 한다. 이게 막혀 있으면 로그인은 되는데 프로필 사진 한 장 못 바꾸는 상태로 갇힌다.
+   */
+  it('lets the unverified account manage its own profile', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/v1/me/profile')
+      .set('x-v1-user-id', unverifiedUserId)
+      .send({ nickname: '게이트미인증', gender: 'male' })
+      .expect(200);
+  });
+
+  /**
+   * 자기 계정 범위를 열어 준 것이 번호까지 열어 준 것은 아니다 — 증명 없이 번호를 붙일 수
+   * 있으면 "프로필에서 번호만 교체"로 인증 자체가 우회된다.
+   */
+  it('still refuses to attach a phone number without a proof token', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/api/v1/me/profile')
+      .set('x-v1-user-id', unverifiedUserId)
+      .send({ nickname: '게이트미인증', gender: 'male', phone: '01077776666' })
+      .expect(400);
+
+    expect(response.body.code).toBe('PHONE_NOT_VERIFIED');
+  });
+
   it('keeps the verification endpoint itself reachable for the unverified account', async () => {
     // 인증 요청까지 막히면 계정이 영구히 잠긴다 — 이 경로만은 열려 있어야 한다.
     const response = await request(app.getHttpServer())
@@ -116,24 +142,33 @@ describe('V1 phone verification write gate integration', () => {
     expect(response.status).not.toBe(403);
   });
 
+  /**
+   * 아래 두 케이스는 **`/teams` 로** 때린다. `/me` 가 아니다.
+   *
+   * 자기 계정 범위(`/me`)는 미인증 계정 전체에 열려 있으므로, 거기서는 관리자든 아니든 통과한다
+   * — 즉 `/me` 로는 면제 배선을 증명할 수도, 회수된 관리자가 막히는지 확인할 수도 없다. 면제가
+   * 통째로 죽어도 두 테스트가 green 이 되어 버린다. `POST /teams` 는 이 파일 위쪽에서 미인증
+   * 계정에 403 임이 이미 증명된 경로라, 신분 차이만이 결과를 가른다.
+   */
   it('lets an unverified platform admin write — the ops console must stay usable', async () => {
     // 운영 콘솔의 쓰기는 대부분 /games/* 로 나가는데 그 경로는 일반 사용자의 신원연동·동의
     // 쓰기와 섞여 있어 경로 허용목록으로 열 수 없다. 그래서 면제는 신분 기준이어야 하고,
     // 이 케이스가 그 배선이 실제 요청 경로에서 동작하는지를 확인한다.
     const response = await request(app.getHttpServer())
-      .patch('/api/v1/me/profile')
+      .post('/api/v1/teams')
       .set('x-v1-user-id', unverifiedAdminUserId)
-      .send({ nickname: '운영자미인증', gender: 'male' });
+      .send({ name: '운영자미인증팀', sportId: 'football' });
 
-    expect(response.status).not.toBe(403);
+    // 팀 생성 자체의 인가·검증 결과는 여기서 다루지 않는다 — 휴대폰 게이트에 걸리지
+    // 않았는지만 본다.
     expect(response.body.code).not.toBe('PHONE_VERIFICATION_REQUIRED');
   });
 
   it('still blocks a revoked admin — the live grant is what carries the trust', async () => {
     const response = await request(app.getHttpServer())
-      .patch('/api/v1/me/profile')
+      .post('/api/v1/teams')
       .set('x-v1-user-id', revokedAdminUserId)
-      .send({ nickname: '회수된관리자', gender: 'male' })
+      .send({ name: '회수된관리자팀', sportId: 'football' })
       .expect(403);
 
     expect(response.body.code).toBe('PHONE_VERIFICATION_REQUIRED');

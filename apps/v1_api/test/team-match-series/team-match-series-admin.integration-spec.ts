@@ -109,6 +109,136 @@ describe('POST /admin/team-match-series + fixtures', () => {
     expect(game.sourceType).toBe('TEAM_MATCH');
   });
 
+  it('요일·시각·장소 템플릿을 지정하면 모든 경기가 그 요일의 그 시각(KST)·장소로 일괄 채워진다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/team-match-series')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '템플릿 리그',
+        sportId,
+        regionId,
+        // 2026-08-10T00:00:00Z = KST 2026-08-10(월) 09:00.
+        startsOn: '2026-08-10T00:00:00.000Z',
+        endsOn: '2026-10-01T00:00:00.000Z',
+        teamIds: [teamAId, teamBId],
+      });
+    const seriesId = createRes.body.data.seriesId;
+
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/team-match-series/${seriesId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 2, schedule: { dayOfWeek: 6, time: '18:00' }, placeName: '상암 풋살파크' });
+    expect(fixturesRes.status).toBe(201);
+    expect(fixturesRes.body.data.teamMatchIds).toHaveLength(2);
+
+    const fixtures = await prisma.v1TeamMatch.findMany({
+      where: { id: { in: fixturesRes.body.data.teamMatchIds } },
+      orderBy: { startAt: 'asc' },
+    });
+    expect(fixtures.every((f) => f.placeName === '상암 풋살파크')).toBe(true);
+    // 8/15(토) 18:00 KST = 09:00 UTC, 그다음 주는 8/22.
+    expect(fixtures[0].startAt.toISOString()).toBe('2026-08-15T09:00:00.000Z');
+    expect(fixtures[1].startAt.toISOString()).toBe('2026-08-22T09:00:00.000Z');
+  });
+
+  it(
+    '대진을 아직 안 만든 새 리그를 조회하면, 같은 팀들이 과거에 뛴 다른 리그의 장소가 최근 사용 장소로 내려온다',
+    async () => {
+      // 다른 테스트의 실행 순서에 기대지 않도록, teamA/teamB가 '상암 풋살파크'에서 이미
+      // 뛴 이력을 이 테스트 안에서 직접 만든다.
+      await prisma.v1TeamMatch.create({
+        data: {
+          hostTeamId: teamAId,
+          approvedApplicantTeamId: teamBId,
+          createdByUserId: ownerUserId,
+          sportId,
+          regionId,
+          title: `과거 대진-${suiteId}`,
+          placeName: '상암 풋살파크',
+          startAt: new Date('2026-07-01T09:00:00.000Z'),
+          status: 'completed',
+        },
+      });
+
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/team-match-series')
+        .set('x-v1-user-id', ownerUserId)
+        .send({
+          title: '장소 추천 리그',
+          sportId,
+          regionId,
+          startsOn: new Date().toISOString(),
+          endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+          teamIds: [teamAId, teamBId],
+        });
+      const seriesId = createRes.body.data.seriesId;
+
+      const detailRes = await request(app.getHttpServer())
+        .get(`/api/v1/admin/team-match-series/${seriesId}`)
+        .set('x-v1-user-id', ownerUserId);
+      expect(detailRes.status).toBe(200);
+      expect(detailRes.body.data.recentVenues).toContain('상암 풋살파크');
+
+      // 대진을 생성하고 나면(이 화면이 더는 필요 없으므로) recentVenues는 빈 배열이다.
+      await request(app.getHttpServer())
+        .post(`/api/v1/admin/team-match-series/${seriesId}/fixtures`)
+        .set('x-v1-user-id', ownerUserId)
+        .send({ weeksCount: 1 });
+      const afterGenerateRes = await request(app.getHttpServer())
+        .get(`/api/v1/admin/team-match-series/${seriesId}`)
+        .set('x-v1-user-id', ownerUserId);
+      expect(afterGenerateRes.body.data.recentVenues).toEqual([]);
+    },
+  );
+
+  it('요일·시각·장소 템플릿을 지정하지 않으면 기존 동작(시작일 그대로, 장소 미정)을 유지한다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/team-match-series')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '템플릿 없는 리그',
+        sportId,
+        regionId,
+        startsOn: '2026-09-01T03:00:00.000Z',
+        endsOn: '2026-10-01T00:00:00.000Z',
+        teamIds: [teamAId, teamBId],
+      });
+    const seriesId = createRes.body.data.seriesId;
+
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/team-match-series/${seriesId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 1 });
+    expect(fixturesRes.status).toBe(201);
+
+    const fixture = await prisma.v1TeamMatch.findUniqueOrThrow({
+      where: { id: fixturesRes.body.data.teamMatchIds[0] },
+    });
+    expect(fixture.placeName).toBe('장소 미정');
+    expect(fixture.startAt.toISOString()).toBe('2026-09-01T03:00:00.000Z');
+  });
+
+  it('시각 형식이 HH:mm이 아니면 400으로 거부한다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/team-match-series')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '잘못된 시각 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+      });
+    const seriesId = createRes.body.data.seriesId;
+
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/admin/team-match-series/${seriesId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 1, schedule: { dayOfWeek: 6, time: '25:99' } });
+    expect(res.status).toBe(400);
+  });
+
   it('대진이 이미 생성된 시리즈에 다시 생성 요청하면 409 SERIES_FIXTURES_EXIST', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/v1/admin/team-match-series')

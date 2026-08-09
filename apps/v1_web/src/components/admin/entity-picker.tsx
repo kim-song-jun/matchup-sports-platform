@@ -8,9 +8,9 @@ export interface EntityPickerItem {
   id: string;
   label: string;
   description?: string;
-  /** #5: 조건에 맞지 않아 선택할 수 없는 후보 — 목록에서 숨기지 않고 회색으로 보여준 뒤
-   * disabledReason으로 "왜 안 되는지"를 병기한다(색상만으로 상태를 전달하지 않기 위함). */
+  /** true면 목록엔 보이되(숨기지 않고) 회색으로 표시하고 클릭/Enter로 선택할 수 없다. */
   disabled?: boolean;
+  /** disabled일 때 항목 아래 표시할 "왜 선택할 수 없는지" 문구 — 컬러만으로 정보를 전달하지 않기 위해 항상 함께 노출한다. */
   disabledReason?: string;
 }
 
@@ -31,6 +31,12 @@ interface EntityPickerProps {
   emptyText?: string;
   /** 전달 시 목록 최상단에 "선택 해제" 옵션 노출 → onChange(null) */
   clearLabel?: string;
+  /**
+   * 서버 모드(onSearch 전달)에서도 검색어가 비어 있을 때 items를 그대로 보여준다.
+   * 호출자가 포커스만으로도 기본 후보(예: 최근 팀)를 미리 fetch해둔 경우에 켠다.
+   * 로컬 모드는 이미 기본으로 이렇게 동작해서 영향 없다.
+   */
+  showResultsWithoutQuery?: boolean;
 }
 
 type MenuEntry = { kind: 'clear' } | { kind: 'item'; item: EntityPickerItem };
@@ -48,6 +54,7 @@ export function EntityPicker({
   allowFreeText = false,
   emptyText = '검색 결과가 없어요',
   clearLabel,
+  showResultsWithoutQuery = false,
 }: EntityPickerProps) {
   const [inputValue, setInputValue] = useState('');
   const [debouncedValue, setDebouncedValue] = useState('');
@@ -101,7 +108,7 @@ export function EntityPicker({
   ];
 
   const hasQuery = debouncedValue.length > 0;
-  const showMenu = open && (hasQuery || !isServerMode || !!clearLabel);
+  const showMenu = open && (hasQuery || !isServerMode || !!clearLabel || (isServerMode && showResultsWithoutQuery));
   const safeHighlightIdx = highlightIdx >= 0 && highlightIdx < menuEntries.length ? highlightIdx : -1;
 
   // 가상 하이라이트: DOM focus를 옮기면 input blur → closeMenu로 메뉴가
@@ -126,8 +133,8 @@ export function EntityPicker({
   }
 
   function commitEntry(entry: MenuEntry) {
-    // 비활성 후보(다른 종목 팀 등)는 목록에 계속 보이되 선택은 no-op — 목록에서 숨기면
-    // "왜 안 보이지?"가 되고, 여기서 조용히 선택되면 잘못된 팀으로 제출될 수 있다.
+    // disabled 항목은 목록에서 숨기지 않되(왜 안 되는지 항상 같이 보여줌) 선택은 막는다.
+    // 메뉴는 열어둬서 사용자가 다른 항목을 마저 고를 수 있게 한다.
     if (entry.kind === 'item' && entry.item.disabled) return;
     onChange(entry.kind === 'clear' ? null : entry.item);
     setInputValue('');
@@ -278,26 +285,34 @@ export function EntityPicker({
                     role="option"
                     id={`${menuId}-opt-${idx}`}
                     aria-selected={highlighted}
-                    aria-disabled={item.disabled ? true : undefined}
+                    aria-disabled={item.disabled || undefined}
+                    // 네이티브 disabled도 함께 건다 — aria-disabled만으론 보조기기·이벤트
+                    // 시스템에 따라 "실제로는 클릭 가능한 버튼"으로 인식될 수 있다. 가상
+                    // 하이라이트는 DOM focus가 아니라 CSS 클래스로만 표시하므로(위 주석 참고)
+                    // disabled 버튼이어도 화살표 키 하이라이트 표시에는 영향이 없다.
+                    disabled={item.disabled}
                     tabIndex={-1}
                     onClick={() => commitEntry(entry)}
                     className={[
                       'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left transition-colors',
-                      item.disabled
-                        ? 'cursor-not-allowed opacity-60'
-                        : 'hover:bg-blue-50',
+                      item.disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-blue-50',
+                      // disabled 항목도 화살표 키로 하이라이트될 수 있다 — 선택은 막되(no-op),
+                      // 지금 어디에 있는지는 키보드 사용자에게도 보여야 한다.
+                      highlighted ? 'bg-blue-50' : '',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                      highlighted && !item.disabled ? 'bg-blue-50' : '',
                     ].join(' ')}
                   >
-                    <span className={`text-[var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-gray-900'}`}>
+                    <span
+                      className={`text-[var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-gray-900'}`}
+                    >
                       {item.label}
                     </span>
-                    {item.disabled && item.disabledReason ? (
-                      <span className="text-[var(--font-size-caption)] text-orange-500">{item.disabledReason}</span>
-                    ) : item.description ? (
+                    {item.description && (
                       <span className="text-[var(--font-size-caption)] text-gray-400">{item.description}</span>
-                    ) : null}
+                    )}
+                    {item.disabled && item.disabledReason && (
+                      <span className="text-[var(--font-size-caption)] text-gray-400">{item.disabledReason}</span>
+                    )}
                   </button>
                 );
               })}

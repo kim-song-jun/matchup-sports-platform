@@ -2614,7 +2614,8 @@ export type V1Tournament = {
   substitutionMode: V1SubstitutionMode | null;
   /** substitutionMode가 'rolling'이면 항상 null(무제한). */
   maxSubstitutions: number | null;
-  /** 선택 가능한 교체 방식 — 항상 두 값 모두, 종목 무관 공통. pin된 값이 없으면 []. */
+  /** 선택 가능한 교체 방식 — 종목·pin 여부와 무관하게 항상 ['limited','rolling'] 두 값
+   *  (TournamentsAdminService#loadLineupInfo). 출전 인원 후보와 달리 빈 배열이 되지 않는다. */
   substitutionModeOptions: V1SubstitutionMode[];
   genderCategory: V1TournamentGenderCategory | null;
   genderMinMale: number | null;

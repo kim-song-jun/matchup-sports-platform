@@ -94,9 +94,9 @@ export class LineupSizeConfigResolver {
     } else if (overrides.maxSubstitutions !== undefined) {
       // null 도 여기서 통과시킨다 — 이 계층은 "관리자가 제한형을 고르면서 개수를 비웠다"와
       // "이미 pin된 레거시 설정(개수 없는 limited)을 그대로 이어받는다"를 구분할 수 없기
-      // 때문이다(호출부만 dto 로 그 의도를 안다). 전자를 막는 것은 호출부의
-      // `assertExplicitSubstitutionLimit()` 담당이고, 이 분기는 후자를 깨지 않기 위해
-      // 값을 그대로 흘린다.
+      // 때문이다(호출부만 dto 로 그 의도를 안다). 전자를 막는 것은
+      // `TournamentsAdminService.assertSubstitutionPolicyPair()` 담당이고, 이 분기는
+      // 후자를 깨지 않기 위해 값을 그대로 흘린다.
       targetMaxSubstitutions = overrides.maxSubstitutions;
     } else if (canonical.lineup.substitutions === 'limited') {
       // 개수를 안 줬지만 canonical 자체가 제한형이면(football) 그 기본 횟수를 쓴다.

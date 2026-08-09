@@ -170,3 +170,13 @@ export function getCompleteTeamMatchSteps(ctx: TeamMatchValidationContext, steps
   const missingSteps = new Set(getTeamMatchMissingFields(ctx).map((item) => item.step));
   return steps.filter((step) => !missingSteps.has(step));
 }
+
+/** steps를 순서대로 검사해 결측 필드가 있는 첫 스텝을 반환한다(없으면 null).
+ * 진행 표시줄 클릭 이동에서 target 이전 스텝이 전부 유효한지 판정할 때 쓴다. */
+export function firstIncompleteTeamMatchStep(
+  ctx: TeamMatchValidationContext,
+  steps: TeamMatchCreateStep[],
+): TeamMatchCreateStep | null {
+  const missingSteps = new Set(getTeamMatchMissingFields(ctx).map((item) => item.step));
+  return steps.find((step) => missingSteps.has(step)) ?? null;
+}

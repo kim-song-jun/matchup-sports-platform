@@ -19,6 +19,7 @@ import type {
   TeamMatchModel,
   TeamMatchStateViewModel,
 } from './team-matches.types';
+import { teamMatchStepHref } from './team-matches.routes';
 
 const TEAM_MATCH_IMAGE_FALLBACK = '/mock/generated/team-huddle.webp';
 
@@ -483,7 +484,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
   return (
     <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="matches" bottomNav={false} backHref={model.backHref ?? '/team-matches'} desktopHead>
       <div className={`tm-create-shell tm-team-match-create-shell ${edit ? 'tm-create-shell-edit' : ''}`}>
-        <CreateProgress step={step} edit={edit} completeSteps={model.form?.completeSteps?.map(stepToNumber) ?? []} />
+        <CreateProgress step={step} edit={edit} completeSteps={model.form?.completeSteps?.map(stepToNumber) ?? []} onGoToStep={model.form?.onGoToStep} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
         {missingFields.length > 0 ? <MissingFieldsBanner missingFields={missingFields} stepHref={teamMatchStepHref} /> : null}
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 팀매치예요" body={model.form.lockedReason} /> : null}
@@ -650,6 +651,20 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   );
 }
 
+/**
+ * CreateField/FieldErrorText 곁에 두는 "필수 입력" 안내 — 실제 제출 로직(RULES 테이블)이
+ * 필수로 판정한 필드에만 붙인다. 호출부가 "값이 비어 있고 + 아직 에러도 없을 때"만
+ * shown=true를 넘긴다 — 값을 채우면 즉시 사라지고(붉은 별표처럼 다 채워도 남아 있는
+ * 표시가 아니다), 에러가 뜨면(에러 문구가 이미 "왜 안 되는지"를 설명하므로) 자리를
+ * 비켜준다. CreateField 자체는 라벨 텍스트만 받아 required 마커를 넣을 수 없어
+ * (v1-ui/create-form-fields.tsx는 여러 화면이 공유하는 컴포넌트라 여기서 수정하지 않는다)
+ * 필드 바깥의 별도 안내로 대신한다.
+ */
+function RequiredHint({ shown }: { shown: boolean }) {
+  if (!shown) return null;
+  return <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>필수 입력이에요</div>;
+}
+
 function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
   const hasTeams = model.teams.length > 0;
   const hasCreatableTeams = model.teams.some((team) => !team.disabled);
@@ -719,6 +734,7 @@ function InfoStep({ model, edit }: { model: TeamMatchCreateViewModel; edit: bool
       <h1 className="tm-text-heading">매치 정보</h1>
       {edit ? <ImmutableMatchContext team={model.selectedTeam} sport={model.selectedSport} /> : null}
       <CreateField id="field-title" error={model.form?.fieldErrors?.title} label="매치 제목" value={d.title} placeholder="예: 토요일 저녁 풋살 상대팀 구합니다" onChange={(value) => model.form?.onFieldChange('title', value)} />
+      <RequiredHint shown={!model.form?.fieldErrors?.title && !d.title.trim()} />
       <CreateField label="설명" value={d.description} placeholder="예: 친선 위주로 즐겁게 경기할 팀을 찾고 있어요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
       <ImageUploadField image={d.imageUrl} onChange={(value) => model.form?.onFieldChange('imageUrl', value)} onUpload={model.form?.uploadImage} />
       {edit ? (
@@ -814,10 +830,15 @@ function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
           />
         ) : null}
       </CreateField>
+      <RequiredHint shown={!errors?.venue && !d.venue.trim()} />
       <CreateField label="상세 주소" value={d.address} placeholder="예: 서울 송파구 올림픽로 25, 3층 2번 코트" onChange={(value) => model.form?.onFieldChange('address', value)} />
       <CreateField id="field-date" error={errors?.date} label="날짜" value={d.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
+      <RequiredHint shown={!errors?.date && !d.date} />
       <div className="tm-create-two-col">
-        <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={d.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
+        <div>
+          <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={d.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
+          <RequiredHint shown={!errors?.startTime && !d.startTime} />
+        </div>
         <CreateField label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
       <div className="tm-create-two-col">
@@ -840,7 +861,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
   }, [selectedRegion?.parentName]);
 
   if (parentNames.length === 0) {
-    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div><FieldErrorText message={error} /></label>;
+    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select id="field-regionId" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div><FieldErrorText message={error} /><RequiredHint shown={!error && !value} /></label>;
   }
 
   return (
@@ -873,6 +894,7 @@ function RegionSelect({ value, regions, onChange, error }: { value: string; regi
       </div>
       <div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div>
       <FieldErrorText message={error} />
+      <RequiredHint shown={!error && !value} />
     </div>
   );
 }
@@ -999,8 +1021,66 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
   );
 }
 
-function CreateProgress({ step, edit, completeSteps = [] }: { step: number; edit: boolean; completeSteps?: number[] }) {
-  const stepLabel = ['팀 선택', '종목 선택', '매치 정보', '경기조건', '장소와 시간', '작성 내용 확인'][step - 1];
+const CREATE_PROGRESS_STEPS: Array<{ key: TeamMatchCreateViewModel['step']; label: string }> = [
+  { key: 'team', label: '팀 선택' },
+  { key: 'sport', label: '종목 선택' },
+  { key: 'info', label: '매치 정보' },
+  { key: 'condition', label: '경기조건' },
+  { key: 'place-time', label: '장소와 시간' },
+  { key: 'confirm', label: '작성 내용 확인' },
+];
+
+/** 받침 유무에 따라 "으로"/"로"를 고른다 — aria-label에 라벨을 이어붙일 때 "선택로"처럼
+ * 어색한 조사가 나오는 것을 막는다(예: 팀 선택→으로, 매치 정보→로). */
+/** 한글 종성 분해에서 ㄹ의 인덱스. 받침이 ㄹ이면 "으로"가 아니라 "로"를 쓴다
+ *  ("이메일로", "서울로" — "이메일으로"는 비문). 받침 유무만 보면 이 예외를
+ *  놓친다. */
+const JONGSEONG_RIEUL = 8;
+
+function withDestinationParticle(label: string) {
+  const trimmed = label.trim();
+  const lastChar = trimmed.charCodeAt(trimmed.length - 1);
+  const isHangulSyllable = lastChar >= 0xac00 && lastChar <= 0xd7a3;
+  const jongseong = isHangulSyllable ? (lastChar - 0xac00) % 28 : 0;
+  const needsEuro = jongseong !== 0 && jongseong !== JONGSEONG_RIEUL;
+  return `${label}${needsEuro ? '으로' : '로'}`;
+}
+
+function CreateProgress({
+  step,
+  edit,
+  completeSteps = [],
+  onGoToStep,
+}: {
+  step: number;
+  edit: boolean;
+  completeSteps?: number[];
+  /** 진행 표시줄 클릭 이동. 있으면 각 단계가 클릭 가능한 버튼이 되고, 없으면(정적 렌더 등)
+   * 예전처럼 읽기 전용 progressbar로 표시한다. */
+  onGoToStep?: (step: TeamMatchCreateViewModel['step']) => void;
+}) {
+  const stepLabel = CREATE_PROGRESS_STEPS[step - 1]?.label ?? '';
+  const bars = CREATE_PROGRESS_STEPS.map((item, index) => {
+    const itemStep = index + 1;
+    const active = itemStep <= step;
+    const complete = completeSteps.includes(itemStep);
+    if (!onGoToStep) {
+      return <span key={item.key} data-active={active} data-complete={complete} aria-hidden="true" />;
+    }
+    return (
+      <button
+        key={item.key}
+        type="button"
+        onClick={() => onGoToStep(item.key)}
+        aria-current={itemStep === step ? 'step' : undefined}
+        aria-label={`${itemStep}단계 ${withDestinationParticle(item.label)} 이동`}
+        style={{ display: 'block', width: '100%', background: 'none', border: 0, padding: 0, margin: 0, cursor: 'pointer' }}
+      >
+        <span data-active={active} data-complete={complete} aria-hidden="true" style={{ display: 'block', width: '100%' }} />
+      </button>
+    );
+  });
+
   return (
     <div className="tm-create-progress">
       {/* edit 모드: 배지 + 안내 텍스트를 space-between으로 양쪽 정렬.
@@ -1009,29 +1089,31 @@ function CreateProgress({ step, edit, completeSteps = [] }: { step: number; edit
         <span className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{edit ? '수정' : `${step}/6단계`}</span>
         <span className="tm-text-caption">{edit ? '변경한 항목만 저장돼요' : stepLabel}</span>
       </div>
-      {/* 단계 진행 바: role="progressbar"로 스크린리더가 진행 상태를 읽을 수 있도록 함.
-          data-complete: 이미 지나온 스텝 중 필수 필드를 전부 채운 스텝 — CSS가 green으로 표시(#1). */}
+      {/* 단계 진행 바 — onGoToStep이 있으면(create 위저드) 각 단계를 클릭해 바로 이동할 수 있고,
+          앞 단계가 비어 있으면 첫 무효 단계로 되돌아간다(team-matches.validation의
+          firstIncompleteTeamMatchStep). onGoToStep이 없으면(정적 렌더 등) 예전처럼 읽기 전용
+          progressbar로 표시한다. data-complete: 이미 지나온 스텝 중 필수 필드를 전부 채운
+          스텝 — CSS가 green으로 표시(#1). */}
       {!edit ? (
-        <div
-          className="tm-create-bars tm-create-bars-6"
-          role="progressbar"
-          aria-valuenow={step}
-          aria-valuemin={1}
-          aria-valuemax={6}
-          aria-label={`팀매치 만들기 진행 상태: ${step}단계 중 6단계 (${stepLabel})`}
-        >
-          {[1, 2, 3, 4, 5, 6].map((item) => <span key={item} data-active={item <= step} data-complete={completeSteps.includes(item)} aria-hidden="true" />)}
-        </div>
+        onGoToStep ? (
+          <nav aria-label="팀매치 만들기 단계 이동" className="tm-create-bars tm-create-bars-6">
+            {bars}
+          </nav>
+        ) : (
+          <div
+            className="tm-create-bars tm-create-bars-6"
+            role="progressbar"
+            aria-valuenow={step}
+            aria-valuemin={1}
+            aria-valuemax={6}
+            aria-label={`팀매치 만들기 진행 상태: ${step}단계 중 6단계 (${stepLabel})`}
+          >
+            {bars}
+          </div>
+        )
       ) : null}
     </div>
   );
-}
-
-/* #2: MissingFieldsBanner가 각 결측 필드를 그 필드가 실제로 사는 스텝으로 링크할 때 쓴다.
- * team-matches.validation.ts의 RULES가 참조하는 step 값은 항상 그 스텝의 라우트 세그먼트와
- * 동일한 문자열이라 템플릿 하나로 전 스텝을 커버한다. */
-function teamMatchStepHref(step: TeamMatchCreateViewModel['step']) {
-  return `/team-matches/new/${step}`;
 }
 
 function stepToNumber(step: TeamMatchCreateViewModel['step']) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTeamMatchPayloadResult,
+  firstIncompleteTeamMatchStep,
   getCompleteTeamMatchSteps,
   getTeamMatchMissingFields,
   getTeamMatchStepErrors,
@@ -106,6 +107,27 @@ describe('getCompleteTeamMatchSteps — CreateProgress 체크 배지 판정', ()
 
     expect(complete).toEqual(expect.arrayContaining(['team', 'sport', 'info', 'condition']));
     expect(complete).not.toContain('place-time');
+  });
+});
+
+describe('firstIncompleteTeamMatchStep — 진행 표시줄 클릭 이동 가드', () => {
+  const order: Array<'team' | 'sport' | 'info' | 'condition' | 'place-time'> = ['team', 'sport', 'info', 'condition', 'place-time'];
+
+  it('모든 이전 단계가 유효하면 null을 반환한다(target으로 자유 이동)', () => {
+    expect(firstIncompleteTeamMatchStep(baseCtx(), order)).toBeNull();
+  });
+
+  it('중간 단계가 비어 있으면 그 단계를 반환한다(더 뒤 단계로 건너뛰지 못하게)', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, title: '' } });
+    expect(firstIncompleteTeamMatchStep(ctx, order)).toBe('info');
+  });
+
+  it('검사 범위를 좁히면(steps 목록) 그 범위 밖 결측은 무시한다', () => {
+    // info로 가려는 클릭은 그 앞 단계(team/sport)만 검사하면 된다 — venue는
+    // place-time 스텝의 필드라 검사 범위 밖이고, 비어 있어도 이 판정을 막지 않는다.
+    // (범위를 place-time까지 넓히면 같은 ctx가 'place-time'을 반환한다 — 위 105행 케이스.)
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, venue: '' } });
+    expect(firstIncompleteTeamMatchStep(ctx, ['team', 'sport'])).toBeNull();
   });
 });
 

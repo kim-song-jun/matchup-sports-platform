@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -75,5 +75,58 @@ describe('team match full edit', () => {
     expect(screen.getByLabelText(/상대팀 부담금/)).toBeInTheDocument();
     expect(screen.getByText('성별 조건')).toBeInTheDocument();
     expect(screen.getByText('지역')).toBeInTheDocument();
+  });
+});
+
+describe('팀매치 만들기 진행 표시줄 — 클릭 이동', () => {
+  it('각 단계가 클릭 가능한 버튼이고, 조사(으로/로)가 올바르게 붙는다', () => {
+    const onGoToStep = vi.fn();
+    const model = getTeamMatchCreateViewModel('team');
+    model.form = {
+      selectedTeamId: 'team-1',
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [],
+      onSelectTeam: () => undefined,
+      onSelectSport: () => undefined,
+      onFieldChange: () => undefined,
+      onRegionChange: () => undefined,
+      onBack: () => undefined,
+      onNext: () => undefined,
+      onSubmit: () => undefined,
+      onGoToStep,
+    };
+
+    renderPage(<TeamMatchCreatePageView model={model} />);
+
+    // 받침 있는 라벨(팀 선택, 경기조건 등)은 "으로", 받침 없는 라벨(매치 정보)은 "로".
+    expect(screen.getByRole('button', { name: '1단계 팀 선택으로 이동' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '3단계 매치 정보로 이동' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '4단계 경기조건으로 이동' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '5단계 장소와 시간으로 이동' }));
+    expect(onGoToStep).toHaveBeenCalledWith('place-time');
+  });
+
+  it('onGoToStep이 없으면(정적 렌더) 예전처럼 읽기 전용 progressbar로 남는다', () => {
+    const model = getTeamMatchCreateViewModel('team');
+    model.form = {
+      selectedTeamId: 'team-1',
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [],
+      onSelectTeam: () => undefined,
+      onSelectSport: () => undefined,
+      onFieldChange: () => undefined,
+      onRegionChange: () => undefined,
+      onBack: () => undefined,
+      onNext: () => undefined,
+      onSubmit: () => undefined,
+    };
+
+    renderPage(<TeamMatchCreatePageView model={model} />);
+
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /단계.*이동/ })).not.toBeInTheDocument();
   });
 });

@@ -153,6 +153,10 @@ export type TeamMatchCreateViewModel = {
     onBack: () => void;
     onNext: () => void;
     onSubmit: () => void;
+    /** 진행 표시줄 클릭 이동. target 이전 스텝이 모두 유효할 때만 target으로 이동하고,
+     * 그렇지 않으면 첫 번째 무효 스텝으로 되돌린다(team-matches.validation의
+     * firstIncompleteTeamMatchStep). edit 화면은 스텝 구분이 없어 설정하지 않는다. */
+    onGoToStep?: (step: TeamMatchCreateStep) => void;
     onCancel?: () => void;
     submitLabel?: string;
     submitting?: boolean;

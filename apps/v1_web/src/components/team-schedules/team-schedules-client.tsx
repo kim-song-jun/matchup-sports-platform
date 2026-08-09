@@ -387,6 +387,14 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       },
       onComplete,
       canComplete: Boolean(schedule && schedule.state === 'SCHEDULED' && new Date(schedule.endAt).getTime() <= Date.now()),
+      // 이 사유는 `manage.visible`(위 382행 — `state === 'SCHEDULED'`를 이미
+      // 요구한다) 안에서만 렌더되므로, 취소·종료된 일정을 위한 분기는 화면에
+      // 도달할 수 없다. 도달 못 하는 문구를 남겨두면 이후에 그게 노출된다고
+      // 오해하게 되므로 시간 조건만 남긴다.
+      completeDisabledReason:
+        schedule && new Date(schedule.endAt).getTime() > Date.now()
+          ? '경기가 끝난 뒤에 완료 처리할 수 있어요.'
+          : null,
       cancelPending: cancelSchedule.isPending,
       completePending: completeSchedule.isPending,
       reminders: [

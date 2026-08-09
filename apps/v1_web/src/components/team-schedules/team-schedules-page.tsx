@@ -336,11 +336,17 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                 <div className="tm-text-label" style={{ marginBottom: 8 }}>운영 관리</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={manage.editHref}>일정 수정</Link>
-                  {manage.canComplete ? (
-                    <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" disabled={manage.completePending} onClick={manage.onComplete}>
-                      {manage.completePending ? '처리 중…' : '완료 처리'}
-                    </button>
-                  ) : null}
+                  {/* 완료 처리는 항상 렌더한다 — canComplete가 false여도 버튼을 감추지 않고
+                      disabled + 사유로 보여준다("버튼이 왜 안 되는지 항상 설명"). */}
+                  <button
+                    type="button"
+                    className="tm-btn tm-btn-sm tm-btn-neutral"
+                    disabled={!manage.canComplete || manage.completePending}
+                    aria-describedby={!manage.canComplete && manage.completeDisabledReason ? 'schedule-complete-disabled-reason' : undefined}
+                    onClick={manage.onComplete}
+                  >
+                    {manage.completePending ? '처리 중…' : '완료 처리'}
+                  </button>
                   {/* 취소는 이 카드에서 유일한 파괴적 액션인데 ghost(배경 없음)라 평문처럼 보여
                       형제 버튼들보다 오히려 덜 눌러 보였다. 테두리를 줘 버튼임이 드러나게 하되,
                       꽉 찬 danger 로 만들면 수정·완료 처리보다 시선을 끌어 잘못 유도하므로
@@ -366,6 +372,11 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                     </button>
                   ))}
                 </div>
+                {!manage.canComplete && manage.completeDisabledReason ? (
+                  <div id="schedule-complete-disabled-reason" className="tm-text-caption" style={{ marginTop: 8 }} role="status">
+                    {manage.completeDisabledReason}
+                  </div>
+                ) : null}
               </div>
             ) : null,
           ].filter(Boolean);

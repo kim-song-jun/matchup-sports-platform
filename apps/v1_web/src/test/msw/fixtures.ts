@@ -727,6 +727,7 @@ export const v1SettingsFixture: V1Settings = {
   profile: {
     displayName: '송준',
   },
+  theme: 'light',
   notifications: {
     matchEnabled: true,
     teamEnabled: true,

@@ -1235,7 +1235,7 @@ function TeamRegistrationHub({
             gap: 4,
           }}
         >
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+          <span className="tm-text-caption" style={{ color: blockMessage ? 'var(--orange700)' : 'var(--text-strong)', fontWeight: 700 }}>
             정원 {describeTournamentCapacity(capacity)}
           </span>
           {blockMessage ? (

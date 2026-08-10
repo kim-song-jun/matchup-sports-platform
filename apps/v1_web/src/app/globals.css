@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* 다크모드 전략을 OS 자동(prefers-color-scheme, Tailwind v4 기본값)에서 수동 토글
+ * (class 기반)로 전환한다. `<html>`에 .dark 클래스가 있을 때만 dark: 유틸리티가
+ * 적용된다 — 적용 여부는 ThemeProvider(src/components/providers/theme-provider.tsx)가
+ * 계정/로컬 선호도를 읽어 결정하며, 기본값은 always light다(OS 설정과 무관). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Tailwind v4 커스텀 폰트 크기 유틸리티 — @theme 블록 안에서 정의해야 text-2xs 등의
  * 클래스가 실제 CSS로 생성된다(v3의 tailwind.config.js theme.extend 대응).
  * --font-size-micro(11px, :root 아래)와 값을 맞춘다. */
@@ -100,6 +106,7 @@
   --tint-orange: rgba(254, 152, 0, 0.10);  /* --orange500(#fe9800) 10% — 주황 안내 카드 */
   --tint-grey: rgba(107, 118, 132, 0.10);  /* --grey600(#6b7684, --text-muted) 10% — 중립(마감/종료) 안내 카드 */
   --tint-blue-border: rgba(49, 130, 246, 0.24); /* --blue500(#3182f6) 24% — 파란 카드 테두리 */
+  --tint-blue: rgba(49, 130, 246, 0.08);   /* --blue500(#3182f6) 8% — 파란 안내 카드 배경, var(--blue50) 다크모드 미대응 대체 */
   /* 어두운 스크림 / 오버레이 (히어로 카드, 서랍, 토스트) */
   --scrim-dark-32: rgba(25, 31, 40, 0.32);  /* 대화상자 스크림 */
   --scrim-dark-72: rgba(25, 31, 40, 0.72);  /* 히어로 하단바 배경 */
@@ -228,52 +235,65 @@
   --tm-tournament-banner-ratio: 4 / 1;
 }
 
-/* ── [레인 C] 핵심 다크모드 토큰 ────────────────────────────────────────────
+/* ── 핵심 다크모드 토큰 ────────────────────────────────────────────
  * team-schedules / team-matches 화면은 여기까지만 커버(토큰 참조 소비처에 자동
  * 전파). 개별 화면의 하드코딩 색(Tailwind gray-*, 인라인 hex 등)은 이번 범위 밖 —
  * 남은 작업으로 PR 본문에 기록한다. tournament-ops(운영 콘솔)는 이미 Tailwind
  * `dark:` 클래스를 전면 사용 중이라 이 토큰과 무관하게 별도로 대응돼 있다.
  * `@theme` 안이 아니라 `:root`를 오버라이드하므로 Tailwind 유틸리티가 아니라
- * CSS 커스텀 프로퍼티를 직접 참조하는 컴포넌트 스타일에 적용된다. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    /* 그레이 스케일도 명도를 반전해 함께 뒤집는다 — .tm-app-frame 같은 공유 셸이
-     * 세만틱 토큰이 아니라 --grey50/100 원시값을 페이지 배경/보더로 직접 참조하는
-     * 경우가 많아(R-X4 위반이지만 기존 코드), 이 스케일을 그대로 두면 텍스트
-     * 토큰만 밝게 뒤집혀 옅은 회색 배경 위에 거의 안 보이는 텍스트가 되는 실측
-     * 대비 회귀가 있었다(스크린샷으로 확인). --border/--list-row-* 등 이미 다크
-     * 값을 가진 시맨틱 토큰과 동일한 명도 지점에 맞춰 매핑한다. */
-    --grey50: #1a1c22;
-    --grey100: #1c1e24;
-    --grey150: #20222a;
-    --grey200: #262932;
-    --grey300: #333a45;
-    --grey400: #4e5968;
-    --grey500: #6b7684;
-    --grey600: #8b95a1;
-    --grey700: #9aa4b2;
-    --grey800: #d1d6db;
-    --grey900: #f2f4f6;
-    --bg: #121317;
-    --background: var(--bg);
-    --surface: #1c1e24;
-    --surface-soft: #24262d;
-    --foreground: #f2f4f6;
-    --text-strong: #f2f4f6;
-    --text: #d1d6db;
-    --text-body: #d1d6db;
-    --text-muted: #9aa4b2;
-    --text-caption: #9aa4b2;
-    --muted: var(--text-muted);
-    --border: #333a45;
-    --border-strong: #4e5968;
-    --line: var(--border);
-    --card-surface: #1c1e24;
-    --list-row-bg: #1a1c22;
-    --list-row-border: #262932;
-    --input-surface: var(--surface);
-  }
+ * CSS 커스텀 프로퍼티를 직접 참조하는 컴포넌트 스타일에 적용된다.
+ * 과거엔 `@media (prefers-color-scheme: dark)`로 OS 설정에 자동 반응했으나,
+ * 수동 토글(ThemeProvider가 <html>에 .dark 클래스를 부여) 도입 이후 클래스
+ * 셀렉터로 전환했다 — 위 @custom-variant dark 와 동일한 `.dark` 클래스를
+ * 기준으로 삼아 Tailwind dark: 유틸리티와 항상 같은 상태를 본다. */
+:root.dark {
+  color-scheme: dark;
+  /* 그레이 스케일도 명도를 반전해 함께 뒤집는다 — .tm-app-frame 같은 공유 셸이
+   * 세만틱 토큰이 아니라 --grey50/100 원시값을 페이지 배경/보더로 직접 참조하는
+   * 경우가 많아(R-X4 위반이지만 기존 코드), 이 스케일을 그대로 두면 텍스트
+   * 토큰만 밝게 뒤집혀 옅은 회색 배경 위에 거의 안 보이는 텍스트가 되는 실측
+   * 대비 회귀가 있었다(스크린샷으로 확인). --border/--list-row-* 등 이미 다크
+   * 값을 가진 시맨틱 토큰과 동일한 명도 지점에 맞춰 매핑한다. */
+  --grey50: #1a1c22;
+  --grey100: #1c1e24;
+  --grey150: #20222a;
+  --grey200: #262932;
+  --grey300: #333a45;
+  --grey400: #4e5968;
+  --grey500: #6b7684;
+  --grey600: #8b95a1;
+  --grey700: #9aa4b2;
+  --grey800: #d1d6db;
+  --grey900: #f2f4f6;
+  --bg: #121317;
+  --background: var(--bg);
+  --surface: #1c1e24;
+  --surface-soft: #24262d;
+  --foreground: #f2f4f6;
+  --text-strong: #f2f4f6;
+  --text: #d1d6db;
+  --text-body: #d1d6db;
+  --text-muted: #9aa4b2;
+  --text-caption: #9aa4b2;
+  --muted: var(--text-muted);
+  --border: #333a45;
+  --border-strong: #4e5968;
+  --line: var(--border);
+  --card-surface: #1c1e24;
+  --list-row-bg: #1a1c22;
+  --list-row-border: #262932;
+  --input-surface: var(--surface);
+}
+
+/* 리뷰 에러/재시도 안내 카드 — 라이트: var(--red50) 파스텔 배경.
+   다크에서는 --red50/--red500이 라이트 전용 고정값이라 그대로 두면
+   밝은 핑크 배경 위에 밝은 텍스트가 겹쳐 대비가 무너진다 (reviews-page.tsx). */
+.tm-review-notice-error {
+  background: var(--red50);
+}
+
+:root.dark .tm-review-notice-error {
+  background: rgba(240, 68, 82, 0.15);
 }
 
 * {

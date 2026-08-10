@@ -445,14 +445,22 @@ export class ProfileService {
       profile: {
         displayName: snapshot.profile?.nickname ?? '사용자',
       },
+      theme: snapshot.themePreference,
       notifications: toSettingsNotifications(preferences),
     };
   }
 
   async updateSettings(user: V1AuthUser, dto: UpdateSettingsDto) {
     this.assertMutableAccount(user);
-    const [profile, preferences] = await this.prisma.$transaction(async (tx) => {
+    const [profile, theme, preferences] = await this.prisma.$transaction(async (tx) => {
       const nextProfile = await tx.v1UserProfile.findUnique({ where: { userId: user.id } });
+
+      const nextTheme =
+        dto.theme === undefined
+          ? (await tx.v1User.findUnique({ where: { id: user.id }, select: { themePreference: true } }))
+              ?.themePreference
+          : (await tx.v1User.update({ where: { id: user.id }, data: { themePreference: dto.theme } }))
+              .themePreference;
 
       const notificationInput = dto.notifications ?? {};
       const individualNotifications = {
@@ -492,11 +500,20 @@ export class ProfileService {
         });
       }
 
-      return [nextProfile, nextPreferences] as const;
+      if (dto.theme !== undefined) {
+        await writeUserAuditLog(tx, {
+          userId: user.id,
+          targetType: 'user_theme_settings',
+          reason: `settings.theme.update:${dto.theme}`,
+        });
+      }
+
+      return [nextProfile, nextTheme, nextPreferences] as const;
     });
 
     return {
       profile: { displayName: profile?.nickname ?? '사용자' },
+      theme: theme ?? 'light',
       notifications: toSettingsNotifications(preferences),
       updatedAt: preferences.updatedAt,
     };

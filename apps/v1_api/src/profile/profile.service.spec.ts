@@ -72,6 +72,62 @@ describe('ProfileService identity binding', () => {
   });
 });
 
+describe('ProfileService settings theme preference', () => {
+  function buildPrisma(overrides: {
+    updateResolvedTheme?: 'light' | 'dark' | 'system';
+    findUniqueResolvedTheme?: 'light' | 'dark' | 'system';
+  } = {}) {
+    const prisma = {
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({ themePreference: overrides.findUniqueResolvedTheme ?? 'light' }),
+        update: jest.fn().mockResolvedValue({ themePreference: overrides.updateResolvedTheme ?? 'dark' }),
+      },
+      v1UserProfile: {
+        findUnique: jest.fn().mockResolvedValue({ nickname: '테스트닉' }),
+      },
+      v1NotificationPreference: {
+        upsert: jest.fn().mockResolvedValue({
+          activityEnabled: true,
+          marketingEnabled: false,
+          updatedAt: new Date('2026-08-10T00:00:00Z'),
+        }),
+      },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
+    return prisma;
+  }
+
+  it('persists an explicit theme choice and echoes it back without touching notifications', async () => {
+    const prisma = buildPrisma({ updateResolvedTheme: 'dark' });
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    const result = await service.updateSettings(user, { theme: 'dark' });
+
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: user.id },
+      data: { themePreference: 'dark' },
+    });
+    expect(prisma.v1User.findUnique).not.toHaveBeenCalled();
+    expect(result.theme).toBe('dark');
+  });
+
+  it('leaves the stored theme untouched and echoes the current value when the request omits theme', async () => {
+    const prisma = buildPrisma({ findUniqueResolvedTheme: 'system' });
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    const result = await service.updateSettings(user, { notifications: { chatEnabled: false } });
+
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+    expect(prisma.v1User.findUnique).toHaveBeenCalledWith({
+      where: { id: user.id },
+      select: { themePreference: true },
+    });
+    expect(result.theme).toBe('system');
+  });
+});
+
 describe('ProfileService phone change proof gate', () => {
   const OLD_PHONE = '01011112222';
   const NEW_PHONE = '01033334444';

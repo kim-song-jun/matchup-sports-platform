@@ -189,7 +189,7 @@ export function ReviewSourcePageView({
                 );
               })}
             </div>
-            <Card pad={14} style={{ background: message ? 'var(--red50)' : 'var(--grey50)' }}>
+            <Card className={message ? 'tm-review-notice-error' : ''} pad={14} style={message ? undefined : { background: 'var(--grey50)' }}>
               <div className="tm-text-label">{message ?? '작성 현황'}</div>
               <div className="tm-text-caption" style={{ marginTop: 5 }}>{message ? '선택 상태를 확인한 뒤 다시 시도해 주세요.' : model.progressLabel}</div>
             </Card>
@@ -448,7 +448,7 @@ function ReviewSkeleton({ count }: { count: number }) {
 
 function ReviewNotice({ onRetry, sub, title }: { onRetry: () => void; sub: string; title: string }) {
   return (
-    <Card pad={16} style={{ background: 'var(--red50)' }}>
+    <Card className="tm-review-notice-error" pad={16}>
       <div className="tm-text-body-lg">{title}</div>
       <div className="tm-text-caption" style={{ marginTop: 5 }}>{sub}</div>
       <button className="tm-btn tm-btn-sm tm-btn-neutral" onClick={onRetry} style={{ marginTop: 12 }} type="button">다시 시도</button>

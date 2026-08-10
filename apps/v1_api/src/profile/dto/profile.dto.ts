@@ -81,6 +81,10 @@ class SettingsNotificationsDto {
 
 export class UpdateSettingsDto {
   @IsOptional()
+  @IsIn(['light', 'dark', 'system'])
+  theme?: 'light' | 'dark' | 'system';
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => SettingsNotificationsDto)
   notifications?: SettingsNotificationsDto;

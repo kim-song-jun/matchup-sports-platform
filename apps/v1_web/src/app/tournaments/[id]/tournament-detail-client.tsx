@@ -440,7 +440,7 @@ export function TournamentDetailView({
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>상품 및 상금</div>
-            <div className="tm-text-body-lg" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 800, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+            <div className="tm-text-body-lg" style={{ marginTop: 4, color: 'var(--orange700)', fontWeight: 800, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
               {prizeText}
             </div>
           </div>
@@ -1886,7 +1886,7 @@ function StandingRow({
       >
         <span
           className="tm-text-caption tab-num"
-          style={{ color: isQualifying ? 'var(--text-strong)' : 'var(--text-caption)', fontWeight: isQualifying ? 700 : 400 }}
+          style={{ color: isQualifying ? 'var(--blue700)' : 'var(--text-caption)', fontWeight: isQualifying ? 700 : 400 }}
         >
           {rank}
         </span>
@@ -1901,7 +1901,7 @@ function StandingRow({
           />
           <span
             className="tm-text-label"
-            style={{ color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+            style={{ color: isQualifying ? 'var(--blue700)' : 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
           >
             {standing.teamName}
           </span>
@@ -1913,7 +1913,7 @@ function StandingRow({
         </div>
       </td>
       <td style={{ padding: '8px 4px', textAlign: 'center' }}>
-        <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+        <span className="tm-text-label tab-num" style={{ color: isQualifying ? 'var(--blue700)' : 'var(--text-strong)', fontWeight: 700 }}>
           {standing.points}
         </span>
       </td>

@@ -28,6 +28,17 @@ enum V1OnboardingStatus {
   deferred
 }
 
+/**
+ * 화면 테마 선호도. 기본값은 항상 light — OS의 prefers-color-scheme을 자동으로
+ * 따라가지 않는다(제품 요구사항). system을 명시적으로 선택한 사용자만 클라이언트에서
+ * OS 설정에 맞춰 dark/light를 동적으로 계산한다.
+ */
+enum V1ThemePreference {
+  light
+  dark
+  system
+}
+
 enum V1AuthProvider {
   kakao
   naver
@@ -498,6 +509,7 @@ model V1User {
   deletedAt        DateTime?          @map("deleted_at")
   emailVerifiedAt  DateTime?          @map("email_verified_at")
   phoneVerifiedAt  DateTime?          @map("phone_verified_at")
+  themePreference  V1ThemePreference  @default(light) @map("theme_preference")
 
   authIdentities                 V1AuthIdentity[]
   profile                        V1UserProfile?

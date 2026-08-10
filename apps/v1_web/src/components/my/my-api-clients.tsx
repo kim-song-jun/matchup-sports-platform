@@ -7,11 +7,14 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { Check } from 'lucide-react';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
+import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
 import { clearStoredV1Session } from '@/lib/session-storage';
+import type { ThemePreference } from '@/lib/theme';
 import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
   useV1AcceptTeamInvitation,
@@ -1500,6 +1503,73 @@ export function NotificationSettingsPageClient() {
                     {enabled ? 'ON' : 'OFF'}
                   </span>
                   <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+const THEME_OPTIONS: { key: ThemePreference; label: string; sub: string }[] = [
+  { key: 'light', label: '라이트', sub: '항상 밝은 화면으로 봐요' },
+  { key: 'dark', label: '다크', sub: '항상 어두운 화면으로 봐요' },
+  { key: 'system', label: '기기 설정', sub: '내 기기의 화면 모드를 따라가요' },
+];
+
+export function ThemeSettingsPageClient() {
+  const { preference, setPreference, isSaving, saveError } = useTheme();
+
+  return (
+    <AppChrome title="화면 테마" activeTab="my" bottomNav={false} backHref="/my/settings">
+      <div className="tm-my-shell">
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">화면 테마</h1>
+          </div>
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">화면 밝기 고르기</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              기본값은 라이트예요. 로그인하면 이 기기뿐 아니라 다른 기기에서도 같은 설정으로 보여요.
+            </div>
+          </Card>
+          {saveError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요. 이 화면에서는 그대로 적용돼요.</div>
+            </Card>
+          ) : null}
+          <div className="tm-card" style={{ padding: 0 }} role="radiogroup" aria-label="화면 테마 선택">
+            {THEME_OPTIONS.map((option) => {
+              const selected = preference === option.key;
+              return (
+                <button
+                  key={option.key}
+                  className="tm-my-menu-row tm-pressable"
+                  onClick={() => setPreference(option.key)}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  disabled={isSaving && selected}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    background: selected ? 'var(--blue50)' : 'none',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="tm-text-body" style={{ color: selected ? 'var(--blue700)' : undefined }}>{option.label}</div>
+                    <div className="tm-text-caption" style={{ marginTop: 3 }}>{option.sub}</div>
+                  </div>
+                  {/* 컬러만으로 선택 상태를 전달하지 않도록 체크 아이콘 + 배경색을 함께 사용 */}
+                  {selected ? <Check size={18} strokeWidth={2.5} color="var(--blue500)" aria-hidden="true" /> : null}
                 </button>
               );
             })}

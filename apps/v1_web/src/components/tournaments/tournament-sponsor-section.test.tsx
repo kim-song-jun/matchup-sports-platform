@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import type { V1TournamentSponsor } from '@/types/api';
 import { TournamentSponsorSection } from './tournament-sponsor-section';
 import styles from './tournament-sponsor-section.module.css';

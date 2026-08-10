@@ -287,6 +287,14 @@ export class AuthService {
 
     if (existingIdentity) {
       if (isExpiredSocialSignup(existingIdentity.user)) {
+        if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
+          this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
+          throw new ForbiddenException({
+            code: 'PERMISSION_DENIED',
+            message: 'This account cannot sign in',
+          });
+        }
+
         await this.prisma.$transaction([
           this.prisma.v1AuthIdentity.update({
             where: { id: existingIdentity.id },

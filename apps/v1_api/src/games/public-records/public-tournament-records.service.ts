@@ -499,18 +499,23 @@ export class PublicTournamentRecordsService {
     if (fixturesWithGame.length === 0) return new Map();
 
     const gameIds = fixturesWithGame.map((fixture) => fixture.game.id);
+    // WHERE 에 type:'GOAL' 을 걸면 안 된다. 취소를 나타내는 행은 GOAL 이 아니라
+    // CORRECTION 이고 `reversesEventId` 를 그 CORRECTION 행이 들고 있어서, GOAL 만
+    // 읽으면 reversedIds 가 항상 비어 취소된 골이 그대로 남는다(알파 실측: 골 2개인
+    // 경기에서 GOAL 4행 중 2행이 CORRECTION 으로 취소됐는데 요약에 4개가 다 떴다).
+    // 같은 파일의 buildEvents 는 전체를 읽고 *나중에* 타입을 거르는데, 여기만
+    // 쿼리에서 걸러 규칙이 갈라졌던 것이다 — buildEvents 와 같은 순서로 맞춘다.
     const events = await this.prisma.v1GameEvent.findMany({
-      where: { gameId: { in: gameIds }, type: 'GOAL' },
+      where: { gameId: { in: gameIds } },
       orderBy: { sequence: 'asc' },
-      select: { id: true, gameId: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true },
+      select: { id: true, gameId: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true },
     });
-    // 정정으로 되돌려진(reversesEventId로 취소된) 골은 요약에서도 뺀다 --
-    // tallyLiveScore/loadLiveScores와 동일한 규칙.
     const reversedIds = new Set(
       events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
     );
     const eventsByGame = new Map<string, typeof events>();
     for (const event of events) {
+      if (event.type !== 'GOAL') continue;
       if (reversedIds.has(event.id)) continue;
       const list = eventsByGame.get(event.gameId) ?? [];
       list.push(event);

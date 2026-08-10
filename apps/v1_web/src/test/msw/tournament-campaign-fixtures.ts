@@ -10,15 +10,24 @@ import type {
 const PUBLISHED_AT = '2026-07-14T01:00:00.000Z';
 const ARCHIVED_AT = '2026-07-14T02:00:00.000Z';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// 아래 대회는 status: 'open' 이라 접수가 열려 있어야 의미가 있는 픽스처다.
+// 절대 날짜로 두면 그 시각 이후 실행되는 모든 테스트가 마감 상태를 보게 된다
+// (2026-08-08 에 실제로 dev CI 가 이 이유로 깨졌다). 실행 시각 기준 상대값을 쓴다.
+function daysFromNow(days: number): string {
+  return new Date(Date.now() + days * DAY_MS).toISOString();
+}
+
 const tournament: V1AdminTournamentCampaignPreview['tournament'] = {
   id: 'tournament-1',
   title: 'Teameet Futsal Cup',
   status: 'open',
   format: 'group_knockout',
   sport: { code: 'futsal', name: '풋살' },
-  scheduledAt: '2026-08-15T00:00:00.000Z',
-  scheduledEndAt: '2026-08-16T00:00:00.000Z',
-  registrationDeadlineAt: '2026-08-08T00:00:00.000Z',
+  scheduledAt: daysFromNow(14),
+  scheduledEndAt: daysFromNow(15),
+  registrationDeadlineAt: daysFromNow(7),
   venue: '데일리그라운드 청라국제도시점',
   coverImageUrl: '/uploads/tournaments/campaign.jpg',
   teamCount: 8,

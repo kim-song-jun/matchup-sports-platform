@@ -153,7 +153,6 @@ function makeLink(label: string, href: string | null): SponsorLink | null {
 function SponsorLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
   return (
     <div aria-hidden="true" className={styles.logo}>
-      <span className="tm-text-label">{name.slice(0, 2)}</span>
       {logoUrl ? (
         <TournamentCampaignMedia
           src={logoUrl}
@@ -161,7 +160,9 @@ function SponsorLogo({ name, logoUrl }: { name: string; logoUrl: string | null }
           sportCode="sponsor"
           className={styles.logoImage}
         />
-      ) : null}
+      ) : (
+        <span className="tm-text-label">{name.slice(0, 2)}</span>
+      )}
     </div>
   );
 }

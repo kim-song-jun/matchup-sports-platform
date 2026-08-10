@@ -310,6 +310,7 @@ function makeSchedule(overrides: Partial<PublicTournamentScheduleResponse> = {})
         scoreStatus: 'unavailable',
         score: null,
         clock: null,
+        scorers: [],
         hasVideo: false,
       },
     ],
@@ -365,6 +366,7 @@ describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여
           scoreStatus: 'unavailable',
           score: null,
           clock: null,
+          scorers: [],
           hasVideo: false,
         },
       ],
@@ -404,6 +406,7 @@ describe('ScheduleContent — 진행 중 경기의 라이브 스코어/경과 �
     scoreStatus: 'live' as const,
     score: { home: 2, away: 0 },
     clock: { periodNumber: 2, elapsedMs: 23 * 60_000, isPaused: false },
+    scorers: [],
     hasVideo: false,
   };
 
@@ -440,6 +443,111 @@ describe('ScheduleContent — 진행 중 경기의 라이브 스코어/경과 �
     );
     expect(screen.getByText('LIVE')).toBeInTheDocument();
     expect(screen.queryByText(/후반|전반/)).not.toBeInTheDocument();
+  });
+});
+
+/* ── 득점자 타임라인 + 영상 링크 (관전자에게 노출) ── */
+
+describe('MatchDetailContent — 골/카드 타임라인의 이름·팀 귀속', () => {
+  it('참가자 이름이 있으면 그대로 보여주고, null이면 익명 라벨을 보여준다', () => {
+    render(
+      <MatchDetailContent
+        data={makeMatch({
+          lineup: null, // 라인업 슬롯의 익명 라벨과 섞이지 않도록 이 테스트는 라인업을 비운다.
+          events: [
+            { type: 'GOAL', sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
+            { type: 'GOAL', sideId: 'side-away', side: 'away', participantId: null, participantName: null, jerseyNumber: null, period: 1, clockMs: 900_000 },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText('김철수')).toBeInTheDocument();
+    expect(screen.getByText(WITHHELD_IDENTITY_LABEL)).toBeInTheDocument();
+  });
+
+  it('라인업이 null(미공개)이어도 이벤트의 이름은 그대로 보인다 -- 라인업 게이트와 독립인 계약', () => {
+    render(
+      <MatchDetailContent
+        data={makeMatch({
+          lineup: null,
+          events: [
+            { type: 'GOAL', sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText('김철수')).toBeInTheDocument();
+  });
+});
+
+describe('MatchDetailContent — 라인업/영상 섹션은 데이터가 없으면 통째로 생략된다', () => {
+  it('lineup이 null이면 라인업 섹션이 렌더되지 않는다(빈 상태 문구로 자리 차지하지 않음)', () => {
+    render(<MatchDetailContent data={makeMatch({ lineup: null })} />);
+    expect(screen.queryByText('라인업')).not.toBeInTheDocument();
+  });
+
+  it('lineup이 있으면 라인업 섹션이 렌더된다', () => {
+    render(<MatchDetailContent data={makeMatch()} />);
+    expect(screen.getByText('라인업')).toBeInTheDocument();
+  });
+
+  it('videos가 빈 배열이면 경기 영상 섹션이 렌더되지 않는다', () => {
+    render(<MatchDetailContent data={makeMatch({ videos: [] })} />);
+    expect(screen.queryByText('경기 영상')).not.toBeInTheDocument();
+  });
+
+  it('videos가 있으면 경기 영상 섹션이 렌더된다', () => {
+    render(
+      <MatchDetailContent
+        data={makeMatch({ videos: [{ id: 'v-1', title: null, url: 'https://youtu.be/abc123' }] })}
+      />,
+    );
+    expect(screen.getByText('경기 영상')).toBeInTheDocument();
+  });
+});
+
+describe('ScheduleContent — 일정 카드 득점자 요약', () => {
+  it('골이 있는 픽스처는 득점자 요약 줄을 보여준다', () => {
+    render(
+      <ScheduleContent
+        tournamentId="tournament-1"
+        data={makeSchedule({
+          items: [
+            {
+              ...makeSchedule().items[0],
+              scorers: [{ side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 600_000 }],
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByRole('list', { name: '득점자' })).toBeInTheDocument();
+    expect(screen.getByText(/10′/)).toBeInTheDocument();
+    expect(screen.getByText(/김철수/)).toBeInTheDocument();
+  });
+
+  it('골이 없으면 득점자 요약 줄 자체를 렌더하지 않는다', () => {
+    render(<ScheduleContent tournamentId="tournament-1" data={makeSchedule()} />);
+    expect(screen.queryByRole('list', { name: '득점자' })).not.toBeInTheDocument();
+  });
+
+  it('참가자 이름이 null(동의 없음)이면 이름을 지어내지 않고 시간만 보여준다', () => {
+    render(
+      <ScheduleContent
+        tournamentId="tournament-1"
+        data={makeSchedule({
+          items: [
+            {
+              ...makeSchedule().items[0],
+              scorers: [{ side: 'away', participantName: null, jerseyNumber: null, clockMs: 300_000 }],
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText(/5′/)).toBeInTheDocument();
+    // 익명 플레이스홀더조차 지어내지 않는다 -- 매치 상세와 달리 이 카드는 시간만 남긴다.
+    expect(screen.queryByText(WITHHELD_IDENTITY_LABEL)).not.toBeInTheDocument();
   });
 });
 

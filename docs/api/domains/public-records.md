@@ -163,6 +163,36 @@ an 8s interval. Past what that supports, the next step is a shared cache
 (CDN/edge or server-side) or a real public broadcast channel -- not a
 shorter interval.
 
+### Scorer timeline/summary addition -- spectator-facing goal identity (2026-08)
+
+Two additions so a spectator (not just the participating teams) can see who
+scored, both server-resolved so the frontend never has to reconstruct
+identity/side itself:
+
+- `GET /tournaments/:id/matches/:fixtureId` `events[]` now also carries
+  `side: 'home' | 'away'` (resolved from `V1GameSide.sideKey`, not left as
+  the opaque `sideId`) and `participantName`/`jerseyNumber` (same source and
+  same consent gate as a lineup slot's `displayNameSnapshot`/`jerseyNumber`).
+  Both are **deliberately independent of the lineup-publish gate**
+  (`lineup`/`isLineupPublished`, D-02): that gate exists to stop a pre-match
+  squad list leaking before kickoff, but a goal/card event can only ever
+  exist once the match has started, so showing who scored is never a
+  pre-match leak -- a consumer must not fall back to cross-referencing
+  `lineup` by `participantId` to resolve a name or side, since that silently
+  breaks in the one case (`lineup === null`) this decoupling exists to cover.
+- `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]` gained
+  `scorers: { side, participantName, jerseyNumber, clockMs }[]` -- a
+  goal-only summary for the schedule card, same identity/consent rule as
+  above. Unlike the Lane 1 live-score/clock fields, this is **not** gated by
+  the `PUBLIC_LIVE` flag: `official_only` fixtures (the common case once a
+  tournament has finished) must show their scorers regardless of that flag,
+  since only the `LIVE` policy is ever demoted by it
+  (`effectivePublicVisibilityMode`). Batched per page the same way
+  `loadLiveScores` batches the live tally (`PublicTournamentRecordsService.loadScorers`)
+  -- one extra `V1GameEvent` query for every fixture on the page that has a
+  game, never one query per fixture. `status_only` fixtures always get `[]`
+  (that mode hides events/scores entirely).
+
 ### Known scope trims (documented, not silently dropped)
 
 - The schedule list only cursor-paginates fixtures that already have a

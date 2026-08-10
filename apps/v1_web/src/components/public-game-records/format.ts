@@ -68,6 +68,19 @@ export function userRecordResultLabel(result: 'WON' | 'LOST' | 'DRAWN' | null): 
   return TEAM_RECORD_RESULT_LABEL[result] ?? '-';
 }
 
+/**
+ * `N′` minute-only clock for the schedule card's compact scorer summary
+ * (narrow-width context, one row per fixture) -- deliberately coarser than
+ * `formatClock`'s `mm:ss`, which the full match-detail timeline uses where
+ * there is room for exact seconds. `null` (no clock captured) renders as an
+ * empty string so a caller can still show the scorer's name without a
+ * dangling "′".
+ */
+export function formatGoalMinute(clockMs: number | null): string {
+  if (clockMs === null) return '';
+  return `${Math.floor(clockMs / 60_000)}′`;
+}
+
 /** `mm:ss` from a game clock in milliseconds, used for goal/card event rows. */
 export function formatClock(clockMs: number | null): string {
   if (clockMs === null) return '';

@@ -40,6 +40,18 @@ export interface PublicSideSummary {
   readonly teamName: string;
 }
 
+/**
+ * One goal in a schedule card's scorer-summary line. `participantName`/
+ * `jerseyNumber` follow the exact same consent gate as `PublicMatchEvent` --
+ * `null` means "withheld", never "unknown"/"guest with no name".
+ */
+export interface PublicScheduleScorer {
+  readonly side: 'home' | 'away';
+  readonly participantName: string | null;
+  readonly jerseyNumber: number | null;
+  readonly clockMs: number | null;
+}
+
 /** One row of `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]`. */
 export interface PublicScheduleEntry {
   readonly fixtureId: string;
@@ -59,6 +71,7 @@ export interface PublicScheduleEntry {
   readonly scoreStatus: PublicScoreStatus;
   readonly score: PublicScore | null;
   readonly clock: PublicGameClock | null;
+  readonly scorers: readonly PublicScheduleScorer[];
   readonly hasVideo: boolean;
 }
 
@@ -99,11 +112,26 @@ export interface PublicLineup {
   readonly away: readonly PublicLineupSlot[];
 }
 
-/** `type` mirrors `V1GameEventType` ('GOAL' | 'CARD') but is kept as `string` to avoid a `@prisma/client` import. */
+/**
+ * `type` mirrors `V1GameEventType` ('GOAL' | 'CARD') but is kept as `string` to avoid a `@prisma/client` import.
+ *
+ * `side`, `participantName`, `jerseyNumber` are all resolved server-side and
+ * are deliberately independent of `lineup` (`PublicMatchDetail.lineup`) --
+ * the lineup-publish gate (킥오프 60분 전) exists to stop pre-match squad
+ * announcements from leaking early, but a goal/card event can only ever
+ * exist once the match has started, so showing who scored is never a
+ * pre-match leak. A consumer must never fall back to cross-referencing
+ * `lineup` for an event's side/name: that cross-reference silently breaks
+ * exactly when `lineup` is `null` (unpublished or `status_only`), which is
+ * the one case this decoupling exists to cover.
+ */
 export interface PublicMatchEvent {
   readonly type: string;
   readonly sideId: string;
+  readonly side: 'home' | 'away';
   readonly participantId: string | null;
+  readonly participantName: string | null;
+  readonly jerseyNumber: number | null;
   readonly period: number | null;
   readonly clockMs: number | null;
 }

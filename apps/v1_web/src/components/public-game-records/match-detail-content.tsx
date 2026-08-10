@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Card, EmptyState } from '@/components/v1-ui/primitives';
+import { Card } from '@/components/v1-ui/primitives';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { LiveBadge } from './live-badge';
@@ -57,72 +57,66 @@ function LineupColumn({ title, slots }: { title: string; slots: readonly PublicL
 }
 
 /**
- * `PublicMatchEvent` itself carries no display-name field (only `participantId`,
- * gated to `null` by the same consent check as the lineup) and no home/away
- * tag readable on its own -- `sideId` is an opaque internal id the DTO never
- * maps back to home/away. The visibility matrix only guarantees "live
- * consent-filtered" events, not per-event names or sides, so neither may be
- * invented. Where a name/side IS safely resolvable, it is by cross-referencing
- * the *same match response*'s lineup slot for that `participantId` (both were
- * computed against the same `identityAsOf` instant and consent map
- * server-side, so a resolvable slot can never disagree with the event on
- * eligibility). If the lineup is unavailable (not yet published) or has no
- * matching slot -- including every event whose `participantId` is itself
- * `null` -- the event still renders, just without a name or side, rather than
- * guessing either.
+ * 각 이벤트의 `side`/`participantName`/`jerseyNumber`는 전부 서버가 이미 해석해
+ * 내려준다(`PublicMatchEvent` 타입 주석 참고) -- 라인업(`lineup`)이 아직 공개되지
+ * 않았거나 `status_only`로 `null`인 상황에서도 이벤트 자체는 그대로 나오므로,
+ * 예전처럼 `lineup` 슬롯을 참가자 id로 역참조해 이름/사이드를 재구성할 필요가
+ * 없다(오히려 그 역참조 방식은 라인업이 없을 때 이름이 사라지는 버그였다).
+ * 홈/원정은 스코어 헤더의 좌(홈)/우(원정) 배치를 그대로 이어받아, 시간·아이콘을
+ * 가운데 열에 두고 좌우 열에 각 팀의 이벤트만 채우는 2열 타임라인으로 보여준다.
  */
-function buildParticipantLookup(
-  lineup: PublicMatchDetail['lineup'],
-): Map<string, { readonly side: 'home' | 'away'; readonly displayName: string | null }> {
-  const lookup = new Map<string, { side: 'home' | 'away'; displayName: string | null }>();
-  if (lineup === null) return lookup;
-  for (const slot of lineup.home) lookup.set(slot.participantId, { side: 'home', displayName: slot.displayName });
-  for (const slot of lineup.away) lookup.set(slot.participantId, { side: 'away', displayName: slot.displayName });
-  return lookup;
-}
-
-function EventRow({
-  event,
-  lookup,
-}: {
-  event: PublicMatchEvent;
-  lookup: Map<string, { readonly side: 'home' | 'away'; readonly displayName: string | null }>;
-}) {
+function EventRow({ event }: { event: PublicMatchEvent }) {
   const icon = event.type === 'GOAL' ? '⚽' : '🟨';
   const eventLabel = event.type === 'GOAL' ? '골' : event.type === 'CARD' ? '카드' : event.type;
-  const resolved = event.participantId !== null ? lookup.get(event.participantId) : undefined;
-  return (
-    <li style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-strong)' }}>
-      <span aria-hidden="true">{icon}</span>
-      <span className="sr-only">{eventLabel}</span>
-      <span className="tab-num" style={{ color: 'var(--text-caption)', width: 40 }}>{formatClock(event.clockMs)}</span>
-      {resolved ? (
-        <>
-          <span style={{ color: 'var(--text-caption)', fontSize: 11 }}>{resolved.side === 'home' ? '홈' : '원정'}</span>
-          <span style={{ fontWeight: 600 }}>{presentParticipantName(resolved.displayName)}</span>
-        </>
+  const content = (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      {event.jerseyNumber !== null ? (
+        <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
       ) : null}
-    </li>
+      <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
+        {presentParticipantName(event.participantName)}
+      </span>
+    </span>
+  );
+  return (
+    <div
+      role="listitem"
+      style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 8 }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{event.side === 'home' ? content : null}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 36 }}>
+        <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}>{icon}</span>
+        <span className="sr-only">{eventLabel}</span>
+        <span className="tab-num" style={{ fontSize: 11, color: 'var(--text-caption)' }}>{formatClock(event.clockMs)}</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-start' }}>{event.side === 'away' ? content : null}</div>
+    </div>
   );
 }
 
 function EventsSection({
   events,
-  lineup,
+  isStatusOnly,
 }: {
   events: readonly PublicMatchEvent[];
-  lineup: PublicMatchDetail['lineup'];
+  isStatusOnly: boolean;
 }) {
   if (events.length === 0) {
-    return <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>기록된 이벤트가 없어요</div>;
+    // status_only는 "이벤트가 없었다"가 아니라 "이 대회는 진행 상태만 공개해서
+    // 애초에 골/카드 기록을 내려주지 않는다" -- 다른 이유(오류·아직 무이벤트)와
+    // 섞이면 관전자가 실제로 무득점 경기였다고 오해할 수 있어 문구를 구분한다.
+    return (
+      <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>
+        {isStatusOnly ? '경기 상태만 공개되고 있어요.' : '기록된 이벤트가 없어요'}
+      </div>
+    );
   }
-  const lookup = buildParticipantLookup(lineup);
   return (
-    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div role="list" aria-label="경기 기록" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {events.map((event, index) => (
-        <EventRow key={`${event.type}-${event.sideId}-${index}`} event={event} lookup={lookup} />
+        <EventRow key={`${event.type}-${event.sideId}-${index}`} event={event} />
       ))}
-    </ul>
+    </div>
   );
 }
 
@@ -233,6 +227,11 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
         </Card>
       ) : null}
 
+      {/* 라인업 미공개(null)는 "빈 상태" 가 아니라 "아직 이 정보를 보여줄 시점이
+          아님" 이다 -- 킥오프 60분 전부터 공개되는 정상적인 대기 상태를 매번 빈
+          카드로 자리 차지하게 두면 관전자가 오류처럼 오인하기 쉽다. status_only
+          안내는 이미 헤더 카드에 한 번 나오므로 여기서 또 반복하지 않고, 섹션
+          자체를 통째로 생략한다. */}
       {data.lineup ? (
         <section>
           <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>라인업</h3>
@@ -243,21 +242,12 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
             </div>
           </Card>
         </section>
-      ) : (
-        <EmptyState
-          title="라인업이 아직 공개되지 않았어요"
-          sub={
-            isStatusOnly
-              ? '이 대회는 진행 상태만 공개하도록 설정돼 있어요.'
-              : '경기 시작 60분 전부터 라인업을 확인할 수 있어요.'
-          }
-        />
-      )}
+      ) : null}
 
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>경기 기록</h3>
         <Card pad={16}>
-          <EventsSection events={data.events} lineup={data.lineup} />
+          <EventsSection events={data.events} isStatusOnly={isStatusOnly} />
         </Card>
       </section>
 

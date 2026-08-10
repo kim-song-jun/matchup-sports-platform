@@ -1,6 +1,17 @@
 import type { V1PublicTournamentStatus } from '@/types/api';
 import type { V1PublicTournamentCampaign } from '@/types/tournament-campaign';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// 대회 일정을 절대 날짜로 박아두면 그 시각이 지나는 순간 'open' 픽스처가 마감 상태로
+// 렌더돼 관련 테스트가 통째로 깨진다. 실제로 마감일이 2026-08-08T00:00Z 로 고정돼 있어
+// 그날 dev CI 가 아무 코드 변경 없이 red 로 돌아섰다.
+// 실행 시각 기준 상대값으로 잡아 'open' 이 언제 돌려도 실제로 열려 있게 한다.
+// 마감 전환 자체를 검증하는 테스트는 자기 deadline 을 명시적으로 덮어쓴다.
+function daysFromNow(days: number): string {
+  return new Date(Date.now() + days * DAY_MS).toISOString();
+}
+
 export function campaign(status: V1PublicTournamentStatus): V1PublicTournamentCampaign {
   return {
     id: 'campaign-1',
@@ -37,9 +48,9 @@ export function campaign(status: V1PublicTournamentStatus): V1PublicTournamentCa
       status,
       format: 'group_knockout',
       sport: { code: 'futsal', name: '풋살' },
-      scheduledAt: '2026-08-15T00:00:00.000Z',
-      scheduledEndAt: '2026-08-16T00:00:00.000Z',
-      registrationDeadlineAt: '2026-08-08T00:00:00.000Z',
+      scheduledAt: daysFromNow(14),
+      scheduledEndAt: daysFromNow(15),
+      registrationDeadlineAt: daysFromNow(7),
       venue: '데일리그라운드 청라국제도시점',
       coverImageUrl: null,
       teamCount: 8,

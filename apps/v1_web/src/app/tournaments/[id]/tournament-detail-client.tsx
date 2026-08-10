@@ -40,8 +40,8 @@ import type {
   V1TournamentGroup,
   V1TournamentFixture,
   V1TournamentAnnouncement,
-  V1TournamentStanding,
   V1TournamentRegistration,
+  V1TournamentStatus,
 } from '@/types/api';
 
 export { getParticipantTeamBuckets } from '@/components/tournaments/tournament-event-hub-sections';
@@ -53,6 +53,37 @@ function getFormatLabel(format: V1TournamentFormat): string {
     case 'league': return '리그';
     case 'knockout': return '토너먼트';
     case 'group_knockout': return '조별리그 후 토너먼트';
+  }
+}
+
+/**
+ * /bracket(순위·대진표·일정 통합 허브, §B-6)로 향하는 단일 진입 CTA의 문구 — 대회
+ * 상태별로 다르게 정한다. 예전엔 in_progress 전용 "순위표 · 대진표 보기"(topCTA)와
+ * 상태 무관 "전체 경기 일정 보기" 링크가 따로 있었는데(§A-1·2), 이제 이 하나로 합친다.
+ *  - in_progress: 오너가 명시한 문구 "진행 중인 대회 보기"를 그대로 쓴다.
+ *  - completed: "진행 중"은 끝난 대회엔 거짓 정보다(오너 지적 그대로). 이 CTA는 최종
+ *    일정·대진표를 다시 보는 용도이고, 시상식 하이라이트는 /results가 별도로 맡고
+ *    있어(CompletedResultHero) 문구를 겹치지 않게 "경기 결과 · 대진표 보기"로 뒀다.
+ *  - open(모집 중)·closed(모집 마감 · 시작 전="예정"): 대진 편성이 아직 안 끝났을 수
+ *    있어 "확정"을 단언하지 않고 "대진표 · 일정 보기"로 통일한다. /bracket 은 대진이
+ *    비어 있어도 빈 화면이 아니라 "대진표 준비 중" 안내를 보여주므로 미리 눌러도
+ *    오류처럼 보이지 않는다(BracketEmpty).
+ *  - draft(비공개 준비 상태)·cancelled(취소): 볼 대진 자체가 무의미하므로 null을
+ *    반환해 CTA를 아예 숨긴다 — 데이터 없는 화면을 억지로 보여주지 않는다는 원칙.
+ */
+export function getBracketEntryCtaLabel(status: V1TournamentStatus): string | null {
+  switch (status) {
+    case 'in_progress':
+      return '진행 중인 대회 보기';
+    case 'completed':
+      return '경기 결과 · 대진표 보기';
+    case 'open':
+    case 'closed':
+      return '대진표 · 일정 보기';
+    case 'draft':
+    case 'cancelled':
+    default:
+      return null;
   }
 }
 
@@ -332,6 +363,93 @@ function ApplyCTA({
   );
 }
 
+/* ── Unified bracket-entry CTA (top-sticky + bottom, mobile/tablet only — desktop
+   uses the always-visible sticky rail below) ── */
+
+function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail }) {
+  const label = getBracketEntryCtaLabel(tournament.status);
+  if (!label) return null;
+  const isLive = tournament.status === 'in_progress';
+
+  return (
+    <Link
+      href={`/tournaments/${tournament.id}/bracket`}
+      className="tm-pressable"
+      aria-label={label}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        width: '100%',
+        padding: '14px 16px',
+        borderRadius: 14,
+        textDecoration: 'none',
+        background: isLive ? 'var(--blue500)' : 'var(--surface)',
+        border: isLive ? 'none' : '1px solid var(--border)',
+        boxShadow: isLive ? '0 2px 14px rgba(49,130,246,0.3)' : 'none',
+      }}
+    >
+      {isLive ? (
+        <span
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: 'rgba(255,255,255,0.18)', borderRadius: 20,
+            padding: '3px 9px', flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: '#4ADE80', flexShrink: 0,
+              boxShadow: '0 0 0 2px rgba(74,222,128,0.35)',
+            }}
+            aria-hidden="true"
+          />
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--blue50)' }}
+        >
+          <Goal size={16} color="var(--blue500)" strokeWidth={2.2} />
+        </span>
+      )}
+      <span style={{ flex: 1, fontSize: 14, fontWeight: 800, letterSpacing: '-0.01em', color: isLive ? '#fff' : 'var(--text-strong)' }}>
+        {label}
+      </span>
+      <ChevronRight
+        size={18}
+        strokeWidth={2.5}
+        style={{ color: isLive ? 'rgba(255,255,255,0.65)' : 'var(--text-caption)', flexShrink: 0 }}
+        aria-hidden="true"
+      />
+    </Link>
+  );
+}
+
+/**
+ * 하단 CTA가 실제로 뷰포트에 들어왔는지 감지 — 상단 스티키 CTA와 하단 CTA가 동시에
+ * 화면에 보이지 않게 하려는 용도(오너 요구: "CTA 가 화면에 동시에 2개 보이면 안 된다").
+ * 방향을 "하단이 보이면 상단을 끈다"로 잡은 이유: position:sticky는 자기 컨테이너가
+ * 끝나기 전까지 계속 화면에 붙어 있는 게 정상 동작이라, 실행 가능한 유일한 신호는
+ * "하단 CTA가 실제로 뷰포트에 들어왔다"는 이벤트뿐이다. IntersectionObserver로
+ * 하단 CTA 엘리먼트의 실제 노출 여부를 관찰한다(스크롤 리스너 + getBoundingClientRect
+ * 폴링보다 가볍고, 스크롤 컨테이너가 `.tm-scroll-area`(모바일)든 문서(데스크톱)든
+ * root 를 명시하지 않아도 실제 클리핑을 그대로 따라간다).
+ */
+function useIsInViewport(ref: React.RefObject<HTMLElement | null>): boolean {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
+  return visible;
+}
+
 /* ── Entry point ── */
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
@@ -423,6 +541,12 @@ export function TournamentDetailView({
   // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
   // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
   const bottomPad = isOpen ? 96 : 48;
+
+  /* ── 통합 진입 CTA(상단 스티키 + 하단, §A-3·4·5) — 모바일/태블릿 전용.
+     데스크탑은 railCTA가 이미 항상 보이는 sticky 패널이라 별도 처리가 필요 없다. */
+  const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status);
+  const bottomCtaRef = useRef<HTMLDivElement | null>(null);
+  const bottomCtaVisible = useIsInViewport(bottomCtaRef);
 
   /* ── Prize card — rendered in left column just after metric strip ── */
   // 상금 칩 분리: '/'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
@@ -669,6 +793,14 @@ export function TournamentDetailView({
       </div>
 
       <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
+
+      {/* ── 하단 통합 진입 CTA — 페이지를 끝까지 읽은 사람이 다시 위로 스크롤하지
+          않아도 되게(§A-5). ref는 상단 스티키 CTA와의 동시 노출을 막는 신호로 쓰인다. */}
+      {bracketCtaLabel ? (
+        <div ref={bottomCtaRef} className="tm-hide-desktop" style={{ marginTop: 24 }}>
+          <BracketEntryCtaButton tournament={tournament} />
+        </div>
+      ) : null}
     </>
   );
 
@@ -774,6 +906,13 @@ export function TournamentDetailView({
       </div>
 
       <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
+
+      {/* ── 하단 통합 진입 CTA — completed 도 leftContent와 동일하게 페이지 끝에 둔다. ── */}
+      {bracketCtaLabel ? (
+        <div ref={bottomCtaRef} className="tm-hide-desktop" style={{ marginTop: 24 }}>
+          <BracketEntryCtaButton tournament={tournament} />
+        </div>
+      ) : null}
     </>
   );
 
@@ -927,7 +1066,8 @@ export function TournamentDetailView({
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80', flexShrink: 0, boxShadow: '0 0 0 2px rgba(74,222,128,0.35)' }} aria-hidden="true" />
           <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
         </span>
-        <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>순위표 · 대진표 보기</span>
+        {/* 라벨: getBracketEntryCtaLabel과 단일 소스 — 모바일 상단/하단 CTA와 동일 문구("진행 중인 대회 보기")를 쓴다. */}
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status)}</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {/* Key facts */}
@@ -944,6 +1084,42 @@ export function TournamentDetailView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>참가비</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatEntryFee(tournament.entryFee)}</span>
+        </div>
+      </div>
+    </aside>
+  ) : tournament.status === 'closed' ? (
+    /* closed(모집 마감·시작 전="예정") — 예전엔 이 상태에서 데스크탑 레일이 비어
+       있었다(모바일만 새 통합 CTA를 받고 데스크탑은 그대로면 반응형 불일치라 함께
+       채운다). in_progress 레일과 동일 구조에서 LIVE 배지·강조색만 뺀 중립 톤. */
+    <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대진표·일정">
+      <Link
+        href={`/tournaments/${tournament.id}/bracket`}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '14px 16px',
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14,
+          textDecoration: 'none',
+          marginBottom: 16,
+        }}
+      >
+        <span
+          aria-hidden="true"
+          style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--blue50)' }}
+        >
+          <Goal size={16} color="var(--blue500)" strokeWidth={2.2} />
+        </span>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status)}</span>
+        <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'var(--text-caption)', flexShrink: 0 }} aria-hidden="true" />
+      </Link>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+        </div>
+        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{tournament.confirmedCount}/{tournament.teamCount}팀</span>
         </div>
       </div>
     </aside>
@@ -981,48 +1157,6 @@ export function TournamentDetailView({
     </aside>
   ) : null;
 
-  /* ── 상단 진입 CTA (in_progress / completed 전용, 모바일 히어로 직후) ── */
-  const topCTA =
-    tournament.status === 'in_progress' ? (
-      <div className="tm-tournament-bleed tm-hide-desktop" style={{ padding: '0 20px 14px' }}>
-        <Link
-          href={`/tournaments/${tournament.id}/bracket`}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            width: '100%',
-            padding: '14px 16px',
-            background: 'var(--blue500)',
-            borderRadius: 14,
-            textDecoration: 'none',
-            boxShadow: '0 2px 14px rgba(49,130,246,0.3)',
-          }}
-          aria-label="현재 순위·대진표 보기"
-        >
-          {/* 라이브 배지 */}
-          <span style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            background: 'rgba(255,255,255,0.18)', borderRadius: 20,
-            padding: '3px 9px', flexShrink: 0,
-          }}>
-            {/* 펄스 점 */}
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: '#4ADE80', flexShrink: 0,
-              boxShadow: '0 0 0 2px rgba(74,222,128,0.35)',
-            }} aria-hidden="true" />
-            <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
-          </span>
-          {/* 액션 텍스트 */}
-          <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
-            순위표 · 대진표 보기
-          </span>
-          <ChevronRight size={18} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
-        </Link>
-      </div>
-    ) : null; // completed: 기존 상단 배너는 CompletedResultHero(헤더 직후, leftContent)로 이전 — 중복 렌더 제거
-
   return (
     <article style={{ paddingBottom: bottomPad }}>
       {/* ── Desktop back navigation (hidden on mobile via .tm-show-desktop) ── */}
@@ -1040,30 +1174,36 @@ export function TournamentDetailView({
       {/* ── Desktop 2-column layout: left=body, right=sticky CTA rail ──
           .tm-tournament-detail-grid: minmax(0,1fr) 340px (≥1440: 360px), gap 32px.
           Mobile: single-column, no grid applied. */}
-      {/* ── 상단 CTA: 히어로 직후 첫 번째로 보이는 진입점 (모바일) ── */}
-      {topCTA}
-
-      {/* 전체 경기 일정: 상태(모집중/진행중/종료) 무관하게 항상 노출되는 유일한 진입점이라
-          어느 status 분기에도 속하지 않은 이 자리에 둔다. */}
-      <div style={{ padding: '0 20px 4px' }}>
-        <Link
-          href={`/tournaments/${tournament.id}/schedule`}
+      {/* ── 상단 통합 진입 CTA(§A-1~5) — 예전엔 in_progress 전용 "순위표 · 대진표
+          보기"(topCTA)와 상태 무관 "전체 경기 일정 보기" 링크가 따로 있었다. 이제
+          하나로 합쳐 /bracket(순위·대진표·일정 통합 허브, §B-6)으로 보낸다.
+          position:sticky — `.tm-scroll-area`가 모바일/태블릿(<1024px)의 실제 스크롤
+          컨테이너라 top:0만으로 헤더(56px, .tm-scroll-area 바깥) 바로 아래에 붙고
+          겹치지 않는다. 데스크탑(≥1024px)은 .tm-scroll-area가 static이 되며 이 CTA도
+          .tm-hide-desktop으로 숨겨지고, 항상 보이는 railCTA(우측 sticky 레일)가
+          같은 역할을 대신한다 — 그래서 desktop에서 top 오프셋을 따로 계산할 필요가
+          없다. 하단 CTA(leftContent/completedLeftContent 맨 끝)와 동시에 화면에
+          보이지 않도록 bottomCtaVisible이 true면 display:none 처리한다(§A-4·5).
+          isOpen(모집 중)은 ApplyCTA가 스크롤 내내 화면 하단에 고정(.tm-fixed-cta)돼
+          있어 이 스티키 CTA를 숨길 스크롤 위치가 존재하지 않는다 — 데스크탑 rail도
+          isOpen일 땐 ApplyCTAButtons만 두고 대진표 링크를 넣지 않으므로(railCTA 위,
+          §isOpen 분기), 동일하게 여기서도 렌더 자체를 건너뛰어 "참가 신청하기" 하나만
+          1차 CTA로 남긴다(토스 루브릭: 카드당 주요 CTA 1개). */}
+      {bracketCtaLabel && !isOpen ? (
+        <div
+          className="tm-hide-desktop"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 4px',
-            minHeight: 44,
-            color: 'var(--blue500)',
-            fontSize: 13,
-            fontWeight: 600,
-            textDecoration: 'none',
+            position: 'sticky',
+            top: 0,
+            zIndex: 15,
+            background: 'var(--bg)',
+            padding: '8px 20px 12px',
+            display: bottomCtaVisible ? 'none' : 'block',
           }}
         >
-          전체 경기 일정 보기
-          <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
-        </Link>
-      </div>
+          <BracketEntryCtaButton tournament={tournament} />
+        </div>
+      ) : null}
 
       <div className="tm-tournament-detail-grid">
         {/* Left column: header + metrics + prize + rules + standings + group fixtures */}
@@ -1081,74 +1221,16 @@ export function TournamentDetailView({
           </div>
         ) : null}
 
-        {/* Bracket 진입 카드와 참가 전 확인 사항 — completed는 leftContent(액션 리스트·아코디언)로 이전 */}
+        {/* Bracket 진입 카드와 참가 전 확인 사항 — completed는 leftContent(액션 리스트·아코디언)로 이전.
+            예전엔 여기 그리드 맨 끝에 in_progress 전용 "대회가 진행 중이에요" 카드
+            (TournamentStatusEntryCard)가 하나 더 있었는데, leftContent 맨 끝의 새
+            통합 하단 CTA(§A-5)와 목적지·문구가 완전히 겹쳐(둘 다 /bracket) 제거했다 —
+            남겨두면 in_progress 페이지 하나에 같은 의미의 CTA가 3개(옛 topCTA는 이미
+            제거, 이 카드, 새 하단 CTA) 쌓이는 상황이었다. */}
         {!isCompleted && <BracketSection tournament={tournament} />}
         {!isCompleted && <TournamentPreParticipationNotice />}
-        <TournamentStatusEntryCard tournament={tournament} />
       </div>
     </article>
-  );
-}
-
-/**
- * in_progress 전용 진입 카드 — 순위·대진표 바로 보기(모바일).
- * completed 전용 진입점은 CompletedResultHero로 분리되어 헤더 직후 상단에 노출된다
- * (기존엔 이 카드가 completed도 함께 처리해 상단 topCTA와 중복 렌더되던 것을 해소).
- */
-function TournamentStatusEntryCard({ tournament }: { tournament: V1TournamentDetail }) {
-  if (tournament.status !== 'in_progress') {
-    return null;
-  }
-
-  return (
-    <div className="tm-tournament-bleed">
-      <div className="tm-match-detail-body">
-        <section style={{ marginTop: 24, paddingBottom: 8 }}>
-          <Link
-            href={`/tournaments/${tournament.id}/bracket`}
-            className="tm-hide-desktop"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-              padding: '14px 16px',
-              background: 'var(--blue500)',
-              borderRadius: 14,
-              textDecoration: 'none',
-              boxShadow: '0 2px 12px rgba(49,130,246,0.28)',
-              transition: 'opacity 0.12s',
-            }}
-            aria-label="대회 순위·브래킷 보기"
-          >
-            <span
-              style={{
-                fontSize: 24,
-                flexShrink: 0,
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(255,255,255,0.15)',
-              }}
-              aria-hidden="true"
-            >
-              <Goal size={22} color="var(--static-white)" strokeWidth={2} aria-hidden="true" />
-            </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 2, letterSpacing: '-0.01em' }}>
-                대회가 진행 중이에요
-              </div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-                현재 순위표와 대진표를 실시간으로 확인하세요.
-              </div>
-            </div>
-            <ChevronRight size={18} strokeWidth={2.2} style={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }} aria-hidden="true" />
-          </Link>
-        </section>
-      </div>
-    </div>
   );
 }
 
@@ -1388,15 +1470,58 @@ function TournamentFlowSection({ tournament }: { tournament: V1TournamentDetail 
   );
 }
 
+/**
+ * 순위표가 상세에서 빠졌다는 안내 + /bracket 바로가기 — §A-1(조별 순위 섹션을 상세에서
+ * 제거하고 /bracket으로 일원화)로 비워진 자리를 채우는 요소. 그냥 지우고 빈 공간을
+ * 남기지 않기 위해(규칙 5), 원래 순위표가 있던 그 위치에 그대로 둔다. 순위표만 옮기고
+ * 일정/대진 카드는 그대로 두는 이유는 오너 발화("조별순위는 /bracket 에서만")가
+ * 순위표 한정이고, 참가자가 자기 경기 시간을 확인하는 일정 카드는 상세에서도 계속
+ * 바로 봐야 하기 때문이다.
+ */
+function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
+  return (
+    <section aria-label="순위표 안내" style={{ marginTop: 24 }}>
+      <Link
+        href={`/tournaments/${tournamentId}/bracket`}
+        className="tm-pressable"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '14px 16px',
+          background: 'var(--grey50)',
+          borderRadius: 14,
+          textDecoration: 'none',
+        }}
+      >
+        <span
+          aria-hidden="true"
+          style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--surface)' }}
+        >
+          <Trophy size={18} color="var(--blue500)" strokeWidth={2} />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>실시간 순위표는 대진표에서 확인하세요</div>
+          <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
+            조별 순위와 결선 진행 상황을 한 곳에서 볼 수 있어요.
+          </div>
+        </div>
+        <ChevronRight size={16} strokeWidth={2.4} style={{ color: 'var(--text-caption)', flexShrink: 0 }} aria-hidden="true" />
+      </Link>
+    </section>
+  );
+}
+
 /* ── FormatLeftSections —
- * Renders standings + group fixtures but NOT the bracket.
+ * Renders group fixtures but NOT the bracket and NOT standings (TARGET §A-1: 순위표는
+ * /bracket으로 일원화되어 StandingsMovedNotice로 대체됐다 — GroupStandingsTable/
+ * StandingRow/GoalDiff는 이 파일 어디에서도 더 쓰이지 않아 완전히 삭제했다).
  * The bracket is extracted to BracketSection (full-width bleed).
  */
 function FormatLeftSections({ tournament }: { tournament: V1TournamentDetail }) {
   const { format, fixtures, groups } = tournament;
 
   const {
-    groupPhaseGroups,
     groupFixtures,
     hasGroupStandings,
     hasGroupFixtures,
@@ -1406,18 +1531,7 @@ function FormatLeftSections({ tournament }: { tournament: V1TournamentDetail }) 
   if (format === 'league') {
     return (
       <>
-        {hasGroupStandings ? (
-          <section aria-labelledby="standings-heading" style={{ marginTop: 24 }}>
-            <div id="standings-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
-              순위표
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
-              {groupPhaseGroups.map((group) => (
-                <GroupStandingsTable key={group.id} group={group} />
-              ))}
-            </div>
-          </section>
-        ) : null}
+        {hasGroupStandings ? <StandingsMovedNotice tournamentId={tournament.id} /> : null}
 
         {hasAnyFixtures ? (
           <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>
@@ -1442,21 +1556,10 @@ function FormatLeftSections({ tournament }: { tournament: V1TournamentDetail }) 
     return null;
   }
 
-  /* group_knockout: group standings + group fixtures only (bracket to bleed) */
+  /* group_knockout: 순위표 안내 + 조별 일정만(대진표는 bleed) */
   return (
     <>
-      {hasGroupStandings ? (
-        <section aria-labelledby="standings-heading" style={{ marginTop: 24 }}>
-          <div id="standings-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
-            조별 순위
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
-            {groupPhaseGroups.map((group) => (
-              <GroupStandingsTable key={group.id} group={group} />
-            ))}
-          </div>
-        </section>
-      ) : null}
+      {hasGroupStandings ? <StandingsMovedNotice tournamentId={tournament.id} /> : null}
 
       {hasGroupFixtures ? (
         <section aria-labelledby="group-fixtures-heading" style={{ marginTop: 24 }}>
@@ -1502,10 +1605,14 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
     );
   }
 
-  /* group_knockout: 결선 픽스처가 확정됐을 때만 표시
-   * - 조별 리그 진행 중(hasKnockoutFixtures=false)이면 노출 안 함
+  /* group_knockout: 결선 픽스처가 있고 + 조별리그가 실제로 끝났을 때만 표시(§B-8과
+   * 동일 기준 — allGroupPhasesComplete). hasKnockoutFixtures만으로는 부족하다: 그
+   * 값은 "결선 픽스처 데이터가 존재하는지"만 볼 뿐, 조별리그가 실제로 끝났는지는
+   * 안 본다. 관리자가 결선 대진을 미리 생성해 두는 경우 등 데이터가 조기에 존재할
+   * 수 있어, 조별리그 완료 여부를 별도로 한 번 더 확인해야 상세 페이지에서도
+   * "아직 안 끝난 조별리그의 결선"을 확정처럼 보여주는 걸 막을 수 있다.
    * - 결선 대진표 전체 보기는 /bracket 서브페이지에서 제공 */
-  if (!hasKnockoutFixtures) return null;
+  if (!hasKnockoutFixtures || !allGroupPhasesComplete(groups, fixtures)) return null;
 
   return (
     <div className="tm-tournament-bleed">
@@ -1521,6 +1628,28 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
       </div>
     </div>
   );
+}
+
+/**
+ * 조 하나의 조별리그가 실제로 끝났는지 판정 — 그 조에 속한 픽스처가 하나 이상 있고
+ * 전부 completed 또는 cancelled 상태일 때만 true. 픽스처가 0개(아직 일정도 안 잡힘)면
+ * "끝났다"고 볼 수 없으므로 false. 오너 지적의 핵심 기준: "실제 조별리그가 다 끝나야"
+ * — 픽스처 1경기만 끝나도 진출/결선이 확정처럼 보이던 버그(§B-7·8)를 여기서 막는다.
+ */
+export function isGroupStageComplete(groupId: string, fixtures: V1TournamentFixture[]): boolean {
+  const groupFixtures = fixtures.filter((f) => f.groupId === groupId);
+  if (groupFixtures.length === 0) return false;
+  return groupFixtures.every((f) => f.status === 'completed' || f.status === 'cancelled');
+}
+
+/**
+ * group_knockout 대회의 조별리그 전체가 끝났는지 — phase==='group'인 그룹이 전부
+ * isGroupStageComplete여야 true. 조별 그룹이 하나도 없으면(아직 대진 편성 전) false.
+ */
+export function allGroupPhasesComplete(groups: V1TournamentGroup[], fixtures: V1TournamentFixture[]): boolean {
+  const groupPhaseGroups = groups.filter((g) => g.phase === 'group');
+  if (groupPhaseGroups.length === 0) return false;
+  return groupPhaseGroups.every((g) => isGroupStageComplete(g.id, fixtures));
 }
 
 /* ── partitionTournamentSections ──
@@ -1842,193 +1971,6 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
           style={{ textAlign: 'center', marginTop: 6, color: 'var(--text-muted)' }}
         >
           {fixture.venue}
-        </div>
-      ) : null}
-    </Card>
-  );
-}
-
-/* ── Group standings table ── */
-
-function GoalDiff({ goalsFor, goalsAgainst }: { goalsFor: number; goalsAgainst: number }) {
-  const diff = goalsFor - goalsAgainst;
-  const color = diff > 0 ? 'var(--green500)' : diff < 0 ? 'var(--red500)' : 'var(--text-muted)';
-  const prefix = diff > 0 ? '+' : '';
-  return (
-    <span className="tab-num" style={{ color }}>
-      {prefix}{diff}
-    </span>
-  );
-}
-
-function StandingRow({
-  standing,
-  rank,
-  isQualifying,
-}: {
-  standing: V1TournamentStanding;
-  rank: number;
-  isQualifying: boolean;
-}) {
-  return (
-    <tr
-      style={{
-        // zebra: 진출 팀은 파란 강조가 우선, 그 외엔 짝수 행에만 옅은 회색을 줘 가독성을 높인다.
-        background: isQualifying ? 'var(--tint-blue)' : rank % 2 === 0 ? 'var(--grey50)' : undefined,
-      }}
-    >
-      <td
-        style={{
-          padding: '8px 8px 8px 0',
-          textAlign: 'center',
-          width: 24,
-        }}
-      >
-        <span
-          className="tm-text-caption tab-num"
-          style={{ color: isQualifying ? 'var(--blue700)' : 'var(--text-caption)', fontWeight: isQualifying ? 700 : 400 }}
-        >
-          {rank}
-        </span>
-      </td>
-      <td style={{ padding: '8px 4px', maxWidth: 160 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <TeamAvatar
-            seed={standing.teamId}
-            name={standing.teamName}
-            logoUrl={standing.teamLogoUrl}
-            size="sm"
-          />
-          <span
-            className="tm-text-label"
-            style={{ color: isQualifying ? 'var(--blue700)' : 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
-          >
-            {standing.teamName}
-          </span>
-          {isQualifying ? (
-            <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>
-              진출
-            </span>
-          ) : null}
-        </div>
-      </td>
-      <td style={{ padding: '8px 4px', textAlign: 'center' }}>
-        <span className="tm-text-label tab-num" style={{ color: isQualifying ? 'var(--blue700)' : 'var(--text-strong)', fontWeight: 700 }}>
-          {standing.points}
-        </span>
-      </td>
-      <td style={{ padding: '8px 4px', textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', gap: 3 }}>
-          <span className="tm-badge tm-badge-green tm-badge-sm tab-num">{standing.wins}승</span>
-          <span className="tm-badge tm-badge-grey tm-badge-sm tab-num">{standing.draws}무</span>
-          <span className="tm-badge tm-badge-red tm-badge-sm tab-num">{standing.losses}패</span>
-        </div>
-      </td>
-      <td style={{ padding: '8px 0 8px 4px', textAlign: 'center' }}>
-        <span className="tm-text-micro">
-          <GoalDiff goalsFor={standing.goalsFor} goalsAgainst={standing.goalsAgainst} />
-        </span>
-      </td>
-    </tr>
-  );
-}
-
-function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
-  const sorted = [...group.standings].sort((a, b) => a.position - b.position);
-  const advanceCount = group.advanceCount;
-
-  return (
-    <Card pad={0}>
-      <div style={{ padding: '12px 14px 8px' }}>
-        <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-          {group.name}
-        </div>
-      </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table
-          /* colgroup으로 열 너비를 명시해 카드 끝선까지 순위표가 확장되도록 함.
-             maxWidth 캡 제거 — 카드 너비에 맞게 테이블이 늘어남. */
-          style={{ width: '100%', borderCollapse: 'collapse', minWidth: 320 }}
-          aria-label={`${group.name} 순위표`}
-        >
-          <colgroup>
-            {/* 순위 */}
-            <col style={{ width: 32 }} />
-            {/* 팀명 — 남은 공간을 모두 차지 */}
-            <col />
-            {/* 승점 */}
-            <col style={{ width: 48 }} />
-            {/* 전적 — 승/무/패 개별 배지 3개라 텍스트보다 폭이 더 필요하다 */}
-            <col style={{ width: 128 }} />
-            {/* 득실 */}
-            <col style={{ width: 48 }} />
-          </colgroup>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--grey100)' }}>
-              <th
-                scope="col"
-                className="tm-text-micro"
-                style={{ padding: '6px 8px 6px 0', color: 'var(--text-caption)', textAlign: 'center', width: 32, whiteSpace: 'nowrap' }}
-              >
-                순위
-              </th>
-              <th
-                scope="col"
-                className="tm-text-micro"
-                style={{ padding: '6px 4px', color: 'var(--text-caption)', textAlign: 'left' }}
-              >
-                팀
-              </th>
-              <th
-                scope="col"
-                className="tm-text-micro"
-                style={{ padding: '6px 4px', color: 'var(--text-caption)', textAlign: 'center' }}
-              >
-                승점
-              </th>
-              <th
-                scope="col"
-                className="tm-text-micro"
-                style={{ padding: '6px 4px', color: 'var(--text-caption)', textAlign: 'center' }}
-              >
-                전적
-              </th>
-              <th
-                scope="col"
-                className="tm-text-micro"
-                style={{ padding: '6px 0 6px 4px', color: 'var(--text-caption)', textAlign: 'center' }}
-              >
-                득실
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.length > 0 ? (
-              sorted.map((standing, index) => (
-                <StandingRow
-                  key={standing.registrationId}
-                  standing={standing}
-                  rank={index + 1}
-                  isQualifying={advanceCount != null && advanceCount > 0 && index + 1 <= advanceCount}
-                />
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="tm-text-caption"
-                  style={{ padding: '12px 0', textAlign: 'center', color: 'var(--text-muted)' }}
-                >
-                  경기 시작 전이에요
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      {advanceCount != null && advanceCount > 0 ? (
-        <div className="tm-text-micro" style={{ padding: '0 14px 12px', color: 'var(--text-muted)' }}>
-          상위 {advanceCount}팀이 다음 단계로 진출해요
         </div>
       ) : null}
     </Card>

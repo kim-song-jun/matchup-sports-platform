@@ -48,7 +48,7 @@ export default function RootLayout({
             상수 문자열만 담으므로(외부 입력 없음) XSS 위험이 없다 — src/lib/theme.ts 참고. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body suppressHydrationWarning>
+      <body>
         <RouteProgressBar />
         <ReleaseVersionWatcher />
         <Providers>{children}</Providers>

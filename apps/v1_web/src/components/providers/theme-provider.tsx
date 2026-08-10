@@ -21,10 +21,32 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+// 프라이빗 모드·스토리지 접근이 차단된 WebView(Capacitor 포함) 등에서는 localStorage
+// 접근 자체가 throw할 수 있다 — FOUC 방지 인라인 스크립트(theme.ts)와 동일하게 방어한다.
 function readStoredPreference(): ThemePreference {
   if (typeof window === 'undefined') return DEFAULT_THEME_PREFERENCE;
-  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return isThemePreference(stored) ? stored : DEFAULT_THEME_PREFERENCE;
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return isThemePreference(stored) ? stored : DEFAULT_THEME_PREFERENCE;
+  } catch {
+    return DEFAULT_THEME_PREFERENCE;
+  }
+}
+
+function writeStoredPreference(next: ThemePreference) {
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, next);
+  } catch {
+    // 스토리지 접근이 막힌 환경 — 이번 세션 동안만 메모리 상태로 적용되고 다음 로드 시 기본값으로 돌아간다.
+  }
+}
+
+function safeHasStoredV1Session() {
+  try {
+    return hasStoredV1Session();
+  } catch {
+    return false;
+  }
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -37,7 +59,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // 알림 설정 페이지의 toggleError와 동일 패턴 — 저장 실패를 3초간 알리고 자동으로 사라진다.
   const [saveError, setSaveError] = useState(false);
 
-  const settings = useV1Settings({ enabled: hasStoredV1Session() });
+  const settings = useV1Settings({ enabled: safeHasStoredV1Session() });
   const updateSettings = useV1UpdateSettings();
 
   useEffect(() => {
@@ -55,7 +77,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setServerSynced(true);
     if (serverTheme !== readStoredPreference()) {
       setPreferenceState(serverTheme);
-      window.localStorage.setItem(THEME_STORAGE_KEY, serverTheme);
+      writeStoredPreference(serverTheme);
     }
   }, [serverSynced, settings.data?.theme]);
 
@@ -67,11 +89,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setPreference = useCallback(
     (next: ThemePreference) => {
+      // 이미 선택된 값을 다시 눌러도 매번 PATCH가 나가지 않도록 no-op 처리.
+      if (next === preference) return;
       setPreferenceState(next);
-      window.localStorage.setItem(THEME_STORAGE_KEY, next);
+      writeStoredPreference(next);
       // 로그아웃 상태에서는 기기 로컬로만 저장한다 — 로그인하면 계정에 반영되고,
       // 이후 다른 기기에서도 이 값을 그대로 불러온다.
-      if (hasStoredV1Session()) {
+      if (safeHasStoredV1Session()) {
         setSaveError(false);
         updateSettings.mutate(
           { theme: next },
@@ -84,7 +108,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [updateSettings],
+    [preference, updateSettings],
   );
 
   const value = useMemo<ThemeContextValue>(

@@ -1561,7 +1561,7 @@ export function ThemeSettingsPageClient() {
                     border: 'none',
                     cursor: 'pointer',
                     textAlign: 'left',
-                    background: selected ? 'var(--blue50)' : 'none',
+                    background: selected ? 'var(--tint-blue)' : 'none',
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>

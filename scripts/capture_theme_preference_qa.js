@@ -4,10 +4,15 @@ const { chromium } = require('@playwright/test');
 const fs = require('fs');
 
 const BASE = process.env.BASE_URL || 'http://localhost:13014';
-// db:seed:demo가 실제로 만드는 계정/데이터 기준 — 매 컨테이너/볼륨마다 UUID가 새로 생성되므로
-// 캡처 직전 DB에서 직접 조회해 갱신해야 한다(하드코딩 ID 재사용 불가).
-const OWNER = { id: 'b708b050-250d-4e41-9b61-033a486e4103', email: 'owner@teameet.v1' };
-const MATCH_ID = '00000000-0000-4000-8000-000000000201';
+// db:seed:demo가 만드는 owner@teameet.v1 계정의 UUID는 postgres 볼륨마다 새로 생성된다 —
+// 하드코딩하면 다음 실행에서 조용히 401로 깨진다(이번 세션에서 실제로 겪음). 캡처 직전
+// `psql -c "select id from v1_users where email='owner@teameet.v1'"`로 조회해 OWNER_USER_ID로
+// 넘기는 게 기본 흐름이고, 폴백값은 마지막으로 확인된 값일 뿐 재사용을 보장하지 않는다.
+const OWNER = {
+  id: process.env.OWNER_USER_ID || 'b708b050-250d-4e41-9b61-033a486e4103',
+  email: process.env.OWNER_USER_EMAIL || 'owner@teameet.v1',
+};
+const MATCH_ID = process.env.MATCH_ID || '00000000-0000-4000-8000-000000000201';
 
 const SCREENS = [
   ['home', '/home'],

@@ -5,11 +5,37 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  isURL,
   Max,
   MaxLength,
   Min,
+  Validate,
   ValidateIf,
+  ValidatorConstraint,
+  type ValidatorConstraintInterface,
 } from 'class-validator';
+
+const SAFE_UPLOAD_SEGMENT = /^[\p{L}\p{N}._-]+$/u;
+
+@ValidatorConstraint({ name: 'isTournamentSponsorLogoUrl', async: false })
+class TournamentSponsorLogoUrlConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    if (typeof value !== 'string') return false;
+    if (!value.startsWith('/uploads/')) return isURL(value, { require_protocol: true });
+
+    const segments = value.slice('/uploads/'.length).split('/');
+    return (
+      segments.length > 0 &&
+      segments.every(
+        (segment) => segment !== '.' && segment !== '..' && SAFE_UPLOAD_SEGMENT.test(segment),
+      )
+    );
+  }
+
+  defaultMessage(): string {
+    return 'logoUrl must be a protocol URL or a safe local /uploads/ path';
+  }
+}
 
 export class CreateTournamentSponsorDto {
   @IsString()
@@ -23,7 +49,7 @@ export class CreateTournamentSponsorDto {
 
   @IsOptional()
   @ValidateIf((_, value) => value !== '')
-  @IsUrl({ require_protocol: true })
+  @Validate(TournamentSponsorLogoUrlConstraint)
   @MaxLength(1000)
   logoUrl?: string;
 
@@ -89,7 +115,7 @@ export class UpdateTournamentSponsorDto {
 
   @IsOptional()
   @ValidateIf((_, value) => value !== '')
-  @IsUrl({ require_protocol: true })
+  @Validate(TournamentSponsorLogoUrlConstraint)
   @MaxLength(1000)
   logoUrl?: string;
 

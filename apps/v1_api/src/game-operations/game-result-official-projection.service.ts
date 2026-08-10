@@ -118,7 +118,34 @@ export class GameResultOfficialProjectionService {
     ) {
       throw new Error('OFFICIAL revision requires non-negative integer home and away scores');
     }
-    return { home: score.home, away: score.away };
+    const penalties = this.penalties(score.penalties);
+    return { home: score.home, away: score.away, ...(penalties === undefined ? {} : { penalties }) };
+  }
+
+  /**
+   * `V1GameResultRevision.score.penalties` is only ever written by the flat
+   * producer shape (`{home,away,penalties?}` -- see `OfficialScore`'s doc).
+   * Absent is the ordinary case (no shootout recorded); present, it must be
+   * exactly as strict as the top-level home/away check above so a
+   * malformed value can never silently reach
+   * `GameResultBracketProjectionService`'s penalty-aware winner resolution.
+   */
+  private penalties(value: unknown): { home: number; away: number } | undefined {
+    if (value === undefined) return undefined;
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      Array.isArray(value) ||
+      typeof (value as { home?: unknown }).home !== 'number' ||
+      !Number.isInteger((value as { home: number }).home) ||
+      (value as { home: number }).home < 0 ||
+      typeof (value as { away?: unknown }).away !== 'number' ||
+      !Number.isInteger((value as { away: number }).away) ||
+      (value as { away: number }).away < 0
+    ) {
+      throw new Error('OFFICIAL revision penalties must be non-negative integer home and away scores');
+    }
+    return { home: (value as { home: number }).home, away: (value as { away: number }).away };
   }
 
   private async writeAggregateWatermarks(

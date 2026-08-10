@@ -12,6 +12,7 @@
 import type { Prisma } from '@prisma/client';
 import {
   hasTournamentFixtureOfficialResult,
+  parseTournamentFixtureOfficialScore,
   resolveTournamentFixtureOfficialResult,
   resolveTournamentFixtureOfficialScore,
   resolveTournamentFixtureOfficialTimestamp,
@@ -101,6 +102,50 @@ describe('resolveTournamentFixtureOfficialScore', () => {
   it('둘 다 없으면 null', () => {
     expect(resolveTournamentFixtureOfficialScore(null, null)).toBeNull();
     expect(resolveTournamentFixtureOfficialScore(null, undefined)).toBeNull();
+  });
+});
+
+describe('parseTournamentFixtureOfficialScore (승부차기)', () => {
+  it('평평한 {home,away} 형태에 penalties가 없으면 hasPenalty:false로 남는다(회귀 방지)', () => {
+    expect(parseTournamentFixtureOfficialScore({ home: 1, away: 0 })).toEqual({
+      homeScore: 1,
+      awayScore: 0,
+      hasPenalty: false,
+      homePenaltyScore: null,
+      awayPenaltyScore: null,
+    });
+  });
+
+  it('평평한 {home,away,penalties} 형태(GamesService.deriveTournamentRevision/교정 산출물) → hasPenalty가 표면화된다', () => {
+    expect(parseTournamentFixtureOfficialScore({ home: 1, away: 1, penalties: { home: 5, away: 4 } })).toEqual({
+      homeScore: 1,
+      awayScore: 1,
+      hasPenalty: true,
+      homePenaltyScore: 5,
+      awayPenaltyScore: 4,
+    });
+  });
+
+  it('중첩 GAME_BACKFILL 형태의 penalty는 기존대로 계속 동작한다(회귀 방지)', () => {
+    expect(
+      parseTournamentFixtureOfficialScore({
+        regulation: { home: 1, away: 1 },
+        penalty: { home: 5, away: 4 },
+        goals: [],
+        incomplete: false,
+        provenance: 'GAME_BACKFILL',
+      }),
+    ).toEqual({ homeScore: 1, awayScore: 1, hasPenalty: true, homePenaltyScore: 5, awayPenaltyScore: 4 });
+  });
+
+  it('penalties가 구조를 갖추지 못하면(home/away 아님) hasPenalty:false로 무시한다', () => {
+    expect(parseTournamentFixtureOfficialScore({ home: 1, away: 1, penalties: { home: 5 } })).toEqual({
+      homeScore: 1,
+      awayScore: 1,
+      hasPenalty: false,
+      homePenaltyScore: null,
+      awayPenaltyScore: null,
+    });
   });
 });
 

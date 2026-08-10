@@ -350,6 +350,53 @@ function assertClockNotDrifted(occurredAt: string): void {
   }
 }
 
+/**
+ * Pulls an optional penalty shootout score off the `end` command's
+ * `payload.penalties` (the generic per-command extensibility slot every
+ * `GameCommandDto` already carries -- no new command or endpoint needed,
+ * matching how `start`/`pause`/`resume`/`next-period` all share the same
+ * envelope). Shape/decisiveness only -- whether a shootout is even allowed
+ * here (knockout fixture, regulation actually tied) is `GamesService.
+ * applyPenalties`'s job, once the fixture's group is known inside the same
+ * transaction. Returns `undefined` (no shootout recorded) when the key is
+ * absent, exactly like every other optional command field in this file.
+ *
+ * Exported (like `canonicalGameCommandPayloadHash`/`groupParticipantsByLineupId`
+ * elsewhere in this file) so this pure parsing rule is unit-testable without
+ * a database.
+ */
+export function extractEndPenalties(
+  payload: Record<string, unknown>,
+): { home: number; away: number } | undefined {
+  const raw = payload.penalties;
+  if (raw === undefined) return undefined;
+  if (
+    typeof raw !== 'object' ||
+    raw === null ||
+    Array.isArray(raw) ||
+    typeof (raw as { home?: unknown }).home !== 'number' ||
+    !Number.isInteger((raw as { home: number }).home) ||
+    (raw as { home: number }).home < 0 ||
+    typeof (raw as { away?: unknown }).away !== 'number' ||
+    !Number.isInteger((raw as { away: number }).away) ||
+    (raw as { away: number }).away < 0
+  ) {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: 'penalties must be an object with non-negative integer home and away scores',
+    });
+  }
+  const home = (raw as { home: number; away: number }).home;
+  const away = (raw as { home: number; away: number }).away;
+  if (home === away) {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: 'A penalty shootout must produce a decisive winner',
+    });
+  }
+  return { home, away };
+}
+
 @Injectable()
 export class GamesService {
   constructor(
@@ -728,7 +775,7 @@ export class GamesService {
               data: { state: V1GamePeriodState.ENDED, endedAt: now, ...(resolved ?? {}) },
             });
           }
-          return this.deriveTournamentRevision(tx, updated, context);
+          return this.deriveTournamentRevision(tx, updated, context, extractEndPenalties(dto.payload));
         }
         return {
           gameId: updated.id,
@@ -3435,13 +3482,15 @@ export class GamesService {
     tx: Transaction,
     game: LockedGame,
     context: GameCommandContext,
+    penalties?: { home: number; away: number },
   ): Promise<GameRevisionMutationResult> {
     const [events, participants, sides] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
     ]);
-    const score = this.scoreFromEvents(events, sides);
+    const regulationScore = this.scoreFromEvents(events, sides);
+    const score = await this.applyPenalties(tx, game, regulationScore, penalties);
     const revision = await tx.v1GameResultRevision.create({
       data: {
         gameId: game.id,
@@ -3557,6 +3606,74 @@ export class GamesService {
       }
     });
     return { home, away };
+  }
+
+  /**
+   * Folds an `end` command's optional penalty shootout score onto the
+   * event-derived regulation score. `undefined` in (no `payload.penalties`
+   * sent) is the ordinary case and passes `score` through unchanged --
+   * every other TOURNAMENT_FIXTURE `end` keeps behaving exactly as before
+   * this feature existed.
+   *
+   * When penalties ARE present, both required conditions are enforced here
+   * (not left to the async bracket projection, which only ever sees an
+   * already-persisted revision and cannot reject bad input before it's
+   * written):
+   *  - the fixture must be a knockout-phase fixture (`V1TournamentGroup.
+   *    phase !== 'group'`, the phase column -- NOT `round`, which is a
+   *    free-text ko/en display label and not a safe discriminator, see
+   *    `isKnockoutFixture`). A group-stage draw stays a draw; recording a
+   *    "shootout winner" there would corrupt `calculateCompetitionStandings`
+   *    the moment anything read `score.penalties` for standings purposes.
+   *  - regulation must actually be level. A shootout score attached to a
+   *    decisive regulation result is meaningless (real football never plays
+   *    penalties when someone already won in 90 minutes) and would silently
+   *    sit unread in `score.penalties` forever, which is exactly the kind
+   *    of dead, unverifiable state this repo's 기술부채 0 rule forbids
+   *    accepting.
+   *
+   * `extractEndPenalties` already guaranteed `penalties.home !==
+   * penalties.away` (a shootout must produce a winner), so once both checks
+   * below pass, `GameResultBracketProjectionService.resolveWinnerSide` can
+   * trust `score.penalties` unconditionally.
+   */
+  private async applyPenalties(
+    tx: Transaction,
+    game: LockedGame,
+    score: GameScore,
+    penalties: { home: number; away: number } | undefined,
+  ): Promise<GameScore> {
+    if (penalties === undefined) return score;
+    if (!(await this.isKnockoutFixture(tx, game.tournamentFixtureId))) {
+      throw new ConflictException({
+        code: 'TOURNAMENT_PENALTY_NOT_ALLOWED',
+        message: 'Penalty shootouts can only be recorded for knockout-phase fixtures',
+      });
+    }
+    if (score.home !== score.away) {
+      throw new ConflictException({
+        code: 'TOURNAMENT_PENALTY_NOT_ALLOWED',
+        message: 'Penalty shootouts are only recorded when regulation time ends level',
+      });
+    }
+    return { ...score, penalties };
+  }
+
+  /**
+   * Knockout판별은 `V1TournamentGroup.phase`(semi/final/third_place)로만
+   * 한다 -- `V1TournamentFixture.round`는 한글/영문이 섞인 표시용 라벨이라
+   * 판별 기준으로 쓰면 함정이다(프로젝트 메모리 기록 그대로).
+   * `groupId`가 없는 픽스처(어느 조에도 배정되지 않음)는 knockout임을
+   * 확인할 방법이 없으므로 보수적으로 knockout이 아닌 것으로 취급한다 --
+   * 승부차기를 지어낼 근거가 없을 때는 허용하지 않는 쪽이 안전하다.
+   */
+  private async isKnockoutFixture(tx: Transaction, tournamentFixtureId: string | null): Promise<boolean> {
+    if (tournamentFixtureId === null) return false;
+    const fixture = await tx.v1TournamentFixture.findUnique({
+      where: { id: tournamentFixtureId },
+      select: { group: { select: { phase: true } } },
+    });
+    return fixture?.group !== null && fixture?.group !== undefined && fixture.group.phase !== 'group';
   }
 
   private async assertTeamMatchMatched(tx: Transaction, teamMatchId: string | null): Promise<void> {

@@ -13,11 +13,14 @@ import type { Prisma } from '@prisma/client';
  *    incomplete, provenance }` 로 감싸여 있다 — 지금 이미 완료된 대회 픽스처 21건이 전부 이
  *    형태다.
  *  - 새로 대회 경기를 "종료"해서 만든 리비전(GamesService.deriveTournamentRevision ->
- *    scoreFromEvents)은 `{ home, away }` 로 평평하다. 이 경로는 승부차기 개념이 아예 없다 —
- *    `CreateGameResultRevisionDto`(승부차기 `penalties` 지원)는 TOURNAMENT_FIXTURE 소스에
- *    대해 `TOURNAMENT_RESULT_DERIVED_ONLY` 로 하드 거부된다(games.service.ts
- *    createResultRevision). 즉 **오늘 이후 새로 종료되는 대회 경기는 신규 경로 자체에
- *    승부차기 기록 수단이 없다** — 21건의 레거시 백필 데이터만 승부차기 정보를 보존한다.
+ *    scoreFromEvents)은 `{ home, away, penalties?: {home,away} }` 로 평평하다.
+ *    `CreateGameResultRevisionDto`는 TOURNAMENT_FIXTURE 소스에 대해 여전히
+ *    `TOURNAMENT_RESULT_DERIVED_ONLY` 로 하드 거부되지만(games.service.ts
+ *    createResultRevision), 결선(knockout, `V1TournamentGroup.phase !== 'group'`) 경기를
+ *    `end` 커맨드로 종료할 때 정규시간이 무승부면 `payload.penalties: {home,away}`를 함께
+ *    보내 승부차기 스코어를 기록할 수 있다(games.service.ts의 `applyPenalties`/
+ *    `extractEndPenalties` 참고) — 조별리그 경기는 같은 경로에서 하드 거부된다. 그 전까지는
+ *    (이 변경 이전 리비전) 21건의 레거시 백필 데이터만 승부차기 정보를 보존했다.
  *
  * **레거시 폴백(R3 §4-3~§4-4단계 사이 한시적):** 새 경로를 무조건 우선하되, 새 경로에
  * `state === 'OFFICIAL'`인 리비전이 없을 때만(`game` 자체가 없는 경우 포함) 레거시
@@ -59,14 +62,19 @@ export function parseTournamentFixtureOfficialScore(
       awayPenaltyScore: hasPenalty ? penalty.away : null,
     };
   }
-  // 평평한 { home, away } 형태 — deriveTournamentRevision 산출물. 승부차기 개념이 없다.
+  // 평평한 { home, away, penalties? } 형태 — deriveTournamentRevision/createResultCorrection/
+  // supersedeAndSubmit 산출물. `penalties`가 있으면(결선 무승부 승부차기 기록) 레거시
+  // hasPenalty/homePenaltyScore/awayPenaltyScore와 같은 모양으로 표면화한다 -- 아래 두
+  // producer가 둘 다 같은 필드 이름(`penalties: {home,away}`)을 쓰므로 하나의 검사로 충분하다.
+  const penalties = record.penalties;
+  const hasPenalty = isScorePair(penalties);
   if (!isScorePair(record)) return null;
   return {
     homeScore: record.home,
     awayScore: record.away,
-    hasPenalty: false,
-    homePenaltyScore: null,
-    awayPenaltyScore: null,
+    hasPenalty,
+    homePenaltyScore: hasPenalty ? penalties.home : null,
+    awayPenaltyScore: hasPenalty ? penalties.away : null,
   };
 }
 

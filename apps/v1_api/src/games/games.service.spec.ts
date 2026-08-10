@@ -5,6 +5,7 @@ import { GameContractError } from './core';
 import { GameCommandDto } from './dto/game-command.dto';
 import {
   canonicalGameCommandPayloadHash,
+  extractEndPenalties,
   gameAuthorizationAction,
   gameOperationAuditActor,
   groupParticipantsByLineupId,
@@ -183,6 +184,38 @@ describe('GamesService command boundary', () => {
 
       expect(grouped.get('lineup-1')?.map((row) => row.id)).toEqual(['a', 'c']);
       expect(grouped.get('lineup-2')?.map((row) => row.id)).toEqual(['b']);
+    });
+  });
+
+  describe('extractEndPenalties (트랙 B: end 커맨드의 승부차기 payload 파싱)', () => {
+    it('payload.penalties가 없으면 undefined(대부분의 end 커맨드는 승부차기가 없다)', () => {
+      expect(extractEndPenalties({})).toBeUndefined();
+    });
+
+    it('유효한 { home, away }를 그대로 반환한다', () => {
+      expect(extractEndPenalties({ penalties: { home: 5, away: 4 } })).toEqual({ home: 5, away: 4 });
+    });
+
+    it('home === away(승부가 갈리지 않음)면 422 TOURNAMENT_PENALTY_INVALID', () => {
+      expect(() => extractEndPenalties({ penalties: { home: 3, away: 3 } })).toThrow(HttpException);
+      try {
+        extractEndPenalties({ penalties: { home: 3, away: 3 } });
+      } catch (error) {
+        expect((error as HttpException).getStatus()).toBe(422);
+        expect((error as HttpException).getResponse()).toEqual(
+          expect.objectContaining({ code: 'TOURNAMENT_PENALTY_INVALID' }),
+        );
+      }
+    });
+
+    it.each([
+      ['home이 음수', { home: -1, away: 4 }],
+      ['away가 정수가 아님', { home: 5, away: 4.5 }],
+      ['home이 숫자가 아님', { home: '5', away: 4 }],
+      ['배열', [5, 4]],
+      ['null', null],
+    ])('penalties가 구조를 갖추지 못하면(%s) 422 TOURNAMENT_PENALTY_INVALID', (_label, penalties) => {
+      expect(() => extractEndPenalties({ penalties })).toThrow(HttpException);
     });
   });
 });

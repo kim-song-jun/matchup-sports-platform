@@ -189,6 +189,31 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     await expect(auditCount(job.businessKey, 'OUTBOX_EFFECT_COMMITTED')).resolves.toBe(0);
   });
 
+  // Outbox-handler cleanup task regression: these two types were being
+  // written by production code (games.service.ts's decideResultRevision
+  // change-request branch; game-operation-flags.ts's writeControlEffect for
+  // the simplified-gate toggle) with NO registered handler anywhere -- alpha
+  // found them retrying 6 times then sitting POISONED forever. Both now get
+  // the exact same durable-audit treatment as GAME_OPERATION_FLAG_CHANGED /
+  // GAME_RESULT_REJECTED, proven end-to-end here (not just "a handler is
+  // registered" but "the real dispatch completes and writes the audit row").
+  it.each([
+    ['GAME_RESULT_CHANGE_REQUESTED', () => new V1GameOperationsWorkerService(prisma)],
+    ['GAME_OPERATION_GATE_MODE_CHANGED', worker],
+  ] as const)('completes (never poisons) a previously-unregistered %s job', async (type, buildService) => {
+    const job = await insertJob({ type });
+    const service = buildService();
+
+    await expect(service.processOne()).resolves.toBe(true);
+
+    await expect(jobState(job.id)).resolves.toMatchObject({
+      status: 'COMPLETED',
+      attempts: 1,
+      leaseOwner: null,
+    });
+    await expect(auditCount(job.businessKey, 'OUTBOX_EFFECT_COMMITTED')).resolves.toBe(1);
+  });
+
   it('releases only its own leases on shutdown using the next exact delay', async () => {
     const firstJob = await insertJob();
     const firstOwner = worker();
@@ -240,13 +265,15 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
 
   it('reports built-in handler readiness and poisoned queue health without leaking owner identity', async () => {
     const service = new V1GameOperationsWorkerService(prisma);
-    // Built-in handlers as of Task 22: GAME_RESULT_OFFICIAL, GAME_RESULT_VOIDED,
-    // GAME_RESULT_SUBMITTED, GAME_RESULT_REVIEW_REMINDER,
-    // GAME_RESULT_REVIEW_ESCALATION, and the two durable-audit-only handlers
-    // GAME_RESULT_REJECTED / GAME_RESULT_SUPPLEMENT_REQUESTED -- 7 total.
+    // Built-in handlers as of the outbox-handler cleanup task: GAME_RESULT_OFFICIAL,
+    // GAME_RESULT_VOIDED, GAME_RESULT_SUBMITTED, GAME_RESULT_REVIEW_REMINDER,
+    // GAME_RESULT_REVIEW_ESCALATION, and the three durable-audit-only handlers
+    // GAME_RESULT_REJECTED / GAME_RESULT_SUPPLEMENT_REQUESTED / GAME_RESULT_CHANGE_REQUESTED
+    // (the last one added this task -- see v1-game-operations-worker.service.ts's
+    // constructor) -- 8 total.
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 7,
+      registeredHandlers: 8,
       queue: {
         pending: 0,
         retry: 0,
@@ -259,7 +286,7 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     service.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 8,
+      registeredHandlers: 9,
     });
 
     await insertJob({ status: 'POISONED', attempts: 6 });
@@ -276,6 +303,10 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     const service = new V1GameOperationsWorkerService(prisma);
     service.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
     service.registerDurableAuditHandler('GAME_OPERATION_JOB_REQUEUED');
+    // Mirrors v1-game-operations-worker.main.ts's bootstrap registration --
+    // see that file's comment for why this gets the identical treatment as
+    // GAME_OPERATION_FLAG_CHANGED above.
+    service.registerDurableAuditHandler('GAME_OPERATION_GATE_MODE_CHANGED');
     return service;
   }
 

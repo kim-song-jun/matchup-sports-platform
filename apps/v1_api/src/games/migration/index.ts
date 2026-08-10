@@ -32,3 +32,10 @@ export type {
   GameResultEntityType,
   GameResultMismatch,
 } from './compare-game-result-reads';
+export { runTeamRecordFactsBackfill } from './team-record-facts-backfill';
+export type {
+  TeamRecordFactsBackfillCounts,
+  TeamRecordFactsBackfillQuarantine,
+  TeamRecordFactsBackfillQuarantineReason,
+  TeamRecordFactsBackfillResult,
+} from './team-record-facts-backfill';

@@ -88,6 +88,12 @@ import type {
 
 type Transaction = Prisma.TransactionClient;
 type CommandResult = object;
+// Exhaustive list of every `v1_outbox_events.type` value this service ever
+// writes — see writeOutbox()'s docblock for why this exists. Each member
+// must have a registered handler in v1-game-operations-worker.service.ts's
+// constructor (or the worker main.ts bootstrap) or it will retry 6 times
+// and end up POISONED forever.
+type GamesOutboxEventType = 'GAME_RESULT_SUBMITTED' | 'GAME_RESULT_OFFICIAL' | 'GAME_RESULT_CHANGE_REQUESTED';
 type GameAuthorizationAction =
   | 'read'
   | 'tournament_command'
@@ -1006,9 +1012,15 @@ export class GamesService {
           where: { id: gameId },
           data: { lastSequence: sequence, version: { increment: 1 } },
         });
-        await this.writeOutbox(tx, `game:${gameId}:event:${sequence}`, gameId, 'GAME_EVENT_APPENDED', {
-          sequence,
-        });
+        // GAME_EVENT_APPENDED used to be written to the outbox here, but a full
+        // repo audit (outbox-handler cleanup task) found no reader anywhere —
+        // not the realtime gateway (it broadcasts synchronously in this same
+        // request, never through the outbox), no projection, no doc/commit
+        // intent. It never poisoned in alpha only because attempts hadn't hit
+        // 6 yet. Removed at the publish site rather than papered over with a
+        // no-op handler: the immutable `v1_game_event` row created above IS
+        // this event's durable record, so nothing is lost by not also
+        // queuing a job nobody claims.
         return {
           gameId,
           state: updated.state,
@@ -1183,9 +1195,10 @@ export class GamesService {
             { version: game.version, state: game.state },
             response,
           );
-          await this.writeOutbox(tx, `game:${gameId}:event:${sequence}`, gameId, 'GAME_EVENT_APPENDED', {
-            sequence,
-          });
+          // See appendEvent()'s identical comment: GAME_EVENT_APPENDED had no
+          // outbox consumer anywhere, and this path already writes a
+          // V1OperationAudit row above (unlike appendEvent's primary path) —
+          // removing the outbox write loses nothing.
           return response;
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -1260,10 +1273,10 @@ export class GamesService {
           where: { id: gameId },
           data: { lastSequence: sequence, version: { increment: 1 } },
         });
-        await this.writeOutbox(tx, `game:${gameId}:event:${sequence}`, gameId, 'GAME_EVENT_REVERSED', {
-          sequence,
-          reversesEventId: target.id,
-        });
+        // GAME_EVENT_REVERSED had the same fate as GAME_EVENT_APPENDED above —
+        // no reader anywhere in the codebase — and is removed for the same
+        // reason: the `v1_game_event` CORRECTION row created above is the
+        // durable record of this reversal.
         return {
           gameId,
           state: updated.state,
@@ -2174,15 +2187,13 @@ export class GamesService {
           null,
           response,
         );
-        if (action === V1IdentityLinkAction.ATTESTED) {
-          await this.writeOutbox(
-            tx,
-            `game:${gameId}:participant:${participantId}:identity:${requested.linkId}:attested`,
-            gameId,
-            'PARTICIPANT_IDENTITY_LINKED',
-            { participantId, linkId: requested.linkId, userId: requested.userId },
-          );
-        }
+        // PARTICIPANT_IDENTITY_LINKED used to be queued to the outbox here.
+        // Removed (outbox-handler cleanup task): no reader anywhere, and the
+        // writeAudit() call above already durably records this decision in
+        // V1OperationAudit inside the same transaction — the outbox write
+        // was a pure duplicate that nothing ever claimed. getPublicParticipant()
+        // reads live (see its docblock), so there was never a cache to
+        // invalidate either.
         return response;
       },
     );
@@ -2257,13 +2268,11 @@ export class GamesService {
           null,
           response,
         );
-        await this.writeOutbox(
-          tx,
-          `game:${gameId}:participant:${participantId}:identity:${linkId}:revoked`,
-          gameId,
-          'PARTICIPANT_IDENTITY_REVOKED',
-          { participantId, linkId },
-        );
+        // PARTICIPANT_IDENTITY_REVOKED — same removal rationale as
+        // PARTICIPANT_IDENTITY_LINKED above: no reader, and writeAudit()
+        // already made this durable. The ≤5s purge guarantee comes from
+        // v1ParticipantIdentityLinkCurrent.delete() above running
+        // synchronously in this same transaction, not from any async worker.
         return response;
       },
     );
@@ -2336,13 +2345,8 @@ export class GamesService {
           null,
           response,
         );
-        await this.writeOutbox(
-          tx,
-          `game:${gameId}:participant:${participantId}:consent:${created.consentVersion}:granted`,
-          gameId,
-          'PARTICIPANT_CONSENT_GRANTED',
-          { participantId, consentVersion: created.consentVersion },
-        );
+        // PARTICIPANT_CONSENT_GRANTED — same removal rationale: no reader,
+        // and writeAudit() above already made this durable.
         return response;
       },
     );
@@ -2427,13 +2431,11 @@ export class GamesService {
           null,
           response,
         );
-        await this.writeOutbox(
-          tx,
-          `game:${gameId}:participant:${participantId}:consent:${created.consentVersion}:revoked`,
-          gameId,
-          'PARTICIPANT_CONSENT_REVOKED',
-          { participantId, consentVersion: created.consentVersion },
-        );
+        // PARTICIPANT_CONSENT_REVOKED — same removal rationale as the grant
+        // path above: no reader, writeAudit() above already made this
+        // durable, and the ≤5s purge guarantee comes from the live read path
+        // (getPublicParticipant()) immediately reflecting the new REVOKED
+        // snapshot, not from any async worker.
         return response;
       },
     );
@@ -3982,11 +3984,25 @@ export class GamesService {
     });
   }
 
+  /**
+   * `type` is deliberately a closed literal union, not `string` — the outbox
+   * only ever runs the worker's registered handlers (see
+   * `v1-game-operations-worker.service.ts`'s constructor); a type written
+   * here without a matching `registerHandler`/`registerDurableAuditHandler`
+   * call retries 6 times on a fixed backoff and then sits POISONED forever
+   * (alpha hit exactly this for GAME_EVENT_APPENDED/REVERSED). Narrowing
+   * this parameter means adding a new event type is a compile error here
+   * until it's added to `GamesOutboxEventType` below, which is the one
+   * place a reviewer needs to check "is a handler registered for this?" —
+   * cheaper than a runtime registry/boot check for a single-file writer,
+   * see the outbox-handler-cleanup task notes for why a repo-wide boot-time
+   * registry was judged out of scope here.
+   */
   private async writeOutbox(
     tx: Transaction,
     businessKey: string,
     gameId: string,
-    type: string,
+    type: GamesOutboxEventType,
     payload: unknown,
     revisionId?: string,
   ) {

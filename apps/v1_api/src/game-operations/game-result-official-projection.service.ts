@@ -3,13 +3,12 @@ import type { GameOperationHandler } from '../jobs/v1-game-operations-worker.ser
 import { GameResultBracketProjectionService } from './game-result-bracket-projection.service';
 import { GameResultEscalationTerminalService } from './game-result-escalation-terminal.service';
 import { GameResultOfficialFactsService } from './game-result-official-facts.service';
-import type {
-  OfficialRevisionRow,
-  OfficialScore,
-} from './game-result-official-projection.types';
+import type { OfficialRevisionRow } from './game-result-official-projection.types';
 import { GameResultProjectionWatermarkService } from './game-result-projection-watermark.service';
 import { GameResultPublicCacheService } from './game-result-public-cache.service';
 import { GameResultStandingsProjectionService } from './game-result-standings-projection.service';
+import { officialRevisionRowSelect } from './official-revision-row.query';
+import { parseOfficialScore } from './parse-official-score';
 
 type LockedOfficialRevisionRow = Omit<OfficialRevisionRow, 'officialAt'> & {
   state: string;
@@ -26,7 +25,7 @@ export class GameResultOfficialProjectionService {
 
   readonly handler: GameOperationHandler = async (claim, tx) => {
     const revision = await this.lockOfficialRevision(tx, this.revisionId(claim.payload));
-    const score = this.score(revision.score);
+    const score = parseOfficialScore(revision.score);
     const publicProjection = this.cache.build(revision, score);
     const teamIds = [revision.homeTeamId, revision.awayTeamId].filter(
       (teamId): teamId is string => teamId !== null,
@@ -72,28 +71,7 @@ export class GameResultOfficialProjectionService {
     revisionId: string,
   ): Promise<OfficialRevisionRow> {
     const rows = await tx.$queryRaw<LockedOfficialRevisionRow[]>`
-      SELECT
-        revision.id AS "revisionId",
-        revision.game_id AS "gameId",
-        revision.revision,
-        revision.state::text AS state,
-        revision.score,
-        revision.events_hash AS "sourceHash",
-        revision.official_at AS "officialAt",
-        revision.reason,
-        game.source_type::text AS "sourceType",
-        game.current_official_revision_id AS "currentOfficialRevisionId",
-        fixture.tournament_id AS "tournamentId",
-        fixture.id AS "tournamentFixtureId",
-        home_side.team_id AS "homeTeamId",
-        away_side.team_id AS "awayTeamId",
-        COALESCE(policy.mode, 'HIDDEN'::"V1VisibilityMode") AS visibility
-      FROM v1_game_result_revisions revision
-      INNER JOIN v1_games game ON game.id = revision.game_id
-      LEFT JOIN v1_tournament_fixtures fixture ON fixture.id = game.tournament_fixture_id
-      LEFT JOIN v1_game_sides home_side ON home_side.game_id = game.id AND home_side.side_key = 'HOME'
-      LEFT JOIN v1_game_sides away_side ON away_side.game_id = game.id AND away_side.side_key = 'AWAY'
-      LEFT JOIN v1_game_visibility_policies policy ON policy.game_id = game.id
+      ${officialRevisionRowSelect()}
       WHERE revision.id = ${revisionId}
       FOR UPDATE OF revision, game
     `;
@@ -102,50 +80,6 @@ export class GameResultOfficialProjectionService {
       throw new Error(`GAME_RESULT_OFFICIAL revision ${revisionId} is not OFFICIAL`);
     }
     return { ...revision, officialAt: revision.officialAt };
-  }
-
-  private score(score: Prisma.JsonValue): OfficialScore {
-    if (
-      typeof score !== 'object' ||
-      score === null ||
-      Array.isArray(score) ||
-      typeof score.home !== 'number' ||
-      !Number.isInteger(score.home) ||
-      score.home < 0 ||
-      typeof score.away !== 'number' ||
-      !Number.isInteger(score.away) ||
-      score.away < 0
-    ) {
-      throw new Error('OFFICIAL revision requires non-negative integer home and away scores');
-    }
-    const penalties = this.penalties(score.penalties);
-    return { home: score.home, away: score.away, ...(penalties === undefined ? {} : { penalties }) };
-  }
-
-  /**
-   * `V1GameResultRevision.score.penalties` is only ever written by the flat
-   * producer shape (`{home,away,penalties?}` -- see `OfficialScore`'s doc).
-   * Absent is the ordinary case (no shootout recorded); present, it must be
-   * exactly as strict as the top-level home/away check above so a
-   * malformed value can never silently reach
-   * `GameResultBracketProjectionService`'s penalty-aware winner resolution.
-   */
-  private penalties(value: unknown): { home: number; away: number } | undefined {
-    if (value === undefined) return undefined;
-    if (
-      typeof value !== 'object' ||
-      value === null ||
-      Array.isArray(value) ||
-      typeof (value as { home?: unknown }).home !== 'number' ||
-      !Number.isInteger((value as { home: number }).home) ||
-      (value as { home: number }).home < 0 ||
-      typeof (value as { away?: unknown }).away !== 'number' ||
-      !Number.isInteger((value as { away: number }).away) ||
-      (value as { away: number }).away < 0
-    ) {
-      throw new Error('OFFICIAL revision penalties must be non-negative integer home and away scores');
-    }
-    return { home: (value as { home: number }).home, away: (value as { away: number }).away };
   }
 
   private async writeAggregateWatermarks(

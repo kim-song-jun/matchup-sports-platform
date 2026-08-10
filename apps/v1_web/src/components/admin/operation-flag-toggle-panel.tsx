@@ -385,13 +385,29 @@ function FlagCard({
 
 // ── Panel ────────────────────────────────────────────────────────────────
 export function OperationFlagTogglePanel() {
-  const { data: gateStatus, isPending: gateStatusPending } = useV1SimplifiedOperationFlagGateStatus();
+  const {
+    data: gateStatus,
+    isPending: gateStatusPending,
+    isError: gateStatusError,
+  } = useV1SimplifiedOperationFlagGateStatus();
   const { toasts, showToast } = useAdminToast();
   const gateEnabled = gateStatus?.enabled ?? false;
 
   return (
     <div className="flex flex-col gap-4">
-      {!gateStatusPending && !gateEnabled && (
+      {/* Copilot 리뷰: 조회가 403(권한 없음)·네트워크 오류로 실패해도
+          `gateStatus?.enabled ?? false` 때문에 "이 환경에서는 간소 토글이
+          꺼져 있어요"로 읽혔다. 운영자는 "환경 설정이 그렇구나"로 오해하고
+          권한 문제를 영영 못 찾는다. 조회 실패는 별도로 안내한다. */}
+      {!gateStatusPending && gateStatusError && (
+        <p className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+          <Lock size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+          간소 토글을 쓸 수 있는지 확인하지 못했어요. 권한이 없거나 일시적인 오류일 수 있어요 —
+          새로고침해도 같으면 플랫폼 운영자에게 문의해 주세요.
+        </p>
+      )}
+
+      {!gateStatusPending && !gateStatusError && !gateEnabled && (
         <p
           role="note"
           className="text-[13px] text-gray-700 bg-gray-100 border border-gray-200 rounded-xl px-3.5 py-3 flex items-start gap-2"

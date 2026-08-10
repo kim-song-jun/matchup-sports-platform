@@ -94,6 +94,44 @@ describe('public tournament QA regressions', () => {
     expect(screen.getByText(/조별리그가 끝난 후/)).toBeInTheDocument();
   });
 
+  it('renders the saved team logo in published group standings', () => {
+    const tournament = makeTournament({
+      format: 'group_knockout',
+      status: 'closed',
+      bracketPublishedAt: '2026-08-09T00:00:00.000Z',
+      groups: [
+        {
+          id: 'group-a',
+          name: 'A조',
+          phase: 'group',
+          sortOrder: 0,
+          advanceCount: 2,
+          groupTeams: [],
+          standings: [
+            {
+              registrationId: 'registration-1',
+              teamId: 'team-1',
+              teamName: '성수 FC',
+              teamLogoUrl: '/uploads/teams/seongsu-fc.png',
+              position: 1,
+              points: 3,
+              wins: 1,
+              draws: 0,
+              losses: 0,
+              goalsFor: 2,
+              goalsAgainst: 0,
+              recalculatedAt: '2026-08-09T00:00:00.000Z',
+            },
+          ],
+        },
+      ],
+    });
+
+    const { container } = render(<BracketPageContent tournament={tournament} />);
+
+    expect(container.querySelector('img[src="/uploads/teams/seongsu-fc.png"]')).toBeInTheDocument();
+  });
+
   it('uses the correct Korean directional particle in journey-link labels', () => {
     render(
       <TournamentFlowNav
@@ -129,9 +167,13 @@ describe('public tournament QA regressions', () => {
           legNumber: 1,
           scheduledAt: null,
           venue: null,
+          homeTeamId: 'team-home',
           homeTeamName: '서울 유나이티드',
+          homeTeamLogoUrl: '/uploads/teams/seoul.png',
           homeRegistrationId: 'registration-home',
+          awayTeamId: 'team-away',
           awayTeamName: '부산 FC',
+          awayTeamLogoUrl: '/uploads/teams/busan.png',
           awayRegistrationId: 'registration-away',
           status: 'completed',
           result: {

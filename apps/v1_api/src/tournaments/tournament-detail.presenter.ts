@@ -127,6 +127,7 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
         registrationId: standing.registrationId,
         teamId: standing.registration.team.id,
         teamName: standing.registration.team.name,
+        teamLogoUrl: standing.registration.team.profile?.logoUrl ?? null,
         position: standing.position,
         points: standing.points,
         wins: standing.wins,
@@ -149,9 +150,13 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
       venue: fixture.venue,
       status: fixture.status,
       homeRegistrationId: fixture.homeRegistrationId,
+      homeTeamId: fixture.homeRegistration?.team.id ?? null,
       homeTeamName: fixture.homeRegistration?.team.name ?? 'TBD',
+      homeTeamLogoUrl: fixture.homeRegistration?.team.profile?.logoUrl ?? null,
       awayRegistrationId: fixture.awayRegistrationId,
+      awayTeamId: fixture.awayRegistration?.team.id ?? null,
       awayTeamName: fixture.awayRegistration?.team.name ?? 'TBD',
+      awayTeamLogoUrl: fixture.awayRegistration?.team.profile?.logoUrl ?? null,
       result: fixture.result
         ? {
             homeScore: fixture.result.homeScore,

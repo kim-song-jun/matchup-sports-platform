@@ -12,7 +12,7 @@ export function PendingTournamentReviewCard() {
   if (!target) return null;
 
   return (
-    <Card pad={16} style={{ background: 'var(--blue50)', border: '1px solid var(--blue100)', marginBottom: 16, minWidth: 0 }}>
+    <Card pad={16} style={{ background: 'var(--tint-blue)', border: '1px solid var(--tint-blue-border)', marginBottom: 16, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div
           style={{
@@ -24,7 +24,7 @@ export function PendingTournamentReviewCard() {
           <Star size={18} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.6} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>참가팀 후기를 기다리고 있어요</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--blue700)' }}>참가팀 후기를 기다리고 있어요</div>
           <div
             style={{
               fontSize: 12, color: 'var(--text-caption)', marginTop: 2,

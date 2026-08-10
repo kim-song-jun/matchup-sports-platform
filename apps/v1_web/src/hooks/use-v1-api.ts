@@ -1848,10 +1848,11 @@ export function useV1UpdateProfile() {
   });
 }
 
-export function useV1Settings() {
+export function useV1Settings(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: v1Keys.settings(),
     queryFn: () => v1Get<V1Settings>('/me/settings'),
+    enabled: options?.enabled,
   });
 }
 
@@ -1859,8 +1860,13 @@ export function useV1UpdateSettings() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: {
+      theme?: V1Settings['theme'];
       notifications?: Partial<V1Settings['notifications']>;
-    }) => v1Patch<{ profile: V1Settings['profile']; notifications: V1Settings['notifications']; updatedAt: string }>('/me/settings', body),
+    }) =>
+      v1Patch<{ profile: V1Settings['profile']; theme: V1Settings['theme']; notifications: V1Settings['notifications']; updatedAt: string }>(
+        '/me/settings',
+        body,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
       queryClient.invalidateQueries({ queryKey: v1Keys.profile() });

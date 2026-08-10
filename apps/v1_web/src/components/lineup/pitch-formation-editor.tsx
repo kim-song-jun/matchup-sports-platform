@@ -382,7 +382,7 @@ function FormationControls({
                   padding: '6px 10px',
                   borderRadius: 999,
                   border: selectedWaitingKey === entry.key ? '2px solid var(--blue500)' : '1px solid var(--border)',
-                  background: selectedWaitingKey === entry.key ? 'var(--blue50)' : 'var(--card-surface)',
+                  background: selectedWaitingKey === entry.key ? 'var(--tint-blue)' : 'var(--card-surface)',
                   cursor: editable ? 'pointer' : 'default',
                   minHeight: 44,
                 }}
@@ -791,7 +791,7 @@ function PlayerToken({
               height: 18,
               borderRadius: '50%',
               border: '1px solid var(--border)',
-              background: '#fff',
+              background: 'var(--card-surface)',
               color: 'var(--text-strong)',
               fontSize: 11,
               lineHeight: 1,

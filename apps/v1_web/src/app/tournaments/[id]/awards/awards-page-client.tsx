@@ -156,7 +156,7 @@ function PrizeSection({
   return (
     <section className="tm-prize-section" style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">상금 · 시상</h3>
-      <div className="tm-prize-card" style={{ background: '#fff', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
+      <div className="tm-prize-card" style={{ background: 'var(--card-surface)', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
         {/* 총 상금 헤더 */}
         {tournament.prizePool !== null && tournament.prizePool > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
@@ -186,7 +186,7 @@ function PrizeSection({
               </div>
               {row.amount && (
                 isAmount ? (
-                  <span style={{ fontSize: 15, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em', flexShrink: 0 }}>{formatPrizeRowValue(row.amount)}</span>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em', flexShrink: 0 }}>{formatPrizeRowValue(row.amount)}</span>
                 ) : (
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-caption)', flexShrink: 0, marginLeft: 10, textAlign: 'right', maxWidth: '55%' }}>{row.amount}</span>
                 )

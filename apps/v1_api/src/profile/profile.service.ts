@@ -21,6 +21,19 @@ import {
   WithdrawalRequestDto,
 } from './dto/profile.dto';
 
+// v1_notification_preferences row가 아직 없는 사용자에게 읽기 전용으로 보여줄 기본값 —
+// Prisma 컬럼 @default 값과 동일하다. 저장 없이 조회만 하는 경로(settings GET, theme-only
+// PATCH)에서 upsert 대신 이 값을 쓴다.
+const DEFAULT_NOTIFICATION_PREFERENCES = {
+  activityEnabled: true,
+  matchEnabled: true,
+  teamEnabled: true,
+  teamMatchEnabled: true,
+  chatEnabled: true,
+  noticeEnabled: true,
+  marketingEnabled: false,
+} as const;
+
 @Injectable()
 export class ProfileService {
   private readonly logger = new Logger(ProfileService.name);
@@ -433,7 +446,12 @@ export class ProfileService {
 
   async settings(user: V1AuthUser) {
     const snapshot = await this.getUserSnapshot(user.id);
-    const preferences = await this.getNotificationPreferences(user.id);
+    // ThemeProvider가 앱 루트에서 이 엔드포인트를 상시 호출하므로(로그인 사용자라면
+    // 거의 매 페이지) 읽기 전용으로 조회한다 — upsert(update:{})는 UPDATE 브랜치를
+    // 매번 실제로 실행해 @updatedAt만 갱신하는 불필요한 write를 만든다.
+    const preferences =
+      (await this.prisma.v1NotificationPreference.findUnique({ where: { userId: user.id } })) ??
+      { ...DEFAULT_NOTIFICATION_PREFERENCES, updatedAt: new Date() };
     return {
       account: {
         email: snapshot.email,
@@ -445,44 +463,64 @@ export class ProfileService {
       profile: {
         displayName: snapshot.profile?.nickname ?? '사용자',
       },
+      theme: snapshot.themePreference,
       notifications: toSettingsNotifications(preferences),
     };
   }
 
   async updateSettings(user: V1AuthUser, dto: UpdateSettingsDto) {
     this.assertMutableAccount(user);
-    const [profile, preferences] = await this.prisma.$transaction(async (tx) => {
+    const [profile, theme, preferences] = await this.prisma.$transaction(async (tx) => {
       const nextProfile = await tx.v1UserProfile.findUnique({ where: { userId: user.id } });
 
-      const notificationInput = dto.notifications ?? {};
-      const individualNotifications = {
-        ...(notificationInput.matchEnabled === undefined ? {} : { matchEnabled: notificationInput.matchEnabled }),
-        ...(notificationInput.teamEnabled === undefined ? {} : { teamEnabled: notificationInput.teamEnabled }),
-        ...(notificationInput.teamMatchEnabled === undefined
-          ? {}
-          : { teamMatchEnabled: notificationInput.teamMatchEnabled }),
-        ...(notificationInput.chatEnabled === undefined ? {} : { chatEnabled: notificationInput.chatEnabled }),
-        ...(notificationInput.noticeEnabled === undefined ? {} : { noticeEnabled: notificationInput.noticeEnabled }),
-      };
-      const nextPreferences = await tx.v1NotificationPreference.upsert({
-        where: { userId: user.id },
-        update: {
-          ...individualNotifications,
-          ...(notificationInput.marketingEnabled === undefined
+      const nextTheme =
+        dto.theme === undefined
+          ? (await tx.v1User.findUnique({ where: { id: user.id }, select: { themePreference: true } }))
+              ?.themePreference
+          : (await tx.v1User.update({ where: { id: user.id }, data: { themePreference: dto.theme } }))
+              .themePreference;
+
+      // dto.notifications가 없으면(테마만 바꾸는 요청 등) upsert를 아예 안 태운다 — upsert는
+      // update 브랜치가 빈 객체여도 실제 UPDATE 문을 실행해 @updatedAt만 갱신하는 무의미한
+      // write가 나간다(잠금·"방금 알림 설정 바뀜"으로 오인될 수 있는 타임스탬프 변경).
+      let nextPreferences;
+      if (dto.notifications) {
+        const notificationInput = dto.notifications;
+        const individualNotifications = {
+          ...(notificationInput.matchEnabled === undefined ? {} : { matchEnabled: notificationInput.matchEnabled }),
+          ...(notificationInput.teamEnabled === undefined ? {} : { teamEnabled: notificationInput.teamEnabled }),
+          ...(notificationInput.teamMatchEnabled === undefined
             ? {}
-            : { marketingEnabled: notificationInput.marketingEnabled }),
-        },
-        create: {
-          userId: user.id,
-          activityEnabled: true,
-          matchEnabled: notificationInput.matchEnabled ?? true,
-          teamEnabled: notificationInput.teamEnabled ?? true,
-          teamMatchEnabled: notificationInput.teamMatchEnabled ?? true,
-          chatEnabled: notificationInput.chatEnabled ?? true,
-          noticeEnabled: notificationInput.noticeEnabled ?? true,
-          marketingEnabled: notificationInput.marketingEnabled ?? false,
-        },
-      });
+            : { teamMatchEnabled: notificationInput.teamMatchEnabled }),
+          ...(notificationInput.chatEnabled === undefined ? {} : { chatEnabled: notificationInput.chatEnabled }),
+          ...(notificationInput.noticeEnabled === undefined ? {} : { noticeEnabled: notificationInput.noticeEnabled }),
+        };
+        nextPreferences = await tx.v1NotificationPreference.upsert({
+          where: { userId: user.id },
+          update: {
+            ...individualNotifications,
+            ...(notificationInput.marketingEnabled === undefined
+              ? {}
+              : { marketingEnabled: notificationInput.marketingEnabled }),
+          },
+          create: {
+            userId: user.id,
+            activityEnabled: true,
+            matchEnabled: notificationInput.matchEnabled ?? true,
+            teamEnabled: notificationInput.teamEnabled ?? true,
+            teamMatchEnabled: notificationInput.teamMatchEnabled ?? true,
+            chatEnabled: notificationInput.chatEnabled ?? true,
+            noticeEnabled: notificationInput.noticeEnabled ?? true,
+            marketingEnabled: notificationInput.marketingEnabled ?? false,
+          },
+        });
+      } else {
+        // 알림 설정을 한 번도 저장한 적 없는 사용자 — Prisma 컬럼 기본값과 동일한 값을
+        // write 없이 그대로 응답에 반영한다.
+        nextPreferences =
+          (await tx.v1NotificationPreference.findUnique({ where: { userId: user.id } })) ??
+          { ...DEFAULT_NOTIFICATION_PREFERENCES, updatedAt: new Date() };
+      }
 
       if (dto.notifications) {
         await writeUserAuditLog(tx, {
@@ -492,11 +530,20 @@ export class ProfileService {
         });
       }
 
-      return [nextProfile, nextPreferences] as const;
+      if (dto.theme !== undefined) {
+        await writeUserAuditLog(tx, {
+          userId: user.id,
+          targetType: 'user_theme_settings',
+          reason: `settings.theme.update:${dto.theme}`,
+        });
+      }
+
+      return [nextProfile, nextTheme, nextPreferences] as const;
     });
 
     return {
       profile: { displayName: profile?.nickname ?? '사용자' },
+      theme: theme ?? 'light',
       notifications: toSettingsNotifications(preferences),
       updatedAt: preferences.updatedAt,
     };
@@ -728,14 +775,6 @@ export class ProfileService {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Deleted account cannot access profile' });
     }
     return user;
-  }
-
-  private getNotificationPreferences(userId: string) {
-    return this.prisma.v1NotificationPreference.upsert({
-      where: { userId },
-      update: {},
-      create: { userId },
-    });
   }
 
   private assertMutableAccount(user: V1AuthUser) {

@@ -1818,6 +1818,7 @@ export type V1Settings = {
   profile: {
     displayName: string;
   };
+  theme: 'light' | 'dark' | 'system';
   notifications: {
     matchEnabled: boolean;
     teamEnabled: boolean;

@@ -68,6 +68,7 @@ export const settingsModel: SettingsViewModel = {
       items: [
         { label: '위치 및 활동 지역', sub: '현재 위치로 활동 지역을 업데이트해요', href: '/my/settings/location', icon: 'MapPin' },
         { label: '알림 설정', sub: '매치와 채팅 알림을 관리해요', href: '/my/settings/notifications', icon: 'Bell' },
+        { label: '화면 테마', sub: '라이트, 다크, 기기 설정 중에서 골라요', href: '/my/settings/theme', icon: 'Moon' },
       ],
     },
     {

@@ -234,7 +234,7 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
             <Trophy size={12} color="var(--orange500)" aria-hidden="true" />
             <span
               className="tm-text-caption"
-              style={{ color: 'var(--text-strong)', fontWeight: 600, minWidth: 0, whiteSpace: 'pre-wrap' }}
+              style={{ color: 'var(--orange700)', fontWeight: 600, minWidth: 0, whiteSpace: 'pre-wrap' }}
             >
               {item.prizeSummary}
             </span>

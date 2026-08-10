@@ -13,6 +13,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatchSeries: vi.fn(),
   useV1TeamMatchSeriesStandings: vi.fn(),
   useV1TeamMatchSeriesPlayerRecords: vi.fn(),
+  // Providers 안의 ThemeProvider가 전역으로 호출한다 — 이 테스트가 <Providers>로 렌더하는 한 필요.
+  useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
+  useV1UpdateSettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });

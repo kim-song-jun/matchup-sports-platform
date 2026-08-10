@@ -1005,7 +1005,7 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
         {/* [P2 마이크로인터랙션] 완료 체크 애니메이션 — globals.css .tm-complete-check (reduced-motion 자동 처리) */}
         <CompletionCheckIcon />
         <EmptyState title="매치를 만들었어요" sub="팀원들에게 링크를 공유해 참여 의사를 확인해 보세요." />
-        <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
+        <Card pad={16} style={{ marginTop: 22, background: 'var(--tint-blue)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">매치 공유</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 링크와 일정을 알려보세요</div>
         </Card>

@@ -125,7 +125,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
           </div>
         ) : null}
         {/* 매치 요약 카드 */}
-        <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
+        <Card pad={16} style={{ background: 'var(--tint-blue)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">{matchTitle}</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>
             {/* eligibility 미도착 시 기본값 '자동 승인'을 보여주면 호스트가 승인 방식을

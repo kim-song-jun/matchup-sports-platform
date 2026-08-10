@@ -2679,11 +2679,34 @@ export function useV1AllTournaments(params?: AllTournamentListFilters) {
   });
 }
 
-export function useV1Tournament(id: string) {
+/**
+ * LIVE 픽스처가 있을 때만 폴링 — `use-public-game-records.ts`의 `LIVE_POLL_INTERVAL_MS`와
+ * 동일한 부하 모델(뷰어당 8초 하한, idle 페이지는 폴링 0)을 이 훅에도 그대로 적용한다.
+ * 별도 모듈 상수를 import하지 않고 값만 재정의한 이유: 두 파일은 서로 다른 기능
+ * 레인(공개 전적 vs 대회 상세)이라 강결합할 이유가 없고, 값 자체가 "8초"라는 합의된
+ * 상수라 로컬 정의로도 단일 소스 원칙이 깨지지 않는다(주석으로 쌍둥이 정의임을 명시).
+ */
+const V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS = 8_000;
+
+/**
+ * `options.livePolling`은 opt-in — 기본값(false)에서는 기존 동작(폴링 없음)을 그대로
+ * 유지한다. 이 훅은 apply/roster/awards/results/admin ops 등 폴링이 불필요한 여러
+ * 화면이 함께 쓰므로, 전역으로 폴링을 켜면 그 화면들까지 불필요한 재조회가 생긴다.
+ * `/tournaments/:id/bracket`(진행 중 대회의 순위·대진표 실시간 갱신이 실제로 필요한
+ * 유일한 소비처)만 명시적으로 켠다.
+ */
+export function useV1Tournament(id: string, options?: { livePolling?: boolean }) {
+  const livePolling = options?.livePolling ?? false;
   return useQuery({
     queryKey: v1Keys.tournament(id),
     queryFn: () => v1Get<V1TournamentDetail>(`/tournaments/${id}`),
     enabled: !!id,
+    refetchInterval: livePolling
+      ? (query: { state: { data?: V1TournamentDetail } }) => {
+          const hasLiveFixture = query.state.data?.fixtures.some((f) => f.status === 'in_progress') ?? false;
+          return hasLiveFixture ? V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS : false;
+        }
+      : undefined,
   });
 }
 

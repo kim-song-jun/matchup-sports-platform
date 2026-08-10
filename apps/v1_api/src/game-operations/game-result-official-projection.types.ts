@@ -1,6 +1,14 @@
 import type { Prisma, V1VisibilityMode } from '@prisma/client';
 
-export type OfficialScore = { home: number; away: number };
+/**
+ * `penalties` mirrors the flat producer shape `GamesService.deriveTournamentRevision`/
+ * `TournamentResultReviewService.supersedeAndSubmit`/`createResultCorrection` write into
+ * `V1GameResultRevision.score` (`{ home, away, penalties?: { home, away } }`) -- see
+ * `tournament-fixture-official-result.ts`'s file doc for the two-producer JSON shape this
+ * type must stay in sync with. Only set when a knockout fixture's regulation score was a
+ * draw and an operator recorded a penalty shootout via the `end` command's payload.
+ */
+export type OfficialScore = { home: number; away: number; penalties?: { home: number; away: number } };
 
 export type OfficialRevisionRow = {
   revisionId: string;

@@ -57,7 +57,7 @@ export class GameResultBracketProjectionService {
     ) {
       throw new Error('BRACKET_SOURCE_STATE_INVALID');
     }
-    if (score.home === score.away) throw new Error('BRACKET_RESULT_DRAW_UNSUPPORTED');
+    const winnerSide = this.resolveWinnerSide(score);
     await this.assertRegistrations(
       tx,
       source.tournamentId,
@@ -65,10 +65,10 @@ export class GameResultBracketProjectionService {
       source.awayRegistrationId,
     );
 
-    const winnerRegistrationId = score.home > score.away
+    const winnerRegistrationId = winnerSide === 'HOME'
       ? source.homeRegistrationId
       : source.awayRegistrationId;
-    const loserRegistrationId = score.home > score.away
+    const loserRegistrationId = winnerSide === 'HOME'
       ? source.awayRegistrationId
       : source.homeRegistrationId;
     for (const edge of edges) {
@@ -79,6 +79,25 @@ export class GameResultBracketProjectionService {
         : loserRegistrationId;
       await this.assignTarget(tx, target!, edge.targetSide, registrationId);
     }
+  }
+
+  /**
+   * Regulation decides it whenever the sides aren't level. A level
+   * regulation score only resolves through `score.penalties` (the flat
+   * `{home,away,penalties?:{home,away}}` shape `GamesService.applyPenalties`
+   * writes for a knockout fixture's `end` command -- see that method's doc
+   * for why penalties can only ever reach this projection already validated
+   * as decisive, non-negative integers). Absent or itself-tied penalties
+   * leave the draw unresolved -- same `BRACKET_RESULT_DRAW_UNSUPPORTED`
+   * thrown before this method existed, now just reached through one more
+   * branch instead of a bare score.home === score.away check.
+   */
+  private resolveWinnerSide(score: OfficialScore): 'HOME' | 'AWAY' {
+    if (score.home !== score.away) return score.home > score.away ? 'HOME' : 'AWAY';
+    if (score.penalties !== undefined && score.penalties.home !== score.penalties.away) {
+      return score.penalties.home > score.penalties.away ? 'HOME' : 'AWAY';
+    }
+    throw new Error('BRACKET_RESULT_DRAW_UNSUPPORTED');
   }
 
   private async lockEdges(

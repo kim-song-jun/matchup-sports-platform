@@ -114,8 +114,14 @@ export const gameSchemaFixture = {
 // (20260810120000_v1_operation_gate_setting); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps
 // its value. Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for the theme-preference lane: V1ThemePreference enum + V1User.themePreference
+// (light/dark/system, default light) — unrelated to game operations, additive-only,
+// no column/type/FK on any existing game-domain model touched. One new migration
+// file backs it (20260810045157_v1_theme_preference); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps
+// its value. Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: '44fc89b84878c917e3ceaab6f6108bb6692678721ecb95297eb32a0edffbe331',
+  schema: '00a1c45e6f91a4ff719e2319d6c8cbc09491e2e1805c02b299c543ac576c7daf',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

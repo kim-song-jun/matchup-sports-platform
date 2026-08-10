@@ -40,6 +40,10 @@ type FakeFixture = {
 type FakeGoalEvent = {
   id: string;
   gameId: string;
+  // 취소는 GOAL 행이 아니라 CORRECTION 행이 `reversesEventId` 로 가리킨다.
+  // fake 가 type 을 안 갖고 있으면 그 구조를 흉내낼 수 없어, 취소된 골이
+  // 그대로 남는 실제 버그를 이 스펙이 못 잡는다(알파 실측으로 드러난 사고).
+  type: 'GOAL' | 'CARD' | 'FOUL' | 'SUBSTITUTION' | 'CORRECTION';
   sideId: string;
   participantId: string | null;
   clockMs: number;
@@ -93,10 +97,16 @@ function buildFakePrisma(options: {
     },
     v1GameEvent: {
       async findMany(args: { where: Record<string, unknown> }) {
-        // loadScorers은 `where.type === 'GOAL'`(OR 없음)로, loadLiveScores는
-        // `where.OR`로 조회한다 -- 이 스펙의 관심사는 loadScorers 경로뿐이다.
-        if ('type' in args.where) return options.goalEvents;
-        return []; // loadLiveScores 경로 -- 라이브 스코어는 이 스펙의 관심사가 아니다.
+        // loadLiveScores 경로 -- 이 스펙의 관심사가 아니다.
+        if ('OR' in args.where) return [];
+        // **where 절을 실제로 적용한다.** 예전 fake 는 where 를 무시하고 배열을
+        // 통째로 돌려줬는데, 그러면 "쿼리에서 type:'GOAL' 로 걸러 CORRECTION 행을
+        // 못 읽는" 종류의 버그를 이 스펙이 절대 못 잡는다(알파에서 실제로 새어나감).
+        // Postgres 가 하는 필터링을 fake 도 똑같이 해야 테스트가 계약을 검증한다.
+        const wantedType = args.where.type;
+        return options.goalEvents.filter(
+          (event) => wantedType === undefined || event.type === wantedType,
+        );
       },
     },
   };
@@ -146,8 +156,8 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
       consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
       consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
       goalEvents: [
-        { id: 'g1', gameId: 'game-1', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
-        { id: 'g2', gameId: 'game-1', sideId: 'side-away', participantId: INELIGIBLE.id, clockMs: 2_700_000, reversesEventId: null },
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
+        { id: 'g2', gameId: 'game-1', type: 'GOAL', sideId: 'side-away', participantId: INELIGIBLE.id, clockMs: 2_700_000, reversesEventId: null },
       ],
     });
     const service = new PublicTournamentRecordsService(prisma);
@@ -167,18 +177,44 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
       consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
       consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
       goalEvents: [
-        { id: 'g1', gameId: 'game-1', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
-        { id: 'g2-correction', gameId: 'game-1', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 900_000, reversesEventId: 'g1' },
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
+        // 취소 행은 GOAL 이 아니라 CORRECTION 이다 -- 이게 실제 저장 구조다.
+        { id: 'c1', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: 'g1' },
       ],
     });
     const service = new PublicTournamentRecordsService(prisma);
 
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
-    // g1은 g2-correction에 의해 되돌려졌으므로 요약에서 빠지고, 되돌린 이벤트
-    // 자신(g2-correction)만 남는다 -- tallyLiveScore/loadLiveScores와 동일 규칙.
+    // g1 은 c1 에 취소됐고, c1 자신은 GOAL 이 아니므로 득점자가 아니다 -> 빈 배열.
+    expect(result.items[0].scorers).toEqual([]);
+  });
+
+  // 알파 실측 회귀: 골 2개인 경기에서 둘 다 CORRECTION 으로 취소되고 다시 기록돼
+  // GOAL 행이 4개가 됐는데, loadScorers 가 쿼리에서 type:'GOAL' 로 걸러 CORRECTION
+  // 행을 아예 안 읽는 바람에 취소 판정이 되지 않아 요약에 4개가 전부 떴다.
+  it('취소 후 재기록으로 GOAL 행이 늘어나도, 살아있는 골만 남는다 (알파 실측 회귀)', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
+      consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
+      goalEvents: [
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 645_886, reversesEventId: null },
+        { id: 'g5', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 27_166_083, reversesEventId: null },
+        { id: 'c9', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 27_166_083, reversesEventId: 'g5' },
+        { id: 'c10', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 645_886, reversesEventId: 'g1' },
+        { id: 'g11', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 27_166_083, reversesEventId: null },
+        { id: 'g12', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 645_886, reversesEventId: null },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    // 살아있는 골은 재기록된 g11/g12 둘뿐 -- 4개가 아니다.
     expect(result.items[0].scorers).toEqual([
-      { side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 900_000 },
+      { side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 27_166_083 },
+      { side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 645_886 },
     ]);
   });
 
@@ -203,7 +239,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
       consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
       consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
       goalEvents: [
-        { id: 'g1', gameId: 'game-1', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
       ],
     });
     const service = new PublicTournamentRecordsService(prisma);

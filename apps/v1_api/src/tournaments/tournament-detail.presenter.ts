@@ -1,4 +1,5 @@
 import type { TournamentDetailRow } from './tournaments-read.query';
+import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 
 /**
  * 대진표 공개 여부 판정의 단일 소스. 즉시 공개(bracketPublishedAt)와 예약 공개
@@ -14,6 +15,26 @@ export function isBracketPublished(
   // 컬럼이 빠진 부분 select 나 구식 fixture 가 들어와도 "비공개"로 안전하게 떨어져야 한다.
   if (publishedAt) return true;
   return Boolean(scheduledAt) && (scheduledAt as Date).getTime() <= now.getTime();
+}
+
+/**
+ * 공개 상세의 fixtures[].result 조립 -- 응답 필드 형태(homeScore/awayScore/hasPenalty/
+ * homePenaltyScore/awayPenaltyScore/note/recordedAt/goals[])는 레거시와 동일하게 유지한다.
+ * `note`는 신규 리비전에 대응 컬럼이 없어 항상 null이다.
+ */
+function presentOfficialResult(game: TournamentDetailRow['fixtures'][number]['game']) {
+  const resolved = resolveTournamentFixtureOfficialResult(game);
+  if (!resolved) return null;
+  return {
+    homeScore: resolved.score.homeScore,
+    awayScore: resolved.score.awayScore,
+    hasPenalty: resolved.score.hasPenalty,
+    homePenaltyScore: resolved.score.homePenaltyScore,
+    awayPenaltyScore: resolved.score.awayPenaltyScore,
+    note: null,
+    recordedAt: (resolved.officialAt ?? resolved.createdAt).toISOString(),
+    goals: resolved.goals,
+  };
 }
 
 export function presentTournamentDetail(row: TournamentDetailRow, now: Date = new Date()) {
@@ -157,24 +178,10 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
       awayTeamId: fixture.awayRegistration?.team.id ?? null,
       awayTeamName: fixture.awayRegistration?.team.name ?? 'TBD',
       awayTeamLogoUrl: fixture.awayRegistration?.team.profile?.logoUrl ?? null,
-      result: fixture.result
-        ? {
-            homeScore: fixture.result.homeScore,
-            awayScore: fixture.result.awayScore,
-            hasPenalty: fixture.result.hasPenalty,
-            homePenaltyScore: fixture.result.homePenaltyScore,
-            awayPenaltyScore: fixture.result.awayPenaltyScore,
-            note: fixture.result.note,
-            recordedAt: fixture.result.recordedAt.toISOString(),
-            goals: fixture.result.goals.map((goal) => ({
-              id: goal.id,
-              team: goal.team,
-              playerId: goal.playerId,
-              playerName: goal.playerName,
-              minute: goal.minute,
-            })),
-          }
-        : null,
+      // R3 §4-3단계: 공개 스코어보드를 레거시 V1TournamentFixtureResult 대신 신규 경로
+      // (V1Game.currentOfficialRevision)에서 조립한다 -- 문서 §1-2/§4 참고. note는 신규
+      // 경로에 대응 컬럼이 없어 항상 null(재현 불가 필드로 별도 보고됨).
+      result: presentOfficialResult(fixture.game),
       videos: fixture.videos.map((video) => ({
         id: video.id,
         title: video.title,

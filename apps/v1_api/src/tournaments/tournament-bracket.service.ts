@@ -8,8 +8,6 @@ import {
   V1GameSideKey,
   V1GameSourceType,
   V1TournamentFixture,
-  V1TournamentFixtureGoal,
-  V1TournamentFixtureResult,
   V1TournamentFixtureVideo,
   V1TournamentGroup,
   V1TournamentGroupTeam,
@@ -34,7 +32,6 @@ import {
   LineupSizeOptionsQueryDto,
 } from './competition-config/competition-config.dto';
 import {
-  calculateCompetitionStandings,
   tryNormalizeCompetitionSportCode,
   validateCompetitionConfig,
 } from './competition-config/competition-config';
@@ -43,6 +40,12 @@ import { LineupSizeConfigResolver } from './competition-config/lineup-size-confi
 import { canonicalCompetitionConfigForSport } from './competition-config/lineup-size';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
+import {
+  hasTournamentFixtureOfficialResult,
+  resolveTournamentFixtureOfficialResult,
+  type TournamentFixtureGameForResult,
+} from './tournament-fixture-official-result';
+import { recalculateAndUpsertGroupStandings } from './tournament-group-standings';
 
 @Injectable()
 export class TournamentBracketService {
@@ -488,14 +491,18 @@ export class TournamentBracketService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const fixture = await this.prisma.v1TournamentFixture.findUnique({
       where: { id: fixtureId },
-      include: { result: true },
+      include: { game: { select: { currentOfficialRevision: { select: { state: true } } } } },
     });
     if (!fixture) {
       throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     }
 
     const changesTeams = dto.homeRegistrationId !== undefined || dto.awayRegistrationId !== undefined;
-    if (changesTeams && fixture.result) {
+    // updateFixture()는 V1TournamentFixture.home/awayRegistrationId만 바꾸고 V1Game.sides는
+    // 절대 건드리지 않는다 -- 신규 경로 자체에는 "결과가 확정된 경기의 팀 변경을 막는" 별도
+    // 가드가 없으므로(games.service.ts 어디에도 이 경로를 막는 코드가 없음을 확인했다) 이
+    // 가드를 지우지 않고 신규 경로(officialize된 결과 유무) 기준으로 다시 판정한다.
+    if (changesTeams && hasTournamentFixtureOfficialResult(fixture.game)) {
       throw new ConflictException({
         code: 'FIXTURE_HAS_RESULT',
         message: '결과가 기록된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 삭제해 주세요.',
@@ -560,12 +567,14 @@ export class TournamentBracketService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const fixture = await this.prisma.v1TournamentFixture.findUnique({
       where: { id: fixtureId },
-      include: { result: true },
+      include: { game: { select: { currentOfficialRevision: { select: { state: true } } } } },
     });
     if (!fixture) {
       throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     }
-    if (fixture.result) {
+    // (a)와 동일한 이유로 신규 경로 기준으로 다시 판정한다 -- "결과가 확정된 경기는
+    // 지울 수 없다"는 계약을 신규 경로에서도 그대로 유지한다.
+    if (hasTournamentFixtureOfficialResult(fixture.game)) {
       throw new ConflictException({
         code: 'FIXTURE_HAS_RESULT',
         message: '결과가 기록된 경기예요. 결과를 먼저 삭제해 주세요.',
@@ -739,7 +748,7 @@ export class TournamentBracketService {
         },
         fixtures: {
           where: { status: 'completed' },
-          include: { result: true },
+          include: { game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } } },
         },
       },
     });
@@ -747,58 +756,15 @@ export class TournamentBracketService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const group of groups) {
-        const standings = calculateCompetitionStandings({
-          tournamentId,
-          configVersionId: competitionConfigVersionId,
-          registrationIds: group.groupTeams.map((team) => team.registrationId),
-          fixtures: group.fixtures.flatMap((fixture) => {
-            if (!fixture.result || !fixture.homeRegistrationId || !fixture.awayRegistrationId) {
-              return [];
-            }
-            return [
-              {
-                homeRegistrationId: fixture.homeRegistrationId,
-                awayRegistrationId: fixture.awayRegistrationId,
-                homeScore: fixture.result.homeScore,
-                awayScore: fixture.result.awayScore,
-              },
-            ];
-          }),
-          config,
-        });
-
-        for (const standing of standings) {
-          await tx.v1TournamentStanding.upsert({
-            where: {
-              groupId_registrationId: {
-                groupId: group.id,
-                registrationId: standing.registrationId,
-              },
-            },
-            create: {
-              groupId: group.id,
-              registrationId: standing.registrationId,
-              points: standing.points,
-              wins: standing.wins,
-              draws: standing.draws,
-              losses: standing.losses,
-              goalsFor: standing.goalsFor,
-              goalsAgainst: standing.goalsAgainst,
-              position: standing.position,
-              recalculatedAt: now,
-            },
-            update: {
-              points: standing.points,
-              wins: standing.wins,
-              draws: standing.draws,
-              losses: standing.losses,
-              goalsFor: standing.goalsFor,
-              goalsAgainst: standing.goalsAgainst,
-              position: standing.position,
-              recalculatedAt: now,
-            },
-          });
-        }
+        // Calculation + upsert extracted to tournament-group-standings.ts —
+        // shared verbatim with the automatic per-result trigger
+        // (GameResultStandingsProjectionService), which recalculates just
+        // the one affected group instead of looping every group.
+        await recalculateAndUpsertGroupStandings(
+          tx,
+          { tournamentId, configVersionId: competitionConfigVersionId, config, group },
+          now,
+        );
       }
 
       await this.adminContext.logAdminAction(
@@ -848,7 +814,19 @@ export class TournamentBracketService {
       this.prisma.v1TournamentFixture.findMany({
         where: { tournamentId },
         include: {
-          result: { include: { goals: { orderBy: { createdAt: 'asc' } } } },
+          game: {
+            select: {
+              sides: { select: { id: true, sideKey: true } },
+              participants: { select: { id: true, displayNameSnapshot: true } },
+              currentOfficialRevision: {
+                select: { id: true, state: true, score: true, officialAt: true, createdAt: true, updatedAt: true },
+              },
+              events: {
+                where: { OR: [{ type: 'GOAL' }, { reversesEventId: { not: null } }] },
+                select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true },
+              },
+            },
+          },
           videos: { orderBy: { sortOrder: 'asc' } },
           homeRegistration: {
             include: { team: { select: { name: true } } },
@@ -882,12 +860,7 @@ export class TournamentBracketService {
         ...this.serializeFixture(f),
         homeTeamName: f.homeRegistration?.team.name ?? 'TBD',
         awayTeamName: f.awayRegistration?.team.name ?? 'TBD',
-        result: f.result
-          ? {
-              ...this.serializeResult(f.result),
-              goals: f.result.goals.map((g) => this.serializeGoal(g)),
-            }
-          : null,
+        result: this.serializeOfficialResult(f.id, f.game),
         videos: f.videos.map((v) => this.serializeVideo(v)),
       })),
       standings: standings.map((s) => ({
@@ -941,19 +914,32 @@ export class TournamentBracketService {
     };
   }
 
-  private serializeResult(row: V1TournamentFixtureResult) {
+  /**
+   * 어드민 대진표(getBracket) 응답의 픽스처별 result 블록 -- 레거시
+   * `V1TournamentFixtureResult`/`V1TournamentFixtureGoal` 대신 신규 경로
+   * (`V1Game.currentOfficialRevision`)에서 조립한다. 응답 필드 형태(스코어/승부차기/골
+   * 목록)는 레거시 serializeResult()/serializeGoal()과 동일하게 유지한다 — 프런트가
+   * 이미 이 모양을 소비하고 있다(apps/v1_web/src/types/api.ts).
+   *
+   * `note`는 신규 리비전에 대응 컬럼이 없어 항상 null이다(레거시 자유 메모 필드는
+   * 재현 불가 — docs/ops/legacy-game-result-r3-removal-inventory.md 관련 작업 보고 참고).
+   */
+  private serializeOfficialResult(fixtureId: string, game: TournamentFixtureGameForResult) {
+    const resolved = resolveTournamentFixtureOfficialResult(game);
+    if (!resolved) return null;
     return {
-      id: row.id,
-      fixtureId: row.fixtureId,
-      homeScore: row.homeScore,
-      awayScore: row.awayScore,
-      hasPenalty: row.hasPenalty,
-      homePenaltyScore: row.homePenaltyScore,
-      awayPenaltyScore: row.awayPenaltyScore,
-      note: row.note,
-      recordedAt: row.recordedAt.toISOString(),
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      id: resolved.revisionId,
+      fixtureId,
+      homeScore: resolved.score.homeScore,
+      awayScore: resolved.score.awayScore,
+      hasPenalty: resolved.score.hasPenalty,
+      homePenaltyScore: resolved.score.homePenaltyScore,
+      awayPenaltyScore: resolved.score.awayPenaltyScore,
+      note: null,
+      recordedAt: (resolved.officialAt ?? resolved.createdAt).toISOString(),
+      createdAt: resolved.createdAt.toISOString(),
+      updatedAt: resolved.updatedAt.toISOString(),
+      goals: resolved.goals,
     };
   }
 
@@ -963,16 +949,6 @@ export class TournamentBracketService {
       title: row.title,
       url: row.url,
       sortOrder: row.sortOrder,
-    };
-  }
-
-  private serializeGoal(row: V1TournamentFixtureGoal) {
-    return {
-      id: row.id,
-      team: row.team,
-      playerId: row.playerId,
-      playerName: row.playerName,
-      minute: row.minute,
     };
   }
 

@@ -7,6 +7,7 @@ import {
   isExistingReviewResult,
   isUniqueConstraintError,
   markExistingReviewResult,
+  officialResultTimestamp,
   REVIEW_TAGS,
   reviewInclude,
   resolveReviewerTeamId,
@@ -60,7 +61,7 @@ export class TournamentFixtureReviewsService {
           sourceType: TOURNAMENT_FIXTURE_SOURCE_TYPE,
           sourceId: fixture.id,
           title: fixtureTitle(fixture),
-          completedAt: toIso(fixture.result?.recordedAt ?? fixture.scheduledAt ?? fixture.updatedAt),
+          completedAt: toIso(officialResultTimestamp(fixture) ?? fixture.scheduledAt ?? fixture.updatedAt),
           targetType: 'team' as const,
           targetCount: 1,
           reviewedCount: reviewKeys.has(key) ? 1 : 0,
@@ -71,7 +72,7 @@ export class TournamentFixtureReviewsService {
           },
           targetTeam: { teamId: targetTeam.teamId, name: targetTeam.name },
           state: reviewKeys.has(key) ? 'done' as const : 'ready' as const,
-          completedAtSort: (fixture.result?.recordedAt ?? fixture.scheduledAt ?? fixture.updatedAt).getTime(),
+          completedAtSort: (officialResultTimestamp(fixture) ?? fixture.scheduledAt ?? fixture.updatedAt).getTime(),
         };
       })
       .filter((item): item is NonNullable<typeof item> => Boolean(item && item.remainingCount > 0));
@@ -85,7 +86,7 @@ export class TournamentFixtureReviewsService {
       source: sourceSummary(
         context.fixture.id,
         fixtureTitle(context.fixture),
-        context.fixture.result?.recordedAt ?? null,
+        officialResultTimestamp(context.fixture),
       ),
       reviewerTeam: context.reviewerTeam,
       targets: [{
@@ -149,7 +150,7 @@ export class TournamentFixtureReviewsService {
       sourceSummary(
         fixture.id,
         fixtureTitle(fixture),
-        fixture.result?.recordedAt ?? fixture.scheduledAt ?? fixture.updatedAt,
+        officialResultTimestamp(fixture) ?? fixture.scheduledAt ?? fixture.updatedAt,
       ),
     ] as const));
   }
@@ -160,7 +161,7 @@ export class TournamentFixtureReviewsService {
       select: tournamentFixtureSelect(),
     });
     if (!fixture) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
-    if (fixture.status !== 'completed' || !fixture.result) {
+    if (fixture.status !== 'completed' || !officialResultTimestamp(fixture)) {
       throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
     }
 

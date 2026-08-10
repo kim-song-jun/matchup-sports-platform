@@ -9,6 +9,7 @@ import type {
 } from './game-result-official-projection.types';
 import { GameResultProjectionWatermarkService } from './game-result-projection-watermark.service';
 import { GameResultPublicCacheService } from './game-result-public-cache.service';
+import { GameResultStandingsProjectionService } from './game-result-standings-projection.service';
 
 type LockedOfficialRevisionRow = Omit<OfficialRevisionRow, 'officialAt'> & {
   state: string;
@@ -19,6 +20,7 @@ export class GameResultOfficialProjectionService {
   private readonly facts = new GameResultOfficialFactsService();
   private readonly cache = new GameResultPublicCacheService();
   private readonly bracket = new GameResultBracketProjectionService();
+  private readonly standings = new GameResultStandingsProjectionService();
   private readonly terminal = new GameResultEscalationTerminalService();
   private readonly watermarks = new GameResultProjectionWatermarkService();
 
@@ -40,6 +42,7 @@ export class GameResultOfficialProjectionService {
     if (repairRequired) await this.watermarks.writeRepairAudit(tx, claim, revision);
 
     await this.bracket.project(tx, revision, score);
+    await this.standings.project(tx, revision);
     await this.terminal.close(tx, revision);
     await this.writeAggregateWatermarks(tx, revision, teamIds);
     await this.watermarks.write(tx, {

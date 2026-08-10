@@ -31,11 +31,26 @@ export function tournamentFixtureSelect() {
     status: true,
     scheduledAt: true,
     updatedAt: true,
-    result: { select: { recordedAt: true } },
+    // R3 §4-3단계: 레거시 V1TournamentFixtureResult.recordedAt 대신 신규 경로
+    // (V1Game.currentOfficialRevision.officialAt)를 읽는다 -- officialResultTimestamp()
+    // 참고. state까지 함께 골라서 VOID로 넘어간 리비전을 "결과 있음"으로 오판하지 않는다.
+    game: { select: { currentOfficialRevision: { select: { state: true, officialAt: true } } } },
     tournament: { select: { title: true } },
     homeRegistration: { select: { teamId: true, team: { select: teamSelect() } } },
     awayRegistration: { select: { teamId: true, team: { select: teamSelect() } } },
   } as const;
+}
+
+/**
+ * 레거시 `fixture.result?.recordedAt`의 신규 경로 대응. `currentOfficialRevisionId`는
+ * VOID 이후 VOID 리비전을 가리키도록 옮겨가므로(tournament-result-review.service.ts
+ * voidResult) 존재 여부가 아니라 `state === 'OFFICIAL'`을 확인해야 레거시의 "결과가
+ * 있다"와 동등해진다. 백필된 픽스처는 officialAt에 레거시 recordedAt이 그대로 들어있어
+ * (game-result-backfill.ts) 이 값이 정확히 같다.
+ */
+export function officialResultTimestamp(fixture: TournamentFixture): Date | null {
+  const revision = fixture.game?.currentOfficialRevision;
+  return revision?.state === 'OFFICIAL' ? revision.officialAt : null;
 }
 
 export function reviewInclude() {

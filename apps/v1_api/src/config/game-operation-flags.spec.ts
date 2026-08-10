@@ -1,0 +1,47 @@
+import { tmpdir } from 'node:os';
+import { basename, dirname, resolve, sep } from 'node:path';
+import {
+  GameOperationGateRootConfigurationError,
+  resolveGameOperationGateRoot,
+  SIMPLIFIED_GATE_ALLOWED_KEYS,
+} from './game-operation-flags';
+
+describe('game operation gate root', () => {
+  it('selects the current OS temporary root for gate evidence', () => {
+    const gateRoot = resolveGameOperationGateRoot();
+
+    expect(dirname(gateRoot)).toBe(
+      resolve(tmpdir(), 'teameet-ulw-evidence'),
+    );
+    expect(basename(gateRoot)).toBe('teameet-team-tournament-operations-v1');
+  });
+
+  it('rejects a sibling temporary root', () => {
+    expect(() =>
+      resolveGameOperationGateRoot(resolve(tmpdir(), 'teameet-sibling-root')),
+    ).toThrow(GameOperationGateRootConfigurationError);
+  });
+
+  it('rejects traversal-shaped configured roots outside the temporary root', () => {
+    const traversalRoot = `${tmpdir()}${sep}..${sep}teameet-traversal-root`;
+
+    expect(() => resolveGameOperationGateRoot(traversalRoot)).toThrow(
+      GameOperationGateRootConfigurationError,
+    );
+  });
+});
+
+// Task: admin on/off for all four operation flags without the immutable gate bundle. Whether the
+// path is reachable at all is now a DB-backed switch (`v1_game_operation_gate_settings`, see the
+// integration spec for CAS/audit coverage of that switch) rather than an environment variable --
+// this spec only covers the key allowlist, which is a pure/static export.
+describe('simplified operation flag gate allowed keys', () => {
+  it('allows all four operation flags now that the gate is a DB switch, not an env var', () => {
+    expect(SIMPLIFIED_GATE_ALLOWED_KEYS).toEqual([
+      'GAME_READ',
+      'GAME_WRITE',
+      'PUBLIC_LIVE',
+      'DIRECTOR_OFFICIALIZE',
+    ]);
+  });
+});

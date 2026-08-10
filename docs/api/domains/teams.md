@@ -1,5 +1,7 @@
 # Domain Contract — Teams
 
+> 팀 일정/출석/용병모집/리마인더(Task 12)는 별도 문서 [team-schedules.md](./team-schedules.md)를 참조.
+
 ## Endpoint Matrix
 
 | Method | Path | Auth | 설명 |

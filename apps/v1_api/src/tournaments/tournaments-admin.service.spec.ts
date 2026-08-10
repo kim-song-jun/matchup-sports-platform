@@ -11,6 +11,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { KakaoGeocodingService } from './kakao-geocoding.service';
+import { CompetitionConfigRegistry } from './competition-config/competition-config-registry';
+import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 import { TournamentsAdminService } from './tournaments-admin.service';
 
 const ownerAuthUser = { id: 'owner-user-id', email: 'admin@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -93,6 +95,9 @@ describe('TournamentsAdminService', () => {
     };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
+    v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
+    v1TournamentFixture: { count: jest.Mock; updateMany: jest.Mock };
+    v1TournamentStanding: { count: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -111,6 +116,12 @@ describe('TournamentsAdminService', () => {
       },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      // "출전 인원" 기능(LineupSizeConfigResolver/TournamentCompetitionConfig.change) 전용
+      // — 대부분의 기존 테스트는 lineupMaxPlayers를 전혀 안 보내거나 종목이 football/futsal이
+      // 아니라 이 경로를 안 타므로 unconfigured mock(undefined 반환)으로 둬도 무해하다.
+      v1CompetitionConfigVersion: { findFirst: jest.fn(), findUnique: jest.fn() },
+      v1TournamentFixture: { count: jest.fn(), updateMany: jest.fn() },
+      v1TournamentStanding: { count: jest.fn() },
       $transaction: jest.fn(),
     };
     const p = prisma;
@@ -821,5 +832,298 @@ describe('TournamentsAdminService', () => {
       response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' },
     });
     expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  // ─── "출전 인원" (lineup size) ──────────────────────────────────────────────
+
+  it('create: sport without competition-config coverage + no lineupMaxPlayers → competitionConfigVersionId stays null (unchanged baseline)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' }); // no `code` — e.g. 배드민턴 등 아직 미지원 종목
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
+
+    await service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', teamCount: 8 });
+
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ competitionConfigVersionId: null }) }),
+    );
+    expect(prisma.v1CompetitionConfigVersion.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('create: explicit lineupMaxPlayers on an unsupported sport → 422 COMPETITION_CONFIG_SPORT_UNSUPPORTED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'badminton' });
+
+    await expect(
+      service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', teamCount: 8, lineupMaxPlayers: 5 }),
+    ).rejects.toMatchObject({ response: { code: 'COMPETITION_CONFIG_SPORT_UNSUPPORTED' } });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  it('create: unsupported lineupMaxPlayers value for a supported sport → 422 LINEUP_SIZE_UNSUPPORTED, listing valid options', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+
+    await expect(
+      service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', teamCount: 8, lineupMaxPlayers: 7 }),
+    ).rejects.toMatchObject({
+      response: { code: 'LINEUP_SIZE_UNSUPPORTED', message: expect.stringContaining('5명/6명') },
+    });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  it('create: reuses an existing competition-config version when its content already matches (find-or-create hit)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({
+      id: 'existing-config-version-6',
+      version: 2,
+      contentHash: 'hash-6',
+    });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
+
+    await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: 'x',
+      teamCount: 8,
+      lineupMaxPlayers: 6,
+    });
+
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ competitionConfigVersionId: 'existing-config-version-6' }),
+      }),
+    );
+  });
+
+  it('create: sport has competition-config coverage but lineupMaxPlayers omitted → defaults to the canonical maxPlayers', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({
+      id: 'default-futsal-config-version',
+      version: 1,
+      contentHash: 'hash-default',
+    });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
+
+    await service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', teamCount: 8 });
+
+    // futsal-v1의 canonical maxPlayers(6)로 조회했는지는 findFirst 호출 인자(where.contentHash)로
+    // 직접 검증할 수 없으니(콘텐츠 해시라 불투명) 대신 find-or-create가 실제로 실행됐다는 것과
+    // 그 결과가 대회에 반영됐다는 것을 검증한다 — canonical 기본값 파생 자체는
+    // lineup-size.spec.ts가 순수 함수 단위로 이미 증명한다.
+    expect(prisma.v1CompetitionConfigVersion.findFirst).toHaveBeenCalled();
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ competitionConfigVersionId: 'default-futsal-config-version' }),
+      }),
+    );
+  });
+
+  it('update: lineupMaxPlayers on an in_progress tournament → 409 TOURNAMENT_LINEUP_SIZE_LOCKED, no reads/writes', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 6 }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED' } });
+    expect(prisma.v1CompetitionConfigVersion.findFirst).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('update: lineupMaxPlayers on a completed tournament → 409 TOURNAMENT_LINEUP_SIZE_LOCKED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'completed' }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 6 }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED' } });
+  });
+
+  it('update: changing sportId and lineupMaxPlayers in the same request → 400 TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ sportId: 'sport-1', status: 'draft' }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { sportId: 'sport-2', lineupMaxPlayers: 6 }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('update: draft tournament + valid lineupMaxPlayers → resolves a version and pins it via TournamentCompetitionConfig.change()', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({
+      sportId: 'sport-1',
+      status: 'draft',
+      competitionConfigVersionId: 'old-config-version',
+    });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing) // update()'s own `existing` fetch
+      .mockResolvedValueOnce({
+        // get()'s re-fetch at the end of update() — includes the `sport` relation
+        // (get()'s query asks for `sport: { select: { code: true } }`) and the
+        // newly-pinned competitionConfigVersionId, both needed by loadLineupInfo().
+        ...tournamentRow({ competitionConfigVersionId: 'new-config-version-6' }),
+        sport: { code: 'futsal' },
+        _count: { registrations: 0, fixtures: 0, announcements: 0 },
+      });
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({
+      id: 'new-config-version-6',
+      version: 3,
+      contentHash: 'hash-6-new',
+    });
+    prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValue({
+      lineup: { minPlayers: 3, maxPlayers: 6 },
+    });
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow());
+
+    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+      changed: true,
+      currentCompetitionConfigVersionId: 'new-config-version-6',
+      expectedVersion: new Date().toISOString(),
+      previewHash: 'hash-6-new',
+      impact: { fixtureCount: 0, completedFixtureCount: 0, standingCount: 0, requiresRecalculation: false },
+      confirmationRequired: false,
+    });
+
+    try {
+      await service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 6 });
+      expect(changeSpy).toHaveBeenCalledWith(
+        ownerAuthUser,
+        'tournament-1',
+        expect.objectContaining({
+          competitionConfigVersionId: 'new-config-version-6',
+          expectedVersion: existing.updatedAt.toISOString(),
+        }),
+      );
+    } finally {
+      changeSpy.mockRestore();
+    }
+  });
+
+  it('update: lineupMaxPlayers blocked when change() reports confirmationRequired (already-recorded results)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({ sportId: 'sport-1', status: 'closed', competitionConfigVersionId: 'old-config-version' }),
+    );
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({
+      id: 'new-config-version-6',
+      version: 3,
+      contentHash: 'hash-6-new',
+    });
+
+    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+      changed: false,
+      currentCompetitionConfigVersionId: 'old-config-version',
+      requestedCompetitionConfigVersionId: 'new-config-version-6',
+      expectedVersion: new Date().toISOString(),
+      previewHash: 'hash-6-new',
+      impact: { fixtureCount: 4, completedFixtureCount: 2, standingCount: 2, requiresRecalculation: true },
+      confirmationRequired: true,
+    });
+
+    try {
+      await expect(
+        service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 6 }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED' } });
+      expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    } finally {
+      changeSpy.mockRestore();
+    }
+  });
+
+  // ─── "교체 방식/횟수" (substitution policy) ─────────────────────────────────
+
+  it('create: substitutionMode "rolling" together with an explicit maxSubstitutions → 400 TOURNAMENT_SUBSTITUTION_POLICY_INVALID', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: 'x',
+        teamCount: 8,
+        substitutionMode: 'rolling',
+        maxSubstitutions: 5,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_SUBSTITUTION_POLICY_INVALID' } });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  it('update: substitutionMode on an in_progress tournament → 409 TOURNAMENT_LINEUP_SIZE_LOCKED (same lock as lineup size)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('update: changing only substitutionMode preserves the currently pinned lineup size instead of resetting it to canonical', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({
+      sportId: 'sport-1',
+      status: 'draft',
+      competitionConfigVersionId: 'pinned-config-version',
+    });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing) // update()'s own `existing` fetch
+      .mockResolvedValueOnce({
+        ...tournamentRow({ competitionConfigVersionId: 'new-config-version' }),
+        sport: { code: 'futsal' },
+        _count: { registrations: 0, fixtures: 0, announcements: 0 },
+      });
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    // 현재 pin된 버전은 canonical(6명/무제한)이 아니라 관리자가 이미 커스터마이즈한
+    // 값(5명/제한 3회)이다 — substitutionMode만 바꿔도 이 5명이 그대로 유지돼야 한다.
+    prisma.v1CompetitionConfigVersion.findUnique
+      .mockResolvedValueOnce({
+        lineup: { minPlayers: 3, maxPlayers: 5, substitutions: 'limited', maxSubstitutions: 3 },
+      }) // update()가 override 병합 전에 읽는 "지금 pin된 값"
+      .mockResolvedValueOnce(undefined) // findOrCreateVersion의 content_hash 충돌 검사(충돌 없음)
+      .mockResolvedValue({
+        lineup: { minPlayers: 3, maxPlayers: 5, substitutions: 'rolling', maxSubstitutions: null },
+      }); // update() 끝의 get() 재조회(loadLineupInfo)용 — 이 테스트는 값 자체를 검증하지 않는다.
+    prisma.v1CompetitionConfigVersion.findFirst
+      .mockResolvedValueOnce(undefined) // find-or-create: 이 content_hash의 버전은 아직 없음
+      .mockResolvedValueOnce({ id: 'latest-version-id' }); // 계열의 최신 버전(신규 버전의 base)
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow());
+
+    const createVersionSpy = jest
+      .spyOn(CompetitionConfigRegistry.prototype, 'createVersion')
+      .mockResolvedValue({
+        id: 'new-config-version',
+        version: 4,
+        contentHash: 'hash-new',
+      } as never);
+    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+      changed: true,
+      currentCompetitionConfigVersionId: 'new-config-version',
+      expectedVersion: new Date().toISOString(),
+      previewHash: 'hash-new',
+      impact: { fixtureCount: 0, completedFixtureCount: 0, standingCount: 0, requiresRecalculation: false },
+      confirmationRequired: false,
+    });
+
+    try {
+      await service.update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' });
+      expect(createVersionSpy).toHaveBeenCalledWith(
+        ownerAuthUser,
+        'latest-version-id',
+        expect.objectContaining({
+          config: expect.objectContaining({
+            lineup: expect.objectContaining({
+              maxPlayers: 5, // 그대로 유지 — canonical(6)로 리셋되지 않는다
+              substitutions: 'rolling',
+              maxSubstitutions: null,
+            }),
+          }),
+        }),
+      );
+    } finally {
+      createVersionSpy.mockRestore();
+      changeSpy.mockRestore();
+    }
   });
 });

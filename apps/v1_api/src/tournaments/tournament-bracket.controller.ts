@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -11,6 +21,13 @@ import {
   UpdateGroupDto,
 } from './dto/admin-bracket.dto';
 import { TournamentBracketService } from './tournament-bracket.service';
+import {
+  ChangeTournamentCompetitionConfigDto,
+  CompetitionConfigListQueryDto,
+  CreateCompetitionConfigDto,
+  CreateCompetitionConfigVersionDto,
+  LineupSizeOptionsQueryDto,
+} from './competition-config/competition-config.dto';
 
 /**
  * 대진(조/픽스처/결과/순위) 어드민 컨트롤러.
@@ -22,6 +39,61 @@ import { TournamentBracketService } from './tournament-bracket.service';
 @UseGuards(V1AuthGuard)
 export class TournamentBracketController {
   constructor(private readonly bracketService: TournamentBracketService) {}
+
+  @Get('admin/competition-configs')
+  listCompetitionConfigs(
+    @CurrentUser() user: V1AuthUser,
+    @Query() query: CompetitionConfigListQueryDto,
+  ) {
+    return this.bracketService.listCompetitionConfigs(user, query);
+  }
+
+  /**
+   * GET /admin/competition-configs/lineup-size-options?sportId=...
+   * 대회 생성/수정 화면의 "출전 인원" 선택지. `admin/competition-configs/:configId/versions`와
+   * 세그먼트 수가 달라(1개 vs 2개) 라우트 충돌이 없다.
+   */
+  @Get('admin/competition-configs/lineup-size-options')
+  getLineupSizeOptions(
+    @CurrentUser() user: V1AuthUser,
+    @Query() query: LineupSizeOptionsQueryDto,
+  ) {
+    return this.bracketService.getLineupSizeOptions(user, query);
+  }
+
+  @Post('admin/competition-configs')
+  createCompetitionConfig(
+    @CurrentUser() user: V1AuthUser,
+    @Body() dto: CreateCompetitionConfigDto,
+  ) {
+    return this.bracketService.createCompetitionConfig(user, dto);
+  }
+
+  @Get('admin/competition-configs/:configId/versions')
+  listCompetitionConfigVersions(
+    @CurrentUser() user: V1AuthUser,
+    @Param('configId') configId: string,
+  ) {
+    return this.bracketService.listCompetitionConfigVersions(user, configId);
+  }
+
+  @Post('admin/competition-configs/:configId/versions')
+  createCompetitionConfigVersion(
+    @CurrentUser() user: V1AuthUser,
+    @Param('configId') configId: string,
+    @Body() dto: CreateCompetitionConfigVersionDto,
+  ) {
+    return this.bracketService.createCompetitionConfigVersion(user, configId, dto);
+  }
+
+  @Patch('admin/tournaments/:tournamentId/competition-config')
+  changeTournamentCompetitionConfig(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Body() dto: ChangeTournamentCompetitionConfigDto,
+  ) {
+    return this.bracketService.changeTournamentCompetitionConfig(user, tournamentId, dto);
+  }
 
   /** POST /admin/tournaments/:tournamentId/groups — 조 생성 */
   @Post('admin/tournaments/:tournamentId/groups')
@@ -76,7 +148,6 @@ export class TournamentBracketController {
     return this.bracketService.deleteFixture(user, fixtureId);
   }
 
-  /** DELETE /admin/fixtures/:fixtureId/result — 결과 삭제 (오입력 복구, status → scheduled) */
   @Delete('admin/fixtures/:fixtureId/result')
   deleteFixtureResult(@CurrentUser() user: V1AuthUser, @Param('fixtureId') fixtureId: string) {
     return this.bracketService.deleteFixtureResult(user, fixtureId);
@@ -104,10 +175,6 @@ export class TournamentBracketController {
     return this.bracketService.removeGroupTeam(user, groupTeamId);
   }
 
-  /**
-   * POST /admin/fixtures/:fixtureId/result — 경기 결과 기록 (upsert)
-   * fixture.status → completed. hasPenalty=true 시 양측 penalty 점수 필수.
-   */
   @Post('admin/fixtures/:fixtureId/result')
   recordResult(
     @CurrentUser() user: V1AuthUser,

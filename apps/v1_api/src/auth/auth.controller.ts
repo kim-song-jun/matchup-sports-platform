@@ -35,6 +35,24 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  /**
+   * `V1AuthGuard` resolves identity via `resolveV1RequestIdentity()`, which
+   * only accepts header-based (passwordless) identity when `NODE_ENV !==
+   * 'production'` — in production this route 401s unless the caller already
+   * presents a valid signed session cookie, so it grants nothing beyond what
+   * the guard already grants callers on every other guarded route. Lets E2E
+   * (and other header-authenticated dev/test callers) upgrade their existing
+   * trusted identity into the same signed `teameet_v1_session` cookie
+   * `login()` issues — most seeded personas have no password, so `login()`
+   * itself isn't usable to obtain one.
+   */
+  @Post('dev-session')
+  @UseGuards(V1AuthGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  devSession(@CurrentUser() user: V1AuthUser) {
+    return this.authService.devSession(user.id, user.email);
+  }
+
   @Post('kakao')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   kakaoLogin(@Body() dto: KakaoLoginDto) {

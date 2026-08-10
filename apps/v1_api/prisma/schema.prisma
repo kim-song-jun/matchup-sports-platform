@@ -290,6 +290,192 @@ enum V1UploadKind {
   video
 }
 
+enum V1GameSourceType {
+  TEAM_MATCH
+  TOURNAMENT_FIXTURE
+}
+
+enum V1GameState {
+  SCHEDULED
+  LIVE
+  PAUSED
+  ENDED
+  CANCELLED
+}
+
+enum V1GameSideKey {
+  HOME
+  AWAY
+}
+
+enum V1GamePeriodState {
+  SCHEDULED
+  LIVE
+  ENDED
+}
+
+enum V1GameLineupState {
+  DRAFT
+  SUBMITTED
+  LOCKED
+}
+
+enum V1IdentityLinkAction {
+  REQUESTED
+  ATTESTED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+enum V1IdentityActorType {
+  USER
+  SYSTEM
+}
+
+enum V1ConsentState {
+  GRANTED
+  REVOKED
+}
+
+enum V1GameEventType {
+  GOAL
+  CARD
+  SUBSTITUTION
+  PERIOD_START
+  PERIOD_END
+  PAUSE
+  RESUME
+  CORRECTION
+  FOUL
+}
+
+enum V1GameResultRevisionState {
+  DRAFT
+  SUBMITTED
+  CHANGE_REQUESTED
+  SUPPLEMENT_REQUESTED
+  REJECTED
+  OFFICIAL
+  VOID
+}
+
+enum V1VisibilityMode {
+  LIVE
+  STATUS_ONLY
+  HIDDEN
+  OFFICIAL_ONLY
+}
+
+enum V1FixtureAdvancementOutcome {
+  WINNER
+  LOSER
+}
+
+enum V1FixtureTargetSide {
+  HOME
+  AWAY
+}
+
+enum V1OutboxStatus {
+  PENDING
+  PROCESSING
+  RETRY
+  POISONED
+  COMPLETED
+}
+
+enum V1ProjectionStatus {
+  PENDING
+  APPLIED
+  FAILED
+}
+
+enum V1ScheduleType {
+  MATCH
+  TRAINING
+  EVENT
+}
+
+enum V1ScheduleVisibility {
+  TEAM
+  MEMBERS
+  PUBLIC
+}
+
+enum V1ScheduleState {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum V1AttendanceStatus {
+  GOING
+  MAYBE
+  NOT_GOING
+  WAITLISTED
+}
+
+enum V1GuestRecruitmentVisibility {
+  MEMBERS
+  PUBLIC
+}
+
+enum V1GuestRecruitmentState {
+  OPEN
+  CLOSED
+  FILLED
+}
+
+enum V1GuestApplicationState {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum V1TournamentStaffRole {
+  FIELD_OPERATOR
+  SUPPORT_READONLY
+  TOURNAMENT_DIRECTOR
+  PLATFORM_OPS
+}
+
+enum V1CompetitionConfigStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum V1EscalationKind {
+  ESCALATION
+  REMINDER
+}
+
+enum V1EscalationStatus {
+  PENDING
+  ACKNOWLEDGED
+  RESOLVED
+  CLOSED
+}
+
+enum V1OperationActorType {
+  USER
+  SYSTEM
+}
+
+enum V1GameOperationFlagKey {
+  GAME_WRITE
+  GAME_READ
+  PUBLIC_LIVE
+  DIRECTOR_OFFICIALIZE
+}
+
+enum V1GameWriteMode {
+  legacy
+  new
+}
+
 model V1RuntimeCheck {
   id        String   @id @default(uuid())
   key       String   @unique
@@ -320,39 +506,43 @@ model V1User {
   sportPreferences               V1UserSportPreference[]
   regions                        V1UserRegion[]
   reputationSummary              V1UserReputationSummary?
-  hostedMatches                  V1Match[]                  @relation("V1MatchHost")
-  matchApplications              V1MatchApplication[]       @relation("V1MatchApplicant")
-  reviewedApplications           V1MatchApplication[]       @relation("V1MatchApplicationReviewer")
+  hostedMatches                  V1Match[]                     @relation("V1MatchHost")
+  matchApplications              V1MatchApplication[]          @relation("V1MatchApplicant")
+  reviewedApplications           V1MatchApplication[]          @relation("V1MatchApplicationReviewer")
   matchParticipants              V1MatchParticipant[]
-  ownedTeams                     V1Team[]                   @relation("V1TeamOwner")
-  teamMemberships                V1TeamMembership[]         @relation("V1TeamMember")
-  removedTeamMemberships         V1TeamMembership[]         @relation("V1TeamMembershipRemover")
-  teamJoinApplications           V1TeamJoinApplication[]    @relation("V1TeamJoinApplicant")
-  reviewedTeamJoins              V1TeamJoinApplication[]    @relation("V1TeamJoinReviewer")
-  teamInvitesReceived            V1TeamInvitation[]         @relation("V1TeamInvitee")
-  teamInvitesSent                V1TeamInvitation[]         @relation("V1TeamInviter")
-  createdTeamMatches             V1TeamMatch[]              @relation("V1TeamMatchCreator")
-  teamMatchApplications          V1TeamMatchApplication[]   @relation("V1TeamMatchApplicantUser")
-  reviewedTeamMatches            V1TeamMatchApplication[]   @relation("V1TeamMatchReviewer")
+  ownedTeams                     V1Team[]                      @relation("V1TeamOwner")
+  teamMemberships                V1TeamMembership[]            @relation("V1TeamMember")
+  removedTeamMemberships         V1TeamMembership[]            @relation("V1TeamMembershipRemover")
+  teamJoinApplications           V1TeamJoinApplication[]       @relation("V1TeamJoinApplicant")
+  reviewedTeamJoins              V1TeamJoinApplication[]       @relation("V1TeamJoinReviewer")
+  teamInvitesReceived            V1TeamInvitation[]            @relation("V1TeamInvitee")
+  teamInvitesSent                V1TeamInvitation[]            @relation("V1TeamInviter")
+  createdTeamMatches             V1TeamMatch[]                 @relation("V1TeamMatchCreator")
+  teamMatchApplications          V1TeamMatchApplication[]      @relation("V1TeamMatchApplicantUser")
+  reviewedTeamMatches            V1TeamMatchApplication[]      @relation("V1TeamMatchReviewer")
   chatParticipations             V1ChatRoomParticipant[]
-  chatMessages                   V1ChatMessage[]            @relation("V1ChatMessageSender")
+  chatMessages                   V1ChatMessage[]               @relation("V1ChatMessageSender")
   notifications                  V1Notification[]
   notificationPreference         V1NotificationPreference?
   pushSubscriptions              V1PushSubscription[]
-  webPushFailureLogs             V1WebPushFailureLog[]      @relation("V1WebPushFailureLogUser")
-  acknowledgedPushFailureLogs    V1WebPushFailureLog[]      @relation("V1WebPushFailureLogAcknowledgedBy")
+  webPushFailureLogs             V1WebPushFailureLog[]         @relation("V1WebPushFailureLogUser")
+  acknowledgedPushFailureLogs    V1WebPushFailureLog[]         @relation("V1WebPushFailureLogAcknowledgedBy")
   searchHistories                V1SearchHistory[]
-  adminUser                      V1AdminUser?               @relation("V1AdminUserAccount")
-  grantedAdmins                  V1AdminUser[]              @relation("V1AdminGrantor")
-  statusLogs                     V1StatusChangeLog[]        @relation("V1StatusActorUser")
-  postEventReviewsWritten        V1PostEventReview[]        @relation("V1PostEventReviewReviewer")
-  postEventUserReviewsReceived   V1PostEventReview[]        @relation("V1PostEventReviewTargetUser")
-  tournamentRegistrationsApplied V1TournamentRegistration[] @relation("V1TournamentRegistrationApplicant")
+  adminUser                      V1AdminUser?                  @relation("V1AdminUserAccount")
+  grantedAdmins                  V1AdminUser[]                 @relation("V1AdminGrantor")
+  statusLogs                     V1StatusChangeLog[]           @relation("V1StatusActorUser")
+  postEventReviewsWritten        V1PostEventReview[]           @relation("V1PostEventReviewReviewer")
+  postEventUserReviewsReceived   V1PostEventReview[]           @relation("V1PostEventReviewTargetUser")
+  tournamentRegistrationsApplied V1TournamentRegistration[]    @relation("V1TournamentRegistrationApplicant")
   tournamentPlayerEntries        V1TournamentPlayer[]
-  tournamentReviews              V1TournamentReview[]       @relation("V1TournamentReviewAuthor")
+  tournamentReviews              V1TournamentReview[]          @relation("V1TournamentReviewAuthor")
+  tournamentStaffAssignments     V1TournamentStaffAssignment[] @relation("V1TournamentStaffUser")
+  grantedTournamentStaff         V1TournamentStaffAssignment[] @relation("V1TournamentStaffGrantor")
   verificationTokens             V1VerificationToken[]
   inquiries                      V1Inquiry[]
   uploadAssets                   V1UploadAsset[]
+  acknowledgedResultEscalations  V1ResultEscalation[]          @relation("V1EscalationAcknowledgedBy")
+  resolvedResultEscalations      V1ResultEscalation[]          @relation("V1EscalationResolvedBy")
 
   @@index([accountStatus])
   @@index([onboardingStatus])
@@ -361,14 +551,14 @@ model V1User {
 }
 
 model V1UploadAsset {
-  id           String       @id @default(uuid())
-  ownerUserId  String       @map("owner_user_id")
-  kind         V1UploadKind
-  mimeType     String       @map("mime_type")
-  byteSize     BigInt       @map("byte_size")
-  url          String       @unique
-  storagePath  String       @unique @map("storage_path")
-  createdAt    DateTime     @default(now()) @map("created_at")
+  id          String       @id @default(uuid())
+  ownerUserId String       @map("owner_user_id")
+  kind        V1UploadKind
+  mimeType    String       @map("mime_type")
+  byteSize    BigInt       @map("byte_size")
+  url         String       @unique
+  storagePath String       @unique @map("storage_path")
+  createdAt   DateTime     @default(now()) @map("created_at")
 
   ownerUser V1User @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
 
@@ -650,6 +840,7 @@ model V1Sport {
   teams           V1Team[]
   teamMatches     V1TeamMatch[]
   tournaments     V1Tournament[]
+  teamMatchSeries V1TeamMatchSeries[]
 
   @@index([isActive, sortOrder])
   @@map("v1_sports")
@@ -693,12 +884,13 @@ model V1Region {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  parent      V1Region?      @relation("V1RegionTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children    V1Region[]     @relation("V1RegionTree")
-  userRegions V1UserRegion[]
-  matches     V1Match[]
-  teams       V1Team[]
-  teamMatches V1TeamMatch[]
+  parent          V1Region?           @relation("V1RegionTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children        V1Region[]          @relation("V1RegionTree")
+  userRegions     V1UserRegion[]
+  matches         V1Match[]
+  teams           V1Team[]
+  teamMatches     V1TeamMatch[]
+  teamMatchSeries V1TeamMatchSeries[]
 
   @@index([parentId])
   @@index([level, isActive, sortOrder])
@@ -706,20 +898,20 @@ model V1Region {
 }
 
 model V1Notice {
-  id          String           @id @default(uuid())
-  audience    V1NoticeAudience @default(public)
-  category    String           @default("안내")
-  title       String
-  body        String
-  contentJson Json?            @map("content_json")
-  contentVersion Int           @default(1) @map("content_version")
-  status      V1NoticeStatus   @default(draft)
-  publishedAt DateTime?        @map("published_at")
-  archivedAt  DateTime?        @map("archived_at")
-  displayStartAt DateTime?     @map("display_start_at")
-  displayEndAt   DateTime?     @map("display_end_at")
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
+  id             String           @id @default(uuid())
+  audience       V1NoticeAudience @default(public)
+  category       String           @default("안내")
+  title          String
+  body           String
+  contentJson    Json?            @map("content_json")
+  contentVersion Int              @default(1) @map("content_version")
+  status         V1NoticeStatus   @default(draft)
+  publishedAt    DateTime?        @map("published_at")
+  archivedAt     DateTime?        @map("archived_at")
+  displayStartAt DateTime?        @map("display_start_at")
+  displayEndAt   DateTime?        @map("display_end_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
 
   contentAssets V1ContentAsset[]
 
@@ -749,7 +941,7 @@ model V1Popup {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  contentAssets  V1ContentAsset[]
+  contentAssets V1ContentAsset[]
 
   @@index([audience, status, displayStartAt, displayEndAt, publishedAt], map: "v1_popups_active_window_idx")
   @@index([createdAt])
@@ -771,8 +963,8 @@ model V1ContentAsset {
   updatedAt             DateTime             @updatedAt @map("updated_at")
 
   uploadedByAdminUser V1AdminUser @relation(fields: [uploadedByAdminUserId], references: [id], onDelete: Restrict)
-  notice             V1Notice?    @relation(fields: [noticeId], references: [id], onDelete: Cascade)
-  popup              V1Popup?     @relation(fields: [popupId], references: [id], onDelete: Cascade)
+  notice              V1Notice?   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  popup               V1Popup?    @relation(fields: [popupId], references: [id], onDelete: Cascade)
 
   @@index([status, createdAt])
   @@index([uploadedByAdminUserId, createdAt])
@@ -955,6 +1147,7 @@ model V1Team {
   postEventReviewsWritten      V1PostEventReview[]        @relation("V1PostEventReviewReviewerTeam")
   postEventTeamReviewsReceived V1PostEventReview[]        @relation("V1PostEventReviewTargetTeam")
   tournamentRegistrations      V1TournamentRegistration[]
+  teamMatchSeriesEntries       V1TeamMatchSeriesTeam[]
 
   @@index([ownerUserId])
   @@index([sportId, regionId, status])
@@ -1059,24 +1252,24 @@ model V1TeamInvitation {
 }
 
 model V1TeamTrustScore {
-  id                     String       @id @default(uuid())
-  teamId                 String       @unique @map("team_id")
-  trustState             V1TrustState @default(sample) @map("trust_state")
-  mannerScore            Decimal?     @map("manner_score") @db.Decimal(4, 2)
-  matchCount             Int          @default(0) @map("match_count")
+  id                    String       @id @default(uuid())
+  teamId                String       @unique @map("team_id")
+  trustState            V1TrustState @default(sample) @map("trust_state")
+  mannerScore           Decimal?     @map("manner_score") @db.Decimal(4, 2)
+  matchCount            Int          @default(0) @map("match_count")
   // 대회후기(tournament_fixture) 전용 평점 — team_match 전용 mannerScore와 소스 분리(두 recalculate 함수가 같은 컬럼을 덮어쓰는 문제 방지)
-  tournamentMannerScore  Decimal?     @map("tournament_manner_score") @db.Decimal(4, 2)
-  tournamentReviewCount  Int          @default(0) @map("tournament_review_count")
+  tournamentMannerScore Decimal?     @map("tournament_manner_score") @db.Decimal(4, 2)
+  tournamentReviewCount Int          @default(0) @map("tournament_review_count")
   // trustState/matchCount/sourceLabel과 마찬가지로, 대회후기(tournament_fixture) 전용 컬럼을 분리한다 —
   // 두 컬럼군을 공유하면 recalculateTeamTrust(team_match)와 recalculateTournamentFixtureTeamTrust(tournament_fixture)가
   // 서로 다른 모집단을 계산하면서도 같은 row를 last-write-wins로 덮어써 버린다.
-  tournamentTrustState   V1TrustState @default(sample) @map("tournament_trust_state")
-  tournamentMatchCount   Int          @default(0) @map("tournament_match_count")
-  tournamentSourceLabel  String?      @map("tournament_source_label")
-  sourceLabel            String?      @map("source_label")
-  calculatedAt           DateTime?    @map("calculated_at")
-  createdAt              DateTime     @default(now()) @map("created_at")
-  updatedAt              DateTime     @updatedAt @map("updated_at")
+  tournamentTrustState  V1TrustState @default(sample) @map("tournament_trust_state")
+  tournamentMatchCount  Int          @default(0) @map("tournament_match_count")
+  tournamentSourceLabel String?      @map("tournament_source_label")
+  sourceLabel           String?      @map("source_label")
+  calculatedAt          DateTime?    @map("calculated_at")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
 
   team V1Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
@@ -1140,41 +1333,55 @@ model V1PostEventReviewTag {
 }
 
 model V1TeamMatch {
-  id                      String            @id @default(uuid())
-  hostTeamId              String            @map("host_team_id")
-  createdByUserId         String            @map("created_by_user_id")
-  sportId                 String            @map("sport_id")
-  regionId                String            @map("region_id")
-  title                   String
-  description             String?
-  imageUrl                String?           @map("image_url")
-  placeName               String            @map("place_name")
-  placeAddress            String?           @map("place_address")
-  startAt                 DateTime          @map("start_at")
-  endAt                   DateTime?         @map("end_at")
-  deadlineAt              DateTime?         @map("deadline_at")
-  formatNote              String?           @map("format_note")
-  minSportLevelId         String?           @map("min_sport_level_id")
-  maxSportLevelId         String?           @map("max_sport_level_id")
-  genderRule              String?           @map("gender_rule")
-  costNote                String?           @map("cost_note")
-  status                  V1TeamMatchStatus @default(recruiting)
-  approvedApplicantTeamId String?           @map("approved_applicant_team_id")
-  cancelledAt             DateTime?         @map("cancelled_at")
-  completedAt             DateTime?         @map("completed_at")
-  createdAt               DateTime          @default(now()) @map("created_at")
-  updatedAt               DateTime          @updatedAt @map("updated_at")
-  deletedAt               DateTime?         @map("deleted_at")
+  id                         String            @id @default(uuid())
+  hostTeamId                 String            @map("host_team_id")
+  createdByUserId            String            @map("created_by_user_id")
+  sportId                    String            @map("sport_id")
+  regionId                   String            @map("region_id")
+  title                      String
+  description                String?
+  imageUrl                   String?           @map("image_url")
+  placeName                  String            @map("place_name")
+  placeAddress               String?           @map("place_address")
+  startAt                    DateTime          @map("start_at")
+  endAt                      DateTime?         @map("end_at")
+  deadlineAt                 DateTime?         @map("deadline_at")
+  formatNote                 String?           @map("format_note")
+  matchFormat                String?           @map("match_format")
+  matchStyle                 String[]          @default([]) @map("match_style")
+  uniformColor               String?           @map("uniform_color")
+  minSportLevelId            String?           @map("min_sport_level_id")
+  maxSportLevelId            String?           @map("max_sport_level_id")
+  genderRule                 String?           @map("gender_rule")
+  costNote                   String?           @map("cost_note")
+  status                     V1TeamMatchStatus @default(recruiting)
+  approvedApplicantTeamId    String?           @map("approved_applicant_team_id")
+  cancelledAt                DateTime?         @map("cancelled_at")
+  completedAt                DateTime?         @map("completed_at")
+  createdAt                  DateTime          @default(now()) @map("created_at")
+  updatedAt                  DateTime          @updatedAt @map("updated_at")
+  deletedAt                  DateTime?         @map("deleted_at")
+  // Nullable / no default until the deferred contract-phase migration adds
+  // SET NOT NULL + SET DEFAULT — see
+  // docs/ops/task9-competition-config-contract-phase.md. The FK constraint
+  // itself (v1_team_matches_competition_config_fk) already exists (added by
+  // 20260729000100_v1_game_operations while this column was still nullable
+  // there too), so `competitionConfig` stays a real relation, just optional.
+  competitionConfigVersionId String?           @map("competition_config_version_id")
+  seriesId                   String?           @map("series_id")
 
-  hostTeam              V1Team                   @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
-  createdByUser         V1User                   @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  sport                 V1Sport                  @relation(fields: [sportId], references: [id], onDelete: Restrict)
-  minSportLevel         V1SportLevel?            @relation("V1TeamMatchMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
-  maxSportLevel         V1SportLevel?            @relation("V1TeamMatchMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
-  region                V1Region                 @relation(fields: [regionId], references: [id], onDelete: Restrict)
-  approvedApplicantTeam V1Team?                  @relation("V1ApprovedApplicantTeam", fields: [approvedApplicantTeamId], references: [id], onDelete: SetNull)
+  hostTeam              V1Team                      @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
+  createdByUser         V1User                      @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  sport                 V1Sport                     @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  minSportLevel         V1SportLevel?               @relation("V1TeamMatchMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
+  maxSportLevel         V1SportLevel?               @relation("V1TeamMatchMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
+  region                V1Region                    @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  approvedApplicantTeam V1Team?                     @relation("V1ApprovedApplicantTeam", fields: [approvedApplicantTeamId], references: [id], onDelete: SetNull)
   applications          V1TeamMatchApplication[]
   chatRoom              V1ChatRoom?
+  game                  V1Game?                     @relation("V1GameTeamMatch")
+  competitionConfig     V1CompetitionConfigVersion? @relation("V1TeamMatchCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_team_matches_competition_config_fk")
+  series                V1TeamMatchSeries?          @relation("V1TeamMatchSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_team_matches_series_fk")
 
   @@index([hostTeamId])
   @@index([createdByUserId])
@@ -1185,6 +1392,8 @@ model V1TeamMatch {
   @@index([status])
   @@index([startAt])
   @@index([createdAt])
+  @@index([competitionConfigVersionId], map: "v1_team_matches_competition_config_idx")
+  @@index([seriesId, startAt], map: "v1_team_matches_series_start_at_idx")
   @@map("v1_team_matches")
 }
 
@@ -1212,6 +1421,49 @@ model V1TeamMatchApplication {
   @@index([status])
   @@index([createdAt])
   @@map("v1_team_match_applications")
+}
+
+enum V1TeamMatchSeriesState {
+  draft
+  active
+  completed
+}
+
+model V1TeamMatchSeries {
+  id                   String                 @id @default(uuid())
+  title                String
+  sportId              String                 @map("sport_id")
+  regionId             String                 @map("region_id")
+  createdByAdminUserId String                 @map("created_by_admin_user_id")
+  startsOn             DateTime               @map("starts_on")
+  endsOn               DateTime               @map("ends_on")
+  tieBreakJson         Json                   @map("tie_break_json")
+  state                V1TeamMatchSeriesState @default(draft)
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+
+  sport          V1Sport                 @relation(fields: [sportId], references: [id], onDelete: Restrict, map: "v1_team_match_series_sport_fk")
+  region         V1Region                @relation(fields: [regionId], references: [id], onDelete: Restrict, map: "v1_team_match_series_region_fk")
+  createdByAdmin V1AdminUser             @relation(fields: [createdByAdminUserId], references: [id], onDelete: Restrict, map: "v1_team_match_series_admin_fk")
+  teams          V1TeamMatchSeriesTeam[]
+  teamMatches    V1TeamMatch[]           @relation("V1TeamMatchSeries")
+
+  @@index([sportId, state])
+  @@map("v1_team_match_series")
+}
+
+model V1TeamMatchSeriesTeam {
+  id        String   @id @default(uuid())
+  seriesId  String   @map("series_id")
+  teamId    String   @map("team_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  series V1TeamMatchSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade, map: "v1_team_match_series_teams_series_fk")
+  team   V1Team            @relation(fields: [teamId], references: [id], onDelete: Restrict, map: "v1_team_match_series_teams_team_fk")
+
+  @@unique([seriesId, teamId], map: "v1_team_match_series_teams_series_team_key")
+  @@index([teamId])
+  @@map("v1_team_match_series_teams")
 }
 
 model V1ChatRoom {
@@ -1285,6 +1537,7 @@ model V1ChatMessage {
 
 model V1Notification {
   id              String                   @id @default(uuid())
+  businessKey     String?                  @unique @map("business_key")
   recipientUserId String                   @map("recipient_user_id")
   targetType      V1NotificationTargetType @map("target_type")
   targetId        String?                  @map("target_id")
@@ -1303,16 +1556,16 @@ model V1Notification {
 }
 
 model V1PushSubscription {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  endpoint   String   @unique
-  p256dh     String
-  auth       String
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  user         V1User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  failureLogs  V1WebPushFailureLog[]
+  user        V1User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  failureLogs V1WebPushFailureLog[]
 
   @@index([userId])
   @@map("v1_push_subscriptions")
@@ -1456,6 +1709,7 @@ model V1AdminUser {
   recordedTournamentResults        V1TournamentFixtureResult[] @relation("V1TournamentFixtureResultRecordedByAdmin")
   inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
   contentAssets                    V1ContentAsset[]
+  createdTeamMatchSeries           V1TeamMatchSeries[]
 
   @@index([adminRole, status])
   @@index([grantedByAdminUserId])
@@ -1641,84 +1895,98 @@ enum V1TournamentAnnouncementCategory {
 }
 
 model V1Tournament {
-  id                     String             @id @default(uuid())
-  sportId                String             @map("sport_id")
-  title                  String
-  status                 V1TournamentStatus @default(draft)
-  format                 V1TournamentFormat @default(group_knockout)
-  registrationDeadlineAt DateTime?          @map("registration_deadline_at")
-  rosterDeadlineAt       DateTime?          @map("roster_deadline_at")
-  bracketPublishedAt     DateTime?          @map("bracket_published_at")
+  id                         String                      @id @default(uuid())
+  sportId                    String                      @map("sport_id")
+  title                      String
+  status                     V1TournamentStatus          @default(draft)
+  format                     V1TournamentFormat          @default(group_knockout)
+  registrationDeadlineAt     DateTime?                   @map("registration_deadline_at")
+  rosterDeadlineAt           DateTime?                   @map("roster_deadline_at")
+  bracketPublishedAt         DateTime?                   @map("bracket_published_at")
   // 예약 공개 시각. 스케줄러 없이 조회 시점에 판정한다(now >= 이 값이면 공개로 간주하며,
   // 이때 bracketPublishedAt 은 null 로 남는다 — 공개 근거가 이 컬럼이다).
   // 즉시 공개(publishBracket)와 공개 취소(unpublishBracket)는 이 값을 null 로 비운다.
-  bracketPublishScheduledAt DateTime?       @map("bracket_publish_scheduled_at")
-  scheduledAt            DateTime?          @map("scheduled_at")
-  scheduledEndAt         DateTime?          @map("scheduled_end_at")
-  venue                  String?
-  parkingInfo            String?            @default("주차와 입장 동선은 지도에서 확인해요.") @map("parking_info")
+  bracketPublishScheduledAt  DateTime?                   @map("bracket_publish_scheduled_at")
+  scheduledAt                DateTime?                   @map("scheduled_at")
+  scheduledEndAt             DateTime?                   @map("scheduled_end_at")
+  venue                      String?
+  parkingInfo                String?                     @default("주차와 입장 동선은 지도에서 확인해요.") @map("parking_info")
   // 카카오 로컬 API 키워드 검색으로 venue를 지오코딩한 좌표(KakaoGeocodingService). 키 미설정/검색
   // 실패 시 null로 남고, 그 경우 프론트는 네이버 지도 검색 링크 폴백을 그대로 사용한다.
-  latitude               Float?
-  longitude              Float?
-  coverImageUrl          String?            @map("cover_image_url")
-  teamCount              Int                @default(8) @map("team_count")
-  minPlayers             Int                @default(6) @map("min_players")
-  maxPlayers             Int                @default(10) @map("max_players")
-  genderCategory         V1TournamentGenderCategory? @map("gender_category")
-  genderMinMale          Int?               @map("gender_min_male")
-  genderMaxMale          Int?               @map("gender_max_male")
-  genderMinFemale        Int?               @map("gender_min_female")
-  genderMaxFemale        Int?               @map("gender_max_female")
-  entryFee               Int                @default(0) @map("entry_fee")
+  latitude                   Float?
+  longitude                  Float?
+  coverImageUrl              String?                     @map("cover_image_url")
+  teamCount                  Int                         @default(8) @map("team_count")
+  minPlayers                 Int                         @default(6) @map("min_players")
+  maxPlayers                 Int                         @default(10) @map("max_players")
+  genderCategory             V1TournamentGenderCategory? @map("gender_category")
+  genderMinMale              Int?                        @map("gender_min_male")
+  genderMaxMale              Int?                        @map("gender_max_male")
+  genderMinFemale            Int?                        @map("gender_min_female")
+  genderMaxFemale            Int?                        @map("gender_max_female")
+  entryFee                   Int                         @default(0) @map("entry_fee")
   // 상금: prizeSummary=대표 상품/상금 문구, prizeBreakdown=순위별 안내 텍스트(예: "1위 100만원 · 2위 50만원"). prizePool은 하위 호환용 숫자 필드.
-  prizePool              Int?               @map("prize_pool")
-  prizeSummary           String?            @map("prize_summary")
-  prizeBreakdown         String?            @map("prize_breakdown")
-  promoHomeEnabled       Boolean            @default(false) @map("promo_home_enabled")
-  promoHomeTitle         String?            @map("promo_home_title")
-  promoHomeSubtitle      String?            @map("promo_home_subtitle")
-  promoHomeImageUrl      String?            @map("promo_home_image_url")
-  promoHomeBadgeText     String?            @map("promo_home_badge_text")
-  promoHomeDateText      String?            @map("promo_home_date_text")
-  promoHomeTeamsText     String?            @map("promo_home_teams_text")
-  promoHomeLocationText  String?            @map("promo_home_location_text")
-  promoHomePrizeText     String?            @map("promo_home_prize_text")
-  promoHomePriority      Int                @default(0) @map("promo_home_priority")
-  promoListEnabled       Boolean            @default(false) @map("promo_list_enabled")
-  promoListTitle         String?            @map("promo_list_title")
-  promoListSubtitle      String?            @map("promo_list_subtitle")
-  promoListImageUrl      String?            @map("promo_list_image_url")
-  promoListBadgeText     String?            @map("promo_list_badge_text")
-  promoListDateText      String?            @map("promo_list_date_text")
-  promoListTeamsText     String?            @map("promo_list_teams_text")
-  promoListLocationText  String?            @map("promo_list_location_text")
-  promoListPrizeText     String?            @map("promo_list_prize_text")
-  promoListPriority      Int                @default(0) @map("promo_list_priority")
-  bankName               String?            @map("bank_name")
-  bankAccount            String?            @map("bank_account")
-  bankHolder             String?            @map("bank_holder")
-  rulesText              String?            @map("rules_text")
-  refundPolicyText       String?            @map("refund_policy_text")
-  createdByAdminUserId   String?            @map("created_by_admin_user_id")
-  createdAt              DateTime           @default(now()) @map("created_at")
-  updatedAt              DateTime           @updatedAt @map("updated_at")
-  deletedAt              DateTime?          @map("deleted_at")
+  prizePool                  Int?                        @map("prize_pool")
+  prizeSummary               String?                     @map("prize_summary")
+  prizeBreakdown             String?                     @map("prize_breakdown")
+  promoHomeEnabled           Boolean                     @default(false) @map("promo_home_enabled")
+  promoHomeTitle             String?                     @map("promo_home_title")
+  promoHomeSubtitle          String?                     @map("promo_home_subtitle")
+  promoHomeImageUrl          String?                     @map("promo_home_image_url")
+  promoHomeBadgeText         String?                     @map("promo_home_badge_text")
+  promoHomeDateText          String?                     @map("promo_home_date_text")
+  promoHomeTeamsText         String?                     @map("promo_home_teams_text")
+  promoHomeLocationText      String?                     @map("promo_home_location_text")
+  promoHomePrizeText         String?                     @map("promo_home_prize_text")
+  promoHomePriority          Int                         @default(0) @map("promo_home_priority")
+  promoListEnabled           Boolean                     @default(false) @map("promo_list_enabled")
+  promoListTitle             String?                     @map("promo_list_title")
+  promoListSubtitle          String?                     @map("promo_list_subtitle")
+  promoListImageUrl          String?                     @map("promo_list_image_url")
+  promoListBadgeText         String?                     @map("promo_list_badge_text")
+  promoListDateText          String?                     @map("promo_list_date_text")
+  promoListTeamsText         String?                     @map("promo_list_teams_text")
+  promoListLocationText      String?                     @map("promo_list_location_text")
+  promoListPrizeText         String?                     @map("promo_list_prize_text")
+  promoListPriority          Int                         @default(0) @map("promo_list_priority")
+  bankName                   String?                     @map("bank_name")
+  bankAccount                String?                     @map("bank_account")
+  bankHolder                 String?                     @map("bank_holder")
+  rulesText                  String?                     @map("rules_text")
+  refundPolicyText           String?                     @map("refund_policy_text")
+  createdByAdminUserId       String?                     @map("created_by_admin_user_id")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @updatedAt @map("updated_at")
+  deletedAt                  DateTime?                   @map("deleted_at")
+  // Nullable / no default until the deferred contract-phase migration adds
+  // SET NOT NULL + SET DEFAULT — see
+  // docs/ops/task9-competition-config-contract-phase.md. The FK constraint
+  // itself (v1_tournaments_competition_config_fk) already exists (added by
+  // 20260729000200_v1_competition_config while this column was still
+  // nullable), so `competitionConfig` stays a real relation, just optional.
+  competitionConfigVersionId String?                     @map("competition_config_version_id")
 
-  sport          V1Sport                    @relation(fields: [sportId], references: [id], onDelete: Restrict)
-  createdByAdmin V1AdminUser?               @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
-  registrations  V1TournamentRegistration[]
-  groups         V1TournamentGroup[]
-  fixtures       V1TournamentFixture[]
-  announcements  V1TournamentAnnouncement[]
-  sponsors       V1TournamentSponsor[]
-  reviews        V1TournamentReview[]
-  awards         V1TournamentAward[]
-  campaign       V1TournamentCampaign?
-  popups         V1TournamentPopup[]
+  sport                V1Sport                              @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  competitionConfig    V1CompetitionConfigVersion?          @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
+  createdByAdmin       V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+  registrations        V1TournamentRegistration[]
+  groups               V1TournamentGroup[]
+  fixtures             V1TournamentFixture[]
+  announcements        V1TournamentAnnouncement[]
+  sponsors             V1TournamentSponsor[]
+  reviews              V1TournamentReview[]
+  awards               V1TournamentAward[]
+  campaign             V1TournamentCampaign?
+  popups               V1TournamentPopup[]
+  fields               V1TournamentField[]
+  staffAssignments     V1TournamentStaffAssignment[]
+  operationAudits      V1OperationAudit[]
+  advancementEdges     V1TournamentFixtureAdvancementEdge[]
+  officialResultCaches V1GameOfficialResultCache[]
 
   @@index([status, scheduledAt])
   @@index([sportId, status])
+  @@index([competitionConfigVersionId], map: "v1_tournaments_competition_config_idx")
   @@map("v1_tournaments")
 }
 
@@ -1834,8 +2102,8 @@ model V1TournamentPlayer {
   createdAt         DateTime                      @default(now()) @map("created_at")
   updatedAt         DateTime                      @updatedAt @map("updated_at")
 
-  registration V1TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  user         V1User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  registration V1TournamentRegistration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  user         V1User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
   goals        V1TournamentFixtureGoal[]
 
   @@unique([registrationId, userId])
@@ -1885,6 +2153,7 @@ model V1TournamentGroup {
   fixtures   V1TournamentFixture[]
   standings  V1TournamentStanding[]
 
+  @@unique([tournamentId, name], map: "v1_tournament_groups_tournament_id_name_key")
   @@index([tournamentId, phase, sortOrder])
   @@map("v1_tournament_groups")
 }
@@ -1905,33 +2174,53 @@ model V1TournamentGroupTeam {
 }
 
 model V1TournamentFixture {
-  id                 String                    @id @default(uuid())
-  tournamentId       String                    @map("tournament_id")
-  groupId            String?                   @map("group_id")
-  round              String
-  fixtureNumber      Int                       @map("fixture_number")
-  legNumber          Int                       @default(1) @map("leg_number")
-  parentFixtureId    String?                   @map("parent_fixture_id")
-  homeRegistrationId String?                   @map("home_registration_id")
-  awayRegistrationId String?                   @map("away_registration_id")
-  scheduledAt        DateTime?                 @map("scheduled_at")
-  venue              String?
-  status             V1TournamentFixtureStatus @default(scheduled)
-  createdAt          DateTime                  @default(now()) @map("created_at")
-  updatedAt          DateTime                  @updatedAt @map("updated_at")
+  id                         String                    @id @default(uuid())
+  tournamentId               String                    @map("tournament_id")
+  groupId                    String?                   @map("group_id")
+  round                      String
+  fixtureNumber              Int                       @map("fixture_number")
+  legNumber                  Int                       @default(1) @map("leg_number")
+  parentFixtureId            String?                   @map("parent_fixture_id")
+  homeRegistrationId         String?                   @map("home_registration_id")
+  awayRegistrationId         String?                   @map("away_registration_id")
+  scheduledAt                DateTime?                 @map("scheduled_at")
+  fieldId                    String?                   @map("field_id")
+  venue                      String?
+  status                     V1TournamentFixtureStatus @default(scheduled)
+  createdAt                  DateTime                  @default(now()) @map("created_at")
+  updatedAt                  DateTime                  @updatedAt @map("updated_at")
+  // Nullable / no default until the deferred contract-phase migration adds
+  // SET NOT NULL + SET DEFAULT — see
+  // docs/ops/task9-competition-config-contract-phase.md. The FK constraint
+  // itself (v1_tournament_fixtures_competition_config_fk) already exists
+  // (added by 20260729000100_v1_game_operations while this column was still
+  // nullable there too), so `competitionConfig` stays a real relation, just
+  // optional.
+  competitionConfigVersionId String?                   @map("competition_config_version_id")
 
-  tournament       V1Tournament               @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  group            V1TournamentGroup?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  parentFixture    V1TournamentFixture?       @relation("V1TournamentFixtureParent", fields: [parentFixtureId], references: [id], onDelete: SetNull)
-  childFixtures    V1TournamentFixture[]      @relation("V1TournamentFixtureParent")
-  homeRegistration V1TournamentRegistration?  @relation("V1TournamentFixtureHome", fields: [homeRegistrationId], references: [id], onDelete: SetNull)
-  awayRegistration V1TournamentRegistration?  @relation("V1TournamentFixtureAway", fields: [awayRegistrationId], references: [id], onDelete: SetNull)
-  result           V1TournamentFixtureResult?
-  videos           V1TournamentFixtureVideo[]
+  tournament         V1Tournament                         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  group              V1TournamentGroup?                   @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  parentFixture      V1TournamentFixture?                 @relation("V1TournamentFixtureParent", fields: [parentFixtureId], references: [id], onDelete: SetNull)
+  childFixtures      V1TournamentFixture[]                @relation("V1TournamentFixtureParent")
+  homeRegistration   V1TournamentRegistration?            @relation("V1TournamentFixtureHome", fields: [homeRegistrationId], references: [id], onDelete: SetNull)
+  awayRegistration   V1TournamentRegistration?            @relation("V1TournamentFixtureAway", fields: [awayRegistrationId], references: [id], onDelete: SetNull)
+  result             V1TournamentFixtureResult?
+  videos             V1TournamentFixtureVideo[]
+  game               V1Game?                              @relation("V1GameTournamentFixture")
+  competitionConfig  V1CompetitionConfigVersion?          @relation("V1FixtureCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_fixtures_competition_config_fk")
+  field              V1TournamentField?                   @relation(fields: [tournamentId, fieldId], references: [tournamentId, id], onDelete: Restrict, map: "v1_tournament_fixtures_field_fk")
+  staffScopes        V1TournamentStaffFixtureScope[]
+  operationAudits    V1OperationAudit[]
+  advancementSources V1TournamentFixtureAdvancementEdge[] @relation("V1FixtureAdvancementSource")
+  advancementTargets V1TournamentFixtureAdvancementEdge[] @relation("V1FixtureAdvancementTarget")
 
+  @@unique([tournamentId, id], map: "v1_tournament_fixtures_tournament_id_id_key")
+  @@unique([tournamentId, round, fixtureNumber, legNumber], map: "v1_tournament_fixtures_tournament_round_number_leg_key")
   @@index([tournamentId, round, fixtureNumber])
   @@index([groupId])
   @@index([parentFixtureId])
+  @@index([competitionConfigVersionId], map: "v1_tournament_fixtures_competition_config_idx")
+  @@index([status, id], map: "v1_tournament_fixtures_status_id_backfill_idx")
   @@map("v1_tournament_fixtures")
 }
 
@@ -1949,22 +2238,42 @@ model V1TournamentFixtureResult {
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
-  fixture         V1TournamentFixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
-  recordedByAdmin V1AdminUser?        @relation("V1TournamentFixtureResultRecordedByAdmin", fields: [recordedByAdminUserId], references: [id], onDelete: SetNull)
+  fixture         V1TournamentFixture       @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  recordedByAdmin V1AdminUser?              @relation("V1TournamentFixtureResultRecordedByAdmin", fields: [recordedByAdminUserId], references: [id], onDelete: SetNull)
   goals           V1TournamentFixtureGoal[]
 
   @@map("v1_tournament_fixture_results")
 }
 
+model V1TournamentFixtureAdvancementEdge {
+  id              String                      @id @default(uuid())
+  tournamentId    String                      @map("tournament_id")
+  sourceFixtureId String                      @map("source_fixture_id")
+  sourceOutcome   V1FixtureAdvancementOutcome @map("source_outcome")
+  targetFixtureId String                      @map("target_fixture_id")
+  targetSide      V1FixtureTargetSide         @map("target_side")
+  createdAt       DateTime                    @default(now()) @map("created_at")
+
+  tournament    V1Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "v1_fixture_advancement_tournament_fk")
+  sourceFixture V1TournamentFixture @relation("V1FixtureAdvancementSource", fields: [tournamentId, sourceFixtureId], references: [tournamentId, id], onDelete: Cascade, map: "v1_fixture_advancement_source_fk")
+  targetFixture V1TournamentFixture @relation("V1FixtureAdvancementTarget", fields: [tournamentId, targetFixtureId], references: [tournamentId, id], onDelete: Cascade, map: "v1_fixture_advancement_target_fk")
+
+  @@unique([sourceFixtureId, sourceOutcome], map: "v1_fixture_advancement_source_outcome_key")
+  @@unique([targetFixtureId, targetSide], map: "v1_fixture_advancement_target_side_key")
+  @@index([tournamentId, sourceFixtureId], map: "v1_fixture_advancement_source_lock_idx")
+  @@index([tournamentId, targetFixtureId], map: "v1_fixture_advancement_target_lock_idx")
+  @@map("v1_tournament_fixture_advancement_edges")
+}
+
 model V1TournamentFixtureGoal {
-  id              String                @id @default(uuid())
-  fixtureResultId String                @map("fixture_result_id")
+  id              String               @id @default(uuid())
+  fixtureResultId String               @map("fixture_result_id")
   team            V1TournamentGoalTeam
-  playerId        String?               @map("player_id")
+  playerId        String?              @map("player_id")
   /// 비회원/대타 등 명단에 없는 득점자를 위해 이름은 항상 필수 — playerId 유무와 무관.
-  playerName      String                @map("player_name")
+  playerName      String               @map("player_name")
   minute          Int?
-  createdAt       DateTime              @default(now()) @map("created_at")
+  createdAt       DateTime             @default(now()) @map("created_at")
 
   fixtureResult V1TournamentFixtureResult @relation(fields: [fixtureResultId], references: [id], onDelete: Cascade)
   player        V1TournamentPlayer?       @relation(fields: [playerId], references: [id], onDelete: SetNull)
@@ -2091,4 +2400,644 @@ model V1IntegrationSettings {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("v1_integration_settings")
+}
+
+model V1Game {
+  id                         String                      @id @default(uuid())
+  sourceType                 V1GameSourceType            @map("source_type")
+  teamMatchId                String?                     @unique @map("team_match_id")
+  tournamentFixtureId        String?                     @unique @map("tournament_fixture_id")
+  state                      V1GameState                 @default(SCHEDULED)
+  version                    Int                         @default(0)
+  lastSequence               Int                         @default(0) @map("last_sequence")
+  currentOfficialRevisionId  String?                     @map("current_official_revision_id")
+  competitionConfigVersionId String                      @map("competition_config_version_id")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @updatedAt @map("updated_at")
+  teamMatch                  V1TeamMatch?                @relation("V1GameTeamMatch", fields: [teamMatchId], references: [id], onDelete: Restrict)
+  tournamentFixture          V1TournamentFixture?        @relation("V1GameTournamentFixture", fields: [tournamentFixtureId], references: [id], onDelete: Restrict)
+  currentOfficialRevision    V1GameResultRevision?       @relation("V1CurrentOfficialRevision", fields: [id, currentOfficialRevisionId], references: [gameId, id], onDelete: Restrict, map: "v1_games_current_revision_fk")
+  sides                      V1GameSide[]
+  periods                    V1GamePeriod[]
+  lineups                    V1GameLineup[]
+  participants               V1GameParticipant[]
+  events                     V1GameEvent[]
+  resultRevisions            V1GameResultRevision[]      @relation("V1GameResultRevisions")
+  visibilityPolicy           V1GameVisibilityPolicy?
+  officialResultCaches       V1GameOfficialResultCache[]
+  competitionConfig          V1CompetitionConfigVersion  @relation("V1GameCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_games_competition_config_fk")
+
+  @@unique([id, currentOfficialRevisionId], map: "v1_games_id_current_official_revision_key")
+  @@index([state, updatedAt])
+  @@index([sourceType, createdAt])
+  @@map("v1_games")
+}
+
+model V1GameSide {
+  id                  String        @id @default(uuid())
+  gameId              String        @map("game_id")
+  sideKey             V1GameSideKey @map("side_key")
+  teamId              String?       @map("team_id")
+  displayNameSnapshot String        @map("display_name_snapshot")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  game                V1Game        @relation(fields: [gameId], references: [id], onDelete: Cascade, map: "v1_game_sides_game_fk")
+
+  @@unique([gameId, sideKey], map: "v1_game_sides_game_id_side_key_key")
+  @@index([teamId], map: "v1_game_sides_team_id_idx")
+  @@map("v1_game_sides")
+}
+
+model V1GamePeriod {
+  id        String            @id @default(uuid())
+  gameId    String            @map("game_id")
+  number    Int
+  state     V1GamePeriodState @default(SCHEDULED)
+  startedAt DateTime?         @map("started_at")
+  endedAt   DateTime?         @map("ended_at")
+  /// Pause-aware clock (경과 시간 일시정지 반영, 2026-08): cumulative milliseconds
+  /// this period has spent PAUSED across every completed pause/resume cycle so
+  /// far. `resume` folds the just-closed segment in here (increment, never
+  /// overwrite) so repeated pause/resume within one period accumulates
+  /// correctly instead of only remembering the most recent pause.
+  pausedTotalMs Int           @default(0) @map("paused_total_ms")
+  /// Start of the CURRENTLY OPEN pause segment, or null when not paused right
+  /// now. `pause` sets this; `resume` (and `end` while paused) folds
+  /// `now - pausedAt` into `pausedTotalMs` and clears it back to null — so at
+  /// most one of "currently paused" (`pausedAt` set) or "between pauses"
+  /// (`pausedAt` null) is ever true, never both partially.
+  pausedAt  DateTime?         @map("paused_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  game      V1Game            @relation(fields: [gameId], references: [id], onDelete: Cascade, map: "v1_game_periods_game_fk")
+
+  @@unique([gameId, number], map: "v1_game_periods_game_id_number_key")
+  @@index([gameId, state], map: "v1_game_periods_game_id_state_idx")
+  @@map("v1_game_periods")
+}
+
+model V1GameLineup {
+  id           String            @id @default(uuid())
+  gameId       String            @map("game_id")
+  sideId       String            @map("side_id")
+  revision     Int
+  state        V1GameLineupState @default(DRAFT)
+  version      Int               @default(0)
+  submittedAt  DateTime?         @map("submitted_at")
+  supersedesId String?           @map("supersedes_id")
+  /// 포메이션 프리셋 라벨(예: "4-4-2"). null이면 자유 배치. 실제 좌표는
+  /// V1GameParticipant.positionX/Y에 저장되고 이 값은 프리셋 선택 UI 복원용 힌트일 뿐이다.
+  formation    String?
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  game         V1Game            @relation(fields: [gameId], references: [id], onDelete: Cascade, map: "v1_game_lineups_game_fk")
+
+  @@unique([gameId, sideId, revision], map: "v1_game_lineups_game_id_side_id_revision_key")
+  @@index([gameId, sideId, state], map: "v1_game_lineups_game_id_side_id_state_idx")
+  @@map("v1_game_lineups")
+}
+
+model V1GameParticipant {
+  id                  String   @id @default(uuid())
+  gameId              String   @map("game_id")
+  sideId              String   @map("side_id")
+  lineupId            String   @map("lineup_id")
+  displayNameSnapshot String   @map("display_name_snapshot")
+  jerseyNumber        Int?     @map("jersey_number")
+  position            String?
+  /// 피치 위 배치 좌표, 0~100 퍼센트(자기 진영 기준: y=0 골라인, y=100 하프라인).
+  /// 둘 다 있거나 둘 다 없어야 한다(서비스 계층에서 검증) — 좌표 없이 배치만 표시하는
+  /// 화면은 없으므로 부분 좌표를 허용하면 렌더링이 조용히 깨진다.
+  positionX           Float?   @map("position_x")
+  positionY           Float?   @map("position_y")
+  /// 선발(true)/후보(false) 여부. GamesService.saveLineup()의 범용 경로(대회 경기 등)가
+  /// 쓰는 실제 컬럼 — SaveGameLineupDto.participants[].started를 그대로 저장한다.
+  /// 예전엔 이 컬럼이 없어 새로고침(재수화) 시 후보를 구분할 방법이 없어 전원 선발로
+  /// 합쳐졌다(대회 경기 라인업 화면 실사용 QA에서 재현). team-match 전용 라인업
+  /// 서비스(team-match-lineup.service.ts)는 이 컬럼과 무관하게 자체 position='BENCH'
+  /// 관례를 그대로 쓴다 — 이미 정상 동작하는 별도 경로라 여기서는 건드리지 않는다.
+  started             Boolean  @default(true) @map("started")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  game                V1Game   @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_participants_game_fk")
+
+  @@index([gameId, sideId], map: "v1_game_participants_game_id_side_id_idx")
+  @@map("v1_game_participants")
+}
+
+model V1ParticipantIdentityLinkEvent {
+  id            String               @id @default(uuid())
+  participantId String               @map("participant_id")
+  linkId        String               @map("link_id")
+  eventVersion  Int                  @map("event_version")
+  requestId     String               @map("request_id")
+  action        V1IdentityLinkAction
+  userId        String               @map("user_id")
+  effectiveAt   DateTime             @default(now()) @map("effective_at")
+  actorType     V1IdentityActorType  @map("actor_type")
+  actorUserId   String?              @map("actor_user_id")
+  systemActor   String?              @map("system_actor")
+  reason        String?
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  @@unique([participantId, eventVersion], map: "v1_identity_events_participant_version_key")
+  @@unique([requestId, action, actorUserId, systemActor], map: "v1_participant_identity_link_events_request_id_action_actor_key")
+  @@unique([linkId, action], map: "v1_identity_events_link_action_key")
+  @@index([participantId, effectiveAt], map: "v1_participant_identity_link_events_participant_id_effectiv_idx")
+  @@map("v1_participant_identity_link_events")
+}
+
+model V1ParticipantIdentityLinkCurrent {
+  participantId String   @id @map("participant_id")
+  linkId        String   @unique(map: "v1_identity_link_current_link_id_key") @map("link_id")
+  userId        String   @map("user_id")
+  version       Int
+  effectiveFrom DateTime @map("effective_from")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("v1_participant_identity_link_current")
+}
+
+model V1ParticipantConsentSnapshot {
+  id             String         @id @default(uuid())
+  participantId  String         @map("participant_id")
+  linkId         String         @map("link_id")
+  consentVersion Int            @map("consent_version")
+  state          V1ConsentState
+  effectiveAt    DateTime       @default(now()) @map("effective_at")
+  policyHash     String         @map("policy_hash")
+  actorUserId    String         @map("actor_user_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  @@unique([participantId, consentVersion], map: "v1_consent_participant_version_key")
+  @@index([participantId, effectiveAt], map: "v1_consent_participant_effective_at_idx")
+  @@map("v1_participant_consent_snapshots")
+}
+
+model V1GameEvent {
+  id                  String          @id @default(uuid())
+  gameId              String          @map("game_id")
+  sequence            Int
+  clientEventId       String          @map("client_event_id")
+  payloadHash         String          @map("payload_hash")
+  type                V1GameEventType
+  sideId              String?         @map("side_id")
+  participantId       String?         @map("participant_id")
+  assistParticipantId String?         @map("assist_participant_id")
+  period              Int
+  clockMs             Int             @map("clock_ms")
+  occurredAt          DateTime        @map("occurred_at")
+  receivedAt          DateTime        @default(now()) @map("received_at")
+  actorUserId         String          @map("actor_user_id")
+  reversesEventId     String?         @unique @map("reverses_event_id")
+  payload             Json
+  game                V1Game          @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_events_game_fk")
+
+  @@unique([gameId, sequence], map: "v1_game_events_game_sequence_key")
+  @@unique([gameId, clientEventId], map: "v1_game_events_game_client_event_key")
+  @@index([gameId, period, sequence], map: "v1_game_events_game_id_period_sequence_idx")
+  @@map("v1_game_events")
+}
+
+model V1GameResultRevision {
+  id                   String                     @id @default(uuid())
+  gameId               String                     @map("game_id")
+  revision             Int
+  state                V1GameResultRevisionState  @default(DRAFT)
+  score                Json
+  eventsHash           String                     @map("events_hash")
+  missingScorer        Boolean                    @default(false) @map("missing_scorer")
+  mvpParticipantId     String?                    @map("mvp_participant_id")
+  reason               String?
+  createdByActorType   V1IdentityActorType        @map("created_by_actor_type")
+  createdByUserId      String?                    @map("created_by_user_id")
+  createdBySystemActor String?                    @map("created_by_system_actor")
+  supersedesId         String?                    @map("supersedes_id")
+  submittedAt          DateTime?                  @map("submitted_at")
+  officialAt           DateTime?                  @map("official_at")
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt            DateTime                   @updatedAt @map("updated_at")
+  game                 V1Game                     @relation("V1GameResultRevisions", fields: [gameId], references: [id], onDelete: Restrict, map: "v1_result_revisions_game_fk")
+  supersedes           V1GameResultRevision?      @relation("V1RevisionSupersedes", fields: [gameId, supersedesId], references: [gameId, id], onDelete: Restrict, map: "v1_result_revisions_supersedes_fk")
+  supersededBy         V1GameResultRevision[]     @relation("V1RevisionSupersedes")
+  currentGames         V1Game[]                   @relation("V1CurrentOfficialRevision")
+  resultParticipants   V1GameResultParticipant[]
+  officialFact         V1GameOfficialFact?
+  teamRecordFacts      V1TeamRecordFact[]
+  resultEscalations    V1ResultEscalation[]
+  officialResultCache  V1GameOfficialResultCache?
+
+  @@unique([gameId, revision], map: "v1_game_result_revisions_game_revision_key")
+  @@unique([gameId, id], map: "v1_game_result_revisions_game_id_id_key")
+  @@index([gameId, state], map: "v1_game_result_revisions_game_id_state_idx")
+  @@map("v1_game_result_revisions")
+}
+
+model V1GameOfficialFact {
+  id             String               @id @default(uuid())
+  revisionId     String               @unique(map: "v1_game_official_facts_revision_id_key") @map("revision_id")
+  gameId         String               @map("game_id")
+  revision       Int
+  sourceType     V1GameSourceType     @map("source_type")
+  tournamentId   String?              @map("tournament_id")
+  homeTeamId     String?              @map("home_team_id")
+  awayTeamId     String?              @map("away_team_id")
+  homeScore      Int                  @map("home_score")
+  awayScore      Int                  @map("away_score")
+  score          Json
+  eventsHash     String               @map("events_hash")
+  officialAt     DateTime             @map("official_at")
+  recordedAt     DateTime             @default(now()) @map("recorded_at")
+  resultRevision V1GameResultRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict, map: "v1_game_official_facts_revision_fk")
+
+  @@unique([gameId, revision], map: "v1_game_official_facts_game_revision_key")
+  @@index([officialAt], map: "v1_game_official_facts_official_at_idx")
+  @@index([tournamentId, officialAt], map: "v1_game_official_facts_tournament_official_at_idx")
+  @@index([homeTeamId, officialAt], map: "v1_game_official_facts_home_team_official_at_idx")
+  @@index([awayTeamId, officialAt], map: "v1_game_official_facts_away_team_official_at_idx")
+  @@map("v1_game_official_facts")
+}
+
+model V1GameOfficialResultCache {
+  id               String               @id @default(uuid())
+  revisionId       String               @unique(map: "v1_game_official_result_cache_revision_key") @map("revision_id")
+  gameId           String               @map("game_id")
+  tournamentId     String?              @map("tournament_id")
+  revision         Int
+  visibilityMode   V1VisibilityMode     @map("visibility_mode")
+  isCurrent        Boolean              @default(false) @map("is_current")
+  sourceHash       String               @map("source_hash")
+  canonicalPayload Json                 @map("canonical_payload")
+  payloadHash      String               @map("payload_hash")
+  cachedAt         DateTime             @default(now()) @map("cached_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  resultRevision   V1GameResultRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict, map: "v1_game_official_result_cache_revision_fk")
+  game             V1Game               @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_official_result_cache_game_fk")
+  tournament       V1Tournament?        @relation(fields: [tournamentId], references: [id], onDelete: Restrict, map: "v1_game_official_result_cache_tournament_fk")
+
+  @@unique([gameId, revision], map: "v1_game_official_result_cache_game_revision_key")
+  @@index([gameId, isCurrent], map: "v1_game_official_result_cache_current_idx")
+  @@index([tournamentId, isCurrent], map: "v1_game_official_result_cache_tournament_current_idx")
+  @@map("v1_game_official_result_cache")
+}
+
+model V1TeamRecordFact {
+  id             String               @id @default(uuid())
+  revisionId     String               @map("revision_id")
+  gameId         String               @map("game_id")
+  teamId         String               @map("team_id")
+  opponentTeamId String?              @map("opponent_team_id")
+  tournamentId   String?              @map("tournament_id")
+  result         String
+  goalsFor       Int                  @map("goals_for")
+  goalsAgainst   Int                  @map("goals_against")
+  sourceHash     String               @map("source_hash")
+  officialAt     DateTime             @map("official_at")
+  recordedAt     DateTime             @default(now()) @map("recorded_at")
+  resultRevision V1GameResultRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict, map: "v1_team_record_facts_revision_fk")
+
+  @@unique([revisionId, teamId], map: "v1_team_record_facts_revision_team_key")
+  @@index([teamId, officialAt], map: "v1_team_record_facts_team_official_at_idx")
+  @@index([teamId, tournamentId, officialAt], map: "v1_team_record_facts_team_tournament_idx")
+  @@map("v1_team_record_facts")
+}
+
+model V1GameResultParticipant {
+  id               String               @id @default(uuid())
+  resultRevisionId String               @map("result_revision_id")
+  participantId    String               @map("participant_id")
+  sideId           String               @map("side_id")
+  started          Boolean              @default(false)
+  minutesPlayed    Int?                 @map("minutes_played")
+  goals            Int                  @default(0)
+  assists          Int                  @default(0)
+  fouls            Int                  @default(0)
+  cards            Json
+  goalkeeper       Boolean              @default(false)
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  resultRevision   V1GameResultRevision @relation(fields: [resultRevisionId], references: [id], onDelete: Restrict, map: "v1_result_participants_revision_fk")
+
+  @@unique([resultRevisionId, participantId], map: "v1_game_result_participants_revision_participant_key")
+  @@map("v1_game_result_participants")
+}
+
+model V1GameResultDecision {
+  id          String              @id @default(uuid())
+  revisionId  String              @map("revision_id")
+  decision    String
+  reason      String?
+  actorType   V1IdentityActorType @map("actor_type")
+  actorUserId String              @map("actor_user_id")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  @@unique([revisionId, actorUserId, decision], map: "v1_game_result_decisions_revision_actor_decision_key")
+  @@map("v1_game_result_decisions")
+}
+
+model V1GameVisibilityPolicy {
+  gameId    String           @id @map("game_id")
+  mode      V1VisibilityMode @default(LIVE)
+  lineupAt  DateTime?        @map("lineup_at")
+  version   Int              @default(0)
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  game      V1Game           @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_visibility_game_fk")
+
+  @@map("v1_game_visibility_policies")
+}
+
+model V1OutboxEvent {
+  id              String         @id @default(uuid())
+  businessKey     String         @unique @map("business_key")
+  aggregateType   String         @map("aggregate_type")
+  aggregateId     String         @map("aggregate_id")
+  revisionId      String?        @map("revision_id")
+  type            String
+  payload         Json
+  availableAt     DateTime       @default(now()) @map("available_at")
+  leaseOwner      String?        @map("lease_owner")
+  leaseUntil      DateTime?      @map("lease_until")
+  attempts        Int            @default(0)
+  retryGeneration Int            @default(0) @map("retry_generation")
+  version         Int            @default(0)
+  status          V1OutboxStatus @default(PENDING)
+  lastError       String?        @map("last_error")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@index([status, availableAt])
+  @@index([leaseUntil])
+  @@map("v1_outbox_events")
+}
+
+model V1IdempotencyRecord {
+  id             String   @id @default(uuid())
+  actorUserId    String   @map("actor_user_id")
+  action         String
+  resourceType   String   @map("resource_type")
+  resourceId     String   @map("resource_id")
+  idempotencyKey String   @map("idempotency_key")
+  payloadHash    String   @map("payload_hash")
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([actorUserId, action, resourceType, resourceId, idempotencyKey], map: "v1_idempotency_records_scope_key")
+  @@index([expiresAt], map: "v1_idempotency_records_expires_at_idx")
+  @@map("v1_idempotency_records")
+}
+
+model V1ProjectionWatermark {
+  id          String             @id @default(uuid())
+  projection  String
+  entityType  String             @map("entity_type")
+  entityId    String             @map("entity_id")
+  revisionId  String             @map("revision_id")
+  sourceHash  String             @map("source_hash")
+  projectedAt DateTime           @default(now()) @map("projected_at")
+  status      V1ProjectionStatus
+
+  @@unique([projection, entityType, entityId], map: "v1_projection_watermarks_projection_entity_key")
+  @@map("v1_projection_watermarks")
+}
+
+model V1TeamSchedule {
+  id               String                      @id @default(uuid())
+  teamId           String                      @map("team_id")
+  teamMatchId      String?                     @map("team_match_id")
+  title            String
+  type             V1ScheduleType
+  startAt          DateTime                    @map("start_at")
+  endAt            DateTime                    @map("end_at")
+  timezone         String
+  capacity         Int?
+  rsvpDeadlineAt   DateTime?                   @map("rsvp_deadline_at")
+  visibility       V1ScheduleVisibility        @default(TEAM)
+  state            V1ScheduleState             @default(SCHEDULED)
+  version          Int                         @default(0)
+  cancelReason     String?                     @map("cancel_reason")
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+  attendance       V1ScheduleAttendance[]
+  guestRecruitment V1ScheduleGuestRecruitment?
+
+  @@unique([teamId, teamMatchId], map: "v1_team_schedules_team_match_unique")
+  @@index([teamId, startAt], map: "v1_team_schedules_team_start_idx")
+  @@index([teamMatchId], map: "v1_team_schedules_team_match_idx")
+  @@map("v1_team_schedules")
+}
+
+model V1ScheduleAttendance {
+  id               String             @id @default(uuid())
+  scheduleId       String             @map("schedule_id")
+  userId           String             @map("user_id")
+  status           V1AttendanceStatus
+  waitlistPosition Int?               @map("waitlist_position")
+  version          Int                @default(0)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  schedule         V1TeamSchedule     @relation(fields: [scheduleId], references: [id], onDelete: Cascade, map: "v1_schedule_attendance_schedule_fk")
+
+  @@unique([scheduleId, userId], map: "v1_schedule_attendance_schedule_user_key")
+  @@map("v1_schedule_attendance")
+}
+
+model V1ScheduleGuestRecruitment {
+  id           String                       @id @default(uuid())
+  scheduleId   String                       @unique @map("schedule_id")
+  slots        Int
+  closesAt     DateTime                     @map("closes_at")
+  note         String?
+  visibility   V1GuestRecruitmentVisibility @default(MEMBERS)
+  state        V1GuestRecruitmentState      @default(OPEN)
+  version      Int                          @default(0)
+  createdAt    DateTime                     @default(now()) @map("created_at")
+  updatedAt    DateTime                     @updatedAt @map("updated_at")
+  schedule     V1TeamSchedule               @relation(fields: [scheduleId], references: [id], onDelete: Cascade, map: "v1_guest_recruitment_schedule_fk")
+  applications V1ScheduleGuestApplication[]
+
+  @@map("v1_schedule_guest_recruitments")
+}
+
+model V1ScheduleGuestApplication {
+  id                  String                     @id @default(uuid())
+  recruitmentId       String                     @map("recruitment_id")
+  userId              String                     @map("user_id")
+  displayNameSnapshot String                     @map("display_name_snapshot")
+  note                String?
+  state               V1GuestApplicationState    @default(PENDING)
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+  recruitment         V1ScheduleGuestRecruitment @relation(fields: [recruitmentId], references: [id], onDelete: Cascade, map: "v1_guest_application_recruitment_fk")
+
+  @@unique([recruitmentId, userId], map: "v1_schedule_guest_applications_recruitment_user_key")
+  @@map("v1_schedule_guest_applications")
+}
+
+model V1TournamentField {
+  id               String                        @id @default(uuid())
+  tournamentId     String                        @map("tournament_id")
+  scopeKey         String                        @map("scope_key")
+  name             String
+  sortOrder        Int                           @default(0) @map("sort_order")
+  active           Boolean                       @default(true)
+  version          Int                           @default(0)
+  createdAt        DateTime                      @default(now()) @map("created_at")
+  updatedAt        DateTime                      @updatedAt @map("updated_at")
+  tournament       V1Tournament                  @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "v1_tournament_fields_tournament_fk")
+  staffAssignments V1TournamentStaffAssignment[]
+  fixtures         V1TournamentFixture[]
+  operationAudits  V1OperationAudit[]
+
+  @@unique([tournamentId, scopeKey], map: "v1_tournament_fields_tournament_scope_key")
+  @@unique([tournamentId, id], map: "v1_tournament_fields_tournament_id_id_key")
+  @@map("v1_tournament_fields")
+}
+
+model V1TournamentStaffAssignment {
+  id              String                          @id @default(uuid())
+  tournamentId    String                          @map("tournament_id")
+  userId          String                          @map("user_id")
+  role            V1TournamentStaffRole
+  fieldId         String?                         @map("field_id")
+  version         Int                             @default(0)
+  expiresAt       DateTime?                       @map("expires_at")
+  revokedAt       DateTime?                       @map("revoked_at")
+  grantedByUserId String                          @map("granted_by_user_id")
+  createdAt       DateTime                        @default(now()) @map("created_at")
+  updatedAt       DateTime                        @updatedAt @map("updated_at")
+  tournament      V1Tournament                    @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "v1_tournament_staff_assignments_tournament_fk")
+  user            V1User                          @relation("V1TournamentStaffUser", fields: [userId], references: [id], onDelete: Restrict, map: "v1_tournament_staff_assignments_user_fk")
+  grantedBy       V1User                          @relation("V1TournamentStaffGrantor", fields: [grantedByUserId], references: [id], onDelete: Restrict, map: "v1_tournament_staff_assignments_grantor_fk")
+  field           V1TournamentField?              @relation(fields: [tournamentId, fieldId], references: [tournamentId, id], onDelete: Restrict, map: "v1_staff_field_fk")
+  fixtureScopes   V1TournamentStaffFixtureScope[]
+
+  @@index([userId, revokedAt, expiresAt], map: "v1_tournament_staff_assignments_user_idx")
+  @@index([tournamentId, role], map: "v1_tournament_staff_assignments_tournament_role_idx")
+  @@map("v1_tournament_staff_assignments")
+}
+
+model V1TournamentStaffFixtureScope {
+  id           String                      @id @default(uuid())
+  assignmentId String                      @map("assignment_id")
+  fixtureId    String                      @map("fixture_id")
+  createdAt    DateTime                    @default(now()) @map("created_at")
+  assignment   V1TournamentStaffAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade, map: "v1_staff_scope_assignment_fk")
+  fixture      V1TournamentFixture         @relation(fields: [fixtureId], references: [id], onDelete: Restrict, map: "v1_staff_scope_fixture_fk")
+
+  @@unique([assignmentId, fixtureId], map: "v1_tournament_staff_fixture_scopes_assignment_fixture_key")
+  @@map("v1_tournament_staff_fixture_scopes")
+}
+
+model V1CompetitionConfigVersion {
+  id              String                    @id @default(uuid())
+  sportCode       String                    @map("sport_code")
+  name            String
+  version         Int
+  status          V1CompetitionConfigStatus @default(ACTIVE)
+  periods         Json
+  events          Json
+  lineup          Json
+  result          Json
+  tieBreak        Json                      @map("tie_break")
+  visibility      Json
+  contentHash     String                    @unique @map("content_hash")
+  createdByUserId String?                   @map("created_by_user_id")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  updatedAt       DateTime                  @updatedAt @map("updated_at")
+  games           V1Game[]                  @relation("V1GameCompetitionConfig")
+  teamMatches     V1TeamMatch[]             @relation("V1TeamMatchCompetitionConfig")
+  tournaments     V1Tournament[]            @relation("V1TournamentCompetitionConfig")
+  fixtures        V1TournamentFixture[]     @relation("V1FixtureCompetitionConfig")
+
+  @@unique([sportCode, name, version])
+  @@map("v1_competition_config_versions")
+}
+
+model V1ResultEscalation {
+  id               String               @id @default(uuid())
+  resultRevisionId String               @map("result_revision_id")
+  kind             V1EscalationKind
+  dueAt            DateTime             @map("due_at")
+  status           V1EscalationStatus   @default(PENDING)
+  ackByUserId      String?              @map("ack_by_user_id")
+  resolvedByUserId String?              @map("resolved_by_user_id")
+  reason           String?
+  version          Int                  @default(0)
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  resultRevision   V1GameResultRevision @relation(fields: [resultRevisionId], references: [id], onDelete: Restrict, map: "v1_result_escalations_revision_fk")
+  acknowledgedBy   V1User?              @relation("V1EscalationAcknowledgedBy", fields: [ackByUserId], references: [id], onDelete: Restrict, map: "v1_result_escalations_ack_user_fk")
+  resolvedBy       V1User?              @relation("V1EscalationResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: Restrict, map: "v1_result_escalations_resolved_user_fk")
+
+  @@unique([resultRevisionId, kind], map: "v1_result_escalations_revision_kind_key")
+  @@index([status, dueAt], map: "v1_result_escalations_status_due_idx")
+  @@map("v1_result_escalations")
+}
+
+model V1GameOperationFlag {
+  id              String                 @id @default(uuid())
+  key             V1GameOperationFlagKey @unique
+  value           String
+  version         Int                    @default(0)
+  ownerActor      String                 @map("owner_actor")
+  updatedByUserId String?                @map("updated_by_user_id")
+  rollbackValue   String?                @map("rollback_value")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+
+  @@map("v1_game_operation_flags")
+}
+
+model V1GameOperationGateSetting {
+  id                    String   @id @default("singleton")
+  simplifiedGateEnabled Boolean  @default(false) @map("simplified_gate_enabled")
+  version               Int      @default(0)
+  updatedByUserId       String?  @map("updated_by_user_id")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@map("v1_game_operation_gate_settings")
+}
+
+model V1GameCutoverEpoch {
+  id                      String          @id @default("game-cutover")
+  version                 Int             @default(0)
+  writeMode               V1GameWriteMode @default(legacy) @map("write_mode")
+  firstNewWriteAt         DateTime?       @map("first_new_write_at")
+  firstNewWriteResourceId String?         @map("first_new_write_resource_id")
+  updatedAt               DateTime        @updatedAt @map("updated_at")
+
+  @@map("v1_game_cutover_epochs")
+}
+
+model V1OperationAudit {
+  id             String               @id @default(uuid())
+  actorType      V1OperationActorType @map("actor_type")
+  actorUserId    String?              @map("actor_user_id")
+  systemActor    String?              @map("system_actor")
+  action         String
+  resourceType   String               @map("resource_type")
+  resourceId     String               @map("resource_id")
+  requestId      String               @map("request_id")
+  maskedSourceIp String?              @map("source_ip")
+  before         Json?
+  after          Json?
+  reason         String?
+  tournamentId   String?              @map("tournament_id")
+  fixtureId      String?              @map("fixture_id")
+  fieldId        String?              @map("field_id")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  tournament     V1Tournament?        @relation(fields: [tournamentId], references: [id], onDelete: Restrict, map: "v1_operation_audits_tournament_fk")
+  fixture        V1TournamentFixture? @relation(fields: [tournamentId, fixtureId], references: [tournamentId, id], onDelete: Restrict, map: "v1_operation_audits_fixture_fk")
+  field          V1TournamentField?   @relation(fields: [tournamentId, fieldId], references: [tournamentId, id], onDelete: Restrict, map: "v1_operation_audits_field_fk")
+
+  @@index([resourceType, resourceId, createdAt], map: "v1_operation_audits_resource_idx")
+  @@index([actorUserId, createdAt], map: "v1_operation_audits_actor_idx")
+  @@index([requestId], map: "v1_operation_audits_request_idx")
+  @@index([tournamentId, createdAt], map: "v1_operation_audits_tournament_idx")
+  @@index([fixtureId, createdAt], map: "v1_operation_audits_fixture_idx")
+  @@index([fieldId, createdAt], map: "v1_operation_audits_field_idx")
+  @@map("v1_operation_audits")
 }

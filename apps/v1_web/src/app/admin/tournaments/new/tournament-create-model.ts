@@ -31,6 +31,13 @@ export type TournamentCreateState = {
   teamCount: string;
   minPlayers: string;
   maxPlayers: string;
+  /** "출전 인원"(라인업 상한) — 위 minPlayers/maxPlayers(등록 로스터 크기)와 다른 값.
+   * 빈 문자열이면 아직 안 골랐거나 종목의 canonical 기본값을 그대로 쓴다는 뜻이다. */
+  lineupMaxPlayers: string;
+  /** "교체 방식" — 빈 문자열이면 아직 안 골랐거나 종목의 canonical 기본값을 그대로 쓴다. */
+  substitutionMode: '' | 'limited' | 'rolling';
+  /** "교체 횟수" — substitutionMode가 'limited'일 때만 의미가 있다. */
+  maxSubstitutions: string;
   genderMinMale: string;
   genderMaxMale: string;
   genderMinFemale: string;
@@ -78,6 +85,9 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   teamCount: '8',
   minPlayers: '6',
   maxPlayers: '10',
+  lineupMaxPlayers: '',
+  substitutionMode: '',
+  maxSubstitutions: '',
   genderMinMale: '',
   genderMaxMale: '',
   genderMinFemale: '',
@@ -128,6 +138,12 @@ export function tournamentCreateReducer(
     case 'set-step':
       return { ...state, step: Math.max(0, Math.min(TOURNAMENT_CREATE_STEPS.length - 1, action.step)) };
     case 'set-field':
+      // 종목이 바뀌면 이전 종목 기준으로 고른 출전 인원은 더 이상 유효한 선택지가
+      // 아닐 수 있다(예: 풋살 6명 → 축구로 바꾸면 6명은 선택 불가) — 함께 초기화해
+      // 새 종목의 선택지 목록이 로드되면 컴포넌트가 canonical 기본값으로 다시 채운다.
+      if (action.field === 'sportId' && action.value !== state.sportId) {
+        return { ...state, sportId: action.value as string, lineupMaxPlayers: '' };
+      }
       return { ...state, [action.field]: action.value };
     case 'set-scheduled-at': {
       const registrationDeadlineAt = state.registrationDeadlineDirty
@@ -206,6 +222,20 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
       errors.maxPlayers = '최대 선수 수는 1~50명이어야 해요.';
     } else if (minPlayers !== null && minPlayers > maxPlayers) {
       errors.maxPlayers = '최대 선수 수는 최소 선수 수보다 작을 수 없어요.';
+    }
+    if (state.substitutionMode === 'limited') {
+      // 비워두면 여기서 막는다. 예전엔 통과시켰는데, 그러면 canonical 이 무제한인
+      // 종목(풋살)에서 서버가 422(SUBSTITUTION_LIMIT_REQUIRED)로 거절해 관리자는
+      // 마지막 단계에서야 실패를 본다 — "안 입력되면 다음으로 못 넘어가게" 원칙대로
+      // 입력 단계에서 잡는다.
+      if (state.maxSubstitutions.trim() === '') {
+        errors.maxSubstitutions = '교체 횟수를 제한하려면 허용 횟수를 입력해 주세요.';
+      } else {
+        const maxSubstitutions = numeric(state.maxSubstitutions);
+        if (maxSubstitutions === null || !Number.isInteger(maxSubstitutions) || maxSubstitutions < 0 || maxSubstitutions > 50) {
+          errors.maxSubstitutions = '교체 횟수는 0~50회 사이의 정수여야 해요.';
+        }
+      }
     }
     if (
       entryFee === null ||
@@ -300,6 +330,15 @@ export function buildTournamentCreatePayload(
     teamCount: Number(state.teamCount),
     minPlayers: Number(state.minPlayers),
     maxPlayers: Number(state.maxPlayers),
+    lineupMaxPlayers: state.lineupMaxPlayers ? Number(state.lineupMaxPlayers) : undefined,
+    substitutionMode: state.substitutionMode || undefined,
+    // 'rolling'을 고르면 횟수는 의미가 없다(서버가 함께 오면 400으로 거절) — 안 보낸다.
+    // trim 없이 truthy 로 보면 공백만 든 문자열('   ')이 통과해 Number('   ') === 0 으로
+    // 직렬화된다 — 관리자가 아무것도 안 썼는데 "교체 0회"가 저장되는 사고다.
+    maxSubstitutions:
+      state.substitutionMode === 'limited' && state.maxSubstitutions.trim() !== ''
+        ? Number(state.maxSubstitutions.trim())
+        : undefined,
     entryFee: Number(state.entryFee || '0'),
     bankName: state.bankName.trim() || undefined,
     bankAccount: state.bankAccount.trim() || undefined,

@@ -22,7 +22,14 @@ const PREFIX = 'roster-cleanup-e2e';
 const ownerId = `${PREFIX}-owner`;
 const memberId = `${PREFIX}-member`;
 const teamId = `${PREFIX}-team`;
-const sportId = `${PREFIX}-sport`;
+// `v1_competition_config_for_sport()` (migration 20260729000200) resolves a tournament's
+// competition config by EXACT sport code and only knows 'soccer' | 'football' | 'futsal'. A
+// prefixed code like `${PREFIX}-futsal` raises COMPETITION_CONFIG_SPORT_UNSUPPORTED as soon as
+// this suite inserts a tournament row, so it must use the real code. `V1Sport.code` is @unique
+// and seed data or another suite may already own the 'futsal' row, so the id is resolved at seed
+// time instead of being fixed up front, and cleanup only deletes a row this suite created.
+let sportId = `${PREFIX}-sport`;
+let sportOwnedByThisSuite = false;
 const regionId = `${PREFIX}-region`;
 const openTournamentId = `${PREFIX}-tournament-open`;
 const doneTournamentId = `${PREFIX}-tournament-done`;
@@ -71,14 +78,24 @@ describe('대회 로스터 정리 계약 (팀 이탈 경로)', () => {
     await prisma.v1Team.deleteMany({ where: { id: teamId } });
     await prisma.v1UserProfile.deleteMany({ where: { userId: { in: [ownerId, memberId] } } });
     await prisma.v1User.deleteMany({ where: { id: { in: [ownerId, memberId] } } });
-    await prisma.v1Sport.deleteMany({ where: { id: sportId } });
+    if (sportOwnedByThisSuite) {
+      await prisma.v1Sport.deleteMany({ where: { id: sportId } });
+    }
     await prisma.v1Region.deleteMany({ where: { id: regionId } });
   }
 
   async function seedFixtures() {
-    await prisma.v1Sport.create({
-      data: { id: sportId, code: `${PREFIX}-futsal`, name: '풋살', isActive: true },
-    });
+    const existingSport = await prisma.v1Sport.findUnique({ where: { code: 'futsal' } });
+    if (existingSport === null) {
+      const created = await prisma.v1Sport.create({
+        data: { id: sportId, code: 'futsal', name: '풋살', isActive: true },
+      });
+      sportId = created.id;
+      sportOwnedByThisSuite = true;
+    } else {
+      sportId = existingSport.id;
+      sportOwnedByThisSuite = false;
+    }
     await prisma.v1Region.create({
       data: { id: regionId, code: `${PREFIX}-region-code`, name: '테스트지역', level: 1 },
     });

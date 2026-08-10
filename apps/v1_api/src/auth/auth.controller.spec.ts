@@ -70,6 +70,40 @@ describe('AuthController', () => {
     expect(authService.login).toHaveBeenCalledWith(dto);
   });
 
+  it('mints a signed session for an already-guard-authenticated caller (dev-session)', async () => {
+    const authService = {
+      me: jest.fn(),
+      kakaoLogin: jest.fn(),
+      completeSocialTerms: jest.fn(),
+      completeSocialProfile: jest.fn(),
+      login: jest.fn(),
+      register: jest.fn(),
+      devSession: jest.fn().mockResolvedValue({
+        session: { userId: 'user-1', userEmail: 'host@teameet.v1' },
+      }),
+    };
+    const moduleRef = await Test.createTestingModule({
+      controllers: [AuthController],
+      providers: [
+        { provide: AuthService, useValue: authService },
+        { provide: PrismaService, useValue: {} },
+      ],
+    }).compile();
+
+    const controller = moduleRef.get(AuthController);
+    const user = {
+      id: 'user-1',
+      email: 'host@teameet.v1',
+      accountStatus: 'active' as const,
+      onboardingStatus: 'completed' as const,
+    };
+
+    await expect(controller.devSession(user)).resolves.toEqual({
+      session: { userId: 'user-1', userEmail: 'host@teameet.v1' },
+    });
+    expect(authService.devSession).toHaveBeenCalledWith('user-1', 'host@teameet.v1');
+  });
+
   it('registers a v1 email user session', async () => {
     const authService = {
       me: jest.fn(),

@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
   useV1AdminTournaments,
   useV1CreateTournament,
+  useV1LineupSizeOptions,
   useV1MasterSports,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
@@ -30,6 +31,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
   useV1AdminTournaments: vi.fn(),
   useV1CreateTournament: vi.fn(),
+  useV1LineupSizeOptions: vi.fn(),
   useV1MasterSports: vi.fn(),
   useV1UploadImages: vi.fn(),
 }));
@@ -37,6 +39,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1AdminTournamentsMock = vi.mocked(useV1AdminTournaments, { partial: true });
 const useV1CreateTournamentMock = vi.mocked(useV1CreateTournament, { partial: true });
+const useV1LineupSizeOptionsMock = vi.mocked(useV1LineupSizeOptions, { partial: true });
 const useV1MasterSportsMock = vi.mocked(useV1MasterSports, { partial: true });
 const useV1UploadImagesMock = vi.mocked(useV1UploadImages, { partial: true });
 const createMutate = vi.fn();
@@ -62,6 +65,13 @@ function previousTournament(): V1Tournament {
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
+    competitionConfigVersionId: null,
+    lineupMaxPlayers: null,
+    lineupMinPlayers: null,
+    lineupSizeOptions: [],
+    substitutionMode: null,
+    maxSubstitutions: null,
+    substitutionModeOptions: [],
     genderCategory: 'mixed',
     genderMinMale: null,
     genderMaxMale: null,
@@ -152,6 +162,18 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       mutate: createMutate,
       isPending: false,
     });
+    useV1LineupSizeOptionsMock.mockReturnValue({
+      data: {
+        sportId: 'sport-futsal',
+        supported: true,
+        options: [5, 6],
+        defaultMaxPlayers: 6,
+        substitutionModes: ['limited', 'rolling'],
+        defaultSubstitutionMode: 'rolling',
+        defaultMaxSubstitutions: null,
+      },
+      isPending: false,
+    });
     uploadMutateAsync.mockResolvedValue({ urls: ['/uploads/cover-test.webp'] });
     useV1UploadImagesMock.mockReturnValue({
       mutateAsync: uploadMutateAsync,
@@ -168,6 +190,59 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(screen.getByLabelText(/종목/)).toHaveValue('sport-futsal');
     expect(screen.getByLabelText(/대회명/)).toHaveValue('2026 서울 풋살 오픈');
     expect(screen.getByLabelText('혼성')).toBeChecked();
+  });
+
+  // "출전 인원"(라인업 상한) 선택지 — 서버가 종목의 canonical 포메이션에서 파생해
+  // 내려주는 값이라 프론트는 후보를 하드코딩하지 않는다. 아래 세 케이스는 각각 다른
+  // 실패 모드를 잡는다: 정상 렌더/자동 기본값, 미지원 종목, 그리고 조회 실패.
+  it('출전 인원: 서버가 준 후보를 칩으로 렌더하고 canonical 기본값을 자동 선택한다', async () => {
+    renderPage();
+    goToParticipationStep();
+
+    const group = await screen.findByRole('group', { name: '출전 인원 선택' });
+    const chips = within(group).getAllByRole('button');
+    expect(chips.map((c) => c.textContent)).toEqual(['5명', '6명']);
+    // defaultMaxPlayers=6 이 자동 선택돼야 한다(관리자가 아무것도 안 골라도 pin 가능).
+    expect(within(group).getByRole('button', { name: '6명' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(group).getByRole('button', { name: '5명' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('출전 인원: 카탈로그가 없는 종목이면 선택지를 지어내지 않고 안내만 보여준다', () => {
+    useV1LineupSizeOptionsMock.mockReturnValue({
+      data: {
+        sportId: 'sport-futsal',
+        supported: false,
+        options: [],
+        defaultMaxPlayers: null,
+        substitutionModes: [],
+        defaultSubstitutionMode: null,
+        defaultMaxSubstitutions: null,
+      },
+      isPending: false,
+    });
+    renderPage();
+    goToParticipationStep();
+
+    expect(screen.queryByRole('group', { name: '출전 인원 선택' })).toBeNull();
+    expect(screen.getByText(/이 종목은 아직 출전 인원을 선택할 수 없어요/)).toBeInTheDocument();
+  });
+
+  // Copilot 리뷰(2라운드, suppressed) 지적: 조회가 "실패"했을 때도 data 가 undefined 라
+  // `!data?.supported` 한 줄로 묶으면 미지원 종목과 똑같은 문구가 떠서 진짜 오류가 숨는다.
+  // 이 테스트가 깨지면 그 잘못된 안내가 되돌아온 것이다.
+  it('출전 인원: 선택지 조회가 실패하면 "미지원 종목"이 아니라 오류 안내를 보여준다', () => {
+    useV1LineupSizeOptionsMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+    });
+    renderPage();
+    goToParticipationStep();
+
+    // 출전 인원 카드와 교체 방식 카드 둘 다 같은 조회 실패를 각자 안내한다(문구 두 개).
+    expect(screen.getAllByText(/불러오지 못했어요/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/이 종목은 아직 출전 인원을 선택할 수 없어요/)).toBeNull();
+    expect(screen.queryByRole('group', { name: '출전 인원 선택' })).toBeNull();
   });
 
   it('T2 proposes D-3 registration and D-7 roster deadlines without overwriting manual edits', () => {
@@ -291,6 +366,30 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       promoHomeEnabled: true,
       promoHomeTitle: '이번 주 추천 대회',
     });
+  });
+
+  it('T6b serializes "제한" substitution mode with its count, but omits the count entirely for "무제한"', () => {
+    const limited = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-football',
+      title: 'x',
+      substitutionMode: 'limited',
+      maxSubstitutions: '5',
+    });
+    expect(limited.substitutionMode).toBe('limited');
+    expect(limited.maxSubstitutions).toBe(5);
+
+    // "무제한"을 고르면 남아 있는 maxSubstitutions 입력값(예: 종목 전환 전 입력)이 있어도
+    // payload에 실리면 안 된다 — 서버가 rolling+개수 조합을 400으로 거절한다.
+    const rolling = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-futsal',
+      title: 'x',
+      substitutionMode: 'rolling',
+      maxSubstitutions: '5',
+    });
+    expect(rolling.substitutionMode).toBe('rolling');
+    expect(rolling.maxSubstitutions).toBeUndefined();
   });
 
   it('blocks moving forward and shows the current step validation error', async () => {

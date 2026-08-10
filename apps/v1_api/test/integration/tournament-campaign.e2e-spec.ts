@@ -55,7 +55,7 @@ describe('Tournament campaign integration contract', () => {
         { id: 'integration-admin-support', userId: supportUserId, adminRole: 'support' },
       ],
     });
-    await prisma.v1Sport.create({ data: { id: sportId, code: 'integration-futsal', name: '풋살' } });
+    await prisma.v1Sport.create({ data: { id: sportId, code: 'futsal', name: '풋살' } });
     await prisma.v1Tournament.createMany({
       data: [
         { id: tournamentId, sportId, title: '통합 테스트 풋살 컵', status: 'open' },

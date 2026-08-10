@@ -237,52 +237,55 @@ describe('AdminTermsService', () => {
   });
 
   it('publishes a future-effective version without archiving the currently effective version', async () => {
-    // changeStatus 는 실제 시각(new Date())으로 예약 발행 여부를 판정하므로
-    // 고정 날짜를 쓰면 그 시각이 지나는 순간 테스트가 영구히 깨진다.
-    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const draft = {
-      ...document,
-      id: 'document-2',
-      version: 'v1.2',
-      status: 'draft',
-      effectiveAt: future,
-      publishedAt: null,
-      _count: undefined,
-    };
-    prisma.v1ManagedTermsDocument.findFirst.mockResolvedValue(draft);
-    prisma.v1ManagedTermsDocument.findMany.mockResolvedValue([]);
-    prisma.v1ManagedTermsDocument.updateMany.mockResolvedValue({ count: 0 });
-    prisma.v1ManagedTermsDocument.update.mockResolvedValue({
-      ...draft,
-      status: 'published',
-      publishedAt: now,
-    });
-    prisma.v1ManagedTermsPolicy.findUniqueOrThrow.mockResolvedValue({
-      ...policy,
-      documents: [
-        document,
-        { ...draft, status: 'published', publishedAt: now, _count: { consentEvents: 0 } },
-      ],
-    });
-
-    const result = await service.changeStatus(user, 'policy-1', 'document-2', {
-      status: 'published',
-      reason: '예약 발행 검증',
-    });
-
-    expect(prisma.v1ManagedTermsDocument.findMany).toHaveBeenCalledWith({
-      where: {
-        policyId: 'policy-1',
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      const future = new Date(now.getTime() + 60_000);
+      const draft = {
+        ...document,
+        id: 'document-2',
+        version: 'v1.2',
+        status: 'draft',
+        effectiveAt: future,
+        publishedAt: null,
+        _count: undefined,
+      };
+      prisma.v1ManagedTermsDocument.findFirst.mockResolvedValue(draft);
+      prisma.v1ManagedTermsDocument.findMany.mockResolvedValue([]);
+      prisma.v1ManagedTermsDocument.updateMany.mockResolvedValue({ count: 0 });
+      prisma.v1ManagedTermsDocument.update.mockResolvedValue({
+        ...draft,
         status: 'published',
-        id: { not: 'document-2' },
-        effectiveAt: { gt: expect.any(Date) },
-      },
-      select: { id: true },
-    });
-    expect(prisma.v1ManagedTermsDocument.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: [] } },
-      data: { status: 'archived', archivedAt: expect.any(Date) },
-    });
-    expect(result.currentDocumentId).toBe('document-1');
+        publishedAt: now,
+      });
+      prisma.v1ManagedTermsPolicy.findUniqueOrThrow.mockResolvedValue({
+        ...policy,
+        documents: [
+          document,
+          { ...draft, status: 'published', publishedAt: now, _count: { consentEvents: 0 } },
+        ],
+      });
+
+      const result = await service.changeStatus(user, 'policy-1', 'document-2', {
+        status: 'published',
+        reason: '예약 발행 검증',
+      });
+
+      expect(prisma.v1ManagedTermsDocument.findMany).toHaveBeenCalledWith({
+        where: {
+          policyId: 'policy-1',
+          status: 'published',
+          id: { not: 'document-2' },
+          effectiveAt: { gt: now },
+        },
+        select: { id: true },
+      });
+      expect(prisma.v1ManagedTermsDocument.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [] } },
+        data: { status: 'archived', archivedAt: expect.any(Date) },
+      });
+      expect(result.currentDocumentId).toBe('document-1');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

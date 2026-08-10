@@ -378,9 +378,9 @@ export function ProfileEditPageClient() {
   const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
   /**
    * 미인증 계정이 이 화면에서 authed 모드로 인증을 끝낸 번호.
-   * 미인증 상태에서는 PATCH /me/profile 자체가 V1AuthGuard 의 전역 쓰기 게이트에 막히므로
-   * (403 PHONE_VERIFICATION_REQUIRED), proofToken 만 받아 두는 public 흐름으로는 저장이 끝나지 않는다.
-   * authed 흐름은 서버가 phone·phoneVerifiedAt 을 직접 갱신하므로 그 뒤 저장이 통과한다.
+   * public 흐름은 proofToken 만 발급하고 계정 상태는 건드리지 않아 가입 도중에만 쓸 수 있다.
+   * 이미 로그인한 계정은 authed 흐름이 서버에서 phone·phoneVerifiedAt 을 직접 갱신하므로,
+   * 저장 시 증명 토큰을 다시 실어 보낼 필요가 없다.
    */
   const [inlineVerifiedPhone, setInlineVerifiedPhone] = useState<string | null>(null);
 
@@ -404,7 +404,7 @@ export function ProfileEditPageClient() {
 
   if (profile.isPending) {
     return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -412,7 +412,7 @@ export function ProfileEditPageClient() {
 
   if (profile.isError || !profile.data) {
     return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
         <div className="tm-my-shell">
           <ErrorState
             message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
@@ -575,12 +575,9 @@ export function ProfileEditPageClient() {
       return;
     }
 
-    // 미인증 계정은 저장 요청 자체가 서버 게이트(PHONE_VERIFICATION_REQUIRED)에 막힌다.
-    // 이 화면의 인증 카드로 먼저 끝내게 안내한다 — 저장을 눌러 403 토스트를 보게 두지 않는다.
-    if (accountPhoneUnverified && !phoneVerifiedInline) {
-      setFieldErrors({ phone: '휴대폰 본인인증을 먼저 완료해 주세요.' });
-      return;
-    }
+    // 미인증이라는 이유만으로 저장을 막지 않는다. 인증 도입 이전에 가입한 레거시 계정도
+    // 자기 프로필은 고칠 수 있어야 한다 — 서버의 쓰기 게이트도 /me 를 열어 두고 있다.
+    // 번호를 바꾸는 경우만 위에서 증명을 요구하며, 그건 서버가 최종적으로 다시 강제한다.
 
     if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
       setFieldErrors({ birthDate: '올바른 생년월일을 입력해 주세요. (예: 1995-01-15)' });
@@ -757,15 +754,16 @@ export function ProfileEditPageClient() {
             </span>
           ) : accountPhoneUnverified ? (
             <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-              아직 본인인증 전이에요. 저장하려면 이 번호로 인증을 먼저 끝내 주세요.
+              아직 본인인증 전이에요. 프로필 저장은 그대로 되지만, 팀·대회·채팅을 이용하려면 인증이 필요해요.
             </span>
           ) : null}
         </label>
 
         {/*
           번호를 바꿨거나 계정이 아직 미인증이면 이 자리에서 인증을 끝낼 수 있게 카드를 띄운다.
-          미인증 계정은 public(proofToken) 흐름으로는 저장이 끝나지 않는다 — 저장 요청 자체가
-          V1AuthGuard 의 쓰기 게이트에 막히므로, 서버 인증 상태를 직접 바꾸는 authed 흐름을 쓴다.
+          미인증 계정에는 authed 흐름을 쓴다 — public(proofToken) 흐름은 가입 중에만 쓸 수 있고,
+          이미 로그인한 계정의 phone·phoneVerifiedAt 을 서버가 직접 갱신해 주는 쪽이 authed 다.
+          저장을 막는 장치가 아니라 인증을 여기서 끝낼 수 있게 해 주는 안내다.
         */}
         {showPhoneVerification ? (
           <PhoneVerificationCard
@@ -1330,7 +1328,7 @@ export function NotificationSettingsPageClient() {
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
     return (
-      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
         <div className="tm-my-shell">
           <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
         </div>

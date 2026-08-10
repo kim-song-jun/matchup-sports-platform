@@ -74,7 +74,7 @@ export function MyInquiriesListClient() {
 
   if (query.isError) {
     return (
-      <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my">
+      <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my" desktopHead>
         <div className="tm-my-shell">
           <ErrorState message={t.listError} onRetry={() => void query.refetch()} />
         </div>
@@ -83,7 +83,7 @@ export function MyInquiriesListClient() {
   }
 
   return (
-    <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my">
+    <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my" desktopHead>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
@@ -158,7 +158,7 @@ export function MyInquiryCreateClient() {
   };
 
   return (
-    <AppChrome title={t.inquiryNew} activeTab="my" bottomNav={false} backHref="/my/inquiries">
+    <AppChrome title={t.inquiryNew} activeTab="my" bottomNav={false} backHref="/my/inquiries" desktopHead>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           <Card pad={16}>
@@ -194,7 +194,7 @@ export function MyInquiryDetailClient({ inquiryId }: { inquiryId: string }) {
 
   if (query.isError) {
     return (
-      <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries">
+      <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries" desktopHead>
         <div className="tm-my-shell">
           <ErrorState message={t.detailError} onRetry={() => void query.refetch()} />
         </div>
@@ -203,7 +203,7 @@ export function MyInquiryDetailClient({ inquiryId }: { inquiryId: string }) {
   }
 
   return (
-    <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries">
+    <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries" desktopHead>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           {!inquiry ? (

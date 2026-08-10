@@ -298,7 +298,7 @@ describe('TournamentsReadService', () => {
               registrationId: 'reg-1',
               sortOrder: 0,
               registration: {
-                team: { id: 'team-1', name: 'FC 서울' },
+                team: { id: 'team-1', name: 'FC 서울', profile: { logoUrl: '/uploads/teams/fc-seoul.png' } },
               },
             },
           ],
@@ -313,7 +313,9 @@ describe('TournamentsReadService', () => {
               goalsFor: 10,
               goalsAgainst: 2,
               recalculatedAt: new Date('2026-06-14T00:00:00Z'),
-              registration: { team: { id: 'team-1', name: 'FC 서울' } },
+              registration: {
+                team: { id: 'team-1', name: 'FC 서울', profile: { logoUrl: '/uploads/teams/fc-seoul.png' } },
+              },
             },
           ],
         },
@@ -330,7 +332,9 @@ describe('TournamentsReadService', () => {
           status: 'scheduled',
           homeRegistrationId: 'reg-1',
           awayRegistrationId: null,
-          homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
+          homeRegistration: {
+            team: { id: 'team-1', name: 'FC 서울', profile: { logoUrl: '/uploads/teams/fc-seoul.png' } },
+          },
           awayRegistration: null,
           videos: [],
           result: null,
@@ -371,12 +375,17 @@ describe('TournamentsReadService', () => {
     });
     expect(result.groups[0].standings[0]).toMatchObject({
       teamName: 'FC 서울',
+      teamLogoUrl: '/uploads/teams/fc-seoul.png',
       position: 1,
       points: 9,
     });
     expect(result.fixtures[0]).toMatchObject({
+      homeTeamId: 'team-1',
       homeTeamName: 'FC 서울',
+      homeTeamLogoUrl: '/uploads/teams/fc-seoul.png',
+      awayTeamId: null,
       awayTeamName: 'TBD',
+      awayTeamLogoUrl: null,
       result: null,
     });
     expect(result.announcements[0]).toMatchObject({

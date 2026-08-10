@@ -11,6 +11,8 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { Trophy } from 'lucide-react';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /* ── 라운드 그룹핑 (기존 pure logic 유지) ── */
@@ -122,7 +124,11 @@ function penaltyText(fixture: V1TournamentFixture): string {
 interface AggregateMatchup {
   id: string;
   homeTeamName: string;
+  homeTeamId: string | null;
+  homeTeamLogoUrl: string | null;
   awayTeamName: string;
+  awayTeamId: string | null;
+  awayTeamLogoUrl: string | null;
   homeAggScore: number;
   awayAggScore: number;
   hasPK: boolean;
@@ -156,7 +162,11 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
         return {
           id: leg1.id,
           homeTeamName: leg1.homeTeamName,
+          homeTeamId: leg1.homeTeamId,
+          homeTeamLogoUrl: leg1.homeTeamLogoUrl,
           awayTeamName: leg1.awayTeamName,
+          awayTeamId: leg1.awayTeamId,
+          awayTeamLogoUrl: leg1.awayTeamLogoUrl,
           homeAggScore: leg1.result?.homeScore ?? 0,
           awayAggScore: leg1.result?.awayScore ?? 0,
           hasPK: leg1.result?.hasPenalty ?? false,
@@ -219,7 +229,11 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
       return {
         id: leg1.id,
         homeTeamName: leg1Home,
+        homeTeamId: leg1.homeTeamId,
+        homeTeamLogoUrl: leg1.homeTeamLogoUrl,
         awayTeamName: leg1Away,
+        awayTeamId: leg1.awayTeamId,
+        awayTeamLogoUrl: leg1.awayTeamLogoUrl,
         homeAggScore: homeAgg,
         awayAggScore: awayAgg,
         hasPK: !!pkLeg,
@@ -239,13 +253,10 @@ function isMultiLeg(fixtures: V1TournamentFixture[]): boolean {
 
 /* ── 합산 매치 카드 ── */
 function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
-  const { homeTeamName, awayTeamName, homeAggScore, awayAggScore, winner, status, pkInfo, legs } = matchup;
+  const { homeTeamId, homeTeamName, homeTeamLogoUrl, awayTeamId, awayTeamName, awayTeamLogoUrl, homeAggScore, awayAggScore, winner, status, pkInfo, legs } = matchup;
   const isLive = status === 'in_progress';
   const isDone = status === 'completed';
   const isMulti = legs.length > 1;
-
-  const homeInitial = homeTeamName?.trim().charAt(0) || '?';
-  const awayInitial = awayTeamName?.trim().charAt(0) || '?';
 
   return (
     <div
@@ -258,7 +269,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-winner={winner === 'home' ? 'true' : undefined}
         data-loser={isDone && winner === 'away' ? 'true' : undefined}
       >
-        <span className="tm-bk2-avatar" aria-hidden="true">{homeInitial}</span>
+        <TeamAvatar seed={homeTeamId ?? homeTeamName} name={homeTeamName} logoUrl={homeTeamLogoUrl} size="sm" />
         <span className="tm-bk2-name">{homeTeamName}</span>
         <span className="tm-bk2-score tab-num">{homeAggScore}</span>
       </div>
@@ -268,7 +279,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-winner={winner === 'away' ? 'true' : undefined}
         data-loser={isDone && winner === 'home' ? 'true' : undefined}
       >
-        <span className="tm-bk2-avatar" aria-hidden="true">{awayInitial}</span>
+        <TeamAvatar seed={awayTeamId ?? awayTeamName} name={awayTeamName} logoUrl={awayTeamLogoUrl} size="sm" />
         <span className="tm-bk2-name">{awayTeamName}</span>
         <span className="tm-bk2-score tab-num">{awayAggScore}</span>
       </div>
@@ -317,11 +328,10 @@ function slotCY(i: number) {
 
 /* ── 팀 행 ── */
 function MatchTeamRow({
-  name, score, isWinner, isLoser,
+  teamId, name, logoUrl, score, isWinner, isLoser,
 }: {
-  name: string; score: number | null; isWinner: boolean; isLoser: boolean;
+  teamId: string | null; name: string; logoUrl: string | null; score: number | null; isWinner: boolean; isLoser: boolean;
 }) {
-  const initial = name?.trim().charAt(0) || '?';
   const decided = (name?.trim().length ?? 0) > 0;
   return (
     <div
@@ -329,7 +339,7 @@ function MatchTeamRow({
       data-winner={isWinner ? 'true' : undefined}
       data-loser={isLoser ? 'true' : undefined}
     >
-      <span className="tm-bk2-avatar" aria-hidden="true">{decided ? initial : '?'}</span>
+      <TeamAvatar seed={teamId ?? name} name={decided ? name : '미정'} logoUrl={logoUrl} size="sm" />
       <span className="tm-bk2-name">{decided ? name : '미정'}</span>
       {score !== null && <span className="tm-bk2-score tab-num">{score}</span>}
       {score === null && decided && <span className="tm-bk2-score" style={{ opacity: 0.25 }}>-</span>}
@@ -344,6 +354,16 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
   const pk = penaltyText(fixture);
   const isLive = fixture.status === 'in_progress';
   const isDone = fixture.status === 'completed';
+  const timeLabel = formatTournamentDateTimeShort(fixture.scheduledAt);
+
+  // 배지가 1개뿐이면(가장 흔한 케이스 — 시각만 있는 "예정" 카드, 혹은 예전부터 있던
+  // LIVE-only·PK-only 단독 케이스) D-12 이전과 동일하게 카드 폭을 꽉 채우는 block 배지를
+  // 그대로 유지한다. 2개 이상 동시에 있을 때만(D-12 가 새로 허용한 조합) flex pill row로
+  // 감싼다 — 리뷰에서 단일 배지 케이스의 폭 축소가 의도치 않은 회귀로 지적되어 조건부 처리.
+  const badges: { key: string; className: string; label: string }[] = [];
+  if (timeLabel) badges.push({ key: 'time', className: 'tm-bk2-badge tm-bk2-badge-time', label: timeLabel });
+  if (isLive) badges.push({ key: 'live', className: 'tm-bk2-badge tm-bk2-badge-live', label: '● LIVE' });
+  if (isDone && pk) badges.push({ key: 'pk', className: 'tm-bk2-badge', label: pk });
 
   return (
     <div
@@ -352,21 +372,22 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
       aria-label={`${fixture.homeTeamName || '미정'} 대 ${fixture.awayTeamName || '미정'}`}
     >
       <MatchTeamRow
+        teamId={fixture.homeTeamId} logoUrl={fixture.homeTeamLogoUrl}
         name={fixture.homeTeamName} score={hasResult ? fixture.result!.homeScore : null}
         isWinner={winner === 'home'} isLoser={isDone && winner === 'away'}
       />
       <div className="tm-bk2-divider" aria-hidden="true" />
       <MatchTeamRow
+        teamId={fixture.awayTeamId} logoUrl={fixture.awayTeamLogoUrl}
         name={fixture.awayTeamName} score={hasResult ? fixture.result!.awayScore : null}
         isWinner={winner === 'away'} isLoser={isDone && winner === 'home'}
       />
-      {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}
-      {isDone && pk && <div className="tm-bk2-badge">{pk}</div>}
-      {!isDone && !isLive && fixture.scheduledAt && (
-        <div className="tm-bk2-badge tm-bk2-badge-time">
-          {new Date(fixture.scheduledAt).toLocaleDateString('ko-KR', {
-            month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-          })}
+      {badges.length === 1 && <div className={badges[0].className}>{badges[0].label}</div>}
+      {badges.length > 1 && (
+        <div className="tm-bk2-badge-row">
+          {badges.map((b) => (
+            <div key={b.key} className={b.className}>{b.label}</div>
+          ))}
         </div>
       )}
     </div>

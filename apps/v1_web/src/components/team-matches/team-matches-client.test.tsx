@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
-import type { TeamMatchDetailViewModel } from './team-matches.types';
-import { TeamMatchDetailPageClient } from './team-matches-client';
+import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
+import type { TeamMatchDetailViewModel, TeamMatchModel } from './team-matches.types';
+import { TeamMatchDetailPageClient, toTeamMatch } from './team-matches-client';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
@@ -27,12 +28,13 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatch: useV1TeamMatchMock,
   useV1TeamMatchEligibility: useV1TeamMatchEligibilityMock,
   useV1TeamMatchApplications: () => ({ data: undefined, isPending: false }),
+  // 라인업 CTA(Task 15) 계산용 — 이 스위트는 GA 이벤트만 검증하므로 소속 팀 없음으로 고정.
+  useV1MyTeams: () => ({ data: undefined, isPending: false }),
   useV1ApplyTeamMatch: () => ({ mutateAsync: applyTeamMatchMutateAsync, isPending: false }),
   useV1ApproveTeamMatchApplication: () => ({ mutate: vi.fn(), isPending: false }),
   useV1RejectTeamMatchApplication: () => ({ mutate: vi.fn(), isPending: false }),
   useV1CloseTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ReopenTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1CompleteTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1CancelTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ResolveChatRoom: () => ({ mutate: vi.fn(), isPending: false }),
   useV1WithdrawTeamMatchApplication: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -46,6 +48,7 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-status-label">{model.statusLabel}</span>
       <span data-testid="team-match-apply-label">{model.applyLabel}</span>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
+      {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
     </div>
   ),
   TeamMatchListPageView: () => null,
@@ -136,5 +139,149 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('상대팀 확정');
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
     expect(screen.queryByText('승인 완료')).not.toBeInTheDocument();
+  });
+});
+
+// Task 17: buildResultAction() is the sole routing gate between the host's
+// result-entry screen (/team-matches/:id/result) and the opponent's
+// approval screen (/team-matches/:id/result/approval). Only the destination
+// screens had coverage before this — nothing failed if the gate itself was
+// reverted (e.g. both roles routed to /result, or an unrelated viewer got a
+// CTA at all). These tests pin the three-way split directly against the
+// rendered CTA so a regression in buildResultAction's role/viewerState
+// branching trips a real assertion.
+describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', () => {
+  function mockMatchedTeamMatch(viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean }) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '서울 풋살장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        capacityText: '2/2',
+        displayState: 'matched',
+        status: 'matched',
+        viewer: { state: viewer.state, manageableHostTeam: viewer.manageableHostTeam ?? false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+      },
+      isError: false,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    applyTeamMatchMutateAsync.mockResolvedValue({ applicationId: 'app-1' });
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it('shows the host the result-entry CTA routed to /result', () => {
+    mockMatchedTeamMatch({ state: 'host_team', manageableHostTeam: true });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    const link = screen.getByRole('link', { name: '경기 결과 입력' });
+    expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result');
+    expect(screen.queryByText('경기 결과 대기')).not.toBeInTheDocument();
+    expect(screen.queryByText('경기 결과 확인/승인')).not.toBeInTheDocument();
+  });
+
+  it('shows the approved opponent the approval CTA routed to /result/approval, never the entry CTA', () => {
+    mockMatchedTeamMatch({ state: 'approved', manageableHostTeam: false });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    const link = screen.getByRole('link', { name: '경기 결과 대기' });
+    expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result/approval');
+    expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
+  });
+
+  it('shows an unrelated viewer neither the entry nor the approval CTA', () => {
+    mockMatchedTeamMatch({ state: 'none', manageableHostTeam: false });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '경기 결과 대기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '경기 결과 확인/승인' })).not.toBeInTheDocument();
+  });
+});
+
+// Regression for the review finding: toTeamMatch used to fall back to
+// team-matches.view-model.ts's hardcoded skeleton mock (a fixed, unrelated match's
+// grade/format/style/uniform, e.g. "A"/"11:11"/"친선"/"빨강") whenever a real team match's
+// structured condition columns were empty — showing fabricated conditions on a real card,
+// not the real (possibly legacy, possibly genuinely-unset) data.
+describe('toTeamMatch — legacy/unmigrated condition fields never show mock data', () => {
+  // Deliberately mirrors team-matches.view-model.ts's mock shape so a regression (mock
+  // leaking through) would make these assertions fail loudly instead of silently.
+  const mockFallback: TeamMatchModel = {
+    id: 'team-match-1', title: 'FC 발빠른놈들 vs 상대팀 구합니다', imageUrl: '/mock/generated/team-huddle.webp',
+    sport: '축구', hostTeam: 'FC 발빠른놈들', venue: '상암 월드컵 A구장', region: '서울 마포',
+    date: '5월 11일 일', time: '09:00', endTime: '11:00',
+    format: '11:11', grade: 'A', style: '친선', cost: 280000, opponentCost: 140000, uniform: '빨강',
+    gender: '성별 무관', manner: 4.8, wins: 23, status: 'open',
+  };
+
+  function realMatch(overrides: Partial<V1TeamMatch>): V1TeamMatch {
+    return {
+      id: 'real-team-match-9',
+      title: '실제 팀매치',
+      sportName: '풋살',
+      placeName: '진짜 경기장',
+      startsAt: '2026-09-01T10:00:00.000Z',
+      capacityText: '1/2',
+      status: 'open',
+      ...overrides,
+    };
+  }
+
+  it('shows real matchFormat/matchStyle/uniformColor when structured columns are populated (post-backfill)', () => {
+    const model = toTeamMatch(
+      realMatch({ matchFormat: '6:6', matchStyle: ['교환매치'], uniformColor: '검정', levelLabel: 'C등급' }),
+      mockFallback,
+    );
+
+    expect(model.format).toBe('6:6');
+    expect(model.style).toBe('교환매치');
+    expect(model.uniform).toBe('검정');
+    expect(model.grade).toBe('C등급');
+  });
+
+  it('never shows the mock fallback grade/format/style/uniform for a real match with empty structured fields', () => {
+    const model = toTeamMatch(
+      realMatch({ matchFormat: null, matchStyle: [], uniformColor: null, levelLabel: null }),
+      mockFallback,
+    );
+
+    expect(model.grade).not.toBe(mockFallback.grade);
+    expect(model.format).not.toBe(mockFallback.format);
+    expect(model.style).not.toBe(mockFallback.style);
+    expect(model.uniform).not.toBe(mockFallback.uniform);
+    expect(model.format).toBe('');
+    expect(model.uniform).toBe('');
+  });
+
+  it('shows the server-derived rulesText as a display fallback for a pre-backfill legacy row instead of mock data', () => {
+    const model = toTeamMatch(
+      realMatch({
+        matchFormat: null,
+        matchStyle: [],
+        uniformColor: null,
+        levelLabel: '중급~고급',
+        // 서버의 formatMatchConditionsRulesText가 미백필 row에 대해 내려주는 실제 값 모양
+        // (levelLabel · formatNote 원문 · genderRule을 이어붙인 표시 전용 파생 문자열).
+        rulesText: '중급~고급 · 5:5 친선전 · 남',
+        genderRule: '남',
+      }),
+      mockFallback,
+    );
+
+    expect(model.style).toBe('중급~고급 · 5:5 친선전 · 남');
+    expect(model.style).not.toBe(mockFallback.style);
+    expect(model.format).toBe('');
+    expect(model.uniform).toBe('');
   });
 });

@@ -7,6 +7,35 @@ services:
     environment:
       V1_RELEASE: ${ALPHA_RELEASE_VERSION:-}
 
+  # 워커는 전용 이미지를 빌드하지 않고 API 이미지를 그대로 재사용한다
+  # (alpha-release-common.sh 의 assert_running_release_digests 가
+  #  running_worker_image == ALPHA_API_IMAGE 를 단언한다). 따라서 entrypoint 는
+  #  API 이미지의 레이아웃(dist/src/...)을 따라야 한다 — Dockerfile.v1-api 의
+  #  CMD ["node", "dist/src/main.js"] 와 같은 규칙이다.
+  v1_game_operations_worker:
+    image: ${ALPHA_API_IMAGE:?ALPHA_API_IMAGE must be an ECR digest URI}
+    command: ["node", "dist/src/jobs/v1-game-operations-worker.main.js"]
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_PASSWORD:-${DB_PASSWORD}}@v1_postgres:5432/${V1_DB_NAME:-teameet_v1}
+      NODE_ENV: production
+      WORKER_PORT: ${WORKER_PORT:-8122}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:${WORKER_PORT:-8122}/api/v1/game-operations-worker/health').then((res) => { if (!res.ok) throw new Error('game operations worker health ' + res.status); }).catch(() => process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      v1_postgres:
+        condition: service_healthy
+
   v1_web:
     image: ${ALPHA_WEB_IMAGE:?ALPHA_WEB_IMAGE must be an ECR digest URI}
 

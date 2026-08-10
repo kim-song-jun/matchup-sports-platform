@@ -10,7 +10,9 @@ import {
   Swords,
   UsersRound,
   Trophy,
+  ListOrdered,
   Medal,
+  Activity,
   Megaphone,
   PanelsTopLeft,
   MessageSquareText,
@@ -24,6 +26,7 @@ import {
   ChevronLeft,
   Menu,
   X,
+  Radio,
 } from 'lucide-react';
 
 // ── Nav items (reviews/notifications removed per task-97 IA) ───────────────
@@ -44,7 +47,9 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { label: '매치', href: '/admin/matches', icon: <Swords size={18} /> },
   { label: '팀', href: '/admin/teams', icon: <UsersRound size={18} /> },
   { label: '팀매치', href: '/admin/team-matches', icon: <Trophy size={18} /> },
+  { label: '리그', href: '/admin/team-match-series', icon: <ListOrdered size={18} /> },
   { label: '대회', href: '/admin/tournaments', icon: <Medal size={18} /> },
+  { label: '대회 현장 운영', href: '/admin/ops/tournaments', icon: <Activity size={18} /> },
   { label: '공지사항', href: '/admin/notices', icon: <Megaphone size={18} /> },
   { label: '팝업', href: '/admin/popups', icon: <PanelsTopLeft size={18} /> },
   { label: '약관', href: '/admin/terms', icon: <ScrollText size={18} /> },
@@ -54,6 +59,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { label: 'SMS · 인증 실패', href: '/admin/ops/sms-failures', icon: <MessageSquareWarning size={18} /> },
   { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
   { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} /> },
+  { label: '경기 운영 플래그', href: '/admin/ops/operation-flags', icon: <Radio size={18} /> },
 ];
 
 const OWNER_NAV_ITEM: NavItem = {

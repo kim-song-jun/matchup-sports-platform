@@ -53,6 +53,7 @@ export default async function TournamentCampaignPage({
       activeTab="tournaments"
       backHref={backHref}
       showNotifications={false}
+      desktopHead
     >
       <TournamentCampaignTemplate campaign={result.campaign} />
     </AppChrome>

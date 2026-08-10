@@ -20,6 +20,7 @@ import { isTermsReconsentRequestAllowed } from '../terms/terms-reconsent-access'
 import {
   PHONE_VERIFICATION_ROUTE,
   isPhoneVerificationEnforced,
+  isPhoneVerificationExemptActor,
   isPhoneVerificationRequestAllowed,
 } from '../verification/phone-verification-access';
 
@@ -72,6 +73,9 @@ export class V1AuthGuard implements CanActivate {
         accountStatus: true,
         onboardingStatus: true,
         phoneVerifiedAt: true,
+        // 휴대폰 인증 게이트의 관리자 면제 판정용. V1AdminUser.userId 가 @unique 라
+        // 중첩 select 로 붙어 별도 쿼리가 생기지 않는다.
+        adminUser: { select: { status: true } },
       },
     });
 
@@ -124,6 +128,7 @@ export class V1AuthGuard implements CanActivate {
       !pendingSignupRoute &&
       isPhoneVerificationEnforced() &&
       !user.phoneVerifiedAt &&
+      !isPhoneVerificationExemptActor(user) &&
       !isPhoneVerificationRequestAllowed(request.method, requestUrl)
     ) {
       throw new ForbiddenException({

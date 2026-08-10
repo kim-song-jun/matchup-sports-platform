@@ -29,6 +29,7 @@ import { TournamentPopupDialog } from '@/components/tournaments/tournament-popup
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import {
   formatTournamentDateShort,
+  formatTournamentDateTimeShort,
   formatTournamentDateRangeWithTime,
   formatTournamentDateLong,
   formatEntryFee,
@@ -357,7 +358,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
 
   if (isLoading) {
     return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments">
+      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments" desktopHead>
         <TournamentDetailSkeleton />
       </AppChrome>
     );
@@ -366,7 +367,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments">
+      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments" desktopHead>
         <div style={{ padding: '48px 20px 0' }}>
           <ErrorState
             message={msg}
@@ -1042,6 +1043,28 @@ export function TournamentDetailView({
       {/* ── 상단 CTA: 히어로 직후 첫 번째로 보이는 진입점 (모바일) ── */}
       {topCTA}
 
+      {/* 전체 경기 일정: 상태(모집중/진행중/종료) 무관하게 항상 노출되는 유일한 진입점이라
+          어느 status 분기에도 속하지 않은 이 자리에 둔다. */}
+      <div style={{ padding: '0 20px 4px' }}>
+        <Link
+          href={`/tournaments/${tournament.id}/schedule`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 4px',
+            minHeight: 44,
+            color: 'var(--blue500)',
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          전체 경기 일정 보기
+          <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+        </Link>
+      </div>
+
       <div className="tm-tournament-detail-grid">
         {/* Left column: header + metrics + prize + rules + standings + group fixtures */}
         <div className="tm-match-detail-body">
@@ -1668,8 +1691,11 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const roundLabel = fixture.round
     ? fixture.round.replace('group', '조별').replace('semi', '4강').replace('final', '결승').replace('third_place', '3·4위')
     : `${fixture.fixtureNumber}경기`;
-  // 날짜 라벨: invalid/누락이면 null → 빈 span(스타일된 공백) 대신 날짜 영역 자체를 숨긴다 (Copilot)
-  const scheduledLabel = formatTournamentDateShort(fixture.scheduledAt);
+  // 일정 라벨: 날짜 + **시각**. 참가자는 이 카드로 "내 경기가 몇 시인지"를 판단하므로
+  // 날짜만으로는 쓸모가 없다(오너 지적: "조별 일정에도 각 경기 시간들 나타나야하고").
+  // invalid/누락이면 null 이 오는데, 그때 영역을 통째로 숨기면 "시간이 안 정해진 것"과
+  // "화면이 빠뜨린 것"을 구분할 수 없다 — 미정임을 명시한다.
+  const scheduledLabel = formatTournamentDateTimeShort(fixture.scheduledAt);
 
   return (
     <Card pad={14}>
@@ -1686,11 +1712,9 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
           <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
             {roundLabel}
           </span>
-          {scheduledLabel ? (
-            <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>
-              {scheduledLabel}
-            </span>
-          ) : null}
+          <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>
+            {scheduledLabel ?? '시간 미정'}
+          </span>
         </div>
         <FixtureStatusBadge status={fixture.status} />
       </div>
@@ -1869,7 +1893,12 @@ function StandingRow({
       </td>
       <td style={{ padding: '8px 4px', maxWidth: 160 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <TeamAvatar seed={standing.teamId} name={standing.teamName} size="sm" />
+          <TeamAvatar
+            seed={standing.teamId}
+            name={standing.teamName}
+            logoUrl={standing.teamLogoUrl}
+            size="sm"
+          />
           <span
             className="tm-text-label"
             style={{ color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}

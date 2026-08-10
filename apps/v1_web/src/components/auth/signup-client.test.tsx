@@ -119,7 +119,7 @@ describe('SignupClient required profile contract', () => {
 
     render(<SignupClient />);
 
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms'));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms?mode=signup'));
     expect(screen.queryByRole('heading', { name: '가입 정보를 확인해 주세요' })).not.toBeInTheDocument();
   });
 
@@ -345,6 +345,6 @@ describe('SignupClient required profile contract', () => {
   it('상단에 약관 화면으로 돌아가는 뒤로가기를 노출한다', () => {
     render(<SignupClient />);
 
-    expect(screen.getAllByRole('link', { name: '뒤로가기' })[0]).toHaveAttribute('href', '/terms');
+    expect(screen.getAllByRole('link', { name: '뒤로가기' })[0]).toHaveAttribute('href', '/terms?mode=signup');
   });
 });

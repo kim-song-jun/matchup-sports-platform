@@ -10,8 +10,8 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
-import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from './notifications.service';
+import { REALTIME_NOTIFIER } from './realtime-notifier.port';
 import { WebPushService } from './web-push.service';
 
 const user = {
@@ -51,7 +51,7 @@ describe('NotificationsService', () => {
     };
   };
 
-  const realtimeGateway = { emitToUser: jest.fn() };
+  const realtimeNotifier = { emitToUser: jest.fn() };
   const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
   const logger = { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() };
 
@@ -75,7 +75,7 @@ describe('NotificationsService', () => {
       providers: [
         NotificationsService,
         { provide: PrismaService, useValue: prisma },
-        { provide: RealtimeGateway, useValue: realtimeGateway },
+        { provide: REALTIME_NOTIFIER, useValue: realtimeNotifier },
         { provide: WebPushService, useValue: webPushService },
         { provide: getLoggerToken(NotificationsService.name), useValue: logger },
       ],
@@ -196,7 +196,7 @@ describe('NotificationsService', () => {
     // Must flush the fire-and-forget promise
     await new Promise(setImmediate);
 
-    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+    expect(realtimeNotifier.emitToUser).toHaveBeenCalledWith(
       'user-1',
       'notification:new',
       expect.objectContaining({ id: 'notif-2' }),
@@ -236,13 +236,13 @@ describe('NotificationsService', () => {
     );
   });
 
-  it('still attempts WebPushService.sendToUser when RealtimeGateway.emitToUser throws synchronously', async () => {
+  it('still attempts WebPushService.sendToUser when the realtime notifier throws synchronously', async () => {
     // Isolation contract mirrored from ChatService.sendMessage: a realtime-emit failure
     // must not prevent the independent web-push attempt from being made.
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
     prisma.v1Notification.create.mockResolvedValue(makeNotification({ id: 'notif-5' }));
     const emitError = new Error('socket not connected');
-    realtimeGateway.emitToUser.mockImplementationOnce(() => {
+    realtimeNotifier.emitToUser.mockImplementationOnce(() => {
       throw emitError;
     });
 

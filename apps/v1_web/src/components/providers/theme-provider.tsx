@@ -97,6 +97,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (serverSynced) return;
+    // 로그아웃 상태에서는 동기화하지 않는다 — enabled:false로 바뀌어도 React Query
+    // 캐시엔 이전 로그인 사용자의 settings.data가 그대로 남아 있을 수 있고(예: 탈퇴
+    // 처리 후 router.replace만 하고 풀 리로드는 안 하는 흐름), 그 값을 로그아웃 상태에
+    // 다시 적용하면 안 된다.
+    if (!hasSession) return;
     const serverTheme = settings.data?.theme;
     if (!serverTheme) return;
     setServerSynced(true);
@@ -104,7 +109,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setPreferenceState(serverTheme);
       writeStoredPreference(serverTheme);
     }
-  }, [serverSynced, settings.data?.theme]);
+  }, [serverSynced, hasSession, settings.data?.theme]);
 
   const effectiveTheme = useMemo(() => resolveEffectiveTheme(preference, prefersDarkOS), [preference, prefersDarkOS]);
 

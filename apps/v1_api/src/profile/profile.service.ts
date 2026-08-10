@@ -462,35 +462,54 @@ export class ProfileService {
           : (await tx.v1User.update({ where: { id: user.id }, data: { themePreference: dto.theme } }))
               .themePreference;
 
-      const notificationInput = dto.notifications ?? {};
-      const individualNotifications = {
-        ...(notificationInput.matchEnabled === undefined ? {} : { matchEnabled: notificationInput.matchEnabled }),
-        ...(notificationInput.teamEnabled === undefined ? {} : { teamEnabled: notificationInput.teamEnabled }),
-        ...(notificationInput.teamMatchEnabled === undefined
-          ? {}
-          : { teamMatchEnabled: notificationInput.teamMatchEnabled }),
-        ...(notificationInput.chatEnabled === undefined ? {} : { chatEnabled: notificationInput.chatEnabled }),
-        ...(notificationInput.noticeEnabled === undefined ? {} : { noticeEnabled: notificationInput.noticeEnabled }),
-      };
-      const nextPreferences = await tx.v1NotificationPreference.upsert({
-        where: { userId: user.id },
-        update: {
-          ...individualNotifications,
-          ...(notificationInput.marketingEnabled === undefined
+      // dto.notifications가 없으면(테마만 바꾸는 요청 등) upsert를 아예 안 태운다 — upsert는
+      // update 브랜치가 빈 객체여도 실제 UPDATE 문을 실행해 @updatedAt만 갱신하는 무의미한
+      // write가 나간다(잠금·"방금 알림 설정 바뀜"으로 오인될 수 있는 타임스탬프 변경).
+      let nextPreferences;
+      if (dto.notifications) {
+        const notificationInput = dto.notifications;
+        const individualNotifications = {
+          ...(notificationInput.matchEnabled === undefined ? {} : { matchEnabled: notificationInput.matchEnabled }),
+          ...(notificationInput.teamEnabled === undefined ? {} : { teamEnabled: notificationInput.teamEnabled }),
+          ...(notificationInput.teamMatchEnabled === undefined
             ? {}
-            : { marketingEnabled: notificationInput.marketingEnabled }),
-        },
-        create: {
-          userId: user.id,
+            : { teamMatchEnabled: notificationInput.teamMatchEnabled }),
+          ...(notificationInput.chatEnabled === undefined ? {} : { chatEnabled: notificationInput.chatEnabled }),
+          ...(notificationInput.noticeEnabled === undefined ? {} : { noticeEnabled: notificationInput.noticeEnabled }),
+        };
+        nextPreferences = await tx.v1NotificationPreference.upsert({
+          where: { userId: user.id },
+          update: {
+            ...individualNotifications,
+            ...(notificationInput.marketingEnabled === undefined
+              ? {}
+              : { marketingEnabled: notificationInput.marketingEnabled }),
+          },
+          create: {
+            userId: user.id,
+            activityEnabled: true,
+            matchEnabled: notificationInput.matchEnabled ?? true,
+            teamEnabled: notificationInput.teamEnabled ?? true,
+            teamMatchEnabled: notificationInput.teamMatchEnabled ?? true,
+            chatEnabled: notificationInput.chatEnabled ?? true,
+            noticeEnabled: notificationInput.noticeEnabled ?? true,
+            marketingEnabled: notificationInput.marketingEnabled ?? false,
+          },
+        });
+      } else {
+        nextPreferences = (await tx.v1NotificationPreference.findUnique({ where: { userId: user.id } })) ?? {
+          // 알림 설정을 한 번도 저장한 적 없는 사용자 — Prisma 컬럼 기본값과 동일한 값을
+          // write 없이 그대로 응답에 반영한다.
           activityEnabled: true,
-          matchEnabled: notificationInput.matchEnabled ?? true,
-          teamEnabled: notificationInput.teamEnabled ?? true,
-          teamMatchEnabled: notificationInput.teamMatchEnabled ?? true,
-          chatEnabled: notificationInput.chatEnabled ?? true,
-          noticeEnabled: notificationInput.noticeEnabled ?? true,
-          marketingEnabled: notificationInput.marketingEnabled ?? false,
-        },
-      });
+          matchEnabled: true,
+          teamEnabled: true,
+          teamMatchEnabled: true,
+          chatEnabled: true,
+          noticeEnabled: true,
+          marketingEnabled: false,
+          updatedAt: new Date(),
+        };
+      }
 
       if (dto.notifications) {
         await writeUserAuditLog(tx, {

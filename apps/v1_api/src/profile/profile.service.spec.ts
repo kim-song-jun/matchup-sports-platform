@@ -91,6 +91,16 @@ describe('ProfileService settings theme preference', () => {
           marketingEnabled: false,
           updatedAt: new Date('2026-08-10T00:00:00Z'),
         }),
+        findUnique: jest.fn().mockResolvedValue({
+          activityEnabled: true,
+          matchEnabled: true,
+          teamEnabled: true,
+          teamMatchEnabled: true,
+          chatEnabled: true,
+          noticeEnabled: true,
+          marketingEnabled: false,
+          updatedAt: new Date('2026-08-01T00:00:00Z'),
+        }),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
       $transaction: jest.fn(),
@@ -111,6 +121,18 @@ describe('ProfileService settings theme preference', () => {
     });
     expect(prisma.v1User.findUnique).not.toHaveBeenCalled();
     expect(result.theme).toBe('dark');
+  });
+
+  // Copilot 리뷰 지적: 테마만 바꾸는 요청에서 알림설정 row에 불필요한 write(upsert)가
+  // 나가면 @updatedAt만 갱신되는 무의미한 쓰기가 발생한다 — 읽기만 해야 한다.
+  it('테마만 바꿀 때는 알림설정 row에 쓰지 않고 읽기만 한다', async () => {
+    const prisma = buildPrisma({ updateResolvedTheme: 'dark' });
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await service.updateSettings(user, { theme: 'dark' });
+
+    expect(prisma.v1NotificationPreference.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1NotificationPreference.findUnique).toHaveBeenCalledWith({ where: { userId: user.id } });
   });
 
   it('leaves the stored theme untouched and echoes the current value when the request omits theme', async () => {

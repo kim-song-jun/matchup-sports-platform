@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ThemeProvider, useTheme } from './theme-provider';
 
@@ -16,8 +17,13 @@ const sessionMock = vi.hoisted(() => ({ hasStoredV1Session: vi.fn() }));
 vi.mock('@/lib/session-storage', () => ({ hasStoredV1Session: sessionMock.hasStoredV1Session }));
 
 function Consumer() {
-  const { preference } = useTheme();
-  return <div data-testid="preference">{preference}</div>;
+  const { preference, setPreference } = useTheme();
+  return (
+    <div>
+      <div data-testid="preference">{preference}</div>
+      <button onClick={() => setPreference('light')}>set-light</button>
+    </div>
+  );
 }
 
 describe('ThemeProvider server sync', () => {
@@ -61,5 +67,37 @@ describe('ThemeProvider server sync', () => {
     );
 
     expect(await screen.findByTestId('preference')).toHaveTextContent('light');
+  });
+
+  // Copilot 리뷰 지적: enabled:false로 바뀌어도 React Query 캐시엔 이전 로그인 사용자의
+  // settings.data가 그대로 남을 수 있다(예: 탈퇴 처리 후 router.replace만 하고 풀 리로드는
+  // 안 하는 흐름) — 로그아웃 상태에선 그 캐시값을 절대 재적용하면 안 된다.
+  it('로그아웃 상태에서는 캐시에 남은 이전 사용자의 서버 테마를 재적용하지 않는다', async () => {
+    const user = userEvent.setup();
+    sessionMock.hasStoredV1Session.mockReturnValue(true);
+    hooks.useV1Settings.mockReturnValue({ data: { theme: 'dark' } });
+
+    const { rerender } = render(
+      <ThemeProvider>
+        <Consumer />
+      </ThemeProvider>,
+    );
+    expect(await screen.findByTestId('preference')).toHaveTextContent('dark');
+
+    // 사용자가 직접 라이트로 바꾼다 — preference/localStorage가 실제 코드 경로로 light가 된다.
+    await user.click(screen.getByRole('button', { name: 'set-light' }));
+    expect(screen.getByTestId('preference')).toHaveTextContent('light');
+
+    // 이제 로그아웃 — 하지만 React Query 캐시(mock)는 지워지지 않고 이전 계정의 dark가
+    // 그대로 남아 있다고 가정한다(쿼리 비활성화만으로는 캐시가 안 지워지는 상황 재현).
+    sessionMock.hasStoredV1Session.mockReturnValue(false);
+    rerender(
+      <ThemeProvider>
+        <Consumer />
+      </ThemeProvider>,
+    );
+
+    // 가드가 없다면 여기서 캐시에 남은 dark로 되돌아간다 — 로그아웃 상태이므로 light가 유지돼야 한다.
+    expect(screen.getByTestId('preference')).toHaveTextContent('light');
   });
 });

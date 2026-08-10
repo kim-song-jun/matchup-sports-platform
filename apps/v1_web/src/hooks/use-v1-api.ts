@@ -56,6 +56,7 @@ import type {
   V1GameOperationFlagKey,
   V1SimplifiedOperationFlagGateStatus,
   V1SimplifiedOperationFlagTogglePayload,
+  V1SetSimplifiedOperationFlagGatePayload,
   V1AdminMatchDetail,
   V1AdminMatchRow,
   V1AdminMe,
@@ -2502,17 +2503,35 @@ export function useV1AdminSendPush() {
 }
 
 // ---------------------------------------------------------------------------
-// Admin — game operation flags (PUBLIC_LIVE / DIRECTOR_OFFICIALIZE 관리자 토글)
+// Admin — game operation flags (경기 운영 플래그 4종 관리자 토글)
 // ---------------------------------------------------------------------------
 
-/** 이 환경(NODE_ENV=production 만으로는 alpha/실프로덕션이 구분되지 않아 별도 서버측 신호를
- * 쓴다 — apps/v1_api 의 isSimplifiedOperationFlagGateEnabled 참고)에서 게이트 번들 없이
- * 켜고 끄는 간소 경로가 열려 있는지. */
+/** 게이트 번들 없이 켜고 끄는 간소 경로가 지금 열려 있는지 — DB 설정값
+ * (`v1_game_operation_gate_settings`, apps/v1_api 의 GameOperationFlagsService.readGateSetting
+ * 참고)이라 프로덕션 포함 모든 환경에서 동일하게 조회/변경된다. */
 export function useV1SimplifiedOperationFlagGateStatus() {
   return useQuery({
     queryKey: v1Keys.adminOperationFlagsSimplifiedGateStatus(),
     queryFn: () =>
       v1Get<V1SimplifiedOperationFlagGateStatus>('/tournament-ops/operation-flags/simplified-gate/status'),
+  });
+}
+
+/** 간소 전환 모드 스위치 자체를 켜고 끈다 — 이 스위치가 꺼져 있으면 아래 4개 플래그의
+ * simplified-toggle 경로는 전부 SIMPLIFIED_GATE_DISABLED로 막힌다. 성공 시 status 쿼리를
+ * 낙관적으로 갱신하고 나머지 플래그 조회도 무효화해 스테퍼가 최신 상태로 다시 그려지게 한다. */
+export function useV1SetSimplifiedOperationFlagGate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1SetSimplifiedOperationFlagGatePayload) =>
+      v1Patch<V1SimplifiedOperationFlagGateStatus>(
+        '/tournament-ops/operation-flags/simplified-gate',
+        payload,
+        { headers: { 'idempotency-key': randomUuid() } },
+      ),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminOperationFlagsSimplifiedGateStatus(), data);
+    },
   });
 }
 
@@ -2523,7 +2542,8 @@ export function useV1OperationFlag(key: V1GameOperationFlagKey) {
   });
 }
 
-/** PUBLIC_LIVE/DIRECTOR_OFFICIALIZE 만 허용 — 서버가 다른 키는 거부한다. */
+/** 4개 키(GAME_READ/GAME_WRITE/PUBLIC_LIVE/DIRECTOR_OFFICIALIZE) 전부 허용 — 서버가 게이트
+ * 번들 증적만 생략할 뿐, frozen cutover order 등 나머지 안전장치는 그대로 검증한다. */
 export function useV1SimplifiedToggleOperationFlag(key: V1GameOperationFlagKey) {
   const queryClient = useQueryClient();
   return useMutation({

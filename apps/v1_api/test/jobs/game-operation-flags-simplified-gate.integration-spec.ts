@@ -7,29 +7,30 @@ import { AdminContextService } from '../../src/common/admin-context.service';
 import {
   GameOperationFlagsService,
   resolveGameOperationGateRoot,
-  SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR,
 } from '../../src/config/game-operation-flags';
 import type { GameOperationFlagKey } from '../../src/config/game-operation-flags';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
- * Task: admin on/off for PUBLIC_LIVE/DIRECTOR_OFFICIALIZE without the immutable gate bundle,
- * non-production only. `V1_ALLOW_SIMPLIFIED_OPERATION_FLAG_GATE` is the only environment signal
- * (see the doc comment on `isSimplifiedOperationFlagGateEnabled`) -- these specs cover:
- *  1. The single most important behavior: the shortcut is REJECTED when that variable is unset,
- *     i.e. in production shape, regardless of caller role or payload.
- *  2. Every safety mechanism `patchFlag` has is still enforced here: admin permission parity, CAS,
- *     "off<->on only" transition validity, and -- deliberately preserved, not relaxed -- the frozen
- *     cutover order (`assertFrozenForwardOrder`), which blocks PUBLIC_LIVE/DIRECTOR_OFFICIALIZE
- *     off->on until GAME_WRITE=new and GAME_READ=new, independent of any gate-bundle evidence.
- *  3. Audit logging still fires, with a `gateMode: 'simplified'` marker distinguishing this path
- *     from the fully gated one in the same `V1OperationAudit` trail.
+ * Task: admin on/off for all four operation flags without the immutable gate bundle. Whether the
+ * shortcut is reachable at all is now a DB-backed switch (`v1_game_operation_gate_settings`
+ * singleton row, flipped via `setSimplifiedGate`), not an environment variable -- these specs
+ * cover:
+ *  1. The single most important behavior: the shortcut is REJECTED while the DB switch is off,
+ *     regardless of caller role or payload.
+ *  2. `setSimplifiedGate` itself: CAS on `expectedVersion` (VERSION_CONFLICT), rejecting a no-op
+ *     flip (GATE_MODE_UNCHANGED), and that it audits with action `OPERATION_GATE_MODE_CHANGED`.
+ *  3. Once the switch is on, every safety mechanism `patchFlag` has is still enforced:
+ *     admin permission parity, CAS, transition validity, and -- deliberately preserved, not
+ *     relaxed -- the frozen cutover order (`assertFrozenForwardOrder`), independent of any
+ *     gate-bundle evidence.
+ *  4. Audit logging on `simplifiedPatchFlag` still fires, with a `gateMode: 'simplified'` marker
+ *     distinguishing this path from the fully gated one in the same `V1OperationAudit` trail.
  */
-describe('simplified (non-production) operation flag admin toggle', () => {
+describe('simplified (DB-gated) operation flag admin toggle', () => {
   let moduleRef: TestingModule;
   let prisma: PrismaService;
   let service: GameOperationFlagsService;
-  let originalGateEnvValue: string | undefined;
   const EVIDENCE_ROOT = resolveGameOperationGateRoot();
   const BASELINE_SHA = 'a'.repeat(40);
   const CANDIDATE_SHA = 'b'.repeat(40);
@@ -71,8 +72,6 @@ describe('simplified (non-production) operation flag admin toggle', () => {
   });
 
   beforeEach(async () => {
-    originalGateEnvValue = process.env[SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR];
-    delete process.env[SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR];
     await prisma.$executeRaw`
       DELETE FROM v1_idempotency_records
       WHERE actor_user_id IN (${OWNER_USER_ID}, ${OPS_USER_ID}, ${SUPPORT_USER_ID}, ${ORDINARY_USER_ID})
@@ -81,14 +80,7 @@ describe('simplified (non-production) operation flag admin toggle', () => {
     await prisma.$executeRaw`TRUNCATE TABLE v1_operation_audits`;
     await prisma.$executeRaw`DELETE FROM v1_game_operation_flags`;
     await prisma.$executeRaw`DELETE FROM v1_game_cutover_epochs WHERE id = 'game-cutover'`;
-  });
-
-  afterEach(() => {
-    if (originalGateEnvValue === undefined) {
-      delete process.env[SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR];
-    } else {
-      process.env[SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR] = originalGateEnvValue;
-    }
+    await prisma.$executeRaw`DELETE FROM v1_game_operation_gate_settings WHERE id = 'singleton'`;
   });
 
   afterAll(async () => {
@@ -97,14 +89,14 @@ describe('simplified (non-production) operation flag admin toggle', () => {
     await moduleRef.close();
   });
 
-  // ── 1. The most important test: production-shaped (env unset) always rejects ──
-  it('rejects the simplified toggle when the opt-in variable is unset, even for an owner with a valid payload', async () => {
+  // ── 1. The most important test: the DB switch defaults to off, so the shortcut is unreachable ──
+  it('rejects the simplified toggle while the DB gate switch is off, even for an owner with a valid payload', async () => {
     await expect(
       service.simplifiedPatchFlag(
         OWNER_USER_ID,
         'PUBLIC_LIVE',
-        { expectedVersion: 0, value: 'on', reason: 'trying to skip the gate in prod' },
-        'prod-reject-1',
+        { expectedVersion: 0, value: 'on', reason: 'trying to skip the gate while the switch is off' },
+        'gate-off-reject-1',
       ),
     ).rejects.toMatchObject({
       response: { code: 'SIMPLIFIED_GATE_DISABLED' },
@@ -116,22 +108,68 @@ describe('simplified (non-production) operation flag admin toggle', () => {
     });
   });
 
-  it('rejects the simplified toggle for any literal other than exactly "true"', async () => {
-    process.env[SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR] = 'TRUE';
-    await expect(
-      service.simplifiedPatchFlag(
+  // ── 2. setSimplifiedGate: the switch itself is CAS'd and audited ──
+  describe('setSimplifiedGate', () => {
+    it('rejects a stale expectedVersion (CAS conflict)', async () => {
+      await service.getSimplifiedGateStatus(OWNER_USER_ID); // ensures the singleton row exists
+      await expect(
+        service.setSimplifiedGate(
+          OWNER_USER_ID,
+          { expectedVersion: 5, enabled: true, reason: 'stale version must be rejected' },
+          'gate-cas-stale',
+        ),
+      ).rejects.toMatchObject({ response: { code: 'VERSION_CONFLICT' } });
+    });
+
+    it('rejects a no-op flip (already in the requested state)', async () => {
+      await expect(
+        service.setSimplifiedGate(
+          OWNER_USER_ID,
+          { expectedVersion: 0, enabled: false, reason: 'already off, this must not audit a no-op' },
+          'gate-noop',
+        ),
+      ).rejects.toMatchObject({ response: { code: 'GATE_MODE_UNCHANGED' } });
+    });
+
+    it('turns the gate on, after which the simplified toggle becomes reachable, and audits OPERATION_GATE_MODE_CHANGED', async () => {
+      const enabled = await service.setSimplifiedGate(
         OWNER_USER_ID,
-        'PUBLIC_LIVE',
-        { expectedVersion: 0, value: 'on', reason: 'near-miss literal must still reject' },
-        'prod-reject-2',
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+        { expectedVersion: 0, enabled: true, reason: 'owner enabling the simplified path' },
+        'gate-on-1',
+      );
+      expect(enabled).toMatchObject({ enabled: true, version: 1, updatedByUserId: OWNER_USER_ID });
+
+      const audits = await prisma.$queryRaw<
+        Array<{ action: string; after: { simplifiedGateEnabled?: boolean; version?: number } }>
+      >`
+        SELECT action, after FROM v1_operation_audits
+        WHERE resource_type = 'operation_gate' AND resource_id = 'simplified'
+      `;
+      expect(audits).toHaveLength(1);
+      expect(audits[0].action).toBe('OPERATION_GATE_MODE_CHANGED');
+      expect(audits[0].after).toMatchObject({ simplifiedGateEnabled: true, version: 1 });
+
+      // Now reachable -- still order-gated, proving the shortcut skips only the gate-bundle
+      // paperwork, never the frozen cutover order.
+      await expect(
+        service.simplifiedPatchFlag(
+          OWNER_USER_ID,
+          'PUBLIC_LIVE',
+          { expectedVersion: 0, value: 'on', reason: 'gate now enabled' },
+          'gate-now-on-attempt',
+        ),
+      ).rejects.toMatchObject({ response: { code: 'CUTOVER_ORDER_VIOLATION' } });
+    });
   });
 
-  // ── 2. Once opted in: permission parity, key allowlist, CAS, transition validity ──
-  describe('with the simplified gate enabled', () => {
-    beforeEach(() => {
-      process.env[SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR] = 'true';
+  // ── 3. Once enabled: permission parity, transition validity, frozen order for all four keys ──
+  describe('with the DB gate switch enabled', () => {
+    beforeEach(async () => {
+      await service.setSimplifiedGate(
+        OWNER_USER_ID,
+        { expectedVersion: 0, enabled: true, reason: 'test setup: enable simplified gate' },
+        `gate-enable-${randomUUID()}`,
+      );
     });
 
     it('still requires the same ops/owner admin level as the gated path', async () => {
@@ -161,16 +199,13 @@ describe('simplified (non-production) operation flag admin toggle', () => {
       ).rejects.toMatchObject({ response: { code: 'CUTOVER_ORDER_VIOLATION' } });
     });
 
-    it('rejects a latched flag key (GAME_WRITE/GAME_READ) even though the gate is enabled', async () => {
-      await expect(
-        service.simplifiedPatchFlag(
-          OWNER_USER_ID,
-          'GAME_WRITE',
-          { expectedVersion: 0, value: 'new', reason: 'must not open the irreversible latch' },
-          'key-not-allowed',
-        ),
-      ).rejects.toMatchObject({ response: { code: 'SIMPLIFIED_GATE_KEY_NOT_ALLOWED' } });
-    });
+    // NOTE: the previous "rejects a latched flag key (GAME_WRITE/GAME_READ)" test was deleted
+    // rather than kept as a fake pass -- `SIMPLIFIED_GATE_ALLOWED_KEYS` now contains all four
+    // members of `GameOperationFlagKey`, and `parseFlagKey` rejects any other string with
+    // `INVALID_OPERATION_FLAG` before the allowlist check ever runs, so `SIMPLIFIED_GATE_KEY_NOT_ALLOWED`
+    // is unreachable through any real call and there is no way to exercise it without mocking
+    // internals (which `assertReceiptIdentity`/CLAUDE.md's "가짜 테스트 금지" rules this project
+    // out). See tests 5/6 below for GAME_WRITE/GAME_READ now going through this path instead.
 
     it('rejects a value outside off/on for the allowed keys', async () => {
       await expect(
@@ -195,7 +230,7 @@ describe('simplified (non-production) operation flag admin toggle', () => {
       ).rejects.toMatchObject({ response: { code: 'VERSION_CONFLICT' } });
     });
 
-    // ── 3. The key finding: frozen cutover order is preserved, not relaxed ──
+    // ── 4. The key finding: frozen cutover order is preserved, not relaxed ──
     it('rejects PUBLIC_LIVE off->on while GAME_WRITE/GAME_READ remain legacy (matches alpha today)', async () => {
       await service.getFlag(OWNER_USER_ID, 'PUBLIC_LIVE'); // ensureDefaults: GAME_WRITE=legacy, GAME_READ=legacy
       await expect(
@@ -218,7 +253,47 @@ describe('simplified (non-production) operation flag admin toggle', () => {
       expect(await auditRowsFor('DIRECTOR_OFFICIALIZE')).toHaveLength(0);
     });
 
-    // ── 4. Rollback (on->off) is not order-gated, and always available as an escape hatch ──
+    // ── 5. The frozen order also protects the newly-allowed GAME_WRITE/GAME_READ keys ──
+    it('rejects GAME_WRITE legacy->new while GAME_READ is still legacy (order invariant survives the simplified path)', async () => {
+      await service.getFlag(OWNER_USER_ID, 'GAME_WRITE'); // ensureDefaults: GAME_READ=legacy too
+      await expect(
+        service.simplifiedPatchFlag(
+          OWNER_USER_ID,
+          'GAME_WRITE',
+          { expectedVersion: 0, value: 'new', reason: 'skip ahead without advancing GAME_READ first' },
+          'order-write-before-read',
+        ),
+      ).rejects.toMatchObject({ response: { code: 'CUTOVER_ORDER_VIOLATION' } });
+      expect(await auditRowsFor('GAME_WRITE')).toHaveLength(0);
+    });
+
+    // ── 6. GAME_READ legacy->compare, then GAME_WRITE legacy->new, in the frozen order: succeeds ──
+    it('allows GAME_READ legacy->compare then GAME_WRITE legacy->new through the simplified path', async () => {
+      await service.getFlag(OWNER_USER_ID, 'GAME_READ'); // ensureDefaults
+      const read = await service.simplifiedPatchFlag(
+        OWNER_USER_ID,
+        'GAME_READ',
+        { expectedVersion: 0, value: 'compare', reason: 'advance read authority to compare first' },
+        'order-read-compare',
+      );
+      expect(read).toMatchObject({ value: 'compare', version: 1 });
+
+      const write = await service.simplifiedPatchFlag(
+        OWNER_USER_ID,
+        'GAME_WRITE',
+        { expectedVersion: 0, value: 'new', reason: 'advance write authority once read is compare' },
+        'order-write-after-read',
+      );
+      expect(write).toMatchObject({ value: 'new', version: 1 });
+
+      const writeAudit = await prisma.$queryRaw<Array<{ after: { gateMode?: string } }>>`
+        SELECT after FROM v1_operation_audits WHERE resource_id = 'GAME_WRITE'
+      `;
+      expect(writeAudit).toHaveLength(1);
+      expect(writeAudit[0].after).toMatchObject({ gateMode: 'simplified' });
+    });
+
+    // ── 7. Rollback (on->off) is not order-gated, and always available as an escape hatch ──
     it('allows PUBLIC_LIVE on->off rollback at any time, replays idempotently, and audits with gateMode: simplified', async () => {
       await forcePublicLiveOn();
       const input = {
@@ -239,7 +314,7 @@ describe('simplified (non-production) operation flag admin toggle', () => {
       expect(audits[0].after).toMatchObject({ gateMode: 'simplified', value: 'off' });
     });
 
-    // ── 5. Once the real migration has advanced write/read to 'new', the simplified path works ──
+    // ── 8. Once the real migration has advanced write/read to 'new', the simplified path works ──
     it('allows PUBLIC_LIVE off->on once GAME_WRITE=new and GAME_READ=new via the fully gated path', async () => {
       await advanceWriteReadToNew();
       const toggled = await service.simplifiedPatchFlag(

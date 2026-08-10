@@ -22,31 +22,42 @@ The flag gate is an immutable phase-specific attempt-bound bundle, not an ad hoc
 
 <!-- API_CONTRACT_SECTION_END:Literal migration/cutover phases -->
 
-## Non-production admin fast path
+## Simplified admin fast path
 
 `PATCH /tournament-ops/operation-flags/:key/simplified-toggle` is an owner-requested admin on/off
-for `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` only. It skips exactly one thing from the literal contract
-above: the immutable gate-bundle evidence (`verifyGateBundle`'s R1/R2 signed-receipt ceremony).
-Everything else is identical to `PATCH /tournament-ops/operation-flags/:key` — the same
-`platform_ops` admin level (`getMutationAdmin`; `support` and non-admin callers are rejected), the
-same CAS on `expectedVersion`, the same `off<->on`-only transition validity, the same
-**frozen cutover order** (`assertFrozenForwardOrder`: an off→on promotion still requires
-`GAME_WRITE=new` and `GAME_READ=new` first — this path does not relax that data-consistency
-invariant, only the paperwork), a mandatory `reason`, a required `Idempotency-Key`, and a
-`V1OperationAudit`/outbox write (marked `gateMode: "simplified"` in the `after` payload to
-distinguish it from the gated path in the same audit trail). `GAME_WRITE`/`GAME_READ` themselves
-can never use this path — only the two always-rollback-able boolean flags.
+for all four operation flags (`GAME_READ`, `GAME_WRITE`, `PUBLIC_LIVE`, `DIRECTOR_OFFICIALIZE`). It
+skips exactly one thing from the literal contract above: the immutable gate-bundle evidence
+(`verifyGateBundle`'s R1/R2 signed-receipt ceremony). Everything else is identical to
+`PATCH /tournament-ops/operation-flags/:key` — the same `platform_ops` admin level
+(`getMutationAdmin`; `support` and non-admin callers are rejected), the same CAS on
+`expectedVersion`, the same single-step transition validity (`assertSingleTransition`; reversing a
+`GAME_READ`/`GAME_WRITE` step still requires the fully gated tuple-transition path), the same
+**frozen cutover order** (`assertFrozenForwardOrder`: `GAME_READ legacy→compare`, then
+`GAME_WRITE legacy→new` requires `GAME_READ=compare`, then `GAME_READ compare→new` requires
+`GAME_WRITE=new`, then `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE off→on` require both `GAME_WRITE=new`
+and `GAME_READ=new` — this path does not relax that data-consistency invariant, only the
+paperwork), a mandatory `reason`, a required `Idempotency-Key`, and a `V1OperationAudit`/outbox
+write (marked `gateMode: "simplified"` in the `after` payload to distinguish it from the gated
+path in the same audit trail). `GAME_WRITE legacy→new` still latches
+`v1_game_cutover_epochs.first_new_write_at` on the first new-authority write, making that step
+practically irreversible through this path too — rolling it back still requires
+`tupleTransition`.
 
-It requires `V1_ALLOW_SIMPLIFIED_OPERATION_FLAG_GATE=true`, unset (disabled) by default. `NODE_ENV`
-cannot gate this: both `deploy/docker-compose.alpha.yml` and `deploy/docker-compose.prod.yml`
-hardcode `NODE_ENV=production` (alpha loads as an overlay on top of the prod compose), so this
-dedicated variable — set only in the alpha compose file — is the sole environment signal.
+Whether this path is reachable at all is a DB-backed switch, not an environment variable: the
+singleton row in `v1_game_operation_gate_settings` (`simplified_gate_enabled`, CAS'd by
+`version`), defaulting to `false` on a freshly provisioned environment (including production).
+`platform_ops` admins flip it via `PATCH /tournament-ops/operation-flags/simplified-gate` (same CAS
++ mandatory `reason` + `V1OperationAudit` shape as everything else in this contract) and read its
+state via `GET /tournament-ops/operation-flags/simplified-gate/status`. It is reachable from any
+environment, including production — the control is the CAS + audit trail on the switch itself, not
+which environment the process runs in.
 
-Because the frozen order is preserved, this path cannot promote `PUBLIC_LIVE` to `on` while
-`GAME_WRITE`/`GAME_READ` remain at their Phase A `legacy` values (alpha's state as of this writing)
-even with the shortcut enabled; it only becomes usable for that promotion once the real migration
-(Phase C, via the fully gated path above) has advanced both to `new`. Rollback (`on`→`off`) has no
-such precondition and is always available.
+Because the frozen order is preserved, this path cannot promote `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE`
+to `on` while `GAME_WRITE`/`GAME_READ` remain at their Phase A `legacy` values (alpha's state as of
+this writing) even with the switch enabled; it only becomes usable for that promotion once
+`GAME_WRITE`/`GAME_READ` have advanced to `new` — either through this same simplified path (in the
+frozen order) or the fully gated path above. Boolean rollback (`on`→`off`) has no such precondition
+and is always available.
 
 ## Migrated deferred-boundary contract
 

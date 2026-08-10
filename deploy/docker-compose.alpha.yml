@@ -6,12 +6,6 @@ services:
     image: ${ALPHA_API_IMAGE:?ALPHA_API_IMAGE must be an ECR digest URI}
     environment:
       V1_RELEASE: ${ALPHA_RELEASE_VERSION:-}
-      # 관리자 화면에서 PUBLIC_LIVE/DIRECTOR_OFFICIALIZE 를 immutable 게이트 번들(R1/R2,
-      # 14일 이상) 없이 CAS+감사 로그만으로 켜고 끌 수 있게 하는 admin 전용 우회 경로.
-      # apps/v1_api/src/config/game-operation-flags.ts의 isSimplifiedOperationFlagGateEnabled()
-      # 참고 -- NODE_ENV=production 은 alpha/실프로덕션 공용이라 구분 신호가 못 되므로 이 변수
-      # 하나만이 유일한 환경 판정 신호다. docker-compose.prod.yml 에는 절대 추가하지 않는다.
-      V1_ALLOW_SIMPLIFIED_OPERATION_FLAG_GATE: "true"
 
   # 워커는 전용 이미지를 빌드하지 않고 API 이미지를 그대로 재사용한다
   # (alpha-release-common.sh 의 assert_running_release_digests 가

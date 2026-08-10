@@ -8,7 +8,7 @@ export default function AdminOperationFlagsPage() {
       <AdminPageHeader
         eyebrow="운영 도구"
         title="경기 운영 플래그"
-        description="관전자 실시간 점수 공개, 심판 결과 공식화를 켜고 꺼요. 모든 변경은 감사 로그에 남아요."
+        description="경기 기록을 새 시스템으로 옮기는 5단계 전환을 순서대로 진행해요. 앞 단계가 끝나야 다음 단계가 열리고, 모든 변경은 감사 로그에 남아요."
       />
       <OperationFlagTogglePanel />
     </>

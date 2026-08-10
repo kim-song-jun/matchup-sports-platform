@@ -2990,6 +2990,17 @@ model V1GameOperationFlag {
   @@map("v1_game_operation_flags")
 }
 
+model V1GameOperationGateSetting {
+  id                    String   @id @default("singleton")
+  simplifiedGateEnabled Boolean  @default(false) @map("simplified_gate_enabled")
+  version               Int      @default(0)
+  updatedByUserId       String?  @map("updated_by_user_id")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@map("v1_game_operation_gate_settings")
+}
+
 model V1GameCutoverEpoch {
   id                      String          @id @default("game-cutover")
   version                 Int             @default(0)

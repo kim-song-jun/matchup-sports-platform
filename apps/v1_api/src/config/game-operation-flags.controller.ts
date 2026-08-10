@@ -13,6 +13,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -69,8 +70,23 @@ export class SimplifiedPatchGameOperationFlagDto {
   expectedVersion!: number;
 
   @IsString()
-  @IsIn(['off', 'on'])
+  @IsIn(['legacy', 'compare', 'new', 'off', 'on'])
   value!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1_000)
+  reason!: string;
+}
+
+export class SetSimplifiedGateDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  expectedVersion!: number;
+
+  @IsBoolean()
+  enabled!: boolean;
 
   @IsString()
   @MinLength(1)
@@ -164,6 +180,18 @@ export class GameOperationFlagsController {
     return this.flags.getSimplifiedGateStatus(user.id);
   }
 
+  // Must stay above `@Patch(':key')` -- otherwise Nest's router would swallow this as
+  // `:key='simplified-gate'` (same reason `@Get('simplified-gate/status')` above is also
+  // declared before `@Get(':key')`).
+  @Patch('simplified-gate')
+  setSimplifiedGate(
+    @CurrentUser() user: V1AuthUser,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: SetSimplifiedGateDto,
+  ) {
+    return this.flags.setSimplifiedGate(user.id, dto, idempotencyKey);
+  }
+
   @Get(':key')
   getFlag(@CurrentUser() user: V1AuthUser, @Param('key') key: string) {
     return this.flags.getFlag(user.id, key);
@@ -179,8 +207,10 @@ export class GameOperationFlagsController {
     return this.flags.patchFlag(user.id, key, dto, idempotencyKey);
   }
 
-  // Non-production admin fast path -- see `isSimplifiedOperationFlagGateEnabled`'s doc comment in
-  // ./game-operation-flags.ts for why this cannot activate in production.
+  // Admin fast path for all four operation flags -- see `SIMPLIFIED_GATE_ALLOWED_KEYS`'s doc
+  // comment in ./game-operation-flags.ts for what this does and does not relax. Whether this is
+  // reachable at all is controlled by `v1_game_operation_gate_settings` (setSimplifiedGate below),
+  // not by which environment this process runs in.
   @Patch(':key/simplified-toggle')
   simplifiedPatchFlag(
     @CurrentUser() user: V1AuthUser,

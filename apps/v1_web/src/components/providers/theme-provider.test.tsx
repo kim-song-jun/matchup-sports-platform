@@ -100,4 +100,34 @@ describe('ThemeProvider server sync', () => {
     // 가드가 없다면 여기서 캐시에 남은 dark로 되돌아간다 — 로그아웃 상태이므로 light가 유지돼야 한다.
     expect(screen.getByTestId('preference')).toHaveTextContent('light');
   });
+
+  // Copilot 리뷰 지적: prefersDarkOS가 초기값 false로 시작하면, system 선호도 + OS가
+  // dark인 사용자는 마운트 직후 effectiveTheme가 잠깐 light로 계산돼 FOUC 스크립트가
+  // 미리 붙여둔 .dark를 뗐다가(toggle(false)) matchMedia effect 이후 다시 붙이는
+  // (toggle(true)) 깜빡임이 생긴다. 초기 state를 matchMedia로 동기 계산하면 classList
+  // 조작이 (true) 한 번만 일어나야 한다.
+  it('system 선호도 + OS dark일 때 마운트 직후 .dark를 뗐다 다시 붙이는 깜빡임이 없다', () => {
+    window.localStorage.setItem('tm-theme', 'system');
+    sessionMock.hasStoredV1Session.mockReturnValue(false);
+    hooks.useV1Settings.mockReturnValue({ data: undefined });
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: true, // OS가 다크라고 가정
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    const toggleSpy = vi.spyOn(document.documentElement.classList, 'toggle');
+
+    render(
+      <ThemeProvider>
+        <Consumer />
+      </ThemeProvider>,
+    );
+
+    const darkCalls = toggleSpy.mock.calls.filter((call) => call[0] === 'dark');
+    expect(darkCalls).toEqual([['dark', true]]);
+
+    toggleSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
 });

@@ -49,9 +49,23 @@ function safeHasStoredV1Session() {
   }
 }
 
+// THEME_INIT_SCRIPT(FOUC 방지 인라인 스크립트)는 첫 페인트 전에 이미 matchMedia로
+// 동기 계산해 .dark 클래스를 붙여둔다. 여기서 초기 state를 false로 시작하면 마운트
+// 직후 useEffect가 돌기 전까지 prefersDarkOS=false로 잘못 계산돼(system 선호도 +
+// OS가 dark인 사용자 기준) FOUC 스크립트가 붙여둔 .dark를 잠깐 떼었다가 다시 붙이는
+// 깜빡임이 생긴다 — 초기값도 동일하게 동기 계산해야 한 번에 일치한다.
+function readPrefersDarkOS(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } catch {
+    return false;
+  }
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [preference, setPreferenceState] = useState<ThemePreference>(readStoredPreference);
-  const [prefersDarkOS, setPrefersDarkOS] = useState(false);
+  const [prefersDarkOS, setPrefersDarkOS] = useState(readPrefersDarkOS);
   // 로그인 사용자가 이 기기에서 처음 로드될 때 한 번만 계정에 저장된 값으로
   // 로컬 값을 덮어쓴다 — 그 뒤로는 이 기기에서의 로컬 선택이 우선이다(예: 방금
   // 이 기기에서 바꿨는데 느린 응답으로 다시 덮어써지는 걸 방지).
@@ -62,6 +76,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const hasSession = safeHasStoredV1Session();
   const settings = useV1Settings({ enabled: hasSession });
   const updateSettings = useV1UpdateSettings();
+
+  // ThemeProvider는 지금은 앱 루트에서 한 번만 마운트되지만, 저장 실패 알림을 3초
+  // setTimeout으로 지우는 로직이 언마운트 이후에도 setState를 시도하지 않도록 방어한다.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     // 일부 구형 WebView는 matchMedia 자체가 없다 — 없으면 시스템 설정 추적을 그냥 건너뛴다
@@ -131,8 +155,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           { theme: next },
           {
             onError: () => {
+              if (!isMountedRef.current) return;
               setSaveError(true);
-              window.setTimeout(() => setSaveError(false), 3000);
+              window.setTimeout(() => {
+                if (isMountedRef.current) setSaveError(false);
+              }, 3000);
             },
           },
         );

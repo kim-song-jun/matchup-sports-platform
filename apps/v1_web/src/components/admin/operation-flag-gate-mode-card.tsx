@@ -45,16 +45,16 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
   }
 
   return (
-    <div className="flex flex-col gap-3 bg-white border border-gray-100 rounded-2xl p-5 md:p-6">
+    <div className="flex flex-col gap-3 bg-[var(--card-surface)] border border-[var(--border)] rounded-2xl p-5 md:p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-[16px] font-bold text-gray-900">간소 전환 모드</h2>
+            <h2 className="text-[16px] font-bold text-[var(--text-strong)]">간소 전환 모드</h2>
             {!isPending && !isError && (
               <span
                 className={[
                   'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold',
-                  enabled ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500',
+                  enabled ? 'bg-blue-100 text-blue-700' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
                 ].join(' ')}
               >
                 {enabled ? <ToggleRight size={12} aria-hidden="true" /> : <ToggleLeft size={12} aria-hidden="true" />}
@@ -62,7 +62,7 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
               </span>
             )}
           </div>
-          <p className="text-[13px] text-gray-500 mt-1.5 leading-relaxed">
+          <p className="text-[13px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
             게이트 번들(R1/R2 서명, 최소 14일) 절차 없이 아래 5단계를 바로 실행할 수 있게 하는
             스위치예요. 켜져 있는 동안에도 CAS·감사 로그·전환 순서 같은 안전장치는 그대로
             적용돼요 — 생략되는 건 서류 절차뿐이에요.
@@ -78,7 +78,7 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
           className={[
             'shrink-0 inline-flex items-center justify-center min-h-[44px] px-4 rounded-xl text-[13px] font-semibold transition-colors',
             'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed',
-            enabled ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-blue-500 text-white hover:bg-blue-600',
+            enabled ? 'bg-[var(--surface-soft)] text-[var(--text-body)] hover:bg-[var(--grey300)]' : 'bg-blue-500 text-white hover:bg-blue-600',
           ].join(' ')}
         >
           {enabled ? '끄기' : '켜기'}
@@ -97,18 +97,18 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
       )}
 
       {gateStatus && (
-        <dl className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-50 text-[12px]">
+        <dl className="grid grid-cols-3 gap-2 pt-3 border-t border-[var(--border)] text-[12px]">
           <div>
             <dt className="text-gray-400">버전</dt>
-            <dd className="text-gray-700 font-medium tabular-nums">v{gateStatus.version}</dd>
+            <dd className="text-[var(--text-body)] font-medium tabular-nums">v{gateStatus.version}</dd>
           </div>
           <div>
             <dt className="text-gray-400">마지막 변경자</dt>
-            <dd className="text-gray-700 font-medium truncate">{gateStatus.updatedByUserId ?? '—'}</dd>
+            <dd className="text-[var(--text-body)] font-medium truncate">{gateStatus.updatedByUserId ?? '—'}</dd>
           </div>
           <div>
             <dt className="text-gray-400">마지막 변경 시각</dt>
-            <dd className="text-gray-700 font-medium">
+            <dd className="text-[var(--text-body)] font-medium">
               {new Date(gateStatus.updatedAt).toLocaleString('ko-KR', {
                 month: 'numeric',
                 day: 'numeric',

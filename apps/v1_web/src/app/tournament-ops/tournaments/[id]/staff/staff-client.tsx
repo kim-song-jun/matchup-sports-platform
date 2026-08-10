@@ -39,9 +39,10 @@ function assignmentStatusLabel(assignment: V1TournamentStaffAssignment): { label
 }
 
 const STATUS_TONE_CLASSES = {
-  green: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-300',
-  red: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-  gray: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
+  // --green700 토큰 없음 — text-green-700는 원래 값 유지, 배경만 토큰화
+  green: 'bg-[var(--green50)] text-green-700 dark:text-green-300',
+  red: 'bg-[var(--red50)] text-[var(--red700)]',
+  gray: 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
 } as const;
 
 /** platform_ops는 누구든, tournament_director는 director를 제외한 배정만 해제할 수 있어요. */
@@ -127,8 +128,8 @@ export function StaffClient({ tournamentId }: Props) {
           <p className="text-[11px] md:text-[12px] font-semibold text-blue-500 tracking-normal mb-1">
             {tournament.data?.title ?? '대회 운영'}
           </p>
-          <h1 className="text-[22px] md:text-[24px] font-bold text-gray-900 dark:text-white">스태프</h1>
-          <p className="text-[13px] md:text-[14px] text-gray-500 dark:text-gray-400 mt-1">
+          <h1 className="text-[22px] md:text-[24px] font-bold text-[var(--text-strong)]">스태프</h1>
+          <p className="text-[13px] md:text-[14px] text-[var(--text-muted)] mt-1">
             대회 운영을 도와주는 스태프의 배정 현황이에요.
           </p>
         </div>
@@ -152,64 +153,64 @@ export function StaffClient({ tournamentId }: Props) {
           <div className="hidden lg:block">
             <AdminTableSkeleton rows={4} cols={5} />
           </div>
-          <div className="lg:hidden bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+          <div className="lg:hidden bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
             <AdminListSkeleton rows={4} />
           </div>
         </>
       ) : staff.isError ? (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-white/10 py-10 px-4 flex flex-col items-center gap-3 text-center">
+        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
           <p className="text-sm text-red-500 font-medium">
             {extractErrorMessage(staff.error, '스태프 목록을 불러오지 못했어요.')}
           </p>
           <button
             type="button"
             onClick={() => void staff.refetch()}
-            className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="text-sm text-blue-500 hover:text-[var(--blue700)] underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             다시 시도하기
           </button>
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
           <AdminEmpty title="배정된 스태프가 없어요" description="스태프를 배정해 대회 운영을 나눠 맡겨보세요." />
         </div>
       ) : (
         <>
           {/* ── 데스크톱 표 (lg+) ────────────────────────────────────── */}
-          <div className="hidden lg:block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+          <div className="hidden lg:block bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-max min-w-full text-sm text-gray-700 dark:text-gray-200">
-                <thead className="sticky top-0 bg-gray-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/10">
+              <table className="w-max min-w-full text-sm text-[var(--text-body)]">
+                <thead className="sticky top-0 bg-[var(--surface-soft)] border-b border-[var(--border)]">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       역할
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       담당 범위
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       만료
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       상태
                     </th>
-                    <th scope="col" className="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-right font-semibold text-[var(--text-muted)] text-[12px]">
                       작업
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                <tbody className="divide-y divide-[var(--border)]">
                   {items.map((assignment) => {
                     const status = assignmentStatusLabel(assignment);
                     return (
                       <tr key={assignment.id}>
                         <td className="px-4 py-3 align-middle">
-                          <p className="font-medium text-gray-900 dark:text-white">{staffRoleLabel(assignment.role)}</p>
+                          <p className="font-medium text-[var(--text-strong)]">{staffRoleLabel(assignment.role)}</p>
                           {/* 담당자를 userId 앞 8자로만 보여주면 표에서 누가 누구인지 알 수 없다.
                               닉네임이 있으면 그것을 보여주고, 없을 때만 종전 식별자 조각으로 남긴다 —
                               닉네임이 공개 신원으로 쓸 수 있는 유일한 값이다(D-03/D-11). */}
                           {assignment.nickname ? (
-                            <p className="text-[12px] text-gray-500 dark:text-gray-400">{assignment.nickname}</p>
+                            <p className="text-[12px] text-[var(--text-muted)]">{assignment.nickname}</p>
                           ) : (
                             <p className="text-[12px] text-gray-400 tabular-nums">{assignment.userId.slice(0, 8)}…</p>
                           )}
@@ -242,7 +243,7 @@ export function StaffClient({ tournamentId }: Props) {
                                 setRevokeError(null);
                                 setRevokeTarget(assignment);
                               }}
-                              className="inline-flex items-center justify-center min-h-[44px] px-3 text-sm text-red-500 hover:text-red-600 font-semibold focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                              className="inline-flex items-center justify-center min-h-[44px] px-3 text-sm text-red-500 hover:text-[var(--red700)] font-semibold focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
                             >
                               해제
                             </button>
@@ -263,14 +264,14 @@ export function StaffClient({ tournamentId }: Props) {
               return (
                 <li
                   key={assignment.id}
-                  className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-white/10 px-4 py-3"
+                  className="bg-[var(--card-surface)] rounded-xl border border-[var(--border)] px-4 py-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-white">{staffRoleLabel(assignment.role)}</p>
+                      <p className="font-medium text-[var(--text-strong)]">{staffRoleLabel(assignment.role)}</p>
                       {/* 데스크톱 표와 같은 규칙 — 닉네임이 있으면 이름, 없을 때만 식별자 조각. */}
                       {assignment.nickname ? (
-                        <p className="text-[12px] text-gray-500 dark:text-gray-400">{assignment.nickname}</p>
+                        <p className="text-[12px] text-[var(--text-muted)]">{assignment.nickname}</p>
                       ) : (
                         <p className="text-[12px] text-gray-400 tabular-nums">{assignment.userId.slice(0, 8)}…</p>
                       )}
@@ -299,7 +300,7 @@ export function StaffClient({ tournamentId }: Props) {
                         setRevokeError(null);
                         setRevokeTarget(assignment);
                       }}
-                      className="mt-2 min-h-[44px] px-3 text-sm text-red-500 hover:text-red-600 font-semibold border-t border-gray-50 dark:border-white/5 pt-2 w-full text-left focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                      className="mt-2 min-h-[44px] px-3 text-sm text-red-500 hover:text-[var(--red700)] font-semibold border-t border-[var(--border)] pt-2 w-full text-left focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
                     >
                       배정 해제
                     </button>

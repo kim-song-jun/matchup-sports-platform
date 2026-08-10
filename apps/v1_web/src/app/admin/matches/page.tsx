@@ -185,7 +185,7 @@ function AdminMatchesPageContent() {
               header: '시작',
               width: 'w-[132px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.startAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.startAt)}</span>
               ),
             },
             {
@@ -199,10 +199,10 @@ function AdminMatchesPageContent() {
               header: '매치',
               render: (row) => (
                 <div className="min-w-0">
-                  <span className="block truncate font-medium text-gray-900" title={row.title}>
+                  <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
                     {row.title}
                   </span>
-                  <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                  <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]">
                     {row.placeName}
                   </span>
                 </div>
@@ -212,14 +212,14 @@ function AdminMatchesPageContent() {
               key: 'sportName',
               header: '종목',
               width: 'w-[96px]',
-              render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+              render: (row) => <span className="text-[var(--text-muted)]">{row.sportName}</span>,
             },
             {
               key: 'hostName',
               header: '호스트',
               width: 'w-[124px]',
               render: (row) => (
-                <span className="block truncate text-gray-600">{row.hostName ?? '—'}</span>
+                <span className="block truncate text-[var(--text-muted)]">{row.hostName ?? '—'}</span>
               ),
             },
             {
@@ -228,7 +228,7 @@ function AdminMatchesPageContent() {
               align: 'center',
               width: 'w-[88px]',
               render: (row) => (
-                <span className="tabular-nums whitespace-nowrap text-gray-600">
+                <span className="tabular-nums whitespace-nowrap text-[var(--text-muted)]">
                   {row.participantCount}/{row.maxParticipants}
                 </span>
               ),
@@ -245,7 +245,7 @@ function AdminMatchesPageContent() {
                     }}
                     className={[
                       'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
-                      'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
+                      'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
                     aria-label={`${row.title} 상태 변경`}

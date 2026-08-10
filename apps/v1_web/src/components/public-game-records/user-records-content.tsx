@@ -22,7 +22,7 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
         </span>
         <span style={{ display: 'flex', gap: 4 }}>
           {item.mvp ? (
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#E8960C', background: '#FFF4DE', borderRadius: 6, padding: '2px 6px' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--orange700, #a36100)', background: 'var(--orange50)', borderRadius: 6, padding: '2px 6px' }}>
               MVP
             </span>
           ) : null}

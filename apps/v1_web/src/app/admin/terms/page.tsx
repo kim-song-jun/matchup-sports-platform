@@ -98,8 +98,11 @@ function documentForm(document: V1AdminTermsDocument): DocumentForm {
   };
 }
 
+// 이 필드들 중 일부(437~550행)는 bg-[var(--card-surface)]인 "약관 편집" 섹션(412행) 안에
+// 중첩된다 — 필드도 card-surface면 카드 안에 묻혀 경계가 안 보인다(전수검수에서 발견).
+// --surface-soft 로 구분하고, disabled 는 --card-surface(더 어두움)로 바꿔 "꺼짐" 느낌을 유지한다.
 const fieldClass =
-  'min-h-[44px] w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-500';
+  'min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--card-surface)] disabled:text-[var(--text-muted)]';
 
 export default function AdminTermsPage() {
   const [search, setSearch] = useState('');
@@ -361,7 +364,7 @@ export default function AdminTermsPage() {
           {errorMessage ? (
             <div className="space-y-3">
               <AdminEmpty title="약관을 불러오지 못했어요" description={errorMessage} />
-              <button type="button" onClick={() => void refetch()} className="min-h-[44px] w-full rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:border-blue-300">
+              <button type="button" onClick={() => void refetch()} className="min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] text-sm font-semibold text-[var(--text-body)] hover:border-blue-300">
                 다시 시도
               </button>
             </div>
@@ -379,13 +382,13 @@ export default function AdminTermsPage() {
                   key={policy.policyId}
                   onClick={() => selectPolicy(policy)}
                   className={[
-                    'w-full rounded-2xl border bg-white p-4 text-left transition-colors',
-                    active ? 'border-blue-400 ring-2 ring-blue-100' : 'border-gray-100 hover:border-gray-200',
+                    'w-full rounded-2xl border bg-[var(--card-surface)] p-4 text-left transition-colors',
+                    active ? 'border-blue-400 ring-2 ring-blue-100' : 'border-[var(--border)] hover:border-[var(--border-strong)]',
                   ].join(' ')}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-gray-900">{policy.name}</p>
+                      <p className="truncate text-sm font-bold text-[var(--text-strong)]">{policy.name}</p>
                       <p className="mt-1 truncate text-xs text-gray-400">{policy.code}</p>
                     </div>
                     <AdminStatusPill
@@ -395,11 +398,11 @@ export default function AdminTermsPage() {
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {policy.placements.map((placement) => (
-                      <span key={placement.placementId} className="rounded-full bg-gray-100 px-2 py-1 text-[11px] text-gray-600">
+                      <span key={placement.placementId} className="rounded-full bg-[var(--surface-soft)] px-2 py-1 text-[11px] text-[var(--text-muted)]">
                         {contextLabel[placement.context]} · {requirementLabel[placement.requirement]}
                       </span>
                     ))}
-                    <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] text-blue-600">
+                    <span className="rounded-full bg-[var(--blue50)] px-2 py-1 text-[11px] text-[var(--blue700)]">
                       동의 {policy.documents.reduce((sum, document) => sum + document.consentEventCount, 0).toLocaleString('ko-KR')}건
                     </span>
                   </div>
@@ -409,21 +412,21 @@ export default function AdminTermsPage() {
           </div>
         </section>
 
-        <section className="min-w-0 rounded-2xl border border-gray-100 bg-white p-4 md:p-5" aria-label="약관 편집">
+        <section className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 md:p-5" aria-label="약관 편집">
           {!selected && !creatingPolicy ? (
             <AdminEmpty title="관리할 약관을 선택해 주세요" description="왼쪽 목록에서 약관을 선택하거나 새 약관을 만드세요." />
           ) : (
             <div className="space-y-6">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] pb-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <ScrollText size={19} className="text-blue-600" aria-hidden="true" />
-                    <h2 className="text-lg font-bold text-gray-900">{creatingPolicy ? '새 약관 정책' : selected?.name}</h2>
+                    <ScrollText size={19} className="text-[var(--blue700)]" aria-hidden="true" />
+                    <h2 className="text-lg font-bold text-[var(--text-strong)]">{creatingPolicy ? '새 약관 정책' : selected?.name}</h2>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">발행된 본문은 감사 이력을 위해 수정할 수 없어요.</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">발행된 본문은 감사 이력을 위해 수정할 수 없어요.</p>
                 </div>
                 {!creatingPolicy && canWrite ? (
-                  <button type="button" onClick={beginNewVersion} className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-blue-200 px-3 text-sm font-semibold text-blue-600 hover:bg-blue-50">
+                  <button type="button" onClick={beginNewVersion} className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-[var(--tint-blue-border)] px-3 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]">
                     <FilePlus2 size={15} aria-hidden="true" />
                     새 버전
                   </button>
@@ -433,28 +436,28 @@ export default function AdminTermsPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 {creatingPolicy ? (
                   <label className="space-y-1.5">
-                    <span className="text-xs font-semibold text-gray-700">정책 코드</span>
+                    <span className="text-xs font-semibold text-[var(--text-body)]">정책 코드</span>
                     <input className={fieldClass} value={newCode} onChange={(event) => setNewCode(event.target.value)} placeholder="예: signup_marketing" disabled={!canWrite} />
                   </label>
                 ) : null}
                 <label className="space-y-1.5">
-                  <span className="text-xs font-semibold text-gray-700">관리 이름</span>
+                  <span className="text-xs font-semibold text-[var(--text-body)]">관리 이름</span>
                   <input className={fieldClass} value={policyName} onChange={(event) => setPolicyName(event.target.value)} disabled={!canWrite} />
                 </label>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-gray-900">노출 위치</h3>
+                  <h3 className="text-sm font-bold text-[var(--text-strong)]">노출 위치</h3>
                   {!creatingPolicy ? (
-                    <label className="flex items-center gap-2 text-xs text-gray-600">
+                    <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                       <input type="checkbox" checked={policyActive} onChange={(event) => setPolicyActive(event.target.checked)} disabled={!canWrite} />
                       정책 활성화
                     </label>
                   ) : null}
                 </div>
                 {placements.map((placement, index) => (
-                  <div key={`${placement.context}-${index}`} className="grid gap-2 rounded-xl bg-gray-50 p-3 sm:grid-cols-[1fr_1fr_90px_auto] sm:items-center">
+                  <div key={`${placement.context}-${index}`} className="grid gap-2 rounded-xl bg-[var(--surface-soft)] p-3 sm:grid-cols-[1fr_1fr_90px_auto] sm:items-center">
                     <select className={fieldClass} value={placement.context} onChange={(event) => setPlacementContext(index, event.target.value as V1ManagedTermsContext)} disabled={!canWrite}>
                       {Object.entries(contextLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
@@ -462,14 +465,14 @@ export default function AdminTermsPage() {
                       {requirementsForContext(placement.context).map((value) => <option key={value} value={value}>{requirementLabel[value]}</option>)}
                     </select>
                     <input className={fieldClass} type="number" min={0} max={1000} value={placement.displayOrder} onChange={(event) => setPlacement(index, { displayOrder: Number(event.target.value) })} disabled={!canWrite} aria-label="노출 순서" />
-                    <label className="flex min-h-[44px] items-center gap-2 px-1 text-xs text-gray-600">
+                    <label className="flex min-h-[44px] items-center gap-2 px-1 text-xs text-[var(--text-muted)]">
                       <input type="checkbox" checked={placement.isActive} onChange={(event) => setPlacement(index, { isActive: event.target.checked })} disabled={!canWrite} />
                       노출
                     </label>
                   </div>
                 ))}
                 {!creatingPolicy && canWrite ? (
-                  <button type="button" onClick={savePolicySettings} disabled={saving} className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-gray-200 px-3 text-sm font-semibold text-gray-700 hover:border-blue-300 disabled:opacity-50">
+                  <button type="button" onClick={savePolicySettings} disabled={saving} className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-[var(--border)] px-3 text-sm font-semibold text-[var(--text-body)] hover:border-blue-300 disabled:opacity-50">
                     <ShieldCheck size={15} aria-hidden="true" />
                     노출 설정 저장
                   </button>
@@ -487,51 +490,51 @@ export default function AdminTermsPage() {
                       onClick={() => setForm(documentForm(document))}
                       className={[
                         'shrink-0 rounded-xl border px-3 py-2 text-xs font-semibold',
-                        form.documentId === document.documentId ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600',
+                        form.documentId === document.documentId ? 'border-blue-400 bg-[var(--blue50)] text-[var(--blue700)]' : 'border-[var(--border)] text-[var(--text-muted)]',
                       ].join(' ')}
                     >
                       {document.version} · {statusLabel[document.status]} · 동의 {document.consentEventCount.toLocaleString('ko-KR')}
                     </button>
                   ))}
-                  {form.documentId === null ? <span className="shrink-0 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">새 초안</span> : null}
+                  {form.documentId === null ? <span className="shrink-0 rounded-xl bg-[var(--tint-orange)] px-3 py-2 text-xs font-semibold text-[var(--orange700)]">새 초안</span> : null}
                 </div>
               ) : null}
 
               <form className="space-y-4" onSubmit={submitDocument}>
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="space-y-1.5">
-                    <span className="text-xs font-semibold text-gray-700">버전</span>
+                    <span className="text-xs font-semibold text-[var(--text-body)]">버전</span>
                     <input className={fieldClass} value={form.version} onChange={(event) => setForm((current) => ({ ...current, version: event.target.value }))} disabled={!editable} placeholder="v1.2" />
                   </label>
                   <label className="space-y-1.5">
-                    <span className="text-xs font-semibold text-gray-700">적용 예정일</span>
+                    <span className="text-xs font-semibold text-[var(--text-body)]">적용 예정일</span>
                     <input className={fieldClass} type="datetime-local" value={form.effectiveAt} onChange={(event) => setForm((current) => ({ ...current, effectiveAt: event.target.value }))} disabled={!editable} />
                   </label>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="space-y-1.5">
-                    <span className="text-xs font-semibold text-gray-700">기존 회원 적용 시점</span>
+                    <span className="text-xs font-semibold text-[var(--text-body)]">기존 회원 적용 시점</span>
                     <input className={fieldClass} type="datetime-local" value={form.enforcementAt} onChange={(event) => setForm((current) => ({ ...current, enforcementAt: event.target.value }))} disabled={!editable} />
                   </label>
-                  <label className="flex min-h-[44px] items-center gap-2 self-end rounded-xl bg-gray-50 px-3 text-sm text-gray-700">
+                  <label className="flex min-h-[44px] items-center gap-2 self-end rounded-xl bg-[var(--surface-soft)] px-3 text-sm text-[var(--text-body)]">
                     <input type="checkbox" checked={form.requiresReconsent} onChange={(event) => setForm((current) => ({ ...current, requiresReconsent: event.target.checked }))} disabled={!editable} />
                     기존 동의자도 이 버전에 재동의
                   </label>
                 </div>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-semibold text-gray-700">표시 제목</span>
+                  <span className="text-xs font-semibold text-[var(--text-body)]">표시 제목</span>
                   <input className={fieldClass} value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} disabled={!editable} />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-semibold text-gray-700">서브 타이틀</span>
+                  <span className="text-xs font-semibold text-[var(--text-body)]">서브 타이틀</span>
                   <input className={fieldClass} value={form.subtitle} onChange={(event) => setForm((current) => ({ ...current, subtitle: event.target.value }))} disabled={!editable} placeholder="전체 조회에서 제목 아래에 표시할 설명" />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-semibold text-gray-700">변경 요약</span>
+                  <span className="text-xs font-semibold text-[var(--text-body)]">변경 요약</span>
                   <input className={fieldClass} value={form.changeSummary} onChange={(event) => setForm((current) => ({ ...current, changeSummary: event.target.value }))} disabled={!editable} placeholder="이 버전에서 바뀐 내용을 기록해 주세요." />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-semibold text-gray-700">약관 본문</span>
+                  <span className="text-xs font-semibold text-[var(--text-body)]">약관 본문</span>
                   <textarea className={`${fieldClass} min-h-[320px] resize-y py-3 leading-6`} value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} disabled={!editable} />
                 </label>
 
@@ -544,9 +547,9 @@ export default function AdminTermsPage() {
               </form>
 
               {!creatingPolicy && form.documentId && canWrite && form.status !== 'archived' ? (
-                <div className="space-y-3 rounded-xl border border-gray-200 p-3">
+                <div className="space-y-3 rounded-xl border border-[var(--border)] p-3">
                   <label className="block space-y-1.5">
-                    <span className="text-xs font-semibold text-gray-700">상태 변경 사유</span>
+                    <span className="text-xs font-semibold text-[var(--text-body)]">상태 변경 사유</span>
                     <input className={fieldClass} value={statusReason} onChange={(event) => setStatusReason(event.target.value)} placeholder="감사 로그에 남을 사유" />
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -556,7 +559,7 @@ export default function AdminTermsPage() {
                         발행
                       </button>
                     ) : null}
-                    <button type="button" onClick={() => submitStatus('archived')} disabled={saving} className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl border border-gray-300 px-4 text-sm font-semibold text-gray-700 disabled:opacity-50">
+                    <button type="button" onClick={() => submitStatus('archived')} disabled={saving} className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50">
                       <Archive size={15} aria-hidden="true" />
                       보관
                     </button>
@@ -564,13 +567,13 @@ export default function AdminTermsPage() {
                 </div>
               ) : null}
 
-              <div className="rounded-2xl bg-gray-50 p-4">
-                <p className="mb-3 text-xs font-bold text-gray-500">실제 본문 미리보기</p>
-                <article className="mx-auto max-w-[680px] rounded-2xl border border-gray-100 bg-white p-5 md:p-7">
-                  <h3 className="text-xl font-bold text-gray-950">{form.title || '약관 제목'}</h3>
-                  {form.subtitle ? <p className="mt-2 text-sm text-gray-600">{form.subtitle}</p> : null}
+              <div className="rounded-2xl bg-[var(--surface-soft)] p-4">
+                <p className="mb-3 text-xs font-bold text-[var(--text-muted)]">실제 본문 미리보기</p>
+                <article className="mx-auto max-w-[680px] rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5 md:p-7">
+                  <h3 className="text-xl font-bold text-[var(--text-strong)]">{form.title || '약관 제목'}</h3>
+                  {form.subtitle ? <p className="mt-2 text-sm text-[var(--text-muted)]">{form.subtitle}</p> : null}
                   <p className="mt-1 text-xs text-gray-400">{form.version || '버전 미입력'}</p>
-                  <div className="mt-6 whitespace-pre-wrap break-words text-sm leading-7 text-gray-700">
+                  <div className="mt-6 whitespace-pre-wrap break-words text-sm leading-7 text-[var(--text-body)]">
                     {form.content || '약관 본문이 여기에 표시돼요.'}
                   </div>
                 </article>

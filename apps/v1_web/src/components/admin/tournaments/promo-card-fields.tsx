@@ -33,7 +33,7 @@ type PromoCardFieldsProps = {
 };
 
 const inputClass =
-  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 export function PromoCardFields({
   variant,
@@ -74,7 +74,7 @@ export function PromoCardFields({
             저장 전에 실제 카드 형태를 확인할 수 있어요.
           </p>
         </div>
-        <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-white px-3 text-sm font-semibold text-[var(--text-body)]">
+        <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">
           <input
             type="checkbox"
             checked={value.enabled}
@@ -210,7 +210,7 @@ export function PromoCardFields({
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     disabled={disabled || uploading}
-                    className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-600 disabled:opacity-50"
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--blue700)] disabled:opacity-50"
                   >
                     <ImagePlus size={16} aria-hidden="true" />
                     {uploading ? '업로드 중…' : '이미지 업로드'}

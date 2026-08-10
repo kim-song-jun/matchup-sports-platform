@@ -116,7 +116,7 @@ function TournamentsListContent() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Sparkles size={18} style={{ color: 'var(--blue500)', flexShrink: 0 }} aria-hidden="true" />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue600, #2563eb)' }}>이벤트 허브</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue500)' }}>이벤트 허브</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>팀밋 주관 대회 캠페인 모아보기</div>
             </div>
           </div>

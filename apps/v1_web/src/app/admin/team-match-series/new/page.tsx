@@ -13,7 +13,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 
 const inputClass =
-  'h-[44px] w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 /** 페이지 로컬 팀 선택 상태 — EntityPickerItem에 종목 판정에 필요한 필드만 얹는다. */
 type SeriesTeamPick = EntityPickerItem & { sportId: string };
@@ -104,13 +104,13 @@ export default function AdminTeamMatchSeriesNewPage() {
 
       <div className="space-y-5">
         <div>
-          <label htmlFor="series-title" className="mb-1 block text-sm font-medium text-gray-900">리그 이름</label>
+          <label htmlFor="series-title" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">리그 이름</label>
           <input id="series-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} className={inputClass} />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="series-sport" className="mb-1 block text-sm font-medium text-gray-900">종목</label>
+            <label htmlFor="series-sport" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">종목</label>
             <select
               id="series-sport"
               value={sportId}
@@ -124,11 +124,11 @@ export default function AdminTeamMatchSeriesNewPage() {
               ))}
             </select>
             {isSportLocked && (
-              <p className="mt-1 text-xs text-gray-500">자동 설정됨 · 변경하려면 선택한 팀을 모두 지우세요</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">자동 설정됨 · 변경하려면 선택한 팀을 모두 지우세요</p>
             )}
           </div>
           <div>
-            <label htmlFor="series-region" className="mb-1 block text-sm font-medium text-gray-900">지역</label>
+            <label htmlFor="series-region" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">지역</label>
             <select id="series-region" value={regionId} onChange={(e) => setRegionId(e.target.value)} className={inputClass}>
               <option value="">지역 선택</option>
               {(regions ?? []).map((region) => (
@@ -140,17 +140,17 @@ export default function AdminTeamMatchSeriesNewPage() {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="series-starts-on" className="mb-1 block text-sm font-medium text-gray-900">시작일</label>
+            <label htmlFor="series-starts-on" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시작일</label>
             <input id="series-starts-on" type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} className={inputClass} />
           </div>
           <div>
-            <label htmlFor="series-ends-on" className="mb-1 block text-sm font-medium text-gray-900">종료일</label>
+            <label htmlFor="series-ends-on" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">종료일</label>
             <input id="series-ends-on" type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} className={inputClass} />
           </div>
         </div>
 
         <div>
-          <label htmlFor="series-team-picker" className="mb-1 block text-sm font-medium text-gray-900">참가 팀 추가 (최소 2팀)</label>
+          <label htmlFor="series-team-picker" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">참가 팀 추가 (최소 2팀)</label>
           <EntityPicker
             id="series-team-picker"
             value={pickerValue}
@@ -164,7 +164,7 @@ export default function AdminTeamMatchSeriesNewPage() {
           />
           <ul className="mt-2 flex flex-wrap gap-2">
             {selectedTeams.map((team) => (
-              <li key={team.id} className="flex min-h-[44px] items-center gap-2 rounded-full bg-blue-50 px-3 text-sm text-blue-700">
+              <li key={team.id} className="flex min-h-[44px] items-center gap-2 rounded-full bg-[var(--blue50)] px-3 text-sm text-[var(--blue700)]">
                 {team.label}
                 <button
                   type="button"
@@ -179,7 +179,7 @@ export default function AdminTeamMatchSeriesNewPage() {
           </ul>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-muted)]">
           순위 규칙: 승점 → 골득실 → 다득점 → 승자승 (고정값 — 리그별 변경 미지원)
         </div>
 

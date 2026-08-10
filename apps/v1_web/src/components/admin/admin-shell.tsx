@@ -134,11 +134,11 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
         'flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm transition-colors border-l-2',
         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
         active
-          ? 'border-blue-500 bg-blue-50/60 text-blue-600 font-semibold'
-          : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+          ? 'border-blue-500 bg-[var(--blue50)]/60 text-[var(--blue700)] font-semibold'
+          : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
       ].join(' ')}
     >
-      <span className={active ? 'text-blue-500' : 'text-gray-400'} aria-hidden="true">
+      <span className={active ? 'text-blue-500' : 'text-[var(--text-muted)]'} aria-hidden="true">
         {item.icon}
       </span>
       <span>{item.label}</span>
@@ -275,19 +275,19 @@ function Drawer({
         aria-label="관리자 메뉴"
         aria-hidden={!open}
         className={[
-          'fixed inset-y-0 left-0 z-50 w-[280px] bg-white flex flex-col',
+          'fixed inset-y-0 left-0 z-50 w-[280px] bg-[var(--card-surface)] flex flex-col',
           'shadow-[4px_0_24px_rgba(20,28,45,0.12)]',
           'transition-transform motion-reduce:transition-none',
           open ? 'translate-x-0 visible' : '-translate-x-full invisible',
         ].join(' ')}
       >
         {/* Drawer header */}
-        <div className="flex items-center justify-between px-4 h-[52px] border-b border-gray-100 shrink-0">
+        <div className="flex items-center justify-between px-4 h-[52px] border-b border-[var(--border)] shrink-0">
           <div className="flex items-center gap-2">
             <LayoutDashboard size={17} className="text-blue-500" aria-hidden="true" />
-            <span className="text-[15px] font-bold text-gray-900">Teameet 운영</span>
+            <span className="text-[15px] font-bold text-[var(--text-strong)]">Teameet 운영</span>
             {adminRoleLabel && (
-              <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 rounded-full px-1.5 py-0.5">
+              <span className="text-[10px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5">
                 {adminRoleLabel}
               </span>
             )}
@@ -296,7 +296,7 @@ function Drawer({
             ref={closeButtonRef}
             onClick={onClose}
             aria-label="메뉴 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-body)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <X size={20} aria-hidden="true" />
           </button>
@@ -318,11 +318,11 @@ function Drawer({
                   'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                   active
-                    ? 'border-blue-500 bg-blue-50/60 text-blue-600 font-semibold'
-                    : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                    ? 'border-blue-500 bg-[var(--blue50)]/60 text-[var(--blue700)] font-semibold'
+                    : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
-                <span className={active ? 'text-blue-500' : 'text-gray-400'} aria-hidden="true">
+                <span className={active ? 'text-blue-500' : 'text-[var(--text-muted)]'} aria-hidden="true">
                   {item.icon}
                 </span>
                 <span>{item.label}</span>
@@ -333,14 +333,14 @@ function Drawer({
         </nav>
 
         {/* Footer */}
-        <div className="px-4 py-4 border-t border-gray-100 shrink-0">
+        <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           {adminName && (
             <p className="text-[12px] text-gray-400 mb-2 truncate">{adminName}</p>
           )}
           <Link
             href="/home"
             onClick={onClose}
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-gray-600 transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             서비스로 돌아가기
@@ -371,19 +371,19 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
   }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-[var(--bg)] flex">
       {/* ── Desktop sidebar (lg+) ─────────────────────────────────────────── */}
       <aside
-        className="hidden lg:flex w-[240px] min-h-screen bg-white border-r border-gray-100 flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
+        className="hidden lg:flex w-[240px] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
         aria-label="관리자 사이드바"
       >
         {/* Brand */}
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2 min-h-[64px]">
+        <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-2 min-h-[64px]">
           <LayoutDashboard size={18} className="text-blue-500 shrink-0" aria-hidden="true" />
           <div className="flex flex-col min-w-0">
-            <span className="text-[15px] font-bold text-gray-900 leading-tight">Teameet 운영</span>
+            <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight">Teameet 운영</span>
             {adminRoleLabel && (
-              <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[10px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
                 {adminRoleLabel}
               </span>
             )}
@@ -398,13 +398,13 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
         </nav>
 
         {/* Footer identity + back link */}
-        <div className="px-4 py-4 border-t border-gray-100 shrink-0">
+        <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           {adminName && (
             <p className="text-[12px] text-gray-400 mb-2 truncate">{adminName}</p>
           )}
           <Link
             href="/home"
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-gray-600 transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             서비스로 돌아가기
@@ -429,18 +429,18 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
       {/* ── Right column: appbar + main ───────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px]">
         {/* Mobile sticky appbar (<lg) */}
-        <header className="lg:hidden sticky top-0 z-20 bg-white border-b border-gray-100 h-[52px] flex items-center px-2">
+        <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[52px] flex items-center px-2">
           <button
             ref={hamburgerRef}
             onClick={openDrawer}
             aria-label="메뉴 열기"
             aria-expanded={drawerOpen}
             aria-controls="admin-drawer"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-body)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Menu size={20} aria-hidden="true" />
           </button>
-          <span className="flex-1 text-center text-[15px] font-bold text-gray-900">
+          <span className="flex-1 text-center text-[15px] font-bold text-[var(--text-strong)]">
             {sectionLabel}
           </span>
           {/* Right slot placeholder (keeps title centered) */}

@@ -79,7 +79,7 @@ export function LineupGrid({
   return (
     <div>
       {visibleSides.length > 1 ? (
-        <div role="tablist" aria-label="팀 선택" className="mb-3 flex gap-1 rounded-lg bg-gray-100 p-1 sm:hidden dark:bg-gray-800">
+        <div role="tablist" aria-label="팀 선택" className="mb-3 flex gap-1 rounded-lg bg-[var(--surface-soft)] p-1 sm:hidden">
           {visibleSides.map((side) => (
             <button
               key={side.id}
@@ -91,8 +91,8 @@ export function LineupGrid({
                 'min-h-[44px] flex-1 rounded-md px-2 text-sm font-semibold transition-colors',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                 activeMobileSideId === side.id
-                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
-                  : 'text-gray-500 dark:text-gray-400',
+                  ? 'bg-[var(--grey300)] text-[var(--text-strong)] shadow-sm'
+                  : 'text-[var(--text-muted)]',
               ].join(' ')}
             >
               {side.displayNameSnapshot}
@@ -114,27 +114,27 @@ export function LineupGrid({
             <section
               key={side.id}
               aria-labelledby={`lineup-side-${side.id}-heading`}
-              className={`rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800 ${isActiveOnMobile ? '' : 'hidden sm:block'}`}
+              className={`rounded-xl border border-[var(--border)] bg-[var(--card-surface)] p-3 ${isActiveOnMobile ? '' : 'hidden sm:block'}`}
             >
               <h3
                 id={`lineup-side-${side.id}-heading`}
-                className="mb-2 text-sm font-semibold text-gray-900 dark:text-white"
+                className="mb-2 text-sm font-semibold text-[var(--text-strong)]"
               >
                 {side.displayNameSnapshot}
-                <span className="ml-1.5 text-2xs font-normal text-gray-400 dark:text-gray-500">
+                <span className="ml-1.5 text-2xs font-normal text-[var(--text-muted)]">
                   {side.sideKey === 'HOME' ? '홈' : '원정'}
                 </span>
               </h3>
 
               {lineup === null || participants.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-6 text-center">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-[var(--text-muted)]">
                     {lineup === null ? '제출된 선발 명단이 없어요.' : '표시할 선수가 없어요.'}
                   </p>
                   {lineup === null && tournamentId !== undefined && fixtureId !== undefined ? (
                     <Link
                       href={`/tournaments/${tournamentId}/matches/${fixtureId}/lineup`}
-                      className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                      className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                     >
                       라인업 제출하러 가기
                     </Link>
@@ -151,23 +151,22 @@ export function LineupGrid({
                         aria-label={`${participant.displayNameSnapshot} 선수 이벤트 기록`}
                         className={[
                           'flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors',
-                          'hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
-                          'dark:hover:bg-blue-500/10',
+                          'hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                           disabled ? 'cursor-not-allowed opacity-50' : '',
                         ].join(' ')}
                       >
                         <span
                           aria-hidden="true"
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-2xs font-bold tabular-nums text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-soft)] text-2xs font-bold tabular-nums text-[var(--text-muted)]"
                         >
                           {participant.jerseyNumber ?? '-'}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-gray-900 dark:text-white">
+                          <span className="block truncate text-sm font-medium text-[var(--text-strong)]">
                             {participant.displayNameSnapshot}
                           </span>
                           {participant.position ? (
-                            <span className="block text-2xs text-gray-400 dark:text-gray-500">
+                            <span className="block text-2xs text-[var(--text-muted)]">
                               {participant.position}
                             </span>
                           ) : null}

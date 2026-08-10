@@ -99,7 +99,7 @@ export function TournamentCampaignTab({
     }
 
     return (
-      <div className="rounded-2xl border border-gray-100 bg-white">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
         <AdminEmpty
           icon={<Globe2 size={40} />}
           title="캠페인이 아직 없어요"
@@ -119,15 +119,15 @@ export function TournamentCampaignTab({
 
   return (
     <div className="grid gap-6">
-      <section className="rounded-2xl border border-gray-100 bg-white p-5" aria-labelledby="campaign-admin-heading">
+      <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-labelledby="campaign-admin-heading">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 id="campaign-admin-heading" className="text-base font-bold tracking-tight text-gray-900">캠페인 운영</h2>
+              <h2 id="campaign-admin-heading" className="text-base font-bold tracking-tight text-[var(--text-strong)]">캠페인 운영</h2>
               <span className={tournamentCampaignStatusBadgeClass(campaign.status)}>{TOURNAMENT_CAMPAIGN_STATUS_LABEL[campaign.status]}</span>
             </div>
-            <p className="mt-2 break-all text-sm font-medium text-gray-700">{campaign.slug}</p>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-2 break-all text-sm font-medium text-[var(--text-body)]">{campaign.slug}</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
               {campaign.status === 'archived'
                 ? '보관되어도 캠페인 행과 주소는 유지돼요.'
                 : '대회 데이터는 서버 원본을 사용하고 설명 콘텐츠만 여기서 관리해요.'}
@@ -136,7 +136,7 @@ export function TournamentCampaignTab({
 
           {canWrite ? (
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setEditorOpen((open) => !open)} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gray-100 px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-200">
+              <button type="button" onClick={() => setEditorOpen((open) => !open)} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)]">
                 <FilePenLine size={15} aria-hidden="true" />
                 캠페인 편집
               </button>
@@ -146,7 +146,7 @@ export function TournamentCampaignTab({
                   type="button"
                   onClick={() => setStatusTarget(status)}
                   className={status === 'archived'
-                    ? 'min-h-[44px] rounded-xl bg-red-50 px-3 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100'
+                    ? 'min-h-[44px] rounded-xl bg-[var(--red50)] px-3 text-xs font-semibold text-[var(--red700)] transition-colors hover:bg-[var(--tint-red)]'
                     : 'min-h-[44px] rounded-xl bg-blue-500 px-3 text-xs font-semibold text-white transition-colors hover:bg-blue-600'}
                 >
                   {tournamentCampaignStatusActionLabel(status)}
@@ -154,7 +154,7 @@ export function TournamentCampaignTab({
               ))}
             </div>
           ) : (
-            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">읽기 전용</span>
+            <span className="rounded-full bg-[var(--surface-soft)] px-2.5 py-1 text-xs font-medium text-[var(--text-muted)]">읽기 전용</span>
           )}
         </div>
       </section>
@@ -212,10 +212,10 @@ function CampaignPreview({ query }: { readonly query: ReturnType<typeof useV1Adm
     return <CampaignError message={extractErrorMessage(query.error, '캠페인 미리보기를 불러오지 못했어요.')} onRetry={() => void query.refetch()} />;
   }
   return (
-    <section aria-label="캠페인 미리보기" className="overflow-hidden rounded-2xl border border-gray-100 bg-white">
-      <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4">
+    <section aria-label="캠페인 미리보기" className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
+      <div className="flex items-center gap-2 border-b border-[var(--border)] px-5 py-4">
         <Eye size={16} className="text-blue-500" aria-hidden="true" />
-        <h2 className="text-sm font-bold text-gray-900">실제 화면 미리보기</h2>
+        <h2 className="text-sm font-bold text-[var(--text-strong)]">실제 화면 미리보기</h2>
       </div>
       <TournamentCampaignTemplate campaign={query.data} preview />
     </section>
@@ -224,13 +224,13 @@ function CampaignPreview({ query }: { readonly query: ReturnType<typeof useV1Adm
 
 function CampaignError({ message, onRetry }: { readonly message: string; readonly onRetry: () => void }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white px-5 py-10 text-center">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-10 text-center">
       <p className="text-sm font-medium text-red-500">{message}</p>
-      <button type="button" onClick={onRetry} className="mt-3 min-h-[44px] rounded-lg px-3 text-sm font-semibold text-blue-500 transition-colors hover:text-blue-600">다시 시도하기</button>
+      <button type="button" onClick={onRetry} className="mt-3 min-h-[44px] rounded-lg px-3 text-sm font-semibold text-blue-500 transition-colors hover:text-[var(--blue700)]">다시 시도하기</button>
     </div>
   );
 }
 
 function CampaignSkeleton() {
-  return <div className="h-48 animate-pulse rounded-2xl bg-gray-100" aria-label="캠페인 불러오는 중" />;
+  return <div className="h-48 animate-pulse rounded-2xl bg-[var(--surface-soft)]" aria-label="캠페인 불러오는 중" />;
 }

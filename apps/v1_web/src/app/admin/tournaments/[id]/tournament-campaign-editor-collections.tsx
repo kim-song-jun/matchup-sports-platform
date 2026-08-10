@@ -9,7 +9,7 @@ import type {
 } from './tournament-campaign-admin-model';
 
 const INPUT_CLASS = [
-  'min-h-[44px] w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900',
+  'min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm text-[var(--text-strong)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
 ].join(' ');
 
@@ -50,9 +50,9 @@ export function TournamentCampaignEditorCollections({
         ])}
       >
         {form.highlights.map((item, index) => (
-          <div key={`highlight-${index}`} className="rounded-xl bg-gray-50 p-4">
+          <div key={`highlight-${index}`} className="rounded-xl bg-[var(--surface-soft)] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold text-gray-600">참가할 이유 {index + 1}</p>
+              <p className="text-xs font-semibold text-[var(--text-muted)]">참가할 이유 {index + 1}</p>
               <RemoveButton
                 label={`참가할 이유 ${index + 1} 삭제`}
                 onClick={() => onHighlightsChange(form.highlights.filter((_, itemIndex) => itemIndex !== index))}
@@ -98,9 +98,9 @@ export function TournamentCampaignEditorCollections({
         onAdd={() => onFaqChange([...form.faq, { question: '', answer: '' }])}
       >
         {form.faq.map((item, index) => (
-          <div key={`faq-${index}`} className="rounded-xl bg-gray-50 p-4">
+          <div key={`faq-${index}`} className="rounded-xl bg-[var(--surface-soft)] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold text-gray-600">FAQ {index + 1}</p>
+              <p className="text-xs font-semibold text-[var(--text-muted)]">FAQ {index + 1}</p>
               <RemoveButton
                 label={`FAQ ${index + 1} 삭제`}
                 onClick={() => onFaqChange(form.faq.filter((_, itemIndex) => itemIndex !== index))}
@@ -149,14 +149,14 @@ function EditorCollectionSection({
     <section className="grid gap-3" aria-label={`${title} 편집`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-bold text-gray-900">{title}</h3>
-          <span className="text-xs text-gray-500 tabular-nums">{count}</span>
+          <h3 className="text-sm font-bold text-[var(--text-strong)]">{title}</h3>
+          <span className="text-xs text-[var(--text-muted)] tabular-nums">{count}</span>
         </div>
         <button
           type="button"
           disabled={addDisabled}
           onClick={onAdd}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-gray-100 px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-40"
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] disabled:opacity-40"
         >
           <Plus size={14} aria-hidden="true" />
           {addLabel}
@@ -182,7 +182,7 @@ function CollectionField({
   readonly onChange: (value: string) => void;
 }) {
   return (
-    <label className="grid gap-1.5 text-xs font-semibold text-gray-700">
+    <label className="grid gap-1.5 text-xs font-semibold text-[var(--text-body)]">
       {label}
       {multiline ? (
         <textarea className={INPUT_CLASS} rows={3} maxLength={maxLength} value={value} onChange={(event) => onChange(event.target.value)} />
@@ -195,7 +195,7 @@ function CollectionField({
 
 function RemoveButton({ label, onClick }: { readonly label: string; readonly onClick: () => void }) {
   return (
-    <button type="button" aria-label={label} onClick={onClick} className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600">
+    <button type="button" aria-label={label} onClick={onClick} className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--red50)] hover:text-[var(--red700)]">
       <Trash2 size={15} aria-hidden="true" />
     </button>
   );

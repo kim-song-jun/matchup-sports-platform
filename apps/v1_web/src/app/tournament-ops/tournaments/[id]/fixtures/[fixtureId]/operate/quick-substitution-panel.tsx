@@ -71,10 +71,10 @@ export function QuickSubstitutionPanel({
 
   return (
     <div
-      className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 dark:border-blue-500/20 dark:bg-blue-500/5"
+      className="rounded-xl border border-[var(--tint-blue-border)] bg-[var(--blue50)] p-3"
       aria-label="빠른 교체 모드"
     >
-      <div className="mb-2 flex items-center gap-1.5 text-2xs font-bold text-blue-700 dark:text-blue-300">
+      <div className="mb-2 flex items-center gap-1.5 text-2xs font-bold text-[var(--blue700)]">
         <ArrowLeftRight size={13} aria-hidden="true" />
         빠른 교체 모드
       </div>
@@ -101,7 +101,7 @@ export function QuickSubstitutionPanel({
           </button>
         </div>
       ) : (
-        <p className="mb-2 text-2xs text-gray-500 dark:text-gray-400">나갈 선수를 먼저 지정하세요.</p>
+        <p className="mb-2 text-2xs text-[var(--text-muted)]">나갈 선수를 먼저 지정하세요.</p>
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -116,9 +116,9 @@ export function QuickSubstitutionPanel({
                 : '다른 팀 지정 중이에요.';
           return (
             <div key={side.id}>
-              <p className="mb-1 text-2xs font-semibold text-gray-600 dark:text-gray-300">{side.displayNameSnapshot}</p>
+              <p className="mb-1 text-2xs font-semibold text-[var(--text-muted)]">{side.displayNameSnapshot}</p>
               {targets.length === 0 ? (
-                <p className="py-2 text-2xs text-gray-400 dark:text-gray-500">{emptyLabel}</p>
+                <p className="py-2 text-2xs text-[var(--text-muted)]">{emptyLabel}</p>
               ) : (
                 // `<li>`로 리스트 구조를 실제 마크업에 담는다 — 인터랙티브 버튼에
                 // `role="listitem"`을 직접 얹으면 버튼의 암묵적 button 역할이
@@ -148,8 +148,8 @@ export function QuickSubstitutionPanel({
                           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                           disabled ? 'cursor-not-allowed opacity-50' : '',
                           armed !== null
-                            ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300'
-                            : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200',
+                            ? 'border-green-300 bg-[var(--green50)] text-[var(--text-strong)] hover:bg-green-100 dark:border-green-500/30'
+                            : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:bg-[var(--surface-soft)]',
                         ].join(' ')}
                       >
                         <span className="tabular-nums text-gray-400">{participant.jerseyNumber ?? '-'}</span>

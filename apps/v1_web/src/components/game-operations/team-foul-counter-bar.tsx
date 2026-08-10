@@ -25,17 +25,17 @@ export function TeamFoulCounterBar({
             className={
               warning
                 ? 'flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 dark:border-orange-500/30 dark:bg-orange-500/10'
-                : 'flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700'
+                : 'flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2'
             }
           >
-            <span className="truncate text-2xs font-medium text-gray-600 dark:text-gray-300">{side.displayNameSnapshot}</span>
+            <span className="truncate text-2xs font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</span>
             <span className="flex items-center gap-1">
               {warning ? <AlertTriangle size={12} aria-hidden="true" className="text-orange-500" /> : null}
               <span
                 className={
                   warning
                     ? 'text-sm font-bold tabular-nums text-orange-700 dark:text-orange-300'
-                    : 'text-sm font-bold tabular-nums text-gray-900 dark:text-white'
+                    : 'text-sm font-bold tabular-nums text-[var(--text-strong)]'
                 }
               >
                 파울 {count}

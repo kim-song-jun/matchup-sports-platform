@@ -88,12 +88,12 @@ export default function AdminOverviewPage() {
       {isPending ? (
         <AdminKpiGridSkeleton count={4} />
       ) : isError ? (
-        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3">
-          <p className="text-sm text-red-600 flex-1">현황 데이터를 불러오지 못했어요.</p>
+        <div className="mb-6 p-4 bg-[var(--red50)] border border-[var(--tint-red-border)] rounded-xl flex items-center gap-3">
+          <p className="text-sm text-[var(--red700)] flex-1">현황 데이터를 불러오지 못했어요.</p>
           <button
             type="button"
             onClick={() => refetch()}
-            className="text-sm text-red-600 font-semibold underline underline-offset-2 min-h-[44px] px-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="text-sm text-[var(--red700)] font-semibold underline underline-offset-2 min-h-[44px] px-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             다시 시도
           </button>
@@ -135,9 +135,9 @@ export default function AdminOverviewPage() {
       {/* ── Warning section ───────────────────────────────────────────── */}
       {!isPending && !isError && (
         <section aria-label="주의 필요 항목" className="mb-6">
-          <h2 className="text-[var(--font-size-body-sm)] font-semibold text-gray-700 mb-3">주의 필요</h2>
+          <h2 className="text-[var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">주의 필요</h2>
           {totalWarnings === 0 ? (
-            <div className="flex items-center gap-2.5 p-4 bg-green-50 border border-green-100 rounded-xl">
+            <div className="flex items-center gap-2.5 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
               <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />
               <p className="text-[var(--font-size-body-sm)] text-green-700">지금은 조치가 필요한 항목이 없어요.</p>
             </div>
@@ -195,12 +195,12 @@ export default function AdminOverviewPage() {
 
       {/* ── Recent actions panel ──────────────────────────────────────── */}
       {!isPending && !isError && (
-        <section aria-label="최근 운영 활동" className="bg-white rounded-2xl border border-gray-100">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-            <h2 className="text-[var(--font-size-body)] font-bold text-gray-900">최근 운영 활동</h2>
+        <section aria-label="최근 운영 활동" className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)]">최근 운영 활동</h2>
             <Link
               href="/admin/audit"
-              className="flex items-center gap-0.5 text-[var(--font-size-label)] text-blue-500 font-medium hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
+              className="flex items-center gap-0.5 text-[var(--font-size-label)] text-blue-500 font-medium hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
             >
               전체 보기
               <ArrowRight size={13} aria-hidden="true" />
@@ -216,13 +216,13 @@ export default function AdminOverviewPage() {
               {overview.recentActions.map((action) => (
                 <li
                   key={action.actionLogId}
-                  className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-50 last:border-0"
+                  className="flex items-center gap-3 px-5 py-3.5 border-b border-[var(--border)] last:border-0"
                 >
                   {/* Status pill for targetType */}
                   <AdminStatusPill status={action.targetType} label={adminTargetTypeLabel(action.targetType)} />
 
                   {/* Action description */}
-                  <span className="flex-1 text-[var(--font-size-label)] text-gray-700 truncate">
+                  <span className="flex-1 text-[var(--font-size-label)] text-[var(--text-body)] truncate">
                     {adminActionLabel(action.actionType)}
                   </span>
 

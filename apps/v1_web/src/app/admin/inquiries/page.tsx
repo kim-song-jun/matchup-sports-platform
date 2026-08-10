@@ -151,7 +151,7 @@ export default function AdminInquiriesPage() {
               value={activeCategory}
               onChange={(event) => setActiveCategory(event.target.value)}
               aria-label="문의 분류 필터"
-              className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-body)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             >
               {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -192,7 +192,7 @@ export default function AdminInquiriesPage() {
               header: '접수',
               width: 'w-[132px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
               ),
             },
             {
@@ -205,7 +205,7 @@ export default function AdminInquiriesPage() {
               key: 'category',
               header: '분류',
               width: 'w-[96px]',
-              render: (row) => <span className="text-gray-600">{CATEGORY_LABEL[row.category]}</span>,
+              render: (row) => <span className="text-[var(--text-muted)]">{CATEGORY_LABEL[row.category]}</span>,
             },
             {
               key: 'title',
@@ -213,7 +213,7 @@ export default function AdminInquiriesPage() {
               render: (row) => (
                 <Link
                   href={`/admin/inquiries/${row.inquiryId}`}
-                  className="block max-w-[420px] truncate font-medium text-gray-900 hover:text-blue-600 hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                  className="block max-w-[420px] truncate font-medium text-[var(--text-strong)] hover:text-[var(--blue700)] hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
                   title={row.title}
                 >
                   {row.title}
@@ -225,7 +225,7 @@ export default function AdminInquiriesPage() {
               header: '문의자',
               width: 'w-[160px]',
               render: (row) => (
-                <span className="block truncate text-gray-600" title={requesterContact(row)}>
+                <span className="block truncate text-[var(--text-muted)]" title={requesterContact(row)}>
                   {requesterLabel(row)}
                 </span>
               ),
@@ -235,13 +235,13 @@ export default function AdminInquiriesPage() {
               header: '답변',
               align: 'center',
               width: 'w-[64px]',
-              render: (row) => <span className="tabular-nums text-gray-600">{row.replyCount}</span>,
+              render: (row) => <span className="tabular-nums text-[var(--text-muted)]">{row.replyCount}</span>,
             },
           ]}
           renderActions={(row) => (
             <Link
               href={`/admin/inquiries/${row.inquiryId}`}
-              className="inline-flex h-[44px] items-center justify-center rounded-lg bg-gray-100 px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex h-[44px] items-center justify-center rounded-lg bg-[var(--surface-soft)] px-3 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               조회
             </Link>

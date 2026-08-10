@@ -9,7 +9,7 @@ import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import type { V1SeriesFixture } from '@/types/team-match-series';
 
 const inputClass =
-  'h-[44px] rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
+  'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
 
 const WEEKDAY_OPTIONS = [
   { value: 0, label: '일요일' },
@@ -67,7 +67,7 @@ export default function TeamMatchSeriesFixturesClient({ seriesId }: { seriesId: 
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-end gap-3">
             <div>
-              <label htmlFor="weeks-count" className="mb-1 block text-sm font-medium text-gray-900">주차 수</label>
+              <label htmlFor="weeks-count" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">주차 수</label>
               <input
                 id="weeks-count"
                 type="number"
@@ -79,7 +79,7 @@ export default function TeamMatchSeriesFixturesClient({ seriesId }: { seriesId: 
               />
             </div>
             <div>
-              <label htmlFor="fixture-day-of-week" className="mb-1 block text-sm font-medium text-gray-900">요일</label>
+              <label htmlFor="fixture-day-of-week" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">요일</label>
               <select
                 id="fixture-day-of-week"
                 value={dayOfWeek}
@@ -93,7 +93,7 @@ export default function TeamMatchSeriesFixturesClient({ seriesId }: { seriesId: 
               </select>
             </div>
             <div>
-              <label htmlFor="fixture-time" className="mb-1 block text-sm font-medium text-gray-900">시각</label>
+              <label htmlFor="fixture-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시각</label>
               <input
                 id="fixture-time"
                 type="time"
@@ -104,7 +104,7 @@ export default function TeamMatchSeriesFixturesClient({ seriesId }: { seriesId: 
               />
             </div>
             <div>
-              <label htmlFor="fixture-place-name" className="mb-1 block text-sm font-medium text-gray-900">기본 장소</label>
+              <label htmlFor="fixture-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
               <input
                 id="fixture-place-name"
                 type="text"
@@ -128,7 +128,7 @@ export default function TeamMatchSeriesFixturesClient({ seriesId }: { seriesId: 
             selectedValue={placeName}
             onSelect={(venue) => setPlaceName(venue.placeName)}
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-[var(--text-muted)]">
             요일·시각을 정하면 매주 그 요일 그 시각으로 채워요. 비워두면 시작일 그대로 매주 반복돼요.
             생성 후 특정 주만 다르면 아래 표에서 개별 수정하면 돼요.
           </p>

@@ -24,12 +24,12 @@ import { staffRoleLabel } from './badges';
  * 바뀌면 다른 색이 나와서 "지금 어느 대회 안에 있는지"가 사이드바 색만 봐도 구분된다.
  */
 const IDENTITY_PALETTE = [
-  { bg: '#EAF2FF', fg: '#1B64DA' },
-  { bg: '#FDF0E7', fg: '#B4530A' },
-  { bg: '#EAF9F1', fg: '#0F8A56' },
-  { bg: '#F5EEFB', fg: '#7C3FC9' },
-  { bg: '#FDEEF0', fg: '#C23A56' },
-  { bg: '#EAF6FA', fg: '#0B7A94' },
+  { className: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' },
+  { className: 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300' },
+  { className: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-300' },
+  { className: 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300' },
+  { className: 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300' },
+  { className: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300' },
 ];
 
 function hashToIndex(id: string, size: number): number {
@@ -67,12 +67,11 @@ function TournamentEmblem({
   return (
     <span
       aria-hidden="true"
+      className={palette.className}
       style={{
         width: size,
         height: size,
         borderRadius: 8,
-        background: palette.bg,
-        color: palette.fg,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -283,20 +282,20 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
         aria-hidden={!open}
         className={[
           'fixed inset-y-0 left-0 z-50 w-[280px] flex flex-col',
-          'bg-white dark:bg-gray-900',
+          'bg-[var(--card-surface)]',
           'shadow-[4px_0_24px_rgba(20,28,45,0.12)]',
           'transition-transform motion-reduce:transition-none',
           open ? 'translate-x-0 visible' : '-translate-x-full invisible',
         ].join(' ')}
       >
-        <div className="flex items-center justify-between px-4 h-[52px] border-b border-gray-100 dark:border-white/10 shrink-0">
+        <div className="flex items-center justify-between px-4 h-[52px] border-b border-[var(--border)] shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={28} />
             <div className="flex flex-col min-w-0">
-              <span className="text-[13px] font-bold text-gray-900 dark:text-white truncate">
+              <span className="text-[13px] font-bold text-[var(--text-strong)] truncate">
                 {tournamentTitle ?? '대회 운영'}
               </span>
-              <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/15 rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[10px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
                 {staffRoleLabel(role)}
               </span>
             </div>
@@ -305,7 +304,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
             ref={closeButtonRef}
             onClick={onClose}
             aria-label="메뉴 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-body)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <X size={20} aria-hidden="true" />
           </button>
@@ -325,8 +324,8 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
                   'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                   active
-                    ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 font-semibold'
-                    : 'border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white',
+                    ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/10 text-[var(--blue700)] font-semibold'
+                    : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
                 <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-gray-400'} aria-hidden="true">
@@ -338,11 +337,11 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
           })}
         </nav>
 
-        <div className="px-4 py-4 border-t border-gray-100 dark:border-white/10 shrink-0">
+        <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           <Link
             href={returnHref}
             onClick={onClose}
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             {returnLabel}
@@ -378,19 +377,19 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   const sectionLabel = navItems.find((item) => isActive(item))?.label ?? '대회 운영';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
+    <div className="min-h-screen bg-[var(--surface-soft)] flex">
       {/* ── Desktop sidebar (lg+) ─────────────────────────────────────── */}
       <aside
-        className="hidden lg:flex w-[240px] min-h-screen bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-white/10 flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
+        className="hidden lg:flex w-[240px] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
         aria-label="대회 운영 사이드바"
       >
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2.5 min-h-[64px]">
+        <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-2.5 min-h-[64px]">
           <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={34} />
           <div className="flex flex-col min-w-0">
-            <span className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight truncate">
+            <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight truncate">
               {tournamentTitle ?? '대회 운영'}
             </span>
-            <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/15 rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+            <span className="text-[10px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
               {staffRoleLabel(role)}
             </span>
           </div>
@@ -409,8 +408,8 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
                   'flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm transition-colors border-l-2',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                   active
-                    ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 font-semibold'
-                    : 'border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white',
+                    ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/10 text-[var(--blue700)] font-semibold'
+                    : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
                 <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-gray-400'} aria-hidden="true">
@@ -422,10 +421,10 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
           })}
         </nav>
 
-        <div className="px-4 py-4 border-t border-gray-100 dark:border-white/10 shrink-0">
+        <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           <Link
             href={returnTarget.href}
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             {returnTarget.label}
@@ -451,18 +450,18 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
 
       {/* ── Right column ─────────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px]">
-        <header className="lg:hidden sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/10 h-[52px] flex items-center px-2">
+        <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[52px] flex items-center px-2">
           <button
             ref={hamburgerRef}
             onClick={openDrawer}
             aria-label="메뉴 열기"
             aria-expanded={drawerOpen}
             aria-controls="tournament-ops-drawer"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-body)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Menu size={20} aria-hidden="true" />
           </button>
-          <span className="flex-1 text-center text-[15px] font-bold text-gray-900 dark:text-white truncate px-2">
+          <span className="flex-1 text-center text-[15px] font-bold text-[var(--text-strong)] truncate px-2">
             {sectionLabel}
           </span>
           <div className="w-[44px]" aria-hidden="true" />

@@ -37,9 +37,9 @@ import {
 } from './tournament-create-model';
 
 const inputClass =
-  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 const textareaClass =
-  'w-full resize-none rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 export default function AdminTournamentsNewPage() {
   const router = useRouter();
@@ -191,9 +191,9 @@ export default function AdminTournamentsNewPage() {
       <form onSubmit={handleSubmit} noValidate className="pb-28">
         <WizardStepper currentStep={state.step} onSelect={goToStep} />
 
-        <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-white">
+        <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
           <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
-            <p className="text-xs font-bold text-blue-600">
+            <p className="text-xs font-bold text-[var(--blue700)]">
               STEP {state.step + 1} / {TOURNAMENT_CREATE_STEPS.length}
             </p>
             <h2 className="mt-1 text-xl font-bold text-[var(--text-strong)]">
@@ -317,7 +317,7 @@ function WizardStepper({
 }) {
   return (
     <nav aria-label="대회 생성 단계" className="mx-auto max-w-4xl">
-      <ol className="grid grid-cols-4 gap-1 rounded-2xl border border-[var(--border)] bg-white p-2 sm:gap-2">
+      <ol className="grid grid-cols-4 gap-1 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-2 sm:gap-2">
         {TOURNAMENT_CREATE_STEPS.map((step, index) => {
           const active = index === currentStep;
           const complete = index < currentStep;
@@ -329,7 +329,7 @@ function WizardStepper({
                 aria-current={active ? 'step' : undefined}
                 className={[
                   'flex min-h-[64px] w-full items-center gap-2 rounded-xl px-2 text-left transition-colors sm:px-3',
-                  active ? 'bg-blue-50 text-blue-700' : 'text-[var(--text-caption)] hover:bg-[var(--grey50)]',
+                  active ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'text-[var(--text-caption)] hover:bg-[var(--grey50)]',
                 ].join(' ')}
               >
                 <span
@@ -338,7 +338,7 @@ function WizardStepper({
                     active
                       ? 'bg-blue-500 text-white'
                       : complete
-                        ? 'bg-blue-100 text-blue-600'
+                        ? 'bg-blue-100 text-[var(--blue700)]'
                         : 'bg-[var(--grey100)] text-[var(--text-caption)]',
                   ].join(' ')}
                 >
@@ -432,7 +432,7 @@ function BasicStep({
               className={[
                 'cursor-pointer rounded-xl border p-3 transition-colors',
                 state.format === value
-                  ? 'border-blue-500 bg-blue-50'
+                  ? 'border-blue-500 bg-[var(--blue50)]'
                   : 'border-[var(--border)] hover:border-[var(--border-strong)]',
               ].join(' ')}
             >
@@ -467,7 +467,7 @@ function BasicStep({
               className={[
                 'grid min-h-[52px] cursor-pointer place-items-center rounded-xl border text-sm font-bold transition-colors',
                 state.genderCategory === value
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  ? 'border-blue-500 bg-[var(--blue50)] text-[var(--blue700)]'
                   : 'border-[var(--border)] text-[var(--text-body)]',
               ].join(' ')}
             >
@@ -707,7 +707,7 @@ function ParticipationStep({
                   className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
                     selected
                       ? 'border-blue-500 bg-blue-500 text-white'
-                      : 'border-[var(--border)] bg-white text-[var(--text-body)] hover:border-blue-500'
+                      : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:border-blue-500'
                   }`}
                 >
                   {option}명
@@ -749,7 +749,7 @@ function ParticipationStep({
                     className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
                       selected
                         ? 'border-blue-500 bg-blue-500 text-white'
-                        : 'border-[var(--border)] bg-white text-[var(--text-body)] hover:border-blue-500'
+                        : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:border-blue-500'
                     }`}
                   >
                     {mode === 'limited' ? '제한' : '무제한(롤링)'}
@@ -855,7 +855,7 @@ function ParticipationStep({
               });
               showToast('직전 대회의 계좌 정보를 불러왔어요.', 'success');
             }}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-45"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-45"
           >
             <Copy size={15} aria-hidden="true" />
             직전 대회 불러오기

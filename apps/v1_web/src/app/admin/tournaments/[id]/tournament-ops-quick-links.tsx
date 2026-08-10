@@ -45,7 +45,7 @@ export function TournamentOpsQuickLinks({ tournamentId }: { tournamentId: string
             type="button"
             disabled
             aria-disabled="true"
-            className="inline-flex flex-col items-start min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap text-gray-400 bg-gray-100 cursor-not-allowed text-left"
+            className="inline-flex flex-col items-start min-h-[44px] px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap text-gray-400 bg-[var(--surface-soft)] cursor-not-allowed text-left"
           >
             <span>{link.label}</span>
             <span className="text-[var(--font-size-micro)] font-normal text-gray-400">{reasonLabel}</span>
@@ -54,7 +54,7 @@ export function TournamentOpsQuickLinks({ tournamentId }: { tournamentId: string
           <Link
             key={link.href}
             href={link.href}
-            className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--tint-blue)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             {link.label}
             <ChevronRight size={12} aria-hidden="true" />

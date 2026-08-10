@@ -7,14 +7,14 @@ import { publicAssetPath } from '@/lib/assets';
 import type { SponsorForm } from './tournament-sponsors-admin-model';
 
 const inputCls = [
-  'h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-900',
+  'h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[13px] text-[var(--text-strong)]',
   'outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2',
-  'focus:ring-blue-100 disabled:bg-gray-50 disabled:text-gray-400',
+  'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
 const textareaCls = [
-  'min-h-[88px] rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[13px] text-gray-900',
+  'min-h-[88px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-[13px] text-[var(--text-strong)]',
   'outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2',
-  'focus:ring-blue-100 disabled:bg-gray-50 disabled:text-gray-400',
+  'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
 const primaryBtnCls = [
   'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-blue-500 px-4',
@@ -22,8 +22,8 @@ const primaryBtnCls = [
   'disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 const secondaryBtnCls = [
-  'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-gray-200',
-  'bg-white px-4 text-[13px] font-semibold text-gray-700 transition-colors hover:bg-gray-50',
+  'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--border)]',
+  'bg-[var(--card-surface)] px-4 text-[13px] font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)]',
   'active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 
@@ -49,13 +49,13 @@ export function TournamentSponsorForm({
   readonly setField: (field: keyof SponsorForm, value: string | boolean) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white px-5 py-5">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[15px] font-bold text-gray-900">
+          <h3 className="text-[15px] font-bold text-[var(--text-strong)]">
             {mode === 'update' ? '협찬 정보 수정' : '협찬 정보 추가'}
           </h3>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             대회 상세에 노출되는 협찬사, 혜택, 이벤트 결과를 관리해요.
           </p>
         </div>
@@ -63,7 +63,7 @@ export function TournamentSponsorForm({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-700"
+            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-body)]"
             aria-label="수정 취소"
           >
             <X size={16} aria-hidden="true" />
@@ -195,13 +195,13 @@ export function TournamentSponsorForm({
           />
         </Field>
 
-        <label className="inline-flex items-center gap-2 text-[13px] font-medium text-gray-800">
+        <label className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--text-body)]">
           <input
             type="checkbox"
             checked={form.isActive}
             onChange={(event) => setField('isActive', event.target.checked)}
             disabled={pending}
-            className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+            className="h-4 w-4 rounded border-[var(--border-strong)] text-blue-500 focus:ring-blue-500"
           />
           대회 상세에 공개
         </label>
@@ -241,9 +241,9 @@ function SponsorLogoUploader({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[13px] text-gray-900">협찬사 로고</span>
+      <span className="text-[13px] text-[var(--text-strong)]">협찬사 로고</span>
       <div className="grid gap-3 sm:grid-cols-[112px_1fr] sm:items-center">
-        <div className="relative grid aspect-square place-items-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+        <div className="relative grid aspect-square place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-soft)]">
           {value ? (
             <Image
               src={publicAssetPath(value)}
@@ -258,7 +258,7 @@ function SponsorLogoUploader({
           )}
         </div>
         <div className="flex flex-col items-start gap-2">
-          <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-50 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+          <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-[var(--blue50)] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
             <ImagePlus size={16} aria-hidden="true" />
             {uploading ? '업로드 중…' : value ? '로고 변경' : '로고 선택'}
             <input
@@ -275,13 +275,13 @@ function SponsorLogoUploader({
             />
           </label>
           {value ? (
-            <button type="button" onClick={onClear} disabled={locked} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 text-sm font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50">
+            <button type="button" onClick={onClear} disabled={locked} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl px-4 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--red50)] hover:text-[var(--red700)] disabled:opacity-50">
               <Trash2 size={16} aria-hidden="true" />
               로고 제거
             </button>
           ) : null}
-          <p className="text-xs leading-5 text-gray-500">JPG, PNG, WebP · 최대 10MB. 정사각형 또는 가로형 로고를 권장해요.</p>
-          {error ? <p role="alert" className="text-xs text-red-600">{error}</p> : null}
+          <p className="text-xs leading-5 text-[var(--text-muted)]">JPG, PNG, WebP · 최대 10MB. 정사각형 또는 가로형 로고를 권장해요.</p>
+          {error ? <p role="alert" className="text-xs text-[var(--red700)]">{error}</p> : null}
         </div>
       </div>
     </div>
@@ -298,7 +298,7 @@ function Field({
   readonly children: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-[13px] text-gray-900">
+    <label className="flex flex-col gap-1.5 text-[13px] text-[var(--text-strong)]">
       <span>
         {label}
         {required ? (

@@ -25,6 +25,10 @@
   border-bottom: 1px solid var(--grey150);
 }
 
+:root.dark .tm-landing-nav {
+  background: rgba(28, 30, 36, 0.92);
+}
+
 .tm-landing-nav-inner {
   display: flex;
   align-items: center;
@@ -296,7 +300,10 @@
 /* ── CTA banner ── */
 .tm-landing-cta-banner {
   padding: 56px 20px;
-  background: var(--grey900);
+  /* --grey900 flips light->dark in :root.dark (text token), which would
+   * turn this always-dark banner nearly white. Use the invariant hex so
+   * the banner stays dark in both themes (matches static-white text below). */
+  background: #191f28;
   text-align: center;
 }
 
@@ -317,7 +324,9 @@
 
 /* ── Footer ── */
 .tm-landing-footer {
-  background: var(--grey900);
+  /* Same invariant-dark fix as .tm-landing-cta-banner above — --grey900
+   * flips to near-white in :root.dark and would hide the white text/border. */
+  background: #191f28;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 32px 20px 40px;
 }

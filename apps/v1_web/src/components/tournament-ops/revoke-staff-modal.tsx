@@ -112,10 +112,10 @@ export function RevokeStaffModal({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="revoke-staff-modal-title"
-        className="bg-white dark:bg-gray-900 rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[400px] overflow-hidden"
+        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[400px] overflow-hidden"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/10">
-          <h2 id="revoke-staff-modal-title" className="text-[16px] font-bold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+          <h2 id="revoke-staff-modal-title" className="text-[16px] font-bold text-[var(--text-strong)]">
             배정 해제
           </h2>
           <button
@@ -123,7 +123,7 @@ export function RevokeStaffModal({
             onClick={() => !pending && onClose()}
             disabled={pending}
             aria-label="모달 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -131,12 +131,12 @@ export function RevokeStaffModal({
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="px-5 py-5 flex flex-col gap-4">
-            <p className="text-[14px] text-gray-600 dark:text-gray-300">
-              <strong className="text-gray-900 dark:text-white">{targetLabel}</strong>의 배정을 해제할까요? 즉시
+            <p className="text-[14px] text-[var(--text-muted)]">
+              <strong className="text-[var(--text-strong)]">{targetLabel}</strong>의 배정을 해제할까요? 즉시
               해당 실시간 세션에서도 방출돼요.
             </p>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="revoke-staff-reason" className="text-[13px] font-semibold text-gray-700 dark:text-gray-200">
+              <label htmlFor="revoke-staff-reason" className="text-[13px] font-semibold text-[var(--text-body)]">
                 사유 <span className="text-red-500" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
@@ -149,7 +149,7 @@ export function RevokeStaffModal({
                 rows={3}
                 disabled={pending}
                 placeholder="해제 사유를 입력해 주세요."
-                className="px-3 py-2.5 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+                className="px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
                 aria-required="true"
               />
             </div>
@@ -166,7 +166,7 @@ export function RevokeStaffModal({
               type="button"
               onClick={() => !pending && onClose()}
               disabled={pending}
-              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-gray-600 dark:text-gray-200 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>

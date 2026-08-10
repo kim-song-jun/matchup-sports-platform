@@ -22,7 +22,7 @@ function segmentButtonClass(active: boolean) {
     'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
     active
       ? 'bg-blue-500 text-white'
-      : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+      : 'bg-[var(--surface-soft)] text-[var(--text-muted)] hover:bg-[var(--grey300)]',
   ].join(' ');
 }
 
@@ -118,11 +118,11 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
         aria-modal="true"
         aria-labelledby="push-broadcast-confirm-title"
         aria-describedby="push-broadcast-confirm-desc"
-        className="bg-white rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[440px] overflow-hidden"
+        className="bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[440px] overflow-hidden"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 id="push-broadcast-confirm-title" className="text-[16px] font-bold text-gray-900 flex items-center gap-1.5">
-            <AlertTriangle size={17} className="text-amber-500" aria-hidden="true" />
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+          <h2 id="push-broadcast-confirm-title" className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-1.5">
+            <AlertTriangle size={17} className="text-[var(--orange500)]" aria-hidden="true" />
             전체 발송 확인
           </h2>
           <button
@@ -130,19 +130,19 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
             onClick={() => !pending && onClose()}
             disabled={pending}
             aria-label="모달 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-strong)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
         </div>
 
         <div className="px-5 py-5 flex flex-col gap-3">
-          <p id="push-broadcast-confirm-desc" className="text-[14px] text-gray-700 leading-relaxed">
+          <p id="push-broadcast-confirm-desc" className="text-[14px] text-[var(--text-body)] leading-relaxed">
             현재 웹 푸시를 구독 중인 <strong>모든 회원</strong>에게 아래 알림을 발송해요. 이 작업은 되돌릴 수 없어요.
           </p>
-          <div className="bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-3">
-            <p className="text-[11px] font-semibold text-gray-400 mb-0.5">제목</p>
-            <p className="text-[14px] font-semibold text-gray-900 break-words">{title}</p>
+          <div className="bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl px-3.5 py-3">
+            <p className="text-[11px] font-semibold text-[var(--text-muted)] mb-0.5">제목</p>
+            <p className="text-[14px] font-semibold text-[var(--text-strong)] break-words">{title}</p>
           </div>
         </div>
 
@@ -151,7 +151,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
             type="button"
             onClick={() => !pending && onClose()}
             disabled={pending}
-            className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
           >
             취소
           </button>
@@ -174,10 +174,10 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
 function ResultStat({ label, value, tone }: { label: string; value: number; tone: 'success' | 'neutral' | 'danger' }) {
   const toneClass =
     tone === 'success'
-      ? 'text-blue-600 bg-blue-50'
+      ? 'text-[var(--blue700)] bg-[var(--blue50)]'
       : tone === 'danger'
-        ? 'text-red-600 bg-red-50'
-        : 'text-gray-600 bg-gray-100';
+        ? 'text-[var(--red700)] bg-[var(--red50)]'
+        : 'text-[var(--text-muted)] bg-[var(--surface-soft)]';
   return (
     <div className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-3.5 ${toneClass}`}>
       <span className="text-[20px] font-bold tabular-nums">{value}</span>
@@ -199,10 +199,10 @@ function PushDeliveryNote({
 }) {
   const tone =
     push.disabled || push.failed > 0
-      ? 'border-red-200 bg-red-50 text-red-700'
+      ? 'border-[var(--tint-red-border)] bg-[var(--red50)] text-[var(--red700)]'
       : push.subscriptions === 0
-        ? 'border-amber-200 bg-amber-50 text-amber-800'
-        : 'border-blue-200 bg-blue-50 text-blue-700';
+        ? 'border-[var(--tint-orange-border)] bg-[var(--orange50)] text-[var(--orange700)]'
+        : 'border-[var(--tint-blue-border)] bg-[var(--blue50)] text-[var(--blue700)]';
 
   const message = push.disabled
     ? '서버에 VAPID 키가 설정되지 않아 웹 푸시가 꺼져 있어요. 알림함에만 남았어요.'
@@ -299,11 +299,11 @@ export function PushSendForm() {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="flex flex-col gap-5 bg-white border border-gray-100 rounded-2xl p-5 md:p-6"
+        className="flex flex-col gap-5 bg-[var(--card-surface)] border border-[var(--border)] rounded-2xl p-5 md:p-6"
       >
         {/* Target toggle */}
         <div className="flex flex-col gap-1.5">
-          <span id="push-send-target-label" className="text-[var(--font-size-label)] font-semibold text-gray-700">
+          <span id="push-send-target-label" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
             발송 대상
           </span>
           <div role="radiogroup" aria-labelledby="push-send-target-label" className="grid grid-cols-2 gap-2">
@@ -341,7 +341,7 @@ export function PushSendForm() {
         {/* User picker */}
         {target === 'user' && (
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="push-send-user" className="text-[var(--font-size-label)] font-semibold text-gray-700">
+            <label htmlFor="push-send-user" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
               받는 사람
             </label>
             <EntityPicker
@@ -362,17 +362,17 @@ export function PushSendForm() {
         {target === 'broadcast' && (
           <p
             role="note"
-            className="text-[var(--font-size-label)] text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3.5 py-3 flex items-start gap-2"
+            className="text-[var(--font-size-label)] text-[var(--orange700)] bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] rounded-xl px-3.5 py-3 flex items-start gap-2"
           >
-            <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
+            <AlertTriangle size={15} className="text-[var(--orange500)] shrink-0 mt-0.5" aria-hidden="true" />
             현재 웹 푸시를 구독 중인 모든 회원에게 발송돼요. 공지 알림을 꺼둔 회원은 자동으로 제외돼요.
           </p>
         )}
 
         {/* Title */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="push-send-title" className="text-[var(--font-size-label)] font-semibold text-gray-700">
-            제목 <span className="text-red-500" aria-hidden="true">*</span>
+          <label htmlFor="push-send-title" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+            제목 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
             <span className="sr-only">(필수)</span>
           </label>
           <input
@@ -385,7 +385,7 @@ export function PushSendForm() {
             placeholder="알림 제목을 입력해 주세요."
             aria-required="true"
             className={[
-              'h-[44px] px-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-900',
+              'h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
               'placeholder:text-gray-400',
               'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
               'transition-colors disabled:opacity-50',
@@ -398,7 +398,7 @@ export function PushSendForm() {
 
         {/* Body */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="push-send-body" className="text-[var(--font-size-label)] font-semibold text-gray-700">
+          <label htmlFor="push-send-body" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
             내용
           </label>
           <textarea
@@ -410,7 +410,7 @@ export function PushSendForm() {
             disabled={sendMutation.isPending}
             placeholder="알림 내용을 입력해 주세요. (선택)"
             className={[
-              'px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-xl text-gray-900 resize-none',
+              'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
               'placeholder:text-gray-400',
               'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
               'transition-colors disabled:opacity-50',
@@ -423,7 +423,7 @@ export function PushSendForm() {
 
         {/* URL */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="push-send-url" className="text-[var(--font-size-label)] font-semibold text-gray-700">
+          <label htmlFor="push-send-url" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
             이동 링크 <span className="text-gray-400 font-normal">(선택)</span>
           </label>
           <input
@@ -434,7 +434,7 @@ export function PushSendForm() {
             disabled={sendMutation.isPending}
             placeholder="/notices/123"
             className={[
-              'h-[44px] px-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-900',
+              'h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
               'placeholder:text-gray-400',
               'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
               'transition-colors disabled:opacity-50',

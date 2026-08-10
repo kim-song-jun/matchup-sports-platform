@@ -169,8 +169,8 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           <p className="text-[11px] md:text-[12px] font-semibold text-blue-500 tracking-normal mb-1">
             {tournament.data?.title ?? '대회 운영'}
           </p>
-          <h1 className="text-[22px] md:text-[24px] font-bold text-gray-900 dark:text-white">운영 보드</h1>
-          <p className="text-[13px] md:text-[14px] text-gray-500 dark:text-gray-400 mt-1">
+          <h1 className="text-[22px] md:text-[24px] font-bold text-[var(--text-strong)]">운영 보드</h1>
+          <p className="text-[13px] md:text-[14px] text-[var(--text-muted)] mt-1">
             경기 진행 상태와 경고를 한눈에 확인해요. 15초마다 자동으로 갱신돼요.
           </p>
         </div>
@@ -179,14 +179,14 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           onClick={() => void board.refetch()}
           disabled={board.isFetching}
           aria-label="지금 새로고침"
-          className="flex items-center justify-center w-[44px] h-[44px] rounded-xl border border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
+          className="flex items-center justify-center w-[44px] h-[44px] rounded-xl border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
         >
           <RefreshCw size={18} aria-hidden="true" className={board.isFetching ? 'animate-spin' : ''} />
         </button>
       </div>
 
       {stages.length > 0 ? (
-        <div className="border-y border-gray-100 dark:border-white/10 py-3 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8">
+        <div className="border-y border-[var(--border)] py-3 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8">
           <TournamentProgressStepper stages={stages} />
         </div>
       ) : null}
@@ -200,7 +200,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           id="board-status-filter"
           value={status ?? ''}
           onChange={(e) => updateFilters({ status: (e.target.value || undefined) as V1GameState | undefined })}
-          className="h-[44px] px-3 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+          className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
         >
           <option value="">전체 상태</option>
           {V1_GAME_STATES.map((value) => (
@@ -217,7 +217,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           id="board-field-filter"
           value={fieldId ?? ''}
           onChange={(e) => updateFilters({ fieldId: e.target.value || undefined })}
-          className="h-[44px] px-3 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+          className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
         >
           <option value="">전체 필드</option>
           {(fields.data?.items ?? []).map((field) => (
@@ -236,7 +236,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           onChange={(e) =>
             updateFilters({ warning: (e.target.value || undefined) as V1TournamentStableWarningCode | undefined })
           }
-          className="h-[44px] px-3 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+          className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
         >
           <option value="">전체 경고</option>
           {V1_STABLE_WARNING_CODES.map((value) => (
@@ -253,60 +253,60 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           <div className="hidden lg:block">
             <AdminTableSkeleton rows={6} cols={5} />
           </div>
-          <div className="lg:hidden bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+          <div className="lg:hidden bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
             <AdminListSkeleton rows={6} />
           </div>
         </>
       ) : board.isError ? (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-white/10 py-10 px-4 flex flex-col items-center gap-3 text-center">
+        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
           <p className="text-sm text-red-500 font-medium">
             {extractErrorMessage(board.error, '운영 보드를 불러오지 못했어요.')}
           </p>
           <button
             type="button"
             onClick={() => void board.refetch()}
-            className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="text-sm text-blue-500 hover:text-[var(--blue700)] underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             다시 시도하기
           </button>
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
           <AdminEmpty title="조건에 맞는 경기가 없어요" description="다른 필터로 다시 확인해 보세요." />
         </div>
       ) : (
         <>
           {/* ── 데스크톱 표 (lg+) ────────────────────────────────────── */}
-          <div className="hidden lg:block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+          <div className="hidden lg:block bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-max min-w-full text-sm text-gray-700 dark:text-gray-200">
-                <thead className="sticky top-0 bg-gray-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/10">
+              <table className="w-max min-w-full text-sm text-[var(--text-body)]">
+                <thead className="sticky top-0 bg-[var(--surface-soft)] border-b border-[var(--border)]">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       대진
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       일정
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       필드
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       상태
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       경고
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       운영
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                <tbody className="divide-y divide-[var(--border)]">
                   {items.map((item) => (
                     <tr key={item.fixtureId}>
                       <td className="px-4 py-3 align-middle">
-                        <p className="font-medium text-gray-900 dark:text-white">{rowLabel(item)}</p>
+                        <p className="font-medium text-[var(--text-strong)]">{rowLabel(item)}</p>
                         <p className="text-[12px] text-gray-400">{item.round} {item.fixtureNumber}경기</p>
                       </td>
                       <td className="px-4 py-3 align-middle tabular-nums">
@@ -328,7 +328,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <Link
                           href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                          className="inline-flex items-center min-h-[36px] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                          className="inline-flex items-center min-h-[36px] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                         >
                           운영 콘솔
                         </Link>
@@ -345,11 +345,11 @@ export function OperationsBoardClient({ tournamentId }: Props) {
             {items.map((item) => (
               <li
                 key={item.fixtureId}
-                className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-white/10 px-4 py-3"
+                className="bg-[var(--card-surface)] rounded-xl border border-[var(--border)] px-4 py-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-white truncate">{rowLabel(item)}</p>
+                    <p className="font-medium text-[var(--text-strong)] truncate">{rowLabel(item)}</p>
                     <p className="text-[12px] text-gray-400">
                       {item.round} {item.fixtureNumber}경기 ·{' '}
                       {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '일정 미정'}
@@ -367,7 +367,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 )}
                 <Link
                   href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                  className="mt-2 inline-flex items-center min-h-[36px] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="mt-2 inline-flex items-center min-h-[36px] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   운영 콘솔로 이동
                 </Link>
@@ -381,7 +381,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 type="button"
                 onClick={() => void handleLoadMore()}
                 disabled={loadingMore}
-                className="h-[44px] px-6 rounded-xl border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-white/5 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+                className="h-[44px] px-6 rounded-xl border border-[var(--border)] text-[var(--text-body)] text-sm font-semibold hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
               >
                 {loadingMore ? '불러오는 중…' : '더 보기'}
               </button>

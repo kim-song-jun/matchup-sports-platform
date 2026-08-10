@@ -15,7 +15,7 @@ interface AdminKpiCardProps {
 const TONE_VALUE: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
   neutral: 'text-blue-500',
   positive: 'text-green-500',
-  warning: 'text-amber-500',
+  warning: 'text-[var(--orange500)]',
   danger: 'text-red-500',
 };
 
@@ -28,10 +28,10 @@ const TONE_ICON: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
 
 /* #10: danger/warning tone일 때 카드 배경·테두리로 시각 강도 격상 */
 const TONE_WRAPPER: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
-  neutral: 'bg-white border-gray-100',
-  positive: 'bg-white border-gray-100',
-  warning: 'bg-amber-50 border-amber-100',
-  danger: 'bg-red-50 border-red-100',
+  neutral: 'bg-[var(--card-surface)] border-[var(--border)]',
+  positive: 'bg-[var(--card-surface)] border-[var(--border)]',
+  warning: 'bg-[var(--tint-orange)] border-[var(--tint-orange-border)]',
+  danger: 'bg-[var(--red50)] border-red-100',
 };
 
 function KpiCardInner({
@@ -44,7 +44,7 @@ function KpiCardInner({
   return (
     <div className={`${TONE_WRAPPER[tone]} rounded-2xl border p-4 md:p-5 min-h-[80px] flex flex-col justify-between`}>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[12px] md:text-[13px] text-gray-500 leading-tight">{label}</p>
+        <p className="text-[12px] md:text-[13px] text-[var(--text-muted)] leading-tight">{label}</p>
         {icon && (
           <span className={`flex-shrink-0 ${TONE_ICON[tone]}`} aria-hidden="true">
             {icon}

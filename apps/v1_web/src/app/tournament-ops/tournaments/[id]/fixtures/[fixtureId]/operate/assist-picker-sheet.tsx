@@ -61,10 +61,10 @@ export function AssistPickerSheet({ open, event, scorerName, teammates, onAttach
         role="dialog"
         aria-modal="true"
         aria-labelledby="assist-picker-title"
-        className="w-full max-w-[440px] rounded-t-2xl bg-white p-5 sm:rounded-2xl dark:bg-gray-800"
+        className="w-full max-w-[440px] rounded-t-2xl bg-[var(--card-surface)] p-5 sm:rounded-2xl"
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 id="assist-picker-title" className="text-base font-bold text-gray-900 dark:text-white">
+          <h2 id="assist-picker-title" className="text-base font-bold text-[var(--text-strong)]">
             {scorerName}의 골, 어시스트한 선수는?
           </h2>
           <button
@@ -72,13 +72,13 @@ export function AssistPickerSheet({ open, event, scorerName, teammates, onAttach
             onClick={closeIfIdle}
             disabled={pending !== null}
             aria-label="닫기"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-700"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
         </div>
         {error ? (
-          <p role="alert" className="mb-2 text-2xs font-medium text-red-600 dark:text-red-400">
+          <p role="alert" className="mb-2 text-2xs font-medium text-[var(--red700)]">
             {error}
           </p>
         ) : null}

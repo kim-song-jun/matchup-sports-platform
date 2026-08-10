@@ -62,9 +62,9 @@ export function RestTimer() {
       <section
         role="alert"
         aria-live="assertive"
-        className="mx-4 flex flex-col items-center gap-2 rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-4 text-center motion-safe:animate-pulse dark:border-amber-500/60 dark:bg-amber-500/10"
+        className="mx-4 flex flex-col items-center gap-2 rounded-xl border-2 border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-4 text-center motion-safe:animate-pulse"
       >
-        <p className="flex items-center gap-1.5 text-base font-extrabold text-amber-700 dark:text-amber-300">
+        <p className="flex items-center gap-1.5 text-base font-extrabold text-[var(--orange700)]">
           <Timer size={18} aria-hidden="true" />
           휴식 시간이 끝났어요
         </p>
@@ -80,9 +80,9 @@ export function RestTimer() {
     const progressPercent =
       phase.totalMs > 0 ? Math.round((1 - remainingMs / phase.totalMs) * 100) : 0;
     return (
-      <section className="mx-4 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/5">
+      <section className="mx-4 flex flex-col gap-2 rounded-xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-3">
         <div className="flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-2xs font-semibold text-amber-700 dark:text-amber-300">
+          <p className="flex items-center gap-1.5 text-2xs font-semibold text-[var(--orange700)]">
             <Timer size={14} aria-hidden="true" />
             쉬는 시간
           </p>
@@ -90,20 +90,20 @@ export function RestTimer() {
             type="button"
             onClick={cancel}
             aria-label="쉬는 시간 취소"
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-amber-600 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 dark:text-amber-300 dark:hover:bg-amber-500/10"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-[var(--orange700)] hover:bg-[var(--tint-orange-border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--orange500)]"
           >
             <X size={16} aria-hidden="true" />
           </button>
         </div>
         <p
-          className="text-center font-mono text-4xl font-black leading-none tabular-nums text-amber-700 dark:text-amber-200"
+          className="text-center font-mono text-4xl font-black leading-none tabular-nums text-[var(--orange700)]"
           aria-live="off"
         >
           {formatCountdown(remainingMs)}
         </p>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-amber-200/60 dark:bg-amber-500/20">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--tint-orange)]">
           <div
-            className="h-full rounded-full bg-amber-500"
+            className="h-full rounded-full bg-[var(--orange500)]"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -117,7 +117,7 @@ export function RestTimer() {
 
   return (
     <section className="mx-4 flex flex-col gap-1.5">
-      <p className="flex items-center gap-1.5 text-2xs font-semibold text-gray-500 dark:text-gray-400">
+      <p className="flex items-center gap-1.5 text-2xs font-semibold text-[var(--text-muted)]">
         <Timer size={14} aria-hidden="true" />
         쉬는 시간
       </p>
@@ -142,13 +142,13 @@ export function RestTimer() {
             // 일어나지 않은 대기 상태에 쓰면 한 화면의 강조색이 하나 더 늘고
             // (R-C1) 정작 카운트다운이 도는 순간의 주의 환기력이 약해진다.
             // 호박색은 아래 "진행 중" 카드에만 남긴다.
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-gray-200 px-1 text-sm font-bold text-gray-700 hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-[var(--border)] px-1 text-sm font-bold text-[var(--text-body)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
           >
             {minutes}분
           </button>
         ))}
       </div>
-      <p className="text-2xs text-gray-400 dark:text-gray-500">
+      <p className="text-2xs text-[var(--text-muted)]">
         화면을 새로고침하면 초기화돼요.
       </p>
     </section>

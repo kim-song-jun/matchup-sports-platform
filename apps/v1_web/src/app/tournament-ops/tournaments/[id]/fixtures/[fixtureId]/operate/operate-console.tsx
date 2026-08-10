@@ -427,7 +427,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   if (fixtureLineup.isLoading || (gameId && gameDetail.isLoading)) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+      <div className="flex min-h-[50vh] items-center justify-center text-sm text-[var(--text-muted)]">
         불러오는 중이에요…
       </div>
     );
@@ -436,7 +436,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   if (fixtureLineup.isError) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 px-4 text-center">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+        <p className="text-sm font-medium text-[var(--text-body)]">
           {extractErrorMessage(fixtureLineup.error, '경기 정보를 불러오지 못했어요.')}
         </p>
         <Button size="md" variant="outline" onClick={() => fixtureLineup.refetch()}>
@@ -448,7 +448,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   if (!gameId) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+      <div className="flex min-h-[50vh] items-center justify-center text-sm text-[var(--text-muted)]">
         아직 생성된 경기 정보가 없어요.
       </div>
     );
@@ -461,7 +461,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-24">
       {/* Sticky context header — tablet 768×1024 / desktop 1280+ keep this
           visible while scrolling the lineup/queue below. */}
-      <header className="sticky top-0 z-10 -mx-4 border-b border-gray-100 bg-white/95 px-4 py-3 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/95">
+      <header className="sticky top-0 z-10 -mx-4 border-b border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur-sm dark:bg-gray-900/95">
         {/* T1-0: next-period 버튼이 추가되며 LIVE 상태의 버튼이 최대 3개(일시
             중지/전반 종료/경기 종료)가 됐다. 기존 "한 줄에 타이틀+뱃지+버튼"
             레이아웃은 390px 모바일에서 버튼 3개가 shrink-0로 자기 너비를 그대로
@@ -473,11 +473,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             레이아웃을 유지한다(768/1440에서는 문제없이 확인됨). */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-gray-900 dark:text-white">
+            <p className="truncate text-sm font-bold text-[var(--text-strong)]">
               {sides.map((side) => side.displayNameSnapshot).join(' vs ') || '경기 운영'}
             </p>
-            <div className="mt-0.5 flex items-center gap-2 text-2xs text-gray-500 dark:text-gray-400">
-              <span className="rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+            <div className="mt-0.5 flex items-center gap-2 text-2xs text-[var(--text-muted)]">
+              <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 font-semibold text-[var(--blue700)]">
                 {gameState ? STATE_LABEL[gameState] : '-'}
               </span>
               <span className="flex items-center gap-1" aria-live="polite">
@@ -535,7 +535,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 })}
               {availableCommands.includes('end') ? (
                 <>
-                  <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-gray-200 dark:bg-gray-700" />
+                  <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-[var(--border)]" />
                   <Button
                     key="end"
                     size="sm"
@@ -554,7 +554,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 방금 실행한 명령에만 붙는 일회성 피드백이라 다음 명령을 누르는
                 순간(`setLastCommandFeedback(null)`) 사라진다. */}
             {lastCommandFeedback ? (
-              <p className="text-2xs tabular-nums text-gray-400 dark:text-gray-500" aria-live="polite">
+              <p className="text-2xs tabular-nums text-[var(--text-muted)]" aria-live="polite">
                 {lastCommandFeedback.label} 완료 · {lastCommandFeedback.durationMs}ms
               </p>
             ) : null}
@@ -568,9 +568,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {sides.length > 0 ? (
           <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <p className="flex items-baseline gap-1.5">
-              <span className="text-2xs font-semibold text-gray-400 dark:text-gray-500">스코어</span>
+              <span className="text-2xs font-semibold text-[var(--text-muted)]">스코어</span>
               <span
-                className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white"
+                className="text-2xl font-bold tabular-nums text-[var(--text-strong)]"
                 aria-label={`스코어 ${sides.map((side) => `${side.displayNameSnapshot} ${scoreBySideId.get(side.id) ?? 0}점`).join(', ')}`}
               >
                 {sides.map((side) => scoreBySideId.get(side.id) ?? 0).join(' : ')}
@@ -685,9 +685,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             {button.type === 'GOAL' ? (
               <Goal size={18} aria-hidden="true" className="text-green-600 dark:text-green-400" />
             ) : button.type === 'FOUL' ? (
-              <AlertTriangle size={18} aria-hidden="true" className="text-gray-500 dark:text-gray-400" />
+              <AlertTriangle size={18} aria-hidden="true" className="text-[var(--text-muted)]" />
             ) : button.type === 'SUBSTITUTION' ? (
-              <ArrowLeftRight size={18} aria-hidden="true" className="text-blue-600 dark:text-blue-400" />
+              <ArrowLeftRight size={18} aria-hidden="true" className="text-[var(--blue700)]" />
             ) : (
               <span
                 aria-hidden="true"
@@ -734,7 +734,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           부정하는 상태다. 서버에 확정된 이벤트 로그를 먼저 보여주고, 큐는 아직 전송되지
           않았거나 실패한 것만 따로 세운다(둘은 다른 것을 뜻한다). */}
       <section className="px-4">
-        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">기록된 이벤트</h3>
+        <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">기록된 이벤트</h3>
         <RecordedEventList
           events={ops.liveEvents}
           sides={sides}
@@ -746,7 +746,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
       {ops.queue.items.length > 0 && (
         <section className="px-4">
-          <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">전송 상태</h3>
+          <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">전송 상태</h3>
           <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} />
         </section>
       )}
@@ -807,9 +807,9 @@ function teammatesForSide(
 
 function Banner({ tone, children }: { tone: 'info' | 'warning' | 'danger'; children: ReactNode }) {
   const toneClass = {
-    info: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300',
+    info: 'bg-[var(--blue50)] text-[var(--blue700)]',
     warning: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
-    danger: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+    danger: 'bg-[var(--red50)] text-[var(--red700)]',
   }[tone];
   return (
     <p role={tone === 'danger' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-sm font-medium ${toneClass}`}>

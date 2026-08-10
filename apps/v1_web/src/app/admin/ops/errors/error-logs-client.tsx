@@ -80,14 +80,14 @@ function shortRelease(releaseSha: string | null): string {
 }
 
 function statusTone(statusCode: number | null): string {
-  if (statusCode === null) return 'bg-gray-100 text-gray-600';
-  if (statusCode >= 500) return 'bg-red-50 text-red-700';
-  if (statusCode >= 400) return 'bg-amber-50 text-amber-700';
-  return 'bg-gray-100 text-gray-600';
+  if (statusCode === null) return 'bg-[var(--surface-soft)] text-[var(--text-muted)]';
+  if (statusCode >= 500) return 'bg-[var(--red50)] text-[var(--red700)]';
+  if (statusCode >= 400) return 'bg-[var(--tint-orange)] text-[var(--orange700)]';
+  return 'bg-[var(--surface-soft)] text-[var(--text-muted)]';
 }
 
 function sourceTone(source: V1AdminErrorLogSource): string {
-  return source === 'server' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700';
+  return source === 'server' ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-purple-50 text-purple-700';
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ export function ErrorLogsClient() {
       key: 'lastSeenAt',
       header: '마지막 발생',
       render: (row) => (
-        <span className="text-gray-500 whitespace-nowrap">{formatRelativeTime(row.lastSeenAt)}</span>
+        <span className="text-[var(--text-muted)] whitespace-nowrap">{formatRelativeTime(row.lastSeenAt)}</span>
       ),
     },
     {
@@ -189,7 +189,7 @@ export function ErrorLogsClient() {
         // route 가 길면(예: /tournaments/campaigns/...) 표 전체를 밀어내 오른쪽 컬럼과
         // 상세 버튼이 가로 스크롤 밖으로 사라진다. 잘라 보여주고 전문은 title 로 준다.
         <span
-          className="block truncate font-mono text-[var(--font-size-label)] text-gray-700 lg:max-w-[200px]"
+          className="block truncate font-mono text-[var(--font-size-label)] text-[var(--text-body)] lg:max-w-[200px]"
           title={row.route ?? undefined}
         >
           {row.route ?? '—'}
@@ -203,7 +203,7 @@ export function ErrorLogsClient() {
         <button
           type="button"
           onClick={() => setSelectedId(row.id)}
-          className="block w-full text-left break-words text-gray-700 lg:max-w-[240px] lg:truncate hover:text-blue-600 hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="block w-full text-left break-words text-[var(--text-body)] lg:max-w-[240px] lg:truncate hover:text-[var(--blue700)] hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           title={row.message}
         >
           {row.message}
@@ -216,7 +216,7 @@ export function ErrorLogsClient() {
       align: 'center',
       width: 'w-[88px]',
       render: (row) => (
-        <span className="tabular-nums font-semibold text-gray-700">
+        <span className="tabular-nums font-semibold text-[var(--text-body)]">
           {row.occurrenceCount.toLocaleString('ko-KR')}
         </span>
       ),
@@ -264,7 +264,7 @@ export function ErrorLogsClient() {
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                   active
                     ? 'bg-blue-500 text-white'
-                    : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
+                    : 'bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--blue700)]',
                 ].join(' ')}
               >
                 {opt.label}
@@ -286,7 +286,7 @@ export function ErrorLogsClient() {
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                   active
                     ? 'bg-blue-500 text-white'
-                    : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
+                    : 'bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--blue700)]',
                 ].join(' ')}
               >
                 {opt.label}
@@ -295,7 +295,7 @@ export function ErrorLogsClient() {
           })}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <label className="flex items-center gap-1.5 text-[var(--font-size-label)] text-gray-600">
+          <label className="flex items-center gap-1.5 text-[var(--font-size-label)] text-[var(--text-muted)]">
             상태코드
             <input
               type="number"
@@ -303,25 +303,25 @@ export function ErrorLogsClient() {
               value={statusCode}
               onChange={(e) => setStatusCode(e.target.value)}
               placeholder="예: 500"
-              className="w-[88px] h-[44px] px-2.5 text-sm bg-white border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+              className="w-[88px] h-[44px] px-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-[var(--font-size-label)] text-gray-600">
+          <label className="flex items-center gap-1.5 text-[var(--font-size-label)] text-[var(--text-muted)]">
             시작일
             <input
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="h-[44px] px-2.5 text-sm bg-white border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+              className="h-[44px] px-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-[var(--font-size-label)] text-gray-600">
+          <label className="flex items-center gap-1.5 text-[var(--font-size-label)] text-[var(--text-muted)]">
             종료일
             <input
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="h-[44px] px-2.5 text-sm bg-white border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+              className="h-[44px] px-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
             />
           </label>
         </div>
@@ -362,7 +362,7 @@ export function ErrorLogsClient() {
           <button
             type="button"
             onClick={() => setSelectedId(row.id)}
-            className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             aria-label={`${row.message} 상세 보기`}
           >
             보기
@@ -372,13 +372,13 @@ export function ErrorLogsClient() {
 
       {pageChangeFailed && (
         <div className="flex flex-col items-center gap-2">
-          <p className="text-[var(--font-size-body-sm)] text-gray-500 dark:text-gray-400" role="alert">
+          <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)]" role="alert">
             {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
           </p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="inline-flex items-center justify-center h-[44px] px-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-[var(--font-size-body-sm)] text-gray-700 dark:text-gray-200 font-medium hover:border-blue-300 hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center h-[44px] px-6 bg-white dark:bg-gray-800 border border-[var(--border)] rounded-xl text-[var(--font-size-body-sm)] text-[var(--text-body)] font-medium hover:border-blue-300 hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             다시 시도하기
           </button>

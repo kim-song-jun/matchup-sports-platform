@@ -21,11 +21,12 @@ import type {
 type Tone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
 
 const TONE_CLASSES: Record<Tone, string> = {
-  blue: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-  green: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-300',
-  amber: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
-  red: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-  gray: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
+  blue: 'bg-[var(--blue50)] text-[var(--blue700)]',
+  // --green700 토큰 없음 — text-green-700는 원래 값 유지, 배경만 토큰화 (전역 규칙 확인 완료)
+  green: 'bg-[var(--green50)] text-green-700 dark:text-green-300',
+  amber: 'bg-[var(--tint-orange)] text-[var(--orange700)]',
+  red: 'bg-[var(--red50)] text-[var(--red700)]',
+  gray: 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
 };
 
 function Pill({ tone, icon, label }: { tone: Tone; icon: ReactNode; label: string }) {

@@ -33,7 +33,7 @@ export function RecordedEventList({
 }) {
   if (events.length === 0) {
     return (
-      <p className="px-1 py-3 text-2xs text-gray-400 dark:text-gray-500">
+      <p className="px-1 py-3 text-2xs text-[var(--text-muted)]">
         아직 기록된 이벤트가 없어요.
       </p>
     );
@@ -69,7 +69,7 @@ export function RecordedEventList({
         return (
           <li
             key={event.id}
-            className="flex flex-col gap-1.5 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
+            className="flex flex-col gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2"
           >
             {/* 좁은 폭에서는 위아래로 쌓는다. 한 줄로 두면 액션 묶음(어시스트·
                 되돌리기·팀명)이 shrink-0 이라 폭을 먼저 가져가고, 남은 자리에서
@@ -84,10 +84,10 @@ export function RecordedEventList({
                     645886/649891/652602/655603ms 가 전부 "10'"로 보였다). 초까지 보여
                     구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
                     충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
-                <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-medium tabular-nums text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                <span className="shrink-0 rounded bg-[var(--surface-soft)] px-1.5 py-0.5 text-2xs font-medium tabular-nums text-[var(--text-muted)]">
                   {periodLabel(event.period)} {formatMatchClock(event.clockMs)}
                 </span>
-                <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                <p className="truncate text-sm font-medium text-[var(--text-strong)]">
                   {eventTypeLabel(event)}
                   {event.type === 'SUBSTITUTION'
                     ? substitutionDetailSuffix(event, playerName)
@@ -112,7 +112,7 @@ export function RecordedEventList({
                     type="button"
                     onClick={() => onAttachAssist(event)}
                     aria-label="이 골에 어시스트 추가"
-                    className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-2xs font-semibold text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                    className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-2xs font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                   >
                     <Handshake size={12} aria-hidden="true" />
                     어시스트
@@ -122,13 +122,13 @@ export function RecordedEventList({
                   <button
                     type="button"
                     onClick={() => onReverseSubstitution(event)}
-                    className="flex min-h-[44px] items-center gap-1 rounded-lg border border-gray-200 px-2 text-2xs font-semibold text-gray-500 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+                    className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--border)] px-2 text-2xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                   >
                     <Undo2 size={12} aria-hidden="true" />
                     되돌리기
                   </button>
                 ) : null}
-                <span className="text-2xs text-gray-500 dark:text-gray-400">
+                <span className="text-2xs text-[var(--text-muted)]">
                   {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
                 </span>
               </div>

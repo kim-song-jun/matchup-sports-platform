@@ -233,20 +233,20 @@ export function ActionTargetPicker({
         role="dialog"
         aria-modal="true"
         aria-labelledby="action-target-picker-title"
-        className="flex max-h-[85vh] w-full max-w-[560px] flex-col rounded-t-2xl bg-white shadow-[0_8px_32px_rgba(20,28,45,0.2)] sm:rounded-2xl dark:bg-gray-800"
+        className="flex max-h-[85vh] w-full max-w-[560px] flex-col rounded-t-2xl bg-[var(--card-surface)] shadow-[0_8px_32px_rgba(20,28,45,0.2)] sm:rounded-2xl"
       >
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-700">
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
-            <h2 id="action-target-picker-title" className="text-base font-bold text-gray-900 dark:text-white">
+            <h2 id="action-target-picker-title" className="text-base font-bold text-[var(--text-strong)]">
               {titleText}
             </h2>
             {isSubstitution && substitutionOut !== null ? (
-              <p className="mt-0.5 text-2xs font-medium text-gray-500 dark:text-gray-400">
+              <p className="mt-0.5 text-2xs font-medium text-[var(--text-muted)]">
                 {substitutionOut.participant.displayNameSnapshot} 선수와 교체
               </p>
             ) : null}
             {/* 액션 탭 시점을 얼린 값 — 선수를 고르는 동안 흘러가지 않는다. */}
-            <p className="mt-0.5 text-2xs font-medium tabular-nums text-blue-600 dark:text-blue-400" aria-live="polite">
+            <p className="mt-0.5 text-2xs font-medium tabular-nums text-[var(--blue700)]" aria-live="polite">
               {periodLabel(frozen.period)} · {formatMatchClock(frozen.clockMs)} 시점 기록 (고정됨)
             </p>
           </div>
@@ -254,7 +254,7 @@ export function ActionTargetPicker({
             type="button"
             onClick={onCancel}
             aria-label="이벤트 기록 취소"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:bg-gray-700"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -274,7 +274,7 @@ export function ActionTargetPicker({
             ) : (
               <div className="flex flex-col gap-3">
                 {remainingSubstitutionsLabel(substitutionOut.sideId) ? (
-                  <p className="text-2xs font-semibold text-gray-500 dark:text-gray-400">
+                  <p className="text-2xs font-semibold text-[var(--text-muted)]">
                     {remainingSubstitutionsLabel(substitutionOut.sideId)}
                   </p>
                 ) : null}
@@ -310,7 +310,7 @@ export function ActionTargetPicker({
                   key={side.id}
                   type="button"
                   onClick={() => commitTeamOnly(side.id)}
-                  className="min-h-[44px] rounded-lg border border-dashed border-gray-300 px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                  className="min-h-[44px] rounded-lg border border-dashed border-[var(--border)] px-3 text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                 >
                   {side.displayNameSnapshot} · 선수 지정 없이 기록
                 </button>

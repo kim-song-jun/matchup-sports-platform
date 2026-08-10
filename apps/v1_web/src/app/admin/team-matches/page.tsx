@@ -161,7 +161,7 @@ export default function AdminTeamMatchesPage() {
             header: '시작',
             width: 'w-[132px]',
             render: (row) => (
-              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.startAt)}</span>
+              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.startAt)}</span>
             ),
           },
           {
@@ -175,10 +175,10 @@ export default function AdminTeamMatchesPage() {
             header: '팀매칭',
             render: (row) => (
               <div className="min-w-0">
-                <span className="block truncate font-medium text-gray-900" title={row.title}>
+                <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
                   {row.title}
                 </span>
-                <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]">
                   {row.hostTeamName}
                 </span>
               </div>
@@ -188,14 +188,14 @@ export default function AdminTeamMatchesPage() {
             key: 'sportName',
             header: '종목',
             width: 'w-[96px]',
-            render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+            render: (row) => <span className="text-[var(--text-muted)]">{row.sportName}</span>,
           },
           {
             key: 'createdAt',
             header: '생성',
             width: 'w-[132px]',
             render: (row) => (
-              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
             ),
           },
         ]}
@@ -208,7 +208,7 @@ export default function AdminTeamMatchesPage() {
                   aria-label={`${row.title} 상태 변경`}
                   className={[
                     'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
-                    'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
+                    'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                     'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                   ].join(' ')}
                 >
@@ -255,7 +255,7 @@ export default function AdminTeamMatchesPage() {
             type="button"
             onClick={() => void refetch()}
             disabled={isFetching}
-            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-medium text-[var(--text-body)] bg-[var(--card-surface)] border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             {isFetching ? '불러오는 중…' : '다시 시도'}
           </button>

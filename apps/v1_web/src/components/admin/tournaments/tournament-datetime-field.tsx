@@ -50,7 +50,7 @@ export function TournamentDatetimeField({
         aria-invalid={Boolean(error)}
         aria-describedby={descriptionId}
         className={[
-          'h-[44px] w-full rounded-xl border bg-white px-3 text-[var(--font-size-label)] text-[var(--text-strong)]',
+          'h-[44px] w-full rounded-xl border bg-[var(--card-surface)] px-3 text-[var(--font-size-label)] text-[var(--text-strong)]',
           'focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50',
           error
             ? 'border-[var(--red500)] focus:border-[var(--red500)]'

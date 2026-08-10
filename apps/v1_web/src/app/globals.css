@@ -104,6 +104,9 @@
   /* 톤 카드 틴트 배경 */
   --tint-green: rgba(3, 178, 108, 0.08);   /* --green500(#03b26c) 8% — 녹색 안내 카드 */
   --tint-orange: rgba(254, 152, 0, 0.10);  /* --orange500(#fe9800) 10% — 주황 안내 카드 */
+  --tint-orange-border: rgba(254, 152, 0, 0.30); /* --orange500 30% — 주황 카드 테두리 (전수검수: amber-* 하드코딩 치환) */
+  --tint-red: rgba(240, 68, 82, 0.08);     /* --red500(#f04452) 8% — 빨강 안내 카드 배경 (전수검수: red-50 하드코딩 치환) */
+  --tint-red-border: rgba(240, 68, 82, 0.28); /* --red500 28% — 빨강 카드 테두리 */
   --tint-grey: rgba(107, 118, 132, 0.10);  /* --grey600(#6b7684, --text-muted) 10% — 중립(마감/종료) 안내 카드 */
   --tint-blue-border: rgba(49, 130, 246, 0.24); /* --blue500(#3182f6) 24% — 파란 카드 테두리 */
   --tint-blue: rgba(49, 130, 246, 0.08);   /* --blue500(#3182f6) 8% — 파란 안내 카드 배경, var(--blue50) 다크모드 미대응 대체 */
@@ -295,6 +298,22 @@
   --green50: rgba(3, 178, 108, 0.14);
   --orange50: rgba(254, 152, 0, 0.16);
   --red50: rgba(240, 68, 82, 0.16);
+  --teal50: rgba(14, 184, 192, 0.16);
+  --yellow50: rgba(255, 195, 66, 0.16);
+  /* 전수검수(2026-08-10)로 발견한 시스템적 대비 결함: blue700/orange700/red700은
+   * 원래 "라이트 모드에서 500계열이 AA를 못 넘어 대신 쓰는 짙은 강조 텍스트색"으로
+   * 설계됐다(위 auth-page.tsx 주석 "blue500(3.71:1 불통과) → blue700(5.41:1 통과)"
+   * 참조). 그런데 이 고정 hex들은 다크모드에서 그대로 유지되면서 배경만 어두워져
+   * (카드 표면·자신의 -50 틴트 배경 모두 대상) 오히려 대비가 무너진다 — 계산 실측:
+   * blue700 3.08:1(카드)/2.6:1(자신의 틴트), orange700 3.39/2.53, red700 2.56/2.16,
+   * 전부 4.5:1 미달. 500계열도 자신의 다크 틴트 배경에 얹히면 근소하게 미달한다
+   * (blue500 3.78, red500 3.79). 개별 호출부가 아니라 토큰 자체를 다크에서 밝게
+   * 오버라이드한다 — 카드 표면(#1c1e24)과 각자의 다크 틴트 배경 양쪽에 4.5:1 이상
+   * 확보한 값으로 재계산해 선택. orange는 이미 다크에서 잘 보이는 --orange500을
+   * 재사용, red는 이 파일에 이미 쓰이던 #ff6b76(.tm-bk2-badge-live 등)과 통일. */
+  --blue700: #6ba8ff;
+  --orange700: var(--orange500);
+  --red700: #ff6b76;
 }
 
 /* alpha 라이브 확인 중 발견: 흰 유리(glass) 배경을 CSS 변수 없이 rgba(255,255,255,X)로
@@ -1670,6 +1689,10 @@ button:disabled {
   background-position: right 14px center;
   background-size: 16px 16px;
   cursor: pointer;
+}
+
+:root.dark .tm-input-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b95a1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 }
 
 .tm-auth-input-error {
@@ -4103,6 +4126,12 @@ button:disabled {
     var(--bg);
 }
 
+:root.dark .v1-root {
+  background:
+    linear-gradient(180deg, var(--surface) 0, var(--bg) 240px),
+    var(--bg);
+}
+
 .v1-frame {
   width: min(100%, var(--v1-shell-wide-frame-width));
   min-height: 100vh;
@@ -5750,6 +5779,7 @@ button:disabled {
 }
 .tm-standings-rank-gold { background: #FFF3CD; color: #856404; }
 .tm-standings-rank-silver { background: #F1F1F1; color: var(--grey700); }
+:root.dark .tm-standings-rank-silver { background: var(--grey200); color: var(--grey800); }
 .tm-standings-rank-bronze { background: #FDE8D0; color: #7A3B1E; }
 
 /* 팀 로고 아바타 */
@@ -5997,6 +6027,7 @@ button:disabled {
   color: var(--text-caption); background: var(--grey50); text-align: center;
 }
 .tm-bk2-badge-live { background: #fff0f0; color: #d9363e; font-weight: 800; }
+:root.dark .tm-bk2-badge-live { background: rgba(240,68,82,0.16); color: #ff6b76; }
 .tm-bk2-badge-time { font-size: 10px; color: var(--text-muted); }
 
 /* 뱃지 줄 — 시각 배지가 LIVE/PK 배지와 함께 표시될 수 있다 (D-12).
@@ -6021,12 +6052,17 @@ button:disabled {
   border: 1px solid #ffe0a3;
   background: #fffaf0;
 }
+:root.dark .tm-bk2-champ-won {
+  border-color: rgba(254,152,0,0.35);
+  background: rgba(254,152,0,0.16);
+}
 .tm-bk2-champ-trophy { font-size: 30px; line-height: 1; }
 .tm-bk2-champ-label {
   font-size: 8px; font-weight: 800; letter-spacing: 0.14em;
   text-transform: uppercase; color: var(--orange);
 }
 .tm-bk2-champ-name { font-size: 12px; font-weight: 900; color: #7A3B1E; word-break: keep-all; line-height: 1.3; }
+:root.dark .tm-bk2-champ-name { color: var(--orange500); }
 
 /* 3·4위전 */
 .tm-bk2-third {
@@ -6057,6 +6093,9 @@ button:disabled {
   border-radius: 0 8px 8px 0;
   background: linear-gradient(to right, transparent, rgba(255,255,255,0.92));
   pointer-events: none;
+}
+:root.dark .tm-bk2-scroll-fade {
+  background: linear-gradient(to right, transparent, var(--grey50));
 }
 
 .tm-bracket-page-intro {
@@ -6195,6 +6234,7 @@ button:disabled {
   color: var(--text-caption); text-align: center; background: var(--grey50);
 }
 .tm-wc-match-badge-live { background: #fff0f0; color: #d9363e; }
+:root.dark .tm-wc-match-badge-live { background: rgba(240,68,82,0.16); color: #ff6b76; }
 .tm-wc-match-badge-time { color: var(--text-muted); font-weight: 600; }
 
 /* 커넥터 */
@@ -6236,6 +6276,10 @@ button:disabled {
   background: linear-gradient(145deg, #FFF8E1 0%, #FFF3CD 100%);
   box-shadow: 0 2px 12px rgba(254,152,0,0.18);
 }
+:root.dark .tm-wc-champ-decided {
+  background: rgba(254,152,0,0.16);
+  box-shadow: 0 2px 12px rgba(254,152,0,0.12);
+}
 .tm-wc-champ-trophy { font-size: 32px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12)); }
 .tm-wc-champ-icon { color: var(--grey400); }
 .tm-wc-champ-label {
@@ -6243,6 +6287,7 @@ button:disabled {
   text-transform: uppercase; color: var(--orange);
 }
 .tm-wc-champ-name { font-size: 13px; font-weight: 900; color: #7A3B1E; word-break: keep-all; line-height: 1.3; }
+:root.dark .tm-wc-champ-name { color: var(--orange500); }
 .tm-wc-champ-tbd { color: var(--text-caption); font-weight: 500; }
 
 /* 3·4위전 */

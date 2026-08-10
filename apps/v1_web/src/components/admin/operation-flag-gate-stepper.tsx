@@ -143,13 +143,13 @@ function StepNode({ status, number }: { status: StepStatus; number: number }) {
   }
   if (status === 'current') {
     return (
-      <span className={`${base} border-2 border-blue-500 bg-white text-blue-600`} aria-hidden="true">
+      <span className={`${base} border-2 border-blue-500 bg-[var(--card-surface)] text-[var(--blue700)]`} aria-hidden="true">
         {number}
       </span>
     );
   }
   return (
-    <span className={`${base} border-2 border-gray-200 bg-gray-50 text-gray-300`} aria-hidden="true">
+    <span className={`${base} border-2 border-[var(--border)] bg-[var(--grey100)] text-[var(--text-caption)]`} aria-hidden="true">
       {number}
     </span>
   );
@@ -207,7 +207,7 @@ function StepRow({ step, status, isLast, gateEnabled, flagQuery, showToast }: St
             className={
               status === 'done'
                 ? 'w-0.5 flex-1 min-h-[24px] my-1 rounded-full bg-blue-500'
-                : 'w-0 flex-1 min-h-[24px] my-1 border-l-2 border-dashed border-gray-200'
+                : 'w-0 flex-1 min-h-[24px] my-1 border-l-2 border-dashed border-[var(--border)]'
             }
           />
         )}
@@ -218,29 +218,33 @@ function StepRow({ step, status, isLast, gateEnabled, flagQuery, showToast }: St
           className={[
             'rounded-2xl border p-5 transition-colors',
             status === 'locked'
-              ? 'bg-gray-50 border-gray-100 opacity-70'
+              ? 'bg-[var(--surface-soft)] border-[var(--border)] opacity-70'
               : status === 'current'
-                ? 'bg-white border-blue-200 ring-1 ring-blue-100'
-                : 'bg-white border-gray-100',
+                ? 'bg-[var(--card-surface)] border-[var(--tint-blue-border)] ring-1 ring-blue-100'
+                : 'bg-[var(--card-surface)] border-[var(--border)]',
           ].join(' ')}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-[16px] font-bold text-gray-900">
+                <h3 className="text-[16px] font-bold text-[var(--text-strong)]">
                   {step.label}
                   <span className="sr-only"> — {statusLabel(status)}</span>
                 </h3>
                 <span
                   className={[
                     'inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold shrink-0',
-                    step.irreversible ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500',
+                    step.irreversible
+                      ? 'bg-[var(--tint-orange)] text-[var(--orange700)]'
+                      : status === 'locked'
+                        ? 'bg-[var(--card-surface)] text-[var(--text-muted)]'
+                        : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
                   ].join(' ')}
                 >
                   {step.revertHint}
                 </span>
               </div>
-              <p className="text-[13px] text-gray-500 mt-1 leading-relaxed">{step.description}</p>
+              <p className="text-[13px] text-[var(--text-muted)] mt-1 leading-relaxed">{step.description}</p>
               <p className="text-[11px] text-gray-400 mt-1.5 font-mono">{step.techNote}</p>
             </div>
 
@@ -254,7 +258,7 @@ function StepRow({ step, status, isLast, gateEnabled, flagQuery, showToast }: St
                   'shrink-0 inline-flex items-center justify-center gap-1 min-h-[44px] px-4 rounded-xl text-[13px] font-semibold transition-colors',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed',
                   step.bidirectional && isOn
-                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-[var(--surface-soft)] text-[var(--text-body)] hover:bg-[var(--grey300)]'
                     : 'bg-blue-500 text-white hover:bg-blue-600',
                 ].join(' ')}
               >
@@ -272,18 +276,18 @@ function StepRow({ step, status, isLast, gateEnabled, flagQuery, showToast }: St
           )}
 
           {flag && status === 'done' && (
-            <dl className="grid grid-cols-3 gap-2 pt-3 mt-3 border-t border-gray-50 text-[12px]">
+            <dl className="grid grid-cols-3 gap-2 pt-3 mt-3 border-t border-[var(--border)] text-[12px]">
               <div>
                 <dt className="text-gray-400">버전</dt>
-                <dd className="text-gray-700 font-medium tabular-nums">v{flag.version}</dd>
+                <dd className="text-[var(--text-body)] font-medium tabular-nums">v{flag.version}</dd>
               </div>
               <div>
                 <dt className="text-gray-400">마지막 변경자</dt>
-                <dd className="text-gray-700 font-medium truncate">{flag.updatedByUserId ?? '—'}</dd>
+                <dd className="text-[var(--text-body)] font-medium truncate">{flag.updatedByUserId ?? '—'}</dd>
               </div>
               <div>
                 <dt className="text-gray-400">마지막 변경 시각</dt>
-                <dd className="text-gray-700 font-medium">
+                <dd className="text-[var(--text-body)] font-medium">
                   {new Date(flag.updatedAt).toLocaleString('ko-KR', {
                     month: 'numeric',
                     day: 'numeric',
@@ -349,7 +353,7 @@ export function OperationFlagGateStepper({ gateEnabled, showToast }: OperationFl
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-[13px] font-semibold text-gray-700">
+          <p className="text-[13px] font-semibold text-[var(--text-body)]">
             5단계 중 {doneCount}단계 완료
           </p>
           {!gateEnabled && (
@@ -359,7 +363,7 @@ export function OperationFlagGateStepper({ gateEnabled, showToast }: OperationFl
             </span>
           )}
         </div>
-        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-1.5 w-full rounded-full bg-[var(--surface-soft)] overflow-hidden">
           <div
             className="h-full bg-blue-500 rounded-full transition-[width] duration-150"
             style={{ width: `${(doneCount / STEPS.length) * 100}%` }}
@@ -368,7 +372,7 @@ export function OperationFlagGateStepper({ gateEnabled, showToast }: OperationFl
       </div>
 
       {anyError && (
-        <p className="text-[13px] text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-3">
+        <p className="text-[13px] text-[var(--red700)] bg-[var(--red50)] border border-[var(--tint-red-border)] rounded-xl px-3.5 py-3">
           일부 단계 상태를 불러오지 못했어요. 새로고침해 주세요.
         </p>
       )}

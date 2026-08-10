@@ -39,7 +39,7 @@ function deriveRole(
 // ── 화면 ──────────────────────────────────────────────────────────────────
 function GateLoadingScreen() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[var(--surface-soft)] flex items-center justify-center px-4">
       <div className="animate-pulse flex flex-col items-center gap-3 w-full max-w-[320px]">
         <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-white/10" />
         <div className="h-4 w-40 rounded-lg bg-gray-200 dark:bg-white/10" />
@@ -50,15 +50,15 @@ function GateLoadingScreen() {
 
 function AccessDenied({ scopeNotYetSupported }: { scopeNotYetSupported: boolean }) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[var(--surface-soft)] flex items-center justify-center px-4">
       <div className="flex flex-col items-center gap-3 text-center max-w-[340px]">
         <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">
           <ShieldOff size={48} />
         </span>
-        <h1 className="text-[var(--font-size-subhead)] font-bold text-gray-900 dark:text-white">
+        <h1 className="text-[var(--font-size-subhead)] font-bold text-[var(--text-strong)]">
           {scopeNotYetSupported ? '아직 지원하지 않는 화면이에요' : '대회 운영자 권한이 필요해요'}
         </h1>
-        <p className="text-[var(--font-size-body-sm)] text-gray-500 dark:text-gray-400 leading-relaxed">
+        <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           {scopeNotYetSupported
             ? '필드/경기 담당자용 화면은 아직 준비 중이에요. 담당 경기 화면이 열리면 다시 안내해 드릴게요.'
             : '이 화면은 이 대회에 배정된 운영 스태프만 접근할 수 있어요. 배정 상태를 확인해 주세요.'}
@@ -76,12 +76,12 @@ function AccessDenied({ scopeNotYetSupported }: { scopeNotYetSupported: boolean 
 
 function GateErrorScreen({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[var(--surface-soft)] flex items-center justify-center px-4">
       <div className="flex flex-col items-center gap-3 text-center max-w-[320px]">
-        <h1 className="text-[var(--font-size-subhead)] font-bold text-gray-900 dark:text-white">
+        <h1 className="text-[var(--font-size-subhead)] font-bold text-[var(--text-strong)]">
           잠시 문제가 생겼어요
         </h1>
-        <p className="text-[var(--font-size-body-sm)] text-gray-500 dark:text-gray-400 leading-relaxed">
+        <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           일시적인 오류로 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
         <button

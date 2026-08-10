@@ -77,7 +77,7 @@ export function CoverImageUploader({
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={locked}
-            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-50 disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-[var(--tint-blue)] disabled:opacity-50"
           >
             <ImagePlus size={16} aria-hidden="true" />
             {uploading ? '업로드 중…' : value ? '이미지 변경' : '이미지 선택'}
@@ -87,7 +87,7 @@ export function CoverImageUploader({
               type="button"
               onClick={onClear}
               disabled={locked}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-[var(--text-caption)] transition-colors hover:bg-red-50 hover:text-[var(--red500)] disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-[var(--text-caption)] transition-colors hover:bg-[var(--red50)] hover:text-[var(--red500)] disabled:opacity-50"
             >
               <Trash2 size={16} aria-hidden="true" />
               이미지 제거

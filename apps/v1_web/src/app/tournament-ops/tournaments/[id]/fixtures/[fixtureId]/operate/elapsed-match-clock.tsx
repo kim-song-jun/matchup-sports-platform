@@ -62,7 +62,7 @@ export function ElapsedMatchClock({
 
   return (
     <div className="flex items-center gap-2" aria-live="off">
-      <span className="text-2xs font-semibold text-gray-400 dark:text-gray-500">{periodLabel(periodNumber)}</span>
+      <span className="text-2xs font-semibold text-[var(--text-muted)]">{periodLabel(periodNumber)}</span>
       {/* 스톱워치 다이얼 — 자릿수가 고정된 큰 숫자를 살짝 어두운 배경 칩 안에
           담아 "지금 흐르고 있는 시각"과 주변 텍스트를 시각적으로 분리한다.
           초록 점(진행 중)/일시정지 아이콘을 숫자 바로 옆에 붙여 한눈에 상태를
@@ -71,7 +71,7 @@ export function ElapsedMatchClock({
         className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-3xl font-extrabold leading-none tabular-nums tracking-tight ${
           isPaused
             ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300'
-            : 'bg-gray-900/[0.04] text-gray-900 dark:bg-white/10 dark:text-white'
+            : 'bg-gray-900/[0.04] text-[var(--text-strong)] dark:bg-white/10'
         }`}
         aria-label={`${periodLabel(periodNumber)} 경과 시간 ${formatStopwatchClock(elapsedMs)}${isPaused ? ' (일시 중지됨)' : ''}`}
       >

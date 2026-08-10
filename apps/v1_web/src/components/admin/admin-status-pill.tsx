@@ -16,11 +16,12 @@ import type { ReactNode } from 'react';
 type Tone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
 
 const TONE_CLASSES: Record<Tone, string> = {
-  blue: 'bg-blue-50 text-blue-700',
-  green: 'bg-green-50 text-green-700',
-  amber: 'bg-amber-50 text-amber-700',
-  red: 'bg-red-50 text-red-700',
-  gray: 'bg-gray-100 text-gray-600',
+  blue: 'bg-[var(--blue50)] text-[var(--blue700)]',
+  // --green700 토큰이 globals.css에 없어 중립 강조 토큰(--text-strong)으로 대체 — 배경만 토큰화
+  green: 'bg-[var(--green50)] text-[var(--text-strong)]',
+  amber: 'bg-[var(--tint-orange)] text-[var(--orange700)]',
+  red: 'bg-[var(--red50)] text-[var(--red700)]',
+  gray: 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
 };
 
 // ── Status meta map ───────────────────────────────────────────────────────

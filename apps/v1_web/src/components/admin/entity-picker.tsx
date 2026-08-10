@@ -180,13 +180,13 @@ export function EntityPicker({
   // ── Selected state — chip display + clear button ──────────────────────────
   if (value) {
     return (
-      <div className="flex items-center justify-between h-[44px] px-3 bg-blue-50 border border-blue-200 rounded-xl">
+      <div className="flex items-center justify-between h-[44px] px-3 bg-[var(--blue50)] border border-[var(--tint-blue-border)] rounded-xl">
         <div className="flex flex-col min-w-0">
           <span className="text-[var(--font-size-label)] font-semibold text-blue-800 truncate">
             {value.label}
           </span>
           {value.description && (
-            <span className="text-[var(--font-size-micro)] text-blue-600 truncate">{value.description}</span>
+            <span className="text-[var(--font-size-micro)] text-[var(--blue700)] truncate">{value.description}</span>
           )}
         </div>
         <button
@@ -194,7 +194,7 @@ export function EntityPicker({
           onClick={() => onChange(null)}
           disabled={disabled}
           aria-label="선택 해제"
-          className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
+          className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-blue-400 hover:text-[var(--blue700)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
         >
           <X size={14} aria-hidden="true" />
         </button>
@@ -229,7 +229,7 @@ export function EntityPicker({
         aria-controls={showMenu ? menuId : undefined}
         aria-activedescendant={safeHighlightIdx >= 0 ? `${menuId}-opt-${safeHighlightIdx}` : undefined}
         className={[
-          'w-full h-[44px] pl-9 pr-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-900',
+          'w-full h-[44px] pl-9 pr-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
           'placeholder:text-gray-400',
           'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
           'transition-colors disabled:opacity-50',
@@ -243,7 +243,7 @@ export function EntityPicker({
           id={menuId}
           // mousedown preventDefault: 스크롤바·여백 클릭이 input blur → 메뉴 닫힘으로 이어지지 않게
           onMouseDown={(e) => e.preventDefault()}
-          className="absolute left-0 right-0 top-[48px] bg-white border border-gray-200 rounded-xl shadow-md z-20 overflow-hidden max-h-[240px] overflow-y-auto"
+          className="absolute left-0 right-0 top-[48px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl shadow-md z-20 overflow-hidden max-h-[240px] overflow-y-auto"
         >
           {loading ? (
             <p className="px-4 py-3 text-[var(--font-size-label)] text-gray-400">검색 중…</p>
@@ -265,13 +265,13 @@ export function EntityPicker({
                       tabIndex={-1}
                       onClick={() => commitEntry(entry)}
                       className={[
-                        'w-full flex items-center px-4 py-2.5 min-h-[44px] text-left border-b border-gray-100',
-                        'hover:bg-gray-50 transition-colors',
+                        'w-full flex items-center px-4 py-2.5 min-h-[44px] text-left border-b border-[var(--border)]',
+                        'hover:bg-[var(--surface-soft)] transition-colors',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                        highlighted ? 'bg-gray-50' : '',
+                        highlighted ? 'bg-[var(--surface-soft)]' : '',
                       ].join(' ')}
                     >
-                      <span className="text-[var(--font-size-label)] font-medium text-gray-500">
+                      <span className="text-[var(--font-size-label)] font-medium text-[var(--text-muted)]">
                         {clearLabel}
                       </span>
                     </button>
@@ -295,15 +295,15 @@ export function EntityPicker({
                     onClick={() => commitEntry(entry)}
                     className={[
                       'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left transition-colors',
-                      item.disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-blue-50',
+                      item.disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-[var(--blue50)]',
                       // disabled 항목도 화살표 키로 하이라이트될 수 있다 — 선택은 막되(no-op),
                       // 지금 어디에 있는지는 키보드 사용자에게도 보여야 한다.
-                      highlighted ? 'bg-blue-50' : '',
+                      highlighted ? 'bg-[var(--blue50)]' : '',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                     ].join(' ')}
                   >
                     <span
-                      className={`text-[var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-gray-900'}`}
+                      className={`text-[var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-[var(--text-strong)]'}`}
                     >
                       {item.label}
                     </span>

@@ -23,10 +23,10 @@ const STATUS_LABEL: Record<QueuedEventStatus, string> = {
 };
 
 const STATUS_BADGE_CLASS: Record<QueuedEventStatus, string> = {
-  queued: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-  sending: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
-  acked: 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400',
-  failed: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400',
+  queued: 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
+  sending: 'bg-[var(--blue50)] text-[var(--blue700)]',
+  acked: 'bg-[var(--green50)] text-[var(--text-strong)]',
+  failed: 'bg-[var(--red50)] text-[var(--red700)]',
 };
 
 function eventLabel(item: QueuedGameEvent): string {
@@ -44,7 +44,7 @@ function eventLabel(item: QueuedGameEvent): string {
 export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
   if (items.length === 0) {
     return (
-      <p className="px-1 py-3 text-2xs text-gray-400 dark:text-gray-500">
+      <p className="px-1 py-3 text-2xs text-[var(--text-muted)]">
         기록된 이벤트가 아직 없어요.
       </p>
     );
@@ -55,10 +55,10 @@ export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
       {items.map((item) => (
         <li
           key={item.clientEventId}
-          className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
+          className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-3 py-2"
         >
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+            <p className="truncate text-sm font-medium text-[var(--text-strong)]">
               {eventLabel(item)}
             </p>
             {/* lastError 가 없는 실패도 사유 자리를 비워두지 않는다. 예전 스키마로 저장된

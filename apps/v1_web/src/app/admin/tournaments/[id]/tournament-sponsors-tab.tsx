@@ -145,22 +145,22 @@ export function TournamentSponsorsTab({
       {!isPending && !isError && sponsors.length > 0 && (
         <div className="flex flex-col gap-3">
           {sponsors.map((sponsor) => (
-            <div key={sponsor.id} className="rounded-2xl border border-gray-100 bg-white px-5 py-4">
+            <div key={sponsor.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-bold text-gray-900 truncate">{sponsor.name}</p>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="text-[13px] font-bold text-[var(--text-strong)] truncate">{sponsor.name}</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {sponsor.isActive ? '공개' : '비공개'} · 정렬 {sponsor.sortOrder}
                   </p>
                 </div>
                 {sponsor.eventTitle ? (
-                  <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600">
+                  <span className="shrink-0 rounded-full bg-[var(--blue50)] px-2 py-1 text-xs font-medium text-[var(--blue700)]">
                     {sponsor.eventTitle}
                   </span>
                 ) : null}
               </div>
               {sponsor.benefitText ? (
-                <p className="mt-3 text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap">
+                <p className="mt-3 text-[13px] text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap">
                   {sponsor.benefitText}
                 </p>
               ) : null}
@@ -169,8 +169,8 @@ export function TournamentSponsorsTab({
                   type="button"
                   onClick={() => startEdit(sponsor)}
                   className={[
-                    'min-h-[44px] rounded-lg bg-gray-100 px-3 text-xs font-semibold text-gray-700',
-                    'transition-colors hover:bg-gray-200',
+                    'min-h-[44px] rounded-lg bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)]',
+                    'transition-colors hover:bg-[var(--border)]',
                   ].join(' ')}
                 >
                   수정
@@ -181,8 +181,8 @@ export function TournamentSponsorsTab({
                     onClick={() => handleDeactivate(sponsor)}
                     disabled={deactivateSponsor.isPending}
                     className={[
-                      'min-h-[44px] rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-600',
-                      'transition-colors hover:bg-red-100 disabled:opacity-50',
+                      'min-h-[44px] rounded-lg bg-[var(--red50)] px-3 text-xs font-semibold text-[var(--red700)]',
+                      'transition-colors hover:bg-[var(--tint-red)] disabled:opacity-50',
                     ].join(' ')}
                   >
                     비공개

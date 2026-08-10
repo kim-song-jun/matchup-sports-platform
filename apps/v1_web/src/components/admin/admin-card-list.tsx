@@ -51,8 +51,8 @@ interface AdminCardListProps<T> {
 
 // ── tone → class (AdminDataTable 과 동일 매핑) ──────────────────────────────
 const TONE_CARD: Record<'danger' | 'warning', string> = {
-  danger: 'bg-red-50/40 border-l-2 border-l-red-400',
-  warning: 'bg-amber-50/40 border-l-2 border-l-amber-400',
+  danger: 'bg-[var(--red50)]/40 border-l-2 border-l-red-400',
+  warning: 'bg-[var(--tint-orange)] border-l-2 border-l-amber-400',
 };
 
 // 모바일 1열 → 좁은 화면부터 채워지는 반응형 그리드.
@@ -77,13 +77,13 @@ export function AdminCardList<T>({
   // Error state
   if (error) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 py-10 px-4 flex flex-col items-center gap-3 text-center">
+      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
         <p className="text-sm text-red-500 font-medium">{error}</p>
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="text-sm text-blue-500 hover:text-[var(--blue700)] underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             다시 시도하기
           </button>
@@ -99,22 +99,22 @@ export function AdminCardList<T>({
         {Array.from({ length: skeletonCards }).map((_, i) => (
           <div
             key={i}
-            className="bg-white rounded-xl border border-gray-100 p-3.5 animate-pulse"
+            className="bg-[var(--card-surface)] rounded-xl border border-[var(--border)] p-3.5 animate-pulse"
           >
             <div className="flex justify-between items-start gap-2">
               <div className="flex-1 min-w-0">
-                <div className="h-3.5 w-2/3 rounded bg-gray-100" />
-                <div className="mt-2 h-2.5 w-1/2 rounded bg-gray-100" />
+                <div className="h-3.5 w-2/3 rounded bg-[var(--surface-soft)]" />
+                <div className="mt-2 h-2.5 w-1/2 rounded bg-[var(--surface-soft)]" />
               </div>
-              <div className="h-5 w-14 rounded-full bg-gray-100" />
+              <div className="h-5 w-14 rounded-full bg-[var(--surface-soft)]" />
             </div>
             <div className="mt-3.5 grid grid-cols-2 gap-2">
-              <div className="h-2.5 rounded bg-gray-100" />
-              <div className="h-2.5 rounded bg-gray-100" />
-              <div className="h-2.5 rounded bg-gray-100" />
-              <div className="h-2.5 rounded bg-gray-100" />
+              <div className="h-2.5 rounded bg-[var(--surface-soft)]" />
+              <div className="h-2.5 rounded bg-[var(--surface-soft)]" />
+              <div className="h-2.5 rounded bg-[var(--surface-soft)]" />
+              <div className="h-2.5 rounded bg-[var(--surface-soft)]" />
             </div>
-            <div className="mt-3.5 h-10 rounded-lg bg-gray-100" />
+            <div className="mt-3.5 h-10 rounded-lg bg-[var(--surface-soft)]" />
           </div>
         ))}
       </div>
@@ -124,7 +124,7 @@ export function AdminCardList<T>({
   // Empty state
   if (rows.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
         {empty ?? <AdminEmpty title="항목이 없어요" description="다른 조건으로 검색해 보세요." />}
       </div>
     );
@@ -142,7 +142,7 @@ export function AdminCardList<T>({
           <li
             key={keyExtractor(row)}
             className={[
-              'bg-white rounded-xl border border-gray-100 p-3.5 flex flex-col transition-colors hover:border-gray-200',
+              'bg-[var(--card-surface)] rounded-xl border border-[var(--border)] p-3.5 flex flex-col transition-colors hover:border-[var(--border-strong)]',
               tone ? TONE_CARD[tone] : '',
             ]
               .filter(Boolean)
@@ -151,7 +151,7 @@ export function AdminCardList<T>({
             {/* 제목 + 상태 */}
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
-                <p className="text-[var(--font-size-body-sm)] font-semibold text-gray-900 truncate">
+                <p className="text-[var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] truncate">
                   {model.title}
                 </p>
                 {model.subtitle != null && (
@@ -175,7 +175,7 @@ export function AdminCardList<T>({
                 {model.meta.map((m, i) => (
                   <dd
                     key={i}
-                    className="flex items-center gap-1.5 text-[var(--font-size-label)] text-gray-600 tabular-nums min-w-0"
+                    className="flex items-center gap-1.5 text-[var(--font-size-label)] text-[var(--text-muted)] tabular-nums min-w-0"
                   >
                     {m.icon && (
                       <span className="shrink-0 text-gray-400 inline-flex" aria-hidden="true">
@@ -189,7 +189,7 @@ export function AdminCardList<T>({
             )}
 
             {model.description ? (
-              <div className="mt-2.5 rounded-lg bg-gray-50 px-3 py-2 text-[var(--font-size-caption)] text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
+              <div className="mt-2.5 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-[var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap break-words">
                 {model.description}
               </div>
             ) : null}

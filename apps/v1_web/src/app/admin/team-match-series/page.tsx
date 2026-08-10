@@ -37,7 +37,7 @@ export default function AdminTeamMatchSeriesListPage() {
             key: 'title',
             header: '리그',
             render: (row) => (
-              <Link href={`/admin/team-match-series/${row.seriesId}`} className="font-semibold text-blue-600">
+              <Link href={`/admin/team-match-series/${row.seriesId}`} className="font-semibold text-[var(--blue700)]">
                 {row.title}
               </Link>
             ),

@@ -60,7 +60,23 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
       awayRegistration: {
         include: { team: { select: { id: true, name: true, profile: { select: { logoUrl: true } } } } },
       },
+      // R3 §4-3단계: 공개 상세의 fixtures[].result는 이제 아래 game.currentOfficialRevision
+      // 에서 조립한다(tournament-detail.presenter.ts). result/goals 조인은 §4-4단계까지는
+      // 의도적으로 남겨둔다 -- docs/ops/legacy-game-result-r3-removal-inventory.md §4.
       result: { include: { goals: { orderBy: { createdAt: 'asc' } } } },
+      game: {
+        select: {
+          sides: { select: { id: true, sideKey: true } },
+          participants: { select: { id: true, displayNameSnapshot: true } },
+          currentOfficialRevision: {
+            select: { id: true, state: true, score: true, officialAt: true, createdAt: true, updatedAt: true },
+          },
+          events: {
+            where: { OR: [{ type: 'GOAL' }, { reversesEventId: { not: null } }] },
+            select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true },
+          },
+        },
+      },
       videos: { orderBy: { sortOrder: 'asc' } },
     },
   },

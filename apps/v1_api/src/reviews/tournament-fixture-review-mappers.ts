@@ -1,4 +1,5 @@
 import { Prisma, V1TeamMembershipRole } from '@prisma/client';
+import { resolveTournamentFixtureOfficialTimestamp } from '../tournaments/tournament-fixture-official-result';
 
 export const TOURNAMENT_FIXTURE_SOURCE_TYPE = 'tournament_fixture' as const;
 export const TEAM_REVIEW_ROLES: V1TeamMembershipRole[] = ['owner', 'manager'];
@@ -31,11 +32,33 @@ export function tournamentFixtureSelect() {
     status: true,
     scheduledAt: true,
     updatedAt: true,
+    // R3 §4-3단계: 신규 경로(V1Game.currentOfficialRevision.officialAt)를 우선 읽는다 --
+    // officialResultTimestamp() 참고. state까지 함께 골라서 VOID로 넘어간 리비전을
+    // "결과 있음"으로 오판하지 않는다.
+    game: { select: { currentOfficialRevision: { select: { state: true, officialAt: true } } } },
+    // R3 §4-3단계 한시적 레거시 폴백 입력 — officialResultTimestamp()가 새 경로에 OFFICIAL
+    // 리비전이 없을 때만(game 백필 전) 레거시 recordedAt으로 대체한다. §4-4단계에서 제거.
     result: { select: { recordedAt: true } },
     tournament: { select: { title: true } },
     homeRegistration: { select: { teamId: true, team: { select: teamSelect() } } },
     awayRegistration: { select: { teamId: true, team: { select: teamSelect() } } },
   } as const;
+}
+
+/**
+ * 신규 경로(`V1Game.currentOfficialRevision.officialAt`) 우선, 새 경로에 OFFICIAL
+ * 리비전이 없을 때만(game 백필 전 등) 레거시 `fixture.result?.recordedAt`으로 폴백한다
+ * (R3 §4-3~§4-4단계 사이 한시적 — resolveTournamentFixtureOfficialTimestamp() 참고).
+ * `currentOfficialRevisionId`는 VOID 이후 VOID 리비전을 가리키도록 옮겨가므로
+ * (tournament-result-review.service.ts voidResult) 존재 여부가 아니라
+ * `state === 'OFFICIAL'`을 확인해야 레거시의 "결과가 있다"와 동등해진다. 백필된 픽스처는
+ * officialAt에 레거시 recordedAt이 그대로 들어있어(game-result-backfill.ts) 이 값이
+ * 정확히 같다. 이 타임스탬프는 `reviewContext()`의 리뷰 게이트("결과가 확정된 경기만
+ * 리뷰 가능")로도 그대로 쓰이므로, 폴백이 빠지면 레거시 결과만 있는(game 백필 전) 완료
+ * 경기가 리뷰를 못 받게 된다.
+ */
+export function officialResultTimestamp(fixture: TournamentFixture): Date | null {
+  return resolveTournamentFixtureOfficialTimestamp(fixture.game, fixture.result?.recordedAt);
 }
 
 export function reviewInclude() {

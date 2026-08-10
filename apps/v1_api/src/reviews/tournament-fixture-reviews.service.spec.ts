@@ -27,7 +27,7 @@ describe('TournamentFixtureReviewsService', () => {
           status: 'completed',
           scheduledAt: recordedAt,
           updatedAt: recordedAt,
-          result: { recordedAt },
+          game: { currentOfficialRevision: { state: 'OFFICIAL', officialAt: recordedAt } },
           homeRegistration: {
             teamId: reviewerTeamId,
             team: { id: reviewerTeamId, name: '성수 FC', profile: { logoUrl: null } },
@@ -140,6 +140,28 @@ describe('TournamentFixtureReviewsService', () => {
       ],
     });
   });
+
+  // R3 §4-3단계: 결과 존재 게이트를 신규 경로(V1Game.currentOfficialRevision)로 옮겼다.
+  // currentOfficialRevisionId는 VOID 이후 VOID 리비전을 가리키도록 다시 옮겨가므로
+  // (tournament-result-review.service.ts voidResult), state까지 확인하지 않으면 무효화된
+  // 결과를 "리뷰 가능"으로 오판한다.
+  it('무효화(VOID)된 결과는 완료로 취급하지 않고 SOURCE_NOT_COMPLETED로 막는다', async () => {
+    const prisma = {
+      v1TournamentFixture: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...fixture({ id: fixtureId, fixtureNumber: 1 }),
+          game: { currentOfficialRevision: { state: 'VOID', officialAt: null } },
+        }),
+      },
+      v1TeamMembership: { findMany: jest.fn() },
+      v1PostEventReview: { findFirst: jest.fn() },
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never);
+
+    await expect(service.source(user, fixtureId)).rejects.toMatchObject({
+      response: { code: 'SOURCE_NOT_COMPLETED' },
+    });
+  });
 });
 
 function fixture(input: { readonly id: string; readonly fixtureNumber: number }) {
@@ -152,7 +174,7 @@ function fixture(input: { readonly id: string; readonly fixtureNumber: number })
     status: 'completed',
     scheduledAt: recordedAt,
     updatedAt: recordedAt,
-    result: { recordedAt },
+    game: { currentOfficialRevision: { state: 'OFFICIAL', officialAt: recordedAt } },
     homeRegistration: {
       teamId: reviewerTeamId,
       team: { id: reviewerTeamId, name: '성수 FC', profile: { logoUrl: null } },

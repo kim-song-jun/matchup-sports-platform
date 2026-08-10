@@ -1,4 +1,5 @@
 import type { TournamentDetailRow } from './tournaments-read.query';
+import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 
 /**
  * 대진표 공개 여부 판정의 단일 소스. 즉시 공개(bracketPublishedAt)와 예약 공개
@@ -14,6 +15,32 @@ export function isBracketPublished(
   // 컬럼이 빠진 부분 select 나 구식 fixture 가 들어와도 "비공개"로 안전하게 떨어져야 한다.
   if (publishedAt) return true;
   return Boolean(scheduledAt) && (scheduledAt as Date).getTime() <= now.getTime();
+}
+
+/**
+ * 공개 상세의 fixtures[].result 조립 -- 응답 필드 형태(homeScore/awayScore/hasPenalty/
+ * homePenaltyScore/awayPenaltyScore/note/recordedAt/goals[])는 레거시와 동일하게 유지한다.
+ * 신규 경로(`V1Game.currentOfficialRevision`)를 우선하고, OFFICIAL 리비전이 없을 때만
+ * (game 백필 전 등) 레거시 `V1TournamentFixtureResult`로 폴백한다(R3 §4-3~§4-4단계 사이
+ * 한시적 — resolveTournamentFixtureOfficialResult() 참고). `note`는 새 경로에서 조립된
+ * 결과일 때만 항상 null이고, 레거시 폴백 결과는 레거시 note를 그대로 보존한다.
+ */
+function presentOfficialResult(
+  game: TournamentDetailRow['fixtures'][number]['game'],
+  legacyResult: TournamentDetailRow['fixtures'][number]['result'],
+) {
+  const resolved = resolveTournamentFixtureOfficialResult(game, legacyResult ?? undefined);
+  if (!resolved) return null;
+  return {
+    homeScore: resolved.score.homeScore,
+    awayScore: resolved.score.awayScore,
+    hasPenalty: resolved.score.hasPenalty,
+    homePenaltyScore: resolved.score.homePenaltyScore,
+    awayPenaltyScore: resolved.score.awayPenaltyScore,
+    note: resolved.note,
+    recordedAt: (resolved.officialAt ?? resolved.createdAt).toISOString(),
+    goals: resolved.goals,
+  };
 }
 
 export function presentTournamentDetail(row: TournamentDetailRow, now: Date = new Date()) {
@@ -157,24 +184,10 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
       awayTeamId: fixture.awayRegistration?.team.id ?? null,
       awayTeamName: fixture.awayRegistration?.team.name ?? 'TBD',
       awayTeamLogoUrl: fixture.awayRegistration?.team.profile?.logoUrl ?? null,
-      result: fixture.result
-        ? {
-            homeScore: fixture.result.homeScore,
-            awayScore: fixture.result.awayScore,
-            hasPenalty: fixture.result.hasPenalty,
-            homePenaltyScore: fixture.result.homePenaltyScore,
-            awayPenaltyScore: fixture.result.awayPenaltyScore,
-            note: fixture.result.note,
-            recordedAt: fixture.result.recordedAt.toISOString(),
-            goals: fixture.result.goals.map((goal) => ({
-              id: goal.id,
-              team: goal.team,
-              playerId: goal.playerId,
-              playerName: goal.playerName,
-              minute: goal.minute,
-            })),
-          }
-        : null,
+      // R3 §4-3단계: 공개 스코어보드를 신규 경로(V1Game.currentOfficialRevision) 우선으로
+      // 조립하고, OFFICIAL 리비전이 없을 때만(game 백필 전) 레거시 V1TournamentFixtureResult로
+      // 폴백한다 -- 문서 §1-2/§4 참고. §4-4단계에서 result 조인과 함께 폴백을 제거한다.
+      result: presentOfficialResult(fixture.game, fixture.result),
       videos: fixture.videos.map((video) => ({
         id: video.id,
         title: video.title,

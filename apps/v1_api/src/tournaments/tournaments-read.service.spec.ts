@@ -647,7 +647,12 @@ describe('TournamentsReadService', () => {
     });
   });
 
-  it('get: fixture with result is serialized correctly', async () => {
+  // R3 §4-3단계: 이 결과는 이제 레거시 V1TournamentFixtureResult가 아니라
+  // V1Game.currentOfficialRevision(신규 경로)에서 조립된다 -- fixture.result는 더 이상
+  // 읽지 않는다. note는 신규 리비전에 대응 컬럼이 없어 항상 null이고(재현 불가 필드),
+  // playerId 없는 골의 playerName은 레거시가 남긴 자유 텍스트("대타 선수")를 보존하지
+  // 못하고 고정 플레이스홀더로 대체된다(참가자를 특정할 수 없을 때의 신규 경로 한계).
+  it('get: fixture with official result(신규 경로) is serialized correctly', async () => {
     const row = fullTournamentRow({
       fixtures: [
         {
@@ -664,18 +669,39 @@ describe('TournamentsReadService', () => {
           homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
           awayRegistration: { team: { id: 'team-2', name: '부산 아이파크' } },
           videos: [],
-          result: {
-            homeScore: 3,
-            awayScore: 2,
-            hasPenalty: false,
-            homePenaltyScore: null,
-            awayPenaltyScore: null,
-            note: '명승부',
-            recordedAt: new Date('2026-07-01T17:30:00Z'),
-            goals: [
-              { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 45 },
-              { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: null },
+          result: null,
+          game: {
+            sides: [
+              { id: 'side-home', sideKey: 'HOME' },
+              { id: 'side-away', sideKey: 'AWAY' },
             ],
+            participants: [{ id: 'player-1', displayNameSnapshot: '홍길동' }],
+            events: [
+              {
+                id: 'goal-1',
+                type: 'GOAL',
+                sideId: 'side-home',
+                participantId: 'player-1',
+                clockMs: 45 * 60_000,
+                reversesEventId: null,
+              },
+              {
+                id: 'goal-2',
+                type: 'GOAL',
+                sideId: 'side-away',
+                participantId: null,
+                clockMs: 10 * 60_000,
+                reversesEventId: null,
+              },
+            ],
+            currentOfficialRevision: {
+              id: 'revision-fixture-2',
+              state: 'OFFICIAL',
+              score: { regulation: { home: 3, away: 2 }, penalty: null, goals: [], incomplete: false },
+              officialAt: new Date('2026-07-01T17:30:00Z'),
+              createdAt: new Date('2026-07-01T17:30:00Z'),
+              updatedAt: new Date('2026-07-01T17:30:00Z'),
+            },
           },
         },
       ],
@@ -691,10 +717,11 @@ describe('TournamentsReadService', () => {
         homeScore: 3,
         awayScore: 2,
         hasPenalty: false,
-        note: '명승부',
+        note: null,
+        recordedAt: '2026-07-01T17:30:00.000Z',
         goals: [
           { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 45 },
-          { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: null },
+          { id: 'goal-2', team: 'away', playerId: null, playerName: '선수 정보 없음', minute: 10 },
         ],
       },
     });

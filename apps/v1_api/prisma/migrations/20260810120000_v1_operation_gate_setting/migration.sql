@@ -9,6 +9,10 @@ CREATE TABLE "v1_game_operation_gate_settings" (
   CONSTRAINT "v1_game_operation_gate_settings_pkey" PRIMARY KEY ("id")
 );
 
-INSERT INTO "v1_game_operation_gate_settings" ("id", "simplified_gate_enabled", "version", "updated_at", "created_at")
-VALUES ('singleton', false, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-ON CONFLICT ("id") DO NOTHING;
+-- singleton 행은 여기서 INSERT 하지 않는다. expand-contract 가드
+-- (scripts/qa/check-expand-contract-migrations.mjs)는 마이그레이션에 추가형 DDL 만
+-- 허용하고 DML 은 거부한다 — 롤백 시 이전 버전 코드가 그 행을 어떻게 다룰지 보장할 수
+-- 없기 때문이다. 대신 GameOperationFlagsService.readGateSetting() 이 매 조회마다
+-- `INSERT ... ON CONFLICT (id) DO NOTHING` 으로 행을 보장한다(기존 ensureDefaults() 가
+-- 플래그 기본행을 다루는 방식과 같다). 따라서 여기 INSERT 는 중복이었고, 없어도
+-- 첫 조회 시점에 기본값 false 로 행이 생긴다.

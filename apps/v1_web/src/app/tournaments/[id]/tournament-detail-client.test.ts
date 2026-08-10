@@ -734,7 +734,7 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.queryByText('대진표 준비 중')).not.toBeInTheDocument();
   });
 
-  it('keeps the application guide, flow explainer, and inline standings/fixtures sections for open tournaments (non-destructive)', () => {
+  it('keeps the application guide, flow explainer, and standings-moved notice for open tournaments (non-destructive)', () => {
     const group = makeGroup({ id: 'g1', phase: 'group', standings: [] });
     const tournament = makeTournament({
       id: 't1',
@@ -748,7 +748,10 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
 
     expect(screen.getByText('참가 신청 안내')).toBeInTheDocument();
     expect(screen.getByText('대회 진행 방식')).toBeInTheDocument();
-    expect(screen.getByText('순위표')).toBeInTheDocument();
+    // 순위표는 상세 화면에 인라인으로 남지 않고 /bracket 바로가기 안내(StandingsMovedNotice)로
+    // 대체됐다(§A-1) — 이 파일 상단 주석 참고. 옛 인라인 '순위표' 헤딩을 찾던 단언을
+    // 실제 렌더 문구로 갱신한다.
+    expect(screen.getByText('실시간 순위표는 대진표에서 확인하세요')).toBeInTheDocument();
     expect(screen.getByText('대진표 준비 중')).toBeInTheDocument();
   });
 

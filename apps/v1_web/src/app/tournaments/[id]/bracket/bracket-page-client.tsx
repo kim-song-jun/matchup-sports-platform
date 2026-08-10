@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Trophy } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
@@ -98,12 +99,16 @@ function GroupStandingsSection({ group }: { group: V1TournamentGroup }) {
                       <StandingRankBadge pos={s.position} advance={advance} />
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Link
+                        href={`/teams/${s.teamId}/records`}
+                        className="tm-pressable"
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, textDecoration: 'none', color: 'inherit' }}
+                      >
                         <TeamAvatar seed={s.teamId} name={s.teamName} logoUrl={s.teamLogoUrl} size="sm" />
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
                           {s.teamName}
                         </span>
-                      </div>
+                      </Link>
                     </td>
                     <td className="num" style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)' }}>
                       {s.points}점
@@ -157,12 +162,16 @@ function LeagueStandingsSection({ standings }: { standings: V1TournamentStanding
                       <StandingRankBadge pos={s.position} advance={null} />
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Link
+                        href={`/teams/${s.teamId}/records`}
+                        className="tm-pressable"
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, textDecoration: 'none', color: 'inherit' }}
+                      >
                         <TeamAvatar seed={s.teamId} name={s.teamName} logoUrl={s.teamLogoUrl} size="sm" />
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
                           {s.teamName}
                         </span>
-                      </div>
+                      </Link>
                     </td>
                     <td className="num" style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)' }}>
                       {s.points}점

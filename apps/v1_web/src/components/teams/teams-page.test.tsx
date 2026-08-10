@@ -330,6 +330,20 @@ describe('TeamDetailPageView', () => {
 
     expect(screen.queryByText('승인 대기 중')).not.toBeInTheDocument();
   });
+
+  it('팀 전적 링크가 데스크톱 전용이 아니라 모바일 레이아웃에도 렌더된다', () => {
+    const model = getTeamDetailViewModel('default');
+    render(<TeamDetailPageView model={model} />);
+
+    // 데스크톱(tm-show-desktop)·모바일(tm-hide-desktop) 레이아웃이 jsdom에는
+    // 둘 다 DOM에 존재한다(CSS display:none은 렌더 여부와 무관) — 모바일 레이아웃에도
+    // 링크가 없으면 이 테스트가 실패해 회귀를 잡는다.
+    const links = screen.getAllByRole('link', { name: /^팀 전적/ });
+    expect(links.length).toBeGreaterThanOrEqual(2);
+    links.forEach((link) => {
+      expect(link).toHaveAttribute('href', `/teams/${model.team.id}/records`);
+    });
+  });
 });
 
 describe('TeamMembersPageView — 보낸 초대 목록', () => {

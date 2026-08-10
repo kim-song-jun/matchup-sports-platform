@@ -530,6 +530,29 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
         ) : null}
         <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+        {/* 데스크톱 레이아웃에만 있던 링크 — 모바일에서 팀 전적으로 갈 방법이 아예 없었다. */}
+        <Link
+          className="tm-pressable"
+          href={`/teams/${team.id}/records`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+            border: '1px solid var(--border)',
+            borderRadius: 14,
+            padding: '14px 16px',
+            background: 'var(--bg)',
+            textDecoration: 'none',
+            color: 'inherit',
+          }}
+        >
+          <div>
+            <div className="tm-text-label">팀 전적</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>승·무·패와 경기별 기록을 확인해요.</div>
+          </div>
+          <ChevronRightIcon size={18} aria-hidden="true" />
+        </Link>
         <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
         <Card pad={16}>
           <InfoRow label="팀명" value={team.name} />

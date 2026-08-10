@@ -130,4 +130,41 @@ describe('ThemeProvider server sync', () => {
     toggleSpy.mockRestore();
     vi.unstubAllGlobals();
   });
+
+  // Copilot 리뷰 지적: 초기 서버 동기화가 끝나기 전(settings 쿼리가 아직 이전 값으로
+  // 응답 중)에 사용자가 먼저 테마를 바꾸면, 뒤늦게 도착하는 stale 서버 값이 방금 고른
+  // 값을 되돌리는 레이스가 있었다.
+  it('초기 서버 동기화가 끝나기 전에 사용자가 먼저 바꾸면 뒤늦게 온 stale 서버 값이 되돌리지 않는다', async () => {
+    const user = userEvent.setup();
+    // 초기값을 dark로 둬야 "set-light" 클릭이 실제 변경이 된다 — 기본값(light)과
+    // 같으면 setPreference의 no-op 가드(next === preference)에 걸려 아무 일도
+    // 안 일어나고 serverSynced도 true가 안 돼서, 이 테스트가 검증하려는 레이스
+    // 자체가 발생하지 않는다.
+    window.localStorage.setItem('tm-theme', 'dark');
+    sessionMock.hasStoredV1Session.mockReturnValue(true);
+    // settings 쿼리가 아직 로딩 중 — 아직 데이터 없음.
+    hooks.useV1Settings.mockReturnValue({ data: undefined });
+
+    const { rerender } = render(
+      <ThemeProvider>
+        <Consumer />
+      </ThemeProvider>,
+    );
+    expect(screen.getByTestId('preference')).toHaveTextContent('dark');
+
+    // 사용자가 응답이 오기 전에 먼저 라이트로 바꾼다.
+    await user.click(screen.getByRole('button', { name: 'set-light' }));
+    expect(screen.getByTestId('preference')).toHaveTextContent('light');
+
+    // 뒤늦게 stale 응답 도착 — 사용자가 고르기 전(pre-click)의 서버 값이라고 가정.
+    hooks.useV1Settings.mockReturnValue({ data: { theme: 'dark' } });
+    rerender(
+      <ThemeProvider>
+        <Consumer />
+      </ThemeProvider>,
+    );
+
+    // 가드가 없다면 여기서 stale 'dark'로 되돌아간다 — 사용자의 최근 선택이 유지돼야 한다.
+    expect(screen.getByTestId('preference')).toHaveTextContent('light');
+  });
 });

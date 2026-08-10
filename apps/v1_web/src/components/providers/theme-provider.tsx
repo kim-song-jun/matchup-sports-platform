@@ -147,6 +147,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (next === preference) return;
       setPreferenceState(next);
       writeStoredPreference(next);
+      // 사용자가 직접 선택한 순간부터는 이 로컬 값이 진실이다 — 아직 초기 서버 동기화가
+      // 안 끝난 상태(settings 쿼리가 아직 이전 값으로 응답 중)에서 사용자가 먼저 바꾸면,
+      // 뒤늦게 도착하는 stale 서버 값이 방금 고른 값을 되돌리는 레이스가 있었다.
+      setServerSynced(true);
       // 로그아웃 상태에서는 기기 로컬로만 저장한다 — 로그인하면 계정에 반영되고,
       // 이후 다른 기기에서도 이 값을 그대로 불러온다.
       if (safeHasStoredV1Session()) {

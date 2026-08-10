@@ -148,6 +148,37 @@ describe('ProfileService settings theme preference', () => {
     });
     expect(result.theme).toBe('system');
   });
+
+  // Copilot 리뷰 지적: ThemeProvider가 앱 루트에서 GET /me/settings를 상시 호출하게
+  // 되면서, settings()가 upsert(update:{})로 알림설정을 읽으면 요청마다 불필요한
+  // UPDATE(@updatedAt 갱신 포함)가 발생한다 — GET은 순수 읽기여야 한다.
+  it('settings() GET은 알림설정 row에 절대 쓰지 않는다', async () => {
+    const prisma = {
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({
+          email: user.email,
+          phone: null,
+          accountStatus: 'active',
+          themePreference: 'dark',
+          authIdentities: [{ provider: 'email', passwordHash: 'hash' }],
+          profile: { nickname: '테스트닉' },
+        }),
+      },
+      v1NotificationPreference: {
+        upsert: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+    };
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    const result = await service.settings(user);
+
+    expect(prisma.v1NotificationPreference.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1NotificationPreference.findUnique).toHaveBeenCalledWith({ where: { userId: user.id } });
+    expect(result.theme).toBe('dark');
+    // row가 아직 없는 사용자 — 기본값(전부 켜짐, marketing만 꺼짐)이 write 없이 그대로 응답된다.
+    expect(result.notifications).toMatchObject({ matchEnabled: true, marketingEnabled: false });
+  });
 });
 
 describe('ProfileService phone change proof gate', () => {

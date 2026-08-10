@@ -53,6 +53,21 @@ const REVIEWED_NON_ADDITIVE = [
       'the bracket generator. Verified 0 duplicate rows on that key on alpha AND prod (prod has 0 fixtures) ' +
       'before adding. Reviewed 2026-08-09.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260810130000_v1_official_fact_backfill_score_shape/migration.sql',
+    statement:
+      'CREATE OR REPLACE FUNCTION v1_guard_game_official_fact_insert() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE revision_row RECORD; game_source_type "V1GameSourceType"; game_tournament_id TEXT; home_team_id_value TEXT; away_team_id_value TEXT; revision_home JSONB; revision_away JSONB; BEGIN SELECT state, revision, score, events_hash, official_at INTO revision_row FROM v1_game_result_revisions WHERE game_id = NEW.game_id AND id = NEW.revision_id FOR KEY SHARE; IF NOT FOUND OR revision_row.state IS DISTINCT FROM \'OFFICIAL\' OR revision_row.official_at IS NULL THEN RAISE EXCEPTION \'official fact requires an official game revision\' USING ERRCODE = \'23514\'; END IF; SELECT game.source_type, fixture.tournament_id, home_side.team_id, away_side.team_id INTO game_source_type, game_tournament_id, home_team_id_value, away_team_id_value FROM v1_games AS game LEFT JOIN v1_tournament_fixtures AS fixture ON fixture.id = game.tournament_fixture_id LEFT JOIN v1_game_sides AS home_side ON home_side.game_id = game.id AND home_side.side_key = \'HOME\' LEFT JOIN v1_game_sides AS away_side ON away_side.game_id = game.id AND away_side.side_key = \'AWAY\' WHERE game.id = NEW.game_id FOR KEY SHARE OF game; revision_home := COALESCE(revision_row.score -> \'home\', revision_row.score -> \'regulation\' -> \'home\'); revision_away := COALESCE(revision_row.score -> \'away\', revision_row.score -> \'regulation\' -> \'away\'); IF NOT FOUND OR NEW.revision IS DISTINCT FROM revision_row.revision OR NEW.source_type IS DISTINCT FROM game_source_type OR NEW.tournament_id IS DISTINCT FROM game_tournament_id OR NEW.home_team_id IS DISTINCT FROM home_team_id_value OR NEW.away_team_id IS DISTINCT FROM away_team_id_value OR NEW.score IS DISTINCT FROM revision_row.score OR NEW.events_hash IS DISTINCT FROM revision_row.events_hash OR NEW.official_at IS DISTINCT FROM revision_row.official_at OR jsonb_typeof(revision_home) IS DISTINCT FROM \'number\' OR jsonb_typeof(revision_away) IS DISTINCT FROM \'number\' OR NEW.home_score IS DISTINCT FROM (revision_home #>> \'{}\')::INTEGER OR NEW.away_score IS DISTINCT FROM (revision_away #>> \'{}\')::INTEGER THEN RAISE EXCEPTION \'official fact must exactly snapshot its official game revision\' USING ERRCODE = \'23514\'; END IF; RETURN NEW; END $$',
+    reason:
+      'Trigger-function replacement that is a STRICT WIDENING: the only behavioural change is ' +
+      "`revision_row.score -> 'home'` becoming `COALESCE(score -> 'home', score -> 'regulation' -> 'home')` " +
+      '(same for away). Every score the previous guard accepted is still accepted and still validated ' +
+      'identically; the nested shape that was previously rejected is now also accepted. So during a rolling ' +
+      'deploy the OLD app + NEW trigger combination behaves exactly as before (old writers only ever produce ' +
+      'the flat shape), and NEW app + OLD trigger fails closed (the fact insert raises, the manual backfill CLI ' +
+      'quarantines it) rather than corrupting anything. Without this widening it is IMPOSSIBLE to ever insert a ' +
+      'v1_game_official_facts row for a game imported by game-result-backfill.ts, which is exactly the 21 alpha ' +
+      'games whose team records read 0 while the standings table showed a win. Reviewed 2026-08-10.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

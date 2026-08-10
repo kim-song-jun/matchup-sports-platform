@@ -1,5 +1,10 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
+import { GameResultOfficialFactsService } from '../../game-operations/game-result-official-facts.service';
+import type {
+  OfficialRevisionRow,
+  OfficialScore,
+} from '../../game-operations/game-result-official-projection.types';
 import {
   compareGameResultSnapshots,
   type SnapshotPair,
@@ -88,6 +93,11 @@ type SourceSnapshot = {
   competitionConfigVersionId: string;
   score: ScoreSnapshot;
   sides: SideSnapshot[];
+  // Only ever set for a TOURNAMENT_FIXTURE source (a TEAM_MATCH has no
+  // tournament). Not part of createImportedGameEventsHash()'s input — it's
+  // metadata for the team-record-facts write createImportedGame() makes
+  // below, not game/result content that drift-detection needs to cover.
+  tournamentId: string | null;
 };
 
 // Structural shape of the `game` relation as selected by inventorySources()
@@ -474,6 +484,7 @@ async function inventorySources(client: MigrationReadClient): Promise<Inventory>
       orderBy: { id: 'asc' },
       select: {
         id: true,
+        tournamentId: true,
         competitionConfigVersionId: true,
         createdAt: true,
         homeRegistration: { select: { team: { select: { id: true, name: true } } } },
@@ -614,6 +625,7 @@ async function inventorySources(client: MigrationReadClient): Promise<Inventory>
     const source: SourceSnapshot = {
       entityType: 'TOURNAMENT_FIXTURE',
       entityId: fixture.id,
+      tournamentId: fixture.tournamentId,
       sourceTimestamp: result.recordedAt,
       competitionConfigVersionId: fixture.competitionConfigVersionId,
       score: {
@@ -701,6 +713,7 @@ async function inventorySources(client: MigrationReadClient): Promise<Inventory>
     const source: SourceSnapshot = {
       entityType: 'TEAM_MATCH',
       entityId: teamMatch.id,
+      tournamentId: null,
       sourceTimestamp,
       competitionConfigVersionId: teamMatch.competitionConfigVersionId,
       score: {
@@ -886,6 +899,7 @@ async function createImportedGame(
 ): Promise<void> {
   const gameId = randomUUID();
   const revisionId = randomUUID();
+  const eventsHash = createImportedGameEventsHash(source);
   await transaction.v1Game.create({
     data: {
       id: gameId,
@@ -911,7 +925,7 @@ async function createImportedGame(
           revision: 1,
           state: IMPORTED_REVISION_STATE,
           score: source.score,
-          eventsHash: createImportedGameEventsHash(source),
+          eventsHash,
           missingScorer: computeMissingScorer(source.score),
           createdByActorType: IMPORTED_REVISION_ACTOR_TYPE,
           createdByUserId: null,
@@ -927,6 +941,57 @@ async function createImportedGame(
     where: { id: gameId },
     data: { currentOfficialRevisionId: revisionId },
   });
+  // Task 9 (outbox-handler + team-record-facts backfill): the live command
+  // path (GamesService.decideResultRevision) gets its team-record facts for
+  // free by going through the GAME_RESULT_OFFICIAL outbox handler
+  // (GameResultOfficialProjectionService -> GameResultOfficialFactsService.
+  // project()). This function bypasses the outbox entirely (it's a
+  // synchronous, already-transactional migration insert, not a durable
+  // command needing at-least-once delivery), so without this call every
+  // future backfilled game would reproduce the exact "team record shows 0
+  // games" gap the retroactive team-record-facts-backfill.ts fixes for the
+  // 21 games Task 10 already imported. Calling the SAME
+  // GameResultOfficialFactsService the live handler uses (not a
+  // reimplementation) keeps the WON/LOST/DRAWN + goals-for/against
+  // calculation defined in exactly one place.
+  //
+  // Only for a source with a real regulation score (`!source.score.
+  // incomplete`, i.e. the 'reconstructable' bucket, entityType
+  // TOURNAMENT_FIXTURE): a 'partial' TEAM_MATCH_COMPLETION_ONLY import has
+  // `score.regulation: null` by construction (see inventorySources() above)
+  // — there is no real result to derive a team record from, and inventing
+  // one (e.g. treating it as a 0-0 draw) would fabricate history. Such a
+  // source simply gets no fact row, same as it gets no goal events in
+  // goal-event-backfill.ts.
+  if (source.score.regulation !== null) {
+    const officialScore: OfficialScore = {
+      home: source.score.regulation.home,
+      away: source.score.regulation.away,
+      ...(source.score.penalty ? { penalties: source.score.penalty } : {}),
+    };
+    const revisionRow: OfficialRevisionRow = {
+      revisionId,
+      gameId,
+      revision: 1,
+      score: source.score,
+      sourceHash: eventsHash,
+      officialAt: source.sourceTimestamp,
+      reason: null,
+      sourceType: source.entityType,
+      currentOfficialRevisionId: revisionId,
+      tournamentId: source.tournamentId,
+      tournamentFixtureId: source.entityType === 'TOURNAMENT_FIXTURE' ? source.entityId : null,
+      homeTeamId: source.sides.find((side) => side.sideKey === 'HOME')?.teamId ?? null,
+      awayTeamId: source.sides.find((side) => side.sideKey === 'AWAY')?.teamId ?? null,
+      // Imported games have no live V1GameVisibilityPolicy row (createImportedGame
+      // never creates one) — 'HIDDEN' mirrors officialRevisionRowSelect()'s own
+      // `COALESCE(policy.mode, 'HIDDEN')` default for the same "no policy row"
+      // case on the live read path. GameResultOfficialFactsService.project()
+      // never reads this field, so it has no effect on the fact rows written.
+      visibility: 'HIDDEN',
+    };
+    await new GameResultOfficialFactsService().project(transaction, revisionRow, officialScore);
+  }
 }
 
 async function withSerializableRetry<T>(

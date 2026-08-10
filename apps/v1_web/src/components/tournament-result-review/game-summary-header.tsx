@@ -7,6 +7,7 @@ import type {
   TournamentGameDetail,
 } from '@/hooks/use-tournament-result-review';
 import { ACTOR_ROLE_LABELS } from './result-review-copy';
+import { formatGameResultScore } from '@/lib/game-result-score';
 
 const GAME_STATE_LABELS: Record<TournamentGameDetail['state'], string> = {
   SCHEDULED: '예정',
@@ -43,9 +44,11 @@ export function GameSummaryHeader({
   const home = game.sides.find((side) => side.sideKey === 'HOME');
   const away = game.sides.find((side) => side.sideKey === 'AWAY');
   const roleLabel: GameActorRole | undefined = game.actorRole;
+  // 백필된 경기의 score 는 중첩(`{regulation:{home,away}}`) 형태라 `.home` 을 직접
+  // 읽으면 `undefined:undefined` 가 된다(알파 실측 사고). lib/game-result-score 참조.
   const confirmedScoreLabel =
     currentRevision && currentRevision.state === 'OFFICIAL'
-      ? `${currentRevision.score.home}:${currentRevision.score.away}`
+      ? formatGameResultScore(currentRevision.score, '기록 없음')
       : null;
   const isVoided = currentRevision?.state === 'VOID';
 

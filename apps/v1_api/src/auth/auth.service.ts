@@ -286,6 +286,14 @@ export class AuthService {
     });
 
     if (existingIdentity) {
+      if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
+        this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
+        throw new ForbiddenException({
+          code: 'PERMISSION_DENIED',
+          message: 'This account cannot sign in',
+        });
+      }
+
       if (isExpiredSocialSignup(existingIdentity.user)) {
         if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
           this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
@@ -313,14 +321,6 @@ export class AuthService {
 
         return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
       } else {
-        if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
-          this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
-          throw new ForbiddenException({
-            code: 'PERMISSION_DENIED',
-            message: 'This account cannot sign in',
-          });
-        }
-
         await this.prisma.$transaction([
           this.prisma.v1AuthIdentity.update({
             where: { id: existingIdentity.id },

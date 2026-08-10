@@ -22,6 +22,32 @@ The flag gate is an immutable phase-specific attempt-bound bundle, not an ad hoc
 
 <!-- API_CONTRACT_SECTION_END:Literal migration/cutover phases -->
 
+## Non-production admin fast path
+
+`PATCH /tournament-ops/operation-flags/:key/simplified-toggle` is an owner-requested admin on/off
+for `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` only. It skips exactly one thing from the literal contract
+above: the immutable gate-bundle evidence (`verifyGateBundle`'s R1/R2 signed-receipt ceremony).
+Everything else is identical to `PATCH /tournament-ops/operation-flags/:key` — the same
+`platform_ops` admin level (`getMutationAdmin`; `support` and non-admin callers are rejected), the
+same CAS on `expectedVersion`, the same `off<->on`-only transition validity, the same
+**frozen cutover order** (`assertFrozenForwardOrder`: an off→on promotion still requires
+`GAME_WRITE=new` and `GAME_READ=new` first — this path does not relax that data-consistency
+invariant, only the paperwork), a mandatory `reason`, a required `Idempotency-Key`, and a
+`V1OperationAudit`/outbox write (marked `gateMode: "simplified"` in the `after` payload to
+distinguish it from the gated path in the same audit trail). `GAME_WRITE`/`GAME_READ` themselves
+can never use this path — only the two always-rollback-able boolean flags.
+
+It requires `V1_ALLOW_SIMPLIFIED_OPERATION_FLAG_GATE=true`, unset (disabled) by default. `NODE_ENV`
+cannot gate this: both `deploy/docker-compose.alpha.yml` and `deploy/docker-compose.prod.yml`
+hardcode `NODE_ENV=production` (alpha loads as an overlay on top of the prod compose), so this
+dedicated variable — set only in the alpha compose file — is the sole environment signal.
+
+Because the frozen order is preserved, this path cannot promote `PUBLIC_LIVE` to `on` while
+`GAME_WRITE`/`GAME_READ` remain at their Phase A `legacy` values (alpha's state as of this writing)
+even with the shortcut enabled; it only becomes usable for that promotion once the real migration
+(Phase C, via the fully gated path above) has advanced both to `new`. Rollback (`on`→`off`) has no
+such precondition and is always available.
+
 ## Migrated deferred-boundary contract
 
 The following pre-normalization deferred-boundary contract is retained here so superseding the duplicate tree loses no contract content.

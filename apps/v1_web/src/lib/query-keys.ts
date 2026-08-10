@@ -72,6 +72,9 @@ export const v1Keys = {
   adminPushFailures: (filters?: { limit?: number }) => [...v1Keys.all, 'admin', 'push-failures', filters ?? {}] as const,
   adminSmsFailures: (filters?: { limit?: number }) => [...v1Keys.all, 'admin', 'sms-failures', filters ?? {}] as const,
   adminOpsSummary: () => [...v1Keys.all, 'admin', 'ops-summary'] as const,
+  adminOperationFlag: (key: string) => [...v1Keys.all, 'admin', 'operation-flags', key] as const,
+  adminOperationFlagsSimplifiedGateStatus: () =>
+    [...v1Keys.all, 'admin', 'operation-flags', 'simplified-gate-status'] as const,
   tournaments: (filters?: Record<string, unknown>) => [...v1Keys.all, 'tournaments', filters ?? {}] as const,
   tournament: (id: string) => [...v1Keys.all, 'tournaments', id] as const,
   tournamentCampaigns: (filters?: Record<string, unknown>) => [...v1Keys.all, 'tournaments', 'campaigns', filters ?? {}] as const,

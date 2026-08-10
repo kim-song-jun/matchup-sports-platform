@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   Menu,
   X,
+  Radio,
 } from 'lucide-react';
 
 // ── Nav items (reviews/notifications removed per task-97 IA) ───────────────
@@ -58,6 +59,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { label: 'SMS · 인증 실패', href: '/admin/ops/sms-failures', icon: <MessageSquareWarning size={18} /> },
   { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
   { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} /> },
+  { label: '경기 운영 플래그', href: '/admin/ops/operation-flags', icon: <Radio size={18} /> },
 ];
 
 const OWNER_NAV_ITEM: NavItem = {

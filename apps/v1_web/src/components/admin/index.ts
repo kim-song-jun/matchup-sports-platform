@@ -23,6 +23,7 @@ export type { ReasonStatusOption } from './admin-reason-modal';
 
 // ── Ops tools ─────────────────────────────────────────────────────────────
 export { PushSendForm } from './push-send-form';
+export { OperationFlagTogglePanel } from './operation-flag-toggle-panel';
 
 // ── Empty / error / loading ───────────────────────────────────────────────
 export { AdminEmpty } from './admin-empty';

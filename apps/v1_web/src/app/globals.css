@@ -297,6 +297,27 @@
   --red50: rgba(240, 68, 82, 0.16);
 }
 
+/* alpha 라이브 확인 중 발견: 흰 유리(glass) 배경을 CSS 변수 없이 rgba(255,255,255,X)로
+ * 하드코딩한 상시 노출 셸 크롬(하단 nav·헤더·서브내비 등)이 다크모드에서도 밝게 남아
+ * 튀었다 — 사진/영상 위에 얹는 오버레이(.tm-video-strip-play 등)는 테마와 무관하게
+ * 항상 흰색이어야 해서 대상이 아니고, 페이지 배경 위에 얹히는 "셸 크롬"만 대상이다.
+ * --surface/--bg 계열 톤에 원래와 비슷한 alpha로 맞춘다. */
+:root.dark .tm-bottom-nav,
+:root.dark .v1-bottom-nav {
+  background: rgba(28, 30, 36, 0.92);
+  border-color: var(--grey100);
+}
+:root.dark .v1-header {
+  background: rgba(28, 30, 36, 0.9);
+  border-color: var(--grey100);
+}
+:root.dark .tm-hub-subnav {
+  background: rgba(28, 30, 36, 0.94);
+}
+:root.dark .v1-muted-panel {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 /* 리뷰 에러/재시도 안내 카드 — 라이트: var(--red50) 파스텔 배경.
    다크에서는 --red50/--red500이 라이트 전용 고정값이라 그대로 두면
    밝은 핑크 배경 위에 밝은 텍스트가 겹쳐 대비가 무너진다 (reviews-page.tsx). */

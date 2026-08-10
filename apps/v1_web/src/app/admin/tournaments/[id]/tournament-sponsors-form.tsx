@@ -254,7 +254,7 @@ function SponsorLogoUploader({
               unoptimized
             />
           ) : (
-            <ImagePlus size={28} className="text-gray-300" aria-hidden="true" />
+            <ImagePlus size={28} className="text-[var(--text-muted)]" aria-hidden="true" />
           )}
         </div>
         <div className="flex flex-col items-start gap-2">

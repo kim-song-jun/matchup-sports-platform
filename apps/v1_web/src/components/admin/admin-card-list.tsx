@@ -52,7 +52,7 @@ interface AdminCardListProps<T> {
 // ── tone → class (AdminDataTable 과 동일 매핑) ──────────────────────────────
 const TONE_CARD: Record<'danger' | 'warning', string> = {
   danger: 'bg-[var(--red50)]/40 border-l-2 border-l-red-400',
-  warning: 'bg-[var(--tint-orange)] border-l-2 border-l-amber-400',
+  warning: 'bg-[var(--tint-orange)] border-l-2 border-l-[var(--orange500)]',
 };
 
 // 모바일 1열 → 좁은 화면부터 채워지는 반응형 그리드.

@@ -195,7 +195,7 @@ export default function AdminInquiryDetailPage() {
           action={
             <Link
               href="/admin/inquiries"
-              className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-gray-50"
+              className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--border)]"
             >
               <ArrowLeft size={16} aria-hidden="true" />
               목록
@@ -227,7 +227,7 @@ export default function AdminInquiryDetailPage() {
         action={
           <Link
             href="/admin/inquiries"
-            className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--border)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <ArrowLeft size={16} aria-hidden="true" />
             목록
@@ -331,7 +331,7 @@ export default function AdminInquiryDetailPage() {
                               type="button"
                               onClick={cancelEditReply}
                               disabled={updateReplyMutation.isPending}
-                              className="inline-flex h-[44px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                              className="inline-flex h-[44px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                             >
                               취소
                             </button>
@@ -401,7 +401,7 @@ export default function AdminInquiryDetailPage() {
                 disabled={!canWrite || statusMutation.isPending}
                 // 부모 <section> 이 이미 --card-surface 라 select/button 도 같은 토큰이면
                 // 카드 안에 묻혀 경계가 안 보인다 — 전수검수에서 발견, --surface-soft 로 구분.
-                className="inline-flex h-[44px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="inline-flex h-[44px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 {statusMutation.isPending ? '변경 중...' : '상태 변경'}
               </button>

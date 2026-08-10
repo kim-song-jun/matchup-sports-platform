@@ -93,7 +93,7 @@ const ROW_TONE_TR: Record<'danger' | 'warning', string> = {
 };
 const ROW_TONE_ACCENT: Record<'danger' | 'warning', string> = {
   danger: 'border-l-2 border-l-red-400',
-  warning: 'border-l-2 border-l-amber-400',
+  warning: 'border-l-2 border-l-[var(--orange500)]',
 };
 
 export function AdminDataTable<T>({
@@ -292,7 +292,7 @@ export function AdminDataTable<T>({
                 {columns.map((col) => (
                   <div key={col.key} className="flex items-start gap-2 text-[13px]">
                     <dt className="shrink-0 text-gray-400 w-[90px] font-medium">{col.header}</dt>
-                    <dd className="text-gray-800 flex-1 tabular-nums">{col.render(row)}</dd>
+                    <dd className="text-[var(--text-body)] flex-1 tabular-nums">{col.render(row)}</dd>
                   </div>
                 ))}
               </dl>

@@ -646,7 +646,7 @@ export function RosterModal({
           {players.map((p) => (
             <li
               key={p.id}
-              className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0"
+              className="flex items-center gap-3 py-2 border-b border-[var(--border)] last:border-0"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
@@ -1128,7 +1128,7 @@ export function RegistrationsTab({
                   onChange={() => toggleSelected(r.id)}
                   disabled={r.status !== 'awaiting_payment'}
                   aria-label={`${r.teamName ?? r.teamId} 일괄 선택`}
-                  className="w-[18px] h-[18px] rounded border-gray-300 text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  className="w-[18px] h-[18px] rounded border-[var(--border)] text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
               </label>
               <span className="truncate">{r.teamName ?? r.teamId}</span>
@@ -1811,7 +1811,7 @@ export function BracketTab({
                 value={publishScheduleInput}
                 onChange={(e) => setPublishScheduleInput(e.target.value)}
                 disabled={!!publishBlockedReason}
-                className="h-[44px] px-3 rounded-xl border border-[var(--border)] text-[13px] text-[var(--text-strong)] disabled:bg-gray-50 disabled:text-gray-400 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="h-[44px] px-3 rounded-xl border border-[var(--border)] text-[13px] text-[var(--text-strong)] disabled:bg-[var(--surface-soft)] disabled:text-gray-400 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               />
             </div>
             <button
@@ -4998,7 +4998,7 @@ function ReviewModerationCard({
                   key={i}
                   size={13}
                   aria-hidden="true"
-                  className={i < review.rating ? 'fill-amber-400 stroke-amber-400' : 'fill-none stroke-gray-300'}
+                  className={i < review.rating ? 'fill-[var(--orange500)] stroke-[var(--orange500)]' : 'fill-none stroke-gray-300'}
                 />
               ))}
             </span>

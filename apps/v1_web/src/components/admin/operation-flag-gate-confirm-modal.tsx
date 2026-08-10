@@ -225,7 +225,7 @@ export function GateConfirmModal({
             {typedChallenge && (
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="gate-confirm-typed" className="text-[13px] font-semibold text-[var(--text-body)]">
-                  확인을 위해 <span className="text-amber-600">&ldquo;{typedChallenge}&rdquo;</span>
+                  확인을 위해 <span className="text-[var(--orange700)]">&ldquo;{typedChallenge}&rdquo;</span>
                   {objectParticle(typedChallenge)} 그대로 입력해 주세요{' '}
                   <span className="text-red-500" aria-hidden="true">*</span>
                   <span className="sr-only">(필수)</span>
@@ -240,10 +240,10 @@ export function GateConfirmModal({
                   placeholder={typedChallenge}
                   className={[
                     'h-[44px] px-3 text-[13px] bg-[var(--card-surface)] border rounded-xl text-[var(--text-strong)]',
-                    'placeholder:text-gray-300',
-                    'focus:outline-none focus:ring-2 focus:ring-amber-500/20',
+                    'placeholder:text-[var(--text-caption)]',
+                    'focus:outline-none focus:ring-2 focus:ring-[var(--orange500)]/20',
                     'transition-colors disabled:opacity-50',
-                    typedInput.length > 0 && !typedOk ? 'border-red-300 focus:border-red-400' : 'border-[var(--border)] focus:border-amber-500',
+                    typedInput.length > 0 && !typedOk ? 'border-red-300 focus:border-red-400' : 'border-[var(--border)] focus:border-[var(--orange500)]',
                   ].join(' ')}
                   aria-required="true"
                   aria-invalid={typedInput.length > 0 && !typedOk}
@@ -269,7 +269,7 @@ export function GateConfirmModal({
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? tone === 'amber'
-                    ? 'bg-amber-500 text-white hover:bg-amber-600'
+                    ? 'bg-[var(--orange500)] text-white hover:bg-[var(--orange700)]'
                     : 'bg-blue-500 text-white hover:bg-blue-600'
                   : 'bg-gray-200 text-white cursor-not-allowed',
               ].join(' ')}

@@ -353,7 +353,7 @@ function Section({
 function MetaRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-baseline gap-2 min-w-0">
-      <dt className="shrink-0 w-[92px] text-gray-400 dark:text-gray-500">{label}</dt>
+      <dt className="shrink-0 w-[92px] text-gray-400 dark:text-gray-400">{label}</dt>
       <dd
         className={[
           'text-[var(--text-body)] break-all min-w-0',

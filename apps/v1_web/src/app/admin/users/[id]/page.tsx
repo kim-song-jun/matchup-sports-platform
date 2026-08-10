@@ -327,7 +327,7 @@ export default function AdminUserDetailPage() {
                 disabled={deleteMutation.isPending}
                 onClick={() => setDeleteOpen(false)}
                 // 방금 card-surface로 바뀐 모달 폼(위)과 겹치지 않게 surface-soft로 구분.
-                className="inline-flex h-[44px] flex-1 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-gray-50 disabled:opacity-60"
+                className="inline-flex h-[44px] flex-1 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--border)] disabled:opacity-60"
               >
                 취소
               </button>
@@ -352,7 +352,7 @@ export default function AdminUserDetailPage() {
       <button
         type="button"
         onClick={() => router.push('/admin/users')}
-        className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--border)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
         <ArrowLeft size={16} aria-hidden="true" />
         목록

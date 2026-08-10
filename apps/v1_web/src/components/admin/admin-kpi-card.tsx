@@ -22,7 +22,7 @@ const TONE_VALUE: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
 const TONE_ICON: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
   neutral: 'text-blue-400',
   positive: 'text-green-400',
-  warning: 'text-amber-400',
+  warning: 'text-[var(--orange500)]',
   danger: 'text-red-400',
 };
 

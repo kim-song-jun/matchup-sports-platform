@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useV1Settings, useV1UpdateSettings } from '@/hooks/use-v1-api';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import {
@@ -59,16 +59,41 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // 알림 설정 페이지의 toggleError와 동일 패턴 — 저장 실패를 3초간 알리고 자동으로 사라진다.
   const [saveError, setSaveError] = useState(false);
 
-  const settings = useV1Settings({ enabled: safeHasStoredV1Session() });
+  const hasSession = safeHasStoredV1Session();
+  const settings = useV1Settings({ enabled: hasSession });
   const updateSettings = useV1UpdateSettings();
 
   useEffect(() => {
+    // 일부 구형 WebView는 matchMedia 자체가 없다 — 없으면 시스템 설정 추적을 그냥 건너뛴다
+    // (system 선호도는 light로 취급됨, 기본값이 light인 것과 일관적).
+    if (typeof window.matchMedia !== 'function') return;
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     setPrefersDarkOS(media.matches);
     const listener = (event: MediaQueryListEvent) => setPrefersDarkOS(event.matches);
-    media.addEventListener('change', listener);
-    return () => media.removeEventListener('change', listener);
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', listener);
+      return () => media.removeEventListener('change', listener);
+    }
+    // Safari < 14 등 addEventListener 미지원 MediaQueryList 폴백.
+    type LegacyMediaQueryList = MediaQueryList & {
+      addListener?: (listener: (event: MediaQueryListEvent) => void) => void;
+      removeListener?: (listener: (event: MediaQueryListEvent) => void) => void;
+    };
+    const legacyMedia = media as LegacyMediaQueryList;
+    legacyMedia.addListener?.(listener);
+    return () => legacyMedia.removeListener?.(listener);
   }, []);
+
+  // 로그아웃을 감지해 serverSynced를 리셋한다 — 안 그러면 계정 A로 동기화한 뒤 같은 기기에서
+  // 로그아웃하고 다른 계정 B로 로그인해도(풀 리로드 없는 SPA 내비게이션) A의 테마가 B에게도
+  // 그대로 남는다. 다음 로그인 때 새 계정의 서버 값으로 한 번 더 동기화되도록 한다.
+  const previousHasSessionRef = useRef(hasSession);
+  useEffect(() => {
+    if (previousHasSessionRef.current && !hasSession) {
+      setServerSynced(false);
+    }
+    previousHasSessionRef.current = hasSession;
+  }, [hasSession]);
 
   useEffect(() => {
     if (serverSynced) return;

@@ -1555,13 +1555,17 @@ export function ThemeSettingsPageClient() {
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  disabled={isSaving && selected}
+                  // 저장 중엔 다른 옵션도 함께 막는다 — 선택된 행만 막으면 저장 대기 중에
+                  // 다른 옵션을 눌러 PATCH 두 개가 동시에 날아갈 수 있고, 응답이 뒤바뀌어
+                  // 도착하면 서버에 최종 저장되는 값이 마지막 클릭과 달라질 수 있다.
+                  disabled={isSaving}
                   style={{
                     width: '100%',
                     border: 'none',
-                    cursor: 'pointer',
+                    cursor: isSaving ? 'default' : 'pointer',
                     textAlign: 'left',
                     background: selected ? 'var(--tint-blue)' : 'none',
+                    opacity: isSaving && !selected ? 0.6 : 1,
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>

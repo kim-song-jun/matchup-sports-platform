@@ -82,7 +82,10 @@ describe('ThemeSettingsPageClient', () => {
     expect(screen.getByText('저장하지 못했어요')).toBeInTheDocument();
   });
 
-  it('선택된 옵션이 저장 중이면 그 옵션만 비활성화한다', () => {
+  // 저장 중엔 선택된 옵션뿐 아니라 전체를 막는다 — 선택된 것만 막으면 저장 대기 중에
+  // 다른 옵션을 눌러 PATCH 두 개가 동시에 나가고, 응답이 뒤바뀌어 도착하면 서버에 최종
+  // 저장되는 값이 마지막 클릭과 달라질 수 있다(Copilot 리뷰에서 지적된 레이스 컨디션).
+  it('저장 중이면 선택 여부와 무관하게 모든 옵션을 비활성화한다', () => {
     hooks.useTheme.mockReturnValue({
       preference: 'dark',
       effectiveTheme: 'dark',
@@ -94,6 +97,7 @@ describe('ThemeSettingsPageClient', () => {
     renderWithClient(<ThemeSettingsPageClient />);
 
     expect(screen.getByRole('radio', { name: /다크/ })).toBeDisabled();
-    expect(screen.getByRole('radio', { name: /라이트/ })).not.toBeDisabled();
+    expect(screen.getByRole('radio', { name: /라이트/ })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: /기기 설정/ })).toBeDisabled();
   });
 });

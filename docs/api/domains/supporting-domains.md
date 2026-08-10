@@ -228,7 +228,8 @@
 - `CreateTournamentSponsorDto`
   - `name`: string, max 120
   - `description?`: string, max 500
-  - `logoUrl?`, `websiteUrl?`, `instagramUrl?`: protocol 포함 URL
+  - `logoUrl?`: protocol 포함 URL 또는 업로드 API가 반환하는 안전한 `/uploads/...` 루트 상대 경로
+  - `websiteUrl?`, `instagramUrl?`: protocol 포함 URL
   - `benefitText?`, `boothText?`: string, max 1000
   - `eventTitle?`: string, max 200
   - `eventDescription?`, `eventResultText?`: string, max 2000

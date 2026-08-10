@@ -44,6 +44,7 @@ import {
   hasTournamentFixtureOfficialResult,
   resolveTournamentFixtureOfficialResult,
   type TournamentFixtureGameForResult,
+  type TournamentFixtureLegacyResult,
 } from './tournament-fixture-official-result';
 import { recalculateAndUpsertGroupStandings } from './tournament-group-standings';
 
@@ -491,7 +492,12 @@ export class TournamentBracketService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const fixture = await this.prisma.v1TournamentFixture.findUnique({
       where: { id: fixtureId },
-      include: { game: { select: { currentOfficialRevision: { select: { state: true } } } } },
+      include: {
+        game: { select: { currentOfficialRevision: { select: { state: true } } } },
+        // R3 §4-3단계 한시적 레거시 폴백 입력 — hasTournamentFixtureOfficialResult()가
+        // 새 경로에 OFFICIAL 리비전이 없을 때만 이 존재 여부를 본다. §4-4단계에서 제거.
+        result: { select: { id: true } },
+      },
     });
     if (!fixture) {
       throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
@@ -501,8 +507,10 @@ export class TournamentBracketService {
     // updateFixture()는 V1TournamentFixture.home/awayRegistrationId만 바꾸고 V1Game.sides는
     // 절대 건드리지 않는다 -- 신규 경로 자체에는 "결과가 확정된 경기의 팀 변경을 막는" 별도
     // 가드가 없으므로(games.service.ts 어디에도 이 경로를 막는 코드가 없음을 확인했다) 이
-    // 가드를 지우지 않고 신규 경로(officialize된 결과 유무) 기준으로 다시 판정한다.
-    if (changesTeams && hasTournamentFixtureOfficialResult(fixture.game)) {
+    // 가드를 지우지 않고 신규 경로 우선 + 레거시 폴백(officialize된 결과 유무) 기준으로
+    // 다시 판정한다 -- 레거시 결과만 있는(game 백필 전) 픽스처의 팀을 바꿀 수 있게 되면
+    // 안 되므로 폴백도 반드시 반영한다.
+    if (changesTeams && hasTournamentFixtureOfficialResult(fixture.game, fixture.result)) {
       throw new ConflictException({
         code: 'FIXTURE_HAS_RESULT',
         message: '결과가 기록된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 삭제해 주세요.',
@@ -567,14 +575,18 @@ export class TournamentBracketService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const fixture = await this.prisma.v1TournamentFixture.findUnique({
       where: { id: fixtureId },
-      include: { game: { select: { currentOfficialRevision: { select: { state: true } } } } },
+      include: {
+        game: { select: { currentOfficialRevision: { select: { state: true } } } },
+        // R3 §4-3단계 한시적 레거시 폴백 입력 — updateFixture()와 동일한 이유. §4-4단계에서 제거.
+        result: { select: { id: true } },
+      },
     });
     if (!fixture) {
       throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     }
-    // (a)와 동일한 이유로 신규 경로 기준으로 다시 판정한다 -- "결과가 확정된 경기는
-    // 지울 수 없다"는 계약을 신규 경로에서도 그대로 유지한다.
-    if (hasTournamentFixtureOfficialResult(fixture.game)) {
+    // (a)와 동일한 이유로 신규 경로 우선 + 레거시 폴백 기준으로 다시 판정한다 -- "결과가
+    // 확정된 경기는 지울 수 없다"는 계약을 레거시 결과만 있는 픽스처에서도 그대로 유지한다.
+    if (hasTournamentFixtureOfficialResult(fixture.game, fixture.result)) {
       throw new ConflictException({
         code: 'FIXTURE_HAS_RESULT',
         message: '결과가 기록된 경기예요. 결과를 먼저 삭제해 주세요.',
@@ -748,7 +760,14 @@ export class TournamentBracketService {
         },
         fixtures: {
           where: { status: 'completed' },
-          include: { game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } } },
+          include: {
+            game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } },
+            // R3 §4-3단계 한시적 레거시 폴백 입력 — standingsFixturesFromGroup()이 새 경로에
+            // OFFICIAL 리비전이 없는 픽스처(game 백필 전)만 이 스코어로 대체한다. §4-4단계에서 제거.
+            result: {
+              select: { homeScore: true, awayScore: true, hasPenalty: true, homePenaltyScore: true, awayPenaltyScore: true },
+            },
+          },
         },
       },
     });
@@ -827,6 +846,9 @@ export class TournamentBracketService {
               },
             },
           },
+          // R3 §4-3단계 한시적 레거시 폴백 입력 — serializeOfficialResult()가 새 경로에
+          // OFFICIAL 리비전이 없는 픽스처만 이 결과로 대체한다. §4-4단계에서 제거.
+          result: { include: { goals: { orderBy: { createdAt: 'asc' } } } },
           videos: { orderBy: { sortOrder: 'asc' } },
           homeRegistration: {
             include: { team: { select: { name: true } } },
@@ -860,7 +882,7 @@ export class TournamentBracketService {
         ...this.serializeFixture(f),
         homeTeamName: f.homeRegistration?.team.name ?? 'TBD',
         awayTeamName: f.awayRegistration?.team.name ?? 'TBD',
-        result: this.serializeOfficialResult(f.id, f.game),
+        result: this.serializeOfficialResult(f.id, f.game, f.result),
         videos: f.videos.map((v) => this.serializeVideo(v)),
       })),
       standings: standings.map((s) => ({
@@ -915,17 +937,23 @@ export class TournamentBracketService {
   }
 
   /**
-   * 어드민 대진표(getBracket) 응답의 픽스처별 result 블록 -- 레거시
-   * `V1TournamentFixtureResult`/`V1TournamentFixtureGoal` 대신 신규 경로
-   * (`V1Game.currentOfficialRevision`)에서 조립한다. 응답 필드 형태(스코어/승부차기/골
-   * 목록)는 레거시 serializeResult()/serializeGoal()과 동일하게 유지한다 — 프런트가
-   * 이미 이 모양을 소비하고 있다(apps/v1_web/src/types/api.ts).
+   * 어드민 대진표(getBracket) 응답의 픽스처별 result 블록 -- 신규 경로
+   * (`V1Game.currentOfficialRevision`)를 우선하고, 새 경로에 OFFICIAL 리비전이 없을
+   * 때만(game 백필 전 등) 레거시 `V1TournamentFixtureResult`/`V1TournamentFixtureGoal`로
+   * 폴백한다(R3 §4-3~§4-4단계 사이 한시적 — resolveTournamentFixtureOfficialResult() 참고).
+   * 응답 필드 형태(스코어/승부차기/골 목록/note)는 레거시 serializeResult()/serializeGoal()과
+   * 동일하게 유지한다 — 프런트가 이미 이 모양을 소비하고 있다(apps/v1_web/src/types/api.ts).
    *
-   * `note`는 신규 리비전에 대응 컬럼이 없어 항상 null이다(레거시 자유 메모 필드는
+   * `note`는 새 경로에서 조립된 결과일 때만 항상 null이다(신규 리비전에 대응 컬럼이 없어
    * 재현 불가 — docs/ops/legacy-game-result-r3-removal-inventory.md 관련 작업 보고 참고).
+   * 레거시 폴백 결과는 레거시 note를 그대로 보존한다.
    */
-  private serializeOfficialResult(fixtureId: string, game: TournamentFixtureGameForResult) {
-    const resolved = resolveTournamentFixtureOfficialResult(game);
+  private serializeOfficialResult(
+    fixtureId: string,
+    game: TournamentFixtureGameForResult,
+    legacyResult: TournamentFixtureLegacyResult,
+  ) {
+    const resolved = resolveTournamentFixtureOfficialResult(game, legacyResult ?? undefined);
     if (!resolved) return null;
     return {
       id: resolved.revisionId,
@@ -935,7 +963,7 @@ export class TournamentBracketService {
       hasPenalty: resolved.score.hasPenalty,
       homePenaltyScore: resolved.score.homePenaltyScore,
       awayPenaltyScore: resolved.score.awayPenaltyScore,
-      note: null,
+      note: resolved.note,
       recordedAt: (resolved.officialAt ?? resolved.createdAt).toISOString(),
       createdAt: resolved.createdAt.toISOString(),
       updatedAt: resolved.updatedAt.toISOString(),

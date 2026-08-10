@@ -18,6 +18,18 @@ import type { Prisma } from '@prisma/client';
  *    대해 `TOURNAMENT_RESULT_DERIVED_ONLY` 로 하드 거부된다(games.service.ts
  *    createResultRevision). 즉 **오늘 이후 새로 종료되는 대회 경기는 신규 경로 자체에
  *    승부차기 기록 수단이 없다** — 21건의 레거시 백필 데이터만 승부차기 정보를 보존한다.
+ *
+ * **레거시 폴백(R3 §4-3~§4-4단계 사이 한시적):** 새 경로를 무조건 우선하되, 새 경로에
+ * `state === 'OFFICIAL'`인 리비전이 없을 때만(`game` 자체가 없는 경우 포함) 레거시
+ * `V1TournamentFixtureResult`로 폴백한다. 이 창(window) 안에서는 레거시 테이블이 여전히
+ * 실사용처를 가진다(`docs/ops/legacy-game-result-r3-removal-inventory.md` §3) — 폴백이
+ * 없으면 아직 game 백필이 안 된 픽스처·환경에서 점수가 조용히 0/빈칸이 된다(오너가 신고한
+ * "결과를 확정해도 점수가 안 바뀐다" 버그의 원인). 이 폴백 자체는 문서 §4-4단계
+ * (`TOURNAMENT_DETAIL_INCLUDE` 등 레거시 조인 제거)에서 함께 삭제된다 — `resolveTournamentFixtureOfficialScore`/
+ * `resolveTournamentFixtureOfficialResult`/`hasTournamentFixtureOfficialResult`/
+ * `resolveTournamentFixtureOfficialTimestamp` 네 함수 모두 정확히 같은 우선순위 기준
+ * (`revision.state === 'OFFICIAL'`)으로 판정해야 소비처 간(스코어보드/순위/가드/리뷰 게이트)
+ * 결과가 어긋나지 않는다.
  */
 export type TournamentFixtureOfficialScore = {
   homeScore: number;
@@ -136,6 +148,12 @@ export type TournamentFixtureGameForResult = {
 export type TournamentFixtureOfficialResult = {
   revisionId: string;
   score: TournamentFixtureOfficialScore;
+  /**
+   * 신규 경로(V1GameResultRevision)에는 대응 컬럼이 없어 새 경로에서 조립된 결과는 항상
+   * `null`이다. 레거시 폴백에서 나온 결과만 레거시 `V1TournamentFixtureResult.note`를
+   * 그대로 채운다.
+   */
+  note: string | null;
   officialAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -143,39 +161,132 @@ export type TournamentFixtureOfficialResult = {
 };
 
 /**
- * 픽스처의 `game` relation 하나를 받아 "레거시 result 존재 여부"에 대응하는 판정 +
- * 스코어/골 조립을 한 번에 한다. `currentOfficialRevisionId`는 OFFICIAL로 전환될 때만
- * 세팅되지만 VOID(결과 무효화) 이후에는 VOID 리비전을 가리키도록 다시 옮겨간다
+ * R3 §4-4단계(문서 §4)까지의 한시적 레거시 폴백 입력. `V1TournamentFixtureResult`를
+ * `goals`와 함께 그대로 받는다 — Prisma의 `V1TournamentFixtureResultGetPayload`를 그대로
+ * 재사용해 스키마 필드와 어긋나지 않게 한다.
+ */
+export type TournamentFixtureLegacyResult = Prisma.V1TournamentFixtureResultGetPayload<{
+  include: { goals: true };
+}> | null;
+
+/**
+ * 순위 계산처럼 골 목록·note 없이 스코어만 필요한 소비처(tournament-group-standings.ts)가
+ * 쓰는 얕은 버전. "새 경로 우선, 새 경로에 OFFICIAL 리비전이 없을 때만 레거시로 폴백"이라는
+ * 판정 기준의 단일 소스 — `resolveTournamentFixtureOfficialResult()`도 이 함수와 정확히
+ * 같은 기준(`revision.state === 'OFFICIAL'`)으로 분기한다. 두 곳이 서로 다른 기준으로
+ * 판정하면 순위표와 스코어보드가 어긋난다.
+ *
+ * 이 폴백은 R3 §4-4단계(문서 §4, `TOURNAMENT_DETAIL_INCLUDE` 등 레거시 조인 제거)에서
+ * 함께 제거되는 한시적 호환 읽기다 — 그 전까지는 레거시 테이블이 실사용처를 가진다
+ * (docs/ops/legacy-game-result-r3-removal-inventory.md §3).
+ */
+export function resolveTournamentFixtureOfficialScore(
+  game: { currentOfficialRevision: { state: string; score: Prisma.JsonValue } | null } | null | undefined,
+  legacyScore: TournamentFixtureOfficialScore | null | undefined,
+): TournamentFixtureOfficialScore | null {
+  const revision = game?.currentOfficialRevision;
+  if (revision && revision.state === 'OFFICIAL') {
+    return parseTournamentFixtureOfficialScore(revision.score);
+  }
+  return legacyScore ?? null;
+}
+
+/**
+ * 픽스처의 `game` relation 하나를 받아 "결과 존재 여부"에 대응하는 판정 + 스코어/골
+ * 조립을 한 번에 한다. `currentOfficialRevisionId`는 OFFICIAL로 전환될 때만 세팅되지만
+ * VOID(결과 무효화) 이후에는 VOID 리비전을 가리키도록 다시 옮겨간다
  * (tournament-result-review.service.ts voidResult 참고) — 그래서 존재 자체가 아니라
  * `state === 'OFFICIAL'`을 반드시 확인해야 레거시의 "결과가 있다"와 동등해진다.
+ *
+ * R3 §4-3단계로 신규 경로가 기본이 됐지만, R3 §4-4단계(레거시 조인 제거)까지는 새 경로에
+ * OFFICIAL 리비전이 없을 때(예: `game` 자체가 아직 없거나 백필이 안 된 픽스처) `legacyResult`
+ * 로 폴백한다. 새 경로가 있으면 무조건 새 경로가 이긴다 — 폴백은 "새 경로가 비어 있을
+ * 때"만이고, 새 경로 값이 이상해도(예: score 파싱 실패) 레거시로 덮어쓰지 않는다(조용한
+ * 데이터 오염 방지, docs/ops/legacy-game-result-r3-removal-inventory.md §3/§4 참고).
  */
 export function resolveTournamentFixtureOfficialResult(
   game: TournamentFixtureGameForResult,
+  legacyResult?: TournamentFixtureLegacyResult,
 ): TournamentFixtureOfficialResult | null {
   const revision = game?.currentOfficialRevision;
-  if (!game || !revision || revision.state !== 'OFFICIAL') return null;
-  const score = parseTournamentFixtureOfficialScore(revision.score);
-  if (!score) return null;
-  const sideKeyById = new Map(game.sides.map((side) => [side.id, side.sideKey] as const));
-  const participantNameById = new Map(
-    game.participants.map((participant) => [participant.id, participant.displayNameSnapshot] as const),
-  );
-  const goals = deriveTournamentFixtureOfficialGoals(game.events, sideKeyById, participantNameById);
+  if (game && revision && revision.state === 'OFFICIAL') {
+    const score = parseTournamentFixtureOfficialScore(revision.score);
+    if (!score) return null;
+    const sideKeyById = new Map(game.sides.map((side) => [side.id, side.sideKey] as const));
+    const participantNameById = new Map(
+      game.participants.map((participant) => [participant.id, participant.displayNameSnapshot] as const),
+    );
+    const goals = deriveTournamentFixtureOfficialGoals(game.events, sideKeyById, participantNameById);
+    return {
+      revisionId: revision.id,
+      score,
+      note: null,
+      officialAt: revision.officialAt,
+      createdAt: revision.createdAt,
+      updatedAt: revision.updatedAt,
+      goals,
+    };
+  }
+  return resolveLegacyTournamentFixtureOfficialResult(legacyResult);
+}
+
+function resolveLegacyTournamentFixtureOfficialResult(
+  legacyResult: TournamentFixtureLegacyResult | undefined,
+): TournamentFixtureOfficialResult | null {
+  if (!legacyResult) return null;
   return {
-    revisionId: revision.id,
-    score,
-    officialAt: revision.officialAt,
-    createdAt: revision.createdAt,
-    updatedAt: revision.updatedAt,
-    goals,
+    revisionId: legacyResult.id,
+    score: {
+      homeScore: legacyResult.homeScore,
+      awayScore: legacyResult.awayScore,
+      hasPenalty: legacyResult.hasPenalty,
+      homePenaltyScore: legacyResult.homePenaltyScore,
+      awayPenaltyScore: legacyResult.awayPenaltyScore,
+    },
+    note: legacyResult.note,
+    officialAt: legacyResult.recordedAt,
+    createdAt: legacyResult.createdAt,
+    updatedAt: legacyResult.updatedAt,
+    goals: legacyResult.goals.map((goal) => ({
+      id: goal.id,
+      team: goal.team,
+      playerId: goal.playerId,
+      playerName: goal.playerName,
+      minute: goal.minute,
+    })),
   };
 }
 
-/** `resolveTournamentFixtureOfficialResult`가 OFFICIAL 결과 유무만 판정할 때 쓰는 얕은 버전. */
+/**
+ * `resolveTournamentFixtureOfficialResult`가 OFFICIAL 결과 유무만 판정할 때 쓰는 얕은
+ * 버전. 새 경로에 OFFICIAL 리비전이 없을 때만 레거시 결과 행 존재 여부로 폴백한다 — 팀
+ * 변경/삭제 가드(tournament-bracket.service.ts updateFixture/deleteFixture)가 이 함수를
+ * 쓴다: 레거시 결과만 있는 픽스처의 팀을 바꿀 수 있게 되면 안 되므로, 가드도 반드시 이
+ * 폴백을 반영해야 한다. R3 §4-4단계에서 두 번째 인자와 함께 제거된다.
+ */
 export function hasTournamentFixtureOfficialResult(
   game: { currentOfficialRevision: { state: string } | null } | null | undefined,
+  legacyResult?: { id: string } | null,
 ): boolean {
-  return game?.currentOfficialRevision?.state === 'OFFICIAL';
+  if (game?.currentOfficialRevision?.state === 'OFFICIAL') return true;
+  return Boolean(legacyResult);
+}
+
+/**
+ * 스코어·골 없이 "언제 결과가 확정됐는지"만 필요한 소비처(reviews)가 쓰는 얕은 버전. 새
+ * 경로 OFFICIAL 리비전의 `officialAt` 우선, 없으면 레거시 `result.recordedAt`으로
+ * 폴백한다. 우선순위 판정 기준은 `resolveTournamentFixtureOfficialResult()`/
+ * `hasTournamentFixtureOfficialResult()`와 반드시 동일하게 유지한다 — 세 함수가 서로
+ * 다른 기준으로 판정하면 리뷰 게이트가 스코어보드/가드와 어긋난다. R3 §4-4단계에서
+ * 두 번째 인자와 함께 제거된다.
+ */
+export function resolveTournamentFixtureOfficialTimestamp(
+  game: { currentOfficialRevision: { state: string; officialAt: Date | null } | null } | null | undefined,
+  legacyRecordedAt: Date | null | undefined,
+): Date | null {
+  const revision = game?.currentOfficialRevision;
+  if (revision?.state === 'OFFICIAL') return revision.officialAt;
+  return legacyRecordedAt ?? null;
 }
 
 /**

@@ -661,6 +661,91 @@ describe('TournamentBracketService', () => {
     }
   });
 
+  it('recalculateStandings: game 백필 전(레거시 result만 있는) 픽스처 → 레거시 스코어로 순위가 계산된다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+
+    // R3 §4-3~§4-4단계 사이 한시적 폴백: game 자체가 없는(아직 game 백필이 안 된) 픽스처는
+    // 레거시 V1TournamentFixtureResult 스코어로 순위를 계산해야 한다 — 폴백이 없으면 이
+    // 픽스처는 "결과 없음"으로 취급돼 순위가 조용히 0으로 빠진다(오너 신고 버그의 원인).
+    prisma.v1TournamentGroup.findMany.mockResolvedValue([
+      {
+        ...groupRow(),
+        groupTeams: [{ registrationId: 'reg-1' }, { registrationId: 'reg-2' }],
+        fixtures: [
+          {
+            ...fixtureRow(),
+            homeRegistrationId: 'reg-1',
+            awayRegistrationId: 'reg-2',
+            game: null,
+            result: {
+              homeScore: 3,
+              awayScore: 0,
+              hasPenalty: false,
+              homePenaltyScore: null,
+              awayPenaltyScore: null,
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.v1TournamentStanding.upsert.mockResolvedValue({});
+
+    await service.recalculateStandings(ownerUser, 'tournament-1');
+
+    const upsertCalls = (prisma.v1TournamentStanding.upsert as jest.Mock).mock.calls;
+    const winner = upsertCalls.find((c) => c[0].create.registrationId === 'reg-1')?.[0].create;
+    const loser = upsertCalls.find((c) => c[0].create.registrationId === 'reg-2')?.[0].create;
+    expect(winner).toMatchObject({ points: 3, wins: 1, goalsFor: 3, goalsAgainst: 0 });
+    expect(loser).toMatchObject({ points: 0, losses: 1, goalsFor: 0, goalsAgainst: 3 });
+  });
+
+  it('recalculateStandings: 새 경로 OFFICIAL 리비전과 레거시 result가 둘 다 있으면 새 경로 스코어가 이긴다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+
+    // 새 경로는 1:1 무승부를, 레거시 result는 3:0 reg-1 승리를 주장한다 — 새 경로가
+    // 무조건 이겨야 한다("새 경로 우선, 없을 때만 레거시" 설계).
+    prisma.v1TournamentGroup.findMany.mockResolvedValue([
+      {
+        ...groupRow(),
+        groupTeams: [{ registrationId: 'reg-1' }, { registrationId: 'reg-2' }],
+        fixtures: [
+          {
+            ...fixtureRow(),
+            homeRegistrationId: 'reg-1',
+            awayRegistrationId: 'reg-2',
+            game: gameOfficialResultRow({
+              currentOfficialRevision: {
+                id: 'revision-priority',
+                state: 'OFFICIAL',
+                score: { home: 1, away: 1 },
+                officialAt: new Date('2026-06-14T00:00:00Z'),
+                createdAt: new Date('2026-06-14T00:00:00Z'),
+                updatedAt: new Date('2026-06-14T00:00:00Z'),
+              },
+            }),
+            result: {
+              homeScore: 3,
+              awayScore: 0,
+              hasPenalty: false,
+              homePenaltyScore: null,
+              awayPenaltyScore: null,
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.v1TournamentStanding.upsert.mockResolvedValue({});
+
+    await service.recalculateStandings(ownerUser, 'tournament-1');
+
+    const upsertCalls = (prisma.v1TournamentStanding.upsert as jest.Mock).mock.calls;
+    for (const call of upsertCalls) {
+      expect(call[0].create).toMatchObject({ points: 1, draws: 1, goalsFor: 1 });
+    }
+  });
+
   it('recalculateStandings: complete tie → seeded draw decides the full position order (TB-4)', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
@@ -899,6 +984,32 @@ describe('TournamentBracketService', () => {
     prisma.v1TournamentFixture.findUnique.mockResolvedValue({
       ...fixtureRow(),
       game: { currentOfficialRevision: { state: 'OFFICIAL' } },
+    });
+
+    await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({
+      response: { code: 'FIXTURE_HAS_RESULT' },
+    });
+  });
+
+  it('updateFixture: game이 없고(백필 전) 레거시 result만 있으면 팀 변경이 409로 막힌다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue({
+      ...fixtureRow(),
+      game: null,
+      result: { id: 'legacy-result-1' },
+    });
+
+    await expect(
+      service.updateFixture(ownerUser, 'fixture-1', { homeRegistrationId: 'reg-3' }),
+    ).rejects.toMatchObject({ response: { code: 'FIXTURE_HAS_RESULT' } });
+  });
+
+  it('deleteFixture: game이 없고(백필 전) 레거시 result만 있으면 삭제가 409로 막힌다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue({
+      ...fixtureRow(),
+      game: null,
+      result: { id: 'legacy-result-1' },
     });
 
     await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({

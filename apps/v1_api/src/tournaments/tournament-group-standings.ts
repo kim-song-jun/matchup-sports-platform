@@ -5,7 +5,10 @@ import {
   type CompetitionConfig,
   type StandingFixture,
 } from './competition-config/competition-config';
-import { parseTournamentFixtureOfficialScore } from './tournament-fixture-official-result';
+import {
+  resolveTournamentFixtureOfficialScore,
+  type TournamentFixtureOfficialScore,
+} from './tournament-fixture-official-result';
 
 /**
  * The shape both `TournamentBracketService.recalculateStandings()` (all
@@ -16,6 +19,16 @@ import { parseTournamentFixtureOfficialScore } from './tournament-fixture-offici
  * completed fixtures, each carrying `game.currentOfficialRevision.{state,
  * score}` — the R3 §4-3 new-path source of truth for a fixture's result
  * (see `tournament-fixture-official-result.ts`).
+ *
+ * `result` is the R3 §4-3~§4-4 한시적 legacy fallback input
+ * (`V1TournamentFixtureResult`'s score columns only — standings never need
+ * goals/note). It is optional: `recalculateStandings()` fetches it and
+ * therefore gets the fallback, while `GameResultStandingsProjectionService`
+ * does not fetch it (that automatic trigger only ever fires off a fresh
+ * new-path OFFICIAL revision, and in production the other fixtures in the
+ * same group have already been through the GAME_BACKFILL migration too —
+ * see `tournament-fixture-official-result.ts`'s file-level doc comment).
+ * Removed together with the rest of the fallback in R3 §4-4단계.
  */
 export type StandingsSourceGroup = {
   id: string;
@@ -26,6 +39,7 @@ export type StandingsSourceGroup = {
     game: {
       currentOfficialRevision: { state: string; score: Prisma.JsonValue } | null;
     } | null;
+    result?: TournamentFixtureOfficialScore | null;
   }[];
 };
 
@@ -33,8 +47,7 @@ export type StandingsSourceGroup = {
 export function standingsFixturesFromGroup(group: StandingsSourceGroup): StandingFixture[] {
   return group.fixtures.flatMap((fixture) => {
     if (!fixture.homeRegistrationId || !fixture.awayRegistrationId) return [];
-    if (fixture.game?.currentOfficialRevision?.state !== 'OFFICIAL') return [];
-    const score = parseTournamentFixtureOfficialScore(fixture.game.currentOfficialRevision.score);
+    const score = resolveTournamentFixtureOfficialScore(fixture.game, fixture.result);
     if (!score) return [];
     return [
       {

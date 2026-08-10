@@ -20,10 +20,16 @@ export function isBracketPublished(
 /**
  * 공개 상세의 fixtures[].result 조립 -- 응답 필드 형태(homeScore/awayScore/hasPenalty/
  * homePenaltyScore/awayPenaltyScore/note/recordedAt/goals[])는 레거시와 동일하게 유지한다.
- * `note`는 신규 리비전에 대응 컬럼이 없어 항상 null이다.
+ * 신규 경로(`V1Game.currentOfficialRevision`)를 우선하고, OFFICIAL 리비전이 없을 때만
+ * (game 백필 전 등) 레거시 `V1TournamentFixtureResult`로 폴백한다(R3 §4-3~§4-4단계 사이
+ * 한시적 — resolveTournamentFixtureOfficialResult() 참고). `note`는 새 경로에서 조립된
+ * 결과일 때만 항상 null이고, 레거시 폴백 결과는 레거시 note를 그대로 보존한다.
  */
-function presentOfficialResult(game: TournamentDetailRow['fixtures'][number]['game']) {
-  const resolved = resolveTournamentFixtureOfficialResult(game);
+function presentOfficialResult(
+  game: TournamentDetailRow['fixtures'][number]['game'],
+  legacyResult: TournamentDetailRow['fixtures'][number]['result'],
+) {
+  const resolved = resolveTournamentFixtureOfficialResult(game, legacyResult ?? undefined);
   if (!resolved) return null;
   return {
     homeScore: resolved.score.homeScore,
@@ -31,7 +37,7 @@ function presentOfficialResult(game: TournamentDetailRow['fixtures'][number]['ga
     hasPenalty: resolved.score.hasPenalty,
     homePenaltyScore: resolved.score.homePenaltyScore,
     awayPenaltyScore: resolved.score.awayPenaltyScore,
-    note: null,
+    note: resolved.note,
     recordedAt: (resolved.officialAt ?? resolved.createdAt).toISOString(),
     goals: resolved.goals,
   };
@@ -178,10 +184,10 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
       awayTeamId: fixture.awayRegistration?.team.id ?? null,
       awayTeamName: fixture.awayRegistration?.team.name ?? 'TBD',
       awayTeamLogoUrl: fixture.awayRegistration?.team.profile?.logoUrl ?? null,
-      // R3 §4-3단계: 공개 스코어보드를 레거시 V1TournamentFixtureResult 대신 신규 경로
-      // (V1Game.currentOfficialRevision)에서 조립한다 -- 문서 §1-2/§4 참고. note는 신규
-      // 경로에 대응 컬럼이 없어 항상 null(재현 불가 필드로 별도 보고됨).
-      result: presentOfficialResult(fixture.game),
+      // R3 §4-3단계: 공개 스코어보드를 신규 경로(V1Game.currentOfficialRevision) 우선으로
+      // 조립하고, OFFICIAL 리비전이 없을 때만(game 백필 전) 레거시 V1TournamentFixtureResult로
+      // 폴백한다 -- 문서 §1-2/§4 참고. §4-4단계에서 result 조인과 함께 폴백을 제거한다.
+      result: presentOfficialResult(fixture.game, fixture.result),
       videos: fixture.videos.map((video) => ({
         id: video.id,
         title: video.title,

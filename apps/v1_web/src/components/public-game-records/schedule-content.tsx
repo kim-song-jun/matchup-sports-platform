@@ -185,14 +185,19 @@ function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
           {[...group.rows]
             .sort((a, b) => a.position - b.position)
             .map((row) => (
-              <div
+              <Link
                 key={row.teamId}
+                href={`/teams/${row.teamId}/records`}
+                className="tm-pressable"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
                   padding: '8px 16px',
+                  minHeight: 44,
                   borderTop: '1px solid var(--grey100)',
+                  textDecoration: 'none',
+                  color: 'inherit',
                 }}
               >
                 <span style={{ width: 20, fontSize: 13, fontWeight: 700, color: 'var(--text-caption)' }}>
@@ -207,7 +212,7 @@ function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
                 <span className="tab-num" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>
                   {row.points}점
                 </span>
-              </div>
+              </Link>
             ))}
         </Card>
       ))}

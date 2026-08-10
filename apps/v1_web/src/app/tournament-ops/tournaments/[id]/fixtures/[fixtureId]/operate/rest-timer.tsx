@@ -127,7 +127,13 @@ export function RestTimer() {
             key={minutes}
             type="button"
             onClick={() => start(minutes)}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-amber-200 px-3 text-sm font-bold text-amber-700 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10"
+            // 대기 상태 프리셋은 중립색이다. 예전엔 이 칩들까지 호박색
+            // 테두리·글자였는데, 호박색은 이 디자인 시스템에서 "경고/마감임박"
+            // 의미색이라(R-C2: 의미색은 상태 표시 전용, 장식 금지) 아무 일도
+            // 일어나지 않은 대기 상태에 쓰면 한 화면의 강조색이 하나 더 늘고
+            // (R-C1) 정작 카운트다운이 도는 순간의 주의 환기력이 약해진다.
+            // 호박색은 아래 "진행 중" 카드에만 남긴다.
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-gray-200 px-3 text-sm font-bold text-gray-700 hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
           >
             {minutes}분
           </button>

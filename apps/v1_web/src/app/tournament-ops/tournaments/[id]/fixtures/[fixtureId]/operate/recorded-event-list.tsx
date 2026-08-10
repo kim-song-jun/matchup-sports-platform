@@ -95,6 +95,23 @@ export function RecordedEventList({
                     맥락은 경기장에서 한 손으로 급하게 조작하는 것이라, 반복
                     눌리는 CTA가 44px 미만이면 오탭 위험이 커진다(Copilot 리뷰
                     지적: 되돌리기 32px). */}
+                {/* 어시스트 — 예전엔 행 아래에 깔리는 전체 폭 파란 밴드였다.
+                    골이 있는 행마다 밴드가 붙으니 목록이 "행 / 행+밴드"로
+                    들쭉날쭉해져 훑어보기 어려웠고(오너 지적: "어시스트 버튼
+                    너무 구리다"), 강조색 면적도 커서 R-C1(단일 액센트) 위계를
+                    흐렸다. 되돌리기와 같은 행 안쪽 액션 자리로 옮겨 모든 행의
+                    높이·구조를 동일하게 만들고, 색은 텍스트에만 남긴다. */}
+                {canAttachAssist ? (
+                  <button
+                    type="button"
+                    onClick={() => onAttachAssist(event)}
+                    aria-label="이 골에 어시스트 추가"
+                    className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-2xs font-semibold text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                  >
+                    <Handshake size={12} aria-hidden="true" />
+                    어시스트
+                  </button>
+                ) : null}
                 {canReverseSubstitution ? (
                   <button
                     type="button"
@@ -110,22 +127,6 @@ export function RecordedEventList({
                 </span>
               </div>
             </div>
-            {/* 어시스트 재설계 — 예전엔 행 중간에 침입한 파란 테두리 칩이었다.
-                지금은 골 커밋 직후 토스트("골을 기록했어요 · 어시스트 추가")가
-                1차 경로이고, 이 줄은 그 토스트를 놓쳤을 때만 쓰는 2차 경로다.
-                그래서 행의 일부처럼 보이는 전체 폭 이어붙임 줄로 바꿔 "이 골의
-                자연스러운 다음 단계"로 읽히게 한다(끼워 넣은 게 아니라 이어지는
-                것으로). */}
-            {canAttachAssist ? (
-              <button
-                type="button"
-                onClick={() => onAttachAssist(event)}
-                className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-blue-50 text-2xs font-semibold text-blue-600 hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20"
-              >
-                <Handshake size={12} aria-hidden="true" />
-                어시스트가 없어요 · 추가하기
-              </button>
-            ) : null}
           </li>
         );
       })}

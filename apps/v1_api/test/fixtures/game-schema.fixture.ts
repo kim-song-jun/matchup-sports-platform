@@ -105,8 +105,17 @@ export const gameSchemaFixture = {
 // hash of its own schema.prisma while schema.prisma itself merged cleanly. The
 // value below is the sha256 of the MERGED file, produced by running
 // `shasum -a 256` against it — neither branch's standalone value.
+// Re-pinned for the operation-gate DB switch: the simplified admin toggle moved
+// off the `V1_ALLOW_SIMPLIFIED_OPERATION_FLAG_GATE` env var onto a new
+// `V1GameOperationGateSetting` singleton model (table
+// v1_game_operation_gate_settings). Purely additive — a brand-new model with its
+// own table, no column/type/FK on any existing model touched, and nothing in the
+// game-operations schema itself changed shape. One new migration file backs it
+// (20260810120000_v1_operation_gate_setting); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps
+// its value. Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: 'a291d5f4fa84d6b11e31ee83972e1c83f8116e9e1ada00aacb3f023d2a7fd5a2',
+  schema: '44fc89b84878c917e3ceaab6f6108bb6692678721ecb95297eb32a0edffbe331',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

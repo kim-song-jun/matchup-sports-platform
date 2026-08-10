@@ -11,6 +11,13 @@ async function bootstrap(): Promise<void> {
   const worker = app.get(V1GameOperationsWorkerService);
   worker.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
   worker.registerDurableAuditHandler('GAME_OPERATION_JOB_REQUEUED');
+  // GAME_OPERATION_GATE_MODE_CHANGED (simplified-gate on/off toggle) is
+  // written by the exact same writeControlEffect() helper as
+  // GAME_OPERATION_FLAG_CHANGED above (game-operation-flags.ts) — same
+  // audit-row + outbox-row shape, so it gets the identical durable-audit
+  // treatment. Outbox-handler cleanup task found this type writing but
+  // never claimed (retrying 6x then POISONED, since it's new this session).
+  worker.registerDurableAuditHandler('GAME_OPERATION_GATE_MODE_CHANGED');
 
   // Task 12 reminders lane: reuses this same DB-leased worker (no second scheduler) — see
   // schedule-reminder.service.ts for the handler bodies. WebPushService is passed as the second

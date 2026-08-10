@@ -2,6 +2,7 @@
 
 import type { TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
 import { EmptyState } from '@/components/v1-ui/primitives';
+import { readGameResultScore } from '@/lib/game-result-score';
 
 const WARNING_LABELS: Record<string, string> = {
   MISSING_SCORER: '득점자 미기재',
@@ -10,8 +11,10 @@ const WARNING_LABELS: Record<string, string> = {
 };
 
 function scoreLabel(item: TournamentOperationsBoardItem): string | null {
-  if (!item.currentScore) return null;
-  return `${item.currentScore.home}:${item.currentScore.away}`;
+  // `.home` 을 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)가
+  // `undefined:undefined` 로 나온다 — 알파 실측 사고. lib/game-result-score 참조.
+  const score = readGameResultScore(item.currentScore);
+  return score === null ? null : `${score.home}:${score.away}`;
 }
 
 /**

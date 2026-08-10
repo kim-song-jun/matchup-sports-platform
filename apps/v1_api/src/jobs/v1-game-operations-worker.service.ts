@@ -80,6 +80,26 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // audit trail.
     this.registerDurableAuditHandler('GAME_RESULT_REJECTED');
     this.registerDurableAuditHandler('GAME_RESULT_SUPPLEMENT_REQUESTED');
+    // GAME_RESULT_CHANGE_REQUESTED (GamesService.decideResultRevision's
+    // TEAM_MATCH change-request branch, games.service.ts) is the same kind
+    // of terminal review decision as REJECTED/SUPPLEMENT_REQUESTED above,
+    // and needed the identical durable-audit treatment — outbox-handler
+    // cleanup task found it writing but never claimed (retrying 6x then
+    // POISONED). Unlike REJECTED/SUPPLEMENT_REQUESTED, this branch does NOT
+    // yet synchronously close its own v1_result_escalations row the way
+    // TournamentResultReviewService.closeReviewSla() does; that's a
+    // pre-existing gap in the TEAM_MATCH review-decision flow, not something
+    // this handler causes or fixes — the async GAME_RESULT_REVIEW_REMINDER/
+    // ESCALATION handlers already guard on `revision.state !== 'SUBMITTED'`
+    // so no duplicate/incorrect notification can fire once a decision lands,
+    // it just leaves the escalation row's `status` sitting PENDING instead
+    // of flipping to CLOSED. Left out of this task's scope deliberately.
+    this.registerDurableAuditHandler('GAME_RESULT_CHANGE_REQUESTED');
+  }
+
+  /** Read-only registration introspection for tests — no DB access. */
+  hasHandler(type: string): boolean {
+    return this.handlers.has(type);
   }
 
   registerHandler(type: string, handler: GameOperationHandler): void {

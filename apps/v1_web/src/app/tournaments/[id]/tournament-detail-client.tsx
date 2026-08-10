@@ -1874,7 +1874,7 @@ function StandingRow({
     <tr
       style={{
         // zebra: 진출 팀은 파란 강조가 우선, 그 외엔 짝수 행에만 옅은 회색을 줘 가독성을 높인다.
-        background: isQualifying ? 'var(--blue50)' : rank % 2 === 0 ? 'var(--grey50)' : undefined,
+        background: isQualifying ? 'var(--tint-blue)' : rank % 2 === 0 ? 'var(--grey50)' : undefined,
       }}
     >
       <td

@@ -12,7 +12,7 @@ export function PendingTournamentReviewCard() {
   if (!target) return null;
 
   return (
-    <Card pad={16} style={{ background: 'var(--blue50)', border: '1px solid var(--blue100)', marginBottom: 16, minWidth: 0 }}>
+    <Card pad={16} style={{ background: 'var(--tint-blue)', border: '1px solid var(--tint-blue-border)', marginBottom: 16, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div
           style={{

@@ -121,7 +121,16 @@ export function RestTimer() {
         <Timer size={14} aria-hidden="true" />
         쉬는 시간
       </p>
-      <div className="flex flex-wrap gap-1.5">
+      {/* flex-wrap 이 아니라 6열 그리드다. wrap 으로 두면 390px 에서 6개가 한 줄에
+          못 들어가 "20분"만 혼자 다음 줄로 떨어져(5+1) 목록이 삐뚤어 보였다(알파
+          실측). 이 콘솔의 주 사용 폭이 경기장에서 한 손으로 쓰는 휴대폰이라 390 이
+          기본값에 가깝다. 프리셋 개수가 고정(6개)이므로 열 수를 고정해 모든 폭에서
+          한 줄·같은 너비로 떨어지게 한다 — 프리셋을 늘리면 이 열 수도 함께 고쳐야
+          한다. min-w-[44px] 는 그리드 셀이 좁아져도 터치 타깃이 무너지지 않게
+          남겨둔다. sm 이상에서 max-w 로 폭을 막는 건, 안 막으면 6열이 컨테이너를
+          그대로 나눠 가져 넓은 화면에서 칩 하나가 200px 가까이 늘어나기 때문이다
+          — 내용은 "10분" 세 글자뿐이라 헐거워 보인다. */}
+      <div className="grid grid-cols-6 gap-1.5 sm:max-w-md">
         {REST_PRESET_MINUTES.map((minutes) => (
           <button
             key={minutes}
@@ -133,7 +142,7 @@ export function RestTimer() {
             // 일어나지 않은 대기 상태에 쓰면 한 화면의 강조색이 하나 더 늘고
             // (R-C1) 정작 카운트다운이 도는 순간의 주의 환기력이 약해진다.
             // 호박색은 아래 "진행 중" 카드에만 남긴다.
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-gray-200 px-3 text-sm font-bold text-gray-700 hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-gray-200 px-1 text-sm font-bold text-gray-700 hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
           >
             {minutes}분
           </button>

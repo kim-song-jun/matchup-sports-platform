@@ -71,7 +71,13 @@ export function RecordedEventList({
             key={event.id}
             className="flex flex-col gap-1.5 rounded-lg border border-gray-100 px-3 py-2 dark:border-gray-700"
           >
-            <div className="flex items-center justify-between gap-2">
+            {/* 좁은 폭에서는 위아래로 쌓는다. 한 줄로 두면 액션 묶음(어시스트·
+                되돌리기·팀명)이 shrink-0 이라 폭을 먼저 가져가고, 남은 자리에서
+                이벤트 문구가 잘려 "골 · 1 김..." 처럼 선수 이름이 사라졌다(알파
+                390px 실측). 이 목록에서 가장 중요한 정보가 "누가 했는지"인데 그게
+                제일 먼저 잘리는 셈이라, 폭이 부족하면 자르는 대신 줄을 나눈다.
+                sm 이상은 한 줄에 다 들어가므로 기존 배치를 그대로 둔다. */}
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 {/* clockMs 는 항상 정상이었다 — 표시만 분 단위(`m'`)로 뭉개서 같은 분에
                     찍힌 여러 이벤트를 구분할 수 없었다(실측 사고 사후조사에서 확인:
@@ -90,7 +96,7 @@ export function RecordedEventList({
                       : ''}
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center justify-end gap-2">
                 {/* 44px 최소 터치 타깃(WCAG 2.5.5 유사 기준) — 이 콘솔의 실사용
                     맥락은 경기장에서 한 손으로 급하게 조작하는 것이라, 반복
                     눌리는 CTA가 44px 미만이면 오탭 위험이 커진다(Copilot 리뷰

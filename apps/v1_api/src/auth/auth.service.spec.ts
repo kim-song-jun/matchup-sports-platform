@@ -561,14 +561,14 @@ describe('AuthService', () => {
     });
   });
 
-  it('completeSocialTerms: 소셜 회원가입 세션 만료(>24h) → 삭제 후 401 SOCIAL_SIGNUP_EXPIRED', async () => {
+  it('completeSocialTerms: 소셜 회원가입 세션 만료(>24h) → 리셋 후 401 SOCIAL_SIGNUP_EXPIRED', async () => {
     const expiredTime = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25시간 전
     const expiredUser = pendingSocialUserRow({
       createdAt: expiredTime,
       updatedAt: expiredTime,
     });
     prisma.v1User.findUnique.mockResolvedValue(expiredUser);
-    prisma.v1User.delete.mockResolvedValue(expiredUser);
+    prisma.v1User.update.mockResolvedValue(expiredUser);
 
     await expect(
       service.completeSocialTerms('user-1', { requiredTermsAccepted: true }),
@@ -577,8 +577,19 @@ describe('AuthService', () => {
       response: { code: 'SOCIAL_SIGNUP_EXPIRED' },
     });
 
-    // expired user must be deleted before the error is thrown
-    expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
+    // expired user must be reset in place (never hard-deleted — a user with
+    // any FK-restricted row, e.g. chat participation, would fail to delete
+    // and 500-loop on every subsequent login attempt)
+    expect(prisma.v1User.delete).not.toHaveBeenCalled();
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { onboardingStatus: 'social_terms_required' },
+    });
+    expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      update: { currentStep: 'terms' },
+      create: { userId: 'user-1', currentStep: 'terms' },
+    });
   });
 
   it.each(['social_profile_required', 'signup_done', 'completed'])(
@@ -766,6 +777,107 @@ describe('AuthService', () => {
     await expect(action).rejects.toMatchObject({ status: 400 });
     expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
     expect(prisma.v1UserOnboardingProgress.upsert).not.toHaveBeenCalled();
+  });
+
+  it('completeSocialProfile: 소셜 회원가입 세션 만료(>24h) → 리셋 후 401 SOCIAL_SIGNUP_EXPIRED', async () => {
+    const expiredTime = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25시간 전
+    const expiredUser = pendingSocialUserRow({
+      onboardingStatus: 'social_profile_required',
+      createdAt: expiredTime,
+      updatedAt: expiredTime,
+    });
+    prisma.v1User.findUnique.mockResolvedValue(expiredUser);
+    prisma.v1User.update.mockResolvedValue(expiredUser);
+
+    await expect(
+      service.completeSocialProfile('user-1', {
+        nickname: '소셜유저',
+        gender: 'female',
+        displayName: '소셜 유저',
+        phone: '01087654321',
+        birthDate: '19991231',
+      }),
+    ).rejects.toMatchObject({
+      status: 401,
+      response: { code: 'SOCIAL_SIGNUP_EXPIRED' },
+    });
+
+    expect(prisma.v1User.delete).not.toHaveBeenCalled();
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { onboardingStatus: 'social_terms_required' },
+    });
+    expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      update: { currentStep: 'terms' },
+      create: { userId: 'user-1', currentStep: 'terms' },
+    });
+  });
+
+  // ─── kakaoLogin ──────────────────────────────────────────────────────────
+
+  describe('kakaoLogin', () => {
+    const originalFetch = global.fetch;
+    const originalEnv = { ...process.env };
+
+    beforeEach(() => {
+      process.env.KAKAO_CLIENT_ID = 'test-client-id';
+      process.env.KAKAO_CLIENT_SECRET = 'test-client-secret';
+      process.env.KAKAO_REDIRECT_URI = 'https://teameet.co.kr/callback/kakao';
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: 4994014420, kakao_account: {} }),
+        }) as unknown as typeof fetch;
+    });
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+      process.env = { ...originalEnv };
+    });
+
+    it('만료된(>24h) 소셜 가입 계정으로 재로그인 → 삭제하지 않고 온보딩을 리셋한 뒤 세션을 반환한다', async () => {
+      const expiredTime = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25시간 전
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+        id: 'identity-1',
+        status: 'active',
+        user: {
+          id: 'user-1',
+          email: null,
+          accountStatus: 'active',
+          onboardingStatus: 'social_profile_required',
+          createdAt: expiredTime,
+          updatedAt: expiredTime,
+        },
+      });
+      // sessionResponse() -> me() re-reads the (now reset) user row
+      prisma.v1User.findUnique.mockResolvedValue(
+        pendingSocialUserRow({ onboardingStatus: 'social_terms_required' }),
+      );
+
+      const result = await service.kakaoLogin({ code: 'auth-code' });
+
+      // a user who already has an FK-restricted row (chat participation, a
+      // match application, ...) would fail v1User.delete() with a foreign
+      // key violation and 500-loop on every retry — must never be attempted
+      expect(prisma.v1User.delete).not.toHaveBeenCalled();
+      expect(prisma.v1User.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { onboardingStatus: 'social_terms_required', lastLoginAt: expect.any(Date) },
+      });
+      expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        update: { currentStep: 'terms' },
+        create: { userId: 'user-1', currentStep: 'terms' },
+      });
+      expect(prisma.v1AuthIdentity.update).toHaveBeenCalledWith({
+        where: { id: 'identity-1' },
+        data: { email: null, lastLoginAt: expect.any(Date) },
+      });
+      expect(result.session.userId).toBe('user-1');
+    });
   });
 
   // ─── me ──────────────────────────────────────────────────────────────────

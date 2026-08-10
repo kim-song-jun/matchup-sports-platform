@@ -88,39 +88,43 @@ export function resolveGameOperationGateRoot(
 }
 
 /**
- * Non-production admin fast path (owner request: "admin on/off").
+ * Simplified gate switch (owner request: "굳이 다 환경변수로 하지 말고 DB 값으로 admin에서
+ * 설정값으로 넣자").
  *
  * The literal gate bundle (docs/api/domains/game-migration.md) exists because promoting
  * `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` off->on is irreversible in effect ("public exposure can't
  * be un-seen") -- it deliberately costs a 14-day, twice-7x24h-signed ceremony. That ceremony stays
- * mandatory wherever this flag is unset. It is opt-in, not opt-out, and defaults to disabled so a
- * freshly provisioned environment (including production) never accidentally exposes the shortcut.
+ * mandatory wherever this switch is off. It is opt-in, not opt-out, and defaults to disabled (see
+ * migration `20260810120000_v1_operation_gate_setting`) so a freshly provisioned environment
+ * (including production) never accidentally exposes the shortcut.
  *
- * `NODE_ENV` cannot distinguish alpha from real production here -- both
- * `deploy/docker-compose.alpha.yml` and `deploy/docker-compose.prod.yml` hardcode
- * `NODE_ENV=production` (alpha's compose file is loaded as an overlay ON TOP of the prod compose,
- * see `deploy/deploy-alpha.sh`), so a `NODE_ENV`-keyed gate would either allow the shortcut on both
- * or block it on both. This dedicated variable is therefore the only environment signal, set to
- * `"true"` only in `deploy/docker-compose.alpha.yml`'s `v1_api` environment block (this HTTP
- * controller is the only consumer -- the game operations worker never calls this path) and left
- * unset in `deploy/docker-compose.prod.yml` (and in every other runtime), mirroring the existing
- * `V1_ALLOW_HEADER_AUTH` opt-in pattern in `auth/v1-session.ts`.
+ * This used to be gated by a dedicated opt-in environment variable set only in the alpha compose
+ * overlay, because `NODE_ENV` can't distinguish alpha from real production (both compose files
+ * hardcode `NODE_ENV=production`). The owner decided environment-locking was the wrong control:
+ * the switch now lives in
+ * `v1_game_operation_gate_settings` (a CAS'd singleton row, see `setSimplifiedGate`) and a
+ * `platform_ops` admin can flip it from any environment, including production. The control is the
+ * CAS + mandatory `reason` + `V1OperationAudit` trail on the switch itself, not which environment
+ * it runs in.
  */
-export const SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR =
-  'V1_ALLOW_SIMPLIFIED_OPERATION_FLAG_GATE';
-
-export function isSimplifiedOperationFlagGateEnabled(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return env[SIMPLIFIED_OPERATION_FLAG_GATE_ENV_VAR] === 'true';
-}
 
 /**
- * Only boolean, always-rollback-able flags may use the simplified path. `GAME_WRITE`/`GAME_READ`
- * carry an irreversible latch (`v1_game_cutover_epochs.first_new_write_at`) once new-authority
- * writes begin, and must keep going through the fully gated `patchFlag`/`tupleTransition` path.
+ * The simplified path only skips the gate-bundle *paperwork* (see `simplifiedPatchFlag`'s doc
+ * comment below) -- the data-consistency invariants that protect the migration are untouched:
+ * `assertSingleTransition` (one step at a time; rollback still requires `tupleTransition`),
+ * `assertFrozenForwardOrder` (READ compare -> WRITE new -> READ new -> PUBLIC_LIVE/
+ * DIRECTOR_OFFICIALIZE, strictly in that order), CAS on `expectedVersion`, the
+ * `V1OperationAudit` trail, and the `platform_ops` permission level all still apply. In
+ * particular, `GAME_WRITE=new` latches `v1_game_cutover_epochs.first_new_write_at` the instant
+ * the first new-authority write happens, which makes that step practically irreversible --
+ * rolling it back still requires the fully gated `tupleTransition` path.
+ *
+ * Owner request: "game write 같은 경우도 모두 진행할 수 있게끔 해줘. 전부 다 말이지?" -- all four
+ * keys may use this path now; only the evidence ceremony is skipped, never the safety rails above.
  */
 export const SIMPLIFIED_GATE_ALLOWED_KEYS: readonly GameOperationFlagKey[] = [
+  'GAME_READ',
+  'GAME_WRITE',
   'PUBLIC_LIVE',
   'DIRECTOR_OFFICIALIZE',
 ];
@@ -128,6 +132,12 @@ export const SIMPLIFIED_GATE_ALLOWED_KEYS: readonly GameOperationFlagKey[] = [
 export type SimplifiedPatchGameOperationFlagInput = {
   expectedVersion: number;
   value: string;
+  reason: string;
+};
+
+export type SetSimplifiedGateInput = {
+  expectedVersion: number;
+  enabled: boolean;
   reason: string;
 };
 
@@ -166,6 +176,21 @@ type FlagRow = {
   updated_by_user_id: string | null;
   rollback_value: string | null;
   updated_at: Date;
+};
+
+type GateSettingRow = {
+  id: string;
+  simplified_gate_enabled: boolean;
+  version: number;
+  updated_by_user_id: string | null;
+  updated_at: Date;
+};
+
+type GateSettingState = {
+  enabled: boolean;
+  version: number;
+  updatedByUserId: string | null;
+  updatedAt: Date;
 };
 
 type CutoverRow = {
@@ -397,23 +422,103 @@ export class GameOperationFlagsService {
     );
   }
 
-  /** Whether the caller's environment has the simplified (non-gate-bundle) admin toggle enabled. */
-  async getSimplifiedGateStatus(userId: string) {
+  /** Whether the simplified (non-gate-bundle) admin toggle is enabled, plus CAS/audit metadata. */
+  async getSimplifiedGateStatus(userId: string): Promise<GateSettingState> {
     await this.assertPlatformOps(userId);
-    return { enabled: isSimplifiedOperationFlagGateEnabled() };
+    return this.readGateSetting();
   }
 
   /**
-   * Non-production admin fast path for `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` only -- see
-   * `isSimplifiedOperationFlagGateEnabled`'s doc comment for why this cannot run in production.
+   * Flips the simplified gate switch itself. This is the only way to change
+   * `v1_game_operation_gate_settings` -- everything else in this file only reads it.
+   */
+  async setSimplifiedGate(
+    userId: string,
+    input: SetSimplifiedGateInput,
+    idempotencyKey: string | undefined,
+  ) {
+    await this.assertPlatformOps(userId);
+    const normalizedIdempotencyKey = requireIdempotencyKey(idempotencyKey);
+    assertReason(input.reason);
+    assertVersion(input.expectedVersion);
+    await this.readGateSetting();
+    const requestPayload = {
+      expectedVersion: input.expectedVersion,
+      enabled: input.enabled,
+      reason: input.reason,
+    };
+
+    return this.withIdempotency(
+      userId,
+      'operation_gate.set',
+      'operation_gate',
+      'simplified',
+      normalizedIdempotencyKey,
+      requestPayload,
+      async (tx) => {
+        const lockedRows = await tx.$queryRaw<GateSettingRow[]>`
+          SELECT id, simplified_gate_enabled, version, updated_by_user_id, updated_at
+          FROM v1_game_operation_gate_settings
+          WHERE id = 'singleton'
+          FOR UPDATE
+        `;
+        const locked = lockedRows[0];
+        if (!locked) {
+          throw new NotFoundException({
+            code: 'OPERATION_GATE_SETTING_NOT_FOUND',
+            message: 'Operation gate setting was not found',
+          });
+        }
+        if (locked.version !== input.expectedVersion) {
+          throw gateVersionConflict(locked);
+        }
+        if (locked.simplified_gate_enabled === input.enabled) {
+          throw new ConflictException({
+            code: 'GATE_MODE_UNCHANGED',
+            message: 'Simplified gate is already in the requested state',
+          });
+        }
+
+        const updatedRows = await tx.$queryRaw<GateSettingRow[]>`
+          UPDATE v1_game_operation_gate_settings
+          SET simplified_gate_enabled = ${input.enabled},
+              version = version + 1,
+              updated_by_user_id = ${userId},
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = 'singleton' AND version = ${input.expectedVersion}
+          RETURNING id, simplified_gate_enabled, version, updated_by_user_id, updated_at
+        `;
+        const updated = updatedRows[0];
+        if (!updated) {
+          throw gateVersionConflict(locked);
+        }
+        await this.writeControlEffect(
+          tx,
+          normalizedIdempotencyKey,
+          'OPERATION_GATE_MODE_CHANGED',
+          'GAME_OPERATION_GATE_MODE_CHANGED',
+          'operation_gate',
+          'simplified',
+          input.reason,
+          { simplifiedGateEnabled: locked.simplified_gate_enabled, version: locked.version },
+          { simplifiedGateEnabled: updated.simplified_gate_enabled, version: updated.version },
+        );
+        return presentGateSetting(updated);
+      },
+    );
+  }
+
+  /**
+   * Admin fast path for all four operation flags -- see the doc comment on
+   * `SIMPLIFIED_GATE_ALLOWED_KEYS` above for why every key may use it and what it does NOT relax.
    *
    * Everything except the immutable gate-bundle evidence ceremony is identical to `patchFlag`:
    * same admin permission level (`assertPlatformOps`), same CAS on `expectedVersion`, same
-   * `assertSingleTransition` (only off<->on), same `assertFrozenForwardOrder` (an off->on
-   * promotion still requires `GAME_WRITE=new` and `GAME_READ=new` -- that invariant protects data
-   * consistency, not just gate-bundle paperwork, so this path does not relax it), same mandatory
-   * `reason` + `Idempotency-Key`, same `V1OperationAudit`/outbox write. The audit `after` payload
-   * is marked `gateMode: 'simplified'` so the trail records which path was used.
+   * `assertSingleTransition`, same `assertFrozenForwardOrder` (an off->on / forward promotion
+   * still requires the frozen READ/WRITE/PUBLIC_LIVE/DIRECTOR_OFFICIALIZE order -- that invariant
+   * protects data consistency, not just gate-bundle paperwork, so this path does not relax it),
+   * same mandatory `reason` + `Idempotency-Key`, same `V1OperationAudit`/outbox write. The audit
+   * `after` payload is marked `gateMode: 'simplified'` so the trail records which path was used.
    */
   async simplifiedPatchFlag(
     userId: string,
@@ -421,10 +526,11 @@ export class GameOperationFlagsService {
     input: SimplifiedPatchGameOperationFlagInput,
     idempotencyKey: string | undefined,
   ) {
-    if (!isSimplifiedOperationFlagGateEnabled()) {
+    const gate = await this.readGateSetting();
+    if (!gate.enabled) {
       throw new ForbiddenException({
         code: 'SIMPLIFIED_GATE_DISABLED',
-        message: 'The simplified operation flag toggle is disabled in this environment',
+        message: '간소 전환 모드가 꺼져 있어요',
       });
     }
     await this.assertPlatformOps(userId);
@@ -820,6 +926,31 @@ export class GameOperationFlagsService {
 
   private async assertPlatformOps(userId: string) {
     return this.adminContext.getMutationAdmin(userId);
+  }
+
+  /** Mirrors `ensureDefaults()` below: guarantees the singleton gate-setting row exists, then
+   * reads it. Called by every path that reads or writes the simplified gate switch. */
+  private async readGateSetting(): Promise<GateSettingState> {
+    const now = new Date();
+    await this.prisma.$executeRaw`
+      INSERT INTO v1_game_operation_gate_settings
+        (id, simplified_gate_enabled, version, updated_at, created_at)
+      VALUES ('singleton', false, 0, ${now}, ${now})
+      ON CONFLICT (id) DO NOTHING
+    `;
+    const rows = await this.prisma.$queryRaw<GateSettingRow[]>`
+      SELECT id, simplified_gate_enabled, version, updated_by_user_id, updated_at
+      FROM v1_game_operation_gate_settings
+      WHERE id = 'singleton'
+    `;
+    const row = rows[0];
+    if (!row) {
+      throw new NotFoundException({
+        code: 'OPERATION_GATE_SETTING_NOT_FOUND',
+        message: 'Operation gate setting was not found',
+      });
+    }
+    return presentGateSetting(row);
   }
 
   private async ensureDefaults() {
@@ -1248,6 +1379,23 @@ function versionConflict(key: GameOperationFlagKey, current: FlagRow) {
     message: `${key} changed before the transition`,
     currentVersion: current.version,
     currentValue: current.value,
+  });
+}
+
+function presentGateSetting(row: GateSettingRow): GateSettingState {
+  return {
+    enabled: row.simplified_gate_enabled,
+    version: row.version,
+    updatedByUserId: row.updated_by_user_id,
+    updatedAt: row.updated_at,
+  };
+}
+
+function gateVersionConflict(current: GateSettingRow) {
+  return new ConflictException({
+    code: 'VERSION_CONFLICT',
+    message: 'Operation gate setting changed before the transition',
+    currentVersion: current.version,
   });
 }
 

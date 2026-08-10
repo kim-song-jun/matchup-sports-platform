@@ -2431,14 +2431,32 @@ export type V1GameOperationFlag = {
   updatedAt: string;
 };
 
-/** 이 환경에서 게이트 번들 없이 켜고 끄는 간소 경로가 열려 있는지. 프로덕션에서는 항상 false. */
+/**
+ * 게이트 번들 없이 켜고 끄는 간소 경로가 열려 있는지 — `v1_game_operation_gate_settings` 싱글턴
+ * 행을 그대로 반영한다(더는 환경변수가 아니라 CAS 가능한 DB 값). `version`은 켜기/끄기 mutation의
+ * `expectedVersion`으로 그대로 되돌려 보내야 한다(CAS 충돌 시 VERSION_CONFLICT).
+ */
 export type V1SimplifiedOperationFlagGateStatus = {
   enabled: boolean;
+  version: number;
+  updatedByUserId: string | null;
+  updatedAt: string;
 };
 
+/**
+ * `value`는 대상 플래그가 허용하는 값 전체를 받는다 — GAME_READ/GAME_WRITE는
+ * legacy/compare/new 전환에도 이 간소 경로를 쓰기 때문에 off/on으로 좁히지 않는다.
+ */
 export type V1SimplifiedOperationFlagTogglePayload = {
   expectedVersion: number;
-  value: 'off' | 'on';
+  value: V1GameOperationFlagValue;
+  reason: string;
+};
+
+/** 간소 전환 모드 스위치 자체를 켜고 끌 때 보내는 payload — PATCH /simplified-gate. */
+export type V1SetSimplifiedOperationFlagGatePayload = {
+  expectedVersion: number;
+  enabled: boolean;
   reason: string;
 };
 

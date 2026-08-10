@@ -249,3 +249,78 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     expect(result.items[0].scorers).toEqual([]);
   });
 });
+
+/**
+ * `v1_game_result_revisions.score` 에는 두 형태가 공존한다 -- 실시간 확정 경로는
+ * 평평한 `{home,away}`, 레거시 백필(`game-result-backfill.ts` ScoreSnapshot)은
+ * `{regulation:{home,away},...}`. 리더가 평평한 형태만 알아서 백필된 완료 경기
+ * 21건이 전부 `scoreStatus:'unavailable'` 로 보였다(알파 실측 회귀).
+ */
+describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두 형태', () => {
+  function fixtureWithRevisionScore(score: unknown) {
+    return makeFixture({
+      status: 'completed',
+      game: {
+        id: 'game-1',
+        state: 'ENDED',
+        visibilityPolicy: { mode: 'LIVE', lineupAt: null },
+        currentOfficialRevision: {
+          state: 'OFFICIAL',
+          supersedesId: null,
+          officialAt: new Date('2026-08-01T00:00:00.000Z'),
+          score,
+        },
+        sides: [
+          { id: 'side-home', sideKey: 'HOME' },
+          { id: 'side-away', sideKey: 'AWAY' },
+        ],
+        periods: [],
+        participants: [ELIGIBLE, INELIGIBLE],
+      },
+    });
+  }
+
+  const emptyConsent = { consentLinks: [], consentSnapshots: [], goalEvents: [] };
+
+  it('평평한 형태 {home,away} 를 읽는다 (실시간 확정 경로)', async () => {
+    const prisma = buildFakePrisma({ fixtures: [fixtureWithRevisionScore({ home: 2, away: 0 })], ...emptyConsent });
+    const result = await new PublicTournamentRecordsService(prisma).getSchedule(TOURNAMENT_ID, {});
+    expect(result.items[0].score).toEqual({ home: 2, away: 0 });
+    expect(result.items[0].scoreStatus).toBe('official');
+  });
+
+  it('중첩 형태 {regulation:{home,away}} 를 읽는다 (레거시 백필 경로)', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [
+        fixtureWithRevisionScore({
+          regulation: { home: 3, away: 0 },
+          penalty: null,
+          goals: [],
+          incomplete: false,
+          provenance: 'TOURNAMENT_FIXTURE_RESULT',
+        }),
+      ],
+      ...emptyConsent,
+    });
+    const result = await new PublicTournamentRecordsService(prisma).getSchedule(TOURNAMENT_ID, {});
+    expect(result.items[0].score).toEqual({ home: 3, away: 0 });
+    expect(result.items[0].scoreStatus).toBe('official');
+  });
+
+  it('regulation 이 null 이면(스코어 미기록) 점수를 지어내지 않는다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [
+        fixtureWithRevisionScore({
+          regulation: null,
+          penalty: null,
+          goals: [],
+          incomplete: true,
+          provenance: 'TEAM_MATCH_COMPLETION_ONLY',
+        }),
+      ],
+      ...emptyConsent,
+    });
+    const result = await new PublicTournamentRecordsService(prisma).getSchedule(TOURNAMENT_ID, {});
+    expect(result.items[0].score).toBeNull();
+  });
+});

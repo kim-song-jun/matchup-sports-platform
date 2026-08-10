@@ -726,15 +726,42 @@ function buildMvp(
   return { participantId: participant.id, displayName: participant.displayNameSnapshot };
 }
 
+/**
+ * `v1_game_result_revisions.score` 에는 **서로 다른 두 형태**가 들어 있다. 둘 다
+ * 정상적으로 생산된 값이라 리더가 양쪽을 다 읽어야 한다.
+ *
+ *   1) 평평한 형태 — 실시간 결과 확정 경로가 쓴다
+ *      (`tournament-result-review.service.ts` 의 `score: { home, away, penalties? }`)
+ *        `{ "home": 2, "away": 0 }`
+ *   2) 중첩 형태 — 레거시 결과 백필이 쓴다
+ *      (`games/migration/game-result-backfill.ts` 의 `ScoreSnapshot`)
+ *        `{ "regulation": { "home": 3, "away": 0 }, "penalty": ..., "goals": [...],
+ *           "incomplete": false, "provenance": "TOURNAMENT_FIXTURE_RESULT" }`
+ *
+ * 예전엔 1)만 인식해서, 백필로 넘어온 완료 경기가 전부 `scoreStatus: 'unavailable'`
+ * 로 보였다(알파 실측: 21경기 전원). 저장된 값을 마이그레이션으로 한 형태로 통일하는
+ * 방법도 있지만, 이미 두 형태가 공존하는 이력 데이터라 리더가 받아주는 쪽이 안전하다
+ * — 통일은 별도 마이그레이션 과제로 남긴다.
+ *
+ * `regulation` 이 명시적으로 `null` 인 경우(완료됐지만 스코어가 기록되지 않은 소스,
+ * `incomplete: true`)는 점수를 지어내지 않고 `null` 을 돌려준다.
+ */
 function parseScore(value: Prisma.JsonValue | null | undefined): { home: number; away: number } | null {
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof (value as { home?: unknown }).home === 'number' &&
-    typeof (value as { away?: unknown }).away === 'number'
-  ) {
-    return { home: (value as { home: number }).home, away: (value as { away: number }).away };
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+
+  const flat = readHomeAway(value);
+  if (flat !== null) return flat;
+
+  const regulation = (value as { regulation?: unknown }).regulation;
+  if (typeof regulation === 'object' && regulation !== null && !Array.isArray(regulation)) {
+    return readHomeAway(regulation);
   }
   return null;
+}
+
+function readHomeAway(value: object): { home: number; away: number } | null {
+  const home = (value as { home?: unknown }).home;
+  const away = (value as { away?: unknown }).away;
+  if (typeof home !== 'number' || typeof away !== 'number') return null;
+  return { home, away };
 }

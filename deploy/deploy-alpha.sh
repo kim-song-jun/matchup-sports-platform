@@ -276,6 +276,14 @@ done
 # 배포를 깨뜨리지 않는다 — 그래서 이 자리에 두어도 안전하다.
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/games/migration/fixture-game-backfill.cli.js'
+# QA 시드는 더 이상 V1TournamentStanding 행을 만들지 않는다(과거엔 배열 인덱스만으로
+# 승점/득실을 하드코딩해 실제 픽스처 결과와 모순되는 값이 나갔다). fixture-game-backfill
+# 뒤에서 돌아야 하는 이유는 순위 재계산이 그 백필이 만드는 V1Game.currentOfficialRevision
+# (새 경로)을 참조하기 때문 — backfill 전에 돌리면 아직 아무 결과도 없는 채로 계산된다.
+# config 가 없거나 유효하지 않은 대회는 격리(quarantine)만 하고 exit 0 을 유지하므로
+# (fixture-game-backfill 과 동일한 격리 패턴) 배포를 막지 않는다.
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/tournaments/tournament-standings-recalculation.cli.js'
 
 "${compose[@]}" up -d
 "${compose[@]}" up -d --force-recreate --no-deps \

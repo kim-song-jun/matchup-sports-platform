@@ -7,6 +7,7 @@ import type {
   GameResultScore,
   TournamentGameSide,
 } from '@/hooks/use-tournament-result-review';
+import type { GameLineup } from '@/types/game-operations';
 
 export type ResultEditSubmitInput = {
   score: GameResultScore;
@@ -27,6 +28,10 @@ export type ResultEditModalProps = {
     mvpParticipantId: string | null;
   };
   sides: readonly TournamentGameSide[];
+  /** `GET /games/:gameId/lineups`(`GamesService.listLineups()`)의 라인업 스냅샷 --
+   * 실명 표시에 쓴다. 아직 로딩 중이거나 없으면 빈 배열을 넘기면 된다(폴백은
+   * `participantLabel`이 알아서 처리한다). */
+  lineups: readonly GameLineup[];
   submitting?: boolean;
   errorMessage?: string | null;
   onConfirm: (input: ResultEditSubmitInput) => void;
@@ -41,12 +46,41 @@ function sideLabel(sides: readonly TournamentGameSide[], sideId: string): string
   return side.sideKey === 'HOME' ? '홈' : '원정';
 }
 
-/** No lineup/roster naming endpoint is available in this worktree yet (Task
- * 14's `apps/v1_api/src/games/lineups` module has not landed) -- see this
- * lane's implementation report. A participant row is labelled by side +
- * a truncated id instead of a real display name until that data exists. */
-function participantLabel(sides: readonly TournamentGameSide[], participantId: string, sideId: string): string {
-  return `${sideLabel(sides, sideId)} · 참가자 ${participantId.slice(-6)}`;
+/**
+ * 참가자 id -> "#등번호 이름" 표시 문자열 맵.
+ *
+ * `GET /games/:gameId/lineups`(라우트는 `apps/v1_api/src/games/games.controller.ts`의
+ * `lineups()` -- Task 14가 찾던 별도 `games/lineups` 디렉터리가 아니라
+ * `games.controller.ts` 안에 이미 있다)가 돌려주는 각 라인업의 `participants[].id`는
+ * 결과 기록 쪽 `GameResultParticipantRecord.participantId`와 같은 값을 가리킨다 --
+ * `GamesService`가 결과 참가자 행을 만들 때 `participantId: participant.id`로
+ * `V1GameParticipant.id`를 그대로 복사해서 저장하기 때문(`games.service.ts`의
+ * `submitResult`류 메서드 참고). 운영 콘솔의 `recorded-event-list.tsx`가 같은
+ * 라인업 응답으로 `playerName` 맵을 만드는 것과 동일한 관례를 따른다.
+ */
+function buildParticipantNameMap(lineups: readonly GameLineup[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const lineup of lineups) {
+    for (const participant of lineup.participants) {
+      const jersey = participant.jerseyNumber !== null ? `#${participant.jerseyNumber} ` : '';
+      map.set(participant.id, `${jersey}${participant.displayNameSnapshot}`);
+    }
+  }
+  return map;
+}
+
+/** 라인업에 없는 참가자(팀 이탈 등으로 로스터에서 빠졌거나, 아직 라인업 응답이
+ * 로딩 중인 경우)는 이름을 지어내지 않고 기존 폴백(사이드 + id 뒷자리)을 쓰되,
+ * 폴백임이 드러나도록 안내 문구를 덧붙인다 -- 조용히 빈칸으로 두지 않는다. */
+function participantLabel(
+  sides: readonly TournamentGameSide[],
+  nameMap: ReadonlyMap<string, string>,
+  participantId: string,
+  sideId: string,
+): string {
+  const name = nameMap.get(participantId);
+  if (name) return `${sideLabel(sides, sideId)} · ${name}`;
+  return `${sideLabel(sides, sideId)} · 참가자 ${participantId.slice(-6)} (라인업에 없음)`;
 }
 
 function toEditable(record: GameResultParticipantRecord): EditableParticipant {
@@ -83,6 +117,7 @@ export function ResultEditModal({
   reasonLabel = '사유',
   base,
   sides,
+  lineups,
   submitting = false,
   errorMessage,
   onConfirm,
@@ -179,6 +214,8 @@ export function ResultEditModal({
       document.body.style.overflow = '';
     };
   }, [open]);
+
+  const participantNameMap = useMemo(() => buildParticipantNameMap(lineups), [lineups]);
 
   const trimmedReason = reason.trim();
   const scoreChanged = home !== base.score.home || away !== base.score.away;
@@ -289,7 +326,7 @@ export function ResultEditModal({
             {participants.map((participant, index) => (
               <div key={participant.participantId} className="tm-card" style={{ padding: 12 }}>
                 <p className="tm-text-caption" style={{ fontWeight: 600, marginBottom: 8 }}>
-                  {participantLabel(sides, participant.participantId, participant.sideId)}
+                  {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
                   <label className="tm-text-micro" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -379,7 +416,7 @@ export function ResultEditModal({
               <option value="">선정 안 함</option>
               {participants.map((participant) => (
                 <option key={participant.participantId} value={participant.participantId}>
-                  {participantLabel(sides, participant.participantId, participant.sideId)}
+                  {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
                 </option>
               ))}
             </select>

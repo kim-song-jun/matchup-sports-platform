@@ -2208,7 +2208,15 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
   it('경기가 라이브로 전환된 뒤에는 스태프도 인계 토큰 없이는 여전히 라인업을 제출할 수 없다', async () => {
     await lineupPrisma.v1Game.update({ where: { id: gameId }, data: { state: 'LIVE' } });
 
-    const dto: SubmitGameLineupDto = { expectedVersion: 2, clientCommandId: 'task18-submit-live-no-token' };
+    // 버전을 하드코딩하지 않고 그 시점 값을 읽는다. 하드코딩(`expectedVersion: 2`)하면 이 블록에
+    // 앞서 게임 버전을 올리는 테스트가 하나라도 추가되는 순간 CAS 가 먼저 걸려 409 가 나고,
+    // 정작 검증하려던 403(TAKEOVER_TOKEN_EXPIRED)에는 도달하지 못한다 — 실제로 field_operator
+    // 저장 테스트가 앞에 놓이면서 그렇게 깨졌다. 이 테스트의 관심사는 버전이 아니라 인계 토큰이다.
+    const current = await lineupPrisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    const dto: SubmitGameLineupDto = {
+      expectedVersion: current.version,
+      clientCommandId: 'task18-submit-live-no-token',
+    };
     const denied = await captureFailure(() =>
       lineupService.submitLineup(
         authUser(lineupIds.director),

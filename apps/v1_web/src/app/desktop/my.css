@@ -105,8 +105,11 @@
   .tm-my-desktop-sidebar .tm-my-profile-head {
     margin: 0;
     border-radius: 16px;
-    border: 1px solid var(--grey100);
-    background: var(--grey50);
+    /* --grey100/--grey50 조합이 페이지 배경(.tm-app-frame = --grey50)과 raw로
+       충돌해 박스 윤곽이 거의 안 보였다. --card-surface + --border-strong로
+       정렬(globals.css .tm-my-profile-head 수정과 동일 근거). */
+    border: 1px solid var(--border-strong);
+    background: var(--card-surface);
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;

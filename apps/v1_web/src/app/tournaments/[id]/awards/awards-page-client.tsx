@@ -214,7 +214,7 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
     return (
       <section style={{ marginBottom: 20 }}>
         <h3 className="tm-hub-section-title">개인 어워드</h3>
-        <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
+        <Card pad={20} style={{ textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true">
             <Star size={28} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.4} />
           </div>
@@ -519,7 +519,7 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
         </div>
 
         {reviews.length === 0 ? (
-          <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
+          <Card pad={20} style={{ textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
               {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다 */}
               {isCompleted && isParticipant && !alreadyReviewed

@@ -154,7 +154,7 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
       <div className="tm-match-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
-          <Card pad={16} style={{ marginTop: 18, background: 'var(--grey50)' }}>
+          <Card pad={16} style={{ marginTop: 18 }}>
             <div className="tm-text-label">목록으로 돌아가 다시 확인해 주세요</div>
             <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
               새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.

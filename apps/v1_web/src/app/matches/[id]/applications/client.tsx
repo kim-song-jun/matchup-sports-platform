@@ -374,7 +374,7 @@ function ApplicationsSkeletonList() {
 
 function ErrorCard({ message }: { message: string }) {
   return (
-    <Card pad={16} style={{ background: 'var(--grey50)' }}>
+    <Card pad={16} style={{ background: 'var(--card-surface)' }}>
       <div className="tm-text-label">{message}</div>
       <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
         새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.

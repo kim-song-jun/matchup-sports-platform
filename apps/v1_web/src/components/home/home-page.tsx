@@ -431,12 +431,16 @@ function QuickAction({ item }: { item: HomeQuickAction }) {
   const content = (
     <>
       {/*
-       * [taste-A] 퀵액션 아이콘 색 강조 낮춤 — 아이콘만 컬러, 배경은 중립 grey50.
+       * [taste-A] 퀵액션 아이콘 색 강조 낮춤 — 아이콘만 컬러, 배경은 중립.
        * 기존: orange·green·blue 배경이 동시에 노출 → 다중 강조색 충돌(R-C1 위반 경계).
-       * 변경: 배경은 통일 var(--grey50), 아이콘 컬러만 item.color로 종목/기능 식별.
+       * 변경: 배경은 통일 var(--grey100), 아이콘 컬러만 item.color로 종목/기능 식별.
        * 아이콘+라벨 텍스트 병행으로 컬러만으로 정보 전달하지 않는다(R-C3 준수).
+       * grey100 사용 이유: 부모 .tm-quick-grid/.tm-app-frame이 grey50이라 동일 토큰을
+       * 재참조하면 44px 타일 경계가 사라진다 — 이 도메인의 기존 중립 아이콘칩 패턴
+       * (.tm-weather-icon-cloud/.tm-weather-icon-fog, globals.css)과 동일하게 한 단계
+       * 진한 grey100으로 타일 경계를 확보한다.
        */}
-      <div className="tm-quick-icon" style={{ background: 'var(--grey50)', color: item.color }}>
+      <div className="tm-quick-icon" style={{ background: 'var(--grey100)', color: item.color }}>
         <QuickActionIcon item={item} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>

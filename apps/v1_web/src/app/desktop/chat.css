@@ -413,7 +413,7 @@
     display: grid;
     place-items: center;
     border-radius: 16px;
-    background: var(--grey100);
+    background: var(--grey150); /* [토큰 충돌 fix] grey100 → grey150 — thread-pane 배경(grey50)과 인접해 거의 안 보이던 것 한 단계 진하게 */
     color: var(--grey500);
   }
 }

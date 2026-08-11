@@ -1895,7 +1895,10 @@ button:disabled {
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   padding: 20px 12px;
-  background: var(--grey50);
+  /* 부모 .tm-app-frame이 --grey50을 페이지 배경으로 쓰므로, 카드 표면 토큰(--card-surface)으로
+     구분해 대비를 준다 — .tm-app-frame 주석(453줄)과 동일한 원칙. */
+  background: var(--card-surface);
+  border: 1px solid var(--border);
   border-radius: 16px;
 }
 
@@ -2177,7 +2180,8 @@ button:disabled {
 .tm-match-summary-row {
   min-height: 44px;
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--grey100); /* [토큰 충돌 fix] 이전엔 --grey50 — .tm-app-frame 페이지 배경(457행)과 동일 토큰이라
+   경계가 안 보였음. list-row-bg 선례(1540행: grey50 → grey100 한 단계 진하게)와 동일 패턴 적용 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3599,7 +3603,8 @@ button:disabled {
   max-width: min(100%, 320px);
   padding: 6px 10px;
   border-radius: 999px;
-  background: var(--grey50);
+  background: var(--grey100); /* [토큰 충돌 fix] 이전엔 --grey50 — .tm-chat-room 배경(3494행)과 동일 토큰이라
+   pill이 채팅방 배경에 녹아 안 보였음. 인접한 .tm-chat-date-divider span(3592행) 선례와 동일 패턴 적용 */
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
@@ -4577,14 +4582,19 @@ button:disabled {
   padding: 18px var(--v1-shell-page-x) 124px;
 }
 
+/* 라이트/다크모드 시인성 fix: .tm-my-profile-head가 .tm-app-frame 페이지 배경과
+   완전히 동일한 --grey50을 raw로 참조해 아바타/이름 헤더가 페이지에 녹아들었다
+   (실측 대비 1:1 — .tm-create-input이 이미 겪고 고친 것과 동일한 결함 서명,
+   globals.css:2635 부근 주석 참조). 신규 토큰 없이 .tm-create-input이 검증한
+   P1 컴포넌트 시맨틱 페어(--card-surface + --border-strong)로 정렬한다. */
 .tm-my-profile-head {
   display: flex;
   align-items: center;
   gap: 16px;
   margin: -18px -20px 0;
   padding: 20px 20px 18px;
-  border-bottom: 1px solid var(--border);
-  background: var(--grey50);
+  border-bottom: 1px solid var(--border-strong); /* 기존 --border(1.10:1대) 대체 */
+  background: var(--card-surface); /* 기존 --grey50(페이지 배경과 동일) 대체 */
 }
 
 .tm-my-home-profile-head {
@@ -4599,8 +4609,8 @@ button:disabled {
   content: "";
   position: absolute;
   inset: 0 -20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--grey50);
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--card-surface);
 }
 
 .tm-my-home-profile-head > * {
@@ -4654,9 +4664,12 @@ button:disabled {
 }
 
 .tm-profile-level-panel {
-  border: 1px solid var(--grey100);
+  /* 흰 카드(--card-surface) 내부에 렌더되므로 grey50/grey100은 카드와 명도가 거의
+     동일해(대비 ~1.04~1.10:1) 패널 경계가 사실상 안 보였다. .tm-create-input과 동일
+     패턴으로 --surface-soft(카드보다 한 단계 진한 표면) + --border-strong으로 교체. */
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--surface-soft);
   padding: 14px;
 }
 
@@ -4675,7 +4688,7 @@ button:disabled {
 
 .tm-profile-edit-shell .tm-my-profile-head {
   margin: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 16px;
 }
 
@@ -4749,7 +4762,8 @@ button:disabled {
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: var(--grey100);
+  background: var(--grey150); /* [토큰 충돌 fix] grey100(대비 ≈1.10:1)은 흰 .tm-card 위에서 배지 형태가
+  거의 안 보임 — grey150으로 한 단계 올려 원형 배지 경계를 명확히 함 */
   color: var(--text-strong);
   display: grid;
   place-items: center;
@@ -4891,9 +4905,13 @@ button:disabled {
 }
 
 .tm-review-avatar {
+  /* 흰 카드(--card-surface) 내부에 렌더되므로 grey100 채움만으로는 대비 ~1.10:1이라
+     아바타 사각 경계가 흐릿했다. .tm-profile-level-panel(4666-4674행)과 동일 패턴으로
+     --surface-soft(카드보다 한 단계 진한 표면) + --border-strong 보더를 더한다. */
   flex-shrink: 0;
   border-radius: 14px;
-  background: var(--grey100);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-soft);
   background-position: center;
   background-size: cover;
   color: var(--text-strong);
@@ -6071,7 +6089,7 @@ button:disabled {
   padding: 14px;
   border: 1px solid var(--grey200);
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--card-surface);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -6528,23 +6546,38 @@ button:disabled {
 }
 .tm-res-match-team-right { text-align: right; }
 .tm-res-match-score {
+  /* 라이트모드 시인성 fix: 실질 배경은 .tm-app-frame의 var(--grey50)이고 이전
+     background(--grey100)와의 실측 대비는 ~1.05:1로 .tm-create-input과 동일한
+     결함 패턴(globals.css:2635 주석 참조)이었다. grey 계열만으로는 이 앱의
+     헤어라인 미니멀 톤 안에서 3:1까지 못 올라가므로(grey50 vs grey300도 ~1.26:1),
+     동일 전례를 따라 background를 한 단계 더 진한 --grey200으로 올리고
+     --border-strong(grey300, ~1.40:1) 보더를 더해 "점수 pill" 그룹핑을 시각적으로
+     복원한다. 신규 토큰 없이 기존 시맨틱 토큰만 재사용.*/
   font-size: 14px; font-weight: 900; color: var(--text-strong);
   flex-shrink: 0; text-align: center; min-width: 52px;
-  background: var(--grey100);
+  background: var(--grey200);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 4px 0;
 }
 .tm-res-match-date { font-size: 10px; color: var(--text-caption); margin-top: 4px; }
 
-/* 조별리그 펼치기 버튼 */
+/* 조별리그 펼치기 버튼
+ * 라이트모드 시인성 fix: 이전엔 background(--grey50)가 조상 체인(.tm-tourn-sub-col →
+ * .tm-app-frame)까지 배경 재정의가 전혀 없어 페이지 배경과 완전히 동일한 토큰이었다 —
+ * hover 전까지 1px border(--grey150) 외엔 '눌러야 할 대상'이라는 시각 단서가 없었다.
+ * .tm-btn-neutral(1443행)이 이미 확립한 페이지-대비 채움색 페어(--button-fill-neutral
+ * 기본 → --grey150 hover)를 그대로 재사용해 신규 토큰 없이 페이지(grey50)·기본·hover
+ * 3단계를 구분한다. border도 .tm-create-input(2638행)과 동일한 이유로 --border-strong으로
+ * 승격 — grey150(1.10:1급)보다 뚜렷이 우월. */
 .tm-res-expand-btn {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: var(--grey50);
-  border: 1px solid var(--grey150);
+  background: var(--button-fill-neutral); /* [P1 component token] 기존 --grey50(페이지 배경과 동일) 대체 */
+  border: 1px solid var(--border-strong); /* [P1 component token] 기존 --grey150 대체 */
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
@@ -6552,7 +6585,7 @@ button:disabled {
   cursor: pointer;
   text-align: left;
 }
-.tm-res-expand-btn:hover { background: var(--grey100); }
+.tm-res-expand-btn:hover { background: var(--grey150); } /* grey100 → grey150 한 단계 진하게 — .tm-btn-neutral과 동일 패턴 */
 .tm-res-expand-chevron { font-size: 14px; transition: transform 0.2s; display: inline-block; }
 
 /* ── 최종결과 — 표창 카드 ── */
@@ -7291,9 +7324,11 @@ button:disabled {
   font-size: 13px;
 }
 
-/* 리텐션 CTA 카드 */
+/* 리텐션 CTA 카드 — 페이지 프레임(.tm-app-frame)이 동일 grey50을 쓰므로
+   카드는 반드시 --card-surface + --card-border로 분리해 대비를 준다 */
 .tm-retention-card {
-  background: var(--grey50);
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
   border-radius: 16px;
   padding: 20px;
   display: flex;

@@ -152,6 +152,11 @@ export function PitchFormationEditor({
       role="application"
       aria-label="피치 배치 보드"
       onClick={handlePitchClick}
+      // tm-pitch-board: 데스크톱(≥1024px)에서 max-height를 걸어 뷰포트 세로 안에
+      // 피치 전체(골 지역까지)가 스크롤 없이 들어오게 한다(desktop/tournaments.css) —
+      // 2026-08 QA 지적: maxWidth 420 하나만으로는 뷰포트가 900px 안팎일 때 피치
+      // 하단(골 박스)이 화면 밖 또는 하단 고정 CTA 바 밑으로 잘려 안 보였다.
+      className="tm-pitch-board"
       style={{
         position: 'relative',
         // 실제 축구장 비율(105:68)을 그대로 쓰면 넓은 데스크톱 컨테이너에서 세로로

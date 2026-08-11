@@ -44,6 +44,43 @@ function renderTitleWithBoundStatusPhrases(title: string) {
   );
 }
 
+/**
+ * interactive=true면 실제 목록에서 쓰는 <Link>(참가자가 상세로 이동), false면 순수 미리보기용
+ * <div>(관리자 위저드의 "공개 화면 확인" 단계처럼 클릭·포커스를 막아야 하는 곳)로 렌더한다.
+ * 두 분기 모두 같은 className/style/aria-label을 써서 시각적으로는 완전히 동일하게 보인다.
+ */
+function CardShell({
+  interactive,
+  href,
+  ariaLabel,
+  children,
+}: {
+  interactive: boolean;
+  href: string;
+  ariaLabel: string;
+  children: React.ReactNode;
+}) {
+  const shellStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    padding: '16px 16px 14px',
+    textDecoration: 'none',
+  };
+  if (interactive) {
+    return (
+      <Link className="tm-card tm-pressable" href={href} style={shellStyle} aria-label={ariaLabel}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <div className="tm-card tm-pressable" style={shellStyle} aria-label={ariaLabel}>
+      {children}
+    </div>
+  );
+}
+
 function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
   const pendingPaymentCount = getPendingPaymentCount(item);
   const max = Math.max(item.teamCount, 1);
@@ -65,7 +102,18 @@ function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
   );
 }
 
-export function TournamentCard({ item }: { item: V1TournamentListItem }) {
+export function TournamentCard({
+  item,
+  interactive = true,
+}: {
+  item: V1TournamentListItem;
+  /**
+   * false면 참가자 목록으로 이동하는 <Link>가 아니라 순수 미리보기용 <div>로 렌더한다.
+   * 관리자 위저드의 "공개 화면 확인" 단계처럼 실제 카드 그대로를 보여주되 클릭·포커스는
+   * 막아야 하는 곳에서 쓴다(기본값 true — 기존 목록 페이지 동작은 그대로 유지).
+   */
+  interactive?: boolean;
+}) {
   const status = getTournamentStatusConfig(item.status);
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
@@ -76,17 +124,10 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
 
   return (
     <div role="listitem" style={{ height: '100%' }}>
-      <Link
-        className="tm-card tm-pressable"
+      <CardShell
+        interactive={interactive}
         href={`/tournaments/${item.id}`}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          padding: '16px 16px 14px',
-          textDecoration: 'none',
-        }}
-        aria-label={`${item.title} — ${sportAccent.label} — ${status.label}`}
+        ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >
         {/* Top row: (선택) 커버 이미지 썸네일 + [제목·배지 / 종목·일정·장소] 세로 스택 */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -287,7 +328,7 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
             <span>{pendingPaymentCount > 0 ? '팀 예약' : '팀 확정'}</span>
           </span>
         </div>
-      </Link>
+      </CardShell>
     </div>
   );
 }

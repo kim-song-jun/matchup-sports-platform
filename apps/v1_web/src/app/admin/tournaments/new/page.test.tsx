@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
+  useV1AdminTournament,
   useV1AdminTournaments,
+  useV1ChangeTournamentStatus,
   useV1CreateTournament,
   useV1LineupSizeOptions,
   useV1MasterSports,
+  useV1UpdateTournament,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import AdminTournamentsNewPage from './page';
@@ -18,9 +21,14 @@ import {
 } from './tournament-create-model';
 import type { V1Tournament } from '@/types/api';
 
+const routerPush = vi.fn();
+const routerReplace = vi.fn();
+let searchParamsValue = new URLSearchParams();
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: routerPush, replace: routerReplace, back: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/admin/tournaments/new',
+  useSearchParams: () => searchParamsValue,
 }));
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
@@ -29,10 +37,13 @@ vi.mock('@/components/auth/pending-social-signup-gate', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
+  useV1AdminTournament: vi.fn(),
   useV1AdminTournaments: vi.fn(),
+  useV1ChangeTournamentStatus: vi.fn(),
   useV1CreateTournament: vi.fn(),
   useV1LineupSizeOptions: vi.fn(),
   useV1MasterSports: vi.fn(),
+  useV1UpdateTournament: vi.fn(),
   useV1UploadImages: vi.fn(),
   // Providers 안의 ThemeProvider가 전역으로 호출한다 — 이 테스트가 <Providers>로 렌더하는 한 필요.
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
@@ -40,12 +51,17 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
+const useV1AdminTournamentMock = vi.mocked(useV1AdminTournament, { partial: true });
 const useV1AdminTournamentsMock = vi.mocked(useV1AdminTournaments, { partial: true });
+const useV1ChangeTournamentStatusMock = vi.mocked(useV1ChangeTournamentStatus, { partial: true });
 const useV1CreateTournamentMock = vi.mocked(useV1CreateTournament, { partial: true });
 const useV1LineupSizeOptionsMock = vi.mocked(useV1LineupSizeOptions, { partial: true });
 const useV1MasterSportsMock = vi.mocked(useV1MasterSports, { partial: true });
+const useV1UpdateTournamentMock = vi.mocked(useV1UpdateTournament, { partial: true });
 const useV1UploadImagesMock = vi.mocked(useV1UploadImages, { partial: true });
 const createMutate = vi.fn();
+const updateMutate = vi.fn();
+const changeStatusMutate = vi.fn();
 const uploadMutateAsync = vi.fn();
 
 function previousTournament(): V1Tournament {
@@ -139,6 +155,23 @@ function fillScheduleStep() {
   });
 }
 
+function goToPresentationStep() {
+  goToParticipationStep();
+  fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+}
+
+function fakeDraftTournament(overrides: Partial<V1Tournament> = {}): V1Tournament {
+  return {
+    ...previousTournament(),
+    id: 'draft-1',
+    status: 'draft',
+    title: '2026 서울 풋살 오픈',
+    sportId: 'sport-futsal',
+    scheduledAt: '2026-08-15T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 function goToParticipationStep() {
   goToScheduleStep();
   fillScheduleStep();
@@ -148,9 +181,10 @@ function goToParticipationStep() {
 describe('AdminTournamentsNewPage four-step wizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsValue = new URLSearchParams();
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false });
     useV1MasterSportsMock.mockReturnValue({
-      data: [{ id: 'sport-futsal', name: '풋살', levels: [] }],
+      data: [{ id: 'sport-futsal', code: 'futsal', name: '풋살', levels: [] }],
       isPending: false,
     });
     useV1AdminTournamentsMock.mockReturnValue({
@@ -161,8 +195,17 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       },
       isPending: false,
     });
+    useV1AdminTournamentMock.mockReturnValue({ data: undefined, isPending: false });
     useV1CreateTournamentMock.mockReturnValue({
       mutate: createMutate,
+      isPending: false,
+    });
+    useV1UpdateTournamentMock.mockReturnValue({
+      mutate: updateMutate,
+      isPending: false,
+    });
+    useV1ChangeTournamentStatusMock.mockReturnValue({
+      mutate: changeStatusMutate,
       isPending: false,
     });
     useV1LineupSizeOptionsMock.mockReturnValue({
@@ -455,5 +498,187 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       promoHomePriority: '홈 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
       promoListPriority: '목록 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
     });
+  });
+});
+
+describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParamsValue = new URLSearchParams();
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false });
+    useV1MasterSportsMock.mockReturnValue({
+      data: [{ id: 'sport-futsal', code: 'futsal', name: '풋살', levels: [] }],
+      isPending: false,
+    });
+    useV1AdminTournamentsMock.mockReturnValue({
+      data: {
+        items: [previousTournament()],
+        pageInfo: { nextCursor: null, hasNext: false },
+        summary: { total: 1, byStatus: {} },
+      },
+      isPending: false,
+    });
+    useV1AdminTournamentMock.mockReturnValue({ data: undefined, isPending: false });
+    useV1CreateTournamentMock.mockReturnValue({ mutate: createMutate, isPending: false });
+    useV1UpdateTournamentMock.mockReturnValue({ mutate: updateMutate, isPending: false });
+    useV1ChangeTournamentStatusMock.mockReturnValue({ mutate: changeStatusMutate, isPending: false });
+    useV1LineupSizeOptionsMock.mockReturnValue({
+      data: {
+        sportId: 'sport-futsal',
+        supported: true,
+        options: [5, 6],
+        defaultMaxPlayers: 6,
+        substitutionModes: ['limited', 'rolling'],
+        defaultSubstitutionMode: 'rolling',
+        defaultMaxSubstitutions: null,
+      },
+      isPending: false,
+    });
+    uploadMutateAsync.mockResolvedValue({ urls: ['/uploads/cover-test.webp'] });
+    useV1UploadImagesMock.mockReturnValue({ mutateAsync: uploadMutateAsync, isPending: false });
+  });
+
+  it('상금·홍보 단계에서 CTA는 "다음"이 아니라 실제로 일어날 일(대회 만들기)을 말한다', () => {
+    renderPage();
+    goToPresentationStep();
+
+    expect(screen.getByRole('button', { name: '대회 만들기' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다음' })).not.toBeInTheDocument();
+  });
+
+  it('상금·홍보 단계에서 대회를 만들면 관리 화면으로 튕기지 않고 확인 단계(5/5)로 진행한다', () => {
+    createMutate.mockImplementation(
+      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftTournament()),
+    );
+    renderPage();
+    goToPresentationStep();
+
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    expect(createMutate).toHaveBeenCalledTimes(1);
+    // 관리 화면(/admin/tournaments/:id)으로 즉시 이동하지 않는다 — 위저드 안에 남는다.
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(screen.getByText('STEP 5 / 5')).toBeInTheDocument();
+    expect(screen.getByText('참가자에게 이렇게 보여요')).toBeInTheDocument();
+    // 확인 단계는 실제 목록 카드 컴포넌트를 그대로 재사용한다 — 새로 그린 목업이 아니다.
+    expect(screen.getByText('2026 서울 풋살 오픈')).toBeInTheDocument();
+    // 새로고침해도 같은 초안을 이어가도록 draftId를 URL에 남긴다.
+    expect(routerReplace).toHaveBeenCalledWith('/admin/tournaments/new?draftId=draft-1');
+  });
+
+  it('확인 단계에서 이전으로 돌아가 다시 저장해도 새로 만들지 않고 수정만 한다 — 중복 생성 방지', () => {
+    const draft = fakeDraftTournament();
+    createMutate.mockImplementation(
+      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) => opts.onSuccess(draft),
+    );
+    updateMutate.mockImplementation(
+      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) => opts.onSuccess(draft),
+    );
+    renderPage();
+    goToPresentationStep();
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+    expect(createMutate).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+    expect(screen.getByText('STEP 4 / 5')).toBeInTheDocument();
+
+    const saveButton = screen.getByRole('button', { name: '저장하고 계속하기' });
+    fireEvent.click(saveButton);
+
+    expect(updateMutate).toHaveBeenCalledTimes(1);
+    // 몇 번을 오가도 POST(생성)는 최초 1번뿐이어야 한다.
+    expect(createMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('확인 단계의 "접수 시작하기"는 확인 모달을 거쳐야만 실제로 상태를 바꾼다', async () => {
+    createMutate.mockImplementation(
+      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftTournament()),
+    );
+    renderPage();
+    goToPresentationStep();
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '접수 시작하기' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/되돌릴 수 없어요/)).toBeInTheDocument();
+    // 모달만 뜨고 아직 실제 전환은 일어나지 않는다.
+    expect(changeStatusMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '접수 시작하기' }));
+
+    await waitFor(() => expect(changeStatusMutate).toHaveBeenCalledTimes(1));
+    expect(changeStatusMutate).toHaveBeenCalledWith({ status: 'open' }, expect.anything());
+  });
+
+  it('확인 단계의 "취소"를 누르면 모달만 닫히고 상태는 바뀌지 않는다', async () => {
+    createMutate.mockImplementation(
+      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftTournament()),
+    );
+    renderPage();
+    goToPresentationStep();
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+    fireEvent.click(screen.getByRole('button', { name: '접수 시작하기' }));
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(changeStatusMutate).not.toHaveBeenCalled();
+  });
+
+  it('"나중에 하기"는 상태를 바꾸지 않고 관리 화면으로만 이동한다', () => {
+    createMutate.mockImplementation(
+      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftTournament()),
+    );
+    renderPage();
+    goToPresentationStep();
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '나중에 하기' }));
+
+    expect(changeStatusMutate).not.toHaveBeenCalled();
+    expect(routerPush).toHaveBeenCalledWith('/admin/tournaments/draft-1');
+  });
+
+  it('공개 확인 스텝 버튼은 초안이 생기기 전에는 잠겨 있고 접근 가능한 이름을 갖는다', () => {
+    renderPage();
+
+    const confirmStepButton = screen.getByRole('button', { name: /5단계 공개 확인/ });
+    expect(confirmStepButton).toBeDisabled();
+  });
+
+  it('대회 형식 라디오의 접근성 이름은 enum 원시값이 아니라 한국어 라벨이다', () => {
+    renderPage();
+
+    expect(screen.getByRole('radio', { name: '조별리그 + 토너먼트' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'group_knockout' })).not.toBeInTheDocument();
+  });
+
+  it('새로고침 후 draftId만 남아 있어도 새로 만들지 않고 확인 단계를 그대로 이어서 보여준다', () => {
+    searchParamsValue = new URLSearchParams('draftId=draft-1');
+    useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament(), isPending: false });
+
+    renderPage();
+
+    expect(screen.getByText('STEP 5 / 5')).toBeInTheDocument();
+    expect(screen.getByText('2026 서울 풋살 오픈')).toBeInTheDocument();
+    expect(createMutate).not.toHaveBeenCalled();
+  });
+
+  it('이미 접수가 시작된 대회로 ?draftId가 남아 있으면 위저드 대신 관리 화면으로 보낸다', () => {
+    searchParamsValue = new URLSearchParams('draftId=draft-1');
+    useV1AdminTournamentMock.mockReturnValue({
+      data: fakeDraftTournament({ status: 'open' }),
+      isPending: false,
+    });
+
+    renderPage();
+
+    expect(routerReplace).toHaveBeenCalledWith('/admin/tournaments/draft-1');
   });
 });

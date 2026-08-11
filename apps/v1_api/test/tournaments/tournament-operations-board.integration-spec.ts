@@ -1842,6 +1842,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
   let gamesService: GamesService;
   let gameId: string;
   let homeSideId: string;
+  let awaySideId: string;
   let lineupId: string;
 
   const authUser = (id: string): V1AuthUser => ({
@@ -1921,9 +1922,10 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       data: { gameId, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Home' },
     });
     homeSideId = home.id;
-    await lineupPrisma.v1GameSide.create({
+    const away = await lineupPrisma.v1GameSide.create({
       data: { gameId, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Away' },
     });
+    awaySideId = away.id;
 
     await lineupPrisma.v1TournamentStaffAssignment.create({
       data: {
@@ -1984,31 +1986,15 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
     expect(result).toEqual({ gameId, lineups: [] });
   });
 
-  // NOTE: per tournament-staff-policy.ts's allowsRoleAction(), FIELD_OPERATOR is authorized for
-  // 'read' | 'tournament_command' | 'event_append' only -- NOT 'lineup_mutate'. So for a
-  // TOURNAMENT_FIXTURE-sourced game, only platform_ops/tournament_director may capture or submit
-  // a lineup. This is shipped, already-merged Task 7 policy code (not owned by this lane); per
-  // Decision #1 the test asserts the actual shipped behavior rather than the recon spec's
-  // "field_operator may capture actual participants after start" characterization.
-  //
-  // The denial code changed from GamesService's own 'PERMISSION_DENIED' to
-  // TournamentStaffAccessService's 'STAFF_SCOPE_DENIED' as part of the Task 18 review P1-4 fix
-  // below: the adapter now authorizes BEFORE resolving fixture/game existence, so this denial now
-  // fires at the adapter's own pre-check rather than inside GamesService.
-  it('denies lineup capture to a field_operator (only tournament_director/platform_ops may lineup_mutate)', async () => {
-    const dto: SaveGameLineupDto = { expectedVersion: 0, clientCommandId: 'task18-lineup-denied', participants: [] };
-    const denied = await captureFailure(() =>
-      lineupService.saveLineup(
-        authUser(lineupIds.fieldOperator),
-        lineupIds.tournament,
-        lineupIds.fixture,
-        homeSideId,
-        undefined,
-        dto,
-      ),
-    );
-    expectHttpError(denied, 403, 'STAFF_SCOPE_DENIED');
-  });
+  // 2026-08-11: FIELD_OPERATOR used to be denied 'lineup_mutate' here (per
+  // tournament-staff-policy.ts's allowsRoleAction()) -- this described the actual shipped Task 7
+  // policy at the time. Per owner decision that contract flipped: field_operator holds
+  // 'tournament_command' (start the fixture) but had no way to satisfy its own precondition (a
+  // saved lineup), so field ops staff alone could never run a tournament. The now-allowed case
+  // lives at the end of this describe block (see 'allows lineup capture by a field_operator...')
+  // rather than here, because a successful save bumps the shared game version and every test below
+  // this point has a version already threaded through it (captures -> submits -> replay -> reject)
+  // -- inserting a version-bumping call here would desync all of them.
 
   // Regression for Task 18 review P1-4: an actor with NO staff assignment at all in this
   // tournament must get the IDENTICAL 403 (same status, same code) whether the fixture id they
@@ -2081,32 +2067,20 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
     expect(result.lineups[0]).toEqual(expect.objectContaining({ id: lineupId, state: 'DRAFT', sideId: homeSideId }));
   });
 
-  it('requires a takeover token to submit a tournament-fixture lineup', async () => {
+  // 2026-08-11 알파 실측 이후 오너 결정으로 계약이 바뀌었다: takeover 토큰은 "현장 기기가
+  // 이 경기를 배타적으로 장악 중"이라는 라이브 운영 개념이라 경기 전 로스터 준비와는
+  // 무관하다는 게 이 코드베이스의 기존 설계 의도였는데(games.service.ts의 requireTakeover
+  // 주석 참고), 그 의도가 참가팀(team_manager/team_owner)에게만 적용되고 스태프
+  // (tournament_director/field_operator/support_readonly)에게는 적용되지 않는 비대칭이
+  // 있었다 -- saveLineup은 토큰 없이 통과하는데 submitLineup만 스태프에게 토큰을 요구해
+  // 라인업 화면이 토큰을 얻지도 보내지도 않는 알파에서 제출이 구조적으로 막혔다. 이제
+  // game.state === SCHEDULED(경기 시작 전)일 때만 스태프도 면제되고, 라이브로 전환된
+  // 뒤(LIVE/PAUSED/ENDED/CANCELLED)에는 두 운영자의 충돌을 막기 위해 기존대로 토큰이
+  // 필요하다 (games.service.ts의 staffLineupSubmitRequiresTakeover 참고). 아래 두 테스트는
+  // 그 새 계약으로 뒤집혔고, 세 번째는 라이브 전환 이후에도 안전장치가 살아있는지 고정한다.
+  it('경기가 아직 시작되지 않았으면(SCHEDULED) 스태프도 인계 토큰 없이 라인업을 제출할 수 있다', async () => {
     const dto: SubmitGameLineupDto = { expectedVersion: 1, clientCommandId: 'task18-submit-no-token' };
-    const denied = await captureFailure(() =>
-      lineupService.submitLineup(
-        authUser(lineupIds.director),
-        lineupIds.tournament,
-        lineupIds.fixture,
-        lineupId,
-        dto.clientCommandId,
-        dto,
-      ),
-    );
-    expectHttpError(denied, 403, 'TAKEOVER_TOKEN_EXPIRED');
-  });
-
-  it('submits the lineup and idempotently replays the identical submit, without duplicating the persisted mutation or its durable idempotency record (regression for review finding #15: counting rows by lineup id alone cannot prove a replay did not silently duplicate a version bump or another durable side effect while the row count coincidentally stayed the same)', async () => {
-    const submitTakeover = await gamesService.requestTakeover(authUser(lineupIds.director), gameId, {
-      clientInstanceId: 'task18-submit-client',
-      lastSequence: 0,
-    });
-    const dto: SubmitGameLineupDto = {
-      expectedVersion: 1,
-      clientCommandId: 'task18-submit',
-      takeoverToken: submitTakeover.takeoverToken,
-    };
-    const first = await lineupService.submitLineup(
+    const submitted = await lineupService.submitLineup(
       authUser(lineupIds.director),
       lineupIds.tournament,
       lineupIds.fixture,
@@ -2114,7 +2088,16 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       dto.clientCommandId,
       dto,
     );
-    expect(first).toEqual(expect.objectContaining({ lineupId, lineupState: 'SUBMITTED', replayed: false }));
+    expect(submitted).toEqual(expect.objectContaining({ lineupId, lineupState: 'SUBMITTED', replayed: false }));
+  });
+
+  it('토큰 없이 제출한 커맨드를 그대로 재생해도 멱등하게 동일 응답을 반환하고, 영속 상태를 중복 변경하지 않는다 (regression for review finding #15: counting rows by lineup id alone cannot prove a replay did not silently duplicate a version bump or another durable side effect while the row count coincidentally stayed the same)', async () => {
+    // 바로 위 테스트가 이미 'task18-submit-no-token'을 실제로 제출했다(토큰 없이, SCHEDULED
+    // 면제). 여기서는 그 동일 clientCommandId를 동일 payload로 다시 호출해 idempotency
+    // 조회가 replay로 단락되는지 확인한다 -- withCommand()는 replay를 실제 버전 검증/뮤테이션
+    // 전에 가로채므로(games.service.ts), 재생 호출은 이후 커맨드가 game.version을 이미
+    // 앞으로 옮겨놨어도 안전해야 한다.
+    const dto: SubmitGameLineupDto = { expectedVersion: 1, clientCommandId: 'task18-submit-no-token' };
 
     // Durable state read directly from the database -- not the service's constructed return
     // value: the lineup row's own `version` (bumped by submitLineup's `version:{increment:1}`),
@@ -2174,6 +2157,77 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       ),
     );
     expectHttpError(denied, 409, 'INVALID_LINEUP_STATE');
+  });
+
+  // 2026-08-11 owner decision (see comment above 'normalizes fixture existence...'): field_operator
+  // now holds 'lineup_mutate' when its assignment is scoped to the fixture, exactly like
+  // `lineupIds.fieldOperator` set up in this block's beforeAll (fixture-scoped to `lineupIds.fixture`).
+  // Uses `awaySideId` (never touched by the tests above) and a freshly-read game version, so this
+  // does not perturb the homeSideId capture/submit/replay chain those tests hardcode
+  // expectedVersion against.
+  //
+  // 병합 메모(2026-08-11): 이 테스트는 원래 "이 describe 블록의 마지막"을 전제로 쓰였는데,
+  // 아래 라이브 전환 테스트가 `game.state`를 LIVE로 **직접 바꾸는 파괴적 셋업**이라 그보다
+  // 앞에 둔다. 순서를 뒤집으면 이 테스트가 LIVE 상태의 게임에 저장을 시도하게 되어
+  // 검증 대상(권한)이 아니라 상태 게이트에 걸릴 수 있다.
+  it('allows lineup capture by a field_operator scoped to the fixture (2026-08-11: lineup_mutate granted)', async () => {
+    const current = await lineupPrisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    const dto: SaveGameLineupDto = {
+      expectedVersion: current.version,
+      clientCommandId: 'task18-lineup-field-operator-allowed',
+      // Same football-v1 minPlayers:7/maxPlayers:11 roster-size gate as the director capture test
+      // above -- a real payload, not the old denial test's `participants: []` placeholder (which
+      // only worked because it never reached this validation before the 403).
+      participants: Array.from({ length: 7 }, (_, index) => ({
+        displayNameSnapshot: `FO Player ${index + 1}`,
+        started: true,
+      })),
+    };
+    const saved = await lineupService.saveLineup(
+      authUser(lineupIds.fieldOperator),
+      lineupIds.tournament,
+      lineupIds.fixture,
+      awaySideId,
+      dto.clientCommandId,
+      dto,
+    );
+    expect(saved).toEqual(expect.objectContaining({ gameId, lineupRevision: 1, replayed: false }));
+  });
+
+  // 오너 결정의 핵심 안전장치: SCHEDULED 면제는 "경기 전 로스터 준비"에만 적용되고, 경기가
+  // 라이브로 전환된 뒤(피리어드가 시작된 이후)에는 두 운영자가 라인업을 놓고 충돌하는 것을
+  // 막기 위해 스태프도 기존대로 토큰이 필요하다 -- 이 테스트가 없으면 SCHEDULED 면제가
+  // 실수로 모든 상태에 적용되도록 조건이 풀려도 아무 테스트도 잡지 못한다. `start` 커맨드를
+  // 거치지 않고 game.state를 직접 LIVE로 돌린다: 이 게임은 홈 사이드만 라인업을 제출했고
+  // assertLineupsSubmittedForStart는 양쪽 사이드 모두 SUBMITTED/LOCKED를 요구하므로 실제
+  // lifecycle로 LIVE에 도달할 수 없다 -- 같은 직접-업데이트 패턴을 이미
+  // game-operations-lineup.integration-spec.ts:135가 쓰고 있다.
+  //
+  // **반드시 이 describe 블록의 마지막에 둘 것** — game.state 를 직접 LIVE 로 바꾸는 파괴적
+  // 셋업이라 뒤에 오는 테스트의 전제를 깨뜨린다.
+  it('경기가 라이브로 전환된 뒤에는 스태프도 인계 토큰 없이는 여전히 라인업을 제출할 수 없다', async () => {
+    await lineupPrisma.v1Game.update({ where: { id: gameId }, data: { state: 'LIVE' } });
+
+    // 버전을 하드코딩하지 않고 그 시점 값을 읽는다. 하드코딩(`expectedVersion: 2`)하면 이 블록에
+    // 앞서 게임 버전을 올리는 테스트가 하나라도 추가되는 순간 CAS 가 먼저 걸려 409 가 나고,
+    // 정작 검증하려던 403(TAKEOVER_TOKEN_EXPIRED)에는 도달하지 못한다 — 실제로 field_operator
+    // 저장 테스트가 앞에 놓이면서 그렇게 깨졌다. 이 테스트의 관심사는 버전이 아니라 인계 토큰이다.
+    const current = await lineupPrisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    const dto: SubmitGameLineupDto = {
+      expectedVersion: current.version,
+      clientCommandId: 'task18-submit-live-no-token',
+    };
+    const denied = await captureFailure(() =>
+      lineupService.submitLineup(
+        authUser(lineupIds.director),
+        lineupIds.tournament,
+        lineupIds.fixture,
+        lineupId,
+        dto.clientCommandId,
+        dto,
+      ),
+    );
+    expectHttpError(denied, 403, 'TAKEOVER_TOKEN_EXPIRED');
   });
 });
 
@@ -3167,6 +3221,7 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
   let httpPrisma: PrismaService;
   let gameAId: string;
   let homeSideAId: string;
+  let awaySideAId: string;
 
   function withUser(userId: string) {
     return { 'x-v1-user-id': userId };
@@ -3297,9 +3352,10 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
       data: { gameId: game.id, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Home' },
     });
     homeSideAId = home.id;
-    await httpPrisma.v1GameSide.create({
+    const away = await httpPrisma.v1GameSide.create({
       data: { gameId: game.id, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Away' },
     });
+    awaySideAId = away.id;
   }, 30_000);
 
   afterAll(async () => {
@@ -3588,18 +3644,12 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
       .expect(422);
   });
 
-  // The denial code here changed from GamesService's own 'PERMISSION_DENIED' to
-  // TournamentStaffAccessService's 'STAFF_SCOPE_DENIED' as part of the Task 18 review P1-4 fix:
-  // TournamentFixtureLineupService now authorizes BEFORE resolving fixture/game existence (see
-  // that service's doc comment), so this denial now fires at the adapter's own pre-check.
-  it('lineup PUT: refuses a field_operator (lacks lineup_mutate authority for a TOURNAMENT_FIXTURE game) with 403 STAFF_SCOPE_DENIED', async () => {
-    const res = await request(app.getHttpServer())
-      .put(`/api/v1/tournament-ops/tournaments/${httpIds.tournamentA}/fixtures/${httpIds.fixtureA}/lineup/${homeSideAId}`)
-      .set(withUser(httpIds.fieldOperatorA))
-      .send({ expectedVersion: 0, clientCommandId: randomUUID(), participants: [] })
-      .expect(403);
-    expect(res.body).toEqual(expect.objectContaining({ code: 'STAFF_SCOPE_DENIED' }));
-  });
+  // 2026-08-11 owner decision: field_operator (fixture-scoped, like `fieldOperatorA` set up in
+  // this block's beforeAll) now holds 'lineup_mutate' and gets 200 here, not 403 -- see the
+  // Task 18 unit-level lineup describe block's matching comment for the full rationale. The
+  // corresponding success case ('allows a field_operator scoped to the fixture...') is placed at
+  // the end of this describe block instead of here: a successful save bumps the shared game
+  // version, and the very next test below hardcodes `expectedVersion: 0` against `homeSideAId`.
 
   it('lineup PUT: an authorized director can save a lineup with a matching Idempotency-Key header, returning 200 with the global envelope', async () => {
     const clientCommandId = randomUUID();
@@ -3616,6 +3666,37 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
         // (200 + envelope shape + Idempotency-Key header) exercised.
         participants: Array.from({ length: 7 }, (_, index) => ({
           displayNameSnapshot: `HTTP Player ${index + 1}`,
+          started: true,
+        })),
+      })
+      .expect(200);
+    expect(res.body).toEqual(
+      expect.objectContaining({
+        status: 'success',
+        data: expect.objectContaining({ gameId: gameAId, replayed: false }),
+      }),
+    );
+  });
+
+  // 2026-08-11 owner decision (see comment above the director save test): field_operator now
+  // gets 200, not 403, once its assignment is scoped to the fixture. Placed last and targets
+  // `awaySideAId` with a freshly-read game version so it doesn't perturb the director test's
+  // hardcoded `expectedVersion: 0` against `homeSideAId` above.
+  it('lineup PUT: allows a field_operator scoped to the fixture to save a lineup, returning 200 (2026-08-11: lineup_mutate granted)', async () => {
+    const current = await httpPrisma.v1Game.findUniqueOrThrow({ where: { id: gameAId } });
+    const clientCommandId = randomUUID();
+    const res = await request(app.getHttpServer())
+      .put(`/api/v1/tournament-ops/tournaments/${httpIds.tournamentA}/fixtures/${httpIds.fixtureA}/lineup/${awaySideAId}`)
+      .set(withUser(httpIds.fieldOperatorA))
+      // Every command mutation route requires Idempotency-Key === body.clientCommandId
+      // (game-contract.ts's assertGameCommandContext -- a missing header normalizes to '' and
+      // always mismatches). The director save test above sets this; this test must too.
+      .set('idempotency-key', clientCommandId)
+      .send({
+        expectedVersion: current.version,
+        clientCommandId,
+        participants: Array.from({ length: 7 }, (_, index) => ({
+          displayNameSnapshot: `FO HTTP Player ${index + 1}`,
           started: true,
         })),
       })

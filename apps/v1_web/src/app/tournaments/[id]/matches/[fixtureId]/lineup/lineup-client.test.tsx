@@ -226,6 +226,85 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
   });
 });
 
+describe('골키퍼 지정 버튼의 aria-label 조사(을/를)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: baseGame(), isLoading: false, isError: false, error: null, refetch: vi.fn() });
+  });
+
+  it('받침 없는 이름·숫자로 끝나는 이름에는 "를"을 붙인다 (받침 유무 무시 고정 "을" 버그 회귀)', () => {
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [
+        baseGameLineup({
+          participants: [
+            {
+              id: 'p-1',
+              gameId: 'game-1',
+              sideId: 'side-host',
+              lineupId: 'lineup-1',
+              displayNameSnapshot: '김알파',
+              jerseyNumber: 1,
+              position: null,
+              positionX: null,
+              positionY: null,
+              started: true,
+              createdAt: '2026-08-01T00:00:00.000Z',
+              updatedAt: '2026-08-01T00:00:00.000Z',
+            },
+            {
+              id: 'p-2',
+              gameId: 'game-1',
+              sideId: 'side-host',
+              lineupId: 'lineup-1',
+              displayNameSnapshot: '레드2',
+              jerseyNumber: 2,
+              position: null,
+              positionX: null,
+              positionY: null,
+              started: true,
+              createdAt: '2026-08-01T00:00:00.000Z',
+              updatedAt: '2026-08-01T00:00:00.000Z',
+            },
+          ],
+        }),
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: '김알파를 골키퍼로 지정' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '레드2를 골키퍼로 지정' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '김알파을 골키퍼로 지정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '레드2을 골키퍼로 지정' })).not.toBeInTheDocument();
+  });
+
+  it('받침 있는 이름에는 "을"을 붙인다', () => {
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [baseGameLineup()], // displayNameSnapshot: '홍길동' (받침 있음)
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: '홍길동을 골키퍼로 지정' })).toBeInTheDocument();
+  });
+});
+
 /**
  * 순환 막다른 길 회귀 가드.
  *

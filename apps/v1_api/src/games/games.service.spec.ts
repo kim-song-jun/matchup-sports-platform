@@ -9,6 +9,7 @@ import {
   gameAuthorizationAction,
   gameOperationAuditActor,
   groupParticipantsByLineupId,
+  staffLineupSubmitRequiresTakeover,
   toGameHttpException,
 } from './games.service';
 
@@ -154,6 +155,24 @@ describe('GamesService command boundary', () => {
     expect(
       gameOperationAuditActor({ actorType: 'SYSTEM', systemActor: 'PROJECTION_REPAIR' }),
     ).toEqual({ type: 'SYSTEM', id: 'PROJECTION_REPAIR' });
+  });
+
+  describe('staffLineupSubmitRequiresTakeover (알파 2026-08-11: 스태프 라인업 제출이 TAKEOVER_TOKEN_EXPIRED로 막히던 사고)', () => {
+    it('경기가 아직 시작되지 않았으면(SCHEDULED) 스태프도 토큰 없이 제출할 수 있다', () => {
+      expect(staffLineupSubmitRequiresTakeover(V1GameState.SCHEDULED)).toBe(false);
+    });
+
+    it.each([
+      ['LIVE', V1GameState.LIVE],
+      ['PAUSED', V1GameState.PAUSED],
+      ['ENDED', V1GameState.ENDED],
+      ['CANCELLED', V1GameState.CANCELLED],
+    ] as const)(
+      '경기가 SCHEDULED를 벗어났으면(%s) 스태프도 기존대로 인계 토큰이 필요하다',
+      (_label, state) => {
+        expect(staffLineupSubmitRequiresTakeover(state)).toBe(true);
+      },
+    );
   });
 
   describe('groupParticipantsByLineupId (Task 21: listLineups() participants roster)', () => {

@@ -310,7 +310,15 @@ function allowsRoleAction(role: TournamentStaffRole, action: TournamentStaffActi
     case 'tournament_director':
       return true;
     case 'field_operator':
-      return action === 'read' || action === 'tournament_command' || action === 'event_append';
+      // 2026-08-11: field_operator는 tournament_command(경기 시작)를 갖지만, 그 전제
+      // 조건인 라인업 제출은 lineup_mutate가 없어 만들 수 없었다 — 현장 스태프 혼자서는
+      // 대회를 굴릴 수 없는 모순(알파 실측 재현). 오너 결정으로 lineup_mutate를 허용한다.
+      return (
+        action === 'read' ||
+        action === 'tournament_command' ||
+        action === 'event_append' ||
+        action === 'lineup_mutate'
+      );
     case 'support_readonly':
     case 'public':
       return action === 'read';

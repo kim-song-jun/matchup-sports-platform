@@ -939,7 +939,7 @@ export function TournamentDetailView({
       {!isCompleted && tournament.refundPolicyText ? (
         <section aria-labelledby="refund-heading">
           <div id="refund-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>환불 정책</div>
-          <Card pad={16} style={{ background: 'var(--grey50)' }}>
+          <Card pad={16} style={{ background: 'var(--grey100)' }}>
             <CollapsiblePolicyText
               id="refund-content"
               text={tournament.refundPolicyText}
@@ -956,7 +956,7 @@ export function TournamentDetailView({
       {!isCompleted ? (
         <section aria-label="참가 전 꼭 확인해 주세요" className="tm-show-desktop">
           <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>참가 전 꼭 확인해 주세요</div>
-          <Card pad={0} style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
+          <Card pad={0} style={{ background: 'var(--grey100)', overflow: 'hidden' }}>
             {([
               { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 확정됩니다.' },
               { label: '환불 불가', text: '단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가합니다.' },
@@ -1388,7 +1388,7 @@ function TournamentPreParticipationNotice() {
           <div id="tournament-precheck-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             참가 전 꼭 확인해 주세요
           </div>
-          <Card pad={0} style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
+          <Card pad={0} style={{ background: 'var(--grey100)', overflow: 'hidden' }}>
             {PRE_PARTICIPATION_CHECK_ITEMS.map((item, idx, arr) => (
               <div
                 key={item.label}
@@ -1492,7 +1492,8 @@ function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
           alignItems: 'center',
           gap: 12,
           padding: '14px 16px',
-          background: 'var(--grey50)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
           borderRadius: 14,
           textDecoration: 'none',
         }}
@@ -1704,7 +1705,7 @@ function FixturesPlaceholder() {
   return (
     <section aria-labelledby="fixtures-placeholder-heading" style={{ marginTop: 24 }}>
       <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>일정 · 대진</div>
-      <Card pad={16} style={{ marginTop: 4, background: 'var(--grey50)' }}>
+      <Card pad={16} style={{ marginTop: 4, background: 'var(--grey100)' }}>
         <div id="fixtures-placeholder-heading" className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
           대진표 준비 중
         </div>

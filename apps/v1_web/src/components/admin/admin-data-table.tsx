@@ -291,7 +291,7 @@ export function AdminDataTable<T>({
               <dl className="flex flex-col gap-1.5">
                 {columns.map((col) => (
                   <div key={col.key} className="flex items-start gap-2 text-[13px]">
-                    <dt className="shrink-0 text-gray-400 w-[90px] font-medium">{col.header}</dt>
+                    <dt className="shrink-0 text-[var(--text-muted)] w-[90px] font-medium">{col.header}</dt>
                     <dd className="text-[var(--text-body)] flex-1 tabular-nums">{col.render(row)}</dd>
                   </div>
                 ))}
@@ -363,7 +363,7 @@ export function AdminTablePaginationBar({
             // 페이지가 많을 때의 생략 구간. 버튼이 아니므로 포커스를 받지 않는다.
             <span
               key={`gap-${index}`}
-              className="px-1 text-gray-400 select-none"
+              className="px-1 text-[var(--text-muted)] select-none"
               aria-hidden="true"
             >
               …

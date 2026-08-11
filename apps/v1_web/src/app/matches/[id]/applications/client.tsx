@@ -247,7 +247,7 @@ function ApplicationRow({
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            color: 'var(--text-muted)',
+            color: 'var(--text)',
             fontSize: 18,
             fontWeight: 800,
           }}

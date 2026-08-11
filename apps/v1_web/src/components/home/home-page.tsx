@@ -12,7 +12,7 @@ import {
   TeamsIcon,
   TrophyIcon,
 } from '@/components/v1-ui/icons';
-import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
+import { Card, ErrorState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { useV1AllTournaments } from '@/hooks/use-v1-api';
@@ -109,18 +109,14 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                 <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
               ) : null}
               {tournaments.isError ? (
-                <div role="alert">
-                  <Card pad={16} style={{ display: 'grid', alignContent: 'center', gap: 10 }}>
-                    <div className="tm-text-body-lg">대회 추천을 불러오지 못했어요</div>
-                    <button
-                      type="button"
-                      className="tm-btn tm-btn-sm tm-btn-neutral"
-                      onClick={() => void tournaments.refetch()}
-                    >
-                      다시 불러오기
-                    </button>
-                  </Card>
-                </div>
+                <Card pad={16}>
+                  <ErrorState
+                    title="대회 추천을 불러오지 못했어요"
+                    message="잠시 후 다시 시도해 주세요."
+                    onRetry={() => void tournaments.refetch()}
+                    retryLabel="다시 불러오기"
+                  />
+                </Card>
               ) : (
                 <TournamentHeroCard items={tournamentItems} loading={tournaments.isLoading} />
               )}
@@ -135,9 +131,10 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           <div className="tm-home-matches-block">
             <SectionTitle title="추천 매치" sub={model.network ? '다시 불러올게요' : '내 실력에 맞는 매치 추천'} action="전체보기" actionHref="/matches" />
             {model.network ? (
-              <div className="tm-home-matches-error-wrap" role="alert">
-                {/* [P2 UX 라이팅] 능동형 + 해요체 */}
-                <EmptyState title="목록을 불러오지 못했어요" sub="아래 버튼으로 다시 불러올 수 있어요." cta="다시 불러오기" onCta={model.retry} />
+              <div className="tm-home-matches-error-wrap">
+                {/* [P2 UX 라이팅] 능동형 + 해요체. role="alert"는 ErrorState 자체 루트에 이미
+                    있어(primitives.tsx) 여기서 다시 걸면 중첩 live region이 된다 — 추가 안 함. */}
+                <ErrorState title="목록을 불러오지 못했어요" message="아래 버튼으로 다시 불러올 수 있어요." onRetry={model.retry} retryLabel="다시 불러오기" />
               </div>
             ) : (
               <RecommendedMatchRail matches={model.recommendedMatches} />
@@ -253,10 +250,7 @@ function HomeChatSummary({ model }: { model: HomeViewModel }) {
     if (model.chatStatus === 'error') {
       return (
         <Card pad={16} className="tm-home-chat-empty">
-          <div className="tm-text-body-lg">채팅방을 불러오지 못했어요</div>
-          <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={model.chatHref} style={{ marginTop: 12 }}>
-            채팅으로 이동
-          </Link>
+          <ErrorState title="채팅방을 불러오지 못했어요" message="다시 불러오거나 채팅 목록으로 이동해 보세요." onRetry={model.chatRetry} retryLabel="다시 불러오기" />
         </Card>
       );
     }
@@ -501,13 +495,7 @@ function FeaturedMatchCard({
       </div>
       <div className={network ? 'tm-featured-content' : 'tm-featured-content tm-featured-content-with-cta'}>
         {network ? (
-          <>
-            {/* [P2 UX 라이팅] 에러 상황: 수동형 유지(실패 사실 전달) + CTA 능동형 */}
-            <div className="tm-text-body-lg">목록을 불러오지 못했어요</div>
-            <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 10 }} onClick={onRetry}>
-              다시 불러오기
-            </button>
-          </>
+          <ErrorState title="목록을 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={onRetry} retryLabel="다시 불러오기" />
         ) : (
           <>
             <div className="tm-featured-copy">

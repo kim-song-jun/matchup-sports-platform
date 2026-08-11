@@ -94,6 +94,7 @@ export function HomePageClient() {
             weatherRefreshing,
             refreshWeather,
             retry: () => void query.refetch(),
+            chatRetry: () => void chatRooms.refetch(),
             phoneVerifyNudge,
           }}
         />
@@ -116,8 +117,9 @@ export function HomePageClient() {
                 refreshWeather,
                 pushNudge,
                 phoneVerifyNudge,
+                chatRetry: () => void chatRooms.refetch(),
               }
-            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge }
+            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge, chatRetry: () => void chatRooms.refetch() }
         }
       />
     </>

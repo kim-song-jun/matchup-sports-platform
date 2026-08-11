@@ -335,12 +335,12 @@ function Drawer({
         {/* Footer */}
         <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           {adminName && (
-            <p className="text-[12px] text-gray-400 mb-2 truncate">{adminName}</p>
+            <p className="text-[12px] text-[var(--text-muted)] mb-2 truncate">{adminName}</p>
           )}
           <Link
             href="/home"
             onClick={onClose}
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             서비스로 돌아가기

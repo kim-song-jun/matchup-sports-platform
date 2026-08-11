@@ -142,7 +142,8 @@ function formatDateTime(value: string | null): string {
 function revisionBadgeTone(state: V1GameResultRevision['state']) {
   if (state === 'OFFICIAL') return 'tm-badge-green';
   if (state === 'CHANGE_REQUESTED' || state === 'REJECTED' || state === 'VOID') return 'tm-badge-red';
-  if (state === 'SUBMITTED' || state === 'SUPPLEMENT_REQUESTED') return 'tm-badge-blue';
+  if (state === 'SUBMITTED') return 'tm-badge-orange';
+  if (state === 'SUPPLEMENT_REQUESTED') return 'tm-badge-blue';
   return 'tm-badge-grey';
 }
 

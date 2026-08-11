@@ -70,6 +70,8 @@ export type HomeViewModel = {
   chatStatus: 'loading' | 'error' | 'ready';
   chatRooms: HomeChatRoom[];
   retry?: () => void;
+  /** 채팅방 목록 조회 전용 재시도 — 전체 홈 데이터(retry)와 별도 쿼리이므로 분리한다. */
+  chatRetry?: () => void;
   stats: HomeStats;
   featuredMatch: HomeMatchCard | null;
   recommendedMatches: HomeMatchCard[];

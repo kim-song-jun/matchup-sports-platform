@@ -356,7 +356,7 @@ function StepBadge({ n, locked }: { n: number; locked: boolean }) {
   if (locked) {
     return (
       <div
-        className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--surface-soft)] text-gray-400 shrink-0"
+        className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--surface-soft)] text-[var(--text-muted)] shrink-0"
         aria-hidden="true"
       >
         <Lock size={14} />
@@ -1811,7 +1811,7 @@ export function BracketTab({
                 value={publishScheduleInput}
                 onChange={(e) => setPublishScheduleInput(e.target.value)}
                 disabled={!!publishBlockedReason}
-                className="h-[44px] px-3 rounded-xl border border-[var(--border)] text-[13px] text-[var(--text-strong)] disabled:bg-[var(--surface-soft)] disabled:text-gray-400 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="h-[44px] px-3 rounded-xl border border-[var(--border)] text-[13px] text-[var(--text-strong)] disabled:bg-[var(--surface-soft)] disabled:text-[var(--text-muted)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               />
             </div>
             <button
@@ -1823,7 +1823,7 @@ export function BracketTab({
             >
               {hasPendingSchedule ? '예약 변경' : '이 시각에 공개 예약'}
             </button>
-            <p className="text-xs text-gray-400 basis-full">
+            <p className="text-xs text-[var(--text-muted)] basis-full">
               예약한 시각이 되면 스케줄러 없이 자동으로 공개돼요. 그 전까지는 조·경기를 계속 수정할 수 있어요.
             </p>
           </div>
@@ -2253,7 +2253,7 @@ export function BracketTab({
                   <h4 className="text-[13px] font-bold text-[var(--text-muted)] m-0">
                     {group.name}
                     {group.advanceCount != null && (
-                      <span className="ml-1.5 font-medium text-gray-400">상위 {group.advanceCount}팀 진출</span>
+                      <span className="ml-1.5 font-medium text-[var(--text-muted)]">상위 {group.advanceCount}팀 진출</span>
                     )}
                   </h4>
                   <button
@@ -2264,7 +2264,7 @@ export function BracketTab({
                       setEditGroupAdvance(group.advanceCount != null ? String(group.advanceCount) : '');
                     }}
                     aria-label={`${group.name} 수정`}
-                    className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-md text-gray-400 hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors"
+                    className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-md text-[var(--text-muted)] hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors"
                   >
                     <Pencil size={12} aria-hidden="true" />
                   </button>
@@ -2272,7 +2272,7 @@ export function BracketTab({
                     type="button"
                     onClick={() => void handleDeleteGroup(group)}
                     aria-label={`${group.name} 삭제`}
-                    className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-md text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
+                    className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
                   >
                     <Trash2 size={12} aria-hidden="true" />
                   </button>
@@ -2286,7 +2286,7 @@ export function BracketTab({
                           type="button"
                           onClick={() => void handleRemoveGroupTeam(gt.id, gt.teamName ?? '이 팀')}
                           aria-label={`${gt.teamName ?? '팀'} 배정 해제`}
-                          className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
+                          className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
                         >
                           <X size={11} aria-hidden="true" />
                         </button>
@@ -2525,7 +2525,7 @@ export function BracketTab({
             </div>
           </div>
           {editFixture?.result && (
-            <p className="text-[11px] text-gray-400 m-0">결과가 기록된 경기는 팀을 바꿀 수 없어요. 팀을 바꾸려면 결과를 먼저 삭제해 주세요.</p>
+            <p className="text-[11px] text-[var(--text-muted)] m-0">결과가 기록된 경기는 팀을 바꿀 수 없어요. 팀을 바꾸려면 결과를 먼저 삭제해 주세요.</p>
           )}
           <div className="flex gap-2 pt-1">
             <button
@@ -3466,7 +3466,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         )}
         {/* Null-state hint when all long-form fields are absent */}
         {!tournament.prizeBreakdown && !tournament.rulesText && !tournament.refundPolicyText && (
-          <p className="mt-3 text-xs text-gray-400">상금 배분, 대회 규정, 환불 정책을 아직 입력하지 않았어요.</p>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">상금 배분, 대회 규정, 환불 정책을 아직 입력하지 않았어요.</p>
         )}
       </div>
 
@@ -3600,7 +3600,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               ].join(' ')}
             >
               <span>{tab.label}</span>
-              <span className={active ? 'ml-1.5 font-semibold tabular-nums text-[var(--blue700)]' : 'ml-1.5 font-semibold tabular-nums text-gray-400'} aria-hidden="true">
+              <span className={active ? 'ml-1.5 font-semibold tabular-nums text-[var(--blue700)]' : 'ml-1.5 font-semibold tabular-nums text-[var(--text-muted)]'} aria-hidden="true">
                 {typeof count === 'number' ? count.toLocaleString('ko-KR') : '—'}
               </span>
             </button>
@@ -3764,7 +3764,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            <p className="text-[11px] text-gray-400">종목을 바꾸면 목록·상세의 종목 뱃지와 필터에 바로 반영돼요.</p>
+            <p className="text-[11px] text-[var(--text-muted)]">종목을 바꾸면 목록·상세의 종목 뱃지와 필터에 바로 반영돼요.</p>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -4082,7 +4082,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             </div>
           ) : null}
 
-          <p className="text-[12px] text-gray-400 -mb-2">상금·시상 정보는 &quot;대회 정보&quot; 탭에서 수정할 수 있어요.</p>
+          <p className="text-[12px] text-[var(--text-muted)] -mb-2">상금·시상 정보는 &quot;대회 정보&quot; 탭에서 수정할 수 있어요.</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
@@ -4669,7 +4669,7 @@ function AwardRow({
           placeholder="어워드명 (예: MVP)"
           className="flex-1 text-[13px] font-semibold border-0 bg-[var(--surface-soft)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
-        <button type="button" onClick={() => removeRow(idx)} className="text-gray-400 hover:text-red-500 p-1 inline-flex" aria-label="항목 삭제"><X size={16} /></button>
+        <button type="button" onClick={() => removeRow(idx)} className="text-[var(--text-muted)] hover:text-red-500 p-1 inline-flex" aria-label="항목 삭제"><X size={16} /></button>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
@@ -4684,7 +4684,7 @@ function AwardRow({
             emptyText={selectedRegistrationId ? '명단에 없는 선수예요' : '검색 결과가 없어요'}
           />
           {!teamNameTrimmed && (
-            <p className="text-[11px] text-gray-400 mt-1">소속 팀을 먼저 선택하면 명단에서 고를 수 있어요</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">소속 팀을 먼저 선택하면 명단에서 고를 수 있어요</p>
           )}
         </div>
         <div>
@@ -4793,7 +4793,7 @@ function ReviewsTab({
         <div className="relative flex-1">
           <label htmlFor="review-search" className="sr-only">리뷰 검색</label>
           <span
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
             aria-hidden="true"
           >
             <Search size={16} />
@@ -4804,7 +4804,7 @@ function ReviewsTab({
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="작성자, 팀명, 후기 내용으로 검색"
-            className="w-full h-[44px] pl-9 pr-3 text-[13px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+            className="w-full h-[44px] pl-9 pr-3 text-[13px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
           />
         </div>
         <button
@@ -4851,7 +4851,7 @@ function ReviewsTab({
         </div>
       ) : (
         <>
-          <p className="text-[12px] text-gray-400 mb-2">총 {total}개</p>
+          <p className="text-[12px] text-[var(--text-muted)] mb-2">총 {total}개</p>
           <div className="flex flex-col gap-3" style={{ opacity: isFetching ? 0.6 : 1 }}>
             {reviews.map((review) => (
               <ReviewModerationCard
@@ -4912,7 +4912,7 @@ function ReviewsTab({
               placeholder="예: 욕설/비방 신고 접수"
               className={textareaCls}
             />
-            <p className="text-[11px] text-gray-400 text-right">{hideReason.length}/200</p>
+            <p className="text-[11px] text-[var(--text-muted)] text-right">{hideReason.length}/200</p>
           </div>
           <div className="flex gap-2 mt-1">
             <button
@@ -4983,7 +4983,7 @@ function ReviewModerationCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-[13px] font-semibold text-[var(--text-strong)] truncate">{review.authorNickname}</p>
             {review.teamName && (
-              <span className="text-[12px] text-gray-400 truncate">· {review.teamName}</span>
+              <span className="text-[12px] text-[var(--text-muted)] truncate">· {review.teamName}</span>
             )}
             {isHidden && (
               <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] text-[11px] font-semibold">
@@ -5002,7 +5002,7 @@ function ReviewModerationCard({
                 />
               ))}
             </span>
-            <span className="text-[11px] text-gray-400">{formatDate(review.createdAt)}</span>
+            <span className="text-[11px] text-[var(--text-muted)]">{formatDate(review.createdAt)}</span>
           </div>
         </div>
       </div>

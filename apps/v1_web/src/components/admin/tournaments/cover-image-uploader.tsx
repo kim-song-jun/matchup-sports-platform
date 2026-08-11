@@ -41,7 +41,11 @@ export function CoverImageUploader({
         {label}
       </span>
       <div className="grid gap-3 sm:grid-cols-[minmax(0,240px)_1fr] sm:items-center">
-        <div className="relative aspect-video overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--grey50)]">
+        {/* 2026-08-11: 이 미리보기는 실제 노출 위치(tournament-card.tsx의 56×56 정사각 썸네일 —
+            대회 상세·목록 어디에도 와이드 히어로 사용처가 없음)를 그대로 반영해 1:1로 맞춘다.
+            이전 16:9 미리보기는 관리자가 가로로 프레이밍한 사진을 업로드하게 유도했지만 실제
+            화면에선 좌우가 크게 잘려 나가는 미리보기-실사용 불일치가 있었다. */}
+        <div className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--grey50)]">
           <Image
             src={publicAssetPath(value ?? COVER_EXAMPLE)}
             alt={previewAlt ?? (value ? '선택한 대회 커버 미리보기' : '대회 커버 이미지 예시')}
@@ -54,7 +58,7 @@ export function CoverImageUploader({
           />
           {!value ? (
             <div className="absolute inset-0 grid place-items-center bg-black/20 px-4 text-center text-xs font-semibold text-white">
-              업로드 전 예시 · 권장 비율 16:9
+              업로드 전 예시 · 목록·상세에 정사각형으로 표시돼요
             </div>
           ) : null}
         </div>

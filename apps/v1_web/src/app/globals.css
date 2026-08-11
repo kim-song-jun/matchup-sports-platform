@@ -148,8 +148,13 @@
   /* orange500(#fe9800) 배경 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 ~2.16:1) — 피치 배치
      골키퍼 마커(pitch-formation-editor.tsx)의 등번호 텍스트에서 실제로 미달을 확인했다
      (2026-08 QA). blue700(#1b64da, ~5.41:1)과 짝을 맞춰 orange 쪽에도 4.5:1을 넘는
-     진한 변형을 추가한다(~4.92:1). */
-  --orange700: #a36100;
+     진한 변형을 추가한다.
+     2026-08-11 재계산: 원래 #a36100은 흰 배경(4.92:1)·--tint-orange 위에서는 통과하지만
+     .tm-badge-orange의 자체 틴트 배경(--orange50 #fff3e0)에서는 4.487:1로 근소 미달—
+     #965300으로 한 단계 더 짙게 해 orange50(5.42:1)·흰 배경(5.94:1) 양쪽 여유를 확보했다.
+     --orange700을 텍스트로 쓰는 다른 소비처(전부 --tint-orange 이상 밝기의 배경)는
+     어두워질수록 대비가 늘어나는 방향이라 회귀 없음. */
+  --orange700: #965300;
   /* 피치 배치 선수 마커(PlayerToken/GK 배지, pitch-formation-editor.tsx) 전용 — 원형
      배경 + 흰 텍스트 조합의 대비를 테마 무관하게 항상 보장해야 하는 solid chip 색이다.
      --blue700/--orange700은 2026-08-10 전수검수로 다크모드에서 "카드/틴트 배경 위
@@ -991,7 +996,7 @@ button:disabled {
 }
 
 .tm-auth-soft-card-error .tm-text-body-lg {
-  color: var(--red500);
+  color: var(--red700);
 }
 
 .tm-auth-inline-error {
@@ -1306,6 +1311,15 @@ button:disabled {
   background: rgba(3, 178, 108, .08);
 }
 
+/* [P0 a11y] orange50/green tint 배경 위 tm-text-caption(grey600, 12px/400)이 4.5:1 미달
+   (실측: orange50 위 4.21:1, green tint 위 4.26:1) — 형제 tm-text-label(title)이 이미
+   쓰는 --text(grey700) 토큰을 재사용해 캡션도 동일 색으로 승격한다(라이트 6.48~6.56:1,
+   다크 8.5:1+로 양쪽 모두 여유 통과, 새 토큰 도입 없음). */
+.tm-auth-notice-orange .tm-text-caption,
+.tm-auth-notice-green .tm-text-caption {
+  color: var(--text);
+}
+
 .tm-text-heading {
   font-size: 24px;
   line-height: 32px;
@@ -1573,9 +1587,18 @@ button:disabled {
   word-break: keep-all; /* [P2 한글] TDS 패턴 */
 }
 
+/* 2026-08-11 전수검수: 500계열 텍스트를 자신의 50계열 틴트 배경에 얹으면 라이트 모드에서
+ * WCAG AA 4.5:1을 전부 미달한다(blue 3.31:1, orange 1.97:1, green 2.50:1, red 3.24:1 —
+ * 12px/700-weight는 large-text 예외 미적용). blue700/red700/green700은 이미 이 파일에
+ * "500이 AA 미달할 때 대신 쓰는 짙은 강조 텍스트"로 도입돼 있고(라인 ~33/41-43),
+ * 각 배지 자체 틴트 배경 위에서도 4.5:1 이상이다(재계산: blue700 4.82:1, orange700
+ * 5.42:1, green700 4.87:1, red700 5.67:1). 다크모드는 :root.dark 블록에서 이미 이
+ * 700 토큰들을 카드·틴트 배경 기준으로 재오버라이드해뒀으므로(라인 ~335-342) 추가 분기
+ * 없이 그대로 4.5:1 이상 유지된다(재계산: blue 5.8/6.5, orange 5.7/6.6, green 7.9/9.0,
+ * red 5.1/5.7 — 카드 표면/페이지 배경 두 경우 모두). */
 .tm-badge-blue {
   background: var(--blue50);
-  color: var(--blue500);
+  color: var(--blue700);
 }
 
 .tm-badge-grey {
@@ -1585,17 +1608,17 @@ button:disabled {
 
 .tm-badge-orange {
   background: var(--orange50);
-  color: var(--orange500);
+  color: var(--orange700);
 }
 
 .tm-badge-green {
   background: var(--green50);
-  color: var(--green500);
+  color: var(--green700);
 }
 
 .tm-badge-red {
   background: var(--red50);
-  color: var(--red500);
+  color: var(--red700);
 }
 
 /* ── [P2 Badge size variants] M3 dot(6px) + Carbon SM(18px) ─────────────────
@@ -3560,7 +3583,11 @@ button:disabled {
   font-size: 11px;
   line-height: 1;
   font-weight: 700;
-  color: var(--orange500);
+  /* orange500(#fe9800)은 라이트 --grey50(.tm-chat-room 배경) 위에서 ~2.07:1로
+     WCAG AA 4.5:1 미달(2026-08-11 audit). --orange700은 라이트에서 #965300(텍스트
+     전용 진한 값, line 157)·다크에서 var(--orange500)(line 341)으로 테마별 자동
+     전환되는 기존 시맨틱 토큰 — 라이트 재계산 ~5.67:1, 다크 기존 유지 ~7.87:1. */
+  color: var(--orange700);
 }
 
 .tm-chat-message-meta {
@@ -3754,7 +3781,8 @@ button:disabled {
   min-height: 44px;
   border-radius: 14px;
   background: var(--green50);
-  color: var(--green500);
+  color: var(--green700); /* green500은 라이트 green50 배경 위 2.5:1로 AA(4.5:1) 미달 —
+    .tm-badge-green과 동일하게 짙은 --green700(라이트 4.87:1 통과)으로 교체 */
   display: grid;
   place-items: center;
   padding: 0 14px;

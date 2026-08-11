@@ -123,7 +123,20 @@ function AwardsPodium({
             </span>
             {/* 단상 */}
             <div className="tm-awards-podium-block" aria-hidden="true">
-              <span style={{ position: 'relative', zIndex: 1, color: '#fff', fontWeight: 900, fontSize: pos === 1 ? 28 : 20, textShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>
+              <span
+                style={{
+                  position: 'relative',
+                  zIndex: 1,
+                  color: '#fff',
+                  fontWeight: 900,
+                  fontSize: pos === 1 ? 28 : 20,
+                  lineHeight: 1,
+                  textShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  background: 'var(--scrim-dark-72)',
+                  borderRadius: 999,
+                  padding: pos === 1 ? '4px 12px' : '3px 9px',
+                }}
+              >
                 {pos}
               </span>
             </div>

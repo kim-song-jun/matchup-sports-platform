@@ -187,7 +187,7 @@ function DesktopChampionHero({
       </div>
       {/* 대회명 */}
       <div className="tm-resd-meta" style={{
-        fontSize: 12, color: 'rgba(255,255,255,0.4)',
+        fontSize: 12, color: 'rgba(255,255,255,0.7)',
         fontWeight: 600, letterSpacing: '0.04em',
         marginBottom: 28,
       }}>
@@ -207,7 +207,7 @@ function DesktopChampionHero({
               letterSpacing: '-0.02em',
             }}>{n}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{label}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{sub}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{sub}</div>
           </div>
         ))}
       </div>
@@ -281,7 +281,7 @@ function MobileChampionBanner({
           <div key={label} style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1, color: '#FDE68A', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{n}</div>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>{label}</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{sub}</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{sub}</div>
           </div>
         ))}
       </div>

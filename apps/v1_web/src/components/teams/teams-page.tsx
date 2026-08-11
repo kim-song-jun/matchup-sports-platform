@@ -1081,10 +1081,14 @@ function TeamCoverImageField({
         상단 이미지 <span className="tm-text-caption" style={{ fontWeight: 400 }}>(선택)</span>
       </div>
       <div className="tm-text-caption" style={{ marginTop: 4 }}>팀 상세 상단에 표시되는 대표 이미지예요.</div>
+      {/* minHeight는 실제 팀 상세 히어로 카드(.tm-team-detail-hero-card)의 콘텐츠 높이를 그대로
+          맞춘 값이다 — pad 18*2 + avatar(xl) 72 + margin 14 + heading line-height 32 + margin 4 +
+          caption line-height 16 + margin 12 + badge row 24 = 210px. 이전 132px는 실제보다
+          약 60% 낮아 사진 상하가 실제보다 덜 잘려 보이는 미리보기-실사용 불일치가 있었다. */}
       <div
         style={{
           marginTop: 10,
-          minHeight: 132,
+          minHeight: 210,
           borderRadius: 14,
           border: '1px solid var(--border-strong)',
           background: coverImageUrl ? `${cssUrl(coverImageUrl)} center/cover` : 'var(--input-surface)',

@@ -69,7 +69,9 @@ describe('Tournament staff policy', () => {
     const allowedByRole: Readonly<Record<TournamentStaffRole, readonly TournamentStaffAction[]>> = {
       platform_ops: actions,
       tournament_director: actions,
-      field_operator: ['read', 'tournament_command', 'event_append'],
+      // 2026-08-11: field_operator에 lineup_mutate 추가 — 경기 시작 권한(tournament_command)의
+      // 전제조건인 라인업 제출을 현장 스태프가 직접 할 수 있어야 한다(알파 실측, 오너 결정).
+      field_operator: ['read', 'tournament_command', 'event_append', 'lineup_mutate'],
       support_readonly: ['read'],
       team_manager: ['read', 'lineup_mutate'],
       public: ['read'],
@@ -110,7 +112,7 @@ describe('Tournament staff policy', () => {
       }
     }
 
-    expect({ allowed, rejected }).toEqual({ allowed: 19, rejected: 17 });
+    expect({ allowed, rejected }).toEqual({ allowed: 20, rejected: 16 });
   });
 
   it('allows team managers only their frozen read and lineup mutation surface', () => {
@@ -134,6 +136,46 @@ describe('Tournament staff policy', () => {
         reason: 'ROLE_ACTION_DENIED',
       });
     }
+  });
+
+  it('grants field_operator lineup_mutate (2026-08-11 fix) without widening support_readonly', () => {
+    // Given: field_operator must be able to submit the lineup that is a
+    // precondition for the tournament_command it already holds (starting a
+    // fixture requires a saved lineup first).
+    const fieldOperatorBase = {
+      role: 'field_operator',
+      now: NOW,
+      resource: resource(),
+      assignment: scopeAssignment('field_operator'),
+    } as const;
+
+    // When / Then: field_operator now gets lineup_mutate...
+    expect(decideTournamentStaffAccess({ ...fieldOperatorBase, action: 'lineup_mutate' })).toEqual({
+      allowed: true,
+      reason: 'ALLOWED',
+    });
+    // ...while its still-excluded actions stay denied.
+    for (const action of ['event_reverse', 'cancel', 'result_review', 'result_officialize'] as const) {
+      expect(decideTournamentStaffAccess({ ...fieldOperatorBase, action })).toEqual({
+        allowed: false,
+        reason: 'ROLE_ACTION_DENIED',
+      });
+    }
+
+    // support_readonly must remain read-only: this fix must not leak into it.
+    const supportReadonlyBase = {
+      role: 'support_readonly',
+      now: NOW,
+      resource: resource(),
+      assignment: assignment('support_readonly'),
+    } as const;
+    expect(
+      decideTournamentStaffAccess({ ...supportReadonlyBase, action: 'lineup_mutate' }),
+    ).toEqual({ allowed: false, reason: 'ROLE_ACTION_DENIED' });
+    expect(decideTournamentStaffAccess({ ...supportReadonlyBase, action: 'read' })).toEqual({
+      allowed: true,
+      reason: 'ALLOWED',
+    });
   });
 
   it('allows public reads while rejecting every representative mutation', () => {

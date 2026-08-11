@@ -155,7 +155,7 @@ function OrderSummaryCard({
   return (
     <Card
       pad={compact ? 12 : 16}
-      style={compact ? { background: 'var(--grey50)' } : undefined}
+      style={compact ? { background: 'var(--grey100)' } : undefined}
       aria-label="신청 요약"
     >
       {!compact && (
@@ -430,7 +430,7 @@ function TeamSelectStep({
 
         {/* Info card: entry fee */}
         {tournament.entryFee > 0 ? (
-          <Card pad={16} style={{ marginTop: 16, background: 'var(--grey50)' }}>
+          <Card pad={16} style={{ marginTop: 16, background: 'var(--grey100)' }}>
             <InfoRow
               label="참가비"
               value={formatEntryFee(tournament.entryFee)}
@@ -1032,7 +1032,7 @@ function AgreementsStep({
 
       {/* Free tournament notice */}
       {tournament.entryFee === 0 ? (
-        <Card pad={12} style={{ marginTop: 16, background: 'var(--grey50)' }}>
+        <Card pad={12} style={{ marginTop: 16, background: 'var(--grey100)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
             이 대회는 무료로 참가할 수 있어요.
           </p>
@@ -1388,7 +1388,7 @@ function PaymentGuideStep({
           )}
         </Card>
 
-        <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
+        <Card pad={14} style={{ marginTop: 12, background: 'var(--grey100)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
             입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
           </p>

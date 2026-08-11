@@ -772,7 +772,6 @@ export function ProfileEditPageClient() {
           <PhoneVerificationCard
             mode={accountPhoneUnverified ? 'authed' : 'public'}
             phone={phoneDigits}
-            surface="inset"
             onVerified={(token) => {
               if (accountPhoneUnverified) setInlineVerifiedPhone(phoneDigits);
               else setPhoneProofToken(token ?? null);

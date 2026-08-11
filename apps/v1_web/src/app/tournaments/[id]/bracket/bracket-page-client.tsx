@@ -6,6 +6,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { ErrorState, EmptyState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import {
   TournamentProgressStepper,
@@ -41,9 +42,72 @@ function toStandingsRows(standings: readonly V1TournamentStanding[]): Tournament
     teamLogoUrl: s.teamLogoUrl,
     position: s.position,
     points: s.points,
+    wins: s.wins,
+    draws: s.draws,
+    losses: s.losses,
     goalsFor: s.goalsFor,
     goalsAgainst: s.goalsAgainst,
   }));
+}
+
+/**
+ * 순위표에서 팀을 펼쳤을 때 그 행 아래에 붙는 상세 — 그 팀이 이 조에서 치른/치를
+ * 경기 목록이다. 오너 지시("클릭했을 때 팀 전적 페이지로 넘어가는 것보다 하단에
+ * 상세를 보여주는 게 낫다")대로 화면 전환 없이 순위 맥락을 유지한 채 보여준다.
+ *
+ * 이미 받아 둔 `fixtures` 만 쓰므로 추가 네트워크 요청이 없다.
+ */
+function TeamFixturesDetail({ teamId, fixtures }: { teamId: string; fixtures: V1TournamentFixture[] }) {
+  const mine = fixtures
+    .filter((f) => f.homeTeamId === teamId || f.awayTeamId === teamId)
+    .sort((a, b) => (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? ''));
+
+  if (mine.length === 0) {
+    return (
+      <p style={{ fontSize: 12, color: 'var(--text-caption)', padding: '8px 0' }}>
+        이 조에서 배정된 경기가 아직 없어요.
+      </p>
+    );
+  }
+
+  return (
+    <ul style={{ display: 'flex', flexDirection: 'column', gap: 6, listStyle: 'none', margin: 0, padding: 0 }}>
+      {mine.map((f) => {
+        const isHome = f.homeTeamId === teamId;
+        const opponent = isHome ? f.awayTeamName : f.homeTeamName;
+        const scored = f.result ? (isHome ? f.result.homeScore : f.result.awayScore) : null;
+        const conceded = f.result ? (isHome ? f.result.awayScore : f.result.homeScore) : null;
+        const outcome =
+          scored === null || conceded === null ? null : scored > conceded ? '승' : scored < conceded ? '패' : '무';
+        return (
+          <li
+            key={f.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 10px',
+              borderRadius: 10,
+              background: 'var(--surface-soft)',
+              fontSize: 12,
+            }}
+          >
+            <span style={{ color: 'var(--text-caption)', minWidth: 26 }}>{isHome ? '홈' : '원정'}</span>
+            <span style={{ color: 'var(--text-strong)', fontWeight: 600, flex: 1, minWidth: 0 }}>{opponent}</span>
+            {outcome ? (
+              <span className="tab-num" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+                {outcome} {scored}-{conceded}
+              </span>
+            ) : (
+              <span style={{ color: 'var(--text-caption)' }}>
+                {formatTournamentDateTimeShort(f.scheduledAt) ?? '시간 미정'}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 /**
@@ -88,6 +152,7 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
         rows={toStandingsRows(group.standings)}
         advance={advance}
         ariaLabel={`${group.name} 순위표`}
+        renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={fixtures} />}
       />
     </section>
   );
@@ -159,6 +224,9 @@ function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
       onLoadMore={() => void fetchNextPage()}
+      /* 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
+         같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고"). */
+      showStandings={false}
     />
   );
 }
@@ -205,27 +273,35 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
         )}
       </div>
 
-      {/* 순위·대진표 / 경기 일정 탭 — team-schedules-page.tsx와 동일한 role=tablist +
-          tm-btn 토글 패턴(이 저장소의 기존 탭 관례)을 그대로 따른다. */}
-      <div role="tablist" aria-label="보기 방식" style={{ display: 'flex', gap: 8, padding: '16px 20px 0' }}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'standings'}
-          className={`tm-btn tm-btn-sm ${activeTab === 'standings' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-          onClick={() => setActiveTab('standings')}
-        >
-          순위 · 대진표
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'schedule'}
-          className={`tm-btn tm-btn-sm ${activeTab === 'schedule' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-          onClick={() => setActiveTab('schedule')}
-        >
-          경기 일정
-        </button>
+      {/* 순위·대진표 / 경기 일정 탭.
+          예전엔 파란 채움 버튼 + 회색 버튼 두 개를 나란히 뒀는데, 그러면 "선택된 탭"이
+          아니라 "파란 버튼 하나와 회색 버튼 하나"로 읽혀 탭인 줄 모른다(오너 지적:
+          "탭인 것처럼 보이지가 않고"). 이 저장소가 이미 쓰는 세그먼트 컨트롤 형태
+          (트랙 배경 위에 선택 항목만 떠오르는 .tm-review-tabs 패턴)와 같은 시각 계약을
+          쓰되, 이름은 화면에 안 묶이도록 .tm-seg-* 로 일반화했다. */}
+      <div style={{ padding: '16px 20px 0' }}>
+        <div role="tablist" aria-label="보기 방식" className="tm-seg-tabs" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'standings'}
+            data-active={activeTab === 'standings'}
+            className="tm-seg-tab"
+            onClick={() => setActiveTab('standings')}
+          >
+            순위 · 대진표
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'schedule'}
+            data-active={activeTab === 'schedule'}
+            className="tm-seg-tab"
+            onClick={() => setActiveTab('schedule')}
+          >
+            경기 일정
+          </button>
+        </div>
       </div>
 
       {activeTab === 'schedule' ? (

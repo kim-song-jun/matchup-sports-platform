@@ -239,15 +239,22 @@ describe('현장 운영 콘솔 가독성 하한', () => {
     const { join } = await import('node:path');
     // jsdom 환경이라 import.meta.url 이 file: 스킴이 아니고 __dirname 도 없다.
     // vitest 는 패키지 루트(apps/v1_web)에서 돌므로 거기서 상대 경로로 잡는다.
-    const dir = join(
-      process.cwd(),
+    // 화면 디렉터리만 훑으면 부족하다 — 이 콘솔이 쓰는 전용 공유 컴포넌트에도 11px 이
+    // 남아 있었다(TeamFoulCounterBar 의 팀명, 알파 배포 후 실측에서 2개 잔존). 소비처가
+    // 이 콘솔뿐인 컴포넌트는 함께 본다.
+    const dirs = [
       'src/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate',
-    );
-    // 경로가 틀리면 offenders 가 빈 배열이 되어 조용히 통과한다 — 그건 가드가 아니다.
-    expect(existsSync(dir)).toBe(true);
-    const offenders = readdirSync(dir)
-      .filter((name) => name.endsWith('.tsx') && !name.endsWith('.test.tsx'))
-      .filter((name) => readFileSync(join(dir, name), 'utf8').includes('text-2xs'));
+      'src/components/game-operations',
+    ].map((rel) => join(process.cwd(), rel));
+    const offenders: string[] = [];
+    for (const dir of dirs) {
+      // 경로가 틀리면 offenders 가 빈 배열이 되어 조용히 통과한다 — 그건 가드가 아니다.
+      expect(existsSync(dir)).toBe(true);
+      for (const name of readdirSync(dir)) {
+        if (!name.endsWith('.tsx') || name.endsWith('.test.tsx')) continue;
+        if (readFileSync(join(dir, name), 'utf8').includes('text-2xs')) offenders.push(name);
+      }
+    }
     expect(offenders).toEqual([]);
   });
 });

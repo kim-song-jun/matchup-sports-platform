@@ -7548,3 +7548,33 @@ button:disabled {
   font-size: 12px;
   text-align: center;
 }
+
+/* 세그먼트 탭 — 트랙 배경 위에 선택된 항목만 떠오르는 형태.
+   나란한 두 버튼(파란 채움 + 회색)은 "탭"이 아니라 "버튼 두 개"로 읽힌다는 오너
+   지적에서 나왔다. .tm-review-tabs 가 이미 쓰던 시각 계약과 동일하되, 이름을 특정
+   화면에 묶지 않도록 일반화했다. 컬럼 수는 쓰는 쪽이 grid-template-columns 로 정한다. */
+.tm-seg-tabs {
+  display: grid;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 15px;
+  background: var(--grey100);
+}
+
+.tm-seg-tab {
+  /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items 로 내용 중앙 정렬) */
+  min-height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tm-seg-tab[data-active='true'] {
+  background: var(--surface);
+  color: var(--text-strong);
+  font-weight: 800;
+}

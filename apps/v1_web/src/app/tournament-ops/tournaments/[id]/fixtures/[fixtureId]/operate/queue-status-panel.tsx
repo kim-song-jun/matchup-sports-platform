@@ -44,7 +44,7 @@ function eventLabel(item: QueuedGameEvent): string {
 export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
   if (items.length === 0) {
     return (
-      <p className="px-1 py-3 text-2xs text-[var(--text-muted)]">
+      <p className="px-1 py-3 text-xs text-[var(--text-muted)]">
         기록된 이벤트가 아직 없어요.
       </p>
     );
@@ -66,13 +66,13 @@ export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
                 그때 아래 재시도 버튼은 뜨면서 이유는 안 보이면 운영자는 무엇이 왜 실패했는지
                 모른 채 버튼만 누르게 된다. */}
             {item.status === 'failed' ? (
-              <p className="text-2xs text-[var(--red700)]" role="alert">
+              <p className="text-xs text-[var(--red700)]" role="alert">
                 {item.lastError?.message ?? '실패 사유를 확인할 수 없어요. 다시 시도해 보고, 계속 실패하면 새로고침해 주세요.'}
               </p>
             ) : null}
           </div>
           <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold ${STATUS_BADGE_CLASS[item.status]}`}
+            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE_CLASS[item.status]}`}
           >
             {STATUS_LABEL[item.status]}
           </span>

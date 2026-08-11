@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useId, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft,
@@ -11,7 +11,6 @@ import {
   Check,
   X,
   RefreshCw,
-  Plus,
   Megaphone,
   Send,
   Pencil,
@@ -82,9 +81,7 @@ import type {
   V1AdminTournamentRegistration,
   V1AdminBracketGroup,
   V1AdminBracketFixture,
-  V1AdminBracketStanding,
   V1AdminTournamentAnnouncement,
-  V1TournamentGroupPhase,
   V1AnnouncementAudience,
   V1AnnouncementCategory,
   V1UpdateTournamentPayload,
@@ -106,11 +103,13 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
-import type { AdminTableColumn } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { TournamentSponsorsTab } from './tournament-sponsors-tab';
 import { TournamentPopupTab } from './tournament-popup-tab';
 import { TournamentCampaignTab } from './tournament-campaign-tab';
+import { BracketGroupQuickAdd } from './bracket-group-quick-add';
+import { BracketGroupCard } from './bracket-group-card';
+import { isGroupReady } from './bracket-group-helpers';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
 import {
@@ -348,61 +347,6 @@ const textareaCls = [
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
-
-// ── 대진관리 스텝 위저드 (조 만들기 → 팀 배정 → 경기 일정 만들기) ─────────────
-// 순서·선행조건을 시각적으로 안내: 번호 배지 + 연결선, 선행조건 미충족 시 잠금 안내로 대체
-
-function StepBadge({ n, locked }: { n: number; locked: boolean }) {
-  if (locked) {
-    return (
-      <div
-        className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--surface-soft)] text-gray-400 shrink-0"
-        aria-hidden="true"
-      >
-        <Lock size={14} />
-      </div>
-    );
-  }
-  return (
-    <div
-      className="flex items-center justify-center w-8 h-8 rounded-full text-[13px] font-bold shrink-0 bg-[var(--blue50)] text-[var(--blue700)] border-2 border-blue-500"
-      aria-hidden="true"
-    >
-      {n}
-    </div>
-  );
-}
-
-function StepRow({
-  n,
-  locked,
-  isLast,
-  children,
-}: {
-  n: number;
-  locked: boolean;
-  isLast?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="grid grid-cols-[32px_1fr] gap-x-3">
-      <div className="flex flex-col items-center">
-        <StepBadge n={n} locked={locked} />
-        {!isLast && <div className="w-px flex-1 bg-gray-200 my-1" aria-hidden="true" />}
-      </div>
-      <div className={isLast ? '' : 'pb-6'}>{children}</div>
-    </div>
-  );
-}
-
-function LockedStepNotice({ reason }: { reason: string }) {
-  return (
-    <div className="flex items-center gap-2 bg-[var(--surface-soft)] rounded-2xl border border-dashed border-[var(--border)] px-5 py-5 text-[13px] text-[var(--text-muted)]">
-      <Lock size={14} aria-hidden="true" />
-      {reason}
-    </div>
-  );
-}
 
 // ── Inline modal (reusable within this file) ──────────────────────────────
 
@@ -1377,23 +1321,9 @@ export function BracketTab({
   const [editGroupName, setEditGroupName] = useState('');
   const [editGroupAdvance, setEditGroupAdvance] = useState('');
 
-  // ── Group creation form ─────────────────────────────────────────────
-  const [groupName, setGroupName] = useState('');
-  const [groupPhase, setGroupPhase] = useState<V1TournamentGroupPhase>('group');
-  const [groupAdvanceCount, setGroupAdvanceCount] = useState('');
-
-  // ── Assign team form ────────────────────────────────────────────────
-  const [assignGroupId, setAssignGroupId] = useState('');
-  const [assignRegId, setAssignRegId] = useState('');
-
-  // ── Create fixture form ─────────────────────────────────────────────
-  const [fixtureGroupId, setFixtureGroupId] = useState('');
-  const [fixtureRound, setFixtureRound] = useState('');
-  const [fixtureNumber, setFixtureNumber] = useState('1');
-  const [fixtureHomeRegId, setFixtureHomeRegId] = useState('');
-  const [fixtureAwayRegId, setFixtureAwayRegId] = useState('');
-  // auto-generate state
-  const [autoGenGroupId, setAutoGenGroupId] = useState('');
+  // 조 카드 트리 — 그룹 생성 폼·팀 배정 폼·픽스처 생성 폼은 각 조 카드(bracket-group-card.tsx)
+  // 안으로 이동했다(설계안 B). 여기 남는 건 "방금 만든 조로 스크롤" 신호뿐.
+  const [focusGroupId, setFocusGroupId] = useState<string | null>(null);
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
   const { confirm: confirmModal, ConfirmModal } = useConfirm();
 
@@ -1486,61 +1416,6 @@ export function BracketTab({
       onSuccess: () => showToast('팀 배정을 해제했어요.', 'success'),
       onError: (err) => showToast(extractErrorMessage(err, '배정 해제에 실패했어요.'), 'error'),
     });
-  };
-
-  const handleCreateGroup = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!groupName.trim()) return;
-    const parsedAdvance = Number.parseInt(groupAdvanceCount, 10);
-    const advanceCount = Number.isInteger(parsedAdvance) && parsedAdvance > 0 ? parsedAdvance : undefined;
-    createGroup.mutate(
-      { name: groupName.trim(), phase: groupPhase, ...(advanceCount != null ? { advanceCount } : {}) },
-      {
-        onSuccess: () => { setGroupName(''); setGroupAdvanceCount(''); showToast('조를 만들었어요.', 'success'); },
-        onError: (err) => showToast(extractErrorMessage(err, '조 생성에 실패했어요.'), 'error'),
-      },
-    );
-  };
-
-  const handleAssignTeam = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assignGroupId || !assignRegId) return;
-    assignGroupTeam.mutate(
-      { groupId: assignGroupId, registrationId: assignRegId },
-      {
-        onSuccess: () => { setAssignRegId(''); showToast('팀을 배정했어요.', 'success'); },
-        onError: (err) => showToast(extractErrorMessage(err, '팀 배정에 실패했어요.'), 'error'),
-      },
-    );
-  };
-
-  const handleCreateFixture = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fixtureRound.trim() || !fixtureNumber) return;
-    // double-booking guard: home === away
-    if (fixtureHomeRegId && fixtureHomeRegId === fixtureAwayRegId) {
-      showToast('홈과 어웨이에 같은 팀을 선택할 수 없어요.', 'error');
-      return;
-    }
-    createFixture.mutate(
-      {
-        round: fixtureRound.trim(),
-        fixtureNumber: parseInt(fixtureNumber, 10),
-        ...(fixtureGroupId ? { groupId: fixtureGroupId } : {}),
-        ...(fixtureHomeRegId ? { homeRegistrationId: fixtureHomeRegId } : {}),
-        ...(fixtureAwayRegId ? { awayRegistrationId: fixtureAwayRegId } : {}),
-      },
-      {
-        onSuccess: () => {
-          setFixtureRound('');
-          setFixtureNumber('1');
-          setFixtureHomeRegId('');
-          setFixtureAwayRegId('');
-          showToast('경기 일정을 추가했어요.', 'success');
-        },
-        onError: (err) => showToast(extractErrorMessage(err, '경기 일정 추가에 실패했어요.'), 'error'),
-      },
-    );
   };
 
   // ── Auto-generate fixtures ───────────────────────────────────────────
@@ -1669,8 +1544,8 @@ export function BracketTab({
 
   const groups: V1AdminBracketGroup[] = bracket?.groups ?? [];
   const fixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
-
-  const hasData = groups.length > 0 || fixtures.length > 0;
+  const allStandings = bracket?.standings ?? [];
+  const readyGroupCount = groups.filter((g) => isGroupReady(g, fixtures)).length;
 
   // ── Task 109 Track 6: 대진표 일괄 공개 ─────────────────────────────
   // 예약 시각이 지나면 서버는 공개로 판정하지만 bracketPublishedAt 은 null 로 남는다.
@@ -1830,525 +1705,70 @@ export function BracketTab({
         )}
       </div>
 
-    <div className={[
-      'flex flex-col gap-6',
-      hasData ? 'xl:grid xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] xl:items-start xl:gap-8' : '',
-    ].join(' ')}>
+    <div className="flex flex-col gap-6">
 
-      {/* ── 좌측 컬럼: 관리 폼 (조 만들기 · 팀 배정 · 픽스처 만들기) ── */}
-      <div className="flex min-w-0 flex-col gap-6">
-
-      {/* ── Step 1: 조 만들기 ───────────────────────────────────────── */}
-      <StepRow n={1} locked={false}>
-      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-5">
-        <h3 className="text-[15px] font-bold text-[var(--text-strong)] mb-1">조 만들기</h3>
-        <p className="text-xs text-[var(--text-muted)] mb-4">먼저 조를 만들어야 2·3단계(팀 배정·경기 일정)를 진행할 수 있어요.</p>
-        {/* sm:flex-wrap — 고정폭 입력 합이 좁은 좌측 컬럼(480px)을 넘으면 버튼이 카드 밖으로 흘렀다 */}
-        <form onSubmit={handleCreateGroup} noValidate className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="group-name" className="text-[13px] text-[var(--text-strong)]">
-              조 이름
-            </label>
-            <input
-              id="group-name"
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="예: A조"
-              disabled={createGroup.isPending}
-              maxLength={20}
-              className={inputCls + ' sm:w-[180px]'}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="group-phase" className="text-[13px] text-[var(--text-strong)]">
-              단계
-            </label>
-            <select
-              id="group-phase"
-              value={groupPhase}
-              onChange={(e) => setGroupPhase(e.target.value as V1TournamentGroupPhase)}
-              disabled={createGroup.isPending}
-              className={inputCls + ' sm:w-[120px]'}
-            >
-              <option value="group">조별</option>
-              <option value="semi">준결승</option>
-              <option value="final">결승</option>
-              <option value="third_place">3위 결정전</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="group-advance" className="text-[13px] text-[var(--text-strong)]">
-              진출 팀 수 <span className="text-xs text-[var(--text-muted)]">(선택)</span>
-            </label>
-            <input
-              id="group-advance"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={groupAdvanceCount}
-              onChange={(e) => setGroupAdvanceCount(e.target.value)}
-              placeholder="예: 2"
-              disabled={createGroup.isPending}
-              className={inputCls + ' sm:w-[110px]'}
-              aria-describedby="group-advance-help"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={!groupName.trim() || createGroup.isPending}
-            className={submitBtnCls}
-          >
-            <Plus size={14} aria-hidden="true" />
-            조 추가
-          </button>
-        </form>
-        <p id="group-advance-help" className="text-xs text-[var(--text-muted)] mt-2">
-          진출 팀 수를 입력하면 순위표에 상위 N팀 진출선이 표시돼요.
+      {/* ── 조 롤업 헤더 + 원클릭 조 추가 ─────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap px-1">
+        <p className="text-[13px] font-semibold text-[var(--text-body)]">
+          총 {groups.length}개 조 · {readyGroupCount}개 준비 완료
         </p>
+        {groups.length > 0 && (
+          <button
+            type="button"
+            onClick={handleRecalculate}
+            disabled={recalculate.isPending}
+            className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <RefreshCw size={13} aria-hidden="true" />
+            순위 재계산
+          </button>
+        )}
       </div>
-      </StepRow>
 
-      {/* ── Step 2: 팀 배정 ─────────────────────────────────────────── */}
-      <StepRow n={2} locked={groups.length === 0 || confirmedRegistrations.length === 0}>
+      <BracketGroupQuickAdd
+        existingGroups={groups}
+        createGroup={createGroup}
+        showToast={showToast}
+        onCreated={(id) => setFocusGroupId(id)}
+      />
+
+      {/* ── 조 카드 목록 (설계안 B) — 조 1개 = 카드 1개, 배정·순위·대진이 카드 안에서 끝난다 ── */}
       {groups.length === 0 ? (
-        <LockedStepNotice reason="1단계에서 조를 먼저 만들어 주세요." />
-      ) : confirmedRegistrations.length === 0 ? (
-        <LockedStepNotice reason="확정된 참가팀이 아직 없어요." />
+        <AdminEmpty title="아직 만든 조가 없어요" description="위에서 원하는 유형을 눌러 조를 만들어 보세요." />
       ) : (
-        <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-5">
-          <h3 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">팀 배정</h3>
-          <form onSubmit={handleAssignTeam} noValidate className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="assign-group" className="text-[13px] text-[var(--text-strong)]">
-                조 선택
-              </label>
-              <select
-                id="assign-group"
-                value={assignGroupId}
-                onChange={(e) => setAssignGroupId(e.target.value)}
-                disabled={assignGroupTeam.isPending}
-                className={inputCls + ' sm:w-[160px]'}
-              >
-                <option value="">조를 선택해 주세요</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1 sm:w-[220px]">
-              <label htmlFor="assign-team" className="text-[13px] text-[var(--text-strong)]">
-                팀 선택
-              </label>
-              <EntityPicker
-                id="assign-team"
-                value={confirmedTeamItems.find((it) => it.id === assignRegId) ?? null}
-                onChange={(item) => setAssignRegId(item?.id ?? '')}
-                items={confirmedTeamItems}
-                disabled={assignGroupTeam.isPending}
-                placeholder="팀 선택"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={!assignGroupId || !assignRegId || assignGroupTeam.isPending}
-              className={submitBtnCls}
-            >
-              배정
-            </button>
-          </form>
-          <p className="text-xs text-[var(--text-muted)] mt-1" aria-live="polite">확정된 팀만 배정할 수 있어요.</p>
+        <div className="flex flex-col gap-4">
+          {groups.map((group) => (
+            <BracketGroupCard
+              key={group.id}
+              group={group}
+              allGroups={groups}
+              allStandings={allStandings}
+              fixtures={fixtures}
+              confirmedTeamItems={confirmedTeamItems}
+              assignGroupTeam={assignGroupTeam}
+              createFixture={createFixture}
+              isAutoGenerating={isAutoGenerating}
+              onAutoGenerate={(groupId) => void handleAutoGenerate(groupId)}
+              onEditGroup={(g) => {
+                setEditGroup(g);
+                setEditGroupName(g.name);
+                setEditGroupAdvance(g.advanceCount != null ? String(g.advanceCount) : '');
+              }}
+              onDeleteGroup={(g) => void handleDeleteGroup(g)}
+              onRemoveGroupTeam={(groupTeamId, teamName) => void handleRemoveGroupTeam(groupTeamId, teamName)}
+              autoFocus={focusGroupId === group.id}
+              showToast={showToast}
+            />
+          ))}
         </div>
       )}
-      </StepRow>
 
-      {/* ── Step 3: 경기 일정 만들기 ────────────────────────────────── */}
-      <StepRow n={3} locked={groups.length === 0 || confirmedRegistrations.length === 0} isLast>
-      {groups.length === 0 ? (
-        <LockedStepNotice reason="1단계에서 조를 먼저 만들어 주세요." />
-      ) : confirmedRegistrations.length === 0 ? (
-        <LockedStepNotice reason="확정된 참가팀이 아직 없어요." />
-      ) : (
-      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-5">
-        <h3 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">경기 일정 만들기</h3>
-
-        {/* ── 대진 자동 생성 (이 스텝은 groups.length>0 일 때만 unlock 되므로 별도 조건 불필요) ── */}
-        <div className="mb-5 pb-5 border-b border-[var(--border)]">
-            <p className="text-xs text-[var(--text-muted)] mb-2">
-              조를 선택하면 조별 라운드로빈 또는 토너먼트 시드 배정 경기 일정을 자동으로 만들어요.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="auto-gen-group" className="text-[13px] text-[var(--text-strong)]">
-                  자동 생성할 조
-                </label>
-                <select
-                  id="auto-gen-group"
-                  value={autoGenGroupId}
-                  onChange={(e) => setAutoGenGroupId(e.target.value)}
-                  disabled={isAutoGenerating || createFixture.isPending}
-                  className={inputCls + ' sm:w-[200px]'}
-                >
-                  <option value="">조를 선택해 주세요</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>{g.name}</option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                disabled={!autoGenGroupId || isAutoGenerating || createFixture.isPending}
-                onClick={() => void handleAutoGenerate(autoGenGroupId)}
-                className={submitBtnCls}
-                aria-label="선택한 조의 경기 일정 자동 생성"
-              >
-                <RefreshCw size={14} aria-hidden="true" />
-                {isAutoGenerating ? '생성 중…' : '대진 자동 생성'}
-              </button>
-            </div>
-          </div>
-
-        {/* ── 수동 픽스처 생성 폼 ── */}
-        {(() => {
-          // Determine phase of the currently selected group for round options
-          const selectedGroup = groups.find((g) => g.id === fixtureGroupId);
-          const selectedPhase = selectedGroup?.phase ?? 'group';
-          const isKnockoutPhase =
-            selectedPhase === 'semi' || selectedPhase === 'final' || selectedPhase === 'third_place';
-
-          // Round options per phase
-          const roundOptions: string[] = isKnockoutPhase
-            ? ['16강', '8강', '4강', '결승', '3·4위전']
-            : ['조별 1라운드', '조별 2라운드', '조별 3라운드', '조별 4라운드', '조별 5라운드'];
-
-          // Double-booking detection: which reg IDs are already used in fixtureRound in selected group
-          const bookedInRound = new Set<string>();
-          if (fixtureRound) {
-            fixtures
-              .filter((f) => f.round === fixtureRound && (!fixtureGroupId || f.groupId === fixtureGroupId))
-              .forEach((f) => {
-                if (f.homeRegistrationId) bookedInRound.add(f.homeRegistrationId);
-                if (f.awayRegistrationId) bookedInRound.add(f.awayRegistrationId);
-              });
-          }
-
-          const homeBooked = fixtureHomeRegId ? bookedInRound.has(fixtureHomeRegId) : false;
-          const awayBooked = fixtureAwayRegId ? bookedInRound.has(fixtureAwayRegId) : false;
-          const sameTeam = !!(fixtureHomeRegId && fixtureHomeRegId === fixtureAwayRegId);
-          const hasBookingWarn = !sameTeam && (homeBooked || awayBooked);
-
-          return (
-            <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Round select */}
-              <div className="flex flex-col gap-1">
-                <label htmlFor="fixture-round" className="text-[13px] text-[var(--text-strong)]">라운드</label>
-                <select
-                  id="fixture-round"
-                  value={fixtureRound}
-                  onChange={(e) => setFixtureRound(e.target.value)}
-                  disabled={createFixture.isPending}
-                  className={inputCls}
-                >
-                  <option value="">라운드 선택</option>
-                  {roundOptions.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Fixture number */}
-              <div className="flex flex-col gap-1">
-                <label htmlFor="fixture-number" className="text-[13px] text-[var(--text-strong)]">번호</label>
-                <input
-                  id="fixture-number"
-                  type="number"
-                  min="1"
-                  value={fixtureNumber}
-                  onChange={(e) => setFixtureNumber(e.target.value)}
-                  disabled={createFixture.isPending}
-                  className={inputCls}
-                />
-              </div>
-
-              {/* Group select */}
-              {groups.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="fixture-group" className="text-[13px] text-[var(--text-strong)]">소속 조 (선택)</label>
-                  <select
-                    id="fixture-group"
-                    value={fixtureGroupId}
-                    onChange={(e) => {
-                      setFixtureGroupId(e.target.value);
-                      // reset round when group/phase changes
-                      setFixtureRound('');
-                    }}
-                    disabled={createFixture.isPending}
-                    className={inputCls}
-                  >
-                    <option value="">조 없음</option>
-                    {groups.map((g) => (<option key={g.id} value={g.id}>{g.name}</option>))}
-                  </select>
-                </div>
-              )}
-
-              {/* Home team — exclude away selection */}
-              <div className="flex flex-col gap-1">
-                <label htmlFor="fixture-home" className="text-[13px] text-[var(--text-strong)]">
-                  홈 팀 (선택)
-                  {homeBooked && (
-                    <span className="ml-1 text-xs text-[var(--orange700)]" aria-live="polite">
-                      이미 해당 라운드에 배정됨
-                    </span>
-                  )}
-                </label>
-                <EntityPicker
-                  id="fixture-home"
-                  value={confirmedTeamItems.find((it) => it.id === fixtureHomeRegId) ?? null}
-                  onChange={(item) => setFixtureHomeRegId(item?.id ?? '')}
-                  items={confirmedTeamItems.filter((it) => it.id !== fixtureAwayRegId)}
-                  disabled={createFixture.isPending}
-                  clearLabel="미정"
-                  placeholder="홈 팀 검색"
-                />
-              </div>
-
-              {/* Away team — exclude home selection.
-                  sm:col-span-2 only when 소속 조 필드가 있어 항목 수가 홀수(5)가 될 때 —
-                  짝수(4, 소속조 없음)일 때 걸면 오히려 그 경우에 빈 칸이 생긴다. */}
-              <div className={`flex flex-col gap-1${groups.length > 0 ? ' sm:col-span-2' : ''}`}>
-                <label htmlFor="fixture-away" className="text-[13px] text-[var(--text-strong)]">
-                  어웨이 팀 (선택)
-                  {awayBooked && (
-                    <span className="ml-1 text-xs text-[var(--orange700)]" aria-live="polite">
-                      이미 해당 라운드에 배정됨
-                    </span>
-                  )}
-                </label>
-                <EntityPicker
-                  id="fixture-away"
-                  value={confirmedTeamItems.find((it) => it.id === fixtureAwayRegId) ?? null}
-                  onChange={(item) => setFixtureAwayRegId(item?.id ?? '')}
-                  items={confirmedTeamItems.filter((it) => it.id !== fixtureHomeRegId)}
-                  disabled={createFixture.isPending}
-                  clearLabel="미정"
-                  placeholder="어웨이 팀 검색"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1 items-start sm:col-span-2">
-                {/* Booking / same-team warning */}
-                {(sameTeam || hasBookingWarn) && (
-                  <p className="text-xs text-[var(--orange700)]" role="alert">
-                    {sameTeam
-                      ? '홈과 어웨이에 같은 팀을 선택할 수 없어요.'
-                      : '해당 라운드에 이미 배정된 팀이 있어요. 확인 후 추가해 주세요.'}
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  disabled={!fixtureRound || !fixtureNumber || sameTeam || createFixture.isPending}
-                  className={submitBtnCls + ' w-full sm:w-auto'}
-                >
-                  <Plus size={14} aria-hidden="true" />경기 일정 추가
-                </button>
-              </div>
-            </form>
-          );
-        })()}
-      </div>
-      )}
-      </StepRow>
-
-      </div>{/* end left column */}
-
-      {/* ── 우측 컬럼: 데이터 (조별 순위표 · 픽스처 목록) ── */}
-      <div className="flex min-w-0 flex-col gap-6">
-
-      {/* ── 조별 순위표 ──────────────────────────────────────────────── */}
-      {groups.length > 0 && (
-        <section
-          aria-labelledby="admin-group-standings-title"
-          className="flex min-w-0 flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-5"
-        >
-          <div className="flex items-center justify-between">
-            <h3 id="admin-group-standings-title" className="text-[15px] font-bold text-[var(--text-strong)]">
-              조별 순위표
-            </h3>
-            <button
-              type="button"
-              onClick={handleRecalculate}
-              disabled={recalculate.isPending}
-              className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-            >
-              <RefreshCw size={13} aria-hidden="true" />
-              순위 재계산
-            </button>
-          </div>
-          {groups.map((group) => {
-            const standings = bracket?.standings.filter((s) => s.groupId === group.id) ?? [];
-            const standingColumns: AdminTableColumn<V1AdminBracketStanding>[] = [
-              {
-                key: 'position',
-                header: '순위',
-                align: 'center',
-                width: 'w-[56px]',
-                render: (s) => <span className="tabular-nums text-[var(--text-muted)]">{s.position}</span>,
-              },
-              {
-                key: 'teamName',
-                header: '팀',
-                render: (s) => <span className="font-medium text-[var(--text-strong)]">{s.teamName ?? s.registrationId}</span>,
-              },
-              {
-                key: 'wins',
-                header: '승',
-                align: 'center',
-                width: 'w-[52px]',
-                render: (s) => <span className="tabular-nums">{s.wins}</span>,
-              },
-              {
-                key: 'draws',
-                header: '무',
-                align: 'center',
-                width: 'w-[52px]',
-                render: (s) => <span className="tabular-nums">{s.draws}</span>,
-              },
-              {
-                key: 'losses',
-                header: '패',
-                align: 'center',
-                width: 'w-[52px]',
-                render: (s) => <span className="tabular-nums">{s.losses}</span>,
-              },
-              {
-                key: 'goalsFor',
-                header: '득점',
-                align: 'center',
-                width: 'w-[60px]',
-                render: (s) => <span className="tabular-nums">{s.goalsFor}</span>,
-              },
-              {
-                key: 'goalsAgainst',
-                header: '실점',
-                align: 'center',
-                width: 'w-[60px]',
-                render: (s) => <span className="tabular-nums">{s.goalsAgainst}</span>,
-              },
-              {
-                key: 'points',
-                header: '승점',
-                align: 'right',
-                width: 'w-[64px]',
-                render: (s) => <span className="tabular-nums font-semibold text-[var(--text-strong)]">{s.points}</span>,
-              },
-            ];
-            // #6a: knockout phases (semi/final/third_place) with no teams → slim hint row
-            //       group phase keeps AdminEmpty as-is (different table-level empty is fine)
-            const isKnockout = group.phase === 'semi' || group.phase === 'final' || group.phase === 'third_place';
-            const knockoutEmpty = isKnockout && standings.length === 0;
-
-            return (
-              <div key={group.id} className="flex flex-col gap-2">
-                <div className="flex items-center gap-1 px-1">
-                  <h4 className="text-[13px] font-bold text-[var(--text-muted)] m-0">
-                    {group.name}
-                    {group.advanceCount != null && (
-                      <span className="ml-1.5 font-medium text-gray-400">상위 {group.advanceCount}팀 진출</span>
-                    )}
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditGroup(group);
-                      setEditGroupName(group.name);
-                      setEditGroupAdvance(group.advanceCount != null ? String(group.advanceCount) : '');
-                    }}
-                    aria-label={`${group.name} 수정`}
-                    className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-md text-gray-400 hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors"
-                  >
-                    <Pencil size={12} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleDeleteGroup(group)}
-                    aria-label={`${group.name} 삭제`}
-                    className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-md text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
-                  >
-                    <Trash2 size={12} aria-hidden="true" />
-                  </button>
-                </div>
-                {group.groupTeams.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 px-1">
-                    {group.groupTeams.map((gt) => (
-                      <span key={gt.id} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]">
-                        {gt.teamName ?? gt.registrationId}
-                        <button
-                          type="button"
-                          onClick={() => void handleRemoveGroupTeam(gt.id, gt.teamName ?? '이 팀')}
-                          aria-label={`${gt.teamName ?? '팀'} 배정 해제`}
-                          className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-gray-400 hover:text-red-500 hover:bg-[var(--red50)] transition-colors"
-                        >
-                          <X size={11} aria-hidden="true" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {knockoutEmpty ? (
-                  // #6a: single slim inline hint instead of tall AdminEmpty box
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--surface-soft)] border border-dashed border-[var(--border)]">
-                    <span className="text-xs text-[var(--text-muted)]" aria-label={`${group.name} 팀 배정 안내`}>
-                      아직 배정된 팀이 없어요
-                    </span>
-                    <span className="text-xs text-[var(--text-muted)]" aria-hidden="true">·</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAssignGroupId(group.id);
-                        const el = document.getElementById('assign-group');
-                        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        el?.focus();
-                      }}
-                      className="text-xs text-[var(--blue700)] hover:opacity-80 underline underline-offset-2 min-h-[44px] inline-flex items-center px-1 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-                    >
-                      팀 배정하기
-                    </button>
-                  </div>
-                ) : (
-                  <AdminDataTable<V1AdminBracketStanding>
-                    columns={standingColumns}
-                    rows={standings}
-                    keyExtractor={(s) => s.id}
-                    scrollOnMobile
-                    empty={
-                      // 팀은 배정됐는데 순위 레코드가 아직 없을 수 있다(순위는 재계산 시점에 만들어진다).
-                      // 이때 "팀이 없어요"라고 하면 방금 배정한 팀이 사라진 것처럼 보인다.
-                      group.groupTeams.length > 0 ? (
-                        <AdminEmpty
-                          title="순위가 아직 없어요"
-                          description="배정은 됐지만 순위는 아직 계산 전이에요. '순위 재계산'을 눌러 주세요."
-                        />
-                      ) : (
-                        <AdminEmpty title="팀이 없어요" description="배정된 팀이 없어요." />
-                      )
-                    }
-                  />
-                )}
-              </div>
-            );
-          })}
-        </section>
-      )}
-
-      </div>{/* end right column */}
-
-      {/* ── 픽스처 목록 — 전폭 섹션: 좁은 우측 컬럼에 있을 때 팀명·액션 버튼이
-             세로로 꺾이던 문제를 그리드 밖 전체 너비로 빼서 해결 ── */}
+      {/* ── 픽스처 목록: 모든 조 합산 전체보기 (조 카드와 별개, 전폭 섹션) ── */}
       {fixtures.length > 0 && (
-        <div className="flex flex-col gap-2 lg:col-span-2">
-          <h3 className="text-[15px] font-bold text-[var(--text-strong)]">경기 일정</h3>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[15px] font-bold text-[var(--text-strong)]">경기 일정 전체보기</h3>
           {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens.
-              tableMaxWidth="max-w-none" — 이 섹션은 이미 lg:col-span-2로 전폭이라
+              tableMaxWidth="max-w-none" — 조 카드 목록과 별개인 전폭 섹션이라
               기본 900px 캡을 걸 이유가 없고, 오히려 좁은 데스크톱(~1024px)에서
               불필요한 가로 스크롤을 유발했다. */}
           <AdminDataTable<V1AdminBracketFixture>

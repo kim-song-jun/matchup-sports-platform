@@ -203,7 +203,9 @@ export class PublicTournamentRecordsService {
         goalsAgainst: true,
         position: true,
         group: { select: { name: true } },
-        registration: { select: { team: { select: { id: true, name: true } } } },
+        registration: {
+          select: { team: { select: { id: true, name: true, profile: { select: { logoUrl: true } } } } },
+        },
       },
     });
 
@@ -224,6 +226,7 @@ export class PublicTournamentRecordsService {
         groupName: standing.group.name,
         teamId: standing.registration.team.id,
         teamName: standing.registration.team.name,
+        teamLogoUrl: standing.registration.team.profile?.logoUrl ?? null,
         position: standing.position,
         points: standing.points,
         wins: standing.wins,

@@ -80,6 +80,7 @@ export interface PublicStandingRow {
   readonly groupName: string;
   readonly teamId: string;
   readonly teamName: string;
+  readonly teamLogoUrl: string | null;
   readonly position: number;
   readonly points: number;
   readonly wins: number;

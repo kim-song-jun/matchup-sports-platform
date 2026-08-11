@@ -3,6 +3,10 @@
 import Link from 'next/link';
 import { Film } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
+import {
+  TournamentStandingsTable,
+  type TournamentStandingsRow,
+} from '@/components/tournaments/tournament-standings-table';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { LiveBadge } from './live-badge';
 import {
@@ -159,6 +163,29 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
   );
 }
 
+/** PublicStandingRow(공개 일정 API) → 공용 순위표 행. teamId를 key로 쓴다(등록 단위 id가 이 응답엔 없다). */
+function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStandingsRow[] {
+  return rows.map((row) => ({
+    key: row.teamId,
+    teamId: row.teamId,
+    teamName: row.teamName,
+    teamLogoUrl: row.teamLogoUrl,
+    position: row.position,
+    points: row.points,
+    goalsFor: row.goalsFor,
+    goalsAgainst: row.goalsAgainst,
+  }));
+}
+
+/**
+ * §순위표 지표 통일 — 이전엔 이 표만 승/무/패+승점 컬럼으로, 순위·대진표 탭
+ * (bracket-page-client.tsx)의 표는 승점+득실 컬럼으로 따로 그려서 같은 대회의
+ * 같은 팀 성적이 탭에 따라 다르게 보였다. 이제 표시 로직은
+ * `TournamentStandingsTable` 한 벌뿐이고(컬럼 근거는 그 파일 주석 참고), 이
+ * 함수는 그룹 나누기 + 어댑터 변환만 담당한다. 이 API 응답엔 진출(advance)
+ * 정보가 없으므로 진출선 하이라이트는 항상 없음(advance=null) — 원래도 이
+ * 탭엔 진출 배지가 없었으니 동작 변화 없음.
+ */
 function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
   const groups = new Map<string, { groupName: string; rows: PublicStandingRow[] }>();
   for (const row of rows) {
@@ -170,51 +197,25 @@ function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {Array.from(groups.entries()).map(([groupId, group]) => (
-        <Card key={groupId} pad={0}>
+        <section key={groupId} aria-label={`${group.groupName} 순위`}>
           <div
             style={{
-              padding: '10px 16px',
               fontSize: 12,
               fontWeight: 700,
-              color: 'var(--text-caption)',
-              borderBottom: '1px solid var(--grey100)',
+              color: 'var(--text-muted)',
+              marginBottom: 8,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
             }}
           >
             {group.groupName}
           </div>
-          {[...group.rows]
-            .sort((a, b) => a.position - b.position)
-            .map((row) => (
-              <Link
-                key={row.teamId}
-                href={`/teams/${row.teamId}/records`}
-                className="tm-pressable"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '8px 16px',
-                  minHeight: 44,
-                  borderTop: '1px solid var(--grey100)',
-                  textDecoration: 'none',
-                  color: 'inherit',
-                }}
-              >
-                <span style={{ width: 20, fontSize: 13, fontWeight: 700, color: 'var(--text-caption)' }}>
-                  {row.position}
-                </span>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
-                  {row.teamName}
-                </span>
-                <span className="tab-num" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {row.wins}승 {row.draws}무 {row.losses}패
-                </span>
-                <span className="tab-num" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>
-                  {row.points}점
-                </span>
-              </Link>
-            ))}
-        </Card>
+          <TournamentStandingsTable
+            rows={toStandingsRows(group.rows)}
+            advance={null}
+            ariaLabel={`${group.groupName} 순위표`}
+          />
+        </section>
       ))}
     </div>
   );

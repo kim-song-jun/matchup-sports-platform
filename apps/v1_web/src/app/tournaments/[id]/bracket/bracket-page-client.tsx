@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { Trophy } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
@@ -13,7 +12,10 @@ import {
   buildTournamentStages,
 } from '@/components/tournaments/tournament-progress-stepper';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
-import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import {
+  TournamentStandingsTable,
+  type TournamentStandingsRow,
+} from '@/components/tournaments/tournament-standings-table';
 import {
   partitionTournamentSections,
   isGroupStageComplete,
@@ -30,29 +32,18 @@ import type {
 
 /* ── 리그 / 조별 순위표 ── */
 
-function StandingRankBadge({ pos, advance }: { pos: number; advance: number | null }) {
-  const promoted = advance !== null && pos <= advance;
-  if (pos === 1) return <span className="tm-standings-rank tm-standings-rank-gold">{pos}</span>;
-  if (pos === 2) return <span className="tm-standings-rank tm-standings-rank-silver">{pos}</span>;
-  if (pos === 3) return <span className="tm-standings-rank tm-standings-rank-bronze">{pos}</span>;
-  return (
-    <span
-      className="tm-standings-rank"
-      style={promoted ? { background: 'var(--blue50)', color: 'var(--blue500)' } : undefined}
-    >
-      {pos}
-    </span>
-  );
-}
-
-function GoalDiff({ gf, ga }: { gf: number; ga: number }) {
-  const diff = gf - ga;
-  const color = diff > 0 ? 'var(--blue500)' : diff < 0 ? 'var(--red, #ff4d4f)' : 'var(--text-muted)';
-  return (
-    <span style={{ color, fontWeight: diff !== 0 ? 700 : 400 }}>
-      {diff > 0 ? '+' : ''}{diff}
-    </span>
-  );
+/** V1TournamentStanding(대회 상세 API) → 공용 순위표 행. registrationId를 key로 쓴다. */
+function toStandingsRows(standings: readonly V1TournamentStanding[]): TournamentStandingsRow[] {
+  return standings.map((s) => ({
+    key: s.registrationId,
+    teamId: s.teamId,
+    teamName: s.teamName,
+    teamLogoUrl: s.teamLogoUrl,
+    position: s.position,
+    points: s.points,
+    goalsFor: s.goalsFor,
+    goalsAgainst: s.goalsAgainst,
+  }));
 }
 
 /**
@@ -65,7 +56,6 @@ function GoalDiff({ gf, ga }: { gf: number; ga: number }) {
  * 같은 기준으로 자동 꺼지게 한다(별도 분기 없이 하나의 변수로 gate).
  */
 function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; fixtures: V1TournamentFixture[] }) {
-  const sorted = [...group.standings].sort((a, b) => a.position - b.position);
   const stageComplete = isGroupStageComplete(group.id, fixtures);
   const advance = stageComplete ? group.advanceCount : null;
 
@@ -94,125 +84,20 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
         ) : null}
       </div>
 
-      <Card pad={0}>
-        <div style={{ overflowX: 'auto' }}>
-          <table
-            className="tm-standings-table"
-            aria-label={`${group.name} 순위표`}
-            style={{ minWidth: 240 }}
-          >
-            <thead className="tm-standings-thead">
-              <tr>
-                <th style={{ width: 36, paddingLeft: 12 }}>#</th>
-                <th>팀</th>
-                <th className="num" style={{ width: 44 }}>승점</th>
-                <th className="num" style={{ width: 44, paddingRight: 12 }}>득실</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.length > 0 ? (
-                sorted.map((s) => (
-                  <tr
-                    key={s.registrationId}
-                    className={`tm-standings-row${advance !== null && s.position <= advance ? ' tm-standings-row-highlight' : ''}`}
-                  >
-                    <td style={{ paddingLeft: 12 }}>
-                      <StandingRankBadge pos={s.position} advance={advance} />
-                    </td>
-                    <td>
-                      <Link
-                        href={`/teams/${s.teamId}/records`}
-                        className="tm-pressable"
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, textDecoration: 'none', color: 'inherit' }}
-                      >
-                        <TeamAvatar seed={s.teamId} name={s.teamName} logoUrl={s.teamLogoUrl} size="sm" />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
-                          {s.teamName}
-                        </span>
-                      </Link>
-                    </td>
-                    <td className="num" style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)' }}>
-                      {s.points}점
-                    </td>
-                    <td className="num" style={{ paddingRight: 12 }}>
-                      <GoalDiff gf={s.goalsFor} ga={s.goalsAgainst} />
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-caption)', fontSize: 13 }}>
-                    순위 집계 전이에요
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <TournamentStandingsTable
+        rows={toStandingsRows(group.standings)}
+        advance={advance}
+        ariaLabel={`${group.name} 순위표`}
+      />
     </section>
   );
 }
 
 /* ── 리그 최종 순위표 (리그 포맷) ── */
 function LeagueStandingsSection({ standings }: { standings: V1TournamentStanding[] }) {
-  const sorted = [...standings].sort((a, b) => a.position - b.position);
-
   return (
     <section aria-label="리그 순위" style={{ marginBottom: 16 }}>
-      <Card pad={0}>
-        <div style={{ overflowX: 'auto' }}>
-          <table
-            className="tm-standings-table"
-            aria-label="리그 순위표"
-            style={{ minWidth: 240 }}
-          >
-            <thead className="tm-standings-thead">
-              <tr>
-                <th style={{ width: 36, paddingLeft: 12 }}>#</th>
-                <th>팀</th>
-                <th className="num" style={{ width: 44 }}>승점</th>
-                <th className="num" style={{ width: 44, paddingRight: 12 }}>득실</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.length > 0 ? (
-                sorted.map((s) => (
-                  <tr key={s.registrationId} className="tm-standings-row">
-                    <td style={{ paddingLeft: 12 }}>
-                      <StandingRankBadge pos={s.position} advance={null} />
-                    </td>
-                    <td>
-                      <Link
-                        href={`/teams/${s.teamId}/records`}
-                        className="tm-pressable"
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, textDecoration: 'none', color: 'inherit' }}
-                      >
-                        <TeamAvatar seed={s.teamId} name={s.teamName} logoUrl={s.teamLogoUrl} size="sm" />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
-                          {s.teamName}
-                        </span>
-                      </Link>
-                    </td>
-                    <td className="num" style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-strong)' }}>
-                      {s.points}점
-                    </td>
-                    <td className="num" style={{ paddingRight: 12 }}>
-                      <GoalDiff gf={s.goalsFor} ga={s.goalsAgainst} />
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-caption)', fontSize: 13 }}>
-                    순위 집계 전이에요
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <TournamentStandingsTable rows={toStandingsRows(standings)} advance={null} ariaLabel="리그 순위표" />
     </section>
   );
 }

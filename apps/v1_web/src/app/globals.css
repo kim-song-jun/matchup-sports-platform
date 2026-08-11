@@ -4838,27 +4838,14 @@ button:disabled {
   background: var(--grey100);
 }
 
-/* 매치 유형(개인/팀) 세그먼트 — 스크롤 영역 직속 자식이라 좌우 여백을 스스로 확보해야 한다.
-   위 검색바 입력·아래 종목 칩/카드가 모두 --v1-shell-page-x 인셋이므로 같은 토큰으로 맞춘다.
-   .tm-segment-row의 기본 배경(--grey100)은 이미 카드 안(예: .tm-my-shell)에 놓이는 다른
-   사용처를 위한 것이라, .tm-app-frame(--grey50)에 직접 얹히는 이 인스턴스에서는 인접 단계라
-   대비가 약하다. .tm-quick-grid와 동일한 원칙(453줄 주석)으로 --card-surface + --border를
-   써서 실제 구분되는 표면으로 만든다. */
+/* 2026-08-11: main에는 없는 dev 전용 오버라이드(--card-surface + border, 세그먼트
+   트랙을 페이지 배경과 더 분리하려던 시도)가 활성 탭의 기본 pill 배경(--surface)과
+   완전히 같은 값이 되어 활성 탭이 자기 트랙에 녹아 사라지는 새 버그를 만들었다(실측
+   지적: "active 상태가 폰트 굵기 차이뿐"). main과 동일한 형태로 되돌린다 —
+   .tm-segment-row의 기본 --grey100 트랙이면 .tm-review-tab[data-active]의 --surface
+   pill이 원래도 잘 보였다(패치를 덧대는 대신 원인이 된 오버라이드 자체를 제거). */
 .tm-match-type-segment {
   margin: 0 var(--v1-shell-page-x) 12px;
-  background: var(--card-surface);
-  border: 1px solid var(--border);
-}
-
-/* [토큰 충돌 fix] .tm-review-tab[data-active]의 기본 활성 배경(--surface)이 바로 위
-   .tm-match-type-segment 트랙 배경(--card-surface)과 완전히 같은 값(둘 다 #fff 라이트 /
-   #1c1e24 다크)이라 활성 탭이 자기 트랙에 녹아 사라져 글자 굵기 차이만 남았다(실측
-   지적: "active 상태가 폰트 굵기 차이뿐"). .tm-review-tabs(트랙이 --grey100)에서는 흰
-   pill이 잘 보이지만 이 트랙(흰색)에서는 반대로 짙은 pill이 필요 — grey150 + border로
-   반전한다. */
-.tm-match-type-segment .tm-review-tab[data-active="true"] {
-  background: var(--grey150);
-  border: 1px solid var(--border-strong);
 }
 
 @media (min-width: 1024px) {

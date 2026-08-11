@@ -19,7 +19,12 @@ import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { useV1FixtureLineup, useV1Game, postV1GameCommand } from '@/hooks/use-v1-game-operations';
 import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
 import { isTakeoverHeld } from '@/lib/game-operations-queue';
-import { freezeCapture, type FrozenEventCapture } from '@/lib/game-operations-clock';
+import {
+  freezeCapture,
+  formatMatchClock,
+  isClockSuspicious,
+  type FrozenEventCapture,
+} from '@/lib/game-operations-clock';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
@@ -172,6 +177,18 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return periods.some((period) => period.number === currentPeriod.number + 1);
   }, [currentPeriod, gameDetail.data?.periods]);
 
+  // alpha "452′" 사고 대응 — 현재 피리어드의 설정된 길이(분). `periodDurations`는
+  // `GameDetail.periods`와 배열 인덱스로 정렬된다(`GamePeriodDuration` 타입
+  // 문서 참고) — 값을 못 읽었거나(레거시 config, 아직 이 필드를 안 주는 목
+  // 테스트 등) 그 피리어드 항목이 비정상이면 `null`이고, 그때는 확인 게이트를
+  // 그냥 건너뛴다(값을 지어내지 않는다).
+  const currentPeriodDurationMinutes = useMemo(() => {
+    if (currentPeriod === null) return null;
+    const durations = gameDetail.data?.periodDurations ?? null;
+    const entry = durations?.[currentPeriod.number - 1] ?? null;
+    return entry?.durationMinutes ?? null;
+  }, [currentPeriod, gameDetail.data?.periodDurations]);
+
   const availableCommands: readonly GameCommandName[] = useMemo(() => {
     switch (gameState) {
       case 'SCHEDULED':
@@ -242,6 +259,27 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const { confirm, ConfirmModal: endGameConfirmModal } = useConfirm();
 
+  // alpha "452′" 사고 대응 — 제출 직전 마지막 확인. `clockMs`가 이 피리어드의
+  // 설정된 길이를 크게 넘으면(`isClockSuspicious`) 운영자에게 한 번 더
+  // 물어본다. `currentPeriodDurationMinutes`가 `null`이면(설정을 못 읽음)
+  // 판단 근거가 없으므로 그냥 통과시킨다 — 지어낸 기준으로 막지 않는다.
+  // 이 함수는 제출을 "막지" 않는다: 운영자가 확인하면 그대로 진행되고,
+  // 취소하면 호출부가 제출 자체를 하지 않을 뿐이다(서버 하드 거부와 다름).
+  const confirmIfClockSuspicious = useCallback(
+    async (clockMs: number, periodNumber: number): Promise<boolean> => {
+      if (currentPeriodDurationMinutes === null || !isClockSuspicious(clockMs, currentPeriodDurationMinutes)) {
+        return true;
+      }
+      return confirm({
+        title: '기록 시각을 확인해주세요',
+        message: `${periodLabel(periodNumber)} ${formatMatchClock(clockMs)}로 기록돼요. 이 피리어드는 보통 ${currentPeriodDurationMinutes}분이에요. 경기 종료를 누르지 않은 채 시간이 흘렀을 수 있어요 — 그대로 기록할까요?`,
+        confirmLabel: '그대로 기록',
+        tone: 'danger',
+      });
+    },
+    [confirm, currentPeriodDurationMinutes],
+  );
+
   const handleSelectAction = useCallback(
     (button: (typeof ACTION_BUTTONS)[number]) => {
       // T1-0: no LIVE period means there is no server-anchored start time to
@@ -288,7 +326,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   }, [ops.liveEvents]);
 
   const handleCommit = useCallback(
-    (input: EventCaptureCommitInput) => {
+    async (input: EventCaptureCommitInput) => {
+      if (!(await confirmIfClockSuspicious(input.clockMs, input.period))) return;
       void ops.submitEvent(input);
       setPendingAction(null);
       // GOAL은 이 콘솔에서 항상 참가자를 선택해 커밋한다(`ActionTargetPicker`가
@@ -309,7 +348,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         });
       }
     },
-    [ops, showToast],
+    [ops, showToast, confirmIfClockSuspicious],
   );
 
   const attachAssist = useCallback(
@@ -335,7 +374,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 액션이 달린 확인 토스트를 띄운다 — 기존 `ops.reverseEvent`(CORRECTION)
   // 경로를 그대로 재사용한다(새 되돌리기 API를 만들지 않는다).
   const handleQuickSubstitute = useCallback(
-    (input: { sideId: string; outParticipant: GameLineupParticipant; inParticipant: GameLineupParticipant }) => {
+    async (input: { sideId: string; outParticipant: GameLineupParticipant; inParticipant: GameLineupParticipant }) => {
       if (currentPeriod === null || currentPeriod.startedAt === null) return;
       const periodStartedAtMs = new Date(currentPeriod.startedAt).getTime();
       const frozen = freezeCapture({
@@ -346,6 +385,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         pausedTotalMs: currentPeriod.pausedTotalMs,
         pausedAtMs: currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime(),
       });
+      // 빠른 교체는 원래 확인창 없이 한 탭으로 끝나는 게 설계 의도지만(위 문서
+      // 참고), 시각이 비정상일 때만은 예외다 — `handleRunCommand`의 '경기
+      // 종료'가 이미 같은 패턴(평소엔 즉시 실행, 위험할 때만 확인)이다.
+      if (!(await confirmIfClockSuspicious(frozen.clockMs, frozen.period))) return;
       void ops.submitEvent({
         type: 'SUBSTITUTION',
         participantId: input.inParticipant.id,
@@ -372,7 +415,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         },
       });
     },
-    [currentPeriod, ops, showToast],
+    [currentPeriod, ops, showToast, confirmIfClockSuspicious],
   );
 
   const handleRunCommand = useCallback(
@@ -665,19 +708,34 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           화면에서 "배경이 꽉 찬 유채색 강조"는 0개가 되고, 색은 작은
           지시자로만 남는다 — 나머지(버튼 배경·테두리·라벨)는 후퇴시켜
           강조가 뭉개지지 않게 한다(R-D2).
-          레이아웃: 5개(골/옐로/레드/파울/교체)가 2열(모바일)/4열(sm+)로
-          나뉘면 마지막 한 개가 다음 줄에 혼자 남아 절반이 빈 채로 어색하게
-          줄바꿈됐다. sm 이상은 5열 한 줄로 펴서 아예 줄바꿈이 안 생기게
-          하고, 모바일 2열에서는 마지막 버튼(교체)만 두 칸을 차지해 그
-          줄을 꽉 채운다 — 잘린 게 아니라 의도된 강조로 읽힌다. */}
-      <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-5">
+          위계 재설계(alpha 390px 실측 지적) — 예전엔 "교체"만 마지막 칸이라는
+          이유로 전폭(2칸)을 차지해, 실제 사용 빈도·중요도가 가장 낮은 축에
+          속하는 교체가 화면에서 가장 큰 버튼이 됐다(다섯 버튼 중 유일하게
+          "행동 하나로 끝나지 않는" 액션이라 오히려 실수 유발 여지도 큼). 실제
+          현장 빈도는 골이 압도적으로 높고(경기당 여러 번, 즉시 기록 필요),
+          카드·파울이 그다음, 교체가 가장 드물다(경기당 정해진 횟수). 전폭
+          자리를 마지막 항목이 아니라 **골**에 준다 — 모바일에서는 골이
+          단독으로 한 줄 전체(2칸)를 차지하고 살짝 더 높게(h-20) 서서
+          "가장 먼저 눈에 띄고 가장 먼저 손이 가는" 위치(엄지 도달 최상단)를
+          갖는다. 나머지 네 버튼(옐로/레드/파울/교체)은 그 아래 2×2로 가지런히
+          정렬된다 — 카드 2개가 한 행, 파울·교체가 한 행이라 성격이 가까운
+          것끼리 묶인다. 색은 여전히 전부 outline 중립(R-K5 "동급 CTA는
+          1개"를 지키려 골을 primary/파란색으로 올리지 않는다 — 이미 헤더의
+          "일시 중지"가 이 화면의 유일한 파란 CTA다) — 위계는 오직 크기·
+          위치로만 만든다.
+          sm 이상: 5개가 균등 5열이면 이 위계가 데스크톱에서만 사라진다.
+          6열 그리드로 바꿔 골이 2칸(전체의 2/6 ≈ 33%), 나머지가 각 1칸
+          (1/6 ≈ 17%)을 차지하게 해 폭 2배 관계를 모바일과 동일하게
+          유지하면서, 6개 칸(2+1+1+1+1)이 딱 맞아떨어져 줄바꿈 없이 한 줄에
+          정렬된다. */}
+      <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-6">
         {ACTION_BUTTONS.map((button, index) => (
           <Button
             key={`${button.type}-${button.cardColor ?? index}`}
             size="lg"
             variant="outline"
-            className={`h-16 flex-col gap-1${
-              index === ACTION_BUTTONS.length - 1 ? ' col-span-2 sm:col-span-1' : ''
+            className={`flex-col gap-1${
+              index === 0 ? ' col-span-2 h-20 sm:col-span-2 sm:h-16' : ' h-16'
             }`}
             disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
             onClick={() => handleSelectAction(button)}
@@ -702,13 +760,22 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {/* 풋살 등 롤링 교체 종목 전용 — 하드코딩된 종목명이 아니라
           `substitutionPolicy.mode`(config 값)로만 노출 여부를 판단한다(요건 B).
           기본 `교체` 액션(액션 우선 2단계)은 이 종목에서도 항상 그대로 쓸 수
-          있다 — 이 토글은 그 위에 얹는 선택적 빠른 경로다. */}
+          있다 — 이 토글은 그 위에 얹는 선택적 빠른 경로다.
+          정렬 재설계(alpha 390px 실측 지적) — 예전엔 `self-start`로 왼쪽에
+          작게 붙어 있어, 바로 위 액션 그리드와 좌우 경계가 어긋나고 크기도
+          확 줄어 "따로 노는 버튼"처럼 보였다. `block`(전폭)으로 바꿔 위
+          그리드와 정확히 같은 `px-4` 좌우 경계를 공유하게 한다 — 그리드가
+          끝나는 자리에서 자연스럽게 다음 단(선택적 빠른 경로)으로 이어지는
+          느낌을 준다. 높이는 그대로 sm(44px 터치 타깃)을 유지한다 — 이건
+          다섯 액션 버튼과 동급 빈도가 아니라 그 아래 얹는 보조 토글이라,
+          높이까지 h-16으로 맞추면 오히려 "6번째 액션 버튼"처럼 위계가
+          부풀어 보인다. */}
       {gameDetail.data?.substitutionPolicy?.mode === 'rolling' && (
         <div className="flex flex-col gap-2 px-4">
           <Button
             size="sm"
             variant={quickSubstitutionMode ? 'primary' : 'outline'}
-            className="self-start"
+            block
             disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
             onClick={() => setQuickSubstitutionMode((current) => !current)}
             aria-pressed={quickSubstitutionMode}

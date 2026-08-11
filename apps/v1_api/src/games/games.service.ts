@@ -31,7 +31,11 @@ import type {
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
-import { parseLineupCatalog, parseLineupLimits } from '../tournaments/competition-config/competition-config.parse';
+import {
+  parseLineupCatalog,
+  parseLineupLimits,
+  parsePeriodDurations,
+} from '../tournaments/competition-config/competition-config.parse';
 import { GameTakeoverService } from './game-takeover.service';
 import {
   decideTournamentStaffAccess,
@@ -609,7 +613,7 @@ export class GamesService {
       // server source of truth (apps/v1_web/src/components/lineup/formation-slots.ts).
       const config = await tx.v1CompetitionConfigVersion.findUnique({
         where: { id: game.competitionConfigVersionId },
-        select: { lineup: true },
+        select: { lineup: true, periods: true },
       });
       const lineup = config === null ? {} : jsonObject(config.lineup);
       return {
@@ -627,6 +631,10 @@ export class GamesService {
           mode: lineup.substitutions === 'rolling' ? 'rolling' : 'limited',
           maxSubstitutions: typeof lineup.maxSubstitutions === 'number' ? lineup.maxSubstitutions : null,
         } as const,
+        // alpha 452′ 사고 대응: 캡처 확인 게이트(`operate-console.tsx`)가 "이
+        // 피리어드가 몇 분짜리인지" 를 알아야 비정상 클럭을 판단할 수 있다 —
+        // `parsePeriodDurations` 문서 참고.
+        periodDurations: config === null ? null : parsePeriodDurations(config.periods),
       };
     });
   }

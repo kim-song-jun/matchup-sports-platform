@@ -665,19 +665,34 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           화면에서 "배경이 꽉 찬 유채색 강조"는 0개가 되고, 색은 작은
           지시자로만 남는다 — 나머지(버튼 배경·테두리·라벨)는 후퇴시켜
           강조가 뭉개지지 않게 한다(R-D2).
-          레이아웃: 5개(골/옐로/레드/파울/교체)가 2열(모바일)/4열(sm+)로
-          나뉘면 마지막 한 개가 다음 줄에 혼자 남아 절반이 빈 채로 어색하게
-          줄바꿈됐다. sm 이상은 5열 한 줄로 펴서 아예 줄바꿈이 안 생기게
-          하고, 모바일 2열에서는 마지막 버튼(교체)만 두 칸을 차지해 그
-          줄을 꽉 채운다 — 잘린 게 아니라 의도된 강조로 읽힌다. */}
-      <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-5">
+          위계 재설계(alpha 390px 실측 지적) — 예전엔 "교체"만 마지막 칸이라는
+          이유로 전폭(2칸)을 차지해, 실제 사용 빈도·중요도가 가장 낮은 축에
+          속하는 교체가 화면에서 가장 큰 버튼이 됐다(다섯 버튼 중 유일하게
+          "행동 하나로 끝나지 않는" 액션이라 오히려 실수 유발 여지도 큼). 실제
+          현장 빈도는 골이 압도적으로 높고(경기당 여러 번, 즉시 기록 필요),
+          카드·파울이 그다음, 교체가 가장 드물다(경기당 정해진 횟수). 전폭
+          자리를 마지막 항목이 아니라 **골**에 준다 — 모바일에서는 골이
+          단독으로 한 줄 전체(2칸)를 차지하고 살짝 더 높게(h-20) 서서
+          "가장 먼저 눈에 띄고 가장 먼저 손이 가는" 위치(엄지 도달 최상단)를
+          갖는다. 나머지 네 버튼(옐로/레드/파울/교체)은 그 아래 2×2로 가지런히
+          정렬된다 — 카드 2개가 한 행, 파울·교체가 한 행이라 성격이 가까운
+          것끼리 묶인다. 색은 여전히 전부 outline 중립(R-K5 "동급 CTA는
+          1개"를 지키려 골을 primary/파란색으로 올리지 않는다 — 이미 헤더의
+          "일시 중지"가 이 화면의 유일한 파란 CTA다) — 위계는 오직 크기·
+          위치로만 만든다.
+          sm 이상: 5개가 균등 5열이면 이 위계가 데스크톱에서만 사라진다.
+          6열 그리드로 바꿔 골이 2칸(전체의 2/6 ≈ 33%), 나머지가 각 1칸
+          (1/6 ≈ 17%)을 차지하게 해 폭 2배 관계를 모바일과 동일하게
+          유지하면서, 6개 칸(2+1+1+1+1)이 딱 맞아떨어져 줄바꿈 없이 한 줄에
+          정렬된다. */}
+      <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-6">
         {ACTION_BUTTONS.map((button, index) => (
           <Button
             key={`${button.type}-${button.cardColor ?? index}`}
             size="lg"
             variant="outline"
-            className={`h-16 flex-col gap-1${
-              index === ACTION_BUTTONS.length - 1 ? ' col-span-2 sm:col-span-1' : ''
+            className={`flex-col gap-1${
+              index === 0 ? ' col-span-2 h-20 sm:col-span-2 sm:h-16' : ' h-16'
             }`}
             disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
             onClick={() => handleSelectAction(button)}
@@ -702,13 +717,22 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {/* 풋살 등 롤링 교체 종목 전용 — 하드코딩된 종목명이 아니라
           `substitutionPolicy.mode`(config 값)로만 노출 여부를 판단한다(요건 B).
           기본 `교체` 액션(액션 우선 2단계)은 이 종목에서도 항상 그대로 쓸 수
-          있다 — 이 토글은 그 위에 얹는 선택적 빠른 경로다. */}
+          있다 — 이 토글은 그 위에 얹는 선택적 빠른 경로다.
+          정렬 재설계(alpha 390px 실측 지적) — 예전엔 `self-start`로 왼쪽에
+          작게 붙어 있어, 바로 위 액션 그리드와 좌우 경계가 어긋나고 크기도
+          확 줄어 "따로 노는 버튼"처럼 보였다. `block`(전폭)으로 바꿔 위
+          그리드와 정확히 같은 `px-4` 좌우 경계를 공유하게 한다 — 그리드가
+          끝나는 자리에서 자연스럽게 다음 단(선택적 빠른 경로)으로 이어지는
+          느낌을 준다. 높이는 그대로 sm(44px 터치 타깃)을 유지한다 — 이건
+          다섯 액션 버튼과 동급 빈도가 아니라 그 아래 얹는 보조 토글이라,
+          높이까지 h-16으로 맞추면 오히려 "6번째 액션 버튼"처럼 위계가
+          부풀어 보인다. */}
       {gameDetail.data?.substitutionPolicy?.mode === 'rolling' && (
         <div className="flex flex-col gap-2 px-4">
           <Button
             size="sm"
             variant={quickSubstitutionMode ? 'primary' : 'outline'}
-            className="self-start"
+            block
             disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
             onClick={() => setQuickSubstitutionMode((current) => !current)}
             aria-pressed={quickSubstitutionMode}

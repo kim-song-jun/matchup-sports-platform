@@ -96,7 +96,7 @@ export function LineupGrid({
               ].join(' ')}
             >
               {side.displayNameSnapshot}
-              <span className="ml-1 text-2xs font-normal opacity-70">
+              <span className="ml-1 text-xs font-normal opacity-70">
                 {side.sideKey === 'HOME' ? '홈' : '원정'}
               </span>
             </button>
@@ -121,7 +121,7 @@ export function LineupGrid({
                 className="mb-2 text-sm font-semibold text-[var(--text-strong)]"
               >
                 {side.displayNameSnapshot}
-                <span className="ml-1.5 text-2xs font-normal text-[var(--text-muted)]">
+                <span className="ml-1.5 text-xs font-normal text-[var(--text-muted)]">
                   {side.sideKey === 'HOME' ? '홈' : '원정'}
                 </span>
               </h3>
@@ -157,7 +157,7 @@ export function LineupGrid({
                       >
                         <span
                           aria-hidden="true"
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-soft)] text-2xs font-bold tabular-nums text-[var(--text-muted)]"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-soft)] text-xs font-bold tabular-nums text-[var(--text-muted)]"
                         >
                           {participant.jerseyNumber ?? '-'}
                         </span>
@@ -166,7 +166,7 @@ export function LineupGrid({
                             {participant.displayNameSnapshot}
                           </span>
                           {participant.position ? (
-                            <span className="block text-2xs text-[var(--text-muted)]">
+                            <span className="block text-xs text-[var(--text-muted)]">
                               {participant.position}
                             </span>
                           ) : null}

@@ -219,3 +219,35 @@ describe('RecordedEventList', () => {
     expect(screen.queryByRole('button', { name: /되돌리기/ })).toBeNull();
   });
 });
+
+/**
+ * 현장 가독성 회귀 가드.
+ *
+ * 이 콘솔은 경기장에서 휴대폰으로 쓰는 화면이다. 2026-08-11 알파 실측(390px)에서
+ * 이 화면의 11px 텍스트가 28개였고, 그 안에 팀명·이벤트 시각·상태 뱃지 같은 **핵심
+ * 식별 정보가 전부** 들어 있었다(`text-2xs` = 11px 유틸리티). 햇빛 아래 한 손으로
+ * 조작하는 맥락에서 읽히지 않는 크기다.
+ *
+ * `--text-2xs` 자체는 앱 전역에서 쓰이므로 값을 바꾸지 않고, **이 화면에서만** 하한을
+ * 12px 로 올렸다. 타입 종류는 12/14/15/24 = 4종으로 유지돼 루브릭 R-T1 을 지킨다.
+ * 소스 텍스트로 고정하는 이유는 렌더 결과의 computed font-size 가 jsdom 에서
+ * Tailwind 유틸리티를 해석하지 못해 단언할 수 없기 때문이다.
+ */
+describe('현장 운영 콘솔 가독성 하한', () => {
+  it('이 화면의 소스에는 11px(text-2xs) 이 남아 있지 않다', async () => {
+    const { existsSync, readdirSync, readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    // jsdom 환경이라 import.meta.url 이 file: 스킴이 아니고 __dirname 도 없다.
+    // vitest 는 패키지 루트(apps/v1_web)에서 돌므로 거기서 상대 경로로 잡는다.
+    const dir = join(
+      process.cwd(),
+      'src/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate',
+    );
+    // 경로가 틀리면 offenders 가 빈 배열이 되어 조용히 통과한다 — 그건 가드가 아니다.
+    expect(existsSync(dir)).toBe(true);
+    const offenders = readdirSync(dir)
+      .filter((name) => name.endsWith('.tsx') && !name.endsWith('.test.tsx'))
+      .filter((name) => readFileSync(join(dir, name), 'utf8').includes('text-2xs'));
+    expect(offenders).toEqual([]);
+  });
+});

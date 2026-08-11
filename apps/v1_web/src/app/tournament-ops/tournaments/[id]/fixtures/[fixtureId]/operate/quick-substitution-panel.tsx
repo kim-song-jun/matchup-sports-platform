@@ -74,7 +74,7 @@ export function QuickSubstitutionPanel({
       className="rounded-xl border border-[var(--tint-blue-border)] bg-[var(--blue50)] p-3"
       aria-label="빠른 교체 모드"
     >
-      <div className="mb-2 flex items-center gap-1.5 text-2xs font-bold text-[var(--blue700)]">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[var(--blue700)]">
         <ArrowLeftRight size={13} aria-hidden="true" />
         빠른 교체 모드
       </div>
@@ -101,7 +101,7 @@ export function QuickSubstitutionPanel({
           </button>
         </div>
       ) : (
-        <p className="mb-2 text-2xs text-[var(--text-muted)]">나갈 선수를 먼저 지정하세요.</p>
+        <p className="mb-2 text-xs text-[var(--text-muted)]">나갈 선수를 먼저 지정하세요.</p>
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -116,9 +116,9 @@ export function QuickSubstitutionPanel({
                 : '다른 팀 지정 중이에요.';
           return (
             <div key={side.id}>
-              <p className="mb-1 text-2xs font-semibold text-[var(--text-muted)]">{side.displayNameSnapshot}</p>
+              <p className="mb-1 text-xs font-semibold text-[var(--text-muted)]">{side.displayNameSnapshot}</p>
               {targets.length === 0 ? (
-                <p className="py-2 text-2xs text-[var(--text-muted)]">{emptyLabel}</p>
+                <p className="py-2 text-xs text-[var(--text-muted)]">{emptyLabel}</p>
               ) : (
                 // `<li>`로 리스트 구조를 실제 마크업에 담는다 — 인터랙티브 버튼에
                 // `role="listitem"`을 직접 얹으면 버튼의 암묵적 button 역할이
@@ -144,7 +144,7 @@ export function QuickSubstitutionPanel({
                           // 36px로 두면 경기장에서 급하게 조작하다 옆 선수를
                           // 잘못 눌러 엉뚱한 교체가 그대로 기록되는 사고로
                           // 이어진다(Copilot 리뷰 지적).
-                          'flex min-h-[44px] items-center gap-1 rounded-full border px-2.5 text-2xs font-medium transition-colors',
+                          'flex min-h-[44px] items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors',
                           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
                           disabled ? 'cursor-not-allowed opacity-50' : '',
                           // 전수검수: hover:bg-green-100(raw, dark: 짝 없음)이 다크에서

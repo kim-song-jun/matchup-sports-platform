@@ -232,6 +232,19 @@ export function useV1GameOperationsConsole(
     lastSequenceRef.current = sync.lastSequence;
   }, [sync.lastSequence]);
 
+  // `reverseEvent` (T3, REST-only, no offline queue — see that function's own
+  // comment) has no realtime broadcast counterpart: `GamesService.
+  // reverseEvent` writes the CORRECTION row over REST and nothing emits
+  // `game.event.committed` for it (unlike WS-submitted GOAL/CARD/FOUL/
+  // SUBSTITUTION appends). Left alone, the operator's own `liveEvents` —
+  // and therefore the scoreboard, which derives purely from it — would only
+  // pick up a reversal on the next full reload. This ref lets `reverseEvent`
+  // (defined outside the gameId-effect below) trigger a full resync of
+  // `liveEvents` from the SAME authoritative source a fresh page load uses,
+  // set inside that effect and cleared on its cleanup so a call after
+  // unmount/gameId-change is a safe no-op.
+  const resyncEventsRef = useRef<(() => void) | null>(null);
+
   // ── Handshake authorization-subject version ────────────────────────────────
   useEffect(() => {
     setGameOperationsAuthorizationSubjectVersion(myAssignment.data?.version ?? 0);
@@ -292,6 +305,33 @@ export function useV1GameOperationsConsole(
         },
       );
     };
+
+    // Always fetches the COMPLETE event history (afterSequence: 0) — unlike
+    // `resubscribeFromLastKnownSequence` (used for connect/gap-recovery,
+    // which asks only for what's missing since `lastSequenceRef.current`),
+    // this must never assume the client's current `liveEvents` are still a
+    // valid base to build on: it exists specifically so `reverseEvent`
+    // (below, outside this effect) can force `liveEvents` back in sync with
+    // the server after a REST-only reversal that has no realtime broadcast
+    // counterpart. A full resubscribe, exactly like the very first mount
+    // performs, is the only response guaranteed self-consistent regardless
+    // of what this client did or didn't already know.
+    const resyncFromServer = () => {
+      socket.emit(
+        'game.subscribe',
+        { gameId, afterSequence: 0 },
+        (result: SubscribeAck) => {
+          if (cancelled) return;
+          if (result.status === 'subscribed' && result.snapshot) {
+            hasReceivedSnapshot = true;
+            applySnapshot(result.snapshot);
+          } else if (result.status === 'denied') {
+            setBannerMessage('운영 권한이 없어 이 경기를 조회할 수 없어요. 새로고침 후 다시 시도해주세요.');
+          }
+        },
+      );
+    };
+    resyncEventsRef.current = resyncFromServer;
 
     const onConnect = () => {
       setConnectionStatus('connected');
@@ -367,6 +407,7 @@ export function useV1GameOperationsConsole(
 
     return () => {
       cancelled = true;
+      if (resyncEventsRef.current === resyncFromServer) resyncEventsRef.current = null;
       socket.emit('game.unsubscribe', { gameId });
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
@@ -719,6 +760,15 @@ export function useV1GameOperationsConsole(
       );
       setGameSnapshot((current) => (current ? { ...current, version: result.version } : current));
       void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+      // Root-cause fix (2026-08, requirement 3): a reversal has no realtime
+      // broadcast counterpart (`GamesService.reverseEvent` is REST-only and
+      // never emits `game.event.committed` — see `resyncEventsRef`'s doc
+      // comment). Without this, `liveEvents` — and the scoreboard, which is
+      // purely derived from it — would keep showing the just-reversed goal
+      // until a full page reload. Force the same full resync a fresh mount
+      // performs so the correction (and its `reversesEventId`) lands
+      // immediately.
+      resyncEventsRef.current?.();
     },
     [gameId, gameSnapshot, takeover, queryClient],
   );

@@ -145,7 +145,11 @@ async function createTask8Service(initialSequences: readonly number[], lastSeque
           payloadHash: string;
         };
       }) {
-        const event = { id: `event-${data.sequence}`, ...data };
+        // See the matching comment in games.task8-retry.spec.ts:
+        // `receivedAt`/`reversesEventId` mirror real Prisma `.create()`
+        // defaults — `GamesService.appendEvent` now reads the created row
+        // back to build the realtime broadcast payload.
+        const event = { id: `event-${data.sequence}`, receivedAt: new Date(), reversesEventId: null, ...data };
         state.events.push(event);
         return event;
       },

@@ -21,6 +21,7 @@ import {
   V1TeamMatchStatus,
   type V1TournamentStaffRole,
   V1VisibilityMode,
+  type V1GameEvent,
 } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -61,6 +62,7 @@ import type {
   GameCreationResult,
   GameEventAppendResult,
   GameMutationResult,
+  PersistedGameEvent,
   GameResultEvent,
   GameResultParticipant,
   GameRevisionMutationResult,
@@ -289,6 +291,43 @@ function actorStorageId(actor: GameActorScope): string {
 
 function jsonInput(value: unknown): Prisma.InputJsonValue {
   return canonicalize(value) as Prisma.InputJsonValue;
+}
+
+/**
+ * `V1GameEvent` (the raw Prisma row from `tx.v1GameEvent.create()`) →
+ * `PersistedGameEvent` (the wire shape `RealtimeGateway` broadcasts and
+ * `GameEventAppendResult.event` carries). See `PersistedGameEvent`'s doc
+ * comment in games.types.ts for why `occurredAt`/`receivedAt` are
+ * stringified HERE rather than left as `Date` — passing raw `Date`s through
+ * `jsonInput()`/`canonicalize()` (idempotency + audit storage) would
+ * silently collapse them to `{}`.
+ */
+function toPersistedGameEvent(row: V1GameEvent): PersistedGameEvent {
+  return {
+    id: row.id,
+    gameId: row.gameId,
+    sequence: row.sequence,
+    clientEventId: row.clientEventId,
+    payloadHash: row.payloadHash,
+    type: row.type,
+    // `?? null` on every nullable column: the Prisma-generated `V1GameEvent`
+    // type already promises `string | null` (never `undefined`) here, but
+    // that's only as reliable as whatever produced `row` honors it — this
+    // is exactly the class of bug this whole fix responds to (see this
+    // function's callers' doc comments), so the conversion at the one place
+    // that builds the wire/audit shape from a raw row doesn't also trust
+    // that promise blindly.
+    sideId: row.sideId ?? null,
+    participantId: row.participantId ?? null,
+    assistParticipantId: row.assistParticipantId ?? null,
+    period: row.period,
+    clockMs: row.clockMs,
+    occurredAt: row.occurredAt.toISOString(),
+    receivedAt: row.receivedAt.toISOString(),
+    actorUserId: row.actorUserId,
+    reversesEventId: row.reversesEventId ?? null,
+    payload: jsonObject(row.payload),
+  };
 }
 
 export function jsonObject(value: Prisma.JsonValue): Record<string, unknown> {
@@ -1007,7 +1046,7 @@ export class GamesService {
         }
         const references = await this.assertEventReferences(tx, game, dto);
         const sequence = game.lastSequence + 1;
-        await tx.v1GameEvent.create({
+        const createdEvent = await tx.v1GameEvent.create({
           data: {
             gameId,
             sequence,
@@ -1056,6 +1095,10 @@ export class GamesService {
           replayed: false,
           clientEventId: dto.clientEventId,
           sequence,
+          // See GameEventAppendResult.event's doc comment — the realtime
+          // gateway broadcasts THIS (the real persisted row), never the raw
+          // client-submitted `dto`.
+          event: toPersistedGameEvent(createdEvent),
         };
       },
     );
@@ -1166,7 +1209,7 @@ export class GamesService {
           };
           const references = await this.assertEventReferences(tx, game, dto);
           const sequence = game.lastSequence + 1;
-          await tx.v1GameEvent.create({
+          const createdEvent = await tx.v1GameEvent.create({
             data: {
               gameId,
               sequence,
@@ -1203,6 +1246,8 @@ export class GamesService {
             replayed: false,
             clientEventId: input.clientEventId,
             sequence,
+            // See GameEventAppendResult.event's doc comment.
+            event: toPersistedGameEvent(createdEvent),
           };
           await this.storeIdempotency(tx, {
             actor,

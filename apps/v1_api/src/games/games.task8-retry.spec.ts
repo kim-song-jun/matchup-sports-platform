@@ -196,7 +196,14 @@ async function createTask8RetryService() {
           payloadHash: string;
         };
       }) {
-        const event = { id: `event-${data.sequence}`, ...data };
+        // `receivedAt`/`reversesEventId` are never in `data` (the former is
+        // a DB-side `@default(now())`, the latter simply isn't set on a
+        // fresh append) — mirror what the REAL Prisma client returns for
+        // them so this fake behaves like a genuine `.create()` call.
+        // `GamesService.appendEvent`/`retryEvent` now read the created row
+        // back (`toPersistedGameEvent`) to build the realtime broadcast
+        // payload, and that read assumes real Prisma defaults are present.
+        const event = { id: `event-${data.sequence}`, receivedAt: new Date(), reversesEventId: null, ...data };
         state.events.push(event);
         return event;
       },

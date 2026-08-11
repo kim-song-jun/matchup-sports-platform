@@ -166,6 +166,16 @@ beforeEach(() => {
   Object.assign(hookMocks.voidRevision, freshMutationMock());
   Object.assign(hookMocks.createCorrection, freshMutationMock());
   Object.assign(hookMocks.lineups, freshQueryMock());
+  // alpha 실사고(2026-08) 수정: `GameResultReviewPanel.handleOfficialize`가
+  // 확인 모달을 띄우기 전 `revisionsQuery.refetch()`/`gameQuery.refetch()`를
+  // 강제로 호출해 그 응답값을 쓴다(캐시된 stale 점수를 보여주지 않기 위함).
+  // 실제 react-query의 `refetch()`는 항상 `{ data, ... }` 형태로 resolve
+  // 되므로, 이 목도 매 호출 시점의 `hookMocks.*.data`(각 테스트가 미리
+  // 세팅한 값)를 그대로 읽어 동일하게 흉내 낸다 — 정적 스냅숏이 아니라
+  // 클로저로 매번 최신값을 읽어야 각 테스트가 `beforeEach` 이후에 설정한
+  // `data`를 반영한다.
+  hookMocks.game.refetch.mockImplementation(async () => ({ data: hookMocks.game.data }));
+  hookMocks.revisions.refetch.mockImplementation(async () => ({ data: hookMocks.revisions.data }));
   hookMocks.confirm.mockResolvedValue(true);
 });
 

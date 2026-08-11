@@ -110,15 +110,21 @@ export function GameResultReviewPanel({
     // `gameQuery.data` read afterwards — those still point at the object
     // this render's closure captured; react-query only produces a new one
     // on the NEXT render, which this async continuation never triggers.
+    // `?.` on the refetch RESULT itself, not just `.data`: react-query's own
+    // `refetch()` never resolves to a non-object (an error still resolves
+    // with `{ data: undefined, error, ... }`, it doesn't reject by default),
+    // but guarding the outer value too costs nothing and keeps this from
+    // throwing if either query is ever driven through a test double that
+    // doesn't fully shape the resolved value.
     const [freshRevisions, freshGameResult] = await Promise.all([
       revisionsQuery.refetch(),
       gameQuery.refetch(),
     ]);
     const freshRevision =
-      freshRevisions.data?.find((candidate) => candidate.id === revision.id) ??
-      freshRevisions.data?.[0] ??
+      freshRevisions?.data?.find((candidate) => candidate.id === revision.id) ??
+      freshRevisions?.data?.[0] ??
       revision;
-    const freshGame = freshGameResult.data ?? game;
+    const freshGame = freshGameResult?.data ?? game;
     const ok = await confirm({
       title: '결과를 확정할까요?',
       message: `${freshRevision.score.home}:${freshRevision.score.away} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,

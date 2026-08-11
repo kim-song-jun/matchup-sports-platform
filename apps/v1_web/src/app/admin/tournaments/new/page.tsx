@@ -491,13 +491,14 @@ function WizardStepper({
                     aria-hidden="true"
                     className={[
                       'grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold',
+                      // locked는 색상으로는 upcoming(아직 안 온 단계)과 구분하지 않는다 —
+                      // 자물쇠 아이콘 자체가 신호이고, 바깥 버튼의 disabled 스타일이 이미
+                      // "지금 누를 수 없음"을 전달한다.
                       active
                         ? 'bg-blue-500 text-white'
                         : done
                           ? 'bg-blue-100 text-[var(--blue700)]'
-                          : locked
-                            ? 'bg-[var(--grey100)] text-[var(--text-caption)]'
-                            : 'bg-[var(--grey100)] text-[var(--text-caption)]',
+                          : 'bg-[var(--grey100)] text-[var(--text-caption)]',
                     ].join(' ')}
                   >
                     {done ? <Check size={14} /> : locked ? <Lock size={12} /> : index + 1}

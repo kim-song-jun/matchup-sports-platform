@@ -5768,7 +5768,9 @@ button:disabled {
 
 /* 레이블 */
 .tm-hub-stage-label {
-  font-size: 11px;
+  /* 대회 진행 단계명(조별리그/4강/결승)은 "지금 어디까지 왔나"를 읽는 라벨이다 —
+     현재 단계만 12px 이고 나머지가 11px 이라 지나간·남은 단계가 잘 안 읽혔다. */
+  font-size: 12px;
   font-weight: 600;
   color: var(--grey400);
   text-align: center;
@@ -5777,7 +5779,8 @@ button:disabled {
   letter-spacing: -0.01em;
 }
 .tm-hub-stage-label-done  { color: var(--blue500); font-weight: 700; }
-.tm-hub-stage-label-active { color: var(--blue500); font-weight: 800; font-size: 12px; }
+/* 크기는 base(12px)와 같게 두고 색·굵기로만 현재 단계를 구분한다. */
+.tm-hub-stage-label-active { color: var(--blue500); font-weight: 800; }
 
 /* 서브레이블 (날짜/시각) */
 .tm-hub-stage-sublabel {

@@ -19,7 +19,12 @@ import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { useV1FixtureLineup, useV1Game, postV1GameCommand } from '@/hooks/use-v1-game-operations';
 import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
 import { isTakeoverHeld } from '@/lib/game-operations-queue';
-import { freezeCapture, type FrozenEventCapture } from '@/lib/game-operations-clock';
+import {
+  freezeCapture,
+  formatMatchClock,
+  isClockSuspicious,
+  type FrozenEventCapture,
+} from '@/lib/game-operations-clock';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
@@ -172,6 +177,18 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return periods.some((period) => period.number === currentPeriod.number + 1);
   }, [currentPeriod, gameDetail.data?.periods]);
 
+  // alpha "452′" 사고 대응 — 현재 피리어드의 설정된 길이(분). `periodDurations`는
+  // `GameDetail.periods`와 배열 인덱스로 정렬된다(`GamePeriodDuration` 타입
+  // 문서 참고) — 값을 못 읽었거나(레거시 config, 아직 이 필드를 안 주는 목
+  // 테스트 등) 그 피리어드 항목이 비정상이면 `null`이고, 그때는 확인 게이트를
+  // 그냥 건너뛴다(값을 지어내지 않는다).
+  const currentPeriodDurationMinutes = useMemo(() => {
+    if (currentPeriod === null) return null;
+    const durations = gameDetail.data?.periodDurations ?? null;
+    const entry = durations?.[currentPeriod.number - 1] ?? null;
+    return entry?.durationMinutes ?? null;
+  }, [currentPeriod, gameDetail.data?.periodDurations]);
+
   const availableCommands: readonly GameCommandName[] = useMemo(() => {
     switch (gameState) {
       case 'SCHEDULED':
@@ -242,6 +259,27 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const { confirm, ConfirmModal: endGameConfirmModal } = useConfirm();
 
+  // alpha "452′" 사고 대응 — 제출 직전 마지막 확인. `clockMs`가 이 피리어드의
+  // 설정된 길이를 크게 넘으면(`isClockSuspicious`) 운영자에게 한 번 더
+  // 물어본다. `currentPeriodDurationMinutes`가 `null`이면(설정을 못 읽음)
+  // 판단 근거가 없으므로 그냥 통과시킨다 — 지어낸 기준으로 막지 않는다.
+  // 이 함수는 제출을 "막지" 않는다: 운영자가 확인하면 그대로 진행되고,
+  // 취소하면 호출부가 제출 자체를 하지 않을 뿐이다(서버 하드 거부와 다름).
+  const confirmIfClockSuspicious = useCallback(
+    async (clockMs: number, periodNumber: number): Promise<boolean> => {
+      if (currentPeriodDurationMinutes === null || !isClockSuspicious(clockMs, currentPeriodDurationMinutes)) {
+        return true;
+      }
+      return confirm({
+        title: '기록 시각을 확인해주세요',
+        message: `${periodLabel(periodNumber)} ${formatMatchClock(clockMs)}로 기록돼요. 이 피리어드는 보통 ${currentPeriodDurationMinutes}분이에요. 경기 종료를 누르지 않은 채 시간이 흘렀을 수 있어요 — 그대로 기록할까요?`,
+        confirmLabel: '그대로 기록',
+        tone: 'danger',
+      });
+    },
+    [confirm, currentPeriodDurationMinutes],
+  );
+
   const handleSelectAction = useCallback(
     (button: (typeof ACTION_BUTTONS)[number]) => {
       // T1-0: no LIVE period means there is no server-anchored start time to
@@ -288,7 +326,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   }, [ops.liveEvents]);
 
   const handleCommit = useCallback(
-    (input: EventCaptureCommitInput) => {
+    async (input: EventCaptureCommitInput) => {
+      if (!(await confirmIfClockSuspicious(input.clockMs, input.period))) return;
       void ops.submitEvent(input);
       setPendingAction(null);
       // GOAL은 이 콘솔에서 항상 참가자를 선택해 커밋한다(`ActionTargetPicker`가
@@ -309,7 +348,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         });
       }
     },
-    [ops, showToast],
+    [ops, showToast, confirmIfClockSuspicious],
   );
 
   const attachAssist = useCallback(
@@ -335,7 +374,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 액션이 달린 확인 토스트를 띄운다 — 기존 `ops.reverseEvent`(CORRECTION)
   // 경로를 그대로 재사용한다(새 되돌리기 API를 만들지 않는다).
   const handleQuickSubstitute = useCallback(
-    (input: { sideId: string; outParticipant: GameLineupParticipant; inParticipant: GameLineupParticipant }) => {
+    async (input: { sideId: string; outParticipant: GameLineupParticipant; inParticipant: GameLineupParticipant }) => {
       if (currentPeriod === null || currentPeriod.startedAt === null) return;
       const periodStartedAtMs = new Date(currentPeriod.startedAt).getTime();
       const frozen = freezeCapture({
@@ -346,6 +385,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         pausedTotalMs: currentPeriod.pausedTotalMs,
         pausedAtMs: currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime(),
       });
+      // 빠른 교체는 원래 확인창 없이 한 탭으로 끝나는 게 설계 의도지만(위 문서
+      // 참고), 시각이 비정상일 때만은 예외다 — `handleRunCommand`의 '경기
+      // 종료'가 이미 같은 패턴(평소엔 즉시 실행, 위험할 때만 확인)이다.
+      if (!(await confirmIfClockSuspicious(frozen.clockMs, frozen.period))) return;
       void ops.submitEvent({
         type: 'SUBSTITUTION',
         participantId: input.inParticipant.id,
@@ -372,7 +415,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         },
       });
     },
-    [currentPeriod, ops, showToast],
+    [currentPeriod, ops, showToast, confirmIfClockSuspicious],
   );
 
   const handleRunCommand = useCallback(

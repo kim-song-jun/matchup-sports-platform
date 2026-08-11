@@ -5,6 +5,7 @@ import {
   formatStopwatchClock,
   freezeCapture,
   isClockDrifted,
+  isClockSuspicious,
   medianOffsetMs,
   pushClockSample,
   sampleOffsetMs,
@@ -281,6 +282,35 @@ describe('formatMatchClock', () => {
 
   it('음수는 0으로 클램프한다', () => {
     expect(formatMatchClock(-500)).toBe('0:00');
+  });
+});
+
+describe('isClockSuspicious', () => {
+  // alpha 실측 사고(2026-08): 20분짜리 전반에서 CARD 이벤트들은 전부
+  // 649,891/652,602/655,603/657,938ms(≈10.8~11분)였는데, GOAL 하나만
+  // 27,166,083ms(≈452분)로 기록돼 공개 화면에 "452′"로 그대로 나갔다. 이
+  // 함수가 나머지 정상 이벤트는 통과시키고 그 GOAL만 잡아내야 실제 사고를
+  // 재현·방지한다.
+  it('실측 사고의 정상 CARD 이벤트들(≈11분, 20분 피리어드)은 의심하지 않는다', () => {
+    expect(isClockSuspicious(649_891, 20)).toBe(false);
+    expect(isClockSuspicious(652_602, 20)).toBe(false);
+    expect(isClockSuspicious(655_603, 20)).toBe(false);
+    expect(isClockSuspicious(657_938, 20)).toBe(false);
+  });
+
+  it('실측 사고의 이상값 GOAL 이벤트(27,166,083ms ≈ 452분, 20분 피리어드)는 의심한다', () => {
+    expect(isClockSuspicious(27_166_083, 20)).toBe(true);
+  });
+
+  it('경계값: 설정된 길이의 정확히 2배는 아직 의심하지 않고, 1ms만 넘으면 의심한다', () => {
+    const twoXMs = 45 * 60_000 * 2;
+    expect(isClockSuspicious(twoXMs, 45)).toBe(false);
+    expect(isClockSuspicious(twoXMs + 1, 45)).toBe(true);
+  });
+
+  it('정상적인 추가시간(피리어드 길이를 살짝 넘는 정도)은 의심하지 않는다', () => {
+    // 45분 피리어드에 8분 추가시간이 붙어도(53분) 배율(×2, 90분) 안에 있다.
+    expect(isClockSuspicious(53 * 60_000, 45)).toBe(false);
   });
 });
 

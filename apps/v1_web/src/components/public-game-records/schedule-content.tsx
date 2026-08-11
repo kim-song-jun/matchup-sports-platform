@@ -8,11 +8,13 @@ import {
   type TournamentStandingsRow,
 } from '@/components/tournaments/tournament-standings-table';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
   fixtureStatusLabel,
   formatGoalMinute,
   formatScoreline,
+  isClockAbnormal,
   isCorrectedOrVoid,
   resultStateLabel,
 } from './format';
@@ -71,6 +73,7 @@ function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] })
     <div key={index}>
       {formatGoalMinute(scorer.clockMs)}
       {scorer.participantName ? ` ${scorer.participantName}` : ''}
+      {isClockAbnormal(scorer.clockMs) ? <AbnormalClockBadge /> : null}
     </div>
   );
   return (

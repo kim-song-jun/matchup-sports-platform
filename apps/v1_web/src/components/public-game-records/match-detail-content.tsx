@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
   fixtureStatusLabel,
   formatClock,
   formatScoreline,
+  isClockAbnormal,
   presentParticipantName,
   resultStateLabel,
 } from './format';
@@ -87,7 +89,10 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 36 }}>
         <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}>{icon}</span>
         <span className="sr-only">{eventLabel}</span>
-        <span className="tab-num" style={{ fontSize: 11, color: 'var(--text-caption)' }}>{formatClock(event.clockMs)}</span>
+        <span className="tab-num" style={{ fontSize: 11, color: 'var(--text-caption)' }}>
+          {formatClock(event.clockMs)}
+          {isClockAbnormal(event.clockMs) ? <AbnormalClockBadge /> : null}
+        </span>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-start' }}>{event.side === 'away' ? content : null}</div>
     </div>

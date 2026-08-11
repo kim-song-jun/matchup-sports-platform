@@ -153,6 +153,39 @@ export function freezeCapture(input: {
   };
 }
 
+/**
+ * alpha "452′" 사고(2026-08) 대응 — 운영자가 경기를 종료하지 않고 몇 시간 뒤
+ * 이벤트를 하나 더 찍으면(`elapsedMatchMs`는 일시정지만 빼고 계속 흐른다)
+ * `clockMs`가 그 피리어드 길이를 크게 넘는 값으로 그대로 굳는다. 서버는 이
+ * 값을 절대 하드 거부하지 않는다(`game-invariants.ts`의 `validateEventShape`
+ * 주석 참고 — 현장에서 늦게라도 기록하려는 시도를 막는 게 잘못된 시각이 남는
+ * 것보다 나쁘다). 그래서 이 판정은 "제출을 막는" 게 아니라 "제출 직전에
+ * 운영자에게 한 번 더 확인을 요구하는" 용도로만 쓴다 — `operate-console.tsx`
+ * 의 커밋 직전 게이트.
+ *
+ * 배율(×2) 근거: `elapsedMatchMs`는 일시정지 구간을 빼고 계산하므로(이 파일의
+ * `elapsedMatchMs` 문서 참고), 정상적인 경기라면 클럭은 실제로 뛴 시간만
+ * 반영한다 — 하프타임 대기·우천 지연처럼 아무리 긴 휴지도 여기 반영되지
+ * 않는다. 그 상태에서도 부상 처치·VAR 확인 같은 정당한 추가시간은 흔히
+ * 발생하므로 살짝의 여유는 필요하지만, 설정된 피리어드 길이의 두 배를 실제로
+ * "뛴" 시간이 넘는 경우는 사실상 없다(45분 피리어드가 90분어치 순수 플레이
+ * 타임을 실제로 넘기는 일은 없다) — 그 정도로 크면 거의 항상 "종료를 못 눌러
+ * 시계가 계속 흐른" 운영 실수다. `extraTime`(연장전 여부) 플래그는 배율을
+ * 바꾸지 않는다 — 연장전은 이미 자신만의 (더 짧은) `durationMinutes`를 가진
+ * 별도 피리어드 항목이라(예: `{code:'EXTRA_FIRST', durationMinutes:15,
+ * extraTime:true}`), 같은 배율이 그 15분에도 그대로 비례해 적용된다. 다만
+ * 어느 피리어드가 초과됐는지는 확인 문구에서 구분해 보여준다(`extraTime`을
+ * 문구에만 반영, 수식엔 반영하지 않음).
+ */
+export const CLOCK_CONFIRM_MULTIPLIER = 2;
+
+/** `clockMs`가 그 피리어드의 설정된 길이(`periodDurationMinutes`)의
+ * `CLOCK_CONFIRM_MULTIPLIER`배를 넘는지 — true면 제출 전 운영자 확인을
+ * 요구해야 한다는 뜻이다(제출 자체를 막지 않는다). */
+export function isClockSuspicious(clockMs: number, periodDurationMinutes: number): boolean {
+  return clockMs > periodDurationMinutes * 60_000 * CLOCK_CONFIRM_MULTIPLIER;
+}
+
 /** Mirrors the server's own `assertClockNotDrifted()` 30s tolerance
  * (`apps/v1_api/src/games/games.service.ts`) as a client-side pre-check —
  * catches an obviously-wrong device clock BEFORE a round trip, rather than

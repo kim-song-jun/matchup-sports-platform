@@ -131,6 +131,20 @@ export interface GameSubstitutionPolicy {
   maxSubstitutions: number | null;
 }
 
+/** One configured period's `{durationMinutes, extraTime}`, index-aligned with
+ * `GameDetail.periods` (array index `i` ↔ `GamePeriod.number === i + 1`) —
+ * see `parsePeriodDurations` (`apps/v1_api/.../competition-config.parse.ts`)
+ * for why the alignment is safe and why a malformed/legacy entry is `null`
+ * rather than a guessed number. Added for the alpha "452′" clock-overrun
+ * incident (2026-08): the operator console uses this to ask for
+ * confirmation before submitting an event whose captured clock runs far
+ * past its period's configured length (`isClockSuspicious`,
+ * `lib/game-operations-clock.ts`). `null` overall means the pinned config
+ * couldn't be read (or predates this field) — the console must skip the
+ * check rather than fabricate a duration.
+ */
+export type GamePeriodDuration = { durationMinutes: number; extraTime: boolean } | null;
+
 export interface GameDetail {
   id: string;
   sourceType: GameSourceType;
@@ -141,6 +155,7 @@ export interface GameDetail {
   currentOfficialRevisionId: string | null;
   sides: GameSide[];
   periods: GamePeriod[];
+  periodDurations: readonly GamePeriodDuration[] | null;
   lineups: GameLineup[];
   actorRole: GameActorRole;
   substitutionPolicy: GameSubstitutionPolicy;

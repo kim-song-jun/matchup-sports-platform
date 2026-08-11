@@ -278,7 +278,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('1피리어드가 진행 중이고 다음 피리어드가 있으면 "전반 종료" 버튼을 보여주고 액션을 허용한다', () => {
+  it('1피리어드가 진행 중이고 다음 피리어드가 있으면 "전반 종료" 버튼을 보여주고 액션을 허용한다', async () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
@@ -297,11 +297,16 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
     // 모달 안에서 선수를 고르면 submitEvent가 골 이벤트로 호출되고 모달이 닫힌다.
+    // alpha 452′ 사고 대응 게이트가 커밋 경로에 확인 한 단계(비동기)를 끼워
+    // 넣었으므로(이 게임은 periodDurations를 안 줘 통과만 비동기로 지연됨),
+    // 여기서부터는 waitFor로 그 마이크로태스크가 끝나길 기다린다.
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
-    expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'GOAL', participantId: 'p-1', sideId: 'side-home' }),
+    await waitFor(() =>
+      expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'GOAL', participantId: 'p-1', sideId: 'side-home' }),
+      ),
     );
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('마지막 피리어드가 진행 중이면 다음 피리어드 버튼이 보이지 않는다', () => {
@@ -354,7 +359,7 @@ describe('OperateConsole — 선수 교체', () => {
     mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents: [] }));
   }
 
-  it('"교체" 액션 버튼이 있고, 2단계(나갈 선수 → 들어올 선수)를 거쳐 SUBSTITUTION 이벤트를 제출한다', () => {
+  it('"교체" 액션 버튼이 있고, 2단계(나갈 선수 → 들어올 선수)를 거쳐 SUBSTITUTION 이벤트를 제출한다', async () => {
     gameWithSubstitutionPolicy({ mode: 'limited', maxSubstitutions: 5 });
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
@@ -369,10 +374,15 @@ describe('OperateConsole — 선수 교체', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
 
-    expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'SUBSTITUTION', participantId: 'p-2', sideId: 'side-home', payload: { outParticipantId: 'p-1' } }),
+    // alpha 452′ 사고 대응 게이트가 커밋 경로에 확인 한 단계(비동기)를 끼워
+    // 넣었으므로(이 게임은 periodDurations를 안 줘 통과만 비동기로 지연됨),
+    // 여기서부터는 waitFor로 그 마이크로태스크가 끝나길 기다린다.
+    await waitFor(() =>
+      expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'SUBSTITUTION', participantId: 'p-2', sideId: 'side-home', payload: { outParticipantId: 'p-1' } }),
+      ),
     );
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('substitutions === "rolling"일 때만 빠른 교체 모드 토글이 보인다', () => {
@@ -510,6 +520,93 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
         version: 3,
       }),
     );
+  });
+});
+
+// alpha "452′" 사고(2026-08) — 운영자가 경기 종료를 누르지 않으면 클럭이
+// 계속 흘러 골/카드가 몇 시간 뒤 시각으로 기록될 수 있다. 서버는 이 값을
+// 하드 거부하지 않으므로(현장 기록이 우선), 콘솔이 제출 직전에 확인만 요구
+// 해야 한다 — 취소해도 "제출 안 됨"일 뿐 서버 422가 아니다.
+describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고)', () => {
+  function setup(periodDurations: unknown) {
+    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: {
+        gameId: 'game-1',
+        lineups: [{
+          sideId: 'side-home',
+          state: 'SUBMITTED',
+          revision: 1,
+          participants: [
+            { id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1', displayNameSnapshot: '정우진', jerseyNumber: 10, position: null, positionX: null, positionY: null, started: true, createdAt: '', updatedAt: '' },
+          ],
+        }],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.useV1Game.mockReturnValue({
+      data: {
+        id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1,
+        // 20분 피리어드가 아득한 과거(2020년)에 시작 — 실제 Date.now() 기준으로도
+        // 항상 40분(×2 배율) 임계값을 훌쩍 넘겨, 테스트 실행 시각과 무관하게
+        // 결정론적으로 "의심스러운 클럭"을 만든다.
+        periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'LIVE', startedAt: '2020-01-01T00:00:00.000Z', endedAt: null, pausedTotalMs: 0, pausedAt: null }],
+        sides: [HOME_AWAY_SIDES[0]],
+        lineups: [],
+        periodDurations,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' } }));
+  }
+
+  it('설정된 피리어드 길이를 크게 넘는 시각을 기록하려 하면 제출 전 확인을 요구하고, 취소하면 제출되지 않는다', async () => {
+    setup([{ durationMinutes: 20, extraTime: false }]);
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '골' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+
+    expect(await screen.findByText(/이 피리어드는 보통 20분이에요/)).toBeInTheDocument();
+    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+
+    // 서버 하드 거부가 아니라 확인 게이트일 뿐이라는 계약: 취소해도 그냥
+    // "제출 안 됨"이지 에러가 아니다.
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+  });
+
+  it('확인을 누르면 그대로(숫자 조작 없이) 기록된다', async () => {
+    setup([{ durationMinutes: 20, extraTime: false }]);
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '골' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+    await screen.findByText(/이 피리어드는 보통 20분이에요/);
+
+    fireEvent.click(screen.getByRole('button', { name: '그대로 기록' }));
+
+    await waitFor(() =>
+      expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'GOAL', participantId: 'p-1' }),
+      ),
+    );
+  });
+
+  it('피리어드 설정을 못 읽었으면(periodDurations: null) 판단 근거가 없으므로 확인 없이 그대로 제출한다', async () => {
+    setup(null);
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '골' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+
+    await waitFor(() => expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalled());
+    expect(screen.queryByText(/이 피리어드는 보통/)).toBeNull();
   });
 });
 

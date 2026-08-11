@@ -407,6 +407,25 @@ export function extractEndPenalties(
   return { home, away };
 }
 
+/**
+ * 2026-08-11 알파 실측: 대회 스태프(감독/현장 담당/조회 전용)가 라인업을
+ * `저장`(saveLineup, takeoverToken 불요구)까지는 통과시키고 `제출`
+ * (submitLineup)에서만 인계 토큰을 요구해, 라인업 화면(lineup-client.tsx)이
+ * 토큰을 얻지도 보내지도 않는 탓에 구조적으로 제출이 불가능했다
+ * (TAKEOVER_TOKEN_EXPIRED). 오너 결정: "경기가 아직 시작되지 않았으면
+ * (SCHEDULED) 스태프도 토큰 없이 제출할 수 있다 — 라이브 중(피리어드가 시작된
+ * 이후)에는 두 운영자가 라인업을 놓고 충돌하는 걸 막기 위해 기존대로 토큰을
+ * 요구한다." `game.state`를 그 판정 기준으로 재사용한다: executeCommand의
+ * 'start' 커맨드가 SCHEDULED→LIVE로 전이시키는 바로 그 트랜잭션에서
+ * V1GamePeriod도 함께 LIVE로 전환하므로(advancePeriod, 이 파일의
+ * executeCommand 본문 참고) game.state는 이미 "피리어드가 시작됐는가"의 단일
+ * 진실 소스다 — 새 판정을 만들지 않는다. 팀 매니저/오너는 이 함수가 관여하지
+ * 않는 상위 조건(actorIsStaff)에서 이미 항상 면제이므로 그대로 둔다.
+ */
+export function staffLineupSubmitRequiresTakeover(gameState: V1GameState): boolean {
+  return gameState !== V1GameState.SCHEDULED;
+}
+
 @Injectable()
 export class GamesService {
   constructor(
@@ -1505,13 +1524,19 @@ export class GamesService {
             context.actor.role === 'tournament_director' ||
             context.actor.role === 'field_operator' ||
             context.actor.role === 'support_readonly');
-        if (game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE && actorIsStaff) {
+        if (
+          game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE &&
+          actorIsStaff &&
+          staffLineupSubmitRequiresTakeover(game.state)
+        ) {
           // Task 20이 requireTakeover에 gameId를 추가해 인계 토큰을 게임 단위로
           // 검증하도록 좁혔다(2-arg). 통합 브랜치에 남아 있던 1-arg 호출은 그
           // 시그니처 변경 이전 형태라 여기서 함께 정리한다.
           // 참가팀(team_manager/team_owner)의 사전 라인업 제출은 이 불변식 대상이
           // 아니다 — takeover는 "현장 기기가 이 경기를 배타적으로 장악 중"이라는
           // 라이브 운영 개념이라 경기 전 로스터 준비와는 무관하다(Task 27 후속).
+          // 스태프도 경기 시작 전(SCHEDULED)에는 같은 이유로 면제한다 —
+          // staffLineupSubmitRequiresTakeover 문서 주석 참고.
           this.requireTakeover(game.id, game.sourceType, context);
         }
         const lineup = await tx.v1GameLineup.findFirst({ where: { id: lineupId, gameId } });

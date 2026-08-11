@@ -8,6 +8,7 @@ import {
   useTournamentGame,
   useVoidResultRevision,
 } from '@/hooks/use-tournament-result-review';
+import { useV1GameLineups } from '@/hooks/use-v1-api';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
@@ -63,6 +64,9 @@ export function GameResultCorrectionPanel({
 }) {
   const gameQuery = useTournamentGame(gameId);
   const revisionsQuery = useGameResultRevisions(gameId);
+  // 정정 폼의 참가자 실명 표시용 -- 로딩 중/실패 시 빈 배열로 두면 모달이 기존
+  // 폴백(사이드 + id 뒷자리)으로 얌전히 물러난다(아래 lineups prop 참고).
+  const lineupsQuery = useV1GameLineups(gameId);
   const createCorrection = useCreateResultCorrection(gameId, tournamentId);
   const officialize = useOfficializeResultRevision(gameId, tournamentId);
   const voidRevision = useVoidResultRevision(gameId, tournamentId);
@@ -226,6 +230,7 @@ export function GameResultCorrectionPanel({
             mvpParticipantId: currentOfficial.mvpParticipantId,
           }}
           sides={game.sides}
+          lineups={lineupsQuery.data ?? []}
           submitting={createCorrection.isPending}
           errorMessage={createCorrection.isError ? describeResultReviewError(createCorrection.error) : null}
           onCancel={() => {

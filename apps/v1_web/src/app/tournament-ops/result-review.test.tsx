@@ -58,6 +58,10 @@ const hookMocks = vi.hoisted(() => ({
   officialize: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
   voidRevision: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
   createCorrection: { mutate: vi.fn(), isPending: false, isError: false, error: null, reset: vi.fn() } as MutationMock,
+  // `ResultEditModal`의 참가자 실명 표시(라인업 데이터)용 -- 기본값 `data: undefined`는
+  // 두 패널의 `lineupsQuery.data ?? []` 폴백을 그대로 거치므로 대부분의 테스트는
+  // 빈 라인업(= 기존 id-접미어 폴백)을 보는 실제 로딩-중 상태와 동일하게 동작한다.
+  lineups: { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() } as QueryMock<unknown>,
   confirm: vi.fn(),
 }));
 
@@ -76,6 +80,13 @@ vi.mock('@/hooks/use-tournament-result-review', async () => {
     useCreateResultCorrection: () => hookMocks.createCorrection,
   };
 });
+
+// 두 패널이 참가자 실명 표시용으로 새로 호출하는 `useV1GameLineups`도 목한다 --
+// 안 그러면 이 모듈의 진짜 `useQuery`가 실행되면서 아래 `renderWithClient`가
+// 기대하는 "QueryClientProvider 불필요" 전제가 깨진다.
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1GameLineups: () => hookMocks.lineups,
+}));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
   useConfirm: () => ({ confirm: hookMocks.confirm, ConfirmModal: null }),
@@ -138,9 +149,9 @@ function buildRevision(
   };
 }
 
-// No `QueryClientProvider` needed: `@/hooks/use-tournament-result-review` is
-// entirely mocked above (real `useQuery`/`useMutation` never run), so there is
-// no react-query context to satisfy.
+// No `QueryClientProvider` needed: `@/hooks/use-tournament-result-review` and
+// `@/hooks/use-v1-api` are entirely mocked above (real `useQuery`/`useMutation`
+// never run), so there is no react-query context to satisfy.
 function renderWithClient(ui: React.ReactElement) {
   return render(ui);
 }
@@ -154,6 +165,7 @@ beforeEach(() => {
   Object.assign(hookMocks.officialize, freshMutationMock());
   Object.assign(hookMocks.voidRevision, freshMutationMock());
   Object.assign(hookMocks.createCorrection, freshMutationMock());
+  Object.assign(hookMocks.lineups, freshQueryMock());
   hookMocks.confirm.mockResolvedValue(true);
 });
 

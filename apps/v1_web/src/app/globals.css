@@ -4893,6 +4893,16 @@ button:disabled {
   font-weight: 800;
 }
 
+/* [토큰 충돌 fix] 다크모드에서 --grey100(트랙, .tm-segment-row/.tm-review-tabs)과
+   --surface(활성 pill)가 둘 다 #1c1e24로 완전히 같은 값이라 활성 탭이 트랙에 녹아
+   사라진다(라이트모드는 #f2f4f6 vs #fff라 그런대로 구분됨 — main에도 있던 원래
+   패턴). .tm-match-type-segment의 dev 전용 오버라이드를 걷어내고서야 드러난, 이
+   컴포넌트를 쓰는 모든 곳(리뷰 탭 3열도 포함)의 근본 다크모드 결함이라 공유
+   셀렉터에서 한 번에 고친다 — --grey150(다크 #20222a)로 실제 구분되게. */
+:root.dark .tm-review-tab[data-active="true"] {
+  background: var(--grey150);
+}
+
 .tm-review-stat-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

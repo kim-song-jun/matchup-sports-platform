@@ -692,4 +692,63 @@ describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
     // 강남(홈) 3골 중 1골이 되돌려져 2, 성수(원정) 1골 → "2 : 1"
     expect(screen.getByText('2 : 1')).toBeInTheDocument();
   });
+
+  /**
+   * Root-cause regression (2026-08 alpha 실사고): 골을 기록하면 "기록된
+   * 이벤트"는 갱신되는데 상단 스코어만 계속 예전 값으로 멈춰 있었다.
+   * 원인은 백엔드 `RealtimeGateway.acknowledgeGameEvent`가 자기 자신에게
+   * 쏘는 `game.event.committed` 브로드캐스트에 서버가 실제로 저장한 행이
+   * 아니라 클라이언트가 보낸 원본 요청 payload를 그대로 실어 보냈다는
+   * 것이다 — 그 payload에는 서버가 나중에 채우는 `id`/`reversesEventId`가
+   * 없다. 이 콘솔의 `useV1GameOperationsConsole`은 그렇게 도착한 이벤트를
+   * `liveEvents`에 그대로 이어붙이므로(`onCommitted`), 방금 기록한 골의
+   * `id`/`reversesEventId`가 `undefined`인 채로 들어온다. `scoreBySideId`가
+   * `reversesEventId !== null`만으로 "되돌려짐" 집합을 만들면
+   * `undefined !== null`이 참이라 그 `undefined`가 집합에 들어가고,
+   * `.has(event.id)`가 `id`도 `undefined`인 바로 그 이벤트(자기 자신)를
+   * "이미 되돌려짐"으로 오판해 점수 집계에서 빼버린다 — 골이 몇 개든
+   * 전부 조용히 빠진다. 백엔드는 이제 실제 저장된 행(id 포함,
+   * reversesEventId: null)을 브로드캐스트하도록 고쳤고(realtime.gateway.ts
+   * `acknowledgeGameEvent`), 이 테스트는 그 수정이 되돌아가더라도(또는
+   * 미래에 다른 실시간 경로가 같은 실수를 반복하더라도) 방어선 역할을
+   * 하도록 프런트 `scoreBySideId`가 `undefined`도 `null`과 동일하게
+   * 다루는지를 직접 검증한다.
+   */
+  it('id/reversesEventId가 undefined인(고쳐지기 전 실시간 브로드캐스트 모양) 자기 자신의 골도 되돌려진 것으로 오판하지 않고 점수에 반영한다', () => {
+    const malformedSelfCommittedGoal = {
+      ...goal(1),
+      id: undefined,
+      reversesEventId: undefined,
+      sideId: 'side-home',
+    } as unknown as GameEventRecord;
+
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ liveEvents: [malformedSelfCommittedGoal] }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('1 : 0')).toBeInTheDocument();
+  });
+
+  it('id/reversesEventId가 둘 다 undefined인 자기-커밋 골이 두 번 연속 들어와도(같은 undefined를 공유) 둘 다 점수에 반영한다', () => {
+    const firstMalformed = {
+      ...goal(1),
+      id: undefined,
+      reversesEventId: undefined,
+      sideId: 'side-home',
+    } as unknown as GameEventRecord;
+    const secondMalformed = {
+      ...goal(2),
+      id: undefined,
+      reversesEventId: undefined,
+      sideId: 'side-away',
+    } as unknown as GameEventRecord;
+
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ liveEvents: [firstMalformed, secondMalformed] }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('1 : 1')).toBeInTheDocument();
+  });
 });

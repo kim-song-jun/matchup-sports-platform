@@ -225,6 +225,80 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(client.emit).toHaveBeenCalledWith('game.event.committed', expect.objectContaining({ gameId: GAME_ID, sequence: 4, version: 5 }));
   });
 
+  /**
+   * Root-cause regression (2026-08 ops-console realtime scoreboard bug): the
+   * broadcast used to carry the raw, un-persisted request `event` verbatim
+   * -- which never has `id`/`reversesEventId` (the client can't know them
+   * before the server assigns them). The web console's scoreboard builds a
+   * `reversedIds` set from every event's `reversesEventId` using `!== null`,
+   * so an `undefined` there slipped in and then matched (via `.has(id)`)
+   * every OTHER event whose `id` was ALSO `undefined` -- silently excluding
+   * every self-recorded goal from the live score until a full reload. This
+   * asserts the gateway now broadcasts `GamesService.appendEvent`'s real
+   * persisted row (`result.event`), not the client's request payload -- if
+   * this regresses, the fix in operate-console.tsx's `scoreBySideId` and
+   * `GamesService.appendEvent`'s new `event` field are both defending
+   * against a bug this test would have caught before either existed.
+   */
+  it('root-cause fix: committed broadcast carries the FULL persisted event, not the raw request payload', async () => {
+    const client = socket();
+    const rawEvent = {
+      type: 'GOAL',
+      sideId: 'side-1',
+      participantId: 'p-1',
+      period: 1,
+      clockMs: 60_000,
+      occurredAt: '2026-08-01T10:00:00.000Z',
+      payload: {},
+    };
+    const payload = {
+      gameId: GAME_ID,
+      expectedVersion: 4,
+      clientEventId: 'event-1',
+      takeoverToken: 'nonempty-takeover-token',
+      payloadHash: 'sha256:stable-payload',
+      event: rawEvent,
+    };
+    const persistedEvent = {
+      id: 'persisted-event-id',
+      gameId: GAME_ID,
+      sequence: 4,
+      clientEventId: 'event-1',
+      payloadHash: 'sha256:stable-payload',
+      type: 'GOAL',
+      sideId: 'side-1',
+      participantId: 'p-1',
+      assistParticipantId: null,
+      period: 1,
+      clockMs: 60_000,
+      occurredAt: '2026-08-01T10:00:00.000Z',
+      receivedAt: '2026-08-01T10:00:00.500Z',
+      actorUserId: 'user-task-8',
+      reversesEventId: null,
+      payload: {},
+    };
+    gamesService.appendEvent.mockResolvedValue({
+      gameId: GAME_ID,
+      state: 'LIVE',
+      version: 5,
+      durableCommandId: 'event-1',
+      replayed: false,
+      clientEventId: 'event-1',
+      sequence: 4,
+      event: persistedEvent,
+    });
+
+    await task8Gateway(gateway).appendGameEvent(client, payload);
+
+    const committedCall = client.emit.mock.calls.find(([name]) => name === 'game.event.committed');
+    expect(committedCall).toBeDefined();
+    const broadcastEvent = (committedCall?.[1] as { event: unknown }).event;
+    expect(broadcastEvent).toEqual(persistedEvent);
+    expect(broadcastEvent).not.toBe(rawEvent);
+    expect((broadcastEvent as { id: string }).id).toBe('persisted-event-id');
+    expect((broadcastEvent as { reversesEventId: string | null }).reversesEventId).toBeNull();
+  });
+
   it('Task 8 RED delegates retry to GamesService.retryEvent with the original event envelope and never appendEvent', async () => {
     const client = socket();
     const payload = {

@@ -625,11 +625,20 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       version: result.version,
       status: result.replayed ? 'replayed' : 'committed',
     };
+    // Root-cause fix (2026-08 ops-console realtime scoreboard bug): broadcast
+    // the FULL persisted event (`result.event`, real `id` + `reversesEventId:
+    // null` + ...) instead of the raw, un-persisted request `event` param.
+    // See `GameEventAppendResult.event`'s doc comment (games.types.ts) for
+    // the full failure chain this caused. `result.event` falls back to the
+    // raw param only for an idempotent replay of a request stored before
+    // this field existed — the frontend's sequence-based de-dup already
+    // discards replayed broadcasts, so a raw-shaped fallback there is inert,
+    // never a live scoreboard input.
     const committed = {
       gameId,
       sequence: result.sequence,
       version: result.version,
-      event,
+      event: result.event ?? event,
     };
     client.emit('game.event.ack', ack);
     client.emit('game.event.committed', committed);

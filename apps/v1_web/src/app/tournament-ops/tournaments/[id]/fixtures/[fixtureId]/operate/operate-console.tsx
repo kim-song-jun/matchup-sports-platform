@@ -246,12 +246,35 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 요건과도 맞는다).
   const scoreBySideId = useMemo(() => {
     const sidesList = gameDetail.data?.sides ?? [];
+    // Realtime scoreboard bug (2026-08) hardening: `GameEventRecord.
+    // reversesEventId`/`.id` are typed `string | null` — never `undefined`
+    // — but that's a compile-time promise, not a runtime guarantee for data
+    // that crossed an untyped WS boundary. The actual bug (fixed at its
+    // source in `RealtimeGateway.acknowledgeGameEvent`, see that function's
+    // comment) was a self-committed event missing BOTH fields: `undefined
+    // !== null` let its own `reversesEventId` slip into this set, and
+    // `.has(event.id)` then matched it — and every OTHER `id: undefined`
+    // event — against itself, silently excluding real goals from the score.
+    // Guarding `undefined` here too keeps this exact silent-exclusion
+    // failure mode from recurring if a future WS/REST path repeats that
+    // mistake — it does not paper over the source bug, which is still fixed
+    // upstream.
     const reversedIds = new Set(
-      ops.liveEvents.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
+      ops.liveEvents
+        .map((event) => event.reversesEventId)
+        .filter((id): id is string => id !== null && id !== undefined),
     );
     const score = new Map<string, number>(sidesList.map((side) => [side.id, 0]));
     for (const event of ops.liveEvents) {
-      if (event.type !== 'GOAL' || event.sideId === null || reversedIds.has(event.id)) continue;
+      // Note: NOT excluding `event.id === undefined` here — a malformed
+      // event missing `id` is still a real, valid goal that must count
+      // (that's the whole point of this fix). What must never happen is an
+      // `undefined` id being treated as "this exact event was reversed" —
+      // handled above by keeping `undefined` out of `reversedIds` in the
+      // first place, not by disqualifying events that lack an `id`.
+      if (event.type !== 'GOAL' || event.sideId === null || event.sideId === undefined || reversedIds.has(event.id)) {
+        continue;
+      }
       score.set(event.sideId, (score.get(event.sideId) ?? 0) + 1);
     }
     return score;

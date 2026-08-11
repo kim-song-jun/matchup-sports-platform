@@ -2544,10 +2544,10 @@ button:disabled {
   background: var(--blue500);
 }
 
-/* 레인 wizard/A: 이미 지나온 스텝인데 필수 필드가 채워졌으면 green으로 "완료" 표시 */
-.tm-create-bars span[data-complete="true"] {
-  background: var(--green500);
-}
+/* 2026-08 사용자 피드백: "완료(초록)+진행중(파랑)" 2색 조합이 이 앱의 "블루 단일
+   액센트" 디자인 원칙과 어긋나 애매해 보인다는 지적 — green 오버라이드를 제거해
+   완료 스텝도 진행중 스텝과 동일하게 파란색으로 통일한다(data-complete는 계속
+   기록만 하되 시각적으로는 data-active와 동일해짐). */
 
 .tm-create-sport-grid {
   display: grid;
@@ -2779,7 +2779,11 @@ button:disabled {
    --card-border 풀보더로 전체를 감싸므로 별도 border는 불필요 — fill만 추가.
    backgroundImage가 있는 채워진 상태는 그 위에 그대로 그려져 회귀 없음. */
 .tm-create-image-preview {
-  height: 132px;
+  /* 2026-08 사용자 피드백: 132px는 실제 노출 위치(상세 히어로 --tm-match-detail-hero
+     220px, 목록 썸네일 --tm-match-list-media 146px) 중 어느 쪽보다도 낮아 cover 크롭이
+     원본 이미지 위쪽 극히 일부만 보여줘 "이게 어떻게 보일지" 예측이 안 됐다 — 더 자주
+     노출되는(첫인상) 상세 히어로 높이에 맞춰 크롭을 더 근접하게 보여준다. */
+  height: 220px;
   padding: 12px;
   background-color: var(--grey150);
   background-position: center;
@@ -3033,7 +3037,7 @@ button:disabled {
 .tm-team-summary-bar {
   min-height: 44px;
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--grey100);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4804,9 +4808,15 @@ button:disabled {
 }
 
 /* 매치 유형(개인/팀) 세그먼트 — 스크롤 영역 직속 자식이라 좌우 여백을 스스로 확보해야 한다.
-   위 검색바 입력·아래 종목 칩/카드가 모두 --v1-shell-page-x 인셋이므로 같은 토큰으로 맞춘다. */
+   위 검색바 입력·아래 종목 칩/카드가 모두 --v1-shell-page-x 인셋이므로 같은 토큰으로 맞춘다.
+   .tm-segment-row의 기본 배경(--grey100)은 이미 카드 안(예: .tm-my-shell)에 놓이는 다른
+   사용처를 위한 것이라, .tm-app-frame(--grey50)에 직접 얹히는 이 인스턴스에서는 인접 단계라
+   대비가 약하다. .tm-quick-grid와 동일한 원칙(453줄 주석)으로 --card-surface + --border를
+   써서 실제 구분되는 표면으로 만든다. */
 .tm-match-type-segment {
   margin: 0 var(--v1-shell-page-x) 12px;
+  background: var(--card-surface);
+  border: 1px solid var(--border);
 }
 
 @media (min-width: 1024px) {
@@ -5215,7 +5225,7 @@ button:disabled {
 
 /* ── 스켈레톤 블록 (components/v1-ui/page-skeleton.tsx) ──────────────────── */
 .tm-skeleton {
-  background: var(--grey100);
+  background: var(--card-surface);
   animation: tm-skeleton-pulse 1.4s ease-in-out infinite;
 }
 

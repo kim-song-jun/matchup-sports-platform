@@ -2938,7 +2938,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             <div key={promo.key} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[13px] font-semibold text-[var(--text-strong)]">{promo.title}</p>
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)]'}`}>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
                   {promo.enabled ? '노출' : '숨김'}
                 </span>
               </div>
@@ -4406,7 +4406,7 @@ function ReviewModerationCard({
               <span className="text-[12px] text-gray-400 truncate">· {review.teamName}</span>
             )}
             {isHidden && (
-              <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--card-surface)] text-[var(--text-muted)] text-[11px] font-semibold">
+              <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] text-[11px] font-semibold">
                 숨김
               </span>
             )}
@@ -4450,7 +4450,7 @@ function ReviewModerationCard({
       )}
 
       {isHidden && review.hiddenReason && (
-        <p className="text-[12px] text-[var(--text-muted)] mt-2.5 bg-[var(--card-surface)] rounded-lg px-3 py-2">
+        <p className="text-[12px] text-[var(--text-muted)] mt-2.5 bg-[var(--card-surface)] border border-[var(--border)] rounded-lg px-3 py-2">
           숨김 사유: {review.hiddenReason}
         </p>
       )}

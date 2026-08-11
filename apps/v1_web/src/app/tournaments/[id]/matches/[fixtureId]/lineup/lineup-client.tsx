@@ -20,6 +20,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
+import { josa } from '@/lib/korean';
 import {
   addPlayer,
   buildSavePayload,
@@ -326,7 +327,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
             {!formationSupported ? (
               <EmptyState
                 title="이 종목은 피치 배치를 아직 지원하지 않아요"
-                sub={`${formationSupportedSportName ?? '이 종목'}은 축구·풋살과 코트 모양·포지션 개념이 달라 준비 중이에요. 명단 탭에서 선발·후보는 그대로 관리할 수 있어요.`}
+                sub={`${josa(formationSupportedSportName ?? '이 종목', ['은', '는'])} 축구·풋살과 코트 모양·포지션 개념이 달라 준비 중이에요. 명단 탭에서 선발·후보는 그대로 관리할 수 있어요.`}
               />
             ) : state.starters.length === 0 ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
@@ -401,7 +402,11 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                             aria-pressed={entry.goalkeeper}
                             disabled={!editable}
                             onClick={() => setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))}
-                            aria-label={`${entry.displayName}${entry.goalkeeper ? ', 골키퍼로 지정됨' : '을 골키퍼로 지정'}`}
+                            aria-label={
+                              entry.goalkeeper
+                                ? `${entry.displayName}, 골키퍼로 지정됨`
+                                : josa(entry.displayName, ['을', '를']) + ' 골키퍼로 지정'
+                            }
                             style={{
                               flexShrink: 0,
                               minWidth: 44,

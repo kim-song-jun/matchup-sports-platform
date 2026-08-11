@@ -226,6 +226,120 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 2026-08 사용자 지적 회귀 테스트.
+//   1) "선발도 등번호 선택 그런게 있어야 하는데 전혀 그런게 없고" → 등번호 input은 예전에도
+//      DOM에 있었지만 눈에 띄는 라벨이 없어 빈 값일 때 입력 가능한 필드처럼 보이지 않았다.
+//      각 행에 <label for=...>등번호</label>가 실제로 연결돼 있는지 검증한다.
+//   2) "데스크탑에서는 피치배치 명단 둘다 같이나올수있을것같고" → 데스크톱 2컬럼 동시 노출은
+//      탭으로 마운트/언마운트하지 않고 두 영역을 항상 함께 렌더할 때만 성립한다. 탭 상태와
+//      무관하게 두 영역이 DOM에 함께 존재하는지 검증한다(진짜 뷰포트 렌더는 playwright가 담당).
+//   3) "항상 피치 배치가 먼저 나왔으면 좋겠어" → 탭 순서·기본 활성 탭이 모두 피치 배치인지 검증.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('FixtureLineupPageClient — 피치 배치 우선 노출 + 등번호 입력 가시성', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: baseGame(), isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [
+        baseGameLineup({
+          participants: [
+            {
+              id: 'p-1',
+              gameId: 'game-1',
+              sideId: 'side-host',
+              lineupId: 'lineup-1',
+              displayNameSnapshot: '홍길동',
+              jerseyNumber: 7,
+              position: null,
+              positionX: null,
+              positionY: null,
+              started: true,
+              createdAt: '2026-08-01T00:00:00.000Z',
+              updatedAt: '2026-08-01T00:00:00.000Z',
+            },
+            {
+              id: 'p-2',
+              gameId: 'game-1',
+              sideId: 'side-host',
+              lineupId: 'lineup-1',
+              displayNameSnapshot: '김후보',
+              jerseyNumber: null, // 등번호 미입력 상태 — "빈 입력이 안 보인다" 문제를 그대로 재현
+              position: null,
+              positionX: null,
+              positionY: null,
+              started: false,
+              createdAt: '2026-08-01T00:00:00.000Z',
+              updatedAt: '2026-08-01T00:00:00.000Z',
+            },
+          ],
+        }),
+      ],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('탭 순서는 "피치 배치" → "명단" 이고 기본 활성 탭은 피치 배치다', () => {
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['피치 배치', '명단']);
+    expect(screen.getByRole('tab', { name: '피치 배치' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '명단' })).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('탭 상태와 무관하게 피치 배치·명단 영역이 항상 함께 DOM에 존재한다 (데스크톱 2컬럼 동시 노출의 전제 조건)', () => {
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    // 기본(피치 배치 활성) 상태에서도 명단 영역이 이미 마운트돼 있어야 한다 — 탭으로
+    // 마운트/언마운트하면 데스크톱 CSS(.tm-fixture-lineup-pane 강제 노출)가 보여줄 것이 없다.
+    expect(screen.getByRole('region', { name: '피치 배치' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '명단' })).toBeInTheDocument();
+
+    // 탭을 전환해도(명단으로) 피치 배치 영역이 언마운트되지 않고 그대로 남아 있어야 한다.
+    fireEvent.click(screen.getByRole('tab', { name: '명단' }));
+    expect(screen.getByRole('region', { name: '피치 배치' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '명단' })).toBeInTheDocument();
+  });
+
+  it('등번호 입력이 선발·후보 각 행에 눈에 보이는 라벨과 함께 존재한다', () => {
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    const starterInput = screen.getByLabelText('홍길동 등번호');
+    expect(starterInput).toHaveAttribute('type', 'number');
+    expect(starterInput.getAttribute('placeholder')).toBeTruthy();
+    const starterInputId = starterInput.getAttribute('id');
+    expect(starterInputId).toBeTruthy();
+    const starterLabel = document.querySelector(`label[for="${starterInputId}"]`);
+    expect(starterLabel).not.toBeNull();
+    // 등번호는 저장/제출 모두 필수가 아니라 라벨에서 "(선택)"임을 함께 밝힌다 — 정확한
+    // 문구 전체가 아니라 "등번호" 텍스트를 포함하는지만 검증해 표현 디테일에 결합하지 않는다.
+    expect(starterLabel?.textContent).toContain('등번호');
+
+    // 등번호가 비어 있는 후보(김후보)도 동일하게 라벨이 연결된 입력을 가진다 —
+    // "빈 값이면 입력창처럼 안 보인다"는 지적을 후보 쪽에도 동일하게 해소해야 한다.
+    const benchInput = screen.getByLabelText('김후보 등번호');
+    expect(benchInput).toHaveAttribute('type', 'number');
+    expect(benchInput.getAttribute('placeholder')).toBeTruthy();
+    const benchInputId = benchInput.getAttribute('id');
+    expect(benchInputId).toBeTruthy();
+    const benchLabel = document.querySelector(`label[for="${benchInputId}"]`);
+    expect(benchLabel).not.toBeNull();
+    expect(benchLabel?.textContent).toContain('등번호');
+  });
+});
+
 describe('골키퍼 지정 버튼의 aria-label 조사(을/를)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -160,6 +160,34 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     });
   }
 
+  // `available_at`/`lease_until`/`updated_at` are all `TIMESTAMP(3)` columns
+  // (millisecond precision) in the migration, but `CURRENT_TIMESTAMP` itself
+  // carries microsecond precision. Postgres ROUNDS (not truncates) when an
+  // expression like `CURRENT_TIMESTAMP` or `CURRENT_TIMESTAMP + INTERVAL`
+  // is coerced into a lower-precision column -- e.g. `04:48:12.585734` gets
+  // stored as `04:48:12.586`, up to 0.5ms *later* than the real instant it
+  // was computed at (verified directly: `SELECT clock_timestamp()::timestamp(3)
+  // > clock_timestamp()` returns true on a live connection). That rounded-up
+  // value can then be later, in wall-clock terms, than a `CURRENT_TIMESTAMP`
+  // read by a *second*, separately-begun transaction that starts a fraction
+  // of a millisecond afterward -- so `available_at <= CURRENT_TIMESTAMP` (or
+  // `lease_until <= CURRENT_TIMESTAMP`) can spuriously evaluate false for a
+  // row that should already be claimable, and claimOne() returns null even
+  // though an eligible row exists (root cause of the flaky
+  // "releases only its own leases..." / "applies every exact retry delay..."
+  // integration-spec failures -- confirmed by running each ~50 times locally
+  // and diagnostic-logging the exact stored vs. transaction-now values on
+  // every empty claim). `date_trunc('milliseconds', ...)` floors instead of
+  // rounding, so every value this service writes into one of those columns
+  // is guaranteed <= the real instant it was computed -- never in the
+  // future relative to any later reader's CURRENT_TIMESTAMP. This is a
+  // dormant defect in the deployed worker too (not test-only): the actual
+  // `run()` poll loop just never hits the race because its 250ms cadence is
+  // ~500,000x wider than the max 0.5ms rounding error, so no job is ever
+  // lost or double-processed in production -- a missed claim simply gets
+  // picked up on the next poll. It only became reliably observable in
+  // integration tests that insert/update a row and claim it back-to-back
+  // with near-zero latency.
   async claimOne(): Promise<GameOperationClaim | null> {
     if (!this.acceptingClaims || this.handlers.size === 0) return null;
 
@@ -188,7 +216,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
             lease_until = NULL,
             last_error = COALESCE(event.last_error, 'lease expired before completion'),
             version = event.version + 1,
-            updated_at = CURRENT_TIMESTAMP
+            updated_at = date_trunc('milliseconds', CURRENT_TIMESTAMP)
         FROM expired
         WHERE event.id = expired.id
           AND event.version = expired.version
@@ -208,10 +236,10 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
         UPDATE v1_outbox_events event
         SET status = 'PROCESSING',
             lease_owner = ${this.owner},
-            lease_until = CURRENT_TIMESTAMP + INTERVAL '30 seconds',
+            lease_until = date_trunc('milliseconds', CURRENT_TIMESTAMP) + INTERVAL '30 seconds',
             attempts = event.attempts + 1,
             version = event.version + 1,
-            updated_at = CURRENT_TIMESTAMP
+            updated_at = date_trunc('milliseconds', CURRENT_TIMESTAMP)
         FROM candidate
         WHERE event.id = candidate.id
           AND event.version = candidate.version
@@ -237,11 +265,13 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
   }
 
   async heartbeat(claim: GameOperationClaim): Promise<boolean> {
+    // See claimOne()'s comment: floor to milliseconds so this can never
+    // round the stored lease_until/updated_at into the future.
     const updated = await this.prisma.$executeRaw`
       UPDATE v1_outbox_events
-      SET lease_until = CURRENT_TIMESTAMP + INTERVAL '30 seconds',
+      SET lease_until = date_trunc('milliseconds', CURRENT_TIMESTAMP) + INTERVAL '30 seconds',
           version = version + 1,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = date_trunc('milliseconds', CURRENT_TIMESTAMP)
       WHERE id = ${claim.id}
         AND status = 'PROCESSING'
         AND lease_owner = ${claim.leaseOwner}
@@ -269,6 +299,8 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
   async fail(claim: GameOperationClaim, error: unknown): Promise<'RETRY' | 'POISONED' | 'STALE'> {
     const lastError = this.boundedError(error);
     if (claim.attempts >= 6) {
+      // See claimOne()'s comment: floor to milliseconds so this can never
+      // round the stored updated_at into the future.
       const poisoned = await this.prisma.$executeRaw`
         UPDATE v1_outbox_events
         SET status = 'POISONED',
@@ -276,7 +308,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
             lease_until = NULL,
             last_error = ${lastError},
             version = version + 1,
-            updated_at = CURRENT_TIMESTAMP
+            updated_at = date_trunc('milliseconds', CURRENT_TIMESTAMP)
         WHERE id = ${claim.id}
           AND status = 'PROCESSING'
           AND lease_owner = ${claim.leaseOwner}
@@ -291,16 +323,18 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
       return 'POISONED';
     }
 
+    // See claimOne()'s comment: floor to milliseconds so this can never
+    // round the stored available_at/updated_at into the future.
     const retryDelayMs = GAME_OPERATION_RETRY_DELAYS_MS[claim.attempts - 1];
     const retried = await this.prisma.$executeRaw`
       UPDATE v1_outbox_events
       SET status = 'RETRY',
-          available_at = CURRENT_TIMESTAMP + (${retryDelayMs} * INTERVAL '1 millisecond'),
+          available_at = date_trunc('milliseconds', CURRENT_TIMESTAMP) + (${retryDelayMs} * INTERVAL '1 millisecond'),
           lease_owner = NULL,
           lease_until = NULL,
           last_error = ${lastError},
           version = version + 1,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = date_trunc('milliseconds', CURRENT_TIMESTAMP)
       WHERE id = ${claim.id}
         AND status = 'PROCESSING'
         AND lease_owner = ${claim.leaseOwner}
@@ -404,10 +438,12 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
   }
 
   async releaseOwnedLeases(): Promise<number> {
+    // See claimOne()'s comment: floor to milliseconds so this can never
+    // round the stored available_at/updated_at into the future.
     const released = await this.prisma.$transaction((tx) => tx.$executeRaw`
       UPDATE v1_outbox_events
       SET status = 'RETRY',
-          available_at = CURRENT_TIMESTAMP + (
+          available_at = date_trunc('milliseconds', CURRENT_TIMESTAMP) + (
             CASE attempts
               WHEN 1 THEN INTERVAL '1 second'
               WHEN 2 THEN INTERVAL '5 seconds'
@@ -420,7 +456,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
           lease_until = NULL,
           last_error = 'worker shutdown before completion',
           version = version + 1,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = date_trunc('milliseconds', CURRENT_TIMESTAMP)
       WHERE status = 'PROCESSING'
         AND lease_owner = ${this.owner}
     `);
@@ -477,6 +513,8 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     client: Pick<Prisma.TransactionClient, '$executeRaw'>,
     claim: GameOperationClaim,
   ): Promise<number> {
+    // See claimOne()'s comment: floor to milliseconds so this can never
+    // round the stored updated_at into the future.
     return client.$executeRaw`
       UPDATE v1_outbox_events
       SET status = 'COMPLETED',
@@ -484,7 +522,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
           lease_until = NULL,
           last_error = NULL,
           version = version + 1,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = date_trunc('milliseconds', CURRENT_TIMESTAMP)
       WHERE id = ${claim.id}
         AND status = 'PROCESSING'
         AND lease_owner = ${claim.leaseOwner}

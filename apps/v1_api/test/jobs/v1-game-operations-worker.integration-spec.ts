@@ -320,6 +320,19 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     const status = options.status ?? 'PENDING';
     const type = options.type ?? 'GAME_OPERATION_FLAG_CHANGED';
     const attempts = options.attempts ?? 0;
+    // v1_outbox_events.available_at/created_at/updated_at are TIMESTAMP(3)
+    // (millisecond precision) but bare CURRENT_TIMESTAMP carries microsecond
+    // precision -- Postgres ROUNDS (not truncates) on storage, which can
+    // push available_at up to 0.5ms *later* than the real insert instant.
+    // A claimOne() call issued immediately afterward (as every caller of
+    // this helper does) opens its own transaction a fraction of a
+    // millisecond later and can see its own CURRENT_TIMESTAMP fall just
+    // short of that rounded-up value, so `available_at <= CURRENT_TIMESTAMP`
+    // spuriously evaluates false and the freshly-inserted row is invisible
+    // to the very next claim -- root cause of this file's flaky CI failures
+    // (see the matching comment on V1GameOperationsWorkerService.claimOne).
+    // date_trunc floors instead of rounding, so the stored value is always
+    // <= the real instant it was computed at.
     await prisma.$executeRaw`
       INSERT INTO v1_outbox_events (
         id,
@@ -348,7 +361,7 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
         NULL,
         ${type},
         '{"source":"worker-contract-spec"}'::jsonb,
-        CURRENT_TIMESTAMP,
+        date_trunc('milliseconds', CURRENT_TIMESTAMP),
         NULL,
         NULL,
         ${attempts},
@@ -356,19 +369,21 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
         0,
         ${status}::"V1OutboxStatus",
         NULL,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
+        date_trunc('milliseconds', CURRENT_TIMESTAMP),
+        date_trunc('milliseconds', CURRENT_TIMESTAMP)
       )
     `;
     return { id, businessKey };
   }
 
   async function makeRetryDue(id: string): Promise<void> {
+    // Same rounding hazard as insertJob() above -- this is immediately
+    // followed by a claimOne()/processOne() call in every caller.
     await prisma.$executeRaw`
       UPDATE v1_outbox_events
-      SET available_at = CURRENT_TIMESTAMP,
+      SET available_at = date_trunc('milliseconds', CURRENT_TIMESTAMP),
           version = version + 1,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = date_trunc('milliseconds', CURRENT_TIMESTAMP)
       WHERE id = ${id}
         AND status = 'RETRY'
     `;

@@ -2632,12 +2632,26 @@ button:disabled {
   }
 }
 
+/* 라이트모드 시인성 fix: 이전엔 background(--grey50)가 .tm-app-frame 페이지 배경과
+   완전히 동일한 토큰이라 fill만으로는 절대 구분되지 않았고(실측 대비 1.05:1),
+   border(--grey100)도 1.10:1이라 사실상 입력창 경계가 안 보였다(라이트모드 스크린샷
+   피드백 원인). 두 안(A: 최소변경/기존토큰재사용, B: .tm-input 표준정렬)을 검토한 결과
+   background/border 모두 새 토큰을 만들지 않고 .tm-input이 이미 쓰는 P1 컴포넌트
+   시맨틱 토큰으로 정렬하는 데 두 안이 동의했다 — B가 제안한 신규 토큰
+   `--input-surface-sunken`(라이트 전용 grey150 fill)은 다크모드에서 --input-surface와
+   완전히 같은 값으로 수렴하고 라이트에서도 이득이 1.05→1.18:1 수준의 미세 차이뿐이라,
+   토큰 신설 비용 대비 이득이 낮다고 판단해 채택하지 않음(A 채택). border는 grey100/150/200
+   후보 중 grey300(--border-strong, 1.40~1.46:1)이 그 다음 후보보다 뚜렷이 우월해 A·B
+   공통으로 채택 — 이 앱의 헤어라인 미니멀 톤(엄밀한 3:1 미달, 절제된 경계) 안에서 인지
+   가능한 최대치. background는 --input-surface(=.tm-input과 동일 시맨틱 페어)로 통일해
+   두 입력 스타일이 색 토큰 체계는 공유하고 border 굵기만 맥락(카드 위/페이지 위)에 따라
+   갈리게 함. */
 .tm-create-input {
   min-height: 48px;
   margin-top: 10px;
-  border: 1px solid var(--grey100);
+  border: 1px solid var(--border-strong); /* [P1 component token] 기존 --grey100(1.10:1) 대체 */
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--input-surface); /* [P1 component token] 기존 --grey50(페이지 배경과 동일) 대체 */
   padding: 0 14px;
   display: flex;
   align-items: center;
@@ -2712,12 +2726,15 @@ button:disabled {
   gap: 8px;
 }
 
+/* .tm-create-input과 톤을 맞춘다(2026-08 시인성 fix) — 가운데 select만 밝아지고
+   좌우 버튼이 예전 grey50/grey200 그대로면 "하나로 이어진 스테퍼"가 아니라
+   3분할처럼 보인다(사용자 확인 후 결정). */
 .tm-create-stepper-button {
   flex: 0 0 48px;
   height: 48px;
-  border: 1px solid var(--grey200);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--input-surface);
   color: var(--blue500);
   font-size: 22px;
   font-weight: 500;
@@ -2729,7 +2746,7 @@ button:disabled {
 }
 
 .tm-create-stepper-button:active {
-  background: var(--grey100);
+  background: var(--grey150);
 }
 
 /* Capacity stepper: the middle <select> sits between −/+ buttons, so drop its
@@ -2751,9 +2768,16 @@ button:disabled {
   font-weight: 600;
 }
 
+/* 빈 상태(backgroundImage 없음) 시인성 fix: image prop이 falsy면 배경이 전혀 없어
+   132px 흰 여백이 됐다(라이트모드 스크린샷 피드백). --grey150은 이미 이 앱에서
+   .tm-auth-progress-bars의 "아직 채워지지 않음" 세그먼트에 쓰이는 토큰이라 "아직
+   업로드 안 됨" 상태와 시맨틱이 들어맞아 재사용(신규 토큰 없음). Card(pad=0)가
+   --card-border 풀보더로 전체를 감싸므로 별도 border는 불필요 — fill만 추가.
+   backgroundImage가 있는 채워진 상태는 그 위에 그대로 그려져 회귀 없음. */
 .tm-create-image-preview {
   height: 132px;
   padding: 12px;
+  background-color: var(--grey150);
   background-position: center;
   background-size: cover;
 }

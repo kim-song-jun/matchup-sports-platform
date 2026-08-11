@@ -205,15 +205,14 @@ export function StaffClient({ tournamentId }: Props) {
                     return (
                       <tr key={assignment.id}>
                         <td className="px-4 py-3 align-middle">
-                          <p className="font-medium text-[var(--text-strong)]">{staffRoleLabel(assignment.role)}</p>
                           {/* 담당자를 userId 앞 8자로만 보여주면 표에서 누가 누구인지 알 수 없다.
                               닉네임이 있으면 그것을 보여주고, 없을 때만 종전 식별자 조각으로 남긴다 —
-                              닉네임이 공개 신원으로 쓸 수 있는 유일한 값이다(D-03/D-11). */}
-                          {assignment.nickname ? (
-                            <p className="text-[12px] text-[var(--text-muted)]">{assignment.nickname}</p>
-                          ) : (
-                            <p className="text-[12px] text-gray-400 tabular-nums">{assignment.userId.slice(0, 8)}…</p>
-                          )}
+                              닉네임이 공개 신원으로 쓸 수 있는 유일한 값이다(D-03/D-11).
+                              같은 역할이 여러 명일 때 행을 구분하는 건 이름이므로 이름을 위에 둔다. */}
+                          <p className="font-medium text-[var(--text-strong)]">
+                            {assignment.nickname ?? `${assignment.userId.slice(0, 8)}…`}
+                          </p>
+                          <p className="text-[12px] text-[var(--text-muted)]">{staffRoleLabel(assignment.role)}</p>
                         </td>
                         <td className="px-4 py-3 align-middle">
                           {assignment.fieldId
@@ -268,13 +267,13 @@ export function StaffClient({ tournamentId }: Props) {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-medium text-[var(--text-strong)]">{staffRoleLabel(assignment.role)}</p>
-                      {/* 데스크톱 표와 같은 규칙 — 닉네임이 있으면 이름, 없을 때만 식별자 조각. */}
-                      {assignment.nickname ? (
-                        <p className="text-[12px] text-[var(--text-muted)]">{assignment.nickname}</p>
-                      ) : (
-                        <p className="text-[12px] text-gray-400 tabular-nums">{assignment.userId.slice(0, 8)}…</p>
-                      )}
+                      {/* 스태프 목록에서 먼저 찾는 건 "누구"다 — 역할이 제목이면 같은 역할이
+                          여러 명일 때 카드가 전부 똑같아 보인다. 이름을 제목으로 올린다.
+                          데스크톱 표와 같은 규칙 — 닉네임이 있으면 이름, 없을 때만 식별자 조각. */}
+                      <p className="font-medium text-[var(--text-strong)] truncate">
+                        {assignment.nickname ?? `${assignment.userId.slice(0, 8)}…`}
+                      </p>
+                      <p className="text-[12px] text-[var(--text-muted)]">{staffRoleLabel(assignment.role)}</p>
                     </div>
                     <span
                       className={[

@@ -45,7 +45,7 @@ function TeamRecordRow({ item, teamId, teamName, teamLogoUrl }: { item: PublicTe
             style={{
               fontSize: 11,
               fontWeight: 700,
-              color: 'var(--blue500)',
+              color: 'var(--blue700)',
               background: 'var(--blue50)',
               borderRadius: 6,
               padding: '2px 6px',

@@ -130,7 +130,7 @@ export function TournamentVenueNavigationButton({
                 rel="noopener noreferrer"
                 onClick={() => setOpen(false)}
                 className="tm-text-caption"
-                style={{ color: 'var(--blue500)', fontWeight: 600, whiteSpace: 'nowrap' }}
+                style={{ color: 'var(--blue700)', fontWeight: 600, whiteSpace: 'nowrap' }}
               >
                 {link.fallbackLabel}
               </a>

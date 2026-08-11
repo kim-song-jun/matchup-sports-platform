@@ -270,7 +270,7 @@ function RegistrationPass({
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
         </div>
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
-          <p className="tm-text-caption" style={{ color: 'var(--orange500)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
+          <p className="tm-text-caption" style={{ color: 'var(--orange700)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
             신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.
           </p>
         </div>
@@ -365,7 +365,7 @@ function RegistrationPass({
               aria-label={belowMinimum ? '선수 명단 등록하기' : '선수 명단 수정하기'}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 1,
-                color: 'var(--blue500)', fontWeight: 700, flexShrink: 0,
+                color: 'var(--blue700)', fontWeight: 700, flexShrink: 0,
                 minHeight: 44, paddingLeft: 8,
               }}
             >
@@ -822,7 +822,7 @@ function RegistrationDetailView({
       ) : null}
 
       {withdrawCancelError ? (
-        <div className="tm-text-caption" role="alert" style={{ color: 'var(--red500)', marginTop: 8, lineHeight: 1.5 }}>
+        <div className="tm-text-caption" role="alert" style={{ color: 'var(--red700)', marginTop: 8, lineHeight: 1.5 }}>
           {withdrawCancelError}
         </div>
       ) : null}
@@ -1065,7 +1065,7 @@ function RegistrationDetailView({
               ) : null}
 
               {withdrawCancelError ? (
-                <div className="tm-text-caption" role="alert" style={{ color: 'var(--red500)', lineHeight: 1.5 }}>
+                <div className="tm-text-caption" role="alert" style={{ color: 'var(--red700)', lineHeight: 1.5 }}>
                   {withdrawCancelError}
                 </div>
               ) : null}

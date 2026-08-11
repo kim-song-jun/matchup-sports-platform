@@ -57,7 +57,7 @@ export function PhoneVerifyPageClient() {
         {verified ? (
           <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}>
             <CheckCircle2 size={20} color="var(--blue500)" aria-hidden="true" />
-            <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue500)' }}>
+            <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue700)' }}>
               휴대폰 본인인증이 완료됐어요.
             </p>
           </Card>

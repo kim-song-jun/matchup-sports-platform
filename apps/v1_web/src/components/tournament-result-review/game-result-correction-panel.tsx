@@ -196,7 +196,7 @@ export function GameResultCorrectionPanel({
 
       {currentOfficial && !readOnly ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--red500)' }}>
+          <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--red700)' }}>
             공식 결과 무효화
           </p>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>

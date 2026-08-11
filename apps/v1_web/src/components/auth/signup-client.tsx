@@ -68,7 +68,7 @@ const onboardingDraftKey = 'teameet.v1.onboardingDraft';
 function RequiredMark() {
   return (
     <>
-      <span aria-hidden="true" style={{ marginLeft: 2, color: 'var(--red500)' }}>*</span>
+      <span aria-hidden="true" style={{ marginLeft: 2, color: 'var(--red700)' }}>*</span>
       <span className="sr-only">(필수)</span>
     </>
   );
@@ -461,7 +461,7 @@ export function SignupClient() {
         {/* 별표를 aria-hidden 으로만 두면 "표시는 필수 입력이에요"로 읽혀 무엇에 대한 설명인지
             사라진다. 시각 사용자는 기호로, 보조공학은 sr-only 단어로 같은 문장을 받게 한다. */}
         <p className="tm-text-caption" style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>
-          <span aria-hidden="true" style={{ color: 'var(--red500)' }}>*</span>
+          <span aria-hidden="true" style={{ color: 'var(--red700)' }}>*</span>
           <span className="sr-only">별표</span> 표시는 필수 입력이에요.
         </p>
 
@@ -621,7 +621,7 @@ export function SignupClient() {
                     aria-hidden="true"
                     style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue500)', display: 'inline-block' }}
                   />
-                  <span className="tm-text-label" style={{ color: 'var(--blue500)' }}>
+                  <span className="tm-text-label" style={{ color: 'var(--blue700)' }}>
                     휴대폰 본인인증이 완료됐어요
                   </span>
                 </div>

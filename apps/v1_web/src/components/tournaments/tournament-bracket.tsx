@@ -9,7 +9,7 @@
  * 드래그 스크롤: 마우스/터치 모두 지원
  */
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -608,9 +608,32 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
     setDragging(false);
   }, []);
 
+  /* 2026-08-11: 4강만 있는 등 라운드 수가 적은 대진은 트리 실폭이 넓은 데스크톱 컬럼
+     (.tm-bracket-page-grid의 1.28fr)보다 훨씬 좁아, 왼쪽 정렬된 트리 오른쪽으로 큰
+     빈 공간이 남아 "레이아웃이 어색하다"는 지적을 받았다(라이브 스크린샷). 실제로
+     스크롤이 필요 없을 때만(scrollWidth<=clientWidth) 트리를 컬럼 안에서 가운데
+     정렬해 빈 공간을 좌우로 나눈다 — 넘칠 때는 기존 왼쪽 정렬 스크롤 동작을 그대로
+     유지(가운데 정렬 + 스크롤 조합은 시작 위치가 어색해짐). */
+  const [fitsWithoutScroll, setFitsWithoutScroll] = useState(false);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const check = () => setFitsWithoutScroll(el.scrollWidth <= el.clientWidth + 1);
+    check();
+    // jsdom(vitest) 등 ResizeObserver 미구현 환경 방어 — 초기 check()는 이미 실행됐으니
+    // 리사이즈 재계산만 건너뛴다(테스트는 리사이즈를 시뮬레이션하지 않으므로 영향 없음).
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [mainRounds.length]);
+
   return (
     <div>
-      <p className="tm-bk2-scroll-hint">단계별 대진은 옆으로 밀어 확인할 수 있어요.</p>
+      {/* 실제로 스크롤할 내용이 없으면(트리가 컬럼 폭 안에 다 들어옴) 힌트 자체가
+          거짓 안내가 되므로 숨긴다 — 데스크톱 전용 CSS(.tm-bracket-page-grid
+          .tm-bk2-scroll-hint)와 별개로 모바일 폭에서도 동일하게 적용. */}
+      {!fitsWithoutScroll && <p className="tm-bk2-scroll-hint">단계별 대진은 옆으로 밀어 확인할 수 있어요.</p>}
       {/* ── 수평 스크롤 브래킷 트리 (드래그 가능) ── */}
       <div style={{ position: 'relative' }}>
         <div
@@ -621,6 +644,8 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
             paddingBottom: 8,
             cursor: dragging ? 'grabbing' : 'grab',
             userSelect: 'none',
+            display: fitsWithoutScroll ? 'flex' : 'block',
+            justifyContent: fitsWithoutScroll ? 'center' : undefined,
           }}
           role="region"
           aria-label="결선 대진표"
@@ -675,8 +700,8 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
           </div>
         </div>
 
-        {/* 오른쪽 페이드 — 더 내용 있음 힌트 */}
-        <div className="tm-bk2-scroll-fade" aria-hidden="true" />
+        {/* 오른쪽 페이드 — 더 내용 있음 힌트. 스크롤이 필요 없을 땐 표시 안 함(위 힌트와 동일 근거) */}
+        {!fitsWithoutScroll && <div className="tm-bk2-scroll-fade" aria-hidden="true" />}
       </div>
 
       {/* ── 3·4위전 ── */}

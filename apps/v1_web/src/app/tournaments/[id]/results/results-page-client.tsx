@@ -555,7 +555,7 @@ function TournamentSummaryCard({ tournament }: { tournament: V1TournamentDetail 
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
           minHeight: 44, borderTop: '1px solid var(--grey100)',
-          fontSize: 13, fontWeight: 600, color: 'var(--blue500)', textDecoration: 'none',
+          fontSize: 13, fontWeight: 600, color: 'var(--blue700)', textDecoration: 'none',
         }}
       >
         대회 상세 보기 <ChevronRight size={14} aria-hidden="true" />
@@ -688,7 +688,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
       {isInProgress && (
         <div style={{ padding: '12px 20px 0' }}>
           <div style={{ padding: '20px', textAlign: 'center', background: 'var(--blue50)', borderRadius: 10 }}>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--blue500)' }}>대회가 진행 중이에요</p>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--blue700)' }}>대회가 진행 중이에요</p>
             <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--blue700)' }}>종료 후 최종 결과를 확인할 수 있어요.</p>
           </div>
         </div>

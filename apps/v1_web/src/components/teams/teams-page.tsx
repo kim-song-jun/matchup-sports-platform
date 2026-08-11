@@ -1035,7 +1035,7 @@ function TeamLogoField({
         />
       </div>
       {error ? (
-        <div className="tm-text-caption" style={{ color: 'var(--red500)', marginTop: 6 }}>{error}</div>
+        <div className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 6 }}>{error}</div>
       ) : null}
     </div>
   );
@@ -1124,7 +1124,7 @@ function TeamCoverImageField({
           onChange={(event) => handleFile(event.target.files?.[0])}
         />
       </div>
-      {error ? <div className="tm-text-caption" style={{ color: 'var(--red500)', marginTop: 6 }}>{error}</div> : null}
+      {error ? <div className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 6 }}>{error}</div> : null}
     </div>
   );
 }
@@ -1276,12 +1276,12 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
             />
           </div>
           {form.error ? (
-            <div id="invite-email-error" className="tm-text-caption" role="alert" style={{ color: 'var(--red500)' }}>
+            <div id="invite-email-error" className="tm-text-caption" role="alert" style={{ color: 'var(--red700)' }}>
               {form.error}
             </div>
           ) : null}
           {form.successMessage ? (
-            <div className="tm-text-caption" role="status" style={{ color: 'var(--green500)' }}>
+            <div className="tm-text-caption" role="status" style={{ color: 'var(--green700)' }}>
               {form.successMessage}
             </div>
           ) : null}
@@ -1782,7 +1782,7 @@ function MemberCard({
         </button>
       ) : null}
       {selfLeave?.error ? (
-        <p role="alert" className="tm-text-caption" style={{ marginTop: 6, color: 'var(--red500)' }}>
+        <p role="alert" className="tm-text-caption" style={{ marginTop: 6, color: 'var(--red700)' }}>
           {selfLeave.error}
         </p>
       ) : null}

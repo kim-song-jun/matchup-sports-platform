@@ -49,12 +49,12 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
               {scoreText(revision.score)}
             </p>
             {scoreChanged && previous ? (
-              <p className="tm-text-caption" style={{ color: 'var(--blue500)', marginTop: 2 }}>
+              <p className="tm-text-caption" style={{ color: 'var(--blue700)', marginTop: 2 }}>
                 이전 {scoreText(previous.score)} → {scoreText(revision.score)}
               </p>
             ) : null}
             {revision.missingScorer ? (
-              <p className="tm-text-caption" style={{ color: 'var(--orange500)', marginTop: 4 }}>
+              <p className="tm-text-caption" style={{ color: 'var(--orange700)', marginTop: 4 }}>
                 득점자 정보가 없는 골이 있어요
               </p>
             ) : null}

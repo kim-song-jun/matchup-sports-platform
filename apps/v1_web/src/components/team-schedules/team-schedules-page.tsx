@@ -354,7 +354,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                   <button
                     type="button"
                     className="tm-btn tm-btn-sm tm-btn-outline"
-                    style={{ color: 'var(--red500)' }}
+                    style={{ color: 'var(--red700)' }}
                     disabled={manage.cancelPending}
                     onClick={manage.onCancel}
                   >

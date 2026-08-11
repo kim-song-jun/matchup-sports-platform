@@ -153,7 +153,7 @@ export function ReasonModal({
             />
           </div>
           {errorMessage ? (
-            <p role="alert" className="tm-text-caption" style={{ color: 'var(--red500)', marginTop: 10 }}>
+            <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 10 }}>
               {errorMessage}
             </p>
           ) : null}

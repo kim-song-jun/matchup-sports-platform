@@ -142,13 +142,15 @@ function PostEventActionList({ heading, cards }: { heading: string; cards: Tourn
           >
             <span
               aria-hidden="true"
+              // 2026-08-11: 5개 카드(결과/영상/리뷰/스폰서/다음대회) 전부 순수 내비게이션이라
+              // 파란 틴트에 의미가 없다는 지적 — 무채색으로 통일
               style={{
                 flexShrink: 0,
                 width: 36,
                 height: 36,
                 borderRadius: 10,
-                background: 'var(--blue50)',
-                color: 'var(--blue500)',
+                background: 'var(--grey100)',
+                color: 'var(--text-strong)',
                 display: 'grid',
                 placeItems: 'center',
               }}
@@ -239,7 +241,7 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
                 height: 36,
                 borderRadius: 10,
                 background: 'var(--blue50)',
-                color: 'var(--blue500)',
+                color: 'var(--blue700)',
                 display: 'grid',
                 placeItems: 'center',
               }}
@@ -317,7 +319,7 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
             <Link
               href={item.notice.href}
               className="tm-text-caption"
-              style={{ color: 'var(--blue500)', fontWeight: 600, marginTop: 2, display: 'inline-block' }}
+              style={{ color: 'var(--blue700)', fontWeight: 600, marginTop: 2, display: 'inline-block' }}
             >
               {item.notice.actionLabel}
             </Link>

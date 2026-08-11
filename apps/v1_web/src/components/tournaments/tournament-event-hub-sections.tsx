@@ -64,12 +64,14 @@ export function TournamentApplicationGuideSection() {
               <span
                 aria-hidden="true"
                 className="tab-num"
+                // 2026-08-11: "대회는 이렇게 진행돼요" 스텝 가이드(tournaments/page.tsx)와
+                // 동일한 순수 안내용 번호 배지 — 무채색으로 통일
                 style={{
                   width: 28,
                   height: 28,
                   borderRadius: 14,
-                  background: 'var(--blue50)',
-                  color: 'var(--blue500)',
+                  background: 'var(--grey100)',
+                  color: 'var(--text-strong)',
                   display: 'grid',
                   placeItems: 'center',
                   fontSize: 'var(--font-size-caption)',

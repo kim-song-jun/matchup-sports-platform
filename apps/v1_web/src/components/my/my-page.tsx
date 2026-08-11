@@ -523,10 +523,14 @@ function MenuSection({ section }: { section: { title: string; items: MyMenuItem[
           const IconComponent = MENU_ICON_MAP[item.icon];
           return (
             <Link key={item.label} className="tm-my-menu-row" href={item.href}>
-              {/* Lucide 아이콘: 단일 글자 모노그램 대체. 의미 있는 시각 단서 제공 */}
+              {/* Lucide 아이콘: 단일 글자 모노그램 대체. 의미 있는 시각 단서 제공.
+                  2026-08-11: 배경(.tm-my-menu-icon = --grey150, 무채색)은 이미 통일돼
+                  있었는데 아이콘 색만 --blue500라 타일마다 "파랑+회색이 섞인" 것처럼
+                  보였다(사용자 라이브 지적) — 진짜 경고가 아닌 순수 내비게이션 메뉴라
+                  아이콘도 배경과 같은 무채색 계열로 통일한다. */}
               <span className="tm-my-menu-icon" aria-hidden="true">
                 {IconComponent ? (
-                  <IconComponent size={18} strokeWidth={1.75} color="var(--blue500)" />
+                  <IconComponent size={18} strokeWidth={1.75} color="var(--text-strong)" />
                 ) : item.icon}
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
@@ -624,7 +628,7 @@ function PhoneVerificationCallout() {
           alignItems: 'center',
           justifyContent: 'center',
           background: 'var(--orange-soft)',
-          color: 'var(--orange500)',
+          color: 'var(--orange700)',
         }}
       >
         <ShieldAlert size={18} strokeWidth={2} />

@@ -314,7 +314,7 @@ export function ResultEditModal({
           </div>
 
           {scoreChanged ? (
-            <p className="tm-text-caption" style={{ color: 'var(--blue500)', marginBottom: 16 }}>
+            <p className="tm-text-caption" style={{ color: 'var(--blue700)', marginBottom: 16 }}>
               점수 변경: {base.score.home}:{base.score.away} → {home}:{away}
             </p>
           ) : null}
@@ -397,7 +397,7 @@ export function ResultEditModal({
           </div>
 
           {participantDiffs.length > 0 ? (
-            <p className="tm-text-caption" style={{ color: 'var(--blue500)', marginBottom: 16 }}>
+            <p className="tm-text-caption" style={{ color: 'var(--blue700)', marginBottom: 16 }}>
               참가자 기록 변경: {participantDiffs.length}명
             </p>
           ) : null}
@@ -438,7 +438,7 @@ export function ResultEditModal({
           </div>
 
           {errorMessage ? (
-            <p role="alert" className="tm-text-caption" style={{ color: 'var(--red500)', marginTop: 12 }}>
+            <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 12 }}>
               {errorMessage}
             </p>
           ) : null}

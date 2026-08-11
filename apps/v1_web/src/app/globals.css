@@ -4850,6 +4850,17 @@ button:disabled {
   border: 1px solid var(--border);
 }
 
+/* [토큰 충돌 fix] .tm-review-tab[data-active]의 기본 활성 배경(--surface)이 바로 위
+   .tm-match-type-segment 트랙 배경(--card-surface)과 완전히 같은 값(둘 다 #fff 라이트 /
+   #1c1e24 다크)이라 활성 탭이 자기 트랙에 녹아 사라져 글자 굵기 차이만 남았다(실측
+   지적: "active 상태가 폰트 굵기 차이뿐"). .tm-review-tabs(트랙이 --grey100)에서는 흰
+   pill이 잘 보이지만 이 트랙(흰색)에서는 반대로 짙은 pill이 필요 — grey150 + border로
+   반전한다. */
+.tm-match-type-segment .tm-review-tab[data-active="true"] {
+  background: var(--grey150);
+  border: 1px solid var(--border-strong);
+}
+
 @media (min-width: 1024px) {
   /* 데스크탑에서는 리스트·검색바의 모바일 패딩이 0으로 리셋되고 스크롤 영역이 열 여백을 담당하므로
      세그먼트도 열 가장자리에 맞춰야 제목·검색바와 정렬된다. */

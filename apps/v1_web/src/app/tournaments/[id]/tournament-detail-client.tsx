@@ -413,9 +413,11 @@ function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail 
       ) : (
         <span
           aria-hidden="true"
-          style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--blue50)' }}
+          // 2026-08-11: 순수 내비게이션 CTA라 경고색 의미가 없는데 파란 틴트가 튀어
+          // 보인다는 지적 — 무채색으로 통일 (마이허브 메뉴 아이콘과 동일 근거)
+          style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--grey100)' }}
         >
-          <Goal size={16} color="var(--blue500)" strokeWidth={2.2} />
+          <Goal size={16} color="var(--text-strong)" strokeWidth={2.2} />
         </span>
       )}
       <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, letterSpacing: '-0.01em', color: isLive ? '#fff' : 'var(--text-strong)' }}>
@@ -702,8 +704,8 @@ export function TournamentDetailView({
             />
             {pendingPaymentCount > 0 ? (
               <div className="tm-text-caption" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: 'var(--text-muted)', marginTop: 6 }}>
-                <span><b style={{ color: 'var(--blue500)', fontWeight: 600 }}>{tournament.confirmedCount}팀</b> 확정</span>
-                <span><b style={{ color: 'var(--orange500)', fontWeight: 600 }}>{pendingPaymentCount}팀</b> 입금 대기</span>
+                <span><b style={{ color: 'var(--blue700)', fontWeight: 600 }}>{tournament.confirmedCount}팀</b> 확정</span>
+                <span><b style={{ color: 'var(--orange700)', fontWeight: 600 }}>{pendingPaymentCount}팀</b> 입금 대기</span>
               </div>
             ) : null}
             {(() => {
@@ -1112,9 +1114,11 @@ export function TournamentDetailView({
       >
         <span
           aria-hidden="true"
-          style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--blue50)' }}
+          // 2026-08-11: 순수 내비게이션 CTA — 위 in_progress/completed 분기(line ~416)와
+          // 동일 근거로 무채색 통일
+          style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--grey100)' }}
         >
-          <Goal size={16} color="var(--blue500)" strokeWidth={2.2} />
+          <Goal size={16} color="var(--text-strong)" strokeWidth={2.2} />
         </span>
         <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status)}</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'var(--text-caption)', flexShrink: 0 }} aria-hidden="true" />
@@ -1505,9 +1509,14 @@ function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
       >
         <span
           aria-hidden="true"
-          style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--surface)' }}
+          // 2026-08-11: 카드 배경(--surface)과 아이콘 배지 배경이 같은 토큰이라 트로피
+          // 아이콘 뒤 원형 배지가 통째로 사라져 보였다 — 바로 위 "대회 현황"
+          // 리스트(PostEventActionList, tournament-venue-retention-sections.tsx)의
+          // 동일 아이콘 배지 관례(무채색 --grey100 + --text-strong 아이콘, 순수
+          // 내비게이션이라 색 의미 없음)와 맞춘다.
+          style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--grey100)' }}
         >
-          <Trophy size={18} color="var(--blue500)" strokeWidth={2} />
+          <Trophy size={18} color="var(--text-strong)" strokeWidth={2} />
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>실시간 순위표는 대진표에서 확인하세요</div>

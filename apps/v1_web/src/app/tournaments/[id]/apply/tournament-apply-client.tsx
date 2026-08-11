@@ -1004,7 +1004,7 @@ function AgreementsStep({
 
         <Card pad={14} style={{ marginTop: 10 }}>
           <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 6 }}>
-            입금자명 <span style={{ color: 'var(--red500)' }}>*</span>
+            입금자명 <span style={{ color: 'var(--red700)' }}>*</span>
           </label>
           <input
             id="depositor-name"

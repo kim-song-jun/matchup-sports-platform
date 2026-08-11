@@ -394,7 +394,7 @@ function AddPlayerForm({
           ) : membersError ? (
             <div
               className="tm-input"
-              style={{ color: 'var(--red500)', display: 'flex', alignItems: 'center', minHeight: 44 }}
+              style={{ color: 'var(--red700)', display: 'flex', alignItems: 'center', minHeight: 44 }}
             >
               팀원 목록을 불러오지 못했어요.
             </div>
@@ -453,12 +453,12 @@ function AddPlayerForm({
                 })}
               </select>
               {selectedMemberMissing ? (
-                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '6px 0 0' }}>
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '6px 0 0' }}>
                   실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.
                 </p>
               ) : null}
               {selectedAlreadyRegistered || selectedAlreadyPending ? (
-                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '6px 0 0' }}>
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '6px 0 0' }}>
                   {selectedAlreadyRegistered ? '이미 명단에 등록된 선수예요.' : '다른 추가 칸에서 선택한 선수예요.'}
                 </p>
               ) : null}
@@ -655,7 +655,7 @@ function FormField({
       >
         {label}
         {required ? (
-          <span style={{ color: 'var(--red500)', marginLeft: 2 }}>*</span>
+          <span style={{ color: 'var(--red700)', marginLeft: 2 }}>*</span>
         ) : null}
       </label>
       {children}
@@ -664,7 +664,7 @@ function FormField({
           id={`${id}-error`}
           role="alert"
           className="tm-text-micro"
-          style={{ color: 'var(--red500)', marginTop: 4 }}
+          style={{ color: 'var(--red700)', marginTop: 4 }}
         >
           {errorMessage}
         </p>
@@ -840,7 +840,7 @@ function PlayerRow({
             </div>
           </FormField>
           {editError ? (
-            <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '8px 0 0' }}>
+            <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '8px 0 0' }}>
               {editError}
             </p>
           ) : null}
@@ -1141,7 +1141,7 @@ export function TournamentRosterPageClient({
                 padding: '10px 14px',
                 borderRadius: 12,
                 background: 'var(--orange50)',
-                color: 'var(--orange500)',
+                color: 'var(--orange700)',
                 lineHeight: 1.55,
               }}
             >

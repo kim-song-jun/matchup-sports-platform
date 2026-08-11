@@ -193,7 +193,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             );
           })}
         </div>
-        {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
+        {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange700)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
         {/* 이미지 첨부는 미구현 상태 — aria-label로 준비 중 안내, title 중복 제거 */}
         {/* [P2 마이크로인터랙션] justSent: Send → Check 아이콘 + tm-complete-check 애니메이션 (0.4s) */}
         <div className="tm-chat-inputbar">

@@ -337,7 +337,7 @@ function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['
           alignItems: 'center',
           justifyContent: 'center',
           background: 'var(--blue-soft)',
-          color: 'var(--blue500)',
+          color: 'var(--blue700)',
         }}
       >
         <BellIcon size={18} strokeWidth={2} />
@@ -382,7 +382,7 @@ function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable
           alignItems: 'center',
           justifyContent: 'center',
           background: 'var(--orange-soft)',
-          color: 'var(--orange500)',
+          color: 'var(--orange700)',
         }}
       >
         <ShieldAlert size={18} strokeWidth={2} />
@@ -595,6 +595,7 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                 }}
               >
                 <span
+                  // 2026-08-11: 순수 내비게이션 카드 아이콘 — 무채색 통일(마이허브 메뉴와 동일 근거)
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -603,8 +604,8 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                     width: 32,
                     height: 32,
                     borderRadius: 8,
-                    background: 'var(--blue50)',
-                    color: 'var(--blue500)',
+                    background: 'var(--grey100)',
+                    color: 'var(--text-strong)',
                   }}
                   aria-hidden="true"
                 >
@@ -648,7 +649,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
         <Link key={match.id} className="tm-pressable tm-match-card" href={`/matches/${match.id}`}>
           <div className="tm-match-card-media" style={{ background: `${cssUrl(match.imageUrl)} center/cover` }} />
           <div style={{ padding: 16 }}>
-            <div className="tm-text-micro" style={{ color: 'var(--blue500)' }}>{match.sportLabel}</div>
+            <div className="tm-text-micro" style={{ color: 'var(--blue700)' }}>{match.sportLabel}</div>
             <div className="tm-text-label line-clamp-2" style={{ color: 'var(--text-strong)', marginTop: 4, minHeight: 36 }}>
               {match.title}
             </div>

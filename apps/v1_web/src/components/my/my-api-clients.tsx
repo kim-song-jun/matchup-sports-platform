@@ -1454,7 +1454,7 @@ export function NotificationSettingsPageClient() {
           ) : null}
           {pushError ? (
             <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>브라우저 알림을 켜지 못했어요</div>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>브라우저 알림을 켜지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{pushError}</div>
             </Card>
           ) : null}
@@ -1470,7 +1470,7 @@ export function NotificationSettingsPageClient() {
           </Card>
           {toggleError ? (
             <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
             </Card>
           ) : null}
@@ -1539,7 +1539,7 @@ export function ThemeSettingsPageClient() {
           </Card>
           {saveError ? (
             <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요. 이 화면에서는 그대로 적용돼요.</div>
             </Card>
           ) : null}

@@ -18,7 +18,7 @@ export function AbnormalClockBadge() {
     <span
       title="비정상적으로 긴 경기 시각이에요. 확인이 필요해요."
       aria-label="비정상적으로 긴 경기 시각이에요. 확인이 필요해요."
-      style={{ color: 'var(--orange500)', marginLeft: 2 }}
+      style={{ color: 'var(--orange700)', marginLeft: 2 }}
     >
       ⚠
     </span>

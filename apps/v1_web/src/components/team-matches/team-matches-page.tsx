@@ -370,7 +370,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 <Card pad={16} style={{ marginTop: 10 }}>
                   <div className="tm-text-body-lg">신청팀</div>
                   {match.applicantActionError ? (
-                    <div className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', marginTop: 6 }}>{match.applicantActionError}</div>
+                    <div className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', marginTop: 6 }}>{match.applicantActionError}</div>
                   ) : null}
                   {model.hostActions?.length ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
@@ -638,11 +638,11 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
           <span className="tm-text-caption">매너 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.manner}</span> · 승 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.wins}</span></span>
           {/* P1: 숫자는 body-lg(17px/700), 단위 "원"은 caption(12px) — 2:1 비율 */}
           {match.opponentCost === 0 ? (
-            <span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue500)' }}>무료</span>
+            <span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue700)' }}>무료</span>
           ) : (
             <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
-              <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--blue500)', fontVariantNumeric: 'tabular-nums' }}>{match.opponentCost.toLocaleString('ko-KR')}</span>
-              <span style={{ fontSize: 'var(--font-size-body-sm)', fontWeight: 500, color: 'var(--blue500)' }}>원</span>
+              <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--blue700)', fontVariantNumeric: 'tabular-nums' }}>{match.opponentCost.toLocaleString('ko-KR')}</span>
+              <span style={{ fontSize: 'var(--font-size-body-sm)', fontWeight: 500, color: 'var(--blue700)' }}>원</span>
             </span>
           )}
         </div>
@@ -710,7 +710,7 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
         const blocked = !hasCreatableTeams;
         return (
           <Card pad={14} style={{ marginTop: 14, background: blocked ? 'var(--orange50)' : 'var(--card-surface)' }}>
-            <div className="tm-text-label" style={blocked ? { color: 'var(--orange500)' } : undefined}>권한 기준</div>
+            <div className="tm-text-label" style={blocked ? { color: 'var(--orange700)' } : undefined}>권한 기준</div>
             <div className="tm-text-caption" style={{ marginTop: 6 }}>
               {blocked
                 ? '팀장이거나 매치 생성 권한이 있어야 다음으로 진행할 수 있어요. 해당 권한이 있는 팀으로 다시 시도해 주세요.'
@@ -1009,7 +1009,7 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
           <input className="sr-only" type="file" accept="image/*" disabled={uploading} onChange={handleChange} />
         </label>
         <div className="tm-text-caption" style={{ marginTop: 8 }}>목록과 상세 화면의 상단 배경으로 보여요.</div>
-        {uploadError ? <div className="tm-text-caption" role="alert" style={{ marginTop: 8, color: 'var(--orange500)' }}>{uploadError}</div> : null}
+        {uploadError ? <div className="tm-text-caption" role="alert" style={{ marginTop: 8, color: 'var(--orange700)' }}>{uploadError}</div> : null}
         {(fileName || image) && !uploading ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 10 }}>
             <span className="tm-text-caption" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName || '선택한 이미지'}</span>

@@ -278,8 +278,8 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
             <span className="tab-num">{item.confirmedCount}</span>
             {pendingPaymentCount > 0 ? (
               <>
-                <span style={{ color: 'var(--orange500)' }}>+</span>
-                <span className="tab-num" style={{ color: 'var(--orange500)' }}>{pendingPaymentCount}</span>
+                <span style={{ color: 'var(--orange700)' }}>+</span>
+                <span className="tab-num" style={{ color: 'var(--orange700)' }}>{pendingPaymentCount}</span>
               </>
             ) : null}
             <span>/</span>

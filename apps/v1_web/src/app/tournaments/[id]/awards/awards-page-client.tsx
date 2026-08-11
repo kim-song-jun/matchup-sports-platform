@@ -177,7 +177,7 @@ function PrizeSection({
               <Trophy size={20} className="tm-medal-gold" strokeWidth={2} />
             </span>
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>총 상금</span>
-            <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--blue500)', letterSpacing: '-0.01em' }}>{formatEntryFee(tournament.prizePool)}</span>
+            <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--blue700)', letterSpacing: '-0.01em' }}>{formatEntryFee(tournament.prizePool)}</span>
           </div>
         )}
 
@@ -243,11 +243,11 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
     const size = 22;
     switch (type) {
       case 'mvp': return <Crown size={size} className="tm-medal-gold" strokeWidth={2} />;
-      case 'top_scorer': return <Goal size={size} style={{ color: 'var(--blue500)' }} strokeWidth={2} />;
-      case 'best_defense': return <Shield size={size} style={{ color: 'var(--blue500)' }} strokeWidth={2} />;
-      case 'best_keeper': return <Hand size={size} style={{ color: 'var(--green500)' }} strokeWidth={2} />;
-      case 'fair_play': return <Handshake size={size} style={{ color: 'var(--green500)' }} strokeWidth={2} />;
-      case 'best_rookie': return <Sparkles size={size} style={{ color: 'var(--orange500)' }} strokeWidth={2} />;
+      case 'top_scorer': return <Goal size={size} style={{ color: 'var(--blue700)' }} strokeWidth={2} />;
+      case 'best_defense': return <Shield size={size} style={{ color: 'var(--blue700)' }} strokeWidth={2} />;
+      case 'best_keeper': return <Hand size={size} style={{ color: 'var(--green700)' }} strokeWidth={2} />;
+      case 'fair_play': return <Handshake size={size} style={{ color: 'var(--green700)' }} strokeWidth={2} />;
+      case 'best_rookie': return <Sparkles size={size} style={{ color: 'var(--orange700)' }} strokeWidth={2} />;
       default: return <Trophy size={size} className="tm-medal-gold" strokeWidth={2} />;
     }
   };
@@ -435,10 +435,10 @@ function ReviewFormModal({
             onChange={(e) => void handlePickPhotos(e.target.files)}
             style={{ display: 'none' }}
           />
-          {photoError && <p style={{ color: 'var(--red500)', fontSize: 11, marginTop: 6 }}>{photoError}</p>}
+          {photoError && <p style={{ color: 'var(--red700)', fontSize: 11, marginTop: 6 }}>{photoError}</p>}
         </div>
 
-        {isError && <p style={{ color: 'var(--red500)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
+        {isError && <p style={{ color: 'var(--red700)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
 
         <button
           type="button" onClick={handleSubmit} disabled={isPending || rating === 0}

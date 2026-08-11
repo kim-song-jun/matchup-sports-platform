@@ -97,7 +97,7 @@ export function ReviewsPageView({
                   {/* #17: CTA 영역에 ChevronRight 추가 — 탭 가능한 카드임을 명시적으로 전달 */}
                   <div className="tm-review-card-foot">
                     <span className="tm-badge tm-badge-grey">{card.kindLabel}</span>
-                    <span className="tm-text-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: 'var(--blue500)' }}>
+                    <span className="tm-text-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: 'var(--blue700)' }}>
                       {card.ctaLabel}
                       <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
                     </span>

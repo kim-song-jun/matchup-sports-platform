@@ -577,11 +577,12 @@
   height: 48px;
   display: grid;
   place-items: center;
-  background: var(--blue50);
+  /* 2026-08-11: 6단계 전부 순수 안내(경고 아님)인데 파란 틴트라 "왜 파란색인지" 의미
+     없이 튀어 보인다는 지적 — 무채색으로 통일(≥1024px 오버라이드는 이미 --bg라 무채색). */
+  background: var(--grey100);
   border-radius: 14px;
   position: relative;
-  /* 테두리 + 옅은 블루 hairline shadow로 살짝 입체감 */
-  box-shadow: 0 0 0 1px var(--blue100, rgba(49, 130, 246, 0.15)), 0 1px 3px rgba(49, 130, 246, 0.16);
+  box-shadow: 0 0 0 1px var(--border), 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .tm-tournament-promo-step-label {

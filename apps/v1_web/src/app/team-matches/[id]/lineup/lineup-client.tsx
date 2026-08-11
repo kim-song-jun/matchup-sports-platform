@@ -531,7 +531,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             </p>
           ) : null}
           {publicationLabel ? (
-            <p className="tm-text-caption" style={{ color: 'var(--blue500)', marginTop: 4, fontWeight: 600 }}>
+            <p className="tm-text-caption" style={{ color: 'var(--blue700)', marginTop: 4, fontWeight: 600 }}>
               {publicationLabel}
             </p>
           ) : null}
@@ -543,11 +543,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               저장 중…
             </p>
           ) : saveStatus === 'saved' ? (
-            <p className="tm-text-caption" style={{ color: 'var(--green500)' }}>
+            <p className="tm-text-caption" style={{ color: 'var(--green700)' }}>
               저장했어요.
             </p>
           ) : saveStatus === 'error' && saveErrorMessage ? (
-            <p role="alert" className="tm-text-caption" style={{ color: 'var(--red500)' }}>
+            <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>
               {saveErrorMessage}
             </p>
           ) : null}
@@ -1000,7 +1000,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               placeholder="예: 등번호가 중복된 것 같아요"
             />
             {changeRequestError ? (
-              <p role="alert" className="tm-text-caption" style={{ color: 'var(--red500)', marginTop: 6 }}>
+              <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 6 }}>
                 {changeRequestError}
               </p>
             ) : null}

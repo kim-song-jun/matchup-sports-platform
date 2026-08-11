@@ -101,7 +101,7 @@ function VideoBadge({ hasVideo }: { hasVideo: boolean }) {
   return (
     <span
       aria-label="경기 영상 있음"
-      style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--blue500)' }}
+      style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--blue700)' }}
     >
       <Film size={12} aria-hidden="true" />
     </span>

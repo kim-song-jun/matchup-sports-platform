@@ -50,7 +50,7 @@ function StandingRankBadge({ pos, advance }: { pos: number; advance: number | nu
   return (
     <span
       className="tm-standings-rank"
-      style={promoted ? { background: 'var(--blue50)', color: 'var(--blue500)' } : undefined}
+      style={promoted ? { background: 'var(--blue50)', color: 'var(--blue700)' } : undefined}
     >
       {pos}
     </span>

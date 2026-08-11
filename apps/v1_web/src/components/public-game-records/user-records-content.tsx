@@ -28,7 +28,7 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
           ) : null}
           {item.isCorrected ? (
             <span
-              style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue500)', background: 'var(--blue50)', borderRadius: 6, padding: '2px 6px' }}
+              style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue700)', background: 'var(--blue50)', borderRadius: 6, padding: '2px 6px' }}
             >
               정정됨
             </span>

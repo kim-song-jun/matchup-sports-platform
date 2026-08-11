@@ -184,10 +184,15 @@ export function DatePickerTextInput({
 
 type AlertBannerTone = 'error' | 'info' | 'warning';
 
+// 2026-08-11: 각 tone의 50계열 배경 위에 500계열 텍스트를 얹으면 라이트 모드에서
+// WCAG AA 4.5:1을 전부 미달한다(실측: error 3.24:1, info 3.31:1, warning 1.97:1 —
+// globals.css의 .tm-badge-* 와 동일 근본원인·동일 수치). 13개 파일·23곳에서 쓰이는
+// 공유 컴포넌트라 여기 하나만 고치면 전체가 함께 고쳐진다. 700계열은 각 tone 배경
+// 위에서 4.5:1 이상(라이트·다크 양쪽, :root.dark가 이미 700 토큰을 재오버라이드해둠).
 const ALERT_BANNER_STYLES: Record<AlertBannerTone, { bg: string; color: string }> = {
-  error:   { bg: 'var(--red50)',    color: 'var(--red500)'    },
-  info:    { bg: 'var(--blue50)',   color: 'var(--blue500)'   },
-  warning: { bg: 'var(--orange50)', color: 'var(--orange500)' },
+  error:   { bg: 'var(--red50)',    color: 'var(--red700)'    },
+  info:    { bg: 'var(--blue50)',   color: 'var(--blue700)'   },
+  warning: { bg: 'var(--orange50)', color: 'var(--orange700)' },
 };
 
 export function AlertBanner({
@@ -405,7 +410,7 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <div className="tm-empty-state" role="alert">
-      <div className="tm-empty-icon" aria-hidden="true" style={{ background: 'var(--red50)', color: 'var(--red500)' }}>
+      <div className="tm-empty-icon" aria-hidden="true" style={{ background: 'var(--red50)', color: 'var(--red700)' }}>
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />

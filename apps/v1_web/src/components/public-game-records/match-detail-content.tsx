@@ -211,7 +211,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
             {data.status === 'live' ? <LiveBadge clock={data.clock} /> : null}
           </div>
           {data.pendingProjection ? (
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--blue500)', textAlign: 'center' }}>
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--blue700)', textAlign: 'center' }}>
               경기 결과가 공식 확정을 기다리고 있어요.
             </p>
           ) : null}

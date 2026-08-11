@@ -107,8 +107,8 @@ export function TournamentCampaignEditor({
         previewAlt={form.heroImageUrl ? '메인 상단 이미지 미리보기' : '메인 상단 이미지 예시'}
         eager
       />
-      {errors.heroImageUrl ? <p className="text-xs text-red-500" role="alert">{errors.heroImageUrl}</p> : null}
-      {uploadError ? <p className="text-xs text-red-500" role="alert">{uploadError}</p> : null}
+      {errors.heroImageUrl ? <p className="text-xs text-[var(--red700)]" role="alert">{errors.heroImageUrl}</p> : null}
+      {uploadError ? <p className="text-xs text-[var(--red700)]" role="alert">{uploadError}</p> : null}
 
       <p className="-mt-4 text-xs text-[var(--text-muted)]">
         {slugLocked ? '한 번 공개된 캠페인의 URL은 보관 후에도 유지돼요.' : '대회별 공개 URL은 자동으로 만들어져요.'}
@@ -184,7 +184,7 @@ function EditorField({
       ) : (
         <input className={INPUT_CLASS} maxLength={maxLength} disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)} />
       )}
-      {error ? <span className="text-xs font-normal text-red-500" role="alert">{error}</span> : null}
+      {error ? <span className="text-xs font-normal text-[var(--red700)]" role="alert">{error}</span> : null}
     </label>
   );
 }

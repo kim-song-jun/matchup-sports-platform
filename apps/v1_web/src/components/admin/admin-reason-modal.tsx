@@ -209,7 +209,7 @@ export function AdminReasonModal({
                 htmlFor="admin-reason-text"
                 className="text-[13px] font-semibold text-[var(--text-body)]"
               >
-                사유 <span className="text-red-500" aria-hidden="true">*</span>
+                사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
               <textarea
@@ -234,7 +234,7 @@ export function AdminReasonModal({
                 id="admin-reason-char-count"
                 className={[
                   'text-[11px] text-right tabular-nums',
-                  reason.length >= REASON_MAX ? 'text-red-500' : 'text-gray-400',
+                  reason.length >= REASON_MAX ? 'text-[var(--red700)]' : 'text-gray-400',
                 ].join(' ')}
                 aria-live="polite"
               >
@@ -244,7 +244,7 @@ export function AdminReasonModal({
 
             {/* Required hint */}
             {trimmedReason.length === 0 && reason.length > 0 && (
-              <p className="text-[12px] text-red-500" role="alert">
+              <p className="text-[12px] text-[var(--red700)]" role="alert">
                 공백만 입력하면 제출할 수 없어요.
               </p>
             )}

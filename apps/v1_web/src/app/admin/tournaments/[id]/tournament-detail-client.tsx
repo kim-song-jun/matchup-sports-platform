@@ -2309,7 +2309,7 @@ export function BracketTab({
                         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         el?.focus();
                       }}
-                      className="text-xs text-blue-500 hover:text-[var(--blue700)] underline underline-offset-2 min-h-[44px] inline-flex items-center px-1 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                      className="text-xs text-[var(--blue700)] hover:opacity-80 underline underline-offset-2 min-h-[44px] inline-flex items-center px-1 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
                     >
                       팀 배정하기
                     </button>
@@ -2430,7 +2430,7 @@ export function BracketTab({
                     <Link
                       href={operateHref}
                       aria-label={`${f.round} ${f.fixtureNumber}번 경기 운영 콘솔 열기`}
-                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-green-600 bg-[var(--green50)] hover:bg-green-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--green700)] bg-[var(--green50)] hover:bg-green-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
                       운영 콘솔 열기
                       <ChevronRight size={12} aria-hidden="true" />
@@ -3325,7 +3325,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   if (isError || !tournament) {
     return (
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
-        <p className="text-sm text-red-500 font-medium">
+        <p className="text-sm text-[var(--red700)] font-medium">
           {extractErrorMessage(error, '대회 정보를 불러오지 못했어요.')}
         </p>
         <button
@@ -4827,7 +4827,7 @@ function ReviewsTab({
         </div>
       ) : isError ? (
         <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
-          <p className="text-sm text-red-500 font-medium">
+          <p className="text-sm text-[var(--red700)] font-medium">
             {extractErrorMessage(error, '리뷰를 불러오지 못했어요.')}
           </p>
           <button

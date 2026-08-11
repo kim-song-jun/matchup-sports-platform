@@ -78,7 +78,7 @@ export function AdminCardList<T>({
   if (error) {
     return (
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
-        <p className="text-sm text-red-500 font-medium">{error}</p>
+        <p className="text-sm text-[var(--red700)] font-medium">{error}</p>
         {onRetry && (
           <button
             type="button"

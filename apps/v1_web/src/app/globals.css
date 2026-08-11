@@ -39,6 +39,8 @@
   --red50: #feebec;
   --red500: #f04452;
   --red700: #b42332;
+  --green700: #037a4a; /* green500/600은 라이트에서도 자신의 green50 배경·흰 배경 위 AA(4.5:1) 미달
+     (green600 vs green50 3.12:1, vs white 3.46:1) — blue700/red700과 동일하게 짙은 버전을 별도 토큰화 */
   --yellow50: #fff8d6;
   --yellow500: #ffc342;
   --teal50: #e2f7f8;
@@ -148,6 +150,18 @@
      (2026-08 QA). blue700(#1b64da, ~5.41:1)과 짝을 맞춰 orange 쪽에도 4.5:1을 넘는
      진한 변형을 추가한다(~4.92:1). */
   --orange700: #a36100;
+  /* 피치 배치 선수 마커(PlayerToken/GK 배지, pitch-formation-editor.tsx) 전용 — 원형
+     배경 + 흰 텍스트 조합의 대비를 테마 무관하게 항상 보장해야 하는 solid chip 색이다.
+     --blue700/--orange700은 2026-08-10 전수검수로 다크모드에서 "카드/틴트 배경 위
+     텍스트"용 밝은 값(각각 #6ba8ff, --orange500)으로 재정의됐는데, 그 값을 배경으로
+     쓰고 흰 텍스트를 얹으면 대비가 무너진다(재계산: 다크 --blue700 배경 + 흰 글씨
+     ≈2.42:1, 다크 --orange700 배경 + 흰 글씨 ≈2.16:1 — 둘 다 WCAG AA 4.5:1 미달,
+     원래 --orange500 텍스트 대비 결함과 동일한 유형이 배경 용도로 재발). 라이트 700
+     hex(#1b64da/#a36100) 자체는 흰 텍스트를 얹는 배경으로도 4.5:1을 넘어(재계산:
+     blue 5.41:1, orange 4.92:1) kakao-yellow/naver-green과 같은 패턴(브랜드/고정
+     chip 색은 다크모드에도 동일 값 유지)으로 고정한다 — :root.dark 오버라이드 없음. */
+  --player-marker-blue: #1b64da;
+  --player-marker-orange: #a36100;
   /* ── 타입 스케일 토큰 — desktop/tournaments.css 대진표·라운드 카드 타이포 ── */
   --font-size-micro: 11px;
   --font-size-caption: 12px;
@@ -182,6 +196,13 @@
   --button-fill-primary-hover:  var(--blue600);
   --button-fill-neutral:        var(--grey100);
   --button-fill-danger:         var(--red500);
+  /* --orange700은 텍스트/뱃지 대비 확보용으로 다크모드에서 --orange500과 동일하게
+   * 오버라이드된다(라인 ~315 주석 참고) — 그 토큰을 버튼 hover 배경에 재사용하면
+   * 다크모드에서 resting/hover 배경이 완전히 같아져 hover 피드백이 사라진다.
+   * --orange600은 다크모드에서 오버라이드되지 않아 항상 --orange500과 구분되므로
+   * 버튼 hover 전용 component 토큰으로 별도 관리한다. */
+  --button-fill-warning:        var(--orange500);
+  --button-fill-warning-hover:  var(--orange600);
   --button-text-primary:        var(--static-white);
   --button-text-neutral:        var(--text-strong);
   /* Card
@@ -314,6 +335,11 @@
   --blue700: #6ba8ff;
   --orange700: var(--orange500);
   --red700: #ff6b76;
+  /* green700 다크 재계산: 라이트 전용으로 새로 추가한 --green700(#037a4a)도 다크에서
+   * 그대로면 카드 표면·자신의 dark green50 틴트 배경 양쪽에서 대비가 무너진다(실측 대상:
+   * '운영 콘솔 열기' CTA, text-green-600 4.11:1 결함의 근본 수정). blue700/red700과 동일한
+   * 여유폭(카드·틴트 배경 양쪽 5.8~7.9:1)으로 밝은 민트 계열을 재계산해 선택. */
+  --green700: #2fe0a0;
 }
 
 /* alpha 라이브 확인 중 발견: 흰 유리(glass) 배경을 CSS 변수 없이 rgba(255,255,255,X)로

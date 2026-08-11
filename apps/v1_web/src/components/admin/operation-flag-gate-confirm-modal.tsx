@@ -197,7 +197,7 @@ export function GateConfirmModal({
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="gate-confirm-reason" className="text-[13px] font-semibold text-[var(--text-body)]">
-                사유 <span className="text-red-500" aria-hidden="true">*</span>
+                사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
               <textarea
@@ -227,7 +227,7 @@ export function GateConfirmModal({
                 <label htmlFor="gate-confirm-typed" className="text-[13px] font-semibold text-[var(--text-body)]">
                   확인을 위해 <span className="text-[var(--orange700)]">&ldquo;{typedChallenge}&rdquo;</span>
                   {objectParticle(typedChallenge)} 그대로 입력해 주세요{' '}
-                  <span className="text-red-500" aria-hidden="true">*</span>
+                  <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                   <span className="sr-only">(필수)</span>
                 </label>
                 <input
@@ -257,7 +257,7 @@ export function GateConfirmModal({
               type="button"
               onClick={() => !pending && onClose()}
               disabled={pending}
-              className="flex-1 h-[48px] rounded-xl text-[13px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[48px] rounded-xl text-[13px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -269,7 +269,7 @@ export function GateConfirmModal({
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? tone === 'amber'
-                    ? 'bg-[var(--orange500)] text-white hover:bg-[var(--orange700)]'
+                    ? 'bg-[var(--button-fill-warning)] text-white hover:bg-[var(--button-fill-warning-hover)]'
                     : 'bg-blue-500 text-white hover:bg-blue-600'
                   : 'bg-gray-200 text-white cursor-not-allowed',
               ].join(' ')}

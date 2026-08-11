@@ -139,7 +139,9 @@ export default function AdminOverviewPage() {
           {totalWarnings === 0 ? (
             <div className="flex items-center gap-2.5 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
               <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />
-              <p className="text-[var(--font-size-body-sm)] text-green-700">지금은 조치가 필요한 항목이 없어요.</p>
+              {/* text-green-700은 dark: 변형이 없는 고정값이라 --green50(dark) 배경 위에서 2.70~3.07:1로 AA 미달.
+                  admin-status-pill.tsx와 동일하게 --green700 토큰 부재 시 중립 강조 토큰(--text-strong)으로 대체. */}
+              <p className="text-[var(--font-size-body-sm)] text-[var(--text-strong)]">지금은 조치가 필요한 항목이 없어요.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

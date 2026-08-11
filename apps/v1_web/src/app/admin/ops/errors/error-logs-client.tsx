@@ -87,7 +87,9 @@ function statusTone(statusCode: number | null): string {
 }
 
 function sourceTone(source: V1AdminErrorLogSource): string {
-  return source === 'server' ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-purple-50 text-purple-700';
+  return source === 'server'
+    ? 'bg-[var(--blue50)] text-[var(--blue700)]'
+    : 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300';
 }
 
 // ── Component ─────────────────────────────────────────────────────────────

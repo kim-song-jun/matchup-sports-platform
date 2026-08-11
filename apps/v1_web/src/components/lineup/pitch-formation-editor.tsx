@@ -686,9 +686,13 @@ function PlayerToken({
           border: '2px solid #fff',
           // blue500/orange500 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 blue500 ~3.71:1,
           // orange500 ~2.16:1, 2026-08 QA) — 등번호 텍스트가 여기서 유일하게 흰 배경 위
-          // 흰 글씨가 아니라 색 배경 위 흰 글씨라 대비가 그대로 노출된다. blue700/orange700
-          // (둘 다 4.5:1 이상)로 교체한다.
-          background: entry.goalkeeper ? 'var(--orange700)' : 'var(--blue700)',
+          // 흰 글씨가 아니라 색 배경 위 흰 글씨라 대비가 그대로 노출된다.
+          // --blue700/--orange700은 쓰지 않는다 — 그 토큰은 2026-08-10 전수검수로
+          // 다크모드에서 "카드/틴트 배경 위 텍스트"용 밝은 값으로 재정의돼(각각
+          // #6ba8ff, --orange500) 원형 배경 + 흰 텍스트 조합엔 다크모드에서 오히려
+          // 대비가 무너진다(재계산 ≈2.42:1/≈2.16:1). 테마 무관 고정 chip 색인
+          // --player-marker-blue/--player-marker-orange(둘 다 4.5:1 이상, globals.css)를 쓴다.
+          background: entry.goalkeeper ? 'var(--player-marker-orange)' : 'var(--player-marker-blue)',
           color: '#fff',
           display: 'flex',
           alignItems: 'center',
@@ -702,9 +706,12 @@ function PlayerToken({
       >
         {entry.jerseyNumber ?? '-'}
       </button>
-      {/* GK 여부를 배경색(orange700)에만 기대지 않고 별도 텍스트 배지로도 병기한다 —
-          색맹 사용자도 등번호를 가리지 않고 피치 위에서 바로 골키퍼를 식별할 수 있어야
-          한다("컬러만으로 정보 전달 금지" 프로젝트 규칙). */}
+      {/* GK 여부를 배경색(player-marker-orange)에만 기대지 않고 별도 텍스트 배지로도
+          병기한다 — 색맹 사용자도 등번호를 가리지 않고 피치 위에서 바로 골키퍼를
+          식별할 수 있어야 한다("컬러만으로 정보 전달 금지" 프로젝트 규칙). 배경은
+          위 PlayerToken 원형과 같은 이유로 --orange700이 아니라 테마 무관 고정
+          --player-marker-orange를 쓴다(다크모드 --orange700은 텍스트용으로 재정의돼
+          흰 텍스트 배경으로 쓰면 대비가 무너짐). */}
       {entry.goalkeeper ? (
         <span
           aria-hidden="true"
@@ -716,7 +723,7 @@ function PlayerToken({
             fontWeight: 800,
             lineHeight: 1,
             color: '#fff',
-            background: 'var(--orange700)',
+            background: 'var(--player-marker-orange)',
             border: '1px solid #fff',
             borderRadius: 4,
             padding: '2px 3px',

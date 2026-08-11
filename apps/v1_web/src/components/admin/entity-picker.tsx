@@ -182,7 +182,7 @@ export function EntityPicker({
     return (
       <div className="flex items-center justify-between h-[44px] px-3 bg-[var(--blue50)] border border-[var(--tint-blue-border)] rounded-xl">
         <div className="flex flex-col min-w-0">
-          <span className="text-[var(--font-size-label)] font-semibold text-blue-800 truncate">
+          <span className="text-[var(--font-size-label)] font-semibold text-[var(--blue700)] truncate">
             {value.label}
           </span>
           {value.description && (

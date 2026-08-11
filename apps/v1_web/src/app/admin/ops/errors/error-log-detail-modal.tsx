@@ -247,7 +247,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
               <p className="text-sm text-[var(--text-muted)]">불러오는 중…</p>
             )}
             {isError && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-[var(--red700)]">
                 {extractErrorMessage(error, '에러 상세를 불러오지 못했어요.')}
               </p>
             )}

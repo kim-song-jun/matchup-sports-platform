@@ -159,7 +159,7 @@ export function StaffClient({ tournamentId }: Props) {
         </>
       ) : staff.isError ? (
         <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
-          <p className="text-sm text-red-500 font-medium">
+          <p className="text-sm text-[var(--red700)] font-medium">
             {extractErrorMessage(staff.error, '스태프 목록을 불러오지 못했어요.')}
           </p>
           <button
@@ -243,7 +243,7 @@ export function StaffClient({ tournamentId }: Props) {
                                 setRevokeError(null);
                                 setRevokeTarget(assignment);
                               }}
-                              className="inline-flex items-center justify-center min-h-[44px] px-3 text-sm text-red-500 hover:text-[var(--red700)] font-semibold focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                              className="inline-flex items-center justify-center min-h-[44px] px-3 text-sm text-[var(--red700)] font-semibold focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
                             >
                               해제
                             </button>
@@ -300,7 +300,7 @@ export function StaffClient({ tournamentId }: Props) {
                         setRevokeError(null);
                         setRevokeTarget(assignment);
                       }}
-                      className="mt-2 min-h-[44px] px-3 text-sm text-red-500 hover:text-[var(--red700)] font-semibold border-t border-[var(--border)] pt-2 w-full text-left focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                      className="mt-2 min-h-[44px] px-3 text-sm text-[var(--red700)] font-semibold border-t border-[var(--border)] pt-2 w-full text-left focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
                     >
                       배정 해제
                     </button>

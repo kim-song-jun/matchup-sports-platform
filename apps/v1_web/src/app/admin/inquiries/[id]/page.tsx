@@ -195,7 +195,7 @@ export default function AdminInquiryDetailPage() {
           action={
             <Link
               href="/admin/inquiries"
-              className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--border)]"
+              className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--surface-soft)]"
             >
               <ArrowLeft size={16} aria-hidden="true" />
               목록
@@ -227,7 +227,7 @@ export default function AdminInquiryDetailPage() {
         action={
           <Link
             href="/admin/inquiries"
-            className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--border)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <ArrowLeft size={16} aria-hidden="true" />
             목록
@@ -331,7 +331,7 @@ export default function AdminInquiryDetailPage() {
                               type="button"
                               onClick={cancelEditReply}
                               disabled={updateReplyMutation.isPending}
-                              className="inline-flex h-[44px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                              className="inline-flex h-[44px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                             >
                               취소
                             </button>

@@ -160,7 +160,7 @@ export function GrantStaffModal({
           <div className="px-5 py-5 flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="grant-staff-user-id" className="text-[13px] font-semibold text-[var(--text-body)]">
-                사용자 ID (UUID) <span className="text-red-500" aria-hidden="true">*</span>
+                사용자 ID (UUID) <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
               <input
@@ -174,7 +174,7 @@ export function GrantStaffModal({
                 className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
               />
               {userId.length > 0 && !userIdValid && (
-                <p className="text-[12px] text-red-500" role="alert">
+                <p className="text-[12px] text-[var(--red700)]" role="alert">
                   올바른 UUID 형식이 아니에요.
                 </p>
               )}
@@ -202,7 +202,7 @@ export function GrantStaffModal({
             {requiresField && (
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="grant-staff-field" className="text-[13px] font-semibold text-[var(--text-body)]">
-                  담당 필드 <span className="text-red-500" aria-hidden="true">*</span>
+                  담당 필드 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                   <span className="sr-only">(필수)</span>
                 </label>
                 <select
@@ -237,7 +237,7 @@ export function GrantStaffModal({
             </div>
 
             {errorMessage && (
-              <p className="text-[13px] text-red-500" role="alert">
+              <p className="text-[13px] text-[var(--red700)]" role="alert">
                 {errorMessage}
               </p>
             )}

@@ -137,7 +137,7 @@ export function RevokeStaffModal({
             </p>
             <div className="flex flex-col gap-1.5">
               <label htmlFor="revoke-staff-reason" className="text-[13px] font-semibold text-[var(--text-body)]">
-                사유 <span className="text-red-500" aria-hidden="true">*</span>
+                사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
               <textarea
@@ -155,7 +155,7 @@ export function RevokeStaffModal({
             </div>
 
             {errorMessage && (
-              <p className="text-[13px] text-red-500" role="alert">
+              <p className="text-[13px] text-[var(--red700)]" role="alert">
                 {errorMessage}
               </p>
             )}

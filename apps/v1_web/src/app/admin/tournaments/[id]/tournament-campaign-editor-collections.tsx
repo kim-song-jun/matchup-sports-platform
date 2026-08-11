@@ -162,7 +162,7 @@ function EditorCollectionSection({
           {addLabel}
         </button>
       </div>
-      {error ? <p className="text-xs text-red-500" role="alert">{error}</p> : null}
+      {error ? <p className="text-xs text-[var(--red700)]" role="alert">{error}</p> : null}
       {children}
     </section>
   );

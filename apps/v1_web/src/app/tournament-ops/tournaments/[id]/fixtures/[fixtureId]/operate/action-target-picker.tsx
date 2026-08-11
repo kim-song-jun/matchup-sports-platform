@@ -241,12 +241,12 @@ export function ActionTargetPicker({
               {titleText}
             </h2>
             {isSubstitution && substitutionOut !== null ? (
-              <p className="mt-0.5 text-2xs font-medium text-[var(--text-muted)]">
+              <p className="mt-0.5 text-xs font-medium text-[var(--text-muted)]">
                 {substitutionOut.participant.displayNameSnapshot} 선수와 교체
               </p>
             ) : null}
             {/* 액션 탭 시점을 얼린 값 — 선수를 고르는 동안 흘러가지 않는다. */}
-            <p className="mt-0.5 text-2xs font-medium tabular-nums text-[var(--blue700)]" aria-live="polite">
+            <p className="mt-0.5 text-xs font-medium tabular-nums text-[var(--blue700)]" aria-live="polite">
               {periodLabel(frozen.period)} · {formatMatchClock(frozen.clockMs)} 시점 기록 (고정됨)
             </p>
           </div>
@@ -274,7 +274,7 @@ export function ActionTargetPicker({
             ) : (
               <div className="flex flex-col gap-3">
                 {remainingSubstitutionsLabel(substitutionOut.sideId) ? (
-                  <p className="text-2xs font-semibold text-[var(--text-muted)]">
+                  <p className="text-xs font-semibold text-[var(--text-muted)]">
                     {remainingSubstitutionsLabel(substitutionOut.sideId)}
                   </p>
                 ) : null}

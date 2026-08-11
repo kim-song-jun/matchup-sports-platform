@@ -476,7 +476,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             <p className="truncate text-sm font-bold text-[var(--text-strong)]">
               {sides.map((side) => side.displayNameSnapshot).join(' vs ') || '경기 운영'}
             </p>
-            <div className="mt-0.5 flex items-center gap-2 text-2xs text-[var(--text-muted)]">
+            <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <span className="rounded-full bg-[var(--blue50)] px-2 py-0.5 font-semibold text-[var(--blue700)]">
                 {gameState ? STATE_LABEL[gameState] : '-'}
               </span>
@@ -554,7 +554,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 방금 실행한 명령에만 붙는 일회성 피드백이라 다음 명령을 누르는
                 순간(`setLastCommandFeedback(null)`) 사라진다. */}
             {lastCommandFeedback ? (
-              <p className="text-2xs tabular-nums text-[var(--text-muted)]" aria-live="polite">
+              <p className="text-xs tabular-nums text-[var(--text-muted)]" aria-live="polite">
                 {lastCommandFeedback.label} 완료 · {lastCommandFeedback.durationMs}ms
               </p>
             ) : null}
@@ -568,7 +568,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {sides.length > 0 ? (
           <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <p className="flex items-baseline gap-1.5">
-              <span className="text-2xs font-semibold text-[var(--text-muted)]">스코어</span>
+              <span className="text-xs font-semibold text-[var(--text-muted)]">스코어</span>
               <span
                 className="text-2xl font-bold tabular-nums text-[var(--text-strong)]"
                 aria-label={`스코어 ${sides.map((side) => `${side.displayNameSnapshot} ${scoreBySideId.get(side.id) ?? 0}점`).join(', ')}`}

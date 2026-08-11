@@ -82,7 +82,7 @@ export function RestTimer() {
     return (
       <section className="mx-4 flex flex-col gap-2 rounded-xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-3">
         <div className="flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-2xs font-semibold text-[var(--orange700)]">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--orange700)]">
             <Timer size={14} aria-hidden="true" />
             쉬는 시간
           </p>
@@ -117,7 +117,7 @@ export function RestTimer() {
 
   return (
     <section className="mx-4 flex flex-col gap-1.5">
-      <p className="flex items-center gap-1.5 text-2xs font-semibold text-[var(--text-muted)]">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]">
         <Timer size={14} aria-hidden="true" />
         쉬는 시간
       </p>
@@ -148,7 +148,7 @@ export function RestTimer() {
           </button>
         ))}
       </div>
-      <p className="text-2xs text-[var(--text-muted)]">
+      <p className="text-xs text-[var(--text-muted)]">
         화면을 새로고침하면 초기화돼요.
       </p>
     </section>

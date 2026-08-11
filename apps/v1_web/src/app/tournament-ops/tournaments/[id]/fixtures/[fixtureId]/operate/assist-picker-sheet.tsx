@@ -78,7 +78,7 @@ export function AssistPickerSheet({ open, event, scorerName, teammates, onAttach
           </button>
         </div>
         {error ? (
-          <p role="alert" className="mb-2 text-2xs font-medium text-[var(--red700)]">
+          <p role="alert" className="mb-2 text-xs font-medium text-[var(--red700)]">
             {error}
           </p>
         ) : null}

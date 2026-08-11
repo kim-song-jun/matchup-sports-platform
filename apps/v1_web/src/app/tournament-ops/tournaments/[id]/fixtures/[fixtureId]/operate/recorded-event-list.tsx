@@ -33,7 +33,7 @@ export function RecordedEventList({
 }) {
   if (events.length === 0) {
     return (
-      <p className="px-1 py-3 text-2xs text-[var(--text-muted)]">
+      <p className="px-1 py-3 text-xs text-[var(--text-muted)]">
         아직 기록된 이벤트가 없어요.
       </p>
     );
@@ -84,7 +84,7 @@ export function RecordedEventList({
                     645886/649891/652602/655603ms 가 전부 "10'"로 보였다). 초까지 보여
                     구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
                     충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
-                <span className="shrink-0 rounded bg-[var(--surface-soft)] px-1.5 py-0.5 text-2xs font-medium tabular-nums text-[var(--text-muted)]">
+                <span className="shrink-0 rounded bg-[var(--surface-soft)] px-1.5 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)]">
                   {periodLabel(event.period)} {formatMatchClock(event.clockMs)}
                 </span>
                 <p className="truncate text-sm font-medium text-[var(--text-strong)]">
@@ -112,7 +112,7 @@ export function RecordedEventList({
                     type="button"
                     onClick={() => onAttachAssist(event)}
                     aria-label="이 골에 어시스트 추가"
-                    className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-2xs font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                    className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-xs font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                   >
                     <Handshake size={12} aria-hidden="true" />
                     어시스트
@@ -122,13 +122,17 @@ export function RecordedEventList({
                   <button
                     type="button"
                     onClick={() => onReverseSubstitution(event)}
-                    className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--border)] px-2 text-2xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                    className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                   >
                     <Undo2 size={12} aria-hidden="true" />
                     되돌리기
                   </button>
                 ) : null}
-                <span className="text-2xs text-[var(--text-muted)]">
+                {/* 팀 귀속은 기록자가 매 행에서 즉시 확인해야 하는 정보인데, 행에서
+                    가장 약하게 표현돼 있었다(11px·regular·muted, 우측 끝 — 알파 390px
+                    실측). 색을 더 쓰지 않고(R-C1) 굵기로만 대비를 올린다 — 색으로
+                    팀을 구분하면 색만으로 의미를 전달하게 돼 R-C3 에 걸린다. */}
+                <span className="text-xs font-medium text-[var(--text-muted)]">
                   {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
                 </span>
               </div>

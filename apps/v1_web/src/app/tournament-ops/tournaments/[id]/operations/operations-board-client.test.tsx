@@ -83,6 +83,20 @@ describe('OperationsBoardClient', () => {
     expect(screen.getAllByText('담당자 미배정').length).toBeGreaterThan(0);
   });
 
+  // 데스크톱 표와 모바일 카드가 같은 행을 그리는데 경기 번호 표기가 갈려 있었다
+  // (표: "8강 1경기" / 카드: "8강 · 1번 경기"). "N경기"는 "그 라운드의 N번째 경기"로
+  // 오독되지만 fixtureNumber 는 대회 전체 연번이다 — 두 경로 모두 같은 표기를 쓴다.
+  it('labels the fixture number identically in the desktop table and the mobile card', () => {
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    // 데스크톱 표: 번호만 단독 노드
+    expect(screen.getByText('8강 · 1번 경기')).toBeInTheDocument();
+    // 모바일 카드: 같은 표기 뒤에 일정이 이어붙는다
+    expect(screen.getByText(/8강 · 1번 경기 ·/)).toBeInTheDocument();
+    // 옛 표기는 어느 경로에도 남아 있으면 안 된다
+    expect(screen.queryByText(/8강 1경기/)).not.toBeInTheDocument();
+  });
+
   it('updates the URL (deep link) when a filter changes, and does not lose the filter selection across an incremental data refresh', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<OperationsBoardClient tournamentId="t-1" />);

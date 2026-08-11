@@ -36,6 +36,19 @@ function validateEventShape(event: GameResultEvent): void {
   if (!Number.isSafeInteger(event.period) || event.period < 1) {
     throw new GameContractError('EVENT_INVALID', 'Event period must be a positive integer');
   }
+  // Deliberately no upper bound here (alpha "452′" incident, 2026-08): an
+  // operator who forgets to end a period before recording another event
+  // will produce a huge-but-real clockMs. Hard-rejecting it here (422) would
+  // make the record UNRECORDABLE, which is worse than a wrong-looking
+  // number — and an already-appended event must never be retroactively
+  // rejected either (it's the immutable source of truth once committed).
+  // The response to an implausible clockMs lives elsewhere, as a
+  // non-blocking signal: the operator console asks for confirmation before
+  // submit when the value runs far past its period's configured
+  // `durationMinutes` (`operate-console.tsx`, `game-operations-clock.ts`'s
+  // `isClockSuspicious`), and the public schedule/match-detail screens flag
+  // an already-recorded outlier instead of hiding or “fixing” it
+  // (`public-game-records/format.ts`'s `isClockAbnormal`).
   if (!Number.isSafeInteger(event.clockMs) || event.clockMs < 0) {
     throw new GameContractError('EVENT_INVALID', 'Event clock must be a non-negative integer');
   }

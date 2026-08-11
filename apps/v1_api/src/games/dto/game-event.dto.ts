@@ -76,6 +76,10 @@ export class AppendGameEventDto {
   @Min(1)
   period!: number;
 
+  // No @Max here on purpose — see the matching comment on
+  // `validateEventShape` in `../core/game-invariants.ts` (alpha "452′"
+  // incident): a hard upper bound would 422-reject a legitimate late
+  // capture instead of just flagging it.
   @Type(() => Number)
   @IsInt()
   @Min(0)

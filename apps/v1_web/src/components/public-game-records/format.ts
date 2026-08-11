@@ -104,6 +104,38 @@ export function periodLabel(periodNumber: number): string {
   return `${periodNumber}피리어드`;
 }
 
+/**
+ * alpha 실측 사고(2026-08) -- 대회 픽스처 하나의 골 이벤트가 `clockMs`
+ * 27,166,083ms(≈452분)로 기록돼 공개 일정 화면에 `452′`가 그대로 나갔다.
+ * 원인은 `clockMs`에 상한 검증이 아예 없다는 것(운영자가 경기 종료를 누르지
+ * 않으면 클럭이 계속 흐른다, `apps/v1_api/.../game-invariants.ts`의
+ * `validateEventShape` 참고) -- 그리고 이 저장소는 그 값을 서버에서 하드
+ * 거부하지 않기로 했다(현장 기록을 막는 게 잘못된 숫자가 남는 것보다 나쁘고,
+ * 이미 기록된 이벤트를 소급 거부할 수도 없다). 그래서 공개 화면의 책임은
+ * "숫자를 고치거나 숨기는" 게 아니라 "이상하다는 신호를 함께 보여주는" 것
+ * 뿐이다 -- `formatGoalMinute`/`formatClock`은 그대로 실제 값을 반환하고,
+ * 이 함수가 그 값이 신뢰할 만한 범위를 벗어났는지만 별도로 판정한다.
+ *
+ * 임계값 90분 -- 이 저장소가 실제로 정의한 두 프리셋(`competition-config.
+ * presets.ts`) 중 가장 긴 단일 피리어드는 축구 전/후반 각 45분이다. 그
+ * 두 배를 골랐다: 정규 시간 + 추가시간을 아무리 넉넉히 잡아도 한 피리어드가
+ * 90분을 실제로 넘는 경기는 없고, 그 이상이면 사실상 항상 "경기 종료를 못
+ * 눌러 시계가 계속 흐른" 운영 실수다. 운영 콘솔의 확인 게이트
+ * (`lib/game-operations-clock.ts`의 `isClockSuspicious`)는 대회마다 실제
+ * 설정된 `durationMinutes`를 대조해 배율(×2)을 곱하는 더 정확한 판정을 쓰지만,
+ * 이 화면(공개 일정/상세)이 받는 `clockMs`에는 그 대회의 피리어드 설정이 함께
+ * 오지 않는다 -- 그래서 여기서는 "알려진 모든 프리셋의 최댓값의 2배"로 고정한
+ * 상수를 대신 쓴다(디자인 여지가 있는 표시 신호일 뿐이라 운영 게이트만큼
+ * 정밀할 필요는 없다).
+ */
+const ABNORMAL_CLOCK_THRESHOLD_MS = 90 * 60_000;
+
+/** `clockMs`(또는 이미 분으로 접힌 값을 ms로 환산한 값)가 신뢰할 만한 범위를
+ * 벗어났는지. `null`은 "시각 자체가 없음"이지 이상값이 아니므로 항상 false. */
+export function isClockAbnormal(clockMs: number | null): boolean {
+  return clockMs !== null && clockMs > ABNORMAL_CLOCK_THRESHOLD_MS;
+}
+
 /** `m:ss` elapsed-time display for the public live clock -- same precision as `formatClock`. */
 export function formatElapsedClock(elapsedMs: number): string {
   const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));

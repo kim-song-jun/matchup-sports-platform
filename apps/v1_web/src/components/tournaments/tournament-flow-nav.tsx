@@ -78,7 +78,7 @@ export function TournamentFlowNav({ prev, next }: TournamentFlowNavProps) {
           <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
             <span>{next.label}</span>
             {next.disabledHint && (
-              <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.75 }}>{next.disabledHint}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.75 }}>{next.disabledHint}</span>
             )}
           </span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

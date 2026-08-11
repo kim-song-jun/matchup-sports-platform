@@ -69,7 +69,9 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
   const [state, setState] = useState<FixtureLineupState | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  const [activeView, setActiveView] = useState<'roster' | 'pitch'>('roster');
+  // 피치 배치가 늘 먼저 보이는 게 기본 기대치다(2026-08 사용자 지적) — 기본 탭도,
+  // 탭 버튼 순서도, 데스크톱 2컬럼의 좌측 배치도 전부 피치 배치가 앞선다.
+  const [activeView, setActiveView] = useState<'roster' | 'pitch'>('pitch');
   const [newPlayerName, setNewPlayerName] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -300,16 +302,11 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
         {saveError ? <AlertBanner message={saveError} tone="error" /> : null}
 
-        <div role="tablist" aria-label="라인업 뷰 전환" style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeView === 'roster'}
-            className={`tm-btn tm-btn-sm ${activeView === 'roster' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-            onClick={() => setActiveView('roster')}
-          >
-            명단
-          </button>
+        {/* 탭은 좁은 폭(모바일·태블릿) 전용 — 데스크톱(≥1024px)에서는 두 영역이
+            .tm-fixture-lineup-grid로 동시에 보이므로 탭 자체가 필요 없다(tm-hide-desktop).
+            순서·기본 선택 모두 피치 배치가 먼저다(2026-08 사용자 지적: "항상 피치 배치가
+            먼저 나왔으면 좋겠다"). */}
+        <div role="tablist" aria-label="라인업 뷰 전환" className="tm-hide-desktop" style={{ display: 'flex', gap: 8 }}>
           <button
             type="button"
             role="tab"
@@ -319,10 +316,26 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
           >
             피치 배치
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'roster'}
+            className={`tm-btn tm-btn-sm ${activeView === 'roster' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+            onClick={() => setActiveView('roster')}
+          >
+            명단
+          </button>
         </div>
 
-        {activeView === 'pitch' ? (
-          <section aria-labelledby="fixture-lineup-pitch-heading">
+        {/* 두 영역을 항상 함께 렌더한다(탭으로 마운트/언마운트하지 않음) — 모바일·태블릿에서는
+            CSS가 활성 탭 쪽만 보여주고(.tm-fixture-lineup-pane.is-active), 데스크톱에서는
+            같은 CSS가 두 pane을 나란히 그리드로 강제 노출한다. DOM 순서 자체도 피치가
+            먼저라 데스크톱 2컬럼에서도 피치가 왼쪽(시각적으로 앞)에 온다. */}
+        <div className="tm-fixture-lineup-grid">
+          <section
+            aria-labelledby="fixture-lineup-pitch-heading"
+            className={`tm-fixture-lineup-pane${activeView === 'pitch' ? ' is-active' : ''}`}
+          >
             <SectionTitle id="fixture-lineup-pitch-heading" title="피치 배치" />
             {!formationSupported ? (
               <EmptyState
@@ -351,8 +364,8 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               </div>
             )}
           </section>
-        ) : (
-          <>
+
+          <section aria-label="명단" className={`tm-fixture-lineup-pane${activeView === 'roster' ? ' is-active' : ''}`}>
             {editable ? (
               <Card pad={16}>
                 <div className="tm-text-body-lg">선수 추가</div>
@@ -387,15 +400,15 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                   선발 명단이 비어 있어요.
                 </p>
               ) : (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }} aria-hidden="true">
-                    <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, minWidth: 44 }}>GK</span>
-                    <span className="tm-text-micro" style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 600 }}>이름</span>
-                    <span className="tm-text-micro" style={{ width: 56, textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>등번호</span>
-                  </div>
-                  <Card pad={0} style={{ marginTop: 4 }}>
-                    {state.starters.map((entry, index) => (
+                <Card pad={0} style={{ marginTop: 8 }}>
+                  {state.starters.map((entry, index) => {
+                    const jerseyInputId = `starter-jersey-${entry.key}`;
+                    return (
                       <div key={entry.key} style={{ padding: 12, ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}) }}>
+                        {/* 1줄: 골키퍼 지정 · 이름 · 이동/제외 액션. 등번호는 아래 줄에
+                            라벨과 함께 독립된 자리를 준다(2026-08 사용자 지적: 등번호 입력이
+                            "전혀 없는 것처럼" 보였다 — 이름·버튼들 사이에 낀 56px 빈 칸으로는
+                            입력 가능한 필드라는 게 눈에 띄지 않았다). */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <button
                             type="button"
@@ -412,35 +425,34 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                               minWidth: 44,
                               minHeight: 44,
                               borderRadius: 999,
-                              // orange50 배경 위 orange500 텍스트는 대비 ~1.97:1로 WCAG AA
-                              // 크게 미달(2026-08 QA 실측) — orange700(~4.92:1)으로 교체.
-                              border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1px solid var(--border)',
-                              background: entry.goalkeeper ? 'var(--orange50)' : 'var(--card-surface)',
-                              color: entry.goalkeeper ? 'var(--orange700)' : 'var(--text-muted)',
+                              // 2026-08 QA 지적: 미지정 상태(점선 아웃라인 이전 버전)도 "GK"가
+                              // 진하게 박힌 원이라 선발 전원이 골키퍼처럼 보였다. 지정된 1명만
+                              // 피치 토큰(PlayerToken)과 동일한 orange700 채움 배지로 "확정"
+                              // 느낌을 주고, 미지정은 점선 아웃라인(이 파일의 EmptySlotMarker와
+                              // 같은 "탭해서 지정" 관용구)으로 눌리지 않은 토글임을 분명히 한다.
+                              border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1.5px dashed var(--grey300)',
+                              background: entry.goalkeeper ? 'var(--orange700)' : 'transparent',
+                              color: entry.goalkeeper ? '#fff' : 'var(--text-caption)',
                               fontSize: 12,
-                              fontWeight: 800,
+                              fontWeight: entry.goalkeeper ? 800 : 600,
                               cursor: editable ? 'pointer' : 'default',
                             }}
                           >
                             GK
                           </button>
-                          <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{entry.displayName}</span>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            aria-label={`${entry.displayName} 등번호`}
-                            className="tm-input"
-                            style={{ width: 56, textAlign: 'center' }}
-                            value={entry.jerseyNumber ?? ''}
-                            disabled={!editable}
-                            onChange={(event) =>
-                              setState((prev) =>
-                                prev
-                                  ? setJerseyNumber(prev, entry.key, event.target.value === '' ? null : Number(event.target.value))
-                                  : prev,
-                              )
-                            }
-                          />
+                          <span
+                            className="tm-text-label"
+                            style={{
+                              flex: 1,
+                              fontWeight: 600,
+                              minWidth: 0,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {entry.displayName}
+                          </span>
                           {editable ? (
                             <>
                               <button
@@ -461,36 +473,27 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                             </>
                           ) : null}
                         </div>
-                      </div>
-                    ))}
-                  </Card>
-                </>
-              )}
-            </section>
-
-            <section aria-labelledby="fixture-lineup-bench-heading">
-              <SectionTitle id="fixture-lineup-bench-heading" title={`후보 (${state.bench.length})`} />
-              {state.bench.length === 0 ? (
-                <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
-                  후보 명단이 비어 있어요.
-                </p>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }} aria-hidden="true">
-                    <span className="tm-text-micro" style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 600 }}>이름</span>
-                    <span className="tm-text-micro" style={{ width: 56, textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>등번호</span>
-                  </div>
-                  <Card pad={0} style={{ marginTop: 4 }}>
-                    {state.bench.map((entry, index) => (
-                      <div key={entry.key} style={{ padding: 12, ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}) }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{entry.displayName}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                          <label
+                            htmlFor={jerseyInputId}
+                            className="tm-text-caption"
+                            style={{ color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}
+                          >
+                            등번호
+                            {/* 등번호는 저장·제출 모두에서 필수가 아니다(fixture-lineup.view-model
+                                buildSavePayload가 null이면 아예 필드를 생략) — "필수처럼 보여서
+                                막힌 줄 알았다"는 오해를 막기 위해 선택 입력임을 라벨에서 바로
+                                밝힌다(2026-08 QA 지적). */}
+                            <span style={{ fontWeight: 400, color: 'var(--text-caption)' }}> (선택)</span>
+                          </label>
                           <input
+                            id={jerseyInputId}
                             type="number"
                             inputMode="numeric"
                             aria-label={`${entry.displayName} 등번호`}
                             className="tm-input"
-                            style={{ width: 56, textAlign: 'center' }}
+                            placeholder="번호"
+                            style={{ width: 72, textAlign: 'center', fontWeight: 700 }}
                             value={entry.jerseyNumber ?? ''}
                             disabled={!editable}
                             onChange={(event) =>
@@ -501,6 +504,40 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                               )
                             }
                           />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </Card>
+              )}
+            </section>
+
+            <section aria-labelledby="fixture-lineup-bench-heading">
+              <SectionTitle id="fixture-lineup-bench-heading" title={`후보 (${state.bench.length})`} />
+              {state.bench.length === 0 ? (
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
+                  후보 명단이 비어 있어요.
+                </p>
+              ) : (
+                <Card pad={0} style={{ marginTop: 8 }}>
+                  {state.bench.map((entry, index) => {
+                    const jerseyInputId = `bench-jersey-${entry.key}`;
+                    return (
+                      <div key={entry.key} style={{ padding: 12, ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}) }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span
+                            className="tm-text-label"
+                            style={{
+                              flex: 1,
+                              fontWeight: 600,
+                              minWidth: 0,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {entry.displayName}
+                          </span>
                           {editable ? (
                             <>
                               <button
@@ -521,14 +558,46 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                             </>
                           ) : null}
                         </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                          <label
+                            htmlFor={jerseyInputId}
+                            className="tm-text-caption"
+                            style={{ color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}
+                          >
+                            등번호
+                            {/* 등번호는 저장·제출 모두에서 필수가 아니다(fixture-lineup.view-model
+                                buildSavePayload가 null이면 아예 필드를 생략) — "필수처럼 보여서
+                                막힌 줄 알았다"는 오해를 막기 위해 선택 입력임을 라벨에서 바로
+                                밝힌다(2026-08 QA 지적). */}
+                            <span style={{ fontWeight: 400, color: 'var(--text-caption)' }}> (선택)</span>
+                          </label>
+                          <input
+                            id={jerseyInputId}
+                            type="number"
+                            inputMode="numeric"
+                            aria-label={`${entry.displayName} 등번호`}
+                            className="tm-input"
+                            placeholder="번호"
+                            style={{ width: 72, textAlign: 'center', fontWeight: 700 }}
+                            value={entry.jerseyNumber ?? ''}
+                            disabled={!editable}
+                            onChange={(event) =>
+                              setState((prev) =>
+                                prev
+                                  ? setJerseyNumber(prev, entry.key, event.target.value === '' ? null : Number(event.target.value))
+                                  : prev,
+                              )
+                            }
+                          />
+                        </div>
                       </div>
-                    ))}
-                  </Card>
-                </>
+                    );
+                  })}
+                </Card>
               )}
             </section>
-          </>
-        )}
+          </section>
+        </div>
       </div>
 
       {editable ? (
@@ -536,7 +605,12 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
           <div style={{ display: 'grid', gridTemplateColumns: state.lineupId ? '1fr 1fr' : '1fr', gap: 8 }}>
             <button
               type="button"
-              className="tm-btn tm-btn-lg tm-btn-neutral"
+              // tm-btn-neutral(회색 채움)은 globals.css의 .tm-btn:disabled 배경(--grey100)과
+              // 완전히 같은 색이라 활성 상태도 비활성처럼 읽혔다(2026-08 QA 지적: "저장 버튼이
+              // 회색이라 비활성처럼 보인다"). tm-btn-outline은 이 화면의 "후보로"/"제외" 등
+              // 보조 액션과 이미 같은 언어(테두리 + 옅은 배경)라 활성 상태가 분명히 눌러지는
+              // 버튼으로 보이면서도 파란 주 CTA(라인업 제출하기)를 침범하지 않는다.
+              className="tm-btn tm-btn-lg tm-btn-outline"
               disabled={saveMutation.isPending}
               onClick={handleSave}
             >

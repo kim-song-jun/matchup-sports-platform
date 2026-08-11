@@ -1384,3 +1384,60 @@
     min-height: 210px;
   }
 }
+
+/* ─── Fixture lineup /tournaments/:id/matches/:fixtureId/lineup ──────────────
+ * Mobile/tablet (<1024): 탭으로 전환하는 단일 pane. 두 pane 모두 항상 DOM에 있고
+ * (탭으로 마운트/언마운트하지 않음) CSS가 활성 탭만 보여준다 — 그래야 데스크톱에서
+ * 같은 마크업을 두 pane 동시 노출로 그대로 승격할 수 있다.
+ * Desktop (≥1024): 2컬럼 그리드로 두 pane을 항상 함께 보여준다(탭은 tm-hide-desktop으로
+ * 숨김). DOM 순서상 피치 pane이 항상 먼저(왼쪽)다.
+ *
+ * COMPONENT CONTRACT:
+ *   <div role="tablist" className="tm-hide-desktop">...</div>
+ *   <div className="tm-fixture-lineup-grid">
+ *     <section className={`tm-fixture-lineup-pane ${activeView==='pitch' ? 'is-active' : ''}`}>피치</section>
+ *     <section className={`tm-fixture-lineup-pane ${activeView==='roster' ? 'is-active' : ''}`}>명단</section>
+ *   </div>
+ */
+.tm-fixture-lineup-pane {
+  display: none;
+}
+
+.tm-fixture-lineup-pane.is-active {
+  display: grid;
+  gap: 14px;
+}
+
+@media (min-width: 1024px) {
+  .tm-fixture-lineup-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* is-active 여부와 무관하게 두 pane 모두 강제 노출 — 탭 상태는 모바일/태블릿에서만 의미가 있다. */
+  .tm-fixture-lineup-pane {
+    display: grid !important;
+    gap: 14px;
+  }
+
+  /* 2026-08 QA 지적: 피치는 maxWidth 420px 기준 세로 ~648px — 데스크톱 페이지 헤더·
+   * 카드·탭 아래에 놓이면 900px 안팎 뷰포트에서 골 지역(피치 하단)이 화면 아래로
+   * 잘리거나 하단 고정 CTA 바(.tm-fixed-cta) 밑에 가려 스크롤 없이는 전혀 안 보였다
+   * ("배치 화면인데 배치 공간 절반이 안 보이는 건 치명적" — 사용자 지적). max-height를
+   * 걸어 aspect-ratio가 폭 대신 높이를 기준으로 줄어들게 해 뷰포트 안에 통째로
+   * 들어오도록 한다(모바일/태블릿은 건드리지 않음 — 그쪽은 스크롤이 기본 탐색이라
+   * 이 문제가 없다).
+   *
+   * 고정 비율(dvh)만 쓰면 뷰포트가 낮을수록 위쪽 고정 chrome(데스크톱 nav 64px +
+   * 하단 고정 CTA 87px + 헤더·카드·섹션타이틀 ~304px)이 차지하는 "비율"이 커져
+   * 똑같은 dvh 비율로는 짧은 뷰포트에서 다시 겹친다 — calc로 그 고정 chrome을
+   * 뷰포트 높이에서 직접 빼서 뷰포트 높이와 무관하게 항상 CTA 위에서 끝나도록
+   * 한다. clamp 하한(260px)은 아주 짧은 뷰포트에서 피치가 으스러지지 않게 하는
+   * 방어선(그 경우는 스크롤로 보완).
+   */
+  .tm-pitch-board {
+    max-height: clamp(260px, calc(100dvh - 64px - 304px - 87px - 24px), 560px);
+  }
+}

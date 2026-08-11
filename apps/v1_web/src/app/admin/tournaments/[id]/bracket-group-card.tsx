@@ -440,6 +440,7 @@ export function BracketGroupCard({
                   <input
                     id={`fixture-number-${group.id}`}
                     type="number"
+                    inputMode="numeric"
                     min="1"
                     value={fixtureNumber}
                     onChange={(e) => setFixtureNumber(e.target.value)}

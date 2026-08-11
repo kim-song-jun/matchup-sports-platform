@@ -15,7 +15,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
-import { GameStateBadge, WarningBadge } from '@/components/tournament-ops/badges';
+import { GameStateBadge, WarningBadge, WARNING_LABELS } from '@/components/tournament-ops/badges';
 import { TournamentProgressStepper, buildTournamentStages } from '@/components/tournaments/tournament-progress-stepper';
 import type {
   V1GameState,
@@ -34,10 +34,12 @@ const GAME_STATE_FILTER_LABELS: Record<V1GameState, string> = {
   CANCELLED: '취소됨',
 };
 
+// 필터 라벨과 배지 라벨이 다르면 "필터를 걸었는데 다른 이름의 행만 나온다"로 읽힌다 —
+// 배지와 같은 출처(WARNING_LABELS)를 쓴다.
 const WARNING_FILTER_LABELS: Record<V1TournamentStableWarningCode, string> = {
-  NO_FIELD_ASSIGNED: '필드 미배정',
-  MISSING_SCORER: '기록자 없음',
-  RESULT_REVIEW_OVERDUE: '결과 검토 지연',
+  NO_FIELD_ASSIGNED: WARNING_LABELS.NO_FIELD_ASSIGNED,
+  MISSING_SCORER: WARNING_LABELS.MISSING_SCORER,
+  RESULT_REVIEW_OVERDUE: WARNING_LABELS.RESULT_REVIEW_OVERDUE,
 };
 
 function readFilter<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {
@@ -328,7 +330,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <Link
                           href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                          className="inline-flex items-center min-h-[36px] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                          className="inline-flex items-center min-h-11 px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                         >
                           운영 콘솔
                         </Link>
@@ -351,10 +353,15 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                   <div className="min-w-0">
                     <p className="font-medium text-[var(--text-strong)] truncate">{rowLabel(item)}</p>
                     <p className="text-[12px] text-gray-400">
-                      {item.round} {item.fixtureNumber}경기 ·{' '}
+                      {/* "4강 4경기"는 "4강의 4번째 경기"로 오독된다 — fixtureNumber 는
+                          대회 전체 연번이므로 '번 경기'로 번호임을 드러낸다. */}
+                      {item.round} · {item.fixtureNumber}번 경기 ·{' '}
                       {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '일정 미정'}
                     </p>
-                    <p className="text-[12px] text-gray-400 mt-0.5">필드 {item.fieldName ?? '미배정'}</p>
+                    {/* 미배정은 아래 경고 배지가 이미 알려준다 — 같은 말을 두 번 하지 않는다. */}
+                    {item.fieldName ? (
+                      <p className="text-[12px] text-gray-400 mt-0.5">필드 {item.fieldName}</p>
+                    ) : null}
                   </div>
                   <GameStateBadge state={item.gameState} />
                 </div>
@@ -367,7 +374,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 )}
                 <Link
                   href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                  className="mt-2 inline-flex items-center min-h-[36px] px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   운영 콘솔로 이동
                 </Link>

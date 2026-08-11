@@ -77,7 +77,9 @@ describe('OperationsBoardClient', () => {
 
     expect(screen.getAllByText('레드팀 vs 블루팀').length).toBeGreaterThan(0);
     expect(screen.getAllByText('진행 중').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('기록자 없음').length).toBeGreaterThan(0);
+    // MISSING_SCORER 는 "골에 득점자가 안 적힘"이지 기록 담당 스태프 부재가 아니다.
+    // 결과 검토 화면과 같은 라벨을 쓴다.
+    expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
     expect(screen.getAllByText('담당자 미배정').length).toBeGreaterThan(0);
   });
 

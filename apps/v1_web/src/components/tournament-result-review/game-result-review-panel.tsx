@@ -95,19 +95,49 @@ export function GameResultReviewPanel({
   const showOfficializeCta = officializeAlwaysVisible || directorGateStatus !== 'disabled';
 
   async function handleOfficialize(revision: GameResultRevision) {
+    // alpha 실사고(2026-08): 실제 점수는 2:1인데 이 확인 모달이 "1:1 결과를
+    // 확정할까요?"로 떴다 — 되돌릴 수 없는 확정 직전에 틀린 숫자를 보여준
+    // 것. 원인은 `revision`이 이 렌더를 만든 `useGameResultRevisions` 쿼리의
+    // 캐시값이고, 전역 QueryClient 기본값(`staleTime: 30_000`, providers.tsx)
+    // 때문에 최근 30초 내 한 번이라도 불러온 적이 있으면 리마운트 없이는
+    // 자동 재요청되지 않는다는 점이다 — 마지막 골 기록 이후 이 화면을
+    // 먼저 열어 뒀던 세션이라면 그 사이 발생한 변경을 놓친 채 굳어 있을 수
+    // 있다. 확정은 무를 수 없으므로 캐시를 신뢰하지 않고, 다이얼로그를
+    // 띄우기 직전 강제로 다시 불러와 그 응답을 확인 문구와 실제 제출
+    // payload 양쪽에 그대로 쓴다(화면엔 새 숫자를 보여주고 서버엔 옛 숫자를
+    // 보내는 불일치를 막기 위함).
+    // Use the Promise's OWN resolved value, not `revisionsQuery.data`/
+    // `gameQuery.data` read afterwards — those still point at the object
+    // this render's closure captured; react-query only produces a new one
+    // on the NEXT render, which this async continuation never triggers.
+    // `?.` on the refetch RESULT itself, not just `.data`: react-query's own
+    // `refetch()` never resolves to a non-object (an error still resolves
+    // with `{ data: undefined, error, ... }`, it doesn't reject by default),
+    // but guarding the outer value too costs nothing and keeps this from
+    // throwing if either query is ever driven through a test double that
+    // doesn't fully shape the resolved value.
+    const [freshRevisions, freshGameResult] = await Promise.all([
+      revisionsQuery.refetch(),
+      gameQuery.refetch(),
+    ]);
+    const freshRevision =
+      freshRevisions?.data?.find((candidate) => candidate.id === revision.id) ??
+      freshRevisions?.data?.[0] ??
+      revision;
+    const freshGame = freshGameResult?.data ?? game;
     const ok = await confirm({
       title: '결과를 확정할까요?',
-      message: `${revision.score.home}:${revision.score.away} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
+      message: `${freshRevision.score.home}:${freshRevision.score.away} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
       confirmLabel: '확정',
     });
     if (!ok) return;
     officialize.mutate(
       {
-        revisionId: revision.id,
-        expectedVersion: game.version,
-        score: revision.score,
-        eventsHash: revision.eventsHash,
-        mvpParticipantId: revision.mvpParticipantId,
+        revisionId: freshRevision.id,
+        expectedVersion: freshGame.version,
+        score: freshRevision.score,
+        eventsHash: freshRevision.eventsHash,
+        mvpParticipantId: freshRevision.mvpParticipantId,
       },
       {
         onSuccess: () => setDirectorGateStatus('enabled'),

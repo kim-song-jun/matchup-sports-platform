@@ -117,9 +117,62 @@ export interface GameMutationResult {
   replayed: boolean;
 }
 
+/**
+ * The wire shape of one committed `v1_game_events` row — mirrors the web
+ * client's `GameEventRecord` (apps/v1_web/src/types/game-operations.ts)
+ * field for field, INCLUDING `occurredAt`/`receivedAt` as already-ISO
+ * strings (not `Date`): this is what actually crosses the socket, and it's
+ * also embedded in `GameEventAppendResult`, which flows through
+ * `jsonInput()`/`canonicalize()` for idempotency-record and audit-log
+ * storage — `canonicalize()` recurses via `Object.entries()`, and
+ * `Object.entries(new Date())` is `[]` (Date's timestamp isn't an own
+ * enumerable property), so a raw `Date` here would silently persist as `{}`.
+ * Pre-stringifying avoids that trap entirely instead of teaching
+ * `canonicalize()` about `Date`.
+ */
+export interface PersistedGameEvent {
+  id: string;
+  gameId: string;
+  sequence: number;
+  clientEventId: string;
+  payloadHash: string;
+  type: GameEventType;
+  sideId: string | null;
+  participantId: string | null;
+  assistParticipantId: string | null;
+  period: number;
+  clockMs: number;
+  occurredAt: string;
+  receivedAt: string;
+  actorUserId: string;
+  reversesEventId: string | null;
+  payload: Record<string, unknown>;
+}
+
 export interface GameEventAppendResult extends GameMutationResult {
   clientEventId: string;
   sequence: number;
+  /**
+   * The FULL persisted event record — root-cause fix for the ops-console
+   * realtime scoreboard bug (2026-08): `RealtimeGateway.acknowledgeGameEvent`
+   * used to broadcast the client's raw, un-persisted request payload
+   * (`input.event`) as if it were a complete `GameEventRecord`. That payload
+   * never carries `id`/`reversesEventId` (the client can't know them before
+   * the server assigns them), so every self-committed event landed in the
+   * console's `liveEvents` with `id: undefined` and `reversesEventId:
+   * undefined`. The scoreboard's `reversedIds` set is built from
+   * `event.reversesEventId`, and `undefined !== null` — so that `undefined`
+   * silently entered the set, which then matched (via `.has(event.id)`)
+   * every OTHER event whose `id` was also `undefined`, including the event
+   * itself. Every self-recorded goal was permanently treated as "already
+   * reversed" and excluded from the score, only correcting itself on a full
+   * reload (which rebuilds `liveEvents` from this same, real `listEvents()`
+   * row shape). Optional because idempotent replays of requests stored
+   * before this field existed won't have it — callers must tolerate its
+   * absence (the frontend's own sequence-based de-dup already discards
+   * replayed broadcasts, so an absent `event` on a replay is harmless).
+   */
+  event?: PersistedGameEvent;
 }
 
 export interface GameRevisionMutationResult extends GameMutationResult {

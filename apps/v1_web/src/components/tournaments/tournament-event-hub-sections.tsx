@@ -26,7 +26,7 @@ export function TournamentApplicationGuideSection() {
   const steps = [
     {
       title: '팀 준비',
-      body: 'TeamMeet 회원가입 후 팀을 만들거나 기존 팀에 합류해요. 대회 신청은 팀장과 운영진이 진행할 수 있어요.',
+      body: '팀밋 회원가입 후 팀을 만들거나 기존 팀에 합류해요. 대회 신청은 팀장과 운영진이 진행할 수 있어요.',
     },
     {
       title: '팀 선택',

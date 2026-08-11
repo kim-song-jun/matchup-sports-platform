@@ -28,7 +28,14 @@ export function deriveOnPitchParticipantIds(
   events: readonly GameEventRecord[],
 ): ReadonlySet<string> {
   const reversedIds = new Set(
-    events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
+    // `undefined` guarded alongside `null`: same hardening as
+    // operate-console.tsx's `scoreBySideId` (see its doc comment for the
+    // full 2026-08 realtime scoreboard bug this class of filter caused) —
+    // this derivation reads the exact same `GameEventRecord[]` a malformed
+    // self-broadcast could have populated with `id`/`reversesEventId:
+    // undefined` before the backend root-cause fix (`RealtimeGateway.
+    // acknowledgeGameEvent`).
+    events.map((event) => event.reversesEventId).filter((id): id is string => id !== null && id !== undefined),
   );
   const onPitch = new Set(participants.filter((p) => p.started).map((p) => p.id));
   const ordered = [...events].sort((left, right) => left.sequence - right.sequence);
@@ -46,7 +53,9 @@ export function deriveOnPitchParticipantIds(
  * "남은 횟수" (remaining count) display subtracts from `maxSubstitutions`. */
 export function countActiveSubstitutions(sideId: string, events: readonly GameEventRecord[]): number {
   const reversedIds = new Set(
-    events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
+    // See `deriveOnPitchParticipantIds`'s matching comment above — same
+    // `undefined`-alongside-`null` hardening, same reason.
+    events.map((event) => event.reversesEventId).filter((id): id is string => id !== null && id !== undefined),
   );
   return events.filter(
     (event) => event.type === 'SUBSTITUTION' && event.sideId === sideId && !reversedIds.has(event.id),

@@ -83,6 +83,21 @@ describe('StaffClient', () => {
     expect(screen.queryByText('director…')).not.toBeInTheDocument();
   });
 
+  // 예전에는 역할이 제목, 사람 이름이 부제였다 — 같은 역할이 여러 명이면 카드/행이
+  // 전부 똑같아 보여서 "누가 배정됐는지"를 목록에서 못 읽었다. 이름이 위에 온다.
+  it('leads each staff row with the person, not the role', () => {
+    setRole('TOURNAMENT_DIRECTOR');
+    render(<StaffClient tournamentId="t-1" />);
+
+    for (const nameEl of screen.getAllByText('디렉터윤')) {
+      const container = nameEl.parentElement;
+      expect(container).not.toBeNull();
+      const texts = Array.from(container!.querySelectorAll('p')).map((p) => p.textContent?.trim());
+      expect(texts[0]).toBe('디렉터윤');
+      expect(texts[1]).toBe('대회 디렉터');
+    }
+  });
+
   it('falls back to the identifier fragment when no nickname exists', () => {
     setRole('TOURNAMENT_DIRECTOR');
     render(<StaffClient tournamentId="t-1" />);

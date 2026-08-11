@@ -172,6 +172,9 @@ function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStanding
     teamLogoUrl: row.teamLogoUrl,
     position: row.position,
     points: row.points,
+    wins: row.wins,
+    draws: row.draws,
+    losses: row.losses,
     goalsFor: row.goalsFor,
     goalsAgainst: row.goalsAgainst,
   }));
@@ -221,18 +224,27 @@ function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
   );
 }
 
+/**
+ * `showStandings=false` 는 이 콘텐츠가 **순위표를 이미 보여주는 화면 안에** 들어갈 때
+ * 쓴다. `/bracket` 은 "순위 · 대진표" 탭에서 조별 순위를 그리는데, "경기 일정" 탭이
+ * 같은 순위표를 한 번 더 그려서 탭만 바꾸면 같은 표가 두 번 나왔다(오너 지적:
+ * "중복되는 정보도 많고"). 독립 일정 페이지(`/tournaments/[id]/schedule`)에는 순위표가
+ * 달리 없으므로 기본값은 `true` 로 둔다.
+ */
 export function ScheduleContent({
   tournamentId,
   data,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
+  showStandings = true,
 }: {
   tournamentId: string;
   data: PublicTournamentScheduleResponse;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
+  showStandings?: boolean;
 }) {
   if (!data.bracketPublished) {
     return (
@@ -244,7 +256,7 @@ export function ScheduleContent({
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {data.standings.length > 0 ? (
+      {showStandings && data.standings.length > 0 ? (
         <section>
           <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
             조별 순위

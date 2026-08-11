@@ -13,16 +13,19 @@ const ROW: TournamentStandingsRow = {
   teamLogoUrl: null,
   position: 1,
   points: 9,
+  wins: 3,
+  draws: 0,
+  losses: 1,
   goalsFor: 10,
   goalsAgainst: 4,
 };
 
 describe('TournamentStandingsTable', () => {
-  it('#/팀/승점/득실 4개 컬럼을 렌더한다', () => {
+  it('#/팀/전적/승점/득실 5개 컬럼을 렌더한다', () => {
     render(<TournamentStandingsTable rows={[ROW]} advance={null} ariaLabel="테스트 순위표" />);
     const table = screen.getByRole('table', { name: '테스트 순위표' });
     const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent);
-    expect(headers).toEqual(['#', '팀', '승점', '득실']);
+    expect(headers).toEqual(['#', '팀', '전적', '승점', '득실']);
   });
 
   it('승점은 "N점", 득실은 부호 있는 숫자로 보여준다', () => {
@@ -196,8 +199,8 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
       (h) => h.textContent,
     );
 
-    expect(bracketHeaders).toEqual(['#', '팀', '승점', '득실']);
-    expect(scheduleHeaders).toEqual(['#', '팀', '승점', '득실']);
+    expect(bracketHeaders).toEqual(['#', '팀', '전적', '승점', '득실']);
+    expect(scheduleHeaders).toEqual(['#', '팀', '전적', '승점', '득실']);
     expect(bracketHeaders).toEqual(scheduleHeaders);
   });
 });

@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { BracketPageContent } from './bracket-page-client';
 import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /**
- * 조별/리그 순위표에서 팀명을 누르면 그 팀의 공개 전적(/teams/:id/records)으로
- * 이동해야 한다 — 오너 요청("순위·브래킷에서 팀을 눌렀을 때 히스토리가 안 나옴")의
+ * 조별/리그 순위표에서 팀명을 누르면 **그 자리에서** 그 팀의 경기 상세가 펼쳐져야
+ * 한다 — 오너 요청("순위·브래킷에서 팀을 눌렀을 때 히스토리가 안 나옴")의
  * 핵심 리그레션 지점. 이전엔 <span>plain text>였다.
  */
 function makeTournament(overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'id' | 'status' | 'format'>): V1TournamentDetail {
@@ -178,8 +179,79 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
 
     render(<BracketPageContent tournament={tournament} />);
 
-    const link = screen.getByRole('link', { name: /한강 유나이티드/ });
-    expect(link).toHaveAttribute('href', '/teams/team-99/records');
+    // 예전엔 이 자리가 `/teams/:teamId/records` 링크였다. 오너 지시로 바뀌었다:
+    // "각 클릭했을 때 그 팀의 경기 상세 페이지로 넘어가는 것보다 하단에 그 내용
+    // 상세를 보여주는 게 더 좋을 것 같고". 화면을 통째로 갈아치우면 방금 보던 순위
+    // 맥락을 잃기 때문이다. 그래서 팀 셀은 링크가 아니라 펼침 토글이어야 한다.
+    expect(screen.queryByRole('link', { name: /한강 유나이티드/ })).toBeNull();
+    const toggle = screen.getByRole('button', { name: /한강 유나이티드/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('조별 순위표의 팀을 누르면 그 자리에서 그 팀의 경기 상세가 펼쳐진다', async () => {
+    const tournament = makeTournament({
+      id: 'tour-2b',
+      status: 'in_progress',
+      format: 'group_knockout',
+      fixtures: [
+        makeFixture({
+          id: 'fx-1',
+          groupId: 'group-a',
+          round: 'group',
+          status: 'completed',
+          homeTeamId: 'team-99',
+          homeTeamName: '한강 유나이티드',
+          awayTeamId: 'team-77',
+          awayTeamName: '마포 FC',
+          result: {
+            homeScore: 3,
+            awayScore: 1,
+            hasPenalty: false,
+            homePenaltyScore: null,
+            awayPenaltyScore: null,
+            note: null,
+            recordedAt: '2026-07-16T00:00:00.000Z',
+            goals: [],
+          },
+        }),
+      ],
+      groups: [
+        makeGroup({
+          id: 'group-a',
+          phase: 'group',
+          name: 'A조',
+          advanceCount: 2,
+          standings: [
+            {
+              registrationId: 'reg-2',
+              teamId: 'team-99',
+              teamName: '한강 유나이티드',
+              teamLogoUrl: null,
+              position: 1,
+              points: 3,
+              wins: 1,
+              draws: 0,
+              losses: 0,
+              goalsFor: 3,
+              goalsAgainst: 1,
+              recalculatedAt: null,
+            },
+          ],
+        }),
+      ],
+    });
+
+    render(<BracketPageContent tournament={tournament} />);
+
+    // 펼치기 전에는 상대팀이 어디에도 없다.
+    expect(screen.queryByText('마포 FC')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: /한강 유나이티드/ }));
+
+    // 펼치면 그 팀 관점(홈/원정·상대·결과)으로 경기가 나온다.
+    expect(screen.getByRole('button', { name: /한강 유나이티드/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('마포 FC')).toBeInTheDocument();
+    expect(screen.getByText(/승 3-1/)).toBeInTheDocument();
   });
 });
 

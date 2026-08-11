@@ -1252,11 +1252,13 @@ function TeamRegistrationHub({
 
       {teams.length === 0 ? (
         <div className="tm-tournament-registration-empty">
+          {/* 신청이 막힌 대회에서 "팀 만들기"를 권하면, 바로 위 안내("지금은 참가 신청을
+              받지 않아요")와 정면으로 어긋난다 — 팀을 만들어도 이 대회엔 신청할 수 없다. */}
           <EmptyState
             title={emptyState.title}
-            sub={emptyState.description}
-            cta="팀 만들기"
-            onCta={() => { window.location.href = '/teams/new'; }}
+            sub={canStartNewRegistration ? emptyState.description : '이 대회는 지금 참가 신청을 받지 않아요.'}
+            cta={canStartNewRegistration ? '팀 만들기' : undefined}
+            onCta={canStartNewRegistration ? () => { window.location.href = '/teams/new'; } : undefined}
             icon={<UsersRound size={36} strokeWidth={1.5} />}
           />
         </div>

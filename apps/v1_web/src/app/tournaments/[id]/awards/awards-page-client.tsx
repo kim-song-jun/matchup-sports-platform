@@ -573,7 +573,7 @@ function RetentionSection({ tournamentId }: { tournamentId: string }) {
         <div>
           <p className="tm-retention-card-title">다음 대회도 함께해요 🎉</p>
           <p className="tm-retention-card-sub">
-            티밋 대회에서 새로운 팀을 만나고<br />
+            팀밋 대회에서 새로운 팀을 만나고<br />
             더 나은 기록에 도전해보세요.
           </p>
         </div>
@@ -593,7 +593,7 @@ function RetentionSection({ tournamentId }: { tournamentId: string }) {
               if (navigator.share) {
                 trackEvent('tournament_share', { channel: 'native_share' });
                 void navigator.share({
-                  title: '티밋 대회 결과',
+                  title: '팀밋 대회 결과',
                   url: window.location.href,
                 });
               } else {

@@ -26,14 +26,20 @@ function MatchSkeleton() {
  * 403(비참가자)이면 조용히 아무것도 렌더하지 않는다. */
 function LineupManagementCta({ tournamentId, fixtureId }: { tournamentId: string; fixtureId: string }) {
   const access = useV1FixtureLineupAccess(tournamentId, fixtureId);
-  if (access.data?.mySideId === null || access.data?.mySideId === undefined) return null;
+  // 대회 스태프는 mySideId 가 null 이지만 양 팀 명단을 대신 짤 수 있다(라인업 화면의
+  // 팀 선택 UI). 예전에는 여기서 걸러져서, 권한은 있는데 들어갈 링크가 없었다.
+  const isStaff = access.data?.isStaff === true;
+  const hasOwnSide = typeof access.data?.mySideId === 'string';
+  if (!hasOwnSide && !isStaff) return null;
   return (
     <Card pad={16} style={{ marginTop: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div className="tm-text-body-lg">라인업</div>
           <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-            선발·후보 명단을 작성하고 제출하세요.
+            {hasOwnSide
+              ? '선발·후보 명단을 작성하고 제출하세요.'
+              : '운영진 권한으로 양 팀 명단을 작성할 수 있어요.'}
           </div>
         </div>
         <Link

@@ -165,6 +165,7 @@ export function TournamentSponsorForm({
           <Field label="정렬">
             <input
               type="number"
+              inputMode="numeric"
               min="0"
               max="9999"
               value={form.sortOrder}

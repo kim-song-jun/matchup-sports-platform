@@ -171,6 +171,7 @@ export function PromoCardFields({
           <input
             id={`${prefix}-priority`}
             type="number"
+            inputMode="numeric"
             min={0}
             max={9999}
             value={value.priority}

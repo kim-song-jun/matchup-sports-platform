@@ -580,7 +580,12 @@ export function TournamentDetailView({
                 <span
                   key={i}
                   className="tm-text-caption"
-                  style={{ background: 'var(--surface)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 10px', borderRadius: 999 }}
+                  // 2026-08-11: 중립 --surface(라이트 흰색/다크 근흑색)를 쓰면 이 칩이 속한
+                  // 주황 카드(Card background: --orange50)와 색이 완전히 분리돼 보인다 —
+                  // 특히 다크모드에서 카드는 따뜻한 주황조인데 칩만 차가운 무채색 검정으로
+                  // 떠 보이는 결함이 실측 확인됐다(라이브 alpha 스크린샷). 카드 톤에 맞춘
+                  // 반투명 --tint-orange(주황 10%, 라이트/다크 공용)로 교체.
+                  style={{ background: 'var(--tint-orange)', border: '1px solid var(--tint-orange-border)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 10px', borderRadius: 999 }}
                 >
                   {m ? (
                     <>

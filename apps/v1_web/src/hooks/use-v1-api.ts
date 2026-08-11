@@ -2106,6 +2106,19 @@ export function useV1AcceptSignupTerms() {
       v1Post<V1CurrentSignupTerms>('/terms/consents', body),
     onSuccess: (result) => {
       queryClient.setQueryData(v1Keys.currentSignupTerms(), result);
+      // PendingSocialSignupGate 는 authMe 캐시의 termsCompliance 로 모든 라우트 진입을
+      // 막는다. invalidateQueries 는 refetch 를 비동기로만 예약하므로, 호출 직후 이어지는
+      // router.replace('/home') 이 refetch 완료보다 먼저 렌더되면 게이트가 갱신 전
+      // compliant:false 스냅샷을 읽고 사용자를 다시 /terms 로 되돌려보낸다 — 재동의
+      // 첫 클릭이 반응 없어 보이는 원인. 방금 응답으로 받은 compliance(서버가 재동의 반영
+      // 직후 다시 계산한 것과 동일한 값)를 authMe 캐시에 동기적으로 반영해 이 레이스를
+      // 없앤다. invalidateQueries 는 다른 authMe 필드까지 최신화하기 위해 그대로 유지한다.
+      if (result.compliance) {
+        const compliance = result.compliance;
+        queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), (current) =>
+          current ? { ...current, termsCompliance: compliance } : current,
+        );
+      }
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
     },
   });

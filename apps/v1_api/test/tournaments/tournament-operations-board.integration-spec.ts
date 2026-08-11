@@ -3650,6 +3650,10 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
     const res = await request(app.getHttpServer())
       .put(`/api/v1/tournament-ops/tournaments/${httpIds.tournamentA}/fixtures/${httpIds.fixtureA}/lineup/${awaySideAId}`)
       .set(withUser(httpIds.fieldOperatorA))
+      // Every command mutation route requires Idempotency-Key === body.clientCommandId
+      // (game-contract.ts's assertGameCommandContext -- a missing header normalizes to '' and
+      // always mismatches). The director save test above sets this; this test must too.
+      .set('idempotency-key', clientCommandId)
       .send({
         expectedVersion: current.version,
         clientCommandId,

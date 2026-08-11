@@ -225,3 +225,63 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
     expect(dirtySubmitButton).toBeDisabled();
   });
 });
+
+/**
+ * 순환 막다른 길 회귀 가드.
+ *
+ * 대회 스태프는 어느 팀에도 속하지 않아 `mySideId` 가 null 이다. 예전엔 그걸 곧바로
+ * "운영진은 대회 운영 콘솔을 이용해 주세요" 로 막았는데, **운영 콘솔에는 라인업 화면이
+ * 없다** — 그래서 운영 콘솔의 "라인업 제출하러 가기" 가 이 화면으로 보내고, 이 화면이
+ * 다시 운영 콘솔로 돌려보내는 순환이 됐다(2026-08-11 알파 실측: 그 화면의 액션 버튼 0개).
+ * 라인업이 없으면 "경기 시작" 이 비활성이므로, 팀 매니저가 없는 자리에서는 경기를
+ * 시작할 방법이 아예 없었다.
+ */
+describe('대회 스태프도 라인업을 짤 수 있다', () => {
+  beforeEach(() => {
+    hoisted.useV1GameMock.mockReturnValue({
+      data: baseGame(), isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [baseGameLineup()], isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+  });
+
+  it('스태프(mySideId=null)를 운영 콘솔로 돌려보내지 않고 편집할 팀을 고르게 한다', () => {
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess({ mySideId: null, isStaff: true }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByText('운영진은 대회 운영 콘솔을 이용해 주세요')).toBeNull();
+    expect(screen.getByText('어느 팀의 명단을 짤까요?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홈팀 명단 짜기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '원정팀 명단 짜기' })).toBeInTheDocument();
+  });
+
+  it('팀을 고르면 매니저와 동일한 편집 화면으로 들어간다', () => {
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess({ mySideId: null, isStaff: true }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '홈팀 명단 짜기' }));
+
+    expect(screen.queryByText('어느 팀의 명단을 짤까요?')).toBeNull();
+    expect(screen.getByRole('button', { name: '라인업 제출하기' })).toBeInTheDocument();
+  });
+
+  it('팀 소속도 스태프도 아니면 권한 없음으로 막는다', () => {
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess({ mySideId: null, isStaff: false }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('이 경기의 라인업을 관리할 권한이 없어요')).toBeInTheDocument();
+    expect(screen.queryByText('어느 팀의 명단을 짤까요?')).toBeNull();
+  });
+});

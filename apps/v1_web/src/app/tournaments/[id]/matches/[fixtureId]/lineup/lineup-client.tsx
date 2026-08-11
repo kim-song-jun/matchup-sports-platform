@@ -72,12 +72,27 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const [newPlayerName, setNewPlayerName] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  /**
+   * 대회 스태프는 어느 팀에도 속하지 않아 `mySideId` 가 null 이다. 예전엔 그걸 곧바로
+   * "운영진은 운영 콘솔을 이용해 주세요" 로 막았는데, **운영 콘솔에는 라인업 화면이
+   * 없다**(tournament-ops 아래에 operate·result-review·records·operations·staff 뿐).
+   * 그래서 운영 콘솔의 "라인업 제출하러 가기" 가 이 화면으로 보내고, 이 화면이 다시
+   * 운영 콘솔로 돌려보내는 순환 막다른 길이 됐다 — 라인업이 없으면 "경기 시작" 이
+   * 비활성이므로, 팀 매니저가 없는 자리에서는 경기를 시작할 방법이 아예 없었다.
+   *
+   * 백엔드는 이미 이 경우를 예상하고 `isStaff`·`homeSideId`·`awaySideId`·팀 이름을
+   * 함께 내려준다(`resolveFixtureLineupAccess`). 스태프면 편집할 팀을 직접 고르게 하고,
+   * 나머지 편집 UI는 매니저와 완전히 동일한 것을 재사용한다(화면 복제 금지).
+   */
+  const [staffSideId, setStaffSideId] = useState<string | null>(null);
+  const editingSideId = access.data?.mySideId ?? staffSideId;
 
   useEffect(() => {
     if (hydrated || gameQuery.data === undefined || lineupsQuery.data === undefined) return;
-    setState(hydrateFixtureLineupState(lineupsQuery.data, access.data?.mySideId ?? '', gameQuery.data.version));
+    if (editingSideId === null) return; // 스태프가 아직 팀을 고르지 않았다.
+    setState(hydrateFixtureLineupState(lineupsQuery.data, editingSideId, gameQuery.data.version));
     setHydrated(true);
-  }, [hydrated, gameQuery.data, lineupsQuery.data, access.data?.mySideId]);
+  }, [hydrated, gameQuery.data, lineupsQuery.data, editingSideId]);
 
   // D-17: 포메이션·포지션 데이터는 gameQuery(GET /games/:gameId, T1-5)의 lineupConfig에서만
   // 온다. formationSupported(위에서 이미 선언됨)는 별개로 "피치 SVG 모양이 축구/풋살만
@@ -158,7 +173,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     );
   }
 
-  if (access.isLoading || !access.data || gameQuery.isLoading || lineupsQuery.isLoading || state === null) {
+  if (access.isLoading || !access.data || gameQuery.isLoading || lineupsQuery.isLoading) {
     return (
       <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
         <PageSkeleton variant="detail" />
@@ -166,18 +181,64 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     );
   }
 
-  if (access.data.mySideId === null) {
+  // 팀에도 안 속하고 스태프도 아니면 이 경기 라인업을 볼 이유가 없다.
+  if (access.data.mySideId === null && !access.data.isStaff) {
     return (
       <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
         <EmptyState
-          title="운영진은 대회 운영 콘솔을 이용해 주세요"
-          sub="이 화면은 참가팀 매니저 전용이에요. 대회 스태프는 tournament-ops 콘솔에서 라인업을 관리할 수 있어요."
+          title="이 경기의 라인업을 관리할 권한이 없어요"
+          sub="참가팀 매니저 또는 대회 운영진만 라인업을 편집할 수 있어요."
         />
       </AppChrome>
     );
   }
 
-  const mySideId = access.data.mySideId;
+  // 스태프가 아직 편집할 팀을 고르지 않았다 — 어느 팀 명단을 짤지 먼저 정한다.
+  if (editingSideId === null) {
+    const choices = [
+      { sideId: access.data.homeSideId, teamName: access.data.homeTeamName, label: '홈' },
+      { sideId: access.data.awaySideId, teamName: access.data.awayTeamName, label: '원정' },
+    ].filter((c): c is { sideId: string; teamName: string | null; label: string } => c.sideId !== null);
+
+    return (
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+        <div style={{ padding: '20px 20px 40px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <h2 className="tm-text-body-lg" style={{ color: 'var(--text-strong)' }}>
+              어느 팀의 명단을 짤까요?
+            </h2>
+            <p className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 4 }}>
+              대회 운영진은 양 팀의 선발 명단을 대신 제출할 수 있어요.
+            </p>
+          </div>
+          {choices.length === 0 ? (
+            <EmptyState title="편성된 팀이 없어요" sub="대진이 확정되면 라인업을 짤 수 있어요." />
+          ) : (
+            choices.map((choice) => (
+              <button
+                key={choice.sideId}
+                type="button"
+                className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
+                onClick={() => setStaffSideId(choice.sideId)}
+              >
+                {choice.teamName ?? choice.label} 명단 짜기
+              </button>
+            ))
+          )}
+        </div>
+      </AppChrome>
+    );
+  }
+
+  if (state === null) {
+    return (
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+        <PageSkeleton variant="detail" />
+      </AppChrome>
+    );
+  }
+
+  const mySideId = editingSideId;
   const editable = state.lineupState === null || state.lineupState === 'DRAFT';
   const outfieldGuidance =
     formationSupported && formationOptions.length === 0 && outfieldCount > 0

@@ -155,7 +155,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
 
   function rowLabel(item: V1TournamentOperationsBoardItem): string {
     const names = teamNamesByFixtureId.get(item.fixtureId);
-    if (!names) return `${item.round} ${item.fixtureNumber}경기`;
+    if (!names) return `${item.fixtureNumber}번 경기`;
     return `${names.home} vs ${names.away}`;
   }
 
@@ -309,7 +309,8 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                     <tr key={item.fixtureId}>
                       <td className="px-4 py-3 align-middle">
                         <p className="font-medium text-[var(--text-strong)]">{rowLabel(item)}</p>
-                        <p className="text-[12px] text-gray-400">{item.round} {item.fixtureNumber}경기</p>
+                        {/* 모바일 카드와 같은 표기 — "4강 4경기"는 "4강의 4번째 경기"로 오독된다. */}
+                        <p className="text-[12px] text-gray-400">{item.round} · {item.fixtureNumber}번 경기</p>
                       </td>
                       <td className="px-4 py-3 align-middle tabular-nums">
                         {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '미정'}

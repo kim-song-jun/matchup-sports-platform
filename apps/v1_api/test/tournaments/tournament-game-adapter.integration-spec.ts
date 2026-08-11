@@ -237,6 +237,45 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
     expect(changedPayload).toMatchObject({ response: { code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE' } });
   });
 
+  /* TBD(팀 미정)로 만든 결선 경기에 나중에 팀을 배정하면, 예전에는 fixture 의
+     home/awayRegistrationId 만 바뀌고 V1GameSide.teamId 는 null 로 남았다. 라인업 접근 판정은
+     `side.teamId === actor.teamId` 로 내 사이드를 찾으므로 배정된 팀의 매니저조차 자기 사이드를
+     못 받았고, 라인업이 없으면 경기 시작도 막혀 그 경기를 진행할 방법이 사라졌다.
+     8강 결과 확정 → 4강 자동 배정도 fixture 만 갱신하므로 같은 상태를 만든다. */
+  it('moves the game sides onto the newly assigned teams when a TBD fixture gets its teams', async () => {
+    const created = await bracket.createFixture(authUser, ids.tournament, {
+      groupId: ids.group,
+      round: 'semi_final',
+      fixtureNumber: 77,
+      // 팀 미정으로 생성 — 결선 대진을 미리 깔아두는 실제 운영 흐름이다
+    });
+
+    const before = await prisma.v1TournamentFixture.findUniqueOrThrow({
+      where: { id: created.id },
+      include: { game: { include: { sides: { orderBy: { sideKey: 'asc' } } } } },
+    });
+    expect(before.game?.sides.map((side) => side.teamId)).toEqual([null, null]);
+
+    await bracket.updateFixture(authUser, created.id, {
+      homeRegistrationId: ids.homeRegistration,
+      awayRegistrationId: ids.awayRegistration,
+    });
+
+    const after = await prisma.v1TournamentFixture.findUniqueOrThrow({
+      where: { id: created.id },
+      include: { game: { include: { sides: { orderBy: { sideKey: 'asc' } } } } },
+    });
+    const home = after.game?.sides.find((side) => side.sideKey === V1GameSideKey.HOME);
+    const away = after.game?.sides.find((side) => side.sideKey === V1GameSideKey.AWAY);
+
+    // 사이드가 실제 팀으로 옮겨져야 매니저가 자기 라인업을 열 수 있다
+    expect(home?.teamId).toBe(ids.homeTeam);
+    expect(away?.teamId).toBe(ids.awayTeam);
+    // 표시 이름도 "홈 팀 미정" 에서 실제 팀명으로 바뀌어야 한다
+    expect(home?.displayNameSnapshot).not.toBe('홈 팀 미정');
+    expect(away?.displayNameSnapshot).not.toBe('어웨이 팀 미정');
+  });
+
   it('rolls back the fixture when its tournament pin is not active', async () => {
     const failure = await captureFailure(() =>
       bracket.createFixture(authUser, ids.invalidTournament, {

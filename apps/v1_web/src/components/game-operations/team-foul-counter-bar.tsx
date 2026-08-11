@@ -28,7 +28,7 @@ export function TeamFoulCounterBar({
                 : 'flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2'
             }
           >
-            <span className="truncate text-2xs font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</span>
+            <span className="truncate text-xs font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</span>
             <span className="flex items-center gap-1">
               {warning ? <AlertTriangle size={12} aria-hidden="true" className="text-orange-500" /> : null}
               <span
@@ -40,7 +40,7 @@ export function TeamFoulCounterBar({
               >
                 파울 {count}
               </span>
-              {warning ? <span className="text-2xs font-semibold text-orange-700 dark:text-orange-300">· 다음부터 10m 프리킥</span> : null}
+              {warning ? <span className="text-xs font-semibold text-orange-700 dark:text-orange-300">· 다음부터 10m 프리킥</span> : null}
             </span>
           </div>
         );

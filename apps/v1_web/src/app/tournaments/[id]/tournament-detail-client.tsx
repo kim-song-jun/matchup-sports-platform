@@ -6,7 +6,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trophy, Goal, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -1874,26 +1874,11 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
           </div>
         </div>
 
-        {/* Score / VS */}
+        {/* VS — 이 카드는 점수를 싣지 않는다(아래 카드 주석 참조). */}
         <div style={{ textAlign: 'center', minWidth: 52 }}>
-          {hasResult ? (
-            <div
-              className="tm-text-body-lg tab-num"
-              style={{
-                color: 'var(--text-strong)',
-                letterSpacing: 1,
-              }}
-            >
-              {homeScore} : {awayScore}
-            </div>
-          ) : (
-            <div
-              className="tm-text-label"
-              style={{ color: 'var(--text-caption)', letterSpacing: 1 }}
-            >
-              vs
-            </div>
-          )}
+          <div className="tm-text-label" style={{ color: 'var(--text-caption)', letterSpacing: 1 }}>
+            vs
+          </div>
         </div>
 
         {/* Away team */}
@@ -1912,65 +1897,22 @@ export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
         </div>
       </div>
 
-      {/* Goals */}
-      {homeGoals.length > 0 || awayGoals.length > 0 ? (
-        <div
-          role="list"
-          aria-label="득점자"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr auto 1fr',
-            gap: 8,
-            marginTop: 6,
-          }}
-        >
-          <div style={{ textAlign: 'right' }}>
-            {homeGoals.map((g) => (
-              <div
-                key={g.id}
-                role="listitem"
-                className="tm-text-micro"
-                style={{ color: 'var(--text-caption)' }}
-              >
-                {g.playerName}
-                {g.minute != null ? ` ${g.minute}′` : ''}
-              </div>
-            ))}
-          </div>
-          <div aria-hidden="true" />
-          <div style={{ textAlign: 'left' }}>
-            {awayGoals.map((g) => (
-              <div
-                key={g.id}
-                role="listitem"
-                className="tm-text-micro"
-                style={{ color: 'var(--text-caption)' }}
-              >
-                {g.playerName}
-                {g.minute != null ? ` ${g.minute}′` : ''}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Penalty */}
-      {hasResult && fixture.result!.hasPenalty ? (
-        <div
-          className="tm-text-micro"
-          style={{ textAlign: 'center', marginTop: 6, color: 'var(--text-caption)' }}
-        >
-          승부차기 {fixture.result!.homePenaltyScore} : {fixture.result!.awayPenaltyScore}
-        </div>
-      ) : null}
-
-      {/* Venue */}
+      {/* Venue — 상단 메타(라운드·시각)와 같은 좌측 축에 둔다. 점수·득점자를 걷어내
+          카드가 비면서, 가운데 정렬된 장소 한 줄만 축이 달라 어정쩡하게 떠 있었다.
+          이제 축은 둘뿐이다: 메타·장소는 왼쪽, 대진은 가운데 대칭. */}
       {fixture.venue ? (
         <div
           className="tm-text-micro"
-          style={{ textAlign: 'center', marginTop: 6, color: 'var(--text-muted)' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            marginTop: 12,
+            color: 'var(--text-muted)',
+          }}
         >
-          {fixture.venue}
+          <MapPin size={12} aria-hidden="true" />
+          <span>{fixture.venue}</span>
         </div>
       ) : null}
     </Card>

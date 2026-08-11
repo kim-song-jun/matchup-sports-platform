@@ -68,10 +68,10 @@ export function FixturePickerList({
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p className="tm-text-body" style={{ color: 'var(--text-strong)' }}>
-                  {names ? `${names.home} vs ${names.away}` : `${item.fixtureNumber}경기`}
+                  {names ? `${names.home} vs ${names.away}` : `${item.fixtureNumber}번 경기`}
                 </p>
                 <p className="tm-text-caption" style={{ color: 'var(--text-weak)', marginTop: 2 }}>
-                  {item.round} · {item.fixtureNumber}경기
+                  {item.round} · {item.fixtureNumber}번 경기
                 </p>
                 {item.warnings.length > 0 ? (
                   <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>

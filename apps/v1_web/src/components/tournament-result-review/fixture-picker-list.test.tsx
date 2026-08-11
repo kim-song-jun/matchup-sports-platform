@@ -46,7 +46,7 @@ describe('FixturePickerList', () => {
 
     expect(screen.getByText('알파 레드 FC vs 알파 그린 FC')).toBeInTheDocument();
     // 라운드·경기 번호는 보조 정보로 남는다.
-    expect(screen.getByText('조별 1라운드 · 1경기')).toBeInTheDocument();
+    expect(screen.getByText('조별 1라운드 · 1번 경기')).toBeInTheDocument();
     expect(screen.getByText('3:1')).toBeInTheDocument();
   });
 
@@ -61,7 +61,7 @@ describe('FixturePickerList', () => {
       />,
     );
 
-    expect(screen.getByText('1경기')).toBeInTheDocument();
+    expect(screen.getByText('1번 경기')).toBeInTheDocument();
   });
 
   it('MISSING_SCORER 를 운영 보드와 같은 뜻(득점자 미기재)으로 표시한다', () => {

@@ -10,6 +10,7 @@ import {
   useTournamentGame,
   type GameResultRevision,
 } from '@/hooks/use-tournament-result-review';
+import { useV1GameLineups } from '@/hooks/use-v1-api';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -50,6 +51,9 @@ export function GameResultReviewPanel({
 }) {
   const gameQuery = useTournamentGame(gameId);
   const revisionsQuery = useGameResultRevisions(gameId);
+  // 재제출 폼의 참가자 실명 표시용 -- 로딩 중/실패 시 빈 배열로 두면 모달이 기존
+  // 폴백(사이드 + id 뒷자리)으로 얌전히 물러난다(아래 lineups prop 참고).
+  const lineupsQuery = useV1GameLineups(gameId);
   const reviewDecision = useReviewResultDecision(gameId, tournamentId);
   const supersedeAndSubmit = useSupersedeAndSubmitResult(gameId, tournamentId);
   const officialize = useOfficializeResultRevision(gameId, tournamentId);
@@ -255,6 +259,7 @@ export function GameResultReviewPanel({
             mvpParticipantId: resubmitTarget.mvpParticipantId,
           }}
           sides={game.sides}
+          lineups={lineupsQuery.data ?? []}
           submitting={supersedeAndSubmit.isPending}
           errorMessage={
             supersedeAndSubmit.isError ? describeResultReviewError(supersedeAndSubmit.error) : null

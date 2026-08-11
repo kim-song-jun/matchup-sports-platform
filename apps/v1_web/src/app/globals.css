@@ -6030,12 +6030,14 @@ button:disabled {
    ═══════════════════════════════════════ */
 
 /* 라운드 라벨 pill */
+/* 라운드 칩("4강","결승")은 대진표에서 지금 보고 있는 단계를 알려주는 핵심 라벨이다 —
+   10px/9px 는 모바일에서 읽기 어려워 12px 로 올린다(letter-spacing 은 줄여 폭 증가를 상쇄). */
 .tm-bk2-pill {
-  font-size: 10px; font-weight: 800; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: 12px; font-weight: 800; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
   padding: 3px 12px; background: var(--grey100); border-radius: 20px;
 }
-.tm-bk2-pill-sm { padding: 2px 10px; font-size: 9px; }
+.tm-bk2-pill-sm { padding: 2px 10px; font-size: 12px; }
 
 /* 매치 카드 */
 .tm-bk2-card {
@@ -6088,7 +6090,7 @@ button:disabled {
 }
 .tm-bk2-badge-live { background: #fff0f0; color: #d9363e; font-weight: 800; }
 :root.dark .tm-bk2-badge-live { background: rgba(240,68,82,0.16); color: #ff6b76; }
-.tm-bk2-badge-time { font-size: 10px; color: var(--text-muted); }
+.tm-bk2-badge-time { font-size: 12px; color: var(--text-muted); }
 
 /* 뱃지 줄 — 시각 배지가 LIVE/PK 배지와 함께 표시될 수 있다 (D-12).
    .tm-bk2-badge 자체는 손대지 않는다 — AggregateMatchCard/.tm-bk2-third가
@@ -6118,7 +6120,8 @@ button:disabled {
 }
 .tm-bk2-champ-trophy { font-size: 30px; line-height: 1; }
 .tm-bk2-champ-label {
-  font-size: 8px; font-weight: 800; letter-spacing: 0.14em;
+  /* "우승" — 대진표에서 가장 의미가 큰 라벨인데 8px 였다. */
+  font-size: 12px; font-weight: 800; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--orange);
 }
 .tm-bk2-champ-name { font-size: 12px; font-weight: 900; color: #7A3B1E; word-break: keep-all; line-height: 1.3; }

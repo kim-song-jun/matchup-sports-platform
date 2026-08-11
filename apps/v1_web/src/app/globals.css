@@ -7339,77 +7339,6 @@ button:disabled {
   line-height: 1.5;
 }
 
-/* ── 토너먼트 흐름 이전/다음 네비게이터 ── */
-.tm-flow-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px 20px;
-  border-top: 1px solid var(--grey100);
-  margin-top: 8px;
-}
-.tm-flow-nav-back {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-  height: 40px;
-  border-radius: 10px;
-  border: 1px solid var(--grey200);
-  background: #fff;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  flex-shrink: 0;
-  white-space: nowrap;
-  transition: background 0.1s, color 0.1s;
-}
-.tm-flow-nav-back:hover { background: var(--grey50); color: var(--text); }
-.tm-flow-nav-next {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 16px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--blue500);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: opacity 0.12s;
-}
-.tm-flow-nav-next:hover { opacity: 0.9; }
-.tm-flow-nav-next-disabled {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 16px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--grey100);
-  color: var(--text-caption);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: default;
-  white-space: nowrap;
-}
-.tm-flow-nav-step {
-  font-size: 10px;
-  font-weight: 500;
-  opacity: 0.7;
-  white-space: nowrap;
-}
-
 /* ── 토너먼트 서브 페이지 데스크탑 레이아웃 ── */
 @media (min-width: 1024px) {
   /* 전체 페이지 래퍼 */
@@ -7435,6 +7364,12 @@ button:disabled {
     grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
   }
   .tm-bracket-page-grid .tm-bk2-scroll-hint { display: none; }
+  /* §대진표 빈 상태 재균형 — 조별리그 진행 중(대진표 미공개)엔 순위표를 넓게.
+     대진 공개 후엔 위 .tm-bracket-page-grid.tm-tourn-sub-grid-6040(클래스 2개)이
+     이 규칙(클래스 3개, 특이도 우위)보다 여전히 이겨 오늘 폭(366:650)을 그대로 유지한다. */
+  .tm-bracket-page-grid.tm-tourn-sub-grid-6040.tm-bracket-page-grid-empty {
+    grid-template-columns: minmax(300px, 1.28fr) minmax(240px, 0.72fr);
+  }
 
   /* 시상 페이지: 각 컬럼과 카드는 콘텐츠 높이만 차지한다. */
   .tm-awards-grid { align-items: start; }
@@ -7504,6 +7439,11 @@ button:disabled {
     padding: 12px 0 20px;
     border-top: 1px solid var(--grey100);
     margin-top: 4px;
+  }
+  /* §브래킷 페이지 전용 — flex-end 대신 좌우 앵커로 808px 고아 공백 제거.
+     results/awards의 .tm-tourn-sub-flownav(flex-end)는 공유 클래스라 그대로 둔다. */
+  .tm-tourn-sub-flownav.tm-bracket-page-flownav {
+    justify-content: space-between;
   }
   .tm-tourn-sub-flownav nav {
     display: flex !important;

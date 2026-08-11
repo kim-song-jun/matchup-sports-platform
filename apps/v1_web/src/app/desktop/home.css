@@ -388,8 +388,7 @@
     padding: 0;
   }
 
-  .tm-home-matches-block .tm-empty-state,
-  .tm-home-matches-block .tm-error-state {
+  .tm-home-matches-block .tm-empty-state {
     min-height: 176px;
     padding: 28px 24px;
     border: 1px solid var(--border);

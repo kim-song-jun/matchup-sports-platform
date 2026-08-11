@@ -35,10 +35,6 @@
   .tm-notice-row:hover {
     background: var(--grey50);
   }
-
-  .tm-notice-row-active:hover {
-    background: var(--blue50);
-  }
 }
 
 /* ─── Notice detail (/notices/[id]) ──────────────────────────────────────── */
@@ -64,12 +60,6 @@
   /* Lead text: slightly more breathing room */
   .tm-notice-lead {
     margin-top: 8px;
-  }
-
-  /* Summary card */
-  .tm-notice-summary-card {
-    margin-top: 20px;
-    padding: 20px;
   }
 
   /* Body paragraphs: generous line-height for reading */

@@ -206,14 +206,6 @@
     overflow: hidden;
   }
 
-  /* Detail page desktop page-head: back link + match title. */
-  .tm-match-detail-desktop-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 28px 0 12px;
-  }
-
   /* Two-column layout for the detail body + sticky right card.
      minmax(0,1fr): 좌측이 내용에 따라 수축 가능 (overflow 방지).
      min(360px,34%): 우측 패널이 초광폭 뷰포트에서 무한 확장되지 않도록 상한.

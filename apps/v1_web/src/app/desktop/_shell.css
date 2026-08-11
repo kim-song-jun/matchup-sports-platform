@@ -638,23 +638,3 @@
   }
 }
 
-/* Generic desktop content grid. Domains may use these or define bespoke grids.
- * 2-up at >=1024, 3-up at >=1440. Card lists should target ~340-360px columns. */
-@media (min-width: 1024px) {
-  .tm-desktop-grid-2 {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
-  .tm-desktop-grid-3 {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
-}
-@media (min-width: 1440px) {
-  .tm-desktop-grid-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 20px;
-  }
-}

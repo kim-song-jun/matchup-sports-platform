@@ -225,7 +225,7 @@ function CampaignPreview({ query }: { readonly query: ReturnType<typeof useV1Adm
 function CampaignError({ message, onRetry }: { readonly message: string; readonly onRetry: () => void }) {
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-10 text-center">
-      <p className="text-sm font-medium text-red-500">{message}</p>
+      <p className="text-sm font-medium text-[var(--red700)]">{message}</p>
       <button type="button" onClick={onRetry} className="mt-3 min-h-[44px] rounded-lg px-3 text-sm font-semibold text-blue-500 transition-colors hover:text-[var(--blue700)]">다시 시도하기</button>
     </div>
   );

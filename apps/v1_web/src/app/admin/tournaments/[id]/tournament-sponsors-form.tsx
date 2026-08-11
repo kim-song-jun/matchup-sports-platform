@@ -304,7 +304,7 @@ function Field({
         {required ? (
           <>
             {' '}
-            <span className="text-red-500" aria-hidden="true">*</span>
+            <span className="text-[var(--red700)]" aria-hidden="true">*</span>
             <span className="sr-only">(필수)</span>
           </>
         ) : null}

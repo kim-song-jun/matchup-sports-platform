@@ -79,3 +79,48 @@ export function parseLineupLimits(
   const maxSubstitutions = typeof lineup.maxSubstitutions === 'number' ? lineup.maxSubstitutions : null;
   return { minPlayers, maxPlayers, substitutions, maxSubstitutions };
 }
+
+/**
+ * Reads each period's `{durationMinutes, extraTime}` back out of a stored
+ * CompetitionConfig JSON blob's `periods` column. Added for the alpha
+ * "452′" clock-overrun incident (2026-08): `clockMs` has no upper-bound
+ * validation anywhere on the write path (see `game-invariants.ts`'s comment
+ * on `validateEventShape` and this repo's decision NOT to hard-reject a
+ * suspiciously large clock -- an operator who is offline/behind must still
+ * be able to record what happened). Instead, the operator console uses this
+ * parsed duration to ask the operator to *confirm* a clock that runs far
+ * past its period's configured length before it submits the event.
+ *
+ * Index `i` in the returned array corresponds to runtime period number
+ * `i + 1` (`V1GamePeriod.number`) -- `advancePeriod()` (games.service.ts)
+ * always walks `V1GamePeriod` rows in the same order this config's
+ * `periods` array was written in at game creation, so array-index
+ * alignment is safe (the same assumption this repo's operator console
+ * `period-label.ts` already relies on: period 1 = the config's first
+ * entry).
+ *
+ * Tolerant like `parseLineupCatalog`/`parseLineupLimits` above, but the
+ * failure mode is `null` (rather than a numeric fallback) because a made-up
+ * duration would drive a real UX decision (whether to interrupt an operator
+ * with a confirmation) -- guessing wrong is worse than not warning at all.
+ * A legacy config row can store `periods` as `{ count: N }` instead of an
+ * array (`computePeriodCount` in `games.service.ts` handles that same
+ * legacy shape); that shape carries no per-period duration, so this returns
+ * `null` wholesale rather than guessing. A malformed individual entry
+ * (missing/non-positive `durationMinutes`) degrades to `null` for just that
+ * entry instead of invalidating the whole array, since one bad period
+ * shouldn't silently disable the warning for every other period.
+ */
+export function parsePeriodDurations(
+  value: Prisma.JsonValue | null | undefined,
+): ReadonlyArray<{ durationMinutes: number; extraTime: boolean } | null> | null {
+  if (!Array.isArray(value)) return null;
+  return value.map((raw) => {
+    if (!isRecord(raw)) return null;
+    const durationMinutes = raw.durationMinutes;
+    if (typeof durationMinutes !== 'number' || !Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      return null;
+    }
+    return { durationMinutes, extraTime: raw.extraTime === true };
+  });
+}

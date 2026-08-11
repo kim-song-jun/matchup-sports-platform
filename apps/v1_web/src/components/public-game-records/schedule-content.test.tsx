@@ -86,3 +86,61 @@ describe('ScheduleContent — 순위표 팀 링크', () => {
     expect(screen.getByText('아직 확정된 일정이 없어요')).toBeInTheDocument();
   });
 });
+
+/**
+ * alpha "452′" 실측 사고(2026-08) 회귀 방지. DB 실측값 그대로 재현한다:
+ * `v1_game_events.clock_ms` GOAL 27,166,083ms(≈452분, 20분 피리어드 경기)
+ * -- 공개 일정 화면(이 컴포넌트)에 `452′`가 경고 표식 없이 그대로 나갔던
+ * 화면이다. 숫자 자체는 조작·은폐하지 않고(그대로 `452′`가 보여야 한다)
+ * 경고 표식만 추가로 붙어야 한다.
+ */
+function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> = {}): import('./types').PublicScheduleEntry {
+  return {
+    fixtureId: 'fixture-1',
+    round: '조별리그',
+    fixtureNumber: 1,
+    legNumber: 1,
+    groupId: null,
+    groupName: null,
+    scheduledAt: '2026-08-01T10:00:00.000Z',
+    venue: null,
+    fieldName: null,
+    home: { registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' },
+    away: { registrationId: 'reg-away', teamId: 'team-away', teamName: '원정팀' },
+    visibilityMode: 'live',
+    status: 'ended',
+    resultState: 'official',
+    scoreStatus: 'official',
+    score: { home: 1, away: 0 },
+    clock: null,
+    scorers: [],
+    hasVideo: false,
+    ...overrides,
+  };
+}
+
+describe('ScheduleContent — 이상 클럭 경고 표식(alpha 452′ 사고)', () => {
+  it('득점자의 clockMs가 이상값이면 분 표시는 그대로 두고 경고 표식을 붙인다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      scorers: [{ side: 'home', participantName: '김선수', jerseyNumber: 9, clockMs: 27_166_083 }],
+    })] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    // 숫자 자체(452′)는 조작·은폐되지 않고 그대로 보인다.
+    expect(screen.getByText(/452′/)).toBeInTheDocument();
+    // 그 옆에 경고 표식이 붙는다.
+    expect(screen.getByLabelText('비정상적으로 긴 경기 시각이에요. 확인이 필요해요.')).toBeInTheDocument();
+  });
+
+  it('정상 clockMs 득점자에는 경고 표식이 붙지 않는다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      scorers: [{ side: 'home', participantName: '김선수', jerseyNumber: 9, clockMs: 649_891 }],
+    })] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText(/10′/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('비정상적으로 긴 경기 시각이에요. 확인이 필요해요.')).not.toBeInTheDocument();
+  });
+});

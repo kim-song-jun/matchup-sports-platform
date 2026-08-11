@@ -774,13 +774,19 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.queryByText('운영진 검토')).not.toBeInTheDocument();
   });
 
-  it('keeps the application guide and flow explainer for in_progress tournaments (non-destructive)', () => {
-    const tournament = makeTournament({ id: 't1', status: 'in_progress', format: 'league', groups: [], fixtures: [] });
+  it('hides the application guide once applications close, but keeps the flow explainer', () => {
+    // 신청을 받지 않는 상태에서 "회원가입 후 팀을 만들어 신청하세요" 안내는 따라 할 수 없다.
+    // 대회 진행 방식(포맷 설명)은 신청 여부와 무관하므로 계속 보여준다.
+    for (const status of ['closed', 'in_progress'] as const) {
+      const tournament = makeTournament({ id: 't1', status, format: 'league', groups: [], fixtures: [] });
 
-    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+      const { unmount } = render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
-    expect(screen.getByText('참가 신청 안내')).toBeInTheDocument();
-    expect(screen.getByText('대회 진행 방식')).toBeInTheDocument();
+      expect(screen.queryByText('참가 신청 안내')).not.toBeInTheDocument();
+      expect(screen.getByText('대회 진행 방식')).toBeInTheDocument();
+
+      unmount();
+    }
   });
 
   it('renders the CompletedResultHero entry point with a safe fallback title when a champion cannot be derived', () => {

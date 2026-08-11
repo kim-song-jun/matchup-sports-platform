@@ -60,12 +60,24 @@ export function GameStateBadge({ state }: { state: V1GameState | null }) {
 }
 
 // ── 운영 보드 경고 배지 ────────────────────────────────────────────────────
+/* 경고 코드 → 한글 라벨의 단일 출처. 결과 검토·정정 화면(fixture-picker-list)도 이걸 쓴다.
+ * MISSING_SCORER 는 서버에서 "골에 득점자가 지정되지 않음"(V1GameResultRevision.missingScorer)을
+ * 뜻한다 — 예전 라벨 '기록자 없음'은 기록 담당 스태프가 없다는 뜻으로 읽혀서, 운영자가
+ * 존재하지도 않는 '기록자' 역할을 배정하려 헤매고 정작 득점자 누락은 방치됐다. */
+export const WARNING_LABELS: Record<V1TournamentOperationsWarningCode, string> = {
+  NO_FIELD_ASSIGNED: '경기장 미배정',
+  MISSING_SCORER: '득점자 미기재',
+  RESULT_REVIEW_OVERDUE: '검토 기한 초과',
+  NO_STAFF_ASSIGNED: '담당자 미배정',
+  LINEUP_NOT_SUBMITTED: '라인업 미제출',
+};
+
 const WARNING_META: Record<V1TournamentOperationsWarningCode, { label: string; tone: Tone; icon: ReactNode }> = {
-  NO_FIELD_ASSIGNED: { label: '필드 미배정', tone: 'amber', icon: <AlertTriangle size={12} aria-hidden="true" /> },
-  MISSING_SCORER: { label: '기록자 없음', tone: 'amber', icon: <AlertTriangle size={12} aria-hidden="true" /> },
-  RESULT_REVIEW_OVERDUE: { label: '결과 검토 지연', tone: 'red', icon: <ShieldAlert size={12} aria-hidden="true" /> },
-  NO_STAFF_ASSIGNED: { label: '담당자 미배정', tone: 'amber', icon: <UserX size={12} aria-hidden="true" /> },
-  LINEUP_NOT_SUBMITTED: { label: '라인업 미제출', tone: 'red', icon: <Clock size={12} aria-hidden="true" /> },
+  NO_FIELD_ASSIGNED: { label: WARNING_LABELS.NO_FIELD_ASSIGNED, tone: 'amber', icon: <AlertTriangle size={12} aria-hidden="true" /> },
+  MISSING_SCORER: { label: WARNING_LABELS.MISSING_SCORER, tone: 'amber', icon: <AlertTriangle size={12} aria-hidden="true" /> },
+  RESULT_REVIEW_OVERDUE: { label: WARNING_LABELS.RESULT_REVIEW_OVERDUE, tone: 'red', icon: <ShieldAlert size={12} aria-hidden="true" /> },
+  NO_STAFF_ASSIGNED: { label: WARNING_LABELS.NO_STAFF_ASSIGNED, tone: 'amber', icon: <UserX size={12} aria-hidden="true" /> },
+  LINEUP_NOT_SUBMITTED: { label: WARNING_LABELS.LINEUP_NOT_SUBMITTED, tone: 'red', icon: <Clock size={12} aria-hidden="true" /> },
 };
 
 export function WarningBadge({ code }: { code: V1TournamentOperationsWarningCode }) {

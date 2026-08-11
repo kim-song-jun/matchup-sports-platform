@@ -3,12 +3,9 @@
 import type { TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
 import { EmptyState } from '@/components/v1-ui/primitives';
 import { readGameResultScore } from '@/lib/game-result-score';
-
-const WARNING_LABELS: Record<string, string> = {
-  MISSING_SCORER: '득점자 미기재',
-  RESULT_REVIEW_OVERDUE: '검토 기한 초과',
-  NO_FIELD_ASSIGNED: '경기장 미배정',
-};
+// 라벨은 운영 보드 배지와 같은 출처를 쓴다 — 같은 경고 코드가 화면마다 다른 뜻으로
+// 번역되던 문제(MISSING_SCORER: '기록자 없음' vs '득점자 미기재')를 막는다.
+import { WARNING_LABELS } from '@/components/tournament-ops/badges';
 
 function scoreLabel(item: TournamentOperationsBoardItem): string | null {
   // `.home` 을 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)가
@@ -30,12 +27,16 @@ export function FixturePickerList({
   onSelect,
   emptyTitle,
   emptySub,
+  teamNamesByFixtureId,
 }: {
   items: readonly TournamentOperationsBoardItem[];
   selectedFixtureId: string | null;
   onSelect: (item: TournamentOperationsBoardItem) => void;
   emptyTitle: string;
   emptySub: string;
+  /** fixtureId → 팀 이름. 운영 보드와 같은 소스(useV1Tournament().fixtures)에서 만든다.
+   *  보드 API 응답에는 팀 이름이 없어서, 이게 없으면 "어느 경기인지" 알 수 없다. */
+  teamNamesByFixtureId?: ReadonlyMap<string, { home: string; away: string }>;
 }) {
   if (items.length === 0) {
     return <EmptyState title={emptyTitle} sub={emptySub} />;
@@ -46,6 +47,7 @@ export function FixturePickerList({
       {items.map((item) => {
         const selected = item.fixtureId === selectedFixtureId;
         const score = scoreLabel(item);
+        const names = teamNamesByFixtureId?.get(item.fixtureId);
         return (
           <li key={item.fixtureId}>
             <button
@@ -66,6 +68,9 @@ export function FixturePickerList({
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p className="tm-text-body" style={{ color: 'var(--text-strong)' }}>
+                  {names ? `${names.home} vs ${names.away}` : `${item.fixtureNumber}경기`}
+                </p>
+                <p className="tm-text-caption" style={{ color: 'var(--text-weak)', marginTop: 2 }}>
                   {item.round} · {item.fixtureNumber}경기
                 </p>
                 {item.warnings.length > 0 ? (

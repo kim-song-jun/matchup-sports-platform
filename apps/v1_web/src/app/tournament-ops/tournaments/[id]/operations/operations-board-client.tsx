@@ -15,7 +15,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
-import { GameStateBadge, WarningBadge } from '@/components/tournament-ops/badges';
+import { GameStateBadge, WarningBadge, WARNING_LABELS } from '@/components/tournament-ops/badges';
 import { TournamentProgressStepper, buildTournamentStages } from '@/components/tournaments/tournament-progress-stepper';
 import type {
   V1GameState,
@@ -34,10 +34,12 @@ const GAME_STATE_FILTER_LABELS: Record<V1GameState, string> = {
   CANCELLED: '취소됨',
 };
 
+// 필터 라벨과 배지 라벨이 다르면 "필터를 걸었는데 다른 이름의 행만 나온다"로 읽힌다 —
+// 배지와 같은 출처(WARNING_LABELS)를 쓴다.
 const WARNING_FILTER_LABELS: Record<V1TournamentStableWarningCode, string> = {
-  NO_FIELD_ASSIGNED: '필드 미배정',
-  MISSING_SCORER: '기록자 없음',
-  RESULT_REVIEW_OVERDUE: '결과 검토 지연',
+  NO_FIELD_ASSIGNED: WARNING_LABELS.NO_FIELD_ASSIGNED,
+  MISSING_SCORER: WARNING_LABELS.MISSING_SCORER,
+  RESULT_REVIEW_OVERDUE: WARNING_LABELS.RESULT_REVIEW_OVERDUE,
 };
 
 function readFilter<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {

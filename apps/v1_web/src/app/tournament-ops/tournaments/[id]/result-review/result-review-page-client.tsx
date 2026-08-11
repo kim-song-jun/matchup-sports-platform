@@ -31,6 +31,16 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
   const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
   const panelHeadingRef = useRef<HTMLHeadingElement>(null);
 
+  /* 보드 API 응답에는 팀 이름이 없어서 목록이 "group · 1경기"로만 보였다 —
+     어느 경기를 검토하는지 알 수 없다. 운영 보드와 같은 소스에서 이름을 채운다. */
+  const teamNamesByFixtureId = useMemo(() => {
+    const map = new Map<string, { home: string; away: string }>();
+    for (const fixture of tournament.data?.fixtures ?? []) {
+      map.set(fixture.id, { home: fixture.homeTeamName, away: fixture.awayTeamName });
+    }
+    return map;
+  }, [tournament.data?.fixtures]);
+
   const needsReview = useMemo(
     () =>
       (boardQuery.data?.items ?? []).filter(
@@ -102,6 +112,7 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
           <div className="tm-result-review-grid">
             <FixturePickerList
               items={needsReview}
+              teamNamesByFixtureId={teamNamesByFixtureId}
               selectedFixtureId={selectedFixtureId}
               onSelect={(item) => {
                 setSelectedFixtureId(item.fixtureId);

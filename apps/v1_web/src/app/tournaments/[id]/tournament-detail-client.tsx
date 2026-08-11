@@ -748,7 +748,9 @@ export function TournamentDetailView({
       {/* ── Prize card — shown HIGH in left column, right after metric strip ── */}
       {prizeCard}
 
-      <TournamentApplicationGuideSection />
+      {/* 신청을 실제로 받는 상태(open)에서만 노출한다. 마감·진행 중·완료된 대회에서
+          "회원가입 후 팀을 만들어 신청하세요" 안내는 따라 할 수 없는 안내라 혼란만 준다. */}
+      {isOpen ? <TournamentApplicationGuideSection /> : null}
 
       <TournamentParticipantSection
         teams={tournament.participantTeams}

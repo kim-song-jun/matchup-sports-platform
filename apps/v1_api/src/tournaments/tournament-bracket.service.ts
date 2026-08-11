@@ -493,7 +493,14 @@ export class TournamentBracketService {
     const fixture = await this.prisma.v1TournamentFixture.findUnique({
       where: { id: fixtureId },
       include: {
-        game: { select: { currentOfficialRevision: { select: { state: true } } } },
+        game: {
+          select: {
+            currentOfficialRevision: { select: { state: true } },
+            // 팀 배정이 바뀌면 이 사이드들의 teamId 도 함께 옮겨야 한다 — 아래 트랜잭션 참고.
+            id: true,
+            sides: { select: { id: true, sideKey: true, teamId: true } },
+          },
+        },
         // R3 §4-3단계 한시적 레거시 폴백 입력 — hasTournamentFixtureOfficialResult()가
         // 새 경로에 OFFICIAL 리비전이 없을 때만 이 존재 여부를 본다. §4-4단계에서 제거.
         result: { select: { id: true } },
@@ -534,6 +541,38 @@ export class TournamentBracketService {
       }
     }
 
+    /* 팀 배정이 바뀌면 V1GameSide 도 같이 옮긴다.
+     *
+     * 예전에는 이 메서드가 fixture 의 home/awayRegistrationId 만 고치고 sides 는 그대로 뒀다.
+     * 그래서 TBD(팀 미정)로 만든 결선 경기에 나중에 팀을 배정하면, fixture 에는 팀이 붙는데
+     * side.teamId 는 계속 null 로 남았다. 라인업 접근 판정(games.service 의
+     * resolveFixtureLineupAccess)은 `side.teamId === actor.teamId` 로 내 사이드를 찾으므로,
+     * 배정된 팀의 매니저조차 mySideId 를 못 받아 "권한이 없어요"만 보게 되고 — 라인업이 없으면
+     * 경기 시작도 막히므로 그 경기를 진행할 방법이 아예 사라졌다.
+     * 8강 결과 확정 → 4강 자동 배정 경로도 fixture 만 갱신하므로 같은 상태를 만든다.
+     *
+     * 결과가 확정된 경기의 팀 변경은 위 FIXTURE_HAS_RESULT 가드가 이미 막았으므로, 여기 도달한
+     * 시점의 사이드 갱신은 아직 결과가 없는 경기에 한정된다. */
+    const sideTeamUpdates: Array<{ sideId: string; teamId: string; teamName: string }> = [];
+    if (changesTeams && fixture.game !== null) {
+      const pairs = [
+        { sideKey: V1GameSideKey.HOME, regId: dto.homeRegistrationId },
+        { sideKey: V1GameSideKey.AWAY, regId: dto.awayRegistrationId },
+      ] as const;
+      for (const { sideKey, regId } of pairs) {
+        if (!regId) continue; // undefined(미변경) 와 null(배정 해제) 은 사이드를 건드리지 않는다
+        const side = fixture.game.sides.find((s) => s.sideKey === sideKey);
+        if (!side) continue;
+        const reg = await this.prisma.v1TournamentRegistration.findUnique({
+          where: { id: regId },
+          select: { team: { select: { id: true, name: true } } },
+        });
+        if (!reg) continue; // 위 검증 루프가 이미 존재·확정을 확인했다
+        if (side.teamId === reg.team.id) continue;
+        sideTeamUpdates.push({ sideId: side.id, teamId: reg.team.id, teamName: reg.team.name });
+      }
+    }
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.v1TournamentFixture.update({
         where: { id: fixtureId },
@@ -544,6 +583,12 @@ export class TournamentBracketService {
           ...(dto.awayRegistrationId !== undefined ? { awayRegistrationId: dto.awayRegistrationId } : {}),
         },
       });
+      for (const update of sideTeamUpdates) {
+        await tx.v1GameSide.update({
+          where: { id: update.sideId },
+          data: { teamId: update.teamId, displayNameSnapshot: update.teamName },
+        });
+      }
       await this.adminContext.logAdminAction(
         admin,
         {

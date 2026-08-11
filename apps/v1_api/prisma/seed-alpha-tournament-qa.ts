@@ -511,6 +511,14 @@ export async function createCompetitionData(
     // 픽스처는 자연키 (tournamentId, round, fixtureNumber, legNumber=1) 로 upsert — 절대 삭제하지
     // 않는다(V1Game·operation_audit 가 Restrict 로 못박는 스켈레톤). 같은 행을 유지해 id 가 안정적이고
     // 붙어 있는 V1Game 은 건드리지 않는다. 등록 참조는 매 배포 새 registration id 로 update 로 갱신.
+    // `status` 는 **create 에만** 넣는다. 시드는 픽스처의 초기 상태만 정하고, 그 뒤의 상태는
+    // 실제 운영이 정한다 — officialize 가 결과 확정과 같은 트랜잭션에서
+    // `fixture.status = completed` 로 올린다(tournament-result-review.service.ts).
+    // 이걸 update 에 넣으면 배포할 때마다 라이브 운영 결과가 시드 값으로 되돌아가고,
+    // 순위 재계산은 `status: 'completed'` 픽스처만 읽으므로(tournament-bracket.service.ts)
+    // 그 경기가 순위에서 통째로 사라진다.
+    // 2026-08-11 알파 실측: 2경기가 ENDED + OFFICIAL 2:0 인데 픽스처만 in_progress 로
+    // 되돌아가 있었고, 2:0 으로 이긴 팀이 순위표에 0승 0-0 으로 표시됐다.
     const groupFixtureData = {
       groupId: group.id,
       competitionConfigVersionId,
@@ -518,7 +526,6 @@ export async function createCompetitionData(
       awayRegistrationId: registrations[awayIndex].id,
       scheduledAt: new Date(scheduledAt.getTime() + index * 90 * 60 * 1000),
       venue: `서울 송파 풋살파크 ${index + 1}구장`,
-      status: fixtureStatuses[index],
     };
     const fixture = await tx.v1TournamentFixture.upsert({
       where: {
@@ -526,21 +533,26 @@ export async function createCompetitionData(
           tournamentId: scenario.id, round: 'group', fixtureNumber: index + 1, legNumber: 1,
         },
       },
-      create: { tournamentId: scenario.id, round: 'group', fixtureNumber: index + 1, ...groupFixtureData },
+      create: {
+        tournamentId: scenario.id, round: 'group', fixtureNumber: index + 1,
+        ...groupFixtureData, status: fixtureStatuses[index],
+      },
       update: groupFixtureData,
     });
     if (fixtureStatuses[index] === V1TournamentFixtureStatus.completed) {
       // 결과는 fixtureId(@unique) 로 upsert — 삭제하지 않는다. V1TournamentFixtureGoal 이
       // fixtureResult 를 Cascade 로 참조하므로 삭제-재생성 대신 upsert 로 같은 결과 행을 유지한다.
-      const groupResultData = {
-        homeScore: index === 0 ? 3 : 2,
-        awayScore: index === 0 ? 1 : 2,
-        note: 'ALPHA QA 경기 결과',
-      };
+      // 스코어는 status 와 같은 이유로 **create 에만** 쓴다: 운영자가 결과를 정정했는데
+      // 다음 배포가 시드 스코어로 되돌리면 레거시 폴백 경로가 틀린 값을 읽는다.
       await tx.v1TournamentFixtureResult.upsert({
         where: { fixtureId: fixture.id },
-        create: { fixtureId: fixture.id, ...groupResultData },
-        update: groupResultData,
+        create: {
+          fixtureId: fixture.id,
+          homeScore: index === 0 ? 3 : 2,
+          awayScore: index === 0 ? 1 : 2,
+          note: 'ALPHA QA 경기 결과',
+        },
+        update: {},
       });
     }
     fixtures.push(fixture);
@@ -554,13 +566,13 @@ export async function createCompetitionData(
     ] as const;
     for (let index = 0; index < knockoutPlans.length; index += 1) {
       const plan = knockoutPlans[index];
+      // 조별 픽스처와 같은 이유로 status·스코어는 create 에만 쓴다(위 주석 참조).
       const knockoutFixtureData = {
         competitionConfigVersionId,
         homeRegistrationId: registrations[plan.homeIndex].id,
         awayRegistrationId: registrations[plan.awayIndex].id,
         scheduledAt: new Date(scheduledAt.getTime() + (pairings.length + index) * 90 * 60 * 1000),
         venue: '서울 송파 풋살파크 결선구장',
-        status: V1TournamentFixtureStatus.completed,
       };
       const fixture = await tx.v1TournamentFixture.upsert({
         where: {
@@ -568,18 +580,21 @@ export async function createCompetitionData(
             tournamentId: scenario.id, round: plan.round, fixtureNumber: plan.fixtureNumber, legNumber: 1,
           },
         },
-        create: { tournamentId: scenario.id, round: plan.round, fixtureNumber: plan.fixtureNumber, ...knockoutFixtureData },
+        create: {
+          tournamentId: scenario.id, round: plan.round, fixtureNumber: plan.fixtureNumber,
+          ...knockoutFixtureData, status: V1TournamentFixtureStatus.completed,
+        },
         update: knockoutFixtureData,
       });
-      const knockoutResultData = {
-        homeScore: plan.homeScore,
-        awayScore: plan.awayScore,
-        note: 'ALPHA QA 결선 결과',
-      };
       await tx.v1TournamentFixtureResult.upsert({
         where: { fixtureId: fixture.id },
-        create: { fixtureId: fixture.id, ...knockoutResultData },
-        update: knockoutResultData,
+        create: {
+          fixtureId: fixture.id,
+          homeScore: plan.homeScore,
+          awayScore: plan.awayScore,
+          note: 'ALPHA QA 결선 결과',
+        },
+        update: {},
       });
       fixtures.push(fixture);
     }

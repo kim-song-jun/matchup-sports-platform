@@ -127,7 +127,7 @@ function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
                   </Link>
                   {member.name && member.nickname ? <p className="mt-1 text-xs text-[var(--text-muted)]">{member.nickname}</p> : null}
                 </div>
-                <span className="shrink-0 rounded-full bg-[var(--card-surface)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">
+                <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--card-surface)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">
                   {MEMBER_ROLE_LABEL[member.role]}
                 </span>
               </div>

@@ -978,11 +978,13 @@ button:disabled {
   justify-content: space-between;
 }
 
+.tm-card.tm-auth-soft-card,
 .tm-auth-soft-card {
   margin-top: 22px;
   background: var(--grey50);
 }
 
+.tm-card.tm-auth-soft-card-error,
 .tm-auth-soft-card-error {
   border-color: var(--red-alpha-08);
   background: var(--red50);
@@ -1012,6 +1014,7 @@ button:disabled {
   line-height: 1.45;
 }
 
+.tm-card.tm-auth-soft-card-warning,
 .tm-auth-soft-card-warning {
   background: rgba(254, 152, 0, .10);
 }

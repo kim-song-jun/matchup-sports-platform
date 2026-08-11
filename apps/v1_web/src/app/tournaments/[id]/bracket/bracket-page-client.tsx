@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { ErrorState, EmptyState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
@@ -104,17 +104,16 @@ function LeagueStandingsSection({ standings }: { standings: V1TournamentStanding
 
 /* ── 빈 브래킷 안내 ── */
 function BracketEmpty({ format }: { format: 'knockout' | 'group_knockout' }) {
-  const message = format === 'group_knockout'
-    ? <>대진표는 조별리그가 끝난 후<br />공개돼요.</>
-    : <>대진 편성이 완료되면<br />대진표가 공개돼요.</>;
+  const sub = format === 'group_knockout'
+    ? '대진표는 조별리그가 끝난 후 공개돼요.'
+    : '대진 편성이 완료되면 대진표가 공개돼요.';
 
   return (
-    <Card pad={24} style={{ textAlign: 'center', marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true"><Trophy size={32} style={{ color: 'var(--grey400)' }} strokeWidth={1.6} /></div>
-      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
-        {message}
-      </p>
-    </Card>
+    <EmptyState
+      title="대진표가 아직 공개되지 않았어요"
+      sub={sub}
+      icon={<Trophy size={32} strokeWidth={1.6} />}
+    />
   );
 }
 
@@ -236,7 +235,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
           {/* 2열 그리드: 좌=순위표 / 우=대진표 (데스크탑) — 탭 전환용 조건 안이지만
               활성 탭일 때만 그리드를 그린다. 아래 흐름 네비게이터(§FlowNav)는 탭과
               무관한 페이지 레벨 이동이라 이 분기 밖(항상)으로 옮겼다. */}
-          <div className={`tm-tourn-sub-grid tm-bracket-page-grid ${format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col'}`}>
+          <div className={`tm-tourn-sub-grid tm-bracket-page-grid ${format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col'} ${format === 'group_knockout' && !showBracket ? 'tm-bracket-page-grid-empty' : ''}`}>
             {/* 좌: 순위표 */}
             <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
               {format === 'league' && (
@@ -289,7 +288,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
       )}
 
       {/* 이전/다음 흐름 네비게이터 — 탭과 무관하게 항상 노출(페이지 레벨 이동) */}
-      <div className="tm-tourn-sub-flownav">
+      <div className="tm-tourn-sub-flownav tm-bracket-page-flownav">
         <TournamentFlowNav
           prev={{ href: `/tournaments/${tournament.id}`, label: '대회 정보' }}
           next={{

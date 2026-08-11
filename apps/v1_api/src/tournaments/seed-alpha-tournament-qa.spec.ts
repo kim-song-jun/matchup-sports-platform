@@ -39,7 +39,6 @@ describe('alpha tournament QA campaign content', () => {
     const tx = {
       v1TournamentGroup: { upsert: jest.fn().mockResolvedValue({ id: 'group-a' }) },
       v1TournamentGroupTeam: { create: jest.fn().mockResolvedValue({}) },
-      v1TournamentStanding: { create: jest.fn().mockResolvedValue({}) },
       v1TournamentFixture: {
         upsert: jest.fn().mockImplementation(
           ({ create }: { create: { round: string; competitionConfigVersionId?: string } }) => {

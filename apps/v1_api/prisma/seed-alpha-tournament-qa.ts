@@ -491,41 +491,12 @@ export async function createCompetitionData(
     await tx.v1TournamentGroupTeam.create({
       data: { groupId: group.id, registrationId: registrations[index].id, sortOrder: index },
     });
-    await tx.v1TournamentStanding.create({
-      data: {
-        groupId: group.id,
-        registrationId: registrations[index].id,
-        points: scenario.status === V1TournamentStatus.completed
-          ? 9 - index * 2
-          : scenario.status === V1TournamentStatus.in_progress && index === 0
-            ? 3
-            : 0,
-        wins: scenario.status === V1TournamentStatus.completed
-          ? Math.max(0, 3 - index)
-          : scenario.status === V1TournamentStatus.in_progress && index === 0
-            ? 1
-            : 0,
-        draws: scenario.status !== V1TournamentStatus.closed && index === 1 ? 1 : 0,
-        losses: scenario.status === V1TournamentStatus.completed
-          ? index
-          : scenario.status === V1TournamentStatus.in_progress && index > 0
-            ? 1
-            : 0,
-        goalsFor: scenario.status === V1TournamentStatus.completed
-          ? 8 - index
-          : scenario.status === V1TournamentStatus.in_progress
-            ? index === 0 ? 3 : 1
-            : 0,
-        goalsAgainst: scenario.status === V1TournamentStatus.completed
-          ? 2 + index
-          : scenario.status === V1TournamentStatus.in_progress
-            ? index === 0 ? 1 : 3
-            : 0,
-        position: index + 1,
-        recalculatedAt: new Date(),
-      },
-    });
   }
+  // 순위(V1TournamentStanding)는 여기서 만들지 않는다 — 실제 경기 결과 기반 계산은 배포
+  // 파이프라인에서 fixture-game-backfill 직후 tournament-standings-recalculation.cli.js가
+  // recalculateAndUpsertGroupStandings()(tournament-group-standings.ts)를 재사용해 수행한다.
+  // 과거엔 여기서 배열 인덱스만으로 승점/승무패/득실을 하드코딩해 실제 픽스처 결과와 모순되는
+  // 값(예: 2:0 승리팀이 패배로 표시)이 나갔다.
 
   const fixtureStatuses =
     scenario.status === V1TournamentStatus.completed

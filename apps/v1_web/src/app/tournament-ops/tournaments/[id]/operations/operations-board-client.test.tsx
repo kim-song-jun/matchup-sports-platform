@@ -45,7 +45,7 @@ const ITEM_A: V1TournamentOperationsBoardItem = {
   awayRegistrationId: 'reg-away',
   scheduledAt: '2026-08-10T05:00:00.000Z',
   currentScore: null,
-  warnings: ['MISSING_SCORER'],
+  warnings: ['MISSING_SCORER', 'NO_FIELD_ASSIGNED'],
   version: 3,
   revisionId: null,
   stableRevision: 'hash-a',
@@ -80,7 +80,28 @@ describe('OperationsBoardClient', () => {
     // MISSING_SCORER 는 "골에 득점자가 안 적힘"이지 기록 담당 스태프 부재가 아니다.
     // 결과 검토 화면과 같은 라벨을 쓴다.
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('담당자 미배정').length).toBeGreaterThan(0);
+  });
+
+  /* 경기장 배정 API 는 있지만 그것을 호출하는 화면이 없어서, 운영자는 "경기장 미배정"을
+     끌 수단이 없다. 담당자 커버 판정도 fieldId 기준이라 같이 묶인다. 해소 불가능한 경고가
+     상시 켜져 있으면 실제로 조치가 필요한 경고까지 묻히므로 화면에서 숨긴다.
+     배정 UI 가 생기면 이 테스트를 뒤집어야 한다. */
+  it('hides warnings the operator has no way to resolve, and keeps the actionable ones', () => {
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    expect(screen.queryByText('경기장 미배정')).not.toBeInTheDocument();
+    expect(screen.queryByText('담당자 미배정')).not.toBeInTheDocument();
+    // 조치 가능한 경고는 그대로 보여야 한다
+    expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
+  });
+
+  it('drops the unresolvable codes from the warning filter so it never returns an empty-looking result', () => {
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    const select = screen.getByLabelText('경고') as HTMLSelectElement;
+    const labels = Array.from(select.options).map((o) => o.textContent);
+    expect(labels).not.toContain('경기장 미배정');
+    expect(labels).toContain('득점자 미기재');
   });
 
   // 데스크톱 표와 모바일 카드가 같은 행을 그리는데 경기 번호 표기가 갈려 있었다

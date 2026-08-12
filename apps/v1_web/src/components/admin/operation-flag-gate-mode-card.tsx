@@ -15,8 +15,8 @@ interface GateModeCardProps {
 }
 
 /**
- * 이 화면의 마스터 스위치 카드. 꺼져 있으면 아래 5단계 스테퍼 전체가 조작 불가 상태로
- * 표시된다(스테퍼 쪽에서 처리) — 이 카드는 그 스위치 자체를 켜고 끄는 역할만 한다.
+ * 이 화면의 마스터 스위치 카드. 꺼져 있으면 아래 운영 토글 2개가 전부 조작 불가 상태로
+ * 표시된다(토글 카드 쪽에서 처리) — 이 카드는 그 스위치 자체를 켜고 끄는 역할만 한다.
  */
 export function GateModeCard({ gateStatus, isPending, isError, showToast }: GateModeCardProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -63,8 +63,8 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
             )}
           </div>
           <p className="text-[13px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
-            게이트 번들(R1/R2 서명, 최소 14일) 절차 없이 아래 5단계를 바로 실행할 수 있게 하는
-            스위치예요. 켜져 있는 동안에도 CAS·감사 로그·전환 순서 같은 안전장치는 그대로
+            게이트 번들(R1/R2 서명, 최소 14일) 절차 없이 아래 운영 토글 2개를 바로 실행할 수
+            있게 하는 스위치예요. 켜져 있는 동안에도 CAS·감사 로그 같은 안전장치는 그대로
             적용돼요 — 생략되는 건 서류 절차뿐이에요.
           </p>
         </div>
@@ -127,8 +127,8 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
           title={`간소 전환 모드 ${turningOn ? '켜기' : '끄기'}`}
           description={
             turningOn
-              ? '지금 켜면 운영진이 게이트 번들 없이 아래 5단계를 바로 실행할 수 있어요. 실행 가능 여부는 여전히 전환 순서로 제한돼요. 언제든 다시 끌 수 있어요.'
-              : '지금 끄면 아래 5단계 실행 버튼이 모두 비활성화돼요. 이미 진행된 단계는 되돌아가지 않아요 — 다시 바꾸려면 정식 게이트 번들 절차를 거쳐야 해요.'
+              ? '지금 켜면 운영진이 게이트 번들 없이 아래 운영 토글 2개를 바로 켜고 끌 수 있어요. 언제든 다시 끌 수 있어요.'
+              : '지금 끄면 아래 운영 토글 2개의 실행 버튼이 모두 비활성화돼요. 이미 켜진/꺼진 값은 그대로 유지돼요 — 다시 바꾸려면 정식 게이트 번들 절차를 거쳐야 해요.'
           }
           confirmLabel={turningOn ? '켜기' : '끄기'}
           tone="blue"

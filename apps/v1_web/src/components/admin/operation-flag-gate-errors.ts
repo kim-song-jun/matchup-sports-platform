@@ -10,9 +10,7 @@ export function friendlyGateErrorMessage(err: unknown): string {
   if (err instanceof V1ApiError) {
     switch (err.code) {
       case 'SIMPLIFIED_GATE_DISABLED':
-        return '간소 전환 모드가 꺼져 있어요 — 먼저 위에서 켜야 아래 단계를 실행할 수 있어요.';
-      case 'CUTOVER_ORDER_VIOLATION':
-        return '아직 실행할 수 없어요 — 앞 단계가 먼저 끝나야 해요.';
+        return '간소 전환 모드가 꺼져 있어요 — 먼저 위에서 켜야 토글을 실행할 수 있어요.';
       case 'VERSION_CONFLICT':
         return '다른 곳에서 이미 값이 바뀌었어요. 화면을 새로고침한 뒤 다시 시도해 주세요.';
       case 'GATE_MODE_UNCHANGED':
@@ -21,8 +19,6 @@ export function friendlyGateErrorMessage(err: unknown): string {
         return '이 작업은 운영진(ops) 이상 권한이 필요해요.';
       case 'SIMPLIFIED_GATE_KEY_NOT_ALLOWED':
         return '이 플래그는 간소 토글로 바꿀 수 없어요.';
-      case 'CUTOVER_LATCHED':
-        return '이미 새 시스템으로 첫 기록이 저장돼 되돌릴 수 없어요.';
       default:
         break;
     }

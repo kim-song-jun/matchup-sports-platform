@@ -1,5 +1,7 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
+import type { V1AuthUser } from '../auth/v1-auth-user';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { TournamentsReadService } from './tournaments-read.service';
 
@@ -14,7 +16,7 @@ export class TournamentsReadController {
   }
 
   @Get(':tournamentId')
-  get(@Param('tournamentId') tournamentId: string) {
-    return this.tournamentsReadService.get(tournamentId);
+  get(@Param('tournamentId') tournamentId: string, @CurrentUser() user: V1AuthUser | undefined) {
+    return this.tournamentsReadService.get(tournamentId, user);
   }
 }

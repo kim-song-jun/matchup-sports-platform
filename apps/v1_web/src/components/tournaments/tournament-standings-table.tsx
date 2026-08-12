@@ -30,8 +30,13 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 export interface TournamentStandingsRow {
   /** React key — registrationId(대회 등록 단위)가 있으면 그걸, 없으면 teamId. */
   readonly key: string;
-  readonly teamId: string;
-  readonly teamName: string;
+  /**
+   * 참가팀 공개 정책 통일(fix/v1-publish) — teamId/teamName은 모집 중(open)이고
+   * 조회자가 운영자·스태프가 아니면 둘 다 null이다. teamName===null을 "비공개"의
+   * 단일 판정 기준으로 쓴다(별도 boolean 플래그를 추가하지 않는다).
+   */
+  readonly teamId: string | null;
+  readonly teamName: string | null;
   readonly teamLogoUrl?: string | null;
   readonly position: number;
   readonly points: number;
@@ -140,11 +145,28 @@ export function TournamentStandingsTable({
             {sorted.length > 0 ? (
               sorted.map((row) => {
                 const expanded = expandedKey === row.key;
+                // 참가팀 공개 정책 통일(fix/v1-publish) — teamName===null이 "이 팀은
+                // 모집 중이라 비공개"의 단일 판정 기준(별도 boolean을 두지 않는다).
+                // teamId도 null이므로 seed는 항상 채워지는 row.key(registrationId)로
+                // 대신한다 — TeamAvatar의 identicon이 팀마다 달라 보여야 하는데
+                // teamId가 전부 null이면 모든 비공개 팀이 같은 무늬로 뭉친다.
+                const isHidden = row.teamName === null;
                 const teamCell = (
                   <>
-                    <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl ?? null} size="sm" />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
-                      {row.teamName}
+                    <TeamAvatar
+                      seed={row.teamId ?? row.key}
+                      name={isHidden ? '참가팀 비공개' : row.teamName}
+                      logoUrl={isHidden ? null : (row.teamLogoUrl ?? null)}
+                      size="sm"
+                    />
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: isHidden ? 500 : 600,
+                        color: isHidden ? 'var(--text-caption)' : 'var(--text-strong)',
+                      }}
+                    >
+                      {isHidden ? '참가팀 비공개' : row.teamName}
                     </span>
                   </>
                 );
@@ -165,7 +187,12 @@ export function TournamentStandingsTable({
                         <StandingRankBadge pos={row.position} advance={advance} unranked={unranked} />
                       </td>
                       <td>
-                        {renderDetail ? (
+                        {isHidden ? (
+                          // 팀명이 가려지면 링크/펼침 둘 다 의미가 없다 — /teams/null 같은
+                          // 깨진 링크나(row.teamId===null), 펼쳐도 어느 팀인지 특정 못 하는
+                          // 토글을 만들지 않는다. 비공개 상태는 그냥 정적 행이다.
+                          <div style={cellStyle}>{teamCell}</div>
+                        ) : renderDetail ? (
                           <button
                             type="button"
                             className="tm-pressable"

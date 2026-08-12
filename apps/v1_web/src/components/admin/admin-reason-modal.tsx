@@ -233,7 +233,7 @@ export function AdminReasonModal({
               <p
                 id="admin-reason-char-count"
                 className={[
-                  'text-[11px] text-right tabular-nums',
+                  'text-[var(--font-size-caption)] text-right tabular-nums',
                   reason.length >= REASON_MAX ? 'text-[var(--red700)]' : 'text-gray-400',
                 ].join(' ')}
                 aria-live="polite"

@@ -596,7 +596,7 @@ export function RosterModal({
                 <div className="flex min-w-0 items-center gap-2">
                   <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-strong)]">{p.realName}</p>
                   {p.isTeamCaptain ? (
-                    <span className="shrink-0 rounded-md bg-[var(--blue50)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--blue700)]">팀장</span>
+                    <span className="shrink-0 rounded-md bg-[var(--blue50)] px-1.5 py-0.5 text-[var(--font-size-caption)] font-semibold text-[var(--blue700)]">팀장</span>
                   ) : null}
                 </div>
                 <p className="text-xs text-[var(--text-muted)]">
@@ -1011,7 +1011,7 @@ export function RegistrationsTab({
               {opt.value !== 'all' && count > 0 && (
                 <span
                   className={[
-                    'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold tabular-nums',
+                    'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[var(--font-size-caption)] font-semibold tabular-nums',
                     // active 상태의 카운트 배지는 파란 칩(bg-blue-500, 테마 불변) 위에 얹히는
                     // 반투명 흰 원이라 --static-white 를 써야 한다 — --card-surface 는 다크에서
                     // 거의 검정이라 파란 칩 위에서 탁하게 죽는 회귀가 있었다(전수검수 발견).
@@ -1945,7 +1945,7 @@ export function BracketTab({
             </div>
           </div>
           {editFixture?.result && (
-            <p className="text-[11px] text-[var(--text-muted)] m-0">결과가 기록된 경기는 팀을 바꿀 수 없어요. 팀을 바꾸려면 결과를 먼저 삭제해 주세요.</p>
+            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)] m-0">결과가 기록된 경기는 팀을 바꿀 수 없어요. 팀을 바꾸려면 결과를 먼저 삭제해 주세요.</p>
           )}
           <div className="flex gap-2 pt-1">
             <button
@@ -2941,7 +2941,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             <div key={promo.key} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[13px] font-semibold text-[var(--text-strong)]">{promo.title}</p>
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
+                <span className={`rounded-full px-2.5 py-1 text-[var(--font-size-caption)] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
                   {promo.enabled ? '노출' : '숨김'}
                 </span>
               </div>
@@ -3187,7 +3187,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            <p className="text-[11px] text-[var(--text-muted)]">종목을 바꾸면 목록·상세의 종목 뱃지와 필터에 바로 반영돼요.</p>
+            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)]">종목을 바꾸면 목록·상세의 종목 뱃지와 필터에 바로 반영돼요.</p>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -3700,7 +3700,7 @@ const TOURNAMENT_FORMAT_LABEL: Record<string, string> = {
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-[11px] text-[var(--text-muted)]">{label}</dt>
+      <dt className="text-[var(--font-size-caption)] text-[var(--text-muted)]">{label}</dt>
       <dd className="text-[13px] text-[var(--text-strong)] m-0">{value}</dd>
     </div>
   );
@@ -3885,7 +3885,7 @@ function InfoTab({
       <div className="border border-[var(--border)] rounded-xl p-4 bg-[var(--card-surface)] flex flex-col gap-3">
         <div>
           <h4 className="text-[13px] font-bold text-[var(--text-strong)] m-0">상금·시상 정보</h4>
-          <p className="text-[11px] text-[var(--text-muted)] mt-0.5 mb-0">공개 페이지 &quot;시상·리뷰&quot;의 상금 카드에 그대로 표시돼요.</p>
+          <p className="text-[var(--font-size-caption)] text-[var(--text-muted)] mt-0.5 mb-0">공개 페이지 &quot;시상·리뷰&quot;의 상금 카드에 그대로 표시돼요.</p>
         </div>
         <PrizeBreakdownEditor
           rows={prizeRows}
@@ -4098,7 +4098,7 @@ function AwardRow({
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label htmlFor={`award-recipient-${idx}`} className="text-[11px] text-[var(--text-muted)] mb-1 block">수상자 이름 *</label>
+          <label htmlFor={`award-recipient-${idx}`} className="text-[var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">수상자 이름 *</label>
           <EntityPicker
             id={`award-recipient-${idx}`}
             value={recipientValue}
@@ -4109,11 +4109,11 @@ function AwardRow({
             emptyText={selectedRegistrationId ? '명단에 없는 선수예요' : '검색 결과가 없어요'}
           />
           {!teamNameTrimmed && (
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">소속 팀을 먼저 선택하면 명단에서 고를 수 있어요</p>
+            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)] mt-1">소속 팀을 먼저 선택하면 명단에서 고를 수 있어요</p>
           )}
         </div>
         <div>
-          <label htmlFor={`award-team-${idx}`} className="text-[11px] text-[var(--text-muted)] mb-1 block">소속 팀 (선택)</label>
+          <label htmlFor={`award-team-${idx}`} className="text-[var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">소속 팀 (선택)</label>
           <EntityPicker
             id={`award-team-${idx}`}
             value={selectedTeamItem}
@@ -4337,7 +4337,7 @@ function ReviewsTab({
               placeholder="예: 욕설/비방 신고 접수"
               className={textareaCls}
             />
-            <p className="text-[11px] text-[var(--text-muted)] text-right">{hideReason.length}/200</p>
+            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)] text-right">{hideReason.length}/200</p>
           </div>
           <div className="flex gap-2 mt-1">
             <button
@@ -4411,7 +4411,7 @@ function ReviewModerationCard({
               <span className="text-[12px] text-[var(--text-muted)] truncate">· {review.teamName}</span>
             )}
             {isHidden && (
-              <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] text-[11px] font-semibold">
+              <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] text-[var(--font-size-caption)] font-semibold">
                 숨김
               </span>
             )}
@@ -4427,7 +4427,7 @@ function ReviewModerationCard({
                 />
               ))}
             </span>
-            <span className="text-[11px] text-[var(--text-muted)]">{formatDate(review.createdAt)}</span>
+            <span className="text-[var(--font-size-caption)] text-[var(--text-muted)]">{formatDate(review.createdAt)}</span>
           </div>
         </div>
       </div>

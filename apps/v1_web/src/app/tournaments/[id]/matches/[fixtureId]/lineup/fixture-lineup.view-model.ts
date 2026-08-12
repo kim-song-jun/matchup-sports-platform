@@ -33,6 +33,11 @@ export function hydrateFixtureLineupState(
   lineups: GameLineup[],
   mySideId: string,
   gameVersion: number,
+  /** [알파 감사 E] 이 종목의 실제 골키퍼 포지션 코드(예: 축구 'GK', 풋살 'GOLEIRO') —
+   * formation-slots.ts의 goalkeeperPositionCode(lineupConfig.positions)로 구한다.
+   * 하드코딩된 'GK'로 비교하면 풋살처럼 코드가 다른 종목에서 저장된 골키퍼를
+   * 다시 골키퍼로 인식하지 못한다. */
+  goalkeeperCode: string,
 ): FixtureLineupState {
   const own = lineups
     .filter((lineup) => lineup.sideId === mySideId)
@@ -46,8 +51,8 @@ export function hydrateFixtureLineupState(
       userId: null,
       displayName: participant.displayNameSnapshot,
       jerseyNumber: participant.jerseyNumber,
-      goalkeeper: participant.position === 'GK',
-      position: participant.position === 'GK' ? null : participant.position,
+      goalkeeper: participant.position === goalkeeperCode,
+      position: participant.position === goalkeeperCode ? null : participant.position,
       positionX: participant.positionX,
       positionY: participant.positionY,
     };
@@ -173,7 +178,13 @@ export function unplaceFromSlot(state: FixtureLineupState, key: string): Fixture
   };
 }
 
-export function buildSavePayload(state: FixtureLineupState): V1SaveGameLineupPayload {
+export function buildSavePayload(
+  state: FixtureLineupState,
+  /** [알파 감사 E] hydrateFixtureLineupState와 동일한 종목별 골키퍼 코드. 여기서
+   * 하드코딩된 'GK'를 그대로 저장하면 풋살 골키퍼가 축구 코드로 저장돼 종목 사전과
+   * 어긋난다(lineupConfig.positions는 GOLEIRO/FIXO/ALA/PIVO). */
+  goalkeeperCode: string,
+): V1SaveGameLineupPayload {
   return {
     expectedVersion: state.gameVersion,
     ...(state.formation !== null ? { formation: state.formation } : {}),
@@ -181,7 +192,7 @@ export function buildSavePayload(state: FixtureLineupState): V1SaveGameLineupPay
       ...state.starters.map((entry) => ({
         displayNameSnapshot: entry.displayName,
         ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
-        ...(entry.goalkeeper ? { position: 'GK' } : entry.position !== null ? { position: entry.position } : {}),
+        ...(entry.goalkeeper ? { position: goalkeeperCode } : entry.position !== null ? { position: entry.position } : {}),
         ...(entry.positionX !== null && entry.positionY !== null
           ? { positionX: entry.positionX, positionY: entry.positionY }
           : {}),

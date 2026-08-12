@@ -310,7 +310,7 @@ export function BracketGroupCard({
             <span className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[15px] font-bold text-[var(--text-strong)]">{group.name}</span>
               {ready && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500 text-white shrink-0">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[var(--font-size-caption)] font-semibold bg-blue-500 text-white shrink-0">
                   <Check size={11} aria-hidden="true" />
                   준비완료
                 </span>

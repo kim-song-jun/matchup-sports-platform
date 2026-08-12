@@ -669,7 +669,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         바꿔 미지정 상태도 눈에 띄게 하고, 색은 피치 배치 화면의 골키퍼 토큰 색과
                         맞춰 두 화면에서 같은 의미가 같은 색으로 읽히게 한다. orange50 배경 위
                         orange500 텍스트는 대비 ~1.97:1로 WCAG AA 크게 미달(2026-08 QA 실측) —
-                        orange700(~4.92:1)으로 교체. */}
+                        orange700(~4.92:1)으로 교체.
+                        [알파 감사 E] 미지정 상태도 얇은 실선 테두리라 선발 전원의 칩이 거의
+                        똑같아 보여 "전원 골키퍼로 표시된다"는 알파 실측 지적을 받았다 — 같은
+                        화면 계열인 대회 fixture 라인업(lineup-client.tsx, 2026-08-11)에서 이미
+                        적용한 "미지정=점선 아웃라인, 지정=orange700 채움"을 그대로 옮겨 두
+                        화면이 같은 의미를 같은 형태로 전달하게 한다. */}
                     <button
                       type="button"
                       aria-pressed={entry.goalkeeper}
@@ -681,11 +686,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         minWidth: 44,
                         minHeight: 44,
                         borderRadius: 999,
-                        border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1px solid var(--border)',
-                        background: entry.goalkeeper ? 'var(--orange50)' : 'var(--card-surface)',
-                        color: entry.goalkeeper ? 'var(--orange700)' : 'var(--text-muted)',
+                        border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1.5px dashed var(--grey300)',
+                        background: entry.goalkeeper ? 'var(--orange700)' : 'transparent',
+                        color: entry.goalkeeper ? '#fff' : 'var(--text-caption)',
                         fontSize: 12,
-                        fontWeight: 800,
+                        fontWeight: entry.goalkeeper ? 800 : 600,
                         cursor: editable ? 'pointer' : 'default',
                       }}
                     >

@@ -6,7 +6,7 @@ import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/compo
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
 import {
-  buildFormationPresets, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
+  buildFormationPresets, goalkeeperPositionCode, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
 } from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { matchSlotsToEntries } from '@/app/team-matches/[id]/lineup/lineup.view-model';
@@ -100,12 +100,18 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const [staffSideId, setStaffSideId] = useState<string | null>(null);
   const editingSideId = access.data?.mySideId ?? staffSideId;
 
+  // [알파 감사 E] 이 종목의 실제 골키퍼 포지션 코드 — 축구 'GK', 풋살 'GOLEIRO'(D-7 사전).
+  // lineupConfig가 아직 없으면(로딩 중 등) 기존 동작과 같은 'GK' 폴백을 쓴다.
+  const goalkeeperCode = gameQuery.data?.lineupConfig
+    ? goalkeeperPositionCode(gameQuery.data.lineupConfig.positions)
+    : 'GK';
+
   useEffect(() => {
     if (hydrated || gameQuery.data === undefined || lineupsQuery.data === undefined) return;
     if (editingSideId === null) return; // 스태프가 아직 팀을 고르지 않았다.
-    setState(hydrateFixtureLineupState(lineupsQuery.data, editingSideId, gameQuery.data.version));
+    setState(hydrateFixtureLineupState(lineupsQuery.data, editingSideId, gameQuery.data.version, goalkeeperCode));
     setHydrated(true);
-  }, [hydrated, gameQuery.data, lineupsQuery.data, editingSideId]);
+  }, [hydrated, gameQuery.data, lineupsQuery.data, editingSideId, goalkeeperCode]);
 
   // D-17: 포메이션·포지션 데이터는 gameQuery(GET /games/:gameId, T1-5)의 lineupConfig에서만
   // 온다. formationSupported(위에서 이미 선언됨)는 별개로 "피치 SVG 모양이 축구/풋살만
@@ -279,7 +285,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     setSaveError(null);
     setSaveStatus('saving');
     try {
-      const result = await saveMutation.mutateAsync({ sideId: mySideId, payload: buildSavePayload(state) });
+      const result = await saveMutation.mutateAsync({ sideId: mySideId, payload: buildSavePayload(state, goalkeeperCode) });
       setState((prev) =>
         prev === null
           ? prev

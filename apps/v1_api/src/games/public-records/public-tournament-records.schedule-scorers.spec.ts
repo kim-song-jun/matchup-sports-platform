@@ -1,4 +1,5 @@
 import type { PrismaService } from '../../prisma/prisma.service';
+import type { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import { PublicTournamentRecordsService } from './public-tournament-records.service';
 
 /**
@@ -9,6 +10,16 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
  */
 
 const TOURNAMENT_ID = 'tournament-1';
+
+/**
+ * Issue #377 -- `PublicTournamentRecordsService`'s constructor now also takes
+ * a `TournamentStaffAccessService`, but only `getMatch` (not `getSchedule`,
+ * which every test in this file exercises) ever calls it. A type-satisfying
+ * stub that is never invoked is deliberate here, not a shortcut around real
+ * coverage -- the staff-bypass scope tests live in
+ * `public-tournament-records.service.spec.ts` next to `getMatch` itself.
+ */
+const UNUSED_ACCESS_SERVICE = {} as unknown as TournamentStaffAccessService;
 
 type FakeFixture = {
   id: string;
@@ -167,7 +178,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
         { id: 'g2', gameId: 'game-1', type: 'GOAL', sideId: 'side-away', participantId: INELIGIBLE.id, clockMs: 2_700_000, reversesEventId: null },
       ],
     });
-    const service = new PublicTournamentRecordsService(prisma);
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
 
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
@@ -189,7 +200,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
         { id: 'c1', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: 'g1' },
       ],
     });
-    const service = new PublicTournamentRecordsService(prisma);
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
 
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
@@ -214,7 +225,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
         { id: 'g12', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 645_886, reversesEventId: null },
       ],
     });
-    const service = new PublicTournamentRecordsService(prisma);
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
 
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
@@ -249,7 +260,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
         { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
       ],
     });
-    const service = new PublicTournamentRecordsService(prisma);
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
 
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
@@ -291,7 +302,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두
 
   it('평평한 형태 {home,away} 를 읽는다 (실시간 확정 경로)', async () => {
     const prisma = buildFakePrisma({ fixtures: [fixtureWithRevisionScore({ home: 2, away: 0 })], ...emptyConsent });
-    const result = await new PublicTournamentRecordsService(prisma).getSchedule(TOURNAMENT_ID, {});
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
     expect(result.items[0].score).toEqual({ home: 2, away: 0 });
     expect(result.items[0].scoreStatus).toBe('official');
   });
@@ -309,7 +320,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두
       ],
       ...emptyConsent,
     });
-    const result = await new PublicTournamentRecordsService(prisma).getSchedule(TOURNAMENT_ID, {});
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
     expect(result.items[0].score).toEqual({ home: 3, away: 0 });
     expect(result.items[0].scoreStatus).toBe('official');
   });
@@ -327,7 +338,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두
       ],
       ...emptyConsent,
     });
-    const result = await new PublicTournamentRecordsService(prisma).getSchedule(TOURNAMENT_ID, {});
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
     expect(result.items[0].score).toBeNull();
   });
 });

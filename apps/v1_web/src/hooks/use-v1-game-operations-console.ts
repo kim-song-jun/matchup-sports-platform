@@ -175,7 +175,8 @@ export interface UseV1GameOperationsConsoleResult {
    */
   assignAssist(input: { eventId: string; assistParticipantId: string | null }): Promise<void>;
   /**
-   * UX 감사 — `start`/`pause`/`resume`/`end`/`next-period` 커맨드는 항상 REST로만
+   * UX 감사 — `start`/`pause`/`resume`/`end`/`end-period`/`start-period`/
+   * `revert-period` 커맨드는 항상 REST로만
    * 처리되고(D-10) 성공해도 게이트웨이가 아무 것도 브로드캐스트하지 않는다
    * (`RealtimeGateway`에 커맨드 성공 emit이 없다 — 이벤트 append만
    * `game.event.committed`를 쏜다). 그래서 명령이 성공해도 `gameSnapshot`은
@@ -822,7 +823,8 @@ export function useV1GameOperationsConsole(
     [gameId, gameSnapshot, takeover, queryClient],
   );
 
-  // UX 감사 — REST 커맨드(start/pause/resume/end/next-period) 성공 응답을
+  // UX 감사 — REST 커맨드(start/pause/resume/end/end-period/start-period/
+  // revert-period) 성공 응답을
   // 그 자리에서 gameSnapshot에 반영한다. 자세한 이유는
   // `UseV1GameOperationsConsoleResult.applyCommandResult` 문서 참고.
   const applyCommandResult = useCallback((result: { state: GameState; version: number }) => {

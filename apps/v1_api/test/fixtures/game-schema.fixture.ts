@@ -120,8 +120,18 @@ export const gameSchemaFixture = {
 // file backs it (20260810045157_v1_theme_preference); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps
 // its value. Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for issue #375 (하프타임 분리): V1GamePeriodState gains a HALFTIME value so
+// "current period ended, next not started yet" is an explicitly observable state instead of
+// an implicit combination. Unlike the two re-pins above, this one DOES touch the game
+// domain — that is why this guard fired, and it fired correctly. It is still additive:
+// `ALTER TYPE ... ADD VALUE 'HALFTIME'` adds an enum member without touching any existing
+// row, column, or FK, and no pre-existing state (SCHEDULED/LIVE/ENDED) changes meaning —
+// only the new `endCurrentPeriod`/`startNextPeriod` commands ever write HALFTIME. One new
+// migration file backs it (20260812000000_v1_game_period_halftime_state); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: '00a1c45e6f91a4ff719e2319d6c8cbc09491e2e1805c02b299c543ac576c7daf',
+  schema: '0e53688d1d7fae9fd53082a63e67c7af8f09f3b1e532fa3d477eaf2407e4c2de',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

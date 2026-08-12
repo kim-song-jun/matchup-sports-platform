@@ -322,6 +322,12 @@ enum V1GameSideKey {
 enum V1GamePeriodState {
   SCHEDULED
   LIVE
+  /// 이슈 #375 — 현재 피리어드는 ENDED로 닫혔지만 다음 피리어드는 아직
+  /// LIVE로 열리지 않은 하프타임 구간. `GamesService.endCurrentPeriod`가
+  /// "다음" 피리어드 행에 이 값을 쓴다(SCHEDULED로 놔두는 암묵적 조합
+  /// 대신) — 그래야 운영 보드/실시간 화면이 "지금 하프타임"을 직접 질의할
+  /// 수 있고, `start-period`가 이 상태에서만 LIVE로 전환할 수 있다.
+  HALFTIME
   ENDED
 }
 

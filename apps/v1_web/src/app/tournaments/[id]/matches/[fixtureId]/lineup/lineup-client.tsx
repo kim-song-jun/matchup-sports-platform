@@ -76,6 +76,16 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   /**
+   * 이슈 #378: SUBMITTED가 되면 editable이 영구히 false로 고정돼 재편집 진입점 자체가
+   * 없었다. 서버 상태(lineupState)와는 분리된 순수 로컬 UI 플래그로 재편집 세션을 연다 —
+   * "다시 편집하기"를 명시적으로 눌러야만 켜지고(제출 완료 상태를 카드에서 먼저 인지한
+   * 뒤), 새로 제출(SUBMITTED)되거나 화면을 새로고침하면 다시 꺼진다(기본값 false). 게임이
+   * 이미 시작됐으면(gameStarted) 이 플래그와 무관하게 재편집 진입점 자체를 숨긴다 — 백엔드
+   * saveLineup의 LINEUP_DEADLINE_PASSED 가드(games.service.ts)와 같은 기준
+   * (game.state !== SCHEDULED)을 프론트에서도 선반영해 헛된 라운드트립을 없앤다.
+   */
+  const [reopened, setReopened] = useState(false);
+  /**
    * 대회 스태프는 어느 팀에도 속하지 않아 `mySideId` 가 null 이다. 예전엔 그걸 곧바로
    * "운영진은 운영 콘솔을 이용해 주세요" 로 막았는데, **운영 콘솔에는 라인업 화면이
    * 없다**(tournament-ops 아래에 operate·result-review·records·operations·staff 뿐).
@@ -242,7 +252,19 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   }
 
   const mySideId = editingSideId;
-  const editable = state.lineupState === null || state.lineupState === 'DRAFT';
+  // 경기가 시작되면(gameQuery.data.state가 SCHEDULED를 벗어나면) 어느 쪽도 더는
+  // 라인업을 편집할 수 없다 — 백엔드 saveLineup의 LINEUP_DEADLINE_PASSED 가드와
+  // 동일한 판정 기준이다(games.service.ts, game.state !== SCHEDULED).
+  const gameStarted = gameQuery.data !== undefined && gameQuery.data.state !== 'SCHEDULED';
+  const canReopen = state.lineupState === 'SUBMITTED' && !gameStarted;
+  // gameStarted를 최우선으로 건다 — TOURNAMENT_FIXTURE는 양 사이드 모두 SUBMITTED/LOCKED
+  // 라인업이 있어야 게임을 시작할 수 있으므로(assertLineupsSubmittedForStart) DRAFT
+  // 상태에서 gameStarted가 참이 되는 경로는 실제로는 나타나지 않지만, 백엔드 가드
+  // (game.state !== SCHEDULED면 무조건 거부)와 프론트 판정 기준을 값 하나로 완전히
+  // 일치시켜 두면 별도로 다시 어긋날 여지가 없다.
+  const editable =
+    !gameStarted &&
+    (state.lineupState === null || state.lineupState === 'DRAFT' || (state.lineupState === 'SUBMITTED' && reopened));
   const outfieldGuidance =
     formationSupported && formationOptions.length === 0 && outfieldCount > 0
       ? `현재 선발 ${outfieldCount}명 — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
@@ -278,6 +300,9 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
       setState((prev) =>
         prev === null ? prev : { ...prev, gameVersion: result.version, lineupState: 'SUBMITTED', dirty: false },
       );
+      // 새로 제출됐으니 재편집 세션은 닫는다 — 다시 바꾸려면 "다시 편집하기"를 또 눌러야
+      // 한다(제출 완료를 매번 인지한 뒤 편집하게 하려는 의도, 실수로 이어지는 편집 방지).
+      setReopened(false);
     } catch (err) {
       setSaveError(extractErrorMessage(err, '제출하지 못했어요.'));
     }
@@ -292,11 +317,15 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
         <Card pad={16}>
           <div className="tm-text-body-lg">{homeName} vs {awayName}</div>
           <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
-            {state.lineupState === 'SUBMITTED'
-              ? '제출됐어요. 대회 운영진이 확인해요.'
-              : state.lineupState === 'LOCKED'
-                ? '잠긴 라인업이에요 — 더 이상 수정할 수 없어요.'
-                : '아직 초안이에요. 저장 후 제출하면 확정돼요.'}
+            {state.lineupState === 'SUBMITTED' && reopened
+              // 재편집을 여는 순간부터 미리 안내한다 — 저장하면 이미 제출된 라인업이
+              // 곧바로 새 내용으로 대체된다는 걸 편집을 시작하기 전에 알아야 한다.
+              ? '다시 편집하는 중이에요. 저장하면 제출했던 라인업이 새 내용으로 바뀌어요.'
+              : state.lineupState === 'SUBMITTED'
+                ? '제출됐어요. 대회 운영진이 확인해요.'
+                : state.lineupState === 'LOCKED'
+                  ? '잠긴 라인업이에요 — 더 이상 수정할 수 없어요.'
+                  : '아직 초안이에요. 저장 후 제출하면 확정돼요.'}
           </div>
         </Card>
 
@@ -633,6 +662,17 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               </button>
             ) : null}
           </div>
+        </div>
+      ) : canReopen ? (
+        // 이슈 #378: SUBMITTED 이후 재편집 진입점이 화면에 아예 없었다 — 경기 시작 전이면
+        // 여기에 단독 CTA로 노출한다. 저장/제출 2버튼 그리드와 같은 tm-fixed-cta 컨테이너·
+        // tm-btn-lg 높이를 그대로 써서 자리가 빈 것처럼 보이지 않게 하고, tm-btn-block으로
+        // 폭 전체를 채워 2버튼 그리드와 시각적 무게를 맞춘다. 경기가 시작되면(gameStarted)
+        // canReopen 자체가 false가 되어 이 진입점도 함께 사라진다.
+        <div className="tm-fixed-cta">
+          <button type="button" className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" onClick={() => setReopened(true)}>
+            다시 편집하기
+          </button>
         </div>
       ) : null}
     </AppChrome>

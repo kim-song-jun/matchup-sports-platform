@@ -1454,6 +1454,27 @@ export class GamesService {
               'Team matches manage lineups only through /team-matches/:teamMatchId/lineup, which enforces roster/eligibility/deadline invariants this generic route does not.',
           });
         }
+        // Issue #378: this route had NO deadline gate at all — a director/manager
+        // could overwrite a tournament-fixture lineup (DRAFT or SUBMITTED) after
+        // kickoff by calling the API directly, even though the frontend hid the
+        // save UI once SUBMITTED. `game.state` is already this codebase's single
+        // source of truth for "has the game started" — see
+        // `staffLineupSubmitRequiresTakeover` above, which reuses the exact same
+        // SCHEDULED→LIVE transition (advancePeriod in executeCommand's 'start'
+        // command) for the same question. Reject anything past SCHEDULED:
+        // LIVE/PAUSED/ENDED obviously must not accept new rosters, and CANCELLED
+        // is included too — a cancelled fixture has no upcoming kickoff to staff
+        // a lineup for, so there is nothing left to save. Mirrors the sibling
+        // team-match path's `LINEUP_DEADLINE_PASSED` gate
+        // (team-match-lineup.service.ts saveLineup) — same code, same shape,
+        // reworded because the fixture path has no wall-clock startAt deadline
+        // and no opponent-correction-request reopen flow to point the caller at.
+        if (game.state !== V1GameState.SCHEDULED) {
+          throw new ConflictException({
+            code: 'LINEUP_DEADLINE_PASSED',
+            message: '경기 시작 이후에는 라인업을 직접 수정할 수 없어요.',
+          });
+        }
         const side = await tx.v1GameSide.findFirst({ where: { id: sideId, gameId } });
         if (side === null) {
           throw this.notFound('GAME_SIDE_NOT_FOUND');

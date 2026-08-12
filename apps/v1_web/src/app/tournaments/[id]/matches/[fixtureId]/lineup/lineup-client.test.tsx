@@ -478,3 +478,72 @@ describe('대회 스태프도 라인업을 짤 수 있다', () => {
     expect(screen.queryByText('어느 팀의 명단을 짤까요?')).toBeNull();
   });
 });
+
+/**
+ * 이슈 #378 회귀 테스트 — SUBMITTED가 되면 editable이 영구히 false로 고정돼 저장/제출
+ * CTA가 렌더링에서 통째로 빠지고, 재편집으로 돌아갈 진입점이 파일 전체 어디에도 없었다
+ * (재현: 새로고침해도 갇힘 — hydrateFixtureLineupState가 서버의 lineupState를 그대로
+ * 반영). 백엔드에는 이미 games.service.ts saveLineup에 game.state 기반
+ * LINEUP_DEADLINE_PASSED 가드를 추가했으므로, 프론트도 같은 기준(gameQuery.data.state)
+ * 으로 "경기 시작 전에는 재편집 진입점을 보여주고, 시작 후에는 아예 숨긴다"를 맞춘다.
+ */
+describe('이슈 #378 — SUBMITTED 이후 재편집 진입점', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [baseGameLineup({ state: 'SUBMITTED' })],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('경기 시작 전(SCHEDULED)이면 "다시 편집하기" 진입점이 보이고, 누르면 편집 UI가 열린다', () => {
+    hoisted.useV1GameMock.mockReturnValue({
+      data: baseGame({ state: 'SCHEDULED' }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    // 제출 완료 상태를 먼저 인지하게 하는 안내 문구가 보이는 동시에, 저장/제출 CTA는
+    // 아직 숨어 있다 — "다시 편집하기"를 눌러야만 편집 UI가 열린다.
+    expect(screen.getByText('제출됐어요. 대회 운영진이 확인해요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '라인업 제출하기' })).not.toBeInTheDocument();
+
+    const reopenButton = screen.getByRole('button', { name: '다시 편집하기' });
+    fireEvent.click(reopenButton);
+
+    expect(screen.queryByRole('button', { name: '다시 편집하기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '저장' })).toBeInTheDocument();
+    expect(screen.getByLabelText('추가할 선수 이름')).toBeInTheDocument();
+  });
+
+  it('경기가 시작(LIVE)되면 "다시 편집하기" 진입점이 아예 보이지 않는다', () => {
+    hoisted.useV1GameMock.mockReturnValue({
+      data: baseGame({ state: 'LIVE' }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByRole('button', { name: '다시 편집하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '라인업 제출하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '저장' })).not.toBeInTheDocument();
+  });
+});

@@ -27,7 +27,13 @@ import { medianOffsetMs, pushClockSample, type ClockPingPong } from '@/lib/game-
 import { getV1GameOperationsSocket, setGameOperationsAuthorizationSubjectVersion } from '@/lib/v1-game-operations-socket';
 import { randomUuid } from '@/lib/uuid';
 import { v1Keys } from '@/lib/query-keys';
-import type { GameEventRecord, GameEventType, GameState, GameTakeoverGrant } from '@/types/game-operations';
+import type {
+  AssignGoalAssistResult,
+  GameEventRecord,
+  GameEventType,
+  GameState,
+  GameTakeoverGrant,
+} from '@/types/game-operations';
 
 /**
  * `game.takeover.request` / `game.takeover.renew` 의 ack 응답.
@@ -154,8 +160,20 @@ export interface UseV1GameOperationsConsoleResult {
   retryFailedEvent(clientEventId: string): void;
   requestTakeover(): void;
   /** T3 추가 — 큐를 거치지 않는 온라인 전용 되돌리기(D-10과 같은 이유로 절대
-   * 오프라인 큐에 들어가지 않는다). 사후 어시스트 부착(reverse+re-append)에 쓰인다. */
+   * 오프라인 큐에 들어가지 않는다). 골/카드/교체 등 일반 이벤트를 되돌릴 때 쓰인다
+   * — 어시스트 부착·해제는 더 이상 이 경로를 타지 않는다(아래 assignAssist 참고,
+   * 이슈 #376). */
   reverseEvent(input: { eventId: string; reason: string }): Promise<void>;
+  /**
+   * 이슈 #376 — 이미 기록된 GOAL 이벤트의 assistParticipantId를 원자적으로
+   * 채우거나(참가자 id) 지우는(null) 커맨드. `reverseEvent`와 같은 이유로 큐를
+   * 거치지 않는 온라인 전용 REST 호출이다(D-10). 예전 `attachAssist`가 하던
+   * "reverseEvent로 되돌리고 새 GOAL을 submitEvent로 재제출"하는 2단계 흐름을
+   * 완전히 대체한다 — 그 흐름은 두 번째 호출이 첫 번째 호출의 버전 갱신을 아직
+   * 반영하지 못한 stale expectedVersion을 큐에 넣어 구조적으로 실패할 수 있었다
+   * (GamesService.assignGoalAssist의 문서 주석 참고).
+   */
+  assignAssist(input: { eventId: string; assistParticipantId: string | null }): Promise<void>;
   /**
    * UX 감사 — `start`/`pause`/`resume`/`end`/`next-period` 커맨드는 항상 REST로만
    * 처리되고(D-10) 성공해도 게이트웨이가 아무 것도 브로드캐스트하지 않는다
@@ -773,6 +791,37 @@ export function useV1GameOperationsConsole(
     [gameId, gameSnapshot, takeover, queryClient],
   );
 
+  // 이슈 #376 — 큐를 거치지 않는 온라인 전용 REST 호출(reverseEvent와 동일한 이유,
+  // 위 주석 참고). 하나의 커맨드로 assistParticipantId를 in-place로 갱신하므로
+  // reverseEvent+submitEvent 2단계가 겪던 stale expectedVersion 레이스가 구조적으로
+  // 사라진다 — 이 함수 하나가 gameSnapshot.version을 읽어 그대로 보내고, 응답의
+  // 새 version으로 갱신할 때까지 다른 커맨드가 끼어들 여지가 없다.
+  const assignAssist = useCallback(
+    async (input: { eventId: string; assistParticipantId: string | null }) => {
+      if (!gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
+        throw new Error('경기 운영 권한이 없어 어시스트를 기록할 수 없어요.');
+      }
+      const clientEventId = randomUuid();
+      const result = await v1Post<AssignGoalAssistResult>(
+        `/games/${gameId}/events/${input.eventId}/assist`,
+        {
+          expectedVersion: gameSnapshot.version,
+          clientEventId,
+          takeoverToken: takeover.token,
+          assistParticipantId: input.assistParticipantId,
+        },
+        { headers: { 'Idempotency-Key': clientEventId } },
+      );
+      setGameSnapshot((current) => (current ? { ...current, version: result.version } : current));
+      void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+      // reverseEvent와 동일한 이유(위 그 함수의 주석 참고) — 이 REST-only 커맨드도
+      // 실시간 브로드캐스트 짝이 없다. liveEvents를 서버 스냅숏으로 강제 재동기화해
+      // in-place로 갱신된 assistParticipantId가 새로고침 없이 즉시 반영되게 한다.
+      resyncEventsRef.current?.();
+    },
+    [gameId, gameSnapshot, takeover, queryClient],
+  );
+
   // UX 감사 — REST 커맨드(start/pause/resume/end/next-period) 성공 응답을
   // 그 자리에서 gameSnapshot에 반영한다. 자세한 이유는
   // `UseV1GameOperationsConsoleResult.applyCommandResult` 문서 참고.
@@ -795,6 +844,7 @@ export function useV1GameOperationsConsole(
     retryFailedEvent,
     requestTakeover,
     reverseEvent,
+    assignAssist,
     applyCommandResult,
   };
 }

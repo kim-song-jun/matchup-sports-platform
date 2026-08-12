@@ -27,12 +27,19 @@ export function AssistPickerSheet({ open, event, scorerName, teammates, onAttach
 
   // Copilot review (PR #276): the parent conditionally renders this sheet
   // (`{assistTarget ? <AssistPickerSheet ... /> : null}`), so calling
-  // onClose() actually unmounts it, not just hides it. attachAssist() is a
-  // two-step reverse-then-resubmit -- if the backdrop/X close it while pick()
-  // is still awaiting onAttach, the finally/catch below would setState on an
-  // unmounted component and, worse, any failure after the sheet is gone
-  // never reaches the user even though the goal may already have been
-  // reversed. Block the close paths while a pick is in flight instead.
+  // onClose() actually unmounts it, not just hides it. If the backdrop/X
+  // close it while pick() is still awaiting onAttach, the finally/catch
+  // below would setState on an unmounted component and, worse, any failure
+  // would never reach the user. Block the close paths while a pick is in
+  // flight instead.
+  //
+  // Issue #376: attachAssist() used to be a two-step reverse-then-resubmit
+  // (this comment originally warned about a reversed-but-not-yet-resubmitted
+  // goal if closed mid-flight) -- it is now a single atomic
+  // `ops.assignAssist` REST call (`GamesService.assignGoalAssist`), so an
+  // interrupted pick can no longer leave the goal in a half-reversed state.
+  // The in-flight guard itself stays: setState-after-unmount and a silently
+  // dropped failure are still worth preventing for any async call here.
   const closeIfIdle = () => {
     if (pending === null) onClose();
   };

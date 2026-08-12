@@ -127,6 +127,7 @@ function consoleState(overrides: Record<string, unknown> = {}) {
     retryFailedEvent: vi.fn(),
     requestTakeover: vi.fn(),
     reverseEvent: vi.fn(),
+    assignAssist: vi.fn(),
     applyCommandResult: vi.fn(),
     ...overrides,
   };

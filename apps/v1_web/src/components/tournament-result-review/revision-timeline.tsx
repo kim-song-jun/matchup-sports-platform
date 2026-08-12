@@ -3,11 +3,16 @@
 import type { GameResultRevision } from '@/hooks/use-tournament-result-review';
 import { REVISION_STATE_BADGE_TONE, REVISION_STATE_LABELS } from './result-review-copy';
 import { formatAdminDateTime } from '@/lib/date-utils';
+import { formatGameResultScore, readGameResultScore } from '@/lib/game-result-score';
 
+// `.home`/`.away` 를 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)가
+// `undefined:undefined` 로 나온다 — 알파 실측 사고("처리 이력"에 실제로 이렇게 떴다).
+// lib/game-result-score 의 공용 정규화 헬퍼로 두 형태를 모두 처리한다.
 function scoreText(score: GameResultRevision['score']): string {
-  const base = `${score.home}:${score.away}`;
-  if (!score.penalties) return base;
-  return `${base} (승부차기 ${score.penalties.home}:${score.penalties.away})`;
+  const base = formatGameResultScore(score);
+  const parsed = readGameResultScore(score);
+  if (!parsed?.penalties) return base;
+  return `${base} (승부차기 ${parsed.penalties.home}:${parsed.penalties.away})`;
 }
 
 /**

@@ -703,6 +703,10 @@ export class GamesService {
           lastSequence: true,
           competitionConfigVersionId: true,
           currentOfficialRevisionId: true,
+          // 승부차기 입력 단계(운영 콘솔) 추가 — 아래 isKnockoutFixture 계산에만
+          // 쓰고, 이 필드 자체는 응답에서 뺀다(destructure로 분리, 기존 관찰
+          // 가능한 API 표면을 넓히지 않는다).
+          tournamentFixtureId: true,
           sides: { orderBy: { sideKey: 'asc' } },
           periods: { orderBy: { number: 'asc' } },
           lineups: { orderBy: [{ sideId: 'asc' }, { revision: 'desc' }] },
@@ -719,9 +723,16 @@ export class GamesService {
         select: { lineup: true, periods: true },
       });
       const lineup = config === null ? {} : jsonObject(config.lineup);
+      const { tournamentFixtureId, ...gameFields } = game;
       return {
-        ...game,
+        ...gameFields,
         actorRole: actor.role,
+        // 승부차기 입력 단계(운영 콘솔) 추가 — `applyPenalties`가 이미 쓰는
+        // 것과 완전히 같은 knockout 판정을 재사용한다(새 판정을 만들지
+        // 않는다). 콘솔은 이 값으로 "승부차기 시작" 버튼을 조별리그 무승부
+        // 에서는 아예 보여주지 않는다 — 보여줬다가 `end` 제출 시점에야
+        // `TOURNAMENT_PENALTY_NOT_ALLOWED`로 실패하는 깨진 UX를 막는다.
+        isKnockoutFixture: await this.isKnockoutFixture(tx, tournamentFixtureId),
         lineupConfig: parseLineupCatalog(config?.lineup ?? null),
         // Live-substitution addition: the console needs this to decide
         // whether to surface the rolling quick-substitution mode (config-

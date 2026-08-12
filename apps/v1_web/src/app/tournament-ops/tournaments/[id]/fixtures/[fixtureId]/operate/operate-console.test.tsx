@@ -888,3 +888,171 @@ describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
     expect(screen.getByText('1 : 1')).toBeInTheDocument();
   });
 });
+
+// 과제 2 — 승부차기 입력 단계. "언제 나타날지"(요구사항 1: TOURNAMENT_FIXTURE +
+// 정규시간(+연장) 종료 시 동점 + knockout 픽스처) 게이팅과, 최종 결과 반영
+// (요구사항 4·5: end 커맨드의 payload.penalties로 실제 반영, 확인 모달을 거침)
+// 을 검증한다.
+describe('OperateConsole — 승부차기 (과제 2)', () => {
+  const PENALTY_SIDES = [
+    { id: 'side-home', gameId: 'game-1', sideKey: 'HOME' as const, teamId: null, displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '' },
+    { id: 'side-away', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: null, displayNameSnapshot: '성수 풋살 클럽', createdAt: '', updatedAt: '' },
+  ];
+  const FINAL_PERIOD = {
+    id: 'period-2', gameId: 'game-1', number: 2, state: 'LIVE',
+    startedAt: '2026-08-07T00:00:00.000Z', endedAt: null, pausedTotalMs: 0, pausedAt: null,
+  };
+
+  function tiedGoal(sequence: number, sideId: string, id: string): GameEventRecord {
+    return {
+      id, gameId: 'game-1', sequence, clientEventId: `client-${sequence}`, payloadHash: 'hash',
+      type: 'GOAL', sideId, participantId: null, assistParticipantId: null, period: 2,
+      clockMs: 5 * 60000, occurredAt: '2026-08-07T00:05:00.000Z', receivedAt: '2026-08-07T00:05:00.000Z',
+      actorUserId: 'actor-1', reversesEventId: null, payload: {},
+    } as GameEventRecord;
+  }
+
+  function setup(
+    overrides: {
+      isKnockoutFixture?: boolean;
+      sourceType?: 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
+      liveEvents?: GameEventRecord[];
+    } = {},
+  ) {
+    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: { gameId: 'game-1', lineups: [] },
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    mocks.useV1Game.mockReturnValue({
+      data: {
+        id: 'game-1',
+        sourceType: overrides.sourceType ?? 'TOURNAMENT_FIXTURE',
+        isKnockoutFixture: overrides.isKnockoutFixture ?? true,
+        state: 'LIVE', version: 2, lastSequence: 1,
+        periods: [
+          { id: 'period-1', gameId: 'game-1', number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z', pausedTotalMs: 0, pausedAt: null },
+          FINAL_PERIOD,
+        ],
+        sides: PENALTY_SIDES,
+        lineups: [],
+      },
+      isLoading: false, isError: false, refetch: vi.fn(),
+    });
+    const liveEvents = overrides.liveEvents ?? [tiedGoal(1, 'side-home', 'e1'), tiedGoal(2, 'side-away', 'e2')];
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents }),
+    );
+  }
+
+  it('대회 knockout 경기가 정규시간 종료 후 동점이면 "승부차기 시작" 버튼이 보이고, "경기 종료" 버튼은 숨는다', () => {
+    setup();
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: /승부차기 시작/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+  });
+
+  it('knockout이 아니면(조별리그) 동점이어도 "승부차기 시작"이 보이지 않고 평소처럼 "경기 종료"가 보인다', () => {
+    setup({ isKnockoutFixture: false });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
+    expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
+  });
+
+  it('동점이 아니면 knockout 경기여도 "승부차기 시작"이 보이지 않는다', () => {
+    setup({ liveEvents: [tiedGoal(1, 'side-home', 'e1')] });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
+    expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
+  });
+
+  it('일반 팀 매치는(방어적 케이스, isKnockoutFixture가 와도) "승부차기 시작"이 보이지 않는다', () => {
+    setup({ sourceType: 'TEAM_MATCH' });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
+  });
+
+  it('승부차기 시작 확인 → 킥 입력(2:1) → 종료 확인을 거치면, end 커맨드가 sideKey 기준 최종 점수로 호출된다', async () => {
+    setup();
+    mocks.postV1GameCommand.mockResolvedValue({
+      gameId: 'game-1', state: 'ENDED', version: 3, revisionId: 'rev-1', revision: 1, revisionState: 'SUBMITTED',
+    });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
+    const startDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
+
+    const panel = await screen.findByRole('dialog', { name: '승부차기' });
+    const successButton = within(panel).getByRole('button', { name: /성공/ });
+    const missButton = within(panel).getByRole('button', { name: /실패/ });
+
+    // 순서는 항상 번갈아 찬다(홈 먼저) — 성공/성공/성공/실패 4번으로
+    // 홈 2 : 원정 1(결판)을 만든다: 홈 성공(1:0)→원정 성공(1:1)→홈 성공(2:1)
+    // →원정 실패(2:1, 결판).
+    fireEvent.click(successButton);
+    fireEvent.click(successButton);
+    fireEvent.click(successButton);
+    fireEvent.click(missButton);
+
+    const finishButton = within(panel).getByRole('button', { name: '승부차기 종료' });
+    expect(finishButton).not.toBeDisabled();
+    fireEvent.click(finishButton);
+
+    const finishDialog = await screen.findByRole('dialog', { name: '승부차기를 종료할까요?' });
+    expect(finishDialog).toHaveTextContent('강남 풋살 클럽 2 : 1 성수 풋살 클럽');
+    fireEvent.click(within(finishDialog).getByRole('button', { name: '승부차기 종료' }));
+
+    await waitFor(() =>
+      expect(mocks.postV1GameCommand).toHaveBeenCalledWith(
+        'game-1',
+        'end',
+        expect.objectContaining({ payload: { penalties: { home: 2, away: 1 } } }),
+      ),
+    );
+  });
+
+  it('두 팀 점수가 같으면 "승부차기 종료" 버튼이 비활성이다(무승부 승부차기는 백엔드도 거부)', async () => {
+    setup();
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
+    const startDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
+
+    const panel = await screen.findByRole('dialog', { name: '승부차기' });
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
+  });
+
+  it('킥을 잘못 입력했을 때 "방금 킥 되돌리기"로 복구할 수 있다', async () => {
+    setup();
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
+    const startDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
+
+    const panel = await screen.findByRole('dialog', { name: '승부차기' });
+    const undoButton = within(panel).getByRole('button', { name: '방금 킥 되돌리기' });
+    // 킥이 하나도 없으면 되돌리기 자체가 막힌다(되돌릴 대상이 없다).
+    expect(undoButton).toBeDisabled();
+
+    // 홈 성공(1:0) → 원정 성공(1:1)까지 두 번 찍으면 결판이 안 나 종료가
+    // 막힌다. 마지막(원정) 킥을 되돌리면 다시 1:0(홈만 득점)으로 돌아가
+    // "승부차기 종료"가 다시 활성화돼야 한다 — 오조작 복구가 실제로 상태를
+    // 바꾼다는 증거다.
+    const successButton = within(panel).getByRole('button', { name: /성공/ });
+    fireEvent.click(successButton); // 홈 1:0
+    fireEvent.click(successButton); // 원정 1:1
+    expect(undoButton).not.toBeDisabled();
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
+
+    fireEvent.click(undoButton); // 원정 킥 되돌림 → 홈 1:0
+
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
+  });
+});

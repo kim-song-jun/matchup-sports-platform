@@ -168,3 +168,38 @@ export function commandConfirmCopy(
       };
   }
 }
+
+/**
+ * 승부차기 시작 확인 — 아직 아무것도 서버에 보내지 않는다(패널을 여는
+ * 로컬 상태 전환일 뿐). 그래도 사용자 결정("예외 없이 전부")에 따라 확인을
+ * 거친다.
+ */
+export function penaltyShootoutStartConfirmCopy(
+  sides: readonly GameSide[],
+  scoreBySideId: ReadonlyMap<string, number>,
+): ConfirmCopy {
+  const scoreText =
+    sides.length > 0 ? sides.map((side) => `${side.displayNameSnapshot} ${scoreBySideId.get(side.id) ?? 0}`).join(' : ') : '동점';
+  return {
+    title: '승부차기를 시작할까요?',
+    message: `정규 시간이 ${scoreText}로 끝났어요. 승부차기로 승자를 가려요.`,
+    confirmLabel: '승부차기 시작',
+    tone: 'default',
+  };
+}
+
+/** 승부차기 종료 확인 — `end` 커맨드를 실제로 실행하는 마지막 단계라
+ * `end`와 같은 danger 톤을 쓴다(되돌릴 수 없음은 동일하다). */
+export function penaltyShootoutFinishConfirmCopy(
+  homeSide: GameSide,
+  awaySide: GameSide,
+  homeScore: number,
+  awayScore: number,
+): ConfirmCopy {
+  return {
+    title: '승부차기를 종료할까요?',
+    message: `${homeSide.displayNameSnapshot} ${homeScore} : ${awayScore} ${awaySide.displayNameSnapshot} 승부차기로 경기를 종료해요. 종료하면 되돌릴 수 없어요.`,
+    confirmLabel: '승부차기 종료',
+    tone: 'danger',
+  };
+}

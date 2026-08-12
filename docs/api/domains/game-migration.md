@@ -1,5 +1,25 @@
 # Game migration and cutover contract
 
+> **Scoped retirement note (Task 10 cutover cleanup).** The `GAME_WRITE`/`GAME_READ` operation
+> flags this doc describes are retired: `GameOperationFlagKey` no longer has those values, the
+> `POST .../operation-flags/tuple-transition` endpoint and `GameOperationFlagsService
+> .tupleTransition()`/`withNewWriteAuthority()` are deleted, `v1_game_cutover_epochs` is no longer
+> read/written by any application code, the gate-bundle machinery no longer accepts a 'tuple'
+> shape (single-key bundles only), and the "frozen forward order"
+> (`assertFrozenForwardOrder`) that serialized `GAME_READ`/`GAME_WRITE`/`PUBLIC_LIVE`/
+> `DIRECTOR_OFFICIALIZE` transitions is deleted -- `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` are
+> independent booleans with no ordering dependency now. See
+> `apps/v1_api/src/config/game-operation-flags.ts`'s top-level doc comment for the authoritative
+> current contract, and the "Simplified admin fast path" section below (updated to match).
+>
+> **What this note does NOT cover:** the phase table immediately below (A/B/C/R1/R2/R3) also
+> describes a separate, broader alpha rollout/runbook system (`scripts/qa/run-v1-alpha-cutover.mjs`,
+> `deploy/runbooks/v1-game-operations-r3-registry.json`, "R3 Post-alpha cleanup" compatibility-reader
+> removal). That system was not investigated or touched by the flag-cleanup work this note
+> describes -- its current status is unknown and out of scope here. Read the phase table below as
+> historical record of what the flags/gate-bundle machinery looked like before this cleanup, not as
+> a live contract.
+
 <!-- API_CONTRACT_SECTION_BEGIN:Literal migration/cutover phases -->
 ### Literal migration/cutover phases
 Only `platform_ops` may mutate flags through a compare-and-swap transaction carrying expected version(s), idempotency key, reason, and the named gate-bundle path/hash; each changed flag writes `V1OperationAudit` plus outbox. Single-key changes use PATCH; any read/write authority rollback uses the tuple-transition endpoint with exact expected values/versions. `GAME_READ=compare` returns the legacy response while synchronously recording a legacy/new comparator result; it never falls back on an error. `GAME_READ=new` returns only the new projection. Permitted transitions are `GAME_READ legacy→compare→new`, `GAME_WRITE legacy→new`, `PUBLIC_LIVE off→on`, and `DIRECTOR_OFFICIALIZE off→on`; boolean rollback is `on→off` with a new audit/version. Phase C transition order is frozen: validate compare gate → CAS `GAME_WRITE legacy→new` while locking `V1GameCutoverEpoch` → CAS `GAME_READ compare→new` → public/director gates. Every new-authority business write and every read/write rollback tuple-CAS locks the singleton cutover row and flag rows in lexical order `FOR UPDATE`; the first successful new write sets `firstNewWriteAt/resourceId` in the same transaction, while rollback requires the latch still null. Therefore write-versus-rollback races serialize with exactly one legal winner. `GAME_READ new→compare|legacy` and `GAME_WRITE new→legacy` are forbidden once the latch is set; a pre-latch rollback atomically restores both authorities to the approved prior values and increments each changed flag version exactly once. `PUBLIC_LIVE` requires V24 privacy/visibility plus V26 PUBLIC-01 receipts; `DIRECTOR_OFFICIALIZE` requires V7 auth plus V22 API and V23 UI audit receipts. Local toggle tests use isolated DBs; V27/F4 require the final tuple/version below after cleanup.
@@ -25,23 +45,19 @@ The flag gate is an immutable phase-specific attempt-bound bundle, not an ad hoc
 ## Simplified admin fast path
 
 `PATCH /tournament-ops/operation-flags/:key/simplified-toggle` is an owner-requested admin on/off
-for all four operation flags (`GAME_READ`, `GAME_WRITE`, `PUBLIC_LIVE`, `DIRECTOR_OFFICIALIZE`). It
-skips exactly one thing from the literal contract above: the immutable gate-bundle evidence
-(`verifyGateBundle`'s R1/R2 signed-receipt ceremony). Everything else is identical to
-`PATCH /tournament-ops/operation-flags/:key` — the same `platform_ops` admin level
-(`getMutationAdmin`; `support` and non-admin callers are rejected), the same CAS on
-`expectedVersion`, the same single-step transition validity (`assertSingleTransition`; reversing a
-`GAME_READ`/`GAME_WRITE` step still requires the fully gated tuple-transition path), the same
-**frozen cutover order** (`assertFrozenForwardOrder`: `GAME_READ legacy→compare`, then
-`GAME_WRITE legacy→new` requires `GAME_READ=compare`, then `GAME_READ compare→new` requires
-`GAME_WRITE=new`, then `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE off→on` require both `GAME_WRITE=new`
-and `GAME_READ=new` — this path does not relax that data-consistency invariant, only the
-paperwork), a mandatory `reason`, a required `Idempotency-Key`, and a `V1OperationAudit`/outbox
-write (marked `gateMode: "simplified"` in the `after` payload to distinguish it from the gated
-path in the same audit trail). `GAME_WRITE legacy→new` still latches
-`v1_game_cutover_epochs.first_new_write_at` on the first new-authority write, making that step
-practically irreversible through this path too — rolling it back still requires
-`tupleTransition`.
+for both remaining operation flags (`PUBLIC_LIVE`, `DIRECTOR_OFFICIALIZE` -- `GAME_WRITE`/`GAME_READ`
+retired, see the note at the top of this doc). It skips exactly one thing from the literal contract
+above: the immutable gate-bundle evidence (`verifyGateBundle`'s R1/R2 signed-receipt ceremony).
+Everything else is identical to `PATCH /tournament-ops/operation-flags/:key` — the same
+`platform_ops` admin level (`getMutationAdmin`; `support` and non-admin callers are rejected), the
+same CAS on `expectedVersion`, the same single-step transition validity (`assertSingleTransition`:
+`off→on` forward, `on→off` rollback, nothing else), a mandatory `reason`, a required
+`Idempotency-Key`, and a `V1OperationAudit`/outbox write (marked `gateMode: "simplified"` in the
+`after` payload to distinguish it from the gated path in the same audit trail). Both flags are
+independent booleans now -- there is no cross-flag ordering constraint (the retired "frozen cutover
+order" existed only to sequence `GAME_READ`/`GAME_WRITE`/`PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE`
+against each other), so `off→on` and `on→off` are both immediately reachable for either flag
+independently once the simplified-gate switch is on.
 
 Whether this path is reachable at all is a DB-backed switch, not an environment variable: the
 singleton row in `v1_game_operation_gate_settings` (`simplified_gate_enabled`, CAS'd by
@@ -51,13 +67,6 @@ singleton row in `v1_game_operation_gate_settings` (`simplified_gate_enabled`, C
 state via `GET /tournament-ops/operation-flags/simplified-gate/status`. It is reachable from any
 environment, including production — the control is the CAS + audit trail on the switch itself, not
 which environment the process runs in.
-
-Because the frozen order is preserved, this path cannot promote `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE`
-to `on` while `GAME_WRITE`/`GAME_READ` remain at their Phase A `legacy` values (alpha's state as of
-this writing) even with the switch enabled; it only becomes usable for that promotion once
-`GAME_WRITE`/`GAME_READ` have advanced to `new` — either through this same simplified path (in the
-frozen order) or the fully gated path above. Boolean rollback (`on`→`off`) has no such precondition
-and is always available.
 
 ## Migrated deferred-boundary contract
 

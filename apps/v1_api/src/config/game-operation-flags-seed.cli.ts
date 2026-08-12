@@ -1,9 +1,9 @@
 /**
  * Post-deploy CLI that seeds the game-operation flag invariant rows.
  *
- * See `game-operation-flags-seed.ts` for why this exists (the tournament
- * operations board fails closed with `500 GAME_READ_FLAG_MISSING` on any
- * environment where these rows were never created).
+ * See `game-operation-flags-seed.ts` for why this exists (defense in depth — every consumer
+ * already treats a missing `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` row as `off`, but this makes the
+ * row's presence an explicit deploy-time fact rather than an implicit one).
  *
  * Run against a deployed environment right after `prisma migrate deploy`:
  *
@@ -15,7 +15,6 @@
  * process exits non-zero on any failure.
  *
  * Mirrors the migration-logic-lives-in-a-CLI split already established by
- * `games/migration/game-result-backfill.cli.ts` (Task 10),
  * `games/migration/game-period-live-backfill.cli.ts` (D-21) and
  * `tournaments/competition-config/competition-config-backfill.cli.ts` (Task 9).
  */

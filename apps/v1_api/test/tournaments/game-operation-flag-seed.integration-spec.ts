@@ -3,17 +3,16 @@ import { GAME_OPERATION_FLAG_DEFAULTS } from '../../src/config/game-operation-fl
 import { seedGameOperationFlagDefaults } from '../../src/config/game-operation-flags-seed';
 
 /**
- * Alpha runtime bug: `v1_game_operation_flags` had **zero rows**, so
- * `TournamentOperationsBoardService.list()` — which deliberately fails closed with
- * `500 GAME_READ_FLAG_MISSING` when the `GAME_READ` row is absent (Task 18 review P1-7) —
- * was unreachable on every freshly provisioned environment.
- *
- * Nothing in the deploy path had ever created those rows:
+ * Alpha runtime bug (historical): `v1_game_operation_flags` had **zero rows** on a freshly
+ * provisioned environment, because nothing in the deploy path had ever created them --
  * `GameOperationFlagsService.ensureDefaults()` is private and only runs when a `platform_ops`
  * operator calls the flags API, and no migration seeds them (DML is never additive under the
- * expand-contract gate). The board's own integration suite never caught it because every one of
- * its cases upserts the flag row in its own setup — none exercise "an environment that was only
- * deployed".
+ * expand-contract gate). At the time, that broke the tournament operations board outright (it
+ * failed closed on a missing `GAME_READ` row -- Task 18 review P1-7). `GAME_READ` is retired now
+ * (Task 10 cutover cleanup), but `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` still benefit from this seed
+ * as defense in depth: it makes each row's presence (and its CAS `version: 0` starting point) an
+ * explicit deploy-time fact instead of an implicit one that only becomes true the first time an
+ * operator happens to touch the flags API.
  *
  * These cases pin the two properties the deploy path actually depends on. The second one is the
  * one that can silently break: the seed runs on EVERY deploy, so if it ever grew a populated
@@ -36,7 +35,6 @@ describe('game operation flag deploy seed', () => {
   });
 
   beforeEach(async () => {
-    await prisma.v1GameCutoverEpoch.deleteMany({});
     await prisma.v1GameOperationFlag.deleteMany({});
   });
 
@@ -44,30 +42,26 @@ describe('game operation flag deploy seed', () => {
     await prisma.$disconnect();
   });
 
-  it('creates every flag row the board read path requires, plus the cutover epoch, on an environment that has only been deployed', async () => {
+  it('creates every flag row on an environment that has only been deployed', async () => {
     await expect(prisma.v1GameOperationFlag.count()).resolves.toBe(0);
 
     const counts = await seedGameOperationFlagDefaults(prisma);
 
-    expect(counts).toEqual({ flagsCreated: FLAG_KEYS.length, cutoverEpochCreated: 1 });
+    expect(counts).toEqual({ flagsCreated: FLAG_KEYS.length });
 
     const rows = await prisma.v1GameOperationFlag.findMany({ orderBy: { key: 'asc' } });
     expect(rows.map((row) => row.key).sort()).toEqual([...FLAG_KEYS].sort());
     for (const row of rows) {
-      expect(row.value).toBe(GAME_OPERATION_FLAG_DEFAULTS[row.key]);
+      // `row.key` is typed against Prisma's DB-level `V1GameOperationFlagKey` enum, which still
+      // has the retired `GAME_WRITE`/`GAME_READ` members (see the DB-cleanup rationale in
+      // `game-operation-flags.ts`'s top-level doc comment); this test only ever seeds/reads the
+      // two keys `GAME_OPERATION_FLAG_DEFAULTS` actually has, so the cast is safe here.
+      expect(row.value).toBe(
+        GAME_OPERATION_FLAG_DEFAULTS[row.key as keyof typeof GAME_OPERATION_FLAG_DEFAULTS],
+      );
       expect(row.version).toBe(0);
       expect(row.ownerActor).toBe('platform_ops');
     }
-
-    // The specific row whose absence produced `500 GAME_READ_FLAG_MISSING`.
-    const gameRead = rows.find((row) => row.key === 'GAME_READ');
-    expect(gameRead).toBeDefined();
-    expect(gameRead?.value).toBe('legacy');
-
-    const epoch = await prisma.v1GameCutoverEpoch.findUnique({ where: { id: 'game-cutover' } });
-    expect(epoch).not.toBeNull();
-    expect(epoch?.writeMode).toBe('legacy');
-    expect(epoch?.version).toBe(0);
   });
 
   it('never resets a value an operator has changed, because the deploy path re-runs it on every release', async () => {
@@ -79,22 +73,14 @@ describe('game operation flag deploy seed', () => {
       where: { key: 'PUBLIC_LIVE' },
       data: { value: 'on', version: 1, updatedByUserId: 'operator-under-test' },
     });
-    await prisma.v1GameCutoverEpoch.update({
-      where: { id: 'game-cutover' },
-      data: { writeMode: 'new', version: 3 },
-    });
 
     const counts = await seedGameOperationFlagDefaults(prisma);
 
-    expect(counts).toEqual({ flagsCreated: 0, cutoverEpochCreated: 0 });
+    expect(counts).toEqual({ flagsCreated: 0 });
 
     const publicLive = await prisma.v1GameOperationFlag.findUnique({ where: { key: 'PUBLIC_LIVE' } });
     expect(publicLive?.value).toBe('on');
     expect(publicLive?.version).toBe(1);
     expect(publicLive?.updatedByUserId).toBe('operator-under-test');
-
-    const epoch = await prisma.v1GameCutoverEpoch.findUnique({ where: { id: 'game-cutover' } });
-    expect(epoch?.writeMode).toBe('new');
-    expect(epoch?.version).toBe(3);
   });
 });

@@ -72,6 +72,7 @@ import type {
 import type { CancelGameDto, GameCommandDto } from './dto/game-command.dto';
 import type {
   AppendGameEventDto,
+  AssignGoalAssistDto,
   ReverseGameEventDto,
 } from './dto/game-event.dto';
 import type {
@@ -228,6 +229,15 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
     case 'event_append':
       return 'event_append';
     case 'event_reverse':
+      return 'event_reverse';
+    // Issue #376: attaching/detaching an assist amends an already-recorded
+    // GOAL event in place -- the same authority level as reversing one, not
+    // a fresh append. Reuses the 'event_reverse' authorization bucket
+    // rather than adding a new TournamentStaffAction (which would also need
+    // a matching entry in tournament-staff-policy.ts's role matrix) purely
+    // to express a permission set that's already identical to event_reverse
+    // everywhere it's checked (resolveActor, decideTournamentStaffAccess).
+    case 'event_assist_assign':
       return 'event_reverse';
     case 'lineup_save':
     case 'lineup_submit':
@@ -1357,6 +1367,141 @@ export class GamesService {
           replayed: false,
           clientEventId: dto.clientEventId,
           sequence,
+        };
+      },
+    );
+  }
+
+  /**
+   * Issue #376 fix — atomic in-place assist attach/detach for an
+   * already-persisted GOAL event, replacing the old "reverseEvent the GOAL
+   * (CORRECTION row + version+1), then re-submit a brand-new GOAL with
+   * assistParticipantId set" two-step flow the operate console used to run
+   * (`operate-console.tsx`'s `attachAssist`, before this fix).
+   *
+   * That flow broke three ways at once: (1) the console's `submitEvent`
+   * closure captured `gameSnapshot.version` from the render BEFORE
+   * `reverseEvent`'s version bump landed in state, so the re-submitted GOAL
+   * almost always carried a stale `expectedVersion` and was rejected by
+   * `assertGameCommandContext`'s VERSION_CONFLICT check; (2) `reverseEvent`
+   * never deletes the original row, so the event list kept showing the
+   * original GOAL, its CORRECTION, and the resubmitted GOAL as three rows
+   * for what a reader experiences as one goal; (3) the official tournament
+   * result derivation (`deriveTournamentRevision` below) counted both the
+   * original and resubmitted GOAL toward the scorer's goal tally.
+   *
+   * This command sidesteps all three by never creating a second event at
+   * all: it updates `assistParticipantId` on the SAME row via a single
+   * version-incrementing command through the same `withCommand` boundary
+   * `reverseEvent` uses (same expectedVersion/takeoverToken/idempotency/
+   * audit handling), so there is exactly one command in flight and exactly
+   * one row before and after.
+   *
+   * Deliberately does NOT touch `payloadHash` on the target row: that
+   * column is the fingerprint of the event's ORIGINAL append payload (used
+   * by `retryEvent`'s offline-replay hash pin), not a live checksum of the
+   * row's current content -- nothing recomputes and compares it against a
+   * fetched row elsewhere. Leaving it alone keeps it meaning "what was
+   * originally submitted", which is itself useful audit information once
+   * this command can also change the row after the fact.
+   *
+   * Detaching an assist (`assistParticipantId: null`) intentionally shares
+   * this same command rather than getting a separate endpoint -- see
+   * `AssignGoalAssistDto`'s doc comment for why.
+   *
+   * Deliberately does NOT reject on `game.state === ENDED`, matching
+   * `reverseEvent`'s existing (also unguarded) behavior -- a correction to
+   * a goal's recorded assist is exactly the kind of thing that legitimately
+   * needs to happen after a game ends (a review catches a missed assist),
+   * and `reverseEvent` already established that corrections are not
+   * blocked by TERMINAL_GAME_IMMUTABLE the way fresh appends are. Widening
+   * that asymmetry between appendEvent and reverseEvent/this command is a
+   * pre-existing product decision, not something this fix introduces or
+   * changes.
+   */
+  async assignGoalAssist(
+    user: V1AuthUser,
+    gameId: string,
+    eventId: string,
+    headerIdempotencyKey: string | undefined,
+    dto: AssignGoalAssistDto,
+  ): Promise<GameEventAppendResult> {
+    return this.withCommand(
+      {
+        gameId,
+        action: 'event_assist_assign',
+        actor: await this.resolveActor(this.prisma, gameId, user.id, 'event_reverse'),
+        expectedVersion: dto.expectedVersion,
+        headerIdempotencyKey,
+        bodyCommandId: dto.clientEventId,
+        takeoverToken: dto.takeoverToken,
+        payload: { eventId, ...dto },
+      },
+      async (tx, game, context) => {
+        this.requireTakeover(game.id, game.sourceType, context);
+        const target = await tx.v1GameEvent.findFirst({ where: { id: eventId, gameId } });
+        if (target === null) {
+          throw this.notFound('GAME_EVENT_NOT_FOUND');
+        }
+        if (target.type !== V1GameEventType.GOAL) {
+          throw new UnprocessableEntityException({
+            code: 'ASSIST_INVALID',
+            message: 'An assist can only be attached to a GOAL event',
+          });
+        }
+        // Same "already reversed" gate reverseEvent itself enforces
+        // (`alreadyReversed` above) -- a reversed GOAL is no longer a valid
+        // goal, so it cannot gain or lose an assist either.
+        const alreadyReversed = await tx.v1GameEvent.findFirst({
+          where: { gameId, reversesEventId: target.id },
+          select: { id: true },
+        });
+        if (alreadyReversed !== null) {
+          throw new ConflictException({
+            code: 'EVENT_ALREADY_REVERSED',
+            message: 'This event was already reversed and can no longer be amended',
+          });
+        }
+        if (dto.assistParticipantId !== null) {
+          // Same two checks `assertEventReferences` runs for a fresh
+          // GOAL+assist append (games.service.ts, ASSIST_INVALID) --
+          // duplicated here rather than shared because that helper takes an
+          // `AppendGameEventDto` (a full new-event submission) and this
+          // command only ever touches one existing field on one existing
+          // row.
+          if (dto.assistParticipantId === target.participantId) {
+            throw new UnprocessableEntityException({
+              code: 'ASSIST_INVALID',
+              message: 'A scorer cannot be credited with their own assist',
+            });
+          }
+          const assistParticipant = await tx.v1GameParticipant.findFirst({
+            where: { gameId: game.id, id: dto.assistParticipantId },
+          });
+          if (assistParticipant === null || assistParticipant.sideId !== target.sideId) {
+            throw new UnprocessableEntityException({
+              code: 'ASSIST_INVALID',
+              message: 'Assist participant must belong to the scoring side',
+            });
+          }
+        }
+        const updatedEvent = await tx.v1GameEvent.update({
+          where: { id: target.id },
+          data: { assistParticipantId: dto.assistParticipantId },
+        });
+        const updated = await tx.v1Game.update({
+          where: { id: gameId },
+          data: { version: { increment: 1 } },
+        });
+        return {
+          gameId,
+          state: updated.state,
+          version: updated.version,
+          durableCommandId: context.durableCommandId,
+          replayed: false,
+          clientEventId: dto.clientEventId,
+          sequence: target.sequence,
+          event: toPersistedGameEvent(updatedEvent),
         };
       },
     );
@@ -3591,7 +3736,28 @@ export class GamesService {
     const cardCount = new Map<string, { yellow: number; red: number }>();
     const assistCount = new Map<string, number>();
     const foulCount = new Map<string, number>();
+    // Issue #376 fix: this loop used to have no reversed-event filter at
+    // all, unlike its two siblings in this same file -- `scoreFromEvents`
+    // (below) builds this identical `reversed` Set from `reversesEventId`
+    // to exclude reversed GOALs from the home/away score, and
+    // `resultInvariantInput` (above, team-match path) does the same to mark
+    // `event.reversed` for the invariant validator. Without it here, a
+    // reversed GOAL's participant/card/foul/assist still got counted
+    // alongside whatever replaced it -- most visibly, attaching an assist
+    // used to reverse the original GOAL and resubmit a new one, which made
+    // the scorer's goal tally double-count (1 official goal, 2 counted)
+    // while `scoreFromEvents`'s home/away total correctly stayed at 1. The
+    // new atomic `assignGoalAssist` command (see its doc comment) no longer
+    // creates that specific pattern, but `reverseEvent` is still the
+    // general correction path for GOAL/CARD/FOUL/SUBSTITUTION, so this
+    // aggregation must independently stay correct for any reversed event.
+    const reversedIds = new Set(
+      events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
+    );
     for (const event of events) {
+      if (reversedIds.has(event.id)) {
+        continue;
+      }
       if (event.type === V1GameEventType.GOAL && event.assistParticipantId !== null) {
         assistCount.set(
           event.assistParticipantId,

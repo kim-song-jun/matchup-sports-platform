@@ -10,6 +10,7 @@ import {
   IsUUID,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { V1GameEventType } from '@prisma/client';
 
@@ -109,4 +110,40 @@ export class ReverseGameEventDto {
   @IsString()
   @IsNotEmpty()
   reason!: string;
+}
+
+/**
+ * Issue #376 fix: in-place assist attach/detach for an already-persisted
+ * GOAL event. Replaces the old "reverseEvent the GOAL, then re-submit a new
+ * GOAL with assistParticipantId set" two-step flow (see
+ * `GamesService.assignGoalAssist`'s doc comment for the full root-cause —
+ * that flow raced the offline queue's `expectedVersion` and left the
+ * original+CORRECTION+resubmitted-GOAL all visible in the event log).
+ *
+ * `assistParticipantId` is required (not `?:`) — unlike
+ * `AppendGameEventDto.assistParticipantId`, this DTO's entire purpose is to
+ * set the field, so the caller must say explicitly what they want: a
+ * participant id to attach, or `null` to detach a previously-attached
+ * assist. Detach shares this same command rather than getting its own
+ * endpoint because it is the exact same in-place mutation of the same
+ * field on the same row — a separate "unassign" endpoint would just be this
+ * one with a narrower body.
+ */
+export class AssignGoalAssistDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  expectedVersion!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  clientEventId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  takeoverToken!: string;
+
+  @ValidateIf((dto: AssignGoalAssistDto) => dto.assistParticipantId !== null)
+  @IsUUID()
+  assistParticipantId!: string | null;
 }

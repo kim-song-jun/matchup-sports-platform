@@ -41,19 +41,15 @@ type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
  * `game.currentOfficialRevisionId` can point at a revision whose `state` is
  * `VOID`, not just `OFFICIAL` -- `voidResultRevision`
  * (`tournament-result-review.service.ts`) appends a new `VOID` revision and
- * repoints the current pointer at it. Per
- * `docs/api/domains/tournament-operations.md`'s void contract ("official
- * correction is `official→superseding correction draft→official|void`"),
- * `VOID` is a TERMINAL state with no further transition defined anywhere in
- * that contract -- `supersedeAndSubmit` (the only "submit a new result"
- * route this domain has) explicitly requires a `REJECTED`/
- * `SUPPLEMENT_REQUESTED` base (`409 RESULT_RESUBMISSION_NOT_ALLOWED`
- * otherwise) and never accepts `VOID`. So after a void, this panel offers
- * NO correction/void CTA at all -- both would be guaranteed rejected
- * server-side (`createResultCorrection`'s `assertRevisionSupersession`
- * requires `baseState === OFFICIAL`; `voidResultRevision` requires
- * `revision.state === OFFICIAL`) -- and instead shows an explicit "voided"
- * banner so the operator never fills out a doomed form.
+ * repoints the current pointer at it. `VOID` 는 '현재 유효한 공식 결과가
+ * 없음'이지 경기의 끝이 아니에요: 권한자는 그 VOID 리비전을 base 로 같은
+ * `POST /games/:gameId/corrections` 를 호출해 재입력 DRAFT 를 만들고
+ * (`assertRevisionSupersession` 의 `VOID_REENTRY` purpose), 이어서
+ * `.../officialize` 로 새 공식 결과를 확정할 수 있어요. 그래서 무효 이후
+ * 이 패널은 '결과 다시 입력' CTA 를 제공하고, 무효화 CTA 만 숨겨요
+ * (`voidResultRevision` 은 여전히 `revision.state === OFFICIAL` 만 받아요).
+ * VOID 리비전에는 참가자 기록이 복사되지 않으므로, 재입력 폼의 초기값은
+ * 무효화 직전 공식 리비전에서 가져와요.
  */
 export function GameResultCorrectionPanel({
   gameId,
@@ -100,12 +96,51 @@ export function GameResultCorrectionPanel({
   const currentOfficial =
     currentPointerRevision && currentPointerRevision.state === 'OFFICIAL' ? currentPointerRevision : null;
   const isVoided = currentPointerRevision?.state === 'VOID';
+  // 무효 처리 뒤에도 결과를 다시 입력할 수 있어요: 서버는 현재 포인터가 가리키는
+  // VOID 리비전을 base 로 재입력 DRAFT 를 받고(VOID_REENTRY), 그 초안을
+  // officialize 하면 새 공식 결과가 돼요.
+  const draftBase = currentOfficial ?? (isVoided ? currentPointerRevision : null);
+  // VOID 리비전에는 참가자 기록이 복사되지 않으므로, 폼 초기값은 무효화 직전
+  // 공식 리비전에서 가져와요.
+  const editPrefill =
+    currentOfficial ??
+    (isVoided && currentPointerRevision
+      ? revisions.find((revision) => revision.id === currentPointerRevision.supersedesId) ??
+        currentPointerRevision
+      : null);
   const pendingCorrection =
-    currentOfficial
+    draftBase
       ? revisions.find(
-          (revision) => revision.state === 'DRAFT' && revision.supersedesId === currentOfficial.id,
+          (revision) => revision.state === 'DRAFT' && revision.supersedesId === draftBase.id,
         ) ?? null
       : null;
+  const entryCopy = isVoided
+    ? {
+        cardTitle: '무효 처리된 경기의 결과를 다시 입력해요',
+        startCta: '결과 다시 입력',
+        pendingTitle: '다시 입력한 결과가 대기 중이에요',
+        confirmCta: '결과 확정',
+        confirmTitle: '다시 입력한 결과를 확정할까요?',
+        confirmMessage: '확정 전 사유와 입력 내용을 다시 확인해 주세요.',
+        modalTitle: '결과를 다시 입력할까요?',
+        modalMessage:
+          '새로 확정할 점수·참가자 기록과 사유를 입력해 주세요. 확정 전까지는 무효 상태가 그대로 유지돼요.',
+        modalConfirmLabel: '결과 제출',
+        reasonLabel: '재입력 사유',
+      }
+    : {
+        cardTitle: '공식 결과를 정정해요',
+        startCta: '정정 시작',
+        pendingTitle: '정정 초안이 대기 중이에요',
+        confirmCta: '정정 확정',
+        confirmTitle: '정정 내용을 확정할까요?',
+        confirmMessage: '확정 전 사유와 변경 내용을 다시 확인해 주세요.',
+        modalTitle: '결과를 정정할까요?',
+        modalMessage:
+          '변경할 점수·참가자 기록과 사유를 입력해 주세요. 확정 전까지는 기존 공식 결과가 그대로 유지돼요.',
+        modalConfirmLabel: '정정 제출',
+        reasonLabel: '정정 사유',
+      };
   const readOnly = !canActOnResultReview(game.actorRole);
   const officializeAlwaysVisible = officializeAlwaysAllowed(game.actorRole);
   const showGatedCta = officializeAlwaysVisible || directorGateStatus !== 'disabled';
@@ -113,9 +148,9 @@ export function GameResultCorrectionPanel({
   async function handleOfficializeCorrection() {
     if (!pendingCorrection) return;
     const ok = await confirm({
-      title: '정정 내용을 확정할까요?',
-      message: `${pendingCorrection.score.home}:${pendingCorrection.score.away}로 공식 결과를 정정해요. 확정 전 사유와 변경 내용을 다시 확인해 주세요.`,
-      confirmLabel: '정정 확정',
+      title: entryCopy.confirmTitle,
+      message: `${pendingCorrection.score.home}:${pendingCorrection.score.away}로 공식 결과를 확정해요. ${entryCopy.confirmMessage}`,
+      confirmLabel: entryCopy.confirmCta,
     });
     if (!ok) return;
     officialize.mutate(
@@ -149,17 +184,17 @@ export function GameResultCorrectionPanel({
 
       {isVoided ? (
         <AlertBanner
-          tone="error"
-          message="공식 결과가 무효 처리됐어요. 무효화는 되돌릴 수 없고, 이 결과는 더 이상 정정하거나 다시 무효화할 수 없어요."
+          tone="warning"
+          message="공식 결과가 무효 처리됐어요. 아래에서 결과를 다시 입력하면 새 공식 결과로 확정할 수 있어요."
         />
       ) : null}
 
-      {currentOfficial && !readOnly ? (
+      {draftBase && !readOnly ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {pendingCorrection ? (
             <>
               <p className="tm-text-label" style={{ fontWeight: 600 }}>
-                정정 초안이 대기 중이에요
+                {entryCopy.pendingTitle}
               </p>
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                 {pendingCorrection.reason ? `사유: ${pendingCorrection.reason}` : null}
@@ -167,16 +202,16 @@ export function GameResultCorrectionPanel({
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {showGatedCta ? (
                   <Button variant="primary" size="md" loading={officialize.isPending} onClick={() => void handleOfficializeCorrection()}>
-                    정정 확정
+                    {entryCopy.confirmCta}
                   </Button>
                 ) : null}
               </div>
             </>
           ) : (
             <>
-              <p className="tm-text-label" style={{ fontWeight: 600 }}>공식 결과를 정정해요</p>
+              <p className="tm-text-label" style={{ fontWeight: 600 }}>{entryCopy.cardTitle}</p>
               <Button variant="primary" size="md" onClick={() => setCorrectionFormOpen(true)}>
-                정정 시작
+                {entryCopy.startCta}
               </Button>
             </>
           )}
@@ -217,17 +252,17 @@ export function GameResultCorrectionPanel({
 
       {officializeConfirmModal}
 
-      {correctionFormOpen && currentOfficial ? (
+      {correctionFormOpen && draftBase && editPrefill ? (
         <ResultEditModal
           open
-          title="결과를 정정할까요?"
-          message="변경할 점수·참가자 기록과 사유를 입력해 주세요. 확정 전까지는 기존 공식 결과가 그대로 유지돼요."
-          confirmLabel="정정 제출"
-          reasonLabel="정정 사유"
+          title={entryCopy.modalTitle}
+          message={entryCopy.modalMessage}
+          confirmLabel={entryCopy.modalConfirmLabel}
+          reasonLabel={entryCopy.reasonLabel}
           base={{
-            score: currentOfficial.score,
-            participants: currentOfficial.resultParticipants,
-            mvpParticipantId: currentOfficial.mvpParticipantId,
+            score: editPrefill.score,
+            participants: editPrefill.resultParticipants,
+            mvpParticipantId: editPrefill.mvpParticipantId,
           }}
           sides={game.sides}
           lineups={lineupsQuery.data ?? []}
@@ -241,12 +276,12 @@ export function GameResultCorrectionPanel({
             createCorrection.mutate(
               {
                 expectedVersion: game.version,
-                baseRevisionId: currentOfficial.id,
+                baseRevisionId: draftBase.id,
                 reason: input.reason,
                 changes: {
                   score: input.score,
                   actualParticipants: input.actualParticipants,
-                  eventsHash: currentOfficial.eventsHash,
+                  eventsHash: editPrefill.eventsHash,
                   mvpParticipantId: input.mvpParticipantId,
                 },
               },

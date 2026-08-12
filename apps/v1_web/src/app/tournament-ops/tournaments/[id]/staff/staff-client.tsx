@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { UserPlus } from 'lucide-react';
+import { MapPin, UserPlus } from 'lucide-react';
 import {
+  useV1CreateTournamentField,
   useV1GrantTournamentStaff,
   useV1RevokeTournamentStaff,
   useV1TournamentFields,
@@ -18,7 +19,12 @@ import { RevokeStaffModal } from '@/components/tournament-ops/revoke-staff-modal
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
 import { useAdminToast, AdminToasts } from '@/components/admin/admin-toast';
-import type { V1GrantTournamentStaffPayload, V1TournamentStaffAssignment, V1TournamentStaffRole } from '@/types/api';
+import type {
+  V1GrantTournamentStaffPayload,
+  V1TournamentField,
+  V1TournamentStaffAssignment,
+  V1TournamentStaffRole,
+} from '@/types/api';
 
 interface Props {
   tournamentId: string;
@@ -51,6 +57,151 @@ function canRevoke(role: V1TournamentStaffRole, target: V1TournamentStaffAssignm
   if (role === 'PLATFORM_OPS') return true;
   if (role === 'TOURNAMENT_DIRECTOR') return target.role !== 'TOURNAMENT_DIRECTOR';
   return false;
+}
+
+/**
+ * 경기장(필드) 안내 · 등록 · 목록 — #373.
+ *
+ * "필드"는 경기가 실제로 열리는 코트·구장이다. 필드 담당자(FIELD_OPERATOR)는 담당 필드가
+ * 있어야만 배정되는데(grant-staff-modal.tsx 의 requiresField), 필드를 등록할 화면이 어디에도
+ * 없어 선택지가 늘 비어 있었고 배정을 끝낼 수 없었다. 백엔드 POST .../fields 는 이미 있다.
+ *
+ * 등록은 플랫폼 운영자만 통과한다(tournament-operations-fields.service.ts 의
+ * authorizeFieldManagement → FIELD_MANAGEMENT_DENIED). 그래서 폼도 그 역할에만 열고,
+ * 대회 디렉터에게는 목록과 "누구에게 요청해야 하는지"를 대신 보여준다 — 눌러 보고 403 을
+ * 받는 버튼은 만들지 않는다.
+ */
+function TournamentFieldsSection({
+  tournamentId,
+  fields,
+  isPending,
+  canCreate,
+}: {
+  tournamentId: string;
+  fields: V1TournamentField[];
+  isPending: boolean;
+  canCreate: boolean;
+}) {
+  const create = useV1CreateTournamentField(tournamentId);
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const trimmedName = name.trim();
+  const canSubmit = trimmedName.length > 0 && !create.isPending;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setError(null);
+    setNotice(null);
+    create.mutate(
+      {
+        // scopeKey 는 서버가 만들어 주지 않는 안정 식별자이고 소문자/숫자/-/_ 만 허용한다
+        // (CreateTournamentFieldDto 의 SCOPE_KEY_PATTERN). 한국어 이름에서 그 규칙에 맞는
+        // 코드를 만들 방법이 없어 충돌하지 않는 값을 대신 만든다 — 운영자가 외울 필요가
+        // 없는 내부 키라서 화면에는 이름만 쓴다.
+        scopeKey: `field-${Date.now().toString(36)}`,
+        name: trimmedName,
+        sortOrder: fields.length,
+      },
+      {
+        onSuccess: (field) => {
+          setName('');
+          setNotice(`${field.name} 경기장을 등록했어요.`);
+        },
+        onError: (mutationError) => {
+          setError(extractErrorMessage(mutationError, '경기장을 등록하지 못했어요.'));
+        },
+      },
+    );
+  }
+
+  return (
+    <section
+      aria-labelledby="tournament-fields-heading"
+      className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-4 py-4 flex flex-col gap-3"
+    >
+      <div className="flex items-start gap-2">
+        <span className="text-blue-500 mt-0.5 shrink-0" aria-hidden="true">
+          <MapPin size={18} />
+        </span>
+        <div>
+          <h2 id="tournament-fields-heading" className="text-[15px] font-bold text-[var(--text-strong)]">
+            경기장(필드)
+          </h2>
+          <p className="text-[13px] text-[var(--text-muted)] mt-0.5">
+            경기가 열리는 코트·구장이에요. 필드 담당자는 담당 경기장을 정해야 배정할 수 있어요.
+          </p>
+        </div>
+      </div>
+
+      {isPending ? (
+        <p className="text-[13px] text-[var(--text-muted)]">경기장을 불러오는 중이에요…</p>
+      ) : fields.length === 0 ? (
+        <p className="text-[13px] text-[var(--text-muted)]">
+          아직 등록된 경기장이 없어요.{' '}
+          {canCreate ? '아래에서 먼저 등록해 주세요.' : '플랫폼 운영자에게 등록을 요청해 주세요.'}
+        </p>
+      ) : (
+        <ul className="flex flex-wrap gap-1.5" role="list">
+          {fields.map((field) => (
+            <li
+              key={field.id}
+              className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-soft)] px-3 py-1 text-[13px] text-[var(--text-body)]"
+            >
+              {field.name}
+              {field.active === false ? (
+                <span className="text-[12px] text-[var(--text-muted)]">사용 안 함</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {canCreate && (
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col sm:flex-row gap-2">
+          <label htmlFor="tournament-field-name" className="sr-only">
+            경기장 이름
+          </label>
+          <input
+            id="tournament-field-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={120}
+            disabled={create.isPending}
+            placeholder="예: A구장, 1번 코트"
+            className="flex-1 h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className={[
+              'h-[44px] px-4 rounded-xl text-sm font-semibold transition-colors shrink-0',
+              'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+              canSubmit
+                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                : 'bg-blue-200 dark:bg-blue-500/30 text-white cursor-not-allowed',
+            ].join(' ')}
+          >
+            {create.isPending ? '등록 중…' : '경기장 추가'}
+          </button>
+        </form>
+      )}
+
+      {error !== null && (
+        <p className="text-[13px] text-[var(--red700)]" role="alert">
+          {error}
+        </p>
+      )}
+      {notice !== null && (
+        <p className="text-[13px] text-[var(--text-body)]" role="status">
+          {notice}
+        </p>
+      )}
+    </section>
+  );
 }
 
 export function StaffClient({ tournamentId }: Props) {
@@ -147,6 +298,14 @@ export function StaffClient({ tournamentId }: Props) {
           </button>
         )}
       </div>
+
+      {/* 스태프 배정이 막히는 원인(선택 가능한 필드 0건)을 같은 화면 안에서 풀 수 있게 목록 위에 둔다. */}
+      <TournamentFieldsSection
+        tournamentId={tournamentId}
+        fields={fields.data?.items ?? []}
+        isPending={fields.isPending}
+        canCreate={role === 'PLATFORM_OPS'}
+      />
 
       {staff.isPending ? (
         <>

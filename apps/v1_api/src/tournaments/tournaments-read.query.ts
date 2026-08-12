@@ -29,7 +29,9 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
         orderBy: { sortOrder: 'asc' },
         include: {
           registration: {
-            include: { team: { select: { id: true, name: true } } },
+            include: {
+              team: { select: { id: true, name: true, profile: { select: { logoUrl: true } } } },
+            },
           },
         },
       },

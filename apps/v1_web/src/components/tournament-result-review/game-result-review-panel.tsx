@@ -11,6 +11,8 @@ import {
   type GameResultRevision,
 } from '@/hooks/use-tournament-result-review';
 import { useV1GameLineups } from '@/hooks/use-v1-api';
+import { useV1GameEventsBackfill } from '@/hooks/use-v1-game-operations';
+import { RecordedEventList } from '@/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate/recorded-event-list';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -54,6 +56,12 @@ export function GameResultReviewPanel({
   // 재제출 폼의 참가자 실명 표시용 -- 로딩 중/실패 시 빈 배열로 두면 모달이 기존
   // 폴백(사이드 + id 뒷자리)으로 얌전히 물러난다(아래 lineups prop 참고).
   const lineupsQuery = useV1GameLineups(gameId);
+  // 검토자는 점수 숫자만 보고 승인/반려를 결정할 수 없다 — 골·도움·카드·파울이
+  // 언제 어느 팀 누구에게 기록됐는지가 그 판단의 근거다. 서버에 확정된 이벤트
+  // 로그를 그대로 읽는다(GET /games/:gameId/events, afterSequence=0 → 전체).
+  // 이 조회는 이미 성공 중인 `useTournamentGame`(GET /games/:id)과 서버에서
+  // 동일한 'read' 권한을 쓰므로 새 권한 리스크가 없다.
+  const eventsQuery = useV1GameEventsBackfill(gameId, 0);
   const reviewDecision = useReviewResultDecision(gameId, tournamentId);
   const supersedeAndSubmit = useSupersedeAndSubmitResult(gameId, tournamentId);
   const officialize = useOfficializeResultRevision(gameId, tournamentId);
@@ -160,6 +168,30 @@ export function GameResultReviewPanel({
       {readOnly ? (
         <AlertBanner tone="info" message="이 화면에서는 결과를 볼 수만 있어요. 검토·확정 권한이 없어요." />
       ) : null}
+
+      {/* 경기 세부 기록 — 종류·시점·팀·선수·도움. 승인 버튼보다 위에 둔다(근거를
+          먼저 보고 결정하게). "아직 기록된 이벤트가 없어요"(RecordedEventList의
+          빈 상태)와 "불러오지 못했어요"(아래 ErrorState + 다시 시도)를 절대 같은
+          화면으로 뭉개지 않는다 — 조회 실패를 미기록으로 오인하면 검토자가 근거
+          없이 승인해 버린다. */}
+      <div>
+        <p className="tm-text-label" style={{ fontWeight: 600, marginBottom: 8 }}>경기 세부 기록</p>
+        {eventsQuery.isPending ? (
+          <p className="tm-text-label">불러오는 중…</p>
+        ) : eventsQuery.isError ? (
+          <ErrorState
+            title="세부 기록을 불러오지 못했어요"
+            message={describeResultReviewError(eventsQuery.error)}
+            onRetry={() => void eventsQuery.refetch()}
+          />
+        ) : (
+          <RecordedEventList
+            events={eventsQuery.data?.events ?? []}
+            sides={game.sides}
+            lineups={lineupsQuery.data ?? []}
+          />
+        )}
+      </div>
 
       {latest && latest.state === 'SUBMITTED' && !readOnly ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>

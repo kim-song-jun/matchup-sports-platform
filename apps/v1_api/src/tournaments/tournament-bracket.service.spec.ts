@@ -958,7 +958,8 @@ describe('TournamentBracketService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1TournamentFixture.findUnique.mockResolvedValue({
       ...fixtureRow(),
-      game: { currentOfficialRevision: { state: 'OFFICIAL' } },
+      // 실제 쿼리는 game.sides 도 함께 include 한다(팀 배정 시 사이드를 옮기기 위해) — mock 도 같은 모양을 준다.
+      game: { id: 'game-1', currentOfficialRevision: { state: 'OFFICIAL' }, sides: [] },
     });
 
     await expect(
@@ -970,7 +971,7 @@ describe('TournamentBracketService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1TournamentFixture.findUnique.mockResolvedValue({
       ...fixtureRow(),
-      game: { currentOfficialRevision: { state: 'VOID' } },
+      game: { id: 'game-1', currentOfficialRevision: { state: 'VOID' }, sides: [] },
     });
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ id: 'reg-3' }));
     prisma.v1TournamentFixture.update.mockResolvedValue(fixtureRow({ homeRegistrationId: 'reg-3' }));
@@ -983,7 +984,8 @@ describe('TournamentBracketService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1TournamentFixture.findUnique.mockResolvedValue({
       ...fixtureRow(),
-      game: { currentOfficialRevision: { state: 'OFFICIAL' } },
+      // 실제 쿼리는 game.sides 도 함께 include 한다(팀 배정 시 사이드를 옮기기 위해) — mock 도 같은 모양을 준다.
+      game: { id: 'game-1', currentOfficialRevision: { state: 'OFFICIAL' }, sides: [] },
     });
 
     await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({

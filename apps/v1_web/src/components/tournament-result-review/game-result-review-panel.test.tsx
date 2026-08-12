@@ -35,6 +35,13 @@ vi.mock('@/hooks/use-tournament-result-review', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1GameLineups: () => ({ data: [], isLoading: false }),
 }));
+// 이벤트 조회 결과를 테스트마다 바꾼다 — "미기록"과 "조회 실패"를 구분하는 게 이 이슈의 핵심이다.
+const eventsMock = vi.hoisted(() => ({
+  state: { data: { events: [], lastSequence: 0, gap: null }, isPending: false, isError: false, error: null, refetch: () => {} } as Record<string, unknown>,
+}));
+vi.mock('@/hooks/use-v1-game-operations', () => ({
+  useV1GameEventsBackfill: () => eventsMock.state,
+}));
 
 const GAME_ID = 'game-1';
 
@@ -148,5 +155,38 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
         expect.anything(),
       ),
     );
+  });
+
+  /* #379 — 검토자는 점수 숫자만으로 승인/반려를 결정할 수 없다. 골·도움·카드가 언제
+     어느 팀 누구에게 기록됐는지가 판단 근거다. 그리고 "아직 안 적혔다"와 "못 불러왔다"를
+     같은 화면으로 뭉개면 검토자가 근거 없이 승인해 버린다. */
+  it('기록된 이벤트를 세부 내역으로 보여준다', () => {
+    eventsMock.state = {
+      data: {
+        events: [
+          { id: 'e1', type: 'GOAL', sequence: 1, sideId: 'side-home', participantId: 'p1',
+            displayNameSnapshot: '김알파', occurredAt: '2026-08-11T00:05:00.000Z', payload: {} },
+        ],
+        lastSequence: 1, gap: null,
+      },
+      isPending: false, isError: false, error: null, refetch: () => {},
+    };
+
+    render(<GameResultReviewPanel gameId={GAME_ID} />);
+
+    expect(screen.getByText('경기 세부 기록')).toBeInTheDocument();
+    expect(screen.queryByText('세부 기록을 불러오지 못했어요')).toBeNull();
+  });
+
+  it('조회 실패를 미기록과 구분해 표시하고 재시도 경로를 준다', () => {
+    eventsMock.state = {
+      data: undefined, isPending: false, isError: true,
+      error: new Error('network down'), refetch: () => {},
+    };
+
+    render(<GameResultReviewPanel gameId={GAME_ID} />);
+
+    // 실패는 실패로 보여야 한다 — 빈 목록처럼 보이면 안 된다
+    expect(screen.getByText('세부 기록을 불러오지 못했어요')).toBeInTheDocument();
   });
 });

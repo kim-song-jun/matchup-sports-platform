@@ -2718,6 +2718,7 @@ export type V1TournamentGroupTeam = {
   registrationId: string;
   teamId: string;
   teamName: string;
+  teamLogoUrl: string | null;
   sortOrder: number;
 };
 
@@ -3712,6 +3713,13 @@ export type V1TournamentField = {
 
 export type V1TournamentFieldListResponse = {
   items: V1TournamentField[];
+};
+
+/** POST /tournament-ops/tournaments/:tournamentId/fields 바디. scopeKey 는 대회 안에서 유일한 안정 식별자예요. */
+export type V1CreateTournamentFieldPayload = {
+  scopeKey: string;
+  name: string;
+  sortOrder?: number;
 };
 
 export type V1AdminRosterEligibleMember = {

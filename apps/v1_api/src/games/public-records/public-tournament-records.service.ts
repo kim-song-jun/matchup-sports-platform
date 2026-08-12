@@ -209,6 +209,48 @@ export class PublicTournamentRecordsService {
       },
     });
 
+    // #374 — 순위 행(V1TournamentStanding)은 첫 결과가 OFFICIAL이 될 때(또는 어드민
+    // 재계산 때) 비로소 생긴다. 그래서 경기 기록이 0건인 대회는 위 조회가 빈 배열을
+    // 돌려주고, 화면은 순위표 섹션 자체를 감춰 버렸다 — 조 편성은 공개됐는데 어느 팀이
+    // 우리 조인지 볼 수 없는 상태. 순위 행이 아직 하나도 없는 조별(phase=group) 조는
+    // 편성된 팀을 전 지표 0인 기준선 행으로 내려 준다. 첫 결과가 들어오면 그 조에 실제
+    // 순위 행이 생겨 `standings: { none: {} }` 조건에서 빠지므로 기준선은 자동으로 사라진다
+    // (재계산은 항상 그 조의 전 팀을 한꺼번에 upsert 하므로 "일부만 집계된" 중간 상태가 없다).
+    const baselineGroups = await this.prisma.v1TournamentGroup.findMany({
+      where: { tournamentId, phase: 'group', standings: { none: {} } },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        groupTeams: {
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          select: {
+            registration: {
+              select: { team: { select: { id: true, name: true, profile: { select: { logoUrl: true } } } } },
+            },
+          },
+        },
+      },
+    });
+    const baselineStandings = baselineGroups.flatMap((group) =>
+      group.groupTeams.map((groupTeam, index) => ({
+        groupId: group.id,
+        groupName: group.name,
+        teamId: groupTeam.registration.team.id,
+        teamName: groupTeam.registration.team.name,
+        teamLogoUrl: groupTeam.registration.team.profile?.logoUrl ?? null,
+        // 편성 순서일 뿐 성적 순위가 아니다. 표가 전부 0이면 프론트(TournamentStandingsTable)가
+        // 메달 색·진출 강조를 스스로 끄고 "아직 경기 기록이 없어요" 안내를 붙인다.
+        position: index + 1,
+        points: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+      })),
+    );
+
     const lastFixture = pageFixtures[pageFixtures.length - 1];
     const nextCursor: string | null =
       hasMore && lastFixture !== undefined && lastFixture.scheduledAt !== null
@@ -221,20 +263,23 @@ export class PublicTournamentRecordsService {
       bracketPublished: true,
       items,
       unscheduled,
-      standings: standings.map((standing) => ({
-        groupId: standing.groupId,
-        groupName: standing.group.name,
-        teamId: standing.registration.team.id,
-        teamName: standing.registration.team.name,
-        teamLogoUrl: standing.registration.team.profile?.logoUrl ?? null,
-        position: standing.position,
-        points: standing.points,
-        wins: standing.wins,
-        draws: standing.draws,
-        losses: standing.losses,
-        goalsFor: standing.goalsFor,
-        goalsAgainst: standing.goalsAgainst,
-      })),
+      standings: [
+        ...standings.map((standing) => ({
+          groupId: standing.groupId,
+          groupName: standing.group.name,
+          teamId: standing.registration.team.id,
+          teamName: standing.registration.team.name,
+          teamLogoUrl: standing.registration.team.profile?.logoUrl ?? null,
+          position: standing.position,
+          points: standing.points,
+          wins: standing.wins,
+          draws: standing.draws,
+          losses: standing.losses,
+          goalsFor: standing.goalsFor,
+          goalsAgainst: standing.goalsAgainst,
+        })),
+        ...baselineStandings,
+      ],
       nextCursor,
     };
   }

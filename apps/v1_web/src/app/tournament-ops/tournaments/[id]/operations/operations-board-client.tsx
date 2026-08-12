@@ -159,9 +159,26 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     return `${names.home} vs ${names.away}`;
   }
 
+  /* 운영자가 해소할 수단이 없는 경고는 보여주지 않는다.
+   *
+   * 경기장 배정 API(PATCH .../fixtures/:fixtureId/field)는 백엔드에 있지만 그것을 호출하는
+   * 화면이 아직 없다 — 즉 NO_FIELD_ASSIGNED 는 모든 경기에 영구히 뜨고 끌 방법이 없다.
+   * NO_STAFF_ASSIGNED 도 같이 묶인다: 필드 담당자 커버 판정이 fixture 의 fieldId 를 기준으로
+   * 하므로, 경기장을 못 채우는 한 스태프를 배정해도 경고가 사라지지 않는다.
+   *
+   * 해소 불가능한 경고가 상시 켜져 있으면 배지 줄이 늘 주황색이라, 실제로 조치가 필요한
+   * 경고(득점자 미기재·검토 기한 초과·라인업 미제출)까지 함께 묻힌다.
+   *
+   * 배정 UI 가 생기면 이 배열을 비우면 원래대로 돌아온다. 백엔드는 계속 두 코드를 계산해
+   * 내려주므로(필터 화면 포함) 데이터는 그대로다. */
+  const UNACTIONABLE_WARNINGS: readonly V1TournamentOperationsWarningCode[] = [
+    'NO_FIELD_ASSIGNED',
+    'NO_STAFF_ASSIGNED',
+  ];
+
   function rowWarnings(item: V1TournamentOperationsBoardItem): readonly V1TournamentOperationsWarningCode[] {
     const live = liveWarningsByFixtureId.get(item.fixtureId) ?? [];
-    return [...item.warnings, ...live];
+    return [...item.warnings, ...live].filter((code) => !UNACTIONABLE_WARNINGS.includes(code));
   }
 
   return (
@@ -241,7 +258,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
         >
           <option value="">전체 경고</option>
-          {V1_STABLE_WARNING_CODES.map((value) => (
+          {/* 배지에서 숨긴 경고는 필터에서도 뺀다 — 고르면 결과가 늘 비어 보이는 필터가 된다.
+              (숨기는 이유는 rowWarnings 위 주석 참고) */}
+          {V1_STABLE_WARNING_CODES.filter((value) => !UNACTIONABLE_WARNINGS.includes(value)).map((value) => (
             <option key={value} value={value}>
               {WARNING_FILTER_LABELS[value]}
             </option>

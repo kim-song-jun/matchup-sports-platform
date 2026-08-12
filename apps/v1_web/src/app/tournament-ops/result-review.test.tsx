@@ -62,6 +62,9 @@ const hookMocks = vi.hoisted(() => ({
   // 두 패널의 `lineupsQuery.data ?? []` 폴백을 그대로 거치므로 대부분의 테스트는
   // 빈 라인업(= 기존 id-접미어 폴백)을 보는 실제 로딩-중 상태와 동일하게 동작한다.
   lineups: { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() } as QueryMock<unknown>,
+  // 검토 패널이 근거로 읽는 경기 세부 기록(GET /games/:id/events). 기본값
+  // `data: undefined`는 패널의 `?? []` 폴백을 거쳐 "기록 없음" 빈 목록이 된다.
+  events: { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() } as QueryMock<unknown>,
   confirm: vi.fn(),
 }));
 
@@ -86,6 +89,11 @@ vi.mock('@/hooks/use-tournament-result-review', async () => {
 // 기대하는 "QueryClientProvider 불필요" 전제가 깨진다.
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1GameLineups: () => hookMocks.lineups,
+}));
+
+// 검토 패널이 경기 세부 기록을 읽는 훅도 같은 이유로 목한다(위 주석 참고).
+vi.mock('@/hooks/use-v1-game-operations', () => ({
+  useV1GameEventsBackfill: () => hookMocks.events,
 }));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
@@ -166,6 +174,7 @@ beforeEach(() => {
   Object.assign(hookMocks.voidRevision, freshMutationMock());
   Object.assign(hookMocks.createCorrection, freshMutationMock());
   Object.assign(hookMocks.lineups, freshQueryMock());
+  Object.assign(hookMocks.events, freshQueryMock());
   // alpha 실사고(2026-08) 수정: `GameResultReviewPanel.handleOfficialize`가
   // 확인 모달을 띄우기 전 `revisionsQuery.refetch()`/`gameQuery.refetch()`를
   // 강제로 호출해 그 응답값을 쓴다(캐시된 stale 점수를 보여주지 않기 위함).
@@ -564,8 +573,8 @@ describe('correction/void unavailable without an official result', () => {
   });
 });
 
-describe('correction/void unavailable once the official result was just voided', () => {
-  it('does not re-offer "start correction"/"void" and shows the void notice when currentOfficialRevisionId now points at the VOID revision', () => {
+describe('re-entry offered once the official result was just voided', () => {
+  it('offers "결과 다시 입력" and hides correction/void CTAs when currentOfficialRevisionId now points at the VOID revision', () => {
     // Mirrors exactly what `invalidateGame` refetches right after a
     // successful void: `game.currentOfficialRevisionId` now points at the
     // freshly-created VOID revision (`rev-2`), which supersedes the prior
@@ -577,20 +586,16 @@ describe('correction/void unavailable once the official result was just voided',
     ];
     renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
 
-    // Both CTAs are guaranteed to be rejected server-side once the current
-    // pointer is VOID (`createResultCorrection`'s `assertRevisionSupersession`
-    // and `voidResultRevision` both require an OFFICIAL base/target) --
-    // reverting the `currentPointerRevision.state === 'OFFICIAL'` check on
-    // `currentOfficial` makes it truthy again for a VOID pointer, and both
-    // buttons would reappear.
+    // 무효 이후에는 '정정 시작'/'무효화' 대신 재입력 CTA 하나만 떠야 해요:
+    // 서버는 VOID 리비전을 base 로 한 새 DRAFT(VOID_REENTRY)만 받고,
+    // 무효 리비전을 다시 무효화하는 건 여전히 409 예요.
     expect(screen.queryByRole('button', { name: '정정 시작' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '무효화' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '결과 다시 입력' })).toBeInTheDocument();
 
-    // This explicit notice only exists on the `isVoided` branch; it is not
-    // present at all on the reverted code (which had no way to distinguish
-    // "voided" from "currently official").
+    // 배너는 무효 사실과 다음 행동(재입력)을 함께 안내해요.
     expect(
-      screen.getByText(/공식 결과가 무효 처리됐어요\. 무효화는 되돌릴 수 없고, 이 결과는 더 이상 정정하거나 다시 무효화할 수 없어요\./),
+      screen.getByText(/공식 결과가 무효 처리됐어요\. 아래에서 결과를 다시 입력하면 새 공식 결과로 확정할 수 있어요\./),
     ).toBeInTheDocument();
 
     // The header must render the void badge, not the void revision's score

@@ -310,17 +310,42 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     fireEvent.click(goalButton);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    // 모달 안에서 선수를 고르면 submitEvent가 골 이벤트로 호출되고 모달이 닫힌다.
-    // alpha 452′ 사고 대응 게이트가 커밋 경로에 확인 한 단계(비동기)를 끼워
-    // 넣었으므로(이 게임은 periodDurations를 안 줘 통과만 비동기로 지연됨),
-    // 여기서부터는 waitFor로 그 마이크로태스크가 끝나길 기다린다.
+    // 선수를 고르면 ActionTargetPicker는 닫히고, 과제 1(운영 콘솔 확인 모달
+    // 전면 적용)의 확인 모달이 뜬다 — 모달 두 개가 동시에 있지 않다(항상
+    // role="dialog" 하나).
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+    const confirmDialog = await screen.findByRole('dialog');
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+
+    // 확인해야만(취소가 아니라) submitEvent가 골 이벤트로 정확히 한 번
+    // 호출되고 모달이 닫힌다 — "확인하면 정확히 한 번만 기록된다" 요구사항.
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '골 기록' }));
     await waitFor(() =>
       expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'GOAL', participantId: 'p-1', sideId: 'side-home' }),
       ),
     );
+    expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('골 확인 모달에서 취소하면 아무것도 기록되지 않는다', async () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^골/ }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+    const confirmDialog = await screen.findByRole('dialog');
+
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
   });
 
   it('마지막 피리어드가 진행 중이면 다음 피리어드 버튼이 보이지 않는다', () => {
@@ -339,7 +364,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
   // 이슈 #375 — "전반 종료" 버튼 라벨은 그대로지만 실제로 서버에 보내는
   // 커맨드는 구 fused `next-period`가 아니라 새로 분리된 `end-period`여야
   // 한다(라벨과 동작을 일치시키는 것이 이슈의 핵심).
-  it('"전반 종료"를 누르면 postV1GameCommand가 end-period로 호출된다', async () => {
+  it('"전반 종료"를 누르면 확인 모달을 거쳐 postV1GameCommand가 end-period로 호출된다', async () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
@@ -348,6 +373,11 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
     fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
+
+    // 사용자 결정("예외 없이 전부")으로 end-period도 이제 확인을 거친다.
+    const dialog = await screen.findByRole('dialog');
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '전반 종료' }));
 
     await waitFor(() =>
       expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything()),
@@ -384,12 +414,17 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(screen.getByRole('button', { name: /^골/ })).toBeDisabled();
     });
 
-    it('"후반 시작"을 누르면 start-period를 보낸다', async () => {
+    it('"후반 시작"을 누르면 확인 모달을 거쳐 start-period를 보낸다', async () => {
       gameAtHalftime();
       mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
       render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
       fireEvent.click(screen.getByRole('button', { name: '후반 시작' }));
+
+      // 사용자 결정("예외 없이 전부")으로 start-period도 이제 확인을 거친다.
+      const dialog = await screen.findByRole('dialog');
+      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: '후반 시작' }));
 
       await waitFor(() =>
         expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'start-period', expect.anything()),
@@ -464,9 +499,11 @@ describe('OperateConsole — 선수 교체', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
 
-    // alpha 452′ 사고 대응 게이트가 커밋 경로에 확인 한 단계(비동기)를 끼워
-    // 넣었으므로(이 게임은 periodDurations를 안 줘 통과만 비동기로 지연됨),
-    // 여기서부터는 waitFor로 그 마이크로태스크가 끝나길 기다린다.
+    // 사용자 결정("예외 없이 전부")으로 교체도 이제 확인 모달을 거친다.
+    const confirmDialog = await screen.findByRole('dialog');
+    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '교체 기록' }));
+
     await waitFor(() =>
       expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'SUBSTITUTION', participantId: 'p-2', sideId: 'side-home', payload: { outParticipantId: 'p-1' } }),
@@ -664,6 +701,9 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
 
     expect(await screen.findByText(/이 피리어드는 보통 20분이에요/)).toBeInTheDocument();
     expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+    // 과제 1 요구사항 4 — 시계 경고와 일반 커밋 확인이 별개 모달로 겹쳐
+    // 뜨지 않는다(모달은 항상 하나뿐, 경고가 그 안에 병합된다).
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
 
     // 서버 하드 거부가 아니라 확인 게이트일 뿐이라는 계약: 취소해도 그냥
     // "제출 안 됨"이지 에러가 아니다.
@@ -688,15 +728,21 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
     );
   });
 
-  it('피리어드 설정을 못 읽었으면(periodDurations: null) 판단 근거가 없으므로 확인 없이 그대로 제출한다', async () => {
+  it('피리어드 설정을 못 읽었으면(periodDurations: null) 시계 경고 없이 일반 확인만 거친다', async () => {
     setup(null);
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     fireEvent.click(screen.getByRole('button', { name: '골' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
 
+    // 과제 1(모든 액션에 확인)로 시계 경고 여부와 무관하게 확인 모달은 뜬다 —
+    // 다만 시계 경고 문구·"그대로 기록" 라벨은 없어야 한다(판단 근거가
+    // 없으면 지어낸 경고를 보여주지 않는다는 계약은 그대로 유지).
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText(/이 피리어드는 보통/)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: '골 기록' }));
+
     await waitFor(() => expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalled());
-    expect(screen.queryByText(/이 피리어드는 보통/)).toBeNull();
   });
 });
 

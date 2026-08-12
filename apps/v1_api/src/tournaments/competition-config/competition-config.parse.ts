@@ -81,6 +81,29 @@ export function parseLineupLimits(
 }
 
 /**
+ * The `lineupConfig` payload that lineup GET responses carry: the sport's position/formation
+ * catalog **plus this tournament's configured squad size** (`lineup.{minPlayers,maxPlayers}`,
+ * the "출전 인원" the admin picked — not `V1Tournament.minPlayers/maxPlayers`, which is the
+ * registration roster size; `lineup-size.ts` documents that distinction).
+ *
+ * The frontend previously received only the catalog, so it had to infer which formations fit
+ * by counting `starters − 골키퍼로 지정된 선수`. That count moves the moment a manager taps GK,
+ * which swapped the whole preset list mid-edit (a 5-a-side squad with no GK assigned yet was
+ * offered 6-a-side presets). Sending the configured size lets the screen tell the manager how
+ * many players the competition actually expects instead of guessing from the current draft.
+ *
+ * Both lineup read paths (`games.service.ts`, `team-match-lineup.service.ts`) must use this
+ * single helper — before it existed each one composed its own `lineupConfig` object and only
+ * one of them would have gained the new field.
+ */
+export function parseLineupConfigForResponse(
+  value: Prisma.JsonValue | null | undefined,
+): Pick<CompetitionConfig['lineup'], 'positions' | 'formations' | 'minPlayers' | 'maxPlayers'> {
+  const { minPlayers, maxPlayers } = parseLineupLimits(value);
+  return { ...parseLineupCatalog(value), minPlayers, maxPlayers };
+}
+
+/**
  * Reads each period's `{durationMinutes, extraTime}` back out of a stored
  * CompetitionConfig JSON blob's `periods` column. Added for the alpha
  * "452′" clock-overrun incident (2026-08): `clockMs` has no upper-bound

@@ -568,16 +568,14 @@ describe('TeamMatchLineupPageClient', () => {
     });
   });
 
-  // ── Blocker 4 regression: autosave must serialize overlapping saves ──
-  // Before this fix, the debounce timer called saveMutation.mutate() unconditionally. On a
-  // slow connection, a second edit made before the first save's ack would fire a second
-  // concurrent save carrying the same (not-yet-bumped) expectedVersion — a spurious
-  // self-inflicted 409 VERSION_CONFLICT, whose "새로고침" then discards the user's newest
-  // edit (full reload, not a merge). Removing the saveInFlightRef/saveQueuedRef guard (i.e.
-  // calling saveMutation.mutate directly from the debounce timer again) makes this fail: the
-  // second assertion below would see 2 calls instead of 1.
-  it('autosave in-flight guard: a second edit made before the first save acks is queued, not fired concurrently', () => {
-    // 이 스위트의 온라인 상태 전제를 테스트 실행 순서와 무관하게 보장한다.
+  // ── 명시적 저장 정책 (2026-08 사용자 요청: "바로바로 실시간 저장 말고 저장 눌렀을 때") ──
+  // 예전에는 편집이 멈추고 900ms 뒤 자동저장이 돌았다. 그 디바운스는 (a) 피치에서 토큰을
+  // 드래그하는 동안 매 포인터 이벤트가 타이머를 재설정해 "저장이 되는 건지" 알 수 없게 만들었고,
+  // (b) 사용자가 누르지 않은 저장을 계속 서버로 보냈다. 이제 저장은 버튼을 누른 그 순간에만
+  // 나가고, 저장이 나가 있는 동안에는 버튼이 잠겨 같은 expectedVersion을 든 두 번째 저장이
+  // 겹치지 않는다(겹치면 자기 자신 때문에 409 VERSION_CONFLICT를 받고, 그 복구는 전체
+  // 재로드라 방금 만든 편집을 통째로 버린다).
+  it('편집만으로는 저장이 나가지 않는다 — 저장은 버튼을 누른 순간에만 나간다', () => {
     Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
     vi.useFakeTimers();
     try {
@@ -600,36 +598,64 @@ describe('TeamMatchLineupPageClient', () => {
 
       render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-      // 첫 번째 편집 → 디바운스 뒤 첫 저장이 나간다.
       fireEvent.click(screen.getAllByRole('button', { name: '선발 추가' })[0]);
+      // 예전 자동저장 디바운스(900ms)를 훌쩍 넘겨도 아무것도 나가지 않아야 한다.
       act(() => {
-        vi.advanceTimersByTime(900);
+        vi.advanceTimersByTime(5_000);
       });
-      expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
+      expect(hoisted.saveMutate).not.toHaveBeenCalled();
+      expect(screen.getByText('저장하지 않은 변경사항이 있어요.')).toBeInTheDocument();
 
-      // 첫 저장이 아직 ack되지 않은 상태에서 두 번째 편집 → 디바운스가 다시 지나가도
-      // 두 번째 저장은 즉시 나가지 않고 큐에만 쌓인다(동시 dispatch 금지).
-      fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
-      act(() => {
-        vi.advanceTimersByTime(900);
-      });
+      fireEvent.click(screen.getByRole('button', { name: '저장' }));
       expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
-
-      // 첫 저장이 서버 ack로 끝나면, 큐에 쌓여 있던 두 번째 저장이 최신 상태로 이어서 나간다.
-      // onSuccess와 onSettled을 별도 act()로 분리해 React가 onSuccess의 setState를 실제로
-      // 커밋하게 한다 — 그래야 "이 save가 나간 뒤 생긴 두 번째 편집은 onSuccess가 dirty를
-      // 지워도 되살아나야 한다"는 부분까지 검증된다(합쳐서 한 act()로 부르면 onSettled의
-      // 재귀 호출이 아직 커밋되지 않은 이전 렌더의 ref 값을 읽어 이 부분을 우회해버린다).
-      act(() => {
-        hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 1 });
-      });
-      act(() => {
-        hoisted.saveMutate.mock.calls[0][1].onSettled();
-      });
-      expect(hoisted.saveMutate).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('저장이 나가 있는 동안에는 저장 버튼이 잠겨 두 번째 저장이 겹치지 않는다', () => {
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: {
+        items: [
+          { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active' },
+          { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active' },
+        ],
+      },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '선발 추가' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: '저장 중…' })).toBeDisabled();
+
+    // 저장이 서버에 나가 있는 동안 편집을 이어가도, 사용자가 누르지 않은 저장이 자동으로
+    // 뒤따라 나가지는 않는다 — 명시적 저장 정책의 핵심.
+    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
+    expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 1 });
+    });
+    act(() => {
+      hoisted.saveMutate.mock.calls[0][1].onSettled();
+    });
+
+    // ack 이후에도 자동 재저장은 없다. 대신 저장 중 만든 편집이 미저장으로 남아 있음을
+    // 화면이 분명히 말하고, 버튼이 다시 눌릴 수 있는 상태로 돌아온다.
+    expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('저장하지 않은 변경사항이 있어요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
   });
 
   // ── P0-1 regression (insane review, 2026-08 GPT Pro): flush-then-submit ──
@@ -765,13 +791,18 @@ describe('TeamMatchLineupPageClient — pitch tab wiring (D-17: consumes server 
       data: {
         teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-1', role: 'team_manager', lineupId: 'lineup-1',
         revision: 1, state: 'DRAFT', version: 1, publicLineupAt: null, formation: null,
-        // 4명 모두 필드 플레이어(비-골키퍼)로 둔다 — 아래 formations는 outfield: 4라
-        // outfieldCount가 실제로 4와 맞아야 formationOptions에 뜬다(D-17 헤드카운트 필터).
+        // outfield: 4 프리셋은 GK 슬롯까지 합쳐 자리가 5개다 — 그래서 선발도 5명이어야
+        // 전부 채워진다. 예전에는 이 목록이 "선발 − 골키퍼로 지정된 선수"로 계산돼 4명
+        // 전원 비-골키퍼인 이 픽스처가 2-2를 추천받았는데, 그 조합은 GK 자리가 영원히 비어
+        // 제출이 불가능했다. 이제 골키퍼 지정 여부와 무관하게 "선발 총원 − 1"로 세므로
+        // 5명일 때 outfield 4 프리셋이 뜬다(GK 지정은 아직 안 한 상태 그대로 둔다 —
+        // 그래도 목록이 흔들리지 않는다는 것이 이 변경의 핵심이다).
         starters: [
           { id: 'p1', displayName: '선수1', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null },
           { id: 'p2', displayName: '선수2', jerseyNumber: 2, position: null, goalkeeper: false, positionX: null, positionY: null },
           { id: 'p3', displayName: '선수3', jerseyNumber: 3, position: null, goalkeeper: false, positionX: null, positionY: null },
           { id: 'p4', displayName: '선수4', jerseyNumber: 4, position: null, goalkeeper: false, positionX: null, positionY: null },
+          { id: 'p5', displayName: '선수5', jerseyNumber: 5, position: null, goalkeeper: false, positionX: null, positionY: null },
         ],
         bench: [],
         lineupConfig: {

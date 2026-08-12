@@ -1,4 +1,5 @@
 import type { FormationSlot } from '@/components/lineup/formation-slots';
+import { applyAssignmentToEntries, planFormationAssignment } from '@/components/lineup/formation-assignment';
 import { randomUuid } from '@/lib/uuid';
 import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import type { GameLineup } from '@/types/game-operations';
@@ -144,6 +145,23 @@ export function clearPlayerPosition(state: FixtureLineupState, key: string): Fix
  * 달라(gameVersion vs baseRevision) 그대로 재사용할 수 없다. */
 export function selectFormation(state: FixtureLineupState, formation: string | null): FixtureLineupState {
   return { ...state, formation, dirty: true };
+}
+
+/** 포메이션 프리셋 적용 — 배치된 선수를 새 슬롯으로 재배치한다. 재배치 규칙 자체는
+ * formation-assignment.ts가 단독으로 갖고 있어 team-match 화면과 완전히 동일하게 동작한다
+ * (상태 타입만 여기서 감싼다). */
+export function applyFormationPreset(
+  state: FixtureLineupState,
+  formation: string,
+  slots: FormationSlot[],
+): FixtureLineupState {
+  const plan = planFormationAssignment(slots, state.starters);
+  return {
+    ...state,
+    formation,
+    starters: applyAssignmentToEntries(state.starters, plan),
+    dirty: true,
+  };
 }
 
 export function placeInSlot(state: FixtureLineupState, key: string, slot: FormationSlot): FixtureLineupState {

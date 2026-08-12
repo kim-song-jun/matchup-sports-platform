@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   useTournamentOpsRole: vi.fn(),
   grantMutate: vi.fn(),
   revokeMutate: vi.fn(),
+  createFieldMutate: vi.fn(),
+  // 테스트마다 필드 목록을 바꿀 수 있게 한다(빈 목록 케이스가 이 이슈의 핵심).
+  fieldsResult: vi.fn(() => ({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } })),
 }));
 
 vi.mock('@/components/tournament-ops/role-context', () => ({
@@ -50,10 +53,11 @@ vi.mock('@/hooks/use-v1-api', () => ({
     data: { items: [DIRECTOR_ROW, FIELD_OPERATOR_ROW] },
     refetch: vi.fn(),
   }),
-  useV1TournamentFields: () => ({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } }),
+  useV1TournamentFields: () => mocks.fieldsResult(),
   useV1Tournament: () => ({ data: { title: '가을 풋살 대회' } }),
   useV1GrantTournamentStaff: () => ({ mutate: mocks.grantMutate, isPending: false }),
   useV1RevokeTournamentStaff: () => ({ mutate: mocks.revokeMutate, isPending: false }),
+  useV1CreateTournamentField: () => ({ mutate: mocks.createFieldMutate, isPending: false }),
 }));
 
 function setRole(role: V1TournamentStaffRole) {
@@ -69,6 +73,8 @@ describe('StaffClient', () => {
     mocks.useTournamentOpsRole.mockReset();
     mocks.grantMutate.mockReset();
     mocks.revokeMutate.mockReset();
+    mocks.createFieldMutate.mockReset();
+    mocks.fieldsResult.mockReturnValue({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } });
   });
 
   // 표가 담당자를 userId 앞 8자로만 보여줘 누가 누구인지 알 수 없었다. 닉네임이 있으면
@@ -174,5 +180,43 @@ describe('StaffClient', () => {
 
     await user.selectOptions(screen.getByLabelText(/담당 필드/), 'field-1');
     expect(screen.getByRole('button', { name: '배정하기' })).toBeEnabled();
+  });
+
+  /* #373 — 프론트에 필드 생성 호출부가 없어 필드가 영영 0건이었고, 그래서
+     필드 담당자 배정을 끝낼 수 없었다. 등록 경로와 "왜 막혔는지" 안내가 이 화면의 계약이다. */
+  it('플랫폼 운영자가 경기장을 등록하면 입력한 이름으로 생성 요청이 나간다', async () => {
+    setRole('PLATFORM_OPS');
+    mocks.fieldsResult.mockReturnValue({ data: { items: [] } });
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+
+    await user.type(screen.getByLabelText('경기장 이름'), 'A구장');
+    await user.click(screen.getByRole('button', { name: '경기장 추가' }));
+
+    expect(mocks.createFieldMutate).toHaveBeenCalledTimes(1);
+    expect(mocks.createFieldMutate.mock.calls[0][0]).toMatchObject({ name: 'A구장' });
+  });
+
+  it('등록된 경기장이 없으면 필드 담당자 배정이 왜 막혔는지 알려주고 제출을 잠근다', async () => {
+    setRole('PLATFORM_OPS');
+    mocks.fieldsResult.mockReturnValue({ data: { items: [] } });
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+
+    await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+    await user.selectOptions(screen.getByLabelText('역할'), 'FIELD_OPERATOR');
+
+    // 같은 문구가 섹션 안내에도 있으므로 모달로 범위를 좁혀 확인한다
+    const modal = screen.getByRole('dialog');
+    // 이유를 문구로 알려준다(색만으로 상태를 전달하지 않는다)
+    // select 의 빈 option 에도 같은 문구가 있으므로, 도움말 문단(aria-describedby)만 겨냥한다
+    const fieldSelect = within(modal).getByLabelText(/담당 필드/);
+    const helpId = fieldSelect.getAttribute('aria-describedby');
+    expect(helpId).toBeTruthy();
+    expect(document.getElementById(helpId!)?.textContent).toMatch(/먼저 등록해 주세요/);
+    // 고를 수 있는 것처럼 보이지 않게 select 자체도 잠근다
+    expect(fieldSelect).toBeDisabled();
+    // 고를 수 있는 것처럼 보이지 않게 잠그고, 제출도 막는다
+    expect(within(modal).getByRole('button', { name: '배정하기' })).toBeDisabled();
   });
 });

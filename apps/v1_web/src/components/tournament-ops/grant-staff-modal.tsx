@@ -209,16 +209,24 @@ export function GrantStaffModal({
                   id="grant-staff-field"
                   value={fieldId}
                   onChange={(e) => setFieldId(e.target.value)}
-                  disabled={pending}
+                  disabled={pending || fields.length === 0}
+                  aria-describedby="grant-staff-field-help"
                   className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
                 >
-                  <option value="">필드를 선택해주세요</option>
+                  <option value="">{fields.length === 0 ? '등록된 경기장이 없어요' : '필드를 선택해주세요'}</option>
                   {fields.map((field) => (
                     <option key={field.id} value={field.id}>
                       {field.name}
                     </option>
                   ))}
                 </select>
+                {/* 등록된 필드가 하나도 없으면 이 select 는 영영 비어 있고 제출 버튼도 계속 잠긴다.
+                    잠긴 이유와 다음 행동을 적지 않으면 운영자는 "필드"가 뭔지도 모른 채 막힌다(#373). */}
+                <p id="grant-staff-field-help" className="text-[12px] text-[var(--text-muted)]">
+                  {fields.length === 0
+                    ? '필드는 경기가 열리는 코트·구장이에요. 스태프 화면 위쪽 “경기장(필드)”에서 먼저 등록해 주세요.'
+                    : '이 담당자가 맡을 코트·구장이에요. 배정하면 그 경기장의 경기만 담당해요.'}
+                </p>
               </div>
             )}
 

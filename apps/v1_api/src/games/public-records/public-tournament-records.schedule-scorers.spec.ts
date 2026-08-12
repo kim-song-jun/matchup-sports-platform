@@ -67,6 +67,13 @@ function buildFakePrisma(options: {
         };
       },
     },
+    // getSchedule 은 순위 행이 아직 없는 조별 조를 찾아 '전 지표 0' 기준선을 만든다(#374).
+    // 이 spec 의 관심사는 득점자 요약이라 기준선 대상이 없는 상태(빈 배열)로 둔다.
+    v1TournamentGroup: {
+      async findMany() {
+        return [];
+      },
+    },
     v1TournamentFixture: {
       async findMany(args: { where: { scheduledAt?: unknown } }) {
         // getSchedule은 scheduledAt이 있는 픽스처(paged)와 없는 픽스처(unscheduled)를

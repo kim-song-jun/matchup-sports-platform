@@ -2414,13 +2414,9 @@ export type V1AdminErrorLogFilters = {
 // Admin — game operation flags (PUBLIC_LIVE / DIRECTOR_OFFICIALIZE admin toggle)
 // ---------------------------------------------------------------------------
 
-export type V1GameOperationFlagKey =
-  | 'GAME_WRITE'
-  | 'GAME_READ'
-  | 'PUBLIC_LIVE'
-  | 'DIRECTOR_OFFICIALIZE';
+export type V1GameOperationFlagKey = 'PUBLIC_LIVE' | 'DIRECTOR_OFFICIALIZE';
 
-export type V1GameOperationFlagValue = 'legacy' | 'compare' | 'new' | 'off' | 'on';
+export type V1GameOperationFlagValue = 'off' | 'on';
 
 export type V1GameOperationFlag = {
   key: V1GameOperationFlagKey;
@@ -2444,10 +2440,6 @@ export type V1SimplifiedOperationFlagGateStatus = {
   updatedAt: string;
 };
 
-/**
- * `value`는 대상 플래그가 허용하는 값 전체를 받는다 — GAME_READ/GAME_WRITE는
- * legacy/compare/new 전환에도 이 간소 경로를 쓰기 때문에 off/on으로 좁히지 않는다.
- */
 export type V1SimplifiedOperationFlagTogglePayload = {
   expectedVersion: number;
   value: V1GameOperationFlagValue;

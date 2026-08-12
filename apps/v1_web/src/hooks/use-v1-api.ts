@@ -2524,7 +2524,7 @@ export function useV1AdminSendPush() {
 }
 
 // ---------------------------------------------------------------------------
-// Admin — game operation flags (경기 운영 플래그 4종 관리자 토글)
+// Admin — game operation flags (PUBLIC_LIVE / DIRECTOR_OFFICIALIZE 운영 토글 2종)
 // ---------------------------------------------------------------------------
 
 /** 게이트 번들 없이 켜고 끄는 간소 경로가 지금 열려 있는지 — DB 설정값
@@ -2538,9 +2538,9 @@ export function useV1SimplifiedOperationFlagGateStatus() {
   });
 }
 
-/** 간소 전환 모드 스위치 자체를 켜고 끈다 — 이 스위치가 꺼져 있으면 아래 4개 플래그의
+/** 간소 전환 모드 스위치 자체를 켜고 끈다 — 이 스위치가 꺼져 있으면 아래 두 플래그의
  * simplified-toggle 경로는 전부 SIMPLIFIED_GATE_DISABLED로 막힌다. 성공 시 status 쿼리를
- * 낙관적으로 갱신하고 나머지 플래그 조회도 무효화해 스테퍼가 최신 상태로 다시 그려지게 한다. */
+ * 낙관적으로 갱신해 두 토글 카드가 최신 상태로 다시 그려지게 한다. */
 export function useV1SetSimplifiedOperationFlagGate() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2563,8 +2563,8 @@ export function useV1OperationFlag(key: V1GameOperationFlagKey) {
   });
 }
 
-/** 4개 키(GAME_READ/GAME_WRITE/PUBLIC_LIVE/DIRECTOR_OFFICIALIZE) 전부 허용 — 서버가 게이트
- * 번들 증적만 생략할 뿐, frozen cutover order 등 나머지 안전장치는 그대로 검증한다. */
+/** PUBLIC_LIVE/DIRECTOR_OFFICIALIZE 둘 다 허용 — 서버가 게이트 번들 증적만 생략할 뿐, CAS·권한·
+ * 감사 로그 같은 나머지 안전장치는 그대로 검증한다. */
 export function useV1SimplifiedToggleOperationFlag(key: V1GameOperationFlagKey) {
   const queryClient = useQueryClient();
   return useMutation({

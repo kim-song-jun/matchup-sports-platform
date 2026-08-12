@@ -7,9 +7,7 @@ import type { V1GameOperationFlag, V1GameOperationFlagKey, V1GameOperationFlagVa
 // ── Fixtures ─────────────────────────────────────────────────────────────
 type FlagState = Record<V1GameOperationFlagKey, V1GameOperationFlagValue>;
 
-const LEGACY_STATE: FlagState = {
-  GAME_READ: 'legacy',
-  GAME_WRITE: 'legacy',
+const OFF_STATE: FlagState = {
   PUBLIC_LIVE: 'off',
   DIRECTOR_OFFICIALIZE: 'off',
 };
@@ -26,10 +24,10 @@ function makeFlag(key: V1GameOperationFlagKey, value: V1GameOperationFlagValue):
   };
 }
 
-let flagState: FlagState = LEGACY_STATE;
+let flagState: FlagState = OFF_STATE;
 let gateEnabled = true;
 
-// mutate 는 키별로 분리해 어느 단계가 실제로 호출됐는지 검증할 수 있게 한다.
+// mutate 는 키별로 분리해 어느 토글이 실제로 호출됐는지 검증할 수 있게 한다.
 const mutateByKey = new Map<V1GameOperationFlagKey, ReturnType<typeof vi.fn>>();
 function mutateFor(key: V1GameOperationFlagKey) {
   if (!mutateByKey.has(key)) mutateByKey.set(key, vi.fn());
@@ -61,85 +59,79 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 describe('OperationFlagTogglePanel', () => {
   beforeEach(() => {
-    flagState = { ...LEGACY_STATE };
+    flagState = { ...OFF_STATE };
     gateEnabled = true;
     mutateByKey.clear();
   });
 
-  it('선행 조건이 안 맞는 단계의 실행 버튼은 비활성이라 눌러도 아무 일도 일어나지 않는다', async () => {
-    // GAME_READ가 legacy라 2단계(GAME_WRITE)는 아직 잠겨 있어야 한다.
-    flagState = { ...LEGACY_STATE, GAME_READ: 'legacy' };
-    const user = userEvent.setup();
+  it('두 토글 모두 순서·잠김 없이 항상 활성 상태로 렌더된다 (독립 킬스위치)', () => {
     render(<OperationFlagTogglePanel />);
 
-    const step2Button = screen.getByRole('button', { name: '새 시스템으로 기록 전환 실행' });
-    expect(step2Button).toBeDisabled();
-
-    await user.click(step2Button);
-    expect(mutateFor('GAME_WRITE')).not.toHaveBeenCalled();
-    // 모달도 열리면 안 된다.
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '실시간 점수 공개 켜기' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: '결과 확정 권한 켜기' })).not.toBeDisabled();
   });
 
-  it('선행 조건이 갖춰지면(READ=compare) 2단계 버튼이 활성화된다', () => {
-    flagState = { ...LEGACY_STATE, GAME_READ: 'compare' };
-    render(<OperationFlagTogglePanel />);
-
-    const step2Button = screen.getByRole('button', { name: '새 시스템으로 기록 전환 실행' });
-    expect(step2Button).not.toBeDisabled();
-  });
-
-  it('간소 전환 모드가 꺼져 있으면 실행 가능했을 단계의 버튼도 비활성이 된다', () => {
+  it('간소 전환 모드가 꺼져 있으면 두 토글 버튼 모두 비활성이 된다', () => {
     gateEnabled = false;
-    flagState = { ...LEGACY_STATE }; // 1단계는 선행조건이 없어 원래라면 바로 실행 가능
     render(<OperationFlagTogglePanel />);
 
-    const step1Button = screen.getByRole('button', { name: '새 시스템 기록 대조 시작 실행' });
-    expect(step1Button).toBeDisabled();
+    expect(screen.getByRole('button', { name: '실시간 점수 공개 켜기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '결과 확정 권한 켜기' })).toBeDisabled();
   });
 
-  it('2단계 확인 모달은 "전환"을 정확히 입력해야만 확인 버튼이 활성화된다', async () => {
-    flagState = { ...LEGACY_STATE, GAME_READ: 'compare' };
+  it('PUBLIC_LIVE를 켜면 status_only 강등과 무관한 "켜짐" 효과 설명이 확인 모달에 뜨고, 확인 시 simplifiedPatchFlag가 off->on으로 호출된다', async () => {
     const user = userEvent.setup();
     render(<OperationFlagTogglePanel />);
 
-    await user.click(screen.getByRole('button', { name: '새 시스템으로 기록 전환 실행' }));
-    const dialog = await screen.findByRole('alertdialog', { name: '새 시스템으로 기록 전환 실행' });
+    await user.click(screen.getByRole('button', { name: '실시간 점수 공개 켜기' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '실시간 점수 공개 켜기' });
 
-    const confirmButton = within(dialog).getByRole('button', { name: '실행' });
-    const typedInput = within(dialog).getByLabelText(/전환.*입력해 주세요/);
-    const reasonInput = within(dialog).getByLabelText(/사유/);
+    expect(within(dialog).getByText(/관전자 화면.*점수와 경기 시계를 그대로 보여줘요/)).toBeInTheDocument();
 
-    // 사유만 채우고 오타를 입력하면 여전히 비활성.
-    await user.type(reasonInput, '알파 검증 완료');
-    await user.type(typedInput, '전환됨');
-    expect(confirmButton).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(/사유/), '알파 검증 완료');
+    await user.click(within(dialog).getByRole('button', { name: '켜기' }));
 
-    // 정확히 "전환"을 입력하면 활성화되고 제출된다.
-    await user.clear(typedInput);
-    await user.type(typedInput, '전환');
-    expect(confirmButton).not.toBeDisabled();
-
-    await user.click(confirmButton);
-    expect(mutateFor('GAME_WRITE')).toHaveBeenCalledTimes(1);
-    const [payload] = mutateFor('GAME_WRITE').mock.calls[0];
-    expect(payload).toEqual({ expectedVersion: 3, value: 'new', reason: '알파 검증 완료' });
+    expect(mutateFor('PUBLIC_LIVE')).toHaveBeenCalledTimes(1);
+    const [payload] = mutateFor('PUBLIC_LIVE').mock.calls[0];
+    expect(payload).toEqual({ expectedVersion: 3, value: 'on', reason: '알파 검증 완료' });
   });
 
-  it('다른 단계(1단계)의 확인 모달에는 타이핑 확인 입력란이 없다', async () => {
-    flagState = { ...LEGACY_STATE };
+  it('DIRECTOR_OFFICIALIZE가 켜져 있을 때 끄면 결과 확정이 거부된다는 경고가 확인 모달에 뜨고, 확인 시 on->off로 호출된다', async () => {
+    flagState = { ...OFF_STATE, DIRECTOR_OFFICIALIZE: 'on' };
     const user = userEvent.setup();
     render(<OperationFlagTogglePanel />);
 
-    await user.click(screen.getByRole('button', { name: '새 시스템 기록 대조 시작 실행' }));
-    const dialog = await screen.findByRole('alertdialog', { name: '새 시스템 기록 대조 시작 실행' });
+    await user.click(screen.getByRole('button', { name: '결과 확정 권한 끄기' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '결과 확정 권한 끄기' });
+
+    expect(within(dialog).getByText(/디렉터의 결과 확정 요청이 거부돼요/)).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText(/사유/), '운영 중단 필요');
+    await user.click(within(dialog).getByRole('button', { name: '끄기' }));
+
+    expect(mutateFor('DIRECTOR_OFFICIALIZE')).toHaveBeenCalledTimes(1);
+    const [payload] = mutateFor('DIRECTOR_OFFICIALIZE').mock.calls[0];
+    expect(payload).toEqual({ expectedVersion: 3, value: 'off', reason: '운영 중단 필요' });
+  });
+
+  it('확인 모달에는 타이핑 확인 입력란이 없다 (두 토글 모두 되돌릴 수 있는 조작)', async () => {
+    const user = userEvent.setup();
+    render(<OperationFlagTogglePanel />);
+
+    await user.click(screen.getByRole('button', { name: '실시간 점수 공개 켜기' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '실시간 점수 공개 켜기' });
 
     expect(within(dialog).queryByLabelText(/그대로 입력해 주세요/)).not.toBeInTheDocument();
+  });
 
-    await user.type(within(dialog).getByLabelText(/사유/), '대조 시작합니다');
-    await user.click(within(dialog).getByRole('button', { name: '실행' }));
-    expect(mutateFor('GAME_READ')).toHaveBeenCalledTimes(1);
-    const [payload] = mutateFor('GAME_READ').mock.calls[0];
-    expect(payload).toEqual({ expectedVersion: 3, value: 'compare', reason: '대조 시작합니다' });
+  it('사유를 입력하지 않으면 확인 버튼이 비활성 상태로 남는다', async () => {
+    const user = userEvent.setup();
+    render(<OperationFlagTogglePanel />);
+
+    await user.click(screen.getByRole('button', { name: '실시간 점수 공개 켜기' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '실시간 점수 공개 켜기' });
+
+    expect(within(dialog).getByRole('button', { name: '켜기' })).toBeDisabled();
+    expect(mutateFor('PUBLIC_LIVE')).not.toHaveBeenCalled();
   });
 });

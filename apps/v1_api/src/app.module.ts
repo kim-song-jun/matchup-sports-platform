@@ -38,8 +38,6 @@ import { TournamentFixtureLineupModule } from './tournament-operations/lineups/t
 import { TournamentOperationsStaffModule } from './tournament-operations/staff/tournament-operations-staff.module';
 import { TournamentOperationsBoardModule } from './tournament-operations/board/tournament-operations-board.module';
 import { TournamentOperationsFieldsModule } from './tournament-operations/fields/tournament-operations-fields.module';
-import { GAME_READ_AUTHORITY } from './tournament-operations/board/game-read-authority.port';
-import { CompareGameReadAuthorityService } from './tournament-operations/board/compare-game-read-authority.service';
 import { TeamMatchSeriesModule } from './team-match-series/team-match-series.module';
 
 @Module({
@@ -83,15 +81,7 @@ import { TeamMatchSeriesModule } from './team-match-series/team-match-series.mod
     TournamentFixtureLineupModule,
     TournamentOperationsStaffModule,
     TournamentOperationsFieldsModule,
-    // Task 26: swap the fail-closed DirectGameReadAuthorityService stub for the real
-    // Task-10-backed comparator so GAME_READ=compare mode actually compares legacy vs projected
-    // results instead of unconditionally throwing 500 GAME_READ_AUTHORITY_NOT_CONFIGURED. See
-    // tournament-operations-board.module.ts's `register()` doc comment and
-    // compare-game-read-authority.service.ts for the full contract.
-    TournamentOperationsBoardModule.register({
-      provide: GAME_READ_AUTHORITY,
-      useClass: CompareGameReadAuthorityService,
-    }),
+    TournamentOperationsBoardModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: V1ThrottlerGuard },

@@ -37,20 +37,12 @@ type GatePair = {
 };
 
 type SingleGateInput = {
-  phase: 'B' | 'C';
+  phase: 'C';
   key: GameOperationFlagKey;
   from: { value: string; version: number };
   to: { value: string; version: number };
   gates: GatePair[];
   transition?: string;
-};
-
-type TupleGateInput = {
-  phase: 'C';
-  tupleKeys: GameOperationFlagKey[];
-  fromTuple: Record<string, { value: string; version: number }>;
-  toTuple: Record<string, { value: string; version: number }>;
-  gates: GatePair[];
 };
 
 describe('Task 5 game operation control plane', () => {
@@ -119,7 +111,6 @@ describe('Task 5 game operation control plane', () => {
     `;
     await prisma.$executeRaw`TRUNCATE TABLE v1_operation_audits`;
     await prisma.$executeRaw`DELETE FROM v1_game_operation_flags`;
-    await prisma.$executeRaw`DELETE FROM v1_game_cutover_epochs WHERE id = 'game-cutover'`;
     attemptId = randomUUID();
     attemptRoot = join(EVIDENCE_ROOT, `task5-${attemptId}`);
     bundlePaths = [];
@@ -139,20 +130,20 @@ describe('Task 5 game operation control plane', () => {
   });
 
   it('creates the exact defaults and enforces active owner/ops DB permission', async () => {
-    await expect(service.getFlag(OWNER_USER_ID, 'GAME_WRITE')).resolves.toMatchObject({
-      key: 'GAME_WRITE',
-      value: 'legacy',
+    await expect(service.getFlag(OWNER_USER_ID, 'PUBLIC_LIVE')).resolves.toMatchObject({
+      key: 'PUBLIC_LIVE',
+      value: 'off',
       version: 0,
     });
-    await expect(service.getFlag(OPS_USER_ID, 'GAME_READ')).resolves.toMatchObject({
-      key: 'GAME_READ',
-      value: 'legacy',
+    await expect(service.getFlag(OPS_USER_ID, 'DIRECTOR_OFFICIALIZE')).resolves.toMatchObject({
+      key: 'DIRECTOR_OFFICIALIZE',
+      value: 'off',
       version: 0,
     });
-    await expect(service.getFlag(SUPPORT_USER_ID, 'GAME_READ')).rejects.toBeInstanceOf(
+    await expect(service.getFlag(SUPPORT_USER_ID, 'DIRECTOR_OFFICIALIZE')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    await expect(service.getFlag(ORDINARY_USER_ID, 'GAME_READ')).rejects.toBeInstanceOf(
+    await expect(service.getFlag(ORDINARY_USER_ID, 'DIRECTOR_OFFICIALIZE')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
     const rows = await prisma.$queryRaw<Array<{ key: string; value: string; version: number }>>`
@@ -162,29 +153,31 @@ describe('Task 5 game operation control plane', () => {
     `;
     expect(rows).toEqual([
       { key: 'DIRECTOR_OFFICIALIZE', value: 'off', version: 0 },
-      { key: 'GAME_READ', value: 'legacy', version: 0 },
-      { key: 'GAME_WRITE', value: 'legacy', version: 0 },
       { key: 'PUBLIC_LIVE', value: 'off', version: 0 },
     ]);
   });
 
-  it('rejects malformed, mixed-gate, and out-of-order transitions before CAS', async () => {
-    await service.getFlag(OWNER_USER_ID, 'GAME_READ');
+  it('rejects malformed and mixed-gate bundles before CAS', async () => {
+    await service.getFlag(OWNER_USER_ID, 'DIRECTOR_OFFICIALIZE');
     const malformed = writeSingleGate({
-      phase: 'B',
-      key: 'GAME_READ',
-      from: { value: 'legacy', version: 0 },
-      to: { value: 'compare', version: 1 },
-      gates: [{ gateId: 'V10', commandId: 'V10' }],
+      phase: 'C',
+      key: 'DIRECTOR_OFFICIALIZE',
+      from: { value: 'off', version: 0 },
+      to: { value: 'on', version: 1 },
+      gates: [
+        { gateId: 'V7', commandId: 'V7' },
+        { gateId: 'V22', commandId: 'V22' },
+        { gateId: 'V23', commandId: 'V23' },
+      ],
     });
     chmodSync(malformed.path, 0o644);
     await expect(
       service.patchFlag(
         OWNER_USER_ID,
-        'GAME_READ',
+        'DIRECTOR_OFFICIALIZE',
         {
           expectedVersion: 0,
-          value: 'compare',
+          value: 'on',
           gateBundlePath: malformed.path,
           gateBundleHash: malformed.sha256,
           reason: 'malformed immutable gate must be rejected',
@@ -197,20 +190,20 @@ describe('Task 5 game operation control plane', () => {
     chmodSync(malformed.path, 0o444);
 
     const wrongGate = writeSingleGate({
-      phase: 'B',
-      key: 'GAME_READ',
-      from: { value: 'legacy', version: 0 },
-      to: { value: 'compare', version: 1 },
+      phase: 'C',
+      key: 'DIRECTOR_OFFICIALIZE',
+      from: { value: 'off', version: 0 },
+      to: { value: 'on', version: 1 },
       gates: [{ gateId: 'V25', commandId: 'V25' }],
-      transition: 'GAME_READ-wrong-gate',
+      transition: 'DIRECTOR_OFFICIALIZE-wrong-gate',
     });
     await expect(
       service.patchFlag(
         OWNER_USER_ID,
-        'GAME_READ',
+        'DIRECTOR_OFFICIALIZE',
         {
           expectedVersion: 0,
-          value: 'compare',
+          value: 'on',
           gateBundlePath: wrongGate.path,
           gateBundleHash: wrongGate.sha256,
           reason: 'mixed gate must be rejected',
@@ -219,60 +212,37 @@ describe('Task 5 game operation control plane', () => {
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    const writeGate = writeSingleGate({
-      phase: 'C',
-      key: 'GAME_WRITE',
-      from: { value: 'legacy', version: 0 },
-      to: { value: 'new', version: 1 },
-      gates: [
-        { gateId: 'V10', commandId: 'V10' },
-        { gateId: 'V25', commandId: 'V25' },
-      ],
-    });
-    await expect(
-      service.patchFlag(
-        OWNER_USER_ID,
-        'GAME_WRITE',
-        {
-          expectedVersion: 0,
-          value: 'new',
-          gateBundlePath: writeGate.path,
-          gateBundleHash: writeGate.sha256,
-          reason: 'write cannot precede compare',
-        },
-        'task5-out-of-order',
-      ),
-    ).rejects.toMatchObject({
-      response: { code: 'CUTOVER_ORDER_VIOLATION' },
-    });
-    await expect(service.getFlag(OWNER_USER_ID, 'GAME_WRITE')).resolves.toMatchObject({
-      value: 'legacy',
+    await expect(service.getFlag(OWNER_USER_ID, 'DIRECTOR_OFFICIALIZE')).resolves.toMatchObject({
+      value: 'off',
       version: 0,
     });
   });
 
   it('applies CAS once, replays the stored response, and records actor-neutral audit/outbox', async () => {
     const gate = writeSingleGate({
-      phase: 'B',
-      key: 'GAME_READ',
-      from: { value: 'legacy', version: 0 },
-      to: { value: 'compare', version: 1 },
-      gates: [{ gateId: 'V10', commandId: 'V10' }],
+      phase: 'C',
+      key: 'PUBLIC_LIVE',
+      from: { value: 'off', version: 0 },
+      to: { value: 'on', version: 1 },
+      gates: [
+        { gateId: 'V24', commandId: 'V24' },
+        { gateId: 'V26', commandId: 'PUBLIC-01' },
+      ],
     });
     const input = {
       expectedVersion: 0,
-      value: 'compare',
+      value: 'on',
       gateBundlePath: gate.path,
       gateBundleHash: gate.sha256,
-      reason: 'enable local comparison',
+      reason: 'enable public live scoreboard',
     };
-    const first = await service.patchFlag(OPS_USER_ID, 'GAME_READ', input, 'task5-cas');
-    const replay = await service.patchFlag(OPS_USER_ID, 'GAME_READ', input, 'task5-cas');
+    const first = await service.patchFlag(OPS_USER_ID, 'PUBLIC_LIVE', input, 'task5-cas');
+    const replay = await service.patchFlag(OPS_USER_ID, 'PUBLIC_LIVE', input, 'task5-cas');
     expect(replay).toEqual(first);
     await expect(
       service.patchFlag(
         OPS_USER_ID,
-        'GAME_READ',
+        'PUBLIC_LIVE',
         { ...input, reason: 'different payload' },
         'task5-cas',
       ),
@@ -280,23 +250,26 @@ describe('Task 5 game operation control plane', () => {
       response: { code: 'IDEMPOTENCY_PAYLOAD_CONFLICT' },
     });
 
+    // Structurally valid gate bundle (correct gates, correct value transition against the REAL
+    // current value 'on') but a stale `expectedVersion` (0, when the real version is now 1) --
+    // proves the CAS check fires independently of, and after, gate-bundle/transition validation.
     const staleGate = writeSingleGate({
       phase: 'C',
-      key: 'GAME_READ',
-      from: { value: 'compare', version: 0 },
-      to: { value: 'new', version: 1 },
+      key: 'PUBLIC_LIVE',
+      from: { value: 'on', version: 0 },
+      to: { value: 'off', version: 1 },
       gates: [
-        { gateId: 'V10', commandId: 'V10' },
-        { gateId: 'V25', commandId: 'V25' },
+        { gateId: 'V24', commandId: 'V24' },
+        { gateId: 'V26', commandId: 'PUBLIC-01' },
       ],
     });
     await expect(
       service.patchFlag(
         OPS_USER_ID,
-        'GAME_READ',
+        'PUBLIC_LIVE',
         {
           expectedVersion: 0,
-          value: 'new',
+          value: 'off',
           gateBundlePath: staleGate.path,
           gateBundleHash: staleGate.sha256,
           reason: 'stale CAS must fail',
@@ -317,7 +290,7 @@ describe('Task 5 game operation control plane', () => {
     >`
       SELECT actor_type::text, actor_user_id, system_actor, action
       FROM v1_operation_audits
-      WHERE resource_id = 'GAME_READ'
+      WHERE resource_id = 'PUBLIC_LIVE'
     `;
     expect(audits).toEqual([
       {
@@ -330,90 +303,14 @@ describe('Task 5 game operation control plane', () => {
     const events = await prisma.$queryRaw<Array<{ type: string }>>`
       SELECT type
       FROM v1_outbox_events
-      WHERE aggregate_id = 'GAME_READ'
+      WHERE aggregate_id = 'PUBLIC_LIVE'
     `;
     expect(events).toEqual([{ type: 'GAME_OPERATION_FLAG_CHANGED' }]);
-    await expect(service.getFlag(OWNER_USER_ID, 'GAME_READ')).resolves.toMatchObject({
-      value: 'compare',
+    await expect(service.getFlag(OWNER_USER_ID, 'PUBLIC_LIVE')).resolves.toMatchObject({
+      value: 'on',
       version: 1,
       updatedByUserId: OPS_USER_ID,
     });
-  });
-
-  it('serializes tuple rollback against the first new-authority write with no split brain', async () => {
-    await advanceToNewTuple();
-    const rollbackGate = writeTupleGate({
-      phase: 'C',
-      tupleKeys: ['GAME_READ', 'GAME_WRITE'],
-      fromTuple: {
-        GAME_READ: { value: 'new', version: 2 },
-        GAME_WRITE: { value: 'new', version: 1 },
-      },
-      toTuple: {
-        GAME_READ: { value: 'compare', version: 3 },
-        GAME_WRITE: { value: 'legacy', version: 2 },
-      },
-      gates: [
-        { gateId: 'V10', commandId: 'V10' },
-        { gateId: 'V25', commandId: 'V25' },
-      ],
-    });
-    const rollback = service.tupleTransition(
-      OWNER_USER_ID,
-      {
-        expectedVersions: { GAME_READ: 2, GAME_WRITE: 1 },
-        transitions: [
-          { key: 'GAME_WRITE', from: 'new', to: 'legacy' },
-          { key: 'GAME_READ', from: 'new', to: 'compare' },
-        ],
-        gateBundlePath: rollbackGate.path,
-        gateBundleHash: rollbackGate.sha256,
-        reason: 'pre-latch authority rollback',
-      },
-      'task5-tuple-race',
-    );
-    const write = service.withNewWriteAuthority('task5-race-resource', async (tx) => {
-      await tx.$executeRaw`SELECT 1`;
-      return { committed: true };
-    });
-    const outcomes = await Promise.allSettled([rollback, write]);
-    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
-    expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toHaveLength(1);
-
-    const flags = await prisma.$queryRaw<Array<{ key: string; value: string }>>`
-      SELECT key::text, value
-      FROM v1_game_operation_flags
-      WHERE key IN ('GAME_READ', 'GAME_WRITE')
-      ORDER BY key
-    `;
-    const epochs = await prisma.$queryRaw<
-      Array<{
-        write_mode: string;
-        first_new_write_at: Date | null;
-        first_new_write_resource_id: string | null;
-      }>
-    >`
-      SELECT write_mode::text, first_new_write_at, first_new_write_resource_id
-      FROM v1_game_cutover_epochs
-      WHERE id = 'game-cutover'
-    `;
-    const epoch = epochs[0];
-    expect(epoch).toBeDefined();
-    if (epoch.first_new_write_at) {
-      expect(flags).toEqual([
-        { key: 'GAME_READ', value: 'new' },
-        { key: 'GAME_WRITE', value: 'new' },
-      ]);
-      expect(epoch.write_mode).toBe('new');
-      expect(epoch.first_new_write_resource_id).toBe('task5-race-resource');
-    } else {
-      expect(flags).toEqual([
-        { key: 'GAME_READ', value: 'compare' },
-        { key: 'GAME_WRITE', value: 'legacy' },
-      ]);
-      expect(epoch.write_mode).toBe('legacy');
-      expect(epoch.first_new_write_resource_id).toBeNull();
-    }
   });
 
   it('requeues only a poisoned job with CAS and transactional audit/outbox', async () => {
@@ -487,72 +384,6 @@ describe('Task 5 game operation control plane', () => {
     ]);
   });
 
-  async function advanceToNewTuple() {
-    const compare = writeSingleGate({
-      phase: 'B',
-      key: 'GAME_READ',
-      from: { value: 'legacy', version: 0 },
-      to: { value: 'compare', version: 1 },
-      gates: [{ gateId: 'V10', commandId: 'V10' }],
-    });
-    await service.patchFlag(
-      OWNER_USER_ID,
-      'GAME_READ',
-      {
-        expectedVersion: 0,
-        value: 'compare',
-        gateBundlePath: compare.path,
-        gateBundleHash: compare.sha256,
-        reason: 'advance compare',
-      },
-      'task5-advance-read-compare',
-    );
-    const write = writeSingleGate({
-      phase: 'C',
-      key: 'GAME_WRITE',
-      from: { value: 'legacy', version: 0 },
-      to: { value: 'new', version: 1 },
-      gates: [
-        { gateId: 'V10', commandId: 'V10' },
-        { gateId: 'V25', commandId: 'V25' },
-      ],
-    });
-    await service.patchFlag(
-      OWNER_USER_ID,
-      'GAME_WRITE',
-      {
-        expectedVersion: 0,
-        value: 'new',
-        gateBundlePath: write.path,
-        gateBundleHash: write.sha256,
-        reason: 'advance write',
-      },
-      'task5-advance-write',
-    );
-    const read = writeSingleGate({
-      phase: 'C',
-      key: 'GAME_READ',
-      from: { value: 'compare', version: 1 },
-      to: { value: 'new', version: 2 },
-      gates: [
-        { gateId: 'V10', commandId: 'V10' },
-        { gateId: 'V25', commandId: 'V25' },
-      ],
-    });
-    await service.patchFlag(
-      OWNER_USER_ID,
-      'GAME_READ',
-      {
-        expectedVersion: 1,
-        value: 'new',
-        gateBundlePath: read.path,
-        gateBundleHash: read.sha256,
-        reason: 'advance read authority',
-      },
-      'task5-advance-read-new',
-    );
-  }
-
   function writeSingleGate(input: SingleGateInput) {
     const prerequisites = writePrerequisites(input.phase, input.gates);
     const transition =
@@ -579,35 +410,11 @@ describe('Task 5 game operation control plane', () => {
     });
   }
 
-  function writeTupleGate(input: TupleGateInput) {
-    const prerequisites = writePrerequisites(input.phase, input.gates);
-    const transition = 'authority-tuple-rollback';
-    const path = join(
-      EVIDENCE_ROOT,
-      `flag-gate-${attemptId}-${input.phase}-${transition}.json`,
-    );
-    bundlePaths.push(path);
-    return immutableJson(path, {
-      schemaVersion: 1,
-      phase: input.phase,
-      attemptId,
-      baselineSHA: BASELINE_SHA,
-      candidateSHA: CANDIDATE_SHA,
-      planSHA: PLAN_SHA,
-      transition,
-      tupleKeys: input.tupleKeys,
-      fromTuple: input.fromTuple,
-      toTuple: input.toTuple,
-      prerequisites,
-      createdAt: new Date().toISOString(),
-    });
-  }
-
   function writePrerequisites(phase: string, gates: GatePair[]) {
     return [...gates]
       .sort((left, right) =>
-        `${left.gateId}\u0000${left.commandId}`.localeCompare(
-          `${right.gateId}\u0000${right.commandId}`,
+        JSON.stringify([left.gateId, left.commandId]).localeCompare(
+          JSON.stringify([right.gateId, right.commandId]),
         ),
       )
       .map((gate) => {

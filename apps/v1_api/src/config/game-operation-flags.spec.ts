@@ -31,17 +31,14 @@ describe('game operation gate root', () => {
   });
 });
 
-// Task: admin on/off for all four operation flags without the immutable gate bundle. Whether the
+// Task: admin on/off for both operation flags without the immutable gate bundle. Whether the
 // path is reachable at all is now a DB-backed switch (`v1_game_operation_gate_settings`, see the
 // integration spec for CAS/audit coverage of that switch) rather than an environment variable --
-// this spec only covers the key allowlist, which is a pure/static export.
+// this spec only covers the key allowlist, which is a pure/static export. `GAME_WRITE`/`GAME_READ`
+// were retired with the Task 10 cutover cleanup -- `GameOperationFlagKey` no longer has those
+// values at all, so this list can only ever contain the two operational kill switches.
 describe('simplified operation flag gate allowed keys', () => {
-  it('allows all four operation flags now that the gate is a DB switch, not an env var', () => {
-    expect(SIMPLIFIED_GATE_ALLOWED_KEYS).toEqual([
-      'GAME_READ',
-      'GAME_WRITE',
-      'PUBLIC_LIVE',
-      'DIRECTOR_OFFICIALIZE',
-    ]);
+  it('allows both operation flags now that the gate is a DB switch, not an env var', () => {
+    expect(SIMPLIFIED_GATE_ALLOWED_KEYS).toEqual(['PUBLIC_LIVE', 'DIRECTOR_OFFICIALIZE']);
   });
 });

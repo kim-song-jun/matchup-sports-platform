@@ -1,46 +1,37 @@
 /**
  * Deploy-time seeding of the game-operation flag invariant rows.
  *
- * `TournamentOperationsBoardService.list()` fails closed with
- * `500 GAME_READ_FLAG_MISSING` when the `GAME_READ` row is absent — deliberately,
- * so that a deleted row can never silently disable compare-mode's mismatch
- * protection (Task 18 review P1-7). That fail-closed contract is correct, but
- * nothing in the deploy path ever created the rows: `ensureDefaults()` is private
- * to `GameOperationFlagsService` and only runs when a `platform_ops` operator
- * calls the flags API, and no migration seeds them (DML is never additive under
- * the expand-contract gate). So every freshly provisioned environment served a
- * 500 on the tournament operations board until somebody happened to touch the
- * flags API — which is exactly the state alpha was found in (0 rows).
- *
- * The board's integration tests never caught it because each one upserts the
- * flag row in its own setup; none of them exercise "an environment that was only
- * deployed".
- *
- * This module is the explicit seed the board service's doc comment already
- * assumed existed. It is run from the deploy path (see `deploy/deploy-alpha.sh`
- * and the migration-replay gate in `.github/workflows/deploy.yml`) right after
- * `prisma migrate deploy`.
+ * `ensureDefaults()` is private to `GameOperationFlagsService` and only runs when a
+ * `platform_ops` operator calls the flags API (`getFlag`/`patchFlag`/`simplifiedPatchFlag`), and
+ * no migration seeds these rows (DML is never additive under the expand-contract gate). Every
+ * consumer of `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` that reads OUTSIDE that admin API (e.g.
+ * `games.service.ts`'s public-visibility read, `tournament-result-review.service.ts`'s
+ * director-officialize check) already treats a missing row as `off` -- the same value the row
+ * would hold if seeded -- so a freshly provisioned environment is never broken by the absence of
+ * this seed. This module exists for defense in depth anyway: it makes the row's presence (and its
+ * CAS `version: 0` starting point) an explicit, observable deploy-time fact instead of an implicit
+ * property that only becomes true the first time an operator happens to touch the flags API. It is
+ * run from the deploy path (see `deploy/deploy-alpha.sh` and the migration-replay gate in
+ * `.github/workflows/deploy.yml`) right after `prisma migrate deploy`.
  *
  * **Idempotent and non-clobbering**: uses `createMany({ skipDuplicates: true })`, not `upsert`,
  * so there is no update path at all — an existing row is left untouched and simply skipped by
  * the unique constraint. A re-run can never reset a value an operator has since changed (e.g.
  * `PUBLIC_LIVE: off -> on`). This matters because the deploy path runs it on *every* deploy.
  */
-import { PrismaClient, V1GameWriteMode } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 import { GAME_OPERATION_FLAG_DEFAULTS, type GameOperationFlagKey } from './game-operation-flags';
 
 export type GameOperationFlagSeedCounts = {
   flagsCreated: number;
-  cutoverEpochCreated: number;
 };
 
 /**
- * Creates the four default flag rows and the cutover epoch if they are missing.
- * Reproduces exactly what `GameOperationFlagsService.ensureDefaults()` would
- * create (same `version: 0`, same `owner_actor`, same schema-level epoch
- * defaults) — not a new or relaxed contract, just seeded at deploy time instead
- * of lazily on the first operator mutation.
+ * Creates the default flag rows if they are missing. Reproduces exactly what
+ * `GameOperationFlagsService.ensureDefaults()` would create (same `version: 0`, same
+ * `owner_actor`) — not a new or relaxed contract, just seeded at deploy time instead of lazily on
+ * the first operator mutation.
  */
 export async function seedGameOperationFlagDefaults(
   prisma: PrismaClient,
@@ -61,10 +52,5 @@ export async function seedGameOperationFlagDefaults(
     skipDuplicates: true,
   });
 
-  const cutoverEpoch = await prisma.v1GameCutoverEpoch.createMany({
-    data: [{ id: 'game-cutover', version: 0, writeMode: V1GameWriteMode.legacy }],
-    skipDuplicates: true,
-  });
-
-  return { flagsCreated: flags.count, cutoverEpochCreated: cutoverEpoch.count };
+  return { flagsCreated: flags.count };
 }

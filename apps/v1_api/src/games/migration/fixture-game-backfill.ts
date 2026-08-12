@@ -14,15 +14,19 @@ import { computePeriodCount, jsonObject } from '../games.service';
  * PR description for the full writeup):
  *
  *   - `status: 'completed'` fixtures are NOT given a Game by this module.
- *     `game-result-backfill.ts` (Task 10) already owns creating the Game +
- *     OFFICIAL result revision for those, from the fixture's actual recorded
- *     score — reimplementing that here would risk a second, subtly
- *     different reconstruction of the same result. This module only adds
- *     the `V1GamePeriod` rows and `V1GameVisibilityPolicy` row Task 10's
- *     `createImportedGame()` never wrote (confirmed by reading it: it has no
- *     `v1GamePeriod`/`visibilityPolicy` write at all), for whichever Game
- *     already exists at the time this runs — regardless of whether Task 10
- *     ran before or after this module.
+ *     Task 10's one-time historical backfill (`game-result-backfill.ts`,
+ *     retired once the GAME_WRITE/GAME_READ cutover completed -- see
+ *     `apps/v1_api/src/config/game-operation-flags.ts`) already created the
+ *     Game + OFFICIAL result revision for every legacy `status: 'completed'`
+ *     fixture that existed at cutover time, from each fixture's actual
+ *     recorded score — reimplementing that here would risk a second,
+ *     subtly different reconstruction of the same result. This module only
+ *     adds the `V1GamePeriod` rows and `V1GameVisibilityPolicy` row that
+ *     one-time backfill's `createImportedGame()` never wrote (confirmed by
+ *     reading it: it has no `v1GamePeriod`/`visibilityPolicy` write at
+ *     all), for whichever Game already exists at the time this runs. A
+ *     `status: 'completed'` fixture with no Game and no history of ever
+ *     going through Task 10's backfill is outside both modules' scope.
  *   - `status: 'scheduled' | 'in_progress'` fixtures have no Task 10
  *     equivalent (that module only reads `status: 'completed'` sources), so
  *     this module creates the Game itself, mirroring

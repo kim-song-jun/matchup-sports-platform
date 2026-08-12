@@ -29,6 +29,7 @@ import {
   resolveGameIdempotency,
   validateGameResultInvariants,
   type RevisionFlow,
+  type RevisionSupersessionPurpose,
 } from '../../games/core';
 import type {
   GameActorScope,
@@ -631,7 +632,10 @@ export class TournamentResultReviewService {
             supersedesRevisionId: base.id,
             baseState: base.state,
             successorState: V1GameResultRevisionState.DRAFT,
-            purpose: 'CORRECTION',
+            purpose:
+              base.state === V1GameResultRevisionState.VOID
+                ? ('VOID_REENTRY' satisfies RevisionSupersessionPurpose)
+                : ('CORRECTION' satisfies RevisionSupersessionPurpose),
           });
         } catch (error) {
           if (error instanceof GameContractError) {

@@ -24,7 +24,8 @@ export interface RevisionTransitionInput {
 export type RevisionSupersessionPurpose =
   | 'TEAM_RESUBMISSION'
   | 'TOURNAMENT_RESUBMISSION'
-  | 'CORRECTION';
+  | 'CORRECTION'
+  | 'VOID_REENTRY';
 
 export interface RevisionSupersessionInput {
   baseGameId: string;
@@ -106,7 +107,11 @@ export function assertRevisionSupersession(input: RevisionSupersessionInput): vo
       [V1GameResultRevisionState.REJECTED, V1GameResultRevisionState.SUPPLEMENT_REQUESTED].some(
         (state) => state === input.baseState,
       )) ||
-    (input.purpose === 'CORRECTION' && input.baseState === V1GameResultRevisionState.OFFICIAL);
+    (input.purpose === 'CORRECTION' && input.baseState === V1GameResultRevisionState.OFFICIAL) ||
+    // 무효 처리(VOID)는 경기의 끝이 아니라 '현재 유효한 공식 결과 없음' 상태예요.
+    // 권한자가 VOID 리비전을 base 로 새 DRAFT 를 만들어 다시 확정할 수 있어야
+    // 경기가 미확정으로 고착되지 않아요. 기존 공식·무효 리비전은 그대로 남아요.
+    (input.purpose === 'VOID_REENTRY' && input.baseState === V1GameResultRevisionState.VOID);
   if (
     !validBase ||
     input.successorState !== V1GameResultRevisionState.DRAFT ||

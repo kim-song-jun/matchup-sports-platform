@@ -206,6 +206,7 @@ export function getTeamDetailViewModel(mode: TeamDetailViewModel['mode'] = 'defa
         message: mode === 'mine'
           ? '멤버 목록을 볼 수 있어요.'
           : '멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.',
+        moreCount: mode === 'mine' ? Math.max(0, team.members - detailByMode[mode].membersList.length) : 0,
       },
     },
   };

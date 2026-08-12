@@ -432,6 +432,30 @@ export class TournamentResultReviewService {
               message: 'This correction no longer supersedes the current official revision',
             });
           }
+        } else {
+          // Issue #376 follow-up: `GamesService.syncAssistsIntoSubmittedRevision`
+          // (ASSIST_SYNC purpose) can now supersede a SUBMITTED revision with a
+          // fresh successor WITHOUT ever changing the predecessor's own `state`
+          // column away from SUBMITTED -- see that method's doc comment for why
+          // no other value in the enum honestly fits "auto-superseded, no
+          // reviewer decision". That means a STANDARD-flow officialize target
+          // can be stale (superseded) even while its own `state` still reads
+          // SUBMITTED, which the CORRECTION-flow check above cannot catch (it
+          // only runs for DRAFT). Mirror the same staleness check in the other
+          // direction: refuse to officialize any revision that a NEWER revision
+          // has already superseded, so a stale reviewer view (or a stale cached
+          // revisionId) can never confirm outdated assist data as official --
+          // exactly the class of bug this whole follow-up exists to close.
+          const supersededBy = await tx.v1GameResultRevision.findFirst({
+            where: { supersedesId: revision.id },
+            select: { id: true },
+          });
+          if (supersededBy !== null) {
+            throw new ConflictException({
+              code: 'REVISION_MUST_BE_SUPERSEDED',
+              message: 'This revision has already been superseded by a newer revision',
+            });
+          }
         }
         const officialized = await tx.v1GameResultRevision.update({
           where: { id: revision.id },

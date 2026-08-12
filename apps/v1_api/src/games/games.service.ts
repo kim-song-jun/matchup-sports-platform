@@ -47,6 +47,7 @@ import {
   assertGameCommandContext,
   assertGameLifecycleTransition,
   assertGameSourceCreationInput,
+  assertRevisionSupersession,
   assertRevisionTransition,
   GameContractError,
   projectParticipantForPublic,
@@ -1418,6 +1419,34 @@ export class GamesService {
    * that asymmetry between appendEvent and reverseEvent/this command is a
    * pre-existing product decision, not something this fix introduces or
    * changes.
+   *
+   * Issue #376 follow-up (alpha finding on fixture
+   * 4439fb84-9117-4d9f-b103-b9abda4bfdd0 -- see
+   * `syncAssistsIntoSubmittedRevision`'s doc comment for the full per-state
+   * rationale, including why that method creates a NEW superseding revision
+   * instead of patching the SUBMITTED one in place): this command DOES
+   * reject when the game's `currentOfficialRevisionId` currently points at
+   * an OFFICIAL revision. Unlike the `game.state === ENDED` looseness
+   * above, silently letting an assist edit land on the event stream while a
+   * CONFIRMED official revision stays frozen would reproduce the exact
+   * event/revision divergence this follow-up fixes, just one state later
+   * and against a result already presented as final. An operator who needs
+   * to fix an assist after official confirmation must go through the
+   * existing "결과 정정" (`createResultCorrection`) flow, which already
+   * carries the reason/review/officialize trail built for exactly that.
+   * When the current official revision is anything other than OFFICIAL (no
+   * revision yet, or the pointer sits on a VOID revision), this command
+   * proceeds as before and additionally supersedes a SUBMITTED revision
+   * with a fresh, assist-synced, still-SUBMITTED successor, if a resync
+   * would actually change anything, via `syncAssistsIntoSubmittedRevision`
+   * -- the change is captured in the response's optional
+   * `revisionAssistSync` field, which flows into this command's normal
+   * `withCommand`-driven `V1OperationAudit` row (`writeAudit` below) the
+   * same way `event` above already does, so the sync is traceable through
+   * the same audit mechanism this repo already uses rather than a new one
+   * -- on top of the successor revision itself being a normal, permanent,
+   * independently-visible row in `GET .../result-revisions` (surfaced by
+   * the existing `RevisionTimeline` UI exactly like every other revision).
    */
   async assignGoalAssist(
     user: V1AuthUser,
@@ -1485,6 +1514,26 @@ export class GamesService {
             });
           }
         }
+        // Issue #376 follow-up -- refuse outright rather than silently
+        // letting the event and an already CONFIRMED official revision
+        // drift apart the same way the original bug report found event and
+        // SUBMITTED revision drifting apart. See this method's doc comment.
+        const officialPointer = await tx.v1Game.findUnique({
+          where: { id: gameId },
+          select: { currentOfficialRevisionId: true },
+        });
+        if (officialPointer?.currentOfficialRevisionId) {
+          const officialRevision = await tx.v1GameResultRevision.findUnique({
+            where: { id: officialPointer.currentOfficialRevisionId },
+            select: { state: true },
+          });
+          if (officialRevision?.state === V1GameResultRevisionState.OFFICIAL) {
+            throw new ConflictException({
+              code: 'RESULT_ALREADY_OFFICIAL',
+              message: '이미 확정된 결과예요. 어시스트를 바꾸려면 결과 정정을 이용해주세요.',
+            });
+          }
+        }
         const updatedEvent = await tx.v1GameEvent.update({
           where: { id: target.id },
           data: { assistParticipantId: dto.assistParticipantId },
@@ -1493,6 +1542,14 @@ export class GamesService {
           where: { id: gameId },
           data: { version: { increment: 1 } },
         });
+        // Issue #376 follow-up -- keep a still-pending SUBMITTED revision's
+        // participant assist counts honest against the event stream this
+        // command just amended, by superseding it with a fresh successor
+        // (see the helper's doc comment for why it cannot patch the
+        // SUBMITTED row in place). Returns null (folded away below, not
+        // embedded as an empty diff) when there is no SUBMITTED revision or
+        // nothing actually changed.
+        const revisionAssistSync = await this.syncAssistsIntoSubmittedRevision(tx, gameId, context);
         return {
           gameId,
           state: updated.state,
@@ -1502,6 +1559,7 @@ export class GamesService {
           clientEventId: dto.clientEventId,
           sequence: target.sequence,
           event: toPersistedGameEvent(updatedEvent),
+          ...(revisionAssistSync === null ? {} : { revisionAssistSync }),
         };
       },
     );
@@ -3753,58 +3811,8 @@ export class GamesService {
           context.actor.actorType === 'SYSTEM' ? context.actor.systemActor : undefined,
       },
     });
-    const goalCount = new Map<string, number>();
-    const cardCount = new Map<string, { yellow: number; red: number }>();
-    const assistCount = new Map<string, number>();
-    const foulCount = new Map<string, number>();
-    // Issue #376 fix: this loop used to have no reversed-event filter at
-    // all, unlike its two siblings in this same file -- `scoreFromEvents`
-    // (below) builds this identical `reversed` Set from `reversesEventId`
-    // to exclude reversed GOALs from the home/away score, and
-    // `resultInvariantInput` (above, team-match path) does the same to mark
-    // `event.reversed` for the invariant validator. Without it here, a
-    // reversed GOAL's participant/card/foul/assist still got counted
-    // alongside whatever replaced it -- most visibly, attaching an assist
-    // used to reverse the original GOAL and resubmit a new one, which made
-    // the scorer's goal tally double-count (1 official goal, 2 counted)
-    // while `scoreFromEvents`'s home/away total correctly stayed at 1. The
-    // new atomic `assignGoalAssist` command (see its doc comment) no longer
-    // creates that specific pattern, but `reverseEvent` is still the
-    // general correction path for GOAL/CARD/FOUL/SUBSTITUTION, so this
-    // aggregation must independently stay correct for any reversed event.
-    const reversedIds = new Set(
-      events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
-    );
-    for (const event of events) {
-      if (reversedIds.has(event.id)) {
-        continue;
-      }
-      if (event.type === V1GameEventType.GOAL && event.assistParticipantId !== null) {
-        assistCount.set(
-          event.assistParticipantId,
-          (assistCount.get(event.assistParticipantId) ?? 0) + 1,
-        );
-      }
-      if (event.participantId === null) {
-        continue;
-      }
-      if (event.type === V1GameEventType.GOAL) {
-        goalCount.set(event.participantId, (goalCount.get(event.participantId) ?? 0) + 1);
-      }
-      if (event.type === V1GameEventType.CARD) {
-        const payload = jsonObject(event.payload);
-        const cards = cardCount.get(event.participantId) ?? { yellow: 0, red: 0 };
-        if (payload.card === 'RED') {
-          cards.red += 1;
-        } else {
-          cards.yellow += 1;
-        }
-        cardCount.set(event.participantId, cards);
-      }
-      if (event.type === V1GameEventType.FOUL) {
-        foulCount.set(event.participantId, (foulCount.get(event.participantId) ?? 0) + 1);
-      }
-    }
+    const { goalCount, cardCount, assistCount, foulCount } =
+      this.aggregateGameParticipantStats(events);
     await tx.v1GameResultParticipant.createMany({
       data: participants.map((participant) => ({
         resultRevisionId: revision.id,
@@ -3843,6 +3851,449 @@ export class GamesService {
       revision: submitted.revision,
       revisionState: submitted.state,
     };
+  }
+
+  /**
+   * Per-participant GOAL/CARD/FOUL/assist aggregation, shared by
+   * `deriveTournamentRevision` (builds a fresh SUBMITTED revision from the
+   * full event stream) and `syncAssistsIntoSubmittedRevision` (assist-only
+   * resync of an already-SUBMITTED revision after `assignGoalAssist` amends
+   * an event in place -- see that method's doc comment for the bug this
+   * closes). Extracted out of `deriveTournamentRevision` verbatim so both
+   * call sites share one source of truth for what counts toward each stat,
+   * `reversesEventId` filtering included -- see that filter's comment
+   * below for the Issue #376 defect it closes.
+   */
+  private aggregateGameParticipantStats(
+    events: readonly {
+      id: string;
+      type: V1GameEventType;
+      participantId: string | null;
+      assistParticipantId: string | null;
+      payload: Prisma.JsonValue;
+      reversesEventId: string | null;
+    }[],
+  ): {
+    goalCount: Map<string, number>;
+    cardCount: Map<string, { yellow: number; red: number }>;
+    assistCount: Map<string, number>;
+    foulCount: Map<string, number>;
+  } {
+    const goalCount = new Map<string, number>();
+    const cardCount = new Map<string, { yellow: number; red: number }>();
+    const assistCount = new Map<string, number>();
+    const foulCount = new Map<string, number>();
+    // Issue #376 fix: this loop used to have no reversed-event filter at
+    // all, unlike its two siblings in this same file -- `scoreFromEvents`
+    // (below) builds this identical `reversed` Set from `reversesEventId`
+    // to exclude reversed GOALs from the home/away score, and
+    // `resultInvariantInput` (above, team-match path) does the same to mark
+    // `event.reversed` for the invariant validator. Without it here, a
+    // reversed GOAL's participant/card/foul/assist still got counted
+    // alongside whatever replaced it -- most visibly, attaching an assist
+    // used to reverse the original GOAL and resubmit a new one, which made
+    // the scorer's goal tally double-count (1 official goal, 2 counted)
+    // while `scoreFromEvents`'s home/away total correctly stayed at 1. The
+    // atomic `assignGoalAssist` command (see its doc comment) no longer
+    // creates that specific pattern, but `reverseEvent` is still the
+    // general correction path for GOAL/CARD/FOUL/SUBSTITUTION, so this
+    // aggregation must independently stay correct for any reversed event.
+    // Every caller of this shared helper (including the #376-follow-up
+    // assist-revision-sync path) inherits this filter for free.
+    const reversedIds = new Set(
+      events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
+    );
+    for (const event of events) {
+      if (reversedIds.has(event.id)) {
+        continue;
+      }
+      if (event.type === V1GameEventType.GOAL && event.assistParticipantId !== null) {
+        assistCount.set(
+          event.assistParticipantId,
+          (assistCount.get(event.assistParticipantId) ?? 0) + 1,
+        );
+      }
+      if (event.participantId === null) {
+        continue;
+      }
+      if (event.type === V1GameEventType.GOAL) {
+        goalCount.set(event.participantId, (goalCount.get(event.participantId) ?? 0) + 1);
+      }
+      if (event.type === V1GameEventType.CARD) {
+        const payload = jsonObject(event.payload);
+        const cards = cardCount.get(event.participantId) ?? { yellow: 0, red: 0 };
+        if (payload.card === 'RED') {
+          cards.red += 1;
+        } else {
+          cards.yellow += 1;
+        }
+        cardCount.set(event.participantId, cards);
+      }
+      if (event.type === V1GameEventType.FOUL) {
+        foulCount.set(event.participantId, (foulCount.get(event.participantId) ?? 0) + 1);
+      }
+    }
+    return { goalCount, cardCount, assistCount, foulCount };
+  }
+
+  /**
+   * Assist-revision-sync fix (Issue #376 follow-up; alpha finding on
+   * fixture 4439fb84-9117-4d9f-b103-b9abda4bfdd0): `assignGoalAssist` amends
+   * `assistParticipantId` on an already-persisted GOAL event in place, but
+   * nothing previously re-derived the game's result revision from that
+   * change. `deriveTournamentRevision` only ever runs ONCE per game, at
+   * `end`/recovery time (its `revision: 1` literal above assumes exactly
+   * one call) -- every assist attach/detach AFTER that moment left the
+   * already-created revision's `V1GameResultParticipant` rows frozen at
+   * whatever they were when the revision was derived, while the event
+   * stream (and the "경기 세부 기록" event list the operate console renders
+   * straight from events) kept moving. Reviewers then saw the two halves of
+   * the same result-review screen disagree, and approving that revision
+   * would have shipped the STALE assist count as the official record
+   * forever.
+   *
+   * ## Why this creates a NEW revision instead of patching the SUBMITTED one
+   *
+   * The first cut of this fix tried `tx.v1GameResultParticipant.update(...)`
+   * directly against the SUBMITTED revision's rows and hit a hard DB wall:
+   * `v1_guard_result_participant_mutation` (a trigger, see
+   * prisma/migrations/20260729000100_v1_game_operations/migration.sql)
+   * rejects every INSERT/UPDATE/DELETE on `v1_game_result_participants`
+   * whose owning revision's `state` isn't `DRAFT` -- SUBMITTED included --
+   * with SQLSTATE 55000 "result participants require a draft revision".
+   * This isn't dead/unenforced code the way `assertRevisionMutationAllowed`
+   * is (see below); it's a live, currently-active trigger, confirmed by a
+   * real failing integration test, and it has never been relaxed by a later
+   * migration. The chosen fix (product decision, not a technical
+   * workaround) is to reuse the SAME supersede-then-submit mechanism
+   * `TournamentResultReviewService.supersedeAndSubmit`/`createResultCorrection`
+   * already use for every other "this SUBMITTED-adjacent content needs to
+   * change" case in this codebase: create a fresh DRAFT successor (which
+   * CAN carry participant rows, per the trigger), attach the resynced
+   * participants to it, then transition it DRAFT -> SUBMITTED (both legal,
+   * pre-existing transitions) -- never mutating the predecessor row itself.
+   * `ASSIST_SYNC` (`games/core/revision-state-machine.ts`) is the new,
+   * additive `RevisionSupersessionPurpose` this requires, following the
+   * exact same shape `VOID_REENTRY` added for issue #380.
+   *
+   * ## Deciding which revision state(s) this method acts on
+   *
+   * `V1GameResultRevisionState` has DRAFT / SUBMITTED / CHANGE_REQUESTED /
+   * SUPPLEMENT_REQUESTED / REJECTED / OFFICIAL / VOID (schema.prisma):
+   *
+   *  - `SUBMITTED` (this method's only base): still awaiting a reviewer
+   *    decision -- nothing has been confirmed or even provisionally decided
+   *    about it yet, so a fresh successor built from the current event
+   *    stream keeps the review screen honest about what the events actually
+   *    say. This is the literal case reported in alpha: revision #1
+   *    SUBMITTED, the event already showing the new assist, the "어시스트
+   *    미기입" warning banner still counting the stale row.
+   *  - `OFFICIAL` is NEVER a base here -- silently rewriting (or silently
+   *    superseding without review) a CONFIRMED public result would destroy
+   *    the audit trail's meaning. `assignGoalAssist` itself refuses the
+   *    whole command up front (see its doc comment) whenever the game's
+   *    `currentOfficialRevisionId` currently points at an OFFICIAL
+   *    revision, so this method's `state: SUBMITTED` filter is structurally
+   *    incapable of ever selecting an OFFICIAL row anyway -- two
+   *    independent, redundant protections for the same invariant. An
+   *    operator who needs to fix an assist on an already-confirmed result
+   *    must go through the existing "결과 정정" (`createResultCorrection`)
+   *    flow instead.
+   *  - `DRAFT` is a correction-in-progress with HAND-AUTHORED participant
+   *    rows (`createResultCorrection`'s `dto.changes.actualParticipants`,
+   *    not event-derived). Silently overwriting -- or superseding -- an
+   *    operator's in-flight correction with a fresh event aggregate would
+   *    clobber the very correction they are actively typing. Excluded by
+   *    the `state: SUBMITTED` filter below (and `assertRevisionSupersession`
+   *    independently rejects `ASSIST_SYNC` from any base other than
+   *    SUBMITTED -- see its unit tests).
+   *  - `CHANGE_REQUESTED` / `SUPPLEMENT_REQUESTED` / `REJECTED` are
+   *    terminal, already-decided snapshots (`TERMINAL_REVISION_STATES` in
+   *    `games/core/revision-state-machine.ts`, which also models `SUBMITTED`
+   *    participants as frozen via `assertRevisionMutationAllowed`'s
+   *    `REVISION_CONTENT_FROZEN` branch -- that function is defined but not
+   *    wired into any runtime check; the DB trigger above is what actually
+   *    enforces the equivalent invariant). They exist specifically to
+   *    preserve "this is what the reviewer saw when they rejected /
+   *    requested changes / requested supplement" -- touching them would
+   *    corrupt that decision's provenance. A resubmission after one of
+   *    these creates a brand-new SUBMITTED revision (`supersedeAndSubmit`),
+   *    which this method picks up normally once it exists. Excluded by the
+   *    `state: SUBMITTED` filter.
+   *  - `VOID` is also terminal and, per `createResultCorrection`'s
+   *    `VOID_REENTRY` comment ("기존 공식·무효 리비전은 그대로 남아요"), an
+   *    existing official/void revision must stay exactly as it is when a
+   *    new correction re-enters review. A VOID revision also never has any
+   *    `V1GameResultParticipant` rows to begin with (`voidResultRevision`
+   *    never creates any), so there would be nothing to sync into even
+   *    before the state filter excludes it.
+   *
+   * ## What happens to the predecessor SUBMITTED row
+   *
+   * Left completely untouched -- `supersedeAndSubmit` never mutates its own
+   * base row either (its REJECTED/SUPPLEMENT_REQUESTED bases are already
+   * permanently frozen by `v1_block_terminal_revision_mutation`, so there is
+   * nothing TO mutate there; SUBMITTED is not in that trigger's terminal
+   * set, so it technically COULD be mutated, but none of the seven
+   * `V1GameResultRevisionState` values honestly describes "auto-superseded
+   * by a system sync, no reviewer decision" -- REJECTED/CHANGE_REQUESTED/
+   * SUPPLEMENT_REQUESTED would misrepresent a human decision that never
+   * happened, and the coordinator's decision for this fix was explicitly
+   * schema-only-if-necessary, not "add a new enum value"). Leaving it
+   * `SUBMITTED` forever, unguarded, would reopen exactly the stale-approval
+   * hazard this whole fix exists to close -- a stale reviewer view (or a
+   * stale cached revisionId) could still `officializeResultRevision` the
+   * OLD row and confirm outdated assist data as official.
+   * `officializeResultRevision`'s STANDARD flow now independently refuses
+   * that: it rejects officializing any revision that a newer revision's
+   * `supersedesId` already points at (see that method's own comment) --
+   * the exact same kind of staleness check its CORRECTION flow already
+   * performs, just in the other direction.
+   *
+   * This method DOES close the predecessor's still-open review SLA
+   * (`V1ResultEscalation` rows + not-yet-fired reminder/escalation outbox
+   * jobs) via `closeAssistSyncPredecessorSla`, mirroring
+   * `TournamentResultReviewService.closeReviewSla` exactly (duplicated, not
+   * imported -- that class already duplicates `jsonInput`/`canonicalize`
+   * from this file in the opposite direction for the identical reason: it
+   * is a different service in a different ownership lane). The successor's
+   * `submittedAt` is copied from the predecessor's ORIGINAL `submittedAt`,
+   * not `new Date()` -- `GameResultSubmittedEscalationService` computes
+   * every reminder/escalation due date from `submittedAt`, so preserving it
+   * means the review deadline the coordinator flagged ("어시스트 한 건
+   * 붙였다고 검토 기한이 리셋되면 그건 부작용이다") genuinely does not move;
+   * an operator fixing an assist does not buy the submitter extra review
+   * time, nor does it dock any already-elapsed time.
+   *
+   * Known residual gap (reported, not fixed here -- see the task report):
+   * if this method runs in the narrow window before the worker has yet
+   * processed the predecessor's OWN original `GAME_RESULT_SUBMITTED` outbox
+   * event, `closeAssistSyncPredecessorSla` finds nothing to close yet, and
+   * the worker's `GameResultSubmittedEscalationService.escalationHandler`
+   * later still sees `revision.state === 'SUBMITTED'` (never changed here)
+   * and can recreate a PENDING escalation row against the now-superseded
+   * predecessor id. Closing that race requires teaching the worker to also
+   * recognize "this revision has since been superseded" (e.g. via the same
+   * `supersedesId`-pointed-at-me check `officializeResultRevision` now
+   * runs), which is a change to a third file/subsystem outside this fix's
+   * scope -- flagged rather than silently patched, per instruction not to
+   * add unrequested complexity here.
+   *
+   * ## Repeated toggling chains revisions -- confirmed, not mitigated
+   *
+   * Attaching/detaching the same goal's assist N times creates N superseding
+   * revisions (revision +1 each time) -- this method always supersedes
+   * "whichever revision is currently SUBMITTED", so it cannot collapse
+   * consecutive system-generated syncs into one row. The suggested
+   * mitigation (delete-and-recreate the immediately-preceding sync
+   * revision instead of chaining) was checked and is structurally
+   * impossible, not merely undesirable: `V1GameResultParticipant.
+   * resultRevision` is `onDelete: Restrict`, so deleting a
+   * `V1GameResultRevision` row first requires deleting its participant
+   * rows -- and `v1_guard_result_participant_mutation` (the same trigger
+   * that forced this whole design) blocks deleting participant rows for
+   * any non-DRAFT revision exactly as it blocks updating them. There is no
+   * state a completed sync's revision can be left in that is simultaneously
+   * "SUBMITTED for review" and "still deletable". Left unmitigated per
+   * instruction (report the fact, do not add complexity to work around a
+   * structural wall).
+   *
+   * Aggregation reuses `aggregateGameParticipantStats` -- the SAME
+   * event-to-participant-stat aggregation `deriveTournamentRevision` uses to
+   * build a revision from scratch, `reversesEventId` filter included --
+   * rather than hand-rolling a +1/-1 delta, so a swapped assist (old
+   * participant loses one, new participant gains one, in the same call) and
+   * every future event-derived stat stay derived from one source of truth
+   * instead of two aggregation implementations that could drift apart.
+   *
+   * Only the `assists` column differs from the predecessor's own rows:
+   * goals/cards/fouls/started/minutesPlayed/goalkeeper are copied through
+   * unchanged -- they are outside `assignGoalAssist`'s blast radius (it
+   * only ever changes `assistParticipantId`), so re-deriving them here too
+   * would be unrelated scope creep with its own risk of silently
+   * overwriting a reviewer-visible field this command was never asked to
+   * touch.
+   *
+   * Returns `null` when there is no SUBMITTED revision to sync, or when the
+   * resync would produce no observable change (e.g. an assist toggle that
+   * happens to reproduce the value already stored) -- callers use this to
+   * skip creating a pointless successor revision and to omit an empty,
+   * meaningless diff from the audit trail's `after` snapshot.
+   */
+  private async syncAssistsIntoSubmittedRevision(
+    tx: Transaction,
+    gameId: string,
+    context: GameCommandContext,
+  ): Promise<{
+    revisionId: string;
+    revision: number;
+    supersedesRevisionId: string;
+    participants: Array<{ participantId: string; assistsBefore: number; assistsAfter: number }>;
+  } | null> {
+    // `orderBy` is required, not cosmetic: because this method deliberately
+    // never changes a predecessor's own `state` column away from SUBMITTED
+    // (see the doc comment above), repeated toggling leaves MULTIPLE rows
+    // with `state: SUBMITTED` for the same game -- an unordered `findFirst`
+    // can return any of them, including an already-superseded one, silently
+    // syncing into the wrong (stale) row while the actual latest revision
+    // is left untouched. Revision numbers strictly increase (`predecessor.
+    // revision + 1` below, mirroring `nextRevisionNumber` elsewhere in this
+    // file), so the highest-numbered SUBMITTED row is always the live one.
+    const predecessor = await tx.v1GameResultRevision.findFirst({
+      where: { gameId, state: V1GameResultRevisionState.SUBMITTED },
+      orderBy: { revision: 'desc' },
+    });
+    if (predecessor === null) {
+      return null;
+    }
+    const [events, predecessorParticipants] = await Promise.all([
+      tx.v1GameEvent.findMany({
+        where: { gameId },
+        select: {
+          id: true,
+          type: true,
+          participantId: true,
+          assistParticipantId: true,
+          payload: true,
+          reversesEventId: true,
+        },
+      }),
+      tx.v1GameResultParticipant.findMany({ where: { resultRevisionId: predecessor.id } }),
+    ]);
+    const { assistCount } = this.aggregateGameParticipantStats(events);
+    const diffs: Array<{ participantId: string; assistsBefore: number; assistsAfter: number }> = [];
+    for (const participant of predecessorParticipants) {
+      const nextAssists = assistCount.get(participant.participantId) ?? 0;
+      if (nextAssists !== participant.assists) {
+        diffs.push({
+          participantId: participant.participantId,
+          assistsBefore: participant.assists,
+          assistsAfter: nextAssists,
+        });
+      }
+    }
+    if (diffs.length === 0) {
+      return null;
+    }
+    try {
+      assertRevisionSupersession({
+        baseGameId: predecessor.gameId,
+        successorGameId: gameId,
+        baseRevisionId: predecessor.id,
+        supersedesRevisionId: predecessor.id,
+        baseState: predecessor.state,
+        successorState: V1GameResultRevisionState.DRAFT,
+        purpose: 'ASSIST_SYNC',
+      });
+    } catch (error) {
+      if (error instanceof GameContractError) {
+        throw toGameHttpException(error);
+      }
+      throw error;
+    }
+    const successorDraft = await tx.v1GameResultRevision.create({
+      data: {
+        gameId,
+        revision: predecessor.revision + 1,
+        score: jsonInput(predecessor.score),
+        eventsHash: predecessor.eventsHash,
+        missingScorer: predecessor.missingScorer,
+        mvpParticipantId: predecessor.mvpParticipantId,
+        reason: '시스템: 어시스트 변경을 반영해 새 리비전을 제출했어요',
+        createdByActorType: context.actor.actorType,
+        createdByUserId:
+          context.actor.actorType === 'USER' ? context.actor.actorUserId : undefined,
+        createdBySystemActor:
+          context.actor.actorType === 'SYSTEM' ? context.actor.systemActor : undefined,
+        supersedesId: predecessor.id,
+      },
+    });
+    await tx.v1GameResultParticipant.createMany({
+      data: predecessorParticipants.map((participant) => ({
+        resultRevisionId: successorDraft.id,
+        participantId: participant.participantId,
+        sideId: participant.sideId,
+        started: participant.started,
+        minutesPlayed: participant.minutesPlayed,
+        goals: participant.goals,
+        assists: assistCount.get(participant.participantId) ?? 0,
+        fouls: participant.fouls,
+        cards: jsonInput(participant.cards),
+        goalkeeper: participant.goalkeeper,
+      })),
+    });
+    try {
+      assertRevisionTransition({
+        from: successorDraft.state,
+        to: V1GameResultRevisionState.SUBMITTED,
+        flow: 'STANDARD',
+      });
+    } catch (error) {
+      if (error instanceof GameContractError) {
+        throw toGameHttpException(error);
+      }
+      throw error;
+    }
+    const submitted = await tx.v1GameResultRevision.update({
+      where: { id: successorDraft.id },
+      data: {
+        state: V1GameResultRevisionState.SUBMITTED,
+        // Preserve the ORIGINAL submission instant -- see this method's doc
+        // comment on why the review SLA clock must not reset.
+        submittedAt: predecessor.submittedAt ?? new Date(),
+      },
+    });
+    await this.closeAssistSyncPredecessorSla(tx, predecessor.id);
+    await this.writeOutbox(
+      tx,
+      `game:${gameId}:revision:${submitted.revision}:submitted`,
+      gameId,
+      'GAME_RESULT_SUBMITTED',
+      { revisionId: submitted.id, supersedesId: predecessor.id },
+      submitted.id,
+    );
+    return {
+      revisionId: submitted.id,
+      revision: submitted.revision,
+      supersedesRevisionId: predecessor.id,
+      participants: diffs,
+    };
+  }
+
+  /**
+   * Cancels the predecessor's still-open review escalations and not-yet-
+   * fired reminder/escalation outbox jobs when `ASSIST_SYNC` supersedes it
+   * (see `syncAssistsIntoSubmittedRevision`'s doc comment). Same two
+   * statements as `TournamentResultReviewService.closeReviewSla`,
+   * duplicated rather than imported -- that method is private on a
+   * different service in a different ownership lane (that file already
+   * duplicates `jsonInput`/`canonicalize` from THIS file for the same
+   * reason, in the opposite direction). Safe to call even when the
+   * predecessor has no open escalations yet: both statements affect 0 rows
+   * and do not error.
+   */
+  private async closeAssistSyncPredecessorSla(tx: Transaction, revisionId: string): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE v1_result_escalations
+      SET status = 'CLOSED'::"V1EscalationStatus",
+          reason = '어시스트 변경으로 새 리비전이 제출되어 대체됨',
+          version = version + 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE result_revision_id = ${revisionId}
+        AND status IN ('PENDING', 'ACKNOWLEDGED')
+    `;
+    await tx.$executeRaw`
+      UPDATE v1_outbox_events
+      SET status = 'COMPLETED'::"V1OutboxStatus",
+          lease_owner = NULL,
+          lease_until = NULL,
+          last_error = NULL,
+          version = version + 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE revision_id = ${revisionId}
+        AND type IN ('GAME_RESULT_REVIEW_REMINDER', 'GAME_RESULT_REVIEW_ESCALATION')
+        AND status IN ('PENDING', 'RETRY')
+    `;
   }
 
   private scoreFromEvents(

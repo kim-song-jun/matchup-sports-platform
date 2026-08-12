@@ -561,7 +561,8 @@ function EmptySlotMarker({ slot, editable, onSelect }: { slot: FormationSlot; ed
         position: 'absolute', left: `${slot.x}%`, top: `${topPct}%`, transform: 'translate(-50%, -50%)',
         width: TOUCH_TARGET_PX, height: TOUCH_TARGET_PX, borderRadius: '50%',
         border: '2px dashed rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.14)', color: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
+        // [R-T2] 44px 원(TOUCH_TARGET_PX)에 포지션 약칭 2~3자라 12px 여유.
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
         cursor: editable ? 'pointer' : 'default',
       }}
     >
@@ -724,7 +725,11 @@ function PlayerToken({
             position: 'absolute',
             top: -4,
             left: -4,
-            fontSize: 8,
+            // [R-T2] 8px는 하한(12px) 4px 미달로 가장 심각한 축에 속한다. 토큰이
+            // minWidth 44px라 배지 자체가 12px로 커져도 안쪽에서 잘리진 않지만,
+            // 포메이션이 촘촘하면 인접 토큰과 겹칠 수 있어 라이브 화면(피치
+            // 라인업 편집)에서 실측 확인 필요.
+            fontSize: 12,
             fontWeight: 800,
             lineHeight: 1,
             color: '#fff',
@@ -755,7 +760,9 @@ function PlayerToken({
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           textAlign: 'center',
-          fontSize: 10,
+          // [R-T2] maxWidth:84 + ellipsis라 12px로 올려도 글자 수만 줄어들 뿐
+          // 레이아웃은 안 깨진다.
+          fontSize: 12,
           fontWeight: 600,
           color: '#fff',
           background: 'rgba(0,0,0,0.6)',
@@ -805,7 +812,8 @@ function PlayerToken({
               border: '1px solid var(--border)',
               background: 'var(--card-surface)',
               color: 'var(--text-strong)',
-              fontSize: 11,
+              // [R-T2] 18×18 원 안 글자 하나("×")라 12px 여유.
+              fontSize: 12,
               lineHeight: 1,
               display: 'flex',
               alignItems: 'center',

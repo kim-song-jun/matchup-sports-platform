@@ -80,9 +80,10 @@ function StageWithConnector({
         role="listitem"
         aria-label={`${stage.label}${stage.status === 'done' ? ' (완료)' : stage.status === 'active' ? ' (진행 중)' : ' (예정)'}`}
       >
-        {/* upcoming 상태만 번호 표시 — done/active는 ::after 로 처리 */}
+        {/* upcoming 상태만 번호 표시 — done/active는 ::after 로 처리.
+            [R-T2] 28px 원(테두리 2px 감안 실질 24px)에 숫자 한 자리라 12px 여유. */}
         <div className={dotClass} aria-hidden="true">
-          {stage.status === 'upcoming' && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--grey400)', lineHeight: 1 }}>{stepNumber}</span>}
+          {stage.status === 'upcoming' && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--grey400)', lineHeight: 1 }}>{stepNumber}</span>}
         </div>
         <span className={labelClass}>{stage.label}</span>
         {stage.subLabel ? <span className={subLabelClass}>{stage.subLabel}</span> : null}

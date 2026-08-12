@@ -266,18 +266,21 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
               <AwardIcon type={award.awardType} />
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
+              {/* [R-T2] flex:1/minWidth:0 컬럼 — 고정폭 아님, 12로 상향. */}
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
                 {award.awardLabel}
               </div>
               <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {award.recipientName}
               </div>
               {award.teamName && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{award.teamName}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{award.teamName}</div>
               )}
             </div>
             {award.note && (
-              <div style={{ fontSize: 11, color: 'var(--text-caption)', flexShrink: 0, maxWidth: 80, textAlign: 'right' }}>{award.note}</div>
+              // [R-T2] maxWidth:80이지만 overflow/ellipsis 미설정이라 넘치면 줄바꿈으로
+              // 흡수된다(잘림 없음) — 12로 상향.
+              <div style={{ fontSize: 12, color: 'var(--text-caption)', flexShrink: 0, maxWidth: 80, textAlign: 'right' }}>{award.note}</div>
             )}
           </div>
         ))}
@@ -387,7 +390,8 @@ function ReviewFormModal({
             resize: 'none', boxSizing: 'border-box',
           }}
         />
-        <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-caption)', marginBottom: 12 }}>{comment.length}/500</div>
+        {/* [R-T2] 고정폭 없는 카운터 텍스트 — 12로 상향. */}
+        <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-caption)', marginBottom: 12 }}>{comment.length}/500</div>
 
         {/* 사진 첨부 (선택, 최대 3장) */}
         <div style={{ marginBottom: 16 }}>
@@ -423,7 +427,9 @@ function ReviewFormModal({
                 }}
               >
                 <ImagePlus size={18} strokeWidth={1.8} aria-hidden="true" />
-                <span style={{ fontSize: 10 }}>{uploadImages.isPending ? '업로드 중' : `${photoUrls.length}/${REVIEW_PHOTO_MAX}`}</span>
+                {/* [R-T2] 64×64 버튼 안 아이콘(18px)+텍스트 세로 스택 — 12px로도
+                    세로 공간(64px)은 여유. 라이브 화면(대회 후기 작성)에서 실측 필요. */}
+                <span style={{ fontSize: 12 }}>{uploadImages.isPending ? '업로드 중' : `${photoUrls.length}/${REVIEW_PHOTO_MAX}`}</span>
               </button>
             )}
           </div>
@@ -435,7 +441,8 @@ function ReviewFormModal({
             onChange={(e) => void handlePickPhotos(e.target.files)}
             style={{ display: 'none' }}
           />
-          {photoError && <p style={{ color: 'var(--red700)', fontSize: 11, marginTop: 6 }}>{photoError}</p>}
+          {/* [R-T2] 고정폭 없는 에러 문구 — 12로 상향. */}
+          {photoError && <p style={{ color: 'var(--red700)', fontSize: 12, marginTop: 6 }}>{photoError}</p>}
         </div>
 
         {isError && <p style={{ color: 'var(--red700)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
@@ -524,7 +531,8 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
               </button>
             )}
             {isCompleted && isParticipant && alreadyReviewed && (
-              <span style={{ fontSize: 11, color: 'var(--text-caption)', background: 'var(--grey100)', padding: '3px 8px', borderRadius: 6 }}>
+              // [R-T2] 고정폭 없는 pill 배지 — 12로 상향.
+              <span style={{ fontSize: 12, color: 'var(--text-caption)', background: 'var(--grey100)', padding: '3px 8px', borderRadius: 6 }}>
                 ✓ 작성완료
               </span>
             )}

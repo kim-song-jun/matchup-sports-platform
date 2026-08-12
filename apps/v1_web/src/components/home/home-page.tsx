@@ -632,10 +632,15 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                     {t.sport.name}
                     {dateLabel ? ` · ${dateLabel}` : ''}
                     {' · '}
-                    {/* [P1 숫자:단위 2:1 + tabular-nums] 팀 수 */}
+                    {/* [P1 숫자:단위 2:1 + tabular-nums] 팀 수.
+                        [R-T2] 단위(9px)가 하한(12px)에 3px 미달 — 알파 실측
+                        최다 위반. 숫자:단위 크기비로 위계를 주던 것을 굵기
+                        위계(숫자 600, 단위 기본)로 옮기고 둘 다 12px로 맞춘다
+                        (R-T3 "강조는 weight로"와도 합치). 부모 div가
+                        flexWrap:wrap이라 폭이 늘어도 줄바꿈으로 흡수된다. */}
                     <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
                       <span style={{ fontWeight: 600 }}>{t.confirmedCount}/{t.teamCount}</span>
-                      <span style={{ fontSize: 9 }}>팀</span>
+                      <span style={{ fontSize: 12 }}>팀</span>
                     </span>
                   </div>
                 </div>
@@ -662,13 +667,15 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
             </div>
             <div className="tm-match-card-footer">
               {/* #8: 잔여 자리 ≤3일 때 인원 수치를 orange로 + 텍스트 강조 */}
-              {/* [P1 숫자:단위 2:1 + tabular-nums] 인원수 조판: 숫자 font-weight 700, 단위 절반 크기 */}
+              {/* [P1 숫자:단위 2:1 + tabular-nums] 인원수 조판: 숫자 font-weight 700, 단위는
+                  굵기(600)로만 recede — [R-T2] 단위가 9px(하한 3px 미달)였던 것을
+                  ambient tm-text-micro(12px, globals.css)와 맞춰 12로 올림. */}
               {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants ? (
                 <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, fontVariantNumeric: 'tabular-nums' }}>
                   <span className="tm-text-micro" style={{ color: 'var(--orange600)', fontWeight: 700 }}>
                     {match.currentParticipants}/{match.maxParticipants}
                   </span>
-                  <span style={{ fontSize: 9, color: 'var(--orange600)', fontWeight: 600 }}>명</span>
+                  <span style={{ fontSize: 12, color: 'var(--orange600)', fontWeight: 600 }}>명</span>
                   <span className="tm-badge tm-badge-orange" style={{ marginLeft: 2 }}>마감 임박</span>
                 </span>
               ) : (
@@ -676,7 +683,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
                   <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                     {match.currentParticipants}/{match.maxParticipants}
                   </span>
-                  <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>명</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>명</span>
                 </span>
               )}
               <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>

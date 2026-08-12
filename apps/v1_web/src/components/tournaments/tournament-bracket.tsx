@@ -709,7 +709,8 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
         <div className="tm-bk2-third">
           <div className="tm-bk2-third-header">
             <span className="tm-bk2-pill tm-bk2-pill-sm">3 · 4위전</span>
-            <span style={{ fontSize: 11, color: 'var(--text-caption)' }}>4강에서 진 두 팀이 3위를 가려요</span>
+            {/* [R-T2] 고정폭 없는 안내문 — 캡션 토큰과 맞춰 12로 상향. */}
+            <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>4강에서 진 두 팀이 3위를 가려요</span>
           </div>
           {thirdPlace.fixtures.map((f) => (
             <div key={f.id} className="tm-bk2-third-match">

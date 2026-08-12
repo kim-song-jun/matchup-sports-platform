@@ -207,7 +207,8 @@ function DesktopChampionHero({
               letterSpacing: '-0.02em',
             }}>{n}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{label}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{sub}</div>
+            {/* [R-T2] 고정폭 없는 3칸 flex(gap 40) — 12로 상향. */}
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{sub}</div>
           </div>
         ))}
       </div>
@@ -280,8 +281,11 @@ function MobileChampionBanner({
         ].map(({ n, label, sub }) => (
           <div key={label} style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1, color: '#FDE68A', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{n}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>{label}</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{sub}</div>
+            {/* [R-T2] 모바일 챔피언 히어로 3칸(gap 28, 고정폭 없음) — label 11→12,
+                sub 9→12(알파 실측 최다 위반과 같은 9px). 텍스트가 짧고("승리",
+                "3경기 중" 등) 컬럼에 폭 제약이 없어 12px도 흡수된다. */}
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>{label}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{sub}</div>
           </div>
         ))}
       </div>
@@ -349,10 +353,12 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
     }}>
       {/* 상단: 라벨 + 날짜 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
-        <span style={{ fontSize: isAccent ? 12 : 10, fontWeight: 700, color: labelColor, letterSpacing: '0.02em' }}>
+        {/* [R-T2] accent 라운드(10→12로 통일)와 일반 라운드가 같은 12px가 됐다 —
+            accent 구분은 옆 스코어 폰트(16 vs 14)가 계속 담당해 위계 손실 없음. */}
+        <span style={{ fontSize: 12, fontWeight: 700, color: labelColor, letterSpacing: '0.02em' }}>
           {label}
         </span>
-        {date && <span style={{ fontSize: 10, color: 'var(--text-caption)' }}>{date}</span>}
+        {date && <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{date}</span>}
       </div>
       {/* 팀 – 스코어 – 팀 (전체 팀명 노출, 잘리지 않음) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -362,7 +368,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
           color: winner === 'home' ? 'var(--text-strong)' : 'var(--text-muted)',
           wordBreak: 'keep-all', lineHeight: 1.35,
         }}>
-          {home}{isAgg && winner === 'home' && <span style={{ fontSize: 10, color: 'var(--text-strong)', marginLeft: 4 }}>✓</span>}
+          {home}{isAgg && winner === 'home' && <span style={{ fontSize: 12, color: 'var(--text-strong)', marginLeft: 4 }}>✓</span>}
         </span>
         <div style={{
           flex: '0 0 60px', textAlign: 'center',
@@ -375,10 +381,12 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
             color: 'var(--text-strong)',
             fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em',
           }}>
-            {homeScore}<span style={{ fontSize: 11, opacity: 0.35, margin: '0 2px' }}>:</span>{awayScore}
+            {homeScore}<span style={{ fontSize: 12, opacity: 0.35, margin: '0 2px' }}>:</span>{awayScore}
           </div>
+          {/* [R-T2] flex:0 0 60px 고정폭 박스 — PK 표기는 짧아(예: "PK 4:3") 12px도
+              여유 있게 들어간다. */}
           {hasPenalty && homePK != null && awayPK != null && (
-            <div style={{ fontSize: 9, color: 'var(--text-caption)', lineHeight: 1.2 }}>PK {homePK}:{awayPK}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-caption)', lineHeight: 1.2 }}>PK {homePK}:{awayPK}</div>
           )}
         </div>
         <span style={{
@@ -387,7 +395,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
           color: winner === 'away' ? 'var(--text-strong)' : 'var(--text-muted)',
           wordBreak: 'keep-all', lineHeight: 1.35,
         }}>
-          {isAgg && winner === 'away' && <span style={{ fontSize: 10, color: 'var(--text-strong)', marginRight: 4 }}>✓</span>}{away}
+          {isAgg && winner === 'away' && <span style={{ fontSize: 12, color: 'var(--text-strong)', marginRight: 4 }}>✓</span>}{away}
         </span>
       </div>
     </div>
@@ -498,8 +506,10 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
         display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
         padding: '7px 14px', background: 'var(--grey150)', borderBottom: '1px solid var(--grey200)',
       }}>
+        {/* [R-T2] 그리드 컬럼(40px/1fr/64px/36px/36px/40px) 헤더 — 가장 좁은 36px도
+            'W'/'GF' 한두 글자라 12px 여유. */}
         {['#', '팀', '결과', 'W', 'GF', '+/-'].map((h) => (
-          <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-caption)', letterSpacing: '0.06em', textTransform: 'uppercase', textAlign: h === '팀' ? 'left' : 'center' }}>{h}</div>
+          <div key={h} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', letterSpacing: '0.06em', textTransform: 'uppercase', textAlign: h === '팀' ? 'left' : 'center' }}>{h}</div>
         ))}
       </div>
       {rows.map((row, idx) => {
@@ -519,7 +529,8 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
               {row.name}
             </div>
             <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: cfg.numColor }}>
+              {/* [R-T2] 64px 고정폭 컬럼 — '준우승'(3자)도 12px에서 여유 있게 들어간다. */}
+              <span style={{ fontSize: 12, fontWeight: 600, color: cfg.numColor }}>
                 {cfg.label}
               </span>
             </div>
@@ -741,7 +752,8 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
                               <div key={f.id} className="tm-res-match-row">
                                 {f.scheduledAt && (
                                   <div className="tm-res-match-meta">
-                                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-caption)' }}>
+                                    {/* [R-T2] marginLeft:auto로 밀린 flex 아이템, 고정폭 없음 — 12로 상향. */}
+                                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-caption)' }}>
                                       {new Date(f.scheduledAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
                                     </span>
                                   </div>

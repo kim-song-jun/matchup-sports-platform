@@ -35,7 +35,8 @@ function TeamRecordRow({ item, teamId, teamName, teamLogoUrl }: { item: PublicTe
           >
             {teamRecordResultLabel(item.result)}
           </span>
-          <span style={{ fontSize: 11, color: 'var(--text-caption)' }}>
+          {/* [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향. */}
+          <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>
             {formatTournamentDateShort(item.officialAt) ?? ''}
             {item.tournamentTitle ? ` · ${item.tournamentTitle}` : ''}
           </span>
@@ -43,7 +44,8 @@ function TeamRecordRow({ item, teamId, teamName, teamLogoUrl }: { item: PublicTe
         {item.isCorrected ? (
           <span
             style={{
-              fontSize: 11,
+              // [R-T2] 고정 크기 없는 배지 텍스트 — 12로 상향.
+              fontSize: 12,
               fontWeight: 700,
               color: 'var(--blue700)',
               background: 'var(--blue50)',

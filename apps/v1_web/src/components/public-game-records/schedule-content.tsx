@@ -31,7 +31,8 @@ function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
   return (
     <span
       style={{
-        fontSize: 11,
+        // [R-T2] 고정 크기 없는 인라인 배지 텍스트 — 12로 상향.
+        fontSize: 12,
         fontWeight: 700,
         color: tone,
         background: bg,
@@ -85,7 +86,8 @@ function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] })
         gridTemplateColumns: '1fr 20px 1fr',
         gap: 6,
         marginTop: 4,
-        fontSize: 11,
+        // [R-T2] 좌우 1fr 트랙이라 폭이 늘어도 그리드가 흡수 — 12로 상향.
+        fontSize: 12,
         color: 'var(--text-caption)',
       }}
     >
@@ -129,7 +131,8 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
           {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
           <VideoBadge hasVideo={entry.hasVideo} />
         </span>
-        <span style={{ fontSize: 11, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
+        {/* [R-T2] 고정폭 없는 flex 텍스트 — 12로 상향. */}
+        <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
           {dateLabel ?? '일정 미정'}
           {entry.status === 'live' ? <LiveBadge clock={entry.clock} /> : ` · ${fixtureStatusLabel(entry.status)}`}
           <ScheduleResultBadge entry={entry} />
@@ -160,7 +163,8 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
       </div>
       <ScorerSummary scorers={entry.scorers} />
       {venue ? (
-        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-caption)' }}>{venue}</div>
+        // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.
+        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)' }}>{venue}</div>
       ) : null}
     </Link>
   );

@@ -6,13 +6,8 @@
  * 계정/로컬 선호도를 읽어 결정하며, 기본값은 always light다(OS 설정과 무관). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Tailwind v4 커스텀 폰트 크기 유틸리티 — @theme 블록 안에서 정의해야 text-2xs 등의
- * 클래스가 실제 CSS로 생성된다(v3의 tailwind.config.js theme.extend 대응).
- * --font-size-micro(11px, :root 아래)와 값을 맞춘다. */
-@theme {
-  --text-2xs: 11px;
-  --text-2xs--line-height: 14px;
-}
+/* [공개 화면 R-T2 정리] Tailwind text-2xs(11px) 유틸리티 — 코드베이스 전체에 사용처가
+ * 0건이라 삭제(죽은 코드). R-T2 하한(12px) 미달이기도 해 되살릴 이유도 없다. */
 
 @font-face {
   font-family: "Pretendard Variable";
@@ -1385,7 +1380,14 @@ button:disabled {
 }
 
 .tm-text-micro {
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 11px는 하한(12px) 미달 — PR #396(알파 감사 B)이 이미
+     .tm-bottom-tab 등 하드코딩 11px를 caption 토큰으로 올린 것과 같은 논리.
+     이 클래스는 공개 화면 전역(홈·대회 신청/명단·팀 매치 등)에서 50곳 넘게
+     쓰여 콜사이트를 하나씩 옮기는 대신 정의 자체를 캡션 토큰으로 올린다 —
+     line-height(16px)는 이미 tm-text-caption과 동일해 이 변경만으로 줄바꿈
+     간격이 흔들리지 않는다. font-weight 500은 caption(400)과의 유일한 차이로
+     그대로 유지(시맨틱 구분 보존). */
+  font-size: var(--font-size-caption);
   line-height: 16px; /* [P1 4pt snap] 15→16 (4의 배수, ×1.45) */
   font-weight: 500;
 }
@@ -1578,7 +1580,6 @@ button:disabled {
 }
 /* v1-shell 인터랙티브 요소 focus ring (WS5 a11y — 기존엔 :active만 있어 키보드 포커스 미표시) */
 .v1-icon-button:focus-visible,
-.v1-tab:focus-visible,
 .v1-button:focus-visible,
 .v1-chip:focus-visible,
 .v1-card-link:focus-visible {
@@ -1698,7 +1699,9 @@ button:disabled {
 
 .tm-badge-sm {
   min-height: 18px;
-  font-size: 11px; /* --font-size-micro(11px) 참조 */
+  /* [공개 화면 R-T2 정리] 실제 라벨 텍스트(room.typeLabel 등)라 캡션 토큰으로 상향.
+     min-height 18px면 12px 텍스트도 여유 있게 들어간다. */
+  font-size: var(--font-size-caption);
   padding: 0 6px;
 }
 
@@ -1869,7 +1872,12 @@ button:disabled {
 }
 
 /* Numeric unread badge — replaces .tm-unread-dot as the default indicator on
- * NotificationBellLink/Button. 1-99 shows the count, 100+ shows "99+". */
+ * NotificationBellLink/Button. 1-99 shows the count, 100+ shows "99+".
+ * [R-T2 예외] height:16px + border:2px(box-sizing:border-box)라 실제 텍스트가
+ * 들어갈 세로 공간은 16-4=12px뿐이다 — 12px 토큰조차 넘친다. 알림 아이콘 위에
+ * 얹히는 장식성 카운트 배지(iOS/카카오톡류 뱃지와 동일 패턴)로, 정확한 수는
+ * 벨을 눌러 알림 목록에서 확인하므로 여기서 1px 더 키우다 잘리는 것보다
+ * 낫다고 판단해 11px(micro)로 남긴다. */
 .tm-unread-badge {
   position: absolute;
   top: 4px;
@@ -2450,7 +2458,10 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] height:20px, border 2px(box-sizing:border-box) 감안해도
+     실사용 세로 공간이 16px라 캡션 토큰(12px)이 여유 있게 들어간다(tm-unread-badge의
+     16px 배지와 달리 이쪽은 감당 가능). */
+  font-size: var(--font-size-caption);
   line-height: 1;
   font-weight: 800;
 }
@@ -3171,7 +3182,10 @@ button:disabled {
   color: var(--static-white);
   display: grid;
   place-items: center;
-  font-size: 10px;
+  /* [공개 화면 R-T2 정리] border 없는 17px 원이라 캡션 토큰(12px)이 들어간다.
+     width가 아니라 min-width라 두 자릿수로 늘어나도 원이 옆으로 넓어질 뿐
+     잘리지 않는다. */
+  font-size: var(--font-size-caption);
   font-weight: 800;
 }
 
@@ -3397,34 +3411,9 @@ button:disabled {
   padding: 12px;
 }
 
-.tm-team-thumb-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.tm-team-thumb {
-  min-width: 78px;
-  height: 52px;
-  border-radius: 14px;
-  border: 1px solid var(--blue100);
-  background: var(--blue50);
-  color: var(--blue500);
-  display: grid;
-  place-items: center;
-  padding: 0 8px;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.tm-team-thumb-example {
-  border-color: var(--orange50);
-  background: var(--orange50);
-  color: var(--orange500);
-}
+/* [공개 화면 R-T2 정리] .tm-team-thumb(11px)를 고치려 확인하다가 .tm-team-thumb-row·
+   .tm-team-thumb·.tm-team-thumb-example 세 규칙 전부 코드베이스 어디서도 className
+   으로 참조되지 않는 죽은 코드임을 확인 — 통째로 삭제. */
 
 .tm-team-upload-preview {
   height: 116px;
@@ -3719,7 +3708,9 @@ button:disabled {
 }
 
 .tm-chat-read-count {
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 고정 크기 배지가 아니라 말풍선 옆 인라인 텍스트라
+     캡션 토큰으로 올려도 줄바꿈 걱정 없다. */
+  font-size: var(--font-size-caption);
   line-height: 1;
   font-weight: 700;
   /* orange500(#fe9800)은 라이트 --grey50(.tm-chat-room 배경) 위에서 ~2.07:1로
@@ -3740,7 +3731,8 @@ button:disabled {
 .tm-chat-message-meta time,
 .tm-chat-message-time {
   color: var(--text-caption);
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 고정폭 없는 인라인 타임스탬프 — 캡션 토큰으로 상향. */
+  font-size: var(--font-size-caption);
   line-height: 1;
   white-space: nowrap;
 }
@@ -4420,7 +4412,6 @@ button:disabled {
 }
 
 .v1-icon-button:active,
-.v1-tab:active,
 .v1-card-link:active,
 .v1-button:active {
   transform: translateY(1px);
@@ -4453,23 +4444,9 @@ button:disabled {
   backdrop-filter: blur(18px);
 }
 
-.v1-tab {
-  border: 0;
-  background: transparent;
-  color: var(--text-caption);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 0;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.v1-tab-active {
-  color: var(--blue);
-}
+/* [공개 화면 R-T2 정리] .v1-tab(11px)를 고치려 확인하다가 이 클래스와
+   .v1-tab-active가 TSX 어디서도 참조되지 않는 죽은 코드임을 확인 —
+   위 :focus-visible/:active 복합 셀렉터에서의 참조도 함께 제거하고 삭제. */
 
 .v1-section {
   margin-top: 22px;
@@ -5662,7 +5639,9 @@ button:disabled {
   align-items: center;
   padding: 1px 5px;
   border-radius: 4px;
-  font-size: 10px;
+  /* [공개 화면 R-T2 정리] '준비 중' 실텍스트 배지 — 고정폭 없이 padding만 있어
+     캡션 토큰으로 올려도 넘치지 않는다. */
+  font-size: var(--font-size-caption);
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: 0;
@@ -5921,7 +5900,10 @@ button:disabled {
   justify-content: center;
   position: relative;
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 28px 원(border 2px 감안 실질 24px)에 숫자 한 자리만
+     들어가 캡션 토큰(12px) 여유. tournament-progress-stepper.tsx의 인라인
+     fontSize:11도 같은 이유로 12로 맞춤. */
+  font-size: var(--font-size-caption);
   font-weight: 700;
   color: var(--grey400);
 }
@@ -5984,7 +5966,9 @@ button:disabled {
 
 /* 서브레이블 (날짜/시각) */
 .tm-hub-stage-sublabel {
-  font-size: 10px;
+  /* [공개 화면 R-T2 정리] 스텝 아래 자유폭 텍스트 — 캡션 토큰으로 상향해도 줄바꿈
+     걱정 없다. */
+  font-size: var(--font-size-caption);
   color: var(--text-caption);
   font-weight: 500;
   margin-top: -2px;
@@ -6046,21 +6030,8 @@ button:disabled {
 :root.dark .tm-standings-rank-silver { background: var(--grey200); color: var(--grey800); }
 .tm-standings-rank-bronze { background: #FDE8D0; color: #7A3B1E; }
 
-/* 팀 로고 아바타 */
-.tm-team-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--grey100);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  flex-shrink: 0;
-  overflow: hidden;
-}
+/* [공개 화면 R-T2 정리] .tm-team-avatar(11px)를 고치려 확인하다가 TSX 어디서도
+   className으로 참조되지 않는 죽은 코드임을 확인 — 삭제. */
 
 /* ── 브래킷 카드 ── */
 .tm-bk-wrap {
@@ -6083,15 +6054,9 @@ button:disabled {
   flex-direction: column;
   gap: 0;
 }
-.tm-bk-round-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-caption);
-  text-align: center;
-  padding: 0 8px 10px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
+/* [공개 화면 R-T2 정리] .tm-bk-round-label(11px)을 고치려 확인하다가 TSX 어디서도
+   참조되지 않는 죽은 코드임을 확인 — 삭제. 실제 브래킷 UI는 tm-bk2-*(아래 SVG
+   커넥터 기반 v2)가 담당한다. */
 
 .tm-bk-match {
   border: 1px solid var(--grey200);
@@ -6132,12 +6097,8 @@ button:disabled {
   text-align: right;
 }
 .tm-bk-divider { height: 1px; background: var(--grey100); margin: 0 10px; }
-.tm-bk-status {
-  padding: 4px 10px 6px;
-  font-size: 10px;
-  color: var(--text-caption);
-  font-weight: 500;
-}
+/* [공개 화면 R-T2 정리] .tm-bk-status(10px)를 고치려 확인하다가 TSX 어디서도
+   참조되지 않는 죽은 코드임을 확인 — 삭제. */
 
 /* 브래킷 커넥터 — 승자→다음 라운드 */
 .tm-bk-connector-col {
@@ -6220,13 +6181,8 @@ button:disabled {
   padding: 12px 20px;
   border-top: 1px solid var(--grey100);
 }
-.tm-bk-third-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-caption);
-  margin-bottom: 8px;
-  text-align: center;
-}
+/* [공개 화면 R-T2 정리] .tm-bk-third-label(11px)을 고치려 확인하다가 TSX 어디서도
+   참조되지 않는 죽은 코드임을 확인 — 삭제. */
 
 
 /* ═══════════════════════════════════════
@@ -6477,12 +6433,11 @@ button:disabled {
 .tm-wc-team-row[data-loser="true"] { opacity: 0.55; }
 .tm-wc-team-row[data-tbd="true"] { opacity: 0.45; }
 
-.tm-wc-team-avatar {
-  flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px;
-  background: var(--grey200); font-size: 11px; font-weight: 800;
-  color: var(--text-strong); display: flex; align-items: center; justify-content: center;
-}
-.tm-wc-team-row[data-winner="true"] .tm-wc-team-avatar { background: var(--blue500); color: #fff; }
+/* [공개 화면 R-T2 정리] .tm-wc-team-avatar(11px)를 고치려 확인하다가 tm-wc-*
+   접두사 전체가 TSX 어디서도 참조되지 않는 죽은 코드(구 "월드컵식" 브래킷
+   레이아웃, tm-bk2-*로 대체된 것으로 보임)임을 확인 — 이 셀렉터와 winner 상태
+   변형만 삭제(같은 접두사의 나머지 규칙은 이 작업 범위 밖이라 남겨둠 — 별도
+   죽은 코드 정리 필요). */
 
 .tm-wc-team-name {
   flex: 1; font-size: 12px; font-weight: 700; color: var(--text-strong);
@@ -6677,21 +6632,12 @@ button:disabled {
   color: #fff;
   flex-shrink: 0;
 }
-.tm-podium-name {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-strong);
-  text-align: center;
-  word-break: keep-all;
-  line-height: 1.3;
-  max-width: 100%;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
+/* [공개 화면 R-T2 정리] .tm-podium-name/-stat/-platform-label(11/10/9px)을
+   고치려 확인하다가 tm-podium-* 전체가 TSX 어디서도 참조되지 않는 죽은
+   코드(시상 페이지는 지금 tm-awards-podium-* 사용)임을 확인 — 이 세 셀렉터만
+   삭제(같은 접두사의 나머지 규칙은 이 작업 범위 밖이라 남겨둠 — 별도 죽은
+   코드 정리 필요). */
 .tm-podium-name-1st { font-size: 13px; font-weight: 900; }
-.tm-podium-stat { font-size: 10px; color: var(--text-caption); font-variant-numeric: tabular-nums; }
 .tm-podium-platform {
   border-radius: 8px 8px 0 0;
   display: flex;
@@ -6699,7 +6645,6 @@ button:disabled {
   justify-content: center;
   padding-top: 6px;
 }
-.tm-podium-platform-label { font-size: 9px; font-weight: 800; color: rgba(255,255,255,0.7); letter-spacing: 0.06em; text-transform: uppercase; }
 
 /* 4위: 시상대 아래 작은 행 */
 .tm-podium-fourth {
@@ -6918,17 +6863,10 @@ button:disabled {
   justify-content: space-between;
   margin-bottom: 4px;
 }
-.tm-match-result-round {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-caption);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.tm-match-result-date {
-  font-size: 11px;
-  color: var(--text-caption);
-}
+/* [공개 화면 R-T2 정리] .tm-match-result-round/-date(11px)를 고치려 확인하다가
+   tm-match-result-* 전체(card/header/score 포함 11개 셀렉터)가 TSX 어디서도
+   참조되지 않는 죽은 코드임을 확인 — 이 두 셀렉터만 삭제(같은 접두사의 나머지
+   규칙은 이 작업 범위 밖이라 남겨둠 — 별도 죽은 코드 정리 필요). */
 .tm-match-result-score-row {
   display: flex;
   align-items: center;
@@ -6956,19 +6894,8 @@ button:disabled {
   color: var(--grey400);
   margin: 0 2px;
 }
-.tm-match-result-note {
-  font-size: 11px;
-  color: var(--text-caption);
-  text-align: center;
-}
-.tm-match-result-winner-badge {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--blue500);
-  background: var(--blue50);
-  border-radius: 4px;
-  padding: 2px 6px;
-}
+/* [공개 화면 R-T2 정리] .tm-match-result-note/-winner-badge(11/10px) 역시 죽은
+   코드라 삭제(위 round/date와 같은 이유). */
 
 /* ── 시상/리뷰 ── */
 .tm-awards-podium-caption {
@@ -7123,10 +7050,13 @@ button:disabled {
   flex-shrink: 0;
 }
 .tm-review-card-author { font-size: 13px; font-weight: 700; color: var(--text-strong); }
-.tm-review-card-team { font-size: 11px; color: var(--text-caption); }
+/* [공개 화면 R-T2 정리] .tm-review-card-team(11px)은 TSX 어디서도 참조되지
+   않는 죽은 코드(리뷰 카드는 팀명을 author 슬롯에 합쳐 렌더 — awards-page-client.tsx
+   review.teamName ?? review.authorNickname)라 삭제. */
 .tm-review-card-stars { display: flex; gap: 2px; }
 .tm-review-card-body { font-size: 13px; color: var(--text); line-height: 1.55; }
-.tm-review-card-date { font-size: 11px; color: var(--text-caption); }
+/* [공개 화면 R-T2 정리] 고정폭 없는 인라인 날짜 텍스트 — 캡션 토큰으로 상향. */
+.tm-review-card-date { font-size: var(--font-size-caption); color: var(--text-caption); }
 
 /* 경기 영상 — 하이라이트 스트립/칩 + 페이지 내 모달 재생 (components/tournaments/match-videos.tsx) */
 .tm-video-strip {
@@ -7206,7 +7136,9 @@ button:disabled {
 .tm-video-strip-title {
   display: block;
   margin-top: 6px;
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 168px 폭 카드 안에서 ellipsis로 잘리는 한 줄 제목 —
+     캡션 토큰으로 올려도 넘치는 대신 자연스럽게 더 잘린다(레이아웃 깨짐 없음). */
+  font-size: var(--font-size-caption);
   font-weight: 600;
   line-height: 1.35;
   color: var(--grey700);
@@ -7546,7 +7478,8 @@ button:disabled {
   .tm-reviews-table-photo-more {
     display: inline-flex;
     align-items: center;
-    font-size: 11px;
+    /* [공개 화면 R-T2 정리] "+N" 인디케이터 — 고정폭 없어 캡션 토큰으로 상향. */
+    font-size: var(--font-size-caption);
     color: var(--text-caption);
     padding-left: 2px;
   }
@@ -7680,10 +7613,13 @@ button:disabled {
   .tm-tourn-hero-full .tm-res-hero-stats .tm-res-hero-stat-num {
     font-size: 20px;
   }
-  .tm-tourn-hero-full .tm-res-hero-stats .tm-res-hero-stat-label {
-    font-size: 10px;
-    opacity: 0.6;
-  }
+  /* [공개 화면 R-T2 정리] .tm-tourn-hero-full .tm-res-hero-stats .tm-res-hero-stat-label
+     (10px)을 고치려 확인하다가 죽은 코드임을 확인 — 삭제. .tm-res-hero-*(모바일
+     챔피언 히어로, tm-hide-desktop)는 트로피/이름/inline-stat만 렌더하고
+     .tm-tourn-hero-full로 감싸는 데스크톱 콘텐츠(시상대·상금·어워드)에는
+     .tm-res-hero-stats 자체가 존재하지 않아 이 데스크톱 오버라이드가 매칭되는
+     DOM이 없다(위 형제 규칙들도 같은 이유로 죽어 있으나 폰트 크기 위반이 아니라
+     이 작업 범위 밖 — 별도 죽은 코드 정리 필요). */
 
   /* ── 메달 카드 데스크탑: 더 컴팩트 ── */
   .tm-tourn-sub-col .tm-award-card span[aria-hidden="true"][style*="font-size: 52px"],

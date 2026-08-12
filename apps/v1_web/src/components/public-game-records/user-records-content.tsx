@@ -16,19 +16,20 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
   return (
     <div style={{ padding: '12px 16px', borderTop: '1px solid var(--grey100)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-caption)' }}>
+        {/* [R-T2] 고정폭 없는 텍스트/배지 — 아래 3개 span 모두 12로 상향. */}
+        <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>
           {formatTournamentDateShort(item.officialAt) ?? ''}
           {item.tournamentTitle ? ` · ${item.tournamentTitle}` : ''}
         </span>
         <span style={{ display: 'flex', gap: 4 }}>
           {item.mvp ? (
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--orange700, #a36100)', background: 'var(--orange50)', borderRadius: 6, padding: '2px 6px' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange700, #a36100)', background: 'var(--orange50)', borderRadius: 6, padding: '2px 6px' }}>
               MVP
             </span>
           ) : null}
           {item.isCorrected ? (
             <span
-              style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue700)', background: 'var(--blue50)', borderRadius: 6, padding: '2px 6px' }}
+              style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue700)', background: 'var(--blue50)', borderRadius: 6, padding: '2px 6px' }}
             >
               정정됨
             </span>

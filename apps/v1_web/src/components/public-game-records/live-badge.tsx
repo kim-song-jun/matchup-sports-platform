@@ -42,11 +42,12 @@ export function LiveBadge({ clock }: { clock: PublicGameClock | null }) {
           boxShadow: clock?.isPaused ? 'none' : '0 0 0 2px color-mix(in srgb, var(--red500) 25%, transparent)',
         }}
       />
-      <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--red700)', letterSpacing: '0.02em' }}>
+      {/* [R-T2] 고정 크기 없는 pill(자동 폭) — 두 span 모두 12로 상향. */}
+      <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--red700)', letterSpacing: '0.02em' }}>
         {clock?.isPaused ? '일시중지' : 'LIVE'}
       </span>
       {clock !== null ? (
-        <span className="tab-num" style={{ fontSize: 11, fontWeight: 700, color: 'var(--red700)' }}>
+        <span className="tab-num" style={{ fontSize: 12, fontWeight: 700, color: 'var(--red700)' }}>
           {periodLabel(clock.periodNumber)} {formatElapsedClock(clock.elapsedMs)}
         </span>
       ) : null}

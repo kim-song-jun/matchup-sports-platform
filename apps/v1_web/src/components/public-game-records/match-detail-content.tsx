@@ -49,7 +49,8 @@ function LineupColumn({ title, slots }: { title: string; slots: readonly PublicL
                 <span className="tab-num" style={{ color: 'var(--text-caption)', width: 20 }}>{slot.jerseyNumber}</span>
               ) : null}
               <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{presentParticipantName(slot.displayName)}</span>
-              {slot.position ? <span style={{ color: 'var(--text-caption)', fontSize: 11 }}>{slot.position}</span> : null}
+              {/* [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향. */}
+              {slot.position ? <span style={{ color: 'var(--text-caption)', fontSize: 12 }}>{slot.position}</span> : null}
             </li>
           ))}
         </ul>
@@ -89,7 +90,8 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 36 }}>
         <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}>{icon}</span>
         <span className="sr-only">{eventLabel}</span>
-        <span className="tab-num" style={{ fontSize: 11, color: 'var(--text-caption)' }}>
+        {/* [R-T2] min-width:36 컬럼(고정폭 아님) 안 시각 텍스트 — 12로 상향. */}
+        <span className="tab-num" style={{ fontSize: 12, color: 'var(--text-caption)' }}>
           {formatClock(event.clockMs)}
           {isClockAbnormal(event.clockMs) ? <AbnormalClockBadge /> : null}
         </span>
@@ -140,7 +142,8 @@ function HistorySection({ history }: { history: PublicMatchDetail['history'] }) 
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>
                 {revision.state === 'VOID' ? '무효 처리' : revision.isCorrection ? '정정' : '확정'} · {revision.revision}차
               </span>
-              <span style={{ fontSize: 11, color: 'var(--text-caption)' }}>
+              {/* [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향. */}
+              <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>
                 {revision.officialAt ? formatTournamentDateTimeLong(revision.officialAt) : ''}
               </span>
             </div>

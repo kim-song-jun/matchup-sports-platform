@@ -415,19 +415,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     [ops, showToast, confirmIfClockSuspicious],
   );
 
+  // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번
+  // 왕복했다: 같은 렌더의 ops 클로저를 공유하다 보니 submitEvent가 reverseEvent의
+  // 버전 갱신을 반영하지 못한 stale expectedVersion을 큐에 넣어 구조적으로
+  // VERSION_CONFLICT가 나거나(운이 나쁠 때가 아니라 매번), 목록엔 원본·CORRECTION·
+  // 신규 GOAL 세 행이 남았다. ops.assignAssist 한 번 호출로 원본 GOAL의
+  // assistParticipantId만 in-place로 채우므로 그 레이스 자체가 사라진다.
   const attachAssist = useCallback(
     async (event: GameEventRecord, assistParticipantId: string) => {
-      await ops.reverseEvent({ eventId: event.id, reason: '어시스트 사후 기록' });
-      await ops.submitEvent({
-        type: 'GOAL',
-        sideId: event.sideId ?? undefined,
-        participantId: event.participantId ?? undefined,
-        assistParticipantId,
-        period: event.period,
-        clockMs: event.clockMs,
-        occurredAt: event.occurredAt,
-        payload: {},
-      });
+      await ops.assignAssist({ eventId: event.id, assistParticipantId });
     },
     [ops],
   );

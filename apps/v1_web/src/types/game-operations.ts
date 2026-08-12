@@ -248,6 +248,34 @@ export interface GameEventAppendResult extends GameMutationResult {
   sequence: number;
 }
 
+/**
+ * Request body for the atomic assist attach/detach command
+ * (`POST /games/:gameId/events/:eventId/assist`) — mirrors the backend's
+ * `AssignGoalAssistDto` (apps/v1_api/src/games/dto/game-event.dto.ts).
+ *
+ * Issue #376 fix: replaces the old two-step `attachAssist` flow that
+ * reversed the GOAL and re-submitted a new one through the offline queue —
+ * that raced `expectedVersion` (the queue's `submitEvent` closure could
+ * still carry the pre-reversal version) and left the original, its
+ * CORRECTION, and the resubmitted GOAL all visible as three rows in the
+ * recorded-events list for one logical goal. This command updates the
+ * original GOAL's `assistParticipantId` in place instead.
+ *
+ * `assistParticipantId: null` detaches a previously-attached assist — see
+ * `AssignGoalAssistDto`'s backend doc comment for why detach shares this
+ * command rather than getting a separate endpoint.
+ */
+export interface AssignGoalAssistRequest {
+  expectedVersion: number;
+  clientEventId: string;
+  takeoverToken: string;
+  assistParticipantId: string | null;
+}
+
+export interface AssignGoalAssistResult extends GameMutationResult {
+  event: GameEventRecord;
+}
+
 export interface GameTakeoverGrant {
   gameId: string;
   takeoverToken: string;

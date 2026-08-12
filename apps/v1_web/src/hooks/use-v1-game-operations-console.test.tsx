@@ -109,3 +109,62 @@ describe('useV1GameOperationsConsole — reverseEvent must never enter the offli
     unmount();
   });
 });
+
+/**
+ * Issue #376 — the old `attachAssist` (operate-console.tsx) called
+ * `ops.reverseEvent` then `ops.submitEvent` from the same render's `ops`
+ * closure; `submitEvent`'s queued item captured `gameSnapshot.version` from
+ * BEFORE `reverseEvent`'s version bump landed in state, so the re-submitted
+ * GOAL structurally carried a stale `expectedVersion`. `assignAssist`
+ * replaces both calls with one direct REST command — this test asserts it
+ * sends the version straight from the hook's own `gameSnapshot` (the same
+ * source `reverseEvent` above reads) and, like `reverseEvent`, never touches
+ * the offline queue at all, so there is no second call whose version could
+ * ever go stale.
+ */
+describe('useV1GameOperationsConsole — assignAssist must never enter the offline queue', () => {
+  it('sends a direct REST assist-assign call and leaves the durable queue empty', async () => {
+    const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, unmount } = renderHook(
+      () =>
+        useV1GameOperationsConsole({
+          tournamentId: null,
+          gameId: 'game-1',
+          myUserId: 'user-1',
+          initialLastSequence: 0,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.gameSnapshot).not.toBeNull());
+    await waitFor(() => expect(result.current.takeover.status).toBe('held'));
+
+    await act(async () => {
+      await result.current.assignAssist({ eventId: 'event-1', assistParticipantId: 'participant-2' });
+    });
+
+    expect(mockV1Post).toHaveBeenCalledWith(
+      '/games/game-1/events/event-1/assist',
+      expect.objectContaining({
+        expectedVersion: 5,
+        takeoverToken: 'tok-1',
+        assistParticipantId: 'participant-2',
+      }),
+      expect.objectContaining({ headers: { 'Idempotency-Key': expect.any(String) } }),
+    );
+
+    expect(result.current.queue.items).toHaveLength(0);
+    expect(mockSocket.emit).not.toHaveBeenCalledWith(
+      'game.event.append',
+      expect.anything(),
+      expect.anything(),
+    );
+    const persisted = JSON.parse(
+      window.localStorage.getItem('teameet.v1.gameOps.queue.game-1') ?? '{"items":[]}',
+    );
+    expect(persisted.items).toHaveLength(0);
+
+    unmount();
+  });
+});

@@ -17,6 +17,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { CancelGameDto, GameCommandDto, GameCommandName } from './dto/game-command.dto';
 import {
   AppendGameEventDto,
+  AssignGoalAssistDto,
   ListGameEventsQueryDto,
   ReverseGameEventDto,
 } from './dto/game-event.dto';
@@ -106,6 +107,18 @@ export class GamesController {
     @Body() dto: ReverseGameEventDto,
   ) {
     return this.gamesService.reverseEvent(user, gameId, eventId, idempotencyKey, dto);
+  }
+
+  @Post(':gameId/events/:eventId/assist')
+  @UseGuards(V1AuthGuard)
+  assignGoalAssist(
+    @CurrentUser() user: V1AuthUser,
+    @Param('gameId') gameId: string,
+    @Param('eventId') eventId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() dto: AssignGoalAssistDto,
+  ) {
+    return this.gamesService.assignGoalAssist(user, gameId, eventId, idempotencyKey, dto);
   }
 
   @Get(':gameId/lineups')

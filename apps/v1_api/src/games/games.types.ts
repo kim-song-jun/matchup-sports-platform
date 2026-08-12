@@ -173,6 +173,31 @@ export interface GameEventAppendResult extends GameMutationResult {
    * replayed broadcasts, so an absent `event` on a replay is harmless).
    */
   event?: PersistedGameEvent;
+  /**
+   * Issue #376 follow-up -- present only on `assignGoalAssist` responses,
+   * and only when that command's `syncAssistsIntoSubmittedRevision` (see
+   * its doc comment in `games.service.ts`) actually superseded a SUBMITTED
+   * result revision with a fresh, assist-synced successor to keep the
+   * review screen honest against the amended event stream. `revisionId`/
+   * `revision` describe the NEW successor (itself left `SUBMITTED`, still
+   * awaiting review -- not the predecessor named by `supersedesRevisionId`,
+   * which this command never mutates). Absent for every other command, and
+   * absent on `assignGoalAssist` itself when there was no SUBMITTED
+   * revision to sync or the resync would have been a no-op. This is the
+   * only place the sync's diff is recorded -- it flows into `withCommand`'s
+   * normal `V1OperationAudit` write (`after: response`) for the same
+   * command, so the change stays traceable through the audit log this repo
+   * already uses instead of a new mechanism (the successor revision itself
+   * is also independently visible forever in `GET .../result-revisions`,
+   * rendered by the existing `RevisionTimeline` UI like any other
+   * revision).
+   */
+  revisionAssistSync?: {
+    revisionId: string;
+    revision: number;
+    supersedesRevisionId: string;
+    participants: Array<{ participantId: string; assistsBefore: number; assistsAfter: number }>;
+  };
 }
 
 export interface GameRevisionMutationResult extends GameMutationResult {

@@ -125,7 +125,7 @@ export function StaffClient({ tournamentId }: Props) {
     <div className="flex flex-col gap-5">
       <div className="flex justify-between items-start gap-3">
         <div>
-          <p className="text-[11px] md:text-[12px] font-semibold text-blue-500 tracking-normal mb-1">
+          <p className="text-[11px] md:text-[12px] font-semibold text-[var(--blue700)] tracking-normal mb-1">
             {tournament.data?.title ?? '대회 운영'}
           </p>
           <h1 className="text-[22px] md:text-[24px] font-bold text-[var(--text-strong)]">스태프</h1>
@@ -165,7 +165,7 @@ export function StaffClient({ tournamentId }: Props) {
           <button
             type="button"
             onClick={() => void staff.refetch()}
-            className="text-sm text-blue-500 hover:text-[var(--blue700)] underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             다시 시도하기
           </button>

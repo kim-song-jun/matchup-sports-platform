@@ -226,7 +226,7 @@ function CampaignError({ message, onRetry }: { readonly message: string; readonl
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-10 text-center">
       <p className="text-sm font-medium text-[var(--red700)]">{message}</p>
-      <button type="button" onClick={onRetry} className="mt-3 min-h-[44px] rounded-lg px-3 text-sm font-semibold text-blue-500 transition-colors hover:text-[var(--blue700)]">다시 시도하기</button>
+      <button type="button" onClick={onRetry} className="mt-3 min-h-[44px] rounded-lg px-3 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-[var(--blue50)]">다시 시도하기</button>
     </div>
   );
 }

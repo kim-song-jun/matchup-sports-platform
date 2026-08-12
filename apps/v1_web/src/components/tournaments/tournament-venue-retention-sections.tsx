@@ -144,12 +144,15 @@ function PostEventActionList({ heading, cards }: { heading: string; cards: Tourn
               aria-hidden="true"
               // 2026-08-11: 5개 카드(결과/영상/리뷰/스폰서/다음대회) 전부 순수 내비게이션이라
               // 파란 틴트에 의미가 없다는 지적 — 무채색으로 통일
+              // 2026-08-12: [인라인 style 우선순위 fix] 배경을 인라인으로 두면 다크모드
+              // 전용 클래스 오버라이드(.tm-post-event-icon-badge, globals.css)가 절대 못
+              // 이겨서 배지가 여전히 카드에 녹아 사라졌다 — 배경은 CSS 클래스로만 관리.
+              className="tm-post-event-icon-badge"
               style={{
                 flexShrink: 0,
                 width: 36,
                 height: 36,
                 borderRadius: 10,
-                background: 'var(--grey100)',
                 color: 'var(--text-strong)',
                 display: 'grid',
                 placeItems: 'center',

@@ -364,7 +364,7 @@ export function PushSendForm() {
             role="note"
             className="text-[var(--font-size-label)] text-[var(--orange700)] bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] rounded-xl px-3.5 py-3 flex items-start gap-2"
           >
-            <AlertTriangle size={15} className="text-[var(--orange500)] shrink-0 mt-0.5" aria-hidden="true" />
+            <AlertTriangle size={15} className="text-[var(--orange700)] shrink-0 mt-0.5" aria-hidden="true" />
             현재 웹 푸시를 구독 중인 모든 회원에게 발송돼요. 공지 알림을 꺼둔 회원은 자동으로 제외돼요.
           </p>
         )}

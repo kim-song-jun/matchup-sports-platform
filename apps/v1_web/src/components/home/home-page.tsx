@@ -433,8 +433,12 @@ function QuickAction({ item }: { item: HomeQuickAction }) {
        * 재참조하면 44px 타일 경계가 사라진다 — 이 도메인의 기존 중립 아이콘칩 패턴
        * (.tm-weather-icon-cloud/.tm-weather-icon-fog, globals.css)과 동일하게 한 단계
        * 진한 grey100으로 타일 경계를 확보한다.
+       * 배경색은 .tm-quick-icon(globals.css)이 담당 — 다크모드에서는 부모
+       * .tm-quick-grid가 --card-surface(#1c1e24)를 쓰는데 --grey100 다크값도
+       * 동일 #1c1e24라 타일 경계가 완전히 사라지는 문제가 있어, :root.dark
+       * 오버라이드로 --grey150(#20222a)을 사용해 대비를 확보한다.
        */}
-      <div className="tm-quick-icon" style={{ background: 'var(--grey100)', color: item.color }}>
+      <div className="tm-quick-icon" style={{ color: item.color }}>
         <QuickActionIcon item={item} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -596,6 +600,10 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
               >
                 <span
                   // 2026-08-11: 순수 내비게이션 카드 아이콘 — 무채색 통일(마이허브 메뉴와 동일 근거)
+                  // 2026-08-12: [인라인 style 우선순위 fix] 배경을 인라인으로 두면 다크모드
+                  // 전용 클래스 오버라이드(.tm-tournament-widget-icon, globals.css)가 절대
+                  // 못 이겨서 배지가 여전히 카드에 녹아 사라졌다 — 배경은 CSS 클래스로만 관리.
+                  className="tm-tournament-widget-icon"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -604,7 +612,6 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                     width: 32,
                     height: 32,
                     borderRadius: 8,
-                    background: 'var(--grey100)',
                     color: 'var(--text-strong)',
                   }}
                   aria-hidden="true"

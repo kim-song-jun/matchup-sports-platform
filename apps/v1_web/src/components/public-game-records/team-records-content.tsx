@@ -8,8 +8,8 @@ import { teamRecordResultLabel } from './format';
 import type { PublicTeamRecordItem, PublicTeamRecordsResponse } from './types';
 
 const RESULT_COLOR: Record<string, string> = {
-  WON: 'var(--blue500)',
-  LOST: 'var(--red500)',
+  WON: 'var(--blue700)',
+  LOST: 'var(--red700)',
   DRAWN: 'var(--text-caption)',
 };
 

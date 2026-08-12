@@ -208,7 +208,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
           role="dialog"
           aria-modal="true"
           aria-labelledby="error-log-detail-title"
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[720px] max-h-[85vh] flex flex-col overflow-hidden"
+          className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[720px] max-h-[85vh] flex flex-col overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--border)] shrink-0">

@@ -498,7 +498,7 @@ function WizardStepper({
                         ? 'bg-blue-500 text-white'
                         : done
                           ? 'bg-blue-100 text-[var(--blue700)]'
-                          : 'bg-[var(--grey100)] text-[var(--text-caption)]',
+                          : 'bg-[var(--grey150)] text-[var(--text-caption)]',
                     ].join(' ')}
                   >
                     {done ? <Check size={14} /> : locked ? <Lock size={12} /> : index + 1}
@@ -850,7 +850,7 @@ function ParticipationStep({
           // 지적). 이 경우 서버 canonical 기본값이 그대로 적용되긴 하지만, 관리자가
           // 선택하지 못한 이유가 "종목이 원래 안 되는 것"인지 "지금 못 불러온 것"인지
           // 구분되어야 한다.
-          <p className="text-xs text-[var(--red500)]">
+          <p className="text-xs text-[var(--red700)]">
             출전 인원 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요. 그대로 저장하면 종목 기본값이 적용돼요.
           </p>
         ) : !lineupSizeOptions.supported ? (
@@ -891,7 +891,7 @@ function ParticipationStep({
         {lineupSizeOptionsPending ? (
           <p className="text-xs text-[var(--text-caption)]">선택지를 불러오는 중이에요…</p>
         ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
-          <p className="text-xs text-[var(--red500)]">
+          <p className="text-xs text-[var(--red700)]">
             교체 방식 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요. 그대로 저장하면 종목 기본값이 적용돼요.
           </p>
         ) : !lineupSizeOptions.supported ? (
@@ -986,7 +986,7 @@ function ParticipationStep({
             />
           </div>
           {errors.genderQuota ? (
-            <p role="alert" className="mt-3 text-xs font-semibold text-[var(--red500)]">
+            <p role="alert" className="mt-3 text-xs font-semibold text-[var(--red700)]">
               {errors.genderQuota}
             </p>
           ) : null}
@@ -1289,14 +1289,14 @@ function Field({
         {label}
         {required ? (
           <>
-            <span aria-hidden="true" className="ml-0.5 text-[var(--red500)]">*</span>
+            <span aria-hidden="true" className="ml-0.5 text-[var(--red700)]">*</span>
             <span className="sr-only"> (필수)</span>
           </>
         ) : null}
       </label>
       {children}
       {error ? (
-        <p role="alert" className="text-xs font-medium text-[var(--red500)]">
+        <p role="alert" className="text-xs font-medium text-[var(--red700)]">
           {error}
         </p>
       ) : hint ? (

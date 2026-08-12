@@ -682,7 +682,7 @@ function CapacityRow({ current, capacity }: { current: number; capacity: number 
 
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; title: string; body: string }) {
   const tint = tone === 'green' ? 'var(--tint-green)' : tone === 'grey' ? 'var(--tint-grey)' : 'var(--tint-orange)';
-  const accent = tone === 'green' ? 'var(--green500)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange600)';
+  const accent = tone === 'green' ? 'var(--green700)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange600)';
   return (
     <Card pad={14} style={{ marginTop: 14, background: tint }}>
       {/* [P0/P1 아이콘+컬러] 아이콘을 타이틀과 함께 표시해 색상만으로 상태를 구분하지 않음 (WCAG 1.4.1) */}

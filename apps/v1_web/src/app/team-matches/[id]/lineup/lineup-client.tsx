@@ -974,7 +974,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         <div
           role="presentation"
           onClick={() => setChangeRequestOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(25,31,40,0.32)', padding: 20 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'var(--scrim-dark-32)', padding: 20 }}
         >
           <section
             ref={changeRequestDialogRef}

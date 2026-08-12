@@ -533,6 +533,13 @@
     background: var(--bg);
     align-self: center;
   }
+
+  /* 다크모드에서 페이지 배경(grey50 #1a1c22)과 카드 배경(--bg #121317)의 명도
+   * 차이가 실측 1.09:1로 거의 없어 카드 경계가 안 보였다 — border 추가로 경계
+   * 확보(shadow만으로는 두 배경이 근접해 elevation이 인지되지 않는다). */
+  :root.dark .tm-auth-frame {
+    border: 1px solid var(--border);
+  }
 }
 
 /* ─── Scale-in animation for desktop filter sheet ─────────────────────────── */

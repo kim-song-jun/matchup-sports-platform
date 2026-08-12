@@ -722,12 +722,15 @@ function PlayerRow({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div
           aria-hidden="true"
+          // 2026-08-12: [인라인 style 우선순위 fix] 배경을 인라인으로 두면 다크모드 전용
+          // 클래스 오버라이드(.tm-roster-player-initial, globals.css)가 절대 못 이겨서
+          // 배지가 여전히 카드에 녹아 사라졌다 — 배경은 CSS 클래스로만 관리.
+          className="tm-roster-player-initial"
           style={{
             flexShrink: 0,
             width: 36,
             height: 36,
             borderRadius: 12,
-            background: 'var(--grey100)',
             color: 'var(--text-strong)',
             display: 'grid',
             placeItems: 'center',

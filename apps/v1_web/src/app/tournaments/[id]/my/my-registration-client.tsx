@@ -1343,7 +1343,7 @@ function TeamRegistrationHub({
                       {` · ${meta}`}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: displayActionDisabled ? 'var(--text-caption)' : 'var(--blue500)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: displayActionDisabled ? 'var(--text-caption)' : 'var(--blue700)' }}>
                     <span className="tm-text-caption" style={{ fontWeight: 700 }}>{displayActionLabel}</span>
                     {!displayActionDisabled ? <ChevronRight size={16} /> : null}
                   </div>

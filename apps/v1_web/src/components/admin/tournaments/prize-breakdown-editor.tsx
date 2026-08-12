@@ -129,7 +129,7 @@ export function PrizeBreakdownEditor({
               type="button"
               onClick={() => onPrizePoolChange(String(total))}
               disabled={disabled}
-              className="min-h-[44px] rounded-xl bg-[var(--grey100)] px-4 text-xs font-semibold text-[var(--text-body)]"
+              className="min-h-[44px] rounded-xl bg-[var(--grey150)] px-4 text-xs font-semibold text-[var(--text-body)]"
             >
               합계를 총상금으로
             </button>

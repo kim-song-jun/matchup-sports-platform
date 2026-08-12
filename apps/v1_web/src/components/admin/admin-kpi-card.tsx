@@ -15,14 +15,14 @@ interface AdminKpiCardProps {
 const TONE_VALUE: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
   neutral: 'text-blue-500',
   positive: 'text-green-500',
-  warning: 'text-[var(--orange500)]',
+  warning: 'text-[var(--orange700)]',
   danger: 'text-red-500',
 };
 
 const TONE_ICON: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
   neutral: 'text-blue-400',
   positive: 'text-green-400',
-  warning: 'text-[var(--orange500)]',
+  warning: 'text-[var(--orange700)]',
   danger: 'text-red-400',
 };
 

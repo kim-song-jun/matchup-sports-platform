@@ -41,7 +41,7 @@
 .tm-landing-brand {
   font-size: 18px;
   font-weight: 800;
-  color: var(--blue500);
+  color: var(--blue700);
   letter-spacing: -0.5px;
   text-decoration: none;
   white-space: nowrap;
@@ -102,7 +102,7 @@
   display: inline-block;
   font-size: 12px;
   font-weight: 600;
-  color: var(--blue500);
+  color: var(--blue700);
   background: var(--blue50);
   border: 1px solid var(--blue100);
   border-radius: 20px;

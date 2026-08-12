@@ -74,7 +74,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
         </AppBackLink>
         {/* 소비자용 대회 화면과 이질감이 있다는 지적(2026-08-05)을 반영해 그 화면들이
             이미 쓰는 eyebrow(파란 대회명)+제목 톤을 맞췄다. */}
-        <p className="text-[11px] md:text-[12px] font-semibold text-blue-500 tracking-normal">
+        <p className="text-[11px] md:text-[12px] font-semibold text-[var(--blue700)] tracking-normal">
           {tournament.data?.title ?? '대회 운영'}
         </p>
         <h1 className="tm-text-heading">결과 정정</h1>

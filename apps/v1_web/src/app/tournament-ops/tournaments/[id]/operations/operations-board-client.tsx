@@ -168,7 +168,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     <div className="flex flex-col gap-5">
       <div className="flex justify-between items-start gap-3">
         <div>
-          <p className="text-[11px] md:text-[12px] font-semibold text-blue-500 tracking-normal mb-1">
+          <p className="text-[11px] md:text-[12px] font-semibold text-[var(--blue700)] tracking-normal mb-1">
             {tournament.data?.title ?? '대회 운영'}
           </p>
           <h1 className="text-[22px] md:text-[24px] font-bold text-[var(--text-strong)]">운영 보드</h1>
@@ -261,13 +261,13 @@ export function OperationsBoardClient({ tournamentId }: Props) {
         </>
       ) : board.isError ? (
         <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
-          <p className="text-sm text-red-500 font-medium">
+          <p className="text-sm text-[var(--red700)] font-medium">
             {extractErrorMessage(board.error, '운영 보드를 불러오지 못했어요.')}
           </p>
           <button
             type="button"
             onClick={() => void board.refetch()}
-            className="text-sm text-blue-500 hover:text-[var(--blue700)] underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             다시 시도하기
           </button>
@@ -394,7 +394,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 {loadingMore ? '불러오는 중…' : '더 보기'}
               </button>
               {loadMoreError && (
-                <p className="text-[13px] text-red-500" role="alert">
+                <p className="text-[13px] text-[var(--red700)]" role="alert">
                   {loadMoreError}
                 </p>
               )}

@@ -255,7 +255,7 @@ export function OtpVerificationCard({
             <span
               id={remainingId}
               className="tm-text-caption"
-              style={{ color: expired ? 'var(--red500)' : 'var(--text-muted)' }}
+              style={{ color: expired ? 'var(--red700)' : 'var(--text-muted)' }}
             >
               {expired ? '인증번호를 다시 받아 주세요' : `남은 시간 ${minutes}:${String(seconds).padStart(2, '0')}`}
             </span>

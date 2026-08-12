@@ -1441,7 +1441,7 @@ export function NotificationSettingsPageClient() {
                     </div>
                     <span
                       className="tm-text-caption"
-                      style={{ minWidth: 24, textAlign: 'right', color: showAsOn ? 'var(--blue500)' : 'var(--text-caption)' }}
+                      style={{ minWidth: 24, textAlign: 'right', color: showAsOn ? 'var(--blue700)' : 'var(--text-caption)' }}
                       aria-hidden="true"
                     >
                       {pushRegistration.isPending ? '···' : pushRegistration.isSubscribed ? 'ON' : 'OFF'}

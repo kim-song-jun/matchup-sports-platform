@@ -1015,7 +1015,7 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
-        background: 'rgba(25, 31, 40, 0.32)',
+        background: 'var(--scrim-dark-32)',
         padding: '20px',
       }}
     >

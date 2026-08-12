@@ -46,6 +46,9 @@
   --teal50: #e2f7f8;
   --teal500: #0eb8c0;
   --teal600: #0da6ad; /* teal500과 동일한 명도차로 파생 — 종목 아이콘 그라디언트용 */
+  --teal700: #096d72; /* teal500(#0eb8c0)은 자신의 teal50 배경 위 2.43:1로 AA(4.5:1) 미달 —
+     blue700/green700과 동일하게 같은 색상(hue 183°)을 유지한 채 명도만 낮춘 짙은 버전을
+     텍스트 전용 토큰으로 추가(teal50 배경 위 5.49:1, 흰 배경 위 6.10:1 통과). */
   --grey50: #f9fafb;
   --grey100: #f2f4f6;
   --grey150: #eaedf0;
@@ -167,6 +170,14 @@
      chip 색은 다크모드에도 동일 값 유지)으로 고정한다 — :root.dark 오버라이드 없음. */
   --player-marker-blue: #1b64da;
   --player-marker-orange: #a36100;
+  /* WeatherStrip 아이콘 대비 결함(2026-08-12 실측) — .tm-weather-icon(기본, 맑음)이
+     yellow500(#ffc342) on yellow50(#fff8d6) 1.50:1, .tm-weather-icon-thunderstorm이
+     orange500 on orange50 1.97:1로 아이콘 최소 기준(WCAG 1.4.11, 3:1) 미달. orange는
+     기존 --orange700(#965300, 5.42:1 on orange50)을 재사용. yellow는 짝이 되는 700
+     토큰이 없어 동일 패턴(blue700/green700/red700/orange700 — 500이 자기 50 틴트
+     배경에서 AA 미달할 때 짙은 변형을 별도 토큰화)으로 신규 추가: #a66c00은
+     yellow50 배경에서 4.12:1(3:1 여유 확보). */
+  --yellow700: #a66c00;
   /* ── 타입 스케일 토큰 — desktop/tournaments.css 대진표·라운드 카드 타이포 ── */
   --font-size-micro: 11px;
   --font-size-caption: 12px;
@@ -309,7 +320,7 @@
   --border-strong: #4e5968;
   --line: var(--border);
   --card-surface: #1c1e24;
-  --list-row-bg: #1a1c22;
+  --list-row-bg: var(--grey150);
   --list-row-border: #262932;
   --input-surface: var(--surface);
   /* 파스텔 배경 토큰(50/100)도 함께 뒤집는다 — 이 값들은 원래 라이트 전용 고정값이라
@@ -339,12 +350,19 @@
    * 재사용, red는 이 파일에 이미 쓰이던 #ff6b76(.tm-bk2-badge-live 등)과 통일. */
   --blue700: #6ba8ff;
   --orange700: var(--orange500);
+  /* --yellow700(light #a66c00)도 동일 이유로 다크에서 --yellow500 재사용 — 다크
+     yellow50 틴트(rgba(255,195,66,0.16)) 위 yellow500은 이미 7.2:1로 충분히 통과. */
+  --yellow700: var(--yellow500);
   --red700: #ff6b76;
   /* green700 다크 재계산: 라이트 전용으로 새로 추가한 --green700(#037a4a)도 다크에서
    * 그대로면 카드 표면·자신의 dark green50 틴트 배경 양쪽에서 대비가 무너진다(실측 대상:
    * '운영 콘솔 열기' CTA, text-green-600 4.11:1 결함의 근본 수정). blue700/red700과 동일한
    * 여유폭(카드·틴트 배경 양쪽 5.8~7.9:1)으로 밝은 민트 계열을 재계산해 선택. */
   --green700: #2fe0a0;
+  /* teal700 다크 재계산: 라이트 전용 --teal700(#096d72)도 다크에서 그대로면 카드 표면·
+   * 자신의 dark teal50 틴트 배경 양쪽에서 대비가 무너진다. blue700/green700과 동일한
+   * 여유폭(카드 9.6:1, 틴트 배경 7.3:1)으로 밝은 시안 계열을 재계산해 선택. */
+  --teal700: #29d9e0;
 }
 
 /* alpha 라이브 확인 중 발견: 흰 유리(glass) 배경을 CSS 변수 없이 rgba(255,255,255,X)로
@@ -1601,9 +1619,24 @@ button:disabled {
   color: var(--blue700);
 }
 
+/* 시인성 fix: 공지 상세(NoticeDetailPageView)의 카테고리 뱃지는 Card로 감싸지 않고
+ * .tm-app-frame(페이지 배경 --grey50) 위에 바로 렌더된다. 배경(--grey100)과 페이지
+ * 배경(--grey50)이 라이트 ~1.05:1, 다크(override 적용 후) ~1.02:1로 근접 충돌해 뱃지
+ * 형태가 페이지에 녹아든다 — 다른 "토큰 충돌 fix" 배지들과 동일 패턴(예: 4861/4964행)으로
+ * 신규 토큰 없이 --border 얇은 보더를 더해 배경 근접과 무관하게 경계를 확보한다. */
 .tm-badge-grey {
   background: var(--grey100);
+  /* 2026-08-12: --border(라이트 ~1.18:1)만으로는 페이지(grey50)·뱃지 자체 배경(grey100)
+     둘 다에 대해 여전히 거의 안 보였다(계산 확인) — --border-strong으로 승격. */
+  border: 1px solid var(--border-strong);
   color: var(--text-muted);
+}
+
+/* 다크모드: --grey100(#1c1e24)이 --card-surface(#1c1e24)와 동일 값이라, 팀매치 만들기
+ * 확인화면·포메이션 프리셋 배지처럼 Card 내부에 얹히면 배경이 그대로 소실된다.
+ * --grey150(#20222a)으로 한 단계 밝혀 카드 표면과 구분되게 한다. */
+:root.dark .tm-badge-grey {
+  background: var(--grey150);
 }
 
 .tm-badge-orange {
@@ -1952,6 +1985,44 @@ button:disabled {
   display: grid;
   place-items: center;
   font-weight: 800;
+  background: var(--grey100);
+}
+
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 부모 .tm-quick-grid의
+   --card-surface(#1c1e24)와 완전히 같아 아이콘 배지 경계가 사라진다(라이트모드는
+   grey100 #f2f4f6 vs card-surface #fff라 구분됨). 신규 토큰 없이 --grey150(다크
+   #20222a, card-surface와 구분)으로 다크 전용 오버라이드 — SidebarTournamentsWidget
+   아이콘(.tm-tournament-widget-icon)과 동일 패턴. */
+:root.dark .tm-quick-icon {
+  background: var(--grey150);
+}
+
+/* 2026-08-12: [인라인 style 우선순위 fix] 아래 두 클래스는 원래 JSX에 인라인
+   style={{ background: 'var(--grey100)' }}가 같이 있어서, 다크 전용 클래스
+   오버라이드를 아무리 추가해도 인라인이 항상 이겨 dead code였다(라이트/다크
+   전부 이 CSS로만 배경을 관리하도록 인라인 background를 제거 — 해당 .tsx도 함께 수정). */
+.tm-roster-player-initial {
+  background: var(--grey100);
+}
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 부모 <Card pad={0}>의
+   --card-surface(#1c1e24)와 완전히 같아 명단 선수 이니셜 배지 경계가 사라진다
+   (라이트모드는 grey100 #f2f4f6 vs card-surface #fff라 구분됨). 신규 토큰 없이
+   --grey150(다크 #20222a, card-surface와 구분)으로 다크 전용 오버라이드 —
+   .tm-quick-icon과 동일 패턴. tournament-roster-client.tsx PlayerRow 이니셜 배지. */
+:root.dark .tm-roster-player-initial {
+  background: var(--grey150);
+}
+
+.tm-guide-step-num {
+  background: var(--grey100);
+}
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 참가 신청 안내 스텝 배지의 부모
+   Card(--card-surface, #1c1e24)와 완전히 같아 번호 배지 경계가 사라진다(라이트모드는
+   grey100 #f2f4f6 vs card-surface #fff라 구분됨, tournament-event-hub-sections.tsx
+   TournamentApplicationGuideSection). 신규 토큰 없이 --grey150(다크 #20222a,
+   card-surface와 구분)으로 다크 전용 오버라이드 — .tm-quick-icon과 동일 패턴. */
+:root.dark .tm-guide-step-num {
+  background: var(--grey150);
 }
 
 .tm-weather-strip {
@@ -1971,7 +2042,7 @@ button:disabled {
   place-items: center;
   border-radius: 50%;
   background: var(--yellow50);
-  color: var(--yellow500);
+  color: var(--yellow700);
   flex-shrink: 0;
 }
 
@@ -1999,7 +2070,7 @@ button:disabled {
 
 .tm-weather-icon-thunderstorm {
   background: var(--orange50);
-  color: var(--orange500);
+  color: var(--orange700);
 }
 
 .tm-section-title {
@@ -2115,6 +2186,14 @@ button:disabled {
   flex-shrink: 0;
 }
 
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 부모 .tm-notice-row(.tm-card,
+   --card-surface #1c1e24)와 완전히 같아 알림 아이콘 타일 경계가 사라진다(라이트모드는
+   grey100 #f2f4f6 vs card-surface #fff라 구분됨). 신규 토큰 없이 --grey150(다크
+   #20222a, card-surface와 구분)으로 다크 전용 오버라이드 — notices-page.tsx */
+:root.dark .tm-notice-row-icon {
+  background: var(--grey150);
+}
+
 .tm-notice-row > span:nth-child(2) {
   flex: 1;
   min-width: 0;
@@ -2165,7 +2244,7 @@ button:disabled {
 }
 
 .tm-notice-related .tm-text-label {
-  color: var(--blue500);
+  color: var(--blue700);
 }
 
 .tm-notice-related .tm-text-caption {
@@ -2213,6 +2292,13 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
   padding: 0 12px;
+}
+
+/* [다크 근접충돌 fix] 다크에서 grey50(#1a1c22)·grey100(#1c1e24) 대비가 1.02:1로 여전히 근접
+   — 라이트는 grey100 유지, 다크만 grey150(#20222a)로 한 단계 더 진하게. .tm-team-summary-bar 동일 구조. */
+:root.dark .tm-match-summary-row,
+:root.dark .tm-team-summary-bar {
+  background: var(--grey150);
 }
 
 .tm-match-summary-row > *,
@@ -3185,6 +3271,14 @@ button:disabled {
   color: var(--static-white);
 }
 
+/* [다크모드 회귀 fix] :root.dark는 --grey900을 #f2f4f6(거의 흰색)로 반전시킨다(304행) —
+   이 카드는 coverImageUrl 유무와 무관하게 항상 어두운 히어로 배경 위에 --static-white
+   텍스트를 얹는 디자인이므로, 다크모드에서 반전되지 않는 고정 다크 배경으로 오버라이드한다.
+   라이트모드 --grey900 리터럴(#191f28, 59행)을 그대로 재사용 — 새 토큰 발명 금지. */
+:root.dark .tm-team-detail-hero-card {
+  background: #191f28;
+}
+
 .tm-team-detail-body {
   padding: 18px 20px 128px;
 }
@@ -3416,6 +3510,15 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+/* [다크모드 회귀 fix] :root.dark는 --grey900을 #f2f4f6(거의 흰색)로 반전시킨다(304행) —
+   이 아바타는 프로필 사진 미설정 유저에게 항상 어두운 배경 위에 --static-white 이니셜을
+   얹는 디자인이므로, 다크모드에서 반전되지 않는 고정 다크 배경으로 오버라이드한다.
+   라이트모드 --grey900 리터럴(#191f28, 59행)을 그대로 재사용 — 새 토큰 발명 금지.
+   .tm-team-detail-hero-card(3245행)와 동일 패턴. */
+:root.dark .tm-chat-avatar {
+  background: #191f28;
+}
+
 .tm-chat-row-actions {
   display: flex;
   width: 72px;
@@ -3448,6 +3551,13 @@ button:disabled {
 }
 
 .tm-chat-row-unread .tm-chat-avatar {
+  background-color: var(--blue500);
+}
+
+/* 위 :root.dark .tm-chat-avatar(3502행) 오버라이드가 셀렉터 3클래스라 이 미읽음
+   예외(2클래스)보다 명시도가 높아 다크모드에서 blue500을 덮어써버린다 — 다크에서도
+   미읽음 아바타는 blue500을 유지해야 하므로 동일 조건으로 명시적으로 재선언한다. */
+:root.dark .tm-chat-row-unread .tm-chat-avatar {
   background-color: var(--blue500);
 }
 
@@ -3626,6 +3736,15 @@ button:disabled {
   background: var(--grey100);
 }
 
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 .tm-chat-room 배경 --grey50(#1a1c22)과
+   거의 같은 값이라(대비 ~1.02:1) 날짜구분선 알약이 채팅방 배경에 녹아 사실상 안 보인다
+   (라이트모드는 grey50 #f9fafb vs grey100 #f2f4f6이라 구분됨 — 기존 코멘트가 전제한
+   대비가 다크에서는 무효). 신규 토큰 없이 --grey150(다크 #20222a, grey50과 구분)으로
+   다크 전용 오버라이드. */
+:root.dark .tm-chat-date-divider span {
+  background: var(--grey150);
+}
+
 .tm-chat-system-message {
   display: flex;
   justify-content: center;
@@ -3642,6 +3761,14 @@ button:disabled {
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+/* [토큰 충돌 fix] 위 라이트모드 fix(grey50→grey100)가 다크에서는 무효 — 다크 --grey100(#1c1e24)이
+   .tm-chat-room 배경 --grey50(#1a1c22)과 거의 같은 값이라(대비 ~1.02:1) 시스템 메시지 알약이
+   여전히 채팅방 배경에 녹아 보인다. 신규 토큰 없이 --grey150(다크 #20222a, grey50과 구분)으로
+   다크 전용 오버라이드 — .tm-chat-date-divider span과 동일 패턴. */
+:root.dark .tm-chat-system-message span {
+  background: var(--grey150);
 }
 
 .tm-chat-bubble {
@@ -4903,6 +5030,38 @@ button:disabled {
   background: var(--grey150);
 }
 
+.tm-tournament-widget-icon {
+  background: var(--grey100);
+}
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 SidebarTournamentsWidget 카드의
+   부모 배경 --surface(#1c1e24)와 완전히 같은 값이라 아이콘 배지가 카드에 녹아
+   사라진다(라이트모드는 grey100 #f2f4f6 vs surface #fff라 구분됨). 신규 토큰 없이
+   --grey150(다크 #20222a, surface와 구분)으로 다크 전용 오버라이드. */
+:root.dark .tm-tournament-widget-icon {
+  background: var(--grey150);
+}
+
+.tm-post-event-icon-badge {
+  background: var(--grey100);
+}
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 PostEventActionList 아이콘 배지를
+   감싸는 Card(--card-surface, #1c1e24)와 완전히 같은 값이라 배지가 카드에 녹아
+   사라진다(라이트모드는 grey100 #f2f4f6 vs card-surface #fff라 구분됨 —
+   tournament-venue-retention-sections.tsx PostEventActionList). 신규 토큰 없이
+   --grey150(다크 #20222a, card-surface와 구분)으로 다크 전용 오버라이드. */
+:root.dark .tm-post-event-icon-badge {
+  background: var(--grey150);
+}
+
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 Card(--card-surface, #1c1e24)와
+   완전히 같은 값이라 .tm-info-row 구분선이 카드 안에서 사라진다(라이트모드는
+   grey100 #f2f4f6 vs card-surface #fff라 구분됨 — 팀매치 만들기 확인화면, 상세
+   우측 레일에서 실사용). 신규 토큰 없이 --grey150(다크 #20222a, card-surface와
+   구분)으로 다크 전용 오버라이드. */
+:root.dark .tm-info-row {
+  border-bottom-color: var(--grey150);
+}
+
 .tm-review-stat-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5140,7 +5299,7 @@ button:disabled {
 .tm-danger-panel {
   border-radius: 8px;
   background: var(--red50);
-  color: var(--red500);
+  color: var(--red700);
   padding: 18px;
 }
 
@@ -5192,7 +5351,11 @@ button:disabled {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  color: var(--red500);
+  /* 2026-08-12: .tm-danger-panel의 color:red700 승격은 .tm-text-body가 이미 자체
+     color(--text)를 갖고 있어 상속되지 않는 no-op이었다 — 실제로 이 아이콘 자체가
+     자신의 틴트 배경(--red50, .tm-danger-panel) 위에서 red500(2026-08-11 사용자 지적
+     계열과 동일 패턴)을 직접 쓰고 있어 이게 진짜 대비 결함이었다. */
+  color: var(--red700);
   display: grid;
   place-items: center;
 }
@@ -5606,7 +5769,7 @@ button:disabled {
 /* pending: 파란 tint — 비색상 지표: 텍스트 '초대중' 병기 필수 */
 .tm-invitation-status-pending {
   background: var(--blue50);
-  color: var(--blue500);
+  color: var(--blue700);
 }
 
 /* accepted: 초록 tint — 비색상 지표: 텍스트 '수락됨' 병기 */
@@ -6056,7 +6219,7 @@ button:disabled {
   border: 1px solid var(--grey200);
   border-radius: 11px;
   overflow: hidden;
-  background: #fff;
+  background: var(--card-surface);
   width: 180px;
 }
 .tm-bk2-card-live { border-color: var(--blue500); box-shadow: 0 0 0 2px var(--blue50); }
@@ -6085,14 +6248,14 @@ button:disabled {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   line-height: 1.2;
 }
-.tm-bk2-row[data-winner=true] .tm-bk2-name { color: var(--blue500); }
+.tm-bk2-row[data-winner=true] .tm-bk2-name { color: var(--blue700); }
 
 /* 점수 */
 .tm-bk2-score {
   font-size: 15px; font-weight: 900; color: var(--text-strong);
   min-width: 18px; text-align: right; line-height: 1; flex-shrink: 0;
 }
-.tm-bk2-row[data-winner=true] .tm-bk2-score { color: var(--blue500); }
+.tm-bk2-row[data-winner=true] .tm-bk2-score { color: var(--blue700); }
 
 /* 구분선 */
 .tm-bk2-divider { height: 1px; background: var(--grey100); }

@@ -261,7 +261,7 @@ export default function AdminTournamentsPage() {
         {/* 페이지 이동 실패는 목록이 비어 보이지 않으므로 따로 알린다. */}
         {isError && rows.length > 0 && (
           <div className="flex flex-col items-center gap-1.5">
-            <p className="text-[var(--font-size-label)] text-red-500" role="alert">
+            <p className="text-[var(--font-size-label)] text-[var(--red700)]" role="alert">
               {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
             </p>
             <button

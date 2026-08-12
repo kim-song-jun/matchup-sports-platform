@@ -53,7 +53,7 @@ export function TournamentCampaignStatusDialog({
         if (event.target === event.currentTarget && !pending) onClose();
       }}
     >
-      <div role="dialog" aria-modal="true" aria-labelledby="campaign-status-dialog-title" className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-[var(--card-surface)] shadow-[0_8px_32px_rgba(20,28,45,0.14)]">
+      <div role="dialog" aria-modal="true" aria-labelledby="campaign-status-dialog-title" className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-[var(--card-surface)] shadow-[var(--shadow-modal)]">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
             <h2 id="campaign-status-dialog-title" className="text-base font-bold text-[var(--text-strong)]">캠페인 상태 변경</h2>

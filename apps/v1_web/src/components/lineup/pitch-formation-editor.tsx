@@ -256,7 +256,7 @@ export function PitchFormationEditor({
           role={guidance.active ? 'status' : undefined}
           className="tm-text-caption"
           style={{
-            color: guidance.active ? 'var(--blue500)' : 'var(--text-muted)',
+            color: guidance.active ? 'var(--blue700)' : 'var(--text-muted)',
             fontWeight: guidance.active ? 700 : 400,
           }}
         >

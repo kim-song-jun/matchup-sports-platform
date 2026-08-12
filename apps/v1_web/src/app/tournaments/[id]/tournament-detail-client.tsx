@@ -716,9 +716,9 @@ export function TournamentDetailView({
               const pct = Math.round((reservedTeamCount / Math.max(tournament.teamCount, 1)) * 100);
               const almostFull = pct >= 80;
               return (
-                <div className="tm-text-caption" style={{ color: almostFull ? 'var(--orange500)' : 'var(--text-muted)', marginTop: 6 }}>
+                <div className="tm-text-caption" style={{ color: almostFull ? 'var(--orange700)' : 'var(--text-muted)', marginTop: 6 }}>
                   {almostFull ? '마감 임박! ' : '아직 '}
-                  <b style={{ color: almostFull ? 'var(--orange500)' : 'var(--blue500)', fontWeight: 500 }}>{remaining}자리</b> 남았어요
+                  <b style={{ color: almostFull ? 'var(--orange700)' : 'var(--blue700)', fontWeight: 500 }}>{remaining}자리</b> 남았어요
                 </div>
               );
             })()}

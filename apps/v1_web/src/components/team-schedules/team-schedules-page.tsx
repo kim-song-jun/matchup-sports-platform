@@ -317,7 +317,7 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
                   {attendance.counts.waitlisted > 0 ? ` · 대기 ${attendance.counts.waitlisted}명` : ''}
                 </div>
                 {attendance.deadlineLabel ? (
-                  <div className="tm-text-caption" style={{ marginTop: 4, color: attendance.deadlinePassed ? 'var(--red500)' : undefined }}>
+                  <div className="tm-text-caption" style={{ marginTop: 4, color: attendance.deadlinePassed ? 'var(--red700)' : undefined }}>
                     {attendance.deadlineLabel}
                   </div>
                 ) : null}
@@ -480,7 +480,9 @@ function ScheduleAttendeeSection({ model }: { model: ScheduleDetailViewModel['at
                   width: 32,
                   height: 32,
                   borderRadius: '50%',
-                  background: 'var(--grey100)',
+                  /* [다크모드 fix] grey100 다크값(#1c1e24)이 카드 배경 --card-surface
+                     다크값(#1c1e24)과 동일해 아바타 원이 안 보였다. grey150(다크 #20222a)로 분리. */
+                  background: 'var(--grey150)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

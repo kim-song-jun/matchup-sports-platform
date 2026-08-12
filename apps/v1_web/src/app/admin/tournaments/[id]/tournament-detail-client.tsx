@@ -2754,7 +2754,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         <button
           type="button"
           onClick={() => void refetch()}
-          className="text-sm text-blue-500 hover:text-[var(--blue700)] underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           다시 시도하기
         </button>
@@ -3341,7 +3341,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
               // 조회 실패를 "미지원 종목"과 같은 문구로 뭉뚱그리면 실제 오류가 숨겨진다
               // (Copilot 리뷰 지적). 현재 pin된 값은 아래 안내로 그대로 보여준다.
-              <p className="text-[12px] text-[var(--red500)]">
+              <p className="text-[12px] text-[var(--red700)]">
                 출전 인원 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
                 {tournament.lineupMaxPlayers !== null ? ` 현재 설정은 ${tournament.lineupMaxPlayers}명이에요.` : ''}
               </p>
@@ -3393,7 +3393,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             ) : lineupSizeOptionsPending ? (
               <p className="text-[12px] text-[var(--text-muted)]">선택지를 불러오는 중이에요…</p>
             ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
-              <p className="text-[12px] text-[var(--red500)]">
+              <p className="text-[12px] text-[var(--red700)]">
                 교체 방식 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
                 {tournament.substitutionMode !== null
                   ? ` 현재 설정은 ${substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions)}이에요.`
@@ -4258,7 +4258,7 @@ function ReviewsTab({
           <button
             type="button"
             onClick={() => void refetch()}
-            className="text-sm text-blue-500 hover:text-[var(--blue700)] underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             다시 시도하기
           </button>

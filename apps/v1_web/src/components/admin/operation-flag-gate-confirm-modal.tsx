@@ -163,7 +163,7 @@ export function GateConfirmModal({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2 id="gate-confirm-title" className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-1.5">
-            {tone === 'amber' && <AlertTriangle size={17} className="text-[var(--orange500)]" aria-hidden="true" />}
+            {tone === 'amber' && <AlertTriangle size={17} className="text-[var(--orange700)]" aria-hidden="true" />}
             {title}
           </h2>
           <button

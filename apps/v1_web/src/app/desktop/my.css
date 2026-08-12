@@ -106,8 +106,9 @@
     margin: 0;
     border-radius: 16px;
     /* 페이지 배경(--bg) 위 --grey50 한 단계 — main과 동일
-       (globals.css .tm-my-profile-head와 동일 근거). */
-    border: 1px solid var(--grey100);
+       (globals.css .tm-my-profile-head와 동일 근거). 경계는 모바일 변형과 같은
+       --border(grey200) — main의 grey100은 grey50 배경 위에서 ~1.03:1로 보이지 않는다. */
+    border: 1px solid var(--border);
     background: var(--grey50);
     flex-direction: column;
     align-items: flex-start;

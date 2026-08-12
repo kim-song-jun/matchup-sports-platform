@@ -148,6 +148,9 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
         registrationId: groupTeam.registrationId,
         teamId: groupTeam.registration.team.id,
         teamName: groupTeam.registration.team.name,
+        // 순위 행이 아직 없을 때 이 편성 목록만으로 순위표를 그리므로(#374), 순위 행과
+        // 같은 아바타가 나오도록 로고도 함께 내려 준다.
+        teamLogoUrl: groupTeam.registration.team.profile?.logoUrl ?? null,
         sortOrder: groupTeam.sortOrder,
       })),
       standings: group.standings.map((standing) => ({

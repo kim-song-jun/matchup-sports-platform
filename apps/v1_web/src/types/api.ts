@@ -2718,6 +2718,7 @@ export type V1TournamentGroupTeam = {
   registrationId: string;
   teamId: string;
   teamName: string;
+  teamLogoUrl: string | null;
   sortOrder: number;
 };
 

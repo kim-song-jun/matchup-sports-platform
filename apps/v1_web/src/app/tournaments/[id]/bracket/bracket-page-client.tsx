@@ -51,6 +51,39 @@ function toStandingsRows(standings: readonly V1TournamentStanding[]): Tournament
 }
 
 /**
+ * 조 순위표 행 — 순위 행이 하나도 없어도 **편성된 팀 전체**를 그린다.
+ *
+ * `V1TournamentStanding` 행은 첫 결과가 OFFICIAL이 될 때(또는 어드민 재계산 때) 비로소
+ * 생긴다(tournament-group-standings.ts). 그래서 경기 기록이 0건인 조는 `group.standings`가
+ * 빈 배열이고, 순위표가 "순위 집계 전이에요" 한 줄로 비어 조 편성은 공개됐는데 우리 조에
+ * 누가 있는지 볼 수 없었다(#374). 집계 전에는 서버가 이미 내려주는 `group.groupTeams`
+ * (sortOrder 순 정렬)를 전 지표 0인 기준선 행으로 대신 쓴다.
+ *
+ * 순위 숫자는 이때 편성 순서일 뿐이므로, 표가 전부 0이면 TournamentStandingsTable이
+ * 메달 색·진출 강조를 스스로 끄고 안내 문구를 붙인다.
+ *
+ * 집계가 시작되면(standings가 한 행이라도 있으면) 서버 값이 유일한 진실이다 — 부분
+ * 병합은 하지 않는다. 재계산은 항상 그 조의 전 팀을 한꺼번에 upsert 하므로
+ * (recalculateAndUpsertGroupStandings) "일부만 집계된" 중간 상태가 존재하지 않는다.
+ */
+function toGroupStandingsRows(group: V1TournamentGroup): TournamentStandingsRow[] {
+  if (group.standings.length > 0) return toStandingsRows(group.standings);
+  return group.groupTeams.map((team, index) => ({
+    key: team.registrationId,
+    teamId: team.teamId,
+    teamName: team.teamName,
+    teamLogoUrl: team.teamLogoUrl,
+    position: index + 1,
+    points: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+  }));
+}
+
+/**
  * 순위표에서 팀을 펼쳤을 때 그 행 아래에 붙는 상세 — 그 팀이 이 조에서 치른/치를
  * 경기 목록이다. 오너 지시("클릭했을 때 팀 전적 페이지로 넘어가는 것보다 하단에
  * 상세를 보여주는 게 낫다")대로 화면 전환 없이 순위 맥락을 유지한 채 보여준다.
@@ -155,7 +188,7 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
       </div>
 
       <TournamentStandingsTable
-        rows={toStandingsRows(group.standings)}
+        rows={toGroupStandingsRows(group)}
         advance={advance}
         ariaLabel={`${group.name} 순위표`}
         renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={groupFixtures} />}
@@ -165,10 +198,10 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
 }
 
 /* ── 리그 최종 순위표 (리그 포맷) ── */
-function LeagueStandingsSection({ standings }: { standings: V1TournamentStanding[] }) {
+function LeagueStandingsSection({ rows }: { rows: readonly TournamentStandingsRow[] }) {
   return (
     <section aria-label="리그 순위" style={{ marginBottom: 16 }}>
-      <TournamentStandingsTable rows={toStandingsRows(standings)} advance={null} ariaLabel="리그 순위표" />
+      <TournamentStandingsTable rows={rows} advance={null} ariaLabel="리그 순위표" />
     </section>
   );
 }
@@ -252,10 +285,12 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const groupStageDone = format === 'knockout' ? true : allGroupPhasesComplete(groups, fixtures);
   const showBracket = hasKnockoutFixtures && groupStageDone;
 
-  // 리그 포맷: 모든 그룹의 standings를 합산
-  const allLeagueStandings = groups
-    .flatMap((g) => g.standings)
-    .filter((s, i, arr) => arr.findIndex((x) => x.registrationId === s.registrationId) === i)
+  // 리그 포맷: 모든 그룹의 순위 행을 합산. 집계 전 조는 toGroupStandingsRows가
+  // 편성 팀(groupTeams)을 0값 기준선 행으로 대신 내주므로, 경기 0건이어도 참가 팀이
+  // 모두 보인다(#374). 중복 제거 키는 등록 단위(row.key = registrationId)로 그대로 유지.
+  const allLeagueRows = groups
+    .flatMap((g) => toGroupStandingsRows(g))
+    .filter((row, index, arr) => arr.findIndex((x) => x.key === row.key) === index)
     .sort((a, b) => a.position - b.position);
 
   return (
@@ -325,7 +360,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                   <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
                     리그 순위
                   </h3>
-                  <LeagueStandingsSection standings={allLeagueStandings} />
+                  <LeagueStandingsSection rows={allLeagueRows} />
                 </section>
               )}
 

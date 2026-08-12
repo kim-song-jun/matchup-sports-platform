@@ -30,6 +30,11 @@ type PromoCardFieldsProps = {
   uploading?: boolean;
   disabled?: boolean;
   priorityError?: string;
+  /**
+   * 이 자리를 비워뒀을 때 실제로 노출될 기본 이미지(대회 커버). 미리보기도 이 값을 반영해
+   * 저장 전에 무엇이 보일지 그대로 확인할 수 있게 한다.
+   */
+  defaultImageUrl?: string | null;
 };
 
 const inputClass =
@@ -44,6 +49,7 @@ export function PromoCardFields({
   uploading = false,
   disabled = false,
   priorityError,
+  defaultImageUrl,
 }: PromoCardFieldsProps) {
   const generatedId = useId().replaceAll(':', '');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -52,11 +58,13 @@ export function PromoCardFields({
     key: K,
     fieldValue: TournamentPromoCardValue[K],
   ) => onChange({ ...value, [key]: fieldValue });
+  const trimmedDefaultImageUrl = defaultImageUrl?.trim() ?? '';
+  const usingDefaultImage = !value.imageUrl.trim() && Boolean(trimmedDefaultImageUrl);
   const previewFields = {
     title: value.title,
     subtitle: value.subtitle,
     badgeText: value.badgeText,
-    imageUrl: value.imageUrl,
+    imageUrl: value.imageUrl.trim() || trimmedDefaultImageUrl,
     dateText: value.dateText,
     teamsText: value.teamsText,
     locationText: value.locationText,
@@ -190,7 +198,7 @@ export function PromoCardFields({
                 onChange={(event) => update('imageUrl', event.target.value)}
                 disabled={disabled}
                 maxLength={1000}
-                placeholder="/uploads/..."
+                placeholder={trimmedDefaultImageUrl ? '비우면 기본 이미지 사용' : '/uploads/...'}
                 className={`${inputClass} min-w-[220px] flex-1`}
               />
               {onSelectImage ? (
@@ -218,7 +226,24 @@ export function PromoCardFields({
                   </button>
                 </>
               ) : null}
+              {trimmedDefaultImageUrl && !usingDefaultImage ? (
+                <button
+                  type="button"
+                  onClick={() => update('imageUrl', '')}
+                  disabled={disabled}
+                  className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50"
+                >
+                  기본 이미지로
+                </button>
+              ) : null}
             </div>
+            <p className="mt-1.5 text-xs text-[var(--text-caption)]">
+              {usingDefaultImage
+                ? '기본 이미지(대회 대표 이미지)를 쓰고 있어요. 이 카드만 다르게 하려면 업로드해 주세요.'
+                : trimmedDefaultImageUrl
+                  ? '이 카드 전용 이미지를 쓰고 있어요. 비우면 기본 이미지로 돌아가요.'
+                  : '비워두면 대회 대표 이미지를 함께 사용해요.'}
+            </p>
           </Field>
         </div>
       </div>

@@ -1168,6 +1168,7 @@ function PresentationStep({
           <h3 className="text-sm font-bold text-[var(--text-strong)]">홍보 카드</h3>
           <p className="mt-1 text-xs text-[var(--text-caption)]">
             생성과 동시에 홈·대회 목록 홍보를 준비할 수 있어요. 노출은 각 카드에서 켜세요.
+            홍보 이미지를 비워두면 위에서 올린 대표 이미지를 함께 사용해요.
           </p>
         </div>
         <PromoCardFields
@@ -1181,6 +1182,7 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoHome'}
           disabled={pending}
           priorityError={errors.promoHomePriority}
+          defaultImageUrl={state.coverImageUrl}
         />
         <PromoCardFields
           variant="list"
@@ -1193,6 +1195,7 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoList'}
           disabled={pending}
           priorityError={errors.promoListPriority}
+          defaultImageUrl={state.coverImageUrl}
         />
       </section>
     </div>

@@ -19,6 +19,14 @@ function stripQueryString(url: string): string {
 // 노출 범위를 제한한다(client-error-reporter.ts 의 4000자 상한과 동일 컨벤션).
 const MAX_LOGGED_STACK_LENGTH = 4000;
 
+// multer 의 LIMIT_FILE_SIZE 는 @nestjs/platform-express 를 거쳐 코드 없는
+// PayloadTooLargeException('File too large') 로 올라온다 — 그대로 내보내면 클라이언트에
+// 영어 메시지 + INTERNAL_ERROR 코드가 노출돼 사용자가 원인도 대처법도 알 수 없다.
+// UploadsService 의 정밀 한도 초과와 같은 코드로 정규화해 계약을 하나로 맞춘다.
+const PAYLOAD_TOO_LARGE_CODE = 'UPLOAD_FILE_TOO_LARGE';
+const PAYLOAD_TOO_LARGE_MESSAGE =
+  '파일 용량이 업로드 한도를 초과했어요. 더 작은 파일로 다시 시도해주세요.';
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   constructor(
@@ -37,7 +45,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const messageObj =
       typeof message === 'object' && message !== null ? (message as Record<string, unknown>) : null;
-    const code = messageObj && typeof messageObj.code === 'string' ? (messageObj.code as string) : undefined;
+    const rawCode = messageObj && typeof messageObj.code === 'string' ? (messageObj.code as string) : undefined;
+    // 서비스가 자체 코드를 붙인 413(UploadsService 의 5MB 초과 등)은 그대로 두고, 코드 없는
+    // 프레임워크발 413(multer 하드캡)만 도메인 코드로 승격한다.
+    const isUncodedPayloadTooLarge = !rawCode && status === HttpStatus.PAYLOAD_TOO_LARGE;
+    const code = rawCode ?? (isUncodedPayloadTooLarge ? PAYLOAD_TOO_LARGE_CODE : undefined);
 
     const logContext = {
       requestId: request.id,
@@ -66,8 +78,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // fingerprint 가 되어 한 행으로 뭉치고, 어드민 목록에도 어떤 필드가 틀렸는지 남지
     // 않는다 — 조사에 필요한 정보가 통째로 사라지므로 join 해서 남긴다.
     // (아래 responseBody 의 message 는 배열 원본을 그대로 내보내 클라이언트 계약을 지킨다.)
-    const responseMessage =
-      typeof message === 'string'
+    const responseMessage = isUncodedPayloadTooLarge
+      ? PAYLOAD_TOO_LARGE_MESSAGE
+      : typeof message === 'string'
         ? message
         : Array.isArray(messageObj?.message)
           ? messageObj.message.filter((item) => typeof item === 'string').join(', ') || `HTTP ${status}`
@@ -79,7 +92,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status: 'error',
       statusCode: status,
       code: code ?? 'INTERNAL_ERROR',
-      message: typeof message === 'string' || (messageObj && typeof messageObj.message === 'string') ? responseMessage : message,
+      message:
+        isUncodedPayloadTooLarge ||
+        typeof message === 'string' ||
+        (messageObj && typeof messageObj.message === 'string')
+          ? responseMessage
+          : message,
       details: messageObj?.details ?? null,
       requestId: request.id,
       timestamp: new Date().toISOString(),

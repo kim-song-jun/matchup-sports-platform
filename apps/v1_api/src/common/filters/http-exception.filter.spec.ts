@@ -1,4 +1,10 @@
-import { ArgumentsHost, HttpException, HttpStatus, InternalServerErrorException } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  InternalServerErrorException,
+  PayloadTooLargeException,
+} from '@nestjs/common';
 import { AllExceptionsFilter } from './http-exception.filter';
 
 function buildHost(request: Record<string, unknown>) {
@@ -235,6 +241,41 @@ describe('AllExceptionsFilter', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ err: expect.any(Error) }),
       'Failed to record server error log',
+    );
+  });
+
+  it('코드 없는 413(multer 하드캡)을 업로드 도메인 코드 + 한국어 메시지로 정규화한다', () => {
+    const request = { id: 'req-413', method: 'POST', originalUrl: '/api/v1/uploads' };
+    const { host, response } = buildHost(request);
+    // @nestjs/platform-express 가 multer LIMIT_FILE_SIZE 를 이 형태로 올린다.
+    const exception = new PayloadTooLargeException('File too large');
+
+    filter.catch(exception, host);
+
+    expect(response.status).toHaveBeenCalledWith(HttpStatus.PAYLOAD_TOO_LARGE);
+    expect(response.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'UPLOAD_FILE_TOO_LARGE',
+        message: '파일 용량이 업로드 한도를 초과했어요. 더 작은 파일로 다시 시도해주세요.',
+      }),
+    );
+  });
+
+  it('서비스가 자체 코드를 붙인 413 은 그대로 통과시킨다', () => {
+    const request = { id: 'req-413-coded', method: 'POST', originalUrl: '/api/v1/uploads' };
+    const { host, response } = buildHost(request);
+    const exception = new HttpException(
+      { code: 'CUSTOM_TOO_LARGE', message: '영상은 200MB까지 올릴 수 있어요.' },
+      HttpStatus.PAYLOAD_TOO_LARGE,
+    );
+
+    filter.catch(exception, host);
+
+    expect(response.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'CUSTOM_TOO_LARGE',
+        message: '영상은 200MB까지 올릴 수 있어요.',
+      }),
     );
   });
 });

@@ -26,7 +26,7 @@ export function CoverImageUploader({
   uploading = false,
   disabled = false,
   label = '커버 이미지',
-  helperText = 'JPG, PNG, WebP · 최대 10MB. 목록과 상세 상단에 같은 이미지가 표시돼요.',
+  helperText = 'JPG, PNG, WebP · 큰 사진은 올릴 때 자동으로 줄여요. 목록·상세는 물론 홍보 카드의 기본 이미지로도 함께 쓰여요.',
   previewAlt,
   eager = false,
 }: CoverImageUploaderProps) {

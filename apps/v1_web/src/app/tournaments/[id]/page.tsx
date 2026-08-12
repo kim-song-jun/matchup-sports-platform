@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TournamentDetailPageClient } from './tournament-detail-client';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentDetail } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -16,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       `${tournament.sport.name} 대회의 일정, 참가 조건과 경기 정보를 확인해 보세요.`,
     ),
     path: `/tournaments/${id}`,
-    image: tournament.coverImageUrl || tournament.promoListImageUrl,
+    image: resolveTournamentImage(tournament, 'cover'),
   });
 }
 

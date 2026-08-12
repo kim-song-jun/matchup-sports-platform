@@ -3,6 +3,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { compressImageForUpload } from '@/lib/image-compress';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup } from '@/types/game-operations';
@@ -1951,17 +1952,23 @@ async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> 
  *
  * 업로드 파일은 v1_api가 /uploads 정적 경로로 서빙하며, 응답 url은 루트-상대(/uploads/...).
  * web은 next.config rewrite로 /uploads/* → v1_api 프록시.
+ *
+ * 전송 전에 compressImageForUpload 로 축소·재인코딩한다 — 대회 포스터처럼 큰 원본을 그대로
+ * 보내면 서버 한도(5MB, 그 위 multer 하드캡 10MB)에 걸려 413 으로 실패하기 때문이다.
  */
 export function useV1UploadImages() {
   return useMutation({
-    mutationFn: (files: File | File[] | FileList) => {
+    mutationFn: async (files: File | File[] | FileList) => {
       const formData = new FormData();
       const fileArray = files instanceof FileList
         ? Array.from(files)
         : Array.isArray(files)
           ? files
           : [files];
-      fileArray.forEach((file) => formData.append('files', file));
+      const prepared = await Promise.all(
+        fileArray.map((file) => compressImageForUpload(file)),
+      );
+      prepared.forEach((file) => formData.append('files', file));
       return v1MultipartPost<V1UploadImagesResult>('/uploads', formData);
     },
   });

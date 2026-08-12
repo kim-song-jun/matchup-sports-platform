@@ -33,7 +33,7 @@ import { OperationAuditWriterService } from '../common/audit/operation-audit-wri
 import { PrismaService } from '../prisma/prisma.service';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import {
-  parseLineupCatalog,
+  parseLineupConfigForResponse,
   parseLineupLimits,
   parsePeriodDurations,
 } from '../tournaments/competition-config/competition-config.parse';
@@ -722,7 +722,7 @@ export class GamesService {
       return {
         ...game,
         actorRole: actor.role,
-        lineupConfig: parseLineupCatalog(config?.lineup ?? null),
+        lineupConfig: parseLineupConfigForResponse(config?.lineup ?? null),
         // Live-substitution addition: the console needs this to decide
         // whether to surface the rolling quick-substitution mode (config-
         // driven, never a hardcoded sport name) and to show a remaining-

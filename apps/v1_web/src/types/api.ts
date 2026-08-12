@@ -1420,6 +1420,16 @@ export type V1LineupConfigFormation = {
 export type V1LineupConfig = {
   positions: V1LineupConfigPosition[];
   formations: V1LineupConfigFormation[];
+  /**
+   * 이 대회에 설정된 **출전 인원**(GK 포함, `CompetitionConfig.lineup.{minPlayers,maxPlayers}`).
+   * 대회 "등록" 로스터 크기(`V1Tournament.minPlayers/maxPlayers`)와는 완전히 다른 값이다 —
+   * 섞으면 안 된다(서버 `lineup-size.ts`가 같은 경고를 달고 있다).
+   *
+   * optional인 이유: 이 필드는 나중에 추가돼(2026-08) 프론트가 먼저 배포되는 창구에서는
+   * 구버전 응답에 없을 수 있다. 없으면 화면은 인원 안내만 생략하고 나머지는 그대로 동작한다.
+   */
+  minPlayers?: number;
+  maxPlayers?: number;
 };
 
 export type V1TeamMatchLineup = {

@@ -21,9 +21,25 @@ type SubmittedRevision = {
 type Recipient = { userId: string; targetType: 'team_match' | 'tournament'; targetId: string };
 
 export class GameResultSubmittedEscalationService {
+  /**
+   * Issue #394 follow-up (see `GamesService.syncAssistsIntoSubmittedRevision`'s
+   * "Known residual gap" doc comment for the full race description): all 3
+   * outbox handlers below only ever gated on `state === 'SUBMITTED'` /
+   * `submittedAt !== null`, never on whether a NEWER revision has since
+   * superseded this one via `ASSIST_SYNC` (which deliberately leaves the
+   * predecessor's own `state` column reading SUBMITTED forever -- no enum
+   * value honestly means "auto-superseded, no reviewer decision"). If the
+   * sync ran before this worker ever processed the predecessor's original
+   * GAME_RESULT_SUBMITTED event, the worker would create a brand-new PENDING
+   * escalation against an id nothing will ever officialize -- a phantom that
+   * nothing closes. `guardSuperseded` below is the fix: check-then-self-heal,
+   * called at the top of every handler AND (belt-and-suspenders, see that
+   * method's own comment) again inside `createQueue`/`scheduleDueDeliveries`.
+   */
   readonly handler: GameOperationHandler = async (claim, tx) => {
     const revision = await this.lockRevision(tx, this.revisionId(claim.payload));
     if (revision.state !== 'SUBMITTED' || revision.submittedAt === null) return;
+    if (await this.guardSuperseded(tx, revision.revisionId)) return;
     await this.createQueue(tx, revision);
     await this.scheduleDueDeliveries(tx, revision);
     const recipient = await this.currentReviewer(tx, revision);
@@ -33,6 +49,13 @@ export class GameResultSubmittedEscalationService {
   readonly reminderHandler: GameOperationHandler = async (claim, tx) => {
     const revision = await this.lockRevision(tx, this.revisionId(claim.payload));
     if (revision.state !== 'SUBMITTED' || revision.submittedAt === null) return;
+    // This handler never calls createQueue/scheduleDueDeliveries, so the
+    // internal guards on those two methods can't protect it -- without this
+    // check a reminder would still be sent to a reviewer about a revision a
+    // newer ASSIST_SYNC has already superseded (the far more common timing:
+    // the sync usually lands hours after the original submit, well after
+    // `handler` already ran and scheduled this reminder job).
+    if (await this.guardSuperseded(tx, revision.revisionId)) return;
     const recipient = await this.currentReviewer(tx, revision);
     if (recipient !== null) await this.notifyReviewer(tx, revision, recipient, 'reminder');
   };
@@ -40,6 +63,7 @@ export class GameResultSubmittedEscalationService {
   readonly escalationHandler: GameOperationHandler = async (claim, tx) => {
     const revision = await this.lockRevision(tx, this.revisionId(claim.payload));
     if (revision.state !== 'SUBMITTED' || revision.submittedAt === null) return;
+    if (await this.guardSuperseded(tx, revision.revisionId)) return;
     await this.createQueue(tx, revision);
     if (revision.seriesId !== null && revision.teamMatchId !== null && revision.hostTeamId !== null) {
       await this.notifyLeagueEscalation(tx, revision);
@@ -72,7 +96,93 @@ export class GameResultSubmittedEscalationService {
     return revision;
   }
 
+  /**
+   * True when some OTHER revision's `supersedesId` already points at this
+   * one -- i.e. this revision was auto-superseded by
+   * `GamesService.syncAssistsIntoSubmittedRevision` (`ASSIST_SYNC`) without
+   * its own `state` ever leaving SUBMITTED. Same predicate
+   * `TournamentResultReviewService.officializeResultRevision`'s STANDARD-flow
+   * stale guard already runs (`tx.v1GameResultRevision.findFirst({ where: {
+   * supersedesId: revision.id } })`), reused here -- expressed as raw SQL to
+   * match this class's existing style (every other query in this file goes
+   * through `$queryRaw`/`$executeRaw`, never a Prisma model delegate).
+   */
+  private async isRevisionSuperseded(tx: Prisma.TransactionClient, revisionId: string): Promise<boolean> {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM v1_game_result_revisions WHERE supersedes_id = ${revisionId} LIMIT 1
+    `;
+    return rows.length > 0;
+  }
+
+  /**
+   * Check-then-self-heal: when `revisionId` has been superseded, closes any
+   * PENDING/ACKNOWLEDGED escalation and not-yet-fired reminder/escalation
+   * outbox rows already sitting against it (harmless no-op the first time --
+   * see `closeOrphanedSla`) and tells the caller to stop (return true).
+   * Called at the top of all 3 handlers above AND again inside
+   * `createQueue`/`scheduleDueDeliveries` below -- the handler-level calls
+   * are what make the job "quietly succeed" (no wrong notification, no
+   * retry loop) and are the only ones reachable via reminderHandler; the
+   * calls inside `createQueue`/`scheduleDueDeliveries` are the same
+   * "two independent, redundant protections for the same invariant" pattern
+   * this file's neighbor (`GamesService.syncAssistsIntoSubmittedRevision`'s
+   * OFFICIAL-base doc comment) already uses -- so neither method can ever
+   * insert a phantom row again even if a future caller forgets the guard
+   * that currently already precedes every call site.
+   */
+  private async guardSuperseded(tx: Prisma.TransactionClient, revisionId: string): Promise<boolean> {
+    if (!(await this.isRevisionSuperseded(tx, revisionId))) return false;
+    await this.closeOrphanedSla(tx, revisionId);
+    return true;
+  }
+
+  /**
+   * Self-heal close: cancels PENDING/ACKNOWLEDGED `v1_result_escalations`
+   * rows and not-yet-fired REMINDER/ESCALATION `v1_outbox_events` rows for a
+   * revision that has since been superseded. Two cases in one call: (a)
+   * nothing exists yet (the race this fix closes -- a handler reaches here
+   * before ever inserting), so this is a no-op; (b) rows already exist
+   * (created by an earlier pass, including by the pre-fix version of this
+   * worker), so this closes them the next time any handler touches this
+   * revisionId. Same two statements as
+   * `GamesService.closeAssistSyncPredecessorSla` /
+   * `TournamentResultReviewService.closeReviewSla` /
+   * `GameResultEscalationTerminalService.close` -- duplicated rather than
+   * imported: the first two are private methods on unrelated ownership
+   * lanes that already duplicate this exact pair of statements between
+   * themselves for the identical reason (different service, different
+   * lane -- see their own comments), and
+   * `GameResultEscalationTerminalService.close` is shaped around the much
+   * heavier `OfficialRevisionRow` (score/sourceHash/tournamentId/...) that
+   * this worker-level self-heal has no reason to assemble just to reach two
+   * UPDATE statements keyed on a bare revisionId.
+   */
+  private async closeOrphanedSla(tx: Prisma.TransactionClient, revisionId: string): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE v1_result_escalations
+      SET status = 'CLOSED'::"V1EscalationStatus",
+          reason = '상위 리비전에 의해 승계되어 자동 정리됨',
+          version = version + 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE result_revision_id = ${revisionId}
+        AND status IN ('PENDING', 'ACKNOWLEDGED')
+    `;
+    await tx.$executeRaw`
+      UPDATE v1_outbox_events
+      SET status = 'COMPLETED'::"V1OutboxStatus",
+          lease_owner = NULL,
+          lease_until = NULL,
+          last_error = NULL,
+          version = version + 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE revision_id = ${revisionId}
+        AND type IN ('GAME_RESULT_REVIEW_REMINDER', 'GAME_RESULT_REVIEW_ESCALATION')
+        AND status IN ('PENDING', 'RETRY')
+    `;
+  }
+
   private async createQueue(tx: Prisma.TransactionClient, revision: SubmittedRevision): Promise<void> {
+    if (await this.guardSuperseded(tx, revision.revisionId)) return;
     if (revision.seriesId !== null) {
       const escalationDueAt = new Date(revision.submittedAt!.getTime() + SERIES_ESCALATION_DELAY_MS);
       await tx.$executeRaw`
@@ -94,6 +204,7 @@ export class GameResultSubmittedEscalationService {
   }
 
   private async scheduleDueDeliveries(tx: Prisma.TransactionClient, revision: SubmittedRevision): Promise<void> {
+    if (await this.guardSuperseded(tx, revision.revisionId)) return;
     const payload = JSON.stringify({ gameId: revision.gameId, revisionId: revision.revisionId });
     if (revision.seriesId !== null) {
       const escalationDueAt = new Date(revision.submittedAt!.getTime() + SERIES_ESCALATION_DELAY_MS);

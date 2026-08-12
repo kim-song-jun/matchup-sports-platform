@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFormationPresets,
+  describeSquadSize,
   goalkeeperPositionCode,
   presetsForOutfieldCount,
   slotsWithGoalkeeper,
@@ -92,5 +93,39 @@ describe('formation-slots', () => {
 
   it('goalkeeperPositionCode falls back to GK when no dictionary entry is flagged as goalkeeper (defensive)', () => {
     expect(goalkeeperPositionCode([{ code: 'FIXO', label: '픽소', short: 'FX' }])).toBe('GK');
+  });
+});
+
+/**
+ * PR #402 Copilot 리뷰가 잡은 실제 결함의 회귀 테스트: 출전 인원은 **범위**인데
+ * maxPlayers만 단일 값처럼 비교해, 범위 안에 있는 정상 선발 수에도 경고가 떴다.
+ */
+describe('describeSquadSize', () => {
+  it('축구 7~11 경기에서 선발 9명은 정상이므로 경고하지 않는다 (예전엔 "11명인데 9명"이라고 틀린 경고)', () => {
+    expect(describeSquadSize(7, 11, 9)).toEqual({ label: '7~11명', outOfRange: false });
+  });
+
+  it('범위를 벗어나면 경고한다 — 하한 미달과 상한 초과 모두', () => {
+    expect(describeSquadSize(7, 11, 6).outOfRange).toBe(true);
+    expect(describeSquadSize(7, 11, 12).outOfRange).toBe(true);
+  });
+
+  it('경계값(하한·상한 정확히 일치)은 정상으로 본다', () => {
+    expect(describeSquadSize(7, 11, 7).outOfRange).toBe(false);
+    expect(describeSquadSize(7, 11, 11).outOfRange).toBe(false);
+  });
+
+  it('min과 max가 같으면 범위가 아니라 단일 인원으로 표기한다 (5인제 대회)', () => {
+    expect(describeSquadSize(5, 5, 5)).toEqual({ label: '5명', outOfRange: false });
+    expect(describeSquadSize(5, 5, 4).outOfRange).toBe(true);
+  });
+
+  it('선발이 아직 0명이면 "벗어났다"고 말하지 않는다 — 막 진입한 화면에서 경고가 뜨면 안 된다', () => {
+    expect(describeSquadSize(7, 11, 0).outOfRange).toBe(false);
+  });
+
+  it('인원 정보가 없는 구버전 응답에서는 안내를 생략한다 — 모르는 값으로 경고하지 않는다', () => {
+    expect(describeSquadSize(null, null, 9)).toEqual({ label: null, outOfRange: false });
+    expect(describeSquadSize(7, null, 9)).toEqual({ label: null, outOfRange: false });
   });
 });

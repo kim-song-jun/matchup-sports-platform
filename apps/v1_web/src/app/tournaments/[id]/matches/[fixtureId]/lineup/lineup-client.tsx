@@ -6,7 +6,8 @@ import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/compo
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
 import {
-  buildFormationPresets, goalkeeperPositionCode, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
+  buildFormationPresets, describeSquadSize, goalkeeperPositionCode, presetsForOutfieldCount, slotsWithGoalkeeper,
+  type FormationPreset,
 } from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { matchSlotsToEntries } from '@/app/team-matches/[id]/lineup/lineup.view-model';
@@ -23,6 +24,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { josa } from '@/lib/korean';
 import {
   addPlayer,
+  applyFormationPreset,
   buildSavePayload,
   clearPlayerPosition,
   createEmptyFixtureLineupState,
@@ -113,14 +115,53 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     setHydrated(true);
   }, [hydrated, gameQuery.data, lineupsQuery.data, editingSideId, goalkeeperCode]);
 
+  // 이 화면은 원래부터 명시적 저장이라 미저장 상태로 나가면 편집이 그대로 사라진다 —
+  // 브라우저 기본 경고로 한 번 막는다(team-match 라인업도 자동저장을 걷어내며 같은 가드를
+  // 갖게 됐다).
+  // 조건은 아래 `editable`(제출 후 정정 재편집 = SUBMITTED && reopened 포함)과 반드시 같아야
+  // 한다 — DRAFT만 보면 제출 후 재편집 중 미저장 변경이 있어도 경고 없이 유실된다
+  // (Copilot 리뷰 지적, 실제 결함). editable은 early return 뒤에 선언돼 여기서 쓸 수 없으므로
+  // 같은 조건을 여기서 다시 계산한다.
+  const hasUnsavedChanges =
+    state?.dirty === true &&
+    (state.lineupState === null || state.lineupState === 'DRAFT' || (state.lineupState === 'SUBMITTED' && reopened));
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      // 최신 브라우저는 문구를 무시하지만 returnValue 설정은 여전히 "경고를 띄우겠다"는 신호다.
+      event.returnValue = '';
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   // D-17: 포메이션·포지션 데이터는 gameQuery(GET /games/:gameId, T1-5)의 lineupConfig에서만
   // 온다. formationSupported(위에서 이미 선언됨)는 별개로 "피치 SVG 모양이 축구/풋살만
   // 구현돼 있다"는 프론트 표시 제약일 뿐이다.
   const sportCatalog: FormationPreset[] = gameQuery.data?.lineupConfig
     ? buildFormationPresets(gameQuery.data.lineupConfig.positions, gameQuery.data.lineupConfig.formations)
     : [];
-  const outfieldCount = state?.starters.filter((entry) => !entry.goalkeeper).length ?? 0;
+  // 선발 총원에서 골키퍼 한 자리를 뺀 값 — **누가 GK로 지정됐는지와 무관하게** 센다.
+  // 예전에는 `goalkeeper` 플래그가 켜진 선수를 뺐는데, 그러면 GK를 지정하는 순간 이 숫자가
+  // 1 줄면서 프리셋 목록이 통째로 갈렸다: 5인 팀이 GK 지정 전에는 6인제 대형(outfield 5)을
+  // 추천받다가, GK를 정하는 순간 고르던 포메이션이 목록에서 사라져 아래 정리 effect가
+  // 자유 배치로 되돌려버렸다(사용자 제보: "5명 6명일 때 따라 좀 달라지는 것 같다").
+  // 라인업에 골키퍼 자리는 항상 정확히 하나이므로 선발 수만으로 필드 인원이 결정된다.
+  const outfieldCount = Math.max(0, (state?.starters.length ?? 0) - 1);
   const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
+  /**
+   * 이 대회에 설정된 출전 인원(GK 포함). **범위**다 — canonical config가 축구 7~11, 풋살 3~6이고
+   * 관리자가 상한만 고르므로 minPlayers와 maxPlayers가 서로 다를 수 있다
+   * (competition-config.presets.ts, lineup-size.ts#buildLineupSizeConfig). maxPlayers만 단일
+   * 값처럼 비교하면 7~11 대회에서 선발 9명(정상)에게 "11명인데 9명이에요"라는 틀린 경고가 뜬다.
+   * 구버전 응답에는 두 필드가 없을 수 있어 null 허용.
+   */
+  const { label: squadSizeLabel, outOfRange: starterCountOutOfRange } = describeSquadSize(
+    gameQuery.data?.lineupConfig?.minPlayers ?? null,
+    gameQuery.data?.lineupConfig?.maxPlayers ?? null,
+    state?.starters.length ?? 0,
+  );
 
   // Copilot review finding (PR #277): 선발/골키퍼 변경으로 outfieldCount가 바뀌어 지금
   // 선택된 formation이 더 이상 formationOptions에 없으면 자유 배치로 되돌린다 — team-match
@@ -271,10 +312,18 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const editable =
     !gameStarted &&
     (state.lineupState === null || state.lineupState === 'DRAFT' || (state.lineupState === 'SUBMITTED' && reopened));
-  const outfieldGuidance =
-    formationSupported && formationOptions.length === 0 && outfieldCount > 0
-      ? `현재 선발 ${outfieldCount}명 — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
-      : null;
+  // 안내는 두 갈래다: ① 지금 선발 수에 맞는 대형이 아예 없을 때, ② 대형은 있지만 선발 수가
+  // 이 대회가 허용하는 출전 인원 **범위**를 벗어났을 때. ②는 이번에 서버가 출전 인원을 함께
+  // 내려주면서 처음 가능해졌다 — 예전에는 화면이 대회 설정을 몰라 "몇 명이어야 맞는지"를
+  // 말할 수 없었다.
+  const starterCount = state.starters.length;
+  const outfieldGuidance = !formationSupported
+    ? null
+    : formationOptions.length === 0 && starterCount > 0
+      ? `현재 선발 ${starterCount}명${squadSizeLabel !== null ? ` · 이 대회 출전 인원은 ${squadSizeLabel}` : ''} — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
+      : starterCountOutOfRange && squadSizeLabel !== null
+        ? `이 대회 출전 인원은 ${squadSizeLabel}인데 지금 선발은 ${starterCount}명이에요.`
+        : null;
   const selectedPreset = state.formation !== null ? formationOptions.find((preset) => preset.code === state.formation) ?? null : null;
   const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;
   const emptySlotCount =
@@ -390,7 +439,22 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                   slots={activeSlots}
                   outfieldGuidance={outfieldGuidance}
                   editable={editable}
-                  onSelectFormation={(formation) => setState((prev) => (prev ? selectFormation(prev, formation) : prev))}
+                  onSelectFormation={(nextFormation) =>
+                    setState((prev) => {
+                      if (!prev) return prev;
+                      // 프리셋을 고르면 라벨만 바꾸는 게 아니라 배치된 선수를 새 슬롯으로
+                      // 재배치한다 — 예전에는 좌표를 그대로 뒀기 때문에 새 프리셋에 없는
+                      // 포지션의 선수가 피치에서 사라졌다. 자유 배치(null)는 슬롯이 없어
+                      // 옮길 자리도 없으므로 라벨만 바꾼다(좌표는 그대로 유효하다).
+                      const preset =
+                        nextFormation === null
+                          ? null
+                          : formationOptions.find((option) => option.code === nextFormation) ?? null;
+                      return preset === null
+                        ? selectFormation(prev, nextFormation)
+                        : applyFormationPreset(prev, preset.code, slotsWithGoalkeeper(preset));
+                    })
+                  }
                   onPlacePlayer={(key, x, y) => setState((prev) => (prev ? setPlayerPosition(prev, key, x, y) : prev))}
                   onUnplacePlayer={(key) => setState((prev) => (prev ? clearPlayerPosition(prev, key) : prev))}
                   onPlaceInSlot={(key, slot) => setState((prev) => (prev ? placeInSlot(prev, key, slot) : prev))}
@@ -649,7 +713,10 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               disabled={saveMutation.isPending}
               onClick={handleSave}
             >
-              {saveMutation.isPending ? '저장 중…' : saveStatus === 'saved' ? '저장했어요' : '저장'}
+              {/* "저장했어요"는 마지막 저장 이후 편집이 없을 때만 참이다 — 예전에는
+                  saveStatus만 봤기 때문에 저장 후 계속 편집해도 문구가 그대로 남아, 이미
+                  저장됐다고 믿고 화면을 떠나면 그 편집을 잃었다. */}
+              {saveMutation.isPending ? '저장 중…' : state.dirty ? '저장' : saveStatus === 'saved' ? '저장했어요' : '저장'}
             </button>
             {state.lineupId ? (
               <button

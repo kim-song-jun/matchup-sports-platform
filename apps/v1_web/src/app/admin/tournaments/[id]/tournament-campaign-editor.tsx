@@ -103,7 +103,7 @@ export function TournamentCampaignEditor({
         onClear={() => setField('heroImageUrl', '')}
         uploading={uploadingSlot === 'hero'}
         disabled={pending || uploadingSlot !== null}
-        helperText="JPG, PNG, WebP · 최대 5MB. 캠페인 상단 배경으로 표시돼요."
+        helperText="JPG, PNG, WebP · 큰 사진은 올릴 때 자동으로 줄여요. 캠페인 상단 배경으로 표시돼요."
         previewAlt={form.heroImageUrl ? '메인 상단 이미지 미리보기' : '메인 상단 이미지 예시'}
         eager
       />

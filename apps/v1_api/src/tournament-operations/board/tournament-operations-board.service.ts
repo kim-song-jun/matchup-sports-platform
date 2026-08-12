@@ -1,10 +1,7 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
-  Inject,
   Injectable,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma, V1EscalationStatus, V1GameSideKey, V1TournamentStaffRole } from '@prisma/client';
@@ -16,15 +13,8 @@ import type {
   TimeRelativeWarningCode,
 } from './dto/list-operations-query.dto';
 import { STABLE_WARNING_CODES } from './dto/list-operations-query.dto';
-import {
-  GAME_READ_AUTHORITY,
-  type GameReadAuthorityPort,
-} from './game-read-authority.port';
 
 type Tx = Prisma.TransactionClient;
-
-const GAME_READ_MODES = ['legacy', 'compare', 'new'] as const;
-type GameReadMode = (typeof GAME_READ_MODES)[number];
 
 /** Review finding #2: type guard so a `?warning=` value can be narrowed (and rejected when it
  * isn't stable) without an unchecked cast -- see `list()`'s use near the top of the method. */
@@ -34,20 +24,12 @@ function isStableWarningCode(code: string): code is StableWarningCode {
 
 /** Recursively sorts object keys (alphabetically, `localeCompare`) so `JSON.stringify` of the
  * result is independent of the source's own key order -- mirrors `canonicalize()` in
- * `../../games/games.service.ts`. Exported (Task 26) so `CompareGameReadAuthorityService`
- * (`compare-game-read-authority.service.ts`) recomputes `expectedScoreHash` with the IDENTICAL
- * canonicalization this file uses, rather than carrying a second, independently-drifting
- * implementation of a hash whose entire purpose is mismatch detection -- two copies of "the same"
- * canonicalization that quietly diverge would make the read-authority check spuriously fire (or
- * spuriously agree) on canonicalization differences instead of real data differences. This matters
- * specifically for `expectedScoreHash` below: Postgres
- * `jsonb` normalizes key order on storage, so `row.game.currentOfficialRevision.score` read back
- * from the DB can have keys in a different order than whatever order the score was originally
- * written in. Hashing the raw (non-canonical) `JSON.stringify` of that value would make
- * `expectedScoreHash` -- and therefore the GAME_READ=compare authority check and the board's own
- * hash-stable-body guarantee -- silently depend on jsonb key ordering, which is not part of the
- * actual data contract (two reads of an UNCHANGED score must hash identically; changing only key
- * order is not a change). */
+ * `../../games/games.service.ts`. Postgres `jsonb` normalizes key order on storage, so
+ * `row.game.currentOfficialRevision.score` read back from the DB can have keys in a different
+ * order than whatever order the score was originally written in. Hashing the raw (non-canonical)
+ * `JSON.stringify` of that value would make `stableRevision`/`watermark` silently depend on jsonb
+ * key ordering, which is not part of the actual data contract (two reads of an UNCHANGED score
+ * must hash identically; changing only key order is not a change). */
 export function canonicalizeForHash(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(canonicalizeForHash);
@@ -266,9 +248,8 @@ function decodeOperationsBoardCursor(raw: string): OperationsBoardCursorPayload 
  * ## watermark
  * NOT the Task-9 `V1ProjectionWatermark` table -- that model is reserved for the async official-
  * result projection pipeline (a distinct, already-shipped purpose) and reusing it here would
- * collide semantically. Content is always drawn from the same persisted columns regardless of the
- * `GAME_READ` flag, so watermark and body bytes stay identical across legacy/compare/rollback
- * (scripts/qa/verify-game-result-cutover.mjs's `liveCutover()` hash-equality assertions).
+ * collide semantically. Content is always drawn from the same persisted columns, so watermark and
+ * body bytes are a pure function of the database state read inside the snapshot transaction.
  *
  * ## Time-relative warnings are a pure function of (persisted state, `now`)
  * `LINEUP_NOT_SUBMITTED` (scheduledAt-60m deadline) and staff-assignment coverage for
@@ -291,51 +272,32 @@ function decodeOperationsBoardCursor(raw: string): OperationsBoardCursorPayload 
  *
  * ## Single consistent read snapshot (P1 fix, review finding #6)
  * All persisted reads that feed the stable body -- the fixture page, lineups, `V1GameSide` rows,
- * escalations, staff assignments, and the `GAME_READ` flag -- now run inside ONE
- * `RepeatableRead` Prisma interactive transaction, so the response reflects a single database
- * instant rather than tearing across several independent round-trips (an escalation opening/
- * closing, or a staff assignment being granted/revoked, between two of the previously-independent
- * queries could previously produce a response that never corresponded to any real committed
- * state). The compare-mode authority call and its post-resolution CAS recheck (review finding #3)
- * deliberately run AFTER that transaction commits, using fresh non-transactional reads -- holding
- * a `RepeatableRead` snapshot open across an arbitrary external comparator call (which, once Task
- * 10 lands, may not even share this process's Prisma connection) is an anti-pattern independent of
- * this fix, so consistency for THAT seam is instead provided by binding the authority call to
- * explicit expected values and re-verifying them fresh afterward -- see the port's doc comment.
+ * escalations, and staff assignments -- run inside ONE `RepeatableRead` Prisma interactive
+ * transaction, so the response reflects a single database instant rather than tearing across
+ * several independent round-trips (an escalation opening/closing, or a staff assignment being
+ * granted/revoked, between two of the previously-independent queries could previously produce a
+ * response that never corresponded to any real committed state).
  *
- * ## GAME_READ authority seam (P0 fix, review finding #4; hardened again by Task 18 review P1-7)
- * The current `GAME_READ` value is read via a plain `findUnique` against the
- * `V1GameOperationFlag` Prisma model (mirrors the pattern already used in
- * games.service.ts:494 for `PUBLIC_LIVE`) -- NOT via `GameOperationFlagsService.getFlag()`,
- * which hard-gates to `platform_ops` (`assertPlatformOps`) and would wrongly 403 a
- * field_operator/support_readonly board viewer. A MISSING flag row now fails closed with
- * `InternalServerErrorException` (`GAME_READ_FLAG_MISSING`) rather than silently defaulting to
- * `'legacy'` -- P1-7: a missing row is indistinguishable at runtime from "an operator/bad
- * migration deleted the row while GAME_READ=compare's mismatch protection was relied on", and a
- * silent legacy fallback would disable that protection with no error and no signal anyone would
- * ever see. `GameOperationFlagsService.ensureDefaults()`/its seed migration is relied upon to
- * guarantee this row's presence; a fresh environment must seed it explicitly rather than lean on
- * this method's runtime default. A flag row that EXISTS with a value other than exactly
- * `'legacy'`, `'compare'`, or `'new'` is likewise fail-closed with `InternalServerErrorException`
- * (`GAME_READ_FLAG_INVALID`), since the board cannot determine which mode was intended and must
- * refuse rather than guess. Only when the (validated) mode is
- * `'compare'` does the board call `GAME_READ_AUTHORITY.resolve()` once per page row that has a
- * current/official result, bound to that row's exact `expectedGameVersion`/`expectedRevisionId`/
- * `expectedScoreHash`; on the first `'mismatch'` outcome (or a post-resolution CAS mismatch) it
- * aborts building the response entirely and throws `ConflictException` before any partial body is
- * serialized (fail-closed for the whole page, not a per-row omission). Under `'legacy'`/`'new'`
- * the comparator is never called. The DEFAULT `GAME_READ_AUTHORITY` binding
- * (`DirectGameReadAuthorityService`) itself now throws if ever actually invoked, rather than
- * always returning `{ outcome: 'ok' }` -- see that class's doc comment -- so a composition root
- * that flips `GAME_READ=compare` without wiring a real comparator fails loudly instead of silently
- * approving every result.
+ * ## Retired: GAME_READ compare/legacy read authority (Task 10 cutover cleanup)
+ * This service used to read a `GAME_READ` operation flag (`'legacy' | 'compare' | 'new'`) on every
+ * call and branch: `'legacy'` served the pre-migration result shape, `'compare'` additionally ran
+ * every page row through a `GAME_READ_AUTHORITY` comparator port (fail-closed on any legacy/new
+ * divergence) before serving, and `'new'` served this method's read path directly with no
+ * comparator call. The migration this flag gated is complete and permanent -- alpha has run
+ * `GAME_READ=new` in production with zero rollback for a full cutover cycle -- so `GameOperationFlagKey`
+ * no longer has a `GAME_READ` value at all (see `apps/v1_api/src/config/game-operation-flags.ts`),
+ * and this method now unconditionally serves what `'new'` mode always served: no flag read, no
+ * comparator call, no `'legacy'`/`'compare'` branch. The response shape, ordering, `stableRevision`
+ * hash, and `watermark` are byte-for-byte identical to what `GAME_READ=new` already produced --
+ * removing a conditional that was always false in production does not change output. The read
+ * authority DI seam (`GAME_READ_AUTHORITY` port, `CompareGameReadAuthorityService`,
+ * `DirectGameReadAuthorityService`) and the comparator/backfill implementation it called
+ * (`games/migration/game-result-backfill.ts`, `games/migration/compare-game-result-reads.ts`) were
+ * removed alongside it -- they had no other caller.
  */
 @Injectable()
 export class TournamentOperationsBoardService {
-  constructor(
-    private readonly prisma: PrismaService,
-    @Inject(GAME_READ_AUTHORITY) private readonly readAuthority: GameReadAuthorityPort,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * `now` is resolved ONCE here (defaulting to the real current instant) and threaded explicitly
@@ -484,15 +446,11 @@ export class TournamentOperationsBoardService {
         ];
         const pageFixtureIds = pageRows.map((row) => row.id);
 
-        const [lineupLatestBySideKey, escalationSummaryMap, staffCoverageResult, gameReadFlag] =
+        const [lineupLatestBySideKey, escalationSummaryMap, staffCoverageResult] =
           await Promise.all([
             this.latestLineupStateBySide(tx, gameIds),
             this.escalationSummaryByGameId(tx, gameIds),
             this.staffCoverage(tx, tournamentId, now, pageFieldIds, pageFixtureIds),
-            tx.v1GameOperationFlag.findUnique({
-              where: { key: 'GAME_READ' },
-              select: { value: true },
-            }),
           ]);
 
         return {
@@ -501,7 +459,6 @@ export class TournamentOperationsBoardService {
           lineupLatestBySideKey,
           escalationSummaryMap,
           staffCoverageResult,
-          gameReadFlag,
         };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
@@ -513,137 +470,7 @@ export class TournamentOperationsBoardService {
       lineupLatestBySideKey,
       escalationSummaryMap,
       staffCoverageResult,
-      gameReadFlag,
     } = snapshot;
-
-    // Task 18 review P1-7 (supersedes the prior "missing row defaults to legacy" design): a
-    // MISSING `GAME_READ` flag row is no longer treated as an implicit, safe 'legacy' default --
-    // it now fails closed with `500 GAME_READ_FLAG_MISSING`. The prior design reasoned that a
-    // missing row could only mean "a fresh environment where GameOperationFlagsService.
-    // ensureDefaults() has never run", and defaulted to legacy as a convenience for that case. The
-    // review correctly points out that reasoning conflates two indistinguishable-at-runtime
-    // situations: a genuinely fresh environment, and an operator (or a bad migration/rollback)
-    // having deleted this row by mistake in an environment that was previously running
-    // GAME_READ=compare -- in the SECOND case, silently falling back to 'legacy' silently
-    // DISABLES the compare-mode mismatch/staleness protection with no error, no log a caller would
-    // ever see, and no signal to the operator that the safety net is gone. A missing invariant row
-    // must fail loudly, exactly like an unrecognized value already does, rather than fail open.
-    // `GameOperationFlagsService.ensureDefaults()`/its seed migration is what is now relied on to
-    // guarantee this row's presence; a fresh environment must seed it explicitly.
-    if (gameReadFlag === null) {
-      throw new InternalServerErrorException({
-        code: 'GAME_READ_FLAG_MISSING',
-        message: '경기 결과 조회 모드 설정이 초기화되지 않았어요. 운영팀에 문의해주세요.',
-      });
-    }
-    const rawGameReadValue = gameReadFlag.value;
-    if (!(GAME_READ_MODES as readonly string[]).includes(rawGameReadValue)) {
-      throw new InternalServerErrorException({
-        code: 'GAME_READ_FLAG_INVALID',
-        message: '경기 결과 조회 모드 설정값이 올바르지 않아요. 운영팀에 문의해주세요.',
-      });
-    }
-    const gameReadMode: GameReadMode = rawGameReadValue as GameReadMode;
-    const isCompareMode = gameReadMode === 'compare';
-
-    if (isCompareMode) {
-      // Review finding #3 / Task 18 review P0-4: bind the authority decision to the EXACT
-      // revision/score this response is about to serialize, then re-verify (CAS-style, fresh
-      // non-transactional read) that nothing changed between the snapshot above and this point,
-      // for every row the authority approved. P0-4 fix: `expectedScoreHash`/`missingScorer` are now
-      // ALSO tracked and re-checked below (previously only `version`/`currentOfficialRevisionId`
-      // were), so a write that mutates the SAME official revision's score/missingScorer in place
-      // (no production write path does this today, see the `stableRevision` doc comment above --
-      // but the CAS recheck existing purely to guard `version`/`revisionId` while silently trusting
-      // the score/missingScorer payload underneath them was never a real guarantee) is caught too.
-      const expectedByGameId = new Map<
-        string,
-        { version: number; revisionId: string; scoreHash: string; missingScorer: boolean }
-      >();
-      for (const row of pageRows) {
-        if (row.game === null || row.game.currentOfficialRevisionId === null) continue;
-        const expectedGameVersion = row.game.version;
-        const expectedRevisionId = row.game.currentOfficialRevisionId;
-        const expectedScoreHash = createHash('sha256')
-          .update(JSON.stringify(canonicalizeForHash(row.game.currentOfficialRevision?.score ?? null)))
-          .digest('hex');
-        const result = await this.readAuthority.resolve({
-          gameId: row.game.id,
-          tournamentFixtureId: row.id,
-          expectedGameVersion,
-          expectedRevisionId,
-          expectedScoreHash,
-        });
-        // P0-4 fix: exhaustively narrow the RUNTIME value, not just the TypeScript union -- a
-        // `GAME_READ_AUTHORITY` implementation (Task 10's real comparator is not present in this
-        // worktree) is external input as far as this method is concerned, and nothing at runtime
-        // stopped a value that is neither `'ok'` nor `'mismatch'` from being silently treated as
-        // approval by an `else`-less `if (outcome === 'mismatch') throw`. Fail closed on anything
-        // unrecognized instead of defaulting to "approved".
-        if (result.outcome === 'ok') {
-          expectedByGameId.set(row.game.id, {
-            version: expectedGameVersion,
-            revisionId: expectedRevisionId,
-            scoreHash: expectedScoreHash,
-            missingScorer: row.game.currentOfficialRevision?.missingScorer ?? false,
-          });
-        } else if (result.outcome === 'mismatch') {
-          throw new ConflictException({
-            code: 'GAME_RESULT_READ_MISMATCH',
-            message: '경기 결과 조회 값이 일치하지 않아 안전하게 처리했어요. 잠시 후 다시 시도해주세요.',
-            details: { mismatch: result.detail },
-          });
-        } else {
-          throw new InternalServerErrorException({
-            code: 'GAME_READ_AUTHORITY_INVALID_RESULT',
-            message: '경기 결과 조회 비교 결과를 해석할 수 없어요. 운영팀에 문의해주세요.',
-          });
-        }
-      }
-
-      if (expectedByGameId.size > 0) {
-        const freshGameRows = await this.prisma.v1Game.findMany({
-          where: { id: { in: [...expectedByGameId.keys()] } },
-          select: {
-            id: true,
-            version: true,
-            currentOfficialRevisionId: true,
-            currentOfficialRevision: { select: { score: true, missingScorer: true } },
-          },
-        });
-        // P0-4 fix: an expected game missing entirely from the fresh read (e.g. deleted between
-        // the snapshot and this point) must not silently pass just because the loop below only
-        // ever iterates rows that DID come back -- require exact coverage of every game the
-        // authority approved.
-        if (freshGameRows.length !== expectedByGameId.size) {
-          throw new ConflictException({
-            code: 'GAME_RESULT_READ_STALE',
-            message: '경기 결과가 조회 도중 변경되어 안전하게 처리했어요. 다시 시도해주세요.',
-            details: { reason: 'EXPECTED_GAME_MISSING' },
-          });
-        }
-        for (const fresh of freshGameRows) {
-          const expected = expectedByGameId.get(fresh.id);
-          if (expected === undefined) continue;
-          const freshScoreHash = createHash('sha256')
-            .update(JSON.stringify(canonicalizeForHash(fresh.currentOfficialRevision?.score ?? null)))
-            .digest('hex');
-          const freshMissingScorer = fresh.currentOfficialRevision?.missingScorer ?? false;
-          if (
-            fresh.version !== expected.version ||
-            fresh.currentOfficialRevisionId !== expected.revisionId ||
-            freshScoreHash !== expected.scoreHash ||
-            freshMissingScorer !== expected.missingScorer
-          ) {
-            throw new ConflictException({
-              code: 'GAME_RESULT_READ_STALE',
-              message: '경기 결과가 조회 도중 변경되어 안전하게 처리했어요. 다시 시도해주세요.',
-              details: { gameId: fresh.id },
-            });
-          }
-        }
-      }
-    }
 
     // Built as one array of {item, liveWarnings} pairs (rather than two independently-mapped
     // arrays) so the stable/time-relative split can never drift out of (fixtureId) alignment with

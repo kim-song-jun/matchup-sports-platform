@@ -97,6 +97,28 @@ comment documents, so a superseded (`corrected`) or voided result is never
 double-counted or shown stale, and a voided game's team/player rows
 disappear the instant the pointer swaps without any row being deleted.
 
+**Issue #377 -- fixture/field-scoped staff bypass (`getMatch` only).**
+`GET /tournaments/:id/matches/:fixtureId` additionally accepts the caller's
+optional identity (`OptionalV1AuthGuard`/`@CurrentUser()`, still no
+`Idempotency-Key`/`expectedVersion` -- this stays a pure read). When a
+logged-in caller is authorized via `TournamentStaffAccessService.assertAccess`
+for `{ tournamentId, fixtureId, fieldId }` -- this fixture's *own* field, the
+exact resource shape `TournamentFixtureLineupService.authorizeAndResolveGameId`
+already uses for the ops lineup routes, never a `tournamentId`-only check --
+`buildLineup`/`buildEvents`/`buildMvp` treat every participant on that one
+response as eligible regardless of `isParticipantPubliclyEligible`. A
+`FIELD_OPERATOR` assigned to a different field, or to a different fixture via
+`fixtureScopes`, is not authorized for this resource and gets the identical
+`WITHHELD_IDENTITY_LABEL`-driving `null` an anonymous visitor gets -- never a
+403; an anonymous caller or an authenticated caller with no staff assignment
+at all also both fall through to that same unauthorized/anonymous path. The
+bypass only widens *which* names the consent gate would otherwise redact --
+it never fabricates a name for a participant absent from the game's own
+roster (`participant?.displayNameSnapshot ?? null` still applies). This
+exception is scoped to `getMatch`'s single-fixture response only; `getSchedule`'s
+scorer summary is unaffected and still applies the consent gate to every
+caller, staff included.
+
 ### `resultState` (per match/schedule entry)
 
 `pending` (no official revision yet, or one is mid-review) | `official`

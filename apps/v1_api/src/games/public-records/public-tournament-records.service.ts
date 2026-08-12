@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma, V1GameEventType, V1GameResultRevisionState, V1VisibilityMode } from '@prisma/client';
 import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { isBracketPublished } from '../../tournaments/tournament-detail.presenter';
+import {
+  TournamentStaffAccessService,
+  type TournamentStaffResource,
+} from '../../tournaments/staff/tournament-staff-access.service';
 import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
 import {
   isParticipantPubliclyEligible,
@@ -74,6 +79,12 @@ const FIXTURE_MATCH_SELECT = {
   homeRegistration: { select: { team: { select: { id: true, name: true } } } },
   awayRegistration: { select: { team: { select: { id: true, name: true } } } },
   group: { select: { name: true } },
+  // `fieldId` (issue #377) -- the scalar FK, not just the display-only
+  // `field` relation below. Needed to build the same
+  // `{ tournamentId, fixtureId, fieldId }` resource shape
+  // `TournamentFixtureLineupService.authorizeAndResolveGameId` already uses,
+  // so a field_operator's staff bypass here is scoped to their own field.
+  fieldId: true,
   field: { select: { name: true } },
   videos: { select: { id: true, title: true, url: true }, orderBy: { sortOrder: 'asc' } },
   game: {
@@ -100,7 +111,10 @@ type EffectiveMode = 'status_only' | 'live' | 'official_only';
 
 @Injectable()
 export class PublicTournamentRecordsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: TournamentStaffAccessService,
+  ) {}
 
   async getSchedule(tournamentId: string, query: PublicTournamentScheduleQueryDto) {
     const tournament = await this.prisma.v1Tournament.findUnique({
@@ -284,7 +298,7 @@ export class PublicTournamentRecordsService {
     };
   }
 
-  async getMatch(tournamentId: string, fixtureId: string) {
+  async getMatch(tournamentId: string, fixtureId: string, user: V1AuthUser | undefined) {
     const tournament = await this.prisma.v1Tournament.findUnique({
       where: { id: tournamentId },
       select: { id: true, title: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
@@ -340,8 +354,9 @@ export class PublicTournamentRecordsService {
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
     const consentMap = await loadParticipantConsentEligibility(this.prisma, participantIds);
     const identityAsOf = officialAt ?? new Date();
+    const isStaffBypass = await this.resolveStaffBypass(user, tournamentId, fixtureId, fixture.fieldId);
 
-    const lineup = buildLineup(fixture, mode, consentMap, identityAsOf);
+    const lineup = buildLineup(fixture, mode, consentMap, identityAsOf, isStaffBypass);
     const events =
       mode === 'status_only'
         ? []
@@ -351,8 +366,9 @@ export class PublicTournamentRecordsService {
             fixture.game?.participants ?? [],
             consentMap,
             identityAsOf,
+            isStaffBypass,
           );
-    const mvp = buildMvp(fixture, mode, currentRevisionState, consentMap, identityAsOf);
+    const mvp = buildMvp(fixture, mode, currentRevisionState, consentMap, identityAsOf, isStaffBypass);
 
     const history =
       fixture.game === null
@@ -400,6 +416,57 @@ export class PublicTournamentRecordsService {
       videos: fixture.videos.map((video) => ({ id: video.id, title: video.title, url: video.url })),
       nextMatch,
     };
+  }
+
+  /**
+   * Issue #377 -- a logged-in caller who is this exact fixture's assigned
+   * tournament staff (not merely "staff of this tournament somewhere") sees
+   * real participant names in `lineup`/`events`/`mvp` below, bypassing the
+   * public consent gate the same way the operator's own authenticated
+   * lineup/ops-console routes already do (`games.service.ts`'s
+   * `listLineups`/`listOperationsLineups` return raw `displayNameSnapshot`
+   * with no consent filter at all -- this route is the one PUBLIC surface
+   * that still applied that filter even to staff, since `getMatch` never
+   * threaded an actor through to the gate at all).
+   *
+   * Reuses `TournamentStaffAccessService.assertAccess` -- the exact same
+   * authority `TournamentFixtureLineupService.authorizeAndResolveGameId`
+   * already relies on for the ops lineup routes -- with the identical
+   * `{ tournamentId, fixtureId, fieldId }` resource shape, so a
+   * `FIELD_OPERATOR` scoped to one field is authorized here if and only if
+   * they would also be authorized to read that field's lineup through the
+   * ops console. This is deliberately a fixture/field-scoped check, never a
+   * tournamentId-only one -- a field operator for Field B must still see
+   * `WITHHELD_IDENTITY_LABEL` on a Field A fixture of the same tournament.
+   *
+   * `assertAccess` never returns a boolean -- it either resolves with a
+   * `TournamentStaffPrincipal` (authorized) or throws `ForbiddenException`
+   * (`STAFF_SCOPE_DENIED`, its only failure mode). This route is reachable
+   * by an anonymous visitor (`OptionalV1AuthGuard`) and by an authenticated
+   * fan with no staff assignment at all, so both of those must fall through
+   * to the exact same redacted response an anonymous visitor gets -- never
+   * a 403. `user === undefined` (anonymous) skips the check entirely rather
+   * than calling `assertAccess` with a placeholder id; any other thrown
+   * error is not this method's `STAFF_SCOPE_DENIED` denial and is left to
+   * propagate (an infra/DB failure must not be silently reinterpreted as
+   * "not staff").
+   */
+  private async resolveStaffBypass(
+    user: V1AuthUser | undefined,
+    tournamentId: string,
+    fixtureId: string,
+    fieldId: string | null,
+  ): Promise<boolean> {
+    if (user === undefined) return false;
+    const resource: TournamentStaffResource =
+      fieldId === null ? { tournamentId, fixtureId } : { tournamentId, fixtureId, fieldId };
+    try {
+      await this.access.assertAccess({ userId: user.id, action: 'read', resource });
+      return true;
+    } catch (error) {
+      if (error instanceof ForbiddenException) return false;
+      throw error;
+    }
   }
 
   private async isPublicLiveEnabled(): Promise<boolean> {
@@ -473,6 +540,7 @@ export class PublicTournamentRecordsService {
     participants: readonly { id: string; displayNameSnapshot: string; jerseyNumber: number | null }[],
     consentMap: Map<string, ParticipantConsentEligibility>,
     identityAsOf: Date,
+    isStaffBypass: boolean,
   ) {
     if (gameId === null) return [];
     const events = await this.prisma.v1GameEvent.findMany({
@@ -502,14 +570,17 @@ export class PublicTournamentRecordsService {
       .filter((event) => scoringTypes.has(event.type) && !reversedIds.has(event.id))
       .map((event) => {
         const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
-        const eligible = consent !== undefined && isParticipantPubliclyEligible(consent, identityAsOf);
+        // 동의(consent) 게이트는 lineup과 정확히 동일하게 적용한다 -- eligible 이
+        // false 면 participantId 와 마찬가지로 이름/등번호도 null. `isStaffBypass`
+        // (issue #377) 는 이 동의 게이트만 건너뛴다 -- `participant` 조회 자체는
+        // 아래에서 그대로 하므로, 라인업 스냅샷에 없는 참가자(`participant` undefined)
+        // 라면 스태프 우회가 켜져 있어도 이름을 지어내지 않고 그대로 null 이다.
+        const eligible = isStaffBypass || (consent !== undefined && isParticipantPubliclyEligible(consent, identityAsOf));
         // 이름/등번호는 buildLineup 과 동일한 방식(participant.displayNameSnapshot,
         // participant.jerseyNumber)으로 뽑되, buildLineup 의 lineupAt(라인업 공개
         // 시각) 게이트는 따르지 않는다 -- 그 게이트는 "경기 전 선발 명단 노출"을 막는
         // 규칙이고, 골/카드 이벤트는 경기가 시작된 뒤에만 발생하므로 득점자를
-        // 보여주는 것이 선발 명단을 미리 흘리는 것이 아니다. 대신 동의(consent)
-        // 게이트는 lineup과 정확히 동일하게 적용한다 -- eligible 이 false 면
-        // participantId 와 마찬가지로 이름/등번호도 null.
+        // 보여주는 것이 선발 명단을 미리 흘리는 것이 아니다.
         const participant = event.participantId === null ? undefined : participantById.get(event.participantId);
         return {
           type: event.type,
@@ -719,6 +790,7 @@ function buildLineup(
   mode: EffectiveMode,
   consentMap: Map<string, ParticipantConsentEligibility>,
   identityAsOf: Date,
+  isStaffBypass: boolean,
 ) {
   if (fixture.game === null) return null;
   if (mode === 'status_only') return null;
@@ -745,7 +817,8 @@ function buildLineup(
   const present = (sideId: string | undefined) =>
     (sideId ? (bySide.get(sideId) ?? []) : []).map((participant) => {
       const consent = consentMap.get(participant.id);
-      const eligible = consent !== undefined && isParticipantPubliclyEligible(consent, identityAsOf);
+      const eligible =
+        isStaffBypass || (consent !== undefined && isParticipantPubliclyEligible(consent, identityAsOf));
       return {
         participantId: participant.id,
         displayName: eligible ? participant.displayNameSnapshot : null,
@@ -763,12 +836,15 @@ function buildMvp(
   currentRevisionState: 'OFFICIAL' | 'VOID' | null,
   consentMap: Map<string, ParticipantConsentEligibility>,
   identityAsOf: Date,
+  isStaffBypass: boolean,
 ) {
   if (mode === 'status_only' || currentRevisionState !== 'OFFICIAL') return null;
   const mvpParticipantId = fixture.game?.currentOfficialRevision?.mvpParticipantId ?? null;
   if (mvpParticipantId === null) return null;
   const consent = consentMap.get(mvpParticipantId);
-  if (consent === undefined || !isParticipantPubliclyEligible(consent, identityAsOf)) return null;
+  const eligible =
+    isStaffBypass || (consent !== undefined && isParticipantPubliclyEligible(consent, identityAsOf));
+  if (!eligible) return null;
   const participant = (fixture.game?.participants ?? []).find((row) => row.id === mvpParticipantId);
   if (participant === undefined) return null;
   return { participantId: participant.id, displayName: participant.displayNameSnapshot };

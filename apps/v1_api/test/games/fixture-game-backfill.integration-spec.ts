@@ -1,6 +1,7 @@
 import { V1GameSideKey, V1VisibilityMode } from '@prisma/client';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { PublicTournamentRecordsService } from '../../src/games/public-records/public-tournament-records.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import {
   createScheduledGame,
   runFixtureGameBackfill,
@@ -69,7 +70,12 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const publicRecords = new PublicTournamentRecordsService(prisma);
+// Issue #377 -- PublicTournamentRecordsService now also takes a
+// TournamentStaffAccessService (staff-scoped real-name bypass on `getMatch`).
+// This suite only exercises `getSchedule`, which never consults it, so a
+// real instance backed by the same `prisma` is enough to satisfy the
+// constructor without needing its own fixture data.
+const publicRecords = new PublicTournamentRecordsService(prisma, new TournamentStaffAccessService(prisma));
 
 describe('fixture-game-backfill — repairs the "public schedule always empty" bug', () => {
   let applyResult: FixtureGameBackfillResult;

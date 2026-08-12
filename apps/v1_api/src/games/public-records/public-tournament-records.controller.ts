@@ -1,5 +1,7 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { CurrentUser } from '../../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../../auth/optional-v1-auth.guard';
+import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
 import { PublicTournamentRecordsService } from './public-tournament-records.service';
 
@@ -26,7 +28,11 @@ export class PublicTournamentRecordsController {
   }
 
   @Get(':tournamentId/matches/:fixtureId')
-  getMatch(@Param('tournamentId') tournamentId: string, @Param('fixtureId') fixtureId: string) {
-    return this.tournamentRecords.getMatch(tournamentId, fixtureId);
+  getMatch(
+    @Param('tournamentId') tournamentId: string,
+    @Param('fixtureId') fixtureId: string,
+    @CurrentUser() user: V1AuthUser | undefined,
+  ) {
+    return this.tournamentRecords.getMatch(tournamentId, fixtureId, user);
   }
 }

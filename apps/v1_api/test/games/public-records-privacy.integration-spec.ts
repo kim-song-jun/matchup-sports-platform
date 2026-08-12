@@ -38,7 +38,18 @@ const prisma = new PrismaService();
 const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
 const staffAccess = new TournamentStaffAccessService(prisma);
 const resultReview = new TournamentResultReviewService(prisma, staffAccess, new OperationAuditWriterService());
-const tournamentRecords = new PublicTournamentRecordsService(prisma);
+// Issue #377 -- `getMatch` now takes a `TournamentStaffAccessService` (real
+// instance, same one `resultReview` already uses against this same `prisma`)
+// plus an optional caller identity. Every `getMatch(...)` call below
+// deliberately passes `undefined` for that identity, never `authUser(ids.platformOps)`
+// (already in scope and used elsewhere in this file) -- `ids.platformOps` is
+// seeded as a real `v1AdminUser` (`adminRole: 'ops'`, see `beforeAll`), so
+// passing it would silently flip `resolveStaffBypass` to the platform_ops
+// admin bypass and make every masked-participant assertion below (revoked
+// consent, unlinked guest) show a real name instead, invalidating this
+// suite's actual purpose (consent gating) without any compile error to catch
+// it. `undefined` reproduces the pre-#377 anonymous-only behavior exactly.
+const tournamentRecords = new PublicTournamentRecordsService(prisma, staffAccess);
 const teamRecords = new PublicTeamRecordsService(prisma);
 const userRecords = new PublicUserRecordsService(prisma);
 
@@ -425,9 +436,9 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     const schedule = await tournamentRecords.getSchedule(ids.tournament, {});
     expect(schedule.items.find((item) => item.fixtureId === ids.fixtureHidden)).toBeUndefined();
 
-    const hidden = await captureFailure(() => tournamentRecords.getMatch(ids.tournament, ids.fixtureHidden));
+    const hidden = await captureFailure(() => tournamentRecords.getMatch(ids.tournament, ids.fixtureHidden, undefined));
     expectHttpCode(hidden, 404, 'TOURNAMENT_MATCH_NOT_FOUND');
-    const nonexistent = await captureFailure(() => tournamentRecords.getMatch(ids.tournament, 'nonexistent-fixture'));
+    const nonexistent = await captureFailure(() => tournamentRecords.getMatch(ids.tournament, 'nonexistent-fixture', undefined));
     expectHttpCode(nonexistent, 404, 'TOURNAMENT_MATCH_NOT_FOUND');
   });
 
@@ -439,7 +450,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     expect(entry?.score).toBeNull();
     expect(entry?.resultState).toBe('official');
 
-    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureStatusOnly);
+    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureStatusOnly, undefined);
     expect(match.visibilityMode).toBe('status_only');
     expect(match.scoreStatus).toBe('official');
     expect(match.score).toBeNull();
@@ -451,7 +462,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
   it('live: while the game is in progress the match is pending with a pending-projection marker, and the published lineup already applies consent gating', async () => {
     await driveToLive(gameMainId, [scorerConsentedId, scorerRevokedId, scorerGuestId]);
 
-    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain);
+    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined);
     expect(match.visibilityMode).toBe('live');
     expect(match.status).toBe('live');
     expect(match.resultState).toBe('pending');
@@ -487,7 +498,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     officialRevisionId = officialized.revisionId;
     await drainOutbox();
 
-    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain);
+    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined);
     expect(match.resultState).toBe('official');
     expect(match.pendingProjection).toBe(false);
     expect(match.score).toEqual({ home: 3, away: 0 });
@@ -579,7 +590,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     correctionOfficialId = officialized.revisionId;
     await drainOutbox();
 
-    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain);
+    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined);
     expect(match.resultState).toBe('corrected');
     expect(match.score).toEqual({ home: 4, away: 0 });
     expect(match.history.some((entry) => entry.isCorrection)).toBe(true);
@@ -605,7 +616,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
   });
 
   it('never exposes roster realName, only displayNameSnapshot-derived identity, anywhere in the public DTOs', async () => {
-    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain);
+    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined);
     const serialized = JSON.stringify(match);
     expect(serialized).not.toContain('realName');
     const schedule = await tournamentRecords.getSchedule(ids.tournament, {});

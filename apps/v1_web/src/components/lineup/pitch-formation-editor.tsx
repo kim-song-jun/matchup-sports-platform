@@ -2,8 +2,10 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
+import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { matchSlotsToEntries, type LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
-import type { FormationPreset, FormationSlot } from './formation-slots';
+import { describeFormationChange, type FormationChangeSummary } from './formation-assignment';
+import { slotsWithGoalkeeper, type FormationPreset, type FormationSlot } from './formation-slots';
 
 /**
  * 피치 위에 선발 선수를 아이콘으로 배치하는 에디터(FIFA 온라인 스타일). 순수 SVG로 그린
@@ -69,6 +71,16 @@ export function PitchFormationEditor({
   const [selectedWaitingKey, setSelectedWaitingKey] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [activeSlotTarget, setActiveSlotTarget] = useState<FormationSlot | null>(null);
+  /** 확인 대기 중인 포메이션 프리셋 코드 — 배치된 선수를 옮겨야 할 때만 채워진다. */
+  const [pendingFormation, setPendingFormation] = useState<string | null>(null);
+  /**
+   * 드래그를 시작한 순간의 "토큰 중심 − 포인터" 차이(퍼센트). 이걸 기록하지 않으면
+   * pointermove가 포인터 절대 위치를 토큰 중심으로 그대로 삼아버려, 토큰 가장자리를 잡는
+   * 순간 토큰이 포인터 아래로 순간이동한다(터치 타겟이 44px이라 최대 22px 점프 — 사용자가
+   * "좌표가 튄다"고 지적한 동작이 바로 이것이다). 렌더에 쓰이지 않으므로 state가 아니라
+   * ref에 둔다.
+   */
+  const dragOffsetRef = useRef<{ dx: number; dy: number } | null>(null);
 
   const slotMode = slots !== null;
   const matched = slotMode ? matchSlotsToEntries(slots, starters) : [];
@@ -93,14 +105,55 @@ export function PitchFormationEditor({
     return Math.min(100, Math.max(0, value));
   }
 
+  /** 0.1퍼센트(420px 피치에서 약 0.4px) 단위로 맞춘다 — 픽셀보다 촘촘한 소수는 화면에서
+   * 구분되지 않으면서 pointermove마다 새 상태를 만들어 리렌더를 유발하고, 저장 페이로드에도
+   * 의미 없는 긴 소수로 실린다. */
+  function roundPct(value: number): number {
+    return Math.round(value * 10) / 10;
+  }
+
   function pointToPitchPct(clientX: number, clientY: number): { x: number; y: number } | null {
     const rect = pitchRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return null;
-    const x = clampPct(((clientX - rect.left) / rect.width) * 100);
+    const x = roundPct(clampPct(((clientX - rect.left) / rect.width) * 100));
     // 화면 y축은 아래로 증가하지만 좌표계는 "하프라인이 위(y 큼)"이므로 뒤집는다.
-    const y = clampPct(100 - ((clientY - rect.top) / rect.height) * 100);
+    const y = roundPct(clampPct(100 - ((clientY - rect.top) / rect.height) * 100));
     return { x, y };
   }
+
+  /**
+   * 포메이션 칩을 눌렀을 때의 관문. 이미 배치된 선수를 옮기거나 대기로 내려야 하는 경우에만
+   * 확인 모달을 띄우고, 바뀔 게 없으면(배치된 선수가 없거나 이미 그 프리셋 좌표와 동일)
+   * 곧바로 적용한다 — 아무 변화도 없는데 모달을 띄우면 프리셋을 훑어보는 동작이 매번 막힌다.
+   *
+   * 자유 배치(null)로의 전환은 슬롯만 사라지고 좌표는 그대로 남아 선수를 잃지 않으므로
+   * 확인 없이 적용한다.
+   */
+  function requestFormation(code: string | null) {
+    if (code === null || code === formation) {
+      onSelectFormation(code);
+      return;
+    }
+    const preset = formationOptions.find((option) => option.code === code);
+    if (preset === undefined) {
+      onSelectFormation(code);
+      return;
+    }
+    const summary = describeFormationChange(slotsWithGoalkeeper(preset), starters);
+    if (summary.movedCount === 0 && summary.unplacedNames.length === 0) {
+      onSelectFormation(code);
+      return;
+    }
+    setPendingFormation(code);
+    setSheetOpen(false);
+  }
+
+  const pendingSummary = (() => {
+    if (pendingFormation === null) return null;
+    const preset = formationOptions.find((option) => option.code === pendingFormation);
+    if (preset === undefined) return null;
+    return describeFormationChange(slotsWithGoalkeeper(preset), starters);
+  })();
 
   function handlePitchClick(event: React.MouseEvent<HTMLDivElement>) {
     if (slotMode || !editable || selectedWaitingKey === null) return;
@@ -110,12 +163,18 @@ export function PitchFormationEditor({
     setSelectedWaitingKey(null);
   }
 
-  function handleTokenPointerDown(key: string) {
+  function handleTokenPointerDown(entry: LineupEntryDraft) {
     return (event: React.PointerEvent<HTMLButtonElement>) => {
       if (!editable) return;
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
-      setDraggingKey(key);
+      // 잡은 지점과 토큰 중심의 차이를 기록해 드래그 내내 같은 지점을 쥔 느낌을 유지한다.
+      const point = pointToPitchPct(event.clientX, event.clientY);
+      dragOffsetRef.current =
+        point === null || entry.positionX === null || entry.positionY === null
+          ? null
+          : { dx: entry.positionX - point.x, dy: entry.positionY - point.y };
+      setDraggingKey(entry.key);
     };
   }
 
@@ -123,11 +182,15 @@ export function PitchFormationEditor({
     if (!editable || draggingKey === null) return;
     const point = pointToPitchPct(event.clientX, event.clientY);
     if (point === null) return;
-    onPlacePlayer(draggingKey, point.x, point.y);
+    const offset = dragOffsetRef.current;
+    const x = roundPct(clampPct(point.x + (offset?.dx ?? 0)));
+    const y = roundPct(clampPct(point.y + (offset?.dy ?? 0)));
+    onPlacePlayer(draggingKey, x, y);
   }
 
   function handleTokenPointerUp() {
     setDraggingKey(null);
+    dragOffsetRef.current = null;
   }
 
   function controlsFor(closeSheetAfterSelect: boolean) {
@@ -140,7 +203,7 @@ export function PitchFormationEditor({
         slotMode={slotMode}
         editable={editable}
         selectedWaitingKey={selectedWaitingKey}
-        onSelectFormation={onSelectFormation}
+        onSelectFormation={requestFormation}
         onSelectWaiting={(key) => selectWaiting(key, { closeSheetAfter: closeSheetAfterSelect })}
       />
     );
@@ -190,7 +253,7 @@ export function PitchFormationEditor({
               <PlayerToken
                 key={entry.key} entry={entry} editable={editable}
                 dragging={draggingKey === entry.key}
-                onPointerDown={handleTokenPointerDown(entry.key)}
+                onPointerDown={handleTokenPointerDown(entry)}
                 onPointerMove={handleTokenPointerMove}
                 onPointerUp={handleTokenPointerUp}
                 onUnplace={() => onUnplaceFromSlot(entry.key)}
@@ -207,7 +270,7 @@ export function PitchFormationEditor({
             <PlayerToken
               key={entry.key} entry={entry} editable={editable}
               dragging={draggingKey === entry.key}
-              onPointerDown={handleTokenPointerDown(entry.key)}
+              onPointerDown={handleTokenPointerDown(entry)}
               onPointerMove={handleTokenPointerMove}
               onPointerUp={handleTokenPointerUp}
               onUnplace={() => onUnplacePlayer(entry.key)}
@@ -299,8 +362,40 @@ export function PitchFormationEditor({
           onClose={() => setActiveSlotTarget(null)}
         />
       ) : null}
+
+      {/* 포메이션 전환 확인 — 이미 배치한 선수가 움직이거나 대기로 내려가는 경우에만 뜬다.
+          문구는 실제 적용에 쓰는 것과 같은 계획(describeFormationChange)에서 뽑으므로
+          "옮겨져요"라고 예고한 내용과 결과가 어긋날 수 없다. */}
+      <ConfirmModal
+        open={pendingFormation !== null && pendingSummary !== null}
+        title={`포메이션을 ${pendingFormation ?? ''}로 바꿀까요?`}
+        message={buildFormationChangeMessage(pendingSummary)}
+        confirmLabel="포메이션 바꾸기"
+        onConfirm={() => {
+          const next = pendingFormation;
+          setPendingFormation(null);
+          if (next !== null) onSelectFormation(next);
+        }}
+        onCancel={() => setPendingFormation(null)}
+      />
     </div>
   );
+}
+
+/** 확인 모달 본문. 이름을 일일이 나열하되 너무 길어지면 앞 3명만 적고 나머지는 수로 줄인다
+ * — 대기로 내려가는 사람이 누구인지가 사용자가 취소를 누를지 결정하는 유일한 근거다. */
+function buildFormationChangeMessage(summary: FormationChangeSummary | null): string {
+  if (summary === null) return '';
+  const parts: string[] = [];
+  if (summary.movedCount > 0) parts.push(`배치된 선수 ${summary.movedCount}명이 새 자리로 옮겨져요.`);
+  if (summary.unplacedNames.length > 0) {
+    const shown = summary.unplacedNames.slice(0, 3).join(', ');
+    const rest = summary.unplacedNames.length - 3;
+    const names = rest > 0 ? `${shown} 외 ${rest}명` : shown;
+    parts.push(`${names}은 새 포메이션에 자리가 없어 대기로 내려가요.`);
+  }
+  if (summary.emptySlotCount > 0) parts.push(`빈 자리 ${summary.emptySlotCount}개는 다시 채워야 해요.`);
+  return parts.join(' ');
 }
 
 /** 포메이션 프리셋 버튼 + 대기 목록. 데스크톱 사이드 패널과 모바일 하단 드로어 양쪽에서

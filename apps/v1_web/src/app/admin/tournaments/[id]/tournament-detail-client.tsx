@@ -112,6 +112,7 @@ import { BracketGroupCard } from './bracket-group-card';
 import { isGroupReady } from './bracket-group-helpers';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import {
   PrizeBreakdownEditor,
   createPrizeRowId,
@@ -2917,7 +2918,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               badge: tournament.promoHomeBadgeText,
               cardTitle: tournament.promoHomeTitle,
               subtitle: tournament.promoHomeSubtitle,
-              imageUrl: tournament.promoHomeImageUrl,
+              imageUrl: resolveTournamentImage(tournament, 'home'),
               dateText: tournament.promoHomeDateText,
               teamsText: tournament.promoHomeTeamsText,
               locationText: tournament.promoHomeLocationText,
@@ -2931,7 +2932,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               badge: tournament.promoListBadgeText,
               cardTitle: tournament.promoListTitle,
               subtitle: tournament.promoListSubtitle,
-              imageUrl: tournament.promoListImageUrl,
+              imageUrl: resolveTournamentImage(tournament, 'list'),
               dateText: tournament.promoListDateText,
               teamsText: tournament.promoListTeamsText,
               locationText: tournament.promoListLocationText,
@@ -3633,6 +3634,16 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             onSelectImage={(file) => void handlePromoImageChange('home', file)}
             uploading={promoUploadingSlot === 'home'}
             disabled={updateTournament.isPending || promoUploadingSlot !== null}
+            // 이 자리를 비웠을 때 실제로 노출될 이미지 — 자기 자리를 뺀 폴백 결과를 그대로
+            // 넘겨 미리보기가 공개 화면과 어긋나지 않게 한다.
+            defaultImageUrl={resolveTournamentImage(
+              {
+                coverImageUrl: tournament?.coverImageUrl,
+                promoHomeImageUrl: null,
+                promoListImageUrl: promoListImageUrl,
+              },
+              'home',
+            )}
           />
           <PromoCardFields
             variant="list"
@@ -3668,6 +3679,14 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             onSelectImage={(file) => void handlePromoImageChange('list', file)}
             uploading={promoUploadingSlot === 'list'}
             disabled={updateTournament.isPending || promoUploadingSlot !== null}
+            defaultImageUrl={resolveTournamentImage(
+              {
+                coverImageUrl: tournament?.coverImageUrl,
+                promoHomeImageUrl: promoHomeImageUrl,
+                promoListImageUrl: null,
+              },
+              'list',
+            )}
           />
 
           <div className="flex gap-2 pt-1 sticky bottom-0 bg-[var(--card-surface)] pb-1">

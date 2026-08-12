@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { ErrorState, EmptyState } from '@/components/v1-ui/primitives';
+import { ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { formatTournamentDateShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import {
   TournamentProgressStepper,
@@ -89,11 +89,23 @@ function toGroupStandingsRows(group: V1TournamentGroup): TournamentStandingsRow[
  * 상세를 보여주는 게 낫다")대로 화면 전환 없이 순위 맥락을 유지한 채 보여준다.
  *
  * 이미 받아 둔 `fixtures` 만 쓰므로 추가 네트워크 요청이 없다.
+ *
+ * 매칭은 teamId로 한다. 참가팀 공개 정책 통일(fix/v1-publish) 이후 모집 중엔
+ * teamId가 null이라 여러 비공개 팀이 서로 같은 "팀"으로 잘못 묶일 수 있지만,
+ * 호출부(TournamentStandingsTable)가 teamName===null(비공개)인 행에는 애초에
+ * 펼침 버튼 자체를 렌더하지 않으므로(정적 행으로 대체) 이 컴포넌트는 실제로는
+ * teamId가 항상 채워진 상태로만 호출된다. 그래도 그 호출부 불변조건이 나중에
+ * 깨지는 경우까지 방어하기 위해 teamId===null이면 매칭을 아예 시도하지 않고
+ * "배정된 경기 없음"으로 안전하게 떨어뜨린다(여러 비공개 팀을 서로 같은 팀으로
+ * 잘못 묶어 보여주는 것보다, 상세를 못 보여주는 쪽이 훨씬 안전한 실패 모드다).
  */
-function TeamFixturesDetail({ teamId, fixtures }: { teamId: string; fixtures: V1TournamentFixture[] }) {
-  const mine = fixtures
-    .filter((f) => f.homeTeamId === teamId || f.awayTeamId === teamId)
-    .sort((a, b) => (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? ''));
+function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtures: V1TournamentFixture[] }) {
+  const mine =
+    teamId === null
+      ? []
+      : fixtures
+          .filter((f) => f.homeTeamId === teamId || f.awayTeamId === teamId)
+          .sort((a, b) => (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? ''));
 
   if (mine.length === 0) {
     return (
@@ -107,7 +119,7 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string; fixtures: V1
     <ul style={{ display: 'flex', flexDirection: 'column', gap: 6, listStyle: 'none', margin: 0, padding: 0 }}>
       {mine.map((f) => {
         const isHome = f.homeTeamId === teamId;
-        const opponent = isHome ? f.awayTeamName : f.homeTeamName;
+        const opponent = (isHome ? f.awayTeamName : f.homeTeamName) ?? '비공개';
         const scored = f.result ? (isHome ? f.result.homeScore : f.result.awayScore) : null;
         const conceded = f.result ? (isHome ? f.result.awayScore : f.result.homeScore) : null;
         const outcome =
@@ -206,18 +218,79 @@ function LeagueStandingsSection({ rows }: { rows: readonly TournamentStandingsRo
   );
 }
 
-/* ── 빈 브래킷 안내 ── */
-function BracketEmpty({ format }: { format: 'knockout' | 'group_knockout' }) {
+/**
+ * 빈 브래킷 안내 — 문구 정정 + 정보 보강(fix/v1-publish).
+ *
+ * 문구: 이 상태(showBracket===false)는 대진 "구조" 자체가 아직 없다는 뜻이고, 그건
+ * 오직 포맷/조별리그 진행 여부로만 정해진다(isBracketPublished + groupStageDone —
+ * 모집 상태와는 독립인 별개 게이트, 이 파일 §B-8 주석 참고) — 그래서 주 문구(sub)는
+ * 기존처럼 포맷 기준을 그대로 유지한다("어떤 이유로 없는지" 자체를 모집 상태로
+ * 바꿔치기하면, 모집은 끝났는데 조별리그가 안 끝난 대회에서 거짓 안내가 된다).
+ *
+ * 대신 "모집 마감 후"·"조별리그가 끝난 후"·"대회 종료 후" 세 시점 중 이 화면이
+ * 말하지 않던 나머지(모집 마감 시점·현재 확정 팀 수)를 정보 보강으로 덧붙인다
+ * (요구사항 3) — 팀명은 없어도 몇 팀이 참가하는지·언제 모집이 마감되는지·대진표
+ * 공개가 예약돼 있는지는 항상 정직하게 보여줄 수 있는 정보다. 채울 정보가
+ * 없으면(스케줄 미정) 그 줄 자체를 렌더하지 않는다.
+ */
+function BracketEmpty({
+  format,
+  status,
+  teamCount,
+  confirmedCount,
+  registrationDeadlineAt,
+  bracketPublishScheduledAt,
+}: {
+  format: 'knockout' | 'group_knockout';
+  status: V1TournamentDetail['status'];
+  teamCount: number;
+  confirmedCount: number;
+  registrationDeadlineAt: string | null;
+  bracketPublishScheduledAt: string | null;
+}) {
   const sub = format === 'group_knockout'
     ? '대진표는 조별리그가 끝난 후 공개돼요.'
     : '대진 편성이 완료되면 대진표가 공개돼요.';
 
+  const isRecruiting = status === 'open';
+  const deadlineLabel = isRecruiting ? formatTournamentDateShort(registrationDeadlineAt) : null;
+  const publishLabel = formatTournamentDateTimeShort(bracketPublishScheduledAt);
+
   return (
-    <EmptyState
-      title="대진표가 아직 공개되지 않았어요"
-      sub={sub}
-      icon={<Trophy size={32} strokeWidth={1.6} />}
-    />
+    <div className="tm-empty-state">
+      <div className="tm-empty-icon" aria-hidden="true">
+        <Trophy size={32} strokeWidth={1.6} />
+      </div>
+      <div className="tm-text-body-lg">대진표가 아직 공개되지 않았어요</div>
+      <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+        {sub}
+      </div>
+      {/* 팀명이 아니라 팀 수 — "감출 때 없는 척하지 마라": 이름은 몰라도 몇 팀이
+          참가하는지는 정직하게 보여준다. */}
+      <div
+        style={{
+          marginTop: 16,
+          padding: '10px 14px',
+          borderRadius: 10,
+          background: 'var(--surface-soft)',
+          fontSize: 13,
+          color: 'var(--text-strong)',
+          fontWeight: 600,
+        }}
+      >
+        확정 {confirmedCount}/{teamCount}팀
+      </div>
+      {deadlineLabel ? (
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 8 }}>
+          모집 마감 {deadlineLabel}
+        </div>
+      ) : null}
+      {publishLabel ? (
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: deadlineLabel ? 2 : 8 }}>
+          대진표 공개 예정 {publishLabel}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -294,7 +367,17 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
     .sort((a, b) => a.position - b.position);
 
   return (
-    <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
+    // §빈 상태 재균형(fix/v1-publish) — 조별리그 미종료 등으로 대진표 우 컬럼이
+    // BracketEmpty 하나뿐일 만큼 콘텐츠가 짧으면, .tm-scroll-area(뷰포트 - 상단바 -
+    // 하단탭바 높이 고정) 안에서 콘텐츠가 위쪽에만 붙고 나머지가 그냥 빈 배경으로
+    // 남아 하단 흐름 네비게이터(TournamentFlowNav)가 탭바 위에 어중간하게 떠 보였다
+    // (알파 400px 실측: 마지막 콘텐츠 bottom 961, 탭바 top 1128 — 167px 빈 공간).
+    // minHeight:'100%'(부모 .tm-scroll-area가 top/bottom absolute로 확정 높이를
+    // 가지므로 퍼센트가 정상 해석됨) + flex column으로 이 페이지를 뷰포트 높이만큼
+    // 늘리고, flownav에 marginTop:'auto'를 줘 콘텐츠가 짧을 때도 네비가 항상 탭바
+    // 바로 위에 붙게 한다 — 콘텐츠가 뷰포트보다 길면 기존과 동일하게 자연스러운
+    // 스크롤 흐름을 그대로 따른다(flex는 늘어나는 방향으로만 작용).
+    <div className="tm-tourn-sub-page" style={{ paddingBottom: 40, minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <header className="tm-bracket-page-intro">
         <div>
           <span className="tm-bracket-page-eyebrow">순위와 대진표</span>
@@ -345,6 +428,9 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
         </div>
       </div>
 
+      {/* flex:1 — 위 minHeight:'100%'+flex column과 짝을 이뤄 탭 콘텐츠가 남는 세로
+          공간을 채우고, 아래 flownav가 marginTop:'auto'로 항상 바닥에 붙게 한다. */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       {activeTab === 'schedule' ? (
         <BracketScheduleTab tournamentId={tournament.id} />
       ) : (
@@ -395,7 +481,14 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                       />
                     </div>
                   ) : (
-                    <BracketEmpty format={format} />
+                    <BracketEmpty
+                      format={format}
+                      status={tournament.status}
+                      teamCount={tournament.teamCount}
+                      confirmedCount={tournament.confirmedCount}
+                      registrationDeadlineAt={tournament.registrationDeadlineAt}
+                      bracketPublishScheduledAt={tournament.bracketPublishScheduledAt}
+                    />
                   )}
                 </section>
               </div>
@@ -403,9 +496,12 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
           </div>
         </>
       )}
+      </div>
 
-      {/* 이전/다음 흐름 네비게이터 — 탭과 무관하게 항상 노출(페이지 레벨 이동) */}
-      <div className="tm-tourn-sub-flownav tm-bracket-page-flownav">
+      {/* 이전/다음 흐름 네비게이터 — 탭과 무관하게 항상 노출(페이지 레벨 이동).
+          marginTop:'auto' — 위 flex column 래퍼 안에서 콘텐츠가 짧아도 항상 바닥에
+          붙는다(§빈 상태 재균형, 이 함수 상단 주석 참고). */}
+      <div className="tm-tourn-sub-flownav tm-bracket-page-flownav" style={{ marginTop: 'auto' }}>
         <TournamentFlowNav
           prev={{ href: `/tournaments/${tournament.id}`, label: '대회 정보' }}
           next={{

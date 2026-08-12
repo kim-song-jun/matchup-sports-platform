@@ -190,6 +190,7 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
         {
           groupId: 'group-a',
           groupName: 'A조',
+          registrationId: 'reg-1',
           teamId: 'team-1',
           teamName: '성수 FC',
           teamLogoUrl: null,

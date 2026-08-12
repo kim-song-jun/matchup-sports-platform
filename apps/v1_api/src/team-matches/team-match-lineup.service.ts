@@ -10,7 +10,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { canonicalGameCommandPayloadHash } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { parseLineupCatalog, parseLineupLimits } from '../tournaments/competition-config/competition-config.parse';
+import { parseLineupConfigForResponse, parseLineupLimits } from '../tournaments/competition-config/competition-config.parse';
 import {
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
@@ -67,7 +67,7 @@ export class TeamMatchLineupService {
       });
       return {
         ...(await this.serializeLineup(tx, context, lineup, visibility?.lineupAt ?? null)),
-        lineupConfig: parseLineupCatalog(config?.lineup ?? null),
+        lineupConfig: parseLineupConfigForResponse(config?.lineup ?? null),
       };
     });
   }

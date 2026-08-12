@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { V1TournamentListItem } from '@/types/api';
-import { getSortedTournamentPromos } from './tournament-promo';
+import { getSortedTournamentPromos, resolveTournamentImage } from './tournament-promo';
 
 function tournament(
   id: string,
@@ -81,5 +81,57 @@ describe('getSortedTournamentPromos', () => {
       'list-first',
       'list-second',
     ]);
+  });
+});
+
+describe('resolveTournamentImage', () => {
+  it('커버만 올려도 홈·목록 홍보 카드가 함께 채워진다', () => {
+    const source = {
+      coverImageUrl: '/uploads/cover.webp',
+      promoHomeImageUrl: null,
+      promoListImageUrl: null,
+    };
+
+    expect(resolveTournamentImage(source, 'cover')).toBe('/uploads/cover.webp');
+    expect(resolveTournamentImage(source, 'home')).toBe('/uploads/cover.webp');
+    expect(resolveTournamentImage(source, 'list')).toBe('/uploads/cover.webp');
+  });
+
+  it('자리마다 지정한 이미지는 커버 폴백보다 우선한다', () => {
+    const source = {
+      coverImageUrl: '/uploads/cover.webp',
+      promoHomeImageUrl: '/uploads/home.webp',
+      promoListImageUrl: '/uploads/list.webp',
+    };
+
+    expect(resolveTournamentImage(source, 'home')).toBe('/uploads/home.webp');
+    expect(resolveTournamentImage(source, 'list')).toBe('/uploads/list.webp');
+  });
+
+  it('커버가 없으면 다른 홍보 자리의 이미지로 폴백한다', () => {
+    const source = {
+      coverImageUrl: null,
+      promoHomeImageUrl: '/uploads/home.webp',
+      promoListImageUrl: null,
+    };
+
+    expect(resolveTournamentImage(source, 'cover')).toBe('/uploads/home.webp');
+    expect(resolveTournamentImage(source, 'list')).toBe('/uploads/home.webp');
+  });
+
+  it('공백만 있는 값은 이미지가 없는 것으로 본다', () => {
+    const source = {
+      coverImageUrl: '   ',
+      promoHomeImageUrl: '',
+      promoListImageUrl: '/uploads/list.webp',
+    };
+
+    expect(resolveTournamentImage(source, 'home')).toBe('/uploads/list.webp');
+    expect(
+      resolveTournamentImage(
+        { coverImageUrl: '  ', promoHomeImageUrl: null, promoListImageUrl: undefined },
+        'home',
+      ),
+    ).toBeNull();
   });
 });

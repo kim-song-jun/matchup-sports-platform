@@ -82,11 +82,42 @@ export function presetsForOutfieldCount(
  * positionCode/label은 이 슬롯·라인업 편집기 내부에서만 쓰는 자리 표시(내부 마커)다 —
  * 실제로 서버에 저장되는 골키퍼 포지션 값은 이 값이 아니라 buildSavePayload가 별도로
  * (goalkeeperPositionCode를 통해) 종목 사전에서 읽어 채운다(D-17, [알파 감사 E]). 그래서
- * 여기 하드코딩된 'GK'는 종목이 늘어나도 안전하다 — 화면 안에서 "이 슬롯이 골키퍼
- * 자리다"를 구분하는 용도일 뿐, 축구/풋살 어느 쪽이든 같은 내부 마커를 공유해도 된다. */
+ * 여기 쓰는 GOALKEEPER_SLOT_CODE는 종목이 늘어나도 안전하다 — 화면 안에서 "이 슬롯이
+ * 골키퍼 자리다"를 구분하는 용도일 뿐, 축구/풋살 어느 쪽이든 같은 내부 마커를 공유해도 된다. */
 export function slotsWithGoalkeeper(preset: FormationPreset): FormationSlot[] {
-  return [{ positionCode: 'GK', label: 'GK', x: 50, y: 6 }, ...preset.slots];
+  return [{ positionCode: GOALKEEPER_SLOT_CODE, label: 'GK', x: 50, y: 6 }, ...preset.slots];
 }
+
+/**
+ * 이 경기가 허용하는 출전 인원(GK 포함)을 화면 문구용으로 정리한다.
+ *
+ * **범위라는 점이 핵심이다.** canonical config는 축구 7~11, 풋살 3~6이고 관리자는 상한만
+ * 고르므로(`lineup-size.ts#buildLineupSizeConfig`) minPlayers와 maxPlayers가 서로 다를 수 있다.
+ * maxPlayers만 단일 값처럼 비교하면 7~11 경기에서 선발 9명(완전히 정상)에게 "11명인데
+ * 9명이에요"라는 틀린 경고가 뜬다 — PR #402 Copilot 리뷰가 잡은 실제 결함이다.
+ *
+ * team-match 라인업과 대회 fixture 라인업이 같은 판정을 각자 구현하지 않도록 여기 한 곳에 둔다.
+ * 인원 정보가 없는 구버전 응답(min/max가 null)에서는 label=null·outOfRange=false로 조용히
+ * 안내를 생략한다 — 모르는 값을 근거로 경고하지 않는다.
+ */
+export function describeSquadSize(
+  minPlayers: number | null,
+  maxPlayers: number | null,
+  starterCount: number,
+): { label: string | null; outOfRange: boolean } {
+  if (minPlayers === null || maxPlayers === null) return { label: null, outOfRange: false };
+  const label = minPlayers === maxPlayers ? `${maxPlayers}명` : `${minPlayers}~${maxPlayers}명`;
+  // 선발이 아직 0명인 상태(막 진입)는 "벗어났다"고 말할 단계가 아니다.
+  const outOfRange = starterCount > 0 && (starterCount < minPlayers || starterCount > maxPlayers);
+  return { label, outOfRange };
+}
+
+/** 골키퍼 슬롯을 가리키는 **화면 내부 마커**. 서버에 저장되는 실제 포지션 코드가 아니다
+ * (그건 goalkeeperPositionCode가 종목 사전에서 읽는다 — 축구 'GK', 풋살 'GOLEIRO').
+ * slotsWithGoalkeeper가 붙이는 값과 그 슬롯을 판별하는 쪽(formation-assignment.ts,
+ * matchSlotsToEntries)이 같은 상수를 봐야 한다 — 예전에는 양쪽이 'GK' 문자열을 각자
+ * 하드코딩해 한쪽만 바꾸면 조용히 어긋날 수 있었다. */
+export const GOALKEEPER_SLOT_CODE = 'GK';
 
 /** [알파 감사 E] positions 사전에서 실제 골키퍼 포지션 코드를 찾는다 — 축구는 'GK',
  * 풋살은 'GOLEIRO'로 서로 다르다. 저장(buildSavePayload)·재수화(hydrateFixtureLineupState)

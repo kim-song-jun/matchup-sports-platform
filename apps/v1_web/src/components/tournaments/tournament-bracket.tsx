@@ -101,14 +101,33 @@ function getWinner(fixture: V1TournamentFixture): WinnerSide {
   return null;
 }
 
+/**
+ * 참가팀 공개 정책 통일(fix/v1-publish) — homeTeamName/awayTeamName은 세 상태를
+ * 가진다: 아직 배정 안 됨('TBD', tournament-detail.presenter.ts의 관용 표기),
+ * 배정은 됐지만 모집 중이라 가려짐(null), 실명(그 외 문자열). "미정"과 "비공개"를
+ * 반드시 구분해서 보여준다 — 관전자가 "아직 대진이 안 정해졌다"와 "정해졌는데
+ * 안 알려준다"를 구분해야 어느 게 왜 없는지 헷갈리지 않는다.
+ */
+function teamDisplayName(name: string | null): { label: string; isPlaceholder: boolean } {
+  if (name === null) return { label: '비공개', isPlaceholder: true };
+  if (name === 'TBD') return { label: '미정', isPlaceholder: true };
+  return { label: name, isPlaceholder: false };
+}
+
 function getChampion(rounds: RoundGroup[]): string | null {
   const finalRound = rounds.find((r) => r.key === 'final');
   const finalFixture = finalRound?.fixtures[0];
   if (!finalFixture || finalFixture.status !== 'completed') return null;
   const w = getWinner(finalFixture);
-  if (w === 'home') return finalFixture.homeTeamName || null;
-  if (w === 'away') return finalFixture.awayTeamName || null;
-  return null;
+  const name = w === 'home' ? finalFixture.homeTeamName : w === 'away' ? finalFixture.awayTeamName : null;
+  // 우승팀 이름이 비공개(null)면 "우승"이라는 사실 자체는 최종 결과이므로 숨기지
+  // 않되, 팀명을 지어내지 않는다 — ChampionSlot이 champion===null이면 "미정"으로
+  // 보이므로, null을 그대로 넘기면 우승 사실 자체가 없던 일처럼 보인다. 모집
+  // 중(open) 상태에서 대회가 이미 완료(final fixture completed)되는 것은 실무상
+  // 있을 수 없는 조합이지만(모집도 안 끝났는데 결승이 끝남), 방어적으로 대회
+  // 이름 자체가 아니라 "비공개"임을 알 수 있게 별도 라벨을 쓴다.
+  if (name === null) return '비공개 우승팀';
+  return name || null;
 }
 
 function penaltyText(fixture: V1TournamentFixture): string {
@@ -123,10 +142,10 @@ function penaltyText(fixture: V1TournamentFixture): string {
 
 interface AggregateMatchup {
   id: string;
-  homeTeamName: string;
+  homeTeamName: string | null;
   homeTeamId: string | null;
   homeTeamLogoUrl: string | null;
-  awayTeamName: string;
+  awayTeamName: string | null;
   awayTeamId: string | null;
   awayTeamLogoUrl: string | null;
   homeAggScore: number;
@@ -178,16 +197,22 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
         };
       }
 
-      // 2-legged: 1차전 홈팀 기준으로 합산
+      // 2-legged: 1차전 홈팀 기준으로 합산.
+      // "어느 레그가 뒤집혔는지"는 registrationId로 판정한다(homeTeamName이 아니다) —
+      // 참가팀 공개 정책 통일(fix/v1-publish) 이후 모집 중엔 팀명이 전부 null이라,
+      // 이름으로 비교하면 서로 다른(둘 다 비공개인) 팀의 레그가 `null === null`로
+      // 잘못 같다고 판정된다. registrationId는 비공개 상태에도 항상 채워지는 안정
+      // 식별자라 이 문제가 없다.
       const leg1Home = leg1.homeTeamName;
       const leg1Away = leg1.awayTeamName;
+      const leg1AwayRegistrationId = leg1.awayRegistrationId;
 
       let homeAgg = leg1.result?.homeScore ?? 0;
       let awayAgg = leg1.result?.awayScore ?? 0;
 
       for (let i = 1; i < legs.length; i++) {
         const leg = legs[i];
-        const isReversed = leg.homeTeamName === leg1Away;
+        const isReversed = leg.homeRegistrationId === leg1AwayRegistrationId;
         if (isReversed) {
           homeAgg += leg.result?.awayScore ?? 0;
           awayAgg += leg.result?.homeScore ?? 0;
@@ -204,7 +229,7 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
       else {
         const pkLeg = legs.find((l) => l.result?.hasPenalty);
         if (pkLeg?.result?.hasPenalty) {
-          const isRevLeg = pkLeg.homeTeamName === leg1Away;
+          const isRevLeg = pkLeg.homeRegistrationId === leg1AwayRegistrationId;
           const homePK = isRevLeg ? pkLeg.result.awayPenaltyScore : pkLeg.result.homePenaltyScore;
           const awayPK = isRevLeg ? pkLeg.result.homePenaltyScore : pkLeg.result.awayPenaltyScore;
           if (homePK !== null && awayPK !== null) {
@@ -217,7 +242,7 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
       const pkLeg = legs.find((l) => l.result?.hasPenalty);
       let pkInfo: string | null = null;
       if (pkLeg?.result?.hasPenalty && pkLeg.result.homePenaltyScore !== null && pkLeg.result.awayPenaltyScore !== null) {
-        const isRevLeg = pkLeg.homeTeamName === leg1Away;
+        const isRevLeg = pkLeg.homeRegistrationId === leg1AwayRegistrationId;
         const hPK = isRevLeg ? pkLeg.result.awayPenaltyScore : pkLeg.result.homePenaltyScore;
         const aPK = isRevLeg ? pkLeg.result.homePenaltyScore : pkLeg.result.awayPenaltyScore;
         pkInfo = `PK ${hPK}:${aPK}`;
@@ -257,20 +282,22 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
   const isLive = status === 'in_progress';
   const isDone = status === 'completed';
   const isMulti = legs.length > 1;
+  const home = teamDisplayName(homeTeamName);
+  const away = teamDisplayName(awayTeamName);
 
   return (
     <div
       className={`tm-bk2-card${isLive ? ' tm-bk2-card-live' : ''}`}
       role="group"
-      aria-label={`${homeTeamName} 대 ${awayTeamName}${isMulti ? ' 합산' : ''}`}
+      aria-label={`${home.label} 대 ${away.label}${isMulti ? ' 합산' : ''}`}
     >
       <div
         className="tm-bk2-row"
         data-winner={winner === 'home' ? 'true' : undefined}
         data-loser={isDone && winner === 'away' ? 'true' : undefined}
       >
-        <TeamAvatar seed={homeTeamId ?? homeTeamName} name={homeTeamName} logoUrl={homeTeamLogoUrl} size="sm" />
-        <span className="tm-bk2-name">{homeTeamName}</span>
+        <TeamAvatar seed={homeTeamId ?? home.label} name={home.label} logoUrl={homeTeamLogoUrl} size="sm" />
+        <span className="tm-bk2-name" style={home.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{home.label}</span>
         <span className="tm-bk2-score tab-num">{homeAggScore}</span>
       </div>
       <div className="tm-bk2-divider" aria-hidden="true" />
@@ -279,8 +306,8 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-winner={winner === 'away' ? 'true' : undefined}
         data-loser={isDone && winner === 'home' ? 'true' : undefined}
       >
-        <TeamAvatar seed={awayTeamId ?? awayTeamName} name={awayTeamName} logoUrl={awayTeamLogoUrl} size="sm" />
-        <span className="tm-bk2-name">{awayTeamName}</span>
+        <TeamAvatar seed={awayTeamId ?? away.label} name={away.label} logoUrl={awayTeamLogoUrl} size="sm" />
+        <span className="tm-bk2-name" style={away.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{away.label}</span>
         <span className="tm-bk2-score tab-num">{awayAggScore}</span>
       </div>
       {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}
@@ -330,17 +357,18 @@ function slotCY(i: number) {
 function MatchTeamRow({
   teamId, name, logoUrl, score, isWinner, isLoser,
 }: {
-  teamId: string | null; name: string; logoUrl: string | null; score: number | null; isWinner: boolean; isLoser: boolean;
+  teamId: string | null; name: string | null; logoUrl: string | null; score: number | null; isWinner: boolean; isLoser: boolean;
 }) {
-  const decided = (name?.trim().length ?? 0) > 0;
+  const { label, isPlaceholder } = teamDisplayName(name);
+  const decided = !isPlaceholder;
   return (
     <div
       className="tm-bk2-row"
       data-winner={isWinner ? 'true' : undefined}
       data-loser={isLoser ? 'true' : undefined}
     >
-      <TeamAvatar seed={teamId ?? name} name={decided ? name : '미정'} logoUrl={logoUrl} size="sm" />
-      <span className="tm-bk2-name">{decided ? name : '미정'}</span>
+      <TeamAvatar seed={teamId ?? label} name={label} logoUrl={logoUrl} size="sm" />
+      <span className="tm-bk2-name" style={!decided ? { color: 'var(--text-caption)' } : undefined}>{label}</span>
       {score !== null && <span className="tm-bk2-score tab-num">{score}</span>}
       {score === null && decided && <span className="tm-bk2-score" style={{ opacity: 0.25 }}>-</span>}
     </div>
@@ -364,12 +392,14 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
   if (timeLabel) badges.push({ key: 'time', className: 'tm-bk2-badge tm-bk2-badge-time', label: timeLabel });
   if (isLive) badges.push({ key: 'live', className: 'tm-bk2-badge tm-bk2-badge-live', label: '● LIVE' });
   if (isDone && pk) badges.push({ key: 'pk', className: 'tm-bk2-badge', label: pk });
+  const homeLabel = teamDisplayName(fixture.homeTeamName).label;
+  const awayLabel = teamDisplayName(fixture.awayTeamName).label;
 
   return (
     <div
       className={`tm-bk2-card${isLive ? ' tm-bk2-card-live' : ''}`}
       role="group"
-      aria-label={`${fixture.homeTeamName || '미정'} 대 ${fixture.awayTeamName || '미정'}`}
+      aria-label={`${homeLabel} 대 ${awayLabel}`}
     >
       <MatchTeamRow
         teamId={fixture.homeTeamId} logoUrl={fixture.homeTeamLogoUrl}

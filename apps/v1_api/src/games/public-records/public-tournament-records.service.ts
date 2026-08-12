@@ -3,7 +3,7 @@ import type { Prisma, V1GameEventType, V1GameResultRevisionState, V1VisibilityMo
 import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
-import { isBracketPublished } from '../../tournaments/tournament-detail.presenter';
+import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournaments/tournament-detail.presenter';
 import {
   TournamentStaffAccessService,
   type TournamentStaffResource,
@@ -116,10 +116,10 @@ export class PublicTournamentRecordsService {
     private readonly access: TournamentStaffAccessService,
   ) {}
 
-  async getSchedule(tournamentId: string, query: PublicTournamentScheduleQueryDto) {
+  async getSchedule(tournamentId: string, query: PublicTournamentScheduleQueryDto, user?: V1AuthUser) {
     const tournament = await this.prisma.v1Tournament.findUnique({
       where: { id: tournamentId },
-      select: { id: true, title: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
+      select: { id: true, title: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
     if (tournament === null) {
       throw new NotFoundException(NOT_FOUND);
@@ -136,6 +136,15 @@ export class PublicTournamentRecordsService {
         nextCursor: null,
       };
     }
+
+    // 참가팀 공개 정책 통일(fix/v1-publish) -- 모집 중(open)에는 이 대회의 조 편성/
+    // 일정 안 팀명도 participantTeams·TournamentsReadService의 groups/fixtures와
+    // 동일한 조건으로 가린다("조별일정은 왜 그대로 보이나"가 이 정책 통일의 발단).
+    // 이 조회는 특정 fixture 하나가 아니라 대회 전체 일정을 한 번에 내려주므로,
+    // 스태프 우회는 fixture/field 단위가 아니라 대회 전체 단위(`{ tournamentId }`)로
+    // 판정한다 -- TournamentsReadService.get()과 동일한 스코프 선택.
+    const staffBypass = await this.resolveTournamentStaffBypass(user, tournamentId);
+    const hideIdentity = shouldHideParticipantIdentity(tournament.status, staffBypass);
 
     const publicLiveEnabled = await this.isPublicLiveEnabled();
     const limit = query.limit ?? 20;
@@ -197,11 +206,15 @@ export class PublicTournamentRecordsService {
     const consentMap = await loadParticipantConsentEligibility(this.prisma, scorerParticipantIds);
 
     const items = pageFixtures
-      .map((fixture) => presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, scorersByGameId, consentMap, now))
+      .map((fixture) =>
+        presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, scorersByGameId, consentMap, now, hideIdentity),
+      )
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
     const unscheduled = rawUnscheduled
-      .map((fixture) => presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, scorersByGameId, consentMap, now))
+      .map((fixture) =>
+        presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, scorersByGameId, consentMap, now, hideIdentity),
+      )
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
     const standings = await this.prisma.v1TournamentStanding.findMany({
@@ -209,6 +222,10 @@ export class PublicTournamentRecordsService {
       orderBy: [{ groupId: 'asc' }, { position: 'asc' }],
       select: {
         groupId: true,
+        // 팀명·로고가 hideIdentity로 가려질 때도 행마다 고유한 키가 남아야 한다
+        // (teamId가 전부 null이 되면 React key가 충돌한다) — registrationId는 그
+        // 재식별 경로가 없는 안전한 안정 키(위 presentSide 주석과 동일 근거).
+        registrationId: true,
         points: true,
         wins: true,
         draws: true,
@@ -239,6 +256,7 @@ export class PublicTournamentRecordsService {
         groupTeams: {
           orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
           select: {
+            registrationId: true,
             registration: {
               select: { team: { select: { id: true, name: true, profile: { select: { logoUrl: true } } } } },
             },
@@ -250,9 +268,10 @@ export class PublicTournamentRecordsService {
       group.groupTeams.map((groupTeam, index) => ({
         groupId: group.id,
         groupName: group.name,
-        teamId: groupTeam.registration.team.id,
-        teamName: groupTeam.registration.team.name,
-        teamLogoUrl: groupTeam.registration.team.profile?.logoUrl ?? null,
+        registrationId: groupTeam.registrationId,
+        teamId: hideIdentity ? null : groupTeam.registration.team.id,
+        teamName: hideIdentity ? null : groupTeam.registration.team.name,
+        teamLogoUrl: hideIdentity ? null : (groupTeam.registration.team.profile?.logoUrl ?? null),
         // 편성 순서일 뿐 성적 순위가 아니다. 표가 전부 0이면 프론트(TournamentStandingsTable)가
         // 메달 색·진출 강조를 스스로 끄고 "아직 경기 기록이 없어요" 안내를 붙인다.
         position: index + 1,
@@ -281,9 +300,10 @@ export class PublicTournamentRecordsService {
         ...standings.map((standing) => ({
           groupId: standing.groupId,
           groupName: standing.group.name,
-          teamId: standing.registration.team.id,
-          teamName: standing.registration.team.name,
-          teamLogoUrl: standing.registration.team.profile?.logoUrl ?? null,
+          registrationId: standing.registrationId,
+          teamId: hideIdentity ? null : standing.registration.team.id,
+          teamName: hideIdentity ? null : standing.registration.team.name,
+          teamLogoUrl: hideIdentity ? null : (standing.registration.team.profile?.logoUrl ?? null),
           position: standing.position,
           points: standing.points,
           wins: standing.wins,
@@ -301,7 +321,7 @@ export class PublicTournamentRecordsService {
   async getMatch(tournamentId: string, fixtureId: string, user: V1AuthUser | undefined) {
     const tournament = await this.prisma.v1Tournament.findUnique({
       where: { id: tournamentId },
-      select: { id: true, title: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
+      select: { id: true, title: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
     if (
       tournament === null ||
@@ -355,6 +375,10 @@ export class PublicTournamentRecordsService {
     const consentMap = await loadParticipantConsentEligibility(this.prisma, participantIds);
     const identityAsOf = officialAt ?? new Date();
     const isStaffBypass = await this.resolveStaffBypass(user, tournamentId, fixtureId, fixture.fieldId);
+    // 참가팀 공개 정책 통일(fix/v1-publish) — 이 경기의 home/away 팀명도 모집 중(open)엔
+    // 가린다. 이 페이지는 fixture 하나만 다루므로 위에서 이미 계산한 fixture/field
+    // 스코프 스태프 우회(isStaffBypass, 참가자 실명 우회와 동일)를 그대로 재사용한다.
+    const hideIdentity = shouldHideParticipantIdentity(tournament.status, isStaffBypass);
 
     const lineup = buildLineup(fixture, mode, consentMap, identityAsOf, isStaffBypass);
     const events =
@@ -394,8 +418,8 @@ export class PublicTournamentRecordsService {
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
       fieldName: fixture.field?.name ?? null,
-      home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration),
-      away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration),
+      home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration, hideIdentity),
+      away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration, hideIdentity),
       visibilityMode: mode,
       status,
       resultState,
@@ -462,6 +486,27 @@ export class PublicTournamentRecordsService {
       fieldId === null ? { tournamentId, fixtureId } : { tournamentId, fixtureId, fieldId };
     try {
       await this.access.assertAccess({ userId: user.id, action: 'read', resource });
+      return true;
+    } catch (error) {
+      if (error instanceof ForbiddenException) return false;
+      throw error;
+    }
+  }
+
+  /**
+   * 참가팀 공개 정책 통일(fix/v1-publish) -- `getSchedule`용 대회 전체 단위
+   * 스태프 우회. 위 `resolveStaffBypass`와 달리 fixture/field로 좁히지 않는다
+   * (`{ tournamentId }`만) -- 이 조회 자체가 특정 경기 하나가 아니라 대회 전체
+   * 일정을 한 번에 내려주기 때문에, 그 응답 전체를 우회할 권한도 대회 전체
+   * 단위로 판정하는 것이 맞다(TournamentsReadService.get()의 동일 이름 메서드와
+   * 같은 스코프 선택 -- decideTournamentStaffAccess의 기존 정책을 그대로 따르는
+   * 결과이지 새로 발명한 로직이 아니다: 특정 fixture/field로만 좁게 배정된
+   * FIELD_OPERATOR는 자연히 이 우회 대상에서 제외된다).
+   */
+  private async resolveTournamentStaffBypass(user: V1AuthUser | undefined, tournamentId: string): Promise<boolean> {
+    if (user === undefined) return false;
+    try {
+      await this.access.assertAccess({ userId: user.id, action: 'read', resource: { tournamentId } });
       return true;
     } catch (error) {
       if (error instanceof ForbiddenException) return false;
@@ -696,12 +741,24 @@ function normalizeRevisionState(state: V1GameResultRevisionState | undefined): '
   return state === 'OFFICIAL' || state === 'VOID' ? state : null;
 }
 
+/**
+ * `hideIdentity`(참가팀 공개 정책 통일, fix/v1-publish) -- true면 어느 팀이 이 경기의
+ * home/away인지(teamId/teamName)를 가린다. registrationId는 그대로 남긴다(대회
+ * 등록 단위 식별자일 뿐, `/teams/:id` 같은 공개 팀 조회로 실명을 되찾을 수 있는
+ * teamId와 달리 그 자체로는 재식별 경로가 없다) -- "이 슬롯에 팀이 배정돼 있다"는
+ * 사실 자체는 숨기지 않고, 그 팀이 누구인지만 가린다.
+ */
 function presentSide(
   registrationId: string | null,
   registration: { team: { id: string; name: string } } | null,
-): { registrationId: string; teamId: string; teamName: string } | null {
+  hideIdentity: boolean,
+): { registrationId: string; teamId: string | null; teamName: string | null } | null {
   if (registrationId === null || registration === null) return null;
-  return { registrationId, teamId: registration.team.id, teamName: registration.team.name };
+  return {
+    registrationId,
+    teamId: hideIdentity ? null : registration.team.id,
+    teamName: hideIdentity ? null : registration.team.name,
+  };
 }
 
 function presentScheduleEntry(
@@ -711,6 +768,7 @@ function presentScheduleEntry(
   scorersByGameId: ReadonlyMap<string, readonly { side: 'home' | 'away'; participantId: string | null; clockMs: number | null }[]>,
   consentMap: Map<string, ParticipantConsentEligibility>,
   now: Date,
+  hideIdentity: boolean,
 ) {
   const policyMode: V1VisibilityMode = fixture.game?.visibilityPolicy?.mode ?? 'HIDDEN';
   const mode = effectivePublicVisibilityMode(policyMode, publicLiveEnabled);
@@ -769,8 +827,8 @@ function presentScheduleEntry(
     scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
     venue: fixture.venue,
     fieldName: fixture.field?.name ?? null,
-    home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration),
-    away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration),
+    home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration, hideIdentity),
+    away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration, hideIdentity),
     visibilityMode: mode as EffectiveMode,
     status,
     resultState: resolveResultState({

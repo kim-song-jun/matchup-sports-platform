@@ -1,5 +1,5 @@
 import type { PrismaService } from '../../prisma/prisma.service';
-import type { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
+import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import { PublicTournamentRecordsService } from './public-tournament-records.service';
 
 /**
@@ -66,13 +66,21 @@ function buildFakePrisma(options: {
   consentLinks: { participantId: string; linkId: string; userId: string }[];
   consentSnapshots: { linkId: string; state: 'GRANTED' | 'REVOKED'; effectiveAt: Date }[];
   goalEvents: FakeGoalEvent[];
+  /**
+   * 참가팀 공개 정책 통일(fix/v1-publish) — 기본값 'closed'(hideIdentity 항상
+   * false)로 이 파일의 기존(득점자 요약) 테스트를 그대로 둔다. 팀명 숨김 자체를
+   * 검증하는 아래 describe 블록만 'open'으로 override한다.
+   */
+  tournamentStatus?: string;
+  tournamentId?: string;
 }): PrismaService {
   const database = {
     v1Tournament: {
       async findUnique() {
         return {
-          id: TOURNAMENT_ID,
+          id: options.tournamentId ?? TOURNAMENT_ID,
           title: '테스트 대회',
+          status: options.tournamentStatus ?? 'closed',
           bracketPublishedAt: new Date('2026-01-01T00:00:00.000Z'),
           bracketPublishScheduledAt: null,
         };
@@ -340,5 +348,92 @@ describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두
     });
     const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
     expect(result.items[0].score).toBeNull();
+  });
+});
+
+/**
+ * 참가팀 공개 정책 통일(fix/v1-publish) -- 사용자가 지적한 "참가팀 공개는 안 됐는데
+ * 조별일정은 어떻게 되어있냐"의 실제 발단이 이 엔드포인트(`GET /tournaments/:id/schedule`,
+ * 화면상 "경기 일정" 탭/`/schedule` 페이지)다. 대회 전체 일정을 한 번에 내려주므로
+ * 스태프 우회는 fixture 단위가 아니라 대회 전체 단위(`{ tournamentId }`)로 판정한다 --
+ * tournamentId가 UUID 형태여야 decideTournamentStaffAccess가 통과시키므로, 이 블록만
+ * 로컬 UUID를 쓴다(파일 상단의 TOURNAMENT_ID는 다른 스펙과의 호환을 위해 그대로 둔다).
+ */
+describe('PublicTournamentRecordsService.getSchedule -- 참가팀 공개 정책 통일', () => {
+  const SCHEDULE_TOURNAMENT_UUID = 'c3000000-0000-4000-8000-000000000001';
+
+  function buildFakeAccessService(
+    assignments: readonly { role: 'FIELD_OPERATOR' | 'TOURNAMENT_DIRECTOR' | 'SUPPORT_READONLY'; fieldId?: string | null }[],
+  ): TournamentStaffAccessService {
+    const fakeAccessPrisma = {
+      v1AdminUser: { async findUnique() { return null; } },
+      v1TournamentStaffAssignment: {
+        async findMany() {
+          return assignments.map((assignment, index) => ({
+            id: `assignment-${index}`,
+            tournamentId: SCHEDULE_TOURNAMENT_UUID,
+            role: assignment.role,
+            fieldId: assignment.fieldId ?? null,
+            version: 1,
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+            expiresAt: null,
+            revokedAt: null,
+            fixtureScopes: [],
+          }));
+        },
+      },
+    };
+    return new TournamentStaffAccessService(fakeAccessPrisma as unknown as PrismaService);
+  }
+
+  it('모집 중(open)에는 관전자에게 일정 카드의 home/away 팀명이 가려진다 — registrationId는 유지', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [],
+      tournamentStatus: 'open',
+      tournamentId: SCHEDULE_TOURNAMENT_UUID,
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(SCHEDULE_TOURNAMENT_UUID, {}, undefined);
+
+    expect(result.items[0].home).toEqual({ registrationId: 'reg-home', teamId: null, teamName: null });
+    expect(result.items[0].away).toEqual({ registrationId: 'reg-away', teamId: null, teamName: null });
+  });
+
+  it('대회 운영진(TOURNAMENT_DIRECTOR)에게는 모집 중에도 일정 카드의 팀명이 그대로 보인다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [],
+      tournamentStatus: 'open',
+      tournamentId: SCHEDULE_TOURNAMENT_UUID,
+    });
+    const access = buildFakeAccessService([{ role: 'TOURNAMENT_DIRECTOR' }]);
+    const service = new PublicTournamentRecordsService(prisma, access);
+    const staffUser = { id: 'staff-1', email: null, accountStatus: 'active' as const, onboardingStatus: 'signup_done' as const };
+
+    const result = await service.getSchedule(SCHEDULE_TOURNAMENT_UUID, {}, staffUser);
+
+    expect(result.items[0].home).toEqual({ registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' });
+  });
+
+  it('모집이 끝나면(closed) 관전자에게도 일정 카드의 팀명이 다시 공개된다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [],
+      tournamentStatus: 'closed',
+      tournamentId: SCHEDULE_TOURNAMENT_UUID,
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(SCHEDULE_TOURNAMENT_UUID, {}, undefined);
+
+    expect(result.items[0].home).toEqual({ registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' });
   });
 });

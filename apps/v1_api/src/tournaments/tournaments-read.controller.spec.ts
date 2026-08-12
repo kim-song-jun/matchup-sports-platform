@@ -47,16 +47,34 @@ describe('TournamentsReadController', () => {
     expect(tournamentsReadService.list).toHaveBeenCalledWith({ limit: 20 });
   });
 
-  it('returns tournament detail without requiring a user argument', async () => {
+  it('returns tournament detail for an anonymous caller (no user)', async () => {
     tournamentsReadService.get.mockResolvedValue({
       id: 'tournament-1',
       title: 'Public tournament',
     });
 
-    await expect(controller.get('tournament-1')).resolves.toEqual({
+    await expect(controller.get('tournament-1', undefined)).resolves.toEqual({
       id: 'tournament-1',
       title: 'Public tournament',
     });
-    expect(tournamentsReadService.get).toHaveBeenCalledWith('tournament-1');
+    expect(tournamentsReadService.get).toHaveBeenCalledWith('tournament-1', undefined);
+  });
+
+  // 참가팀 공개 정책 통일(fix/v1-publish) — 운영자·스태프 우회는 서비스 계층
+  // (tournaments-read.service.spec.ts)에서 실제 정책을 검증한다. 이 컨트롤러
+  // 스펙의 관심사는 @CurrentUser()가 뽑아낸 값이 그대로 service.get()에
+  // 전달되는지(배선)뿐이다.
+  it('forwards the resolved @CurrentUser() to service.get() for the staff-bypass check', async () => {
+    const staffUser = {
+      id: 'staff-1',
+      email: 'staff@teameet.v1',
+      accountStatus: 'active' as const,
+      onboardingStatus: 'completed' as const,
+    };
+    tournamentsReadService.get.mockResolvedValue({ id: 'tournament-1', title: 'Public tournament' });
+
+    await controller.get('tournament-1', staffUser);
+
+    expect(tournamentsReadService.get).toHaveBeenCalledWith('tournament-1', staffUser);
   });
 });

@@ -14,6 +14,7 @@ import {
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
+import { clearExpiringDraft, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
@@ -63,13 +64,9 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   // 마스터 데이터 준비 후 1회 hydrate: 저장된 선택이 유효하면 우선, 없으면 첫 항목 기본값.
   useEffect(() => {
     if (selectionHydrated || !sports.data || regionOptions.length === 0) return;
-    let stored: { sportId?: string; regionId?: string } = {};
-    try {
-      const raw = window.localStorage.getItem(selectionKey);
-      if (raw) stored = JSON.parse(raw) as { sportId?: string; regionId?: string };
-    } catch {
-      window.localStorage.removeItem(selectionKey);
-    }
+    // 만료됐거나 깨진 값은 readExpiringDraft가 지우고 null을 준다 → 아래 기본값(첫 항목)으로
+    // 시작한다. 예전에는 만료가 없어 지난번 종목·지역이 새 작성에 그대로 복원됐다.
+    const stored = readExpiringDraft<{ sportId?: string; regionId?: string }>(selectionKey) ?? {};
     const sportId =
       stored.sportId && sports.data.some((item) => item.id === stored.sportId)
         ? stored.sportId
@@ -85,7 +82,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   // hydrate 이후 선택 변경을 영속(다음 step 재마운트에서 복원).
   useEffect(() => {
     if (!selectionHydrated) return;
-    window.localStorage.setItem(selectionKey, JSON.stringify(selection));
+    writeExpiringDraft(selectionKey, selection);
   }, [selection, selectionHydrated]);
 
   const selectedSportId = selection.sportId;
@@ -93,7 +90,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   const updateSelection = (updater: (current: MatchSelection) => MatchSelection) => {
     setSelection((current) => {
       const next = updater(current);
-      window.localStorage.setItem(selectionKey, JSON.stringify(next));
+      writeExpiringDraft(selectionKey, next);
       return next;
     });
   };
@@ -168,8 +165,8 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
       createMatch.mutate(payloadResult.payload, {
         onSuccess: (result) => {
           window.localStorage.setItem('teameet:v1:last-match-id', result.matchId);
-          window.localStorage.removeItem(storageKey);
-          window.localStorage.removeItem(selectionKey);
+          clearExpiringDraft(storageKey);
+          clearExpiringDraft(selectionKey);
           trackEvent('match_create_complete', {
             sportType: sports.data?.find((sport) => sport.id === selectedSportId)?.name ?? '',
           });
@@ -402,18 +399,13 @@ function usePersistedDraft() {
   const draftRef = useRef(draft);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(storageKey);
-    if (!stored) return;
-    try {
-      const hydrated = {
-        ...buildDefaultDraft(),
-        ...normalizeStoredDraft(JSON.parse(stored) as Partial<MatchDraft>),
-      };
-      draftRef.current = hydrated;
-      setDraft(hydrated);
-    } catch {
-      window.localStorage.removeItem(storageKey);
-    }
+    // 하루가 지난 드래프트는 readExpiringDraft가 알아서 버린다 — 예전에는 만료가 없어
+    // 며칠 전 작성하다 만 내용이 새 매치 작성 화면에 그대로 되살아났다.
+    const stored = readExpiringDraft<Partial<MatchDraft>>(storageKey);
+    if (stored === null) return;
+    const hydrated = { ...buildDefaultDraft(), ...normalizeStoredDraft(stored) };
+    draftRef.current = hydrated;
+    setDraft(hydrated);
   }, []);
 
   const setPersistedDraft = (action: SetStateAction<MatchDraft>) => {
@@ -421,7 +413,7 @@ function usePersistedDraft() {
     // React state updater도 route 이동 뒤로 지연될 수 있으므로 ref에서 즉시 계산·저장한 뒤
     // 화면 상태를 갱신한다. 그래야 마지막 입력 직후 다음 step으로 이동해도 값이 보존된다.
     draftRef.current = next;
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    writeExpiringDraft(storageKey, next);
     setDraft(next);
   };
 

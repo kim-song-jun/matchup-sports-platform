@@ -79,7 +79,7 @@ export function TournamentCampaignEditorCollections({
                 onClear={() => onHighlightImageClear(index)}
                 uploading={uploadingHighlightIndex === index}
                 disabled={imageUploadDisabled}
-                helperText="JPG, PNG, WebP · 최대 5MB. 해당 참가 이유 카드에 표시돼요."
+                helperText="JPG, PNG, WebP · 큰 사진은 올릴 때 자동으로 줄여요. 해당 참가 이유 카드에 표시돼요."
                 previewAlt={item.imageUrl ? `참가할 이유 ${index + 1} 이미지 미리보기` : `참가할 이유 ${index + 1} 이미지 예시`}
               />
             </div>

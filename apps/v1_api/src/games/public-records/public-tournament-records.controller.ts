@@ -23,8 +23,9 @@ export class PublicTournamentRecordsController {
   getSchedule(
     @Param('tournamentId') tournamentId: string,
     @Query() query: PublicTournamentScheduleQueryDto,
+    @CurrentUser() user: V1AuthUser | undefined,
   ) {
-    return this.tournamentRecords.getSchedule(tournamentId, query);
+    return this.tournamentRecords.getSchedule(tournamentId, query, user);
   }
 
   @Get(':tournamentId/matches/:fixtureId')

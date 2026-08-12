@@ -1,4 +1,5 @@
 import type { FormationSlot } from '@/components/lineup/formation-slots';
+import { applyAssignmentToEntries, planFormationAssignment } from '@/components/lineup/formation-assignment';
 import { randomUuid } from '@/lib/uuid';
 import type {
   V1TeamMatchLineup,
@@ -330,27 +331,48 @@ export function unplaceFromSlot(state: LineupEditorState, key: string): LineupEd
   };
 }
 
-/** 슬롯 하나에 어느 선발이 채워져 있는지 짝짓는다. 좌표가 아니라 positionCode로 매칭해서
- * 드래그로 좌표가 슬롯 원위치에서 벗어나도("배치 후 드래그로 좌표만 변경, positionCode
- * 유지") 여전히 그 슬롯을 채운 것으로 인식한다. 골키퍼 슬롯은 entry.goalkeeper 플래그로
- * 매칭한다(이 앱 전체가 GK를 그렇게 식별하는 기존 관례와 동일). 같은 코드의 슬롯이
- * 여럿이면(예: FIXO×2) 먼저 나온 슬롯부터 순서대로 소비한다. 컴포넌트(렌더링)·
+/** 슬롯 하나에 어느 선발이 채워져 있는지 짝짓는다. 컴포넌트(렌더링)·
  * validateLineupForSubmit(제출 검증)·fixture 화면(대회 fixture 라인업, 상태 타입은 달라도
- * starters: LineupEntryDraft[]는 동일해 그대로 재사용) 세 곳이 공유하는 단일 진실 공급원. */
+ * starters: LineupEntryDraft[]는 동일해 그대로 재사용) 세 곳이 공유하는 단일 진실 공급원.
+ *
+ * 짝짓기 자체는 formation-assignment.ts의 최소 비용 매칭에 위임한다 — 예전에는 이 함수가
+ * positionCode 완전일치로만 매칭하는 별도 구현을 갖고 있었고, 그래서 (a) 포메이션을 바꿔
+ * 그 코드 슬롯이 사라진 선수가 조용히 탈락해 피치에서 증발했고, (b) 좌표 없이 position만
+ * 남은 레거시 엔트리를 "채워진 슬롯"으로 세면서 실제 렌더링은 좌표 폴백(50,50)으로 중앙에
+ * 그려 슬롯 라벨과 어긋났다. 이제 "배치됨"의 기준이 자유 배치 모드와 동일하게 **좌표 유무**
+ * 하나로 통일된다.
+ *
+ * 드래그로 좌표가 슬롯 원위치에서 벗어나도 그 슬롯을 채운 것으로 인식하는 기존 계약은
+ * 그대로다 — 최소 비용 매칭이 가장 가까운 슬롯에 붙이고, positionCode가 일치하면 그쪽을
+ * 압도적으로 우선하기 때문이다. */
 export function matchSlotsToEntries(
   slots: FormationSlot[],
   starters: LineupEntryDraft[],
 ): Array<{ slot: FormationSlot; entry: LineupEntryDraft | null }> {
-  const consumed = new Set<string>();
-  return slots.map((slot) => {
-    const match = starters.find((entry) => {
-      if (consumed.has(entry.key)) return false;
-      if (slot.positionCode === 'GK') return entry.goalkeeper;
-      return !entry.goalkeeper && entry.position === slot.positionCode;
-    });
-    if (match) consumed.add(match.key);
-    return { slot, entry: match ?? null };
-  });
+  const plan = planFormationAssignment(slots, starters);
+  const entryByKey = new Map(starters.map((entry) => [entry.key, entry]));
+  return plan.slotAssignments.map(({ slot, entryKey }) => ({
+    slot,
+    entry: entryKey === null ? null : entryByKey.get(entryKey) ?? null,
+  }));
+}
+
+/** 포메이션 프리셋을 실제로 적용한다 — 라벨만 바꾸는 selectFormation과 달리 이미 배치된
+ * 선수를 새 슬롯 좌표로 재배치하고, 자리가 부족해 남는 선수는 대기로 내려보낸다(좌표까지
+ * 완전히 지운다). 프리셋 전환에서 선수가 사라지던 결함의 수정 지점이며, 확인 모달이
+ * describeFormationChange로 보여준 예고와 정확히 같은 계획을 적용한다. */
+export function applyFormationPreset(
+  state: LineupEditorState,
+  formation: string,
+  slots: FormationSlot[],
+): LineupEditorState {
+  const plan = planFormationAssignment(slots, state.starters);
+  return {
+    ...state,
+    formation,
+    starters: applyAssignmentToEntries(state.starters, plan),
+    dirty: true,
+  };
 }
 
 export function setJerseyNumber(state: LineupEditorState, slot: LineupSlot, key: string, value: number | null): LineupEditorState {

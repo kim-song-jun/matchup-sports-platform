@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { FormationSlot } from '@/components/lineup/formation-slots';
+import type { GameLineup } from '@/types/game-operations';
 import {
-  addPlayer, buildSavePayload, createEmptyFixtureLineupState, moveToStarters,
+  addPlayer, buildSavePayload, createEmptyFixtureLineupState, hydrateFixtureLineupState, moveToStarters,
   placeInSlot, selectFormation, setGoalkeeper, unplaceFromSlot,
 } from './fixture-lineup.view-model';
 
@@ -45,7 +46,56 @@ describe('fixture-lineup.view-model', () => {
     let state = withOneStarter();
     const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
     state = placeInSlot(state, state.starters[0].key, fixoSlot);
-    const payload = buildSavePayload(state);
+    const payload = buildSavePayload(state, 'GK');
     expect(payload.participants[0]).toMatchObject({ position: 'FIXO', positionX: 33, positionY: 43, started: true });
+  });
+
+  // [알파 감사 E] 저장 시 종목별 골키퍼 코드를 실제로 쓰는지 검증한다 — 회귀하면
+  // 풋살 골키퍼가 축구 코드 'GK'로 저장돼 lineupConfig.positions(GOLEIRO/FIXO/ALA/PIVO)와
+  // 어긋난다. 하드코딩된 'GK'로 되돌아가면 이 테스트가 깨진다.
+  it('buildSavePayload writes the sport-specific goalkeeper code (futsal GOLEIRO), not a hardcoded GK', () => {
+    let state = withOneStarter();
+    state = setGoalkeeper(state, state.starters[0].key);
+    const payload = buildSavePayload(state, 'GOLEIRO');
+    expect(payload.participants[0]).toMatchObject({ position: 'GOLEIRO' });
+    expect(payload.participants[0].position).not.toBe('GK');
+  });
+
+  // [알파 감사 E] 재수화(새로고침·재편집 진입)도 같은 종목 코드로 비교해야 한다 —
+  // 하드코딩된 'GK' 비교로 되돌아가면 풋살에서 저장된 골키퍼(position: 'GOLEIRO')를
+  // 다시 열었을 때 goalkeeper 플래그가 꺼진 채로(그리고 position: 'GOLEIRO'가 그대로
+  // 일반 포지션인 것처럼) 복원된다.
+  it('hydrateFixtureLineupState recognizes a futsal goalkeeper saved under its sport-specific code', () => {
+    const lineup: GameLineup = {
+      id: 'lineup-1',
+      gameId: 'game-1',
+      sideId: 'side-1',
+      revision: 1,
+      state: 'DRAFT',
+      version: 1,
+      submittedAt: null,
+      supersedesId: null,
+      formation: null,
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+      participants: [
+        {
+          id: 'p1',
+          gameId: 'game-1',
+          sideId: 'side-1',
+          lineupId: 'lineup-1',
+          displayNameSnapshot: '홍길동',
+          jerseyNumber: 1,
+          position: 'GOLEIRO',
+          positionX: 50,
+          positionY: 6,
+          started: true,
+          createdAt: '2026-08-01T00:00:00.000Z',
+          updatedAt: '2026-08-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const state = hydrateFixtureLineupState([lineup], 'side-1', 1, 'GOLEIRO');
+    expect(state.starters[0]).toMatchObject({ goalkeeper: true, position: null });
   });
 });

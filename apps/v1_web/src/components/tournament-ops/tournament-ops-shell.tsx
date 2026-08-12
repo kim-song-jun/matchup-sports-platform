@@ -295,7 +295,8 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
               <span className="text-[13px] font-bold text-[var(--text-strong)] truncate">
                 {tournamentTitle ?? '대회 운영'}
               </span>
-              <span className="text-[10px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
+              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
                 {staffRoleLabel(role)}
               </span>
             </div>
@@ -389,7 +390,8 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
             <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight truncate">
               {tournamentTitle ?? '대회 운영'}
             </span>
-            <span className="text-[10px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+            {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
+            <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
               {staffRoleLabel(role)}
             </span>
           </div>

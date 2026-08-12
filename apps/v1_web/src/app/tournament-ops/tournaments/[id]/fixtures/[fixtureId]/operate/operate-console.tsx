@@ -600,7 +600,17 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const lineups = fixtureLineup.data?.lineups ?? [];
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-24">
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-24 lg:max-w-6xl lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-6">
+      {/* [알파 감사 F] 1280px+ 데스크톱에서 콘텐츠가 상단 1/3에만 몰리고 그 아래가
+          광활하게 비어 있다는 실측 지적 — 모바일/태블릿은 기존과 동일한 세로
+          스택(flex-col, max-w-3xl)을 그대로 유지하고, lg(1024px)부터만 2열
+          grid로 전환한다. 왼쪽(점수·명령·액션 버튼 — 경기 중 빠르게 눌러야
+          하는 primary)이 더 넓은 1.6fr, 오른쪽(기록된 이벤트·전송 상태 —
+          참고용 secondary, R-D1)이 1fr다. 위→아래로만 쌓지 않고 나란히
+          배치해 데스크톱의 남는 세로 공간을 채운다. 두 컬럼 모두 내부에서
+          기존과 같은 gap-4 세로 리듬을 유지해 모바일 스택 순서·간격은
+          픽셀 단위로 그대로다. */}
+      <div className="flex flex-col gap-4">
       {/* Sticky context header — tablet 768×1024 / desktop 1280+ keep this
           visible while scrolling the lineup/queue below. */}
       <header className="sticky top-0 z-10 -mx-4 border-b border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur-sm dark:bg-gray-900/95">
@@ -864,7 +874,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             size="lg"
             variant="outline"
             className={`flex-col gap-1${
-              index === 0 ? ' col-span-2 h-20 sm:col-span-2 sm:h-16' : ' h-16'
+              // [알파 감사 F] 데스크톱(lg, 1024px+)에서는 버튼이 더 크고 눌러야
+              // 쉬워지는 방향이 맞다 — 경기 중 빠르게 눌러야 하는 화면이다.
+              // 모바일(h-20/h-16)·태블릿(sm:h-16)은 기존 그대로 두고 lg에서만
+              // 한 단계 더 키운다(h-24/h-20).
+              index === 0 ? ' col-span-2 h-20 sm:col-span-2 sm:h-16 lg:h-24' : ' h-16 lg:h-20'
             }`}
             disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
             onClick={() => handleSelectAction(button)}
@@ -924,6 +938,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         </div>
       )}
 
+      </div>
+
+      {/* [알파 감사 F] 오른쪽 컬럼(secondary) — lg 미만에서는 그냥 다음 섹션으로
+          이어져 기존 세로 스택과 동일하다. */}
+      <div className="flex flex-col gap-4">
       {/* "기록한 이벤트" 라는 제목 아래에 로컬 전송 큐만 그리고 있었다. 큐는 이번 세션에
           내가 올린 것만 담으므로, 새로고침하거나 다른 운영자가 넘겨받으면 골이 4개
           기록된 경기도 "기록된 이벤트가 아직 없어요" 로 보였다 — 화면이 실제 기록을
@@ -946,6 +965,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} />
         </section>
       )}
+      </div>
 
       {pendingAction && (
         <ActionTargetPicker

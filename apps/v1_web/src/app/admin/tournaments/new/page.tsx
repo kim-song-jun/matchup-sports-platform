@@ -505,7 +505,7 @@ function WizardStepper({
                   </span>
                   <span className="hidden min-w-0 sm:block" aria-hidden="true">
                     <span className="block truncate text-xs font-bold">{step.title}</span>
-                    <span className="mt-0.5 block truncate text-[11px]">{step.description}</span>
+                    <span className="mt-0.5 block truncate text-[var(--font-size-caption)]">{step.description}</span>
                   </span>
                 </button>
               </li>

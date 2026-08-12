@@ -352,7 +352,7 @@ export function ResultEditModal({
                   {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-                  <label className="tm-text-micro" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     득점
                     <input
                       type="number"
@@ -366,7 +366,7 @@ export function ResultEditModal({
                       }
                     />
                   </label>
-                  <label className="tm-text-micro" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     경고
                     <input
                       type="number"
@@ -382,7 +382,7 @@ export function ResultEditModal({
                       }
                     />
                   </label>
-                  <label className="tm-text-micro" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     퇴장
                     <input
                       type="number"
@@ -398,7 +398,7 @@ export function ResultEditModal({
                       }
                     />
                   </label>
-                  <label className="tm-text-micro" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <input
                       type="checkbox"
                       checked={participant.started}
@@ -406,7 +406,7 @@ export function ResultEditModal({
                     />
                     선발
                   </label>
-                  <label className="tm-text-micro" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <label className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <input
                       type="checkbox"
                       checked={participant.goalkeeper}

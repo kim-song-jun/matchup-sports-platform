@@ -245,7 +245,7 @@ function StepRow({ step, status, isLast, gateEnabled, flagQuery, showToast }: St
                 </span>
               </div>
               <p className="text-[13px] text-[var(--text-muted)] mt-1 leading-relaxed">{step.description}</p>
-              <p className="text-[11px] text-gray-400 mt-1.5 font-mono">{step.techNote}</p>
+              <p className="text-[var(--font-size-caption)] text-gray-400 mt-1.5 font-mono">{step.techNote}</p>
             </div>
 
             {buttonVisible && (

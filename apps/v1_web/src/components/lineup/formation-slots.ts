@@ -77,7 +77,22 @@ export function presetsForOutfieldCount(
 
 /** 골키퍼 슬롯은 좌표가 (50,6) 고정이라 서버 프리셋 slots 배열에 담기지 않는다(현행
  * 동작 유지, T1-5) — 이 함수가 항상 앞에 붙인다. 원본 preset.slots는 건드리지 않고
- * 새 배열을 만들어 돌려준다. */
+ * 새 배열을 만들어 돌려준다.
+ *
+ * positionCode/label은 이 슬롯·라인업 편집기 내부에서만 쓰는 자리 표시(내부 마커)다 —
+ * 실제로 서버에 저장되는 골키퍼 포지션 값은 이 값이 아니라 buildSavePayload가 별도로
+ * (goalkeeperPositionCode를 통해) 종목 사전에서 읽어 채운다(D-17, [알파 감사 E]). 그래서
+ * 여기 하드코딩된 'GK'는 종목이 늘어나도 안전하다 — 화면 안에서 "이 슬롯이 골키퍼
+ * 자리다"를 구분하는 용도일 뿐, 축구/풋살 어느 쪽이든 같은 내부 마커를 공유해도 된다. */
 export function slotsWithGoalkeeper(preset: FormationPreset): FormationSlot[] {
   return [{ positionCode: 'GK', label: 'GK', x: 50, y: 6 }, ...preset.slots];
+}
+
+/** [알파 감사 E] positions 사전에서 실제 골키퍼 포지션 코드를 찾는다 — 축구는 'GK',
+ * 풋살은 'GOLEIRO'로 서로 다르다. 저장(buildSavePayload)·재수화(hydrateFixtureLineupState)
+ * 양쪽 모두 이 값을 써야 대회 fixture 라인업이 종목과 무관하게 'GK' 문자열로
+ * 하드코딩되지 않는다. positions 사전에 goalkeeper:true 항목이 없으면(방어적 상황 —
+ * 사전 파싱 실패 등) 기존 동작과 동일하게 'GK'로 폴백한다. */
+export function goalkeeperPositionCode(positions: readonly LineupConfigPosition[]): string {
+  return positions.find((position) => position.goalkeeper === true)?.code ?? 'GK';
 }

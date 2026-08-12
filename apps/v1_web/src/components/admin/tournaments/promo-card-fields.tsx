@@ -31,8 +31,9 @@ type PromoCardFieldsProps = {
   disabled?: boolean;
   priorityError?: string;
   /**
-   * 이 자리를 비워뒀을 때 실제로 노출될 기본 이미지(대회 커버). 미리보기도 이 값을 반영해
-   * 저장 전에 무엇이 보일지 그대로 확인할 수 있게 한다.
+   * 이 자리를 비워뒀을 때 실제로 노출될 기본 이미지 — 보통 대회 커버지만, 커버가 없으면
+   * 다른 홍보 자리의 이미지일 수도 있다(resolveTournamentImage 의 폴백 순서). 호출자가 자기
+   * 자리를 뺀 폴백 결과를 계산해 넘겨야 미리보기가 공개 화면과 어긋나지 않는다.
    */
   defaultImageUrl?: string | null;
 };
@@ -240,10 +241,10 @@ export function PromoCardFields({
             <p className="mt-1.5 text-xs text-[var(--text-caption)]">
               {trimmedDefaultImageUrl
                 ? usingDefaultImage
-                  ? '기본 이미지(대회 대표 이미지)를 쓰고 있어요. 이 카드만 다르게 하려면 업로드해 주세요.'
+                  ? '기본 이미지를 쓰고 있어요. 이 카드만 다르게 하려면 업로드해 주세요.'
                   : '이 카드 전용 이미지를 쓰고 있어요. 비우면 기본 이미지로 돌아가요.'
                 : value.imageUrl.trim()
-                  ? '대표 이미지가 아직 없어서, 이 이미지가 대표 이미지 자리에도 함께 쓰여요.'
+                  ? '다른 자리에 이미지가 없어서, 이 이미지가 대표 이미지 자리에도 함께 쓰여요.'
                   : '대표 이미지를 올리면 비워둔 이 자리에도 함께 쓰여요.'}
             </p>
           </Field>

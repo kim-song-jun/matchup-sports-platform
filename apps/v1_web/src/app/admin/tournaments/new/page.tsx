@@ -27,6 +27,7 @@ import {
   PromoCardFields,
   type TournamentPromoCardValue,
 } from '@/components/admin/tournaments/promo-card-fields';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { TournamentCard } from '@/app/tournaments/tournament-card';
@@ -1182,7 +1183,16 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoHome'}
           disabled={pending}
           priorityError={errors.promoHomePriority}
-          defaultImageUrl={state.coverImageUrl}
+          // 이 자리를 비웠을 때 실제로 노출될 이미지 — 자기 자리를 뺀 폴백 결과를 그대로 넘겨
+          // 미리보기가 공개 화면과 어긋나지 않게 한다.
+          defaultImageUrl={resolveTournamentImage(
+            {
+              coverImageUrl: state.coverImageUrl,
+              promoHomeImageUrl: null,
+              promoListImageUrl: state.promoList.imageUrl,
+            },
+            'home',
+          )}
         />
         <PromoCardFields
           variant="list"
@@ -1195,7 +1205,14 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoList'}
           disabled={pending}
           priorityError={errors.promoListPriority}
-          defaultImageUrl={state.coverImageUrl}
+          defaultImageUrl={resolveTournamentImage(
+            {
+              coverImageUrl: state.coverImageUrl,
+              promoHomeImageUrl: state.promoHome.imageUrl,
+              promoListImageUrl: null,
+            },
+            'list',
+          )}
         />
       </section>
     </div>

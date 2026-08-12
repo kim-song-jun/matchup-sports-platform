@@ -1588,7 +1588,8 @@ export type V1ReviewSourceResponse = {
   reviewerTeam: {
     teamId: string;
     name: string;
-    role: 'owner' | 'manager';
+    /** 팀 후기는 참가팀 active 멤버 전원이 쓸 수 있으므로 일반 멤버(member)도 온다. */
+    role: 'owner' | 'manager' | 'member';
   } | null;
   targets: V1ReviewTarget[];
 };

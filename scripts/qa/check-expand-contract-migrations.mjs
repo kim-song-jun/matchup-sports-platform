@@ -23,6 +23,60 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20260812231238_v1_post_event_review_reviewer_user_unique/migration.sql',
+    statement: `DO $$
+DECLARE
+  source_conflicts bigint;
+  group_conflicts bigint;
+BEGIN
+  SELECT count(*) INTO source_conflicts
+  FROM (
+    SELECT 1
+    FROM "v1_post_event_reviews"
+    WHERE "target_team_id" IS NOT NULL
+    GROUP BY "reviewer_user_id", "target_team_id", "source_type", "source_id"
+    HAVING count(*) > 1
+  ) AS duplicated_by_source;
+
+  SELECT count(*) INTO group_conflicts
+  FROM (
+    SELECT 1
+    FROM "v1_post_event_reviews"
+    WHERE "target_team_id" IS NOT NULL
+      AND "source_group_id" IS NOT NULL
+    GROUP BY "reviewer_user_id", "target_team_id", "source_type", "source_group_id"
+    HAVING count(*) > 1
+  ) AS duplicated_by_group;
+
+  IF source_conflicts > 0 OR group_conflicts > 0 THEN
+    RAISE EXCEPTION
+      '팀 후기 unique 제약을 사람 기준으로 바꿀 수 없어요. (reviewer_user_id, target_team_id, source_type, source_id) 충돌 %건, (reviewer_user_id, target_team_id, source_type, source_group_id) 충돌 %건. 한 사람이 서로 다른 두 팀 소속으로 같은 상대를 평가한 후기입니다. 어느 후기를 남길지 자동으로 정하지 않으니, 수동으로 정리한 뒤 마이그레이션을 다시 실행하세요.',
+      source_conflicts, group_conflicts
+      USING ERRCODE = '23505';
+  END IF;
+
+  DROP INDEX IF EXISTS "v1_post_event_reviews_reviewer_team_id_target_team_id_sourc_key";
+  DROP INDEX IF EXISTS "v1_post_event_reviews_team_source_group_key";
+
+  CREATE UNIQUE INDEX IF NOT EXISTS "v1_post_event_reviews_user_team_source_key"
+    ON "v1_post_event_reviews"("reviewer_user_id", "target_team_id", "source_type", "source_id");
+  CREATE UNIQUE INDEX IF NOT EXISTS "v1_post_event_reviews_user_team_source_group_key"
+    ON "v1_post_event_reviews"("reviewer_user_id", "target_team_id", "source_type", "source_group_id");
+END $$`,
+    reason:
+      'Swaps the team-review duplicate-prevention key from the reviewing TEAM to the reviewing PERSON, so ' +
+      'that every member of a participating team can submit a review instead of only the owner/manager. ' +
+      'Rolling-deploy safe in both directions: the two DROPs only RELAX constraints, which no running app ' +
+      'instance can trip; and the two new indexes are strictly narrower only for a writer that submits more ' +
+      'than one team review per person per source, which the OLD app cannot do — it gates writes to a single ' +
+      'owner/manager per team, so pre-existing rows hold at most one review per (team, target, source) and ' +
+      'therefore at most one per (person, target, source). The one shape that could collide — one person ' +
+      'reviewing the same opponent as owner of two different teams — is not silently repaired: the preceding ' +
+      'DO block counts it and aborts the migration with ERRCODE 23505 so a human decides which review ' +
+      'survives. The whole statement is a DO block purely because that guard needs procedural control flow; ' +
+      "isAdditiveStatement has no DO branch and so cannot see the CREATE UNIQUE INDEXes it wraps. Reviewed 2026-08-12.",
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260809133000_v1_team_schedule_match_unique/migration.sql',
     statement:
       'CREATE UNIQUE INDEX "v1_team_schedules_team_match_unique" ON "v1_team_schedules"("team_id", "team_match_id")',

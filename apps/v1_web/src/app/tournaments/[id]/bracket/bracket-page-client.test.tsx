@@ -253,6 +253,75 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
     expect(screen.getByText('마포 FC')).toBeInTheDocument();
     expect(screen.getByText(/승 3-1/)).toBeInTheDocument();
   });
+
+  /* #381 — 조별 순위 영역의 펼침 상세는 "그 조에서 치른 경기"만 보여야 한다.
+     예전엔 대회 전체 픽스처를 팀 id 로만 걸러서, 같은 팀의 결선(4강·결승) 경기와
+     스코어가 조별 경기와 한 목록에 섞여 나왔다. 결선은 오른쪽 "토너먼트 대진"
+     영역이 담당한다. */
+  it('조별 순위 펼침에는 그 조 경기만 나오고 결선 경기는 섞이지 않는다', async () => {
+    const tournament = makeTournament({
+      id: 'tour-381',
+      status: 'in_progress',
+      format: 'group_knockout',
+      fixtures: [
+        makeFixture({
+          id: 'fx-group',
+          groupId: 'group-a',
+          round: 'group',
+          status: 'completed',
+          homeTeamId: 'team-99',
+          homeTeamName: '한강 유나이티드',
+          awayTeamId: 'team-77',
+          awayTeamName: '마포 FC',
+          result: {
+            homeScore: 3, awayScore: 1, hasPenalty: false,
+            homePenaltyScore: null, awayPenaltyScore: null,
+            note: null, recordedAt: '2026-07-16T00:00:00.000Z', goals: [],
+          },
+        }),
+        // 같은 팀의 결선 경기 — 조별 영역에 나오면 안 된다.
+        makeFixture({
+          id: 'fx-semi',
+          groupId: 'group-semi',
+          round: '4강',
+          status: 'completed',
+          homeTeamId: 'team-99',
+          homeTeamName: '한강 유나이티드',
+          awayTeamId: 'team-55',
+          awayTeamName: '성수 스타즈',
+          result: {
+            homeScore: 2, awayScore: 0, hasPenalty: false,
+            homePenaltyScore: null, awayPenaltyScore: null,
+            note: null, recordedAt: '2026-07-20T00:00:00.000Z', goals: [],
+          },
+        }),
+      ],
+      groups: [
+        makeGroup({
+          id: 'group-a',
+          phase: 'group',
+          name: 'A조',
+          advanceCount: 2,
+          standings: [
+            {
+              registrationId: 'reg-381', teamId: 'team-99', teamName: '한강 유나이티드',
+              teamLogoUrl: null, position: 1, points: 3, wins: 1, draws: 0, losses: 0,
+              goalsFor: 3, goalsAgainst: 1, recalculatedAt: null,
+            },
+          ],
+        }),
+      ],
+    });
+
+    render(<BracketPageContent tournament={tournament} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /한강 유나이티드/ }));
+
+    // 그 조 경기는 나온다
+    expect(screen.getByText('마포 FC')).toBeInTheDocument();
+    // 결선 상대는 조별 순위 영역에 나오면 안 된다
+    expect(screen.queryByText('성수 스타즈')).toBeNull();
+  });
 });
 
 /**

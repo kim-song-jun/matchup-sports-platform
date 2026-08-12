@@ -122,6 +122,12 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string; fixtures: V1
 function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; fixtures: V1TournamentFixture[] }) {
   const stageComplete = isGroupStageComplete(group.id, fixtures);
   const advance = stageComplete ? group.advanceCount : null;
+  /* #381 — 펼침 상세는 "이 조에서 치른 경기"만 보여준다. 예전엔 대회 전체 픽스처를
+     팀 id 로만 걸러서, 조별 순위 영역인데도 그 팀의 결선(4강·결승·3·4위전) 경기와
+     스코어가 조별 경기와 같은 목록에 섞여 나왔다. 결선 픽스처는 오른쪽 "토너먼트
+     대진" 영역(TournamentBracket)이 담당한다. 결선 픽스처는 결선 조(phase
+     semi/final/third_place)에 붙거나 groupId 가 null 이므로 이 한 조건으로 전부 빠진다. */
+  const groupFixtures = fixtures.filter((f) => f.groupId === group.id);
 
   return (
     <section aria-label={`${group.name} 순위`} style={{ marginBottom: 16 }}>
@@ -152,7 +158,7 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
         rows={toStandingsRows(group.standings)}
         advance={advance}
         ariaLabel={`${group.name} 순위표`}
-        renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={fixtures} />}
+        renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={groupFixtures} />}
       />
     </section>
   );

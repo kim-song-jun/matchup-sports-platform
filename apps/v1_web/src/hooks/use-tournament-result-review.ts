@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
+import type { V1GameResultScore, V1GameResultScoreInput } from '@/types/api';
 
 /**
  * Task 23 -- tournament result review / correction UI data layer.
@@ -47,11 +48,27 @@ export type GameResultRevisionState =
   | 'OFFICIAL'
   | 'VOID';
 
-export type GameResultScore = {
-  home: number;
-  away: number;
-  penalties?: { home: number; away: number };
-};
+/**
+ * `GET /games/:gameId/result-revisions`/the operations board 가 실제로 돌려주는
+ * 스코어는 **두 형태의 union**이다 -- 이 화면이 새로 만드는 결과는 평평한
+ * `{home, away, penalties?}`, 레거시 백필 경로로 들어온 결과는 중첩된
+ * `{regulation:{home,away}|null, penalty, goals, incomplete, provenance}`다(알파
+ * 실측: 백필된 경기가 `undefined:undefined`로 표시됐다). 예전에는 이 타입을 항상
+ * 평평한 형태로만(잘못) 선언해서 `.home`/`.away`를 직접 읽는 소비처가 컴파일은
+ * 통과하면서 런타임에만 깨졌다. 정확한 계약은 `@/types/api`의
+ * `V1GameResultScore`이므로 그걸 그대로 재사용한다 -- 읽는 쪽은 반드시
+ * `lib/game-result-score.ts`의 `readGameResultScore`/`formatGameResultScore`로
+ * 분기해야 한다.
+ */
+export type GameResultScore = V1GameResultScore;
+
+/** 결과 제출(정정/재제출) 시 **보내는** 스코어 -- 서버 `GameScoreDto`가
+ * `whitelist: true, forbidNonWhitelisted: true` 아래서 `home`/`away`/`penalties?`만
+ * 받으므로, 위 `GameResultScore`(서버가 돌려주는 스냅샷)를 그대로 보내면 여분
+ * 필드(`goals`/`penalty`/`incomplete`/`provenance`/`regulation`) 때문에
+ * `400 VALIDATION_ERROR`가 난다(알파 실측). 두 방향이 이 타입을 공유하지 않도록
+ * 분리해 뒀다 -- `@/types/api`의 `V1GameResultScoreInput`을 그대로 재사용한다. */
+export type GameResultScoreInput = V1GameResultScoreInput;
 
 export type GameResultCards = { yellow: number; red: number };
 
@@ -321,7 +338,7 @@ export function useReviewResultDecision(gameId: string, tournamentId?: string) {
 export type SupersedeAndSubmitInput = {
   revisionId: string;
   expectedVersion: number;
-  score: GameResultScore;
+  score: GameResultScoreInput;
   actualParticipants: GameResultParticipantInput[];
   eventsHash: string;
   mvpParticipantId?: string;
@@ -407,7 +424,7 @@ export type CreateResultCorrectionInput = {
   baseRevisionId: string;
   reason: string;
   changes: {
-    score: GameResultScore;
+    score: GameResultScoreInput;
     actualParticipants: GameResultParticipantInput[];
     eventsHash: string;
     mvpParticipantId?: string;

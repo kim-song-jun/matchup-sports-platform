@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ResultEditModal } from './result-edit-modal';
 import type {
@@ -122,5 +122,57 @@ describe('ResultEditModal participant naming', () => {
 
     expect(screen.getAllByText('홈 · 참가자 dc52c8 (라인업에 없음)')).toHaveLength(2);
     expect(screen.getAllByText('원정 · 참가자 701eb3 (라인업에 없음)')).toHaveLength(2);
+  });
+});
+
+/**
+ * 알파 실측 결함(#380): `GET /games/:id/result-revisions`가 돌려주는 스코어는
+ * 최상위에 `home`/`away`가 없고 `regulation` 안에 중첩된 형태일 수 있다
+ * (`{ regulation: {home,away}|null, penalty, goals, incomplete, provenance }`).
+ * 이 모달이 그 형태를 평평하게(`.home`/`.away` 직접) 읽으면 폼이 빈 채로 뜨고,
+ * 제출 시 서버 `GameScoreDto`가 허용하지 않는 여분 필드(`goals`/`penalty`/
+ * `incomplete`/`provenance`/`regulation`)가 함께 나가 `400 VALIDATION_ERROR`가
+ * 난다(실제로 프론트가 보낸 payload 그대로면 400, `changes.score`만
+ * `{"home":2,"away":1}`로 바꾸면 201).
+ */
+const REGULATION_SCORE: GameResultScore = {
+  regulation: { home: 2, away: 1 },
+  penalty: null,
+  goals: [],
+  incomplete: false,
+  provenance: 'TOURNAMENT_FIXTURE_RESULT',
+};
+
+describe('ResultEditModal — result-revisions 의 중첩(regulation) 스코어 계약', () => {
+  it('base.score 가 중첩 regulation 형태여도 모달 초기값이 undefined 가 아니라 실제 점수로 채워진다', () => {
+    const props = baseProps();
+    render(
+      <ResultEditModal {...props} base={{ ...props.base, score: REGULATION_SCORE }} lineups={[]} />,
+    );
+
+    expect(screen.getByLabelText('홈 점수')).toHaveValue(2);
+    expect(screen.getByLabelText('원정 점수')).toHaveValue(1);
+  });
+
+  it('onConfirm 이 넘기는 score 는 항상 {home, away} 뿐이다 -- goals/penalty/incomplete/provenance/regulation 이 섞이면 서버가 400을 낸다', () => {
+    const onConfirm = vi.fn();
+    const props = baseProps();
+    render(
+      <ResultEditModal
+        {...props}
+        base={{ ...props.base, score: REGULATION_SCORE }}
+        lineups={[]}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('원정 점수'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('사유'), { target: { value: '득점 누락 정정' } });
+    fireEvent.click(screen.getByRole('button', { name: props.confirmLabel }));
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    const submittedScore = onConfirm.mock.calls[0][0].score;
+    expect(submittedScore).toEqual({ home: 2, away: 3 });
+    expect(Object.keys(submittedScore).sort()).toEqual(['away', 'home']);
   });
 });

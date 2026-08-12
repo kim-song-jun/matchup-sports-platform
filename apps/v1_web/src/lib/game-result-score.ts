@@ -16,18 +16,30 @@ import type { V1GameResultScore } from '@/types/api';
  *
  * `regulation` 이 명시적으로 null 인 경우(완료됐지만 스코어 미기록, `incomplete`)는
  * 점수를 지어내지 않고 `null` 을 돌려준다 — 호출부가 "기록 없음"을 어떻게 쓸지 정한다.
+ *
+ * 승부차기 점수는 두 형태에서 필드 이름이 다르다 -- 중첩 형태는 `penalty`(단수,
+ * `{home,away}|null`), 평평한 형태는 `penalties`(복수, optional). 여기서는 이름을
+ * `penalties`(복수)로 통일해 돌려준다 -- 호출부가 형태별 이름 차이를 또 신경 쓰지
+ * 않게.
  */
 export function readGameResultScore(
   score: V1GameResultScore | null | undefined,
-): { home: number; away: number } | null {
+): { home: number; away: number; penalties?: { home: number; away: number } } | null {
   if (!score) return null;
   if ('regulation' in score) {
-    return score.regulation ?? null;
+    if (!score.regulation) return null;
+    return score.penalty
+      ? { home: score.regulation.home, away: score.regulation.away, penalties: score.penalty }
+      : { home: score.regulation.home, away: score.regulation.away };
   }
-  return { home: score.home, away: score.away };
+  return score.penalties
+    ? { home: score.home, away: score.away, penalties: score.penalties }
+    : { home: score.home, away: score.away };
 }
 
-/** `3:1` — 점수를 못 읽으면 `fallback`(기본 `기록 없음`). */
+/** `3:1` — 점수를 못 읽으면 `fallback`(기본 `기록 없음`). 승부차기는 포함하지 않는다
+ * (필요하면 `readGameResultScore`의 `penalties`를 직접 조합해라 -- `revision-timeline.tsx`
+ * 참고). */
 export function formatGameResultScore(
   score: V1GameResultScore | null | undefined,
   fallback = '기록 없음',

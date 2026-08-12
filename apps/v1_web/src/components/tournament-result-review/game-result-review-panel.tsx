@@ -15,6 +15,7 @@ import { useV1GameEventsBackfill } from '@/hooks/use-v1-game-operations';
 import { RecordedEventList } from '@/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate/recorded-event-list';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
+import { formatGameResultScore } from '@/lib/game-result-score';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { RevisionTimeline } from './revision-timeline';
@@ -135,7 +136,9 @@ export function GameResultReviewPanel({
     const freshGame = freshGameResult?.data ?? game;
     const ok = await confirm({
       title: '결과를 확정할까요?',
-      message: `${freshRevision.score.home}:${freshRevision.score.away} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
+      // `.home`/`.away` 를 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)에서
+      // "undefined:undefined 결과를..."이 뜬다 — lib/game-result-score 참조.
+      message: `${formatGameResultScore(freshRevision.score)} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
       confirmLabel: '확정',
     });
     if (!ok) return;

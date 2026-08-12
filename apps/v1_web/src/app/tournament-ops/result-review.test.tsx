@@ -559,6 +559,43 @@ describe('correction -- create against the current official revision, always cap
     expect(screen.getByRole('button', { name: '정정 확정' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '정정 시작' })).not.toBeInTheDocument();
   });
+
+  /**
+   * 알파 실측 결함(#380)의 세 번째 증상: 정정 초안을 확정하기 직전 확인 문구가
+   * "undefined:undefined로 공식 결과를 확정해요"로 떴다 -- 백필된(중첩 `regulation`
+   * 형태) 리비전의 점수를 평평하게 읽었기 때문. 되돌릴 수 없는 확정 액션 직전에
+   * 틀린 문구를 보여준 것과 같은 계열의 사고다.
+   */
+  it('정정 확정 확인 문구는 중첩(regulation) 형태로 백필된 초안이어도 실제 점수를 보여준다', async () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 2, currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [
+      buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' }),
+      buildRevision({
+        id: 'rev-2',
+        revision: 2,
+        state: 'DRAFT',
+        supersedesId: 'rev-1',
+        reason: '득점 누락 정정',
+        score: {
+          regulation: { home: 2, away: 1 },
+          penalty: null,
+          goals: [],
+          incomplete: false,
+          provenance: 'TOURNAMENT_FIXTURE_RESULT',
+        },
+      }),
+    ];
+    const user = userEvent.setup();
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    await user.click(screen.getByRole('button', { name: '정정 확정' }));
+
+    expect(hookMocks.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('2:1로 공식 결과를 확정해요') }),
+    );
+    const calledMessage = hookMocks.confirm.mock.calls[0][0].message as string;
+    expect(calledMessage).not.toContain('undefined');
+  });
 });
 
 describe('correction/void unavailable without an official result', () => {

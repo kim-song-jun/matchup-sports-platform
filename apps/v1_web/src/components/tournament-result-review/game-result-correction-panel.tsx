@@ -12,6 +12,7 @@ import { useV1GameLineups } from '@/hooks/use-v1-api';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
+import { formatGameResultScore } from '@/lib/game-result-score';
 import { RevisionTimeline } from './revision-timeline';
 import { GameSummaryHeader } from './game-summary-header';
 import { ReasonModal } from './reason-modal';
@@ -149,7 +150,10 @@ export function GameResultCorrectionPanel({
     if (!pendingCorrection) return;
     const ok = await confirm({
       title: entryCopy.confirmTitle,
-      message: `${pendingCorrection.score.home}:${pendingCorrection.score.away}로 공식 결과를 확정해요. ${entryCopy.confirmMessage}`,
+      // `.home`/`.away` 를 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)에서
+      // "undefined:undefined로 공식 결과를 확정해요"가 뜬다 — 되돌릴 수 없는 확정
+      // 직전에 틀린 문구를 보여준 것과 같은 계열의 사고. lib/game-result-score 참조.
+      message: `${formatGameResultScore(pendingCorrection.score)}로 공식 결과를 확정해요. ${entryCopy.confirmMessage}`,
       confirmLabel: entryCopy.confirmCta,
     });
     if (!ok) return;

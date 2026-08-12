@@ -5,12 +5,28 @@ import type {
   GameResultParticipantInput,
   GameResultParticipantRecord,
   GameResultScore,
+  GameResultScoreInput,
   TournamentGameSide,
 } from '@/hooks/use-tournament-result-review';
 import type { GameLineup } from '@/types/game-operations';
+import { formatGameResultScore, readGameResultScore } from '@/lib/game-result-score';
 
+/**
+ * `score` 는 서버가 돌려주는 스냅샷(`GameResultScore`, 두 형태의 union -- `base.score`가
+ * 이 형태다)이 **아니라** 항상 `GameResultScoreInput`(`{home, away}` 평평한 형태)이어야
+ * 한다. `CreateGameResultCorrectionDto`/`SupersedeAndSubmitGameResultRevisionDto`의
+ * `GameScoreDto`가 `whitelist: true, forbidNonWhitelisted: true` 아래서 `home`/`away`/
+ * `penalties?` 만 받기 때문 -- `base.score`를 그대로(또는 spread해서) 보내면
+ * `goals`/`penalty`/`incomplete`/`provenance`/`regulation` 같은 여분 필드가 섞여
+ * `400 VALIDATION_ERROR`가 난다(알파 실측). `base.score`가 union 타입인 채로 이 타입을
+ * 좁혀 두면, `onConfirm` 구현부가 실수로 스냅샷을 그대로(또는 spread해서) 넘기는 순간
+ * 컴파일이 깨진다 -- union의 중첩 분기(`regulation` 형태)는 `home`/`away`가 아예 없어서
+ * `GameResultScoreInput`에 대입할 수 없기 때문이다. 이전에는 `GameResultScore`가(잘못)
+ * 항상 평평한 형태로만 선언돼 있어서 두 방향이 사실상 같은 타입을 공유했고, 그래서
+ * 틀린 채로 컴파일을 통과했다.
+ */
 export type ResultEditSubmitInput = {
-  score: GameResultScore;
+  score: GameResultScoreInput;
   actualParticipants: GameResultParticipantInput[];
   mvpParticipantId?: string;
   reason: string;
@@ -139,8 +155,14 @@ export function ResultEditModal({
   // `isPending` flips true/false during submit), so such an effect would
   // silently discard in-progress edits on any unrelated parent re-render
   // while this modal stays mounted.
-  const [home, setHome] = useState(base.score.home);
-  const [away, setAway] = useState(base.score.away);
+  // `base.score`는 두 형태의 union이다(백필된 경기는 중첩 `{regulation:{…}}` 형태) --
+  // `.home`/`.away`를 직접 읽으면 그 경로에서 `undefined`가 되어 폼이 빈 채로 뜬다
+  // (알파 실측 사고). `readGameResultScore`로 정규화하고, 기록된 점수가 없으면(레거시
+  // `regulation: null`) 폼의 편집 시작값으로 0을 쓴다 -- 이건 "기록 없음"을 사실인 척
+  // 보여주는 게 아니라(그런 표시는 `formatGameResultScore`의 "기록 없음" 폴백을 그대로
+  // 쓴다, 아래 diff 문구 참고) 값을 입력받아야 하는 숫자 입력란의 편집 시작값일 뿐이다.
+  const [home, setHome] = useState(readGameResultScore(base.score)?.home ?? 0);
+  const [away, setAway] = useState(readGameResultScore(base.score)?.away ?? 0);
   const [participants, setParticipants] = useState<EditableParticipant[]>(() =>
     base.participants.map(toEditable),
   );
@@ -218,7 +240,8 @@ export function ResultEditModal({
   const participantNameMap = useMemo(() => buildParticipantNameMap(lineups), [lineups]);
 
   const trimmedReason = reason.trim();
-  const scoreChanged = home !== base.score.home || away !== base.score.away;
+  const baseScore = readGameResultScore(base.score);
+  const scoreChanged = home !== (baseScore?.home ?? 0) || away !== (baseScore?.away ?? 0);
   const participantDiffs = useMemo(
     () =>
       participants.filter((participant, index) => {
@@ -315,7 +338,7 @@ export function ResultEditModal({
 
           {scoreChanged ? (
             <p className="tm-text-caption" style={{ color: 'var(--blue700)', marginBottom: 16 }}>
-              점수 변경: {base.score.home}:{base.score.away} → {home}:{away}
+              점수 변경: {formatGameResultScore(base.score)} → {home}:{away}
             </p>
           ) : null}
 
@@ -463,9 +486,11 @@ export function ResultEditModal({
             onClick={() => {
               if (!canSubmit) return;
               onConfirm({
-                score: home === base.score.home && away === base.score.away
-                  ? base.score
-                  : { ...base.score, home, away },
+                // 항상 평평한 `{home, away}`만 보낸다 -- `base.score`(서버 스냅샷)를
+                // 그대로 넘기거나 spread하면 `goals`/`penalty`/`incomplete`/`provenance`/
+                // `regulation` 같은 여분 필드가 함께 딸려가 서버 `GameScoreDto`의
+                // `forbidNonWhitelisted`에 걸려 `400 VALIDATION_ERROR`가 난다(알파 실측).
+                score: { home, away },
                 actualParticipants: participants,
                 ...(mvpParticipantId ? { mvpParticipantId } : {}),
                 reason: trimmedReason,

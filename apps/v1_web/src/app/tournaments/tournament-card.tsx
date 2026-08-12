@@ -7,6 +7,7 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { publicAssetPath } from '@/lib/assets';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import type { V1TournamentListItem } from '@/types/api';
 
@@ -118,9 +119,9 @@ export function TournamentCard({
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
   const reservedTeamCount = getReservedTeamCount(item);
-  // coverImageUrl이 없는 대회도 홈 프로모션용으로 등록된 실사진(promoHomeImageUrl)이 있으면
-  // 아이콘 대신 그 사진을 썸네일로 재사용한다 (둘 다 없으면 종목색 그라디언트+아이콘 폴백).
-  const thumbnailImageUrl = item.coverImageUrl ?? item.promoHomeImageUrl;
+  // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
+  // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
+  const thumbnailImageUrl = resolveTournamentImage(item, 'cover');
 
   return (
     <div role="listitem" style={{ height: '100%' }}>

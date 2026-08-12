@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
-import { getSortedTournamentPromos } from '@/lib/tournament-promo';
+import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentListItem } from '@/types/api';
 
 type TournamentPromoCarouselProps = {
@@ -132,7 +132,8 @@ export function TournamentPromoCarousel({
             const title = promo.promoListTitle?.trim() || promo.title;
             const subtitle = promo.promoListSubtitle?.trim();
             const badge = promo.promoListBadgeText?.trim() || '추천 대회';
-            const imageUrl = promo.promoListImageUrl?.trim();
+            // 목록 홍보 이미지를 따로 지정하지 않았으면 대회 커버(기본 이미지)를 그대로 쓴다.
+            const imageUrl = resolveTournamentImage(promo, 'list');
             const facts = [
               promo.promoListDateText?.trim(),
               promo.promoListTeamsText?.trim(),

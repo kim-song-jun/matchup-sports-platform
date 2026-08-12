@@ -3,6 +3,7 @@ import { computeRevealedTeamTrustBatch } from './team-trust-aggregation';
 const teamA = '00000000-0000-4000-8000-0000000000a1';
 const teamB = '00000000-0000-4000-8000-0000000000a2';
 const teamC = '00000000-0000-4000-8000-0000000000a3';
+const teamD = '00000000-0000-4000-8000-0000000000a4';
 
 function makeCandidate(overrides: Partial<{
   targetTeamId: string;
@@ -57,20 +58,23 @@ describe('computeRevealedTeamTrustBatch', () => {
     expect(result.get(teamC)).toEqual({ trustState: 'none', mannerScore: null, reviewCount: 0 });
   });
 
-  it('동시에 쿼리된 두 팀이 각각 2건 이상의 공개된 리뷰를 가질 때 평균이 서로 섞이지 않는다 (배치 크로스토크 방지)', async () => {
+  it('동시에 쿼리된 두 팀이 각각 2개 팀에게 받은 공개 리뷰를 가질 때 평균이 서로 섞이지 않는다 (배치 크로스토크 방지)', async () => {
     const now = new Date('2026-07-19T00:10:00Z'); // 상호제출 즉시공개 경로, 72시간 미경과
+    // 평가팀을 teamC/teamD로 나눈다 — 집계가 "팀 평균 1표"라서 한 팀이 여러 경기에서 준 평점은
+    // 몇 건이든 1표로 접힌다. 서로 다른 두 팀이 줘야 reviewCount가 2가 되고, 그래야 이 테스트가
+    // 노리는 "두 대상팀의 값이 섞이지 않는가"를 건수까지 포함해 검증할 수 있다.
     const candidates = [
       makeCandidate({ targetTeamId: teamA, sourceId: 'src-a1', reviewerTeamId: teamC, rating: 5 }),
-      makeCandidate({ targetTeamId: teamA, sourceId: 'src-a2', reviewerTeamId: teamC, rating: 3 }),
+      makeCandidate({ targetTeamId: teamA, sourceId: 'src-a2', reviewerTeamId: teamD, rating: 3 }),
       makeCandidate({ targetTeamId: teamB, sourceId: 'src-b1', reviewerTeamId: teamC, rating: 1 }),
-      makeCandidate({ targetTeamId: teamB, sourceId: 'src-b2', reviewerTeamId: teamC, rating: 2 }),
+      makeCandidate({ targetTeamId: teamB, sourceId: 'src-b2', reviewerTeamId: teamD, rating: 2 }),
     ];
     // 4건 전부 상호제출로 공개
     const reverse = [
       { sourceId: 'src-a1', reviewerTeamId: teamA, targetTeamId: teamC },
-      { sourceId: 'src-a2', reviewerTeamId: teamA, targetTeamId: teamC },
+      { sourceId: 'src-a2', reviewerTeamId: teamA, targetTeamId: teamD },
       { sourceId: 'src-b1', reviewerTeamId: teamB, targetTeamId: teamC },
-      { sourceId: 'src-b2', reviewerTeamId: teamB, targetTeamId: teamC },
+      { sourceId: 'src-b2', reviewerTeamId: teamB, targetTeamId: teamD },
     ];
 
     const findMany = jest.fn()
@@ -86,6 +90,42 @@ describe('computeRevealedTeamTrustBatch', () => {
     expect(result.get(teamA)).toEqual({ trustState: 'estimated', mannerScore: 4, reviewCount: 2 });
     // teamB: rating 1,2 -> 평균 1.5, 2건. teamA의 5,3이 섞이면 평균/건수가 달라진다.
     expect(result.get(teamB)).toEqual({ trustState: 'estimated', mannerScore: 1.5, reviewCount: 2 });
+  });
+
+  it('한 팀이 여러 명·여러 경기로 준 평점은 팀 평균 1표로 접힌다 (원시 평균/건수와 구분)', async () => {
+    const now = new Date('2026-07-19T00:10:00Z');
+    // 이 함수가 화면에 보이는 팀 신뢰점수를 DB 값 위에 덮어쓰므로, DB를 쓰는 recalculateTeamTrust와
+    // 같은 "팀 평균 1표" 규칙이어야 한다. 원시 평균/원시 건수로 계산하면 상대 팀원 3명이 한 경기에서
+    // 쓰는 것만으로 reviewCount가 3이 되어 'verified'(인증팀)에 닿는다 — 권한 개방 전에는 팀당 1건이라
+    // 구조적으로 불가능했던 등급이고, 이 테스트가 그 회귀를 고정한다.
+    const candidates = [
+      // teamC 소속 3명이 같은 경기에서 각자 제출 (평균 2)
+      makeCandidate({ targetTeamId: teamA, sourceId: 'src-1', reviewerTeamId: teamC, rating: 1 }),
+      makeCandidate({ targetTeamId: teamA, sourceId: 'src-1', reviewerTeamId: teamC, rating: 2 }),
+      makeCandidate({ targetTeamId: teamA, sourceId: 'src-1', reviewerTeamId: teamC, rating: 3 }),
+      // teamD 소속 1명 (평균 5)
+      makeCandidate({ targetTeamId: teamA, sourceId: 'src-2', reviewerTeamId: teamD, rating: 5 }),
+    ];
+    const reverse = [
+      { sourceId: 'src-1', reviewerTeamId: teamA, targetTeamId: teamC },
+      { sourceId: 'src-2', reviewerTeamId: teamA, targetTeamId: teamD },
+    ];
+
+    const findMany = jest.fn().mockResolvedValueOnce(candidates).mockResolvedValueOnce(reverse);
+    jest.useFakeTimers().setSystemTime(now);
+    const result = await computeRevealedTeamTrustBatch({ v1PostEventReview: { findMany } } as never, [teamA]);
+    jest.useRealTimers();
+
+    // 팀 평균 1표: (teamC 평균 2 + teamD 평균 5) / 2 = 3.5, 평가한 팀 수 2 → 'estimated'
+    // 원시 평균이었다면 (1+2+3+5)/4 = 2.75 이고 reviewCount 4 → 'verified' 였다.
+    expect(result.get(teamA)).toEqual({ trustState: 'estimated', mannerScore: 3.5, reviewCount: 2 });
+  });
+
+  it('reviewerTeamId가 null인 행은 쿼리 단계에서 제외해 유령 1표를 만들지 않는다', async () => {
+    const findMany = jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await computeRevealedTeamTrustBatch({ v1PostEventReview: { findMany } } as never, [teamA]);
+    // 첫 쿼리(candidates)가 null 그룹을 걸러야 한다 — recalculateTournamentFixtureTeamTrust와 동일한 처리.
+    expect(findMany.mock.calls[0][0].where).toMatchObject({ reviewerTeamId: { not: null } });
   });
 
   it('상호제출(reverse 있음)과 72시간 경과(reverse 없음) 둘 다 공개로 집계한다', async () => {

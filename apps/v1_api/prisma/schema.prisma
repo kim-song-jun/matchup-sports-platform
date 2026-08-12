@@ -1321,8 +1321,11 @@ model V1PostEventReview {
   tags         V1PostEventReviewTag[]
 
   @@unique([reviewerUserId, targetUserId, sourceType, sourceId])
-  @@unique([reviewerTeamId, targetTeamId, sourceType, sourceId])
-  @@unique([reviewerTeamId, targetTeamId, sourceType, sourceGroupId], map: "v1_post_event_reviews_team_source_group_key")
+  // 팀 대상 후기의 중복 방지 단위는 "팀"이 아니라 "사람"이다 — 참가팀 active 멤버 전원이
+  // 상대팀 후기를 쓰므로, reviewerTeamId 기준으로 잠그면 팀에서 한 명만 쓰고 나머지가 막힌다.
+  // 중복 스코프(team_match=매치당 sourceId / tournament_fixture=대회당 sourceGroupId)는 그대로 유지.
+  @@unique([reviewerUserId, targetTeamId, sourceType, sourceId], map: "v1_post_event_reviews_user_team_source_key")
+  @@unique([reviewerUserId, targetTeamId, sourceType, sourceGroupId], map: "v1_post_event_reviews_user_team_source_group_key")
   @@index([reviewerUserId, sourceType, submittedAt])
   @@index([reviewerTeamId, sourceType, submittedAt])
   @@index([targetUserId, submittedAt])

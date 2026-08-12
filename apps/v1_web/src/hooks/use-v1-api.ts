@@ -245,7 +245,9 @@ import type {
   V1TournamentStaffAssignment,
   V1GrantTournamentStaffPayload,
   V1RevokeTournamentStaffPayload,
+  V1TournamentField,
   V1TournamentFieldListResponse,
+  V1CreateTournamentFieldPayload,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
@@ -3976,6 +3978,27 @@ export function useV1TournamentFields(tournamentId: string, options?: QueryOptio
     queryKey: v1Keys.tournamentOperationsFields(tournamentId),
     queryFn: () => v1Get<V1TournamentFieldListResponse>(`/tournament-ops/tournaments/${tournamentId}/fields`),
     enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+  });
+}
+
+/**
+ * POST /tournament-ops/tournaments/:tournamentId/fields — 경기장(필드) 등록.
+ *
+ * 백엔드는 Task 18 때부터 있었지만 호출부가 없어 필드가 영원히 0건이었고, 그래서
+ * 필드 담당자 배정을 끝낼 수 없었다(#373). 성공 시 목록 쿼리를 무효화해 같은 화면의
+ * 선택지가 바로 채워지고 새로고침해도 서버 값이 그대로 남는다.
+ *
+ * 권한: 플랫폼 운영자만 통과한다(서버 authorizeFieldManagement → FIELD_MANAGEMENT_DENIED).
+ * 호출하는 화면에서 역할을 먼저 가려 폼을 열 것.
+ */
+export function useV1CreateTournamentField(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1CreateTournamentFieldPayload) =>
+      v1Post<V1TournamentField>(`/tournament-ops/tournaments/${tournamentId}/fields`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+    },
   });
 }
 

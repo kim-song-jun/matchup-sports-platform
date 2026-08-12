@@ -230,11 +230,19 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             meta: member.role,
             status: member.role === 'owner' || member.role === 'manager' ? '관리자' : '활동중',
             visibility: query.data.membersVisibilityEnabled ? '공개' : '비공개',
+            // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
+            profileHref: `/users/${member.userId}`,
           })),
           memberAccess: {
             canView: query.data.canViewMembers,
             enabled: query.data.membersVisibilityEnabled,
             message: '',
+            // memberCount는 활성 멤버만 세는 캐시 필드지만 비동기 드리프트 가능성을 배제할 수
+            // 없으므로(예: standings-wrong-check-fixture-status-first 류 캐시 불일치) 음수로
+            // 내려가지 않게 0으로 floor한다 — "+ -2명 더보기" 같은 값을 절대 렌더하지 않기 위함.
+            moreCount: query.data.canViewMembers
+              ? Math.max(0, query.data.memberCount - query.data.membersPreview.length)
+              : 0,
           },
         },
         mode: toDetailMode(query.data, eligibility.data),

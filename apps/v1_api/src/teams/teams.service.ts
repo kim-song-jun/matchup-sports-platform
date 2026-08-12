@@ -191,12 +191,22 @@ export class TeamsService {
       },
       membersVisibilityEnabled: team.membersVisible,
       canViewMembers,
-      membersPreview: canViewMembers ? team.memberships.slice(0, 8).map((membership) => ({
-        membershipId: membership.id,
-        userId: membership.userId,
-        displayName: membership.user.profile?.nickname ?? membership.user.profile?.displayName ?? '멤버',
-        role: membership.role,
-      })) : [],
+      // teamInclude()의 memberships where절은 로그인 사용자의 viewer.role/joinState 계산을 위해
+      // "status: active OR userId: 현재 사용자"로 본인의 비활성(탈퇴·추방) 멤버십도 함께 내려준다.
+      // 그 행이 role asc/joinedAt asc 정렬에서 앞쪽에 오면 미리보기에 섞여 "이미 나간 멤버"가
+      // 현재 멤버처럼 보이거나(프로필 프로필도 삭제돼 링크가 깨진 상태로) 노출될 수 있어
+      // active 멤버십만 미리보기 후보로 남긴다.
+      membersPreview: canViewMembers
+        ? team.memberships
+            .filter((membership) => membership.status === 'active')
+            .slice(0, 8)
+            .map((membership) => ({
+              membershipId: membership.id,
+              userId: membership.userId,
+              displayName: membership.user.profile?.nickname ?? membership.user.profile?.displayName ?? '멤버',
+              role: membership.role,
+            }))
+        : [],
       memberCount: team.memberCount,
       managerCount: team.managerCount,
       trust: {

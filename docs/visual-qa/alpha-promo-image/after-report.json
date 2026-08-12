@@ -1,0 +1,14 @@
+{
+  "phase": "after",
+  "capturedAt": "2026-08-12T14:55:19.444Z",
+  "originalBytes": 35032442,
+  "rawUpload": {
+    "status": 413,
+    "body": "{\"status\":\"error\",\"statusCode\":413,\"code\":\"UPLOAD_FILE_TOO_LARGE\",\"message\":\"파일 용량이 업로드 한도를 초과했어요. 더 작은 파일로 다시 시도해주세요.\",\"details\":null,\"requestId\":41,\"timestamp\":\"2026-08-12T14:55:23.245Z\"}"
+  },
+  "uiUpload": {
+    "status": 201,
+    "body": "{\"status\":\"success\",\"data\":{\"urls\":[\"/uploads/2026/08/30d22ca0-59bd-45f2-a2ae-a065396443fb.webp\"]},\"timestamp\":\"2026-08-12T14:55:24.981Z\"}"
+  },
+  "previewSrc": "/uploads/2026/08/30d22ca0-59bd-45f2-a2ae-a065396443fb.webp"
+}

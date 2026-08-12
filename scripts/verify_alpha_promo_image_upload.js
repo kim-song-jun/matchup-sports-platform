@@ -114,6 +114,33 @@ async function advanceToPromoStep(page) {
   await page.waitForTimeout(800);
 }
 
+/**
+ * 홈 히어로의 computed backgroundImage 를 읽어 커버 폴백이 실제로 적용됐는지 수치로 남긴다.
+ * 스크린샷 육안 대조로는 "그라디언트냐 사진이냐"를 놓치기 쉬워 URL 문자열로 대조한다.
+ */
+async function measurePromoFallback(page, tournaments) {
+  const cards = await page.$$eval('.tm-featured-media', (nodes) =>
+    nodes.map((node) => ({
+      label: node.closest('a')?.getAttribute('aria-label') ?? null,
+      background: getComputedStyle(node).backgroundImage,
+      hasPlaceholderTrophy: Boolean(node.querySelector('svg[width="120"]')),
+    })),
+  );
+  const coverOnly = tournaments.filter(
+    (item) => (item.coverImageUrl || '').trim() && !(item.promoHomeImageUrl || '').trim(),
+  );
+  return {
+    coverOnlyTournaments: coverOnly.map((item) => ({
+      title: item.title,
+      coverImageUrl: item.coverImageUrl,
+      promoHomeImageUrl: item.promoHomeImageUrl,
+      // 폴백이 걸렸다면 이 커버 URL 이 홈 히어로 배경에 그대로 들어가 있어야 한다.
+      renderedWithCover: cards.some((card) => card.background.includes(item.coverImageUrl)),
+    })),
+    cards,
+  };
+}
+
 async function settle(page) {
   await page.waitForLoadState('load', { timeout: 60000 }).catch(() => {});
   await page.addStyleTag({ content: HIDE }).catch(() => {});
@@ -206,13 +233,25 @@ async function main() {
       ]);
       const shotPage = await shotContext.newPage();
       for (const [name, route] of [
-        ['home', '/'],
+        ['home', '/home'],
         ['tournaments', '/tournaments'],
       ]) {
         await shotPage.goto(`${BASE}${route}`, { waitUntil: 'commit', timeout: 60000 });
         await settle(shotPage);
         await shotPage.screenshot({ path: path.join(OUT, `${PHASE}-${name}-${widthLabel}.png`) });
         console.log(`[${PHASE}] 캡처: ${PHASE}-${name}-${widthLabel}.png`);
+        if (name === 'home' && widthLabel === 'desktop') {
+          const listed = await fetch(`${BASE}/api/v1/tournaments?limit=30`)
+            .then((response) => response.json())
+            .then((json) => json?.data?.items ?? [])
+            .catch(() => []);
+          report.promoFallback = await measurePromoFallback(shotPage, listed);
+          for (const item of report.promoFallback.coverOnlyTournaments) {
+            console.log(
+              `[${PHASE}] 커버 폴백 — ${item.title}: promoHomeImageUrl=${item.promoHomeImageUrl} → 홈 히어로에 커버 반영=${item.renderedWithCover}`,
+            );
+          }
+        }
       }
       await shotContext.close();
     }

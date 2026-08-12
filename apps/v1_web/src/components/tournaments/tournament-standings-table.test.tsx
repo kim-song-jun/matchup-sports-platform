@@ -21,6 +21,26 @@ const ROW: TournamentStandingsRow = {
 };
 
 describe('TournamentStandingsTable', () => {
+  /* #374 — 경기 기록이 0건이어도 조 편성 팀은 보여야 한다. 전 지표가 0인 기준선 행을
+     받았을 때 순위표는 팀을 모두 렌더하되, 성적이 아닌 편성 순서에 메달·진출 강조를
+     붙이면 안 된다(1위처럼 보이는 오해를 만든다). */
+  it('전 지표가 0이면 팀은 모두 보여주되 순위 강조는 하지 않는다', () => {
+    const zeroRows: TournamentStandingsRow[] = [
+      { ...ROW, key: 'r1', teamId: 't1', teamName: '한강 유나이티드', position: 1,
+        points: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 },
+      { ...ROW, key: 'r2', teamId: 't2', teamName: '마포 FC', position: 2,
+        points: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 },
+    ];
+
+    render(<TournamentStandingsTable rows={zeroRows} advance={2} ariaLabel="테스트 순위표" />);
+
+    // 편성된 팀이 빠짐없이 나온다
+    expect(screen.getByText('한강 유나이티드')).toBeInTheDocument();
+    expect(screen.getByText('마포 FC')).toBeInTheDocument();
+    // 아직 성적이 아니라는 것을 문구로 알린다
+    expect(screen.getByText(/아직 경기 기록이 없어요/)).toBeInTheDocument();
+  });
+
   it('#/팀/전적/승점/득실 5개 컬럼을 렌더한다', () => {
     render(<TournamentStandingsTable rows={[ROW]} advance={null} ariaLabel="테스트 순위표" />);
     const table = screen.getByRole('table', { name: '테스트 순위표' });

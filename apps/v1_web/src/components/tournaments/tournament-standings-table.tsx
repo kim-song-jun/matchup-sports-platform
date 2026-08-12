@@ -42,15 +42,23 @@ export interface TournamentStandingsRow {
   readonly goalsAgainst: number;
 }
 
-function StandingRankBadge({ pos, advance }: { pos: number; advance: number | null }) {
+/**
+ * `unranked`는 아직 한 경기도 집계되지 않은 표(전 팀 0점·0경기)에서 켜진다. 그때
+ * 1·2·3위에 금·은·동을 칠하면 "조 편성 순서"일 뿐인 숫자가 성적처럼 읽힌다(#374).
+ * 색만 빼고 번호는 그대로 남겨 순서 정보는 유지하되, 없는 성적을 색으로 만들어내지
+ * 않는다. 안내 문구는 표 하단에 텍스트로 함께 붙는다(색만으로 상태를 구분하지 않음).
+ */
+function StandingRankBadge({ pos, advance, unranked }: { pos: number; advance: number | null; unranked: boolean }) {
   const promoted = advance !== null && pos <= advance;
-  if (pos === 1) return <span className="tm-standings-rank tm-standings-rank-gold">{pos}</span>;
-  if (pos === 2) return <span className="tm-standings-rank tm-standings-rank-silver">{pos}</span>;
-  if (pos === 3) return <span className="tm-standings-rank tm-standings-rank-bronze">{pos}</span>;
+  if (!unranked) {
+    if (pos === 1) return <span className="tm-standings-rank tm-standings-rank-gold">{pos}</span>;
+    if (pos === 2) return <span className="tm-standings-rank tm-standings-rank-silver">{pos}</span>;
+    if (pos === 3) return <span className="tm-standings-rank tm-standings-rank-bronze">{pos}</span>;
+  }
   return (
     <span
       className="tm-standings-rank"
-      style={promoted ? { background: 'var(--blue50)', color: 'var(--blue700)' } : undefined}
+      style={promoted && !unranked ? { background: 'var(--blue50)', color: 'var(--blue700)' } : undefined}
     >
       {pos}
     </span>
@@ -97,6 +105,23 @@ export function TournamentStandingsTable({
   const sorted = [...rows].sort((a, b) => a.position - b.position);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const COLUMN_COUNT = 5;
+  /**
+   * "아직 한 경기도 집계되지 않았다"는 행 값만으로 정확히 판별된다 — 경기가 한 건이라도
+   * 집계되면 최소 한 팀은 승/무/패 중 하나가 1 이상이 되기 때문에, 전 행이 전 지표 0이면
+   * 집계된 경기가 0건이다. API에 별도 플래그를 새로 얹지 않고 이 규칙 하나로 두 소비처
+   * (순위·대진표 탭의 조별/리그 순위, 경기 일정 탭의 조별 순위)를 함께 덮는다.
+   */
+  const unranked =
+    sorted.length > 0 &&
+    sorted.every(
+      (row) =>
+        row.points === 0 &&
+        row.wins === 0 &&
+        row.draws === 0 &&
+        row.losses === 0 &&
+        row.goalsFor === 0 &&
+        row.goalsAgainst === 0,
+    );
 
   return (
     <Card pad={0}>
@@ -137,7 +162,7 @@ export function TournamentStandingsTable({
                       className={`tm-standings-row${advance !== null && row.position <= advance ? ' tm-standings-row-highlight' : ''}`}
                     >
                       <td style={{ paddingLeft: 12 }}>
-                        <StandingRankBadge pos={row.position} advance={advance} />
+                        <StandingRankBadge pos={row.position} advance={advance} unranked={unranked} />
                       </td>
                       <td>
                         {renderDetail ? (
@@ -202,6 +227,20 @@ export function TournamentStandingsTable({
           </tbody>
         </table>
       </div>
+      {/* 집계 전 표는 숫자가 전부 0이라 "데이터가 안 들어온 건지" 헷갈린다. 순위가 아직
+          정해지지 않았다는 사실을 색이 아니라 문장으로 명시한다. */}
+      {unranked ? (
+        <div
+          style={{
+            padding: '10px 12px',
+            borderTop: '1px solid var(--grey100)',
+            fontSize: 12,
+            color: 'var(--text-caption)',
+          }}
+        >
+          아직 경기 기록이 없어요. 첫 결과가 등록되면 순위가 매겨져요.
+        </div>
+      ) : null}
     </Card>
   );
 }

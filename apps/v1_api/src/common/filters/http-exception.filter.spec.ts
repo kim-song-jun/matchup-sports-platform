@@ -245,7 +245,12 @@ describe('AllExceptionsFilter', () => {
   });
 
   it('코드 없는 413(multer 하드캡)을 업로드 도메인 코드 + 한국어 메시지로 정규화한다', () => {
-    const request = { id: 'req-413', method: 'POST', originalUrl: '/api/v1/uploads' };
+    const request = {
+      id: 'req-413',
+      method: 'POST',
+      originalUrl: '/api/v1/uploads',
+      headers: { 'content-type': 'multipart/form-data; boundary=----x' },
+    };
     const { host, response } = buildHost(request);
     // @nestjs/platform-express 가 multer LIMIT_FILE_SIZE 를 이 형태로 올린다.
     const exception = new PayloadTooLargeException('File too large');
@@ -262,7 +267,12 @@ describe('AllExceptionsFilter', () => {
   });
 
   it('서비스가 자체 코드를 붙인 413 은 그대로 통과시킨다', () => {
-    const request = { id: 'req-413-coded', method: 'POST', originalUrl: '/api/v1/uploads' };
+    const request = {
+      id: 'req-413-coded',
+      method: 'POST',
+      originalUrl: '/api/v1/uploads',
+      headers: { 'content-type': 'multipart/form-data; boundary=----x' },
+    };
     const { host, response } = buildHost(request);
     const exception = new HttpException(
       { code: 'CUSTOM_TOO_LARGE', message: '영상은 200MB까지 올릴 수 있어요.' },
@@ -275,6 +285,26 @@ describe('AllExceptionsFilter', () => {
       expect.objectContaining({
         code: 'CUSTOM_TOO_LARGE',
         message: '영상은 200MB까지 올릴 수 있어요.',
+      }),
+    );
+  });
+
+  it('multipart 가 아닌 요청의 413 은 업로드 코드로 바꾸지 않는다', () => {
+    const request = {
+      id: 'req-413-json',
+      method: 'POST',
+      originalUrl: '/api/v1/tournaments',
+      headers: { 'content-type': 'application/json' },
+    };
+    const { host, response } = buildHost(request);
+    const exception = new PayloadTooLargeException('request entity too large');
+
+    filter.catch(exception, host);
+
+    expect(response.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'INTERNAL_ERROR',
+        message: 'request entity too large',
       }),
     );
   });

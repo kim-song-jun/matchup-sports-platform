@@ -68,8 +68,9 @@ function toEncodedFile(original: File, blob: Blob): File {
 /**
  * 업로드에 쓸 파일을 돌려준다 — 필요하면 축소·재인코딩한 새 File, 아니면 원본 그대로.
  *
- * 재인코딩해도 한도(5MB) 안으로 못 들어오고 원본도 한도를 넘으면, 서버의 영어 413 대신
- * 무엇을 해야 하는지 알려주는 한국어 에러를 던진다.
+ * 재인코딩 대상 형식(jpeg/png/webp)인데 재인코딩해도 한도(5MB) 안으로 못 들어오고 원본도
+ * 한도를 넘으면, 서버의 영어 413 대신 무엇을 해야 하는지 알려주는 한국어 에러를 던진다.
+ * 그 외 형식은 크기와 무관하게 그대로 돌려주고 서버 검증에 맡긴다.
  */
 export async function compressImageForUpload(
   file: File,

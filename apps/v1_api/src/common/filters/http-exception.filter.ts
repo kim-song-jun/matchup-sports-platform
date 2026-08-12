@@ -47,8 +47,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       typeof message === 'object' && message !== null ? (message as Record<string, unknown>) : null;
     const rawCode = messageObj && typeof messageObj.code === 'string' ? (messageObj.code as string) : undefined;
     // 서비스가 자체 코드를 붙인 413(UploadsService 의 5MB 초과 등)은 그대로 두고, 코드 없는
-    // 프레임워크발 413(multer 하드캡)만 도메인 코드로 승격한다.
-    const isUncodedPayloadTooLarge = !rawCode && status === HttpStatus.PAYLOAD_TOO_LARGE;
+    // 프레임워크발 413(multer 하드캡)만 도메인 코드로 승격한다. 이 필터는 전역이라
+    // multipart 요청으로 한정해야 JSON 본문 크기 초과 같은 다른 413 까지 업로드 코드로
+    // 잘못 표시되지 않는다.
+    const contentType = request.headers?.['content-type'];
+    const isMultipartRequest =
+      typeof contentType === 'string' && contentType.toLowerCase().includes('multipart/form-data');
+    const isUncodedPayloadTooLarge =
+      !rawCode && status === HttpStatus.PAYLOAD_TOO_LARGE && isMultipartRequest;
     const code = rawCode ?? (isUncodedPayloadTooLarge ? PAYLOAD_TOO_LARGE_CODE : undefined);
 
     const logContext = {

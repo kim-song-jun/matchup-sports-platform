@@ -238,11 +238,13 @@ export function PromoCardFields({
               ) : null}
             </div>
             <p className="mt-1.5 text-xs text-[var(--text-caption)]">
-              {usingDefaultImage
-                ? '기본 이미지(대회 대표 이미지)를 쓰고 있어요. 이 카드만 다르게 하려면 업로드해 주세요.'
-                : trimmedDefaultImageUrl
-                  ? '이 카드 전용 이미지를 쓰고 있어요. 비우면 기본 이미지로 돌아가요.'
-                  : '비워두면 대회 대표 이미지를 함께 사용해요.'}
+              {trimmedDefaultImageUrl
+                ? usingDefaultImage
+                  ? '기본 이미지(대회 대표 이미지)를 쓰고 있어요. 이 카드만 다르게 하려면 업로드해 주세요.'
+                  : '이 카드 전용 이미지를 쓰고 있어요. 비우면 기본 이미지로 돌아가요.'
+                : value.imageUrl.trim()
+                  ? '대표 이미지가 아직 없어서, 이 이미지가 대표 이미지 자리에도 함께 쓰여요.'
+                  : '대표 이미지를 올리면 비워둔 이 자리에도 함께 쓰여요.'}
             </p>
           </Field>
         </div>

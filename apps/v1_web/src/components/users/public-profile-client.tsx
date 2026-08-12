@@ -110,7 +110,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              background: 'var(--surface-soft)',
+              background: 'var(--grey50)',
               border: '1px solid var(--border)',
               borderRadius: 12,
               padding: '10px 14px',

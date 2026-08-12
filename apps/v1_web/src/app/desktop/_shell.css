@@ -382,7 +382,7 @@
   .tm-desktop-footer {
     display: block;
     border-top: 1px solid var(--grey150);
-    background: var(--card-surface);
+    background: var(--grey50);
     margin-top: 24px;
   }
 

@@ -1019,7 +1019,7 @@ function RegistrationDetailView({
             </section>
 
             {showAwaitingPaymentNotice ? (
-              <Card pad={14} style={{ marginTop: 12, background: 'var(--grey100)' }}>
+              <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
                 <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
                   <p style={{ margin: 0 }}>아직 참가가 확정된 상태는 아닙니다.</p>
                   <p style={{ margin: '8px 0 0' }}>
@@ -1229,7 +1229,7 @@ function TeamRegistrationHub({
             marginTop: 10,
             padding: '10px 12px',
             borderRadius: 10,
-            background: blockMessage ? 'var(--orange50)' : 'var(--grey100)',
+            background: blockMessage ? 'var(--orange50)' : 'var(--grey50)',
             display: 'flex',
             flexDirection: 'column',
             gap: 4,

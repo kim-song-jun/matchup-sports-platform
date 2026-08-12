@@ -429,14 +429,12 @@ function QuickAction({ item }: { item: HomeQuickAction }) {
        * 기존: orange·green·blue 배경이 동시에 노출 → 다중 강조색 충돌(R-C1 위반 경계).
        * 변경: 배경은 통일 var(--grey100), 아이콘 컬러만 item.color로 종목/기능 식별.
        * 아이콘+라벨 텍스트 병행으로 컬러만으로 정보 전달하지 않는다(R-C3 준수).
-       * grey100 사용 이유: 부모 .tm-quick-grid/.tm-app-frame이 grey50이라 동일 토큰을
-       * 재참조하면 44px 타일 경계가 사라진다 — 이 도메인의 기존 중립 아이콘칩 패턴
+       * grey100 사용 이유: 부모 .tm-quick-grid가 --grey50이라 동일 토큰을 재참조하면
+       * 44px 타일 경계가 사라진다 — 이 도메인의 기존 중립 아이콘칩 패턴
        * (.tm-weather-icon-cloud/.tm-weather-icon-fog, globals.css)과 동일하게 한 단계
        * 진한 grey100으로 타일 경계를 확보한다.
-       * 배경색은 .tm-quick-icon(globals.css)이 담당 — 다크모드에서는 부모
-       * .tm-quick-grid가 --card-surface(#1c1e24)를 쓰는데 --grey100 다크값도
-       * 동일 #1c1e24라 타일 경계가 완전히 사라지는 문제가 있어, :root.dark
-       * 오버라이드로 --grey150(#20222a)을 사용해 대비를 확보한다.
+       * 배경색은 .tm-quick-icon(globals.css)이 담당 — 다크에서는 --grey100(#1c1e24)이
+       * 그리드 배경과의 명도차가 거의 없어 :root.dark 오버라이드로 --grey150(#20222a)을 쓴다.
        */}
       <div className="tm-quick-icon" style={{ color: item.color }}>
         <QuickActionIcon item={item} />

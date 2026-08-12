@@ -222,9 +222,10 @@
   --button-text-primary:        var(--static-white);
   --button-text-neutral:        var(--text-strong);
   /* Card
-   * 카드 배경을 페이지 배경(--bg)에 물리지 않고 흰색으로 고정한다 — 페이지 배경이
-   * grey50으로 바뀌어도(.tm-app-frame 참고) 카드는 항상 흰 카드로 남아 대비가 유지된다.
-   * DESIGN.md: "카드는 배경색 차이로 구분한다: 흰 카드 on gray-50 배경". */
+   * 카드 표면은 흰색으로 고정한다(다크는 아래 .dark 블록에서 #1c1e24로 오버라이드).
+   * 페이지 배경(--bg)과 같은 값이므로 라이트에서 카드는 --card-border로 구분되고,
+   * 서브 영역(패널·요약바 등)은 그 사이 단계인 --grey50/100을 쓴다.
+   * DESIGN.md: "카드는 배경색 차이로 구분한다: … gray-50 카드 on 흰 배경". */
   --card-border:                var(--border);
   --card-surface:               #ffffff;
   --card-radius:                16px;
@@ -473,11 +474,12 @@ button:disabled {
   width: min(100%, var(--v1-app-chrome-frame-width));
   height: 100dvh;
   margin: 0 auto;
-  /* 페이지 배경 = grey50, 카드(--card-surface) = 흰색으로 고정해 대비를 준다 — 이전엔
-     둘 다 --bg(흰색)라 카드와 배경이 시각적으로 구분되지 않았다. 별개로 일정 상세/
-     생성 화면은 실제로 좌우 padding이 0인 버그(죽은 CSS 클래스 `.tm-team-detail-section`)도
-     있었다 — 그건 team-schedules-page.tsx에서 따로 고쳤다. */
-  background: var(--grey50);
+  /* 페이지 배경 = --bg(라이트 흰색 / 다크 #121317). 프로덕션(main)과 동일한 셸 배경이며,
+     그 위에 얹히는 서브 영역(패널·요약바·입력창 등)이 --grey50/100 한 단계를 써서 대비를
+     만든다 — DESIGN.md의 "gray-50 카드 on 흰 배경" 관례. 2026-08-05~08-11 사이 이 값이
+     --grey50으로 바뀌면서 자식들이 페이지 배경과 같은 토큰을 피해 흰 카드로 올라갔고,
+     그 결과 alpha만 프로덕션과 다른 회색 셸이 됐다 — 그 파생 변경들과 함께 되돌린다. */
+  background: var(--bg);
   font-family: var(--font);
   overflow: hidden;
   position: relative;
@@ -1649,14 +1651,11 @@ button:disabled {
 }
 
 /* 시인성 fix: 공지 상세(NoticeDetailPageView)의 카테고리 뱃지는 Card로 감싸지 않고
- * .tm-app-frame(페이지 배경 --grey50) 위에 바로 렌더된다. 배경(--grey100)과 페이지
- * 배경(--grey50)이 라이트 ~1.05:1, 다크(override 적용 후) ~1.02:1로 근접 충돌해 뱃지
- * 형태가 페이지에 녹아든다 — 다른 "토큰 충돌 fix" 배지들과 동일 패턴(예: 4861/4964행)으로
- * 신규 토큰 없이 --border 얇은 보더를 더해 배경 근접과 무관하게 경계를 확보한다. */
+ * 페이지 위에 바로 렌더되고, 카드 안(--card-surface)에서도 쓰인다. 다크에서는
+ * --grey100(#1c1e24)이 --card-surface와 완전히 같은 값이라 채움만으로는 경계가 사라진다
+ * — 신규 토큰 없이 --border-strong 보더를 더해 배경이 무엇이든 경계를 확보한다. */
 .tm-badge-grey {
   background: var(--grey100);
-  /* 2026-08-12: --border(라이트 ~1.18:1)만으로는 페이지(grey50)·뱃지 자체 배경(grey100)
-     둘 다에 대해 여전히 거의 안 보였다(계산 확인) — --border-strong으로 승격. */
   border: 1px solid var(--border-strong);
   color: var(--text-muted);
 }
@@ -1983,10 +1982,8 @@ button:disabled {
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   padding: 20px 12px;
-  /* 부모 .tm-app-frame이 --grey50을 페이지 배경으로 쓰므로, 카드 표면 토큰(--card-surface)으로
-     구분해 대비를 준다 — .tm-app-frame 주석(453줄)과 동일한 원칙. */
-  background: var(--card-surface);
-  border: 1px solid var(--border);
+  /* 페이지 배경(--bg) 위에 한 단계 얹는 서브 패널 — main과 동일하게 --grey50. */
+  background: var(--grey50);
   border-radius: 16px;
 }
 
@@ -2017,10 +2014,10 @@ button:disabled {
   background: var(--grey100);
 }
 
-/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 부모 .tm-quick-grid의
-   --card-surface(#1c1e24)와 완전히 같아 아이콘 배지 경계가 사라진다(라이트모드는
-   grey100 #f2f4f6 vs card-surface #fff라 구분됨). 신규 토큰 없이 --grey150(다크
-   #20222a, card-surface와 구분)으로 다크 전용 오버라이드 — SidebarTournamentsWidget
+/* [토큰 충돌 fix] 다크모드에서 --grey50(#1a1c22, 부모 .tm-quick-grid)과
+   --grey100(#1c1e24)의 명도차가 거의 없어 아이콘 배지 경계가 사라진다(라이트는
+   grey50 #f9fafb vs grey100 #f2f4f6로 구분됨). 신규 토큰 없이 --grey150(다크
+   #20222a)으로 다크 전용 오버라이드 — SidebarTournamentsWidget
    아이콘(.tm-tournament-widget-icon)과 동일 패턴. */
 :root.dark .tm-quick-icon {
   background: var(--grey150);
@@ -2314,8 +2311,7 @@ button:disabled {
 .tm-match-summary-row {
   min-height: 44px;
   border-radius: 12px;
-  background: var(--grey100); /* [토큰 충돌 fix] 이전엔 --grey50 — .tm-app-frame 페이지 배경(457행)과 동일 토큰이라
-   경계가 안 보였음. list-row-bg 선례(1540행: grey50 → grey100 한 단계 진하게)와 동일 패턴 적용 */
+  background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2323,8 +2319,9 @@ button:disabled {
   padding: 0 12px;
 }
 
-/* [다크 근접충돌 fix] 다크에서 grey50(#1a1c22)·grey100(#1c1e24) 대비가 1.02:1로 여전히 근접
-   — 라이트는 grey100 유지, 다크만 grey150(#20222a)로 한 단계 더 진하게. .tm-team-summary-bar 동일 구조. */
+/* [다크 전용] 다크에서 페이지 배경(--bg #121317)과 grey50(#1a1c22)의 명도차가 라이트보다
+   훨씬 덜 읽히므로, 다크에서만 grey150(#20222a)으로 한 단계 더 진하게 둔다.
+   라이트는 main과 동일한 grey50. .tm-team-summary-bar 동일 구조. */
 :root.dark .tm-match-summary-row,
 :root.dark .tm-team-summary-bar {
   background: var(--grey150);
@@ -2777,26 +2774,18 @@ button:disabled {
   }
 }
 
-/* 라이트모드 시인성 fix: 이전엔 background(--grey50)가 .tm-app-frame 페이지 배경과
-   완전히 동일한 토큰이라 fill만으로는 절대 구분되지 않았고(실측 대비 1.05:1),
-   border(--grey100)도 1.10:1이라 사실상 입력창 경계가 안 보였다(라이트모드 스크린샷
-   피드백 원인). 두 안(A: 최소변경/기존토큰재사용, B: .tm-input 표준정렬)을 검토한 결과
-   background/border 모두 새 토큰을 만들지 않고 .tm-input이 이미 쓰는 P1 컴포넌트
-   시맨틱 토큰으로 정렬하는 데 두 안이 동의했다 — B가 제안한 신규 토큰
-   `--input-surface-sunken`(라이트 전용 grey150 fill)은 다크모드에서 --input-surface와
-   완전히 같은 값으로 수렴하고 라이트에서도 이득이 1.05→1.18:1 수준의 미세 차이뿐이라,
-   토큰 신설 비용 대비 이득이 낮다고 판단해 채택하지 않음(A 채택). border는 grey100/150/200
-   후보 중 grey300(--border-strong, 1.40~1.46:1)이 그 다음 후보보다 뚜렷이 우월해 A·B
-   공통으로 채택 — 이 앱의 헤어라인 미니멀 톤(엄밀한 3:1 미달, 절제된 경계) 안에서 인지
-   가능한 최대치. background는 --input-surface(=.tm-input과 동일 시맨틱 페어)로 통일해
-   두 입력 스타일이 색 토큰 체계는 공유하고 border 굵기만 맥락(카드 위/페이지 위)에 따라
-   갈리게 함. */
+/* 입력창 시인성: fill(--grey50)은 페이지 배경(--bg) 위에서 "눌린 필드" 톤을 만들고,
+   경계는 border-strong(--grey300)이 담당한다. 2026-08-11에 fill을 --input-surface(=--bg)로
+   올렸던 것은 그때 페이지 배경 자체가 --grey50이라 fill이 완전히 묻혔기 때문인데,
+   페이지 배경을 main과 동일한 --bg로 되돌리면서 그 전제가 사라져 fill도 main과 같은
+   --grey50으로 복귀한다. border는 grey100(1.10:1)이 사실상 안 보인다는 사용자 피드백이
+   있었으므로 grey300(--border-strong)을 유지 — 이 앱의 헤어라인 톤 안에서 인지 가능한 최대치. */
 .tm-create-input {
   min-height: 48px;
   margin-top: 10px;
   border: 1px solid var(--border-strong); /* [P1 component token] 기존 --grey100(1.10:1) 대체 */
   border-radius: 12px;
-  background: var(--input-surface); /* [P1 component token] 기존 --grey50(페이지 배경과 동일) 대체 */
+  background: var(--grey50);
   padding: 0 14px;
   display: flex;
   align-items: center;
@@ -2879,7 +2868,7 @@ button:disabled {
   height: 48px;
   border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: var(--input-surface);
+  background: var(--grey50);
   color: var(--blue500);
   font-size: 22px;
   font-weight: 500;
@@ -2891,7 +2880,7 @@ button:disabled {
 }
 
 .tm-create-stepper-button:active {
-  background: var(--grey150);
+  background: var(--grey100);
 }
 
 /* Capacity stepper: the middle <select> sits between −/+ buttons, so drop its
@@ -3178,7 +3167,7 @@ button:disabled {
 .tm-team-summary-bar {
   min-height: 44px;
   border-radius: 12px;
-  background: var(--grey100);
+  background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4773,19 +4762,17 @@ button:disabled {
   padding: 18px var(--v1-shell-page-x) 124px;
 }
 
-/* 라이트/다크모드 시인성 fix: .tm-my-profile-head가 .tm-app-frame 페이지 배경과
-   완전히 동일한 --grey50을 raw로 참조해 아바타/이름 헤더가 페이지에 녹아들었다
-   (실측 대비 1:1 — .tm-create-input이 이미 겪고 고친 것과 동일한 결함 서명,
-   globals.css:2635 부근 주석 참조). 신규 토큰 없이 .tm-create-input이 검증한
-   P1 컴포넌트 시맨틱 페어(--card-surface + --border-strong)로 정렬한다. */
+/* 프로필 헤더는 페이지 배경(--bg) 위에 --grey50 한 단계로 얹힌다 — main과 동일.
+   2026-08-11에 --card-surface + --border-strong으로 올렸던 것은 그때 페이지 배경이
+   --grey50이라 헤더가 페이지에 녹아들었기 때문이며, 페이지 배경 복원으로 전제가 사라졌다. */
 .tm-my-profile-head {
   display: flex;
   align-items: center;
   gap: 16px;
   margin: -18px -20px 0;
   padding: 20px 20px 18px;
-  border-bottom: 1px solid var(--border-strong); /* 기존 --border(1.10:1대) 대체 */
-  background: var(--card-surface); /* 기존 --grey50(페이지 배경과 동일) 대체 */
+  border-bottom: 1px solid var(--border);
+  background: var(--grey50);
 }
 
 .tm-my-home-profile-head {
@@ -4800,8 +4787,8 @@ button:disabled {
   content: "";
   position: absolute;
   inset: 0 -20px;
-  border-bottom: 1px solid var(--border-strong);
-  background: var(--card-surface);
+  border-bottom: 1px solid var(--border);
+  background: var(--grey50);
 }
 
 .tm-my-home-profile-head > * {
@@ -5456,7 +5443,7 @@ button:disabled {
 
 /* ── 스켈레톤 블록 (components/v1-ui/page-skeleton.tsx) ──────────────────── */
 .tm-skeleton {
-  background: var(--card-surface);
+  background: var(--grey100); /* 페이지 배경(--bg) 위 플레이스홀더 — main과 동일 */
   animation: tm-skeleton-pulse 1.4s ease-in-out infinite;
 }
 
@@ -6339,7 +6326,7 @@ button:disabled {
   padding: 14px;
   border: 1px solid var(--grey200);
   border-radius: 12px;
-  background: var(--card-surface);
+  background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -6796,38 +6783,29 @@ button:disabled {
 }
 .tm-res-match-team-right { text-align: right; }
 .tm-res-match-score {
-  /* 라이트모드 시인성 fix: 실질 배경은 .tm-app-frame의 var(--grey50)이고 이전
-     background(--grey100)와의 실측 대비는 ~1.05:1로 .tm-create-input과 동일한
-     결함 패턴(globals.css:2635 주석 참조)이었다. grey 계열만으로는 이 앱의
-     헤어라인 미니멀 톤 안에서 3:1까지 못 올라가므로(grey50 vs grey300도 ~1.26:1),
-     동일 전례를 따라 background를 한 단계 더 진한 --grey200으로 올리고
-     --border-strong(grey300, ~1.40:1) 보더를 더해 "점수 pill" 그룹핑을 시각적으로
-     복원한다. 신규 토큰 없이 기존 시맨틱 토큰만 재사용.*/
+  /* 점수 pill — 페이지 배경(--bg) 위 --grey100 한 단계로 그룹핑. main과 동일.
+     2026-08-11에 grey200 + border-strong으로 올렸던 것은 그때 페이지 배경이 --grey50이라
+     grey100 채움이 ~1.05:1로 묻혔기 때문이며, 페이지 배경 복원으로 전제가 사라졌다. */
   font-size: 14px; font-weight: 900; color: var(--text-strong);
   flex-shrink: 0; text-align: center; min-width: 52px;
-  background: var(--grey200);
-  border: 1px solid var(--border-strong);
+  background: var(--grey100);
   border-radius: 8px;
   padding: 4px 0;
 }
 .tm-res-match-date { font-size: 12px; color: var(--text-caption); margin-top: 4px; }
 
-/* 조별리그 펼치기 버튼
- * 라이트모드 시인성 fix: 이전엔 background(--grey50)가 조상 체인(.tm-tourn-sub-col →
- * .tm-app-frame)까지 배경 재정의가 전혀 없어 페이지 배경과 완전히 동일한 토큰이었다 —
- * hover 전까지 1px border(--grey150) 외엔 '눌러야 할 대상'이라는 시각 단서가 없었다.
- * .tm-btn-neutral(1443행)이 이미 확립한 페이지-대비 채움색 페어(--button-fill-neutral
- * 기본 → --grey150 hover)를 그대로 재사용해 신규 토큰 없이 페이지(grey50)·기본·hover
- * 3단계를 구분한다. border도 .tm-create-input(2638행)과 동일한 이유로 --border-strong으로
- * 승격 — grey150(1.10:1급)보다 뚜렷이 우월. */
+/* 조별리그 펼치기 버튼 — 페이지 배경(--bg) 위 --grey50 채움 + grey150 보더. main과 동일.
+ * 2026-08-11에 --button-fill-neutral(grey100) + --border-strong으로 올렸던 것은 그때
+ * 페이지 배경 자체가 --grey50이라 채움이 페이지와 완전히 같은 값이었기 때문이며,
+ * 페이지 배경 복원으로 그 전제가 사라졌다. */
 .tm-res-expand-btn {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: var(--button-fill-neutral); /* [P1 component token] 기존 --grey50(페이지 배경과 동일) 대체 */
-  border: 1px solid var(--border-strong); /* [P1 component token] 기존 --grey150 대체 */
+  background: var(--grey50);
+  border: 1px solid var(--grey150);
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
@@ -6835,7 +6813,7 @@ button:disabled {
   cursor: pointer;
   text-align: left;
 }
-.tm-res-expand-btn:hover { background: var(--grey150); } /* grey100 → grey150 한 단계 진하게 — .tm-btn-neutral과 동일 패턴 */
+.tm-res-expand-btn:hover { background: var(--grey100); } /* 기본(grey50)보다 한 단계 진하게 — main과 동일 */
 .tm-res-expand-chevron { font-size: 14px; transition: transform 0.2s; display: inline-block; }
 
 /* ── 최종결과 — 표창 카드 ── */
@@ -7574,11 +7552,9 @@ button:disabled {
   font-size: 13px;
 }
 
-/* 리텐션 CTA 카드 — 페이지 프레임(.tm-app-frame)이 동일 grey50을 쓰므로
-   카드는 반드시 --card-surface + --card-border로 분리해 대비를 준다 */
+/* 리텐션 CTA 카드 — 페이지 배경(--bg) 위 --grey50 한 단계. main과 동일. */
 .tm-retention-card {
-  background: var(--card-surface);
-  border: 1px solid var(--card-border);
+  background: var(--grey50);
   border-radius: 16px;
   padding: 20px;
   display: flex;

@@ -3,7 +3,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { compressImageForUpload } from '@/lib/image-compress';
+import { compressImagesForUpload } from '@/lib/image-compress';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup } from '@/types/game-operations';
@@ -1965,9 +1965,7 @@ export function useV1UploadImages() {
         : Array.isArray(files)
           ? files
           : [files];
-      const prepared = await Promise.all(
-        fileArray.map((file) => compressImageForUpload(file)),
-      );
+      const prepared = await compressImagesForUpload(fileArray);
       prepared.forEach((file) => formData.append('files', file));
       return v1MultipartPost<V1UploadImagesResult>('/uploads', formData);
     },

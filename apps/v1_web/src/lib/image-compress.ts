@@ -100,6 +100,23 @@ export async function compressImageForUpload(
   throw new Error(IMAGE_TOO_LARGE_MESSAGE);
 }
 
+/**
+ * 여러 장을 순차로 처리한다 — 동시에 돌리면 사진 여러 장을 고른 모바일에서
+ * ImageBitmap + 캔버스가 한꺼번에 잡혀(4천만 화소 한 장이 수십 MB) 탭이 죽을 수 있다.
+ * 대회 후기 사진첨부(awards)처럼 한 번에 여러 장을 올리는 화면이 실제로 있다.
+ * 업로드 자체가 네트워크에 훨씬 오래 묶이므로 직렬화 비용은 사실상 드러나지 않는다.
+ */
+export async function compressImagesForUpload(
+  files: File[],
+  encode: ImageEncoder = encodeWithCanvas,
+): Promise<File[]> {
+  const prepared: File[] = [];
+  for (const file of files) {
+    prepared.push(await compressImageForUpload(file, encode));
+  }
+  return prepared;
+}
+
 /** 브라우저 캔버스 기반 기본 인코더. 브라우저 밖(SSR·테스트)에서는 null 을 돌려준다. */
 async function encodeWithCanvas(
   file: File,

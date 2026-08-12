@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   compressImageForUpload,
+  compressImagesForUpload,
   fitWithin,
   IMAGE_TOO_LARGE_MESSAGE,
   UPLOAD_IMAGE_MAX_BYTES,
@@ -106,5 +107,37 @@ describe('compressImageForUpload', () => {
 
     expect(result).toBe(original);
     expect(encode).not.toHaveBeenCalled();
+  });
+});
+
+describe('compressImagesForUpload', () => {
+  it('여러 장을 동시에 인코딩하지 않는다 — 모바일에서 비트맵이 한꺼번에 잡히면 탭이 죽는다', async () => {
+    let inFlight = 0;
+    let peakInFlight = 0;
+    const encode: ImageEncoder = async () => {
+      inFlight += 1;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight -= 1;
+      return makeBlob(200 * 1024);
+    };
+
+    const results = await compressImagesForUpload(
+      [makeFile(9 * MB, 'image/jpeg', 'a.jpg'), makeFile(9 * MB, 'image/jpeg', 'b.jpg'), makeFile(9 * MB, 'image/jpeg', 'c.jpg')],
+      encode,
+    );
+
+    expect(peakInFlight).toBe(1);
+    expect(results.map((file) => file.name)).toEqual(['a.webp', 'b.webp', 'c.webp']);
+  });
+
+  it('원본 순서를 그대로 유지한다', async () => {
+    const encode: ImageEncoder = async () => makeBlob(100 * 1024);
+    const results = await compressImagesForUpload(
+      [makeFile(400 * 1024, 'image/jpeg', 'small.jpg'), makeFile(9 * MB, 'image/jpeg', 'big.jpg')],
+      encode,
+    );
+
+    expect(results.map((file) => file.name)).toEqual(['small.jpg', 'big.webp']);
   });
 });

@@ -3,7 +3,7 @@
 import { Handshake, Undo2 } from 'lucide-react';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { periodLabel } from './period-label';
-import type { GameEventRecord, GameLineup, GameSide } from '@/types/game-operations';
+import type { GameEventRecord, GameLineup } from '@/types/game-operations';
 
 /**
  * 서버에 확정된 경기 이벤트 로그.
@@ -23,7 +23,11 @@ export function RecordedEventList({
   onReverseSubstitution,
 }: {
   readonly events: readonly GameEventRecord[];
-  readonly sides: readonly GameSide[];
+  /** 이 목록이 실제로 읽는 건 `id`·`displayNameSnapshot` 둘뿐이라 구조적
+   * 최소 계약으로 받는다 — 결과 검토 화면이 넘기는
+   * `TournamentGameDetail['sides']`(createdAt/updatedAt 없는 클라이언트
+   * 미러)도 같은 렌더러를 그대로 쓸 수 있게 하기 위함이다. */
+  readonly sides: ReadonlyArray<{ id: string; displayNameSnapshot: string }>;
   readonly lineups: readonly GameLineup[];
   readonly onAttachAssist?: (event: GameEventRecord) => void;
   /** 빠른 교체 모드의 오조작 복구 경로 — 되돌리기 버튼은 아직 되돌려지지
@@ -91,9 +95,11 @@ export function RecordedEventList({
                   {eventTypeLabel(event)}
                   {event.type === 'SUBSTITUTION'
                     ? substitutionDetailSuffix(event, playerName)
-                    : event.participantId && playerName.has(event.participantId)
-                      ? ` · ${playerName.get(event.participantId)}`
-                      : ''}
+                    : `${
+                        event.participantId && playerName.has(event.participantId)
+                          ? ` · ${playerName.get(event.participantId)}`
+                          : ''
+                      }${assistSuffix(event, playerName)}`}
                 </p>
               </div>
               <div className="flex shrink-0 items-center justify-end gap-2">
@@ -157,6 +163,15 @@ function substitutionDetailSuffix(event: GameEventRecord, playerName: Map<string
   if (inName !== undefined) return ` · → ${inName}`;
   if (outName !== undefined) return ` · ${outName} →`;
   return '';
+}
+
+/** "(도움 10 김철수)" — 골에 기록된 도움 선수. 결과 검토자가 승인/반려의
+ * 근거로 확인해야 하는 정보라 목록에 함께 보여준다. 라인업 스냅샷에 없는
+ * 참가자는 이름을 지어내지 않고 생략한다(득점자와 같은 규칙). */
+function assistSuffix(event: GameEventRecord, playerName: Map<string, string>): string {
+  if (event.type !== 'GOAL' || event.assistParticipantId === null) return '';
+  const name = playerName.get(event.assistParticipantId);
+  return name === undefined ? '' : ` (도움 ${name})`;
 }
 
 function eventTypeLabel(event: GameEventRecord): string {

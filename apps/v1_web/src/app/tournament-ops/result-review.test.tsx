@@ -62,6 +62,9 @@ const hookMocks = vi.hoisted(() => ({
   // 두 패널의 `lineupsQuery.data ?? []` 폴백을 그대로 거치므로 대부분의 테스트는
   // 빈 라인업(= 기존 id-접미어 폴백)을 보는 실제 로딩-중 상태와 동일하게 동작한다.
   lineups: { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() } as QueryMock<unknown>,
+  // 검토 패널이 근거로 읽는 경기 세부 기록(GET /games/:id/events). 기본값
+  // `data: undefined`는 패널의 `?? []` 폴백을 거쳐 "기록 없음" 빈 목록이 된다.
+  events: { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() } as QueryMock<unknown>,
   confirm: vi.fn(),
 }));
 
@@ -86,6 +89,11 @@ vi.mock('@/hooks/use-tournament-result-review', async () => {
 // 기대하는 "QueryClientProvider 불필요" 전제가 깨진다.
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1GameLineups: () => hookMocks.lineups,
+}));
+
+// 검토 패널이 경기 세부 기록을 읽는 훅도 같은 이유로 목한다(위 주석 참고).
+vi.mock('@/hooks/use-v1-game-operations', () => ({
+  useV1GameEventsBackfill: () => hookMocks.events,
 }));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
@@ -166,6 +174,7 @@ beforeEach(() => {
   Object.assign(hookMocks.voidRevision, freshMutationMock());
   Object.assign(hookMocks.createCorrection, freshMutationMock());
   Object.assign(hookMocks.lineups, freshQueryMock());
+  Object.assign(hookMocks.events, freshQueryMock());
   // alpha 실사고(2026-08) 수정: `GameResultReviewPanel.handleOfficialize`가
   // 확인 모달을 띄우기 전 `revisionsQuery.refetch()`/`gameQuery.refetch()`를
   // 강제로 호출해 그 응답값을 쓴다(캐시된 stale 점수를 보여주지 않기 위함).

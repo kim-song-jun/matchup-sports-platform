@@ -30,7 +30,7 @@ function isStableWarningCode(code: string): code is StableWarningCode {
  * `JSON.stringify` of that value would make `stableRevision`/`watermark` silently depend on jsonb
  * key ordering, which is not part of the actual data contract (two reads of an UNCHANGED score
  * must hash identically; changing only key order is not a change). */
-export function canonicalizeForHash(value: unknown): unknown {
+function canonicalizeForHash(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(canonicalizeForHash);
   }

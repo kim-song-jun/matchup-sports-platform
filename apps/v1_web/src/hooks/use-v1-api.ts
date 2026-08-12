@@ -1953,8 +1953,8 @@ async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> 
  * 업로드 파일은 v1_api가 /uploads 정적 경로로 서빙하며, 응답 url은 루트-상대(/uploads/...).
  * web은 next.config rewrite로 /uploads/* → v1_api 프록시.
  *
- * 전송 전에 compressImageForUpload 로 축소·재인코딩한다 — 대회 포스터처럼 큰 원본을 그대로
- * 보내면 서버 한도(5MB, 그 위 multer 하드캡 10MB)에 걸려 413 으로 실패하기 때문이다.
+ * 전송 전에 compressImagesForUpload 로 한 장씩 축소·재인코딩한다 — 대회 포스터처럼 큰 원본을
+ * 그대로 보내면 서버 한도(5MB, 그 위 multer 하드캡 10MB)에 걸려 413 으로 실패하기 때문이다.
  */
 export function useV1UploadImages() {
   return useMutation({

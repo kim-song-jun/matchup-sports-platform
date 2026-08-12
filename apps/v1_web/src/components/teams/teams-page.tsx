@@ -300,6 +300,27 @@ function TeamOperationsSection({
   );
 }
 
+/**
+ * 미리보기(최대 8명) 뒤에 남은 멤버가 있을 때만 노출되는 보조 CTA.
+ * 기존 `/teams/{teamId}/members` 전체 목록으로 보낸다 — 새 라우트를 만들지 않는다.
+ * 화면의 주요 CTA(가입/채팅 버튼)와 겹치지 않도록 tm-list-row 안의 텍스트 링크로만 표현한다.
+ */
+function TeamMembersMoreLink({ teamId, count }: { teamId: string; count: number }) {
+  if (count <= 0) return null;
+  return (
+    <Link
+      href={`/teams/${teamId}/members`}
+      className="tm-list-row tm-pressable"
+      style={{ justifyContent: 'center', gap: 4, textDecoration: 'none' }}
+    >
+      <span className="tm-text-label" style={{ color: 'var(--blue500)', fontWeight: 600 }}>
+        + {count}명 더보기
+      </span>
+      <ChevronRightIcon size={16} stroke="var(--blue500)" strokeWidth={2} aria-hidden="true" />
+    </Link>
+  );
+}
+
 export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const { team, mode } = model;
   const locked = mode === 'pending' || mode === 'closed';
@@ -454,7 +475,21 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 </span>
               )}
             </div>
-            {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
+            {team.memberAccess.canView ? (
+              <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                {team.membersList.map((member, index) => (
+                  <ListItem
+                    key={index}
+                    title={member.name}
+                    sub={`${member.role} · ${member.meta} · ${member.status}`}
+                    trailing={member.visibility}
+                    href={member.profileHref}
+                    chev={Boolean(member.profileHref)}
+                  />
+                ))}
+                <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
+              </div>
+            ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
           </Card>
         </div>
 
@@ -590,7 +625,21 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               </span>
             )}
           </div>
-          {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
+          {team.memberAccess.canView ? (
+            <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+              {team.membersList.map((member, index) => (
+                <ListItem
+                  key={index}
+                  title={member.name}
+                  sub={`${member.role} · ${member.meta} · ${member.status}`}
+                  trailing={member.visibility}
+                  href={member.profileHref}
+                  chev={Boolean(member.profileHref)}
+                />
+              ))}
+              <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
+            </div>
+          ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
         </Card>
       </article>
       <div className="tm-fixed-cta tm-hide-desktop">

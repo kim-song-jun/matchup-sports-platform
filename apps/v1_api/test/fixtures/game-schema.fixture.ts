@@ -130,8 +130,17 @@ export const gameSchemaFixture = {
 // migration file backs it (20260812000000_v1_game_period_halftime_state); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for 팀 후기 작성 권한 개방: V1PostEventReview swaps its two team-scoped unique keys
+// for person-scoped ones (reviewer_team_id -> reviewer_user_id) so every member of a
+// participating team can submit a review instead of only the owner/manager. Like the theme
+// preference re-pin and unlike the HALFTIME one, this does NOT touch the game domain — no
+// v1_game_* model, enum, or relation changes; the guard fired only because it hashes the whole
+// schema.prisma file. One new migration file backs it
+// (20260812231238_v1_post_event_review_reviewer_user_unique); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: '0e53688d1d7fae9fd53082a63e67c7af8f09f3b1e532fa3d477eaf2407e4c2de',
+  schema: 'e0ff0a056fc475cf4c687cb40c9466d1c8e96ec60fa146e76ca35a7c2b664535',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

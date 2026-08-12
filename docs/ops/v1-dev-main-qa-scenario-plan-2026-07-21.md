@@ -301,7 +301,7 @@ Web Push(VAPID) + 운영 실패 대시보드(#93) · realtime Socket.IO gateway(
 - [ ] **72시간 지연 공개 fallback** — 상대 미제출이어도 72h 경과 시 단독 제출 리뷰가 공개(71:59와 72:00 경계값 확인).
 - [ ] **레거시(sportId 없음) 리뷰 — 종목별 집계 제외** — `receivedSummary`(bySport)는 미포함, `GET /reviews/received`(개별 목록)는 sportId=null만 별도 필터.
 - [ ] **월별(period) 필터 형식 검증** — `2026-13`/`july` 등 형식 위반은 400(`@Matches ^\d{4}-(0[1-9]|1[0-2])$`), `2026-07`만 정상.
-- [ ] **팀 리뷰 작성 권한 — manager+만 가능** — member는 403 `NOT_TEAM_REVIEW_MANAGER`로 화면 진입 차단.
+- [ ] **팀 리뷰 작성 권한 — 참가팀 active 멤버 전원 가능** — 일반 member도 정상 제출된다(2026-08-12 정책 변경). 참가팀 소속이 아닌 계정만 403 `NOT_TEAM_MEMBER`로 차단.
 - [ ] **양쪽 팀 모두 관리하는 경우 — 모호성 오류** — 겸직 시 409 `AMBIGUOUS_REVIEWER_TEAM`.
 - [ ] **멱등성 — 중복 제출** — unique constraint(P2002)로 신규 row 없이 기존 리뷰를 `alreadySubmitted=true`로 반환, 내용 덮어쓰기 없음.
 - [ ] **이미 제출한 대상 카드 잠금(locked)** — `alreadySubmitted=true, locked=true, lockReason='ALREADY_SUBMITTED'`인 대상은 `submitAll`이 재전송 대상에서 제외.

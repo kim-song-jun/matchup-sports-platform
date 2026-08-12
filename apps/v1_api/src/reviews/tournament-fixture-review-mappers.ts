@@ -1,8 +1,7 @@
-import { Prisma, V1TeamMembershipRole } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { resolveTournamentFixtureOfficialTimestamp } from '../tournaments/tournament-fixture-official-result';
 
 export const TOURNAMENT_FIXTURE_SOURCE_TYPE = 'tournament_fixture' as const;
-export const TEAM_REVIEW_ROLES: V1TeamMembershipRole[] = ['owner', 'manager'];
 export const REVIEW_TAGS = {
   punctual: '시간 약속을 잘 지켜요',
   manner: '매너가 좋아요',
@@ -133,6 +132,12 @@ export function isExistingReviewResult(review: ReviewWithIncludes): review is Ex
   return '__alreadySubmitted' in review;
 }
 
+/**
+ * @param reviewCount 후기를 쓴 **팀 수**(작성자 수가 아니다). 팀 후기는 참가팀 멤버 전원이
+ *   쓸 수 있으므로 작성자 수로 세면 한 경기만 뛰어도 `trustStateForReviewCount`의 최고
+ *   등급(3건)에 닿아 지표가 무력화된다 — 집계 쪽에서 팀 단위로 접은 값을 넘겨야 한다.
+ * @param avgRating 팀별 평균 rating들의 평균("팀 평균 1표"). 원시 평균이 아니다.
+ */
 export function teamTrustData(reviewCount: number, avgRating: number | null, matchCount: number) {
   return {
     // trustState/matchCount/sourceLabel(team_match 전용, recalculateTeamTrust가 관리)과 컬럼을 분리 —
@@ -157,8 +162,13 @@ export function resolveReviewerTeamId(teamIds: string[], homeTeamId: string, awa
   return matches.length === 1 ? matches[0] : null;
 }
 
-export function teamReviewKey(sourceGroupId: string, reviewerTeamId: string, targetTeamId: string) {
-  return `${sourceGroupId}:${reviewerTeamId}:${targetTeamId}`;
+/**
+ * 대회 후기의 "이미 썼음" 판정 키. 중복 방지 스코프가 대회(sourceGroupId) 단위인 것은
+ * 그대로지만, 주체는 팀이 아니라 **사람**이다 — 팀 기준으로 키를 잡으면 한 명이 쓴 순간
+ * 같은 팀원 전원의 pending 목록에서 그 경기가 사라진다.
+ */
+export function teamReviewKey(sourceGroupId: string, reviewerUserId: string, targetTeamId: string) {
+  return `${sourceGroupId}:${reviewerUserId}:${targetTeamId}`;
 }
 
 export function isUniqueConstraintError(error: unknown) {

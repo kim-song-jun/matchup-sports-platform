@@ -18,6 +18,7 @@ import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
 import { isReviewRevealed } from './review-visibility';
+import { average, revealGroupKey, trustStateForReviewCount } from './team-trust-aggregation';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 
 const REVIEW_TAGS = {
@@ -34,7 +35,6 @@ const REVIEW_TAGS = {
 type ReviewTagCode = keyof typeof REVIEW_TAGS;
 
 const ELIGIBLE_PARTICIPANT_STATUSES: V1MatchParticipantStatus[] = ['active', 'completed'];
-const TEAM_REVIEW_ROLES: V1TeamMembershipRole[] = ['owner', 'manager'];
 
 type SourceType = 'match' | 'team_match' | 'tournament_fixture';
 type TargetType = 'user' | 'team';
@@ -70,9 +70,9 @@ export class ReviewsService {
 
   async received(user: V1AuthUser, query: ListReviewsQueryDto) {
     const limit = normalizeLimit(query.limit);
-    const managedTeamIds = await this.managedTeamIds(user.id);
+    const participatingTeamIds = await this.participatingTeamIds(user.id);
     const receivedFilters: Prisma.V1PostEventReviewWhereInput[] = [{ targetUserId: user.id }];
-    if (managedTeamIds.length) receivedFilters.push({ targetTeamId: { in: managedTeamIds } });
+    if (participatingTeamIds.length) receivedFilters.push({ targetTeamId: { in: participatingTeamIds } });
     const reviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         status: 'submitted',
@@ -95,7 +95,7 @@ export class ReviewsService {
   async receivedSummary(user: V1AuthUser, query: { targetType: 'user' | 'team'; period?: string }) {
     const now = new Date();
     const targetFilter = query.targetType === 'team'
-      ? { targetTeamId: { in: await this.managedTeamIds(user.id) }, targetType: 'team' as const }
+      ? { targetTeamId: { in: await this.participatingTeamIds(user.id) }, targetType: 'team' as const }
       : { targetUserId: user.id, targetType: 'user' as const };
 
     const candidates = await this.prisma.v1PostEventReview.findMany({
@@ -239,11 +239,7 @@ export class ReviewsService {
   }
 
   private async pendingTeamReviews(user: V1AuthUser, limit: number) {
-    const memberships = await this.prisma.v1TeamMembership.findMany({
-      where: { userId: user.id, status: 'active', role: { in: TEAM_REVIEW_ROLES } },
-      select: { teamId: true },
-    });
-    const teamIds = memberships.map((membership) => membership.teamId);
+    const teamIds = await this.participatingTeamIds(user.id);
     if (!teamIds.length) return [];
 
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
@@ -276,14 +272,15 @@ export class ReviewsService {
         approvedApplicantTeam: { select: { id: true, name: true } },
       },
     });
-    const reviewKeys = await this.existingTeamReviewKeys(teamMatches.map((match) => match.id), teamIds);
+    // "이미 썼음" 판정은 사람 기준 — 팀 기준으로 두면 팀장이 쓴 순간 나머지 팀원 전원에게 완료로 표시된다.
+    const reviewKeys = await this.existingTeamReviewKeys(teamMatches.map((match) => match.id), user.id);
 
     return teamMatches
       .map((match) => {
         const reviewerTeamId = resolveReviewerTeamId(teamIds, match.hostTeamId, match.approvedApplicantTeamId);
         if (!reviewerTeamId || !match.approvedApplicantTeamId) return null;
         const targetTeam = reviewerTeamId === match.hostTeamId ? match.approvedApplicantTeam : match.hostTeam;
-        const key = teamReviewKey(match.id, reviewerTeamId, targetTeam?.id ?? '');
+        const key = teamReviewKey(match.id, targetTeam?.id ?? '');
         return {
           sourceType: 'team_match' as const,
           sourceId: match.id,
@@ -386,9 +383,10 @@ export class ReviewsService {
 
     const reviewerTeam = await this.resolveReviewerTeam(user.id, teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId);
     const targetTeam = reviewerTeam.teamId === teamMatch.hostTeamId ? teamMatch.approvedApplicantTeam : teamMatch.hostTeam;
+    // 기존 후기 조회도 사람 기준 — 팀 기준으로 조회하면 같은 팀 다른 사람의 후기를 "내 후기"로 잘못 잠근다.
     const existing = await this.prisma.v1PostEventReview.findFirst({
       where: {
-        reviewerTeamId: reviewerTeam.teamId,
+        reviewerUserId: user.id,
         targetTeamId: targetTeam.id,
         sourceType: 'team_match',
         sourceId: teamMatch.id,
@@ -477,7 +475,7 @@ export class ReviewsService {
       return created;
     }).catch(async (error: unknown) => {
       if (!isUniqueConstraintError(error)) throw error;
-      return this.findExistingTeamReview(reviewerTeamId, dto.sourceId, targetTeamId);
+      return this.findExistingTeamReview(user.id, dto.sourceId, targetTeamId);
     });
 
     return { review: this.toReviewDetail(review), alreadySubmitted: isExistingReviewResult(review) };
@@ -492,9 +490,9 @@ export class ReviewsService {
     return markExistingReviewResult(review);
   }
 
-  private async findExistingTeamReview(reviewerTeamId: string, sourceId: string, targetTeamId: string) {
+  private async findExistingTeamReview(reviewerUserId: string, sourceId: string, targetTeamId: string) {
     const review = await this.prisma.v1PostEventReview.findFirst({
-      where: { reviewerTeamId, sourceType: 'team_match', sourceId, targetTeamId },
+      where: { reviewerUserId, sourceType: 'team_match', sourceId, targetTeamId },
       include: reviewInclude(),
     });
     if (!review) throw conflict('DUPLICATE_REVIEW_RETRY', 'Duplicate review was detected but existing review was not found');
@@ -528,45 +526,59 @@ export class ReviewsService {
     ]);
   }
 
-  private async resolveReviewerTeam(userId: string, hostTeamId: string, approvedApplicantTeamId: string) {
+  private async resolveReviewerTeam(
+    userId: string,
+    hostTeamId: string,
+    approvedApplicantTeamId: string,
+  ): Promise<{ teamId: string; name: string; role: V1TeamMembershipRole }> {
     const memberships = await this.prisma.v1TeamMembership.findMany({
       where: {
         userId,
         status: 'active',
-        role: { in: TEAM_REVIEW_ROLES },
         teamId: { in: [hostTeamId, approvedApplicantTeamId] },
       },
       select: { teamId: true, role: true, team: { select: { name: true } } },
     });
     if (memberships.length === 0) {
-      throw forbidden('NOT_TEAM_REVIEW_MANAGER', 'Only participating team owner or manager can submit team reviews');
+      throw forbidden('NOT_TEAM_MEMBER', '참가팀 소속만 후기를 쓸 수 있어요.');
     }
     if (memberships.length > 1) {
-      throw conflict('AMBIGUOUS_REVIEWER_TEAM', 'Reviewer manages both participating teams');
+      // 양 팀 모두에 소속된 사용자는 어느 팀 입장으로 쓰는지 서버가 임의로 정할 수 없다.
+      throw conflict('AMBIGUOUS_REVIEWER_TEAM', 'Reviewer belongs to both participating teams');
     }
     const membership = memberships[0];
-    return { teamId: membership.teamId, name: membership.team.name, role: membership.role as 'owner' | 'manager' };
+    return { teamId: membership.teamId, name: membership.team.name, role: membership.role };
   }
 
-  private async managedTeamIds(userId: string) {
+  /**
+   * 후기 맥락에서 "내가 참가팀으로 서 있는 팀들". 역할(owner/manager/member)을 가리지 않는다.
+   *
+   * 쓰기 경로(resolveReviewerTeam)뿐 아니라 읽기 경로(received / receivedSummary)도 이 헬퍼를 쓴다 —
+   * 즉 "우리 팀이 받은 후기"도 active 멤버 전원이 본다. 2026-08-12 정책 변경에서 의도적으로 내린
+   * 결정이다(팀이 받은 평가는 팀원이 보는 게 자연스럽다는 판단). 전에는 owner/manager만 볼 수 있었고,
+   * received는 레거시 행(sportId=null)에 한해 reveal 게이트 없이 작성자까지 내려주므로 그 범위가
+   * 함께 넓어진다는 점을 확인한 뒤 유지하기로 했다. 읽기만 좁히려면 여기가 아니라 호출부에서
+   * 역할 필터를 건 별도 헬퍼를 써야 한다.
+   */
+  private async participatingTeamIds(userId: string) {
     const memberships = await this.prisma.v1TeamMembership.findMany({
-      where: { userId, status: 'active', role: { in: TEAM_REVIEW_ROLES } },
+      where: { userId, status: 'active' },
       select: { teamId: true },
     });
     return memberships.map((membership) => membership.teamId);
   }
 
-  private async existingTeamReviewKeys(sourceIds: string[], reviewerTeamIds: string[]) {
-    if (!sourceIds.length || !reviewerTeamIds.length) return new Set<string>();
+  private async existingTeamReviewKeys(sourceIds: string[], reviewerUserId: string) {
+    if (!sourceIds.length) return new Set<string>();
     const reviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         sourceType: 'team_match',
         sourceId: { in: sourceIds },
-        reviewerTeamId: { in: reviewerTeamIds },
+        reviewerUserId,
       },
-      select: { sourceId: true, reviewerTeamId: true, targetTeamId: true },
+      select: { sourceId: true, targetTeamId: true },
     });
-    return new Set(reviews.map((review) => teamReviewKey(review.sourceId, review.reviewerTeamId ?? '', review.targetTeamId ?? '')));
+    return new Set(reviews.map((review) => teamReviewKey(review.sourceId, review.targetTeamId ?? '')));
   }
 
   private async recalculateUserReputation(tx: PrismaTx, targetUserId: string) {
@@ -597,7 +609,17 @@ export class ReviewsService {
     const [candidates, completedMatchCount] = await Promise.all([
       tx.v1PostEventReview.findMany({
         // sourceType 필터 추가 — team_match 리뷰만 팀신뢰점수에 반영(대회후기는 별도 경로에서 집계)
-        where: { targetTeamId, targetType: 'team', status: 'submitted', sourceType: 'team_match' },
+        where: {
+          targetTeamId,
+          targetType: 'team',
+          status: 'submitted',
+          sourceType: 'team_match',
+          // 팀 후기는 항상 reviewerTeamId를 기록하지만 컬럼이 nullable이라, null 그룹이 "이름 없는 한 팀"으로
+          // 집계에 섞여 유령 1표를 만들지 않도록 쿼리 단계에서 제외한다. reveal 판정에서도 null 그룹은
+          // reverse 매칭이 절대 성립하지 않아 72시간 폴백으로만 열리므로 애초에 후보에서 빼는 편이 맞다.
+          // (recalculateTournamentFixtureTeamTrust / computeRevealedTeamTrustBatch와 동일한 처리)
+          reviewerTeamId: { not: null },
+        },
         select: { sourceId: true, reviewerTeamId: true, targetTeamId: true, rating: true, submittedAt: true },
       }),
       tx.v1TeamMatch.count({
@@ -619,11 +641,48 @@ export class ReviewsService {
           })
         ).map((review) => ({ sourceId: review.sourceId, reviewerUserId: review.reviewerTeamId ?? '', targetUserId: review.targetTeamId }))
       : [];
-    const revealed = candidates.filter((review) =>
-      isReviewRevealed({ sourceId: review.sourceId, reviewerUserId: review.reviewerTeamId ?? '', targetUserId: review.targetTeamId, submittedAt: review.submittedAt }, reverseReviews, now),
+    // reveal 판정은 "경기 × 평가한 팀" 단위로 접는다. 한 팀에서 여러 팀원이 각자 후기를 쓰면 제출 시각이
+    // 제각각이라 72시간 폴백이 행마다 따로 만료되고, 같은 팀의 기여분이 부분적으로만 공개돼 팀 평균이
+    // 흔들린다. 그룹당 한 번만 판정하고 그 그룹의 최초 제출 시각을 기준으로 삼아 팀 기여분이 통째로
+    // 공개/비공개되게 한다. (사람 단위 판정은 쓸 수 없다 — 상대팀에서 "나를" 평가한 사람이 있어야만
+    // 공개되는 셈이라 사실상 열리지 않는다.)
+    const revealGroups = new Map<string, { sourceId: string; reviewerTeamId: string; earliestSubmittedAt: Date }>();
+    for (const review of candidates) {
+      const key = revealGroupKey(review.sourceId, review.reviewerTeamId ?? '');
+      const group = revealGroups.get(key);
+      if (!group) {
+        revealGroups.set(key, { sourceId: review.sourceId, reviewerTeamId: review.reviewerTeamId ?? '', earliestSubmittedAt: review.submittedAt });
+        continue;
+      }
+      if (review.submittedAt < group.earliestSubmittedAt) group.earliestSubmittedAt = review.submittedAt;
+    }
+    const revealedGroupKeys = new Set(
+      [...revealGroups.entries()]
+        .filter(([, group]) =>
+          isReviewRevealed(
+            { sourceId: group.sourceId, reviewerUserId: group.reviewerTeamId, targetUserId: targetTeamId, submittedAt: group.earliestSubmittedAt },
+            reverseReviews,
+            now,
+          ),
+        )
+        .map(([key]) => key),
     );
-    const reviewCount = revealed.length;
-    const avgRating = reviewCount ? revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount : null;
+
+    // 집계 그룹은 reviewerTeamId "만"으로 묶는다 — reveal 그룹 키(sourceId 포함)와 다르다.
+    // 같은 두 팀이 여러 경기를 치러도 "팀 평균 1표"이므로 경기 수만큼 표가 늘어나면 안 되고,
+    // 반대로 reveal 키에서 sourceId를 빼면 A경기의 되평가가 B경기 후기를 열어버린다.
+    const ratingsByReviewerTeam = new Map<string, number[]>();
+    for (const review of candidates) {
+      const reviewerTeamId = review.reviewerTeamId ?? '';
+      if (!revealedGroupKeys.has(revealGroupKey(review.sourceId, reviewerTeamId))) continue;
+      const ratings = ratingsByReviewerTeam.get(reviewerTeamId) ?? [];
+      ratings.push(review.rating);
+      ratingsByReviewerTeam.set(reviewerTeamId, ratings);
+    }
+    // 팀별 평균을 먼저 낸 뒤 그 평균들의 평균 — 인원 많은 팀의 목소리가 커지지 않도록 팀당 1표로 환산한다.
+    const teamAverages = [...ratingsByReviewerTeam.values()].map(average);
+    const reviewCount = teamAverages.length; // 평가에 참여한 "팀 수"
+    const avgRating = teamAverages.length ? average(teamAverages) : null;
 
     await tx.v1TeamTrustScore.upsert({
       where: { teamId: targetTeamId },
@@ -773,12 +832,11 @@ function reputationData(reviewCount: number, avgRating: number | null, sourceLab
   };
 }
 
-function trustStateForReviewCount(reviewCount: number) {
-  if (reviewCount >= 3) return 'verified' as const;
-  if (reviewCount >= 1) return 'estimated' as const;
-  return 'none' as const;
-}
-
+// trustStateForReviewCount / average / revealGroupKey 는 team-trust-aggregation.ts에서 import한다.
+// 이 세 개는 원래 여기와 그쪽에 각각 복제돼 있었고, 그 복제 때문에 "DB는 팀 평균 1표로 저장하는데
+// 화면에 보이는 live 재계산은 원시 평균·원시 건수"로 두 경로가 갈라지는 사고가 났다. 단일 정의로 합친다.
+// decimalScore만 여기 남는다 — 이쪽은 Prisma 컬럼에 쓰려고 Prisma.Decimal을 반환하고,
+// 배치 헬퍼 쪽은 API 응답용 number를 반환해서 서로 다른 함수다.
 function decimalScore(avgRating: number | null) {
   return avgRating === null ? null : new Prisma.Decimal(avgRating.toFixed(2));
 }
@@ -799,8 +857,9 @@ function resolveReviewerTeamId(teamIds: string[], hostTeamId: string, approvedAp
   return matches.length === 1 ? matches[0] : null;
 }
 
-function teamReviewKey(sourceId: string, reviewerTeamId: string, targetTeamId: string) {
-  return `${sourceId}:${reviewerTeamId}:${targetTeamId}`;
+// 작성 주체가 사람이므로 키에는 팀이 들어가지 않는다 — 조회 자체가 reviewerUserId로 좁혀져 있다.
+function teamReviewKey(sourceId: string, targetTeamId: string) {
+  return `${sourceId}:${targetTeamId}`;
 }
 
 function isUniqueConstraintError(error: unknown) {

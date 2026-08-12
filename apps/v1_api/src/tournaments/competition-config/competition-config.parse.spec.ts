@@ -1,4 +1,47 @@
-import { parseLineupLimits, parsePeriodDurations } from './competition-config.parse';
+import {
+  parseLineupConfigForResponse,
+  parseLineupLimits,
+  parsePeriodDurations,
+} from './competition-config.parse';
+
+/**
+ * The lineup screens pick which formation presets to offer from the squad size the admin
+ * configured for this competition. Before this helper existed the response carried only the
+ * position/formation catalog, so the frontend inferred the number by counting
+ * `starters − 골키퍼로 지정된 선수` — a count that shifts the moment a manager taps GK, which
+ * swapped the whole preset list mid-edit. If this field silently stops being sent, that
+ * guidance disappears without any type error, so the contract is pinned here.
+ */
+describe('parseLineupConfigForResponse', () => {
+  it('carries the configured squad size alongside the position/formation catalog', () => {
+    const parsed = parseLineupConfigForResponse({
+      minPlayers: 5,
+      maxPlayers: 5,
+      substitutions: 'rolling',
+      maxSubstitutions: null,
+      positions: [{ code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true }],
+      formations: [
+        { code: '2-2', label: '박스', outfield: 4, slots: [{ position: 'FIXO', x: 28, y: 38 }] },
+      ],
+    });
+
+    expect(parsed.minPlayers).toBe(5);
+    expect(parsed.maxPlayers).toBe(5);
+    expect(parsed.positions).toHaveLength(1);
+    expect(parsed.formations).toHaveLength(1);
+  });
+
+  it('degrades to the same tolerant defaults as its two halves for a legacy/empty blob', () => {
+    // 구버전 config row에는 positions/formations가 아예 없다 — 화면은 이 상태를 "프리셋 없음,
+    // 자유 배치만"으로 이미 다루므로 여기서 던지면 안 된다.
+    expect(parseLineupConfigForResponse(null)).toEqual({
+      positions: [],
+      formations: [],
+      minPlayers: 1,
+      maxPlayers: 11,
+    });
+  });
+});
 
 /**
  * Extracted from a private duplicate in team-match-lineup.service.ts so

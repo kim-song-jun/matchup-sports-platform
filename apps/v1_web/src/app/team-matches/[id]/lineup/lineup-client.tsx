@@ -43,6 +43,7 @@ import {
   removeEntry,
   resolveOwnTeamId,
   restoreEntry,
+  applyFormationPreset,
   selectFormation,
   setGoalkeeper,
   setJerseyNumber,
@@ -50,8 +51,6 @@ import {
   unplaceFromSlot,
   validateLineupForSubmit,
 } from './lineup.view-model';
-
-const AUTOSAVE_DEBOUNCE_MS = 900;
 
 export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string }) {
   const teamMatchQuery = useV1TeamMatch(teamMatchId);
@@ -230,13 +229,20 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     );
   }
 
+  // 미저장 변경이 있는 채로 탭을 닫거나 새로고침하면 브라우저 기본 경고를 띄운다 —
+  // 자동저장을 없앤 대가로 "저장 안 하고 나가면 잃는다"는 위험이 생겼으므로, 그 위험을
+  // 사용자가 모르고 지나치지 않게 막는 것까지가 이 변경의 범위다.
   useEffect(() => {
-    if (!state || !state.dirty || !editable) return;
-    const timer = window.setTimeout(runQueuedSave, AUTOSAVE_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-    // state 객체 참조가 바뀔 때마다(모든 편집 액션이 새 객체를 만든다) 디바운스를 다시 잰다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, editable]);
+    if (!state?.dirty || !editable) return;
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      // 최신 브라우저는 문구를 무시하고 기본 경고만 보여주지만, returnValue 설정은 여전히
+      // "경고를 띄우겠다"는 신호로 요구된다.
+      event.returnValue = '';
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [state?.dirty, editable]);
 
   // D-17: 종목별 포메이션·포지션 사전은 서버 lineupConfig가 유일한 출처다 — 종목명으로
   // 하드코딩 카탈로그를 스위치하지 않는다. lineupConfig가 아직 없는(구버전 응답) 경우
@@ -244,8 +250,14 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const sportCatalog: FormationPreset[] = lineupQuery.data?.lineupConfig
     ? buildFormationPresets(lineupQuery.data.lineupConfig.positions, lineupQuery.data.lineupConfig.formations)
     : [];
-  const outfieldCount = state?.starters.filter((entry) => !entry.goalkeeper).length ?? 0;
+  // 선발 총원 − 골키퍼 한 자리. **누가 GK로 지정됐는지와 무관하게** 센다 — 예전에는
+  // goalkeeper 플래그가 켜진 선수를 뺐기 때문에 GK를 지정하는 순간 이 숫자가 1 줄고
+  // 프리셋 목록이 갈려, 고르던 포메이션이 사라지며 아래 정리 effect가 자유 배치로
+  // 되돌려버렸다. 라인업의 골키퍼 자리는 항상 정확히 하나다.
+  const outfieldCount = Math.max(0, (state?.starters.length ?? 0) - 1);
   const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
+  /** 이 경기에 설정된 출전 인원(GK 포함). 구버전 응답에는 없을 수 있어 null 허용. */
+  const configuredSquadSize = lineupQuery.data?.lineupConfig?.maxPlayers ?? null;
 
   // Copilot review finding (PR #277): 선발/골키퍼 변경으로 outfieldCount가 바뀌어 지금
   // 선택된 formation이 더 이상 formationOptions에 없으면(예: 5명→4명으로 줄어 "1-1-2"
@@ -444,10 +456,17 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   const counts = deriveLineupCounts(state, rosterPool);
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
-  const outfieldGuidance =
-    formationSupported && formationOptions.length === 0 && outfieldCount > 0
-      ? `현재 선발 ${outfieldCount}명 — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
-      : null;
+  // ① 지금 선발 수에 맞는 대형이 아예 없을 때, ② 대형은 있지만 이 경기에 설정된 출전
+  // 인원과 선발 수가 다를 때. ②는 서버가 lineupConfig에 출전 인원을 함께 내려주면서
+  // 처음 가능해졌다(그전에는 화면이 "몇 명이어야 맞는지"를 알 방법이 없었다).
+  const starterCount = state.starters.length;
+  const outfieldGuidance = !formationSupported
+    ? null
+    : formationOptions.length === 0 && starterCount > 0
+      ? `현재 선발 ${starterCount}명${configuredSquadSize !== null ? ` · 이 경기 출전 인원은 ${configuredSquadSize}명` : ''} — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
+      : configuredSquadSize !== null && starterCount > 0 && starterCount !== configuredSquadSize
+        ? `이 경기 출전 인원은 ${configuredSquadSize}명인데 지금 선발은 ${starterCount}명이에요.`
+        : null;
   const selectedPreset = state.formation !== null ? formationOptions.find((preset) => preset.code === state.formation) ?? null : null;
   const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;
   const validationErrors = validateLineupForSubmit(state, activeSlots);
@@ -537,18 +556,26 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           ) : null}
         </Card>
 
+        {/* 순서가 중요하다: 저장 실패는 dirty와 동시에 참이므로 먼저 걸러야 하고, "저장했어요"는
+            **마지막 저장 이후 편집이 없을 때만** 참이다 — 예전에는 saveStatus만 보고 그렸기
+            때문에 저장 후 계속 편집해도 "저장했어요."가 그대로 남아, 사용자가 이미 저장됐다고
+            믿고 화면을 떠나면 그 편집을 잃었다. */}
         <div style={{ marginBottom: 12 }} aria-live="polite">
           {saveStatus === 'saving' ? (
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
               저장 중…
             </p>
-          ) : saveStatus === 'saved' ? (
-            <p className="tm-text-caption" style={{ color: 'var(--green700)' }}>
-              저장했어요.
-            </p>
           ) : saveStatus === 'error' && saveErrorMessage ? (
             <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>
               {saveErrorMessage}
+            </p>
+          ) : state.dirty ? (
+            <p className="tm-text-caption" style={{ color: 'var(--orange700)' }}>
+              저장하지 않은 변경사항이 있어요.
+            </p>
+          ) : saveStatus === 'saved' ? (
+            <p className="tm-text-caption" style={{ color: 'var(--green700)' }}>
+              저장했어요.
             </p>
           ) : null}
         </div>
@@ -609,8 +636,20 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                   slots={activeSlots}
                   outfieldGuidance={outfieldGuidance}
                   editable={editable}
-                  onSelectFormation={(formation) =>
-                    setState((prev) => (prev ? selectFormation(prev, formation) : prev))
+                  onSelectFormation={(nextFormation) =>
+                    setState((prev) => {
+                      if (!prev) return prev;
+                      // 프리셋을 고르면 배치된 선수를 새 슬롯으로 재배치한다(좌표를 그대로
+                      // 두면 새 프리셋에 없는 포지션의 선수가 피치에서 사라졌다). 자유
+                      // 배치(null)는 슬롯이 없으니 라벨만 바꾼다.
+                      const preset =
+                        nextFormation === null
+                          ? null
+                          : formationOptions.find((option) => option.code === nextFormation) ?? null;
+                      return preset === null
+                        ? selectFormation(prev, nextFormation)
+                        : applyFormationPreset(prev, preset.code, slotsWithGoalkeeper(preset));
+                    })
                   }
                   onPlacePlayer={(key, x, y) =>
                     setState((prev) => (prev ? setPlayerPosition(prev, key, x, y) : prev))
@@ -949,29 +988,44 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
       {editable ? (
         <div className="tm-fixed-cta">
-          {/* insane review(P0-1, 2026-08 GPT Pro): 편집 중(dirty)에는 버튼을 그냥 막지 않는다
-              — 자동저장이 900ms 뒤에야 도는데 그동안 무작정 비활성화만 하면 사용자는 자기가
-              막 끝낸 편집이 저장될 때까지 그냥 기다렸다가 다시 눌러야 한다. 대신 클릭 자체를
-              "flush-then-submit" 트리거로 쓴다: handleSubmit이 dirty를 보면 디바운스를
-              기다리지 않고 즉시 저장을 밀어넣고, 그 ack로 받은 새 revision으로 이어서
-              제출한다(submitFlowPending이 true인 동안). 버튼은 그 진행 중에만, 그리고 실제
-              제출 mutation이 나가 있는 동안만 비활성화한다 — validationErrors/일반 dirty와는
-              분리된 상태라서 "편집 후 방금 클릭"과 "지금 flush 진행 중이라 중복 클릭 막아야
-              함"을 구분할 수 있다. 저장이 실패·충돌하면 submitFlowPending이 즉시 풀리고
-              제출은 나가지 않는다(runQueuedSave의 onError 참고) — saveErrorMessage로 이유를
-              보여준다. */}
-          <button
-            type="button"
-            className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
-            disabled={validationErrors.length > 0 || submitMutation.isPending || submitFlowPending}
-            onClick={handleSubmit}
-          >
-            {submitMutation.isPending
-              ? '제출 중…'
-              : submitFlowPending
-                ? '변경사항 저장 중…'
-                : '라인업 제출하기'}
-          </button>
+          {/* 저장은 명시적이다(2026-08 사용자 요청: "바로바로 실시간 저장 말고 저장 눌렀을 때").
+              예전에는 편집이 멈추고 900ms 뒤 자동저장이 돌았는데, 피치에서 토큰을 드래그하는
+              동안 좌표가 매 포인터 이벤트마다 새 저장을 예약했다 저장을 취소하기를 반복해
+              "저장이 되는 건지 안 되는 건지 모르겠다"는 상태가 됐다. 이제 사용자가 누른
+              그 순간에만 서버로 나간다.
+
+              직렬화(saveInFlightRef)는 자동저장 시절 그대로 유지한다 — 저장 버튼을 연타하면
+              같은 expectedVersion을 든 두 요청이 겹쳐 자기 자신 때문에 409 VERSION_CONFLICT를
+              받고, 그 복구(전체 재로드)가 방금 만든 편집을 통째로 버린다. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <button
+              type="button"
+              className="tm-btn tm-btn-lg tm-btn-neutral"
+              disabled={!state.dirty || saveStatus === 'saving' || submitFlowPending}
+              onClick={runQueuedSave}
+            >
+              {saveStatus === 'saving' ? '저장 중…' : state.dirty ? '저장' : '저장됨'}
+            </button>
+            {/* insane review(P0-1, 2026-08 GPT Pro): 편집 중(dirty)에는 제출 버튼을 그냥 막지
+                않는다 — 대신 클릭 자체를 "flush-then-submit" 트리거로 쓴다: handleSubmit이
+                dirty를 보면 즉시 저장을 밀어넣고, 그 ack로 받은 새 revision으로 이어서
+                제출한다(submitFlowPending이 true인 동안). 저장을 깜빡한 채 제출해도 옛
+                revision이 실려 나가지 않는다. 저장이 실패·충돌하면 submitFlowPending이 즉시
+                풀리고 제출은 나가지 않는다(runQueuedSave의 onError) — saveErrorMessage로
+                이유를 보여준다. */}
+            <button
+              type="button"
+              className="tm-btn tm-btn-lg tm-btn-primary"
+              disabled={validationErrors.length > 0 || submitMutation.isPending || submitFlowPending}
+              onClick={handleSubmit}
+            >
+              {submitMutation.isPending
+                ? '제출 중…'
+                : submitFlowPending
+                  ? '변경사항 저장 중…'
+                  : '라인업 제출하기'}
+            </button>
+          </div>
         </div>
       ) : null}
 

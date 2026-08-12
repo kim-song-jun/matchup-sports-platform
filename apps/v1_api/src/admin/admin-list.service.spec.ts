@@ -663,9 +663,11 @@ describe('AdminService — list/detail endpoints', () => {
       });
       prisma.v1PostEventReview.findMany
         .mockResolvedValueOnce([
+          // 평가팀을 t-2/t-3/t-4로 나눈다 — 집계가 "팀 평균 1표"라서 같은 팀이 3경기에서 준 것이면
+          // 1표로 접혀 estimated가 된다. 3팀이 각각 5/4/5를 주면 평균의 평균도 4.67로 같다.
           { targetTeamId: 't-1', sourceId: 's-1', reviewerTeamId: 't-2', rating: 5, submittedAt: longAgo },
-          { targetTeamId: 't-1', sourceId: 's-2', reviewerTeamId: 't-2', rating: 4, submittedAt: longAgo },
-          { targetTeamId: 't-1', sourceId: 's-3', reviewerTeamId: 't-2', rating: 5, submittedAt: longAgo },
+          { targetTeamId: 't-1', sourceId: 's-2', reviewerTeamId: 't-3', rating: 4, submittedAt: longAgo },
+          { targetTeamId: 't-1', sourceId: 's-3', reviewerTeamId: 't-4', rating: 5, submittedAt: longAgo },
         ])
         .mockResolvedValueOnce([]); // reverse-review lookup: not needed, fallback window already elapsed
 

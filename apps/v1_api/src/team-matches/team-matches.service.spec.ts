@@ -794,8 +794,16 @@ describe('TeamMatchesService', () => {
 
   const OLD_SUBMITTED_AT = new Date(Date.now() - 100 * 60 * 60 * 1000); // 100h ago (>72h reveal window)
 
-  /** targetTeamId/reviewerTeamId in-필터로 팀별 candidate 리뷰를 되돌려주는 v1PostEventReview mock. */
-  function mockPostEventReviewsByTeam(reviewsByTeam: Record<string, Array<{ sourceId: string; rating: number }>>) {
+  /**
+   * targetTeamId/reviewerTeamId in-필터로 팀별 candidate 리뷰를 되돌려주는 v1PostEventReview mock.
+   *
+   * reviewerTeamId를 행마다 지정할 수 있다 — 신뢰점수 집계가 "팀 평균 1표"라서, 같은 상대팀이 여러
+   * 경기에서 준 평점은 몇 건이든 1표로 접힌다. 평가한 팀 수가 등급을 정하므로(3팀 이상 verified)
+   * 등급을 다루는 케이스는 평가팀을 서로 다르게 줘야 한다. 생략하면 기존처럼 단일 상대팀으로 채운다.
+   */
+  function mockPostEventReviewsByTeam(
+    reviewsByTeam: Record<string, Array<{ sourceId: string; rating: number; reviewerTeamId?: string }>>,
+  ) {
     prisma.v1PostEventReview.findMany.mockImplementation((args: { where: Record<string, unknown> }) => {
       const where = args.where as { targetTeamId?: { in: string[] }; reviewerTeamId?: { in: string[] } };
       if (where.targetTeamId) {
@@ -804,7 +812,7 @@ describe('TeamMatchesService', () => {
           (reviewsByTeam[teamId] ?? []).map((review) => ({
             targetTeamId: teamId,
             sourceId: review.sourceId,
-            reviewerTeamId: `opponent-of-${teamId}`,
+            reviewerTeamId: review.reviewerTeamId ?? `opponent-of-${teamId}`,
             rating: review.rating,
             submittedAt: OLD_SUBMITTED_AT,
           })),
@@ -819,11 +827,13 @@ describe('TeamMatchesService', () => {
   }
 
   it('list: 캐시된 trustState(sample)와 다른 live 재계산 값(verified)을 반환한다', async () => {
+    // 서로 다른 3개 팀이 평가 → 3표 → verified. (같은 팀이 3경기에서 준 것이면 팀 평균 1표로 접혀
+    // estimated가 되므로, 등급을 검증하려면 평가팀을 나눠야 한다.)
     mockPostEventReviewsByTeam({
       'team-host': [
-        { sourceId: 'tm-a', rating: 5 },
-        { sourceId: 'tm-b', rating: 5 },
-        { sourceId: 'tm-c', rating: 5 },
+        { sourceId: 'tm-a', rating: 5, reviewerTeamId: 'rival-1' },
+        { sourceId: 'tm-b', rating: 5, reviewerTeamId: 'rival-2' },
+        { sourceId: 'tm-c', rating: 5, reviewerTeamId: 'rival-3' },
       ],
     });
     prisma.v1TeamMatch.findMany.mockResolvedValue([
@@ -854,11 +864,12 @@ describe('TeamMatchesService', () => {
   });
 
   it('applications: 신청 팀이 2개 이상일 때 배치 크로스토크 없이 각 팀의 live 값을 정확히 매핑한다', async () => {
+    // A팀은 서로 다른 3개 팀에게 평가받아 3표(verified), B팀은 1팀 1표(estimated).
     mockPostEventReviewsByTeam({
       'team-applicant-a': [
-        { sourceId: 'tm-x', rating: 5 },
-        { sourceId: 'tm-y', rating: 5 },
-        { sourceId: 'tm-z', rating: 5 },
+        { sourceId: 'tm-x', rating: 5, reviewerTeamId: 'rival-1' },
+        { sourceId: 'tm-y', rating: 5, reviewerTeamId: 'rival-2' },
+        { sourceId: 'tm-z', rating: 5, reviewerTeamId: 'rival-3' },
       ],
       'team-applicant-b': [{ sourceId: 'tm-w', rating: 2 }],
     });

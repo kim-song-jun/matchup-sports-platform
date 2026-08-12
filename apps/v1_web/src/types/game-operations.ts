@@ -162,6 +162,17 @@ export interface GameDetail {
   lineups: GameLineup[];
   actorRole: GameActorRole;
   substitutionPolicy: GameSubstitutionPolicy;
+  /**
+   * 승부차기 입력 단계(운영 콘솔) 추가 — `GamesService.isKnockoutFixture`를
+   * `GET /games/:gameId`에서도 그대로 재사용해 계산한다(새 필드일 뿐 스키마
+   * 변경은 아니다). knockout(`V1TournamentGroup.phase !== 'group'`)이 아닌
+   * 픽스처에서는 백엔드가 `end` 커맨드의 `payload.penalties`를
+   * `TOURNAMENT_PENALTY_NOT_ALLOWED`로 거부한다 — 이 필드가 없으면 콘솔이
+   * 조별리그 무승부에서도 "승부차기 시작" 버튼을 보여줬다가 마지막 제출에서만
+   * 실패하는 깨진 UX가 된다(`operate-console.tsx`의 `penaltyShootoutEligible`
+   * 참고). `groupId`가 없는 픽스처는 보수적으로 `false`.
+   */
+  isKnockoutFixture: boolean;
 }
 
 export interface GameEventRecord {

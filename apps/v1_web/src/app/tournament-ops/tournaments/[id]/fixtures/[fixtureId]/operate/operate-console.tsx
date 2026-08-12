@@ -13,6 +13,7 @@ import {
   RotateCcw,
   SkipForward,
   Square,
+  Target,
   Timer,
 } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
@@ -23,7 +24,6 @@ import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/
 import { isTakeoverHeld } from '@/lib/game-operations-queue';
 import {
   freezeCapture,
-  formatMatchClock,
   isClockSuspicious,
   type FrozenEventCapture,
 } from '@/lib/game-operations-clock';
@@ -37,6 +37,7 @@ import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { QuickSubstitutionPanel } from './quick-substitution-panel';
 import { RestTimer } from './rest-timer';
+import { PenaltyShootoutPanel } from './penalty-shootout-panel';
 import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
 import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
@@ -44,6 +45,19 @@ import { deriveFoulCounts } from '@/lib/team-foul-counter';
 import { deriveOnPitchParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
 import { periodLabel } from './period-label';
+import {
+  commandConfirmCopy,
+  commitActionConfirmCopy,
+  penaltyShootoutFinishConfirmCopy,
+  penaltyShootoutStartConfirmCopy,
+  playerLabel,
+} from './confirm-copy';
+import {
+  isPenaltyShootoutDecisive,
+  penaltyScoreBySideId,
+  type PenaltyKick,
+  type PenaltyKickResult,
+} from '@/lib/penalty-shootout';
 import type {
   GameCardColor,
   GameCommandName,
@@ -51,6 +65,7 @@ import type {
   GameEventType,
   GameLineup,
   GameLineupParticipant,
+  GameSide,
   GameState,
 } from '@/types/game-operations';
 
@@ -321,27 +336,68 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return score;
   }, [gameDetail.data?.sides, ops.liveEvents]);
 
-  const { confirm, ConfirmModal: endGameConfirmModal } = useConfirm();
+  // 과제 2 — 승부차기 시작 버튼 노출 조건. "정규시간(+연장) 종료 시 동점"을
+  // 이 화면의 상태 모델로 정확히 옮기면: `currentPeriod !== null &&
+  // !hasNextPeriod`다 — 마지막으로 설정된 피리어드가 LIVE(또는 PAUSED로 잠시
+  // 멈춘)인 채 다음 피리어드가 없는 상태. 이 시스템은 별도의 "연장전" 피리어드
+  // 타입을 두지 않는다(competition-config 프리셋은 전반/후반 두 피리어드뿐 —
+  // `연장`은 대회가 설정한 마지막 피리어드가 곧 그 뜻이다). `currentPeriod`가
+  // null이면 하프타임/시작 전이라 이 시점 자체가 아니다(`hasNextPeriod`도
+  // currentPeriod가 null이면 항상 false를 주므로 따로 체크할 필요 없다).
+  //
+  // knockout 게이트(`isKnockoutFixture`)가 필요한 이유 — `GamesService.
+  // applyPenalties`(백엔드, 이미 배포됨: `.changeset/v1-tournament-result-ops.md`
+  // "승부차기" 항목)는 조별리그 픽스처의 `end payload.penalties`를
+  // `TOURNAMENT_PENALTY_NOT_ALLOWED`로 거부한다. 이 게이트 없이 "동점이면
+  // 무조건 버튼 노출"로 두면, 조별리그 무승부(드물지 않다 — `V1TournamentStanding.
+  // draws`가 정식으로 집계되는 결과다)에서마다 "승부차기 시작" → 킥 입력까지
+  // 다 하고 "승부차기 종료"에서만 실패하는 깨진 UX가 된다. `isKnockoutFixture`
+  // 는 그 판정을 프런트에도 그대로 노출한 것뿐이다(새 판정 로직 아님 —
+  // `GET /games/:gameId`의 `GameDetail.isKnockoutFixture` doc 참고).
+  const penaltyShootoutEligible = useMemo(() => {
+    if (gameDetail.data?.sourceType !== 'TOURNAMENT_FIXTURE') return false;
+    if (gameDetail.data?.isKnockoutFixture !== true) return false;
+    if (currentPeriod === null || hasNextPeriod) return false;
+    if (gameState !== 'LIVE' && gameState !== 'PAUSED') return false;
+    const sidesList = gameDetail.data?.sides ?? [];
+    if (sidesList.length !== 2) return false;
+    return (scoreBySideId.get(sidesList[0].id) ?? 0) === (scoreBySideId.get(sidesList[1].id) ?? 0);
+  }, [
+    gameDetail.data?.sourceType,
+    gameDetail.data?.isKnockoutFixture,
+    gameDetail.data?.sides,
+    currentPeriod,
+    hasNextPeriod,
+    gameState,
+    scoreBySideId,
+  ]);
 
-  // alpha "452′" 사고 대응 — 제출 직전 마지막 확인. `clockMs`가 이 피리어드의
-  // 설정된 길이를 크게 넘으면(`isClockSuspicious`) 운영자에게 한 번 더
-  // 물어본다. `currentPeriodDurationMinutes`가 `null`이면(설정을 못 읽음)
-  // 판단 근거가 없으므로 그냥 통과시킨다 — 지어낸 기준으로 막지 않는다.
-  // 이 함수는 제출을 "막지" 않는다: 운영자가 확인하면 그대로 진행되고,
-  // 취소하면 호출부가 제출 자체를 하지 않을 뿐이다(서버 하드 거부와 다름).
-  const confirmIfClockSuspicious = useCallback(
-    async (clockMs: number, periodNumber: number): Promise<boolean> => {
+  // 킥별 기록은 서버에 남지 않는다(옵션 B — `@/lib/penalty-shootout.ts` doc
+  // 참고). `null` = 패널이 닫혀 있음, 빈 배열 `[]` = 패널이 열려 있고 아직
+  // 킥이 없음 — 이 하나의 상태로 "열림 여부"와 "킥 목록"을 함께 표현해 별도
+  // boolean을 두지 않는다.
+  const [penaltyKicks, setPenaltyKicks] = useState<PenaltyKick[] | null>(null);
+
+  const { confirm, ConfirmModal: confirmModal } = useConfirm();
+
+  // alpha "452′" 사고 대응 — 예전엔 이 계산이 곧장 `confirm()`을 띄우는
+  // `confirmIfClockSuspicious`였다(시계가 수상할 때만 확인). 과제 1(사용자
+  // 결정: "예외 없이 전부"에 확인 모달)로 이제 모든 커밋이 항상 확인을
+  // 거치므로, 시계가 수상하다고 여기서 또 `confirm()`을 부르면 확인 모달이
+  // 두 번(먼저 이 경고, 그다음 액션 확인) 뜬다 — 나쁜 UX다. 그래서 이 함수는
+  // 더 이상 confirm을 부르지 않고 "경고가 필요한가/피리어드가 몇 분짜리인가"
+  // 만 계산해서 돌려주고, 호출부(`handleCommit`/`handleQuickSubstitute`)가
+  // `commitActionConfirmCopy`에 이 값을 건네 **같은 모달 안에** 병합한다.
+  // `currentPeriodDurationMinutes`가 `null`이면(설정을 못 읽음) 판단 근거가
+  // 없으므로 경고 없이 통과시킨다 — 지어낸 기준으로 막지 않는다.
+  const clockWarningMinutes = useCallback(
+    (clockMs: number): number | null => {
       if (currentPeriodDurationMinutes === null || !isClockSuspicious(clockMs, currentPeriodDurationMinutes)) {
-        return true;
+        return null;
       }
-      return confirm({
-        title: '기록 시각을 확인해주세요',
-        message: `${periodLabel(periodNumber)} ${formatMatchClock(clockMs)}로 기록돼요. 이 피리어드는 보통 ${currentPeriodDurationMinutes}분이에요. 경기 종료를 누르지 않은 채 시간이 흘렀을 수 있어요 — 그대로 기록할까요?`,
-        confirmLabel: '그대로 기록',
-        tone: 'danger',
-      });
+      return currentPeriodDurationMinutes;
     },
-    [confirm, currentPeriodDurationMinutes],
+    [currentPeriodDurationMinutes],
   );
 
   const handleSelectAction = useCallback(
@@ -391,9 +447,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const handleCommit = useCallback(
     async (input: EventCaptureCommitInput) => {
-      if (!(await confirmIfClockSuspicious(input.clockMs, input.period))) return;
-      void ops.submitEvent(input);
+      // 확인 모달을 띄우기 전에 선택 화면부터 닫는다 — 모달 두 개가 겹쳐
+      // 보이지 않게(ActionTargetPicker의 role="dialog" 위에 ConfirmModal의
+      // role="dialog"가 또 뜨는 상태를 만들지 않는다). 확인 문구 자체에
+      // 팀·선수·시각이 다 들어 있으니(요구사항 2) 선택 화면을 먼저 닫아도
+      // 정보가 사라지지 않는다.
       setPendingAction(null);
+      const copy = commitActionConfirmCopy(
+        input,
+        gameDetail.data?.sides ?? [],
+        fixtureLineup.data?.lineups ?? [],
+        clockWarningMinutes(input.clockMs),
+      );
+      if (!(await confirm(copy))) return;
+      void ops.submitEvent(input);
       // GOAL은 이 콘솔에서 항상 참가자를 선택해 커밋한다(`ActionTargetPicker`가
       // GOAL에는 `allowTeamOnly`를 열어주지 않는다) — `participantId`가 정말 없는
       // 경우는 findRecentGoalEvent 자체가 매칭할 수 없으므로 어시스트 추가 액션을
@@ -412,7 +479,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         });
       }
     },
-    [ops, showToast, confirmIfClockSuspicious],
+    [ops, showToast, confirm, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes],
   );
 
   // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번
@@ -445,11 +512,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         pausedTotalMs: currentPeriod.pausedTotalMs,
         pausedAtMs: currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime(),
       });
-      // 빠른 교체는 원래 확인창 없이 한 탭으로 끝나는 게 설계 의도지만(위 문서
-      // 참고), 시각이 비정상일 때만은 예외다 — `handleRunCommand`의 '경기
-      // 종료'가 이미 같은 패턴(평소엔 즉시 실행, 위험할 때만 확인)이다.
-      if (!(await confirmIfClockSuspicious(frozen.clockMs, frozen.period))) return;
-      void ops.submitEvent({
+      // 사용자 결정("예외 없이 전부")으로 빠른 교체도 이제 확인을 거친다 —
+      // 예전엔 "지정 후 탭" 두 단계 자체가 오조작 방지라 확인창을 생략했지만,
+      // 그 설계는 이번 결정으로 폐기됐다(과제 1 doc, `confirm-copy.ts` 참고).
+      // `commitActionConfirmCopy`가 일반 교체(ActionTargetPicker 경로)와 정확히
+      // 같은 문구 형식을 쓰도록, 제출할 이벤트와 동일한 shape을 먼저 만든다.
+      const commitInput: EventCaptureCommitInput = {
         type: 'SUBSTITUTION',
         participantId: input.inParticipant.id,
         sideId: input.sideId,
@@ -457,7 +525,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         clockMs: frozen.clockMs,
         occurredAt: frozen.occurredAt,
         payload: { outParticipantId: input.outParticipant.id },
-      });
+      };
+      const copy = commitActionConfirmCopy(
+        commitInput,
+        gameDetail.data?.sides ?? [],
+        fixtureLineup.data?.lineups ?? [],
+        clockWarningMinutes(frozen.clockMs),
+      );
+      if (!(await confirm(copy))) return;
+      void ops.submitEvent(commitInput);
       const outParticipantId = input.outParticipant.id;
       const inParticipantId = input.inParticipant.id;
       const clockMs = frozen.clockMs;
@@ -475,32 +551,23 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         },
       });
     },
-    [currentPeriod, ops, showToast, confirmIfClockSuspicious],
+    [currentPeriod, ops, showToast, confirm, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes],
   );
 
+  // 확인 모달은 더 이상 이 함수 안에서 뜨지 않는다 — 과제 1(사용자 결정:
+  // "예외 없이 전부"에 확인)로 start/pause/resume/end-period/start-period/end
+  // 전부가 확인을 거쳐야 하는데, 그 문구는 명령마다 달라야 한다(요구사항 2:
+  // "정말?" 금지, 팀/스코어가 보여야 함). 그래서 확인은 호출부(아래
+  // `confirmAndRunCommand`, 그리고 승부차기 종료의 `handleFinishPenaltyShootout`)
+  // 가 각자의 문구로 미리 처리하고, 이 함수는 "이미 확인된 명령을 그대로
+  // 실행"만 한다 — `revert-period`(사용자 결정에서 제외된 유일한 명령, 그
+  // 자체가 교정 행동이라 확인이 없다)도 같은 이유로 이 함수를 직접 부른다.
+  // `payload`는 승부차기 종료가 `{ penalties: { home, away } }`를 실어 보내는
+  // 통로다 — 새 커맨드나 새 엔드포인트가 아니라 `end`가 이미 갖고 있던 범용
+  // payload 슬롯을 그대로 쓴다(`GamesService.extractEndPenalties` doc 참고).
   const handleRunCommand = useCallback(
-    async (command: GameCommandName) => {
+    async (command: GameCommandName, payload: Record<string, unknown> = {}) => {
       if (!gameId || !isTakeoverHeld(ops.takeover)) return;
-      // UX 감사 item 3 — "경기 종료"는 되돌릴 수 없는데 확인 단계 없이 즉시
-      // 실행됐다. 이슈 #375 정정: 예전 이 주석은 "다른 명령(...전반종료)은
-      // 되돌릴 수 있으니 확인 없이 즉시 실행한다"고 적혀 있었지만, 그
-      // 시점엔 되돌리기 자체가 아예 없어 전제가 거짓이었다(원인 브리프
-      // 참고). 지금은 `end-period`가 진짜로 되돌릴 수 있는 명령이다 —
-      // 하프타임 동안은 물론, 다음 피리어드에 이벤트가 하나도 없는 동안은
-      // 그 뒤에도 서버가 되돌리기를 허용한다(`revert-period`,
-      // GamesService.revertPeriodTransition). `start-period`/`revert-period`도
-      // 같은 이유로 확인을 생략한다(각각 스스로 되돌릴 수 있거나, 되돌리기
-      // 그 자체다). 진짜로 되돌릴 수 없는 건 `end`(경기 종료) 하나뿐이라
-      // 확인 게이트는 여전히 그 하나에만 건다.
-      if (command === 'end') {
-        const confirmed = await confirm({
-          title: '경기를 종료할까요?',
-          message: '종료하면 되돌릴 수 없어요. 기록한 골·카드·교체를 먼저 확인해주세요.',
-          confirmLabel: '경기 종료',
-          tone: 'danger',
-        });
-        if (!confirmed) return;
-      }
       setCommandPending(true);
       setCommandError(null);
       setLastCommandFeedback(null);
@@ -517,7 +584,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           clientCommandId: randomUuid(),
           takeoverToken: ops.takeover.token,
           occurredAt: new Date(Date.now() + ops.clockOffsetMs).toISOString(),
-          payload: {},
+          payload,
         });
         // UX 감사 — 커맨드 성공은 소켓으로 브로드캐스트되지 않는다(REST
         // 전용, D-10). `gameState`는 `ops.gameSnapshot?.state`를
@@ -536,7 +603,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         // (GamesService.revertPeriodTransition). 하프타임 창을 넘겨 다음
         // 피리어드에 이벤트가 이미 생겼다면 서버가 PERIOD_REVERT_HAS_EVENTS로
         // 거부하고, 그 실패는 이 화면의 공용 오류 배너로 그대로 뜬다(토스트
-        // 자체는 별도 실패 처리를 하지 않는다).
+        // 자체는 별도 실패 처리를 하지 않는다). 요구사항 6 — 이 되돌리기
+        // 토스트는 확인 모달이 생겼다고 없애지 않는다(사후 복구 수단 유지).
         if (command === 'end-period') {
           showToast(`${label}했어요`, {
             action: {
@@ -553,8 +621,72 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         setCommandPending(false);
       }
     },
-    [gameId, ops, gameVersion, gameDetail, currentPeriod, halftimePeriod, confirm, showToast],
+    [gameId, ops, gameVersion, gameDetail, currentPeriod, halftimePeriod, showToast],
   );
+
+  // start/pause/resume/end-period/start-period/end 버튼이 실제로 부르는 진입점 —
+  // 명령별 확인 문구(`commandConfirmCopy`)를 먼저 보여주고, 확인해야만
+  // `handleRunCommand`를 부른다. `revert-period`는 이 함수의 타입에서부터
+  // 제외돼 있다(사용자 결정에서 빠진 유일한 명령 — 버튼 onClick이 그 경우엔
+  // 이 함수 대신 `handleRunCommand`를 직접 부른다).
+  const confirmAndRunCommand = useCallback(
+    async (command: Exclude<GameCommandName, 'revert-period'>) => {
+      const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null);
+      const copy = commandConfirmCopy(command, label, {
+        sides: gameDetail.data?.sides ?? [],
+        scoreBySideId,
+      });
+      if (!(await confirm(copy))) return;
+      await handleRunCommand(command);
+    },
+    [confirm, currentPeriod, halftimePeriod, gameDetail.data?.sides, scoreBySideId, handleRunCommand],
+  );
+
+  // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는
+  // 로컬 상태 전환뿐) — 그래도 사용자 결정("예외 없이 전부")에 따라 확인을
+  // 거친다.
+  const handleStartPenaltyShootout = useCallback(async () => {
+    const copy = penaltyShootoutStartConfirmCopy(gameDetail.data?.sides ?? [], scoreBySideId);
+    if (!(await confirm(copy))) return;
+    setPenaltyKicks([]);
+  }, [confirm, gameDetail.data?.sides, scoreBySideId]);
+
+  // 패널을 닫는다 — 취소는 사이드 이펙트가 없으므로(아직 아무것도 서버에
+  // 보내지 않았다) 확인을 거치지 않는다. ActionTargetPicker의 onCancel과
+  // 같은 원칙이다.
+  const handleCancelPenaltyShootout = useCallback(() => {
+    setPenaltyKicks(null);
+  }, []);
+
+  const handleRecordPenaltyKick = useCallback((sideId: string, result: PenaltyKickResult) => {
+    setPenaltyKicks((current) => (current === null ? current : [...current, { sideId, result }]));
+  }, []);
+
+  // 요구사항 3(과제 2) — 오조작 복구. 로컬 상태 되감기일 뿐이라 확인이 없다
+  // (revert-period와 같은 이유 — 되돌리기 자체가 이미 교정 행동이다).
+  const handleUndoPenaltyKick = useCallback(() => {
+    setPenaltyKicks((current) => (current === null || current.length === 0 ? current : current.slice(0, -1)));
+  }, []);
+
+  // 승부차기 종료 — 이 순간에야 `end` 커맨드가 실제로 나간다. `home`/`away`는
+  // 배열 순서가 아니라 `sideKey`로 매핑한다(백엔드 `scoreFromEvents`/
+  // `GameScore`가 sideKey 기준이지 sides 배열 순서 기준이 아니다 — 순서로
+  // 매핑하면 HOME/AWAY가 뒤바뀐 채로 기록될 수 있다).
+  const handleFinishPenaltyShootout = useCallback(async () => {
+    if (penaltyKicks === null) return;
+    const sidesList = gameDetail.data?.sides ?? [];
+    const homeSide = sidesList.find((side) => side.sideKey === 'HOME');
+    const awaySide = sidesList.find((side) => side.sideKey === 'AWAY');
+    if (homeSide === undefined || awaySide === undefined) return;
+    const score = penaltyScoreBySideId(penaltyKicks);
+    const homeScore = score.get(homeSide.id) ?? 0;
+    const awayScore = score.get(awaySide.id) ?? 0;
+    if (!isPenaltyShootoutDecisive(homeScore, awayScore)) return;
+    const copy = penaltyShootoutFinishConfirmCopy(homeSide, awaySide, homeScore, awayScore);
+    if (!(await confirm(copy))) return;
+    setPenaltyKicks(null);
+    await handleRunCommand('end', { penalties: { home: homeScore, away: awayScore } });
+  }, [penaltyKicks, gameDetail.data?.sides, confirm, handleRunCommand]);
 
   // 이슈 #375 — Copilot review 패턴 재사용(PR #276, 위 liveEventsRef와 같은
   // 이유): 되돌리기 토스트의 onClick이 "토스트를 띄운 그 순간의"
@@ -683,7 +815,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                         (command === 'start' && sidesMissingLineup.length > 0)
                       }
                       loading={commandPending}
-                      onClick={() => handleRunCommand(command)}
+                      // 사용자 결정("예외 없이 전부") 예외는 `revert-period`
+                      // 하나뿐 — 그 자체가 이미 되돌리기라 확인이 없다.
+                      onClick={() => void (command === 'revert-period' ? handleRunCommand('revert-period') : confirmAndRunCommand(command))}
                     >
                       {!commandPending ? <Icon size={14} aria-hidden="true" /> : null}
                       {commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
@@ -693,17 +827,37 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               {availableCommands.includes('end') ? (
                 <>
                   <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-[var(--border)]" />
-                  <Button
-                    key="end"
-                    size="sm"
-                    variant="danger"
-                    disabled={!isTakeoverHeld(ops.takeover) || commandPending}
-                    loading={commandPending}
-                    onClick={() => handleRunCommand('end')}
-                  >
-                    {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
-                    {commandLabel('end', currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
-                  </Button>
+                  {/* 과제 2 — 정규시간(+연장) 종료 시 동점인 대회 knockout
+                      경기에서는 "경기 종료"를 바로 누르는 대신 승부차기
+                      입력으로 먼저 보낸다(`penaltyShootoutEligible` 계산
+                      참고). tone을 danger(빨강)가 아니라 primary(파랑)로
+                      두는 이유 — 이 버튼 자체는 아직 되돌릴 수 없는 일을
+                      하지 않는다(패널을 여는 로컬 전환일 뿐), 진짜
+                      되돌릴 수 없는 지점은 패널 안의 "승부차기 종료"다. */}
+                  {penaltyShootoutEligible ? (
+                    <Button
+                      key="penalty-start"
+                      size="sm"
+                      variant="primary"
+                      disabled={!isTakeoverHeld(ops.takeover) || commandPending}
+                      onClick={() => void handleStartPenaltyShootout()}
+                    >
+                      <Target size={14} aria-hidden="true" />
+                      승부차기 시작
+                    </Button>
+                  ) : (
+                    <Button
+                      key="end"
+                      size="sm"
+                      variant="danger"
+                      disabled={!isTakeoverHeld(ops.takeover) || commandPending}
+                      loading={commandPending}
+                      onClick={() => void confirmAndRunCommand('end')}
+                    >
+                      {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
+                      {commandLabel('end', currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
+                    </Button>
+                  )}
                 </>
               ) : null}
             </div>
@@ -996,19 +1150,24 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           onClose={() => setAssistTarget(null)}
         />
       ) : null}
+      {/* 과제 2 — 승부차기 킥 입력 패널. `penaltyKicks !== null`이면 패널이
+          열려 있다는 뜻(빈 배열 포함) — `handleStartPenaltyShootout`의
+          `setPenaltyKicks([])`가 이 조건을 처음 참으로 만든다. */}
+      {penaltyKicks !== null && sides.length === 2 ? (
+        <PenaltyShootoutPanel
+          sides={sides}
+          kicks={penaltyKicks}
+          onRecordKick={handleRecordPenaltyKick}
+          onUndoLastKick={handleUndoPenaltyKick}
+          onFinish={() => void handleFinishPenaltyShootout()}
+          onCancel={handleCancelPenaltyShootout}
+          finishing={commandPending}
+        />
+      ) : null}
       <EventToasts toasts={toasts} onDismiss={dismiss} />
-      {endGameConfirmModal}
+      {confirmModal}
     </div>
   );
-}
-
-function playerLabel(participantId: string | null, lineups: readonly GameLineup[]): string {
-  if (participantId === null) return '선수';
-  for (const lineup of lineups) {
-    const participant = lineup.participants.find((row) => row.id === participantId);
-    if (participant) return participant.displayNameSnapshot;
-  }
-  return '선수';
 }
 
 function teammatesForSide(

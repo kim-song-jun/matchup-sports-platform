@@ -2705,19 +2705,27 @@ export type V1Tournament = {
   updatedAt: string;
 };
 
+/**
+ * 참가팀 공개 정책 통일(fix/v1-publish) — teamId/teamName/teamLogoUrl은 대회가
+ * 모집 중(status==='open')이고 조회자가 운영자·스태프가 아니면 전부 null이다
+ * (registrationId는 재식별 경로가 없으므로 항상 남는다 — React key 등에 안전하게
+ * 쓸 수 있다). "미배정"과는 다른 상태다: 미배정 슬롯은 이 타입 자체가 아예 없거나
+ * (groupTeams는 등록된 팀만 배열에 담김) V1TournamentFixture의 homeTeamName처럼
+ * 'TBD' 같은 별도 문자열로 구분된다.
+ */
 export type V1TournamentGroupTeam = {
   id: string;
   registrationId: string;
-  teamId: string;
-  teamName: string;
+  teamId: string | null;
+  teamName: string | null;
   teamLogoUrl: string | null;
   sortOrder: number;
 };
 
 export type V1TournamentStanding = {
   registrationId: string;
-  teamId: string;
-  teamName: string;
+  teamId: string | null;
+  teamName: string | null;
   teamLogoUrl: string | null;
   position: number;
   points: number;
@@ -2766,6 +2774,13 @@ export type V1TournamentFixtureVideo = {
   url: string;
 };
 
+/**
+ * 참가팀 공개 정책 통일(fix/v1-publish) — homeTeamName/awayTeamName은 세 가지 값을
+ * 가진다: 슬롯에 팀이 아직 배정 안 됨('TBD', 기존과 동일), 배정은 됐지만 모집 중이라
+ * 가려짐(null — homeRegistrationId는 non-null인데 이름만 없는 상태로 구분), 그 외
+ * 실명. `null`과 'TBD'를 반드시 구분해서 표시할 것 — 둘 다 "미정"으로 뭉치면 "이미
+ * 배정됐지만 비공개"와 "아직 배정 안 됨"을 사용자가 구분할 수 없다.
+ */
 export type V1TournamentFixture = {
   id: string;
   groupId: string | null;
@@ -2777,11 +2792,11 @@ export type V1TournamentFixture = {
   status: string;
   homeRegistrationId: string | null;
   homeTeamId: string | null;
-  homeTeamName: string;
+  homeTeamName: string | null;
   homeTeamLogoUrl: string | null;
   awayRegistrationId: string | null;
   awayTeamId: string | null;
-  awayTeamName: string;
+  awayTeamName: string | null;
   awayTeamLogoUrl: string | null;
   result: V1TournamentFixtureResult | null;
   videos: V1TournamentFixtureVideo[];

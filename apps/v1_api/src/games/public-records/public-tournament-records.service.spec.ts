@@ -64,6 +64,12 @@ function buildFakePrisma(options: {
   events: FakeGoalEvent[];
   /** Issue #377 -- this fixture's assigned field, for the staff-bypass scope tests below. */
   fieldId?: string | null;
+  /**
+   * 참가팀 공개 정책 통일(fix/v1-publish) — 대부분의 기존 테스트는 팀명 숨김과
+   * 무관하므로 기본값 'closed'(모집 마감 이후, hideIdentity 항상 false). 팀명
+   * 숨김 자체를 검증하는 테스트만 'open'으로 override한다.
+   */
+  tournamentStatus?: string;
 }): PrismaService {
   const database = {
     v1Tournament: {
@@ -71,6 +77,7 @@ function buildFakePrisma(options: {
         return {
           id: TOURNAMENT_ID,
           title: '테스트 대회',
+          status: options.tournamentStatus ?? 'closed',
           bracketPublishedAt: new Date('2026-01-01T00:00:00.000Z'),
           bracketPublishScheduledAt: null,
         };
@@ -435,5 +442,70 @@ describe('PublicTournamentRecordsService.getMatch -- issue #377 스태프 실명
         jerseyNumber: null,
       }),
     ]);
+  });
+});
+
+/**
+ * 참가팀 공개 정책 통일(fix/v1-publish) -- `getMatch`도 fixture.homeRegistration/
+ * awayRegistration을 통해 팀명을 보여주므로(참가자 실명과는 별개 경로), 모집 중(open)엔
+ * 이 팀명도 같은 조건으로 가려야 한다. 이 경기 하나만 다루는 페이지이므로 스태프
+ * 우회는 위 스코프 테스트들과 동일한 fixture/field 단위 isStaffBypass를 그대로 쓴다.
+ */
+describe('PublicTournamentRecordsService.getMatch -- 참가팀 공개 정책 통일(홈/원정 팀명)', () => {
+  function buildOpenTournamentPrisma() {
+    const now = new Date();
+    return buildFakePrisma({
+      scheduledAt: new Date(now.getTime() + 90 * 60 * 1000),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      tournamentStatus: 'open',
+    });
+  }
+
+  it('모집 중(open)에는 관전자에게 home/away 팀명·팀ID가 가려진다 — registrationId는 유지', async () => {
+    const prisma = buildOpenTournamentPrisma();
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.home).toEqual({ registrationId: 'reg-home', teamId: null, teamName: null });
+    expect(result.away).toEqual({ registrationId: 'reg-away', teamId: null, teamName: null });
+  });
+
+  it('이 경기가 배정된 필드의 FIELD_OPERATOR에게는 모집 중에도 home/away 팀명이 그대로 보인다', async () => {
+    const FIELD_ID = 'a1000000-0000-4000-8000-000000000003';
+    const now = new Date();
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date(now.getTime() + 90 * 60 * 1000),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      fieldId: FIELD_ID,
+      tournamentStatus: 'open',
+    });
+    const access = buildFakeAccessService([{ role: 'FIELD_OPERATOR', fieldId: FIELD_ID }]);
+    const service = new PublicTournamentRecordsService(prisma, access);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, STAFF_USER);
+
+    expect(result.home).toEqual({ registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' });
+    expect(result.away).toEqual({ registrationId: 'reg-away', teamId: 'team-away', teamName: '원정팀' });
+  });
+
+  it('모집이 끝나면(closed) 관전자에게도 home/away 팀명이 다시 공개된다', async () => {
+    const now = new Date();
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date(now.getTime() + 90 * 60 * 1000),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      tournamentStatus: 'closed',
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.home).toEqual({ registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' });
   });
 });

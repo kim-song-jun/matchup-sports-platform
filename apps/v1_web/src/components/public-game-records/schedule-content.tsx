@@ -20,8 +20,15 @@ import {
 } from './format';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
 
+/**
+ * 참가팀 공개 정책 통일(fix/v1-publish) — side 자체가 null이면 슬롯 미배정("미정"),
+ * side는 있는데 teamName이 null이면 모집 중이라 가려진 것("비공개")이다. 이전엔
+ * 이 함수가 둘 다 "미정"으로 뭉뚱그렸다 — 사용자가 "대진이 아직 안 정해졌다"와
+ * "정해졌는데 안 보여준다"를 구분 못 하게 된다.
+ */
 function sideLabel(side: PublicScheduleEntry['home']): string {
-  return side?.teamName ?? '미정';
+  if (side === null) return '미정';
+  return side.teamName ?? '비공개';
 }
 
 function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
@@ -170,10 +177,15 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
   );
 }
 
-/** PublicStandingRow(공개 일정 API) → 공용 순위표 행. teamId를 key로 쓴다(등록 단위 id가 이 응답엔 없다). */
+/**
+ * PublicStandingRow(공개 일정 API) → 공용 순위표 행. registrationId를 key로 쓴다 —
+ * 참가팀 공개 정책 통일(fix/v1-publish) 이후 모집 중엔 teamId가 전부 null이라
+ * teamId를 key로 쓰면 React key가 전부 충돌한다(registrationId는 비공개 상태에도
+ * 항상 채워지는 안정 식별자).
+ */
 function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStandingsRow[] {
   return rows.map((row) => ({
-    key: row.teamId,
+    key: row.registrationId,
     teamId: row.teamId,
     teamName: row.teamName,
     teamLogoUrl: row.teamLogoUrl,
@@ -261,8 +273,33 @@ export function ScheduleContent({
     );
   }
 
+  // 참가팀 공개 정책 통일(fix/v1-publish) — 대진표(구조)는 공개됐어도 모집
+  // 중(open)이면 그 안의 팀명은 가려진다(사용자가 지적한 "조별일정은 왜 그대로
+  // 보이나"의 실제 발단). 백엔드가 status를 직접 내려주지 않으므로(이 응답은
+  // status를 애초에 갖고 있지 않다), 응답 데이터 자체에서 "배정은 됐는데 이름이
+  // null"인 항목이 있는지로 판정한다 — 운영자·스태프에게는 이 조건이 false가
+  // 되므로(실명이 그대로 옴) 배너도 자동으로 안 뜬다.
+  const hasHiddenIdentity =
+    data.items.some((e) => (e.home && e.home.teamName === null) || (e.away && e.away.teamName === null)) ||
+    data.unscheduled.some((e) => (e.home && e.home.teamName === null) || (e.away && e.away.teamName === null)) ||
+    data.standings.some((s) => s.teamName === null);
+
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {hasHiddenIdentity ? (
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: 10,
+            background: 'var(--grey50)',
+            fontSize: 12,
+            color: 'var(--text-caption)',
+            lineHeight: 1.5,
+          }}
+        >
+          참가팀 명단은 모집이 마감된 후 공개돼요. 일정과 경기 수는 미리 확인할 수 있어요.
+        </div>
+      ) : null}
       {showStandings && data.standings.length > 0 ? (
         <section>
           <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>

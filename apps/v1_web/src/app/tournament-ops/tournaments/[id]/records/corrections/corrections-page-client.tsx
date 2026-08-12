@@ -31,9 +31,13 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
   /* 보드 API 응답에는 팀 이름이 없어서 목록이 "group · 1경기"로만 보였다 —
      어느 경기를 정정하는지 알 수 없다. 운영 보드와 같은 소스에서 이름을 채운다. */
   const teamNamesByFixtureId = useMemo(() => {
+    // 참가팀 공개 정책 통일(fix/v1-publish) — useV1Tournament는 공개 상세 응답을
+    // 그대로 쓰므로 타입상 null일 수 있다. 이 화면에 접근하는 스태프는 대회 전체
+    // 단위로 인가되어 항상 실명을 받으므로(operations-board-client.tsx와 동일 근거)
+    // 실질적으로 null은 나타나지 않지만, 방어적으로 '미정'을 fallback한다.
     const map = new Map<string, { home: string; away: string }>();
     for (const fixture of tournament.data?.fixtures ?? []) {
-      map.set(fixture.id, { home: fixture.homeTeamName, away: fixture.awayTeamName });
+      map.set(fixture.id, { home: fixture.homeTeamName ?? '미정', away: fixture.awayTeamName ?? '미정' });
     }
     return map;
   }, [tournament.data?.fixtures]);

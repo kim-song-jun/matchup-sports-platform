@@ -582,7 +582,8 @@ function BracketEmpty() {
       background: 'var(--grey50)', borderRadius: 14,
     }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true"><Trophy size={30} style={{ color: 'var(--grey400)' }} strokeWidth={1.6} /></div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>대진표 준비 중</div>
+      {/* [R-T1 타입 위계 정리] 13px → 12px(보조 정보 tier) — weight 700은 유지. */}
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>대진표 준비 중</div>
       <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>조별 리그가 끝나면 결선 대진표가 공개돼요.</div>
     </div>
   );

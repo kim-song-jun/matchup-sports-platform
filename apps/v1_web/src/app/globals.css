@@ -235,8 +235,7 @@
   --input-placeholder:          var(--text-caption);
 
   /* ── [P1 State-layer] 공통 상호작용 투명도 토큰 (M3 state-layer 모델) ───────
-   * hover 4% / pressed 8% — 컴포넌트마다 제각각이던 hover/active 피드백을 일괄 통일.
-   * 실제 사용처: .tm-card.tm-interactive, .tm-list-row.tm-interactive ───────── */
+   * hover 4% / pressed 8% — 컴포넌트마다 제각각이던 hover/active 피드백을 일괄 통일. ───────── */
   --state-hover-opacity: 0.04;
   --state-pressed-opacity: 0.08;
 
@@ -366,20 +365,9 @@
  * 튀었다 — 사진/영상 위에 얹는 오버레이(.tm-video-strip-play 등)는 테마와 무관하게
  * 항상 흰색이어야 해서 대상이 아니고, 페이지 배경 위에 얹히는 "셸 크롬"만 대상이다.
  * --surface/--bg 계열 톤에 원래와 비슷한 alpha로 맞춘다. */
-:root.dark .tm-bottom-nav,
-:root.dark .v1-bottom-nav {
+:root.dark .tm-bottom-nav {
   background: rgba(28, 30, 36, 0.92);
   border-color: var(--grey100);
-}
-:root.dark .v1-header {
-  background: rgba(28, 30, 36, 0.9);
-  border-color: var(--grey100);
-}
-:root.dark .tm-hub-subnav {
-  background: rgba(28, 30, 36, 0.94);
-}
-:root.dark .v1-muted-panel {
-  background: rgba(255, 255, 255, 0.06);
 }
 
 /* 리뷰 에러/재시도 안내 카드 — 라이트: var(--red50) 파스텔 배경.
@@ -685,12 +673,6 @@ button:disabled {
   color: var(--text-muted);
   margin-top: 8px;
   margin-bottom: 24px;
-}
-
-.tm-auth-helper {
-  margin-top: 8px;
-  line-height: 1.5;
-  color: var(--text-muted);
 }
 
 .tm-auth-email-link {
@@ -1153,25 +1135,6 @@ button:disabled {
   background: var(--grey50);
 }
 
-.tm-auth-location-status {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--grey100);
-}
-
-.tm-auth-location-status-allowed {
-  color: var(--blue600);
-}
-
-.tm-auth-location-status-denied,
-.tm-auth-location-status-unsupported {
-  color: var(--orange500);
-}
-
-.tm-auth-signup-terms {
-  margin-top: 18px;
-}
-
 .tm-auth-check {
   width: 24px;
   height: 24px;
@@ -1225,8 +1188,7 @@ button:disabled {
   color: var(--blue500);
 }
 
-.tm-auth-step-card,
-.tm-auth-option-row {
+.tm-auth-step-card {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
@@ -1581,37 +1543,30 @@ button:disabled {
   outline-offset: 2px;
 }
 /* v1-shell 인터랙티브 요소 focus ring (WS5 a11y — 기존엔 :active만 있어 키보드 포커스 미표시) */
-.v1-icon-button:focus-visible,
-.v1-button:focus-visible,
-.v1-chip:focus-visible,
-.v1-card-link:focus-visible {
+.v1-button:focus-visible {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
 
 /* ── [P1 Card / List-row interactive states] ──────────────────────────────────
  * 실제 컴포넌트 클래스: .tm-card-interactive (예: search-result-card), .tm-list-row-interactive.
- * 복합 .tm-card.tm-interactive 도 병행 지원(향후 사용 대비).
  * state-layer 토큰(--state-hover-opacity:0.04) 기반 hover 피드백.
  * @media(hover:hover) 가드로 터치기기 ghost hover 억제.
  * ─────────────────────────────────────────────────────────────────────────── */
 @media (hover: hover) {
-  .tm-card-interactive:hover,
-  .tm-card.tm-interactive:hover {
+  .tm-card-interactive:hover {
     box-shadow: var(--shadow-1); /* elevation-1 lift */
     cursor: pointer;
   }
 
-  .tm-list-row-interactive:hover,
-  .tm-list-row.tm-interactive:hover {
+  .tm-list-row-interactive:hover {
     background: var(--grey100); /* list-row-bg(grey50) → grey100 한 단계 진하게 */
     cursor: pointer;
   }
 }
 
 /* [P1 focus-visible] 카드 키보드 포커스 링 — base 승격 (기존 1회성 패치 통합) */
-.tm-card-interactive:focus-visible,
-.tm-card.tm-interactive:focus-visible {
+.tm-card-interactive:focus-visible {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
@@ -1681,19 +1636,6 @@ button:disabled {
 .tm-badge-red {
   background: var(--red50);
   color: var(--red700);
-}
-
-/* ── [P2 Badge size variants] M3 dot(6px) + Carbon SM(18px) ─────────────────
- * .tm-badge-dot  — 라벨 없는 상태 점 (미읽음·온라인·모집중 등)
- * .tm-badge-sm   — 밀도 높은 컨텍스트용 소형 뱃지 (font-size-2xs 토큰 참조)
- * 색 variant(.tm-badge-blue 등)과 조합해 사용
- * ─────────────────────────────────────────────────────────────────────────── */
-.tm-badge-dot {
-  width: 6px;
-  height: 6px;
-  min-height: unset;
-  border-radius: 50%;
-  padding: 0;
 }
 
 .tm-badge-sm {
@@ -2161,15 +2103,6 @@ button:disabled {
   margin-top: 10px;
 }
 
-.tm-kpi-panel {
-  background: var(--grey50);
-  border-radius: 16px;
-  padding: 20px 16px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
 .tm-notice-head {
   display: flex;
   align-items: flex-start;
@@ -2338,14 +2271,6 @@ button:disabled {
 .tm-match-summary-row > *,
 .tm-team-summary-bar > * {
   min-width: 0;
-}
-
-.tm-match-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 0 10px;
 }
 
 .tm-match-card-stack {
@@ -2622,35 +2547,6 @@ button:disabled {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
-}
-
-.tm-filter-view-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.tm-filter-view-option {
-  min-height: 58px;
-  padding: 10px 12px;
-  border: 1px solid var(--grey100);
-  border-radius: 14px;
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  text-align: left;
-}
-
-.tm-filter-view-option-active {
-  border-color: var(--blue500);
-  background: var(--blue50);
-}
-
-.tm-filter-view-option-active .tm-text-label {
-  color: var(--blue500);
 }
 
 .tm-filter-actions {
@@ -3000,12 +2896,6 @@ button:disabled {
   place-items: center;
 }
 
-.tm-team-info-link {
-  display: block;
-  margin-top: 14px;
-  padding: 16px;
-}
-
 .tm-list-searchbar {
   min-height: 56px;
   padding: 8px 10px 8px 20px;
@@ -3139,15 +3029,6 @@ button:disabled {
   text-align: left;
 }
 
-.tm-list-search-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .tm-list-filter-button {
   width: 44px; /* WS11 a11y 터치 타깃 (40→44) */
   min-width: 44px;
@@ -3230,30 +3111,6 @@ button:disabled {
   outline-offset: 2px;
 }
 
-.tm-team-inline-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.tm-team-inline-stats > div {
-  min-height: 52px;
-  border-radius: 12px;
-  background: rgba(255,255,255,.72);
-  padding: 8px 10px;
-}
-
-.tm-team-card-footer {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--grey100);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
 .tm-team-card-action-row {
   margin-top: 14px;
   padding-top: 12px;
@@ -3279,11 +3136,6 @@ button:disabled {
 
 .tm-team-card-action-status-muted {
   color: var(--text-caption);
-}
-
-.tm-team-card-action-link {
-  color: var(--blue500);
-  white-space: nowrap;
 }
 
 .tm-team-intro-box {
@@ -3376,11 +3228,6 @@ button:disabled {
   padding: 0 10px;
 }
 
-.tm-team-image-grid {
-  display: grid;
-  gap: 10px;
-}
-
 @media (max-width: 767px) {
   .tm-team-list .tm-team-card-action-row {
     padding-right: 64px;
@@ -3391,40 +3238,6 @@ button:disabled {
   .tm-team-list .tm-team-card-stack > .tm-team-card:nth-child(even) .tm-team-card-action-row {
     padding-right: 64px;
   }
-}
-
-.tm-team-image-slot {
-  border-radius: 14px;
-  border: 1px solid var(--grey100);
-  background: var(--bg);
-  padding: 12px;
-}
-
-/* [공개 화면 R-T2 정리] .tm-team-thumb(11px)를 고치려 확인하다가 .tm-team-thumb-row·
-   .tm-team-thumb·.tm-team-thumb-example 세 규칙 전부 코드베이스 어디서도 className
-   으로 참조되지 않는 죽은 코드임을 확인 — 통째로 삭제. */
-
-.tm-team-upload-preview {
-  height: 116px;
-  margin-top: 10px;
-  border-radius: 12px;
-  background-color: var(--grey50);
-  background-position: center;
-  background-size: cover;
-}
-
-.tm-team-photo-grid {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.tm-team-photo-preview {
-  aspect-ratio: 1;
-  border-radius: 10px;
-  background-position: center;
-  background-size: cover;
 }
 
 .tm-member-section {
@@ -3546,11 +3359,6 @@ button:disabled {
   place-items: center;
   align-content: center;
   gap: 3px;
-}
-
-.tm-chat-row-action-danger {
-  background: var(--red500);
-  color: var(--static-white);
 }
 
 .tm-chat-row-action:disabled {
@@ -3796,15 +3604,6 @@ button:disabled {
   color: var(--static-white);
 }
 
-.tm-chat-bubble-system {
-  max-width: 100%;
-  margin: 0 auto 14px;
-  background: transparent;
-  box-shadow: none;
-  text-align: center;
-  color: var(--text-muted);
-}
-
 .tm-chat-bubble-me .tm-text-body,
 .tm-chat-bubble-me .tm-text-micro {
   color: inherit;
@@ -3841,14 +3640,6 @@ button:disabled {
 
 .tm-chat-message-line-me {
   justify-content: flex-end;
-}
-
-/* 그룹의 마지막 메시지 옆에만 시각 노출 */
-.tm-chat-time {
-  color: var(--text-caption);
-  white-space: nowrap;
-  flex-shrink: 0;
-  padding-bottom: 2px;
 }
 
 /* 그룹 첫 버블만 이름표/정렬 방향 쪽 모서리를 살짝 좁혀 "말풍선 시작" 느낌을 준다 */
@@ -4110,8 +3901,7 @@ button:disabled {
   }
 
   .tm-search-quick-grid,
-  .tm-create-two-col,
-  .tm-filter-view-grid {
+  .tm-create-two-col {
     grid-template-columns: 1fr !important;
   }
 
@@ -4130,7 +3920,6 @@ button:disabled {
   }
 
   .tm-match-list-footer,
-  .tm-team-card-footer,
   .tm-my-card-actions,
   .tm-section-row,
   .tm-member-actions {
@@ -4139,7 +3928,6 @@ button:disabled {
   }
 
   .tm-match-list-footer > *,
-  .tm-team-card-footer > *,
   .tm-my-card-actions > *,
   .tm-section-row > *,
   .tm-member-actions > * {
@@ -4189,7 +3977,6 @@ button:disabled {
     gap: 4px;
   }
 
-  .tm-team-inline-stats,
   .tm-team-stat-grid {
     grid-template-columns: 1fr !important;
   }
@@ -4245,56 +4032,7 @@ button:disabled {
   }
 }
 
-.design-page {
-  min-height: 100vh;
-  padding: 24px;
-  background: #f2f4f6;
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: 16px;
-}
-
-.design-page-title {
-  width: min(100%, var(--v1-shell-frame-width));
-  margin: 0;
-  color: #191f28;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.design-artboard {
-  width: 375px;
-  max-width: 100%;
-  min-height: 812px;
-  overflow: hidden;
-  border-radius: 18px;
-  box-shadow: 0 12px 40px rgba(25, 31, 40, 0.14);
-  background: #fff;
-  position: relative;
-}
-
-.design-click-layer {
-  width: 100%;
-  min-height: inherit;
-}
-
 @media (max-width: 430px) {
-  .design-page {
-    padding: 0;
-    background: #fff;
-  }
-
-  .design-page-title {
-    display: none;
-  }
-
-  .design-artboard {
-    width: 100%;
-    min-height: 100vh;
-    border-radius: 0;
-    box-shadow: none;
-  }
 }
 
 .v1-root {
@@ -4323,145 +4061,8 @@ button:disabled {
   padding: calc(var(--v1-shell-wide-topbar-height) + 6px) var(--v1-shell-page-x) calc(20px + var(--v1-shell-wide-bottom-nav-height) + var(--v1-shell-safe-bottom));
 }
 
-.v1-public-main {
-  min-height: 100vh;
-  padding: 28px 20px 52px;
-}
-
-.v1-header {
-  position: fixed;
-  z-index: 20;
-  top: 0;
-  left: 50%;
-  width: min(100%, var(--v1-shell-wide-frame-width));
-  transform: translateX(-50%);
-  height: var(--v1-shell-wide-topbar-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 var(--v1-shell-wide-topbar-right-x) 0 var(--v1-shell-wide-topbar-left-x);
-  border-bottom: 1px solid rgba(226, 230, 238, 0.86);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(18px);
-}
-
-.v1-brand {
-  min-width: 0;
-}
-
-.v1-title {
-  margin: 0;
-  font-size: 18px;
-  line-height: 1.2;
-  font-weight: 800;
-  color: var(--text-strong);
-}
-
-.v1-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.v1-back-button {
-  width: 30px;
-  height: 30px;
-  margin-left: -8px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  color: var(--text-body);
-}
-
-.v1-eyebrow {
-  margin: 0 0 4px;
-  font-size: 12px;
-  line-height: 1.2;
-  font-weight: 700;
-  color: var(--text-caption);
-}
-
-.v1-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.v1-icon-button {
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  color: var(--grey-700);
-  position: relative;
-}
-
-.v1-icon-button:active,
-.v1-card-link:active,
 .v1-button:active {
   transform: translateY(1px);
-}
-
-.v1-unread-dot {
-  position: absolute;
-  top: 10px;
-  right: 11px;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--red);
-  border: 2px solid #fff;
-}
-
-.v1-bottom-nav {
-  position: fixed;
-  z-index: 20;
-  left: 50%;
-  bottom: 0;
-  width: min(100%, var(--v1-shell-wide-frame-width));
-  transform: translateX(-50%);
-  min-height: calc(var(--v1-shell-wide-bottom-nav-height) + var(--v1-shell-safe-bottom));
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  padding: 7px 0 calc(14px + var(--v1-shell-safe-bottom));
-  border-top: 1px solid rgba(226, 230, 238, 0.92);
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(18px);
-}
-
-/* [공개 화면 R-T2 정리] .v1-tab(11px)를 고치려 확인하다가 이 클래스와
-   .v1-tab-active가 TSX 어디서도 참조되지 않는 죽은 코드임을 확인 —
-   위 :focus-visible/:active 복합 셀렉터에서의 참조도 함께 제거하고 삭제. */
-
-.v1-section {
-  margin-top: 22px;
-}
-
-.v1-section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.v1-section-title {
-  margin: 0;
-  color: var(--text-strong);
-  font-size: 15px;
-  line-height: 1.3;
-  font-weight: 850;
-}
-
-.v1-section-subtitle {
-  margin: 3px 0 0;
-  color: var(--text-caption);
-  font-size: 12px;
-  line-height: 1.45;
 }
 
 .v1-card {
@@ -4473,138 +4074,6 @@ button:disabled {
 
 .v1-card-pad {
   padding: 16px;
-}
-
-.v1-card-link {
-  display: block;
-}
-
-.v1-hero-card {
-  overflow: hidden;
-}
-
-.v1-hero-media {
-  min-height: 142px;
-  background: linear-gradient(135deg, #1e4fd8, #2fb68d);
-  position: relative;
-}
-
-.v1-hero-media::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 28% 22%, rgba(255,255,255,0.28), transparent 30%),
-    linear-gradient(180deg, transparent, rgba(10, 18, 32, 0.68));
-}
-
-.v1-hero-text {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 14px;
-  z-index: 1;
-  color: #fff;
-}
-
-.v1-hero-title {
-  margin: 4px 0 0;
-  font-size: 19px;
-  line-height: 1.28;
-  font-weight: 850;
-}
-
-.v1-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.v1-quick-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.v1-quick {
-  min-height: 66px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 12px;
-  text-align: left;
-  color: var(--text-strong);
-}
-
-.v1-quick-primary {
-  background: var(--blue);
-  border-color: var(--blue);
-  color: #fff;
-}
-
-.v1-list {
-  display: grid;
-  gap: 10px;
-}
-
-.v1-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: start;
-}
-
-.v1-stack {
-  display: grid;
-  gap: 10px;
-}
-
-.v1-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.v1-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--surface-soft);
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1;
-  font-weight: 750;
-  white-space: nowrap;
-}
-
-.v1-badge-blue {
-  background: var(--blue-soft);
-  color: var(--blue);
-}
-
-.v1-badge-green {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.v1-badge-orange {
-  background: var(--orange-soft);
-  color: var(--orange);
-}
-
-.v1-badge-red {
-  background: var(--red-soft);
-  color: var(--red);
-}
-
-.v1-body {
-  margin: 0;
-  color: var(--text-body);
-  font-size: 14px;
-  line-height: 1.5;
 }
 
 .v1-caption {
@@ -4622,45 +4091,6 @@ button:disabled {
   font-weight: 850;
 }
 
-.v1-big-number {
-  display: block;
-  color: var(--text-strong);
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: 0;
-}
-
-.v1-toolbar {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-}
-
-.v1-toolbar::-webkit-scrollbar {
-  display: none;
-}
-
-.v1-chip {
-  min-height: 34px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text-muted);
-  padding: 0 13px;
-  font-size: 13px;
-  font-weight: 750;
-  white-space: nowrap;
-}
-
-.v1-chip-active {
-  border-color: var(--blue);
-  background: var(--blue);
-  color: #fff;
-}
-
 .v1-button {
   min-height: 42px;
   border: 0;
@@ -4674,63 +4104,6 @@ button:disabled {
   background: var(--blue);
   font-size: 14px;
   font-weight: 800;
-}
-
-.v1-button-secondary {
-  background: var(--surface-soft);
-  color: var(--text-strong);
-}
-
-.v1-muted-panel {
-  border: 1px dashed var(--border-strong);
-  border-radius: 8px;
-  padding: 14px;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.v1-search-box {
-  min-height: 48px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  color: var(--text-muted);
-}
-
-.v1-input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text-strong);
-}
-
-.v1-state {
-  min-height: 180px;
-  display: grid;
-  place-items: center;
-  text-align: center;
-}
-
-.v1-form-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.v1-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 14px 0;
-}
-
-.v1-floating-cta {
-  position: sticky;
-  bottom: 92px;
-  margin-top: 18px;
 }
 
 .tm-my-shell {
@@ -4809,13 +4182,6 @@ button:disabled {
 
 .tm-my-profile-edit-link {
   flex-shrink: 0;
-}
-
-.tm-my-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 8px;
 }
 
 .tm-profile-level-panel {
@@ -5377,22 +4743,6 @@ button:disabled {
     box-shadow: var(--shadow-2);
   }
 
-  .v1-header,
-  .v1-bottom-nav {
-    position: sticky;
-    left: auto;
-    width: 100%;
-    transform: none;
-  }
-
-  .v1-header {
-    top: 0;
-  }
-
-  .v1-bottom-nav {
-    bottom: 0;
-  }
-
   .v1-main {
     min-height: auto;
     padding-top: 20px;
@@ -5528,14 +4878,6 @@ button:disabled {
 
 .tm-signup-hero .tm-auth-sub {
   margin-top: 10px;
-}
-
-.tm-signup-skip {
-  margin-top: 12px;
-  width: 100%;
-  text-align: center;
-  color: var(--text-muted);
-  font-weight: 600;
 }
 
 @media (min-width: 1024px) {
@@ -5767,91 +5109,10 @@ button:disabled {
   color: var(--blue700);
 }
 
-/* accepted: 초록 tint — 비색상 지표: 텍스트 '수락됨' 병기 */
-.tm-invitation-status-accepted {
-  background: var(--green50);
-  color: var(--green500);
-}
-
-/* declined: 회색 tint — 비색상 지표: 텍스트 '거절됨' 병기 */
-.tm-invitation-status-declined {
-  background: var(--grey100);
-  color: var(--text-muted);
-}
-
-/* cancelled: 회색 tint — 비색상 지표: 텍스트 '취소됨' 병기 */
-.tm-invitation-status-cancelled {
-  background: var(--grey100);
-  color: var(--text-caption);
-}
-
 /* focus ring — .tm-btn:focus-visible 패턴과 통일 */
 .tm-invitation-card:focus-visible {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
-}
-
-/* ═══════════════════════════════════════════════════
-   TOURNAMENT HUB — 대회 서브 탭 네비게이션
-   Pages: 대회 정보 | 순위·브래킷 | 최종결과 | 시상
-   ═══════════════════════════════════════════════════ */
-
-/* Sub-nav 탭 바 — sticky top으로 스크롤 시 고정 */
-.tm-hub-subnav {
-  position: sticky;
-  top: var(--v1-shell-header-height, 56px);
-  z-index: 10;
-  background: var(--glass-white-96, rgba(255,255,255,0.96));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  display: flex;
-  border-bottom: 1px solid var(--grey100);
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-.tm-hub-subnav::-webkit-scrollbar { display: none; }
-
-.tm-hub-subnav-tab {
-  flex: none;
-  padding: 0 16px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
-  border-bottom: 2px solid transparent;
-  text-decoration: none;
-  transition: color 0.12s, border-color 0.12s;
-}
-.tm-hub-subnav-tab:hover { color: var(--text); }
-.tm-hub-subnav-tab[data-active="true"],
-.tm-hub-subnav-tab-active {
-  color: var(--blue500);
-  border-bottom-color: var(--blue500);
-  font-weight: 700;
-}
-
-/* ── 대회 컨텍스트 헤더 (타이틀·종목·상태) ── */
-.tm-hub-ctx-header {
-  padding: 20px 20px 14px;
-  border-bottom: 1px solid var(--grey100);
-}
-.tm-hub-ctx-title {
-  font-size: 18px;
-  font-weight: 850;
-  color: var(--text-strong);
-  line-height: 1.3;
-  margin: 0 0 6px;
-}
-.tm-hub-ctx-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 /* ── 대회 진행 단계 표시기 (리그 종료 → 준결승 → 결승) ── */
@@ -6028,146 +5289,6 @@ button:disabled {
   padding-bottom: 4px;
 }
 .tm-bk-wrap::-webkit-scrollbar { display: none; }
-
-.tm-bk-rounds {
-  display: flex;
-  gap: 0;
-  min-width: max-content;
-  padding: 8px 0 4px;
-}
-
-.tm-bk-round-col {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-/* [공개 화면 R-T2 정리] .tm-bk-round-label(11px)을 고치려 확인하다가 TSX 어디서도
-   참조되지 않는 죽은 코드임을 확인 — 삭제. 실제 브래킷 UI는 tm-bk2-*(아래 SVG
-   커넥터 기반 v2)가 담당한다. */
-
-.tm-bk-match {
-  border: 1px solid var(--grey200);
-  border-radius: 10px;
-  overflow: hidden;
-  background: #fff;
-  width: 150px;
-  margin: 0 8px;
-  flex-shrink: 0;
-}
-.tm-bk-match-live {
-  border-color: var(--blue500);
-  box-shadow: 0 0 0 2px var(--blue50);
-}
-.tm-bk-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  gap: 6px;
-}
-.tm-bk-row-win { background: var(--blue50); }
-.tm-bk-team {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tm-bk-team-tbd { color: var(--text-caption); font-weight: 400; }
-.tm-bk-score {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-strong);
-  min-width: 18px;
-  text-align: right;
-}
-.tm-bk-divider { height: 1px; background: var(--grey100); margin: 0 10px; }
-/* [공개 화면 R-T2 정리] .tm-bk-status(10px)를 고치려 확인하다가 TSX 어디서도
-   참조되지 않는 죽은 코드임을 확인 — 삭제. */
-
-/* 브래킷 커넥터 — 승자→다음 라운드 */
-.tm-bk-connector-col {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  width: 24px;
-  flex-shrink: 0;
-  position: relative;
-}
-.tm-bk-elbow {
-  width: 100%;
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.tm-bk-elbow::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  width: 50%;
-  height: 2px;
-  background: var(--grey300);
-}
-.tm-bk-elbow-top::after {
-  content: '';
-  position: absolute;
-  right: 50%;
-  top: 50%;
-  width: 2px;
-  height: 50%;
-  background: var(--grey300);
-}
-.tm-bk-elbow-bottom::after {
-  content: '';
-  position: absolute;
-  right: 50%;
-  bottom: 50%;
-  top: 0;
-  width: 2px;
-  height: 50%;
-  background: var(--grey300);
-}
-
-/* 우승 슬롯 */
-.tm-bk-champ {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100px;
-  min-height: 72px;
-  border: 1.5px dashed var(--grey300);
-  border-radius: 12px;
-  padding: 12px 8px;
-  margin: 0 8px;
-  text-align: center;
-}
-.tm-bk-champ-decided {
-  border-style: solid;
-  border-color: var(--blue500);
-  background: var(--blue50);
-}
-.tm-bk-champ-icon { color: var(--grey400); }
-.tm-bk-champ-decided .tm-bk-champ-icon { color: var(--blue500); }
-.tm-bk-champ-name {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  word-break: keep-all;
-}
-.tm-bk-champ-decided .tm-bk-champ-name { color: var(--blue500); }
-
-/* 3·4위전 */
-.tm-bk-third-place {
-  margin-top: 20px;
-  padding: 12px 20px;
-  border-top: 1px solid var(--grey100);
-}
 /* [공개 화면 R-T2 정리] .tm-bk-third-label(11px)을 고치려 확인하다가 TSX 어디서도
    참조되지 않는 죽은 코드임을 확인 — 삭제. */
 
@@ -6204,16 +5325,6 @@ button:disabled {
 .tm-bk2-row[data-winner=true] { background: var(--blue50); }
 .tm-bk2-row[data-loser=true]  { opacity: 0.55; }
 
-/* 아바타 */
-/* 아래 두 아바타의 11px 이니셜은 22px 원 안에 들어가는 장식성 표시라 예외로 둔다 —
-   키우면 원 밖으로 넘친다. 팀 식별은 옆의 팀 이름(12px 이상)이 담당한다. */
-.tm-bk2-avatar {
-  flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px;
-  background: var(--grey150); font-size: 11px; font-weight: 800;
-  color: var(--text); display: flex; align-items: center; justify-content: center;
-}
-.tm-bk2-row[data-winner=true] .tm-bk2-avatar { background: var(--blue500); color: #fff; }
-
 /* 팀명 — 줄임표 방지를 위해 최대 6자 표시, 넘으면 11px */
 .tm-bk2-name {
   flex: 1; font-size: 12px; font-weight: 700; color: var(--text-strong);
@@ -6224,7 +5335,10 @@ button:disabled {
 
 /* 점수 */
 .tm-bk2-score {
-  font-size: 15px; font-weight: 900; color: var(--text-strong);
+  /* [R-T1/R-T3 타입 위계 정리] weight 900 → 700 — 히어로 숫자(30px+)가 아니라
+     15px 인라인 점수라 rubric R-T3("800 이상은 히어로 숫자·로고 한정") 초과.
+     팀명(tm-bk2-name, 700)보다 여전히 먼저 눈에 띄어야 해서 크기(15px)는 유지. */
+  font-size: 15px; font-weight: 700; color: var(--text-strong);
   min-width: 18px; text-align: right; line-height: 1; flex-shrink: 0;
 }
 .tm-bk2-row[data-winner=true] .tm-bk2-score { color: var(--blue700); }
@@ -6273,7 +5387,10 @@ button:disabled {
   font-size: 12px; font-weight: 800; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--orange);
 }
-.tm-bk2-champ-name { font-size: 12px; font-weight: 900; color: #7A3B1E; word-break: keep-all; line-height: 1.3; }
+/* [R-T1/R-T3 타입 위계 정리] weight 900 → 700 — 12px 텍스트에는 900이 과함(가독성 저하).
+   "히어로" 신호는 이미 트로피 카드 배경·보더·메달 아이콘이 담당하므로 폰트 굵기로
+   추가 강조할 필요가 없다. */
+.tm-bk2-champ-name { font-size: 12px; font-weight: 700; color: #7A3B1E; word-break: keep-all; line-height: 1.3; }
 :root.dark .tm-bk2-champ-name { color: var(--orange500); }
 
 /* 3·4위전 */
@@ -6325,18 +5442,23 @@ button:disabled {
   font-size: 12px;
   font-weight: 700;
 }
+/* [R-T1 타입 위계 정리] 22px 하드코딩 → --font-size-subhead(20px) 토큰 + weight 700
+   명시(기존엔 미지정 → Tailwind preflight로 h1이 400 상속, 대회명이 본문보다 안 굵어
+   보였다). 대진표 페이지 콘텐츠 중 가장 큰 tier(1단계: 대회명). */
 .tm-bracket-page-intro h1 {
   margin: 0;
   color: var(--text-strong);
-  font-size: 22px;
-  line-height: 1.35;
+  font-size: var(--font-size-subhead);
+  font-weight: 700;
+  line-height: 1.3;
   letter-spacing: -0.02em;
   word-break: keep-all;
 }
+/* [R-T1] 13px → --font-size-caption(12px) — 부제 문단은 보조 정보 tier(4단계). */
 .tm-bracket-page-intro p {
   margin: 7px 0 0;
   color: var(--text-caption);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 .tm-bracket-page-format {
@@ -6349,6 +5471,18 @@ button:disabled {
   font-weight: 700;
 }
 .tm-bracket-page-stepper { padding: 0 20px; }
+
+/* [R-T1 타입 위계 정리] .tm-hub-section-title(15px/850)은 상금·결과·일정·팀기록·
+   개인기록·경기상세 등 8개 다른 화면과 공유하는 토큰이라 전역 정의는 그대로 두고,
+   이 페이지(.tm-bracket-page-grid 안)에서만 override한다. 850은 CSS 표준
+   font-weight 스텝(400/500/600/700/800/900)에도 없는 값이고, rubric R-T3
+   ("weight 800 이상은 히어로 숫자·로고 한정")에도 어긋난다 — 섹션 제목은 2단계
+   (--font-size-body-lg, 17px/700)로 정리해 대회명(1단계, 20px)·카드 본문(15px)·
+   보조 정보(12px)와 명확히 구분되는 4단계 위계를 만든다. */
+.tm-bracket-page-grid .tm-hub-section-title {
+  font-size: var(--font-size-body-lg);
+  font-weight: 700;
+}
 
 @media (max-width: 479px) {
   .tm-bracket-page-intro {
@@ -6364,152 +5498,6 @@ button:disabled {
     align-items: center;
   }
 }
-
-/* ═══════════════════════════════════════════════════
-   WORLD CUP BRACKET — tm-wc-* 네임스페이스
-   ═══════════════════════════════════════════════════ */
-
-.tm-wc-outer { display: flex; flex-direction: column; gap: 20px; }
-
-.tm-wc-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding: 4px 0 12px;
-}
-.tm-wc-scroll::-webkit-scrollbar { display: none; }
-
-.tm-wc-tree {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 4px 0;
-  min-width: max-content;
-}
-
-/* 라운드 열 */
-.tm-wc-col { display: flex; flex-direction: column; align-items: center; min-width: 160px; }
-.tm-wc-col-champ { min-width: 110px; }
-.tm-wc-col-head { height: 32px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
-.tm-wc-col-pill {
-  font-size: 12px; font-weight: 800; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.1em;
-  padding: 4px 14px; background: var(--grey100); border-radius: 20px;
-}
-.tm-wc-col-body { display: flex; flex-direction: column; align-items: stretch; width: 100%; }
-
-/* 매치 카드 */
-.tm-wc-match {
-  border: 1.5px solid var(--grey200);
-  border-radius: 12px;
-  overflow: hidden;
-  background: #fff;
-  width: 160px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
-.tm-wc-match-live { border-color: var(--blue500); box-shadow: 0 0 0 3px var(--blue50); }
-.tm-wc-match-compact { width: 200px; }
-.tm-wc-match-slot { flex-shrink: 0; }
-.tm-wc-match-slot-gap { margin-top: 20px; }
-
-/* 팀 행 */
-.tm-wc-team-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 10px; transition: background 0.1s;
-}
-.tm-wc-team-row[data-winner="true"] { background: var(--blue50); }
-.tm-wc-team-row[data-loser="true"] { opacity: 0.55; }
-.tm-wc-team-row[data-tbd="true"] { opacity: 0.45; }
-
-/* [공개 화면 R-T2 정리] .tm-wc-team-avatar(11px)를 고치려 확인하다가 tm-wc-*
-   접두사 전체가 TSX 어디서도 참조되지 않는 죽은 코드(구 "월드컵식" 브래킷
-   레이아웃, tm-bk2-*로 대체된 것으로 보임)임을 확인 — 이 셀렉터와 winner 상태
-   변형만 삭제(같은 접두사의 나머지 규칙은 이 작업 범위 밖이라 남겨둠 — 별도
-   죽은 코드 정리 필요). */
-
-.tm-wc-team-name {
-  flex: 1; font-size: 12px; font-weight: 700; color: var(--text-strong);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2;
-}
-.tm-wc-team-row[data-winner="true"] .tm-wc-team-name { color: var(--blue500); }
-
-.tm-wc-team-score {
-  font-size: 16px; font-weight: 900; color: var(--text-strong);
-  min-width: 20px; text-align: right; line-height: 1;
-}
-.tm-wc-team-row[data-winner="true"] .tm-wc-team-score { color: var(--blue500); }
-
-.tm-wc-divider { height: 1px; background: var(--grey100); }
-
-.tm-wc-match-badge {
-  padding: 4px 10px 5px; font-size: 12px; font-weight: 700;
-  color: var(--text-caption); text-align: center; background: var(--grey50);
-}
-.tm-wc-match-badge-live { background: #fff0f0; color: #d9363e; }
-:root.dark .tm-wc-match-badge-live { background: rgba(240,68,82,0.16); color: #ff6b76; }
-.tm-wc-match-badge-time { color: var(--text-muted); font-weight: 600; }
-
-/* 커넥터 */
-.tm-wc-conn {
-  display: flex; flex-direction: column;
-  width: 28px; align-self: stretch; position: relative;
-  margin-top: 32px;
-}
-.tm-wc-conn-top-arm {
-  flex: 1;
-  border-right: 2px solid var(--grey300);
-  border-bottom: 2px solid var(--grey300);
-}
-.tm-wc-conn-bottom-arm {
-  flex: 1;
-  border-right: 2px solid var(--grey300);
-  border-top: 2px solid var(--grey300);
-}
-.tm-wc-conn-mid-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--grey400); align-self: flex-end;
-  margin-right: -5px; flex-shrink: 0;
-}
-.tm-wc-conn-single {
-  height: 2px; background: var(--grey300);
-  width: 28px; align-self: center;
-  margin-top: 32px;
-}
-
-/* 챔피언 슬롯 */
-.tm-wc-champ {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; width: 100px; min-height: 90px;
-  border: 2px dashed var(--grey300); border-radius: 14px;
-  padding: 14px 8px; text-align: center;
-}
-.tm-wc-champ-decided {
-  border: none;
-  background: linear-gradient(145deg, #FFF8E1 0%, #FFF3CD 100%);
-  box-shadow: 0 2px 12px rgba(254,152,0,0.18);
-}
-:root.dark .tm-wc-champ-decided {
-  background: rgba(254,152,0,0.16);
-  box-shadow: 0 2px 12px rgba(254,152,0,0.12);
-}
-.tm-wc-champ-trophy { font-size: 32px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12)); }
-.tm-wc-champ-icon { color: var(--grey400); }
-.tm-wc-champ-label {
-  font-size: 12px; font-weight: 800; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--orange);
-}
-.tm-wc-champ-name { font-size: 13px; font-weight: 900; color: #7A3B1E; word-break: keep-all; line-height: 1.3; }
-:root.dark .tm-wc-champ-name { color: var(--orange500); }
-.tm-wc-champ-tbd { color: var(--text-caption); font-weight: 500; }
-
-/* 3·4위전 */
-.tm-wc-third { border-top: 1px dashed var(--grey200); padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
-.tm-wc-third-header { display: flex; align-items: center; gap: 10px; }
-.tm-wc-third-pill {
-  font-size: 12px; font-weight: 800; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.08em;
-  padding: 3px 12px; background: var(--grey100); border-radius: 20px; white-space: nowrap;
-}
-.tm-wc-third-match { display: flex; flex-wrap: wrap; gap: 10px; }
 
 /* ═══════════════════════════════════════════════
    RESULTS PAGE v2 — tm-res-* (confetti + rank)
@@ -6591,74 +5579,6 @@ button:disabled {
   .tm-resd-hero, .tm-resd-trophy, .tm-resd-name, .tm-resd-meta, .tm-resd-stat { animation: none; }
 }
 
-/* ── 시상대 (Podium) ── */
-.tm-podium {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  padding: 8px 0 0;
-}
-.tm-podium-slot {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-}
-.tm-podium-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 0 4px 8px;
-}
-.tm-podium-avatar {
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  color: #fff;
-  flex-shrink: 0;
-}
-/* [공개 화면 R-T2 정리] .tm-podium-name/-stat/-platform-label(11/10/9px)을
-   고치려 확인하다가 tm-podium-* 전체가 TSX 어디서도 참조되지 않는 죽은
-   코드(시상 페이지는 지금 tm-awards-podium-* 사용)임을 확인 — 이 세 셀렉터만
-   삭제(같은 접두사의 나머지 규칙은 이 작업 범위 밖이라 남겨둠 — 별도 죽은
-   코드 정리 필요). */
-.tm-podium-name-1st { font-size: 13px; font-weight: 900; }
-.tm-podium-platform {
-  border-radius: 8px 8px 0 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 6px;
-}
-
-/* 4위: 시상대 아래 작은 행 */
-.tm-podium-fourth {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: var(--grey50);
-  border-radius: 0 0 10px 10px;
-  margin-top: 0;
-}
-.tm-podium-fourth-badge {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--grey200);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.tm-podium-fourth-name { flex: 1; font-size: 13px; font-weight: 700; color: var(--text-strong); }
-.tm-podium-fourth-stat { font-size: 12px; color: var(--text-caption); font-variant-numeric: tabular-nums; }
-
 /* 경기 결과 행 — button으로 변경해 탭 가능 */
 .tm-res-match-row {
   display: block;
@@ -6675,28 +5595,6 @@ button:disabled {
 .tm-res-match-row:last-child { border-bottom: none; }
 .tm-res-match-row:hover, .tm-res-match-row:focus-visible { background: var(--grey50); }
 .tm-res-match-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.tm-res-match-chevron {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--grey400);
-  flex-shrink: 0;
-}
-
-/* 순위 카드 */
-.tm-res-rank-card {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 12px 16px;
-  border-radius: 12px;
-}
-.tm-res-rank-name { font-size: 15px; font-weight: 800; color: var(--text-strong); line-height: 1.2; }
-.tm-res-rank-label { font-size: 12px; font-weight: 700; margin-top: 1px; }
-.tm-res-rank-record { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; margin-left: 8px; }
-.tm-res-rank-record-num { font-size: 13px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; }
-.tm-res-rank-record-sub { font-size: 12px; color: var(--text-caption); font-variant-numeric: tabular-nums; }
 
 /* 경기 결과 블록 */
 .tm-res-matches-block {
@@ -6737,7 +5635,6 @@ button:disabled {
   border-radius: 8px;
   padding: 4px 0;
 }
-.tm-res-match-date { font-size: 12px; color: var(--text-caption); margin-top: 4px; }
 
 /* 조별리그 펼치기 버튼 — 페이지 배경(--bg) 위 --grey50 채움 + grey150 보더. main과 동일.
  * 2026-08-11에 --button-fill-neutral(grey100) + --border-strong으로 올렸던 것은 그때
@@ -6760,118 +5657,6 @@ button:disabled {
 }
 .tm-res-expand-btn:hover { background: var(--grey100); } /* 기본(grey50)보다 한 단계 진하게 — main과 동일 */
 .tm-res-expand-chevron { font-size: 14px; transition: transform 0.2s; display: inline-block; }
-
-/* ── 최종결과 — 표창 카드 ── */
-.tm-results-champion-card {
-  background: linear-gradient(135deg, var(--blue500) 0%, #1a6ee8 100%);
-  border-radius: 16px;
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  color: #fff;
-  text-align: center;
-  margin-bottom: 4px;
-}
-.tm-results-champion-trophy { font-size: 40px; line-height: 1; }
-.tm-results-champion-label {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.8;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.tm-results-champion-name {
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-}
-.tm-results-champion-sub { font-size: 12px; opacity: 0.7; }
-
-/* 최종 순위 리스트 */
-.tm-results-rank-list { display: flex; flex-direction: column; gap: 0; }
-.tm-results-rank-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--grey100);
-}
-.tm-results-rank-row:last-child { border-bottom: none; }
-.tm-results-rank-medal {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-.tm-results-rank-medal-1 { background: #FFF3CD; }
-.tm-results-rank-medal-2 { background: #F5F5F5; }
-.tm-results-rank-medal-3 { background: #FDE8D0; }
-.tm-results-rank-medal-other { background: var(--grey100); font-size: 13px; font-weight: 700; color: var(--text-caption); }
-.tm-results-rank-team {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-.tm-results-rank-stat {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── 경기 결과 요약 카드 ── */
-.tm-match-result-card {
-  border: 1px solid var(--grey150);
-  border-radius: 12px;
-  padding: 14px 16px;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.tm-match-result-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-/* [공개 화면 R-T2 정리] .tm-match-result-round/-date(11px)를 고치려 확인하다가
-   tm-match-result-* 전체(card/header/score 포함 11개 셀렉터)가 TSX 어디서도
-   참조되지 않는 죽은 코드임을 확인 — 이 두 셀렉터만 삭제(같은 접두사의 나머지
-   규칙은 이 작업 범위 밖이라 남겨둠 — 별도 죽은 코드 정리 필요). */
-.tm-match-result-score-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.tm-match-result-team {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-.tm-match-result-team-right { text-align: right; }
-.tm-match-result-score {
-  font-size: 22px;
-  font-weight: 900;
-  color: var(--text-strong);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  text-align: center;
-  min-width: 64px;
-}
-.tm-match-result-score-sep {
-  font-size: 16px;
-  color: var(--grey400);
-  margin: 0 2px;
-}
 /* [공개 화면 R-T2 정리] .tm-match-result-note/-winner-badge(11/10px) 역시 죽은
    코드라 삭제(위 round/date와 같은 이유). */
 
@@ -6970,33 +5755,6 @@ button:disabled {
 .tm-awards-podium-pos {
   font-size: 22px;
   line-height: 1;
-}
-
-.tm-awards-prize-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--grey100);
-}
-.tm-awards-prize-row:last-child { border-bottom: none; }
-.tm-awards-prize-icon {
-  font-size: 20px;
-  width: 36px;
-  text-align: center;
-  flex-shrink: 0;
-}
-.tm-awards-prize-label {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.tm-awards-prize-amount {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--blue500);
-  font-variant-numeric: tabular-nums;
 }
 
 /* 리뷰 카드 */
@@ -7467,11 +6225,6 @@ button:disabled {
     white-space: nowrap;
   }
 }
-
-/* 섹션 공통 */
-.tm-hub-section {
-  padding: 20px 20px 0;
-}
 .tm-hub-section-title {
   font-size: 15px;
   font-weight: 850;
@@ -7549,54 +6302,6 @@ button:disabled {
   .tm-results-grid > .tm-tourn-sub-col:first-child { position: sticky; top: 12px; }
   /* 챔피언 카드 풀 너비 래퍼 */
   .tm-tourn-hero-full { padding-top: 16px; padding-left: 0 !important; padding-right: 0 !important; }
-
-  /* ── 히어로 카드 데스크탑: 가로형 배너 ── */
-  .tm-tourn-hero-full .tm-res-hero {
-    flex-direction: row;
-    align-items: center;
-    text-align: left;
-    padding: 20px 28px;
-    border-radius: 10px;
-    gap: 20px;
-  }
-  .tm-tourn-hero-full .tm-res-hero-trophy {
-    font-size: 40px;
-    margin-bottom: 0;
-    flex-shrink: 0;
-  }
-  .tm-tourn-hero-full .tm-res-hero-name {
-    font-size: 22px;
-    margin: 2px 0;
-  }
-  /* 통계를 세로에서 가로로 */
-  .tm-tourn-hero-full .tm-res-hero-stats {
-    display: flex !important;
-    flex-direction: row !important;
-    margin-left: auto;
-    flex-shrink: 0;
-    gap: 20px;
-    align-items: center;
-  }
-  .tm-tourn-hero-full .tm-res-hero-stat {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center;
-    gap: 1px;
-  }
-  .tm-tourn-hero-full .tm-res-hero-stat-sep {
-    display: none !important;
-  }
-  .tm-tourn-hero-full .tm-res-hero-stats .tm-res-hero-stat-num {
-    font-size: 20px;
-  }
-  /* [공개 화면 R-T2 정리] .tm-tourn-hero-full .tm-res-hero-stats .tm-res-hero-stat-label
-     (10px)을 고치려 확인하다가 죽은 코드임을 확인 — 삭제. .tm-res-hero-*(모바일
-     챔피언 히어로, tm-hide-desktop)는 트로피/이름/inline-stat만 렌더하고
-     .tm-tourn-hero-full로 감싸는 데스크톱 콘텐츠(시상대·상금·어워드)에는
-     .tm-res-hero-stats 자체가 존재하지 않아 이 데스크톱 오버라이드가 매칭되는
-     DOM이 없다(위 형제 규칙들도 같은 이유로 죽어 있으나 폰트 크기 위반이 아니라
-     이 작업 범위 밖 — 별도 죽은 코드 정리 필요). */
-
   /* ── 메달 카드 데스크탑: 더 컴팩트 ── */
   .tm-tourn-sub-col .tm-award-card span[aria-hidden="true"][style*="font-size: 52px"],
   .tm-tourn-sub-col .tm-award-card span[aria-hidden="true"][style*="font-size: 42px"] {
@@ -7765,7 +6470,11 @@ button:disabled {
   display: grid;
   place-items: center;
   color: var(--text-muted);
-  font-size: 14px;
+  /* [R-T1 타입 위계 정리] 14px → 15px — 이 페이지 전용 클래스(다른 화면 미사용)라
+     3단계(카드 핵심 정보, tm-bk2-score와 동일 15px)에 바로 편입. 탭 버튼은 폭
+     여유가 커서 축소 위험 없음(픽스처 실측: "순위 · 대진표"/"경기 일정" 모두
+     여유 있게 들어감). */
+  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
 }

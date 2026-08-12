@@ -262,18 +262,23 @@ function BracketEmpty({
         <Trophy size={32} strokeWidth={1.6} />
       </div>
       <div className="tm-text-body-lg">대진표가 아직 공개되지 않았어요</div>
-      <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+      {/* [R-T1 타입 위계 정리] tm-text-label(13/600) → tm-text-caption(12/400) —
+          이 안내문은 의미상 보조 정보(4단계)라 tm-text-label(3단계 라벨용)보다
+          캡션 토큰이 더 맞는다. */}
+      <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
         {sub}
       </div>
       {/* 팀명이 아니라 팀 수 — "감출 때 없는 척하지 마라": 이름은 몰라도 몇 팀이
-          참가하는지는 정직하게 보여준다. */}
+          참가하는지는 정직하게 보여준다.
+          [R-T1] 13px → 12px(보조 정보 tier) — weight 600은 유지해 캡션류보다 한 단
+          더 강조. */}
       <div
         style={{
           marginTop: 16,
           padding: '10px 14px',
           borderRadius: 10,
           background: 'var(--surface-soft)',
-          fontSize: 13,
+          fontSize: 12,
           color: 'var(--text-strong)',
           fontWeight: 600,
         }}

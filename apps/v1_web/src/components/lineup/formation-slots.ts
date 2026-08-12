@@ -88,6 +88,30 @@ export function slotsWithGoalkeeper(preset: FormationPreset): FormationSlot[] {
   return [{ positionCode: GOALKEEPER_SLOT_CODE, label: 'GK', x: 50, y: 6 }, ...preset.slots];
 }
 
+/**
+ * 이 경기가 허용하는 출전 인원(GK 포함)을 화면 문구용으로 정리한다.
+ *
+ * **범위라는 점이 핵심이다.** canonical config는 축구 7~11, 풋살 3~6이고 관리자는 상한만
+ * 고르므로(`lineup-size.ts#buildLineupSizeConfig`) minPlayers와 maxPlayers가 서로 다를 수 있다.
+ * maxPlayers만 단일 값처럼 비교하면 7~11 경기에서 선발 9명(완전히 정상)에게 "11명인데
+ * 9명이에요"라는 틀린 경고가 뜬다 — PR #402 Copilot 리뷰가 잡은 실제 결함이다.
+ *
+ * team-match 라인업과 대회 fixture 라인업이 같은 판정을 각자 구현하지 않도록 여기 한 곳에 둔다.
+ * 인원 정보가 없는 구버전 응답(min/max가 null)에서는 label=null·outOfRange=false로 조용히
+ * 안내를 생략한다 — 모르는 값을 근거로 경고하지 않는다.
+ */
+export function describeSquadSize(
+  minPlayers: number | null,
+  maxPlayers: number | null,
+  starterCount: number,
+): { label: string | null; outOfRange: boolean } {
+  if (minPlayers === null || maxPlayers === null) return { label: null, outOfRange: false };
+  const label = minPlayers === maxPlayers ? `${maxPlayers}명` : `${minPlayers}~${maxPlayers}명`;
+  // 선발이 아직 0명인 상태(막 진입)는 "벗어났다"고 말할 단계가 아니다.
+  const outOfRange = starterCount > 0 && (starterCount < minPlayers || starterCount > maxPlayers);
+  return { label, outOfRange };
+}
+
 /** 골키퍼 슬롯을 가리키는 **화면 내부 마커**. 서버에 저장되는 실제 포지션 코드가 아니다
  * (그건 goalkeeperPositionCode가 종목 사전에서 읽는다 — 축구 'GK', 풋살 'GOLEIRO').
  * slotsWithGoalkeeper가 붙이는 값과 그 슬롯을 판별하는 쪽(formation-assignment.ts,

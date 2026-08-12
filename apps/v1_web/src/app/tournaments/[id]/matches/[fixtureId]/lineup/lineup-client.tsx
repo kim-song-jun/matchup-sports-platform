@@ -6,7 +6,8 @@ import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/compo
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
 import {
-  buildFormationPresets, goalkeeperPositionCode, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
+  buildFormationPresets, describeSquadSize, goalkeeperPositionCode, presetsForOutfieldCount, slotsWithGoalkeeper,
+  type FormationPreset,
 } from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { matchSlotsToEntries } from '@/app/team-matches/[id]/lineup/lineup.view-model';
@@ -117,7 +118,13 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   // 이 화면은 원래부터 명시적 저장이라 미저장 상태로 나가면 편집이 그대로 사라진다 —
   // 브라우저 기본 경고로 한 번 막는다(team-match 라인업도 자동저장을 걷어내며 같은 가드를
   // 갖게 됐다).
-  const hasUnsavedChanges = state?.dirty === true && (state.lineupState === null || state.lineupState === 'DRAFT');
+  // 조건은 아래 `editable`(제출 후 정정 재편집 = SUBMITTED && reopened 포함)과 반드시 같아야
+  // 한다 — DRAFT만 보면 제출 후 재편집 중 미저장 변경이 있어도 경고 없이 유실된다
+  // (Copilot 리뷰 지적, 실제 결함). editable은 early return 뒤에 선언돼 여기서 쓸 수 없으므로
+  // 같은 조건을 여기서 다시 계산한다.
+  const hasUnsavedChanges =
+    state?.dirty === true &&
+    (state.lineupState === null || state.lineupState === 'DRAFT' || (state.lineupState === 'SUBMITTED' && reopened));
   useEffect(() => {
     if (!hasUnsavedChanges) return;
     function warnBeforeUnload(event: BeforeUnloadEvent) {
@@ -143,8 +150,18 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   // 라인업에 골키퍼 자리는 항상 정확히 하나이므로 선발 수만으로 필드 인원이 결정된다.
   const outfieldCount = Math.max(0, (state?.starters.length ?? 0) - 1);
   const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
-  /** 이 대회에 설정된 출전 인원(GK 포함). 구버전 응답에는 없을 수 있어 null 허용. */
-  const configuredSquadSize = gameQuery.data?.lineupConfig?.maxPlayers ?? null;
+  /**
+   * 이 대회에 설정된 출전 인원(GK 포함). **범위**다 — canonical config가 축구 7~11, 풋살 3~6이고
+   * 관리자가 상한만 고르므로 minPlayers와 maxPlayers가 서로 다를 수 있다
+   * (competition-config.presets.ts, lineup-size.ts#buildLineupSizeConfig). maxPlayers만 단일
+   * 값처럼 비교하면 7~11 대회에서 선발 9명(정상)에게 "11명인데 9명이에요"라는 틀린 경고가 뜬다.
+   * 구버전 응답에는 두 필드가 없을 수 있어 null 허용.
+   */
+  const { label: squadSizeLabel, outOfRange: starterCountOutOfRange } = describeSquadSize(
+    gameQuery.data?.lineupConfig?.minPlayers ?? null,
+    gameQuery.data?.lineupConfig?.maxPlayers ?? null,
+    state?.starters.length ?? 0,
+  );
 
   // Copilot review finding (PR #277): 선발/골키퍼 변경으로 outfieldCount가 바뀌어 지금
   // 선택된 formation이 더 이상 formationOptions에 없으면 자유 배치로 되돌린다 — team-match
@@ -295,16 +312,17 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const editable =
     !gameStarted &&
     (state.lineupState === null || state.lineupState === 'DRAFT' || (state.lineupState === 'SUBMITTED' && reopened));
-  // 안내는 두 갈래다: ① 지금 선발 수에 맞는 대형이 아예 없을 때, ② 대형은 있지만 대회가
-  // 정한 출전 인원과 선발 수가 다를 때. ②는 이번에 서버가 출전 인원을 함께 내려주면서
-  // 처음 가능해졌다 — 예전에는 화면이 대회 설정을 몰라 "몇 명이어야 맞는지"를 말할 수 없었다.
+  // 안내는 두 갈래다: ① 지금 선발 수에 맞는 대형이 아예 없을 때, ② 대형은 있지만 선발 수가
+  // 이 대회가 허용하는 출전 인원 **범위**를 벗어났을 때. ②는 이번에 서버가 출전 인원을 함께
+  // 내려주면서 처음 가능해졌다 — 예전에는 화면이 대회 설정을 몰라 "몇 명이어야 맞는지"를
+  // 말할 수 없었다.
   const starterCount = state.starters.length;
   const outfieldGuidance = !formationSupported
     ? null
     : formationOptions.length === 0 && starterCount > 0
-      ? `현재 선발 ${starterCount}명${configuredSquadSize !== null ? ` · 이 대회 출전 인원은 ${configuredSquadSize}명` : ''} — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
-      : configuredSquadSize !== null && starterCount > 0 && starterCount !== configuredSquadSize
-        ? `이 대회 출전 인원은 ${configuredSquadSize}명인데 지금 선발은 ${starterCount}명이에요.`
+      ? `현재 선발 ${starterCount}명${squadSizeLabel !== null ? ` · 이 대회 출전 인원은 ${squadSizeLabel}` : ''} — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
+      : starterCountOutOfRange && squadSizeLabel !== null
+        ? `이 대회 출전 인원은 ${squadSizeLabel}인데 지금 선발은 ${starterCount}명이에요.`
         : null;
   const selectedPreset = state.formation !== null ? formationOptions.find((preset) => preset.code === state.formation) ?? null : null;
   const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;

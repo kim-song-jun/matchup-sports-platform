@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import {
-  buildFormationPresets, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
+  buildFormationPresets, describeSquadSize, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
 } from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -256,8 +256,18 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   // 되돌려버렸다. 라인업의 골키퍼 자리는 항상 정확히 하나다.
   const outfieldCount = Math.max(0, (state?.starters.length ?? 0) - 1);
   const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
-  /** 이 경기에 설정된 출전 인원(GK 포함). 구버전 응답에는 없을 수 있어 null 허용. */
-  const configuredSquadSize = lineupQuery.data?.lineupConfig?.maxPlayers ?? null;
+  /**
+   * 이 경기에 설정된 출전 인원(GK 포함). **범위**다 — canonical config가 축구 7~11, 풋살 3~6이고
+   * 관리자가 상한만 고르므로 minPlayers와 maxPlayers가 서로 다를 수 있다
+   * (competition-config.presets.ts, lineup-size.ts#buildLineupSizeConfig). maxPlayers만 단일
+   * 값처럼 비교하면 7~11 경기에서 선발 9명(정상)에게 "11명인데 9명이에요"라는 틀린 경고가 뜬다.
+   * 구버전 응답에는 두 필드가 없을 수 있어 null 허용.
+   */
+  const { label: squadSizeLabel, outOfRange: starterCountOutOfRange } = describeSquadSize(
+    lineupQuery.data?.lineupConfig?.minPlayers ?? null,
+    lineupQuery.data?.lineupConfig?.maxPlayers ?? null,
+    state?.starters.length ?? 0,
+  );
 
   // Copilot review finding (PR #277): 선발/골키퍼 변경으로 outfieldCount가 바뀌어 지금
   // 선택된 formation이 더 이상 formationOptions에 없으면(예: 5명→4명으로 줄어 "1-1-2"
@@ -456,16 +466,16 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   const counts = deriveLineupCounts(state, rosterPool);
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
-  // ① 지금 선발 수에 맞는 대형이 아예 없을 때, ② 대형은 있지만 이 경기에 설정된 출전
-  // 인원과 선발 수가 다를 때. ②는 서버가 lineupConfig에 출전 인원을 함께 내려주면서
+  // ① 지금 선발 수에 맞는 대형이 아예 없을 때, ② 대형은 있지만 선발 수가 이 경기가 허용하는
+  // 출전 인원 **범위**를 벗어났을 때. ②는 서버가 lineupConfig에 출전 인원을 함께 내려주면서
   // 처음 가능해졌다(그전에는 화면이 "몇 명이어야 맞는지"를 알 방법이 없었다).
   const starterCount = state.starters.length;
   const outfieldGuidance = !formationSupported
     ? null
     : formationOptions.length === 0 && starterCount > 0
-      ? `현재 선발 ${starterCount}명${configuredSquadSize !== null ? ` · 이 경기 출전 인원은 ${configuredSquadSize}명` : ''} — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
-      : configuredSquadSize !== null && starterCount > 0 && starterCount !== configuredSquadSize
-        ? `이 경기 출전 인원은 ${configuredSquadSize}명인데 지금 선발은 ${starterCount}명이에요.`
+      ? `현재 선발 ${starterCount}명${squadSizeLabel !== null ? ` · 이 경기 출전 인원은 ${squadSizeLabel}` : ''} — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
+      : starterCountOutOfRange && squadSizeLabel !== null
+        ? `이 경기 출전 인원은 ${squadSizeLabel}인데 지금 선발은 ${starterCount}명이에요.`
         : null;
   const selectedPreset = state.formation !== null ? formationOptions.find((preset) => preset.code === state.formation) ?? null : null;
   const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;

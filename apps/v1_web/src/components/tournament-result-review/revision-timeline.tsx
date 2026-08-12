@@ -44,7 +44,10 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
           <li key={revision.id} className="tm-card" style={{ padding: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <span className={`tm-badge tm-badge-${tone}`}>{REVISION_STATE_LABELS[revision.state]}</span>
-              <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>
+              {/* [알파 감사 C] tm-text-micro(11px)는 R-T2 하한(12px) 미달 — 처리
+                  이력의 날짜가 알파 실측에서 지적됐다. 한 단계 위 캡션
+                  토큰으로 교체. */}
+              <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
                 {revision.submittedAt
                   ? formatAdminDateTime(revision.submittedAt)
                   : formatAdminDateTime(revision.createdAt)}
@@ -68,7 +71,8 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
                 사유: {revision.reason}
               </p>
             ) : null}
-            <p className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 6 }}>
+            {/* [알파 감사 C] "담당자 처리 · 리비전 #N" — 알파 실측 지적 항목. 11px → 12px. */}
+            <p className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 6 }}>
               {revision.createdByActorType === 'SYSTEM'
                 ? `자동 처리(${revision.createdBySystemActor ?? '시스템'})`
                 : '담당자 처리'}

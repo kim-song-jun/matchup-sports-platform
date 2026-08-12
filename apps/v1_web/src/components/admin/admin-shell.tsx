@@ -115,7 +115,7 @@ function NavBadge({ count }: { count: number }) {
   return (
     <span
       aria-hidden="true"
-      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[11px] font-semibold leading-none text-white tabular-nums"
+      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -286,8 +286,9 @@ function Drawer({
           <div className="flex items-center gap-2">
             <LayoutDashboard size={17} className="text-blue-500" aria-hidden="true" />
             <span className="text-[15px] font-bold text-[var(--text-strong)]">Teameet 운영</span>
+            {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
-              <span className="text-[10px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5">
+              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5">
                 {adminRoleLabel}
               </span>
             )}
@@ -382,8 +383,9 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           <LayoutDashboard size={18} className="text-blue-500 shrink-0" aria-hidden="true" />
           <div className="flex flex-col min-w-0">
             <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight">Teameet 운영</span>
+            {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
-              <span className="text-[10px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
                 {adminRoleLabel}
               </span>
             )}

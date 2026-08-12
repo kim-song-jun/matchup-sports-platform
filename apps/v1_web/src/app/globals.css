@@ -587,8 +587,11 @@ button:disabled {
 
 .tm-bottom-tab span {
   color: var(--grey500);
-  font-size: 11px;
-  line-height: 15px;
+  /* [알파 감사 B] 11px는 R-T2 최소 하한(12px) 미달 — 하단 탭바 5개
+     라벨(홈/매치/대회/팀/마이) 전부 해당. 토큰(--font-size-caption)으로
+     교체. 탭바는 min-height라 1px 증가가 레이아웃을 깨지 않는다. */
+  font-size: var(--font-size-caption);
+  line-height: 16px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -1539,6 +1542,32 @@ button:disabled {
   color: var(--text-caption);
   cursor: not-allowed;
   opacity: 1;
+}
+
+/* [알파 감사 A] outline 변형은 활성 배경(--bg, #ffffff)과 비활성 배경(--grey100,
+   #f2f4f6)의 명도차가 1~2단계뿐이라 배경 교체만으로는 활성/비활성이 거의
+   구분되지 않는다(실측: 운영 콘솔 골/카드/파울/교체 버튼 — 눌러봐야 안 눌리는
+   걸 알게 됨). 활성 상태의 흰 배경 정체성을 지우고 테두리까지 grey100으로
+   맞춰 "칠해진 비활성 표면"으로 분명히 보이게 한다. */
+.tm-btn-outline:disabled {
+  border-color: var(--grey100);
+}
+
+/* [알파 감사 A] 아이콘·색상 스와치처럼 하드코딩된 색(text-green-600,
+   bg-red-500 등)을 쓰는 자식 요소는 위 color 오버라이드가 닿지 않아 비활성
+   버튼 안에서도 원래 색 그대로 선명하게 남는다 — 이 프로젝트의 기존 관례
+   (.tm-quick-action:disabled, .tm-team-logo-preset:disabled 등이 이미
+   opacity로 자식을 죽이는 패턴)와 동일하게 opacity로 통일해 죽인다.
+   버튼 자체(background/border/color)는 위에서 이미 비활성 토큰으로
+   덮어썼으므로 opacity: 1을 유지하고, 여기서는 "색이 살아있는 자식 요소"만
+   추가로 덮는다.
+   :not([aria-busy="true"]) 예외: Button 컴포넌트는 loading=true일 때도
+   disabled를 켜고 스피너(SVG, aria-hidden)를 자식으로 넣는다(button.tsx) —
+   이 규칙이 스피너에도 그대로 걸리면 "지금 처리 중"이라는 로딩 표시 자체가
+   흐려져 반대 효과(진행 상황이 안 보임)를 낸다. aria-busy="true"는 Button이
+   loading일 때만 세우는 값이라 로딩 스피너만 정확히 예외 처리된다. */
+.tm-btn:disabled:not([aria-busy='true']) > * {
+  opacity: 0.5;
 }
 
 /* ── Keyboard focus ring (WCAG 2.1 AA) ── */

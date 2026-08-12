@@ -141,7 +141,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
             현재 웹 푸시를 구독 중인 <strong>모든 회원</strong>에게 아래 알림을 발송해요. 이 작업은 되돌릴 수 없어요.
           </p>
           <div className="bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl px-3.5 py-3">
-            <p className="text-[11px] font-semibold text-[var(--text-muted)] mb-0.5">제목</p>
+            <p className="text-[var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">제목</p>
             <p className="text-[14px] font-semibold text-[var(--text-strong)] break-words">{title}</p>
           </div>
         </div>

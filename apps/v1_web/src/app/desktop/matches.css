@@ -141,12 +141,9 @@
     transition: background-color 0.12s;
   }
 
-  /* [토큰 충돌 fix] 이전엔 --grey50 — 부모 .tm-app-frame 페이지 배경(globals.css:457)과
-     동일 토큰이라 hover 피드백이 시각적으로 사라졌다. 2026-08-12: grey100은 다크에서
-     grey50과 대비 1.02:1로 여전히 근접(계산 확인) — 이 저장소의 동일 시나리오 선례
-     (.tm-match-summary-row 등)와 같은 grey150으로 통일. */
+  /* hover tint — 페이지 배경(--bg) 위 --grey50 한 단계. main과 동일. */
   .tm-match-list-card:hover {
-    background: var(--grey150);
+    background: var(--grey50);
   }
 
   /* Taller card media on desktop for visual weight. */

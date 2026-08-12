@@ -189,9 +189,7 @@ export function ReviewSourcePageView({
                 );
               })}
             </div>
-            {/* [토큰 충돌 fix] 이전엔 --grey50 — .tm-app-frame 페이지 배경(globals.css:457)과 동일 토큰이라
-               경계가 안 보였음. tm-match-summary-row 선례(globals.css:2183)와 동일 패턴으로 grey100으로 한 단계 진하게 */}
-            <Card className={message ? 'tm-review-notice-error' : ''} pad={14} style={message ? undefined : { background: 'var(--grey100)' }}>
+            <Card className={message ? 'tm-review-notice-error' : ''} pad={14} style={message ? undefined : { background: 'var(--grey50)' }}>
               <div className="tm-text-label">{message ?? '작성 현황'}</div>
               <div className="tm-text-caption" style={{ marginTop: 5 }}>{message ? '선택 상태를 확인한 뒤 다시 시도해 주세요.' : model.progressLabel}</div>
             </Card>

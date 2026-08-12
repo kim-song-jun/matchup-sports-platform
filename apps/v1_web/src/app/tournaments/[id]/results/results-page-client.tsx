@@ -469,10 +469,8 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
         if (!f.result) return null;
         const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = f.result;
         const winner = getWinnerSide(f.result);
-        // 2026-08-12: grey100은 다크에서 페이지(.tm-app-frame, grey50)와 1.02:1로 근접
-        // 충돌(계산 확인) — 아래 순위1(POS_CFG) 챔피언 행이 이미 쓰는 grey150으로 통일
         return (
-          <div key={f.id} style={{ ...cardStyle, background: 'var(--grey150)' }}>
+          <div key={f.id} style={{ ...cardStyle, background: 'var(--grey50)' }}>
             <MatchRow
               label="3·4위전"
               home={f.homeTeamName} away={f.awayTeamName}
@@ -491,7 +489,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
 
 /* 순위별 스타일 */
 const POS_CFG: Record<number, { bg: string; numColor: string; label: string }> = {
-  1: { bg: 'var(--grey150)',   numColor: 'var(--text-strong)',  label: '우승'   },
+  1: { bg: 'var(--grey50)',    numColor: 'var(--text-strong)',  label: '우승'   },
   2: { bg: 'transparent',     numColor: 'var(--text-caption)', label: '준우승' },
   3: { bg: 'transparent',     numColor: 'var(--text-caption)', label: '3위'    },
   4: { bg: 'transparent',     numColor: 'var(--text-caption)', label: '4위'    },
@@ -500,11 +498,9 @@ const POS_CFG: Record<number, { bg: string; numColor: string; label: string }> =
 function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixtures: V1TournamentFixture[] }) {
   return (
     <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--grey150)' }}>
-      {/* 2026-08-12: grey100은 다크에서 페이지(.tm-app-frame, grey50)와 1.02:1로 근접충돌 — grey150으로
-          통일(단, borderBottom까지 grey150이면 배경과 같아져 헤더-1위행 경계가 사라지므로 grey200 유지). */}
       <div style={{
         display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
-        padding: '7px 14px', background: 'var(--grey150)', borderBottom: '1px solid var(--grey200)',
+        padding: '7px 14px', background: 'var(--grey50)', borderBottom: '1px solid var(--grey150)',
       }}>
         {/* [R-T2] 그리드 컬럼(40px/1fr/64px/36px/36px/40px) 헤더 — 가장 좁은 36px도
             'W'/'GF' 한두 글자라 12px 여유. */}

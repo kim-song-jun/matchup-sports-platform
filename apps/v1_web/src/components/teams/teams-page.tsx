@@ -143,7 +143,7 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
       <div className="tm-team-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
-          <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 18 }}>
+          <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 18, background: 'var(--grey50)' }}>
             <div className="tm-text-label">목록에서 다시 확인해 주세요</div>
             <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
               새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 보세요.
@@ -251,7 +251,7 @@ function TeamOpenMatchesSection({
           ))}
         </div>
       ) : (
-        <Card pad={16}>
+        <Card pad={16} style={{ background: 'var(--grey50)' }}>
           <div className="tm-text-label">아직 열어둔 매치가 없어요</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>이 팀이 새 경기를 모집하면 여기서 확인할 수 있어요.</div>
         </Card>
@@ -1091,7 +1091,7 @@ function TeamCoverImageField({
           minHeight: 210,
           borderRadius: 14,
           border: '1px solid var(--border-strong)',
-          background: coverImageUrl ? `${cssUrl(coverImageUrl)} center/cover` : 'var(--input-surface)',
+          background: coverImageUrl ? `${cssUrl(coverImageUrl)} center/cover` : 'var(--grey50)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1197,7 +1197,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           <Card pad={12}><KPIStat label="관리자" value={model.summary.managers} unit="명" /></Card>
           <Card pad={12}><KPIStat label="검토" value={model.summary.pending} unit="명" /></Card>
         </div>
-        <Card pad={16} style={{ marginTop: 14 }}>
+        <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 14 }}>
           <div className="tm-text-label">권한 규칙</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>멤버를 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 할 수 있어요. 모든 변경은 확인 창을 거쳐 적용돼요.</div>
         </Card>

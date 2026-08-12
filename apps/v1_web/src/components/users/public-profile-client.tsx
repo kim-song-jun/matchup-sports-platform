@@ -110,6 +110,8 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              /* 이 박스는 흰 카드(--card-surface) *내부*라 페이지 배경과 무관하다 —
+                 --grey50은 다크에서 카드(#1c1e24)와 사실상 같은 값이라 묻힌다. */
               background: 'var(--surface-soft)',
               border: '1px solid var(--border)',
               borderRadius: 12,

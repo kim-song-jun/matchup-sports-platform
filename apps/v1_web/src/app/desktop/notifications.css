@@ -54,15 +54,13 @@
   }
 
   .tm-notification-card:hover {
-    /* [토큰 충돌 fix] 이전엔 --grey50 — .tm-app-frame 페이지 배경(globals.css:457)과
-       동일 토큰이라 hover 시 카드가 프레임에 녹아 사라졌음. list-row-bg 선례
-       (globals.css:1540, 2183: grey50 → grey100 한 단계 진하게)와 동일 패턴 적용 */
-    background: var(--grey100);
+    /* 페이지 배경(--bg) 위 hover tint — main과 동일한 --grey50 */
+    background: var(--grey50);
   }
 
   /* 미읽음 hover: 아이콘 tint·미읽음 점은 유지한 채 동일 배경 tint */
   .tm-notification-card-unread:hover {
-    background: var(--grey100);
+    background: var(--grey50);
   }
 
   .tm-notification-card:focus-visible {

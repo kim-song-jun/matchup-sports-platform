@@ -14,7 +14,8 @@ import type {
 
 /**
  * Task 21 — REST reads/commands for the live tournament operations console.
- * `POST /games/:gameId/commands/:command` (start/pause/resume/end) and the
+ * `POST /games/:gameId/commands/:command` (start/pause/resume/end/end-period/
+ * start-period/revert-period — 이슈 #375) and the
  * fixture-scoped lineup read are the only REST surfaces this console needs
  * beyond the `/game-operations` socket (event append itself goes through the
  * socket-first path in `use-v1-game-operations-console.ts`, falling back to

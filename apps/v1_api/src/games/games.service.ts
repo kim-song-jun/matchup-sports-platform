@@ -220,6 +220,13 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
     case 'game_pause':
     case 'game_resume':
     case 'game_end':
+    // 이슈 #375 — end-period/start-period/revert-period은 next_period가
+    // 쓰던 자리를 그대로 물려받는다(같은 굵기의 권한: 대회 커맨드). 구
+    // next_period는 배포 안전을 위해 당분간 함께 받는다(game-command.dto.ts
+    // GameCommandName.next_period의 @deprecated 문서 참고).
+    case 'game_end_period':
+    case 'game_start_period':
+    case 'game_revert_period':
     case 'game_next_period':
     case 'result_recovery_derive_and_submit':
       return 'tournament_command';
@@ -463,6 +470,33 @@ export function extractEndPenalties(
  */
 export function staffLineupSubmitRequiresTakeover(gameState: V1GameState): boolean {
   return gameState !== V1GameState.SCHEDULED;
+}
+
+/**
+ * 이슈 #375 — `executeCommand`의 command 문자열을 idempotency/audit
+ * (`writeAudit`, `withCommand`)이 쓰는 `action` 문자열로 매핑한다. 구
+ * `next-period`가 이미 하이픈이 아니라 언더스코어(`game_next_period`)로
+ * 특별 취급됐던 관례를 새 세 커맨드에도 그대로 잇는다 — `game_${command}`
+ * 템플릿을 그냥 쓰면 `game_end-period`처럼 하이픈이 섞인 액션 문자열이
+ * 나와 감사 로그/권한 매핑(`gameAuthorizationAction`)의 스네이크케이스
+ * 관례와 어긋난다. 순수 함수라 `GamesService` 밖에서도 단위 테스트할 수
+ * 있다(`canonicalGameCommandPayloadHash`/`extractEndPenalties`와 같은 이유).
+ */
+export function gameCommandAuditAction(
+  command: 'start' | 'pause' | 'resume' | 'end' | 'end-period' | 'start-period' | 'revert-period' | 'next-period',
+): string {
+  switch (command) {
+    case 'end-period':
+      return 'game_end_period';
+    case 'start-period':
+      return 'game_start_period';
+    case 'revert-period':
+      return 'game_revert_period';
+    case 'next-period':
+      return 'game_next_period';
+    default:
+      return `game_${command}`;
+  }
 }
 
 @Injectable()
@@ -749,14 +783,22 @@ export class GamesService {
   async executeCommand(
     user: V1AuthUser,
     gameId: string,
-    command: 'start' | 'pause' | 'resume' | 'end' | 'next-period',
+    command:
+      | 'start'
+      | 'pause'
+      | 'resume'
+      | 'end'
+      | 'end-period'
+      | 'start-period'
+      | 'revert-period'
+      | 'next-period',
     headerIdempotencyKey: string | undefined,
     dto: GameCommandDto,
   ): Promise<GameMutationResult | GameRevisionMutationResult> {
     return this.withCommand<GameMutationResult | GameRevisionMutationResult>(
       {
         gameId,
-        action: command === 'next-period' ? 'game_next_period' : `game_${command}`,
+        action: gameCommandAuditAction(command),
         actor: await this.resolveActor(this.prisma, gameId, user.id, 'tournament_command'),
         expectedVersion: dto.expectedVersion,
         headerIdempotencyKey,
@@ -776,8 +818,22 @@ export class GamesService {
         assertClockNotDrifted(dto.occurredAt);
         this.requireTakeover(game.id, game.sourceType, context);
 
+        // 이슈 #375 — 구 `next-period`(fused 종료+시작, 배포 호환용으로만
+        // 남겨둠 — GameCommandName.next_period의 @deprecated 문서 참고)와
+        // 새로 분리된 `end-period`/`start-period`/`revert-period`. 넷 다
+        // advancePeriod류 헬퍼로 위임하고, 아래 `end`/`start`/`pause`/
+        // `resume` 공용 게임-상태 전이 블록은 거치지 않는다.
         if (command === 'next-period') {
           return this.advancePeriod(tx, game, context);
+        }
+        if (command === 'end-period') {
+          return this.endCurrentPeriod(tx, game, context);
+        }
+        if (command === 'start-period') {
+          return this.startNextPeriod(tx, game, context);
+        }
+        if (command === 'revert-period') {
+          return this.revertPeriodTransition(tx, game, context);
         }
 
         const target: V1GameState = {
@@ -789,6 +845,27 @@ export class GamesService {
         this.assertLifecycle(game.sourceType, 'TOURNAMENT_COMMAND', game.state, target);
         if (command === 'start') {
           await this.assertLineupsSubmittedForStart(tx, game.id);
+        }
+        // 이슈 #375 — HALFTIME이 실제로 영속되는 상태가 되면서 "game.state
+        // === LIVE인데 LIVE인 피리어드는 없다"(하프타임 도중)가 처음으로
+        // 정상 상태가 됐다. `pause`는 LIVE 피리어드가 있어야만 뜻이 통하는
+        // 명령이다 — 없으면 game.state만 PAUSED로 바뀌고 실제로는 아무
+        // 피리어드도 멈추지 않는, 하프타임+PAUSED가 겹친 혼란스러운 조합을
+        // 만든다. 이 조합은 end-period 도입 이전에는 도달 불가능했던
+        // 상태라 여기서만 막는다(resume은 이 가드 덕분에 "PAUSED인데 LIVE
+        // 피리어드가 없다"에 도달할 방법 자체가 사라져 대칭 가드가
+        // 불필요하다).
+        if (command === 'pause') {
+          const livePeriodForPause = await tx.v1GamePeriod.findFirst({
+            where: { gameId: game.id, state: V1GamePeriodState.LIVE },
+            select: { id: true },
+          });
+          if (livePeriodForPause === null) {
+            throw new ConflictException({
+              code: 'PERIOD_NOT_STARTED',
+              message: '일시 중지할 피리어드가 없어요',
+            });
+          }
         }
         const now = new Date();
         const updated = await tx.v1Game.update({
@@ -837,8 +914,21 @@ export class GamesService {
           // the same way `resume` would, so a period that ends mid-pause
           // never leaves a dangling `pausedAt` and its final `pausedTotalMs`
           // still excludes that last stoppage.
+          //
+          // 이슈 #375 — `state: LIVE`만 찾던 필터에 `HALFTIME`도 더한다.
+          // "경기 종료"는 game.state===LIVE인 동안 언제든 눌릴 수 있고,
+          // 하프타임도 이제 game.state===LIVE인 채 지속되는 실제 상태라
+          // 하프타임 도중 경기를 종료하는 경로가 새로 생겼다 — 다음
+          // 피리어드가 "시작도 안 했는데 ENDED도 아닌" HALFTIME으로 영원히
+          // 남는 대신 이 경로에서도 함께 ENDED로 닫는다. HALFTIME
+          // 피리어드는 애초에 pausedAt이 설정될 수 없으므로(pause는 LIVE
+          // 피리어드만 건드린다) resolveOpenPause는 안전하게 null을
+          // 돌려준다.
           const livePeriods = await tx.v1GamePeriod.findMany({
-            where: { gameId: game.id, state: V1GamePeriodState.LIVE },
+            where: {
+              gameId: game.id,
+              state: { in: [V1GamePeriodState.LIVE, V1GamePeriodState.HALFTIME] },
+            },
           });
           for (const period of livePeriods) {
             const resolved = this.resolveOpenPause(period, now);
@@ -886,6 +976,16 @@ export class GamesService {
   }
 
   /**
+   * @deprecated 이슈 #375 — `next-period` 전용 fused 핸들러. `GameCommandName.
+   * next_period`의 문서(game-command.dto.ts)에 적은 배포 호환 사유로만
+   * 남아 있다. 동작은 **절대 바꾸지 않는다**: 기존 통합 테스트
+   * (`test/games/game-period-lifecycle.integration-spec.ts`,
+   * `test/games/live-game-commands.integration-spec.ts`)가 정확히 이 fused
+   * 동작(종료+시작을 한 트랜잭션에서, HALFTIME을 거치지 않고)에 근거해
+   * 작성돼 있고, 이 값을 여전히 보내는 배포 직후의 구 프런트 번들도 같은
+   * 동작을 기대한다. 새 분기 로직은 여기 추가하지 말고 `endCurrentPeriod`/
+   * `startNextPeriod`/`revertPeriodTransition`에 넣는다.
+   *
    * `next_period` (T1-0) — closes whichever `V1GamePeriod` is currently LIVE
    * and opens the following period number, both server-timestamped in the
    * same transaction as the version bump. Reaches here only for
@@ -932,6 +1032,211 @@ export class GamesService {
     await tx.v1GamePeriod.update({
       where: { id: next.id },
       data: { state: V1GamePeriodState.LIVE, startedAt: now },
+    });
+    const updated = await tx.v1Game.update({
+      where: { id: game.id },
+      data: { version: { increment: 1 } },
+    });
+    return {
+      gameId: updated.id,
+      state: updated.state,
+      version: updated.version,
+      durableCommandId: context.durableCommandId,
+      replayed: false,
+    };
+  }
+
+  /**
+   * 이슈 #375 (`end-period`) — `advancePeriod`의 "종료" 절반만 수행한다.
+   * 현재 LIVE인 피리어드를 ENDED로 닫고, **다음 피리어드가 곧장 LIVE로
+   * 열리지 않는다** — 대신 HALFTIME으로 옮겨 "하프타임"을 실제로 관측
+   * 가능한 상태로 만든다(운영 보드/실시간 화면이 이 값을 그대로 질의할 수
+   * 있다). `startNextPeriod`가 이 HALFTIME 피리어드를 LIVE로 여는 짝이다.
+   *
+   * `advancePeriod`와 동일하게 game.state===LIVE + 다음 피리어드 존재를
+   * 전제한다(마지막 피리어드는 이 커맨드가 아니라 `end`로 끝낸다 — 콘솔의
+   * `availableCommands`도 `hasNextPeriod`일 때만 이 버튼을 보여준다).
+   */
+  private async endCurrentPeriod(
+    tx: Transaction,
+    game: LockedGame,
+    context: GameCommandContext,
+  ): Promise<GameMutationResult> {
+    if (game.state !== V1GameState.LIVE) {
+      throw new ConflictException({
+        code: 'PERIOD_NOT_STARTED',
+        message: '경기가 진행 중이어야 피리어드를 종료할 수 있어요',
+      });
+    }
+    const current = await tx.v1GamePeriod.findFirst({
+      where: { gameId: game.id, state: V1GamePeriodState.LIVE },
+    });
+    if (current === null) {
+      throw new ConflictException({
+        code: 'PERIOD_NOT_STARTED',
+        message: '진행 중인 피리어드가 없어요',
+      });
+    }
+    const next = await tx.v1GamePeriod.findFirst({
+      where: { gameId: game.id, number: current.number + 1 },
+    });
+    if (next === null) {
+      throw new ConflictException({
+        code: 'NO_NEXT_PERIOD',
+        message: '마지막 피리어드예요',
+      });
+    }
+    const now = new Date();
+    await tx.v1GamePeriod.update({
+      where: { id: current.id },
+      data: { state: V1GamePeriodState.ENDED, endedAt: now },
+    });
+    await tx.v1GamePeriod.update({
+      where: { id: next.id },
+      data: { state: V1GamePeriodState.HALFTIME },
+    });
+    const updated = await tx.v1Game.update({
+      where: { id: game.id },
+      data: { version: { increment: 1 } },
+    });
+    return {
+      gameId: updated.id,
+      state: updated.state,
+      version: updated.version,
+      durableCommandId: context.durableCommandId,
+      replayed: false,
+    };
+  }
+
+  /**
+   * 이슈 #375 (`start-period`) — `endCurrentPeriod`가 HALFTIME으로 옮겨
+   * 놓은 다음 피리어드를 LIVE로 연다(`advancePeriod`의 "시작" 절반).
+   * HALFTIME인 피리어드가 하나도 없으면(하프타임이 아니거나, 이미
+   * 시작됐거나) 거부한다 — 이 커맨드가 여는 대상은 항상 정확히 하나여야
+   * 한다(같은 시점에 HALFTIME 피리어드가 둘 이상 존재하는 것은
+   * endCurrentPeriod/startNextPeriod의 짝 구조상 불가능하다).
+   */
+  private async startNextPeriod(
+    tx: Transaction,
+    game: LockedGame,
+    context: GameCommandContext,
+  ): Promise<GameMutationResult> {
+    if (game.state !== V1GameState.LIVE) {
+      throw new ConflictException({
+        code: 'PERIOD_NOT_STARTED',
+        message: '경기가 진행 중이어야 다음 피리어드를 시작할 수 있어요',
+      });
+    }
+    const halftime = await tx.v1GamePeriod.findFirst({
+      where: { gameId: game.id, state: V1GamePeriodState.HALFTIME },
+    });
+    if (halftime === null) {
+      throw new ConflictException({
+        code: 'HALFTIME_NOT_ACTIVE',
+        message: '하프타임 상태가 아니에요',
+      });
+    }
+    const now = new Date();
+    await tx.v1GamePeriod.update({
+      where: { id: halftime.id },
+      data: { state: V1GamePeriodState.LIVE, startedAt: now },
+    });
+    const updated = await tx.v1Game.update({
+      where: { id: game.id },
+      data: { version: { increment: 1 } },
+    });
+    return {
+      gameId: updated.id,
+      state: updated.state,
+      version: updated.version,
+      durableCommandId: context.durableCommandId,
+      replayed: false,
+    };
+  }
+
+  /**
+   * 이슈 #375 (`revert-period`) — `endCurrentPeriod`(그리고 그 뒤
+   * `startNextPeriod`까지)를 되돌린다. `GamesService.reverseEvent`가
+   * "이벤트 하나"를 되돌리는 선례라면, 이건 그 선례를 "피리어드 전환"
+   * 단위로 적용한 것이다 — 다만 되돌릴 대상을 클라이언트가 id로 지정할
+   * 필요가 없다(한 시점에 "되돌릴 수 있는 전환"은 항상 최대 하나뿐이라
+   * next/current 피리어드의 상태만으로 유일하게 특정된다).
+   *
+   * 대상 판별: 되돌릴 "다음 피리어드"는 (a) 아직 `HALFTIME`이거나(전반
+   * 종료 후 후반 시작 전) (b) 이미 `LIVE`이면서 그 바로 앞 피리어드
+   * (number - 1)가 `ENDED`인 경우(후반이 이미 시작된 뒤)다. (b)의 "앞
+   * 피리어드가 ENDED" 조건이 핵심이다 — 이게 없으면 피리어드 1의 최초
+   * `start`로 생긴 LIVE(앞에 아무 피리어드도 없다)까지 되돌릴 대상으로
+   * 잘못 집어낸다.
+   *
+   * 데이터 정합성 게이트(사용자 결정, 이슈 #375 브리프): 다음 피리어드에
+   * **이벤트가 하나라도 기록된 뒤에는 되돌릴 수 없다.** 골/카드가 이미 그
+   * 피리어드 번호로 기록된 채 그 피리어드를 SCHEDULED로 되돌리면, 그
+   * 이벤트들은 "시작도 안 한 피리어드에 속한 기록"이 되어 이후 조회/집계
+   * (`deriveTournamentRevision`, `assertEventReferences`)에서 소속이
+   * 뒤틀린다. 그래서 콘솔 UI는 하프타임 동안만 되돌리기 진입점을 보여주지만
+   * (operate-console.tsx), 백엔드는 그보다 넓게 "다음 피리어드에 기록된
+   * 이벤트가 없는 동안"이라는 더 근본적인 조건으로 강제한다 — 하프타임
+   * 창을 넘겨도 아직 아무 기록이 없다면 서버는 여전히 허용한다.
+   */
+  private async revertPeriodTransition(
+    tx: Transaction,
+    game: LockedGame,
+    context: GameCommandContext,
+  ): Promise<GameMutationResult> {
+    if (game.state !== V1GameState.LIVE) {
+      throw new ConflictException({
+        code: 'PERIOD_NOT_STARTED',
+        message: '경기가 진행 중이어야 피리어드 전환을 되돌릴 수 있어요',
+      });
+    }
+    const next = await tx.v1GamePeriod.findFirst({
+      where: {
+        gameId: game.id,
+        OR: [
+          { state: V1GamePeriodState.HALFTIME },
+          { state: V1GamePeriodState.LIVE, number: { gt: 1 } },
+        ],
+      },
+      orderBy: { number: 'desc' },
+    });
+    const previous =
+      next === null
+        ? null
+        : await tx.v1GamePeriod.findFirst({ where: { gameId: game.id, number: next.number - 1 } });
+    if (next === null || previous === null || previous.state !== V1GamePeriodState.ENDED) {
+      // `next`가 LIVE인데 바로 앞 피리어드가 ENDED가 아니면(전형적으로
+      // 피리어드 1의 최초 kickoff) end-period/start-period가 만든 전환이
+      // 아니라는 뜻 — 되돌릴 게 없다.
+      throw new ConflictException({
+        code: 'PERIOD_REVERT_NOT_AVAILABLE',
+        message: '되돌릴 피리어드 전환이 없어요',
+      });
+    }
+    const nextPeriodEventCount = await tx.v1GameEvent.count({
+      where: { gameId: game.id, period: next.number },
+    });
+    if (nextPeriodEventCount > 0) {
+      throw new ConflictException({
+        code: 'PERIOD_REVERT_HAS_EVENTS',
+        message: '이미 기록된 이벤트가 있어 되돌릴 수 없어요',
+      });
+    }
+    await tx.v1GamePeriod.update({
+      where: { id: next.id },
+      data: {
+        state: V1GamePeriodState.SCHEDULED,
+        startedAt: null,
+        // start-period 이후 pause/resume이 한 번도 없었다면 이미 0/null이라
+        // no-op이다 — 이벤트 없이도 pause/resume만 눌렸던 드문 경로까지
+        // 대비해 "한 번도 시작 안 한 피리어드"로 완전히 되돌린다.
+        pausedTotalMs: 0,
+        pausedAt: null,
+      },
+    });
+    await tx.v1GamePeriod.update({
+      where: { id: previous.id },
+      data: { state: V1GamePeriodState.LIVE, endedAt: null },
     });
     const updated = await tx.v1Game.update({
       where: { id: game.id },
@@ -1846,8 +2151,15 @@ export class GamesService {
         // note) -- it exists so a later period-opening path for team
         // matches closes correctly without this submission path needing to
         // change again.
+        //
+        // 이슈 #375: `end-period`/`next-period`는 TEAM_MATCH sourceType도
+        // 막지 않으므로(위 TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN 가드는 오직
+        // `end`만 막는다) 팀매치 경기도 이론상 HALFTIME 도중 이 결과제출
+        // 경로로 끝날 수 있다 — `executeCommand('end')`와 동일하게
+        // HALFTIME도 함께 닫아 다음 피리어드가 영원히 HALFTIME으로 남지
+        // 않게 한다.
         await tx.v1GamePeriod.updateMany({
-          where: { gameId, state: V1GamePeriodState.LIVE },
+          where: { gameId, state: { in: [V1GamePeriodState.LIVE, V1GamePeriodState.HALFTIME] } },
           data: { state: V1GamePeriodState.ENDED, endedAt: new Date() },
         });
         if (game.teamMatchId !== null) {
@@ -3312,7 +3624,13 @@ export class GamesService {
     // T1-0: only the currently-LIVE period may receive events. Before this,
     // `V1GamePeriod.state` was never checked here at all, and nothing ever
     // set it past SCHEDULED -- see the design doc's §2.8 diagnosis.
-    if (period.state === V1GamePeriodState.SCHEDULED) {
+    //
+    // 이슈 #375: HALFTIME도 SCHEDULED와 마찬가지로 "아직 시작 안 함"이다 —
+    // `end-period`가 다음 피리어드를 SCHEDULED 대신 HALFTIME으로 옮기므로,
+    // 이 가드가 SCHEDULED만 봤다면 하프타임 도중(또는 되돌리기 직후 stale
+    // 클라이언트가 보낸) 이벤트가 "아직 시작하지 않은 피리어드"를 그냥
+    // 통과해버린다.
+    if (period.state === V1GamePeriodState.SCHEDULED || period.state === V1GamePeriodState.HALFTIME) {
       throw new ConflictException({
         code: 'PERIOD_NOT_STARTED',
         message: '아직 시작하지 않은 피리어드예요',

@@ -10,8 +10,10 @@ import {
   ArrowLeftRight,
   Pause,
   Play,
+  RotateCcw,
   SkipForward,
   Square,
+  Timer,
 } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -65,23 +67,44 @@ const STATE_LABEL: Record<GameState, string> = {
   CANCELLED: '취소됨',
 };
 
-const COMMAND_LABEL: Record<Exclude<GameCommandName, 'next-period'>, string> = {
+const COMMAND_LABEL: Record<
+  Exclude<GameCommandName, 'end-period' | 'start-period' | 'revert-period'>,
+  string
+> = {
   start: '경기 시작',
   pause: '일시 중지',
   resume: '재개',
   end: '경기 종료',
 };
 
-/** `next-period`는 고정 라벨이 없다 — 화면 전체가 공유하는 `periodLabel`(UX
- * 감사 item 4)을 그대로 써서 "전반 종료"/"후반 종료"/"N피리어드 종료"를
- * 만든다. */
-function nextPeriodCommandLabel(currentPeriodNumber: number): string {
+/** `end-period`/`start-period`는 고정 라벨이 없다 — 화면 전체가 공유하는
+ * `periodLabel`(UX 감사 item 4)을 그대로 써서 "전반 종료"/"후반 시작"/
+ * "N피리어드 종료"를 만든다(이슈 #375: 구 `nextPeriodCommandLabel` 하나가
+ * 종료+시작 라벨을 겸했던 것을 명령이 둘로 나뉜 만큼 함수도 나눈다). */
+function endPeriodCommandLabel(currentPeriodNumber: number): string {
   return `${periodLabel(currentPeriodNumber)} 종료`;
 }
 
-function commandLabel(command: GameCommandName, currentPeriodNumber: number | null): string {
-  if (command === 'next-period') {
-    return nextPeriodCommandLabel(currentPeriodNumber ?? 1);
+/** `nextPeriodNumber`는 지금 HALFTIME인 피리어드의 번호다(halftimePeriod?.
+ * number) — currentPeriod(=LIVE 피리어드)가 아니다, 하프타임 중엔 LIVE인
+ * 피리어드가 없기 때문이다. */
+function startPeriodCommandLabel(nextPeriodNumber: number): string {
+  return `${periodLabel(nextPeriodNumber)} 시작`;
+}
+
+function commandLabel(
+  command: GameCommandName,
+  currentPeriodNumber: number | null,
+  nextPeriodNumber: number | null,
+): string {
+  if (command === 'end-period') {
+    return endPeriodCommandLabel(currentPeriodNumber ?? 1);
+  }
+  if (command === 'start-period') {
+    return startPeriodCommandLabel(nextPeriodNumber ?? 2);
+  }
+  if (command === 'revert-period') {
+    return '되돌리기';
   }
   return COMMAND_LABEL[command];
 }
@@ -89,12 +112,14 @@ function commandLabel(command: GameCommandName, currentPeriodNumber: number | nu
 /** 명령 버튼 재설계 — 색 하나로만 구분되던 걸(전부 알약 3개) 아이콘까지
  * 더해 한눈에 "무슨 동작인지"를 알 수 있게 한다. 위험도(경기 종료) 자체의
  * 구분은 아이콘이 아니라 색+구분선(아래 렌더 부분)이 계속 맡는다 — 아이콘은
- * 여기서 "정지/재생/다음/멈춤"의 의미만 보탠다. */
+ * 여기서 "정지/재생/다음/멈춤/되돌리기"의 의미만 보탠다. */
 const COMMAND_ICON: Record<GameCommandName, typeof Pause> = {
   start: Play,
   pause: Pause,
   resume: Play,
-  'next-period': SkipForward,
+  'end-period': SkipForward,
+  'start-period': Play,
+  'revert-period': RotateCcw,
   end: Square,
 };
 
@@ -163,12 +188,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const gameVersion = ops.gameSnapshot?.version ?? gameDetail.data?.version ?? 0;
 
   // T1-0: a period only counts as "current" once the server has marked it
-  // LIVE (via executeCommand's start/next_period). Falling back to "the
+  // LIVE (via executeCommand's start/start-period). Falling back to "the
   // highest period number" was the root cause of every captured event
   // landing on the last period at clockMs 0 — see the design doc's §2.8.
   const currentPeriod = useMemo(() => {
     const periods = gameDetail.data?.periods ?? [];
     return periods.find((period) => period.state === 'LIVE') ?? null;
+  }, [gameDetail.data?.periods]);
+
+  // 이슈 #375 — end-period가 다음 피리어드를 SCHEDULED가 아니라 HALFTIME으로
+  // 옮긴다. currentPeriod와 배타적이다(한 번에 최대 하나만 참일 수 있다: 어떤
+  // 피리어드도 LIVE가 아니면서 정확히 하나가 HALFTIME이거나, 그 반대다).
+  const halftimePeriod = useMemo(() => {
+    const periods = gameDetail.data?.periods ?? [];
+    return periods.find((period) => period.state === 'HALFTIME') ?? null;
   }, [gameDetail.data?.periods]);
 
   const hasNextPeriod = useMemo(() => {
@@ -190,17 +223,25 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   }, [currentPeriod, gameDetail.data?.periodDurations]);
 
   const availableCommands: readonly GameCommandName[] = useMemo(() => {
+    // 이슈 #375 — 하프타임은 gameState==='LIVE'인 채로 지속되는 실제 상태라
+    // (요건 3 테스트: "LIVE 중에는 보이지 않는다"의 반례가 되지 않도록)
+    // gameState 스위치보다 먼저 갈라야 한다. `pause`는 이 구간에서
+    // 뜻이 없어(멈출 LIVE 피리어드가 없다) 뺀다 — 백엔드도 같은 이유로
+    // 거부한다(games.service.ts executeCommand의 PERIOD_NOT_STARTED 가드).
+    if (gameState === 'LIVE' && halftimePeriod !== null) {
+      return ['start-period', 'revert-period', 'end'];
+    }
     switch (gameState) {
       case 'SCHEDULED':
         return ['start'];
       case 'LIVE':
-        return hasNextPeriod ? ['pause', 'next-period', 'end'] : ['pause', 'end'];
+        return hasNextPeriod ? ['pause', 'end-period', 'end'] : ['pause', 'end'];
       case 'PAUSED':
         return ['resume', 'end'];
       default:
         return [];
     }
-  }, [gameState, hasNextPeriod]);
+  }, [gameState, hasNextPeriod, halftimePeriod]);
 
   const foulCounts = useMemo(
     () => deriveFoulCounts(ops.liveEvents, currentPeriod?.number ?? 1),
@@ -445,8 +486,16 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     async (command: GameCommandName) => {
       if (!gameId || !isTakeoverHeld(ops.takeover)) return;
       // UX 감사 item 3 — "경기 종료"는 되돌릴 수 없는데 확인 단계 없이 즉시
-      // 실행됐다. 다른 명령(일시중지/재개/전반종료)은 되돌릴 수 있으니 그대로
-      // 즉시 실행한다 — 종료만 확인을 거친다.
+      // 실행됐다. 이슈 #375 정정: 예전 이 주석은 "다른 명령(...전반종료)은
+      // 되돌릴 수 있으니 확인 없이 즉시 실행한다"고 적혀 있었지만, 그
+      // 시점엔 되돌리기 자체가 아예 없어 전제가 거짓이었다(원인 브리프
+      // 참고). 지금은 `end-period`가 진짜로 되돌릴 수 있는 명령이다 —
+      // 하프타임 동안은 물론, 다음 피리어드에 이벤트가 하나도 없는 동안은
+      // 그 뒤에도 서버가 되돌리기를 허용한다(`revert-period`,
+      // GamesService.revertPeriodTransition). `start-period`/`revert-period`도
+      // 같은 이유로 확인을 생략한다(각각 스스로 되돌릴 수 있거나, 되돌리기
+      // 그 자체다). 진짜로 되돌릴 수 없는 건 `end`(경기 종료) 하나뿐이라
+      // 확인 게이트는 여전히 그 하나에만 건다.
       if (command === 'end') {
         const confirmed = await confirm({
           title: '경기를 종료할까요?',
@@ -459,11 +508,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       setCommandPending(true);
       setCommandError(null);
       setLastCommandFeedback(null);
-      // 라벨은 실행 "전" currentPeriod 기준으로 미리 굳혀둔다 — next-period 명령이
-      // 성공하면 refetch 후 currentPeriod가 바로 다음 피리어드로 바뀌어서, 완료 후에
-      // 다시 계산하면 "방금 무엇을 끝냈는지"가 아니라 "다음에 뭘 할 수 있는지"로
+      // 라벨은 실행 "전" currentPeriod/halftimePeriod 기준으로 미리 굳혀둔다 —
+      // end-period/start-period 명령이 성공하면 refetch 후 currentPeriod·
+      // halftimePeriod가 곧장 바뀌어서(하프타임 진입/탈출), 완료 후에 다시
+      // 계산하면 "방금 무엇을 끝냈는지"가 아니라 "다음에 뭘 할 수 있는지"로
       // 라벨이 뒤바뀐다.
-      const label = commandLabel(command, currentPeriod?.number ?? null);
+      const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null);
       const startedAtMs = performance.now();
       try {
         const result = await postV1GameCommand(gameId, command, {
@@ -482,14 +532,44 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         ops.applyCommandResult(result);
         await gameDetail.refetch();
         setLastCommandFeedback({ label, durationMs: Math.round(performance.now() - startedAtMs) });
+        // 이슈 #375 — 기존 골/교체 되돌리기(findRecentGoalEvent /
+        // ops.reverseEvent)와 같은 토스트 패턴을 따른다: end-period 직후
+        // "방금 실수로 눌렀다"를 바로 되돌릴 수 있는 액션을 붙인다. 골/교체
+        // 되돌리기와 달리 "어떤 이벤트인지" 찾을 필요가 없다 — 되돌릴
+        // 대상은 서버가 "지금 되돌릴 수 있는 전환" 하나로 유일하게 정한다
+        // (GamesService.revertPeriodTransition). 하프타임 창을 넘겨 다음
+        // 피리어드에 이벤트가 이미 생겼다면 서버가 PERIOD_REVERT_HAS_EVENTS로
+        // 거부하고, 그 실패는 이 화면의 공용 오류 배너로 그대로 뜬다(토스트
+        // 자체는 별도 실패 처리를 하지 않는다).
+        if (command === 'end-period') {
+          showToast(`${label}했어요`, {
+            action: {
+              label: '되돌리기',
+              onClick: () => {
+                void handleRunCommandRef.current('revert-period');
+              },
+            },
+          });
+        }
       } catch (error) {
         setCommandError(extractErrorMessage(error, '명령을 처리하지 못했어요. 다시 시도해주세요.'));
       } finally {
         setCommandPending(false);
       }
     },
-    [gameId, ops, gameVersion, gameDetail, currentPeriod, confirm],
+    [gameId, ops, gameVersion, gameDetail, currentPeriod, halftimePeriod, confirm, showToast],
   );
+
+  // 이슈 #375 — Copilot review 패턴 재사용(PR #276, 위 liveEventsRef와 같은
+  // 이유): 되돌리기 토스트의 onClick이 "토스트를 띄운 그 순간의"
+  // handleRunCommand 클로저를 그대로 들고 몇 초를 살아있으면, 그사이
+  // gameVersion이 바뀌어도(end-period 성공 자체가 버전을 올린다) 반영되지
+  // 않아 되돌리기 요청이 낡은 expectedVersion으로 나가 충돌한다 — ref로
+  // 항상 최신 함수를 가리키게 한다.
+  const handleRunCommandRef = useRef(handleRunCommand);
+  useEffect(() => {
+    handleRunCommandRef.current = handleRunCommand;
+  }, [handleRunCommand]);
 
   if (fixtureLineup.isLoading || (gameId && gameDetail.isLoading)) {
     return (
@@ -528,15 +608,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {/* Sticky context header — tablet 768×1024 / desktop 1280+ keep this
           visible while scrolling the lineup/queue below. */}
       <header className="sticky top-0 z-10 -mx-4 border-b border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur-sm dark:bg-gray-900/95">
-        {/* T1-0: next-period 버튼이 추가되며 LIVE 상태의 버튼이 최대 3개(일시
-            중지/전반 종료/경기 종료)가 됐다. 기존 "한 줄에 타이틀+뱃지+버튼"
-            레이아웃은 390px 모바일에서 버튼 3개가 shrink-0로 자기 너비를 그대로
-            차지해 왼쪽 뱃지·연결상태 영역이 극단적으로 좁아져 "진행 중" 뱃지가
-            글자 단위로 세로 줄바꿈되는 회귀를 만들었다(2버튼 상태에서는 재현 안
-            됨 — 실측 스크린샷으로 확인). 모바일에서는 타이틀 행과 버튼 행을
-            세로로 분리하고, 버튼 행은 필요시 자체적으로 줄바꿈하도록 바꿔
-            타이틀/뱃지 쪽 공간을 압박하지 않는다. sm(640px) 이상은 기존 한 줄
-            레이아웃을 유지한다(768/1440에서는 문제없이 확인됨). */}
+        {/* T1-0: next-period(현재는 end-period) 버튼이 추가되며 LIVE 상태의
+            버튼이 최대 3개(일시 중지/전반 종료/경기 종료)가 됐다. 기존 "한
+            줄에 타이틀+뱃지+버튼" 레이아웃은 390px 모바일에서 버튼 3개가
+            shrink-0로 자기 너비를 그대로 차지해 왼쪽 뱃지·연결상태 영역이
+            극단적으로 좁아져 "진행 중" 뱃지가 글자 단위로 세로 줄바꿈되는
+            회귀를 만들었다(2버튼 상태에서는 재현 안 됨 — 실측 스크린샷으로
+            확인). 모바일에서는 타이틀 행과 버튼 행을 세로로 분리하고, 버튼
+            행은 필요시 자체적으로 줄바꿈하도록 바꿔 타이틀/뱃지 쪽 공간을
+            압박하지 않는다. sm(640px) 이상은 기존 한 줄 레이아웃을 유지한다
+            (768/1440에서는 문제없이 확인됨).
+            이슈 #375 — 하프타임 버튼 셋(후반 시작/되돌리기/경기 종료)도 같은
+            "비-end 2개 + 구분선 + end 1개" 모양이라 이 컨테이너를 그대로
+            재사용한다(새 레이아웃을 만들지 않는다) — 위에서 이미 3버튼
+            모바일 줄바꿈까지 검증된 자리다. */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-[var(--text-strong)]">
@@ -595,7 +680,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                       onClick={() => handleRunCommand(command)}
                     >
                       {!commandPending ? <Icon size={14} aria-hidden="true" /> : null}
-                      {commandLabel(command, currentPeriod?.number ?? null)}
+                      {commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
                     </Button>
                   );
                 })}
@@ -611,7 +696,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                     onClick={() => handleRunCommand('end')}
                   >
                     {!commandPending ? <Square size={14} aria-hidden="true" /> : null}
-                    {commandLabel('end', currentPeriod?.number ?? null)}
+                    {commandLabel('end', currentPeriod?.number ?? null, halftimePeriod?.number ?? null)}
                   </Button>
                 </>
               ) : null}
@@ -650,6 +735,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 pausedTotalMs={currentPeriod.pausedTotalMs}
                 pausedAtMs={currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime()}
               />
+            ) : halftimePeriod !== null ? (
+              // 이슈 #375 — 어떤 피리어드도 LIVE가 아니므로 경과 시간 자체가
+              // 없다(잴 대상이 없다). 자리를 비워두면(예전 동작) "고장
+              // 났나?" 처럼 읽히므로, ElapsedMatchClock과 같은 슬롯에
+              // 같은 시각적 무게로 하프타임임을 명시한다 — STATE_LABEL
+              // 뱃지는 여전히 "진행 중"이라(게임 자체는 LIVE) 이 칩이 없으면
+              // 하프타임이라는 사실이 화면 어디에도 안 보인다. 아이콘은
+              // `Pause`(=PAUSED 상태 배지가 이미 쓰는 아이콘) 대신
+              // `Timer`를 써서 "일시 중지"와 헷갈리지 않게 한다 — 아래
+              // RestTimer("휴식 타이머")와 같은 아이콘 언어를 공유한다.
+              <span className="flex items-center gap-1.5 rounded-lg bg-[var(--blue50)] px-2.5 py-1 text-sm font-bold text-[var(--blue700)] dark:bg-blue-500/10">
+                <Timer size={16} aria-hidden="true" />
+                하프타임
+              </span>
             ) : null}
           </div>
         ) : null}
@@ -680,7 +779,18 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             </Link>
           </Banner>
         )}
+        {/* 이슈 #375 — halftimePeriod가 있을 때도 currentPeriod는 null이라
+            (LIVE인 피리어드가 없다), 이 조건을 손대지 않았다면 하프타임
+            도중에도 "경기를 시작해 주세요."가 그대로 떠서 운영자가 경기가
+            아직 시작조차 안 됐다고 오해할 뻔했다. 하프타임은 별도의 정확한
+            안내로 갈라낸다. */}
+        {halftimePeriod !== null && gameState === 'LIVE' && (
+          <Banner tone="info">
+            하프타임이에요. 준비되면 위 &lsquo;{startPeriodCommandLabel(halftimePeriod.number)}&rsquo;을 눌러주세요.
+          </Banner>
+        )}
         {currentPeriod === null &&
+          halftimePeriod === null &&
           gameState !== 'ENDED' &&
           gameState !== 'CANCELLED' &&
           !(gameState === 'SCHEDULED' && sidesMissingLineup.length > 0) && (

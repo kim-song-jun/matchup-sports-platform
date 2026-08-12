@@ -92,6 +92,19 @@ vi.mock('./lineup-grid', () => ({
   },
 }));
 
+// 이슈 #375 — `mocks.postV1GameCommand`는 `vi.hoisted`로 파일 전체가 공유하는
+// 스파이라 `vitest.config.mts`에 clearMocks가 없는 이 프로젝트에서는 호출
+// 기록이 테스트 사이에 그대로 누적된다. "하프타임" describe가 실제로
+// postV1GameCommand를 호출하는 테스트를 추가하면서, 그 뒤에 있는 "경기 종료
+// 확인" describe의 "아직 호출되지 않았다" 단언이 앞선 테스트의 호출까지
+// 주워 담아 깨졌다 — 구현 결함이 아니라 파일 전체가 공유하는 목의 호출
+// 기록이 초기화되지 않던 잠재적 취약점이다. 매 테스트 전에 호출 기록만
+// 지운다(mockClear, 각 describe가 이미 따로 설정하는 mockResolvedValue
+// 구현 자체는 건드리지 않는다).
+beforeEach(() => {
+  mocks.postV1GameCommand.mockClear();
+});
+
 const SIDE_ID = 'side-home';
 
 function goal(sequence: number): GameEventRecord {
@@ -320,6 +333,82 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
     expect(screen.queryByText('전반 종료')).toBeNull();
     expect(screen.queryByText('후반 종료')).toBeNull();
+  });
+
+  // 이슈 #375 — "전반 종료" 버튼 라벨은 그대로지만 실제로 서버에 보내는
+  // 커맨드는 구 fused `next-period`가 아니라 새로 분리된 `end-period`여야
+  // 한다(라벨과 동작을 일치시키는 것이 이슈의 핵심).
+  it('"전반 종료"를 누르면 postV1GameCommand가 end-period로 호출된다', async () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
+
+    await waitFor(() =>
+      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything()),
+    );
+  });
+
+  // 이슈 #375 — 하프타임(피리어드1 ENDED + 피리어드2 HALFTIME)에서는 '후반
+  // 시작'과 '되돌리기'가 보이고, 클릭하면 각각 start-period/revert-period를
+  // 보낸다. 요구사항의 리터럴 테스트: "LIVE 중에는 보이지 않는다"는 바로
+  // 위(마지막 피리어드가 진행 중) 테스트가 이미 덮는다.
+  describe('하프타임', () => {
+    function gameAtHalftime() {
+      gameWithPeriods('LIVE', [
+        { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+        { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
+      ]);
+    }
+
+    it('"후반 시작"과 "되돌리기"를 보여주고, 일시 중지·전반 종료는 숨긴다', () => {
+      gameAtHalftime();
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByRole('button', { name: '후반 시작' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '되돌리기' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '일시 중지' })).toBeNull();
+      expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
+      expect(screen.getByText(/하프타임이에요/)).toBeInTheDocument();
+      // 경기를 시작해 주세요 배너가 하프타임 배너로 잘못 겹치지 않아야 한다.
+      expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
+
+      // 하프타임 동안 골/카드 등 액션 버튼은 여전히 막혀 있어야 한다(LIVE인
+      // 피리어드가 없다 — currentPeriod === null 가드는 손대지 않았다).
+      expect(screen.getByRole('button', { name: /^골/ })).toBeDisabled();
+    });
+
+    it('"후반 시작"을 누르면 start-period를 보낸다', async () => {
+      gameAtHalftime();
+      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '후반 시작' }));
+
+      await waitFor(() =>
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'start-period', expect.anything()),
+      );
+    });
+
+    it('"되돌리기"를 누르면 확인 없이 곧장 revert-period를 보낸다', async () => {
+      gameAtHalftime();
+      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
+
+      // UX 감사 item 3 — end/전반종료와 달리 되돌리기는 그 자체가 이미
+      // 교정 행동이라 확인 다이얼로그를 거치지 않는다.
+      expect(screen.queryByRole('dialog')).toBeNull();
+      await waitFor(() =>
+        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'revert-period', expect.anything()),
+      );
+    });
   });
 });
 

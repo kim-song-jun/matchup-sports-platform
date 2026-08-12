@@ -47,7 +47,8 @@ export interface GamePeriodClockRow {
  * during a between-periods break the operator has not started the next
  * period for yet, or after the game has ended -- rather than guessing from a
  * stale period's frozen time. A `LIVE` row with `startedAt === null` (should
- * never happen once `start`/`next_period` have run, but this read side must
+ * never happen once `start`/`start-period` (or the deprecated fused
+ * `next-period`) have run, but this read side must
  * not crash on a write-side invariant it cannot itself enforce) also
  * resolves to `null`.
  */

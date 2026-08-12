@@ -12,7 +12,10 @@
 export type GameSourceType = 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
 export type GameState = 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
 export type GameSideKey = 'HOME' | 'AWAY';
-export type GamePeriodState = 'SCHEDULED' | 'LIVE' | 'ENDED';
+/** 이슈 #375 — `HALFTIME`: 현재 피리어드는 `ENDED`로 닫혔지만 다음
+ * 피리어드는 아직 `LIVE`로 열리지 않은 하프타임 구간(`end-period`가 다음
+ * 피리어드 행에 쓰는 값, `start-period`가 `LIVE`로 옮긴다). */
+export type GamePeriodState = 'SCHEDULED' | 'LIVE' | 'HALFTIME' | 'ENDED';
 export type GameLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
 
 /**
@@ -191,7 +194,16 @@ export interface GameEventsBackfill {
   gap: GameEventGap | null;
 }
 
-export type GameCommandName = 'start' | 'pause' | 'resume' | 'end' | 'next-period';
+/**
+ * 이슈 #375 — 구 `next-period`(전반 종료를 누르면 곧장 후반까지 시작시켜
+ * 되돌릴 수 없던 fused 커맨드)를 `end-period`(현재 피리어드만 종료 →
+ * 하프타임)와 `start-period`(하프타임 → 다음 피리어드 시작)로 쪼갰고,
+ * `revert-period`(하프타임 되돌리기)를 새로 추가했다. `next-period`는
+ * 백엔드가 배포 호환용으로 당분간만 계속 받는 값이라(`GameCommandName.
+ * next_period`의 @deprecated 문서, apps/v1_api) 이 프런트 타입에서는
+ * 아예 제거한다 — 새로 빌드되는 콘솔은 이 값을 절대 보내지 않는다.
+ */
+export type GameCommandName = 'start' | 'pause' | 'resume' | 'end' | 'end-period' | 'start-period' | 'revert-period';
 
 export interface GameCommandRequest {
   expectedVersion: number;

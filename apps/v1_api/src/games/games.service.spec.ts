@@ -7,6 +7,7 @@ import {
   canonicalGameCommandPayloadHash,
   extractEndPenalties,
   gameAuthorizationAction,
+  gameCommandAuditAction,
   gameOperationAuditActor,
   groupParticipantsByLineupId,
   staffLineupSubmitRequiresTakeover,
@@ -108,6 +109,14 @@ describe('GamesService command boundary', () => {
   it.each([
     ['game_start', 'tournament_command'],
     ['game_end', 'tournament_command'],
+    // 이슈 #375 — end-period/start-period/revert-period은 next_period가 쓰던
+    // tournament_command 굵기의 권한을 그대로 물려받는다. next_period 자체도
+    // 배포 호환용으로 당분간 계속 받으므로(game-command.dto.ts의
+    // @deprecated 문서) 함께 매핑돼야 한다.
+    ['game_end_period', 'tournament_command'],
+    ['game_start_period', 'tournament_command'],
+    ['game_revert_period', 'tournament_command'],
+    ['game_next_period', 'tournament_command'],
     ['game_cancel', 'cancel'],
     ['event_append', 'event_append'],
     ['event_reverse', 'event_reverse'],
@@ -128,6 +137,29 @@ describe('GamesService command boundary', () => {
     expect(() => gameAuthorizationAction('game_destroy')).toThrow(
       'Unsupported game command action: game_destroy',
     );
+  });
+
+  // 이슈 #375 — 하이픈이 들어간 커맨드 이름(`end-period` 등)을 그냥
+  // `game_${command}` 템플릿에 넣으면 감사 로그 액션 문자열에 하이픈이
+  // 섞여(`game_end-period`) 나머지 액션들의 스네이크케이스 관례와 어긋난다.
+  // 실제로 이 매핑이 깨지면 gameAuthorizationAction의 switch 어느 case에도
+  // 안 걸려 executeCommand가 즉시 예외를 던진다 — 이 테스트가 그 회귀를
+  // 직접 잡는다.
+  it.each([
+    ['start', 'game_start'],
+    ['pause', 'game_pause'],
+    ['resume', 'game_resume'],
+    ['end', 'game_end'],
+    ['end-period', 'game_end_period'],
+    ['start-period', 'game_start_period'],
+    ['revert-period', 'game_revert_period'],
+    ['next-period', 'game_next_period'],
+  ] as const)('maps command %s to the audit action %s (hyphens become underscores)', (command, action) => {
+    expect(gameCommandAuditAction(command)).toBe(action);
+    // 어느 커맨드로 만들어졌든, 결과 액션 문자열은 항상
+    // gameAuthorizationAction이 이해하는 값이어야 한다 — 매핑 두 개가
+    // 서로 어긋나면 executeCommand가 런타임에만 발견되는 예외를 던진다.
+    expect(() => gameAuthorizationAction(gameCommandAuditAction(command))).not.toThrow();
   });
 
   it('maps game principals to actor-neutral audit identities', () => {

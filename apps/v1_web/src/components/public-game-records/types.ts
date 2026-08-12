@@ -34,10 +34,15 @@ export interface PublicGameClock {
   readonly isPaused: boolean;
 }
 
+/**
+ * 참가팀 공개 정책 통일(fix/v1-publish) — teamId/teamName은 대회가 모집
+ * 중(status==='open')이고 조회자가 운영자·스태프가 아니면 둘 다 null이다.
+ * registrationId는 재식별 경로가 없으므로 항상 남는다.
+ */
 export interface PublicSideSummary {
   readonly registrationId: string;
-  readonly teamId: string;
-  readonly teamName: string;
+  readonly teamId: string | null;
+  readonly teamName: string | null;
 }
 
 /**
@@ -75,11 +80,14 @@ export interface PublicScheduleEntry {
   readonly hasVideo: boolean;
 }
 
+/** teamId/teamName/teamLogoUrl 비공개 규칙은 PublicSideSummary와 동일. */
 export interface PublicStandingRow {
   readonly groupId: string;
   readonly groupName: string;
-  readonly teamId: string;
-  readonly teamName: string;
+  /** 참가팀 공개 정책 통일(fix/v1-publish) — teamId가 null이어도 행마다 고유한 키. */
+  readonly registrationId: string;
+  readonly teamId: string | null;
+  readonly teamName: string | null;
   readonly teamLogoUrl: string | null;
   readonly position: number;
   readonly points: number;

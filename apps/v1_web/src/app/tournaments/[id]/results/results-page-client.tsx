@@ -342,7 +342,11 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
     date, isAccent = false, isAgg = false,
   }: {
     label: React.ReactNode; labelColor?: string;
-    home: string; away: string; homeScore: number; awayScore: number;
+    // 참가팀 공개 정책 통일(fix/v1-publish) — 이 페이지는 status==='completed'
+    // 대회만 다루므로(모집 중이 아님) hideIdentity는 실질적으로 항상 false지만,
+    // 타입은 V1TournamentFixture.homeTeamName/awayTeamName을 그대로 따르므로
+    // string | null을 받는다. null은 '팀 정보 없음'으로 방어적으로 표시한다.
+    home: string | null; away: string | null; homeScore: number; awayScore: number;
     winner: 'home' | 'away' | null;
     hasPenalty?: boolean; homePK?: number | null; awayPK?: number | null;
     date?: string; isAccent?: boolean; isAgg?: boolean;
@@ -368,7 +372,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
           color: winner === 'home' ? 'var(--text-strong)' : 'var(--text-muted)',
           wordBreak: 'keep-all', lineHeight: 1.35,
         }}>
-          {home}{isAgg && winner === 'home' && <span style={{ fontSize: 12, color: 'var(--text-strong)', marginLeft: 4 }}>✓</span>}
+          {home ?? '팀 정보 없음'}{isAgg && winner === 'home' && <span style={{ fontSize: 12, color: 'var(--text-strong)', marginLeft: 4 }}>✓</span>}
         </span>
         <div style={{
           flex: '0 0 60px', textAlign: 'center',
@@ -395,7 +399,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
           color: winner === 'away' ? 'var(--text-strong)' : 'var(--text-muted)',
           wordBreak: 'keep-all', lineHeight: 1.35,
         }}>
-          {isAgg && winner === 'away' && <span style={{ fontSize: 12, color: 'var(--text-strong)', marginRight: 4 }}>✓</span>}{away}
+          {isAgg && winner === 'away' && <span style={{ fontSize: 12, color: 'var(--text-strong)', marginRight: 4 }}>✓</span>}{away ?? '팀 정보 없음'}
         </span>
       </div>
     </div>

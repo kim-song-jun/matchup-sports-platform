@@ -85,9 +85,15 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const tournament = useV1Tournament(tournamentId);
 
   const teamNamesByFixtureId = useMemo(() => {
+    // 참가팀 공개 정책 통일(fix/v1-publish) — 이 페이지는 GET /tournaments/:id(공개
+    // 상세)를 그대로 쓰므로(useV1Tournament) 타입상 homeTeamName/awayTeamName이
+    // null일 수 있다. 실제로는 이 화면에 접근하는 스태프(TOURNAMENT_DIRECTOR 등,
+    // TournamentOperationsBoardController와 동일하게 대회 전체 단위로 인가됨)는
+    // 항상 실명을 받으므로 null은 이 화면에서 실질적으로 나타나지 않지만, 방어적으로
+    // '미정'으로 표시한다(빈 문자열을 만들어 rowLabel의 "vs" 표기가 깨지지 않도록).
     const map = new Map<string, { home: string; away: string }>();
     for (const fixture of tournament.data?.fixtures ?? []) {
-      map.set(fixture.id, { home: fixture.homeTeamName, away: fixture.awayTeamName });
+      map.set(fixture.id, { home: fixture.homeTeamName ?? '미정', away: fixture.awayTeamName ?? '미정' });
     }
     return map;
   }, [tournament.data?.fixtures]);

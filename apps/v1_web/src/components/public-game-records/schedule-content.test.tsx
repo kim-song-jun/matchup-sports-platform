@@ -28,6 +28,7 @@ describe('ScheduleContent — 순위표 팀 링크', () => {
         {
           groupId: 'group-a',
           groupName: 'A조',
+          registrationId: 'reg-77',
           teamId: 'team-77',
           teamName: '망원 FC',
           teamLogoUrl: '/uploads/team-77-logo.png',
@@ -59,6 +60,7 @@ describe('ScheduleContent — 순위표 팀 링크', () => {
         {
           groupId: 'group-a',
           groupName: 'A조',
+          registrationId: 'reg-77',
           teamId: 'team-77',
           teamName: '망원 FC',
           teamLogoUrl: '/uploads/team-77-logo.png',

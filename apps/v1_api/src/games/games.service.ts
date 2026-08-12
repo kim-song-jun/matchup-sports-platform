@@ -4113,15 +4113,25 @@ export class GamesService {
     ]);
     const regulationScore = this.scoreFromEvents(events, sides);
     const score = await this.applyPenalties(tx, game, regulationScore, penalties);
+    // Issue #392 fix: `missingScorer` must be derived from the SAME
+    // reversed-event-excluding aggregation `aggregateGameParticipantStats`
+    // already builds below for goals/cards/assists/fouls -- moved ahead of
+    // `v1GameResultRevision.create` so its `missingScorer` field can reuse
+    // that one `reversedIds` computation instead of the old inline
+    // `events.some(...)` here, which (like the pre-#376-fix participant
+    // loop) had no `reversesEventId` filter at all: a GOAL recorded without
+    // a scorer and then reversed (mis-tap corrected, wrong event undone)
+    // still tripped the "득점자 미기재" warning forever, even though the
+    // event stream no longer contains any live scorer-less goal.
+    const { goalCount, cardCount, assistCount, foulCount, missingScorer } =
+      this.aggregateGameParticipantStats(events);
     const revision = await tx.v1GameResultRevision.create({
       data: {
         gameId: game.id,
         revision: 1,
         score: jsonInput(score),
         eventsHash: canonicalGameCommandPayloadHash(events.map((event) => event.payloadHash)),
-        missingScorer: events.some(
-          (event) => event.type === V1GameEventType.GOAL && event.participantId === null,
-        ),
+        missingScorer,
         createdByActorType: context.actor.actorType,
         createdByUserId:
           context.actor.actorType === 'USER' ? context.actor.actorUserId : undefined,
@@ -4129,8 +4139,6 @@ export class GamesService {
           context.actor.actorType === 'SYSTEM' ? context.actor.systemActor : undefined,
       },
     });
-    const { goalCount, cardCount, assistCount, foulCount } =
-      this.aggregateGameParticipantStats(events);
     await tx.v1GameResultParticipant.createMany({
       data: participants.map((participant) => ({
         resultRevisionId: revision.id,
@@ -4181,6 +4189,18 @@ export class GamesService {
    * call sites share one source of truth for what counts toward each stat,
    * `reversesEventId` filtering included -- see that filter's comment
    * below for the Issue #376 defect it closes.
+   *
+   * Also derives `missingScorer` (Issue #392 fix) from the SAME
+   * `reversedIds` set used for the per-participant counts above, instead of
+   * `deriveTournamentRevision` computing it separately with its own
+   * unfiltered `events.some(...)`, which -- like the pre-#376-fix
+   * goal/card/foul/assist loop -- never excluded reversed events: a GOAL
+   * appended without a scorer and then reversed (mis-tap, wrong event
+   * undone) kept tripping the "득점자 미기재" warning forever even after the
+   * event stream no longer contained any live scorer-less goal. This keeps
+   * `missingScorer` consistent with the same semantics `resultInvariantInput`
+   * already uses for the manual team-match submission path: "does any
+   * non-reversed GOAL event lack a participantId".
    */
   private aggregateGameParticipantStats(
     events: readonly {
@@ -4196,11 +4216,13 @@ export class GamesService {
     cardCount: Map<string, { yellow: number; red: number }>;
     assistCount: Map<string, number>;
     foulCount: Map<string, number>;
+    missingScorer: boolean;
   } {
     const goalCount = new Map<string, number>();
     const cardCount = new Map<string, { yellow: number; red: number }>();
     const assistCount = new Map<string, number>();
     const foulCount = new Map<string, number>();
+    let missingScorer = false;
     // Issue #376 fix: this loop used to have no reversed-event filter at
     // all, unlike its two siblings in this same file -- `scoreFromEvents`
     // (below) builds this identical `reversed` Set from `reversesEventId`
@@ -4232,6 +4254,9 @@ export class GamesService {
         );
       }
       if (event.participantId === null) {
+        if (event.type === V1GameEventType.GOAL) {
+          missingScorer = true;
+        }
         continue;
       }
       if (event.type === V1GameEventType.GOAL) {
@@ -4251,7 +4276,7 @@ export class GamesService {
         foulCount.set(event.participantId, (foulCount.get(event.participantId) ?? 0) + 1);
       }
     }
-    return { goalCount, cardCount, assistCount, foulCount };
+    return { goalCount, cardCount, assistCount, foulCount, missingScorer };
   }
 
   /**

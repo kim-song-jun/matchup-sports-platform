@@ -181,6 +181,91 @@ describe('ScheduleContent — 스코어 행과 득점자 행의 3열 축 일치'
   });
 });
 
+/**
+ * 팀장이 이 화면에 들어왔을 때 "우리 팀 경기가 어느 것이고 라인업이 남았는지"를 바로
+ * 알아야 한다. 예전에는 공개 일정만 있어서, 자기 팀 경기를 눈으로 찾아 하나씩 눌러
+ * 들어가야 라인업 진입점을 만날 수 있었다.
+ */
+describe('ScheduleContent — 우리 팀 경기 강조', () => {
+  const myFixtures = {
+    teams: [
+      {
+        registrationId: 'reg-home',
+        teamId: 'team-home',
+        teamName: '홈팀',
+        fixtures: [
+          {
+            fixtureId: 'fixture-1',
+            gameId: 'game-1',
+            sideId: 'side-1',
+            round: '조별리그',
+            legNumber: 1,
+            groupName: null,
+            scheduledAt: '2026-08-01T10:00:00.000Z',
+            status: 'scheduled',
+            isHome: true,
+            opponentTeamName: '원정팀',
+            lineupState: null,
+          },
+        ],
+      },
+    ],
+  };
+
+  it('내 팀 경기 행에 "우리 팀" 표시와 라인업 상태, 라인업 링크가 붙는다', () => {
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
+
+    expect(screen.getByText('우리 팀')).toBeInTheDocument();
+    // 색만으로 상태를 전달하지 않는다 — 문구가 함께 있어야 한다.
+    expect(screen.getAllByText('라인업 미작성').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: '라인업 짜기' })).toHaveAttribute(
+      'href',
+      '/tournaments/tour-1/matches/fixture-1/lineup',
+    );
+  });
+
+  it('화면 위 요약이 남은 라인업 수와 가장 임박한 경기로 가는 길을 보여준다', () => {
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
+
+    expect(screen.getByText('라인업이 아직 정해지지 않은 경기가 1경기 있어요.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '원정팀전 라인업 준비하기' })).toHaveAttribute(
+      'href',
+      '/tournaments/tour-1/matches/fixture-1/lineup',
+    );
+  });
+
+  it('제출을 마쳤으면 남은 일이 없다고 알리고 준비하기 CTA를 띄우지 않는다', () => {
+    const data = { ...makeData(), items: [fixtureEntry()] };
+    const submitted = {
+      teams: [
+        {
+          ...myFixtures.teams[0],
+          fixtures: [{ ...myFixtures.teams[0].fixtures[0], lineupState: 'SUBMITTED' as const }],
+        },
+      ],
+    };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={submitted} />);
+
+    expect(screen.getByText('모든 경기의 라인업을 제출했어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /라인업 준비하기/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '라인업 보기' })).toBeInTheDocument();
+  });
+
+  it('로그인하지 않았거나 참가팀이 아니면 화면이 종전 그대로다', () => {
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByText('우리 팀')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /라인업/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('ScheduleContent — 스코어 아래 승부차기 보조 표기', () => {
   it('승부차기가 있으면 정규시간 스코어는 그대로 두고 아래에 "승부차기 4-3"을 붙인다', () => {
     const data = {

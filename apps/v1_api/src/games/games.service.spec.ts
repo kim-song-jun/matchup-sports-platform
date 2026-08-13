@@ -10,6 +10,8 @@ import {
   gameCommandAuditAction,
   gameOperationAuditActor,
   groupParticipantsByLineupId,
+  latestLineupStateBySideId,
+  resolveLineupRosterRegistration,
   staffLineupSubmitRequiresTakeover,
   toGameHttpException,
 } from './games.service';
@@ -20,6 +22,7 @@ function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
     gameId: 'game-id',
     sideId: 'side-id',
     lineupId: 'lineup-id',
+    userId: null,
     displayNameSnapshot: 'Player',
     jerseyNumber: null,
     position: null,
@@ -268,5 +271,98 @@ describe('GamesService command boundary', () => {
     ])('penalties가 구조를 갖추지 못하면(%s) 422 TOURNAMENT_PENALTY_INVALID', (_label, penalties) => {
       expect(() => extractEndPenalties({ penalties })).toThrow(HttpException);
     });
+  });
+});
+
+/**
+ * 대회 경기 라인업이 참가 등록 명단(V1TournamentPlayer)에서만 만들어지게 되면서 생긴
+ * 두 판정 지점. 응답에 선수 실명이 들어가므로 "누가 어느 팀 명단을 볼 수 있는가"는
+ * PII 경계 그 자체다.
+ */
+describe('resolveLineupRosterRegistration', () => {
+  const home = { id: 'reg-home', teamId: 'team-home' };
+  const away = { id: 'reg-away', teamId: 'team-away' };
+
+  it('참가팀 매니저는 자기 팀 사이드의 등록 명단을 읽는다', () => {
+    expect(
+      resolveLineupRosterRegistration({
+        actorRole: 'team_manager',
+        actorTeamId: 'team-home',
+        sideTeamId: 'team-home',
+        homeRegistration: home,
+        awayRegistration: away,
+      }),
+    ).toEqual({ registrationId: 'reg-home' });
+  });
+
+  // 이 분기가 무너지면 상대팀 선수 실명이 그대로 넘어간다.
+  it('참가팀 매니저가 상대팀 사이드를 요청하면 거부한다', () => {
+    expect(
+      resolveLineupRosterRegistration({
+        actorRole: 'team_manager',
+        actorTeamId: 'team-home',
+        sideTeamId: 'team-away',
+        homeRegistration: home,
+        awayRegistration: away,
+      }),
+    ).toEqual({ denied: 'forbidden' });
+  });
+
+  it('팀 오너도 같은 제한을 받는다', () => {
+    expect(
+      resolveLineupRosterRegistration({
+        actorRole: 'team_owner',
+        actorTeamId: 'team-home',
+        sideTeamId: 'team-away',
+        homeRegistration: home,
+        awayRegistration: away,
+      }),
+    ).toEqual({ denied: 'forbidden' });
+  });
+
+  // 팀 매니저가 자리를 비운 대회 당일에 운영진이 대신 명단을 짜야 한다.
+  it('대회 스태프는 양 팀 어느 쪽이든 읽을 수 있다', () => {
+    for (const role of ['tournament_director', 'field_operator', 'platform_ops']) {
+      expect(
+        resolveLineupRosterRegistration({
+          actorRole: role,
+          actorTeamId: null,
+          sideTeamId: 'team-away',
+          homeRegistration: home,
+          awayRegistration: away,
+        }),
+      ).toEqual({ registrationId: 'reg-away' });
+    }
+  });
+
+  it('사이드에 대응하는 대회 등록이 없으면 빈 명단이 아니라 없음으로 구분한다', () => {
+    expect(
+      resolveLineupRosterRegistration({
+        actorRole: 'platform_ops',
+        actorTeamId: null,
+        sideTeamId: 'team-ghost',
+        homeRegistration: home,
+        awayRegistration: away,
+      }),
+    ).toEqual({ denied: 'registration_not_found' });
+  });
+});
+
+describe('latestLineupStateBySideId', () => {
+  // 라인업은 저장할 때마다 행이 쌓인다 — 옛 리비전을 집으면 이미 제출한 라인업이
+  // 일정 화면에서 "미작성"으로 표시된다.
+  it('사이드별로 가장 높은 revision의 상태를 고른다 (입력 순서와 무관)', () => {
+    const latest = latestLineupStateBySideId([
+      { sideId: 'side-a', state: 'DRAFT', revision: 1 },
+      { sideId: 'side-a', state: 'SUBMITTED', revision: 3 },
+      { sideId: 'side-a', state: 'DRAFT', revision: 2 },
+      { sideId: 'side-b', state: 'LOCKED', revision: 1 },
+    ]);
+    expect(latest.get('side-a')).toBe('SUBMITTED');
+    expect(latest.get('side-b')).toBe('LOCKED');
+  });
+
+  it('라인업이 하나도 없으면 빈 맵이다 — 화면은 이걸 "미작성"으로 읽는다', () => {
+    expect(latestLineupStateBySideId([]).size).toBe(0);
   });
 });

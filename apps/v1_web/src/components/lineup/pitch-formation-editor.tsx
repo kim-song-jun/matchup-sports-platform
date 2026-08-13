@@ -897,6 +897,12 @@ function PlayerToken({
   const x = entry.positionX ?? 50;
   // y=100(상대 골라인)이 위, y=0(우리 골라인)이 아래 — 화면 top%는 반대로 계산한다.
   const topPct = 100 - (entry.positionY ?? 50);
+  /** 피치 아래쪽 끝에 놓인 토큰은 이름표를 토큰 위로 올린다. 골키퍼가 대표적인데
+   * (슬롯 좌표가 항상 y=6이라 화면 94% 지점), 이름표를 토큰 아래에 두면 보드 밖으로
+   * 나가 overflow:hidden 에 잘려 이름을 아예 못 읽는다 — alpha 실측에서 모바일(피치
+   * 높이 553px)·데스크톱(521px) 양쪽에서 재현됐다. 임계값 88%는 토큰 반지름(22px)과
+   * 이름표 높이(~19px)를 가장 짧은 피치에서도 담을 수 있는 선이다. */
+  const labelAbove = topPct > 88;
   return (
     <div
       style={{
@@ -985,10 +991,11 @@ function PlayerToken({
         aria-hidden="true"
         style={{
           position: 'absolute',
-          top: '100%',
+          // 위로 올릴 때 6px을 띄우는 건 GK 배지가 토큰 위로 4px 삐져나오기 때문이다 —
+          // 3px만 두면 긴 이름에서 배지와 겹친다.
+          ...(labelAbove ? { bottom: '100%', marginBottom: 6 } : { top: '100%', marginTop: 3 }),
           left: '50%',
           transform: 'translateX(-50%)',
-          marginTop: 3,
           maxWidth: 84,
           overflow: 'hidden',
           textOverflow: 'ellipsis',

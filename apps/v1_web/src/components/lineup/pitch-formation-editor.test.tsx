@@ -120,6 +120,24 @@ describe('PitchFormationEditor — slot mode', () => {
     expect(screen.getAllByText(/필드 4명이 필요해요/)[0]).toBeInTheDocument();
   });
 
+  it('피치 맨 아래 토큰(골키퍼)의 이름표는 보드 밖으로 잘리지 않게 토큰 위에 붙는다', () => {
+    // 골키퍼 슬롯 좌표는 항상 y=6(화면 94%)이라 이름표를 토큰 아래에 두면 보드
+    // (overflow:hidden) 밖으로 나가 이름을 아예 못 읽는다 — alpha 실측 결함.
+    render(
+      <PitchFormationEditor {...baseProps} formation={null} slots={null}
+        starters={[makeEntry({ key: 'gk', displayName: '김골키', goalkeeper: true, positionX: 50, positionY: 6 })]} />,
+    );
+    expect(screen.getByTitle('김골키')).toHaveStyle({ bottom: '100%' });
+  });
+
+  it('피치 가운데 토큰의 이름표는 기존대로 토큰 아래에 붙는다', () => {
+    render(
+      <PitchFormationEditor {...baseProps} formation={null} slots={null}
+        starters={[makeEntry({ key: 'f1', displayName: '김필드', positionX: 50, positionY: 43 })]} />,
+    );
+    expect(screen.getByTitle('김필드')).toHaveStyle({ top: '100%' });
+  });
+
   it('free mode (slots=null) keeps the pre-existing tap-to-place guidance copy unchanged', () => {
     render(<PitchFormationEditor {...baseProps} starters={[makeEntry({ key: 'w1', displayName: '대기선수' })]} formation={null} slots={null} />);
     expect(screen.getByText('선수를 드래그하거나, 아래 목록에서 선수를 고른 뒤 피치를 탭해 배치하세요')).toBeInTheDocument();

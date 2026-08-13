@@ -37,13 +37,31 @@ export function readGameResultScore(
     : { home: score.home, away: score.away };
 }
 
-/** `3:1` — 점수를 못 읽으면 `fallback`(기본 `기록 없음`). 승부차기는 포함하지 않는다
- * (필요하면 `readGameResultScore`의 `penalties`를 직접 조합해라 -- `revision-timeline.tsx`
- * 참고). */
+/** `3:1` — 점수를 못 읽으면 `fallback`(기본 `기록 없음`). 승부차기는 포함하지 않는다 —
+ * 순위·집계처럼 "정규시간 점수"만 뜻해야 하는 자리(조별 순위는 승부차기를 읽지 않는다)를
+ * 위한 포맷이다. 결과를 **보여주는** 자리에는 `formatGameResultScoreWithPenalties`를 써라. */
 export function formatGameResultScore(
   score: V1GameResultScore | null | undefined,
   fallback = '기록 없음',
 ): string {
   const parsed = readGameResultScore(score);
   return parsed === null ? fallback : `${parsed.home}:${parsed.away}`;
+}
+
+/**
+ * `0:0 (승부차기 2:0)` — 결과를 사람에게 보여주는 모든 자리의 단일 포맷.
+ *
+ * 결선 무승부는 승부차기로만 승자가 갈리는데, 정규시간 점수만 그리면 화면에 `0:0`만
+ * 남아 "승자가 없는 종료된 결승"이 된다(알파 실측: 서버에는 `penalties {2,0}`가 있는데
+ * 스태프 화면 어디에도 안 보였다 — 운영 보드·운영 콘솔·결과 검수 헤더 전부). 승부차기가
+ * 없는 경기는 괄호 자체를 붙이지 않으므로 일반 경기 표시는 이 함수로 바꿔도 그대로다.
+ */
+export function formatGameResultScoreWithPenalties(
+  score: V1GameResultScore | null | undefined,
+  fallback = '기록 없음',
+): string {
+  const parsed = readGameResultScore(score);
+  if (parsed === null) return fallback;
+  const base = `${parsed.home}:${parsed.away}`;
+  return parsed.penalties ? `${base} (승부차기 ${parsed.penalties.home}:${parsed.penalties.away})` : base;
 }

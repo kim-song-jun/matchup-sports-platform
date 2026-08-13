@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1GameResultRevision } from '@/types/api';
 import {
@@ -296,7 +296,97 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     expect(screen.getByLabelText('호스트팀 (홈)')).toHaveValue(1);
     expect(screen.getByLabelText('상대팀 (원정)')).toHaveValue(2);
     expect(screen.getAllByLabelText(/번 골$/)[0]).toHaveValue('p-1');
-    expect(screen.getByLabelText('4. MVP')).toHaveValue('p-1');
+    expect(screen.getByLabelText('5. MVP')).toHaveValue('p-1');
+  });
+
+  // 출전 게이트: 라인업에 이름이 오른 것과 경기에 나간 것은 다르다. 결과에 실린 선수만
+  // 개인 프로필의 "출전 N경기"로 집계되므로(백엔드 PublicUserRecordsService), 끝까지
+  // 벤치를 지킨 선수는 payload에서 빠져야 한다.
+  describe('출전 게이트 — 교체 출전 체크', () => {
+    function withBench() {
+      useV1TeamMatchLineupMock.mockReturnValue(
+        settledQuery(
+          lineup({
+            bench: [
+              { id: 'p-2', displayName: '이서준', jerseyNumber: 14, position: null, goalkeeper: false },
+              { id: 'p-3', displayName: '박도윤', jerseyNumber: 21, position: null, goalkeeper: false },
+            ],
+          }),
+        ),
+      );
+    }
+
+    it('체크하지 않은 벤치 선수는 제출 payload에서 빠진다', async () => {
+      withBench();
+      createMutateAsync.mockResolvedValue({ revisionId: 'rev-new', version: 4 });
+      submitMutateAsync.mockResolvedValue({});
+      render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+      fireEvent.click(screen.getByText('결과 작성 완료'));
+      fireEvent.click(screen.getByText('제출하기'));
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      const payload = createMutateAsync.mock.calls[0][0];
+      expect(payload.actualParticipants.map((row: { participantId: string }) => row.participantId)).toEqual(['p-1']);
+    });
+
+    it('교체 출전을 체크한 벤치 선수는 started=false로 실린다', async () => {
+      withBench();
+      createMutateAsync.mockResolvedValue({ revisionId: 'rev-new', version: 4 });
+      submitMutateAsync.mockResolvedValue({});
+      render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+      fireEvent.click(screen.getByLabelText(/이서준/));
+      fireEvent.click(screen.getByText('결과 작성 완료'));
+      fireEvent.click(screen.getByText('제출하기'));
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      const payload = createMutateAsync.mock.calls[0][0];
+      expect(payload.actualParticipants).toEqual([
+        { participantId: 'p-1', sideId: 'side-home', started: true, goals: 0, assists: 0, fouls: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+        { participantId: 'p-2', sideId: 'side-home', started: false, goals: 0, assists: 0, fouls: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+      ]);
+    });
+
+    it('출전하지 않은 선수는 득점자·MVP 드롭다운에 아예 나오지 않는다', () => {
+      withBench();
+      render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+      const mvp = screen.getByLabelText('5. MVP');
+      expect(within(mvp).queryByText(/이서준/)).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText(/이서준/));
+      expect(within(mvp).getByText(/이서준/)).toBeInTheDocument();
+      // 체크하지 않은 나머지 벤치 선수는 여전히 후보에서 빠져 있다.
+      expect(within(mvp).queryByText(/박도윤/)).not.toBeInTheDocument();
+    });
+
+    it('교체 출전 체크를 해제하면 그 선수에게 붙어 있던 득점·MVP도 함께 걷어낸다', async () => {
+      withBench();
+      createMutateAsync.mockResolvedValue({ revisionId: 'rev-new', version: 4 });
+      submitMutateAsync.mockResolvedValue({});
+      render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+      fireEvent.click(screen.getByLabelText(/이서준/));
+      fireEvent.change(screen.getByLabelText('호스트팀 (홈)'), { target: { value: '1' } });
+      fireEvent.change(screen.getAllByLabelText(/번 골$/)[0], { target: { value: 'p-2' } });
+      fireEvent.change(screen.getByLabelText('5. MVP'), { target: { value: 'p-2' } });
+
+      // 잘못 체크했음을 깨닫고 해제 — 결과에 없는 선수를 가리키는 득점자가 남으면 안 된다.
+      fireEvent.click(screen.getByLabelText(/이서준/));
+      expect(screen.getAllByLabelText(/번 골$/)[0]).toHaveValue('');
+      expect(screen.getByLabelText('5. MVP')).toHaveValue('');
+
+      fireEvent.click(screen.getByText('결과 작성 완료'));
+      fireEvent.click(screen.getByText('제출하기'));
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      const payload = createMutateAsync.mock.calls[0][0];
+      // 골 수는 유지되고(스코어 1:0) 득점자만 미지정으로 돌아간다.
+      expect(payload.score).toEqual({ home: 1, away: 0 });
+      expect(payload.actualParticipants.map((row: { participantId: string }) => row.participantId)).toEqual(['p-1']);
+      expect(payload.mvpParticipantId).toBeUndefined();
+    });
   });
 
   it('DRAFT 상태에서는 재작성 폼 대신 제출 확인 카드를 보여주고, 제출하면 submitRevision을 호출한다', async () => {
@@ -349,7 +439,7 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     fireEvent.click(screen.getByText('+ 카드 추가'));
     fireEvent.change(screen.getByLabelText('카드 대상 선수'), { target: { value: 'p-1' } });
     fireEvent.change(screen.getByLabelText('카드 종류'), { target: { value: 'yellow' } });
-    fireEvent.change(screen.getByLabelText('4. MVP'), { target: { value: 'p-1' } });
+    fireEvent.change(screen.getByLabelText('5. MVP'), { target: { value: 'p-1' } });
 
     fireEvent.click(screen.getByText('결과 작성 완료'));
     fireEvent.click(screen.getByText('제출하기'));

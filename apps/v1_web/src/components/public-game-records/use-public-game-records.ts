@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { v1Get } from '@/lib/api-client';
+import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
 import type {
   PublicMatchDetail,
   PublicTeamRecordsResponse,
@@ -45,16 +46,12 @@ export interface ScheduleFilters {
  * 'live'` fixture/match, so an idle spectator on a fully-scheduled or
  * fully-completed tournament page never polls at all.
  *
- * Load model, stated accurately: `react-query`'s cache is per-browser, so it
- * does NOT dedupe requests across spectators. Server load is roughly
- * (spectators watching a live page) x (1 / interval) -- it DOES scale with
- * viewers. What this design buys is bounding *when* that cost is paid: no
- * polling at all unless the loaded page actually holds a live fixture, and
- * an 8s floor per viewer. If viewer counts grow past what that supports, the
- * next step is a shared cache (CDN/edge or server-side) or a real public
- * broadcast channel -- not a shorter interval.
+ * 주기 값과 그 근거(왜 10초인지, 관전자 수에 비례하는 부하 모델, 왜 이 값이
+ * `useV1Tournament`와 반드시 같아야 하는지)는 `@/lib/public-live-polling`에 단일
+ * 소스로 모여 있다 -- `/tournaments/:id/bracket`이 두 훅을 같은 화면에서 동시에
+ * 쓰기 때문에 두 곳이 각자 숫자를 갖는 구조 자체가 드리프트 위험이었다.
  */
-const LIVE_POLL_INTERVAL_MS = 8_000;
+const LIVE_POLL_INTERVAL_MS = PUBLIC_LIVE_POLL_INTERVAL_MS;
 
 /**
  * `GET /tournaments/:id/schedule` -- cursor-paginated fixture list.

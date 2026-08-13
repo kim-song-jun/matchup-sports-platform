@@ -18,9 +18,19 @@ const mocks = vi.hoisted(() => ({
   useV1Game: vi.fn(),
   useV1GameOperationsConsole: vi.fn(),
   postV1GameCommand: vi.fn(),
+  // 종료된 경기의 확정 결과(승부차기 포함) 조회 — 기본값은 "아직 리비전 없음"이라
+  // 이 훅을 신경 쓰지 않는 기존 테스트들은 그대로 동작한다.
+  useV1GameResultRevisions: vi.fn((..._args: unknown[]) => ({
+    data: undefined as Array<Record<string, unknown>> | undefined,
+    isPending: false,
+    isError: false,
+  })),
 }));
 
-vi.mock('@/hooks/use-v1-api', () => ({ useV1AuthMe: () => mocks.useV1AuthMe() }));
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1AuthMe: () => mocks.useV1AuthMe(),
+  useV1GameResultRevisions: (...args: unknown[]) => mocks.useV1GameResultRevisions(...args),
+}));
 vi.mock('@/hooks/use-v1-game-operations', () => ({
   useV1FixtureLineup: () => mocks.useV1FixtureLineup(),
   useV1Game: () => mocks.useV1Game(),
@@ -1135,5 +1145,75 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     fireEvent.click(undoButton); // 원정 킥 되돌림 → 홈 1:0
 
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
+  });
+
+  /* 종료 후 결과 표시 — 승부차기를 입력하고 종료하면 패널이 닫히고 헤더 스코어는
+     골 이벤트에서만 파생돼 "0 : 0"만 남았다. 방금 입력한 승부차기 결과가 이 화면
+     어디에도 없어서, 운영자는 자기가 기록한 값을 확인할 수단이 없었다(알파 실측:
+     서버에는 승부차기 2:0 이 저장돼 있었다). 승부차기는 골 이벤트가 아니므로
+     `liveEvents`로는 절대 복원되지 않는다 — 확정 결과 리비전에서 읽어야 한다. */
+  describe('종료된 경기의 승부차기 결과', () => {
+    function setupEnded(revisions: Array<Record<string, unknown>>, currentOfficialRevisionId: string | null = null) {
+      mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+      mocks.useV1FixtureLineup.mockReturnValue({
+        data: { gameId: 'game-1', lineups: [] },
+        isLoading: false, isError: false, error: null, refetch: vi.fn(),
+      });
+      mocks.useV1Game.mockReturnValue({
+        data: {
+          id: 'game-1',
+          sourceType: 'TOURNAMENT_FIXTURE',
+          isKnockoutFixture: true,
+          state: 'ENDED', version: 3, lastSequence: 2,
+          currentOfficialRevisionId,
+          periods: [FIRST_PERIOD, FINAL_PERIOD],
+          sides: PENALTY_SIDES,
+          lineups: [],
+        },
+        isLoading: false, isError: false, refetch: vi.fn(),
+      });
+      mocks.useV1GameOperationsConsole.mockReturnValue(
+        consoleState({
+          gameSnapshot: { version: 3, state: 'ENDED' },
+          liveEvents: [tiedGoal(1, 'side-home', 'e1'), tiedGoal(2, 'side-away', 'e2')],
+        }),
+      );
+      mocks.useV1GameResultRevisions.mockReturnValue({ data: revisions, isPending: false, isError: false });
+    }
+
+    it('경기 종료 후에도 확정된 승부차기 점수를 헤더에 남긴다', () => {
+      setupEnded([{ id: 'rev-1', revision: 1, state: 'DRAFT', score: { home: 1, away: 1, penalties: { home: 2, away: 0 } } }]);
+
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByText('승부차기 2:0')).toBeInTheDocument();
+      // 정규시간 스코어는 그대로 남는다 — 승부차기가 정규 점수를 덮어쓰면 안 된다.
+      expect(screen.getByText('1 : 1')).toBeInTheDocument();
+    });
+
+    it('정정으로 확정본이 바뀌면 최신 리비전이 아니라 확정된 리비전의 승부차기를 보여준다', () => {
+      // 목록은 revision 내림차순(서버 정렬)이다. 최신(rev-2)은 아직 확정 전 초안이고
+      // 확정본은 rev-1 — 여기서 최신을 그대로 쓰면 확정되지 않은 값을 결과로 보여준다.
+      setupEnded(
+        [
+          { id: 'rev-2', revision: 2, state: 'DRAFT', score: { home: 1, away: 1, penalties: { home: 5, away: 4 } } },
+          { id: 'rev-1', revision: 1, state: 'OFFICIAL', score: { home: 1, away: 1, penalties: { home: 2, away: 0 } } },
+        ],
+        'rev-1',
+      );
+
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.getByText('승부차기 2:0')).toBeInTheDocument();
+      expect(screen.queryByText('승부차기 5:4')).toBeNull();
+    });
+
+    it('승부차기 없이 끝난 경기에는 승부차기 표기를 만들지 않는다', () => {
+      setupEnded([{ id: 'rev-1', revision: 1, state: 'DRAFT', score: { home: 2, away: 1 } }]);
+
+      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+      expect(screen.queryByText(/승부차기/)).toBeNull();
+    });
   });
 });

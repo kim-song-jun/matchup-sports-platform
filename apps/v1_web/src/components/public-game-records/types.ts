@@ -52,6 +52,12 @@ export interface PublicGameClock {
   readonly isPaused: boolean;
 }
 
+/** 'halftime' = 피리어드 사이 휴식(다음 피리어드 미시작). 'regulation_ended' =
+ *  모든 피리어드가 ENDED인데 게임(V1Game.state)은 아직 LIVE — 결과 확정 또는
+ *  승부차기를 기다리는 중. 운영 콘솔의 halftimePeriod/regulationEnded와 동일한
+ *  두 상태를 그대로 재사용한다(operate-console.tsx, 이슈 #375 / 종료 흐름 개편). */
+export type PublicPeriodBreak = 'halftime' | 'regulation_ended';
+
 /**
  * 참가팀 공개 정책 통일(fix/v1-publish) — teamId/teamName은 대회가 모집
  * 중(status==='open')이고 조회자가 운영자·스태프가 아니면 둘 다 null이다.
@@ -94,6 +100,7 @@ export interface PublicScheduleEntry {
   readonly scoreStatus: PublicScoreStatus;
   readonly score: PublicScore | null;
   readonly clock: PublicGameClock | null;
+  readonly periodBreak: PublicPeriodBreak | null;
   readonly scorers: readonly PublicScheduleScorer[];
   readonly hasVideo: boolean;
 }
@@ -212,6 +219,7 @@ export interface PublicMatchDetail {
   readonly scoreStatus: PublicScoreStatus;
   readonly score: PublicScore | null;
   readonly clock: PublicGameClock | null;
+  readonly periodBreak: PublicPeriodBreak | null;
   readonly lineup: PublicLineup | null;
   readonly events: readonly PublicMatchEvent[];
   readonly mvp: PublicMatchMvp | null;
@@ -278,11 +286,14 @@ export interface PublicUserRecordItem {
   readonly officialAt: string;
 }
 
+/**
+ * 파울 누적치는 이 요약에 없다 — 서버가 공개 응답에서 아예 빼기 때문이다
+ * (`PublicUserRecordsService`의 summary 주석 참조). 카드(경고/퇴장)만 공개된다.
+ */
 export interface PublicUserRecordsSummary {
   readonly appearances: number;
   readonly goals: number;
   readonly assists: number;
-  readonly fouls: number;
   readonly yellowCards: number;
   readonly redCards: number;
   readonly mvpCount: number;

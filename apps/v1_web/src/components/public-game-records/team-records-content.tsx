@@ -5,13 +5,8 @@ import { Card, EmptyState, KPIStat } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { teamRecordResultLabel } from './format';
+import { resultChipStyle, resultStripeStyle } from './result-emphasis';
 import type { PublicTeamRecordItem, PublicTeamRecordsResponse } from './types';
-
-const RESULT_COLOR: Record<string, string> = {
-  WON: 'var(--blue700)',
-  LOST: 'var(--red700)',
-  DRAWN: 'var(--text-caption)',
-};
 
 /** 대회 소스면 대회 상세로, 팀매치 소스면 팀매치 상세로 — exactly-one-source라 항상 둘 중
  * 하나만 있다(V1Game의 CHECK 제약, public-team-records.service.ts 주석 참고). */
@@ -26,15 +21,16 @@ function recordHref(item: PublicTeamRecordItem): string | null {
  * 상세보다 훨씬 밋밋해 보였다. */
 function TeamRecordRow({ item, teamId, teamName, teamLogoUrl }: { item: PublicTeamRecordItem; teamId: string; teamName: string; teamLogoUrl: string | null }) {
   return (
-    <div style={{ padding: '14px 16px', borderTop: '1px solid var(--grey100)' }}>
+    <div
+      style={{
+        padding: '14px 16px 14px 12px',
+        borderTop: '1px solid var(--grey100)',
+        ...resultStripeStyle(item.result),
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
-            className="tab-num"
-            style={{ fontSize: 12, fontWeight: 800, color: RESULT_COLOR[item.result] ?? 'var(--text-strong)' }}
-          >
-            {teamRecordResultLabel(item.result)}
-          </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span style={resultChipStyle(item.result)}>{teamRecordResultLabel(item.result)}</span>
           {/* [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향. */}
           <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>
             {formatTournamentDateShort(item.officialAt) ?? ''}

@@ -213,7 +213,8 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
       data: { userId: ids.targetUser, state: 'GRANTED', policyHash: 'records-e2e-policy-hash' },
     });
     const afterGrant = await userRecords.getRecords(ids.targetUser, {});
-    expect(afterGrant.summary).toEqual(expect.objectContaining({ appearances: 1, goals: 2, assists: 0, fouls: 0 }));
+    // 파울 누적치는 공개 요약에 싣지 않는다(개인 프로필 낙인 방지) — 그래서 fouls 는 단언하지 않는다.
+    expect(afterGrant.summary).toEqual(expect.objectContaining({ appearances: 1, goals: 2, assists: 0 }));
     expect(afterGrant.items).toHaveLength(1);
     expect(afterGrant.items[0]).toEqual(
       expect.objectContaining({ gameId, goals: 2, officialAt: officialAt.toISOString() }),

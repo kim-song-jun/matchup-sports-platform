@@ -1178,6 +1178,7 @@ model V1Team {
   postEventReviewsWritten      V1PostEventReview[]        @relation("V1PostEventReviewReviewerTeam")
   postEventTeamReviewsReceived V1PostEventReview[]        @relation("V1PostEventReviewTargetTeam")
   tournamentRegistrations      V1TournamentRegistration[]
+  tournamentReviews            V1TournamentReview[]       @relation("V1TournamentReviewTeam")
   teamMatchSeriesEntries       V1TeamMatchSeriesTeam[]
 
   @@index([ownerUserId])
@@ -2051,6 +2052,12 @@ model V1TournamentReview {
   id           String    @id @default(uuid())
   tournamentId String    @map("tournament_id")
   authorUserId String    @map("author_user_id")
+  // 리뷰가 귀속되는 팀. 팀장·운영진(manager+) 누구나 작성 가능해지면서 "누가 썼는지"와
+  // "어느 팀 리뷰인지"가 분리됐다 — nullable인 이유는 (a) 마이그레이션 백필 시 같은
+  // (tournamentId, teamId) 조합에 중복 리뷰가 있던 레거시 행 중 가장 이른 1건만 채우고
+  // 나머지는 NULL로 보존하기 때문, (b) 팀 삭제는 이 스키마에서 항상 soft delete(deletedAt)라
+  // onDelete: Restrict가 걸리지만, 그래도 스키마 자체는 nullable로 열어 둔다.
+  teamId       String?   @map("team_id")
   teamName     String?   @map("team_name") // 작성자 팀명 (snapshot)
   rating       Int // 1~5
   comment      String?   @db.Text
@@ -2062,8 +2069,18 @@ model V1TournamentReview {
 
   tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   author     V1User       @relation("V1TournamentReviewAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  // Restrict: V1Team은 이 코드베이스에서 물리적으로 delete되지 않는다(항상 deletedAt soft
+  // delete) — 다른 v1_tournament_registrations.team 관계도 동일하게 Restrict를 쓴다. 리뷰가
+  // 팀 삭제로 사라지는 경로 자체를 DB 레벨에서 막는 것이 SetNull보다 강한 보장이다.
+  team       V1Team?      @relation("V1TournamentReviewTeam", fields: [teamId], references: [id], onDelete: Restrict)
 
   @@unique([tournamentId, authorUserId])
+  // 팀당 대회 1건 제약. WHERE 절 partial index가 아니라 평범한 composite unique로 구현한다 —
+  // Postgres 표준 NULL-distinct 시맨틱상 team_id가 NULL인 행끼리는 서로 유일성 위반이 아니므로
+  // (레거시 미연결 리뷰가 여러 건 있어도 안전), 애초에 partial index가 필요 없다. 반대로 partial
+  // index를 쓰면 Prisma schema DSL이 WHERE 절을 표현할 수 없어 `prisma migrate diff` 드리프트
+  // 게이트가 항상 실패한다 — 그래서 여기서는 의도적으로 평범한 unique를 쓴다.
+  @@unique([tournamentId, teamId])
   @@index([tournamentId, createdAt])
   @@map("v1_tournament_reviews")
 }
@@ -2541,6 +2558,17 @@ model V1GameParticipant {
   gameId              String   @map("game_id")
   sideId              String   @map("side_id")
   lineupId            String   @map("lineup_id")
+  /// 이 참가자가 가리키는 실제 사용자. 대회 경기 라인업은 **참가 등록 명단
+  /// (V1TournamentPlayer)이 유일한 출처**라, 화면을 다시 열 때 저장된 라인업과 등록
+  /// 명단을 정확히 대조할 수 있어야 한다 — 이름 문자열만으로는 동명이인을 구분할 수
+  /// 없어 선발 표시가 엉뚱한 사람에게 붙는다. FK 대신 nullable 컬럼인 이유: ① 이
+  /// 컬럼이 없던 시절 저장된 라인업과 ② 사용자 계정과 무관한 team-match 경로가 함께
+  /// 살아 있어야 하기 때문이다(그쪽은 이 컬럼을 쓰지 않는다).
+  ///
+  /// 이 값이 실려 저장되면 같은 트랜잭션에서 신원 연결(identity link, action
+  /// ROSTER_ASSERTED)도 자동 생성된다(GamesService.saveLineup) — 개인 기록 공개의
+  /// 출발점이다. 연결은 participant 생성만으로는 만들어지지 않으므로 여전히 옵셔널이다.
+  userId              String?  @map("user_id")
   displayNameSnapshot String   @map("display_name_snapshot")
   jerseyNumber        Int?     @map("jersey_number")
   position            String?
@@ -2556,16 +2584,11 @@ model V1GameParticipant {
   /// 서비스(team-match-lineup.service.ts)는 이 컬럼과 무관하게 자체 position='BENCH'
   /// 관례를 그대로 쓴다 — 이미 정상 동작하는 별도 경로라 여기서는 건드리지 않는다.
   started             Boolean  @default(true) @map("started")
-  /// 라인업 저장 시 팀 매니저가 로스터에 지정한 계정. 대회 라인업 DTO/서비스가 이 값을
-  /// 함께 저장하면(GamesService.saveLineup) 같은 트랜잭션에서 신원 연결(identity link)이
-  /// 자동 생성된다 — participant 생성만으로는 연결이 만들어지지 않으므로 옵셔널이다.
-  userId              String?  @map("user_id")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
   game                V1Game   @relation(fields: [gameId], references: [id], onDelete: Restrict, map: "v1_game_participants_game_fk")
 
   @@index([gameId, sideId], map: "v1_game_participants_game_id_side_id_idx")
-  @@index([userId], map: "v1_game_participants_user_id_idx")
   @@map("v1_game_participants")
 }
 

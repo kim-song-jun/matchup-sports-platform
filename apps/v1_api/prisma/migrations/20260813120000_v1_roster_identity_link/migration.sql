@@ -5,12 +5,14 @@
 -- 방식이고 프론트 호출부가 0건). 대회 라인업 DTO/V1GameParticipant 스키마에 userId 자체가
 -- 없어 자동 연결이 구조적으로 불가능했다. 이 마이그레이션은 그 구조적 공백을 메운다.
 --
--- 1) v1_game_participants 에 user_id 를 추가한다. 라인업 저장이 이 컬럼을 채우면 서비스
---    계층이 같은 트랜잭션에서 identity link 를 자동 생성할 수 있다.
-ALTER TABLE "v1_game_participants" ADD COLUMN "user_id" TEXT;
-CREATE INDEX "v1_game_participants_user_id_idx" ON "v1_game_participants"("user_id");
-
--- 2) V1IdentityLinkAction 에 ROSTER_ASSERTED 를 추가한다. 트리거 v1_guard_identity_event
+-- v1_game_participants.user_id 는 여기서 만들지 않는다. 같은 날 dev 에 먼저 들어간
+-- 20260813190000_v1_game_participant_user_id 가 그 컬럼의 소유자다(대회 라인업을 참가
+-- 등록 명단과 대조하려고 추가됐고, userId 단독 조회 경로가 없어 인덱스도 두지 않기로
+-- 결정됐다). 이 마이그레이션이 그 타임스탬프보다 앞서므로 여기서 같은 컬럼을 또 만들면
+-- 빈 DB 재생 시 뒤따르는 마이그레이션과 충돌한다 — 컬럼은 그쪽에 맡기고, 여기서는
+-- 연결/동의에 필요한 것만 만든다.
+--
+-- 1) V1IdentityLinkAction 에 ROSTER_ASSERTED 를 추가한다. 트리거 v1_guard_identity_event
 --    (20260729000100_v1_game_operations 에서 생성)는 action IN ('ATTESTED', 'EXPIRED') 인
 --    경우에만 승인자≠본인 검증을 강제하므로, ROSTER_ASSERTED 는 그 트리거를 건드리지 않고
 --    통과한다 — 팀 매니저가 자기 자신을 라인업에 넣는 경우(선수 겸 매니저)도 막히지 않는다.

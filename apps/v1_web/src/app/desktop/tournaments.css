@@ -484,7 +484,10 @@
   font-size: var(--font-size-body-lg);
   font-weight: 700;
   color: var(--text-strong);
-  margin: 0;
+  /* 제목 아래 여백: 이전엔 0이라 h2 line-box의 half-leading(약 4px)만 남아
+     바로 아래 스텝 그리드와 붙어 보였다. 모바일 스텝퍼는 행 간격(12px)과 같은
+     값으로 맞춰 세로 리듬을 통일한다(데스크탑 카드 그리드는 아래 ≥1024 override). */
+  margin: 0 0 12px;
 }
 
 /* ── Prize Breakdown: 3-card grid ── */
@@ -810,6 +813,13 @@
   }
 
   /* Prize cards: stay 3-col on desktop (already set) */
+
+  /* 데스크탑에선 아래가 배경이 있는 카드 그리드라 제목이 카드 상단 모서리에
+     바로 붙으면 눌려 보인다. 그리드 gap(16px)과 같은 값으로 띄워 카드 사이
+     간격과 제목-카드 간격을 한 리듬으로 맞춘다. */
+  .tm-tournament-promo-section-title {
+    margin-bottom: 16px;
+  }
 
   /* 데스크탑: 좁은 아이콘 스텝퍼 대신 설명이 포함된 3열 카드 그리드로 전환.
      보더 대신 grey50 배경 하나로 구분(solid-first) — 흰 원형 아이콘 칩이

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -23,5 +23,44 @@ export class TournamentFixtureLineupAccessController {
     @Param('fixtureId') fixtureId: string,
   ) {
     return this.gamesService.resolveFixtureLineupAccess(user, tournamentId, fixtureId);
+  }
+
+  /**
+   * 라인업 편집기가 쓰는 참가 등록 명단. `sideId`로 어느 팀 명단인지 지정한다 —
+   * 스태프는 양 팀 중 하나를 골라 대신 짤 수 있어서 "내 팀"만으로는 정해지지 않는다.
+   */
+  @Get('lineup-roster')
+  lineupRoster(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('fixtureId') fixtureId: string,
+    @Query('sideId') sideId?: string,
+  ) {
+    // sideId 없이 내려보내면 Prisma가 `id: undefined` 를 **필터 없음**으로 해석해
+    // 그 경기의 아무 사이드나 집어 든다 — 요청하지 않은 팀의 명단을 조용히 돌려주는
+    // 셈이라, 없는 값은 여기서 잘라낸다(Copilot 리뷰 지적).
+    if (sideId === undefined || sideId.trim() === '') {
+      throw new BadRequestException({
+        code: 'GAME_SIDE_ID_REQUIRED',
+        message: '어느 팀의 명단인지 지정해 주세요.',
+      });
+    }
+    return this.gamesService.resolveFixtureLineupRoster(user, tournamentId, fixtureId, sideId);
+  }
+}
+
+/**
+ * 대회 일정 화면이 "내 팀 경기"를 표시하기 위한 진입점. 공개 일정 응답
+ * (`/tournaments/:id/schedule`)은 인증이 없어 누가 보든 같은 내용이라, 로그인한 팀장에게
+ * 자기 팀 경기를 알려주려면 이 인증 전용 경로가 따로 필요하다.
+ */
+@Controller('tournaments/:tournamentId')
+@UseGuards(V1AuthGuard)
+export class MyTournamentFixturesController {
+  constructor(private readonly gamesService: GamesService) {}
+
+  @Get('my-fixtures')
+  myFixtures(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string) {
+    return this.gamesService.listMyTournamentFixtures(user, tournamentId);
   }
 }

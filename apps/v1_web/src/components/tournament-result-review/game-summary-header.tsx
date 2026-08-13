@@ -7,7 +7,7 @@ import type {
   TournamentGameDetail,
 } from '@/hooks/use-tournament-result-review';
 import { ACTOR_ROLE_LABELS } from './result-review-copy';
-import { formatGameResultScore } from '@/lib/game-result-score';
+import { formatGameResultScore, readGameResultScore } from '@/lib/game-result-score';
 
 const GAME_STATE_LABELS: Record<TournamentGameDetail['state'], string> = {
   SCHEDULED: '예정',
@@ -50,6 +50,16 @@ export function GameSummaryHeader({
     currentRevision && currentRevision.state === 'OFFICIAL'
       ? formatGameResultScore(currentRevision.score, '기록 없음')
       : null;
+  // 결선 무승부는 승부차기로만 승자가 갈린다 — 정규시간 점수만 그리면 확정된 결승이
+  // "0:0"으로만 보여 승자가 없는 결과로 읽힌다(알파 실측: 서버에는 승부차기 2:0이
+  // 있는데 이 헤더에는 안 나왔다).
+  const confirmedPenalties =
+    currentRevision && currentRevision.state === 'OFFICIAL'
+      ? (readGameResultScore(currentRevision.score)?.penalties ?? null)
+      : null;
+  const confirmedPenaltyLabel = confirmedPenalties
+    ? `승부차기 ${confirmedPenalties.home}:${confirmedPenalties.away}`
+    : null;
   const isVoided = currentRevision?.state === 'VOID';
 
   return (
@@ -77,9 +87,20 @@ export function GameSummaryHeader({
         </p>
       </div>
       {confirmedScoreLabel ? (
-        <p className="tab-num" style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-strong)' }}>
-          {confirmedScoreLabel}
-        </p>
+        /* 승부차기는 큰 숫자에 섞지 않고 바로 아래 캡션으로 병기한다 — 26px 한 줄에
+           "0:0 (승부차기 2:0)"을 넣으면 모바일에서 줄바꿈되고, 무엇보다 "정규시간
+           점수"와 "승부차기 점수"는 다른 값이라 같은 위계로 읽히면 안 된다(공개
+           결과 화면도 스코어 밑 작은 `PK 4:3` 배치를 쓴다). */
+        <div style={{ textAlign: 'right' }}>
+          <p className="tab-num" style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-strong)' }}>
+            {confirmedScoreLabel}
+          </p>
+          {confirmedPenaltyLabel ? (
+            <p className="tm-text-caption tab-num" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
+              {confirmedPenaltyLabel}
+            </p>
+          ) : null}
+        </div>
       ) : isVoided ? (
         <span className="tm-badge tm-badge-red">무효 처리됨</span>
       ) : (

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1FixtureLineupAccess } from '@/hooks/use-v1-api';
 import type { V1Game } from '@/types/api';
@@ -16,18 +16,13 @@ import type { GameLineup } from '@/types/game-operations';
 
 const hoisted = vi.hoisted(() => ({
   useV1FixtureLineupAccessMock: vi.fn(),
+  useV1FixtureLineupRosterMock: vi.fn(),
   useV1GameMock: vi.fn(),
   useV1GameLineupsMock: vi.fn(),
   useV1TournamentMock: vi.fn(),
-  useV1TeamMembersMock: vi.fn(),
   saveMutateAsync: vi.fn(),
   submitMutateAsync: vi.fn(),
 }));
-// F1(팀원 연결) 기본값 — roster 내용을 검증하지 않는 기존 시나리오 전체가 이 기본값을 쓴다.
-// vi.clearAllMocks()는 구현을 지우지 않으므로(clear ≠ reset) 이 mockReturnValue는 매 테스트
-// beforeEach 이후에도 그대로 유지된다. roster 목록 자체를 검증하는 테스트만 render 직전에
-// mockReturnValueOnce로 개별 덮어쓴다.
-hoisted.useV1TeamMembersMock.mockReturnValue({ data: undefined, isLoading: false });
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -37,6 +32,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1FixtureLineupAccess: hoisted.useV1FixtureLineupAccessMock,
+  useV1FixtureLineupRoster: hoisted.useV1FixtureLineupRosterMock,
   useV1Game: hoisted.useV1GameMock,
   useV1GameLineups: hoisted.useV1GameLineupsMock,
   useV1Tournament: hoisted.useV1TournamentMock,
@@ -46,7 +42,6 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // 이상 실제로 렌더되는 하위 트리가 쓰는 훅도 채워줘야 한다(team-matches 쪽 lineup.test.tsx와
   // 동일한 이유).
   useV1NotificationUnreadSummary: () => ({ data: undefined }),
-  useV1TeamMembers: hoisted.useV1TeamMembersMock,
 }));
 
 import { FixtureLineupPageClient } from './lineup-client';
@@ -59,9 +54,35 @@ function baseAccess(overrides: Partial<V1FixtureLineupAccess> = {}): V1FixtureLi
     scheduledAt: null,
     homeSideId: 'side-host',
     homeTeamName: '홈팀',
+    homeRegistrationId: 'reg-home',
     awaySideId: 'side-away',
     awayTeamName: '원정팀',
+    awayRegistrationId: 'reg-away',
     ...overrides,
+  };
+}
+
+/**
+ * 이 화면의 선수는 전부 대회 참가 등록 명단에서 온다 — 테스트에 등장하는 이름을 모두
+ * 담은 기본 명단을 둔다. 명단에 없는 사람은 (설계상) 화면에 오르지 않으므로, 명단을
+ * 비워두면 어떤 렌더 검증도 통과할 수 없다.
+ */
+function baseRoster(players?: Array<{ userId: string; name: string }>) {
+  return {
+    data: {
+      sideId: 'side-host',
+      registrationId: 'reg-home',
+      players: players ?? [
+        { userId: 'u-hong', name: '홍길동' },
+        { userId: 'u-kim', name: '김후보' },
+        { userId: 'u-alpha', name: '김알파' },
+        { userId: 'u-red2', name: '레드2' },
+      ],
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
   };
 }
 
@@ -101,6 +122,7 @@ function baseGameLineup(overrides: Partial<GameLineup> = {}): GameLineup {
         gameId: 'game-1',
         sideId: 'side-host',
         lineupId: 'lineup-1',
+        userId: null,
         displayNameSnapshot: '홍길동',
         jerseyNumber: 7,
         position: null,
@@ -118,6 +140,7 @@ function baseGameLineup(overrides: Partial<GameLineup> = {}): GameLineup {
 describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster());
     hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
   });
 
@@ -202,7 +225,7 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
     expect(lineupsRefetch).not.toHaveBeenCalled();
   });
 
-  it('선수 추가로 dirty해지면 제출 버튼이 잠기고 "먼저 저장해 주세요"로 이유를 인라인으로 보여준다', () => {
+  it('선발 체크로 dirty해지면 제출 버튼이 잠기고 "먼저 저장해 주세요"로 이유를 인라인으로 보여준다', () => {
     hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
       data: baseAccess(),
       isLoading: false,
@@ -223,8 +246,7 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
 
     expect(screen.getByRole('button', { name: '라인업 제출하기' })).not.toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText('추가할 선수 이름'), { target: { value: '새 선수' } });
-    fireEvent.click(screen.getByRole('button', { name: '추가' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
 
     // 사유는 버튼 라벨이 아니라 CTA 안 안내 줄에 있다 — 라벨에 두면 저장 버튼과 폭을
     // 반씩 나눠 갖는 이 버튼 안에서 문장이 대여섯 줄로 부풀어 모바일에서 잘렸다.
@@ -264,6 +286,112 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 등록 명단이 유일한 출처 — 이 화면에서 선수를 새로 만들 방법은 없고, 팀장이 하는 일은
+// 등록된 사람 중 선발을 고르는 것뿐이다. 아래 테스트는 그 계약을 화면 수준에서 고정한다.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('FixtureLineupPageClient — 등록 명단에서 선발 고르기', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster());
+    hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: baseGame(), isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [baseGameLineup()],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('이름을 직접 입력해 선수를 추가하는 입력이 더는 없다', () => {
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByLabelText('추가할 선수 이름')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '추가' })).not.toBeInTheDocument();
+  });
+
+  it('등록 명단 전원이 한 목록에 뜨고, 저장된 선발만 체크돼 있다', () => {
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    // 저장된 라인업에는 홍길동 한 명뿐이지만, 명단에 있는 나머지도 후보로 함께 보여야
+    // 팀장이 "누구를 넣을 수 있는지"를 이 화면에서 판단할 수 있다.
+    expect(screen.getByRole('checkbox', { name: '홍길동 선발' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: '김후보 선발' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: '김알파 선발' })).not.toBeChecked();
+    expect(screen.getByText('선발 1명 · 후보 3명')).toBeInTheDocument();
+  });
+
+  it('체크하면 선발로, 다시 누르면 후보로 돌아가고 요약 숫자가 따라 바뀐다', () => {
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
+    expect(screen.getByRole('checkbox', { name: '김후보 선발' })).toBeChecked();
+    expect(screen.getByText('선발 2명 · 후보 2명')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: '김후보 선발' }));
+    expect(screen.getByRole('checkbox', { name: '김후보 선발' })).not.toBeChecked();
+    expect(screen.getByText('선발 1명 · 후보 3명')).toBeInTheDocument();
+  });
+
+  // Copilot 리뷰 지적: access의 home/away registrationId를 사이드 비교로 고르면 지금
+  // 편집 중인 명단과 어긋날 수 있고, null이면 `/registrations//roster` 깨진 주소가 된다.
+  it('명단 관리 링크는 로스터를 실제로 불러온 registration을 가리킨다', () => {
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue({
+      ...baseRoster(),
+      data: { ...baseRoster().data, registrationId: 'reg-actually-loaded' },
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('link', { name: '참가 선수 명단 관리하기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/registrations/reg-actually-loaded/roster',
+    );
+  });
+
+  it('등록 명단이 비어 있으면 명단을 먼저 채우라고 안내한다', () => {
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster([]));
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('아직 등록된 선수가 없어요')).toBeInTheDocument();
+  });
+
+  it('명단 조회가 실패하면 빈 명단 대신 재시도 가능한 에러를 보여준다', () => {
+    const refetch = vi.fn();
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('boom'),
+      refetch,
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    // 빈 목록으로 넘어가면 팀장은 "등록한 선수가 사라졌다"고 읽는다 — 실패는 실패로 보인다.
+    expect(screen.queryByText('아직 등록된 선수가 없어요')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 2026-08 사용자 지적 회귀 테스트.
 //   1) "선발도 등번호 선택 그런게 있어야 하는데 전혀 그런게 없고" → 등번호 input은 예전에도
 //      DOM에 있었지만 눈에 띄는 라벨이 없어 빈 값일 때 입력 가능한 필드처럼 보이지 않았다.
@@ -276,6 +404,7 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
 describe('FixtureLineupPageClient — 피치 배치 우선 노출 + 등번호 입력 가시성', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster());
     hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
     hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
       data: baseAccess(),
@@ -294,6 +423,7 @@ describe('FixtureLineupPageClient — 피치 배치 우선 노출 + 등번호 �
               gameId: 'game-1',
               sideId: 'side-host',
               lineupId: 'lineup-1',
+              userId: null,
               displayNameSnapshot: '홍길동',
               jerseyNumber: 7,
               position: null,
@@ -308,6 +438,7 @@ describe('FixtureLineupPageClient — 피치 배치 우선 노출 + 등번호 �
               gameId: 'game-1',
               sideId: 'side-host',
               lineupId: 'lineup-1',
+              userId: null,
               displayNameSnapshot: '김후보',
               jerseyNumber: null, // 등번호 미입력 상태 — "빈 입력이 안 보인다" 문제를 그대로 재현
               position: null,
@@ -380,6 +511,7 @@ describe('FixtureLineupPageClient — 피치 배치 우선 노출 + 등번호 �
 describe('골키퍼 지정 버튼의 aria-label 조사(을/를)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster());
     hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
     hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
       data: baseAccess(),
@@ -401,6 +533,7 @@ describe('골키퍼 지정 버튼의 aria-label 조사(을/를)', () => {
               gameId: 'game-1',
               sideId: 'side-host',
               lineupId: 'lineup-1',
+              userId: null,
               displayNameSnapshot: '김알파',
               jerseyNumber: 1,
               position: null,
@@ -415,6 +548,7 @@ describe('골키퍼 지정 버튼의 aria-label 조사(을/를)', () => {
               gameId: 'game-1',
               sideId: 'side-host',
               lineupId: 'lineup-1',
+              userId: null,
               displayNameSnapshot: '레드2',
               jerseyNumber: 2,
               position: null,
@@ -517,95 +651,6 @@ describe('대회 스태프도 라인업을 짤 수 있다', () => {
 });
 
 /**
- * F1 — 라인업 행을 팀원 계정에 연결한다. 로스터 select에서 팀원을 고르면 저장 payload의
- * participants[].userId에 실려야 백엔드가 ROSTER_ASSERTED 신원 연결을 만든다(games.service.ts
- * saveLineup 계약, fixture-lineup.view-model.test의 순수 로직 테스트와 달리 여기서는
- * "화면에서 실제로 그 값이 저장 요청까지 흘러가는지"를 검증한다).
- */
-describe('팀원 연결(F1) — 로스터에서 고른 팀원이 저장 payload에 실린다', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
-    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
-      data: baseAccess(),
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-    hoisted.useV1GameMock.mockReturnValue({
-      data: baseGame({
-        sides: [
-          { id: 'side-host', gameId: 'game-1', sideKey: 'HOME', teamId: 'team-host', displayNameSnapshot: '홈팀' },
-        ],
-      }),
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-    hoisted.useV1GameLineupsMock.mockReturnValue({
-      data: [baseGameLineup()], // participants: [{ displayNameSnapshot: '홍길동', ... }]
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-  });
-
-  // 이 describe 안에서만 roster를 채운다 — 컴포넌트가 여러 번 다시 렌더될 때마다
-  // useV1TeamMembers가 다시 호출되므로 mockReturnValueOnce는 렌더 도중 조용히 소진돼
-  // select의 <option>이 사라진다(실제로 겪은 flake). 고정 mockReturnValue를 쓰고 이
-  // describe가 끝나면 전역 기본값(빈 roster)으로 되돌려 다른 describe에 새지 않게 한다.
-  afterEach(() => {
-    hoisted.useV1TeamMembersMock.mockReturnValue({ data: undefined, isLoading: false });
-  });
-
-  it('로스터 팀원을 선택하면 연결 표시가 뜨고, 저장 시 participants[].userId로 전송된다', async () => {
-    hoisted.useV1TeamMembersMock.mockReturnValue({
-      data: {
-        items: [
-          {
-            membershipId: 'm-1',
-            userId: 'user-9',
-            displayName: '이영희',
-            realName: null,
-            phone: null,
-            birthDate: null,
-            gender: null,
-            profileImageUrl: null,
-            role: 'member',
-            status: 'active',
-            joinedAt: '2026-01-01T00:00:00.000Z',
-            canChangeRole: false,
-            canRemove: false,
-          },
-        ],
-        summary: { ownerCount: 1, managerCount: 0, memberCount: 1 },
-        viewerRole: 'manager',
-        pageInfo: { nextCursor: null, hasNext: false },
-      },
-      isLoading: false,
-    });
-    hoisted.saveMutateAsync.mockResolvedValue({ gameId: 'game-1', lineupId: 'lineup-1', lineupRevision: 2, state: 'DRAFT', version: 1 });
-
-    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
-
-    const select = screen.getByLabelText('홍길동 팀원 연결');
-    fireEvent.change(select, { target: { value: 'user-9' } });
-
-    // 색만으로 구분하지 않는다 — 연결 여부가 텍스트로도 드러나야 한다.
-    expect(screen.getByText('✓ 연결됨')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-
-    await waitFor(() => expect(hoisted.saveMutateAsync).toHaveBeenCalledTimes(1));
-    const [savedArgs] = hoisted.saveMutateAsync.mock.calls[0];
-    expect(savedArgs.payload.participants[0]).toMatchObject({ userId: 'user-9', displayNameSnapshot: '홍길동' });
-  });
-});
-
-/**
  * 이슈 #378 회귀 테스트 — SUBMITTED가 되면 editable이 영구히 false로 고정돼 저장/제출
  * CTA가 렌더링에서 통째로 빠지고, 재편집으로 돌아갈 진입점이 파일 전체 어디에도 없었다
  * (재현: 새로고침해도 갇힘 — hydrateFixtureLineupState가 서버의 lineupState를 그대로
@@ -616,6 +661,7 @@ describe('팀원 연결(F1) — 로스터에서 고른 팀원이 저장 payload�
 describe('이슈 #378 — SUBMITTED 이후 재편집 진입점', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster());
     hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
     hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
       data: baseAccess(),
@@ -654,7 +700,8 @@ describe('이슈 #378 — SUBMITTED 이후 재편집 진입점', () => {
 
     expect(screen.queryByRole('button', { name: '다시 편집하기' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '저장' })).toBeInTheDocument();
-    expect(screen.getByLabelText('추가할 선수 이름')).toBeInTheDocument();
+    // 편집이 열렸다는 건 선발 체크가 다시 눌린다는 뜻이다 — 제출 상태에서는 잠겨 있다.
+    expect(screen.getByRole('checkbox', { name: '홍길동 선발' })).toBeEnabled();
   });
 
   it('경기가 시작(LIVE)되면 "다시 편집하기" 진입점이 아예 보이지 않는다', () => {

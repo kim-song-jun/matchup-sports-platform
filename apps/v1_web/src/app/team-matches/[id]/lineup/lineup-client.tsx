@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import {
-  buildFormationPresets, describeSquadSize, presetsForOutfieldCount, slotsWithGoalkeeper, type FormationPreset,
+  buildFormationPresets, describeSquadSize, slotsWithGoalkeeper, type FormationPreset,
 } from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -44,6 +44,7 @@ import {
   resolveOwnTeamId,
   restoreEntry,
   applyFormationPreset,
+  seatStartersInEmptySlots,
   selectFormation,
   setGoalkeeper,
   setJerseyNumber,
@@ -250,12 +251,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const sportCatalog: FormationPreset[] = lineupQuery.data?.lineupConfig
     ? buildFormationPresets(lineupQuery.data.lineupConfig.positions, lineupQuery.data.lineupConfig.formations)
     : [];
-  // 선발 총원 − 골키퍼 한 자리. **누가 GK로 지정됐는지와 무관하게** 센다 — 예전에는
-  // goalkeeper 플래그가 켜진 선수를 뺐기 때문에 GK를 지정하는 순간 이 숫자가 1 줄고
-  // 프리셋 목록이 갈려, 고르던 포메이션이 사라지며 아래 정리 effect가 자유 배치로
-  // 되돌려버렸다. 라인업의 골키퍼 자리는 항상 정확히 하나다.
-  const outfieldCount = Math.max(0, (state?.starters.length ?? 0) - 1);
-  const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
+  // 선발 인원수로 선택지를 거르지 않는다 — 명단을 다 채우기 전에도 포메이션을 먼저 고를
+  // 수 있어야 빈 자리가 눈에 보이고, 그 자리를 채워 나갈 수 있다. 인원이 대형과 맞지
+  // 않는다는 사실은 선택을 막는 대신 드롭다운 아래 안내 문구로 알린다(PitchFormationEditor).
+  const formationOptions = sportCatalog;
   /**
    * 이 경기에 설정된 출전 인원(GK 포함). **범위**다 — canonical config가 축구 7~11, 풋살 3~6이고
    * 관리자가 상한만 고르므로 minPlayers와 maxPlayers가 서로 다를 수 있다
@@ -269,21 +268,20 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     state?.starters.length ?? 0,
   );
 
-  // Copilot review finding (PR #277): 선발/골키퍼 변경으로 outfieldCount가 바뀌어 지금
-  // 선택된 formation이 더 이상 formationOptions에 없으면(예: 5명→4명으로 줄어 "1-1-2"
-  // 프리셋이 사라짐) 자유 배치로 되돌린다. 그대로 두면 화면은 이전 formation 라벨을
-  // 계속 보여주면서도 슬롯 모드는 이미 꺼져(selectedPreset=null → activeSlots=null)
-  // 제출 검증이 빈 슬롯 체크를 건너뛰고, 저장 페이로드에도 더 이상 유효하지 않은
-  // formation 코드가 그대로 실릴 수 있었다.
+  // 서버 카탈로그에 아예 없는 formation 코드(예: 대회 종목 설정이 바뀐 뒤 다시 연 옛
+  // 초안)만 자유 배치로 되돌린다 — 그대로 두면 화면은 이전 formation 라벨을 계속
+  // 보여주면서도 슬롯 모드는 이미 꺼져(selectedPreset=null → activeSlots=null) 제출
+  // 검증이 빈 슬롯 체크를 건너뛰고, 저장 페이로드에도 유효하지 않은 코드가 실린다.
+  // 카탈로그가 아직 안 실린 동안(sportCatalog=[])에는 아무것도 하지 않는다 — 로딩
+  // 중이라는 이유로 사용자가 고른 포메이션을 지우면 그대로 자동저장까지 따라 나간다.
   useEffect(() => {
-    if (state && state.formation !== null && !formationOptions.some((preset) => preset.code === state.formation)) {
+    if (sportCatalog.length === 0) return;
+    if (state && state.formation !== null && !sportCatalog.some((preset) => preset.code === state.formation)) {
       setState((prev) => (prev ? selectFormation(prev, null) : prev));
     }
-    // formationOptions/starters 참조가 바뀔 때마다(포메이션 프리셋 목록이 재계산될 때마다)
-    // 다시 검사한다 — state 전체를 deps에 넣으면 selectFormation 자체가 새 state를 만들어
-    // 무한 루프가 된다.
+    // state 전체를 deps에 넣으면 selectFormation 자체가 새 state를 만들어 무한 루프가 된다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formationOptions, state?.formation, state?.starters]);
+  }, [sportCatalog, state?.formation]);
 
   function handleConflictReload() {
     lineupQuery.refetch().then((result) => {
@@ -466,14 +464,16 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   const counts = deriveLineupCounts(state, rosterPool);
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
-  // ① 지금 선발 수에 맞는 대형이 아예 없을 때, ② 대형은 있지만 선발 수가 이 경기가 허용하는
-  // 출전 인원 **범위**를 벗어났을 때. ②는 서버가 lineupConfig에 출전 인원을 함께 내려주면서
-  // 처음 가능해졌다(그전에는 화면이 "몇 명이어야 맞는지"를 알 방법이 없었다).
+  // ① 이 종목에 등록된 대형이 아예 없을 때(축구처럼 서버 카탈로그가 비어 있는 경우),
+  // ② 대형은 있지만 선발 수가 이 경기가 허용하는 출전 인원 **범위**를 벗어났을 때.
+  // ②는 서버가 lineupConfig에 출전 인원을 함께 내려주면서 처음 가능해졌다(그전에는 화면이
+  // "몇 명이어야 맞는지"를 알 방법이 없었다). 고른 대형과 선발 수의 차이 자체는 여기가
+  // 아니라 PitchFormationEditor가 드롭다운 바로 아래에서 따로 알려준다.
   const starterCount = state.starters.length;
   const outfieldGuidance = !formationSupported
     ? null
-    : formationOptions.length === 0 && starterCount > 0
-      ? `현재 선발 ${starterCount}명${squadSizeLabel !== null ? ` · 이 경기 출전 인원은 ${squadSizeLabel}` : ''} — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
+    : formationOptions.length === 0
+      ? '이 종목은 등록된 포지션 대형이 없어요. 자유 배치로 직접 배치해 주세요.'
       : starterCountOutOfRange && squadSizeLabel !== null
         ? `이 경기 출전 인원은 ${squadSizeLabel}인데 지금 선발은 ${starterCount}명이에요.`
         : null;
@@ -481,6 +481,27 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;
   const validationErrors = validateLineupForSubmit(state, activeSlots);
   const publicationLabel = describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
+
+  /**
+   * 선발 명단을 바꾸는 편집 액션의 결과를 통과시키면, **이번에 새로 선발이 된 사람**과
+   * **이번에 골키퍼로 지정된 사람**만 골라 지금 포메이션의 빈 자리에 앉힌다. 이전 상태와
+   * 비교해 대상 key를 뽑기 때문에, 사용자가 일부러 대기로 남겨둔 선수는 다른 사람을
+   * 등록해도 그대로 대기에 남는다 — 자동 배치를 "등록한 그 순간, 그 사람에게만" 묶어두는
+   * 것이 포메이션 변경 때 선수가 멋대로 들어오던 과거 동작과 갈리는 지점이다.
+   */
+  function withSeatedNewcomers(prev: LineupEditorState, next: LineupEditorState): LineupEditorState {
+    if (next === prev || activeSlots === null) return next;
+    const before = new Map(prev.starters.map((entry) => [entry.key, entry]));
+    const seatKeys = next.starters
+      .filter((entry) => {
+        const previous = before.get(entry.key);
+        return previous === undefined || (entry.goalkeeper && !previous.goalkeeper);
+      })
+      .map((entry) => entry.key);
+    if (seatKeys.length === 0) return next;
+    const starters = seatStartersInEmptySlots(next.starters, activeSlots, seatKeys);
+    return starters === next.starters ? next : { ...next, starters, dirty: true };
+  }
 
   // insane review(P0-1, 2026-08 GPT Pro): 제출은 항상 서버에 마지막 저장된 revision만 실어
   // 보내야 한다. 자동저장은 900ms 디바운스 뒤에야 실행되므로, 방금 입력을 마치자마자 제출을
@@ -728,7 +749,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       type="button"
                       aria-pressed={entry.goalkeeper}
                       disabled={!editable}
-                      onClick={() => setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))}
+                      onClick={() =>
+                        setState((prev) => (prev ? withSeatedNewcomers(prev, setGoalkeeper(prev, entry.key)) : prev))
+                      }
                       aria-label={`${entry.displayName}${entry.goalkeeper ? ', 골키퍼로 지정됨' : '을 골키퍼로 지정'}`}
                       style={{
                         flexShrink: 0,
@@ -863,7 +886,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         <button
                           type="button"
                           className="tm-btn tm-btn-sm tm-btn-outline"
-                          onClick={() => setState((prev) => (prev ? moveEntry(prev, 'bench', entry.key, 'starter') : prev))}
+                          onClick={() =>
+                            setState((prev) =>
+                              prev ? withSeatedNewcomers(prev, moveEntry(prev, 'bench', entry.key, 'starter')) : prev,
+                            )
+                          }
                         >
                           선발로
                         </button>
@@ -915,7 +942,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       <button
                         type="button"
                         className="tm-btn tm-btn-sm tm-btn-primary"
-                        onClick={() => setState((prev) => (prev ? addRosterMemberToStarters(prev, member) : prev))}
+                        onClick={() =>
+                          setState((prev) =>
+                            prev ? withSeatedNewcomers(prev, addRosterMemberToStarters(prev, member)) : prev,
+                          )
+                        }
                       >
                         선발 추가
                       </button>
@@ -964,7 +995,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                   onClick={() => {
                     setState((prev) => {
                       if (!prev) return prev;
-                      return guestSlot === 'starter' ? addGuestToStarters(prev, guestName) : addGuestToBench(prev, guestName);
+                      return guestSlot === 'starter'
+                        ? withSeatedNewcomers(prev, addGuestToStarters(prev, guestName))
+                        : addGuestToBench(prev, guestName);
                     });
                     setGuestName('');
                   }}

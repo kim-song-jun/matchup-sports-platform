@@ -18,10 +18,17 @@ export class GameLineupParticipantDto {
   @IsUUID()
   participantId?: string;
 
-  // 매니저가 로스터에 지정한 계정. 주어지면 서비스 계층(games.service.ts#saveLineup)이
-  // 이 사이드 팀의 active 멤버인지 검증한 뒤 같은 트랜잭션에서 신원 연결(identity link,
-  // action ROSTER_ASSERTED)을 자동 생성한다 -- GET /users/:id/records가 항상 0건이던
-  // 문제(연결을 만드는 제품 경로 부재)를 이 저장 경로에서 메운다.
+  /**
+   * 이 참가자가 가리키는 사용자. 대회 경기 라인업은 참가 등록 명단에서만 만들어지므로
+   * 화면이 등록 명단의 userId를 그대로 실어 보낸다 — 다시 열 때 이름이 아니라 이 값으로
+   * 대조해야 동명이인이 섞이지 않는다. optional인 이유는 이 필드가 없던 시절의 클라이언트와
+   * 사용자 계정을 쓰지 않는 team-match 경로를 그대로 받아야 하기 때문이다.
+   *
+   * 값이 실리면 서비스 계층(games.service.ts#saveLineup)이 이 사이드 팀의 active 멤버인지
+   * 검증한 뒤 같은 트랜잭션에서 신원 연결(identity link, action ROSTER_ASSERTED)을 자동
+   * 생성한다 — GET /users/:id/records가 항상 0건이던 문제(연결을 만드는 제품 경로 부재)를
+   * 이 저장 경로에서 메운다.
+   */
   @IsOptional()
   @IsUUID()
   userId?: string;

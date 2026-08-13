@@ -5,6 +5,7 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
 import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
 import { ScheduleContent } from '@/components/public-game-records/schedule-content';
+import { useV1MyTournamentFixtures } from '@/hooks/use-v1-api';
 
 function ScheduleSkeleton() {
   return (
@@ -18,6 +19,9 @@ function ScheduleSkeleton() {
 export function SchedulePageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     usePublicTournamentSchedule(tournamentId);
+  // 로그인한 팀장에게만 자기 팀 경기가 얹힌다 — 비로그인·비참가자는 401/빈 응답이라
+  // 화면이 종전과 똑같다(공개 일정은 이 조회와 무관하게 그려진다).
+  const myFixtures = useV1MyTournamentFixtures(tournamentId);
 
   if (isLoading) {
     return (
@@ -62,6 +66,7 @@ export function SchedulePageClient({ tournamentId }: { tournamentId: string }) {
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={() => void fetchNextPage()}
+        myFixtures={myFixtures.data}
       />
     </AppChrome>
   );

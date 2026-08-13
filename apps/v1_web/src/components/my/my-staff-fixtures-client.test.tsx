@@ -60,6 +60,7 @@ function entry(overrides: Partial<PublicScheduleEntry> & { fixtureId: string }):
     scoreStatus: 'none',
     score: null,
     clock: null,
+    periodBreak: null,
     scorers: [],
     hasVideo: false,
     ...overrides,

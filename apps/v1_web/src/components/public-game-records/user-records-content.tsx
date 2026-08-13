@@ -4,17 +4,18 @@ import Link from 'next/link';
 import { Card, EmptyState, KPIStat } from '@/components/v1-ui/primitives';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { userRecordResultLabel } from './format';
+import { resultChipStyle, resultStripeStyle } from './result-emphasis';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
-
-const RESULT_COLOR: Record<string, string> = {
-  WON: 'var(--blue500)',
-  LOST: 'var(--red500)',
-  DRAWN: 'var(--text-caption)',
-};
 
 function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
   return (
-    <div style={{ padding: '12px 16px', borderTop: '1px solid var(--grey100)' }}>
+    <div
+      style={{
+        padding: '12px 16px 12px 12px',
+        borderTop: '1px solid var(--grey100)',
+        ...resultStripeStyle(item.result),
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         {/* [R-T2] 고정폭 없는 텍스트/배지 — 아래 3개 span 모두 12로 상향. */}
         <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>
@@ -37,12 +38,7 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <span
-          className="tab-num"
-          style={{ fontSize: 14, fontWeight: 800, color: item.result ? (RESULT_COLOR[item.result] ?? 'var(--text-strong)') : 'var(--text-caption)', width: 20 }}
-        >
-          {userRecordResultLabel(item.result)}
-        </span>
+        <span style={resultChipStyle(item.result)}>{userRecordResultLabel(item.result)}</span>
         <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
           {item.teamName ?? '소속 미상'} vs {item.opponentTeamName ?? '상대 미상'}
         </span>

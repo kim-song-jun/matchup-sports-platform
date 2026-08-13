@@ -104,8 +104,10 @@ function AccessDenied({ scopeNotYetSupported }: { scopeNotYetSupported: boolean 
             ? '대회 전체 화면은 대회 운영자만 열 수 있어요. 담당 경기는 “내 대회 운영”에서 바로 들어갈 수 있어요.'
             : '이 화면은 이 대회에 배정된 운영 스태프만 접근할 수 있어요. 배정 상태를 확인해 주세요.'}
         </p>
+        {/* `/tournament-ops` 에는 page.tsx 가 없다(layout.tsx 만 있음) — 예전 링크는 404 로
+            떨어져서, 막힌 담당자가 갈 곳이 아예 없는 막다른 길이었다. 담당 대회 목록으로 보낸다. */}
         <Link
-          href={scopeNotYetSupported ? '/tournament-ops' : '/home'}
+          href={scopeNotYetSupported ? '/my/tournament-staff' : '/home'}
           className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           {scopeNotYetSupported ? '내 대회 운영으로 가기' : '서비스로 돌아가기'}

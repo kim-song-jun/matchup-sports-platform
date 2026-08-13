@@ -171,7 +171,12 @@ describe('TournamentOpsGate', () => {
     );
 
     expect(screen.getByText('담당 범위 밖의 화면이에요')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '내 대회 운영으로 가기' })).toHaveAttribute('href', '/tournament-ops');
+    // 예전 계약은 '/tournament-ops' 였는데 그 라우트엔 page.tsx 가 없어서 404 였다 —
+    // 막힌 담당자가 갈 곳이 없는 막다른 길을 테스트가 그대로 고정하고 있었다.
+    expect(screen.getByRole('link', { name: '내 대회 운영으로 가기' })).toHaveAttribute(
+      'href',
+      '/my/tournament-staff',
+    );
     expect(screen.queryByText('보드 콘텐츠')).not.toBeInTheDocument();
   });
 

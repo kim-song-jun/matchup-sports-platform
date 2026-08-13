@@ -6,6 +6,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1MyTournamentStaffAssignments } from '@/hooks/use-v1-api';
+import { myStaffEntryHref } from '@/hooks/use-v1-my-staff-assignments';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import type { V1MyTournamentStaffAssignment, V1MyTournamentStaffGroup } from '@/types/api';
 
@@ -60,7 +61,8 @@ function StaffTournamentRow({ group }: { group: V1MyTournamentStaffGroup }) {
   return (
     <Link
       className="tm-list-row tm-pressable"
-      href={`/tournament-ops/tournaments/${group.tournamentId}/operations`}
+      // 역할에 따라 목적지가 다르다 — 필드 담당자를 운영 보드로 보내면 403 이다.
+      href={myStaffEntryHref(group)}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-body" style={{ color: 'var(--text-strong)' }}>

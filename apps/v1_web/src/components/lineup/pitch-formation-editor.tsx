@@ -199,6 +199,7 @@ export function PitchFormationEditor({
         formation={formation}
         formationOptions={formationOptions}
         outfieldGuidance={outfieldGuidance}
+        outfieldCount={Math.max(0, starters.length - 1)}
         waiting={slotMode ? slotWaiting : waiting}
         slotMode={slotMode}
         editable={editable}
@@ -404,6 +405,7 @@ function FormationControls({
   formation,
   formationOptions,
   outfieldGuidance,
+  outfieldCount,
   waiting,
   slotMode,
   editable,
@@ -414,6 +416,9 @@ function FormationControls({
   formation: string | null;
   formationOptions: FormationPreset[];
   outfieldGuidance: string | null;
+  /** 지금 선발에서 골키퍼 한 자리를 뺀 필드 인원수 — 고른 대형이 요구하는 인원과 비교해
+   * 안내 문구를 만드는 데만 쓴다. 인원이 안 맞아도 선택 자체를 막지는 않는다. */
+  outfieldCount: number;
   waiting: LineupEntryDraft[];
   slotMode: boolean;
   editable: boolean;
@@ -421,39 +426,55 @@ function FormationControls({
   onSelectFormation: (formation: string | null) => void;
   onSelectWaiting: (key: string) => void;
 }) {
+  // 이 컴포넌트는 데스크톱 사이드 패널과 모바일 드로어에 각각 한 번씩, 즉 같은 화면에 두 번
+  // 렌더된다 — label htmlFor가 가리키는 id가 겹치면 안 되므로 인스턴스마다 새로 만든다.
+  const selectId = `${useId()}-formation`;
+  // 인원수로 선택지를 막지 않는 대신, 고른 대형이 지금 선발과 어떻게 어긋나는지 말로 알려준다.
+  // 빈 자리는 빈 자리대로 남고 남는 선수는 대기 목록에 남는다 — 어느 쪽도 저장을 막지 않는다.
+  const selectedPreset = formation !== null ? formationOptions.find((preset) => preset.code === formation) ?? null : null;
+  const fitGuidance =
+    selectedPreset === null
+      ? null
+      : selectedPreset.outfield > outfieldCount
+        ? `이 대형은 골키퍼 외 필드 ${selectedPreset.outfield}명이 필요해요. 지금 선발은 ${outfieldCount}명이라 ${selectedPreset.outfield - outfieldCount}자리가 비어요.`
+        : selectedPreset.outfield < outfieldCount
+          ? `이 대형에는 필드 ${selectedPreset.outfield}명이 들어가요. 남는 ${outfieldCount - selectedPreset.outfield}명은 대기 목록에 남아요.`
+          : null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 6 }}>
+        <label
+          htmlFor={selectId}
+          className="tm-text-caption"
+          style={{ display: 'block', color: 'var(--text-muted)', marginBottom: 6 }}
+        >
           포메이션
-        </div>
+        </label>
+        <select
+          id={selectId}
+          className="tm-input tm-input-select"
+          value={formation ?? ''}
+          disabled={!editable}
+          onChange={(event) => onSelectFormation(event.target.value === '' ? null : event.target.value)}
+          style={{ width: '100%', minHeight: 44 }}
+        >
+          <option value="">자유 배치</option>
+          {formationOptions.map((preset) => (
+            <option key={preset.code} value={preset.code}>
+              {preset.code} · {preset.label} (필드 {preset.outfield}명)
+            </option>
+          ))}
+        </select>
         {outfieldGuidance ? (
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.5 }}>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
             {outfieldGuidance}
           </p>
         ) : null}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="포메이션 프리셋">
-          {formationOptions.map((preset) => (
-            <button
-              key={preset.code} type="button" disabled={!editable}
-              aria-pressed={formation === preset.code}
-              className={`tm-badge ${formation === preset.code ? 'tm-badge-blue' : 'tm-badge-grey'}`}
-              style={{ border: 'none', cursor: editable ? 'pointer' : 'default' }}
-              onClick={() => onSelectFormation(preset.code)}
-            >
-              {preset.code} · {preset.label}
-            </button>
-          ))}
-          <button
-            type="button" disabled={!editable}
-            aria-pressed={formation === null}
-            className={`tm-badge ${formation === null ? 'tm-badge-blue' : 'tm-badge-grey'}`}
-            style={{ border: 'none', cursor: editable ? 'pointer' : 'default' }}
-            onClick={() => onSelectFormation(null)}
-          >
-            자유 배치
-          </button>
-        </div>
+        {fitGuidance ? (
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+            {fitGuidance}
+          </p>
+        ) : null}
       </div>
 
       {slotMode ? (

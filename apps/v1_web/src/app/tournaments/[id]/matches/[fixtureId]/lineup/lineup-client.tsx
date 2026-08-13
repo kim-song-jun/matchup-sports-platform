@@ -6,11 +6,11 @@ import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/compo
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
 import {
-  buildFormationPresets, describeSquadSize, goalkeeperPositionCode, presetsForOutfieldCount, slotsWithGoalkeeper,
+  buildFormationPresets, describeSquadSize, goalkeeperPositionCode, slotsWithGoalkeeper,
   type FormationPreset,
 } from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
-import { matchSlotsToEntries } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import { matchSlotsToEntries, seatStartersInEmptySlots } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import {
   useV1FixtureLineupAccess,
   useV1Game,
@@ -150,14 +150,12 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const sportCatalog: FormationPreset[] = gameQuery.data?.lineupConfig
     ? buildFormationPresets(gameQuery.data.lineupConfig.positions, gameQuery.data.lineupConfig.formations)
     : [];
-  // 선발 총원에서 골키퍼 한 자리를 뺀 값 — **누가 GK로 지정됐는지와 무관하게** 센다.
-  // 예전에는 `goalkeeper` 플래그가 켜진 선수를 뺐는데, 그러면 GK를 지정하는 순간 이 숫자가
-  // 1 줄면서 프리셋 목록이 통째로 갈렸다: 5인 팀이 GK 지정 전에는 6인제 대형(outfield 5)을
-  // 추천받다가, GK를 정하는 순간 고르던 포메이션이 목록에서 사라져 아래 정리 effect가
-  // 자유 배치로 되돌려버렸다(사용자 제보: "5명 6명일 때 따라 좀 달라지는 것 같다").
-  // 라인업에 골키퍼 자리는 항상 정확히 하나이므로 선발 수만으로 필드 인원이 결정된다.
-  const outfieldCount = Math.max(0, (state?.starters.length ?? 0) - 1);
-  const formationOptions = presetsForOutfieldCount(sportCatalog, outfieldCount);
+  // 선발 인원수로 선택지를 거르지 않는다. 예전에는 필드 인원이 정확히 일치하는 대형만
+  // 남겼는데, 그러면 명단이 덜 찬 동안에는 고를 수 있는 대형이 하나도 없었고 인원이
+  // 바뀔 때마다 목록이 통째로 갈려 고르던 포메이션이 사라졌다(사용자 제보: "5명 6명일 때
+  // 따라 좀 달라지는 것 같다"). 이제 카탈로그 전체를 항상 보여주고, 인원이 대형과 맞지
+  // 않는다는 사실은 드롭다운 아래 안내 문구로만 알린다(PitchFormationEditor).
+  const formationOptions = sportCatalog;
   /**
    * 이 대회에 설정된 출전 인원(GK 포함). **범위**다 — canonical config가 축구 7~11, 풋살 3~6이고
    * 관리자가 상한만 고르므로 minPlayers와 maxPlayers가 서로 다를 수 있다
@@ -171,17 +169,18 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     state?.starters.length ?? 0,
   );
 
-  // Copilot review finding (PR #277): 선발/골키퍼 변경으로 outfieldCount가 바뀌어 지금
-  // 선택된 formation이 더 이상 formationOptions에 없으면 자유 배치로 되돌린다 — team-match
-  // 라인업 화면(lineup-client.tsx)과 동일한 정리. 그대로 두면 슬롯 모드는 이미 꺼졌는데
-  // (activeSlots=null → emptySlotCount=0) formation 라벨만 남아, 제출 게이트가 풀리고
-  // 저장 페이로드에 더 이상 유효하지 않은 formation 코드가 실릴 수 있었다.
+  // 서버 카탈로그에 아예 없는 formation 코드(대회 종목 설정이 바뀐 뒤 다시 연 옛 초안)만
+  // 자유 배치로 되돌린다 — team-match 라인업 화면과 동일한 정리. 그대로 두면 슬롯 모드는
+  // 이미 꺼졌는데(activeSlots=null → emptySlotCount=0) formation 라벨만 남아, 제출 게이트가
+  // 풀리고 저장 페이로드에 유효하지 않은 코드가 실린다. 카탈로그가 아직 안 실린
+  // 동안(sportCatalog=[])에는 아무것도 하지 않는다.
   useEffect(() => {
-    if (state && state.formation !== null && !formationOptions.some((preset) => preset.code === state.formation)) {
+    if (sportCatalog.length === 0) return;
+    if (state && state.formation !== null && !sportCatalog.some((preset) => preset.code === state.formation)) {
       setState((prev) => (prev ? selectFormation(prev, null) : prev));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formationOptions, state?.formation, state?.starters]);
+  }, [sportCatalog, state?.formation]);
 
   if (access.isError) {
     // 접근권한 조회는 retry:false라 네트워크 일시 오류도 즉시 isError=true가 된다
@@ -320,15 +319,16 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const editable =
     !gameStarted &&
     (state.lineupState === null || state.lineupState === 'DRAFT' || (state.lineupState === 'SUBMITTED' && reopened));
-  // 안내는 두 갈래다: ① 지금 선발 수에 맞는 대형이 아예 없을 때, ② 대형은 있지만 선발 수가
-  // 이 대회가 허용하는 출전 인원 **범위**를 벗어났을 때. ②는 이번에 서버가 출전 인원을 함께
-  // 내려주면서 처음 가능해졌다 — 예전에는 화면이 대회 설정을 몰라 "몇 명이어야 맞는지"를
-  // 말할 수 없었다.
+  // 안내는 두 갈래다: ① 이 종목에 등록된 대형이 아예 없을 때(축구처럼 서버 카탈로그가 빈
+  // 경우), ② 대형은 있지만 선발 수가 이 대회가 허용하는 출전 인원 **범위**를 벗어났을 때.
+  // ②는 이번에 서버가 출전 인원을 함께 내려주면서 처음 가능해졌다 — 예전에는 화면이 대회
+  // 설정을 몰라 "몇 명이어야 맞는지"를 말할 수 없었다. 고른 대형과 선발 수의 차이 자체는
+  // 여기가 아니라 PitchFormationEditor가 드롭다운 바로 아래에서 따로 알려준다.
   const starterCount = state.starters.length;
   const outfieldGuidance = !formationSupported
     ? null
-    : formationOptions.length === 0 && starterCount > 0
-      ? `현재 선발 ${starterCount}명${squadSizeLabel !== null ? ` · 이 대회 출전 인원은 ${squadSizeLabel}` : ''} — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요.`
+    : formationOptions.length === 0
+      ? '이 종목은 등록된 포지션 대형이 없어요. 자유 배치로 직접 배치해 주세요.'
       : starterCountOutOfRange && squadSizeLabel !== null
         ? `이 대회 출전 인원은 ${squadSizeLabel}인데 지금 선발은 ${starterCount}명이에요.`
         : null;
@@ -343,6 +343,26 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     : emptySlotCount > 0
       ? `포지션 자리 ${emptySlotCount}개가 비어 있어요.`
       : null;
+
+  /**
+   * 선발 명단을 바꾸는 편집 액션의 결과를 통과시키면, **이번에 새로 선발이 된 사람**과
+   * **이번에 골키퍼로 지정된 사람**만 골라 지금 포메이션의 빈 자리에 앉힌다 — team-match
+   * 라인업 화면과 같은 규칙이고, 자리 배정 자체는 seatStartersInEmptySlots 하나가 맡는다.
+   * 사용자가 일부러 대기로 남겨둔 선수는 다른 사람을 등록해도 대기에 그대로 남는다.
+   */
+  function withSeatedNewcomers(prev: FixtureLineupState, next: FixtureLineupState): FixtureLineupState {
+    if (next === prev || activeSlots === null) return next;
+    const before = new Map(prev.starters.map((entry) => [entry.key, entry]));
+    const seatKeys = next.starters
+      .filter((entry) => {
+        const previous = before.get(entry.key);
+        return previous === undefined || (entry.goalkeeper && !previous.goalkeeper);
+      })
+      .map((entry) => entry.key);
+    if (seatKeys.length === 0) return next;
+    const starters = seatStartersInEmptySlots(next.starters, activeSlots, seatKeys);
+    return starters === next.starters ? next : { ...next, starters, dirty: true };
+  }
 
   async function handleSave() {
     if (state === null) return;
@@ -528,7 +548,9 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                             type="button"
                             aria-pressed={entry.goalkeeper}
                             disabled={!editable}
-                            onClick={() => setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))}
+                            onClick={() =>
+                              setState((prev) => (prev ? withSeatedNewcomers(prev, setGoalkeeper(prev, entry.key)) : prev))
+                            }
                             aria-label={
                               entry.goalkeeper
                                 ? `${entry.displayName}, 골키퍼로 지정됨`
@@ -657,7 +679,11 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                               <button
                                 type="button"
                                 className="tm-btn tm-btn-sm tm-btn-outline"
-                                onClick={() => setState((prev) => (prev ? moveToStarters(prev, entry.key) : prev))}
+                                onClick={() =>
+                                  setState((prev) =>
+                                    prev ? withSeatedNewcomers(prev, moveToStarters(prev, entry.key)) : prev,
+                                  )
+                                }
                               >
                                 선발로
                               </button>

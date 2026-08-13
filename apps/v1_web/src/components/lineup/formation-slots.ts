@@ -66,15 +66,6 @@ export function buildFormationPresets(
   }));
 }
 
-/** 필드 인원수(골키퍼 제외)에 맞는 프리셋만 남긴다. 순서는 formations 배열 순서를 그대로
- * 따른다 — 화면의 칩 정렬 순서가 서버가 준 순서와 일치한다. */
-export function presetsForOutfieldCount(
-  presets: readonly FormationPreset[],
-  outfieldCount: number,
-): FormationPreset[] {
-  return presets.filter((preset) => preset.outfield === outfieldCount);
-}
-
 /** 골키퍼 슬롯은 좌표가 (50,6) 고정이라 서버 프리셋 slots 배열에 담기지 않는다(현행
  * 동작 유지, T1-5) — 이 함수가 항상 앞에 붙인다. 원본 preset.slots는 건드리지 않고
  * 새 배열을 만들어 돌려준다.

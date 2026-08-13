@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { FormationSlot } from '@/components/lineup/formation-slots';
 import type { GameLineup, GameLineupParticipant } from '@/types/game-operations';
 import {
-  buildSavePayload, hydrateFixtureLineupState, placeInSlot, selectFormation, setGoalkeeper,
-  toggleStarter, unplaceFromSlot, type FixtureRosterPlayer,
+  applyLoadedSelection, buildSavePayload, hydrateFixtureLineupState, placeInSlot, selectFormation,
+  setGoalkeeper, toggleStarter, unplaceFromSlot, type FixtureRosterPlayer,
 } from './fixture-lineup.view-model';
 
 const HONG: FixtureRosterPlayer = { userId: 'user-hong', name: '홍길동' };
@@ -264,5 +264,91 @@ describe('fixture-lineup.view-model — 피치 배치', () => {
       [HONG],
     );
     expect(state.starters[0]).toMatchObject({ goalkeeper: true, position: null });
+  });
+});
+
+describe('applyLoadedSelection', () => {
+  /** 등록 명단 두 명이 모두 후보로 시작하는 상태 — 불러오기 전의 기본 모습이다. */
+  function emptyState() {
+    return hydrateFixtureLineupState([], 'side-1', 1, 'GK', [HONG, KIM]);
+  }
+
+  function loaded(overrides: Partial<{
+    userId: string | null;
+    jerseyNumber: number | null;
+    position: string | null;
+    positionX: number | null;
+    positionY: number | null;
+    started: boolean;
+    goalkeeper: boolean;
+  }> = {}) {
+    return {
+      userId: HONG.userId,
+      jerseyNumber: null,
+      position: null,
+      positionX: null,
+      positionY: null,
+      started: true,
+      goalkeeper: false,
+      ...overrides,
+    };
+  }
+
+  it('명단 크기는 그대로 두고 선발 선택만 복원한다', () => {
+    const next = applyLoadedSelection(emptyState(), [loaded()], { formation: null, keepPlacement: true });
+
+    expect(next.starters).toHaveLength(1);
+    expect(next.bench).toHaveLength(1);
+    expect(next.starters[0].userId).toBe(HONG.userId);
+    expect(next.starters.length + next.bench.length).toBe(2);
+  });
+
+  it('불러온 라인업에 없던 사람은 후보로 내려간다', () => {
+    const next = applyLoadedSelection(emptyState(), [loaded()], { formation: null, keepPlacement: true });
+
+    expect(next.bench.map((entry) => entry.userId)).toEqual([KIM.userId]);
+  });
+
+  it('등번호와 배치 좌표를 함께 되살린다', () => {
+    const next = applyLoadedSelection(
+      emptyState(),
+      [loaded({ jerseyNumber: 7, position: 'MF', positionX: 40, positionY: 70 })],
+      { formation: '4-4-2', keepPlacement: true },
+    );
+
+    expect(next.starters[0]).toMatchObject({ jerseyNumber: 7, position: 'MF', positionX: 40, positionY: 70 });
+    expect(next.formation).toBe('4-4-2');
+  });
+
+  it('종목이 다르면 배치를 버리고 명단 구성만 가져온다', () => {
+    const next = applyLoadedSelection(
+      emptyState(),
+      [loaded({ jerseyNumber: 7, position: 'PIVO', positionX: 40, positionY: 70 })],
+      { formation: '1-2-1', keepPlacement: false },
+    );
+
+    // 있지도 않은 포지션에 선수가 서지 않도록 좌표·포지션·포메이션을 버린다.
+    expect(next.starters[0]).toMatchObject({ positionX: null, positionY: null, position: null });
+    expect(next.formation).toBeNull();
+    // 명단 구성(누가 선발인지)과 등번호는 그대로 살아 있다.
+    expect(next.starters[0].jerseyNumber).toBe(7);
+    expect(next.starters[0].userId).toBe(HONG.userId);
+  });
+
+  it('후보로 불러온 사람에게는 골키퍼 표시나 좌표가 남지 않는다', () => {
+    const next = applyLoadedSelection(
+      emptyState(),
+      [loaded({ started: false, goalkeeper: true, positionX: 50, positionY: 6 })],
+      { formation: null, keepPlacement: true },
+    );
+
+    const hong = next.bench.find((entry) => entry.userId === HONG.userId);
+    expect(hong).toMatchObject({ goalkeeper: false, positionX: null, positionY: null });
+  });
+
+  it('불러오면 저장해야 할 변경으로 표시된다', () => {
+    const next = applyLoadedSelection(emptyState(), [loaded()], { formation: null, keepPlacement: true });
+
+    expect(next.dirty).toBe(true);
   });
 });

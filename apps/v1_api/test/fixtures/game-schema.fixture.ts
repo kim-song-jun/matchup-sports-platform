@@ -182,7 +182,15 @@ export const gameSchemaFixture = {
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: '00a50be5568ad1debdaa1b9e585185172ff1ace4c364f11f16112457c32c9a70',
+  // 팀 라인업 재사용(2026-08-13)과 dev의 스키마 변경이 여기서 만났다. 두 브랜치가
+  // 각자 자기 schema.prisma 해시를 못 박아 둔 탓에 이 값만 충돌했고, schema.prisma
+  // 자체는 깨끗하게 병합됐다 — 그래서 아래 값은 어느 쪽 브랜치의 값도 아니라
+  // **병합된 파일**에 `shasum -a 256`을 돌려 새로 계산한 것이다(이 파일의 기존
+  // 재-pin 주석들이 따르는 관례 그대로). 이번 브랜치가 더한 것은 라인업 프리셋
+  // 테이블 2개와 v1_team_memberships.jersey_number이고, 둘 다 새 마이그레이션
+  // 파일로 들어가므로 바인딩된 20260729000100_v1_game_operations 마이그레이션은
+  // 건드리지 않았다 — migration 해시가 그대로인 이유다.
+  schema: '13b2dec321db5618bfcfac7482525a7dba7709047e299d558b9ffe4367baa1a3',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

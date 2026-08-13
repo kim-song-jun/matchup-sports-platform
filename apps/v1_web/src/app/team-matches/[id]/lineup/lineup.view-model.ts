@@ -213,6 +213,58 @@ export function addGuestToBench(state: LineupEditorState, displayName: string): 
   return { ...state, bench: [...state.bench, makeEntry({ displayName: trimmed })], dirty: true };
 }
 
+/**
+ * 불러온 라인업으로 명단 전체를 갈아끼운다.
+ *
+ * 대회 경기 화면(applyLoadedSelection)과 결정적으로 다르다. 그쪽은 등록 명단이 고정돼
+ * 있어서 "누가 선발인지"만 덧입히지만, 팀 매치는 **명단 자체를 팀장이 정한다** — 그래서
+ * 불러오기가 명단을 통째로 대신 채운다. 지금 작성 중이던 내용은 사라지므로 호출부가
+ * 먼저 확인을 받는다.
+ *
+ * 부분 병합은 하지 않는다. 화면이 엔트리 식별자를 들고 있지 않아 "내가 방금 넣은 사람"과
+ * "불러온 사람"을 안전하게 합칠 방법이 없다 — applyVersionConflictReload가 같은 이유로
+ * 같은 선택을 한다.
+ *
+ * `keepPlacement`가 false면 좌표·포지션·포메이션을 버리고 명단 구성만 가져온다(종목이
+ * 다른 라인업을 불러올 때).
+ */
+export function replaceEntries(
+  state: LineupEditorState,
+  entries: ReadonlyArray<{
+    userId: string | null;
+    displayName: string;
+    jerseyNumber: number | null;
+    position: string | null;
+    positionX: number | null;
+    positionY: number | null;
+    started: boolean;
+    goalkeeper: boolean;
+  }>,
+  options: { formation: string | null; keepPlacement: boolean },
+): LineupEditorState {
+  const toDraft = (entry: (typeof entries)[number]): LineupEntryDraft =>
+    makeEntry({
+      userId: entry.userId,
+      displayName: entry.displayName,
+      jerseyNumber: entry.jerseyNumber,
+      goalkeeper: entry.started && entry.goalkeeper,
+      position: options.keepPlacement && !entry.goalkeeper ? entry.position : null,
+      positionX: options.keepPlacement ? entry.positionX : null,
+      positionY: options.keepPlacement ? entry.positionY : null,
+    });
+
+  return {
+    ...state,
+    starters: entries.filter((entry) => entry.started).map(toDraft),
+    // 후보는 피치 위에 없으므로 좌표도 골키퍼 표시도 갖지 않는다.
+    bench: entries
+      .filter((entry) => !entry.started)
+      .map((entry) => ({ ...toDraft(entry), goalkeeper: false, positionX: null, positionY: null })),
+    formation: options.keepPlacement ? options.formation : null,
+    dirty: true,
+  };
+}
+
 export type LineupSlot = 'starter' | 'bench';
 
 function slotKey(slot: LineupSlot): 'starters' | 'bench' {

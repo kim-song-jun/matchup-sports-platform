@@ -11,6 +11,7 @@ import { ResultEscalationMutationService } from '../game-operations/result-escal
 import { ResultEscalationService } from '../game-operations/result-escalation.service';
 import { ResultEscalationValidationInterceptor } from '../game-operations/result-escalation-validation.interceptor';
 import { PrismaModule } from '../prisma/prisma.module';
+import { LineupTodoService } from '../team-lineups/lineup-todo.service';
 import { WorkerNotificationsModule } from './schedule-reminders/worker-notifications.module';
 import {
   V1GameOperationsJobsController,
@@ -65,6 +66,10 @@ import { V1GameOperationsWorkerService } from './v1-game-operations-worker.servi
   ],
   providers: [
     V1GameOperationsWorkerService,
+    // 라인업 리마인더 스캔이 쓰는 읽기 전용 서비스. 서비스만 가져오고 컨트롤러
+    // (LineupTodosController)는 HTTP 앱에만 두므로, 위 주석이 경고하는 "같은 컨트롤러가
+    // 두 모듈에 등록되는" 문제는 생기지 않는다.
+    LineupTodoService,
     ResultEscalationAccessService,
     ResultEscalationMutationService,
     ResultEscalationService,

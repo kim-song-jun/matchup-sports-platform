@@ -1470,9 +1470,12 @@ export type V1FixtureLineupAccess = {
   homeSideId: string | null;
   homeTeamName: string | null;
   homeRegistrationId: string | null;
+  /** 팀 스코프 자산(이전 라인업 히스토리·프리셋)을 부를 때 쓴다. */
+  homeTeamId: string | null;
   awaySideId: string | null;
   awayTeamName: string | null;
   awayRegistrationId: string | null;
+  awayTeamId: string | null;
 };
 
 export function useV1FixtureLineupAccess(tournamentId: string, fixtureId: string, options?: { enabled?: boolean }) {
@@ -1510,6 +1513,151 @@ export function useV1FixtureLineupRoster(
     // 목록에서 사라진 선수가 저장 페이로드에는 그대로 실린다(등록 명단이 SSOT라는 이 화면의 전제가
     // 조용히 깨진다). 명단을 고쳤다면 화면을 다시 여는 것이 맞다(Copilot 리뷰 지적).
     refetchOnWindowFocus: false,
+  });
+}
+
+/** 불러오기 시트가 쓰는 한 명분 엔트리 — 히스토리와 프리셋이 같은 모양을 쓴다. */
+export type V1LineupSourceEntry = {
+  userId: string | null;
+  displayName: string;
+  jerseyNumber: number | null;
+  position: string | null;
+  positionX: number | null;
+  positionY: number | null;
+  started: boolean;
+  goalkeeper: boolean;
+};
+
+/** 우리 팀이 과거에 낸 라인업 한 건(대회·팀 매치 교차). */
+export type V1TeamLineupHistoryItem = {
+  lineupId: string;
+  gameId: string;
+  source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
+  sourceLabel: string;
+  opponentName: string | null;
+  playedAt: string | null;
+  sportName: string | null;
+  formation: string | null;
+  starterCount: number;
+  benchCount: number;
+  participants: V1LineupSourceEntry[];
+};
+
+export function useV1TeamLineupHistory(teamId: string | null, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.teamLineupHistory(teamId ?? ''),
+    queryFn: () => v1Get<{ items: V1TeamLineupHistoryItem[] }>(`/teams/${teamId}/lineup-history`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export type V1TeamLineupPreset = {
+  presetId: string;
+  name: string;
+  formation: string | null;
+  sportName: string | null;
+  updatedAt: string;
+  starterCount: number;
+  benchCount: number;
+  entries: V1LineupSourceEntry[];
+};
+
+export type V1SaveLineupPresetPayload = {
+  name: string;
+  formation?: string;
+  sportName?: string;
+  entries: Array<{
+    userId?: string;
+    displayName: string;
+    jerseyNumber?: number;
+    position?: string;
+    positionX?: number;
+    positionY?: number;
+    started: boolean;
+    goalkeeper?: boolean;
+  }>;
+};
+
+export function useV1TeamLineupPresets(teamId: string | null, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.teamLineupPresets(teamId ?? ''),
+    queryFn: () => v1Get<{ items: V1TeamLineupPreset[] }>(`/teams/${teamId}/lineup-presets`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1CreateLineupPreset(teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1SaveLineupPresetPayload) =>
+      v1Post<V1TeamLineupPreset>(`/teams/${teamId}/lineup-presets`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.teamLineupPresets(teamId ?? '') });
+    },
+  });
+}
+
+export function useV1UpdateLineupPreset(teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ presetId, body }: { presetId: string; body: Partial<V1SaveLineupPresetPayload> }) =>
+      v1Patch<V1TeamLineupPreset>(`/teams/${teamId}/lineup-presets/${presetId}`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.teamLineupPresets(teamId ?? '') });
+    },
+  });
+}
+
+export function useV1DeleteLineupPreset(teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (presetId: string) =>
+      v1Delete<{ deleted: boolean }>(`/teams/${teamId}/lineup-presets/${presetId}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.teamLineupPresets(teamId ?? '') });
+    },
+  });
+}
+
+/** 아직 라인업을 넣지 않은 다가오는 경기 — 홈·마이 페이지의 "할 일" 카드가 쓴다. */
+export type V1LineupTodo = {
+  source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
+  teamId: string;
+  teamName: string;
+  gameId: string;
+  tournamentId: string | null;
+  tournamentTitle: string | null;
+  title: string;
+  opponentName: string | null;
+  scheduledAt: string | null;
+  state: 'MISSING' | 'DRAFT';
+  deepLink: string;
+};
+
+export function useV1LineupTodos(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.lineupTodos(),
+    queryFn: () => v1Get<{ items: V1LineupTodo[] }>('/me/lineup-todos'),
+    enabled: options?.enabled ?? true,
+    retry: false,
+  });
+}
+
+export function useV1ChangeMembershipJersey(teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ membershipId, jerseyNumber }: { membershipId: string; jerseyNumber: number | null }) =>
+      v1Patch<{ membershipId: string; teamId: string; jerseyNumber: number | null }>(
+        `/team-memberships/${membershipId}/jersey`,
+        { jerseyNumber },
+      ),
+    onSuccess: () => {
+      // useV1TeamMembers는 filters까지 키에 포함하므로 정확히 같은 배열을 만들 수 없다 —
+      // 팀 하위 전체를 무효화해 어떤 필터 조합으로 캐시된 목록이든 새 등번호를 받게 한다.
+      void queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId ?? '') });
+    },
   });
 }
 

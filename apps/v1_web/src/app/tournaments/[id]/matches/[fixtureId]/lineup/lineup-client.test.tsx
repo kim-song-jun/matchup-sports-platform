@@ -46,6 +46,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // (enabled:false) 훅 자체는 매 렌더 호출되므로 모듈 모킹에 반드시 있어야 한다.
   useV1TeamLineupHistory: () => ({ data: undefined, isLoading: false }),
   useV1TeamLineupPresets: () => ({ data: undefined, isLoading: false }),
+  useV1CreateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
+  useV1UpdateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
 }));
 
 import { FixtureLineupPageClient } from './lineup-client';

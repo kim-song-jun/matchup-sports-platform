@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ShieldAlert, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
 import {
   BellIcon,
   ChatIcon,
@@ -123,6 +124,11 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             </div>
           </div>
           ) : null}
+
+          {/* 라인업을 아직 넣지 않은 경기가 있으면 가장 먼저 보여준다 — 놓치면 경기 당일에
+              발을 구르게 되는 일이라, 추천 매치나 채팅보다 위에 온다. 할 일이 없으면
+              컴포넌트가 스스로 아무것도 그리지 않으므로 빈 자리가 생기지 않는다. */}
+          <LineupTodoCard enabled={!model.signedOut} />
 
           <HomeChatSummary model={model} />
 

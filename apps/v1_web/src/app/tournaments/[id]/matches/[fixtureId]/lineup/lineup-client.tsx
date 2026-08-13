@@ -11,6 +11,7 @@ import {
 } from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { LoadLineupSheet, type LoadableLineup } from '@/components/lineup/load-lineup-sheet';
+import { SavePresetDialog } from '@/components/lineup/save-preset-dialog';
 import { buildRecentJerseyMap, describeSkipped, resolveJerseyNumber, resolveLoadableEntries } from '@/components/lineup/lineup-source';
 import { matchSlotsToEntries } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import {
@@ -20,9 +21,11 @@ import {
   useV1GameLineups,
   useV1SaveGameLineup,
   useV1SubmitGameLineup,
+  useV1CreateLineupPreset,
   useV1TeamLineupHistory,
   useV1TeamLineupPresets,
   useV1Tournament,
+  useV1UpdateLineupPreset,
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { formatMonthDay } from '@/lib/date-utils';
@@ -137,10 +140,15 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
         : access.data?.awayTeamId ?? null;
   const [loadSheetOpen, setLoadSheetOpen] = useState(false);
   const [loadNotice, setLoadNotice] = useState<string | null>(null);
-  // 시트를 한 번이라도 연 뒤에만 불러온다 — 라인업만 짜고 나가는 대부분의 방문에서
-  // 쓰지 않을 목록 두 개를 미리 받을 이유가 없다.
+  const [savePresetOpen, setSavePresetOpen] = useState(false);
+  const [presetError, setPresetError] = useState<string | null>(null);
+  // 시트를 한 번이라도 열었거나 프리셋을 저장하려 할 때만 불러온다 — 라인업만 짜고 나가는
+  // 대부분의 방문에서 쓰지 않을 목록을 미리 받을 이유가 없다. 프리셋 목록은 저장 시
+  // "같은 이름이 이미 있는지"를 미리 알려주는 데도 쓰인다.
   const historyQuery = useV1TeamLineupHistory(editingTeamId, { enabled: loadSheetOpen });
-  const presetsQuery = useV1TeamLineupPresets(editingTeamId, { enabled: loadSheetOpen });
+  const presetsQuery = useV1TeamLineupPresets(editingTeamId, { enabled: loadSheetOpen || savePresetOpen });
+  const createPreset = useV1CreateLineupPreset(editingTeamId);
+  const updatePreset = useV1UpdateLineupPreset(editingTeamId);
 
   useEffect(() => {
     if (hydrated || gameQuery.data === undefined || lineupsQuery.data === undefined) return;
@@ -467,6 +475,57 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     setLoadSheetOpen(false);
   }
 
+  /**
+   * 지금 명단을 프리셋으로 저장한다.
+   *
+   * 같은 이름이 이미 있으면 새로 만드는 대신 그 프리셋을 갈아끼운다 — 다이얼로그가
+   * 입력 중에 이미 "덮어써요"라고 알려주므로, 여기서 다시 물어 두 번 확인을 받게 하지
+   * 않는다. 서버도 같은 이름을 409로 막으므로 이 분기가 유일한 통로다.
+   */
+  async function handleSavePreset(name: string) {
+    if (state === null) return;
+    setPresetError(null);
+    const entries = [
+      ...state.starters.map((entry) => ({
+        ...(entry.userId !== null ? { userId: entry.userId } : {}),
+        displayName: entry.displayName,
+        ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
+        ...(entry.position !== null ? { position: entry.position } : {}),
+        ...(entry.positionX !== null && entry.positionY !== null
+          ? { positionX: entry.positionX, positionY: entry.positionY }
+          : {}),
+        started: true,
+        goalkeeper: entry.goalkeeper,
+      })),
+      ...state.bench.map((entry) => ({
+        ...(entry.userId !== null ? { userId: entry.userId } : {}),
+        displayName: entry.displayName,
+        ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
+        started: false,
+        goalkeeper: false,
+      })),
+    ];
+    const payload = {
+      name,
+      ...(state.formation !== null ? { formation: state.formation } : {}),
+      ...(formationSupportedSportName !== null ? { sportName: formationSupportedSportName } : {}),
+      entries,
+    };
+
+    try {
+      const existing = (presetsQuery.data?.items ?? []).find((preset) => preset.name === name);
+      if (existing !== undefined) {
+        await updatePreset.mutateAsync({ presetId: existing.presetId, body: payload });
+      } else {
+        await createPreset.mutateAsync(payload);
+      }
+      setSavePresetOpen(false);
+      setLoadNotice(`'${name}' 프리셋으로 저장했어요.`);
+    } catch (error) {
+      setPresetError(extractErrorMessage(error, '프리셋을 저장하지 못했어요.'));
+    }
+  }
+
   async function handleSave() {
     if (state === null) return;
     setSaveError(null);
@@ -649,6 +708,19 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                 >
                   이전 라인업 불러오기
                 </button>
+                {state.starters.length > 0 ? (
+                  <button
+                    type="button"
+                    className="tm-btn tm-btn-sm tm-btn-outline"
+                    onClick={() => {
+                      setPresetError(null);
+                      setSavePresetOpen(true);
+                    }}
+                    style={{ minHeight: 44 }}
+                  >
+                    프리셋으로 저장
+                  </button>
+                ) : null}
               </div>
             ) : null}
             {loadNotice !== null ? (
@@ -822,6 +894,15 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
         currentSportName={formationSupportedSportName}
         loading={historyQuery.isLoading || presetsQuery.isLoading}
         onSelect={handleSelectLineup}
+      />
+
+      <SavePresetDialog
+        open={savePresetOpen}
+        onClose={() => setSavePresetOpen(false)}
+        existingNames={(presetsQuery.data?.items ?? []).map((preset) => preset.name)}
+        saving={createPreset.isPending || updatePreset.isPending}
+        error={presetError}
+        onSave={(name) => void handleSavePreset(name)}
       />
 
       {editable ? (

@@ -215,9 +215,14 @@ export class LineupTodoService {
         where: { gameId: { in: gameIds } },
         select: { id: true, gameId: true, teamId: true },
       }),
+      // `distinct`로 사이드마다 최신 revision 한 행만 받는다 — 이 경로는 리마인더 스캔이
+      // 15분마다 도는 곳이라, 전 revision을 받아 메모리에서 고르면 라인업을 자주 고치는
+      // 팀이 늘어날수록 스캔 비용이 함께 자란다(Copilot 리뷰 지적). 정렬이 사이드별
+      // revision 내림차순이므로 남는 행은 인메모리로 고르던 것과 같다.
       this.prisma.v1GameLineup.findMany({
         where: { gameId: { in: gameIds } },
         orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
+        distinct: ['sideId'],
         select: { sideId: true, state: true },
       }),
     ]);

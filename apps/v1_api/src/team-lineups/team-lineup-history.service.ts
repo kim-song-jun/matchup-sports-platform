@@ -59,11 +59,14 @@ export class TeamLineupHistoryService {
       return { items: [] };
     }
 
-    // 사이드마다 최신 revision 하나씩만 쓴다. revision 내림차순으로 받아 먼저 만난 것을
-    // 채택하면 되므로 사이드 수만큼 쿼리를 날릴 필요가 없다.
+    // 사이드마다 최신 revision 하나씩만 쓴다. `distinct`가 이 정렬(사이드별 revision
+    // 내림차순)의 첫 행만 남기므로, 라인업을 여러 번 고쳐 저장한 팀이라도 가져오는 양이
+    // 사이드 수를 넘지 않는다 — 예전에는 전 revision을 받아 메모리에서 골라냈고, 그러면
+    // 팀이 오래 활동할수록 전송량이 함께 자랐다(Copilot 리뷰 지적).
     const lineups = await this.prisma.v1GameLineup.findMany({
       where: { sideId: { in: sides.map((side) => side.id) } },
       orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
+      distinct: ['sideId'],
       select: { id: true, gameId: true, sideId: true, formation: true },
     });
     const latestBySideId = new Map<string, (typeof lineups)[number]>();

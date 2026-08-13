@@ -1178,6 +1178,7 @@ model V1Team {
   postEventTeamReviewsReceived V1PostEventReview[]        @relation("V1PostEventReviewTargetTeam")
   tournamentRegistrations      V1TournamentRegistration[]
   teamMatchSeriesEntries       V1TeamMatchSeriesTeam[]
+  lineupPresets                V1TeamLineupPreset[]
 
   @@index([ownerUserId])
   @@index([sportId, regionId, status])
@@ -1224,6 +1225,11 @@ model V1TeamMembership {
   joinedAt        DateTime?              @map("joined_at")
   leftAt          DateTime?              @map("left_at")
   removedByUserId String?                @map("removed_by_user_id")
+  /// 팀이 이 멤버에게 지정한 고정 등번호(영구 번호). 라인업 화면에서 등번호를 고쳐도
+  /// 이 값은 바뀌지 않는다 — 한 경기의 임시 번호가 팀 기본값을 조용히 덮어쓰면 안 되므로
+  /// 팀원 관리 화면에서만 명시적으로 바꾼다. 라인업의 등번호 자동 채움은 이 값을
+  /// 2순위로 쓴다(1순위는 불러온 라인업의 값, 3순위는 그 선수가 직전에 달았던 번호).
+  jerseyNumber    Int?                   @map("jersey_number")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
 
@@ -1232,9 +1238,69 @@ model V1TeamMembership {
   removedByUser V1User? @relation("V1TeamMembershipRemover", fields: [removedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([teamId, userId])
+  /// 한 팀 안에서 같은 등번호를 두 사람이 가질 수 없다. Postgres는 NULL을 서로 다른
+  /// 값으로 취급하므로 번호를 지정하지 않은 멤버는 몇 명이든 공존한다.
+  @@unique([teamId, jerseyNumber], map: "v1_team_memberships_team_id_jersey_number_key")
   @@index([userId, status])
   @@index([teamId, role, status])
   @@map("v1_team_memberships")
+}
+
+/// 팀이 이름을 붙여 저장해 두는 라인업 템플릿("주전 4-4-2", "주말 리그용" 등).
+///
+/// 경기 스냅샷(V1GameLineup/V1GameParticipant)과 의도적으로 다른 테이블이다. 스냅샷은
+/// "그날 실제로 이렇게 뛰었다"는 기록이라 사후에 바뀌면 안 되지만, 프리셋은 팀이 계속
+/// 고쳐 쓰는 살아있는 템플릿이고 불러올 때마다 **현재의** 이름·자격으로 다시 해석된다.
+model V1TeamLineupPreset {
+  id              String   @id @default(uuid())
+  teamId          String   @map("team_id")
+  name            String
+  /// 포메이션 프리셋 라벨(예: "4-4-2"). null이면 자유 배치.
+  formation       String?
+  /// 저장 당시 종목 이름(예: "축구"). 불러오기 목록에서 지금 화면의 종목과 다르면 경고
+  /// 배지를 붙이기 위한 표시용 값이며, 불러오기를 막는 데는 쓰지 않는다 — 대회와 팀
+  /// 매치를 가로질러 재사용하는 것이 이 기능의 의도다.
+  sportName       String?  @map("sport_name")
+  createdByUserId String   @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  team    V1Team                    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  entries V1TeamLineupPresetEntry[]
+
+  @@unique([teamId, name], map: "v1_team_lineup_presets_team_id_name_key")
+  @@index([teamId, updatedAt], map: "v1_team_lineup_presets_team_id_updated_at_idx")
+  @@map("v1_team_lineup_presets")
+}
+
+model V1TeamLineupPresetEntry {
+  id           String   @id @default(uuid())
+  presetId     String   @map("preset_id")
+  /// 연동 팀원이면 userId. 이 값이 있으면 불러올 때 이름이 아니라 사람으로 대조하므로
+  /// 그 사이 닉네임이 바뀌어도 같은 사람으로 이어진다. FK를 걸지 않는 이유는
+  /// V1GameParticipant.userId와 같다 — 사용자 탈퇴가 팀의 템플릿을 막아서는 안 된다.
+  userId       String?  @map("user_id")
+  /// 저장 시점의 표시 이름. 게스트(userId=null)에게는 유일한 신원이고, 연동 팀원에게는
+  /// 그 사람이 팀을 떠난 뒤에도 목록에 이름을 보여주기 위한 폴백이다.
+  displayName  String   @map("display_name")
+  jerseyNumber Int?     @map("jersey_number")
+  /// 포지션 코드(DF/MF/FW 등). 골키퍼는 이 컬럼이 아니라 goalkeeper 플래그로 표시한다.
+  position     String?
+  /// 피치 배치 좌표, 0~100 퍼센트. 선발에만 있고 둘 다 있거나 둘 다 없다.
+  positionX    Float?   @map("position_x")
+  positionY    Float?   @map("position_y")
+  started      Boolean  @default(true)
+  /// 골키퍼 여부를 종목 코드가 아니라 **의미**로 저장한다. 경기 스냅샷은 종목별 코드
+  /// (축구 'GK', 풋살 'GOLEIRO')를 position에 넣지만, 프리셋은 종목이 다른 화면으로도
+  /// 불려갈 수 있어 코드를 그대로 옮기면 골키퍼를 못 알아본다 — 적용 시점에 그 화면의
+  /// 골키퍼 코드로 변환한다.
+  goalkeeper   Boolean  @default(false)
+  sortOrder    Int      @map("sort_order")
+
+  preset V1TeamLineupPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  @@index([presetId, sortOrder], map: "v1_team_lineup_preset_entries_preset_id_sort_order_idx")
+  @@map("v1_team_lineup_preset_entries")
 }
 
 model V1TeamJoinApplication {

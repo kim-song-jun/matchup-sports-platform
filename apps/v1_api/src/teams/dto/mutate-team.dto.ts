@@ -135,6 +135,15 @@ export class ChangeTeamMembershipRoleDto {
   role!: 'owner' | 'manager' | 'member';
 }
 
+export class ChangeTeamMembershipJerseyDto {
+  /** 팀 고정 등번호. null이면 해제한다(번호 없는 상태로 되돌림). */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(999)
+  jerseyNumber!: number | null;
+}
+
 export class RemoveTeamMembershipDto {
   @IsOptional()
   @IsString()

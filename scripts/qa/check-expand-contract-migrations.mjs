@@ -306,6 +306,24 @@ END $$`,
     reason:
       'FK on the same newly-added nullable column, which the additivity rules already treat as safe when written as a bare ALTER TABLE -- it is flagged here only because the idempotency guard wraps it in a DO block the parser cannot see into. Legacy NULL-valued rows bypass the constraint by definition, and the OLD app only ever produces NULL team_id, so no old write can violate it. ON DELETE RESTRICT adds no rolling risk either: V1Team is never physically deleted in this codebase (always deletedAt soft delete) and the sibling FK on v1_tournament_registrations.team_id already uses RESTRICT. Reviewed 2026-08-13.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813120000_v1_roster_identity_link/migration.sql',
+    statement: 'WITH latest_snapshot AS ( SELECT DISTINCT ON (participant_id) participant_id, state FROM "v1_participant_consent_snapshots" ORDER BY participant_id, consent_version DESC ), granted_user_ids AS ( SELECT DISTINCT lc.user_id FROM "v1_participant_identity_link_current" lc JOIN latest_snapshot ls ON ls.participant_id = lc.participant_id WHERE ls.state = \'GRANTED\' ) INSERT INTO "v1_user_record_consents" ("user_id", "state", "effective_at", "policy_hash", "created_at", "updated_at") SELECT "user_id", \'GRANTED\', CURRENT_TIMESTAMP, \'backfill-20260813-participant-snapshot\', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM granted_user_ids ON CONFLICT ("user_id") DO NOTHING',
+    reason:
+      'Seeds the user-level record-consent table that the CREATE TABLE two statements above introduced in this very file, so the target did not exist one statement ago and the OLD app cannot read, write, or even name it -- every row this INSERT adds is invisible to the previous release, and a rollback leaves them inert rather than misread. The three pre-existing tables it touches (v1_participant_consent_snapshots, v1_participant_identity_link_current) are only ever SELECTed: no pre-existing row is deleted, narrowed, or reinterpreted, and no column changes shape. It is a pure carry-forward of consent that users already gave at participant granularity, so omitting it would be the regression (names that are public today would silently disappear once the NEW app switches to the user-level switch). Re-runnable: ON CONFLICT ("user_id") DO NOTHING makes a second execution a no-op and also absorbs the legitimate case of several participants resolving to one account. Flagged only because isAdditiveStatement has no data-statement branch and therefore cannot prove any INSERT additive -- this needs the human last mile, not a rule change, since "INSERT into a table created earlier in the same diff" is safe here but would not be a sound general rule (a table can also be created and then filled in ways an old reader does observe, e.g. via a view or trigger it already knows). Reviewed 2026-08-13 while unblocking the alpha deploy, same deploy-time-only surface as the entries above.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
+    statement: 'CREATE UNIQUE INDEX IF NOT EXISTS "v1_team_memberships_team_id_jersey_number_key" ON "v1_team_memberships" ("team_id", "jersey_number")',
+    reason:
+      'No write the OLD app can make is able to violate this index, because half of its key did not exist until this same migration: jersey_number is added (nullable, no default) by the ALTER TABLE immediately above, so every row the previous release inserts or updates leaves it NULL. Postgres treats a composite unique index row as exempt when ANY key column is NULL -- not only when the whole key is -- so the entire legacy population and every legacy write sit outside the constraint by construction. The gate cannot prove this: its unique-index rule requires the ENTIRE column list to be nullable-and-newly-added (columns.every), and team_id is pre-existing, so the statement falls through to review even though the one-NULL-is-enough semantics make it strictly safer than the all-new-columns case the rule already accepts. Nothing pre-existing is rewritten or narrowed -- the index is created, not backfilled -- and a rollback simply leaves an index no old writer can trip. The uniqueness is intended product behaviour (one jersey number per team, any number of members left unnumbered thanks to the same NULL-distinct semantics) and the NEW app translates its 23505 into TEAM_JERSEY_NUMBER_TAKEN. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
+    statement: 'DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = \'v1_team_lineup_presets_team_id_fkey\' ) THEN ALTER TABLE "v1_team_lineup_presets" ADD CONSTRAINT "v1_team_lineup_presets_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "v1_teams"("id") ON DELETE CASCADE ON UPDATE CASCADE; END IF; IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = \'v1_team_lineup_preset_entries_preset_id_fkey\' ) THEN ALTER TABLE "v1_team_lineup_preset_entries" ADD CONSTRAINT "v1_team_lineup_preset_entries_preset_id_fkey" FOREIGN KEY ("preset_id") REFERENCES "v1_team_lineup_presets"("id") ON DELETE CASCADE ON UPDATE CASCADE; END IF; END $$',
+    reason:
+      'Both foreign keys target tables this same migration creates two statements earlier (v1_team_lineup_presets, v1_team_lineup_preset_entries), so at the moment they are added the referencing tables are empty and no pre-existing row can fail them. The OLD app cannot name either table, let alone insert into one, so no legacy write can violate the constraints while the rolling deploy has both releases live; a rollback leaves two constraints guarding tables nobody reads. ON DELETE CASCADE points from the new tables toward existing ones (a team, a preset) rather than the other way round, so deleting a team removes only these brand-new rows and nothing an old reader tracks. Flagged solely because the idempotency wrapper is a DO block, which the additivity parser cannot see into -- exactly the same blind spot the reviewed entries above cover; written as bare ALTER TABLE ADD CONSTRAINT statements they would satisfy the FK rule directly. Reviewed 2026-08-13.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();
@@ -424,9 +442,17 @@ function normalizeIdent(value) {
   return value ? value.toLowerCase().replace(/"/g, '') : value;
 }
 
+// `IF NOT EXISTS` must be skipped here, not just tolerated: without it a
+// `CREATE TABLE IF NOT EXISTS "t"` (the idempotent form this repo's hand-written
+// migrations prefer) never lands in `newTables`, and every index/constraint the
+// same file then puts on that brand-new table gets judged as if it were being
+// bolted onto a pre-existing one — a unique index on a table no old app instance
+// can even name was reported as non-additive and blocked the alpha deploy
+// (2026-08-13). Only migration files ADDED by this diff are parsed, so a CREATE
+// TABLE appearing here is by definition introducing the table for this release.
 function tableCreatedBy(statement) {
   return normalizeIdent(
-    statement.match(/^CREATE TABLE\s+(?:"[^"]+"\.)?("[^"]+"|[a-zA-Z_][\w$]*)/i)?.[1],
+    statement.match(/^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(?:"[^"]+"\.)?("[^"]+"|[a-zA-Z_][\w$]*)/i)?.[1],
   );
 }
 

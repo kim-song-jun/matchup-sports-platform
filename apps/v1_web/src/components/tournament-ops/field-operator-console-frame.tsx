@@ -10,22 +10,33 @@ import { staffRoleLabel } from './badges';
  *
  * `TournamentOpsShell`을 쓰지 않는다: 셸의 내비게이션(운영 보드·결과 검토·스태프)은 전부
  * 대회 전역 화면이라 이 역할이 열면 403이 난다 — 누르면 막히는 링크를 만들지 않는 것이
- * 이 저장소의 원칙(D-16)이다. 대신 지금 어느 대회에 있는지와 돌아갈 곳(내 대회 운영)만
+ * 이 저장소의 원칙(D-16)이다. 대신 지금 어느 대회에 있는지와 돌아갈 곳(담당 경기 목록)만
  * 남긴다.
+ *
+ * 뒤로 가기는 **왔던 담당 경기 목록**(`/my/tournament-staff/:tournamentId`)으로 돌린다.
+ * 예전에는 `/tournament-ops` 를 가리켰는데 그 경로엔 `page.tsx` 가 없어(=`layout.tsx` 만
+ * 존재) 404 였다 — 누르면 막히는 링크를 만들지 않는다는 위 원칙을 정작 이 프레임이
+ * 어기고 있었다. `tournamentId` 가 없으면 대회 목록으로 한 단계 물러선다.
  */
 export function FieldOperatorConsoleFrame({
   children,
   tournamentTitle,
+  tournamentId,
 }: {
   children: ReactNode;
   tournamentTitle?: string;
+  tournamentId?: string;
 }) {
+  const backHref =
+    tournamentId === undefined
+      ? '/my/tournament-staff'
+      : `/my/tournament-staff/${encodeURIComponent(tournamentId)}`;
   return (
     <div className="min-h-screen bg-[var(--surface-soft)] flex flex-col">
       <header className="sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] min-h-[52px] flex items-center gap-2 px-2">
         <Link
-          href="/tournament-ops"
-          aria-label="내 대회 운영으로 돌아가기"
+          href={backHref}
+          aria-label="담당 경기 목록으로 돌아가기"
           className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-body)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           <ChevronLeft size={20} aria-hidden="true" />

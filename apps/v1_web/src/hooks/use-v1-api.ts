@@ -247,6 +247,7 @@ import type {
   V1MyTournamentStaffResponse,
   V1TournamentField,
   V1TournamentFieldListResponse,
+  V1TournamentFixtureFieldResult,
   V1CreateTournamentFieldPayload,
 } from '@/types/api';
 
@@ -3968,6 +3969,58 @@ export function useV1CreateTournamentField(tournamentId: string) {
     mutationFn: (payload: V1CreateTournamentFieldPayload) =>
       v1Post<V1TournamentField>(`/tournament-ops/tournaments/${tournamentId}/fields`, payload),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+    },
+  });
+}
+
+/**
+ * 경기 ↔ 경기장(필드) 연결.
+ *
+ * `V1TournamentFixture.fieldId` 의 **유일한 쓰기 경로**다(백엔드 DTO 주석이 그렇게 못박고
+ * 있다). 백엔드는 Task 18 때부터 있었는데 호출부가 없어서, 필드를 만들어 스태프에게
+ * 배정해도 그 필드에 걸린 경기가 영원히 0건이었다 — 필드 담당자는 담당 경기를 가질 수
+ * 없었고, `NO_FIELD_ASSIGNED`·`NO_STAFF_ASSIGNED` 경고는 끌 방법이 없어 운영 보드에서
+ * 통째로 숨겨져 있었다(2026-08-13 alpha 실측: 픽스처 20건 전부 `fieldId=null`).
+ * 필드 *생성* 호출부가 없어 같은 증상이 한 단계 위에서 났던 #373 과 같은 결함이다.
+ *
+ * 배정/해제는 별도 메서드다 — nullable 필드를 PATCH 하나로 다루면 "비우기"와 "안 건드림"이
+ * 구분되지 않아서, 백엔드가 의도적으로 갈라 놓았다.
+ *
+ * 권한: 필드 *관리*(생성·수정)와 달리 플랫폼 운영자 전용이 아니다. 서버는
+ * `event_reverse` 권한으로 판정하므로 **플랫폼 운영자와 대회 디렉터**가 통과하고,
+ * 필드 담당자·조회 전용은 거부된다. 호출 화면에서 역할을 먼저 가릴 것.
+ *
+ * 보드가 `fieldName` 을 직접 렌더하므로 성공 시 보드 쿼리도 함께 무효화한다.
+ */
+export function useV1AssignFixtureField(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fixtureId, fieldId }: { fixtureId: string; fieldId: string }) =>
+      v1Patch<V1TournamentFixtureFieldResult>(
+        `/tournament-ops/tournaments/${tournamentId}/fixtures/${fixtureId}/field`,
+        { fieldId },
+        idempotencyInit(),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsBoardAll(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+    },
+  });
+}
+
+/** DELETE /tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field — 배정 해제. */
+export function useV1ClearFixtureField(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fixtureId }: { fixtureId: string }) =>
+      v1Delete<V1TournamentFixtureFieldResult>(
+        `/tournament-ops/tournaments/${tournamentId}/fixtures/${fixtureId}/field`,
+        undefined,
+        idempotencyInit(),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsBoardAll(tournamentId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
     },
   });

@@ -3760,6 +3760,16 @@ export type V1TournamentFieldListResponse = {
   items: V1TournamentField[];
 };
 
+/**
+ * PATCH/DELETE /tournament-ops/tournaments/:id/fixtures/:fixtureId/field 응답.
+ * 해제(DELETE)면 `fieldId` 가 null 로 돌아온다.
+ */
+export type V1TournamentFixtureFieldResult = {
+  fixtureId: string;
+  tournamentId: string;
+  fieldId: string | null;
+};
+
 /** POST /tournament-ops/tournaments/:tournamentId/fields 바디. scopeKey 는 대회 안에서 유일한 안정 식별자예요. */
 export type V1CreateTournamentFieldPayload = {
   scopeKey: string;

@@ -263,7 +263,10 @@ async function main() {
             listed = (await listResponse.json())?.data?.items ?? null;
             if (!Array.isArray(listed)) throw new Error('예상과 다른 응답 형식');
           } catch (error) {
-            report.promoFallback = { error: `대회 목록 조회 실패: ${error.message}` };
+            // 여기서 다시 던지면 report 저장과 남은 캡처까지 통째로 날아간다 — Error 가 아닌
+            // 값이 올라와도 메시지를 안전하게 뽑아 기록만 하고 계속 진행한다.
+            const reason = error instanceof Error ? error.message : String(error);
+            report.promoFallback = { error: `대회 목록 조회 실패: ${reason}` };
             console.warn(`[${PHASE}] ${report.promoFallback.error} — 폴백 측정을 건너뜁니다.`);
           }
           if (listed) {

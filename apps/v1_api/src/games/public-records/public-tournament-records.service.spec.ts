@@ -250,11 +250,11 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
     ]);
   });
 
-  it('동의하지 않은(자격 없는) 참가자면 participantId 와 participantName 이 둘 다 null 이다', async () => {
+  it('정책 변경(2026-08-13): 동의 없이 미연동/게스트 참가자라도 대회 참가자면 관전자에게 이름이 보인다', async () => {
     const now = new Date();
     const prisma = buildFakePrisma({
       scheduledAt: new Date(now.getTime() + 90 * 60 * 1000),
-      consentLinks: [], // 링크 자체가 없음 -- unlinked, 절대 eligible 아님
+      consentLinks: [], // 링크 자체가 없음 -- 게스트/미연동. 예전엔 이 이유만으로 항상 masked였다.
       consentSnapshots: [],
       events: [
         {
@@ -271,14 +271,15 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
     });
     const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
 
-    // 익명 요청 regression -- issue #377 이전과 동일하게 masked 여야 한다.
+    // 익명 요청 -- 대회 참가자는 동의/연동 여부와 무관하게 이름이 공개된다(정책 변경).
+    // 이전 정책의 회귀 테스트는 아래 "롤백 스위치" describe 블록으로 옮겼다.
     const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
 
     expect(result.events).toEqual([
       expect.objectContaining({
-        participantId: null,
-        participantName: null,
-        jerseyNumber: null,
+        participantId: INELIGIBLE_PARTICIPANT.id,
+        participantName: '이영희',
+        jerseyNumber: 10,
       }),
     ]);
   });
@@ -317,6 +318,49 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
 });
 
 /**
+ * 대회 참가자 이름 공개 정책의 롤백 스위치 자체를 검증한다. 이 describe 안에서만
+ * `V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE=true`를 설정하고 각 테스트가 끝나면
+ * 반드시 지운다 -- 이 값이 다른 테스트로 새어나가면 위/아래의 "정책 공개가 기본"이라는
+ * 전제를 조용히 뒤집는다.
+ */
+describe('PublicTournamentRecordsService.getMatch -- 롤백 스위치(V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE)', () => {
+  const CONSENT_GATE_ENV_KEY = 'V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE';
+
+  it('플래그를 켜면(true) 이전 Task 24 동의 게이팅으로 즉시 되돌아간다 -- 미연동 참가자는 다시 masked', async () => {
+    process.env[CONSENT_GATE_ENV_KEY] = 'true';
+    try {
+      const now = new Date();
+      const prisma = buildFakePrisma({
+        scheduledAt: new Date(now.getTime() + 90 * 60 * 1000),
+        consentLinks: [],
+        consentSnapshots: [],
+        events: [
+          {
+            id: 'event-goal-rollback',
+            gameId: GAME_ID,
+            type: 'GOAL',
+            sideId: 'side-away',
+            participantId: INELIGIBLE_PARTICIPANT.id,
+            period: 1,
+            clockMs: 900_000,
+            reversesEventId: null,
+          },
+        ],
+      });
+      const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+      const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+      expect(result.events).toEqual([
+        expect.objectContaining({ participantId: null, participantName: null, jerseyNumber: null }),
+      ]);
+    } finally {
+      delete process.env[CONSENT_GATE_ENV_KEY];
+    }
+  });
+});
+
+/**
  * Issue #377 -- 권한 범위(scope)가 이 이슈의 핵심이다. 아래 다섯 케이스는 모두
  * `INELIGIBLE_PARTICIPANT`(consent 없음, 원래는 항상 masked)에 골을 넣혀
  * "동의가 아예 없어도 이 경기 담당 스태프에게만 실명이 뜨는지" 그리고
@@ -325,8 +369,23 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
  * `decideTournamentStaffAccess` 정책 자체가 아니라, `getMatch`가 그 정책에
  * *올바른 resource*(대회 전체가 아니라 이 fixture 의 실제 fieldId)를 넘기는지가
  * 이 스펙의 진짜 관심사이기 때문이다.
+ *
+ * 대회 참가자 이름 공개 정책(2026-08-13)으로 기본 정책이 "전원 공개"가 되면서 이
+ * 블록의 전제("스태프 우회가 없으면 masked") 자체는 기본 상태에서 더는 관측되지
+ * 않는다(누구나 이름을 본다, 스태프 여부와 무관). 그래서 이 블록 전체를 롤백
+ * 스위치로 강제 전환해 예전 동의 게이팅 경로를 켜 둔 채로 돌린다 -- PR #389의 스태프
+ * 우회 로직 자체가 손대지 않고 그대로 남아 있는지를 계속 증명하기 위해서다. 기대값은
+ * 원래 그대로다.
  */
 describe('PublicTournamentRecordsService.getMatch -- issue #377 스태프 실명 우회 권한 스코프', () => {
+  const CONSENT_GATE_ENV_KEY = 'V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE';
+  beforeEach(() => {
+    process.env[CONSENT_GATE_ENV_KEY] = 'true';
+  });
+  afterEach(() => {
+    delete process.env[CONSENT_GATE_ENV_KEY];
+  });
+
   // 마찬가지로 UUID 형태 -- decideTournamentStaffAccess 의 stable-id 검증 대상.
   const FIELD_ID = 'a1000000-0000-4000-8000-000000000003';
   const OTHER_FIELD_ID = 'a1000000-0000-4000-8000-000000000004';

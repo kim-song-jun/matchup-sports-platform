@@ -176,7 +176,7 @@ function makeFixture(overrides: Partial<FakeFixture>): FakeFixture {
 }
 
 describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 요약', () => {
-  it('동의한 참가자의 골에는 홈/원정과 이름/등번호가 실리고, 미동의 참가자는 이름 없이 시간만 실린다', async () => {
+  it('정책 변경(2026-08-13): 동의 여부와 무관하게 대회 참가자는 모두 홈/원정과 이름/등번호가 실린다', async () => {
     const prisma = buildFakePrisma({
       fixtures: [makeFixture({})],
       consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
@@ -191,10 +191,38 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
     expect(result.items).toHaveLength(1);
+    // INELIGIBLE(연동/동의 없음)도 이름이 그대로 실린다 -- 대회 참가자는 동의와
+    // 무관하게 공개된다(정책 변경). 이전 정책 회귀는 아래 롤백 플래그 테스트로 옮겼다.
     expect(result.items[0].scorers).toEqual([
       { side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 600_000 },
-      { side: 'away', participantName: null, jerseyNumber: null, clockMs: 2_700_000 },
+      { side: 'away', participantName: '이영희', jerseyNumber: 10, clockMs: 2_700_000 },
     ]);
+  });
+
+  it('롤백 스위치(V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE=true)를 켜면 동의 게이팅으로 되돌아간다', async () => {
+    const CONSENT_GATE_ENV_KEY = 'V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE';
+    process.env[CONSENT_GATE_ENV_KEY] = 'true';
+    try {
+      const prisma = buildFakePrisma({
+        fixtures: [makeFixture({})],
+        consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
+        consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
+        goalEvents: [
+          { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
+          { id: 'g2', gameId: 'game-1', type: 'GOAL', sideId: 'side-away', participantId: INELIGIBLE.id, clockMs: 2_700_000, reversesEventId: null },
+        ],
+      });
+      const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+      const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+      expect(result.items[0].scorers).toEqual([
+        { side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 600_000 },
+        { side: 'away', participantName: null, jerseyNumber: null, clockMs: 2_700_000 },
+      ]);
+    } finally {
+      delete process.env[CONSENT_GATE_ENV_KEY];
+    }
   });
 
   it('취소된(reversesEventId로 되돌려진) 골은 요약에서 빠진다', async () => {

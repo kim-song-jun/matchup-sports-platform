@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { TournamentStandingsTable, type TournamentStandingsRow } from './tournament-standings-table';
-import { BracketPageContent } from '@/app/tournaments/[id]/bracket/bracket-page-client';
+import { renderBracketStandingsTab } from '@/app/tournaments/[id]/bracket/bracket-test-utils';
 import { ScheduleContent } from '@/components/public-game-records/schedule-content';
 import type { V1TournamentDetail, V1TournamentGroup } from '@/types/api';
 import type { PublicTournamentScheduleResponse } from '@/components/public-game-records/types';
@@ -208,7 +208,7 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
   }
 
   it('두 컴포넌트가 렌더하는 순위표 헤더가 완전히 같다', () => {
-    const { container: bracketContainer } = render(<BracketPageContent tournament={makeTournament()} />);
+    const { container: bracketContainer } = renderBracketStandingsTab(makeTournament());
     const { container: scheduleContainer } = render(
       <ScheduleContent tournamentId="tour-1" data={makeScheduleData()} />,
     );

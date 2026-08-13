@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { BracketPageContent } from './bracket-page-client';
+import { renderBracketPage, renderBracketStandingsTab } from './bracket-test-utils';
 import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /**
@@ -110,6 +110,52 @@ function makeFixture(
   };
 }
 
+/**
+ * 오너 지시 — 이 화면에 들어오면 "경기 일정"이 먼저 보여야 한다(순위·대진표는 결과가
+ * 쌓인 뒤에 보는 정보). 기본 탭이 순위·대진표로 되돌아가거나 세그먼트 탭 나열 순서가
+ * 뒤집히면 이 테스트가 깨진다.
+ */
+describe('BracketPageContent — 기본 탭', () => {
+  it('처음 렌더하면 경기 일정 탭이 첫 번째이자 선택된 탭이고, 순위표는 아직 안 보인다', () => {
+    const tournament = makeTournament({
+      id: 'tour-default-tab',
+      status: 'in_progress',
+      format: 'group_knockout',
+      groups: [
+        makeGroup({
+          id: 'group-a',
+          phase: 'group',
+          name: 'A조',
+          standings: [
+            {
+              registrationId: 'reg-1',
+              teamId: 'team-1',
+              teamName: '성수 FC',
+              teamLogoUrl: null,
+              position: 1,
+              points: 3,
+              wins: 1,
+              draws: 0,
+              losses: 0,
+              goalsFor: 2,
+              goalsAgainst: 0,
+              recalculatedAt: null,
+            },
+          ],
+        }),
+      ],
+    });
+
+    renderBracketPage(tournament);
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual(['경기 일정', '순위 · 대진표']);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'false');
+    expect(screen.queryByRole('table', { name: 'A조 순위표' })).not.toBeInTheDocument();
+  });
+});
+
 describe('BracketPageContent — 순위표 팀 링크', () => {
   it('리그 포맷: 순위표의 팀명을 누르면 /teams/:teamId/records 로 이동한다', () => {
     const tournament = makeTournament({
@@ -140,7 +186,7 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
       ],
     });
 
-    render(<BracketPageContent tournament={tournament} />);
+    renderBracketStandingsTab(tournament);
 
     const link = screen.getByRole('link', { name: /성수 FC/ });
     expect(link).toHaveAttribute('href', '/teams/team-42/records');
@@ -177,7 +223,7 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
       ],
     });
 
-    render(<BracketPageContent tournament={tournament} />);
+    renderBracketStandingsTab(tournament);
 
     // 예전엔 이 자리가 `/teams/:teamId/records` 링크였다. 오너 지시로 바뀌었다:
     // "각 클릭했을 때 그 팀의 경기 상세 페이지로 넘어가는 것보다 하단에 그 내용
@@ -241,7 +287,7 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
       ],
     });
 
-    render(<BracketPageContent tournament={tournament} />);
+    renderBracketStandingsTab(tournament);
 
     // 펼치기 전에는 상대팀이 어디에도 없다.
     expect(screen.queryByText('마포 FC')).toBeNull();
@@ -313,7 +359,7 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
       ],
     });
 
-    render(<BracketPageContent tournament={tournament} />);
+    renderBracketStandingsTab(tournament);
 
     await userEvent.click(screen.getByRole('button', { name: /한강 유나이티드/ }));
 
@@ -365,7 +411,7 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
       ],
     });
 
-    render(<BracketPageContent tournament={tournament} />);
+    renderBracketStandingsTab(tournament);
 
     expect(screen.queryByText(/상위 2팀 진출/)).not.toBeInTheDocument();
     expect(screen.getByText('조별리그가 끝나면 진출 팀이 정해져요')).toBeInTheDocument();
@@ -406,7 +452,7 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
       ],
     });
 
-    render(<BracketPageContent tournament={tournament} />);
+    renderBracketStandingsTab(tournament);
 
     expect(screen.getByText(/상위 2팀 진출/)).toBeInTheDocument();
     expect(screen.queryByText('조별리그가 끝나면 진출 팀이 정해져요')).not.toBeInTheDocument();
@@ -437,7 +483,7 @@ describe('BracketPageContent — 결선 대진표는 조별리그 완료 후에�
       groups: [makeGroup({ id: 'group-a', phase: 'group', name: 'A조', advanceCount: 1 })],
     });
 
-    render(<BracketPageContent tournament={tournament} />);
+    renderBracketStandingsTab(tournament);
 
     expect(screen.getByText(/대진표는 조별리그가 끝난 후/)).toBeInTheDocument();
     expect(screen.queryByText('결승 홈팀')).not.toBeInTheDocument();
@@ -462,7 +508,7 @@ describe('BracketPageContent — 결선 대진표는 조별리그 완료 후에�
       groups: [makeGroup({ id: 'group-a', phase: 'group', name: 'A조', advanceCount: 1 })],
     });
 
-    render(<BracketPageContent tournament={tournament} />);
+    renderBracketStandingsTab(tournament);
 
     expect(screen.queryByText(/대진표는 조별리그가 끝난 후/)).not.toBeInTheDocument();
     expect(screen.getByText('결승 홈팀')).toBeInTheDocument();
@@ -486,7 +532,7 @@ describe('BracketPageContent — 결선 대진표는 조별리그 완료 후에�
       ],
     });
 
-    render(<BracketPageContent tournament={tournament} />);
+    renderBracketStandingsTab(tournament);
 
     expect(screen.getByText('결승 홈팀')).toBeInTheDocument();
   });

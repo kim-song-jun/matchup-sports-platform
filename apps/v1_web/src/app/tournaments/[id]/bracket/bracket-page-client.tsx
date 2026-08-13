@@ -303,6 +303,10 @@ function BracketEmpty({
  * 이미 6:4 그리드로 꽉 참) 같은 화면에 나란히 얹으면 세로로 매우 길어진다. 섹션
  * 대신 탭을 골라 스크롤 깊이를 유지했다. 일정 목록 자체는 새로 만들지 않고 기존
  * `schedule-content.tsx`의 `ScheduleContent`를 그대로 재사용한다(복제 금지 지침).
+ *
+ * 기본 탭은 "경기 일정"이다(오너 지시). 대회 진행 중 이 화면에 들어오는 대부분의
+ * 목적은 "다음 경기가 언제/어디서"이고, 순위·대진표는 결과가 쌓인 뒤에 보는
+ * 정보라 첫 화면을 일정에 내줬다. 세그먼트 탭 나열 순서도 기본 탭과 같게 둔다.
  */
 function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
   // schedule-page-client.tsx와 동일한 데이터 배선(usePublicTournamentSchedule 페이지
@@ -350,7 +354,7 @@ function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
 export function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const { format, fixtures, groups } = tournament;
   const stages = buildTournamentStages(tournament);
-  const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('standings');
+  const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('schedule');
 
   const { groupPhaseGroups, knockoutFixtures, hasGroupStandings, hasKnockoutFixtures } =
     partitionTournamentSections(format, fixtures, groups);
@@ -385,7 +389,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
         <div>
           <span className="tm-bracket-page-eyebrow">순위와 대진표</span>
           <h1>{tournament.title}</h1>
-          <p>조별 순위와 결선 진행 상황을 단계별로 확인하세요.</p>
+          <p>경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.</p>
         </div>
         <span className="tm-bracket-page-format">
           {format === 'league' ? '리그' : format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트'}
@@ -400,7 +404,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
         )}
       </div>
 
-      {/* 순위·대진표 / 경기 일정 탭.
+      {/* 경기 일정 / 순위·대진표 탭.
           예전엔 파란 채움 버튼 + 회색 버튼 두 개를 나란히 뒀는데, 그러면 "선택된 탭"이
           아니라 "파란 버튼 하나와 회색 버튼 하나"로 읽혀 탭인 줄 모른다(오너 지적:
           "탭인 것처럼 보이지가 않고"). 이 저장소가 이미 쓰는 세그먼트 컨트롤 형태
@@ -411,22 +415,22 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === 'standings'}
-            data-active={activeTab === 'standings'}
-            className="tm-seg-tab"
-            onClick={() => setActiveTab('standings')}
-          >
-            순위 · 대진표
-          </button>
-          <button
-            type="button"
-            role="tab"
             aria-selected={activeTab === 'schedule'}
             data-active={activeTab === 'schedule'}
             className="tm-seg-tab"
             onClick={() => setActiveTab('schedule')}
           >
             경기 일정
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'standings'}
+            data-active={activeTab === 'standings'}
+            className="tm-seg-tab"
+            onClick={() => setActiveTab('standings')}
+          >
+            순위 · 대진표
           </button>
         </div>
       </div>

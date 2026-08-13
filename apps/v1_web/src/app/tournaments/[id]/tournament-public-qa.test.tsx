@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
-import { BracketPageContent } from './bracket/bracket-page-client';
+import { renderBracketStandingsTab } from './bracket/bracket-test-utils';
 import { ResultsPageContent } from './results/results-page-client';
 
 function makeTournament(
@@ -82,14 +82,14 @@ describe('public tournament QA regressions', () => {
   });
 
   it('does not mention a group stage for an empty direct-knockout bracket', () => {
-    render(<BracketPageContent tournament={makeTournament({ format: 'knockout', status: 'open' })} />);
+    renderBracketStandingsTab(makeTournament({ format: 'knockout', status: 'open' }));
 
     expect(screen.getByText(/대진 편성이 완료되면/)).toBeInTheDocument();
     expect(screen.queryByText(/조별리그가 끝난 후/)).not.toBeInTheDocument();
   });
 
   it('keeps the group-stage explanation for a group-then-knockout bracket', () => {
-    render(<BracketPageContent tournament={makeTournament({ format: 'group_knockout', status: 'open' })} />);
+    renderBracketStandingsTab(makeTournament({ format: 'group_knockout', status: 'open' }));
 
     expect(screen.getByText(/조별리그가 끝난 후/)).toBeInTheDocument();
   });
@@ -127,7 +127,7 @@ describe('public tournament QA regressions', () => {
       ],
     });
 
-    const { container } = render(<BracketPageContent tournament={tournament} />);
+    const { container } = renderBracketStandingsTab(tournament);
 
     expect(container.querySelector('img[src="/uploads/teams/seongsu-fc.png"]')).toBeInTheDocument();
   });

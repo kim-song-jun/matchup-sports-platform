@@ -85,6 +85,9 @@ export interface GameLineupParticipant {
   gameId: string;
   sideId: string;
   lineupId: string;
+  /** 이 참가자가 가리키는 사용자 — 대회 경기 라인업을 등록 명단과 대조하는 열쇠.
+   * 이 컬럼이 없던 시절의 라인업과 team-match 경로에서는 null이다. */
+  userId: string | null;
   displayNameSnapshot: string;
   jerseyNumber: number | null;
   position: string | null;

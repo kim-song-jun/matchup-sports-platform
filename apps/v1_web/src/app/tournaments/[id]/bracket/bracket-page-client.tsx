@@ -109,7 +109,7 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
 
   if (mine.length === 0) {
     return (
-      <p style={{ fontSize: 12, color: 'var(--text-caption)', padding: '8px 0' }}>
+      <p className="tm-text-caption" style={{ padding: '8px 0' }}>
         이 조에서 배정된 경기가 아직 없어요.
       </p>
     );
@@ -178,10 +178,8 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
     <section aria-label={`${group.name} 순위`} style={{ marginBottom: 16 }}>
       {/* 조 이름 */}
       <div
+        className="tm-text-caption-strong"
         style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: 'var(--text-muted)',
           marginBottom: 8,
           letterSpacing: '0.04em',
           textTransform: 'uppercase',
@@ -189,11 +187,11 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
       >
         {group.name}
         {advance !== null ? (
-          <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--text-caption)' }}>
+          <span className="tm-text-caption" style={{ marginLeft: 8 }}>
             상위 {advance}팀 진출
           </span>
         ) : group.advanceCount !== null ? (
-          <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--text-caption)', textTransform: 'none', letterSpacing: 'normal' }}>
+          <span className="tm-text-caption" style={{ marginLeft: 8, textTransform: 'none', letterSpacing: 'normal' }}>
             조별리그가 끝나면 진출 팀이 정해져요
           </span>
         ) : null}

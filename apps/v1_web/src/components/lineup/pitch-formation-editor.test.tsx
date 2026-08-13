@@ -235,3 +235,46 @@ describe('PitchFormationEditor — 포메이션 전환 확인', () => {
     expect(onSelectFormation).toHaveBeenCalledWith(null);
   });
 });
+
+/**
+ * 모바일 포메이션 진입점 — 기능은 처음부터 있었지만 "배치 설정 · 2-2" 회색 버튼 하나라
+ * **포메이션을 고르는 자리라는 게 읽히지 않았다**(사용자 지적). 무엇을 고르는 자리인지,
+ * 지금 무엇인지, 누를 수 있는지 셋 다 화면에 있어야 한다.
+ */
+describe('PitchFormationEditor — 모바일 포메이션 진입점', () => {
+  function mobileEntry() {
+    // 데스크톱 사이드 패널에도 같은 컨트롤이 있으므로 진입점 버튼만 골라낸다.
+    return screen.getByRole('button', { name: /^포메이션 .*변경하기$/ });
+  }
+
+  it('진입점이 "포메이션" 라벨과 현재 대형(코드·이름·필드 인원)을 함께 보여준다', () => {
+    render(<PitchFormationEditor {...baseProps} starters={[]} slots={null} />);
+
+    const entry = mobileEntry();
+    expect(within(entry).getByText('포메이션')).toBeInTheDocument();
+    // 시트 안 목록과 같은 문구 — 코드만으로는 무엇인지 알 수 없다.
+    expect(within(entry).getByText(/2-2 · 박스 \(필드 4명\)/)).toBeInTheDocument();
+  });
+
+  it('자유 배치일 때는 "자유 배치"로 보여준다 (빈 값이 아니라)', () => {
+    render(<PitchFormationEditor {...baseProps} formation={null} starters={[]} slots={null} />);
+
+    expect(within(mobileEntry()).getByText(/자유 배치/)).toBeInTheDocument();
+  });
+
+  it('누르면 포메이션 선택 시트가 열린다', () => {
+    render(<PitchFormationEditor {...baseProps} starters={[]} slots={null} />);
+
+    fireEvent.click(mobileEntry());
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  // 제출 완료처럼 편집이 닫힌 상태에서 활성 버튼을 남기면, 눌러서 바꿔도 저장할 수단이 없어
+  // 헛수고가 된다(alpha 실측에서 실제로 활성이었다).
+  it('편집할 수 없는 상태면 진입점이 비활성이다', () => {
+    render(<PitchFormationEditor {...baseProps} editable={false} starters={[]} slots={null} />);
+
+    expect(mobileEntry()).toBeDisabled();
+  });
+});

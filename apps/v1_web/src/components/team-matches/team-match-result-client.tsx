@@ -332,6 +332,13 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const [mvpParticipantId, setMvpParticipantId] = useState('');
   const [reason, setReason] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  // 벤치 선수 중 실제로 교체 투입된 사람. 라인업에 이름이 올랐다는 것과 경기에 나갔다는
+  // 것은 다르고, 결과에 실리는 선수만 개인 기록의 "출전"으로 집계되므로(백엔드
+  // PublicUserRecordsService.summary.appearances) 끝까지 벤치를 지킨 선수는 여기서
+  // 빠진 채 제출된다. 대회 경기는 운영 콘솔의 SUBSTITUTION 이벤트가 같은 판정을
+  // 대신하지만(games.service.ts#deriveTournamentRevision), 팀 매치에는 라이브 이벤트
+  // 스트림이 없어 이 화면이 그 입력을 받는 유일한 곳이다.
+  const [substituteIds, setSubstituteIds] = useState<string[]>([]);
   // P0-3: "결과 작성 완료"는 더 이상 그 자리에서 서버에 DRAFT를 만들지 않는다 — 로컬
   // 단계만 'reviewing'으로 넘어가고, 실제 제출(createRevision -> submitRevision 순차 호출)은
   // 검토 화면의 "제출하기"를 눌러야 일어난다. 그래야 득점자를 잘못 골랐을 때 "수정하기"로
@@ -367,6 +374,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
     setCardDrafts(hydrated.cardDrafts);
     setMvpParticipantId(hydrated.mvpParticipantId);
     setReason(hydrated.reason);
+    setSubstituteIds(hydrated.substituteIds);
     removedGoalsRef.current = [];
   }, [revisions.data]);
 
@@ -479,7 +487,31 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const homeSide = game.data?.sides.find((side) => side.sideKey === 'HOME');
   const awaySide = game.data?.sides.find((side) => side.sideKey === 'AWAY');
   const roster = toResultRosterRows(lineup.data?.starters ?? [], lineup.data?.bench ?? []);
+  // 득점자·카드·MVP를 고를 수 있는 대상이자 결과에 실릴 대상 — 선발 전원 + 교체 투입으로
+  // 체크된 벤치 선수. 출전하지 않은 선수에게 골을 붙일 수 있으면 그 자체가 모순이므로
+  // 드롭다운도 이 목록만 쓴다.
+  const appearedRoster = roster.filter((row) => row.started || substituteIds.includes(row.participantId));
+  const benchRoster = roster.filter((row) => !row.started);
   const latest = revisions.data?.[0] ?? null;
+
+  // 체크를 해제하면 그 선수에게 이미 붙어 있던 골·카드·MVP도 함께 걷어낸다 — 남겨두면
+  // 결과에 없는 선수를 가리키는 득점자가 그대로 제출된다(골 개수는 유지하고 "미지정"으로
+  // 되돌려, 호스트가 스코어를 다시 맞출 필요는 없게 한다).
+  function toggleSubstitute(participantId: string, cameOn: boolean) {
+    setSubstituteIds((current) =>
+      cameOn
+        ? current.includes(participantId)
+          ? current
+          : [...current, participantId]
+        : current.filter((id) => id !== participantId),
+    );
+    if (cameOn) return;
+    setHomeGoals((current) =>
+      current.map((goal) => (goal.participantId === participantId ? { ...goal, participantId: null } : goal)),
+    );
+    setCardDrafts((current) => current.filter((card) => card.participantId !== participantId));
+    setMvpParticipantId((current) => (current === participantId ? '' : current));
+  }
   const hostName = teamMatch.data.hostTeam?.name ?? '홈팀';
   const opponentName = teamMatch.data.approvedOpponentTeam?.name ?? '상대팀';
   const canDraft = latest === null || latest.state === 'CHANGE_REQUESTED';
@@ -505,7 +537,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         else current.red += 1;
         cardsByParticipant.set(card.participantId, current);
       }
-      const actualParticipants: V1GameResultParticipantInput[] = roster.map((row) => ({
+      // 출전자만 싣는다 — 벤치를 지킨 선수까지 보내면 서버가 그 row를 그대로 저장하고
+      // 개인 프로필의 "출전 N경기"가 뛰지 않은 경기까지 세게 된다.
+      const actualParticipants: V1GameResultParticipantInput[] = appearedRoster.map((row) => ({
         participantId: row.participantId,
         sideId: homeSide.id,
         started: row.started,
@@ -748,7 +782,41 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               </div>
             ) : (
               <>
-                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>2. 득점자</div>
+                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>2. 출전 선수</div>
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
+                  선발 {roster.length - benchRoster.length}명은 자동으로 출전 처리돼요. 교체로 들어간
+                  선수만 체크해 주세요 — 체크하지 않은 선수는 이 경기에 출전한 것으로 기록되지 않아요.
+                </div>
+                {benchRoster.length === 0 ? (
+                  <div className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)' }}>
+                    교체 명단이 비어 있어요.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 4, marginTop: 10 }}>
+                    {benchRoster.map((row) => (
+                      <label
+                        key={row.participantId}
+                        className="tm-text-body"
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, cursor: 'pointer' }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={substituteIds.includes(row.participantId)}
+                          onChange={(event) => toggleSubstitute(row.participantId, event.target.checked)}
+                        />
+                        <span>
+                          {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}
+                          {row.displayName}
+                        </span>
+                        <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                          교체 출전
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>3. 득점자</div>
                 {homeGoals.length === 0 ? (
                   <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
                     위에서 홈 득점 수를 입력하면 골마다 득점자를 고를 수 있어요.
@@ -771,7 +839,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                           onChange={(event) => setGoalScorer(goal.key, event.target.value === '' ? null : event.target.value)}
                         >
                           <option value="">미지정</option>
-                          {roster.map((row) => (
+                          {appearedRoster.map((row) => (
                             <option key={row.participantId} value={row.participantId}>
                               {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}
                               {row.displayName}
@@ -783,7 +851,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                   </div>
                 )}
 
-                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>3. 옐로카드·레드카드</div>
+                <div className="tm-text-body-lg" style={{ marginTop: 20 }}>4. 옐로카드·레드카드</div>
                 <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
                   {cardDrafts.map((card) => (
                     <div key={card.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -798,7 +866,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                         onChange={(event) => updateCard(card.key, { participantId: event.target.value })}
                       >
                         <option value="">선수를 선택해 주세요</option>
-                        {roster.map((row) => (
+                        {appearedRoster.map((row) => (
                           <option key={row.participantId} value={row.participantId}>
                             {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}
                             {row.displayName}
@@ -839,7 +907,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 </div>
 
                 <label htmlFor="result-mvp-select" className="tm-text-body-lg" style={{ display: 'block', marginTop: 20 }}>
-                  4. MVP
+                  5. MVP
                 </label>
                 <select
                   id="result-mvp-select"
@@ -849,7 +917,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                   onChange={(event) => setMvpParticipantId(event.target.value)}
                 >
                   <option value="">선택 안 함</option>
-                  {roster.map((row) => (
+                  {appearedRoster.map((row) => (
                     <option key={row.participantId} value={row.participantId}>
                       {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}
                       {row.displayName}

@@ -49,6 +49,7 @@ import {
   assertGameSourceCreationInput,
   assertRevisionSupersession,
   assertRevisionTransition,
+  deriveAppearedParticipantIds,
   GameContractError,
   projectParticipantForPublic,
   resolveGameIdempotency,
@@ -4403,18 +4404,42 @@ export class GamesService {
           context.actor.actorType === 'SYSTEM' ? context.actor.systemActor : undefined,
       },
     });
+    // Appearance gate: a `v1_game_result_participants` row means "this player
+    // played", and every downstream reader treats it that way -- most visibly
+    // `PublicUserRecordsService`, whose `summary.appearances` is a plain count
+    // of these rows behind the profile's "출전 N경기". Before this, every
+    // named participant got a row with a hardcoded `started: true`, so a
+    // substitute who sat on the bench the whole match came out of a
+    // tournament with the same appearance record as the player who started
+    // it -- and was recorded as a *starter* on top of that.
+    //
+    // Who actually played is derived, not stored: `started` plus every active
+    // SUBSTITUTION that brought someone on (`deriveAppearedParticipantIds`).
+    // The stat maps are unioned in as a safety net -- `assertEventReferences`
+    // checks only that a GOAL/CARD/FOUL names a participant of the right
+    // side, never that they were on the pitch, so an operator who records a
+    // substitute's goal but forgets the substitution itself produces a scorer
+    // with no appearance. Dropping that row would silently delete the goal
+    // from their record; keeping it treats scoring as the proof of playing it
+    // plainly is.
+    const appearedIds = new Set(deriveAppearedParticipantIds(participants, events));
+    for (const statted of [goalCount, assistCount, foulCount, cardCount]) {
+      for (const participantId of statted.keys()) appearedIds.add(participantId);
+    }
     await tx.v1GameResultParticipant.createMany({
-      data: participants.map((participant) => ({
-        resultRevisionId: revision.id,
-        participantId: participant.id,
-        sideId: participant.sideId,
-        started: true,
-        goals: goalCount.get(participant.id) ?? 0,
-        assists: assistCount.get(participant.id) ?? 0,
-        fouls: foulCount.get(participant.id) ?? 0,
-        cards: jsonInput(cardCount.get(participant.id) ?? { yellow: 0, red: 0 }),
-        goalkeeper: false,
-      })),
+      data: participants
+        .filter((participant) => appearedIds.has(participant.id))
+        .map((participant) => ({
+          resultRevisionId: revision.id,
+          participantId: participant.id,
+          sideId: participant.sideId,
+          started: participant.started,
+          goals: goalCount.get(participant.id) ?? 0,
+          assists: assistCount.get(participant.id) ?? 0,
+          fouls: foulCount.get(participant.id) ?? 0,
+          cards: jsonInput(cardCount.get(participant.id) ?? { yellow: 0, red: 0 }),
+          goalkeeper: false,
+        })),
     });
     const submitted = await tx.v1GameResultRevision.update({
       where: { id: revision.id },

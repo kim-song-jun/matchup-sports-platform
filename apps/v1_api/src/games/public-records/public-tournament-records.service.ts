@@ -14,7 +14,7 @@ import {
   loadParticipantConsentEligibility,
   type ParticipantConsentEligibility,
 } from './public-consent';
-import { resolveLiveClock, type PublicGameClock } from './public-clock';
+import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
 import { effectivePublicVisibilityMode, isLineupPublished, publicFixtureStatus, resolveResultState } from './public-visibility';
 import type { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
@@ -376,6 +376,15 @@ export class PublicTournamentRecordsService {
       mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore);
     const clock: PublicGameClock | null =
       mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], new Date()) : null;
+    // `clock`과 달리 `status === 'live'` 게이트가 하나 더 필요하다: `resolveLiveClock`은
+    // LIVE 피리어드가 없으면 구조적으로 `null`이라 종료된 경기에서 게이트 없이도 값이
+    // 생기지 않지만, `resolvePeriodBreak`는 피리어드가 전부 ENDED면 'regulation_ended'를
+    // 반환한다 -- 게이트가 없으면 이미 `status === 'ended'`로 끝난 경기 응답에 "정규 시간
+    // 종료"가 실려 `liveScore`(위 367행)의 게이트와 계약이 어긋난다.
+    const periodBreak: PublicPeriodBreak | null =
+      mode === 'live' && !showOfficialResult && status === 'live'
+        ? resolvePeriodBreak(fixture.game?.periods ?? [])
+        : null;
 
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
     // 정책 공개(기본값)에서는 이 맵이 쓰이지 않는다 -- 위 getSchedule과 동일한 이유로
@@ -436,6 +445,7 @@ export class PublicTournamentRecordsService {
       scoreStatus,
       score,
       clock,
+      periodBreak,
       lineup,
       events,
       mvp,
@@ -862,6 +872,13 @@ function presentScheduleEntry(
       : 'unavailable';
   const clock: PublicGameClock | null =
     mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], now) : null;
+  // `status === 'live'` 게이트가 `clock`보다 하나 더 필요한 이유는 getMatch의 쌍둥이
+  // 주석(위)과 동일하다 -- `resolvePeriodBreak`는 피리어드가 전부 ENDED면 값을 반환하므로
+  // 게이트 없이는 종료된 경기 카드에도 "정규 시간 종료"가 실린다.
+  const periodBreak: PublicPeriodBreak | null =
+    mode === 'live' && !showOfficialResult && status === 'live'
+      ? resolvePeriodBreak(fixture.game?.periods ?? [])
+      : null;
 
   // 득점자 요약 -- `status_only`는 결과 자체를 숨기므로 골 요약도 함께 숨긴다.
   // 이름/등번호 노출 규칙은 getMatch의 buildEvents와 정확히 동일하다: 동의
@@ -907,6 +924,7 @@ function presentScheduleEntry(
     scoreStatus,
     score: mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore),
     clock,
+    periodBreak,
     scorers,
     hasVideo: fixture.videos.length > 0,
   };

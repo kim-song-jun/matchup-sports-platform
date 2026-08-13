@@ -156,11 +156,22 @@ projection, computed only when there is no official revision yet:
   whichever `V1GamePeriod` row is currently `LIVE`, gated the same way as
   `score` above. `null` before kickoff, during a between-periods break, or
   once the game has ended.
+- `periodBreak` -- `'halftime' | 'regulation_ended' | null`
+  (`resolvePeriodBreak`, `public-clock.ts`), gated identically to `clock`
+  above. Disambiguates *why* `clock` is `null` while the fixture is still
+  `status === 'live'`: `'halftime'` (a `V1GamePeriod` row is `HALFTIME`) or
+  `'regulation_ended'` (every period is `ENDED` but `V1Game.state` has not
+  reached `ENDED` yet -- pending official confirmation or a penalty
+  shootout). `null` whenever `clock !== null` (redundant otherwise) or the
+  visibility mode withholds live detail. Mirrors the operations console's
+  own `halftimePeriod`/`regulationEnded` derivation and its exact spectator
+  wording ("하프타임"/"정규 시간 종료") so the two surfaces never disagree.
 
-Neither field is a new privacy tier: both are derived purely from data the
-`live` mode already exposes elsewhere on the same response (`events[]`
+None of these fields is a new privacy tier: all are derived purely from data
+the `live` mode already exposes elsewhere on the same response (`events[]`
 already lists every GOAL; a running tally of the same GOALs reveals nothing
-new). `GET /tournaments/:id/schedule` batches this into a single extra
+new; `periodBreak` reads the same `V1GamePeriod.state` column `clock` already
+reads). `GET /tournaments/:id/schedule` batches this into a single extra
 `V1GameEvent` query per page (grouped by `gameId`, only for fixtures whose
 game is currently `LIVE`/`PAUSED`) rather than one query per fixture --
 `PublicTournamentRecordsService.loadLiveScores`.
@@ -181,9 +192,12 @@ requests across viewers, so server load is roughly
 (spectators on a page holding a live fixture) x (1 / poll interval) and
 **does** scale with viewers. What the design bounds is when that cost is
 paid: a page with no live fixture never polls, and each viewer is floored at
-an 8s interval. Past what that supports, the next step is a shared cache
-(CDN/edge or server-side) or a real public broadcast channel -- not a
-shorter interval.
+a 10s interval (2026-08: relaxed from the original 8s, after a minute-scale
+interval was tried and rejected -- this surface is what a spectator follows a
+live game on, so score changes and period transitions must land while the game
+is still on that play, and a stale summary defeats the feature). Past what
+that supports, the next step is a shared cache (CDN/edge or server-side) or a
+real public broadcast channel -- not a shorter interval.
 
 ### 승부차기(penalties) 표면화 -- 공개 일정/경기 상세 (2026-08)
 

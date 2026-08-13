@@ -1,4 +1,4 @@
-import { computeElapsedMs, resolveLiveClock } from './public-clock';
+import { computeElapsedMs, resolveLiveClock, resolvePeriodBreak } from './public-clock';
 
 describe('computeElapsedMs', () => {
   it('일시정지 없이 5분이 지났으면 300000ms를 반환한다', () => {
@@ -88,6 +88,44 @@ describe('resolveLiveClock', () => {
       [{ number: 1, state: 'LIVE', startedAt: null, pausedTotalMs: 0, pausedAt: null }],
       now,
     );
+    expect(result).toBeNull();
+  });
+});
+
+describe('resolvePeriodBreak', () => {
+  it('피리어드가 없으면(게임 미생성) null', () => {
+    expect(resolvePeriodBreak([])).toBeNull();
+  });
+
+  it('LIVE 피리어드가 있으면 다른 상태와 무관하게 null (clock을 우선한다)', () => {
+    const result = resolvePeriodBreak([
+      { number: 1, state: 'ENDED', startedAt: new Date(), pausedTotalMs: 0, pausedAt: null },
+      { number: 2, state: 'LIVE', startedAt: new Date(), pausedTotalMs: 0, pausedAt: null },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('LIVE 피리어드가 없고 HALFTIME 피리어드가 있으면 halftime', () => {
+    const result = resolvePeriodBreak([
+      { number: 1, state: 'ENDED', startedAt: new Date(), pausedTotalMs: 0, pausedAt: null },
+      { number: 2, state: 'HALFTIME', startedAt: null, pausedTotalMs: 0, pausedAt: null },
+    ]);
+    expect(result).toBe('halftime');
+  });
+
+  it('모든 피리어드가 ENDED면 regulation_ended', () => {
+    const result = resolvePeriodBreak([
+      { number: 1, state: 'ENDED', startedAt: new Date(), pausedTotalMs: 0, pausedAt: null },
+      { number: 2, state: 'ENDED', startedAt: new Date(), pausedTotalMs: 0, pausedAt: null },
+    ]);
+    expect(result).toBe('regulation_ended');
+  });
+
+  it('전부 SCHEDULED(킥오프 전)면 null — 하프타임으로 오판하지 않는다', () => {
+    const result = resolvePeriodBreak([
+      { number: 1, state: 'SCHEDULED', startedAt: null, pausedTotalMs: 0, pausedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, pausedTotalMs: 0, pausedAt: null },
+    ]);
     expect(result).toBeNull();
   });
 });

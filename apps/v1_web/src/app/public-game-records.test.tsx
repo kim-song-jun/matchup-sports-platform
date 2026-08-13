@@ -117,6 +117,7 @@ function makeMatch(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDetai
     scoreStatus: 'official',
     score: { home: 2, away: 1, penalties: null },
     clock: null,
+    periodBreak: null,
     lineup: {
       home: [{ participantId: 'p-1', displayName: null, jerseyNumber: 7, position: 'FW' }],
       away: [{ participantId: 'p-2', displayName: '이몽룡', jerseyNumber: 10, position: 'MF' }],
@@ -310,6 +311,7 @@ function makeSchedule(overrides: Partial<PublicTournamentScheduleResponse> = {})
         scoreStatus: 'unavailable',
         score: null,
         clock: null,
+        periodBreak: null,
         scorers: [],
         hasVideo: false,
       },
@@ -366,6 +368,7 @@ describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여
           scoreStatus: 'unavailable',
           score: null,
           clock: null,
+          periodBreak: null,
           scorers: [],
           hasVideo: false,
         },
@@ -406,6 +409,7 @@ describe('ScheduleContent — 진행 중 경기의 라이브 스코어/경과 �
     scoreStatus: 'live' as const,
     score: { home: 2, away: 0, penalties: null },
     clock: { periodNumber: 2, elapsedMs: 23 * 60_000, isPaused: false },
+    periodBreak: null,
     scorers: [],
     hasVideo: false,
   };

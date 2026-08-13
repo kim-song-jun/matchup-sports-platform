@@ -66,3 +66,29 @@ export function resolveLiveClock(
   });
   return { periodNumber: live.number, elapsedMs, isPaused: live.pausedAt !== null };
 }
+
+export type PublicPeriodBreak = 'halftime' | 'regulation_ended';
+
+/**
+ * `resolveLiveClock`이 `null`을 반환했을 때(=지금 LIVE인 피리어드가 없음) 그 이유가
+ * 하프타임인지 정규 시간 종료(결과 확정/승부차기 대기)인지 구분한다. 운영 콘솔의
+ * `halftimePeriod`/`regulationEnded` 파생 로직(`operate-console.tsx`, 이슈 #375 /
+ * 종료 흐름 개편)과 정확히 같은 판정이다 -- 같은 V1GamePeriod 행을 보고 두 화면이
+ * 다른 결론을 내면 안 되므로 로직을 그대로 미러링한다(공유 패키지가 없다는 제약은
+ * `computeElapsedMs`의 문서 주석과 동일, apps/v1_api와 apps/v1_web은 별도 런타임).
+ *
+ * `periods`가 비었거나(게임 미생성) 전부 SCHEDULED(킥오프 전, `start` 커맨드가 게임과
+ * 피리어드 1을 같은 트랜잭션에서 LIVE로 묶어 전이시키므로 이 상태에서 LIVE 피리어드가
+ * "아직 없다"가 legit하게 존재하는 유일한 경우다 -- games.service.ts의 executeCommand
+ * 'start' 분기 참고)이면 `null`을 반환한다 -- `resolveLiveClock`이 그 경우 클록을 알아서
+ * `null`로 돌려주는 것과 대칭이다. 호출부는 `clock`과 동일한 조건(`mode==='live' &&
+ * !showOfficialResult`)으로만 이 함수를 부르므로 status_only/공식결과확정 이후에는
+ * 애초에 호출되지 않는다.
+ */
+export function resolvePeriodBreak(periods: readonly GamePeriodClockRow[]): PublicPeriodBreak | null {
+  if (periods.length === 0) return null;
+  if (periods.some((period) => period.state === 'LIVE')) return null;
+  if (periods.some((period) => period.state === 'HALFTIME')) return 'halftime';
+  if (periods.every((period) => period.state === 'ENDED')) return 'regulation_ended';
+  return null;
+}

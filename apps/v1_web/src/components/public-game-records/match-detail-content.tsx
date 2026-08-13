@@ -11,6 +11,7 @@ import {
   formatClock,
   formatScoreline,
   isClockAbnormal,
+  periodLabel,
   presentParticipantName,
   resultStateLabel,
 } from './format';
@@ -119,11 +120,61 @@ function EventsSection({
       </div>
     );
   }
+
+  // period(전반/후반/...) 별로 묶는다. 서버가 이미 period asc -> clockMs asc 로
+  // 정렬해 내려주므로(public-tournament-records.event-order.spec.ts) 버킷
+  // 내부 순서는 절대 다시 정렬하지 않고 원본 배열 순서를 그대로 보존한다.
+  // period===null(타입상 허용되지만 V1GameEvent.period가 NOT NULL이라 현재
+  // 서버 경로로는 발생하지 않음)인 이벤트는 유실시키지 않고 별도 "기타" 구간에
+  // 담는다.
+  const byPeriod = new Map<number, PublicMatchEvent[]>();
+  const unknownPeriodEvents: PublicMatchEvent[] = [];
+  for (const event of events) {
+    if (event.period === null) {
+      unknownPeriodEvents.push(event);
+      continue;
+    }
+    const bucket = byPeriod.get(event.period) ?? [];
+    bucket.push(event);
+    byPeriod.set(event.period, bucket);
+  }
+  const periodNumbers = Array.from(byPeriod.keys()).sort((a, b) => a - b);
+
   return (
-    <div role="list" aria-label="경기 기록" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {events.map((event, index) => (
-        <EventRow key={`${event.type}-${event.sideId}-${index}`} event={event} />
-      ))}
+    <div role="list" aria-label="경기 기록" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {periodNumbers.map((period) => {
+        const headingId = `match-events-period-${period}`;
+        return (
+          <div key={period} role="group" aria-labelledby={headingId}>
+            <div
+              id={headingId}
+              style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}
+            >
+              {periodLabel(period)}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {byPeriod.get(period)!.map((event, index) => (
+                <EventRow key={`${event.type}-${event.sideId}-${period}-${index}`} event={event} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      {unknownPeriodEvents.length > 0 ? (
+        <div role="group" aria-labelledby="match-events-period-unknown">
+          <div
+            id="match-events-period-unknown"
+            style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}
+          >
+            기타
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {unknownPeriodEvents.map((event, index) => (
+              <EventRow key={`${event.type}-${event.sideId}-unknown-${index}`} event={event} />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -214,7 +265,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
               {data.venue ? ` · ${data.venue}` : ''}
               {data.fieldName ? ` (${data.fieldName})` : ''}
             </span>
-            {data.status === 'live' ? <LiveBadge clock={data.clock} /> : null}
+            {data.status === 'live' ? <LiveBadge clock={data.clock} periodBreak={data.periodBreak} /> : null}
           </div>
           {data.pendingProjection ? (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--blue700)', textAlign: 'center' }}>

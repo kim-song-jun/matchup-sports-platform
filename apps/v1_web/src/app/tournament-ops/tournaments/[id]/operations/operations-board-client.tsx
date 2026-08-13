@@ -16,6 +16,7 @@ import {
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
+import { readGameResultScore } from '@/lib/game-result-score';
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
 import { GameStateBadge, WarningBadge, WARNING_LABELS } from '@/components/tournament-ops/badges';
@@ -50,6 +51,43 @@ const WARNING_FILTER_LABELS: Record<V1TournamentStableWarningCode, string> = {
 function readFilter<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {
   if (value === null) return undefined;
   return (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
+}
+
+/**
+ * 확정 결과 칸 — 데스크톱 표와 모바일 카드가 공유한다(한쪽만 그리면 뷰포트에 따라 결과가
+ * 사라진다).
+ *
+ * 결선 무승부는 승부차기로만 승자가 갈리는데 이 보드에는 결과 칸 자체가 없어서, 운영자가
+ * 방금 입력한 승부차기 결과를 보드에서 확인할 방법이 없었다(알파 실측: 서버에는 정규 0:0 ·
+ * 승부차기 2:0 이 저장돼 있었다). 승부차기는 정규시간 점수와 다른 값이므로 같은 줄에 섞지
+ * 않고 아래 캡션으로 병기한다 — 공개 결과 화면의 `PK 4:3` 배치와 같은 규칙이다.
+ *
+ * 확정 결과가 없는 경기(진행 중·예정)는 `—` 로 비워 둔다. `0:0` 을 그리면 "득점 없이 끝난
+ * 경기"로 오독된다.
+ */
+function FixtureResultCell({
+  item,
+  align = 'left',
+}: {
+  item: V1TournamentOperationsBoardItem;
+  align?: 'left' | 'right';
+}) {
+  const score = readGameResultScore(item.currentScore);
+  if (score === null) {
+    return <span className="text-[12px] text-gray-300 dark:text-gray-600">—</span>;
+  }
+  return (
+    <div className={align === 'right' ? 'text-right' : undefined}>
+      <p className="font-medium tabular-nums text-[var(--text-strong)]">
+        {score.home}:{score.away}
+      </p>
+      {score.penalties ? (
+        <p className="text-[12px] tabular-nums text-[var(--text-muted)]">
+          승부차기 {score.penalties.home}:{score.penalties.away}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /**
@@ -392,6 +430,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       상태
                     </th>
                     <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                      결과
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
                       경고
                     </th>
                     <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
@@ -420,6 +461,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <GameStateBadge state={item.gameState} />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <FixtureResultCell item={item} />
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <div className="flex flex-wrap gap-1">
@@ -476,7 +520,10 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <p className="text-[12px] text-gray-400 mt-0.5">필드 {item.fieldName}</p>
                     ) : null}
                   </div>
-                  <GameStateBadge state={item.gameState} />
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <GameStateBadge state={item.gameState} />
+                    <FixtureResultCell item={item} align="right" />
+                  </div>
                 </div>
                 {rowWarnings(item).length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">

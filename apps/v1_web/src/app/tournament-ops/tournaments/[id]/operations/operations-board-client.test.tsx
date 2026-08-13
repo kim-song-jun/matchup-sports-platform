@@ -64,6 +64,21 @@ const ITEM_A: V1TournamentOperationsBoardItem = {
   stableRevision: 'hash-a',
 };
 
+/** 결선 무승부 → 승부차기로 끝난 경기. 알파 실측 데이터 형태 그대로(정규시간 0:0,
+ *  승부차기 2:0, 실시간 확정 경로라 평평한 `{home,away,penalties}`). */
+const ENDED_PENALTY_ITEM: V1TournamentOperationsBoardItem = {
+  ...ITEM_A,
+  fixtureId: 'fixture-2',
+  round: '결승',
+  fixtureNumber: 2,
+  gameId: 'game-2',
+  gameState: 'ENDED',
+  warnings: [],
+  currentScore: { home: 0, away: 0, penalties: { home: 2, away: 0 } },
+  revisionId: 'rev-2',
+  stableRevision: 'hash-b',
+};
+
 const PAGE: V1TournamentOperationsBoardPage = {
   items: [ITEM_A],
   nextCursor: 'cursor-2',
@@ -109,6 +124,36 @@ describe('OperationsBoardClient', () => {
     expect(screen.getAllByText('경기장 미배정').length).toBeGreaterThan(0);
     expect(screen.getAllByText('담당자 미배정').length).toBeGreaterThan(0);
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
+  });
+
+  /* 결과·승부차기 표시 — 이 보드에는 결과 칸이 아예 없어서, 결선 무승부를 승부차기로
+     끝낸 경기도 "종료" 배지 하나로만 보였다(알파 실측: 서버에는 정규 0:0 · 승부차기 2:0
+     이 저장돼 있는데 스태프 화면 어디에도 그 값이 없었다). 표와 카드 두 경로 모두
+     같은 값을 그려야 한다 — 한쪽만 고치면 뷰포트에 따라 결과가 사라진다. */
+  describe('결과·승부차기', () => {
+    it('종료된 경기의 확정 스코어와 승부차기를 함께 보여준다', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: { ...PAGE, items: [ENDED_PENALTY_ITEM], liveWarnings: [] },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      // 데스크톱 표 + 모바일 카드 = 같은 값 두 벌
+      expect(screen.getAllByText('0:0')).toHaveLength(2);
+      expect(screen.getAllByText('승부차기 2:0')).toHaveLength(2);
+    });
+
+    it('아직 확정 결과가 없는 경기는 결과 칸을 비워 둔다 — 0:0 을 지어내지 않는다', () => {
+      // ITEM_A 는 진행 중(currentScore: null)이다. 여기에 0:0 이 그려지면 운영자는
+      // "득점 없이 끝난 경기"로 오독한다.
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      expect(screen.queryByText('0:0')).not.toBeInTheDocument();
+      expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
+    });
   });
 
   it('offers every stable warning code in the filter', () => {

@@ -15,7 +15,7 @@ import { useV1GameEventsBackfill } from '@/hooks/use-v1-game-operations';
 import { RecordedEventList } from '@/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate/recorded-event-list';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
-import { formatGameResultScore } from '@/lib/game-result-score';
+import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { RevisionTimeline } from './revision-timeline';
@@ -138,7 +138,10 @@ export function GameResultReviewPanel({
       title: '결과를 확정할까요?',
       // `.home`/`.away` 를 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)에서
       // "undefined:undefined 결과를..."이 뜬다 — lib/game-result-score 참조.
-      message: `${formatGameResultScore(freshRevision.score)} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
+      // 승부차기까지 넣어 읽어준다: 결선 무승부를 확정하는 자리인데 "0:0 결과를
+      // 공식 결과로 확정해요"만 뜨면, 되돌릴 수 없는 확정 직전에 정작 승자를 가른
+      // 값이 문구에서 빠진다.
+      message: `${formatGameResultScoreWithPenalties(freshRevision.score)} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
       confirmLabel: '확정',
     });
     if (!ok) return;

@@ -300,25 +300,48 @@ const ROUND_LABEL_MAP: Record<string, string> = {
   third_place: '3·4위전', '3·4위전': '3·4위전',
 };
 
-function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] }) {
+/**
+ * 결선 결과 카드.
+ *
+ * 어떤 경기가 결승·4강·3·4위전인지는 **호출자가 넘긴 `kindOf`** 로만 판정한다.
+ * 예전에는 여기서 `f.round` 문자열을 또 비교했는데, 바깥 필터와 판정 기준이 갈리면
+ * "필터는 통과했는데 어느 카드에도 안 들어가는" 경기가 조용히 사라진다.
+ */
+function KnockoutResultsTable({
+  fixtures,
+  kindOf,
+}: {
+  fixtures: V1TournamentFixture[];
+  kindOf: (fixture: V1TournamentFixture) => KnockoutKind | null;
+}) {
   if (fixtures.length === 0) return null;
 
-  const semiByMatchup = new Map<number, V1TournamentFixture[]>();
-  const nonSemiFixtures: V1TournamentFixture[] = [];
+  const semiByMatchup = new Map<number | string, V1TournamentFixture[]>();
+  const finalFixtures: V1TournamentFixture[] = [];
+  const thirdFixtures: V1TournamentFixture[] = [];
 
   for (const f of fixtures) {
-    const isSemi = f.round === 'semi' || f.round === '4강';
-    if (isSemi && f.fixtureNumber != null) {
-      const bucket = semiByMatchup.get(f.fixtureNumber) ?? [];
-      bucket.push(f);
-      semiByMatchup.set(f.fixtureNumber, bucket);
-    } else {
-      nonSemiFixtures.push(f);
+    // 4강은 1·2차전을 대진 번호로 묶는다. 번호가 비어도 4강 카드로는 남겨야 하므로
+    // 경기 id 로 단독 버킷을 만든다 — 결승 카드로 흘려보내면 라벨이 "결승"으로 뒤바뀐다.
+    switch (kindOf(f)) {
+      case 'semi': {
+        const key = f.fixtureNumber ?? `solo-${f.id}`;
+        const bucket = semiByMatchup.get(key) ?? [];
+        bucket.push(f);
+        semiByMatchup.set(key, bucket);
+        break;
+      }
+      case 'third_place':
+        thirdFixtures.push(f);
+        break;
+      case 'final':
+        finalFixtures.push(f);
+        break;
+      default:
+        // 호출자가 이미 걸러 낸 경우만 여기 온다. 조용히 버리지 않고 결승 카드로 낸다.
+        finalFixtures.push(f);
     }
   }
-
-  const finalFixtures = nonSemiFixtures.filter((f) => f.round === 'final' || f.round === '결승');
-  const thirdFixtures = nonSemiFixtures.filter((f) => f.round === 'third_place' || f.round === '3·4위전');
 
   const calcAggregate = (legs: V1TournamentFixture[]) => {
     const leg1 = legs.find((f) => f.legNumber === 1 || !f.legNumber);
@@ -628,11 +651,72 @@ function VideoGallerySection({ fixtures }: { fixtures: V1TournamentFixture[] }) 
  * 새 목록을 별도로 추가하지 말 것 — 같은 화면에 조별 경기 목록이 두 벌 생긴다.
  * ───────────────────────────────────────────────────────── */
 
-/** 백엔드가 라운드를 코드('group')와 한글 라벨('조별리그') 두 형태로 내려준다. */
-const GROUP_ROUNDS: readonly string[] = ['group', '조별리그'];
+/* 조별·결선 분류는 `fixture.round` 문자열이 아니라 편성(`groups[].phase`)으로 판정한다.
+ *
+ * `round`는 대회마다 운영진이 정하는 자유 라벨이라 목록으로 따라잡을 수 없다.
+ * alpha 실측(2026-08-13) 기준 조별 경기의 실제 round 값은
+ *   'group'(12건) · '조별 1라운드'(10) · '조별 2라운드'(6) · '조별 3라운드'(6)
+ * 이고, 예전 상수에 적혀 있던 '조별리그'는 **한 건도 없었다**. 그 결과 정확일치
+ * 필터가 조별 경기 34건 중 22건을 떨어뜨려, 최종결과 화면이 "조별리그 경기 0경기 /
+ * 아직 등록되지 않았어요"라는 틀린 안내를 냈다(일정 화면에는 같은 경기가 보였다).
+ *
+ * `phase`는 백엔드가 관리하는 닫힌 값('group'|'semi'|'final'|'third_place')이라
+ * 새 라운드 라벨이 생겨도 깨지지 않는다. 라벨 매칭은 편성에 붙지 못한 경기의
+ * 폴백으로만 남긴다.
+ */
+/** 결선 카드의 종류. 이 화면이 실제로 그릴 수 있는 세 가지뿐이다. */
+export type KnockoutKind = 'final' | 'semi' | 'third_place';
 
-function isGroupStageFixture(fixture: V1TournamentFixture): boolean {
-  return GROUP_ROUNDS.includes(fixture.round);
+/** 결선 섹션 정렬 순서(결승 → 4강 → 3·4위전). */
+const KNOCKOUT_KIND_ORDER: Record<KnockoutKind, number> = { final: 0, semi: 1, third_place: 2 };
+
+/** 편성에 붙지 못한(groupId 없음/편성 삭제됨) 경기용 폴백 — 알려진 라벨만 인정한다. */
+const KNOCKOUT_KIND_BY_LABEL: Record<string, KnockoutKind> = {
+  final: 'final', '결승': 'final',
+  semi: 'semi', '4강': 'semi',
+  third_place: 'third_place', '3·4위전': 'third_place',
+};
+
+/**
+ * `tournament.groups`를 한 번 순회해 groupId → phase 표를 만든 뒤 경기의 단계를 판정한다.
+ *
+ * 판정을 여기 한 곳에 모으는 이유: 예전에는 바깥 필터와 `KnockoutResultsTable` 내부가
+ * **각자** 라운드 문자열을 분류해서, 한쪽만 넓히면 통과했는데 안 그려지는 경기가
+ * 생겼다. `knockoutKind`가 null 이면 결선 목록에서도 빠지므로 필터와 렌더가 항상 같은
+ * 집합을 본다 — 조용히 사라지는 경기가 없다.
+ *
+ * `phase`가 알려지지 않은 값이면(백엔드가 새 단계를 추가한 경우) 조별에도 결선에도
+ * 넣지 않는다. 이는 기존 동작과 같고, 잘못된 칸에 넣는 것보다 안전하다.
+ */
+function createStageResolver(groups: V1TournamentDetail['groups']) {
+  const phaseByGroupId = new Map(groups.map((g) => [g.id, g.phase]));
+
+  const phaseOf = (fixture: V1TournamentFixture): string | undefined =>
+    (fixture.groupId === null ? undefined : phaseByGroupId.get(fixture.groupId));
+
+  const isGroupStage = (fixture: V1TournamentFixture): boolean => {
+    const phase = phaseOf(fixture);
+    if (phase !== undefined) return phase === 'group';
+    const label = fixture.round.trim();
+    return label === 'group' || label.startsWith('조별');
+  };
+
+  const knockoutKind = (fixture: V1TournamentFixture): KnockoutKind | null => {
+    const phase = phaseOf(fixture);
+    if (phase !== undefined) {
+      return phase in KNOCKOUT_KIND_ORDER ? (phase as KnockoutKind) : null;
+    }
+    return KNOCKOUT_KIND_BY_LABEL[fixture.round.trim()] ?? null;
+  };
+
+  return {
+    isGroupStage,
+    knockoutKind,
+    knockoutOrder: (fixture: V1TournamentFixture): number => {
+      const kind = knockoutKind(fixture);
+      return kind === null ? 9 : KNOCKOUT_KIND_ORDER[kind];
+    },
+  };
 }
 
 interface GroupSection { key: string; name: string; fixtures: V1TournamentFixture[] }
@@ -742,7 +826,8 @@ export function GroupStageFixtures({ tournament }: { tournament: V1TournamentDet
   const panelId = useId();
   const [expanded, setExpanded] = useState(false);
 
-  const fixtures = tournament.fixtures.filter(isGroupStageFixture);
+  const { isGroupStage } = createStageResolver(tournament.groups);
+  const fixtures = tournament.fixtures.filter(isGroupStage);
   const hasGroupPhase = tournament.groups.some((g) => g.phase === 'group');
   // 조별리그 자체가 없는 대회(순수 토너먼트)에서는 블록을 아예 내지 않는다.
   if (fixtures.length === 0 && !hasGroupPhase) return null;
@@ -813,13 +898,11 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
   const championName = isCompleted ? getChampionName(tournament) : null;
   const knockoutRows = !isCompleted ? [] : buildKnockoutFinalRanking(tournament.fixtures);
 
-  const knockoutFixtures = tournament.fixtures.filter(
-    (f) => f.status === 'completed' && f.result !== null &&
-      ['final', 'semi', 'third_place', '결승', '4강', '3·4위전'].includes(f.round),
-  ).sort((a, b) => {
-    const order: Record<string, number> = { final: 0, '결승': 0, semi: 1, '4강': 1, third_place: 2, '3·4위전': 2 };
-    return (order[a.round] ?? 9) - (order[b.round] ?? 9);
-  });
+  // 조별과 같은 이유로 라운드 라벨 정확일치를 쓰지 않는다 — 편성 phase 가 판정 기준이다.
+  const { knockoutKind, knockoutOrder } = createStageResolver(tournament.groups);
+  const knockoutFixtures = tournament.fixtures
+    .filter((f) => f.status === 'completed' && f.result !== null && knockoutKind(f) !== null)
+    .sort((a, b) => knockoutOrder(a) - knockoutOrder(b));
 
   return (
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
@@ -903,7 +986,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
             {knockoutFixtures.length > 0 && (
               <>
                 <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>결선 경기</h3>
-                <KnockoutResultsTable fixtures={knockoutFixtures} />
+                <KnockoutResultsTable fixtures={knockoutFixtures} kindOf={knockoutKind} />
               </>
             )}
             <GroupStageFixtures tournament={tournament} />

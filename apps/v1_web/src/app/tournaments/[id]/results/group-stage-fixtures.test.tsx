@@ -287,3 +287,109 @@ describe('최종결과 — 조별리그 경기 블록', () => {
     );
   });
 });
+
+/**
+ * 단계 분류 회귀 — 라운드 라벨이 아니라 편성 phase 로 가른다.
+ *
+ * 이 describe 가 존재하는 이유: 위 테스트들이 전부 `round: 'group'`(= 옛 상수에 들어
+ * 있던 값)만 써서, 실제 alpha 데이터의 라벨로는 화면이 비어도 전부 통과했다.
+ * 2026-08-13 alpha 실측 분포는 'group' 12건 · '조별 1/2/3라운드' 22건이었고
+ * 옛 상수에 적힌 '조별리그'는 0건이었다 — 즉 조별 경기의 3분의 2가 최종결과
+ * 화면에서 "0경기"로 사라져 있었다. 아래 케이스는 옛 구현에서 반드시 실패한다.
+ */
+describe('최종결과 — 조별/결선 분류는 편성 phase 기준', () => {
+  const alphaLikeTournament = () =>
+    makeTournament({
+      groups: [
+        makeGroup({ id: 'group-a', name: 'A조', phase: 'group', sortOrder: 0 }),
+        makeGroup({ id: 'group-b', name: 'B조', phase: 'group', sortOrder: 1 }),
+        // alpha 실제 데이터의 결선 편성은 이름이 '준결승1' 인데 phase 는 'final' 이다.
+        makeGroup({ id: 'group-f', name: '준결승1', phase: 'final', sortOrder: 2 }),
+      ],
+      fixtures: [
+        makeFixture({
+          id: 'fx-a1', groupId: 'group-a', round: '조별 1라운드', fixtureNumber: 1,
+          homeTeamName: '볼케이노Fc', awayTeamName: 'SOUL FC', result: makeResult(0, 2),
+        }),
+        makeFixture({
+          id: 'fx-b1', groupId: 'group-b', round: '조별 2라운드', fixtureNumber: 2,
+          homeTeamName: '팀밋fs', awayTeamName: 'VORTEX FS', result: makeResult(1, 0),
+        }),
+        makeFixture({
+          id: 'fx-b2', groupId: 'group-b', round: '조별 3라운드', fixtureNumber: 3,
+          homeTeamName: '팀밋fs', awayTeamName: 'VORTEX FS', result: makeResult(0, 2),
+        }),
+        makeFixture({
+          id: 'fx-final', groupId: 'group-f', round: '결승', fixtureNumber: 4,
+          homeTeamName: '볼케이노Fc', awayTeamName: 'SOUL FC', result: makeResult(3, 3),
+        }),
+      ],
+    });
+
+  it("'조별 N라운드' 라벨의 경기도 조별리그 경기로 집계한다", () => {
+    render(<ResultsPageContent tournament={alphaLikeTournament()} />);
+
+    // 옛 구현: 라벨이 GROUP_ROUNDS 에 없어 "조별리그 경기 0경기" + EmptyState 였다.
+    expect(screen.getByRole('button', { name: /조별리그 경기 3경기/ })).toBeInTheDocument();
+
+    expandGroupBlock();
+    expect(screen.queryByText('조별리그 경기가 아직 등록되지 않았어요.')).toBeNull();
+    expect(screen.getByText('A조 · 1경기')).toBeInTheDocument();
+    expect(screen.getByText('B조 · 2경기')).toBeInTheDocument();
+  });
+
+  it('결선 편성(phase=final)의 경기는 조별 목록에 섞이지 않고 결선 경기로 남는다', () => {
+    render(<ResultsPageContent tournament={alphaLikeTournament()} />);
+
+    expect(screen.getByRole('heading', { name: '결선 경기' })).toBeInTheDocument();
+    // 결선 경기는 조별 목록(3경기)에 포함되지 않는다.
+    expect(screen.getByRole('button', { name: /조별리그 경기 3경기/ })).toBeInTheDocument();
+    // 편성 이름이 '준결승1' 이어도 phase 가 final 이므로 결승 카드로 그린다.
+    expect(screen.getByText('결승')).toBeInTheDocument();
+  });
+
+  it('편성 phase 가 라운드 라벨을 이긴다 — 라벨이 결선이어도 group 편성이면 조별이다', () => {
+    render(
+      <ResultsPageContent
+        tournament={makeTournament({
+          groups: [makeGroup({ id: 'group-a', name: 'A조', phase: 'group' })],
+          fixtures: [
+            makeFixture({
+              id: 'fx-mislabeled', groupId: 'group-a', round: '결승',
+              homeTeamName: '성수 FC', awayTeamName: '망원 FC', result: makeResult(1, 0),
+            }),
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /조별리그 경기 1경기/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '결선 경기' })).toBeNull();
+  });
+
+  it('편성에 붙지 못한 경기(groupId=null)는 라운드 라벨로 폴백 분류한다', () => {
+    render(
+      <ResultsPageContent
+        tournament={makeTournament({
+          groups: [],
+          fixtures: [
+            makeFixture({
+              id: 'fx-orphan-group', groupId: null, round: '조별 1라운드',
+              homeTeamName: '성수 FC', awayTeamName: '망원 FC', result: makeResult(2, 0),
+            }),
+            makeFixture({
+              id: 'fx-orphan-final', groupId: null, round: 'final', fixtureNumber: 9,
+              homeTeamName: '서울 유나이티드', awayTeamName: '부산 FC', result: makeResult(2, 1),
+            }),
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /조별리그 경기 1경기/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '결선 경기' })).toBeInTheDocument();
+
+    expandGroupBlock();
+    expect(screen.getByText('성수 FC')).toBeInTheDocument();
+  });
+});

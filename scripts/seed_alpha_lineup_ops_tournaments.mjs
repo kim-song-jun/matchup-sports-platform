@@ -31,19 +31,47 @@ if (!PASSWORD || !ADMIN_EMAIL || (!process.env.ALPHA_ENTRANTS && (!CAPTAIN_A_EMA
   process.exit(1);
 }
 
-async function login(email) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * 로그인은 분당 제한이 걸려 있다(`ThrottlerException` 429) — 팀장 계정을 여러 개 붙여
+ * 대회를 연달아 만들면 실제로 걸린다(실측). 서버·네트워크가 잠깐 없는 경우(502/503/504)와
+ * 같이 기다렸다 다시 시도한다. 자격증명이 틀린 4xx 는 재시도해도 같은 답이라 즉시 올린다.
+ */
+async function login(email, attempt = 1) {
   const res = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: PASSWORD }),
   });
+  if ([429, 502, 503, 504].includes(res.status) && attempt <= 6) {
+    await sleep(15_000 * attempt);
+    return login(email, attempt + 1);
+  }
   if (!res.ok) throw new Error(`login ${email} → ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const cookie = (res.headers.getSetCookie?.() ?? []).find((c) => c.startsWith('teameet_v1_session='));
   if (!cookie) throw new Error(`${email}: 세션 쿠키 없음`);
   return cookie.split(';')[0];
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * 로그인한 계정의 밀린 가입 약관을 동의 처리한다.
+ *
+ * 시드로 만든 계정에는 약관 동의 이력이 없어서, 로그인은 되는데 첫 쓰기에서 403
+ * `TERMS_RECONSENT_REQUIRED` 로 막힌다(실측). 약관 동의 자체는 미인증·미동의 계정에도
+ * 열려 있는 경로라 여기서 바로 해소할 수 있다. 이미 동의한 계정에는 무해하다.
+ */
+async function acceptPendingSignupTerms(cookie, label) {
+  const current = await call('GET', '/terms/current?context=signup', cookie);
+  const items = current.data?.items ?? [];
+  const pending = current.data?.compliance?.pendingRequiredDocumentIds ?? [];
+  const documentIds = pending.length > 0 ? pending : items.filter((i) => i.requirement === 'required').map((i) => i.documentId);
+  if (documentIds.length === 0) return;
+  const res = await call('POST', '/terms/consents', cookie, { documentIds });
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(`${label} 약관 동의 실패 (${res.status}): ${JSON.stringify(res.raw).slice(0, 200)}`);
+  }
+}
 
 /** alpha 는 배포·재시작 중 nginx 가 502/503/504 를 잠깐 돌려준다(HTML 본문). 그건 요청이
  *  틀린 게 아니라 서버가 잠깐 없는 것이므로 재시도한다 — 그 외 4xx 는 계약 문제라 즉시
@@ -289,10 +317,13 @@ async function resolveEntrants() {
   for (const raw of spec.split(',').map((s) => s.trim()).filter(Boolean)) {
     const [captainEmail, teamId, label] = raw.split(':');
     if (!captainEmail || !teamId) throw new Error(`ALPHA_ENTRANTS 형식 오류: "${raw}" (이메일:팀ID:표시이름)`);
+    const cookie = await login(captainEmail);
+    // 시드로 만든 계정은 약관 동의 이력이 없어 첫 쓰기에서 403 이 난다 — 여기서 먼저 푼다.
+    await acceptPendingSignupTerms(cookie, captainEmail);
     entrants.push({
       label: label ?? teamId.slice(0, 8),
       teamId,
-      cookie: await login(captainEmail),
+      cookie,
       depositorName: label ?? '테스트팀장',
     });
   }

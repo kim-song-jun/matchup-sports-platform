@@ -691,6 +691,7 @@ export class GamesService {
             gameId: game.id,
             sideId: side.id,
             lineupId: side.lineupId,
+            userId: participant.userId,
             displayNameSnapshot: participant.displayNameSnapshot,
             jerseyNumber: participant.jerseyNumber,
             position: participant.position,

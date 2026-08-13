@@ -74,6 +74,18 @@ export function hydrateFixtureLineupState(
   const own = lineups
     .filter((lineup) => lineup.sideId === mySideId)
     .sort((a, b) => b.revision - a.revision)[0];
+  /**
+   * 대진이 확정되면 백엔드가 등록 명단 전원을 담은 초기 라인업을 미리 깔아 둔다
+   * (tournament-bracket.service.ts → createFromSourceInTransaction). 그 참가자들은
+   * `started` 컬럼 기본값 때문에 **전원 선발**로 저장돼 있는데, 그건 "이 사람들이 선발로
+   * 정해졌다"는 뜻이 아니라 **아직 아무도 고르지 않았다**는 뜻이다. 그대로 화면에 옮기면
+   * 팀장의 일이 "선발 고르기"가 아니라 "안 뛸 사람 하나씩 빼기"가 된다.
+   *
+   * 자동 생성분은 `revision === 1 && state === 'DRAFT'` 로 정확히 식별된다 — 저장
+   * (saveLineup)은 언제나 `previous.revision + 1` 로 새 리비전을 만들기 때문에, 누군가
+   * 한 번이라도 선발을 고르고 저장했다면 revision 이 2 이상이다.
+   */
+  const untouchedInitialLineup = own !== undefined && own.revision === 1 && own.state === 'DRAFT';
   const participants = own?.participants ?? [];
   const byUserId = new Map<string, (typeof participants)[number]>();
   const legacyByName = new Map<string, (typeof participants)[number][]>();
@@ -108,8 +120,9 @@ export function hydrateFixtureLineupState(
     // V1GameParticipant.started 컬럼(2026-08 추가)으로 선발/후보를 그대로 되살린다 —
     // 예전엔 이 컬럼이 없어 새로고침하면 후보가 전원 선발로 합쳐졌다(실사용 QA 재현).
     // 저장된 적 없는 사람은 후보에서 시작한다 — "선발만 고르면 나머지는 후보"라는
-    // 이 화면의 기본 규칙 그대로다.
-    if (saved?.started === true) starters.push(entry);
+    // 이 화면의 기본 규칙 그대로다. 아무도 손대지 않은 초기 라인업이면 저장된 started 를
+    // 신뢰하지 않는다(위 untouchedInitialLineup 주석 참고).
+    if (!untouchedInitialLineup && saved?.started === true) starters.push(entry);
     else bench.push(entry);
   }
 
@@ -118,8 +131,12 @@ export function hydrateFixtureLineupState(
     bench,
     formation: own?.formation ?? null,
     gameVersion,
-    lineupId: own?.id ?? null,
-    lineupState: own?.state ?? null,
+    // 초기 라인업은 **제출 대상이 아니다.** 그 리비전을 그대로 제출하면 화면에는 후보로
+    // 보이는 사람들이 전원 선발로 확정된다 — 화면과 저장된 내용이 어긋나는 최악의 경우다.
+    // lineupId 를 비워 두면 화면이 "먼저 저장" 경로를 강제하고, 저장이 만든 새 리비전
+    // (지금 화면 그대로)이 제출 대상이 된다.
+    lineupId: untouchedInitialLineup ? null : (own?.id ?? null),
+    lineupState: untouchedInitialLineup ? null : (own?.state ?? null),
     dirty: false,
     droppedUnrosteredCount: participants.length - matched,
   };

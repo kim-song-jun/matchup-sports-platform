@@ -28,12 +28,16 @@ function participant(overrides: Partial<GameLineupParticipant>): GameLineupParti
   };
 }
 
+/**
+ * 기본은 **저장을 한 번 거친** 라인업(revision 2)이다 — revision 1 + DRAFT 는 대진 확정 때
+ * 백엔드가 깔아 두는 초기 라인업이라 "아직 아무도 고르지 않음"으로 해석된다(아래 전용 테스트).
+ */
 function lineup(participants: GameLineupParticipant[], formation: string | null = null): GameLineup {
   return {
     id: 'lineup-1',
     gameId: 'game-1',
     sideId: 'side-1',
-    revision: 1,
+    revision: 2,
     state: 'DRAFT',
     version: 1,
     submittedAt: null,
@@ -115,6 +119,68 @@ describe('fixture-lineup.view-model — 등록 명단이 유일한 출처', () =
     );
     expect([...state.starters, ...state.bench].map((entry) => entry.displayName)).toEqual(['홍길동']);
     expect(state.droppedUnrosteredCount).toBe(1);
+  });
+
+  // 대진 확정 시 백엔드가 등록 명단 전원을 담은 초기 라인업(revision 1 DRAFT)을 깔아 두는데,
+  // 그 참가자들은 컬럼 기본값 때문에 전원 started=true 다 — "정해졌다"가 아니라 "아직 아무도
+  // 고르지 않았다"는 뜻이다. 그대로 옮기면 팀장의 일이 "선발 고르기"가 아니라 "빼기"가 된다.
+  it('아무도 손대지 않은 초기 라인업(revision 1 DRAFT)은 전원 후보로 시작한다', () => {
+    const state = hydrateFixtureLineupState(
+      [
+        {
+          ...lineup([
+            participant({ id: 'p1', userId: 'user-hong', displayNameSnapshot: '홍길동', started: true }),
+            participant({ id: 'p2', userId: 'user-kim', displayNameSnapshot: '김철수', started: true }),
+          ]),
+          revision: 1,
+        },
+      ],
+      'side-1',
+      1,
+      'GK',
+      [HONG, KIM],
+    );
+    expect(state.starters).toHaveLength(0);
+    expect(state.bench.map((entry) => entry.userId)).toEqual(['user-hong', 'user-kim']);
+  });
+
+  // 화면에는 후보로 보이는 사람이 제출로 선발 확정되면 최악이다 — 먼저 저장하게 만든다.
+  it('초기 라인업은 제출 대상이 아니다 — 저장을 거쳐야 제출할 수 있다', () => {
+    const state = hydrateFixtureLineupState(
+      [{ ...lineup([participant({ userId: 'user-hong', displayNameSnapshot: '홍길동', started: true })]), revision: 1 }],
+      'side-1',
+      1,
+      'GK',
+      [HONG],
+    );
+    expect(state.lineupId).toBeNull();
+    expect(state.lineupState).toBeNull();
+  });
+
+  // 한 번이라도 저장했으면 그건 사람이 고른 결과다 — 그대로 되살려야 한다.
+  it('저장을 거친 라인업(revision 2+)의 선발은 그대로 복원한다', () => {
+    const saved = {
+      ...lineup([
+        participant({ id: 'p1', userId: 'user-hong', displayNameSnapshot: '홍길동', started: true }),
+        participant({ id: 'p2', userId: 'user-kim', displayNameSnapshot: '김철수', started: false }),
+      ]),
+      revision: 2,
+    };
+    const state = hydrateFixtureLineupState([saved], 'side-1', 1, 'GK', [HONG, KIM]);
+    expect(state.starters.map((entry) => entry.userId)).toEqual(['user-hong']);
+    expect(state.bench.map((entry) => entry.userId)).toEqual(['user-kim']);
+    expect(state.lineupId).toBe('lineup-1');
+  });
+
+  // 제출·잠금된 라인업은 revision 1이어도 사람이 확정한 결과다(스태프가 대신 제출한 경우 등).
+  it('revision 1이어도 이미 제출(SUBMITTED)됐으면 그 선발을 그대로 살린다', () => {
+    const submitted = {
+      ...lineup([participant({ userId: 'user-hong', displayNameSnapshot: '홍길동', started: true })]),
+      state: 'SUBMITTED' as const,
+    };
+    const state = hydrateFixtureLineupState([submitted], 'side-1', 1, 'GK', [HONG, KIM]);
+    expect(state.starters.map((entry) => entry.userId)).toEqual(['user-hong']);
+    expect(state.lineupState).toBe('SUBMITTED');
   });
 
   it('저장 페이로드는 등록 명단의 userId를 함께 실어 보낸다', () => {

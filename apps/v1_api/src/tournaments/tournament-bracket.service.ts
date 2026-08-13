@@ -397,7 +397,10 @@ export class TournamentBracketService {
           team: { select: { id: true, name: true } },
           players: {
             where: { removedAt: null },
-            select: { id: true, realName: true, registrationId: true },
+            // userId 는 초기 라인업 참가자를 등록 명단의 그 사람과 잇는 열쇠다 — 이름만
+            // 넘기면 동명이인을 구분할 수 없어 나중에 라인업 화면이 선발 표시를 엉뚱한
+            // 사람에게 붙인다(V1GameParticipant.userId, 2026-08 추가).
+            select: { id: true, userId: true, realName: true, registrationId: true },
             orderBy: { id: 'asc' },
           },
         },
@@ -443,11 +446,13 @@ export class TournamentBracketService {
           participants: [
             ...(home?.players ?? []).map((player) => ({
               sourceParticipantId: player.id,
+              userId: player.userId,
               sideKey: V1GameSideKey.HOME,
               displayNameSnapshot: player.realName,
             })),
             ...(away?.players ?? []).map((player) => ({
               sourceParticipantId: player.id,
+              userId: player.userId,
               sideKey: V1GameSideKey.AWAY,
               displayNameSnapshot: player.realName,
             })),

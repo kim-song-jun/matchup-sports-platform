@@ -108,7 +108,7 @@ export type CreateCandidate = {
   visibilityMode: V1VisibilityMode;
   periodCount: number;
   sides: Array<{ sideKey: V1GameSideKey; teamId: string | null; displayNameSnapshot: string }>;
-  participants: Array<{ sideKey: V1GameSideKey; displayNameSnapshot: string }>;
+  participants: Array<{ sideKey: V1GameSideKey; userId: string; displayNameSnapshot: string }>;
 };
 
 type PeriodBackfillCandidate = { gameId: string; periodCount: number };
@@ -206,7 +206,7 @@ async function collectCandidates(client: MigrationReadClient): Promise<Candidate
     select: {
       id: true,
       team: { select: { id: true, name: true } },
-      players: { where: { removedAt: null }, select: { realName: true }, orderBy: { id: 'asc' } },
+      players: { where: { removedAt: null }, select: { userId: true, realName: true }, orderBy: { id: 'asc' } },
     },
   });
   const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
@@ -255,10 +255,12 @@ async function collectCandidates(client: MigrationReadClient): Promise<Candidate
       participants: [
         ...(home?.players ?? []).map((player) => ({
           sideKey: V1GameSideKey.HOME,
+          userId: player.userId,
           displayNameSnapshot: player.realName,
         })),
         ...(away?.players ?? []).map((player) => ({
           sideKey: V1GameSideKey.AWAY,
+          userId: player.userId,
           displayNameSnapshot: player.realName,
         })),
       ],
@@ -353,6 +355,10 @@ export async function createScheduledGame(tx: Prisma.TransactionClient, candidat
         gameId: game.id,
         sideId: side.id,
         lineupId: side.lineupId,
+        // GamesService.createFromSourceInTransaction 과 같은 계약 — 등록 명단의 userId 를
+        // 함께 남겨야 라인업 화면이 저장된 참가자를 명단의 그 사람과 이을 수 있다. 이 파일이
+        // 그쪽을 "mirror" 한다고 선언하고 있으므로 여기도 같이 채운다(Copilot 리뷰 지적).
+        userId: participant.userId,
         displayNameSnapshot: participant.displayNameSnapshot,
       },
     });

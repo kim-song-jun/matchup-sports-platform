@@ -12,11 +12,14 @@ const ids = {
   hostUser: '68000000-0000-4000-8000-000000000001',
   opponentUser: '68000000-0000-4000-8000-000000000002',
   strangerUser: '68000000-0000-4000-8000-000000000003',
+  hostManagerUser: '68000000-0000-4000-8000-000000000004',
+  hostMemberUser: '68000000-0000-4000-8000-000000000005',
   sport: '68000000-0000-4000-8000-000000000010',
   region: '68000000-0000-4000-8000-000000000011',
   hostTeam: '68000000-0000-4000-8000-000000000020',
   opponentTeam: '68000000-0000-4000-8000-000000000021',
   teamMatch: '68000000-0000-4000-8000-000000000030',
+  teamMatchManagerScope: '68000000-0000-4000-8000-000000000031',
 } as const;
 
 const prisma = new PrismaService();
@@ -58,6 +61,8 @@ describe('Task 14 participant identity link + consent', () => {
   let configId: string;
   let gameId: string;
   let participantId: string;
+  let managerScopeGameId: string;
+  let managerScopeParticipantId: string;
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
@@ -73,7 +78,13 @@ describe('Task 14 participant identity link + consent', () => {
     }
     configId = config.id;
     await prisma.v1User.createMany({
-      data: [ids.hostUser, ids.opponentUser, ids.strangerUser].map((id, index) => ({
+      data: [
+        ids.hostUser,
+        ids.opponentUser,
+        ids.strangerUser,
+        ids.hostManagerUser,
+        ids.hostMemberUser,
+      ].map((id, index) => ({
         id,
         email: `task14-identity-${index}@example.test`,
         accountStatus: 'active',
@@ -96,6 +107,11 @@ describe('Task 14 participant identity link + consent', () => {
       data: [
         { teamId: ids.hostTeam, userId: ids.hostUser, role: 'owner', status: 'active' },
         { teamId: ids.opponentTeam, userId: ids.opponentUser, role: 'owner', status: 'active' },
+        // Track A fixture: a manager and a plain member on the host team, used to prove
+        // assertAttestorAuthority() now accepts manager (not owner-only) while still
+        // rejecting member.
+        { teamId: ids.hostTeam, userId: ids.hostManagerUser, role: 'manager', status: 'active' },
+        { teamId: ids.hostTeam, userId: ids.hostMemberUser, role: 'member', status: 'active' },
       ],
     });
     await prisma.v1TeamMatch.create({
@@ -131,6 +147,48 @@ describe('Task 14 participant identity link + consent', () => {
     gameId = created.gameId;
     const persisted = await prisma.v1GameParticipant.findFirstOrThrow({ where: { gameId } });
     participantId = persisted.id;
+
+    // Track A fixture: a second, independent team match/game so the manager/member
+    // attestation-authority cases below don't depend on the mutable state the tests
+    // above leave `gameId`/`participantId` in.
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: ids.teamMatchManagerScope,
+        hostTeamId: ids.hostTeam,
+        createdByUserId: ids.hostUser,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Task 14 identity match (manager scope)',
+        placeName: 'Task 14 ground',
+        startAt: new Date('2026-09-02T00:00:00.000Z'),
+        approvedApplicantTeamId: ids.opponentTeam,
+        competitionConfigVersionId: configId,
+      },
+    });
+    const managerScopeInput: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: ids.teamMatchManagerScope,
+      competitionConfigVersionId: configId,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Task 14 Host' },
+        { sideKey: V1GameSideKey.AWAY, teamId: ids.opponentTeam, displayNameSnapshot: 'Task 14 Opponent' },
+      ],
+      participants: [
+        { sourceParticipantId: 'guest-manager-scope-1', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Unlinked Guest 2' },
+      ],
+    };
+    const managerScopeCreated = await prisma.$transaction((tx) =>
+      service.createFromSourceInTransaction(
+        tx,
+        managerScopeInput,
+        context('identity-manager-scope-source-create', managerScopeInput),
+      ),
+    );
+    managerScopeGameId = managerScopeCreated.gameId;
+    const managerScopePersisted = await prisma.v1GameParticipant.findFirstOrThrow({
+      where: { gameId: managerScopeGameId },
+    });
+    managerScopeParticipantId = managerScopePersisted.id;
   });
 
   afterAll(async () => {
@@ -416,5 +474,58 @@ describe('Task 14 participant identity link + consent', () => {
         nickname: null,
       }),
     ).toEqual({ participantId: 'p3', kind: 'unlinked' });
+  });
+
+  // Track A regression: assertAttestorAuthority() used to query team membership with
+  // role: 'owner' only, so a team manager could never approve/reject an identity-link
+  // request for their own team's participant even though every other attestation-adjacent
+  // gate in this service (resolveActor's team_manager/team_owner branches) already treats
+  // owner and manager as equally authoritative. A plain member must still be forbidden.
+  it('lets a team manager (not just the owner) attest an identity link for their own team, and forbids a plain member', async () => {
+    const request = await service.requestIdentityLink(
+      authUser(ids.opponentUser),
+      managerScopeGameId,
+      managerScopeParticipantId,
+      'identity-manager-scope-request-1',
+      { expectedVersion: 0, clientCommandId: 'identity-manager-scope-request-1' },
+    );
+    expect(request).toEqual(
+      expect.objectContaining({ state: 'pending_attestation', requestId: expect.any(String) }),
+    );
+
+    const memberAttempt = await captureFailure(() =>
+      service.attestIdentityLink(
+        authUser(ids.hostMemberUser),
+        managerScopeGameId,
+        managerScopeParticipantId,
+        request.requestId,
+        'identity-manager-scope-member-attempt',
+        {
+          expectedVersion: request.version,
+          clientCommandId: 'identity-manager-scope-member-attempt',
+          decision: 'approve',
+        },
+      ),
+    );
+    expectHttpCode(memberAttempt, 403, 'PERMISSION_DENIED');
+
+    const attestedByManager = await service.attestIdentityLink(
+      authUser(ids.hostManagerUser),
+      managerScopeGameId,
+      managerScopeParticipantId,
+      request.requestId,
+      'identity-manager-scope-manager-attest',
+      {
+        expectedVersion: request.version,
+        clientCommandId: 'identity-manager-scope-manager-attest',
+        decision: 'approve',
+      },
+    );
+    expect(attestedByManager).toEqual(expect.objectContaining({ linkState: 'active' }));
+
+    const current = await prisma.v1ParticipantIdentityLinkCurrent.findUniqueOrThrow({
+      where: { participantId: managerScopeParticipantId },
+    });
+    expect(current.userId).toBe(ids.opponentUser);
   });
 });

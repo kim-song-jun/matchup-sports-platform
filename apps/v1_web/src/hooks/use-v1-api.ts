@@ -2804,7 +2804,11 @@ export function useV1TournamentParticipantCheck(tournamentId: string, enabled = 
 export function useV1SubmitTournamentReview(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[] }) =>
+    // teamId는 여러 팀의 팀장·운영진을 겸하고 그 팀들이 모두 이 대회에 참가 확정된
+    // 사용자에게만 필요하다(단일 자격 팀이면 서버가 자동 선택). 서버가 400
+    // TEAM_SELECTION_REQUIRED + details.teams 로 후보 목록을 돌려주면 호출자가 사용자에게
+    // 팀을 고르게 한 뒤 이 필드를 채워 재요청한다.
+    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[]; teamId?: string }) =>
       v1Post<V1TournamentReview>(`/tournaments/${tournamentId}/reviews`, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });

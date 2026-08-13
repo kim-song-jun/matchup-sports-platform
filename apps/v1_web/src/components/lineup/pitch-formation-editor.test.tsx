@@ -1,8 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { slotsWithGoalkeeper, type FormationPreset } from './formation-slots';
 import { PitchFormationEditor } from './pitch-formation-editor';
+
+/** 포메이션 드롭다운에서 하나를 고른다. 데스크톱 사이드 패널과 모바일 드로어에 같은
+ * 컨트롤이 두 벌 렌더되므로 첫 번째(데스크톱)를 조작한다. 빈 문자열은 "자유 배치". */
+function chooseFormation(value: string) {
+  fireEvent.change(screen.getAllByLabelText('포메이션')[0], { target: { value } });
+}
 
 function makeEntry(overrides: Partial<LineupEntryDraft> & { key: string }): LineupEntryDraft {
   return {
@@ -57,13 +63,47 @@ describe('PitchFormationEditor — slot mode', () => {
     expect(onUnplacePlayer).not.toHaveBeenCalled();
   });
 
-  it('shows outfieldGuidance instead of hiding the formation section when no preset fits the headcount, and still offers 자유 배치', () => {
+  it('shows outfieldGuidance and still offers 자유 배치 when the sport has no registered formations', () => {
     render(
       <PitchFormationEditor {...baseProps} starters={[]} formation={null} formationOptions={[]} slots={null}
-        outfieldGuidance="현재 선발 3명 — 이 인원수에 맞는 정해진 포지션 대형이 없어요. 자유 배치를 사용해 주세요." />,
+        outfieldGuidance="이 종목은 등록된 포지션 대형이 없어요. 자유 배치로 직접 배치해 주세요." />,
     );
-    expect(screen.getByText(/이 인원수에 맞는 정해진 포지션 대형이 없어요/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '자유 배치' })).toBeInTheDocument();
+    expect(screen.getAllByText(/등록된 포지션 대형이 없어요/)[0]).toBeInTheDocument();
+    const select = screen.getAllByLabelText('포메이션')[0];
+    expect(within(select).getByRole('option', { name: '자유 배치' })).toBeInTheDocument();
+  });
+
+  it('keeps every formation selectable no matter the headcount — a short-handed squad can still pick one', () => {
+    // 선발 1명(필드 0명)이어도 필드 4명짜리 대형이 선택지에 남아야 한다. 예전에는 인원수와
+    // 정확히 맞는 프리셋만 노출해, 명단을 다 채우기 전에는 아예 고를 수 없었다.
+    render(
+      <PitchFormationEditor {...baseProps} starters={[makeEntry({ key: 'w1', displayName: '대기선수' })]}
+        formation={null} slots={null} />,
+    );
+    const select = screen.getAllByLabelText('포메이션')[0];
+    expect(within(select).getByRole('option', { name: '2-2 · 박스 (필드 4명)' })).toBeInTheDocument();
+  });
+
+  it('selecting from the dropdown reports the formation code, and 자유 배치 reports null', () => {
+    const onSelectFormation = vi.fn();
+    render(
+      <PitchFormationEditor {...baseProps} starters={[]} formation={null} slots={null}
+        onSelectFormation={onSelectFormation} />,
+    );
+    const select = screen.getAllByLabelText('포메이션')[0];
+    fireEvent.change(select, { target: { value: '2-2' } });
+    expect(onSelectFormation).toHaveBeenCalledWith('2-2');
+    fireEvent.change(select, { target: { value: '' } });
+    expect(onSelectFormation).toHaveBeenLastCalledWith(null);
+  });
+
+  it('spells out how the chosen formation mismatches the current squad instead of hiding the option', () => {
+    // 선발 1명 → 필드 0명. 필드 4명 대형을 고른 상태이므로 4자리가 빈다.
+    render(
+      <PitchFormationEditor {...baseProps} starters={[makeEntry({ key: 'w1', displayName: '대기선수' })]}
+        slots={slotsWithGoalkeeper(preset)} />,
+    );
+    expect(screen.getAllByText(/필드 4명이 필요해요/)[0]).toBeInTheDocument();
   });
 
   it('free mode (slots=null) keeps the pre-existing tap-to-place guidance copy unchanged', () => {
@@ -114,7 +154,7 @@ describe('PitchFormationEditor — 포메이션 전환 확인', () => {
       <PitchFormationEditor {...baseProps} starters={placedIn2v2()} slots={slotsWithGoalkeeper(preset)}
         formationOptions={[preset, diamond]} onSelectFormation={onSelectFormation} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /1-2-1/ }));
+    chooseFormation('1-2-1');
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     // 확인 전에는 절대 적용되지 않아야 한다 — 이게 "확인 모달" 정책의 핵심.
@@ -127,7 +167,7 @@ describe('PitchFormationEditor — 포메이션 전환 확인', () => {
       <PitchFormationEditor {...baseProps} starters={placedIn2v2()} slots={slotsWithGoalkeeper(preset)}
         formationOptions={[preset, diamond]} onSelectFormation={onSelectFormation} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /1-2-1/ }));
+    chooseFormation('1-2-1');
     fireEvent.click(screen.getByRole('button', { name: '포메이션 바꾸기' }));
 
     expect(onSelectFormation).toHaveBeenCalledWith('1-2-1');
@@ -139,7 +179,7 @@ describe('PitchFormationEditor — 포메이션 전환 확인', () => {
       <PitchFormationEditor {...baseProps} starters={placedIn2v2()} slots={slotsWithGoalkeeper(preset)}
         formationOptions={[preset, diamond]} onSelectFormation={onSelectFormation} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /1-2-1/ }));
+    chooseFormation('1-2-1');
     fireEvent.click(screen.getByRole('button', { name: '취소' }));
 
     expect(onSelectFormation).not.toHaveBeenCalled();
@@ -151,7 +191,7 @@ describe('PitchFormationEditor — 포메이션 전환 확인', () => {
       <PitchFormationEditor {...baseProps} starters={placedIn2v2()} slots={slotsWithGoalkeeper(preset)}
         formationOptions={[preset, tiny]} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /1-1/ }));
+    chooseFormation('1-1');
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText(/대기로 내려가요/)).toBeInTheDocument();
@@ -163,7 +203,7 @@ describe('PitchFormationEditor — 포메이션 전환 확인', () => {
       <PitchFormationEditor {...baseProps} starters={[makeEntry({ key: 'w1', displayName: '대기선수' })]}
         slots={slotsWithGoalkeeper(preset)} formationOptions={[preset, diamond]} onSelectFormation={onSelectFormation} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /1-2-1/ }));
+    chooseFormation('1-2-1');
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(onSelectFormation).toHaveBeenCalledWith('1-2-1');
@@ -175,7 +215,7 @@ describe('PitchFormationEditor — 포메이션 전환 확인', () => {
       <PitchFormationEditor {...baseProps} starters={placedIn2v2()} slots={slotsWithGoalkeeper(preset)}
         formationOptions={[preset, diamond]} onSelectFormation={onSelectFormation} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: '자유 배치' }));
+    chooseFormation('');
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(onSelectFormation).toHaveBeenCalledWith(null);

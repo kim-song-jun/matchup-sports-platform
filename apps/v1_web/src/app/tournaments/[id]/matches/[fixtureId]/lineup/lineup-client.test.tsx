@@ -219,10 +219,40 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
     fireEvent.change(screen.getByLabelText('추가할 선수 이름'), { target: { value: '새 선수' } });
     fireEvent.click(screen.getByRole('button', { name: '추가' }));
 
-    const dirtySubmitButton = screen.getByRole('button', {
-      name: '저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요',
-    });
+    // 사유는 버튼 라벨이 아니라 CTA 안 안내 줄에 있다 — 라벨에 두면 저장 버튼과 폭을
+    // 반씩 나눠 갖는 이 버튼 안에서 문장이 대여섯 줄로 부풀어 모바일에서 잘렸다.
+    // 화면에 보이는 사유와 스크린리더가 읽는 사유(aria-describedby)를 모두 검증한다.
+    const dirtySubmitButton = screen.getByRole('button', { name: '라인업 제출하기' });
     expect(dirtySubmitButton).toBeDisabled();
+    expect(screen.getByText('저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요.')).toBeInTheDocument();
+    expect(dirtySubmitButton).toHaveAccessibleDescription(
+      '저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요.',
+    );
+  });
+
+  it('하단 고정 CTA를 쓰므로 하단 탭바를 렌더하지 않는다', () => {
+    // .tm-fixed-cta 는 bottom:0, 탭바는 74px 높이로 같은 자리를 쓴다. 둘을 함께 띄우면
+    // 저장·제출 버튼과 "배치 설정" 바텀시트 하단이 탭바에 가려진다(2026-08-13 제보).
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: baseGame(), isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [baseGameLineup()],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { container } = render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(container.querySelector('.tm-fixed-cta')).not.toBeNull();
+    expect(screen.queryByRole('navigation', { name: '주요 메뉴' })).not.toBeInTheDocument();
   });
 });
 

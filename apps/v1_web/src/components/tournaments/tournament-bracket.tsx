@@ -582,9 +582,10 @@ function BracketEmpty() {
       background: 'var(--grey50)', borderRadius: 14,
     }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true"><Trophy size={30} style={{ color: 'var(--grey400)' }} strokeWidth={1.6} /></div>
-      {/* [R-T1 타입 위계 정리] 13px → 12px(보조 정보 tier) — weight 700은 유지. */}
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>대진표 준비 중</div>
-      <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>조별 리그가 끝나면 결선 대진표가 공개돼요.</div>
+      {/* [R-T1 타입 위계 정리] 13px → 12px(보조 정보 tier) — weight 700은 유지.
+          [대진표 12px 인라인 정리] 인라인 스타일 → tm-text-caption-strong/tm-text-caption 토큰. */}
+      <div className="tm-text-caption-strong" style={{ marginBottom: 2 }}>대진표 준비 중</div>
+      <div className="tm-text-caption">조별 리그가 끝나면 결선 대진표가 공개돼요.</div>
     </div>
   );
 }
@@ -741,7 +742,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
           <div className="tm-bk2-third-header">
             <span className="tm-bk2-pill tm-bk2-pill-sm">3 · 4위전</span>
             {/* [R-T2] 고정폭 없는 안내문 — 캡션 토큰과 맞춰 12로 상향. */}
-            <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>4강에서 진 두 팀이 3위를 가려요</span>
+            <span className="tm-text-caption">4강에서 진 두 팀이 3위를 가려요</span>
           </div>
           {thirdPlace.fixtures.map((f) => (
             <div key={f.id} className="tm-bk2-third-match">

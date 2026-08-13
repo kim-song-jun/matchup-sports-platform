@@ -1343,6 +1343,18 @@ button:disabled {
   color: var(--text-caption);
 }
 
+/* [대진표 12px 인라인 정리] 캡션(400)보다 한 단 강조가 필요하지만 3단계 라벨
+   (tm-text-label, 13px)까지는 안 가는 짧은 굵은 보조 라벨(조 이름, "대진표 준비
+   중" 같은 상태 타이틀)용. 크기·줄높이는 tm-text-caption과 동일하고 굵기·색만
+   다르다 — 대진표 페이지에 산발적으로 흩어져 있던 fontSize:12/fontWeight:700
+   인라인 스타일들을 이 토큰 하나로 수렴한다. */
+.tm-text-caption-strong {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
 .tm-text-micro {
   /* [공개 화면 R-T2 정리] 11px는 하한(12px) 미달 — PR #396(알파 감사 B)이 이미
      .tm-bottom-tab 등 하드코딩 11px를 caption 토큰으로 올린 것과 같은 논리.
@@ -6479,8 +6491,21 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* [R-T3 타입 위계 정리] 활성 상태 800 제거 — R-T3는 800 이상을 히어로 숫자·로고
+   전용으로 규정하고, 세그먼트 탭은 여기 해당하지 않는다. 선택 상태는 굵기가 아니라
+   배경(트랙 위로 떠오르는 pill) + 텍스트 색(muted → strong)으로 구분한다 —
+   font-weight는 비활성과 동일한 700 그대로 둬서 그 자체가 신호가 되지 않게 한다. */
 .tm-seg-tab[data-active='true'] {
   background: var(--surface);
   color: var(--text-strong);
-  font-weight: 800;
+}
+
+/* [토큰 충돌 fix] 다크모드에서 --grey100(트랙, .tm-seg-tabs)과 --surface(활성 pill)가
+   둘 다 #1c1e24로 완전히 같은 값이라 활성 탭이 트랙에 녹아 사라진다(라이트모드는
+   #f2f4f6 vs #fff라 구분됨). 위에서 font-weight 800을 걷어내 배경이 선택 상태를
+   나타내는 유일한 비색상 신호가 됐으므로, 이 충돌을 그대로 두면 다크모드에서 선택
+   상태가 사실상 안 보이게 된다 — .tm-review-tab[data-active]/.tm-match-type-segment에
+   이미 쓰인 동일 패턴(--grey150)으로 다크 전용 오버라이드. */
+:root.dark .tm-seg-tab[data-active='true'] {
+  background: var(--grey150);
 }

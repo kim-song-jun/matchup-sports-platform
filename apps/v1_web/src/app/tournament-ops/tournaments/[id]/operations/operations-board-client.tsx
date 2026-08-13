@@ -7,10 +7,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import {
   fetchV1TournamentOperationsBoardPage,
+  useV1AssignFixtureField,
+  useV1ClearFixtureField,
   useV1TournamentFields,
   useV1TournamentOperationsBoard,
   useV1Tournament,
 } from '@/hooks/use-v1-api';
+import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { AdminEmpty } from '@/components/admin/admin-empty';
@@ -19,10 +22,12 @@ import { GameStateBadge, WarningBadge, WARNING_LABELS } from '@/components/tourn
 import { TournamentProgressStepper, buildTournamentStages } from '@/components/tournaments/tournament-progress-stepper';
 import type {
   V1GameState,
+  V1TournamentField,
   V1TournamentOperationsBoardItem,
   V1TournamentOperationsLiveWarning,
   V1TournamentOperationsWarningCode,
   V1TournamentStableWarningCode,
+  V1TournamentStaffRole,
 } from '@/types/api';
 import { V1_GAME_STATES, V1_STABLE_WARNING_CODES } from '@/types/api';
 
@@ -45,6 +50,79 @@ const WARNING_FILTER_LABELS: Record<V1TournamentStableWarningCode, string> = {
 function readFilter<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {
   if (value === null) return undefined;
   return (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
+}
+
+/**
+ * 경기장 배정은 서버가 `event_reverse` 권한으로 판정한다 — 플랫폼 운영자와 대회 디렉터만
+ * 통과하고 필드 담당자·조회 전용은 거부된다. 누르면 403 나는 컨트롤을 만들지 않기 위해
+ * 화면에서도 같은 기준으로 가린다(권한 판정 자체는 서버가 최종).
+ */
+const FIELD_ASSIGN_ROLES: readonly V1TournamentStaffRole[] = ['PLATFORM_OPS', 'TOURNAMENT_DIRECTOR'];
+
+/** 경기 한 건의 경기장 선택. 권한이 없으면 읽기 전용 텍스트로 떨어진다. */
+function FixtureFieldCell({
+  tournamentId,
+  item,
+  fields,
+  canAssign,
+}: {
+  tournamentId: string;
+  item: V1TournamentOperationsBoardItem;
+  fields: readonly V1TournamentField[];
+  canAssign: boolean;
+}) {
+  const assign = useV1AssignFixtureField(tournamentId);
+  const clear = useV1ClearFixtureField(tournamentId);
+  const [error, setError] = useState<string | null>(null);
+  const pending = assign.isPending || clear.isPending;
+
+  if (!canAssign) {
+    return <span className="text-[var(--text-body)]">{item.fieldName ?? '미배정'}</span>;
+  }
+
+  const selectId = `field-${item.fixtureId}`;
+  return (
+    <div className="flex flex-col gap-1">
+      {/* 표 헤더가 "필드"라 라벨이 시각적으로 중복된다 — 스크린리더에만 경기까지 밝혀 준다. */}
+      <label className="sr-only" htmlFor={selectId}>
+        {rowLabelFor(item)} 경기장
+      </label>
+      <select
+        id={selectId}
+        value={item.fieldId ?? ''}
+        disabled={pending}
+        onChange={(e) => {
+          setError(null);
+          const next = e.target.value;
+          const onError = (err: unknown) =>
+            setError(extractErrorMessage(err, '경기장을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.'));
+          if (next === '') {
+            clear.mutate({ fixtureId: item.fixtureId }, { onError });
+          } else {
+            assign.mutate({ fixtureId: item.fixtureId, fieldId: next }, { onError });
+          }
+        }}
+        className="min-h-11 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-2 text-[13px] text-[var(--text-body)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+      >
+        <option value="">미배정</option>
+        {fields.map((field) => (
+          <option key={field.id} value={field.id}>
+            {field.name}
+          </option>
+        ))}
+      </select>
+      {error !== null && (
+        <p className="text-[12px] text-[var(--red700)]" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** 표·카드·라벨이 같은 문구를 쓰도록 컴포넌트 밖으로 뺀 경기 이름(팀명은 호출부가 채운다). */
+function rowLabelFor(item: V1TournamentOperationsBoardItem): string {
+  return `${item.round} ${item.fixtureNumber}번`;
 }
 
 interface Props {
@@ -83,6 +161,10 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const board = useV1TournamentOperationsBoard(tournamentId, filters);
   const fields = useV1TournamentFields(tournamentId);
   const tournament = useV1Tournament(tournamentId);
+
+  const role = useTournamentOpsRole();
+  const canAssignField = FIELD_ASSIGN_ROLES.includes(role);
+  const allFields = useMemo(() => fields.data?.items ?? [], [fields.data]);
 
   const teamNamesByFixtureId = useMemo(() => {
     // 참가팀 공개 정책 통일(fix/v1-publish) — 이 페이지는 GET /tournaments/:id(공개
@@ -165,26 +247,14 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     return `${names.home} vs ${names.away}`;
   }
 
-  /* 운영자가 해소할 수단이 없는 경고는 보여주지 않는다.
-   *
-   * 경기장 배정 API(PATCH .../fixtures/:fixtureId/field)는 백엔드에 있지만 그것을 호출하는
-   * 화면이 아직 없다 — 즉 NO_FIELD_ASSIGNED 는 모든 경기에 영구히 뜨고 끌 방법이 없다.
-   * NO_STAFF_ASSIGNED 도 같이 묶인다: 필드 담당자 커버 판정이 fixture 의 fieldId 를 기준으로
-   * 하므로, 경기장을 못 채우는 한 스태프를 배정해도 경고가 사라지지 않는다.
-   *
-   * 해소 불가능한 경고가 상시 켜져 있으면 배지 줄이 늘 주황색이라, 실제로 조치가 필요한
-   * 경고(득점자 미기재·검토 기한 초과·라인업 미제출)까지 함께 묻힌다.
-   *
-   * 배정 UI 가 생기면 이 배열을 비우면 원래대로 돌아온다. 백엔드는 계속 두 코드를 계산해
-   * 내려주므로(필터 화면 포함) 데이터는 그대로다. */
-  const UNACTIONABLE_WARNINGS: readonly V1TournamentOperationsWarningCode[] = [
-    'NO_FIELD_ASSIGNED',
-    'NO_STAFF_ASSIGNED',
-  ];
-
+  /* 예전에는 NO_FIELD_ASSIGNED·NO_STAFF_ASSIGNED 를 여기서 통째로 걸러냈다 — 경기장 배정
+   * API 는 백엔드에 있는데 그걸 호출하는 화면이 없어서, 두 경고가 모든 경기에 영구히 켜진
+   * 채 끌 방법이 없었기 때문이다(해소 불가능한 경고가 상시 주황이면 정말 조치가 필요한
+   * 경고까지 묻힌다). 이 화면에 경기장 배정 셀렉트가 생겨 이제 둘 다 **해소 가능한 경고**가
+   * 됐으므로 필터를 제거한다 — 원래 주석이 "배정 UI 가 생기면 되돌린다"고 적어 둔 대로다. */
   function rowWarnings(item: V1TournamentOperationsBoardItem): readonly V1TournamentOperationsWarningCode[] {
     const live = liveWarningsByFixtureId.get(item.fixtureId) ?? [];
-    return [...item.warnings, ...live].filter((code) => !UNACTIONABLE_WARNINGS.includes(code));
+    return [...item.warnings, ...live];
   }
 
   return (
@@ -264,9 +334,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
         >
           <option value="">전체 경고</option>
-          {/* 배지에서 숨긴 경고는 필터에서도 뺀다 — 고르면 결과가 늘 비어 보이는 필터가 된다.
-              (숨기는 이유는 rowWarnings 위 주석 참고) */}
-          {V1_STABLE_WARNING_CODES.filter((value) => !UNACTIONABLE_WARNINGS.includes(value)).map((value) => (
+          {/* 예전에는 배지에서 숨긴 경고를 필터에서도 뺐다 — 이제 숨기는 경고가 없으므로
+              전체 코드를 그대로 낸다(rowWarnings 위 주석 참고). */}
+          {V1_STABLE_WARNING_CODES.map((value) => (
             <option key={value} value={value}>
               {WARNING_FILTER_LABELS[value]}
             </option>
@@ -340,7 +410,14 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle tabular-nums">
                         {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '미정'}
                       </td>
-                      <td className="px-4 py-3 align-middle">{item.fieldName ?? '미배정'}</td>
+                      <td className="px-4 py-3 align-middle">
+                        <FixtureFieldCell
+                          tournamentId={tournamentId}
+                          item={item}
+                          fields={allFields}
+                          canAssign={canAssignField}
+                        />
+                      </td>
                       <td className="px-4 py-3 align-middle">
                         <GameStateBadge state={item.gameState} />
                       </td>
@@ -384,8 +461,18 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       {item.round} · {item.fixtureNumber}번 경기 ·{' '}
                       {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '일정 미정'}
                     </p>
-                    {/* 미배정은 아래 경고 배지가 이미 알려준다 — 같은 말을 두 번 하지 않는다. */}
-                    {item.fieldName ? (
+                    {/* 배정 권한이 있으면 여기서 바로 바꾼다 — 권한이 없으면 배정된 필드만 읽기로
+                        보여주고, 미배정은 아래 경고 배지가 이미 알려주므로 반복하지 않는다. */}
+                    {canAssignField ? (
+                      <div className="mt-1.5">
+                        <FixtureFieldCell
+                          tournamentId={tournamentId}
+                          item={item}
+                          fields={allFields}
+                          canAssign
+                        />
+                      </div>
+                    ) : item.fieldName ? (
                       <p className="text-[12px] text-gray-400 mt-0.5">필드 {item.fieldName}</p>
                     ) : null}
                   </div>

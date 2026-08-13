@@ -8,6 +8,15 @@ const mocks = vi.hoisted(() => ({
   useV1TournamentOperationsBoard: vi.fn(),
   fetchV1TournamentOperationsBoardPage: vi.fn(),
   routerReplace: vi.fn(),
+  useTournamentOpsRole: vi.fn(),
+  assignFixtureField: vi.fn(),
+  clearFixtureField: vi.fn(),
+}));
+
+// 런타임에는 `_gate.tsx` 가 이 화면을 항상 TournamentOpsRoleProvider 로 감싼다(셸 분기).
+// 테스트는 provider 트리를 세우는 대신 역할만 갈아끼운다 — staff-client.test.tsx 와 같은 방식.
+vi.mock('@/components/tournament-ops/role-context', () => ({
+  useTournamentOpsRole: () => mocks.useTournamentOpsRole(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -23,7 +32,11 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TournamentOperationsBoard: (...args: unknown[]) => mocks.useV1TournamentOperationsBoard(...args),
   fetchV1TournamentOperationsBoardPage: (...args: unknown[]) => mocks.fetchV1TournamentOperationsBoardPage(...args),
-  useV1TournamentFields: () => ({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } }),
+  useV1TournamentFields: () => ({
+    data: { items: [{ id: 'field-1', name: '1번 코트' }, { id: 'field-2', name: '2번 코트' }] },
+  }),
+  useV1AssignFixtureField: () => ({ mutate: mocks.assignFixtureField, isPending: false }),
+  useV1ClearFixtureField: () => ({ mutate: mocks.clearFixtureField, isPending: false }),
   useV1Tournament: () => ({
     data: {
       title: '가을 풋살 대회',
@@ -63,6 +76,9 @@ describe('OperationsBoardClient', () => {
     mocks.useV1TournamentOperationsBoard.mockReset();
     mocks.fetchV1TournamentOperationsBoardPage.mockReset();
     mocks.routerReplace.mockReset();
+    mocks.assignFixtureField.mockReset();
+    mocks.clearFixtureField.mockReset();
+    mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
     mocks.useV1TournamentOperationsBoard.mockReturnValue({
       data: PAGE,
       isPending: false,
@@ -82,26 +98,76 @@ describe('OperationsBoardClient', () => {
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
   });
 
-  /* 경기장 배정 API 는 있지만 그것을 호출하는 화면이 없어서, 운영자는 "경기장 미배정"을
-     끌 수단이 없다. 담당자 커버 판정도 fieldId 기준이라 같이 묶인다. 해소 불가능한 경고가
-     상시 켜져 있으면 실제로 조치가 필요한 경고까지 묻히므로 화면에서 숨긴다.
-     배정 UI 가 생기면 이 테스트를 뒤집어야 한다. */
-  it('hides warnings the operator has no way to resolve, and keeps the actionable ones', () => {
+  /* 이 두 테스트는 예전에 정반대를 못박고 있었다: 경기장 배정 UI 가 없어서 운영자가
+     "경기장 미배정"·"담당자 미배정"을 끌 수단이 없었고, 해소 불가능한 경고가 상시 켜져
+     있으면 조치가 필요한 경고까지 묻히므로 **화면에서 숨겼다**(필터 선택지에서도 뺐다).
+     이제 이 화면에 배정 셀렉트가 있어 둘 다 해소 가능하므로 원래대로 되돌린다 —
+     당시 주석도 "배정 UI 가 생기면 이 테스트를 뒤집어야 한다"고 적어 두었다. */
+  it('shows the field/staff warnings now that the board can resolve them', () => {
     render(<OperationsBoardClient tournamentId="t-1" />);
 
-    expect(screen.queryByText('경기장 미배정')).not.toBeInTheDocument();
-    expect(screen.queryByText('담당자 미배정')).not.toBeInTheDocument();
-    // 조치 가능한 경고는 그대로 보여야 한다
+    expect(screen.getAllByText('경기장 미배정').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('담당자 미배정').length).toBeGreaterThan(0);
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
   });
 
-  it('drops the unresolvable codes from the warning filter so it never returns an empty-looking result', () => {
+  it('offers every stable warning code in the filter', () => {
     render(<OperationsBoardClient tournamentId="t-1" />);
 
     const select = screen.getByLabelText('경고') as HTMLSelectElement;
     const labels = Array.from(select.options).map((o) => o.textContent);
-    expect(labels).not.toContain('경기장 미배정');
+    expect(labels).toContain('경기장 미배정');
     expect(labels).toContain('득점자 미기재');
+  });
+
+  /* 경기장 배정 — `V1TournamentFixture.fieldId` 의 유일한 쓰기 경로다.
+     백엔드는 Task 18 부터 있었는데 호출부가 없어 alpha 의 픽스처가 전부 fieldId=null 이었고,
+     그래서 필드 담당자는 담당 경기를 영영 가질 수 없었다. */
+  describe('경기장 배정', () => {
+    it('셀렉트에서 고르면 그 경기에 배정한다', async () => {
+      const user = userEvent.setup();
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      const selects = screen.getAllByLabelText('8강 1번 경기장') as HTMLSelectElement[];
+      await user.selectOptions(selects[0], 'field-2');
+
+      expect(mocks.assignFixtureField).toHaveBeenCalledWith(
+        { fixtureId: 'fixture-1', fieldId: 'field-2' },
+        expect.anything(),
+      );
+      expect(mocks.clearFixtureField).not.toHaveBeenCalled();
+    });
+
+    it('미배정을 고르면 배정 해제로 보낸다 — 빈 fieldId 로 배정하지 않는다', async () => {
+      const user = userEvent.setup();
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      const selects = screen.getAllByLabelText('8강 1번 경기장') as HTMLSelectElement[];
+      await user.selectOptions(selects[0], '');
+
+      expect(mocks.clearFixtureField).toHaveBeenCalledWith(
+        { fixtureId: 'fixture-1' },
+        expect.anything(),
+      );
+      expect(mocks.assignFixtureField).not.toHaveBeenCalled();
+    });
+
+    it('현재 배정된 필드를 선택값으로 반영한다', () => {
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      const selects = screen.getAllByLabelText('8강 1번 경기장') as HTMLSelectElement[];
+      expect(selects[0].value).toBe('field-1');
+    });
+
+    it('권한 없는 역할에게는 셀렉트 대신 읽기 전용 텍스트를 보여준다', () => {
+      // 서버는 event_reverse 로 판정한다 — 필드 담당자는 거부되므로 누르면 403 나는
+      // 컨트롤을 아예 만들지 않는다.
+      mocks.useTournamentOpsRole.mockReturnValue('FIELD_OPERATOR');
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      expect(screen.queryByLabelText('8강 1번 경기장')).not.toBeInTheDocument();
+      expect(screen.getAllByText('1번 코트').length).toBeGreaterThan(0);
+    });
   });
 
   // 데스크톱 표와 모바일 카드가 같은 행을 그리는데 경기 번호 표기가 갈려 있었다

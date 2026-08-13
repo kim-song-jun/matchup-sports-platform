@@ -1449,6 +1449,15 @@ export type V1TeamMatchLineup = {
   starters: V1TeamMatchLineupStarter[];
   bench: V1TeamMatchLineupBenchEntry[];
   lineupConfig?: V1LineupConfig;
+  /** 지금 이 라인업에 넣을 수 있는 팀원 — 서버가 저장 때 강제하는 조건(팀 소속 + 참석
+   * 응답)을 그대로 계산해 준다. `jerseyNumber`는 팀 고정 등번호로, 등번호 자동 채움의
+   * 2순위 소스다. */
+  eligibleMembers?: Array<{
+    userId: string;
+    displayName: string;
+    jerseyNumber: number | null;
+    attending: boolean;
+  }>;
 };
 
 // 저장 요청 한 명분 — userId(연동된 활성 팀원) 또는 displayName(비연동 게스트) 중 하나는

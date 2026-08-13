@@ -108,9 +108,16 @@ export function hydrateResultFormFromRevision(revision: V1GameResultRevision): {
 } {
   const homeGoals: GoalDraft[] = [];
   const cardDrafts: CardDraft[] = [];
-  // A submitted revision only ever contains players who appeared, so every
-  // non-starter row in it is a substitute who actually came on — that is
-  // exactly the set of "교체 출전" toggles to restore.
+  // 출전 게이트가 붙은 뒤 제출된 revision에는 출전자만 실리므로, 그 안의 non-starter
+  // 행은 곧 "교체로 들어간 선수" = 복원할 체크 목록이다.
+  //
+  // 단, 게이트 이전에 제출된 revision은 벤치를 포함한 로스터 전원을 담고 있어 그
+  // 구분이 성립하지 않는다(정정 요청을 받아 지금 다시 열린 CHANGE_REQUESTED
+  // revision이 딱 그럴 수 있다) — 그 경우 실제로 뛰지 않은 선수까지 체크된 채로
+  // 복원된다. 그래도 복원을 유지하는 쪽을 택한다: 잘못 체크된 선수는 "출전 선수"
+  // 목록에 그대로 보여 호스트가 해제할 수 있지만, 반대로 비워두면 정말 교체 출전한
+  // 선수가 아무 표시 없이 결과에서 빠져 그대로 제출되기 때문이다. 눈에 보이는 과잉이
+  // 조용한 누락보다 고치기 쉽다.
   const substituteIds = revision.resultParticipants
     .filter((row) => !row.started)
     .map((row) => row.participantId);

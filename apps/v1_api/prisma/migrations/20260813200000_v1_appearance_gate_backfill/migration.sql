@@ -41,9 +41,18 @@ WHERE rp.result_revision_id = rev.id
       AND e.participant_id = rp.participant_id
       AND NOT EXISTS (SELECT 1 FROM v1_game_events r WHERE r.reverses_event_id = e.id)
   )
-  -- 피치 위에 있었다는 다른 증거(기록된 스탯 / MVP 지명)도 없는 경우에만 지운다.
-  -- 서비스 코드의 스탯 union과 같은 안전장치다: 교체 입력을 빠뜨린 채 골만 기록된
-  -- 운영 실수에서 그 골을 소리 없이 삭제해 버리지 않기 위한 것.
+  -- 피치 위에 있었다는 다른 증거도 없는 경우에만 지운다.
+  --
+  -- 스탯(골/도움/파울/카드) 조건은 서비스 코드의 스탯 union과 같은 안전장치다:
+  -- 교체 입력을 빠뜨린 채 골만 기록된 운영 실수에서 그 골을 소리 없이 삭제해
+  -- 버리지 않기 위한 것.
+  --
+  -- MVP 조건은 백필에만 있고 런타임에는 없는데, 그래야 맞다. `deriveTournamentRevision`
+  -- 은 애초에 `mvp_participant_id`를 쓰지 않으므로(자동 파생 revision의 MVP는 항상
+  -- null) 런타임 union에 MVP를 넣으면 절대 발화하지 않는 죽은 조건이 된다. 반면 과거
+  -- 데이터에는 MVP가 붙은 TOURNAMENT_FIXTURE revision이 존재할 수 있다 — 정정·재제출
+  -- 경로(`tournament-result-review.service.ts`)가 사람이 고른 MVP를 그대로 싣기
+  -- 때문이다. 그 행을 지우면 revision이 결과에 없는 선수를 MVP로 가리키게 된다.
   AND rp.goals = 0
   AND rp.assists = 0
   AND rp.fouls = 0

@@ -130,13 +130,26 @@ async function measurePromoFallback(page, tournaments) {
     (item) => (item.coverImageUrl || '').trim() && !(item.promoHomeImageUrl || '').trim(),
   );
   return {
-    coverOnlyTournaments: coverOnly.map((item) => ({
-      title: item.title,
-      coverImageUrl: item.coverImageUrl,
-      promoHomeImageUrl: item.promoHomeImageUrl,
-      // 폴백이 걸렸다면 이 커버 URL 이 홈 히어로 배경에 그대로 들어가 있어야 한다.
-      renderedWithCover: cards.some((card) => card.background.includes(item.coverImageUrl)),
-    })),
+    coverOnlyTournaments: coverOnly.map((item) => {
+      const cover = (item.coverImageUrl || '').trim();
+      // 히어로 카드의 aria-label 은 promoHomeTitle(없으면 대회명)을 쓴다 — 그 대회의 카드를
+      // 특정해서 배경을 본다. "아무 카드나 이 URL 을 쓰더라" 로 판정하면 노출이 꺼져 카드가
+      // 아예 없는 대회도 다른 카드 때문에 통과할 수 있다.
+      const cardTitle = (item.promoHomeTitle || '').trim() || item.title;
+      const card = cards.find((entry) => entry.label === `대회 상세 — ${cardTitle}`);
+      return {
+        title: item.title,
+        cardTitle,
+        promoHomeEnabled: item.promoHomeEnabled,
+        coverImageUrl: cover,
+        promoHomeImageUrl: item.promoHomeImageUrl,
+        // 이 대회의 카드가 렌더됐는지부터 구분한다 — 안 보이는 것과 폴백 실패는 다른 사실이다.
+        cardFound: Boolean(card),
+        cardBackground: card?.background ?? null,
+        // 폴백이 걸렸다면 이 커버 URL 이 그 카드 배경에 그대로 들어가 있어야 한다.
+        renderedWithCover: Boolean(card && cover && card.background.includes(cover)),
+      };
+    }),
     cards,
   };
 }
@@ -241,15 +254,25 @@ async function main() {
         await shotPage.screenshot({ path: path.join(OUT, `${PHASE}-${name}-${widthLabel}.png`) });
         console.log(`[${PHASE}] 캡처: ${PHASE}-${name}-${widthLabel}.png`);
         if (name === 'home' && widthLabel === 'desktop') {
-          const listed = await fetch(`${BASE}/api/v1/tournaments?limit=30`)
-            .then((response) => response.json())
-            .then((json) => json?.data?.items ?? [])
-            .catch(() => []);
-          report.promoFallback = await measurePromoFallback(shotPage, listed);
-          for (const item of report.promoFallback.coverOnlyTournaments) {
-            console.log(
-              `[${PHASE}] 커버 폴백 — ${item.title}: promoHomeImageUrl=${item.promoHomeImageUrl} → 홈 히어로에 커버 반영=${item.renderedWithCover}`,
-            );
+          // 목록 조회가 실패하면 대상이 0건이라 측정이 '통과'처럼 보인다 — 조용히 넘기지 않고
+          // 실패 사실을 report 와 콘솔에 남겨 근거 없는 결과를 구분할 수 있게 한다.
+          let listed = null;
+          try {
+            const listResponse = await fetch(`${BASE}/api/v1/tournaments?limit=30`);
+            if (!listResponse.ok) throw new Error(`HTTP ${listResponse.status}`);
+            listed = (await listResponse.json())?.data?.items ?? null;
+            if (!Array.isArray(listed)) throw new Error('예상과 다른 응답 형식');
+          } catch (error) {
+            report.promoFallback = { error: `대회 목록 조회 실패: ${error.message}` };
+            console.warn(`[${PHASE}] ${report.promoFallback.error} — 폴백 측정을 건너뜁니다.`);
+          }
+          if (listed) {
+            report.promoFallback = await measurePromoFallback(shotPage, listed);
+            for (const item of report.promoFallback.coverOnlyTournaments) {
+              console.log(
+                `[${PHASE}] 커버 폴백 — ${item.title}(카드="${item.cardTitle}", 노출=${item.promoHomeEnabled}): 카드발견=${item.cardFound} 커버반영=${item.renderedWithCover}`,
+              );
+            }
           }
         }
       }

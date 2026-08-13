@@ -1,14 +1,55 @@
 {
   "phase": "after",
-  "capturedAt": "2026-08-12T14:55:19.444Z",
-  "originalBytes": 35032442,
+  "capturedAt": "2026-08-13T01:28:43.059Z",
+  "originalBytes": 35032249,
   "rawUpload": {
     "status": 413,
-    "body": "{\"status\":\"error\",\"statusCode\":413,\"code\":\"UPLOAD_FILE_TOO_LARGE\",\"message\":\"파일 용량이 업로드 한도를 초과했어요. 더 작은 파일로 다시 시도해주세요.\",\"details\":null,\"requestId\":41,\"timestamp\":\"2026-08-12T14:55:23.245Z\"}"
+    "body": "{\"status\":\"error\",\"statusCode\":413,\"code\":\"UPLOAD_FILE_TOO_LARGE\",\"message\":\"파일 용량이 업로드 한도를 초과했어요. 더 작은 파일로 다시 시도해주세요.\",\"details\":null,\"requestId\":9800,\"timestamp\":\"2026-08-13T01:28:50.540Z\"}"
   },
   "uiUpload": {
     "status": 201,
-    "body": "{\"status\":\"success\",\"data\":{\"urls\":[\"/uploads/2026/08/30d22ca0-59bd-45f2-a2ae-a065396443fb.webp\"]},\"timestamp\":\"2026-08-12T14:55:24.981Z\"}"
+    "body": "{\"status\":\"success\",\"data\":{\"urls\":[\"/uploads/2026/08/d6e3fc28-2360-4abc-9f2e-a729a6346283.webp\"]},\"timestamp\":\"2026-08-13T01:28:52.725Z\"}"
   },
-  "previewSrc": "/uploads/2026/08/30d22ca0-59bd-45f2-a2ae-a065396443fb.webp"
+  "previewSrc": "/uploads/2026/08/d6e3fc28-2360-4abc-9f2e-a729a6346283.webp",
+  "promoFallback": {
+    "coverOnlyTournaments": [
+      {
+        "title": "Test123",
+        "cardTitle": "카드제목제목",
+        "promoHomeEnabled": true,
+        "coverImageUrl": "/uploads/2026/08/9d380c61-bd5e-474a-8e13-e9cc5c7526bc.png",
+        "promoHomeImageUrl": null,
+        "cardFound": true,
+        "cardBackground": "url(\"https://alpha.teameet.co.kr/uploads/2026/08/9d380c61-bd5e-474a-8e13-e9cc5c7526bc.png\")",
+        "renderedWithCover": true
+      }
+    ],
+    "cards": [
+      {
+        "label": null,
+        "background": "url(\"https://alpha.teameet.co.kr/mock/generated/team-huddle.webp\")",
+        "hasPlaceholderTrophy": false
+      },
+      {
+        "label": "대회 상세 — tt",
+        "background": "linear-gradient(135deg, rgb(49, 130, 246), rgb(34, 114, 235))",
+        "hasPlaceholderTrophy": true
+      },
+      {
+        "label": "대회 상세 — 카드제목제목",
+        "background": "url(\"https://alpha.teameet.co.kr/uploads/2026/08/9d380c61-bd5e-474a-8e13-e9cc5c7526bc.png\")",
+        "hasPlaceholderTrophy": false
+      },
+      {
+        "label": "대회 상세 — Teameet Futsal Cup(혼성)",
+        "background": "url(\"https://alpha.teameet.co.kr/uploads/2026/07/baac9140-2f85-4762-95c6-5ca8b0c3c628.jpg\")",
+        "hasPlaceholderTrophy": false
+      },
+      {
+        "label": "대회 상세 — (테스트) 참가 모집 중 풋살 오픈",
+        "background": "url(\"https://alpha.teameet.co.kr/mock/generated/futsal-rooftop.webp\")",
+        "hasPlaceholderTrophy": false
+      }
+    ]
+  }
 }

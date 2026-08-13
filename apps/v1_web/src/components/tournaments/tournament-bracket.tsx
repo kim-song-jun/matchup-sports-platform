@@ -9,7 +9,7 @@
  * 드래그 스크롤: 마우스/터치 모두 지원
  */
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { Fragment, useRef, useState, useCallback, useEffect } from 'react';
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -444,6 +444,19 @@ function ChampionSlot({ champion }: { champion: string | null }) {
   );
 }
 
+/**
+ * 커넥터의 스파인→출구선이 만나는 접합점 y좌표.
+ * BracketSvgConnector(고정폭 CONN_W 내부 드로잉)와 ConnectorSegment(늘어나는
+ * 연장선)가 동일한 y를 써야 접합점에서 선이 어긋나지 않는다 — 단일 소스로 공유.
+ */
+function connectorJunctionY(topCount: number, totalH: number, nextN: number): number {
+  if (topCount === 1) return totalH / 2;
+  const exitY = nextN === 1 ? totalH / 2 : undefined; // 단일 출구: 열 중앙
+  const spineTop = slotCY(0);
+  const spineBot = slotCY(topCount - 1);
+  return exitY ?? (spineTop + spineBot) / 2;
+}
+
 /* ── SVG 커넥터 ──
  * topCount: 상위 라운드 경기 수 (보통 2)
  * totalH:   상위 라운드 열 높이
@@ -455,7 +468,6 @@ function BracketSvgConnector({
   topCount: number; totalH: number; nextN?: number;
 }) {
   const midX = CONN_W / 2;
-  const exitY = nextN === 1 ? totalH / 2 : undefined; // 단일 출구: 열 중앙
 
   if (topCount === 1) {
     /* 단순 수평선: 결승 → 챔피언 — totalH 전체를 쓰고 중앙에 선을 그린다 */
@@ -469,9 +481,9 @@ function BracketSvgConnector({
 
   /* 2개 이상: 중앙 스파인 + 각 입력선 + 출구선 */
   const paths: React.ReactNode[] = [];
+  const junctionY = connectorJunctionY(topCount, totalH, nextN);
   const spineTop = slotCY(0);
   const spineBot = slotCY(topCount - 1);
-  const junctionY = exitY ?? (spineTop + spineBot) / 2;
 
   /* 세로 스파인 (왼쪽 절반에 위치) */
   paths.push(
@@ -505,6 +517,37 @@ function BracketSvgConnector({
       style={{ flexShrink: 0, overflow: 'visible' }}>
       {paths}
     </svg>
+  );
+}
+
+/**
+ * ── 커넥터 세그먼트 (고정폭 SVG + 늘어나는 연장선) ──
+ * 트리가 컬럼 폭보다 좁을 때 남는 폭을 연결선 구간으로 흡수해 트리 왼쪽 끝이
+ * 섹션 제목과 정렬되게 한다(fix/v1-bracket-fill-width). SVG 자체는 원래 고정
+ * 픽셀 지오메트리(CONN_W)를 그대로 유지해 스파인·점 등이 비율 왜곡 없이 그려지고,
+ * 그 오른쪽에 flex-grow 되는 빈 div를 붙여 접합점(junctionY)과 같은 높이에
+ * 수평선을 하나 더 그린다 — 이 연장선만 늘어나므로 커넥터 구조 자체는 항상
+ * 또렷하게 유지된다. 남는 폭이 없으면(트리가 컬럼보다 넓음) 연장선 폭은 0으로
+ * 수렴하고 기존과 동일하게 가로 스크롤된다(모바일 등 좁은 뷰포트 포함).
+ */
+function ConnectorSegment({
+  topCount, totalH, nextN = 1,
+}: {
+  topCount: number; totalH: number; nextN?: number;
+}) {
+  const junctionY = connectorJunctionY(topCount, totalH, nextN);
+  return (
+    <div style={{ display: 'flex', flex: '1 0 auto', minWidth: CONN_W, paddingTop: HEAD_H }}>
+      <div style={{ flexShrink: 0 }}>
+        <BracketSvgConnector topCount={topCount} totalH={totalH} nextN={nextN} />
+      </div>
+      <div style={{ flexGrow: 1, minWidth: 0, position: 'relative' }} aria-hidden="true">
+        <div style={{
+          position: 'absolute', top: junctionY - 1, left: 0, right: 0, height: 2,
+          background: 'var(--grey300)',
+        }} />
+      </div>
+    </div>
   );
 }
 
@@ -640,15 +683,19 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
     setDragging(false);
   }, []);
 
-  /* 2026-08-11: 4강만 있는 등 라운드 수가 적은 대진은 트리 실폭이 넓은 데스크톱 컬럼
-     (.tm-bracket-page-grid의 1.28fr)보다 훨씬 좁아, 왼쪽 정렬된 트리 오른쪽으로 큰
-     빈 공간이 남아 "레이아웃이 어색하다"는 지적을 받았다(라이브 스크린샷). 실제로
-     스크롤이 필요 없을 때만(scrollWidth<=clientWidth) 트리를 컬럼 안에서 가운데
-     정렬해 빈 공간을 좌우로 나눈다 — 넘칠 때는 기존 왼쪽 정렬 스크롤 동작을 그대로
-     유지(가운데 정렬 + 스크롤 조합은 시작 위치가 어색해짐). */
+  /* 2026-08-13 (fix/v1-bracket-fill-width): 4강만 있는 등 라운드 수가 적은 대진은
+     트리 실폭이 넓은 데스크톱 컬럼(.tm-bracket-page-grid의 1.28fr)보다 좁을 수
+     있다. 예전엔 가운데 정렬로 빈 공간을 옮기기만 했는데, 그러면 왼쪽 정렬된
+     섹션 제목과 트리 시작점이 어긋나 오히려 더 어색했다. 지금은 라운드 사이
+     연결선 구간(ConnectorSegment의 flex-grow 연장선)이 남는 폭을 흡수해 트리가
+     컬럼을 꽉 채우도록 CSS만으로 처리한다 — 트리 폭 계산에 JS 측정이 필요 없다.
+     fitsWithoutScroll은 오직 스크롤 힌트/페이드 표시 여부에만 남아있다(실제로
+     스크롤할 게 없는데 "옆으로 밀어보세요" 안내를 보여주는 게 거짓 안내이므로). */
   const [fitsWithoutScroll, setFitsWithoutScroll] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = scrollRef.current;
+    const content = contentRef.current;
     if (!el) return;
     const check = () => setFitsWithoutScroll(el.scrollWidth <= el.clientWidth + 1);
     check();
@@ -656,7 +703,11 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
     // 리사이즈 재계산만 건너뛴다(테스트는 리사이즈를 시뮬레이션하지 않으므로 영향 없음).
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(check);
+    // 래퍼(el)뿐 아니라 내용 요소(content)도 관찰한다 — 래퍼 자체 크기는 상위
+    // 그리드 컬럼폭에 매여 안 변할 수 있어도, 내용(팀 로고 지연 로드 등)의 실폭이
+    // 바뀌면 scrollWidth가 바뀌므로 내용 쪽 리사이즈도 재계산 트리거가 필요하다.
     observer.observe(el);
+    if (content) observer.observe(content);
     return () => observer.disconnect();
   }, [mainRounds.length]);
 
@@ -676,8 +727,6 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
             paddingBottom: 8,
             cursor: dragging ? 'grabbing' : 'grab',
             userSelect: 'none',
-            display: fitsWithoutScroll ? 'flex' : 'block',
-            justifyContent: fitsWithoutScroll ? 'center' : undefined,
           }}
           role="region"
           aria-label="결선 대진표"
@@ -686,7 +735,10 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseUp}
         >
-          <div style={{ display: 'inline-flex', alignItems: 'flex-start', paddingRight: 8 }}>
+          {/* width:100%로 래퍼 폭을 채우려 하되, 라운드 컬럼·커넥터 최소폭(flexShrink:0
+              / minWidth)의 합이 그보다 크면 자연스럽게 오버플로해 상위 overflowX:auto가
+              스크롤을 켠다. 남는 폭은 각 ConnectorSegment의 연장선(flex-grow)이 흡수한다. */}
+          <div ref={contentRef} style={{ display: 'flex', width: '100%', alignItems: 'flex-start', paddingRight: 8 }}>
 
             {mainRounds.map((round, idx) => {
               const isFirst = idx === 0;
@@ -703,7 +755,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
               })();
 
               return (
-                <div key={round.key} style={{ display: 'flex', alignItems: 'flex-start' }}>
+                <Fragment key={round.key}>
                   <BracketRoundCol
                     round={round}
                     headLabel={round.label}
@@ -711,20 +763,12 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
                     centered={!isFirst}
                   />
                   {!isLast && (
-                    <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, paddingTop: HEAD_H }}>
-                      <BracketSvgConnector
-                        topCount={slotCount}
-                        totalH={rH}
-                        nextN={nextSlotCount}
-                      />
-                    </div>
+                    <ConnectorSegment topCount={slotCount} totalH={rH} nextN={nextSlotCount} />
                   )}
                   {isLast && (
-                    <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, paddingTop: HEAD_H }}>
-                      <BracketSvgConnector topCount={1} totalH={treeH} nextN={1} />
-                    </div>
+                    <ConnectorSegment topCount={1} totalH={treeH} nextN={1} />
                   )}
-                </div>
+                </Fragment>
               );
             })}
 

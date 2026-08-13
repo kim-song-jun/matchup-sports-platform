@@ -2,6 +2,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WebPushService } from '../notifications/web-push.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { LineupTodoService } from '../team-lineups/lineup-todo.service';
+import {
+  LINEUP_REMINDER_SCAN_TYPE,
+  LineupReminderService,
+  scheduleNextScan,
+} from './lineup-reminders/lineup-reminder.service';
 import { ScheduleReminderService } from './schedule-reminders/schedule-reminder.service';
 import { V1GameOperationsWorkerModule } from './v1-game-operations-worker.module';
 import { V1GameOperationsWorkerService } from './v1-game-operations-worker.service';
@@ -40,6 +47,17 @@ async function bootstrap(): Promise<void> {
     'SCHEDULE_GUEST_APPLICATION_MANAGER_NOTIFICATION',
     scheduleReminders.guestApplicationManagerNotificationHandler,
   );
+
+  // 라인업 리마인더 lane. 이벤트가 아니라 "아직 안 한 상태"를 감지해야 하므로 주기
+  // 스캔이 필요한데, 두 번째 스케줄러를 들이지 않고 이 워커의 outbox 루프를 그대로
+  // 재사용한다 — 스캔 한 번이 끝날 때 다음 스캔을 outbox 행으로 예약하는 방식이다.
+  const lineupTodos = app.get(LineupTodoService);
+  const lineupReminders = new LineupReminderService(lineupTodos, webPush);
+  worker.registerHandler(LINEUP_REMINDER_SCAN_TYPE, lineupReminders.scanHandler);
+  // 체인의 첫 고리. 이미 예약돼 있으면 슬롯 키가 같아 무시되므로, 워커를 몇 번 재시작해도
+  // 스캔이 늘어나지 않는다. 반대로 어떤 이유로 체인이 끊겼더라도 다음 배포 때 되살아난다.
+  const prisma = app.get(PrismaService);
+  await prisma.$transaction((tx) => scheduleNextScan(tx, new Date()));
 
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({

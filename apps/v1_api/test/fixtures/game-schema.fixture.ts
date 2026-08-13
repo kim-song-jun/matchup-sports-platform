@@ -147,8 +147,16 @@ export const gameSchemaFixture = {
 // (20260813061500_v1_tournament_personal_review_scope); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for 대회 후기 팀 스코프: V1TournamentReview gains a nullable team_id (+ V1Team relation)
+// and swaps its author-scoped unique key for a team-scoped one, so a tournament review belongs to
+// the participating team rather than to whoever filed the entry. Same shape as the three review
+// re-pins above — no v1_game_* model, enum, or relation changes; the guard fired only because it
+// hashes the whole schema.prisma file. One new migration file backs it
+// (20260813120000_v1_tournament_review_team_scope); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: '8082327f33930061ad963f51541707b7d7bea4b70e72d94303b60592e153cd32',
+  schema: '714e385d1c20c34a7d7da48ca8207de2e8d87edd4b3371e1978b8bc03574b7c9',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

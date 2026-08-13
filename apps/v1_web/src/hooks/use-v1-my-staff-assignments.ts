@@ -57,15 +57,23 @@ export function myAssignmentVersion(
   return group.assignments.reduce((max, assignment) => Math.max(max, assignment.version), 0);
 }
 
-/** 역할별 진입 목적지. FIELD_OPERATOR 만 셸을 건너뛰고 담당 경기 콘솔로 직행한다. */
-export function myStaffEntryHref(group: V1MyTournamentStaffGroup): string | null {
+/**
+ * 역할별 진입 목적지.
+ *
+ * 셸 역할(대회 디렉터·플랫폼 운영자)은 대회 전역 리소스를 읽을 수 있으므로 운영 보드로 간다.
+ * **필드 담당자만 있는 배정은 운영 보드로 보내면 안 된다** — `/operations` 라우트에는
+ * `:tournamentId` 뿐이라 서버 가드가 만드는 리소스가 `{tournamentId}` 하나뿐이고, 필드 담당자는
+ * 배정에 반드시 경기 또는 필드 스코프가 걸려 있어(`STAFF_SCOPE_REQUIRED` 불변식)
+ * `FIXTURE_SCOPE_REQUIRED`/`FIELD_SCOPE_REQUIRED` 로 **예외 없이 403** 이 된다.
+ * 그래서 담당 경기를 고르는 화면(`/my/tournament-staff/:tournamentId`)으로 보낸다.
+ *
+ * 예전 구현은 `fixtureIds[0]` 으로 임의의 한 경기에 직행하고 경기 스코프가 없으면 `null` 을
+ * 돌려줬는데, ① 담당 경기가 여럿이면 어느 하나를 말없이 골라 버리고 ② 필드 단위 배정은
+ * 갈 곳이 사라졌다. 목록 화면은 두 경우를 모두 정직하게 다룬다.
+ */
+export function myStaffEntryHref(group: V1MyTournamentStaffGroup): string {
   const tournamentId = encodeURIComponent(group.tournamentId);
-  const fieldOperator = group.assignments.find((assignment) => assignment.role === 'FIELD_OPERATOR');
-  const shellRole = group.assignments.find((assignment) => assignment.role !== 'FIELD_OPERATOR');
-  if (shellRole !== undefined) return `/tournament-ops/tournaments/${tournamentId}/operations`;
-  if (fieldOperator === undefined) return null;
-  const target = fieldOperator.fixtureIds[0];
-  // 경기 스코프가 없는 필드 단위 배정은 갈 경기를 화면이 특정할 수 없다 — 링크를 만들지 않는다.
-  if (target === undefined) return null;
-  return `/tournament-ops/tournaments/${tournamentId}/fixtures/${encodeURIComponent(target)}/operate`;
+  const hasShellRole = group.assignments.some((assignment) => assignment.role !== 'FIELD_OPERATOR');
+  if (hasShellRole) return `/tournament-ops/tournaments/${tournamentId}/operations`;
+  return `/my/tournament-staff/${tournamentId}`;
 }

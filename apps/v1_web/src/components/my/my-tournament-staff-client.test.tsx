@@ -53,7 +53,7 @@ describe('MyTournamentStaffPageClient', () => {
     expect(screen.getByText('담당 대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
   });
 
-  it('대회별로 묶인 배정을 역할·필드와 함께 보여주고 운영 화면으로 링크한다', () => {
+  function mockGroup(assignments: unknown[]) {
     apiMocks.useV1MyTournamentStaffAssignments.mockReturnValue({
       data: {
         items: [
@@ -61,23 +61,66 @@ describe('MyTournamentStaffPageClient', () => {
             tournamentId: 't-1',
             tournamentTitle: '성수 5인제 컵',
             tournamentStatus: 'in_progress',
-            assignments: [
-              { id: 'a-1', role: 'FIELD_OPERATOR', fieldId: 'f-1', fieldName: 'A구장', version: 0, expiresAt: null },
-              { id: 'a-2', role: 'FIELD_OPERATOR', fieldId: 'f-2', fieldName: 'B구장', version: 0, expiresAt: null },
-            ],
+            assignments,
           },
         ],
       },
       isLoading: false,
       isError: false,
     });
+  }
+
+  it('대회별로 묶인 배정을 역할·필드와 함께 보여준다', () => {
+    mockGroup([
+      { id: 'a-1', role: 'FIELD_OPERATOR', fieldId: 'f-1', fieldName: 'A구장', fixtureIds: [], version: 0, expiresAt: null },
+      { id: 'a-2', role: 'FIELD_OPERATOR', fieldId: 'f-2', fieldName: 'B구장', fixtureIds: [], version: 0, expiresAt: null },
+    ]);
 
     render(<MyTournamentStaffPageClient />);
 
     expect(screen.getByText('성수 5인제 컵')).toBeInTheDocument();
     expect(screen.getByText('필드 담당자 · A구장 / 필드 담당자 · B구장')).toBeInTheDocument();
     expect(screen.getByText('진행 중')).toBeInTheDocument();
-    const link = screen.getByText('성수 5인제 컵').closest('a');
-    expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations');
+  });
+
+  /**
+   * 이 describe 가 고정하는 계약이 예전에는 정반대였다 — 필드 담당자 카드도 운영 보드
+   * (`/operations`)로 링크한다고 못박혀 있었고, 그게 alpha 에서 403 막다른 길을 만들었다.
+   * 서버 가드는 `/operations` 라우트에서 스코프 있는 배정을 예외 없이 거부하므로, 이 링크가
+   * 역할에 따라 갈리는 것이 정상이다.
+   */
+  describe('진입 목적지는 역할에 따라 갈린다', () => {
+    const hrefOf = () => screen.getByText('성수 5인제 컵').closest('a');
+
+    it('필드 담당자만 있으면 담당 경기 목록으로 보낸다 (운영 보드는 403이다)', () => {
+      mockGroup([
+        { id: 'a-1', role: 'FIELD_OPERATOR', fieldId: 'f-1', fieldName: 'A구장', fixtureIds: [], version: 0, expiresAt: null },
+      ]);
+
+      render(<MyTournamentStaffPageClient />);
+
+      expect(hrefOf()).toHaveAttribute('href', '/my/tournament-staff/t-1');
+    });
+
+    it('대회 디렉터는 운영 보드로 보낸다', () => {
+      mockGroup([
+        { id: 'a-1', role: 'TOURNAMENT_DIRECTOR', fieldId: null, fieldName: null, fixtureIds: [], version: 0, expiresAt: null },
+      ]);
+
+      render(<MyTournamentStaffPageClient />);
+
+      expect(hrefOf()).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations');
+    });
+
+    it('셸 역할이 하나라도 있으면 운영 보드로 보낸다', () => {
+      mockGroup([
+        { id: 'a-1', role: 'FIELD_OPERATOR', fieldId: 'f-1', fieldName: 'A구장', fixtureIds: [], version: 0, expiresAt: null },
+        { id: 'a-2', role: 'SUPPORT_READONLY', fieldId: null, fieldName: null, fixtureIds: [], version: 0, expiresAt: null },
+      ]);
+
+      render(<MyTournamentStaffPageClient />);
+
+      expect(hrefOf()).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations');
+    });
   });
 });

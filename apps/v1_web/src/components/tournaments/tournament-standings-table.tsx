@@ -134,11 +134,17 @@ export function TournamentStandingsTable({
         <table className="tm-standings-table" aria-label={ariaLabel} style={{ minWidth: 296 }}>
           <thead className="tm-standings-thead">
             <tr>
+              {/* §숫자 3열의 폭은 비율 + 최소값으로 준다. 예전엔 56/44/44px 고정이라
+                  표가 넓어질 때 늘어난 폭이 전부 팀명 칸으로 흘러갔고, 숫자 블록은
+                  144px 그대로 오른쪽 끝에 붙어 있어 팀명과 전적 사이가 통째로 비었다
+                  (768px 실측: 행 558px 중 319px = 57%가 공백). 비율로 주면 넓은 폭에서
+                  숫자 블록도 같이 벌어져 그 공백이 줄고, min-width가 좁은 폭에서의
+                  판독성(390px에서 기존과 동일한 56/44/44)을 지킨다. */}
               <th style={{ width: 36, paddingLeft: 12 }}>#</th>
               <th>팀</th>
-              <th className="num" style={{ width: 56 }}>전적</th>
-              <th className="num" style={{ width: 44 }}>승점</th>
-              <th className="num" style={{ width: 44, paddingRight: 12 }}>득실</th>
+              <th className="num" style={{ width: '18%', minWidth: 56 }}>전적</th>
+              <th className="num" style={{ width: '13%', minWidth: 44 }}>승점</th>
+              <th className="num" style={{ width: '13%', minWidth: 44, paddingRight: 12 }}>득실</th>
             </tr>
           </thead>
           <tbody>
@@ -205,7 +211,12 @@ export function TournamentStandingsTable({
                               size={14}
                               aria-hidden="true"
                               style={{
-                                marginLeft: 'auto',
+                                // 예전엔 marginLeft:'auto'로 팀 칸 오른쪽 끝에 밀어붙였는데,
+                                // 넓은 폭에서 팀명과 전적 사이에 아이콘 하나만 덩그러니 뜨는
+                                // 모양이 됐다(768px 실측: 팀명 끝에서 200px 떨어진 자리).
+                                // 펼침 affordance는 팀명에 붙어 있어야 무엇을 펼치는지 읽힌다.
+                                marginLeft: 2,
+                                flexShrink: 0,
                                 color: 'var(--text-caption)',
                                 transform: expanded ? 'rotate(180deg)' : undefined,
                                 transition: 'transform 120ms ease',

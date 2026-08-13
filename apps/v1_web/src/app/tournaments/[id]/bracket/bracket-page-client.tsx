@@ -365,6 +365,19 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const groupStageDone = format === 'knockout' ? true : allGroupPhasesComplete(groups, fixtures);
   const showBracket = hasKnockoutFixtures && groupStageDone;
 
+  /**
+   * §데스크탑 폭 배분 — 결선 라운드 수가 대진표에 필요한 가로 폭의 유일한 근거다.
+   * 기본 배분(순위표 0.72fr : 대진표 1.28fr)은 라운드가 여러 개일 때를 전제로 대진표에
+   * 넓은 쪽을 준 것인데, 결승 하나만 남은 대회에서는 그 폭을 연결선만 가로지르고
+   * (1440 실측: 650px 칼럼에 카드 180px + 우승 카드) 순위표는 366px로 눌렸다.
+   *
+   * 임계값이 1인 이유는 대진표 자체의 최소 폭 산술이다(tournament-bracket.tsx의
+   * COL_W 180 + CONN_W 36 + CHAMP_W 120): 라운드 R개의 최소 폭 = R×216 + 120.
+   * R=1이면 336px라 좁힌 칼럼(460px)에 들어가지만, R=2(4강+결승)는 552px라 넘쳐
+   * 가로 스크롤이 생긴다 — 그 경우는 기본 배분(대진표 650px)이 맞다.
+   */
+  const knockoutRoundCount = new Set(knockoutFixtures.map((f) => f.round)).size;
+
   // 리그 포맷: 모든 그룹의 순위 행을 합산. 집계 전 조는 toGroupStandingsRows가
   // 편성 팀(groupTeams)을 0값 기준선 행으로 대신 내주므로, 경기 0건이어도 참가 팀이
   // 모두 보인다(#374). 중복 제거 키는 등록 단위(row.key = registrationId)로 그대로 유지.
@@ -384,10 +397,15 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
     // 늘리고, flownav에 marginTop:'auto'를 줘 콘텐츠가 짧을 때도 네비가 항상 탭바
     // 바로 위에 붙게 한다 — 콘텐츠가 뷰포트보다 길면 기존과 동일하게 자연스러운
     // 스크롤 흐름을 그대로 따른다(flex는 늘어나는 방향으로만 작용).
-    <div className="tm-tourn-sub-page" style={{ paddingBottom: 40, minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+    // paddingBottom 40 → 16: flownav가 marginTop:auto로 이미 바닥에 붙는데 그 아래로
+    // 40px이 더 붙어 하단 탭바와의 사이가 52px(모바일)·88px(데스크탑) 흰 공간으로 남았다.
+    <div className="tm-tourn-sub-page" style={{ paddingBottom: 16, minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <header className="tm-bracket-page-intro">
         <div>
-          <span className="tm-bracket-page-eyebrow">순위와 대진표</span>
+          {/* §첫 화면 밀도 — eyebrow("순위와 대진표")는 상단 앱바 제목("순위·브래킷")과
+              같은 말을 두 번 하는 자리라 삭제했다. 안내 문단은 좁은 폭에서 숨긴다
+              (globals.css의 .tm-bracket-page-intro p) — 390px에서 이 인트로 블록이
+              스크롤 영역의 22%(159px)를 먹어 정작 경기가 2~3개밖에 안 보였다. */}
           <h1>{tournament.title}</h1>
           <p>경기 일정과 조별 순위, 결선 진행 상황을 확인하세요.</p>
         </div>
@@ -439,13 +457,18 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
           공간을 채우고, 아래 flownav가 marginTop:'auto'로 항상 바닥에 붙게 한다. */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       {activeTab === 'schedule' ? (
-        <BracketScheduleTab tournamentId={tournament.id} />
+        // §일정 탭 가로 밀도 — 데스크탑에서 카드가 콘텐츠 폭(1440에서 998px)까지 그대로
+        // 늘어나는데 안의 팀명·점수는 중앙 정렬 고정이라 좌우로 각각 300px 가까이 비었다.
+        // 읽기 좋은 폭으로 묶어 가운데 세운다(제약은 globals.css, ≥1024에서만 적용).
+        <div className="tm-bracket-schedule-pane">
+          <BracketScheduleTab tournamentId={tournament.id} />
+        </div>
       ) : (
         <>
           {/* 2열 그리드: 좌=순위표 / 우=대진표 (데스크탑) — 탭 전환용 조건 안이지만
               활성 탭일 때만 그리드를 그린다. 아래 흐름 네비게이터(§FlowNav)는 탭과
               무관한 페이지 레벨 이동이라 이 분기 밖(항상)으로 옮겼다. */}
-          <div className={`tm-tourn-sub-grid tm-bracket-page-grid ${format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col'} ${format === 'group_knockout' && !showBracket ? 'tm-bracket-page-grid-empty' : ''}`}>
+          <div className={`tm-tourn-sub-grid tm-bracket-page-grid ${format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col'} ${format === 'group_knockout' && !showBracket ? 'tm-bracket-page-grid-empty' : ''} ${showBracket && knockoutRoundCount <= 1 ? 'tm-bracket-page-grid-slim-bracket' : ''}`}>
             {/* 좌: 순위표 */}
             <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
               {format === 'league' && (

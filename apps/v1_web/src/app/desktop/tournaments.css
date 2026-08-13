@@ -1448,6 +1448,14 @@
    * 방어선(그 경우는 스크롤로 보완).
    */
   .tm-pitch-board {
-    max-height: clamp(260px, calc(100dvh - 64px - 304px - 87px - 24px), 560px);
+    /* 높이만 자르고 폭을 420px 그대로 두면 aspect-ratio 가 무시되어 축구장이 뭉툭해진다
+       — 실측 420x521 = 1.24 로, 규격 비율 1.544 와 어긋났다(하프 코트로 그리던 때는
+       "반쪽"이라 왜곡이 눈에 안 띄었지만 풀 구장이 되며 드러났다). 같은 상한을 변수로
+       빼고 폭을 거기에 연동해, 높이가 잘리는 만큼 폭도 함께 줄어 비율이 항상 유지되게
+       한다. 폭은 인라인 style 이 var(--tm-pitch-max-width) 로 읽어 간다 — 인라인이
+       클래스보다 우선하므로 CSS 가 값을 넘겨주는 형태여야 덮어쓸 수 있다. */
+    --tm-pitch-max-h: clamp(260px, calc(100dvh - 64px - 304px - 87px - 24px), 560px);
+    --tm-pitch-max-width: min(420px, calc(var(--tm-pitch-max-h) / 1.54412));
+    max-height: var(--tm-pitch-max-h);
   }
 }

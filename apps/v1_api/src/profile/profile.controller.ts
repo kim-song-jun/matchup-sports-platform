@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { V1SessionLogoutInterceptor } from '../auth/v1-session.interceptor';
 import {
   UpdateMyPreferencesDto,
+  UpdateMyRecordConsentDto,
   UpdateMyRegionsDto,
   UpdateProfileDto,
   UpdateSettingsDto,
@@ -72,6 +74,18 @@ export class ProfileController {
   @UseGuards(V1AuthGuard)
   updateMyPreferences(@CurrentUser() user: V1AuthUser, @Body() dto: UpdateMyPreferencesDto) {
     return this.profileService.updateMyPreferences(user, dto);
+  }
+
+  @Get('me/record-consent')
+  @UseGuards(V1AuthGuard)
+  myRecordConsent(@CurrentUser() user: V1AuthUser) {
+    return this.profileService.myRecordConsent(user);
+  }
+
+  @Put('me/record-consent')
+  @UseGuards(V1AuthGuard)
+  updateMyRecordConsent(@CurrentUser() user: V1AuthUser, @Body() dto: UpdateMyRecordConsentDto) {
+    return this.profileService.updateMyRecordConsent(user, dto);
   }
 
   @Post('auth/logout')

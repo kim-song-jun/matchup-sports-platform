@@ -1,13 +1,17 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { slotsWithGoalkeeper, type FormationPreset } from './formation-slots';
 import { PitchFormationEditor } from './pitch-formation-editor';
 
-/** 포메이션 드롭다운에서 하나를 고른다. 데스크톱 사이드 패널과 모바일 드로어에 같은
- * 컨트롤이 두 벌 렌더되므로 첫 번째(데스크톱)를 조작한다. 빈 문자열은 "자유 배치". */
-function chooseFormation(value: string) {
-  fireEvent.change(screen.getAllByLabelText('포메이션')[0], { target: { value } });
+/** 포메이션 칩 하나를 누른다. 데스크톱 사이드 패널과 모바일 드로어에 같은 컨트롤이 두 벌
+ * 렌더되므로 첫 번째(데스크톱)를 조작한다. 빈 문자열은 "자유 배치".
+ *
+ * 칩의 접근 이름은 "<코드> <라벨> · 필드 N명" 형태라, 코드로 시작하는지로 특정한다 —
+ * 그냥 부분일치로 두면 '1-1'이 '1-2-1'에도 걸린다. */
+function chooseFormation(code: string) {
+  const name = code === '' ? /^자유 배치/ : new RegExp(`^${code}\\s`);
+  fireEvent.click(screen.getAllByRole('button', { name })[0]);
 }
 
 function makeEntry(overrides: Partial<LineupEntryDraft> & { key: string }): LineupEntryDraft {
@@ -69,8 +73,7 @@ describe('PitchFormationEditor — slot mode', () => {
         outfieldGuidance="이 종목은 등록된 포지션 대형이 없어요. 자유 배치로 직접 배치해 주세요." />,
     );
     expect(screen.getAllByText(/등록된 포지션 대형이 없어요/)[0]).toBeInTheDocument();
-    const select = screen.getAllByLabelText('포메이션')[0];
-    expect(within(select).getByRole('option', { name: '자유 배치' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^자유 배치/ })[0]).toBeInTheDocument();
   });
 
   it('keeps every formation selectable no matter the headcount — a short-handed squad can still pick one', () => {
@@ -80,21 +83,32 @@ describe('PitchFormationEditor — slot mode', () => {
       <PitchFormationEditor {...baseProps} starters={[makeEntry({ key: 'w1', displayName: '대기선수' })]}
         formation={null} slots={null} />,
     );
-    const select = screen.getAllByLabelText('포메이션')[0];
-    expect(within(select).getByRole('option', { name: '2-2 · 박스 (필드 4명)' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '2-2 박스 · 필드 4명' })[0]).toBeInTheDocument();
   });
 
-  it('selecting from the dropdown reports the formation code, and 자유 배치 reports null', () => {
+  it('picking a chip reports the formation code, and 자유 배치 reports null', () => {
     const onSelectFormation = vi.fn();
     render(
       <PitchFormationEditor {...baseProps} starters={[]} formation={null} slots={null}
         onSelectFormation={onSelectFormation} />,
     );
-    const select = screen.getAllByLabelText('포메이션')[0];
-    fireEvent.change(select, { target: { value: '2-2' } });
+    chooseFormation('2-2');
     expect(onSelectFormation).toHaveBeenCalledWith('2-2');
-    fireEvent.change(select, { target: { value: '' } });
+    chooseFormation('');
     expect(onSelectFormation).toHaveBeenLastCalledWith(null);
+  });
+
+  it('chip preview shares the pitch coordinate system — GK sits at the bottom, forwards at the top', () => {
+    // 미니 프리뷰가 y를 뒤집지 않으면 칩에서 본 모양과 실제 배치가 위아래로 뒤집힌다.
+    // 사용자는 칩을 보고 고르므로 이 어긋남은 곧 잘못된 선택으로 이어진다.
+    render(
+      <PitchFormationEditor {...baseProps} starters={[]} formation={null} slots={null} />,
+    );
+    const chip = screen.getAllByRole('button', { name: /^2-2\s/ })[0];
+    const cys = [...chip.querySelectorAll('circle')].map((circle) => Number(circle.getAttribute('cy')));
+    expect(cys).toHaveLength(5); // GK + 필드 4명
+    // slotsWithGoalkeeper가 맨 앞에 붙이는 GK(y=6)는 화면상 가장 아래(cy 최대)여야 한다.
+    expect(cys[0]).toBeGreaterThan(Math.max(...cys.slice(1)));
   });
 
   it('spells out how the chosen formation mismatches the current squad instead of hiding the option', () => {

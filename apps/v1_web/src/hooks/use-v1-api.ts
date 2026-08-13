@@ -1708,7 +1708,11 @@ export type V1SaveGameLineupPayload = {
   expectedVersion: number;
   formation?: string;
   participants: Array<{
-    /** 등록 명단의 사용자 — 다시 열 때 이름이 아니라 이 값으로 명단과 대조한다. */
+    /**
+     * 등록 명단의 사용자 — 다시 열 때 이름이 아니라 이 값으로 명단과 대조한다.
+     * 이 값이 실리면 백엔드가 같은 트랜잭션에서 ROSTER_ASSERTED 신원 연결을 만들어
+     * 이 사용자의 개인 기록(활동 기록)에 반영한다(games.service.ts saveLineup).
+     */
     userId?: string;
     displayNameSnapshot: string;
     jerseyNumber?: number;
@@ -2010,6 +2014,32 @@ export function useV1NotificationPreferences() {
   return useQuery({
     queryKey: v1Keys.notificationPreferences(),
     queryFn: () => v1Get<V1NotificationPreferences>('/notification-preferences'),
+  });
+}
+
+/**
+ * 사용자 단위 공개 기록 동의(F2) — 라인업에서 팀원 연결로 신원이 이어진 경기가
+ * `/users/:id/records` 공개 프로필에 보일지 여부를 사용자 본인이 한 번에 켜고 끈다.
+ * 동의하면 과거 경기까지 전부 소급 공개된다(시점 비교 없음, 사용자 명시 결정) — 그래서
+ * 토글 문구가 이 소급 효과를 먼저 알려야 한다.
+ */
+export type V1RecordConsent = { granted: boolean; effectiveAt: string | null };
+
+export function useV1RecordConsent() {
+  return useQuery({
+    queryKey: v1Keys.recordConsent(),
+    queryFn: () => v1Get<V1RecordConsent>('/me/record-consent'),
+  });
+}
+
+export function useV1UpdateRecordConsent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { granted: boolean; policyHash: string }) =>
+      v1Put<V1RecordConsent>('/me/record-consent', body),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1RecordConsent>(v1Keys.recordConsent(), result);
+    },
   });
 }
 

@@ -27,16 +27,15 @@ interface EligibleResultRow {
 }
 
 /**
- * Task 24 -- `GET /users/:id/records`. The one route where D-03's consent
- * gate is load-bearing: a `V1GameResultParticipant` row only ever
- * contributes here when (a) it is reached through the game's *current*
- * official revision (a voided or superseded revision structurally has no
- * path in -- see `GameResultVoidProjectionService`'s comment) and (b) the
- * specific participant row passes `isParticipantPubliclyEligible` against
- * that revision's `officialAt`. An unlinked guest, a linked-but-unconsented
- * participant, or a since-revoked consent all fail (b) and are silently
- * absent -- never a placeholder/error row, per "no `PENDING_IDENTITY` row is
- * created" in the todo.
+ * Task 24, 사용자 단위 동의로 재정의(2026-08-13) -- `GET /users/:id/records`.
+ * 이 라우트가 동의 게이트가 실제로 힘을 갖는 유일한 곳이다: `V1GameResultParticipant`
+ * 행은 (a) 게임의 *현재* 공식 리비전을 거쳐 도달했고(void/superseded 리비전은
+ * 애초에 경로가 없다 -- `GameResultVoidProjectionService`의 주석 참고) (b) 그
+ * participant 행이 `isParticipantPubliclyEligible`(사용자 단위 동의 GRANTED +
+ * participant 단위 최신 스냅샷이 REVOKED 아님)를 통과할 때만 여기 반영된다.
+ * 미연동 게스트, 사용자 단위 동의가 없는/철회된 연동, 개별 스냅샷으로 숨긴 참가
+ * 기록은 전부 (b)에서 걸러져 조용히 빠진다 -- placeholder/error 행 없음("no
+ * `PENDING_IDENTITY` row is created").
  */
 @Injectable()
 export class PublicUserRecordsService {
@@ -137,7 +136,7 @@ export class PublicUserRecordsService {
       if (!isCurrent || revision.officialAt === null) continue;
 
       const consent = eligibility.get(row.participantId);
-      if (consent === undefined || !isParticipantPubliclyEligible(consent, revision.officialAt)) continue;
+      if (consent === undefined || !isParticipantPubliclyEligible(consent)) continue;
 
       if (seasonRange && (revision.officialAt < seasonRange.gte || revision.officialAt >= seasonRange.lt)) {
         continue;

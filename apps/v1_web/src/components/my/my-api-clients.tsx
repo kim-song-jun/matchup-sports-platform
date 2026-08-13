@@ -34,6 +34,7 @@ import {
   useV1Notifications,
   useV1Profile,
   useV1ReceivedInvitations,
+  useV1RecordConsent,
   useV1RejectTeamJoinApplication,
   useV1RemoveTeamMembership,
   useV1ResolveLocation,
@@ -46,12 +47,13 @@ import {
   useV1UpdateMyPreferences,
   useV1UpdateMyRegion,
   useV1UpdateProfile,
+  useV1UpdateRecordConsent,
   useV1UpdateSettings,
   useV1WithdrawalRequest,
   useV1WithdrawMyJoinApplication,
 } from '@/hooks/use-v1-api';
 import { usePendingIds } from '@/hooks/use-pending-ids';
-import { formatMonthDay } from '@/lib/date-utils';
+import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
@@ -1525,6 +1527,103 @@ export function NotificationSettingsPageClient() {
   );
 }
 
+// F2: 이 문자열이 바뀌면(정책 개정) 기존 GRANTED 동의는 재동의를 요구해야 한다는 뜻이지만,
+// 지금은 v1 최초 버전이라 상수 하나로 고정한다 — 서버는 이 값을 그대로
+// V1UserRecordConsent.policyHash에 저장할 뿐 검증하지 않는다(신뢰 경계는 프론트가 아니라
+// "무엇에 동의했는지" 감사 로그 목적).
+const RECORD_CONSENT_POLICY_HASH = 'v1-public-record-consent-1';
+
+export function RecordConsentSettingsPageClient() {
+  const consent = useV1RecordConsent();
+  const update = useV1UpdateRecordConsent();
+  const [toggleError, setToggleError] = useState(false);
+
+  if (consent.isError) {
+    return (
+      <AppChrome title="경기 기록 공개" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+        <div className="tm-my-shell">
+          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void consent.refetch()} />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const granted = Boolean(consent.data?.granted);
+  const toggle = () => {
+    setToggleError(false);
+    update.mutate(
+      { granted: !granted, policyHash: RECORD_CONSENT_POLICY_HASH },
+      { onError: () => setToggleError(true) },
+    );
+  };
+
+  return (
+    <AppChrome title="경기 기록 공개" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+      <div className="tm-my-shell">
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">경기 기록 공개</h1>
+          </div>
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">공개 프로필에 경기 기록 표시</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              팀 라인업에 내 계정으로 연결된 경기가 공개 활동 기록(/users/내ID/records)에 나타나요.
+              {/* 과거 경기까지 소급 공개된다는 게 이 기능의 핵심 조건 — 켜기 전에 반드시
+                  알아야 한다(사용자 명시 결정: "모두 그냥 다 보이게"). */}
+              {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
+            </div>
+          </Card>
+          {toggleError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+            </Card>
+          ) : null}
+          <div className="tm-card" style={{ padding: 0 }}>
+            <button
+              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+              onClick={toggle}
+              type="button"
+              disabled={consent.isLoading || update.isPending}
+              role="switch"
+              aria-checked={granted}
+              aria-label="경기 기록 공개"
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body">경기 기록 공개</div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                  {update.isPending
+                    ? '저장하는 중이에요…'
+                    : granted
+                      ? '지금 공개돼 있어요. 끄면 새 경기부터 다시 비공개예요.'
+                      : '지금은 비공개예요. 켜면 과거 경기까지 함께 공개돼요.'}
+                </div>
+              </div>
+              <span
+                className="tm-text-caption"
+                style={{ minWidth: 24, textAlign: 'right', color: granted ? 'var(--blue500)' : 'var(--text-caption)' }}
+                aria-hidden="true"
+              >
+                {granted ? 'ON' : 'OFF'}
+              </span>
+              <span className={`tm-toggle ${granted ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+            </button>
+          </div>
+          {granted && consent.data?.effectiveAt ? (
+            <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+              {formatTournamentDateTimeLong(consent.data.effectiveAt)}부터 공개하고 있어요.
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </AppChrome>
+  );
+}
+
 const THEME_OPTIONS: { key: ThemePreference; label: string; sub: string }[] = [
   { key: 'light', label: '라이트', sub: '항상 밝은 화면으로 봐요' },
   { key: 'dark', label: '다크', sub: '항상 어두운 화면으로 봐요' },
@@ -1715,6 +1814,17 @@ function toMyHomeModel(
   const activityCount = activitySummary?.totals.activityCount ?? '—';
   const monthlyMatchCount = activitySummary?.monthly.matchCount ?? '—';
   const sections = myHomeModel.sections.map((section) => ({ ...section, items: [...section.items] }));
+  // F3: 마이페이지에서 내 활동 기록(/users/:id/records)으로 가는 동선이 아예 없었다 —
+  // 정적 myHomeModel엔 내 userId를 미리 넣을 수 없어 여기서 프로필 응답으로 동적으로 붙인다.
+  const myActivitySection = sections.find((section) => section.title === '내 활동');
+  if (myActivitySection && !myActivitySection.items.some((item) => item.href === `/users/${profile.userId}/records`)) {
+    myActivitySection.items.push({
+      label: '내 활동 기록',
+      sub: '팀 라인업에 연결된 경기 기록을 확인해요',
+      href: `/users/${profile.userId}/records`,
+      icon: 'Award',
+    });
+  }
   const communitySection = sections.find((section) => section.title === '커뮤니티');
   if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
     communitySection.items.push({

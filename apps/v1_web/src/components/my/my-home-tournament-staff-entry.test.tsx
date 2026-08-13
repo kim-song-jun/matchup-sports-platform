@@ -46,7 +46,7 @@ const profile: V1Profile = {
     profileImageUrl: null,
     gender: null,
   },
-  reputation: { trustState: 'none', mannerScore: null, activityCount: 0, reviewCount: 0 },
+  reputation: { trustState: 'estimated', mannerScore: null, activityCount: 0, reviewCount: 0 },
 };
 
 function mockBaseHooks() {

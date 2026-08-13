@@ -5,6 +5,9 @@ import {
   V1TournamentRegistrationStatus,
   V1TournamentStatus,
 } from '@prisma/client';
+// 같은 `prisma/` 폴더 안의 모듈이라 프로덕션 이미지에도 함께 복사된다 — 아래 경고가 금지하는
+// 건 이 이미지에 없는 `../src/...` import 다.
+import { seedAlphaQaSquads } from './seed-alpha-qa-squads';
 
 // canonical 풋살 competition config 의 id.
 //
@@ -908,11 +911,17 @@ async function main() {
           competitionConfigVersionId,
         );
       }
+      // QA 스쿼드(팀 10 × 선수 10) — 대회 시나리오와 독립적인 "테스트용 팀·계정 풀"이다.
+      // alpha 는 SMS 미설정 + 휴대폰 인증 강제라 API 로는 계정을 늘릴 수 없어(register →
+      // PHONE_NOT_VERIFIED, phone/issue → SMS_NOT_CONFIGURED) 이 시드가 유일한 경로다.
+      const squads = await seedAlphaQaSquads(tx, sport.id, region.id);
+
       return {
         tournaments: ALPHA_TOURNAMENT_SCENARIOS.length,
         campaigns: ALPHA_TOURNAMENT_SCENARIOS.filter((scenario) => scenario.hasCampaign).length,
         statuses: ALPHA_TOURNAMENT_SCENARIOS.map((scenario) => scenario.status),
         completedIncludes: ['results', 'videos', 'reviews', 'awards'],
+        qaSquads: squads,
       };
     });
     process.stdout.write(`${JSON.stringify({ status: 'ok', ...summary })}\n`);

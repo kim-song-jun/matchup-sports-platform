@@ -17,8 +17,9 @@
 -- 추가된 "교체 출전" 체크로 앞으로 제출되는 결과부터 정확해진다.
 
 -- 트리거 `v1_guard_result_participant_mutation`은 revision이 DRAFT일 때만 result participant 행의 변경을 허용한다
--- (20260729000100_v1_game_operations). 백필 대상은 전부 SUBMITTED/OFFICIAL이므로
--- 이 트랜잭션 동안만 끈다. 트랜잭션이 끝나면 원래대로 다시 켜진다.
+-- (20260729000100_v1_game_operations). 아래 두 문장은 state 조건으로 대상을
+-- SUBMITTED/OFFICIAL로 한정하므로 전부 그 트리거에 막힌다 — 이 트랜잭션 동안만 끈다.
+-- 트랜잭션이 끝나면 원래대로 다시 켜진다.
 ALTER TABLE v1_game_result_participants DISABLE TRIGGER v1_guard_result_participant_mutation;
 
 -- 1) 출전 증거가 없는 행 제거.
@@ -28,6 +29,11 @@ WHERE rp.result_revision_id = rev.id
   AND EXISTS (
     SELECT 1 FROM v1_games g WHERE g.id = rev.game_id AND g.source_type = 'TOURNAMENT_FIXTURE'
   )
+  -- 확정됐거나 확정을 기다리는 결과만 손본다. DRAFT/CHANGE_REQUESTED는 아직 작성
+  -- 중이라 이 백필의 대상(과거에 확정된 기록)이 아니고, 지우면 편집 중인 내용을
+  -- 빼앗는 셈이 된다. REJECTED/VOID는 공개 경로가 애초에 읽지 않는다
+  -- (PublicUserRecordsService는 game.currentOfficialRevisionId를 통해서만 도달한다).
+  AND rev.state IN ('SUBMITTED', 'OFFICIAL')
   -- 선발이 아니었고
   AND NOT EXISTS (
     SELECT 1 FROM v1_game_participants p WHERE p.id = rp.participant_id AND p.started = TRUE
@@ -70,6 +76,7 @@ WHERE rp.result_revision_id = rev.id
   AND EXISTS (
     SELECT 1 FROM v1_games g WHERE g.id = rev.game_id AND g.source_type = 'TOURNAMENT_FIXTURE'
   )
+  AND rev.state IN ('SUBMITTED', 'OFFICIAL')
   AND rp.started IS DISTINCT FROM p.started;
 
 ALTER TABLE v1_game_result_participants ENABLE TRIGGER v1_guard_result_participant_mutation;

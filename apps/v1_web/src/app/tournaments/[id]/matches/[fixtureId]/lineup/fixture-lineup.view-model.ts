@@ -125,6 +125,68 @@ export function hydrateFixtureLineupState(
   };
 }
 
+/**
+ * 불러온 라인업을 이 화면에 적용한다.
+ *
+ * **명단 자체는 절대 바뀌지 않는다.** 이 화면의 선수 목록은 대회 등록 명단이 유일한
+ * 출처이므로(위 모듈 주석), 불러오기가 하는 일은 그 명단 위에 "누가 선발이었고 등번호와
+ * 자리가 무엇이었는지"를 덧입히는 것뿐이다. 불러온 라인업에 없던 사람은 후보로 내려가고,
+ * 불러온 라인업에만 있고 지금 명단에 없는 사람은 애초에 여기까지 오지 않는다(자격 필터가
+ * 걸러낸다).
+ *
+ * `keepPlacement`가 false면 좌표·포지션·포메이션을 버리고 명단 구성만 가져온다 — 종목이
+ * 다른 라인업(예: 풋살 라인업을 축구 경기에)을 불러올 때 포지션 코드와 좌표를 그대로
+ * 옮기면 있지도 않은 자리에 선수가 서게 된다.
+ */
+export function applyLoadedSelection(
+  state: FixtureLineupState,
+  loaded: ReadonlyArray<{
+    userId: string | null;
+    jerseyNumber: number | null;
+    position: string | null;
+    positionX: number | null;
+    positionY: number | null;
+    started: boolean;
+    goalkeeper: boolean;
+  }>,
+  options: { formation: string | null; keepPlacement: boolean },
+): FixtureLineupState {
+  const byUserId = new Map(
+    loaded
+      .filter((entry): entry is typeof entry & { userId: string } => entry.userId !== null)
+      .map((entry) => [entry.userId, entry]),
+  );
+
+  const starters: LineupEntryDraft[] = [];
+  const bench: LineupEntryDraft[] = [];
+  for (const entry of [...state.starters, ...state.bench]) {
+    const hit = entry.userId !== null ? byUserId.get(entry.userId) : undefined;
+    if (hit === undefined) {
+      // 불러온 라인업에 없던 사람 — 이 화면의 기본 규칙대로 후보에서 시작한다.
+      bench.push({ ...entry, goalkeeper: false, positionX: null, positionY: null });
+      continue;
+    }
+    const next: LineupEntryDraft = {
+      ...entry,
+      jerseyNumber: hit.jerseyNumber,
+      goalkeeper: hit.started && hit.goalkeeper,
+      position: options.keepPlacement && !hit.goalkeeper ? hit.position : null,
+      positionX: options.keepPlacement ? hit.positionX : null,
+      positionY: options.keepPlacement ? hit.positionY : null,
+    };
+    if (hit.started) starters.push(next);
+    else bench.push({ ...next, goalkeeper: false, positionX: null, positionY: null });
+  }
+
+  return {
+    ...state,
+    starters,
+    bench,
+    formation: options.keepPlacement ? options.formation : null,
+    dirty: true,
+  };
+}
+
 /** 체크 하나로 선발↔후보를 오간다 — 이 화면의 유일한 명단 편집 조작이다. */
 export function toggleStarter(state: FixtureLineupState, key: string): FixtureLineupState {
   return state.starters.some((entry) => entry.key === key)

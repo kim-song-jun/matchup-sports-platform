@@ -2280,9 +2280,14 @@ export class GamesService {
       // 알아야 한다 — 사이드(팀)당 하나씩 함께 내려준다. 스태프는 양 팀 중 하나를 골라
       // 대신 짤 수 있으므로 자기 팀 것만 주는 형태로는 부족하다.
       homeRegistrationId: fixture.homeRegistration?.id ?? null,
+      // 팀 스코프 자산(이전 라인업 히스토리·프리셋)은 teamId로 부른다. sideId만으로는
+      // 어느 팀인지 알 수 없어서, 화면이 팀을 알아내려고 조회를 한 번 더 하는 대신
+      // 이미 여기서 읽은 값을 그대로 실어 준다.
+      homeTeamId,
       awaySideId: awaySide?.id ?? null,
       awayTeamName: fixture.awayRegistration?.team.name ?? null,
       awayRegistrationId: fixture.awayRegistration?.id ?? null,
+      awayTeamId,
     };
   }
 

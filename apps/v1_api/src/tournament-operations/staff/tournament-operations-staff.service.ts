@@ -41,6 +41,13 @@ export type MyTournamentStaffAssignmentItem = {
   readonly fieldName: string | null;
   readonly version: number;
   readonly expiresAt: Date | null;
+  /**
+   * 이 배정이 담당하는 경기들. FIELD_OPERATOR 는 배정에 반드시 경기/필드 스코프가 붙고
+   * 대회 전역 리소스를 읽을 수 없어 대회 셸 진입이 막히므로, 화면은 이 목록으로
+   * "이 경기 콘솔에 들어가도 되는가"를 판정한다(서버 assertAccess 가 최종 판정).
+   * 필드 단위로만 배정된 경우 빈 배열이며, 그때는 fieldId 로 범위가 정해진다.
+   */
+  readonly fixtureIds: readonly string[];
 };
 
 export type MyTournamentStaffGroup = {
@@ -113,6 +120,10 @@ export class TournamentOperationsStaffService {
         expiresAt: true,
         tournament: { select: { title: true, status: true } },
         field: { select: { name: true } },
+        // 담당 경기 식별자 — 필드 담당자(FIELD_OPERATOR)가 대회 셸을 거치지 않고 자기 경기
+        // 콘솔로 바로 들어갈 때 진입 판정에 쓴다. 이 역할은 대회 전역 리소스를 읽을 권한이
+        // 없어 셸 진입이 구조적으로 막히므로, 이 목록이 담당 경기를 아는 유일한 출처다.
+        fixtureScopes: { select: { fixtureId: true }, orderBy: { fixtureId: 'asc' } },
       },
       orderBy: [{ tournamentId: 'asc' }, { createdAt: 'asc' }],
     });
@@ -141,6 +152,7 @@ export class TournamentOperationsStaffService {
         fieldName: assignment.field?.name ?? null,
         version: assignment.version,
         expiresAt: assignment.expiresAt,
+        fixtureIds: assignment.fixtureScopes.map((scope) => scope.fixtureId),
       });
     }
 

@@ -130,6 +130,8 @@ export const v1Keys = {
   myTournamentStaffAssignments: () => [...v1Keys.all, 'me', 'tournament-staff'] as const,
   tournamentOperationsFields: (tournamentId: string) =>
     [...v1Keys.all, 'tournament-ops', tournamentId, 'fields'] as const,
+  /** 내 스태프 배정(GET /tournament-ops/me/assignments) — identity 스코프라 `all` 접두사를 유지한다. */
+  myTournamentOpsAssignments: () => [...v1Keys.all, 'tournament-ops', 'me', 'assignments'] as const,
 };
 
 // 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아

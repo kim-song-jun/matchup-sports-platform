@@ -1,5 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { resolveTournamentFixtureOfficialTimestamp } from '../tournaments/tournament-fixture-official-result';
+// 신뢰 등급 경계는 team-trust-aggregation.ts의 단일 정의를 쓴다 — 예전엔 여기에도 사본이 있었고,
+// 그런 복제가 "DB 저장값과 화면 재계산값이 갈라지는" 사고의 원인이었다(reviews.service.ts 하단 주석 참고).
+import { trustStateForReviewCount } from './team-trust-aggregation';
 
 export const TOURNAMENT_FIXTURE_SOURCE_TYPE = 'tournament_fixture' as const;
 export const REVIEW_TAGS = {
@@ -38,11 +41,24 @@ export function tournamentFixtureSelect() {
     // R3 §4-3단계 한시적 레거시 폴백 입력 — officialResultTimestamp()가 새 경로에 OFFICIAL
     // 리비전이 없을 때만(game 백필 전) 레거시 recordedAt으로 대체한다. §4-4단계에서 제거.
     result: { select: { recordedAt: true } },
-    tournament: { select: { title: true } },
-    homeRegistration: { select: { teamId: true, team: { select: teamSelect() } } },
-    awayRegistration: { select: { teamId: true, team: { select: teamSelect() } } },
+    // sportId: 개인 후기 행의 sportId 스냅샷 — 종목별 받은 후기 집계(ReviewsService.receivedSummary)가
+    // sportId 없는 행을 레거시로 취급해 통째로 빼기 때문에, 대회 개인 후기도 종목을 실어야 집계에 잡힌다.
+    tournament: { select: { title: true, sportId: true } },
+    // registration id: 상대팀 등록 로스터(V1TournamentPlayer)를 조회하는 키. 개인 후기 대상 명단의 근거다.
+    homeRegistration: { select: { id: true, teamId: true, team: { select: teamSelect() } } },
+    awayRegistration: { select: { id: true, teamId: true, team: { select: teamSelect() } } },
   } as const;
 }
+
+/** 상대팀 로스터(개인 후기 대상)를 읽을 때 쓰는 select. 실명(realName)은 응답에 싣지 않는다 — 닉네임만 노출한다. */
+export function rosterPlayerSelect() {
+  return {
+    userId: true,
+    user: { select: userSelect() },
+  } as const;
+}
+
+export type RosterPlayer = Prisma.V1TournamentPlayerGetPayload<{ select: ReturnType<typeof rosterPlayerSelect> }>;
 
 /**
  * 신규 경로(`V1Game.currentOfficialRevision.officialAt`) 우선, 새 경로에 OFFICIAL
@@ -185,18 +201,15 @@ function teamSelect() {
 
 function teamInfo(registration: NonNullable<TournamentFixture['homeRegistration']>) {
   return {
+    // 로스터(V1TournamentPlayer)는 팀이 아니라 "이 대회의 등록"에 달려 있으므로, 개인 후기 대상 명단을
+    // 뽑으려면 teamId가 아니라 registrationId가 필요하다.
+    registrationId: registration.id,
     teamId: registration.teamId,
     name: registration.team.name,
     imageUrl: registration.team.profile?.logoUrl ?? null,
   };
 }
 
-function trustStateForReviewCount(reviewCount: number) {
-  if (reviewCount >= 3) return 'verified' as const;
-  if (reviewCount >= 1) return 'estimated' as const;
-  return 'none' as const;
-}
-
-function decimalScore(avgRating: number | null) {
+export function decimalScore(avgRating: number | null) {
   return avgRating === null ? null : new Prisma.Decimal(avgRating.toFixed(2));
 }

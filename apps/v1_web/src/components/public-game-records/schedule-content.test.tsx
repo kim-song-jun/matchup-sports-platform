@@ -113,7 +113,7 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
     status: 'ended',
     resultState: 'official',
     scoreStatus: 'official',
-    score: { home: 1, away: 0 },
+    score: { home: 1, away: 0, penalties: null },
     clock: null,
     scorers: [],
     hasVideo: false,
@@ -144,5 +144,30 @@ describe('ScheduleContent — 이상 클럭 경고 표식(alpha 452′ 사고)',
 
     expect(screen.getByText(/10′/)).toBeInTheDocument();
     expect(screen.queryByLabelText('비정상적으로 긴 경기 시각이에요. 확인이 필요해요.')).not.toBeInTheDocument();
+  });
+});
+
+describe('ScheduleContent — 스코어 아래 승부차기 보조 표기', () => {
+  it('승부차기가 있으면 정규시간 스코어는 그대로 두고 아래에 "승부차기 4-3"을 붙인다', () => {
+    const data = {
+      ...makeData(),
+      items: [fixtureEntry({ score: { home: 1, away: 1, penalties: { home: 4, away: 3 } } })],
+    };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    // 큰 스코어가 승부차기 숫자로 덮이지 않는다 -- 승부차기는 보조 표기로만 나온다.
+    expect(screen.getByText('1 : 1')).toBeInTheDocument();
+    expect(screen.getByText('승부차기 4-3')).toBeInTheDocument();
+    expect(screen.queryByText('4 : 3')).not.toBeInTheDocument();
+  });
+
+  it('승부차기가 없는 경기에는 보조 표기를 아예 렌더하지 않는다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({})] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('1 : 0')).toBeInTheDocument();
+    expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
   });
 });

@@ -9,7 +9,7 @@ import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
-import { formatTournamentDateShort, formatTournamentDateRangeShort } from '@/lib/date-utils';
+import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
@@ -617,9 +617,192 @@ function VideoGallerySection({ fixtures }: { fixtures: V1TournamentFixture[] }) 
   );
 }
 
+/* ─────────────────────────────────────────────────────────
+ * 조별리그 경기 — 이 화면에서 조별 경기를 나열하는 **유일한** 블록.
+ *
+ * 원래는 "완료 + 결과 등록"된 조별 경기만 담던 접힘 목록이었다. 그래서 조별 결과가
+ * 아직 하나도 입력되지 않은 대회에서는 블록 자체가 사라져, 최종결과 화면에서 조별
+ * 일정을 확인할 방법이 전혀 없었다. 지금은 조별 경기 **전체**(예정·진행 중·취소
+ * 포함)를 조별로 묶어 보여주고, 결과가 없는 경기는 스코어 대신 상태 칩으로 구분한다.
+ *
+ * 새 목록을 별도로 추가하지 말 것 — 같은 화면에 조별 경기 목록이 두 벌 생긴다.
+ * ───────────────────────────────────────────────────────── */
+
+/** 백엔드가 라운드를 코드('group')와 한글 라벨('조별리그') 두 형태로 내려준다. */
+const GROUP_ROUNDS: readonly string[] = ['group', '조별리그'];
+
+function isGroupStageFixture(fixture: V1TournamentFixture): boolean {
+  return GROUP_ROUNDS.includes(fixture.round);
+}
+
+interface GroupSection { key: string; name: string; fixtures: V1TournamentFixture[] }
+
+/** 일정순(시각 미정은 뒤로) → 대진 번호순. 목록 순서가 데이터 순서에 흔들리지 않게 고정한다. */
+function compareGroupFixtures(a: V1TournamentFixture, b: V1TournamentFixture): number {
+  const at = a.scheduledAt ? Date.parse(a.scheduledAt) : Number.POSITIVE_INFINITY;
+  const bt = b.scheduledAt ? Date.parse(b.scheduledAt) : Number.POSITIVE_INFINITY;
+  if (at !== bt) return at - bt;
+  return a.fixtureNumber - b.fixtureNumber;
+}
+
+function buildGroupSections(
+  groups: V1TournamentDetail['groups'],
+  fixtures: V1TournamentFixture[],
+): GroupSection[] {
+  const sections: GroupSection[] = [...groups]
+    .filter((g) => g.phase === 'group')
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((g) => ({
+      key: g.id,
+      name: g.name,
+      fixtures: fixtures.filter((f) => f.groupId === g.id).sort(compareGroupFixtures),
+    }))
+    .filter((section) => section.fixtures.length > 0);
+
+  // 조가 지워졌거나 groupId가 비어 편성에 붙지 못한 경기도 목록에서 빠지면 안 된다.
+  const sectioned = new Set(sections.flatMap((s) => s.fixtures.map((f) => f.id)));
+  const rest = fixtures.filter((f) => !sectioned.has(f.id)).sort(compareGroupFixtures);
+  if (rest.length > 0) sections.push({ key: '__unsectioned__', name: '기타', fixtures: rest });
+  return sections;
+}
+
+/** 결과가 아직 없는 경기의 상태 표시 — 색만으로 구분하지 않도록 항상 텍스트를 함께 낸다. */
+function GroupFixtureStatusChip({ fixture }: { fixture: V1TournamentFixture }) {
+  if (fixture.result !== null) return null;
+  const chip =
+    fixture.status === 'cancelled'
+      ? { tone: 'tm-badge-red', label: '취소' }
+      : fixture.status === 'in_progress'
+        ? { tone: 'tm-badge-blue', label: '진행 중' }
+        : fixture.status === 'completed'
+          ? { tone: 'tm-badge-grey', label: '결과 미등록' }
+          : { tone: 'tm-badge-grey', label: '경기 예정' };
+  return <span className={`tm-badge tm-badge-sm ${chip.tone}`}>{chip.label}</span>;
+}
+
+function GroupFixtureRow({
+  tournamentId,
+  fixture,
+}: {
+  tournamentId: string;
+  fixture: V1TournamentFixture;
+}) {
+  const result = fixture.result;
+  const winner = result ? getWinnerSide(result) : null;
+  // null은 "배정됐지만 아직 비공개"(모집 중) — 이 화면에서는 사실상 나오지 않지만
+  // 타입상 가능하므로 결선 카드(MatchRow)와 같은 문구로 방어한다.
+  const home = fixture.homeTeamName ?? '팀 정보 없음';
+  const away = fixture.awayTeamName ?? '팀 정보 없음';
+  const when = formatTournamentDateTimeShort(fixture.scheduledAt);
+  const meta = [when, fixture.venue].filter((v): v is string => Boolean(v)).join(' · ');
+  const scoreLabel = result ? `${result.homeScore} 대 ${result.awayScore}` : '경기 결과 미정';
+
+  return (
+    <Link
+      href={`/tournaments/${tournamentId}/matches/${fixture.id}`}
+      className="tm-res-match-row"
+      style={{ minHeight: 44, textDecoration: 'none', color: 'inherit' }}
+      aria-label={`${home} ${scoreLabel} ${away}, 경기 상세 보기`}
+    >
+      <div className="tm-res-match-meta">
+        <GroupFixtureStatusChip fixture={fixture} />
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-caption)', wordBreak: 'keep-all' }}>
+          {meta === '' ? '일정 미정' : meta}
+        </span>
+      </div>
+      <div className="tm-res-match-teams">
+        <span
+          className="tm-res-match-team"
+          style={{ fontWeight: winner === 'home' ? 700 : 400, color: winner === 'home' ? 'var(--text-strong)' : 'var(--text-muted)' }}
+        >
+          {home}
+        </span>
+        <span className="tm-res-match-score tab-num">
+          {result
+            ? <>{result.homeScore}<span style={{ opacity: 0.35, margin: '0 2px' }}>:</span>{result.awayScore}</>
+            : <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)' }}>vs</span>}
+        </span>
+        <span
+          className="tm-res-match-team tm-res-match-team-right"
+          style={{ fontWeight: winner === 'away' ? 700 : 400, color: winner === 'away' ? 'var(--text-strong)' : 'var(--text-muted)' }}
+        >
+          {away}
+        </span>
+      </div>
+      <ChevronRight
+        size={16}
+        aria-hidden="true"
+        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-caption)' }}
+      />
+    </Link>
+  );
+}
+
+export function GroupStageFixtures({ tournament }: { tournament: V1TournamentDetail }) {
+  const panelId = useId();
+  const [expanded, setExpanded] = useState(false);
+
+  const fixtures = tournament.fixtures.filter(isGroupStageFixture);
+  const hasGroupPhase = tournament.groups.some((g) => g.phase === 'group');
+  // 조별리그 자체가 없는 대회(순수 토너먼트)에서는 블록을 아예 내지 않는다.
+  if (fixtures.length === 0 && !hasGroupPhase) return null;
+
+  const recorded = fixtures.filter((f) => f.result !== null).length;
+  const sections = buildGroupSections(tournament.groups, fixtures);
+
+  return (
+    <section style={{ marginTop: 16 }}>
+      <button
+        type="button"
+        className="tm-res-expand-btn"
+        style={{ minHeight: 44 }}
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+      >
+        <span>
+          조별리그 경기 {fixtures.length}경기
+          {recorded < fixtures.length && (
+            <span style={{ marginLeft: 6, fontWeight: 500, color: 'var(--text-caption)' }}>
+              결과 등록 {recorded}경기
+            </span>
+          )}
+        </span>
+        <span
+          className="tm-res-expand-chevron"
+          aria-hidden="true"
+          style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
+        >
+          ▾
+        </span>
+      </button>
+      {expanded && (
+        <div id={panelId} style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {sections.length === 0 ? (
+            <EmptyState
+              title="조별리그 경기가 아직 등록되지 않았어요."
+              sub="운영진이 조별 대진을 확정하면 이곳에서 경기를 확인할 수 있어요."
+            />
+          ) : (
+            sections.map((section) => (
+              <div key={section.key}>
+                <div className="tm-res-group-label">{section.name} · {section.fixtures.length}경기</div>
+                <div className="tm-res-matches-block">
+                  {section.fixtures.map((fixture) => (
+                    <GroupFixtureRow key={fixture.id} tournamentId={tournament.id} fixture={fixture} />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /* ── 메인 콘텐츠 ── */
 export function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
-  const [showGroup, setShowGroup] = useState(false);
   // 결과(순위·결선·조별)와 경기 영상을 세그먼트 탭으로 분리
   const [activeTab, setActiveTab] = useState<'results' | 'videos'>('results');
   const videosTotal = tournament.fixtures.reduce(
@@ -637,29 +820,6 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
     const order: Record<string, number> = { final: 0, '결승': 0, semi: 1, '4강': 1, third_place: 2, '3·4위전': 2 };
     return (order[a.round] ?? 9) - (order[b.round] ?? 9);
   });
-
-  const groupFixtures = tournament.fixtures.filter(
-    (f) => f.status === 'completed' && f.result !== null && ['group', '조별리그'].includes(f.round),
-  );
-
-  const groupSections = [...tournament.groups]
-    .filter((g) => g.phase === 'group')
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((g) => ({
-      name: g.name,
-      fixtures: groupFixtures
-        .filter((f) => f.groupId === g.id)
-        .sort((a, b) => a.fixtureNumber - b.fixtureNumber),
-    }))
-    .filter((section) => section.fixtures.length > 0);
-
-  const sectionedFixtureIds = new Set(groupSections.flatMap((s) => s.fixtures.map((f) => f.id)));
-  const unsectionedFixtures = groupFixtures
-    .filter((f) => !sectionedFixtureIds.has(f.id))
-    .sort((a, b) => a.fixtureNumber - b.fixtureNumber);
-  if (unsectionedFixtures.length > 0) {
-    groupSections.push({ name: '기타', fixtures: unsectionedFixtures });
-  }
 
   return (
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
@@ -700,11 +860,24 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
         </div>
       )}
 
+      {/* 진행 중에는 조별리그 블록을 포함해 결과 영역 전체를 감춘다 — 아직 확정되지
+          않은 성적을 "최종결과" 화면에 얹으면 최종 순위로 오해되기 때문. 대신 진행
+          중인 조별 일정·스코어의 정본인 경기 일정 화면으로 보낸다. */}
       {isInProgress && (
         <div style={{ padding: '12px 20px 0' }}>
           <div style={{ padding: '20px', textAlign: 'center', background: 'var(--blue50)', borderRadius: 10 }}>
             <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--blue700)' }}>대회가 진행 중이에요</p>
             <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--blue700)' }}>종료 후 최종 결과를 확인할 수 있어요.</p>
+            <Link
+              href={`/tournaments/${tournament.id}/schedule`}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                minHeight: 44, marginTop: 4, padding: '0 12px',
+                fontSize: 13, fontWeight: 700, color: 'var(--blue700)', textDecoration: 'none',
+              }}
+            >
+              조별리그 경기 일정 보기 <ChevronRight size={14} aria-hidden="true" />
+            </Link>
           </div>
         </div>
       )}
@@ -733,46 +906,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
                 <KnockoutResultsTable fixtures={knockoutFixtures} />
               </>
             )}
-            {groupFixtures.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <button type="button" className="tm-res-expand-btn"
-                  onClick={() => setShowGroup((v) => !v)} aria-expanded={showGroup}>
-                  <span>조별리그 결과 {groupFixtures.length}경기</span>
-                  <span className="tm-res-expand-chevron" style={{ transform: showGroup ? 'rotate(180deg)' : undefined }}>▾</span>
-                </button>
-                {showGroup && (
-                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {groupSections.map((section) => (
-                      <div key={section.name}>
-                        <div className="tm-res-group-label">{section.name}</div>
-                        <div className="tm-res-matches-block">
-                          {section.fixtures.map((f) => {
-                            const winner = getWinnerSide(f.result!);
-                            return (
-                              <div key={f.id} className="tm-res-match-row">
-                                {f.scheduledAt && (
-                                  <div className="tm-res-match-meta">
-                                    {/* [R-T2] marginLeft:auto로 밀린 flex 아이템, 고정폭 없음 — 12로 상향. */}
-                                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-caption)' }}>
-                                      {new Date(f.scheduledAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="tm-res-match-teams">
-                                  <span className="tm-res-match-team" style={{ fontWeight: winner === 'home' ? 700 : 400, color: winner === 'home' ? 'var(--text-strong)' : 'var(--text-muted)' }}>{f.homeTeamName}</span>
-                                  <span className="tm-res-match-score tab-num">{f.result?.homeScore}<span style={{ opacity: 0.35, margin: '0 2px' }}>:</span>{f.result?.awayScore}</span>
-                                  <span className="tm-res-match-team tm-res-match-team-right" style={{ fontWeight: winner === 'away' ? 700 : 400, color: winner === 'away' ? 'var(--text-strong)' : 'var(--text-muted)' }}>{f.awayTeamName}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <GroupStageFixtures tournament={tournament} />
           </div>
         </div>
       )}

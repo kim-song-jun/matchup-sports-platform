@@ -72,11 +72,11 @@ describe('resultStateLabel / formatScoreline', () => {
   });
 
   it('scoreStatus가 unavailable이면 score가 있어도 숫자를 절대 보여주지 않는다', () => {
-    expect(formatScoreline({ home: 3, away: 1 }, 'unavailable')).toBe('- : -');
+    expect(formatScoreline({ home: 3, away: 1, penalties: null }, 'unavailable')).toBe('- : -');
   });
 
   it('official 스코어는 그대로 숫자로 렌더한다', () => {
-    expect(formatScoreline({ home: 2, away: 0 }, 'official')).toBe('2 : 0');
+    expect(formatScoreline({ home: 2, away: 0, penalties: null }, 'official')).toBe('2 : 0');
   });
 });
 
@@ -115,7 +115,7 @@ function makeMatch(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDetai
     status: 'ended',
     resultState: 'official',
     scoreStatus: 'official',
-    score: { home: 2, away: 1 },
+    score: { home: 2, away: 1, penalties: null },
     clock: null,
     lineup: {
       home: [{ participantId: 'p-1', displayName: null, jerseyNumber: 7, position: 'FW' }],
@@ -404,7 +404,7 @@ describe('ScheduleContent — 진행 중 경기의 라이브 스코어/경과 �
     status: 'live',
     resultState: 'pending' as const,
     scoreStatus: 'live' as const,
-    score: { home: 2, away: 0 },
+    score: { home: 2, away: 0, penalties: null },
     clock: { periodNumber: 2, elapsedMs: 23 * 60_000, isPaused: false },
     scorers: [],
     hasVideo: false,
@@ -560,7 +560,7 @@ describe('MatchDetailContent — 진행 중 경기의 라이브 스코어/경과
           status: 'live',
           resultState: 'pending',
           scoreStatus: 'live',
-          score: { home: 1, away: 0 },
+          score: { home: 1, away: 0, penalties: null },
           clock: { periodNumber: 1, elapsedMs: 12 * 60_000 + 30_000, isPaused: false },
         })}
       />,

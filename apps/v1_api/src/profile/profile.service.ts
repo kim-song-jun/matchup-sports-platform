@@ -396,14 +396,18 @@ export class ProfileService {
    */
   private async computeRevealedUserReputation(userId: string): Promise<{ reviewCount: number; mannerScore: number | null }> {
     const candidates = await this.prisma.v1PostEventReview.findMany({
-      where: { targetUserId: userId, targetType: 'user', status: 'submitted' },
+      // sourceType='match' — 개인 매치 후기만. 대회 개인 후기(tournament_fixture · targetType=user)는
+      // V1UserReputationSummary의 tournament_* 컬럼에 따로 집계되며(ReviewsService 쪽 주석 참고),
+      // 한 대회에서 상대팀 로스터 전원에게 수십 건이 들어올 수 있어 같은 평점에 합산하지 않는다.
+      // 이 프로필 헤드라인 평점은 계속 개인 매치 기준이다.
+      where: { targetUserId: userId, targetType: 'user', status: 'submitted', sourceType: 'match' },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
     if (candidates.length === 0) return { reviewCount: 0, mannerScore: null };
 
     const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
     const reverseReviews = await this.prisma.v1PostEventReview.findMany({
-      where: { reviewerUserId: userId, sourceId: { in: sourceIds }, status: 'submitted' },
+      where: { reviewerUserId: userId, sourceType: 'match', sourceId: { in: sourceIds }, status: 'submitted' },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true },
     });
 
@@ -428,6 +432,10 @@ export class ProfileService {
         targetUserId: userId,
         targetType: 'user',
         status: 'submitted',
+        // computeRevealedUserReputation()과 같은 모집단(개인 매치 후기)이어야 한다 —
+        // totals.reviewCount는 match 기준인데 monthly.reviewCount만 대회 후기를 더하면
+        // "이번 달 3건인데 누적은 1건" 같은 어긋난 숫자가 한 화면에 함께 나온다.
+        sourceType: 'match',
         submittedAt: { gte: monthStart, lt: nextMonthStart },
       },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true, submittedAt: true },
@@ -436,7 +444,7 @@ export class ProfileService {
 
     const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
     const reverseReviews = await this.prisma.v1PostEventReview.findMany({
-      where: { reviewerUserId: userId, sourceId: { in: sourceIds }, status: 'submitted' },
+      where: { reviewerUserId: userId, sourceType: 'match', sourceId: { in: sourceIds }, status: 'submitted' },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true },
     });
 

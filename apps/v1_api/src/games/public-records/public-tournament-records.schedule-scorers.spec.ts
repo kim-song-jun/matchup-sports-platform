@@ -309,6 +309,10 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
  * 평평한 `{home,away}`, 레거시 백필(`game-result-backfill.ts` ScoreSnapshot)은
  * `{regulation:{home,away},...}`. 리더가 평평한 형태만 알아서 백필된 완료 경기
  * 21건이 전부 `scoreStatus:'unavailable'` 로 보였다(알파 실측 회귀).
+ *
+ * **승부차기 필드 이름도 형태마다 다르다** -- 평평한 형태는 `penalties`(복수),
+ * 백필 형태는 `penalty`(단수). 정규 스코어와 똑같은 함정이라(한쪽만 읽으면 그
+ * 형태로 저장된 경기에서만 승부차기가 조용히 사라진다) 양쪽을 함께 못박는다.
  */
 describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두 형태', () => {
   function fixtureWithRevisionScore(score: unknown) {
@@ -339,8 +343,20 @@ describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두
   it('평평한 형태 {home,away} 를 읽는다 (실시간 확정 경로)', async () => {
     const prisma = buildFakePrisma({ fixtures: [fixtureWithRevisionScore({ home: 2, away: 0 })], ...emptyConsent });
     const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
-    expect(result.items[0].score).toEqual({ home: 2, away: 0 });
+    // 승부차기가 없었던 경기도 `penalties` 키 자체는 남는다(null) -- 소비처가
+    // "키가 없다"와 "값이 null 이다" 두 경우를 갈라 다룰 필요가 없게 한다.
+    expect(result.items[0].score).toEqual({ home: 2, away: 0, penalties: null });
     expect(result.items[0].scoreStatus).toBe('official');
+  });
+
+  it('평평한 형태의 penalties(복수) 를 그대로 실어 보낸다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [fixtureWithRevisionScore({ home: 1, away: 1, penalties: { home: 4, away: 3 } })],
+      ...emptyConsent,
+    });
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+    // 정규시간 스코어는 승부차기로 덮이지 않는다 -- 축구에서 둘은 별개의 값이다.
+    expect(result.items[0].score).toEqual({ home: 1, away: 1, penalties: { home: 4, away: 3 } });
   });
 
   it('중첩 형태 {regulation:{home,away}} 를 읽는다 (레거시 백필 경로)', async () => {
@@ -357,8 +373,26 @@ describe('PublicTournamentRecordsService.getSchedule -- 리비전 score JSON 두
       ...emptyConsent,
     });
     const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
-    expect(result.items[0].score).toEqual({ home: 3, away: 0 });
+    expect(result.items[0].score).toEqual({ home: 3, away: 0, penalties: null });
     expect(result.items[0].scoreStatus).toBe('official');
+  });
+
+  it('백필 중첩 형태의 penalty(단수) 도 평평한 형태와 똑같은 모양으로 실린다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [
+        fixtureWithRevisionScore({
+          regulation: { home: 2, away: 2 },
+          penalty: { home: 5, away: 4 },
+          goals: [],
+          incomplete: false,
+          provenance: 'TOURNAMENT_FIXTURE_RESULT',
+        }),
+      ],
+      ...emptyConsent,
+    });
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+    // 저장 형태가 달라도 소비처(공개 일정 화면)가 보는 모양은 하나여야 한다.
+    expect(result.items[0].score).toEqual({ home: 2, away: 2, penalties: { home: 5, away: 4 } });
   });
 
   it('regulation 이 null 이면(스코어 미기록) 점수를 지어내지 않는다', async () => {

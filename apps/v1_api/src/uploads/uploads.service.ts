@@ -259,6 +259,17 @@ export class UploadsService {
     await this.safeUnlink(resolvedPath);
   }
 
+  /**
+   * Best-effort cleanup of multer temp files for a request that will never reach
+   * `storeFiles()`. Multer writes the upload to disk BEFORE the handler runs, so a request
+   * rejected by an authorization check inside a service (rather than by a guard) still leaves
+   * temp files behind unless the rejecting caller discards them -- see
+   * `TournamentFixtureVideosService.uploadAndCreateVideo()`.
+   */
+  async discardTemps(files: UploadedFile[]): Promise<void> {
+    await this.unlinkTemps(files);
+  }
+
   /** Best-effort cleanup of all multer temp files (e.g. on a validation failure). */
   private async unlinkTemps(files: UploadedFile[]): Promise<void> {
     await Promise.all(files.map((f) => this.safeUnlink(f.path)));

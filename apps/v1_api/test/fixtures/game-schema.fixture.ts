@@ -139,8 +139,16 @@ export const gameSchemaFixture = {
 // (20260812231238_v1_post_event_review_reviewer_user_unique); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for 대회 개인 후기: V1UserReputationSummary gains four tournament_* columns so
+// tournament-sourced personal reviews aggregate separately from casual-match ones (mirroring the
+// V1TeamTrustScore.tournament_* split), and V1PostEventReview gains a tournament-scoped unique key.
+// Same shape as the two review re-pins above — no v1_game_* model, enum, or relation changes; the
+// guard fired only because it hashes the whole schema.prisma file. One new migration file backs it
+// (20260813061500_v1_tournament_personal_review_scope); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: 'e0ff0a056fc475cf4c687cb40c9466d1c8e96ec60fa146e76ca35a7c2b664535',
+  schema: '8082327f33930061ad963f51541707b7d7bea4b70e72d94303b60592e153cd32',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -348,7 +348,12 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
   });
 
-  it('마지막 피리어드가 진행 중이면 다음 피리어드 버튼이 보이지 않는다', () => {
+  // 종료 흐름 개편(사용자 결정 2) — 예전엔 마지막 피리어드가 LIVE인 동안
+  // "경기 종료" 버튼 하나뿐이었고, 그 한 번의 클릭이 피리어드 닫기·게임
+  // ENDED·스코어 산출·결과 리비전 제출을 한 트랜잭션에서 다 했다. 이제
+  // 마지막 피리어드도 "후반 종료"로 먼저 닫고, "경기 종료"는 그다음
+  // 단계에서만 보인다.
+  it('마지막 피리어드가 진행 중이면 "후반 종료"를 보여주고, "경기 종료"는 아직 보여주지 않는다', () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
       { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
@@ -356,9 +361,33 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
-    expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
-    expect(screen.queryByText('전반 종료')).toBeNull();
-    expect(screen.queryByText('후반 종료')).toBeNull();
+    expect(screen.getByRole('button', { name: '후반 종료' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
+  });
+
+  // 마지막 피리어드 종료는 되돌릴 수 없다(서버 revert-period는 되감을 "다음
+  // 피리어드"를 전제한다). 확인 문구가 그 사실을 말해야 하고, 성공 후에도
+  // 실패가 예정된 "되돌리기" 토스트를 붙이면 안 된다.
+  it('"후반 종료"는 되돌릴 수 없다고 알린 뒤 end-period를 보내고, 되돌리기 토스트를 붙이지 않는다', async () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
+    ]);
+    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '후반 종료' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('되돌릴 수 없어요');
+    fireEvent.click(within(dialog).getByRole('button', { name: '후반 종료' }));
+
+    await waitFor(() =>
+      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything()),
+    );
+    // 전반 종료에는 붙는 되돌리기 토스트가 여기서는 붙지 않는다.
+    await waitFor(() => expect(screen.queryByRole('button', { name: '되돌리기' })).toBeNull());
   });
 
   // 이슈 #375 — "전반 종료" 버튼 라벨은 그대로지만 실제로 서버에 보내는
@@ -382,6 +411,27 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     await waitFor(() =>
       expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything()),
     );
+  });
+
+  // 종료 흐름 개편 요구사항 1 — 전반 종료는 확인 게이트 없이 실행되면 안
+  // 된다(예전 전제였던 "되돌릴 수 있으니 즉시 실행"은 사실이 아니다:
+  // 후반에 기록이 하나라도 생기면 서버가 되돌리기를 거부한다).
+  it('"전반 종료" 확인 모달에서 취소하면 아무 명령도 나가지 않는다', async () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
   });
 
   // 이슈 #375 — 하프타임(피리어드1 ENDED + 피리어드2 HALFTIME)에서는 '후반
@@ -601,7 +651,11 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
     mocks.useV1Game.mockReturnValue({
       data: {
         id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1,
-        periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null, pausedTotalMs: 0, pausedAt: null }],
+        // 종료 흐름 개편(사용자 결정 2) — "경기 종료"는 이제 정규 시간이
+        // 끝난 뒤(모든 피리어드 ENDED + 게임은 아직 LIVE)에만 보인다.
+        // 예전 이 테스트는 피리어드 1이 LIVE인 상태를 썼는데, 그 상태에서
+        // 나오는 버튼은 이제 "전반 종료"다.
+        periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z', pausedTotalMs: 0, pausedAt: null }],
         sides: [HOME_AWAY_SIDES[0]],
         lineups: [],
       },
@@ -898,9 +952,13 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     { id: 'side-home', gameId: 'game-1', sideKey: 'HOME' as const, teamId: null, displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '' },
     { id: 'side-away', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: null, displayNameSnapshot: '성수 풋살 클럽', createdAt: '', updatedAt: '' },
   ];
+  // 종료 흐름 개편(사용자 결정 2·3) — 승부차기 입력은 이제 "후반 종료"
+  // 이후, 즉 마지막 피리어드까지 ENDED가 된 뒤에만 열린다(경기 자체는
+  // 아직 LIVE = 결과 미확정). 예전엔 마지막 피리어드가 LIVE인 동안 열려
+  // 있었다 — 아직 뛰는 중인 경기에 승부차기 입력이 열려 있는 셈이었다.
   const FINAL_PERIOD = {
-    id: 'period-2', gameId: 'game-1', number: 2, state: 'LIVE',
-    startedAt: '2026-08-07T00:00:00.000Z', endedAt: null, pausedTotalMs: 0, pausedAt: null,
+    id: 'period-2', gameId: 'game-1', number: 2, state: 'ENDED',
+    startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:45:00.000Z', pausedTotalMs: 0, pausedAt: null,
   };
 
   function tiedGoal(sequence: number, sideId: string, id: string): GameEventRecord {
@@ -912,11 +970,17 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     } as GameEventRecord;
   }
 
+  const FIRST_PERIOD = {
+    id: 'period-1', gameId: 'game-1', number: 1, state: 'ENDED',
+    startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z', pausedTotalMs: 0, pausedAt: null,
+  };
+
   function setup(
     overrides: {
       isKnockoutFixture?: boolean;
       sourceType?: 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
       liveEvents?: GameEventRecord[];
+      periods?: ReadonlyArray<Record<string, unknown>>;
     } = {},
   ) {
     mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
@@ -930,10 +994,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
         sourceType: overrides.sourceType ?? 'TOURNAMENT_FIXTURE',
         isKnockoutFixture: overrides.isKnockoutFixture ?? true,
         state: 'LIVE', version: 2, lastSequence: 1,
-        periods: [
-          { id: 'period-1', gameId: 'game-1', number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z', pausedTotalMs: 0, pausedAt: null },
-          FINAL_PERIOD,
-        ],
+        periods: overrides.periods ?? [FIRST_PERIOD, FINAL_PERIOD],
         sides: PENALTY_SIDES,
         lineups: [],
       },
@@ -951,6 +1012,26 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
 
     expect(screen.getByRole('button', { name: /승부차기 시작/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+    expect(screen.getByText(/정규 시간이 무승부로 끝났어요/)).toBeInTheDocument();
+  });
+
+  // 요구사항 4 — 아직 정규 시간이 끝나지 않은 예외 종료 경로(하프타임 중
+  // 중단 등)에서 결선 무승부인 채 "경기 종료"를 누르면, 예전에는 그대로
+  // 나가 리비전이 저장되고 브래킷 프로젝션만 조용히 POISONED가 됐다.
+  // 이제 버튼 자체가 막히고 사유를 알려준다(백엔드도 409
+  // TOURNAMENT_PENALTY_REQUIRED로 이중 방어).
+  it('결선 무승부인데 승부차기 결과가 없으면 "경기 종료"를 막고 사유를 알려준다', () => {
+    // 하프타임(후반이 아직 시작조차 안 됨) — game.state는 LIVE라 "경기 종료"
+    // 탈출구가 남아 있는 상태다.
+    setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    const endButton = screen.getByRole('button', { name: '경기 종료' });
+    expect(endButton).toBeDisabled();
+    expect(screen.getByText(/승부차기 결과를 입력해주세요/)).toBeInTheDocument();
+    // 아직 정규 시간이 끝나지 않았으므로 승부차기 입력도 아직 열리지 않는다.
+    expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
   });
 
   it('knockout이 아니면(조별리그) 동점이어도 "승부차기 시작"이 보이지 않고 평소처럼 "경기 종료"가 보인다', () => {

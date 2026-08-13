@@ -37,7 +37,9 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * 필요한 지점(팀·대회·채팅·매치·리뷰)은 그대로 막아 두고, 자기 계정을 건사하는 일만 돌려준다.
  * - /onboarding   : 온보딩 진행·완료·보류.
  * - /notifications, /notification-preferences : 읽음 처리와 푸시 구독. 수신자는 본인뿐이다.
- * - /uploads      : 프로필 사진. 자체 rate limit(이미지 20/분·영상 3/분)이 이미 걸려 있다.
+ * - /uploads      : 프로필 사진. 자체 rate limit(20/분)이 이미 걸려 있다. 영상 업로드는 이
+ *                   접두사에 없다 — 대회 스태프 전용 경로(/tournament-ops/*)로 옮겨졌고,
+ *                   그 경로는 여기서 열리지 않는다(운영자 면제는 아래 신분 기준으로 처리).
  * - /inquiries    : 고객 문의. 막으면 "인증이 안 된다"는 문의 자체를 보낼 수 없는 교착이 된다.
  *                   유일하게 운영자에게 도달하므로 컨트롤러에 별도 rate limit 을 둔다.
  * - /search       : 최근 검색어 기록.

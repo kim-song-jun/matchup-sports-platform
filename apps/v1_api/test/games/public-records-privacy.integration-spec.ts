@@ -501,7 +501,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined);
     expect(match.resultState).toBe('official');
     expect(match.pendingProjection).toBe(false);
-    expect(match.score).toEqual({ home: 3, away: 0 });
+    expect(match.score).toEqual({ home: 3, away: 0, penalties: null });
 
     const goalEvents = match.events.filter((event) => event.type === 'GOAL');
     expect(goalEvents).toHaveLength(3);
@@ -592,7 +592,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
 
     const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined);
     expect(match.resultState).toBe('corrected');
-    expect(match.score).toEqual({ home: 4, away: 0 });
+    expect(match.score).toEqual({ home: 4, away: 0, penalties: null });
     expect(match.history.some((entry) => entry.isCorrection)).toBe(true);
 
     const teamRecord = await teamRecords.getRecords(ids.hostTeam, {});

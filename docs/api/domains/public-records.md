@@ -185,6 +185,29 @@ an 8s interval. Past what that supports, the next step is a shared cache
 (CDN/edge or server-side) or a real public broadcast channel -- not a
 shorter interval.
 
+### 승부차기(penalties) 표면화 -- 공개 일정/경기 상세 (2026-08)
+
+`score` 는 `{ home, away, penalties: { home, away } | null }` 이다. `penalties` 는
+결선(knockout)이 정규시간 동점으로 끝나 승부차기까지 간 경기에만 채워지고, 그 외에는
+**키를 유지한 채 `null`** 이다(키 자체가 사라지는 경우는 없어, 소비처가 "키 없음"과
+"값 null" 두 경우를 갈라 다룰 필요가 없다). 라이브 집계 스코어(`tallyLiveScore`)에는
+승부차기 킥이 `V1GameEvent` 로 기록되지 않으므로 `scoreStatus: 'live'` 인 응답의
+`penalties` 는 항상 `null` 이다.
+
+`v1_game_result_revisions.score` 는 느슨한 JSON 이고 **승부차기 필드 이름이 저장
+형태마다 다르다** -- 라이브 종료 경로가 쓰는 평평한 형태는 `penalties`(복수),
+레거시 데이터의 중첩 형태는
+`penalty`(단수). `parseScore` 는 정규 스코어와 마찬가지로 **양쪽을 모두 읽어**
+위의 한 가지 모양으로 정규화한다(`tournaments/tournament-fixture-official-result.ts`
+의 `parseTournamentFixtureOfficialScore` 와 같은 기준). 한쪽만 읽으면 그 형태로
+저장된 경기에서만 승부차기가 조용히 사라진다 -- 이 저장소에서 반복된 함정이라
+두 형태 모두 스펙으로 못박혀 있다.
+
+프런트는 정규시간 스코어를 절대 승부차기 숫자로 덮지 않는다. 스코어라인
+(`1 : 1`) 아래에 보조 텍스트("승부차기 4-3")로만 붙이고
+(`components/public-game-records/penalty-scoreline.tsx`), 승부차기가 없는 경기에는
+아무것도 렌더하지 않는다.
+
 ### Scorer timeline/summary addition -- spectator-facing goal identity (2026-08)
 
 Two additions so a spectator (not just the participating teams) can see who

@@ -201,6 +201,18 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const gameState = ops.gameSnapshot?.state ?? gameDetail.data?.state ?? null;
   const gameVersion = ops.gameSnapshot?.version ?? gameDetail.data?.version ?? 0;
+  // 확인 모달이 떠 있는 동안 버전이 낡는 문제(409 VERSION_CONFLICT) —
+  // 커맨드는 이제 예외 없이 확인을 거치고(사용자 결정), 승부차기 입력은 킥을
+  // 다 찍을 때까지 수 분이 걸릴 수도 있다. 그사이 다른 이벤트가 커밋되면
+  // (`use-v1-game-operations-console`의 WS ack가 gameSnapshot.version을
+  // 올린다) 모달을 연 렌더의 클로저가 들고 있던 `gameVersion`은 이미 낡은
+  // 값이고, 그대로 보내면 서버가 CAS에서 409를 던진다(postV1GameCommand는
+  // 재시도하지 않는다). ref로 "보내는 순간의" 최신 버전을 읽는다 —
+  // 아래 handleRunCommandRef가 토스트 콜백에 쓰는 것과 같은 패턴이다.
+  const gameVersionRef = useRef(gameVersion);
+  useEffect(() => {
+    gameVersionRef.current = gameVersion;
+  }, [gameVersion]);
 
   // T1-0: a period only counts as "current" once the server has marked it
   // LIVE (via executeCommand's start/start-period). Falling back to "the
@@ -225,6 +237,21 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return periods.some((period) => period.number === currentPeriod.number + 1);
   }, [currentPeriod, gameDetail.data?.periods]);
 
+  // 종료 흐름 개편(사용자 결정 2) — "후반은 끝났지만 결과는 아직 확정 전"인
+  // 중간 단계. 새 상태 컬럼도 새 enum 값도 없다: 마지막 피리어드를
+  // `end-period`로 닫으면(다음 피리어드가 없으므로 HALFTIME 승격이 생략된다)
+  // **게임은 LIVE인데 LIVE도 HALFTIME도 아닌 피리어드만 남는** 조합이 되고,
+  // 그 조합 자체가 곧 "정규 시간 종료"다(백엔드 `endCurrentPeriod` doc 참고).
+  // `gameState !== 'LIVE'`를 먼저 배제해야 한다 — 경기가 ENDED된 뒤에도
+  // 모든 피리어드는 ENDED이므로 그 상태까지 이 값이 참이 되면 종료된 경기에
+  // "경기 종료" 버튼이 다시 살아난다.
+  const regulationEnded = useMemo(() => {
+    if (gameState !== 'LIVE') return false;
+    const periods = gameDetail.data?.periods ?? [];
+    if (periods.length === 0) return false;
+    return periods.every((period) => period.state === 'ENDED');
+  }, [gameState, gameDetail.data?.periods]);
+
   // alpha "452′" 사고 대응 — 현재 피리어드의 설정된 길이(분). `periodDurations`는
   // `GameDetail.periods`와 배열 인덱스로 정렬된다(`GamePeriodDuration` 타입
   // 문서 참고) — 값을 못 읽었거나(레거시 config, 아직 이 필드를 안 주는 목
@@ -246,17 +273,34 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     if (gameState === 'LIVE' && halftimePeriod !== null) {
       return ['start-period', 'revert-period', 'end'];
     }
+    // 종료 흐름 개편(사용자 결정 2) — 정규 시간이 끝난 중간 단계에서는
+    // 남은 동작이 "경기 종료"(또는 결선 무승부면 그 자리를 대신하는
+    // 승부차기 입력)뿐이다. 되돌릴 피리어드 전환이 없으므로
+    // `revert-period`도 넣지 않는다(백엔드가 PERIOD_REVERT_NOT_AVAILABLE로
+    // 거부한다 — 누를 수 없는 버튼을 만들지 않는다).
+    if (gameState === 'LIVE' && regulationEnded) {
+      return ['end'];
+    }
     switch (gameState) {
       case 'SCHEDULED':
         return ['start'];
       case 'LIVE':
-        return hasNextPeriod ? ['pause', 'end-period', 'end'] : ['pause', 'end'];
+        // 마지막 피리어드에서도 이제 `end-period`(=“후반 종료”)를 낸다.
+        // 예전엔 여기서 곧장 `end`만 줬고, 그 한 번의 클릭이 피리어드
+        // 닫기·게임 ENDED·스코어 산출·결과 리비전 제출·outbox 발행을 전부
+        // 했다 — 승부차기를 입력할 자리가 아예 없었다.
+        return hasNextPeriod ? ['pause', 'end-period', 'end'] : ['pause', 'end-period'];
       case 'PAUSED':
+        // 일시 중지 중의 `end`는 정상 종료 흐름이 아니라 "경기를 더 진행할
+        // 수 없어 중단한다"는 예외 경로다(부상·기상 등). 정상 흐름을 3단계로
+        // 쪼갠 뒤에도 이 탈출구는 남긴다 — 다만 결선 무승부라면 아래
+        // `endBlockedReason`이 막고 사유를 알려준다(그대로 종료하면 브래킷
+        // 진출자를 정할 수 없다).
         return ['resume', 'end'];
       default:
         return [];
     }
-  }, [gameState, hasNextPeriod, halftimePeriod]);
+  }, [gameState, hasNextPeriod, halftimePeriod, regulationEnded]);
 
   const foulCounts = useMemo(
     () => deriveFoulCounts(ops.liveEvents, currentPeriod?.number ?? 1),
@@ -336,14 +380,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return score;
   }, [gameDetail.data?.sides, ops.liveEvents]);
 
-  // 과제 2 — 승부차기 시작 버튼 노출 조건. "정규시간(+연장) 종료 시 동점"을
-  // 이 화면의 상태 모델로 정확히 옮기면: `currentPeriod !== null &&
-  // !hasNextPeriod`다 — 마지막으로 설정된 피리어드가 LIVE(또는 PAUSED로 잠시
-  // 멈춘)인 채 다음 피리어드가 없는 상태. 이 시스템은 별도의 "연장전" 피리어드
-  // 타입을 두지 않는다(competition-config 프리셋은 전반/후반 두 피리어드뿐 —
-  // `연장`은 대회가 설정한 마지막 피리어드가 곧 그 뜻이다). `currentPeriod`가
-  // null이면 하프타임/시작 전이라 이 시점 자체가 아니다(`hasNextPeriod`도
-  // currentPeriod가 null이면 항상 false를 주므로 따로 체크할 필요 없다).
+  // 과제 2 — 승부차기 시작 버튼 노출 조건. 종료 흐름 개편(사용자 결정 2·3)
+  // 으로 이 시점이 **후반 종료 이후**로 옮겨졌다: 예전엔 "마지막 피리어드가
+  // 아직 LIVE인 동안"(`currentPeriod !== null && !hasNextPeriod`)에 띄웠는데,
+  // 그러면 아직 뛰고 있는 경기 중에 승부차기 입력이 열려 있는 셈이었다.
+  // 지금은 `regulationEnded`(모든 피리어드 ENDED + 게임은 여전히 LIVE) —
+  // 즉 정규 시간이 실제로 끝난 뒤에만 열린다. 이 시스템은 별도의 "연장전"
+  // 피리어드 타입을 두지 않는다(competition-config 프리셋은 전반/후반 두
+  // 피리어드뿐 — `연장`은 대회가 설정한 마지막 피리어드가 곧 그 뜻이다).
   //
   // knockout 게이트(`isKnockoutFixture`)가 필요한 이유 — `GamesService.
   // applyPenalties`(백엔드, 이미 배포됨: `.changeset/v1-tournament-result-ops.md`
@@ -354,23 +398,29 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 다 하고 "승부차기 종료"에서만 실패하는 깨진 UX가 된다. `isKnockoutFixture`
   // 는 그 판정을 프런트에도 그대로 노출한 것뿐이다(새 판정 로직 아님 —
   // `GET /games/:gameId`의 `GameDetail.isKnockoutFixture` doc 참고).
-  const penaltyShootoutEligible = useMemo(() => {
+  const knockoutTied = useMemo(() => {
     if (gameDetail.data?.sourceType !== 'TOURNAMENT_FIXTURE') return false;
     if (gameDetail.data?.isKnockoutFixture !== true) return false;
-    if (currentPeriod === null || hasNextPeriod) return false;
-    if (gameState !== 'LIVE' && gameState !== 'PAUSED') return false;
     const sidesList = gameDetail.data?.sides ?? [];
     if (sidesList.length !== 2) return false;
     return (scoreBySideId.get(sidesList[0].id) ?? 0) === (scoreBySideId.get(sidesList[1].id) ?? 0);
-  }, [
-    gameDetail.data?.sourceType,
-    gameDetail.data?.isKnockoutFixture,
-    gameDetail.data?.sides,
-    currentPeriod,
-    hasNextPeriod,
-    gameState,
-    scoreBySideId,
-  ]);
+  }, [gameDetail.data?.sourceType, gameDetail.data?.isKnockoutFixture, gameDetail.data?.sides, scoreBySideId]);
+
+  const penaltyShootoutEligible = knockoutTied && regulationEnded;
+
+  // 요구사항 4 — 결선 무승부인데 승부차기가 비어 있으면 경기 종료를 막는다.
+  // 예전엔 그대로 보냈고, 서버도 받아 리비전을 SUBMITTED로 저장한 뒤
+  // 브래킷 프로젝션이 `BRACKET_RESULT_DRAW_UNSUPPORTED`로 6회 재시도하다
+  // outbox 잡이 조용히 POISONED가 됐다(운영자에게는 "종료 성공"으로 보인다).
+  // 백엔드도 같은 조건을 409 `TOURNAMENT_PENALTY_REQUIRED`로 막지만
+  // (`GamesService.applyPenalties`), 여기서 먼저 눌리지 않게 해 왕복 자체를
+  // 없앤다. `penaltyShootoutEligible`인 상태에서는 애초에 "경기 종료" 대신
+  // "승부차기 시작"이 렌더되므로 막을 것이 없다 — 남는 건 하프타임·일시
+  // 중지처럼 아직 정규 시간이 안 끝난 예외 종료 경로다.
+  const endBlockedReason: string | null =
+    knockoutTied && !penaltyShootoutEligible
+      ? '결선 경기는 무승부로 끝낼 수 없어요. 남은 피리어드를 마친 뒤 승부차기 결과를 입력해주세요.'
+      : null;
 
   // 킥별 기록은 서버에 남지 않는다(옵션 B — `@/lib/penalty-shootout.ts` doc
   // 참고). `null` = 패널이 닫혀 있음, 빈 배열 `[]` = 패널이 열려 있고 아직
@@ -580,7 +630,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       const startedAtMs = performance.now();
       try {
         const result = await postV1GameCommand(gameId, command, {
-          expectedVersion: gameVersion,
+          expectedVersion: gameVersionRef.current,
           clientCommandId: randomUuid(),
           takeoverToken: ops.takeover.token,
           occurredAt: new Date(Date.now() + ops.clockOffsetMs).toISOString(),
@@ -605,7 +655,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         // 거부하고, 그 실패는 이 화면의 공용 오류 배너로 그대로 뜬다(토스트
         // 자체는 별도 실패 처리를 하지 않는다). 요구사항 6 — 이 되돌리기
         // 토스트는 확인 모달이 생겼다고 없애지 않는다(사후 복구 수단 유지).
-        if (command === 'end-period') {
+        //
+        // 종료 흐름 개편 — `hasNextPeriod` 조건이 새로 붙었다. 마지막
+        // 피리어드를 닫는 `end-period`(=후반 종료)는 되돌릴 수 없다:
+        // `revertPeriodTransition`은 "다음 피리어드를 SCHEDULED로 되감고
+        // 이전 피리어드를 다시 LIVE로"가 전부라 되감을 다음 피리어드가
+        // 없으면 PERIOD_REVERT_NOT_AVAILABLE 409다. 그런데도 토스트를
+        // 붙이면 누를 때마다 실패 배너만 뜨는 거짓 복구 수단이 된다 —
+        // 대신 확인 문구가 "되돌릴 수 없다"를 미리 알린다(confirm-copy.ts).
+        if (command === 'end-period' && hasNextPeriod) {
           showToast(`${label}했어요`, {
             action: {
               label: '되돌리기',
@@ -621,7 +679,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         setCommandPending(false);
       }
     },
-    [gameId, ops, gameVersion, gameDetail, currentPeriod, halftimePeriod, showToast],
+    [gameId, ops, gameDetail, currentPeriod, halftimePeriod, hasNextPeriod, showToast],
   );
 
   // start/pause/resume/end-period/start-period/end 버튼이 실제로 부르는 진입점 —
@@ -635,11 +693,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       const copy = commandConfirmCopy(command, label, {
         sides: gameDetail.data?.sides ?? [],
         scoreBySideId,
+        // 같은 `end-period` 커맨드라도 "전반 종료"(하프타임으로 넘어감,
+        // 되돌릴 수 있음)와 "후반 종료"(정규 시간이 끝남, 되돌릴 수 없음)는
+        // 사용자에게 전혀 다른 일이다 — 문구가 그 차이를 정확히 말해야 한다.
+        isFinalPeriod: !hasNextPeriod,
       });
       if (!(await confirm(copy))) return;
       await handleRunCommand(command);
     },
-    [confirm, currentPeriod, halftimePeriod, gameDetail.data?.sides, scoreBySideId, handleRunCommand],
+    [confirm, currentPeriod, halftimePeriod, hasNextPeriod, gameDetail.data?.sides, scoreBySideId, handleRunCommand],
   );
 
   // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는
@@ -826,7 +888,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 })}
               {availableCommands.includes('end') ? (
                 <>
-                  <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-[var(--border)]" />
+                  {/* 구분선은 왼쪽에 실제로 버튼이 있을 때만 그린다 — 정규 시간 종료 상태에서는
+                      availableCommands 가 ['end'] 하나뿐이라, 조건 없이 그리면 세로선이 첫 버튼
+                      왼쪽에 홀로 매달린다. */}
+                  {availableCommands.some((command) => command !== 'end') ? (
+                    <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-[var(--border)]" />
+                  ) : null}
                   {/* 과제 2 — 정규시간(+연장) 종료 시 동점인 대회 knockout
                       경기에서는 "경기 종료"를 바로 누르는 대신 승부차기
                       입력으로 먼저 보낸다(`penaltyShootoutEligible` 계산
@@ -850,7 +917,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                       key="end"
                       size="sm"
                       variant="danger"
-                      disabled={!isTakeoverHeld(ops.takeover) || commandPending}
+                      // 요구사항 4 — 결선 무승부인데 승부차기가 없으면 누를
+                      // 수 없다. 숨기지 않고 비활성 + 아래 배너로 사유를
+                      // 설명한다(이 화면의 반복 패턴 ①: 라인업 미제출 시
+                      // "경기 시작"을 다루는 방식과 동일).
+                      disabled={!isTakeoverHeld(ops.takeover) || commandPending || endBlockedReason !== null}
                       loading={commandPending}
                       onClick={() => void confirmAndRunCommand('end')}
                     >
@@ -909,6 +980,16 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 <Timer size={16} aria-hidden="true" />
                 하프타임
               </span>
+            ) : regulationEnded ? (
+              // 종료 흐름 개편 — 하프타임 칩과 같은 이유로 같은 슬롯을 쓴다:
+              // 이 단계에서도 LIVE인 피리어드가 없어 잴 경과 시간이 없는데,
+              // 상태 뱃지는 여전히 "진행 중"(게임 자체는 LIVE)이라 이 칩이
+              // 없으면 "정규 시간은 끝났고 결과는 아직 확정 전"이라는 사실이
+              // 화면 어디에도 드러나지 않는다.
+              <span className="flex items-center gap-1.5 rounded-lg bg-[var(--blue50)] px-2.5 py-1 text-sm font-bold text-[var(--blue700)] dark:bg-blue-500/10">
+                <Timer size={16} aria-hidden="true" />
+                정규 시간 종료
+              </span>
             ) : null}
           </div>
         ) : null}
@@ -949,8 +1030,27 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             하프타임이에요. 준비되면 위 &lsquo;{startPeriodCommandLabel(halftimePeriod.number)}&rsquo;을 눌러주세요.
           </Banner>
         )}
+        {/* 종료 흐름 개편 — 하프타임과 똑같은 함정이 정규 시간 종료
+            단계에도 있다: 여기서도 currentPeriod는 null이라, 아래
+            "경기를 시작해 주세요."가 그대로 떠서 방금 후반을 끝낸
+            운영자에게 경기가 시작조차 안 됐다고 말하게 된다. 갈라내고,
+            다음에 무엇을 해야 하는지(승부차기 입력이 필요한지 여부까지)
+            정확히 알린다. */}
+        {regulationEnded && (
+          <Banner tone="info">
+            {penaltyShootoutEligible
+              ? '정규 시간이 무승부로 끝났어요. 위 ‘승부차기 시작’으로 결과를 입력해주세요.'
+              : '정규 시간이 끝났어요. 기록을 확인한 뒤 위 ‘경기 종료’를 눌러주세요.'}
+          </Banner>
+        )}
+        {/* 요구사항 4 — 결선 무승부인데 승부차기가 없어 "경기 종료"를 막았을
+            때 그 사유. 버튼을 숨기지 않고 비활성 + 사유 배너로 설명한다. */}
+        {endBlockedReason !== null && availableCommands.includes('end') && (
+          <Banner tone="warning">{endBlockedReason}</Banner>
+        )}
         {currentPeriod === null &&
           halftimePeriod === null &&
+          !regulationEnded &&
           gameState !== 'ENDED' &&
           gameState !== 'CANCELLED' &&
           !(gameState === 'SCHEDULED' && sidesMissingLineup.length > 0) && (

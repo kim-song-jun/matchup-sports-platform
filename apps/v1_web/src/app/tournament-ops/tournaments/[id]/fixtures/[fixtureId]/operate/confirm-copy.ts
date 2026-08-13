@@ -3,11 +3,16 @@
  *
  * 배경(사용자 결정): 이 화면은 원래 `end`(경기 종료) 하나에만 확인 게이트를
  * 걸었다 — "나머지 명령은 되돌릴 수 있으니 확인을 생략한다"는 전제였다.
- * 사용자에게 트레이드오프(경기 중 빠르게 눌러야 하는데 모달이 기록을
- * 늦춘다)를 안내했지만, 사용자는 "모달이 떠야하긴해 실수를 막는게 더
- * 중요한거지"라며 예외 없이 전부에 확인을 걸기로 했다 — "빠른 기록 모드"
- * 같은 우회로도 만들지 않기로 했다. 단 `revert-period`(되돌리기)만은 그
- * 자체가 이미 교정 행동이라 제외한다(사용자가 고른 목록에도 없다).
+ * **그 전제는 사실이 아니었다**: 피리어드 종료(`end-period`)를 되돌리는
+ * `revert-period`는 "다음 피리어드를 SCHEDULED로 되감는" 명령이라 (a) 다음
+ * 피리어드에 이벤트가 하나라도 기록되면 거부되고(PERIOD_REVERT_HAS_EVENTS),
+ * (b) 마지막 피리어드 종료(= 후반 종료)는 되감을 다음 피리어드 자체가 없어
+ * 아예 되돌릴 수 없다(PERIOD_REVERT_NOT_AVAILABLE). 사용자에게 트레이드오프
+ * (경기 중 빠르게 눌러야 하는데 모달이 기록을 늦춘다)를 안내했지만, 사용자는
+ * "모달이 떠야하긴해 실수를 막는게 더 중요한거지"라며 예외 없이 전부에 확인을
+ * 걸기로 했다 — "빠른 기록 모드" 같은 우회로도 만들지 않기로 했다. 단
+ * `revert-period`(되돌리기)만은 그 자체가 이미 교정 행동이라 제외한다
+ * (사용자가 고른 목록에도 없다).
  *
  * 문구 원칙: "정말?" 같은 무의미한 문구를 쓰지 않는다 — 무엇이(팀·선수·
  * 시각) 기록되는지 보여야 실수를 실제로 잡는다. 되돌릴 수 없는 액션
@@ -131,7 +136,15 @@ export function commitActionConfirmCopy(
 export function commandConfirmCopy(
   command: Exclude<GameCommandName, 'revert-period'>,
   label: string,
-  ctx: { readonly sides: readonly GameSide[]; readonly scoreBySideId: ReadonlyMap<string, number> },
+  ctx: {
+    readonly sides: readonly GameSide[];
+    readonly scoreBySideId: ReadonlyMap<string, number>;
+    /** `end-period`가 마지막 피리어드를 닫는가(= "후반 종료"). 같은 커맨드지만
+     * 결과가 전혀 다르다 — 전반 종료는 하프타임으로 넘어가고 되돌릴 수 있는
+     * 반면, 마지막 피리어드 종료는 정규 시간을 끝내고 되돌릴 수 없다. 다른
+     * 커맨드에서는 무시된다. */
+    readonly isFinalPeriod?: boolean;
+  },
 ): ConfirmCopy {
   const teamNames = ctx.sides.map((side) => side.displayNameSnapshot).join(' vs ') || '경기';
   const scoreText =
@@ -146,12 +159,24 @@ export function commandConfirmCopy(
     case 'resume':
       return { title: '경기를 재개할까요?', message: '일시 중지된 경기를 다시 진행해요.', confirmLabel: label, tone: 'default' };
     case 'end-period':
-      return {
-        title: `${label}할까요?`,
-        message: `${scoreText ?? '현재 스코어'}로 종료하고 하프타임으로 넘어가요.`,
-        confirmLabel: label,
-        tone: 'default',
-      };
+      // 마지막 피리어드 종료 = 정규 시간 종료. 되돌릴 수 없다는 사실을
+      // 정확히 말해야 한다(서버에 이 전환을 되감는 경로가 없다 —
+      // `revertPeriodTransition`은 되감을 "다음 피리어드"를 전제한다).
+      // 다만 경기 자체가 끝나는 것은 아니라는 것도 함께 알려야 한다 —
+      // 결과 확정(스코어 산출·결과 제출)은 그다음 "경기 종료"에서 일어난다.
+      return ctx.isFinalPeriod === true
+        ? {
+            title: `${label}할까요?`,
+            message: `${scoreText ?? '현재 스코어'}로 정규 시간을 마쳐요. 이 단계는 되돌릴 수 없어요 — 다만 경기 결과는 아직 확정되지 않아요(다음 단계에서 승부차기 입력 또는 경기 종료).`,
+            confirmLabel: label,
+            tone: 'danger',
+          }
+        : {
+            title: `${label}할까요?`,
+            message: `${scoreText ?? '현재 스코어'}로 종료하고 하프타임으로 넘어가요. 다음 피리어드에 기록이 생기기 전까지는 되돌릴 수 있어요.`,
+            confirmLabel: label,
+            tone: 'default',
+          };
     case 'start-period':
       return {
         title: `${label}할까요?`,

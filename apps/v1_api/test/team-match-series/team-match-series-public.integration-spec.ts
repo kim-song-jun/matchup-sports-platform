@@ -246,6 +246,14 @@ describe('GET /team-match-series/:seriesId/player-records', () => {
       ],
     });
     // `guestParticipantId`는 identity link/consent 레코드가 아예 없다 -- 동의 미연동 상태.
+    // Task 24 규칙 재정의(2026-08-13): 공개 동의가 사용자 단위 `V1UserRecordConsent`로
+    // 옮겨갔다 -- 이게 없으면 위 participant 단위 스냅샷이 GRANTED여도 순위에서 빠진다.
+    await prisma.v1UserRecordConsent.createMany({
+      data: [
+        { userId: scorerUserId, state: 'GRANTED', policyHash: 't4-records-policy-hash' },
+        { userId: assisterUserId, state: 'GRANTED', policyHash: 't4-records-policy-hash' },
+      ],
+    });
 
     // v1_guard_result_participant_mutation 트리거가 참가자 행 insert 시점의
     // 리비전 상태를 DRAFT로 강제하므로, 먼저 DRAFT로 만들고 참가자를 넣은 뒤

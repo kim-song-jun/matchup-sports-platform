@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1AuthProvider } from '@prisma/client';
+import { Prisma, V1AuthProvider, V1ConsentState } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
@@ -15,6 +15,7 @@ import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import {
   UpdateMyPreferencesDto,
+  UpdateMyRecordConsentDto,
   UpdateMyRegionsDto,
   UpdateProfileDto,
   UpdateSettingsDto,
@@ -656,6 +657,31 @@ export class ProfileService {
     };
   }
 
+  /**
+   * 사용자 단위 공개 기록 동의 조회. 아직 한 번도 응답한 적 없으면(row 없음)
+   * 미동의 기본값을 반환한다 — participant 단위 스냅샷과 달리 opt-in 이 기본이다.
+   */
+  async myRecordConsent(user: V1AuthUser) {
+    const consent = await this.prisma.v1UserRecordConsent.findUnique({ where: { userId: user.id } });
+    return toRecordConsentResponse(consent);
+  }
+
+  /**
+   * 사용자 단위 공개 기록 동의 저장. granted=false 는 개별 REVOKED 스냅샷 없이도
+   * 즉시 이 사용자의 모든 참가 기록을 비공개로 되돌린다(public-consent.ts 의
+   * isParticipantPubliclyEligible 이 이 state 를 상위 게이트로 검사).
+   */
+  async updateMyRecordConsent(user: V1AuthUser, dto: UpdateMyRecordConsentDto) {
+    this.assertMutableAccount(user);
+    const state = dto.granted ? V1ConsentState.GRANTED : V1ConsentState.REVOKED;
+    const consent = await this.prisma.v1UserRecordConsent.upsert({
+      where: { userId: user.id },
+      update: { state, policyHash: dto.policyHash, effectiveAt: new Date() },
+      create: { userId: user.id, state, policyHash: dto.policyHash },
+    });
+    return toRecordConsentResponse(consent);
+  }
+
   logout() {
     return { ok: true };
   }
@@ -975,6 +1001,15 @@ function toReputationPayload(reputation: {
     mannerScore: reputation?.mannerScore ? Number(reputation.mannerScore) : null,
     activityCount: reputation?.reviewCount ?? 0,
     reviewCount: reputation?.reviewCount ?? 0,
+  };
+}
+
+function toRecordConsentResponse(
+  consent: { state: V1ConsentState; effectiveAt: Date } | null,
+): { granted: boolean; effectiveAt: string | null } {
+  return {
+    granted: consent?.state === V1ConsentState.GRANTED,
+    effectiveAt: consent ? consent.effectiveAt.toISOString() : null,
   };
 }
 

@@ -166,6 +166,15 @@ function buildFakePrisma(options: {
         return options.consentSnapshots;
       },
     },
+    // 사용자 단위 공개 동의(Task 24 규칙 재정의, 2026-08-13). 이 스펙의 롤백 스위치
+    // 테스트는 전부 consentLinks가 빈 배열이라 loadParticipantConsentEligibility가
+    // 이 테이블까지 조회하지는 않지만(링크가 없으면 조회 자체를 skip), 방어적으로
+    // 빈 배열을 반환하도록 둔다.
+    v1UserRecordConsent: {
+      async findMany() {
+        return [];
+      },
+    },
     v1GameEvent: {
       // computeLiveScore(select 에 participantId 없음)와 buildEvents(select 에
       // participantId 있음) 가 같은 모델을 다른 select 로 두 번 조회한다.

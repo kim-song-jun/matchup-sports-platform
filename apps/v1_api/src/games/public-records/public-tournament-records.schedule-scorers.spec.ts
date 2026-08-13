@@ -65,6 +65,13 @@ function buildFakePrisma(options: {
   fixtures: FakeFixture[];
   consentLinks: { participantId: string; linkId: string; userId: string }[];
   consentSnapshots: { linkId: string; state: 'GRANTED' | 'REVOKED'; effectiveAt: Date }[];
+  /**
+   * 사용자 단위 공개 동의(Task 24 규칙 재정의, 2026-08-13). 기본값 없음 --
+   * `loadParticipantConsentEligibility`가 `consentLinks`에 있는 userId만
+   * 조회하므로, 롤백 스위치 테스트처럼 링크가 있는 케이스는 반드시 이 필드도
+   * 채워야 eligible로 남는다.
+   */
+  userConsents?: { userId: string; state: 'GRANTED' | 'REVOKED' }[];
   goalEvents: FakeGoalEvent[];
   /**
    * 참가팀 공개 정책 통일(fix/v1-publish) — 기본값 'closed'(hideIdentity 항상
@@ -119,6 +126,11 @@ function buildFakePrisma(options: {
     v1ParticipantConsentSnapshot: {
       async findMany() {
         return options.consentSnapshots;
+      },
+    },
+    v1UserRecordConsent: {
+      async findMany() {
+        return options.userConsents ?? [];
       },
     },
     v1GameEvent: {
@@ -207,6 +219,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
         fixtures: [makeFixture({})],
         consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
         consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
+        userConsents: [{ userId: 'user-1', state: 'GRANTED' }],
         goalEvents: [
           { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
           { id: 'g2', gameId: 'game-1', type: 'GOAL', sideId: 'side-away', participantId: INELIGIBLE.id, clockMs: 2_700_000, reversesEventId: null },

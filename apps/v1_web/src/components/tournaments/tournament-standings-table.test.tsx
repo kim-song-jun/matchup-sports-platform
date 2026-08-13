@@ -1,18 +1,10 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { TournamentStandingsTable, type TournamentStandingsRow } from './tournament-standings-table';
 import { renderBracketStandingsTab } from '@/app/tournaments/[id]/bracket/bracket-test-utils';
 import { ScheduleContent } from '@/components/public-game-records/schedule-content';
 import type { V1TournamentDetail, V1TournamentGroup } from '@/types/api';
 import type { PublicTournamentScheduleResponse } from '@/components/public-game-records/types';
-
-// ScheduleContent가 라인업 CTA 판정을 위해 useV1MyTeams()를 직접 호출한다
-// (schedule-content.tsx 참고) — 아래 파일 하단의 순위표 컬럼 통일 테스트는
-// ScheduleContent를 QueryClientProvider 없이 직접 render하므로 mock이 필요하다.
-// 이 테스트의 관심사는 컬럼 파리티이지 CTA 노출이 아니므로 항상 꺼둔다.
-vi.mock('@/hooks/use-v1-api', () => ({
-  useV1MyTeams: () => ({ data: undefined }),
-}));
 
 const ROW: TournamentStandingsRow = {
   key: 'reg-1',

@@ -390,6 +390,57 @@ function scoreFromJson(value: Prisma.JsonValue): GameScore {
  * by `lineupId` without re-sorting -- the caller (`listLineups`) already
  * requested rows in the order this function must preserve per bucket.
  */
+/**
+ * 라인업 편집용 등록 명단을 어느 등록(registration)에서 읽을지 정한다 — 그리고 애초에
+ * 읽어도 되는지도 함께 정한다.
+ *
+ * 참가팀 매니저·오너는 **자기 팀 사이드만** 볼 수 있다. 이걸 놓치면 상대팀 선수 실명을
+ * 그대로 넘겨주는 PII 유출이 된다(라인업을 짜려면 이름이 필요해 응답에 실명이 들어간다).
+ * 대회 스태프는 양 팀을 대신 짤 수 있어야 해서 이 제한을 받지 않는다 — saveLineup의
+ * sideId 가드(이 파일)와 정확히 같은 판단 기준이다.
+ *
+ * DB를 건드리지 않는 순수 판정이라 단독으로 테스트한다(games.service.spec.ts).
+ */
+export function resolveLineupRosterRegistration(params: {
+  actorRole: string;
+  actorTeamId: string | null;
+  sideTeamId: string | null;
+  homeRegistration: { id: string; teamId: string } | null;
+  awayRegistration: { id: string; teamId: string } | null;
+}): { registrationId: string } | { denied: 'forbidden' | 'registration_not_found' } {
+  const isTeamActor = params.actorRole === 'team_manager' || params.actorRole === 'team_owner';
+  if (isTeamActor && params.actorTeamId !== params.sideTeamId) {
+    return { denied: 'forbidden' };
+  }
+  const registration =
+    params.homeRegistration?.teamId === params.sideTeamId
+      ? params.homeRegistration
+      : params.awayRegistration?.teamId === params.sideTeamId
+        ? params.awayRegistration
+        : null;
+  // 사이드는 있는데 대회 등록이 없다 — 등록이 취소돼 fixture에서 떨어져 나간 경우다.
+  // 빈 명단으로 돌려주면 "선수가 아직 없네"로 오해되므로 명시적으로 구분한다.
+  return registration === null ? { denied: 'registration_not_found' } : { registrationId: registration.id };
+}
+
+/**
+ * 사이드별 **최신** 라인업 상태만 남긴다. 라인업은 저장할 때마다 revision이 올라가며
+ * 행이 쌓이므로, 정렬을 믿지 않고 revision을 직접 비교해 고른다 — 옛 리비전이 남으면
+ * 일정 화면이 이미 제출한 라인업을 "미작성"으로 표시한다.
+ */
+export function latestLineupStateBySideId(
+  lineups: readonly { sideId: string; state: V1GameLineupState; revision: number }[],
+): Map<string, V1GameLineupState> {
+  const latest = new Map<string, { state: V1GameLineupState; revision: number }>();
+  for (const lineup of lineups) {
+    const current = latest.get(lineup.sideId);
+    if (current === undefined || lineup.revision > current.revision) {
+      latest.set(lineup.sideId, { state: lineup.state, revision: lineup.revision });
+    }
+  }
+  return new Map(Array.from(latest.entries(), ([sideId, value]) => [sideId, value.state]));
+}
+
 export function groupParticipantsByLineupId(
   participants: readonly V1GameParticipant[],
 ): Map<string, V1GameParticipant[]> {
@@ -2063,6 +2114,7 @@ export class GamesService {
               gameId,
               sideId,
               lineupId: lineup.id,
+              userId: participant.userId,
               displayNameSnapshot: participant.displayNameSnapshot,
               jerseyNumber: participant.jerseyNumber,
               position: participant.position,
@@ -2199,8 +2251,8 @@ export class GamesService {
       select: {
         scheduledAt: true,
         game: { select: { id: true } },
-        homeRegistration: { select: { teamId: true, team: { select: { name: true } } } },
-        awayRegistration: { select: { teamId: true, team: { select: { name: true } } } },
+        homeRegistration: { select: { id: true, teamId: true, team: { select: { name: true } } } },
+        awayRegistration: { select: { id: true, teamId: true, team: { select: { name: true } } } },
       },
     });
     if (fixture === null || fixture.game === null) {
@@ -2224,8 +2276,193 @@ export class GamesService {
       scheduledAt: fixture.scheduledAt,
       homeSideId: homeSide?.id ?? null,
       homeTeamName: fixture.homeRegistration?.team.name ?? null,
+      // 라인업 화면이 참가 등록 명단을 불러오려면 어느 등록(registration)의 명단인지
+      // 알아야 한다 — 사이드(팀)당 하나씩 함께 내려준다. 스태프는 양 팀 중 하나를 골라
+      // 대신 짤 수 있으므로 자기 팀 것만 주는 형태로는 부족하다.
+      homeRegistrationId: fixture.homeRegistration?.id ?? null,
       awaySideId: awaySide?.id ?? null,
       awayTeamName: fixture.awayRegistration?.team.name ?? null,
+      awayRegistrationId: fixture.awayRegistration?.id ?? null,
+    };
+  }
+
+  /**
+   * 이 경기에서 어느 한 팀의 **참가 등록 명단**(V1TournamentPlayer)을 라인업 편집용으로
+   * 읽는다. 대회 경기 라인업의 선수는 등록 명단이 유일한 출처이고, 명단에 없는 사람을
+   * 임의로 적어 넣는 경로는 없앴다.
+   *
+   * 인가는 `resolveActor`(read)를 그대로 재사용한다 — 참가팀 매니저·오너는 자기 팀
+   * 사이드만, 대회 스태프는 양 팀 모두. 소비자용 로스터 API
+   * (`TournamentPlayersService.listPlayers`)를 쓰지 않는 이유가 바로 이것이다: 그쪽은
+   * `assertTeamMember` 라 팀에 속하지 않은 스태프가 항상 403이 되는데, 스태프는 팀
+   * 매니저가 없는 자리에서 라인업을 대신 제출해야 한다.
+   *
+   * 응답에는 이름과 userId만 담는다 — 생년월일·성별·연락처 같은 나머지 PII는 라인업을
+   * 짜는 데 필요 없다.
+   */
+  async resolveFixtureLineupRoster(
+    user: V1AuthUser,
+    tournamentId: string,
+    fixtureId: string,
+    sideId: string,
+  ) {
+    const fixture = await this.prisma.v1TournamentFixture.findUnique({
+      where: { tournamentId_id: { tournamentId, id: fixtureId } },
+      select: {
+        game: { select: { id: true } },
+        homeRegistration: { select: { id: true, teamId: true } },
+        awayRegistration: { select: { id: true, teamId: true } },
+      },
+    });
+    if (fixture === null || fixture.game === null) {
+      throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
+    }
+    const gameId = fixture.game.id;
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
+    const side = await this.prisma.v1GameSide.findFirst({ where: { id: sideId, gameId } });
+    if (side === null) {
+      throw this.notFound('GAME_SIDE_NOT_FOUND');
+    }
+    const resolved = resolveLineupRosterRegistration({
+      actorRole: actor.role,
+      actorTeamId:
+        actor.role === 'team_manager' || actor.role === 'team_owner' ? (actor.teamId ?? null) : null,
+      sideTeamId: side.teamId,
+      homeRegistration: fixture.homeRegistration,
+      awayRegistration: fixture.awayRegistration,
+    });
+    if ('denied' in resolved) {
+      if (resolved.denied === 'forbidden') throw this.forbidden();
+      throw this.notFound('TOURNAMENT_REGISTRATION_NOT_FOUND');
+    }
+    const players = await this.prisma.v1TournamentPlayer.findMany({
+      where: { registrationId: resolved.registrationId, removedAt: null },
+      orderBy: { addedAt: 'asc' },
+      select: { id: true, userId: true, realName: true },
+    });
+    return {
+      sideId,
+      registrationId: resolved.registrationId,
+      players: players.map((player) => ({
+        tournamentPlayerId: player.id,
+        userId: player.userId,
+        name: player.realName,
+      })),
+    };
+  }
+
+  /**
+   * 로그인한 사용자가 **매니저·오너로 있는 팀**이 이 대회에서 치르는 경기와 각 경기의
+   * 라인업 상태를 한 번에 준다. 대회 일정 화면이 "내 팀 경기가 어느 것이고 무엇을 아직
+   * 안 했는지"를 표시하는 데 쓴다 — 이게 없으면 화면은 경기마다 lineup-access를 따로
+   * 불러야 해서 경기 수만큼 요청이 늘고, 그마저도 공개 일정 응답과 짝지을 수 없다.
+   *
+   * 인가는 `resolveActor`가 아니라 팀 멤버십으로 직접 판정한다 — resolveActor는 경기
+   * 하나를 전제로 하는데 여기서는 "이 대회에서 내가 이끄는 팀"이 출발점이고, 경기별
+   * 판정 기준(홈/원정 등록팀의 owner·manager)은 아래 조회 조건과 정확히 같다.
+   */
+  async listMyTournamentFixtures(user: V1AuthUser, tournamentId: string) {
+    const memberships = await this.prisma.v1TeamMembership.findMany({
+      where: { userId: user.id, status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { teamId: true },
+    });
+    const myTeamIds = memberships.map((membership) => membership.teamId);
+    if (myTeamIds.length === 0) {
+      return { teams: [] };
+    }
+    const registrations = await this.prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId, teamId: { in: myTeamIds } },
+      select: { id: true, teamId: true, team: { select: { name: true } } },
+    });
+    if (registrations.length === 0) {
+      return { teams: [] };
+    }
+    const registrationIds = registrations.map((registration) => registration.id);
+    const fixtures = await this.prisma.v1TournamentFixture.findMany({
+      where: {
+        tournamentId,
+        OR: [
+          { homeRegistrationId: { in: registrationIds } },
+          { awayRegistrationId: { in: registrationIds } },
+        ],
+      },
+      select: {
+        id: true,
+        round: true,
+        legNumber: true,
+        scheduledAt: true,
+        status: true,
+        homeRegistrationId: true,
+        awayRegistrationId: true,
+        group: { select: { name: true } },
+        game: { select: { id: true } },
+        homeRegistration: { select: { teamId: true, team: { select: { name: true } } } },
+        awayRegistration: { select: { teamId: true, team: { select: { name: true } } } },
+      },
+      orderBy: [{ scheduledAt: 'asc' }, { fixtureNumber: 'asc' }],
+    });
+    const gameIds = fixtures
+      .map((fixture) => fixture.game?.id ?? null)
+      .filter((gameId): gameId is string => gameId !== null);
+    // 내 팀 사이드와 그 사이드의 최신 라인업만 두 번의 조회로 모은다(경기별 반복 조회 금지).
+    const sides =
+      gameIds.length === 0
+        ? []
+        : await this.prisma.v1GameSide.findMany({
+            where: { gameId: { in: gameIds }, teamId: { in: myTeamIds } },
+            select: { id: true, gameId: true, teamId: true },
+          });
+    const lineups =
+      sides.length === 0
+        ? []
+        : await this.prisma.v1GameLineup.findMany({
+            where: { sideId: { in: sides.map((side) => side.id) } },
+            orderBy: { revision: 'desc' },
+            select: { sideId: true, state: true, revision: true },
+          });
+    const latestLineupBySideId = latestLineupStateBySideId(lineups);
+    const sideByGameAndTeam = new Map<string, { id: string }>();
+    for (const side of sides) {
+      sideByGameAndTeam.set(`${side.gameId}:${side.teamId}`, { id: side.id });
+    }
+
+    return {
+      teams: registrations.map((registration) => ({
+        registrationId: registration.id,
+        teamId: registration.teamId,
+        teamName: registration.team.name,
+        fixtures: fixtures
+          .filter(
+            (fixture) =>
+              fixture.homeRegistrationId === registration.id ||
+              fixture.awayRegistrationId === registration.id,
+          )
+          .map((fixture) => {
+            const isHome = fixture.homeRegistrationId === registration.id;
+            const gameId = fixture.game?.id ?? null;
+            const side =
+              gameId === null
+                ? undefined
+                : sideByGameAndTeam.get(`${gameId}:${registration.teamId}`);
+            return {
+              fixtureId: fixture.id,
+              gameId,
+              sideId: side?.id ?? null,
+              round: fixture.round,
+              legNumber: fixture.legNumber,
+              groupName: fixture.group?.name ?? null,
+              scheduledAt: fixture.scheduledAt,
+              status: fixture.status,
+              isHome,
+              opponentTeamName:
+                (isHome
+                  ? fixture.awayRegistration?.team.name
+                  : fixture.homeRegistration?.team.name) ?? null,
+              // 라인업을 아직 한 번도 저장하지 않았으면 null — 화면은 이걸 "미작성"으로 읽는다.
+              lineupState: side === undefined ? null : (latestLineupBySideId.get(side.id) ?? null),
+            };
+          }),
+      })),
     };
   }
 

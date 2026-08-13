@@ -6,8 +6,8 @@
  * 프론트에 카탈로그를 다시 두면 T1-5가 dead code가 되고, 종목을 늘릴 때마다 이 코어를
  * 고쳐야 해 종목 확장성이 깨진다.
  *
- * 좌표는 pitch-formation-editor.tsx와 같은 좌표계(0~100%, y=0 자기 골라인 · y=100
- * 하프라인 · 낮은 y=수비/높은 y=공격)를 그대로 신뢰한다 — 이 모듈은 좌표를 계산하지
+ * 좌표는 pitch-formation-editor.tsx와 같은 좌표계(0~100%, y=0 우리 골라인 · y=50
+ * 하프라인 · y=100 상대 골라인 · 낮은 y=수비/높은 y=공격)를 그대로 신뢰한다 — 이 모듈은 좌표를 계산하지
  * 않고 서버가 준 좌표를 그대로 옮겨 담기만 한다.
  *
  * 이 모듈은 앱의 LineupEntryDraft 타입을 전혀 모른다(의도적) — React 없이도 단독으로
@@ -64,15 +64,6 @@ export function buildFormationPresets(
       y: slot.y,
     })),
   }));
-}
-
-/** 필드 인원수(골키퍼 제외)에 맞는 프리셋만 남긴다. 순서는 formations 배열 순서를 그대로
- * 따른다 — 화면의 칩 정렬 순서가 서버가 준 순서와 일치한다. */
-export function presetsForOutfieldCount(
-  presets: readonly FormationPreset[],
-  outfieldCount: number,
-): FormationPreset[] {
-  return presets.filter((preset) => preset.outfield === outfieldCount);
 }
 
 /** 골키퍼 슬롯은 좌표가 (50,6) 고정이라 서버 프리셋 slots 배열에 담기지 않는다(현행

@@ -3,7 +3,6 @@ import {
   buildFormationPresets,
   describeSquadSize,
   goalkeeperPositionCode,
-  presetsForOutfieldCount,
   slotsWithGoalkeeper,
   type FormationPreset,
   type LineupConfigFormation,
@@ -51,16 +50,6 @@ describe('formation-slots', () => {
       [{ code: 'x', label: 'X', outfield: 1, slots: [{ position: 'UNKNOWN', x: 50, y: 50 }] }],
     );
     expect(presets[0].slots[0]).toEqual({ positionCode: 'UNKNOWN', label: 'UNKNOWN', x: 50, y: 50 });
-  });
-
-  it('presetsForOutfieldCount returns only presets matching the given outfield count, preserving order', () => {
-    const presets: FormationPreset[] = [
-      { code: 'a', label: 'A', outfield: 4, slots: [] },
-      { code: 'b', label: 'B', outfield: 5, slots: [] },
-      { code: 'c', label: 'C', outfield: 4, slots: [] },
-    ];
-    expect(presetsForOutfieldCount(presets, 4).map((p) => p.code)).toEqual(['a', 'c']);
-    expect(presetsForOutfieldCount(presets, 6)).toEqual([]);
   });
 
   it('slotsWithGoalkeeper prepends a fixed (50,6) GK slot without mutating the source preset', () => {

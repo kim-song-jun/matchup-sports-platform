@@ -24,6 +24,7 @@ import {
   placeInSlot,
   removeEntry,
   resolveOwnTeamId,
+  seatStartersInEmptySlots,
   selectFormation,
   setGoalkeeper,
   setJerseyNumber,
@@ -321,6 +322,59 @@ describe('lineup.view-model', () => {
     state = setPlayerPosition(state, state.starters[0].key, 61, 12); // 배치 후 드래그로 좌표만 변경
     const matched = matchSlotsToEntries([fixoSlot], state.starters);
     expect(matched[0].entry?.key).toBe(state.starters[0].key);
+  });
+
+  it('seatStartersInEmptySlots seats a newly registered starter in the first empty outfield slot', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addGuestToStarters(state, '새선수');
+    const slots: FormationSlot[] = [
+      { positionCode: 'GK', label: 'GK', x: 50, y: 6 },
+      { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 },
+      { positionCode: 'PIVO', label: '피보', x: 50, y: 80 },
+    ];
+    const seated = seatStartersInEmptySlots(state.starters, slots, [state.starters[0].key]);
+    expect(seated[0]).toMatchObject({ position: 'FIXO', positionX: 33, positionY: 43, goalkeeper: false });
+  });
+
+  it('seatStartersInEmptySlots never puts a non-goalkeeper in the goalkeeper slot, even when that is the only empty one', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addGuestToStarters(state, '필드선수');
+    const gkOnly: FormationSlot[] = [{ positionCode: 'GK', label: 'GK', x: 50, y: 6 }];
+    expect(seatStartersInEmptySlots(state.starters, gkOnly, [state.starters[0].key])).toBe(state.starters);
+  });
+
+  it('seatStartersInEmptySlots puts a just-designated goalkeeper on the goal line — designating GK alone used to leave them waiting', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addGuestToStarters(state, '골키퍼');
+    state = setGoalkeeper(state, state.starters[0].key);
+    const slots: FormationSlot[] = [
+      { positionCode: 'GK', label: 'GK', x: 50, y: 6 },
+      { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 },
+    ];
+    const seated = seatStartersInEmptySlots(state.starters, slots, [state.starters[0].key]);
+    expect(seated[0]).toMatchObject({ goalkeeper: true, position: null, positionX: 50, positionY: 6 });
+  });
+
+  it('seatStartersInEmptySlots touches only the keys it was given — a starter left waiting on purpose stays waiting', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addGuestToStarters(state, '남겨둔선수');
+    state = addGuestToStarters(state, '새선수');
+    const slots: FormationSlot[] = [
+      { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 },
+      { positionCode: 'PIVO', label: '피보', x: 50, y: 80 },
+    ];
+    const seated = seatStartersInEmptySlots(state.starters, slots, [state.starters[1].key]);
+    expect(seated[0]).toMatchObject({ displayName: '남겨둔선수', positionX: null, positionY: null });
+    expect(seated[1]).toMatchObject({ displayName: '새선수', position: 'FIXO' });
+  });
+
+  it('seatStartersInEmptySlots returns the same array reference when every slot is already taken', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addGuestToStarters(state, '먼저온선수');
+    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
+    state = placeInSlot(state, state.starters[0].key, fixoSlot);
+    state = addGuestToStarters(state, '늦게온선수');
+    expect(seatStartersInEmptySlots(state.starters, [fixoSlot], [state.starters[1].key])).toBe(state.starters);
   });
 
   it('validateLineupForSubmit reports unfilled slots only when a slot preset is active', () => {
@@ -830,12 +884,61 @@ describe('TeamMatchLineupPageClient — pitch tab wiring (D-17: consumes server 
     hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
     fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
-    expect(screen.getByRole('group', { name: '포메이션 프리셋' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '2-2 · 박스' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '1-2-1 · 다이아몬드' })).toBeInTheDocument();
+    const select = screen.getAllByLabelText('포메이션')[0];
+    expect(within(select).getByRole('option', { name: '2-2 · 박스 (필드 4명)' })).toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: '1-2-1 · 다이아몬드 (필드 4명)' })).toBeInTheDocument();
   });
 
-  it('renders zero formation chips (only 자유 배치) when lineupConfig is absent — proves there is no hardcoded fallback catalog', async () => {
+  it('선발로 추가한 선수는 곧바로 피치의 빈 자리에 앉는다 — 자동 배치 배선이 빠지면 이 테스트가 깨진다', async () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'team-host', role: 'manager' }] }, isLoading: false });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: {
+        teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-1', role: 'team_manager', lineupId: 'lineup-1',
+        revision: 1, state: 'DRAFT', version: 1, publicLineupAt: null, formation: '2-2',
+        // 이미 저장돼 있던 선발 한 명 — 좌표가 없으니 대기 상태다. 자동 배치는 등록하는
+        // 순간에만 도는 것이므로, 이 선수는 화면을 열었다는 이유만으로 앉지 않아야 한다.
+        starters: [
+          { id: 'p0', displayName: '기존선수', jerseyNumber: 7, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+        bench: [],
+        lineupConfig: {
+          minPlayers: 3, maxPlayers: 5, substitutions: 'rolling', maxSubstitutions: null,
+          positions: [
+            { code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true },
+            { code: 'FIXO', label: '픽소', short: 'FX' },
+            { code: 'PIVO', label: '피보', short: 'PV' },
+          ],
+          formations: [
+            { code: '2-2', label: '박스', outfield: 4, slots: [
+              { position: 'FIXO', x: 28, y: 38 }, { position: 'FIXO', x: 72, y: 38 },
+              { position: 'PIVO', x: 28, y: 76 }, { position: 'PIVO', x: 72, y: 76 },
+            ] },
+          ],
+        },
+      },
+      isLoading: false, isError: false, refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: [{ membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active' }] },
+      isLoading: false,
+    });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    // 화면을 연 시점: 2-2의 다섯 자리(GK + 필드 4)가 모두 비어 있고, 기존 선발은 대기다.
+    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
+    expect(screen.getAllByRole('button', { name: /자리, 비어 있음/ })).toHaveLength(5);
+
+    // 명단 탭에서 팀원 한 명을 선발로 추가하면, 피치로 돌아왔을 때 그 사람 몫으로 한 자리가
+    // 이미 차 있어야 한다 — 예전에는 대기 목록에 들어간 뒤 빈 자리를 직접 탭해야 했다.
+    // 반대로 '기존선수'는 이번에 등록한 사람이 아니므로 여전히 대기로 남는다(자리는 4개).
+    fireEvent.click(screen.getByRole('tab', { name: '명단' }));
+    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
+    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
+    expect(screen.getAllByRole('button', { name: /자리, 비어 있음/ })).toHaveLength(4);
+  });
+
+  it('offers only 자유 배치 when lineupConfig is absent — proves there is no hardcoded fallback catalog', async () => {
     hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), sport: { name: '풋살' } }, isLoading: false, isError: false });
     hoisted.useV1MyTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'team-1', role: 'owner' }] }, isLoading: false });
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
@@ -845,17 +948,18 @@ describe('TeamMatchLineupPageClient — pitch tab wiring (D-17: consumes server 
         starters: [{ id: 'p1', displayName: '선수1', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null }],
         bench: [],
         // lineupConfig 없음(구버전 응답 흉내) — 이전 초안이라면 FUTSAL_FORMATION_PRESETS로
-        // 폴백해 이 상황에서도 "2-2 · 박스" 칩이 보였을 것이다.
+        // 폴백해 이 상황에서도 "2-2 · 박스" 선택지가 보였을 것이다.
       },
       isLoading: false, isError: false, refetch: hoisted.refetchLineup,
     });
     hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
     fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
-    // "포메이션 프리셋" 그룹 안을 좁혀서 본다 — 페이지 전체를 대상으로 하면 모바일 드로어
-    // 토글 버튼("배치 설정 · 대기 1명")도 " · "를 포함해 오탐을 낼 수 있다.
-    const formationGroup = screen.getByRole('group', { name: '포메이션 프리셋' });
-    expect(within(formationGroup).getAllByRole('button')).toHaveLength(1);
-    expect(within(formationGroup).getByRole('button', { name: '자유 배치' })).toBeInTheDocument();
+    // 드롭다운 안을 좁혀서 본다 — 페이지 전체를 대상으로 하면 모바일 드로어 토글
+    // 버튼("배치 설정 · 대기 1명")도 " · "를 포함해 오탐을 낼 수 있다.
+    const select = screen.getAllByLabelText('포메이션')[0];
+    expect(within(select).getAllByRole('option')).toHaveLength(1);
+    expect(within(select).getByRole('option', { name: '자유 배치' })).toBeInTheDocument();
+    expect(screen.getAllByText('이 종목은 등록된 포지션 대형이 없어요. 자유 배치로 직접 배치해 주세요.')[0]).toBeInTheDocument();
   });
 });

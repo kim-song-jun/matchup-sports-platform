@@ -23,6 +23,59 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
+    statement:
+      'CREATE UNIQUE INDEX IF NOT EXISTS "v1_team_memberships_team_id_jersey_number_key" ON "v1_team_memberships" ("team_id", "jersey_number")',
+    reason:
+      'The indexed column is created by the statement immediately above it in the SAME migration ' +
+      '("v1_team_memberships"."jersey_number" — grep confirms no other migration in the repo mentions a ' +
+      'jersey column on that table), so every pre-existing row holds NULL and Postgres never treats NULLs ' +
+      'as colliding: the index cannot fail to build on any environment, and no live-data duplicate audit is ' +
+      'needed to prove it. During a rolling deploy an old instance cannot trip the constraint either — it ' +
+      'does not know the column exists, so it can only write NULL. Rolling back leaves an unwritten column ' +
+      'and index behind, exactly like the ADD COLUMN itself. This is strictly safer than the natural-key ' +
+      'uniques allowlisted below, which constrain columns that already held data. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
+    statement: `DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'v1_team_lineup_presets_team_id_fkey'
+  ) THEN
+    ALTER TABLE "v1_team_lineup_presets"
+      ADD CONSTRAINT "v1_team_lineup_presets_team_id_fkey"
+      FOREIGN KEY ("team_id") REFERENCES "v1_teams"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'v1_team_lineup_preset_entries_preset_id_fkey'
+  ) THEN
+    ALTER TABLE "v1_team_lineup_preset_entries"
+      ADD CONSTRAINT "v1_team_lineup_preset_entries_preset_id_fkey"
+      FOREIGN KEY ("preset_id") REFERENCES "v1_team_lineup_presets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$`,
+    reason:
+      'Both FKs attach tables the SAME migration creates ("v1_team_lineup_presets", ' +
+      '"v1_team_lineup_preset_entries"), so they are validated against zero rows and reference an existing ' +
+      'v1_teams parent — the plain-statement form of exactly this is already provable-additive to the gate ' +
+      '(ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY); the guard fires on the DO $$ wrapper, not on what ' +
+      'it wraps, same as the wrapper entries below. No deployed revision writes either table, so nothing ' +
+      'mid-rollout or post-rollback can violate them. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
+    statement:
+      'CREATE UNIQUE INDEX IF NOT EXISTS "v1_team_lineup_presets_team_id_name_key" ON "v1_team_lineup_presets" ("team_id", "name")',
+    reason:
+      'Constrains a table the SAME migration creates a few statements earlier ("v1_team_lineup_presets"), ' +
+      'so it is built against zero rows and cannot fail. No deployed revision writes that table, so an old ' +
+      'instance mid-rollout cannot trip the constraint and a rollback leaves an unwritten table behind. ' +
+      'Same shape as the v1_post_event_reviews / v1_tournament_reviews unique-index entries below, which ' +
+      'are also new-table constraints. Reviewed 2026-08-13.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260813120000_v1_roster_identity_link/migration.sql',
     statement: `WITH latest_snapshot AS (
   SELECT DISTINCT ON (participant_id) participant_id, state

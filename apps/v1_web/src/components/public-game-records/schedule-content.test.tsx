@@ -1,7 +1,25 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ScheduleContent } from './schedule-content';
 import type { PublicTournamentScheduleResponse } from './types';
+
+/**
+ * `ScheduleContent`는 라인업 CTA 판정을 위해 `useV1MyTeams()`를 직접 호출한다
+ * (참가팀 매니저에게만 보이는 힌트 — 실제 인가는 라인업 화면이 다시 검증한다).
+ * mock하지 않으면 QueryClientProvider가 없어 모든 테스트가
+ * "No QueryClient set"으로 죽는다. 기본값은 `undefined`(비로그인과 동일한
+ * 모양) — 이 mock을 건드리지 않는 기존 테스트들은 전부 "라인업 CTA 없음"
+ * 시나리오를 그대로 검증하게 된다.
+ */
+const myTeamsMock = vi.fn();
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1MyTeams: () => myTeamsMock(),
+}));
+
+beforeEach(() => {
+  myTeamsMock.mockReset();
+  myTeamsMock.mockReturnValue({ data: undefined });
+});
 
 /**
  * 대회 일정 화면의 조별 순위표에서 팀명을 누르면 그 팀의 공개 전적
@@ -203,5 +221,70 @@ describe('ScheduleContent — 스코어 아래 승부차기 보조 표기', () =
 
     expect(screen.getByText('1 : 0')).toBeInTheDocument();
     expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 트랙 C — 대회 일정 화면에서 우리 팀 경기의 라인업으로 바로 진입.
+ *
+ * 백엔드는 참가팀의 owner·manager 모두에게 라인업 접근을 허용하지만, 이전엔
+ * 진입 CTA가 경기 공개(공개 기록 상세 페이지) 이후에만 렌더돼 URL을 직접
+ * 아는 사람만 사전 준비를 할 수 있었다(match-page-client.tsx LineupManagementCta
+ * 주석 참고). 이 CTA는 `useV1MyTeams()`가 주는 role만으로 판단하는 **힌트**이고,
+ * 실제 인가는 라인업 화면이 `useV1FixtureLineupAccess`로 다시 검증한다.
+ */
+describe('ScheduleContent — 일정 카드 라인업 CTA', () => {
+  it('내가 manager로 속한 팀의 경기에는 라인업 CTA가 보이고 라인업 화면으로 바로 연결된다', () => {
+    myTeamsMock.mockReturnValue({
+      data: { items: [{ teamId: 'team-home', role: 'manager' }] },
+    });
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    const link = screen.getByRole('link', { name: '라인업' });
+    expect(link).toHaveAttribute('href', '/tournaments/tour-1/matches/fixture-1/lineup');
+  });
+
+  it('내가 owner로 속한 원정팀의 경기에도 라인업 CTA가 보인다', () => {
+    myTeamsMock.mockReturnValue({
+      data: { items: [{ teamId: 'team-away', role: 'owner' }] },
+    });
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByRole('link', { name: '라인업' })).toBeInTheDocument();
+  });
+
+  it('내가 member(운영진 아님)로만 속한 팀의 경기에는 라인업 CTA가 보이지 않는다', () => {
+    myTeamsMock.mockReturnValue({
+      data: { items: [{ teamId: 'team-home', role: 'member' }] },
+    });
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByRole('link', { name: '라인업' })).not.toBeInTheDocument();
+  });
+
+  it('무관한 팀 소속이면 라인업 CTA가 보이지 않는다', () => {
+    myTeamsMock.mockReturnValue({
+      data: { items: [{ teamId: 'team-unrelated', role: 'owner' }] },
+    });
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByRole('link', { name: '라인업' })).not.toBeInTheDocument();
+  });
+
+  it('비로그인(내 팀 조회 실패)이면 라인업 CTA가 보이지 않는다', () => {
+    myTeamsMock.mockReturnValue({ data: undefined });
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByRole('link', { name: '라인업' })).not.toBeInTheDocument();
   });
 });

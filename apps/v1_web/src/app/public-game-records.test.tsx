@@ -30,6 +30,14 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+// ScheduleContent가 라인업 CTA 판정을 위해 useV1MyTeams()를 직접 호출한다
+// (schedule-content.tsx 참고) — mock하지 않으면 QueryClientProvider 없이 죽는다.
+// 이 파일의 관심사는 CTA 노출 조건이 아니라 404 게이트/공개 데이터 렌더이므로
+// 기본값(undefined = 비로그인과 동일)으로 CTA를 항상 꺼둔다.
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1MyTeams: () => ({ data: undefined }),
+}));
+
 vi.mock('@/lib/seo', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/seo')>();
   return {

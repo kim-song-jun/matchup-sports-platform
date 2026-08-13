@@ -1177,6 +1177,7 @@ model V1Team {
   postEventReviewsWritten      V1PostEventReview[]        @relation("V1PostEventReviewReviewerTeam")
   postEventTeamReviewsReceived V1PostEventReview[]        @relation("V1PostEventReviewTargetTeam")
   tournamentRegistrations      V1TournamentRegistration[]
+  tournamentReviews            V1TournamentReview[]       @relation("V1TournamentReviewTeam")
   teamMatchSeriesEntries       V1TeamMatchSeriesTeam[]
 
   @@index([ownerUserId])
@@ -2050,6 +2051,12 @@ model V1TournamentReview {
   id           String    @id @default(uuid())
   tournamentId String    @map("tournament_id")
   authorUserId String    @map("author_user_id")
+  // 리뷰가 귀속되는 팀. 팀장·운영진(manager+) 누구나 작성 가능해지면서 "누가 썼는지"와
+  // "어느 팀 리뷰인지"가 분리됐다 — nullable인 이유는 (a) 마이그레이션 백필 시 같은
+  // (tournamentId, teamId) 조합에 중복 리뷰가 있던 레거시 행 중 가장 이른 1건만 채우고
+  // 나머지는 NULL로 보존하기 때문, (b) 팀 삭제는 이 스키마에서 항상 soft delete(deletedAt)라
+  // onDelete: Restrict가 걸리지만, 그래도 스키마 자체는 nullable로 열어 둔다.
+  teamId       String?   @map("team_id")
   teamName     String?   @map("team_name") // 작성자 팀명 (snapshot)
   rating       Int // 1~5
   comment      String?   @db.Text
@@ -2061,8 +2068,18 @@ model V1TournamentReview {
 
   tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   author     V1User       @relation("V1TournamentReviewAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  // Restrict: V1Team은 이 코드베이스에서 물리적으로 delete되지 않는다(항상 deletedAt soft
+  // delete) — 다른 v1_tournament_registrations.team 관계도 동일하게 Restrict를 쓴다. 리뷰가
+  // 팀 삭제로 사라지는 경로 자체를 DB 레벨에서 막는 것이 SetNull보다 강한 보장이다.
+  team       V1Team?      @relation("V1TournamentReviewTeam", fields: [teamId], references: [id], onDelete: Restrict)
 
   @@unique([tournamentId, authorUserId])
+  // 팀당 대회 1건 제약. WHERE 절 partial index가 아니라 평범한 composite unique로 구현한다 —
+  // Postgres 표준 NULL-distinct 시맨틱상 team_id가 NULL인 행끼리는 서로 유일성 위반이 아니므로
+  // (레거시 미연결 리뷰가 여러 건 있어도 안전), 애초에 partial index가 필요 없다. 반대로 partial
+  // index를 쓰면 Prisma schema DSL이 WHERE 절을 표현할 수 없어 `prisma migrate diff` 드리프트
+  // 게이트가 항상 실패한다 — 그래서 여기서는 의도적으로 평범한 unique를 쓴다.
+  @@unique([tournamentId, teamId])
   @@index([tournamentId, createdAt])
   @@map("v1_tournament_reviews")
 }

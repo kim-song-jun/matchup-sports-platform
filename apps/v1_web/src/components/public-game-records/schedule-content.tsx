@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { Film } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
@@ -7,6 +8,7 @@ import {
   TournamentStandingsTable,
   type TournamentStandingsRow,
 } from '@/components/tournaments/tournament-standings-table';
+import { useV1MyTeams } from '@/hooks/use-v1-api';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
@@ -136,21 +138,57 @@ function VideoBadge({ hasVideo }: { hasVideo: boolean }) {
   );
 }
 
-function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: PublicScheduleEntry }) {
+/**
+ * 내가 owner·manager로 속한 팀 id 집합. `useV1MyTeams()`는 `{ items: [...] }`로
+ * 감싼 페이지네이션 응답을 돌려주므로 언랩이 필요하다(team-matches 라인업
+ * view-model의 `resolveOwnTeamId`와 동일한 관례 — `.find is not a function`으로
+ * 화면 전체가 죽는 걸 막는다). 비로그인 방문자는 `/me/teams` 가 401로 실패해
+ * `data`가 `undefined`로 남고, 그 결과 빈 Set이 되어 CTA는 애초에 렌더되지
+ * 않는다. **이 Set은 순전히 UI 힌트**다 — 실제 인가는 라인업 화면이
+ * `useV1FixtureLineupAccess`로 다시 검증하므로 여기서 최종 판정하지 않는다.
+ */
+type MyTeamRow = { teamId: string; role: 'owner' | 'manager' | 'member' };
+
+function toManagedTeamIds(
+  myTeams: MyTeamRow[] | { items: MyTeamRow[] } | undefined,
+): ReadonlySet<string> {
+  const rows = Array.isArray(myTeams) ? myTeams : myTeams?.items;
+  if (!rows) return new Set();
+  return new Set(
+    rows.filter((team) => team.role === 'owner' || team.role === 'manager').map((team) => team.teamId),
+  );
+}
+
+function ScheduleRow({
+  tournamentId,
+  entry,
+  managedTeamIds,
+}: {
+  tournamentId: string;
+  entry: PublicScheduleEntry;
+  managedTeamIds: ReadonlySet<string>;
+}) {
   const dateLabel = formatTournamentDateTimeShort(entry.scheduledAt);
   const venue = venueLabel(entry);
+  // 참가팀(홈 또는 원정) 중 내가 owner·manager로 속한 팀이 있으면 라인업
+  // CTA를 보여준다 — 대회 "내 경기" 목록에서 라인업으로 바로 진입하는 경로가
+  // 없어 URL을 직접 아는 운영진만 사전 준비할 수 있던 문제(match-page-client.tsx
+  // LineupManagementCta 주석 참고)를 일정 화면 쪽에서 메운다.
+  const canManageLineup =
+    (Boolean(entry.home?.teamId) && managedTeamIds.has(entry.home!.teamId as string)) ||
+    (Boolean(entry.away?.teamId) && managedTeamIds.has(entry.away!.teamId as string));
   return (
-    <Link
-      href={`/tournaments/${tournamentId}/matches/${entry.fixtureId}`}
-      className="tm-pressable"
-      style={{
-        display: 'block',
-        padding: '12px 16px',
-        minHeight: 44,
-        borderTop: '1px solid var(--grey100)',
-        textDecoration: 'none',
-      }}
-    >
+    <div style={{ borderTop: '1px solid var(--grey100)' }}>
+      <Link
+        href={`/tournaments/${tournamentId}/matches/${entry.fixtureId}`}
+        className="tm-pressable"
+        style={{
+          display: 'block',
+          padding: '12px 16px',
+          minHeight: 44,
+          textDecoration: 'none',
+        }}
+      >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
           {entry.groupName ?? entry.round}
@@ -201,7 +239,21 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
         // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.
         <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)' }}>{venue}</div>
       ) : null}
-    </Link>
+      </Link>
+      {canManageLineup ? (
+        // 라인업 CTA는 상세로 가는 행 전체 Link 바깥의 형제 요소다 — <a> 안에
+        // <a>를 중첩하면 무효 HTML이라 브라우저가 바깥 링크를 조기 종료시킨다.
+        <div style={{ padding: '0 16px 12px', display: 'flex', justifyContent: 'flex-end' }}>
+          <Link
+            href={`/tournaments/${tournamentId}/matches/${entry.fixtureId}/lineup`}
+            className="tm-btn tm-btn-sm tm-btn-primary"
+            style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+          >
+            라인업
+          </Link>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -293,6 +345,16 @@ export function ScheduleContent({
   onLoadMore?: () => void;
   showStandings?: boolean;
 }) {
+  // Rules of Hooks — 아래 `!data.bracketPublished` 조기 return보다 먼저 호출해야 한다.
+  //
+  // 공개 화면이라 비로그인 방문자에게는 이 요청이 401로 끝난다(retry: 1 이므로 2회).
+  // 그 잡음을 없애려고 localStorage 세션 힌트로 요청을 끄는 방법을 검토했으나 쓰지
+  // 않는다 — 힌트가 유실된(쿠키 세션은 살아 있는) 로그인 운영진에게 라인업 CTA가
+  // 통째로 사라져, 이 CTA를 추가한 목적 자체가 무너진다. RequireAuth 가 production
+  // 에서 힌트를 신뢰하지 않고 항상 확인하는 것과 같은 이유다.
+  const myTeams = useV1MyTeams();
+  const managedTeamIds = useMemo(() => toManagedTeamIds(myTeams.data), [myTeams.data]);
+
   if (!data.bracketPublished) {
     return (
       <div style={{ padding: '40px 20px' }}>
@@ -346,7 +408,7 @@ export function ScheduleContent({
         ) : (
           <Card pad={0}>
             {data.items.map((entry) => (
-              <ScheduleRow key={entry.fixtureId} tournamentId={tournamentId} entry={entry} />
+              <ScheduleRow key={entry.fixtureId} tournamentId={tournamentId} entry={entry} managedTeamIds={managedTeamIds} />
             ))}
           </Card>
         )}
@@ -370,7 +432,7 @@ export function ScheduleContent({
           </h3>
           <Card pad={0}>
             {data.unscheduled.map((entry) => (
-              <ScheduleRow key={entry.fixtureId} tournamentId={tournamentId} entry={entry} />
+              <ScheduleRow key={entry.fixtureId} tournamentId={tournamentId} entry={entry} managedTeamIds={managedTeamIds} />
             ))}
           </Card>
         </section>

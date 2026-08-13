@@ -3323,7 +3323,12 @@ export class GamesService {
       throw this.forbidden();
     }
     const membership = await tx.v1TeamMembership.findFirst({
-      where: { teamId: sideTeamId, userId: actor.actorUserId, status: 'active', role: 'owner' },
+      where: {
+        teamId: sideTeamId,
+        userId: actor.actorUserId,
+        status: 'active',
+        role: { in: ['owner', 'manager'] },
+      },
     });
     if (membership === null) {
       throw this.forbidden();
@@ -3786,7 +3791,7 @@ export class GamesService {
     // an active member of one of the two match teams to self-request/revoke
     // their own identity link or consent, or to act as a distinct attestor.
     // Per-participant authority (self-only revoke/consent, distinct-side
-    // owner attestation) is enforced inside each command body, not here.
+    // owner/manager attestation) is enforced inside each command body, not here.
     if ((action === 'read' || action === 'participant_identity') && memberships.length > 0) {
       return {
         actorType: 'USER',

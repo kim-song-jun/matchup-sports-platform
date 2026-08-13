@@ -266,7 +266,13 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
     expect(screen.getByText('경기 콘솔')).toBeInTheDocument();
     // 대회 전역 내비(셸)는 이 역할에게 열리지 않는다 — 누르면 403 나는 링크를 만들지 않는다.
     expect(screen.queryByTestId('shell')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '내 대회 운영으로 돌아가기' })).toHaveAttribute('href', '/tournament-ops');
+    // 예전 계약은 '/tournament-ops' 였는데 그 라우트엔 page.tsx 가 없어 404 였다 — 셸이
+    // "누르면 막히는 링크를 만들지 않는다"고 선언해 놓고 정작 자기 뒤로가기가 그랬다.
+    // 왔던 담당 경기 목록으로 돌린다.
+    expect(screen.getByRole('link', { name: '담당 경기 목록으로 돌아가기' })).toHaveAttribute(
+      'href',
+      '/my/tournament-staff/t-1',
+    );
   });
 
   it('배정에 없는 경기는 딥링크로도 열리지 않는다', () => {

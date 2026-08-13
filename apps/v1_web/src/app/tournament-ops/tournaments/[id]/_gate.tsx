@@ -198,7 +198,10 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
         if (covered) {
           return (
             <TournamentOpsRoleProvider role="FIELD_OPERATOR">
-              <FieldOperatorConsoleFrame tournamentTitle={tournament.data?.title}>
+              <FieldOperatorConsoleFrame
+                tournamentTitle={tournament.data?.title}
+                tournamentId={tournamentId}
+              >
                 {children}
               </FieldOperatorConsoleFrame>
             </TournamentOpsRoleProvider>

@@ -103,12 +103,18 @@ function baseGame(overrides: Partial<V1Game> = {}): V1Game {
   };
 }
 
+/**
+ * **저장을 한 번 거친** 라인업(revision 2)이 기본이다. revision 1 + DRAFT 는 대진 확정 때
+ * 백엔드가 깔아 두는 초기 라인업이라 화면이 "아직 아무도 선발을 고르지 않음"으로 읽고 전원
+ * 후보로 시작한다(fixture-lineup.view-model 의 untouchedInitialLineup). 아래 테스트들은
+ * 대부분 "선발이 복원된 화면"을 전제로 UI를 검증하므로, 그 전제를 리비전으로 명시한다.
+ */
 function baseGameLineup(overrides: Partial<GameLineup> = {}): GameLineup {
   return {
     id: 'lineup-1',
     gameId: 'game-1',
     sideId: 'side-host',
-    revision: 1,
+    revision: 2,
     state: 'DRAFT',
     version: 0,
     submittedAt: null,

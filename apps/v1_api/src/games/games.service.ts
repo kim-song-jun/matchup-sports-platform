@@ -694,12 +694,6 @@ export class GamesService {
             displayNameSnapshot: participant.displayNameSnapshot,
             jerseyNumber: participant.jerseyNumber,
             position: participant.position,
-            // 대회 경기의 초기 라인업은 **등록 명단 전체를 후보로** 깔아 둔 상태다 — 아직
-            // 아무도 선발을 고르지 않았기 때문이다. 컬럼 기본값(true)에 맡기면 명단 전원이
-            // 선발로 들어가, 팀장이 라인업 화면에서 "선발을 고르는" 대신 "안 뛸 사람을 하나씩
-            // 빼는" 반대 작업을 하게 된다(등록 인원이 많을수록 손이 많이 간다). 실제로 선발을
-            // 정하는 것은 라인업 저장(saveLineup)이고, 그때 started 가 명시적으로 실려 온다.
-            started: false,
           },
         });
       }

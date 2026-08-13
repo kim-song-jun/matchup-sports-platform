@@ -60,13 +60,29 @@ function venueLabel(entry: PublicScheduleEntry): string | null {
 }
 
 /**
+ * 일정 카드 안에서 "홈 | 스코어 | 원정"으로 쌓이는 모든 행이 **공유하는 단 하나의
+ * 3열 축**. 스코어 행과 득점자 행이 각자 열 폭을 들고 있던 것이 alpha에서 관측된
+ * 정렬 틀어짐의 원인이었다 — 스코어 행은 가운데 칸이 64px(`flex 0 0 64px`), 득점자
+ * 행은 20px + 좁은 gap 이어서 득점자 텍스트가 팀명 축보다 26px 더 안쪽까지, 즉
+ * 스코어 칸 밑으로 파고들었다(390px 실측: 팀명 우단 153px vs 득점자 우단 179px).
+ * 두 행이 이 상수를 함께 쓰는 한 축은 다시 어긋날 수 없다.
+ *
+ * `minmax(0, 1fr)`(기본 `1fr` = `minmax(auto, 1fr)` 아님)은 긴 팀명·긴 득점자
+ * 이름이 좌우 트랙을 밀어 가운데 칸을 행 정중앙에서 이탈시키는 것을 막는다 —
+ * 넘치면 줄바꿈으로 흡수한다. `PenaltyScoreline`이 "가운데 칸 = 행 정중앙"을
+ * 전제로 `textAlign: center` 하나로 스코어 밑에 놓이는 것도 이 고정에 의존한다.
+ */
+const SCORE_AXIS_COLUMNS = 'minmax(0, 1fr) 64px minmax(0, 1fr)';
+const SCORE_AXIS_COLUMN_GAP = 10;
+
+/**
  * 득점자 요약 -- 골이 하나도 없으면 이 함수 자체가 `null`을 반환해 빈 줄을
  * 아예 렌더하지 않는다(요구사항: "골이 없으면 그 줄 자체를 렌더하지 마라").
  *
  * 홈/원정 분리: 스코어 행이 이미 "홈은 오른쪽 정렬, 원정은 왼쪽 정렬"로 좌우를
- * 확립해 뒀으므로, 득점자도 그 축을 그대로 이어받아 3열 그리드(`FixtureCard`의
- * 득점자 그리드와 동일한 `1fr auto 1fr` 패턴, `tournament-detail-client.tsx`)로
- * 나눈다. 예시 문구("⚽ 10' 김골키 · 45' 김골키")처럼 한 줄로 이어붙이는 방식은
+ * 확립해 뒀으므로, 득점자도 **그 행과 같은 3열 축**(`SCORE_AXIS_COLUMNS`)을
+ * 문자 그대로 공유한다 — 비슷한 패턴을 다시 적는 게 아니라 같은 상수를 쓴다.
+ * 예시 문구("⚽ 10' 김골키 · 45' 김골키")처럼 한 줄로 이어붙이는 방식은
  * 390px 폭에서 "어느 팀 골인지"를 시간순 나열만으로는 알 수 없다는 문제가 있다
  * (2:0 같은 스코어에서 이게 실제 정보 손실이다) -- 이미 검증된 좌우분리 패턴을
  * 그대로 재사용해 폭 문제와 팀 귀속 모호성을 동시에 해결한다. 이름이 null(동의
@@ -91,8 +107,10 @@ function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] })
       aria-label="득점자"
       style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 20px 1fr',
-        gap: 6,
+        // 스코어 행과 **같은** 축(`SCORE_AXIS_COLUMNS`) — 홈 득점자는 홈 팀명
+        // 아래, 원정 득점자는 원정 팀명 아래, ⚽는 스코어 칸 아래에 놓인다.
+        gridTemplateColumns: SCORE_AXIS_COLUMNS,
+        columnGap: SCORE_AXIS_COLUMN_GAP,
         marginTop: 4,
         // [R-T2] 좌우 1fr 트랙이라 폭이 늘어도 그리드가 흡수 — 12로 상향.
         fontSize: 12,
@@ -146,14 +164,20 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
           <ScheduleResultBadge entry={entry} />
         </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ flex: 1, textAlign: 'right', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: SCORE_AXIS_COLUMNS,
+          columnGap: SCORE_AXIS_COLUMN_GAP,
+          alignItems: 'center',
+        }}
+      >
+        <span style={{ textAlign: 'right', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
           {sideLabel(entry.home)}
         </span>
         <span
           className="tab-num"
           style={{
-            flex: '0 0 64px',
             textAlign: 'center',
             fontSize: 14,
             fontWeight: 800,
@@ -165,7 +189,7 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
         >
           {formatScoreline(entry.score, entry.scoreStatus)}
         </span>
-        <span style={{ flex: 1, textAlign: 'left', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
+        <span style={{ textAlign: 'left', fontSize: 14, fontWeight: 600, color: 'var(--text-strong)' }}>
           {sideLabel(entry.away)}
         </span>
       </div>

@@ -163,6 +163,30 @@ END $$`,
       'v1_game_official_facts row for a game imported by game-result-backfill.ts, which is exactly the 21 alpha ' +
       'games whose team records read 0 while the standings table showed a win. Reviewed 2026-08-10.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_appearance_gate_backfill/migration.sql',
+    statement: 'ALTER TABLE v1_game_result_participants DISABLE TRIGGER v1_guard_result_participant_mutation',
+    reason:
+      'Scope-limited trigger toggle, not a schema change: the DISABLE and its matching ENABLE below bracket the two data statements inside this one migration transaction, so the guard is restored before anything else can observe it (a rolled-back migration never commits the DISABLE either). It is required because v1_guard_result_participant_mutation only permits writes while the owning revision is DRAFT, and this backfill by definition targets SUBMITTED/OFFICIAL revisions. No app code path reads or depends on the trigger being momentarily off. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_appearance_gate_backfill/migration.sql',
+    statement: 'DELETE FROM v1_game_result_participants rp USING v1_game_result_revisions rev WHERE rp.result_revision_id = rev.id AND EXISTS ( SELECT 1 FROM v1_games g WHERE g.id = rev.game_id AND g.source_type = \'TOURNAMENT_FIXTURE\' ) AND rev.state IN (\'SUBMITTED\', \'OFFICIAL\') AND NOT EXISTS ( SELECT 1 FROM v1_game_participants p WHERE p.id = rp.participant_id AND p.started = TRUE ) AND NOT EXISTS ( SELECT 1 FROM v1_game_events e WHERE e.game_id = rev.game_id AND e.type = \'SUBSTITUTION\' AND e.participant_id = rp.participant_id AND NOT EXISTS (SELECT 1 FROM v1_game_events r WHERE r.reverses_event_id = e.id) ) AND rp.goals = 0 AND rp.assists = 0 AND rp.fouls = 0 AND COALESCE((rp.cards ->> \'yellow\')::int, 0) = 0 AND COALESCE((rp.cards ->> \'red\')::int, 0) = 0 AND rev.mvp_participant_id IS DISTINCT FROM rp.participant_id',
+    reason:
+      'Data-only correction with no schema change, so both rolling-deploy directions are safe: the OLD app reads v1_game_result_participants as a plain list (PublicUserRecordsService counts rows for summary.appearances) and simply sees the corrected, smaller set; the NEW app writes the same shape it always did. Only rows with NO evidence of playing are removed -- not a starter, never the incoming side of an active SUBSTITUTION, zero goals/assists/fouls/cards, and not the revision MVP -- so no goal, card or MVP reference is ever orphaned. Restricted to source_type=TOURNAMENT_FIXTURE and to SUBMITTED/OFFICIAL revisions, leaving in-progress DRAFT/CHANGE_REQUESTED edits untouched. Rollback is application-images-only and the old images do not need these rows to exist (a bench player who never played simply stops appearing in their own record); the judgement inputs (V1GameParticipant.started and the event stream) are untouched, so the deleted rows are reconstructible from the same rule at any time. Verified on a throwaway Postgres 16 with the full migration chain replayed: starter kept, active substitute kept, reversed substitution deleted, never-used bench deleted, a substitute whose substitution was never entered but who scored kept with goals=1, DRAFT row untouched, TEAM_MATCH row untouched. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_appearance_gate_backfill/migration.sql',
+    statement: 'UPDATE v1_game_result_participants rp SET started = p.started FROM v1_game_result_revisions rev, v1_game_participants p WHERE rp.result_revision_id = rev.id AND rp.participant_id = p.id AND EXISTS ( SELECT 1 FROM v1_games g WHERE g.id = rev.game_id AND g.source_type = \'TOURNAMENT_FIXTURE\' ) AND rev.state IN (\'SUBMITTED\', \'OFFICIAL\') AND rp.started IS DISTINCT FROM p.started',
+    reason:
+      'Column-value correction on an existing boolean, no schema change. `started` was written as a hardcoded true for every participant by deriveTournamentRevision, so this realigns it with the lineup row it was always supposed to mirror (V1GameParticipant.started). Both rolling-deploy directions are safe: the OLD app only renders this flag (public records items[].started) and never branches on it in a way a more accurate value breaks, and the NEW app writes the same column with the same meaning. Same scoping as the DELETE above (TOURNAMENT_FIXTURE + SUBMITTED/OFFICIAL only), and it is idempotent -- the IS DISTINCT FROM guard makes a re-run a no-op. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_appearance_gate_backfill/migration.sql',
+    statement: 'ALTER TABLE v1_game_result_participants ENABLE TRIGGER v1_guard_result_participant_mutation',
+    reason:
+      'The restoring half of the DISABLE above -- it puts v1_guard_result_participant_mutation back exactly as the schema declares it, inside the same transaction. Reviewed 2026-08-13.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

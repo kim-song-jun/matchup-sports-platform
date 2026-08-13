@@ -1,4 +1,3 @@
-import { HttpException } from '@nestjs/common';
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
@@ -7,24 +6,35 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
- * Task 14 blocker fix: `revokeParticipantConsent` used to look up the "last"
- * consent snapshot by `participantId` alone (`orderBy consentVersion desc`),
- * never cross-checking it against the participant's *current* identity link
- * - unlike `grantParticipantConsent`, which already rejects a mismatched
- * `dto.linkId` with `409 CONSENT_LINK_MISMATCH`.
+ * Task 14 원래 계약(위 커밋 이력 참고)은 "직전 스냅샷이 GRANTED여야만 철회
+ * 가능"이었고, 그 가드가 참가자의 *현재* 신원 연결과 무관하게 `participantId`
+ * 만으로 "마지막" 스냅샷을 찾았다(`orderBy consentVersion desc`) -- 그래서
+ * 죽은 링크(A) 밑에 남은 낡은 GRANTED를, 그 링크를 가져본 적 없는 새 링크(B)
+ * 보유자가 철회 요청 한 번으로 "뒤집을" 수 있는 구멍이 있었다. 그 사고를
+ * 재현·고정한 스펙이었다.
  *
- * `revokeIdentityLink` does not itself revoke consent (consent is a separate
- * append-only history), so a still-GRANTED snapshot can be left behind under
- * a link that is no longer current. This spec builds exactly that state -
- * grant under link A, revoke link A (consent stays GRANTED), then establish
- * a brand-new link B that never had its own consent granted - and proves
- * `revokeParticipantConsent` now refuses to "revoke" the stale link-A grant
- * on link B's behalf.
+ * 이 worktree(2026-08-13 사용자 재정의)는 그 가드 자체를 없앴다: 공개 동의의
+ * 출처가 참가자 단위 스냅샷에서 사용자 단위 `V1UserRecordConsent`로 옮겨가면서,
+ * 라인업에서 자동 연결(`ROSTER_ASSERTED`)된 참가 기록은 참가자 스냅샷을 한 번도
+ * 거치지 않는 경우가 흔해졌다 -- "직전 스냅샷 GRANTED 필수"를 유지하면 그런
+ * 사용자는 자기 기록 하나만 개별로 숨기는 길이 아예 막힌다. 새 규칙은
+ * "현재 링크가 호출자 것이면, 그 링크 아래 스냅샷이 하나도 없어도 철회(=개별
+ * 숨김 생성)할 수 있다"이다(`revokeParticipantConsent`, `games.service.ts`).
  *
- * On revert, the final call below would succeed (200), fabricate a new
- * `REVOKED` consent snapshot whose `linkId` still points at the dead link A,
- * and bump the snapshot count to 2 instead of throwing `409
- * CONSENT_NOT_GRANTED` with the count held at 1.
+ * 다만 이 스펙이 원래 지키려던 불변식 -- **죽은 linkId 아래 남은 낡은 GRANTED를
+ * 그 링크를 가져본 적 없는 제3의 링크 보유자가 뒤집어 이력을 날조할 수 없다** --
+ * 는 새 규칙에서도 여전히 유효하다. 스냅샷 조회가 `current.linkId`로 스코프되기
+ * 때문에(`scoped = findFirst({ participantId, linkId: current.linkId })`), 링크
+ * B 보유자가 만드는 새 스냅샷은 항상 `linkId: B`로만 쓰이고 링크 A의 행은 절대
+ * 건드리지 않는다. 이 스펙은 그 스코핑이 실제로 지켜지는지를 증명한다:
+ *
+ *  - 링크 B 보유자의 철회 호출은 이제 성공한다(에러가 아니라 200).
+ *  - 새로 생기는 REVOKED 스냅샷의 `linkId`는 B다(A가 아니다).
+ *  - 링크 A의 기존 GRANTED 행은 손대지 않은 채로(state=GRANTED, linkId=A) 그대로
+ *    남는다.
+ *  - `consentVersion`은 `@@unique([participantId, consentVersion])` 제약을
+ *    공유하므로 링크로 스코프하지 않은 참가자 전체 최댓값(A의 1)에서 이어
+ *    붙는다(B의 새 행은 2).
  */
 
 const ids = {
@@ -56,30 +66,14 @@ function creationContext(commandId: string, payload: unknown): GameCommandContex
   };
 }
 
-async function captureFailure(operation: () => Promise<unknown>) {
-  try {
-    await operation();
-  } catch (error) {
-    return error;
-  }
-  throw new Error('Expected operation to fail');
-}
-
-function expectHttpCode(error: unknown, status: number, code: string) {
-  expect(error).toBeInstanceOf(HttpException);
-  const exception = error as HttpException;
-  expect(exception.getStatus()).toBe(status);
-  expect(exception.getResponse()).toEqual(expect.objectContaining({ code }));
-}
-
-describe('Task 14 revokeParticipantConsent is scoped to the current identity link', () => {
+describe('revokeParticipantConsent is scoped to the current identity link', () => {
   let configId: string;
   let gameId: string;
   let participantId: string;
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL is required for Task 14 integration verification');
+      throw new Error('DATABASE_URL is required for this integration verification');
     }
     await prisma.$connect();
     const config = await prisma.v1CompetitionConfigVersion.findFirst({
@@ -158,7 +152,7 @@ describe('Task 14 revokeParticipantConsent is scoped to the current identity lin
     await prisma.$disconnect();
   });
 
-  it('refuses to revoke a stale link\'s leftover GRANTED consent snapshot on behalf of a brand-new link', async () => {
+  it("revokes only the current link's own history, never rewriting a dead link's leftover GRANTED snapshot", async () => {
     // Link A: opponentUser self-requests, hostUser (distinct, owns the
     // participant's HOME side) attests.
     const requestA = await service.requestIdentityLink(
@@ -189,7 +183,7 @@ describe('Task 14 revokeParticipantConsent is scoped to the current identity lin
     expect(grantedA.state).toBe('GRANTED');
     expect(
       await prisma.v1ParticipantConsentSnapshot.findMany({ where: { participantId }, orderBy: { consentVersion: 'asc' } }),
-    ).toEqual([expect.objectContaining({ linkId: linkA, state: 'GRANTED' })]);
+    ).toEqual([expect.objectContaining({ linkId: linkA, state: 'GRANTED', consentVersion: 1 })]);
 
     // Link A is revoked. This does NOT itself revoke the consent granted
     // under it - the v1 GRANTED row is left behind, now orphaned from any
@@ -236,26 +230,42 @@ describe('Task 14 revokeParticipantConsent is scoped to the current identity lin
     const snapshotCountBeforeRevoke = await prisma.v1ParticipantConsentSnapshot.count({ where: { participantId } });
     expect(snapshotCountBeforeRevoke).toBe(1); // only the stale link-A grant
 
-    // The current (link-B) holder tries to revoke consent without link B
-    // ever having been granted any. This must fail - there is nothing to
-    // revoke under the CURRENT link - rather than silently "revoking" link
-    // A's leftover grant.
-    const revokeUnderLinkB = await captureFailure(() =>
-      service.revokeParticipantConsent(
-        authUser(ids.opponentUser),
-        gameId,
-        participantId,
-        'consent-scope-revoke-under-b',
-        { expectedVersion: attestedB.version, clientCommandId: 'consent-scope-revoke-under-b', reason: 'nothing to revoke' },
-      ),
+    // The current (link-B) holder revokes without link B ever having been
+    // granted any consent snapshot of its own. Under the new contract this
+    // now SUCCEEDS -- "current link is mine" is sufficient to create an
+    // individual hide-override, precisely so a ROSTER_ASSERTED-linked user
+    // (who never went through a participant-scoped grant at all) can still
+    // hide their own record. It must NOT touch link A's leftover grant.
+    const revokedUnderB = await service.revokeParticipantConsent(
+      authUser(ids.opponentUser),
+      gameId,
+      participantId,
+      'consent-scope-revoke-under-b',
+      { expectedVersion: attestedB.version, clientCommandId: 'consent-scope-revoke-under-b', reason: 'hide my own record' },
     );
-    expectHttpCode(revokeUnderLinkB, 409, 'CONSENT_NOT_GRANTED');
+    expect(revokedUnderB.state).toBe('REVOKED');
 
-    // No new snapshot row was fabricated, and the stale link-A row is
-    // untouched (still GRANTED, still linkId=A).
-    expect(await prisma.v1ParticipantConsentSnapshot.count({ where: { participantId } })).toBe(1);
-    const onlyRow = await prisma.v1ParticipantConsentSnapshot.findFirstOrThrow({ where: { participantId } });
-    expect(onlyRow.linkId).toBe(linkA);
-    expect(onlyRow.state).toBe('GRANTED');
+    // A brand-new snapshot was written under link B, not link A, and its
+    // consentVersion continues from the participant-wide max (A's 1) rather
+    // than starting its own sequence at 1 -- the two share one
+    // `@@unique([participantId, consentVersion])` space.
+    const allSnapshots = await prisma.v1ParticipantConsentSnapshot.findMany({
+      where: { participantId },
+      orderBy: { consentVersion: 'asc' },
+    });
+    expect(allSnapshots).toHaveLength(2);
+    expect(allSnapshots[0]).toEqual(
+      expect.objectContaining({ linkId: linkA, state: 'GRANTED', consentVersion: 1 }),
+    );
+    expect(allSnapshots[1]).toEqual(
+      expect.objectContaining({ linkId: linkB, state: 'REVOKED', consentVersion: 2 }),
+    );
+
+    // Link A's row is byte-for-byte untouched: still GRANTED, still linkId=A.
+    const linkARow = await prisma.v1ParticipantConsentSnapshot.findFirstOrThrow({
+      where: { participantId, linkId: linkA },
+    });
+    expect(linkARow.state).toBe('GRANTED');
+    expect(linkARow.consentVersion).toBe(1);
   });
 });

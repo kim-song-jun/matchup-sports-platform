@@ -100,6 +100,11 @@ describe('PublicUserRecordsService.getRecords — assist/foul summary (T1-4)', (
     await prisma.v1ParticipantConsentSnapshot.create({
       data: { participantId, linkId: ids.linkId, consentVersion: 1, state: 'GRANTED', effectiveAt: officialAt, policyHash: 'summary-policy-hash', actorUserId: ids.targetUser },
     });
+    // Task 24 규칙 재정의(2026-08-13): 공개 동의가 사용자 단위 `V1UserRecordConsent`로
+    // 옮겨갔다 -- 이게 없으면 위 participant 단위 스냅샷이 GRANTED여도 records가 0건이다.
+    await prisma.v1UserRecordConsent.create({
+      data: { userId: ids.targetUser, state: 'GRANTED', policyHash: 'summary-policy-hash' },
+    });
   });
 
   afterAll(async () => {

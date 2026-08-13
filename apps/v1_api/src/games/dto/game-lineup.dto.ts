@@ -18,6 +18,14 @@ export class GameLineupParticipantDto {
   @IsUUID()
   participantId?: string;
 
+  // 매니저가 로스터에 지정한 계정. 주어지면 서비스 계층(games.service.ts#saveLineup)이
+  // 이 사이드 팀의 active 멤버인지 검증한 뒤 같은 트랜잭션에서 신원 연결(identity link,
+  // action ROSTER_ASSERTED)을 자동 생성한다 -- GET /users/:id/records가 항상 0건이던
+  // 문제(연결을 만드는 제품 경로 부재)를 이 저장 경로에서 메운다.
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+
   @IsString()
   @IsNotEmpty()
   displayNameSnapshot!: string;

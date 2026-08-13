@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { FormationSlot } from '@/components/lineup/formation-slots';
 import type { GameLineup } from '@/types/game-operations';
 import {
-  addPlayer, buildSavePayload, createEmptyFixtureLineupState, hydrateFixtureLineupState, moveToStarters,
-  placeInSlot, selectFormation, setGoalkeeper, unplaceFromSlot,
+  addPlayer, buildSavePayload, createEmptyFixtureLineupState, hydrateFixtureLineupState, linkedUserIds, moveToStarters,
+  placeInSlot, selectFormation, setEntryUserId, setGoalkeeper, unplaceFromSlot,
 } from './fixture-lineup.view-model';
 
 function withOneStarter() {
@@ -97,5 +97,32 @@ describe('fixture-lineup.view-model', () => {
     };
     const state = hydrateFixtureLineupState([lineup], 'side-1', 1, 'GOLEIRO');
     expect(state.starters[0]).toMatchObject({ goalkeeper: true, position: null });
+  });
+
+  // F1: 팀원 연결 — 라인업 행을 계정(userId)에 붙이면 저장 payload에 실제로 실려야
+  // 백엔드가 ROSTER_ASSERTED 신원 연결을 만든다(games.service.ts saveLineup 계약).
+  it('setEntryUserId links an entry to a userId and buildSavePayload carries it through', () => {
+    let state = withOneStarter();
+    state = setEntryUserId(state, state.starters[0].key, 'user-1');
+    expect(state.starters[0].userId).toBe('user-1');
+    const payload = buildSavePayload(state, 'GK');
+    expect(payload.participants[0]).toMatchObject({ userId: 'user-1' });
+  });
+
+  it('setEntryUserId(null) unlinks — buildSavePayload omits userId entirely (stays a guest)', () => {
+    let state = withOneStarter();
+    state = setEntryUserId(state, state.starters[0].key, 'user-1');
+    state = setEntryUserId(state, state.starters[0].key, null);
+    expect(state.starters[0].userId).toBeNull();
+    const payload = buildSavePayload(state, 'GK');
+    expect(payload.participants[0]).not.toHaveProperty('userId');
+  });
+
+  it('linkedUserIds collects userIds from both starters and bench, ignoring unlinked guests', () => {
+    let state = withOneStarter();
+    state = addPlayer(state, '이영희'); // 후보로 들어가는 게스트
+    state = setEntryUserId(state, state.starters[0].key, 'user-1');
+    state = setEntryUserId(state, state.bench[0].key, 'user-2');
+    expect(linkedUserIds(state)).toEqual(new Set(['user-1', 'user-2']));
   });
 });

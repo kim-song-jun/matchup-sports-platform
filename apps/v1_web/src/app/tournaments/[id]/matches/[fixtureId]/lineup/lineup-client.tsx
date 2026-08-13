@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -10,13 +10,18 @@ import {
   type FormationPreset,
 } from '@/components/lineup/formation-slots';
 import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
-import { matchSlotsToEntries } from '@/app/team-matches/[id]/lineup/lineup.view-model';
+import {
+  matchSlotsToEntries,
+  type LineupEntryDraft,
+  type RosterOption,
+} from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import {
   useV1FixtureLineupAccess,
   useV1Game,
   useV1GameLineups,
   useV1SaveGameLineup,
   useV1SubmitGameLineup,
+  useV1TeamMembers,
   useV1Tournament,
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
@@ -29,11 +34,13 @@ import {
   clearPlayerPosition,
   createEmptyFixtureLineupState,
   hydrateFixtureLineupState,
+  linkedUserIds,
   moveToBench,
   moveToStarters,
   placeInSlot,
   removePlayer,
   selectFormation,
+  setEntryUserId,
   setGoalkeeper,
   setJerseyNumber,
   setPlayerPosition,
@@ -109,6 +116,21 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
    */
   const [staffSideId, setStaffSideId] = useState<string | null>(null);
   const editingSideId = access.data?.mySideId ?? staffSideId;
+  // 팀원 연결(F1): 라인업 행을 실제 계정에 붙이려면 그 사이드가 어느 팀인지 알아야 GET
+  // /teams/:id/members로 로스터를 가져올 수 있다. access 응답에는 sideId만 있고 teamId가
+  // 없어(V1FixtureLineupAccess) gameQuery.data.sides(teamId 보유)에서 sideId로 역참조한다.
+  const editingTeamId =
+    gameQuery.data?.sides.find((side) => side.id === editingSideId)?.teamId ?? null;
+  const rosterQuery = useV1TeamMembers(editingTeamId, { limit: 100 }, { enabled: editingTeamId !== null });
+  const rosterPool: RosterOption[] = useMemo(
+    () =>
+      (rosterQuery.data?.items ?? []).map((member) => ({
+        userId: member.userId,
+        displayName: member.displayName,
+        role: member.role,
+      })),
+    [rosterQuery.data],
+  );
 
   // [알파 감사 E] 이 종목의 실제 골키퍼 포지션 코드 — 축구 'GK', 풋살 'GOLEIRO'(D-7 사전).
   // lineupConfig가 아직 없으면(로딩 중 등) 기존 동작과 같은 'GK' 폴백을 쓴다.
@@ -307,6 +329,9 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   }
 
   const mySideId = editingSideId;
+  // 팀원 연결(F1): 이미 다른 행에 연결된 userId는 select 옵션에서 빼서 같은 사람이 두 번
+  // 연결되는 것을 저장 왕복 없이 미리 막는다(서버도 LINEUP_DUPLICATE_USER로 최종 방어).
+  const linkedIds = linkedUserIds(state);
   // 경기가 시작되면(gameQuery.data.state가 SCHEDULED를 벗어나면) 어느 쪽도 더는
   // 라인업을 편집할 수 없다 — 백엔드 saveLineup의 LINEUP_DEADLINE_PASSED 가드와
   // 동일한 판정 기준이다(games.service.ts, game.state !== SCHEDULED).
@@ -619,6 +644,14 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                             }
                           />
                         </div>
+                        <RosterLinkRow
+                          entry={entry}
+                          editable={editable}
+                          rosterPool={rosterPool}
+                          rosterLoading={editingTeamId !== null && rosterQuery.isLoading}
+                          linkedIds={linkedIds}
+                          onChange={(userId) => setState((prev) => (prev ? setEntryUserId(prev, entry.key, userId) : prev))}
+                        />
                       </div>
                     );
                   })}
@@ -704,6 +737,14 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                             }
                           />
                         </div>
+                        <RosterLinkRow
+                          entry={entry}
+                          editable={editable}
+                          rosterPool={rosterPool}
+                          rosterLoading={editingTeamId !== null && rosterQuery.isLoading}
+                          linkedIds={linkedIds}
+                          onChange={(userId) => setState((prev) => (prev ? setEntryUserId(prev, entry.key, userId) : prev))}
+                        />
                       </div>
                     );
                   })}
@@ -775,5 +816,76 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
         </div>
       ) : null}
     </AppChrome>
+  );
+}
+
+/**
+ * 라인업 한 행(선발/후보 공용)의 '팀원 연결' 선택 — F1. 라인업에 이름만 적혀 있던 행을
+ * 실제 팀 계정(userId)에 붙인다. 매니저가 팀원을 로스터에 넣는 이 행위 자체가 신원 연결의
+ * 근거(roster attribution)가 되어, 저장 시 백엔드가 ROSTER_ASSERTED 이벤트로 연결을 만들고
+ * 이후 그 사용자의 '내 활동 기록'(/users/:id/records)에 이 경기가 반영된다.
+ *
+ * 연결 여부는 select 값뿐 아니라 우측 상태 텍스트("연결됨"/"연결 안 됨")로도 드러난다 —
+ * 색만으로 구분하지 않는다(프로젝트 접근성 규칙). select 자체가 44px 이상(`.tm-input`
+ * min-height 50px)이라 터치 타깃도 별도 처리 없이 충족한다.
+ */
+function RosterLinkRow({
+  entry,
+  editable,
+  rosterPool,
+  linkedIds,
+  rosterLoading,
+  onChange,
+}: {
+  entry: LineupEntryDraft;
+  editable: boolean;
+  rosterPool: RosterOption[];
+  /** 이 라인업 전체(선발+후보)에서 이미 연결된 userId 집합 — 자기 자신은 제외하고 걸러야
+   * 지금 선택된 팀원이 옵션에서 사라지지 않는다. */
+  linkedIds: Set<string>;
+  rosterLoading: boolean;
+  onChange: (userId: string | null) => void;
+}) {
+  const selectId = `roster-link-${entry.key}`;
+  const options = rosterPool.filter((member) => member.userId === entry.userId || !linkedIds.has(member.userId));
+  const linked = entry.userId !== null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+      <label
+        htmlFor={selectId}
+        className="tm-text-caption"
+        style={{ color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}
+      >
+        팀원 연결
+      </label>
+      <select
+        id={selectId}
+        className="tm-input tm-input-select"
+        aria-label={`${entry.displayName} 팀원 연결`}
+        style={{ flex: 1, minHeight: 44 }}
+        value={entry.userId ?? ''}
+        disabled={!editable || rosterLoading}
+        onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
+      >
+        <option value="">연결 안 함 (게스트)</option>
+        {options.map((member) => (
+          <option key={member.userId} value={member.userId}>
+            {member.displayName}
+          </option>
+        ))}
+      </select>
+      <span
+        className="tm-text-caption"
+        style={{
+          flexShrink: 0,
+          minWidth: 64,
+          textAlign: 'right',
+          fontWeight: 700,
+          color: linked ? 'var(--blue500)' : 'var(--text-muted)',
+        }}
+      >
+        {linked ? '✓ 연결됨' : '연결 안 됨'}
+      </span>
+    </div>
   );
 }

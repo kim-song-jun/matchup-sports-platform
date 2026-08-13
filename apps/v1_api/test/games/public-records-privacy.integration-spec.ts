@@ -284,9 +284,10 @@ describe('Task 24 public tournament schedule/match and team/player record projec
 
     // Two-party link + consent, seeded directly (Task 14's write-side flow
     // does not exist in this worktree yet -- see the report's gap note).
-    // `V1ParticipantIdentityLinkCurrent`/`V1ParticipantConsentSnapshot` are
-    // exactly the two tables `public-consent.ts` reads, so seeding them
-    // directly still exercises the real read-side join/gate.
+    // `V1ParticipantIdentityLinkCurrent`/`V1ParticipantConsentSnapshot`/
+    // `V1UserRecordConsent` are exactly the three tables `public-consent.ts`
+    // reads (2026-08-13 규칙 재정의), so seeding them directly still exercises
+    // the real read-side join/gate.
     await prisma.v1ParticipantIdentityLinkCurrent.create({
       data: {
         participantId: consentedParticipant.id,
@@ -343,6 +344,17 @@ describe('Task 24 public tournament schedule/match and team/player record projec
       ],
     });
     // `scorerGuestId` gets no link/consent row at all -- the unlinked-guest case.
+
+    // Task 24 규칙 재정의(2026-08-13): 공개 동의가 participant 단위 스냅샷이 아니라
+    // 사용자 단위 `V1UserRecordConsent`로 옮겨갔다. 둘 다 GRANTED로 심어서 이 스위트가
+    // 검증하려는 실제 계약(개별 participant의 REVOKED 스냅샷이 사용자 단위 GRANTED를
+    // 덮어써서 숨긴다)이 새 모델에서도 그대로 성립하는지 증명한다.
+    await prisma.v1UserRecordConsent.createMany({
+      data: [
+        { userId: ids.userConsented, state: 'GRANTED', policyHash: 'task24-policy-hash' },
+        { userId: ids.userRevoked, state: 'GRANTED', policyHash: 'task24-policy-hash' },
+      ],
+    });
   });
 
   afterAll(async () => {

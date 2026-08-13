@@ -117,6 +117,25 @@ export function setJerseyNumber(state: FixtureLineupState, key: string, value: n
   return { ...state, starters: state.starters.map(patch), bench: state.bench.map(patch), dirty: true };
 }
 
+/** 라인업 한 행을 팀원(userId)에 연결하거나(값 지정) 연결을 해제한다(null). 이 연결이 저장
+ * payload의 participants[].userId 로 실려야 백엔드가 ROSTER_ASSERTED 신원 연결을 만든다
+ * (games.service.ts saveLineup) — 연결하지 않은 행은 지금처럼 이름만 있는 게스트로 남는다. */
+export function setEntryUserId(state: FixtureLineupState, key: string, userId: string | null): FixtureLineupState {
+  const patch = (entry: LineupEntryDraft) => (entry.key === key ? { ...entry, userId } : entry);
+  return { ...state, starters: state.starters.map(patch), bench: state.bench.map(patch), dirty: true };
+}
+
+/** 지금 라인업(선발+후보)에 이미 연결된 userId 집합. 팀원 연결 select 옵션에서 다른 행에
+ * 이미 배정된 사람을 골라 같은 사람이 두 번 연결되는 것을 UI 단에서 막는 데 쓴다(서버도
+ * saveLineup에서 LINEUP_DUPLICATE_USER로 최종 방어하지만, 저장 왕복 없이 미리 걸러준다). */
+export function linkedUserIds(state: FixtureLineupState): Set<string> {
+  return new Set(
+    [...state.starters, ...state.bench]
+      .map((entry) => entry.userId)
+      .filter((userId): userId is string => userId !== null),
+  );
+}
+
 export function setGoalkeeper(state: FixtureLineupState, key: string): FixtureLineupState {
   return {
     ...state,
@@ -209,6 +228,7 @@ export function buildSavePayload(
     participants: [
       ...state.starters.map((entry) => ({
         displayNameSnapshot: entry.displayName,
+        ...(entry.userId !== null ? { userId: entry.userId } : {}),
         ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
         ...(entry.goalkeeper ? { position: goalkeeperCode } : entry.position !== null ? { position: entry.position } : {}),
         ...(entry.positionX !== null && entry.positionY !== null
@@ -218,6 +238,7 @@ export function buildSavePayload(
       })),
       ...state.bench.map((entry) => ({
         displayNameSnapshot: entry.displayName,
+        ...(entry.userId !== null ? { userId: entry.userId } : {}),
         ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
         started: false,
       })),

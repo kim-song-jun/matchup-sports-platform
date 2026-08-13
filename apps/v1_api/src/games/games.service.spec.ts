@@ -26,6 +26,7 @@ function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
     positionX: null,
     positionY: null,
     started: true,
+    userId: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,

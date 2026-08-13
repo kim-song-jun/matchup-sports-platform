@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1FixtureLineupAccess } from '@/hooks/use-v1-api';
 import type { V1Game } from '@/types/api';
@@ -19,9 +19,15 @@ const hoisted = vi.hoisted(() => ({
   useV1GameMock: vi.fn(),
   useV1GameLineupsMock: vi.fn(),
   useV1TournamentMock: vi.fn(),
+  useV1TeamMembersMock: vi.fn(),
   saveMutateAsync: vi.fn(),
   submitMutateAsync: vi.fn(),
 }));
+// F1(팀원 연결) 기본값 — roster 내용을 검증하지 않는 기존 시나리오 전체가 이 기본값을 쓴다.
+// vi.clearAllMocks()는 구현을 지우지 않으므로(clear ≠ reset) 이 mockReturnValue는 매 테스트
+// beforeEach 이후에도 그대로 유지된다. roster 목록 자체를 검증하는 테스트만 render 직전에
+// mockReturnValueOnce로 개별 덮어쓴다.
+hoisted.useV1TeamMembersMock.mockReturnValue({ data: undefined, isLoading: false });
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -40,6 +46,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // 이상 실제로 렌더되는 하위 트리가 쓰는 훅도 채워줘야 한다(team-matches 쪽 lineup.test.tsx와
   // 동일한 이유).
   useV1NotificationUnreadSummary: () => ({ data: undefined }),
+  useV1TeamMembers: hoisted.useV1TeamMembersMock,
 }));
 
 import { FixtureLineupPageClient } from './lineup-client';
@@ -506,6 +513,95 @@ describe('대회 스태프도 라인업을 짤 수 있다', () => {
 
     expect(screen.getByText('이 경기의 라인업을 관리할 권한이 없어요')).toBeInTheDocument();
     expect(screen.queryByText('어느 팀의 명단을 짤까요?')).toBeNull();
+  });
+});
+
+/**
+ * F1 — 라인업 행을 팀원 계정에 연결한다. 로스터 select에서 팀원을 고르면 저장 payload의
+ * participants[].userId에 실려야 백엔드가 ROSTER_ASSERTED 신원 연결을 만든다(games.service.ts
+ * saveLineup 계약, fixture-lineup.view-model.test의 순수 로직 테스트와 달리 여기서는
+ * "화면에서 실제로 그 값이 저장 요청까지 흘러가는지"를 검증한다).
+ */
+describe('팀원 연결(F1) — 로스터에서 고른 팀원이 저장 payload에 실린다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameMock.mockReturnValue({
+      data: baseGame({
+        sides: [
+          { id: 'side-host', gameId: 'game-1', sideKey: 'HOME', teamId: 'team-host', displayNameSnapshot: '홈팀' },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [baseGameLineup()], // participants: [{ displayNameSnapshot: '홍길동', ... }]
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  // 이 describe 안에서만 roster를 채운다 — 컴포넌트가 여러 번 다시 렌더될 때마다
+  // useV1TeamMembers가 다시 호출되므로 mockReturnValueOnce는 렌더 도중 조용히 소진돼
+  // select의 <option>이 사라진다(실제로 겪은 flake). 고정 mockReturnValue를 쓰고 이
+  // describe가 끝나면 전역 기본값(빈 roster)으로 되돌려 다른 describe에 새지 않게 한다.
+  afterEach(() => {
+    hoisted.useV1TeamMembersMock.mockReturnValue({ data: undefined, isLoading: false });
+  });
+
+  it('로스터 팀원을 선택하면 연결 표시가 뜨고, 저장 시 participants[].userId로 전송된다', async () => {
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            membershipId: 'm-1',
+            userId: 'user-9',
+            displayName: '이영희',
+            realName: null,
+            phone: null,
+            birthDate: null,
+            gender: null,
+            profileImageUrl: null,
+            role: 'member',
+            status: 'active',
+            joinedAt: '2026-01-01T00:00:00.000Z',
+            canChangeRole: false,
+            canRemove: false,
+          },
+        ],
+        summary: { ownerCount: 1, managerCount: 0, memberCount: 1 },
+        viewerRole: 'manager',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isLoading: false,
+    });
+    hoisted.saveMutateAsync.mockResolvedValue({ gameId: 'game-1', lineupId: 'lineup-1', lineupRevision: 2, state: 'DRAFT', version: 1 });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    const select = screen.getByLabelText('홍길동 팀원 연결');
+    fireEvent.change(select, { target: { value: 'user-9' } });
+
+    // 색만으로 구분하지 않는다 — 연결 여부가 텍스트로도 드러나야 한다.
+    expect(screen.getByText('✓ 연결됨')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(hoisted.saveMutateAsync).toHaveBeenCalledTimes(1));
+    const [savedArgs] = hoisted.saveMutateAsync.mock.calls[0];
+    expect(savedArgs.payload.participants[0]).toMatchObject({ userId: 'user-9', displayNameSnapshot: '홍길동' });
   });
 });
 

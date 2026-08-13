@@ -33,6 +33,7 @@ import { OperationAuditWriterService } from '../common/audit/operation-audit-wri
 import { PrismaService } from '../prisma/prisma.service';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import {
+  parseLineupCatalog,
   parseLineupConfigForResponse,
   parseLineupLimits,
   parsePeriodDurations,
@@ -2044,6 +2045,34 @@ export class GamesService {
             message: `선발 인원은 ${lineupLimits.minPlayers}명 이상 ${lineupLimits.maxPlayers}명 이하여야 해요.`,
           });
         }
+        // 라인업 저장 시 매니저가 로스터에 지정한 계정(userId) 검증 -- 이 사이드
+        // 팀의 active 멤버가 아니면 거부한다. side.teamId가 null(팀 없는 게스트
+        // 사이드)일 때 userId가 오는 것도 같은 코드로 막는다: 소속 팀이 없으니
+        // "이 팀의 멤버"라는 전제 자체가 성립하지 않는다. 같은 요청 안에서 같은
+        // 계정이 두 번 오면(선발+후보 중복 지정 등) 별도 코드로 거부한다.
+        const seenLineupUserIds = new Set<string>();
+        for (const participant of dto.participants) {
+          if (participant.userId === undefined) continue;
+          if (seenLineupUserIds.has(participant.userId)) {
+            throw new UnprocessableEntityException({
+              code: 'LINEUP_DUPLICATE_USER',
+              message: '같은 선수를 라인업에 두 번 넣을 수 없어요.',
+            });
+          }
+          seenLineupUserIds.add(participant.userId);
+          const membership =
+            side.teamId === null
+              ? null
+              : await tx.v1TeamMembership.findFirst({
+                  where: { teamId: side.teamId, userId: participant.userId, status: 'active' },
+                });
+          if (membership === null) {
+            throw new UnprocessableEntityException({
+              code: 'LINEUP_USER_NOT_TEAM_MEMBER',
+              message: '이 팀의 활동 중인 멤버만 라인업에 연결할 수 있어요.',
+            });
+          }
+        }
         const previous = await tx.v1GameLineup.findFirst({
           where: { gameId, sideId },
           orderBy: { revision: 'desc' },
@@ -2058,7 +2087,7 @@ export class GamesService {
           },
         });
         for (const participant of dto.participants) {
-          await tx.v1GameParticipant.create({
+          const createdParticipant = await tx.v1GameParticipant.create({
             data: {
               gameId,
               sideId,
@@ -2069,6 +2098,35 @@ export class GamesService {
               positionX: participant.positionX,
               positionY: participant.positionY,
               started: participant.started,
+              userId: participant.userId,
+            },
+          });
+          if (participant.userId === undefined) continue;
+          // 로스터 귀속을 신원 연결(identity link)로 자동 승격한다 -- 방금 만든
+          // participant라 정상적으로는 기존 링크가 있을 수 없지만, 방어적으로 한
+          // 번 더 확인한다(재시도 등으로 이 루프가 두 번 돌 가능성에 대비).
+          const existingLink = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+            where: { participantId: createdParticipant.id },
+          });
+          if (existingLink !== null) continue;
+          const linkId = randomUUID();
+          const identityEvent = await this.appendIdentityEvent(tx, {
+            participantId: createdParticipant.id,
+            linkId,
+            requestId: linkId,
+            action: V1IdentityLinkAction.ROSTER_ASSERTED,
+            userId: participant.userId,
+            actorType: V1IdentityActorType.USER,
+            actorUserId: user.id,
+            reason: 'roster',
+          });
+          await tx.v1ParticipantIdentityLinkCurrent.create({
+            data: {
+              participantId: createdParticipant.id,
+              linkId,
+              userId: participant.userId,
+              version: 1,
+              effectiveFrom: identityEvent.effectiveAt,
             },
           });
         }
@@ -3019,33 +3077,60 @@ export class GamesService {
         if (!isLinkedCaller && actor.role !== 'platform_ops') {
           throw this.forbidden();
         }
-        // Mirror grantParticipantConsent's `current.linkId !== dto.linkId`
-        // check: a consent snapshot only authorizes revoke while it belongs
-        // to the participant's CURRENT link. Without this, a stale grant
-        // left GRANTED under a since-revoked link (revokeIdentityLink does
-        // not itself revoke consent) would be the highest `consentVersion`
-        // row and could be "revoked" by the holder of an unrelated new link
-        // who never granted anything themselves - fabricating history
-        // against a dead linkId. platform_ops with no current link at all
-        // (current === null) is the sole exception, since there is then no
-        // current linkId to scope by.
-        const last = await tx.v1ParticipantConsentSnapshot.findFirst({
+        // 스냅샷 조회는 참가자의 **현재 링크**로 스코프한다. 죽은 linkId 아래
+        // 남아 있던 낡은 GRANTED 를, 그것을 준 적 없는 새 링크 보유자가 뒤집어
+        // 이력을 날조하는 일을 막기 위해서다(공개 판정도 public-consent.ts 에서
+        // 현재 linkId 기준으로만 스냅샷을 읽으므로 낡은 스냅샷은 애초에 무시된다).
+        // 현재 링크가 아예 없는 platform_ops 만 예외로 참가자 전체를 본다.
+        //
+        // 예전에는 "직전 스냅샷이 GRANTED 여야만 철회 가능"이었다. 그 규칙은 참가자
+        // 스냅샷이 공개 동의의 유일한 출처이던 시절의 것이고, 지금은 사용자 단위
+        // `V1UserRecordConsent` 가 출처다 -- 라인업에서 자동 연결(ROSTER_ASSERTED)된
+        // 참가 기록은 참가자 스냅샷을 한 번도 거치지 않으므로, 옛 가드를 두면 당사자가
+        // 자기 기록 하나만 숨기는 길이 아예 막힌다. 그래서 "현재 링크가 내 것이면
+        // 스냅샷이 없어도 숨길 수 있다"로 바꾸되, 새 스냅샷은 언제나 현재 링크 아래에
+        // 쓴다 -- 위의 날조 시나리오는 그대로 불가능하다.
+        const scoped = await tx.v1ParticipantConsentSnapshot.findFirst({
           where: current === null ? { participantId } : { participantId, linkId: current.linkId },
           orderBy: { consentVersion: 'desc' },
         });
-        if (last === null || last.state !== V1ConsentState.GRANTED) {
+        if (scoped !== null && scoped.state === V1ConsentState.REVOKED) {
+          throw new ConflictException({
+            code: 'CONSENT_ALREADY_REVOKED',
+            message: '이미 공개에서 제외된 기록이에요.',
+          });
+        }
+        const targetLinkId = scoped?.linkId ?? current?.linkId ?? null;
+        if (targetLinkId === null) {
           throw new ConflictException({
             code: 'CONSENT_NOT_GRANTED',
             message: '철회할 동의 내역이 없어요.',
           });
         }
+        // policyHash 는 이력 표기용이다. 직전 스냅샷이 없으면(자동 연결만 된 경우)
+        // 사용자 단위 동의에 쓰인 해시를 물려받고, 그것마저 없으면 상수를 남긴다.
+        const userConsent =
+          current === null
+            ? null
+            : await tx.v1UserRecordConsent.findUnique({
+                where: { userId: current.userId },
+                select: { policyHash: true },
+              });
+        // consentVersion 은 `@@unique([participantId, consentVersion])` 를 공유하므로
+        // 링크로 스코프하지 않은 참가자 전체 최댓값에서 이어 붙인다 -- 링크가 교체된
+        // 참가자에서 옛 링크 쪽 버전과 충돌하지 않게 한다.
+        const highest = await tx.v1ParticipantConsentSnapshot.findFirst({
+          where: { participantId },
+          orderBy: { consentVersion: 'desc' },
+          select: { consentVersion: true },
+        });
         const created = await tx.v1ParticipantConsentSnapshot.create({
           data: {
             participantId,
-            linkId: last.linkId,
-            consentVersion: last.consentVersion + 1,
+            linkId: targetLinkId,
+            consentVersion: (highest?.consentVersion ?? 0) + 1,
             state: V1ConsentState.REVOKED,
-            policyHash: last.policyHash,
+            policyHash: scoped?.policyHash ?? userConsent?.policyHash ?? 'participant-hide-override',
             actorUserId: actor.actorUserId,
           },
         });
@@ -3248,6 +3333,11 @@ export class GamesService {
           action:
             | typeof V1IdentityLinkAction.REQUESTED
             | typeof V1IdentityLinkAction.ATTESTED
+            // 라인업 저장 시 매니저가 로스터에 지정한 계정으로 자동 생성되는 연결.
+            // v1_guard_identity_event 트리거는 ATTESTED/EXPIRED만 승인자≠본인을
+            // 검증하므로 ROSTER_ASSERTED는 그 검증을 우회하지 않고 애초에 대상이
+            // 아니다(자기 자신을 로스터에 넣는 선수 겸 매니저도 막히지 않는다).
+            | typeof V1IdentityLinkAction.ROSTER_ASSERTED
             | typeof V1IdentityLinkAction.REJECTED
             | typeof V1IdentityLinkAction.REVOKED;
           actorType: typeof V1IdentityActorType.USER;
@@ -4133,11 +4223,28 @@ export class GamesService {
     context: GameCommandContext,
     penalties?: { home: number; away: number },
   ): Promise<GameRevisionMutationResult> {
-    const [events, participants, sides] = await Promise.all([
+    const [events, participants, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
+      tx.v1CompetitionConfigVersion.findUnique({
+        where: { id: game.competitionConfigVersionId },
+        select: { lineup: true },
+      }),
     ]);
+    // 하드코딩 버그 수정: started/goalkeeper를 실제 라인업 값과 무관하게
+    // 항상 true/false로 박아 넣었다 -- 후보로 저장한 선수도 결과 프로젝션에서는
+    // 전부 선발로 보였고, 실제로 골키퍼였던 선수도 항상 goalkeeper:false였다.
+    // started는 라인업이 저장한 값(participant.started)을 그대로 쓴다.
+    // goalkeeper는 이 대회 종목의 골키퍼 포지션 코드(competitionConfig의
+    // lineup.positions 중 goalkeeper:true인 항목의 code -- 축구 'GK', 풋살
+    // 'GOLEIRO' 등 종목마다 다르다. 프론트 formation-slots.ts의
+    // goalkeeperPositionCode와 같은 방식)와 participant.position이 일치하는지로
+    // 판정한다. 사전에 골키퍼 항목이 없는 레거시 config는 기존 관례와 동일하게
+    // 'GK'로 폴백한다.
+    const goalkeeperPositionCode =
+      parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
+      'GK';
     const regulationScore = this.scoreFromEvents(events, sides);
     const score = await this.applyPenalties(tx, game, regulationScore, penalties);
     // Issue #392 fix: `missingScorer` must be derived from the SAME
@@ -4171,12 +4278,12 @@ export class GamesService {
         resultRevisionId: revision.id,
         participantId: participant.id,
         sideId: participant.sideId,
-        started: true,
+        started: participant.started,
         goals: goalCount.get(participant.id) ?? 0,
         assists: assistCount.get(participant.id) ?? 0,
         fouls: foulCount.get(participant.id) ?? 0,
         cards: jsonInput(cardCount.get(participant.id) ?? { yellow: 0, red: 0 }),
-        goalkeeper: false,
+        goalkeeper: participant.position === goalkeeperPositionCode,
       })),
     });
     const submitted = await tx.v1GameResultRevision.update({

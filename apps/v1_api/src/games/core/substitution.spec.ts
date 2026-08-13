@@ -1,5 +1,6 @@
 import {
   countActiveSubstitutions,
+  deriveAppearedParticipantIds,
   deriveOnPitchParticipantIds,
   validateSubstitution,
   type SubstitutionParticipant,
@@ -103,6 +104,77 @@ describe('deriveOnPitchParticipantIds', () => {
       { id: 'e1', sequence: 1, type: 'GOAL', sideId: 'side-home', participantId: 'p1', reversesEventId: null, payload: {} },
     ];
     expect(deriveOnPitchParticipantIds(participants, events)).toEqual(new Set(['p1']));
+  });
+});
+
+describe('deriveAppearedParticipantIds', () => {
+  it('counts starters and excludes a bench player who never came on', () => {
+    const participants = [
+      participant('starter', 'side-home', true),
+      participant('unused-bench', 'side-home', false),
+    ];
+    expect(deriveAppearedParticipantIds(participants, [])).toEqual(new Set(['starter']));
+  });
+
+  it('counts a substitute who came on', () => {
+    const participants = [
+      participant('starter', 'side-home', true),
+      participant('sub', 'side-home', false),
+    ];
+    const appeared = deriveAppearedParticipantIds(participants, [
+      subEvent('e1', 1, 'side-home', 'sub', 'starter'),
+    ]);
+    expect(appeared).toEqual(new Set(['starter', 'sub']));
+  });
+
+  it('keeps a substituted-off starter — going off does not un-play the match', () => {
+    // The contrast with deriveOnPitchParticipantIds is the whole point: there
+    // the starter is removed, here they stay.
+    const participants = [
+      participant('starter', 'side-home', true),
+      participant('sub', 'side-home', false),
+    ];
+    const events = [subEvent('e1', 1, 'side-home', 'sub', 'starter')];
+    expect(deriveOnPitchParticipantIds(participants, events).has('starter')).toBe(false);
+    expect(deriveAppearedParticipantIds(participants, events).has('starter')).toBe(true);
+  });
+
+  it('does not count a substitute whose substitution was reversed', () => {
+    const participants = [
+      participant('starter', 'side-home', true),
+      participant('sub', 'side-home', false),
+    ];
+    const appeared = deriveAppearedParticipantIds(participants, [
+      subEvent('e1', 1, 'side-home', 'sub', 'starter'),
+      subEvent('e2', 2, 'side-home', 'starter', 'sub', 'e1'),
+    ]);
+    expect(appeared).toEqual(new Set(['starter']));
+  });
+
+  it('counts a rolling substitute who came on, went off, and came on again', () => {
+    const participants = [
+      participant('starter', 'side-home', true),
+      participant('sub', 'side-home', false),
+    ];
+    const appeared = deriveAppearedParticipantIds(participants, [
+      subEvent('e1', 1, 'side-home', 'sub', 'starter'),
+      subEvent('e2', 2, 'side-home', 'starter', 'sub'),
+    ]);
+    expect(appeared).toEqual(new Set(['starter', 'sub']));
+  });
+
+  it('ignores non-SUBSTITUTION events — a bench player named on a GOAL is not folded in here', () => {
+    // The stat-map union that covers this case lives in
+    // `GamesService#deriveTournamentRevision`, deliberately not in this pure
+    // fold, which answers only "who was fielded".
+    const participants = [
+      participant('starter', 'side-home', true),
+      participant('bench', 'side-home', false),
+    ];
+    const events: SubstitutionPriorEvent[] = [
+      { id: 'e1', sequence: 1, type: 'GOAL', sideId: 'side-home', participantId: 'bench', reversesEventId: null, payload: {} },
+    ];
+    expect(deriveAppearedParticipantIds(participants, events)).toEqual(new Set(['starter']));
   });
 });
 

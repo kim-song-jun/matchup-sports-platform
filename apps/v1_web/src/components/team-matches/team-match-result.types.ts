@@ -104,9 +104,16 @@ export function hydrateResultFormFromRevision(revision: V1GameResultRevision): {
   cardDrafts: CardDraft[];
   mvpParticipantId: string;
   reason: string;
+  substituteIds: string[];
 } {
   const homeGoals: GoalDraft[] = [];
   const cardDrafts: CardDraft[] = [];
+  // A submitted revision only ever contains players who appeared, so every
+  // non-starter row in it is a substitute who actually came on — that is
+  // exactly the set of "교체 출전" toggles to restore.
+  const substituteIds = revision.resultParticipants
+    .filter((row) => !row.started)
+    .map((row) => row.participantId);
   for (const row of revision.resultParticipants) {
     for (let i = 0; i < row.goals; i += 1) {
       homeGoals.push({ key: randomUuid(), participantId: row.participantId });
@@ -129,6 +136,7 @@ export function hydrateResultFormFromRevision(revision: V1GameResultRevision): {
     cardDrafts,
     mvpParticipantId: revision.mvpParticipantId ?? '',
     reason: revision.reason ?? '',
+    substituteIds,
   };
 }
 

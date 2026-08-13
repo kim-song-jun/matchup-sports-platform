@@ -82,6 +82,53 @@ export function deriveOnPitchParticipantIds(
   return onPitch;
 }
 
+/**
+ * Everyone who was on the pitch at *any* point — the starters plus every
+ * player an active SUBSTITUTION ever brought on. This is deliberately NOT
+ * `deriveOnPitchParticipantIds`: that one answers "who is out there right
+ * now" and therefore *removes* a substituted-off player, while an appearance
+ * is permanent — a starter who came off in the 30th minute still played the
+ * match.
+ *
+ * The distinction is the whole point of the appearance gate: being named on
+ * a lineup (`V1GameParticipant`) is an entry, not an appearance. A bench
+ * player who never came on has no `started` flag and is never the INCOMING
+ * side of a SUBSTITUTION, so they are correctly absent from this set and
+ * must not be counted as having played the match.
+ *
+ * A reversed SUBSTITUTION is skipped for the same reason it is skipped in
+ * the on-pitch fold — `reverseEvent` is how a mis-entered substitution is
+ * undone, so the player it named never actually came on.
+ */
+export function deriveAppearedParticipantIds(
+  participants: readonly Pick<SubstitutionParticipant, 'id' | 'started'>[],
+  // Narrower than the on-pitch fold's input on purpose: no `sequence` (set
+  // union needs no ordering) and no `payload` (the OUTGOING player is
+  // irrelevant — going off does not un-play a match). Keeping the parameter
+  // to exactly what is read lets callers pass raw `V1GameEvent` rows, whose
+  // `payload` is a `Prisma.JsonValue` and so is not assignable to
+  // `SubstitutionPriorEvent['payload']`.
+  priorEvents: readonly Pick<
+    SubstitutionPriorEvent,
+    'id' | 'type' | 'participantId' | 'reversesEventId'
+  >[],
+): ReadonlySet<string> {
+  const reversedIds = new Set(
+    priorEvents
+      .map((event) => event.reversesEventId)
+      .filter((id): id is string => id !== null),
+  );
+  const appeared = new Set(participants.filter((p) => p.started).map((p) => p.id));
+  for (const event of priorEvents) {
+    if (event.type !== 'SUBSTITUTION' || reversedIds.has(event.id)) continue;
+    // Unlike the on-pitch fold this needs no `sequence` ordering: set union is
+    // commutative, and nothing is ever removed.
+    if (event.participantId === null) continue; // malformed row defensively ignored — cannot happen for events that passed validateSubstitution at append time
+    appeared.add(event.participantId);
+  }
+  return appeared;
+}
+
 /** Active (non-reversed) SUBSTITUTION count for one side — what
  * `substitutions: 'limited'` caps against. */
 export function countActiveSubstitutions(

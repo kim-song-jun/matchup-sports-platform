@@ -23,8 +23,11 @@ const COUNT = Number(process.env.COUNT || '1');
 const TITLE_PREFIX = process.env.TITLE_PREFIX || '(테스트) 라인업·실시간 운영';
 const ROSTER_SIZE = Number(process.env.ROSTER_SIZE || '8');
 
-if (!PASSWORD || !ADMIN_EMAIL || !CAPTAIN_A_EMAIL || !CAPTAIN_B_EMAIL) {
-  console.error('ALPHA_PASSWORD / ALPHA_ADMIN_EMAIL / ALPHA_CAPTAIN_A_EMAIL / ALPHA_CAPTAIN_B_EMAIL 이 필요해요.');
+// 참가 팀을 `ALPHA_ENTRANTS` 로 직접 주면 기본 두 팀(CAPTAIN_A/B)은 필요 없다.
+if (!PASSWORD || !ADMIN_EMAIL || (!process.env.ALPHA_ENTRANTS && (!CAPTAIN_A_EMAIL || !CAPTAIN_B_EMAIL))) {
+  console.error(
+    'ALPHA_PASSWORD / ALPHA_ADMIN_EMAIL 은 필수이고, 참가 팀은 ALPHA_CAPTAIN_A_EMAIL+ALPHA_CAPTAIN_B_EMAIL 또는 ALPHA_ENTRANTS 로 지정해요.',
+  );
   process.exit(1);
 }
 
@@ -132,17 +135,38 @@ async function registerTeam(tournamentId, teamId, captainCookie, adminCookie, de
   return reg.id;
 }
 
-/** 조별 → 4강 → 결승 → 3·4위전. 두 팀뿐이라 모든 경기가 A vs B 지만, 단계(phase)별 분기
- *  (조별 무승부 허용 vs knockout 승부차기 필수)는 그대로 전부 탄다. */
-const STAGES = [
-  { name: '조별리그', phase: 'group', round: '조별리그', sortOrder: 1 },
-  { name: '4강', phase: 'semi', round: '4강', sortOrder: 2 },
-  { name: '결승', phase: 'final', round: '결승', sortOrder: 3 },
-  { name: '3·4위전', phase: 'third_place', round: '3·4위전', sortOrder: 4 },
-];
+/**
+ * 대진 구성. 참가 팀 수에 따라 갈린다.
+ *
+ * 2팀: 모든 경기가 같은 대진이지만 단계(phase)별 분기 — 조별은 무승부로 끝낼 수 있고
+ * (승부차기 버튼이 뜨면 **안 되는** 경로), knockout 은 승부차기가 열리는 경로 — 는 전부 탄다.
+ *
+ * 4팀: 진짜 브래킷 모양. 두 조에서 한 경기씩, 4강은 조를 교차해 붙고, 결승·3·4위전까지 6경기.
+ *
+ * 결승·3·4위전에 진출팀을 비워 두지 않고 미리 배정한다. 진출 자동 배정은
+ * `v1_tournament_fixture_advancement_edges` 를 읽어 동작하는데 그 테이블에 행을 만드는 쓰기
+ * 경로가 코드베이스에 없다(읽기만 있다 — `GameResultBracketProjectionService.lockEdges`).
+ * TBD 로 두면 4강이 끝나도 아무도 채워주지 않아 그 두 경기는 영영 운영할 수 없다.
+ */
+const STAGES_BY_TEAM_COUNT = {
+  2: [
+    { name: '조별리그', phase: 'group', round: '조별리그', home: 0, away: 1 },
+    { name: '4강', phase: 'semi', round: '4강', home: 0, away: 1 },
+    { name: '결승', phase: 'final', round: '결승', home: 0, away: 1 },
+    { name: '3·4위전', phase: 'third_place', round: '3·4위전', home: 0, away: 1 },
+  ],
+  4: [
+    { name: 'A조', phase: 'group', round: '조별리그', home: 0, away: 1 },
+    { name: 'B조', phase: 'group', round: '조별리그', home: 2, away: 3 },
+    { name: '4강 1경기', phase: 'semi', round: '4강', home: 0, away: 2 },
+    { name: '4강 2경기', phase: 'semi', round: '4강', home: 1, away: 3 },
+    { name: '결승', phase: 'final', round: '결승', home: 0, away: 1 },
+    { name: '3·4위전', phase: 'third_place', round: '3·4위전', home: 2, away: 3 },
+  ],
+};
 
-async function createOne(index, cookies, termsDocumentIds) {
-  const { admin, captainA, captainB } = cookies;
+async function createOne(index, cookies, termsDocumentIds, entrants) {
+  const { admin } = cookies;
   const title = `${TITLE_PREFIX} ${String(index).padStart(2, '0')}`;
   console.log(`\n[${index}] ${title}`);
 
@@ -153,7 +177,7 @@ async function createOne(index, cookies, termsDocumentIds) {
       title,
       format: 'group_knockout',
       entryFee: 0,
-      teamCount: 2,
+      teamCount: entrants.length,
       minPlayers: 5,
       maxPlayers: 15,
       venue: '알파 QA 풋살장',
@@ -168,37 +192,60 @@ async function createOne(index, cookies, termsDocumentIds) {
 
   must('status→open', await call('POST', `/admin/tournaments/${tid}/status`, admin, { status: 'open' }));
 
-  const regA = await registerTeam(tid, TEAM_A, captainA, admin, 'E2E팀장A', termsDocumentIds);
-  const regB = await registerTeam(tid, TEAM_B, captainB, admin, 'E2E팀장B', termsDocumentIds);
-  console.log(`   등록 확정 A=${regA.slice(0, 8)} B=${regB.slice(0, 8)}`);
-
-  const rosterA = await fillRoster(tid, regA, captainA, admin);
-  const rosterB = await fillRoster(tid, regB, captainB, admin);
-  console.log(`   로스터 A=${rosterA.added}/${rosterA.candidates} B=${rosterB.added}/${rosterB.candidates}`);
-
-  const fixtures = [];
-  for (const [i, stage] of STAGES.entries()) {
-    const group = must(
-      `그룹 생성(${stage.name})`,
-      await call('POST', `/admin/tournaments/${tid}/groups`, admin, {
-        name: stage.name,
-        phase: stage.phase,
-        sortOrder: stage.sortOrder,
-      }),
+  // 참가 팀 등록 → 확정 → 로스터. 팀 순서가 곧 대진표의 좌석 번호(STAGES 의 home/away 인덱스)다.
+  const registrationIds = [];
+  for (const entrant of entrants) {
+    const registrationId = await registerTeam(
+      tid,
+      entrant.teamId,
+      entrant.cookie,
+      admin,
+      entrant.depositorName,
+      termsDocumentIds,
     );
+    const roster = await fillRoster(tid, registrationId, entrant.cookie, admin);
+    console.log(`   ${entrant.label}: 확정 ${registrationId.slice(0, 8)} · 로스터 ${roster.added}/${roster.candidates}`);
+    registrationIds.push(registrationId);
+  }
+
+  const stages = STAGES_BY_TEAM_COUNT[entrants.length];
+  if (!stages) throw new Error(`참가 팀 ${entrants.length}개에 대한 대진 구성이 없어요(2 또는 4).`);
+
+  // 같은 라운드가 두 경기인 4팀 브래킷에서는 그룹을 라운드마다 하나만 만들고 재사용한다 —
+  // 조는 "A조/B조"처럼 실제로 갈리지만 4강 두 경기는 같은 4강 그룹에 들어가야 한다.
+  const groupIdByName = new Map();
+  const fixtures = [];
+  for (const [i, stage] of stages.entries()) {
+    let groupId = groupIdByName.get(stage.name);
+    if (!groupId) {
+      const group = must(
+        `그룹 생성(${stage.name})`,
+        await call('POST', `/admin/tournaments/${tid}/groups`, admin, {
+          name: stage.name,
+          phase: stage.phase,
+          sortOrder: i + 1,
+        }),
+      );
+      groupId = group.id;
+      groupIdByName.set(stage.name, groupId);
+    }
     const fixture = must(
       `픽스처 생성(${stage.name})`,
       await call('POST', `/admin/tournaments/${tid}/fixtures`, admin, {
-        groupId: group.id,
+        groupId,
         round: stage.round,
         fixtureNumber: i + 1,
-        homeRegistrationId: regA,
-        awayRegistrationId: regB,
+        homeRegistrationId: registrationIds[stage.home],
+        awayRegistrationId: registrationIds[stage.away],
         venue: '알파 QA 풋살장',
         scheduledAt: isoDaysFromNow(1, 10 + i),
       }),
     );
-    fixtures.push({ stage: stage.name, fixtureId: fixture.id, gameId: fixture.gameId ?? null });
+    fixtures.push({
+      stage: stage.name,
+      matchup: `${entrants[stage.home].label} vs ${entrants[stage.away].label}`,
+      fixtureId: fixture.id,
+    });
   }
 
   // 대진표를 공개하지 않으면 공개 상세(`GET /tournaments/:id`)가 groups·fixtures 를
@@ -213,21 +260,48 @@ async function createOne(index, cookies, termsDocumentIds) {
 
   // 라인업 진입이 실제로 열렸는지 확인한다 — 이 시드의 목적 자체가 "라인업 확정부터
   // 테스트"이므로, 경기만 만들어두고 접근이 막혀 있으면 만든 의미가 없다.
-  const access = await call('GET', `/tournaments/${tid}/fixtures/${fixtures[0].fixtureId}/lineup-access`, captainA);
+  const access = await call(
+    'GET',
+    `/tournaments/${tid}/fixtures/${fixtures[0].fixtureId}/lineup-access`,
+    entrants[0].cookie,
+  );
   if (access.status !== 200 || !access.data?.gameId) {
     throw new Error(`라인업 접근 검증 실패 (${access.status}): ${JSON.stringify(access.raw).slice(0, 200)}`);
   }
 
-  console.log(`   경기 ${fixtures.length}개: ${fixtures.map((f) => f.stage).join(', ')}`);
+  console.log(`   경기 ${fixtures.length}개: ${fixtures.map((f) => `${f.stage}(${f.matchup})`).join(', ')}`);
   return { title, tournamentId: tid, fixtures };
 }
 
-const cookies = {
-  admin: await login(ADMIN_EMAIL),
-  captainA: await login(CAPTAIN_A_EMAIL),
-  captainB: await login(CAPTAIN_B_EMAIL),
-};
-console.log('로그인 완료 (admin / captainA / captainB)');
+/**
+ * 참가 팀 명단. 기본은 기존 E2E 두 팀이고, `ALPHA_ENTRANTS` 로 넘기면 팀 수를 바꾼다 —
+ * `이메일:팀ID:표시이름` 을 쉼표로 이어 붙인다(팀장 계정이어야 등록·로스터·라인업이 된다).
+ */
+async function resolveEntrants() {
+  const spec = process.env.ALPHA_ENTRANTS;
+  if (!spec) {
+    return [
+      { label: 'A팀', teamId: TEAM_A, cookie: await login(CAPTAIN_A_EMAIL), depositorName: 'E2E팀장A' },
+      { label: 'B팀', teamId: TEAM_B, cookie: await login(CAPTAIN_B_EMAIL), depositorName: 'E2E팀장B' },
+    ];
+  }
+  const entrants = [];
+  for (const raw of spec.split(',').map((s) => s.trim()).filter(Boolean)) {
+    const [captainEmail, teamId, label] = raw.split(':');
+    if (!captainEmail || !teamId) throw new Error(`ALPHA_ENTRANTS 형식 오류: "${raw}" (이메일:팀ID:표시이름)`);
+    entrants.push({
+      label: label ?? teamId.slice(0, 8),
+      teamId,
+      cookie: await login(captainEmail),
+      depositorName: label ?? '테스트팀장',
+    });
+  }
+  return entrants;
+}
+
+const cookies = { admin: await login(ADMIN_EMAIL) };
+const entrants = await resolveEntrants();
+console.log(`로그인 완료 (admin + 팀장 ${entrants.length}명: ${entrants.map((e) => e.label).join(', ')})`);
 
 const termsDocumentIds = await tournamentTermsDocumentIds();
 console.log(`대회 신청 약관 ${termsDocumentIds.length}건 동의 예정`);
@@ -236,7 +310,7 @@ const START_INDEX = Number(process.env.START_INDEX || '1');
 const created = [];
 for (let i = START_INDEX; i < START_INDEX + COUNT; i += 1) {
   try {
-    created.push(await createOne(i, cookies, termsDocumentIds));
+    created.push(await createOne(i, cookies, termsDocumentIds, entrants));
   } catch (error) {
     console.error(`[${i}] 중단: ${error.message}`);
     break;

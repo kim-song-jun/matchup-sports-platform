@@ -168,8 +168,21 @@ export const gameSchemaFixture = {
 // migration file backs it (20260813070000_v1_tournament_review_team_scope); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for 라인업 기반 신원 연결: `V1IdentityLinkAction` gains `ROSTER_ASSERTED` and a new
+// `V1UserRecordConsent` model lands. Unlike the 대회 후기 팀 귀속 re-pin above, this one *does*
+// touch the game domain — the identity-link enum is read by `v1_guard_identity_event`, so the
+// guard firing here is the intended signal, not incidental file-hash noise. The new action is
+// additive and deliberately outside that trigger's `ATTESTED`/`EXPIRED` branch: roster
+// attribution records a squad-list fact rather than a two-party attestation, so a player who is
+// also the manager can be linked from their own lineup save. `V1GameParticipant.user_id` is in
+// this diff too but is owned by 20260813190000_v1_game_participant_user_id (dev), not by this
+// branch. Backing migration: 20260813120000_v1_roster_identity_link — verified by replaying the
+// full chain against an empty database (`prisma migrate deploy`) plus a drift check
+// (`prisma migrate diff --exit-code` → "No difference detected"). The bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: '1c26ba9b9c08a4c7cca1c83e45af05989459134e9e182850bba864b0269c7825',
+  schema: '00a50be5568ad1debdaa1b9e585185172ff1ace4c364f11f16112457c32c9a70',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

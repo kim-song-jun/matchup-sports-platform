@@ -4,6 +4,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import { v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { compressImagesForUpload } from '@/lib/image-compress';
+import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
 import type { GameLineup, GameLineupState } from '@/types/game-operations';
@@ -1506,6 +1507,12 @@ export function useV1FixtureLineupRoster(
       ),
     enabled: Boolean(tournamentId) && Boolean(fixtureId) && Boolean(sideId),
     retry: false,
+    // 편집 세션 동안 명단을 고정한다. 전역 기본값은 refetchOnWindowFocus: true(providers.tsx)인데,
+    // 라인업 화면은 이 명단으로 **한 번만** 상태를 수화하고 이후 그 상태를 편집한다 — 창을 잠깐
+    // 벗어난 사이 명단이 갱신되면 화면(로스터 기준으로 그린다)과 저장 대상(수화된 상태) 이 갈라져,
+    // 목록에서 사라진 선수가 저장 페이로드에는 그대로 실린다(등록 명단이 SSOT라는 이 화면의 전제가
+    // 조용히 깨진다). 명단을 고쳤다면 화면을 다시 여는 것이 맞다(Copilot 리뷰 지적).
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -2863,13 +2870,13 @@ export function useV1AllTournaments(params?: AllTournamentListFilters) {
 }
 
 /**
- * LIVE 픽스처가 있을 때만 폴링 — `use-public-game-records.ts`의 `LIVE_POLL_INTERVAL_MS`와
- * 동일한 부하 모델(뷰어당 8초 하한, idle 페이지는 폴링 0)을 이 훅에도 그대로 적용한다.
- * 별도 모듈 상수를 import하지 않고 값만 재정의한 이유: 두 파일은 서로 다른 기능
- * 레인(공개 전적 vs 대회 상세)이라 강결합할 이유가 없고, 값 자체가 "8초"라는 합의된
- * 상수라 로컬 정의로도 단일 소스 원칙이 깨지지 않는다(주석으로 쌍둥이 정의임을 명시).
+ * LIVE 픽스처가 있을 때만 폴링 — 주기 값과 근거(뷰어당 10초 하한, idle 페이지는 폴링 0,
+ * 관전자 수에 비례하는 부하 모델)는 `@/lib/public-live-polling`이 단일 소스로 보유한다.
+ * `/tournaments/:id/bracket`이 이 훅과 공개 일정 훅(`usePublicTournamentSchedule`)을
+ * 같은 화면에서 동시에 쓰므로, 두 곳이 각자 숫자를 정의하면 한쪽만 수정될 때 어긋난 두
+ * 주기로 이중 폴링이 된다 — 그래서 주석 규율 대신 공유 상수로 구조적으로 묶었다.
  */
-const V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS = 8_000;
+const V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS = PUBLIC_LIVE_POLL_INTERVAL_MS;
 
 /**
  * `options.livePolling`은 opt-in — 기본값(false)에서는 기존 동작(폴링 없음)을 그대로
@@ -2945,7 +2952,11 @@ export function useV1TournamentParticipantCheck(tournamentId: string, enabled = 
 export function useV1SubmitTournamentReview(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[] }) =>
+    // teamId는 여러 팀의 팀장·운영진을 겸하고 그 팀들이 모두 이 대회에 참가 확정된
+    // 사용자에게만 필요하다(단일 자격 팀이면 서버가 자동 선택). 서버가 400
+    // TEAM_SELECTION_REQUIRED + details.teams 로 후보 목록을 돌려주면 호출자가 사용자에게
+    // 팀을 고르게 한 뒤 이 필드를 채워 재요청한다.
+    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[]; teamId?: string }) =>
       v1Post<V1TournamentReview>(`/tournaments/${tournamentId}/reviews`, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });

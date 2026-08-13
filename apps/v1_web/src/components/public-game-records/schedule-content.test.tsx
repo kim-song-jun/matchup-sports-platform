@@ -115,6 +115,7 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
     scoreStatus: 'official',
     score: { home: 1, away: 0, penalties: null },
     clock: null,
+    periodBreak: null,
     scorers: [],
     hasVideo: false,
     ...overrides,

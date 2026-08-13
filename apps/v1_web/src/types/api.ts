@@ -3666,8 +3666,11 @@ export type V1TournamentOperationsBoardItem = {
   homeRegistrationId: string | null;
   awayRegistrationId: string | null;
   scheduledAt: string | null;
-  /** V1GameResultRevision.score — 형태는 아직 확정되지 않았다(Task 20-22가 정의). 화면은 존재 여부만 사용한다. */
-  currentScore: unknown;
+  /** 확정(OFFICIAL) 리비전의 점수 스냅샷 — `V1GameResultRevision.score` 그대로다
+   *  (`game.currentOfficialRevision?.score ?? null`). 두 형태의 유니온이므로 읽을 때는
+   *  반드시 `lib/game-result-score` 의 헬퍼를 쓴다(직접 `.home` 을 읽으면 백필된 경기가
+   *  `undefined:undefined` 가 된다). 승부차기는 이 안의 `penalties`/`penalty` 에 있다. */
+  currentScore: V1GameResultScore | null;
   warnings: V1TournamentStableWarningCode[];
   version: number | null;
   revisionId: string | null;

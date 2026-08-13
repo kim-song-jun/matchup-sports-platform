@@ -767,8 +767,8 @@ export async function createScenario(
   });
   await tx.v1TournamentReview.createMany({
     data: [
-      { tournamentId: scenario.id, authorUserId: teams[0].user.id, teamName: teams[0].team.name, rating: 5, comment: '경기 진행과 결과 안내가 명확했어요.', photoUrls: [COVER_IMAGE_URL] },
-      { tournamentId: scenario.id, authorUserId: teams[1].user.id, teamName: teams[1].team.name, rating: 4, comment: '영상과 개인 시상까지 남아 다음 대회 준비에 도움이 됐어요.', photoUrls: [TEAM_IMAGE_URL] },
+      { tournamentId: scenario.id, authorUserId: teams[0].user.id, teamId: teams[0].team.id, teamName: teams[0].team.name, rating: 5, comment: '경기 진행과 결과 안내가 명확했어요.', photoUrls: [COVER_IMAGE_URL] },
+      { tournamentId: scenario.id, authorUserId: teams[1].user.id, teamId: teams[1].team.id, teamName: teams[1].team.name, rating: 4, comment: '영상과 개인 시상까지 남아 다음 대회 준비에 도움이 됐어요.', photoUrls: [TEAM_IMAGE_URL] },
     ],
   });
   await tx.v1TournamentSponsor.create({

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -34,8 +34,17 @@ export class TournamentFixtureLineupAccessController {
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
     @Param('fixtureId') fixtureId: string,
-    @Query('sideId') sideId: string,
+    @Query('sideId') sideId?: string,
   ) {
+    // sideId 없이 내려보내면 Prisma가 `id: undefined` 를 **필터 없음**으로 해석해
+    // 그 경기의 아무 사이드나 집어 든다 — 요청하지 않은 팀의 명단을 조용히 돌려주는
+    // 셈이라, 없는 값은 여기서 잘라낸다(Copilot 리뷰 지적).
+    if (sideId === undefined || sideId.trim() === '') {
+      throw new BadRequestException({
+        code: 'GAME_SIDE_ID_REQUIRED',
+        message: '어느 팀의 명단인지 지정해 주세요.',
+      });
+    }
     return this.gamesService.resolveFixtureLineupRoster(user, tournamentId, fixtureId, sideId);
   }
 }

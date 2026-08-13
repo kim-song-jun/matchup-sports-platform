@@ -537,3 +537,48 @@ describe('BracketPageContent — 결선 대진표는 조별리그 완료 후에�
     expect(screen.getByText('결승 홈팀')).toBeInTheDocument();
   });
 });
+
+/**
+ * §데스크탑 폭 배분 — 대진표에 넓은 칼럼(0.72:1.28)을 주는 기본 배분은 라운드가 여러
+ * 개일 때의 전제다. 결승 하나뿐인 대회에서는 그 폭을 커넥터만 가로지르고 순위표는
+ * 366px로 눌렸다(1440 실측). 폭 배분을 뒤집는 근거가 "결선 라운드 수"라는 데이터이므로,
+ * CSS가 아니라 이 판정 로직을 테스트한다 — 라운드가 3개 이상인 대회까지 좁은 대진표로
+ * 바뀌면 8강 대진이 잘린다.
+ */
+describe('BracketPageContent — 결선 라운드 수에 따른 칼럼 배분 클래스', () => {
+  const groupsDone = [makeGroup({ id: 'group-a', phase: 'group', name: 'A조', advanceCount: 2 })];
+  const groupFixture = makeFixture({ id: 'fx-group', groupId: 'group-a', round: 'group', status: 'completed' });
+
+  it('결선이 결승뿐이면 순위표 쪽을 넓히는 클래스를 붙인다', () => {
+    const { container } = renderBracketStandingsTab(
+      makeTournament({
+        id: 'tour-slim',
+        status: 'in_progress',
+        format: 'group_knockout',
+        groups: groupsDone,
+        fixtures: [groupFixture, makeFixture({ id: 'fx-final', groupId: null, round: 'final', status: 'scheduled' })],
+      }),
+    );
+
+    expect(container.querySelector('.tm-bracket-page-grid-slim-bracket')).toBeInTheDocument();
+  });
+
+  // 4강+결승은 대진표 최소 폭이 2×216+120 = 552px라 좁힌 칼럼(460px)에 안 들어간다.
+  it('4강+결승이면 대진표 폭을 그대로 둔다', () => {
+    const { container } = renderBracketStandingsTab(
+      makeTournament({
+        id: 'tour-wide',
+        status: 'in_progress',
+        format: 'group_knockout',
+        groups: groupsDone,
+        fixtures: [
+          groupFixture,
+          makeFixture({ id: 'fx-semi', groupId: null, round: 'semi', status: 'scheduled' }),
+          makeFixture({ id: 'fx-final', groupId: null, round: 'final', status: 'scheduled' }),
+        ],
+      }),
+    );
+
+    expect(container.querySelector('.tm-bracket-page-grid-slim-bracket')).not.toBeInTheDocument();
+  });
+});

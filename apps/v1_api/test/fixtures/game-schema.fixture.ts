@@ -147,8 +147,29 @@ export const gameSchemaFixture = {
 // (20260813061500_v1_tournament_personal_review_scope); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for 대회 라인업의 등록 명단 연결: V1GameParticipant gains a nullable `user_id` so a
+// saved tournament lineup can be matched back against the tournament roster by person instead of
+// by display-name string (동명이인이면 이름 매칭은 선발 표시를 엉뚱한 사람에게 붙인다). Like the
+// HALFTIME re-pin and unlike the review ones, this DOES touch the game domain — that is why this
+// guard fired, and it fired correctly. It is still additive: the column is nullable with no
+// default, so every existing participant row keeps its exact meaning (null = 이 컬럼이 없던 시절에
+// 저장됐거나 사용자 계정을 쓰지 않는 team-match 경로), and no enum, relation, or FK changes. One
+// new migration file backs it (20260813190000_v1_game_participant_user_id); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for 대회 후기 팀 귀속: V1TournamentReview gains a nullable `team_id` (+ V1Team
+// relation and a (tournament_id, team_id) unique) so a tournament review belongs to the team
+// rather than to whoever pressed the apply button — 팀장이 신청했으면 운영진이 후기를 쓸 수도,
+// 우리 팀이 이미 썼는지 볼 수도 없었다. Same shape as the review re-pins above and unlike the
+// HALFTIME/user_id ones, this does NOT touch the game domain — no v1_game_* model, enum, or
+// relation changes; the guard fired only because it hashes the whole schema.prisma file. The
+// column is nullable by design: the backfill leaves ambiguous legacy rows unmapped rather than
+// guessing, and NULLs do not collide under the new unique (Postgres NULL-distinct). One new
+// migration file backs it (20260813070000_v1_tournament_review_team_scope); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: '8082327f33930061ad963f51541707b7d7bea4b70e72d94303b60592e153cd32',
+  schema: '1c26ba9b9c08a4c7cca1c83e45af05989459134e9e182850bba864b0269c7825',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

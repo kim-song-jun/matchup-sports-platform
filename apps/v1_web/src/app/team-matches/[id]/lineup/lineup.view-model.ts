@@ -1,4 +1,4 @@
-import type { FormationSlot } from '@/components/lineup/formation-slots';
+import { GOALKEEPER_SLOT_CODE, type FormationSlot } from '@/components/lineup/formation-slots';
 import { applyAssignmentToEntries, planFormationAssignment } from '@/components/lineup/formation-assignment';
 import { randomUuid } from '@/lib/uuid';
 import type {
@@ -407,6 +407,66 @@ export function matchSlotsToEntries(
     slot,
     entry: entryKey === null ? null : entryByKey.get(entryKey) ?? null,
   }));
+}
+
+/**
+ * 지정한 선발들을 지금 포메이션의 빈 자리에 앉힌다 — "선수를 등록하면 알아서 자리에
+ * 들어간다"는 동작의 유일한 구현체다.
+ *
+ * **호출 시점을 좁게 유지하는 것이 이 함수의 핵심 계약이다.** 호출부는 방금 선발이 된
+ * 사람(그리고 방금 골키퍼로 지정된 사람)의 key만 `seatKeys`로 넘긴다. 포메이션을 바꿀 때는
+ * 이 함수를 부르지 않는다 — 그때 이미 배치된 선수를 옮기는 일은 formation-assignment.ts가
+ * 맡고, 대기 중이던 선수를 그 김에 끌어들이지는 않는다("아무것도 선택하지 않았는데 선수가
+ * 들어가 있다"는 제보가 바로 그 무분별한 자동 채우기 때문이었다).
+ *
+ * 골키퍼 자리에는 `goalkeeper` 플래그가 켜진 사람만 앉는다. 필드 선수는 골키퍼 자리를
+ * 절대 차지하지 않고, 앉을 자리가 없으면 조용히 대기로 남는다. 바꿀 게 없으면 **원본 배열
+ * 참조를 그대로** 돌려주므로 호출부가 결과로 setState를 해도 불필요한 렌더가 생기지 않는다.
+ */
+export function seatStartersInEmptySlots(
+  starters: LineupEntryDraft[],
+  slots: FormationSlot[],
+  seatKeys: readonly string[],
+): LineupEntryDraft[] {
+  const seating = new Set(seatKeys);
+  // 아직 피치에 없는 사람만 대상 — 이미 좌표가 있는 선수는 사용자가 직접 놓았거나 드래그로
+  // 옮긴 것이므로 건드리지 않는다.
+  const toSeat = starters.filter(
+    (entry) => seating.has(entry.key) && (entry.positionX === null || entry.positionY === null),
+  );
+  if (toSeat.length === 0) return starters;
+
+  const emptySlots = matchSlotsToEntries(slots, starters)
+    .filter((row) => row.entry === null)
+    .map((row) => row.slot);
+  if (emptySlots.length === 0) return starters;
+
+  const assignments = new Map<string, FormationSlot>();
+  const takenSlots = new Set<FormationSlot>();
+  for (const entry of toSeat) {
+    const slot = emptySlots.find((candidate) => {
+      if (takenSlots.has(candidate)) return false;
+      const isGoalkeeperSlot = candidate.positionCode === GOALKEEPER_SLOT_CODE;
+      return entry.goalkeeper ? isGoalkeeperSlot : !isGoalkeeperSlot;
+    });
+    if (slot === undefined) continue;
+    takenSlots.add(slot);
+    assignments.set(entry.key, slot);
+  }
+  if (assignments.size === 0) return starters;
+
+  return starters.map((entry) => {
+    const slot = assignments.get(entry.key);
+    if (slot === undefined) return entry;
+    const isGoalkeeperSlot = slot.positionCode === GOALKEEPER_SLOT_CODE;
+    return {
+      ...entry,
+      positionX: slot.x,
+      positionY: slot.y,
+      position: isGoalkeeperSlot ? null : slot.positionCode,
+      goalkeeper: isGoalkeeperSlot,
+    };
+  });
 }
 
 /** 포메이션 프리셋을 실제로 적용한다 — 라벨만 바꾸는 selectFormation과 달리 이미 배치된

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, V1TeamMembershipRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -32,6 +32,14 @@ export class ListTournamentReviewsQueryDto {
 }
 
 export class SubmitTournamentReviewDto {
+  /**
+   * 후기를 남길 참가 팀. 대표를 맡은 참가 팀이 하나뿐이면 생략할 수 있고,
+   * 두 팀 이상의 owner|manager 를 겸한 경우에만 필수다.
+   */
+  @IsOptional()
+  @IsString()
+  teamId?: string;
+
   @IsInt()
   @Min(1)
   @Max(5)
@@ -93,6 +101,13 @@ export class HideTournamentReviewDto {
 type ReviewRowWithAuthor = Prisma.V1TournamentReviewGetPayload<{
   include: { author: { select: { id: true; profile: { select: { nickname: true; profileImageUrl: true } } } } };
 }>;
+
+/** 대회 후기를 팀 이름으로 남길 수 있는 역할 — 경기 리뷰(reviews 모듈)와 동일 기준 */
+const TOURNAMENT_REVIEW_ROLES: V1TeamMembershipRole[] = ['owner', 'manager'];
+
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P2002');
+}
 
 @Injectable()
 export class TournamentReviewsService {
@@ -172,7 +187,44 @@ export class TournamentReviewsService {
     };
   }
 
-  /** 리뷰 작성 (참가 확정 팀의 대표만 가능, 대회 completed 상태) */
+  /**
+   * 내가 후기를 남길 수 있는 참가 팀 목록.
+   *
+   * 자격은 "대회에 신청서를 낸 계정"이 아니라 **참가 확정 팀의 현재 owner|manager** 다.
+   * 신청은 매니저가 내고 후기는 팀장이 쓰는 흔한 운영 방식을 막지 않기 위함이며,
+   * 반대로 팀을 떠난 신청자는 더 이상 팀 이름으로 후기를 남길 수 없다.
+   */
+  private async reviewableTeams(tournamentId: string, userId: string) {
+    const registrations = await this.prisma.v1TournamentRegistration.findMany({
+      where: {
+        tournamentId,
+        status: 'confirmed',
+        team: {
+          memberships: {
+            some: { userId, status: 'active', role: { in: TOURNAMENT_REVIEW_ROLES } },
+          },
+        },
+      },
+      select: { team: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (registrations.length === 0) return [];
+
+    const teamIds = registrations.map((r) => r.team.id);
+    const written = await this.prisma.v1TournamentReview.findMany({
+      where: { tournamentId, teamId: { in: teamIds } },
+      select: { teamId: true },
+    });
+    const writtenTeamIds = new Set(written.map((r) => r.teamId));
+
+    return registrations.map((r) => ({
+      teamId: r.team.id,
+      teamName: r.team.name,
+      alreadyReviewed: writtenTeamIds.has(r.team.id),
+    }));
+  }
+
+  /** 리뷰 작성 (참가 확정 팀의 팀장·매니저, 팀당 1건, 대회 completed 상태) */
   async submitReview(
     tournamentId: string,
     user: V1AuthUser,
@@ -189,76 +241,106 @@ export class TournamentReviewsService {
       throw new BadRequestException({ code: 'TOURNAMENT_NOT_COMPLETED', message: '대회가 종료된 후 리뷰를 작성할 수 있어요.' });
     }
 
-    // 2. 참가팀 확인 (해당 유저가 appliedByUser인 confirmed 등록 존재)
-    const registration = await this.prisma.v1TournamentRegistration.findFirst({
-      where: {
-        tournamentId,
-        appliedByUserId: user.id,
-        status: 'confirmed',
-      },
-      include: { team: { select: { id: true, name: true } } },
-    });
-    if (!registration) {
+    // 2. 작성 자격 팀 확인
+    const teams = await this.reviewableTeams(tournamentId, user.id);
+    if (teams.length === 0) {
       throw new ForbiddenException({
-        code: 'NOT_PARTICIPANT',
-        message: '대회에 참가한 팀의 대표만 리뷰를 작성할 수 있어요.',
+        code: 'NOT_TEAM_REVIEW_MANAGER',
+        message: '대회에 참가한 팀의 팀장 또는 매니저만 후기를 작성할 수 있어요.',
       });
     }
 
-    // 3. 중복 리뷰 확인
-    const existing = await this.prisma.v1TournamentReview.findUnique({
-      where: { tournamentId_authorUserId: { tournamentId, authorUserId: user.id } },
-    });
-    if (existing) {
-      throw new BadRequestException({ code: 'ALREADY_REVIEWED', message: '이미 리뷰를 작성했어요.' });
+    // 3. 어느 팀 이름으로 남길지 확정 — 겸직이면 호출자가 명시해야 한다
+    let target: (typeof teams)[number];
+    if (dto.teamId) {
+      const picked = teams.find((t) => t.teamId === dto.teamId);
+      if (!picked) {
+        throw new ForbiddenException({
+          code: 'NOT_TEAM_REVIEW_MANAGER',
+          message: '선택한 팀의 팀장 또는 매니저가 아니에요.',
+        });
+      }
+      target = picked;
+    } else if (teams.length > 1) {
+      throw new BadRequestException({
+        code: 'REVIEWER_TEAM_REQUIRED',
+        message: '후기를 남길 팀을 선택해 주세요.',
+      });
+    } else {
+      target = teams[0];
     }
 
-    // 4. 저장
-    const review = await this.prisma.v1TournamentReview.create({
-      data: {
-        tournamentId,
-        authorUserId: user.id,
-        teamName: registration.team.name,
-        rating: dto.rating,
-        comment: dto.comment ?? null,
-        photoUrls: dto.photoUrls ?? [],
-      },
-      include: {
-        author: { select: { id: true, profile: { select: { nickname: true, profileImageUrl: true } } } },
-      },
-    });
+    // 4. 중복 리뷰 확인 (팀 단위)
+    if (target.alreadyReviewed) {
+      throw new BadRequestException({ code: 'ALREADY_REVIEWED', message: '이미 팀 후기가 등록됐어요.' });
+    }
+
+    // 5. 저장 — 동시 제출은 (tournament_id, team_id) unique 가 최종 방어선이다
+    const review = await this.prisma.v1TournamentReview
+      .create({
+        data: {
+          tournamentId,
+          authorUserId: user.id,
+          teamId: target.teamId,
+          teamName: target.teamName,
+          rating: dto.rating,
+          comment: dto.comment ?? null,
+          photoUrls: dto.photoUrls ?? [],
+        },
+        include: {
+          author: { select: { id: true, profile: { select: { nickname: true, profileImageUrl: true } } } },
+        },
+      })
+      .catch((error: unknown) => {
+        if (isUniqueConstraintError(error)) {
+          throw new BadRequestException({ code: 'ALREADY_REVIEWED', message: '이미 팀 후기가 등록됐어요.' });
+        }
+        throw error;
+      });
 
     return this.mapReviewRow(review);
   }
 
-  /** 내가 참가 확정한 대회 중 종료됐지만 아직 리뷰를 작성하지 않은 대회 목록 (최근 종료순) */
+  /**
+   * 내가 대표를 맡은 팀이 참가 확정한 대회 중, 종료됐지만 아직 팀 후기가 없는 대회 목록.
+   * 팀 단위로 판단하므로 신청은 매니저가 했더라도 팀장에게 동일하게 노출된다.
+   */
   async listMyPendingReviews(userId: string) {
     const registrations = await this.prisma.v1TournamentRegistration.findMany({
       where: {
-        appliedByUserId: userId,
         status: 'confirmed',
         tournament: { status: 'completed', deletedAt: null },
+        team: {
+          memberships: {
+            some: { userId, status: 'active', role: { in: TOURNAMENT_REVIEW_ROLES } },
+          },
+        },
       },
       select: {
+        teamId: true,
         tournament: { select: { id: true, title: true, scheduledEndAt: true, updatedAt: true } },
       },
-      distinct: ['tournamentId'],
     });
     if (registrations.length === 0) return [];
 
-    const tournamentIds = registrations.map((r) => r.tournament.id);
+    const tournamentIds = [...new Set(registrations.map((r) => r.tournament.id))];
     const reviewed = await this.prisma.v1TournamentReview.findMany({
-      where: { authorUserId: userId, tournamentId: { in: tournamentIds } },
-      select: { tournamentId: true },
+      where: { tournamentId: { in: tournamentIds }, teamId: { not: null } },
+      select: { tournamentId: true, teamId: true },
     });
-    const reviewedSet = new Set(reviewed.map((r) => r.tournamentId));
+    const reviewedKeys = new Set(reviewed.map((r) => `${r.tournamentId}:${r.teamId}`));
 
     // scheduledEndAt(예정 종료일) 우선 — updatedAt은 완료 후 커버이미지 등 무관한 수정에도 갱신되어 정렬 기준으로 부정확
     const completedAt = (t: { scheduledEndAt: Date | null; updatedAt: Date }) => t.scheduledEndAt ?? t.updatedAt;
 
-    return registrations
-      .map((r) => r.tournament)
-      .filter((t) => !reviewedSet.has(t.id))
+    // 한 대회에 여러 팀의 대표를 겸할 수 있으므로, 대회 단위로 접어 카드가 중복되지 않게 한다.
+    const pendingByTournament = new Map<string, (typeof registrations)[number]['tournament']>();
+    for (const r of registrations) {
+      if (reviewedKeys.has(`${r.tournament.id}:${r.teamId}`)) continue;
+      if (!pendingByTournament.has(r.tournament.id)) pendingByTournament.set(r.tournament.id, r.tournament);
+    }
+
+    return [...pendingByTournament.values()]
       .sort((a, b) => completedAt(b).getTime() - completedAt(a).getTime())
       .map((t) => ({
         tournamentId: t.id,
@@ -267,26 +349,16 @@ export class TournamentReviewsService {
       }));
   }
 
-  /** 내 리뷰 조회 (이미 작성했는지 확인) */
-  async getMyReview(tournamentId: string, userId: string) {
-    const review = await this.prisma.v1TournamentReview.findUnique({
-      where: { tournamentId_authorUserId: { tournamentId, authorUserId: userId } },
-    });
-    if (!review) return null;
+  /**
+   * 후기 작성 자격 확인 — 참가 팀 여부와, 팀별 작성 완료 상태를 함께 돌려준다.
+   * 프론트는 `reviewableTeams` 로 CTA 노출/팀 선택 여부를 결정한다.
+   */
+  async participantCheck(tournamentId: string, userId: string) {
+    const teams = await this.reviewableTeams(tournamentId, userId);
     return {
-      id: review.id,
-      rating: review.rating,
-      comment: review.comment ?? null,
-      createdAt: review.createdAt.toISOString(),
+      isParticipant: teams.length > 0,
+      reviewableTeams: teams,
     };
-  }
-
-  /** 참가 팀 대표인지 확인 */
-  async isParticipant(tournamentId: string, userId: string): Promise<boolean> {
-    const reg = await this.prisma.v1TournamentRegistration.findFirst({
-      where: { tournamentId, appliedByUserId: userId, status: 'confirmed' },
-    });
-    return !!reg;
   }
 
   // ───────────────────── 리뷰 숨김 모더레이션 (어드민 전용) ─────────────────────

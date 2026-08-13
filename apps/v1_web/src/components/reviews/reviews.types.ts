@@ -43,6 +43,8 @@ export type ReviewSourcePageModel = V1ReviewSourceResponse & {
 export type ReviewTargetViewModel = V1ReviewTarget & {
   initials: string;
   statusLabel: string;
+  /** 양 팀 겸직이라 대상마다 작성자 팀이 다를 때만 채워진다. */
+  reviewerTeamLabel: string | null;
 };
 
 export type ReceivedReviewGroup = {

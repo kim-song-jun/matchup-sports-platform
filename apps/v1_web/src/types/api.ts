@@ -1565,10 +1565,22 @@ export type V1ReviewReceivedResponse = {
   };
 };
 
+export type V1ReviewerTeam = {
+  teamId: string;
+  name: string;
+  /** 팀 후기는 참가팀 active 멤버 전원이 쓸 수 있으므로 일반 멤버(member)도 온다. */
+  role: 'owner' | 'manager' | 'member';
+};
+
 export type V1ReviewTarget = {
   targetType: V1ReviewTargetType;
   targetUserId: string | null;
   targetTeamId: string | null;
+  /**
+   * 이 대상을 평가할 때 내가 서는 참가팀. 양 팀 모두의 멤버인 경우 대상마다 달라지므로
+   * 최상위 `reviewerTeam` 대신 이 값을 봐야 한다. 개인 매치 후기는 null.
+   */
+  reviewerTeam: V1ReviewerTeam | null;
   name: string;
   imageUrl: string | null;
   subtitle: string;
@@ -1585,12 +1597,11 @@ export type V1ReviewSourceResponse = {
     title: string;
     completedAt: string | null;
   };
-  reviewerTeam: {
-    teamId: string;
-    name: string;
-    /** 팀 후기는 참가팀 active 멤버 전원이 쓸 수 있으므로 일반 멤버(member)도 온다. */
-    role: 'owner' | 'manager' | 'member';
-  } | null;
+  /**
+   * 내가 서는 참가팀. 양 팀 모두의 멤버라 대상마다 달라지는 경우 null 이므로,
+   * 표시·제출 모두 `targets[].reviewerTeam` 을 기준으로 삼아야 한다.
+   */
+  reviewerTeam: V1ReviewerTeam | null;
   targets: V1ReviewTarget[];
 };
 
@@ -2965,6 +2976,22 @@ export type V1PendingTournamentReview = {
   tournamentId: string;
   tournamentTitle: string;
   completedAt: string;
+};
+
+/** 대회 후기를 남길 수 있는 참가 팀 한 곳 */
+export type V1TournamentReviewableTeam = {
+  teamId: string;
+  teamName: string;
+  alreadyReviewed: boolean;
+};
+
+/**
+ * 후기 작성 자격. `reviewableTeams` 는 내가 팀장·매니저인 참가 확정 팀 목록이며,
+ * 두 팀 이상이면 제출 시 `teamId` 를 명시해야 한다.
+ */
+export type V1TournamentReviewEligibility = {
+  isParticipant: boolean;
+  reviewableTeams: V1TournamentReviewableTeam[];
 };
 
 export type V1TournamentAward = {

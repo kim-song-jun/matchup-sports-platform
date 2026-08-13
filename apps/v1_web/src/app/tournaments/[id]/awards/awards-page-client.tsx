@@ -8,7 +8,6 @@ import { useRef, useState } from 'react';
 import {
   useV1Tournament,
   useV1TournamentParticipantCheck,
-  useV1MyTournamentReview,
   useV1SubmitTournamentReview,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
@@ -29,6 +28,7 @@ import type {
   V1TournamentFixtureResult,
   V1TournamentGroup,
   V1TournamentReview,
+  V1TournamentReviewableTeam,
   V1TournamentStanding,
 } from '@/types/api';
 
@@ -322,12 +322,14 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
 
 /* ── 리뷰 작성 모달 ── */
 function ReviewFormModal({
-  tournamentId, onClose,
-}: { tournamentId: string; onClose: () => void }) {
+  tournamentId, writableTeams, onClose,
+}: { tournamentId: string; writableTeams: V1TournamentReviewableTeam[]; onClose: () => void }) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  // 두 참가 팀의 대표를 겸한 경우에만 선택지가 생긴다 — 그 외에는 유일한 팀으로 고정.
+  const [teamId, setTeamId] = useState(writableTeams[0]?.teamId ?? '');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { mutate, isPending, isError } = useV1SubmitTournamentReview(tournamentId);
   const uploadImages = useV1UploadImages();
@@ -353,7 +355,12 @@ function ReviewFormModal({
     // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
     // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
     if (isPending) return;
-    mutate({ rating, comment: comment.trim() || undefined, photoUrls: photoUrls.length > 0 ? photoUrls : undefined }, {
+    mutate({
+      teamId: teamId || undefined,
+      rating,
+      comment: comment.trim() || undefined,
+      photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
+    }, {
       onSuccess: () => onClose(),
     });
   };
@@ -372,6 +379,31 @@ function ReviewFormModal({
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>대회 후기 작성</h3>
           <button type="button" onClick={onClose} style={{ display: 'inline-flex', background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)' }} aria-label="닫기"><X size={20} /></button>
         </div>
+
+        {writableTeams.length > 1 && (
+          <div style={{ marginBottom: 16 }}>
+            <label
+              htmlFor="tournament-review-team"
+              style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-strong)', marginBottom: 6 }}
+            >
+              어느 팀 후기인가요?
+            </label>
+            <select
+              id="tournament-review-team"
+              value={teamId}
+              onChange={(e) => setTeamId(e.target.value)}
+              style={{
+                width: '100%', minHeight: 44, padding: '0 12px', borderRadius: 8,
+                border: '1px solid var(--grey200)', fontSize: 13,
+                color: 'var(--text-strong)', background: 'var(--surface)', boxSizing: 'border-box',
+              }}
+            >
+              {writableTeams.map((team) => (
+                <option key={team.teamId} value={team.teamId}>{team.teamName}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
           <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
@@ -500,18 +532,24 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
   const isCompleted = tournament.status === 'completed';
 
   const { data: participantData } = useV1TournamentParticipantCheck(tournament.id, hasSession && isCompleted);
-  const { data: myReview } = useV1MyTournamentReview(tournament.id, hasSession && isCompleted);
 
-  const isParticipant = participantData?.isParticipant ?? false;
-  const alreadyReviewed = !!myReview;
-  const canWrite = isCompleted && isParticipant && !alreadyReviewed;
+  // 자격은 팀 단위다 — 내가 팀장·매니저인 참가 팀 중 아직 후기가 없는 팀이 있으면 쓸 수 있다.
+  const reviewableTeams = participantData?.reviewableTeams ?? [];
+  const writableTeams = reviewableTeams.filter((team) => !team.alreadyReviewed);
+  const isParticipant = reviewableTeams.length > 0;
+  const alreadyReviewed = isParticipant && writableTeams.length === 0;
+  const canWrite = isCompleted && writableTeams.length > 0;
 
   const reviews = tournament.reviews ?? [];
 
   return (
     <>
       {showForm && (
-        <ReviewFormModal tournamentId={tournament.id} onClose={() => setShowForm(false)} />
+        <ReviewFormModal
+          tournamentId={tournament.id}
+          writableTeams={writableTeams}
+          onClose={() => setShowForm(false)}
+        />
       )}
       <section style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -530,7 +568,7 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
                 + 후기 쓰기
               </button>
             )}
-            {isCompleted && isParticipant && alreadyReviewed && (
+            {isCompleted && alreadyReviewed && (
               // [R-T2] 고정폭 없는 pill 배지 — 12로 상향.
               <span style={{ fontSize: 12, color: 'var(--text-caption)', background: 'var(--grey100)', padding: '3px 8px', borderRadius: 6 }}>
                 ✓ 작성완료
@@ -543,12 +581,12 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
           <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
               {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다 */}
-              {isCompleted && isParticipant && !alreadyReviewed
+              {canWrite
                 ? '첫 번째 후기를 남겨보세요!'
                 : isCompleted && !hasSession
-                  ? '아직 등록된 후기가 없어요. 로그인하면 참가팀 대표는 후기를 작성할 수 있어요.'
+                  ? '아직 등록된 후기가 없어요. 로그인하면 참가팀의 팀장·매니저는 후기를 작성할 수 있어요.'
                   : isCompleted && hasSession && !isParticipant
-                    ? '아직 등록된 후기가 없어요. 후기는 대회를 신청한 팀 대표만 작성할 수 있어요.'
+                    ? '아직 등록된 후기가 없어요. 후기는 참가한 팀의 팀장 또는 매니저만 작성할 수 있어요.'
                     : '아직 등록된 후기가 없어요.'}
             </p>
           </Card>

@@ -173,9 +173,13 @@ export function toIso(value: Date) {
   return value.toISOString();
 }
 
-export function resolveReviewerTeamId(teamIds: string[], homeTeamId: string, awayTeamId: string) {
-  const matches = teamIds.filter((teamId) => teamId === homeTeamId || teamId === awayTeamId);
-  return matches.length === 1 ? matches[0] : null;
+/**
+ * 내가 참가팀으로 서 있는 팀 중 이 경기에 나온 팀 전부.
+ * 양 팀 모두의 active 멤버인 사람은 두 방향의 후기를 각각 남길 수 있으므로
+ * 하나로 좁히지 않고 전부 돌려준다 — 예전에는 이 경우를 모호하다고 보고 아예 막았다.
+ */
+export function resolveReviewerTeamIds(teamIds: string[], homeTeamId: string, awayTeamId: string) {
+  return [homeTeamId, awayTeamId].filter((teamId) => teamIds.includes(teamId));
 }
 
 /**

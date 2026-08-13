@@ -176,6 +176,7 @@ import type {
   V1TournamentDetail,
   V1PendingTournamentReview,
   V1TournamentReview,
+  V1TournamentReviewEligibility,
   V1TournamentReviewsPage,
   V1AdminTournamentReviewsPage,
   V1TournamentAward,
@@ -2705,16 +2706,7 @@ export function useV1TournamentReviews(
   });
 }
 
-/** 내 리뷰 조회 (이미 작성했는지 확인) */
-export function useV1MyTournamentReview(tournamentId: string, enabled = true) {
-  return useQuery({
-    queryKey: ['tournament-reviews-me', tournamentId],
-    queryFn: () => v1Get<V1TournamentReview | null>(`/tournaments/${tournamentId}/reviews/me`),
-    enabled: !!tournamentId && enabled,
-  });
-}
-
-/** 참가 확정했지만 아직 리뷰를 작성하지 않은 종료 대회 목록 (최근 종료순) */
+/** 대표를 맡은 팀이 참가 확정했지만 아직 팀 후기가 없는 종료 대회 목록 (최근 종료순) */
 export function useV1PendingTournamentReviews(enabled = true) {
   return useQuery({
     queryKey: ['tournament-reviews-pending'],
@@ -2723,25 +2715,26 @@ export function useV1PendingTournamentReviews(enabled = true) {
   });
 }
 
-/** 참가팀 여부 확인 */
+/** 후기 작성 자격 — 대표를 맡은 참가 팀과 팀별 작성 완료 여부 */
 export function useV1TournamentParticipantCheck(tournamentId: string, enabled = true) {
   return useQuery({
     queryKey: ['tournament-participant-check', tournamentId],
-    queryFn: () => v1Get<{ isParticipant: boolean }>(`/tournaments/${tournamentId}/participant-check`),
+    queryFn: () => v1Get<V1TournamentReviewEligibility>(`/tournaments/${tournamentId}/participant-check`),
     enabled: !!tournamentId && enabled,
   });
 }
 
-/** 리뷰 제출 */
+/** 리뷰 제출 — 대표를 맡은 참가 팀이 둘 이상이면 teamId 필수 */
 export function useV1SubmitTournamentReview(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[] }) =>
+    mutationFn: (body: { teamId?: string; rating: number; comment?: string; photoUrls?: string[] }) =>
       v1Post<V1TournamentReview>(`/tournaments/${tournamentId}/reviews`, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
       void queryClient.invalidateQueries({ queryKey: ['tournament-reviews', tournamentId] });
-      void queryClient.invalidateQueries({ queryKey: ['tournament-reviews-me', tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ['tournament-participant-check', tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ['tournament-reviews-pending'] });
     },
   });
 }

@@ -286,27 +286,30 @@ export class ReviewsService {
     const reviewKeys = await this.existingTeamReviewKeys(teamMatches.map((match) => match.id), user.id);
 
     return teamMatches
-      .map((match) => {
-        const reviewerTeamId = resolveReviewerTeamId(teamIds, match.hostTeamId, match.approvedApplicantTeamId);
-        if (!reviewerTeamId || !match.approvedApplicantTeamId) return null;
-        const targetTeam = reviewerTeamId === match.hostTeamId ? match.approvedApplicantTeam : match.hostTeam;
-        const key = teamReviewKey(match.id, targetTeam?.id ?? '');
-        return {
-          sourceType: 'team_match' as const,
-          sourceId: match.id,
-          title: match.title,
-          completedAt: toIso(match.completedAt ?? match.startAt),
-          targetType: 'team' as const,
-          targetCount: 1,
-          reviewedCount: reviewKeys.has(key) ? 1 : 0,
-          remainingCount: reviewKeys.has(key) ? 0 : 1,
-          reviewerTeam: { teamId: reviewerTeamId, name: reviewerTeamId === match.hostTeamId ? match.hostTeam.name : match.approvedApplicantTeam?.name ?? '' },
-          targetTeam: targetTeam ? { teamId: targetTeam.id, name: targetTeam.name } : null,
-          state: reviewKeys.has(key) ? 'done' : 'ready',
-          completedAtSort: (match.completedAt ?? match.startAt).getTime(),
-        };
+      .flatMap((match) => {
+        if (!match.approvedApplicantTeamId) return [];
+        // 양 팀 모두의 멤버면 두 방향이 각각 별도의 후기 항목이 된다.
+        return resolveReviewerTeamIds(teamIds, match.hostTeamId, match.approvedApplicantTeamId).map((reviewerTeamId) => {
+          const isHost = reviewerTeamId === match.hostTeamId;
+          const targetTeam = isHost ? match.approvedApplicantTeam : match.hostTeam;
+          const key = teamReviewKey(match.id, targetTeam?.id ?? '');
+          return {
+            sourceType: 'team_match' as const,
+            sourceId: match.id,
+            title: match.title,
+            completedAt: toIso(match.completedAt ?? match.startAt),
+            targetType: 'team' as const,
+            targetCount: 1,
+            reviewedCount: reviewKeys.has(key) ? 1 : 0,
+            remainingCount: reviewKeys.has(key) ? 0 : 1,
+            reviewerTeam: { teamId: reviewerTeamId, name: isHost ? match.hostTeam.name : match.approvedApplicantTeam?.name ?? '' },
+            targetTeam: targetTeam ? { teamId: targetTeam.id, name: targetTeam.name } : null,
+            state: reviewKeys.has(key) ? 'done' : 'ready',
+            completedAtSort: (match.completedAt ?? match.startAt).getTime(),
+          };
+        });
       })
-      .filter((item): item is NonNullable<typeof item> => Boolean(item && item.remainingCount > 0));
+      .filter((item) => item.remainingCount > 0);
   }
 
   private async matchSource(user: V1AuthUser, sourceId: string) {
@@ -357,6 +360,8 @@ export class ReviewsService {
             targetType: 'user' as const,
             targetUserId: participant.userId,
             targetTeamId: null,
+            // 개인 매치는 팀을 대표해 쓰는 후기가 아니다 — 팀 대상 후기와 target 모양만 맞춘다.
+            reviewerTeam: null,
             name: participant.user.profile?.nickname ?? '참가자',
             imageUrl: participant.user.profile?.profileImageUrl ?? null,
             subtitle: '개인 매치 참가자',
@@ -391,35 +396,44 @@ export class ReviewsService {
       throw conflict('TEAM_MATCH_NOT_READY', 'Team match does not have an approved opponent');
     }
 
-    const reviewerTeam = await this.resolveReviewerTeam(user.id, teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId);
-    const targetTeam = reviewerTeam.teamId === teamMatch.hostTeamId ? teamMatch.approvedApplicantTeam : teamMatch.hostTeam;
+    // 양 팀 모두의 멤버면 두 방향 모두 대상이 된다 — 어느 팀 입장인지는 target 마다 실어 보낸다.
+    const reviewerTeams = await this.resolveReviewerTeams(user.id, teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId);
+    const opponentOf = (reviewerTeamId: string) =>
+      reviewerTeamId === teamMatch.hostTeamId ? teamMatch.approvedApplicantTeam! : teamMatch.hostTeam;
     // 기존 후기 조회도 사람 기준 — 팀 기준으로 조회하면 같은 팀 다른 사람의 후기를 "내 후기"로 잘못 잠근다.
-    const existing = await this.prisma.v1PostEventReview.findFirst({
+    const existingReviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         reviewerUserId: user.id,
-        targetTeamId: targetTeam.id,
+        targetTeamId: { in: reviewerTeams.map((team) => opponentOf(team.teamId).id) },
         sourceType: 'team_match',
         sourceId: teamMatch.id,
       },
       include: reviewInclude(),
     });
+    const existingByTargetTeam = new Map(existingReviews.map((review) => [review.targetTeamId, review]));
 
     return {
       source: sourceSummary('team_match', teamMatch.id, teamMatch.title, teamMatch.completedAt ?? teamMatch.startAt),
       sportId: teamMatch.sportId,
-      reviewerTeam,
-      targets: [{
-        targetType: 'team' as const,
-        targetUserId: null,
-        targetTeamId: targetTeam.id,
-        name: targetTeam.name,
-        imageUrl: targetTeam.profile?.logoUrl ?? null,
-        subtitle: '상대 팀',
-        alreadySubmitted: Boolean(existing),
-        review: existing ? this.toReviewDetail(existing) : null,
-        locked: Boolean(existing),
-        lockReason: existing ? 'ALREADY_SUBMITTED' : null,
-      }],
+      // 겸직이면 단일 값으로 좁힐 수 없으므로 null — 소비자는 target.reviewerTeam 을 봐야 한다.
+      reviewerTeam: reviewerTeams.length === 1 ? reviewerTeams[0] : null,
+      targets: reviewerTeams.map((reviewerTeam) => {
+        const targetTeam = opponentOf(reviewerTeam.teamId);
+        const existing = existingByTargetTeam.get(targetTeam.id) ?? null;
+        return {
+          targetType: 'team' as const,
+          targetUserId: null,
+          targetTeamId: targetTeam.id,
+          reviewerTeam,
+          name: targetTeam.name,
+          imageUrl: targetTeam.profile?.logoUrl ?? null,
+          subtitle: '상대 팀',
+          alreadySubmitted: Boolean(existing),
+          review: existing ? this.toReviewDetail(existing) : null,
+          locked: Boolean(existing),
+          lockReason: existing ? 'ALREADY_SUBMITTED' : null,
+        };
+      }),
     };
   }
 
@@ -461,11 +475,13 @@ export class ReviewsService {
     const targetTeamId = dto.targetTeamId;
     const source = await this.teamMatchSource(user, dto.sourceId);
     const target = source.targets.find((item) => item.targetTeamId === targetTeamId);
-    if (!target || !source.reviewerTeam) throw forbidden('TARGET_NOT_REVIEWABLE', 'Target team is not reviewable for this source');
+    if (!target) throw forbidden('TARGET_NOT_REVIEWABLE', 'Target team is not reviewable for this source');
+    // 2팀 경기에서는 대상 팀이 곧 작성자 팀을 결정한다(B를 평가하면 나는 A 입장) —
+    // 겸직이어도 별도의 reviewerTeamId 를 받을 필요가 없다.
     const existing = target.review;
     if (existing) return { review: existing, alreadySubmitted: true };
 
-    const reviewerTeamId = source.reviewerTeam.teamId;
+    const reviewerTeamId = target.reviewerTeam.teamId;
     const review = await this.prisma.$transaction(async (tx) => {
       const created = await tx.v1PostEventReview.create({
         data: {
@@ -536,11 +552,19 @@ export class ReviewsService {
     ]);
   }
 
-  private async resolveReviewerTeam(
+  /**
+   * 내가 이 경기에서 후기를 쓸 수 있는 참가팀 전부.
+   *
+   * 양 팀 모두의 active 멤버인 사용자는 예전에 `AMBIGUOUS_REVIEWER_TEAM`(409)으로 아예 막혀
+   * 어느 쪽 후기도 못 썼다. 서버가 임의로 한 팀을 고를 수 없다는 판단은 맞지만, 고르는 주체를
+   * 사용자로 옮기면 되는 문제였다 — 이제 양쪽을 모두 돌려주고 제출 시 `reviewerTeamId` 로
+   * 어느 팀 입장인지 명시받는다.
+   */
+  private async resolveReviewerTeams(
     userId: string,
     hostTeamId: string,
     approvedApplicantTeamId: string,
-  ): Promise<{ teamId: string; name: string; role: V1TeamMembershipRole }> {
+  ): Promise<Array<{ teamId: string; name: string; role: V1TeamMembershipRole }>> {
     const memberships = await this.prisma.v1TeamMembership.findMany({
       where: {
         userId,
@@ -552,12 +576,13 @@ export class ReviewsService {
     if (memberships.length === 0) {
       throw forbidden('NOT_TEAM_MEMBER', '참가팀 소속만 후기를 쓸 수 있어요.');
     }
-    if (memberships.length > 1) {
-      // 양 팀 모두에 소속된 사용자는 어느 팀 입장으로 쓰는지 서버가 임의로 정할 수 없다.
-      throw conflict('AMBIGUOUS_REVIEWER_TEAM', 'Reviewer belongs to both participating teams');
-    }
-    const membership = memberships[0];
-    return { teamId: membership.teamId, name: membership.team.name, role: membership.role };
+    // 홈 → 원정 순서를 고정해 겸직 시에도 목록/화면 순서가 흔들리지 않게 한다.
+    return [hostTeamId, approvedApplicantTeamId].flatMap((teamId) => {
+      const membership = memberships.find((row) => row.teamId === teamId);
+      return membership
+        ? [{ teamId: membership.teamId, name: membership.team.name, role: membership.role }]
+        : [];
+    });
   }
 
   /**
@@ -893,9 +918,12 @@ function groupReviewedTargets(reviews: Array<{ sourceId: string; targetUserId: s
   return grouped;
 }
 
-function resolveReviewerTeamId(teamIds: string[], hostTeamId: string, approvedApplicantTeamId: string | null) {
-  const matches = teamIds.filter((teamId) => teamId === hostTeamId || teamId === approvedApplicantTeamId);
-  return matches.length === 1 ? matches[0] : null;
+/**
+ * 내가 참가팀으로 서 있는 팀 중 이 경기에 나온 팀 전부(홈 → 원정 순).
+ * 양 팀 모두의 멤버면 두 방향 후기를 각각 남길 수 있으므로 하나로 좁히지 않는다.
+ */
+function resolveReviewerTeamIds(teamIds: string[], hostTeamId: string, approvedApplicantTeamId: string) {
+  return [hostTeamId, approvedApplicantTeamId].filter((teamId) => teamIds.includes(teamId));
 }
 
 // 작성 주체가 사람이므로 키에는 팀이 들어가지 않는다 — 조회 자체가 reviewerUserId로 좁혀져 있다.

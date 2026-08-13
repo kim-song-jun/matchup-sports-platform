@@ -171,8 +171,12 @@ export function GrantStaffModal({
 
   // 이미 사람을 고른 뒤에는 검색을 멈춘다 — 선택 결과가 입력창에 남아 있는 상태에서
   // 계속 조회하면 쓰지도 않을 명부를 불필요하게 더 읽는다.
+  //
+  // 지금 입력값(query)의 길이도 함께 본다. 훅 안의 하한 검사는 debouncedQuery 기준이라,
+  // 검색어를 2글자 미만으로 지우는 순간부터 디바운스가 끝나기까지 250ms 동안은 직전
+  // 검색어로 조회가 살아 있다 — 지우는 동작마다 쌓이면 60초 30회 한도에 더 빨리 닿는다.
   const search = useV1TournamentStaffCandidateSearch(tournamentId, debouncedQuery, {
-    enabled: open && selected === null,
+    enabled: open && selected === null && query.trim().length >= MIN_QUERY_LENGTH,
   });
 
   if (!open) return null;

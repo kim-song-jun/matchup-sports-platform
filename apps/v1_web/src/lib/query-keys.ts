@@ -127,6 +127,7 @@ export const v1Keys = {
     [...v1Keys.all, 'tournament-ops', tournamentId, 'operations', filters ?? {}] as const,
   tournamentOperationsStaff: (tournamentId: string) =>
     [...v1Keys.all, 'tournament-ops', tournamentId, 'staff'] as const,
+  myTournamentStaffAssignments: () => [...v1Keys.all, 'me', 'tournament-staff'] as const,
   tournamentOperationsFields: (tournamentId: string) =>
     [...v1Keys.all, 'tournament-ops', tournamentId, 'fields'] as const,
 };

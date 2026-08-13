@@ -27,6 +27,7 @@ import {
   useV1MyActivitySummary,
   useV1MyTeams,
   useV1MyTeamMatches,
+  useV1MyTournamentStaffAssignments,
   useV1MasterRegions,
   useV1MasterSports,
   useV1MyJoinApplications,
@@ -97,6 +98,9 @@ export function MyHomePageClient() {
   // 추가 요청이 발생하지 않는다.
   const authMe = useV1AuthMe();
   const phoneVerified = authMe.data?.verification?.phoneVerified;
+  // 대부분의 사용자는 스태프가 아니다 — "대회 운영" 메뉴는 유효한 배정이 있을 때만 노출해야
+  // 하므로(스코프 밖 사용자에게 안 보여야 함) 항상 조회는 하되, 프로필 로딩 후에만 호출한다.
+  const staffAssignments = useV1MyTournamentStaffAssignments({ enabled: Boolean(profile.data) });
 
   const model = useMemo(() => {
     if (!profile.data) {
@@ -125,8 +129,17 @@ export function MyHomePageClient() {
       activitySummary.data,
       hasPendingReview(pendingReviews.data),
       phoneVerified,
+      staffAssignments.data?.items.length ?? 0,
     );
-  }, [profile.data, teams.data, notifications.data, activitySummary.data, pendingReviews.data, phoneVerified]);
+  }, [
+    profile.data,
+    teams.data,
+    notifications.data,
+    activitySummary.data,
+    pendingReviews.data,
+    phoneVerified,
+    staffAssignments.data,
+  ]);
 
   if (profile.isError) {
     return <ErrorState message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void profile.refetch()} />;
@@ -1695,6 +1708,7 @@ function toMyHomeModel(
   activitySummary?: V1MyActivitySummary,
   hasPendingReviews?: boolean,
   phoneVerified?: boolean,
+  staffTournamentCount = 0,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
@@ -1708,6 +1722,22 @@ function toMyHomeModel(
       sub: hasPendingReviews ? '작성할 리뷰가 있어요' : '작성한 리뷰와 받은 리뷰를 확인해요',
       href: '/my/reviews',
       icon: 'Star',
+    });
+  }
+  // 스태프가 아닌 대부분의 사용자에게는 이 섹션 자체가 없어야 한다 — 유효한(만료·해제되지
+  // 않은) 배정이 하나라도 있을 때만 추가한다. "내 활동" 바로 다음에 둬서, 지금 처리해야
+  // 하는 운영 업무가 있다는 신호가 눈에 잘 띄게 한다.
+  if (staffTournamentCount > 0 && !sections.some((section) => section.title === '대회 운영')) {
+    sections.splice(1, 0, {
+      title: '대회 운영',
+      items: [
+        {
+          label: '담당 대회 운영',
+          sub: `담당 중인 대회 ${staffTournamentCount}개`,
+          href: '/my/tournament-staff',
+          icon: 'ShieldCheck',
+        },
+      ],
     });
   }
   if (!sections.some((section) => section.title === '문의')) {

@@ -114,12 +114,19 @@ export function GrantStaffModal({
     }
   }, [open]);
 
+  /**
+   * 검색 입력으로 초점을 옮긴다 — 모달을 열었을 때와, 고른 사람을 "다시 고르기"로 해제해
+   * 검색으로 돌아왔을 때 둘 다 해당한다. 후자를 클릭 핸들러 안에서 처리할 수 없는 이유는
+   * `setSelected(null)`이 리렌더 뒤에야 반영되기 때문이다 — 핸들러가 도는 시점의 DOM 은
+   * 아직 선택 카드라 검색 input 이 없고 `firstFieldRef.current`는 null 이다. 초점을 옮기지
+   * 않으면 방금 누른 "다시 고르기" 버튼이 사라지면서 키보드 초점이 문서 최상단으로 날아간다.
+   */
   useEffect(() => {
-    if (open) {
+    if (open && selected === null) {
       const id = setTimeout(() => firstFieldRef.current?.focus(), 60);
       return () => clearTimeout(id);
     }
-  }, [open]);
+  }, [open, selected]);
 
   useEffect(() => {
     if (!open) return;
@@ -259,7 +266,11 @@ export function GrantStaffModal({
                     onClick={() => {
                       setSelected(null);
                       setQuery('');
-                      firstFieldRef.current?.focus();
+                      // debouncedQuery 도 함께 비운다 — 이걸 남겨 두면 선택이 풀리는 순간
+                      // enabled 가 다시 켜지면서 직전 검색어로 쓸모없는 조회가 한 번 더
+                      // 나간다(서버 rate limit 에 불리). 초점 이동은 이 자리에서 하지
+                      // 않는다 — 아래 effect 참고.
+                      setDebouncedQuery('');
                     }}
                     disabled={pending}
                     className="shrink-0 h-[44px] px-3 text-[13px] font-semibold text-[var(--text-muted)] rounded-lg hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"

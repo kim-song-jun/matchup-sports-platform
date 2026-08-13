@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StaffClient } from './staff-client';
@@ -235,6 +235,22 @@ describe('StaffClient', () => {
 
     expect(mocks.grantMutate).toHaveBeenCalledTimes(1);
     expect(mocks.grantMutate.mock.calls[0][0]).toMatchObject({ userId: 'user-seungmin' });
+  });
+
+  /* "다시 고르기"를 누르면 그 버튼 자체가 사라진다 — 초점을 검색 입력으로 옮기지 않으면
+     키보드 사용자의 초점이 문서 최상단으로 날아간다. 클릭 핸들러 안에서 focus() 하면 그
+     시점엔 검색 input 이 아직 마운트 전이라 아무 일도 일어나지 않는다(Copilot 리뷰 지적). */
+  it('고른 사람을 해제하면 검색 입력으로 초점이 돌아온다', async () => {
+    setRole('PLATFORM_OPS');
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+
+    await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+    await pickCandidate(user, '이승민');
+    await user.click(screen.getByRole('button', { name: '다시 고르기' }));
+
+    const searchInput = await screen.findByLabelText(/배정할 사람/);
+    await waitFor(() => expect(searchInput).toHaveFocus());
   });
 
   it('사람을 고르지 않고 배정하면 이유를 알려주고 요청은 나가지 않는다', async () => {

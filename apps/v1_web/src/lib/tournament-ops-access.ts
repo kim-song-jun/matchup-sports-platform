@@ -26,10 +26,16 @@ export function isTournamentStaffScopeNotYetSupported(reasonCode: string | undef
   return reasonCode !== undefined && SCOPE_NOT_YET_SUPPORTED_REASONS.has(reasonCode);
 }
 
-/** D-16 공용 사유 문구 — "숨기지 않는다"의 실제 카피 소스. */
+/**
+ * D-16 공용 사유 문구 — "숨기지 않는다"의 실제 카피 소스.
+ *
+ * 스코프 사유(FIXTURE/FIELD_*)는 더 이상 "미구현"이 아니다: 필드 담당자는 대회 전체 화면
+ * 대신 담당 경기 콘솔로 직행한다(`/tournament-ops` 진입점). 그래서 문구도 "아직 지원하지
+ * 않는 화면"이 아니라 담당 범위 밖이라는 사실을 그대로 말한다.
+ */
 export function tournamentOpsAccessDeniedLabel(reasonCode: string | undefined): string {
   return isTournamentStaffScopeNotYetSupported(reasonCode)
-    ? '아직 지원하지 않는 화면이에요.'
+    ? '담당 범위 밖의 화면이에요.'
     : '스태프 배정이 필요해요.';
 }
 

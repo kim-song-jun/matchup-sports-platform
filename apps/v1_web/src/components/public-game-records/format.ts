@@ -55,6 +55,26 @@ export function formatScoreline(score: PublicScore | null, scoreStatus: PublicSc
   return `${score.home} : ${score.away}`;
 }
 
+/**
+ * 스코어라인 아래에 작게 붙는 승부차기 보조 텍스트. 정규시간 스코어를 대체하지
+ * 않는다 — 축구에서 승부차기는 정규시간 무승부(예: 1 : 1)를 유지한 채 진출팀만
+ * 가르는 것이라, 큰 숫자를 `4 : 3`으로 바꿔버리면 기록 자체가 왜곡된다.
+ *
+ * 승부차기가 없었던 경기(`penalties === null`)와 애초에 숫자를 보여줄 수 없는
+ * 경기(`unavailable`/`status_only`)는 `null` 을 돌려주고, 호출부는 아무것도
+ * 렌더하지 않는다.
+ */
+export function formatPenaltyScoreline(
+  score: PublicScore | null,
+  scoreStatus: PublicScoreStatus,
+): string | null {
+  // `== null` 로 null 과 undefined 를 함께 거른다 — 서버는 두 emission 지점 모두 키를 채우지만,
+  // 배포 과도기나 React Query 캐시에 남은 구 응답에는 penalties 키가 아예 없을 수 있다.
+  // 시스템 경계에서 들어오는 값이므로 키 부재를 정상 입력으로 취급한다.
+  if (scoreStatus === 'unavailable' || score === null || score.penalties == null) return null;
+  return `승부차기 ${score.penalties.home}-${score.penalties.away}`;
+}
+
 const TEAM_RECORD_RESULT_LABEL: Record<string, string> = { WON: '승', DRAWN: '무', LOST: '패' };
 
 /** Team-record row result ('WON'|'DRAWN'|'LOST' as a plain string, see `PublicTeamRecordItem.result`). */

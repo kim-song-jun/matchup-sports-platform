@@ -17,9 +17,27 @@ export type PublicResultState = 'pending' | 'official' | 'corrected' | 'void';
 
 export type PublicScoreStatus = 'unavailable' | 'live' | 'official';
 
+/**
+ * 승부차기 최종 스코어. 결선(knockout) 경기가 정규시간 동점으로 끝나 승부차기까지
+ * 간 경우에만 존재한다 — 조별리그에서는 서버가 애초에 기록을 거부한다
+ * (`TOURNAMENT_PENALTY_NOT_ALLOWED`).
+ */
+export interface PublicPenaltyScore {
+  readonly home: number;
+  readonly away: number;
+}
+
 export interface PublicScore {
   readonly home: number;
   readonly away: number;
+  /**
+   * 승부차기가 없었던 경기(대부분)는 `null`. 서버는 두 가지 저장 형태(평평한
+   * `{home,away,penalties}` / 백필된 `{regulation,penalty}`)를 모두 읽어 이 한 가지
+   * 모양으로 정규화해 내려준다(`public-tournament-records.service.ts`의 `parseScore`)
+   * — 소비처는 저장 형태를 알 필요가 없다. 진행 중(`scoreStatus: 'live'`) 스코어에는
+   * 승부차기가 존재할 수 없으므로 항상 `null`이다.
+   */
+  readonly penalties: PublicPenaltyScore | null;
 }
 
 /**

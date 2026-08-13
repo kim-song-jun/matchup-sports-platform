@@ -215,6 +215,9 @@ export function StaffClient({ tournamentId }: Props) {
 
   const [grantOpen, setGrantOpen] = useState(false);
   const [grantError, setGrantError] = useState<string | null>(null);
+  // 토스트는 3.5초 뒤 사라진다 — "배정된 사람이 어디로 들어가면 되는지"는 그 자리에서
+  // 전달해야 하는 안내라, 다음 배정 전까지 남는 문장으로 따로 보여준다.
+  const [grantNotice, setGrantNotice] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<V1TournamentStaffAssignment | null>(null);
   const [revokeError, setRevokeError] = useState<string | null>(null);
 
@@ -248,6 +251,11 @@ export function StaffClient({ tournamentId }: Props) {
       onSuccess: () => {
         setGrantOpen(false);
         showToast('스태프를 배정했어요.');
+        setGrantNotice(
+          payload.role === 'FIELD_OPERATOR'
+            ? '배정했어요. 그분은 마이페이지 → “대회 운영을 맡고 있어요”에서 담당 경기 기록 화면으로 바로 들어갈 수 있어요.'
+            : '배정했어요. 그분은 마이페이지 → “대회 운영을 맡고 있어요”에서 이 대회 운영 보드로 들어갈 수 있어요.',
+        );
       },
       onError: (error) => {
         setGrantError(extractErrorMessage(error, '스태프 배정에 실패했어요.'));
@@ -298,6 +306,15 @@ export function StaffClient({ tournamentId }: Props) {
           </button>
         )}
       </div>
+
+      {grantNotice !== null && (
+        <p
+          role="status"
+          className="bg-[var(--blue50)] text-[var(--blue700)] rounded-2xl px-4 py-3 text-[13px] leading-relaxed"
+        >
+          {grantNotice}
+        </p>
+      )}
 
       {/* 스태프 배정이 막히는 원인(선택 가능한 필드 0건)을 같은 화면 안에서 풀 수 있게 목록 위에 둔다. */}
       <TournamentFieldsSection

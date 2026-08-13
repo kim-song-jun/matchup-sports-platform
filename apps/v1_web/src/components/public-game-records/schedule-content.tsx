@@ -18,6 +18,7 @@ import {
   isCorrectedOrVoid,
   resultStateLabel,
 } from './format';
+import { PenaltyScoreline } from './penalty-scoreline';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
 
 /**
@@ -168,6 +169,9 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
           {sideLabel(entry.away)}
         </span>
       </div>
+      {/* 스코어 아래 보조 표기 — 스코어 칸(가운데 64px)이 행 정중앙이라 행 전체를
+          가운데 정렬하면 그대로 스코어 밑에 놓인다. 승부차기가 없으면 렌더 없음. */}
+      <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
       <ScorerSummary scorers={entry.scorers} />
       {venue ? (
         // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.

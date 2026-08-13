@@ -26,9 +26,18 @@ import './multer.types';
 // Files between 5MB and this cap still get the clear "5MB 초과" 400 from the
 // service; larger ones are rejected by multer before fully buffering to disk.
 export const UPLOAD_HARD_CAP_BYTES = 10 * 1024 * 1024; // 10MB
-// 영상 전용 하드 캡 — 서비스의 정밀 200MB 검증 위에 두는 multer 백스톱
-const VIDEO_UPLOAD_HARD_CAP_BYTES = 220 * 1024 * 1024; // 220MB
 
+/**
+ * ## 영상 업로드는 여기 없다 (의도된 것 — 다시 추가하지 말 것)
+ * `POST /uploads/videos` 는 로그인만 하면 누구나 호출할 수 있었고, 사용자당 하루 500MB·보관
+ * 2GB 의 파일을 공개 정적 경로(`/uploads/*`)에 올릴 수 있었다. 그런데 그 파일을 제품에서
+ * 소비하는 경로는 대회 경기 영상 하나뿐이고, 그 등록은 대회 스태프만 할 수 있다 — 즉 일반
+ * 사용자에게 열려 있던 부분은 "아무도 참조하지 않는 파일을 올릴 수 있는 공개 파일 호스트"가
+ * 전부였다. 그래서 영상 업로드는 스태프 권한 안에서 업로드와 등록을 한 번에 처리하는
+ * `POST /tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos/upload`
+ * (`TournamentFixtureVideosController`)로 옮겼다. 업로드 저장 자체는 그대로
+ * `UploadsService.storeFiles(..., 'video')` 가 담당한다.
+ */
 @ApiTags('uploads')
 @Controller('uploads')
 export class UploadsController {
@@ -87,39 +96,5 @@ export class UploadsController {
     // this service (next.config rewrite), so images resolve in dev and prod
     // without depending on the request host.
     return this.uploadsService.storeFiles(files ?? [], user.id, '', 'image');
-  }
-
-  @Post('videos')
-  @UseGuards(V1AuthGuard)
-  // R05-001: video uploads are expensive in bytes; limit to 3/min per connection.
-  @Throttle({ default: { limit: 3, ttl: 60_000 } })
-  @ApiOperation({ summary: '경기 영상 업로드 (1개, 200MB, mp4/webm/mov)' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        files: {
-          type: 'array',
-          items: { type: 'string', format: 'binary' },
-        },
-      },
-    },
-  })
-  @ApiCreatedResponse({ description: '업로드 성공 — { urls: string[] }' })
-  @ApiUnauthorizedResponse({ description: '인증이 필요해요.' })
-  @UseInterceptors(
-    FilesInterceptor('files', 1, {
-      dest: UploadsService.UPLOAD_BASE,
-      limits: { fileSize: VIDEO_UPLOAD_HARD_CAP_BYTES, files: 1 },
-    }),
-  )
-  async uploadVideo(
-    @CurrentUser() user: V1AuthUser,
-    @UploadedFiles() files: Express.Multer.File[],
-  ): Promise<{ urls: string[] }> {
-    // 정적 서빙(express.static)이 Range 요청을 지원하므로 /uploads/* URL 그대로
-    // <video> 태그에서 시킹·스트리밍이 동작한다.
-    return this.uploadsService.storeFiles(files ?? [], user.id, '', 'video');
   }
 }

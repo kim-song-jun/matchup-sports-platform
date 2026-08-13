@@ -27,6 +27,7 @@ const ids = {
   tournament: '66000000-0000-4000-8000-000000000030',
   fixture: '66000000-0000-4000-8000-000000000040',
   fixtureHalftimeEnd: '66000000-0000-4000-8000-000000000041',
+  fixtureFinalPeriodEnd: '66000000-0000-4000-8000-000000000042',
 } as const;
 
 const prisma = new PrismaService();
@@ -435,5 +436,129 @@ describe('이슈 #375 — 경기 종료가 하프타임 도중에도 다음 피�
 
     const periods = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
     expect(periods.every((period) => period.state === 'ENDED' && period.endedAt !== null)).toBe(true);
+  });
+});
+
+/**
+ * 운영 콘솔 종료 흐름 개편(사용자 결정: 후반 종료 → 승부차기 → 경기 종료) —
+ * `end-period`가 마지막 피리어드에서 `NO_NEXT_PERIOD` 409로 거부되던 것을
+ * 풀었다. 이 스위트가 못박는 계약은 두 가지다.
+ *   1. 마지막 피리어드도 `end-period`로 닫힌다 — 승격시킬 다음 피리어드가
+ *      없으므로 HALFTIME 피리어드는 생기지 않고, 게임은 여전히 LIVE다.
+ *   2. **그 단계는 결과를 확정하지 않는다** — 결과 리비전(SUBMITTED)과
+ *      `GAME_RESULT_SUBMITTED` outbox는 여전히 `end`에서만 만들어진다.
+ *      이게 깨지면 "후반은 끝났지만 결과는 확정 전"이라는 중간 단계 자체가
+ *      의미를 잃고(승부차기를 입력할 자리가 사라진다) 예전 한-트랜잭션
+ *      동작으로 되돌아간다.
+ */
+describe('정규 시간 종료 — 마지막 피리어드도 end-period로 닫고, 결과는 아직 만들지 않는다', () => {
+  let gameId: string;
+  let takeoverToken: string;
+
+  beforeAll(async () => {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required for the final-period end integration suite');
+    }
+    await prisma.$connect();
+    const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
+      where: { name: 'football-v1', status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+    });
+
+    await prisma.v1TournamentFixture.create({
+      data: {
+        id: ids.fixtureFinalPeriodEnd,
+        tournamentId: ids.tournament,
+        round: 'group',
+        fixtureNumber: 3,
+        competitionConfigVersionId: config.id,
+      },
+    });
+
+    const input: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceId: ids.fixtureFinalPeriodEnd,
+      competitionConfigVersionId: config.id,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Issue 375 Host' },
+        { sideKey: V1GameSideKey.AWAY, teamId: ids.opponentTeam, displayNameSnapshot: 'Issue 375 Opponent' },
+      ],
+      participants: [],
+    };
+    const actor: GameActorScope = {
+      actorType: 'USER',
+      actorUserId: ids.director,
+      role: 'tournament_director',
+      tournamentId: ids.tournament,
+      fixtureId: ids.fixtureFinalPeriodEnd,
+    };
+    const created = await prisma.$transaction((tx) =>
+      service.createFromSourceInTransaction(tx, input, sourceContext(actor, 'final-period-create', input)),
+    );
+    gameId = created.gameId;
+    await prisma.v1GameLineup.updateMany({ where: { gameId, revision: 1 }, data: { state: 'SUBMITTED' } });
+    takeoverToken = (
+      await service.requestTakeover(authUser(ids.director), gameId, {
+        clientInstanceId: 'final-period-client',
+        lastSequence: 0,
+      })
+    ).takeoverToken;
+
+    // SCHEDULED → LIVE(피리어드 1) → 전반 종료 → 후반 시작: 마지막
+    // 피리어드가 LIVE인 상태까지 몰고 간다.
+    await service.executeCommand(authUser(ids.director), gameId, 'start', 'final-period-start', {
+      expectedVersion: 0,
+      clientCommandId: 'final-period-start',
+      takeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
+    await service.executeCommand(authUser(ids.director), gameId, 'end-period', 'final-period-end-1', {
+      expectedVersion: 1,
+      clientCommandId: 'final-period-end-1',
+      takeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
+    await service.executeCommand(authUser(ids.director), gameId, 'start-period', 'final-period-start-2', {
+      expectedVersion: 2,
+      clientCommandId: 'final-period-start-2',
+      takeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it('마지막 피리어드를 end-period로 닫으면 HALFTIME 없이 전부 ENDED가 되고, 결과 리비전은 아직 생기지 않는다', async () => {
+    const result = await service.executeCommand(authUser(ids.director), gameId, 'end-period', 'final-period-end-2', {
+      expectedVersion: 3,
+      clientCommandId: 'final-period-end-2',
+      takeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
+
+    expect(result.state).toBe(V1GameState.LIVE);
+    const periods = await prisma.v1GamePeriod.findMany({ where: { gameId }, orderBy: { number: 'asc' } });
+    expect(periods.every((period) => period.state === 'ENDED' && period.endedAt !== null)).toBe(true);
+    expect(periods.some((period) => period.state === 'HALFTIME')).toBe(false);
+    // 중간 단계의 정의 그 자체: 결과는 아직 없다.
+    expect(await prisma.v1GameResultRevision.count({ where: { gameId } })).toBe(0);
+
+    // 그다음 `end`가 비로소 결과를 만든다 — 이미 ENDED인 피리어드에는
+    // no-op이므로 한 번에 끝냈을 때와 결과가 같다.
+    const ended = await service.executeCommand(authUser(ids.director), gameId, 'end', 'final-period-game-end', {
+      expectedVersion: result.version,
+      clientCommandId: 'final-period-game-end',
+      takeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
+    expect(ended.state).toBe(V1GameState.ENDED);
+    expect(await prisma.v1GameResultRevision.count({ where: { gameId } })).toBe(1);
   });
 });

@@ -21,6 +21,30 @@ interface GrantStaffModalProps {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/**
+ * 입력값이 왜 막혔는지 말해 준다(해요체). 종전에는 제출 버튼이 조용히 잠겨 있을 뿐이라
+ * 운영자가 "왜 안 눌리는지" 알 방법이 없었다 — 특히 담당 필드 미선택이 그랬다.
+ */
+function validationMessage(
+  trimmedUserId: string,
+  role: Exclude<V1TournamentStaffRole, 'PLATFORM_OPS'>,
+  fieldId: string,
+  fieldCount: number,
+): string | null {
+  if (trimmedUserId.length === 0) {
+    return '배정할 사용자 ID를 입력해 주세요.';
+  }
+  if (!UUID_PATTERN.test(trimmedUserId)) {
+    return '올바른 UUID 형식이 아니에요. 사용자 관리 화면에서 복사한 ID를 그대로 붙여넣어 주세요.';
+  }
+  if (role === 'FIELD_OPERATOR' && fieldId === '') {
+    return fieldCount === 0
+      ? '등록된 경기장이 없어 필드 담당자를 배정할 수 없어요. 위쪽 “경기장(필드)”에서 먼저 등록해 주세요.'
+      : '필드 담당자는 담당 경기장을 골라야 해요.';
+  }
+  return null;
+}
+
 export function GrantStaffModal({
   open,
   onClose,
@@ -36,9 +60,11 @@ export function GrantStaffModal({
   );
   const [fieldId, setFieldId] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
+  const fieldSelectRef = useRef<HTMLSelectElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
 
   useEffect(() => {
@@ -47,6 +73,7 @@ export function GrantStaffModal({
       setRole(roleOptions[0]?.value ?? 'SUPPORT_READONLY');
       setFieldId('');
       setExpiresAt('');
+      setSubmitAttempted(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -114,11 +141,21 @@ export function GrantStaffModal({
   const trimmedUserId = userId.trim();
   const userIdValid = UUID_PATTERN.test(trimmedUserId);
   const requiresField = role === 'FIELD_OPERATOR';
-  const canSubmit = userIdValid && (!requiresField || fieldId !== '') && !pending;
+  const validationError = validationMessage(trimmedUserId, role, fieldId, fields.length);
+  // 버튼은 잠그지 않는다 — 눌러야 막힌 이유를 알 수 있다(제출 시 검증).
+  const canSubmit = !pending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (pending) return;
+    setSubmitAttempted(true);
+    if (validationError !== null) {
+      // 막힌 입력으로 초점을 옮겨 준다 — 사유만 띄우고 커서를 그대로 두면
+      // 키보드 사용자는 어디를 고쳐야 하는지 찾아다녀야 한다.
+      const target = userIdValid ? fieldSelectRef.current : firstFieldRef.current;
+      target?.focus();
+      return;
+    }
     onSubmit({
       userId: trimmedUserId,
       role,
@@ -171,13 +208,13 @@ export function GrantStaffModal({
                 onChange={(e) => setUserId(e.target.value)}
                 disabled={pending}
                 placeholder="00000000-0000-4000-8000-000000000000"
+                aria-describedby="grant-staff-user-id-help"
+                aria-invalid={submitAttempted && !userIdValid ? true : undefined}
                 className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
               />
-              {userId.length > 0 && !userIdValid && (
-                <p className="text-[12px] text-[var(--red700)]" role="alert">
-                  올바른 UUID 형식이 아니에요.
-                </p>
-              )}
+              <p id="grant-staff-user-id-help" className="text-[12px] text-[var(--text-muted)]">
+                배정할 분의 사용자 ID예요. 어드민 &gt; 사용자 관리에서 그 사람의 ID를 복사해 붙여넣어 주세요.
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -207,6 +244,7 @@ export function GrantStaffModal({
                 </label>
                 <select
                   id="grant-staff-field"
+                  ref={fieldSelectRef}
                   value={fieldId}
                   onChange={(e) => setFieldId(e.target.value)}
                   disabled={pending || fields.length === 0}
@@ -243,6 +281,20 @@ export function GrantStaffModal({
                 className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
               />
             </div>
+
+            {/* 배정 후 그 사람이 어디로 들어가는지 — 배정만 하고 "이제 뭘 하라고 전해야
+                하는지"를 모르면 배정이 끝나도 현장은 그대로 막힌다. */}
+            <p className="text-[12px] text-[var(--text-muted)] leading-relaxed bg-[var(--surface-soft)] rounded-xl px-3 py-2">
+              {requiresField
+                ? '배정하면 그분은 마이페이지 → “대회 운영을 맡고 있어요”에서 담당 경기 기록 화면으로 바로 들어갈 수 있어요.'
+                : '배정하면 그분은 마이페이지 → “대회 운영을 맡고 있어요”에서 이 대회 운영 보드로 들어갈 수 있어요.'}
+            </p>
+
+            {submitAttempted && validationError !== null && (
+              <p className="text-[13px] text-[var(--red700)]" role="alert">
+                {validationError}
+              </p>
+            )}
 
             {errorMessage && (
               <p className="text-[13px] text-[var(--red700)]" role="alert">

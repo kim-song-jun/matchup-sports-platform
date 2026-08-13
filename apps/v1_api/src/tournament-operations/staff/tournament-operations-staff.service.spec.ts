@@ -180,6 +180,7 @@ type FakeAssignmentRow = {
   revokedAt: Date | null;
   createdAt: Date;
   tournament: { title: string; status: V1TournamentStatus };
+  fixtureScopes: { fixtureId: string }[];
 };
 
 /**
@@ -216,6 +217,7 @@ function buildMyAssignmentsHarness(rows: FakeAssignmentRow[]) {
       expiresAt: row.expiresAt,
       tournament: row.tournament,
       field: row.fieldId !== null ? { name: row.fieldName ?? null } : null,
+      fixtureScopes: row.fixtureScopes,
     }));
   });
 
@@ -244,11 +246,25 @@ function assignmentRow(overrides: Partial<FakeAssignmentRow> = {}): FakeAssignme
     revokedAt: null,
     createdAt: new Date('2026-08-01T00:00:00.000Z'),
     tournament: { title: '성수 5인제 컵', status: 'open' },
+    // 딥링크 진입 판정에 쓰는 담당 경기 스코프. 필드 단위 배정은 빈 배열이다.
+    fixtureScopes: [],
     ...overrides,
   };
 }
 
 describe('TournamentOperationsStaffService.myAssignments', () => {
+  it('담당 경기 스코프를 fixtureIds 로 실어 보낸다 (필드 담당자 딥링크 진입 판정의 유일한 근거)', async () => {
+    const { service } = buildMyAssignmentsHarness([
+      assignmentRow({ fixtureScopes: [{ fixtureId: 'fx-1' }, { fixtureId: 'fx-2' }] }),
+    ]);
+
+    const result = await service.myAssignments(targetUserId);
+
+    // 이 값이 빠지면 필드 담당자는 자기 경기 콘솔로 갈 수 없다 — 대회 전역 리소스를 읽을
+    // 권한이 없어 셸 진입이 구조적으로 막히므로 이 응답이 담당 경기를 아는 유일한 출처다.
+    expect(result.items[0]?.assignments[0]?.fixtureIds).toEqual(['fx-1', 'fx-2']);
+  });
+
   it('유효한 배정이 있는 사용자에게 그 대회가 반환된다', async () => {
     const { service } = buildMyAssignmentsHarness([assignmentRow()]);
 

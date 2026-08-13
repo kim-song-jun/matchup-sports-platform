@@ -151,6 +151,61 @@ export function v1Delete<T>(path: string, body?: unknown, init?: RequestInit) {
   return v1Api<T>(path, { ...init, method: 'DELETE', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
+/**
+ * multipart/form-data POST — 파일 업로드 전용. `v1Api` 와 달리 content-type 을 직접 지정하지
+ * 않는다(브라우저가 boundary 를 붙여야 한다). 이미지 업로드 훅이 쓰던 지역 함수를 여기로
+ * 옮겼다 — 경기 영상 업로드도 같은 처리가 필요해 두 벌로 갈라두지 않는다.
+ */
+export async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${getV1ApiBaseUrl()}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      // intentionally no content-type — browser sets multipart boundary automatically
+      ...getV1DevAuthHeaders(),
+    },
+    body: formData,
+  });
+
+  const body: ApiEnvelope<T> | ApiErrorBody | null = await response.json().catch(() => null);
+
+  // `response.json()` can yield a non-object JSON primitive (e.g. a 200 with body "ok").
+  // Guard `typeof === 'object'` before `'status' in body` — the `in` operator throws a
+  // TypeError on primitives, which would turn upload error handling into a crash.
+  if (!response.ok || (typeof body === 'object' && body !== null && 'status' in body && body.status === 'error')) {
+    // `??`로는 부족하다 — null/undefined만 걸러내므로 `"오류"` 같은 JSON primitive 바디는
+    // 그대로 통과해 V1ApiError가 statusCode/code/message를 undefined로 들고 가게 된다.
+    // 그러면 원래의 HTTP 실패 정보(상태코드)를 잃고 호출부의 에러 분기가 전부 빗나간다.
+    // 바디가 에러 엔벨로프 모양일 때만 채택하고 나머지는 fallback으로 채운다.
+    const isErrorEnvelope = typeof body === 'object' && body !== null && 'status' in body;
+    throw new V1ApiError(
+      isErrorEnvelope
+        ? (body as ApiErrorBody)
+        : {
+            status: 'error' as const,
+            statusCode: response.status,
+            code: 'NETWORK_OR_PARSE_ERROR',
+            message: response.statusText || '업로드에 실패했어요.',
+            timestamp: new Date().toISOString(),
+          },
+    );
+  }
+
+  // 200이지만 정상 엔벨로프가 아닌 경우(빈 바디/HTML → null, 또는 "ok" 같은 JSON
+  // primitive)를 모두 가드. data 필드를 가진 객체임을 확인한 뒤에만 .data 반환 —
+  // primitive를 그대로 통과시키면 .data가 undefined로 호출부에서 크래시한다.
+  if (typeof body !== 'object' || body === null || !('data' in body)) {
+    throw new V1ApiError({
+      status: 'error' as const,
+      statusCode: response.status,
+      code: 'NETWORK_OR_PARSE_ERROR',
+      message: '업로드 응답을 해석하지 못했어요. 다시 시도해 주세요.',
+      timestamp: new Date().toISOString(),
+    });
+  }
+  return (body as ApiEnvelope<T>).data;
+}
+
 function withQuery(path: string, query?: QueryParams) {
   if (!query) return path;
 

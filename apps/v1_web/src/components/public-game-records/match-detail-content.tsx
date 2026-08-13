@@ -14,6 +14,7 @@ import {
   presentParticipantName,
   resultStateLabel,
 } from './format';
+import { PenaltyScoreline } from './penalty-scoreline';
 import type { PublicLineupSlot, PublicMatchDetail, PublicMatchEvent } from './types';
 
 function sideLabel(side: PublicMatchDetail['home']): string {
@@ -193,6 +194,8 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
               {sideLabel(data.away)}
             </span>
           </div>
+          {/* 스코어 아래 보조 표기 — 승부차기가 없으면 렌더 없음. */}
+          <PenaltyScoreline score={data.score} scoreStatus={data.scoreStatus} fontSize={12} />
           <div
             style={{
               display: 'flex',

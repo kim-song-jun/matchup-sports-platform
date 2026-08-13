@@ -42,8 +42,9 @@ describe('isTournamentStaffScopeNotYetSupported', () => {
 });
 
 describe('tournamentOpsAccessDeniedLabel', () => {
-  it('scope-not-yet-supported면 준비 중 문구', () => {
-    expect(tournamentOpsAccessDeniedLabel('FIELD_SCOPE_REQUIRED')).toBe('아직 지원하지 않는 화면이에요.');
+  // 필드 담당자에게는 담당 경기 콘솔 직행 경로가 생겼다 — "미구현"이 아니라 담당 범위 밖이다.
+  it('스코프 사유는 담당 범위 밖 문구', () => {
+    expect(tournamentOpsAccessDeniedLabel('FIELD_SCOPE_REQUIRED')).toBe('담당 범위 밖의 화면이에요.');
   });
   it('그 외 사유는 스태프 배정 문구(D-16 예시 카피)', () => {
     expect(tournamentOpsAccessDeniedLabel('ASSIGNMENT_REQUIRED')).toBe('스태프 배정이 필요해요.');

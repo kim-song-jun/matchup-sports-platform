@@ -184,17 +184,6 @@ export class RecordResultDto {
   note?: string;
 
   /**
-   * 경기 하이라이트/중계 영상 목록 (옵션) — 전달 시 replace-all.
-   * undefined 로 생략하면 기존 영상 목록을 유지한다.
-   */
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(10)
-  @ValidateNested({ each: true })
-  @Type(() => FixtureVideoDto)
-  videos?: FixtureVideoDto[];
-
-  /**
    * 득점자 목록 (옵션) — 전달 시 replace-all.
    * undefined 로 생략하면 기존 득점 기록을 유지한다.
    */
@@ -233,15 +222,7 @@ export class FixtureGoalDto {
   minute?: number;
 }
 
-export class FixtureVideoDto {
-  /** 표시 제목 (예: "전반 하이라이트") — 없으면 "경기 영상 N"으로 표시 */
-  @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  title?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(1000)
-  url!: string;
-}
+// 영상 등록 DTO는 여기 없다: `RecordResultDto.videos` 는 항상 409
+// (TOURNAMENT_RESULT_DERIVED_ONLY)로 끝나는 경로에 달려 있어 한 번도 저장된 적이 없는 죽은
+// 입력이었다. 실제 등록·삭제는 대회 스태프 권한이 걸린
+// `apps/v1_api/src/tournaments/videos/` (CreateFixtureVideoDto)가 담당한다.

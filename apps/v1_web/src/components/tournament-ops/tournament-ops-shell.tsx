@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ChevronLeft,
   ClipboardCheck,
+  Film,
   LayoutDashboard,
   Menu,
   PencilLine,
@@ -132,6 +133,13 @@ function buildNavItems(tournamentId: string, role: V1TournamentStaffRole): NavIt
       href: `${base}/records/corrections`,
       icon: <PencilLine size={18} aria-hidden="true" />,
       ...resultGate,
+    },
+    {
+      // 영상 등록·삭제는 서버에서 event_append 권한을 요구한다 — 지원 담당은 조회만 되므로
+      // 링크는 열어 두되(목록은 볼 수 있다) 화면 안에서 등록·삭제 버튼이 사라진다.
+      label: '경기 영상',
+      href: `${base}/videos`,
+      icon: <Film size={18} aria-hidden="true" />,
     },
     {
       label: '스태프',

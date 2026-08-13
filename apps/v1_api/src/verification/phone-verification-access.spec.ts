@@ -38,7 +38,6 @@ describe('isPhoneVerificationRequestAllowed', () => {
     expect(isPhoneVerificationRequestAllowed('PATCH', '/api/v1/onboarding/preferences')).toBe(true);
     expect(isPhoneVerificationRequestAllowed('POST', '/api/v1/onboarding/complete')).toBe(true);
     expect(isPhoneVerificationRequestAllowed('POST', '/api/v1/uploads')).toBe(true);
-    expect(isPhoneVerificationRequestAllowed('POST', '/api/v1/uploads/videos')).toBe(true);
     expect(isPhoneVerificationRequestAllowed('PATCH', '/api/v1/notifications/n-1/read')).toBe(true);
     expect(isPhoneVerificationRequestAllowed('POST', '/api/v1/notifications/read-all')).toBe(true);
     expect(
@@ -76,6 +75,14 @@ describe('isPhoneVerificationRequestAllowed', () => {
     expect(isPhoneVerificationRequestAllowed('POST', '/api/v1/team-memberships/tm-1/remove')).toBe(false);
     expect(isPhoneVerificationRequestAllowed('POST', '/api/v1/matches')).toBe(false);
     expect(isPhoneVerificationRequestAllowed('POST', '/api/v1/uploadsx')).toBe(false);
+    // 영상 업로드가 /uploads 밖(스태프 전용 경로)으로 옮겨졌으므로 이 경로는 열려 있으면 안 된다 —
+    // 운영자는 신분 기준 면제(isPhoneVerificationExemptActor)로 통과한다.
+    expect(
+      isPhoneVerificationRequestAllowed(
+        'POST',
+        '/api/v1/tournament-ops/tournaments/t-1/fixtures/f-1/videos/upload',
+      ),
+    ).toBe(false);
     expect(isPhoneVerificationRequestAllowed('POST', '/api/v1/searchable/x')).toBe(false);
   });
 

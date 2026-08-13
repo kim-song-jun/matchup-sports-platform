@@ -1027,15 +1027,27 @@ model V1UserRegion {
 }
 
 model V1UserReputationSummary {
-  id           String       @id @default(uuid())
-  userId       String       @unique @map("user_id")
-  trustState   V1TrustState @default(sample) @map("trust_state")
-  mannerScore  Decimal?     @map("manner_score") @db.Decimal(4, 2)
-  reviewCount  Int          @default(0) @map("review_count")
-  sourceLabel  String?      @map("source_label")
-  calculatedAt DateTime?    @map("calculated_at")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  id          String       @id @default(uuid())
+  userId      String       @unique @map("user_id")
+  trustState  V1TrustState @default(sample) @map("trust_state")
+  mannerScore Decimal?     @map("manner_score") @db.Decimal(4, 2)
+  reviewCount Int          @default(0) @map("review_count")
+  sourceLabel String?      @map("source_label")
+  // 대회 개인 후기(sourceType=tournament_fixture · targetType=user) 전용 집계.
+  // V1TeamTrustScore의 tournament* 컬럼 분리와 같은 이유로 개인 매치(match) 후기와 컬럼을 나눈다 —
+  // 대회는 한 번 나가면 상대팀 로스터 전원에게 며칠 만에 수십 건을 받을 수 있어서, 같은 컬럼에 합산하면
+  // 개인 매치로 쌓아온 평점이 대회 한 번에 통째로 덮인다. 두 recalculate 경로가 서로 다른 모집단을
+  // 계산하면서 같은 컬럼을 last-write-wins로 덮어쓰는 문제도 함께 막는다.
+  tournamentTrustState  V1TrustState @default(sample) @map("tournament_trust_state")
+  tournamentMannerScore Decimal?     @map("tournament_manner_score") @db.Decimal(4, 2)
+  // 후기 "건수"가 아니라 "평가한 상대팀 수"다(V1TeamTrustScore.tournamentReviewCount와 같은 의미) —
+  // recalculateTournamentUserReputation()이 (대회 × 평가한 팀) 단위로 접은 뒤 그 수를 넣는다.
+  tournamentReviewCount Int          @default(0) @map("tournament_review_count")
+  tournamentSourceLabel String?      @map("tournament_source_label")
+  // calculatedAt은 두 경로가 공유한다(V1TeamTrustScore와 동일) — 값이 아니라 "마지막 재계산 시각"이라 소스별로 나눌 필요가 없다.
+  calculatedAt DateTime? @map("calculated_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   user V1User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1321,6 +1333,11 @@ model V1PostEventReview {
   tags         V1PostEventReviewTag[]
 
   @@unique([reviewerUserId, targetUserId, sourceType, sourceId])
+  // 개인 대상 후기 중 대회(tournament_fixture) 후기는 중복 방지 스코프가 경기가 아니라 **대회**다 —
+  // sourceId는 픽스처라서 위 제약만으로는 같은 상대를 예선·8강·결승에서 세 번 평가할 수 있다.
+  // 팀 대상 후기의 sourceGroupId 제약과 같은 규칙이며, match 후기는 sourceGroupId가 NULL이라
+  // (Postgres unique는 NULL을 서로 다른 값으로 본다) 이 제약에 걸리지 않는다.
+  @@unique([reviewerUserId, targetUserId, sourceType, sourceGroupId], map: "v1_post_event_reviews_user_user_source_group_key")
   // 팀 대상 후기의 중복 방지 단위는 "팀"이 아니라 "사람"이다 — 참가팀 active 멤버 전원이
   // 상대팀 후기를 쓰므로, reviewerTeamId 기준으로 잠그면 팀에서 한 명만 쓰고 나머지가 막힌다.
   // 중복 스코프(team_match=매치당 sourceId / tournament_fixture=대회당 sourceGroupId)는 그대로 유지.

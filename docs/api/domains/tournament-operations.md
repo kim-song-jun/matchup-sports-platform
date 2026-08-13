@@ -34,6 +34,20 @@ All routes below are under `/api/v1`, require `V1AuthGuard` (authenticated user)
 - A revoked or fully-non-staff user (no admin grant, no assignment row at all) gets `403 STAFF_SCOPE_DENIED` on every route in this table, including `GET` — access is re-derived per call, so revoking the last active assignment for a user immediately removes both read and write access on their next request (`RealtimeGateway.evictUserFromScopedGameRooms` also disconnects any live socket).
 - `reason` on revoke is validated (non-empty string) and **is persisted** (Task 18 review finding #11) as a follow-up `V1OperationAudit` row scoped to the assignment id, since `TournamentStaffService.revokeStaff`'s own audit envelope has no free-text field to carry it.
 
+### `GET /api/v1/tournament-ops/me/assignments` — the assignee's own entry path
+
+`MyTournamentStaffAssignmentsController`/`Service` (same directory). Guarded by `V1AuthGuard` only, **not** `TournamentStaffGuard`: the route carries no tournament path parameter and its result set is closed to the caller (`where.userId` comes from the authenticated principal; there is no request field that can name another user). Returns only assignments that are neither revoked nor expired.
+
+| Field | Meaning |
+|---|---|
+| `assignmentId`, `tournamentId`, `tournamentTitle`, `tournamentStatus`, `tournamentScheduledAt`, `role`, `expiresAt`, `fieldId`, `fieldName` | the assignment itself |
+| `version` | the assignment's optimistic-lock version. The `/game-operations` socket handshake must present this value or `game.subscribe`/`game.takeover.request` deny it as stale (`RealtimeGateway`). The web console used to read it from the tournament-wide staff list — which a `FIELD_OPERATOR` is always denied, so that role presented `0` and its live subscription broke as soon as its assignment version moved past `0`. This route is now that value's single source for every role (`useMyTournamentStaffAssignmentVersion`). |
+| `fixtures[]` — `{fixtureId,round,fixtureNumber,legNumber,scheduledAt,status,fieldId,fieldName,homeTeamName,awayTeamName}` | **`FIELD_OPERATOR` only.** The fixtures this assignment covers, earliest first, capped at 50 per assignment (`fixturesTruncated` flags the cut). Other roles always get `[]` and no fixture query runs at all. |
+
+- **Why it exists.** A `FIELD_OPERATOR` assignment always carries a fixture and/or field scope (`tournament-staff-policy.ts`'s `parseAssignment`), so the tournament-wide `read` that the ops shell's entry check performs is *always* denied for that role with `FIXTURE_SCOPE_REQUIRED`/`FIELD_SCOPE_REQUIRED`. Before this route there was no way for such a staffer to discover which fixture console they may open — the shell was the only entry point and it is structurally closed to them. The web client deep-links straight to `/tournament-ops/tournaments/:id/fixtures/:fixtureId/operate` from this response.
+- **Scope resolution mirrors the policy, it does not replace it.** `fixtures[]` is computed with the same rule the policy applies (`fixtureIds` membership AND `fieldId` equality when each is present). It is a *display* list: every call the console then makes is still authorized per request by `TournamentStaffAccessService.assertAccess()` (see `TournamentFixtureLineupService.authorizeAndResolveGameId`), so a fixture absent from this list cannot be operated by hand-editing the URL. `my-tournament-staff-assignments.service.spec.ts` cross-checks the two rules against `decideTournamentStaffAccess` in both directions (listed ⇒ ALLOWED, excluded ⇒ denied).
+- **`platform_ops` admins get an empty list**, since the admin bypass leaves no assignment row; their entry point remains the admin screens (`?from=admin`).
+
 ### Errors
 
 | HTTP | Code | Meaning |
@@ -249,3 +263,52 @@ Every route requires `V1AuthGuard` and reuses the [game aggregate](./games.md)'s
 | `409` | `REVISION_MUST_BE_SUPERSEDED` | a correction officialize no longer supersedes the current pointer; a void target is not the current official revision; or a correction's `baseRevisionId` is not the current official revision |
 | `409` | `NEXT_FIXTURE_CONFLICT` | void blocked because a downstream bracket fixture already advanced past `scheduled` |
 | `422` | `PARTICIPANT_INVALID` \| `PARTICIPANT_SIDE_MISMATCH` \| `SCORE_EVENT_MISMATCH` \| `SCORE_INVALID` \| `EVENT_INVALID` | `supersede-and-submit`/`corrections` content invariant violations |
+
+## Fixture videos (highlight/broadcast clips)
+
+`apps/v1_api/src/tournaments/videos/**`. Writes to `V1TournamentFixtureVideo`, which had a read
+path (public records, admin bracket, the results page player) and a seed script but **no production
+write path at all** — the only write-shaped DTO was `RecordResultDto.videos` on a route that always
+throws `409 TOURNAMENT_RESULT_DERIVED_ONLY`. That dead input was removed in the same change.
+
+| Method and route | Body | Result | Actor |
+|---|---|---|---|
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/videos` | — | `{items: [{fixtureId,round,fixtureNumber,legNumber,scheduledAt,status,homeTeamName,awayTeamName,videos[]}]}` | tournament-wide `read` (so `platform_ops`, `tournament_director`, `support_readonly`) |
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos` | — | `{items: FixtureVideo[]}` | `read` on that fixture (adds scoped `field_operator`) |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos` | `{url, title?}` | created `FixtureVideo` (`201`) | `event_append` on that fixture |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos/upload` | multipart `files` (exactly one MP4/WebM/MOV, 200MB) + optional `title` text field | created `FixtureVideo` (`201`) | `event_append` on that fixture |
+| `DELETE /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos/:videoId` | — | `{deleted:true}` | `event_append` on that fixture |
+
+`FixtureVideo` is `{id,title,url,sortOrder,source,createdAt}` where `source` is `upload` (our own
+`/uploads/...` path) or `external` (an `http`/`https` link). Source is derived from the URL shape,
+not stored — no schema change was needed.
+
+- **Actor mapping.** Registration/removal is authorized as `event_append`, the only record-append
+  action a `field_operator` holds (`tournament-staff-policy.ts`'s `allowsRoleAction`), so directors
+  and platform ops can register anywhere in their tournament while a field operator can register
+  only on the fixtures (or field) their assignment scopes. `support_readonly` holds `read` only and
+  therefore gets `403 STAFF_SCOPE_DENIED {reason:"ROLE_ACTION_DENIED"}` on every write here.
+- **Authorization happens in the service, not in `TournamentStaffGuard`.** The guard can only see
+  route parameters, and a field-scoped `field_operator` needs the fixture's `fieldId` to be
+  authorized at all — the same reason `TournamentFixtureLineupService` authorizes in the service.
+  Existence is checked only *after* authorization, so a denied caller cannot use `404` vs `403` as
+  a fixture-existence oracle.
+- **URL validation** (`fixture-video-url.ts`): `http`/`https` only (so `javascript:`, `data:`,
+  `vbscript:`, `file:` and protocol-relative `//host/...` are rejected), no embedded credentials,
+  and upload paths must stay inside `/uploads/` (encoded traversal included) with an `mp4`/`webm`/
+  `mov` extension. A rejected URL is `400 FIXTURE_VIDEO_URL_INVALID` with `details.reason`.
+- **An upload URL may only be registered by the account that uploaded it** — the `V1UploadAsset`
+  row must exist, be `kind: video`, and be owned by the caller (`400
+  FIXTURE_VIDEO_UPLOAD_NOT_FOUND` otherwise), so a leaked URL cannot be attached to arbitrary
+  fixtures.
+- **Upload and registration are one request** so a failed registration never leaves an unreferenced
+  200MB file; if registration fails after storage the file and its asset row are rolled back, and
+  an authorization failure discards multer's temp files (multer writes them before the handler
+  runs).
+- **Deleting a video reclaims its file.** When no other `V1TournamentFixtureVideo` row references
+  the same URL, the physical file and the `V1UploadAsset` row (which carries the uploader's
+  retained-storage quota) are deleted; a filesystem failure keeps the ledger row and logs an error
+  rather than orphaning an untracked file. External links have nothing to reclaim. Cascade deletes
+  (fixture removal) do not pass through this service — see the service doc comment.
+- Limits: 10 videos per fixture (`409 FIXTURE_VIDEO_LIMIT_EXCEEDED`), no duplicate URL within a
+  fixture (`409 FIXTURE_VIDEO_DUPLICATE`), upload route throttled to 3/min.

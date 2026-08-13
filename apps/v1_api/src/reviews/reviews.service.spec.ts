@@ -237,7 +237,91 @@ describe('ReviewsService', () => {
     );
   });
 
+  describe('대회 개인 후기(tournament_fixture · targetType=user) 수용', () => {
+    const tournamentFixtureId = '00000000-0000-4000-8000-000000000050';
+
+    function stubTournamentService() {
+      return {
+        pending: jest.fn(),
+        source: jest.fn(),
+        sourceSummaries: jest.fn(),
+        submit: jest.fn().mockResolvedValue({ review: null, alreadySubmitted: false }),
+      };
+    }
+
+    it('개인 대상 후기를 400으로 막지 않고 대상 정보를 그대로 대회 서비스에 넘긴다', async () => {
+      const tournamentFixtureReviews = stubTournamentService();
+      const service = new ReviewsService({} as never, tournamentFixtureReviews as never);
+
+      await service.submit(user, {
+        sourceType: 'tournament_fixture',
+        sourceId: tournamentFixtureId,
+        targetType: 'user',
+        targetUserId,
+        rating: 5,
+        tagCodes: ['manner'],
+      });
+
+      // targetType/targetUserId가 떨어지면 대회 서비스가 팀 후기로 오인해 엉뚱한 행을 만든다.
+      expect(tournamentFixtureReviews.submit).toHaveBeenCalledWith(
+        user,
+        expect.objectContaining({ sourceId: tournamentFixtureId, targetType: 'user', targetUserId }),
+        ['manner'],
+      );
+    });
+
+    it('대상 두 종류를 함께 보내면 400으로 막는다', async () => {
+      const tournamentFixtureReviews = stubTournamentService();
+      const service = new ReviewsService({} as never, tournamentFixtureReviews as never);
+
+      await expect(service.submit(user, {
+        sourceType: 'tournament_fixture',
+        sourceId: tournamentFixtureId,
+        targetType: 'user',
+        targetUserId,
+        targetTeamId: hostTeamId,
+        rating: 5,
+        tagCodes: ['manner'],
+      })).rejects.toMatchObject({ response: { code: 'INVALID_TOURNAMENT_FIXTURE_REVIEW_TARGET' } });
+      expect(tournamentFixtureReviews.submit).not.toHaveBeenCalled();
+    });
+
+    // 팀 매치에는 참가 선수 명단을 담는 모델이 없어(신청·승인이 팀 단위) "그 경기의 상대 선수"를
+    // 특정할 근거가 없다. 대회에만 열어둔 개인 후기가 team_match로 새어나가지 않는지 고정한다.
+    it('팀 매치에는 개인 대상 후기를 열지 않는다', async () => {
+      const service = new ReviewsService({} as never, stubTournamentService() as never);
+
+      await expect(service.submit(user, {
+        sourceType: 'team_match',
+        sourceId: teamSourceId,
+        targetType: 'user',
+        targetUserId,
+        rating: 5,
+        tagCodes: ['manner'],
+      })).rejects.toMatchObject({ response: { code: 'INVALID_TEAM_MATCH_REVIEW_TARGET' } });
+    });
+  });
+
   describe('recalculateUserReputation', () => {
+    // 소스 분리의 반대편 절반 — 대회 개인 후기는 tournament_* 컬럼에만 쌓여야 하고,
+    // 이 필터가 빠지면 대회 한 번에 들어온 수십 건이 개인 매치 평점을 통째로 덮는다.
+    // mock은 where와 무관하게 고정값을 주므로 인자 단언으로만 잡을 수 있다.
+    it('개인 매치(sourceType=match) 후기만 mannerScore 집계에 넣는다', async () => {
+      const findManyMock = jest.fn().mockResolvedValue([]);
+      const prisma = {
+        v1PostEventReview: { findMany: findManyMock },
+        v1UserReputationSummary: { upsert: jest.fn().mockResolvedValue({}) },
+      };
+      const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
+      const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+      await service['recalculateUserReputation'](prisma as never, 'x');
+
+      expect(findManyMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        where: expect.objectContaining({ targetUserId: 'x', targetType: 'user', sourceType: 'match' }),
+      }));
+    });
+
     it('공개되지 않은(상대 미제출+72시간 미경과) 리뷰는 mannerScore 집계에서 제외한다', async () => {
       const now = new Date('2026-07-19T00:00:00Z');
       jest.useFakeTimers().setSystemTime(now);

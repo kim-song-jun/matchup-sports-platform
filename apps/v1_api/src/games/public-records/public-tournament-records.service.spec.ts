@@ -81,6 +81,17 @@ function buildFakePrisma(options: {
     officialAt: Date;
     score: unknown;
   } | null;
+  /**
+   * `resolvePeriodBreak` 배선 검증용(하프타임/정규 시간 종료) -- 기본값 `[]`이라
+   * 기존 테스트는 그대로 LIVE 클록 없는 경로를 탄다(회귀 없음).
+   */
+  periods?: readonly {
+    number: number;
+    state: string;
+    startedAt: Date | null;
+    pausedTotalMs: number;
+    pausedAt: Date | null;
+  }[];
 }): PrismaService {
   const database = {
     v1Tournament: {
@@ -128,7 +139,7 @@ function buildFakePrisma(options: {
             ],
             participants: [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
             currentOfficialRevision: options.officialRevision ?? null,
-            periods: [],
+            periods: options.periods ?? [],
           },
         };
       },
@@ -657,5 +668,26 @@ describe('PublicTournamentRecordsService.getMatch -- 승부차기 표면화', ()
     expect(await nested.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).toMatchObject({
       score: { home: 3, away: 0, penalties: null },
     });
+  });
+});
+
+describe('PublicTournamentRecordsService.getMatch -- periodBreak 배선', () => {
+  it('HALFTIME 피리어드가 있으면 응답 periodBreak가 halftime이고 clock은 null이다', async () => {
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      periods: [
+        { number: 1, state: 'ENDED', startedAt: new Date('2026-08-10T04:00:00.000Z'), pausedTotalMs: 0, pausedAt: null },
+        { number: 2, state: 'HALFTIME', startedAt: null, pausedTotalMs: 0, pausedAt: null },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.periodBreak).toBe('halftime');
+    expect(result.clock).toBeNull();
   });
 });

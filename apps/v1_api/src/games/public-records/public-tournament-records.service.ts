@@ -14,7 +14,7 @@ import {
   loadParticipantConsentEligibility,
   type ParticipantConsentEligibility,
 } from './public-consent';
-import { resolveLiveClock, type PublicGameClock } from './public-clock';
+import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
 import { effectivePublicVisibilityMode, isLineupPublished, publicFixtureStatus, resolveResultState } from './public-visibility';
 import type { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
@@ -376,6 +376,8 @@ export class PublicTournamentRecordsService {
       mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore);
     const clock: PublicGameClock | null =
       mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], new Date()) : null;
+    const periodBreak: PublicPeriodBreak | null =
+      mode === 'live' && !showOfficialResult ? resolvePeriodBreak(fixture.game?.periods ?? []) : null;
 
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
     // 정책 공개(기본값)에서는 이 맵이 쓰이지 않는다 -- 위 getSchedule과 동일한 이유로
@@ -436,6 +438,7 @@ export class PublicTournamentRecordsService {
       scoreStatus,
       score,
       clock,
+      periodBreak,
       lineup,
       events,
       mvp,
@@ -862,6 +865,8 @@ function presentScheduleEntry(
       : 'unavailable';
   const clock: PublicGameClock | null =
     mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], now) : null;
+  const periodBreak: PublicPeriodBreak | null =
+    mode === 'live' && !showOfficialResult ? resolvePeriodBreak(fixture.game?.periods ?? []) : null;
 
   // 득점자 요약 -- `status_only`는 결과 자체를 숨기므로 골 요약도 함께 숨긴다.
   // 이름/등번호 노출 규칙은 getMatch의 buildEvents와 정확히 동일하다: 동의
@@ -907,6 +912,7 @@ function presentScheduleEntry(
     scoreStatus,
     score: mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore),
     clock,
+    periodBreak,
     scorers,
     hasVideo: fixture.videos.length > 0,
   };

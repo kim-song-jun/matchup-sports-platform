@@ -160,7 +160,11 @@ function ScheduleRow({ tournamentId, entry }: { tournamentId: string; entry: Pub
         {/* [R-T2] 고정폭 없는 flex 텍스트 — 12로 상향. */}
         <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
           {dateLabel ?? '일정 미정'}
-          {entry.status === 'live' ? <LiveBadge clock={entry.clock} /> : ` · ${fixtureStatusLabel(entry.status)}`}
+          {entry.status === 'live' ? (
+            <LiveBadge clock={entry.clock} periodBreak={entry.periodBreak} />
+          ) : (
+            ` · ${fixtureStatusLabel(entry.status)}`
+          )}
           <ScheduleResultBadge entry={entry} />
         </span>
       </div>

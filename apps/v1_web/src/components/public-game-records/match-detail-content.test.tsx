@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { MatchDetailContent } from './match-detail-content';
 import type { PublicMatchDetail } from './types';
@@ -30,6 +30,7 @@ function makeDetail(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDeta
     scoreStatus: 'official',
     score: { home: 1, away: 0, penalties: null },
     clock: null,
+    periodBreak: null,
     lineup: null,
     events: [],
     mvp: null,
@@ -85,5 +86,37 @@ describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고
 
     expect(screen.getByText('10:49')).toBeInTheDocument();
     expect(screen.queryByLabelText('비정상적으로 긴 경기 시각이에요. 확인이 필요해요.')).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchDetailContent — 전반/후반 섹션 분리', () => {
+  it('전반과 후반 이벤트가 각각 자기 구간에만 들어간다 (시간 역전 버그 회귀)', () => {
+    const data = makeDetail({
+      events: [
+        { type: 'GOAL', sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 600_000 },
+        { type: 'GOAL', sideId: 'side-away', side: 'away', participantId: 'p-2', participantName: '이선수', jerseyNumber: 10, period: 2, clockMs: 300_000 },
+      ],
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    const firstHalf = screen.getByRole('group', { name: '전반' });
+    const secondHalf = screen.getByRole('group', { name: '후반' });
+    expect(within(firstHalf).getByText('김선수')).toBeInTheDocument();
+    expect(within(firstHalf).queryByText('이선수')).not.toBeInTheDocument();
+    expect(within(secondHalf).getByText('이선수')).toBeInTheDocument();
+    expect(within(secondHalf).queryByText('김선수')).not.toBeInTheDocument();
+  });
+
+  it('period가 null인 이벤트는 "기타" 구간에 담겨 유실되지 않는다', () => {
+    const data = makeDetail({
+      events: [
+        { type: 'CARD', sideId: 'side-home', side: 'home', participantId: 'p-3', participantName: '박선수', jerseyNumber: 5, period: null, clockMs: null },
+      ],
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(within(screen.getByRole('group', { name: '기타' })).getByText('박선수')).toBeInTheDocument();
   });
 });

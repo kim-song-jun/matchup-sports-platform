@@ -50,11 +50,18 @@ export interface ScheduleFilters {
  * (spectators watching a live page) x (1 / interval) -- it DOES scale with
  * viewers. What this design buys is bounding *when* that cost is paid: no
  * polling at all unless the loaded page actually holds a live fixture, and
- * an 8s floor per viewer. If viewer counts grow past what that supports, the
+ * a 10s floor per viewer. If viewer counts grow past what that supports, the
  * next step is a shared cache (CDN/edge or server-side) or a real public
  * broadcast channel -- not a shorter interval.
+ *
+ * Why 10s: this surface is what a spectator actually follows a live game on --
+ * score changes and period transitions (first half -> second half, etc.) have
+ * to land while the game is still on that play. A minute-scale interval was
+ * tried and rejected for that reason: it makes the page a stale summary rather
+ * than a live view. 10s keeps the freshness while staying slightly cheaper
+ * than the original 8s.
  */
-const LIVE_POLL_INTERVAL_MS = 8_000;
+const LIVE_POLL_INTERVAL_MS = 10_000;
 
 /**
  * `GET /tournaments/:id/schedule` -- cursor-paginated fixture list.

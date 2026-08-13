@@ -2654,12 +2654,14 @@ export function useV1AllTournaments(params?: AllTournamentListFilters) {
 
 /**
  * LIVE 픽스처가 있을 때만 폴링 — `use-public-game-records.ts`의 `LIVE_POLL_INTERVAL_MS`와
- * 동일한 부하 모델(뷰어당 8초 하한, idle 페이지는 폴링 0)을 이 훅에도 그대로 적용한다.
+ * 동일한 부하 모델(뷰어당 10초 하한, idle 페이지는 폴링 0)을 이 훅에도 그대로 적용한다.
  * 별도 모듈 상수를 import하지 않고 값만 재정의한 이유: 두 파일은 서로 다른 기능
- * 레인(공개 전적 vs 대회 상세)이라 강결합할 이유가 없고, 값 자체가 "8초"라는 합의된
+ * 레인(공개 전적 vs 대회 상세)이라 강결합할 이유가 없고, 값 자체가 "10초"라는 합의된
  * 상수라 로컬 정의로도 단일 소스 원칙이 깨지지 않는다(주석으로 쌍둥이 정의임을 명시).
+ * `/tournaments/:id/bracket`은 이 훅과 공개 일정 훅을 동시에 쓰므로 두 값은 항상 같이
+ * 움직여야 한다 — 한쪽만 바꾸면 같은 화면에서 서로 다른 주기로 두 번 폴링한다.
  */
-const V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS = 8_000;
+const V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS = 10_000;
 
 /**
  * `options.livePolling`은 opt-in — 기본값(false)에서는 기존 동작(폴링 없음)을 그대로

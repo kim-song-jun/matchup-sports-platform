@@ -600,7 +600,11 @@ export class PublicTournamentRecordsService {
     if (gameId === null) return [];
     const events = await this.prisma.v1GameEvent.findMany({
       where: { gameId },
-      orderBy: { sequence: 'asc' },
+      // 타임라인은 입력(append) 순서가 아니라 경기 시각순이어야 한다 -- sequence 는
+      // 서버가 이벤트를 "받은" 순서일 뿐 경기 중 실제 발생 순서와 다를 수 있다
+      // (알파 실측: CARD 4건 뒤에 더 이른 시각의 GOAL 이 붙어 나온 사고).
+      // sequence 는 동시각(clockMs) tiebreak 용으로만 남긴다.
+      orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
       select: {
         id: true,
         type: true,
@@ -681,7 +685,8 @@ export class PublicTournamentRecordsService {
     // 쿼리에서 걸러 규칙이 갈라졌던 것이다 — buildEvents 와 같은 순서로 맞춘다.
     const events = await this.prisma.v1GameEvent.findMany({
       where: { gameId: { in: gameIds } },
-      orderBy: { sequence: 'asc' },
+      // buildEvents 와 같은 이유로 시각순 -- sequence 는 tiebreak 용으로만 남긴다.
+      orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
       select: { id: true, gameId: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true },
     });
     const reversedIds = new Set(

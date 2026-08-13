@@ -23,6 +23,35 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20260813120000_v1_roster_identity_link/migration.sql',
+    statement: `WITH latest_snapshot AS (
+  SELECT DISTINCT ON (participant_id) participant_id, state
+  FROM "v1_participant_consent_snapshots"
+  ORDER BY participant_id, consent_version DESC
+),
+granted_user_ids AS (
+  SELECT DISTINCT lc.user_id
+  FROM "v1_participant_identity_link_current" lc
+  JOIN latest_snapshot ls ON ls.participant_id = lc.participant_id
+  WHERE ls.state = 'GRANTED'
+)
+INSERT INTO "v1_user_record_consents" ("user_id", "state", "effective_at", "policy_hash", "created_at", "updated_at")
+SELECT "user_id", 'GRANTED', CURRENT_TIMESTAMP, 'backfill-20260813-participant-snapshot', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM granted_user_ids
+ON CONFLICT ("user_id") DO NOTHING`,
+    reason:
+      'Seeds the v1_user_record_consents table that the SAME migration creates three statements earlier — ' +
+      'it writes to a table no deployed revision has ever read, so neither an old app instance mid-rollout ' +
+      'nor a rollback can observe it (rolling back leaves an unread table behind, exactly like the CREATE ' +
+      'TABLE itself). It only INSERTs, never UPDATEs or DELETEs, and ON CONFLICT DO NOTHING makes a re-run ' +
+      'a no-op. Why it exists: public record visibility moves from a per-participant consent snapshot to a ' +
+      'per-user switch, so users who had already granted per-participant consent would silently vanish from ' +
+      'public lineups/scorer names the moment the new gate went live (alpha holds at least one such ' +
+      'participant — a named scorer on an official fixture). The read side never reads this table for ' +
+      'anyone without a GRANTED snapshot, so the backfill grants nothing that was not already granted. ' +
+      'Reviewed 2026-08-13.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
     statement: `UPDATE "v1_tournament_reviews" r
 SET "team_id" = candidate.team_id

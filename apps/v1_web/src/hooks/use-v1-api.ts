@@ -1,7 +1,7 @@
 'use client';
 
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
+import { v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { compressImagesForUpload } from '@/lib/image-compress';
 import { v1Keys } from '@/lib/query-keys';
@@ -9,8 +9,6 @@ import { randomUuid } from '@/lib/uuid';
 import type { GameLineup } from '@/types/game-operations';
 import type {
   V1AdminRosterEligibleMembersResponse,
-  ApiEnvelope,
-  ApiErrorBody,
   AdminListFilters,
   AdminCursorPage,
   CursorPage,
@@ -1892,53 +1890,6 @@ export function useV1WithdrawalRequest() {
 // ---------------------------------------------------------------------------
 // Upload (multipart/form-data — no application/json header)
 // ---------------------------------------------------------------------------
-
-/**
- * Multipart POST helper.
- * Omits `content-type` so the browser sets the correct `multipart/form-data; boundary=...` header.
- */
-async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> {
-  const response = await fetch(`${getV1ApiBaseUrl()}${path}`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      // intentionally no content-type — browser sets multipart boundary automatically
-      ...getV1DevAuthHeaders(),
-    },
-    body: formData,
-  });
-
-  const body: ApiEnvelope<T> | ApiErrorBody | null = await response.json().catch(() => null);
-
-  // `response.json()` can yield a non-object JSON primitive (e.g. a 200 with body "ok").
-  // Guard `typeof === 'object'` before `'status' in body` — the `in` operator throws a
-  // TypeError on primitives, which would turn upload error handling into a crash.
-  if (!response.ok || (typeof body === 'object' && body !== null && 'status' in body && body.status === 'error')) {
-    throw new V1ApiError(
-      (body as ApiErrorBody) ?? {
-        status: 'error' as const,
-        statusCode: response.status,
-        code: 'NETWORK_OR_PARSE_ERROR',
-        message: response.statusText || '업로드에 실패했어요.',
-        timestamp: new Date().toISOString(),
-      },
-    );
-  }
-
-  // 200이지만 정상 엔벨로프가 아닌 경우(빈 바디/HTML → null, 또는 "ok" 같은 JSON
-  // primitive)를 모두 가드. data 필드를 가진 객체임을 확인한 뒤에만 .data 반환 —
-  // primitive를 그대로 통과시키면 .data가 undefined로 호출부에서 크래시한다.
-  if (typeof body !== 'object' || body === null || !('data' in body)) {
-    throw new V1ApiError({
-      status: 'error' as const,
-      statusCode: response.status,
-      code: 'NETWORK_OR_PARSE_ERROR',
-      message: '업로드 응답을 해석하지 못했어요. 다시 시도해 주세요.',
-      timestamp: new Date().toISOString(),
-    });
-  }
-  return (body as ApiEnvelope<T>).data;
-}
 
 /**
  * 이미지 업로드 mutation.

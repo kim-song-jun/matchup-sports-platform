@@ -28,7 +28,7 @@ function makeDetail(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDeta
     status: 'ended',
     resultState: 'official',
     scoreStatus: 'official',
-    score: { home: 1, away: 0 },
+    score: { home: 1, away: 0, penalties: null },
     clock: null,
     lineup: null,
     events: [],

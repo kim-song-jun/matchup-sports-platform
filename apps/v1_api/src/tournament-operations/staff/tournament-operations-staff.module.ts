@@ -3,6 +3,8 @@ import { OperationAuditModule } from '../../common/audit/operation-audit.module'
 import { RealtimeModule } from '../../realtime/realtime.module';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import { TournamentStaffService } from '../../tournaments/staff/tournament-staff.service';
+import { MyTournamentStaffAssignmentsController } from './my-tournament-staff-assignments.controller';
+import { MyTournamentStaffAssignmentsService } from './my-tournament-staff-assignments.service';
 import { TournamentOperationsStaffController } from './tournament-operations-staff.controller';
 import { TournamentOperationsStaffService } from './tournament-operations-staff.service';
 
@@ -17,11 +19,12 @@ import { TournamentOperationsStaffService } from './tournament-operations-staff.
  */
 @Module({
   imports: [OperationAuditModule, RealtimeModule],
-  controllers: [TournamentOperationsStaffController],
+  controllers: [TournamentOperationsStaffController, MyTournamentStaffAssignmentsController],
   providers: [
     TournamentStaffAccessService,
     TournamentStaffService,
     TournamentOperationsStaffService,
+    MyTournamentStaffAssignmentsService,
   ],
 })
 export class TournamentOperationsStaffModule {}

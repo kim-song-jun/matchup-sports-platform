@@ -44,7 +44,7 @@ describe('TournamentOpsQuickLinks (T6-5, D-16)', () => {
   it('scope-not-yet-supported 사유는 다른 문구로 보여준다', () => {
     vi.mocked(useV1TournamentStaffAssignments).mockReturnValue({ isPending: false, isError: true, error: apiError('FIXTURE_SCOPE_REQUIRED') } as never);
     render(<TournamentOpsQuickLinks tournamentId="t-1" />);
-    expect(screen.getAllByText('아직 지원하지 않는 화면이에요.').length).toBe(2);
+    expect(screen.getAllByText('담당 범위 밖의 화면이에요.').length).toBe(2);
   });
 
   it('조회 중에는 활성 링크로 먼저 보여주지 않는다(레이스 클릭 방지)', () => {

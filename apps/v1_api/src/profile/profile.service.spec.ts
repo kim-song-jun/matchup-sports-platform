@@ -342,12 +342,14 @@ describe('ProfileService activitySummary', () => {
 
       const result = await service.activitySummary(user);
 
+      // sourceType='match' — 대회 개인 후기(tournament_fixture)는 V1UserReputationSummary의
+      // tournament_* 컬럼에 따로 집계되므로 이 헤드라인 평점 모집단에 섞이면 안 된다.
       expect(findMany).toHaveBeenNthCalledWith(1, {
-        where: { targetUserId: user.id, targetType: 'user', status: 'submitted' },
+        where: { targetUserId: user.id, targetType: 'user', status: 'submitted', sourceType: 'match' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
       });
       expect(findMany).toHaveBeenNthCalledWith(2, {
-        where: { reviewerUserId: user.id, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        where: { reviewerUserId: user.id, sourceType: 'match', sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true },
       });
       expect(result.totals).toEqual({ activityCount: 7, teamCount: 1, mannerScore: 5 });
@@ -570,7 +572,9 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
 
       expect(result.activitySummary.monthly.reviewCount).toBe(1);
       expect(prisma.v1PostEventReview.findMany).toHaveBeenCalledWith({
-        where: { reviewerUserId: targetUserId, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        // 월별 개수도 헤드라인 평점과 같은 모집단(개인 매치)이어야 한다 — 한쪽만 대회 후기를
+        // 더하면 "이번 달 3건인데 누적은 1건" 같은 어긋난 숫자가 한 화면에 함께 나온다.
+        where: { reviewerUserId: targetUserId, sourceType: 'match', sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true },
       });
     } finally {

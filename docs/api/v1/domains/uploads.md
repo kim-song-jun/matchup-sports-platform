@@ -5,9 +5,10 @@
 | Method | Path | Auth | Contract |
 |---|---|---|---|
 | `POST` | `/api/v1/uploads` | user | multipart field `files`, 1–5 JPEG/PNG/WebP images, 5MB each |
-| `POST` | `/api/v1/uploads/videos` | user | multipart field `files`, exactly one MP4/WebM/MOV video, 200MB |
 
-Successful responses use the global envelope and return `{ urls: string[] }`. Each URL is a server-generated root-relative `/uploads/YYYY/MM/<uuid>.<ext>` path. Uploaded media is served outside the API prefix at `/uploads/*`; the v1 Web rewrite proxies that path to the API origin.
+Video upload is **not** a general `/uploads` route. It is `POST /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos/upload` (multipart field `files`, exactly one MP4/WebM/MOV video, 200MB), which stores the file through the same `UploadsService` and registers the fixture video in the same request — see [Tournament operations](../../domains/tournament-operations.md#fixture-videos-highlightbroadcast-clips). The former login-only `POST /api/v1/uploads/videos` was removed: the only product surface consuming those files is tournament fixture video, which is staff-authorized, so the open route was an unreferenced public video host.
+
+The image endpoint's successful response uses the global envelope and returns `{ urls: string[] }` (the fixture-video route returns the registered video row instead). Each URL is a server-generated root-relative `/uploads/YYYY/MM/<uuid>.<ext>` path. Uploaded media is served outside the API prefix at `/uploads/*`; the v1 Web rewrite proxies that path to the API origin.
 
 ## Validation And Storage
 

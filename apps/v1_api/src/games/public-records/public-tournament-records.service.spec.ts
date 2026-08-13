@@ -70,6 +70,17 @@ function buildFakePrisma(options: {
    * 숨김 자체를 검증하는 테스트만 'open'으로 override한다.
    */
   tournamentStatus?: string;
+  /**
+   * 승부차기 표면화 테스트용 -- 기본값 `null`(확정 결과 없음)이라 기존 테스트는
+   * 그대로 라이브 경로를 탄다. `score` 는 실제 컬럼과 같은 느슨한 JSON 이라
+   * 평평한 형태/백필 중첩 형태를 그대로 넣어볼 수 있다.
+   */
+  officialRevision?: {
+    state: string;
+    supersedesId: string | null;
+    officialAt: Date;
+    score: unknown;
+  } | null;
 }): PrismaService {
   const database = {
     v1Tournament: {
@@ -116,7 +127,7 @@ function buildFakePrisma(options: {
               { id: 'side-away', sideKey: 'AWAY' },
             ],
             participants: [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
-            currentOfficialRevision: null,
+            currentOfficialRevision: options.officialRevision ?? null,
             periods: [],
           },
         };
@@ -507,5 +518,85 @@ describe('PublicTournamentRecordsService.getMatch -- 참가팀 공개 정책 통
     const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
 
     expect(result.home).toEqual({ registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' });
+  });
+});
+
+/**
+ * 승부차기(penalties) 표면화 계약.
+ *
+ * `v1_game_result_revisions.score` 는 느슨한 JSON 이고 **승부차기 필드 이름이 저장
+ * 형태마다 다르다** -- 라이브 종료 경로가 쓰는 평평한 형태는 `penalties`(복수),
+ * 레거시 백필(`games/migration/game-result-backfill.ts`)이 쓴 중첩 형태는
+ * `penalty`(단수). 이 저장소에서 소비처가 한쪽만 읽어 승부차기가 조용히 사라지는
+ * 사고가 반복됐으므로(같은 이유로 `tournaments/tournament-fixture-official-result.ts`
+ * 도 양쪽을 다 읽는다), 두 형태를 각각 못박는다. 한쪽만 테스트하면 나머지 형태로
+ * 저장된 경기에서 승부차기가 사라져도 전부 초록이다.
+ */
+describe('PublicTournamentRecordsService.getMatch -- 승부차기 표면화', () => {
+  const OFFICIAL_AT = new Date('2026-08-10T06:00:00.000Z');
+
+  function buildPenaltyPrisma(score: unknown): PrismaService {
+    return buildFakePrisma({
+      scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      officialRevision: { state: 'OFFICIAL', supersedesId: null, officialAt: OFFICIAL_AT, score },
+    });
+  }
+
+  it('평평한 형태 { home, away, penalties } 의 승부차기가 응답에 실린다', async () => {
+    const service = new PublicTournamentRecordsService(
+      buildPenaltyPrisma({ home: 1, away: 1, penalties: { home: 4, away: 3 } }),
+      NO_ASSIGNMENTS_ACCESS,
+    );
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.scoreStatus).toBe('official');
+    // 정규시간 스코어는 승부차기로 덮이지 않는다 -- 둘은 별개의 값이다.
+    expect(result.score).toEqual({ home: 1, away: 1, penalties: { home: 4, away: 3 } });
+  });
+
+  it('백필 중첩 형태 { regulation, penalty } 의 승부차기도 같은 모양으로 실린다', async () => {
+    const service = new PublicTournamentRecordsService(
+      buildPenaltyPrisma({
+        regulation: { home: 2, away: 2 },
+        penalty: { home: 5, away: 4 },
+        goals: [],
+        incomplete: false,
+        provenance: 'TOURNAMENT_FIXTURE_RESULT',
+      }),
+      NO_ASSIGNMENTS_ACCESS,
+    );
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    // 저장 형태가 달라도 소비처가 보는 모양은 하나여야 한다.
+    expect(result.score).toEqual({ home: 2, away: 2, penalties: { home: 5, away: 4 } });
+  });
+
+  it('승부차기가 없는 경기는 두 형태 모두 penalties 가 null 이다(키가 사라지지 않는다)', async () => {
+    const flat = new PublicTournamentRecordsService(
+      buildPenaltyPrisma({ home: 3, away: 0 }),
+      NO_ASSIGNMENTS_ACCESS,
+    );
+    const nested = new PublicTournamentRecordsService(
+      buildPenaltyPrisma({
+        regulation: { home: 3, away: 0 },
+        penalty: null,
+        goals: [],
+        incomplete: false,
+        provenance: 'TOURNAMENT_FIXTURE_RESULT',
+      }),
+      NO_ASSIGNMENTS_ACCESS,
+    );
+
+    expect(await flat.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).toMatchObject({
+      score: { home: 3, away: 0, penalties: null },
+    });
+    expect(await nested.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).toMatchObject({
+      score: { home: 3, away: 0, penalties: null },
+    });
   });
 });

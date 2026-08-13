@@ -167,7 +167,9 @@ describe('StaffClient', () => {
     );
   });
 
-  it('requires a field for a field_operator grant before the submit button enables', async () => {
+  /* 종전에는 담당 필드를 안 고르면 제출 버튼이 조용히 잠겨 있었다 — 왜 안 눌리는지
+     알 방법이 없었다. 이제 버튼은 눌리고, 막힌 이유를 해요체로 말해 준다. */
+  it('필드 담당자 배정에서 담당 필드를 안 고르면 이유를 알려주고 배정 요청은 나가지 않는다', async () => {
     setRole('PLATFORM_OPS');
     const user = userEvent.setup();
     render(<StaffClient tournamentId="t-1" />);
@@ -175,11 +177,33 @@ describe('StaffClient', () => {
     await user.click(screen.getByRole('button', { name: '스태프 배정' }));
     await user.selectOptions(screen.getByLabelText('역할'), 'FIELD_OPERATOR');
     await user.type(screen.getByLabelText(/사용자 ID/), '11111111-1111-4111-8111-111111111111');
+    await user.click(screen.getByRole('button', { name: '배정하기' }));
 
-    expect(screen.getByRole('button', { name: '배정하기' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('필드 담당자는 담당 경기장을 골라야 해요.');
+    expect(mocks.grantMutate).not.toHaveBeenCalled();
 
     await user.selectOptions(screen.getByLabelText(/담당 필드/), 'field-1');
-    expect(screen.getByRole('button', { name: '배정하기' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: '배정하기' }));
+
+    expect(mocks.grantMutate).toHaveBeenCalledTimes(1);
+    expect(mocks.grantMutate.mock.calls[0][0]).toMatchObject({
+      role: 'FIELD_OPERATOR',
+      fieldId: 'field-1',
+      userId: '11111111-1111-4111-8111-111111111111',
+    });
+  });
+
+  it('사용자 ID 형식이 틀리면 이유를 알려주고 배정 요청은 나가지 않는다', async () => {
+    setRole('PLATFORM_OPS');
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+
+    await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+    await user.type(screen.getByLabelText(/사용자 ID/), 'not-a-uuid');
+    await user.click(screen.getByRole('button', { name: '배정하기' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('올바른 UUID 형식이 아니에요');
+    expect(mocks.grantMutate).not.toHaveBeenCalled();
   });
 
   /* #373 — 프론트에 필드 생성 호출부가 없어 필드가 영영 0건이었고, 그래서
@@ -216,7 +240,11 @@ describe('StaffClient', () => {
     expect(document.getElementById(helpId!)?.textContent).toMatch(/먼저 등록해 주세요/);
     // 고를 수 있는 것처럼 보이지 않게 select 자체도 잠근다
     expect(fieldSelect).toBeDisabled();
-    // 고를 수 있는 것처럼 보이지 않게 잠그고, 제출도 막는다
-    expect(within(modal).getByRole('button', { name: '배정하기' })).toBeDisabled();
+    // 제출을 눌러도 배정은 나가지 않고, 먼저 무엇을 해야 하는지 알려준다
+    // (사용자 ID는 채워 둔다 — 검증 순서상 ID가 먼저라 비워 두면 그 사유가 먼저 나온다)
+    await user.type(within(modal).getByLabelText(/사용자 ID/), '11111111-1111-4111-8111-111111111111');
+    await user.click(within(modal).getByRole('button', { name: '배정하기' }));
+    expect(within(modal).getByRole('alert')).toHaveTextContent('등록된 경기장이 없어');
+    expect(mocks.grantMutate).not.toHaveBeenCalled();
   });
 });

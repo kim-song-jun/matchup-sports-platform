@@ -54,6 +54,7 @@ const ids = {
   knockoutTargetFixture: '86000000-0000-4000-8000-000000000041',
   decisiveKnockoutFixture: '86000000-0000-4000-8000-000000000042',
   groupPhaseFixture: '86000000-0000-4000-8000-000000000043',
+  drawKnockoutFixture: '86000000-0000-4000-8000-000000000044',
   hostRegistration: '86000000-0000-4000-8000-000000000050',
   opponentRegistration: '86000000-0000-4000-8000-000000000051',
 } as const;
@@ -198,15 +199,36 @@ async function driveToEnd(
     });
     version += 1;
   }
-  const endToken = await grantTakeover(gameId, ids.platformOps, `end-${gameId}`);
+  return endGame(gameId, version, endPayload);
+}
+
+/**
+ * `end` 커맨드만 따로 보낸다.
+ *
+ * 종료가 거부된 뒤 "승부차기를 실어 다시 종료"하는 흐름을 `driveToEnd` 재호출로 표현하면 안 된다 —
+ * 골 append 는 이미 커밋됐는데 `clientEventId` 가 경기당 고정이고 `occurredAt` 이 멱등 payload 해시에
+ * 들어가므로, 두 번째 호출은 "같은 커맨드 ID, 다른 payload" 로 판정돼 409 로 죽는다(벽시계 의존이라
+ * CI 에서도 동일하게 실패한다). 재시도는 골을 다시 넣지 말고 이 함수로 `end` 만 다시 보낸다.
+ *
+ * `attempt` 는 멱등 키를 분리한다. 거부된 첫 시도는 롤백돼 멱등 레코드를 남기지 않지만, 재시도가
+ * 우연히 같은 키를 재사용하지 않도록 호출자가 명시적으로 구분한다.
+ */
+async function endGame(
+  gameId: string,
+  expectedVersion: number,
+  endPayload: Record<string, unknown>,
+  attempt = 1,
+) {
+  const key = `task-penalty-end-${gameId}-${attempt}`;
+  const endToken = await grantTakeover(gameId, ids.platformOps, `end-${gameId}-${attempt}`);
   // 'end' on a TOURNAMENT_FIXTURE game always derives+submits a result
   // revision (GamesService.deriveTournamentRevision), so the union always
   // resolves to GameRevisionMutationResult here -- the generic
   // GameMutationResult branch only ever applies to start/pause/resume/
   // next-period.
-  return games.executeCommand(authUser(ids.platformOps), gameId, 'end', `task-penalty-end-${gameId}`, {
-    expectedVersion: version,
-    clientCommandId: `task-penalty-end-${gameId}`,
+  return games.executeCommand(authUser(ids.platformOps), gameId, 'end', key, {
+    expectedVersion,
+    clientCommandId: key,
     takeoverToken: endToken,
     occurredAt: new Date().toISOString(),
     payload: endPayload,
@@ -296,6 +318,14 @@ describe('Track B tournament penalty shootout', () => {
           fixtureNumber: 1,
           competitionConfigVersionId: config.id,
         },
+        {
+          id: ids.drawKnockoutFixture,
+          tournamentId: ids.tournament,
+          groupId: ids.semiGroup,
+          round: '준결승',
+          fixtureNumber: 3,
+          competitionConfigVersionId: config.id,
+        },
       ],
     });
     await prisma.v1TournamentRegistration.createMany({
@@ -304,7 +334,12 @@ describe('Track B tournament penalty shootout', () => {
         { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
       ],
     });
-    for (const fixtureId of [ids.knockoutSourceFixture, ids.decisiveKnockoutFixture, ids.groupPhaseFixture]) {
+    for (const fixtureId of [
+      ids.knockoutSourceFixture,
+      ids.decisiveKnockoutFixture,
+      ids.groupPhaseFixture,
+      ids.drawKnockoutFixture,
+    ]) {
       await prisma.v1TournamentFixture.update({
         where: { id: fixtureId },
         data: { homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
@@ -387,6 +422,32 @@ describe('Track B tournament penalty shootout', () => {
     // The whole `end` transaction (period-close + revision) rolled back, so
     // the game never actually reached ENDED.
     expect(game.state).not.toBe(V1GameState.ENDED);
+  });
+
+  /**
+   * 운영 콘솔 종료 흐름 개편 요구사항 4의 백엔드 절반. 예전엔 이 `end`가
+   * 그대로 통과해 리비전이 SUBMITTED로 저장됐고, 그 뒤 비동기 브래킷
+   * 프로젝션이 `resolveWinnerSide`에서 `BRACKET_RESULT_DRAW_UNSUPPORTED`를
+   * 던져 outbox 잡이 재시도 끝에 POISONED로 남았다 — 운영자 화면에는
+   * "종료 성공"만 보였다. 커맨드 자리에서 거부해야 그 자리에서 승부차기를
+   * 입력해 복구할 수 있다.
+   */
+  it('결선 무승부인데 승부차기가 없으면 경기를 종료할 수 없다(409 TOURNAMENT_PENALTY_REQUIRED, 리비전 0건, 게임 상태 롤백)', async () => {
+    const gameId = await buildTournamentGame(ids.drawKnockoutFixture);
+
+    const rejected = await captureFailure(() => driveToEnd(gameId, 1, 1, {}));
+    expectHttpCode(rejected, 409, 'TOURNAMENT_PENALTY_REQUIRED');
+
+    expect(await prisma.v1GameResultRevision.count({ where: { gameId } })).toBe(0);
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    expect(game.state).not.toBe(V1GameState.ENDED);
+
+    // 같은 경기에 승부차기 결과를 실어 다시 종료하면 정상적으로 끝난다 —
+    // 거부가 막다른 길이 아니라 "입력하고 다시 오세요"라는 복구 가능한
+    // 게이트라는 증거. 골은 이미 커밋돼 있으므로 다시 넣지 않고 `end` 만 재전송한다
+    // (driveToEnd 를 다시 부르면 고정 clientEventId + 바뀐 occurredAt 으로 멱등 충돌).
+    const ended = await endGame(gameId, game.version, { penalties: { home: 4, away: 2 } }, 2);
+    expect(ended.revisionState).toBe(V1GameResultRevisionState.SUBMITTED);
   });
 
   it('결선이라도 정규시간이 무승부가 아니면 승부차기를 받지 않는다(409)', async () => {

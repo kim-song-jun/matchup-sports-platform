@@ -27,6 +27,7 @@ import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitiv
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
 import { PendingTournamentReviewCard } from '@/components/tournaments/pending-review-card';
+import { MyOpsEntryCard } from '@/components/tournament-ops/my-ops-entry-card';
 import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
@@ -128,6 +129,9 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
           </div>
           {/* RIGHT: menu sections */}
           <div className="tm-my-desktop-main">
+            {/* 스태프 배정이 있는 사용자에게만 렌더된다(없으면 null) — 대회 운영 화면으로
+                들어갈 앱 내 유일한 진입점이다. */}
+            <MyOpsEntryCard />
             <PendingTournamentReviewCard />
             <div className="tm-my-desktop-menu-grid">
               {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}

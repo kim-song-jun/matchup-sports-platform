@@ -85,10 +85,8 @@ function persistQueue(gameId: string, state: GameOperationsQueueState): void {
 }
 
 interface MyStaffAssignment {
-  readonly userId: string;
+  readonly tournamentId: string;
   readonly version: number;
-  readonly revokedAt: string | null;
-  readonly expiresAt: string | null;
 }
 
 /** Resolves the CURRENT actor's own tournament-staff assignment version, so
@@ -96,17 +94,25 @@ interface MyStaffAssignment {
  * staleness gate will actually recognize as fresh (see that handler's own
  * doc comment in `RealtimeGateway`). `null` (no row found) is correct and
  * expected for a `platform_ops` admin-bypass actor -- the gateway only
- * enforces this check `when principal.assignmentVersion !== null`. */
+ * enforces this check `when principal.assignmentVersion !== null`.
+ *
+ * 출처가 `GET /tournament-ops/tournaments/:id/staff`(대회 전역 목록)였는데, 그 라우트는
+ * **필드 담당자에게 항상 403**이다(배정에 fixture/field 스코프가 붙어 대회 전역 read가
+ * 거부된다). 그래서 정작 현장에서 콘솔을 쓰는 역할만 자기 배정 버전을 못 읽고 0을 제시해,
+ * 버전이 0이 아닌 배정이면 소켓 구독·takeover가 STAFF_SCOPE_DENIED로 막혔다. 본인 스코프로
+ * 닫힌 `GET /tournament-ops/me/assignments`로 바꾼다 — 모든 역할이 같은 경로로 자기 버전을
+ * 읽고, 어드민 우회(platform_ops)는 배정 행이 없어 종전대로 null이 된다. */
 function useMyTournamentStaffAssignmentVersion(tournamentId: string | null, myUserId: string | undefined) {
   return useQuery({
-    queryKey: [...v1Keys.all, 'tournament-ops', tournamentId ?? '', 'staff'] as const,
-    queryFn: () =>
-      v1Get<{ items: MyStaffAssignment[] }>(`/tournament-ops/tournaments/${tournamentId}/staff`),
+    queryKey: v1Keys.myTournamentOpsAssignments(),
+    queryFn: () => v1Get<{ items: MyStaffAssignment[] }>('/tournament-ops/me/assignments'),
     // 팀매치(tournamentId===null)는 스태프 배정 개념이 없다 — 쿼리 자체를 스킵하고
     // 아래 효과가 항상 0을 기록/전송하게 둔다(그래도 self-consistency 체크는 통과한다).
     enabled: Boolean(tournamentId) && Boolean(myUserId),
     staleTime: 15_000,
-    select: (data) => data.items.find((item) => item.userId === myUserId) ?? null,
+    // 한 대회에 배정이 여러 건이면 첫 행을 쓴다 — 서버의 assertAccess도 통과하는 첫 배정을
+    // principal로 삼으므로 종전(전역 목록에서 내 첫 행) 동작과 같다.
+    select: (data) => data.items.find((item) => item.tournamentId === tournamentId) ?? null,
   });
 }
 

@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ShieldOff } from 'lucide-react';
 import { useV1AuthMe, useV1Tournament, useV1TournamentStaffAssignments } from '@/hooks/use-v1-api';
+import { assignmentCoversFixture, useV1MyStaffAssignments } from '@/hooks/use-v1-my-staff-assignments';
 import { getTournamentOpsOrigin, saveTournamentOpsOrigin } from '@/lib/session-storage';
 import { classifyTournamentStaffAccessError, isTournamentStaffScopeNotYetSupported } from '@/lib/tournament-ops-access';
 import type { V1TournamentStaffRole } from '@/types/api';
 import { TournamentOpsShell } from '@/components/tournament-ops/tournament-ops-shell';
+import { FieldOperatorConsoleFrame } from '@/components/tournament-ops/field-operator-console-frame';
 import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-context';
 
 // ── 역할 도출 ────────────────────────────────────────────────────────────
@@ -36,6 +38,37 @@ function deriveRole(
   return myActiveRow?.role ?? 'PLATFORM_OPS';
 }
 
+// ── 필드 담당자 딥링크 ────────────────────────────────────────────────────
+/**
+ * 경기 콘솔 경로(`/tournament-ops/tournaments/:id/fixtures/:fixtureId/...`)에서 fixtureId를
+ * 꺼낸다. 그 외 경로면 null.
+ *
+ * 왜 필요한가: 위 `deriveRole`이 쓰는 셸 진입 판정(대회 전역 리소스 1회 조회)은 **그대로
+ * 둔다** — 그 판정을 느슨하게 하면 "스태프 목록에 내 행이 없으면 platform_ops"라는 역할
+ * 추론이 무너져 일반 스태프에게 어드민 전용 내비가 열린다. 대신 필드 담당자는 애초에 셸에
+ * 들어갈 수 없는 역할이므로(배정에 항상 fixture/field 스코프가 붙어 대회 전역 read가 늘
+ * 거부된다) **셸을 건너뛰고 자기 경기 화면만** 열어 준다. 아래 분기는 셸 진입 판정을
+ * 바꾸지 않고, 종전에 무조건 "권한 없음"으로 끝나던 경로 하나만 연다.
+ */
+const FIXTURE_CONSOLE_PATH = /^\/tournament-ops\/tournaments\/([^/]+)\/fixtures\/([^/]+)/;
+
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    // 잘못 인코딩된 경로는 원문 그대로 비교한다 — 여기서 던지면 화면 전체가 죽는다.
+    return segment;
+  }
+}
+
+function fixtureIdFromConsolePath(pathname: string | null, tournamentId: string): string | null {
+  if (pathname === null) return null;
+  const match = FIXTURE_CONSOLE_PATH.exec(pathname);
+  if (match === null) return null;
+  // 경로 세그먼트는 인코딩돼 있을 수 있고 params의 tournamentId는 디코딩된 값이다.
+  return decodeSegment(match[1]) === tournamentId ? decodeSegment(match[2]) : null;
+}
+
 // ── 화면 ──────────────────────────────────────────────────────────────────
 function GateLoadingScreen() {
   return (
@@ -56,18 +89,21 @@ function AccessDenied({ scopeNotYetSupported }: { scopeNotYetSupported: boolean 
           <ShieldOff size={48} />
         </span>
         <h1 className="text-[var(--font-size-subhead)] font-bold text-[var(--text-strong)]">
-          {scopeNotYetSupported ? '아직 지원하지 않는 화면이에요' : '대회 운영자 권한이 필요해요'}
+          {scopeNotYetSupported ? '담당 범위 밖의 화면이에요' : '대회 운영자 권한이 필요해요'}
         </h1>
+        {/* 종전 문구는 "필드/경기 담당자용 화면은 아직 준비 중"이었다 — 담당 경기 콘솔로
+            직행하는 경로가 생긴 지금은 사실이 아니다. 막힌 이유(대회 전체 화면)와 대신
+            갈 곳(내 대회 운영)을 그대로 적는다. */}
         <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           {scopeNotYetSupported
-            ? '필드/경기 담당자용 화면은 아직 준비 중이에요. 담당 경기 화면이 열리면 다시 안내해 드릴게요.'
+            ? '대회 전체 화면은 대회 운영자만 열 수 있어요. 담당 경기는 “내 대회 운영”에서 바로 들어갈 수 있어요.'
             : '이 화면은 이 대회에 배정된 운영 스태프만 접근할 수 있어요. 배정 상태를 확인해 주세요.'}
         </p>
         <Link
-          href="/home"
+          href={scopeNotYetSupported ? '/tournament-ops' : '/home'}
           className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
-          서비스로 돌아가기
+          {scopeNotYetSupported ? '내 대회 운영으로 가기' : '서비스로 돌아가기'}
         </Link>
       </div>
     </div>
@@ -109,6 +145,13 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
   // 셸이 fallback 제목("대회 운영")으로 조용히 대체한다.
   const tournament = useV1Tournament(tournamentId);
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  // 경기 콘솔 딥링크에서 셸 진입이 거부됐을 때만 내 배정을 조회한다 — 셸로 들어가는
+  // 정상 경로에서는 추가 요청이 발생하지 않는다.
+  const fixtureId = fixtureIdFromConsolePath(pathname, tournamentId);
+  const shellDenied = staff.isError && classifyTournamentStaffAccessError(staff.error).isAuthDenied;
+  const myAssignments = useV1MyStaffAssignments({ enabled: fixtureId !== null && shellDenied });
 
   // T6-2: `?from=admin`은 admin 화면이 명시적으로 실어 보내는 진입 의도다
   // (referrer는 신뢰하지 않는다 — 계획 문서 "설계 노트" 참고). 첫 진입 시
@@ -131,6 +174,34 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
   if (staff.isError || !staff.data) {
     const denial = classifyTournamentStaffAccessError(staff.error);
     if (denial.isAuthDenied) {
+      // 필드 담당자 딥링크: 셸은 못 들어가지만 자기 담당 경기 화면은 열려야 한다.
+      // 스코프 없는 전역 승인이 아니다 — 내 배정이 "바로 이 대회의 바로 이 경기"를
+      // 담당할 때만 통과하고, 통과 후에도 화면이 호출하는 모든 API는 서버에서
+      // 경기 단위로 다시 인가된다(TournamentFixtureLineupService.authorizeAndResolveGameId).
+      if (fixtureId !== null) {
+        if (myAssignments.isPending) {
+          return <GateLoadingScreen />;
+        }
+        // 배정 조회가 실패한 것(5xx/네트워크)을 "담당이 아님"으로 읽으면, 담당자에게
+        // 재시도 대신 잘못된 권한 안내를 보여주게 된다 — 원인대로 갈라 놓는다.
+        if (myAssignments.isError) {
+          return <GateErrorScreen onRetry={() => void myAssignments.refetch()} />;
+        }
+        const covered = (myAssignments.data?.items ?? []).some(
+          (assignment) =>
+            assignment.role === 'FIELD_OPERATOR' &&
+            assignmentCoversFixture(assignment, tournamentId, fixtureId),
+        );
+        if (covered) {
+          return (
+            <TournamentOpsRoleProvider role="FIELD_OPERATOR">
+              <FieldOperatorConsoleFrame tournamentTitle={tournament.data?.title}>
+                {children}
+              </FieldOperatorConsoleFrame>
+            </TournamentOpsRoleProvider>
+          );
+        }
+      }
       return <AccessDenied scopeNotYetSupported={isTournamentStaffScopeNotYetSupported(denial.reasonCode)} />;
     }
     return <GateErrorScreen onRetry={() => void staff.refetch()} />;

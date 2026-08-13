@@ -38,6 +38,7 @@ import { TournamentFixtureLineupModule } from './tournament-operations/lineups/t
 import { TournamentOperationsStaffModule } from './tournament-operations/staff/tournament-operations-staff.module';
 import { TournamentOperationsBoardModule } from './tournament-operations/board/tournament-operations-board.module';
 import { TournamentOperationsFieldsModule } from './tournament-operations/fields/tournament-operations-fields.module';
+import { TournamentFixtureVideosModule } from './tournaments/videos/tournament-fixture-videos.module';
 import { TeamMatchSeriesModule } from './team-match-series/team-match-series.module';
 
 @Module({
@@ -82,6 +83,7 @@ import { TeamMatchSeriesModule } from './team-match-series/team-match-series.mod
     TournamentOperationsStaffModule,
     TournamentOperationsFieldsModule,
     TournamentOperationsBoardModule,
+    TournamentFixtureVideosModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: V1ThrottlerGuard },

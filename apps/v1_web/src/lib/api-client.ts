@@ -173,14 +173,21 @@ export async function v1MultipartPost<T>(path: string, formData: FormData): Prom
   // Guard `typeof === 'object'` before `'status' in body` — the `in` operator throws a
   // TypeError on primitives, which would turn upload error handling into a crash.
   if (!response.ok || (typeof body === 'object' && body !== null && 'status' in body && body.status === 'error')) {
+    // `??`로는 부족하다 — null/undefined만 걸러내므로 `"오류"` 같은 JSON primitive 바디는
+    // 그대로 통과해 V1ApiError가 statusCode/code/message를 undefined로 들고 가게 된다.
+    // 그러면 원래의 HTTP 실패 정보(상태코드)를 잃고 호출부의 에러 분기가 전부 빗나간다.
+    // 바디가 에러 엔벨로프 모양일 때만 채택하고 나머지는 fallback으로 채운다.
+    const isErrorEnvelope = typeof body === 'object' && body !== null && 'status' in body;
     throw new V1ApiError(
-      (body as ApiErrorBody) ?? {
-        status: 'error' as const,
-        statusCode: response.status,
-        code: 'NETWORK_OR_PARSE_ERROR',
-        message: response.statusText || '업로드에 실패했어요.',
-        timestamp: new Date().toISOString(),
-      },
+      isErrorEnvelope
+        ? (body as ApiErrorBody)
+        : {
+            status: 'error' as const,
+            statusCode: response.status,
+            code: 'NETWORK_OR_PARSE_ERROR',
+            message: response.statusText || '업로드에 실패했어요.',
+            timestamp: new Date().toISOString(),
+          },
     );
   }
 

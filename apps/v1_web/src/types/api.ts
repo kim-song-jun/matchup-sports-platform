@@ -788,6 +788,11 @@ export type V1TeamMember = {
   joinedAt: string;
   canChangeRole: boolean;
   canRemove: boolean;
+  /** 팀이 지정한 고정 등번호. 라인업의 등번호 자동 채움이 2순위로 쓴다. */
+  jerseyNumber?: number | null;
+  /** 등번호는 권한 계층과 무관한 팀 살림이라, 역할 변경과 달리 owner 행도 관리자가
+   * 바꿀 수 있다(서버 `members` 응답이 그렇게 계산해 준다). */
+  canEditJersey?: boolean;
 };
 
 export type V1TeamMembersPage = {

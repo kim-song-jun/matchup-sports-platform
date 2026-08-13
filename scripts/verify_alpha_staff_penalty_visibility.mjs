@@ -9,12 +9,16 @@
 // "보인다/안 보인다"를 눈으로 판단하지 않고, DOM 텍스트에서 실제 값을 찾아 보고한다.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const BASE = process.env.ALPHA_BASE || 'https://alpha.teameet.co.kr';
 const EMAIL = process.env.ALPHA_EMAIL;
 const PASSWORD = process.env.ALPHA_PASSWORD;
 const LABEL = process.env.LABEL || 'before';
-const OUT = process.env.OUT_DIR || `/private/tmp/alpha-staff-penalty/${LABEL}`;
+// 기본 출력은 OS 임시 디렉터리 — macOS 전용 경로를 박아두면 Linux/WSL 에서 그대로는
+// 못 돌린다(`OUT_DIR` 로 덮어쓸 수 있다).
+const OUT = process.env.OUT_DIR || join(tmpdir(), 'alpha-staff-penalty', LABEL);
 
 if (!EMAIL || !PASSWORD) {
   console.error('ALPHA_EMAIL / ALPHA_PASSWORD 환경변수가 필요해요.');
@@ -78,6 +82,9 @@ try {
       ['operations-board', `${BASE}/tournament-ops/tournaments/${TID}/operations`],
       ['operate-console', `${BASE}/tournament-ops/tournaments/${TID}/fixtures/${FID}/operate`],
       ['result-review', `${BASE}/tournament-ops/tournaments/${TID}/result-review`],
+      // 확정된 결과의 요약 헤더(GameSummaryHeader)·처리 이력이 실제로 렌더되는 곳은
+      // 결과 정정 화면이다 — 승부차기 경기를 딥링크로 바로 선택해 연다.
+      ['records-corrections', `${BASE}/tournament-ops/tournaments/${TID}/records/corrections?fixtureId=${FID}`],
     ];
 
     for (const [name, url] of screens) {

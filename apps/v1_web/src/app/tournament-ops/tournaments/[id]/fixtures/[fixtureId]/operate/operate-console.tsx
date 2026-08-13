@@ -400,6 +400,13 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     // 아직 확정 전 초안일 수 있고, 그 초안을 결과로 보여주면 화면이 공식 결과와
     // 어긋난다. 확정 전(운영 콘솔로 막 종료한 직후)에는 확정본이 아직 없으므로
     // 최신 리비전(서버 정렬: revision 내림차순)을 쓴다.
+    //
+    // 확정본 id 를 목록에서 못 찾으면 아무것도 보여주지 않는다(최신으로 폴백하지
+    // 않는다). `GET /games/:id/result-revisions` 는 그 경기의 리비전을 페이지네이션
+    // 없이 전부 돌려주고 `currentOfficialRevisionId` 는 같은 경기의 리비전만 가리키므로
+    // 정상 경로에서는 못 찾을 수 없다 — 못 찾았다는 건 데이터가 어긋났다는 뜻이고,
+    // 그 상태에서 초안일 수도 있는 다른 리비전의 승부차기 점수를 "결과"로 그리면
+    // 화면이 공식 결과와 다른 값을 단언하게 된다. 결과 표시에서 그건 빈 칸보다 나쁘다.
     const officialId = gameDetail.data?.currentOfficialRevisionId ?? null;
     const chosen = officialId ? revisions.find((revision) => revision.id === officialId) : revisions[0];
     return readGameResultScore(chosen?.score)?.penalties ?? null;

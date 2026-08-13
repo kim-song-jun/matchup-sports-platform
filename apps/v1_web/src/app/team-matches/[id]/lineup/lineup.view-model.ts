@@ -35,7 +35,18 @@ export type RosterOption = {
 type MyTeamRow = { teamId: string; role: 'owner' | 'manager' | 'member' };
 
 export function resolveOwnTeamId(
-  teamMatch: { hostTeamId?: string; approvedOpponentTeam?: { teamId: string } | null } | undefined,
+  teamMatch:
+    | {
+        hostTeamId?: string;
+        /** 팀 매치 상세 응답이 실제로 호스트팀을 싣는 자리. `hostTeamId`는 목록 응답에만
+         * 있고 상세에는 없어서, 이걸 보지 않으면 **호스트팀 팀장이 자기 팀을 못 찾는다**
+         * (2026-08-13 로컬 검증에서 확인: 상세 응답에 hostTeamId 키 자체가 없다). 그 결과
+         * 호스트 쪽 팀장에게는 로스터 풀도 "이전 라인업 불러오기"도 뜨지 않았고, 상대팀
+         * (신청) 쪽 팀장만 화면이 정상으로 보였다. */
+        hostTeam?: { teamId: string } | null;
+        approvedOpponentTeam?: { teamId: string } | null;
+      }
+    | undefined,
   /**
    * `useV1MyTeams()`가 주는 값을 그대로 받는다. 이 엔드포인트는 `{ items: [...] }`로 감싼
    * 페이지네이션 응답을 돌려주므로 호출부에서 언랩을 잊으면 `.find is not a function`으로
@@ -46,9 +57,10 @@ export function resolveOwnTeamId(
 ): string | null {
   const rows = Array.isArray(myTeams) ? myTeams : myTeams?.items;
   if (!teamMatch || !rows) return null;
-  const candidateTeamIds = [teamMatch.hostTeamId, teamMatch.approvedOpponentTeam?.teamId].filter(
-    (id): id is string => Boolean(id),
-  );
+  const candidateTeamIds = [
+    teamMatch.hostTeamId ?? teamMatch.hostTeam?.teamId,
+    teamMatch.approvedOpponentTeam?.teamId,
+  ].filter((id): id is string => Boolean(id));
   const match = rows.find(
     (team) => candidateTeamIds.includes(team.teamId) && (team.role === 'owner' || team.role === 'manager'),
   );

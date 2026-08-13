@@ -165,6 +165,12 @@
      chip 색은 다크모드에도 동일 값 유지)으로 고정한다 — :root.dark 오버라이드 없음. */
   --player-marker-blue: #1b64da;
   --player-marker-orange: #a36100;
+  /* 라인업 피치 보드(.tm-pitch-board) 크기 상한. 여기 값은 모바일 기준 — 높이는 제약하지
+     않고 폭만 420px로 묶는다(피치 컴포넌트 인라인 style의 fallback과 같은 값). 데스크톱
+     에서는 desktop/tournaments.css가 뷰포트 높이에 맞춰 둘 다 덮어쓰며, 그때 폭을 높이에
+     연동해 축구장 비율(1:1.544)이 깨지지 않게 한다 — 높이만 자르면 피치가 뭉툭해진다. */
+  --tm-pitch-max-h: none;
+  --tm-pitch-max-width: 420px;
   /* WeatherStrip 아이콘 대비 결함(2026-08-12 실측) — .tm-weather-icon(기본, 맑음)이
      yellow500(#ffc342) on yellow50(#fff8d6) 1.50:1, .tm-weather-icon-thunderstorm이
      orange500 on orange50 1.97:1로 아이콘 최소 기준(WCAG 1.4.11, 3:1) 미달. orange는

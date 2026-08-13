@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyLineupEditorState, replaceEntries } from './lineup.view-model';
+import { createEmptyLineupEditorState, replaceEntries, resolveOwnTeamId } from './lineup.view-model';
 
 function loaded(overrides: Partial<{
   userId: string | null;
@@ -111,5 +111,47 @@ describe('replaceEntries', () => {
     );
 
     expect(next.starters[0]).toMatchObject({ userId: null, displayName: '용병친구' });
+  });
+});
+
+/**
+ * 호스트팀 팀장이 자기 팀을 못 찾던 결함(2026-08-13 로컬 검증에서 발견)에 대한 회귀 테스트.
+ * 팀 매치 **상세** 응답에는 `hostTeamId`가 없고 `hostTeam.teamId`만 있는데, 예전에는
+ * `hostTeamId`만 봤다 — 그래서 호스트 쪽 팀장에게는 로스터 풀도 "이전 라인업 불러오기"도
+ * 뜨지 않았고, 신청(상대팀) 쪽 팀장만 화면이 정상으로 보였다.
+ */
+describe('resolveOwnTeamId', () => {
+  const myTeams = { items: [{ teamId: 'team-host', role: 'owner' as const }] };
+
+  it('상세 응답 모양(hostTeam.teamId만 있음)에서도 호스트팀 팀장을 찾아낸다', () => {
+    const teamId = resolveOwnTeamId({ hostTeam: { teamId: 'team-host' }, approvedOpponentTeam: null }, myTeams);
+
+    expect(teamId).toBe('team-host');
+  });
+
+  it('목록 응답 모양(hostTeamId)도 그대로 동작한다', () => {
+    expect(resolveOwnTeamId({ hostTeamId: 'team-host' }, myTeams)).toBe('team-host');
+  });
+
+  it('상대팀(신청) 쪽 팀장도 자기 팀을 찾는다', () => {
+    const teamId = resolveOwnTeamId(
+      { hostTeam: { teamId: 'team-other' }, approvedOpponentTeam: { teamId: 'team-host' } },
+      myTeams,
+    );
+
+    expect(teamId).toBe('team-host');
+  });
+
+  it('일반 멤버는 라인업을 관리할 수 없으므로 팀을 돌려주지 않는다', () => {
+    const teamId = resolveOwnTeamId(
+      { hostTeam: { teamId: 'team-host' } },
+      { items: [{ teamId: 'team-host', role: 'member' as const }] },
+    );
+
+    expect(teamId).toBeNull();
+  });
+
+  it('어느 쪽에도 속하지 않으면 null이다', () => {
+    expect(resolveOwnTeamId({ hostTeam: { teamId: 'team-stranger' } }, myTeams)).toBeNull();
   });
 });

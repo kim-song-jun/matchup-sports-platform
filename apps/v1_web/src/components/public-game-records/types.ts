@@ -278,11 +278,14 @@ export interface PublicUserRecordItem {
   readonly officialAt: string;
 }
 
+/**
+ * 파울 누적치는 이 요약에 없다 — 서버가 공개 응답에서 아예 빼기 때문이다
+ * (`PublicUserRecordsService`의 summary 주석 참조). 카드(경고/퇴장)만 공개된다.
+ */
 export interface PublicUserRecordsSummary {
   readonly appearances: number;
   readonly goals: number;
   readonly assists: number;
-  readonly fouls: number;
   readonly yellowCards: number;
   readonly redCards: number;
   readonly mvpCount: number;

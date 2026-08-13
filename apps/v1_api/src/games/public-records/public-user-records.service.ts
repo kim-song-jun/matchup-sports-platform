@@ -15,7 +15,6 @@ interface EligibleResultRow {
   readonly sideId: string;
   readonly goals: number;
   readonly assists: number;
-  readonly fouls: number;
   readonly cardsYellow: number;
   readonly cardsRed: number;
   readonly minutesPlayed: number | null;
@@ -66,11 +65,14 @@ export class PublicUserRecordsService {
 
     const detail = await this.hydrate(page);
 
+    // 파울 누적치는 공개 응답에 싣지 않는다. 카드(경고/퇴장)는 경기 서사로서
+    // 공개하지만, 일반 파울 개수는 선수 개인 프로필에 낙인으로 남을 뿐
+    // 관전자에게 주는 정보가 없다. DB(`V1GameResultParticipant.fouls`)와
+    // 운영 콘솔의 팀 파울 카운터는 그대로 유지된다.
     const summary = {
       appearances: eligibleRows.length,
       goals: eligibleRows.reduce((sum, row) => sum + row.goals, 0),
       assists: eligibleRows.reduce((sum, row) => sum + row.assists, 0),
-      fouls: eligibleRows.reduce((sum, row) => sum + row.fouls, 0),
       yellowCards: eligibleRows.reduce((sum, row) => sum + row.cardsYellow, 0),
       redCards: eligibleRows.reduce((sum, row) => sum + row.cardsRed, 0),
       mvpCount: eligibleRows.filter((row) => row.isMvp).length,
@@ -109,7 +111,6 @@ export class PublicUserRecordsService {
         minutesPlayed: true,
         goals: true,
         assists: true,
-        fouls: true,
         cards: true,
         goalkeeper: true,
         resultRevision: {
@@ -153,7 +154,6 @@ export class PublicUserRecordsService {
         sideId: row.sideId,
         goals: row.goals,
         assists: row.assists,
-        fouls: row.fouls,
         cardsYellow: cards.yellow,
         cardsRed: cards.red,
         minutesPlayed: row.minutesPlayed,

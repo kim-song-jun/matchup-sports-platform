@@ -23,6 +23,107 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
+    statement: `UPDATE "v1_tournament_reviews" r
+SET "team_id" = candidate.team_id
+FROM (
+  SELECT matched.review_id, matched.team_id
+  FROM (
+    SELECT
+      rv.id AS review_id,
+      reg.team_id AS team_id,
+      COUNT(*) OVER (PARTITION BY rv.id) AS candidate_count
+    FROM "v1_tournament_reviews" rv
+    JOIN "v1_tournament_registrations" reg
+      ON reg.tournament_id = rv.tournament_id
+     AND reg.applied_by_user_id = rv.author_user_id
+     AND reg.status = 'confirmed'
+    JOIN "v1_teams" t ON t.id = reg.team_id
+    WHERE rv.team_id IS NULL
+      AND (rv.team_name IS NULL OR t.name = rv.team_name)
+  ) AS matched
+  WHERE matched.candidate_count = 1
+) AS candidate
+WHERE r.id = candidate.review_id`,
+    reason:
+      'Backfills the just-added nullable v1_tournament_reviews.team_id so a tournament review belongs to ' +
+      'the team rather than to whoever pressed the apply button. Rolling-deploy safe: the OLD app has no ' +
+      'knowledge of team_id at all — it neither reads nor writes the column (its review create/read paths ' +
+      'select the pre-existing columns only) — so filling it changes nothing the OLD app can observe, and a ' +
+      'rollback leaves the values sitting inert. No pre-existing column or row is deleted, narrowed, or ' +
+      'reinterpreted; the statement only turns NULL into a value on a column that did not exist one ' +
+      'migration ago. It is deliberately conservative about WHICH value: the candidate must come from a ' +
+      "confirmed registration AND match the review's own team_name snapshot, and it is applied only when " +
+      'exactly one candidate survives (COUNT(*) OVER (PARTITION BY rv.id) = 1) — ambiguous legacy rows are ' +
+      'left NULL rather than guessed, and NULLs never collide under the (tournament_id, team_id) unique. ' +
+      'Re-runnable: the WHERE rv.team_id IS NULL guard makes a second execution a no-op. It is a bare ' +
+      'UPDATE rather than a DO block because no procedural control flow is needed; isAdditiveStatement has ' +
+      'no data-statement branch and so cannot prove any UPDATE additive, which is why this needs review ' +
+      'rather than a rule change. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
+    statement: `DO $$
+DECLARE
+  duplicate_count bigint;
+BEGIN
+  SELECT count(*) INTO duplicate_count
+  FROM (
+    SELECT 1
+    FROM "v1_tournament_reviews"
+    WHERE "team_id" IS NOT NULL
+    GROUP BY "tournament_id", "team_id"
+    HAVING count(*) > 1
+  ) AS duplicated;
+
+  IF duplicate_count > 0 THEN
+    RAISE EXCEPTION
+      '대회 후기에 팀당 1건 제약을 걸 수 없어요. (tournament_id, team_id) 충돌 %건. 백필 로직이 예상과 다르게 동작했습니다 — 수동으로 정리한 뒤 마이그레이션을 다시 실행하세요.',
+      duplicate_count
+      USING ERRCODE = '23505';
+  END IF;
+
+  CREATE UNIQUE INDEX IF NOT EXISTS "v1_tournament_reviews_tournament_id_team_id_key"
+    ON "v1_tournament_reviews"("tournament_id", "team_id");
+END $$`,
+    reason:
+      'Adds the per-team duplicate key for tournament reviews so one team gets one review per tournament, ' +
+      'now that any owner/manager of the team can write it instead of only the applicant. Rolling-deploy ' +
+      'safe: the OLD app never writes team_id (it does not know the column), so every row it inserts ' +
+      'during the overlap carries team_id NULL, and Postgres never treats two NULLs as colliding — the ' +
+      'new index cannot reject a single OLD-app write. The NEW app enforces the same one-per-team rule in ' +
+      'application code before insert. The pre-existing (tournament_id, author_user_id) unique is kept, so ' +
+      'the per-person rule the OLD app relies on is unchanged in both directions. The one shape that could ' +
+      'collide — two backfilled rows landing on the same (tournament, team) — is not silently repaired: ' +
+      'the preceding DO block counts it and aborts with ERRCODE 23505 so a human decides which review ' +
+      'survives (same pattern as the two review re-pins below). The statement is a DO block purely because ' +
+      'that guard needs procedural control flow; isAdditiveStatement has no DO branch and so cannot see ' +
+      'the CREATE UNIQUE INDEX it wraps. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
+    statement: `DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'v1_tournament_reviews_team_id_fkey'
+  ) THEN
+    ALTER TABLE "v1_tournament_reviews"
+      ADD CONSTRAINT "v1_tournament_reviews_team_id_fkey"
+      FOREIGN KEY ("team_id") REFERENCES "v1_teams"("id")
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$`,
+    reason:
+      'Adds the FK behind the new nullable team_id column. Rolling-deploy safe by the same argument the ' +
+      "gate's own ADD CONSTRAINT FK rule uses: the referencing column was created by this very migration " +
+      'and is nullable, so no pre-existing row can violate it, and the OLD app never writes the column so ' +
+      'it cannot insert an unmatched value during the overlap. RESTRICT (not CASCADE) is chosen so a team ' +
+      'deletion can never take reviews with it — V1Team is always soft-deleted (deletedAt) in this ' +
+      'codebase, matching v1_tournament_registrations.team. The statement is wrapped in a DO block only to ' +
+      'make it idempotent via pg_constraint lookup (this repo requires re-runnable migrations); ' +
+      'isAdditiveStatement has no DO branch and so cannot see the ADD CONSTRAINT it wraps. ' +
+      'Reviewed 2026-08-13.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260813061500_v1_tournament_personal_review_scope/migration.sql',
     statement: `DO $$
 DECLARE

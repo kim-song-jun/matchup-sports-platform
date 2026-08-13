@@ -11,6 +11,12 @@ const mocks = vi.hoisted(() => ({
   createFieldMutate: vi.fn(),
   // 테스트마다 필드 목록을 바꿀 수 있게 한다(빈 목록 케이스가 이 이슈의 핵심).
   fieldsResult: vi.fn(() => ({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } })),
+  // 스태프 배정 후보 검색. 배정 폼이 UUID 직접 입력에서 닉네임 검색으로 바뀌며 추가됐다.
+  candidateSearchResult: vi.fn(() => ({
+    data: { items: [{ id: 'user-seungmin', nickname: '이승민', displayName: null, maskedEmail: 'se***@example.com' }] },
+    isError: false,
+    isFetching: false,
+  })),
 }));
 
 vi.mock('@/components/tournament-ops/role-context', () => ({
@@ -58,7 +64,18 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1GrantTournamentStaff: () => ({ mutate: mocks.grantMutate, isPending: false }),
   useV1RevokeTournamentStaff: () => ({ mutate: mocks.revokeMutate, isPending: false }),
   useV1CreateTournamentField: () => ({ mutate: mocks.createFieldMutate, isPending: false }),
+  useV1TournamentStaffCandidateSearch: () => mocks.candidateSearchResult(),
 }));
+
+/**
+ * 배정 폼에서 배정 대상을 고른다. 검색 입력은 250ms 디바운스 뒤에야 결과 목록을 그리므로
+ * (GrantStaffModal 의 SEARCH_DEBOUNCE_MS) findBy 로 목록이 나타날 때까지 기다린다.
+ */
+async function pickCandidate(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.type(screen.getByLabelText(/배정할 사람/), name.slice(0, 2));
+  const option = await screen.findByRole('button', { name: new RegExp(name) });
+  await user.click(option);
+}
 
 function setRole(role: V1TournamentStaffRole) {
   mocks.useTournamentOpsRole.mockReturnValue(role);
@@ -75,6 +92,11 @@ describe('StaffClient', () => {
     mocks.revokeMutate.mockReset();
     mocks.createFieldMutate.mockReset();
     mocks.fieldsResult.mockReturnValue({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } });
+    mocks.candidateSearchResult.mockReturnValue({
+      data: { items: [{ id: 'user-seungmin', nickname: '이승민', displayName: null, maskedEmail: 'se***@example.com' }] },
+      isError: false,
+      isFetching: false,
+    });
   });
 
   // 표가 담당자를 userId 앞 8자로만 보여줘 누가 누구인지 알 수 없었다. 닉네임이 있으면
@@ -176,7 +198,7 @@ describe('StaffClient', () => {
 
     await user.click(screen.getByRole('button', { name: '스태프 배정' }));
     await user.selectOptions(screen.getByLabelText('역할'), 'FIELD_OPERATOR');
-    await user.type(screen.getByLabelText(/사용자 ID/), '11111111-1111-4111-8111-111111111111');
+    await pickCandidate(user, '이승민');
     await user.click(screen.getByRole('button', { name: '배정하기' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('필드 담당자는 담당 경기장을 골라야 해요.');
@@ -189,21 +211,54 @@ describe('StaffClient', () => {
     expect(mocks.grantMutate.mock.calls[0][0]).toMatchObject({
       role: 'FIELD_OPERATOR',
       fieldId: 'field-1',
-      userId: '11111111-1111-4111-8111-111111111111',
+      userId: 'user-seungmin',
     });
   });
 
-  it('사용자 ID 형식이 틀리면 이유를 알려주고 배정 요청은 나가지 않는다', async () => {
+  /* 종전에는 이 자리가 사용자 UUID 직접 입력이었고, 안내는 "어드민 > 사용자 관리에서 ID를
+     복사해 오라"였다 — 어드민이 아닌 대회 디렉터는 그 화면에 못 들어가므로 스태프를 배정할
+     방법이 사실상 없었다(2026-08-13 사용자 제보). 검색해서 고른 사람의 id 가 그대로 배정
+     요청에 실려야 이 경로가 성립한다. */
+  it('닉네임으로 검색해 고른 사람의 id 로 배정 요청이 나간다', async () => {
     setRole('PLATFORM_OPS');
     const user = userEvent.setup();
     render(<StaffClient tournamentId="t-1" />);
 
     await user.click(screen.getByRole('button', { name: '스태프 배정' }));
-    await user.type(screen.getByLabelText(/사용자 ID/), 'not-a-uuid');
+    await pickCandidate(user, '이승민');
+
+    // 고른 뒤에는 누구를 배정하는지 화면에 남아 있어야 한다 — 검색어만 지워지면 무엇을
+    // 골랐는지 확인할 방법이 없다.
+    expect(screen.getByRole('dialog')).toHaveTextContent('이승민');
+
     await user.click(screen.getByRole('button', { name: '배정하기' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('올바른 UUID 형식이 아니에요');
+    expect(mocks.grantMutate).toHaveBeenCalledTimes(1);
+    expect(mocks.grantMutate.mock.calls[0][0]).toMatchObject({ userId: 'user-seungmin' });
+  });
+
+  it('사람을 고르지 않고 배정하면 이유를 알려주고 요청은 나가지 않는다', async () => {
+    setRole('PLATFORM_OPS');
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+
+    await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+    await user.click(screen.getByRole('button', { name: '배정하기' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('배정할 사람을 검색해서 골라 주세요.');
     expect(mocks.grantMutate).not.toHaveBeenCalled();
+  });
+
+  it('검색 결과가 없으면 그 사실을 말해 준다', async () => {
+    setRole('PLATFORM_OPS');
+    mocks.candidateSearchResult.mockReturnValue({ data: { items: [] }, isError: false, isFetching: false });
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+
+    await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+    await user.type(screen.getByLabelText(/배정할 사람/), '없는사람');
+
+    expect(await screen.findByText(/검색 결과가 없어요/)).toBeInTheDocument();
   });
 
   /* #373 — 프론트에 필드 생성 호출부가 없어 필드가 영영 0건이었고, 그래서
@@ -241,8 +296,8 @@ describe('StaffClient', () => {
     // 고를 수 있는 것처럼 보이지 않게 select 자체도 잠근다
     expect(fieldSelect).toBeDisabled();
     // 제출을 눌러도 배정은 나가지 않고, 먼저 무엇을 해야 하는지 알려준다
-    // (사용자 ID는 채워 둔다 — 검증 순서상 ID가 먼저라 비워 두면 그 사유가 먼저 나온다)
-    await user.type(within(modal).getByLabelText(/사용자 ID/), '11111111-1111-4111-8111-111111111111');
+    // (배정 대상은 골라 둔다 — 검증 순서상 대상이 먼저라 비워 두면 그 사유가 먼저 나온다)
+    await pickCandidate(user, '이승민');
     await user.click(within(modal).getByRole('button', { name: '배정하기' }));
     expect(within(modal).getByRole('alert')).toHaveTextContent('등록된 경기장이 없어');
     expect(mocks.grantMutate).not.toHaveBeenCalled();

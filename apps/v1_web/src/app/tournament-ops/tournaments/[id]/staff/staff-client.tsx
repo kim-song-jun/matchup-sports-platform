@@ -492,6 +492,7 @@ export function StaffClient({ tournamentId }: Props) {
           open={grantOpen}
           onClose={() => setGrantOpen(false)}
           onSubmit={handleGrantSubmit}
+          tournamentId={tournamentId}
           roleOptions={grantableRoles}
           fields={fields.data?.items ?? []}
           pending={grant.isPending}

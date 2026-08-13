@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { V1TournamentStaffRole, V1TournamentStatus } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { V1AccountStatus, V1TournamentStaffRole, V1TournamentStatus } from '@prisma/client';
+import { maskEmail } from '../../auth/account-recovery.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   TournamentStaffAccessService,
@@ -11,6 +12,25 @@ import {
 } from '../../tournaments/staff/tournament-staff.service';
 import type { GrantTournamentStaffDto } from './dto/grant-tournament-staff.dto';
 import type { RevokeTournamentStaffDto } from './dto/revoke-tournament-staff.dto';
+import type { SearchStaffCandidatesDto } from './dto/search-staff-candidates.dto';
+
+/**
+ * 스태프 배정 후보. 신원 확인에 필요한 최소한만 담는다 — 실명·전화번호·원본 이메일은
+ * 포함하지 않는다(searchCandidates 주석 참고).
+ */
+export type StaffCandidate = {
+  readonly id: string;
+  readonly nickname: string | null;
+  readonly displayName: string | null;
+  /** `ab***@example.com`. 이메일이 없는 소셜 전용 계정은 null. */
+  readonly maskedEmail: string | null;
+};
+
+/**
+ * 한 번에 돌려주는 후보 수 상한. 스크롤로 명부를 훑는 용도가 되지 않도록 페이지네이션을
+ * 일부러 주지 않는다 — 후보가 이보다 많으면 검색어를 더 구체적으로 좁히는 것이 맞다.
+ */
+const SEARCH_RESULT_LIMIT = 10;
 
 export type TournamentStaffAssignmentListItem = TournamentStaffAssignmentResult & {
   readonly grantedByUserId: string | null;
@@ -204,6 +224,71 @@ export class TournamentOperationsStaffService {
         grantedByUserId: assignment.grantedByUserId,
         createdAt: assignment.createdAt,
         nickname: assignment.user?.profile?.nickname ?? null,
+      })),
+    };
+  }
+
+  /**
+   * 배정할 사람을 닉네임으로 찾는다. 이 검색이 없던 동안 배정 폼은 사용자 UUID를 직접
+   * 받았고, 화면 안내는 "어드민 > 사용자 관리에서 ID를 복사해 오라"였다 — 어드민이
+   * 아닌 대회 디렉터는 그 화면에 못 들어가므로 사실상 스태프를 배정할 방법이 없었다
+   * (2026-08-13 사용자 제보).
+   *
+   * 권한은 **grant 와 정확히 같게** 좁힌다(`platform_ops` | `tournament_director`).
+   * `assertAccess`의 'read'만 통과시키면 SUPPORT_READONLY 같은 열람 전용 스태프도
+   * 사용자 명부를 조회할 수 있게 되는데, 그건 배정을 할 수 없는 사람에게 검색만
+   * 열어 주는 셈이라 개인정보만 새어 나간다. 판정 기준은 assertGrantAuthority
+   * (tournaments/staff/tournament-staff.service.ts)와 같은 두 역할이다.
+   *
+   * 노출 필드는 닉네임·표시명과 **마스킹된 이메일**뿐이다. 실명(realName)은 검색
+   * 대상에서도 응답에서도 제외한다 — 동명이인 구분에는 닉네임으로 충분한 반면
+   * 실명은 훨씬 민감하다. 이메일은 부분검색을 허용하지 않고 정확히 일치할 때만
+   * 매칭한다(이미 주소를 아는 사람만 찾을 수 있다는 뜻이라 명부 열람이 안 된다).
+   */
+  async searchCandidates(
+    actorUserId: string,
+    tournamentId: string,
+    query: SearchStaffCandidatesDto,
+  ): Promise<{ readonly items: readonly StaffCandidate[] }> {
+    const principal = await this.access.assertAccess({
+      userId: actorUserId,
+      action: 'read',
+      resource: { tournamentId },
+    });
+    if (principal.role !== 'platform_ops' && principal.role !== 'tournament_director') {
+      throw new ForbiddenException({
+        code: 'STAFF_MANAGEMENT_DENIED',
+        message: 'Tournament staff management is denied',
+        details: { reason: 'DIRECTOR_AUTHORITY_REQUIRED' },
+      });
+    }
+
+    const q = query.q.trim();
+    const users = await this.prisma.v1User.findMany({
+      where: {
+        deletedAt: null,
+        accountStatus: V1AccountStatus.active,
+        OR: [
+          { profile: { nickname: { contains: q, mode: 'insensitive' } } },
+          { profile: { displayName: { contains: q, mode: 'insensitive' } } },
+          { email: { equals: q, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        email: true,
+        profile: { select: { nickname: true, displayName: true } },
+      },
+      orderBy: [{ profile: { nickname: 'asc' } }, { id: 'asc' }],
+      take: SEARCH_RESULT_LIMIT,
+    });
+
+    return {
+      items: users.map((user) => ({
+        id: user.id,
+        nickname: user.profile?.nickname ?? null,
+        displayName: user.profile?.displayName ?? null,
+        maskedEmail: user.email === null ? null : maskEmail(user.email),
       })),
     };
   }

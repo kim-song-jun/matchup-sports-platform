@@ -1,8 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
-import type { V1GrantTournamentStaffPayload, V1TournamentField, V1TournamentStaffRole } from '@/types/api';
+import { Search, X } from 'lucide-react';
+import { useV1TournamentStaffCandidateSearch } from '@/hooks/use-v1-api';
+import type {
+  V1GrantTournamentStaffPayload,
+  V1TournamentField,
+  V1TournamentStaffCandidate,
+  V1TournamentStaffRole,
+} from '@/types/api';
 
 export interface GrantableRoleOption {
   value: Exclude<V1TournamentStaffRole, 'PLATFORM_OPS'>;
@@ -13,29 +19,36 @@ interface GrantStaffModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (payload: V1GrantTournamentStaffPayload) => void;
+  /** 후보 검색은 대회 단위 권한을 타므로 어느 대회인지 알아야 한다. */
+  tournamentId: string;
   roleOptions: GrantableRoleOption[];
   fields: V1TournamentField[];
   pending?: boolean;
   errorMessage?: string | null;
 }
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/** 서버가 요구하는 최소 검색어 길이(SearchStaffCandidatesDto). 더 짧으면 호출하지 않는다. */
+const MIN_QUERY_LENGTH = 2;
+
+/** 타이핑마다 부르면 서버 rate limit(60초 30회)에 금방 닿는다. */
+const SEARCH_DEBOUNCE_MS = 250;
+
+function candidateLabel(candidate: V1TournamentStaffCandidate): string {
+  return candidate.nickname ?? candidate.displayName ?? '이름 없는 사용자';
+}
 
 /**
  * 입력값이 왜 막혔는지 말해 준다(해요체). 종전에는 제출 버튼이 조용히 잠겨 있을 뿐이라
  * 운영자가 "왜 안 눌리는지" 알 방법이 없었다 — 특히 담당 필드 미선택이 그랬다.
  */
 function validationMessage(
-  trimmedUserId: string,
+  selected: V1TournamentStaffCandidate | null,
   role: Exclude<V1TournamentStaffRole, 'PLATFORM_OPS'>,
   fieldId: string,
   fieldCount: number,
 ): string | null {
-  if (trimmedUserId.length === 0) {
-    return '배정할 사용자 ID를 입력해 주세요.';
-  }
-  if (!UUID_PATTERN.test(trimmedUserId)) {
-    return '올바른 UUID 형식이 아니에요. 사용자 관리 화면에서 복사한 ID를 그대로 붙여넣어 주세요.';
+  if (selected === null) {
+    return '배정할 사람을 검색해서 골라 주세요.';
   }
   if (role === 'FIELD_OPERATOR' && fieldId === '') {
     return fieldCount === 0
@@ -49,12 +62,18 @@ export function GrantStaffModal({
   open,
   onClose,
   onSubmit,
+  tournamentId,
   roleOptions,
   fields,
   pending = false,
   errorMessage,
 }: GrantStaffModalProps) {
-  const [userId, setUserId] = useState('');
+  // 검색어(query)와 실제 요청에 쓰는 값(debouncedQuery)을 나눈다 — 타이핑마다 요청하면
+  // 서버 rate limit 에 닿고, 요청 하나가 응답하기 전에 다음 글자가 들어오면 결과가
+  // 깜빡인다.
+  const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [selected, setSelected] = useState<V1TournamentStaffCandidate | null>(null);
   const [role, setRole] = useState<Exclude<V1TournamentStaffRole, 'PLATFORM_OPS'>>(
     roleOptions[0]?.value ?? 'SUPPORT_READONLY',
   );
@@ -69,7 +88,9 @@ export function GrantStaffModal({
 
   useEffect(() => {
     if (open) {
-      setUserId('');
+      setQuery('');
+      setDebouncedQuery('');
+      setSelected(null);
       setRole(roleOptions[0]?.value ?? 'SUPPORT_READONLY');
       setFieldId('');
       setExpiresAt('');
@@ -77,6 +98,11 @@ export function GrantStaffModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
     if (open) {
@@ -136,12 +162,21 @@ export function GrantStaffModal({
     };
   }, [open]);
 
+  // 이미 사람을 고른 뒤에는 검색을 멈춘다 — 선택 결과가 입력창에 남아 있는 상태에서
+  // 계속 조회하면 쓰지도 않을 명부를 불필요하게 더 읽는다.
+  const search = useV1TournamentStaffCandidateSearch(tournamentId, debouncedQuery, {
+    enabled: open && selected === null,
+  });
+
   if (!open) return null;
 
-  const trimmedUserId = userId.trim();
-  const userIdValid = UUID_PATTERN.test(trimmedUserId);
+  const trimmedQuery = query.trim();
   const requiresField = role === 'FIELD_OPERATOR';
-  const validationError = validationMessage(trimmedUserId, role, fieldId, fields.length);
+  const validationError = validationMessage(selected, role, fieldId, fields.length);
+  const candidates = search.data?.items ?? [];
+  // 디바운스가 끝나기 전에는 직전 검색어의 결과가 남아 있다 — 그 사이 "결과 없음"을
+  // 띄우면 아직 찾는 중인데 없다고 단정하는 셈이라 입력이 안정된 뒤에만 판정한다.
+  const searchSettled = trimmedQuery === debouncedQuery.trim() && !search.isFetching;
   // 버튼은 잠그지 않는다 — 눌러야 막힌 이유를 알 수 있다(제출 시 검증).
   const canSubmit = !pending;
 
@@ -149,15 +184,15 @@ export function GrantStaffModal({
     e.preventDefault();
     if (pending) return;
     setSubmitAttempted(true);
-    if (validationError !== null) {
+    if (validationError !== null || selected === null) {
       // 막힌 입력으로 초점을 옮겨 준다 — 사유만 띄우고 커서를 그대로 두면
       // 키보드 사용자는 어디를 고쳐야 하는지 찾아다녀야 한다.
-      const target = userIdValid ? fieldSelectRef.current : firstFieldRef.current;
+      const target = selected !== null ? fieldSelectRef.current : firstFieldRef.current;
       target?.focus();
       return;
     }
     onSubmit({
-      userId: trimmedUserId,
+      userId: selected.id,
       role,
       ...(requiresField ? { fieldId } : {}),
       ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
@@ -176,9 +211,13 @@ export function GrantStaffModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="grant-staff-modal-title"
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] overflow-hidden"
+        /* 모바일에서 폼이 화면보다 길어지면(특히 키보드가 올라온 상태) 하단의 취소·배정
+           버튼이 화면 밖으로 밀려 눌 수 없었다 — 높이를 뷰포트로 묶고 본문만 스크롤시켜
+           머리말과 버튼 줄은 항상 보이게 한다. 검색 결과 목록이 생기면서 길이가 더
+           늘어나 이 처리 없이는 확실히 잘린다. */
+        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] max-h-[calc(100dvh-32px)] flex flex-col overflow-hidden"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+        <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2 id="grant-staff-modal-title" className="text-[16px] font-bold text-[var(--text-strong)]">
             스태프 배정
           </h2>
@@ -193,28 +232,120 @@ export function GrantStaffModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="px-5 py-5 flex flex-col gap-4">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col min-h-0">
+          <div className="px-5 py-5 flex flex-col gap-4 overflow-y-auto">
+            {/* 예전에는 이 자리가 사용자 UUID 직접 입력이었고 안내는 "어드민 > 사용자
+                관리에서 ID를 복사해 오라"였다 — 어드민이 아닌 대회 디렉터는 그 화면에
+                들어갈 수 없으므로 사실상 배정할 방법이 없었다(2026-08-13 사용자 제보).
+                닉네임으로 찾아 고르는 방식으로 바꾼다. */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-staff-user-id" className="text-[13px] font-semibold text-[var(--text-body)]">
-                사용자 ID (UUID) <span className="text-[var(--red700)]" aria-hidden="true">*</span>
+              <label htmlFor="grant-staff-user-search" className="text-[13px] font-semibold text-[var(--text-body)]">
+                배정할 사람 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
-              <input
-                id="grant-staff-user-id"
-                ref={firstFieldRef}
-                type="text"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                disabled={pending}
-                placeholder="00000000-0000-4000-8000-000000000000"
-                aria-describedby="grant-staff-user-id-help"
-                aria-invalid={submitAttempted && !userIdValid ? true : undefined}
-                className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
-              />
-              <p id="grant-staff-user-id-help" className="text-[12px] text-[var(--text-muted)]">
-                배정할 분의 사용자 ID예요. 어드민 &gt; 사용자 관리에서 그 사람의 ID를 복사해 붙여넣어 주세요.
-              </p>
+
+              {selected !== null ? (
+                <div className="flex items-center gap-3 min-h-[44px] px-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl">
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-sm font-semibold text-[var(--text-strong)] truncate">
+                      {candidateLabel(selected)}
+                    </span>
+                    {selected.maskedEmail !== null && (
+                      <span className="text-[12px] text-[var(--text-muted)] truncate">{selected.maskedEmail}</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelected(null);
+                      setQuery('');
+                      firstFieldRef.current?.focus();
+                    }}
+                    disabled={pending}
+                    className="shrink-0 h-[44px] px-3 text-[13px] font-semibold text-[var(--text-muted)] rounded-lg hover:bg-gray-200 dark:hover:bg-white/20 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+                  >
+                    다시 고르기
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Search
+                      size={16}
+                      aria-hidden="true"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                    />
+                    <input
+                      id="grant-staff-user-search"
+                      ref={firstFieldRef}
+                      type="search"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      disabled={pending}
+                      placeholder="닉네임으로 검색"
+                      autoComplete="off"
+                      aria-describedby="grant-staff-user-search-help"
+                      aria-invalid={submitAttempted && selected === null ? true : undefined}
+                      className="w-full h-[44px] pl-9 pr-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+                    />
+                  </div>
+
+                  {/* 결과 수는 화면에 목록으로 보이지만, 스크린리더는 목록이 조용히 바뀌는
+                      것을 알 수 없다 — aria-live 로 검색 상태를 말해 준다. */}
+                  <p className="sr-only" role="status" aria-live="polite">
+                    {trimmedQuery.length < MIN_QUERY_LENGTH
+                      ? ''
+                      : !searchSettled
+                        ? '검색 중이에요.'
+                        : `검색 결과 ${candidates.length}명`}
+                  </p>
+
+                  {trimmedQuery.length >= MIN_QUERY_LENGTH && (
+                    <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+                      {search.isError ? (
+                        <p className="px-3 py-3 text-[13px] text-[var(--red700)]">
+                          검색하지 못했어요. 잠시 후 다시 시도해 주세요.
+                        </p>
+                      ) : !searchSettled ? (
+                        <p className="px-3 py-3 text-[13px] text-[var(--text-muted)]">검색 중이에요…</p>
+                      ) : candidates.length === 0 ? (
+                        <p className="px-3 py-3 text-[13px] text-[var(--text-muted)]">
+                          검색 결과가 없어요. 닉네임을 정확히 입력했는지 확인해 주세요.
+                        </p>
+                      ) : (
+                        <ul className="max-h-[200px] overflow-y-auto">
+                          {candidates.map((candidate) => (
+                            <li key={candidate.id} className="border-b border-[var(--border)] last:border-b-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelected(candidate);
+                                  setQuery('');
+                                }}
+                                disabled={pending}
+                                className="w-full min-h-[44px] px-3 py-2 flex flex-col items-start text-left hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2 disabled:opacity-50"
+                              >
+                                <span className="text-sm font-semibold text-[var(--text-strong)] truncate max-w-full">
+                                  {candidateLabel(candidate)}
+                                </span>
+                                {candidate.maskedEmail !== null && (
+                                  <span className="text-[12px] text-[var(--text-muted)] truncate max-w-full">
+                                    {candidate.maskedEmail}
+                                  </span>
+                                )}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
+                  <p id="grant-staff-user-search-help" className="text-[12px] text-[var(--text-muted)]">
+                    닉네임 {MIN_QUERY_LENGTH}글자 이상으로 찾을 수 있어요. 이메일은 전체를 정확히 입력해야 찾아져요.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -303,7 +434,7 @@ export function GrantStaffModal({
             )}
           </div>
 
-          <div className="flex items-center gap-2 px-5 pb-5">
+          <div className="shrink-0 flex items-center gap-2 px-5 pb-5 pt-1">
             <button
               type="button"
               onClick={() => !pending && onClose()}

@@ -21,6 +21,7 @@ function participant(id: string, sideId: string, name: string) {
     gameId: 'g-1',
     sideId,
     lineupId: `lineup-${sideId}`,
+    userId: null,
     displayNameSnapshot: name,
     jerseyNumber: 10,
     position: null,

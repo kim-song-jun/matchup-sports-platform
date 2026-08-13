@@ -28,6 +28,7 @@ const TEAMMATE: GameLineupParticipant = {
   gameId: 'game-1',
   sideId: 'side-home',
   lineupId: 'lineup-home',
+  userId: null,
   displayNameSnapshot: '조현우',
   jerseyNumber: 9,
   position: null,

@@ -6,7 +6,7 @@ import { trackEvent } from '@/lib/analytics';
 import { compressImagesForUpload } from '@/lib/image-compress';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
-import type { GameLineup } from '@/types/game-operations';
+import type { GameLineup, GameLineupState } from '@/types/game-operations';
 import type {
   V1AdminRosterEligibleMembersResponse,
   AdminListFilters,
@@ -1468,8 +1468,10 @@ export type V1FixtureLineupAccess = {
   scheduledAt: string | null;
   homeSideId: string | null;
   homeTeamName: string | null;
+  homeRegistrationId: string | null;
   awaySideId: string | null;
   awayTeamName: string | null;
+  awayRegistrationId: string | null;
 };
 
 export function useV1FixtureLineupAccess(tournamentId: string, fixtureId: string, options?: { enabled?: boolean }) {
@@ -1477,6 +1479,63 @@ export function useV1FixtureLineupAccess(tournamentId: string, fixtureId: string
     queryKey: v1Keys.fixtureLineupAccess(tournamentId, fixtureId),
     queryFn: () => v1Get<V1FixtureLineupAccess>(`/tournaments/${tournamentId}/fixtures/${fixtureId}/lineup-access`),
     enabled: Boolean(tournamentId) && Boolean(fixtureId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+/** 라인업 편집기가 쓰는 참가 등록 명단 — 대회 경기 라인업 선수의 유일한 출처. */
+export type V1FixtureLineupRoster = {
+  sideId: string;
+  registrationId: string;
+  players: Array<{ tournamentPlayerId: string; userId: string; name: string }>;
+};
+
+export function useV1FixtureLineupRoster(
+  tournamentId: string,
+  fixtureId: string,
+  sideId: string | null,
+) {
+  return useQuery({
+    queryKey: v1Keys.fixtureLineupRoster(tournamentId, fixtureId, sideId ?? ''),
+    queryFn: () =>
+      v1Get<V1FixtureLineupRoster>(
+        `/tournaments/${tournamentId}/fixtures/${fixtureId}/lineup-roster?sideId=${encodeURIComponent(sideId ?? '')}`,
+      ),
+    enabled: Boolean(tournamentId) && Boolean(fixtureId) && Boolean(sideId),
+    retry: false,
+  });
+}
+
+/** 대회 일정 화면이 "내 팀 경기"를 짚어주기 위한 인증 전용 조회. */
+export type V1MyTournamentFixture = {
+  fixtureId: string;
+  gameId: string | null;
+  sideId: string | null;
+  round: string;
+  legNumber: number;
+  groupName: string | null;
+  scheduledAt: string | null;
+  status: string;
+  isHome: boolean;
+  opponentTeamName: string | null;
+  lineupState: GameLineupState | null;
+};
+
+export type V1MyTournamentFixtures = {
+  teams: Array<{
+    registrationId: string;
+    teamId: string;
+    teamName: string;
+    fixtures: V1MyTournamentFixture[];
+  }>;
+};
+
+export function useV1MyTournamentFixtures(tournamentId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.myTournamentFixtures(tournamentId),
+    queryFn: () => v1Get<V1MyTournamentFixtures>(`/tournaments/${tournamentId}/my-fixtures`),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+    // 비로그인 방문자에게는 401이 정상이다 — 재시도하지 않고 조용히 없는 것으로 둔다.
     retry: false,
   });
 }
@@ -1494,6 +1553,8 @@ export type V1SaveGameLineupPayload = {
   expectedVersion: number;
   formation?: string;
   participants: Array<{
+    /** 등록 명단의 사용자 — 다시 열 때 이름이 아니라 이 값으로 명단과 대조한다. */
+    userId?: string;
     displayNameSnapshot: string;
     jerseyNumber?: number;
     position?: string;

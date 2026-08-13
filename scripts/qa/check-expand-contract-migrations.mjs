@@ -23,6 +23,47 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20260813061500_v1_tournament_personal_review_scope/migration.sql',
+    statement: `DO $$
+DECLARE
+  group_conflicts bigint;
+BEGIN
+  SELECT count(*) INTO group_conflicts
+  FROM (
+    SELECT 1
+    FROM "v1_post_event_reviews"
+    WHERE "target_user_id" IS NOT NULL
+      AND "source_group_id" IS NOT NULL
+    GROUP BY "reviewer_user_id", "target_user_id", "source_type", "source_group_id"
+    HAVING count(*) > 1
+  ) AS duplicated_by_group;
+
+  IF group_conflicts > 0 THEN
+    RAISE EXCEPTION
+      '개인 후기에 대회 단위 중복 방지 제약을 걸 수 없어요. (reviewer_user_id, target_user_id, source_type, source_group_id) 충돌 %건. 한 사람이 같은 대회에서 같은 상대를 두 번 이상 평가한 후기입니다. 어느 후기를 남길지 자동으로 정하지 않으니, 수동으로 정리한 뒤 마이그레이션을 다시 실행하세요.',
+      group_conflicts
+      USING ERRCODE = '23505';
+  END IF;
+
+  CREATE UNIQUE INDEX IF NOT EXISTS "v1_post_event_reviews_user_user_source_group_key"
+    ON "v1_post_event_reviews"("reviewer_user_id", "target_user_id", "source_type", "source_group_id");
+END $$`,
+    reason:
+      'Adds a tournament-scoped duplicate key for PERSONAL reviews so the same reviewer cannot rate the ' +
+      'same opponent once per fixture (group stage, quarter-final, final) — team-target reviews already ' +
+      'use this source_group_id scope. Rolling-deploy safe: the index is narrower only for a writer that ' +
+      'submits more than one personal review per (reviewer, target, tournament), which no app version can ' +
+      'do — the OLD app rejects targetType=user on tournament_fixture outright (assertSubmitShape 400), so ' +
+      'no pre-existing row carries a non-NULL source_group_id on a personal review at all, and the NEW app ' +
+      'enforces the same key in application code. match-sourced personal reviews keep source_group_id NULL, ' +
+      'which Postgres never treats as colliding, so the pre-existing population is untouched. The one shape ' +
+      'that could collide is not silently repaired: the preceding DO block counts it and aborts with ' +
+      'ERRCODE 23505 so a human decides which review survives. The statement is a DO block purely because ' +
+      'that guard needs procedural control flow; isAdditiveStatement has no DO branch and so cannot see the ' +
+      'CREATE UNIQUE INDEX it wraps. The four ALTER TABLE ADD COLUMN IF NOT EXISTS statements in the same ' +
+      'file are additive on their own and pass without review. Reviewed 2026-08-13.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260812231238_v1_post_event_review_reviewer_user_unique/migration.sql',
     statement: `DO $$
 DECLARE

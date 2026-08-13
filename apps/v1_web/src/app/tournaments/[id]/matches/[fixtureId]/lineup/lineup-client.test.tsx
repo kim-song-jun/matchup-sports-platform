@@ -341,6 +341,22 @@ describe('FixtureLineupPageClient — 등록 명단에서 선발 고르기', () 
     expect(screen.getByText('선발 1명 · 후보 3명')).toBeInTheDocument();
   });
 
+  // Copilot 리뷰 지적: access의 home/away registrationId를 사이드 비교로 고르면 지금
+  // 편집 중인 명단과 어긋날 수 있고, null이면 `/registrations//roster` 깨진 주소가 된다.
+  it('명단 관리 링크는 로스터를 실제로 불러온 registration을 가리킨다', () => {
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue({
+      ...baseRoster(),
+      data: { ...baseRoster().data, registrationId: 'reg-actually-loaded' },
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('link', { name: '참가 선수 명단 관리하기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/registrations/reg-actually-loaded/roster',
+    );
+  });
+
   it('등록 명단이 비어 있으면 명단을 먼저 채우라고 안내한다', () => {
     hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster([]));
     hoisted.useV1GameLineupsMock.mockReturnValue({

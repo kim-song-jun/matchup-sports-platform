@@ -436,11 +436,14 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const rosterEntries = (rosterQuery.data?.players ?? [])
     .map((player) => entryByKey.get(player.userId))
     .filter((entry): entry is NonNullable<typeof entry> => entry !== undefined);
-  const rosterHref = `/tournaments/${tournamentId}/registrations/${
-    access.data.mySideId === access.data.homeSideId
-      ? (access.data.homeRegistrationId ?? '')
-      : (access.data.awayRegistrationId ?? '')
-  }/roster`;
+  // 명단 관리 링크의 registration은 **로스터를 실제로 불러온 그 응답**에서 가져온다 —
+  // access의 home/away registrationId를 사이드 비교로 고르면 지금 편집 중인 명단과
+  // 어긋날 수 있고, null이면 `/registrations//roster` 같은 깨진 주소가 만들어진다
+  // (Copilot 리뷰 지적). 이 링크는 rosterQuery.data가 있을 때만 렌더된다.
+  const rosterHref =
+    rosterQuery.data === undefined
+      ? null
+      : `/tournaments/${tournamentId}/registrations/${rosterQuery.data.registrationId}/roster`;
 
   return (
     <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
@@ -554,7 +557,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                 명단을 고치러 갈 곳을 여기서 바로 알려주지 않으면 팀장은 "빠진 선수를
                 어디서 넣지?"에서 막힌다. 스태프는 남의 팀 등록을 고칠 수 없으므로
                 자기 팀을 편집 중인 매니저에게만 보여준다. */}
-            {access.data.mySideId !== null && rosterQuery.data !== undefined ? (
+            {access.data.mySideId !== null && rosterHref !== null ? (
               <p className="tm-text-caption" style={{ margin: '0 0 8px' }}>
                 <Link href={rosterHref} style={{ color: 'var(--blue500)', fontWeight: 700 }}>
                   참가 선수 명단 관리하기

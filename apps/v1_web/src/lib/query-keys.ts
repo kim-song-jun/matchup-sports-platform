@@ -137,6 +137,13 @@ export const v1Keys = {
     [...v1Keys.all, 'tournament-ops', tournamentId, 'operations'] as const,
   tournamentOperationsStaff: (tournamentId: string) =>
     [...v1Keys.all, 'tournament-ops', tournamentId, 'staff'] as const,
+  /**
+   * 스태프 배정 후보 검색. 검색어를 키에 포함해 타이핑마다 캐시가 갈리게 한다 —
+   * 스태프 목록(tournamentOperationsStaff)의 하위 키로 두면 배정·해제 후의 목록
+   * 무효화가 검색 결과까지 통째로 날려 버리므로 형제 키로 분리한다.
+   */
+  tournamentOperationsStaffCandidates: (tournamentId: string, query: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'staff-candidates', query] as const,
   myTournamentStaffAssignments: () => [...v1Keys.all, 'me', 'tournament-staff'] as const,
   tournamentOperationsFields: (tournamentId: string) =>
     [...v1Keys.all, 'tournament-ops', tournamentId, 'fields'] as const,

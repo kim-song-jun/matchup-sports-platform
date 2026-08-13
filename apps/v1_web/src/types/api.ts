@@ -3730,6 +3730,22 @@ export type V1MyTournamentStaffResponse = {
   items: V1MyTournamentStaffGroup[];
 };
 
+/**
+ * GET /tournament-ops/tournaments/:tournamentId/staff/user-search 응답의 items[] 항목.
+ * 서버가 신원 확인에 필요한 최소한만 내려준다 — 실명·전화번호·원본 이메일은 오지 않고
+ * 이메일은 `ab***@example.com` 형태로 마스킹돼 있다.
+ */
+export type V1TournamentStaffCandidate = {
+  id: string;
+  nickname: string | null;
+  displayName: string | null;
+  maskedEmail: string | null;
+};
+
+export type V1TournamentStaffCandidateSearchResponse = {
+  items: V1TournamentStaffCandidate[];
+};
+
 /** POST /tournament-ops/tournaments/:tournamentId/staff 바디. `PLATFORM_OPS`는 배정 대상이 될 수 없다. */
 export type V1GrantTournamentStaffPayload = {
   userId: string;

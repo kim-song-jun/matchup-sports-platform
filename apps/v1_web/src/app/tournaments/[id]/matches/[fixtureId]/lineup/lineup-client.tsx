@@ -49,6 +49,14 @@ import {
  * team-match 쪽 자동저장은 "명단이 없어지면 큰일" 성격의 시즌 매치용 배려인데,
  * 이 화면은 아직 임시 데이터 손실 시 되돌릴 UX(버전 충돌 재로드 등)가 없어
  * 명시적 저장이 더 안전하다.
+ *
+ * `bottomNav={false}` — 하단 고정 CTA(.tm-fixed-cta)나 바텀시트를 쓰는 화면은 하단
+ * 탭바를 띄우지 않는 것이 이 저장소의 규약이다(team-match 라인업·대회 상세·참가 신청·
+ * 매치 생성 모두 동일). .tm-fixed-cta 는 `bottom: 0` 이고 탭바는 74px 높이로 같은 자리를
+ * 차지하므로, 둘을 함께 띄우면 저장/제출 버튼과 "배치 설정" 바텀시트 하단이 탭바에
+ * 가려진다 — 이 화면만 규약에서 빠져 있어 모바일에서 실제로 잘려 보였다(2026-08-13
+ * 사용자 제보 스크린샷). 탭바를 끄면 AppChrome 이 상단에 홈 단축키를 자동 노출해
+ * (shell.tsx 의 showHomeShortcut) 이동 경로도 유지된다.
  */
 export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamentId: string; fixtureId: string }) {
   const access = useV1FixtureLineupAccess(tournamentId, fixtureId);
@@ -184,7 +192,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     const code = access.error instanceof V1ApiError ? access.error.code : null;
     if (code === 'PERMISSION_DENIED') {
       return (
-        <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+        <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
           <EmptyState
             title="라인업을 관리할 수 없어요"
             sub="이 경기에 참가하는 팀의 매니저·오너만 라인업을 관리할 수 있어요."
@@ -194,13 +202,13 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     }
     if (code === 'GAME_NOT_FOUND' || code === 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND') {
       return (
-        <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+        <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
           <EmptyState title="경기를 찾을 수 없어요" sub="대회 경기 정보가 삭제됐거나 아직 준비되지 않았어요." />
         </AppChrome>
       );
     }
     return (
-      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
         <div style={{ padding: '40px 20px' }}>
           <ErrorState
             message={extractErrorMessage(access.error, '접근 권한을 불러오지 못했어요.')}
@@ -219,7 +227,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     // 바로 아래 `state === null` 스켈레톤 분기가 영원히 참이 돼 PageSkeleton에 갇힌다.
     const error = gameQuery.error ?? lineupsQuery.error;
     return (
-      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
         <div style={{ padding: '40px 20px' }}>
           <ErrorState
             message={extractErrorMessage(error, '라인업 정보를 불러오지 못했어요.')}
@@ -235,7 +243,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
   if (access.isLoading || !access.data || gameQuery.isLoading || lineupsQuery.isLoading) {
     return (
-      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -244,7 +252,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   // 팀에도 안 속하고 스태프도 아니면 이 경기 라인업을 볼 이유가 없다.
   if (access.data.mySideId === null && !access.data.isStaff) {
     return (
-      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
         <EmptyState
           title="이 경기의 라인업을 관리할 권한이 없어요"
           sub="참가팀 매니저 또는 대회 운영진만 라인업을 편집할 수 있어요."
@@ -261,7 +269,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     ].filter((c): c is { sideId: string; teamName: string | null; label: string } => c.sideId !== null);
 
     return (
-      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
         <div style={{ padding: '20px 20px 40px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <h2 className="tm-text-body-lg" style={{ color: 'var(--text-strong)' }}>
@@ -292,7 +300,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
   if (state === null) {
     return (
-      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+      <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -328,6 +336,13 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;
   const emptySlotCount =
     activeSlots !== null ? matchSlotsToEntries(activeSlots, state.starters).filter((row) => row.entry === null).length : 0;
+  // 제출을 막는 사유. null 이면 제출 가능하다 — 버튼의 disabled 조건과 하단 CTA 안내
+  // 문구가 같은 값을 보므로 "버튼은 잠겼는데 이유는 안 보이는" 어긋남이 생기지 않는다.
+  const submitBlockedReason = state.dirty
+    ? '저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요.'
+    : emptySlotCount > 0
+      ? `포지션 자리 ${emptySlotCount}개가 비어 있어요.`
+      : null;
 
   async function handleSave() {
     if (state === null) return;
@@ -367,7 +382,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   const awayName = access.data.awayTeamName ?? '원정팀';
 
   return (
-    <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} desktopHead>
+    <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
       <div style={{ padding: '0 16px 96px', display: 'grid', gap: 14 }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">{homeName} vs {awayName}</div>
@@ -701,6 +716,22 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
       {editable ? (
         <div className="tm-fixed-cta">
+          {/* 제출이 막힌 사유는 버튼 라벨이 아니라 버튼 위 한 줄로 말한다 — 예전에는 사유
+              전체("저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요")가 제출 버튼의
+              라벨이었는데, 이 버튼은 저장 버튼과 1fr 1fr 로 폭을 나눠 갖는다. 모바일
+              390px 에서 한 칸은 약 170px 이라 그 문장이 버튼 안에서 대여섯 줄로 부풀고
+              하단이 잘려 보였다(2026-08-13 사용자 제보 스크린샷). 사유 자체는 그대로
+              보여 주되(왜 막혔는지 모르면 갇힌다) 자리를 버튼 밖으로 옮긴 것이고,
+              aria-describedby 로 제출 버튼과 묶어 스크린리더에서도 사유가 함께 읽힌다. */}
+          {submitBlockedReason !== null ? (
+            <p
+              id="fixture-lineup-submit-blocked"
+              className="tm-text-caption"
+              style={{ color: 'var(--text-muted)', margin: '0 0 8px', textAlign: 'center' }}
+            >
+              {submitBlockedReason}
+            </p>
+          ) : null}
           <div style={{ display: 'grid', gridTemplateColumns: state.lineupId ? '1fr 1fr' : '1fr', gap: 8 }}>
             <button
               type="button"
@@ -722,16 +753,11 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               <button
                 type="button"
                 className="tm-btn tm-btn-lg tm-btn-primary"
-                disabled={submitMutation.isPending || state.dirty || emptySlotCount > 0}
+                disabled={submitMutation.isPending || submitBlockedReason !== null}
+                aria-describedby={submitBlockedReason !== null ? 'fixture-lineup-submit-blocked' : undefined}
                 onClick={handleSubmit}
               >
-                {submitMutation.isPending
-                  ? '제출 중…'
-                  : state.dirty
-                    ? '저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요'
-                    : emptySlotCount > 0
-                      ? `포지션 자리 ${emptySlotCount}개가 비어 있어요`
-                      : '라인업 제출하기'}
+                {submitMutation.isPending ? '제출 중…' : '라인업 제출하기'}
               </button>
             ) : null}
           </div>

@@ -9,9 +9,11 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { V1AuthGuard } from '../../auth/v1-auth.guard';
@@ -19,6 +21,7 @@ import type { V1AuthUser } from '../../auth/v1-auth-user';
 import type { TournamentStaffAuditContext } from '../../tournaments/staff/tournament-staff.service';
 import { GrantTournamentStaffDto } from './dto/grant-tournament-staff.dto';
 import { RevokeTournamentStaffDto } from './dto/revoke-tournament-staff.dto';
+import { SearchStaffCandidatesDto } from './dto/search-staff-candidates.dto';
 import { TournamentOperationsStaffService } from './tournament-operations-staff.service';
 
 const UUID_PARAM = new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY });
@@ -40,6 +43,23 @@ export class TournamentOperationsStaffController {
   @Get()
   list(@CurrentUser() user: V1AuthUser, @Param('tournamentId', UUID_PARAM) tournamentId: string) {
     return this.staff.list(user.id, tournamentId);
+  }
+
+  /**
+   * 배정할 사람을 닉네임으로 찾는 검색. 인가는 grant 와 동일하게 좁혀져 있고
+   * (TournamentOperationsStaffService.searchCandidates 주석 참고) 응답도 마스킹된
+   * 신원만 담는다. 호출 빈도를 60초 30회로 묶는 것은 그 위의 마지막 장치다 — 두 글자
+   * 하한과 10건 상한만으로는 검색어를 바꿔 가며 반복 호출해 명부를 재구성하는 것을
+   * 막지 못한다.
+   */
+  @Get('user-search')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  searchCandidates(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId', UUID_PARAM) tournamentId: string,
+    @Query() dto: SearchStaffCandidatesDto,
+  ) {
+    return this.staff.searchCandidates(user.id, tournamentId, dto);
   }
 
   @Post()

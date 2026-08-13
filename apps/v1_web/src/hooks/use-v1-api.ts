@@ -241,6 +241,7 @@ import type {
   V1TournamentOperationsBoardFilters,
   V1TournamentOperationsBoardPage,
   V1TournamentStaffListResponse,
+  V1TournamentStaffCandidateSearchResponse,
   V1TournamentStaffAssignment,
   V1GrantTournamentStaffPayload,
   V1RevokeTournamentStaffPayload,
@@ -3927,6 +3928,31 @@ export function useV1TournamentStaffAssignments(tournamentId: string, options?: 
     queryKey: v1Keys.tournamentOperationsStaff(tournamentId),
     queryFn: () => v1Get<V1TournamentStaffListResponse>(`/tournament-ops/tournaments/${tournamentId}/staff`),
     enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+  });
+}
+
+/**
+ * GET /tournament-ops/tournaments/:tournamentId/staff/user-search — 배정할 사람을 닉네임으로
+ * 찾는다. 서버가 최소 2글자를 요구하므로(400) 그보다 짧으면 아예 호출하지 않는다. 호출
+ * 빈도는 서버에서 60초 30회로 묶여 있어 호출자가 입력을 디바운스하는 것을 전제로 한다
+ * (GrantStaffModal 이 250ms 디바운스). 검색 결과는 사용자 명부 일부라 캐시에 오래 남기지
+ * 않는다.
+ */
+export function useV1TournamentStaffCandidateSearch(
+  tournamentId: string,
+  query: string,
+  options?: QueryOptions,
+) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsStaffCandidates(tournamentId, trimmed),
+    queryFn: () =>
+      v1Get<V1TournamentStaffCandidateSearchResponse>(
+        `/tournament-ops/tournaments/${tournamentId}/staff/user-search?q=${encodeURIComponent(trimmed)}`,
+      ),
+    enabled: Boolean(tournamentId) && trimmed.length >= 2 && (options?.enabled ?? true),
+    staleTime: 30_000,
+    gcTime: 60_000,
   });
 }
 

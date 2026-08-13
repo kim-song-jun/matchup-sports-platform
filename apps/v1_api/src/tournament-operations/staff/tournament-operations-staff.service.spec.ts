@@ -340,3 +340,69 @@ describe('TournamentOperationsStaffService.myAssignments', () => {
     expect(result.items.map((item) => item.tournamentStatus)).toEqual(['in_progress', 'open']);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 스태프 배정 후보 검색 (2026-08-13). 배정 폼이 사용자 UUID 직접 입력이라 어드민이 아닌
+// 대회 디렉터는 스태프를 배정할 방법이 사실상 없었던 것을 고치며 추가된 경로다. 검색은
+// 사용자 명부를 건드리므로 인가 범위와 노출 필드가 곧 개인정보 계약이다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildSearchHarness(role: string, rows: unknown[]) {
+  const findMany = jest.fn().mockResolvedValue(rows);
+  const assertAccess = jest.fn().mockResolvedValue({ role, tournamentId });
+  const prisma = { v1User: { findMany } };
+  const service = new TournamentOperationsStaffService(
+    prisma as never,
+    { assertAccess } as never,
+    {} as never,
+  );
+  return { service, findMany, assertAccess };
+}
+
+describe('TournamentOperationsStaffService.searchCandidates', () => {
+  it('열람 전용 스태프는 후보를 검색할 수 없다 (배정 권한과 같은 범위로 좁힌다)', async () => {
+    // assertAccess 의 'read' 만 통과시키면 배정을 할 수 없는 사람에게 검색만 열어 주는
+    // 셈이라 개인정보만 새어 나간다. DB 조회 자체가 일어나지 않아야 한다.
+    const { service, findMany } = buildSearchHarness('support_readonly', []);
+
+    await expect(service.searchCandidates(actorUserId, tournamentId, { q: '이승민' })).rejects.toMatchObject({
+      response: { details: { reason: 'DIRECTOR_AUTHORITY_REQUIRED' } },
+    });
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('대회 디렉터는 검색할 수 있고, 이메일은 마스킹돼서만 나간다', async () => {
+    const { service } = buildSearchHarness('tournament_director', [
+      { id: 'u-1', email: 'seungmin@example.com', profile: { nickname: '이승민', displayName: '승민' } },
+    ]);
+
+    const result = await service.searchCandidates(actorUserId, tournamentId, { q: '이승' });
+
+    expect(result.items).toEqual([
+      { id: 'u-1', nickname: '이승민', displayName: '승민', maskedEmail: 'se***@example.com' },
+    ]);
+  });
+
+  it('이메일은 정확히 일치할 때만 매칭하고, 실명은 검색 대상이 아니다', async () => {
+    // 이메일 부분검색을 허용하면 "@gmail.com" 한 번으로 명부가 열린다. 실명(realName)은
+    // 동명이인 구분에 필요하지도 않으면서 닉네임보다 훨씬 민감해 조건에서 제외한다.
+    const { service, findMany } = buildSearchHarness('tournament_director', []);
+
+    await service.searchCandidates(actorUserId, tournamentId, { q: 'someone@example.com' });
+
+    const where = findMany.mock.calls[0]?.[0]?.where;
+    expect(where.OR).toContainEqual({ email: { equals: 'someone@example.com', mode: 'insensitive' } });
+    expect(JSON.stringify(where)).not.toContain('realName');
+    expect(findMany.mock.calls[0]?.[0]?.take).toBe(10);
+  });
+
+  it('탈퇴·정지 계정은 후보에 오르지 않는다', async () => {
+    const { service, findMany } = buildSearchHarness('tournament_director', []);
+
+    await service.searchCandidates(actorUserId, tournamentId, { q: '이승민' });
+
+    const where = findMany.mock.calls[0]?.[0]?.where;
+    expect(where.deletedAt).toBeNull();
+    expect(where.accountStatus).toBe('active');
+  });
+});

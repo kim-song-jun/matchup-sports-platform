@@ -157,8 +157,19 @@ export const gameSchemaFixture = {
 // new migration file backs it (20260813190000_v1_game_participant_user_id); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for 대회 후기 팀 귀속: V1TournamentReview gains a nullable `team_id` (+ V1Team
+// relation and a (tournament_id, team_id) unique) so a tournament review belongs to the team
+// rather than to whoever pressed the apply button — 팀장이 신청했으면 운영진이 후기를 쓸 수도,
+// 우리 팀이 이미 썼는지 볼 수도 없었다. Same shape as the review re-pins above and unlike the
+// HALFTIME/user_id ones, this does NOT touch the game domain — no v1_game_* model, enum, or
+// relation changes; the guard fired only because it hashes the whole schema.prisma file. The
+// column is nullable by design: the backfill leaves ambiguous legacy rows unmapped rather than
+// guessing, and NULLs do not collide under the new unique (Postgres NULL-distinct). One new
+// migration file backs it (20260813070000_v1_tournament_review_team_scope); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: '44e461f4b83fd493cb610cb595b68980039a92427c93e332a9e5c92ae9dfe798',
+  schema: '1c26ba9b9c08a4c7cca1c83e45af05989459134e9e182850bba864b0269c7825',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

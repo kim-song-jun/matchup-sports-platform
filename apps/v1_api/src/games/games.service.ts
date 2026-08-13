@@ -1075,9 +1075,29 @@ export class GamesService {
    * 가능한 상태로 만든다(운영 보드/실시간 화면이 이 값을 그대로 질의할 수
    * 있다). `startNextPeriod`가 이 HALFTIME 피리어드를 LIVE로 여는 짝이다.
    *
-   * `advancePeriod`와 동일하게 game.state===LIVE + 다음 피리어드 존재를
-   * 전제한다(마지막 피리어드는 이 커맨드가 아니라 `end`로 끝낸다 — 콘솔의
-   * `availableCommands`도 `hasNextPeriod`일 때만 이 버튼을 보여준다).
+   * 마지막 피리어드(다음 피리어드가 없음)도 이 커맨드로 닫는다 — 예전엔
+   * `NO_NEXT_PERIOD` 409로 거부하고 "마지막 피리어드는 `end`로 끝낸다"고
+   * 적어 뒀지만, 그 결과 운영자에게는 "후반 종료 = 경기 종료(결과 리비전
+   * 제출까지 한 트랜잭션)"밖에 없었다. 사용자 결정(운영 콘솔 종료 흐름
+   * 개편)은 **후반 종료 → (결선 무승부면 승부차기 입력) → 경기 종료**의
+   * 3단계이고, 그 중간 단계가 바로 "정규 시간은 끝났지만 결과는 아직
+   * 확정 전"이다. 다음 피리어드가 없으면 HALFTIME 승격만 건너뛰고 현재
+   * 피리어드만 ENDED로 닫는다 — 그러면 `game.state`는 LIVE인 채로 LIVE·
+   * HALFTIME 피리어드가 하나도 없는 상태가 되고, 이 조합이 곧 "정규 시간
+   * 종료" 그 자체다(새 enum 값도 새 컬럼도 만들지 않는다).
+   *
+   * 이 단계는 결과를 만들지 않는다: 스코어 산출·리비전 SUBMITTED·
+   * `GAME_RESULT_SUBMITTED` outbox는 전부 `end`(`deriveTournamentRevision`)
+   * 쪽에 그대로 남는다. `end`는 `state IN (LIVE, HALFTIME)`인 피리어드만
+   * 닫으므로(executeCommand의 ENDED 분기) 이미 ENDED인 피리어드에는
+   * no-op이고, 따라서 이 중간 단계를 거쳐도 최종 결과는 한 번에 끝냈을
+   * 때와 동일하다.
+   *
+   * 되돌리기 비대칭 주의: `revertPeriodTransition`은 "다음 피리어드"를
+   * SCHEDULED로 되감는 명령이라 다음 피리어드가 없는 이 전환은 되돌릴 수
+   * 없다(`PERIOD_REVERT_NOT_AVAILABLE`). 콘솔도 그래서 마지막 피리어드
+   * 종료에는 되돌리기 토스트를 붙이지 않고, 확인 문구에서 "되돌릴 수
+   * 없다"고 명시한다.
    */
   private async endCurrentPeriod(
     tx: Transaction,
@@ -1102,21 +1122,17 @@ export class GamesService {
     const next = await tx.v1GamePeriod.findFirst({
       where: { gameId: game.id, number: current.number + 1 },
     });
-    if (next === null) {
-      throw new ConflictException({
-        code: 'NO_NEXT_PERIOD',
-        message: '마지막 피리어드예요',
-      });
-    }
     const now = new Date();
     await tx.v1GamePeriod.update({
       where: { id: current.id },
       data: { state: V1GamePeriodState.ENDED, endedAt: now },
     });
-    await tx.v1GamePeriod.update({
-      where: { id: next.id },
-      data: { state: V1GamePeriodState.HALFTIME },
-    });
+    if (next !== null) {
+      await tx.v1GamePeriod.update({
+        where: { id: next.id },
+        data: { state: V1GamePeriodState.HALFTIME },
+      });
+    }
     const updated = await tx.v1Game.update({
       where: { id: game.id },
       data: { version: { increment: 1 } },
@@ -4708,6 +4724,27 @@ export class GamesService {
    * penalties.away` (a shootout must produce a winner), so once both checks
    * below pass, `GameResultBracketProjectionService.resolveWinnerSide` can
    * trust `score.penalties` unconditionally.
+   *
+   * 역방향 가드(운영 콘솔 종료 흐름 개편): **결선 무승부인데 승부차기가
+   * 없는** `end`도 여기서 막는다. 예전엔 그대로 통과시켜 리비전이
+   * SUBMITTED로 저장됐고, 그 뒤 비동기 브래킷 프로젝션이
+   * `resolveWinnerSide`에서 `BRACKET_RESULT_DRAW_UNSUPPORTED`를 던져
+   * 6회 재시도 끝에 outbox 잡이 조용히 POISONED로 남았다 — 운영자는
+   * "경기 종료 성공"만 보고 다음 라운드 대진이 영영 비어 있는 것을
+   * 나중에야 알게 된다. 실패를 비동기 잡이 아니라 커맨드 자리에서
+   * 돌려주면 운영자가 그 자리에서 승부차기를 입력해 복구할 수 있다.
+   * (조별리그 무승부는 정상 결과이므로 knockout일 때만 막는다.)
+   *
+   * 이 가드는 `resultRecoveryDeriveAndSubmit`(이미 ENDED인데 리비전이 0건인
+   * 게임을 복구하는 경로)에도 그대로 적용된다 — 일부러 분기하지 않았다.
+   * 그 경로로 무승부 결선 리비전을 만들면 똑같이 브래킷이 POISONED가
+   * 되므로, "조용히 만들어 두기"보다 거부하는 쪽이 맞다.
+   *
+   * 대신 그 경로에도 빠져나갈 문을 열어 둔다: `GameResultRecoveryDto.penalties`로
+   * `end`와 같은 형태의 승부차기 점수를 실을 수 있다. 이 문이 없으면 결선 무승부
+   * 레거시 게임(GOAL 이벤트가 없어 0-0으로 산출되는 백필 이전 데이터 포함)은
+   * 복구가 영구히 막힌다 — 결과 교정 흐름은 리비전이 1건 이상이어야 시작할 수
+   * 있어 대안이 되지 못한다. 그래서 메시지도 특정 커맨드를 지목하지 않는다.
    */
   private async applyPenalties(
     tx: Transaction,
@@ -4715,7 +4752,15 @@ export class GamesService {
     score: GameScore,
     penalties: { home: number; away: number } | undefined,
   ): Promise<GameScore> {
-    if (penalties === undefined) return score;
+    if (penalties === undefined) {
+      if (score.home === score.away && (await this.isKnockoutFixture(tx, game.tournamentFixtureId))) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_PENALTY_REQUIRED',
+          message: '결선 경기는 무승부로 끝낼 수 없어요. 승부차기 결과를 입력해주세요.',
+        });
+      }
+      return score;
+    }
     if (!(await this.isKnockoutFixture(tx, game.tournamentFixtureId))) {
       throw new ConflictException({
         code: 'TOURNAMENT_PENALTY_NOT_ALLOWED',
@@ -5008,7 +5053,10 @@ export class GamesService {
           where: { id: game.id },
           data: { version: { increment: 1 } },
         });
-        return this.deriveTournamentRevision(tx, { ...game, version: updated.version }, context);
+        // 승부차기를 그대로 넘긴다 — 결선 무승부 게임을 복구하려면 `end`와 똑같이 penalties가
+        // 필요하다(applyPenalties의 TOURNAMENT_PENALTY_REQUIRED 가드). 넘기지 않으면 그런 게임은
+        // 복구 자체가 409로 막혀 영구 막다른 길이 된다.
+        return this.deriveTournamentRevision(tx, { ...game, version: updated.version }, context, dto.penalties);
       },
     );
   }

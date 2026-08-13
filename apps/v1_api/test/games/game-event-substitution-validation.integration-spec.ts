@@ -152,8 +152,16 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
 
     // 라이브 콘솔의 실제 라인업 저장 경로가 아니라 테스트 픽스처 셋업이다 —
     // "누가 선발/후보인가"만 필요하므로 saveLineup(다른 레인이 동시 작업 중)을
-    // 거치지 않고 직접 세팅한다. Bench 2는 started=false로 남긴다(교체 IN 후보로
-    // 계속 쓴다).
+    // 거치지 않고 직접 세팅한다.
+    //
+    // 선발도 **명시적으로** 올린다. 예전에는 생성 시 컬럼 기본값이 전원 선발이라
+    // 벤치만 내리면 됐지만, 이제 createFromSourceInTransaction 이 초기 참가자를
+    // 전원 후보로 깔아 둔다(선발은 라인업 저장 때 정해진다). 이 테스트가 검증하는
+    // 것은 교체 규칙이지 생성 시 기본값이 아니므로, 전제를 픽스처가 직접 만든다.
+    await prisma.v1GameParticipant.updateMany({
+      where: { id: { in: [homeStarter1Id, homeStarter2Id, awayStarterId] } },
+      data: { started: true },
+    });
     await prisma.v1GameParticipant.updateMany({
       where: { id: { in: [homeBench1Id, homeBench2Id] } },
       data: { started: false },

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { slotsWithGoalkeeper, type FormationPreset } from './formation-slots';

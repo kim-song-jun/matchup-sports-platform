@@ -108,7 +108,7 @@ export type CreateCandidate = {
   visibilityMode: V1VisibilityMode;
   periodCount: number;
   sides: Array<{ sideKey: V1GameSideKey; teamId: string | null; displayNameSnapshot: string }>;
-  participants: Array<{ sideKey: V1GameSideKey; userId: string; displayNameSnapshot: string }>;
+  participants: Array<{ sideKey: V1GameSideKey; userId?: string; displayNameSnapshot: string }>;
 };
 
 type PeriodBackfillCandidate = { gameId: string; periodCount: number };

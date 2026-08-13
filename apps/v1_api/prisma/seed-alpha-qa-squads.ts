@@ -65,6 +65,14 @@ export async function seedAlphaQaSquads(
   sportId: string,
   regionId: string,
 ): Promise<AlphaQaSquadSummary> {
+  // alpha 전용 안전장치. 호출부(`seed-alpha-tournament-qa.ts`)가 이미 NODE_ENV·확인 플래그·
+  // alpha DB 호스트/이름까지 4중으로 검사하고, 프로덕션 배포 스크립트에는 이 시드를 실행하는
+  // 줄 자체가 없다(alpha 전용 `deploy/deploy-alpha.sh` 에만 있다). 그래도 여기서 한 번 더
+  // 막는 이유는, 이 모듈만 따로 import 해서 다른 자리에서 부르는 실수를 막기 위해서다 —
+  // 가짜 계정 100개는 프로덕션에 절대 들어가면 안 된다.
+  if (process.env.V1_ALPHA_QA_SEED !== 'true') {
+    return { teams: 0, users: 0, skippedReason: 'V1_ALPHA_QA_SEED!=true — alpha 전용 시드라 건너뜀' };
+  }
   const source = await tx.v1AuthIdentity.findFirst({
     where: { provider: V1AuthProvider.email, providerUserKey: PASSWORD_SOURCE_EMAIL, status: 'active' },
     select: { passwordHash: true },

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { V1TournamentStaffRole } from '@prisma/client';
+import { V1TournamentStaffRole, V1TournamentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   TournamentStaffAccessService,
@@ -34,6 +34,41 @@ const STAFF_LIST_SELECT = {
   user: { select: { profile: { select: { nickname: true } } } },
 } as const;
 
+export type MyTournamentStaffAssignmentItem = {
+  readonly id: string;
+  readonly role: V1TournamentStaffRole;
+  readonly fieldId: string | null;
+  readonly fieldName: string | null;
+  readonly version: number;
+  readonly expiresAt: Date | null;
+};
+
+export type MyTournamentStaffGroup = {
+  readonly tournamentId: string;
+  readonly tournamentTitle: string;
+  readonly tournamentStatus: V1TournamentStatus;
+  readonly assignments: readonly MyTournamentStaffAssignmentItem[];
+};
+
+// 진행 중인 대회를 먼저 보여준다 -- "지금 뭘 해야 하는지"가 급한 순서. 대기(open)는 곧 시작할
+// 수 있으니 그 다음, closed/draft는 준비 단계, completed/cancelled는 더 이상 할 일이 없다.
+const TOURNAMENT_STATUS_PRIORITY: Record<V1TournamentStatus, number> = {
+  in_progress: 0,
+  open: 1,
+  closed: 2,
+  draft: 3,
+  completed: 4,
+  cancelled: 5,
+};
+
+// 한 대회에 여러 배정(예: 필드 담당자로 두 구장)이 있으면 책임이 큰 역할부터 보여준다.
+const STAFF_ROLE_PRIORITY: Record<V1TournamentStaffRole, number> = {
+  TOURNAMENT_DIRECTOR: 0,
+  FIELD_OPERATOR: 1,
+  SUPPORT_READONLY: 2,
+  PLATFORM_OPS: 3,
+};
+
 /**
  * List/grant/revoke orchestration for tournament staff assignments (Task 18).
  *
@@ -51,6 +86,81 @@ export class TournamentOperationsStaffService {
     private readonly access: TournamentStaffAccessService,
     private readonly staffService: TournamentStaffService,
   ) {}
+
+  /**
+   * "내 담당 대회" (마이페이지 진입점). `list()`와 달리 tournamentId를 모르는 호출자를 위한
+   * self-scoped 조회라 `access.assertAccess()`를 거치지 않는다 -- 자기 자신의 배정을 보는 데는
+   * 추가 인가가 필요 없다(TeamsService.myInvitations(), TeamSchedulesService.mySchedule()와
+   * 동일한 관례). 만료(`expiresAt` 지남)·해제(`revokedAt` not null)된 배정은 이미 그만둔
+   * 스태프가 계속 진입 경로를 보게 되는 것이라 반드시 제외한다.
+   */
+  async myAssignments(
+    userId: string,
+  ): Promise<{ readonly items: readonly MyTournamentStaffGroup[] }> {
+    const now = new Date();
+    const assignments = await this.prisma.v1TournamentStaffAssignment.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      select: {
+        id: true,
+        tournamentId: true,
+        role: true,
+        fieldId: true,
+        version: true,
+        expiresAt: true,
+        tournament: { select: { title: true, status: true } },
+        field: { select: { name: true } },
+      },
+      orderBy: [{ tournamentId: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    // 한 사용자가 같은 대회에 여러 배정을 가질 수 있다(예: 필드 담당자로 두 구장) -- 대회
+    // 단위로 묶어 진입 경로가 대회당 하나만 노출되게 한다(중복 카드 방지).
+    const groups = new Map<
+      string,
+      { tournamentId: string; tournamentTitle: string; tournamentStatus: V1TournamentStatus; assignments: MyTournamentStaffAssignmentItem[] }
+    >();
+    for (const assignment of assignments) {
+      let group = groups.get(assignment.tournamentId);
+      if (!group) {
+        group = {
+          tournamentId: assignment.tournamentId,
+          tournamentTitle: assignment.tournament.title,
+          tournamentStatus: assignment.tournament.status,
+          assignments: [],
+        };
+        groups.set(assignment.tournamentId, group);
+      }
+      group.assignments.push({
+        id: assignment.id,
+        role: assignment.role,
+        fieldId: assignment.fieldId,
+        fieldName: assignment.field?.name ?? null,
+        version: assignment.version,
+        expiresAt: assignment.expiresAt,
+      });
+    }
+
+    const items = [...groups.values()];
+    for (const group of items) {
+      group.assignments.sort((a, b) => {
+        const roleDiff = STAFF_ROLE_PRIORITY[a.role] - STAFF_ROLE_PRIORITY[b.role];
+        if (roleDiff !== 0) return roleDiff;
+        return (a.fieldName ?? '').localeCompare(b.fieldName ?? '', 'ko');
+      });
+    }
+    items.sort((a, b) => {
+      const statusDiff =
+        TOURNAMENT_STATUS_PRIORITY[a.tournamentStatus] - TOURNAMENT_STATUS_PRIORITY[b.tournamentStatus];
+      if (statusDiff !== 0) return statusDiff;
+      return a.tournamentTitle.localeCompare(b.tournamentTitle, 'ko');
+    });
+
+    return { items };
+  }
 
   async list(
     userId: string,

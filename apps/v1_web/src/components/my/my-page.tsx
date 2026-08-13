@@ -61,6 +61,7 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   LogOut,
   Mail,
   Send,
+  ShieldCheck,
 };
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {

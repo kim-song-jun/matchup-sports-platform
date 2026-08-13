@@ -8,7 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ListTournamentReviewsQueryDto {
@@ -56,7 +56,7 @@ export class SubmitTournamentReviewDto {
    * 400 TEAM_SELECTION_REQUIRED.
    */
   @IsOptional()
-  @IsString()
+  @IsUUID()
   teamId?: string;
 }
 

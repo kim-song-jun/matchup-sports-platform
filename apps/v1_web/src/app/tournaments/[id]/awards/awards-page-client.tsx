@@ -424,16 +424,24 @@ function ReviewFormModal({
             <p id="review-team-select-heading" style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
               여러 팀을 운영하고 계세요. 리뷰를 남길 팀을 선택해주세요.
             </p>
-            <div role="radiogroup" aria-labelledby="review-team-select-heading" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/*
+              커스텀 `role="radio"` 버튼 대신 sr-only native radio + 라벨 패턴을 쓴다
+              (tournament-roster-client.tsx의 eligibility 라디오와 같은 패턴). role만
+              선언한 버튼 묶음은 스크린리더에 라디오 그룹으로 보이지만 화살표 키 이동과
+              roving tabindex가 없어 실제로는 그렇게 동작하지 않는다 — native input은
+              그 전부를 브라우저가 제공한다.
+            */}
+            <div
+              role="radiogroup"
+              aria-labelledby="review-team-select-heading"
+              style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+            >
               {teamOptions.map((team) => {
                 const isSelected = team.teamId === selectedTeamId;
                 return (
-                  <button
+                  <label
                     key={team.teamId}
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    onClick={() => setSelectedTeamId(team.teamId)}
+                    htmlFor={`review-team-${team.teamId}`}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       width: '100%', minHeight: 44, padding: '10px 14px', borderRadius: 10,
@@ -443,9 +451,18 @@ function ReviewFormModal({
                       cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
                     }}
                   >
+                    <input
+                      id={`review-team-${team.teamId}`}
+                      type="radio"
+                      name="review-team-select"
+                      value={team.teamId}
+                      checked={isSelected}
+                      onChange={() => setSelectedTeamId(team.teamId)}
+                      className="sr-only"
+                    />
                     {team.teamName}
                     {isSelected && <span aria-hidden="true" style={{ color: 'var(--blue500)' }}>✓</span>}
-                  </button>
+                  </label>
                 );
               })}
             </div>

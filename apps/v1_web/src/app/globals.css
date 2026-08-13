@@ -5447,13 +5447,9 @@ button:disabled {
   padding: 20px;
   border-bottom: 1px solid var(--grey100);
 }
-.tm-bracket-page-eyebrow {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--blue500);
-  font-size: 12px;
-  font-weight: 700;
-}
+/* [.tm-bracket-page-eyebrow 삭제] "순위와 대진표" eyebrow는 상단 앱바 제목
+   ("순위·브래킷")과 같은 말이라 첫 화면 높이만 18px 먹고 정보는 0이었다 —
+   마크업(bracket-page-client.tsx)에서 제거하며 이 규칙도 함께 지운다. */
 /* [R-T1 타입 위계 정리] 22px 하드코딩 → --font-size-subhead(20px) 토큰 + weight 700
    명시(기존엔 미지정 → Tailwind preflight로 h1이 400 상속, 대회명이 본문보다 안 굵어
    보였다). 대진표 페이지 콘텐츠 중 가장 큰 tier(1단계: 대회명). */
@@ -5496,9 +5492,19 @@ button:disabled {
   font-weight: 700;
 }
 
+/* §첫 화면 밀도(390px 실측: 스크롤영역 714px 중 인트로+스테퍼+탭이 307px = 43%).
+   좁은 폭에서는 안내 문단이 두 줄(약 44px)을 쓰면서도 탭 두 개가 이미 말해주는 내용을
+   반복한다 — 768px 미만에서만 숨기고, 가로가 남는 데스크탑에서는 그대로 보여준다. */
+@media (max-width: 767px) {
+  .tm-bracket-page-intro { padding: 16px 20px; }
+  .tm-bracket-page-intro p { display: none; }
+}
+
+/* 480px 미만에서도 포맷 배지를 제목 옆에 둔다. 예전엔 세로로 쌓아 배지가 자기 줄
+   (약 41px)을 통째로 차지했는데, 배지는 한 단어짜리 보조 라벨이라 제목이 두 줄로
+   접히는 편이 전체 높이가 더 낮다. */
 @media (max-width: 479px) {
   .tm-bracket-page-intro {
-    flex-direction: column;
     gap: 12px;
   }
 }
@@ -5510,6 +5516,12 @@ button:disabled {
     align-items: center;
   }
 }
+
+/* §768~1023px에서 2열은 불가능 — 이 구간의 콘텐츠 폭은 셸이 약 600px로 묶는다
+   (실측). 순위표는 최소 296px(표 minWidth), 대진표는 매치 카드 180px + 우승 카드
+   110px가 필요해 둘을 나란히 세우면 합이 600을 넘어 양쪽 다 가로 스크롤이 생겼다
+   (시도 결과 실측: 순위표 칼럼 187px). 그래서 이 구간의 공백은 레이아웃이 아니라
+   표의 열 배분(tournament-standings-table.tsx의 폭 %)으로 줄인다. */
 
 /* ═══════════════════════════════════════════════
    RESULTS PAGE v2 — tm-res-* (confetti + rank)
@@ -6303,6 +6315,30 @@ button:disabled {
      이 규칙(클래스 3개, 특이도 우위)보다 여전히 이겨 오늘 폭(366:650)을 그대로 유지한다. */
   .tm-bracket-page-grid.tm-tourn-sub-grid-6040.tm-bracket-page-grid-empty {
     grid-template-columns: minmax(300px, 1.28fr) minmax(240px, 0.72fr);
+  }
+  /* §라운드 수에 맞춘 폭 배분 — 위 0.72:1.28은 4강·8강처럼 라운드가 여러 개인
+     대진표를 전제로 넓은 쪽을 대진표에 준 배분이다. 결승만 남은 대회(라운드 ≤ 2)에서는
+     그 폭을 연결선이 가로지를 뿐이라(1440 실측: 대진표 칼럼 650px에 카드 180px),
+     대신 366px로 눌려 있던 순위표에 폭을 돌려준다. 클래스 3개라 위 2개짜리 규칙을
+     특이도로 이긴다(-empty와 동시에 켜지지 않는다 — 그쪽은 대진표 미공개 상태 전용). */
+  .tm-bracket-page-grid.tm-tourn-sub-grid-6040.tm-bracket-page-grid-slim-bracket,
+  .tm-bracket-page-grid.tm-tourn-sub-grid-2col.tm-bracket-page-grid-slim-bracket {
+    /* 두 칼럼 모두 "콘텐츠에 맞는 상한"으로 묶고 남는 폭은 바깥 여백으로 보낸다.
+       fr로 나눠 가지면 남는 폭이 칼럼 안쪽 공백(순위표 가운데 빈 띠, 늘어난 연결선)이
+       된다 — 순위표는 400px을 넘기면 숫자 3열이 오른쪽 끝에 고정된 채 팀명 칸만
+       넓어지고(390px 실측 공백 109px → 558px에서 319px), 대진표는 커넥터가
+       flexGrow로 늘어나 빈 선만 길어진다. */
+    grid-template-columns: minmax(320px, 370px) minmax(280px, 460px);
+    justify-content: center;
+  }
+
+  /* §일정 탭 가로 밀도 — 1440에서 일정 카드가 998px까지 늘어나는데 팀명·점수는 중앙
+     정렬이라 좌우로 각각 300px 가까이 비고, 조·시간·구장은 양 끝에 붙어 시선 이동만
+     길어졌다. 읽기 좋은 폭으로 묶어 가운데 세운다. */
+  .tm-bracket-schedule-pane {
+    max-width: 840px;
+    margin: 0 auto;
+    width: 100%;
   }
 
   /* 시상 페이지: 각 컬럼과 카드는 콘텐츠 높이만 차지한다. */

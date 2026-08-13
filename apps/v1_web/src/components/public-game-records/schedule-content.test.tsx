@@ -147,6 +147,40 @@ describe('ScheduleContent — 이상 클럭 경고 표식(alpha 452′ 사고)',
   });
 });
 
+/**
+ * alpha 실측 정렬 사고(2026-08-13) 회귀 방지. 스코어 행은 `flex 1 / 64px / 1`,
+ * 득점자 행은 `grid 1fr 20px 1fr`로 **축을 각자 따로** 들고 있어서, 390px에서
+ * 홈 팀명 우단은 153px인데 홈 득점자 우단은 179px이었다(원정도 대칭으로 26px
+ * 어긋남) -- 득점자 텍스트가 팀명 축을 벗어나 가운데 스코어 칸 밑으로 파고들었다.
+ *
+ * 그래서 이 테스트는 특정 열 폭 값을 단언하지 않는다(그건 구현 되읊기다). 두 행이
+ * **같은 축을 쓴다는 불변식**만 본다 -- 누가 한쪽 행의 열 정의만 다시 손대면
+ * 그 순간 이 테스트가 깨지고, 그게 정확히 사용자가 본 그 버그다.
+ */
+describe('ScheduleContent — 스코어 행과 득점자 행의 3열 축 일치', () => {
+  it('득점자 행이 스코어 행과 완전히 같은 열 정의(축)를 공유한다', () => {
+    const data = {
+      ...makeData(),
+      items: [fixtureEntry({
+        scorers: [
+          { side: 'home', participantName: '홈선수', jerseyNumber: 7, clockMs: 645_886 },
+          { side: 'away', participantName: '원정선수', jerseyNumber: 11, clockMs: 48_263 },
+        ],
+      })],
+    };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    const scoreRow = screen.getByText('1 : 0').parentElement;
+    const scorerRow = screen.getByRole('list', { name: '득점자' });
+
+    // 축이 실제로 정의돼 있어야 한다 -- 양쪽 모두 빈 문자열이면 위 단언은 공허하게 통과한다.
+    expect(scoreRow?.style.gridTemplateColumns).not.toBe('');
+    expect(scorerRow.style.gridTemplateColumns).toBe(scoreRow?.style.gridTemplateColumns);
+    expect(scorerRow.style.columnGap).toBe(scoreRow?.style.columnGap);
+  });
+});
+
 describe('ScheduleContent — 스코어 아래 승부차기 보조 표기', () => {
   it('승부차기가 있으면 정규시간 스코어는 그대로 두고 아래에 "승부차기 4-3"을 붙인다', () => {
     const data = {

@@ -106,10 +106,25 @@ describe('PublicUserRecordsService.getRecords — assist/foul summary (T1-4)', (
     await prisma.$disconnect();
   });
 
-  it('rolls up assists and fouls into the summary', async () => {
+  it('rolls up assists into the summary', async () => {
     const records = await userRecords.getRecords(ids.targetUser, {});
     expect(records.summary).toEqual(
-      expect.objectContaining({ appearances: 1, goals: 0, assists: 2, fouls: 3 }),
+      expect.objectContaining({ appearances: 1, goals: 0, assists: 2 }),
     );
+  });
+
+  // 이 픽스처의 참가자는 fouls=3 으로 저장돼 있다(위 seed 참조). 그 값이 DB 에
+  // 그대로 남아 있는데도 공개 응답에는 실리지 않아야 한다 — 카드(경고/퇴장)는
+  // 공개하되 일반 파울 누적치는 개인 프로필에 노출하지 않는다는 정책.
+  it('keeps the stored foul count out of the public summary', async () => {
+    const stored = await prisma.v1GameResultParticipant.findFirst({
+      where: { participantId },
+      select: { fouls: true },
+    });
+    expect(stored?.fouls).toBe(3);
+
+    const records = await userRecords.getRecords(ids.targetUser, {});
+    expect(records.summary).not.toHaveProperty('fouls');
+    expect(JSON.stringify(records)).not.toContain('fouls');
   });
 });

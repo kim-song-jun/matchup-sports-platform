@@ -244,7 +244,7 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
   return {
     userId: 'user-1',
     nickname: '홍길동',
-    summary: { appearances: 1, goals: 1, assists: 0, fouls: 0, yellowCards: 0, redCards: 0, mvpCount: 1 },
+    summary: { appearances: 1, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 1 },
     items: [
       {
         id: 'result-1',

@@ -1,0 +1,14 @@
+{
+  "phase": "before",
+  "capturedAt": "2026-08-12T14:36:11.293Z",
+  "originalBytes": 35033666,
+  "rawUpload": {
+    "status": 413,
+    "body": "{\"status\":\"error\",\"statusCode\":413,\"code\":\"INTERNAL_ERROR\",\"message\":\"File too large\",\"details\":null,\"requestId\":321,\"timestamp\":\"2026-08-12T14:36:15.110Z\"}"
+  },
+  "uiUpload": {
+    "status": 413,
+    "body": "(본문 없음)"
+  },
+  "previewSrc": null
+}

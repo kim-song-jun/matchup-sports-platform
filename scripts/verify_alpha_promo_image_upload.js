@@ -114,6 +114,46 @@ async function advanceToPromoStep(page) {
   await page.waitForTimeout(800);
 }
 
+/**
+ * 홈 히어로의 computed backgroundImage 를 읽어 커버 폴백이 실제로 적용됐는지 수치로 남긴다.
+ * 스크린샷 육안 대조로는 "그라디언트냐 사진이냐"를 놓치기 쉬워 URL 문자열로 대조한다.
+ */
+async function measurePromoFallback(page, tournaments) {
+  const cards = await page.$$eval('.tm-featured-media', (nodes) =>
+    nodes.map((node) => ({
+      label: node.closest('a')?.getAttribute('aria-label') ?? null,
+      background: getComputedStyle(node).backgroundImage,
+      hasPlaceholderTrophy: Boolean(node.querySelector('svg[width="120"]')),
+    })),
+  );
+  const coverOnly = tournaments.filter(
+    (item) => (item.coverImageUrl || '').trim() && !(item.promoHomeImageUrl || '').trim(),
+  );
+  return {
+    coverOnlyTournaments: coverOnly.map((item) => {
+      const cover = (item.coverImageUrl || '').trim();
+      // 히어로 카드의 aria-label 은 promoHomeTitle(없으면 대회명)을 쓴다 — 그 대회의 카드를
+      // 특정해서 배경을 본다. "아무 카드나 이 URL 을 쓰더라" 로 판정하면 노출이 꺼져 카드가
+      // 아예 없는 대회도 다른 카드 때문에 통과할 수 있다.
+      const cardTitle = (item.promoHomeTitle || '').trim() || item.title;
+      const card = cards.find((entry) => entry.label === `대회 상세 — ${cardTitle}`);
+      return {
+        title: item.title,
+        cardTitle,
+        promoHomeEnabled: item.promoHomeEnabled,
+        coverImageUrl: cover,
+        promoHomeImageUrl: item.promoHomeImageUrl,
+        // 이 대회의 카드가 렌더됐는지부터 구분한다 — 안 보이는 것과 폴백 실패는 다른 사실이다.
+        cardFound: Boolean(card),
+        cardBackground: card?.background ?? null,
+        // 폴백이 걸렸다면 이 커버 URL 이 그 카드 배경에 그대로 들어가 있어야 한다.
+        renderedWithCover: Boolean(card && cover && card.background.includes(cover)),
+      };
+    }),
+    cards,
+  };
+}
+
 async function settle(page) {
   await page.waitForLoadState('load', { timeout: 60000 }).catch(() => {});
   await page.addStyleTag({ content: HIDE }).catch(() => {});
@@ -206,13 +246,38 @@ async function main() {
       ]);
       const shotPage = await shotContext.newPage();
       for (const [name, route] of [
-        ['home', '/'],
+        ['home', '/home'],
         ['tournaments', '/tournaments'],
       ]) {
         await shotPage.goto(`${BASE}${route}`, { waitUntil: 'commit', timeout: 60000 });
         await settle(shotPage);
         await shotPage.screenshot({ path: path.join(OUT, `${PHASE}-${name}-${widthLabel}.png`) });
         console.log(`[${PHASE}] 캡처: ${PHASE}-${name}-${widthLabel}.png`);
+        if (name === 'home' && widthLabel === 'desktop') {
+          // 목록 조회가 실패하면 대상이 0건이라 측정이 '통과'처럼 보인다 — 조용히 넘기지 않고
+          // 실패 사실을 report 와 콘솔에 남겨 근거 없는 결과를 구분할 수 있게 한다.
+          let listed = null;
+          try {
+            const listResponse = await fetch(`${BASE}/api/v1/tournaments?limit=30`);
+            if (!listResponse.ok) throw new Error(`HTTP ${listResponse.status}`);
+            listed = (await listResponse.json())?.data?.items ?? null;
+            if (!Array.isArray(listed)) throw new Error('예상과 다른 응답 형식');
+          } catch (error) {
+            // 여기서 다시 던지면 report 저장과 남은 캡처까지 통째로 날아간다 — Error 가 아닌
+            // 값이 올라와도 메시지를 안전하게 뽑아 기록만 하고 계속 진행한다.
+            const reason = error instanceof Error ? error.message : String(error);
+            report.promoFallback = { error: `대회 목록 조회 실패: ${reason}` };
+            console.warn(`[${PHASE}] ${report.promoFallback.error} — 폴백 측정을 건너뜁니다.`);
+          }
+          if (listed) {
+            report.promoFallback = await measurePromoFallback(shotPage, listed);
+            for (const item of report.promoFallback.coverOnlyTournaments) {
+              console.log(
+                `[${PHASE}] 커버 폴백 — ${item.title}(카드="${item.cardTitle}", 노출=${item.promoHomeEnabled}): 카드발견=${item.cardFound} 커버반영=${item.renderedWithCover}`,
+              );
+            }
+          }
+        }
       }
       await shotContext.close();
     }

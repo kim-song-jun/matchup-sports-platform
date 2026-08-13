@@ -12,18 +12,14 @@ const mocks = vi.hoisted(() => ({
   usePathname: vi.fn(),
 }));
 
+// 내 배정 조회(useV1MyTournamentStaffAssignments)만 대체한다. 판정 헬퍼(coversFixture)는
+// 실제 구현을 그대로 쓴다 — "이 경기를 담당하는가" 판정 자체가 이 게이트 테스트의 검증 대상이다.
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AuthMe: (...args: unknown[]) => mocks.useV1AuthMe(...args),
   useV1Tournament: (...args: unknown[]) => mocks.useV1Tournament(...args),
   useV1TournamentStaffAssignments: (...args: unknown[]) => mocks.useV1TournamentStaffAssignments(...args),
+  useV1MyTournamentStaffAssignments: (...args: unknown[]) => mocks.useV1MyStaffAssignments(...args),
 }));
-
-// 내 배정 조회만 대체하고, 같은 모듈의 순수 헬퍼(assignmentCoversFixture)는 실제 구현을 쓴다 —
-// "이 경기를 담당하는가" 판정 자체가 이 게이트 테스트의 검증 대상이기 때문이다.
-vi.mock('@/hooks/use-v1-my-staff-assignments', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks/use-v1-my-staff-assignments')>();
-  return { ...actual, useV1MyStaffAssignments: (...args: unknown[]) => mocks.useV1MyStaffAssignments(...args) };
-});
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => mocks.useSearchParams(),
@@ -219,14 +215,31 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
     mocks.useV1MyStaffAssignments.mockReturnValue({ isPending: false, isError: false, data: { items } });
   }
 
-  const fieldOperatorAssignment = (overrides: Record<string, unknown> = {}) => ({
-    assignmentId: 'a-1',
-    tournamentId: 't-1',
-    tournamentTitle: '가을 풋살 대회',
-    role: 'FIELD_OPERATOR',
-    fixtures: [{ fixtureId: 'fx-1' }],
-    ...overrides,
-  });
+  /**
+   * `GET /me/tournament-staff` 응답의 items[] 한 칸 — 대회 단위로 묶인 그룹이다.
+   * `fixtureIds` 가 비고 `fieldId` 만 있으면 필드 단위 배정이라 화면이 담당 여부를 판정할 수
+   * 없고, 그때는 막지 않고 서버 판정에 맡긴다(coversFixture 참조).
+   */
+  const fieldOperatorAssignment = (overrides: Record<string, unknown> = {}) => {
+    const { tournamentId = 't-1', fixtureIds = ['fx-1'], fieldId = null, ...rest } = overrides;
+    return {
+      tournamentId,
+      tournamentTitle: '가을 풋살 대회',
+      tournamentStatus: 'in_progress',
+      assignments: [
+        {
+          id: 'a-1',
+          role: 'FIELD_OPERATOR',
+          fieldId,
+          fieldName: null,
+          version: 1,
+          expiresAt: null,
+          fixtureIds,
+          ...rest,
+        },
+      ],
+    };
+  };
 
   beforeEach(() => {
     mocks.useV1AuthMe.mockReturnValue({ isPending: false, isError: false, data: AUTH_ME, refetch: vi.fn() });
@@ -253,7 +266,7 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
 
   it('배정에 없는 경기는 딥링크로도 열리지 않는다', () => {
     scopeDeniedShell();
-    myAssignments([fieldOperatorAssignment({ fixtures: [{ fixtureId: 'fx-other' }] })]);
+    myAssignments([fieldOperatorAssignment({ fixtureIds: ['fx-other'] })]);
 
     render(
       <TournamentOpsGate tournamentId="t-1">

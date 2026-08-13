@@ -27,6 +27,8 @@ import { medianOffsetMs, pushClockSample, type ClockPingPong } from '@/lib/game-
 import { getV1GameOperationsSocket, setGameOperationsAuthorizationSubjectVersion } from '@/lib/v1-game-operations-socket';
 import { randomUuid } from '@/lib/uuid';
 import { v1Keys } from '@/lib/query-keys';
+import type { V1MyTournamentStaffResponse } from '@/types/api';
+import { myAssignmentVersion } from '@/hooks/use-v1-my-staff-assignments';
 import type {
   AssignGoalAssistResult,
   GameEventRecord,
@@ -84,11 +86,6 @@ function persistQueue(gameId: string, state: GameOperationsQueueState): void {
   window.localStorage.setItem(queueStorageKey(gameId), serializeQueueState(state));
 }
 
-interface MyStaffAssignment {
-  readonly tournamentId: string;
-  readonly version: number;
-}
-
 /** Resolves the CURRENT actor's own tournament-staff assignment version, so
  * the socket handshake can present a value the gateway's `game.subscribe`
  * staleness gate will actually recognize as fresh (see that handler's own
@@ -100,19 +97,19 @@ interface MyStaffAssignment {
  * **필드 담당자에게 항상 403**이다(배정에 fixture/field 스코프가 붙어 대회 전역 read가
  * 거부된다). 그래서 정작 현장에서 콘솔을 쓰는 역할만 자기 배정 버전을 못 읽고 0을 제시해,
  * 버전이 0이 아닌 배정이면 소켓 구독·takeover가 STAFF_SCOPE_DENIED로 막혔다. 본인 스코프로
- * 닫힌 `GET /tournament-ops/me/assignments`로 바꾼다 — 모든 역할이 같은 경로로 자기 버전을
+ * 닫힌 `GET /me/tournament-staff`로 바꾼다 — 모든 역할이 같은 경로로 자기 버전을
  * 읽고, 어드민 우회(platform_ops)는 배정 행이 없어 종전대로 null이 된다. */
 function useMyTournamentStaffAssignmentVersion(tournamentId: string | null, myUserId: string | undefined) {
   return useQuery({
     queryKey: v1Keys.myTournamentOpsAssignments(),
-    queryFn: () => v1Get<{ items: MyStaffAssignment[] }>('/tournament-ops/me/assignments'),
+    queryFn: () => v1Get<V1MyTournamentStaffResponse>('/me/tournament-staff'),
     // 팀매치(tournamentId===null)는 스태프 배정 개념이 없다 — 쿼리 자체를 스킵하고
     // 아래 효과가 항상 0을 기록/전송하게 둔다(그래도 self-consistency 체크는 통과한다).
     enabled: Boolean(tournamentId) && Boolean(myUserId),
     staleTime: 15_000,
-    // 한 대회에 배정이 여러 건이면 첫 행을 쓴다 — 서버의 assertAccess도 통과하는 첫 배정을
-    // principal로 삼으므로 종전(전역 목록에서 내 첫 행) 동작과 같다.
-    select: (data) => data.items.find((item) => item.tournamentId === tournamentId) ?? null,
+    // 한 대회에 배정이 여러 건이면 가장 높은 버전을 쓴다 — 게이트는 "제시값이 서버보다
+    // 낮으면 거부"라 최댓값이 안전하다. 배정이 없으면 0(게이트 미적용).
+    select: (data) => (tournamentId === null ? 0 : myAssignmentVersion(data, tournamentId)),
   });
 }
 
@@ -272,8 +269,8 @@ export function useV1GameOperationsConsole(
 
   // ── Handshake authorization-subject version ────────────────────────────────
   useEffect(() => {
-    setGameOperationsAuthorizationSubjectVersion(myAssignment.data?.version ?? 0);
-  }, [myAssignment.data?.version]);
+    setGameOperationsAuthorizationSubjectVersion(myAssignment.data ?? 0);
+  }, [myAssignment.data]);
 
   // ── Socket lifecycle: connect, subscribe, listen ───────────────────────────
   useEffect(() => {
@@ -473,7 +470,7 @@ export function useV1GameOperationsConsole(
 
   // ── Takeover: request once, renew on a timer, expire on a timer ────────────
   const requestTakeover = useCallback(() => {
-    if (!gameId || (!myAssignment.data && myAssignment.isLoading)) return;
+    if (!gameId || (myAssignment.data === undefined && myAssignment.isLoading)) return;
     const socket = getV1GameOperationsSocket();
     clientInstanceIdRef.current = clientInstanceIdRef.current ?? randomUuid();
     dispatchTakeover({ type: 'REQUEST' });
@@ -481,7 +478,7 @@ export function useV1GameOperationsConsole(
       'game.takeover.request',
       {
         gameId,
-        authorizationSubjectVersion: myAssignment.data?.version ?? 0,
+        authorizationSubjectVersion: myAssignment.data ?? 0,
         clientInstanceId: clientInstanceIdRef.current,
         lastSequence: sync.lastSequence,
       },
@@ -501,7 +498,7 @@ export function useV1GameOperationsConsole(
           type: 'GRANTED',
           token: result.takeoverToken,
           expiresAtMs: new Date(result.expiresAt).getTime(),
-          assignmentVersion: myAssignment.data?.version ?? 0,
+          assignmentVersion: myAssignment.data ?? 0,
         });
       },
     );

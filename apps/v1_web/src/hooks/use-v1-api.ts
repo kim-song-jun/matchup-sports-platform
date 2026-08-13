@@ -244,6 +244,7 @@ import type {
   V1TournamentStaffAssignment,
   V1GrantTournamentStaffPayload,
   V1RevokeTournamentStaffPayload,
+  V1MyTournamentStaffResponse,
   V1TournamentField,
   V1TournamentFieldListResponse,
   V1CreateTournamentFieldPayload,
@@ -3925,6 +3926,20 @@ export function useV1TournamentStaffAssignments(tournamentId: string, options?: 
     queryKey: v1Keys.tournamentOperationsStaff(tournamentId),
     queryFn: () => v1Get<V1TournamentStaffListResponse>(`/tournament-ops/tournaments/${tournamentId}/staff`),
     enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+  });
+}
+
+/**
+ * GET /me/tournament-staff — "내 담당 대회" (마이페이지 진입점). 서버가 이미 만료·해제된
+ * 배정을 제외하고 대회 단위로 묶어서 돌려준다 — 여기서는 그대로 노출만 한다. 대부분의
+ * 사용자는 스태프가 아니므로 마이홈 등 항상 렌더되는 화면에서는 `enabled`로 프로필 로딩
+ * 이후에만 호출해 불필요한 401 재시도를 피한다(useV1MyTeams와 동일한 관례).
+ */
+export function useV1MyTournamentStaffAssignments(options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.myTournamentStaffAssignments(),
+    queryFn: () => v1Get<V1MyTournamentStaffResponse>('/me/tournament-staff'),
+    enabled: options?.enabled ?? true,
   });
 }
 

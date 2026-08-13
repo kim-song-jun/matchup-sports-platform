@@ -3703,6 +3703,33 @@ export type V1TournamentStaffListResponse = {
   items: V1TournamentStaffAssignment[];
 };
 
+/** GET /me/tournament-staff 응답의 items[].assignments[] 항목 — 담당 대회의 개별 배정. */
+export type V1MyTournamentStaffAssignment = {
+  id: string;
+  role: V1TournamentStaffRole;
+  fieldId: string | null;
+  fieldName: string | null;
+  version: number;
+  expiresAt: string | null;
+  /**
+   * 이 배정이 담당하는 경기들. FIELD_OPERATOR 가 대회 셸을 거치지 않고 자기 경기 콘솔로
+   * 직행할 때 진입 판정에 쓴다. 필드 단위로만 배정되면 빈 배열이며, 그때는 fieldId 가 범위다.
+   */
+  fixtureIds: string[];
+};
+
+/** GET /me/tournament-staff 응답의 items[] 항목 — 대회 단위로 묶은 "내 담당 대회". */
+export type V1MyTournamentStaffGroup = {
+  tournamentId: string;
+  tournamentTitle: string;
+  tournamentStatus: V1TournamentStatus;
+  assignments: V1MyTournamentStaffAssignment[];
+};
+
+export type V1MyTournamentStaffResponse = {
+  items: V1MyTournamentStaffGroup[];
+};
+
 /** POST /tournament-ops/tournaments/:tournamentId/staff 바디. `PLATFORM_OPS`는 배정 대상이 될 수 없다. */
 export type V1GrantTournamentStaffPayload = {
   userId: string;

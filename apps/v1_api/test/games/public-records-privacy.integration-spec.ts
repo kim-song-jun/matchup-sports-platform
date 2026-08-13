@@ -459,7 +459,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     expect(match.resultState).toBe('official');
   });
 
-  it('live: while the game is in progress the match is pending with a pending-projection marker, and the published lineup already applies consent gating', async () => {
+  it('live: while the game is in progress the match is pending with a pending-projection marker, and the published lineup names every participant regardless of consent (participant-name-public policy)', async () => {
     await driveToLive(gameMainId, [scorerConsentedId, scorerRevokedId, scorerGuestId]);
 
     const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined);
@@ -475,12 +475,17 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     const consentedEntry = homeLineup.find((entry) => entry.participantId === scorerConsentedId);
     const revokedEntry = homeLineup.find((entry) => entry.participantId === scorerRevokedId);
     const guestEntry = homeLineup.find((entry) => entry.participantId === scorerGuestId);
+    // Policy change (2026-08-13): tournament participants are named regardless of
+    // consent-link state, so the linked-but-revoked and unlinked-guest scorers are
+    // no longer redacted here -- only `public-user-records.service.ts`'s own
+    // consent gate (unaffected by this change, see the 'official' test below)
+    // still hides them from their *personal* record pages.
     expect(consentedEntry?.displayName).toBe('Consented Scorer');
-    expect(revokedEntry?.displayName).toBeNull();
-    expect(guestEntry?.displayName).toBeNull();
+    expect(revokedEntry?.displayName).toBe('Revoked Scorer');
+    expect(guestEntry?.displayName).toBe('Guest Scorer');
   });
 
-  it('official: the current revision names only the consented scorer in events/lineup and both team and user records reflect it, while team goals still count the redacted scorers', async () => {
+  it('official: the current revision names every scorer in events/lineup regardless of consent (participant-name-public policy), while team goal counts and personal user records stay independent of any scorer\'s consent state', async () => {
     await endGame(gameMainId, 4);
     await drainOutbox();
     const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId: gameMainId } });
@@ -505,9 +510,14 @@ describe('Task 24 public tournament schedule/match and team/player record projec
 
     const goalEvents = match.events.filter((event) => event.type === 'GOAL');
     expect(goalEvents).toHaveLength(3);
+    // Policy change (2026-08-13): every home scorer is a tournament participant,
+    // so all three are now named regardless of consent-link state -- not just
+    // the consented one.
     const namedGoals = goalEvents.filter((event) => event.participantId !== null);
-    expect(namedGoals).toHaveLength(1);
-    expect(namedGoals[0]?.participantId).toBe(scorerConsentedId);
+    expect(namedGoals).toHaveLength(3);
+    expect(namedGoals.map((event) => event.participantId).sort()).toEqual(
+      [scorerConsentedId, scorerRevokedId, scorerGuestId].sort(),
+    );
 
     const teamRecord = await teamRecords.getRecords(ids.hostTeam, {});
     const teamItem = teamRecord.items.find((item) => item.gameId === gameMainId);

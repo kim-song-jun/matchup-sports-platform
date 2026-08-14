@@ -49,3 +49,5 @@ Root containment is an additional boundary and does not replace those checks.
   taint through that helper to `lstatSync` and `openSync`.
 - The immutable reader now canonicalizes the requested path with `realpathSync`, applies the
   root-prefix guard inline, and rejects canonical/requested-path mismatches before later reads.
+- A second scan showed CodeQL did not treat the shared `gateFailure()` call as an aborting guard.
+  The containment check is now an isolated branch with a direct exception before any later sink.

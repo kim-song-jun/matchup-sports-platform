@@ -1139,11 +1139,14 @@ function readImmutableJson(
   } catch {
     gateFailure('Evidence path cannot be resolved');
   }
-  if (
-    !absolutePath.startsWith(`${gateRoot}${sep}`) ||
-    (requireDirectGateRootChild && dirname(absolutePath) !== gateRoot)
-  ) {
-    gateFailure('Evidence path is outside the canonical evidence root');
+  if (!absolutePath.startsWith(`${gateRoot}${sep}`)) {
+    throw new BadRequestException({
+      code: 'INVALID_GATE_BUNDLE',
+      message: 'Evidence path is outside the canonical evidence root',
+    });
+  }
+  if (requireDirectGateRootChild && dirname(absolutePath) !== gateRoot) {
+    gateFailure('Gate bundle must be a direct child of the canonical evidence root');
   }
   if (absolutePath !== requestedPath) {
     gateFailure('Evidence must not be accessed through a symlink');

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
-import { staffRoleLabel } from '@/components/tournament-ops/badges';
+import { PublicFixtureStateBadge, staffRoleLabel } from '@/components/tournament-ops/badges';
 import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
 import { useV1MyTournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { findMyTournamentGroup } from '@/hooks/use-v1-my-staff-assignments';
@@ -156,8 +156,6 @@ function StaffFixtureRow({
   const meta = [`${fixture.round} · ${fixture.fixtureNumber}번 경기`, when === '' ? '일정 미정' : when]
     .filter(Boolean)
     .join(' · ');
-  const status = fixtureStatusBadge(fixture.status);
-
   return (
     <Link
       className="tm-list-row tm-pressable"
@@ -165,34 +163,15 @@ function StaffFixtureRow({
       aria-label={`${home} 대 ${away}, 경기 운영 콘솔 열기`}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-          <div className="tm-text-body" style={{ color: 'var(--text-strong)' }}>
-            {home} vs {away}
-          </div>
-          <span className={`tm-badge tm-badge-sm ${status.className}`} aria-label={`경기 상태: ${status.label}`}>
-            {status.label}
-          </span>
+        <div className="tm-text-body" style={{ color: 'var(--text-strong)' }}>
+          {home} vs {away}
         </div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>
           {meta}
         </div>
       </div>
+      <PublicFixtureStateBadge status={fixture.status} />
       <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} />
     </Link>
   );
-}
-
-function fixtureStatusBadge(status: string): { label: string; className: string } {
-  switch (status) {
-    case 'scheduled':
-      return { label: '예정', className: 'tm-badge-grey' };
-    case 'live':
-      return { label: '진행 중', className: 'tm-badge-green' };
-    case 'ended':
-      return { label: '종료', className: 'tm-badge-blue' };
-    case 'cancelled':
-      return { label: '취소', className: 'tm-badge-red' };
-    default:
-      return { label: '상태 확인 필요', className: 'tm-badge-orange' };
-  }
 }

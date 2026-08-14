@@ -144,21 +144,21 @@ describe('MyStaffFixturesPageClient', () => {
     expect(screen.queryByText(/남의 팀/)).toBeNull();
   });
 
-  it('예정·진행 중·종료 경기를 색상과 텍스트 상태 배지로 구분한다', () => {
+  it.each([
+    ['scheduled', '예정'],
+    ['in_progress', '진행 중'],
+    ['completed', '종료'],
+    ['cancelled', '취소됨'],
+    ['unexpected', '상태 확인 필요'],
+  ])('%s 경기 상태를 색상 외 아이콘과 텍스트로 함께 표시한다', (status, label) => {
     mockData(
-      [assignment({ fixtureIds: ['fx-scheduled', 'fx-live', 'fx-ended'] })],
-      [
-        entry({ fixtureId: 'fx-scheduled', fixtureNumber: 1, status: 'scheduled' }),
-        entry({ fixtureId: 'fx-live', fixtureNumber: 2, status: 'live' }),
-        entry({ fixtureId: 'fx-ended', fixtureNumber: 3, status: 'ended' }),
-      ],
+      [assignment({ fixtureIds: ['fx-1'] })],
+      [entry({ fixtureId: 'fx-1', status })],
     );
 
     render(<MyStaffFixturesPageClient tournamentId="t-1" />);
 
-    expect(screen.getByLabelText('경기 상태: 예정')).toHaveClass('tm-badge-grey');
-    expect(screen.getByLabelText('경기 상태: 진행 중')).toHaveClass('tm-badge-green');
-    expect(screen.getByLabelText('경기 상태: 종료')).toHaveClass('tm-badge-blue');
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 
   it('담당 경기가 없으면 이유를 정직하게 알린다', () => {

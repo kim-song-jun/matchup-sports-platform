@@ -1,0 +1,59 @@
+[
+  {
+    "page": "list",
+    "width": 390,
+    "file": "list-mobile-390.png",
+    "targetCards": 0,
+    "reviewerLabels": 0,
+    "teamNames": []
+  },
+  {
+    "page": "list",
+    "width": 768,
+    "file": "list-tablet-768.png",
+    "targetCards": 0,
+    "reviewerLabels": 0,
+    "teamNames": []
+  },
+  {
+    "page": "list",
+    "width": 1440,
+    "file": "list-desktop-1440.png",
+    "targetCards": 0,
+    "reviewerLabels": 0,
+    "teamNames": []
+  },
+  {
+    "page": "source",
+    "width": 390,
+    "file": "source-mobile-390.png",
+    "targetCards": 13,
+    "reviewerLabels": 13,
+    "teamNames": [
+      "E2E 알파 B팀",
+      "E2E 알파 A팀"
+    ]
+  },
+  {
+    "page": "source",
+    "width": 768,
+    "file": "source-tablet-768.png",
+    "targetCards": 13,
+    "reviewerLabels": 13,
+    "teamNames": [
+      "E2E 알파 B팀",
+      "E2E 알파 A팀"
+    ]
+  },
+  {
+    "page": "source",
+    "width": 1440,
+    "file": "source-desktop-1440.png",
+    "targetCards": 13,
+    "reviewerLabels": 13,
+    "teamNames": [
+      "E2E 알파 B팀",
+      "E2E 알파 A팀"
+    ]
+  }
+]

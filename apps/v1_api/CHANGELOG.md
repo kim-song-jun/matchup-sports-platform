@@ -1,5 +1,14 @@
 # v1_api
 
+## 0.3.1
+
+### Patch Changes
+
+- 8b2c4c5: Canonicalize operation-gate evidence paths before enforcing the trusted root boundary.
+- 03d3701: Restrict operation-gate bundle and linked receipt reads to the canonical evidence root so
+  caller-controlled or bundle-controlled paths cannot read arbitrary host files.
+- d48c81a: Make the operation-gate evidence root guard explicit before immutable filesystem reads.
+
 ## 0.3.0
 
 ### Minor Changes

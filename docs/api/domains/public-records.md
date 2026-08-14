@@ -72,6 +72,11 @@ falls back to `fixture.scheduledAt - 60m` before that -- so the public
 default fails closed (no lineup) even when nothing has explicitly published
 it yet, without needing a scheduler.
 
+Lineup revisions are immutable snapshots. The public match projection selects
+the highest `V1GameLineup.revision` independently for each side and exposes
+only participants whose `lineupId` belongs to that latest snapshot; repeated
+draft saves therefore never append older saved lineups to the visible roster.
+
 ### Consent-gated personal identity (D-03/D-11, `public-consent.ts`)
 
 A participant's `displayNameSnapshot` is exposed in a lineup slot, a

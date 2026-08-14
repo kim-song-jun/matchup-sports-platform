@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ErrorState } from '@/components/v1-ui/primitives';
-import { useV1Tournament } from '@/hooks/use-v1-api';
+import { useV1MyTournamentFixtures, useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
@@ -317,12 +317,16 @@ function BracketEmpty({
  * 목적은 "다음 경기가 언제/어디서"이고, 순위·대진표는 결과가 쌓인 뒤에 보는
  * 정보라 첫 화면을 일정에 내줬다. 세그먼트 탭 나열 순서도 기본 탭과 같게 둔다.
  */
-function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
+export function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
   // schedule-page-client.tsx와 동일한 데이터 배선(usePublicTournamentSchedule 페이지
   // 합치기 + 로딩/에러 분기) — AppChrome 래핑만 없는 얇은 버전이라 별도 훅으로
   // 추출하지 않았다(두 곳뿐이라 공용 추상화를 새로 만드는 게 오히려 과설계).
   const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     usePublicTournamentSchedule(tournamentId);
+  // `/schedule`의 권한 기능도 통합 허브인 `/bracket`에서 동일하게 제공한다. 공개 일정
+  // 조회와 분리된 인증 전용 요청이라 비로그인·비참가자는 빈 상태로 끝나고, 참가팀
+  // owner/manager에게만 자기 팀 경기 강조와 라인업 바로가기가 열린다.
+  const myFixtures = useV1MyTournamentFixtures(tournamentId);
 
   if (isLoading) {
     return (
@@ -352,6 +356,7 @@ function BracketScheduleTab({ tournamentId }: { tournamentId: string }) {
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
       onLoadMore={() => void fetchNextPage()}
+      myFixtures={myFixtures.data}
       /* 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
          같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고"). */
       showStandings={false}

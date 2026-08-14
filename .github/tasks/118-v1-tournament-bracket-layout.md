@@ -12,6 +12,8 @@
 - 조별 순위와 결선 대진의 위계를 명확히 하고, 4강 → 결승 → 우승 흐름을 자연스럽게 읽히게 한다.
 - 데스크톱의 비어 보이는 상단과 좁은 브래킷 열을 재균형한다.
 - 태블릿과 모바일에서 대진 카드·커넥터·3·4위전이 잘리거나 눌리지 않게 한다.
+- `/bracket`을 경기 일정의 기준 화면으로 사용하고, 상세에서 뒤로 갈 때 `/schedule`로 이탈하지 않게 한다.
+- 로그인한 참가팀 매니저의 모든 경기를 파란색으로 강조하고 권한이 있으면 라인업으로 바로 진입시킨다.
 
 ## Owned files
 
@@ -30,6 +32,8 @@
 - [x] 390px, 768px, 1280px에서 문서 가로 오버플로가 없다.
 - [x] 변경 계약을 검증하는 좁은 테스트와 커밋본 CI가 통과한다.
 - [x] Alpha 실제 화면의 콘솔 오류와 레이아웃을 확인한다.
+- [x] `/bracket` 경기 일정에 참가팀별 내 경기 강조와 라인업 상태/CTA를 연결한다.
+- [x] 경기 상세와 진행 중 결과 화면의 일정 복귀 경로를 `/bracket`으로 통일한다.
 
 ## Progress snapshot
 
@@ -40,6 +44,7 @@
 - Screenshot evidence: `output/playwright/visual-audit/2026-07-19-tournament-bracket/after-mobile-390x844.png`, `after-mobile-bracket-end-390x844.png`, `after-tablet-768x1024.png`.
 - Console verdict: 첫 history 조회에 이전 navigation 시각의 Server Components 오류 3건이 있었으나, 같은 route를 새로고침하고 reload 시작시각 이후 로그만 재조회했을 때 신규 오류는 `0`건이었다.
 - CI / Deploy evidence: [CI / Deploy 29654556718](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29654556718), [Deploy Alpha 29654556713](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29654556713) 모두 같은 SHA `a34d2e627f158c35d81ccbecd12b8a2be9743ea2`에서 성공했다.
+- 2026-08-14: `/bracket`의 일정 탭에도 `GET /tournaments/:id/my-fixtures` 결과를 연결했다. 참가팀 owner/manager의 모든 경기 행은 파란 배경과 `우리 팀` 문구로 강조되고, 라인업 상태 및 바로가기 CTA가 함께 노출된다. 경기 상세의 명시적 뒤로가기와 진행 중 결과 화면의 일정 CTA도 `/bracket`으로 통일했다.
 
 ## Ambiguity log
 

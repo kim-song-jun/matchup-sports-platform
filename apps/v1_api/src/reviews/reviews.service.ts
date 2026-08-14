@@ -94,19 +94,48 @@ export class ReviewsService {
     const reviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         status: 'submitted',
-        sportId: null, // 레거시(이 기능 출시 이전) 리뷰만 — 개별 노출은 소급 마스킹하지 않는다는 스펙에 따름
-        OR: receivedFilters,
+        // 개인/팀매치 신규 후기는 집계로만 공개한다. 대회 후기는 익명 개별 항목으로 공개하되,
+        // 아래 reveal gate를 통과하기 전에는 응답에 넣지 않는다.
+        OR: [{ sportId: null }, { sourceType: 'tournament_fixture' }],
+        AND: [{ OR: receivedFilters }],
       },
       orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       include: reviewInclude(),
     });
-    const pageItems = reviews.slice(0, limit);
+    const tournamentReviews = reviews.filter((review) => review.sourceType === 'tournament_fixture' && review.sportId !== null);
+    const userTournamentReviews = tournamentReviews.filter((review) => review.targetType === 'user');
+    const teamTournamentReviews = tournamentReviews.filter((review) => review.targetType === 'team');
+    const [reverseUserReviews, reverseTeamReviews] = await Promise.all([
+      this.reverseUserReviews(user.id, userTournamentReviews),
+      this.reverseTeamReviews(teamTournamentReviews),
+    ]);
+    const now = new Date();
+    const visibleReviews = reviews.filter((review) => {
+      if (review.sportId === null) return true;
+      const teamTarget = review.targetType === 'team';
+      return isReviewRevealed(
+        {
+          sourceId: reviewRevealScope(review),
+          reviewerUserId: teamTarget ? review.reviewerTeamId ?? '' : review.reviewerUserId,
+          targetUserId: teamTarget ? review.targetTeamId : review.targetUserId,
+          submittedAt: review.submittedAt,
+        },
+        teamTarget ? reverseTeamReviews : reverseUserReviews,
+        now,
+      );
+    });
+    const cursorIndex = query.cursor ? visibleReviews.findIndex((review) => review.id === query.cursor) : -1;
+    const pageStart = cursorIndex >= 0 ? cursorIndex + 1 : 0;
+    const pageItems = visibleReviews.slice(pageStart, pageStart + limit);
 
     return {
-      items: pageItems.map((review) => this.toReviewDetail(review)),
-      pageInfo: { nextCursor: reviews.length > limit ? pageItems.at(-1)?.id ?? null : null, hasNext: reviews.length > limit },
+      items: pageItems.map((review) => review.sportId === null
+        ? { ...this.toReviewDetail(review), anonymous: false as const }
+        : this.toAnonymousReceivedReview(review)),
+      pageInfo: {
+        nextCursor: visibleReviews.length > pageStart + limit ? pageItems.at(-1)?.id ?? null : null,
+        hasNext: visibleReviews.length > pageStart + limit,
+      },
     };
   }
 
@@ -818,6 +847,18 @@ export class ReviewsService {
       tags: review.tags.map((tag) => ({ tagCode: tag.tagCode, label: tag.labelSnapshot })),
       status: review.status,
       submittedAt: toIso(review.submittedAt),
+    };
+  }
+
+  private toAnonymousReceivedReview(review: ReviewWithIncludes) {
+    const detail = this.toReviewDetail(review);
+    return {
+      ...detail,
+      anonymous: true as const,
+      reviewerUser: null,
+      reviewerTeam: null,
+      // 정확한 제출 시각도 상대의 행동 시점과 대조하면 작성자 추정 단서가 된다.
+      submittedAt: null,
     };
   }
 

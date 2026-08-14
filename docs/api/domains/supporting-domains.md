@@ -33,7 +33,7 @@
 | Method | Path | Auth | 용도 |
 |---|---|---|---|
 | `GET` | `/api/v1/reviews?tab=pending\|written` | Required | 작성할 리뷰/작성 완료 리뷰 목록. pending은 optional `tournamentId` UUID로 해당 대회 fixture만 필터 |
-| `GET` | `/api/v1/reviews/received` | Required | 내가 받은 리뷰 목록 |
+| `GET` | `/api/v1/reviews/received` | Required | 내가 받은 리뷰 목록. 과거 리뷰는 기존 상세, 신규 대회 리뷰는 reveal 이후 익명 상세 |
 | `GET` | `/api/v1/reviews/sources/:sourceType/:sourceId` | Required | 리뷰 작성 대상 조회 |
 | `POST` | `/api/v1/reviews` | Required | 경기 후 리뷰 제출 |
 
@@ -41,7 +41,7 @@
 
 - `sourceType`: `match | team_match | tournament_fixture`
   - `match`: 완료된 개인 매치 참가자가 상대 참가자(`targetType=user`)를 평가한다.
-  - `team_match`: 완료된 팀매치의 팀장/운영진이 상대 팀(`targetType=team`)을 평가한다.
+  - `team_match`: 완료된 팀매치의 참가팀 active 멤버가 상대 팀(`targetType=team`)을 평가한다.
   - `tournament_fixture`: 완료되고 공식 결과가 기록된 대회 경기에서 참가팀 active `owner | manager`는 상대 팀(`targetType=team`)과 상대 등록 선수(`targetType=user`)를, active `member`는 상대 등록 선수만 평가한다.
     - `sourceId`는 작성 화면으로 진입한 fixture ID다.
     - 중복 방지는 내부 `sourceGroupId=tournamentId` 기준이다. 같은 대회에서 같은 두 팀이 리그전/토너먼트로 두 번 만나도, 같은 작성자는 같은 상대 팀·선수를 한 번만 평가한다.
@@ -51,6 +51,8 @@
   - `targetUserId`는 `sourceType=match`에서만 사용한다.
   - `targetTeamId`는 `sourceType=team_match | tournament_fixture`에서만 사용한다.
 - 중복 제출은 기존 리뷰를 반환하는 idempotent 응답으로 처리된다.
+- 신규 개인매치·팀매치 리뷰는 받은 사람에게 종목별 집계로만 공개한다. 신규 대회 리뷰는 상호 제출 완료 또는 최초 제출로부터 72시간 뒤 `GET /reviews/received`에 나타나며, `anonymous=true`, `reviewerUser=null`, `reviewerTeam=null`, `submittedAt=null`로 작성자 식별정보와 행동 시각을 제거하고 별점·태그만 반환한다.
+- `sportId=null`인 기존 행은 `anonymous=false`로 “이전 리뷰”에 유지한다.
 - 팀 대상 리뷰 제출 후 `v1_team_trust_scores`가 재계산된다. 대회 fixture 리뷰는 `sourceLabel='완료 팀매치·대회 경기 리뷰 기반'`으로 반영한다.
 
 ### CAUTION

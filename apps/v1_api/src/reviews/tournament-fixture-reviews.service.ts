@@ -37,7 +37,7 @@ export class TournamentFixtureReviewsService {
     if (!teamIds.length) return [];
     const roleByTeamId = new Map(memberships.map((membership) => [membership.teamId, membership.role]));
 
-    const fixtures = await this.prisma.v1TournamentFixture.findMany({
+    const fixtures = (await this.prisma.v1TournamentFixture.findMany({
       where: {
         ...(tournamentId ? { tournamentId } : {}),
         status: 'completed',
@@ -51,7 +51,7 @@ export class TournamentFixtureReviewsService {
       orderBy: [{ updatedAt: 'desc' }, { fixtureNumber: 'desc' }],
       take: limit * 4,
       select: tournamentFixtureSelect(),
-    });
+    })).filter((fixture) => officialResultTimestamp(fixture) !== null);
     const reviewed = await this.existingReviews(fixtures.map((fixture) => fixture.tournamentId), user.id);
     const seenKeys = new Set<string>();
 
@@ -70,7 +70,7 @@ export class TournamentFixtureReviewsService {
           const key = teamReviewKey(fixture.tournamentId, user.id, targetTeam.teamId);
           if (seenKeys.has(key)) return null;
           seenKeys.add(key);
-          const completedAt = officialResultTimestamp(fixture) ?? fixture.scheduledAt ?? fixture.updatedAt;
+          const completedAt = officialResultTimestamp(fixture)!;
           return {
             fixture,
             reviewerTeamId,

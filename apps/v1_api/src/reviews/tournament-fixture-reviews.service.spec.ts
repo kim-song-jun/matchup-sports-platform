@@ -203,6 +203,29 @@ describe('TournamentFixtureReviewsService', () => {
     ]);
   });
 
+  it('공식 결과가 없는 completed fixture는 pending 목록에서 제외한다', async () => {
+    const fixtureWithoutOfficialResult = {
+      ...fixture({ id: fixtureId, fixtureNumber: 1 }),
+      game: { currentOfficialRevision: null },
+      result: null,
+    };
+    const prisma = {
+      v1TeamMembership: {
+        findMany: jest.fn().mockResolvedValue([{ teamId: reviewerTeamId, role: 'owner' }]),
+      },
+      v1TournamentFixture: {
+        findMany: jest.fn().mockResolvedValue([fixtureWithoutOfficialResult]),
+      },
+      v1TournamentPlayer: { findMany: jest.fn() },
+      v1PostEventReview: { findMany: jest.fn() },
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never);
+
+    await expect(service.pending(user, 20, tournamentId)).resolves.toEqual([]);
+    expect(prisma.v1PostEventReview.findMany).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentPlayer.findMany).not.toHaveBeenCalled();
+  });
+
   it('pending 대상 수는 상대 팀 1 + 상대팀 로스터 인원이다', async () => {
     const prisma = {
       v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),

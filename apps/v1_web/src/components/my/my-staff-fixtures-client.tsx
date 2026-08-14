@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
-import { staffRoleLabel } from '@/components/tournament-ops/badges';
+import { PublicFixtureStateBadge, staffRoleLabel } from '@/components/tournament-ops/badges';
 import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
 import { useV1MyTournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { findMyTournamentGroup } from '@/hooks/use-v1-my-staff-assignments';
@@ -156,7 +156,6 @@ function StaffFixtureRow({
   const meta = [`${fixture.round} · ${fixture.fixtureNumber}번 경기`, when === '' ? '일정 미정' : when]
     .filter(Boolean)
     .join(' · ');
-
   return (
     <Link
       className="tm-list-row tm-pressable"
@@ -171,6 +170,7 @@ function StaffFixtureRow({
           {meta}
         </div>
       </div>
+      <PublicFixtureStateBadge status={fixture.status} />
       <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} />
     </Link>
   );

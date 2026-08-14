@@ -59,6 +59,22 @@ export function GameStateBadge({ state }: { state: V1GameState | null }) {
   return <Pill tone={meta.tone} icon={meta.icon} label={meta.label} />;
 }
 
+const PUBLIC_FIXTURE_STATE: Readonly<Record<string, V1GameState>> = {
+  scheduled: 'SCHEDULED',
+  in_progress: 'LIVE',
+  completed: 'ENDED',
+  cancelled: 'CANCELLED',
+};
+
+/** 공개 일정의 소문자 fixture 상태를 현장 운영 화면의 상태 언어로 맞춘다. */
+export function PublicFixtureStateBadge({ status }: { status: string }) {
+  const state = PUBLIC_FIXTURE_STATE[status];
+  if (state === undefined) {
+    return <Pill tone="gray" icon={<Clock size={12} aria-hidden="true" />} label="상태 확인 필요" />;
+  }
+  return <GameStateBadge state={state} />;
+}
+
 // ── 운영 보드 경고 배지 ────────────────────────────────────────────────────
 /* 경고 코드 → 한글 라벨의 단일 출처. 결과 검토·정정 화면(fixture-picker-list)도 이걸 쓴다.
  * MISSING_SCORER 는 서버에서 "골에 득점자가 지정되지 않음"(V1GameResultRevision.missingScorer)을

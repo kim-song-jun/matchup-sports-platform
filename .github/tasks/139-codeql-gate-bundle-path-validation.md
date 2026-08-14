@@ -42,3 +42,10 @@ Root containment is an additional boundary and does not replace those checks.
 
 - Nested evidence must remain supported because gate bundles reference prerequisite, lifecycle,
   deployment, and public-proof receipts below the root; only the bundle itself is a direct child.
+
+## Progress Snapshot
+
+- The first fix added a reusable lexical containment validator, but PR #471 CodeQL still traced
+  taint through that helper to `lstatSync` and `openSync`.
+- The immutable reader now canonicalizes the requested path with `realpathSync`, applies the
+  root-prefix guard inline, and rejects canonical/requested-path mismatches before later reads.

@@ -1128,14 +1128,25 @@ function readImmutableJson(
   requireDirectGateRootChild: boolean,
 ): Record<string, unknown> {
   if (!SHA256_PATTERN.test(expectedHash)) gateFailure('Expected hash must be lowercase SHA-256');
+  const gateRoot = resolveGameOperationGateRoot();
+  const requestedPath = resolve(path);
   let absolutePath: string;
   try {
-    absolutePath = resolveGameOperationEvidencePath(path, requireDirectGateRootChild);
-  } catch (error) {
-    if (error instanceof GameOperationEvidencePathError) {
-      gateFailure('Evidence path is outside the canonical evidence root');
-    }
-    throw error;
+    // Resolve symlinks before applying the containment guard. Keeping the
+    // canonicalized value on the guarded branch is also the pattern CodeQL's
+    // path-injection query recognizes as a path sanitizer.
+    absolutePath = realpathSync(requestedPath);
+  } catch {
+    gateFailure('Evidence path cannot be resolved');
+  }
+  if (
+    !absolutePath.startsWith(`${gateRoot}${sep}`) ||
+    (requireDirectGateRootChild && dirname(absolutePath) !== gateRoot)
+  ) {
+    gateFailure('Evidence path is outside the canonical evidence root');
+  }
+  if (absolutePath !== requestedPath) {
+    gateFailure('Evidence must not be accessed through a symlink');
   }
   let descriptor: number | undefined;
   try {

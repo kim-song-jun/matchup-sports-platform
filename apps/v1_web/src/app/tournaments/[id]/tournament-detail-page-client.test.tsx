@@ -20,6 +20,7 @@ function render(ui: ReactElement) {
 const tournamentApiMocks = vi.hoisted(() => ({
   useV1Tournament: vi.fn(),
   useV1MyRegistrations: vi.fn(),
+  useV1Reviews: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
@@ -113,6 +114,13 @@ describe('TournamentDetailPageClient GA events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isPending: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
   });
 
   it('tracks tournament_view once the tournament detail loads', async () => {

@@ -1,0 +1,151 @@
+{
+  "browserPid": 52824,
+  "parentPid": 50380,
+  "route": "/tournaments/13500000-0000-4000-8000-000000000001",
+  "results": [
+    {
+      "persona": "member-light",
+      "viewport": "390x844",
+      "screenshot": "docs/visual-qa/task-135-tournament-reviews/mobile-390/member-light.png",
+      "sectionText": "리뷰할 수 있는 경기\n\n경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.\n\nFinal\nTeameet Captain FC vs Rival United\n2 : 2\nPK 5 : 4\n남은 리뷰 1개",
+      "apiResponses": [
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001/registrations/my-registrations",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/reviews?tab=pending&tournamentId=13500000-0000-4000-8000-000000000001&limit=50",
+          "status": 200
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": [],
+      "documentTheme": "light"
+    },
+    {
+      "persona": "member-light",
+      "viewport": "768x1024",
+      "screenshot": "docs/visual-qa/task-135-tournament-reviews/tablet-768/member-light.png",
+      "sectionText": "리뷰할 수 있는 경기\n\n경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.\n\nFinal\nTeameet Captain FC vs Rival United\n2 : 2\nPK 5 : 4\n남은 리뷰 1개",
+      "apiResponses": [
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001/registrations/my-registrations",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/reviews?tab=pending&tournamentId=13500000-0000-4000-8000-000000000001&limit=50",
+          "status": 200
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": [],
+      "documentTheme": "light"
+    },
+    {
+      "persona": "member-light",
+      "viewport": "1440x900",
+      "screenshot": "docs/visual-qa/task-135-tournament-reviews/desktop-1440/member-light.png",
+      "sectionText": "리뷰할 수 있는 경기\n\n경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.\n\nFinal\nTeameet Captain FC vs Rival United\n2 : 2\nPK 5 : 4\n남은 리뷰 1개",
+      "apiResponses": [
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001/registrations/my-registrations",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/reviews?tab=pending&tournamentId=13500000-0000-4000-8000-000000000001&limit=50",
+          "status": 200
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": [],
+      "documentTheme": "light"
+    },
+    {
+      "persona": "owner-dark",
+      "viewport": "390x844",
+      "screenshot": "docs/visual-qa/task-135-tournament-reviews/mobile-390/owner-dark.png",
+      "sectionText": "리뷰할 수 있는 경기\n\n경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.\n\nFinal\nTeameet Captain FC vs Rival United\n2 : 2\nPK 5 : 4\n남은 리뷰 2개",
+      "apiResponses": [
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001/registrations/my-registrations",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/reviews?tab=pending&tournamentId=13500000-0000-4000-8000-000000000001&limit=50",
+          "status": 200
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": [],
+      "documentTheme": "dark"
+    },
+    {
+      "persona": "owner-dark",
+      "viewport": "768x1024",
+      "screenshot": "docs/visual-qa/task-135-tournament-reviews/tablet-768/owner-dark.png",
+      "sectionText": "리뷰할 수 있는 경기\n\n경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.\n\nFinal\nTeameet Captain FC vs Rival United\n2 : 2\nPK 5 : 4\n남은 리뷰 2개",
+      "apiResponses": [
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001/registrations/my-registrations",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/reviews?tab=pending&tournamentId=13500000-0000-4000-8000-000000000001&limit=50",
+          "status": 200
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": [],
+      "documentTheme": "dark"
+    },
+    {
+      "persona": "owner-dark",
+      "viewport": "1440x900",
+      "screenshot": "docs/visual-qa/task-135-tournament-reviews/desktop-1440/owner-dark.png",
+      "sectionText": "리뷰할 수 있는 경기\n\n경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.\n\nFinal\nTeameet Captain FC vs Rival United\n2 : 2\nPK 5 : 4\n남은 리뷰 2개",
+      "apiResponses": [
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/13500000-0000-4000-8000-000000000001/registrations/my-registrations",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/reviews?tab=pending&tournamentId=13500000-0000-4000-8000-000000000001&limit=50",
+          "status": 200
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": [],
+      "documentTheme": "dark"
+    }
+  ]
+}

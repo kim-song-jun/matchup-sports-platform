@@ -31,12 +31,15 @@ import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-revi
 export class TournamentFixtureReviewsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async pending(user: V1AuthUser, limit: number) {
-    const teamIds = await this.participatingTeamIds(user.id);
+  async pending(user: V1AuthUser, limit: number, tournamentId?: string) {
+    const memberships = await this.participatingTeamMemberships(user.id);
+    const teamIds = memberships.map((membership) => membership.teamId);
     if (!teamIds.length) return [];
+    const roleByTeamId = new Map(memberships.map((membership) => [membership.teamId, membership.role]));
 
-    const fixtures = await this.prisma.v1TournamentFixture.findMany({
+    const fixtures = (await this.prisma.v1TournamentFixture.findMany({
       where: {
+        ...(tournamentId ? { tournamentId } : {}),
         status: 'completed',
         homeRegistrationId: { not: null },
         awayRegistrationId: { not: null },
@@ -48,7 +51,7 @@ export class TournamentFixtureReviewsService {
       orderBy: [{ updatedAt: 'desc' }, { fixtureNumber: 'desc' }],
       take: limit * 4,
       select: tournamentFixtureSelect(),
-    });
+    })).filter((fixture) => officialResultTimestamp(fixture) !== null);
     const reviewed = await this.existingReviews(fixtures.map((fixture) => fixture.tournamentId), user.id);
     const seenKeys = new Set<string>();
 
@@ -58,6 +61,8 @@ export class TournamentFixtureReviewsService {
         if (!teams) return [];
         // 양 팀 모두의 멤버면 두 방향이 각각 별도 항목이 된다.
         return resolveReviewerTeamIds(teamIds, teams.home.teamId, teams.away.teamId).map((reviewerTeamId) => {
+          const reviewerRole = roleByTeamId.get(reviewerTeamId);
+          if (!reviewerRole) return null;
           const isHome = reviewerTeamId === teams.home.teamId;
           const targetTeam = isHome ? teams.away : teams.home;
           // 키의 주체는 팀이 아니라 사람이다 — 팀 기준이면 팀장이 쓴 순간 나머지 팀원 전원의
@@ -65,10 +70,11 @@ export class TournamentFixtureReviewsService {
           const key = teamReviewKey(fixture.tournamentId, user.id, targetTeam.teamId);
           if (seenKeys.has(key)) return null;
           seenKeys.add(key);
-          const completedAt = officialResultTimestamp(fixture) ?? fixture.scheduledAt ?? fixture.updatedAt;
+          const completedAt = officialResultTimestamp(fixture)!;
           return {
             fixture,
             reviewerTeamId,
+            reviewerRole,
             targetTeam,
             teamReviewed: reviewed.teams.has(key),
             completedAt,
@@ -88,16 +94,17 @@ export class TournamentFixtureReviewsService {
         const reviewedUserIds = reviewed.users.get(entry.fixture.tournamentId) ?? new Set<string>();
         const reviewedPlayerCount = rosterUserIds.filter((userId) => reviewedUserIds.has(userId)).length;
         // 대상 = 상대 팀 1 + 상대팀 등록 로스터 인원. 로스터가 비어 있으면(등록 전/전원 삭제) 팀 후기만 남는다.
-        const targetCount = 1 + rosterUserIds.length;
-        const reviewedCount = (entry.teamReviewed ? 1 : 0) + reviewedPlayerCount;
+        const canReviewTeam = canReviewOpponentTeam(entry.reviewerRole);
+        const targetCount = (canReviewTeam ? 1 : 0) + rosterUserIds.length;
+        const reviewedCount = (canReviewTeam && entry.teamReviewed ? 1 : 0) + reviewedPlayerCount;
         return {
           sourceType: TOURNAMENT_FIXTURE_SOURCE_TYPE,
           sourceId: entry.fixture.id,
           title: fixtureTitle(entry.fixture),
           completedAt: toIso(entry.completedAt),
-          // 카드 한 장에 팀 대상 1건 + 선수 대상 N건이 섞여 있다. 목록 카드의 targetType은
-          // 뱃지/문구를 고르는 대표 값이라 상대 팀으로 유지한다(개별 대상은 source 화면에서 나뉜다).
-          targetType: 'team' as const,
+          // 목록 카드의 대표 target도 실제 역할 계약을 따른다. member는 선수 target만 남으므로
+          // team으로 표시하면 작성 화면과 목록 배지가 서로 모순된다.
+          targetType: canReviewTeam ? 'team' as const : 'user' as const,
           targetCount,
           reviewedCount,
           remainingCount: Math.max(targetCount - reviewedCount, 0),
@@ -124,7 +131,7 @@ export class TournamentFixtureReviewsService {
       // 겸직이면 단일 값으로 좁힐 수 없으므로 null — 소비자는 target.reviewerTeam 을 봐야 한다.
       reviewerTeam: contexts.length === 1 ? first.reviewerTeam : null,
       targets: contexts.flatMap((context) => [
-        teamTarget(context),
+        ...(canReviewOpponentTeam(context.reviewerTeam.role) ? [teamTarget(context)] : []),
         ...context.roster.map((player) => playerTarget(player, context)),
       ]),
     };
@@ -167,6 +174,9 @@ export class TournamentFixtureReviewsService {
     tagCodes: TournamentFixtureReviewTagCode[],
     context: ReviewContext,
   ) {
+    if (!canReviewOpponentTeam(context.reviewerTeam.role)) {
+      throw forbidden('TEAM_REVIEW_ROLE_REQUIRED', '상대팀 후기는 팀장·운영진만 작성할 수 있어요.');
+    }
     if (!dto.targetTeamId) throw badRequest('TARGET_TEAM_REQUIRED', 'targetTeamId is required');
     const targetTeamId = dto.targetTeamId;
     if (context.targetTeam.teamId !== targetTeamId) {
@@ -297,9 +307,9 @@ export class TournamentFixtureReviewsService {
   }
 
   /**
-   * 참가팀의 active 멤버면 역할과 무관하게 상대팀 후기를 쓸 수 있다. 경기에 뛴 사람은 팀
-   * 전체인데 평가를 팀장 한 명의 인상으로 결정하면 표본이 1이라 개인 편향이 그대로 팀
-   * 신뢰도가 된다. 인원 수에 따른 영향력 차이는 집계 쪽에서 "팀 평균 1표"로 흡수한다.
+   * fixture source에는 참가팀 active 멤버 모두 들어올 수 있지만 대상은 역할별로 다르다.
+   * owner/manager는 상대팀과 상대 선수를, member는 상대 선수만 평가한다. 상대팀 제출은
+   * submitTeamReview에서도 다시 막아 클라이언트가 임의 payload를 보내도 권한이 넓어지지 않는다.
    *
    * 양 팀 모두의 멤버인 사용자는 예전에 `AMBIGUOUS_REVIEWER_TEAM`(409)으로 어느 쪽 후기도
    * 못 썼다. 이제 양쪽을 모두 돌려주고, 평가 대상이 어느 팀/로스터에 속하는지로 작성자 팀이
@@ -326,12 +336,12 @@ export class TournamentFixtureReviewsService {
     });
   }
 
-  private async participatingTeamIds(userId: string) {
+  private async participatingTeamMemberships(userId: string) {
     const memberships = await this.prisma.v1TeamMembership.findMany({
       where: { userId, status: 'active' },
-      select: { teamId: true },
+      select: { teamId: true, role: true },
     });
-    return memberships.map((membership) => membership.teamId);
+    return memberships;
   }
 
   /**
@@ -440,6 +450,10 @@ type ReviewContext = {
   readonly roster: RosterPlayer[];
   readonly existingByUserId: Map<string, ReviewWithIncludes>;
 };
+
+function canReviewOpponentTeam(role: V1TeamMembershipRole) {
+  return role === 'owner' || role === 'manager';
+}
 
 function teamTarget(context: ReviewContext) {
   return {

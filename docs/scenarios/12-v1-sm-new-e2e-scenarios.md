@@ -500,6 +500,7 @@ DB evidence:
 
 Validation evidence:
 
+- 2026-08-14: Task 135 role-aware tournament fixture review entry passed API targeted Jest `41/41`, Web targeted Vitest `18/18`, and live headed Playwright `6/6` across 390/768/1440. Member-light returned one player target; owner-dark returned opponent team + player targets. Every capture showed regulation `2:2` and `PK 5:4`, review API 200, and zero console/page/request errors. Evidence: `docs/visual-qa/task-135-tournament-reviews/manifest.json`.
 - 2026-06-05: Task 89 `89-11` completed. `pnpm v1:db:generate`, API/Web `tsc --noEmit`, backend unit suite `87/87`, targeted review view-model test `1/1`, and review route responsive smoke `29 routes x 3 viewports` passed with 0 issues. Report: `output/playwright/v1-responsive-smoke/reviews-responsive-smoke-final/report.md`.
 
 ## Suggested Automation Files

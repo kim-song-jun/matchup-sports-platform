@@ -1579,10 +1579,22 @@ export type V1ReviewReceivedResponse = {
   };
 };
 
+export type V1ReviewerTeam = {
+  teamId: string;
+  name: string;
+  /** 팀 후기는 참가팀 active 멤버 전원이 쓸 수 있으므로 일반 멤버(member)도 온다. */
+  role: 'owner' | 'manager' | 'member';
+};
+
 export type V1ReviewTarget = {
   targetType: V1ReviewTargetType;
   targetUserId: string | null;
   targetTeamId: string | null;
+  /**
+   * 이 대상을 평가할 때 내가 서는 참가팀. 양 팀 모두의 멤버인 경우 대상마다 달라지므로
+   * 최상위 `reviewerTeam` 대신 이 값을 봐야 한다. 개인 매치 후기는 null.
+   */
+  reviewerTeam: V1ReviewerTeam | null;
   name: string;
   imageUrl: string | null;
   subtitle: string;
@@ -1599,12 +1611,11 @@ export type V1ReviewSourceResponse = {
     title: string;
     completedAt: string | null;
   };
-  reviewerTeam: {
-    teamId: string;
-    name: string;
-    /** 팀 후기는 참가팀 active 멤버 전원이 쓸 수 있으므로 일반 멤버(member)도 온다. */
-    role: 'owner' | 'manager' | 'member';
-  } | null;
+  /**
+   * 내가 서는 참가팀. 양 팀 모두의 멤버라 대상마다 달라지는 경우 null 이므로,
+   * 표시·제출 모두 `targets[].reviewerTeam` 을 기준으로 삼아야 한다.
+   */
+  reviewerTeam: V1ReviewerTeam | null;
   targets: V1ReviewTarget[];
 };
 

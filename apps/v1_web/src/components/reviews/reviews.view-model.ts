@@ -59,11 +59,16 @@ export function toReviewSourcePageModel(data: V1ReviewSourceResponse): ReviewSou
   };
 }
 
-export function toTargetViewModel(target: V1ReviewTarget): ReviewTargetViewModel {
+/**
+ * @param showReviewerTeam 양 팀 모두의 멤버라 대상마다 작성자 팀이 달라지는 경우에만 true.
+ *   그 외에는 헤더의 "OO 대표로 작성"이 이미 같은 정보를 보여주므로 카드에서는 생략한다.
+ */
+export function toTargetViewModel(target: V1ReviewTarget, showReviewerTeam = false): ReviewTargetViewModel {
   return {
     ...target,
     initials: initials(target.name),
     statusLabel: target.alreadySubmitted || target.review ? '작성됨' : target.locked ? '잠김' : '대기',
+    reviewerTeamLabel: showReviewerTeam && target.reviewerTeam ? `${target.reviewerTeam.name} 대표로 작성` : null,
   };
 }
 

@@ -193,6 +193,8 @@ describe('ReviewsService', () => {
         ]),
       },
       v1PostEventReview: {
+        // 겸직(양 팀 멤버) 지원 이후 teamMatchSource 는 대상별 기존 후기를 한 번에 조회한다.
+        findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
       },
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
@@ -849,3 +851,121 @@ async function runTeamTrust(candidates: FakeRow[], reverseReviews: FakeRow[]) {
   await makeService({})['recalculateTeamTrust'](tx as never, 'team-x');
   return upsert.mock.calls[0][0].update as { mannerScore: { toFixed: (digits: number) => string } | null; trustState: string };
 }
+
+/**
+ * 양 팀 모두의 active 멤버인 사용자(겸직) — 예전에는 AMBIGUOUS_REVIEWER_TEAM(409)으로
+ * 어느 쪽 후기도 쓸 수 없었다. 이제 두 방향 모두 대상이 되고, 평가 대상 팀이 곧 작성자 팀을
+ * 결정한다. 잡아야 하는 회귀: (a) 겸직자가 다시 409로 막히는 것,
+ * (b) 두 방향 중 한쪽만 노출되는 것, (c) 작성자 팀이 뒤바뀌어 저장되는 것.
+ */
+describe('ReviewsService — 양 팀 겸직 후기', () => {
+  const bothTeamMemberships = [
+    { teamId: hostTeamId, role: 'manager', team: { name: '홈팀' } },
+    { teamId: awayTeamId, role: 'member', team: { name: '원정팀' } },
+  ];
+
+  const createdRow = (reviewerTeamId: string, targetTeamId: string) => ({
+    id: 'review-dual-1',
+    sourceType: 'team_match',
+    sourceId: teamSourceId,
+    targetType: 'team',
+    targetUser: null,
+    targetTeam: { id: targetTeamId, name: '상대팀', profile: { logoUrl: null } },
+    reviewerUser: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } },
+    reviewerTeam: { id: reviewerTeamId, name: '내팀', profile: { logoUrl: null } },
+    rating: 5,
+    tags: [],
+    status: 'submitted',
+    submittedAt,
+  });
+
+  function makeDualPrisma(createMock = jest.fn()) {
+    return {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: teamSourceId,
+          title: '홈팀 vs 원정팀',
+          status: 'completed',
+          completedAt: submittedAt,
+          startAt: submittedAt,
+          sportId: 'sport-futsal',
+          hostTeamId,
+          approvedApplicantTeamId: awayTeamId,
+          hostTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+          approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+        }),
+      },
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue(bothTeamMemberships) },
+      v1PostEventReview: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
+        v1PostEventReview: { create: createMock, findMany: jest.fn().mockResolvedValue([]) },
+        v1TeamMatch: { count: jest.fn().mockResolvedValue(1) },
+        v1TeamTrustScore: { upsert: jest.fn().mockResolvedValue({}) },
+      })),
+    };
+  }
+
+  const tournamentFixtureReviews = {
+    pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn(),
+  };
+
+  it('겸직자에게 두 방향이 모두 대상으로 나오고, 각 대상에 작성자 팀이 실린다', async () => {
+    const prisma = makeDualPrisma();
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+    const source = await service.source(user, { sourceType: 'team_match', sourceId: teamSourceId });
+
+    expect(source.targets).toHaveLength(2);
+    // 단일 값으로 좁힐 수 없으므로 최상위는 null — 소비자는 target.reviewerTeam 을 봐야 한다.
+    expect(source.reviewerTeam).toBeNull();
+    expect(source.targets.map((target) => [target.targetTeamId, target.reviewerTeam?.teamId])).toEqual([
+      [awayTeamId, hostTeamId],
+      [hostTeamId, awayTeamId],
+    ]);
+  });
+
+  it('원정팀을 평가하면 홈팀 입장으로 저장된다 (대상이 작성자 팀을 결정)', async () => {
+    const createMock = jest.fn().mockResolvedValue(createdRow(hostTeamId, awayTeamId));
+    const prisma = makeDualPrisma(createMock);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+    await service.submit(user, {
+      sourceType: 'team_match',
+      sourceId: teamSourceId,
+      targetType: 'team',
+      targetTeamId: awayTeamId,
+      rating: 5,
+      tagCodes: ['manner'],
+    });
+
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ reviewerTeamId: hostTeamId, targetTeamId: awayTeamId }),
+      }),
+    );
+  });
+
+  it('반대 방향(홈팀 평가)은 원정팀 입장으로 저장된다', async () => {
+    const createMock = jest.fn().mockResolvedValue(createdRow(awayTeamId, hostTeamId));
+    const prisma = makeDualPrisma(createMock);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+    await service.submit(user, {
+      sourceType: 'team_match',
+      sourceId: teamSourceId,
+      targetType: 'team',
+      targetTeamId: hostTeamId,
+      rating: 3,
+      tagCodes: ['manner'],
+    });
+
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ reviewerTeamId: awayTeamId, targetTeamId: hostTeamId }),
+      }),
+    );
+  });
+});

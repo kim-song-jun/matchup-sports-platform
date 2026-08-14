@@ -1,13 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy } from 'lucide-react';
-import { useReducer, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy, Lock } from 'lucide-react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import {
+  useV1AdminTournament,
   useV1AdminTournaments,
+  useV1ChangeTournamentStatus,
   useV1CreateTournament,
+  useV1LineupSizeOptions,
   useV1MasterSports,
+  useV1UpdateTournament,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -23,11 +27,17 @@ import {
   PromoCardFields,
   type TournamentPromoCardValue,
 } from '@/components/admin/tournaments/promo-card-fields';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { TournamentCard } from '@/app/tournaments/tournament-card';
 import {
+  CONFIRM_STEP_INDEX,
   INITIAL_TOURNAMENT_CREATE_STATE,
+  LAST_INPUT_STEP_INDEX,
   TOURNAMENT_CREATE_STEPS,
   buildTournamentCreatePayload,
+  buildTournamentPreviewItem,
   canSubmitTournamentCreate,
   tournamentCreateReducer,
   validateTournamentCreateStep,
@@ -36,12 +46,15 @@ import {
 } from './tournament-create-model';
 
 const inputClass =
-  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 const textareaClass =
-  'w-full resize-none rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 export default function AdminTournamentsNewPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const draftIdParam = searchParams.get('draftId');
   const { toasts, showToast } = useAdminToast();
   const [state, dispatch] = useReducer(
     tournamentCreateReducer,
@@ -54,12 +67,32 @@ export default function AdminTournamentsNewPage() {
   const { data: sports, isPending: sportsPending } = useV1MasterSports();
   const { data: previousTournaments } = useV1AdminTournaments({ limit: 50 });
   const createTournament = useV1CreateTournament();
+  const updateTournament = useV1UpdateTournament(state.draftId ?? '');
+  const changeStatus = useV1ChangeTournamentStatus(state.draftId ?? '');
   const uploadImages = useV1UploadImages();
-  const pending = createTournament.isPending;
+  const pending = createTournament.isPending || updateTournament.isPending;
   const selectedSport = sports?.find((sport) => sport.id === state.sportId);
   const previousWithBank = previousTournaments?.items.find(
     (tournament) => tournament.bankName || tournament.bankAccount || tournament.bankHolder,
   );
+  const { confirm, ConfirmModal: startRegistrationConfirmModal } = useConfirm();
+
+  // 새로고침·직접 URL 진입(?draftId=…)으로 돌아온 경우 — 메모리 상태는 비어 있지만 이미
+  // 서버에 초안이 있으므로, 그 값을 폼에 채우고 확인 단계로 보낸다. state.draftId가 이미
+  // 있으면(같은 세션에서 방금 생성) 다시 덮어쓰지 않는다 — 지금 입력 중인 값을 잃으면 안 된다.
+  const hydratedRef = useRef(false);
+  const draftQuery = useV1AdminTournament(draftIdParam ?? '');
+  useEffect(() => {
+    if (hydratedRef.current || !draftIdParam || state.draftId || !draftQuery.data) return;
+    hydratedRef.current = true;
+    if (draftQuery.data.status !== 'draft') {
+      // 이미 접수가 시작됐거나 그 이후 상태 — 이 위저드로는 더 이상 이어갈 수 없다.
+      showToast('이미 접수를 시작한 대회예요. 관리 화면으로 이동할게요.', 'success');
+      router.replace(`/admin/tournaments/${draftQuery.data.id}`);
+      return;
+    }
+    dispatch({ type: 'hydrate-from-draft', tournament: draftQuery.data });
+  }, [draftIdParam, state.draftId, draftQuery.data, router, showToast]);
 
   const clearError = (field: string) => {
     setErrors((current) => {
@@ -82,6 +115,10 @@ export default function AdminTournamentsNewPage() {
   };
 
   const goToStep = (nextStep: number) => {
+    // "공개 확인" 단계는 초안이 실제로 만들어진 뒤에만 들어갈 수 있다 — 검증만 통과했다고
+    // 스텝 버튼을 직접 눌러 건너뛸 수 있으면, 대회가 없는 채로 "접수 시작하기"를 누르는
+    // 상황이 생긴다(잠김 상태, 스테퍼 버튼도 이 조건으로 disabled 처리).
+    if (nextStep === CONFIRM_STEP_INDEX && !state.draftId) return;
     if (nextStep < state.step) {
       dispatch({ type: 'set-step', step: nextStep });
       setErrors({});
@@ -141,7 +178,12 @@ export default function AdminTournamentsNewPage() {
     }
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  /**
+   * "참가 조건" 다음 단계(상금·홍보)의 주 CTA — 여기서 실제로 대회가 생성(또는, 이미
+   * 만든 초안을 수정하러 돌아온 경우 수정)된다. draftId 유무로 POST/PATCH를 가른다 —
+   * 이 분기 하나가 "3단계→4단계를 여러 번 오가도 중복 생성되지 않는다"는 계약의 핵심이다.
+   */
+  const handleCreateOrUpdateDraft = (event: React.FormEvent) => {
     event.preventDefault();
     const allErrors = Object.assign(
       {},
@@ -158,15 +200,62 @@ export default function AdminTournamentsNewPage() {
       return;
     }
 
-    createTournament.mutate(buildTournamentCreatePayload(state), {
+    const payload = buildTournamentCreatePayload(state);
+
+    if (state.draftId) {
+      updateTournament.mutate(payload, {
+        onSuccess: (tournament) => {
+          dispatch({ type: 'draft-created', tournament });
+        },
+        onError: (error) => {
+          showToast(extractErrorMessage(error, '대회 수정에 실패했어요.'), 'error');
+        },
+      });
+      return;
+    }
+
+    createTournament.mutate(payload, {
       onSuccess: (tournament) => {
-        showToast('대회를 만들었어요.', 'success');
-        router.push(`/admin/tournaments/${tournament.id}`);
+        dispatch({ type: 'draft-created', tournament });
+        // draftId를 URL에 남겨 새로고침해도 같은 초안을 이어가고, 다시 만들지 않게 한다.
+        router.replace(`${pathname}?draftId=${tournament.id}`);
       },
       onError: (error) => {
         showToast(extractErrorMessage(error, '대회 생성에 실패했어요.'), 'error');
       },
     });
+  };
+
+  /** "확인" 단계의 보조 동작 — 초안 상태 그대로 두고 관리 화면으로 이동한다(접수는 나중에). */
+  const handleLater = () => {
+    if (!state.draftId) return;
+    router.push(`/admin/tournaments/${state.draftId}`);
+  };
+
+  /** "확인" 단계의 주 CTA — 되돌리기 어려운 전환(초안 → 접수 중)이라 확인 모달을 거친다. */
+  const handleStartRegistration = async () => {
+    if (!state.draftId) return;
+    const ok = await confirm({
+      title: '접수를 시작할까요?',
+      message:
+        '접수를 시작하면 방금 확인한 화면 그대로 참가자에게 공개되고, 바로 신청을 받을 수 있어요. 시작한 뒤에는 초안으로 되돌릴 수 없어요.',
+      confirmLabel: '접수 시작하기',
+      cancelLabel: '취소',
+    });
+    if (!ok) return;
+
+    changeStatus.mutate(
+      { status: 'open' },
+      {
+        onSuccess: () => {
+          showToast('접수를 시작했어요.', 'success');
+          router.push(`/admin/tournaments/${state.draftId}`);
+        },
+        onError: (error) => {
+          showToast(extractErrorMessage(error, '접수 시작에 실패했어요.'), 'error');
+        },
+      },
+    );
   };
 
   return (
@@ -184,15 +273,15 @@ export default function AdminTournamentsNewPage() {
       <AdminPageHeader
         eyebrow="대회 관리"
         title="새 대회 만들기"
-        description="필요한 내용을 네 단계로 나눠 입력하고, 마지막에 공개 화면을 확인하세요."
+        description="기본 정보부터 참가 조건까지 입력하면 대회가 초안으로 만들어져요. 마지막 확인 화면에서 참가자에게 보일 모습을 확인한 뒤 접수를 시작하세요."
       />
 
-      <form onSubmit={handleSubmit} noValidate className="pb-28">
-        <WizardStepper currentStep={state.step} onSelect={goToStep} />
+      <form onSubmit={handleCreateOrUpdateDraft} noValidate className="pb-28">
+        <WizardStepper currentStep={state.step} hasDraft={state.draftId !== null} onSelect={goToStep} />
 
-        <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-white">
+        <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
           <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
-            <p className="text-xs font-bold text-blue-600">
+            <p className="text-xs font-bold text-[var(--blue700)]">
               STEP {state.step + 1} / {TOURNAMENT_CREATE_STEPS.length}
             </p>
             <h2 className="mt-1 text-xl font-bold text-[var(--text-strong)]">
@@ -254,11 +343,14 @@ export default function AdminTournamentsNewPage() {
                 }}
               />
             ) : null}
+            {state.step === CONFIRM_STEP_INDEX ? (
+              <ConfirmStep state={state} sport={selectedSport} />
+            ) : null}
           </div>
         </div>
 
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur lg:pl-[var(--admin-sidebar-width,0px)]">
-          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
             {state.step === 0 ? (
               <Link
                 href="/admin/tournaments"
@@ -278,8 +370,9 @@ export default function AdminTournamentsNewPage() {
               </button>
             )}
 
-            {state.step < TOURNAMENT_CREATE_STEPS.length - 1 ? (
+            {state.step < LAST_INPUT_STEP_INDEX ? (
               <button
+                key="wizard-cta-next"
                 type="button"
                 onClick={goNext}
                 disabled={pending}
@@ -288,71 +381,140 @@ export default function AdminTournamentsNewPage() {
                 다음
                 <ArrowRight size={16} aria-hidden="true" />
               </button>
-            ) : (
+            ) : state.step === LAST_INPUT_STEP_INDEX ? (
+              // 여기서 실제로 대회가 생성/수정된다 — "다음"이 아니라 지금 일어날 일을 그대로
+              // 말한다(요구사항 #3). 이미 초안이 있으면(이전으로 돌아와 고친 경우) 저장 문구로
+              // 바뀐다 — 라벨만 봐도 생성인지 수정인지 알 수 있게.
+              //
+              // key가 반드시 위 "다음" 버튼과 달라야 한다 — 같으면 React가 같은 <button> DOM
+              // 노드를 재사용해 type 속성만 "button"→"submit"으로 그 자리에서 바꿔치기한다.
+              // 그러면 "다음"을 누른 그 클릭이, type이 바뀐 그 프레임에 브라우저의 기본
+              // submit 처리까지 얹혀서 같은 클릭 한 번으로 즉시 폼이 제출돼 버린다 — 사용자가
+              // "다음"을 눌렀을 뿐인데 대회가 생성되는, 이번 작업의 발단이 된 그 버그의 실제
+              // 원인이었다(3단계에서 "다음"을 누르면 대회가 생성된다던 신고와 정확히 일치).
               <button
+                key="wizard-cta-submit"
                 type="submit"
                 disabled={pending || uploadImages.isPending || promoUploadingSlot !== null}
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-blue-500 px-6 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
               >
                 <Check size={16} aria-hidden="true" />
-                {pending ? '만드는 중…' : '대회 만들기'}
+                {pending
+                  ? '저장하는 중…'
+                  : state.draftId
+                    ? '저장하고 계속하기'
+                    : '대회 만들기'}
               </button>
+            ) : (
+              <div key="wizard-cta-confirm" className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleLater}
+                  disabled={changeStatus.isPending}
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50"
+                >
+                  나중에 하기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleStartRegistration()}
+                  disabled={changeStatus.isPending}
+                  className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-blue-500 px-6 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+                >
+                  <Check size={16} aria-hidden="true" />
+                  {changeStatus.isPending ? '시작하는 중…' : '접수 시작하기'}
+                </button>
+              </div>
             )}
           </div>
         </div>
       </form>
 
+      {startRegistrationConfirmModal}
       <AdminToasts toasts={toasts} />
     </>
   );
 }
 
+/**
+ * done/current/locked 3상태 + 진행률 표시 — components/admin/operation-flag-gate-stepper.tsx의
+ * 패턴을 그대로 따른다. "locked"는 오직 확인 단계(CONFIRM_STEP_INDEX)에만 적용된다: 초안이
+ * 아직 없으면 버튼 자체를 disabled로 막아 "대회 없이 확인 화면으로 건너뛰기"를 원천 차단한다
+ * (goToStep의 방어 로직과 이중화). 나머지 단계는 기존처럼 검증만 통과하면 앞으로 건너뛸 수 있다.
+ */
 function WizardStepper({
   currentStep,
+  hasDraft,
   onSelect,
 }: {
   currentStep: number;
+  hasDraft: boolean;
   onSelect: (step: number) => void;
 }) {
+  const doneCount = TOURNAMENT_CREATE_STEPS.filter((_, index) => index < currentStep).length;
+
   return (
-    <nav aria-label="대회 생성 단계" className="mx-auto max-w-4xl">
-      <ol className="grid grid-cols-4 gap-1 rounded-2xl border border-[var(--border)] bg-white p-2 sm:gap-2">
-        {TOURNAMENT_CREATE_STEPS.map((step, index) => {
-          const active = index === currentStep;
-          const complete = index < currentStep;
-          return (
-            <li key={step.title}>
-              <button
-                type="button"
-                onClick={() => onSelect(index)}
-                aria-current={active ? 'step' : undefined}
-                className={[
-                  'flex min-h-[64px] w-full items-center gap-2 rounded-xl px-2 text-left transition-colors sm:px-3',
-                  active ? 'bg-blue-50 text-blue-700' : 'text-[var(--text-caption)] hover:bg-[var(--grey50)]',
-                ].join(' ')}
-              >
-                <span
+    <div className="mx-auto max-w-4xl">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold text-[var(--text-body)]">
+          {TOURNAMENT_CREATE_STEPS.length}단계 중 {doneCount}단계 완료
+        </p>
+      </div>
+      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--grey100)]">
+        <div
+          className="h-full rounded-full bg-blue-500 transition-[width] duration-150"
+          style={{ width: `${(doneCount / TOURNAMENT_CREATE_STEPS.length) * 100}%` }}
+        />
+      </div>
+      <nav aria-label="대회 생성 단계">
+        <ol className="grid grid-cols-5 gap-1 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-2 sm:gap-2">
+          {TOURNAMENT_CREATE_STEPS.map((step, index) => {
+            const active = index === currentStep;
+            const done = index < currentStep;
+            const locked = index === CONFIRM_STEP_INDEX && !hasDraft && !active;
+            const statusLabel = done ? '완료' : active ? '진행 중' : locked ? '잠김' : '';
+            return (
+              <li key={step.title}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(index)}
+                  disabled={locked}
+                  aria-current={active ? 'step' : undefined}
+                  aria-label={`${index + 1}단계 ${step.title}${statusLabel ? ` — ${statusLabel}` : ''}`}
+                  title={step.description}
                   className={[
-                    'grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold',
-                    active
-                      ? 'bg-blue-500 text-white'
-                      : complete
-                        ? 'bg-blue-100 text-blue-600'
-                        : 'bg-[var(--grey100)] text-[var(--text-caption)]',
+                    'flex min-h-[64px] w-full items-center gap-2 rounded-xl px-2 text-left transition-colors sm:px-3',
+                    'disabled:cursor-not-allowed disabled:opacity-60',
+                    active ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'text-[var(--text-caption)] hover:bg-[var(--grey50)] disabled:hover:bg-transparent',
                   ].join(' ')}
                 >
-                  {complete ? <Check size={14} aria-hidden="true" /> : index + 1}
-                </span>
-                <span className="hidden min-w-0 sm:block">
-                  <span className="block truncate text-xs font-bold">{step.title}</span>
-                  <span className="mt-0.5 block truncate text-[11px]">{step.description}</span>
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
+                  <span
+                    aria-hidden="true"
+                    className={[
+                      'grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold',
+                      // locked는 색상으로는 upcoming(아직 안 온 단계)과 구분하지 않는다 —
+                      // 자물쇠 아이콘 자체가 신호이고, 바깥 버튼의 disabled 스타일이 이미
+                      // "지금 누를 수 없음"을 전달한다.
+                      active
+                        ? 'bg-blue-500 text-white'
+                        : done
+                          ? 'bg-blue-100 text-[var(--blue700)]'
+                          : 'bg-[var(--grey150)] text-[var(--text-caption)]',
+                    ].join(' ')}
+                  >
+                    {done ? <Check size={14} /> : locked ? <Lock size={12} /> : index + 1}
+                  </span>
+                  <span className="hidden min-w-0 sm:block" aria-hidden="true">
+                    <span className="block truncate text-xs font-bold">{step.title}</span>
+                    <span className="mt-0.5 block truncate text-[var(--font-size-caption)]">{step.description}</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+    </div>
   );
 }
 
@@ -431,7 +593,7 @@ function BasicStep({
               className={[
                 'cursor-pointer rounded-xl border p-3 transition-colors',
                 state.format === value
-                  ? 'border-blue-500 bg-blue-50'
+                  ? 'border-blue-500 bg-[var(--blue50)]'
                   : 'border-[var(--border)] hover:border-[var(--border-strong)]',
               ].join(' ')}
             >
@@ -441,6 +603,10 @@ function BasicStep({
                 value={value}
                 checked={state.format === value}
                 onChange={() => setField('format', value as V1TournamentFormat)}
+                // 접근성 이름을 라디오 자체에 명시적으로 고정한다 — enum 원시값(value=
+                // "group_knockout" 등)이 아니라 화면에 보이는 한국어 라벨이 스크린 리더에
+                // 그대로 읽혀야 한다.
+                aria-label={label}
                 className="sr-only"
               />
               <span className="block text-sm font-bold text-[var(--text-strong)]">{label}</span>
@@ -466,7 +632,7 @@ function BasicStep({
               className={[
                 'grid min-h-[52px] cursor-pointer place-items-center rounded-xl border text-sm font-bold transition-colors',
                 state.genderCategory === value
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  ? 'border-blue-500 bg-[var(--blue50)] text-[var(--blue700)]'
                   : 'border-[var(--border)] text-[var(--text-body)]',
               ].join(' ')}
             >
@@ -597,6 +763,44 @@ function ParticipationStep({
   dispatch: React.Dispatch<TournamentCreateAction>;
   showToast: (message: string, variant?: 'success' | 'error') => void;
 }) {
+  const {
+    data: lineupSizeOptions,
+    isPending: lineupSizeOptionsPending,
+    isError: lineupSizeOptionsFailed,
+  } = useV1LineupSizeOptions(state.sportId || null);
+
+  // 종목의 선택지가 로드되면, 관리자가 아직 아무것도 고르지 않았을 때만 canonical
+  // 기본값을 자동으로 채워 넣는다 — 값을 이미 골랐거나 다시 비운(종목 변경) 상태를
+  // 덮어쓰지 않는다. dispatch는 useReducer가 주는 안정적인 참조라 매 렌더 재실행을
+  // 걱정할 필요가 없다(setField는 매 렌더 새로 만들어져 effect 의존성으로 쓰기 부적절).
+  useEffect(() => {
+    if (state.lineupMaxPlayers !== '') return;
+    if (!lineupSizeOptions?.supported || lineupSizeOptions.defaultMaxPlayers === null) return;
+    dispatch({
+      type: 'set-field',
+      field: 'lineupMaxPlayers',
+      value: String(lineupSizeOptions.defaultMaxPlayers),
+    });
+  }, [state.lineupMaxPlayers, lineupSizeOptions, dispatch]);
+
+  // 교체 방식/횟수도 같은 원칙으로 canonical 기본값을 자동 채운다.
+  useEffect(() => {
+    if (state.substitutionMode !== '') return;
+    if (!lineupSizeOptions?.supported || lineupSizeOptions.defaultSubstitutionMode === null) return;
+    dispatch({
+      type: 'set-field',
+      field: 'substitutionMode',
+      value: lineupSizeOptions.defaultSubstitutionMode,
+    });
+    if (lineupSizeOptions.defaultSubstitutionMode === 'limited' && lineupSizeOptions.defaultMaxSubstitutions !== null) {
+      dispatch({
+        type: 'set-field',
+        field: 'maxSubstitutions',
+        value: String(lineupSizeOptions.defaultMaxSubstitutions),
+      });
+    }
+  }, [state.substitutionMode, lineupSizeOptions, dispatch]);
+
   return (
     <div className="grid gap-6">
       <div className="grid gap-4 sm:grid-cols-3">
@@ -613,7 +817,7 @@ function ParticipationStep({
         />
         <NumberField
           id="min-players"
-          label="최소 선수 수"
+          label="최소 선수 수 (등록 명단)"
           value={state.minPlayers}
           onChange={(value) => setField('minPlayers', value)}
           min={1}
@@ -624,7 +828,7 @@ function ParticipationStep({
         />
         <NumberField
           id="max-players"
-          label="최대 선수 수"
+          label="최대 선수 수 (등록 명단)"
           value={state.maxPlayers}
           onChange={(value) => setField('maxPlayers', value)}
           min={1}
@@ -634,6 +838,105 @@ function ParticipationStep({
           required
         />
       </div>
+
+      <Field
+        id="lineup-max-players"
+        label="출전 인원"
+        hint="경기장에 실제로 서는 라인업 인원(골키퍼 포함)이에요. 위 선수 수(등록 명단)와는 달라요 — 등록 명단 중 이 인원만 한 경기에 출전할 수 있어요."
+      >
+        {lineupSizeOptionsPending ? (
+          <p className="text-xs text-[var(--text-caption)]">선택지를 불러오는 중이에요…</p>
+        ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
+          // 조회 실패를 "미지원 종목"으로 뭉뚱그리면 실제 오류가 숨겨진다(Copilot 리뷰
+          // 지적). 이 경우 서버 canonical 기본값이 그대로 적용되긴 하지만, 관리자가
+          // 선택하지 못한 이유가 "종목이 원래 안 되는 것"인지 "지금 못 불러온 것"인지
+          // 구분되어야 한다.
+          <p className="text-xs text-[var(--red700)]">
+            출전 인원 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요. 그대로 저장하면 종목 기본값이 적용돼요.
+          </p>
+        ) : !lineupSizeOptions.supported ? (
+          <p className="text-xs text-[var(--text-caption)]">
+            이 종목은 아직 출전 인원을 선택할 수 없어요. 기본 규칙을 그대로 적용해요.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2" role="group" aria-label="출전 인원 선택">
+            {lineupSizeOptions.options.map((option) => {
+              const selected = state.lineupMaxPlayers === String(option);
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => setField('lineupMaxPlayers', String(option))}
+                  aria-pressed={selected}
+                  className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
+                    selected
+                      ? 'border-blue-500 bg-blue-500 text-white'
+                      : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:border-blue-500'
+                  }`}
+                >
+                  {option}명
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Field>
+
+      <Field
+        id="substitution-mode"
+        label="교체 방식"
+        hint="경기 중 후보 선수를 주전과 몇 번까지 바꿀 수 있는지예요. 무제한(롤링)은 이미 나갔던 선수도 다시 투입할 수 있어요."
+        error={errors.maxSubstitutions}
+      >
+        {lineupSizeOptionsPending ? (
+          <p className="text-xs text-[var(--text-caption)]">선택지를 불러오는 중이에요…</p>
+        ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
+          <p className="text-xs text-[var(--red700)]">
+            교체 방식 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요. 그대로 저장하면 종목 기본값이 적용돼요.
+          </p>
+        ) : !lineupSizeOptions.supported ? (
+          <p className="text-xs text-[var(--text-caption)]">
+            이 종목은 아직 교체 방식을 선택할 수 없어요. 기본 규칙을 그대로 적용해요.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="교체 방식 선택">
+              {lineupSizeOptions.substitutionModes.map((mode) => {
+                const selected = state.substitutionMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => setField('substitutionMode', mode)}
+                    aria-pressed={selected}
+                    className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
+                      selected
+                        ? 'border-blue-500 bg-blue-500 text-white'
+                        : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:border-blue-500'
+                    }`}
+                  >
+                    {mode === 'limited' ? '제한' : '무제한(롤링)'}
+                  </button>
+                );
+              })}
+            </div>
+            {state.substitutionMode === 'limited' ? (
+              <NumberField
+                id="max-substitutions"
+                label="허용 교체 횟수"
+                value={state.maxSubstitutions}
+                onChange={(value) => setField('maxSubstitutions', value)}
+                min={0}
+                max={50}
+                disabled={pending}
+                error={errors.maxSubstitutions}
+              />
+            ) : null}
+          </div>
+        )}
+      </Field>
 
       {state.genderCategory === 'mixed' ? (
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
@@ -684,7 +987,7 @@ function ParticipationStep({
             />
           </div>
           {errors.genderQuota ? (
-            <p role="alert" className="mt-3 text-xs font-semibold text-[var(--red500)]">
+            <p role="alert" className="mt-3 text-xs font-semibold text-[var(--red700)]">
               {errors.genderQuota}
             </p>
           ) : null}
@@ -717,7 +1020,7 @@ function ParticipationStep({
               });
               showToast('직전 대회의 계좌 정보를 불러왔어요.', 'success');
             }}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-45"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-45"
           >
             <Copy size={15} aria-hidden="true" />
             직전 대회 불러오기
@@ -866,6 +1169,7 @@ function PresentationStep({
           <h3 className="text-sm font-bold text-[var(--text-strong)]">홍보 카드</h3>
           <p className="mt-1 text-xs text-[var(--text-caption)]">
             생성과 동시에 홈·대회 목록 홍보를 준비할 수 있어요. 노출은 각 카드에서 켜세요.
+            홍보 이미지를 비워두면 위에서 올린 대표 이미지를 함께 사용해요.
           </p>
         </div>
         <PromoCardFields
@@ -879,6 +1183,16 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoHome'}
           disabled={pending}
           priorityError={errors.promoHomePriority}
+          // 이 자리를 비웠을 때 실제로 노출될 이미지 — 자기 자리를 뺀 폴백 결과를 그대로 넘겨
+          // 미리보기가 공개 화면과 어긋나지 않게 한다.
+          defaultImageUrl={resolveTournamentImage(
+            {
+              coverImageUrl: state.coverImageUrl,
+              promoHomeImageUrl: null,
+              promoListImageUrl: state.promoList.imageUrl,
+            },
+            'home',
+          )}
         />
         <PromoCardFields
           variant="list"
@@ -891,8 +1205,46 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoList'}
           disabled={pending}
           priorityError={errors.promoListPriority}
+          defaultImageUrl={resolveTournamentImage(
+            {
+              coverImageUrl: state.coverImageUrl,
+              promoHomeImageUrl: state.promoHome.imageUrl,
+              promoListImageUrl: null,
+            },
+            'list',
+          )}
         />
       </section>
+    </div>
+  );
+}
+
+/**
+ * "공개 확인" 단계 — 이미 초안으로 만들어진 대회를 실제 <TournamentCard/>(대회 목록에서
+ * 참가자가 보는 그 컴포넌트)로 미리 보여준다. 가짜 목업 마크업을 새로 그리지 않고 실제
+ * 컴포넌트를 재사용하는 게 요구사항의 핵심이라, 카드 자체는 목록 페이지와 완전히 동일하다.
+ */
+function ConfirmStep({
+  state,
+  sport,
+}: {
+  state: TournamentCreateState;
+  sport: { code?: string; name: string } | undefined;
+}) {
+  const previewItem = buildTournamentPreviewItem(state, sport);
+  return (
+    <div className="grid gap-5">
+      <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--grey50)] p-4 sm:p-5">
+        <p className="mb-3 text-xs font-bold text-[var(--text-caption)]">참가자에게 이렇게 보여요</p>
+        <div className="mx-auto max-w-sm">
+          <TournamentCard item={previewItem} interactive={false} />
+        </div>
+      </div>
+      <div className="rounded-xl bg-[var(--blue50)] p-4 text-sm leading-6 text-[var(--blue700)]">
+        지금은 초안이라 참가자에게 보이지 않아요. <strong>접수 시작하기</strong>를 누르면 이
+        화면 그대로 대회 목록·상세에 공개되고 바로 신청을 받을 수 있어요. 아직 준비가 덜
+        됐다면 <strong>나중에 하기</strong>로 초안을 남겨 두고 나갈 수 있어요.
+      </div>
     </div>
   );
 }
@@ -957,14 +1309,14 @@ function Field({
         {label}
         {required ? (
           <>
-            <span aria-hidden="true" className="ml-0.5 text-[var(--red500)]">*</span>
+            <span aria-hidden="true" className="ml-0.5 text-[var(--red700)]">*</span>
             <span className="sr-only"> (필수)</span>
           </>
         ) : null}
       </label>
       {children}
       {error ? (
-        <p role="alert" className="text-xs font-medium text-[var(--red500)]">
+        <p role="alert" className="text-xs font-medium text-[var(--red700)]">
           {error}
         </p>
       ) : hint ? (

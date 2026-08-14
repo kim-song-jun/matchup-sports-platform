@@ -9,9 +9,10 @@
  * 드래그 스크롤: 마우스/터치 모두 지원
  */
 
-import { useRef, useState, useCallback } from 'react';
+import { Fragment, useRef, useState, useCallback, useEffect } from 'react';
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /* ── 라운드 그룹핑 (기존 pure logic 유지) ── */
@@ -100,14 +101,33 @@ function getWinner(fixture: V1TournamentFixture): WinnerSide {
   return null;
 }
 
+/**
+ * 참가팀 공개 정책 통일(fix/v1-publish) — homeTeamName/awayTeamName은 세 상태를
+ * 가진다: 아직 배정 안 됨('TBD', tournament-detail.presenter.ts의 관용 표기),
+ * 배정은 됐지만 모집 중이라 가려짐(null), 실명(그 외 문자열). "미정"과 "비공개"를
+ * 반드시 구분해서 보여준다 — 관전자가 "아직 대진이 안 정해졌다"와 "정해졌는데
+ * 안 알려준다"를 구분해야 어느 게 왜 없는지 헷갈리지 않는다.
+ */
+function teamDisplayName(name: string | null): { label: string; isPlaceholder: boolean } {
+  if (name === null) return { label: '비공개', isPlaceholder: true };
+  if (name === 'TBD') return { label: '미정', isPlaceholder: true };
+  return { label: name, isPlaceholder: false };
+}
+
 function getChampion(rounds: RoundGroup[]): string | null {
   const finalRound = rounds.find((r) => r.key === 'final');
   const finalFixture = finalRound?.fixtures[0];
   if (!finalFixture || finalFixture.status !== 'completed') return null;
   const w = getWinner(finalFixture);
-  if (w === 'home') return finalFixture.homeTeamName || null;
-  if (w === 'away') return finalFixture.awayTeamName || null;
-  return null;
+  const name = w === 'home' ? finalFixture.homeTeamName : w === 'away' ? finalFixture.awayTeamName : null;
+  // 우승팀 이름이 비공개(null)면 "우승"이라는 사실 자체는 최종 결과이므로 숨기지
+  // 않되, 팀명을 지어내지 않는다 — ChampionSlot이 champion===null이면 "미정"으로
+  // 보이므로, null을 그대로 넘기면 우승 사실 자체가 없던 일처럼 보인다. 모집
+  // 중(open) 상태에서 대회가 이미 완료(final fixture completed)되는 것은 실무상
+  // 있을 수 없는 조합이지만(모집도 안 끝났는데 결승이 끝남), 방어적으로 대회
+  // 이름 자체가 아니라 "비공개"임을 알 수 있게 별도 라벨을 쓴다.
+  if (name === null) return '비공개 우승팀';
+  return name || null;
 }
 
 function penaltyText(fixture: V1TournamentFixture): string {
@@ -122,10 +142,10 @@ function penaltyText(fixture: V1TournamentFixture): string {
 
 interface AggregateMatchup {
   id: string;
-  homeTeamName: string;
+  homeTeamName: string | null;
   homeTeamId: string | null;
   homeTeamLogoUrl: string | null;
-  awayTeamName: string;
+  awayTeamName: string | null;
   awayTeamId: string | null;
   awayTeamLogoUrl: string | null;
   homeAggScore: number;
@@ -177,16 +197,22 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
         };
       }
 
-      // 2-legged: 1차전 홈팀 기준으로 합산
+      // 2-legged: 1차전 홈팀 기준으로 합산.
+      // "어느 레그가 뒤집혔는지"는 registrationId로 판정한다(homeTeamName이 아니다) —
+      // 참가팀 공개 정책 통일(fix/v1-publish) 이후 모집 중엔 팀명이 전부 null이라,
+      // 이름으로 비교하면 서로 다른(둘 다 비공개인) 팀의 레그가 `null === null`로
+      // 잘못 같다고 판정된다. registrationId는 비공개 상태에도 항상 채워지는 안정
+      // 식별자라 이 문제가 없다.
       const leg1Home = leg1.homeTeamName;
       const leg1Away = leg1.awayTeamName;
+      const leg1AwayRegistrationId = leg1.awayRegistrationId;
 
       let homeAgg = leg1.result?.homeScore ?? 0;
       let awayAgg = leg1.result?.awayScore ?? 0;
 
       for (let i = 1; i < legs.length; i++) {
         const leg = legs[i];
-        const isReversed = leg.homeTeamName === leg1Away;
+        const isReversed = leg.homeRegistrationId === leg1AwayRegistrationId;
         if (isReversed) {
           homeAgg += leg.result?.awayScore ?? 0;
           awayAgg += leg.result?.homeScore ?? 0;
@@ -203,7 +229,7 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
       else {
         const pkLeg = legs.find((l) => l.result?.hasPenalty);
         if (pkLeg?.result?.hasPenalty) {
-          const isRevLeg = pkLeg.homeTeamName === leg1Away;
+          const isRevLeg = pkLeg.homeRegistrationId === leg1AwayRegistrationId;
           const homePK = isRevLeg ? pkLeg.result.awayPenaltyScore : pkLeg.result.homePenaltyScore;
           const awayPK = isRevLeg ? pkLeg.result.homePenaltyScore : pkLeg.result.awayPenaltyScore;
           if (homePK !== null && awayPK !== null) {
@@ -216,7 +242,7 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
       const pkLeg = legs.find((l) => l.result?.hasPenalty);
       let pkInfo: string | null = null;
       if (pkLeg?.result?.hasPenalty && pkLeg.result.homePenaltyScore !== null && pkLeg.result.awayPenaltyScore !== null) {
-        const isRevLeg = pkLeg.homeTeamName === leg1Away;
+        const isRevLeg = pkLeg.homeRegistrationId === leg1AwayRegistrationId;
         const hPK = isRevLeg ? pkLeg.result.awayPenaltyScore : pkLeg.result.homePenaltyScore;
         const aPK = isRevLeg ? pkLeg.result.homePenaltyScore : pkLeg.result.awayPenaltyScore;
         pkInfo = `PK ${hPK}:${aPK}`;
@@ -256,20 +282,22 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
   const isLive = status === 'in_progress';
   const isDone = status === 'completed';
   const isMulti = legs.length > 1;
+  const home = teamDisplayName(homeTeamName);
+  const away = teamDisplayName(awayTeamName);
 
   return (
     <div
       className={`tm-bk2-card${isLive ? ' tm-bk2-card-live' : ''}`}
       role="group"
-      aria-label={`${homeTeamName} 대 ${awayTeamName}${isMulti ? ' 합산' : ''}`}
+      aria-label={`${home.label} 대 ${away.label}${isMulti ? ' 합산' : ''}`}
     >
       <div
         className="tm-bk2-row"
         data-winner={winner === 'home' ? 'true' : undefined}
         data-loser={isDone && winner === 'away' ? 'true' : undefined}
       >
-        <TeamAvatar seed={homeTeamId ?? homeTeamName} name={homeTeamName} logoUrl={homeTeamLogoUrl} size="sm" />
-        <span className="tm-bk2-name">{homeTeamName}</span>
+        <TeamAvatar seed={homeTeamId ?? home.label} name={home.label} logoUrl={homeTeamLogoUrl} size="sm" />
+        <span className="tm-bk2-name" style={home.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{home.label}</span>
         <span className="tm-bk2-score tab-num">{homeAggScore}</span>
       </div>
       <div className="tm-bk2-divider" aria-hidden="true" />
@@ -278,8 +306,8 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-winner={winner === 'away' ? 'true' : undefined}
         data-loser={isDone && winner === 'home' ? 'true' : undefined}
       >
-        <TeamAvatar seed={awayTeamId ?? awayTeamName} name={awayTeamName} logoUrl={awayTeamLogoUrl} size="sm" />
-        <span className="tm-bk2-name">{awayTeamName}</span>
+        <TeamAvatar seed={awayTeamId ?? away.label} name={away.label} logoUrl={awayTeamLogoUrl} size="sm" />
+        <span className="tm-bk2-name" style={away.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{away.label}</span>
         <span className="tm-bk2-score tab-num">{awayAggScore}</span>
       </div>
       {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}
@@ -329,17 +357,18 @@ function slotCY(i: number) {
 function MatchTeamRow({
   teamId, name, logoUrl, score, isWinner, isLoser,
 }: {
-  teamId: string | null; name: string; logoUrl: string | null; score: number | null; isWinner: boolean; isLoser: boolean;
+  teamId: string | null; name: string | null; logoUrl: string | null; score: number | null; isWinner: boolean; isLoser: boolean;
 }) {
-  const decided = (name?.trim().length ?? 0) > 0;
+  const { label, isPlaceholder } = teamDisplayName(name);
+  const decided = !isPlaceholder;
   return (
     <div
       className="tm-bk2-row"
       data-winner={isWinner ? 'true' : undefined}
       data-loser={isLoser ? 'true' : undefined}
     >
-      <TeamAvatar seed={teamId ?? name} name={decided ? name : '미정'} logoUrl={logoUrl} size="sm" />
-      <span className="tm-bk2-name">{decided ? name : '미정'}</span>
+      <TeamAvatar seed={teamId ?? label} name={label} logoUrl={logoUrl} size="sm" />
+      <span className="tm-bk2-name" style={!decided ? { color: 'var(--text-caption)' } : undefined}>{label}</span>
       {score !== null && <span className="tm-bk2-score tab-num">{score}</span>}
       {score === null && decided && <span className="tm-bk2-score" style={{ opacity: 0.25 }}>-</span>}
     </div>
@@ -353,12 +382,24 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
   const pk = penaltyText(fixture);
   const isLive = fixture.status === 'in_progress';
   const isDone = fixture.status === 'completed';
+  const timeLabel = formatTournamentDateTimeShort(fixture.scheduledAt);
+
+  // 배지가 1개뿐이면(가장 흔한 케이스 — 시각만 있는 "예정" 카드, 혹은 예전부터 있던
+  // LIVE-only·PK-only 단독 케이스) D-12 이전과 동일하게 카드 폭을 꽉 채우는 block 배지를
+  // 그대로 유지한다. 2개 이상 동시에 있을 때만(D-12 가 새로 허용한 조합) flex pill row로
+  // 감싼다 — 리뷰에서 단일 배지 케이스의 폭 축소가 의도치 않은 회귀로 지적되어 조건부 처리.
+  const badges: { key: string; className: string; label: string }[] = [];
+  if (timeLabel) badges.push({ key: 'time', className: 'tm-bk2-badge tm-bk2-badge-time', label: timeLabel });
+  if (isLive) badges.push({ key: 'live', className: 'tm-bk2-badge tm-bk2-badge-live', label: '● LIVE' });
+  if (isDone && pk) badges.push({ key: 'pk', className: 'tm-bk2-badge', label: pk });
+  const homeLabel = teamDisplayName(fixture.homeTeamName).label;
+  const awayLabel = teamDisplayName(fixture.awayTeamName).label;
 
   return (
     <div
       className={`tm-bk2-card${isLive ? ' tm-bk2-card-live' : ''}`}
       role="group"
-      aria-label={`${fixture.homeTeamName || '미정'} 대 ${fixture.awayTeamName || '미정'}`}
+      aria-label={`${homeLabel} 대 ${awayLabel}`}
     >
       <MatchTeamRow
         teamId={fixture.homeTeamId} logoUrl={fixture.homeTeamLogoUrl}
@@ -371,13 +412,12 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
         name={fixture.awayTeamName} score={hasResult ? fixture.result!.awayScore : null}
         isWinner={winner === 'away'} isLoser={isDone && winner === 'home'}
       />
-      {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}
-      {isDone && pk && <div className="tm-bk2-badge">{pk}</div>}
-      {!isDone && !isLive && fixture.scheduledAt && (
-        <div className="tm-bk2-badge tm-bk2-badge-time">
-          {new Date(fixture.scheduledAt).toLocaleDateString('ko-KR', {
-            month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-          })}
+      {badges.length === 1 && <div className={badges[0].className}>{badges[0].label}</div>}
+      {badges.length > 1 && (
+        <div className="tm-bk2-badge-row">
+          {badges.map((b) => (
+            <div key={b.key} className={b.className}>{b.label}</div>
+          ))}
         </div>
       )}
     </div>
@@ -404,6 +444,19 @@ function ChampionSlot({ champion }: { champion: string | null }) {
   );
 }
 
+/**
+ * 커넥터의 스파인→출구선이 만나는 접합점 y좌표.
+ * BracketSvgConnector(고정폭 CONN_W 내부 드로잉)와 ConnectorSegment(늘어나는
+ * 연장선)가 동일한 y를 써야 접합점에서 선이 어긋나지 않는다 — 단일 소스로 공유.
+ */
+function connectorJunctionY(topCount: number, totalH: number, nextN: number): number {
+  if (topCount === 1) return totalH / 2;
+  const exitY = nextN === 1 ? totalH / 2 : undefined; // 단일 출구: 열 중앙
+  const spineTop = slotCY(0);
+  const spineBot = slotCY(topCount - 1);
+  return exitY ?? (spineTop + spineBot) / 2;
+}
+
 /* ── SVG 커넥터 ──
  * topCount: 상위 라운드 경기 수 (보통 2)
  * totalH:   상위 라운드 열 높이
@@ -415,7 +468,6 @@ function BracketSvgConnector({
   topCount: number; totalH: number; nextN?: number;
 }) {
   const midX = CONN_W / 2;
-  const exitY = nextN === 1 ? totalH / 2 : undefined; // 단일 출구: 열 중앙
 
   if (topCount === 1) {
     /* 단순 수평선: 결승 → 챔피언 — totalH 전체를 쓰고 중앙에 선을 그린다 */
@@ -429,9 +481,9 @@ function BracketSvgConnector({
 
   /* 2개 이상: 중앙 스파인 + 각 입력선 + 출구선 */
   const paths: React.ReactNode[] = [];
+  const junctionY = connectorJunctionY(topCount, totalH, nextN);
   const spineTop = slotCY(0);
   const spineBot = slotCY(topCount - 1);
-  const junctionY = exitY ?? (spineTop + spineBot) / 2;
 
   /* 세로 스파인 (왼쪽 절반에 위치) */
   paths.push(
@@ -465,6 +517,37 @@ function BracketSvgConnector({
       style={{ flexShrink: 0, overflow: 'visible' }}>
       {paths}
     </svg>
+  );
+}
+
+/**
+ * ── 커넥터 세그먼트 (고정폭 SVG + 늘어나는 연장선) ──
+ * 트리가 컬럼 폭보다 좁을 때 남는 폭을 연결선 구간으로 흡수해 트리 왼쪽 끝이
+ * 섹션 제목과 정렬되게 한다(fix/v1-bracket-fill-width). SVG 자체는 원래 고정
+ * 픽셀 지오메트리(CONN_W)를 그대로 유지해 스파인·점 등이 비율 왜곡 없이 그려지고,
+ * 그 오른쪽에 flex-grow 되는 빈 div를 붙여 접합점(junctionY)과 같은 높이에
+ * 수평선을 하나 더 그린다 — 이 연장선만 늘어나므로 커넥터 구조 자체는 항상
+ * 또렷하게 유지된다. 남는 폭이 없으면(트리가 컬럼보다 넓음) 연장선 폭은 0으로
+ * 수렴하고 기존과 동일하게 가로 스크롤된다(모바일 등 좁은 뷰포트 포함).
+ */
+function ConnectorSegment({
+  topCount, totalH, nextN = 1,
+}: {
+  topCount: number; totalH: number; nextN?: number;
+}) {
+  const junctionY = connectorJunctionY(topCount, totalH, nextN);
+  return (
+    <div style={{ display: 'flex', flex: '1 0 auto', minWidth: CONN_W, paddingTop: HEAD_H }}>
+      <div style={{ flexShrink: 0 }}>
+        <BracketSvgConnector topCount={topCount} totalH={totalH} nextN={nextN} />
+      </div>
+      <div style={{ flexGrow: 1, minWidth: 0, position: 'relative' }} aria-hidden="true">
+        <div style={{
+          position: 'absolute', top: junctionY - 1, left: 0, right: 0, height: 2,
+          background: 'var(--grey300)',
+        }} />
+      </div>
+    </div>
   );
 }
 
@@ -542,8 +625,10 @@ function BracketEmpty() {
       background: 'var(--grey50)', borderRadius: 14,
     }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true"><Trophy size={30} style={{ color: 'var(--grey400)' }} strokeWidth={1.6} /></div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>대진표 준비 중</div>
-      <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>조별 리그가 끝나면 결선 대진표가 공개돼요.</div>
+      {/* [R-T1 타입 위계 정리] 13px → 12px(보조 정보 tier) — weight 700은 유지.
+          [대진표 12px 인라인 정리] 인라인 스타일 → tm-text-caption-strong/tm-text-caption 토큰. */}
+      <div className="tm-text-caption-strong" style={{ marginBottom: 2 }}>대진표 준비 중</div>
+      <div className="tm-text-caption">조별 리그가 끝나면 결선 대진표가 공개돼요.</div>
     </div>
   );
 }
@@ -598,9 +683,40 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
     setDragging(false);
   }, []);
 
+  /* 2026-08-13 (fix/v1-bracket-fill-width): 4강만 있는 등 라운드 수가 적은 대진은
+     트리 실폭이 넓은 데스크톱 컬럼(.tm-bracket-page-grid의 1.28fr)보다 좁을 수
+     있다. 예전엔 가운데 정렬로 빈 공간을 옮기기만 했는데, 그러면 왼쪽 정렬된
+     섹션 제목과 트리 시작점이 어긋나 오히려 더 어색했다. 지금은 라운드 사이
+     연결선 구간(ConnectorSegment의 flex-grow 연장선)이 남는 폭을 흡수해 트리가
+     컬럼을 꽉 채우도록 CSS만으로 처리한다 — 트리 폭 계산에 JS 측정이 필요 없다.
+     fitsWithoutScroll은 오직 스크롤 힌트/페이드 표시 여부에만 남아있다(실제로
+     스크롤할 게 없는데 "옆으로 밀어보세요" 안내를 보여주는 게 거짓 안내이므로). */
+  const [fitsWithoutScroll, setFitsWithoutScroll] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    const content = contentRef.current;
+    if (!el) return;
+    const check = () => setFitsWithoutScroll(el.scrollWidth <= el.clientWidth + 1);
+    check();
+    // jsdom(vitest) 등 ResizeObserver 미구현 환경 방어 — 초기 check()는 이미 실행됐으니
+    // 리사이즈 재계산만 건너뛴다(테스트는 리사이즈를 시뮬레이션하지 않으므로 영향 없음).
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(check);
+    // 래퍼(el)뿐 아니라 내용 요소(content)도 관찰한다 — 래퍼 자체 크기는 상위
+    // 그리드 컬럼폭에 매여 안 변할 수 있어도, 내용(팀 로고 지연 로드 등)의 실폭이
+    // 바뀌면 scrollWidth가 바뀌므로 내용 쪽 리사이즈도 재계산 트리거가 필요하다.
+    observer.observe(el);
+    if (content) observer.observe(content);
+    return () => observer.disconnect();
+  }, [mainRounds.length]);
+
   return (
     <div>
-      <p className="tm-bk2-scroll-hint">단계별 대진은 옆으로 밀어 확인할 수 있어요.</p>
+      {/* 실제로 스크롤할 내용이 없으면(트리가 컬럼 폭 안에 다 들어옴) 힌트 자체가
+          거짓 안내가 되므로 숨긴다 — 데스크톱 전용 CSS(.tm-bracket-page-grid
+          .tm-bk2-scroll-hint)와 별개로 모바일 폭에서도 동일하게 적용. */}
+      {!fitsWithoutScroll && <p className="tm-bk2-scroll-hint">단계별 대진은 옆으로 밀어 확인할 수 있어요.</p>}
       {/* ── 수평 스크롤 브래킷 트리 (드래그 가능) ── */}
       <div style={{ position: 'relative' }}>
         <div
@@ -619,7 +735,10 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseUp}
         >
-          <div style={{ display: 'inline-flex', alignItems: 'flex-start', paddingRight: 8 }}>
+          {/* width:100%로 래퍼 폭을 채우려 하되, 라운드 컬럼·커넥터 최소폭(flexShrink:0
+              / minWidth)의 합이 그보다 크면 자연스럽게 오버플로해 상위 overflowX:auto가
+              스크롤을 켠다. 남는 폭은 각 ConnectorSegment의 연장선(flex-grow)이 흡수한다. */}
+          <div ref={contentRef} style={{ display: 'flex', width: '100%', alignItems: 'flex-start', paddingRight: 8 }}>
 
             {mainRounds.map((round, idx) => {
               const isFirst = idx === 0;
@@ -636,7 +755,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
               })();
 
               return (
-                <div key={round.key} style={{ display: 'flex', alignItems: 'flex-start' }}>
+                <Fragment key={round.key}>
                   <BracketRoundCol
                     round={round}
                     headLabel={round.label}
@@ -644,20 +763,12 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
                     centered={!isFirst}
                   />
                   {!isLast && (
-                    <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, paddingTop: HEAD_H }}>
-                      <BracketSvgConnector
-                        topCount={slotCount}
-                        totalH={rH}
-                        nextN={nextSlotCount}
-                      />
-                    </div>
+                    <ConnectorSegment topCount={slotCount} totalH={rH} nextN={nextSlotCount} />
                   )}
                   {isLast && (
-                    <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, paddingTop: HEAD_H }}>
-                      <BracketSvgConnector topCount={1} totalH={treeH} nextN={1} />
-                    </div>
+                    <ConnectorSegment topCount={1} totalH={treeH} nextN={1} />
                   )}
-                </div>
+                </Fragment>
               );
             })}
 
@@ -665,8 +776,8 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
           </div>
         </div>
 
-        {/* 오른쪽 페이드 — 더 내용 있음 힌트 */}
-        <div className="tm-bk2-scroll-fade" aria-hidden="true" />
+        {/* 오른쪽 페이드 — 더 내용 있음 힌트. 스크롤이 필요 없을 땐 표시 안 함(위 힌트와 동일 근거) */}
+        {!fitsWithoutScroll && <div className="tm-bk2-scroll-fade" aria-hidden="true" />}
       </div>
 
       {/* ── 3·4위전 ── */}
@@ -674,7 +785,8 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
         <div className="tm-bk2-third">
           <div className="tm-bk2-third-header">
             <span className="tm-bk2-pill tm-bk2-pill-sm">3 · 4위전</span>
-            <span style={{ fontSize: 11, color: 'var(--text-caption)' }}>4강에서 진 두 팀이 3위를 가려요</span>
+            {/* [R-T2] 고정폭 없는 안내문 — 캡션 토큰과 맞춰 12로 상향. */}
+            <span className="tm-text-caption">4강에서 진 두 팀이 3위를 가려요</span>
           </div>
           {thirdPlace.fixtures.map((f) => (
             <div key={f.id} className="tm-bk2-third-match">

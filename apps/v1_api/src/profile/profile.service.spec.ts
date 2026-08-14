@@ -72,6 +72,115 @@ describe('ProfileService identity binding', () => {
   });
 });
 
+describe('ProfileService settings theme preference', () => {
+  function buildPrisma(overrides: {
+    updateResolvedTheme?: 'light' | 'dark' | 'system';
+    findUniqueResolvedTheme?: 'light' | 'dark' | 'system';
+  } = {}) {
+    const prisma = {
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({ themePreference: overrides.findUniqueResolvedTheme ?? 'light' }),
+        update: jest.fn().mockResolvedValue({ themePreference: overrides.updateResolvedTheme ?? 'dark' }),
+      },
+      v1UserProfile: {
+        findUnique: jest.fn().mockResolvedValue({ nickname: '테스트닉' }),
+      },
+      v1NotificationPreference: {
+        upsert: jest.fn().mockResolvedValue({
+          activityEnabled: true,
+          marketingEnabled: false,
+          updatedAt: new Date('2026-08-10T00:00:00Z'),
+        }),
+        findUnique: jest.fn().mockResolvedValue({
+          activityEnabled: true,
+          matchEnabled: true,
+          teamEnabled: true,
+          teamMatchEnabled: true,
+          chatEnabled: true,
+          noticeEnabled: true,
+          marketingEnabled: false,
+          updatedAt: new Date('2026-08-01T00:00:00Z'),
+        }),
+      },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
+    return prisma;
+  }
+
+  it('persists an explicit theme choice and echoes it back without touching notifications', async () => {
+    const prisma = buildPrisma({ updateResolvedTheme: 'dark' });
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    const result = await service.updateSettings(user, { theme: 'dark' });
+
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: user.id },
+      data: { themePreference: 'dark' },
+    });
+    expect(prisma.v1User.findUnique).not.toHaveBeenCalled();
+    expect(result.theme).toBe('dark');
+  });
+
+  // Copilot 리뷰 지적: 테마만 바꾸는 요청에서 알림설정 row에 불필요한 write(upsert)가
+  // 나가면 @updatedAt만 갱신되는 무의미한 쓰기가 발생한다 — 읽기만 해야 한다.
+  it('테마만 바꿀 때는 알림설정 row에 쓰지 않고 읽기만 한다', async () => {
+    const prisma = buildPrisma({ updateResolvedTheme: 'dark' });
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await service.updateSettings(user, { theme: 'dark' });
+
+    expect(prisma.v1NotificationPreference.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1NotificationPreference.findUnique).toHaveBeenCalledWith({ where: { userId: user.id } });
+  });
+
+  it('leaves the stored theme untouched and echoes the current value when the request omits theme', async () => {
+    const prisma = buildPrisma({ findUniqueResolvedTheme: 'system' });
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    const result = await service.updateSettings(user, { notifications: { chatEnabled: false } });
+
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+    expect(prisma.v1User.findUnique).toHaveBeenCalledWith({
+      where: { id: user.id },
+      select: { themePreference: true },
+    });
+    expect(result.theme).toBe('system');
+  });
+
+  // Copilot 리뷰 지적: ThemeProvider가 앱 루트에서 GET /me/settings를 상시 호출하게
+  // 되면서, settings()가 upsert(update:{})로 알림설정을 읽으면 요청마다 불필요한
+  // UPDATE(@updatedAt 갱신 포함)가 발생한다 — GET은 순수 읽기여야 한다.
+  it('settings() GET은 알림설정 row에 절대 쓰지 않는다', async () => {
+    const prisma = {
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({
+          email: user.email,
+          phone: null,
+          accountStatus: 'active',
+          themePreference: 'dark',
+          authIdentities: [{ provider: 'email', passwordHash: 'hash' }],
+          profile: { nickname: '테스트닉' },
+        }),
+      },
+      v1NotificationPreference: {
+        upsert: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+    };
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    const result = await service.settings(user);
+
+    expect(prisma.v1NotificationPreference.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1NotificationPreference.findUnique).toHaveBeenCalledWith({ where: { userId: user.id } });
+    expect(result.theme).toBe('dark');
+    // row가 아직 없는 사용자 — 기본값(전부 켜짐, marketing만 꺼짐)이 write 없이 그대로 응답된다.
+    expect(result.notifications).toMatchObject({ matchEnabled: true, marketingEnabled: false });
+  });
+});
+
 describe('ProfileService phone change proof gate', () => {
   const OLD_PHONE = '01011112222';
   const NEW_PHONE = '01033334444';
@@ -233,12 +342,14 @@ describe('ProfileService activitySummary', () => {
 
       const result = await service.activitySummary(user);
 
+      // sourceType='match' — 대회 개인 후기(tournament_fixture)는 V1UserReputationSummary의
+      // tournament_* 컬럼에 따로 집계되므로 이 헤드라인 평점 모집단에 섞이면 안 된다.
       expect(findMany).toHaveBeenNthCalledWith(1, {
-        where: { targetUserId: user.id, targetType: 'user', status: 'submitted' },
+        where: { targetUserId: user.id, targetType: 'user', status: 'submitted', sourceType: 'match' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
       });
       expect(findMany).toHaveBeenNthCalledWith(2, {
-        where: { reviewerUserId: user.id, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        where: { reviewerUserId: user.id, sourceType: 'match', sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true },
       });
       expect(result.totals).toEqual({ activityCount: 7, teamCount: 1, mannerScore: 5 });
@@ -461,7 +572,9 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
 
       expect(result.activitySummary.monthly.reviewCount).toBe(1);
       expect(prisma.v1PostEventReview.findMany).toHaveBeenCalledWith({
-        where: { reviewerUserId: targetUserId, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        // 월별 개수도 헤드라인 평점과 같은 모집단(개인 매치)이어야 한다 — 한쪽만 대회 후기를
+        // 더하면 "이번 달 3건인데 누적은 1건" 같은 어긋난 숫자가 한 화면에 함께 나온다.
+        where: { reviewerUserId: targetUserId, sourceType: 'match', sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true },
       });
     } finally {

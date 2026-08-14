@@ -172,7 +172,7 @@ export default function AdminTournamentsPage() {
                 header: '일정',
                 width: 'w-[168px]',
                 render: (row) => (
-                  <span className="whitespace-nowrap text-gray-500">
+                  <span className="whitespace-nowrap text-[var(--text-muted)]">
                     {formatDateRange(row.scheduledAt, row.scheduledEndAt)}
                   </span>
                 ),
@@ -188,11 +188,11 @@ export default function AdminTournamentsPage() {
                 header: '대회',
                 render: (row) => (
                   <div className="min-w-0">
-                    <span className="block truncate font-medium text-gray-900" title={row.title}>
+                    <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
                       {row.title}
                     </span>
                     {row.venue ? (
-                      <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                      <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]">
                         {row.venue}
                       </span>
                     ) : null}
@@ -204,7 +204,7 @@ export default function AdminTournamentsPage() {
                 header: '접수 마감',
                 width: 'w-[124px]',
                 render: (row) => (
-                  <span className="whitespace-nowrap text-gray-500">
+                  <span className="whitespace-nowrap text-[var(--text-muted)]">
                     {formatDate(row.registrationDeadlineAt)}
                   </span>
                 ),
@@ -215,7 +215,7 @@ export default function AdminTournamentsPage() {
                 align: 'center',
                 width: 'w-[80px]',
                 render: (row) => (
-                  <span className="tabular-nums text-gray-600">{row.registrationCount}</span>
+                  <span className="tabular-nums text-[var(--text-muted)]">{row.registrationCount}</span>
                 ),
               },
               {
@@ -224,7 +224,7 @@ export default function AdminTournamentsPage() {
                 align: 'right',
                 width: 'w-[112px]',
                 render: (row) => (
-                  <span className="tabular-nums whitespace-nowrap text-gray-600">
+                  <span className="tabular-nums whitespace-nowrap text-[var(--text-muted)]">
                     {formatCurrency(row.entryFee)}
                   </span>
                 ),
@@ -236,8 +236,8 @@ export default function AdminTournamentsPage() {
                 aria-label={`${row.title} 상세 보기`}
                 className={[
                   'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg',
-                  'text-[var(--font-size-label)] font-medium text-gray-600 bg-gray-100',
-                  'hover:bg-gray-200 transition-colors whitespace-nowrap',
+                  'text-[var(--font-size-label)] font-medium text-[var(--text-muted)] bg-[var(--surface-soft)]',
+                  'hover:bg-[var(--grey300)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}
               >
@@ -261,7 +261,7 @@ export default function AdminTournamentsPage() {
         {/* 페이지 이동 실패는 목록이 비어 보이지 않으므로 따로 알린다. */}
         {isError && rows.length > 0 && (
           <div className="flex flex-col items-center gap-1.5">
-            <p className="text-[var(--font-size-label)] text-red-500" role="alert">
+            <p className="text-[var(--font-size-label)] text-[var(--red700)]" role="alert">
               {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
             </p>
             <button
@@ -270,7 +270,7 @@ export default function AdminTournamentsPage() {
               disabled={isFetching}
               className={[
                 'h-[44px] px-6 rounded-xl text-[var(--font-size-label)] font-semibold transition-colors',
-                'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
+                'border border-[var(--border)] text-[var(--text-body)] bg-[var(--card-surface)] hover:bg-[var(--surface-soft)]',
                 'disabled:opacity-50',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               ].join(' ')}

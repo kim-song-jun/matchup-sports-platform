@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Trophy, LayoutGrid, Star, ChevronRight, Video, Gift, Search } from 'lucide-react';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import type {
+  V1ReviewListItem,
   V1TournamentFixture,
   V1TournamentStatus,
 } from '@/types/api';
@@ -68,6 +69,7 @@ export function TournamentPostEventHubSection({
   hasAnnouncements,
   sponsorCount,
   announcements,
+  fixtureReviewState = { status: 'guest', items: [] },
 }: {
   tournamentId: string;
   status: V1TournamentStatus;
@@ -75,6 +77,7 @@ export function TournamentPostEventHubSection({
   hasAnnouncements: boolean;
   sponsorCount?: number;
   announcements: TournamentAnnouncementSummary[];
+  fixtureReviewState?: TournamentFixtureReviewState;
 }) {
   // completed: verbose 5카드 대신 Toss식 컴팩트 액션 리스트로 대체(스크롤·복잡도 축소).
   if (status === 'completed') {
@@ -103,11 +106,26 @@ export function TournamentPostEventHubSection({
   // "다음 대회"는 상태 무관 항상 available이라 완료 리스트(TournamentCompletedActionList)와
   // 동일하게 절제 원칙상 제외. 아무것도 없으면(경기 결과·공지 전무) 섹션째 숨긴다 — 조별
   // 순위·대진표는 이미 같은 페이지 다른 섹션에서 보여주고 있어 여기서 반복하지 않는다.
-  const availableCards = cards.filter((card) => card.status === 'available' && card.key !== 'next_tournament');
-  if (availableCards.length === 0) return null;
+  const availableCards = cards.filter(
+    (card) => card.status === 'available' && card.key !== 'next_tournament' && card.key !== 'reviews',
+  );
+  if (availableCards.length === 0 && !hasCompletedFixture) return null;
 
-  return <PostEventActionList heading="대회 현황" cards={availableCards} />;
+  return (
+    <>
+      {availableCards.length > 0 ? <PostEventActionList heading="대회 현황" cards={availableCards} /> : null}
+      {hasCompletedFixture ? (
+        <TournamentFixtureReviewEntrySection fixtures={fixtures} state={fixtureReviewState} />
+      ) : null}
+    </>
+  );
 }
+
+export type TournamentFixtureReviewState = {
+  status: 'guest' | 'loading' | 'error' | 'ready';
+  items: V1ReviewListItem[];
+  onRetry?: () => void;
+};
 
 const POST_EVENT_CARD_ICON: Record<TournamentPostEventCard['key'], ReactNode> = {
   results: <Trophy size={18} strokeWidth={2} aria-hidden="true" />,
@@ -142,13 +160,18 @@ function PostEventActionList({ heading, cards }: { heading: string; cards: Tourn
           >
             <span
               aria-hidden="true"
+              // 2026-08-11: 5개 카드(결과/영상/리뷰/스폰서/다음대회) 전부 순수 내비게이션이라
+              // 파란 틴트에 의미가 없다는 지적 — 무채색으로 통일
+              // 2026-08-12: [인라인 style 우선순위 fix] 배경을 인라인으로 두면 다크모드
+              // 전용 클래스 오버라이드(.tm-post-event-icon-badge, globals.css)가 절대 못
+              // 이겨서 배지가 여전히 카드에 녹아 사라졌다 — 배경은 CSS 클래스로만 관리.
+              className="tm-post-event-icon-badge"
               style={{
                 flexShrink: 0,
                 width: 36,
                 height: 36,
                 borderRadius: 10,
-                background: 'var(--blue50)',
-                color: 'var(--blue500)',
+                color: 'var(--text-strong)',
                 display: 'grid',
                 placeItems: 'center',
               }}
@@ -169,6 +192,161 @@ function PostEventActionList({ heading, cards }: { heading: string; cards: Tourn
       </Card>
     </section>
   );
+}
+
+function TournamentFixtureReviewEntrySection({
+  fixtures,
+  state,
+}: {
+  fixtures: V1TournamentFixture[];
+  state: TournamentFixtureReviewState;
+}) {
+  if (state.status === 'guest') return null;
+
+  if (state.status === 'loading') {
+    return (
+      <section aria-labelledby="fixture-review-heading" style={{ marginTop: 24 }}>
+        <div id="fixture-review-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+          리뷰할 수 있는 경기
+        </div>
+        <Card pad={16}>
+          <div className="tm-text-label" role="status" style={{ color: 'var(--text-muted)' }}>
+            남은 리뷰를 확인하고 있어요.
+          </div>
+        </Card>
+      </section>
+    );
+  }
+
+  if (state.status === 'error') {
+    return (
+      <section aria-labelledby="fixture-review-heading" style={{ marginTop: 24 }}>
+        <div id="fixture-review-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+          리뷰할 수 있는 경기
+        </div>
+        <Card pad={16}>
+          <ErrorState
+            title="리뷰 가능 경기를 불러오지 못했어요"
+            message="잠시 후 다시 시도해 주세요."
+            onRetry={state.onRetry}
+          />
+        </Card>
+      </section>
+    );
+  }
+
+  const fixtureById = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
+  const entries = state.items.flatMap((item) => {
+    if (item.sourceType !== 'tournament_fixture' || item.remainingCount <= 0) return [];
+    const fixture = fixtureById.get(item.sourceId);
+    if (!fixture || fixture.status !== 'completed' || fixture.result === null) return [];
+    return [{ fixture, remainingCount: item.remainingCount }];
+  });
+
+  if (entries.length === 0) return null;
+  return <TournamentFixtureReviewEntryList entries={entries} />;
+}
+
+function TournamentFixtureReviewEntryList({
+  entries,
+}: {
+  entries: Array<{ fixture: V1TournamentFixture; remainingCount: number }>;
+}) {
+  return (
+    <section aria-labelledby="fixture-review-heading" style={{ marginTop: 24 }}>
+      <div id="fixture-review-heading" className="tm-text-body-lg" style={{ marginBottom: 4 }}>
+        리뷰할 수 있는 경기
+      </div>
+      <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5, margin: '0 0 8px' }}>
+        경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.
+      </p>
+      <Card pad={0} style={{ overflow: 'hidden' }}>
+        {entries.map(({ fixture, remainingCount }, index) => {
+          const homeTeamName = getFixtureTeamLabel(fixture.homeTeamName);
+          const awayTeamName = getFixtureTeamLabel(fixture.awayTeamName);
+          const result = fixture.result!;
+          const roundLabel = fixture.round || `${fixture.fixtureNumber}경기`;
+          const hasPenaltyResult =
+            result.hasPenalty && result.homePenaltyScore !== null && result.awayPenaltyScore !== null;
+
+          return (
+            <Link
+              key={fixture.id}
+              href={`/my/reviews/tournament_fixture/${fixture.id}`}
+              className="tm-list-row-interactive tm-pressable"
+              aria-label={`${homeTeamName} 대 ${awayTeamName} 경기 남은 리뷰 ${remainingCount}개 작성`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                minHeight: 68,
+                padding: '12px 16px',
+                borderBottom: index < entries.length - 1 ? '1px solid var(--border)' : 'none',
+                textDecoration: 'none',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                className="tm-post-event-icon-badge"
+                style={{
+                  flexShrink: 0,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  color: 'var(--text-strong)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}
+              >
+                <Star size={18} strokeWidth={2} />
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 2 }}>
+                  {roundLabel}
+                </div>
+                <div
+                  className="tm-text-label"
+                  style={{
+                    color: 'var(--text-strong)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {homeTeamName} <span aria-hidden="true" style={{ color: 'var(--text-caption)' }}>vs</span> {awayTeamName}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div className="tab-num tm-text-label" style={{ color: 'var(--text-strong)' }}>
+                  {result.homeScore} : {result.awayScore}
+                </div>
+                {hasPenaltyResult ? (
+                  <div className="tab-num tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 1 }}>
+                    PK {result.homePenaltyScore} : {result.awayPenaltyScore}
+                  </div>
+                ) : null}
+                <div className="tm-text-caption" style={{ color: 'var(--blue700)', fontWeight: 700, marginTop: 2 }}>
+                  남은 리뷰 {remainingCount}개
+                </div>
+              </div>
+              <ChevronRight
+                size={16}
+                strokeWidth={2.2}
+                aria-hidden="true"
+                style={{ color: 'var(--text-caption)', flexShrink: 0 }}
+              />
+            </Link>
+          );
+        })}
+      </Card>
+    </section>
+  );
+}
+
+function getFixtureTeamLabel(teamName: string | null | undefined) {
+  if (teamName === null) return '비공개';
+  if (!teamName || teamName === 'TBD') return '미정';
+  return teamName;
 }
 
 type CompletedActionItem = {
@@ -239,7 +417,7 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
                 height: 36,
                 borderRadius: 10,
                 background: 'var(--blue50)',
-                color: 'var(--blue500)',
+                color: 'var(--blue700)',
                 display: 'grid',
                 placeItems: 'center',
               }}
@@ -317,7 +495,7 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
             <Link
               href={item.notice.href}
               className="tm-text-caption"
-              style={{ color: 'var(--blue500)', fontWeight: 600, marginTop: 2, display: 'inline-block' }}
+              style={{ color: 'var(--blue700)', fontWeight: 600, marginTop: 2, display: 'inline-block' }}
             >
               {item.notice.actionLabel}
             </Link>

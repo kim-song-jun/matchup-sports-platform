@@ -1,0 +1,493 @@
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  chmodSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
+import { AdminContextService } from '../../src/common/admin-context.service';
+import {
+  GameOperationFlagsService,
+  resolveGameOperationGateRoot,
+} from '../../src/config/game-operation-flags';
+import type { GameOperationFlagKey } from '../../src/config/game-operation-flags';
+import { PrismaService } from '../../src/prisma/prisma.service';
+
+const EVIDENCE_ROOT = resolveGameOperationGateRoot();
+const BASELINE_SHA = 'a'.repeat(40);
+const CANDIDATE_SHA = 'b'.repeat(40);
+const PLAN_SHA = 'c'.repeat(64);
+const OWNER_USER_ID = '00000000-0000-4000-8000-000000005001';
+const OPS_USER_ID = '00000000-0000-4000-8000-000000005002';
+const SUPPORT_USER_ID = '00000000-0000-4000-8000-000000005003';
+const ORDINARY_USER_ID = '00000000-0000-4000-8000-000000005004';
+const TEST_USER_IDS = [
+  OWNER_USER_ID,
+  OPS_USER_ID,
+  SUPPORT_USER_ID,
+  ORDINARY_USER_ID,
+];
+
+type GatePair = {
+  gateId: string;
+  commandId: string;
+};
+
+type SingleGateInput = {
+  phase: 'C';
+  key: GameOperationFlagKey;
+  from: { value: string; version: number };
+  to: { value: string; version: number };
+  gates: GatePair[];
+  transition?: string;
+};
+
+describe('Task 5 game operation control plane', () => {
+  let moduleRef: TestingModule;
+  let prisma: PrismaService;
+  let service: GameOperationFlagsService;
+  let attemptId: string;
+  let attemptRoot: string;
+  let bundlePaths: string[];
+  let receiptSequence: number;
+
+  beforeAll(async () => {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required for Task 5 integration verification');
+    }
+    moduleRef = await Test.createTestingModule({
+      providers: [PrismaService, AdminContextService, GameOperationFlagsService],
+    }).compile();
+    prisma = moduleRef.get(PrismaService);
+    service = moduleRef.get(GameOperationFlagsService);
+    await prisma.$connect();
+    await deleteTestRows(prisma);
+    for (const userId of TEST_USER_IDS) {
+      await prisma.v1User.create({
+        data: {
+          id: userId,
+          email: `task5-${userId.slice(-4)}@example.test`,
+          accountStatus: 'active',
+          onboardingStatus: 'completed',
+        },
+      });
+    }
+    await prisma.v1AdminUser.createMany({
+      data: [
+        {
+          id: '00000000-0000-4000-8000-000000005011',
+          userId: OWNER_USER_ID,
+          adminRole: 'owner',
+          status: 'active',
+        },
+        {
+          id: '00000000-0000-4000-8000-000000005012',
+          userId: OPS_USER_ID,
+          adminRole: 'ops',
+          status: 'active',
+        },
+        {
+          id: '00000000-0000-4000-8000-000000005013',
+          userId: SUPPORT_USER_ID,
+          adminRole: 'support',
+          status: 'active',
+        },
+      ],
+    });
+  });
+
+  beforeEach(async () => {
+    await prisma.$executeRaw`
+      DELETE FROM v1_idempotency_records
+      WHERE actor_user_id IN (${OWNER_USER_ID}, ${OPS_USER_ID}, ${SUPPORT_USER_ID}, ${ORDINARY_USER_ID})
+    `;
+    await prisma.$executeRaw`
+      DELETE FROM v1_outbox_events
+      WHERE business_key LIKE 'platform-ops-control:%'
+         OR business_key LIKE 'task5-poisoned:%'
+    `;
+    await prisma.$executeRaw`TRUNCATE TABLE v1_operation_audits`;
+    await prisma.$executeRaw`DELETE FROM v1_game_operation_flags`;
+    attemptId = randomUUID();
+    attemptRoot = join(EVIDENCE_ROOT, `task5-${attemptId}`);
+    bundlePaths = [];
+    receiptSequence = 0;
+    mkdirSync(attemptRoot, { recursive: true, mode: 0o700 });
+  });
+
+  afterEach(() => {
+    for (const path of bundlePaths) rmSync(path, { force: true });
+    rmSync(attemptRoot, { recursive: true, force: true });
+  });
+
+  afterAll(async () => {
+    await deleteTestRows(prisma);
+    await prisma.$disconnect();
+    await moduleRef.close();
+  });
+
+  it('creates the exact defaults and enforces active owner/ops DB permission', async () => {
+    await expect(service.getFlag(OWNER_USER_ID, 'PUBLIC_LIVE')).resolves.toMatchObject({
+      key: 'PUBLIC_LIVE',
+      value: 'off',
+      version: 0,
+    });
+    await expect(service.getFlag(OPS_USER_ID, 'DIRECTOR_OFFICIALIZE')).resolves.toMatchObject({
+      key: 'DIRECTOR_OFFICIALIZE',
+      value: 'off',
+      version: 0,
+    });
+    await expect(service.getFlag(SUPPORT_USER_ID, 'DIRECTOR_OFFICIALIZE')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(service.getFlag(ORDINARY_USER_ID, 'DIRECTOR_OFFICIALIZE')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    const rows = await prisma.$queryRaw<Array<{ key: string; value: string; version: number }>>`
+      SELECT key::text, value, version
+      FROM v1_game_operation_flags
+      ORDER BY key
+    `;
+    expect(rows).toEqual([
+      { key: 'DIRECTOR_OFFICIALIZE', value: 'off', version: 0 },
+      { key: 'PUBLIC_LIVE', value: 'off', version: 0 },
+    ]);
+  });
+
+  it('rejects malformed and mixed-gate bundles before CAS', async () => {
+    await service.getFlag(OWNER_USER_ID, 'DIRECTOR_OFFICIALIZE');
+    const malformed = writeSingleGate({
+      phase: 'C',
+      key: 'DIRECTOR_OFFICIALIZE',
+      from: { value: 'off', version: 0 },
+      to: { value: 'on', version: 1 },
+      gates: [
+        { gateId: 'V7', commandId: 'V7' },
+        { gateId: 'V22', commandId: 'V22' },
+        { gateId: 'V23', commandId: 'V23' },
+      ],
+    });
+    chmodSync(malformed.path, 0o644);
+    await expect(
+      service.patchFlag(
+        OWNER_USER_ID,
+        'DIRECTOR_OFFICIALIZE',
+        {
+          expectedVersion: 0,
+          value: 'on',
+          gateBundlePath: malformed.path,
+          gateBundleHash: malformed.sha256,
+          reason: 'malformed immutable gate must be rejected',
+        },
+        'task5-malformed',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'INVALID_GATE_BUNDLE' },
+    });
+    chmodSync(malformed.path, 0o444);
+
+    const wrongGate = writeSingleGate({
+      phase: 'C',
+      key: 'DIRECTOR_OFFICIALIZE',
+      from: { value: 'off', version: 0 },
+      to: { value: 'on', version: 1 },
+      gates: [{ gateId: 'V25', commandId: 'V25' }],
+      transition: 'DIRECTOR_OFFICIALIZE-wrong-gate',
+    });
+    await expect(
+      service.patchFlag(
+        OWNER_USER_ID,
+        'DIRECTOR_OFFICIALIZE',
+        {
+          expectedVersion: 0,
+          value: 'on',
+          gateBundlePath: wrongGate.path,
+          gateBundleHash: wrongGate.sha256,
+          reason: 'mixed gate must be rejected',
+        },
+        'task5-wrong-gate',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    await expect(service.getFlag(OWNER_USER_ID, 'DIRECTOR_OFFICIALIZE')).resolves.toMatchObject({
+      value: 'off',
+      version: 0,
+    });
+  });
+
+  it('applies CAS once, replays the stored response, and records actor-neutral audit/outbox', async () => {
+    const gate = writeSingleGate({
+      phase: 'C',
+      key: 'PUBLIC_LIVE',
+      from: { value: 'off', version: 0 },
+      to: { value: 'on', version: 1 },
+      gates: [
+        { gateId: 'V24', commandId: 'V24' },
+        { gateId: 'V26', commandId: 'PUBLIC-01' },
+      ],
+    });
+    const input = {
+      expectedVersion: 0,
+      value: 'on',
+      gateBundlePath: gate.path,
+      gateBundleHash: gate.sha256,
+      reason: 'enable public live scoreboard',
+    };
+    const first = await service.patchFlag(OPS_USER_ID, 'PUBLIC_LIVE', input, 'task5-cas');
+    const replay = await service.patchFlag(OPS_USER_ID, 'PUBLIC_LIVE', input, 'task5-cas');
+    expect(replay).toEqual(first);
+    await expect(
+      service.patchFlag(
+        OPS_USER_ID,
+        'PUBLIC_LIVE',
+        { ...input, reason: 'different payload' },
+        'task5-cas',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'IDEMPOTENCY_PAYLOAD_CONFLICT' },
+    });
+
+    // Structurally valid gate bundle (correct gates, correct value transition against the REAL
+    // current value 'on') but a stale `expectedVersion` (0, when the real version is now 1) --
+    // proves the CAS check fires independently of, and after, gate-bundle/transition validation.
+    const staleGate = writeSingleGate({
+      phase: 'C',
+      key: 'PUBLIC_LIVE',
+      from: { value: 'on', version: 0 },
+      to: { value: 'off', version: 1 },
+      gates: [
+        { gateId: 'V24', commandId: 'V24' },
+        { gateId: 'V26', commandId: 'PUBLIC-01' },
+      ],
+    });
+    await expect(
+      service.patchFlag(
+        OPS_USER_ID,
+        'PUBLIC_LIVE',
+        {
+          expectedVersion: 0,
+          value: 'off',
+          gateBundlePath: staleGate.path,
+          gateBundleHash: staleGate.sha256,
+          reason: 'stale CAS must fail',
+        },
+        'task5-stale',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'VERSION_CONFLICT' },
+    });
+
+    const audits = await prisma.$queryRaw<
+      Array<{
+        actor_type: string;
+        actor_user_id: string | null;
+        system_actor: string | null;
+        action: string;
+      }>
+    >`
+      SELECT actor_type::text, actor_user_id, system_actor, action
+      FROM v1_operation_audits
+      WHERE resource_id = 'PUBLIC_LIVE'
+    `;
+    expect(audits).toEqual([
+      {
+        actor_type: 'SYSTEM',
+        actor_user_id: null,
+        system_actor: 'PLATFORM_OPS_CONTROL',
+        action: 'OPERATION_FLAG_CHANGED',
+      },
+    ]);
+    const events = await prisma.$queryRaw<Array<{ type: string }>>`
+      SELECT type
+      FROM v1_outbox_events
+      WHERE aggregate_id = 'PUBLIC_LIVE'
+    `;
+    expect(events).toEqual([{ type: 'GAME_OPERATION_FLAG_CHANGED' }]);
+    await expect(service.getFlag(OWNER_USER_ID, 'PUBLIC_LIVE')).resolves.toMatchObject({
+      value: 'on',
+      version: 1,
+      updatedByUserId: OPS_USER_ID,
+    });
+  });
+
+  it('requeues only a poisoned job with CAS and transactional audit/outbox', async () => {
+    const jobId = randomUUID();
+    const now = new Date();
+    await prisma.$executeRaw`
+      INSERT INTO v1_outbox_events
+        (id, business_key, aggregate_type, aggregate_id, type, payload,
+         available_at, lease_owner, lease_until, attempts, retry_generation,
+         version, status, last_error, created_at, updated_at)
+      VALUES
+        (${jobId}, ${`task5-poisoned:${jobId}`}, 'game', 'task5-game',
+         'GAME_OPERATION_FLAG_CHANGED', '{}'::jsonb, ${now}, 'dead-worker',
+         ${now}, 6, 2, 4, 'POISONED', 'bounded failure', ${now}, ${now})
+    `;
+    await expect(
+      service.requeueJob(
+        OPS_USER_ID,
+        jobId,
+        { expectedVersion: 4, reason: 'operator reviewed poison cause' },
+        'task5-requeue',
+      ),
+    ).resolves.toMatchObject({
+      id: jobId,
+      status: 'RETRY',
+      attempts: 0,
+      retryGeneration: 3,
+      version: 5,
+      leaseOwner: null,
+      leaseUntil: null,
+      lastError: null,
+    });
+    await expect(
+      service.requeueJob(
+        OPS_USER_ID,
+        jobId,
+        { expectedVersion: 5, reason: 'cannot requeue retry state' },
+        'task5-requeue-invalid-state',
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'JOB_NOT_POISONED' },
+    });
+    const effects = await prisma.$queryRaw<
+      Array<{
+        action: string;
+        actor_type: string;
+        actor_user_id: string | null;
+        system_actor: string | null;
+        event_type: string;
+      }>
+    >`
+      SELECT audit.action,
+             audit.actor_type::text,
+             audit.actor_user_id,
+             audit.system_actor,
+             event.type AS event_type
+      FROM v1_operation_audits audit
+      JOIN v1_outbox_events event
+        ON event.aggregate_id = audit.resource_id
+       AND event.type = 'GAME_OPERATION_JOB_REQUEUED'
+      WHERE audit.resource_id = ${jobId}
+    `;
+    expect(effects).toEqual([
+      {
+        action: 'JOB_REQUEUED',
+        actor_type: 'SYSTEM',
+        actor_user_id: null,
+        system_actor: 'PLATFORM_OPS_CONTROL',
+        event_type: 'GAME_OPERATION_JOB_REQUEUED',
+      },
+    ]);
+  });
+
+  function writeSingleGate(input: SingleGateInput) {
+    const prerequisites = writePrerequisites(input.phase, input.gates);
+    const transition =
+      input.transition ??
+      `${input.key}:${input.from.value}->${input.to.value}`;
+    const path = join(
+      EVIDENCE_ROOT,
+      `flag-gate-${attemptId}-${input.phase}-${slug(transition)}.json`,
+    );
+    bundlePaths.push(path);
+    return immutableJson(path, {
+      schemaVersion: 1,
+      phase: input.phase,
+      attemptId,
+      baselineSHA: BASELINE_SHA,
+      candidateSHA: CANDIDATE_SHA,
+      planSHA: PLAN_SHA,
+      transition,
+      key: input.key,
+      from: input.from,
+      to: input.to,
+      prerequisites,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  function writePrerequisites(phase: string, gates: GatePair[]) {
+    return [...gates]
+      .sort((left, right) =>
+        JSON.stringify([left.gateId, left.commandId]).localeCompare(
+          JSON.stringify([right.gateId, right.commandId]),
+        ),
+      )
+      .map((gate) => {
+        const path = join(
+          attemptRoot,
+          `receipt-${receiptSequence++}-${phase}-${gate.gateId}-${gate.commandId}.json`,
+        );
+        const receipt = immutableJson(path, {
+          schemaVersion: 1,
+          gateId: gate.gateId,
+          phase,
+          commandId: gate.commandId,
+          attemptId,
+          baselineSHA: BASELINE_SHA,
+          candidateSHA: CANDIDATE_SHA,
+          planSHA: PLAN_SHA,
+          verdict: 'accepted',
+          createdAt: new Date().toISOString(),
+        });
+        return {
+          gateId: gate.gateId,
+          phase,
+          commandId: gate.commandId,
+          path: receipt.path,
+          sha256: receipt.sha256,
+          verdict: 'accepted',
+        };
+      });
+  }
+});
+
+async function deleteTestRows(prisma: PrismaService) {
+  await prisma.$executeRaw`
+    DELETE FROM v1_idempotency_records
+    WHERE actor_user_id IN (${OWNER_USER_ID}, ${OPS_USER_ID}, ${SUPPORT_USER_ID}, ${ORDINARY_USER_ID})
+  `;
+  await prisma.$executeRaw`
+    DELETE FROM v1_outbox_events
+    WHERE business_key LIKE 'platform-ops-control:%'
+       OR business_key LIKE 'task5-poisoned:%'
+  `;
+  await prisma.$executeRaw`TRUNCATE TABLE v1_operation_audits`;
+  await prisma.v1AdminUser.deleteMany({ where: { userId: { in: TEST_USER_IDS } } });
+  await prisma.v1User.deleteMany({ where: { id: { in: TEST_USER_IDS } } });
+}
+
+function immutableJson(path: string, value: unknown) {
+  const bytes = Buffer.from(canonicalJson(value));
+  writeFileSync(path, bytes, { flag: 'wx', mode: 0o444 });
+  return {
+    path,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+  };
+}
+
+function slug(value: string) {
+  return value.replace(/[^A-Za-z0-9._-]+/g, '-');
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) throw new Error('test receipt is not JSON serializable');
+    return encoded;
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (!isRecord(value)) throw new Error('test receipt must be a record');
+  return `{${Object.keys(value)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+    .join(',')}}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}

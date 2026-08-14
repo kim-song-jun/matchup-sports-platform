@@ -14,6 +14,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { GamesService } from '../games/games.service';
 import { TeamMatchesService } from './team-matches.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 
@@ -52,6 +53,9 @@ function teamMatchRow(overrides: Record<string, unknown> = {}) {
     endAt: null,
     deadlineAt: null,
     formatNote: null,
+    matchFormat: null,
+    matchStyle: [],
+    uniformColor: null,
     genderRule: null,
     costNote: null,
     status: 'recruiting',
@@ -101,21 +105,38 @@ describe('TeamMatchesService', () => {
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TeamMatchApplication: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
+    // 매치 ↔ 팀일정 연동(레인 schedule): create()/approveApplication()/cancel()/update()가 같은
+    // 트랜잭션 안에서 team-schedules.service.ts의 평문 함수(createTeamMatchScheduleInTx 등)를
+    // 호출하며 이 tx 프록시(=prisma 목)를 그대로 넘긴다. v1TeamSchedule 델리게이트가 없으면
+    // "Cannot read properties of undefined"로 깨진다.
+    v1TeamSchedule: { create: jest.Mock; findMany: jest.Mock; updateMany: jest.Mock };
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
-    v1Team: { findMany: jest.Mock };
+    v1Team: { findFirst: jest.Mock; findMany: jest.Mock };
+    v1Game: { findUnique: jest.Mock };
+    v1GameSide: { update: jest.Mock };
+    v1GameParticipant: { createMany: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
     v1PostEventReview: { findMany: jest.Mock };
+    v1IdempotencyRecord: { findFirst: jest.Mock };
+    v1CompetitionConfigVersion: { findFirst: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
+    $executeRaw: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
+  let games: { createFromSourceInTransaction: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
       v1User: { findUnique: jest.fn().mockResolvedValue({ phone: '01012345678', profile: { realName: '매니저 실명', gender: 'male' } }) },
       v1TeamMembership: { findFirst: jest.fn(), findMany: jest.fn() },
       v1TeamMatch: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1TeamSchedule: {
+        create: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       v1TeamMatchApplication: {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
@@ -125,22 +146,43 @@ describe('TeamMatchesService', () => {
       },
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
-      v1Team: { findMany: jest.fn() },
+      v1Team: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'team-applicant',
+          name: 'Applicant Team',
+          memberships: [],
+        }),
+        findMany: jest.fn(),
+      },
+      v1Game: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'game-1',
+          sides: [{ id: 'side-away', sideKey: 'AWAY', teamId: null }],
+          lineups: [{ id: 'lineup-away', sideId: 'side-away', revision: 1 }],
+        }),
+      },
+      v1GameSide: { update: jest.fn().mockResolvedValue({}) },
+      v1GameParticipant: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
       v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+      v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null) },
+      v1CompetitionConfigVersion: { findFirst: jest.fn().mockResolvedValue({ id: 'config-1' }) },
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue(undefined),
+      $executeRaw: jest.fn().mockResolvedValue(undefined),
     };
 
     // Default: $transaction executes the callback with the same prisma proxy
-    const p = prisma as unknown as Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
     (prisma.$transaction as jest.Mock).mockImplementation(
-      (cb: (tx: typeof p) => Promise<unknown>) => cb(p),
+      (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma),
     );
 
     notifications = {
       emitNotification: jest.fn().mockResolvedValue(undefined),
       emitToManyDeferred: jest.fn(),
+    };
+    games = {
+      createFromSourceInTransaction: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -148,6 +190,7 @@ describe('TeamMatchesService', () => {
         TeamMatchesService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
+        { provide: GamesService, useValue: games },
       ],
     }).compile();
 
@@ -155,6 +198,55 @@ describe('TeamMatchesService', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  // ─── #3 최근 장소 조회 ──────────────────────────────────────────────────────
+
+  it('recentVenues: owner/manager 권한 없는 사용자는 403 PERMISSION_DENIED (조회 자체 미실행)', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(null); // not a manager
+
+    await expect(service.recentVenues(manager, 'team-host')).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1TeamMatch.findMany).not.toHaveBeenCalled();
+  });
+
+  it('recentVenues: 이 팀이 호스트인 팀매치만 최신순으로 조회하고 placeName을 애플리케이션에서 dedup한다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    // 같은 placeName이 여러 행(가장 최근 것이 먼저)으로 섞여 와도 최초 1개만 남아야 한다 —
+    // Prisma `distinct` + `orderBy: createdAt`은 Postgres DISTINCT ON 규칙상
+    // orderBy가 distinct 필드로 시작하지 않으면 의도한 순서를 보장 못 해 서비스가
+    // 직접 dedup한다(회귀 방지).
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      { placeName: '풋살파크 강서', placeAddress: '서울 강서구' },
+      { placeName: '풋살파크 강서', placeAddress: '서울 강서구(구주소)' },
+      { placeName: '잠실 풋살장', placeAddress: null },
+    ]);
+
+    await expect(service.recentVenues(manager, 'team-host')).resolves.toEqual({
+      items: [
+        { placeName: '풋살파크 강서', addressText: '서울 강서구' },
+        { placeName: '잠실 풋살장', addressText: null },
+      ],
+    });
+    expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { hostTeamId: 'team-host', deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      }),
+    );
+  });
+
+  it('recentVenues: 앞뒤 공백만 다른 레거시 값은 trim 후 같은 장소로 dedup되고, 공백뿐인 값은 제외한다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      { placeName: '  ', placeAddress: null }, // 공백뿐 — 제외
+      { placeName: '풋살파크 강서 ', placeAddress: '주소1' }, // trim 전 다른 문자열
+      { placeName: '풋살파크 강서', placeAddress: '주소2' }, // trim 후 위와 동일 장소
+    ]);
+
+    await expect(service.recentVenues(manager, 'team-host')).resolves.toEqual({
+      items: [{ placeName: '풋살파크 강서', addressText: '주소1' }],
+    });
+  });
 
   // ─── create: guard tests ───────────────────────────────────────────────────
 
@@ -221,10 +313,23 @@ describe('TeamMatchesService', () => {
       id: 'mem-1',
       team: { sportId: 'sport-1' },
     });
-    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
     prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Team.findFirst.mockResolvedValue({
+      id: 'team-host',
+      name: 'Host Team',
+      memberships: [{ id: 'mem-1', userId: manager.id, role: 'owner', user: { profile: { nickname: '매니저', displayName: null } } }],
+    });
     prisma.v1TeamMatch.create.mockResolvedValue(teamMatchRow({ deadlineAt }));
     prisma.v1StatusChangeLog.create.mockResolvedValue({});
+    games.createFromSourceInTransaction.mockResolvedValue({
+      gameId: 'game-1',
+      sourceType: 'TEAM_MATCH',
+      sourceId: 'tm-1',
+      competitionConfigVersionId: 'config-1',
+      state: 'SCHEDULED',
+      version: 0,
+    });
 
     await service.create(manager, {
       hostTeamId: 'team-host',
@@ -238,6 +343,53 @@ describe('TeamMatchesService', () => {
 
     expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ deadlineAt }),
+    });
+  });
+
+  // Copilot 리뷰 finding(PR #295): matchFormat/matchStyle/uniformColor를 dto 값 그대로
+  // (trim 없이) 저장하면 공백뿐인 문자열이 남아, "구조화 필드가 채워져 있다"는 잘못된
+  // 판정(hasStructuredConditions)으로 이어질 수 있다. 저장 직전에 항상 trim되는지 검증한다.
+  it('create: matchFormat/matchStyle/uniformColor 공백을 trim하고, 공백뿐인 항목은 제거한다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({
+      id: 'mem-1',
+      team: { sportId: 'sport-1' },
+    });
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Team.findFirst.mockResolvedValue({
+      id: 'team-host',
+      name: 'Host Team',
+      memberships: [{ id: 'mem-1', userId: manager.id, role: 'owner', user: { profile: { nickname: '매니저', displayName: null } } }],
+    });
+    prisma.v1TeamMatch.create.mockResolvedValue(teamMatchRow());
+    prisma.v1StatusChangeLog.create.mockResolvedValue({});
+    games.createFromSourceInTransaction.mockResolvedValue({
+      gameId: 'game-1',
+      sourceType: 'TEAM_MATCH',
+      sourceId: 'tm-1',
+      competitionConfigVersionId: 'config-1',
+      state: 'SCHEDULED',
+      version: 0,
+    });
+
+    await service.create(manager, {
+      hostTeamId: 'team-host',
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '경기조건 trim 검증 팀매치',
+      startsAt: FUTURE.toISOString(),
+      manualPlaceName: '잠실',
+      matchFormat: '  6:6  ',
+      matchStyle: ['  친선  ', '   ', '매너 중시'],
+      uniformColor: '  ',
+    });
+
+    expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        matchFormat: '6:6',
+        matchStyle: ['친선', '매너 중시'],
+        uniformColor: null,
+      }),
     });
   });
 
@@ -271,6 +423,29 @@ describe('TeamMatchesService', () => {
   });
 
   // ─── cancel: 상태 머신 ────────────────────────────────────────────────────
+
+  it('update: Game이 핀한 TeamMatch 종목을 바꾸면 409 COMPETITION_CONFIG_IMMUTABLE', async () => {
+    // hostTeam.sportId는 시도하는 dto.sportId('sport-2')와 일치시켜, host-team 불일치
+    // 체크(먼저 발화)를 통과시키고 순수하게 pin 불변식만 검증한다.
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ hostTeam: { sportId: 'sport-2' } }));
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+
+    await expect(
+      service.update(manager, 'tm-1', {
+        hostTeamId: 'team-host',
+        sportId: 'sport-2',
+        regionId: 'region-1',
+        title: '풀살 상대팀 모집',
+        startsAt: FUTURE.toISOString(),
+        manualPlaceName: '잠실',
+        version: teamMatchRow().updatedAt.toISOString(),
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'COMPETITION_CONFIG_IMMUTABLE' },
+    });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
 
   it('cancel: 이미 취소된 팀매치 재취소 → 409 ALREADY_PROCESSED', async () => {
     // getManageableTeamMatch: team match exists + membership exists
@@ -352,28 +527,6 @@ describe('TeamMatchesService', () => {
     expect(result.status).toBe('recruiting');
     expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'recruiting' }) }),
-    );
-  });
-
-  it('complete: matched 팀매치를 completed로 전환하고 양 팀 운영자에게 알림을 보낸다', async () => {
-    prisma.v1TeamMatch.findFirst.mockResolvedValue(
-      teamMatchRow({ status: 'matched', startAt: PAST, approvedApplicantTeamId: 'team-applicant' }),
-    );
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
-    prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'completed', completedAt: new Date() }));
-    prisma.v1StatusChangeLog.create.mockResolvedValue({});
-
-    const result = await service.complete(manager, 'tm-1', { note: '경기 완료' });
-
-    expect(result.status).toBe('completed');
-    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'completed', completedAt: expect.any(Date) }) }),
-    );
-    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
-      expect.any(Function),
-      'team_match_completed',
-      'tm-1',
-      '"풋살 상대팀 모집" 팀매치 리뷰를 남겨보세요.',
     );
   });
 
@@ -544,6 +697,63 @@ describe('TeamMatchesService', () => {
     expect(result.status).toBe('expired');
   });
 
+  // Task 17: the result-entry/approval screens call `/games/:gameId/...` and
+  // have no other route to learn the Game id for a team match — detail() must
+  // surface it.
+  it('detail: 연결된 Game이 있으면 gameId를 응답에 포함한다', async () => {
+    const teamMatch = {
+      ...teamMatchRow({ status: 'matched', startAt: FUTURE }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: manager.id,
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: [],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+      game: { id: 'game-abc' },
+    };
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(null, 'tm-1');
+    expect(result.gameId).toBe('game-abc');
+  });
+
+  it('detail: 연결된 Game이 없으면 gameId는 null이다', async () => {
+    const teamMatch = {
+      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: manager.id,
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: [],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+      game: null,
+    };
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(null, 'tm-1');
+    expect(result.gameId).toBeNull();
+  });
+
   it('detail: 호스트팀 일반 멤버는 신청 관리 권한이 없으므로 host_team 상태가 아니다', async () => {
     const teamMatch = {
       ...teamMatchRow({ status: 'recruiting', startAt: FUTURE }),
@@ -584,8 +794,16 @@ describe('TeamMatchesService', () => {
 
   const OLD_SUBMITTED_AT = new Date(Date.now() - 100 * 60 * 60 * 1000); // 100h ago (>72h reveal window)
 
-  /** targetTeamId/reviewerTeamId in-필터로 팀별 candidate 리뷰를 되돌려주는 v1PostEventReview mock. */
-  function mockPostEventReviewsByTeam(reviewsByTeam: Record<string, Array<{ sourceId: string; rating: number }>>) {
+  /**
+   * targetTeamId/reviewerTeamId in-필터로 팀별 candidate 리뷰를 되돌려주는 v1PostEventReview mock.
+   *
+   * reviewerTeamId를 행마다 지정할 수 있다 — 신뢰점수 집계가 "팀 평균 1표"라서, 같은 상대팀이 여러
+   * 경기에서 준 평점은 몇 건이든 1표로 접힌다. 평가한 팀 수가 등급을 정하므로(3팀 이상 verified)
+   * 등급을 다루는 케이스는 평가팀을 서로 다르게 줘야 한다. 생략하면 기존처럼 단일 상대팀으로 채운다.
+   */
+  function mockPostEventReviewsByTeam(
+    reviewsByTeam: Record<string, Array<{ sourceId: string; rating: number; reviewerTeamId?: string }>>,
+  ) {
     prisma.v1PostEventReview.findMany.mockImplementation((args: { where: Record<string, unknown> }) => {
       const where = args.where as { targetTeamId?: { in: string[] }; reviewerTeamId?: { in: string[] } };
       if (where.targetTeamId) {
@@ -594,7 +812,7 @@ describe('TeamMatchesService', () => {
           (reviewsByTeam[teamId] ?? []).map((review) => ({
             targetTeamId: teamId,
             sourceId: review.sourceId,
-            reviewerTeamId: `opponent-of-${teamId}`,
+            reviewerTeamId: review.reviewerTeamId ?? `opponent-of-${teamId}`,
             rating: review.rating,
             submittedAt: OLD_SUBMITTED_AT,
           })),
@@ -609,11 +827,13 @@ describe('TeamMatchesService', () => {
   }
 
   it('list: 캐시된 trustState(sample)와 다른 live 재계산 값(verified)을 반환한다', async () => {
+    // 서로 다른 3개 팀이 평가 → 3표 → verified. (같은 팀이 3경기에서 준 것이면 팀 평균 1표로 접혀
+    // estimated가 되므로, 등급을 검증하려면 평가팀을 나눠야 한다.)
     mockPostEventReviewsByTeam({
       'team-host': [
-        { sourceId: 'tm-a', rating: 5 },
-        { sourceId: 'tm-b', rating: 5 },
-        { sourceId: 'tm-c', rating: 5 },
+        { sourceId: 'tm-a', rating: 5, reviewerTeamId: 'rival-1' },
+        { sourceId: 'tm-b', rating: 5, reviewerTeamId: 'rival-2' },
+        { sourceId: 'tm-c', rating: 5, reviewerTeamId: 'rival-3' },
       ],
     });
     prisma.v1TeamMatch.findMany.mockResolvedValue([
@@ -644,11 +864,12 @@ describe('TeamMatchesService', () => {
   });
 
   it('applications: 신청 팀이 2개 이상일 때 배치 크로스토크 없이 각 팀의 live 값을 정확히 매핑한다', async () => {
+    // A팀은 서로 다른 3개 팀에게 평가받아 3표(verified), B팀은 1팀 1표(estimated).
     mockPostEventReviewsByTeam({
       'team-applicant-a': [
-        { sourceId: 'tm-x', rating: 5 },
-        { sourceId: 'tm-y', rating: 5 },
-        { sourceId: 'tm-z', rating: 5 },
+        { sourceId: 'tm-x', rating: 5, reviewerTeamId: 'rival-1' },
+        { sourceId: 'tm-y', rating: 5, reviewerTeamId: 'rival-2' },
+        { sourceId: 'tm-z', rating: 5, reviewerTeamId: 'rival-3' },
       ],
       'team-applicant-b': [{ sourceId: 'tm-w', rating: 2 }],
     });

@@ -533,6 +533,13 @@
     background: var(--bg);
     align-self: center;
   }
+
+  /* 다크모드에서 페이지 배경(grey50 #1a1c22)과 카드 배경(--bg #121317)의 명도
+   * 차이가 실측 1.09:1로 거의 없어 카드 경계가 안 보였다 — border 추가로 경계
+   * 확보(shadow만으로는 두 배경이 근접해 elevation이 인지되지 않는다). */
+  :root.dark .tm-auth-frame {
+    border: 1px solid var(--border);
+  }
 }
 
 /* ─── Scale-in animation for desktop filter sheet ─────────────────────────── */
@@ -638,23 +645,3 @@
   }
 }
 
-/* Generic desktop content grid. Domains may use these or define bespoke grids.
- * 2-up at >=1024, 3-up at >=1440. Card lists should target ~340-360px columns. */
-@media (min-width: 1024px) {
-  .tm-desktop-grid-2 {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
-  .tm-desktop-grid-3 {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-  }
-}
-@media (min-width: 1440px) {
-  .tm-desktop-grid-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 20px;
-  }
-}

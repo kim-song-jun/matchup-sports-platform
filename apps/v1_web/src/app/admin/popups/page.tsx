@@ -352,13 +352,13 @@ export default function AdminPopupsPage() {
             minCardWidth="100%"
             renderActions={(row) => (
               <>
-                <button type="button" onClick={() => openView(row)} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
+                <button type="button" onClick={() => openView(row)} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)] hover:border-blue-300 hover:text-[var(--blue700)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
                   <Eye size={15} aria-hidden="true" /> 조회
                 </button>
-                <button type="button" onClick={() => openEdit(row)} disabled={!canWrite || isMutating} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
+                <button type="button" onClick={() => openEdit(row)} disabled={!canWrite || isMutating} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)] hover:border-blue-300 hover:text-[var(--blue700)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
                   <Pencil size={15} aria-hidden="true" /> 수정
                 </button>
-                <button type="button" onClick={() => removePopup(row)} disabled={!canWrite || isMutating} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-red-100 bg-white px-3 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2">
+                <button type="button" onClick={() => removePopup(row)} disabled={!canWrite || isMutating} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-[var(--tint-red-border)] bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--red700)] hover:bg-[var(--tint-red)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2">
                   <Trash2 size={15} aria-hidden="true" /> 삭제
                 </button>
               </>
@@ -384,7 +384,7 @@ export default function AdminPopupsPage() {
 
         </section>
 
-        <aside className="h-fit rounded-2xl border border-gray-100 bg-white p-4 xl:sticky xl:top-6" aria-label={mode === 'view' ? '팝업 상세 조회' : mode === 'edit' ? '팝업 수정' : '팝업 생성'}>
+        <aside className="h-fit rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 xl:sticky xl:top-6" aria-label={mode === 'view' ? '팝업 상세 조회' : mode === 'edit' ? '팝업 수정' : '팝업 생성'}>
           {mode === 'view' ? (
             <PopupDetail
               popup={selectedPopup}
@@ -467,20 +467,20 @@ function PopupDetail({
     <div>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold text-blue-600">팝업 상세</p>
-          <h2 className="mt-1 text-lg font-bold text-gray-900">{popup.title}</h2>
+          <p className="text-xs font-semibold text-[var(--blue700)]">팝업 상세</p>
+          <h2 className="mt-1 text-lg font-bold text-[var(--text-strong)]">{popup.title}</h2>
         </div>
         <AdminStatusPill status={popup.status} label={STATUS_LABEL[popup.status]} />
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-3 text-sm">
-        <div><dt className="text-xs text-gray-400">게시일</dt><dd className="mt-1 text-gray-700">{formatDateTime(popup.publishedAt)}</dd></div>
-        <div><dt className="text-xs text-gray-400">수정일</dt><dd className="mt-1 text-gray-700">{formatDateTime(popup.updatedAt)}</dd></div>
-        <div className="col-span-2"><dt className="text-xs text-gray-400">노출 기간</dt><dd className="mt-1 text-gray-700">{formatDisplayWindow(popup.displayStartAt, popup.displayEndAt)}</dd></div>
-        <div className="col-span-2"><dt className="text-xs text-gray-400">노출 화면</dt><dd className="mt-1 text-gray-700">{formatTargetScreens(popup.targetScreens)}</dd></div>
-        <div className="col-span-2"><dt className="text-xs text-gray-400">정확한 경로</dt><dd className="mt-1 break-all text-gray-700">{popup.targetPaths?.length ? popup.targetPaths.join(', ') : '없음'}</dd></div>
-        <div className="col-span-2"><dt className="text-xs text-gray-400">이동 링크</dt><dd className="mt-1 break-all text-gray-700">{popup.linkUrl ? `${popup.linkLabel ?? '자세히 보기'} · ${popup.linkUrl}` : '없음'}</dd></div>
+      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-[var(--surface-soft)] p-3 text-sm">
+        <div><dt className="text-xs text-gray-400">게시일</dt><dd className="mt-1 text-[var(--text-body)]">{formatDateTime(popup.publishedAt)}</dd></div>
+        <div><dt className="text-xs text-gray-400">수정일</dt><dd className="mt-1 text-[var(--text-body)]">{formatDateTime(popup.updatedAt)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-gray-400">노출 기간</dt><dd className="mt-1 text-[var(--text-body)]">{formatDisplayWindow(popup.displayStartAt, popup.displayEndAt)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-gray-400">노출 화면</dt><dd className="mt-1 text-[var(--text-body)]">{formatTargetScreens(popup.targetScreens)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-gray-400">정확한 경로</dt><dd className="mt-1 break-all text-[var(--text-body)]">{popup.targetPaths?.length ? popup.targetPaths.join(', ') : '없음'}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-gray-400">이동 링크</dt><dd className="mt-1 break-all text-[var(--text-body)]">{popup.linkUrl ? `${popup.linkLabel ?? '자세히 보기'} · ${popup.linkUrl}` : '없음'}</dd></div>
       </dl>
-      <div className="mt-4 max-h-[440px] overflow-y-auto rounded-xl border border-gray-100 p-4 text-sm leading-7 text-gray-700">
+      <div className="mt-4 max-h-[440px] overflow-y-auto rounded-xl border border-[var(--border)] p-4 text-sm leading-7 text-[var(--text-body)]">
         <RichContentRenderer content={popup.content} legacyBody={popup.body} />
       </div>
       {canWrite && onEdit ? (
@@ -548,22 +548,22 @@ function PopupForm({
   return (
     <div>
       <div className="flex items-start justify-between gap-3">
-        <div><p className="text-xs font-semibold text-blue-600">화면 안내 팝업</p><h2 className="mt-1 text-lg font-bold text-gray-900">{mode === 'create' ? '새 팝업 생성' : '팝업 수정'}</h2></div>
-        <button type="button" onClick={onCancel} disabled={saving} aria-label="편집 닫기" className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500">
+        <div><p className="text-xs font-semibold text-[var(--blue700)]">화면 안내 팝업</p><h2 className="mt-1 text-lg font-bold text-[var(--text-strong)]">{mode === 'create' ? '새 팝업 생성' : '팝업 수정'}</h2></div>
+        <button type="button" onClick={onCancel} disabled={saving} aria-label="편집 닫기" className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-soft)] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500">
           <X size={19} aria-hidden="true" />
         </button>
       </div>
       <form className="mt-4 flex flex-col gap-3" onSubmit={onSubmit}>
-        <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">제목</span><input value={title} onChange={(event) => onTitleChange(event.target.value)} maxLength={120} disabled={!canWrite || saving} required className="h-[44px] rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="팝업 제목" /></label>
-        <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">공개 상태</span><select value={status} onChange={(event) => onStatusChange(event.target.value as V1AdminPopupStatus)} disabled={!canWrite || saving} className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50">{EDITABLE_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-        <fieldset className="rounded-xl border border-gray-200 p-3">
-          <legend className="px-1 text-sm font-semibold text-gray-700">노출 화면</legend>
-          <p className="mb-3 text-xs leading-5 text-gray-500">팝업을 보여줄 화면을 하나 이상 선택해 주세요. 상세·등록 화면도 해당 영역에 포함돼요.</p>
+        <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">제목</span><input value={title} onChange={(event) => onTitleChange(event.target.value)} maxLength={120} disabled={!canWrite || saving} required className="h-[44px] rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" placeholder="팝업 제목" /></label>
+        <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">공개 상태</span><select value={status} onChange={(event) => onStatusChange(event.target.value as V1AdminPopupStatus)} disabled={!canWrite || saving} className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]">{EDITABLE_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <fieldset className="rounded-xl border border-[var(--border)] p-3">
+          <legend className="px-1 text-sm font-semibold text-[var(--text-body)]">노출 화면</legend>
+          <p className="mb-3 text-xs leading-5 text-[var(--text-muted)]">팝업을 보여줄 화면을 하나 이상 선택해 주세요. 상세·등록 화면도 해당 영역에 포함돼요.</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {POPUP_TARGET_OPTIONS.map((option) => {
               const checked = targetScreens.includes(option.value);
               return (
-                <label key={option.value} className="flex min-h-[48px] cursor-pointer items-start gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:border-blue-200">
+                <label key={option.value} className="flex min-h-[48px] cursor-pointer items-start gap-2 rounded-lg border border-[var(--border)] px-3 py-2 hover:border-blue-200">
                   <input
                     type="checkbox"
                     value={option.value}
@@ -574,48 +574,48 @@ function PopupForm({
                         ? targetScreens.filter((screen) => screen !== option.value)
                         : [...targetScreens, option.value],
                     )}
-                    className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                    className="mt-1 h-4 w-4 rounded border-[var(--border-strong)] text-blue-500 focus:ring-blue-500"
                   />
-                  <span><span className="block text-sm font-medium text-gray-700">{option.label}</span><span className="block text-xs text-gray-400">{option.description}</span></span>
+                  <span><span className="block text-sm font-medium text-[var(--text-body)]">{option.label}</span><span className="block text-xs text-gray-400">{option.description}</span></span>
                 </label>
               );
             })}
           </div>
         </fieldset>
-        <fieldset className="rounded-xl border border-gray-200 p-3">
-          <legend className="px-1 text-sm font-semibold text-gray-700">정확한 화면 <span className="font-normal text-gray-400">(선택)</span></legend>
-          <p className="mb-3 text-xs leading-5 text-gray-500">설정하면 해당 경로에서 화면 그룹 팝업보다 먼저 노출돼요. 대회를 선택하면 상세 경로가 자동으로 입력돼요.</p>
+        <fieldset className="rounded-xl border border-[var(--border)] p-3">
+          <legend className="px-1 text-sm font-semibold text-[var(--text-body)]">정확한 화면 <span className="font-normal text-gray-400">(선택)</span></legend>
+          <p className="mb-3 text-xs leading-5 text-[var(--text-muted)]">설정하면 해당 경로에서 화면 그룹 팝업보다 먼저 노출돼요. 대회를 선택하면 상세 경로가 자동으로 입력돼요.</p>
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-semibold text-gray-700">특정 대회 상세</span>
+            <span className="text-sm font-semibold text-[var(--text-body)]">특정 대회 상세</span>
             <select
               value={targetPath.startsWith('/tournaments/') ? targetPath.slice('/tournaments/'.length) : ''}
               onChange={(event) => onTargetPathChange(event.target.value ? `/tournaments/${event.target.value}` : '')}
               disabled={!canWrite || saving}
-              className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50"
+              className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]"
             >
               <option value="">선택하지 않음</option>
               {tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.title}</option>)}
             </select>
           </label>
           <label className="mt-3 flex flex-col gap-1.5">
-            <span className="text-sm font-semibold text-gray-700">정확한 내부 경로</span>
+            <span className="text-sm font-semibold text-[var(--text-body)]">정확한 내부 경로</span>
             <input
               value={targetPath}
               onChange={(event) => onTargetPathChange(event.target.value)}
               maxLength={500}
               disabled={!canWrite || saving}
-              className="h-[44px] rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50"
+              className="h-[44px] rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]"
               placeholder="/tournaments/대회-id"
             />
           </label>
         </fieldset>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">이동 링크 <span className="font-normal text-gray-400">(선택)</span></span><input value={linkUrl} onChange={(event) => onLinkUrlChange(event.target.value)} maxLength={500} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="/matches 또는 https://..." /></label>
-          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">버튼 문구 <span className="font-normal text-gray-400">(선택)</span></span><input value={linkLabel} onChange={(event) => onLinkLabelChange(event.target.value)} maxLength={40} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="자세히 보기" /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">이동 링크 <span className="font-normal text-gray-400">(선택)</span></span><input value={linkUrl} onChange={(event) => onLinkUrlChange(event.target.value)} maxLength={500} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" placeholder="/matches 또는 https://..." /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">버튼 문구 <span className="font-normal text-gray-400">(선택)</span></span><input value={linkLabel} onChange={(event) => onLinkLabelChange(event.target.value)} maxLength={40} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" placeholder="자세히 보기" /></label>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">노출 시작</span><input type="datetime-local" value={displayStartAt} onChange={(event) => onDisplayStartAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" /></label>
-          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">노출 종료</span><input type="datetime-local" value={displayEndAt} min={displayStartAt || undefined} onChange={(event) => onDisplayEndAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">노출 시작</span><input type="datetime-local" value={displayStartAt} onChange={(event) => onDisplayStartAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-[var(--text-body)]">노출 종료</span><input type="datetime-local" value={displayEndAt} min={displayStartAt || undefined} onChange={(event) => onDisplayEndAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)]" /></label>
         </div>
         <RichTextEditor
           value={content}
@@ -623,7 +623,7 @@ function PopupForm({
           onUploadImage={onUploadImage}
           disabled={!canWrite || saving}
         />
-        <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">각 화면에서는 공개 상태이고 노출 기간 안에 있는 팝업 중 가장 최근 항목 하나를 보여줘요. 내부 링크는 /로 시작하고 외부 링크는 https://만 사용할 수 있어요.</p>
+        <p className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-xs leading-5 text-[var(--text-muted)]">각 화면에서는 공개 상태이고 노출 기간 안에 있는 팝업 중 가장 최근 항목 하나를 보여줘요. 내부 링크는 /로 시작하고 외부 링크는 https://만 사용할 수 있어요.</p>
         <button type="submit" disabled={!canWrite || saving} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">{saving ? '저장 중...' : mode === 'create' ? '팝업 생성' : '수정 저장'}</button>
       </form>
     </div>

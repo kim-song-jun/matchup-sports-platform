@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
   useV1CancelTeamInvitation,
+  useV1ChangeMembershipJersey,
   useV1ChangeTeamMembershipRole,
   useV1CreateTeamJoinApplication,
   useV1LeaveTeam,
@@ -37,6 +38,7 @@ import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/l
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { JerseyNumberDialog } from './jersey-number-dialog';
 import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
@@ -230,11 +232,19 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             meta: member.role,
             status: member.role === 'owner' || member.role === 'manager' ? '관리자' : '활동중',
             visibility: query.data.membersVisibilityEnabled ? '공개' : '비공개',
+            // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
+            profileHref: `/users/${member.userId}`,
           })),
           memberAccess: {
             canView: query.data.canViewMembers,
             enabled: query.data.membersVisibilityEnabled,
             message: '',
+            // memberCount는 활성 멤버만 세는 캐시 필드지만 비동기 드리프트 가능성을 배제할 수
+            // 없으므로(예: standings-wrong-check-fixture-status-first 류 캐시 불일치) 음수로
+            // 내려가지 않게 0으로 floor한다 — "+ -2명 더보기" 같은 값을 절대 렌더하지 않기 위함.
+            moreCount: query.data.canViewMembers
+              ? Math.max(0, query.data.memberCount - query.data.membersPreview.length)
+              : 0,
           },
         },
         mode: toDetailMode(query.data, eligibility.data),
@@ -279,6 +289,10 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
   const viewerRole = team.data?.viewer.role;
   const viewerMembershipId = team.data?.viewer.membershipId ?? null;
+  /** 등번호를 고칠 대상. null이면 다이얼로그가 닫혀 있다. */
+  const [jerseyTarget, setJerseyTarget] = useState<{ membershipId: string; name: string; current: number | null } | null>(null);
+  const [jerseyError, setJerseyError] = useState<string | null>(null);
+  const changeJersey = useV1ChangeMembershipJersey(teamId);
   const canManageMembers = isTeamOperatorRole(viewerRole);
   const canDelegateOwner = viewerRole === 'owner';
   const canManageInvitations = canManageMembers;
@@ -390,6 +404,11 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
             delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
             demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
+            editJersey: () => setJerseyTarget({
+              membershipId: member.membershipId,
+              name: member.displayName,
+              current: member.jerseyNumber ?? null,
+            }),
             remove: () => confirmAction(confirm, {
               title: '멤버 내보내기',
               message: `${member.displayName}님을 팀에서 내보낼까요? 팀에 저장된 활동 기록은 유지돼요.`,
@@ -478,6 +497,30 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
       <TeamMembersPageView model={model} backHref={`/teams/${teamId}`} />
+      <JerseyNumberDialog
+        open={jerseyTarget !== null}
+        memberName={jerseyTarget?.name ?? ''}
+        current={jerseyTarget?.current ?? null}
+        saving={changeJersey.isPending}
+        error={jerseyError}
+        onClose={() => {
+          setJerseyTarget(null);
+          setJerseyError(null);
+        }}
+        onSave={(jerseyNumber) => {
+          if (jerseyTarget === null) return;
+          setJerseyError(null);
+          changeJersey.mutate(
+            { membershipId: jerseyTarget.membershipId, jerseyNumber },
+            {
+              onSuccess: () => setJerseyTarget(null),
+              // 같은 번호를 쓰는 팀원이 있으면 서버가 409로 막는다 — 다이얼로그를 열어 둔
+              // 채로 이유를 보여줘야 다른 번호를 바로 넣을 수 있다.
+              onError: (error) => setJerseyError(extractErrorMessage(error, '등번호를 저장하지 못했어요.')),
+            },
+          );
+        }}
+      />
     </>
   );
 }
@@ -810,6 +853,7 @@ function toMemberModel(
     delegateOwner: () => void;
     demote: () => void;
     remove: () => void;
+    editJersey: () => void;
     /** 본인 행에만 설정 — 나머지 멤버 행은 undefined */
     selfLeave?: { pending: boolean; error?: string | null; activeOwnerCount: number | undefined; onSelect: () => void };
   },
@@ -825,12 +869,25 @@ function toMemberModel(
   if (actions.canManageMembers && member.canRemove && member.role !== 'owner') {
     itemActions.push({ label: '내보내기', tone: 'danger', onSelect: actions.remove });
   }
+  // 등번호는 권한 계층과 무관한 팀 살림이라 owner 행에도 붙는다 — 주장이 7번을 달 수
+  // 없으면 이상하다. 서버가 canEditJersey를 그 기준으로 계산해 준다.
+  if (member.canEditJersey === true) {
+    itemActions.push({
+      label: member.jerseyNumber === null || member.jerseyNumber === undefined ? '등번호 지정' : '등번호 변경',
+      onSelect: actions.editJersey,
+    });
+  }
   const ownerCanLeave = member.role !== 'owner' || (actions.selfLeave?.activeOwnerCount ?? 0) > 1;
 
   return {
     name: member.displayName,
     role: roleLabel(member.role),
-    meta: `가입 ${formatDate(member.joinedAt)}`,
+    // 등번호가 있으면 가입일과 함께 보여준다 — 라인업을 짤 때 누가 몇 번인지 여기서
+    // 바로 확인할 수 있어야 팀원 화면과 라인업 화면이 따로 놀지 않는다.
+    meta:
+      member.jerseyNumber === null || member.jerseyNumber === undefined
+        ? `가입 ${formatDate(member.joinedAt)}`
+        : `${member.jerseyNumber}번 · 가입 ${formatDate(member.joinedAt)}`,
     profileHref: `/users/${member.userId}`,
     locked: member.role === 'owner',
     actions: itemActions,

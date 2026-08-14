@@ -18,6 +18,8 @@ import { PopupsModule } from './popups/popups.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
+import { TeamLineupsModule } from './team-lineups/team-lineups.module';
+import { TeamSchedulesModule } from './team-schedules/team-schedules.module';
 import { ChatModule } from './chat/chat.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -31,6 +33,14 @@ import { VerificationModule } from './verification/verification.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { LogsModule } from './logs/logs.module';
 import { ErrorLogsModule } from './error-logs/error-logs.module';
+import { GamesModule } from './games/games.module';
+import { GameOperationFlagsModule } from './config/game-operation-flags.module';
+import { TournamentFixtureLineupModule } from './tournament-operations/lineups/tournament-fixture-lineup.module';
+import { TournamentOperationsStaffModule } from './tournament-operations/staff/tournament-operations-staff.module';
+import { TournamentOperationsBoardModule } from './tournament-operations/board/tournament-operations-board.module';
+import { TournamentOperationsFieldsModule } from './tournament-operations/fields/tournament-operations-fields.module';
+import { TournamentFixtureVideosModule } from './tournaments/videos/tournament-fixture-videos.module';
+import { TeamMatchSeriesModule } from './team-match-series/team-match-series.module';
 
 @Module({
   imports: [
@@ -54,6 +64,10 @@ import { ErrorLogsModule } from './error-logs/error-logs.module';
     NoticesModule,
     TeamsModule,
     TeamMatchesModule,
+    TeamLineupsModule,
+    TeamSchedulesModule,
+    GamesModule,
+    GameOperationFlagsModule,
     ChatModule,
     RealtimeModule,
     NotificationsModule,
@@ -63,9 +77,15 @@ import { ErrorLogsModule } from './error-logs/error-logs.module';
     ReviewsModule,
     UploadsModule,
     TournamentsModule,
+    TeamMatchSeriesModule,
     VerificationModule,
     IntegrationsModule,
     LogsModule,
+    TournamentFixtureLineupModule,
+    TournamentOperationsStaffModule,
+    TournamentOperationsFieldsModule,
+    TournamentOperationsBoardModule,
+    TournamentFixtureVideosModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: V1ThrottlerGuard },

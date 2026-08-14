@@ -30,10 +30,16 @@ type PromoCardFieldsProps = {
   uploading?: boolean;
   disabled?: boolean;
   priorityError?: string;
+  /**
+   * 이 자리를 비워뒀을 때 실제로 노출될 기본 이미지 — 보통 대회 커버지만, 커버가 없으면
+   * 다른 홍보 자리의 이미지일 수도 있다(resolveTournamentImage 의 폴백 순서). 호출자가 자기
+   * 자리를 뺀 폴백 결과를 계산해 넘겨야 미리보기가 공개 화면과 어긋나지 않는다.
+   */
+  defaultImageUrl?: string | null;
 };
 
 const inputClass =
-  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 export function PromoCardFields({
   variant,
@@ -44,6 +50,7 @@ export function PromoCardFields({
   uploading = false,
   disabled = false,
   priorityError,
+  defaultImageUrl,
 }: PromoCardFieldsProps) {
   const generatedId = useId().replaceAll(':', '');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -52,11 +59,13 @@ export function PromoCardFields({
     key: K,
     fieldValue: TournamentPromoCardValue[K],
   ) => onChange({ ...value, [key]: fieldValue });
+  const trimmedDefaultImageUrl = defaultImageUrl?.trim() ?? '';
+  const usingDefaultImage = !value.imageUrl.trim() && Boolean(trimmedDefaultImageUrl);
   const previewFields = {
     title: value.title,
     subtitle: value.subtitle,
     badgeText: value.badgeText,
-    imageUrl: value.imageUrl,
+    imageUrl: value.imageUrl.trim() || trimmedDefaultImageUrl,
     dateText: value.dateText,
     teamsText: value.teamsText,
     locationText: value.locationText,
@@ -74,7 +83,7 @@ export function PromoCardFields({
             저장 전에 실제 카드 형태를 확인할 수 있어요.
           </p>
         </div>
-        <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-white px-3 text-sm font-semibold text-[var(--text-body)]">
+        <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">
           <input
             type="checkbox"
             checked={value.enabled}
@@ -171,6 +180,7 @@ export function PromoCardFields({
           <input
             id={`${prefix}-priority`}
             type="number"
+            inputMode="numeric"
             min={0}
             max={9999}
             value={value.priority}
@@ -189,7 +199,7 @@ export function PromoCardFields({
                 onChange={(event) => update('imageUrl', event.target.value)}
                 disabled={disabled}
                 maxLength={1000}
-                placeholder="/uploads/..."
+                placeholder={trimmedDefaultImageUrl ? '비우면 기본 이미지 사용' : '/uploads/...'}
                 className={`${inputClass} min-w-[220px] flex-1`}
               />
               {onSelectImage ? (
@@ -210,14 +220,33 @@ export function PromoCardFields({
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     disabled={disabled || uploading}
-                    className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-600 disabled:opacity-50"
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--tint-blue-border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--blue700)] disabled:opacity-50"
                   >
                     <ImagePlus size={16} aria-hidden="true" />
                     {uploading ? '업로드 중…' : '이미지 업로드'}
                   </button>
                 </>
               ) : null}
+              {trimmedDefaultImageUrl && !usingDefaultImage ? (
+                <button
+                  type="button"
+                  onClick={() => update('imageUrl', '')}
+                  disabled={disabled}
+                  className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50"
+                >
+                  기본 이미지로
+                </button>
+              ) : null}
             </div>
+            <p className="mt-1.5 text-xs text-[var(--text-caption)]">
+              {trimmedDefaultImageUrl
+                ? usingDefaultImage
+                  ? '기본 이미지를 쓰고 있어요. 이 카드만 다르게 하려면 업로드해 주세요.'
+                  : '이 카드 전용 이미지를 쓰고 있어요. 비우면 기본 이미지로 돌아가요.'
+                : value.imageUrl.trim()
+                  ? '다른 자리에 이미지가 없어서, 이 이미지가 대표 이미지 자리에도 함께 쓰여요.'
+                  : '대표 이미지를 올리면 비워둔 이 자리에도 함께 쓰여요.'}
+            </p>
           </Field>
         </div>
       </div>

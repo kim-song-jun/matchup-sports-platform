@@ -54,6 +54,7 @@
   }
 
   .tm-notification-card:hover {
+    /* 페이지 배경(--bg) 위 hover tint — main과 동일한 --grey50 */
     background: var(--grey50);
   }
 

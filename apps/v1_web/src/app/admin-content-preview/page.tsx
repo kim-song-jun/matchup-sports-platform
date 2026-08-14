@@ -30,7 +30,7 @@ export default function AdminContentPreviewPage() {
 
   if (payload.kind === 'popup') {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-[var(--surface-soft)]">
         <HomePopupDialog
           popup={{
             id: `admin-preview-${revision}`,
@@ -66,5 +66,5 @@ export default function AdminContentPreviewPage() {
 }
 
 function PreviewStatus({ label }: { label: string }) {
-  return <main className="grid min-h-screen place-items-center bg-gray-50 p-6 text-sm text-gray-500">{label}</main>;
+  return <main className="grid min-h-screen place-items-center bg-[var(--surface-soft)] p-6 text-sm text-[var(--text-muted)]">{label}</main>;
 }

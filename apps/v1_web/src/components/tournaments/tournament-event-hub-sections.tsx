@@ -26,7 +26,7 @@ export function TournamentApplicationGuideSection() {
   const steps = [
     {
       title: '팀 준비',
-      body: 'TeamMeet 회원가입 후 팀을 만들거나 기존 팀에 합류해요. 대회 신청은 팀장과 운영진이 진행할 수 있어요.',
+      body: '팀밋 회원가입 후 팀을 만들거나 기존 팀에 합류해요. 대회 신청은 팀장과 운영진이 진행할 수 있어요.',
     },
     {
       title: '팀 선택',
@@ -63,13 +63,17 @@ export function TournamentApplicationGuideSection() {
             <li key={step.title} style={{ display: 'grid', gridTemplateColumns: '28px 1fr', gap: 10 }}>
               <span
                 aria-hidden="true"
-                className="tab-num"
+                className="tab-num tm-guide-step-num"
+                // 2026-08-11: "대회는 이렇게 진행돼요" 스텝 가이드(tournaments/page.tsx)와
+                // 동일한 순수 안내용 번호 배지 — 무채색으로 통일
+                // 2026-08-12: [인라인 style 우선순위 fix] 배경을 인라인으로 두면 다크모드
+                // 전용 클래스 오버라이드(.tm-guide-step-num, globals.css)가 절대 못 이겨서
+                // 배지가 여전히 카드에 녹아 사라졌다 — 배경은 CSS 클래스로만 관리.
                 style={{
                   width: 28,
                   height: 28,
                   borderRadius: 14,
-                  background: 'var(--blue50)',
-                  color: 'var(--blue500)',
+                  color: 'var(--text-strong)',
                   display: 'grid',
                   placeItems: 'center',
                   fontSize: 'var(--font-size-caption)',

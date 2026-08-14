@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* 다크모드 전략을 OS 자동(prefers-color-scheme, Tailwind v4 기본값)에서 수동 토글
+ * (class 기반)로 전환한다. `<html>`에 .dark 클래스가 있을 때만 dark: 유틸리티가
+ * 적용된다 — 적용 여부는 ThemeProvider(src/components/providers/theme-provider.tsx)가
+ * 계정/로컬 선호도를 읽어 결정하며, 기본값은 always light다(OS 설정과 무관). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* [공개 화면 R-T2 정리] Tailwind text-2xs(11px) 유틸리티 — 코드베이스 전체에 사용처가
+ * 0건이라 삭제(죽은 코드). R-T2 하한(12px) 미달이기도 해 되살릴 이유도 없다. */
+
 @font-face {
   font-family: "Pretendard Variable";
   src: url("/fonts/PretendardVariable.woff2") format("woff2");
@@ -25,11 +34,16 @@
   --red50: #feebec;
   --red500: #f04452;
   --red700: #b42332;
+  --green700: #037a4a; /* green500/600은 라이트에서도 자신의 green50 배경·흰 배경 위 AA(4.5:1) 미달
+     (green600 vs green50 3.12:1, vs white 3.46:1) — blue700/red700과 동일하게 짙은 버전을 별도 토큰화 */
   --yellow50: #fff8d6;
   --yellow500: #ffc342;
   --teal50: #e2f7f8;
   --teal500: #0eb8c0;
   --teal600: #0da6ad; /* teal500과 동일한 명도차로 파생 — 종목 아이콘 그라디언트용 */
+  --teal700: #096d72; /* teal500(#0eb8c0)은 자신의 teal50 배경 위 2.43:1로 AA(4.5:1) 미달 —
+     blue700/green700과 동일하게 같은 색상(hue 183°)을 유지한 채 명도만 낮춘 짙은 버전을
+     텍스트 전용 토큰으로 추가(teal50 배경 위 5.49:1, 흰 배경 위 6.10:1 통과). */
   --grey50: #f9fafb;
   --grey100: #f2f4f6;
   --grey150: #eaedf0;
@@ -90,8 +104,12 @@
   /* 톤 카드 틴트 배경 */
   --tint-green: rgba(3, 178, 108, 0.08);   /* --green500(#03b26c) 8% — 녹색 안내 카드 */
   --tint-orange: rgba(254, 152, 0, 0.10);  /* --orange500(#fe9800) 10% — 주황 안내 카드 */
+  --tint-orange-border: rgba(254, 152, 0, 0.30); /* --orange500 30% — 주황 카드 테두리 (전수검수: amber-* 하드코딩 치환) */
+  --tint-red: rgba(240, 68, 82, 0.08);     /* --red500(#f04452) 8% — 빨강 안내 카드 배경 (전수검수: red-50 하드코딩 치환) */
+  --tint-red-border: rgba(240, 68, 82, 0.28); /* --red500 28% — 빨강 카드 테두리 */
   --tint-grey: rgba(107, 118, 132, 0.10);  /* --grey600(#6b7684, --text-muted) 10% — 중립(마감/종료) 안내 카드 */
   --tint-blue-border: rgba(49, 130, 246, 0.24); /* --blue500(#3182f6) 24% — 파란 카드 테두리 */
+  --tint-blue: rgba(49, 130, 246, 0.08);   /* --blue500(#3182f6) 8% — 파란 안내 카드 배경, var(--blue50) 다크모드 미대응 대체 */
   /* 어두운 스크림 / 오버레이 (히어로 카드, 서랍, 토스트) */
   --scrim-dark-32: rgba(25, 31, 40, 0.32);  /* 대화상자 스크림 */
   --scrim-dark-72: rgba(25, 31, 40, 0.72);  /* 히어로 하단바 배경 */
@@ -125,6 +143,42 @@
   /* 대회 상금 / 보조 색 */
   --prize-gold: #ffd84d;
   --orange600: #f08a00;
+  /* orange500(#fe9800) 배경 + 흰 텍스트는 WCAG AA 4.5:1 미달(실측 ~2.16:1) — 피치 배치
+     골키퍼 마커(pitch-formation-editor.tsx)의 등번호 텍스트에서 실제로 미달을 확인했다
+     (2026-08 QA). blue700(#1b64da, ~5.41:1)과 짝을 맞춰 orange 쪽에도 4.5:1을 넘는
+     진한 변형을 추가한다.
+     2026-08-11 재계산: 원래 #a36100은 흰 배경(4.92:1)·--tint-orange 위에서는 통과하지만
+     .tm-badge-orange의 자체 틴트 배경(--orange50 #fff3e0)에서는 4.487:1로 근소 미달—
+     #965300으로 한 단계 더 짙게 해 orange50(5.42:1)·흰 배경(5.94:1) 양쪽 여유를 확보했다.
+     --orange700을 텍스트로 쓰는 다른 소비처(전부 --tint-orange 이상 밝기의 배경)는
+     어두워질수록 대비가 늘어나는 방향이라 회귀 없음. */
+  --orange700: #965300;
+  /* 피치 배치 선수 마커(PlayerToken/GK 배지, pitch-formation-editor.tsx) 전용 — 원형
+     배경 + 흰 텍스트 조합의 대비를 테마 무관하게 항상 보장해야 하는 solid chip 색이다.
+     --blue700/--orange700은 2026-08-10 전수검수로 다크모드에서 "카드/틴트 배경 위
+     텍스트"용 밝은 값(각각 #6ba8ff, --orange500)으로 재정의됐는데, 그 값을 배경으로
+     쓰고 흰 텍스트를 얹으면 대비가 무너진다(재계산: 다크 --blue700 배경 + 흰 글씨
+     ≈2.42:1, 다크 --orange700 배경 + 흰 글씨 ≈2.16:1 — 둘 다 WCAG AA 4.5:1 미달,
+     원래 --orange500 텍스트 대비 결함과 동일한 유형이 배경 용도로 재발). 라이트 700
+     hex(#1b64da/#a36100) 자체는 흰 텍스트를 얹는 배경으로도 4.5:1을 넘어(재계산:
+     blue 5.41:1, orange 4.92:1) kakao-yellow/naver-green과 같은 패턴(브랜드/고정
+     chip 색은 다크모드에도 동일 값 유지)으로 고정한다 — :root.dark 오버라이드 없음. */
+  --player-marker-blue: #1b64da;
+  --player-marker-orange: #a36100;
+  /* 라인업 피치 보드(.tm-pitch-board) 크기 상한. 여기 값은 모바일 기준 — 높이는 제약하지
+     않고 폭만 420px로 묶는다(피치 컴포넌트 인라인 style의 fallback과 같은 값). 데스크톱
+     에서는 desktop/tournaments.css가 뷰포트 높이에 맞춰 둘 다 덮어쓰며, 그때 폭을 높이에
+     연동해 축구장 비율(1:1.544)이 깨지지 않게 한다 — 높이만 자르면 피치가 뭉툭해진다. */
+  --tm-pitch-max-h: none;
+  --tm-pitch-max-width: 420px;
+  /* WeatherStrip 아이콘 대비 결함(2026-08-12 실측) — .tm-weather-icon(기본, 맑음)이
+     yellow500(#ffc342) on yellow50(#fff8d6) 1.50:1, .tm-weather-icon-thunderstorm이
+     orange500 on orange50 1.97:1로 아이콘 최소 기준(WCAG 1.4.11, 3:1) 미달. orange는
+     기존 --orange700(#965300, 5.42:1 on orange50)을 재사용. yellow는 짝이 되는 700
+     토큰이 없어 동일 패턴(blue700/green700/red700/orange700 — 500이 자기 50 틴트
+     배경에서 AA 미달할 때 짙은 변형을 별도 토큰화)으로 신규 추가: #a66c00은
+     yellow50 배경에서 4.12:1(3:1 여유 확보). */
+  --yellow700: #a66c00;
   /* ── 타입 스케일 토큰 — desktop/tournaments.css 대진표·라운드 카드 타이포 ── */
   --font-size-micro: 11px;
   --font-size-caption: 12px;
@@ -159,11 +213,22 @@
   --button-fill-primary-hover:  var(--blue600);
   --button-fill-neutral:        var(--grey100);
   --button-fill-danger:         var(--red500);
+  /* --orange700은 텍스트/뱃지 대비 확보용으로 다크모드에서 --orange500과 동일하게
+   * 오버라이드된다(라인 ~315 주석 참고) — 그 토큰을 버튼 hover 배경에 재사용하면
+   * 다크모드에서 resting/hover 배경이 완전히 같아져 hover 피드백이 사라진다.
+   * --orange600은 다크모드에서 오버라이드되지 않아 항상 --orange500과 구분되므로
+   * 버튼 hover 전용 component 토큰으로 별도 관리한다. */
+  --button-fill-warning:        var(--orange500);
+  --button-fill-warning-hover:  var(--orange600);
   --button-text-primary:        var(--static-white);
   --button-text-neutral:        var(--text-strong);
-  /* Card */
+  /* Card
+   * 카드 표면은 흰색으로 고정한다(다크는 아래 .dark 블록에서 #1c1e24로 오버라이드).
+   * 페이지 배경(--bg)과 같은 값이므로 라이트에서 카드는 --card-border로 구분되고,
+   * 서브 영역(패널·요약바 등)은 그 사이 단계인 --grey50/100을 쓴다.
+   * DESIGN.md: "카드는 배경색 차이로 구분한다: … gray-50 카드 on 흰 배경". */
   --card-border:                var(--border);
-  --card-surface:               var(--bg);
+  --card-surface:               #ffffff;
   --card-radius:                16px;
   /* List row — 원래 시각(grey50 bg / grey100 border) 유지 (component 토큰 계층만 정리) */
   --list-row-bg:                var(--grey50);
@@ -176,8 +241,7 @@
   --input-placeholder:          var(--text-caption);
 
   /* ── [P1 State-layer] 공통 상호작용 투명도 토큰 (M3 state-layer 모델) ───────
-   * hover 4% / pressed 8% — 컴포넌트마다 제각각이던 hover/active 피드백을 일괄 통일.
-   * 실제 사용처: .tm-card.tm-interactive, .tm-list-row.tm-interactive ───────── */
+   * hover 4% / pressed 8% — 컴포넌트마다 제각각이던 hover/active 피드백을 일괄 통일. ───────── */
   --state-hover-opacity: 0.04;
   --state-pressed-opacity: 0.08;
 
@@ -210,6 +274,117 @@
      거의 안 보였다. 4/1로 완화해 세로 가시 영역을 넓혀 사진 하단부가 안정적으로
      드러나도록 함(1440px 데스크톱 실측: 라이브 스크린샷으로 확인 완료). */
   --tm-tournament-banner-ratio: 4 / 1;
+}
+
+/* ── 핵심 다크모드 토큰 ────────────────────────────────────────────
+ * team-schedules / team-matches 화면은 여기까지만 커버(토큰 참조 소비처에 자동
+ * 전파). 개별 화면의 하드코딩 색(Tailwind gray-*, 인라인 hex 등)은 이번 범위 밖 —
+ * 남은 작업으로 PR 본문에 기록한다. tournament-ops(운영 콘솔)는 이미 Tailwind
+ * `dark:` 클래스를 전면 사용 중이라 이 토큰과 무관하게 별도로 대응돼 있다.
+ * `@theme` 안이 아니라 `:root`를 오버라이드하므로 Tailwind 유틸리티가 아니라
+ * CSS 커스텀 프로퍼티를 직접 참조하는 컴포넌트 스타일에 적용된다.
+ * 과거엔 `@media (prefers-color-scheme: dark)`로 OS 설정에 자동 반응했으나,
+ * 수동 토글(ThemeProvider가 <html>에 .dark 클래스를 부여) 도입 이후 클래스
+ * 셀렉터로 전환했다 — 위 @custom-variant dark 와 동일한 `.dark` 클래스를
+ * 기준으로 삼아 Tailwind dark: 유틸리티와 항상 같은 상태를 본다. */
+:root.dark {
+  color-scheme: dark;
+  /* 그레이 스케일도 명도를 반전해 함께 뒤집는다 — .tm-app-frame 같은 공유 셸이
+   * 세만틱 토큰이 아니라 --grey50/100 원시값을 페이지 배경/보더로 직접 참조하는
+   * 경우가 많아(R-X4 위반이지만 기존 코드), 이 스케일을 그대로 두면 텍스트
+   * 토큰만 밝게 뒤집혀 옅은 회색 배경 위에 거의 안 보이는 텍스트가 되는 실측
+   * 대비 회귀가 있었다(스크린샷으로 확인). --border/--list-row-* 등 이미 다크
+   * 값을 가진 시맨틱 토큰과 동일한 명도 지점에 맞춰 매핑한다. */
+  --grey50: #1a1c22;
+  --grey100: #1c1e24;
+  --grey150: #20222a;
+  --grey200: #262932;
+  --grey300: #333a45;
+  --grey400: #4e5968;
+  --grey500: #6b7684;
+  --grey600: #8b95a1;
+  --grey700: #9aa4b2;
+  --grey800: #d1d6db;
+  --grey900: #f2f4f6;
+  --bg: #121317;
+  --background: var(--bg);
+  --surface: #1c1e24;
+  --surface-soft: #24262d;
+  --foreground: #f2f4f6;
+  --text-strong: #f2f4f6;
+  --text: #d1d6db;
+  --text-body: #d1d6db;
+  --text-muted: #9aa4b2;
+  --text-caption: #9aa4b2;
+  --muted: var(--text-muted);
+  --border: #333a45;
+  --border-strong: #4e5968;
+  --line: var(--border);
+  --card-surface: #1c1e24;
+  --list-row-bg: var(--grey150);
+  --list-row-border: #262932;
+  --input-surface: var(--surface);
+  /* 파스텔 배경 토큰(50/100)도 함께 뒤집는다 — 이 값들은 원래 라이트 전용 고정값이라
+   * 화면 곳곳(대회·매치·팀·인증 등 40여 곳)에서 var(--blue50) 등을 배경으로 직접
+   * 참조하는 카드/배지가 다크모드에서도 밝은 파스텔 그대로 남아 튀는 문제가 있었다
+   * (실측: 대회 목록 "이벤트 허브" 배너 등). --tint-blue/--tint-blue-border와 같은
+   * 방식(강조색을 낮은 alpha로 배경에 얹기)으로 어두운 카드 표면 톤에 자연스럽게
+   * 녹아들게 하고, 페어링되는 텍스트는 대개 고정 강조색(--blue700 등)이나 시맨틱
+   * 토큰(--text-strong 등, 이미 위에서 뒤집힘)이라 대비가 무너지지 않는다. */
+  --blue50: rgba(49, 130, 246, 0.14);
+  --blue100: rgba(49, 130, 246, 0.24);
+  --green50: rgba(3, 178, 108, 0.14);
+  --orange50: rgba(254, 152, 0, 0.16);
+  --red50: rgba(240, 68, 82, 0.16);
+  --teal50: rgba(14, 184, 192, 0.16);
+  --yellow50: rgba(255, 195, 66, 0.16);
+  /* 전수검수(2026-08-10)로 발견한 시스템적 대비 결함: blue700/orange700/red700은
+   * 원래 "라이트 모드에서 500계열이 AA를 못 넘어 대신 쓰는 짙은 강조 텍스트색"으로
+   * 설계됐다(위 auth-page.tsx 주석 "blue500(3.71:1 불통과) → blue700(5.41:1 통과)"
+   * 참조). 그런데 이 고정 hex들은 다크모드에서 그대로 유지되면서 배경만 어두워져
+   * (카드 표면·자신의 -50 틴트 배경 모두 대상) 오히려 대비가 무너진다 — 계산 실측:
+   * blue700 3.08:1(카드)/2.6:1(자신의 틴트), orange700 3.39/2.53, red700 2.56/2.16,
+   * 전부 4.5:1 미달. 500계열도 자신의 다크 틴트 배경에 얹히면 근소하게 미달한다
+   * (blue500 3.78, red500 3.79). 개별 호출부가 아니라 토큰 자체를 다크에서 밝게
+   * 오버라이드한다 — 카드 표면(#1c1e24)과 각자의 다크 틴트 배경 양쪽에 4.5:1 이상
+   * 확보한 값으로 재계산해 선택. orange는 이미 다크에서 잘 보이는 --orange500을
+   * 재사용, red는 이 파일에 이미 쓰이던 #ff6b76(.tm-bk2-badge-live 등)과 통일. */
+  --blue700: #6ba8ff;
+  --orange700: var(--orange500);
+  /* --yellow700(light #a66c00)도 동일 이유로 다크에서 --yellow500 재사용 — 다크
+     yellow50 틴트(rgba(255,195,66,0.16)) 위 yellow500은 이미 7.2:1로 충분히 통과. */
+  --yellow700: var(--yellow500);
+  --red700: #ff6b76;
+  /* green700 다크 재계산: 라이트 전용으로 새로 추가한 --green700(#037a4a)도 다크에서
+   * 그대로면 카드 표면·자신의 dark green50 틴트 배경 양쪽에서 대비가 무너진다(실측 대상:
+   * '운영 콘솔 열기' CTA, text-green-600 4.11:1 결함의 근본 수정). blue700/red700과 동일한
+   * 여유폭(카드·틴트 배경 양쪽 5.8~7.9:1)으로 밝은 민트 계열을 재계산해 선택. */
+  --green700: #2fe0a0;
+  /* teal700 다크 재계산: 라이트 전용 --teal700(#096d72)도 다크에서 그대로면 카드 표면·
+   * 자신의 dark teal50 틴트 배경 양쪽에서 대비가 무너진다. blue700/green700과 동일한
+   * 여유폭(카드 9.6:1, 틴트 배경 7.3:1)으로 밝은 시안 계열을 재계산해 선택. */
+  --teal700: #29d9e0;
+}
+
+/* alpha 라이브 확인 중 발견: 흰 유리(glass) 배경을 CSS 변수 없이 rgba(255,255,255,X)로
+ * 하드코딩한 상시 노출 셸 크롬(하단 nav·헤더·서브내비 등)이 다크모드에서도 밝게 남아
+ * 튀었다 — 사진/영상 위에 얹는 오버레이(.tm-video-strip-play 등)는 테마와 무관하게
+ * 항상 흰색이어야 해서 대상이 아니고, 페이지 배경 위에 얹히는 "셸 크롬"만 대상이다.
+ * --surface/--bg 계열 톤에 원래와 비슷한 alpha로 맞춘다. */
+:root.dark .tm-bottom-nav {
+  background: rgba(28, 30, 36, 0.92);
+  border-color: var(--grey100);
+}
+
+/* 리뷰 에러/재시도 안내 카드 — 라이트: var(--red50) 파스텔 배경.
+   다크에서는 --red50/--red500이 라이트 전용 고정값이라 그대로 두면
+   밝은 핑크 배경 위에 밝은 텍스트가 겹쳐 대비가 무너진다 (reviews-page.tsx). */
+.tm-review-notice-error {
+  background: var(--red50);
+}
+
+:root.dark .tm-review-notice-error {
+  background: rgba(240, 68, 82, 0.15);
 }
 
 * {
@@ -288,6 +463,11 @@ button:disabled {
   width: min(100%, var(--v1-app-chrome-frame-width));
   height: 100dvh;
   margin: 0 auto;
+  /* 페이지 배경 = --bg(라이트 흰색 / 다크 #121317). 프로덕션(main)과 동일한 셸 배경이며,
+     그 위에 얹히는 서브 영역(패널·요약바·입력창 등)이 --grey50/100 한 단계를 써서 대비를
+     만든다 — DESIGN.md의 "gray-50 카드 on 흰 배경" 관례. 2026-08-05~08-11 사이 이 값이
+     --grey50으로 바뀌면서 자식들이 페이지 배경과 같은 토큰을 피해 흰 카드로 올라갔고,
+     그 결과 alpha만 프로덕션과 다른 회색 셸이 됐다 — 그 파생 변경들과 함께 되돌린다. */
   background: var(--bg);
   font-family: var(--font);
   overflow: hidden;
@@ -398,8 +578,11 @@ button:disabled {
 
 .tm-bottom-tab span {
   color: var(--grey500);
-  font-size: 11px;
-  line-height: 15px;
+  /* [알파 감사 B] 11px는 R-T2 최소 하한(12px) 미달 — 하단 탭바 5개
+     라벨(홈/매치/대회/팀/마이) 전부 해당. 토큰(--font-size-caption)으로
+     교체. 탭바는 min-height라 1px 증가가 레이아웃을 깨지 않는다. */
+  font-size: var(--font-size-caption);
+  line-height: 16px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -496,12 +679,6 @@ button:disabled {
   color: var(--text-muted);
   margin-top: 8px;
   margin-bottom: 24px;
-}
-
-.tm-auth-helper {
-  margin-top: 8px;
-  line-height: 1.5;
-  color: var(--text-muted);
 }
 
 .tm-auth-email-link {
@@ -812,18 +989,20 @@ button:disabled {
   justify-content: space-between;
 }
 
+.tm-card.tm-auth-soft-card,
 .tm-auth-soft-card {
   margin-top: 22px;
   background: var(--grey50);
 }
 
+.tm-card.tm-auth-soft-card-error,
 .tm-auth-soft-card-error {
   border-color: var(--red-alpha-08);
   background: var(--red50);
 }
 
 .tm-auth-soft-card-error .tm-text-body-lg {
-  color: var(--red500);
+  color: var(--red700);
 }
 
 .tm-auth-inline-error {
@@ -846,6 +1025,7 @@ button:disabled {
   line-height: 1.45;
 }
 
+.tm-card.tm-auth-soft-card-warning,
 .tm-auth-soft-card-warning {
   background: rgba(254, 152, 0, .10);
 }
@@ -961,25 +1141,6 @@ button:disabled {
   background: var(--grey50);
 }
 
-.tm-auth-location-status {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--grey100);
-}
-
-.tm-auth-location-status-allowed {
-  color: var(--blue600);
-}
-
-.tm-auth-location-status-denied,
-.tm-auth-location-status-unsupported {
-  color: var(--orange500);
-}
-
-.tm-auth-signup-terms {
-  margin-top: 18px;
-}
-
 .tm-auth-check {
   width: 24px;
   height: 24px;
@@ -1033,8 +1194,7 @@ button:disabled {
   color: var(--blue500);
 }
 
-.tm-auth-step-card,
-.tm-auth-option-row {
+.tm-auth-step-card {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
@@ -1137,6 +1297,15 @@ button:disabled {
   background: rgba(3, 178, 108, .08);
 }
 
+/* [P0 a11y] orange50/green tint 배경 위 tm-text-caption(grey600, 12px/400)이 4.5:1 미달
+   (실측: orange50 위 4.21:1, green tint 위 4.26:1) — 형제 tm-text-label(title)이 이미
+   쓰는 --text(grey700) 토큰을 재사용해 캡션도 동일 색으로 승격한다(라이트 6.48~6.56:1,
+   다크 8.5:1+로 양쪽 모두 여유 통과, 새 토큰 도입 없음). */
+.tm-auth-notice-orange .tm-text-caption,
+.tm-auth-notice-green .tm-text-caption {
+  color: var(--text);
+}
+
 .tm-text-heading {
   font-size: 24px;
   line-height: 32px;
@@ -1180,8 +1349,27 @@ button:disabled {
   color: var(--text-caption);
 }
 
+/* [대진표 12px 인라인 정리] 캡션(400)보다 한 단 강조가 필요하지만 3단계 라벨
+   (tm-text-label, 13px)까지는 안 가는 짧은 굵은 보조 라벨(조 이름, "대진표 준비
+   중" 같은 상태 타이틀)용. 크기·줄높이는 tm-text-caption과 동일하고 굵기·색만
+   다르다 — 대진표 페이지에 산발적으로 흩어져 있던 fontSize:12/fontWeight:700
+   인라인 스타일들을 이 토큰 하나로 수렴한다. */
+.tm-text-caption-strong {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
 .tm-text-micro {
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 11px는 하한(12px) 미달 — PR #396(알파 감사 B)이 이미
+     .tm-bottom-tab 등 하드코딩 11px를 caption 토큰으로 올린 것과 같은 논리.
+     이 클래스는 공개 화면 전역(홈·대회 신청/명단·팀 매치 등)에서 50곳 넘게
+     쓰여 콜사이트를 하나씩 옮기는 대신 정의 자체를 캡션 토큰으로 올린다 —
+     line-height(16px)는 이미 tm-text-caption과 동일해 이 변경만으로 줄바꿈
+     간격이 흔들리지 않는다. font-weight 500은 caption(400)과의 유일한 차이로
+     그대로 유지(시맨틱 구분 보존). */
+  font-size: var(--font-size-caption);
   line-height: 16px; /* [P1 4pt snap] 15→16 (4의 배수, ×1.45) */
   font-weight: 500;
 }
@@ -1340,6 +1528,32 @@ button:disabled {
   opacity: 1;
 }
 
+/* [알파 감사 A] outline 변형은 활성 배경(--bg, #ffffff)과 비활성 배경(--grey100,
+   #f2f4f6)의 명도차가 1~2단계뿐이라 배경 교체만으로는 활성/비활성이 거의
+   구분되지 않는다(실측: 운영 콘솔 골/카드/파울/교체 버튼 — 눌러봐야 안 눌리는
+   걸 알게 됨). 활성 상태의 흰 배경 정체성을 지우고 테두리까지 grey100으로
+   맞춰 "칠해진 비활성 표면"으로 분명히 보이게 한다. */
+.tm-btn-outline:disabled {
+  border-color: var(--grey100);
+}
+
+/* [알파 감사 A] 아이콘·색상 스와치처럼 하드코딩된 색(text-green-600,
+   bg-red-500 등)을 쓰는 자식 요소는 위 color 오버라이드가 닿지 않아 비활성
+   버튼 안에서도 원래 색 그대로 선명하게 남는다 — 이 프로젝트의 기존 관례
+   (.tm-quick-action:disabled, .tm-team-logo-preset:disabled 등이 이미
+   opacity로 자식을 죽이는 패턴)와 동일하게 opacity로 통일해 죽인다.
+   버튼 자체(background/border/color)는 위에서 이미 비활성 토큰으로
+   덮어썼으므로 opacity: 1을 유지하고, 여기서는 "색이 살아있는 자식 요소"만
+   추가로 덮는다.
+   :not([aria-busy="true"]) 예외: Button 컴포넌트는 loading=true일 때도
+   disabled를 켜고 스피너(SVG, aria-hidden)를 자식으로 넣는다(button.tsx) —
+   이 규칙이 스피너에도 그대로 걸리면 "지금 처리 중"이라는 로딩 표시 자체가
+   흐려져 반대 효과(진행 상황이 안 보임)를 낸다. aria-busy="true"는 Button이
+   loading일 때만 세우는 값이라 로딩 스피너만 정확히 예외 처리된다. */
+.tm-btn:disabled:not([aria-busy='true']) > * {
+  opacity: 0.5;
+}
+
 /* ── Keyboard focus ring (WCAG 2.1 AA) ── */
 .tm-btn:focus-visible,
 .tm-pressable:focus-visible {
@@ -1347,38 +1561,30 @@ button:disabled {
   outline-offset: 2px;
 }
 /* v1-shell 인터랙티브 요소 focus ring (WS5 a11y — 기존엔 :active만 있어 키보드 포커스 미표시) */
-.v1-icon-button:focus-visible,
-.v1-tab:focus-visible,
-.v1-button:focus-visible,
-.v1-chip:focus-visible,
-.v1-card-link:focus-visible {
+.v1-button:focus-visible {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
 
 /* ── [P1 Card / List-row interactive states] ──────────────────────────────────
  * 실제 컴포넌트 클래스: .tm-card-interactive (예: search-result-card), .tm-list-row-interactive.
- * 복합 .tm-card.tm-interactive 도 병행 지원(향후 사용 대비).
  * state-layer 토큰(--state-hover-opacity:0.04) 기반 hover 피드백.
  * @media(hover:hover) 가드로 터치기기 ghost hover 억제.
  * ─────────────────────────────────────────────────────────────────────────── */
 @media (hover: hover) {
-  .tm-card-interactive:hover,
-  .tm-card.tm-interactive:hover {
+  .tm-card-interactive:hover {
     box-shadow: var(--shadow-1); /* elevation-1 lift */
     cursor: pointer;
   }
 
-  .tm-list-row-interactive:hover,
-  .tm-list-row.tm-interactive:hover {
+  .tm-list-row-interactive:hover {
     background: var(--grey100); /* list-row-bg(grey50) → grey100 한 단계 진하게 */
     cursor: pointer;
   }
 }
 
 /* [P1 focus-visible] 카드 키보드 포커스 링 — base 승격 (기존 1회성 패치 통합) */
-.tm-card-interactive:focus-visible,
-.tm-card.tm-interactive:focus-visible {
+.tm-card-interactive:focus-visible {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
@@ -1404,47 +1610,57 @@ button:disabled {
   word-break: keep-all; /* [P2 한글] TDS 패턴 */
 }
 
+/* 2026-08-11 전수검수: 500계열 텍스트를 자신의 50계열 틴트 배경에 얹으면 라이트 모드에서
+ * WCAG AA 4.5:1을 전부 미달한다(blue 3.31:1, orange 1.97:1, green 2.50:1, red 3.24:1 —
+ * 12px/700-weight는 large-text 예외 미적용). blue700/red700/green700은 이미 이 파일에
+ * "500이 AA 미달할 때 대신 쓰는 짙은 강조 텍스트"로 도입돼 있고(라인 ~33/41-43),
+ * 각 배지 자체 틴트 배경 위에서도 4.5:1 이상이다(재계산: blue700 4.82:1, orange700
+ * 5.42:1, green700 4.87:1, red700 5.67:1). 다크모드는 :root.dark 블록에서 이미 이
+ * 700 토큰들을 카드·틴트 배경 기준으로 재오버라이드해뒀으므로(라인 ~335-342) 추가 분기
+ * 없이 그대로 4.5:1 이상 유지된다(재계산: blue 5.8/6.5, orange 5.7/6.6, green 7.9/9.0,
+ * red 5.1/5.7 — 카드 표면/페이지 배경 두 경우 모두). */
 .tm-badge-blue {
   background: var(--blue50);
-  color: var(--blue500);
+  color: var(--blue700);
 }
 
+/* 시인성 fix: 공지 상세(NoticeDetailPageView)의 카테고리 뱃지는 Card로 감싸지 않고
+ * 페이지 위에 바로 렌더되고, 카드 안(--card-surface)에서도 쓰인다. 다크에서는
+ * --grey100(#1c1e24)이 --card-surface와 완전히 같은 값이라 채움만으로는 경계가 사라진다
+ * — 신규 토큰 없이 --border-strong 보더를 더해 배경이 무엇이든 경계를 확보한다. */
 .tm-badge-grey {
   background: var(--grey100);
+  border: 1px solid var(--border-strong);
   color: var(--text-muted);
+}
+
+/* 다크모드: --grey100(#1c1e24)이 --card-surface(#1c1e24)와 동일 값이라, 팀매치 만들기
+ * 확인화면·포메이션 프리셋 배지처럼 Card 내부에 얹히면 배경이 그대로 소실된다.
+ * --grey150(#20222a)으로 한 단계 밝혀 카드 표면과 구분되게 한다. */
+:root.dark .tm-badge-grey {
+  background: var(--grey150);
 }
 
 .tm-badge-orange {
   background: var(--orange50);
-  color: var(--orange500);
+  color: var(--orange700);
 }
 
 .tm-badge-green {
   background: var(--green50);
-  color: var(--green500);
+  color: var(--green700);
 }
 
 .tm-badge-red {
   background: var(--red50);
-  color: var(--red500);
-}
-
-/* ── [P2 Badge size variants] M3 dot(6px) + Carbon SM(18px) ─────────────────
- * .tm-badge-dot  — 라벨 없는 상태 점 (미읽음·온라인·모집중 등)
- * .tm-badge-sm   — 밀도 높은 컨텍스트용 소형 뱃지 (font-size-2xs 토큰 참조)
- * 색 variant(.tm-badge-blue 등)과 조합해 사용
- * ─────────────────────────────────────────────────────────────────────────── */
-.tm-badge-dot {
-  width: 6px;
-  height: 6px;
-  min-height: unset;
-  border-radius: 50%;
-  padding: 0;
+  color: var(--red700);
 }
 
 .tm-badge-sm {
   min-height: 18px;
-  font-size: 11px; /* --font-size-micro(11px) 참조 */
+  /* [공개 화면 R-T2 정리] 실제 라벨 텍스트(room.typeLabel 등)라 캡션 토큰으로 상향.
+     min-height 18px면 12px 텍스트도 여유 있게 들어간다. */
+  font-size: var(--font-size-caption);
   padding: 0 6px;
 }
 
@@ -1551,6 +1767,10 @@ button:disabled {
   cursor: pointer;
 }
 
+:root.dark .tm-input-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b95a1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
 .tm-auth-input-error {
   border-color: var(--red500);
 }
@@ -1581,6 +1801,15 @@ button:disabled {
   outline-offset: 2px;
 }
 
+/* MultiPresetChipSelector 다중선택 상한 도달 시 미선택 칩(예: 경기 스타일 3개 제한) —
+ * 색상 단독 전달 금지: 불투명도 + not-allowed 커서로 "지금은 못 고름"을 함께 표시한다.
+ * disabled 속성은 쓰지 않는다 — 클릭을 막으면 limitMessage(왜 안 되는지)를 띄울 방법이
+ * 없어진다. */
+.tm-chip[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .tm-chip-active {
   border-color: var(--blue500);
   background: var(--blue500);
@@ -1602,7 +1831,12 @@ button:disabled {
 }
 
 /* Numeric unread badge — replaces .tm-unread-dot as the default indicator on
- * NotificationBellLink/Button. 1-99 shows the count, 100+ shows "99+". */
+ * NotificationBellLink/Button. 1-99 shows the count, 100+ shows "99+".
+ * [R-T2 예외] height:16px + border:2px(box-sizing:border-box)라 실제 텍스트가
+ * 들어갈 세로 공간은 16-4=12px뿐이다 — 12px 토큰조차 넘친다. 알림 아이콘 위에
+ * 얹히는 장식성 카운트 배지(iOS/카카오톡류 뱃지와 동일 패턴)로, 정확한 수는
+ * 벨을 눌러 알림 목록에서 확인하므로 여기서 1px 더 키우다 잘리는 것보다
+ * 낫다고 판단해 11px(micro)로 남긴다. */
 .tm-unread-badge {
   position: absolute;
   top: 4px;
@@ -1716,6 +1950,7 @@ button:disabled {
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   padding: 20px 12px;
+  /* 페이지 배경(--bg) 위에 한 단계 얹는 서브 패널 — main과 동일하게 --grey50. */
   background: var(--grey50);
   border-radius: 16px;
 }
@@ -1744,6 +1979,44 @@ button:disabled {
   display: grid;
   place-items: center;
   font-weight: 800;
+  background: var(--grey100);
+}
+
+/* [토큰 충돌 fix] 다크모드에서 --grey50(#1a1c22, 부모 .tm-quick-grid)과
+   --grey100(#1c1e24)의 명도차가 거의 없어 아이콘 배지 경계가 사라진다(라이트는
+   grey50 #f9fafb vs grey100 #f2f4f6로 구분됨). 신규 토큰 없이 --grey150(다크
+   #20222a)으로 다크 전용 오버라이드 — SidebarTournamentsWidget
+   아이콘(.tm-tournament-widget-icon)과 동일 패턴. */
+:root.dark .tm-quick-icon {
+  background: var(--grey150);
+}
+
+/* 2026-08-12: [인라인 style 우선순위 fix] 아래 두 클래스는 원래 JSX에 인라인
+   style={{ background: 'var(--grey100)' }}가 같이 있어서, 다크 전용 클래스
+   오버라이드를 아무리 추가해도 인라인이 항상 이겨 dead code였다(라이트/다크
+   전부 이 CSS로만 배경을 관리하도록 인라인 background를 제거 — 해당 .tsx도 함께 수정). */
+.tm-roster-player-initial {
+  background: var(--grey100);
+}
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 부모 <Card pad={0}>의
+   --card-surface(#1c1e24)와 완전히 같아 명단 선수 이니셜 배지 경계가 사라진다
+   (라이트모드는 grey100 #f2f4f6 vs card-surface #fff라 구분됨). 신규 토큰 없이
+   --grey150(다크 #20222a, card-surface와 구분)으로 다크 전용 오버라이드 —
+   .tm-quick-icon과 동일 패턴. tournament-roster-client.tsx PlayerRow 이니셜 배지. */
+:root.dark .tm-roster-player-initial {
+  background: var(--grey150);
+}
+
+.tm-guide-step-num {
+  background: var(--grey100);
+}
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 참가 신청 안내 스텝 배지의 부모
+   Card(--card-surface, #1c1e24)와 완전히 같아 번호 배지 경계가 사라진다(라이트모드는
+   grey100 #f2f4f6 vs card-surface #fff라 구분됨, tournament-event-hub-sections.tsx
+   TournamentApplicationGuideSection). 신규 토큰 없이 --grey150(다크 #20222a,
+   card-surface와 구분)으로 다크 전용 오버라이드 — .tm-quick-icon과 동일 패턴. */
+:root.dark .tm-guide-step-num {
+  background: var(--grey150);
 }
 
 .tm-weather-strip {
@@ -1763,7 +2036,7 @@ button:disabled {
   place-items: center;
   border-radius: 50%;
   background: var(--yellow50);
-  color: var(--yellow500);
+  color: var(--yellow700);
   flex-shrink: 0;
 }
 
@@ -1791,7 +2064,7 @@ button:disabled {
 
 .tm-weather-icon-thunderstorm {
   background: var(--orange50);
-  color: var(--orange500);
+  color: var(--orange700);
 }
 
 .tm-section-title {
@@ -1848,15 +2121,6 @@ button:disabled {
   margin-top: 10px;
 }
 
-.tm-kpi-panel {
-  background: var(--grey50);
-  border-radius: 16px;
-  padding: 20px 16px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
 .tm-notice-head {
   display: flex;
   align-items: flex-start;
@@ -1896,11 +2160,6 @@ button:disabled {
   text-align: left;
 }
 
-.tm-notice-row-active {
-  border-color: rgba(49, 130, 246, .24);
-  background: var(--blue50);
-}
-
 .tm-notice-row-icon {
   width: 38px;
   height: 38px;
@@ -1912,9 +2171,12 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.tm-notice-row-active .tm-notice-row-icon {
-  background: var(--blue500);
-  color: var(--static-white);
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 부모 .tm-notice-row(.tm-card,
+   --card-surface #1c1e24)와 완전히 같아 알림 아이콘 타일 경계가 사라진다(라이트모드는
+   grey100 #f2f4f6 vs card-surface #fff라 구분됨). 신규 토큰 없이 --grey150(다크
+   #20222a, card-surface와 구분)으로 다크 전용 오버라이드 — notices-page.tsx */
+:root.dark .tm-notice-row-icon {
+  background: var(--grey150);
 }
 
 .tm-notice-row > span:nth-child(2) {
@@ -1931,10 +2193,6 @@ button:disabled {
   color: var(--text-caption);
 }
 
-.tm-notice-row-active .tm-notice-row-meta {
-  color: var(--blue500);
-}
-
 .tm-notice-row-title {
   margin-top: 4px;
   color: var(--text-strong);
@@ -1948,17 +2206,6 @@ button:disabled {
 
 .tm-notice-title {
   margin-top: 12px;
-}
-
-.tm-notice-summary-card {
-  margin-top: 18px;
-  background: var(--grey50);
-}
-
-.tm-notice-summary-card p {
-  margin: 8px 0 0;
-  color: var(--text-strong);
-  line-height: 1.6;
 }
 
 .tm-notice-body {
@@ -1982,7 +2229,7 @@ button:disabled {
 }
 
 .tm-notice-related .tm-text-label {
-  color: var(--blue500);
+  color: var(--blue700);
 }
 
 .tm-notice-related .tm-text-caption {
@@ -2023,7 +2270,7 @@ button:disabled {
 .tm-match-summary-row {
   min-height: 44px;
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2031,17 +2278,17 @@ button:disabled {
   padding: 0 12px;
 }
 
+/* [다크 전용] 다크에서 페이지 배경(--bg #121317)과 grey50(#1a1c22)의 명도차가 라이트보다
+   훨씬 덜 읽히므로, 다크에서만 grey150(#20222a)으로 한 단계 더 진하게 둔다.
+   라이트는 main과 동일한 grey50. .tm-team-summary-bar 동일 구조. */
+:root.dark .tm-match-summary-row,
+:root.dark .tm-team-summary-bar {
+  background: var(--grey150);
+}
+
 .tm-match-summary-row > *,
 .tm-team-summary-bar > * {
   min-width: 0;
-}
-
-.tm-match-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 0 10px;
 }
 
 .tm-match-card-stack {
@@ -2151,7 +2398,10 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] height:20px, border 2px(box-sizing:border-box) 감안해도
+     실사용 세로 공간이 16px라 캡션 토큰(12px)이 여유 있게 들어간다(tm-unread-badge의
+     16px 배지와 달리 이쪽은 감당 가능). */
+  font-size: var(--font-size-caption);
   line-height: 1;
   font-weight: 800;
 }
@@ -2317,35 +2567,6 @@ button:disabled {
   margin-top: 10px;
 }
 
-.tm-filter-view-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.tm-filter-view-option {
-  min-height: 58px;
-  padding: 10px 12px;
-  border: 1px solid var(--grey100);
-  border-radius: 14px;
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  text-align: left;
-}
-
-.tm-filter-view-option-active {
-  border-color: var(--blue500);
-  background: var(--blue50);
-}
-
-.tm-filter-view-option-active .tm-text-label {
-  color: var(--blue500);
-}
-
 .tm-filter-actions {
   display: grid;
   grid-template-columns: 96px 1fr;
@@ -2385,6 +2606,11 @@ button:disabled {
 .tm-create-bars span[data-active="true"] {
   background: var(--blue500);
 }
+
+/* 2026-08 사용자 피드백: "완료(초록)+진행중(파랑)" 2색 조합이 이 앱의 "블루 단일
+   액센트" 디자인 원칙과 어긋나 애매해 보인다는 지적 — green 오버라이드를 제거해
+   완료 스텝도 진행중 스텝과 동일하게 파란색으로 통일한다(data-complete는 계속
+   기록만 하되 시각적으로는 data-active와 동일해짐). */
 
 .tm-create-sport-grid {
   display: grid;
@@ -2473,10 +2699,16 @@ button:disabled {
   }
 }
 
+/* 입력창 시인성: fill(--grey50)은 페이지 배경(--bg) 위에서 "눌린 필드" 톤을 만들고,
+   경계는 border-strong(--grey300)이 담당한다. 2026-08-11에 fill을 --input-surface(=--bg)로
+   올렸던 것은 그때 페이지 배경 자체가 --grey50이라 fill이 완전히 묻혔기 때문인데,
+   페이지 배경을 main과 동일한 --bg로 되돌리면서 그 전제가 사라져 fill도 main과 같은
+   --grey50으로 복귀한다. border는 grey100(1.10:1)이 사실상 안 보인다는 사용자 피드백이
+   있었으므로 grey300(--border-strong)을 유지 — 이 앱의 헤어라인 톤 안에서 인지 가능한 최대치. */
 .tm-create-input {
   min-height: 48px;
   margin-top: 10px;
-  border: 1px solid var(--grey100);
+  border: 1px solid var(--border-strong); /* [P1 component token] 기존 --grey100(1.10:1) 대체 */
   border-radius: 12px;
   background: var(--grey50);
   padding: 0 14px;
@@ -2497,6 +2729,20 @@ button:disabled {
   min-height: 72px;
   align-items: flex-start;
   padding-top: 12px;
+}
+
+/* 레인 wizard/A: 스텝 게이팅·결측 필드 인라인 에러 — 색상 단독 전달 금지, 아이콘+문구 병행 */
+.tm-create-input-error {
+  border-color: var(--orange500);
+}
+
+.tm-create-field-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  color: var(--orange500);
+  font-size: var(--font-size-caption);
 }
 
 .tm-team-description-input {
@@ -2539,10 +2785,13 @@ button:disabled {
   gap: 8px;
 }
 
+/* .tm-create-input과 톤을 맞춘다(2026-08 시인성 fix) — 가운데 select만 밝아지고
+   좌우 버튼이 예전 grey50/grey200 그대로면 "하나로 이어진 스테퍼"가 아니라
+   3분할처럼 보인다(사용자 확인 후 결정). */
 .tm-create-stepper-button {
   flex: 0 0 48px;
   height: 48px;
-  border: 1px solid var(--grey200);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   background: var(--grey50);
   color: var(--blue500);
@@ -2578,9 +2827,20 @@ button:disabled {
   font-weight: 600;
 }
 
+/* 빈 상태(backgroundImage 없음) 시인성 fix: image prop이 falsy면 배경이 전혀 없어
+   132px 흰 여백이 됐다(라이트모드 스크린샷 피드백). --grey150은 이미 이 앱에서
+   .tm-auth-progress-bars의 "아직 채워지지 않음" 세그먼트에 쓰이는 토큰이라 "아직
+   업로드 안 됨" 상태와 시맨틱이 들어맞아 재사용(신규 토큰 없음). Card(pad=0)가
+   --card-border 풀보더로 전체를 감싸므로 별도 border는 불필요 — fill만 추가.
+   backgroundImage가 있는 채워진 상태는 그 위에 그대로 그려져 회귀 없음. */
 .tm-create-image-preview {
-  height: 132px;
+  /* 2026-08 사용자 피드백: 132px는 실제 노출 위치(상세 히어로 --tm-match-detail-hero
+     220px, 목록 썸네일 --tm-match-list-media 146px) 중 어느 쪽보다도 낮아 cover 크롭이
+     원본 이미지 위쪽 극히 일부만 보여줘 "이게 어떻게 보일지" 예측이 안 됐다 — 더 자주
+     노출되는(첫인상) 상세 히어로 높이에 맞춰 크롭을 더 근접하게 보여준다. */
+  height: 220px;
   padding: 12px;
+  background-color: var(--grey150);
   background-position: center;
   background-size: cover;
 }
@@ -2652,12 +2912,6 @@ button:disabled {
   background: var(--grey900);
   display: grid;
   place-items: center;
-}
-
-.tm-team-info-link {
-  display: block;
-  margin-top: 14px;
-  padding: 16px;
 }
 
 .tm-list-searchbar {
@@ -2793,15 +3047,6 @@ button:disabled {
   text-align: left;
 }
 
-.tm-list-search-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .tm-list-filter-button {
   width: 44px; /* WS11 a11y 터치 타깃 (40→44) */
   min-width: 44px;
@@ -2825,14 +3070,17 @@ button:disabled {
   color: var(--static-white);
   display: grid;
   place-items: center;
-  font-size: 10px;
+  /* [공개 화면 R-T2 정리] border 없는 17px 원이라 캡션 토큰(12px)이 들어간다.
+     width가 아니라 min-width라 두 자릿수로 늘어나도 원이 옆으로 넓어질 뿐
+     잘리지 않는다. */
+  font-size: var(--font-size-caption);
   font-weight: 800;
 }
 
 .tm-team-summary-bar {
   min-height: 44px;
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2881,30 +3129,6 @@ button:disabled {
   outline-offset: 2px;
 }
 
-.tm-team-inline-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.tm-team-inline-stats > div {
-  min-height: 52px;
-  border-radius: 12px;
-  background: rgba(255,255,255,.72);
-  padding: 8px 10px;
-}
-
-.tm-team-card-footer {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--grey100);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
 .tm-team-card-action-row {
   margin-top: 14px;
   padding-top: 12px;
@@ -2932,11 +3156,6 @@ button:disabled {
   color: var(--text-caption);
 }
 
-.tm-team-card-action-link {
-  color: var(--blue500);
-  white-space: nowrap;
-}
-
 .tm-team-intro-box {
   margin-top: 14px;
   border: 1px solid var(--grey100);
@@ -2952,6 +3171,14 @@ button:disabled {
 .tm-team-detail-hero-card {
   background: var(--grey900);
   color: var(--static-white);
+}
+
+/* [다크모드 회귀 fix] :root.dark는 --grey900을 #f2f4f6(거의 흰색)로 반전시킨다(304행) —
+   이 카드는 coverImageUrl 유무와 무관하게 항상 어두운 히어로 배경 위에 --static-white
+   텍스트를 얹는 디자인이므로, 다크모드에서 반전되지 않는 고정 다크 배경으로 오버라이드한다.
+   라이트모드 --grey900 리터럴(#191f28, 59행)을 그대로 재사용 — 새 토큰 발명 금지. */
+:root.dark .tm-team-detail-hero-card {
+  background: #191f28;
 }
 
 .tm-team-detail-body {
@@ -3019,11 +3246,6 @@ button:disabled {
   padding: 0 10px;
 }
 
-.tm-team-image-grid {
-  display: grid;
-  gap: 10px;
-}
-
 @media (max-width: 767px) {
   .tm-team-list .tm-team-card-action-row {
     padding-right: 64px;
@@ -3034,65 +3256,6 @@ button:disabled {
   .tm-team-list .tm-team-card-stack > .tm-team-card:nth-child(even) .tm-team-card-action-row {
     padding-right: 64px;
   }
-}
-
-.tm-team-image-slot {
-  border-radius: 14px;
-  border: 1px solid var(--grey100);
-  background: var(--bg);
-  padding: 12px;
-}
-
-.tm-team-thumb-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.tm-team-thumb {
-  min-width: 78px;
-  height: 52px;
-  border-radius: 14px;
-  border: 1px solid var(--blue100);
-  background: var(--blue50);
-  color: var(--blue500);
-  display: grid;
-  place-items: center;
-  padding: 0 8px;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.tm-team-thumb-example {
-  border-color: var(--orange50);
-  background: var(--orange50);
-  color: var(--orange500);
-}
-
-.tm-team-upload-preview {
-  height: 116px;
-  margin-top: 10px;
-  border-radius: 12px;
-  background-color: var(--grey50);
-  background-position: center;
-  background-size: cover;
-}
-
-.tm-team-photo-grid {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.tm-team-photo-preview {
-  aspect-ratio: 1;
-  border-radius: 10px;
-  background-position: center;
-  background-size: cover;
 }
 
 .tm-member-section {
@@ -3185,6 +3348,15 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+/* [다크모드 회귀 fix] :root.dark는 --grey900을 #f2f4f6(거의 흰색)로 반전시킨다(304행) —
+   이 아바타는 프로필 사진 미설정 유저에게 항상 어두운 배경 위에 --static-white 이니셜을
+   얹는 디자인이므로, 다크모드에서 반전되지 않는 고정 다크 배경으로 오버라이드한다.
+   라이트모드 --grey900 리터럴(#191f28, 59행)을 그대로 재사용 — 새 토큰 발명 금지.
+   .tm-team-detail-hero-card(3245행)와 동일 패턴. */
+:root.dark .tm-chat-avatar {
+  background: #191f28;
+}
+
 .tm-chat-row-actions {
   display: flex;
   width: 72px;
@@ -3207,16 +3379,18 @@ button:disabled {
   gap: 3px;
 }
 
-.tm-chat-row-action-danger {
-  background: var(--red500);
-  color: var(--static-white);
-}
-
 .tm-chat-row-action:disabled {
   opacity: .55;
 }
 
 .tm-chat-row-unread .tm-chat-avatar {
+  background-color: var(--blue500);
+}
+
+/* 위 :root.dark .tm-chat-avatar(3502행) 오버라이드가 셀렉터 3클래스라 이 미읽음
+   예외(2클래스)보다 명시도가 높아 다크모드에서 blue500을 덮어써버린다 — 다크에서도
+   미읽음 아바타는 blue500을 유지해야 하므로 동일 조건으로 명시적으로 재선언한다. */
+:root.dark .tm-chat-row-unread .tm-chat-avatar {
   background-color: var(--blue500);
 }
 
@@ -3284,30 +3458,6 @@ button:disabled {
   flex: 0 0 auto;
 }
 
-.tm-chat-empty {
-  min-height: 360px;
-  padding: 92px 28px 24px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.tm-chat-empty .tm-btn {
-  margin-top: 18px;
-}
-
-.tm-chat-empty-icon {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 18px;
-  border-radius: 22px;
-  background: var(--grey100);
-  color: var(--grey400);
-  display: grid;
-  place-items: center;
-}
-
 .tm-chat-room {
   height: 100%;
   min-height: 0;
@@ -3373,10 +3523,16 @@ button:disabled {
 }
 
 .tm-chat-read-count {
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 고정 크기 배지가 아니라 말풍선 옆 인라인 텍스트라
+     캡션 토큰으로 올려도 줄바꿈 걱정 없다. */
+  font-size: var(--font-size-caption);
   line-height: 1;
   font-weight: 700;
-  color: var(--orange500);
+  /* orange500(#fe9800)은 라이트 --grey50(.tm-chat-room 배경) 위에서 ~2.07:1로
+     WCAG AA 4.5:1 미달(2026-08-11 audit). --orange700은 라이트에서 #965300(텍스트
+     전용 진한 값, line 157)·다크에서 var(--orange500)(line 341)으로 테마별 자동
+     전환되는 기존 시맨틱 토큰 — 라이트 재계산 ~5.67:1, 다크 기존 유지 ~7.87:1. */
+  color: var(--orange700);
 }
 
 .tm-chat-message-meta {
@@ -3390,7 +3546,8 @@ button:disabled {
 .tm-chat-message-meta time,
 .tm-chat-message-time {
   color: var(--text-caption);
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 고정폭 없는 인라인 타임스탬프 — 캡션 토큰으로 상향. */
+  font-size: var(--font-size-caption);
   line-height: 1;
   white-space: nowrap;
 }
@@ -3415,6 +3572,15 @@ button:disabled {
   background: var(--grey100);
 }
 
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 .tm-chat-room 배경 --grey50(#1a1c22)과
+   거의 같은 값이라(대비 ~1.02:1) 날짜구분선 알약이 채팅방 배경에 녹아 사실상 안 보인다
+   (라이트모드는 grey50 #f9fafb vs grey100 #f2f4f6이라 구분됨 — 기존 코멘트가 전제한
+   대비가 다크에서는 무효). 신규 토큰 없이 --grey150(다크 #20222a, grey50과 구분)으로
+   다크 전용 오버라이드. */
+:root.dark .tm-chat-date-divider span {
+  background: var(--grey150);
+}
+
 .tm-chat-system-message {
   display: flex;
   justify-content: center;
@@ -3426,10 +3592,19 @@ button:disabled {
   max-width: min(100%, 320px);
   padding: 6px 10px;
   border-radius: 999px;
-  background: var(--grey50);
+  background: var(--grey100); /* [토큰 충돌 fix] 이전엔 --grey50 — .tm-chat-room 배경(3494행)과 동일 토큰이라
+   pill이 채팅방 배경에 녹아 안 보였음. 인접한 .tm-chat-date-divider span(3592행) 선례와 동일 패턴 적용 */
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+/* [토큰 충돌 fix] 위 라이트모드 fix(grey50→grey100)가 다크에서는 무효 — 다크 --grey100(#1c1e24)이
+   .tm-chat-room 배경 --grey50(#1a1c22)과 거의 같은 값이라(대비 ~1.02:1) 시스템 메시지 알약이
+   여전히 채팅방 배경에 녹아 보인다. 신규 토큰 없이 --grey150(다크 #20222a, grey50과 구분)으로
+   다크 전용 오버라이드 — .tm-chat-date-divider span과 동일 패턴. */
+:root.dark .tm-chat-system-message span {
+  background: var(--grey150);
 }
 
 .tm-chat-bubble {
@@ -3445,15 +3620,6 @@ button:disabled {
   max-width: 250px;
   background: var(--blue500);
   color: var(--static-white);
-}
-
-.tm-chat-bubble-system {
-  max-width: 100%;
-  margin: 0 auto 14px;
-  background: transparent;
-  box-shadow: none;
-  text-align: center;
-  color: var(--text-muted);
 }
 
 .tm-chat-bubble-me .tm-text-body,
@@ -3492,14 +3658,6 @@ button:disabled {
 
 .tm-chat-message-line-me {
   justify-content: flex-end;
-}
-
-/* 그룹의 마지막 메시지 옆에만 시각 노출 */
-.tm-chat-time {
-  color: var(--text-caption);
-  white-space: nowrap;
-  flex-shrink: 0;
-  padding-bottom: 2px;
 }
 
 /* 그룹 첫 버블만 이름표/정렬 방향 쪽 모서리를 살짝 좁혀 "말풍선 시작" 느낌을 준다 */
@@ -3569,7 +3727,8 @@ button:disabled {
   min-height: 44px;
   border-radius: 14px;
   background: var(--green50);
-  color: var(--green500);
+  color: var(--green700); /* green500은 라이트 green50 배경 위 2.5:1로 AA(4.5:1) 미달 —
+    .tm-badge-green과 동일하게 짙은 --green700(라이트 4.87:1 통과)으로 교체 */
   display: grid;
   place-items: center;
   padding: 0 14px;
@@ -3760,8 +3919,7 @@ button:disabled {
   }
 
   .tm-search-quick-grid,
-  .tm-create-two-col,
-  .tm-filter-view-grid {
+  .tm-create-two-col {
     grid-template-columns: 1fr !important;
   }
 
@@ -3780,7 +3938,6 @@ button:disabled {
   }
 
   .tm-match-list-footer,
-  .tm-team-card-footer,
   .tm-my-card-actions,
   .tm-section-row,
   .tm-member-actions {
@@ -3789,7 +3946,6 @@ button:disabled {
   }
 
   .tm-match-list-footer > *,
-  .tm-team-card-footer > *,
   .tm-my-card-actions > *,
   .tm-section-row > *,
   .tm-member-actions > * {
@@ -3839,7 +3995,6 @@ button:disabled {
     gap: 4px;
   }
 
-  .tm-team-inline-stats,
   .tm-team-stat-grid {
     grid-template-columns: 1fr !important;
   }
@@ -3895,62 +4050,19 @@ button:disabled {
   }
 }
 
-.design-page {
-  min-height: 100vh;
-  padding: 24px;
-  background: #f2f4f6;
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: 16px;
-}
-
-.design-page-title {
-  width: min(100%, var(--v1-shell-frame-width));
-  margin: 0;
-  color: #191f28;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.design-artboard {
-  width: 375px;
-  max-width: 100%;
-  min-height: 812px;
-  overflow: hidden;
-  border-radius: 18px;
-  box-shadow: 0 12px 40px rgba(25, 31, 40, 0.14);
-  background: #fff;
-  position: relative;
-}
-
-.design-click-layer {
-  width: 100%;
-  min-height: inherit;
-}
-
 @media (max-width: 430px) {
-  .design-page {
-    padding: 0;
-    background: #fff;
-  }
-
-  .design-page-title {
-    display: none;
-  }
-
-  .design-artboard {
-    width: 100%;
-    min-height: 100vh;
-    border-radius: 0;
-    box-shadow: none;
-  }
 }
 
 .v1-root {
   min-height: 100vh;
   background:
     linear-gradient(180deg, #ffffff 0, var(--bg) 240px),
+    var(--bg);
+}
+
+:root.dark .v1-root {
+  background:
+    linear-gradient(180deg, var(--surface) 0, var(--bg) 240px),
     var(--bg);
 }
 
@@ -3967,160 +4079,8 @@ button:disabled {
   padding: calc(var(--v1-shell-wide-topbar-height) + 6px) var(--v1-shell-page-x) calc(20px + var(--v1-shell-wide-bottom-nav-height) + var(--v1-shell-safe-bottom));
 }
 
-.v1-public-main {
-  min-height: 100vh;
-  padding: 28px 20px 52px;
-}
-
-.v1-header {
-  position: fixed;
-  z-index: 20;
-  top: 0;
-  left: 50%;
-  width: min(100%, var(--v1-shell-wide-frame-width));
-  transform: translateX(-50%);
-  height: var(--v1-shell-wide-topbar-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 var(--v1-shell-wide-topbar-right-x) 0 var(--v1-shell-wide-topbar-left-x);
-  border-bottom: 1px solid rgba(226, 230, 238, 0.86);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(18px);
-}
-
-.v1-brand {
-  min-width: 0;
-}
-
-.v1-title {
-  margin: 0;
-  font-size: 18px;
-  line-height: 1.2;
-  font-weight: 800;
-  color: var(--text-strong);
-}
-
-.v1-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.v1-back-button {
-  width: 30px;
-  height: 30px;
-  margin-left: -8px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  color: var(--text-body);
-}
-
-.v1-eyebrow {
-  margin: 0 0 4px;
-  font-size: 12px;
-  line-height: 1.2;
-  font-weight: 700;
-  color: var(--text-caption);
-}
-
-.v1-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.v1-icon-button {
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  color: var(--grey-700);
-  position: relative;
-}
-
-.v1-icon-button:active,
-.v1-tab:active,
-.v1-card-link:active,
 .v1-button:active {
   transform: translateY(1px);
-}
-
-.v1-unread-dot {
-  position: absolute;
-  top: 10px;
-  right: 11px;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--red);
-  border: 2px solid #fff;
-}
-
-.v1-bottom-nav {
-  position: fixed;
-  z-index: 20;
-  left: 50%;
-  bottom: 0;
-  width: min(100%, var(--v1-shell-wide-frame-width));
-  transform: translateX(-50%);
-  min-height: calc(var(--v1-shell-wide-bottom-nav-height) + var(--v1-shell-safe-bottom));
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  padding: 7px 0 calc(14px + var(--v1-shell-safe-bottom));
-  border-top: 1px solid rgba(226, 230, 238, 0.92);
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(18px);
-}
-
-.v1-tab {
-  border: 0;
-  background: transparent;
-  color: var(--text-caption);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 0;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.v1-tab-active {
-  color: var(--blue);
-}
-
-.v1-section {
-  margin-top: 22px;
-}
-
-.v1-section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.v1-section-title {
-  margin: 0;
-  color: var(--text-strong);
-  font-size: 15px;
-  line-height: 1.3;
-  font-weight: 850;
-}
-
-.v1-section-subtitle {
-  margin: 3px 0 0;
-  color: var(--text-caption);
-  font-size: 12px;
-  line-height: 1.45;
 }
 
 .v1-card {
@@ -4132,138 +4092,6 @@ button:disabled {
 
 .v1-card-pad {
   padding: 16px;
-}
-
-.v1-card-link {
-  display: block;
-}
-
-.v1-hero-card {
-  overflow: hidden;
-}
-
-.v1-hero-media {
-  min-height: 142px;
-  background: linear-gradient(135deg, #1e4fd8, #2fb68d);
-  position: relative;
-}
-
-.v1-hero-media::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 28% 22%, rgba(255,255,255,0.28), transparent 30%),
-    linear-gradient(180deg, transparent, rgba(10, 18, 32, 0.68));
-}
-
-.v1-hero-text {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 14px;
-  z-index: 1;
-  color: #fff;
-}
-
-.v1-hero-title {
-  margin: 4px 0 0;
-  font-size: 19px;
-  line-height: 1.28;
-  font-weight: 850;
-}
-
-.v1-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.v1-quick-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.v1-quick {
-  min-height: 66px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 12px;
-  text-align: left;
-  color: var(--text-strong);
-}
-
-.v1-quick-primary {
-  background: var(--blue);
-  border-color: var(--blue);
-  color: #fff;
-}
-
-.v1-list {
-  display: grid;
-  gap: 10px;
-}
-
-.v1-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: start;
-}
-
-.v1-stack {
-  display: grid;
-  gap: 10px;
-}
-
-.v1-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.v1-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--surface-soft);
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1;
-  font-weight: 750;
-  white-space: nowrap;
-}
-
-.v1-badge-blue {
-  background: var(--blue-soft);
-  color: var(--blue);
-}
-
-.v1-badge-green {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.v1-badge-orange {
-  background: var(--orange-soft);
-  color: var(--orange);
-}
-
-.v1-badge-red {
-  background: var(--red-soft);
-  color: var(--red);
-}
-
-.v1-body {
-  margin: 0;
-  color: var(--text-body);
-  font-size: 14px;
-  line-height: 1.5;
 }
 
 .v1-caption {
@@ -4281,45 +4109,6 @@ button:disabled {
   font-weight: 850;
 }
 
-.v1-big-number {
-  display: block;
-  color: var(--text-strong);
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: 0;
-}
-
-.v1-toolbar {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-}
-
-.v1-toolbar::-webkit-scrollbar {
-  display: none;
-}
-
-.v1-chip {
-  min-height: 34px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text-muted);
-  padding: 0 13px;
-  font-size: 13px;
-  font-weight: 750;
-  white-space: nowrap;
-}
-
-.v1-chip-active {
-  border-color: var(--blue);
-  background: var(--blue);
-  color: #fff;
-}
-
 .v1-button {
   min-height: 42px;
   border: 0;
@@ -4335,69 +4124,15 @@ button:disabled {
   font-weight: 800;
 }
 
-.v1-button-secondary {
-  background: var(--surface-soft);
-  color: var(--text-strong);
-}
-
-.v1-muted-panel {
-  border: 1px dashed var(--border-strong);
-  border-radius: 8px;
-  padding: 14px;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.v1-search-box {
-  min-height: 48px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  color: var(--text-muted);
-}
-
-.v1-input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text-strong);
-}
-
-.v1-state {
-  min-height: 180px;
-  display: grid;
-  place-items: center;
-  text-align: center;
-}
-
-.v1-form-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.v1-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 14px 0;
-}
-
-.v1-floating-cta {
-  position: sticky;
-  bottom: 92px;
-  margin-top: 18px;
-}
-
 .tm-my-shell {
   display: grid;
   gap: 14px;
   padding: 18px var(--v1-shell-page-x) 124px;
 }
 
+/* 프로필 헤더는 페이지 배경(--bg) 위에 --grey50 한 단계로 얹힌다 — main과 동일.
+   2026-08-11에 --card-surface + --border-strong으로 올렸던 것은 그때 페이지 배경이
+   --grey50이라 헤더가 페이지에 녹아들었기 때문이며, 페이지 배경 복원으로 전제가 사라졌다. */
 .tm-my-profile-head {
   display: flex;
   align-items: center;
@@ -4467,17 +4202,13 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.tm-my-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 8px;
-}
-
 .tm-profile-level-panel {
-  border: 1px solid var(--grey100);
+  /* 흰 카드(--card-surface) 내부에 렌더되므로 grey50/grey100은 카드와 명도가 거의
+     동일해(대비 ~1.04~1.10:1) 패널 경계가 사실상 안 보였다. .tm-create-input과 동일
+     패턴으로 --surface-soft(카드보다 한 단계 진한 표면) + --border-strong으로 교체. */
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--surface-soft);
   padding: 14px;
 }
 
@@ -4496,7 +4227,7 @@ button:disabled {
 
 .tm-profile-edit-shell .tm-my-profile-head {
   margin: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 16px;
 }
 
@@ -4536,6 +4267,10 @@ button:disabled {
   border-right: 1px solid var(--border);
 }
 
+.tm-my-monthly > div:nth-child(2n) {
+  border-right: 0;
+}
+
 .tm-my-monthly > div:last-child {
   border-right: 0;
 }
@@ -4566,7 +4301,8 @@ button:disabled {
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: var(--grey100);
+  background: var(--grey150); /* [토큰 충돌 fix] grey100(대비 ≈1.10:1)은 흰 .tm-card 위에서 배지 형태가
+  거의 안 보임 — grey150으로 한 단계 올려 원형 배지 경계를 명확히 함 */
   color: var(--text-strong);
   display: grid;
   place-items: center;
@@ -4606,8 +4342,12 @@ button:disabled {
   background: var(--grey100);
 }
 
-/* 매치 유형(개인/팀) 세그먼트 — 스크롤 영역 직속 자식이라 좌우 여백을 스스로 확보해야 한다.
-   위 검색바 입력·아래 종목 칩/카드가 모두 --v1-shell-page-x 인셋이므로 같은 토큰으로 맞춘다. */
+/* 2026-08-11: main에는 없는 dev 전용 오버라이드(--card-surface + border, 세그먼트
+   트랙을 페이지 배경과 더 분리하려던 시도)가 활성 탭의 기본 pill 배경(--surface)과
+   완전히 같은 값이 되어 활성 탭이 자기 트랙에 녹아 사라지는 새 버그를 만들었다(실측
+   지적: "active 상태가 폰트 굵기 차이뿐"). main과 동일한 형태로 되돌린다 —
+   .tm-segment-row의 기본 --grey100 트랙이면 .tm-review-tab[data-active]의 --surface
+   pill이 원래도 잘 보였다(패치를 덧대는 대신 원인이 된 오버라이드 자체를 제거). */
 .tm-match-type-segment {
   margin: 0 var(--v1-shell-page-x) 12px;
 }
@@ -4655,6 +4395,48 @@ button:disabled {
   background: var(--surface);
   color: var(--text-strong);
   font-weight: 800;
+}
+
+/* [토큰 충돌 fix] 다크모드에서 --grey100(트랙, .tm-segment-row/.tm-review-tabs)과
+   --surface(활성 pill)가 둘 다 #1c1e24로 완전히 같은 값이라 활성 탭이 트랙에 녹아
+   사라진다(라이트모드는 #f2f4f6 vs #fff라 그런대로 구분됨 — main에도 있던 원래
+   패턴). .tm-match-type-segment의 dev 전용 오버라이드를 걷어내고서야 드러난, 이
+   컴포넌트를 쓰는 모든 곳(리뷰 탭 3열도 포함)의 근본 다크모드 결함이라 공유
+   셀렉터에서 한 번에 고친다 — --grey150(다크 #20222a)로 실제 구분되게. */
+:root.dark .tm-review-tab[data-active="true"] {
+  background: var(--grey150);
+}
+
+.tm-tournament-widget-icon {
+  background: var(--grey100);
+}
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 SidebarTournamentsWidget 카드의
+   부모 배경 --surface(#1c1e24)와 완전히 같은 값이라 아이콘 배지가 카드에 녹아
+   사라진다(라이트모드는 grey100 #f2f4f6 vs surface #fff라 구분됨). 신규 토큰 없이
+   --grey150(다크 #20222a, surface와 구분)으로 다크 전용 오버라이드. */
+:root.dark .tm-tournament-widget-icon {
+  background: var(--grey150);
+}
+
+.tm-post-event-icon-badge {
+  background: var(--grey100);
+}
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 PostEventActionList 아이콘 배지를
+   감싸는 Card(--card-surface, #1c1e24)와 완전히 같은 값이라 배지가 카드에 녹아
+   사라진다(라이트모드는 grey100 #f2f4f6 vs card-surface #fff라 구분됨 —
+   tournament-venue-retention-sections.tsx PostEventActionList). 신규 토큰 없이
+   --grey150(다크 #20222a, card-surface와 구분)으로 다크 전용 오버라이드. */
+:root.dark .tm-post-event-icon-badge {
+  background: var(--grey150);
+}
+
+/* [토큰 충돌 fix] 다크모드에서 --grey100(#1c1e24)이 Card(--card-surface, #1c1e24)와
+   완전히 같은 값이라 .tm-info-row 구분선이 카드 안에서 사라진다(라이트모드는
+   grey100 #f2f4f6 vs card-surface #fff라 구분됨 — 팀매치 만들기 확인화면, 상세
+   우측 레일에서 실사용). 신규 토큰 없이 --grey150(다크 #20222a, card-surface와
+   구분)으로 다크 전용 오버라이드. */
+:root.dark .tm-info-row {
+  border-bottom-color: var(--grey150);
 }
 
 .tm-review-stat-grid {
@@ -4708,9 +4490,13 @@ button:disabled {
 }
 
 .tm-review-avatar {
+  /* 흰 카드(--card-surface) 내부에 렌더되므로 grey100 채움만으로는 대비 ~1.10:1이라
+     아바타 사각 경계가 흐릿했다. .tm-profile-level-panel(4666-4674행)과 동일 패턴으로
+     --surface-soft(카드보다 한 단계 진한 표면) + --border-strong 보더를 더한다. */
   flex-shrink: 0;
   border-radius: 14px;
-  background: var(--grey100);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-soft);
   background-position: center;
   background-size: cover;
   color: var(--text-strong);
@@ -4890,7 +4676,7 @@ button:disabled {
 .tm-danger-panel {
   border-radius: 8px;
   background: var(--red50);
-  color: var(--red500);
+  color: var(--red700);
   padding: 18px;
 }
 
@@ -4942,7 +4728,11 @@ button:disabled {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  color: var(--red500);
+  /* 2026-08-12: .tm-danger-panel의 color:red700 승격은 .tm-text-body가 이미 자체
+     color(--text)를 갖고 있어 상속되지 않는 no-op이었다 — 실제로 이 아이콘 자체가
+     자신의 틴트 배경(--red50, .tm-danger-panel) 위에서 red500(2026-08-11 사용자 지적
+     계열과 동일 패턴)을 직접 쓰고 있어 이게 진짜 대비 결함이었다. */
+  color: var(--red700);
   display: grid;
   place-items: center;
 }
@@ -4969,22 +4759,6 @@ button:disabled {
     border-radius: 18px;
     overflow: hidden;
     box-shadow: var(--shadow-2);
-  }
-
-  .v1-header,
-  .v1-bottom-nav {
-    position: sticky;
-    left: auto;
-    width: 100%;
-    transform: none;
-  }
-
-  .v1-header {
-    top: 0;
-  }
-
-  .v1-bottom-nav {
-    bottom: 0;
   }
 
   .v1-main {
@@ -5014,7 +4788,7 @@ button:disabled {
 
 /* ── 스켈레톤 블록 (components/v1-ui/page-skeleton.tsx) ──────────────────── */
 .tm-skeleton {
-  background: var(--grey100);
+  background: var(--grey100); /* 페이지 배경(--bg) 위 플레이스홀더 — main과 동일 */
   animation: tm-skeleton-pulse 1.4s ease-in-out infinite;
 }
 
@@ -5124,14 +4898,6 @@ button:disabled {
   margin-top: 10px;
 }
 
-.tm-signup-skip {
-  margin-top: 12px;
-  width: 100%;
-  text-align: center;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
 @media (min-width: 1024px) {
   .tm-signup-hero .tm-auth-heading {
     font-size: 28px;
@@ -5220,7 +4986,9 @@ button:disabled {
   align-items: center;
   padding: 1px 5px;
   border-radius: 4px;
-  font-size: 10px;
+  /* [공개 화면 R-T2 정리] '준비 중' 실텍스트 배지 — 고정폭 없이 padding만 있어
+     캡션 토큰으로 올려도 넘치지 않는다. */
+  font-size: var(--font-size-caption);
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: 0;
@@ -5356,94 +5124,13 @@ button:disabled {
 /* pending: 파란 tint — 비색상 지표: 텍스트 '초대중' 병기 필수 */
 .tm-invitation-status-pending {
   background: var(--blue50);
-  color: var(--blue500);
-}
-
-/* accepted: 초록 tint — 비색상 지표: 텍스트 '수락됨' 병기 */
-.tm-invitation-status-accepted {
-  background: var(--green50);
-  color: var(--green500);
-}
-
-/* declined: 회색 tint — 비색상 지표: 텍스트 '거절됨' 병기 */
-.tm-invitation-status-declined {
-  background: var(--grey100);
-  color: var(--text-muted);
-}
-
-/* cancelled: 회색 tint — 비색상 지표: 텍스트 '취소됨' 병기 */
-.tm-invitation-status-cancelled {
-  background: var(--grey100);
-  color: var(--text-caption);
+  color: var(--blue700);
 }
 
 /* focus ring — .tm-btn:focus-visible 패턴과 통일 */
 .tm-invitation-card:focus-visible {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
-}
-
-/* ═══════════════════════════════════════════════════
-   TOURNAMENT HUB — 대회 서브 탭 네비게이션
-   Pages: 대회 정보 | 순위·브래킷 | 최종결과 | 시상
-   ═══════════════════════════════════════════════════ */
-
-/* Sub-nav 탭 바 — sticky top으로 스크롤 시 고정 */
-.tm-hub-subnav {
-  position: sticky;
-  top: var(--v1-shell-header-height, 56px);
-  z-index: 10;
-  background: var(--glass-white-96, rgba(255,255,255,0.96));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  display: flex;
-  border-bottom: 1px solid var(--grey100);
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-.tm-hub-subnav::-webkit-scrollbar { display: none; }
-
-.tm-hub-subnav-tab {
-  flex: none;
-  padding: 0 16px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
-  border-bottom: 2px solid transparent;
-  text-decoration: none;
-  transition: color 0.12s, border-color 0.12s;
-}
-.tm-hub-subnav-tab:hover { color: var(--text); }
-.tm-hub-subnav-tab[data-active="true"],
-.tm-hub-subnav-tab-active {
-  color: var(--blue500);
-  border-bottom-color: var(--blue500);
-  font-weight: 700;
-}
-
-/* ── 대회 컨텍스트 헤더 (타이틀·종목·상태) ── */
-.tm-hub-ctx-header {
-  padding: 20px 20px 14px;
-  border-bottom: 1px solid var(--grey100);
-}
-.tm-hub-ctx-title {
-  font-size: 18px;
-  font-weight: 850;
-  color: var(--text-strong);
-  line-height: 1.3;
-  margin: 0 0 6px;
-}
-.tm-hub-ctx-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 /* ── 대회 진행 단계 표시기 (리그 종료 → 준결승 → 결승) ── */
@@ -5479,7 +5166,10 @@ button:disabled {
   justify-content: center;
   position: relative;
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 28px 원(border 2px 감안 실질 24px)에 숫자 한 자리만
+     들어가 캡션 토큰(12px) 여유. tournament-progress-stepper.tsx의 인라인
+     fontSize:11도 같은 이유로 12로 맞춤. */
+  font-size: var(--font-size-caption);
   font-weight: 700;
   color: var(--grey400);
 }
@@ -5526,7 +5216,9 @@ button:disabled {
 
 /* 레이블 */
 .tm-hub-stage-label {
-  font-size: 11px;
+  /* 대회 진행 단계명(조별리그/4강/결승)은 "지금 어디까지 왔나"를 읽는 라벨이다 —
+     현재 단계만 12px 이고 나머지가 11px 이라 지나간·남은 단계가 잘 안 읽혔다. */
+  font-size: 12px;
   font-weight: 600;
   color: var(--grey400);
   text-align: center;
@@ -5535,11 +5227,14 @@ button:disabled {
   letter-spacing: -0.01em;
 }
 .tm-hub-stage-label-done  { color: var(--blue500); font-weight: 700; }
-.tm-hub-stage-label-active { color: var(--blue500); font-weight: 800; font-size: 12px; }
+/* 크기는 base(12px)와 같게 두고 색·굵기로만 현재 단계를 구분한다. */
+.tm-hub-stage-label-active { color: var(--blue500); font-weight: 800; }
 
 /* 서브레이블 (날짜/시각) */
 .tm-hub-stage-sublabel {
-  font-size: 10px;
+  /* [공개 화면 R-T2 정리] 스텝 아래 자유폭 텍스트 — 캡션 토큰으로 상향해도 줄바꿈
+     걱정 없다. */
+  font-size: var(--font-size-caption);
   color: var(--text-caption);
   font-weight: 500;
   margin-top: -2px;
@@ -5565,7 +5260,8 @@ button:disabled {
 }
 .tm-standings-thead th {
   padding: 8px 8px 8px 0;
-  font-size: 11px;
+  /* 순위표 열 이름은 표를 읽는 기준이다 — 12px 미만이면 모바일에서 판독이 어렵다. */
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-caption);
   text-align: left;
@@ -5597,23 +5293,11 @@ button:disabled {
 }
 .tm-standings-rank-gold { background: #FFF3CD; color: #856404; }
 .tm-standings-rank-silver { background: #F1F1F1; color: var(--grey700); }
+:root.dark .tm-standings-rank-silver { background: var(--grey200); color: var(--grey800); }
 .tm-standings-rank-bronze { background: #FDE8D0; color: #7A3B1E; }
 
-/* 팀 로고 아바타 */
-.tm-team-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--grey100);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  flex-shrink: 0;
-  overflow: hidden;
-}
+/* [공개 화면 R-T2 정리] .tm-team-avatar(11px)를 고치려 확인하다가 TSX 어디서도
+   className으로 참조되지 않는 죽은 코드임을 확인 — 삭제. */
 
 /* ── 브래킷 카드 ── */
 .tm-bk-wrap {
@@ -5623,163 +5307,8 @@ button:disabled {
   padding-bottom: 4px;
 }
 .tm-bk-wrap::-webkit-scrollbar { display: none; }
-
-.tm-bk-rounds {
-  display: flex;
-  gap: 0;
-  min-width: max-content;
-  padding: 8px 0 4px;
-}
-
-.tm-bk-round-col {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-.tm-bk-round-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-caption);
-  text-align: center;
-  padding: 0 8px 10px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.tm-bk-match {
-  border: 1px solid var(--grey200);
-  border-radius: 10px;
-  overflow: hidden;
-  background: #fff;
-  width: 150px;
-  margin: 0 8px;
-  flex-shrink: 0;
-}
-.tm-bk-match-live {
-  border-color: var(--blue500);
-  box-shadow: 0 0 0 2px var(--blue50);
-}
-.tm-bk-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  gap: 6px;
-}
-.tm-bk-row-win { background: var(--blue50); }
-.tm-bk-team {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tm-bk-team-tbd { color: var(--text-caption); font-weight: 400; }
-.tm-bk-score {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-strong);
-  min-width: 18px;
-  text-align: right;
-}
-.tm-bk-divider { height: 1px; background: var(--grey100); margin: 0 10px; }
-.tm-bk-status {
-  padding: 4px 10px 6px;
-  font-size: 10px;
-  color: var(--text-caption);
-  font-weight: 500;
-}
-
-/* 브래킷 커넥터 — 승자→다음 라운드 */
-.tm-bk-connector-col {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  width: 24px;
-  flex-shrink: 0;
-  position: relative;
-}
-.tm-bk-elbow {
-  width: 100%;
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.tm-bk-elbow::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  width: 50%;
-  height: 2px;
-  background: var(--grey300);
-}
-.tm-bk-elbow-top::after {
-  content: '';
-  position: absolute;
-  right: 50%;
-  top: 50%;
-  width: 2px;
-  height: 50%;
-  background: var(--grey300);
-}
-.tm-bk-elbow-bottom::after {
-  content: '';
-  position: absolute;
-  right: 50%;
-  bottom: 50%;
-  top: 0;
-  width: 2px;
-  height: 50%;
-  background: var(--grey300);
-}
-
-/* 우승 슬롯 */
-.tm-bk-champ {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100px;
-  min-height: 72px;
-  border: 1.5px dashed var(--grey300);
-  border-radius: 12px;
-  padding: 12px 8px;
-  margin: 0 8px;
-  text-align: center;
-}
-.tm-bk-champ-decided {
-  border-style: solid;
-  border-color: var(--blue500);
-  background: var(--blue50);
-}
-.tm-bk-champ-icon { color: var(--grey400); }
-.tm-bk-champ-decided .tm-bk-champ-icon { color: var(--blue500); }
-.tm-bk-champ-name {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  word-break: keep-all;
-}
-.tm-bk-champ-decided .tm-bk-champ-name { color: var(--blue500); }
-
-/* 3·4위전 */
-.tm-bk-third-place {
-  margin-top: 20px;
-  padding: 12px 20px;
-  border-top: 1px solid var(--grey100);
-}
-.tm-bk-third-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-caption);
-  margin-bottom: 8px;
-  text-align: center;
-}
+/* [공개 화면 R-T2 정리] .tm-bk-third-label(11px)을 고치려 확인하다가 TSX 어디서도
+   참조되지 않는 죽은 코드임을 확인 — 삭제. */
 
 
 /* ═══════════════════════════════════════
@@ -5787,19 +5316,21 @@ button:disabled {
    ═══════════════════════════════════════ */
 
 /* 라운드 라벨 pill */
+/* 라운드 칩("4강","결승")은 대진표에서 지금 보고 있는 단계를 알려주는 핵심 라벨이다 —
+   10px/9px 는 모바일에서 읽기 어려워 12px 로 올린다(letter-spacing 은 줄여 폭 증가를 상쇄). */
 .tm-bk2-pill {
-  font-size: 10px; font-weight: 800; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: 12px; font-weight: 800; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
   padding: 3px 12px; background: var(--grey100); border-radius: 20px;
 }
-.tm-bk2-pill-sm { padding: 2px 10px; font-size: 9px; }
+.tm-bk2-pill-sm { padding: 2px 10px; font-size: 12px; }
 
 /* 매치 카드 */
 .tm-bk2-card {
   border: 1px solid var(--grey200);
   border-radius: 11px;
   overflow: hidden;
-  background: #fff;
+  background: var(--card-surface);
   width: 180px;
 }
 .tm-bk2-card-live { border-color: var(--blue500); box-shadow: 0 0 0 2px var(--blue50); }
@@ -5812,39 +5343,46 @@ button:disabled {
 .tm-bk2-row[data-winner=true] { background: var(--blue50); }
 .tm-bk2-row[data-loser=true]  { opacity: 0.55; }
 
-/* 아바타 */
-.tm-bk2-avatar {
-  flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px;
-  background: var(--grey150); font-size: 11px; font-weight: 800;
-  color: var(--text); display: flex; align-items: center; justify-content: center;
-}
-.tm-bk2-row[data-winner=true] .tm-bk2-avatar { background: var(--blue500); color: #fff; }
-
 /* 팀명 — 줄임표 방지를 위해 최대 6자 표시, 넘으면 11px */
 .tm-bk2-name {
   flex: 1; font-size: 12px; font-weight: 700; color: var(--text-strong);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   line-height: 1.2;
 }
-.tm-bk2-row[data-winner=true] .tm-bk2-name { color: var(--blue500); }
+.tm-bk2-row[data-winner=true] .tm-bk2-name { color: var(--blue700); }
 
 /* 점수 */
 .tm-bk2-score {
-  font-size: 15px; font-weight: 900; color: var(--text-strong);
+  /* [R-T1/R-T3 타입 위계 정리] weight 900 → 700 — 히어로 숫자(30px+)가 아니라
+     15px 인라인 점수라 rubric R-T3("800 이상은 히어로 숫자·로고 한정") 초과.
+     팀명(tm-bk2-name, 700)보다 여전히 먼저 눈에 띄어야 해서 크기(15px)는 유지. */
+  font-size: 15px; font-weight: 700; color: var(--text-strong);
   min-width: 18px; text-align: right; line-height: 1; flex-shrink: 0;
 }
-.tm-bk2-row[data-winner=true] .tm-bk2-score { color: var(--blue500); }
+.tm-bk2-row[data-winner=true] .tm-bk2-score { color: var(--blue700); }
 
 /* 구분선 */
 .tm-bk2-divider { height: 1px; background: var(--grey100); }
 
 /* 뱃지 */
 .tm-bk2-badge {
-  padding: 3px 10px 4px; font-size: 10px; font-weight: 600;
+  padding: 3px 10px 4px; font-size: 12px; font-weight: 600;
   color: var(--text-caption); background: var(--grey50); text-align: center;
 }
 .tm-bk2-badge-live { background: #fff0f0; color: #d9363e; font-weight: 800; }
-.tm-bk2-badge-time { font-size: 10px; color: var(--text-muted); }
+:root.dark .tm-bk2-badge-live { background: rgba(240,68,82,0.16); color: #ff6b76; }
+.tm-bk2-badge-time { font-size: 12px; color: var(--text-muted); }
+
+/* 뱃지 줄 — 시각 배지가 LIVE/PK 배지와 함께 표시될 수 있다 (D-12).
+   .tm-bk2-badge 자체는 손대지 않는다 — AggregateMatchCard/.tm-bk2-third가
+   이 클래스를 단독 block 배지로 그대로 쓰고 있어서다. */
+.tm-bk2-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 
 /* 챔피언 슬롯 */
 .tm-bk2-champ {
@@ -5857,12 +5395,21 @@ button:disabled {
   border: 1px solid #ffe0a3;
   background: #fffaf0;
 }
+:root.dark .tm-bk2-champ-won {
+  border-color: rgba(254,152,0,0.35);
+  background: rgba(254,152,0,0.16);
+}
 .tm-bk2-champ-trophy { font-size: 30px; line-height: 1; }
 .tm-bk2-champ-label {
-  font-size: 8px; font-weight: 800; letter-spacing: 0.14em;
+  /* "우승" — 대진표에서 가장 의미가 큰 라벨인데 8px 였다. */
+  font-size: 12px; font-weight: 800; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--orange);
 }
-.tm-bk2-champ-name { font-size: 12px; font-weight: 900; color: #7A3B1E; word-break: keep-all; line-height: 1.3; }
+/* [R-T1/R-T3 타입 위계 정리] weight 900 → 700 — 12px 텍스트에는 900이 과함(가독성 저하).
+   "히어로" 신호는 이미 트로피 카드 배경·보더·메달 아이콘이 담당하므로 폰트 굵기로
+   추가 강조할 필요가 없다. */
+.tm-bk2-champ-name { font-size: 12px; font-weight: 700; color: #7A3B1E; word-break: keep-all; line-height: 1.3; }
+:root.dark .tm-bk2-champ-name { color: var(--orange500); }
 
 /* 3·4위전 */
 .tm-bk2-third {
@@ -5870,7 +5417,7 @@ button:disabled {
   padding: 14px;
   border: 1px solid var(--grey200);
   border-radius: 12px;
-  background: var(--grey50);
+  background: var(--grey50); /* 페이지 배경(--bg) 위 한 단계 — main과 동일 */
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -5881,7 +5428,7 @@ button:disabled {
 .tm-bk2-scroll-hint {
   margin: 0 0 8px;
   color: var(--text-caption);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 .tm-bk2-scroll-fade {
@@ -5894,6 +5441,9 @@ button:disabled {
   background: linear-gradient(to right, transparent, rgba(255,255,255,0.92));
   pointer-events: none;
 }
+:root.dark .tm-bk2-scroll-fade {
+  background: linear-gradient(to right, transparent, var(--grey50));
+}
 
 .tm-bracket-page-intro {
   display: flex;
@@ -5903,25 +5453,26 @@ button:disabled {
   padding: 20px;
   border-bottom: 1px solid var(--grey100);
 }
-.tm-bracket-page-eyebrow {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--blue500);
-  font-size: 12px;
-  font-weight: 700;
-}
+/* [.tm-bracket-page-eyebrow 삭제] "순위와 대진표" eyebrow는 상단 앱바 제목
+   ("순위·브래킷")과 같은 말이라 첫 화면 높이만 18px 먹고 정보는 0이었다 —
+   마크업(bracket-page-client.tsx)에서 제거하며 이 규칙도 함께 지운다. */
+/* [R-T1 타입 위계 정리] 22px 하드코딩 → --font-size-subhead(20px) 토큰 + weight 700
+   명시(기존엔 미지정 → Tailwind preflight로 h1이 400 상속, 대회명이 본문보다 안 굵어
+   보였다). 대진표 페이지 콘텐츠 중 가장 큰 tier(1단계: 대회명). */
 .tm-bracket-page-intro h1 {
   margin: 0;
   color: var(--text-strong);
-  font-size: 22px;
-  line-height: 1.35;
+  font-size: var(--font-size-subhead);
+  font-weight: 700;
+  line-height: 1.3;
   letter-spacing: -0.02em;
   word-break: keep-all;
 }
+/* [R-T1] 13px → --font-size-caption(12px) — 부제 문단은 보조 정보 tier(4단계). */
 .tm-bracket-page-intro p {
   margin: 7px 0 0;
   color: var(--text-caption);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   line-height: 1.55;
 }
 .tm-bracket-page-format {
@@ -5930,14 +5481,36 @@ button:disabled {
   border-radius: 999px;
   background: var(--blue50);
   color: var(--blue500);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .tm-bracket-page-stepper { padding: 0 20px; }
 
+/* [R-T1 타입 위계 정리] .tm-hub-section-title(15px/850)은 상금·결과·일정·팀기록·
+   개인기록·경기상세 등 8개 다른 화면과 공유하는 토큰이라 전역 정의는 그대로 두고,
+   이 페이지(.tm-bracket-page-grid 안)에서만 override한다. 850은 CSS 표준
+   font-weight 스텝(400/500/600/700/800/900)에도 없는 값이고, rubric R-T3
+   ("weight 800 이상은 히어로 숫자·로고 한정")에도 어긋난다 — 섹션 제목은 2단계
+   (--font-size-body-lg, 17px/700)로 정리해 대회명(1단계, 20px)·카드 본문(15px)·
+   보조 정보(12px)와 명확히 구분되는 4단계 위계를 만든다. */
+.tm-bracket-page-grid .tm-hub-section-title {
+  font-size: var(--font-size-body-lg);
+  font-weight: 700;
+}
+
+/* §첫 화면 밀도(390px 실측: 스크롤영역 714px 중 인트로+스테퍼+탭이 307px = 43%).
+   좁은 폭에서는 안내 문단이 두 줄(약 44px)을 쓰면서도 탭 두 개가 이미 말해주는 내용을
+   반복한다 — 768px 미만에서만 숨기고, 가로가 남는 데스크탑에서는 그대로 보여준다. */
+@media (max-width: 767px) {
+  .tm-bracket-page-intro { padding: 16px 20px; }
+  .tm-bracket-page-intro p { display: none; }
+}
+
+/* 480px 미만에서도 포맷 배지를 제목 옆에 둔다. 예전엔 세로로 쌓아 배지가 자기 줄
+   (약 41px)을 통째로 차지했는데, 배지는 한 단어짜리 보조 라벨이라 제목이 두 줄로
+   접히는 편이 전체 높이가 더 낮다. */
 @media (max-width: 479px) {
   .tm-bracket-page-intro {
-    flex-direction: column;
     gap: 12px;
   }
 }
@@ -5950,146 +5523,11 @@ button:disabled {
   }
 }
 
-/* ═══════════════════════════════════════════════════
-   WORLD CUP BRACKET — tm-wc-* 네임스페이스
-   ═══════════════════════════════════════════════════ */
-
-.tm-wc-outer { display: flex; flex-direction: column; gap: 20px; }
-
-.tm-wc-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding: 4px 0 12px;
-}
-.tm-wc-scroll::-webkit-scrollbar { display: none; }
-
-.tm-wc-tree {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 4px 0;
-  min-width: max-content;
-}
-
-/* 라운드 열 */
-.tm-wc-col { display: flex; flex-direction: column; align-items: center; min-width: 160px; }
-.tm-wc-col-champ { min-width: 110px; }
-.tm-wc-col-head { height: 32px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
-.tm-wc-col-pill {
-  font-size: 10px; font-weight: 800; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.1em;
-  padding: 4px 14px; background: var(--grey100); border-radius: 20px;
-}
-.tm-wc-col-body { display: flex; flex-direction: column; align-items: stretch; width: 100%; }
-
-/* 매치 카드 */
-.tm-wc-match {
-  border: 1.5px solid var(--grey200);
-  border-radius: 12px;
-  overflow: hidden;
-  background: #fff;
-  width: 160px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
-.tm-wc-match-live { border-color: var(--blue500); box-shadow: 0 0 0 3px var(--blue50); }
-.tm-wc-match-compact { width: 200px; }
-.tm-wc-match-slot { flex-shrink: 0; }
-.tm-wc-match-slot-gap { margin-top: 20px; }
-
-/* 팀 행 */
-.tm-wc-team-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 10px; transition: background 0.1s;
-}
-.tm-wc-team-row[data-winner="true"] { background: var(--blue50); }
-.tm-wc-team-row[data-loser="true"] { opacity: 0.55; }
-.tm-wc-team-row[data-tbd="true"] { opacity: 0.45; }
-
-.tm-wc-team-avatar {
-  flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px;
-  background: var(--grey200); font-size: 11px; font-weight: 800;
-  color: var(--text-strong); display: flex; align-items: center; justify-content: center;
-}
-.tm-wc-team-row[data-winner="true"] .tm-wc-team-avatar { background: var(--blue500); color: #fff; }
-
-.tm-wc-team-name {
-  flex: 1; font-size: 12px; font-weight: 700; color: var(--text-strong);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2;
-}
-.tm-wc-team-row[data-winner="true"] .tm-wc-team-name { color: var(--blue500); }
-
-.tm-wc-team-score {
-  font-size: 16px; font-weight: 900; color: var(--text-strong);
-  min-width: 20px; text-align: right; line-height: 1;
-}
-.tm-wc-team-row[data-winner="true"] .tm-wc-team-score { color: var(--blue500); }
-
-.tm-wc-divider { height: 1px; background: var(--grey100); }
-
-.tm-wc-match-badge {
-  padding: 4px 10px 5px; font-size: 10px; font-weight: 700;
-  color: var(--text-caption); text-align: center; background: var(--grey50);
-}
-.tm-wc-match-badge-live { background: #fff0f0; color: #d9363e; }
-.tm-wc-match-badge-time { color: var(--text-muted); font-weight: 600; }
-
-/* 커넥터 */
-.tm-wc-conn {
-  display: flex; flex-direction: column;
-  width: 28px; align-self: stretch; position: relative;
-  margin-top: 32px;
-}
-.tm-wc-conn-top-arm {
-  flex: 1;
-  border-right: 2px solid var(--grey300);
-  border-bottom: 2px solid var(--grey300);
-}
-.tm-wc-conn-bottom-arm {
-  flex: 1;
-  border-right: 2px solid var(--grey300);
-  border-top: 2px solid var(--grey300);
-}
-.tm-wc-conn-mid-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--grey400); align-self: flex-end;
-  margin-right: -5px; flex-shrink: 0;
-}
-.tm-wc-conn-single {
-  height: 2px; background: var(--grey300);
-  width: 28px; align-self: center;
-  margin-top: 32px;
-}
-
-/* 챔피언 슬롯 */
-.tm-wc-champ {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; width: 100px; min-height: 90px;
-  border: 2px dashed var(--grey300); border-radius: 14px;
-  padding: 14px 8px; text-align: center;
-}
-.tm-wc-champ-decided {
-  border: none;
-  background: linear-gradient(145deg, #FFF8E1 0%, #FFF3CD 100%);
-  box-shadow: 0 2px 12px rgba(254,152,0,0.18);
-}
-.tm-wc-champ-trophy { font-size: 32px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12)); }
-.tm-wc-champ-icon { color: var(--grey400); }
-.tm-wc-champ-label {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--orange);
-}
-.tm-wc-champ-name { font-size: 13px; font-weight: 900; color: #7A3B1E; word-break: keep-all; line-height: 1.3; }
-.tm-wc-champ-tbd { color: var(--text-caption); font-weight: 500; }
-
-/* 3·4위전 */
-.tm-wc-third { border-top: 1px dashed var(--grey200); padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
-.tm-wc-third-header { display: flex; align-items: center; gap: 10px; }
-.tm-wc-third-pill {
-  font-size: 10px; font-weight: 800; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.08em;
-  padding: 3px 12px; background: var(--grey100); border-radius: 20px; white-space: nowrap;
-}
-.tm-wc-third-match { display: flex; flex-wrap: wrap; gap: 10px; }
+/* §768~1023px에서 2열은 불가능 — 이 구간의 콘텐츠 폭은 셸이 약 600px로 묶는다
+   (실측). 순위표는 최소 296px(표 minWidth), 대진표는 매치 카드 180px + 우승 카드
+   110px가 필요해 둘을 나란히 세우면 합이 600을 넘어 양쪽 다 가로 스크롤이 생겼다
+   (시도 결과 실측: 순위표 칼럼 187px). 그래서 이 구간의 공백은 레이아웃이 아니라
+   표의 열 배분(tournament-standings-table.tsx의 폭 %)으로 줄인다. */
 
 /* ═══════════════════════════════════════════════
    RESULTS PAGE v2 — tm-res-* (confetti + rank)
@@ -6171,84 +5609,6 @@ button:disabled {
   .tm-resd-hero, .tm-resd-trophy, .tm-resd-name, .tm-resd-meta, .tm-resd-stat { animation: none; }
 }
 
-/* ── 시상대 (Podium) ── */
-.tm-podium {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  padding: 8px 0 0;
-}
-.tm-podium-slot {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-}
-.tm-podium-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 0 4px 8px;
-}
-.tm-podium-avatar {
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  color: #fff;
-  flex-shrink: 0;
-}
-.tm-podium-name {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-strong);
-  text-align: center;
-  word-break: keep-all;
-  line-height: 1.3;
-  max-width: 100%;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.tm-podium-name-1st { font-size: 13px; font-weight: 900; }
-.tm-podium-stat { font-size: 10px; color: var(--text-caption); font-variant-numeric: tabular-nums; }
-.tm-podium-platform {
-  border-radius: 8px 8px 0 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 6px;
-}
-.tm-podium-platform-label { font-size: 9px; font-weight: 800; color: rgba(255,255,255,0.7); letter-spacing: 0.06em; text-transform: uppercase; }
-
-/* 4위: 시상대 아래 작은 행 */
-.tm-podium-fourth {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: var(--grey50);
-  border-radius: 0 0 10px 10px;
-  margin-top: 0;
-}
-.tm-podium-fourth-badge {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--grey200);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.tm-podium-fourth-name { flex: 1; font-size: 13px; font-weight: 700; color: var(--text-strong); }
-.tm-podium-fourth-stat { font-size: 12px; color: var(--text-caption); font-variant-numeric: tabular-nums; }
-
 /* 경기 결과 행 — button으로 변경해 탭 가능 */
 .tm-res-match-row {
   display: block;
@@ -6265,28 +5625,6 @@ button:disabled {
 .tm-res-match-row:last-child { border-bottom: none; }
 .tm-res-match-row:hover, .tm-res-match-row:focus-visible { background: var(--grey50); }
 .tm-res-match-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.tm-res-match-chevron {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--grey400);
-  flex-shrink: 0;
-}
-
-/* 순위 카드 */
-.tm-res-rank-card {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 12px 16px;
-  border-radius: 12px;
-}
-.tm-res-rank-name { font-size: 15px; font-weight: 800; color: var(--text-strong); line-height: 1.2; }
-.tm-res-rank-label { font-size: 11px; font-weight: 700; margin-top: 1px; }
-.tm-res-rank-record { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; margin-left: 8px; }
-.tm-res-rank-record-num { font-size: 13px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; }
-.tm-res-rank-record-sub { font-size: 11px; color: var(--text-caption); font-variant-numeric: tabular-nums; }
 
 /* 경기 결과 블록 */
 .tm-res-matches-block {
@@ -6318,15 +5656,20 @@ button:disabled {
 }
 .tm-res-match-team-right { text-align: right; }
 .tm-res-match-score {
+  /* 점수 pill — 페이지 배경(--bg) 위 --grey100 한 단계로 그룹핑. main과 동일.
+     2026-08-11에 grey200 + border-strong으로 올렸던 것은 그때 페이지 배경이 --grey50이라
+     grey100 채움이 ~1.05:1로 묻혔기 때문이며, 페이지 배경 복원으로 전제가 사라졌다. */
   font-size: 14px; font-weight: 900; color: var(--text-strong);
   flex-shrink: 0; text-align: center; min-width: 52px;
   background: var(--grey100);
   border-radius: 8px;
   padding: 4px 0;
 }
-.tm-res-match-date { font-size: 10px; color: var(--text-caption); margin-top: 4px; }
 
-/* 조별리그 펼치기 버튼 */
+/* 조별리그 펼치기 버튼 — 페이지 배경(--bg) 위 --grey50 채움 + grey150 보더. main과 동일.
+ * 2026-08-11에 --button-fill-neutral(grey100) + --border-strong으로 올렸던 것은 그때
+ * 페이지 배경 자체가 --grey50이라 채움이 페이지와 완전히 같은 값이었기 때문이며,
+ * 페이지 배경 복원으로 그 전제가 사라졌다. */
 .tm-res-expand-btn {
   width: 100%;
   display: flex;
@@ -6342,140 +5685,10 @@ button:disabled {
   cursor: pointer;
   text-align: left;
 }
-.tm-res-expand-btn:hover { background: var(--grey100); }
+.tm-res-expand-btn:hover { background: var(--grey100); } /* 기본(grey50)보다 한 단계 진하게 — main과 동일 */
 .tm-res-expand-chevron { font-size: 14px; transition: transform 0.2s; display: inline-block; }
-
-/* ── 최종결과 — 표창 카드 ── */
-.tm-results-champion-card {
-  background: linear-gradient(135deg, var(--blue500) 0%, #1a6ee8 100%);
-  border-radius: 16px;
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  color: #fff;
-  text-align: center;
-  margin-bottom: 4px;
-}
-.tm-results-champion-trophy { font-size: 40px; line-height: 1; }
-.tm-results-champion-label {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.8;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.tm-results-champion-name {
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-}
-.tm-results-champion-sub { font-size: 12px; opacity: 0.7; }
-
-/* 최종 순위 리스트 */
-.tm-results-rank-list { display: flex; flex-direction: column; gap: 0; }
-.tm-results-rank-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--grey100);
-}
-.tm-results-rank-row:last-child { border-bottom: none; }
-.tm-results-rank-medal {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-.tm-results-rank-medal-1 { background: #FFF3CD; }
-.tm-results-rank-medal-2 { background: #F5F5F5; }
-.tm-results-rank-medal-3 { background: #FDE8D0; }
-.tm-results-rank-medal-other { background: var(--grey100); font-size: 13px; font-weight: 700; color: var(--text-caption); }
-.tm-results-rank-team {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-.tm-results-rank-stat {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── 경기 결과 요약 카드 ── */
-.tm-match-result-card {
-  border: 1px solid var(--grey150);
-  border-radius: 12px;
-  padding: 14px 16px;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.tm-match-result-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-.tm-match-result-round {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-caption);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.tm-match-result-date {
-  font-size: 11px;
-  color: var(--text-caption);
-}
-.tm-match-result-score-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.tm-match-result-team {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-.tm-match-result-team-right { text-align: right; }
-.tm-match-result-score {
-  font-size: 22px;
-  font-weight: 900;
-  color: var(--text-strong);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  text-align: center;
-  min-width: 64px;
-}
-.tm-match-result-score-sep {
-  font-size: 16px;
-  color: var(--grey400);
-  margin: 0 2px;
-}
-.tm-match-result-note {
-  font-size: 11px;
-  color: var(--text-caption);
-  text-align: center;
-}
-.tm-match-result-winner-badge {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--blue500);
-  background: var(--blue50);
-  border-radius: 4px;
-  padding: 2px 6px;
-}
+/* [공개 화면 R-T2 정리] .tm-match-result-note/-winner-badge(11/10px) 역시 죽은
+   코드라 삭제(위 round/date와 같은 이유). */
 
 /* ── 시상/리뷰 ── */
 .tm-awards-podium-caption {
@@ -6574,33 +5787,6 @@ button:disabled {
   line-height: 1;
 }
 
-.tm-awards-prize-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--grey100);
-}
-.tm-awards-prize-row:last-child { border-bottom: none; }
-.tm-awards-prize-icon {
-  font-size: 20px;
-  width: 36px;
-  text-align: center;
-  flex-shrink: 0;
-}
-.tm-awards-prize-label {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.tm-awards-prize-amount {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--blue500);
-  font-variant-numeric: tabular-nums;
-}
-
 /* 리뷰 카드 */
 .tm-review-card {
   border: 1px solid var(--grey150);
@@ -6630,10 +5816,13 @@ button:disabled {
   flex-shrink: 0;
 }
 .tm-review-card-author { font-size: 13px; font-weight: 700; color: var(--text-strong); }
-.tm-review-card-team { font-size: 11px; color: var(--text-caption); }
+/* [공개 화면 R-T2 정리] .tm-review-card-team(11px)은 TSX 어디서도 참조되지
+   않는 죽은 코드(리뷰 카드는 팀명을 author 슬롯에 합쳐 렌더 — awards-page-client.tsx
+   review.teamName ?? review.authorNickname)라 삭제. */
 .tm-review-card-stars { display: flex; gap: 2px; }
 .tm-review-card-body { font-size: 13px; color: var(--text); line-height: 1.55; }
-.tm-review-card-date { font-size: 11px; color: var(--text-caption); }
+/* [공개 화면 R-T2 정리] 고정폭 없는 인라인 날짜 텍스트 — 캡션 토큰으로 상향. */
+.tm-review-card-date { font-size: var(--font-size-caption); color: var(--text-caption); }
 
 /* 경기 영상 — 하이라이트 스트립/칩 + 페이지 내 모달 재생 (components/tournaments/match-videos.tsx) */
 .tm-video-strip {
@@ -6713,7 +5902,9 @@ button:disabled {
 .tm-video-strip-title {
   display: block;
   margin-top: 6px;
-  font-size: 11px;
+  /* [공개 화면 R-T2 정리] 168px 폭 카드 안에서 ellipsis로 잘리는 한 줄 제목 —
+     캡션 토큰으로 올려도 넘치는 대신 자연스럽게 더 잘린다(레이아웃 깨짐 없음). */
+  font-size: var(--font-size-caption);
   font-weight: 600;
   line-height: 1.35;
   color: var(--grey700);
@@ -7053,7 +6244,8 @@ button:disabled {
   .tm-reviews-table-photo-more {
     display: inline-flex;
     align-items: center;
-    font-size: 11px;
+    /* [공개 화면 R-T2 정리] "+N" 인디케이터 — 고정폭 없어 캡션 토큰으로 상향. */
+    font-size: var(--font-size-caption);
     color: var(--text-caption);
     padding-left: 2px;
   }
@@ -7062,11 +6254,6 @@ button:disabled {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-}
-
-/* 섹션 공통 */
-.tm-hub-section {
-  padding: 20px 20px 0;
 }
 .tm-hub-section-title {
   font-size: 15px;
@@ -7081,7 +6268,7 @@ button:disabled {
   font-size: 13px;
 }
 
-/* 리텐션 CTA 카드 */
+/* 리텐션 CTA 카드 — 페이지 배경(--bg) 위 --grey50 한 단계. main과 동일. */
 .tm-retention-card {
   background: var(--grey50);
   border-radius: 16px;
@@ -7102,77 +6289,6 @@ button:disabled {
   color: var(--text);
   margin: 0;
   line-height: 1.5;
-}
-
-/* ── 토너먼트 흐름 이전/다음 네비게이터 ── */
-.tm-flow-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px 20px;
-  border-top: 1px solid var(--grey100);
-  margin-top: 8px;
-}
-.tm-flow-nav-back {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-  height: 40px;
-  border-radius: 10px;
-  border: 1px solid var(--grey200);
-  background: #fff;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  flex-shrink: 0;
-  white-space: nowrap;
-  transition: background 0.1s, color 0.1s;
-}
-.tm-flow-nav-back:hover { background: var(--grey50); color: var(--text); }
-.tm-flow-nav-next {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 16px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--blue500);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: opacity 0.12s;
-}
-.tm-flow-nav-next:hover { opacity: 0.9; }
-.tm-flow-nav-next-disabled {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 16px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--grey100);
-  color: var(--text-caption);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: default;
-  white-space: nowrap;
-}
-.tm-flow-nav-step {
-  font-size: 10px;
-  font-weight: 500;
-  opacity: 0.7;
-  white-space: nowrap;
 }
 
 /* ── 토너먼트 서브 페이지 데스크탑 레이아웃 ── */
@@ -7200,6 +6316,36 @@ button:disabled {
     grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
   }
   .tm-bracket-page-grid .tm-bk2-scroll-hint { display: none; }
+  /* §대진표 빈 상태 재균형 — 조별리그 진행 중(대진표 미공개)엔 순위표를 넓게.
+     대진 공개 후엔 위 .tm-bracket-page-grid.tm-tourn-sub-grid-6040(클래스 2개)이
+     이 규칙(클래스 3개, 특이도 우위)보다 여전히 이겨 오늘 폭(366:650)을 그대로 유지한다. */
+  .tm-bracket-page-grid.tm-tourn-sub-grid-6040.tm-bracket-page-grid-empty {
+    grid-template-columns: minmax(300px, 1.28fr) minmax(240px, 0.72fr);
+  }
+  /* §라운드 수에 맞춘 폭 배분 — 위 0.72:1.28은 4강·8강처럼 라운드가 여러 개인
+     대진표를 전제로 넓은 쪽을 대진표에 준 배분이다. 결승만 남은 대회(라운드 ≤ 2)에서는
+     그 폭을 연결선이 가로지를 뿐이라(1440 실측: 대진표 칼럼 650px에 카드 180px),
+     대신 366px로 눌려 있던 순위표에 폭을 돌려준다. 클래스 3개라 위 2개짜리 규칙을
+     특이도로 이긴다(-empty와 동시에 켜지지 않는다 — 그쪽은 대진표 미공개 상태 전용). */
+  .tm-bracket-page-grid.tm-tourn-sub-grid-6040.tm-bracket-page-grid-slim-bracket,
+  .tm-bracket-page-grid.tm-tourn-sub-grid-2col.tm-bracket-page-grid-slim-bracket {
+    /* 두 칼럼 모두 "콘텐츠에 맞는 상한"으로 묶고 남는 폭은 바깥 여백으로 보낸다.
+       fr로 나눠 가지면 남는 폭이 칼럼 안쪽 공백(순위표 가운데 빈 띠, 늘어난 연결선)이
+       된다 — 순위표는 400px을 넘기면 숫자 3열이 오른쪽 끝에 고정된 채 팀명 칸만
+       넓어지고(390px 실측 공백 109px → 558px에서 319px), 대진표는 커넥터가
+       flexGrow로 늘어나 빈 선만 길어진다. */
+    grid-template-columns: minmax(320px, 370px) minmax(280px, 460px);
+    justify-content: center;
+  }
+
+  /* §일정 탭 가로 밀도 — 1440에서 일정 카드가 998px까지 늘어나는데 팀명·점수는 중앙
+     정렬이라 좌우로 각각 300px 가까이 비고, 조·시간·구장은 양 끝에 붙어 시선 이동만
+     길어졌다. 읽기 좋은 폭으로 묶어 가운데 세운다. */
+  .tm-bracket-schedule-pane {
+    max-width: 840px;
+    margin: 0 auto;
+    width: 100%;
+  }
 
   /* 시상 페이지: 각 컬럼과 카드는 콘텐츠 높이만 차지한다. */
   .tm-awards-grid { align-items: start; }
@@ -7210,51 +6356,6 @@ button:disabled {
   .tm-results-grid > .tm-tourn-sub-col:first-child { position: sticky; top: 12px; }
   /* 챔피언 카드 풀 너비 래퍼 */
   .tm-tourn-hero-full { padding-top: 16px; padding-left: 0 !important; padding-right: 0 !important; }
-
-  /* ── 히어로 카드 데스크탑: 가로형 배너 ── */
-  .tm-tourn-hero-full .tm-res-hero {
-    flex-direction: row;
-    align-items: center;
-    text-align: left;
-    padding: 20px 28px;
-    border-radius: 10px;
-    gap: 20px;
-  }
-  .tm-tourn-hero-full .tm-res-hero-trophy {
-    font-size: 40px;
-    margin-bottom: 0;
-    flex-shrink: 0;
-  }
-  .tm-tourn-hero-full .tm-res-hero-name {
-    font-size: 22px;
-    margin: 2px 0;
-  }
-  /* 통계를 세로에서 가로로 */
-  .tm-tourn-hero-full .tm-res-hero-stats {
-    display: flex !important;
-    flex-direction: row !important;
-    margin-left: auto;
-    flex-shrink: 0;
-    gap: 20px;
-    align-items: center;
-  }
-  .tm-tourn-hero-full .tm-res-hero-stat {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center;
-    gap: 1px;
-  }
-  .tm-tourn-hero-full .tm-res-hero-stat-sep {
-    display: none !important;
-  }
-  .tm-tourn-hero-full .tm-res-hero-stats .tm-res-hero-stat-num {
-    font-size: 20px;
-  }
-  .tm-tourn-hero-full .tm-res-hero-stats .tm-res-hero-stat-label {
-    font-size: 10px;
-    opacity: 0.6;
-  }
-
   /* ── 메달 카드 데스크탑: 더 컴팩트 ── */
   .tm-tourn-sub-col .tm-award-card span[aria-hidden="true"][style*="font-size: 52px"],
   .tm-tourn-sub-col .tm-award-card span[aria-hidden="true"][style*="font-size: 42px"] {
@@ -7269,6 +6370,11 @@ button:disabled {
     padding: 12px 0 20px;
     border-top: 1px solid var(--grey100);
     margin-top: 4px;
+  }
+  /* §브래킷 페이지 전용 — flex-end 대신 좌우 앵커로 808px 고아 공백 제거.
+     results/awards의 .tm-tourn-sub-flownav(flex-end)는 공유 클래스라 그대로 둔다. */
+  .tm-tourn-sub-flownav.tm-bracket-page-flownav {
+    justify-content: space-between;
   }
   .tm-tourn-sub-flownav nav {
     display: flex !important;
@@ -7397,4 +6503,51 @@ button:disabled {
   color: var(--text-caption);
   font-size: 12px;
   text-align: center;
+}
+
+/* 세그먼트 탭 — 트랙 배경 위에 선택된 항목만 떠오르는 형태.
+   나란한 두 버튼(파란 채움 + 회색)은 "탭"이 아니라 "버튼 두 개"로 읽힌다는 오너
+   지적에서 나왔다. .tm-review-tabs 가 이미 쓰던 시각 계약과 동일하되, 이름을 특정
+   화면에 묶지 않도록 일반화했다. 컬럼 수는 쓰는 쪽이 grid-template-columns 로 정한다. */
+.tm-seg-tabs {
+  display: grid;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 15px;
+  background: var(--grey100);
+}
+
+.tm-seg-tab {
+  /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items 로 내용 중앙 정렬) */
+  min-height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  /* [R-T1 타입 위계 정리] 14px → 15px — 이 페이지 전용 클래스(다른 화면 미사용)라
+     3단계(카드 핵심 정보, tm-bk2-score와 동일 15px)에 바로 편입. 탭 버튼은 폭
+     여유가 커서 축소 위험 없음(픽스처 실측: "순위 · 대진표"/"경기 일정" 모두
+     여유 있게 들어감). */
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* [R-T3 타입 위계 정리] 활성 상태 800 제거 — R-T3는 800 이상을 히어로 숫자·로고
+   전용으로 규정하고, 세그먼트 탭은 여기 해당하지 않는다. 선택 상태는 굵기가 아니라
+   배경(트랙 위로 떠오르는 pill) + 텍스트 색(muted → strong)으로 구분한다 —
+   font-weight는 비활성과 동일한 700 그대로 둬서 그 자체가 신호가 되지 않게 한다. */
+.tm-seg-tab[data-active='true'] {
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+/* [토큰 충돌 fix] 다크모드에서 --grey100(트랙, .tm-seg-tabs)과 --surface(활성 pill)가
+   둘 다 #1c1e24로 완전히 같은 값이라 활성 탭이 트랙에 녹아 사라진다(라이트모드는
+   #f2f4f6 vs #fff라 구분됨). 위에서 font-weight 800을 걷어내 배경이 선택 상태를
+   나타내는 유일한 비색상 신호가 됐으므로, 이 충돌을 그대로 두면 다크모드에서 선택
+   상태가 사실상 안 보이게 된다 — .tm-review-tab[data-active]/.tm-match-type-segment에
+   이미 쓰인 동일 패턴(--grey150)으로 다크 전용 오버라이드. */
+:root.dark .tm-seg-tab[data-active='true'] {
+  background: var(--grey150);
 }

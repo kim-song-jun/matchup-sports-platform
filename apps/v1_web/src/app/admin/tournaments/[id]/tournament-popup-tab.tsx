@@ -110,7 +110,7 @@ export function TournamentPopupTab({
         />
       ) : (
         <p
-          className="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-600"
+          className="rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
           role="status"
         >
           조회 전용 권한으로 접속했어요. 팝업을 추가하거나 변경하려면 운영 권한이 필요해요.
@@ -135,11 +135,11 @@ export function TournamentPopupTab({
       {!isPending && !isError && popups.length > 0 && (
         <div className="flex flex-col gap-3">
           {popups.map((popup) => (
-            <div key={popup.id} className="rounded-2xl border border-gray-100 bg-white px-5 py-4">
+            <div key={popup.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-bold text-gray-900 truncate">{popup.title}</p>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="text-[13px] font-bold text-[var(--text-strong)] truncate">{popup.title}</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {STATUS_LABEL[popup.status]}
                     {popup.displayStartAt || popup.displayEndAt
                       ? ` · ${popup.displayStartAt ?? '제한 없음'} ~ ${popup.displayEndAt ?? '제한 없음'}`
@@ -147,7 +147,7 @@ export function TournamentPopupTab({
                   </p>
                 </div>
               </div>
-              <p className="mt-3 text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap">
+              <p className="mt-3 text-[13px] text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap">
                 {popup.body}
               </p>
               {canWrite ? (
@@ -156,8 +156,8 @@ export function TournamentPopupTab({
                     type="button"
                     onClick={() => startEdit(popup)}
                     className={[
-                      'min-h-[44px] rounded-lg bg-gray-100 px-3 text-xs font-semibold text-gray-700',
-                      'transition-colors hover:bg-gray-200',
+                      'min-h-[44px] rounded-lg bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)]',
+                      'transition-colors hover:bg-[var(--border)]',
                     ].join(' ')}
                   >
                     수정
@@ -167,8 +167,8 @@ export function TournamentPopupTab({
                     onClick={() => handleDelete(popup)}
                     disabled={deletePopup.isPending}
                     className={[
-                      'min-h-[44px] rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-600',
-                      'transition-colors hover:bg-red-100 disabled:opacity-50',
+                      'min-h-[44px] rounded-lg bg-[var(--red50)] px-3 text-xs font-semibold text-[var(--red700)]',
+                      'transition-colors hover:bg-[var(--tint-red)] disabled:opacity-50',
                     ].join(' ')}
                   >
                     삭제

@@ -245,7 +245,7 @@ export default function AdminNoticesPage() {
                 value={activeAudience}
                 onChange={(event) => setActiveAudience(event.target.value)}
                 aria-label="공지 대상 필터"
-                className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-body)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               >
                 {audienceOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -281,7 +281,7 @@ export default function AdminNoticesPage() {
                 type="button"
                 onClick={() => startEdit(row)}
                 disabled={!canWrite || isSaving}
-                className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-[var(--font-size-label)] font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[var(--font-size-label)] font-semibold text-[var(--text-body)] hover:border-blue-300 hover:text-[var(--blue700)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <Pencil size={14} aria-hidden="true" />
                 수정
@@ -295,7 +295,7 @@ export default function AdminNoticesPage() {
                 header: '게시',
                 width: 'w-[132px]',
                 render: (row) => (
-                  <span className="whitespace-nowrap text-gray-500">
+                  <span className="whitespace-nowrap text-[var(--text-muted)]">
                     {formatDateTime(row.publishedAt)}
                   </span>
                 ),
@@ -313,10 +313,10 @@ export default function AdminNoticesPage() {
                 header: '제목',
                 render: (row) => (
                   <div className="min-w-0">
-                    <span className="block truncate font-medium text-gray-900" title={row.title}>
+                    <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
                       {row.title}
                     </span>
-                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                    <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]">
                       {noticeSummary(row.body, row.content)}
                     </span>
                   </div>
@@ -327,7 +327,7 @@ export default function AdminNoticesPage() {
                 header: '대상',
                 width: 'w-[104px]',
                 render: (row) => (
-                  <span className="text-gray-600">{audienceLabel[row.audience]}</span>
+                  <span className="text-[var(--text-muted)]">{audienceLabel[row.audience]}</span>
                 ),
               },
               {
@@ -335,55 +335,55 @@ export default function AdminNoticesPage() {
                 header: '분류',
                 width: 'w-[104px]',
                 render: (row) => (
-                  <span className="block truncate text-gray-600">{row.category}</span>
+                  <span className="block truncate text-[var(--text-muted)]">{row.category}</span>
                 ),
               },
             ]}
           />
         </section>
 
-        <section className="rounded-2xl border border-gray-100 bg-white p-4 h-fit" aria-label={editingNotice ? '공지 수정' : '공지 작성'}>
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 h-fit" aria-label={editingNotice ? '공지 수정' : '공지 작성'}>
           <div className="mb-4">
             <div className="flex items-start justify-between gap-3">
-              <h2 className="text-[var(--font-size-body-lg)] font-bold text-gray-900">{editingNotice ? '공지 수정' : '공지 작성'}</h2>
+              <h2 className="text-[var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">{editingNotice ? '공지 수정' : '공지 작성'}</h2>
               {editingNotice ? (
                 <button
                   type="button"
                   onClick={() => void cancelForm()}
                   disabled={isSaving}
-                  className="inline-flex min-h-[32px] items-center justify-center gap-1 rounded-lg px-2 text-[var(--font-size-label)] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="inline-flex min-h-[32px] items-center justify-center gap-1 rounded-lg px-2 text-[var(--font-size-label)] font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-body)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   <X size={14} aria-hidden="true" />
                   취소
                 </button>
               ) : null}
             </div>
-            <p className="mt-1 text-[var(--font-size-caption)] text-gray-500">
+            <p className="mt-1 text-[var(--font-size-caption)] text-[var(--text-muted)]">
               {editingNotice ? '선택한 공지의 내용과 발행 상태를 수정해요.' : '공지는 팝업과 별도로 공지 목록에 발행돼요.'}
             </p>
           </div>
 
           <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[var(--font-size-label)] font-semibold text-gray-700">제목</span>
+              <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">제목</span>
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={120}
                 disabled={!canWrite || isSaving}
-                className="h-[44px] rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                className="h-[44px] rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)] disabled:text-gray-400"
                 placeholder="공지 제목"
               />
             </label>
 
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1.5">
-                <span className="text-[var(--font-size-label)] font-semibold text-gray-700">대상</span>
+                <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">대상</span>
                 <select
                   value={audience}
                   onChange={(event) => setAudience(event.target.value as V1AdminNoticeAudience)}
                   disabled={!canWrite || isSaving}
-                  className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                  className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)] disabled:text-gray-400"
                 >
                   {AUDIENCE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -392,12 +392,12 @@ export default function AdminNoticesPage() {
               </label>
 
               <label className="flex flex-col gap-1.5">
-                <span className="text-[var(--font-size-label)] font-semibold text-gray-700">상태</span>
+                <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">상태</span>
                 <select
                   value={createStatus}
                   onChange={(event) => setCreateStatus(event.target.value as Extract<V1AdminNoticeStatus, 'draft' | 'published'>)}
                   disabled={!canWrite || isSaving}
-                  className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                  className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)] disabled:text-gray-400"
                 >
                   {CREATE_STATUS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -407,12 +407,12 @@ export default function AdminNoticesPage() {
             </div>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-[var(--font-size-label)] font-semibold text-gray-700">분류</span>
+              <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">분류</span>
               <select
                 value={category}
                 onChange={(event) => setCategory(event.target.value as V1AdminNoticeCategory)}
                 disabled={!canWrite || isSaving}
-                className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-[var(--surface-soft)] disabled:text-gray-400"
               >
                 {CATEGORY_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -431,7 +431,7 @@ export default function AdminNoticesPage() {
             />
 
             {!canWrite ? (
-              <p className="rounded-xl bg-gray-50 px-3 py-2 text-[var(--font-size-caption)] text-gray-500">
+              <p className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-[var(--font-size-caption)] text-[var(--text-muted)]">
                 지원 역할은 공지를 조회할 수 있지만 작성할 수 없어요.
               </p>
             ) : null}

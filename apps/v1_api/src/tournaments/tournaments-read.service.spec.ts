@@ -10,6 +10,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { TournamentsReadService } from './tournaments-read.service';
 
 const authUser = {
@@ -136,6 +137,17 @@ describe('TournamentsReadService', () => {
     v1TournamentPopup: {
       findFirst: jest.Mock;
     };
+    // 참가팀 식별 정보 통일 정책(fix/v1-publish)의 운영자·스태프 우회는
+    // TournamentStaffAccessService(실제 구현)를 그대로 배선하므로, 그게 의존하는
+    // v1AdminUser/v1TournamentStaffAssignment도 이 같은 fake PrismaService 위에
+    // 함께 둔다 — mock-for-mock이 아니라 실제 decideTournamentStaffAccess 정책을
+    // 거치는 계약 테스트로 만들기 위함(PublicTournamentRecordsService 스펙과 동일 패턴).
+    v1AdminUser: {
+      findUnique: jest.Mock;
+    };
+    v1TournamentStaffAssignment: {
+      findMany: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
@@ -147,11 +159,18 @@ describe('TournamentsReadService', () => {
       v1TournamentPopup: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      v1AdminUser: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      v1TournamentStaffAssignment: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TournamentsReadService,
+        TournamentStaffAccessService,
         { provide: PrismaService, useValue: prisma },
       ],
     }).compile();
@@ -285,7 +304,13 @@ describe('TournamentsReadService', () => {
   // ─── get — detail shape ──────────────────────────────────────────────────────
 
   it('get: returns full detail with groups, fixtures, announcements', async () => {
+    // status를 명시적으로 모집 마감 이후로 둔다 — 이 테스트는 groups/fixtures의 팀명
+    // "직렬화 형태"를 검증하는 것이 목적이고, 모집 중(open) 팀명 비공개 정책은
+    // 아래 "참가팀 식별 정보 통일 정책" describe 블록에서 별도로 검증한다. 기본값
+    // (fullTournamentRow의 status: 'open')을 그대로 두면 이 테스트가 검증하려는
+    // 팀명이 정책에 의해 null로 가려져 목적과 다른 이유로 실패한다.
     const row = fullTournamentRow({
+      status: 'closed',
       groups: [
         {
           id: 'group-1',
@@ -596,6 +621,197 @@ describe('TournamentsReadService', () => {
     },
   );
 
+  // ─── groups/fixtures 팀 식별 정보 통일 정책 (fix/v1-publish) ────────────────────
+  // participantTeams만 감추던 모집 중(open) 게이트를 groups/fixtures 안의 팀명·로고·
+  // 팀ID에도 동일하게 적용한다 — 대진표가 공개돼도(구조는 보여도) 모집 중이면 그 안의
+  // 팀 식별 정보는 가려야 "모집 마감 후 공개" 문구와 어긋나지 않는다. tournamentId는
+  // UUID 형태여야 한다 — decideTournamentStaffAccess가 stable-id 검증을 하므로
+  // 'tournament-1' 같은 임의 문자열은 스태프 우회 케이스를 전부 INVALID_INPUT으로
+  // 잘못 거부한다(실제 정책이 아니라 id 형태 때문에 실패하는 거짓 결과를 피하려는 것).
+  describe('groups/fixtures 팀 식별 정보 통일 정책', () => {
+    const TOURNAMENT_UUID = 'b2000000-0000-4000-8000-000000000001';
+
+    function openRowWithNamedGroupsAndFixtures(overrides: Record<string, unknown> = {}) {
+      return fullTournamentRow({
+        id: TOURNAMENT_UUID,
+        status: 'open',
+        groups: [
+          {
+            id: 'group-1',
+            name: 'A조',
+            phase: 'group',
+            sortOrder: 0,
+            advanceCount: 2,
+            groupTeams: [
+              {
+                id: 'gt-1',
+                registrationId: 'reg-1',
+                sortOrder: 0,
+                registration: {
+                  team: { id: 'team-1', name: 'FC 서울', profile: { logoUrl: '/uploads/teams/fc-seoul.png' } },
+                },
+              },
+            ],
+            standings: [
+              {
+                registrationId: 'reg-1',
+                position: 1,
+                points: 3,
+                wins: 1,
+                draws: 0,
+                losses: 0,
+                goalsFor: 2,
+                goalsAgainst: 0,
+                recalculatedAt: new Date('2026-06-14T00:00:00Z'),
+                registration: {
+                  team: { id: 'team-1', name: 'FC 서울', profile: { logoUrl: '/uploads/teams/fc-seoul.png' } },
+                },
+              },
+            ],
+          },
+        ],
+        fixtures: [
+          {
+            id: 'fixture-1',
+            groupId: 'group-1',
+            round: 'group',
+            fixtureNumber: 1,
+            legNumber: 1,
+            scheduledAt: new Date('2026-07-01T10:00:00Z'),
+            venue: '1경기장',
+            status: 'scheduled',
+            homeRegistrationId: 'reg-1',
+            awayRegistrationId: 'reg-2',
+            homeRegistration: {
+              team: { id: 'team-1', name: 'FC 서울', profile: { logoUrl: '/uploads/teams/fc-seoul.png' } },
+            },
+            awayRegistration: {
+              team: { id: 'team-2', name: '부산 SC', profile: null },
+            },
+            videos: [],
+            result: null,
+          },
+        ],
+        ...overrides,
+      });
+    }
+
+    it('관전자(비로그인)에게는 모집 중 groups/fixtures 팀명·로고·팀ID가 가려진다', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(openRowWithNamedGroupsAndFixtures());
+
+      const result = await service.get(TOURNAMENT_UUID);
+
+      expect(result.groups[0].groupTeams[0]).toMatchObject({
+        teamId: null,
+        teamName: null,
+        teamLogoUrl: null,
+      });
+      expect(result.groups[0].standings[0]).toMatchObject({
+        teamId: null,
+        teamName: null,
+        teamLogoUrl: null,
+        // 성적 집계는 팀 식별 정보와 무관하게 그대로 노출 — 정직한 비공개.
+        points: 3,
+        wins: 1,
+      });
+      expect(result.fixtures[0]).toMatchObject({
+        homeTeamId: null,
+        homeTeamName: null,
+        homeTeamLogoUrl: null,
+        awayTeamId: null,
+        awayTeamName: null,
+        awayTeamLogoUrl: null,
+      });
+    });
+
+    it('팀명은 가려도 조 수·팀 수·경기 일정 같은 구조/집계는 유지된다 — 없는 척하지 않는다', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(openRowWithNamedGroupsAndFixtures());
+
+      const result = await service.get(TOURNAMENT_UUID);
+
+      expect(result.groups).toHaveLength(1);
+      expect(result.groups[0].name).toBe('A조');
+      expect(result.groups[0].groupTeams).toHaveLength(1);
+      expect(result.fixtures).toHaveLength(1);
+      expect(result.fixtures[0].scheduledAt).toBe(new Date('2026-07-01T10:00:00Z').toISOString());
+      expect(result.fixtures[0].venue).toBe('1경기장');
+      expect(result.fixtures[0].homeRegistrationId).toBe('reg-1');
+      expect(result.fixtures[0].awayRegistrationId).toBe('reg-2');
+    });
+
+    it('로그인했지만 이 대회 스태프가 아닌 사용자에게도 그대로 가려진다', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(openRowWithNamedGroupsAndFixtures());
+      // v1TournamentStaffAssignment.findMany는 beforeEach 기본값([])을 그대로 사용 —
+      // 이 대회에 배정이 전혀 없는 로그인 사용자.
+
+      const result = await service.get(TOURNAMENT_UUID, authUser);
+
+      expect(result.groups[0].groupTeams[0].teamName).toBeNull();
+      expect(result.fixtures[0].homeTeamName).toBeNull();
+    });
+
+    it('대회 운영진(TOURNAMENT_DIRECTOR)에게는 모집 중에도 groups/fixtures 팀명이 그대로 보인다', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(openRowWithNamedGroupsAndFixtures());
+      prisma.v1TournamentStaffAssignment.findMany.mockResolvedValue([
+        {
+          id: 'assignment-1',
+          tournamentId: TOURNAMENT_UUID,
+          role: 'TOURNAMENT_DIRECTOR',
+          fieldId: null,
+          version: 1,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          expiresAt: null,
+          revokedAt: null,
+          fixtureScopes: [],
+        },
+      ]);
+
+      const result = await service.get(TOURNAMENT_UUID, authUser);
+
+      expect(result.groups[0].groupTeams[0]).toMatchObject({ teamId: 'team-1', teamName: 'FC 서울' });
+      expect(result.fixtures[0]).toMatchObject({ homeTeamName: 'FC 서울', awayTeamName: '부산 SC' });
+      // participantTeams도 같은 우회를 받는다 — 정책이 통일됐으므로 한쪽만 우회되면 안 된다.
+      expect(prisma.v1TournamentStaffAssignment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { tournamentId: TOURNAMENT_UUID, userId: authUser.id } }),
+      );
+    });
+
+    it('특정 fixture/field로만 배정된 FIELD_OPERATOR는 대회 전체 조회에서는 우회 대상이 아니다 — least-privilege, 새 로직 아님', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(openRowWithNamedGroupsAndFixtures());
+      prisma.v1TournamentStaffAssignment.findMany.mockResolvedValue([
+        {
+          id: 'assignment-1',
+          tournamentId: TOURNAMENT_UUID,
+          role: 'FIELD_OPERATOR',
+          fieldId: null,
+          version: 1,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          expiresAt: null,
+          revokedAt: null,
+          // 이 스태프는 특정 경기에만 배정됨(UUID 형태 — decideTournamentStaffAccess의
+          // stable-id 검증 대상) — 이 조회는 fixtureId를 전혀 넘기지 않는(대회 전체
+          // 상세) resource이므로 FIXTURE_SCOPE_REQUIRED로 거부된다.
+          fixtureScopes: [{ fixtureId: 'b2000000-0000-4000-8000-000000000099' }],
+        },
+      ]);
+
+      const result = await service.get(TOURNAMENT_UUID, authUser);
+
+      expect(result.fixtures[0].homeTeamName).toBeNull();
+    });
+
+    it('모집이 끝나면(closed) 관전자에게도 groups/fixtures 팀명이 다시 공개된다', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(
+        openRowWithNamedGroupsAndFixtures({ status: 'closed' }),
+      );
+
+      const result = await service.get(TOURNAMENT_UUID);
+
+      expect(result.groups[0].groupTeams[0].teamName).toBe('FC 서울');
+      expect(result.fixtures[0]).toMatchObject({ homeTeamName: 'FC 서울', awayTeamName: '부산 SC' });
+    });
+  });
+
   it('get: includes active tournament-scoped sponsor and event data', async () => {
     const row = fullTournamentRow({
       sponsors: [
@@ -647,8 +863,16 @@ describe('TournamentsReadService', () => {
     });
   });
 
-  it('get: fixture with result is serialized correctly', async () => {
+  // R3 §4-3단계: 이 결과는 이제 레거시 V1TournamentFixtureResult가 아니라
+  // V1Game.currentOfficialRevision(신규 경로)에서 조립된다 -- fixture.result는 더 이상
+  // 읽지 않는다. note는 신규 리비전에 대응 컬럼이 없어 항상 null이고(재현 불가 필드),
+  // playerId 없는 골의 playerName은 레거시가 남긴 자유 텍스트("대타 선수")를 보존하지
+  // 못하고 고정 플레이스홀더로 대체된다(참가자를 특정할 수 없을 때의 신규 경로 한계).
+  it('get: fixture with official result(신규 경로) is serialized correctly', async () => {
+    // status='closed' — 위 "returns full detail" 테스트와 동일한 이유(팀명 비공개
+    // 정책과 무관하게 result 조립 로직만 검증).
     const row = fullTournamentRow({
+      status: 'closed',
       fixtures: [
         {
           id: 'fixture-2',
@@ -664,18 +888,39 @@ describe('TournamentsReadService', () => {
           homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
           awayRegistration: { team: { id: 'team-2', name: '부산 아이파크' } },
           videos: [],
-          result: {
-            homeScore: 3,
-            awayScore: 2,
-            hasPenalty: false,
-            homePenaltyScore: null,
-            awayPenaltyScore: null,
-            note: '명승부',
-            recordedAt: new Date('2026-07-01T17:30:00Z'),
-            goals: [
-              { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 45 },
-              { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: null },
+          result: null,
+          game: {
+            sides: [
+              { id: 'side-home', sideKey: 'HOME' },
+              { id: 'side-away', sideKey: 'AWAY' },
             ],
+            participants: [{ id: 'player-1', displayNameSnapshot: '홍길동' }],
+            events: [
+              {
+                id: 'goal-1',
+                type: 'GOAL',
+                sideId: 'side-home',
+                participantId: 'player-1',
+                clockMs: 45 * 60_000,
+                reversesEventId: null,
+              },
+              {
+                id: 'goal-2',
+                type: 'GOAL',
+                sideId: 'side-away',
+                participantId: null,
+                clockMs: 10 * 60_000,
+                reversesEventId: null,
+              },
+            ],
+            currentOfficialRevision: {
+              id: 'revision-fixture-2',
+              state: 'OFFICIAL',
+              score: { regulation: { home: 3, away: 2 }, penalty: null, goals: [], incomplete: false },
+              officialAt: new Date('2026-07-01T17:30:00Z'),
+              createdAt: new Date('2026-07-01T17:30:00Z'),
+              updatedAt: new Date('2026-07-01T17:30:00Z'),
+            },
           },
         },
       ],
@@ -691,10 +936,11 @@ describe('TournamentsReadService', () => {
         homeScore: 3,
         awayScore: 2,
         hasPenalty: false,
-        note: '명승부',
+        note: null,
+        recordedAt: '2026-07-01T17:30:00.000Z',
         goals: [
           { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 45 },
-          { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: null },
+          { id: 'goal-2', team: 'away', playerId: null, playerName: '선수 정보 없음', minute: 10 },
         ],
       },
     });

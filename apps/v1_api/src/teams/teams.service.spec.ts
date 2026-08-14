@@ -549,6 +549,39 @@ describe('TeamsService', () => {
       expect(result.membersPreview).toHaveLength(2);
     });
 
+    it('membersPreview excludes the viewer own inactive (left) membership even though it is fetched for viewer.role calculation', async () => {
+      // teamInclude()의 memberships where절은 "status: active OR userId: 조회자"라서, 이미
+      // 팀을 나간 조회자 본인의 멤버십도 viewer.role 계산을 위해 함께 내려온다. 그 행이
+      // membersPreview에 그대로 섞이면 탈퇴한 사람이 현재 멤버처럼(그리고 삭제됐을 수 있는
+      // 프로필로 연결되는 깨진 링크와 함께) 보인다 — teams.service.ts의 active 필터가 이를 막는다.
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        ...teamRow({ membersVisible: true }),
+        sport: { id: 'sport-1', name: 'Soccer' },
+        region: null,
+        profile: null,
+        memberships: [
+          {
+            ...membershipRow({ id: 'owner-membership', role: 'owner', userId: owner.id, status: 'active' }),
+            user: { profile: { nickname: 'owner', displayName: null, profileImageUrl: null } },
+          },
+          {
+            ...membershipRow({ id: 'member-left', role: 'member', userId: member.id, status: 'left', leftAt: new Date('2026-01-01') }),
+            user: { profile: { nickname: 'viewer', displayName: null, profileImageUrl: null } },
+          },
+        ],
+        joinApplications: [],
+        trustScore: null,
+        ownerUser: { id: owner.id, profile: { nickname: 'owner', displayName: null, profileImageUrl: null } },
+      });
+
+      const result = await service.detail(member, 'team-1');
+
+      expect(result.canViewMembers).toBe(true);
+      expect(result.membersPreview).toHaveLength(1);
+      expect(result.membersPreview[0].userId).toBe(owner.id);
+      expect(result.membersPreview.some((entry) => entry.userId === member.id)).toBe(false);
+    });
+
     it('members exposes private profile fields only for the ordinary member viewer own row', async () => {
       prisma.v1Team.findFirst.mockResolvedValueOnce({
         ...teamRow({ membersVisible: false }),

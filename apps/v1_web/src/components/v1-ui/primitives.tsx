@@ -184,10 +184,15 @@ export function DatePickerTextInput({
 
 type AlertBannerTone = 'error' | 'info' | 'warning';
 
+// 2026-08-11: 각 tone의 50계열 배경 위에 500계열 텍스트를 얹으면 라이트 모드에서
+// WCAG AA 4.5:1을 전부 미달한다(실측: error 3.24:1, info 3.31:1, warning 1.97:1 —
+// globals.css의 .tm-badge-* 와 동일 근본원인·동일 수치). 13개 파일·23곳에서 쓰이는
+// 공유 컴포넌트라 여기 하나만 고치면 전체가 함께 고쳐진다. 700계열은 각 tone 배경
+// 위에서 4.5:1 이상(라이트·다크 양쪽, :root.dark가 이미 700 토큰을 재오버라이드해둠).
 const ALERT_BANNER_STYLES: Record<AlertBannerTone, { bg: string; color: string }> = {
-  error:   { bg: 'var(--red50)',    color: 'var(--red500)'    },
-  info:    { bg: 'var(--blue50)',   color: 'var(--blue500)'   },
-  warning: { bg: 'var(--orange50)', color: 'var(--orange500)' },
+  error:   { bg: 'var(--red50)',    color: 'var(--red700)'    },
+  info:    { bg: 'var(--blue50)',   color: 'var(--blue700)'   },
+  warning: { bg: 'var(--orange50)', color: 'var(--orange700)' },
 };
 
 export function AlertBanner({
@@ -324,12 +329,19 @@ export function SectionTitle({ title, sub, action, actionHref, id }: SectionTitl
 type ListItemProps = {
   title: string;
   sub?: string;
-  trailing?: string;
+  /** 문자열 외에 배지 등 ReactNode도 허용(상태 표시는 컬러만이 아니라 배지 형태로도 구분) */
+  trailing?: ReactNode;
   chev?: boolean;
   href?: string;
+  /**
+   * "덜 강조" 처리(예: 가확정 매치 카드의 반투명)를 위한 선택적 style 전달 — 기본값 없음, 넘기지
+   * 않으면 기존 렌더링과 완전히 동일하다. 색/투명도만으로 정보를 전달하면 안 되므로 항상 trailing
+   * 배지 텍스트와 함께 쓴다(호출부 책임).
+   */
+  style?: CSSProperties;
 };
 
-export function ListItem({ title, sub, trailing, chev, href }: ListItemProps) {
+export function ListItem({ title, sub, trailing, chev, href, style }: ListItemProps) {
   const content = (
     <>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -345,11 +357,11 @@ export function ListItem({ title, sub, trailing, chev, href }: ListItemProps) {
   );
 
   return href ? (
-    <Link className="tm-list-row tm-pressable" href={href}>
+    <Link className="tm-list-row tm-pressable" href={href} style={style}>
       {content}
     </Link>
   ) : (
-    <div className="tm-list-row">
+    <div className="tm-list-row" style={style}>
       {content}
     </div>
   );
@@ -398,7 +410,7 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <div className="tm-empty-state" role="alert">
-      <div className="tm-empty-icon" aria-hidden="true" style={{ background: 'var(--red50)', color: 'var(--red500)' }}>
+      <div className="tm-empty-icon" aria-hidden="true" style={{ background: 'var(--red50)', color: 'var(--red700)' }}>
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="8" x2="12" y2="12" />

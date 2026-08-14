@@ -27,8 +27,17 @@ function makeFixture(overrides: Partial<V1TournamentFixture> = {}): V1Tournament
   };
 }
 
-describe('FixtureCard — 득점자 표시 (Task 109 Track 5)', () => {
-  it('renders home and away scorer names on the correct side', () => {
+/**
+ * 이 카드는 **대회 상세 페이지의 일정 섹션** 전용이다. 한때 점수와 득점자까지 실었지만
+ * 오너가 실제 화면을 보고 걷어내라고 판단했다: "몇 대 몇인지랑 누가 넣었는지 그건 빼주고
+ * 장소랑 누가 누구 하는지만". 대회 상세는 "언제·어디서·누가 붙는지"를 훑는 자리이고,
+ * 결과와 득점 기록은 `/bracket` 의 경기 일정 탭과 경기 상세가 담당한다.
+ *
+ * 아래 테스트는 그 결정이 조용히 되돌려지는 걸 막는다 — 결과가 있어도 이 카드에는
+ * 점수도 득점자도 나오면 안 된다.
+ */
+describe('FixtureCard — 대회 상세 카드는 점수·득점자를 싣지 않는다', () => {
+  it('결과가 있어도 점수와 득점자를 렌더하지 않고 대진(vs)만 보여준다', () => {
     render(
       <FixtureCard
         fixture={makeFixture({
@@ -49,10 +58,11 @@ describe('FixtureCard — 득점자 표시 (Task 109 Track 5)', () => {
       />,
     );
 
-    expect(screen.getByText(/홍길동/)).toBeInTheDocument();
-    expect(screen.getByText(/23′/)).toBeInTheDocument();
-    expect(screen.getByText(/대타 선수/)).toBeInTheDocument();
-    expect(screen.getByText(/67′/)).toBeInTheDocument();
+    expect(screen.queryByText(/홍길동/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/대타 선수/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/23′/)).not.toBeInTheDocument();
+    expect(screen.queryByText('2 : 1')).not.toBeInTheDocument();
+    expect(screen.getByText('vs')).toBeInTheDocument();
   });
 
   it('renders nothing for the goal list when the result has no goals recorded', () => {

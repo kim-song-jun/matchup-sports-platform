@@ -102,7 +102,10 @@ describe('HomePage', () => {
   });
 
   it('uses the compact recommended-match error container for network failures', () => {
-    const model = { ...getHomeViewModel(), network: true, recommendedMatches: [] };
+    // retry는 실제 프로덕션(home-client.tsx)에서 항상 채워지는 필드다 — ErrorState는
+    // EmptyState와 달리 onRetry가 없으면 버튼 자체를 렌더하지 않으므로(의도된 동작:
+    // 핸들러 없는 죽은 버튼을 보여주지 않음) 픽스처에서도 실제 사용처처럼 채워준다.
+    const model = { ...getHomeViewModel(), network: true, recommendedMatches: [], retry: vi.fn() };
 
     const { container } = render(
       <Providers>
@@ -111,7 +114,9 @@ describe('HomePage', () => {
     );
 
     const error = container.querySelector('.tm-home-matches-error-wrap');
-    expect(error).toHaveAttribute('role', 'alert');
+    // role="alert"는 ErrorState 자체 루트에 있다(중첩 live region을 피하려고 wrapper에는
+    // 다시 걸지 않음) — wrapper 안에서 alert 요소가 실제로 존재하는지로 검증한다.
+    expect(error?.querySelector('[role="alert"]')).not.toBeNull();
     expect(error).toHaveTextContent('목록을 불러오지 못했어요');
     expect(error).toHaveTextContent('다시 불러오기');
   });

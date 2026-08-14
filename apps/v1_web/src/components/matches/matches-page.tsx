@@ -10,7 +10,7 @@ import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon 
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { cssUrl } from '@/lib/assets';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
-import { CreateField, DraggableFilterSheet, GenderRuleSelector } from '@/components/v1-ui/create-form-fields';
+import { CreateField, DraggableFilterSheet, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import type {
   MatchCardModel,
   MatchCreateViewModel,
@@ -439,6 +439,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
   const primaryLabel = model.form?.submitLabel ?? (edit ? '변경사항 저장' : model.step === 'confirm' ? '매치 만들기' : '다음');
   const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
   const secondaryAction = model.form?.onBack;
+  const missingFields = model.form?.missingFields ?? [];
   return (
     <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false} backHref={edit ? (model.matchId ? `/matches/${model.matchId}` : '/matches') : '/matches'}>
       {/* Desktop page head */}
@@ -455,8 +456,9 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
             {['종목 선택', '매치 정보', '장소와 시간', '작성 내용 확인'][stepNo - 1]} — {stepNo}단계 / 4단계
           </div>
         ) : null}
-        <CreateProgress step={stepNo} edit={edit} />
+        <CreateProgress step={stepNo} edit={edit} completeSteps={model.form?.completeSteps?.map(stepToNumber) ?? []} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
+        {missingFields.length > 0 ? <MissingFieldsBanner missingFields={missingFields} stepHref={matchStepHref} /> : null}
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 매치예요" body={model.form.lockedReason} /> : null}
         {model.step === 'sport' ? <SportStep model={model} /> : null}
         {model.step === 'info' || model.step === 'edit' ? <InfoStep model={model} edit={edit} /> : null}
@@ -680,7 +682,7 @@ function CapacityRow({ current, capacity }: { current: number; capacity: number 
 
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; title: string; body: string }) {
   const tint = tone === 'green' ? 'var(--tint-green)' : tone === 'grey' ? 'var(--tint-grey)' : 'var(--tint-orange)';
-  const accent = tone === 'green' ? 'var(--green500)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange600)';
+  const accent = tone === 'green' ? 'var(--green700)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange600)';
   return (
     <Card pad={14} style={{ marginTop: 14, background: tint }}>
       {/* [P0/P1 아이콘+컬러] 아이콘을 타이틀과 함께 표시해 색상만으로 상태를 구분하지 않음 (WCAG 1.4.1) */}
@@ -693,7 +695,7 @@ function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; t
   );
 }
 
-function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
+function CreateProgress({ step, edit, completeSteps = [] }: { step: number; edit: boolean; completeSteps?: number[] }) {
   return (
     <div className="tm-create-progress">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
@@ -711,7 +713,8 @@ function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
         </span>
         <span className="tm-text-caption">{edit ? '기존 값 유지 · 변경사항만 저장' : ['종목 선택', '매치 정보', '장소와 시간', '작성 내용 확인'][step - 1]}</span>
       </div>
-      {!edit ? <div className="tm-create-bars" aria-hidden="true">{[1, 2, 3, 4].map((item) => <span key={item} data-active={item <= step} />)}</div> : null}
+      {/* data-complete: 이미 지나온 스텝 중 필수 필드를 전부 채운 스텝 — CSS가 green으로 표시(#1). */}
+      {!edit ? <div className="tm-create-bars" aria-hidden="true">{[1, 2, 3, 4].map((item) => <span key={item} data-active={item <= step} data-complete={completeSteps.includes(item)} />)}</div> : null}
     </div>
   );
 }
@@ -736,6 +739,7 @@ function SportStep({ model }: { model: MatchCreateViewModel }) {
           </button>
         ))}
       </div>
+      <FieldErrorText id="field-sportId" message={model.form?.fieldErrors?.sportId} />
     </div>
   );
 }
@@ -746,7 +750,7 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
     <div>
       <h1 className="tm-text-heading">매치 정보</h1>
       {edit ? <CreateSelect label="종목" value={model.selectedSport} options={model.sports} onChange={model.form?.onSelectSport} /> : null}
-      <CreateField label="제목" value={draft.title} placeholder="예: 주말 저녁 풋살 멤버 모집" onChange={(value) => model.form?.onFieldChange('title', value)} />
+      <CreateField id="field-title" error={model.form?.fieldErrors?.title} label="제목" value={draft.title} placeholder="예: 주말 저녁 풋살 멤버 모집" onChange={(value) => model.form?.onFieldChange('title', value)} />
       <CreateField label="설명" value={draft.description} placeholder="예: 초보도 편하게 참여할 수 있는 친선 매치예요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
       <ImageUploadField image={draft.image} onChange={(value) => model.form?.onFieldChange('image', value)} onUpload={model.form?.uploadImage} />
       <CapacityField value={draft.capacity} onChange={(value) => model.form?.onFieldChange('capacity', value)} />
@@ -802,7 +806,7 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
           {uploading ? '업로드 중…' : fileName ? '이미지 변경' : '대표 이미지 선택'}
           <input className="sr-only" type="file" accept="image/*" disabled={uploading} onChange={handleChange} />
         </label>
-        {uploadError ? <div className="tm-text-caption" role="alert" style={{ marginTop: 8, color: 'var(--orange500)' }}>{uploadError}</div> : null}
+        {uploadError ? <div className="tm-text-caption" role="alert" style={{ marginTop: 8, color: 'var(--orange700)' }}>{uploadError}</div> : null}
         {image && !uploading ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 10 }}>
             <span className="tm-text-caption" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName || '현재 대표 이미지'}</span>
@@ -893,34 +897,62 @@ function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
 
 function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
+  const errors = model.form?.fieldErrors;
+  const recentVenues = model.form?.recentVenues ?? [];
+  // #3 1단계: 장소 입력창이 focus를 갖고 있는 동안만 최근 사용 장소 칩을 보여준다.
+  // 칩 버튼은 onMouseDown preventDefault로 이 blur보다 클릭이 먼저 처리되게 한다
+  // (EntityPicker 드롭다운과 동일한 패턴) — 그래서 탭 한 번으로 안전하게 채워진다.
+  const [venueFocused, setVenueFocused] = useState(false);
   return (
     <>
-      <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} />
-      <CreateField label="장소" value={draft.venue} placeholder="예: 한강공원 축구장, 동네 체육관 등" onChange={(value) => model.form?.onFieldChange('venue', value)} />
+      <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} error={errors?.regionId} />
+      <CreateField
+        id="field-venue"
+        error={errors?.venue}
+        label="장소"
+        value={draft.venue}
+        placeholder="예: 한강공원 축구장, 동네 체육관 등"
+        onChange={(value) => model.form?.onFieldChange('venue', value)}
+        onFocus={() => setVenueFocused(true)}
+        onBlur={() => setVenueFocused(false)}
+      >
+        {venueFocused ? (
+          <RecentVenueChips
+            items={recentVenues}
+            selectedValue={draft.venue}
+            onSelect={(venue) => {
+              model.form?.onFieldChange('venue', venue.placeName);
+              model.form?.onFieldChange('address', venue.addressText ?? '');
+              setVenueFocused(false);
+            }}
+          />
+        ) : null}
+      </CreateField>
       <CreateField label="상세 주소" value={draft.address} placeholder="예: 서울 영등포구 여의동로 330" onChange={(value) => model.form?.onFieldChange('address', value)} />
-      <CreateField label="날짜" value={draft.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
+      <CreateField id="field-date" error={errors?.date} label="날짜" value={draft.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
       <div className="tm-create-two-col">
-        <CreateField label="시작 시간" value={draft.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
+        <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={draft.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
         <CreateField label="종료 시간" value={draft.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
       <div className="tm-create-two-col">
         <CreateField label="신청 마감일" value={draft.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
-        <CreateField label="신청 마감시간" value={draft.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
+        <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={draft.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
       </div>
       <div className="tm-text-caption" style={{ marginTop: 6 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
     </>
   );
 }
 
-function RegionSelect({ value, regions, onChange }: { value: string; regions: Array<{ id: string; name: string }>; onChange?: (regionId: string) => void }) {
+function RegionSelect({ value, regions, onChange, error }: { value: string; regions: Array<{ id: string; name: string }>; onChange?: (regionId: string) => void; error?: string }) {
   return (
     <label className="tm-create-field">
       <div className="tm-text-label">지역</div>
-      <select aria-label="지역" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}>
+      <select id="field-regionId" aria-label="지역" className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}>
         <option value="">시/군/구 선택</option>
         {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
       </select>
       <div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천에 쓰이고, 장소와 주소는 아래에 직접 입력해 주세요.</div>
+      <FieldErrorText message={error} />
     </label>
   );
 }
@@ -973,7 +1005,7 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
         {/* [P2 마이크로인터랙션] 완료 체크 애니메이션 — globals.css .tm-complete-check (reduced-motion 자동 처리) */}
         <CompletionCheckIcon />
         <EmptyState title="매치를 만들었어요" sub="팀원들에게 링크를 공유해 참여 의사를 확인해 보세요." />
-        <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
+        <Card pad={16} style={{ marginTop: 22, background: 'var(--tint-blue)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">매치 공유</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 링크와 일정을 알려보세요</div>
         </Card>
@@ -994,6 +1026,13 @@ function stepToNumber(step: MatchCreateViewModel['step']) {
   if (step === 'info') return 2;
   if (step === 'place-time') return 3;
   return 4;
+}
+
+/* #2: MissingFieldsBanner가 각 결측 필드를 그 필드가 실제로 사는 스텝으로 링크할 때 쓴다.
+ * 'info' 스텝만 라우트가 세그먼트 없는 /matches/new 라 템플릿 하나로 처리할 수 없다. */
+function matchStepHref(step: MatchCreateViewModel['step']) {
+  if (step === 'info') return '/matches/new';
+  return `/matches/new/${step}`;
 }
 
 function nextCreateHref(step: MatchCreateViewModel['step']) {

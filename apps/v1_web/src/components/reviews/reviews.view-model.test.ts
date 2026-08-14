@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { REVIEW_TAG_OPTIONS, sourceTypeLabel, toReviewsPageModel } from './reviews.view-model';
+import { REVIEW_TAG_OPTIONS, sourceTypeLabel, toReviewsPageModel, toReviewsReceivedPageModel, toTargetViewModel } from './reviews.view-model';
+import type { V1ReviewTarget } from '@/types/api';
 
 /**
  * v1 API(reviews.service.ts의 REVIEW_TAGS)가 수용하는 리뷰 태그 코드의 정본.
@@ -72,5 +73,75 @@ describe('reviews view model — 대회 경기 리뷰 계약', () => {
       kindLabel: '대회 경기',
       ctaLabel: '리뷰',
     });
+  });
+
+  it('익명 대회 리뷰와 이전 리뷰를 서로 다른 섹션으로 분리한다', () => {
+    const shared = {
+      sourceType: 'tournament_fixture' as const,
+      sourceId: 'fixture-1',
+      targetType: 'user' as const,
+      targetUser: { userId: 'me', name: '나', imageUrl: null },
+      targetTeam: null,
+      rating: 5,
+      tags: [{ tagCode: 'manner', label: '매너가 좋아요' }],
+      status: 'submitted' as const,
+      submittedAt: '2026-08-14T12:00:00.000Z' as string | null,
+    };
+    const model = toReviewsReceivedPageModel({
+      items: [
+        { ...shared, reviewId: 'anonymous', anonymous: true, reviewerUser: null, reviewerTeam: null, submittedAt: null },
+        {
+          ...shared,
+          reviewId: 'legacy',
+          anonymous: false,
+          reviewerUser: { userId: 'old-reviewer', name: '기존 작성자', imageUrl: null },
+          reviewerTeam: null,
+        },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+
+    expect(model.anonymousUserGroups.flatMap((group) => group.reviews).map((review) => review.reviewId)).toEqual(['anonymous']);
+    expect(model.anonymousUserGroups[0]?.meta).toBe('작성자 비공개 · 받은 리뷰 1건');
+    expect(model.legacyUserGroups.flatMap((group) => group.reviews).map((review) => review.reviewId)).toEqual(['legacy']);
+  });
+});
+
+/**
+ * lockReason 은 API 의 에러 코드값이다. 이걸 그대로 렌더하면 사용자 화면에
+ * 'ALREADY_SUBMITTED' 라는 영문 코드가 그대로 뜬다 — alpha 에서 실제로 그렇게 노출됐다.
+ */
+describe('reviews view model — 잠김 사유 문구', () => {
+  const target = (overrides: Partial<V1ReviewTarget> = {}): V1ReviewTarget => ({
+    targetType: 'team',
+    targetUserId: null,
+    targetTeamId: 'team-1',
+    reviewerTeam: null,
+    name: '상대 팀',
+    imageUrl: null,
+    subtitle: '대회 상대 팀',
+    alreadySubmitted: false,
+    review: null,
+    locked: false,
+    lockReason: null,
+    ...overrides,
+  });
+
+  it('ALREADY_SUBMITTED 코드를 화면에 그대로 노출하지 않는다', () => {
+    const model = toTargetViewModel(target({ locked: true, alreadySubmitted: true, lockReason: 'ALREADY_SUBMITTED' }));
+
+    expect(model.lockReasonLabel).toBeNull();
+    // 작성 완료 사실 자체는 배지로 계속 전달된다 — 정보가 사라지는 게 아니라 중복이 사라진다.
+    expect(model.statusLabel).toBe('작성됨');
+  });
+
+  it('아직 매핑하지 않은 코드는 삼키지 않고 그대로 보여준다', () => {
+    const model = toTargetViewModel(target({ locked: true, lockReason: 'SOME_FUTURE_REASON' }));
+
+    expect(model.lockReasonLabel).toBe('SOME_FUTURE_REASON');
+  });
+
+  it('잠기지 않은 대상은 사유 문구가 없다', () => {
+    expect(toTargetViewModel(target()).lockReasonLabel).toBeNull();
   });
 });

@@ -105,7 +105,8 @@ function TournamentsListContent() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(135deg, var(--blue50) 0%, #e8f0fe 100%)',
+            background: 'var(--blue50)',
+            border: '1px solid var(--blue100)',
             borderRadius: 14,
             padding: '12px 16px',
             textDecoration: 'none',
@@ -113,13 +114,13 @@ function TournamentsListContent() {
           aria-label="이벤트 허브 — 팀밋 주관 대회 캠페인 모아보기"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Sparkles size={18} style={{ color: 'var(--blue500)', flexShrink: 0 }} aria-hidden="true" />
+            <Sparkles size={18} style={{ color: 'var(--blue700)', flexShrink: 0 }} aria-hidden="true" />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue600, #2563eb)' }}>이벤트 허브</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue700)' }}>이벤트 허브</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>팀밋 주관 대회 캠페인 모아보기</div>
             </div>
           </div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue500)', whiteSpace: 'nowrap' }}>바로가기 →</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue700)', whiteSpace: 'nowrap' }}>바로가기 →</span>
         </Link>
       </div>
 
@@ -208,7 +209,7 @@ function TournamentsListContent() {
         <div className="tm-tournament-promo-steps">
           {PROCESS_STEPS.map((step) => (
             <div key={step.label} className="tm-tournament-promo-step">
-              <div className="tm-tournament-promo-step-icon" aria-hidden="true" style={{ color: 'var(--blue500)' }}>
+              <div className="tm-tournament-promo-step-icon" aria-hidden="true" style={{ color: 'var(--text-strong)' }}>
                 {step.icon}
               </div>
               <div className="tm-tournament-promo-step-text">

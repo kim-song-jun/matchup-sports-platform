@@ -170,7 +170,7 @@ export default function AdminTeamsPage() {
               key: 'name',
               header: '팀',
               render: (row) => (
-                <span className="block truncate font-medium text-gray-900" title={row.name}>
+                <span className="block truncate font-medium text-[var(--text-strong)]" title={row.name}>
                   {row.name}
                 </span>
               ),
@@ -185,14 +185,14 @@ export default function AdminTeamsPage() {
               key: 'sportName',
               header: '종목',
               width: 'w-[104px]',
-              render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+              render: (row) => <span className="text-[var(--text-muted)]">{row.sportName}</span>,
             },
             {
               key: 'ownerName',
               header: '팀장',
               width: 'w-[132px]',
               render: (row) => (
-                <span className="block truncate text-gray-600">{row.ownerName ?? '—'}</span>
+                <span className="block truncate text-[var(--text-muted)]">{row.ownerName ?? '—'}</span>
               ),
             },
             {
@@ -201,7 +201,7 @@ export default function AdminTeamsPage() {
               align: 'center',
               width: 'w-[116px]',
               render: (row) => (
-                <span className="tabular-nums whitespace-nowrap text-gray-600">
+                <span className="tabular-nums whitespace-nowrap text-[var(--text-muted)]">
                   {row.memberCount} / {row.managerCount}
                 </span>
               ),
@@ -211,7 +211,7 @@ export default function AdminTeamsPage() {
               header: '생성',
               width: 'w-[112px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-gray-500">{formatDate(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDate(row.createdAt)}</span>
               ),
             },
           ]}
@@ -222,7 +222,7 @@ export default function AdminTeamsPage() {
                 aria-label={`${row.name} 상세 보기`}
                 className={[
                   'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
-                  'text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors whitespace-nowrap',
+                  'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}
               >
@@ -235,7 +235,7 @@ export default function AdminTeamsPage() {
                     aria-label={`${row.name} 상태 변경`}
                     className={[
                       'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
-                      'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
+                      'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
                   >

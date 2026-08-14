@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { TeamMatchCreateViewModel } from './team-matches.types';
-import { buildTeamMatchMutationPayload, draftFromTeamMatchEdit, TeamMatchCreatePageClient } from './team-matches-create-client';
+import { draftFromTeamMatchEdit, TeamMatchCreatePageClient } from './team-matches-create-client';
+import { buildTeamMatchPayloadResult } from './team-matches.validation';
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
@@ -60,6 +61,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   }),
   useV1CreateTeamMatch: () => ({ mutate: createTeamMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
+  useV1TeamRecentVenues: () => ({ data: undefined }),
 }));
 
 vi.mock('./team-matches-page', () => ({
@@ -210,7 +212,7 @@ describe('team match edit hydration', () => {
       status: 'recruiting' as const, version: new Date().toISOString(),
     };
     const draft = draftFromTeamMatchEdit(edit);
-    const payload = buildTeamMatchMutationPayload(draft, 'team-1', 'sport-futsal', 'region-gangnam');
+    const payload = buildTeamMatchPayloadResult(draft, 'team-1', 'sport-futsal', 'region-gangnam').payload;
 
     expect(draft).toMatchObject({
       imageUrl: '/uploads/team-match-cover.webp',
@@ -225,11 +227,47 @@ describe('team match edit hydration', () => {
     });
   });
 
+  // Regression: the legacy formatNote write used
+  // [grade, format, style, uniform].filter(Boolean).join(' · ') — a blank field is
+  // dropped, not left as an empty slot, so every later field shifts left by one. A
+  // 3-segment rulesText can't be trusted to be [grade,format,style] just because it has
+  // 3 parts; it's just as likely [grade,style,uniform] (format left blank at creation).
+  // Reading it positionally anyway would put a style/uniform value under the wrong label
+  // (e.g. show '친선' as the match format when it was actually the style).
+  it('does not misassign an ambiguous legacy rulesText onto format/uniform — keeps it under style instead', () => {
+    const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const draft = draftFromTeamMatchEdit({
+      teamMatchId: 'team-match-legacy-mid-blank',
+      editable: true,
+      lockedReason: null,
+      form: {
+        hostTeamId: 'team-real',
+        sportId: 'sport-futsal',
+        regionId: 'region-gangnam',
+        title: '레거시 팀매치',
+        startsAt,
+        manualPlaceName: '레거시 장소',
+        // 원래 grade='B', format=''(비움), style='친선', uniform='파랑'으로 저장됐던 row —
+        // 구조화 컬럼(matchFormat/matchStyle/uniformColor)은 모두 비어 있어 legacy 분기를 탄다.
+        rulesText: 'B · 친선 · 파랑',
+      },
+      status: 'recruiting',
+      version: new Date().toISOString(),
+    });
+
+    // format/uniform은 실제로 무엇이었는지 알 수 없으므로 값을 지어내지 않는다 —
+    // '친선'이 경기방식으로, '파랑'이 스타일로 잘못 배정되면 안 된다.
+    expect(draft.format).toBe('');
+    expect(draft.uniform).toBe('');
+    // 대신 원본 세그먼트를 전부 style에 그대로 보존한다.
+    expect(draft.style).toEqual(['B', '친선', '파랑']);
+  });
+
   it('maps a removed edit image to null instead of a fallback image', () => {
     const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const draft = { ...getTeamMatchCreateViewModel('edit').draft, title: '이미지 제거', imageUrl: '', venue: '잠실', date: startsAt.toISOString().slice(0, 10), startTime: '19:00' };
 
-    expect(buildTeamMatchMutationPayload(draft, 'team-1', 'sport-futsal', 'region-gangnam')?.imageUrl).toBeNull();
+    expect(buildTeamMatchPayloadResult(draft, 'team-1', 'sport-futsal', 'region-gangnam').payload?.imageUrl).toBeNull();
   });
 });
 
@@ -239,7 +277,7 @@ describe('team-match deadline payload', () => {
     const start = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     start.setHours(18, 0, 0, 0);
     const deadline = new Date(start.getTime() - 24 * 60 * 60 * 1000);
-    const payload = buildTeamMatchMutationPayload(
+    const payload = buildTeamMatchPayloadResult(
       {
         ...draft,
         title: '마감 시간이 있는 팀매치',
@@ -253,7 +291,7 @@ describe('team-match deadline payload', () => {
       'team-1',
       'sport-futsal',
       'region-gangnam',
-    );
+    ).payload;
 
     expect(payload?.deadlineAt).toBe(deadline.toISOString());
   });

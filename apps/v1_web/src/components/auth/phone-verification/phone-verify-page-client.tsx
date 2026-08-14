@@ -52,12 +52,12 @@ export function PhoneVerifyPageClient() {
   const verified = alreadyVerified || done;
 
   return (
-    <AppChrome title="휴대폰 본인인증" activeTab="my" backHref="/my" bottomNav={false}>
+    <AppChrome title="휴대폰 본인인증" activeTab="my" backHref="/my" bottomNav={false} desktopHead>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
         {verified ? (
           <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}>
             <CheckCircle2 size={20} color="var(--blue500)" aria-hidden="true" />
-            <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue500)' }}>
+            <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue700)' }}>
               휴대폰 본인인증이 완료됐어요.
             </p>
           </Card>

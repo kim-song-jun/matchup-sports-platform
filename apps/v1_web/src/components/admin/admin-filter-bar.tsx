@@ -62,8 +62,8 @@ export function AdminFilterBar({
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={searchPlaceholder}
             className={[
-              'w-full h-[44px] pl-9 pr-4 text-sm bg-white border border-gray-200 rounded-xl',
-              'placeholder:text-gray-400 text-gray-900',
+              'w-full h-[44px] pl-9 pr-4 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl',
+              'placeholder:text-gray-400 text-[var(--text-strong)]',
               'transition-colors focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
             ].join(' ')}
           />
@@ -89,7 +89,7 @@ export function AdminFilterBar({
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       active
                         ? 'bg-blue-500 text-white'
-                        : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
+                        : 'bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--blue700)]',
                     ].join(' ')}
                   >
                     <span>{opt.label}</span>

@@ -68,7 +68,7 @@ const onboardingDraftKey = 'teameet.v1.onboardingDraft';
 function RequiredMark() {
   return (
     <>
-      <span aria-hidden="true" style={{ marginLeft: 2, color: 'var(--red500)' }}>*</span>
+      <span aria-hidden="true" style={{ marginLeft: 2, color: 'var(--red700)' }}>*</span>
       <span className="sr-only">(필수)</span>
     </>
   );
@@ -120,7 +120,7 @@ export function SignupClient() {
   useEffect(() => {
     const documentIds = readSignupTermsDocumentIds();
     if (documentIds.length === 0) {
-      router.replace('/terms');
+      router.replace('/terms?mode=signup');
       return;
     }
     setAcceptedTermsDocumentIds(documentIds);
@@ -233,7 +233,7 @@ export function SignupClient() {
       advanceTimerRef.current = null;
     }
     if (step === 'account') {
-      router.push('/terms');
+      router.push('/terms?mode=signup');
       return;
     }
     // 인증 단계로 되돌아와도 이미 받은 증명은 유지한다 — 되돌아왔다는 이유로 재인증을 시키면
@@ -357,7 +357,7 @@ export function SignupClient() {
         return;
       }
       if (nextError instanceof V1ApiError && (nextError.code === 'TERMS_REQUIRED' || nextError.code === 'TERMS_DOCUMENT_STALE')) {
-        router.replace('/terms');
+        router.replace('/terms?mode=signup');
         return;
       }
       setError(nextError instanceof Error ? nextError.message : '회원가입에 실패했어요.');
@@ -406,11 +406,11 @@ export function SignupClient() {
   return (
     <AuthFrame
       // 이 화면만 상단바 없이 렌더돼 회원가입을 시작하면 빠져나갈 컨트롤이 없었다.
-      // 뒤로가기 목적지는 이미 getSignupFormViewModel().backHref 로 선언돼 있던 '/terms'
+      // 뒤로가기 목적지는 이미 getSignupFormViewModel().backHref 로 선언돼 있던 '/terms?mode=signup'
       // (직전 단계)를 그대로 쓴다 — 약관 화면에 다시 /login 으로 나가는 뒤로가기가 있어
       // /signup → /terms → /login 으로 로그인 화면까지 이어진다.
       topTitle="회원가입"
-      backHref="/terms"
+      backHref="/terms?mode=signup"
       fixedAction={
         <>
           <button
@@ -461,7 +461,7 @@ export function SignupClient() {
         {/* 별표를 aria-hidden 으로만 두면 "표시는 필수 입력이에요"로 읽혀 무엇에 대한 설명인지
             사라진다. 시각 사용자는 기호로, 보조공학은 sr-only 단어로 같은 문장을 받게 한다. */}
         <p className="tm-text-caption" style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>
-          <span aria-hidden="true" style={{ color: 'var(--red500)' }}>*</span>
+          <span aria-hidden="true" style={{ color: 'var(--red700)' }}>*</span>
           <span className="sr-only">별표</span> 표시는 필수 입력이에요.
         </p>
 
@@ -621,7 +621,7 @@ export function SignupClient() {
                     aria-hidden="true"
                     style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue500)', display: 'inline-block' }}
                   />
-                  <span className="tm-text-label" style={{ color: 'var(--blue500)' }}>
+                  <span className="tm-text-label" style={{ color: 'var(--blue700)' }}>
                     휴대폰 본인인증이 완료됐어요
                   </span>
                 </div>

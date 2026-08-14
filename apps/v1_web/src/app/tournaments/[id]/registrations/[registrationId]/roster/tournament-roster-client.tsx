@@ -394,7 +394,7 @@ function AddPlayerForm({
           ) : membersError ? (
             <div
               className="tm-input"
-              style={{ color: 'var(--red500)', display: 'flex', alignItems: 'center', minHeight: 44 }}
+              style={{ color: 'var(--red700)', display: 'flex', alignItems: 'center', minHeight: 44 }}
             >
               팀원 목록을 불러오지 못했어요.
             </div>
@@ -453,12 +453,12 @@ function AddPlayerForm({
                 })}
               </select>
               {selectedMemberMissing ? (
-                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '6px 0 0' }}>
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '6px 0 0' }}>
                   실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.
                 </p>
               ) : null}
               {selectedAlreadyRegistered || selectedAlreadyPending ? (
-                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '6px 0 0' }}>
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '6px 0 0' }}>
                   {selectedAlreadyRegistered ? '이미 명단에 등록된 선수예요.' : '다른 추가 칸에서 선택한 선수예요.'}
                 </p>
               ) : null}
@@ -655,7 +655,7 @@ function FormField({
       >
         {label}
         {required ? (
-          <span style={{ color: 'var(--red500)', marginLeft: 2 }}>*</span>
+          <span style={{ color: 'var(--red700)', marginLeft: 2 }}>*</span>
         ) : null}
       </label>
       {children}
@@ -664,7 +664,7 @@ function FormField({
           id={`${id}-error`}
           role="alert"
           className="tm-text-micro"
-          style={{ color: 'var(--red500)', marginTop: 4 }}
+          style={{ color: 'var(--red700)', marginTop: 4 }}
         >
           {errorMessage}
         </p>
@@ -722,12 +722,15 @@ function PlayerRow({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div
           aria-hidden="true"
+          // 2026-08-12: [인라인 style 우선순위 fix] 배경을 인라인으로 두면 다크모드 전용
+          // 클래스 오버라이드(.tm-roster-player-initial, globals.css)가 절대 못 이겨서
+          // 배지가 여전히 카드에 녹아 사라졌다 — 배경은 CSS 클래스로만 관리.
+          className="tm-roster-player-initial"
           style={{
             flexShrink: 0,
             width: 36,
             height: 36,
             borderRadius: 12,
-            background: 'var(--grey100)',
             color: 'var(--text-strong)',
             display: 'grid',
             placeItems: 'center',
@@ -840,7 +843,7 @@ function PlayerRow({
             </div>
           </FormField>
           {editError ? (
-            <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '8px 0 0' }}>
+            <p className="tm-text-micro" role="alert" style={{ color: 'var(--red700)', margin: '8px 0 0' }}>
               {editError}
             </p>
           ) : null}
@@ -934,7 +937,7 @@ export function TournamentRosterPageClient({
 
   if (isLoading) {
     return (
-      <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments">
+      <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments" desktopHead>
         <div
           aria-busy="true"
           aria-label="명단 불러오는 중"
@@ -955,7 +958,7 @@ export function TournamentRosterPageClient({
   if (isError) {
     const msg = extractErrorMessage(rosterErr, '명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments">
+      <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments" desktopHead>
         <div style={{ padding: '0 20px', marginTop: 40 }}>
           <ErrorState
             message={msg}
@@ -1068,7 +1071,7 @@ export function TournamentRosterPageClient({
   }
 
   return (
-    <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments">
+    <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments" desktopHead>
       <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
 
         {tournament && registration ? (
@@ -1141,7 +1144,7 @@ export function TournamentRosterPageClient({
                 padding: '10px 14px',
                 borderRadius: 12,
                 background: 'var(--orange50)',
-                color: 'var(--orange500)',
+                color: 'var(--orange700)',
                 lineHeight: 1.55,
               }}
             >

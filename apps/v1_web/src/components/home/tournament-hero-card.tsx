@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
-import { getSortedTournamentPromos } from '@/lib/tournament-promo';
+import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentListItem } from '@/types/api';
 
 /**
@@ -46,7 +46,8 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
         const cardTitle = featured.promoHomeTitle?.trim() || featured.title;
         const cardBody = featured.promoHomeSubtitle?.trim() || featured.venue || `${featured.sport.name} 대회`;
         const badgeText = featured.promoHomeBadgeText?.trim() || '추천 대회';
-        const imageUrl = featured.promoHomeImageUrl?.trim();
+        // 홈 홍보 이미지를 따로 지정하지 않았으면 대회 커버(기본 이미지)를 그대로 쓴다.
+        const imageUrl = resolveTournamentImage(featured, 'home');
         const facts = [
           { kind: 'date', value: featured.promoHomeDateText?.trim() },
           { kind: 'teams', value: featured.promoHomeTeamsText?.trim() },

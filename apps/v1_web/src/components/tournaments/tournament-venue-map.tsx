@@ -112,7 +112,7 @@ export function TournamentVenueMap({
         borderRadius: 12,
         overflow: 'hidden',
         marginTop: 12,
-        background: 'var(--surface-alt, #eef1f4)',
+        background: 'var(--surface-soft)',
       }}
     />
   );

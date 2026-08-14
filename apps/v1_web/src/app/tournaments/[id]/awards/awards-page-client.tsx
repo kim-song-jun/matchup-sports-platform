@@ -15,6 +15,7 @@ import {
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
+import { V1ApiError } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
@@ -123,7 +124,20 @@ function AwardsPodium({
             </span>
             {/* 단상 */}
             <div className="tm-awards-podium-block" aria-hidden="true">
-              <span style={{ position: 'relative', zIndex: 1, color: '#fff', fontWeight: 900, fontSize: pos === 1 ? 28 : 20, textShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>
+              <span
+                style={{
+                  position: 'relative',
+                  zIndex: 1,
+                  color: '#fff',
+                  fontWeight: 900,
+                  fontSize: pos === 1 ? 28 : 20,
+                  lineHeight: 1,
+                  textShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  background: 'var(--scrim-dark-72)',
+                  borderRadius: 999,
+                  padding: pos === 1 ? '4px 12px' : '3px 9px',
+                }}
+              >
                 {pos}
               </span>
             </div>
@@ -156,7 +170,7 @@ function PrizeSection({
   return (
     <section className="tm-prize-section" style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">상금 · 시상</h3>
-      <div className="tm-prize-card" style={{ background: '#fff', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
+      <div className="tm-prize-card" style={{ background: 'var(--card-surface)', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
         {/* 총 상금 헤더 */}
         {tournament.prizePool !== null && tournament.prizePool > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
@@ -164,7 +178,7 @@ function PrizeSection({
               <Trophy size={20} className="tm-medal-gold" strokeWidth={2} />
             </span>
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>총 상금</span>
-            <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--blue500)', letterSpacing: '-0.01em' }}>{formatEntryFee(tournament.prizePool)}</span>
+            <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--blue700)', letterSpacing: '-0.01em' }}>{formatEntryFee(tournament.prizePool)}</span>
           </div>
         )}
 
@@ -186,7 +200,7 @@ function PrizeSection({
               </div>
               {row.amount && (
                 isAmount ? (
-                  <span style={{ fontSize: 15, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em', flexShrink: 0 }}>{formatPrizeRowValue(row.amount)}</span>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em', flexShrink: 0 }}>{formatPrizeRowValue(row.amount)}</span>
                 ) : (
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-caption)', flexShrink: 0, marginLeft: 10, textAlign: 'right', maxWidth: '55%' }}>{row.amount}</span>
                 )
@@ -230,11 +244,11 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
     const size = 22;
     switch (type) {
       case 'mvp': return <Crown size={size} className="tm-medal-gold" strokeWidth={2} />;
-      case 'top_scorer': return <Goal size={size} style={{ color: 'var(--blue500)' }} strokeWidth={2} />;
-      case 'best_defense': return <Shield size={size} style={{ color: 'var(--blue500)' }} strokeWidth={2} />;
-      case 'best_keeper': return <Hand size={size} style={{ color: 'var(--green500)' }} strokeWidth={2} />;
-      case 'fair_play': return <Handshake size={size} style={{ color: 'var(--green500)' }} strokeWidth={2} />;
-      case 'best_rookie': return <Sparkles size={size} style={{ color: 'var(--orange500)' }} strokeWidth={2} />;
+      case 'top_scorer': return <Goal size={size} style={{ color: 'var(--blue700)' }} strokeWidth={2} />;
+      case 'best_defense': return <Shield size={size} style={{ color: 'var(--blue700)' }} strokeWidth={2} />;
+      case 'best_keeper': return <Hand size={size} style={{ color: 'var(--green700)' }} strokeWidth={2} />;
+      case 'fair_play': return <Handshake size={size} style={{ color: 'var(--green700)' }} strokeWidth={2} />;
+      case 'best_rookie': return <Sparkles size={size} style={{ color: 'var(--orange700)' }} strokeWidth={2} />;
       default: return <Trophy size={size} className="tm-medal-gold" strokeWidth={2} />;
     }
   };
@@ -253,18 +267,21 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
               <AwardIcon type={award.awardType} />
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
+              {/* [R-T2] flex:1/minWidth:0 컬럼 — 고정폭 아님, 12로 상향. */}
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
                 {award.awardLabel}
               </div>
               <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {award.recipientName}
               </div>
               {award.teamName && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{award.teamName}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{award.teamName}</div>
               )}
             </div>
             {award.note && (
-              <div style={{ fontSize: 11, color: 'var(--text-caption)', flexShrink: 0, maxWidth: 80, textAlign: 'right' }}>{award.note}</div>
+              // [R-T2] maxWidth:80이지만 overflow/ellipsis 미설정이라 넘치면 줄바꿈으로
+              // 흡수된다(잘림 없음) — 12로 상향.
+              <div style={{ fontSize: 12, color: 'var(--text-caption)', flexShrink: 0, maxWidth: 80, textAlign: 'right' }}>{award.note}</div>
             )}
           </div>
         ))}
@@ -305,6 +322,19 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
 }
 
 /* ── 리뷰 작성 모달 ── */
+/** 서버 400 TEAM_SELECTION_REQUIRED 의 details.teams 를 안전하게 파싱한다. */
+function parseTeamSelectionOptions(error: unknown): { teamId: string; teamName: string }[] | null {
+  if (!(error instanceof V1ApiError) || error.code !== 'TEAM_SELECTION_REQUIRED') return null;
+  const details = error.details as { teams?: unknown } | null;
+  if (!Array.isArray(details?.teams)) return null;
+  const teams = details.teams.filter(
+    (t): t is { teamId: string; teamName: string } =>
+      !!t && typeof t === 'object' && typeof (t as { teamId?: unknown }).teamId === 'string'
+      && typeof (t as { teamName?: unknown }).teamName === 'string',
+  );
+  return teams.length > 0 ? teams : null;
+}
+
 function ReviewFormModal({
   tournamentId, onClose,
 }: { tournamentId: string; onClose: () => void }) {
@@ -312,8 +342,13 @@ function ReviewFormModal({
   const [comment, setComment] = useState('');
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  // 여러 팀의 팀장·운영진을 겸하고 그 팀들이 모두 이 대회에 참가 확정된 경우에만 채워진다
+  // (서버 400 TEAM_SELECTION_REQUIRED 응답에서 파싱). 단일 자격 팀 사용자는 절대 겪지 않는다.
+  const [teamOptions, setTeamOptions] = useState<{ teamId: string; teamName: string }[] | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [genericError, setGenericError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { mutate, isPending, isError } = useV1SubmitTournamentReview(tournamentId);
+  const { mutate, isPending } = useV1SubmitTournamentReview(tournamentId);
   const uploadImages = useV1UploadImages();
 
   const handlePickPhotos = async (files: FileList | null) => {
@@ -337,9 +372,31 @@ function ReviewFormModal({
     // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
     // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
     if (isPending) return;
-    mutate({ rating, comment: comment.trim() || undefined, photoUrls: photoUrls.length > 0 ? photoUrls : undefined }, {
-      onSuccess: () => onClose(),
-    });
+    // 팀 선택이 필요한 상태인데 아직 고르지 않았으면 제출하지 않는다(라디오 그룹이
+    // required 이므로 버튼도 비활성화돼 있지만, 방어적으로 한 번 더 막는다).
+    if (teamOptions && !selectedTeamId) return;
+    setGenericError(false);
+    mutate(
+      {
+        rating,
+        comment: comment.trim() || undefined,
+        photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
+        teamId: selectedTeamId ?? undefined,
+      },
+      {
+        onSuccess: () => onClose(),
+        onError: (err) => {
+          const teams = parseTeamSelectionOptions(err);
+          if (teams) {
+            // 평점·코멘트·사진은 그대로 보존한 채 팀 선택 UI만 노출한다 — 다시 입력하게
+            // 만들지 않는다. 사용자가 하나를 고르면 같은 폼으로 재제출된다.
+            setTeamOptions(teams);
+            return;
+          }
+          setGenericError(true);
+        },
+      },
+    );
   };
 
   return (
@@ -362,6 +419,56 @@ function ReviewFormModal({
           <StarRating value={rating} onChange={setRating} />
         </div>
 
+        {teamOptions && (
+          <div style={{ marginBottom: 16 }}>
+            <p id="review-team-select-heading" style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
+              여러 팀을 운영하고 계세요. 리뷰를 남길 팀을 선택해주세요.
+            </p>
+            {/*
+              커스텀 `role="radio"` 버튼 대신 sr-only native radio + 라벨 패턴을 쓴다
+              (tournament-roster-client.tsx의 eligibility 라디오와 같은 패턴). role만
+              선언한 버튼 묶음은 스크린리더에 라디오 그룹으로 보이지만 화살표 키 이동과
+              roving tabindex가 없어 실제로는 그렇게 동작하지 않는다 — native input은
+              그 전부를 브라우저가 제공한다.
+            */}
+            <div
+              role="radiogroup"
+              aria-labelledby="review-team-select-heading"
+              style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+            >
+              {teamOptions.map((team) => {
+                const isSelected = team.teamId === selectedTeamId;
+                return (
+                  <label
+                    key={team.teamId}
+                    htmlFor={`review-team-${team.teamId}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', minHeight: 44, padding: '10px 14px', borderRadius: 10,
+                      border: isSelected ? '1.5px solid var(--blue500)' : '1px solid var(--grey200)',
+                      background: isSelected ? 'var(--blue50)' : 'var(--surface)',
+                      color: 'var(--text-strong)', fontSize: 13, fontWeight: isSelected ? 700 : 500,
+                      cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
+                    }}
+                  >
+                    <input
+                      id={`review-team-${team.teamId}`}
+                      type="radio"
+                      name="review-team-select"
+                      value={team.teamId}
+                      checked={isSelected}
+                      onChange={() => setSelectedTeamId(team.teamId)}
+                      className="sr-only"
+                    />
+                    {team.teamName}
+                    {isSelected && <span aria-hidden="true" style={{ color: 'var(--blue500)' }}>✓</span>}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <textarea
           value={comment} onChange={(e) => setComment(e.target.value)}
           placeholder="대회 운영, 경기장, 대진표 등 솔직한 후기를 남겨주세요. (선택)"
@@ -374,7 +481,8 @@ function ReviewFormModal({
             resize: 'none', boxSizing: 'border-box',
           }}
         />
-        <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-caption)', marginBottom: 12 }}>{comment.length}/500</div>
+        {/* [R-T2] 고정폭 없는 카운터 텍스트 — 12로 상향. */}
+        <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-caption)', marginBottom: 12 }}>{comment.length}/500</div>
 
         {/* 사진 첨부 (선택, 최대 3장) */}
         <div style={{ marginBottom: 16 }}>
@@ -410,7 +518,9 @@ function ReviewFormModal({
                 }}
               >
                 <ImagePlus size={18} strokeWidth={1.8} aria-hidden="true" />
-                <span style={{ fontSize: 10 }}>{uploadImages.isPending ? '업로드 중' : `${photoUrls.length}/${REVIEW_PHOTO_MAX}`}</span>
+                {/* [R-T2] 64×64 버튼 안 아이콘(18px)+텍스트 세로 스택 — 12px로도
+                    세로 공간(64px)은 여유. 라이브 화면(대회 후기 작성)에서 실측 필요. */}
+                <span style={{ fontSize: 12 }}>{uploadImages.isPending ? '업로드 중' : `${photoUrls.length}/${REVIEW_PHOTO_MAX}`}</span>
               </button>
             )}
           </div>
@@ -422,17 +532,19 @@ function ReviewFormModal({
             onChange={(e) => void handlePickPhotos(e.target.files)}
             style={{ display: 'none' }}
           />
-          {photoError && <p style={{ color: 'var(--red500)', fontSize: 11, marginTop: 6 }}>{photoError}</p>}
+          {/* [R-T2] 고정폭 없는 에러 문구 — 12로 상향. */}
+          {photoError && <p style={{ color: 'var(--red700)', fontSize: 12, marginTop: 6 }}>{photoError}</p>}
         </div>
 
-        {isError && <p style={{ color: 'var(--red500)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
+        {genericError && <p style={{ color: 'var(--red700)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
 
         <button
-          type="button" onClick={handleSubmit} disabled={isPending || rating === 0}
+          type="button" onClick={handleSubmit}
+          disabled={isPending || rating === 0 || (!!teamOptions && !selectedTeamId)}
           className="tm-btn tm-btn-primary"
           style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: 14, fontWeight: 700 }}
         >
-          {isPending ? '저장 중...' : '후기 등록'}
+          {isPending ? '저장 중...' : teamOptions ? '선택한 팀으로 등록' : '후기 등록'}
         </button>
       </div>
     </div>
@@ -511,7 +623,8 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
               </button>
             )}
             {isCompleted && isParticipant && alreadyReviewed && (
-              <span style={{ fontSize: 11, color: 'var(--text-caption)', background: 'var(--grey100)', padding: '3px 8px', borderRadius: 6 }}>
+              // [R-T2] 고정폭 없는 pill 배지 — 12로 상향.
+              <span style={{ fontSize: 12, color: 'var(--text-caption)', background: 'var(--grey100)', padding: '3px 8px', borderRadius: 6 }}>
                 ✓ 작성완료
               </span>
             )}
@@ -560,7 +673,7 @@ function RetentionSection({ tournamentId }: { tournamentId: string }) {
         <div>
           <p className="tm-retention-card-title">다음 대회도 함께해요 🎉</p>
           <p className="tm-retention-card-sub">
-            티밋 대회에서 새로운 팀을 만나고<br />
+            팀밋 대회에서 새로운 팀을 만나고<br />
             더 나은 기록에 도전해보세요.
           </p>
         </div>
@@ -580,7 +693,7 @@ function RetentionSection({ tournamentId }: { tournamentId: string }) {
               if (navigator.share) {
                 trackEvent('tournament_share', { channel: 'native_share' });
                 void navigator.share({
-                  title: '티밋 대회 결과',
+                  title: '팀밋 대회 결과',
                   url: window.location.href,
                 });
               } else {
@@ -707,7 +820,7 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
 
   if (isLoading) {
     return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments">
+      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments" desktopHead>
         <AwardsPageSkeleton />
       </AppChrome>
     );
@@ -716,7 +829,7 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments">
+      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments" desktopHead>
         <div style={{ padding: '40px 20px' }}>
           <ErrorState message={msg} onRetry={() => void refetch()} />
         </div>
@@ -729,6 +842,7 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
       title="시상·리뷰"
       backHref={`/tournaments/${tournamentId}/results`}
       activeTab="tournaments"
+      desktopHead
     >
       <AwardsPageContent tournament={data} />
     </AppChrome>

@@ -35,9 +35,9 @@ function formatScore(value: string | number | null | undefined) {
 
 function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
-    <div className="min-w-0 rounded-xl bg-gray-50 px-4 py-3">
+    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
       <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-gray-900">{value ?? '-'}</dd>
+      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{value ?? '-'}</dd>
     </div>
   );
 }
@@ -52,12 +52,12 @@ function SummaryItem({
   value: string | number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-4 py-3">
-      <dt className="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-500">
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+      <dt className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
         <span className="shrink-0 text-gray-400" aria-hidden="true">{icon}</span>
         <span className="truncate">{label}</span>
       </dt>
-      <dd className="shrink-0 text-sm font-bold tabular-nums text-gray-900">{value}</dd>
+      <dd className="shrink-0 text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
     </div>
   );
 }
@@ -66,7 +66,7 @@ function BackLink() {
   return (
     <Link
       href="/admin/teams"
-      className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+      className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
     >
       <ArrowLeft size={16} aria-hidden="true" />
       목록
@@ -78,16 +78,16 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
   const matches = team.recentHostedTeamMatches ?? [];
 
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5" aria-label="최근 주최 팀매치">
-      <h2 className="text-[17px] font-bold text-gray-900">최근 주최 팀매치</h2>
+    <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="최근 주최 팀매치">
+      <h2 className="text-[17px] font-bold text-[var(--text-strong)]">최근 주최 팀매치</h2>
       {matches.length > 0 ? (
         <ol className="mt-4 flex flex-col gap-2">
           {matches.map((match) => (
-            <li key={match.teamMatchId} className="rounded-xl bg-gray-50 px-4 py-3">
+            <li key={match.teamMatchId} className="rounded-xl bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="break-words text-sm font-semibold text-gray-900">{match.title}</p>
-                  <p className="mt-1 text-xs font-medium text-gray-500">{formatDateTime(match.startAt)}</p>
+                  <p className="break-words text-sm font-semibold text-[var(--text-strong)]">{match.title}</p>
+                  <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{formatDateTime(match.startAt)}</p>
                 </div>
                 <AdminStatusPill status={match.status} />
               </div>
@@ -95,7 +95,7 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
           ))}
         </ol>
       ) : (
-        <div className="mt-4 rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
           최근 주최한 팀매치가 없어요.
         </div>
       )}
@@ -111,36 +111,36 @@ const MEMBER_ROLE_LABEL: Record<V1AdminTeamDetail['members'][number]['role'], st
 
 function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5" aria-label="팀원 목록">
+    <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="팀원 목록">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[17px] font-bold text-gray-900">팀원</h2>
-        <span className="text-sm font-semibold tabular-nums text-gray-500">{team.members.length}명</span>
+        <h2 className="text-[17px] font-bold text-[var(--text-strong)]">팀원</h2>
+        <span className="text-sm font-semibold tabular-nums text-[var(--text-muted)]">{team.members.length}명</span>
       </div>
       {team.members.length > 0 ? (
         <ol className="mt-4 grid gap-3 sm:grid-cols-2">
           {team.members.map((member) => (
-            <li key={member.membershipId} className="min-w-0 rounded-xl bg-gray-50 px-4 py-3">
+            <li key={member.membershipId} className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <Link href={`/admin/users/${member.userId}`} className="break-words text-sm font-bold text-gray-900 hover:text-blue-600">
+                  <Link href={`/admin/users/${member.userId}`} className="break-words text-sm font-bold text-[var(--text-strong)] hover:text-[var(--blue700)]">
                     {member.name ?? member.nickname ?? member.email ?? member.userId}
                   </Link>
-                  {member.name && member.nickname ? <p className="mt-1 text-xs text-gray-500">{member.nickname}</p> : null}
+                  {member.name && member.nickname ? <p className="mt-1 text-xs text-[var(--text-muted)]">{member.nickname}</p> : null}
                 </div>
-                <span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-semibold text-gray-600">
+                <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--card-surface)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">
                   {MEMBER_ROLE_LABEL[member.role]}
                 </span>
               </div>
               <dl className="mt-3 grid gap-1.5 text-xs">
-                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">이메일</dt><dd className="min-w-0 break-all text-gray-700">{member.email ?? '미등록'}</dd></div>
-                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">전화번호</dt><dd className="min-w-0 break-all text-gray-700">{member.phone ?? '미등록'}</dd></div>
-                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">가입일</dt><dd className="min-w-0 text-gray-700">{formatDateTime(member.joinedAt)}</dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">이메일</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.email ?? '미등록'}</dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">전화번호</dt><dd className="min-w-0 break-all text-[var(--text-body)]">{member.phone ?? '미등록'}</dd></div>
+                <div className="flex gap-2"><dt className="w-14 shrink-0 text-gray-400">가입일</dt><dd className="min-w-0 text-[var(--text-body)]">{formatDateTime(member.joinedAt)}</dd></div>
               </dl>
             </li>
           ))}
         </ol>
       ) : (
-        <div className="mt-4 rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">활성 팀원이 없어요.</div>
+        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">활성 팀원이 없어요.</div>
       )}
     </section>
   );
@@ -188,15 +188,15 @@ export default function AdminTeamDetailPage() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex min-w-0 flex-col gap-4" aria-label="팀 상세 정보">
-          <article className="rounded-2xl border border-gray-100 bg-white p-5">
+          <article className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-500">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
                   <Users size={16} aria-hidden="true" />
                   팀
                 </div>
-                <h2 className="mt-2 break-words text-[22px] font-bold text-gray-900">{team.name}</h2>
-                <p className="mt-1 text-sm text-gray-500">{team.sportName}</p>
+                <h2 className="mt-2 break-words text-[22px] font-bold text-[var(--text-strong)]">{team.name}</h2>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">{team.sportName}</p>
               </div>
               <AdminStatusPill status={team.status} />
             </div>
@@ -219,8 +219,8 @@ export default function AdminTeamDetailPage() {
         </section>
 
         <aside className="flex flex-col gap-4" aria-label="팀 운영 요약">
-          <section className="rounded-2xl border border-gray-100 bg-white p-4">
-            <h2 className="text-[17px] font-bold text-gray-900">운영 요약</h2>
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">
               <SummaryItem icon={<Users size={16} />} label="전체 멤버" value={team.memberCount} />
               <SummaryItem icon={<Shield size={16} />} label="매니저" value={team.managerCount} />
@@ -230,8 +230,8 @@ export default function AdminTeamDetailPage() {
             </dl>
           </section>
 
-          <section className="rounded-2xl border border-gray-100 bg-white p-4">
-            <h2 className="text-[17px] font-bold text-gray-900">신뢰 정보</h2>
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">신뢰 정보</h2>
             {trust ? (
               <dl className="mt-4 grid gap-3">
                 <SummaryItem icon={<Shield size={16} />} label="상태" value={trust.trustState} />
@@ -240,7 +240,7 @@ export default function AdminTeamDetailPage() {
                 <SummaryItem icon={<Calendar size={16} />} label="계산일" value={formatDateTime(trust.calculatedAt)} />
               </dl>
             ) : (
-              <div className="mt-4 rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+              <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
                 아직 산정된 팀 신뢰 정보가 없어요.
               </div>
             )}

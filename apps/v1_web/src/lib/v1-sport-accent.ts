@@ -40,28 +40,28 @@ const SPORT_ACCENT_MAP: Record<string, SportAccent> = {
     label: '축구',
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
-    badgeText: 'var(--green500)',
+    badgeText: 'var(--green700)',
     gradientTo: 'var(--green600)',
   },
   futsal: {
     label: '풋살',
     dot: 'var(--blue500)',
     badgeBg: 'var(--blue50)',
-    badgeText: 'var(--blue500)',
+    badgeText: 'var(--blue700)',
     gradientTo: 'var(--blue600)',
   },
   running: {
     label: '러닝',
     dot: 'var(--orange500)',
     badgeBg: 'var(--orange50)',
-    badgeText: 'var(--orange500)',
+    badgeText: 'var(--orange700)',
     gradientTo: 'var(--orange600)',
   },
   swimming: {
     label: '수영',
     dot: 'var(--teal500)',
     badgeBg: 'var(--teal50)',
-    badgeText: 'var(--teal500)',
+    badgeText: 'var(--teal700)',
     gradientTo: 'var(--teal600)',
   },
   // ── Additional codes that may appear if new sports are seeded ──────────
@@ -69,49 +69,49 @@ const SPORT_ACCENT_MAP: Record<string, SportAccent> = {
     label: '농구',
     dot: 'var(--orange500)',
     badgeBg: 'var(--orange50)',
-    badgeText: 'var(--orange500)',
+    badgeText: 'var(--orange700)',
     gradientTo: 'var(--orange600)',
   },
   badminton: {
     label: '배드민턴',
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
-    badgeText: 'var(--green500)',
+    badgeText: 'var(--green700)',
     gradientTo: 'var(--green600)',
   },
   tennis: {
     label: '테니스',
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
-    badgeText: 'var(--green500)',
+    badgeText: 'var(--green700)',
     gradientTo: 'var(--green600)',
   },
   baseball: {
     label: '야구',
     dot: 'var(--orange500)',
     badgeBg: 'var(--orange50)',
-    badgeText: 'var(--orange500)',
+    badgeText: 'var(--orange700)',
     gradientTo: 'var(--orange600)',
   },
   volleyball: {
     label: '배구',
     dot: 'var(--blue500)',
     badgeBg: 'var(--blue50)',
-    badgeText: 'var(--blue500)',
+    badgeText: 'var(--blue700)',
     gradientTo: 'var(--blue600)',
   },
   cycling: {
     label: '사이클',
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
-    badgeText: 'var(--green500)',
+    badgeText: 'var(--green700)',
     gradientTo: 'var(--green600)',
   },
   golf: {
     label: '골프',
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
-    badgeText: 'var(--green500)',
+    badgeText: 'var(--green700)',
     gradientTo: 'var(--green600)',
   },
 };
@@ -131,7 +131,7 @@ const FALLBACK_ACCENT: SportAccent = {
  *
  * @example
  * const { label, badgeBg, badgeText } = getSportAccent('futsal');
- * // → { label: '풋살', badgeBg: 'var(--blue50)', badgeText: 'var(--blue500)', dot: 'var(--blue500)' }
+ * // → { label: '풋살', badgeBg: 'var(--blue50)', badgeText: 'var(--blue700)', dot: 'var(--blue500)' }
  */
 export function getSportAccent(code: string): SportAccent {
   return SPORT_ACCENT_MAP[code] ?? FALLBACK_ACCENT;

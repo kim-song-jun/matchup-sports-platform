@@ -235,3 +235,129 @@ describe('TeamMembersPageClient GA events', () => {
     });
   });
 });
+
+describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
+  function baseTeamDetail(overrides: Record<string, unknown> = {}) {
+    return {
+      teamId: 'team-1',
+      name: '성수 풋살 크루',
+      status: 'active',
+      visibility: 'public',
+      sport: { sportId: 'sport-futsal', name: '풋살' },
+      region: { regionId: 'region-seoul', name: '서울', parentName: null },
+      joinPolicy: 'approval_required',
+      membersVisibilityEnabled: true,
+      canViewMembers: true,
+      profile: {
+        logoUrl: null,
+        coverImageUrl: null,
+        introduction: '',
+        activityAreaText: null,
+        activityDays: [],
+        activityFrequency: null,
+        activityTimeSlots: [],
+        activityTypes: [],
+        activityMemo: null,
+        activitySummary: null,
+        skillLevelText: null,
+        genderRule: '성별 무관',
+        joinPolicy: 'approval_required',
+        memberGoalCount: 20,
+      },
+      owner: { userId: 'user-owner', displayName: '김도윤', profileImageUrl: null },
+      membersPreview: [],
+      memberCount: 0,
+      managerCount: 1,
+      trust: { trustState: 'none', score: null },
+      viewer: {
+        role: 'none',
+        membershipId: null,
+        joinState: 'none',
+        canRequestJoin: true,
+        disabledReason: null,
+        manageRoute: null,
+      },
+      ...overrides,
+    };
+  }
+
+  function member(index: number) {
+    return { membershipId: `mem-${index}`, userId: `user-${index}`, displayName: `멤버${index}`, role: 'member' };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'none', message: '가입 불가' } });
+    teamApiMocks.useV1CreateTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+  });
+
+  it('총원이 미리보기(8명)보다 많으면 정확한 남은 인원 수로 "+ n명 더보기" CTA가 뜨고 전체 멤버 목록으로 연결된다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({
+        memberCount: 12,
+        membersPreview: Array.from({ length: 8 }, (_, i) => member(i)),
+      }),
+      isError: false,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    // 총원 12 - 미리보기 8 = 4명이 남아야 한다.
+    const moreLinks = screen.getAllByRole('link', { name: /\+ 4명 더보기/ });
+    expect(moreLinks.length).toBeGreaterThanOrEqual(2); // 데스크톱·모바일 레이아웃 둘 다 렌더
+    moreLinks.forEach((link) => expect(link).toHaveAttribute('href', '/teams/team-1/members'));
+  });
+
+  it('총원이 미리보기 인원 이하면 더보기 CTA가 없다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({
+        memberCount: 6,
+        membersPreview: Array.from({ length: 6 }, (_, i) => member(i)),
+      }),
+      isError: false,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.queryByText(/더보기/)).not.toBeInTheDocument();
+  });
+
+  it('미리보기 멤버를 누르면 해당 멤버의 공개 프로필(/users/{userId})로 이동한다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({
+        memberCount: 2,
+        membersPreview: [
+          { membershipId: 'mem-owner', userId: 'user-owner-42', displayName: '박서준', role: 'owner' },
+          member(1),
+        ],
+      }),
+      isError: false,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const memberLinks = screen.getAllByRole('link', { name: /박서준/ });
+    expect(memberLinks.length).toBeGreaterThanOrEqual(2);
+    memberLinks.forEach((link) => expect(link).toHaveAttribute('href', '/users/user-owner-42'));
+  });
+
+  it('멤버 목록이 비공개인 팀에서는 미리보기도 더보기 CTA도 노출되지 않는다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({
+        membersVisibilityEnabled: false,
+        canViewMembers: false,
+        memberCount: 12,
+        membersPreview: [],
+      }),
+      isError: false,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.queryByText(/더보기/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.').length).toBeGreaterThan(0);
+  });
+});

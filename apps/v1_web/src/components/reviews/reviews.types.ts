@@ -1,5 +1,5 @@
 import type {
-  V1ReviewDetail,
+  V1ReceivedReviewDetail,
   V1ReviewListItem,
   V1ReviewSourceResponse,
   V1ReviewSourceType,
@@ -43,6 +43,10 @@ export type ReviewSourcePageModel = V1ReviewSourceResponse & {
 export type ReviewTargetViewModel = V1ReviewTarget & {
   initials: string;
   statusLabel: string;
+  /** 양 팀 겸직이라 대상마다 작성자 팀이 다를 때만 채워진다. */
+  reviewerTeamLabel: string | null;
+  /** lockReason 을 사용자 문구로 옮긴 값. 배지와 중복되는 코드는 null 이라 표시하지 않는다. */
+  lockReasonLabel: string | null;
 };
 
 export type ReceivedReviewGroup = {
@@ -51,11 +55,13 @@ export type ReceivedReviewGroup = {
   title: string;
   meta: string;
   average: string;
-  reviews: V1ReviewDetail[];
+  reviews: V1ReceivedReviewDetail[];
 };
 
 export type ReviewsReceivedPageModel = {
   stats: ReviewStat[];
-  userGroups: ReceivedReviewGroup[];
-  teamGroups: ReceivedReviewGroup[];
+  anonymousUserGroups: ReceivedReviewGroup[];
+  anonymousTeamGroups: ReceivedReviewGroup[];
+  legacyUserGroups: ReceivedReviewGroup[];
+  legacyTeamGroups: ReceivedReviewGroup[];
 };

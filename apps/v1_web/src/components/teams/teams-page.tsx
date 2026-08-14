@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
-import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -300,6 +300,27 @@ function TeamOperationsSection({
   );
 }
 
+/**
+ * 미리보기(최대 8명) 뒤에 남은 멤버가 있을 때만 노출되는 보조 CTA.
+ * 기존 `/teams/{teamId}/members` 전체 목록으로 보낸다 — 새 라우트를 만들지 않는다.
+ * 화면의 주요 CTA(가입/채팅 버튼)와 겹치지 않도록 tm-list-row 안의 텍스트 링크로만 표현한다.
+ */
+function TeamMembersMoreLink({ teamId, count }: { teamId: string; count: number }) {
+  if (count <= 0) return null;
+  return (
+    <Link
+      href={`/teams/${teamId}/members`}
+      className="tm-list-row tm-pressable"
+      style={{ justifyContent: 'center', gap: 4, textDecoration: 'none' }}
+    >
+      <span className="tm-text-label" style={{ color: 'var(--blue500)', fontWeight: 600 }}>
+        + {count}명 더보기
+      </span>
+      <ChevronRightIcon size={16} stroke="var(--blue500)" strokeWidth={2} aria-hidden="true" />
+    </Link>
+  );
+}
+
 export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const { team, mode } = model;
   const locked = mode === 'pending' || mode === 'closed';
@@ -371,6 +392,52 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
           </Card>
           <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+          <Link
+            className="tm-pressable"
+            href={`/teams/${team.id}/records`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              border: '1px solid var(--border)',
+              borderRadius: 14,
+              padding: '14px 16px',
+              background: 'var(--bg)',
+              textDecoration: 'none',
+              color: 'inherit',
+            }}
+          >
+            <div>
+              <div className="tm-text-label">팀 전적</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>승·무·패와 경기별 기록을 확인해요.</div>
+            </div>
+            <ChevronRightIcon size={18} aria-hidden="true" />
+          </Link>
+          {mode === 'mine' ? (
+            <Link
+              className="tm-pressable"
+              href={`/teams/${team.id}/schedules`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                padding: '14px 16px',
+                background: 'var(--bg)',
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
+            >
+              <div>
+                <div className="tm-text-label">팀 일정</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>훈련·경기·이벤트 일정을 보고 참석을 체크해요.</div>
+              </div>
+              <ChevronRightIcon size={18} aria-hidden="true" />
+            </Link>
+          ) : null}
           <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
           <Card pad={16}>
             <InfoRow label="팀명" value={team.name} />
@@ -408,7 +475,21 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 </span>
               )}
             </div>
-            {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
+            {team.memberAccess.canView ? (
+              <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                {team.membersList.map((member, index) => (
+                  <ListItem
+                    key={index}
+                    title={member.name}
+                    sub={`${member.role} · ${member.meta} · ${member.status}`}
+                    trailing={member.visibility}
+                    href={member.profileHref}
+                    chev={Boolean(member.profileHref)}
+                  />
+                ))}
+                <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
+              </div>
+            ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
           </Card>
         </div>
 
@@ -436,7 +517,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
           ) : (
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              {locked ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.' : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
+              {/* 이미 소속된 멤버·운영진에게 "신청 전에…" 라고 말하면 안 된다 — 본문은 운영
+                  메뉴를 보여주는데 사이드바만 비멤버 문구를 유지해 역할이 어긋나 있었다. */}
+              {mode === 'mine'
+                ? '이미 이 팀의 멤버예요. 운영 메뉴에서 팀을 관리해요.'
+                : locked
+                  ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.'
+                  : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
             </div>
           )}
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
@@ -478,6 +565,29 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
         ) : null}
         <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+        {/* 데스크톱 레이아웃에만 있던 링크 — 모바일에서 팀 전적으로 갈 방법이 아예 없었다. */}
+        <Link
+          className="tm-pressable"
+          href={`/teams/${team.id}/records`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+            border: '1px solid var(--border)',
+            borderRadius: 14,
+            padding: '14px 16px',
+            background: 'var(--bg)',
+            textDecoration: 'none',
+            color: 'inherit',
+          }}
+        >
+          <div>
+            <div className="tm-text-label">팀 전적</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>승·무·패와 경기별 기록을 확인해요.</div>
+          </div>
+          <ChevronRightIcon size={18} aria-hidden="true" />
+        </Link>
         <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
         <Card pad={16}>
           <InfoRow label="팀명" value={team.name} />
@@ -515,13 +625,36 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               </span>
             )}
           </div>
-          {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
+          {team.memberAccess.canView ? (
+            <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+              {team.membersList.map((member, index) => (
+                <ListItem
+                  key={index}
+                  title={member.name}
+                  sub={`${member.role} · ${member.meta} · ${member.status}`}
+                  trailing={member.visibility}
+                  href={member.profileHref}
+                  chev={Boolean(member.profileHref)}
+                />
+              ))}
+              <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
+            </div>
+          ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
         </Card>
       </article>
       <div className="tm-fixed-cta tm-hide-desktop">
         {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하므로 같은 말을 반복하지 않는다. */}
         {mode === 'pending' ? null : (
-          <div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>
+          <div className="tm-text-caption" style={{ marginBottom: 8 }}>
+            {/* mode==='mine' 은 이미 이 팀 소속(CTA 가 "팀 관리")인데, 예전에는 locked 여부로만
+                문구를 갈라서 팀장·매니저에게도 "신청 전 ... 확인해 주세요" 라는 비회원 안내가
+                그대로 나갔다. 이미 들어와 있는 사람에게 가입 안내를 하지 않는다. */}
+            {mode === 'mine'
+              ? '팀 정보와 멤버를 관리할 수 있어요.'
+              : locked
+                ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.'
+                : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
+          </div>
         )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
         {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}
@@ -951,7 +1084,7 @@ function TeamLogoField({
         />
       </div>
       {error ? (
-        <div className="tm-text-caption" style={{ color: 'var(--red500)', marginTop: 6 }}>{error}</div>
+        <div className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 6 }}>{error}</div>
       ) : null}
     </div>
   );
@@ -997,12 +1130,16 @@ function TeamCoverImageField({
         상단 이미지 <span className="tm-text-caption" style={{ fontWeight: 400 }}>(선택)</span>
       </div>
       <div className="tm-text-caption" style={{ marginTop: 4 }}>팀 상세 상단에 표시되는 대표 이미지예요.</div>
+      {/* minHeight는 실제 팀 상세 히어로 카드(.tm-team-detail-hero-card)의 콘텐츠 높이를 그대로
+          맞춘 값이다 — pad 18*2 + avatar(xl) 72 + margin 14 + heading line-height 32 + margin 4 +
+          caption line-height 16 + margin 12 + badge row 24 = 210px. 이전 132px는 실제보다
+          약 60% 낮아 사진 상하가 실제보다 덜 잘려 보이는 미리보기-실사용 불일치가 있었다. */}
       <div
         style={{
           marginTop: 10,
-          minHeight: 132,
+          minHeight: 210,
           borderRadius: 14,
-          border: '1px solid var(--border)',
+          border: '1px solid var(--border-strong)',
           background: coverImageUrl ? `${cssUrl(coverImageUrl)} center/cover` : 'var(--grey50)',
           display: 'flex',
           alignItems: 'center',
@@ -1036,7 +1173,7 @@ function TeamCoverImageField({
           onChange={(event) => handleFile(event.target.files?.[0])}
         />
       </div>
-      {error ? <div className="tm-text-caption" style={{ color: 'var(--red500)', marginTop: 6 }}>{error}</div> : null}
+      {error ? <div className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 6 }}>{error}</div> : null}
     </div>
   );
 }
@@ -1188,12 +1325,12 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
             />
           </div>
           {form.error ? (
-            <div id="invite-email-error" className="tm-text-caption" role="alert" style={{ color: 'var(--red500)' }}>
+            <div id="invite-email-error" className="tm-text-caption" role="alert" style={{ color: 'var(--red700)' }}>
               {form.error}
             </div>
           ) : null}
           {form.successMessage ? (
-            <div className="tm-text-caption" role="status" style={{ color: 'var(--green500)' }}>
+            <div className="tm-text-caption" role="status" style={{ color: 'var(--green700)' }}>
               {form.successMessage}
             </div>
           ) : null}
@@ -1694,7 +1831,7 @@ function MemberCard({
         </button>
       ) : null}
       {selfLeave?.error ? (
-        <p role="alert" className="tm-text-caption" style={{ marginTop: 6, color: 'var(--red500)' }}>
+        <p role="alert" className="tm-text-caption" style={{ marginTop: 6, color: 'var(--red700)' }}>
           {selfLeave.error}
         </p>
       ) : null}

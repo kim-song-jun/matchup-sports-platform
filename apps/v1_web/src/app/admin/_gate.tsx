@@ -19,13 +19,13 @@ function resolveRoleLabel(role: 'owner' | 'ops' | 'support' | undefined): string
 // ── Access-denied screen ──────────────────────────────────────────────────
 function AccessDenied() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4">
       <div className="flex flex-col items-center gap-3 text-center max-w-[320px]">
-        <span className="text-gray-300" aria-hidden="true">
+        <span className="text-[var(--text-caption)]" aria-hidden="true">
           <ShieldOff size={48} />
         </span>
-        <h1 className="text-[var(--font-size-subhead)] font-bold text-gray-900">운영자 권한이 필요해요</h1>
-        <p className="text-[var(--font-size-body-sm)] text-gray-500 leading-relaxed">
+        <h1 className="text-[var(--font-size-subhead)] font-bold text-[var(--text-strong)]">운영자 권한이 필요해요</h1>
+        <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           이 페이지는 플랫폼 운영자만 접근할 수 있어요. 계정 권한을 확인해 주세요.
         </p>
         <Link
@@ -42,7 +42,7 @@ function AccessDenied() {
 // ── Loading screen ────────────────────────────────────────────────────────
 function AdminLoadingScreen() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
       <AdminPageSkeleton />
     </div>
   );
@@ -51,10 +51,10 @@ function AdminLoadingScreen() {
 // ── Transient-error screen (network / 5xx) — retryable, NOT access denied ───
 function AdminErrorScreen({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4">
       <div className="flex flex-col items-center gap-3 text-center max-w-[320px]">
-        <h1 className="text-[var(--font-size-subhead)] font-bold text-gray-900">잠시 문제가 생겼어요</h1>
-        <p className="text-[var(--font-size-body-sm)] text-gray-500 leading-relaxed">
+        <h1 className="text-[var(--font-size-subhead)] font-bold text-[var(--text-strong)]">잠시 문제가 생겼어요</h1>
+        <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           일시적인 오류로 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
         <button

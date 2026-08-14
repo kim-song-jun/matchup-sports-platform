@@ -1,0 +1,16 @@
+-- 이슈 #375: "전반 종료"를 누르면 곧장 후반이 시작되고 전반 상태로 되돌릴
+-- 수 없던 문제 수정. V1GamePeriodState에 HALFTIME을 추가해 "현재 피리어드는
+-- 끝났지만 다음 피리어드는 아직 시작하지 않은" 하프타임 구간을 (다음
+-- 피리어드가 그냥 SCHEDULED로 남아있는) 암묵적 조합이 아니라 명시적으로
+-- 관측 가능한 상태로 만든다. GamesService.endCurrentPeriod가 다음 피리어드
+-- 행을 SCHEDULED -> HALFTIME으로 옮기고, GamesService.startNextPeriod가
+-- HALFTIME -> LIVE로 옮긴다.
+--
+-- 백필 불필요: 이 값은 이 마이그레이션과 함께 배포되는 새 코드
+-- (endCurrentPeriod)만 쓰기 시작하는 값이다. 마이그레이션 시점에 이미
+-- 존재하는 v1_game_periods 행은 전부 SCHEDULED/LIVE/ENDED 중 하나이고,
+-- 그중 어느 것도 HALFTIME으로 재해석될 이유가 없다 — 진행 중이던 경기는
+-- 그대로 LIVE(구 next-period 커맨드가 계속 그 값을 쓴다, games.service.ts의
+-- advancePeriod 문서 참고), 이미 끝난 하프는 그대로 ENDED로 유지된다.
+-- enum에 값을 추가하는 것 자체는 기존 행을 전혀 건드리지 않는다.
+ALTER TYPE "V1GamePeriodState" ADD VALUE 'HALFTIME';

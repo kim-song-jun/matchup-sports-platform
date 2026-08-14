@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import {
+  Award,
   Bell,
   ClipboardList,
   Crown,
@@ -9,6 +10,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Moon,
   Plus,
   Send,
   Settings,
@@ -47,6 +49,7 @@ import type {
 
 /** Lucide 아이콘 이름 → 컴포넌트 매핑. view-model의 icon 문자열을 참조함. */
 const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  Award,
   ClipboardList,
   Plus,
   Users,
@@ -55,10 +58,12 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   Settings,
   MapPin,
   Bell,
+  Moon,
   FileText,
   LogOut,
   Mail,
   Send,
+  ShieldCheck,
 };
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
@@ -126,6 +131,8 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
           </div>
           {/* RIGHT: menu sections */}
           <div className="tm-my-desktop-main">
+            {/* 스태프 배정이 있는 사용자에게만 렌더된다(없으면 null) — 대회 운영 화면으로
+                들어갈 앱 내 유일한 진입점이다. */}
             <PendingTournamentReviewCard />
             <div className="tm-my-desktop-menu-grid">
               {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
@@ -521,10 +528,14 @@ function MenuSection({ section }: { section: { title: string; items: MyMenuItem[
           const IconComponent = MENU_ICON_MAP[item.icon];
           return (
             <Link key={item.label} className="tm-my-menu-row" href={item.href}>
-              {/* Lucide 아이콘: 단일 글자 모노그램 대체. 의미 있는 시각 단서 제공 */}
+              {/* Lucide 아이콘: 단일 글자 모노그램 대체. 의미 있는 시각 단서 제공.
+                  2026-08-11: 배경(.tm-my-menu-icon = --grey150, 무채색)은 이미 통일돼
+                  있었는데 아이콘 색만 --blue500라 타일마다 "파랑+회색이 섞인" 것처럼
+                  보였다(사용자 라이브 지적) — 진짜 경고가 아닌 순수 내비게이션 메뉴라
+                  아이콘도 배경과 같은 무채색 계열로 통일한다. */}
               <span className="tm-my-menu-icon" aria-hidden="true">
                 {IconComponent ? (
-                  <IconComponent size={18} strokeWidth={1.75} color="var(--blue500)" />
+                  <IconComponent size={18} strokeWidth={1.75} color="var(--text-strong)" />
                 ) : item.icon}
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
@@ -622,7 +633,7 @@ function PhoneVerificationCallout() {
           alignItems: 'center',
           justifyContent: 'center',
           background: 'var(--orange-soft)',
-          color: 'var(--orange500)',
+          color: 'var(--orange700)',
         }}
       >
         <ShieldAlert size={18} strokeWidth={2} />

@@ -34,7 +34,7 @@ export function TournamentDatetimeField({
         {label}
         {required ? (
           <>
-            <span aria-hidden="true" className="ml-0.5 text-[var(--red500)]">*</span>
+            <span aria-hidden="true" className="ml-0.5 text-[var(--red700)]">*</span>
             <span className="sr-only"> (필수)</span>
           </>
         ) : null}
@@ -50,10 +50,10 @@ export function TournamentDatetimeField({
         aria-invalid={Boolean(error)}
         aria-describedby={descriptionId}
         className={[
-          'h-[44px] w-full rounded-xl border bg-white px-3 text-[var(--font-size-label)] text-[var(--text-strong)]',
+          'h-[44px] w-full rounded-xl border bg-[var(--card-surface)] px-3 text-[var(--font-size-label)] text-[var(--text-strong)]',
           'focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50',
           error
-            ? 'border-[var(--red500)] focus:border-[var(--red500)]'
+            ? 'border-[var(--red700)] focus:border-[var(--red700)]'
             : 'border-[var(--border)] focus:border-blue-500',
         ].join(' ')}
       />
@@ -61,7 +61,7 @@ export function TournamentDatetimeField({
         <p
           id={`${id}-error`}
           role="alert"
-          className="text-[var(--font-size-caption)] text-[var(--red500)]"
+          className="text-[var(--font-size-caption)] text-[var(--red700)]"
         >
           {error}
         </p>

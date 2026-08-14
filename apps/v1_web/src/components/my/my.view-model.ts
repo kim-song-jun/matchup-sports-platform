@@ -68,6 +68,10 @@ export const settingsModel: SettingsViewModel = {
       items: [
         { label: '위치 및 활동 지역', sub: '현재 위치로 활동 지역을 업데이트해요', href: '/my/settings/location', icon: 'MapPin' },
         { label: '알림 설정', sub: '매치와 채팅 알림을 관리해요', href: '/my/settings/notifications', icon: 'Bell' },
+        { label: '화면 테마', sub: '라이트, 다크, 기기 설정 중에서 골라요', href: '/my/settings/theme', icon: 'Moon' },
+        // F2: 팀 라인업에 연결된 내 경기 기록을 공개 프로필(/users/:id/records)에 노출할지
+        // 사용자 단위로 한 번에 켜고 끈다. 새 API 계약: GET/PUT /me/record-consent.
+        { label: '경기 기록 공개', sub: '내 활동 기록을 공개 프로필에 표시할지 정해요', href: '/my/settings/record-consent', icon: 'ShieldCheck' },
       ],
     },
     {

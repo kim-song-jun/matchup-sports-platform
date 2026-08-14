@@ -24,7 +24,7 @@ type PrizeBreakdownEditorProps = {
 };
 
 const fieldClass =
-  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 export function PrizeBreakdownEditor({
   rows,
@@ -94,7 +94,7 @@ export function PrizeBreakdownEditor({
               onClick={() => onChange(rows.filter((candidate) => candidate.id !== row.id))}
               disabled={disabled}
               aria-label={`상금 항목 ${index + 1} 삭제`}
-              className="grid h-[44px] w-[44px] place-items-center rounded-xl text-[var(--text-caption)] transition-colors hover:bg-red-50 hover:text-[var(--red500)] disabled:opacity-50"
+              className="grid h-[44px] w-[44px] place-items-center rounded-xl text-[var(--text-caption)] transition-colors hover:bg-[var(--red50)] hover:text-[var(--red500)] disabled:opacity-50"
             >
               <X size={17} aria-hidden="true" />
             </button>
@@ -114,13 +114,13 @@ export function PrizeBreakdownEditor({
               onChange([...rows, { id: createPrizeRowId(), label, value: '' }]);
             }}
             disabled={disabled || rows.length >= 12}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-blue-50 px-4 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-100 disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[var(--blue50)] px-4 text-sm font-semibold text-[var(--blue700)] transition-colors hover:bg-blue-100 disabled:opacity-50"
           >
             <Plus size={16} aria-hidden="true" />
             항목 추가
           </button>
           {total > 0 ? (
-            <span className={`text-xs ${mismatch ? 'font-semibold text-amber-700' : 'text-[var(--text-caption)]'}`}>
+            <span className={`text-xs ${mismatch ? 'font-semibold text-[var(--orange700)]' : 'text-[var(--text-caption)]'}`}>
               배분 합계 {formatWithComma(String(total))}원{mismatch ? ' · 총상금과 달라요' : ''}
             </span>
           ) : null}
@@ -129,7 +129,7 @@ export function PrizeBreakdownEditor({
               type="button"
               onClick={() => onPrizePoolChange(String(total))}
               disabled={disabled}
-              className="min-h-[44px] rounded-xl bg-[var(--grey100)] px-4 text-xs font-semibold text-[var(--text-body)]"
+              className="min-h-[44px] rounded-xl bg-[var(--grey150)] px-4 text-xs font-semibold text-[var(--text-body)]"
             >
               합계를 총상금으로
             </button>

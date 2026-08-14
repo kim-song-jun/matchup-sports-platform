@@ -11,7 +11,7 @@ interface AdminEmptyProps {
 export function AdminEmpty({ icon, title, description, action }: AdminEmptyProps) {
   return (
     <div className="flex flex-col items-center justify-center py-14 gap-2 text-center px-5">
-      <span className="text-gray-300 mb-1" aria-hidden="true">
+      <span className="text-gray-300 dark:text-gray-600 mb-1" aria-hidden="true">
         {icon ?? <Inbox size={40} />}
       </span>
       <p className="tm-text-body font-semibold [color:var(--text-muted)]">{title}</p>

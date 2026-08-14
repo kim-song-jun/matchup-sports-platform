@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateProfileDto {
@@ -81,6 +81,10 @@ class SettingsNotificationsDto {
 
 export class UpdateSettingsDto {
   @IsOptional()
+  @IsIn(['light', 'dark', 'system'])
+  theme?: 'light' | 'dark' | 'system';
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => SettingsNotificationsDto)
   notifications?: SettingsNotificationsDto;
@@ -125,4 +129,18 @@ export class WithdrawalRequestDto {
   @IsString()
   @MaxLength(500)
   reason?: string | null;
+}
+
+/**
+ * 사용자 단위 공개 기록 동의 저장. granted=false 는 즉시 철회(REVOKED) — 개별
+ * participant 스냅샷과 달리 이 스위치 하나가 사용자에 연결된 모든 참가 기록의
+ * 공개 여부를 결정한다(과거 경기 포함, 시간 비교 없음).
+ */
+export class UpdateMyRecordConsentDto {
+  @IsBoolean()
+  granted!: boolean;
+
+  @IsString()
+  @IsNotEmpty()
+  policyHash!: string;
 }

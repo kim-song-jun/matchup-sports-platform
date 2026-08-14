@@ -141,6 +141,7 @@
     transition: background-color 0.12s;
   }
 
+  /* hover tint — 페이지 배경(--bg) 위 --grey50 한 단계. main과 동일. */
   .tm-match-list-card:hover {
     background: var(--grey50);
   }
@@ -204,14 +205,6 @@
     height: 280px;
     border-radius: 16px 16px 0 0;
     overflow: hidden;
-  }
-
-  /* Detail page desktop page-head: back link + match title. */
-  .tm-match-detail-desktop-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 28px 0 12px;
   }
 
   /* Two-column layout for the detail body + sticky right card.

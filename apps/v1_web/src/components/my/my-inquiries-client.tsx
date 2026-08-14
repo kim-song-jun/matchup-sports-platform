@@ -74,7 +74,7 @@ export function MyInquiriesListClient() {
 
   if (query.isError) {
     return (
-      <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my">
+      <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my" desktopHead>
         <div className="tm-my-shell">
           <ErrorState message={t.listError} onRetry={() => void query.refetch()} />
         </div>
@@ -83,7 +83,7 @@ export function MyInquiriesListClient() {
   }
 
   return (
-    <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my">
+    <AppChrome title={t.inquiry} activeTab="my" bottomNav={false} backHref="/my" desktopHead>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
@@ -158,7 +158,7 @@ export function MyInquiryCreateClient() {
   };
 
   return (
-    <AppChrome title={t.inquiryNew} activeTab="my" bottomNav={false} backHref="/my/inquiries">
+    <AppChrome title={t.inquiryNew} activeTab="my" bottomNav={false} backHref="/my/inquiries" desktopHead>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           <Card pad={16}>
@@ -194,7 +194,7 @@ export function MyInquiryDetailClient({ inquiryId }: { inquiryId: string }) {
 
   if (query.isError) {
     return (
-      <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries">
+      <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries" desktopHead>
         <div className="tm-my-shell">
           <ErrorState message={t.detailError} onRetry={() => void query.refetch()} />
         </div>
@@ -203,7 +203,7 @@ export function MyInquiryDetailClient({ inquiryId }: { inquiryId: string }) {
   }
 
   return (
-    <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries">
+    <AppChrome title={t.detail} activeTab="my" bottomNav={false} backHref="/my/inquiries" desktopHead>
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           {!inquiry ? (
@@ -246,10 +246,10 @@ function InquiryDetail({ inquiry }: { inquiry: V1Inquiry }) {
         {inquiry.replies && inquiry.replies.length > 0 ? (
           <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
             {inquiry.replies.map((reply) => (
-              <div key={reply.replyId} style={{ borderRadius: 14, background: '#f8fafc', padding: 12 }}>
+              <div key={reply.replyId} style={{ borderRadius: 14, background: 'var(--surface-soft)', padding: 12 }}>
                 <div className="tm-text-label" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span>{reply.adminName ?? '\uc6b4\uc601\ud300'}</span>
-                  <span style={{ color: '#94a3b8' }}>{formatDate(reply.createdAt)}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{formatDate(reply.createdAt)}</span>
                 </div>
                 <p className="tm-text-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: '8px 0 0' }}>
                   {reply.body}

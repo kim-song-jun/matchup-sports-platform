@@ -1,4 +1,5 @@
 import type { TournamentDetailRow } from './tournaments-read.query';
+import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 
 /**
  * 대진표 공개 여부 판정의 단일 소스. 즉시 공개(bracketPublishedAt)와 예약 공개
@@ -16,7 +17,59 @@ export function isBracketPublished(
   return Boolean(scheduledAt) && (scheduledAt as Date).getTime() <= now.getTime();
 }
 
-export function presentTournamentDetail(row: TournamentDetailRow, now: Date = new Date()) {
+/**
+ * 참가팀 식별 정보(팀명·로고·팀ID)를 감출지 판정하는 단일 소스.
+ *
+ * 이전에는 `participantTeams`(참가팀 명단)만 `status === 'open'`(모집 중)에 감췄고,
+ * `groups`/`fixtures` 안의 팀명(조 편성·대진표)은 별개 게이트(`isBracketPublished`)만
+ * 따랐다 — 운영자가 대진표를 먼저 공개하면 모집 중에도 조 편성 안의 팀명이 그대로
+ * 보이는 불일치가 있었다("모집 마감 후 공개" 문구와 어긋남). 이 함수를 두 곳 모두에
+ * 적용해 정책을 하나로 통일한다: 대진표 공개 여부(`isBracketPublished`)는 "조/픽스처
+ * 구조 자체를 보여줄지"를 판정하고, 이 함수는 그 구조 **안의 팀 식별 정보**를 보여줄지
+ * 별도로 판정한다 — 두 게이트는 여전히 독립이다(대진표는 공개하되 모집 중에는 그
+ * 안의 팀명만 가리는 것이 가능해야 하므로).
+ *
+ * `staffBypass=true`(운영자·스태프)는 예외 — 지금도 자신이 운영하는 대회의 참가팀을
+ * 봐야 실무가 돌아간다(TournamentStaffAccessService 판정 결과를 그대로 받는다).
+ */
+export function shouldHideParticipantIdentity(
+  status: TournamentDetailRow['status'],
+  staffBypass: boolean,
+): boolean {
+  return status === 'open' && !staffBypass;
+}
+
+/**
+ * 공개 상세의 fixtures[].result 조립 -- 응답 필드 형태(homeScore/awayScore/hasPenalty/
+ * homePenaltyScore/awayPenaltyScore/note/recordedAt/goals[])는 레거시와 동일하게 유지한다.
+ * 신규 경로(`V1Game.currentOfficialRevision`)를 우선하고, OFFICIAL 리비전이 없을 때만
+ * (game 백필 전 등) 레거시 `V1TournamentFixtureResult`로 폴백한다(R3 §4-3~§4-4단계 사이
+ * 한시적 — resolveTournamentFixtureOfficialResult() 참고). `note`는 새 경로에서 조립된
+ * 결과일 때만 항상 null이고, 레거시 폴백 결과는 레거시 note를 그대로 보존한다.
+ */
+function presentOfficialResult(
+  game: TournamentDetailRow['fixtures'][number]['game'],
+  legacyResult: TournamentDetailRow['fixtures'][number]['result'],
+) {
+  const resolved = resolveTournamentFixtureOfficialResult(game, legacyResult ?? undefined);
+  if (!resolved) return null;
+  return {
+    homeScore: resolved.score.homeScore,
+    awayScore: resolved.score.awayScore,
+    hasPenalty: resolved.score.hasPenalty,
+    homePenaltyScore: resolved.score.homePenaltyScore,
+    awayPenaltyScore: resolved.score.awayPenaltyScore,
+    note: resolved.note,
+    recordedAt: (resolved.officialAt ?? resolved.createdAt).toISOString(),
+    goals: resolved.goals,
+  };
+}
+
+export function presentTournamentDetail(
+  row: TournamentDetailRow,
+  now: Date = new Date(),
+  staffBypass = false,
+) {
   // Task 109 Track 6: bracketPublishedAt이 null이면 대진표(조/픽스처)를 관리자가 아직
   // 일괄 공개하지 않은 상태 — 공개 조회에서는 groups/fixtures를 빈 배열로 감춘다.
   // 다른 대회 정보(공지·리뷰·수상·스폰서 등)는 이 게이트와 무관하게 그대로 노출한다.
@@ -25,6 +78,10 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
   // bracketPublishedAt이 비어 있어도 공개로 간주하므로, 예약 시각과 실제 노출 사이에
   // cron 주기만큼의 지연이 생기지 않는다.
   const bracketPublished = isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now);
+  // 참가팀 공개 정책 통일(fix/v1-publish) — participantTeams와 groups/fixtures의 팀명이
+  // 같은 조건으로 감춰진다. 대진표 공개 여부(bracketPublished)와는 독립 — 대진표는
+  // 공개돼도(구조는 보여도) 모집 중이면 그 안의 팀 식별 정보만 별도로 가려진다.
+  const hideIdentity = shouldHideParticipantIdentity(row.status, staffBypass);
 
   return {
     id: row.id,
@@ -86,10 +143,10 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
     confirmedCount: row._count.registrations,
     // 모집 중(open)에는 참가팀 명단(팀명·로고·지역)을 비공개한다. 확정 인원수(confirmedCount)는
     // 위에서 status와 무관하게 항상 노출되므로 "몇 팀이 참가하는지"는 계속 보여준다.
-    participantTeams:
-      row.status === 'open'
-        ? []
-        : row.registrations
+    // 운영자·스태프(staffBypass)는 예외 — hideIdentity가 이미 그 조건을 반영한다.
+    participantTeams: hideIdentity
+      ? []
+      : row.registrations
             .filter((registration) => ['confirmed', 'waitlisted'].includes(registration.status))
             .sort((a, b) => {
               const aRank = a.status === 'confirmed' ? 0 : 1;
@@ -108,6 +165,12 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
     pendingPaymentCount: row.registrations.filter((registration) =>
       ['awaiting_payment', 'payment_checking', 'paid'].includes(registration.status),
     ).length,
+    // 대진표 구조(조 이름·조 수·팀 수·경기 일정)는 bracketPublished 게이트만 따른다 —
+    // "관전자가 언제 무슨 경기가 있는지는 알아야 한다"는 판단(조별 편성 자체를 감추면
+    // 일정 정보까지 사라진다). 그 구조 **안의 팀 식별 정보**(teamId/teamName/
+    // teamLogoUrl)만 hideIdentity로 별도로 가린다 — registrationId·sortOrder·경기
+    // 성적(points/wins/...)·일정·장소는 집계/구조 정보이므로 계속 노출한다("감출 때
+    // 없는 척하지 마라": 이름만 가리되 몇 팀·몇 경기인지는 정직하게 보여준다).
     groups: !bracketPublished
       ? []
       : row.groups.map((group) => ({
@@ -119,15 +182,18 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
       groupTeams: group.groupTeams.map((groupTeam) => ({
         id: groupTeam.id,
         registrationId: groupTeam.registrationId,
-        teamId: groupTeam.registration.team.id,
-        teamName: groupTeam.registration.team.name,
+        teamId: hideIdentity ? null : groupTeam.registration.team.id,
+        teamName: hideIdentity ? null : groupTeam.registration.team.name,
+        // 순위 행이 아직 없을 때 이 편성 목록만으로 순위표를 그리므로(#374), 순위 행과
+        // 같은 아바타가 나오도록 로고도 함께 내려 준다.
+        teamLogoUrl: hideIdentity ? null : (groupTeam.registration.team.profile?.logoUrl ?? null),
         sortOrder: groupTeam.sortOrder,
       })),
       standings: group.standings.map((standing) => ({
         registrationId: standing.registrationId,
-        teamId: standing.registration.team.id,
-        teamName: standing.registration.team.name,
-        teamLogoUrl: standing.registration.team.profile?.logoUrl ?? null,
+        teamId: hideIdentity ? null : standing.registration.team.id,
+        teamName: hideIdentity ? null : standing.registration.team.name,
+        teamLogoUrl: hideIdentity ? null : (standing.registration.team.profile?.logoUrl ?? null),
         position: standing.position,
         points: standing.points,
         wins: standing.wins,
@@ -150,31 +216,22 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
       venue: fixture.venue,
       status: fixture.status,
       homeRegistrationId: fixture.homeRegistrationId,
-      homeTeamId: fixture.homeRegistration?.team.id ?? null,
-      homeTeamName: fixture.homeRegistration?.team.name ?? 'TBD',
-      homeTeamLogoUrl: fixture.homeRegistration?.team.profile?.logoUrl ?? null,
+      // homeTeamName은 세 갈래: 슬롯에 팀이 아직 배정 안 됐으면 'TBD'(기존 동작 유지),
+      // 배정은 됐지만 모집 중이라 가려야 하면 null(진짜 미배정과 구분되는 값 —
+      // 프런트가 null이면 "비공개", 'TBD'면 "미배정"으로 다르게 안내한다), 그 외엔 실명.
+      homeTeamId: hideIdentity ? null : (fixture.homeRegistration?.team.id ?? null),
+      homeTeamName:
+        fixture.homeRegistration === null ? 'TBD' : hideIdentity ? null : fixture.homeRegistration.team.name,
+      homeTeamLogoUrl: hideIdentity ? null : (fixture.homeRegistration?.team.profile?.logoUrl ?? null),
       awayRegistrationId: fixture.awayRegistrationId,
-      awayTeamId: fixture.awayRegistration?.team.id ?? null,
-      awayTeamName: fixture.awayRegistration?.team.name ?? 'TBD',
-      awayTeamLogoUrl: fixture.awayRegistration?.team.profile?.logoUrl ?? null,
-      result: fixture.result
-        ? {
-            homeScore: fixture.result.homeScore,
-            awayScore: fixture.result.awayScore,
-            hasPenalty: fixture.result.hasPenalty,
-            homePenaltyScore: fixture.result.homePenaltyScore,
-            awayPenaltyScore: fixture.result.awayPenaltyScore,
-            note: fixture.result.note,
-            recordedAt: fixture.result.recordedAt.toISOString(),
-            goals: fixture.result.goals.map((goal) => ({
-              id: goal.id,
-              team: goal.team,
-              playerId: goal.playerId,
-              playerName: goal.playerName,
-              minute: goal.minute,
-            })),
-          }
-        : null,
+      awayTeamId: hideIdentity ? null : (fixture.awayRegistration?.team.id ?? null),
+      awayTeamName:
+        fixture.awayRegistration === null ? 'TBD' : hideIdentity ? null : fixture.awayRegistration.team.name,
+      awayTeamLogoUrl: hideIdentity ? null : (fixture.awayRegistration?.team.profile?.logoUrl ?? null),
+      // R3 §4-3단계: 공개 스코어보드를 신규 경로(V1Game.currentOfficialRevision) 우선으로
+      // 조립하고, OFFICIAL 리비전이 없을 때만(game 백필 전) 레거시 V1TournamentFixtureResult로
+      // 폴백한다 -- 문서 §1-2/§4 참고. §4-4단계에서 result 조인과 함께 폴백을 제거한다.
+      result: presentOfficialResult(fixture.game, fixture.result),
       videos: fixture.videos.map((video) => ({
         id: video.id,
         title: video.title,

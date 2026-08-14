@@ -8,6 +8,10 @@ export interface EntityPickerItem {
   id: string;
   label: string;
   description?: string;
+  /** true면 목록엔 보이되(숨기지 않고) 회색으로 표시하고 클릭/Enter로 선택할 수 없다. */
+  disabled?: boolean;
+  /** disabled일 때 항목 아래 표시할 "왜 선택할 수 없는지" 문구 — 컬러만으로 정보를 전달하지 않기 위해 항상 함께 노출한다. */
+  disabledReason?: string;
 }
 
 interface EntityPickerProps {
@@ -27,6 +31,12 @@ interface EntityPickerProps {
   emptyText?: string;
   /** 전달 시 목록 최상단에 "선택 해제" 옵션 노출 → onChange(null) */
   clearLabel?: string;
+  /**
+   * 서버 모드(onSearch 전달)에서도 검색어가 비어 있을 때 items를 그대로 보여준다.
+   * 호출자가 포커스만으로도 기본 후보(예: 최근 팀)를 미리 fetch해둔 경우에 켠다.
+   * 로컬 모드는 이미 기본으로 이렇게 동작해서 영향 없다.
+   */
+  showResultsWithoutQuery?: boolean;
 }
 
 type MenuEntry = { kind: 'clear' } | { kind: 'item'; item: EntityPickerItem };
@@ -44,6 +54,7 @@ export function EntityPicker({
   allowFreeText = false,
   emptyText = '검색 결과가 없어요',
   clearLabel,
+  showResultsWithoutQuery = false,
 }: EntityPickerProps) {
   const [inputValue, setInputValue] = useState('');
   const [debouncedValue, setDebouncedValue] = useState('');
@@ -97,7 +108,7 @@ export function EntityPicker({
   ];
 
   const hasQuery = debouncedValue.length > 0;
-  const showMenu = open && (hasQuery || !isServerMode || !!clearLabel);
+  const showMenu = open && (hasQuery || !isServerMode || !!clearLabel || (isServerMode && showResultsWithoutQuery));
   const safeHighlightIdx = highlightIdx >= 0 && highlightIdx < menuEntries.length ? highlightIdx : -1;
 
   // 가상 하이라이트: DOM focus를 옮기면 input blur → closeMenu로 메뉴가
@@ -122,6 +133,9 @@ export function EntityPicker({
   }
 
   function commitEntry(entry: MenuEntry) {
+    // disabled 항목은 목록에서 숨기지 않되(왜 안 되는지 항상 같이 보여줌) 선택은 막는다.
+    // 메뉴는 열어둬서 사용자가 다른 항목을 마저 고를 수 있게 한다.
+    if (entry.kind === 'item' && entry.item.disabled) return;
     onChange(entry.kind === 'clear' ? null : entry.item);
     setInputValue('');
     setDebouncedValue('');
@@ -166,13 +180,13 @@ export function EntityPicker({
   // ── Selected state — chip display + clear button ──────────────────────────
   if (value) {
     return (
-      <div className="flex items-center justify-between h-[44px] px-3 bg-blue-50 border border-blue-200 rounded-xl">
+      <div className="flex items-center justify-between h-[44px] px-3 bg-[var(--blue50)] border border-[var(--tint-blue-border)] rounded-xl">
         <div className="flex flex-col min-w-0">
-          <span className="text-[var(--font-size-label)] font-semibold text-blue-800 truncate">
+          <span className="text-[var(--font-size-label)] font-semibold text-[var(--blue700)] truncate">
             {value.label}
           </span>
           {value.description && (
-            <span className="text-[var(--font-size-micro)] text-blue-600 truncate">{value.description}</span>
+            <span className="text-[var(--font-size-micro)] text-[var(--blue700)] truncate">{value.description}</span>
           )}
         </div>
         <button
@@ -180,7 +194,7 @@ export function EntityPicker({
           onClick={() => onChange(null)}
           disabled={disabled}
           aria-label="선택 해제"
-          className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
+          className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--blue700)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
         >
           <X size={14} aria-hidden="true" />
         </button>
@@ -215,7 +229,7 @@ export function EntityPicker({
         aria-controls={showMenu ? menuId : undefined}
         aria-activedescendant={safeHighlightIdx >= 0 ? `${menuId}-opt-${safeHighlightIdx}` : undefined}
         className={[
-          'w-full h-[44px] pl-9 pr-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-900',
+          'w-full h-[44px] pl-9 pr-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
           'placeholder:text-gray-400',
           'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
           'transition-colors disabled:opacity-50',
@@ -229,7 +243,7 @@ export function EntityPicker({
           id={menuId}
           // mousedown preventDefault: 스크롤바·여백 클릭이 input blur → 메뉴 닫힘으로 이어지지 않게
           onMouseDown={(e) => e.preventDefault()}
-          className="absolute left-0 right-0 top-[48px] bg-white border border-gray-200 rounded-xl shadow-md z-20 overflow-hidden max-h-[240px] overflow-y-auto"
+          className="absolute left-0 right-0 top-[48px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl shadow-md z-20 overflow-hidden max-h-[240px] overflow-y-auto"
         >
           {loading ? (
             <p className="px-4 py-3 text-[var(--font-size-label)] text-gray-400">검색 중…</p>
@@ -251,13 +265,13 @@ export function EntityPicker({
                       tabIndex={-1}
                       onClick={() => commitEntry(entry)}
                       className={[
-                        'w-full flex items-center px-4 py-2.5 min-h-[44px] text-left border-b border-gray-100',
-                        'hover:bg-gray-50 transition-colors',
+                        'w-full flex items-center px-4 py-2.5 min-h-[44px] text-left border-b border-[var(--border)]',
+                        'hover:bg-[var(--surface-soft)] transition-colors',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                        highlighted ? 'bg-gray-50' : '',
+                        highlighted ? 'bg-[var(--surface-soft)]' : '',
                       ].join(' ')}
                     >
-                      <span className="text-[var(--font-size-label)] font-medium text-gray-500">
+                      <span className="text-[var(--font-size-label)] font-medium text-[var(--text-muted)]">
                         {clearLabel}
                       </span>
                     </button>
@@ -271,20 +285,33 @@ export function EntityPicker({
                     role="option"
                     id={`${menuId}-opt-${idx}`}
                     aria-selected={highlighted}
+                    aria-disabled={item.disabled || undefined}
+                    // 네이티브 disabled도 함께 건다 — aria-disabled만으론 보조기기·이벤트
+                    // 시스템에 따라 "실제로는 클릭 가능한 버튼"으로 인식될 수 있다. 가상
+                    // 하이라이트는 DOM focus가 아니라 CSS 클래스로만 표시하므로(위 주석 참고)
+                    // disabled 버튼이어도 화살표 키 하이라이트 표시에는 영향이 없다.
+                    disabled={item.disabled}
                     tabIndex={-1}
                     onClick={() => commitEntry(entry)}
                     className={[
-                      'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left',
-                      'hover:bg-blue-50 transition-colors',
+                      'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left transition-colors',
+                      item.disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-[var(--blue50)]',
+                      // disabled 항목도 화살표 키로 하이라이트될 수 있다 — 선택은 막되(no-op),
+                      // 지금 어디에 있는지는 키보드 사용자에게도 보여야 한다.
+                      highlighted ? 'bg-[var(--blue50)]' : '',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                      highlighted ? 'bg-blue-50' : '',
                     ].join(' ')}
                   >
-                    <span className="text-[var(--font-size-label)] font-semibold text-gray-900">
+                    <span
+                      className={`text-[var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-[var(--text-strong)]'}`}
+                    >
                       {item.label}
                     </span>
                     {item.description && (
                       <span className="text-[var(--font-size-caption)] text-gray-400">{item.description}</span>
+                    )}
+                    {item.disabled && item.disabledReason && (
+                      <span className="text-[var(--font-size-caption)] text-gray-400">{item.disabledReason}</span>
                     )}
                   </button>
                 );

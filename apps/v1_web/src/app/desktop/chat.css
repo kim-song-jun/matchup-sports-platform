@@ -3,31 +3,19 @@
  * ALL rules MUST be inside @media (min-width:1024px) or @media (min-width:1440px).
  * Mobile (<768) is byte-identical — do NOT add mobile rules here.
  *
- * Mobile transparency note: the desktop layout wrapper (.tm-chat-desktop-wrap)
- * and page-head (.tm-chat-room-desktop-head) are rendered in JSX always but use
- * display:contents on mobile so they do not disrupt existing mobile layout.
+ * Mobile transparency note: page-head (.tm-chat-room-desktop-head) is rendered
+ * in JSX always but uses tm-show-desktop (display:none on mobile) so it needs
+ * no extra rule here. (2026-08 다크모드 전수검수: 문서화됐던 .tm-chat-desktop-wrap
+ * 래퍼는 실제로 어느 JSX에서도 쓰이지 않는 죽은 클래스로 확인돼 제거 — 실제 데스크톱
+ * 레이아웃은 .tm-chat-desktop-workspace/.tm-chat-desktop-list-pane/
+ * .tm-chat-desktop-thread-pane 로 대체돼 있었다.)
  */
-
-/* Mobile transparency: .tm-chat-desktop-wrap is invisible on mobile (display:contents
- * makes it a transparent layout wrapper). .tm-chat-room-desktop-head uses
- * tm-show-desktop (display:none on mobile) so it needs no extra rule here. */
-.tm-chat-desktop-wrap {
-  display: contents;
-}
 
 /* ─── /chat list: constrained reading column ──────────────────────────────
  * The swipe-row list should not stretch to the full 1120px.
  * A ~760px column feels like a proper chat app list on desktop.
  */
 @media (min-width: 1024px) {
-  /* Override display:contents for the column wrapper. */
-  .tm-chat-desktop-wrap {
-    display: block;
-    max-width: 760px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-
   /* List: remove the mobile-inherited full-bleed padding; wrapper provides the
      column centring. Keep the bottom padding for breathing room.
      flex column: empty/loading state를 수직 중앙 정렬하기 위해 flex context 부여.
@@ -69,17 +57,6 @@
     flex-direction: column;
     align-items: flex-end;
     gap: 4px;
-  }
-
-  /* (3) 빈 상태·로딩 상태: .tm-chat-list가 flex column이므로 flex:1로 남은 공간을 채우고
-   * column center 정렬로 수직 중앙에 위치시킨다. */
-  .tm-chat-empty {
-    flex: 1 1 auto;
-    min-height: 360px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
   }
 
   /* Desktop uses a fixed trailing pin action and never inherits mobile drag state. */
@@ -279,10 +256,6 @@
     max-width: 840px;
   }
 
-  .tm-chat-desktop-wrap {
-    max-width: 840px;
-  }
-
   .tm-chat-room {
     max-width: 840px;
   }
@@ -440,7 +413,7 @@
     display: grid;
     place-items: center;
     border-radius: 16px;
-    background: var(--grey100);
+    background: var(--grey150); /* [토큰 충돌 fix] grey100 → grey150 — thread-pane 배경(grey50)과 인접해 거의 안 보이던 것 한 단계 진하게 */
     color: var(--grey500);
   }
 }

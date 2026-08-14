@@ -155,7 +155,11 @@ jobs:
             NEXT_PUBLIC_API_URL=/api/v1
             INTERNAL_API_ORIGIN=http://v1_api:8121
             NEXT_PUBLIC_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
-            NEXT_PUBLIC_KAKAO_REDIRECT_URI=${{ secrets.KAKAO_REDIRECT_URI }}
+            # alpha 는 자기 콜백을 써야 한다 — prod 값(teameet.co.kr)이 박히면 alpha 에서
+            # 카카오 로그인을 끝까지 진행할 수 없다. ALPHA_KAKAO_REDIRECT_URI 는 c135ebe6
+            # 에서 바로 이 목적으로 만들어졌는데, 이후 배포 방식을 매니페스트/SSM 으로
+            # 바꾸면서 배선만 끊겼다(시크릿 자체는 계속 살아 있다).
+            NEXT_PUBLIC_KAKAO_REDIRECT_URI=${{ secrets.ALPHA_KAKAO_REDIRECT_URI }}
             NEXT_PUBLIC_GA_MEASUREMENT_ID=${{ secrets.GA_ALPHA }}
           cache-from: type=gha,scope=alpha-v1-web
           cache-to: type=gha,mode=max,scope=alpha-v1-web

@@ -1,22 +1,40 @@
 import type {
   V1CreateTournamentPayload,
+  V1Tournament,
   V1TournamentFormat,
   V1TournamentGenderCategory,
+  V1TournamentListItem,
 } from '@/types/api';
 import type { TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
-import { serializeTournamentPrizeRows } from '@/components/admin/tournaments/prize-breakdown-editor';
+import {
+  createPrizeRowId,
+  serializeTournamentPrizeRows,
+} from '@/components/admin/tournaments/prize-breakdown-editor';
 import type { TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
-import { datetimeLocalToIso } from '@/components/admin/tournaments/tournament-datetime-field';
+import {
+  datetimeLocalToIso,
+  isoToDatetimeLocal,
+} from '@/components/admin/tournaments/tournament-datetime-field';
+import { parsePrizeRows } from '@/lib/prize-breakdown';
 
 export const TOURNAMENT_CREATE_STEPS = [
   { title: '기본 정보', description: '종목과 대회 성격' },
   { title: '일정·장소', description: '날짜와 신청 마감' },
   { title: '참가 조건', description: '정원과 정산 계좌' },
   { title: '상금·홍보', description: '공개 화면 준비' },
+  { title: '공개 확인', description: '참가자 화면 미리보기' },
 ] as const;
+
+/** "참가 조건" 다음, 아직 입력만 하는 마지막 단계(상금·홍보) — 여기서 "다음"을 누르면
+ * 대회가 초안으로 즉시 생성된다. CONFIRM_STEP_INDEX는 그 결과를 보여주는 새 마지막 단계. */
+export const LAST_INPUT_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 2;
+export const CONFIRM_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 1;
 
 export type TournamentCreateState = {
   step: number;
+  /** 초안이 이미 생성된 뒤의 대회 id. null이면 아직 서버에 아무것도 만들지 않은 상태 —
+   * "참가 조건" 다음 단계에서 이 값의 유무로 생성(POST)인지 수정(PATCH)인지를 가른다. */
+  draftId: string | null;
   sportId: string;
   title: string;
   format: V1TournamentFormat;
@@ -31,6 +49,13 @@ export type TournamentCreateState = {
   teamCount: string;
   minPlayers: string;
   maxPlayers: string;
+  /** "출전 인원"(라인업 상한) — 위 minPlayers/maxPlayers(등록 로스터 크기)와 다른 값.
+   * 빈 문자열이면 아직 안 골랐거나 종목의 canonical 기본값을 그대로 쓴다는 뜻이다. */
+  lineupMaxPlayers: string;
+  /** "교체 방식" — 빈 문자열이면 아직 안 골랐거나 종목의 canonical 기본값을 그대로 쓴다. */
+  substitutionMode: '' | 'limited' | 'rolling';
+  /** "교체 횟수" — substitutionMode가 'limited'일 때만 의미가 있다. */
+  maxSubstitutions: string;
   genderMinMale: string;
   genderMaxMale: string;
   genderMinFemale: string;
@@ -64,6 +89,7 @@ const EMPTY_PROMO: TournamentPromoCardValue = {
 
 export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   step: 0,
+  draftId: null,
   sportId: '',
   title: '',
   format: 'group_knockout',
@@ -78,6 +104,9 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   teamCount: '8',
   minPlayers: '6',
   maxPlayers: '10',
+  lineupMaxPlayers: '',
+  substitutionMode: '',
+  maxSubstitutions: '',
   genderMinMale: '',
   genderMaxMale: '',
   genderMinFemale: '',
@@ -118,7 +147,11 @@ export type TournamentCreateAction =
       slot: 'promoHome' | 'promoList';
       patch: Partial<TournamentPromoCardValue>;
     }
-  | { type: 'copy-bank'; bankName: string; bankAccount: string; bankHolder: string };
+  | { type: 'copy-bank'; bankName: string; bankAccount: string; bankHolder: string }
+  /** 초안 생성/수정 성공 직후 — draftId를 고정하고 확인 단계로 넘어간다. */
+  | { type: 'draft-created'; tournament: V1Tournament }
+  /** 새로고침으로 돌아온 admin/tournaments/new?draftId=… — 서버 값으로 폼 전체를 복원한다. */
+  | { type: 'hydrate-from-draft'; tournament: V1Tournament };
 
 export function tournamentCreateReducer(
   state: TournamentCreateState,
@@ -128,6 +161,12 @@ export function tournamentCreateReducer(
     case 'set-step':
       return { ...state, step: Math.max(0, Math.min(TOURNAMENT_CREATE_STEPS.length - 1, action.step)) };
     case 'set-field':
+      // 종목이 바뀌면 이전 종목 기준으로 고른 출전 인원은 더 이상 유효한 선택지가
+      // 아닐 수 있다(예: 풋살 6명 → 축구로 바꾸면 6명은 선택 불가) — 함께 초기화해
+      // 새 종목의 선택지 목록이 로드되면 컴포넌트가 canonical 기본값으로 다시 채운다.
+      if (action.field === 'sportId' && action.value !== state.sportId) {
+        return { ...state, sportId: action.value as string, lineupMaxPlayers: '' };
+      }
       return { ...state, [action.field]: action.value };
     case 'set-scheduled-at': {
       const registrationDeadlineAt = state.registrationDeadlineDirty
@@ -159,7 +198,148 @@ export function tournamentCreateReducer(
         bankAccount: action.bankAccount,
         bankHolder: action.bankHolder,
       };
+    case 'draft-created':
+      // 지금 폼에 입력된 값은 이미 서버에 그대로 반영됐다 — id만 고정하고 확인 단계로 이동한다.
+      return { ...state, draftId: action.tournament.id, step: CONFIRM_STEP_INDEX };
+    case 'hydrate-from-draft':
+      return {
+        ...mapTournamentToWizardFields(action.tournament),
+        step: CONFIRM_STEP_INDEX,
+      };
   }
+}
+
+/**
+ * V1Tournament(서버 응답) → 위저드 폼 필드. 새로고침으로 `?draftId=`만 남았을 때 폼 전체를
+ * 되살리는 데 쓴다(뒤로가기 없이 "이전"으로 3단계를 다시 열어도 값이 비어 있지 않아야 한다).
+ * buildTournamentCreatePayload의 정확한 역변환 — 필드가 늘어나면 두 함수를 함께 갱신할 것.
+ */
+export function mapTournamentToWizardFields(tournament: V1Tournament): TournamentCreateState {
+  const prizeRows: TournamentPrizeRow[] = tournament.prizeBreakdown
+    ? parsePrizeRows(tournament.prizeBreakdown).map((row) => ({
+        id: createPrizeRowId(),
+        label: row.label,
+        value: row.amount,
+      }))
+    : INITIAL_TOURNAMENT_CREATE_STATE.prizeRows;
+
+  return {
+    ...INITIAL_TOURNAMENT_CREATE_STATE,
+    draftId: tournament.id,
+    sportId: tournament.sportId,
+    title: tournament.title,
+    format: tournament.format,
+    genderCategory: tournament.genderCategory ?? 'mixed',
+    scheduledAt: isoToDatetimeLocal(tournament.scheduledAt),
+    scheduledEndAt: isoToDatetimeLocal(tournament.scheduledEndAt),
+    registrationDeadlineAt: isoToDatetimeLocal(tournament.registrationDeadlineAt),
+    rosterDeadlineAt: isoToDatetimeLocal(tournament.rosterDeadlineAt),
+    // 이미 서버에 저장된 값이니 자동 제안 로직(D-3/D-7)이 다시 덮어쓰면 안 된다.
+    registrationDeadlineDirty: true,
+    rosterDeadlineDirty: true,
+    venue: tournament.venue ?? '',
+    teamCount: String(tournament.teamCount),
+    minPlayers: String(tournament.minPlayers),
+    maxPlayers: String(tournament.maxPlayers),
+    lineupMaxPlayers: tournament.lineupMaxPlayers !== null ? String(tournament.lineupMaxPlayers) : '',
+    substitutionMode: tournament.substitutionMode ?? '',
+    maxSubstitutions: tournament.maxSubstitutions !== null ? String(tournament.maxSubstitutions) : '',
+    genderMinMale: tournament.genderMinMale !== null ? String(tournament.genderMinMale) : '',
+    genderMaxMale: tournament.genderMaxMale !== null ? String(tournament.genderMaxMale) : '',
+    genderMinFemale: tournament.genderMinFemale !== null ? String(tournament.genderMinFemale) : '',
+    genderMaxFemale: tournament.genderMaxFemale !== null ? String(tournament.genderMaxFemale) : '',
+    entryFee: String(tournament.entryFee),
+    bankName: tournament.bankName ?? '',
+    bankAccount: tournament.bankAccount ?? '',
+    bankHolder: tournament.bankHolder ?? '',
+    prizePool: tournament.prizePool !== null ? String(tournament.prizePool) : '',
+    prizeSummary: tournament.prizeSummary ?? '',
+    prizeRows,
+    rulesText: tournament.rulesText ?? '',
+    refundPolicyText: tournament.refundPolicyText ?? '',
+    coverImageUrl: tournament.coverImageUrl,
+    promoHome: {
+      enabled: tournament.promoHomeEnabled,
+      title: tournament.promoHomeTitle ?? '',
+      subtitle: tournament.promoHomeSubtitle ?? '',
+      imageUrl: tournament.promoHomeImageUrl ?? '',
+      badgeText: tournament.promoHomeBadgeText ?? '',
+      dateText: tournament.promoHomeDateText ?? '',
+      teamsText: tournament.promoHomeTeamsText ?? '',
+      locationText: tournament.promoHomeLocationText ?? '',
+      prizeText: tournament.promoHomePrizeText ?? '',
+      priority: String(tournament.promoHomePriority),
+    },
+    promoList: {
+      enabled: tournament.promoListEnabled,
+      title: tournament.promoListTitle ?? '',
+      subtitle: tournament.promoListSubtitle ?? '',
+      imageUrl: tournament.promoListImageUrl ?? '',
+      badgeText: tournament.promoListBadgeText ?? '',
+      dateText: tournament.promoListDateText ?? '',
+      teamsText: tournament.promoListTeamsText ?? '',
+      locationText: tournament.promoListLocationText ?? '',
+      prizeText: tournament.promoListPrizeText ?? '',
+      priority: String(tournament.promoListPriority),
+    },
+  };
+}
+
+/**
+ * 위저드 상태 → 공개 목록 카드(V1TournamentListItem)로 변환 — "공개 화면 확인" 단계에서
+ * 실제 <TournamentCard/>를 그대로 재사용해 보여주기 위한 어댑터. 신청자가 아직 없으므로
+ * confirmedCount/pendingPaymentCount는 항상 0. status는 접수 시작 "이후" 참가자가 보게 될
+ * 모습을 보여주려는 목적이라 실제 상태(draft)가 아니라 항상 'open'으로 표시한다 — draft는
+ * 참가자에게 애초에 노출되지 않는 상태라 그대로 보여주면 "준비 중" 배지만 뜨는 오해를 준다.
+ */
+export function buildTournamentPreviewItem(
+  state: TournamentCreateState,
+  sport: { code?: string; name: string } | undefined,
+): V1TournamentListItem {
+  return {
+    id: state.draftId ?? 'preview',
+    sportId: state.sportId,
+    sport: { code: sport?.code ?? '', name: sport?.name ?? '' },
+    title: state.title.trim() || '새 대회',
+    status: 'open',
+    format: state.format,
+    registrationDeadlineAt: datetimeLocalToIso(state.registrationDeadlineAt),
+    scheduledAt: datetimeLocalToIso(state.scheduledAt),
+    scheduledEndAt: datetimeLocalToIso(state.scheduledEndAt),
+    venue: state.venue.trim() || null,
+    coverImageUrl: state.coverImageUrl,
+    teamCount: Number(state.teamCount) || 0,
+    genderCategory: state.genderCategory,
+    entryFee: Number(state.entryFee) || 0,
+    prizePool: state.prizePool ? Number(state.prizePool) : null,
+    prizeSummary: state.prizeSummary.trim() || null,
+    prizeBreakdown: serializeTournamentPrizeRows(state.prizeRows) || null,
+    promoHomeEnabled: state.promoHome.enabled,
+    promoHomeTitle: state.promoHome.title.trim() || null,
+    promoHomeSubtitle: state.promoHome.subtitle.trim() || null,
+    promoHomeImageUrl: state.promoHome.imageUrl.trim() || null,
+    promoHomeBadgeText: state.promoHome.badgeText.trim() || null,
+    promoHomeDateText: state.promoHome.dateText.trim() || null,
+    promoHomeTeamsText: state.promoHome.teamsText.trim() || null,
+    promoHomeLocationText: state.promoHome.locationText.trim() || null,
+    promoHomePrizeText: state.promoHome.prizeText.trim() || null,
+    promoHomePriority: Number(state.promoHome.priority) || 0,
+    promoListEnabled: state.promoList.enabled,
+    promoListTitle: state.promoList.title.trim() || null,
+    promoListSubtitle: state.promoList.subtitle.trim() || null,
+    promoListImageUrl: state.promoList.imageUrl.trim() || null,
+    promoListBadgeText: state.promoList.badgeText.trim() || null,
+    promoListDateText: state.promoList.dateText.trim() || null,
+    promoListTeamsText: state.promoList.teamsText.trim() || null,
+    promoListLocationText: state.promoList.locationText.trim() || null,
+    promoListPrizeText: state.promoList.prizeText.trim() || null,
+    promoListPriority: Number(state.promoList.priority) || 0,
+    campaignSlug: null,
+    confirmedCount: 0,
+    pendingPaymentCount: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export function validateTournamentCreateStep(state: TournamentCreateState, step = state.step) {
@@ -206,6 +386,20 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
       errors.maxPlayers = '최대 선수 수는 1~50명이어야 해요.';
     } else if (minPlayers !== null && minPlayers > maxPlayers) {
       errors.maxPlayers = '최대 선수 수는 최소 선수 수보다 작을 수 없어요.';
+    }
+    if (state.substitutionMode === 'limited') {
+      // 비워두면 여기서 막는다. 예전엔 통과시켰는데, 그러면 canonical 이 무제한인
+      // 종목(풋살)에서 서버가 422(SUBSTITUTION_LIMIT_REQUIRED)로 거절해 관리자는
+      // 마지막 단계에서야 실패를 본다 — "안 입력되면 다음으로 못 넘어가게" 원칙대로
+      // 입력 단계에서 잡는다.
+      if (state.maxSubstitutions.trim() === '') {
+        errors.maxSubstitutions = '교체 횟수를 제한하려면 허용 횟수를 입력해 주세요.';
+      } else {
+        const maxSubstitutions = numeric(state.maxSubstitutions);
+        if (maxSubstitutions === null || !Number.isInteger(maxSubstitutions) || maxSubstitutions < 0 || maxSubstitutions > 50) {
+          errors.maxSubstitutions = '교체 횟수는 0~50회 사이의 정수여야 해요.';
+        }
+      }
     }
     if (
       entryFee === null ||
@@ -300,6 +494,15 @@ export function buildTournamentCreatePayload(
     teamCount: Number(state.teamCount),
     minPlayers: Number(state.minPlayers),
     maxPlayers: Number(state.maxPlayers),
+    lineupMaxPlayers: state.lineupMaxPlayers ? Number(state.lineupMaxPlayers) : undefined,
+    substitutionMode: state.substitutionMode || undefined,
+    // 'rolling'을 고르면 횟수는 의미가 없다(서버가 함께 오면 400으로 거절) — 안 보낸다.
+    // trim 없이 truthy 로 보면 공백만 든 문자열('   ')이 통과해 Number('   ') === 0 으로
+    // 직렬화된다 — 관리자가 아무것도 안 썼는데 "교체 0회"가 저장되는 사고다.
+    maxSubstitutions:
+      state.substitutionMode === 'limited' && state.maxSubstitutions.trim() !== ''
+        ? Number(state.maxSubstitutions.trim())
+        : undefined,
     entryFee: Number(state.entryFee || '0'),
     bankName: state.bankName.trim() || undefined,
     bankAccount: state.bankAccount.trim() || undefined,

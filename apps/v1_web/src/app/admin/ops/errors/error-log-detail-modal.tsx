@@ -208,13 +208,13 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
           role="dialog"
           aria-modal="true"
           aria-labelledby="error-log-detail-title"
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[720px] max-h-[85vh] flex flex-col overflow-hidden"
+          className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[720px] max-h-[85vh] flex flex-col overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
+          <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--border)] shrink-0">
             <h2
               id="error-log-detail-title"
-              className="text-[16px] font-bold text-gray-900 dark:text-white truncate"
+              className="text-[16px] font-bold text-[var(--text-strong)] truncate"
             >
               {detail ? detail.message : '에러 상세'}
             </h2>
@@ -223,7 +223,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                 <button
                   type="button"
                   onClick={() => void copyToClipboard(fullMarkdown(detail), '전체 내용을')}
-                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 dark:hover:bg-blue-950/60 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   <Copy size={14} aria-hidden="true" />
                   전체 복사
@@ -234,7 +234,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                 type="button"
                 onClick={onClose}
                 aria-label="모달 닫기"
-                className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <X size={18} aria-hidden="true" />
               </button>
@@ -244,10 +244,10 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
           {/* Body */}
           <div className="overflow-y-auto px-5 py-5 flex flex-col gap-6">
             {isLoading && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">불러오는 중…</p>
+              <p className="text-sm text-[var(--text-muted)]">불러오는 중…</p>
             )}
             {isError && (
-              <p className="text-sm text-red-500">
+              <p className="text-sm text-[var(--red700)]">
                 {extractErrorMessage(error, '에러 상세를 불러오지 못했어요.')}
               </p>
             )}
@@ -285,9 +285,9 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                     <MetaRow label="method" value={detail.method ?? '—'} mono />
                     <MetaRow label="route" value={detail.route ?? '—'} mono />
                   </dl>
-                  <p className="text-[12px] font-semibold text-gray-500 dark:text-gray-400 mb-1">headers</p>
+                  <p className="text-[12px] font-semibold text-[var(--text-muted)] mb-1">headers</p>
                   <CodeBlock content={safeJsonStringify(detail.requestHeaders)} />
-                  <p className="text-[12px] font-semibold text-gray-500 dark:text-gray-400 mb-1 mt-3">body</p>
+                  <p className="text-[12px] font-semibold text-[var(--text-muted)] mb-1 mt-3">body</p>
                   <CodeBlock content={safeJsonStringify(detail.requestBody)} />
                 </Section>
 
@@ -300,7 +300,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                     <MetaRow label="statusCode" value={String(detail.statusCode ?? '—')} mono />
                     <MetaRow label="errorCode" value={detail.errorCode ?? '—'} mono />
                   </dl>
-                  <p className="text-[12px] font-semibold text-gray-500 dark:text-gray-400 mb-1">body</p>
+                  <p className="text-[12px] font-semibold text-[var(--text-muted)] mb-1">body</p>
                   <CodeBlock content={safeJsonStringify(detail.responseBody)} />
                 </Section>
 
@@ -334,12 +334,12 @@ function Section({
   return (
     <section aria-label={title}>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[13px] font-bold text-gray-700 dark:text-gray-300">{title}</h3>
+        <h3 className="text-[13px] font-bold text-[var(--text-body)]">{title}</h3>
         <button
           type="button"
           onClick={onCopy}
           aria-label={`${title} 복사`}
-          className="inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-md text-[12px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-md text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           <Copy size={12} aria-hidden="true" />
           복사
@@ -353,10 +353,10 @@ function Section({
 function MetaRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-baseline gap-2 min-w-0">
-      <dt className="shrink-0 w-[92px] text-gray-400 dark:text-gray-500">{label}</dt>
+      <dt className="shrink-0 w-[92px] text-gray-400 dark:text-gray-400">{label}</dt>
       <dd
         className={[
-          'text-gray-800 dark:text-gray-200 break-all min-w-0',
+          'text-[var(--text-body)] break-all min-w-0',
           mono ? 'font-mono text-[12px]' : '',
         ].join(' ')}
       >
@@ -368,7 +368,7 @@ function MetaRow({ label, value, mono }: { label: string; value: string; mono?: 
 
 function CodeBlock({ content }: { content: string }) {
   return (
-    <pre className="overflow-x-auto max-h-[280px] overflow-y-auto rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 p-3 text-[12px] font-mono text-gray-800 dark:text-gray-200 whitespace-pre">
+    <pre className="overflow-x-auto max-h-[280px] overflow-y-auto rounded-xl bg-[var(--grey100)] border border-[var(--border)] p-3 text-[12px] font-mono text-[var(--text-body)] whitespace-pre">
       {content}
     </pre>
   );

@@ -1,13 +1,15 @@
 'use client';
 
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
+import { v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { compressImagesForUpload } from '@/lib/image-compress';
+import { PUBLIC_LIVE_POLL_INTERVAL_MS } from '@/lib/public-live-polling';
 import { v1Keys } from '@/lib/query-keys';
+import { randomUuid } from '@/lib/uuid';
+import type { GameLineup, GameLineupState } from '@/types/game-operations';
 import type {
   V1AdminRosterEligibleMembersResponse,
-  ApiEnvelope,
-  ApiErrorBody,
   AdminListFilters,
   AdminCursorPage,
   CursorPage,
@@ -50,6 +52,11 @@ import type {
   V1AdminErrorLogFilters,
   V1AdminPushSendPayload,
   V1AdminPushSendResult,
+  V1GameOperationFlag,
+  V1GameOperationFlagKey,
+  V1SimplifiedOperationFlagGateStatus,
+  V1SimplifiedOperationFlagTogglePayload,
+  V1SetSimplifiedOperationFlagGatePayload,
   V1AdminMatchDetail,
   V1AdminMatchRow,
   V1AdminMe,
@@ -89,6 +96,7 @@ import type {
   V1MatchUpdatePayload,
   V1MyActivitySummary,
   V1MyJoinApplicationsPage,
+  V1RecentVenue,
   V1MyRegionUpdateResult,
   V1MyTeamsResponse,
   V1MyTeamMatch,
@@ -129,12 +137,41 @@ import type {
   V1TeamMatchApplicationsPage,
   V1TeamMatchEdit,
   V1TeamMatchEligibility,
+  V1TeamMatchLineup,
+  V1TeamMatchLineupChangeRequestResult,
+  V1TeamMatchLineupSavePayload,
+  V1TeamMatchLineupSaveResult,
+  V1TeamMatchLineupSubmitResult,
   V1TeamMatchMutationPayload,
   V1TeamMatchMutationResult,
   V1TeamMatchUpdatePayload,
+  V1Game,
+  V1GameResultRevision,
+  V1CreateGameResultRevisionPayload,
+  V1SubmitGameResultRevisionPayload,
+  V1DecideGameResultRevisionPayload,
+  V1GameRevisionMutationResult,
   V1TeamMutationPayload,
   V1TeamMutationResult,
   V1TeamUpdatePayload,
+  V1TeamSchedulesPage,
+  V1TeamScheduleDetail,
+  V1TeamScheduleMutationResult,
+  V1CreateScheduleDto,
+  V1UpdateScheduleDto,
+  V1CancelScheduleDto,
+  V1CancelScheduleResult,
+  V1CompleteScheduleResult,
+  V1TriggerScheduleReminderDto,
+  V1TriggerScheduleReminderResult,
+  V1SetScheduleAttendanceDto,
+  V1SetScheduleAttendanceResult,
+  V1CreateGuestRecruitmentDto,
+  V1UpdateGuestRecruitmentDto,
+  V1GuestRecruitmentMutationResult,
+  V1CreateGuestApplicationDto,
+  V1GuestApplicationResult,
+  V1MySchedulePage,
   V1UploadImagesResult,
   V1TournamentListPage,
   V1TournamentDetail,
@@ -155,7 +192,6 @@ import type {
   V1AdminBracketGroup,
   V1AdminBracketGroupTeam,
   V1AdminBracketFixture,
-  V1AdminBracketResult,
   V1AdminTournamentAnnouncement,
   V1AdminTournamentAnnouncementWithIdempotent,
   V1AdminTournamentSponsor,
@@ -173,6 +209,7 @@ import type {
   V1Tournament,
   V1CreateTournamentPayload,
   V1UpdateTournamentPayload,
+  V1LineupSizeOptions,
   V1ChangeTournamentStatusPayload,
   V1CreateRegistrationPayload,
   V1SubmitRegistrationPayload,
@@ -187,7 +224,6 @@ import type {
   V1CreateGroupTeamPayload,
   V1CreateFixturePayload,
   V1UpdateFixturePayload,
-  V1RecordResultPayload,
   V1CreateAnnouncementPayload,
   V1CreateTournamentSponsorPayload,
   V1UpdateTournamentSponsorPayload,
@@ -203,6 +239,18 @@ import type {
   V1IntegrationSettings,
   V1UpdateIntegrationSettingsPayload,
   V1PublicKakaoMapsKeyResponse,
+  V1TournamentOperationsBoardFilters,
+  V1TournamentOperationsBoardPage,
+  V1TournamentStaffListResponse,
+  V1TournamentStaffCandidateSearchResponse,
+  V1TournamentStaffAssignment,
+  V1GrantTournamentStaffPayload,
+  V1RevokeTournamentStaffPayload,
+  V1MyTournamentStaffResponse,
+  V1TournamentField,
+  V1TournamentFieldListResponse,
+  V1TournamentFixtureFieldResult,
+  V1CreateTournamentFieldPayload,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
@@ -509,13 +557,10 @@ export function useV1Home(filters?: ListFilters) {
   });
 }
 
-export function useV1ActivePopup(screen: V1PopupTargetScreen | null, path?: string | null) {
+export function useV1ActivePopup(screen: V1PopupTargetScreen | null) {
   return useQuery({
-    queryKey: v1Keys.activePopup(screen, path),
-    queryFn: () => v1Get<V1ActivePopupResponse>('/popups/active', {
-      screen: screen ?? undefined,
-      path: path ?? undefined,
-    }),
+    queryKey: v1Keys.activePopup(screen),
+    queryFn: () => v1Get<V1ActivePopupResponse>('/popups/active', { screen: screen ?? undefined }),
     enabled: Boolean(screen),
   });
 }
@@ -590,6 +635,19 @@ export function useV1MatchEdit(matchId: string) {
     queryKey: [...v1Keys.match(matchId), 'edit'] as const,
     queryFn: () => v1Get<V1MatchEdit>(`/matches/${matchId}/edit`),
     enabled: Boolean(matchId),
+  });
+}
+
+/**
+ * #3 1단계: 개인 매치 위저드의 장소 입력창 포커스 시 보여줄 최근 사용 장소 칩.
+ * 로그인 사용자만 호출 가능(서버가 hostUserId=현재 사용자로 조회) — 위저드는 항상
+ * 로그인 상태에서만 진입하므로 별도 enabled 게이트가 필요 없다.
+ */
+export function useV1MyRecentVenues() {
+  return useQuery({
+    queryKey: v1Keys.myRecentVenues(),
+    queryFn: () => v1Get<{ items: V1RecentVenue[] }>('/matches/me/recent-venues'),
+    staleTime: 60_000,
   });
 }
 
@@ -737,6 +795,20 @@ export function useV1Teams(filters?: ListFilters, options?: QueryOptions) {
     queryKey: v1Keys.teams(filters),
     queryFn: () => v1Get<CursorPage<V1Team>>('/teams', filters),
     enabled: options?.enabled,
+  });
+}
+
+/**
+ * #3 1단계: 팀매치 위저드의 장소 입력창 포커스 시 보여줄, 이 팀이 호스트로 과거에
+ * 실제로 입력했던 장소 칩. team 스텝에서 팀을 고르기 전에는 teamId가 비어 있어
+ * enabled=false로 대기한다.
+ */
+export function useV1TeamRecentVenues(teamId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamRecentVenues(teamId),
+    queryFn: () => v1Get<{ items: V1RecentVenue[] }>(`/teams/${teamId}/recent-venues`),
+    enabled: Boolean(teamId),
+    staleTime: 60_000,
   });
 }
 
@@ -1009,6 +1081,157 @@ export function useV1LeaveTeam(teamId: string) {
   });
 }
 
+// ── Team schedules (Task 12 backend / Task 13 frontend) ──────────────────────
+// 프론트엔드에서 Idempotency-Key 를 보내는 첫 도메인 — 모든 스케줄 mutation은 얼어붙은
+// REST 계약(글로벌 계약 문서)에 따라 매 호출마다 새 키가 필요하다. 자동 재시도(react-query
+// mutation retry)를 켜지 않는 한 "한 번의 mutate() 호출 = 한 번의 사용자 의도 = 새 키"가
+// 안전한 기본값이다.
+function idempotencyInit(): RequestInit {
+  return { headers: { 'Idempotency-Key': randomUuid() } };
+}
+
+export function useV1TeamSchedules(teamId: string, filters?: ListFilters, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.teamSchedules(teamId, filters),
+    queryFn: () => v1Get<V1TeamSchedulesPage>(`/teams/${teamId}/schedules`, filters),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+    // 빠른 필터 전환(종류/상태 칩)에서 화면이 매번 깜빡이지 않도록 이전 페이지 데이터를
+    // 유지한 채 새 쿼리를 백그라운드에서 가져온다.
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useV1TeamSchedule(teamId: string, scheduleId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.teamSchedule(teamId, scheduleId),
+    queryFn: () => v1Get<V1TeamScheduleDetail>(`/teams/${teamId}/schedules/${scheduleId}`),
+    enabled: Boolean(teamId) && Boolean(scheduleId) && (options?.enabled ?? true),
+  });
+}
+
+export function useV1CreateTeamSchedule(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateScheduleDto) =>
+      v1Post<V1TeamScheduleMutationResult>(`/teams/${teamId}/schedules`, body, idempotencyInit()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+    },
+  });
+}
+
+export function useV1UpdateTeamSchedule(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateScheduleDto) =>
+      v1Patch<V1TeamScheduleMutationResult>(`/teams/${teamId}/schedules/${scheduleId}`, body, idempotencyInit()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+    },
+  });
+}
+
+export function useV1CancelTeamSchedule(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CancelScheduleDto) =>
+      v1Post<V1CancelScheduleResult>(`/teams/${teamId}/schedules/${scheduleId}/cancel`, body, idempotencyInit()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+    },
+  });
+}
+
+export function useV1CompleteTeamSchedule(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { expectedVersion: number }) =>
+      v1Post<V1CompleteScheduleResult>(`/teams/${teamId}/schedules/${scheduleId}/complete`, body, idempotencyInit()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+    },
+  });
+}
+
+export function useV1TriggerScheduleReminder(teamId: string, scheduleId: string) {
+  return useMutation({
+    mutationFn: (body: V1TriggerScheduleReminderDto) =>
+      v1Post<V1TriggerScheduleReminderResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/reminders`,
+        body,
+        idempotencyInit(),
+      ),
+  });
+}
+
+export function useV1SetMyScheduleAttendance(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1SetScheduleAttendanceDto) =>
+      v1Put<V1SetScheduleAttendanceResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/attendance/me`,
+        body,
+        idempotencyInit(),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'schedules'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+    },
+  });
+}
+
+export function useV1CreateGuestRecruitment(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateGuestRecruitmentDto) =>
+      v1Post<V1GuestRecruitmentMutationResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/guest-recruitment`,
+        body,
+        idempotencyInit(),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) }),
+  });
+}
+
+export function useV1UpdateGuestRecruitment(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateGuestRecruitmentDto) =>
+      v1Patch<V1GuestRecruitmentMutationResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/guest-recruitment`,
+        body,
+        idempotencyInit(),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) }),
+  });
+}
+
+export function useV1ApplyGuestRecruitment(teamId: string, scheduleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateGuestApplicationDto) =>
+      v1Post<V1GuestApplicationResult>(
+        `/teams/${teamId}/schedules/${scheduleId}/guest-recruitment/applications`,
+        body,
+        idempotencyInit(),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamSchedule(teamId, scheduleId) }),
+  });
+}
+
+export function useV1MySchedule(filters?: ListFilters) {
+  return useQuery({
+    queryKey: v1Keys.mySchedule(filters),
+    queryFn: () => v1Get<V1MySchedulePage>('/me/schedule', filters),
+  });
+}
+
 export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.teamMatches(filters),
@@ -1099,18 +1322,6 @@ export function useV1ReopenTeamMatch(teamMatchId: string) {
   });
 }
 
-export function useV1CompleteTeamMatch(teamMatchId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body?: { note?: string | null }) =>
-      v1Post<{ teamMatchId: string; status: string; completedAt: string | null; detailRoute: string }>(`/team-matches/${teamMatchId}/complete`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
-    },
-  });
-}
-
 export function useV1ApplyTeamMatch(teamMatchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1176,6 +1387,446 @@ export function useV1MyTeamMatches(filters?: ListFilters) {
   return useQuery({
     queryKey: [...v1Keys.all, 'me', 'team-matches', filters ?? {}] as const,
     queryFn: () => v1Get<CursorPage<V1MyTeamMatch>>('/me/team-matches', filters),
+  });
+}
+
+// ─── Task 17: Game/result-revision + team-match lineup (result entry/approval) ───
+
+// 새 Idempotency-Key(v4 UUID)를 만들고, games.md의 고정 계약대로 헤더와 바디의
+// clientCommandId를 항상 같은 값으로 묶는다 — 둘 중 하나만 다르면 서버가
+// 422 COMMAND_IDEMPOTENCY_KEY_MISMATCH로 거부한다.
+function withGameCommandId<T extends object>(body: T) {
+  const clientCommandId = randomUuid();
+  return { clientCommandId, body: { ...body, clientCommandId }, headers: { 'idempotency-key': clientCommandId } };
+}
+
+export function useV1Game(gameId: string | null | undefined, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.game(gameId ?? ''),
+    queryFn: () => v1Get<V1Game>(`/games/${gameId}`),
+    enabled: Boolean(gameId) && (options?.enabled ?? true),
+  });
+}
+
+export function useV1GameResultRevisions(gameId: string | null | undefined, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.gameResultRevisions(gameId ?? ''),
+    queryFn: () => v1Get<V1GameResultRevision[]>(`/games/${gameId}/result-revisions`),
+    enabled: Boolean(gameId) && (options?.enabled ?? true),
+  });
+}
+
+// ── 팀 매치 라인업 (Task 15) ──
+// GET은 호출자 소속 팀(내 팀) 쪽 사이드만 돌려준다 — 403/404는 재시도해도 같은 답이므로
+// retry: false (V1CheckEmail 등 다른 read 계열과 동일 컨벤션). 호출자 본인 팀(호스트 또는
+// 승인된 상대팀) 라인업만 반환된다 — Task 14 계약상 own-side 전용 라우트다.
+export function useV1TeamMatchLineup(teamMatchId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] as const,
+    queryFn: () => v1Get<V1TeamMatchLineup>(`/team-matches/${teamMatchId}/lineup`),
+    enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1CreateGameResultRevision(gameId: string, teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: V1CreateGameResultRevisionPayload) => {
+      const { body, headers } = withGameCommandId(input);
+      return v1Post<V1GameRevisionMutationResult>(`/games/${gameId}/result-revisions`, body, { headers });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.gameResultRevisions(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+    },
+  });
+}
+
+export function useV1SaveTeamMatchLineup(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; payload: V1TeamMatchLineupSavePayload }) =>
+      v1Put<V1TeamMatchLineupSaveResult>(`/team-matches/${teamMatchId}/lineup`, vars.payload, {
+        headers: { 'Idempotency-Key': vars.idempotencyKey },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+    },
+  });
+}
+
+// ── 대회 경기(tournament fixture) 라인업 — 참가팀 자기 서비스 ──
+// team-match와 달리 범용 games 라우트(/games/:gameId/lineups/*)를 그대로 쓴다 —
+// resolveActor의 TOURNAMENT_FIXTURE 팀 액터 분기(games.service.ts)가 참가팀
+// owner/manager만 자기 사이드에 read/write 하도록 이미 인가를 강제한다.
+
+export type V1FixtureLineupAccess = {
+  gameId: string;
+  mySideId: string | null;
+  isStaff: boolean;
+  scheduledAt: string | null;
+  homeSideId: string | null;
+  homeTeamName: string | null;
+  homeRegistrationId: string | null;
+  /** 팀 스코프 자산(이전 라인업 히스토리·프리셋)을 부를 때 쓴다. */
+  homeTeamId: string | null;
+  awaySideId: string | null;
+  awayTeamName: string | null;
+  awayRegistrationId: string | null;
+  awayTeamId: string | null;
+};
+
+export function useV1FixtureLineupAccess(tournamentId: string, fixtureId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.fixtureLineupAccess(tournamentId, fixtureId),
+    queryFn: () => v1Get<V1FixtureLineupAccess>(`/tournaments/${tournamentId}/fixtures/${fixtureId}/lineup-access`),
+    enabled: Boolean(tournamentId) && Boolean(fixtureId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+/** 라인업 편집기가 쓰는 참가 등록 명단 — 대회 경기 라인업 선수의 유일한 출처. */
+export type V1FixtureLineupRoster = {
+  sideId: string;
+  registrationId: string;
+  players: Array<{ tournamentPlayerId: string; userId: string; name: string }>;
+};
+
+export function useV1FixtureLineupRoster(
+  tournamentId: string,
+  fixtureId: string,
+  sideId: string | null,
+) {
+  return useQuery({
+    queryKey: v1Keys.fixtureLineupRoster(tournamentId, fixtureId, sideId ?? ''),
+    queryFn: () =>
+      v1Get<V1FixtureLineupRoster>(
+        `/tournaments/${tournamentId}/fixtures/${fixtureId}/lineup-roster?sideId=${encodeURIComponent(sideId ?? '')}`,
+      ),
+    enabled: Boolean(tournamentId) && Boolean(fixtureId) && Boolean(sideId),
+    retry: false,
+    // 편집 세션 동안 명단을 고정한다. 전역 기본값은 refetchOnWindowFocus: true(providers.tsx)인데,
+    // 라인업 화면은 이 명단으로 **한 번만** 상태를 수화하고 이후 그 상태를 편집한다 — 창을 잠깐
+    // 벗어난 사이 명단이 갱신되면 화면(로스터 기준으로 그린다)과 저장 대상(수화된 상태) 이 갈라져,
+    // 목록에서 사라진 선수가 저장 페이로드에는 그대로 실린다(등록 명단이 SSOT라는 이 화면의 전제가
+    // 조용히 깨진다). 명단을 고쳤다면 화면을 다시 여는 것이 맞다(Copilot 리뷰 지적).
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** 불러오기 시트가 쓰는 한 명분 엔트리 — 히스토리와 프리셋이 같은 모양을 쓴다. */
+export type V1LineupSourceEntry = {
+  userId: string | null;
+  displayName: string;
+  jerseyNumber: number | null;
+  position: string | null;
+  positionX: number | null;
+  positionY: number | null;
+  started: boolean;
+  goalkeeper: boolean;
+};
+
+/** 우리 팀이 과거에 낸 라인업 한 건(대회·팀 매치 교차). */
+export type V1TeamLineupHistoryItem = {
+  lineupId: string;
+  gameId: string;
+  source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
+  sourceLabel: string;
+  opponentName: string | null;
+  playedAt: string | null;
+  sportName: string | null;
+  formation: string | null;
+  starterCount: number;
+  benchCount: number;
+  participants: V1LineupSourceEntry[];
+};
+
+export function useV1TeamLineupHistory(teamId: string | null, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.teamLineupHistory(teamId ?? ''),
+    queryFn: () => v1Get<{ items: V1TeamLineupHistoryItem[] }>(`/teams/${teamId}/lineup-history`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export type V1TeamLineupPreset = {
+  presetId: string;
+  name: string;
+  formation: string | null;
+  sportName: string | null;
+  updatedAt: string;
+  starterCount: number;
+  benchCount: number;
+  entries: V1LineupSourceEntry[];
+};
+
+export type V1SaveLineupPresetPayload = {
+  name: string;
+  formation?: string;
+  sportName?: string;
+  entries: Array<{
+    userId?: string;
+    displayName: string;
+    jerseyNumber?: number;
+    position?: string;
+    positionX?: number;
+    positionY?: number;
+    started: boolean;
+    goalkeeper?: boolean;
+  }>;
+};
+
+export function useV1TeamLineupPresets(teamId: string | null, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.teamLineupPresets(teamId ?? ''),
+    queryFn: () => v1Get<{ items: V1TeamLineupPreset[] }>(`/teams/${teamId}/lineup-presets`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1CreateLineupPreset(teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1SaveLineupPresetPayload) =>
+      v1Post<V1TeamLineupPreset>(`/teams/${teamId}/lineup-presets`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.teamLineupPresets(teamId ?? '') });
+    },
+  });
+}
+
+export function useV1UpdateLineupPreset(teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ presetId, body }: { presetId: string; body: Partial<V1SaveLineupPresetPayload> }) =>
+      v1Patch<V1TeamLineupPreset>(`/teams/${teamId}/lineup-presets/${presetId}`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.teamLineupPresets(teamId ?? '') });
+    },
+  });
+}
+
+export function useV1DeleteLineupPreset(teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (presetId: string) =>
+      v1Delete<{ deleted: boolean }>(`/teams/${teamId}/lineup-presets/${presetId}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.teamLineupPresets(teamId ?? '') });
+    },
+  });
+}
+
+/** 아직 라인업을 넣지 않은 다가오는 경기 — 홈·마이 페이지의 "할 일" 카드가 쓴다. */
+export type V1LineupTodo = {
+  source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
+  teamId: string;
+  teamName: string;
+  gameId: string;
+  tournamentId: string | null;
+  tournamentTitle: string | null;
+  title: string;
+  opponentName: string | null;
+  scheduledAt: string | null;
+  state: 'MISSING' | 'DRAFT';
+  deepLink: string;
+};
+
+export function useV1LineupTodos(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.lineupTodos(),
+    queryFn: () => v1Get<{ items: V1LineupTodo[] }>('/me/lineup-todos'),
+    enabled: options?.enabled ?? true,
+    retry: false,
+  });
+}
+
+export function useV1ChangeMembershipJersey(teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ membershipId, jerseyNumber }: { membershipId: string; jerseyNumber: number | null }) =>
+      v1Patch<{ membershipId: string; teamId: string; jerseyNumber: number | null }>(
+        `/team-memberships/${membershipId}/jersey`,
+        { jerseyNumber },
+      ),
+    onSuccess: () => {
+      // useV1TeamMembers는 filters까지 키에 포함하므로 정확히 같은 배열을 만들 수 없다 —
+      // 팀 하위 전체를 무효화해 어떤 필터 조합으로 캐시된 목록이든 새 등번호를 받게 한다.
+      void queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId ?? '') });
+    },
+  });
+}
+
+/** 대회 일정 화면이 "내 팀 경기"를 짚어주기 위한 인증 전용 조회. */
+export type V1MyTournamentFixture = {
+  fixtureId: string;
+  gameId: string | null;
+  sideId: string | null;
+  round: string;
+  legNumber: number;
+  groupName: string | null;
+  scheduledAt: string | null;
+  status: string;
+  isHome: boolean;
+  opponentTeamName: string | null;
+  lineupState: GameLineupState | null;
+};
+
+export type V1MyTournamentFixtures = {
+  teams: Array<{
+    registrationId: string;
+    teamId: string;
+    teamName: string;
+    fixtures: V1MyTournamentFixture[];
+  }>;
+};
+
+export function useV1MyTournamentFixtures(tournamentId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.myTournamentFixtures(tournamentId),
+    queryFn: () => v1Get<V1MyTournamentFixtures>(`/tournaments/${tournamentId}/my-fixtures`),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+    // 비로그인 방문자에게는 401이 정상이다 — 재시도하지 않고 조용히 없는 것으로 둔다.
+    retry: false,
+  });
+}
+
+export function useV1GameLineups(gameId: string | null, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.gameLineups(gameId ?? ''),
+    queryFn: () => v1Get<GameLineup[]>(`/games/${gameId}/lineups`),
+    enabled: Boolean(gameId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export type V1SaveGameLineupPayload = {
+  expectedVersion: number;
+  formation?: string;
+  participants: Array<{
+    /**
+     * 등록 명단의 사용자 — 다시 열 때 이름이 아니라 이 값으로 명단과 대조한다.
+     * 이 값이 실리면 백엔드가 같은 트랜잭션에서 ROSTER_ASSERTED 신원 연결을 만들어
+     * 이 사용자의 개인 기록(활동 기록)에 반영한다(games.service.ts saveLineup).
+     */
+    userId?: string;
+    displayNameSnapshot: string;
+    jerseyNumber?: number;
+    position?: string;
+    positionX?: number;
+    positionY?: number;
+    started: boolean;
+  }>;
+};
+
+export type V1GameLineupMutationResult = {
+  gameId: string;
+  lineupId: string;
+  lineupRevision: number;
+  state: string;
+  version: number;
+};
+
+export function useV1SaveGameLineup(gameId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { sideId: string; payload: V1SaveGameLineupPayload }) => {
+      const { body, headers } = withGameCommandId(vars.payload);
+      return v1Put<V1GameLineupMutationResult>(`/games/${gameId}/lineups/${vars.sideId}`, body, { headers });
+    },
+    onSuccess: () => {
+      if (gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameLineups(gameId) });
+    },
+  });
+}
+
+export function useV1SubmitGameLineup(gameId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { lineupId: string; expectedVersion: number }) => {
+      const { body, headers } = withGameCommandId({ expectedVersion: vars.expectedVersion });
+      return v1Post<V1GameLineupMutationResult & { lineupState: string }>(
+        `/games/${gameId}/lineups/${vars.lineupId}/submit`,
+        body,
+        { headers },
+      );
+    },
+    onSuccess: () => {
+      if (gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameLineups(gameId) });
+    },
+  });
+}
+
+export function useV1SubmitGameResultRevision(gameId: string, teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ revisionId, ...input }: V1SubmitGameResultRevisionPayload & { revisionId: string }) => {
+      const { body, headers } = withGameCommandId(input);
+      return v1Post<V1GameRevisionMutationResult>(
+        `/games/${gameId}/result-revisions/${revisionId}/submit`,
+        body,
+        { headers },
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.gameResultRevisions(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+      // 제출은 같은 트랜잭션에서 TeamMatch를 completed로 전이시키므로 상세도 함께 갱신한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+    },
+  });
+}
+
+export function useV1SubmitTeamMatchLineup(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; expectedVersion: number }) =>
+      v1Post<V1TeamMatchLineupSubmitResult>(
+        `/team-matches/${teamMatchId}/lineup/submit`,
+        { expectedVersion: vars.expectedVersion },
+        { headers: { 'Idempotency-Key': vars.idempotencyKey } },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+    },
+  });
+}
+
+export function useV1DecideGameResultRevision(gameId: string, teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ revisionId, ...input }: V1DecideGameResultRevisionPayload & { revisionId: string }) => {
+      const { body, headers } = withGameCommandId(input);
+      return v1Post<V1GameRevisionMutationResult>(
+        `/games/${gameId}/result-revisions/${revisionId}/decision`,
+        body,
+        { headers },
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.gameResultRevisions(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+    },
+  });
+}
+
+// 상대팀 라인업을 재작성(초안화)하라고 요청한다 — 대상은 항상 "내가 아닌 쪽" 사이드이며,
+// 그 사이드를 조회하는 API가 없어 내용은 볼 수 없고 사유만 남길 수 있는 blind 액션이다
+// (lineup-client.tsx의 안내 문구 참고). 성공해도 내 사이드 쿼리는 바뀌지 않으므로 invalidate하지 않는다.
+export function useV1RequestTeamMatchLineupChange(teamMatchId: string) {
+  return useMutation({
+    mutationFn: (vars: { idempotencyKey: string; expectedVersion: number; reason: string }) =>
+      v1Post<V1TeamMatchLineupChangeRequestResult>(
+        `/team-matches/${teamMatchId}/lineup/change-request`,
+        { expectedVersion: vars.expectedVersion, reason: vars.reason },
+        { headers: { 'Idempotency-Key': vars.idempotencyKey } },
+      ),
   });
 }
 
@@ -1366,6 +2017,32 @@ export function useV1NotificationPreferences() {
   });
 }
 
+/**
+ * 사용자 단위 공개 기록 동의(F2) — 라인업에서 팀원 연결로 신원이 이어진 경기가
+ * `/users/:id/records` 공개 프로필에 보일지 여부를 사용자 본인이 한 번에 켜고 끈다.
+ * 동의하면 과거 경기까지 전부 소급 공개된다(시점 비교 없음, 사용자 명시 결정) — 그래서
+ * 토글 문구가 이 소급 효과를 먼저 알려야 한다.
+ */
+export type V1RecordConsent = { granted: boolean; effectiveAt: string | null };
+
+export function useV1RecordConsent() {
+  return useQuery({
+    queryKey: v1Keys.recordConsent(),
+    queryFn: () => v1Get<V1RecordConsent>('/me/record-consent'),
+  });
+}
+
+export function useV1UpdateRecordConsent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { granted: boolean; policyHash: string }) =>
+      v1Put<V1RecordConsent>('/me/record-consent', body),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1RecordConsent>(v1Keys.recordConsent(), result);
+    },
+  });
+}
+
 export function useV1Profile() {
   return useQuery({
     queryKey: v1Keys.profile(),
@@ -1421,10 +2098,11 @@ export function useV1UpdateProfile() {
   });
 }
 
-export function useV1Settings() {
+export function useV1Settings(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: v1Keys.settings(),
     queryFn: () => v1Get<V1Settings>('/me/settings'),
+    enabled: options?.enabled,
   });
 }
 
@@ -1432,8 +2110,13 @@ export function useV1UpdateSettings() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: {
+      theme?: V1Settings['theme'];
       notifications?: Partial<V1Settings['notifications']>;
-    }) => v1Patch<{ profile: V1Settings['profile']; notifications: V1Settings['notifications']; updatedAt: string }>('/me/settings', body),
+    }) =>
+      v1Patch<{ profile: V1Settings['profile']; theme: V1Settings['theme']; notifications: V1Settings['notifications']; updatedAt: string }>(
+        '/me/settings',
+        body,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
       queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
@@ -1458,53 +2141,6 @@ export function useV1WithdrawalRequest() {
 // ---------------------------------------------------------------------------
 
 /**
- * Multipart POST helper.
- * Omits `content-type` so the browser sets the correct `multipart/form-data; boundary=...` header.
- */
-async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> {
-  const response = await fetch(`${getV1ApiBaseUrl()}${path}`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      // intentionally no content-type — browser sets multipart boundary automatically
-      ...getV1DevAuthHeaders(),
-    },
-    body: formData,
-  });
-
-  const body: ApiEnvelope<T> | ApiErrorBody | null = await response.json().catch(() => null);
-
-  // `response.json()` can yield a non-object JSON primitive (e.g. a 200 with body "ok").
-  // Guard `typeof === 'object'` before `'status' in body` — the `in` operator throws a
-  // TypeError on primitives, which would turn upload error handling into a crash.
-  if (!response.ok || (typeof body === 'object' && body !== null && 'status' in body && body.status === 'error')) {
-    throw new V1ApiError(
-      (body as ApiErrorBody) ?? {
-        status: 'error' as const,
-        statusCode: response.status,
-        code: 'NETWORK_OR_PARSE_ERROR',
-        message: response.statusText || '업로드에 실패했어요.',
-        timestamp: new Date().toISOString(),
-      },
-    );
-  }
-
-  // 200이지만 정상 엔벨로프가 아닌 경우(빈 바디/HTML → null, 또는 "ok" 같은 JSON
-  // primitive)를 모두 가드. data 필드를 가진 객체임을 확인한 뒤에만 .data 반환 —
-  // primitive를 그대로 통과시키면 .data가 undefined로 호출부에서 크래시한다.
-  if (typeof body !== 'object' || body === null || !('data' in body)) {
-    throw new V1ApiError({
-      status: 'error' as const,
-      statusCode: response.status,
-      code: 'NETWORK_OR_PARSE_ERROR',
-      message: '업로드 응답을 해석하지 못했어요. 다시 시도해 주세요.',
-      timestamp: new Date().toISOString(),
-    });
-  }
-  return (body as ApiEnvelope<T>).data;
-}
-
-/**
  * 이미지 업로드 mutation.
  *
  * BE 계약: POST /api/v1/uploads (= getV1ApiBaseUrl + '/uploads')  multipart/form-data, field 이름 = 'files'
@@ -1516,74 +2152,26 @@ async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> 
  *
  * 업로드 파일은 v1_api가 /uploads 정적 경로로 서빙하며, 응답 url은 루트-상대(/uploads/...).
  * web은 next.config rewrite로 /uploads/* → v1_api 프록시.
+ *
+ * 전송 전에 compressImagesForUpload 로 한 장씩 축소·재인코딩한다 — 대회 포스터처럼 큰 원본을
+ * 그대로 보내면 서버 한도(5MB, 그 위 multer 하드캡 10MB)에 걸려 413 으로 실패하기 때문이다.
  */
 export function useV1UploadImages() {
   return useMutation({
-    mutationFn: (files: File | File[] | FileList) => {
+    mutationFn: async (files: File | File[] | FileList) => {
       const formData = new FormData();
       const fileArray = files instanceof FileList
         ? Array.from(files)
         : Array.isArray(files)
           ? files
           : [files];
-      fileArray.forEach((file) => formData.append('files', file));
+      const prepared = await compressImagesForUpload(fileArray);
+      prepared.forEach((file) => formData.append('files', file));
       return v1MultipartPost<V1UploadImagesResult>('/uploads', formData);
     },
   });
 }
 
-/**
- * 진행률 콜백이 필요한 대용량 업로드용 XHR 멀티파트 (fetch는 업로드 진행 이벤트가 없다).
- * 응답 파싱·에러 규약은 v1MultipartPost와 동일하게 맞춘다.
- */
-function v1MultipartUploadWithProgress<T>(
-  path: string,
-  formData: FormData,
-  onProgress?: (percent: number) => void,
-): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${getV1ApiBaseUrl()}${path}`);
-    xhr.withCredentials = true;
-    for (const [k, v] of Object.entries(getV1DevAuthHeaders())) xhr.setRequestHeader(k, v);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
-    };
-    xhr.onerror = () =>
-      reject(new V1ApiError({ status: 'error', statusCode: 0, code: 'NETWORK_OR_PARSE_ERROR', message: '업로드에 실패했어요.', timestamp: new Date().toISOString() }));
-    xhr.onload = () => {
-      let body: ApiEnvelope<T> | ApiErrorBody | null = null;
-      try { body = JSON.parse(xhr.responseText); } catch { body = null; }
-      const isError =
-        xhr.status < 200 || xhr.status >= 300 ||
-        (typeof body === 'object' && body !== null && 'status' in body && body.status === 'error');
-      if (isError) {
-        reject(new V1ApiError(
-          (body as ApiErrorBody) ?? { status: 'error', statusCode: xhr.status, code: 'NETWORK_OR_PARSE_ERROR', message: xhr.statusText || '업로드에 실패했어요.', timestamp: new Date().toISOString() },
-        ));
-        return;
-      }
-      resolve((body as ApiEnvelope<T>).data);
-    };
-    xhr.send(formData);
-  });
-}
-
-/**
- * 경기 영상 파일 업로드 mutation (1개, 최대 200MB, mp4/webm/mov).
- * BE 계약: POST /api/v1/uploads/videos — field 'files', 응답 { urls: string[] }.
- * 응답 url(/uploads/*.mp4)은 정적 서빙이 Range 요청을 지원해 <video>에서 바로 스트리밍된다.
- * 200MB 대용량이라 onProgress로 업로드 진행률(%)을 노출한다.
- */
-export function useV1UploadVideo() {
-  return useMutation({
-    mutationFn: ({ file, onProgress }: { file: File; onProgress?: (percent: number) => void }) => {
-      const formData = new FormData();
-      formData.append('files', file);
-      return v1MultipartUploadWithProgress<V1UploadImagesResult>('/uploads/videos', formData, onProgress);
-    },
-  });
-}
 
 export function useV1AdminOverview() {
   return useQuery({
@@ -1725,6 +2313,19 @@ export function useV1AcceptSignupTerms() {
       v1Post<V1CurrentSignupTerms>('/terms/consents', body),
     onSuccess: (result) => {
       queryClient.setQueryData(v1Keys.currentSignupTerms(), result);
+      // PendingSocialSignupGate 는 authMe 캐시의 termsCompliance 로 모든 라우트 진입을
+      // 막는다. invalidateQueries 는 refetch 를 비동기로만 예약하므로, 호출 직후 이어지는
+      // router.replace('/home') 이 refetch 완료보다 먼저 렌더되면 게이트가 갱신 전
+      // compliant:false 스냅샷을 읽고 사용자를 다시 /terms 로 되돌려보낸다 — 재동의
+      // 첫 클릭이 반응 없어 보이는 원인. 방금 응답으로 받은 compliance(서버가 재동의 반영
+      // 직후 다시 계산한 것과 동일한 값)를 authMe 캐시에 동기적으로 반영해 이 레이스를
+      // 없앤다. invalidateQueries 는 다른 authMe 필드까지 최신화하기 위해 그대로 유지한다.
+      if (result.compliance) {
+        const compliance = result.compliance;
+        queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), (current) =>
+          current ? { ...current, termsCompliance: compliance } : current,
+        );
+      }
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
     },
   });
@@ -2128,6 +2729,63 @@ export function useV1AdminSendPush() {
 }
 
 // ---------------------------------------------------------------------------
+// Admin — game operation flags (PUBLIC_LIVE / DIRECTOR_OFFICIALIZE 운영 토글 2종)
+// ---------------------------------------------------------------------------
+
+/** 게이트 번들 없이 켜고 끄는 간소 경로가 지금 열려 있는지 — DB 설정값
+ * (`v1_game_operation_gate_settings`, apps/v1_api 의 GameOperationFlagsService.readGateSetting
+ * 참고)이라 프로덕션 포함 모든 환경에서 동일하게 조회/변경된다. */
+export function useV1SimplifiedOperationFlagGateStatus() {
+  return useQuery({
+    queryKey: v1Keys.adminOperationFlagsSimplifiedGateStatus(),
+    queryFn: () =>
+      v1Get<V1SimplifiedOperationFlagGateStatus>('/tournament-ops/operation-flags/simplified-gate/status'),
+  });
+}
+
+/** 간소 전환 모드 스위치 자체를 켜고 끈다 — 이 스위치가 꺼져 있으면 아래 두 플래그의
+ * simplified-toggle 경로는 전부 SIMPLIFIED_GATE_DISABLED로 막힌다. 성공 시 status 쿼리를
+ * 낙관적으로 갱신해 두 토글 카드가 최신 상태로 다시 그려지게 한다. */
+export function useV1SetSimplifiedOperationFlagGate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1SetSimplifiedOperationFlagGatePayload) =>
+      v1Patch<V1SimplifiedOperationFlagGateStatus>(
+        '/tournament-ops/operation-flags/simplified-gate',
+        payload,
+        { headers: { 'idempotency-key': randomUuid() } },
+      ),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminOperationFlagsSimplifiedGateStatus(), data);
+    },
+  });
+}
+
+export function useV1OperationFlag(key: V1GameOperationFlagKey) {
+  return useQuery({
+    queryKey: v1Keys.adminOperationFlag(key),
+    queryFn: () => v1Get<V1GameOperationFlag>(`/tournament-ops/operation-flags/${key}`),
+  });
+}
+
+/** PUBLIC_LIVE/DIRECTOR_OFFICIALIZE 둘 다 허용 — 서버가 게이트 번들 증적만 생략할 뿐, CAS·권한·
+ * 감사 로그 같은 나머지 안전장치는 그대로 검증한다. */
+export function useV1SimplifiedToggleOperationFlag(key: V1GameOperationFlagKey) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1SimplifiedOperationFlagTogglePayload) =>
+      v1Patch<V1GameOperationFlag>(
+        `/tournament-ops/operation-flags/${key}/simplified-toggle`,
+        payload,
+        { headers: { 'idempotency-key': randomUuid() } },
+      ),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminOperationFlag(key), data);
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Admin — ops (SMS / 인증 실패 로그 + 운영 KPI 요약)
 // ---------------------------------------------------------------------------
 
@@ -2241,11 +2899,34 @@ export function useV1AllTournaments(params?: AllTournamentListFilters) {
   });
 }
 
-export function useV1Tournament(id: string) {
+/**
+ * LIVE 픽스처가 있을 때만 폴링 — 주기 값과 근거(뷰어당 10초 하한, idle 페이지는 폴링 0,
+ * 관전자 수에 비례하는 부하 모델)는 `@/lib/public-live-polling`이 단일 소스로 보유한다.
+ * `/tournaments/:id/bracket`이 이 훅과 공개 일정 훅(`usePublicTournamentSchedule`)을
+ * 같은 화면에서 동시에 쓰므로, 두 곳이 각자 숫자를 정의하면 한쪽만 수정될 때 어긋난 두
+ * 주기로 이중 폴링이 된다 — 그래서 주석 규율 대신 공유 상수로 구조적으로 묶었다.
+ */
+const V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS = PUBLIC_LIVE_POLL_INTERVAL_MS;
+
+/**
+ * `options.livePolling`은 opt-in — 기본값(false)에서는 기존 동작(폴링 없음)을 그대로
+ * 유지한다. 이 훅은 apply/roster/awards/results/admin ops 등 폴링이 불필요한 여러
+ * 화면이 함께 쓰므로, 전역으로 폴링을 켜면 그 화면들까지 불필요한 재조회가 생긴다.
+ * `/tournaments/:id/bracket`(진행 중 대회의 순위·대진표 실시간 갱신이 실제로 필요한
+ * 유일한 소비처)만 명시적으로 켠다.
+ */
+export function useV1Tournament(id: string, options?: { livePolling?: boolean }) {
+  const livePolling = options?.livePolling ?? false;
   return useQuery({
     queryKey: v1Keys.tournament(id),
     queryFn: () => v1Get<V1TournamentDetail>(`/tournaments/${id}`),
     enabled: !!id,
+    refetchInterval: livePolling
+      ? (query: { state: { data?: V1TournamentDetail } }) => {
+          const hasLiveFixture = query.state.data?.fixtures.some((f) => f.status === 'in_progress') ?? false;
+          return hasLiveFixture ? V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS : false;
+        }
+      : undefined,
   });
 }
 
@@ -2301,7 +2982,11 @@ export function useV1TournamentParticipantCheck(tournamentId: string, enabled = 
 export function useV1SubmitTournamentReview(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[] }) =>
+    // teamId는 여러 팀의 팀장·운영진을 겸하고 그 팀들이 모두 이 대회에 참가 확정된
+    // 사용자에게만 필요하다(단일 자격 팀이면 서버가 자동 선택). 서버가 400
+    // TEAM_SELECTION_REQUIRED + details.teams 로 후보 목록을 돌려주면 호출자가 사용자에게
+    // 팀을 고르게 한 뒤 이 필드를 채워 재요청한다.
+    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[]; teamId?: string }) =>
       v1Post<V1TournamentReview>(`/tournaments/${tournamentId}/reviews`, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
@@ -2699,6 +3384,20 @@ export function useV1AdminTournament(id: string) {
   });
 }
 
+/**
+ * "출전 인원"(라인업 상한) 선택지 — 대회 생성/수정 화면이 선택된 sportId로 조회한다.
+ * D-17과 같은 원칙(카탈로그 단일 출처는 서버): FUTSAL_FORMATIONS/축구 포메이션이 실제로
+ * 지원하는 인원수는 서버(competition-config.presets.ts)만 알고 있으므로 프론트는 절대
+ * 후보 목록을 하드코딩하지 않는다.
+ */
+export function useV1LineupSizeOptions(sportId: string | null) {
+  return useQuery({
+    queryKey: v1Keys.adminLineupSizeOptions(sportId ?? ''),
+    queryFn: () => v1Get<V1LineupSizeOptions>('/admin/competition-configs/lineup-size-options', { sportId }),
+    enabled: !!sportId,
+  });
+}
+
 export function useV1CreateTournament() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -3047,17 +3746,6 @@ export function useV1DeleteFixture(tournamentId: string) {
   });
 }
 
-/** 결과 삭제(오입력 복구, `DELETE /admin/fixtures/:id/result`) — 경기 상태 scheduled 복귀 */
-export function useV1DeleteFixtureResult(tournamentId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}/result`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
-    },
-  });
-}
-
 /** 조 이름·진출 팀 수 수정 (`PATCH /admin/groups/:id`) */
 export function useV1UpdateGroup(tournamentId: string) {
   const queryClient = useQueryClient();
@@ -3088,22 +3776,6 @@ export function useV1RemoveGroupTeam(tournamentId: string) {
     mutationFn: (groupTeamId: string) => v1Delete<{ deleted: boolean }>(`/admin/group-teams/${groupTeamId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
-    },
-  });
-}
-
-export function useV1RecordResult(tournamentId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      fixtureId,
-      ...body
-    }: { fixtureId: string } & V1RecordResultPayload) =>
-      v1Post<V1AdminBracketResult>(`/admin/fixtures/${fixtureId}/result`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.adminTournamentBracket(tournamentId),
-      });
     },
   });
 }
@@ -3448,5 +4120,303 @@ export function useV1DeleteAdminContentAsset() {
   return useMutation({
     mutationFn: (assetId: string) =>
       v1Delete<{ assetId: string; deleted: true }>(`/admin/content-assets/${assetId}`),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 대회 운영(tournament-ops) 셸/보드/스태프 (Task 19 — 백엔드는 Task 18)
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /tournament-ops/tournaments/:tournamentId/operations — 운영 보드 한 페이지.
+ * `refetchInterval`로 상단(현재 커서) 페이지를 주기적으로 재조회해 점진 업데이트를
+ * 지원한다 — `placeholderData: keepPreviousData`가 재조회 중 목록이 빈 화면으로
+ * 깜빡이는 것을 막아, 필터 입력 등 화면의 로컬 상태가 유지된다.
+ */
+export function useV1TournamentOperationsBoard(
+  tournamentId: string,
+  filters?: V1TournamentOperationsBoardFilters,
+  options?: QueryOptions,
+) {
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
+    queryFn: () =>
+      v1Get<V1TournamentOperationsBoardPage>(
+        `/tournament-ops/tournaments/${tournamentId}/operations`,
+        filters,
+      ),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+    placeholderData: keepPreviousData,
+    refetchInterval: 15_000,
+  });
+}
+
+/** "더 보기" 등 일회성 다음 페이지 조회용 — 폴링 대상이 아닌 과거 페이지는 훅 없이 직접 fetchQuery로 가져온다. */
+export function fetchV1TournamentOperationsBoardPage(
+  queryClient: QueryClient,
+  tournamentId: string,
+  filters: V1TournamentOperationsBoardFilters,
+) {
+  return queryClient.fetchQuery({
+    queryKey: v1Keys.tournamentOperationsBoard(tournamentId, filters as Record<string, unknown>),
+    queryFn: () =>
+      v1Get<V1TournamentOperationsBoardPage>(
+        `/tournament-ops/tournaments/${tournamentId}/operations`,
+        filters,
+      ),
+  });
+}
+
+/**
+ * GET /tournament-ops/tournaments/:tournamentId/staff — 대회 전체 스태프 배정 목록.
+ * `read` 액션은 platform_ops/tournament_director/support_readonly에게만 허용된다
+ * (field_operator는 항상 field/fixture 스코프가 있어 대회 전역 리소스로는 403) — 이 응답이
+ * 성공하면 셸 게이트가 여기서 내 역할을 함께 도출한다.
+ */
+export function useV1TournamentStaffAssignments(tournamentId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsStaff(tournamentId),
+    queryFn: () => v1Get<V1TournamentStaffListResponse>(`/tournament-ops/tournaments/${tournamentId}/staff`),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+  });
+}
+
+/**
+ * GET /tournament-ops/tournaments/:tournamentId/staff/user-search — 배정할 사람을 닉네임으로
+ * 찾는다. 서버가 최소 2글자를 요구하므로(400) 그보다 짧으면 아예 호출하지 않는다. 호출
+ * 빈도는 서버에서 60초 30회로 묶여 있어 호출자가 입력을 디바운스하는 것을 전제로 한다
+ * (GrantStaffModal 이 250ms 디바운스). 검색 결과는 사용자 명부 일부라 캐시에 오래 남기지
+ * 않는다.
+ */
+export function useV1TournamentStaffCandidateSearch(
+  tournamentId: string,
+  query: string,
+  options?: QueryOptions,
+) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsStaffCandidates(tournamentId, trimmed),
+    queryFn: () =>
+      v1Get<V1TournamentStaffCandidateSearchResponse>(
+        `/tournament-ops/tournaments/${tournamentId}/staff/user-search?q=${encodeURIComponent(trimmed)}`,
+      ),
+    enabled: Boolean(tournamentId) && trimmed.length >= 2 && (options?.enabled ?? true),
+    staleTime: 30_000,
+    gcTime: 60_000,
+  });
+}
+
+/**
+ * GET /me/tournament-staff — "내 담당 대회" (마이페이지 진입점). 서버가 이미 만료·해제된
+ * 배정을 제외하고 대회 단위로 묶어서 돌려준다 — 여기서는 그대로 노출만 한다. 대부분의
+ * 사용자는 스태프가 아니므로 마이홈 등 항상 렌더되는 화면에서는 `enabled`로 프로필 로딩
+ * 이후에만 호출해 불필요한 401 재시도를 피한다(useV1MyTeams와 동일한 관례).
+ */
+export function useV1MyTournamentStaffAssignments(options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.myTournamentStaffAssignments(),
+    queryFn: () => v1Get<V1MyTournamentStaffResponse>('/me/tournament-staff'),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/** GET /tournament-ops/tournaments/:tournamentId/fields — 필터 드롭다운용 필드/코트 목록. */
+export function useV1TournamentFields(tournamentId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.tournamentOperationsFields(tournamentId),
+    queryFn: () => v1Get<V1TournamentFieldListResponse>(`/tournament-ops/tournaments/${tournamentId}/fields`),
+    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+  });
+}
+
+/**
+ * POST /tournament-ops/tournaments/:tournamentId/fields — 경기장(필드) 등록.
+ *
+ * 백엔드는 Task 18 때부터 있었지만 호출부가 없어 필드가 영원히 0건이었고, 그래서
+ * 필드 담당자 배정을 끝낼 수 없었다(#373). 성공 시 목록 쿼리를 무효화해 같은 화면의
+ * 선택지가 바로 채워지고 새로고침해도 서버 값이 그대로 남는다.
+ *
+ * 권한: 플랫폼 운영자만 통과한다(서버 authorizeFieldManagement → FIELD_MANAGEMENT_DENIED).
+ * 호출하는 화면에서 역할을 먼저 가려 폼을 열 것.
+ */
+export function useV1CreateTournamentField(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1CreateTournamentFieldPayload) =>
+      v1Post<V1TournamentField>(`/tournament-ops/tournaments/${tournamentId}/fields`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+    },
+  });
+}
+
+/**
+ * 경기 ↔ 경기장(필드) 연결.
+ *
+ * `V1TournamentFixture.fieldId` 의 **유일한 쓰기 경로**다(백엔드 DTO 주석이 그렇게 못박고
+ * 있다). 백엔드는 Task 18 때부터 있었는데 호출부가 없어서, 필드를 만들어 스태프에게
+ * 배정해도 그 필드에 걸린 경기가 영원히 0건이었다 — 필드 담당자는 담당 경기를 가질 수
+ * 없었고, `NO_FIELD_ASSIGNED`·`NO_STAFF_ASSIGNED` 경고는 끌 방법이 없어 운영 보드에서
+ * 통째로 숨겨져 있었다(2026-08-13 alpha 실측: 픽스처 20건 전부 `fieldId=null`).
+ * 필드 *생성* 호출부가 없어 같은 증상이 한 단계 위에서 났던 #373 과 같은 결함이다.
+ *
+ * 배정/해제는 별도 메서드다 — nullable 필드를 PATCH 하나로 다루면 "비우기"와 "안 건드림"이
+ * 구분되지 않아서, 백엔드가 의도적으로 갈라 놓았다.
+ *
+ * 권한: 필드 *관리*(생성·수정)와 달리 플랫폼 운영자 전용이 아니다. 서버는
+ * `event_reverse` 권한으로 판정하므로 **플랫폼 운영자와 대회 디렉터**가 통과하고,
+ * 필드 담당자·조회 전용은 거부된다. 호출 화면에서 역할을 먼저 가릴 것.
+ *
+ * 보드가 `fieldName` 을 직접 렌더하므로 성공 시 보드 쿼리도 함께 무효화한다.
+ */
+export function useV1AssignFixtureField(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fixtureId, fieldId }: { fixtureId: string; fieldId: string }) =>
+      v1Patch<V1TournamentFixtureFieldResult>(
+        `/tournament-ops/tournaments/${tournamentId}/fixtures/${fixtureId}/field`,
+        { fieldId },
+        idempotencyInit(),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsBoardAll(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+    },
+  });
+}
+
+/** DELETE /tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field — 배정 해제. */
+export function useV1ClearFixtureField(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fixtureId }: { fixtureId: string }) =>
+      v1Delete<V1TournamentFixtureFieldResult>(
+        `/tournament-ops/tournaments/${tournamentId}/fixtures/${fixtureId}/field`,
+        undefined,
+        idempotencyInit(),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsBoardAll(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+    },
+  });
+}
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff — 스태프 배정(관리자/대회 디렉터). */
+export function useV1GrantTournamentStaff(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1GrantTournamentStaffPayload) =>
+      v1Post<V1TournamentStaffAssignment>(`/tournament-ops/tournaments/${tournamentId}/staff`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsStaff(tournamentId) });
+    },
+  });
+}
+
+/** POST /tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke — 스태프 배정 해제. */
+export function useV1RevokeTournamentStaff(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      assignmentId,
+      payload,
+    }: {
+      assignmentId: string;
+      payload: V1RevokeTournamentStaffPayload;
+    }) =>
+      v1Post<V1TournamentStaffAssignment>(
+        `/tournament-ops/tournaments/${tournamentId}/staff/${assignmentId}/revoke`,
+        payload,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsStaff(tournamentId) });
+    },
+  });
+}
+
+import type {
+  V1AdminSeriesDetail,
+  V1AdminSeriesListItem,
+  V1CreateSeriesPayload,
+  V1CreateSeriesResult,
+  V1GenerateSeriesFixturesPayload,
+  V1GenerateSeriesFixturesResult,
+  V1PublicSeriesDetail,
+  V1SeriesPlayerRecordsResponse,
+  V1SeriesStandingsResponse,
+  V1UpdateSeriesFixturePayload,
+  V1UpdateSeriesFixtureResult,
+} from '@/types/team-match-series';
+
+export function useV1AdminTeamMatchSeriesList() {
+  return useQuery({
+    queryKey: v1Keys.adminTeamMatchSeriesList(),
+    queryFn: () => v1Get<{ items: V1AdminSeriesListItem[] }>('/admin/team-match-series'),
+  });
+}
+
+export function useV1AdminTeamMatchSeries(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTeamMatchSeries(seriesId),
+    queryFn: () => v1Get<V1AdminSeriesDetail>(`/admin/team-match-series/${seriesId}`),
+    enabled: Boolean(seriesId),
+  });
+}
+
+export function useV1CreateTeamMatchSeries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateSeriesPayload) => v1Post<V1CreateSeriesResult>('/admin/team-match-series', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeriesList() });
+    },
+  });
+}
+
+export function useV1GenerateSeriesFixtures(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1GenerateSeriesFixturesPayload) =>
+      v1Post<V1GenerateSeriesFixturesResult>(`/admin/team-match-series/${seriesId}/fixtures`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeries(seriesId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeriesList() });
+    },
+  });
+}
+
+export function useV1UpdateSeriesFixture(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1UpdateSeriesFixturePayload }) =>
+      v1Patch<V1UpdateSeriesFixtureResult>(`/admin/team-match-series/${seriesId}/fixtures/${teamMatchId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeries(seriesId) });
+    },
+  });
+}
+
+export function useV1TeamMatchSeries(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamMatchSeries(seriesId),
+    queryFn: () => v1Get<V1PublicSeriesDetail>(`/team-match-series/${seriesId}`),
+    enabled: Boolean(seriesId),
+  });
+}
+
+export function useV1TeamMatchSeriesStandings(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamMatchSeriesStandings(seriesId),
+    queryFn: () => v1Get<V1SeriesStandingsResponse>(`/team-match-series/${seriesId}/standings`),
+    enabled: Boolean(seriesId),
+  });
+}
+
+export function useV1TeamMatchSeriesPlayerRecords(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamMatchSeriesPlayerRecords(seriesId),
+    queryFn: () => v1Get<V1SeriesPlayerRecordsResponse>(`/team-match-series/${seriesId}/player-records`),
+    enabled: Boolean(seriesId),
   });
 }

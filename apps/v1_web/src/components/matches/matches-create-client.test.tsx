@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import { writeExpiringDraft } from '@/lib/expiring-draft';
 import type { MatchCreateViewModel } from './matches.types';
 import { draftFromMatchEdit, MatchCreatePageClient } from './matches-create-client';
 
@@ -40,6 +41,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   }),
   useV1CreateMatch: () => ({ mutate: createMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
+  useV1MyRecentVenues: () => ({ data: undefined }),
 }));
 
 vi.mock('./matches-page', () => ({
@@ -147,16 +149,17 @@ describe('MatchCreatePageClient — GA events', () => {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 7);
     const date = futureDate.toISOString().slice(0, 10);
-    window.localStorage.setItem(
-      'teameet:v1:match-draft',
-      JSON.stringify({
-        title: '사용자가 직접 작성한 매치',
-        venue: '사용자가 선택한 체육관',
-        date,
-        startTime: '18:00',
-        endTime: '20:00',
-      }),
-    );
+    // 드래프트는 저장 시각이 담긴 봉투 형태로 보관된다(만료 판정용) — 평면 JSON을 직접
+    // 넣으면 "언제 저장됐는지 모르는 예전 형식"으로 간주돼 폐기된다(lib/expiring-draft.ts).
+    // 이 테스트가 검증하려는 건 저장 형식이 아니라 "옛 샘플 기본값과 우연히 같은 정상 입력이
+    // 지워지지 않는다"이므로, 지금 막 저장된 드래프트로 픽스처를 만든다.
+    writeExpiringDraft('teameet:v1:match-draft', {
+      title: '사용자가 직접 작성한 매치',
+      venue: '사용자가 선택한 체육관',
+      date,
+      startTime: '18:00',
+      endTime: '20:00',
+    });
 
     render(<MatchCreatePageClient step="confirm" />);
 

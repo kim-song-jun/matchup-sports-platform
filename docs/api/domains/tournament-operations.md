@@ -1,0 +1,314 @@
+# Tournament operations contract
+
+The authoritative field, fixture-lineup, competition-config, operations-board, job-requeue, and operation-flag method/field/actor rows are frozen in the [REST and idempotency registry](../global-contract.md#frozen-rest-and-idempotency-contract).
+
+Staff scope and actor permissions are defined by [Tournament operations authorization](./tournament-operations-auth.md). Review escalation is a durable result boundary defined by [Tournament operations escalations](./tournament-operations-escalations.md), never an ephemeral admin task queue.
+
+Task 18 implements the staff, field/court, fixture-lineup, and operations-board HTTP surfaces that the auth doc's "Task 7 adds no staff-management HTTP route... deferred to Task 18" note anticipated, plus the fixture→field write path the [schema ledger](./games.md#frozen-additive-schema-ledger) columns already had FK-ready but unused. This document describes exactly what shipped, module by module, and calls out every place the shipped code deviates from the frozen registry prose above — per the project's standing rule that **shipped code is canonical over contract prose**; the registry table is not amended, but every deviation is listed here so it is never mistaken for silent drift.
+
+All routes below are under `/api/v1`, require `V1AuthGuard` (authenticated user), and return the global `{status,data,timestamp}` envelope. `expectedVersion` is always a non-negative integer compared by optimistic CAS.
+
+## Deviations from the frozen registry (read this first)
+
+1. **Idempotency-Key is accepted but not deduplicated for staff mutations only (field mutations were hardened post-review).** The registry's blanket rule ("All authenticated mutations carry `Idempotency-Key`... same key + same payload replays") is implemented as a true replay contract for games (`V1IdempotencyRecord`), for escalations, and — since Task 18 review finding #9 — for **all four field/fixture-field routes** (`POST .../fields`, `PATCH .../fields/:id`, `PATCH .../fixtures/:fixtureId/field`, `DELETE .../fixtures/:fixtureId/field`): each locks a durable per-(actor, action, resourceType, resourceId, key) scope with `pg_advisory_xact_lock` (mirroring `apps/v1_api/src/game-operations/result-escalation-mutation.service.ts`) and looks up the same `V1IdempotencyRecord` table used by games/escalations. A replay with the same key and the same request-body hash returns the original committed response without re-running the mutation; the same key reused with a **different** body hash is rejected with `409 IDEMPOTENCY_PAYLOAD_CONFLICT`. **`POST .../staff` and `POST .../staff/:id/revoke` still do NOT implement real idempotency** — they delegate entirely to Task 7's `TournamentStaffService`, which is out of this lane's ownership, so the `Idempotency-Key` header (or a server-generated UUID if absent/blank) is used only to populate the `V1OperationAudit.requestId` column there; retrying an identical staff-grant request with the same key still creates a **second** row, not a replay. Fixture-lineup save/submit (below) *do* implement the real `V1IdempotencyRecord` replay contract, because they delegate to the already-shipped `GamesService`.
+2. **`PUT .../fixtures/:fixtureId/lineup/:sideId` body shape is `SaveGameLineupDto`, not the registry's `{expectedVersion,sideId,formation,starters,bench}`.** `sideId` is a path segment, not a body field, and the body is `{expectedVersion,clientCommandId,formation?,participants:[{participantId?,displayNameSnapshot,jerseyNumber?,position?,started}]}` — the same shape `POST /games/:gameId/lineups/:sideId` already used. There is no separate `starters`/`bench` split; `participants[].started` carries that distinction per participant.
+3. **`assigned field_operator may capture actual participants after start` (registry row 47) does not hold.** `tournament-staff-policy.ts`'s `allowsRoleAction()` authorizes `FIELD_OPERATOR` for `read`, `tournament_command`, and `event_append` only — never `lineup_mutate`. For a `TOURNAMENT_FIXTURE`-sourced game, **only `tournament_director` and `platform_ops`** may call lineup save/submit; a `field_operator` gets `403 PERMISSION_DENIED`. This is shipped Task 7 policy code that Task 18 does not own and reuses as-is per the project's shipped-code-wins rule; it is flagged here because it directly contradicts the registry's actor prose.
+4. **`GET .../fields` is readable by every assigned tournament staff role, not only `platform_ops`/`tournament_director`.** The registry row says "platform_ops; tournament_director read"; the shipped `TournamentOperationsFieldsService.list()` authorizes via `action:'read'`, which `field_operator` and `support_readonly` also pass. This is a deliberate widening (sensible default — the plan and registry are silent on whether `field_operator`/`support_readonly` may read the field list, and denying a court list to on-court staff would be actively unhelpful).
+5. **`PATCH .../fixtures/:fixtureId/field` and `DELETE .../fixtures/:fixtureId/field` are not in the frozen registry at all.** They are Task 18's answer to `V1TournamentFixture.fieldId` having a column and FK (`v1_tournament_fixtures_field_fk`) but no write path anywhere in the codebase before this task. See [Fixture field assignment](#fixture-field-assignment) below.
+6. **The operations-board `warning` codes and `watermark` shape are Task 18's own sensible default**, not frozen text — the registry only says `{cursor,status,fieldId,warning} → incremental fixture snapshot + watermark` without defining either. See [Operations board](#operations-board-get-operations) below for the exact contract this repo now implements and tests against.
+
+## Staff grant/revoke/list
+
+`apps/v1_api/src/tournament-operations/staff/**`. Authorization is entirely delegated to the already-shipped, already-audited [Task 7 `TournamentStaffService`](./tournament-operations-auth.md) (`bootstrapFirstDirector`/`grantStaff`/`revokeStaff`) and `TournamentStaffAccessService.assertAccess()`; this module adds only the HTTP surface plus a local `list()` read (Task 7 never added `TournamentStaffService.listStaff`, and this lane does not own `apps/v1_api/src/tournaments/staff/`).
+
+**Post-review hardening (Task 18 review findings #10/#11):** a `TOURNAMENT_DIRECTOR` grant carrying a `fieldId` or non-empty `fixtureIds` is now rejected with `400 STAFF_SCOPE_NOT_ALLOWED` **before** the zero-active-directors bootstrap branch runs (previously the branch silently forwarded only `userId`/`tournamentId`/`expiresAt` to `bootstrapFirstDirector()`, which has no scope parameters at all, so an illegal scope on a director grant "succeeded" only in the window before any director existed). `revoke`'s `reason` is now genuinely persisted: since `TournamentStaffService.revokeStaff()` (Task 7, out of this lane) has no free-text field, this module writes a follow-up `V1OperationAudit` row (`action: tournament.staff.revoke_reason`, `resourceType: TOURNAMENT_STAFF_ASSIGNMENT`, `resourceId` = the assignment id) immediately after the revoke transaction commits, carrying the table's own `reason` column. This second write is a best-effort follow-up, not atomic with the revoke itself.
+
+| Method and route | Body | Result | Actor |
+|---|---|---|---|
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/staff` | — | `{items: TournamentStaffAssignment[]}`, each `{id,tournamentId,userId,role,fieldId,fixtureIds,version,expiresAt,revokedAt,grantedByUserId,createdAt}` | any current, unrevoked, unexpired assignment (any role) or `platform_ops` |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/staff` | `{userId,role,fieldId?,fixtureIds?,expiresAt?}` | created assignment (`201`) | `platform_ops`; `tournament_director` for `FIELD_OPERATOR`/`SUPPORT_READONLY` only |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke` | `{expectedVersion,reason}` | revoked assignment (`200`) | `platform_ops`; owning `tournament_director` for subordinate roles |
+
+- **Director bootstrap has no separate route.** When `role:"TOURNAMENT_DIRECTOR"` is posted and the tournament currently has zero active (unrevoked, unexpired) directors, the controller silently routes to `TournamentStaffService.bootstrapFirstDirector()` instead of `grantStaff()` — `grantStaff()` itself throws `403 STAFF_MANAGEMENT_DENIED {reason:"FIRST_DIRECTOR_REQUIRES_BOOTSTRAP"}` in that exact case. Only `platform_ops` may bootstrap. This branch is a pre-check only; `bootstrapFirstDirector()` re-verifies "zero active directors" itself inside a `Serializable` transaction, so a race between two concurrent bootstrap attempts still fails one of them closed with `409 STAFF_DIRECTOR_ALREADY_BOOTSTRAPPED`.
+- **A `tournament_director` can never grant or revoke `TOURNAMENT_DIRECTOR` or `PLATFORM_OPS`** (`403 STAFF_MANAGEMENT_DENIED {reason:"DIRECTOR_CANNOT_GRANT_DIRECTOR"|"PLATFORM_OPS_ASSIGNMENT_FORBIDDEN"}`). `FIELD_OPERATOR` grants require `fieldId` or a non-empty `fixtureIds` (`422 STAFF_SCOPE_REQUIRED`); every other role must carry neither (`422 STAFF_SCOPE_NOT_ALLOWED`).
+- A revoked or fully-non-staff user (no admin grant, no assignment row at all) gets `403 STAFF_SCOPE_DENIED` on every route in this table, including `GET` — access is re-derived per call, so revoking the last active assignment for a user immediately removes both read and write access on their next request (`RealtimeGateway.evictUserFromScopedGameRooms` also disconnects any live socket).
+- `reason` on revoke is validated (non-empty string) and **is persisted** (Task 18 review finding #11) as a follow-up `V1OperationAudit` row scoped to the assignment id, since `TournamentStaffService.revokeStaff`'s own audit envelope has no free-text field to carry it.
+
+### `GET /api/v1/tournament-ops/me/assignments` — the assignee's own entry path
+
+`MyTournamentStaffAssignmentsController`/`Service` (same directory). Guarded by `V1AuthGuard` only, **not** `TournamentStaffGuard`: the route carries no tournament path parameter and its result set is closed to the caller (`where.userId` comes from the authenticated principal; there is no request field that can name another user). Returns only assignments that are neither revoked nor expired.
+
+| Field | Meaning |
+|---|---|
+| `assignmentId`, `tournamentId`, `tournamentTitle`, `tournamentStatus`, `tournamentScheduledAt`, `role`, `expiresAt`, `fieldId`, `fieldName` | the assignment itself |
+| `version` | the assignment's optimistic-lock version. The `/game-operations` socket handshake must present this value or `game.subscribe`/`game.takeover.request` deny it as stale (`RealtimeGateway`). The web console used to read it from the tournament-wide staff list — which a `FIELD_OPERATOR` is always denied, so that role presented `0` and its live subscription broke as soon as its assignment version moved past `0`. This route is now that value's single source for every role (`useMyTournamentStaffAssignmentVersion`). |
+| `fixtures[]` — `{fixtureId,round,fixtureNumber,legNumber,scheduledAt,status,fieldId,fieldName,homeTeamName,awayTeamName}` | **`FIELD_OPERATOR` only.** The fixtures this assignment covers, earliest first, capped at 50 per assignment (`fixturesTruncated` flags the cut). Other roles always get `[]` and no fixture query runs at all. |
+
+- **Why it exists.** A `FIELD_OPERATOR` assignment always carries a fixture and/or field scope (`tournament-staff-policy.ts`'s `parseAssignment`), so the tournament-wide `read` that the ops shell's entry check performs is *always* denied for that role with `FIXTURE_SCOPE_REQUIRED`/`FIELD_SCOPE_REQUIRED`. Before this route there was no way for such a staffer to discover which fixture console they may open — the shell was the only entry point and it is structurally closed to them. The web client deep-links straight to `/tournament-ops/tournaments/:id/fixtures/:fixtureId/operate` from this response.
+- **Scope resolution mirrors the policy, it does not replace it.** `fixtures[]` is computed with the same rule the policy applies (`fixtureIds` membership AND `fieldId` equality when each is present). It is a *display* list: every call the console then makes is still authorized per request by `TournamentStaffAccessService.assertAccess()` (see `TournamentFixtureLineupService.authorizeAndResolveGameId`), so a fixture absent from this list cannot be operated by hand-editing the URL. `my-tournament-staff-assignments.service.spec.ts` cross-checks the two rules against `decideTournamentStaffAccess` in both directions (listed ⇒ ALLOWED, excluded ⇒ denied).
+- **`platform_ops` admins get an empty list**, since the admin bypass leaves no assignment row; their entry point remains the admin screens (`?from=admin`).
+
+### Errors
+
+| HTTP | Code | Meaning |
+|---|---|---|
+| `401` | — | unauthenticated |
+| `403` | `STAFF_SCOPE_DENIED` | no eligible read/authorize scope for the requesting actor (`details.reason` is one of `ASSIGNMENT_REQUIRED\|ASSIGNMENT_ROLE_MISMATCH\|ASSIGNMENT_REVOKED\|ASSIGNMENT_NOT_STARTED\|ASSIGNMENT_EXPIRED\|CROSS_TOURNAMENT_SCOPE\|FIXTURE_SCOPE_REQUIRED\|FIXTURE_SCOPE_DENIED\|FIELD_SCOPE_REQUIRED\|FIELD_SCOPE_DENIED\|ROLE_ACTION_DENIED`) |
+| `403` | `STAFF_MANAGEMENT_DENIED` | grant/revoke role-authority rule violated (`details.reason` one of `DIRECTOR_AUTHORITY_REQUIRED\|PLATFORM_OPS_ASSIGNMENT_FORBIDDEN\|DIRECTOR_CANNOT_GRANT_DIRECTOR\|DIRECTOR_CANNOT_REVOKE_DIRECTOR\|CROSS_TOURNAMENT_SCOPE\|FIRST_DIRECTOR_REQUIRES_BOOTSTRAP\|FIRST_DIRECTOR_REQUIRES_PLATFORM_OPS\|ACTOR_AUTHORITY_CHANGED`) |
+| `404` | `TOURNAMENT_NOT_FOUND` \| `STAFF_TARGET_NOT_FOUND` \| `STAFF_ASSIGNMENT_NOT_FOUND` | tournament, grant target, or revoke target does not exist (or the assignment does not belong to this tournament) |
+| `409` | `STAFF_TARGET_INACTIVE` | grant target's `accountStatus` is not `active` |
+| `409` | `STAFF_DIRECTOR_ALREADY_BOOTSTRAPPED` | bootstrap raced against an existing active director |
+| `409` | `STAFF_ASSIGNMENT_ALREADY_REVOKED` | revoke target already has `revokedAt` set |
+| `409` | `STALE_STAFF_ASSIGNMENT_VERSION` | `expectedVersion` on revoke did not match the current row |
+| `422` | `STAFF_SCOPE_REQUIRED` \| `STAFF_SCOPE_NOT_ALLOWED` \| `INVALID_STAFF_ROLE` \| `INVALID_STAFF_EXPIRY` \| `CROSS_TOURNAMENT_FIELD_SCOPE` \| `CROSS_TOURNAMENT_FIXTURE_SCOPE` | malformed or cross-tournament grant input |
+
+## Field/court CRUD
+
+`apps/v1_api/src/tournament-operations/fields/**`. `scopeKey` is the caller-supplied *stable* identity for a field/court (`@@unique([tournamentId, scopeKey])`); assigning or reassigning a fixture only ever writes `V1TournamentFixture.fieldId` — it never creates or churns a `V1TournamentField` row.
+
+| Method and route | Body | Result | Actor |
+|---|---|---|---|
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/fields` | — | `{items: [{id,tournamentId,scopeKey,name,sortOrder,active,version}]}`, ordered `(sortOrder asc, createdAt asc, id asc)` | any assigned tournament staff role or `platform_ops` (see deviation 4 above) |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/fields` | `{scopeKey,name,sortOrder?}` | created field (`201`) | `platform_ops` only |
+| `PATCH /api/v1/tournament-ops/tournaments/:tournamentId/fields/:fieldId` | `{expectedVersion,name?,sortOrder?,active?}` — **at least one of `name`/`sortOrder`/`active` is required** | updated field, CAS'd | `platform_ops` only |
+
+`platform_ops`-only mutation (deviation 5's sibling nuance): `TOURNAMENT_STAFF_ACTIONS`'s `allowsRoleAction()` returns `true` for both `platform_ops` and `tournament_director` on every action, so it cannot by itself express "director may read but not mutate fields." The service layers an explicit `principal.role === 'platform_ops'` check on top of `assertAccess({action:'event_reverse'})` — the same nuance-layering pattern `TournamentStaffService.assertGrantAuthority` already uses for its own role rules.
+
+**List ordering is now total** (Task 18 review finding #16.2): `id asc` is a final tie-breaker after `sortOrder`/`createdAt`, so two fields sharing both values still resolve to one deterministic, repeatable order instead of whatever order Postgres happens to return.
+
+**An empty PATCH body is rejected** (Task 18 review finding #16.1): a request carrying only `expectedVersion` (no `name`/`sortOrder`/`active`) returns `422 FIELD_UPDATE_EMPTY` instead of manufacturing a version bump and an audit row for a request that changes nothing.
+
+### Fixture field assignment
+
+| Method and route | Body | Result | Actor |
+|---|---|---|---|
+| `PATCH /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field` | `{fieldId}` | `{fixtureId,tournamentId,fieldId}` | `platform_ops` or `tournament_director` (tournament-wide or scoped to this fixture/field) |
+| `DELETE /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field` | — | `{fixtureId,tournamentId,fieldId:null}` | same as above |
+
+These two routes are new (deviation 5): `V1TournamentFixture.fieldId` and its FK to `V1TournamentField` already existed and were already migrated before Task 18, but nothing wrote to the column. Unlike literal field CRUD, assignment is treated as ordinary day-of-tournament operations work (`action:'event_reverse'`, no extra `platform_ops`-only gate) — `field_operator`/`support_readonly` are still denied because `event_reverse` is not in their allowed-action set. Assign is a separate verb from clear (`PATCH` vs `DELETE`, no nullable body) specifically so "assign to X" and "no-op" are never ambiguous over a nullable JSON field.
+
+**Authorization is re-checked as late as possible, and both writes are CAS'd** (Task 18 review finding #8): `assignFixtureField()`/`clearFixtureField()` re-derive the acting principal via `TournamentStaffAccessService.assertAccess()` as the *first* statement inside the write transaction (not before it opens), so a revoke that commits between an earlier check and this call is visible and aborts the write. Both writes also CAS on the `fieldId` value the request actually observed (`WHERE fieldId = <observed>`) rather than a blind `UPDATE`, so two concurrent requests that both observed the same prior `fieldId` can never both silently win — the loser gets `409 FIXTURE_FIELD_ASSIGNMENT_CONFLICT` instead of a swallowed lost update.
+
+### Errors
+
+| HTTP | Code | Meaning |
+|---|---|---|
+| `401` | — | unauthenticated |
+| `403` | `STAFF_SCOPE_DENIED` | no eligible read/action scope (fixture assignment routes) |
+| `403` | `FIELD_MANAGEMENT_DENIED` | non-`platform_ops` attempted field create/update |
+| `404` | `TOURNAMENT_NOT_FOUND` \| `FIELD_NOT_FOUND` \| `TOURNAMENT_FIXTURE_NOT_FOUND` | tournament, field, or fixture not found (or cross-tournament) |
+| `409` | `FIELD_SCOPE_KEY_DUPLICATE` | `(tournamentId, scopeKey)` already exists |
+| `409` | `STALE_FIELD_VERSION` | `expectedVersion` did not match the current row |
+| `409` | `FIXTURE_FIELD_ASSIGNMENT_CONFLICT` | a concurrent assign/clear already changed the fixture's `fieldId` (CAS loss) |
+| `409` | `IDEMPOTENCY_PAYLOAD_CONFLICT` | the same `Idempotency-Key` was reused with a different request body |
+| `422` | `FIELD_UPDATE_EMPTY` | PATCH body carried only `expectedVersion`, no actual field to change |
+
+## Tournament fixture lineup capture and submit
+
+`apps/v1_api/src/tournament-operations/lineups/**`. A thin `fixtureId → gameId` adapter over the already-shipped `GamesService.listLineups`/`saveLineup`/`submitLineup` (the same methods `POST /games/:gameId/lineups/:sideId` uses) — authorization, CAS, idempotency, and takeover-token enforcement are all `GamesService`'s, not re-derived here.
+
+| Method and route | Body | Result | Actor |
+|---|---|---|---|
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/lineup` | — | **Task 21 shape change**: `{gameId, lineups}` — previously a bare `V1GameLineup[]`. `gameId` lets a caller resolve `/games/:gameId/*` (game detail, commands, events) BEFORE any lineup exists (an empty `lineups` array alone carried no id). Each lineup row also carries a `participants` roster array (Task 21 addition — see [games.md](./games.md)), ordered by `sideId` asc, `revision` desc | any actor `GamesService.resolveActor` authorizes for `read` on this fixture's game |
+| `PUT /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/lineup/:sideId` | `SaveGameLineupDto` — see deviation 2 above | new `DRAFT` lineup revision | `tournament_director` or `platform_ops` only (see deviation 3) |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/lineup/:lineupId/submit` | `SubmitGameLineupDto {expectedVersion,clientCommandId,takeoverToken?}` | `DRAFT → SUBMITTED` | same as save; `takeoverToken` is mandatory for a `TOURNAMENT_FIXTURE` game (`403 TAKEOVER_TOKEN_EXPIRED` without one) |
+
+- **`fixtureId → gameId` resolution is a strict, tournament-scoped lookup**: `V1TournamentFixture.findUnique({tournamentId,id:fixtureId})` selecting only `game.id`. A fixture that does not exist under this tournament, or has no linked game yet, returns `404 TOURNAMENT_FIXTURE_GAME_NOT_FOUND` before any `GamesService` call — this also naturally rejects a `fixtureId` that belongs to a different tournament.
+- **Save and submit are truly idempotent** (unlike staff/field mutations above): they go through `GamesService`'s real `V1IdempotencyRecord` replay contract. The same `clientCommandId` with an identical payload returns the stored response with `replayed:true`; the same `clientCommandId` with a different payload returns `422 COMMAND_IDEMPOTENCY_KEY_MISMATCH`/`409` per the games contract. Submitting an already-`SUBMITTED` lineup under a *new* `clientCommandId` is not a replay and returns `409 INVALID_LINEUP_STATE`.
+- **Path params (`tournamentId`,`fixtureId`,`sideId`,`lineupId`) are UUID-validated at the HTTP boundary** (`ParseUUIDPipe`, `422` on a malformed value) — this controller previously had no such pipe, unlike its board/fields/staff siblings, so a malformed uuid fell through to the service layer (which has no uuid-format guard of its own) instead of failing fast.
+
+### Errors
+
+Identical to the [game aggregate](./games.md) mutation/version/history rules, since every mutation delegates directly to `GamesService`, plus:
+
+| HTTP | Code | Meaning |
+|---|---|---|
+| `404` | `TOURNAMENT_FIXTURE_GAME_NOT_FOUND` | fixture not found in this tournament, or has no linked game |
+| `403` | `PERMISSION_DENIED` | actor scope not permitted (e.g. `field_operator` attempting save/submit — see deviation 3) |
+| `403` | `TAKEOVER_TOKEN_EXPIRED` | missing/blank `takeoverToken` on a `TOURNAMENT_FIXTURE` submit |
+| `409` | `INVALID_LINEUP_STATE` | submit targeted a lineup that is not `DRAFT` |
+| `404` | `GAME_LINEUP_NOT_FOUND` \| `GAME_SIDE_NOT_FOUND` | `lineupId`/`sideId` does not belong to the resolved game |
+| `422` | — (`ParseUUIDPipe` default body) | a path param (`tournamentId`/`fixtureId`/`sideId`/`lineupId`) is not a valid uuid |
+
+## Operations board (`GET .../operations`)
+
+`apps/v1_api/src/tournament-operations/board/**`. `GET /api/v1/tournament-ops/tournaments/:tournamentId/operations`, guarded by `TournamentStaffGuard` + `@RequireTournamentStaff({action:'read'})` (locally re-provided in this module — `tournaments.module.ts` has no `exports` array today).
+
+**Query**: `{cursor?,status?,fieldId?,warning?,limit?}` — `limit` follows the [global cursor rule](../global-contract.md#frozen-rest-and-idempotency-contract) (default 20, max 100). Pagination is a deterministic keyset cursor on `(round, fixtureNumber, id)`: a page never duplicates or drops a fixture, and `nextCursor` is `null` on the last page. **`cursor`/`nextCursor` are an opaque, self-describing `(tournamentId, round, fixtureNumber, id)` tuple** (base64url-encoded JSON), not a bare `V1TournamentFixture.id` (Task 18 review P1-1/P1-2 fix, superseding the prior "raw fixture id, resolved against the DB" design referenced by review finding #7): the next page's predicate is built directly from the tuple the cursor itself carries, so a walk survives the cursor's own anchor row being deleted or re-sorted between two page requests. **A cursor that fails to decode, and a cursor that decodes but names a DIFFERENT tournament than the one being queried, are both normalized to the exact same clean empty page** — there is no longer a distinguishing `400` response that would let a caller probe whether some fixture exists in a different (possibly private) tournament. Query count is a small, page-size-independent constant: a populated page runs four round-trips (the fixture page, two lineup/side reads, one staff-coverage read) plus one additional DB-side aggregate round-trip for the escalation summary (`GROUP BY` via a raw query, Task 18 review P1-6 — not a per-model Prisma call), all batched via `IN`/join clauses so the count does not grow with how many of the page's rows have games/lineups/escalations. (Prior to the Task 10 cutover cleanup this was five round-trips, the fifth being a `GAME_READ` operation-flag read that gated a compare-mode authority seam — both are retired now that the cutover is complete and permanent; see "Retired: compare-read authority seam" below.) **The lineup round-trip is bounded to one row per `(gameId, sideId)`** (review finding #13 fix): `latestLineupStateBySide()` reads `V1GameLineup` with `distinct: ['gameId', 'sideId']` and a matching leading `orderBy` (so Prisma compiles it to a single DISTINCT-ON-style query), instead of transferring every historical revision a side has ever accumulated — the round-trip count above stays fixed regardless of revision-history depth. **The staff-coverage read is bounded to the current page's own fieldIds/fixtureIds** (Task 18 review P1-6), not every active `FIELD_OPERATOR` assignment tournament-wide.
+
+**Response**: `{items: FixtureOperationsRow[], nextCursor, watermark, liveWarnings: LiveWarningEntry[]}`:
+
+```
+{
+  fixtureId, tournamentId, round, fixtureNumber,
+  gameId, gameState, fieldId, fieldName,
+  homeRegistrationId, awayRegistrationId, scheduledAt,
+  currentScore, warnings: string[], version, revisionId, stableRevision
+}
+```
+is one `FixtureOperationsRow`; `LiveWarningEntry` is `{fixtureId, warnings: string[]}`.
+
+- **`status` filters `V1Game.state`, not `V1TournamentFixture.status`.** `V1TournamentFixtureStatus` is dead/unmaintained — `GamesService` never writes it once the Game model became authoritative. `fieldId` filters `V1TournamentFixture.fieldId` directly.
+- **`warning` codes** (Task 18 sensible default, deviation 6). Split into two groups (D3 determinism hardening below):
+  - Stable (persisted state only — reported in `items[].warnings`):
+    - `NO_FIELD_ASSIGNED` — `fieldId` is `null`.
+    - `MISSING_SCORER` — the current/official result revision has `missingScorer:true` ([D-07](./games.md#frozen-operational-decision-table)).
+    - `RESULT_REVIEW_OVERDUE` — an open (`PENDING`/`ACKNOWLEDGED`) `V1ResultEscalation` exists for the fixture's game.
+  - Time-relative (persisted state **and** the request's wall-clock instant — reported ONLY in the separate `liveWarnings` array, never in `items[].warnings`):
+    - `NO_STAFF_ASSIGNED` — no live `FIELD_OPERATOR` assignment scopes this fixture's field or fixture id directly at the request instant (`tournament_director`/`support_readonly` are tournament-wide by policy and never carry a field/fixture scope, so they never "cover" a specific fixture for this warning; an assignment's `expiresAt` is compared against the request instant).
+    - `LINEUP_NOT_SUBMITTED` — `scheduledAt - 60m` has passed (mirrors [D-02](./games.md#frozen-operational-decision-table)'s `publicLineupAt` lock window) but either side's latest lineup is still `DRAFT` or missing.
+  - **`?warning=<code>` accepts ONLY stable codes** (P0 fix, Task 18 review finding #2 — reverses an earlier draft of this document, which said `warning` accepted both groups). Passing a time-relative code (`NO_STAFF_ASSIGNED`/`LINEUP_NOT_SUBMITTED`) is rejected with `400 OPERATIONS_BOARD_WARNING_FILTER_NOT_STABLE` instead of filtering `items` by it: the filter runs BEFORE `items` is built, so a time-relative filter would make `items` MEMBERSHIP a function of `now` alone — two identical, unchanged databases queried on either side of a deadline could return different `items`, contaminating the hash-stable body's core guarantee. The corrected rule is absolute: **`items` membership must never depend on a time-relative value.** A client that needs a live-warning-aware view fetches the (always time-independent) full page and filters client-side using the separate `liveWarnings` array.
+- **`watermark`** (deviation 6) is an opaque per-response token — **not** the Task 9 `V1ProjectionWatermark` table, which is reserved for the async official-result projection pipeline and would collide semantically if reused here. It is a hash of the page's ordered `(fixtureId, stableRevision)` pairs (see `stableRevision` below), so it moves whenever ANY item's stable fields change, regardless of which underlying model caused it. Content is drawn purely from persisted columns read inside the snapshot transaction.
+
+### Incremental key: `items[].stableRevision` (P0 fix, Task 18 review finding #5)
+
+`(fixtureId, version, revisionId)` alone cannot identify every stable-body change: `version`/`revisionId` are `V1Game` fields, so a fixture-only mutation (field (re)assignment, a field rename, an escalation transition that doesn't flip `RESULT_REVIEW_OVERDUE`'s boolean) can change the response without moving either, and a fixture with no game at all always has `version:null, revisionId:null` regardless of its own mutations. Each item now carries `stableRevision` — a `sha256` hex digest over EVERY persisted input that can change that item's stable fields: `V1TournamentFixture.updatedAt`, `V1TournamentField.version` (nullable), `V1Game.version`+`updatedAt` (nullable), `V1Game.currentOfficialRevisionId` (nullable), and the max `V1ResultEscalation.version`/`updatedAt` across ALL escalations tied to the fixture's game. A correct client diff compares `stableRevision` per `fixtureId` (falling back to "present in one snapshot but not the other" for adds/removals); `version`/`revisionId` remain for backward compatibility but are no longer sufficient alone.
+
+### Stable body vs. `liveWarnings` (D3 determinism hardening)
+
+`{items, nextCursor, watermark}` is the **hash-stable body**: every field is a pure function of persisted columns alone (never the request's wall-clock instant), listed field-by-field below. `liveWarnings` is explicitly **excluded** from that guarantee — its content is a function of persisted state **and** `now` (the reference instant `TournamentOperationsBoardService.list()` resolves exactly once per call, defaulting to the real current time, and threads explicitly into every row's time-relative computation so one response is never internally inconsistent). A determinism oracle comparing two reads separated by real time with zero intervening writes must compare `{items, nextCursor, watermark}` only and may ignore `liveWarnings`; `liveWarnings` legitimately differs across such reads if a fixture/assignment straddles the `scheduledAt-60m`/`expiresAt` boundary between them — that is correct, live behavior, not a bug.
+
+Stable body field → persisted source:
+
+| Field | Persisted source |
+|---|---|
+| `items[].fixtureId` | `V1TournamentFixture.id` |
+| `items[].tournamentId` | `V1TournamentFixture.tournamentId` |
+| `items[].round` | `V1TournamentFixture.round` |
+| `items[].fixtureNumber` | `V1TournamentFixture.fixtureNumber` |
+| `items[].gameId` | `V1Game.id` (via `fixture.game`, nullable) |
+| `items[].gameState` | `V1Game.state` |
+| `items[].fieldId` | `V1TournamentFixture.fieldId` |
+| `items[].fieldName` | `V1TournamentField.name` (via `fixture.field`) |
+| `items[].homeRegistrationId` | `V1TournamentFixture.homeRegistrationId` |
+| `items[].awayRegistrationId` | `V1TournamentFixture.awayRegistrationId` |
+| `items[].scheduledAt` | `V1TournamentFixture.scheduledAt` |
+| `items[].currentScore` | `V1GameResultRevision.score` (via `game.currentOfficialRevision`) |
+| `items[].warnings` | `NO_FIELD_ASSIGNED` ← `fieldId`; `MISSING_SCORER` ← `currentOfficialRevision.missingScorer`; `RESULT_REVIEW_OVERDUE` ← `V1ResultEscalation.status` |
+| `items[].version` | `V1Game.version` |
+| `items[].revisionId` | `V1Game.currentOfficialRevisionId` |
+| `items[].stableRevision` | `sha256` of `[fixture.updatedAt, field.version, game.version, game.updatedAt, revisionId, maxEscalationVersion, maxEscalationUpdatedAt]` — see "Incremental key" above |
+| `nextCursor` | opaque-encoded `(tournamentId, round, fixtureNumber, id)` of the last page row (keyset cursor; no longer a bare `V1TournamentFixture.id` — Task 18 review P1-1/P1-2) |
+| `watermark` | `sha256` hash of the page's ordered `(fixtureId, stableRevision)` list |
+
+`liveWarnings[].fixtureId` correlates back to `items[].fixtureId` (not new information); `liveWarnings[].warnings` holds only `NO_STAFF_ASSIGNED` (← `V1TournamentStaffAssignment.expiresAt` vs. request instant) and `LINEUP_NOT_SUBMITTED` (← `V1TournamentFixture.scheduledAt - 60m` vs. request instant, plus the latest `V1GameLineup.state` per side).
+
+Any hash-equality check spanning real time (e.g. `scripts/qa/verify-game-result-cutover.mjs`'s `liveCutover()`, which hashes the *whole* response body including `liveWarnings`) still requires its fixtures/assignments held away from the two time-relative boundaries so `liveWarnings` itself doesn't change between reads either — exactly as this repo's own Task 18 integration spec's fixtures already are (`overdueFixture.scheduledAt` is 3h in the past; the seeded staff assignment has `expiresAt: null`) — but the *architectural* guarantee (the stable body is provably pure) no longer depends on that convention being followed correctly; the integration spec proves it directly by calling `list()` with two `now` values 10+ minutes apart and zero DB writes between them, and asserting `{items, nextCursor, watermark}` is byte-identical while `liveWarnings` is allowed (and, for a fixture straddling the boundary, expected) to differ.
+
+### Retired: compare-read authority seam (Task 10 cutover cleanup)
+
+This section used to document a `GAME_READ_AUTHORITY` DI seam (`GameReadAuthorityPort`, `CompareGameReadAuthorityService`, `DirectGameReadAuthorityService`) that the board consulted whenever the `GAME_READ` operation flag was `'compare'` — comparing legacy vs. projected game results row-by-row and failing the whole page closed (`409 GAME_RESULT_READ_MISMATCH`/`409 GAME_RESULT_READ_STALE`) on any divergence, plus a `500 GAME_READ_FLAG_MISSING`/`500 GAME_READ_FLAG_INVALID`/`500 GAME_READ_AUTHORITY_NOT_CONFIGURED` fail-closed contract for the flag/binding itself.
+
+The Task 10 GAME_WRITE/GAME_READ cutover this seam supported is complete and permanent — alpha ran `GAME_READ=new` in production with no rollback for a full cutover cycle — so `GameOperationFlagKey` no longer has a `GAME_READ` value at all (see `apps/v1_api/src/config/game-operation-flags.ts`'s top-level doc comment), and `TournamentOperationsBoardService.list()` now unconditionally serves what `'new'` mode always served: no flag read, no comparator call, no `'legacy'`/`'compare'` branch. The response shape, ordering, `stableRevision` hash, and `watermark` are byte-for-byte identical to what `GAME_READ=new` already produced. The DI seam (port + both implementations) and the comparator/backfill implementation it called (`games/migration/game-result-backfill.ts`, `games/migration/compare-game-result-reads.ts`) were deleted along with it — they had no other caller. `TournamentOperationsBoardModule` is a plain static module now (no more `register(authorityProvider?)` override seam).
+
+### Single consistent read snapshot (P1 fix, Task 18 review finding #6)
+
+All persisted reads that feed the stable body — the fixture page, lineups, `V1GameSide` rows, escalations, and staff assignments — run inside ONE `RepeatableRead` Prisma interactive transaction, so the response reflects a single database instant rather than tearing across several independent round-trips (an escalation opening/closing, or a staff assignment being granted/revoked, between two previously-independent queries could otherwise produce a response that never corresponded to any real committed state).
+
+`V1GameOperationsWorkerModule` (the `GameOperationFlagsController`/`ResultEscalationController`/`PlatformResultEscalationController` bundle bootstrapped by the standalone `v1-game-operations-worker.main.ts` process) is **not** imported by the main `AppModule` from Task 18. `ResultEscalationController`/`PlatformResultEscalationController` are already mounted once via `NotificationsModule` — importing the worker module wholesale here would have registered both controllers a second time at the identical routes (Express tolerates this silently, so it would not have turned CI red on its own). Exposing `/tournament-ops/operation-flags/*` on the live API process is a different task's job on its own branch; Task 18 does not reproduce that wiring.
+
+### Errors
+
+| HTTP | Code | Meaning |
+|---|---|---|
+| `401` | — | unauthenticated |
+| `403` | `STAFF_SCOPE_DENIED` | no eligible staff scope for this tournament |
+| `400` | `OPERATIONS_BOARD_WARNING_FILTER_NOT_STABLE` | `?warning=` carried a time-relative code (`NO_STAFF_ASSIGNED`/`LINEUP_NOT_SUBMITTED`); only stable codes may filter `items` |
+(`GAME_RESULT_READ_MISMATCH`/`GAME_RESULT_READ_STALE`/`GAME_READ_FLAG_MISSING`/`GAME_READ_FLAG_INVALID`/`GAME_READ_AUTHORITY_NOT_CONFIGURED` were retired with the compare-read authority seam above — none of them can occur anymore.)
+
+A cursor that fails to decode, or decodes but names a different tournament than the one being queried, is no longer a distinguishing `400` — both now yield the identical clean empty page (see the Query section above; Task 18 review P1-1 removed the prior `400 OPERATIONS_BOARD_CURSOR_TOURNAMENT_MISMATCH` response for exactly this reason).
+
+## Result review, officialize, correction, and void (Task 22)
+
+`apps/v1_api/src/tournament-operations/results/tournament-result-review.{service,controller,dto}.ts`, registered in the existing `TournamentsModule` (this module is not owned by any Task 127 todo, so this lane wires its new controller/provider there rather than in `apps/v1_api/src/games/**`, which Task 6 owns with no further serial-ownership transfer to this lane). All five routes below are physically declared in this lane's own controller, not `GamesController`, but are still mounted at the SAME `/api/v1/games/:gameId/...` prefix the [frozen REST registry](../global-contract.md#frozen-rest-and-idempotency-contract) names -- a Nest route path is independent of which file declares the controller class.
+
+`TournamentResultReviewService` deliberately does not call `GamesService.withCommand`/`resolveActor` (both `private`, and the frozen plan's serial-ownership whitelist has no further transfer of `games.service.ts` past Task 6/9/14/16). It reimplements the same generic command-boundary shape -- row lock, `expectedVersion` CAS, `V1IdempotencyRecord` replay, actor audit -- using only already-public building blocks: `apps/v1_api/src/games/core`'s exported contract functions (`assertGameCommandContext`, `assertRevisionTransition`, `assertRevisionSupersession`, `resolveGameIdempotency`, `validateGameResultInvariants`), `canonicalGameCommandPayloadHash`/`gameOperationAuditActor`/`toGameHttpException` (public exports of `games.service.ts`, unmodified by this lane), the shared `OperationAuditWriterService`, and Task 7's already-shipped `TournamentStaffAccessService.assertAccess()` for actor resolution in place of `GamesService.resolveActor`'s tournament branch.
+
+**Two small, deliberate touches outside this lane's own directory, called out per the project's ownership discipline:**
+
+1. `apps/v1_api/src/tournaments/staff/tournament-staff-policy.ts` (Task 7) gains two new `TournamentStaffAction` members, `'result_review'` and `'result_officialize'` (both authorized only for `platform_ops`/`tournament_director` in `allowsRoleAction()`). This is the single shared authorization-action vocabulary every tournament-operations lane extends when it adds a new staff-checked action; it cannot be duplicated into this lane's own directory without forking the staff policy into two disagreeing sources of truth.
+2. `apps/v1_api/src/jobs/v1-game-operations-worker.service.ts` (Task 9) registers the new outbox event types this lane's commands emit: `GAME_RESULT_VOIDED` (handled by `GameResultVoidProjectionService`, itself correctly placed inside Task 9's own `apps/v1_api/src/game-operations/**`) plus durable-audit-only registrations for `GAME_RESULT_REJECTED`/`GAME_RESULT_SUPPLEMENT_REQUESTED` (these two close their own review SLA synchronously in the API command itself, via `closeReviewSla()`, so the worker-side handler only needs to make the outbox row's own business key durable). This is Task 9's single outbox-consumer dispatch registry; splitting a second, parallel dispatch mechanism out of it purely to avoid touching this file would be strictly worse than three additive `registerHandler`/`registerDurableAuditHandler` lines.
+
+`voidResultRevision` 자체의 불변식(`base.state` 는 `OFFICIAL`)은 계속 그 메서드 안에서 인라인으로 검사해요(무효 리비전은 draft 단계 없이 terminal `VOID` 로 바로 생성되니까요). 다만 **무효는 결과의 끝이 아니라 '현재 유효한 공식 결과 없음' 상태**예요: 무효 뒤에도 권한자가 결과를 다시 입력해 확정할 수 있어야 경기가 미확정으로 고착되지 않으므로, `apps/v1_api/src/games/core/revision-state-machine.ts` 의 `RevisionSupersessionPurpose` 에 `'VOID_REENTRY'` 를 추가하고 `baseState === VOID` 인 supersession 을 허용해요. `createResultCorrection` 은 base 가 현재 포인터인 VOID 리비전이면 자동으로 이 purpose 를 써서 재입력 `DRAFT` 를 만들고, 이어지는 `.../officialize` 는 기존 CORRECTION 플로우 검사(`draft.supersedesId === game.currentOfficialRevisionId`)를 그대로 통과해 새 공식 결과가 돼요. 기존 공식 리비전과 `VOID` 이력은 append-only 로 모두 보존되고, 공개 화면은 언제나 현재 포인터(=최신 공식 결과)만 노출해요.
+
+`officializeResultRevision` also writes `V1TournamentFixture.status = 'completed'` for the game's own fixture, in the same transaction as the `currentOfficialRevisionId` swap (idempotent on repeat officialize, e.g. a later correction). This is the one exception to the "`V1TournamentFixtureStatus` is dead/unmaintained" note elsewhere in this file: that note describes `GamesService` and the operations board's read path, neither of which ever advances the column. `GameResultBracketProjectionService.project` (Task 9) gates bracket advancement on the source fixture's `status` already being `'completed'`, and nothing wrote that column before this lane -- so bracket advancement could never actually fire. Officialize is this fixture's authoritative "result decided" moment, so this lane writes it synchronously here, keeping the async `GAME_RESULT_OFFICIAL` projection's read consistent with no eventual-consistency gap. Void/reject/request_supplement do not revert it.
+
+Making bracket advancement actually reachable (the fix above) exposed a second, pre-existing Task 9 defect in `GameResultVoidProjectionService.hidePublicCache`: it used to both `UPDATE` every current row for the game to `is_current = false` AND `INSERT` (upsert) a new cache row keyed by the VOID revision's own id, hardcoded to `is_current = false`. That `INSERT` always violated the `v1_guard_game_official_result_cache` BEFORE INSERT trigger (an invariant, not owned by this lane), which requires any inserted row's `revision_id` to reference a revision whose `state = 'OFFICIAL'` -- a VOID revision never qualifies. The always-thrown exception rolled back the *entire* handler transaction, silently undoing the correct `UPDATE` too (the outbox worker just retries in the background; nothing surfaces synchronously). Before this lane's officialize fix, this was unobservable: `GameResultBracketProjectionService.project` also always threw during officialize, so no cache row for this game was ever durably committed in the first place, and "every row is `is_current = false`" was vacuously true over an empty result set. Now that officialize's cache writes actually commit, `hidePublicCache` only performs the `UPDATE`; it no longer inserts a marker row for the VOID revision (nothing reads `v1_game_official_result_cache` expecting one -- "no OFFICIAL revision is current" is already fully represented by every existing row for the game being `is_current = false`).
+
+| Method and route | Body | Result | Actor |
+|---|---|---|---|
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/review-decision` | `ReviewDecisionGameResultRevisionDto {expectedVersion,clientCommandId,decision:reject\|request_supplement,reason}` | terminal `REJECTED`/`SUPPLEMENT_REQUESTED`; closes the revision's pending review SLA in the same transaction | `tournament_director`/`platform_ops` |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/supersede-and-submit` | `SupersedeAndSubmitGameResultRevisionDto {expectedVersion,clientCommandId,score,actualParticipants,eventsHash,mvpParticipantId?,reason}` | atomically creates and submits a same-game successor with a fresh 24h/48h review SLA; base must be `REJECTED`/`SUPPLEMENT_REQUESTED` or `409 RESULT_RESUBMISSION_NOT_ALLOWED` with zero new rows | `tournament_director`/`platform_ops` |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/officialize` | `OfficializeGameResultRevisionDto {expectedVersion,clientCommandId,projectionPreviewHash}` | moves a `SUBMITTED` revision (STANDARD flow) or a correction `DRAFT` (CORRECTION flow) to `OFFICIAL`, atomically swaps `currentOfficialRevisionId`, writes `GAME_RESULT_OFFICIAL` outbox | `platform_ops`; `tournament_director` only while `DIRECTOR_OFFICIALIZE=on` (re-checked fresh on every call -- `403 DIRECTOR_OFFICIALIZE_DISABLED` otherwise) |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/void` | `VoidGameResultRevisionDto {expectedVersion,clientCommandId,reason}` | appends an immutable `VOID` revision and swaps the current pointer; `revisionId` must be the game's CURRENT official revision (`409 REVISION_MUST_BE_SUPERSEDED` otherwise); `409 NEXT_FIXTURE_CONFLICT` before the pointer swap if a downstream bracket fixture already advanced past `scheduled` | same as officialize |
+| `POST /api/v1/games/:gameId/corrections` | `CreateGameResultCorrectionDto {expectedVersion,clientCommandId,baseRevisionId,reason,changes:{score,actualParticipants,eventsHash,mvpParticipantId?}}` | creates a same-game superseding `DRAFT`; creation alone never swaps the pointer. `baseRevisionId` 는 게임의 현재 포인터여야 하고, 그 리비전이 `OFFICIAL` 이면 정정(CORRECTION), `VOID` 면 무효 후 재입력(VOID_REENTRY)으로 동작해요 | `tournament_director`/`platform_ops` (not flag-gated) |
+
+**`baseRevisionId` on `POST .../corrections` must be the game's CURRENT `currentOfficialRevisionId`, not merely any revision whose own `state` column happens to read `OFFICIAL`.** Once a revision is superseded -- by a later correction's officialize, or by a void -- its `state` column stays `OFFICIAL` forever; only the game's separate `currentOfficialRevisionId` pointer moves. `createResultCorrection` now checks `game.currentOfficialRevisionId === base.id` before ever creating the draft (`409 REVISION_MUST_BE_SUPERSEDED` otherwise, zero new rows) -- the earlier defect this closes (checking `base.state === OFFICIAL` alone) was never exploitable end-to-end, because `officializeResultRevision`'s own CORRECTION-flow re-check already blocks such a stale draft from ever reaching `OFFICIAL`, but the stale draft could still be created and left dangling with no test covering that path. `tournament-officialize.integration-spec.ts` now covers it directly.
+
+Every route requires `V1AuthGuard` and reuses the [game aggregate](./games.md)'s versioned mutation/idempotency rules verbatim: `Idempotency-Key` must equal the body's `clientCommandId` (`422 COMMAND_IDEMPOTENCY_KEY_MISMATCH` otherwise); a stale `expectedVersion` is `409 VERSION_CONFLICT`; a replayed key with an identical payload hash returns the original response with `replayed:true`; a replayed key with a different payload hash is `409 IDEMPOTENCY_PAYLOAD_CONFLICT`. Every mutation's actor is resolved through `TournamentStaffAccessService.assertAccess({action:'result_review'|'result_officialize',...})` against the game's owning tournament (via `V1TournamentFixture.tournamentId`) -- a team-match-sourced game (no `tournamentFixtureId`) is `404 GAME_NOT_FOUND` for every route in this table, since these actions exist only for `TOURNAMENT_FIXTURE` games.
+
+### Errors
+
+| HTTP | Code | Meaning |
+|---|---|---|
+| `401` | — | unauthenticated |
+| `403` | `STAFF_SCOPE_DENIED` | actor is not `platform_ops` and holds no `tournament_director` assignment for this game's tournament |
+| `403` | `DIRECTOR_OFFICIALIZE_DISABLED` | a `tournament_director` attempted officialize/void while the flag is `off` |
+| `404` | `GAME_NOT_FOUND` | game not found, or not `TOURNAMENT_FIXTURE`-sourced |
+| `404` | `RESULT_REVISION_NOT_FOUND` | `revisionId`/`baseRevisionId` does not belong to this game |
+| `409` | `VERSION_CONFLICT` \| `IDEMPOTENCY_PAYLOAD_CONFLICT` \| `COMMAND_CONCURRENCY_CONFLICT` | standard versioned-mutation/idempotency races |
+| `409` | `TERMINAL_REVISION_IMMUTABLE` | the target revision is already terminal (`REJECTED`/`SUPPLEMENT_REQUESTED`/`OFFICIAL`/`VOID`/`CHANGE_REQUESTED`) |
+| `409` | `RESULT_RESUBMISSION_NOT_ALLOWED` | `supersede-and-submit` base is not `REJECTED`/`SUPPLEMENT_REQUESTED` |
+| `409` | `PROJECTION_PREVIEW_MISMATCH` | `officialize`'s `projectionPreviewHash` does not match the revision's current content |
+| `409` | `REVISION_MUST_BE_SUPERSEDED` | a correction officialize no longer supersedes the current pointer; a void target is not the current official revision; or a correction's `baseRevisionId` is not the current official revision |
+| `409` | `NEXT_FIXTURE_CONFLICT` | void blocked because a downstream bracket fixture already advanced past `scheduled` |
+| `422` | `PARTICIPANT_INVALID` \| `PARTICIPANT_SIDE_MISMATCH` \| `SCORE_EVENT_MISMATCH` \| `SCORE_INVALID` \| `EVENT_INVALID` | `supersede-and-submit`/`corrections` content invariant violations |
+
+## Fixture videos (highlight/broadcast clips)
+
+`apps/v1_api/src/tournaments/videos/**`. Writes to `V1TournamentFixtureVideo`, which had a read
+path (public records, admin bracket, the results page player) and a seed script but **no production
+write path at all** — the only write-shaped DTO was `RecordResultDto.videos` on a route that always
+throws `409 TOURNAMENT_RESULT_DERIVED_ONLY`. That dead input was removed in the same change.
+
+| Method and route | Body | Result | Actor |
+|---|---|---|---|
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/videos` | — | `{items: [{fixtureId,round,fixtureNumber,legNumber,scheduledAt,status,homeTeamName,awayTeamName,videos[]}]}` | tournament-wide `read` (so `platform_ops`, `tournament_director`, `support_readonly`) |
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos` | — | `{items: FixtureVideo[]}` | `read` on that fixture (adds scoped `field_operator`) |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos` | `{url, title?}` | created `FixtureVideo` (`201`) | `event_append` on that fixture |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos/upload` | multipart `files` (exactly one MP4/WebM/MOV, 200MB) + optional `title` text field | created `FixtureVideo` (`201`) | `event_append` on that fixture |
+| `DELETE /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/videos/:videoId` | — | `{deleted:true}` | `event_append` on that fixture |
+
+`FixtureVideo` is `{id,title,url,sortOrder,source,createdAt}` where `source` is `upload` (our own
+`/uploads/...` path) or `external` (an `http`/`https` link). Source is derived from the URL shape,
+not stored — no schema change was needed.
+
+- **Actor mapping.** Registration/removal is authorized as `event_append`, the only record-append
+  action a `field_operator` holds (`tournament-staff-policy.ts`'s `allowsRoleAction`), so directors
+  and platform ops can register anywhere in their tournament while a field operator can register
+  only on the fixtures (or field) their assignment scopes. `support_readonly` holds `read` only and
+  therefore gets `403 STAFF_SCOPE_DENIED {reason:"ROLE_ACTION_DENIED"}` on every write here.
+- **Authorization happens in the service, not in `TournamentStaffGuard`.** The guard can only see
+  route parameters, and a field-scoped `field_operator` needs the fixture's `fieldId` to be
+  authorized at all — the same reason `TournamentFixtureLineupService` authorizes in the service.
+  Existence is checked only *after* authorization, so a denied caller cannot use `404` vs `403` as
+  a fixture-existence oracle.
+- **URL validation** (`fixture-video-url.ts`): `http`/`https` only (so `javascript:`, `data:`,
+  `vbscript:`, `file:` and protocol-relative `//host/...` are rejected), no embedded credentials,
+  and upload paths must stay inside `/uploads/` (encoded traversal included) with an `mp4`/`webm`/
+  `mov` extension. A rejected URL is `400 FIXTURE_VIDEO_URL_INVALID` with `details.reason`.
+- **An upload URL may only be registered by the account that uploaded it** — the `V1UploadAsset`
+  row must exist, be `kind: video`, and be owned by the caller (`400
+  FIXTURE_VIDEO_UPLOAD_NOT_FOUND` otherwise), so a leaked URL cannot be attached to arbitrary
+  fixtures.
+- **Upload and registration are one request** so a failed registration never leaves an unreferenced
+  200MB file; if registration fails after storage the file and its asset row are rolled back, and
+  an authorization failure discards multer's temp files (multer writes them before the handler
+  runs).
+- **Deleting a video reclaims its file.** When no other `V1TournamentFixtureVideo` row references
+  the same URL, the physical file and the `V1UploadAsset` row (which carries the uploader's
+  retained-storage quota) are deleted; a filesystem failure keeps the ledger row and logs an error
+  rather than orphaning an untracked file. External links have nothing to reclaim. Cascade deletes
+  (fixture removal) do not pass through this service — see the service doc comment.
+- Limits: 10 videos per fixture (`409 FIXTURE_VIDEO_LIMIT_EXCEEDED`), no duplicate URL within a
+  fixture (`409 FIXTURE_VIDEO_DUPLICATE`), upload route throttled to 3/min.

@@ -66,7 +66,7 @@ function shortId(id: string | null | undefined): string {
 function IdCell({ id }: { id: string | null | undefined }) {
   if (!id) return <span className="text-gray-400">—</span>;
   return (
-    <span className="font-mono text-[var(--font-size-micro)] text-gray-600" title={id}>
+    <span className="font-mono text-[var(--font-size-micro)] text-[var(--text-muted)]" title={id}>
       {shortId(id)}
     </span>
   );
@@ -76,7 +76,7 @@ function IdCell({ id }: { id: string | null | undefined }) {
 function ReasonCell({ reason }: { reason: string | null | undefined }) {
   if (!reason) return <span className="text-gray-400">—</span>;
   return (
-    <span className="block max-w-[220px] truncate text-gray-600" title={reason}>
+    <span className="block max-w-[220px] truncate text-[var(--text-muted)]" title={reason}>
       {reason}
     </span>
   );
@@ -130,10 +130,10 @@ function LogDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="audit-log-detail-title"
-        className="flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_32px_rgba(20,28,45,0.14)]"
+        className="flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl bg-[var(--card-surface)] shadow-[0_8px_32px_rgba(20,28,45,0.14)]"
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
-          <h2 id="audit-log-detail-title" className="truncate text-[16px] font-bold text-gray-900">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
+          <h2 id="audit-log-detail-title" className="truncate text-[16px] font-bold text-[var(--text-strong)]">
             {title}
           </h2>
           <button
@@ -141,7 +141,7 @@ function LogDetailModal({
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -155,8 +155,8 @@ function LogDetailModal({
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex gap-3 py-1.5">
-      <dt className="w-[92px] shrink-0 text-[var(--font-size-label)] text-gray-500">{label}</dt>
-      <dd className="min-w-0 flex-1 break-all text-[var(--font-size-body-sm)] text-gray-800">{value}</dd>
+      <dt className="w-[92px] shrink-0 text-[var(--font-size-label)] text-[var(--text-muted)]">{label}</dt>
+      <dd className="min-w-0 flex-1 break-all text-[var(--font-size-body-sm)] text-[var(--text-strong)]">{value}</dd>
     </div>
   );
 }
@@ -165,8 +165,8 @@ function StateBlock({ label, value }: { label: string; value: unknown }) {
   if (value === null || value === undefined) return null;
   return (
     <section className="mt-4">
-      <h3 className="mb-1.5 text-[var(--font-size-label)] font-semibold text-gray-700">{label}</h3>
-      <pre className="max-h-[220px] overflow-auto rounded-xl bg-gray-50 p-3 font-mono text-[var(--font-size-micro)] leading-relaxed text-gray-700">
+      <h3 className="mb-1.5 text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</h3>
+      <pre className="max-h-[220px] overflow-auto rounded-xl bg-[var(--surface-soft)] p-3 font-mono text-[var(--font-size-micro)] leading-relaxed text-[var(--text-body)]">
         {JSON.stringify(value, null, 2)}
       </pre>
     </section>
@@ -267,7 +267,7 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             header: '시각',
             width: 'w-[140px]',
             render: (row) => (
-              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
             ),
           },
           {
@@ -282,7 +282,7 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             key: 'action',
             header: '액션',
             render: (row) => (
-              <span className="font-medium text-gray-900">{adminActionLabel(row.actionType)}</span>
+              <span className="font-medium text-[var(--text-strong)]">{adminActionLabel(row.actionType)}</span>
             ),
           },
           {
@@ -375,7 +375,7 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             header: '시각',
             width: 'w-[140px]',
             render: (row) => (
-              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+              <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(row.createdAt)}</span>
             ),
           },
           {
@@ -468,7 +468,7 @@ export default function AdminAuditPage() {
       <div
         role="tablist"
         aria-label="감사 로그 종류"
-        className="flex items-center gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit"
+        className="flex items-center gap-1 mb-4 bg-[var(--surface-soft)] p-1 rounded-xl w-fit"
       >
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -485,8 +485,8 @@ export default function AdminAuditPage() {
                 'px-4 min-h-[44px] rounded-lg text-[var(--font-size-label)] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 isActive
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
+                  ? 'bg-[var(--card-surface)] text-[var(--text-strong)] shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-body)]',
               ].join(' ')}
             >
               {tab.label}
@@ -514,7 +514,7 @@ export default function AdminAuditPage() {
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 isActive
                   ? 'bg-blue-500 text-white'
-                  : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
+                  : 'bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--blue700)]',
               ].join(' ')}
             >
               {opt.label}

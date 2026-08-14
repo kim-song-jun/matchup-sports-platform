@@ -7,11 +7,14 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { Check } from 'lucide-react';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
+import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
 import { clearStoredV1Session } from '@/lib/session-storage';
+import type { ThemePreference } from '@/lib/theme';
 import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
   useV1AcceptTeamInvitation,
@@ -24,12 +27,14 @@ import {
   useV1MyActivitySummary,
   useV1MyTeams,
   useV1MyTeamMatches,
+  useV1MyTournamentStaffAssignments,
   useV1MasterRegions,
   useV1MasterSports,
   useV1MyJoinApplications,
   useV1Notifications,
   useV1Profile,
   useV1ReceivedInvitations,
+  useV1RecordConsent,
   useV1RejectTeamJoinApplication,
   useV1RemoveTeamMembership,
   useV1ResolveLocation,
@@ -42,12 +47,13 @@ import {
   useV1UpdateMyPreferences,
   useV1UpdateMyRegion,
   useV1UpdateProfile,
+  useV1UpdateRecordConsent,
   useV1UpdateSettings,
   useV1WithdrawalRequest,
   useV1WithdrawMyJoinApplication,
 } from '@/hooks/use-v1-api';
 import { usePendingIds } from '@/hooks/use-pending-ids';
-import { formatMonthDay } from '@/lib/date-utils';
+import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
@@ -94,6 +100,9 @@ export function MyHomePageClient() {
   // 추가 요청이 발생하지 않는다.
   const authMe = useV1AuthMe();
   const phoneVerified = authMe.data?.verification?.phoneVerified;
+  // 대부분의 사용자는 스태프가 아니다 — "대회 운영" 메뉴는 유효한 배정이 있을 때만 노출해야
+  // 하므로(스코프 밖 사용자에게 안 보여야 함) 항상 조회는 하되, 프로필 로딩 후에만 호출한다.
+  const staffAssignments = useV1MyTournamentStaffAssignments({ enabled: Boolean(profile.data) });
 
   const model = useMemo(() => {
     if (!profile.data) {
@@ -122,8 +131,17 @@ export function MyHomePageClient() {
       activitySummary.data,
       hasPendingReview(pendingReviews.data),
       phoneVerified,
+      staffAssignments.data?.items.length ?? 0,
     );
-  }, [profile.data, teams.data, notifications.data, activitySummary.data, pendingReviews.data, phoneVerified]);
+  }, [
+    profile.data,
+    teams.data,
+    notifications.data,
+    activitySummary.data,
+    pendingReviews.data,
+    phoneVerified,
+    staffAssignments.data,
+  ]);
 
   if (profile.isError) {
     return <ErrorState message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void profile.refetch()} />;
@@ -378,9 +396,9 @@ export function ProfileEditPageClient() {
   const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
   /**
    * 미인증 계정이 이 화면에서 authed 모드로 인증을 끝낸 번호.
-   * 미인증 상태에서는 PATCH /me/profile 자체가 V1AuthGuard 의 전역 쓰기 게이트에 막히므로
-   * (403 PHONE_VERIFICATION_REQUIRED), proofToken 만 받아 두는 public 흐름으로는 저장이 끝나지 않는다.
-   * authed 흐름은 서버가 phone·phoneVerifiedAt 을 직접 갱신하므로 그 뒤 저장이 통과한다.
+   * public 흐름은 proofToken 만 발급하고 계정 상태는 건드리지 않아 가입 도중에만 쓸 수 있다.
+   * 이미 로그인한 계정은 authed 흐름이 서버에서 phone·phoneVerifiedAt 을 직접 갱신하므로,
+   * 저장 시 증명 토큰을 다시 실어 보낼 필요가 없다.
    */
   const [inlineVerifiedPhone, setInlineVerifiedPhone] = useState<string | null>(null);
 
@@ -404,7 +422,7 @@ export function ProfileEditPageClient() {
 
   if (profile.isPending) {
     return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
         <PageSkeleton variant="detail" />
       </AppChrome>
     );
@@ -412,7 +430,7 @@ export function ProfileEditPageClient() {
 
   if (profile.isError || !profile.data) {
     return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
         <div className="tm-my-shell">
           <ErrorState
             message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
@@ -575,12 +593,9 @@ export function ProfileEditPageClient() {
       return;
     }
 
-    // 미인증 계정은 저장 요청 자체가 서버 게이트(PHONE_VERIFICATION_REQUIRED)에 막힌다.
-    // 이 화면의 인증 카드로 먼저 끝내게 안내한다 — 저장을 눌러 403 토스트를 보게 두지 않는다.
-    if (accountPhoneUnverified && !phoneVerifiedInline) {
-      setFieldErrors({ phone: '휴대폰 본인인증을 먼저 완료해 주세요.' });
-      return;
-    }
+    // 미인증이라는 이유만으로 저장을 막지 않는다. 인증 도입 이전에 가입한 레거시 계정도
+    // 자기 프로필은 고칠 수 있어야 한다 — 서버의 쓰기 게이트도 /me 를 열어 두고 있다.
+    // 번호를 바꾸는 경우만 위에서 증명을 요구하며, 그건 서버가 최종적으로 다시 강제한다.
 
     if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
       setFieldErrors({ birthDate: '올바른 생년월일을 입력해 주세요. (예: 1995-01-15)' });
@@ -757,21 +772,21 @@ export function ProfileEditPageClient() {
             </span>
           ) : accountPhoneUnverified ? (
             <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-              아직 본인인증 전이에요. 저장하려면 이 번호로 인증을 먼저 끝내 주세요.
+              아직 본인인증 전이에요. 프로필 저장은 그대로 되지만, 팀·대회·채팅을 이용하려면 인증이 필요해요.
             </span>
           ) : null}
         </label>
 
         {/*
           번호를 바꿨거나 계정이 아직 미인증이면 이 자리에서 인증을 끝낼 수 있게 카드를 띄운다.
-          미인증 계정은 public(proofToken) 흐름으로는 저장이 끝나지 않는다 — 저장 요청 자체가
-          V1AuthGuard 의 쓰기 게이트에 막히므로, 서버 인증 상태를 직접 바꾸는 authed 흐름을 쓴다.
+          미인증 계정에는 authed 흐름을 쓴다 — public(proofToken) 흐름은 가입 중에만 쓸 수 있고,
+          이미 로그인한 계정의 phone·phoneVerifiedAt 을 서버가 직접 갱신해 주는 쪽이 authed 다.
+          저장을 막는 장치가 아니라 인증을 여기서 끝낼 수 있게 해 주는 안내다.
         */}
         {showPhoneVerification ? (
           <PhoneVerificationCard
             mode={accountPhoneUnverified ? 'authed' : 'public'}
             phone={phoneDigits}
-            surface="inset"
             onVerified={(token) => {
               if (accountPhoneUnverified) setInlineVerifiedPhone(phoneDigits);
               else setPhoneProofToken(token ?? null);
@@ -1330,7 +1345,7 @@ export function NotificationSettingsPageClient() {
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
     return (
-      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
         <div className="tm-my-shell">
           <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
         </div>
@@ -1441,7 +1456,7 @@ export function NotificationSettingsPageClient() {
                     </div>
                     <span
                       className="tm-text-caption"
-                      style={{ minWidth: 24, textAlign: 'right', color: showAsOn ? 'var(--blue500)' : 'var(--text-caption)' }}
+                      style={{ minWidth: 24, textAlign: 'right', color: showAsOn ? 'var(--blue700)' : 'var(--text-caption)' }}
                       aria-hidden="true"
                     >
                       {pushRegistration.isPending ? '···' : pushRegistration.isSubscribed ? 'ON' : 'OFF'}
@@ -1454,7 +1469,7 @@ export function NotificationSettingsPageClient() {
           ) : null}
           {pushError ? (
             <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>브라우저 알림을 켜지 못했어요</div>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>브라우저 알림을 켜지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{pushError}</div>
             </Card>
           ) : null}
@@ -1470,7 +1485,7 @@ export function NotificationSettingsPageClient() {
           </Card>
           {toggleError ? (
             <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
             </Card>
           ) : null}
@@ -1502,6 +1517,174 @@ export function NotificationSettingsPageClient() {
                     {enabled ? 'ON' : 'OFF'}
                   </span>
                   <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+// F2: 이 문자열이 바뀌면(정책 개정) 기존 GRANTED 동의는 재동의를 요구해야 한다는 뜻이지만,
+// 지금은 v1 최초 버전이라 상수 하나로 고정한다 — 서버는 이 값을 그대로
+// V1UserRecordConsent.policyHash에 저장할 뿐 검증하지 않는다(신뢰 경계는 프론트가 아니라
+// "무엇에 동의했는지" 감사 로그 목적).
+const RECORD_CONSENT_POLICY_HASH = 'v1-public-record-consent-1';
+
+export function RecordConsentSettingsPageClient() {
+  const consent = useV1RecordConsent();
+  const update = useV1UpdateRecordConsent();
+  const [toggleError, setToggleError] = useState(false);
+
+  if (consent.isError) {
+    return (
+      <AppChrome title="경기 기록 공개" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+        <div className="tm-my-shell">
+          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void consent.refetch()} />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const granted = Boolean(consent.data?.granted);
+  const toggle = () => {
+    setToggleError(false);
+    update.mutate(
+      { granted: !granted, policyHash: RECORD_CONSENT_POLICY_HASH },
+      { onError: () => setToggleError(true) },
+    );
+  };
+
+  return (
+    <AppChrome title="경기 기록 공개" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+      <div className="tm-my-shell">
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">경기 기록 공개</h1>
+          </div>
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">공개 프로필에 경기 기록 표시</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              팀 라인업에 내 계정으로 연결된 경기가 공개 활동 기록(/users/내ID/records)에 나타나요.
+              {/* 과거 경기까지 소급 공개된다는 게 이 기능의 핵심 조건 — 켜기 전에 반드시
+                  알아야 한다(사용자 명시 결정: "모두 그냥 다 보이게"). */}
+              {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
+            </div>
+          </Card>
+          {toggleError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+            </Card>
+          ) : null}
+          <div className="tm-card" style={{ padding: 0 }}>
+            <button
+              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+              onClick={toggle}
+              type="button"
+              disabled={consent.isLoading || update.isPending}
+              role="switch"
+              aria-checked={granted}
+              aria-label="경기 기록 공개"
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body">경기 기록 공개</div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                  {update.isPending
+                    ? '저장하는 중이에요…'
+                    : granted
+                      ? '지금 공개돼 있어요. 끄면 새 경기부터 다시 비공개예요.'
+                      : '지금은 비공개예요. 켜면 과거 경기까지 함께 공개돼요.'}
+                </div>
+              </div>
+              <span
+                className="tm-text-caption"
+                style={{ minWidth: 24, textAlign: 'right', color: granted ? 'var(--blue500)' : 'var(--text-caption)' }}
+                aria-hidden="true"
+              >
+                {granted ? 'ON' : 'OFF'}
+              </span>
+              <span className={`tm-toggle ${granted ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+            </button>
+          </div>
+          {granted && consent.data?.effectiveAt ? (
+            <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+              {formatTournamentDateTimeLong(consent.data.effectiveAt)}부터 공개하고 있어요.
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+const THEME_OPTIONS: { key: ThemePreference; label: string; sub: string }[] = [
+  { key: 'light', label: '라이트', sub: '항상 밝은 화면으로 봐요' },
+  { key: 'dark', label: '다크', sub: '항상 어두운 화면으로 봐요' },
+  { key: 'system', label: '기기 설정', sub: '내 기기의 화면 모드를 따라가요' },
+];
+
+export function ThemeSettingsPageClient() {
+  const { preference, setPreference, isSaving, saveError } = useTheme();
+
+  return (
+    <AppChrome title="화면 테마" activeTab="my" bottomNav={false} backHref="/my/settings">
+      <div className="tm-my-shell">
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">화면 테마</h1>
+          </div>
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">화면 밝기 고르기</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              기본값은 라이트예요. 로그인하면 이 기기뿐 아니라 다른 기기에서도 같은 설정으로 보여요.
+            </div>
+          </Card>
+          {saveError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요. 이 화면에서는 그대로 적용돼요.</div>
+            </Card>
+          ) : null}
+          <div className="tm-card" style={{ padding: 0 }} role="radiogroup" aria-label="화면 테마 선택">
+            {THEME_OPTIONS.map((option) => {
+              const selected = preference === option.key;
+              return (
+                <button
+                  key={option.key}
+                  className="tm-my-menu-row tm-pressable"
+                  onClick={() => setPreference(option.key)}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  // 저장 중엔 다른 옵션도 함께 막는다 — 선택된 행만 막으면 저장 대기 중에
+                  // 다른 옵션을 눌러 PATCH 두 개가 동시에 날아갈 수 있고, 응답이 뒤바뀌어
+                  // 도착하면 서버에 최종 저장되는 값이 마지막 클릭과 달라질 수 있다.
+                  disabled={isSaving}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    cursor: isSaving ? 'default' : 'pointer',
+                    textAlign: 'left',
+                    background: selected ? 'var(--tint-blue)' : 'none',
+                    opacity: isSaving && !selected ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="tm-text-body" style={{ color: selected ? 'var(--blue700)' : undefined }}>{option.label}</div>
+                    <div className="tm-text-caption" style={{ marginTop: 3 }}>{option.sub}</div>
+                  </div>
+                  {/* 컬러만으로 선택 상태를 전달하지 않도록 체크 아이콘 + 배경색을 함께 사용 */}
+                  {selected ? <Check size={18} strokeWidth={2.5} color="var(--blue500)" aria-hidden="true" /> : null}
                 </button>
               );
             })}
@@ -1624,12 +1807,24 @@ function toMyHomeModel(
   activitySummary?: V1MyActivitySummary,
   hasPendingReviews?: boolean,
   phoneVerified?: boolean,
+  staffTournamentCount = 0,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
   const activityCount = activitySummary?.totals.activityCount ?? '—';
   const monthlyMatchCount = activitySummary?.monthly.matchCount ?? '—';
   const sections = myHomeModel.sections.map((section) => ({ ...section, items: [...section.items] }));
+  // F3: 마이페이지에서 내 활동 기록(/users/:id/records)으로 가는 동선이 아예 없었다 —
+  // 정적 myHomeModel엔 내 userId를 미리 넣을 수 없어 여기서 프로필 응답으로 동적으로 붙인다.
+  const myActivitySection = sections.find((section) => section.title === '내 활동');
+  if (myActivitySection && !myActivitySection.items.some((item) => item.href === `/users/${profile.userId}/records`)) {
+    myActivitySection.items.push({
+      label: '내 활동 기록',
+      sub: '팀 라인업에 연결된 경기 기록을 확인해요',
+      href: `/users/${profile.userId}/records`,
+      icon: 'Award',
+    });
+  }
   const communitySection = sections.find((section) => section.title === '커뮤니티');
   if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
     communitySection.items.push({
@@ -1637,6 +1832,22 @@ function toMyHomeModel(
       sub: hasPendingReviews ? '작성할 리뷰가 있어요' : '작성한 리뷰와 받은 리뷰를 확인해요',
       href: '/my/reviews',
       icon: 'Star',
+    });
+  }
+  // 스태프가 아닌 대부분의 사용자에게는 이 섹션 자체가 없어야 한다 — 유효한(만료·해제되지
+  // 않은) 배정이 하나라도 있을 때만 추가한다. "내 활동" 바로 다음에 둬서, 지금 처리해야
+  // 하는 운영 업무가 있다는 신호가 눈에 잘 띄게 한다.
+  if (staffTournamentCount > 0 && !sections.some((section) => section.title === '대회 운영')) {
+    sections.splice(1, 0, {
+      title: '대회 운영',
+      items: [
+        {
+          label: '담당 대회 운영',
+          sub: `담당 중인 대회 ${staffTournamentCount}개`,
+          href: '/my/tournament-staff',
+          icon: 'ShieldCheck',
+        },
+      ],
     });
   }
   if (!sections.some((section) => section.title === '문의')) {

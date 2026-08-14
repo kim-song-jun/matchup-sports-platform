@@ -53,8 +53,8 @@ interface AdminDataTableProps<T> {
   tableMaxWidth?: string;
   /**
    * #9: Per-row visual tone for dangerous/warning states (suspended, blocked, cancelled…).
-   * danger → bg-red-50/40 + left red accent bar.
-   * warning → bg-amber-50/40 + left amber accent bar.
+   * danger → var(--red50)/40 + left red accent bar.
+   * warning → var(--tint-orange) + left amber accent bar.
    */
   rowTone?: (row: T) => 'danger' | 'warning' | undefined;
   /**
@@ -88,12 +88,12 @@ function alignClass(align: AdminTableColumn<unknown>['align']): string {
 // ── Component ─────────────────────────────────────────────────────────────
 // #9: row tone → Tailwind class maps
 const ROW_TONE_TR: Record<'danger' | 'warning', string> = {
-  danger: 'bg-red-50/40',
-  warning: 'bg-amber-50/40',
+  danger: 'bg-[var(--red50)]/40',
+  warning: 'bg-[var(--tint-orange)]',
 };
 const ROW_TONE_ACCENT: Record<'danger' | 'warning', string> = {
   danger: 'border-l-2 border-l-red-400',
-  warning: 'border-l-2 border-l-amber-400',
+  warning: 'border-l-2 border-l-[var(--orange500)]',
 };
 
 export function AdminDataTable<T>({
@@ -117,13 +117,13 @@ export function AdminDataTable<T>({
   // Error state
   if (error) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 py-10 px-4 flex flex-col items-center gap-3 text-center">
-        <p className="text-sm text-red-500 font-medium">{error}</p>
+      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
+        <p className="text-sm text-[var(--red700)] font-medium">{error}</p>
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             다시 시도하기
           </button>
@@ -135,7 +135,7 @@ export function AdminDataTable<T>({
   // Loading state
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
         <AdminListSkeleton rows={skeletonRows} />
       </div>
     );
@@ -144,7 +144,7 @@ export function AdminDataTable<T>({
   // Empty state
   if (rows.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
         {empty ?? <AdminEmpty title="항목이 없어요" description="다른 조건으로 검색해 보세요." />}
       </div>
     );
@@ -162,12 +162,12 @@ export function AdminDataTable<T>({
     // 여기 <table> 자체에 같이 걸면 w-max로 콘텐츠 폭까지 자라야 할 테이블이
     // 그 cap에 눌려 overflow-x-auto 스크롤 대신 다시 컬럼 압축이 재발한다.
     const tableClassName = compact
-      ? 'w-max min-w-full text-[13px] text-gray-700'
-      : 'w-max min-w-full text-sm text-gray-700';
+      ? 'w-max min-w-full text-[13px] text-[var(--text-body)]'
+      : 'w-max min-w-full text-sm text-[var(--text-body)]';
 
     return (
       <table className={tableClassName}>
-        <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 z-10">
+        <thead className="sticky top-0 bg-[var(--card-surface)] border-b border-[var(--border)] z-10">
           <tr>
             {columns.map((col) => (
               <th
@@ -175,7 +175,7 @@ export function AdminDataTable<T>({
                 scope="col"
                 className={[
                   cellPad,
-                  'font-semibold text-gray-600 text-[12px] tracking-wide whitespace-nowrap select-none',
+                  'font-semibold text-[var(--text-muted)] text-[12px] tracking-wide whitespace-nowrap select-none',
                   alignClass(col.align),
                   col.width ?? '',
                   col.className ?? '',
@@ -187,7 +187,7 @@ export function AdminDataTable<T>({
             {hasActions && (
               <th
                 scope="col"
-                className={[cellPad, 'font-semibold text-gray-600 text-[12px] tracking-wide text-right whitespace-nowrap'].join(' ')}
+                className={[cellPad, 'font-semibold text-[var(--text-muted)] text-[12px] tracking-wide text-right whitespace-nowrap'].join(' ')}
               >
                 {actionsHeader ?? '작업'}
               </th>
@@ -220,7 +220,7 @@ export function AdminDataTable<T>({
                 className={[
                   'transition-colors',
                   onRowClick
-                    ? 'cursor-pointer hover:bg-gray-50/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2'
+                    ? 'cursor-pointer hover:bg-[var(--surface-soft)]/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2'
                     : '',
                   tone ? ROW_TONE_TR[tone] : '',
                 ].filter(Boolean).join(' ')}
@@ -260,7 +260,7 @@ export function AdminDataTable<T>({
     <>
       {/* ── Desktop table (lg+) ─────────────────────────────────────────── */}
       {/* max-w-[900px]: tableMaxWidth 미전달 시 과폭 방지 기본 캡 (1920+ 대응) */}
-      <div className={['hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden', tableMaxWidth ?? 'max-w-[900px]'].join(' ')}>
+      <div className={['hidden lg:block bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden', tableMaxWidth ?? 'max-w-[900px]'].join(' ')}>
         <div className="overflow-x-auto">
           {renderTable(false)}
         </div>
@@ -275,7 +275,7 @@ export function AdminDataTable<T>({
         <div className="lg:hidden overflow-x-auto -mx-4 px-4">
           {/* w-max min-w-full: 카드가 테이블 콘텐츠 폭만큼 자라야 바깥 래퍼가 스크롤된다 —
               카드 폭이 뷰포트에 갇히면 overflow-hidden이 넘친 컬럼을 잘라낸다 */}
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden w-max min-w-full">
+          <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden w-max min-w-full">
             {renderTable(true)}
           </div>
         </div>
@@ -286,18 +286,18 @@ export function AdminDataTable<T>({
             return (
             <li
               key={keyExtractor(row)}
-              className={['bg-white rounded-xl border border-gray-100 px-4 py-3', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
+              className={['bg-[var(--card-surface)] rounded-xl border border-[var(--border)] px-4 py-3', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
             >
               <dl className="flex flex-col gap-1.5">
                 {columns.map((col) => (
                   <div key={col.key} className="flex items-start gap-2 text-[13px]">
-                    <dt className="shrink-0 text-gray-400 w-[90px] font-medium">{col.header}</dt>
-                    <dd className="text-gray-800 flex-1 tabular-nums">{col.render(row)}</dd>
+                    <dt className="shrink-0 text-[var(--text-muted)] w-[90px] font-medium">{col.header}</dt>
+                    <dd className="text-[var(--text-body)] flex-1 tabular-nums">{col.render(row)}</dd>
                   </div>
                 ))}
               </dl>
               {hasActions && (
-                <div className="mt-3 flex items-center gap-2 justify-end border-t border-gray-50 pt-2.5">
+                <div className="mt-3 flex items-center gap-2 justify-end border-t border-[var(--border)] pt-2.5">
                   {renderActions!(row)}
                 </div>
               )}
@@ -342,7 +342,7 @@ export function AdminTablePaginationBar({
       className="flex flex-wrap items-center justify-between gap-3 pt-1"
       aria-label="목록 페이지"
     >
-      <p className="text-[var(--font-size-label)] text-gray-500 tabular-nums">
+      <p className="text-[var(--font-size-label)] text-[var(--text-muted)] tabular-nums">
         전체 {total.toLocaleString('ko-KR')}건 중 {from.toLocaleString('ko-KR')}–
         {to.toLocaleString('ko-KR')}
       </p>
@@ -352,7 +352,7 @@ export function AdminTablePaginationBar({
           type="button"
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1 || loading}
-          className={[btn, 'text-gray-600 hover:bg-gray-100'].join(' ')}
+          className={[btn, 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]'].join(' ')}
           aria-label="이전 페이지"
         >
           이전
@@ -363,7 +363,7 @@ export function AdminTablePaginationBar({
             // 페이지가 많을 때의 생략 구간. 버튼이 아니므로 포커스를 받지 않는다.
             <span
               key={`gap-${index}`}
-              className="px-1 text-gray-400 select-none"
+              className="px-1 text-[var(--text-muted)] select-none"
               aria-hidden="true"
             >
               …
@@ -381,7 +381,7 @@ export function AdminTablePaginationBar({
                 'tabular-nums',
                 item === page
                   ? 'bg-blue-500 text-white'
-                  : 'text-gray-600 hover:bg-gray-100',
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]',
               ].join(' ')}
             >
               {item}
@@ -393,7 +393,7 @@ export function AdminTablePaginationBar({
           type="button"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages || loading}
-          className={[btn, 'text-gray-600 hover:bg-gray-100'].join(' ')}
+          className={[btn, 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]'].join(' ')}
           aria-label="다음 페이지"
         >
           다음

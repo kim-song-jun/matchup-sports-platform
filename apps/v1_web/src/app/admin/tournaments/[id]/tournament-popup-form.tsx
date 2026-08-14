@@ -6,14 +6,14 @@ import type { V1TournamentPopupStatus } from '@/types/api';
 import type { PopupForm } from './tournament-popup-admin-model';
 
 const inputCls = [
-  'h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-[13px] text-gray-900',
+  'h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[13px] text-[var(--text-strong)]',
   'outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2',
-  'focus:ring-blue-100 disabled:bg-gray-50 disabled:text-gray-400',
+  'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
 const textareaCls = [
-  'min-h-[96px] rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[13px] text-gray-900',
+  'min-h-[96px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-[13px] text-[var(--text-strong)]',
   'outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2',
-  'focus:ring-blue-100 disabled:bg-gray-50 disabled:text-gray-400',
+  'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
 const primaryBtnCls = [
   'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-blue-500 px-4',
@@ -21,8 +21,8 @@ const primaryBtnCls = [
   'disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 const secondaryBtnCls = [
-  'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-gray-200',
-  'bg-white px-4 text-[13px] font-semibold text-gray-700 transition-colors hover:bg-gray-50',
+  'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--border)]',
+  'bg-[var(--card-surface)] px-4 text-[13px] font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)]',
   'active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 
@@ -48,13 +48,13 @@ export function TournamentPopupForm({
   readonly setField: <K extends keyof PopupForm>(field: K, value: PopupForm[K]) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white px-5 py-5">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[15px] font-bold text-gray-900">
+          <h3 className="text-[15px] font-bold text-[var(--text-strong)]">
             {mode === 'update' ? '팝업 수정' : '팝업 추가'}
           </h3>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             대회 상세 페이지 진입 시 노출되는 공지·홍보 팝업이에요. 발행 상태 + 노출 기간 안에서만 보여요.
           </p>
         </div>
@@ -62,7 +62,7 @@ export function TournamentPopupForm({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-700"
+            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-body)]"
             aria-label="수정 취소"
           >
             <X size={16} aria-hidden="true" />
@@ -171,13 +171,13 @@ function Field({
   readonly children: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-[13px] text-gray-900">
+    <label className="flex flex-col gap-1.5 text-[13px] text-[var(--text-strong)]">
       <span>
         {label}
         {required ? (
           <>
             {' '}
-            <span className="text-red-500" aria-hidden="true">*</span>
+            <span className="text-[var(--red700)]" aria-hidden="true">*</span>
             <span className="sr-only">(필수)</span>
           </>
         ) : null}

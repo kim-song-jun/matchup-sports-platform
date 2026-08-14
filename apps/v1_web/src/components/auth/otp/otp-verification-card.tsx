@@ -186,7 +186,7 @@ export function OtpVerificationCard({
         style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}
       >
         <CheckCircle2 size={20} color="var(--blue500)" aria-hidden="true" />
-        <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue500)' }}>
+        <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue700)' }}>
           {verifiedMessage}
         </p>
       </div>
@@ -255,7 +255,7 @@ export function OtpVerificationCard({
             <span
               id={remainingId}
               className="tm-text-caption"
-              style={{ color: expired ? 'var(--red500)' : 'var(--text-muted)' }}
+              style={{ color: expired ? 'var(--red700)' : 'var(--text-muted)' }}
             >
               {expired ? '인증번호를 다시 받아 주세요' : `남은 시간 ${minutes}:${String(seconds).padStart(2, '0')}`}
             </span>

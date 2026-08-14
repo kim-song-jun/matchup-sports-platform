@@ -10,16 +10,35 @@ export const v1Keys = {
   masterSports: () => [...v1Keys.all, 'master', 'sports'] as const,
   masterRegions: () => [...v1Keys.all, 'master', 'regions'] as const,
   home: (filters?: Record<string, unknown>) => [...v1Keys.all, 'home', filters ?? {}] as const,
-  activePopup: (screen: string | null, path?: string | null) => [...v1Keys.all, 'popups', 'active', screen, path ?? null] as const,
+  activePopup: (screen: string | null) => [...v1Keys.all, 'popups', 'active', screen] as const,
   recentSearches: () => [...v1Keys.all, 'search', 'recent'] as const,
   notices: (filters?: Record<string, unknown>) => [...v1Keys.all, 'notices', filters ?? {}] as const,
   notice: (noticeId: string) => [...v1Keys.all, 'notices', noticeId] as const,
   matches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'matches', filters ?? {}] as const,
   match: (matchId: string) => [...v1Keys.all, 'matches', matchId] as const,
+  myRecentVenues: () => [...v1Keys.all, 'matches', 'me', 'recent-venues'] as const,
   teams: (filters?: Record<string, unknown>) => [...v1Keys.all, 'teams', filters ?? {}] as const,
   team: (teamId: string) => [...v1Keys.all, 'teams', teamId] as const,
+  teamRecentVenues: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'recent-venues'] as const,
   teamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'team-matches', filters ?? {}] as const,
   teamMatch: (teamMatchId: string) => [...v1Keys.all, 'team-matches', teamMatchId] as const,
+  teamSchedules: (teamId: string, filters?: Record<string, unknown>) => [...v1Keys.team(teamId), 'schedules', filters ?? {}] as const,
+  teamSchedule: (teamId: string, scheduleId: string) => [...v1Keys.team(teamId), 'schedules', scheduleId] as const,
+  mySchedule: (filters?: Record<string, unknown>) => [...v1Keys.all, 'me', 'schedule', filters ?? {}] as const,
+  teamMatchLineup: (teamMatchId: string) => [...v1Keys.teamMatch(teamMatchId), 'lineup'] as const,
+  game: (gameId: string) => [...v1Keys.all, 'games', gameId] as const,
+  gameResultRevisions: (gameId: string) => [...v1Keys.game(gameId), 'result-revisions'] as const,
+  gameLineups: (gameId: string) => [...v1Keys.game(gameId), 'lineups'] as const,
+  gameOperationsLineup: (gameId: string) => [...v1Keys.game(gameId), 'operations-lineup'] as const,
+  fixtureLineupAccess: (tournamentId: string, fixtureId: string) =>
+    [...v1Keys.all, 'tournaments', tournamentId, 'fixtures', fixtureId, 'lineup-access'] as const,
+  fixtureLineupRoster: (tournamentId: string, fixtureId: string, sideId: string) =>
+    [...v1Keys.all, 'tournaments', tournamentId, 'fixtures', fixtureId, 'lineup-roster', sideId] as const,
+  myTournamentFixtures: (tournamentId: string) =>
+    [...v1Keys.all, 'tournaments', tournamentId, 'my-fixtures'] as const,
+  teamLineupHistory: (teamId: string) => [...v1Keys.team(teamId), 'lineup-history'] as const,
+  teamLineupPresets: (teamId: string) => [...v1Keys.team(teamId), 'lineup-presets'] as const,
+  lineupTodos: () => [...v1Keys.all, 'me', 'lineup-todos'] as const,
   reviews: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', filters ?? {}] as const,
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,
@@ -31,6 +50,7 @@ export const v1Keys = {
   notifications: (filters?: Record<string, unknown>) => [...v1Keys.notificationsRoot(), filters ?? {}] as const,
   notificationUnreadSummary: () => [...v1Keys.notificationsRoot(), 'unread-summary'] as const,
   notificationPreferences: () => [...v1Keys.all, 'notification-preferences'] as const,
+  recordConsent: () => [...v1Keys.all, 'me', 'record-consent'] as const,
   inquiries: (filters?: Record<string, unknown>) => [...v1Keys.all, 'inquiries', filters ?? {}] as const,
   inquiry: (inquiryId: string) => [...v1Keys.all, 'inquiries', inquiryId] as const,
   profile: () => [...v1Keys.all, 'me', 'profile'] as const,
@@ -60,6 +80,9 @@ export const v1Keys = {
   adminPushFailures: (filters?: { limit?: number }) => [...v1Keys.all, 'admin', 'push-failures', filters ?? {}] as const,
   adminSmsFailures: (filters?: { limit?: number }) => [...v1Keys.all, 'admin', 'sms-failures', filters ?? {}] as const,
   adminOpsSummary: () => [...v1Keys.all, 'admin', 'ops-summary'] as const,
+  adminOperationFlag: (key: string) => [...v1Keys.all, 'admin', 'operation-flags', key] as const,
+  adminOperationFlagsSimplifiedGateStatus: () =>
+    [...v1Keys.all, 'admin', 'operation-flags', 'simplified-gate-status'] as const,
   tournaments: (filters?: Record<string, unknown>) => [...v1Keys.all, 'tournaments', filters ?? {}] as const,
   tournament: (id: string) => [...v1Keys.all, 'tournaments', id] as const,
   tournamentCampaigns: (filters?: Record<string, unknown>) => [...v1Keys.all, 'tournaments', 'campaigns', filters ?? {}] as const,
@@ -74,6 +97,8 @@ export const v1Keys = {
     [...v1Keys.all, 'tournaments', tournamentId, 'registrations', registrationId, 'players'] as const,
   adminTournaments: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'tournaments', filters ?? {}] as const,
   adminTournament: (id: string) => [...v1Keys.all, 'admin', 'tournaments', id] as const,
+  adminLineupSizeOptions: (sportId: string) =>
+    [...v1Keys.all, 'admin', 'competition-configs', 'lineup-size-options', sportId] as const,
   adminTournamentCampaign: (id: string) =>
     [...v1Keys.all, 'admin', 'tournaments', id, 'campaign'] as const,
   adminTournamentRegistrations: (tournamentId: string, filters?: Record<string, unknown>) =>
@@ -90,11 +115,48 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'sponsors'] as const,
   adminTournamentPopups: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'popups'] as const,
+  adminTeamMatchSeriesList: () => [...v1Keys.all, 'admin', 'team-match-series'] as const,
+  adminTeamMatchSeries: (seriesId: string) => [...v1Keys.all, 'admin', 'team-match-series', seriesId] as const,
+  teamMatchSeries: (seriesId: string) => [...v1Keys.all, 'team-match-series', seriesId] as const,
+  teamMatchSeriesStandings: (seriesId: string) => [...v1Keys.teamMatchSeries(seriesId), 'standings'] as const,
+  teamMatchSeriesPlayerRecords: (seriesId: string) => [...v1Keys.teamMatchSeries(seriesId), 'player-records'] as const,
   teamInvitations: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'invitations'] as const,
   receivedInvitations: () => [...v1Keys.all, 'me', 'invitations'] as const,
   myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
+  // Task 21: live tournament operations console (fixture lineup + event backfill).
+  // `game`은 위쪽에 이미 선언돼 있어 여기서 다시 정의하지 않는다 — 양쪽 브랜치가
+  // 동일한 정의를 각각 추가해 머지 시 중복 키가 될 뻔했다.
+  gameEvents: (gameId: string) => [...v1Keys.game(gameId), 'events'] as const,
+  fixtureLineup: (tournamentId: string, fixtureId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'fixtures', fixtureId, 'lineup'] as const,
+  tournamentOperationsBoard: (tournamentId: string, filters?: Record<string, unknown>) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'operations', filters ?? {}] as const,
+  /**
+   * 필터를 뺀 보드 접두사 — **무효화 전용**.
+   *
+   * 보드 쿼리 키는 마지막 원소가 항상 필터 객체이고(`limit` 이 늘 들어가 비는 일이 없다),
+   * `invalidateQueries` 는 접두사 일치라 `tournamentOperationsBoard(id)`(= 필터 `{}`)로는
+   * 실제로 떠 있는 어떤 쿼리와도 안 맞아 **조용히 아무것도 무효화하지 않는다.**
+   * 필터와 무관하게 보드를 다시 읽어야 하는 변경(경기장 배정 등)은 이 키를 쓴다.
+   */
+  tournamentOperationsBoardAll: (tournamentId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'operations'] as const,
+  tournamentOperationsStaff: (tournamentId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'staff'] as const,
+  /**
+   * 스태프 배정 후보 검색. 검색어를 키에 포함해 타이핑마다 캐시가 갈리게 한다 —
+   * 스태프 목록(tournamentOperationsStaff)의 하위 키로 두면 배정·해제 후의 목록
+   * 무효화가 검색 결과까지 통째로 날려 버리므로 형제 키로 분리한다.
+   */
+  tournamentOperationsStaffCandidates: (tournamentId: string, query: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'staff-candidates', query] as const,
+  myTournamentStaffAssignments: () => [...v1Keys.all, 'me', 'tournament-staff'] as const,
+  tournamentOperationsFields: (tournamentId: string) =>
+    [...v1Keys.all, 'tournament-ops', tournamentId, 'fields'] as const,
+  /** 내 스태프 배정(GET /tournament-ops/me/assignments) — identity 스코프라 `all` 접두사를 유지한다. */
+  myTournamentOpsAssignments: () => [...v1Keys.all, 'tournament-ops', 'me', 'assignments'] as const,
 };
 
 // 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아

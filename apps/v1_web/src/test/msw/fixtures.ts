@@ -380,6 +380,7 @@ export const v1ReviewsReceivedFixture: V1ReviewReceivedResponse = {
   items: [
     {
       reviewId: 'review-received-1',
+      anonymous: false,
       sourceType: 'match',
       sourceId: 'match-completed-1',
       targetType: 'user',
@@ -394,6 +395,7 @@ export const v1ReviewsReceivedFixture: V1ReviewReceivedResponse = {
     },
     {
       reviewId: 'review-team-received-1',
+      anonymous: false,
       sourceType: 'team_match',
       sourceId: 'team-match-completed-1',
       targetType: 'team',
@@ -423,6 +425,7 @@ export const v1ReviewMatchSourceFixture: V1ReviewSourceResponse = {
       targetType: 'user',
       targetUserId: 'user-2',
       targetTeamId: null,
+      reviewerTeam: null,
       name: '민준',
       imageUrl: null,
       subtitle: '개인 매치 참가자',
@@ -435,6 +438,7 @@ export const v1ReviewMatchSourceFixture: V1ReviewSourceResponse = {
       targetType: 'user',
       targetUserId: 'user-3',
       targetTeamId: null,
+      reviewerTeam: null,
       name: '서연',
       imageUrl: null,
       subtitle: '개인 매치 참가자',
@@ -459,6 +463,7 @@ export const v1ReviewTeamMatchSourceFixture: V1ReviewSourceResponse = {
       targetType: 'team',
       targetUserId: null,
       targetTeamId: 'team-2',
+      reviewerTeam: { teamId: 'team-1', name: '성수 볼러즈', role: 'owner' },
       name: '마포 FC',
       imageUrl: null,
       subtitle: '상대 팀',
@@ -727,6 +732,7 @@ export const v1SettingsFixture: V1Settings = {
   profile: {
     displayName: '송준',
   },
+  theme: 'light',
   notifications: {
     matchEnabled: true,
     teamEnabled: true,

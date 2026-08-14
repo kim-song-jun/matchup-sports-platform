@@ -75,11 +75,13 @@ export type TeamDetailViewModel = {
     county: string;
     level: string;
     genderRule: string;
-    membersList: Array<{ name: string; role: string; meta: string; status: string; visibility: '공개' | '비공개' }>;
+    membersList: Array<{ name: string; role: string; meta: string; status: string; visibility: '공개' | '비공개'; profileHref?: string }>;
     memberAccess: {
       canView: boolean;
       enabled: boolean;
       message: string;
+      /** 미리보기(최대 8명) 뒤에 남은 인원 수. 0이면 "+N명 더보기" CTA를 노출하지 않는다. */
+      moreCount: number;
     };
   };
   mode: 'default' | 'pending' | 'mine' | 'closed';

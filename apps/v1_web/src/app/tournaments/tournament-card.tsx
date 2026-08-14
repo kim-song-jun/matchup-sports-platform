@@ -7,6 +7,7 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { publicAssetPath } from '@/lib/assets';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import type { V1TournamentListItem } from '@/types/api';
 
@@ -44,6 +45,43 @@ function renderTitleWithBoundStatusPhrases(title: string) {
   );
 }
 
+/**
+ * interactive=true면 실제 목록에서 쓰는 <Link>(참가자가 상세로 이동), false면 순수 미리보기용
+ * <div>(관리자 위저드의 "공개 화면 확인" 단계처럼 클릭·포커스를 막아야 하는 곳)로 렌더한다.
+ * 두 분기 모두 같은 className/style/aria-label을 써서 시각적으로는 완전히 동일하게 보인다.
+ */
+function CardShell({
+  interactive,
+  href,
+  ariaLabel,
+  children,
+}: {
+  interactive: boolean;
+  href: string;
+  ariaLabel: string;
+  children: React.ReactNode;
+}) {
+  const shellStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    padding: '16px 16px 14px',
+    textDecoration: 'none',
+  };
+  if (interactive) {
+    return (
+      <Link className="tm-card tm-pressable" href={href} style={shellStyle} aria-label={ariaLabel}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <div className="tm-card tm-pressable" style={shellStyle} aria-label={ariaLabel}>
+      {children}
+    </div>
+  );
+}
+
 function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
   const pendingPaymentCount = getPendingPaymentCount(item);
   const max = Math.max(item.teamCount, 1);
@@ -65,28 +103,32 @@ function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
   );
 }
 
-export function TournamentCard({ item }: { item: V1TournamentListItem }) {
+export function TournamentCard({
+  item,
+  interactive = true,
+}: {
+  item: V1TournamentListItem;
+  /**
+   * false면 참가자 목록으로 이동하는 <Link>가 아니라 순수 미리보기용 <div>로 렌더한다.
+   * 관리자 위저드의 "공개 화면 확인" 단계처럼 실제 카드 그대로를 보여주되 클릭·포커스는
+   * 막아야 하는 곳에서 쓴다(기본값 true — 기존 목록 페이지 동작은 그대로 유지).
+   */
+  interactive?: boolean;
+}) {
   const status = getTournamentStatusConfig(item.status);
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
   const reservedTeamCount = getReservedTeamCount(item);
-  // coverImageUrl이 없는 대회도 홈 프로모션용으로 등록된 실사진(promoHomeImageUrl)이 있으면
-  // 아이콘 대신 그 사진을 썸네일로 재사용한다 (둘 다 없으면 종목색 그라디언트+아이콘 폴백).
-  const thumbnailImageUrl = item.coverImageUrl ?? item.promoHomeImageUrl;
+  // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
+  // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
+  const thumbnailImageUrl = resolveTournamentImage(item, 'cover');
 
   return (
     <div role="listitem" style={{ height: '100%' }}>
-      <Link
-        className="tm-card tm-pressable"
+      <CardShell
+        interactive={interactive}
         href={`/tournaments/${item.id}`}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          padding: '16px 16px 14px',
-          textDecoration: 'none',
-        }}
-        aria-label={`${item.title} — ${sportAccent.label} — ${status.label}`}
+        ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >
         {/* Top row: (선택) 커버 이미지 썸네일 + [제목·배지 / 종목·일정·장소] 세로 스택 */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -234,7 +276,7 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
             <Trophy size={12} color="var(--orange500)" aria-hidden="true" />
             <span
               className="tm-text-caption"
-              style={{ color: 'var(--text-strong)', fontWeight: 600, minWidth: 0, whiteSpace: 'pre-wrap' }}
+              style={{ color: 'var(--orange700)', fontWeight: 600, minWidth: 0, whiteSpace: 'pre-wrap' }}
             >
               {item.prizeSummary}
             </span>
@@ -278,8 +320,8 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
             <span className="tab-num">{item.confirmedCount}</span>
             {pendingPaymentCount > 0 ? (
               <>
-                <span style={{ color: 'var(--orange500)' }}>+</span>
-                <span className="tab-num" style={{ color: 'var(--orange500)' }}>{pendingPaymentCount}</span>
+                <span style={{ color: 'var(--orange700)' }}>+</span>
+                <span className="tab-num" style={{ color: 'var(--orange700)' }}>{pendingPaymentCount}</span>
               </>
             ) : null}
             <span>/</span>
@@ -287,7 +329,7 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
             <span>{pendingPaymentCount > 0 ? '팀 예약' : '팀 확정'}</span>
           </span>
         </div>
-      </Link>
+      </CardShell>
     </div>
   );
 }

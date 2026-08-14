@@ -1,4 +1,26 @@
-import { isReviewRevealed, REVEAL_FALLBACK_HOURS } from './review-visibility';
+import { isReviewRevealed, REVEAL_FALLBACK_HOURS, reviewRevealScope } from './review-visibility';
+
+describe('reviewRevealScope', () => {
+  it('경기 단위 후기는 sourceId 그대로 쓴다', () => {
+    expect(reviewRevealScope({ sourceType: 'match', sourceId: 'match-1', sourceGroupId: null })).toBe('match-1');
+    expect(reviewRevealScope({ sourceType: 'team_match', sourceId: 'tm-1', sourceGroupId: null })).toBe('tm-1');
+  });
+
+  // 대회 후기는 중복 방지 스코프가 대회 단위라, 서로 다른 경기에서 주고받은 짝이 픽스처
+  // 기준으로는 절대 맞지 않는다 — 그러면 상호 공개 경로가 죽고 72시간 폴백만 남는다.
+  it('대회 후기는 서로 다른 경기여도 같은 대회면 같은 스코프다', () => {
+    const fromQualifier = reviewRevealScope({ sourceType: 'tournament_fixture', sourceId: 'fixture-1', sourceGroupId: 'cup-1' });
+    const fromFinal = reviewRevealScope({ sourceType: 'tournament_fixture', sourceId: 'fixture-9', sourceGroupId: 'cup-1' });
+    expect(fromQualifier).toBe(fromFinal);
+    expect(fromQualifier).not.toBe(reviewRevealScope({ sourceType: 'tournament_fixture', sourceId: 'fixture-1', sourceGroupId: 'cup-2' }));
+  });
+
+  // sourceGroupId가 비어 있는(백필 전 등) 대회 행까지 한 스코프로 뭉치면 서로 무관한 대회의
+  // 후기가 짝으로 매칭돼 아직 안 열려야 할 후기가 공개된다.
+  it('대회 행이지만 sourceGroupId가 없으면 sourceId로 되돌아간다', () => {
+    expect(reviewRevealScope({ sourceType: 'tournament_fixture', sourceId: 'fixture-1', sourceGroupId: null })).toBe('fixture-1');
+  });
+});
 
 describe('isReviewRevealed', () => {
   const baseReview = {

@@ -220,15 +220,15 @@ function AdminUsersPageContent() {
               render: (row) => (
                 <div className="min-w-0">
                   <span className="flex items-center gap-1.5">
-                    <span className="truncate font-medium text-gray-900">{formatUserTitle(row)}</span>
+                    <span className="truncate font-medium text-[var(--text-strong)]">{formatUserTitle(row)}</span>
                     {row.adminRole ? (
-                      <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[var(--font-size-micro)] font-semibold text-blue-700">
+                      <span className="shrink-0 rounded bg-[var(--blue50)] px-1.5 py-0.5 text-[var(--font-size-micro)] font-semibold text-[var(--blue700)]">
                         운영자
                       </span>
                     ) : null}
                   </span>
                   {row.email ? (
-                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500" title={row.email}>
+                    <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]" title={row.email}>
                       {row.email}
                     </span>
                   ) : null}
@@ -245,14 +245,14 @@ function AdminUsersPageContent() {
               key: 'gender',
               header: '성별',
               width: 'w-[72px]',
-              render: (row) => <span className="text-gray-600">{formatGender(row.gender)}</span>,
+              render: (row) => <span className="text-[var(--text-muted)]">{formatGender(row.gender)}</span>,
             },
             {
               key: 'authProviders',
               header: '로그인',
               width: 'w-[124px]',
               render: (row) => (
-                <span className="block truncate text-gray-600" title={formatAuthProviders(row.authProviders)}>
+                <span className="block truncate text-[var(--text-muted)]" title={formatAuthProviders(row.authProviders)}>
                   {formatAuthProviders(row.authProviders)}
                 </span>
               ),
@@ -263,7 +263,7 @@ function AdminUsersPageContent() {
               align: 'center',
               width: 'w-[110px]',
               render: (row) => (
-                <span className="tabular-nums whitespace-nowrap text-gray-600">
+                <span className="tabular-nums whitespace-nowrap text-[var(--text-muted)]">
                   {row.hostedMatchCount} / {row.ownedTeamCount}
                 </span>
               ),
@@ -276,7 +276,7 @@ function AdminUsersPageContent() {
               render: (row) => {
                 const teamRoles = getTeamRoleCounts(row);
                 return (
-                  <span className="tabular-nums whitespace-nowrap text-gray-600">
+                  <span className="tabular-nums whitespace-nowrap text-[var(--text-muted)]">
                     {row.membershipCount}
                     <span className="text-gray-400">
                       {' '}
@@ -291,7 +291,7 @@ function AdminUsersPageContent() {
               header: '가입',
               width: 'w-[104px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-gray-500">{formatDateCompact(row.createdAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateCompact(row.createdAt)}</span>
               ),
             },
             {
@@ -299,7 +299,7 @@ function AdminUsersPageContent() {
               header: '최근 로그인',
               width: 'w-[112px]',
               render: (row) => (
-                <span className="whitespace-nowrap text-gray-500">{formatDateCompact(row.lastLoginAt)}</span>
+                <span className="whitespace-nowrap text-[var(--text-muted)]">{formatDateCompact(row.lastLoginAt)}</span>
               ),
             },
           ]}
@@ -309,7 +309,7 @@ function AdminUsersPageContent() {
                 href={`/admin/users/${row.userId}`}
                 className={[
                   'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
-                  'text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors whitespace-nowrap',
+                  'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}
                 aria-label={`${row.nickname ?? row.displayName ?? '회원'} 상세 보기`}
@@ -326,7 +326,7 @@ function AdminUsersPageContent() {
                     }}
                     className={[
                       'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
-                      'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
+                      'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
                     aria-label={`${row.nickname ?? row.displayName ?? '회원'} 상태 변경`}

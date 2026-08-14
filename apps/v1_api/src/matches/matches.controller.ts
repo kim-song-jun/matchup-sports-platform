@@ -28,6 +28,14 @@ export class MatchesController {
     return this.matchesService.create(user, dto);
   }
 
+  // 리터럴 경로라 ':matchId' 계열 라우트보다 먼저 등록해야 한다 — 안 그러면
+  // 'me'가 matchId 파라미터로 매칭돼 404가 아니라 엉뚱한 500/조회 실패로 샌다.
+  @Get('me/recent-venues')
+  @UseGuards(V1AuthGuard)
+  recentVenues(@CurrentUser() user: V1AuthUser) {
+    return this.matchesService.recentVenues(user);
+  }
+
   @Get(':matchId/edit')
   @UseGuards(V1AuthGuard)
   edit(@CurrentUser() user: V1AuthUser, @Param('matchId') matchId: string) {

@@ -6,7 +6,7 @@ import { cssUrl } from '@/lib/assets';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import { REVIEW_TAG_OPTIONS, toTargetViewModel } from './reviews.view-model';
 import { ReviewsSummaryDashboard } from './reviews-summary-dashboard';
-import type { V1ReviewDetail, V1ReviewReceivedSummaryResponse, V1ReviewTargetType } from '@/types/api';
+import type { V1ReceivedReviewDetail, V1ReviewReceivedSummaryResponse, V1ReviewTargetType } from '@/types/api';
 
 type QueryStateProps = {
   errorMessage: string | null;
@@ -47,10 +47,11 @@ export function ReviewsPageView({
   const isReceivedTab = model.tab === 'received';
   // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
   // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
-  const hasLegacyContent = loading || Boolean(errorMessage) || receivedModel.userGroups.length > 0 || receivedModel.teamGroups.length > 0;
+  const hasAnonymousContent = receivedModel.anonymousUserGroups.length > 0 || receivedModel.anonymousTeamGroups.length > 0;
+  const hasLegacyContent = loading || Boolean(errorMessage) || receivedModel.legacyUserGroups.length > 0 || receivedModel.legacyTeamGroups.length > 0;
 
   return (
-    <AppChrome title="리뷰" activeTab="my" backHref="/my">
+    <AppChrome title="리뷰" activeTab="my" backHref="/my" desktopHead>
       <div className="tm-review-shell">
         <ReviewTabs active={model.tab} onChange={onTabChange} />
         {isReceivedTab ? (
@@ -65,6 +66,7 @@ export function ReviewsPageView({
                 <ReviewsSummaryDashboard summary={teamSummary} period={teamPeriod} onPeriodChange={onTeamPeriodChange} loading={teamSummaryLoading} />
               </div>
             ) : null}
+            {hasAnonymousContent ? <AnonymousReceivedContent model={receivedModel} /> : null}
             {hasLegacyContent ? (
               <div style={{ marginTop: 24 }}>
                 <div className="tm-my-section-label">이전 리뷰</div>
@@ -97,7 +99,7 @@ export function ReviewsPageView({
                   {/* #17: CTA 영역에 ChevronRight 추가 — 탭 가능한 카드임을 명시적으로 전달 */}
                   <div className="tm-review-card-foot">
                     <span className="tm-badge tm-badge-grey">{card.kindLabel}</span>
-                    <span className="tm-text-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: 'var(--blue500)' }}>
+                    <span className="tm-text-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: 'var(--blue700)' }}>
                       {card.ctaLabel}
                       <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
                     </span>
@@ -120,7 +122,7 @@ function ReviewsReceivedContent({
 }: QueryStateProps & {
   model: ReviewsReceivedPageModel;
 }) {
-  const empty = model.userGroups.length === 0 && model.teamGroups.length === 0;
+  const empty = model.legacyUserGroups.length === 0 && model.legacyTeamGroups.length === 0;
 
   return (
     <>
@@ -128,9 +130,22 @@ function ReviewsReceivedContent({
       {loading ? <ReviewSkeleton count={2} /> : null}
       {!loading && errorMessage ? <ReviewNotice title="받은 리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
       {!loading && !errorMessage && empty ? <ReviewEmpty title="받은 리뷰가 없어요" sub="상대방이 보낸 리뷰가 경기별로 모여서 보여요." /> : null}
-      {!loading && !errorMessage && model.userGroups.length > 0 ? <ReceivedGroupSection title="내가 받은 리뷰" groups={model.userGroups} /> : null}
-      {!loading && !errorMessage && model.teamGroups.length > 0 ? <ReceivedGroupSection title="내 팀이 받은 리뷰" groups={model.teamGroups} /> : null}
+      {!loading && !errorMessage && model.legacyUserGroups.length > 0 ? <ReceivedGroupSection title="내가 받은 리뷰" groups={model.legacyUserGroups} /> : null}
+      {!loading && !errorMessage && model.legacyTeamGroups.length > 0 ? <ReceivedGroupSection title="내 팀이 받은 리뷰" groups={model.legacyTeamGroups} /> : null}
     </>
+  );
+}
+
+function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }) {
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div className="tm-my-section-label">대회에서 받은 익명 리뷰</div>
+      <div className="tm-text-caption" style={{ marginBottom: 10 }}>작성자는 공개되지 않으며, 상호 작성 완료 또는 72시간 뒤에 보여요.</div>
+      {model.anonymousUserGroups.length > 0 ? <ReceivedGroupSection groups={model.anonymousUserGroups} title="내가 받은 리뷰" /> : null}
+      {model.anonymousTeamGroups.length > 0 ? (
+        <div style={{ marginTop: 16 }}><ReceivedGroupSection groups={model.anonymousTeamGroups} title="내 팀이 받은 리뷰" /></div>
+      ) : null}
+    </div>
   );
 }
 
@@ -158,7 +173,7 @@ export function ReviewSourcePageView({
   const canSubmit = pendingTargets.some((target) => drafts[targetKey(target.targetType, target.targetUserId, target.targetTeamId)]?.tagCodes.length > 0);
 
   return (
-    <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews">
+    <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
       <div className="tm-review-shell tm-review-compose-shell">
         {loading ? <ReviewSkeleton count={3} /> : null}
         {!loading && errorMessage ? <ReviewNotice title="리뷰 대상을 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
@@ -176,7 +191,8 @@ export function ReviewSourcePageView({
             </Card>
             <div className="tm-review-target-stack">
               {model.targets.map((target) => {
-                const targetModel = toTargetViewModel(target);
+                // reviewerTeam 이 null = 양 팀 겸직이라 대상마다 작성자 팀이 다르다는 뜻.
+                const targetModel = toTargetViewModel(target, model.reviewerTeam === null);
                 const key = targetKey(target.targetType, target.targetUserId, target.targetTeamId);
                 return (
                   <ReviewTargetCard
@@ -189,7 +205,7 @@ export function ReviewSourcePageView({
                 );
               })}
             </div>
-            <Card pad={14} style={{ background: message ? 'var(--red50)' : 'var(--grey50)' }}>
+            <Card className={message ? 'tm-review-notice-error' : ''} pad={14} style={message ? undefined : { background: 'var(--grey50)' }}>
               <div className="tm-text-label">{message ?? '작성 현황'}</div>
               <div className="tm-text-caption" style={{ marginTop: 5 }}>{message ? '선택 상태를 확인한 뒤 다시 시도해 주세요.' : model.progressLabel}</div>
             </Card>
@@ -233,10 +249,11 @@ export function ReviewsReceivedPageView({
 }) {
   // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
   // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
-  const hasLegacyContent = loading || Boolean(errorMessage) || model.userGroups.length > 0 || model.teamGroups.length > 0;
+  const hasAnonymousContent = model.anonymousUserGroups.length > 0 || model.anonymousTeamGroups.length > 0;
+  const hasLegacyContent = loading || Boolean(errorMessage) || model.legacyUserGroups.length > 0 || model.legacyTeamGroups.length > 0;
   return (
     // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
-    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received">
+    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received" desktopHead>
       <div className="tm-review-shell">
         <div>
           <div className="tm-my-section-label">내가 받은 리뷰 집계</div>
@@ -248,6 +265,7 @@ export function ReviewsReceivedPageView({
             <ReviewsSummaryDashboard summary={teamSummary} period={teamPeriod} onPeriodChange={onTeamPeriodChange} loading={teamSummaryLoading} />
           </div>
         ) : null}
+        {hasAnonymousContent ? <AnonymousReceivedContent model={model} /> : null}
         {hasLegacyContent ? (
           <div style={{ marginTop: 24 }}>
             <div className="tm-my-section-label">이전 리뷰</div>
@@ -270,7 +288,7 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
   const remaining = Math.max(0, model.targets.length - reviewed);
 
   return (
-    <AppChrome title="" activeTab="my" bottomNav={false} backHref="/my/reviews">
+    <AppChrome title="" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
       <div className="tm-review-complete">
         <div className="tm-review-complete-icon">✓</div>
         <div className="tm-text-heading" style={{ marginTop: 22 }}>리뷰를 보냈어요</div>
@@ -346,12 +364,15 @@ function ReviewTargetCard({
             <div style={{ minWidth: 0 }}>
               <div className="tm-text-body-lg">{target.name}</div>
               <div className="tm-text-caption" style={{ marginTop: 2 }}>{target.subtitle || targetTypeLabel(target.targetType)}</div>
+              {target.reviewerTeamLabel ? (
+                <div className="tm-text-caption" style={{ marginTop: 2 }}>{target.reviewerTeamLabel}</div>
+              ) : null}
             </div>
             <span className={`tm-badge ${target.statusLabel === '작성됨' ? 'tm-badge-green' : target.statusLabel === '잠김' ? 'tm-badge-grey' : active ? 'tm-badge-blue' : 'tm-badge-grey'}`}>
               {target.statusLabel === '대기' && active ? '작성 중' : target.statusLabel}
             </span>
           </div>
-          {target.lockReason ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{target.lockReason}</div> : null}
+          {target.lockReasonLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{target.lockReasonLabel}</div> : null}
           <StarRating disabled={locked} rating={draft.rating} onChange={onUpdateRating} />
           <div className="tm-review-chip-row">
             {REVIEW_TAG_OPTIONS.map((tag) => {
@@ -397,7 +418,7 @@ function StarRating({ disabled, onChange, rating }: { disabled?: boolean; onChan
   );
 }
 
-function ReceivedGroupSection({ groups, title }: { groups: ReviewsReceivedPageModel['userGroups']; title: string }) {
+function ReceivedGroupSection({ groups, title }: { groups: ReviewsReceivedPageModel['anonymousUserGroups']; title: string }) {
   return (
     <section>
       <div className="tm-my-section-label">{title}</div>
@@ -421,13 +442,13 @@ function ReceivedGroupSection({ groups, title }: { groups: ReviewsReceivedPageMo
   );
 }
 
-function ReceivedReviewRow({ review }: { review: V1ReviewDetail }) {
+function ReceivedReviewRow({ review }: { review: V1ReceivedReviewDetail }) {
   const firstTag = review.tags[0]?.label ?? '별점만';
   return (
     <div className="tm-review-received-row">
-      <Avatar imageUrl={review.reviewerUser.imageUrl} initials={review.reviewerUser.name.slice(0, 2)} size={34} />
+      <Avatar imageUrl={review.reviewerUser?.imageUrl} initials={review.anonymous ? '익명' : review.reviewerUser?.name.slice(0, 2) ?? '리뷰'} size={34} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="tm-text-label">{review.reviewerTeam?.name ?? review.reviewerUser.name}</div>
+        <div className="tm-text-label">{review.anonymous ? '익명 리뷰' : review.reviewerTeam?.name ?? review.reviewerUser?.name ?? '리뷰'}</div>
         <div className="tm-text-caption" style={{ marginTop: 2 }}>{review.rating}점 · {firstTag}</div>
       </div>
     </div>
@@ -448,7 +469,7 @@ function ReviewSkeleton({ count }: { count: number }) {
 
 function ReviewNotice({ onRetry, sub, title }: { onRetry: () => void; sub: string; title: string }) {
   return (
-    <Card pad={16} style={{ background: 'var(--red50)' }}>
+    <Card className="tm-review-notice-error" pad={16}>
       <div className="tm-text-body-lg">{title}</div>
       <div className="tm-text-caption" style={{ marginTop: 5 }}>{sub}</div>
       <button className="tm-btn tm-btn-sm tm-btn-neutral" onClick={onRetry} style={{ marginTop: 12 }} type="button">다시 시도</button>

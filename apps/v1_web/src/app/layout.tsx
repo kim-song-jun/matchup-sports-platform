@@ -5,6 +5,7 @@ import { ReleaseVersionWatcher } from '@/components/v1-ui/release-version-watche
 import { RouteProgressBar } from '@/components/v1-ui/route-progress';
 import { publicAssetPath } from '@/lib/assets';
 import { getSiteOrigin } from '@/lib/seo';
+import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import './globals.css';
 import './desktop/index.css';
 
@@ -34,7 +35,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <head>
         <link
           rel="preload"
@@ -43,6 +44,9 @@ export default function RootLayout({
           type="font/woff2"
           crossOrigin="anonymous"
         />
+        {/* 첫 페인트 전에 .dark 클래스를 동기 적용해 FOUC(테마 깜빡임)를 막는다.
+            상수 문자열만 담으므로(외부 입력 없음) XSS 위험이 없다 — src/lib/theme.ts 참고. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
         <RouteProgressBar />

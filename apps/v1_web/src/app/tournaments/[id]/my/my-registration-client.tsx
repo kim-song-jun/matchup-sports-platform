@@ -270,7 +270,7 @@ function RegistrationPass({
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
         </div>
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
-          <p className="tm-text-caption" style={{ color: 'var(--orange500)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
+          <p className="tm-text-caption" style={{ color: 'var(--orange700)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
             신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.
           </p>
         </div>
@@ -365,7 +365,7 @@ function RegistrationPass({
               aria-label={belowMinimum ? '선수 명단 등록하기' : '선수 명단 수정하기'}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 1,
-                color: 'var(--blue500)', fontWeight: 700, flexShrink: 0,
+                color: 'var(--blue700)', fontWeight: 700, flexShrink: 0,
                 minHeight: 44, paddingLeft: 8,
               }}
             >
@@ -822,7 +822,7 @@ function RegistrationDetailView({
       ) : null}
 
       {withdrawCancelError ? (
-        <div className="tm-text-caption" role="alert" style={{ color: 'var(--red500)', marginTop: 8, lineHeight: 1.5 }}>
+        <div className="tm-text-caption" role="alert" style={{ color: 'var(--red700)', marginTop: 8, lineHeight: 1.5 }}>
           {withdrawCancelError}
         </div>
       ) : null}
@@ -1065,7 +1065,7 @@ function RegistrationDetailView({
               ) : null}
 
               {withdrawCancelError ? (
-                <div className="tm-text-caption" role="alert" style={{ color: 'var(--red500)', lineHeight: 1.5 }}>
+                <div className="tm-text-caption" role="alert" style={{ color: 'var(--red700)', lineHeight: 1.5 }}>
                   {withdrawCancelError}
                 </div>
               ) : null}
@@ -1235,7 +1235,7 @@ function TeamRegistrationHub({
             gap: 4,
           }}
         >
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+          <span className="tm-text-caption" style={{ color: blockMessage ? 'var(--orange700)' : 'var(--text-strong)', fontWeight: 700 }}>
             정원 {describeTournamentCapacity(capacity)}
           </span>
           {blockMessage ? (
@@ -1252,11 +1252,13 @@ function TeamRegistrationHub({
 
       {teams.length === 0 ? (
         <div className="tm-tournament-registration-empty">
+          {/* 신청이 막힌 대회에서 "팀 만들기"를 권하면, 바로 위 안내("지금은 참가 신청을
+              받지 않아요")와 정면으로 어긋난다 — 팀을 만들어도 이 대회엔 신청할 수 없다. */}
           <EmptyState
             title={emptyState.title}
-            sub={emptyState.description}
-            cta="팀 만들기"
-            onCta={() => { window.location.href = '/teams/new'; }}
+            sub={canStartNewRegistration ? emptyState.description : '이 대회는 지금 참가 신청을 받지 않아요.'}
+            cta={canStartNewRegistration ? '팀 만들기' : undefined}
+            onCta={canStartNewRegistration ? () => { window.location.href = '/teams/new'; } : undefined}
             icon={<UsersRound size={36} strokeWidth={1.5} />}
           />
         </div>
@@ -1341,7 +1343,7 @@ function TeamRegistrationHub({
                       {` · ${meta}`}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: displayActionDisabled ? 'var(--text-caption)' : 'var(--blue500)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: displayActionDisabled ? 'var(--text-caption)' : 'var(--blue700)' }}>
                     <span className="tm-text-caption" style={{ fontWeight: 700 }}>{displayActionLabel}</span>
                     {!displayActionDisabled ? <ChevronRight size={16} /> : null}
                   </div>
@@ -1386,7 +1388,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
 
   if (isLoading) {
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
         <div aria-busy="true" aria-label="신청 정보 불러오는 중" style={{ padding: '0 20px', marginTop: 24 }}>
           {[1, 2, 3].map((i) => (
             <div
@@ -1403,7 +1405,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   if (registrationsError) {
     const msg = extractErrorMessage(registrationsErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
         <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner message={msg} />
           <Link
@@ -1420,7 +1422,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
 
   if (!tournament) {
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
         <TeamRegistrationHub
           tournamentId={tournamentId}
           tournamentSportId={null}
@@ -1441,7 +1443,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
       (team) => eligibleTeams.includes(team) || registrationTeamIds.has(team.teamId),
     );
     return (
-      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
         <TeamRegistrationHub
           tournamentId={tournamentId}
           tournamentSportId={tournament.sportId}
@@ -1459,7 +1461,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   const canManageSelectedRegistration = selectedTeam?.role === 'owner' || selectedTeam?.role === 'manager';
 
   return (
-    <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments">
+    <AppChrome title="내 신청" backHref={pageBackHref} activeTab="tournaments" desktopHead>
       <RegistrationDetailView
         tournamentId={tournamentId}
         tournament={{

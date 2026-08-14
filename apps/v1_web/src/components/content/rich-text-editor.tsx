@@ -169,9 +169,9 @@ export function RichTextEditor({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[var(--font-size-label)] font-semibold text-gray-700">{label}</span>
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-        <div className="flex flex-wrap gap-1 border-b border-gray-100 bg-gray-50 p-2" role="toolbar" aria-label="본문 서식">
+      <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</span>
+      <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)] focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+        <div className="flex flex-wrap gap-1 border-b border-[var(--border)] bg-[var(--surface-soft)] p-2" role="toolbar" aria-label="본문 서식">
           <ToolbarButton label="실행 취소" onClick={() => editor?.chain().focus().undo().run()} disabled={disabled || !editor?.can().undo()}><Undo2 /></ToolbarButton>
           <ToolbarButton label="다시 실행" onClick={() => editor?.chain().focus().redo().run()} disabled={disabled || !editor?.can().redo()}><Redo2 /></ToolbarButton>
           <ToolbarDivider />
@@ -205,7 +205,7 @@ export function RichTextEditor({
         </div>
         <EditorContent editor={editor} className="tm-rich-editor" />
       </div>
-      <p className={`text-xs ${uploadError ? 'text-red-600' : 'text-gray-500'}`} role={uploadError ? 'alert' : undefined}>
+      <p className={`text-xs ${uploadError ? 'text-[var(--red700)]' : 'text-[var(--text-muted)]'}`} role={uploadError ? 'alert' : undefined}>
         {uploadError || (uploading ? '이미지를 업로드하고 있어요…' : 'JPG, PNG, WebP · 파일당 최대 5MB · 최대 10개')}
       </p>
     </div>
@@ -233,7 +233,7 @@ function ToolbarButton({
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors [&_svg]:h-4 [&_svg]:w-4 ${active ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-white hover:text-gray-900'} disabled:cursor-not-allowed disabled:opacity-35`}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors [&_svg]:h-4 [&_svg]:w-4 ${active ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : 'text-[var(--text-muted)] hover:bg-white dark:hover:bg-[var(--grey150)] hover:text-[var(--text-strong)]'} disabled:cursor-not-allowed disabled:opacity-35`}
     >
       {children}
     </button>
@@ -241,5 +241,5 @@ function ToolbarButton({
 }
 
 function ToolbarDivider() {
-  return <span className="mx-0.5 h-9 w-px bg-gray-200" aria-hidden="true" />;
+  return <span className="mx-0.5 h-9 w-px bg-[var(--border)]" aria-hidden="true" />;
 }

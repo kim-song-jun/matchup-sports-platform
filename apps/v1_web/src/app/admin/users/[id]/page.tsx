@@ -79,9 +79,9 @@ const TEAM_ROLE_LABEL: Record<TeamMembershipRole, string> = {
 
 function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
-    <div className="min-w-0 rounded-xl bg-gray-50 px-4 py-3">
+    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
       <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-gray-900">{value ?? '-'}</dd>
+      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{value ?? '-'}</dd>
     </div>
   );
 }
@@ -165,15 +165,15 @@ export default function AdminUserDetailPage() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex min-w-0 flex-col gap-4" aria-label="회원 상세 정보">
-          <article className="rounded-2xl border border-gray-100 bg-white p-5">
+          <article className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-500">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
                   <UserRound size={16} aria-hidden="true" />
                   회원
                 </div>
-                <h2 className="mt-2 break-words text-[22px] font-bold text-gray-900">{userTitle(user)}</h2>
-                <p className="mt-1 break-all text-sm text-gray-500">{user.email ?? '이메일 없음'}</p>
+                <h2 className="mt-2 break-words text-[22px] font-bold text-[var(--text-strong)]">{userTitle(user)}</h2>
+                <p className="mt-1 break-all text-sm text-[var(--text-muted)]">{user.email ?? '이메일 없음'}</p>
               </div>
               <AdminStatusPill status={user.accountStatus} />
             </div>
@@ -197,22 +197,22 @@ export default function AdminUserDetailPage() {
               <DetailRow label="관리자 권한" value={user.adminRole ?? '없음'} />
             </dl>
             {user.bio ? (
-              <div className="mt-3 rounded-xl bg-gray-50 px-4 py-3">
+              <div className="mt-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
                 <p className="text-xs font-semibold text-gray-400">소개</p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-900">{user.bio}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-strong)]">{user.bio}</p>
               </div>
             ) : null}
           </article>
 
           {user.withdrawalRequest ? (
-            <section className="rounded-2xl border border-amber-100 bg-amber-50/60 p-5" aria-label="탈퇴 요청 메시지">
+            <section className="rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-5" aria-label="탈퇴 요청 메시지">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-[17px] font-bold text-amber-950">탈퇴 요청 메시지</h2>
-                <time className="text-xs font-semibold text-amber-700">
+                <h2 className="text-[17px] font-bold text-[var(--text-strong)]">탈퇴 요청 메시지</h2>
+                <time className="text-xs font-semibold text-[var(--orange700)]">
                   {formatDateTime(user.withdrawalRequest.requestedAt)}
                 </time>
               </div>
-              <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-amber-950">
+              <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-strong)]">
                 {user.withdrawalRequest.reason || '사용자가 별도 메시지를 남기지 않았어요.'}
               </p>
             </section>
@@ -259,8 +259,8 @@ export default function AdminUserDetailPage() {
         </section>
 
         <aside className="flex flex-col gap-4" aria-label="회원 운영 정보">
-          <section className="rounded-2xl border border-gray-100 bg-white p-4">
-            <h2 className="text-[17px] font-bold text-gray-900">활동 요약</h2>
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">활동 요약</h2>
             <dl className="mt-4 grid gap-3">
               <SummaryItem icon={<Calendar size={16} />} label="개설 매치" value={user.hostedMatchCount} />
               <SummaryItem icon={<Users size={16} />} label="생성/소유 팀" value={user.ownedTeamCount} />
@@ -272,9 +272,9 @@ export default function AdminUserDetailPage() {
             </dl>
           </section>
 
-          <section className="rounded-2xl border border-gray-100 bg-white p-4">
-            <h2 className="text-[17px] font-bold text-gray-900">삭제 처리</h2>
-            <p className="mt-2 text-sm leading-relaxed text-gray-500">
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">삭제 처리</h2>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
               삭제하면 계정 상태가 삭제로 바뀌고 이메일, 전화번호, 카카오 같은 로그인 식별자가 재가입 가능하도록 마스킹돼요. 처리 사유는 감사 로그에 남아요.
             </p>
             <button
@@ -299,23 +299,25 @@ export default function AdminUserDetailPage() {
         >
           <form
             onSubmit={handleDeleteSubmit}
-            className="w-full max-w-[440px] rounded-2xl bg-white p-5 shadow-[var(--shadow-modal)]"
+            // 전수검수: bg-white가 다크에서 안 뒤집혀 안의 text-[var(--text-strong)] 등이
+            // 근접색이 되던 회귀 — 다른 어드민 모달들과 동일하게 --card-surface로 교체.
+            className="w-full max-w-[440px] rounded-2xl bg-[var(--card-surface)] p-5 shadow-[var(--shadow-modal)]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-user-title"
           >
-            <h2 id="delete-user-title" className="text-[18px] font-bold text-gray-900">회원 삭제</h2>
-            <p className="mt-2 text-sm leading-relaxed text-gray-500">
+            <h2 id="delete-user-title" className="text-[18px] font-bold text-[var(--text-strong)]">회원 삭제</h2>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
               {userTitle(user)} 회원을 삭제 처리합니다. 되돌리려면 별도 상태 변경과 계정 확인이 필요해요.
             </p>
-            <label className="mt-4 block text-sm font-semibold text-gray-700" htmlFor="delete-user-reason">
+            <label className="mt-4 block text-sm font-semibold text-[var(--text-body)]" htmlFor="delete-user-reason">
               삭제 사유
             </label>
             <textarea
               id="delete-user-reason"
               value={deleteReason}
               onChange={(event) => setDeleteReason(event.target.value)}
-              className="mt-2 min-h-[120px] w-full resize-y rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="mt-2 min-h-[120px] w-full resize-y rounded-xl border border-[var(--border)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               placeholder="운영자가 확인한 삭제 사유를 입력해 주세요."
               maxLength={500}
             />
@@ -324,7 +326,8 @@ export default function AdminUserDetailPage() {
                 type="button"
                 disabled={deleteMutation.isPending}
                 onClick={() => setDeleteOpen(false)}
-                className="inline-flex h-[44px] flex-1 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                // 방금 card-surface로 바뀐 모달 폼(위)과 겹치지 않게 surface-soft로 구분.
+                className="inline-flex h-[44px] flex-1 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--border)] disabled:opacity-60"
               >
                 취소
               </button>
@@ -349,7 +352,7 @@ export default function AdminUserDetailPage() {
       <button
         type="button"
         onClick={() => router.push('/admin/users')}
-        className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
         <ArrowLeft size={16} aria-hidden="true" />
         목록
@@ -360,12 +363,12 @@ export default function AdminUserDetailPage() {
 
 function SummaryItem({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-4 py-3">
-      <dt className="flex items-center gap-2 text-sm font-semibold text-gray-500">
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+      <dt className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
         <span className="text-gray-400" aria-hidden="true">{icon}</span>
         {label}
       </dt>
-      <dd className="text-sm font-bold tabular-nums text-gray-900">{value}</dd>
+      <dd className="text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
     </div>
   );
 }
@@ -380,19 +383,19 @@ function RelatedList({
   items: Array<{ id: string; title: string; meta: string }>;
 }) {
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5">
-      <h2 className="text-[17px] font-bold text-gray-900">{title}</h2>
+    <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
+      <h2 className="text-[17px] font-bold text-[var(--text-strong)]">{title}</h2>
       {items.length > 0 ? (
         <ol className="mt-4 flex flex-col gap-2">
           {items.map((item) => (
-            <li key={item.id} className="rounded-xl bg-gray-50 px-4 py-3">
-              <p className="break-words text-sm font-semibold text-gray-900">{item.title}</p>
-              <p className="mt-1 text-xs font-medium text-gray-500">{item.meta}</p>
+            <li key={item.id} className="rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+              <p className="break-words text-sm font-semibold text-[var(--text-strong)]">{item.title}</p>
+              <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{item.meta}</p>
             </li>
           ))}
         </ol>
       ) : (
-        <div className="mt-4 rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
           {empty}
         </div>
       )}

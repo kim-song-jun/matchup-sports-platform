@@ -195,7 +195,7 @@ export default function AdminInquiryDetailPage() {
           action={
             <Link
               href="/admin/inquiries"
-              className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--surface-soft)]"
             >
               <ArrowLeft size={16} aria-hidden="true" />
               목록
@@ -227,7 +227,7 @@ export default function AdminInquiryDetailPage() {
         action={
           <Link
             href="/admin/inquiries"
-            className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <ArrowLeft size={16} aria-hidden="true" />
             목록
@@ -237,11 +237,11 @@ export default function AdminInquiryDetailPage() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex min-w-0 flex-col gap-4" aria-label="문의 내용">
-          <article className="rounded-2xl border border-gray-100 bg-white p-5">
+          <article className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="break-words text-[20px] font-bold text-gray-900">{inquiry.title}</h2>
-                <div className="mt-3 flex flex-wrap gap-2 text-[13px] text-gray-500">
+                <h2 className="break-words text-[20px] font-bold text-[var(--text-strong)]">{inquiry.title}</h2>
+                <div className="mt-3 flex flex-wrap gap-2 text-[13px] text-[var(--text-muted)]">
                   <span className="inline-flex items-center gap-1.5">
                     <Tag size={14} aria-hidden="true" />
                     {CATEGORY_LABEL[inquiry.category]}
@@ -263,15 +263,15 @@ export default function AdminInquiryDetailPage() {
               <AdminStatusPill status={inquiry.status} label={STATUS_LABEL[inquiry.status]} />
             </div>
 
-            <div className="mt-5 whitespace-pre-wrap break-words rounded-xl bg-gray-50 px-4 py-3 text-sm leading-relaxed text-gray-800">
+            <div className="mt-5 whitespace-pre-wrap break-words rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-sm leading-relaxed text-[var(--text-body)]">
               {inquiry.body}
             </div>
           </article>
 
-          <section className="rounded-2xl border border-gray-100 bg-white p-5" aria-label="답변 내역">
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="답변 내역">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-[17px] font-bold text-gray-900">답변</h2>
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500">
+              <h2 className="text-[17px] font-bold text-[var(--text-strong)]">답변</h2>
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)]">
                 <MessageSquareText size={15} aria-hidden="true" />
                 {inquiry.replies.length}
               </span>
@@ -282,9 +282,9 @@ export default function AdminInquiryDetailPage() {
                 {inquiry.replies.map((reply) => {
                   const isEditing = editingReplyId === reply.replyId;
                   return (
-                    <li key={reply.replyId} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                    <li key={reply.replyId} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-[var(--text-strong)]">
                           {reply.adminName ?? '운영팀'}
                           {reply.adminRole ? (
                             <span className="ml-2 text-xs font-medium text-gray-400">{reply.adminRole}</span>
@@ -300,7 +300,7 @@ export default function AdminInquiryDetailPage() {
                               type="button"
                               onClick={() => startEditReply(reply.replyId, reply.body)}
                               aria-label="답변 수정"
-                              className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                              className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg text-gray-400 hover:bg-[var(--border)] hover:text-[var(--text-muted)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                             >
                               <Pencil size={15} aria-hidden="true" />
                             </button>
@@ -316,7 +316,7 @@ export default function AdminInquiryDetailPage() {
                             maxLength={2000}
                             disabled={updateReplyMutation.isPending}
                             aria-label="답변 내용 수정"
-                            className="resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                            className="resize-y rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm leading-relaxed text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                           />
                           <div className="flex gap-2">
                             <button
@@ -331,21 +331,21 @@ export default function AdminInquiryDetailPage() {
                               type="button"
                               onClick={cancelEditReply}
                               disabled={updateReplyMutation.isPending}
-                              className="inline-flex h-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                              className="inline-flex h-[44px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                             >
                               취소
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-700">{reply.body}</p>
+                        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-body)]">{reply.body}</p>
                       )}
                     </li>
                   );
                 })}
               </ol>
             ) : (
-              <div className="rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+              <div className="rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
                 등록된 답변이 없어요.
               </div>
             )}
@@ -353,8 +353,8 @@ export default function AdminInquiryDetailPage() {
         </section>
 
         <aside className="flex flex-col gap-4" aria-label="문의 처리">
-          <section className="rounded-2xl border border-gray-100 bg-white p-4">
-            <h2 className="text-[16px] font-bold text-gray-900">답변 작성</h2>
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+            <h2 className="text-[16px] font-bold text-[var(--text-strong)]">답변 작성</h2>
             <form className="mt-3 flex flex-col gap-3" onSubmit={handleReplySubmit}>
               <textarea
                 value={replyBody}
@@ -362,11 +362,11 @@ export default function AdminInquiryDetailPage() {
                 rows={8}
                 maxLength={2000}
                 disabled={!canWrite || replyMutation.isPending}
-                className="resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-relaxed text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                className="resize-y rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm leading-relaxed text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                 placeholder="답변 내용"
               />
               {!canWrite ? (
-                <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                <p className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">
                   지원 권한은 조회만 가능해요.
                 </p>
               ) : null}
@@ -381,14 +381,14 @@ export default function AdminInquiryDetailPage() {
             </form>
           </section>
 
-          <section className="rounded-2xl border border-gray-100 bg-white p-4">
-            <h2 className="text-[16px] font-bold text-gray-900">상태 변경</h2>
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+            <h2 className="text-[16px] font-bold text-[var(--text-strong)]">상태 변경</h2>
             <form className="mt-3 flex flex-col gap-3" onSubmit={handleStatusSubmit}>
               <select
                 value={status}
                 onChange={(event) => setStatus(event.target.value as V1InquiryStatus)}
                 disabled={!canWrite || statusMutation.isPending}
-                className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
               >
                 {STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -399,7 +399,9 @@ export default function AdminInquiryDetailPage() {
               <button
                 type="submit"
                 disabled={!canWrite || statusMutation.isPending}
-                className="inline-flex h-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                // 부모 <section> 이 이미 --card-surface 라 select/button 도 같은 토큰이면
+                // 카드 안에 묻혀 경계가 안 보인다 — 전수검수에서 발견, --surface-soft 로 구분.
+                className="inline-flex h-[44px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 {statusMutation.isPending ? '변경 중...' : '상태 변경'}
               </button>

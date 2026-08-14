@@ -16,11 +16,14 @@ import type { ReactNode } from 'react';
 type Tone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
 
 const TONE_CLASSES: Record<Tone, string> = {
-  blue: 'bg-blue-50 text-blue-700',
-  green: 'bg-green-50 text-green-700',
-  amber: 'bg-amber-50 text-amber-700',
-  red: 'bg-red-50 text-red-700',
-  gray: 'bg-gray-100 text-gray-600',
+  blue: 'bg-[var(--blue50)] text-[var(--blue700)]',
+  // --green700 토큰이 globals.css에 없어 중립 강조 토큰(--text-strong)으로 대체 — 배경만 토큰화
+  green: 'bg-[var(--green50)] text-[var(--text-strong)]',
+  amber: 'bg-[var(--tint-orange)] text-[var(--orange700)]',
+  red: 'bg-[var(--red50)] text-[var(--red700)]',
+  // --surface-soft 배경만으로는 흰색 카드/행(--card-surface)과 대비가 거의 없어(~1.10:1)
+  // border-strong 테두리를 더해 컨테이너와 무관하게 경계가 보이도록 함 (기존 P1 패턴 재사용)
+  gray: 'bg-[var(--surface-soft)] text-[var(--text-muted)] border border-[var(--border-strong)]',
 };
 
 // ── Status meta map ───────────────────────────────────────────────────────

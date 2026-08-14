@@ -332,8 +332,7 @@
 
 @media (min-width: 1024px) {
   /* State page: center the empty/error content with comfortable max-width */
-  .tm-match-list .tm-empty-state,
-  .tm-match-list .tm-error-state {
+  .tm-match-list .tm-empty-state {
     max-width: 520px;
     margin-left: auto;
     margin-right: auto;

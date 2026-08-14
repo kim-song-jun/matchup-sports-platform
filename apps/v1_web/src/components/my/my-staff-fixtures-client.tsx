@@ -156,6 +156,7 @@ function StaffFixtureRow({
   const meta = [`${fixture.round} · ${fixture.fixtureNumber}번 경기`, when === '' ? '일정 미정' : when]
     .filter(Boolean)
     .join(' · ');
+  const status = fixtureStatusBadge(fixture.status);
 
   return (
     <Link
@@ -164,8 +165,13 @@ function StaffFixtureRow({
       aria-label={`${home} 대 ${away}, 경기 운영 콘솔 열기`}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="tm-text-body" style={{ color: 'var(--text-strong)' }}>
-          {home} vs {away}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div className="tm-text-body" style={{ color: 'var(--text-strong)' }}>
+            {home} vs {away}
+          </div>
+          <span className={`tm-badge tm-badge-sm ${status.className}`} aria-label={`경기 상태: ${status.label}`}>
+            {status.label}
+          </span>
         </div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>
           {meta}
@@ -174,4 +180,19 @@ function StaffFixtureRow({
       <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} />
     </Link>
   );
+}
+
+function fixtureStatusBadge(status: string): { label: string; className: string } {
+  switch (status) {
+    case 'scheduled':
+      return { label: '예정', className: 'tm-badge-grey' };
+    case 'live':
+      return { label: '진행 중', className: 'tm-badge-green' };
+    case 'ended':
+      return { label: '종료', className: 'tm-badge-blue' };
+    case 'cancelled':
+      return { label: '취소', className: 'tm-badge-red' };
+    default:
+      return { label: '상태 확인 필요', className: 'tm-badge-orange' };
+  }
 }

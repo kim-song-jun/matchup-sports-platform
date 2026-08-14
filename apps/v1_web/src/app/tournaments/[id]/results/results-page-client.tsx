@@ -952,7 +952,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
             <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--blue700)' }}>대회가 진행 중이에요</p>
             <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--blue700)' }}>종료 후 최종 결과를 확인할 수 있어요.</p>
             <Link
-              href={`/tournaments/${tournament.id}/schedule`}
+              href={`/tournaments/${tournament.id}/bracket`}
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 minHeight: 44, marginTop: 4, padding: '0 12px',

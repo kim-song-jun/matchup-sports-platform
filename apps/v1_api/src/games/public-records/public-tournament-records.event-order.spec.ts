@@ -21,6 +21,7 @@ const GAME_ID = 'game-order-1';
 const HOME_SCORER = {
   id: 'participant-home',
   sideId: 'side-home',
+  lineupId: 'lineup-home-1',
   displayNameSnapshot: '김철수',
   jerseyNumber: 7,
   position: 'FW',
@@ -120,6 +121,7 @@ function buildFakePrisma(events: readonly FakeEvent[]): PrismaService {
               { id: 'side-home', sideKey: 'HOME' },
               { id: 'side-away', sideKey: 'AWAY' },
             ],
+            lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1 }],
             participants: [HOME_SCORER],
             currentOfficialRevision: null,
             periods: [],
@@ -155,6 +157,7 @@ function buildFakePrisma(events: readonly FakeEvent[]): PrismaService {
                 { id: 'side-home', sideKey: 'HOME' },
                 { id: 'side-away', sideKey: 'AWAY' },
               ],
+              lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1 }],
               periods: [],
               participants: [HOME_SCORER],
             },

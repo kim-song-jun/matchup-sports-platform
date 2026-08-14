@@ -93,8 +93,11 @@ const FIXTURE_MATCH_SELECT = {
       state: true,
       visibilityPolicy: { select: { mode: true, lineupAt: true } },
       sides: { select: { id: true, sideKey: true } },
+      lineups: {
+        select: { id: true, sideId: true, revision: true },
+      },
       participants: {
-        select: { id: true, sideId: true, displayNameSnapshot: true, jerseyNumber: true, position: true },
+        select: { id: true, sideId: true, lineupId: true, displayNameSnapshot: true, jerseyNumber: true, position: true },
       },
       currentOfficialRevision: {
         select: { state: true, supersedesId: true, officialAt: true, score: true, mvpParticipantId: true },
@@ -945,8 +948,21 @@ function buildLineup(
   }
 
   type ParticipantRow = NonNullable<FixtureMatchRow['game']>['participants'][number];
+  // 저장할 때마다 immutable lineup revision과 participant snapshot이 새로
+  // 생긴다. 전체 participant를 side로만 묶으면 과거 저장본까지 합쳐지므로,
+  // lineups에서 side별 가장 큰 revision의 id 하나만 선택한다. DB 반환 순서에
+  // 기대지 않아 조회 옵션이 바뀌어도 최신 저장본 계약을 유지한다.
+  const latestLineupBySide = new Map<string, { id: string; revision: number }>();
+  for (const lineup of fixture.game.lineups) {
+    const current = latestLineupBySide.get(lineup.sideId);
+    if (current === undefined || lineup.revision > current.revision) {
+      latestLineupBySide.set(lineup.sideId, { id: lineup.id, revision: lineup.revision });
+    }
+  }
+
   const bySide = new Map<string, ParticipantRow[]>();
   for (const participant of fixture.game.participants) {
+    if (latestLineupBySide.get(participant.sideId)?.id !== participant.lineupId) continue;
     const list = bySide.get(participant.sideId) ?? [];
     list.push(participant);
     bySide.set(participant.sideId, list);

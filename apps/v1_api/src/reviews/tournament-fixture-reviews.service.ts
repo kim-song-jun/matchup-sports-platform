@@ -102,9 +102,9 @@ export class TournamentFixtureReviewsService {
           sourceId: entry.fixture.id,
           title: fixtureTitle(entry.fixture),
           completedAt: toIso(entry.completedAt),
-          // 카드 한 장에 팀 대상 1건 + 선수 대상 N건이 섞여 있다. 목록 카드의 targetType은
-          // 뱃지/문구를 고르는 대표 값이라 상대 팀으로 유지한다(개별 대상은 source 화면에서 나뉜다).
-          targetType: 'team' as const,
+          // 목록 카드의 대표 target도 실제 역할 계약을 따른다. member는 선수 target만 남으므로
+          // team으로 표시하면 작성 화면과 목록 배지가 서로 모순된다.
+          targetType: canReviewTeam ? 'team' as const : 'user' as const,
           targetCount,
           reviewedCount,
           remainingCount: Math.max(targetCount - reviewedCount, 0),

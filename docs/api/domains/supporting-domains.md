@@ -56,7 +56,7 @@
 ### CAUTION
 
 - `sourceType=tournament_fixture`는 대회 fixture가 `completed`이고 `result`가 존재해야 작성 가능하다.
-- `sourceType=tournament_fixture`는 참가 양 팀 중 정확히 한 팀의 active 멤버만 작성한다. 같은 사용자가 양 팀 모두에 active 멤버이면 작성 팀을 확정할 수 없으므로 차단한다.
+- `sourceType=tournament_fixture`는 참가팀 active 멤버만 작성한다. 같은 사용자가 양 팀 모두에 active 멤버이면 두 방향을 모두 반환하며, 선택한 대상의 반대편 팀을 작성자 팀으로 확정한다. 각 방향의 역할 게이트는 해당 작성자 팀 membership role을 따른다.
 - `owner | manager`의 fixture 리뷰 대상은 상대 팀 1건과 상대팀의 현재 대회 등록 로스터 선수다. `member`의 대상은 상대 등록 선수뿐이며 상대팀 제출은 `403 TEAM_REVIEW_ROLE_REQUIRED`다.
 - 같은 대회·같은 상대팀/선수 중복은 작성자 기준으로 수렴한다.
 

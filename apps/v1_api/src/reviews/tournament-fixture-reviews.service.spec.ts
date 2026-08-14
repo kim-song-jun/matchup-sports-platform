@@ -437,7 +437,7 @@ describe('TournamentFixtureReviewsService', () => {
 
     // 판정 키가 팀 기준으로 되돌아가면 팀장의 후기가 팀원 전원의 목록을 완료 처리해 []가 된다.
     await expect(service.pending(teammate, 20, tournamentId)).resolves.toMatchObject([
-      { sourceId: fixtureId, targetCount: 1, targetTeam: { teamId: targetTeamId }, remainingCount: 1, state: 'ready' },
+      { sourceId: fixtureId, targetType: 'user', targetCount: 1, targetTeam: { teamId: targetTeamId }, remainingCount: 1, state: 'ready' },
     ]);
     // "이미 썼음" 조회도 사람 축이어야 한다(팀 축이면 팀장의 후기가 팀원 목록을 지운다).
     expect(prisma.v1PostEventReview.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({

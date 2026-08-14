@@ -262,8 +262,8 @@ function TournamentFixtureReviewEntryList({
       </p>
       <Card pad={0} style={{ overflow: 'hidden' }}>
         {entries.map(({ fixture, remainingCount }, index) => {
-          const homeTeamName = fixture.homeTeamName === null ? '비공개' : fixture.homeTeamName || '미정';
-          const awayTeamName = fixture.awayTeamName === null ? '비공개' : fixture.awayTeamName || '미정';
+          const homeTeamName = getFixtureTeamLabel(fixture.homeTeamName);
+          const awayTeamName = getFixtureTeamLabel(fixture.awayTeamName);
           const result = fixture.result!;
           const roundLabel = fixture.round || `${fixture.fixtureNumber}경기`;
           const hasPenaltyResult =
@@ -341,6 +341,12 @@ function TournamentFixtureReviewEntryList({
       </Card>
     </section>
   );
+}
+
+function getFixtureTeamLabel(teamName: string | null | undefined) {
+  if (teamName === null) return '비공개';
+  if (!teamName || teamName === 'TBD') return '미정';
+  return teamName;
 }
 
 type CompletedActionItem = {

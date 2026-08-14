@@ -360,7 +360,7 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     );
     expect(screen.getByText('남은 리뷰 2개')).toBeInTheDocument();
     expect(screen.getByText('2 : 1')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '비공개 대 TBD 경기 남은 리뷰 1개 작성' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '비공개 대 미정 경기 남은 리뷰 1개 작성' })).toBeInTheDocument();
     expect(screen.getByText('PK 5 : 4')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /팀C 대 팀D/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /팀E 대 팀F/ })).not.toBeInTheDocument();

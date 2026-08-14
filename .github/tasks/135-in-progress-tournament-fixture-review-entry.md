@@ -65,7 +65,7 @@ Design source: `docs/reference/handoff-sm-new-direction/sports-platform/project/
 
 - 2026-08-14: 서버의 fixture 단위 완료/공식 결과/참가팀 멤버 권한 게이트가 이미 존재함을 확인했다. 변경은 frontend direct-entry UI와 문서 동기화로 한정한다.
 - 2026-08-14: 사용자 확인으로 역할 계약을 확정했다. `owner | manager`는 상대팀+상대 선수, `member`는 상대 선수만 평가하며 대회 자체 후기는 기존 owner/manager 완료 후기를 유지한다.
-- 2026-08-14: tournamentId pending 필터, 역할별 source/submit/pending, 개인화 CTA, PK 점수, 비공개/TBD 구분을 구현했다. 타깃 API 38건과 Web 18건이 통과했다.
+- 2026-08-14: tournamentId pending 필터, 역할별 source/submit/pending, 개인화 CTA, PK 점수, 비공개/미정 구분을 구현했다. 최신 dev의 양 팀 겸직 계약을 보존한 통합 타깃 API 41건과 Web 18건이 통과했다.
 
 ## Ambiguity log
 

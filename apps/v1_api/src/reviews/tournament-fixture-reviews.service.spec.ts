@@ -7,7 +7,7 @@ const user = {
   accountStatus: 'active' as const,
   onboardingStatus: 'completed' as const,
 };
-// 같은 팀의 일반 멤버(role: 'member'). 예전 정책에서는 이 사람이 제출하면 403이었다.
+// 같은 팀의 일반 멤버(role: 'member'). 상대 선수 후기는 가능하지만 상대팀 후기는 쓸 수 없다.
 const teammate = { ...user, id: '00000000-0000-4000-8000-000000000002', email: 'member@teameet.v1' };
 // 어느 참가팀에도 속하지 않은 사용자(다른 팀 소속).
 const outsider = { ...user, id: '00000000-0000-4000-8000-000000000003', email: 'outsider@teameet.v1' };
@@ -178,7 +178,7 @@ describe('TournamentFixtureReviewsService', () => {
   it('deduplicates pending reviews when the same teams meet twice in one tournament', async () => {
     const prisma = {
       v1TeamMembership: {
-        findMany: jest.fn().mockResolvedValue([{ teamId: reviewerTeamId }]),
+        findMany: jest.fn().mockResolvedValue([{ teamId: reviewerTeamId, role: 'owner' }]),
       },
       v1TournamentFixture: {
         findMany: jest.fn().mockResolvedValue([
@@ -294,12 +294,8 @@ describe('TournamentFixtureReviewsService', () => {
     });
   });
 
-  // 아래 5개는 "팀 후기 작성 권한 개방"(팀장 전용 → 참가팀 active 멤버 전원) 회귀 테스트다.
-  // 이 블록의 prisma 스텁은 고정값 mock이 아니라 where 인자를 실제로 평가하는 미니 스토어
-  // (membershipStore/reviewStore)를 쓴다 — 고정값 mock은 서비스가 role 필터를 되살리거나
-  // 중복 판정 축을 사람→팀으로 되돌려도 같은 값을 돌려줘서 정책 역전을 못 잡기 때문이다.
-  it('일반 멤버(role: member)도 상대팀 후기를 제출할 수 있다', async () => {
-    const createMock = jest.fn().mockResolvedValue(reviewRow({ id: 'review-member', reviewerUserId: teammate.id, rating: 4 }));
+  // 역할별 계약: owner/manager는 상대팀+상대 선수, member는 상대 선수만 평가한다.
+  it('일반 멤버는 상대팀 후기를 제출할 수 없다', async () => {
     const prisma = {
       v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       // role 필터가 살아 있으면(role: { in: ['owner','manager'] }) 이 행이 걸러져
@@ -307,51 +303,61 @@ describe('TournamentFixtureReviewsService', () => {
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([]),
-      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(trustTx(createMock))),
+      $transaction: jest.fn(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
     await expect(
       service.submit(teammate, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 4 }, ['manner']),
-    ).resolves.toMatchObject({
-      alreadySubmitted: false,
-      review: { reviewId: 'review-member', rating: 4, targetTeam: { teamId: targetTeamId } },
-    });
-    expect(createMock).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        reviewerUserId: teammate.id,
-        reviewerTeamId,
-        targetTeamId,
-        sourceGroupId: tournamentId,
-        rating: 4,
-      }),
-    }));
-    // 스토어가 걸러주는 것과 별개로, 역할 필터가 쿼리에 다시 붙는 것 자체를 막는다.
-    expect(prisma.v1TeamMembership.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.not.objectContaining({ role: expect.anything() }),
-    }));
+    ).rejects.toMatchObject({ response: { code: 'TEAM_REVIEW_ROLE_REQUIRED' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('source(): 일반 멤버의 role을 그대로 실어 응답한다', async () => {
+  it('source(): 일반 멤버에게는 상대 선수 target만 반환한다', async () => {
     const prisma = {
       v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
-      v1TournamentPlayer: playerStore([]),
+      v1TournamentPlayer: playerStore([
+        player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
+      ]),
       v1PostEventReview: reviewStore([]),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
     await expect(service.source(teammate, fixtureId)).resolves.toMatchObject({
       reviewerTeam: { teamId: reviewerTeamId, name: '성수 FC', role: 'member' },
-      targets: [{ targetTeamId, alreadySubmitted: false, locked: false }],
+      targets: [{ targetType: 'user', targetUserId: opponentPlayerId, targetTeamId: null, locked: false }],
     });
   });
 
-  it('같은 팀의 다른 사람이 이미 썼어도 내 후기는 새로 생성된다', async () => {
-    const createMock = jest.fn().mockResolvedValue(reviewRow({ id: 'review-second', reviewerUserId: teammate.id, rating: 2 }));
+  it('일반 멤버는 상대팀 등록 선수 후기를 제출할 수 있다', async () => {
+    const createMock = jest.fn().mockResolvedValue(
+      playerReviewRow({ id: 'review-member-player', reviewerUserId: teammate.id, targetUserId: opponentPlayerId, rating: 4 }),
+    );
     const prisma = {
       v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
+      v1TournamentPlayer: playerStore([
+        player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
+      ]),
+      v1PostEventReview: reviewStore([]),
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(reputationTx(createMock))),
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never);
+
+    await expect(
+      service.submit(teammate, { sourceId: fixtureId, targetType: 'user', targetUserId: opponentPlayerId, rating: 4 }, ['manner']),
+    ).resolves.toMatchObject({
+      alreadySubmitted: false,
+      review: { targetType: 'user', targetUser: { userId: opponentPlayerId } },
+    });
+  });
+
+  it('같은 팀의 다른 운영진이 이미 썼어도 내 후기는 새로 생성된다', async () => {
+    const createMock = jest.fn().mockResolvedValue(reviewRow({ id: 'review-second', reviewerUserId: teammate.id, rating: 2 }));
+    const prisma = {
+      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'manager' })]),
       v1TournamentPlayer: playerStore([]),
       // 팀장(user)이 같은 대회·같은 상대팀에 이미 후기를 남긴 상태.
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
@@ -384,7 +390,7 @@ describe('TournamentFixtureReviewsService', () => {
   it('P2002 폴백은 내 후기만 찾는다 — 없으면 DUPLICATE_REVIEW_RETRY로 실패한다', async () => {
     const prisma = {
       v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
-      v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
+      v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'manager' })]),
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
       $transaction: jest.fn().mockRejectedValue({ code: 'P2002' }),
@@ -400,7 +406,7 @@ describe('TournamentFixtureReviewsService', () => {
     const transactionMock = jest.fn();
     const prisma = {
       v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
-      v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
+      v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'manager' })]),
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-mine', reviewerUserId: teammate.id, rating: 3 })]),
       $transaction: transactionMock,
@@ -413,7 +419,7 @@ describe('TournamentFixtureReviewsService', () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it('팀장이 이미 쓴 경기도 다른 팀원의 pending 목록에는 남는다', async () => {
+  it('팀장이 팀 후기를 쓴 경기여도 일반 멤버에게 남은 선수 후기가 있으면 pending에 남는다', async () => {
     const prisma = {
       v1TeamMembership: membershipStore([
         membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' }),
@@ -422,21 +428,28 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentFixture: {
         findMany: jest.fn().mockResolvedValue([fixture({ id: fixtureId, fixtureNumber: 1 })]),
       },
-      v1TournamentPlayer: playerStore([]),
+      v1TournamentPlayer: playerStore([
+        player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
+      ]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
     // 판정 키가 팀 기준으로 되돌아가면 팀장의 후기가 팀원 전원의 목록을 완료 처리해 []가 된다.
-    await expect(service.pending(teammate, 20)).resolves.toMatchObject([
-      { sourceId: fixtureId, targetTeam: { teamId: targetTeamId }, remainingCount: 1, state: 'ready' },
+    await expect(service.pending(teammate, 20, tournamentId)).resolves.toMatchObject([
+      { sourceId: fixtureId, targetCount: 1, targetTeam: { teamId: targetTeamId }, remainingCount: 1, state: 'ready' },
     ]);
     // "이미 썼음" 조회도 사람 축이어야 한다(팀 축이면 팀장의 후기가 팀원 목록을 지운다).
     expect(prisma.v1PostEventReview.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
       where: expect.objectContaining({ reviewerUserId: teammate.id }),
     }));
     // 반대 방향도 고정 — 정작 쓴 사람에게는 남지 않아야 한다(키가 아무것도 못 맞추는 반대 회귀 차단).
-    await expect(service.pending(user, 20)).resolves.toEqual([]);
+    await expect(service.pending(user, 20, tournamentId)).resolves.toMatchObject([
+      { sourceId: fixtureId, targetCount: 2, reviewedCount: 1, remainingCount: 1 },
+    ]);
+    expect(prisma.v1TournamentFixture.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ tournamentId }),
+    }));
   });
 
   it('참가팀 소속이 아니면 NOT_TEAM_MEMBER로 막는다', async () => {

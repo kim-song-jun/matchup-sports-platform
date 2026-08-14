@@ -23,6 +23,30 @@ const leaderId = '00000000-0000-4000-8000-000000000043';
 const outsiderId = '00000000-0000-4000-8000-000000000044';
 
 describe('ReviewsService', () => {
+  it('tournamentId pending 필터는 해당 대회의 fixture 후기만 조회한다', async () => {
+    const tournamentId = '00000000-0000-4000-8000-000000000099';
+    const tournamentFixtureReviews = {
+      pending: jest.fn().mockResolvedValue([
+        {
+          sourceType: 'tournament_fixture',
+          sourceId,
+          remainingCount: 2,
+          completedAtSort: submittedAt.getTime(),
+        },
+      ]),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService({} as never, tournamentFixtureReviews as never);
+
+    await expect(service.list(user, { tab: 'pending', tournamentId, limit: 20 })).resolves.toEqual({
+      items: [{ sourceType: 'tournament_fixture', sourceId, remainingCount: 2 }],
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+    expect(tournamentFixtureReviews.pending).toHaveBeenCalledWith(user, 20, tournamentId);
+  });
+
   it('returns an idempotent duplicate response when personal review create hits the unique constraint', async () => {
     const existingReview = {
       id: 'review-1',

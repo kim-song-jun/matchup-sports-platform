@@ -496,6 +496,7 @@ DB evidence:
 | V1-14-005 | Ineligible and locked source handling | Not completed, cancelled, not-participated, self-target, already submitted, missing opponent, non-manager team actor, and ambiguous two-team-manager cases show concrete lock/error reasons rather than fake success |
 | V1-14-006 | Written and received review surfaces | Written reviews appear in `/my/reviews?tab=written`; received reviews appear in `/my/reviews/received` grouped by event and separated between user reviews and managed-team reviews |
 | V1-14-007 | Reputation and trust score recalculation | Personal match reviews recalculate target `V1UserReputationSummary`; team match reviews recalculate target `V1TeamTrustScore` with `1-2` reviews as `estimated` and `3+` as `verified` |
+| V1-14-008 | In-progress tournament detail exposes role-aware completed fixture reviews | While a tournament is `in_progress`, authenticated participants see direct `/my/reviews/tournament_fixture/:fixtureId` entries only for completed fixtures with an official result and remaining targets. `owner | manager` targets include the opponent team and roster players; `member` targets include roster players only. Guests, outsiders, fully reviewed fixtures, repeated opponents, scheduled/live/cancelled, and result-less completed fixtures have no CTA. Penalty shootouts show regulation and `PK` scores. |
 
 Validation evidence:
 

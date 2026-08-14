@@ -270,7 +270,7 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders only the genuinely available rows (not "준비 중" placeholders) for an in_progress tournament with a completed fixture', () => {
+  it('renders direct review entries only for completed fixtures with results while the tournament is in progress', () => {
     const fixtures: V1TournamentFixture[] = [
       {
         id: 'f1',
@@ -283,6 +283,30 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
         awayTeamName: '팀B',
         result: { homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
       } as V1TournamentFixture,
+      {
+        id: 'f-completed-without-result',
+        round: '조별 2라운드',
+        status: 'completed',
+        homeTeamName: '팀C',
+        awayTeamName: '팀D',
+        result: null,
+      } as V1TournamentFixture,
+      {
+        id: 'f-penalty',
+        round: '결승',
+        status: 'completed',
+        homeTeamName: null,
+        awayTeamName: 'TBD',
+        result: { homeScore: 1, awayScore: 1, hasPenalty: true, homePenaltyScore: 5, awayPenaltyScore: 4 },
+      } as V1TournamentFixture,
+      {
+        id: 'f-scheduled',
+        round: '조별 3라운드',
+        status: 'scheduled',
+        homeTeamName: '팀E',
+        awayTeamName: '팀F',
+        result: { homeScore: 0, awayScore: 0, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
+      } as V1TournamentFixture,
     ];
 
     render(
@@ -293,13 +317,52 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
         hasAnnouncements: false,
         sponsorCount: 0,
         announcements: [],
+        fixtureReviewState: {
+          status: 'ready',
+          items: [
+            {
+              sourceType: 'tournament_fixture',
+              sourceId: 'f1',
+              title: 'TeamMeet Cup · 조별 1라운드',
+              completedAt: '2026-08-14T00:00:00.000Z',
+              targetType: 'team',
+              targetCount: 3,
+              reviewedCount: 1,
+              remainingCount: 2,
+              state: 'ready',
+            },
+            {
+              sourceType: 'tournament_fixture',
+              sourceId: 'f-penalty',
+              title: 'TeamMeet Cup · 결승',
+              completedAt: '2026-08-14T01:00:00.000Z',
+              targetType: 'user',
+              targetCount: 1,
+              reviewedCount: 0,
+              remainingCount: 1,
+              state: 'ready',
+            },
+          ],
+        },
       }),
     );
 
     expect(screen.getByText('대회 현황')).toBeInTheDocument();
-    // 결과·순위, 리뷰 등 "available" 상태 카드만 뜨고, "하이라이트 영상" 같은 upcoming
-    // placeholder는 나오지 않는다.
+    // 결과·순위처럼 실제로 열린 행만 유지하고, generic 리뷰함 링크와 준비 중 placeholder는 제거한다.
     expect(screen.queryByText('하이라이트 영상')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /리뷰·매너 기록/ })).toHaveAttribute('href', '/my/reviews');
+    expect(screen.queryByRole('link', { name: /리뷰·매너 기록/ })).not.toBeInTheDocument();
+
+    expect(screen.getByText('리뷰할 수 있는 경기')).toBeInTheDocument();
+    expect(screen.getByText('경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '팀A 대 팀B 경기 남은 리뷰 2개 작성' })).toHaveAttribute(
+      'href',
+      '/my/reviews/tournament_fixture/f1',
+    );
+    expect(screen.getByText('남은 리뷰 2개')).toBeInTheDocument();
+    expect(screen.getByText('2 : 1')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '비공개 대 TBD 경기 남은 리뷰 1개 작성' })).toBeInTheDocument();
+    expect(screen.getByText('PK 5 : 4')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /팀C 대 팀D/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /팀E 대 팀F/ })).not.toBeInTheDocument();
   });
 });

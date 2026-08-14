@@ -53,9 +53,26 @@ export class ReviewsService {
 
   async list(user: V1AuthUser, query: ListReviewsQueryDto) {
     const tab = query.tab ?? 'pending';
-    if (tab === 'written') return this.written(user, query);
+    if (tab === 'written') {
+      if (query.tournamentId) {
+        throw new BadRequestException({
+          code: 'TOURNAMENT_FILTER_PENDING_ONLY',
+          message: 'tournamentId filter is only available for pending reviews',
+        });
+      }
+      return this.written(user, query);
+    }
 
     const limit = normalizeLimit(query.limit);
+    if (query.tournamentId) {
+      const tournamentFixtureItems = await this.tournamentFixtureReviews.pending(user, limit, query.tournamentId);
+      return {
+        items: tournamentFixtureItems
+          .slice(0, limit)
+          .map(({ completedAtSort: _completedAtSort, ...item }) => item),
+        pageInfo: { nextCursor: null, hasNext: false },
+      };
+    }
     const [personalItems, teamItems, tournamentFixtureItems] = await Promise.all([
       this.pendingPersonalReviews(user, limit),
       this.pendingTeamReviews(user, limit),

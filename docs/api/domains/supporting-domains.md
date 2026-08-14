@@ -32,7 +32,7 @@
 
 | Method | Path | Auth | 용도 |
 |---|---|---|---|
-| `GET` | `/api/v1/reviews?tab=pending\|written` | Required | 작성할 리뷰/작성 완료 리뷰 목록 |
+| `GET` | `/api/v1/reviews?tab=pending\|written` | Required | 작성할 리뷰/작성 완료 리뷰 목록. pending은 optional `tournamentId` UUID로 해당 대회 fixture만 필터 |
 | `GET` | `/api/v1/reviews/received` | Required | 내가 받은 리뷰 목록 |
 | `GET` | `/api/v1/reviews/sources/:sourceType/:sourceId` | Required | 리뷰 작성 대상 조회 |
 | `POST` | `/api/v1/reviews` | Required | 경기 후 리뷰 제출 |
@@ -42,9 +42,10 @@
 - `sourceType`: `match | team_match | tournament_fixture`
   - `match`: 완료된 개인 매치 참가자가 상대 참가자(`targetType=user`)를 평가한다.
   - `team_match`: 완료된 팀매치의 팀장/운영진이 상대 팀(`targetType=team`)을 평가한다.
-  - `tournament_fixture`: 완료되고 결과가 기록된 대회 경기의 팀장/운영진이 상대 팀(`targetType=team`)을 평가한다.
+  - `tournament_fixture`: 완료되고 공식 결과가 기록된 대회 경기에서 참가팀 active `owner | manager`는 상대 팀(`targetType=team`)과 상대 등록 선수(`targetType=user`)를, active `member`는 상대 등록 선수만 평가한다.
     - `sourceId`는 작성 화면으로 진입한 fixture ID다.
-    - 중복 방지는 내부 `sourceGroupId=tournamentId` 기준이다. 같은 대회에서 같은 두 팀이 리그전/토너먼트로 두 번 만나도, 같은 리뷰 작성 팀은 같은 상대 팀을 한 번만 평가한다.
+    - 중복 방지는 내부 `sourceGroupId=tournamentId` 기준이다. 같은 대회에서 같은 두 팀이 리그전/토너먼트로 두 번 만나도, 같은 작성자는 같은 상대 팀·선수를 한 번만 평가한다.
+    - `GET /reviews?tab=pending&tournamentId=:uuid`는 해당 대회의 사용자별 남은 fixture 리뷰만 반환한다. 비참가자, 이미 전부 작성한 경기, 같은 상대 재대결 중복은 목록에서 제외한다.
 - `POST /reviews` body:
   - 공통: `sourceType`, `sourceId`, `targetType`, `rating(1~5)`, `tagCodes(1~8)`
   - `targetUserId`는 `sourceType=match`에서만 사용한다.
@@ -55,8 +56,9 @@
 ### CAUTION
 
 - `sourceType=tournament_fixture`는 대회 fixture가 `completed`이고 `result`가 존재해야 작성 가능하다.
-- `sourceType=tournament_fixture`의 팀 리뷰는 팀장/운영진만 작성한다. 같은 사용자가 양 팀을 모두 관리하는 fixture는 작성 팀을 확정할 수 없으므로 차단한다.
-- 대회 fixture 리뷰는 현재 팀 단위 매너 평가다. “칭찬할 선수/비매너 선수 선택” 같은 선수 단위 평가는 별도 target/model 계약이 필요하므로 이 sourceType으로 가장하지 않는다.
+- `sourceType=tournament_fixture`는 참가 양 팀 중 정확히 한 팀의 active 멤버만 작성한다. 같은 사용자가 양 팀 모두에 active 멤버이면 작성 팀을 확정할 수 없으므로 차단한다.
+- `owner | manager`의 fixture 리뷰 대상은 상대 팀 1건과 상대팀의 현재 대회 등록 로스터 선수다. `member`의 대상은 상대 등록 선수뿐이며 상대팀 제출은 `403 TEAM_REVIEW_ROLE_REQUIRED`다.
+- 같은 대회·같은 상대팀/선수 중복은 작성자 기준으로 수렴한다.
 
 ## 2) Reports (`/reports`, `/admin/reports`)
 
@@ -275,7 +277,7 @@
   - 필드: `id`, `title`, `body`, `category`, `audience`, `publishedAt`, `createdAt`
   - `category`: `general | venue | sponsor | media | results | review`
   - 프론트는 `venue` 공지를 장소·주차·경기 준비 안내 앵커로, `sponsor | media | results | review` 공지를 후속 허브 CTA 앵커로 사용한다. 이 공지는 실제 스폰서 로고, 영상 업로드, 구조화 순위표를 대체하지 않으며 운영진이 공개한 안내 콘텐츠로만 취급한다.
-  - 완료된 fixture 결과가 있으면 후속 허브의 리뷰 CTA는 `/my/reviews`로 연결된다. 실제 작성 대상은 `/reviews` 목록/`/reviews/sources/tournament_fixture/:fixtureId`가 서버에서 참가 팀 권한과 제출 여부를 검증한다.
+  - 진행 중 대회에 완료+결과 확정 fixture가 있으면 상세는 사용자별 pending 응답에 남은 fixture만 `리뷰할 수 있는 경기`로 표시해 `/my/reviews/tournament_fixture/:fixtureId` 작성 화면으로 직접 연결한다. 예정·진행·취소, 결과 없는 완료, 비참가자, 작성 완료, 같은 상대 재대결 중복에는 CTA를 만들지 않는다. 승부차기 결과는 정규 점수와 `PK` 점수를 함께 표시한다.
 - `sponsors`는 대회 한정 협찬/이벤트 구조화 목록이다.
   - public detail에는 `isActive=true`인 row만 포함한다.
   - 정렬: `sortOrder ASC`, `createdAt ASC`

@@ -45,6 +45,8 @@ export type ReviewTargetViewModel = V1ReviewTarget & {
   statusLabel: string;
   /** 양 팀 겸직이라 대상마다 작성자 팀이 다를 때만 채워진다. */
   reviewerTeamLabel: string | null;
+  /** lockReason 을 사용자 문구로 옮긴 값. 배지와 중복되는 코드는 null 이라 표시하지 않는다. */
+  lockReasonLabel: string | null;
 };
 
 export type ReceivedReviewGroup = {

@@ -355,7 +355,7 @@ function ReviewTargetCard({
               {target.statusLabel === '대기' && active ? '작성 중' : target.statusLabel}
             </span>
           </div>
-          {target.lockReason ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{target.lockReason}</div> : null}
+          {target.lockReasonLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{target.lockReasonLabel}</div> : null}
           <StarRating disabled={locked} rating={draft.rating} onChange={onUpdateRating} />
           <div className="tm-review-chip-row">
             {REVIEW_TAG_OPTIONS.map((tag) => {

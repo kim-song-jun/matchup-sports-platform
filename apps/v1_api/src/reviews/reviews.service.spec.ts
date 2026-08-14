@@ -478,6 +478,89 @@ describe('ReviewsService', () => {
     });
   });
 
+  describe('received', () => {
+    const tournamentReceivedReview = (submittedAtValue: Date) => ({
+      id: 'review-tournament-received',
+      sourceType: 'tournament_fixture',
+      sourceId: 'fixture-1',
+      sourceGroupId: 'tournament-1',
+      targetType: 'user',
+      targetUserId: user.id,
+      targetTeamId: null,
+      targetUser: { id: user.id, profile: { nickname: '받은 선수', profileImageUrl: null } },
+      targetTeam: null,
+      reviewerUserId: targetUserId,
+      reviewerTeamId: awayTeamId,
+      reviewerUser: { id: targetUserId, profile: { nickname: '보낸 선수', profileImageUrl: '/secret.png' } },
+      reviewerTeam: { id: awayTeamId, name: '상대 팀', profile: { logoUrl: '/secret-team.png' } },
+      sportId: 'sport-futsal',
+      rating: 5,
+      tags: [{ tagCode: 'manner', labelSnapshot: '매너가 좋아요', createdAt: submittedAtValue }],
+      status: 'submitted',
+      submittedAt: submittedAtValue,
+    });
+
+    it('상호 제출된 대회 개인 리뷰를 즉시 익명으로 반환한다', async () => {
+      const now = new Date('2026-08-14T12:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(now);
+      try {
+        const candidate = tournamentReceivedReview(new Date('2026-08-14T11:00:00.000Z'));
+        const findMany = jest.fn()
+          .mockResolvedValueOnce([candidate])
+          .mockResolvedValueOnce([{
+            sourceType: 'tournament_fixture',
+            sourceId: 'fixture-2',
+            sourceGroupId: 'tournament-1',
+            reviewerUserId: user.id,
+            targetUserId,
+          }]);
+        const prisma = {
+          v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+          v1PostEventReview: { findMany },
+        };
+        const service = new ReviewsService(prisma as never, {} as never);
+
+        const result = await service.received(user, { limit: 20 });
+
+        expect(result.items).toEqual([
+          expect.objectContaining({
+            reviewId: candidate.id,
+            anonymous: true,
+            reviewerUser: null,
+            reviewerTeam: null,
+            submittedAt: null,
+            rating: 5,
+          }),
+        ]);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('상대가 제출하지 않았고 72시간 전인 대회 리뷰는 받은 목록에서 숨긴다', async () => {
+      const now = new Date('2026-08-14T12:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(now);
+      try {
+        const prisma = {
+          v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+          v1PostEventReview: {
+            findMany: jest.fn()
+              .mockResolvedValueOnce([tournamentReceivedReview(new Date('2026-08-14T11:00:00.000Z'))])
+              .mockResolvedValueOnce([]),
+          },
+        };
+        const service = new ReviewsService(prisma as never, {} as never);
+
+        await expect(service.received(user, { limit: 20 })).resolves.toEqual({
+          items: [],
+          pageInfo: { nextCursor: null, hasNext: false },
+        });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
   describe('receivedSummary', () => {
     it('sportId가 없는(레거시) 리뷰는 집계에서 제외하고, 공개되지 않은 리뷰도 제외한다', async () => {
       const now = new Date('2026-08-01T00:00:00Z');

@@ -1572,11 +1572,20 @@ export type V1ReviewListResponse = {
 };
 
 export type V1ReviewReceivedResponse = {
-  items: V1ReviewDetail[];
+  items: V1ReceivedReviewDetail[];
   pageInfo: {
     nextCursor: string | null;
     hasNext: boolean;
   };
+};
+
+export type V1ReceivedReviewDetail = Omit<V1ReviewDetail, 'reviewerUser' | 'reviewerTeam' | 'submittedAt'> & {
+  /** 신규 대회 리뷰는 작성자 식별자를 절대 내려주지 않는다. */
+  anonymous: boolean;
+  reviewerUser: V1ReviewActorUser | null;
+  reviewerTeam: V1ReviewActorTeam | null;
+  /** 익명 리뷰는 행동 시점으로 작성자를 추정하지 못하도록 제출 시각도 숨긴다. */
+  submittedAt: string | null;
 };
 
 export type V1ReviewerTeam = {

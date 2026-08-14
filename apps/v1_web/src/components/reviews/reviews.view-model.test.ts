@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { REVIEW_TAG_OPTIONS, sourceTypeLabel, toReviewsPageModel, toTargetViewModel } from './reviews.view-model';
+import { REVIEW_TAG_OPTIONS, sourceTypeLabel, toReviewsPageModel, toReviewsReceivedPageModel, toTargetViewModel } from './reviews.view-model';
 import type { V1ReviewTarget } from '@/types/api';
 
 /**
@@ -73,6 +73,37 @@ describe('reviews view model — 대회 경기 리뷰 계약', () => {
       kindLabel: '대회 경기',
       ctaLabel: '리뷰',
     });
+  });
+
+  it('익명 대회 리뷰와 이전 리뷰를 서로 다른 섹션으로 분리한다', () => {
+    const shared = {
+      sourceType: 'tournament_fixture' as const,
+      sourceId: 'fixture-1',
+      targetType: 'user' as const,
+      targetUser: { userId: 'me', name: '나', imageUrl: null },
+      targetTeam: null,
+      rating: 5,
+      tags: [{ tagCode: 'manner', label: '매너가 좋아요' }],
+      status: 'submitted' as const,
+      submittedAt: '2026-08-14T12:00:00.000Z' as string | null,
+    };
+    const model = toReviewsReceivedPageModel({
+      items: [
+        { ...shared, reviewId: 'anonymous', anonymous: true, reviewerUser: null, reviewerTeam: null, submittedAt: null },
+        {
+          ...shared,
+          reviewId: 'legacy',
+          anonymous: false,
+          reviewerUser: { userId: 'old-reviewer', name: '기존 작성자', imageUrl: null },
+          reviewerTeam: null,
+        },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    });
+
+    expect(model.anonymousUserGroups.flatMap((group) => group.reviews).map((review) => review.reviewId)).toEqual(['anonymous']);
+    expect(model.anonymousUserGroups[0]?.meta).toBe('작성자 비공개 · 받은 리뷰 1건');
+    expect(model.legacyUserGroups.flatMap((group) => group.reviews).map((review) => review.reviewId)).toEqual(['legacy']);
   });
 });
 

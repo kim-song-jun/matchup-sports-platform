@@ -1,5 +1,5 @@
 import type { ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewSourcePageModel, ReviewTargetViewModel } from './reviews.types';
-import type { V1ReviewDetail, V1ReviewListResponse, V1ReviewReceivedResponse, V1ReviewSourceResponse, V1ReviewSourceType, V1ReviewTarget } from '@/types/api';
+import type { V1ReceivedReviewDetail, V1ReviewListResponse, V1ReviewReceivedResponse, V1ReviewSourceResponse, V1ReviewSourceType, V1ReviewTarget } from '@/types/api';
 
 export const REVIEW_TAG_OPTIONS = [
   { code: 'manner', label: '매너가 좋아요' },
@@ -101,8 +101,10 @@ export function toReviewsReceivedPageModel(data: V1ReviewReceivedResponse | unde
       { label: '평균', value: averageRating(items) },
       { label: '태그', value: `${tagCount}개` },
     ],
-    userGroups: groupReceivedReviews(userReviews),
-    teamGroups: groupReceivedReviews(teamReviews),
+    anonymousUserGroups: groupReceivedReviews(userReviews.filter((review) => review.anonymous)),
+    anonymousTeamGroups: groupReceivedReviews(teamReviews.filter((review) => review.anonymous)),
+    legacyUserGroups: groupReceivedReviews(userReviews.filter((review) => !review.anonymous)),
+    legacyTeamGroups: groupReceivedReviews(teamReviews.filter((review) => !review.anonymous)),
   };
 }
 
@@ -136,8 +138,8 @@ function buildListMeta(completedAt: string | null, reviewedCount: number, target
   return `${formatDateTime(completedAt)} · ${reviewedCount}/${targetCount} 완료`;
 }
 
-function groupReceivedReviews(items: V1ReviewDetail[]) {
-  const groups = new Map<string, V1ReviewDetail[]>();
+function groupReceivedReviews(items: V1ReceivedReviewDetail[]) {
+  const groups = new Map<string, V1ReceivedReviewDetail[]>();
   for (const review of items) {
     const key = `${review.sourceType}:${review.sourceId}`;
     groups.set(key, [...(groups.get(key) ?? []), review]);
@@ -150,14 +152,16 @@ function groupReceivedReviews(items: V1ReviewDetail[]) {
       sourceType,
       sourceId,
       title: sourceTypeLabel(sourceType),
-      meta: `${first ? formatDateTime(first.submittedAt) : '종료 일정'} · 받은 리뷰 ${reviews.length}건`,
+      meta: first?.anonymous
+        ? `작성자 비공개 · 받은 리뷰 ${reviews.length}건`
+        : `${first ? formatDateTime(first.submittedAt) : '종료 일정'} · 받은 리뷰 ${reviews.length}건`,
       average: averageRating(reviews),
       reviews,
     };
   });
 }
 
-function averageRating(reviews: V1ReviewDetail[]) {
+function averageRating(reviews: V1ReceivedReviewDetail[]) {
   if (reviews.length === 0) return '-';
   const average = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
   return average.toFixed(average % 1 === 0 ? 0 : 1);

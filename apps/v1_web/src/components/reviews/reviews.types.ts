@@ -1,5 +1,5 @@
 import type {
-  V1ReviewDetail,
+  V1ReceivedReviewDetail,
   V1ReviewListItem,
   V1ReviewSourceResponse,
   V1ReviewSourceType,
@@ -55,11 +55,13 @@ export type ReceivedReviewGroup = {
   title: string;
   meta: string;
   average: string;
-  reviews: V1ReviewDetail[];
+  reviews: V1ReceivedReviewDetail[];
 };
 
 export type ReviewsReceivedPageModel = {
   stats: ReviewStat[];
-  userGroups: ReceivedReviewGroup[];
-  teamGroups: ReceivedReviewGroup[];
+  anonymousUserGroups: ReceivedReviewGroup[];
+  anonymousTeamGroups: ReceivedReviewGroup[];
+  legacyUserGroups: ReceivedReviewGroup[];
+  legacyTeamGroups: ReceivedReviewGroup[];
 };

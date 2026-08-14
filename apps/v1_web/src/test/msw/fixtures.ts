@@ -380,6 +380,7 @@ export const v1ReviewsReceivedFixture: V1ReviewReceivedResponse = {
   items: [
     {
       reviewId: 'review-received-1',
+      anonymous: false,
       sourceType: 'match',
       sourceId: 'match-completed-1',
       targetType: 'user',
@@ -394,6 +395,7 @@ export const v1ReviewsReceivedFixture: V1ReviewReceivedResponse = {
     },
     {
       reviewId: 'review-team-received-1',
+      anonymous: false,
       sourceType: 'team_match',
       sourceId: 'team-match-completed-1',
       targetType: 'team',

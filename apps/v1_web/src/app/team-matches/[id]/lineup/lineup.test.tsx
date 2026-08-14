@@ -449,6 +449,12 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1MyTeams: hoisted.useV1MyTeamsMock,
   useV1TeamMatchLineup: hoisted.useV1TeamMatchLineupMock,
   useV1TeamMembers: hoisted.useV1TeamMembersMock,
+  // "이전 라인업 불러오기"/"프리셋으로 저장"이 쓰는 훅. 시트를 열기 전에는 조회하지
+  // 않지만(enabled:false) 훅 자체는 매 렌더 호출되므로 모듈 모킹에 반드시 있어야 한다.
+  useV1TeamLineupHistory: () => ({ data: undefined, isLoading: false }),
+  useV1TeamLineupPresets: () => ({ data: undefined, isLoading: false }),
+  useV1CreateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
+  useV1UpdateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
   useV1SaveTeamMatchLineup: () => ({ mutate: hoisted.saveMutate, isPending: false }),
   useV1SubmitTeamMatchLineup: () => ({ mutate: hoisted.submitMutate, isPending: false }),
   useV1RequestTeamMatchLineupChange: () => ({ mutate: hoisted.changeRequestMutate, isPending: false }),

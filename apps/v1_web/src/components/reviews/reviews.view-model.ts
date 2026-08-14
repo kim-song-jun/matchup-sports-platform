@@ -59,11 +59,33 @@ export function toReviewSourcePageModel(data: V1ReviewSourceResponse): ReviewSou
   };
 }
 
-export function toTargetViewModel(target: V1ReviewTarget): ReviewTargetViewModel {
+/**
+ * @param showReviewerTeam 양 팀 모두의 멤버라 대상마다 작성자 팀이 달라지는 경우에만 true.
+ *   그 외에는 헤더의 "OO 대표로 작성"이 이미 같은 정보를 보여주므로 카드에서는 생략한다.
+ */
+/**
+ * `lockReason` 은 API 의 에러 코드값이라 그대로 그리면 화면에 `ALREADY_SUBMITTED` 가 노출된다.
+ * 코드별로 보여줄 문구를 여기서 정하되, `null` 은 "문구를 띄우지 않는다"는 뜻이다.
+ */
+const LOCK_REASON_LABEL: Record<string, string | null> = {
+  // 같은 카드의 '작성됨' 배지가 이미 같은 사실을 전달하므로 문구를 겹쳐 띄우지 않는다.
+  ALREADY_SUBMITTED: null,
+};
+
+function lockReasonLabel(lockReason: string | null) {
+  if (!lockReason) return null;
+  // 아직 매핑하지 않은 코드는 삼키지 않고 그대로 보여준다 — 조용히 감추면 잠긴 이유를
+  // 사용자도 우리도 알 수 없게 된다. 새 코드가 생기면 위 표에 문구를 추가하면 된다.
+  return lockReason in LOCK_REASON_LABEL ? LOCK_REASON_LABEL[lockReason] : lockReason;
+}
+
+export function toTargetViewModel(target: V1ReviewTarget, showReviewerTeam = false): ReviewTargetViewModel {
   return {
     ...target,
     initials: initials(target.name),
     statusLabel: target.alreadySubmitted || target.review ? '작성됨' : target.locked ? '잠김' : '대기',
+    reviewerTeamLabel: showReviewerTeam && target.reviewerTeam ? `${target.reviewerTeam.name} 대표로 작성` : null,
+    lockReasonLabel: lockReasonLabel(target.lockReason),
   };
 }
 

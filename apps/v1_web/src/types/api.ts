@@ -788,6 +788,11 @@ export type V1TeamMember = {
   joinedAt: string;
   canChangeRole: boolean;
   canRemove: boolean;
+  /** 팀이 지정한 고정 등번호. 라인업의 등번호 자동 채움이 2순위로 쓴다. */
+  jerseyNumber?: number | null;
+  /** 등번호는 권한 계층과 무관한 팀 살림이라, 역할 변경과 달리 owner 행도 관리자가
+   * 바꿀 수 있다(서버 `members` 응답이 그렇게 계산해 준다). */
+  canEditJersey?: boolean;
 };
 
 export type V1TeamMembersPage = {
@@ -1449,6 +1454,15 @@ export type V1TeamMatchLineup = {
   starters: V1TeamMatchLineupStarter[];
   bench: V1TeamMatchLineupBenchEntry[];
   lineupConfig?: V1LineupConfig;
+  /** 지금 이 라인업에 넣을 수 있는 팀원 — 서버가 저장 때 강제하는 조건(팀 소속 + 참석
+   * 응답)을 그대로 계산해 준다. `jerseyNumber`는 팀 고정 등번호로, 등번호 자동 채움의
+   * 2순위 소스다. */
+  eligibleMembers?: Array<{
+    userId: string;
+    displayName: string;
+    jerseyNumber: number | null;
+    attending: boolean;
+  }>;
 };
 
 // 저장 요청 한 명분 — userId(연동된 활성 팀원) 또는 displayName(비연동 게스트) 중 하나는
@@ -1565,10 +1579,22 @@ export type V1ReviewReceivedResponse = {
   };
 };
 
+export type V1ReviewerTeam = {
+  teamId: string;
+  name: string;
+  /** 팀 후기는 참가팀 active 멤버 전원이 쓸 수 있으므로 일반 멤버(member)도 온다. */
+  role: 'owner' | 'manager' | 'member';
+};
+
 export type V1ReviewTarget = {
   targetType: V1ReviewTargetType;
   targetUserId: string | null;
   targetTeamId: string | null;
+  /**
+   * 이 대상을 평가할 때 내가 서는 참가팀. 양 팀 모두의 멤버인 경우 대상마다 달라지므로
+   * 최상위 `reviewerTeam` 대신 이 값을 봐야 한다. 개인 매치 후기는 null.
+   */
+  reviewerTeam: V1ReviewerTeam | null;
   name: string;
   imageUrl: string | null;
   subtitle: string;
@@ -1585,12 +1611,11 @@ export type V1ReviewSourceResponse = {
     title: string;
     completedAt: string | null;
   };
-  reviewerTeam: {
-    teamId: string;
-    name: string;
-    /** 팀 후기는 참가팀 active 멤버 전원이 쓸 수 있으므로 일반 멤버(member)도 온다. */
-    role: 'owner' | 'manager' | 'member';
-  } | null;
+  /**
+   * 내가 서는 참가팀. 양 팀 모두의 멤버라 대상마다 달라지는 경우 null 이므로,
+   * 표시·제출 모두 `targets[].reviewerTeam` 을 기준으로 삼아야 한다.
+   */
+  reviewerTeam: V1ReviewerTeam | null;
   targets: V1ReviewTarget[];
 };
 

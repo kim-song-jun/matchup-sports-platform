@@ -23,6 +23,67 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
+    statement:
+      'DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = ' +
+      "'v1_team_lineup_presets_team_id_fkey' ) THEN ALTER TABLE \"v1_team_lineup_presets\" ADD CONSTRAINT " +
+      '\"v1_team_lineup_presets_team_id_fkey\" FOREIGN KEY (\"team_id\") REFERENCES \"v1_teams\"(\"id\") ON ' +
+      'DELETE CASCADE ON UPDATE CASCADE; END IF; IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = ' +
+      "'v1_team_lineup_preset_entries_preset_id_fkey' ) THEN ALTER TABLE " +
+      '\"v1_team_lineup_preset_entries\" ADD CONSTRAINT \"v1_team_lineup_preset_entries_preset_id_fkey\" ' +
+      'FOREIGN KEY (\"preset_id\") REFERENCES \"v1_team_lineup_presets\"(\"id\") ON DELETE CASCADE ON UPDATE ' +
+      'CASCADE; END IF; END $$',
+    reason:
+      'Both FKs target tables this same migration creates a few statements earlier ' +
+      '(v1_team_lineup_presets, v1_team_lineup_preset_entries), so there is no pre-existing row that could ' +
+      'violate them and no old app instance that writes to those tables at all. The pg_constraint guards ' +
+      'only make it re-runnable. The gate rejects it because it cannot parse inside a DO block, not because ' +
+      'the enclosed ALTERs are unsafe — the same two ADD CONSTRAINT ... FOREIGN KEY statements written ' +
+      'bare would pass its own new-table rule. Reviewed 2026-08-13 to unblock alpha deploys.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
+    statement:
+      'CREATE UNIQUE INDEX IF NOT EXISTS "v1_team_memberships_team_id_jersey_number_key" ON ' +
+      '"v1_team_memberships" ("team_id", "jersey_number")',
+    reason:
+      'jersey_number is added as a nullable column by the ALTER TABLE two statements above in this same ' +
+      'migration, so every pre-existing v1_team_memberships row holds NULL there and Postgres never treats ' +
+      'two NULLs as colliding — no existing row can trip this index, and an old app instance that has never ' +
+      'heard of the column can only keep writing NULL. The gate rejects it only because its additive rule ' +
+      'requires EVERY indexed column to be newly-added-and-nullable, while team_id is pre-existing; the ' +
+      'safety actually comes from the nullable column alone. Reviewed 2026-08-13 to unblock alpha deploys.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813120000_v1_roster_identity_link/migration.sql',
+    statement: `WITH latest_snapshot AS (
+  SELECT DISTINCT ON (participant_id) participant_id, state
+  FROM "v1_participant_consent_snapshots"
+  ORDER BY participant_id, consent_version DESC
+),
+granted_user_ids AS (
+  SELECT DISTINCT lc.user_id
+  FROM "v1_participant_identity_link_current" lc
+  JOIN latest_snapshot ls ON ls.participant_id = lc.participant_id
+  WHERE ls.state = 'GRANTED'
+)
+INSERT INTO "v1_user_record_consents" ("user_id", "state", "effective_at", "policy_hash", "created_at", "updated_at")
+SELECT "user_id", 'GRANTED', CURRENT_TIMESTAMP, 'backfill-20260813-participant-snapshot', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM granted_user_ids
+ON CONFLICT ("user_id") DO NOTHING`,
+    reason:
+      'Seeds the v1_user_record_consents table that the SAME migration creates three statements earlier — ' +
+      'it writes to a table no deployed revision has ever read, so neither an old app instance mid-rollout ' +
+      'nor a rollback can observe it (rolling back leaves an unread table behind, exactly like the CREATE ' +
+      'TABLE itself). It only INSERTs, never UPDATEs or DELETEs, and ON CONFLICT DO NOTHING makes a re-run ' +
+      'a no-op. Why it exists: public record visibility moves from a per-participant consent snapshot to a ' +
+      'per-user switch, so users who had already granted per-participant consent would silently vanish from ' +
+      'public lineups/scorer names the moment the new gate went live (alpha holds at least one such ' +
+      'participant — a named scorer on an official fixture). The read side never reads this table for ' +
+      'anyone without a GRANTED snapshot, so the backfill grants nothing that was not already granted. ' +
+      'Reviewed 2026-08-13.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
     statement: `UPDATE "v1_tournament_reviews" r
 SET "team_id" = candidate.team_id
@@ -424,9 +485,17 @@ function normalizeIdent(value) {
   return value ? value.toLowerCase().replace(/"/g, '') : value;
 }
 
+/**
+ * `CREATE TABLE`이 만드는 테이블 이름. `IF NOT EXISTS`를 건너뛰지 않으면 그 키워드의
+ * 첫 낱말(`IF`)을 테이블 이름으로 읽어, **이 마이그레이션이 방금 만든 테이블**을 기존
+ * 테이블로 오인한다 — 그러면 그 새 테이블에 거는 UNIQUE INDEX·FK가 전부 non-additive로
+ * 거부된다(2026-08-13 alpha 배포 차단의 실제 원인: v1_team_lineup_presets).
+ */
 function tableCreatedBy(statement) {
   return normalizeIdent(
-    statement.match(/^CREATE TABLE\s+(?:"[^"]+"\.)?("[^"]+"|[a-zA-Z_][\w$]*)/i)?.[1],
+    statement.match(
+      /^CREATE TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"[^"]+"\.)?("[^"]+"|[a-zA-Z_][\w$]*)/i,
+    )?.[1],
   );
 }
 

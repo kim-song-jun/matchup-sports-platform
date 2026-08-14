@@ -302,20 +302,75 @@ export function PitchFormationEditor({
             ? { text: '토큰을 끌어 위치를 옮기거나, 토큰 위 × 버튼으로 배치를 취소할 수 있어요', active: false }
             : null;
 
+  // 모바일 진입점에 지금 무엇이 골라져 있는지 그대로 보여준다 — 코드(`3-1`)만으로는
+  // 무엇을 뜻하는지 알기 어려워, 시트 안 목록과 **같은 문구**(코드 · 이름 · 필드 인원)를 쓴다.
+  const mobileSelectedPreset =
+    formation !== null ? (formationOptions.find((preset) => preset.code === formation) ?? null) : null;
+  const mobileFormationLabel =
+    mobileSelectedPreset !== null
+      ? `${mobileSelectedPreset.code} · ${mobileSelectedPreset.label} (필드 ${mobileSelectedPreset.outfield}명)`
+      : '자유 배치';
+  const mobileWaitingCount = slotMode ? slotWaiting.length : waiting.length;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* 모바일: "배치 설정" 버튼 → 하단 드로어. 데스크톱에서는 숨긴다(사이드 패널이 항상 보임). */}
+      {/* 모바일: 포메이션 진입점 → 하단 드로어. 데스크톱에서는 숨긴다(사이드 패널이 항상 보임).
+          예전에는 "배치 설정 · 3-1" 회색 버튼 하나였는데, 화면의 대부분을 피치가 차지하는
+          가운데 그 피치를 바꾸는 유일한 손잡이가 작은 회색 칩처럼 보여 **포메이션을 고르는
+          곳이라는 게 읽히지 않았다**(사용자 지적: "포메이션 선택 드롭다운이 없는 거 아니야?").
+          기능은 처음부터 있었으므로 시트 내용은 그대로 두고 진입점만 드러낸다 — 무엇을 고르는
+          자리인지(라벨), 지금 무엇인지(대형 이름·필드 인원), 누를 수 있다는 것(캐럿)을
+          셋 다 보이게 한다. */}
       <div className="tm-hide-desktop">
         <button
           type="button"
-          className="tm-btn tm-btn-md tm-btn-neutral"
+          className="tm-pressable"
           onClick={() => setSheetOpen(true)}
+          disabled={!editable}
           aria-haspopup="dialog"
+          aria-label={`포메이션 ${mobileFormationLabel}, 변경하기`}
+          style={{
+            width: '100%',
+            minHeight: 56,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '10px 14px',
+            borderRadius: 12,
+            border: '1px solid var(--border)',
+            background: 'var(--card-surface)',
+            textAlign: 'left',
+            cursor: editable ? 'pointer' : 'default',
+            opacity: editable ? 1 : 0.6,
+          }}
         >
-          배치 설정{formation ? ` · ${formation}` : ''}
-          {(slotMode ? slotWaiting.length : waiting.length) > 0
-            ? ` · 대기 ${slotMode ? slotWaiting.length : waiting.length}명`
-            : ''}
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span className="tm-text-caption" style={{ display: 'block', color: 'var(--text-muted)', fontWeight: 700 }}>
+              포메이션
+            </span>
+            <span
+              className="tm-text-label"
+              style={{
+                display: 'block',
+                marginTop: 2,
+                fontWeight: 700,
+                color: 'var(--text-strong)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {mobileFormationLabel}
+              {mobileWaitingCount > 0 ? (
+                <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}> · 대기 {mobileWaitingCount}명</span>
+              ) : null}
+            </span>
+          </span>
+          {/* 캐럿은 장식이 아니라 "눌러서 고른다"는 유일한 시각 신호라, 라벨 대비를 따르는
+              토큰 색을 쓰고 스크린리더에는 위 aria-label 이 같은 뜻을 전한다. */}
+          <span aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-muted)', fontSize: 18, lineHeight: 1 }}>
+            ⌄
+          </span>
         </button>
       </div>
 

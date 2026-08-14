@@ -176,7 +176,8 @@ export function ReviewSourcePageView({
             </Card>
             <div className="tm-review-target-stack">
               {model.targets.map((target) => {
-                const targetModel = toTargetViewModel(target);
+                // reviewerTeam 이 null = 양 팀 겸직이라 대상마다 작성자 팀이 다르다는 뜻.
+                const targetModel = toTargetViewModel(target, model.reviewerTeam === null);
                 const key = targetKey(target.targetType, target.targetUserId, target.targetTeamId);
                 return (
                   <ReviewTargetCard
@@ -346,12 +347,15 @@ function ReviewTargetCard({
             <div style={{ minWidth: 0 }}>
               <div className="tm-text-body-lg">{target.name}</div>
               <div className="tm-text-caption" style={{ marginTop: 2 }}>{target.subtitle || targetTypeLabel(target.targetType)}</div>
+              {target.reviewerTeamLabel ? (
+                <div className="tm-text-caption" style={{ marginTop: 2 }}>{target.reviewerTeamLabel}</div>
+              ) : null}
             </div>
             <span className={`tm-badge ${target.statusLabel === '작성됨' ? 'tm-badge-green' : target.statusLabel === '잠김' ? 'tm-badge-grey' : active ? 'tm-badge-blue' : 'tm-badge-grey'}`}>
               {target.statusLabel === '대기' && active ? '작성 중' : target.statusLabel}
             </span>
           </div>
-          {target.lockReason ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{target.lockReason}</div> : null}
+          {target.lockReasonLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{target.lockReasonLabel}</div> : null}
           <StarRating disabled={locked} rating={draft.rating} onChange={onUpdateRating} />
           <div className="tm-review-chip-row">
             {REVIEW_TAG_OPTIONS.map((tag) => {

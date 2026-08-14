@@ -42,6 +42,12 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // 이상 실제로 렌더되는 하위 트리가 쓰는 훅도 채워줘야 한다(team-matches 쪽 lineup.test.tsx와
   // 동일한 이유).
   useV1NotificationUnreadSummary: () => ({ data: undefined }),
+  // "이전 라인업 불러오기" 시트가 쓰는 두 목록. 시트를 열기 전에는 조회하지 않지만
+  // (enabled:false) 훅 자체는 매 렌더 호출되므로 모듈 모킹에 반드시 있어야 한다.
+  useV1TeamLineupHistory: () => ({ data: undefined, isLoading: false }),
+  useV1TeamLineupPresets: () => ({ data: undefined, isLoading: false }),
+  useV1CreateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
+  useV1UpdateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
 }));
 
 import { FixtureLineupPageClient } from './lineup-client';
@@ -55,9 +61,11 @@ function baseAccess(overrides: Partial<V1FixtureLineupAccess> = {}): V1FixtureLi
     homeSideId: 'side-host',
     homeTeamName: '홈팀',
     homeRegistrationId: 'reg-home',
+    homeTeamId: 'team-host',
     awaySideId: 'side-away',
     awayTeamName: '원정팀',
     awayRegistrationId: 'reg-away',
+    awayTeamId: 'team-away',
     ...overrides,
   };
 }
@@ -103,12 +111,18 @@ function baseGame(overrides: Partial<V1Game> = {}): V1Game {
   };
 }
 
+/**
+ * **저장을 한 번 거친** 라인업(revision 2)이 기본이다. revision 1 + DRAFT 는 대진 확정 때
+ * 백엔드가 깔아 두는 초기 라인업이라 화면이 "아직 아무도 선발을 고르지 않음"으로 읽고 전원
+ * 후보로 시작한다(fixture-lineup.view-model 의 untouchedInitialLineup). 아래 테스트들은
+ * 대부분 "선발이 복원된 화면"을 전제로 UI를 검증하므로, 그 전제를 리비전으로 명시한다.
+ */
 function baseGameLineup(overrides: Partial<GameLineup> = {}): GameLineup {
   return {
     id: 'lineup-1',
     gameId: 'game-1',
     sideId: 'side-host',
-    revision: 1,
+    revision: 2,
     state: 'DRAFT',
     version: 0,
     submittedAt: null,

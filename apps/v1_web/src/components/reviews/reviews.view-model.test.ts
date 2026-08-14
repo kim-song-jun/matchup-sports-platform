@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { REVIEW_TAG_OPTIONS, sourceTypeLabel, toReviewsPageModel } from './reviews.view-model';
+import { REVIEW_TAG_OPTIONS, sourceTypeLabel, toReviewsPageModel, toTargetViewModel } from './reviews.view-model';
+import type { V1ReviewTarget } from '@/types/api';
 
 /**
  * v1 API(reviews.service.ts의 REVIEW_TAGS)가 수용하는 리뷰 태그 코드의 정본.
@@ -72,5 +73,44 @@ describe('reviews view model — 대회 경기 리뷰 계약', () => {
       kindLabel: '대회 경기',
       ctaLabel: '리뷰',
     });
+  });
+});
+
+/**
+ * lockReason 은 API 의 에러 코드값이다. 이걸 그대로 렌더하면 사용자 화면에
+ * 'ALREADY_SUBMITTED' 라는 영문 코드가 그대로 뜬다 — alpha 에서 실제로 그렇게 노출됐다.
+ */
+describe('reviews view model — 잠김 사유 문구', () => {
+  const target = (overrides: Partial<V1ReviewTarget> = {}): V1ReviewTarget => ({
+    targetType: 'team',
+    targetUserId: null,
+    targetTeamId: 'team-1',
+    reviewerTeam: null,
+    name: '상대 팀',
+    imageUrl: null,
+    subtitle: '대회 상대 팀',
+    alreadySubmitted: false,
+    review: null,
+    locked: false,
+    lockReason: null,
+    ...overrides,
+  });
+
+  it('ALREADY_SUBMITTED 코드를 화면에 그대로 노출하지 않는다', () => {
+    const model = toTargetViewModel(target({ locked: true, alreadySubmitted: true, lockReason: 'ALREADY_SUBMITTED' }));
+
+    expect(model.lockReasonLabel).toBeNull();
+    // 작성 완료 사실 자체는 배지로 계속 전달된다 — 정보가 사라지는 게 아니라 중복이 사라진다.
+    expect(model.statusLabel).toBe('작성됨');
+  });
+
+  it('아직 매핑하지 않은 코드는 삼키지 않고 그대로 보여준다', () => {
+    const model = toTargetViewModel(target({ locked: true, lockReason: 'SOME_FUTURE_REASON' }));
+
+    expect(model.lockReasonLabel).toBe('SOME_FUTURE_REASON');
+  });
+
+  it('잠기지 않은 대상은 사유 문구가 없다', () => {
+    expect(toTargetViewModel(target()).lockReasonLabel).toBeNull();
   });
 });

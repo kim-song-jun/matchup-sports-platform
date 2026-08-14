@@ -62,25 +62,34 @@ function toStandingsRows(standings: readonly V1TournamentStanding[]): Tournament
  * 순위 숫자는 이때 편성 순서일 뿐이므로, 표가 전부 0이면 TournamentStandingsTable이
  * 메달 색·진출 강조를 스스로 끄고 안내 문구를 붙인다.
  *
- * 집계가 시작되면(standings가 한 행이라도 있으면) 서버 값이 유일한 진실이다 — 부분
- * 병합은 하지 않는다. 재계산은 항상 그 조의 전 팀을 한꺼번에 upsert 하므로
- * (recalculateAndUpsertGroupStandings) "일부만 집계된" 중간 상태가 존재하지 않는다.
+ * 서버가 내려준 순위 행의 기록과 position은 그대로 보존한다. 다만 배포 전 데이터나
+ * 비동기 projection 지연 때문에 일부 행만 보이는 순간에도 편성 팀이 사라지면 안 되므로,
+ * registrationId 기준으로 누락된 팀만 0기록 행으로 뒤에 보완한다. 정상 재계산 응답은 전
+ * 팀을 포함하므로 이 병합은 아무 값도 바꾸지 않는다.
  */
 function toGroupStandingsRows(group: V1TournamentGroup): TournamentStandingsRow[] {
-  if (group.standings.length > 0) return toStandingsRows(group.standings);
-  return group.groupTeams.map((team, index) => ({
-    key: team.registrationId,
-    teamId: team.teamId,
-    teamName: team.teamName,
-    teamLogoUrl: team.teamLogoUrl,
-    position: index + 1,
-    points: 0,
-    wins: 0,
-    draws: 0,
-    losses: 0,
-    goalsFor: 0,
-    goalsAgainst: 0,
-  }));
+  const rows = toStandingsRows(group.standings);
+  const recordedRegistrationIds = new Set(rows.map((row) => row.key));
+  let nextPosition = rows.reduce((max, row) => Math.max(max, row.position), 0) + 1;
+
+  for (const team of group.groupTeams) {
+    if (recordedRegistrationIds.has(team.registrationId)) continue;
+    rows.push({
+      key: team.registrationId,
+      teamId: team.teamId,
+      teamName: team.teamName,
+      teamLogoUrl: team.teamLogoUrl,
+      position: nextPosition++,
+      points: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+    });
+  }
+
+  return rows;
 }
 
 /**

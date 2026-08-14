@@ -283,7 +283,7 @@ describe('최종결과 — 조별리그 경기 블록', () => {
     expect(screen.queryByRole('button', { name: /조별리그 경기/ })).toBeNull();
     expect(screen.getByRole('link', { name: /조별리그 경기 일정 보기/ })).toHaveAttribute(
       'href',
-      '/tournaments/tournament-1/schedule',
+      '/tournaments/tournament-1/bracket',
     );
   });
 });

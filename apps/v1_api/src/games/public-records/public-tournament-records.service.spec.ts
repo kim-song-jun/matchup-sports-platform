@@ -13,6 +13,7 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
 type FakeParticipant = {
   id: string;
   sideId: string;
+  lineupId: string;
   displayNameSnapshot: string;
   jerseyNumber: number | null;
   position: string | null;
@@ -44,6 +45,7 @@ const GAME_ID = 'game-1';
 const ELIGIBLE_PARTICIPANT: FakeParticipant = {
   id: 'participant-eligible',
   sideId: 'side-home',
+  lineupId: 'lineup-home-1',
   displayNameSnapshot: '김철수',
   jerseyNumber: 7,
   position: 'FW',
@@ -52,6 +54,7 @@ const ELIGIBLE_PARTICIPANT: FakeParticipant = {
 const INELIGIBLE_PARTICIPANT: FakeParticipant = {
   id: 'participant-ineligible',
   sideId: 'side-away',
+  lineupId: 'lineup-away-1',
   displayNameSnapshot: '이영희',
   jerseyNumber: 10,
   position: 'MF',
@@ -99,6 +102,8 @@ function buildFakePrisma(options: {
    * 경기에서 라이브 전용 필드가 새는지 확인할 수 있다.
    */
   gameState?: string;
+  lineups?: readonly { id: string; sideId: string; revision: number }[];
+  participants?: readonly FakeParticipant[];
 }): PrismaService {
   const database = {
     v1Tournament: {
@@ -144,7 +149,11 @@ function buildFakePrisma(options: {
               { id: 'side-home', sideKey: 'HOME' },
               { id: 'side-away', sideKey: 'AWAY' },
             ],
-            participants: [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
+            lineups: options.lineups ?? [
+              { id: 'lineup-home-1', sideId: 'side-home', revision: 1 },
+              { id: 'lineup-away-1', sideId: 'side-away', revision: 1 },
+            ],
+            participants: options.participants ?? [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
             currentOfficialRevision: options.officialRevision ?? null,
             periods: options.periods ?? [],
           },
@@ -243,6 +252,32 @@ const STAFF_USER: V1AuthUser = {
 };
 
 describe('PublicTournamentRecordsService.getMatch -- event participant identity (골/카드 이름·등번호)', () => {
+  it('각 팀에서 가장 마지막으로 저장한 라인업 revision의 참가자만 공개한다', async () => {
+    const oldHome = { ...ELIGIBLE_PARTICIPANT, id: 'participant-home-old', lineupId: 'lineup-home-1', displayNameSnapshot: '이전 홈 선수' };
+    const latestHome = { ...ELIGIBLE_PARTICIPANT, id: 'participant-home-latest', lineupId: 'lineup-home-2', displayNameSnapshot: '최신 홈 선수' };
+    const oldAway = { ...INELIGIBLE_PARTICIPANT, id: 'participant-away-old', lineupId: 'lineup-away-1', displayNameSnapshot: '이전 원정 선수' };
+    const latestAway = { ...INELIGIBLE_PARTICIPANT, id: 'participant-away-latest', lineupId: 'lineup-away-3', displayNameSnapshot: '최신 원정 선수' };
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date(Date.now() - 60_000),
+      consentLinks: [], consentSnapshots: [], events: [],
+      lineups: [
+        { id: 'lineup-home-1', sideId: 'side-home', revision: 1 },
+        { id: 'lineup-away-1', sideId: 'side-away', revision: 1 },
+        { id: 'lineup-home-2', sideId: 'side-home', revision: 2 },
+        { id: 'lineup-away-3', sideId: 'side-away', revision: 3 },
+      ],
+      participants: [oldHome, latestHome, oldAway, latestAway],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.lineup).toEqual({
+      home: [expect.objectContaining({ participantId: latestHome.id, displayName: '최신 홈 선수' })],
+      away: [expect.objectContaining({ participantId: latestAway.id, displayName: '최신 원정 선수' })],
+    });
+  });
+
   it('동의한 참가자의 골 이벤트에 participantName/jerseyNumber 가 실린다', async () => {
     const now = new Date();
     const prisma = buildFakePrisma({

@@ -157,6 +157,76 @@ describe('BracketPageContent — 기본 탭', () => {
 });
 
 describe('BracketPageContent — 순위표 팀 링크', () => {
+  it('경기가 하나도 없어도 편성된 팀 전체와 0 기록을 보여준다', () => {
+    const tournament = makeTournament({
+      id: 'tour-no-results',
+      status: 'closed',
+      format: 'group_knockout',
+      groups: [
+        makeGroup({
+          id: 'group-a',
+          phase: 'group',
+          name: 'A조',
+          groupTeams: [
+            { id: 'gt-1', registrationId: 'reg-1', teamId: 'team-1', teamName: '성수 FC', teamLogoUrl: null, sortOrder: 0 },
+            { id: 'gt-2', registrationId: 'reg-2', teamId: 'team-2', teamName: '마포 FC', teamLogoUrl: null, sortOrder: 1 },
+          ],
+          standings: [],
+        }),
+      ],
+    });
+
+    renderBracketStandingsTab(tournament);
+
+    expect(screen.getByRole('button', { name: /성수 FC/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /마포 FC/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('cell', { name: '0승 0무 0패' })).toHaveLength(2);
+    expect(screen.getAllByText('0점')).toHaveLength(2);
+    expect(screen.getByText('아직 경기 기록이 없어요. 첫 결과가 등록되면 순위가 매겨져요.')).toBeInTheDocument();
+  });
+
+  it('일부 순위 행만 도착해도 경기 기록과 편성된 팀 전체를 함께 보여준다', () => {
+    const tournament = makeTournament({
+      id: 'tour-partial-standings',
+      status: 'in_progress',
+      format: 'group_knockout',
+      groups: [
+        makeGroup({
+          id: 'group-a',
+          phase: 'group',
+          name: 'A조',
+          groupTeams: [
+            { id: 'gt-1', registrationId: 'reg-1', teamId: 'team-1', teamName: '성수 FC', teamLogoUrl: null, sortOrder: 0 },
+            { id: 'gt-2', registrationId: 'reg-2', teamId: 'team-2', teamName: '마포 FC', teamLogoUrl: null, sortOrder: 1 },
+            { id: 'gt-3', registrationId: 'reg-3', teamId: 'team-3', teamName: '한강 FC', teamLogoUrl: null, sortOrder: 2 },
+          ],
+          standings: [
+            {
+              registrationId: 'reg-1', teamId: 'team-1', teamName: '성수 FC', teamLogoUrl: null,
+              position: 1, points: 3, wins: 1, draws: 0, losses: 0,
+              goalsFor: 4, goalsAgainst: 2, recalculatedAt: '2026-08-14T00:00:00.000Z',
+            },
+            {
+              registrationId: 'reg-2', teamId: 'team-2', teamName: '마포 FC', teamLogoUrl: null,
+              position: 2, points: 0, wins: 0, draws: 0, losses: 1,
+              goalsFor: 2, goalsAgainst: 4, recalculatedAt: '2026-08-14T00:00:00.000Z',
+            },
+          ],
+        }),
+      ],
+    });
+
+    renderBracketStandingsTab(tournament);
+
+    expect(screen.getByRole('button', { name: /성수 FC/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /마포 FC/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /한강 FC/ })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '1승 0무 0패' })).toHaveTextContent('1-0-0');
+    expect(screen.getByText('3점')).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '0승 0무 1패' })).toHaveTextContent('0-0-1');
+    expect(screen.getAllByText('0점')).toHaveLength(2);
+  });
+
   it('리그 포맷: 순위표의 팀명을 누르면 /teams/:teamId/records 로 이동한다', () => {
     const tournament = makeTournament({
       id: 'tour-1',

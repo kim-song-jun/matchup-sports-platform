@@ -12,6 +12,7 @@ import { MatchPageClient } from './match-page-client';
  */
 const accessMock = vi.fn();
 const matchMock = vi.fn();
+const chromeMock = vi.fn(({ children }: { children: React.ReactNode }) => <div>{children}</div>);
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1FixtureLineupAccess: (...args: unknown[]) => accessMock(...args),
@@ -27,7 +28,7 @@ vi.mock('@/components/public-game-records/match-detail-content', () => ({
 
 // 앱 셸은 알림 배지 등 이 테스트와 무관한 훅을 끌고 온다 — 관심사는 CTA 노출 조건뿐이다.
 vi.mock('@/components/v1-ui/shell', () => ({
-  AppChrome: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppChrome: (props: { children: React.ReactNode }) => chromeMock(props),
 }));
 
 function renderWith(access: { mySideId: string | null; isStaff: boolean } | undefined) {
@@ -46,6 +47,7 @@ describe('MatchPageClient — 라인업 관리 진입점', () => {
   beforeEach(() => {
     accessMock.mockReset();
     matchMock.mockReset();
+    chromeMock.mockClear();
   });
 
   it('참가팀 매니저에게 라인업 관리 링크를 보여준다', () => {
@@ -76,5 +78,13 @@ describe('MatchPageClient — 라인업 관리 진입점', () => {
     renderWith(undefined);
 
     expect(screen.queryByRole('link', { name: '라인업 관리' })).not.toBeInTheDocument();
+  });
+
+  it('경기 상세의 뒤로가기는 통합 일정 화면인 bracket으로 돌아간다', () => {
+    renderWith({ mySideId: 'side-home', isStaff: false });
+
+    expect(chromeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ backHref: '/tournaments/t-1/bracket' }),
+    );
   });
 });

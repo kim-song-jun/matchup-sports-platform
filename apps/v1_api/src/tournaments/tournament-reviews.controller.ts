@@ -50,17 +50,25 @@ export class TournamentReviewsController {
     return this.reviewsService.submitReview(tournamentId, user, dto);
   }
 
-  /**
-   * GET /tournaments/:tournamentId/participant-check — 후기 작성 자격
-   * `{ isParticipant, reviewableTeams: [{ teamId, teamName, alreadyReviewed }] }`
-   */
+  /** GET /tournaments/:tournamentId/reviews/me  — 내 리뷰 */
+  @Get('tournaments/:tournamentId/reviews/me')
+  @UseGuards(V1AuthGuard)
+  async getMyReview(
+    @Param('tournamentId') tournamentId: string,
+    @CurrentUser() user: V1AuthUser,
+  ) {
+    return this.reviewsService.getMyReview(tournamentId, user.id);
+  }
+
+  /** GET /tournaments/:tournamentId/participant-check  — 참가자 여부 */
   @Get('tournaments/:tournamentId/participant-check')
   @UseGuards(V1AuthGuard)
   async participantCheck(
     @Param('tournamentId') tournamentId: string,
     @CurrentUser() user: V1AuthUser,
   ) {
-    return this.reviewsService.participantCheck(tournamentId, user.id);
+    const isParticipant = await this.reviewsService.isParticipant(tournamentId, user.id);
+    return { isParticipant };
   }
 
   /** GET /tournaments/me/pending-reviews — 리뷰 미작성 종료 대회 목록 (최근순) */

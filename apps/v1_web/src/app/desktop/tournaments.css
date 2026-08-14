@@ -484,7 +484,10 @@
   font-size: var(--font-size-body-lg);
   font-weight: 700;
   color: var(--text-strong);
-  margin: 0;
+  /* 제목 아래 여백: 이전엔 0이라 h2 line-box의 half-leading(약 4px)만 남아
+     바로 아래 스텝 그리드와 붙어 보였다. 모바일 스텝퍼는 행 간격(12px)과 같은
+     값으로 맞춰 세로 리듬을 통일한다(데스크탑 카드 그리드는 아래 ≥1024 override). */
+  margin: 0 0 12px;
 }
 
 /* ── Prize Breakdown: 3-card grid ── */
@@ -810,6 +813,13 @@
   }
 
   /* Prize cards: stay 3-col on desktop (already set) */
+
+  /* 데스크탑에선 아래가 배경이 있는 카드 그리드라 제목이 카드 상단 모서리에
+     바로 붙으면 눌려 보인다. 그리드 gap(16px)과 같은 값으로 띄워 카드 사이
+     간격과 제목-카드 간격을 한 리듬으로 맞춘다. */
+  .tm-tournament-promo-section-title {
+    margin-bottom: 16px;
+  }
 
   /* 데스크탑: 좁은 아이콘 스텝퍼 대신 설명이 포함된 3열 카드 그리드로 전환.
      보더 대신 grey50 배경 하나로 구분(solid-first) — 흰 원형 아이콘 칩이
@@ -1438,6 +1448,14 @@
    * 방어선(그 경우는 스크롤로 보완).
    */
   .tm-pitch-board {
-    max-height: clamp(260px, calc(100dvh - 64px - 304px - 87px - 24px), 560px);
+    /* 높이만 자르고 폭을 420px 그대로 두면 aspect-ratio 가 무시되어 축구장이 뭉툭해진다
+       — 실측 420x521 = 1.24 로, 규격 비율 1.544 와 어긋났다(하프 코트로 그리던 때는
+       "반쪽"이라 왜곡이 눈에 안 띄었지만 풀 구장이 되며 드러났다). 같은 상한을 변수로
+       빼고 폭을 거기에 연동해, 높이가 잘리는 만큼 폭도 함께 줄어 비율이 항상 유지되게
+       한다. 폭은 인라인 style 이 var(--tm-pitch-max-width) 로 읽어 간다 — 인라인이
+       클래스보다 우선하므로 CSS 가 값을 넘겨주는 형태여야 덮어쓸 수 있다. */
+    --tm-pitch-max-h: clamp(260px, calc(100dvh - 64px - 304px - 87px - 24px), 560px);
+    --tm-pitch-max-width: min(420px, calc(var(--tm-pitch-max-h) / 1.54412));
+    max-height: var(--tm-pitch-max-h);
   }
 }

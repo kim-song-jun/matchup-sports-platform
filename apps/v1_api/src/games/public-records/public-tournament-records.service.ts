@@ -14,7 +14,7 @@ import {
   loadParticipantConsentEligibility,
   type ParticipantConsentEligibility,
 } from './public-consent';
-import { resolveLiveClock, type PublicGameClock } from './public-clock';
+import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
 import { effectivePublicVisibilityMode, isLineupPublished, publicFixtureStatus, resolveResultState } from './public-visibility';
 import type { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
@@ -376,6 +376,15 @@ export class PublicTournamentRecordsService {
       mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore);
     const clock: PublicGameClock | null =
       mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], new Date()) : null;
+    // `clock`과 달리 `status === 'live'` 게이트가 하나 더 필요하다: `resolveLiveClock`은
+    // LIVE 피리어드가 없으면 구조적으로 `null`이라 종료된 경기에서 게이트 없이도 값이
+    // 생기지 않지만, `resolvePeriodBreak`는 피리어드가 전부 ENDED면 'regulation_ended'를
+    // 반환한다 -- 게이트가 없으면 이미 `status === 'ended'`로 끝난 경기 응답에 "정규 시간
+    // 종료"가 실려 `liveScore`(위 367행)의 게이트와 계약이 어긋난다.
+    const periodBreak: PublicPeriodBreak | null =
+      mode === 'live' && !showOfficialResult && status === 'live'
+        ? resolvePeriodBreak(fixture.game?.periods ?? [])
+        : null;
 
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
     // 정책 공개(기본값)에서는 이 맵이 쓰이지 않는다 -- 위 getSchedule과 동일한 이유로
@@ -383,14 +392,13 @@ export class PublicTournamentRecordsService {
     const consentMap = isTournamentParticipantNameGatingReverted()
       ? await loadParticipantConsentEligibility(this.prisma, participantIds)
       : new Map<string, ParticipantConsentEligibility>();
-    const identityAsOf = officialAt ?? new Date();
     const isStaffBypass = await this.resolveStaffBypass(user, tournamentId, fixtureId, fixture.fieldId);
     // 참가팀 공개 정책 통일(fix/v1-publish) — 이 경기의 home/away 팀명도 모집 중(open)엔
     // 가린다. 이 페이지는 fixture 하나만 다루므로 위에서 이미 계산한 fixture/field
     // 스코프 스태프 우회(isStaffBypass, 참가자 실명 우회와 동일)를 그대로 재사용한다.
     const hideIdentity = shouldHideParticipantIdentity(tournament.status, isStaffBypass);
 
-    const lineup = buildLineup(fixture, mode, consentMap, identityAsOf, isStaffBypass);
+    const lineup = buildLineup(fixture, mode, consentMap, isStaffBypass);
     const events =
       mode === 'status_only'
         ? []
@@ -399,10 +407,9 @@ export class PublicTournamentRecordsService {
             fixture.game?.sides ?? [],
             fixture.game?.participants ?? [],
             consentMap,
-            identityAsOf,
             isStaffBypass,
           );
-    const mvp = buildMvp(fixture, mode, currentRevisionState, consentMap, identityAsOf, isStaffBypass);
+    const mvp = buildMvp(fixture, mode, currentRevisionState, consentMap, isStaffBypass);
 
     const history =
       fixture.game === null
@@ -436,6 +443,7 @@ export class PublicTournamentRecordsService {
       scoreStatus,
       score,
       clock,
+      periodBreak,
       lineup,
       events,
       mvp,
@@ -594,7 +602,6 @@ export class PublicTournamentRecordsService {
     sides: readonly { id: string; sideKey: 'HOME' | 'AWAY' }[],
     participants: readonly { id: string; displayNameSnapshot: string; jerseyNumber: number | null }[],
     consentMap: Map<string, ParticipantConsentEligibility>,
-    identityAsOf: Date,
     isStaffBypass: boolean,
   ) {
     if (gameId === null) return [];
@@ -634,7 +641,7 @@ export class PublicTournamentRecordsService {
         // (issue #377) 는 이 동의 게이트만 건너뛴다 -- `participant` 조회 자체는
         // 아래에서 그대로 하므로, 라인업 스냅샷에 없는 참가자(`participant` undefined)
         // 라면 스태프 우회가 켜져 있어도 이름을 지어내지 않고 그대로 null 이다.
-        const eligible = resolveParticipantNameEligible(isStaffBypass, consent, identityAsOf);
+        const eligible = resolveParticipantNameEligible(isStaffBypass, consent);
         // 이름/등번호는 buildLineup 과 동일한 방식(participant.displayNameSnapshot,
         // participant.jerseyNumber)으로 뽑되, buildLineup 의 lineupAt(라인업 공개
         // 시각) 게이트는 따르지 않는다 -- 그 게이트는 "경기 전 선발 명단 노출"을 막는
@@ -793,19 +800,20 @@ function isTournamentParticipantNameGatingReverted(): boolean {
 
 /**
  * 라인업/이벤트/MVP 세 빌더와 일정 카드 득점자 요약이 공유하는 단일 판정. 기본(정책
- * 공개)일 때는 무조건 true -- `consent`/`identityAsOf`는 건드리지도 않는다. 되돌렸을
- * 때만 기존 규칙(스태프 우회 OR 동의 eligible)을 그대로 재현한다. 일정 카드 득점자
- * 요약은 원래 `isStaffBypass`를 받지 않았으므로(그 화면은 스태프 우회 자체가 없다)
- * 그 호출부는 항상 `isStaffBypass=false`로 호출해 되돌린 상태에서도 기존 동작과
- * 완전히 동일하게 유지한다.
+ * 공개)일 때는 무조건 true -- `consent`는 건드리지도 않는다. 되돌렸을 때만 기존
+ * 규칙(스태프 우회 OR 동의 eligible)을 그대로 재현한다. `isParticipantPubliclyEligible`
+ * 자체가 시간 인자를 받지 않으므로(공개 동의 규칙 재정의, `public-consent.ts` 참고)
+ * 이 함수도 시간 인자를 받지 않는다. 일정 카드 득점자 요약은 원래 `isStaffBypass`를
+ * 받지 않았으므로(그 화면은 스태프 우회 자체가 없다) 그 호출부는 항상
+ * `isStaffBypass=false`로 호출해 되돌린 상태에서도 기존 동작과 완전히 동일하게
+ * 유지한다.
  */
 function resolveParticipantNameEligible(
   isStaffBypass: boolean,
   consent: ParticipantConsentEligibility | undefined,
-  identityAsOf: Date,
 ): boolean {
   if (!isTournamentParticipantNameGatingReverted()) return true;
-  return isStaffBypass || (consent !== undefined && isParticipantPubliclyEligible(consent, identityAsOf));
+  return isStaffBypass || (consent !== undefined && isParticipantPubliclyEligible(consent));
 }
 
 /**
@@ -862,12 +870,17 @@ function presentScheduleEntry(
       : 'unavailable';
   const clock: PublicGameClock | null =
     mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], now) : null;
+  // `status === 'live'` 게이트가 `clock`보다 하나 더 필요한 이유는 getMatch의 쌍둥이
+  // 주석(위)과 동일하다 -- `resolvePeriodBreak`는 피리어드가 전부 ENDED면 값을 반환하므로
+  // 게이트 없이는 종료된 경기 카드에도 "정규 시간 종료"가 실린다.
+  const periodBreak: PublicPeriodBreak | null =
+    mode === 'live' && !showOfficialResult && status === 'live'
+      ? resolvePeriodBreak(fixture.game?.periods ?? [])
+      : null;
 
   // 득점자 요약 -- `status_only`는 결과 자체를 숨기므로 골 요약도 함께 숨긴다.
   // 이름/등번호 노출 규칙은 getMatch의 buildEvents와 정확히 동일하다: 동의
   // (consent)가 eligible일 때만 이름을 채우고, 아니면 시간만 남긴다.
-  const officialAt = fixture.game?.currentOfficialRevision?.officialAt ?? null;
-  const identityAsOf = officialAt ?? now;
   const participantById = new Map((fixture.game?.participants ?? []).map((p) => [p.id, p] as const));
   const scorers =
     mode === 'status_only' || fixture.game === null
@@ -876,7 +889,7 @@ function presentScheduleEntry(
           const consent = raw.participantId === null ? undefined : consentMap.get(raw.participantId);
           // 일정 카드 득점자 요약은 스태프 우회가 없는 화면이라 항상 isStaffBypass=false
           // 로 호출한다(되돌린 상태에서도 기존 동작 그대로).
-          const eligible = resolveParticipantNameEligible(false, consent, identityAsOf);
+          const eligible = resolveParticipantNameEligible(false, consent);
           const participant = raw.participantId === null ? undefined : participantById.get(raw.participantId);
           return {
             side: raw.side,
@@ -907,6 +920,7 @@ function presentScheduleEntry(
     scoreStatus,
     score: mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore),
     clock,
+    periodBreak,
     scorers,
     hasVideo: fixture.videos.length > 0,
   };
@@ -916,7 +930,6 @@ function buildLineup(
   fixture: FixtureMatchRow,
   mode: EffectiveMode,
   consentMap: Map<string, ParticipantConsentEligibility>,
-  identityAsOf: Date,
   isStaffBypass: boolean,
 ) {
   if (fixture.game === null) return null;
@@ -944,7 +957,7 @@ function buildLineup(
   const present = (sideId: string | undefined) =>
     (sideId ? (bySide.get(sideId) ?? []) : []).map((participant) => {
       const consent = consentMap.get(participant.id);
-      const eligible = resolveParticipantNameEligible(isStaffBypass, consent, identityAsOf);
+      const eligible = resolveParticipantNameEligible(isStaffBypass, consent);
       return {
         participantId: participant.id,
         displayName: eligible ? participant.displayNameSnapshot : null,
@@ -961,14 +974,13 @@ function buildMvp(
   mode: EffectiveMode,
   currentRevisionState: 'OFFICIAL' | 'VOID' | null,
   consentMap: Map<string, ParticipantConsentEligibility>,
-  identityAsOf: Date,
   isStaffBypass: boolean,
 ) {
   if (mode === 'status_only' || currentRevisionState !== 'OFFICIAL') return null;
   const mvpParticipantId = fixture.game?.currentOfficialRevision?.mvpParticipantId ?? null;
   if (mvpParticipantId === null) return null;
   const consent = consentMap.get(mvpParticipantId);
-  const eligible = resolveParticipantNameEligible(isStaffBypass, consent, identityAsOf);
+  const eligible = resolveParticipantNameEligible(isStaffBypass, consent);
   if (!eligible) return null;
   const participant = (fixture.game?.participants ?? []).find((row) => row.id === mvpParticipantId);
   if (participant === undefined) return null;

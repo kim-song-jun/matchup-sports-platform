@@ -21,6 +21,7 @@ import { RevealedTeamTrust, computeRevealedTeamTrustBatch } from '../reviews/tea
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import {
+  ChangeTeamMembershipJerseyDto,
   ChangeTeamMembershipRoleDto,
   LeaveTeamDto,
   MutateTeamDto,
@@ -486,8 +487,15 @@ export class TeamsService {
           role: membership.role,
           status: membership.status,
           joinedAt: membership.joinedAt,
+          // 팀 고정 등번호. PII가 아니라 팀 안에서 공개된 식별자이므로 멤버 목록을 볼 수
+          // 있는 사람은 그대로 볼 수 있고, 바꾸는 것만 관리 권한으로 제한한다.
+          jerseyNumber: membership.jerseyNumber,
           canChangeRole: isManageableTarget,
           canRemove: isManageableTarget,
+          // 역할 변경과 달리 owner의 등번호도 관리자가 손볼 수 있어야 한다 — 등번호는
+          // 권한 계층과 무관한 팀 살림이고, owner 본인만 자기 번호를 못 바꾸면
+          // "주장이 7번을 달 수 없는" 이상한 제약이 된다.
+          canEditJersey: membership.status === 'active' && (viewerIsOwner || viewerIsManager),
         };
       }),
       summary: {
@@ -596,6 +604,49 @@ export class TeamsService {
               : null,
         })),
     };
+  }
+
+  /**
+   * 팀 고정 등번호 지정·해제. 역할 변경(changeMembershipRole)과 달리 **대상의 역할을
+   * 따지지 않는다** — 등번호는 권한 계층이 아니라 팀 살림이라, 관리자는 owner의 번호도
+   * 정할 수 있어야 한다. 관리 권한(owner/manager) 자체는 그대로 요구한다.
+   *
+   * 라인업 화면에서 고친 등번호는 여기로 흘러들어오지 않는다(설계 결정 D5): 한 경기의
+   * 임시 번호가 팀 기본값을 조용히 덮어쓰면, 나중에 아무도 왜 번호가 바뀌었는지 모른다.
+   */
+  async changeMembershipJersey(
+    user: V1AuthUser,
+    membershipId: string,
+    dto: ChangeTeamMembershipJerseyDto,
+  ) {
+    this.assertActiveAccount(user);
+    const target = await this.getMembershipWithTeam(membershipId);
+    await this.getManageableTeam(user, target.teamId);
+
+    if (target.status !== 'active') {
+      throw stateConflict('Only active memberships can have a jersey number');
+    }
+    if (target.jerseyNumber === dto.jerseyNumber) {
+      return { membershipId: target.id, teamId: target.teamId, jerseyNumber: target.jerseyNumber };
+    }
+
+    try {
+      const updated = await this.prisma.v1TeamMembership.update({
+        where: { id: target.id },
+        data: { jerseyNumber: dto.jerseyNumber },
+      });
+      return { membershipId: updated.id, teamId: updated.teamId, jerseyNumber: updated.jerseyNumber };
+    } catch (error) {
+      // 같은 팀에 이미 그 번호를 쓰는 사람이 있다 — DB 유니크 제약이 최종 방어선이고,
+      // 사전 조회로 막으면 동시에 같은 번호를 지정하는 두 요청 사이에 틈이 생긴다.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException({
+          code: 'TEAM_JERSEY_NUMBER_TAKEN',
+          message: '이미 같은 등번호를 쓰는 팀원이 있어요.',
+        });
+      }
+      throw error;
+    }
   }
 
   async changeMembershipRole(

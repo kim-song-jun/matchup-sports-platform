@@ -336,8 +336,9 @@ export class TournamentFixtureReviewsService {
 
   /**
    * 상대팀의 현재 등록 로스터. removedAt이 있는 행은 대회 도중 빠진 선수라 대상에서 제외한다.
-   * 작성자 본인이 상대 등록에 올라 있는 비정상 상태(양 팀 이중 등록)에서도 자기 자신은 빼낸다 —
-   * resolveReviewerTeam의 AMBIGUOUS_REVIEWER_TEAM 가드는 멤버십 기준이라 로스터 이중 등록까지는 못 막는다.
+   * 작성자 본인이 상대 등록에 올라 있는 경우(양 팀 이중 등록)에도 자기 자신은 빼낸다 —
+   * 양 팀 겸직은 이제 정상 경로라 두 방향 맥락이 모두 생기고, 그때 상대 로스터에 내가
+   * 들어 있으면 자기 자신을 평가하게 되기 때문이다.
    */
   private async opponentRoster(registrationId: string, reviewerUserId: string) {
     const players = await this.prisma.v1TournamentPlayer.findMany({

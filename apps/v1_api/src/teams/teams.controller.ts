@@ -6,6 +6,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
 import {
+  ChangeTeamMembershipJerseyDto,
   ChangeTeamMembershipRoleDto,
   LeaveTeamDto,
   MutateTeamDto,
@@ -121,6 +122,16 @@ export class TeamsController {
     @Body() dto: ChangeTeamMembershipRoleDto,
   ) {
     return this.teamsService.changeMembershipRole(user, membershipId, dto);
+  }
+
+  @Patch('team-memberships/:membershipId/jersey')
+  @UseGuards(V1AuthGuard)
+  changeMembershipJersey(
+    @CurrentUser() user: V1AuthUser,
+    @Param('membershipId') membershipId: string,
+    @Body() dto: ChangeTeamMembershipJerseyDto,
+  ) {
+    return this.teamsService.changeMembershipJersey(user, membershipId, dto);
   }
 
   @Post('team-memberships/:membershipId/remove')

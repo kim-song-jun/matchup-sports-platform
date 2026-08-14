@@ -5,7 +5,7 @@ import { Card } from '@/components/v1-ui/primitives';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { matchSlotsToEntries, type LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { describeFormationChange, type FormationChangeSummary } from './formation-assignment';
-import { slotsWithGoalkeeper, type FormationPreset, type FormationSlot } from './formation-slots';
+import { GOALKEEPER_SLOT_CODE, slotsWithGoalkeeper, type FormationPreset, type FormationSlot } from './formation-slots';
 
 /**
  * 피치 위에 선발 선수를 아이콘으로 배치하는 에디터(FIFA 온라인 스타일). 순수 SVG로 그린
@@ -228,7 +228,10 @@ export function PitchFormationEditor({
         // 지나치게 길어진다(라이브 확인: 1152px 컨테이너 → 세로 1780px+). 모바일 폭
         // 기준으로 최대 너비를 잡아 어떤 컨테이너 폭에서도 합리적인 높이로 고정한다.
         width: '100%',
-        maxWidth: 420,
+        // 데스크톱에서는 max-height 가 걸리므로 그 높이에 맞춘 폭을 CSS 가 변수로 넘겨준다
+        // (desktop/tournaments.css의 .tm-pitch-board) — 높이만 자르면 비율이 깨진다.
+        // 변수가 없는 모바일에서는 fallback 420px 그대로.
+        maxWidth: 'var(--tm-pitch-max-width, 420px)',
         aspectRatio: `1 / ${1 / PITCH_ASPECT}`,
         borderRadius: 12,
         overflow: 'hidden',
@@ -299,20 +302,75 @@ export function PitchFormationEditor({
             ? { text: '토큰을 끌어 위치를 옮기거나, 토큰 위 × 버튼으로 배치를 취소할 수 있어요', active: false }
             : null;
 
+  // 모바일 진입점에 지금 무엇이 골라져 있는지 그대로 보여준다 — 코드(`3-1`)만으로는
+  // 무엇을 뜻하는지 알기 어려워, 시트 안 목록과 **같은 문구**(코드 · 이름 · 필드 인원)를 쓴다.
+  const mobileSelectedPreset =
+    formation !== null ? (formationOptions.find((preset) => preset.code === formation) ?? null) : null;
+  const mobileFormationLabel =
+    mobileSelectedPreset !== null
+      ? `${mobileSelectedPreset.code} · ${mobileSelectedPreset.label} (필드 ${mobileSelectedPreset.outfield}명)`
+      : '자유 배치';
+  const mobileWaitingCount = slotMode ? slotWaiting.length : waiting.length;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* 모바일: "배치 설정" 버튼 → 하단 드로어. 데스크톱에서는 숨긴다(사이드 패널이 항상 보임). */}
+      {/* 모바일: 포메이션 진입점 → 하단 드로어. 데스크톱에서는 숨긴다(사이드 패널이 항상 보임).
+          예전에는 "배치 설정 · 3-1" 회색 버튼 하나였는데, 화면의 대부분을 피치가 차지하는
+          가운데 그 피치를 바꾸는 유일한 손잡이가 작은 회색 칩처럼 보여 **포메이션을 고르는
+          곳이라는 게 읽히지 않았다**(사용자 지적: "포메이션 선택 드롭다운이 없는 거 아니야?").
+          기능은 처음부터 있었으므로 시트 내용은 그대로 두고 진입점만 드러낸다 — 무엇을 고르는
+          자리인지(라벨), 지금 무엇인지(대형 이름·필드 인원), 누를 수 있다는 것(캐럿)을
+          셋 다 보이게 한다. */}
       <div className="tm-hide-desktop">
         <button
           type="button"
-          className="tm-btn tm-btn-md tm-btn-neutral"
+          className="tm-pressable"
           onClick={() => setSheetOpen(true)}
+          disabled={!editable}
           aria-haspopup="dialog"
+          aria-label={`포메이션 ${mobileFormationLabel}, 변경하기`}
+          style={{
+            width: '100%',
+            minHeight: 56,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '10px 14px',
+            borderRadius: 12,
+            border: '1px solid var(--border)',
+            background: 'var(--card-surface)',
+            textAlign: 'left',
+            cursor: editable ? 'pointer' : 'default',
+            opacity: editable ? 1 : 0.6,
+          }}
         >
-          배치 설정{formation ? ` · ${formation}` : ''}
-          {(slotMode ? slotWaiting.length : waiting.length) > 0
-            ? ` · 대기 ${slotMode ? slotWaiting.length : waiting.length}명`
-            : ''}
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span className="tm-text-caption" style={{ display: 'block', color: 'var(--text-muted)', fontWeight: 700 }}>
+              포메이션
+            </span>
+            <span
+              className="tm-text-label"
+              style={{
+                display: 'block',
+                marginTop: 2,
+                fontWeight: 700,
+                color: 'var(--text-strong)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {mobileFormationLabel}
+              {mobileWaitingCount > 0 ? (
+                <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}> · 대기 {mobileWaitingCount}명</span>
+              ) : null}
+            </span>
+          </span>
+          {/* 캐럿은 장식이 아니라 "눌러서 고른다"는 유일한 시각 신호라, 라벨 대비를 따르는
+              토큰 색을 쓰고 스크린리더에는 위 aria-label 이 같은 뜻을 전한다. */}
+          <span aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-muted)', fontSize: 18, lineHeight: 1 }}>
+            ⌄
+          </span>
         </button>
       </div>
 
@@ -428,7 +486,8 @@ function FormationControls({
   onSelectWaiting: (key: string) => void;
 }) {
   // 이 컴포넌트는 데스크톱 사이드 패널과 모바일 드로어에 각각 한 번씩, 즉 같은 화면에 두 번
-  // 렌더된다 — label htmlFor가 가리키는 id가 겹치면 안 되므로 인스턴스마다 새로 만든다.
+  // 렌더된다 — 칩 그룹의 aria-labelledby가 가리키는 id가 겹치면 안 되므로 인스턴스마다
+  // 새로 만든다.
   const selectId = `${useId()}-formation`;
   // 인원수로 선택지를 막지 않는 대신, 고른 대형이 지금 선발과 어떻게 어긋나는지 말로 알려준다.
   // 빈 자리는 빈 자리대로 남고 남는 선수는 대기 목록에 남는다 — 어느 쪽도 저장을 막지 않는다.
@@ -444,28 +503,38 @@ function FormationControls({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <label
-          htmlFor={selectId}
+        <span
+          id={selectId}
           className="tm-text-caption"
           style={{ display: 'block', color: 'var(--text-muted)', marginBottom: 6 }}
         >
           포메이션
-        </label>
-        <select
-          id={selectId}
-          className="tm-input tm-input-select"
-          value={formation ?? ''}
-          disabled={!editable}
-          onChange={(event) => onSelectFormation(event.target.value === '' ? null : event.target.value)}
-          style={{ width: '100%', minHeight: 44 }}
+        </span>
+        <div
+          role="group"
+          aria-labelledby={selectId}
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(104px, 1fr))', gap: 8 }}
         >
-          <option value="">자유 배치</option>
+          <FormationChip
+            selected={formation === null}
+            title="자유 배치"
+            caption="칸 없이 직접"
+            slots={null}
+            disabled={!editable}
+            onSelect={() => onSelectFormation(null)}
+          />
           {formationOptions.map((preset) => (
-            <option key={preset.code} value={preset.code}>
-              {preset.code} · {preset.label} (필드 {preset.outfield}명)
-            </option>
+            <FormationChip
+              key={preset.code}
+              selected={formation === preset.code}
+              title={preset.code}
+              caption={`${preset.label} · 필드 ${preset.outfield}명`}
+              slots={slotsWithGoalkeeper(preset)}
+              disabled={!editable}
+              onSelect={() => onSelectFormation(preset.code)}
+            />
           ))}
-        </select>
+        </div>
         {outfieldGuidance ? (
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
             {outfieldGuidance}
@@ -535,6 +604,90 @@ function FormationControls({
         <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>모든 선발이 배치됐어요.</p>
       )}
     </div>
+  );
+}
+
+/** 포메이션 하나를 고르는 칩 — 배치 모양을 미니 피치로 함께 보여준다.
+ *
+ * 예전에는 native `<select>` 하나였는데 두 가지가 불편했다. (1) 옵션 문자열이 길어
+ * ("1-2-1 · 다이아몬드 (필드 4명)") 좁은 패널에서 닫는 괄호까지 잘렸고, (2) 이름만으로는
+ * 어떤 배치인지 알 수 없어 하나씩 골라 피치를 봐야 했다. 칩은 드롭다운을 여는 단계 없이
+ * 선택지 전체를 한 번에 보여주고, 각 칩이 곧 44px 이상의 터치 타겟이 된다.
+ *
+ * 단일 선택이지만 radio 대신 `aria-pressed` 토글 버튼 그룹으로 둔다 — 이 저장소가 이미
+ * 쓰는 패턴이고(team-schedules-page.tsx), radio 로 가면 화살표 키 로빙 포커스를 직접
+ * 관리해야 하는데 그만한 이득이 없다. */
+function FormationChip({
+  selected,
+  title,
+  caption,
+  slots,
+  disabled,
+  onSelect,
+}: {
+  selected: boolean;
+  title: string;
+  caption: string;
+  /** null이면 "자유 배치" — 점 없는 빈 피치를 보여준다. */
+  slots: FormationSlot[] | null;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      aria-label={`${title} ${caption}`}
+      disabled={disabled}
+      onClick={onSelect}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 6,
+        padding: '10px 8px',
+        minHeight: TOUCH_TARGET_PX,
+        borderRadius: 10,
+        border: `1px solid ${selected ? 'var(--blue500)' : 'var(--border)'}`,
+        background: selected ? 'var(--tint-blue)' : 'var(--card-surface)',
+        color: 'var(--text-strong)',
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+        transition: 'border-color 120ms ease, background-color 120ms ease',
+      }}
+    >
+      <MiniFormationPreview slots={slots} />
+      <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}>{title}</span>
+      <span
+        className="tm-text-caption"
+        style={{ color: 'var(--text-muted)', lineHeight: 1.3, textAlign: 'center' }}
+      >
+        {caption}
+      </span>
+    </button>
+  );
+}
+
+/** 칩 안의 미니 피치. 실제 배치 보드와 **같은 좌표계**(y=0 우리 골라인 · y=100 상대
+ * 골라인)를 써서 칩에서 본 모양이 그대로 피치에 놓인다 — viewBox를 실제 구장 비율
+ * (68×105)로 두면 preserveAspectRatio 기본값이 비율을 지켜 주므로 점은 원 그대로다.
+ * 라인은 하프라인 하나만 그린다. 이 크기에서 페널티박스까지 넣으면 선과 점이 뒤엉켜
+ * 정작 봐야 할 배치 모양이 안 보인다. */
+function MiniFormationPreview({ slots }: { slots: FormationSlot[] | null }) {
+  return (
+    <svg viewBox="0 0 68 105" aria-hidden="true" style={{ width: 44, height: 68, display: 'block' }}>
+      <rect x={0} y={0} width={68} height={105} rx={3} fill="#1f8a4c" />
+      <line x1={0} y1={52.5} x2={68} y2={52.5} stroke="rgba(255,255,255,0.55)" strokeWidth={1.2} />
+      {slots?.map((slot, index) => (
+        <circle
+          key={`${slot.positionCode}-${slot.x}-${slot.y}-${index}`}
+          cx={slot.x * 0.68}
+          cy={(100 - slot.y) * 1.05}
+          r={5}
+          fill={slot.positionCode === GOALKEEPER_SLOT_CODE ? 'var(--player-marker-orange)' : 'var(--player-marker-blue)'}
+        />
+      ))}
+    </svg>
   );
 }
 

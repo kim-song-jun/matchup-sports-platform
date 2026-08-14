@@ -788,6 +788,11 @@ export type V1TeamMember = {
   joinedAt: string;
   canChangeRole: boolean;
   canRemove: boolean;
+  /** 팀이 지정한 고정 등번호. 라인업의 등번호 자동 채움이 2순위로 쓴다. */
+  jerseyNumber?: number | null;
+  /** 등번호는 권한 계층과 무관한 팀 살림이라, 역할 변경과 달리 owner 행도 관리자가
+   * 바꿀 수 있다(서버 `members` 응답이 그렇게 계산해 준다). */
+  canEditJersey?: boolean;
 };
 
 export type V1TeamMembersPage = {
@@ -1449,6 +1454,15 @@ export type V1TeamMatchLineup = {
   starters: V1TeamMatchLineupStarter[];
   bench: V1TeamMatchLineupBenchEntry[];
   lineupConfig?: V1LineupConfig;
+  /** 지금 이 라인업에 넣을 수 있는 팀원 — 서버가 저장 때 강제하는 조건(팀 소속 + 참석
+   * 응답)을 그대로 계산해 준다. `jerseyNumber`는 팀 고정 등번호로, 등번호 자동 채움의
+   * 2순위 소스다. */
+  eligibleMembers?: Array<{
+    userId: string;
+    displayName: string;
+    jerseyNumber: number | null;
+    attending: boolean;
+  }>;
 };
 
 // 저장 요청 한 명분 — userId(연동된 활성 팀원) 또는 displayName(비연동 게스트) 중 하나는
@@ -2978,22 +2992,6 @@ export type V1PendingTournamentReview = {
   completedAt: string;
 };
 
-/** 대회 후기를 남길 수 있는 참가 팀 한 곳 */
-export type V1TournamentReviewableTeam = {
-  teamId: string;
-  teamName: string;
-  alreadyReviewed: boolean;
-};
-
-/**
- * 후기 작성 자격. `reviewableTeams` 는 내가 팀장·매니저인 참가 확정 팀 목록이며,
- * 두 팀 이상이면 제출 시 `teamId` 를 명시해야 한다.
- */
-export type V1TournamentReviewEligibility = {
-  isParticipant: boolean;
-  reviewableTeams: V1TournamentReviewableTeam[];
-};
-
 export type V1TournamentAward = {
   id: string;
   awardType: string;   // 'mvp' | 'top_scorer' | ...
@@ -3679,8 +3677,11 @@ export type V1TournamentOperationsBoardItem = {
   homeRegistrationId: string | null;
   awayRegistrationId: string | null;
   scheduledAt: string | null;
-  /** V1GameResultRevision.score — 형태는 아직 확정되지 않았다(Task 20-22가 정의). 화면은 존재 여부만 사용한다. */
-  currentScore: unknown;
+  /** 확정(OFFICIAL) 리비전의 점수 스냅샷 — `V1GameResultRevision.score` 그대로다
+   *  (`game.currentOfficialRevision?.score ?? null`). 두 형태의 유니온이므로 읽을 때는
+   *  반드시 `lib/game-result-score` 의 헬퍼를 쓴다(직접 `.home` 을 읽으면 백필된 경기가
+   *  `undefined:undefined` 가 된다). 승부차기는 이 안의 `penalties`/`penalty` 에 있다. */
+  currentScore: V1GameResultScore | null;
   warnings: V1TournamentStableWarningCode[];
   version: number | null;
   revisionId: string | null;

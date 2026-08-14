@@ -104,8 +104,10 @@ export class TeamMatchSeriesPublicService {
     for (const row of participantRows) {
       const eligibilityRow = eligibility.get(row.participantId);
       if (eligibilityRow === undefined) continue;
-      const officialAt = row.resultRevision.officialAt;
-      if (officialAt === null || !isParticipantPubliclyEligible(eligibilityRow, officialAt)) continue;
+      // officialAt이 null이면(공식 확정 안 됨) 이 행은 애초에 집계 대상이 아니다 --
+      // 동의 판정(isParticipantPubliclyEligible)은 시간 비교를 하지 않으므로
+      // 이 null 체크는 그 판정과 무관한 별개의 "공식 결과인가" 게이트다.
+      if (row.resultRevision.officialAt === null || !isParticipantPubliclyEligible(eligibilityRow)) continue;
       const userId = eligibilityRow.linkedUserId!;
       const current = totalsByUserId.get(userId) ?? { goals: 0, assists: 0 };
       current.goals += row.goals;

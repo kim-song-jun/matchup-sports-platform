@@ -38,6 +38,10 @@ const config: Config = {
         // test/team-match-series/**, so the admin/public HTTP contract specs would exist
         // on disk but never run in CI's migration replay + drift gate.
         '<rootDir>/test/team-match-series/**/*.integration-spec.ts',
+        // 팀 스코프 라인업 재사용(히스토리·프리셋·고정 등번호). 위 두 주석이 경고하는
+        // silent-omission 함정을 피하려고 디렉터리를 만들 때 함께 등록한다 — 등록을
+        // 잊으면 스펙이 디스크에만 있고 CI에서는 한 번도 돌지 않는다.
+        '<rootDir>/test/team-lineups/**/*.integration-spec.ts',
         // 레인 schedule (매치 ↔ 팀일정 연동) 작업 중 발견: test/team-matches/** 도 같은
         // silent-omission 함정에 걸려 있다 — 그 디렉터리의 기존 두 스펙
         // (team-match-lineup.integration-spec.ts, team-match-game-adapter.integration-spec.ts)은

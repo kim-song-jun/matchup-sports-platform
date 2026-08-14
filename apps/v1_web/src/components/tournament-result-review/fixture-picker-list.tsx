@@ -2,7 +2,7 @@
 
 import type { TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
 import { EmptyState } from '@/components/v1-ui/primitives';
-import { readGameResultScore } from '@/lib/game-result-score';
+import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
 // 라벨은 운영 보드 배지와 같은 출처를 쓴다 — 같은 경고 코드가 화면마다 다른 뜻으로
 // 번역되던 문제(MISSING_SCORER: '기록자 없음' vs '득점자 미기재')를 막는다.
 import { WARNING_LABELS } from '@/components/tournament-ops/badges';
@@ -10,8 +10,11 @@ import { WARNING_LABELS } from '@/components/tournament-ops/badges';
 function scoreLabel(item: TournamentOperationsBoardItem): string | null {
   // `.home` 을 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)가
   // `undefined:undefined` 로 나온다 — 알파 실측 사고. lib/game-result-score 참조.
-  const score = readGameResultScore(item.currentScore);
-  return score === null ? null : `${score.home}:${score.away}`;
+  // 승부차기까지 병기해야 결선 무승부 경기가 목록에서 "0:0"으로만 보이지 않는다.
+  // 점수가 없는 경기는 라벨 자체를 안 그린다(호출부가 null 을 그렇게 쓴다) — 그래서
+  // 포맷터의 "기록 없음" 폴백을 쓰지 않고 null 판정을 먼저 한다.
+  if (readGameResultScore(item.currentScore) === null) return null;
+  return formatGameResultScoreWithPenalties(item.currentScore);
 }
 
 /**

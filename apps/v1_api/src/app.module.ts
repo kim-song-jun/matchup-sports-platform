@@ -18,6 +18,7 @@ import { PopupsModule } from './popups/popups.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
+import { TeamLineupsModule } from './team-lineups/team-lineups.module';
 import { TeamSchedulesModule } from './team-schedules/team-schedules.module';
 import { ChatModule } from './chat/chat.module';
 import { RealtimeModule } from './realtime/realtime.module';
@@ -63,6 +64,7 @@ import { TeamMatchSeriesModule } from './team-match-series/team-match-series.mod
     NoticesModule,
     TeamsModule,
     TeamMatchesModule,
+    TeamLineupsModule,
     TeamSchedulesModule,
     GamesModule,
     GameOperationFlagsModule,

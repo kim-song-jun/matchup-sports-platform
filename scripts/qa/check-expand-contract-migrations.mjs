@@ -23,6 +23,168 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
+    statement:
+      'DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = ' +
+      "'v1_team_lineup_presets_team_id_fkey' ) THEN ALTER TABLE \"v1_team_lineup_presets\" ADD CONSTRAINT " +
+      '\"v1_team_lineup_presets_team_id_fkey\" FOREIGN KEY (\"team_id\") REFERENCES \"v1_teams\"(\"id\") ON ' +
+      'DELETE CASCADE ON UPDATE CASCADE; END IF; IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = ' +
+      "'v1_team_lineup_preset_entries_preset_id_fkey' ) THEN ALTER TABLE " +
+      '\"v1_team_lineup_preset_entries\" ADD CONSTRAINT \"v1_team_lineup_preset_entries_preset_id_fkey\" ' +
+      'FOREIGN KEY (\"preset_id\") REFERENCES \"v1_team_lineup_presets\"(\"id\") ON DELETE CASCADE ON UPDATE ' +
+      'CASCADE; END IF; END $$',
+    reason:
+      'Both FKs target tables this same migration creates a few statements earlier ' +
+      '(v1_team_lineup_presets, v1_team_lineup_preset_entries), so there is no pre-existing row that could ' +
+      'violate them and no old app instance that writes to those tables at all. The pg_constraint guards ' +
+      'only make it re-runnable. The gate rejects it because it cannot parse inside a DO block, not because ' +
+      'the enclosed ALTERs are unsafe — the same two ADD CONSTRAINT ... FOREIGN KEY statements written ' +
+      'bare would pass its own new-table rule. Reviewed 2026-08-13 to unblock alpha deploys.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
+    statement:
+      'CREATE UNIQUE INDEX IF NOT EXISTS "v1_team_memberships_team_id_jersey_number_key" ON ' +
+      '"v1_team_memberships" ("team_id", "jersey_number")',
+    reason:
+      'jersey_number is added as a nullable column by the ALTER TABLE two statements above in this same ' +
+      'migration, so every pre-existing v1_team_memberships row holds NULL there and Postgres never treats ' +
+      'two NULLs as colliding — no existing row can trip this index, and an old app instance that has never ' +
+      'heard of the column can only keep writing NULL. The gate rejects it only because its additive rule ' +
+      'requires EVERY indexed column to be newly-added-and-nullable, while team_id is pre-existing; the ' +
+      'safety actually comes from the nullable column alone. Reviewed 2026-08-13 to unblock alpha deploys.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813120000_v1_roster_identity_link/migration.sql',
+    statement: `WITH latest_snapshot AS (
+  SELECT DISTINCT ON (participant_id) participant_id, state
+  FROM "v1_participant_consent_snapshots"
+  ORDER BY participant_id, consent_version DESC
+),
+granted_user_ids AS (
+  SELECT DISTINCT lc.user_id
+  FROM "v1_participant_identity_link_current" lc
+  JOIN latest_snapshot ls ON ls.participant_id = lc.participant_id
+  WHERE ls.state = 'GRANTED'
+)
+INSERT INTO "v1_user_record_consents" ("user_id", "state", "effective_at", "policy_hash", "created_at", "updated_at")
+SELECT "user_id", 'GRANTED', CURRENT_TIMESTAMP, 'backfill-20260813-participant-snapshot', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM granted_user_ids
+ON CONFLICT ("user_id") DO NOTHING`,
+    reason:
+      'Seeds the v1_user_record_consents table that the SAME migration creates three statements earlier — ' +
+      'it writes to a table no deployed revision has ever read, so neither an old app instance mid-rollout ' +
+      'nor a rollback can observe it (rolling back leaves an unread table behind, exactly like the CREATE ' +
+      'TABLE itself). It only INSERTs, never UPDATEs or DELETEs, and ON CONFLICT DO NOTHING makes a re-run ' +
+      'a no-op. Why it exists: public record visibility moves from a per-participant consent snapshot to a ' +
+      'per-user switch, so users who had already granted per-participant consent would silently vanish from ' +
+      'public lineups/scorer names the moment the new gate went live (alpha holds at least one such ' +
+      'participant — a named scorer on an official fixture). The read side never reads this table for ' +
+      'anyone without a GRANTED snapshot, so the backfill grants nothing that was not already granted. ' +
+      'Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
+    statement: `UPDATE "v1_tournament_reviews" r
+SET "team_id" = candidate.team_id
+FROM (
+  SELECT matched.review_id, matched.team_id
+  FROM (
+    SELECT
+      rv.id AS review_id,
+      reg.team_id AS team_id,
+      COUNT(*) OVER (PARTITION BY rv.id) AS candidate_count
+    FROM "v1_tournament_reviews" rv
+    JOIN "v1_tournament_registrations" reg
+      ON reg.tournament_id = rv.tournament_id
+     AND reg.applied_by_user_id = rv.author_user_id
+     AND reg.status = 'confirmed'
+    JOIN "v1_teams" t ON t.id = reg.team_id
+    WHERE rv.team_id IS NULL
+      AND (rv.team_name IS NULL OR t.name = rv.team_name)
+  ) AS matched
+  WHERE matched.candidate_count = 1
+) AS candidate
+WHERE r.id = candidate.review_id`,
+    reason:
+      'Backfills the just-added nullable v1_tournament_reviews.team_id so a tournament review belongs to ' +
+      'the team rather than to whoever pressed the apply button. Rolling-deploy safe: the OLD app has no ' +
+      'knowledge of team_id at all — it neither reads nor writes the column (its review create/read paths ' +
+      'select the pre-existing columns only) — so filling it changes nothing the OLD app can observe, and a ' +
+      'rollback leaves the values sitting inert. No pre-existing column or row is deleted, narrowed, or ' +
+      'reinterpreted; the statement only turns NULL into a value on a column that did not exist one ' +
+      'migration ago. It is deliberately conservative about WHICH value: the candidate must come from a ' +
+      "confirmed registration AND match the review's own team_name snapshot, and it is applied only when " +
+      'exactly one candidate survives (COUNT(*) OVER (PARTITION BY rv.id) = 1) — ambiguous legacy rows are ' +
+      'left NULL rather than guessed, and NULLs never collide under the (tournament_id, team_id) unique. ' +
+      'Re-runnable: the WHERE rv.team_id IS NULL guard makes a second execution a no-op. It is a bare ' +
+      'UPDATE rather than a DO block because no procedural control flow is needed; isAdditiveStatement has ' +
+      'no data-statement branch and so cannot prove any UPDATE additive, which is why this needs review ' +
+      'rather than a rule change. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
+    statement: `DO $$
+DECLARE
+  duplicate_count bigint;
+BEGIN
+  SELECT count(*) INTO duplicate_count
+  FROM (
+    SELECT 1
+    FROM "v1_tournament_reviews"
+    WHERE "team_id" IS NOT NULL
+    GROUP BY "tournament_id", "team_id"
+    HAVING count(*) > 1
+  ) AS duplicated;
+
+  IF duplicate_count > 0 THEN
+    RAISE EXCEPTION
+      '대회 후기에 팀당 1건 제약을 걸 수 없어요. (tournament_id, team_id) 충돌 %건. 백필 로직이 예상과 다르게 동작했습니다 — 수동으로 정리한 뒤 마이그레이션을 다시 실행하세요.',
+      duplicate_count
+      USING ERRCODE = '23505';
+  END IF;
+
+  CREATE UNIQUE INDEX IF NOT EXISTS "v1_tournament_reviews_tournament_id_team_id_key"
+    ON "v1_tournament_reviews"("tournament_id", "team_id");
+END $$`,
+    reason:
+      'Adds the per-team duplicate key for tournament reviews so one team gets one review per tournament, ' +
+      'now that any owner/manager of the team can write it instead of only the applicant. Rolling-deploy ' +
+      'safe: the OLD app never writes team_id (it does not know the column), so every row it inserts ' +
+      'during the overlap carries team_id NULL, and Postgres never treats two NULLs as colliding — the ' +
+      'new index cannot reject a single OLD-app write. The NEW app enforces the same one-per-team rule in ' +
+      'application code before insert. The pre-existing (tournament_id, author_user_id) unique is kept, so ' +
+      'the per-person rule the OLD app relies on is unchanged in both directions. The one shape that could ' +
+      'collide — two backfilled rows landing on the same (tournament, team) — is not silently repaired: ' +
+      'the preceding DO block counts it and aborts with ERRCODE 23505 so a human decides which review ' +
+      'survives (same pattern as the two review re-pins below). The statement is a DO block purely because ' +
+      'that guard needs procedural control flow; isAdditiveStatement has no DO branch and so cannot see ' +
+      'the CREATE UNIQUE INDEX it wraps. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
+    statement: `DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'v1_tournament_reviews_team_id_fkey'
+  ) THEN
+    ALTER TABLE "v1_tournament_reviews"
+      ADD CONSTRAINT "v1_tournament_reviews_team_id_fkey"
+      FOREIGN KEY ("team_id") REFERENCES "v1_teams"("id")
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$`,
+    reason:
+      'Adds the FK behind the new nullable team_id column. Rolling-deploy safe by the same argument the ' +
+      "gate's own ADD CONSTRAINT FK rule uses: the referencing column was created by this very migration " +
+      'and is nullable, so no pre-existing row can violate it, and the OLD app never writes the column so ' +
+      'it cannot insert an unmatched value during the overlap. RESTRICT (not CASCADE) is chosen so a team ' +
+      'deletion can never take reviews with it — V1Team is always soft-deleted (deletedAt) in this ' +
+      'codebase, matching v1_tournament_registrations.team. The statement is wrapped in a DO block only to ' +
+      'make it idempotent via pg_constraint lookup (this repo requires re-runnable migrations); ' +
+      'isAdditiveStatement has no DO branch and so cannot see the ADD CONSTRAINT it wraps. ' +
+      'Reviewed 2026-08-13.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260813061500_v1_tournament_personal_review_scope/migration.sql',
     statement: `DO $$
 DECLARE
@@ -163,6 +325,48 @@ END $$`,
       'v1_game_official_facts row for a game imported by game-result-backfill.ts, which is exactly the 21 alpha ' +
       'games whose team records read 0 while the standings table showed a win. Reviewed 2026-08-10.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_appearance_gate_backfill/migration.sql',
+    statement: 'ALTER TABLE v1_game_result_participants DISABLE TRIGGER v1_guard_result_participant_mutation',
+    reason:
+      'Scope-limited trigger toggle, not a schema change: the DISABLE and its matching ENABLE below bracket the two data statements inside this one migration transaction, so the guard is restored before anything else can observe it (a rolled-back migration never commits the DISABLE either). It is required because v1_guard_result_participant_mutation only permits writes while the owning revision is DRAFT, and this backfill by definition targets SUBMITTED/OFFICIAL revisions. No app code path reads or depends on the trigger being momentarily off. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_appearance_gate_backfill/migration.sql',
+    statement: 'DELETE FROM v1_game_result_participants rp USING v1_game_result_revisions rev WHERE rp.result_revision_id = rev.id AND EXISTS ( SELECT 1 FROM v1_games g WHERE g.id = rev.game_id AND g.source_type = \'TOURNAMENT_FIXTURE\' ) AND rev.state IN (\'SUBMITTED\', \'OFFICIAL\') AND NOT EXISTS ( SELECT 1 FROM v1_game_participants p WHERE p.id = rp.participant_id AND p.started = TRUE ) AND NOT EXISTS ( SELECT 1 FROM v1_game_events e WHERE e.game_id = rev.game_id AND e.type = \'SUBSTITUTION\' AND e.participant_id = rp.participant_id AND NOT EXISTS (SELECT 1 FROM v1_game_events r WHERE r.reverses_event_id = e.id) ) AND rp.goals = 0 AND rp.assists = 0 AND rp.fouls = 0 AND COALESCE((rp.cards ->> \'yellow\')::int, 0) = 0 AND COALESCE((rp.cards ->> \'red\')::int, 0) = 0 AND rev.mvp_participant_id IS DISTINCT FROM rp.participant_id',
+    reason:
+      'Data-only correction with no schema change, so both rolling-deploy directions are safe: the OLD app reads v1_game_result_participants as a plain list (PublicUserRecordsService counts rows for summary.appearances) and simply sees the corrected, smaller set; the NEW app writes the same shape it always did. Only rows with NO evidence of playing are removed -- not a starter, never the incoming side of an active SUBSTITUTION, zero goals/assists/fouls/cards, and not the revision MVP -- so no goal, card or MVP reference is ever orphaned. Restricted to source_type=TOURNAMENT_FIXTURE and to SUBMITTED/OFFICIAL revisions, leaving in-progress DRAFT/CHANGE_REQUESTED edits untouched. Rollback is application-images-only and the old images do not need these rows to exist (a bench player who never played simply stops appearing in their own record); the judgement inputs (V1GameParticipant.started and the event stream) are untouched, so the deleted rows are reconstructible from the same rule at any time. Verified on a throwaway Postgres 16 with the full migration chain replayed: starter kept, active substitute kept, reversed substitution deleted, never-used bench deleted, a substitute whose substitution was never entered but who scored kept with goals=1, DRAFT row untouched, TEAM_MATCH row untouched. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_appearance_gate_backfill/migration.sql',
+    statement: 'UPDATE v1_game_result_participants rp SET started = p.started FROM v1_game_result_revisions rev, v1_game_participants p WHERE rp.result_revision_id = rev.id AND rp.participant_id = p.id AND EXISTS ( SELECT 1 FROM v1_games g WHERE g.id = rev.game_id AND g.source_type = \'TOURNAMENT_FIXTURE\' ) AND rev.state IN (\'SUBMITTED\', \'OFFICIAL\') AND rp.started IS DISTINCT FROM p.started',
+    reason:
+      'Column-value correction on an existing boolean, no schema change. `started` was written as a hardcoded true for every participant by deriveTournamentRevision, so this realigns it with the lineup row it was always supposed to mirror (V1GameParticipant.started). Both rolling-deploy directions are safe: the OLD app only renders this flag (public records items[].started) and never branches on it in a way a more accurate value breaks, and the NEW app writes the same column with the same meaning. Same scoping as the DELETE above (TOURNAMENT_FIXTURE + SUBMITTED/OFFICIAL only), and it is idempotent -- the IS DISTINCT FROM guard makes a re-run a no-op. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813200000_v1_appearance_gate_backfill/migration.sql',
+    statement: 'ALTER TABLE v1_game_result_participants ENABLE TRIGGER v1_guard_result_participant_mutation',
+    reason:
+      'The restoring half of the DISABLE above -- it puts v1_guard_result_participant_mutation back exactly as the schema declares it, inside the same transaction. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
+    statement: 'UPDATE "v1_tournament_reviews" r SET "team_id" = candidate.team_id FROM ( SELECT matched.review_id, matched.team_id FROM ( SELECT rv.id AS review_id, reg.team_id AS team_id, COUNT(*) OVER (PARTITION BY rv.id) AS candidate_count FROM "v1_tournament_reviews" rv JOIN "v1_tournament_registrations" reg ON reg.tournament_id = rv.tournament_id AND reg.applied_by_user_id = rv.author_user_id AND reg.status = \'confirmed\' JOIN "v1_teams" t ON t.id = reg.team_id WHERE rv.team_id IS NULL AND (rv.team_name IS NULL OR t.name = rv.team_name) ) AS matched WHERE matched.candidate_count = 1 ) AS candidate WHERE r.id = candidate.review_id',
+    reason:
+      'Textbook expand-contract backfill of a column added nullable two statements earlier in the same file, so nothing pre-existing is rewritten: only rows WHERE team_id IS NULL are touched, and the migration deliberately leaves team_id NULL whenever the (tournament, author) join is ambiguous rather than guessing. Rolling-deploy safe in both directions because the OLD app has no notion of the column at all (it neither selects nor writes team_id), so a filled value is invisible to it, while the NEW app is the only reader. Rollback is application-images-only and old images keep working against the populated column. Reviewed 2026-08-13 while unblocking the alpha deploy (the gate runs at deploy time, not in PR CI, so this surfaced only after #439 merged).',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
+    statement: 'DO $$ DECLARE duplicate_count bigint; BEGIN SELECT count(*) INTO duplicate_count FROM ( SELECT 1 FROM "v1_tournament_reviews" WHERE "team_id" IS NOT NULL GROUP BY "tournament_id", "team_id" HAVING count(*) > 1 ) AS duplicated; IF duplicate_count > 0 THEN RAISE EXCEPTION \'대회 후기에 팀당 1건 제약을 걸 수 없어요. (tournament_id, team_id) 충돌 %건. 백필 로직이 예상과 다르게 동작했습니다 — 수동으로 정리한 뒤 마이그레이션을 다시 실행하세요.\', duplicate_count USING ERRCODE = \'23505\'; END IF; CREATE UNIQUE INDEX IF NOT EXISTS "v1_tournament_reviews_tournament_id_team_id_key" ON "v1_tournament_reviews"("tournament_id", "team_id"); END $$',
+    reason:
+      'The unique index inside this DO block cannot be tripped by an old writer: (tournament_id, team_id) is unique only among non-NULL team_id under standard Postgres NULL-distinct semantics, and the OLD app never writes team_id (the column does not exist in its client), so every review it inserts is NULL-scoped and collision-free. Only the NEW app populates team_id, and it enforces the same one-review-per-team rule. The block also re-verifies zero duplicates BEFORE creating the index and raises 23505 otherwise, so a bad backfill fails loudly instead of silently skipping the constraint. The gate flags it because a DO block is opaque to the additivity parser, not because the index is reachable by legacy writes. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260813070000_v1_tournament_review_team_scope/migration.sql',
+    statement: 'DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = \'v1_tournament_reviews_team_id_fkey\' ) THEN ALTER TABLE "v1_tournament_reviews" ADD CONSTRAINT "v1_tournament_reviews_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "v1_teams"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$',
+    reason:
+      'FK on the same newly-added nullable column, which the additivity rules already treat as safe when written as a bare ALTER TABLE -- it is flagged here only because the idempotency guard wraps it in a DO block the parser cannot see into. Legacy NULL-valued rows bypass the constraint by definition, and the OLD app only ever produces NULL team_id, so no old write can violate it. ON DELETE RESTRICT adds no rolling risk either: V1Team is never physically deleted in this codebase (always deletedAt soft delete) and the sibling FK on v1_tournament_registrations.team_id already uses RESTRICT. Reviewed 2026-08-13.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();
@@ -281,9 +485,17 @@ function normalizeIdent(value) {
   return value ? value.toLowerCase().replace(/"/g, '') : value;
 }
 
+/**
+ * `CREATE TABLE`이 만드는 테이블 이름. `IF NOT EXISTS`를 건너뛰지 않으면 그 키워드의
+ * 첫 낱말(`IF`)을 테이블 이름으로 읽어, **이 마이그레이션이 방금 만든 테이블**을 기존
+ * 테이블로 오인한다 — 그러면 그 새 테이블에 거는 UNIQUE INDEX·FK가 전부 non-additive로
+ * 거부된다(2026-08-13 alpha 배포 차단의 실제 원인: v1_team_lineup_presets).
+ */
 function tableCreatedBy(statement) {
   return normalizeIdent(
-    statement.match(/^CREATE TABLE\s+(?:"[^"]+"\.)?("[^"]+"|[a-zA-Z_][\w$]*)/i)?.[1],
+    statement.match(
+      /^CREATE TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"[^"]+"\.)?("[^"]+"|[a-zA-Z_][\w$]*)/i,
+    )?.[1],
   );
 }
 

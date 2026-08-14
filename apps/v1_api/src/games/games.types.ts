@@ -72,6 +72,9 @@ export interface GameSideCreationInput {
 
 export interface GameParticipantCreationInput {
   sourceParticipantId: string;
+  /** 이 참가자가 가리키는 사용자 — 대회 경기라면 등록 명단(V1TournamentPlayer)의 userId.
+   * 이름 문자열만으로는 동명이인을 구분할 수 없어 라인업 화면이 명단과 대조하지 못한다. */
+  userId?: string;
   sideKey: GameSideKey;
   displayNameSnapshot: string;
   jerseyNumber?: number;

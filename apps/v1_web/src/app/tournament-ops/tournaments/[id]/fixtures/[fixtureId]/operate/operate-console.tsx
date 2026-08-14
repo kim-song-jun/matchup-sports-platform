@@ -18,8 +18,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { useV1AuthMe } from '@/hooks/use-v1-api';
+import { useV1AuthMe, useV1GameResultRevisions } from '@/hooks/use-v1-api';
 import { useV1FixtureLineup, useV1Game, postV1GameCommand } from '@/hooks/use-v1-game-operations';
+import { readGameResultScore } from '@/lib/game-result-score';
 import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
 import { isTakeoverHeld } from '@/lib/game-operations-queue';
 import {
@@ -66,6 +67,7 @@ import type {
   GameLineup,
   GameLineupParticipant,
   GameSide,
+  GameSideKey,
   GameState,
 } from '@/types/game-operations';
 
@@ -379,6 +381,36 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     }
     return score;
   }, [gameDetail.data?.sides, ops.liveEvents]);
+
+  /* 종료된 경기의 확정 결과 — 승부차기는 골 이벤트가 아니라 `end` 커맨드의
+   * `payload.penalties`로 결과 리비전에 저장된다. 그래서 위 `scoreBySideId`(이벤트
+   * 파생)로는 절대 복원되지 않는다: 승부차기를 입력하고 종료하면 패널이 닫히면서
+   * 방금 기록한 값이 이 화면에서 완전히 사라졌다(알파 실측 — 서버에는 남아 있었다).
+   *
+   * 경기가 끝난 뒤에만 조회한다(그 전에는 결과 리비전 자체가 없다). 조회 권한은
+   * 이 콘솔을 여는 것과 같은 `read` 권한이라 필드 담당자도 그대로 통과한다. */
+  const gameEnded = gameState === 'ENDED';
+  const resultRevisions = useV1GameResultRevisions(gameId, { enabled: gameEnded });
+
+  const confirmedPenalties = useMemo(() => {
+    if (!gameEnded) return null;
+    const revisions = resultRevisions.data ?? [];
+    if (revisions.length === 0) return null;
+    // 확정본이 있으면 그걸 따른다 — 정정으로 점수가 바뀐 경기에서 "가장 최신 리비전"은
+    // 아직 확정 전 초안일 수 있고, 그 초안을 결과로 보여주면 화면이 공식 결과와
+    // 어긋난다. 확정 전(운영 콘솔로 막 종료한 직후)에는 확정본이 아직 없으므로
+    // 최신 리비전(서버 정렬: revision 내림차순)을 쓴다.
+    //
+    // 확정본 id 를 목록에서 못 찾으면 아무것도 보여주지 않는다(최신으로 폴백하지
+    // 않는다). `GET /games/:id/result-revisions` 는 그 경기의 리비전을 페이지네이션
+    // 없이 전부 돌려주고 `currentOfficialRevisionId` 는 같은 경기의 리비전만 가리키므로
+    // 정상 경로에서는 못 찾을 수 없다 — 못 찾았다는 건 데이터가 어긋났다는 뜻이고,
+    // 그 상태에서 초안일 수도 있는 다른 리비전의 승부차기 점수를 "결과"로 그리면
+    // 화면이 공식 결과와 다른 값을 단언하게 된다. 결과 표시에서 그건 빈 칸보다 나쁘다.
+    const officialId = gameDetail.data?.currentOfficialRevisionId ?? null;
+    const chosen = officialId ? revisions.find((revision) => revision.id === officialId) : revisions[0];
+    return readGameResultScore(chosen?.score)?.penalties ?? null;
+  }, [gameEnded, resultRevisions.data, gameDetail.data?.currentOfficialRevisionId]);
 
   // 과제 2 — 승부차기 시작 버튼 노출 조건. 종료 흐름 개편(사용자 결정 2·3)
   // 으로 이 시점이 **후반 종료 이후**로 옮겨졌다: 예전엔 "마지막 피리어드가
@@ -958,6 +990,22 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 {sides.map((side) => scoreBySideId.get(side.id) ?? 0).join(' : ')}
               </span>
             </p>
+            {/* 승부차기 — 정규시간 점수와 다른 값이라 위 스코어에 섞지 않고 별도 칩으로
+                병기한다. 경기가 끝난 뒤에는 경과 시간 칩이 들어올 자리가 비므로 그
+                슬롯을 그대로 쓴다(하프타임·정규 시간 종료 칩과 같은 자리·같은 무게).
+                aria-label 은 "2:0"이 시각으로 읽히지 않게 점수임을 명시한다. */}
+            {confirmedPenalties ? (
+              <span
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--blue50)] px-2.5 py-1 text-sm font-bold tabular-nums text-[var(--blue700)] dark:bg-blue-500/10"
+                aria-label={`승부차기 ${sides
+                  .map((side) => `${side.displayNameSnapshot} ${penaltyScoreForSide(side, confirmedPenalties)}점`)
+                  .join(', ')}`}
+              >
+                <Target size={16} aria-hidden="true" />
+                승부차기{' '}
+                {sides.map((side) => penaltyScoreForSide(side, confirmedPenalties)).join(':')}
+              </span>
+            ) : null}
             {currentPeriod && currentPeriod.startedAt ? (
               <ElapsedMatchClock
                 periodNumber={currentPeriod.number}
@@ -1268,6 +1316,19 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {confirmModal}
     </div>
   );
+}
+
+/**
+ * 승부차기 점수는 `{home, away}` 로 저장되는데 헤더는 `sides` **배열 순서**로 좌우를
+ * 정한다(제목 줄 "A vs B"와 순서를 맞추기 위해 홈/원정을 임의로 가정하지 않는다는
+ * 기존 규칙). 두 규칙이 어긋나면 정규 점수와 승부차기의 좌우가 뒤바뀌어 보이므로,
+ * 배열 순서로 늘어놓되 값은 `sideKey` 로 골라 항상 같은 팀을 가리키게 한다.
+ */
+function penaltyScoreForSide(
+  side: { sideKey: GameSideKey },
+  penalties: { home: number; away: number },
+): number {
+  return side.sideKey === 'HOME' ? penalties.home : penalties.away;
 }
 
 function teammatesForSide(

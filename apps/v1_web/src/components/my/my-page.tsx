@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import {
+  Award,
   Bell,
   ClipboardList,
   Crown,
@@ -48,6 +49,7 @@ import type {
 
 /** Lucide 아이콘 이름 → 컴포넌트 매핑. view-model의 icon 문자열을 참조함. */
 const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  Award,
   ClipboardList,
   Plus,
   Users,

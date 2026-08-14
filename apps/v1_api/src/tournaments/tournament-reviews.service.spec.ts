@@ -623,28 +623,27 @@ describe('TournamentReviewsService — review hide moderation', () => {
 });
 
 /**
- * 대회 후기 작성 자격 — 신청자(appliedByUserId) 1명에서 "참가 확정 팀의 현재 owner|manager,
- * 팀당 1건"으로 넓힌 변경의 계약 테스트. 잡아야 하는 실제 버그:
- *   1) 매니저가 신청서를 낸 대회에서 팀장이 후기를 못 쓰는 것(원래 증상)
- *   2) 팀을 떠난 신청자가 여전히 팀 이름으로 후기를 쓰는 것
- *   3) 같은 팀의 두 번째 매니저가 팀 후기를 하나 더 쌓는 것
+ * 트랙 B — 대회 후기 작성 권한을 "대회 신청 버튼을 누른 본인(appliedByUserId)" 에서
+ * "참가 확정 팀의 팀장·운영진(owner/manager, active membership)" 으로 확장한 계약.
+ * findEligibleTeams()가 v1TournamentRegistration.findMany(team: { memberships: { some: ... } })
+ * 경유로 판정하므로, 각 테스트는 registration.findMany 목으로 "내가 owner/manager인 팀의
+ * confirmed 등록" 존재 여부를 표현한다.
  */
-describe('TournamentReviewsService — 후기 작성 자격', () => {
+describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 manager+)', () => {
   let service: TournamentReviewsService;
   let prisma: {
     v1Tournament: { findFirst: jest.Mock };
-    v1TournamentRegistration: { findMany: jest.Mock };
-    v1TournamentReview: { findMany: jest.Mock; create: jest.Mock };
+    v1TournamentRegistration: { findMany: jest.Mock; findFirst: jest.Mock };
+    v1TournamentReview: { findFirst: jest.Mock; create: jest.Mock };
   };
 
   const completedTournament = { id: 'tournament-1', status: 'completed', deletedAt: null };
-  const registrationRow = (teamId: string, name: string) => ({ teamId, team: { id: teamId, name } });
 
   beforeEach(async () => {
     prisma = {
-      v1Tournament: { findFirst: jest.fn().mockResolvedValue(completedTournament) },
-      v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
-      v1TournamentReview: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
+      v1Tournament: { findFirst: jest.fn() },
+      v1TournamentRegistration: { findMany: jest.fn(), findFirst: jest.fn() },
+      v1TournamentReview: { findFirst: jest.fn(), create: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -660,85 +659,194 @@ describe('TournamentReviewsService — 후기 작성 자격', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  it('자격 조회는 신청자가 아니라 팀의 active owner|manager 멤버십으로 판정한다', async () => {
-    prisma.v1TournamentRegistration.findMany.mockResolvedValue([registrationRow('team-1', '레알마드리드')]);
+  // (a) manager가 후기 작성 성공
+  it('submitReview: 팀장이 아닌 매니저(manager)도 참가 확정 팀 몫으로 후기를 작성할 수 있다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null); // 중복 없음
+    prisma.v1TournamentReview.create.mockResolvedValue(
+      reviewRow({ authorUserId: 'manager-user-id', teamName: '레알마드리드' }),
+    );
 
-    await service.participantCheck('tournament-1', 'captain-user-id');
+    const result = await service.submitReview(
+      'tournament-1',
+      { ...plainUser, id: 'manager-user-id' },
+      { rating: 5, comment: '좋은 대회였어요' },
+    );
 
-    // appliedByUserId 로 좁히지 않는다 — 신청은 매니저가 하고 후기는 팀장이 쓰는 경우를 살린다.
-    const where = prisma.v1TournamentRegistration.findMany.mock.calls[0][0].where;
-    expect(where.appliedByUserId).toBeUndefined();
-    expect(where.team.memberships.some).toEqual({
-      userId: 'captain-user-id',
-      status: 'active',
-      role: { in: ['owner', 'manager'] },
-    });
-  });
-
-  it('팀을 떠나 active 멤버십이 없으면 신청자였더라도 403', async () => {
-    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
-
-    await expect(
-      service.submitReview('tournament-1', { ...plainUser, id: 'left-applicant-id' }, { rating: 5 }),
-    ).rejects.toThrow(ForbiddenException);
-    expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
-  });
-
-  it('팀장이 신청서를 내지 않았어도 후기를 작성하고, 행에 팀이 기록된다', async () => {
-    prisma.v1TournamentRegistration.findMany.mockResolvedValue([registrationRow('team-1', '레알마드리드')]);
-    prisma.v1TournamentReview.create.mockResolvedValue(reviewRow({ teamId: 'team-1' }));
-
-    await service.submitReview('tournament-1', { ...plainUser, id: 'captain-user-id' }, { rating: 4 });
-
-    expect(prisma.v1TournamentReview.create).toHaveBeenCalledWith(
+    expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          authorUserId: 'captain-user-id',
-          teamId: 'team-1',
-          teamName: '레알마드리드',
-          rating: 4,
+        where: expect.objectContaining({
+          tournamentId: 'tournament-1',
+          status: 'confirmed',
+          team: expect.objectContaining({
+            memberships: {
+              some: { userId: 'manager-user-id', status: 'active', role: { in: ['owner', 'manager'] } },
+            },
+          }),
         }),
       }),
     );
+    expect(prisma.v1TournamentReview.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tournamentId: 'tournament-1',
+          authorUserId: 'manager-user-id',
+          teamId: 'team-1',
+          teamName: '레알마드리드',
+        }),
+      }),
+    );
+    expect(result.teamName).toBe('레알마드리드');
   });
 
-  it('같은 팀이 이미 후기를 남겼으면 다른 매니저가 써도 400 ALREADY_REVIEWED', async () => {
-    prisma.v1TournamentRegistration.findMany.mockResolvedValue([registrationRow('team-1', '레알마드리드')]);
-    prisma.v1TournamentReview.findMany.mockResolvedValue([{ teamId: 'team-1' }]);
+  // (b) 같은 팀 두 번째 작성은 ALREADY_REVIEWED
+  it('submitReview: 같은 팀 몫으로 다른 운영진이 이미 썼으면 ALREADY_REVIEWED, 저장하지 않는다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    // 팀장이 이미 같은 팀(teamId: team-1) 몫으로 후기를 써 둔 상태 — authorUserId는 나와 다르다.
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(
+      reviewRow({ authorUserId: 'owner-user-id', teamId: 'team-1', teamName: '레알마드리드' }),
+    );
 
     await expect(
-      service.submitReview('tournament-1', { ...plainUser, id: 'second-manager-id' }, { rating: 5 }),
-    ).rejects.toThrow(BadRequestException);
+      service.submitReview(
+        'tournament-1',
+        { ...plainUser, id: 'manager-user-id' },
+        { rating: 4 },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'ALREADY_REVIEWED' } });
     expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
   });
 
-  it('두 참가 팀의 대표를 겸하면 teamId 없이는 400, 지정하면 그 팀으로 저장한다', async () => {
+  // (c) 일반 member는 403
+  it('submitReview: 참가 확정 팀 소속이라도 일반 member는 403 NOT_PARTICIPANT', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    // member는 owner/manager 조건에 걸리지 않으므로 findMany where에 매칭되는 등록이 없다.
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.submitReview(
+        'tournament-1',
+        { ...plainUser, id: 'member-user-id' },
+        { rating: 3 },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'NOT_PARTICIPANT' } });
+    expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+  });
+
+  // (e) 두 팀의 팀장·운영진을 겸하고 두 팀 모두 참가 확정 — teamId 없이 제출하면 400
+  it('submitReview: 2개 팀 모두 참가 확정인 사용자가 teamId 없이 제출하면 400 TEAM_SELECTION_REQUIRED + details.teams', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([
-      registrationRow('team-1', '레알마드리드'),
-      registrationRow('team-2', '바르셀로나'),
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+      { teamId: 'team-2', team: { name: '바르셀로나' } },
     ]);
 
     await expect(
-      service.submitReview('tournament-1', plainUser, { rating: 5 }),
-    ).rejects.toThrow(BadRequestException);
+      service.submitReview(
+        'tournament-1',
+        { ...plainUser, id: 'dual-manager-user-id' },
+        { rating: 5 },
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'TEAM_SELECTION_REQUIRED',
+        details: {
+          teams: [
+            { teamId: 'team-1', teamName: '레알마드리드' },
+            { teamId: 'team-2', teamName: '바르셀로나' },
+          ],
+        },
+      },
+    });
     expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+  });
 
-    prisma.v1TournamentReview.create.mockResolvedValue(reviewRow({ teamId: 'team-2' }));
-    await service.submitReview('tournament-1', plainUser, { teamId: 'team-2', rating: 5 });
+  // (f) 위와 같은 사용자가 teamId를 명시하면 그 팀 몫으로 정상 저장된다
+  it('submitReview: 2개 팀 모두 참가 확정인 사용자가 teamId를 지정하면 그 팀으로 저장한다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+      { teamId: 'team-2', team: { name: '바르셀로나' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentReview.create.mockResolvedValue(
+      reviewRow({ authorUserId: 'dual-manager-user-id', teamId: 'team-2', teamName: '바르셀로나' }),
+    );
+
+    const result = await service.submitReview(
+      'tournament-1',
+      { ...plainUser, id: 'dual-manager-user-id' },
+      { rating: 5, teamId: 'team-2' },
+    );
 
     expect(prisma.v1TournamentReview.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ teamId: 'team-2', teamName: '바르셀로나' }),
       }),
     );
+    expect(result.teamName).toBe('바르셀로나');
   });
 
-  it('대표가 아닌 팀을 teamId 로 지정하면 403', async () => {
-    prisma.v1TournamentRegistration.findMany.mockResolvedValue([registrationRow('team-1', '레알마드리드')]);
+  // (g) 자격 없는 teamId를 지정하면 403 (다른 팀의 teamId를 끼워 넣는 시도 방어)
+  it('submitReview: 자격 목록에 없는 teamId를 지정하면 403 NOT_PARTICIPANT', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+      { teamId: 'team-2', team: { name: '바르셀로나' } },
+    ]);
 
     await expect(
-      service.submitReview('tournament-1', plainUser, { teamId: 'team-9', rating: 5 }),
-    ).rejects.toThrow(ForbiddenException);
+      service.submitReview(
+        'tournament-1',
+        { ...plainUser, id: 'dual-manager-user-id' },
+        { rating: 5, teamId: 'team-999-not-mine' },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'NOT_PARTICIPANT' } });
     expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+  });
+
+  // (d) getMyReview가 팀장이 쓴 후기를 운영진에게도 보여준다
+  it('getMyReview: 팀장이 작성한 후기를 같은 팀 운영진 조회에도 반환한다', async () => {
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(
+      reviewRow({ id: 'review-9', authorUserId: 'owner-user-id', teamId: 'team-1', rating: 5 }),
+    );
+
+    const result = await service.getMyReview('tournament-1', 'manager-user-id');
+
+    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tournamentId: 'tournament-1',
+          OR: [{ authorUserId: 'manager-user-id' }, { teamId: { in: ['team-1'] } }],
+        },
+      }),
+    );
+    expect(result).toMatchObject({ id: 'review-9', rating: 5 });
+  });
+
+  it('getMyReview: 참가 확정 팀이 전혀 없으면 authorUserId 기준으로만 조회한다', async () => {
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+
+    const result = await service.getMyReview('tournament-1', 'stranger-user-id');
+
+    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tournamentId: 'tournament-1',
+          OR: [{ authorUserId: 'stranger-user-id' }],
+        },
+      }),
+    );
+    expect(result).toBeNull();
   });
 });

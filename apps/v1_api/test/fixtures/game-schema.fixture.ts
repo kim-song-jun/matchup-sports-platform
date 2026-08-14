@@ -147,16 +147,50 @@ export const gameSchemaFixture = {
 // (20260813061500_v1_tournament_personal_review_scope); the bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
-// Re-pinned for 대회 후기 팀 스코프: V1TournamentReview gains a nullable team_id (+ V1Team relation)
-// and swaps its author-scoped unique key for a team-scoped one, so a tournament review belongs to
-// the participating team rather than to whoever filed the entry. Same shape as the three review
-// re-pins above — no v1_game_* model, enum, or relation changes; the guard fired only because it
-// hashes the whole schema.prisma file. One new migration file backs it
-// (20260813120000_v1_tournament_review_team_scope); the bound
+// Re-pinned for 대회 라인업의 등록 명단 연결: V1GameParticipant gains a nullable `user_id` so a
+// saved tournament lineup can be matched back against the tournament roster by person instead of
+// by display-name string (동명이인이면 이름 매칭은 선발 표시를 엉뚱한 사람에게 붙인다). Like the
+// HALFTIME re-pin and unlike the review ones, this DOES touch the game domain — that is why this
+// guard fired, and it fired correctly. It is still additive: the column is nullable with no
+// default, so every existing participant row keeps its exact meaning (null = 이 컬럼이 없던 시절에
+// 저장됐거나 사용자 계정을 쓰지 않는 team-match 경로), and no enum, relation, or FK changes. One
+// new migration file backs it (20260813190000_v1_game_participant_user_id); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for 대회 후기 팀 귀속: V1TournamentReview gains a nullable `team_id` (+ V1Team
+// relation and a (tournament_id, team_id) unique) so a tournament review belongs to the team
+// rather than to whoever pressed the apply button — 팀장이 신청했으면 운영진이 후기를 쓸 수도,
+// 우리 팀이 이미 썼는지 볼 수도 없었다. Same shape as the review re-pins above and unlike the
+// HALFTIME/user_id ones, this does NOT touch the game domain — no v1_game_* model, enum, or
+// relation changes; the guard fired only because it hashes the whole schema.prisma file. The
+// column is nullable by design: the backfill leaves ambiguous legacy rows unmapped rather than
+// guessing, and NULLs do not collide under the new unique (Postgres NULL-distinct). One new
+// migration file backs it (20260813070000_v1_tournament_review_team_scope); the bound
+// 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
+// Recomputed with `shasum -a 256` against the file on this branch.
+// Re-pinned for 라인업 기반 신원 연결: `V1IdentityLinkAction` gains `ROSTER_ASSERTED` and a new
+// `V1UserRecordConsent` model lands. Unlike the 대회 후기 팀 귀속 re-pin above, this one *does*
+// touch the game domain — the identity-link enum is read by `v1_guard_identity_event`, so the
+// guard firing here is the intended signal, not incidental file-hash noise. The new action is
+// additive and deliberately outside that trigger's `ATTESTED`/`EXPIRED` branch: roster
+// attribution records a squad-list fact rather than a two-party attestation, so a player who is
+// also the manager can be linked from their own lineup save. `V1GameParticipant.user_id` is in
+// this diff too but is owned by 20260813190000_v1_game_participant_user_id (dev), not by this
+// branch. Backing migration: 20260813120000_v1_roster_identity_link — verified by replaying the
+// full chain against an empty database (`prisma migrate deploy`) plus a drift check
+// (`prisma migrate diff --exit-code` → "No difference detected"). The bound
 // 20260729000100_v1_game_operations migration is untouched, so `migration` keeps its value.
 // Recomputed with `shasum -a 256` against the file on this branch.
 export const gameSchemaSourceManifest = {
-  schema: '714e385d1c20c34a7d7da48ca8207de2e8d87edd4b3371e1978b8bc03574b7c9',
+  // 팀 라인업 재사용(2026-08-13)과 dev의 스키마 변경이 여기서 만났다. 두 브랜치가
+  // 각자 자기 schema.prisma 해시를 못 박아 둔 탓에 이 값만 충돌했고, schema.prisma
+  // 자체는 깨끗하게 병합됐다 — 그래서 아래 값은 어느 쪽 브랜치의 값도 아니라
+  // **병합된 파일**에 `shasum -a 256`을 돌려 새로 계산한 것이다(이 파일의 기존
+  // 재-pin 주석들이 따르는 관례 그대로). 이번 브랜치가 더한 것은 라인업 프리셋
+  // 테이블 2개와 v1_team_memberships.jersey_number이고, 둘 다 새 마이그레이션
+  // 파일로 들어가므로 바인딩된 20260729000100_v1_game_operations 마이그레이션은
+  // 건드리지 않았다 — migration 해시가 그대로인 이유다.
+  schema: '13b2dec321db5618bfcfac7482525a7dba7709047e299d558b9ffe4367baa1a3',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

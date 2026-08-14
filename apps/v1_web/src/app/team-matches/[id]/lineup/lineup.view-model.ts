@@ -35,7 +35,18 @@ export type RosterOption = {
 type MyTeamRow = { teamId: string; role: 'owner' | 'manager' | 'member' };
 
 export function resolveOwnTeamId(
-  teamMatch: { hostTeamId?: string; approvedOpponentTeam?: { teamId: string } | null } | undefined,
+  teamMatch:
+    | {
+        hostTeamId?: string;
+        /** 팀 매치 상세 응답이 실제로 호스트팀을 싣는 자리. `hostTeamId`는 목록 응답에만
+         * 있고 상세에는 없어서, 이걸 보지 않으면 **호스트팀 팀장이 자기 팀을 못 찾는다**
+         * (2026-08-13 로컬 검증에서 확인: 상세 응답에 hostTeamId 키 자체가 없다). 그 결과
+         * 호스트 쪽 팀장에게는 로스터 풀도 "이전 라인업 불러오기"도 뜨지 않았고, 상대팀
+         * (신청) 쪽 팀장만 화면이 정상으로 보였다. */
+        hostTeam?: { teamId: string } | null;
+        approvedOpponentTeam?: { teamId: string } | null;
+      }
+    | undefined,
   /**
    * `useV1MyTeams()`가 주는 값을 그대로 받는다. 이 엔드포인트는 `{ items: [...] }`로 감싼
    * 페이지네이션 응답을 돌려주므로 호출부에서 언랩을 잊으면 `.find is not a function`으로
@@ -46,9 +57,10 @@ export function resolveOwnTeamId(
 ): string | null {
   const rows = Array.isArray(myTeams) ? myTeams : myTeams?.items;
   if (!teamMatch || !rows) return null;
-  const candidateTeamIds = [teamMatch.hostTeamId, teamMatch.approvedOpponentTeam?.teamId].filter(
-    (id): id is string => Boolean(id),
-  );
+  const candidateTeamIds = [
+    teamMatch.hostTeamId ?? teamMatch.hostTeam?.teamId,
+    teamMatch.approvedOpponentTeam?.teamId,
+  ].filter((id): id is string => Boolean(id));
   const match = rows.find(
     (team) => candidateTeamIds.includes(team.teamId) && (team.role === 'owner' || team.role === 'manager'),
   );
@@ -211,6 +223,58 @@ export function addGuestToBench(state: LineupEditorState, displayName: string): 
   const trimmed = displayName.trim();
   if (trimmed.length === 0) return state;
   return { ...state, bench: [...state.bench, makeEntry({ displayName: trimmed })], dirty: true };
+}
+
+/**
+ * 불러온 라인업으로 명단 전체를 갈아끼운다.
+ *
+ * 대회 경기 화면(applyLoadedSelection)과 결정적으로 다르다. 그쪽은 등록 명단이 고정돼
+ * 있어서 "누가 선발인지"만 덧입히지만, 팀 매치는 **명단 자체를 팀장이 정한다** — 그래서
+ * 불러오기가 명단을 통째로 대신 채운다. 지금 작성 중이던 내용은 사라지므로 호출부가
+ * 먼저 확인을 받는다.
+ *
+ * 부분 병합은 하지 않는다. 화면이 엔트리 식별자를 들고 있지 않아 "내가 방금 넣은 사람"과
+ * "불러온 사람"을 안전하게 합칠 방법이 없다 — applyVersionConflictReload가 같은 이유로
+ * 같은 선택을 한다.
+ *
+ * `keepPlacement`가 false면 좌표·포지션·포메이션을 버리고 명단 구성만 가져온다(종목이
+ * 다른 라인업을 불러올 때).
+ */
+export function replaceEntries(
+  state: LineupEditorState,
+  entries: ReadonlyArray<{
+    userId: string | null;
+    displayName: string;
+    jerseyNumber: number | null;
+    position: string | null;
+    positionX: number | null;
+    positionY: number | null;
+    started: boolean;
+    goalkeeper: boolean;
+  }>,
+  options: { formation: string | null; keepPlacement: boolean },
+): LineupEditorState {
+  const toDraft = (entry: (typeof entries)[number]): LineupEntryDraft =>
+    makeEntry({
+      userId: entry.userId,
+      displayName: entry.displayName,
+      jerseyNumber: entry.jerseyNumber,
+      goalkeeper: entry.started && entry.goalkeeper,
+      position: options.keepPlacement && !entry.goalkeeper ? entry.position : null,
+      positionX: options.keepPlacement ? entry.positionX : null,
+      positionY: options.keepPlacement ? entry.positionY : null,
+    });
+
+  return {
+    ...state,
+    starters: entries.filter((entry) => entry.started).map(toDraft),
+    // 후보는 피치 위에 없으므로 좌표도 골키퍼 표시도 갖지 않는다.
+    bench: entries
+      .filter((entry) => !entry.started)
+      .map((entry) => ({ ...toDraft(entry), goalkeeper: false, positionX: null, positionY: null })),
+    formation: options.keepPlacement ? options.formation : null,
+    dirty: true,
+  };
 }
 
 export type LineupSlot = 'starter' | 'bench';

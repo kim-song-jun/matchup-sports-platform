@@ -16,17 +16,21 @@ import type { CSSProperties } from 'react';
  *   이라 이 쌍의 대상이 아니다.
  * - 무승부 칩 배경은 `--grey100`이 아니라 `--surface-soft`다. 다크에서 `--grey100`은 카드
  *   표면과 같은 값(#1c1e24)이라 칩이 통째로 사라진다.
+ * - 무승부·미확정 칩의 텍스트는 `--text-caption`이 아니라 `--text-body`다. caption(라이트
+ *   #6b7684)은 흰 카드 위에서 4.55:1로 간신히 AA였는데, 칩 배경(#f2f4f6)을 깔면 4.19:1로
+ *   떨어져 미달한다 — alpha 라이브에서 computed 값으로 실측한 회귀다. body(#4e5968)는 같은
+ *   배경에서 6.45:1, 다크(#d1d6db on #24262d)에서도 넉넉히 통과한다.
  * - 색만으로 정보를 전달하지 않는다(WCAG 1.4.1) — 칩 안의 '승/무/패' 글자가 항상 함께 렌더되고,
  *   좌측 띠는 그 글자를 보조하는 스캔 힌트일 뿐 단독으로 의미를 지지 않는다.
  */
 const CHIP_TONE: Record<string, { color: string; background: string }> = {
   WON: { color: 'var(--blue700)', background: 'var(--blue50)' },
-  DRAWN: { color: 'var(--text-caption)', background: 'var(--surface-soft)' },
+  DRAWN: { color: 'var(--text-body)', background: 'var(--surface-soft)' },
   LOST: { color: 'var(--red700)', background: 'var(--red50)' },
 };
 
 /** 결과를 특정할 수 없는 행(개인 전적의 `result: null` — 스코어 사이드 매칭 실패) 용 중립 톤. */
-const NEUTRAL_TONE = { color: 'var(--text-caption)', background: 'var(--surface-soft)' };
+const NEUTRAL_TONE = { color: 'var(--text-body)', background: 'var(--surface-soft)' };
 
 const STRIPE_COLOR: Record<string, string> = {
   WON: 'var(--blue500)',

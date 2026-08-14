@@ -32,6 +32,13 @@ export const v1Keys = {
   gameOperationsLineup: (gameId: string) => [...v1Keys.game(gameId), 'operations-lineup'] as const,
   fixtureLineupAccess: (tournamentId: string, fixtureId: string) =>
     [...v1Keys.all, 'tournaments', tournamentId, 'fixtures', fixtureId, 'lineup-access'] as const,
+  fixtureLineupRoster: (tournamentId: string, fixtureId: string, sideId: string) =>
+    [...v1Keys.all, 'tournaments', tournamentId, 'fixtures', fixtureId, 'lineup-roster', sideId] as const,
+  myTournamentFixtures: (tournamentId: string) =>
+    [...v1Keys.all, 'tournaments', tournamentId, 'my-fixtures'] as const,
+  teamLineupHistory: (teamId: string) => [...v1Keys.team(teamId), 'lineup-history'] as const,
+  teamLineupPresets: (teamId: string) => [...v1Keys.team(teamId), 'lineup-presets'] as const,
+  lineupTodos: () => [...v1Keys.all, 'me', 'lineup-todos'] as const,
   reviews: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', filters ?? {}] as const,
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,
@@ -43,6 +50,7 @@ export const v1Keys = {
   notifications: (filters?: Record<string, unknown>) => [...v1Keys.notificationsRoot(), filters ?? {}] as const,
   notificationUnreadSummary: () => [...v1Keys.notificationsRoot(), 'unread-summary'] as const,
   notificationPreferences: () => [...v1Keys.all, 'notification-preferences'] as const,
+  recordConsent: () => [...v1Keys.all, 'me', 'record-consent'] as const,
   inquiries: (filters?: Record<string, unknown>) => [...v1Keys.all, 'inquiries', filters ?? {}] as const,
   inquiry: (inquiryId: string) => [...v1Keys.all, 'inquiries', inquiryId] as const,
   profile: () => [...v1Keys.all, 'me', 'profile'] as const,

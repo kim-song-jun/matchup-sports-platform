@@ -44,6 +44,7 @@ function lineup(sideId: string, participants: Array<{ id: string; name: string; 
       gameId: 'game-1',
       sideId,
       lineupId: `lineup-${sideId}`,
+      userId: null,
       displayNameSnapshot: p.name,
       jerseyNumber: p.jersey,
       position: null,

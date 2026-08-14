@@ -33,6 +33,7 @@ import { OperationAuditWriterService } from '../common/audit/operation-audit-wri
 import { PrismaService } from '../prisma/prisma.service';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import {
+  parseLineupCatalog,
   parseLineupConfigForResponse,
   parseLineupLimits,
   parsePeriodDurations,
@@ -49,6 +50,7 @@ import {
   assertGameSourceCreationInput,
   assertRevisionSupersession,
   assertRevisionTransition,
+  deriveAppearedParticipantIds,
   GameContractError,
   projectParticipantForPublic,
   resolveGameIdempotency,
@@ -390,6 +392,57 @@ function scoreFromJson(value: Prisma.JsonValue): GameScore {
  * by `lineupId` without re-sorting -- the caller (`listLineups`) already
  * requested rows in the order this function must preserve per bucket.
  */
+/**
+ * 라인업 편집용 등록 명단을 어느 등록(registration)에서 읽을지 정한다 — 그리고 애초에
+ * 읽어도 되는지도 함께 정한다.
+ *
+ * 참가팀 매니저·오너는 **자기 팀 사이드만** 볼 수 있다. 이걸 놓치면 상대팀 선수 실명을
+ * 그대로 넘겨주는 PII 유출이 된다(라인업을 짜려면 이름이 필요해 응답에 실명이 들어간다).
+ * 대회 스태프는 양 팀을 대신 짤 수 있어야 해서 이 제한을 받지 않는다 — saveLineup의
+ * sideId 가드(이 파일)와 정확히 같은 판단 기준이다.
+ *
+ * DB를 건드리지 않는 순수 판정이라 단독으로 테스트한다(games.service.spec.ts).
+ */
+export function resolveLineupRosterRegistration(params: {
+  actorRole: string;
+  actorTeamId: string | null;
+  sideTeamId: string | null;
+  homeRegistration: { id: string; teamId: string } | null;
+  awayRegistration: { id: string; teamId: string } | null;
+}): { registrationId: string } | { denied: 'forbidden' | 'registration_not_found' } {
+  const isTeamActor = params.actorRole === 'team_manager' || params.actorRole === 'team_owner';
+  if (isTeamActor && params.actorTeamId !== params.sideTeamId) {
+    return { denied: 'forbidden' };
+  }
+  const registration =
+    params.homeRegistration?.teamId === params.sideTeamId
+      ? params.homeRegistration
+      : params.awayRegistration?.teamId === params.sideTeamId
+        ? params.awayRegistration
+        : null;
+  // 사이드는 있는데 대회 등록이 없다 — 등록이 취소돼 fixture에서 떨어져 나간 경우다.
+  // 빈 명단으로 돌려주면 "선수가 아직 없네"로 오해되므로 명시적으로 구분한다.
+  return registration === null ? { denied: 'registration_not_found' } : { registrationId: registration.id };
+}
+
+/**
+ * 사이드별 **최신** 라인업 상태만 남긴다. 라인업은 저장할 때마다 revision이 올라가며
+ * 행이 쌓이므로, 정렬을 믿지 않고 revision을 직접 비교해 고른다 — 옛 리비전이 남으면
+ * 일정 화면이 이미 제출한 라인업을 "미작성"으로 표시한다.
+ */
+export function latestLineupStateBySideId(
+  lineups: readonly { sideId: string; state: V1GameLineupState; revision: number }[],
+): Map<string, V1GameLineupState> {
+  const latest = new Map<string, { state: V1GameLineupState; revision: number }>();
+  for (const lineup of lineups) {
+    const current = latest.get(lineup.sideId);
+    if (current === undefined || lineup.revision > current.revision) {
+      latest.set(lineup.sideId, { state: lineup.state, revision: lineup.revision });
+    }
+  }
+  return new Map(Array.from(latest.entries(), ([sideId, value]) => [sideId, value.state]));
+}
+
 export function groupParticipantsByLineupId(
   participants: readonly V1GameParticipant[],
 ): Map<string, V1GameParticipant[]> {
@@ -638,6 +691,7 @@ export class GamesService {
             gameId: game.id,
             sideId: side.id,
             lineupId: side.lineupId,
+            userId: participant.userId,
             displayNameSnapshot: participant.displayNameSnapshot,
             jerseyNumber: participant.jerseyNumber,
             position: participant.position,
@@ -2044,6 +2098,67 @@ export class GamesService {
             message: `선발 인원은 ${lineupLimits.minPlayers}명 이상 ${lineupLimits.maxPlayers}명 이하여야 해요.`,
           });
         }
+        // 라인업에 실려 온 계정(userId) 검증. 이 값이 저장되면 아래에서 신원 연결이
+        // 자동으로 생기므로, 아무 계정이나 남의 경기 기록에 붙지 않게 여기서 막는다.
+        //
+        // 인정 근거는 두 가지이고 **둘 중 하나면 통과**한다:
+        //  ① 이 사이드 팀의 active 멤버
+        //  ② 이 경기의 참가 등록 명단(V1TournamentPlayer)에 살아 있는 선수
+        // ②가 필요한 이유: 대회 라인업 화면은 팀 멤버십이 아니라 **등록 명단**을
+        // 출처로 삼는다(resolveFixtureLineupRoster). 등록 이후 팀을 떠났거나 애초에
+        // 멤버십 없이 명단에만 오른 선수가 있을 수 있어서, 멤버십만 요구하면 정상적인
+        // 라인업 저장이 422로 막힌다. 반대로 명단에도 팀에도 없는 계정은 여전히 거부된다.
+        // 같은 요청 안에서 같은 계정이 두 번 오면(선발+후보 중복 지정 등) 별도 코드로 거부.
+        const seenLineupUserIds = new Set<string>();
+        const rosterUserIds = new Set<string>();
+        if (
+          game.tournamentFixtureId !== null &&
+          dto.participants.some((participant) => participant.userId !== undefined)
+        ) {
+          // resolveFixtureLineupRoster 와 같은 경로로 이 사이드의 등록을 찾는다 --
+          // 라인업 화면이 명단을 읽어 오는 출처와 검증의 출처가 갈리면, 화면에 뜬
+          // 선수를 저장할 수 없는 상황이 생긴다.
+          const fixture = await tx.v1TournamentFixture.findUnique({
+            where: { id: game.tournamentFixtureId },
+            select: {
+              homeRegistration: { select: { id: true, teamId: true } },
+              awayRegistration: { select: { id: true, teamId: true } },
+            },
+          });
+          const registrationId = [fixture?.homeRegistration, fixture?.awayRegistration].find(
+            (registration) => registration != null && registration.teamId === side.teamId,
+          )?.id;
+          if (registrationId !== undefined) {
+            const rosterPlayers = await tx.v1TournamentPlayer.findMany({
+              where: { registrationId, removedAt: null },
+              select: { userId: true },
+            });
+            for (const player of rosterPlayers) rosterUserIds.add(player.userId);
+          }
+        }
+        for (const participant of dto.participants) {
+          if (participant.userId === undefined) continue;
+          if (seenLineupUserIds.has(participant.userId)) {
+            throw new UnprocessableEntityException({
+              code: 'LINEUP_DUPLICATE_USER',
+              message: '같은 선수를 라인업에 두 번 넣을 수 없어요.',
+            });
+          }
+          seenLineupUserIds.add(participant.userId);
+          if (rosterUserIds.has(participant.userId)) continue;
+          const membership =
+            side.teamId === null
+              ? null
+              : await tx.v1TeamMembership.findFirst({
+                  where: { teamId: side.teamId, userId: participant.userId, status: 'active' },
+                });
+          if (membership === null) {
+            throw new UnprocessableEntityException({
+              code: 'LINEUP_USER_NOT_TEAM_MEMBER',
+              message: '참가 명단에 있거나 이 팀에서 활동 중인 선수만 라인업에 연결할 수 있어요.',
+            });
+          }
+        }
         const previous = await tx.v1GameLineup.findFirst({
           where: { gameId, sideId },
           orderBy: { revision: 'desc' },
@@ -2058,17 +2173,46 @@ export class GamesService {
           },
         });
         for (const participant of dto.participants) {
-          await tx.v1GameParticipant.create({
+          const createdParticipant = await tx.v1GameParticipant.create({
             data: {
               gameId,
               sideId,
               lineupId: lineup.id,
+              userId: participant.userId,
               displayNameSnapshot: participant.displayNameSnapshot,
               jerseyNumber: participant.jerseyNumber,
               position: participant.position,
               positionX: participant.positionX,
               positionY: participant.positionY,
               started: participant.started,
+            },
+          });
+          if (participant.userId === undefined) continue;
+          // 로스터 귀속을 신원 연결(identity link)로 자동 승격한다 -- 방금 만든
+          // participant라 정상적으로는 기존 링크가 있을 수 없지만, 방어적으로 한
+          // 번 더 확인한다(재시도 등으로 이 루프가 두 번 돌 가능성에 대비).
+          const existingLink = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+            where: { participantId: createdParticipant.id },
+          });
+          if (existingLink !== null) continue;
+          const linkId = randomUUID();
+          const identityEvent = await this.appendIdentityEvent(tx, {
+            participantId: createdParticipant.id,
+            linkId,
+            requestId: linkId,
+            action: V1IdentityLinkAction.ROSTER_ASSERTED,
+            userId: participant.userId,
+            actorType: V1IdentityActorType.USER,
+            actorUserId: user.id,
+            reason: 'roster',
+          });
+          await tx.v1ParticipantIdentityLinkCurrent.create({
+            data: {
+              participantId: createdParticipant.id,
+              linkId,
+              userId: participant.userId,
+              version: 1,
+              effectiveFrom: identityEvent.effectiveAt,
             },
           });
         }
@@ -2199,8 +2343,8 @@ export class GamesService {
       select: {
         scheduledAt: true,
         game: { select: { id: true } },
-        homeRegistration: { select: { teamId: true, team: { select: { name: true } } } },
-        awayRegistration: { select: { teamId: true, team: { select: { name: true } } } },
+        homeRegistration: { select: { id: true, teamId: true, team: { select: { name: true } } } },
+        awayRegistration: { select: { id: true, teamId: true, team: { select: { name: true } } } },
       },
     });
     if (fixture === null || fixture.game === null) {
@@ -2224,8 +2368,198 @@ export class GamesService {
       scheduledAt: fixture.scheduledAt,
       homeSideId: homeSide?.id ?? null,
       homeTeamName: fixture.homeRegistration?.team.name ?? null,
+      // 라인업 화면이 참가 등록 명단을 불러오려면 어느 등록(registration)의 명단인지
+      // 알아야 한다 — 사이드(팀)당 하나씩 함께 내려준다. 스태프는 양 팀 중 하나를 골라
+      // 대신 짤 수 있으므로 자기 팀 것만 주는 형태로는 부족하다.
+      homeRegistrationId: fixture.homeRegistration?.id ?? null,
+      // 팀 스코프 자산(이전 라인업 히스토리·프리셋)은 teamId로 부른다. sideId만으로는
+      // 어느 팀인지 알 수 없어서, 화면이 팀을 알아내려고 조회를 한 번 더 하는 대신
+      // 이미 여기서 읽은 값을 그대로 실어 준다.
+      homeTeamId,
       awaySideId: awaySide?.id ?? null,
       awayTeamName: fixture.awayRegistration?.team.name ?? null,
+      awayRegistrationId: fixture.awayRegistration?.id ?? null,
+      awayTeamId,
+    };
+  }
+
+  /**
+   * 이 경기에서 어느 한 팀의 **참가 등록 명단**(V1TournamentPlayer)을 라인업 편집용으로
+   * 읽는다. 대회 경기 라인업의 선수는 등록 명단이 유일한 출처이고, 명단에 없는 사람을
+   * 임의로 적어 넣는 경로는 없앴다.
+   *
+   * 인가는 `resolveActor`(read)를 그대로 재사용한다 — 참가팀 매니저·오너는 자기 팀
+   * 사이드만, 대회 스태프는 양 팀 모두. 소비자용 로스터 API
+   * (`TournamentPlayersService.listPlayers`)를 쓰지 않는 이유가 바로 이것이다: 그쪽은
+   * `assertTeamMember` 라 팀에 속하지 않은 스태프가 항상 403이 되는데, 스태프는 팀
+   * 매니저가 없는 자리에서 라인업을 대신 제출해야 한다.
+   *
+   * 응답에는 이름과 userId만 담는다 — 생년월일·성별·연락처 같은 나머지 PII는 라인업을
+   * 짜는 데 필요 없다.
+   */
+  async resolveFixtureLineupRoster(
+    user: V1AuthUser,
+    tournamentId: string,
+    fixtureId: string,
+    sideId: string,
+  ) {
+    const fixture = await this.prisma.v1TournamentFixture.findUnique({
+      where: { tournamentId_id: { tournamentId, id: fixtureId } },
+      select: {
+        game: { select: { id: true } },
+        homeRegistration: { select: { id: true, teamId: true } },
+        awayRegistration: { select: { id: true, teamId: true } },
+      },
+    });
+    if (fixture === null || fixture.game === null) {
+      throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
+    }
+    const gameId = fixture.game.id;
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
+    const side = await this.prisma.v1GameSide.findFirst({ where: { id: sideId, gameId } });
+    if (side === null) {
+      throw this.notFound('GAME_SIDE_NOT_FOUND');
+    }
+    const resolved = resolveLineupRosterRegistration({
+      actorRole: actor.role,
+      actorTeamId:
+        actor.role === 'team_manager' || actor.role === 'team_owner' ? (actor.teamId ?? null) : null,
+      sideTeamId: side.teamId,
+      homeRegistration: fixture.homeRegistration,
+      awayRegistration: fixture.awayRegistration,
+    });
+    if ('denied' in resolved) {
+      if (resolved.denied === 'forbidden') throw this.forbidden();
+      throw this.notFound('TOURNAMENT_REGISTRATION_NOT_FOUND');
+    }
+    const players = await this.prisma.v1TournamentPlayer.findMany({
+      where: { registrationId: resolved.registrationId, removedAt: null },
+      orderBy: { addedAt: 'asc' },
+      select: { id: true, userId: true, realName: true },
+    });
+    return {
+      sideId,
+      registrationId: resolved.registrationId,
+      players: players.map((player) => ({
+        tournamentPlayerId: player.id,
+        userId: player.userId,
+        name: player.realName,
+      })),
+    };
+  }
+
+  /**
+   * 로그인한 사용자가 **매니저·오너로 있는 팀**이 이 대회에서 치르는 경기와 각 경기의
+   * 라인업 상태를 한 번에 준다. 대회 일정 화면이 "내 팀 경기가 어느 것이고 무엇을 아직
+   * 안 했는지"를 표시하는 데 쓴다 — 이게 없으면 화면은 경기마다 lineup-access를 따로
+   * 불러야 해서 경기 수만큼 요청이 늘고, 그마저도 공개 일정 응답과 짝지을 수 없다.
+   *
+   * 인가는 `resolveActor`가 아니라 팀 멤버십으로 직접 판정한다 — resolveActor는 경기
+   * 하나를 전제로 하는데 여기서는 "이 대회에서 내가 이끄는 팀"이 출발점이고, 경기별
+   * 판정 기준(홈/원정 등록팀의 owner·manager)은 아래 조회 조건과 정확히 같다.
+   */
+  async listMyTournamentFixtures(user: V1AuthUser, tournamentId: string) {
+    const memberships = await this.prisma.v1TeamMembership.findMany({
+      where: { userId: user.id, status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { teamId: true },
+    });
+    const myTeamIds = memberships.map((membership) => membership.teamId);
+    if (myTeamIds.length === 0) {
+      return { teams: [] };
+    }
+    const registrations = await this.prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId, teamId: { in: myTeamIds } },
+      select: { id: true, teamId: true, team: { select: { name: true } } },
+    });
+    if (registrations.length === 0) {
+      return { teams: [] };
+    }
+    const registrationIds = registrations.map((registration) => registration.id);
+    const fixtures = await this.prisma.v1TournamentFixture.findMany({
+      where: {
+        tournamentId,
+        OR: [
+          { homeRegistrationId: { in: registrationIds } },
+          { awayRegistrationId: { in: registrationIds } },
+        ],
+      },
+      select: {
+        id: true,
+        round: true,
+        legNumber: true,
+        scheduledAt: true,
+        status: true,
+        homeRegistrationId: true,
+        awayRegistrationId: true,
+        group: { select: { name: true } },
+        game: { select: { id: true } },
+        homeRegistration: { select: { teamId: true, team: { select: { name: true } } } },
+        awayRegistration: { select: { teamId: true, team: { select: { name: true } } } },
+      },
+      orderBy: [{ scheduledAt: 'asc' }, { fixtureNumber: 'asc' }],
+    });
+    const gameIds = fixtures
+      .map((fixture) => fixture.game?.id ?? null)
+      .filter((gameId): gameId is string => gameId !== null);
+    // 내 팀 사이드와 그 사이드의 최신 라인업만 두 번의 조회로 모은다(경기별 반복 조회 금지).
+    const sides =
+      gameIds.length === 0
+        ? []
+        : await this.prisma.v1GameSide.findMany({
+            where: { gameId: { in: gameIds }, teamId: { in: myTeamIds } },
+            select: { id: true, gameId: true, teamId: true },
+          });
+    const lineups =
+      sides.length === 0
+        ? []
+        : await this.prisma.v1GameLineup.findMany({
+            where: { sideId: { in: sides.map((side) => side.id) } },
+            orderBy: { revision: 'desc' },
+            select: { sideId: true, state: true, revision: true },
+          });
+    const latestLineupBySideId = latestLineupStateBySideId(lineups);
+    const sideByGameAndTeam = new Map<string, { id: string }>();
+    for (const side of sides) {
+      sideByGameAndTeam.set(`${side.gameId}:${side.teamId}`, { id: side.id });
+    }
+
+    return {
+      teams: registrations.map((registration) => ({
+        registrationId: registration.id,
+        teamId: registration.teamId,
+        teamName: registration.team.name,
+        fixtures: fixtures
+          .filter(
+            (fixture) =>
+              fixture.homeRegistrationId === registration.id ||
+              fixture.awayRegistrationId === registration.id,
+          )
+          .map((fixture) => {
+            const isHome = fixture.homeRegistrationId === registration.id;
+            const gameId = fixture.game?.id ?? null;
+            const side =
+              gameId === null
+                ? undefined
+                : sideByGameAndTeam.get(`${gameId}:${registration.teamId}`);
+            return {
+              fixtureId: fixture.id,
+              gameId,
+              sideId: side?.id ?? null,
+              round: fixture.round,
+              legNumber: fixture.legNumber,
+              groupName: fixture.group?.name ?? null,
+              scheduledAt: fixture.scheduledAt,
+              status: fixture.status,
+              isHome,
+              opponentTeamName:
+                (isHome
+                  ? fixture.awayRegistration?.team.name
+                  : fixture.homeRegistration?.team.name) ?? null,
+              // 라인업을 아직 한 번도 저장하지 않았으면 null — 화면은 이걸 "미작성"으로 읽는다.
+              lineupState: side === undefined ? null : (latestLineupBySideId.get(side.id) ?? null),
+            };
+          }),
+      })),
     };
   }
 
@@ -3019,33 +3353,60 @@ export class GamesService {
         if (!isLinkedCaller && actor.role !== 'platform_ops') {
           throw this.forbidden();
         }
-        // Mirror grantParticipantConsent's `current.linkId !== dto.linkId`
-        // check: a consent snapshot only authorizes revoke while it belongs
-        // to the participant's CURRENT link. Without this, a stale grant
-        // left GRANTED under a since-revoked link (revokeIdentityLink does
-        // not itself revoke consent) would be the highest `consentVersion`
-        // row and could be "revoked" by the holder of an unrelated new link
-        // who never granted anything themselves - fabricating history
-        // against a dead linkId. platform_ops with no current link at all
-        // (current === null) is the sole exception, since there is then no
-        // current linkId to scope by.
-        const last = await tx.v1ParticipantConsentSnapshot.findFirst({
+        // 스냅샷 조회는 참가자의 **현재 링크**로 스코프한다. 죽은 linkId 아래
+        // 남아 있던 낡은 GRANTED 를, 그것을 준 적 없는 새 링크 보유자가 뒤집어
+        // 이력을 날조하는 일을 막기 위해서다(공개 판정도 public-consent.ts 에서
+        // 현재 linkId 기준으로만 스냅샷을 읽으므로 낡은 스냅샷은 애초에 무시된다).
+        // 현재 링크가 아예 없는 platform_ops 만 예외로 참가자 전체를 본다.
+        //
+        // 예전에는 "직전 스냅샷이 GRANTED 여야만 철회 가능"이었다. 그 규칙은 참가자
+        // 스냅샷이 공개 동의의 유일한 출처이던 시절의 것이고, 지금은 사용자 단위
+        // `V1UserRecordConsent` 가 출처다 -- 라인업에서 자동 연결(ROSTER_ASSERTED)된
+        // 참가 기록은 참가자 스냅샷을 한 번도 거치지 않으므로, 옛 가드를 두면 당사자가
+        // 자기 기록 하나만 숨기는 길이 아예 막힌다. 그래서 "현재 링크가 내 것이면
+        // 스냅샷이 없어도 숨길 수 있다"로 바꾸되, 새 스냅샷은 언제나 현재 링크 아래에
+        // 쓴다 -- 위의 날조 시나리오는 그대로 불가능하다.
+        const scoped = await tx.v1ParticipantConsentSnapshot.findFirst({
           where: current === null ? { participantId } : { participantId, linkId: current.linkId },
           orderBy: { consentVersion: 'desc' },
         });
-        if (last === null || last.state !== V1ConsentState.GRANTED) {
+        if (scoped !== null && scoped.state === V1ConsentState.REVOKED) {
+          throw new ConflictException({
+            code: 'CONSENT_ALREADY_REVOKED',
+            message: '이미 공개에서 제외된 기록이에요.',
+          });
+        }
+        const targetLinkId = scoped?.linkId ?? current?.linkId ?? null;
+        if (targetLinkId === null) {
           throw new ConflictException({
             code: 'CONSENT_NOT_GRANTED',
             message: '철회할 동의 내역이 없어요.',
           });
         }
+        // policyHash 는 이력 표기용이다. 직전 스냅샷이 없으면(자동 연결만 된 경우)
+        // 사용자 단위 동의에 쓰인 해시를 물려받고, 그것마저 없으면 상수를 남긴다.
+        const userConsent =
+          current === null
+            ? null
+            : await tx.v1UserRecordConsent.findUnique({
+                where: { userId: current.userId },
+                select: { policyHash: true },
+              });
+        // consentVersion 은 `@@unique([participantId, consentVersion])` 를 공유하므로
+        // 링크로 스코프하지 않은 참가자 전체 최댓값에서 이어 붙인다 -- 링크가 교체된
+        // 참가자에서 옛 링크 쪽 버전과 충돌하지 않게 한다.
+        const highest = await tx.v1ParticipantConsentSnapshot.findFirst({
+          where: { participantId },
+          orderBy: { consentVersion: 'desc' },
+          select: { consentVersion: true },
+        });
         const created = await tx.v1ParticipantConsentSnapshot.create({
           data: {
             participantId,
-            linkId: last.linkId,
-            consentVersion: last.consentVersion + 1,
+            linkId: targetLinkId,
+            consentVersion: (highest?.consentVersion ?? 0) + 1,
             state: V1ConsentState.REVOKED,
-            policyHash: last.policyHash,
+            policyHash: scoped?.policyHash ?? userConsent?.policyHash ?? 'participant-hide-override',
             actorUserId: actor.actorUserId,
           },
         });
@@ -3248,6 +3609,11 @@ export class GamesService {
           action:
             | typeof V1IdentityLinkAction.REQUESTED
             | typeof V1IdentityLinkAction.ATTESTED
+            // 라인업 저장 시 매니저가 로스터에 지정한 계정으로 자동 생성되는 연결.
+            // v1_guard_identity_event 트리거는 ATTESTED/EXPIRED만 승인자≠본인을
+            // 검증하므로 ROSTER_ASSERTED는 그 검증을 우회하지 않고 애초에 대상이
+            // 아니다(자기 자신을 로스터에 넣는 선수 겸 매니저도 막히지 않는다).
+            | typeof V1IdentityLinkAction.ROSTER_ASSERTED
             | typeof V1IdentityLinkAction.REJECTED
             | typeof V1IdentityLinkAction.REVOKED;
           actorType: typeof V1IdentityActorType.USER;
@@ -3323,7 +3689,12 @@ export class GamesService {
       throw this.forbidden();
     }
     const membership = await tx.v1TeamMembership.findFirst({
-      where: { teamId: sideTeamId, userId: actor.actorUserId, status: 'active', role: 'owner' },
+      where: {
+        teamId: sideTeamId,
+        userId: actor.actorUserId,
+        status: 'active',
+        role: { in: ['owner', 'manager'] },
+      },
     });
     if (membership === null) {
       throw this.forbidden();
@@ -3786,7 +4157,7 @@ export class GamesService {
     // an active member of one of the two match teams to self-request/revoke
     // their own identity link or consent, or to act as a distinct attestor.
     // Per-participant authority (self-only revoke/consent, distinct-side
-    // owner attestation) is enforced inside each command body, not here.
+    // owner/manager attestation) is enforced inside each command body, not here.
     if ((action === 'read' || action === 'participant_identity') && memberships.length > 0) {
       return {
         actorType: 'USER',
@@ -4133,11 +4504,28 @@ export class GamesService {
     context: GameCommandContext,
     penalties?: { home: number; away: number },
   ): Promise<GameRevisionMutationResult> {
-    const [events, participants, sides] = await Promise.all([
+    const [events, participants, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
+      tx.v1CompetitionConfigVersion.findUnique({
+        where: { id: game.competitionConfigVersionId },
+        select: { lineup: true },
+      }),
     ]);
+    // 하드코딩 버그 수정: started/goalkeeper를 실제 라인업 값과 무관하게
+    // 항상 true/false로 박아 넣었다 -- 후보로 저장한 선수도 결과 프로젝션에서는
+    // 전부 선발로 보였고, 실제로 골키퍼였던 선수도 항상 goalkeeper:false였다.
+    // started는 라인업이 저장한 값(participant.started)을 그대로 쓴다.
+    // goalkeeper는 이 대회 종목의 골키퍼 포지션 코드(competitionConfig의
+    // lineup.positions 중 goalkeeper:true인 항목의 code -- 축구 'GK', 풋살
+    // 'GOLEIRO' 등 종목마다 다르다. 프론트 formation-slots.ts의
+    // goalkeeperPositionCode와 같은 방식)와 participant.position이 일치하는지로
+    // 판정한다. 사전에 골키퍼 항목이 없는 레거시 config는 기존 관례와 동일하게
+    // 'GK'로 폴백한다.
+    const goalkeeperPositionCode =
+      parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
+      'GK';
     const regulationScore = this.scoreFromEvents(events, sides);
     const score = await this.applyPenalties(tx, game, regulationScore, penalties);
     // Issue #392 fix: `missingScorer` must be derived from the SAME
@@ -4166,18 +4554,45 @@ export class GamesService {
           context.actor.actorType === 'SYSTEM' ? context.actor.systemActor : undefined,
       },
     });
+    // Appearance gate: a `v1_game_result_participants` row means "this player
+    // played", and every downstream reader treats it that way -- most visibly
+    // `PublicUserRecordsService`, whose `summary.appearances` is a plain count
+    // of these rows behind the profile's "출전 N경기". Before this, every
+    // named participant got a row with a hardcoded `started: true`, so a
+    // substitute who sat on the bench the whole match came out of a
+    // tournament with the same appearance record as the player who started
+    // it -- and was recorded as a *starter* on top of that.
+    //
+    // Who actually played is derived, not stored: `started` plus every active
+    // SUBSTITUTION that brought someone on (`deriveAppearedParticipantIds`).
+    // The stat maps are unioned in as a safety net -- `assertEventReferences`
+    // checks only that a GOAL/CARD/FOUL names a participant of the right
+    // side, never that they were on the pitch, so an operator who records a
+    // substitute's goal but forgets the substitution itself produces a scorer
+    // with no appearance. Dropping that row would silently delete the goal
+    // from their record; keeping it treats scoring as the proof of playing it
+    // plainly is.
+    const appearedIds = new Set(deriveAppearedParticipantIds(participants, events));
+    for (const statted of [goalCount, assistCount, foulCount, cardCount]) {
+      for (const participantId of statted.keys()) appearedIds.add(participantId);
+    }
     await tx.v1GameResultParticipant.createMany({
-      data: participants.map((participant) => ({
-        resultRevisionId: revision.id,
-        participantId: participant.id,
-        sideId: participant.sideId,
-        started: true,
-        goals: goalCount.get(participant.id) ?? 0,
-        assists: assistCount.get(participant.id) ?? 0,
-        fouls: foulCount.get(participant.id) ?? 0,
-        cards: jsonInput(cardCount.get(participant.id) ?? { yellow: 0, red: 0 }),
-        goalkeeper: false,
-      })),
+      data: participants
+        .filter((participant) => appearedIds.has(participant.id))
+        .map((participant) => ({
+          resultRevisionId: revision.id,
+          participantId: participant.id,
+          sideId: participant.sideId,
+          started: participant.started,
+          goals: goalCount.get(participant.id) ?? 0,
+          assists: assistCount.get(participant.id) ?? 0,
+          fouls: foulCount.get(participant.id) ?? 0,
+          cards: jsonInput(cardCount.get(participant.id) ?? { yellow: 0, red: 0 }),
+          // 예전엔 false 로 못박혀 있었다 — 라인업이 이미 골키퍼를 알고 있는데도
+          // 기록에는 남지 않아 개인 프로필에서 GK 출전을 구분할 수 없었다.
+          // 포지션 코드는 경기의 competition config 에서 읽는다(종목마다 다르다).
+          goalkeeper: participant.position === goalkeeperPositionCode,
+        })),
     });
     const submitted = await tx.v1GameResultRevision.update({
       where: { id: revision.id },

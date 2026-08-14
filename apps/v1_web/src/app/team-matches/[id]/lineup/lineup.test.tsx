@@ -449,6 +449,12 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1MyTeams: hoisted.useV1MyTeamsMock,
   useV1TeamMatchLineup: hoisted.useV1TeamMatchLineupMock,
   useV1TeamMembers: hoisted.useV1TeamMembersMock,
+  // "이전 라인업 불러오기"/"프리셋으로 저장"이 쓰는 훅. 시트를 열기 전에는 조회하지
+  // 않지만(enabled:false) 훅 자체는 매 렌더 호출되므로 모듈 모킹에 반드시 있어야 한다.
+  useV1TeamLineupHistory: () => ({ data: undefined, isLoading: false }),
+  useV1TeamLineupPresets: () => ({ data: undefined, isLoading: false }),
+  useV1CreateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
+  useV1UpdateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
   useV1SaveTeamMatchLineup: () => ({ mutate: hoisted.saveMutate, isPending: false }),
   useV1SubmitTeamMatchLineup: () => ({ mutate: hoisted.submitMutate, isPending: false }),
   useV1RequestTeamMatchLineupChange: () => ({ mutate: hoisted.changeRequestMutate, isPending: false }),
@@ -884,9 +890,8 @@ describe('TeamMatchLineupPageClient — pitch tab wiring (D-17: consumes server 
     hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
     fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
-    const select = screen.getAllByLabelText('포메이션')[0];
-    expect(within(select).getByRole('option', { name: '2-2 · 박스 (필드 4명)' })).toBeInTheDocument();
-    expect(within(select).getByRole('option', { name: '1-2-1 · 다이아몬드 (필드 4명)' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '2-2 박스 · 필드 4명' })[0]).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '1-2-1 다이아몬드 · 필드 4명' })[0]).toBeInTheDocument();
   });
 
   it('선발로 추가한 선수는 곧바로 피치의 빈 자리에 앉는다 — 자동 배치 배선이 빠지면 이 테스트가 깨진다', async () => {
@@ -955,11 +960,11 @@ describe('TeamMatchLineupPageClient — pitch tab wiring (D-17: consumes server 
     hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
     fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
-    // 드롭다운 안을 좁혀서 본다 — 페이지 전체를 대상으로 하면 모바일 드로어 토글
+    // 칩 그룹 안만 좁혀서 본다 — 페이지 전체를 대상으로 하면 모바일 드로어 토글
     // 버튼("배치 설정 · 대기 1명")도 " · "를 포함해 오탐을 낼 수 있다.
-    const select = screen.getAllByLabelText('포메이션')[0];
-    expect(within(select).getAllByRole('option')).toHaveLength(1);
-    expect(within(select).getByRole('option', { name: '자유 배치' })).toBeInTheDocument();
+    const group = screen.getAllByRole('group', { name: '포메이션' })[0];
+    expect(within(group).getAllByRole('button')).toHaveLength(1);
+    expect(within(group).getByRole('button', { name: /^자유 배치/ })).toBeInTheDocument();
     expect(screen.getAllByText('이 종목은 등록된 포지션 대형이 없어요. 자유 배치로 직접 배치해 주세요.')[0]).toBeInTheDocument();
   });
 });

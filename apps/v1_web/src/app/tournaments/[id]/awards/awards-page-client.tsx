@@ -8,12 +8,14 @@ import { useRef, useState } from 'react';
 import {
   useV1Tournament,
   useV1TournamentParticipantCheck,
+  useV1MyTournamentReview,
   useV1SubmitTournamentReview,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
+import { V1ApiError } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
@@ -28,7 +30,6 @@ import type {
   V1TournamentFixtureResult,
   V1TournamentGroup,
   V1TournamentReview,
-  V1TournamentReviewableTeam,
   V1TournamentStanding,
 } from '@/types/api';
 
@@ -321,17 +322,33 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
 }
 
 /* ── 리뷰 작성 모달 ── */
+/** 서버 400 TEAM_SELECTION_REQUIRED 의 details.teams 를 안전하게 파싱한다. */
+function parseTeamSelectionOptions(error: unknown): { teamId: string; teamName: string }[] | null {
+  if (!(error instanceof V1ApiError) || error.code !== 'TEAM_SELECTION_REQUIRED') return null;
+  const details = error.details as { teams?: unknown } | null;
+  if (!Array.isArray(details?.teams)) return null;
+  const teams = details.teams.filter(
+    (t): t is { teamId: string; teamName: string } =>
+      !!t && typeof t === 'object' && typeof (t as { teamId?: unknown }).teamId === 'string'
+      && typeof (t as { teamName?: unknown }).teamName === 'string',
+  );
+  return teams.length > 0 ? teams : null;
+}
+
 function ReviewFormModal({
-  tournamentId, writableTeams, onClose,
-}: { tournamentId: string; writableTeams: V1TournamentReviewableTeam[]; onClose: () => void }) {
+  tournamentId, onClose,
+}: { tournamentId: string; onClose: () => void }) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
-  // 두 참가 팀의 대표를 겸한 경우에만 선택지가 생긴다 — 그 외에는 유일한 팀으로 고정.
-  const [teamId, setTeamId] = useState(writableTeams[0]?.teamId ?? '');
+  // 여러 팀의 팀장·운영진을 겸하고 그 팀들이 모두 이 대회에 참가 확정된 경우에만 채워진다
+  // (서버 400 TEAM_SELECTION_REQUIRED 응답에서 파싱). 단일 자격 팀 사용자는 절대 겪지 않는다.
+  const [teamOptions, setTeamOptions] = useState<{ teamId: string; teamName: string }[] | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [genericError, setGenericError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { mutate, isPending, isError } = useV1SubmitTournamentReview(tournamentId);
+  const { mutate, isPending } = useV1SubmitTournamentReview(tournamentId);
   const uploadImages = useV1UploadImages();
 
   const handlePickPhotos = async (files: FileList | null) => {
@@ -355,14 +372,31 @@ function ReviewFormModal({
     // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
     // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
     if (isPending) return;
-    mutate({
-      teamId: teamId || undefined,
-      rating,
-      comment: comment.trim() || undefined,
-      photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
-    }, {
-      onSuccess: () => onClose(),
-    });
+    // 팀 선택이 필요한 상태인데 아직 고르지 않았으면 제출하지 않는다(라디오 그룹이
+    // required 이므로 버튼도 비활성화돼 있지만, 방어적으로 한 번 더 막는다).
+    if (teamOptions && !selectedTeamId) return;
+    setGenericError(false);
+    mutate(
+      {
+        rating,
+        comment: comment.trim() || undefined,
+        photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
+        teamId: selectedTeamId ?? undefined,
+      },
+      {
+        onSuccess: () => onClose(),
+        onError: (err) => {
+          const teams = parseTeamSelectionOptions(err);
+          if (teams) {
+            // 평점·코멘트·사진은 그대로 보존한 채 팀 선택 UI만 노출한다 — 다시 입력하게
+            // 만들지 않는다. 사용자가 하나를 고르면 같은 폼으로 재제출된다.
+            setTeamOptions(teams);
+            return;
+          }
+          setGenericError(true);
+        },
+      },
+    );
   };
 
   return (
@@ -380,35 +414,60 @@ function ReviewFormModal({
           <button type="button" onClick={onClose} style={{ display: 'inline-flex', background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)' }} aria-label="닫기"><X size={20} /></button>
         </div>
 
-        {writableTeams.length > 1 && (
-          <div style={{ marginBottom: 16 }}>
-            <label
-              htmlFor="tournament-review-team"
-              style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-strong)', marginBottom: 6 }}
-            >
-              어느 팀 후기인가요?
-            </label>
-            <select
-              id="tournament-review-team"
-              value={teamId}
-              onChange={(e) => setTeamId(e.target.value)}
-              style={{
-                width: '100%', minHeight: 44, padding: '0 12px', borderRadius: 8,
-                border: '1px solid var(--grey200)', fontSize: 13,
-                color: 'var(--text-strong)', background: 'var(--surface)', boxSizing: 'border-box',
-              }}
-            >
-              {writableTeams.map((team) => (
-                <option key={team.teamId} value={team.teamId}>{team.teamName}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
           <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
           <StarRating value={rating} onChange={setRating} />
         </div>
+
+        {teamOptions && (
+          <div style={{ marginBottom: 16 }}>
+            <p id="review-team-select-heading" style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
+              여러 팀을 운영하고 계세요. 리뷰를 남길 팀을 선택해주세요.
+            </p>
+            {/*
+              커스텀 `role="radio"` 버튼 대신 sr-only native radio + 라벨 패턴을 쓴다
+              (tournament-roster-client.tsx의 eligibility 라디오와 같은 패턴). role만
+              선언한 버튼 묶음은 스크린리더에 라디오 그룹으로 보이지만 화살표 키 이동과
+              roving tabindex가 없어 실제로는 그렇게 동작하지 않는다 — native input은
+              그 전부를 브라우저가 제공한다.
+            */}
+            <div
+              role="radiogroup"
+              aria-labelledby="review-team-select-heading"
+              style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+            >
+              {teamOptions.map((team) => {
+                const isSelected = team.teamId === selectedTeamId;
+                return (
+                  <label
+                    key={team.teamId}
+                    htmlFor={`review-team-${team.teamId}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', minHeight: 44, padding: '10px 14px', borderRadius: 10,
+                      border: isSelected ? '1.5px solid var(--blue500)' : '1px solid var(--grey200)',
+                      background: isSelected ? 'var(--blue50)' : 'var(--surface)',
+                      color: 'var(--text-strong)', fontSize: 13, fontWeight: isSelected ? 700 : 500,
+                      cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
+                    }}
+                  >
+                    <input
+                      id={`review-team-${team.teamId}`}
+                      type="radio"
+                      name="review-team-select"
+                      value={team.teamId}
+                      checked={isSelected}
+                      onChange={() => setSelectedTeamId(team.teamId)}
+                      className="sr-only"
+                    />
+                    {team.teamName}
+                    {isSelected && <span aria-hidden="true" style={{ color: 'var(--blue500)' }}>✓</span>}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <textarea
           value={comment} onChange={(e) => setComment(e.target.value)}
@@ -477,14 +536,15 @@ function ReviewFormModal({
           {photoError && <p style={{ color: 'var(--red700)', fontSize: 12, marginTop: 6 }}>{photoError}</p>}
         </div>
 
-        {isError && <p style={{ color: 'var(--red700)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
+        {genericError && <p style={{ color: 'var(--red700)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
 
         <button
-          type="button" onClick={handleSubmit} disabled={isPending || rating === 0}
+          type="button" onClick={handleSubmit}
+          disabled={isPending || rating === 0 || (!!teamOptions && !selectedTeamId)}
           className="tm-btn tm-btn-primary"
           style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: 14, fontWeight: 700 }}
         >
-          {isPending ? '저장 중...' : '후기 등록'}
+          {isPending ? '저장 중...' : teamOptions ? '선택한 팀으로 등록' : '후기 등록'}
         </button>
       </div>
     </div>
@@ -532,24 +592,18 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
   const isCompleted = tournament.status === 'completed';
 
   const { data: participantData } = useV1TournamentParticipantCheck(tournament.id, hasSession && isCompleted);
+  const { data: myReview } = useV1MyTournamentReview(tournament.id, hasSession && isCompleted);
 
-  // 자격은 팀 단위다 — 내가 팀장·매니저인 참가 팀 중 아직 후기가 없는 팀이 있으면 쓸 수 있다.
-  const reviewableTeams = participantData?.reviewableTeams ?? [];
-  const writableTeams = reviewableTeams.filter((team) => !team.alreadyReviewed);
-  const isParticipant = reviewableTeams.length > 0;
-  const alreadyReviewed = isParticipant && writableTeams.length === 0;
-  const canWrite = isCompleted && writableTeams.length > 0;
+  const isParticipant = participantData?.isParticipant ?? false;
+  const alreadyReviewed = !!myReview;
+  const canWrite = isCompleted && isParticipant && !alreadyReviewed;
 
   const reviews = tournament.reviews ?? [];
 
   return (
     <>
       {showForm && (
-        <ReviewFormModal
-          tournamentId={tournament.id}
-          writableTeams={writableTeams}
-          onClose={() => setShowForm(false)}
-        />
+        <ReviewFormModal tournamentId={tournament.id} onClose={() => setShowForm(false)} />
       )}
       <section style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -568,7 +622,7 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
                 + 후기 쓰기
               </button>
             )}
-            {isCompleted && alreadyReviewed && (
+            {isCompleted && isParticipant && alreadyReviewed && (
               // [R-T2] 고정폭 없는 pill 배지 — 12로 상향.
               <span style={{ fontSize: 12, color: 'var(--text-caption)', background: 'var(--grey100)', padding: '3px 8px', borderRadius: 6 }}>
                 ✓ 작성완료
@@ -581,12 +635,12 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
           <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
               {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다 */}
-              {canWrite
+              {isCompleted && isParticipant && !alreadyReviewed
                 ? '첫 번째 후기를 남겨보세요!'
                 : isCompleted && !hasSession
-                  ? '아직 등록된 후기가 없어요. 로그인하면 참가팀의 팀장·매니저는 후기를 작성할 수 있어요.'
+                  ? '아직 등록된 후기가 없어요. 로그인하면 참가팀 대표는 후기를 작성할 수 있어요.'
                   : isCompleted && hasSession && !isParticipant
-                    ? '아직 등록된 후기가 없어요. 후기는 참가한 팀의 팀장 또는 매니저만 작성할 수 있어요.'
+                    ? '아직 등록된 후기가 없어요. 후기는 대회를 신청한 팀 대표만 작성할 수 있어요.'
                     : '아직 등록된 후기가 없어요.'}
             </p>
           </Card>

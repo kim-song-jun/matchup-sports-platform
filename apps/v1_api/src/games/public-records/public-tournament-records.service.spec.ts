@@ -81,6 +81,24 @@ function buildFakePrisma(options: {
     officialAt: Date;
     score: unknown;
   } | null;
+  /**
+   * `resolvePeriodBreak` 배선 검증용(하프타임/정규 시간 종료) -- 기본값 `[]`이라
+   * 기존 테스트는 그대로 LIVE 클록 없는 경로를 탄다(회귀 없음).
+   */
+  periods?: readonly {
+    number: number;
+    state: string;
+    startedAt: Date | null;
+    pausedTotalMs: number;
+    pausedAt: Date | null;
+  }[];
+  /**
+   * `periodBreak`의 `status === 'live'` 게이트 검증용 -- 기본값 'LIVE'라 기존 테스트는
+   * 전부 그대로 진행 중 경로를 탄다. 'ENDED'로 override하면 publicFixtureStatus가
+   * 'ended'를 돌려주므로(public-visibility.ts의 GAME_STATE_TO_PUBLIC_STATUS) 종료된
+   * 경기에서 라이브 전용 필드가 새는지 확인할 수 있다.
+   */
+  gameState?: string;
 }): PrismaService {
   const database = {
     v1Tournament: {
@@ -120,7 +138,7 @@ function buildFakePrisma(options: {
           videos: [],
           game: {
             id: GAME_ID,
-            state: 'LIVE',
+            state: options.gameState ?? 'LIVE',
             visibilityPolicy: { mode: 'LIVE', lineupAt: null },
             sides: [
               { id: 'side-home', sideKey: 'HOME' },
@@ -128,7 +146,7 @@ function buildFakePrisma(options: {
             ],
             participants: [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
             currentOfficialRevision: options.officialRevision ?? null,
-            periods: [],
+            periods: options.periods ?? [],
           },
         };
       },
@@ -146,6 +164,15 @@ function buildFakePrisma(options: {
     v1ParticipantConsentSnapshot: {
       async findMany() {
         return options.consentSnapshots;
+      },
+    },
+    // 사용자 단위 공개 동의(Task 24 규칙 재정의, 2026-08-13). 이 스펙의 롤백 스위치
+    // 테스트는 전부 consentLinks가 빈 배열이라 loadParticipantConsentEligibility가
+    // 이 테이블까지 조회하지는 않지만(링크가 없으면 조회 자체를 skip), 방어적으로
+    // 빈 배열을 반환하도록 둔다.
+    v1UserRecordConsent: {
+      async findMany() {
+        return [];
       },
     },
     v1GameEvent: {
@@ -657,5 +684,70 @@ describe('PublicTournamentRecordsService.getMatch -- 승부차기 표면화', ()
     expect(await nested.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).toMatchObject({
       score: { home: 3, away: 0, penalties: null },
     });
+  });
+});
+
+describe('PublicTournamentRecordsService.getMatch -- periodBreak 배선', () => {
+  it('HALFTIME 피리어드가 있으면 응답 periodBreak가 halftime이고 clock은 null이다', async () => {
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      periods: [
+        { number: 1, state: 'ENDED', startedAt: new Date('2026-08-10T04:00:00.000Z'), pausedTotalMs: 0, pausedAt: null },
+        { number: 2, state: 'HALFTIME', startedAt: null, pausedTotalMs: 0, pausedAt: null },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.periodBreak).toBe('halftime');
+    expect(result.clock).toBeNull();
+  });
+
+  it('경기가 이미 종료됐으면(status !== live) 피리어드가 전부 ENDED여도 periodBreak는 null이다', async () => {
+    // 게이트가 없으면 `resolvePeriodBreak`가 'regulation_ended'를 반환해, 이미 끝난
+    // 경기 응답에 라이브 전용 상태가 실린다(PR #433 Copilot 리뷰 지적). `liveScore`가
+    // 이미 `status === 'live'`로 게이팅하는 것과 같은 계약을 맞춘다.
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      gameState: 'ENDED',
+      periods: [
+        { number: 1, state: 'ENDED', startedAt: new Date('2026-08-10T04:00:00.000Z'), pausedTotalMs: 0, pausedAt: null },
+        { number: 2, state: 'ENDED', startedAt: new Date('2026-08-10T04:30:00.000Z'), pausedTotalMs: 0, pausedAt: null },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.status).toBe('ended');
+    expect(result.periodBreak).toBeNull();
+  });
+
+  it('진행 중 경기에서 피리어드가 전부 ENDED면(결과 확정 대기) regulation_ended를 노출한다', async () => {
+    // 위 테스트와 쌍 -- 게이트가 정상 케이스까지 막아버리면 하프타임/정규시간 종료
+    // 표시 자체가 죽으므로, 양방향으로 확인한다.
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      periods: [
+        { number: 1, state: 'ENDED', startedAt: new Date('2026-08-10T04:00:00.000Z'), pausedTotalMs: 0, pausedAt: null },
+        { number: 2, state: 'ENDED', startedAt: new Date('2026-08-10T04:30:00.000Z'), pausedTotalMs: 0, pausedAt: null },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.status).toBe('live');
+    expect(result.periodBreak).toBe('regulation_ended');
   });
 });

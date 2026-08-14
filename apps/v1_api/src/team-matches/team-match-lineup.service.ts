@@ -68,6 +68,7 @@ export class TeamMatchLineupService {
       return {
         ...(await this.serializeLineup(tx, context, lineup, visibility?.lineupAt ?? null)),
         lineupConfig: parseLineupConfigForResponse(config?.lineup ?? null),
+        eligibleMembers: await this.loadEligibleMembers(tx, context),
       };
     });
   }
@@ -140,6 +141,7 @@ export class TeamMatchLineupService {
               gameId: context.gameId,
               sideId: context.ownSideId,
               lineupId: lineup.id,
+              userId: entry.userId,
               displayNameSnapshot: entry.displayNameSnapshot,
               jerseyNumber: entry.jerseyNumber ?? null,
               position: entry.position,
@@ -300,6 +302,9 @@ export class TeamMatchLineupService {
                 gameId: context.gameId,
                 sideId: context.opponentSideId,
                 lineupId: reopened.id,
+                // 정정 요청으로 다시 연 초안은 원본의 복사본이다 — 사람 연결도 그대로
+                // 따라가야 상대팀이 수정할 때 정체성이 끊기지 않는다.
+                userId: participant.userId,
                 displayNameSnapshot: participant.displayNameSnapshot,
                 jerseyNumber: participant.jerseyNumber,
                 position: participant.position,
@@ -497,6 +502,50 @@ export class TeamMatchLineupService {
     };
   }
 
+  /**
+   * 지금 이 라인업에 등록할 수 있는 팀원 목록.
+   *
+   * 저장 시점의 자격 판정(resolveEntry)과 **완전히 같은 조건**을 화면에 미리 알려주기
+   * 위한 읽기 경로다. 화면은 지금껏 팀원 전체만 알고 있어서, 참석 응답을 하지 않은
+   * 팀원을 명단에 넣고 저장 버튼을 눌러야 비로소 422를 만났다. 판정 규칙을 프론트에
+   * 복제하면 서버와 갈라지므로, 규칙을 이미 소유한 이쪽이 결과만 내려준다.
+   *
+   * `attending`은 이 팀 매치에 연결된 팀 일정이 있을 때만 의미가 있다 — 일정이 없으면
+   * resolveEntry도 참석 검증을 건너뛰므로 여기서도 전원 true다.
+   *
+   * `jerseyNumber`는 팀 고정 등번호로, 라인업 화면의 등번호 자동 채움이 2순위 소스로
+   * 쓴다(1순위는 불러온 라인업의 값, 3순위는 그 선수가 직전에 달았던 번호).
+   */
+  private async loadEligibleMembers(tx: Transaction, context: TeamMatchLineupContext) {
+    const memberships = await tx.v1TeamMembership.findMany({
+      where: { teamId: context.ownTeamId, status: 'active' },
+      select: {
+        userId: true,
+        jerseyNumber: true,
+        user: { select: { profile: { select: { nickname: true, displayName: true } } } },
+      },
+    });
+    const schedule = await tx.v1TeamSchedule.findFirst({
+      where: { teamMatchId: context.teamMatchId, teamId: context.ownTeamId },
+      select: { id: true },
+    });
+    const goingUserIds = new Set<string>();
+    if (schedule !== null) {
+      const attendances = await tx.v1ScheduleAttendance.findMany({
+        where: { scheduleId: schedule.id, status: 'GOING' },
+        select: { userId: true },
+      });
+      for (const attendance of attendances) goingUserIds.add(attendance.userId);
+    }
+    return memberships.map((membership) => ({
+      userId: membership.userId,
+      displayName:
+        membership.user.profile?.nickname || membership.user.profile?.displayName || '팀원',
+      jerseyNumber: membership.jerseyNumber,
+      attending: schedule === null ? true : goingUserIds.has(membership.userId),
+    }));
+  }
+
   private async latestLineup(tx: Transaction, gameId: string, sideId: string) {
     return tx.v1GameLineup.findFirst({
       where: { gameId, sideId },
@@ -629,6 +678,7 @@ export class TeamMatchLineupService {
     entry: TeamMatchLineupParticipantDto,
     position: string | null,
   ): Promise<{
+    userId: string | null;
     displayNameSnapshot: string;
     jerseyNumber?: number;
     position: string | null;
@@ -644,6 +694,8 @@ export class TeamMatchLineupService {
         });
       }
       return {
+        // 비연동 게스트 — 플랫폼 계정이 없으므로 정체성은 이름뿐이다.
+        userId: null,
         displayNameSnapshot: displayName,
         jerseyNumber: entry.jerseyNumber,
         position,
@@ -686,6 +738,9 @@ export class TeamMatchLineupService {
       membership.user.profile?.displayName ||
       '팀원';
     return {
+      // 이 열쇠가 있어야 다음에 이 라인업을 불러올 때 이름이 아니라 사람으로 대조된다 —
+      // 동명이인이나 닉네임 변경에도 같은 사람으로 이어진다.
+      userId: membership.userId,
       displayNameSnapshot,
       jerseyNumber: entry.jerseyNumber,
       position,
@@ -720,6 +775,9 @@ export class TeamMatchLineupService {
         // to attribute a goal/card to a specific roster entry — this route was
         // the only existing lineup read and previously erased the id.
         id: participant.id,
+        // 저장된 사람 연결. 화면이 재수화할 때 이름 매칭 휴리스틱 대신 이 값을 쓰면
+        // 같은 이름의 다른 팀원을 혼동하지 않는다.
+        userId: participant.userId,
         displayName: participant.displayNameSnapshot,
         jerseyNumber: participant.jerseyNumber,
         position: participant.position === GOALKEEPER_MARKER ? null : participant.position,
@@ -731,6 +789,7 @@ export class TeamMatchLineupService {
       .filter((participant) => participant.position === BENCH_MARKER)
       .map((participant) => ({
         id: participant.id,
+        userId: participant.userId,
         displayName: participant.displayNameSnapshot,
         jerseyNumber: participant.jerseyNumber,
       }));

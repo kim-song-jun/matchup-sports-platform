@@ -1,7 +1,9 @@
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve, sep } from 'node:path';
 import {
+  GameOperationEvidencePathError,
   GameOperationGateRootConfigurationError,
+  resolveGameOperationEvidencePath,
   resolveGameOperationGateRoot,
   SIMPLIFIED_GATE_ALLOWED_KEYS,
 } from './game-operation-flags';
@@ -27,6 +29,36 @@ describe('game operation gate root', () => {
 
     expect(() => resolveGameOperationGateRoot(traversalRoot)).toThrow(
       GameOperationGateRootConfigurationError,
+    );
+  });
+
+  it('accepts nested evidence below the canonical gate root', () => {
+    const gateRoot = resolveGameOperationGateRoot();
+    const nestedReceipt = resolve(gateRoot, 'receipts', 'accepted.json');
+
+    expect(resolveGameOperationEvidencePath(nestedReceipt)).toBe(nestedReceipt);
+  });
+
+  it('rejects arbitrary and traversal-shaped evidence paths', () => {
+    const gateRoot = resolveGameOperationGateRoot();
+    const outsidePath = resolve(gateRoot, '..', 'operator-secret.json');
+
+    expect(() => resolveGameOperationEvidencePath(outsidePath)).toThrow(
+      GameOperationEvidencePathError,
+    );
+    expect(() => resolveGameOperationEvidencePath('/etc/passwd')).toThrow(
+      GameOperationEvidencePathError,
+    );
+  });
+
+  it('requires a gate bundle itself to be a direct child of the gate root', () => {
+    const gateRoot = resolveGameOperationGateRoot();
+    const directBundle = resolve(gateRoot, 'flag-gate-attempt-C-enable.json');
+    const nestedBundle = resolve(gateRoot, 'nested', 'flag-gate-attempt-C-enable.json');
+
+    expect(resolveGameOperationEvidencePath(directBundle, true)).toBe(directBundle);
+    expect(() => resolveGameOperationEvidencePath(nestedBundle, true)).toThrow(
+      GameOperationEvidencePathError,
     );
   });
 });

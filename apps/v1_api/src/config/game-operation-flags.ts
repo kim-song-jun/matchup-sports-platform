@@ -17,7 +17,7 @@ import {
   realpathSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -33,7 +33,6 @@ export type GameOperationFlagValue = 'off' | 'on';
 const FLAG_KEYS: GameOperationFlagKey[] = ['DIRECTOR_OFFICIALIZE', 'PUBLIC_LIVE'];
 const GATE_EVIDENCE_DIRECTORY = 'teameet-ulw-evidence';
 const GATE_EVIDENCE_ATTEMPT = 'teameet-team-tournament-operations-v1';
-const GATE_ROOT = `${resolveGameOperationGateRoot()}/`;
 const SYSTEM_ACTOR = 'PLATFORM_OPS_CONTROL';
 const IDEMPOTENCY_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 const SHA_PATTERN = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
@@ -49,6 +48,14 @@ export class GameOperationGateRootConfigurationError extends Error {
   }
 }
 
+export class GameOperationEvidencePathError extends Error {
+  readonly name = 'GameOperationEvidencePathError';
+
+  constructor(readonly candidatePath: string) {
+    super('Game operation evidence path must stay inside the canonical gate root');
+  }
+}
+
 export function resolveGameOperationGateRoot(
   configuredTemporaryRoot: string = tmpdir(),
 ): string {
@@ -61,6 +68,27 @@ export function resolveGameOperationGateRoot(
     GATE_EVIDENCE_DIRECTORY,
     GATE_EVIDENCE_ATTEMPT,
   );
+}
+
+export function resolveGameOperationEvidencePath(
+  candidatePath: string,
+  requireDirectChild = false,
+): string {
+  const gateRoot = resolveGameOperationGateRoot();
+  const absolutePath = resolve(candidatePath);
+  const relativePath = relative(gateRoot, absolutePath);
+  const escapesGateRoot =
+    relativePath === '' ||
+    relativePath === '..' ||
+    relativePath.startsWith(`..${sep}`) ||
+    isAbsolute(relativePath);
+  if (
+    escapesGateRoot ||
+    (requireDirectChild && dirname(absolutePath) !== gateRoot)
+  ) {
+    throw new GameOperationEvidencePathError(candidatePath);
+  }
+  return absolutePath;
 }
 
 /**
@@ -1097,15 +1125,17 @@ function assertGatePhase(phase: string) {
 function readImmutableJson(
   path: string,
   expectedHash: string,
-  requireGateRoot: boolean,
+  requireDirectGateRootChild: boolean,
 ): Record<string, unknown> {
   if (!SHA256_PATTERN.test(expectedHash)) gateFailure('Expected hash must be lowercase SHA-256');
-  const absolutePath = resolve(path);
-  if (
-    requireGateRoot &&
-    dirname(absolutePath) !== GATE_ROOT.slice(0, -1)
-  ) {
-    gateFailure('Gate bundle path is outside the canonical evidence root');
+  let absolutePath: string;
+  try {
+    absolutePath = resolveGameOperationEvidencePath(path, requireDirectGateRootChild);
+  } catch (error) {
+    if (error instanceof GameOperationEvidencePathError) {
+      gateFailure('Evidence path is outside the canonical evidence root');
+    }
+    throw error;
   }
   let descriptor: number | undefined;
   try {

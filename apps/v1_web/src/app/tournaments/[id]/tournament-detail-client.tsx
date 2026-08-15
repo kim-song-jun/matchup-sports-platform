@@ -1647,14 +1647,10 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
     );
   }
 
-  /* group_knockout: 결선 픽스처가 있고 + 조별리그가 실제로 끝났을 때만 표시(§B-8과
-   * 동일 기준 — allGroupPhasesComplete). hasKnockoutFixtures만으로는 부족하다: 그
-   * 값은 "결선 픽스처 데이터가 존재하는지"만 볼 뿐, 조별리그가 실제로 끝났는지는
-   * 안 본다. 관리자가 결선 대진을 미리 생성해 두는 경우 등 데이터가 조기에 존재할
-   * 수 있어, 조별리그 완료 여부를 별도로 한 번 더 확인해야 상세 페이지에서도
-   * "아직 안 끝난 조별리그의 결선"을 확정처럼 보여주는 걸 막을 수 있다.
-   * - 결선 대진표 전체 보기는 /bracket 서브페이지에서 제공 */
-  if (!hasKnockoutFixtures || !allGroupPhasesComplete(groups, fixtures)) return null;
+  /* group_knockout도 결선 fixture가 생성된 순간부터 구조를 공개한다. 팀이 아직
+   * 배정되지 않은 슬롯은 TournamentBracket의 기존 `미정` 표현을 사용하고,
+   * 실제 진출 팀 확정·배정 규칙은 서버 계약에 그대로 맡긴다. */
+  if (!hasKnockoutFixtures) return null;
 
   return (
     <div className="tm-tournament-bleed">

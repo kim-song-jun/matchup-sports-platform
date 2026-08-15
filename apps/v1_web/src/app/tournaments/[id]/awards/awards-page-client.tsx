@@ -45,13 +45,13 @@ function getWinnerSide(result: V1TournamentFixtureResult): 'home' | 'away' | nul
   return null;
 }
 
-function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number; name: string }> {
+export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number; name: string }> {
   const allStandings = tournament.groups
     .flatMap((g) => g.standings)
     .filter((s, i, arr) => arr.findIndex((x) => x.registrationId === s.registrationId) === i)
     .sort((a, b) => a.position - b.position);
 
-  if (allStandings.length >= 3) {
+  if (allStandings.length >= 3 && tournament.format === 'league') {
     return [1, 2, 3].map((pos) => {
       const s = allStandings[pos - 1];
       return { pos, name: s?.teamName ?? '미정' };

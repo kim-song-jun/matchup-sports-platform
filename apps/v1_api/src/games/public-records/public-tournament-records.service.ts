@@ -681,7 +681,7 @@ export class PublicTournamentRecordsService {
    */
   private async loadScorers(
     fixtures: readonly FixtureScheduleRow[],
-  ): Promise<ReadonlyMap<string, readonly { side: 'home' | 'away'; participantId: string | null; clockMs: number | null }[]>> {
+  ): Promise<ReadonlyMap<string, readonly { side: 'home' | 'away'; participantId: string | null; period: number | null; clockMs: number | null }[]>> {
     const fixturesWithGame = fixtures.filter(
       (fixture): fixture is FixtureScheduleRow & { game: NonNullable<FixtureScheduleRow['game']> } =>
         fixture.game !== null,
@@ -699,7 +699,7 @@ export class PublicTournamentRecordsService {
       where: { gameId: { in: gameIds } },
       // buildEvents 와 같은 이유로 시각순 -- sequence 는 tiebreak 용으로만 남긴다.
       orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
-      select: { id: true, gameId: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true },
+      select: { id: true, gameId: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, reversesEventId: true },
     });
     const reversedIds = new Set(
       events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
@@ -713,13 +713,14 @@ export class PublicTournamentRecordsService {
       eventsByGame.set(event.gameId, list);
     }
 
-    const result = new Map<string, { side: 'home' | 'away'; participantId: string | null; clockMs: number | null }[]>();
+    const result = new Map<string, { side: 'home' | 'away'; participantId: string | null; period: number | null; clockMs: number | null }[]>();
     for (const fixture of fixturesWithGame) {
       const sideKeyById = new Map(fixture.game.sides.map((side) => [side.id, side.sideKey] as const));
       const rows = (eventsByGame.get(fixture.game.id) ?? []).map((event) => ({
         // sideId nullable 방어(위 buildEvents와 동일한 fail-safe 규칙).
         side: (sideKeyById.get(event.sideId ?? '') === 'HOME' ? 'home' : 'away') as 'home' | 'away',
         participantId: event.participantId,
+        period: event.period,
         clockMs: event.clockMs,
       }));
       result.set(fixture.game.id, rows);
@@ -845,7 +846,7 @@ function presentScheduleEntry(
   fixture: FixtureScheduleRow,
   publicLiveEnabled: boolean,
   liveScoreByGameId: ReadonlyMap<string, GameScore>,
-  scorersByGameId: ReadonlyMap<string, readonly { side: 'home' | 'away'; participantId: string | null; clockMs: number | null }[]>,
+  scorersByGameId: ReadonlyMap<string, readonly { side: 'home' | 'away'; participantId: string | null; period: number | null; clockMs: number | null }[]>,
   consentMap: Map<string, ParticipantConsentEligibility>,
   now: Date,
   hideIdentity: boolean,
@@ -900,6 +901,7 @@ function presentScheduleEntry(
             side: raw.side,
             participantName: eligible ? (participant?.displayNameSnapshot ?? null) : null,
             jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+            period: raw.period,
             clockMs: raw.clockMs,
           };
         });

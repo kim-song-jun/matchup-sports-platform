@@ -125,6 +125,7 @@ import {
 } from '@/components/admin/tournaments/promo-card-fields';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
+import { TournamentStatisticsTab } from './tournament-statistics-tab';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -448,7 +449,7 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
 
 // ── Tab type ──────────────────────────────────────────────────────────────
 
-type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'popups' | 'campaign' | 'reviews' | 'awards';
+type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'popups' | 'campaign' | 'reviews' | 'awards' | 'statistics';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'info', label: '대회 정보' },
@@ -460,6 +461,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'campaign', label: '캠페인' },
   { id: 'reviews', label: '리뷰 관리' },
   { id: 'awards', label: '개인 어워드' },
+  { id: 'statistics', label: '통계' },
 ];
 
 // ── Registration roster modal ─────────────────────────────────────────────
@@ -3004,7 +3006,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             ? tournament.operationCounts?.registrations
             : tab.id === 'bracket'
               ? tournament.operationCounts?.fixtures
-              : tournament.operationCounts?.announcements;
+              : tab.id === 'announcements'
+                ? tournament.operationCounts?.announcements
+                : undefined;
           return (
             <button
               key={tab.id}
@@ -3164,6 +3168,17 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             tournamentId={id}
             showToast={showToast}
           />
+        )}
+      </div>
+
+      <div
+        id="panel-statistics"
+        aria-labelledby="tab-statistics"
+        role="tabpanel"
+        hidden={activeTab !== 'statistics'}
+      >
+        {activeTab === 'statistics' && (
+          <TournamentStatisticsTab tournamentId={id} />
         )}
       </div>
 

@@ -249,9 +249,11 @@ identity/side itself:
   events or malformed historical payloads; consumers must not present it as
   a yellow card.
 - `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]` gained
-  `scorers: { side, participantName, jerseyNumber, clockMs }[]` -- a
+  `scorers: { side, participantName, jerseyNumber, period, clockMs }[]` -- a
   goal-only summary for the schedule card, same identity/consent rule as
-  above. Unlike the Lane 1 live-score/clock fields, this is **not** gated by
+  above. `period` is the stored game period (`1` first half, `2` second half,
+  `null` only for malformed/historical data) and lets consumers group halves
+  before sorting by `clockMs`. Unlike the Lane 1 live-score/clock fields, this is **not** gated by
   the `PUBLIC_LIVE` flag: `official_only` fixtures (the common case once a
   tournament has finished) must show their scorers regardless of that flag,
   since only the `LIVE` policy is ever demoted by it

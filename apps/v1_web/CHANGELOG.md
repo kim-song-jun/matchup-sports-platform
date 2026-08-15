@@ -1,5 +1,12 @@
 # v1_web
 
+## 0.4.2
+
+### Patch Changes
+
+- 239aae1: 대진만 생성되고 경기가 시작되지 않은 대회에서 출전 인원을 변경하면 미시작 대진과 경기 설정도 함께 갱신합니다.
+- 252285d: Fix admin tournament scorer totals by aggregating the same roster player across fixture-scoped game participant IDs.
+
 ## 0.4.1
 
 ### Patch Changes

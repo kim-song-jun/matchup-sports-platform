@@ -648,6 +648,7 @@ jobs:
           set -Eeuo pipefail
           curl -fsS --connect-timeout 5 --max-time 15 http://localhost:8121/api/v1/health |
             jq -e '.data.checks.db == true' >/dev/null
+          test "$(sudo docker inspect --format '{{.State.Health.Status}}' teameet_v1_game_operations_worker)" = "healthy"
           test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 \
             -o /dev/null -w '%{http_code}' https://teameet.co.kr/landing)" = "200"
           curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 \

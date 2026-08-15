@@ -321,7 +321,7 @@ $(tail -20 "${LOG_FILE}")"
     log "롤백: .env 복원"
   fi
 
-  "${compose[@]}" up -d --no-deps v1_api v1_web
+  "${compose[@]}" up -d --no-deps v1_api v1_web v1_game_operations_worker
   log "롤백: 앱 재기동(컨테이너 DB 기준)"
 
   # --no-deps 로 v1_api/v1_web 만 재생성하면 새 컨테이너가 새 내부 IP 를 받는다. nginx 는
@@ -493,7 +493,7 @@ if [[ "${MODE}" == "cutover" ]]; then
   maintenance_on
 
   # DB 컨테이너는 살려 둔다 — 이것이 롤백 경로 전체를 지탱한다.
-  "${compose[@]}" stop v1_api v1_web
+  "${compose[@]}" stop v1_api v1_web v1_game_operations_worker
   log "앱 컨테이너 정지 (v1_postgres 는 유지)"
   # 정지 직후에도 열려 있는 커넥션이 남을 수 있다. 덤프 일관성을 위해 잠시 기다린다.
   sleep 5
@@ -592,7 +592,7 @@ log ".env 전환 완료 (V1_DB_HOST=${RDS_HOST})"
   || fail "compose 가 해석한 DATABASE_URL 이 RDS 를 가리키지 않습니다"
 log "compose 해석 결과가 RDS 를 가리킴을 확인"
 
-"${compose[@]}" up -d --no-deps v1_api v1_web
+"${compose[@]}" up -d --no-deps v1_api v1_web v1_game_operations_worker
 log "앱 기동"
 
 # --no-deps 로 재생성된 컨테이너는 새 내부 IP 를 받는다 — nginx 를 리로드하지 않으면

@@ -529,12 +529,8 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
   });
 });
 
-/**
- * §B-8 — 결선 대진표는 조별리그가 실제로 끝난 뒤에만 나타난다. knockout 포맷(조별리그
- * 자체가 없는 대회)은 이 게이트를 적용하지 않고 처음부터 보인다.
- */
-describe('BracketPageContent — 결선 대진표는 조별리그 완료 후에만(knockout은 예외)', () => {
-  it('group_knockout: 조별리그 미완료면 결선 대진표 대신 빈 안내를 보여준다', () => {
+describe('BracketPageContent — 생성된 결선 fixture는 조별리그 중에도 공개', () => {
+  it('group_knockout: 조별리그 미완료여도 미배정 결선 슬롯을 미정으로 보여준다', () => {
     const tournament = makeTournament({
       id: 'tour-5',
       status: 'in_progress',
@@ -546,8 +542,8 @@ describe('BracketPageContent — 결선 대진표는 조별리그 완료 후에�
           groupId: null,
           round: 'final',
           status: 'scheduled',
-          homeTeamName: '결승 홈팀',
-          awayTeamName: '결승 원정팀',
+          homeTeamName: 'TBD',
+          awayTeamName: 'TBD',
         }),
       ],
       groups: [makeGroup({ id: 'group-a', phase: 'group', name: 'A조', advanceCount: 1 })],
@@ -555,8 +551,8 @@ describe('BracketPageContent — 결선 대진표는 조별리그 완료 후에�
 
     renderBracketStandingsTab(tournament);
 
-    expect(screen.getByText(/대진표는 조별리그가 끝난 후/)).toBeInTheDocument();
-    expect(screen.queryByText('결승 홈팀')).not.toBeInTheDocument();
+    expect(screen.queryByText(/대진표는 조별리그가 끝난 후/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('미정')).toHaveLength(3);
   });
 
   it('group_knockout: 조별리그가 모두 끝나면 결선 대진표를 보여준다', () => {

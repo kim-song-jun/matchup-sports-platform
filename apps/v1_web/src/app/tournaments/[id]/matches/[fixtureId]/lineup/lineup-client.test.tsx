@@ -627,6 +627,7 @@ describe('골키퍼 지정 버튼의 aria-label 조사(을/를)', () => {
 
     render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
 
+    fireEvent.click(screen.getByRole('checkbox', { name: '박철 선발' }));
     expect(screen.getByRole('button', { name: '박철을 골키퍼로 지정' })).toBeInTheDocument();
   });
 });

@@ -1777,7 +1777,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       lastSequence: 0,
     });
     const dto: SubmitGameLineupDto = {
-      expectedVersion: 2,
+      expectedVersion: 1,
       clientCommandId: 'task18-submit-again',
       takeoverToken: submitAgainTakeover.takeoverToken,
     };

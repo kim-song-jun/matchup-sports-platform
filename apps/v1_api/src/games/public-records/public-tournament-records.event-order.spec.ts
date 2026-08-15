@@ -39,6 +39,7 @@ type FakeEvent = {
   clockMs: number;
   sequence: number;
   reversesEventId: string | null;
+  payload?: { card: 'YELLOW' | 'RED' };
 };
 
 /** 실제 Prisma orderBy(단일 객체 또는 배열)를 그대로 흉내 낸다. */
@@ -60,10 +61,10 @@ function applyOrderBy<T extends Record<string, unknown>>(rows: readonly T[], ord
 // 뒤죽박죽이다 -- 시간상 가장 이른 이벤트(id: goal-early, clockMs 645_886)가
 // 맨 마지막에 입력됐다(sequence:5).
 const ALPHA_SHAPED_EVENTS: FakeEvent[] = [
-  { id: 'card-1', gameId: GAME_ID, type: 'CARD', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 649_891, sequence: 1, reversesEventId: null },
-  { id: 'card-2', gameId: GAME_ID, type: 'CARD', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 652_602, sequence: 2, reversesEventId: null },
-  { id: 'card-3', gameId: GAME_ID, type: 'CARD', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 655_603, sequence: 3, reversesEventId: null },
-  { id: 'card-4', gameId: GAME_ID, type: 'CARD', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 657_938, sequence: 4, reversesEventId: null },
+  { id: 'card-1', gameId: GAME_ID, type: 'CARD', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 649_891, sequence: 1, reversesEventId: null, payload: { card: 'YELLOW' } },
+  { id: 'card-2', gameId: GAME_ID, type: 'CARD', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 652_602, sequence: 2, reversesEventId: null, payload: { card: 'RED' } },
+  { id: 'card-3', gameId: GAME_ID, type: 'CARD', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 655_603, sequence: 3, reversesEventId: null, payload: { card: 'YELLOW' } },
+  { id: 'card-4', gameId: GAME_ID, type: 'CARD', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 657_938, sequence: 4, reversesEventId: null, payload: { card: 'RED' } },
   { id: 'goal-early', gameId: GAME_ID, type: 'GOAL', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 645_886, sequence: 5, reversesEventId: null },
 ];
 
@@ -244,6 +245,17 @@ describe('PublicTournamentRecordsService -- 이벤트는 경기 시각순(sequen
     expect(result.events.map((event) => [event.period, event.clockMs])).toEqual([
       [1, 2_400_000],
       [2, 60_000],
+    ]);
+  });
+
+  it('CARD 이벤트는 저장된 payload의 옐로/레드 색상을 공개한다', async () => {
+    const prisma = buildFakePrisma(ALPHA_SHAPED_EVENTS);
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.events.filter((event) => event.type === 'CARD').map((event) => event.cardColor)).toEqual([
+      'YELLOW', 'RED', 'YELLOW', 'RED',
     ]);
   });
 

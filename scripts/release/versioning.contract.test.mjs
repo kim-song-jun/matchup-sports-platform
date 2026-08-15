@@ -293,6 +293,19 @@ test('a fully versioned dev-to-main promotion may include released behavior chan
   }
 });
 
+test('promotion workflow includes Changesets added and consumed within the release range', () => {
+  const deployWorkflow = readFileSync(join(repoRoot, '.github/workflows/deploy.yml'), 'utf8');
+
+  assert.match(
+    deployWorkflow,
+    /git log --format= --name-only --diff-filter=D[\s\S]*"\$\{BASE_SHA\}\.\.\$\{HEAD_SHA\}" -- '\.changeset\/\*\.md'/,
+  );
+  assert.match(
+    deployWorkflow,
+    /sort -u -o \/tmp\/teameet-changed-files\.txt \/tmp\/teameet-changed-files\.txt/,
+  );
+});
+
 test('dev-to-main promotion rejects pending unreleased Changesets', () => {
   const root = createFixture({
     apiVersion: '0.2.0',

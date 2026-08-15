@@ -2835,16 +2835,21 @@ export type V1TournamentFixture = {
   scheduledAt: string | null;
   venue: string | null;
   /**
-   * 원본 `V1TournamentFixture.status` 컬럼(`scheduled|completed|cancelled`). 서버가
-   * 이 컬럼을 `in_progress`로 전이시키는 경로가 없으므로 **라이브 판정에 쓰면 안 된다** —
-   * 그 용도는 아래 `liveStatus`다.
+   * 원본 `V1TournamentFixture.status` 컬럼. DB enum 은
+   * `scheduled | in_progress | completed | cancelled` 네 값이지만, **실제로 기록되는
+   * 값은 `scheduled`(생성 시)와 `completed`(결과 확정 시) 둘뿐이다** — 서버 어디에서도
+   * `in_progress`/`cancelled` 를 이 컬럼에 쓰지 않는다. 따라서 **라이브 판정에 쓰면
+   * 안 된다**(경기가 뛰는 중에도 `scheduled` 로 남는다). 그 용도는 아래 `liveStatus` 다.
+   * 어드민 화면이 이 원본 어휘에 의존하므로 타입은 넓게 유지한다.
    */
   status: string;
   /**
-   * `V1Game.state` 우선으로 파생한 공개 진행 상태(`scheduled|live|ended|cancelled`).
-   * 공개 일정 API(`/tournaments/:id/schedule`)가 쓰는 것과 같은 어휘·같은 판정 함수다.
+   * `V1Game.state` 우선으로 파생한 공개 진행 상태. 서버의
+   * `publicFixtureStatus()`(`PublicFixtureStatus`) 반환 타입과 1:1 대응하며, 공개 일정
+   * API(`/tournaments/:id/schedule`)가 쓰는 것과 같은 어휘·같은 판정 함수다. 값이
+   * 고정 집합이라 유니온으로 좁혀 게이트 오타를 타입에서 잡는다.
    */
-  liveStatus: string;
+  liveStatus: 'scheduled' | 'live' | 'ended' | 'cancelled';
   homeRegistrationId: string | null;
   homeTeamId: string | null;
   homeTeamName: string | null;

@@ -95,6 +95,42 @@ describe('buildTournamentStatistics', () => {
     expect(result.scorers[0]).toMatchObject({ playerName: '대타 선수', goals: 2 });
   });
 
+  it('aggregates the same tournament player across fixture-scoped participant ids', () => {
+    const first = fixture({
+      id: 'fx-1', homeId: 'registration-a', homeName: 'Alpha FC', awayId: 'registration-b', awayName: 'Beta FC', homeScore: 2, awayScore: 0,
+      goals: [
+        goal('g-1', 'home', 'game-participant-1', 'Player One'),
+        goal('g-2', 'home', 'game-participant-1', 'Player One'),
+      ],
+    });
+    const second = fixture({
+      id: 'fx-2', homeId: 'registration-a', homeName: 'Alpha FC', awayId: 'registration-c', awayName: 'Gamma FC', homeScore: 1, awayScore: 0,
+      goals: [goal('g-3', 'home', 'game-participant-2', ' Player One ')],
+    });
+
+    expect(buildTournamentStatistics([first, second]).scorers).toEqual([
+      expect.objectContaining({ playerName: 'Player One', teamName: 'Alpha FC', goals: 3 }),
+    ]);
+  });
+
+  it('keeps players with the same name on different teams separate', () => {
+    const result = buildTournamentStatistics([
+      fixture({
+        id: 'fx-1', homeId: 'registration-a', homeName: 'Alpha FC', awayId: 'registration-b', awayName: 'Beta FC', homeScore: 1, awayScore: 1,
+        goals: [
+          goal('g-1', 'home', 'game-participant-1', 'Same Name'),
+          goal('g-2', 'away', 'game-participant-2', 'Same Name'),
+        ],
+      }),
+    ]);
+
+    expect(result.scorers).toHaveLength(2);
+    expect(result.scorers.map(({ teamName, goals }) => [teamName, goals])).toEqual([
+      ['Alpha FC', 1],
+      ['Beta FC', 1],
+    ]);
+  });
+
   it('결과가 없는 예정 경기는 모든 통계에서 제외한다', () => {
     const scheduled = fixture({ id: 'fx-1', homeId: 'a', homeName: '한강 FC', awayId: 'b', awayName: '성수 FC', homeScore: 1, awayScore: 0 });
     scheduled.status = 'scheduled';

@@ -1,5 +1,7 @@
+import type { PinoLogger } from 'nestjs-pino';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { GamesController } from './games.controller';
-import type { GameBroadcastRegistry } from './game-broadcast.registry';
+import { GameBroadcastRegistry } from './game-broadcast.registry';
 import type { GamesService } from './games.service';
 import type { AppendGameEventDto, AssignGoalAssistDto, ReverseGameEventDto } from './dto/game-event.dto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -85,5 +87,45 @@ describe('GamesController — REST 변경의 룸 브로드캐스트', () => {
     await expect(controller.appendEvent(user, 'game-1', 'idem-1', {} as AppendGameEventDto)).resolves.toBe(
       committedResult,
     );
+  });
+
+  /**
+   * 위 케이스들은 registry 를 목으로 두므로, 게이트웨이가 `afterInit()` 에서 자신을
+   * 등록하는 배선이 끊기거나 delegate 가 엉뚱한 room 으로 emit 해도 통과한다 —
+   * 목을 검증하는 것과 계약을 검증하는 것의 차이다(PR 리뷰 지적).
+   *
+   * 그래서 여기서는 진짜 `GameBroadcastRegistry` 한 개를 게이트웨이와 컨트롤러가
+   * 공유하게 하고, REST write 가 실제로 `game:<gameId>` room 으로 나가는지까지 본다.
+   * 소켓 서버만 가짜다.
+   */
+  it('REST write 가 게이트웨이가 등록한 delegate 를 통해 game:<id> room 으로 나간다', async () => {
+    const emit = jest.fn();
+    const to = jest.fn().mockReturnValue({ emit });
+    const fakeServer = { use: jest.fn(), to } as unknown as Parameters<RealtimeGateway['afterInit']>[0];
+
+    const registry = new GameBroadcastRegistry({ warn: jest.fn() } as unknown as PinoLogger);
+    const gateway = new RealtimeGateway(
+      {} as never, // PrismaService — afterInit 경로에서 쓰이지 않는다
+      {} as never, // TournamentStaffAccessService — 동일
+      {} as never, // GamesService — 동일
+      { error: jest.fn(), warn: jest.fn() } as unknown as PinoLogger,
+      registry,
+    );
+    gateway.afterInit(fakeServer);
+
+    const service = {
+      appendEvent: jest.fn().mockResolvedValue(committedResult),
+    } as unknown as GamesService;
+    const controller = new GamesController(service, registry);
+
+    await controller.appendEvent(user, 'game-1', 'idem-1', {} as AppendGameEventDto);
+
+    expect(to).toHaveBeenCalledWith('game:game-1');
+    expect(emit).toHaveBeenCalledWith('game.event.committed', {
+      gameId: 'game-1',
+      sequence: 7,
+      version: 12,
+      event: persistedEvent,
+    });
   });
 });

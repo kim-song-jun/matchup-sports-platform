@@ -191,7 +191,10 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
           hasPK: leg1.result?.hasPenalty ?? false,
           pkInfo: penaltyText(leg1) || null,
           winner: w,
-          status: leg1.status,
+          // `AggregateMatchup.status` 는 이 뷰모델 내부 어휘(scheduled/in_progress/
+          // completed)다. 진행 중 여부만 `liveStatus` 에서 끌어오고 나머지는 원본
+          // 컬럼을 유지한다 — 2차전 합산 분기(아래 anyLive)와 같은 규칙이다.
+          status: leg1.liveStatus === 'live' ? 'in_progress' : leg1.status,
           legs,
           fixtureNumber,
         };
@@ -249,7 +252,9 @@ function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[]
       }
 
       const allDone = legs.every((l) => l.status === 'completed');
-      const anyLive = legs.some((l) => l.status === 'in_progress');
+      // MatchCard 와 같은 이유로 `liveStatus` 기준이다 — 원본 `status` 는 `in_progress`
+      // 로 전이되지 않으므로 여기서 보면 2차전 합산 카드도 LIVE 가 되지 않는다.
+      const anyLive = legs.some((l) => l.liveStatus === 'live');
 
       return {
         id: leg1.id,
@@ -380,7 +385,11 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
   const winner = getWinner(fixture);
   const hasResult = fixture.result !== null;
   const pk = penaltyText(fixture);
-  const isLive = fixture.status === 'in_progress';
+  // LIVE 판정은 `liveStatus`(V1Game.state 파생)로만 한다. 원본 `status` 컬럼은 서버
+  // 어디에서도 `in_progress`로 전이되지 않아서, 여기서 그 값을 보면 경기가 뛰는 중에도
+  // LIVE 배지가 영영 뜨지 않는다. 반면 `completed`는 결과 확정 시 실제로 기록되므로
+  // 종료 판정은 원본 컬럼을 그대로 쓴다.
+  const isLive = fixture.liveStatus === 'live';
   const isDone = fixture.status === 'completed';
   const timeLabel = formatTournamentDateTimeShort(fixture.scheduledAt);
 

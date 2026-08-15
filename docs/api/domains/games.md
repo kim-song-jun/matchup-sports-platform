@@ -54,6 +54,21 @@ then bounds the ascending event query by that watermark. The response therefore 
 events newer than its advertised watermark. `gap` reports the first discontinuity observed in the
 bounded rows; it is a recovery signal, not a synthesized event or an alternate pagination cursor.
 
+The three REST routes that append to the event log — `POST /events`,
+`POST /events/:eventId/reverse`, and `POST /events/:eventId/assist` — additionally broadcast
+`game.event.committed` to the `game:<gameId>` room on the `/game-operations` namespace after the
+write commits, with the same event name and payload shape the socket lane emits. Delivery is
+best-effort and never fails the HTTP write: the durable `sequence` in the database stays
+authoritative, and a dropped broadcast is recovered through HTTP backfill
+(`GET /api/v1/games/:gameId/events?afterSequence=N`) or a fresh subscribe snapshot, exactly as the
+frozen realtime contract specifies. A result whose idempotent replay carries no persisted `event`
+record is deliberately not broadcast, because a payload without the server-assigned
+`id`/`reversesEventId` corrupts a receiver's reversal bookkeeping. Receivers de-duplicate by
+durable `sequence`, so a client that observes both the socket-lane and REST-lane delivery of the
+same event is unaffected. `RealtimeGateway.afterInit()` registers the room delegate into
+`GameBroadcastRegistry`; a process that never starts the gateway (the standalone
+v1-game-operations-worker) leaves it unregistered and the broadcast is a no-op.
+
 Game events and result revisions are append-only. A reversal is a compensating event; it never
 rewrites the original event. Result participant/scorer records are validated against the
 persisted Game sides/participants and the pinned active competition configuration. Tournament

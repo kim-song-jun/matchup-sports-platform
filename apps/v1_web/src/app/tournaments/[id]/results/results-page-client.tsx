@@ -753,12 +753,16 @@ function buildGroupSections(
 /** 결과가 아직 없는 경기의 상태 표시 — 색만으로 구분하지 않도록 항상 텍스트를 함께 낸다. */
 function GroupFixtureStatusChip({ fixture }: { fixture: V1TournamentFixture }) {
   if (fixture.result !== null) return null;
+  // 원본 `status` 컬럼이 아니라 `liveStatus`(V1Game.state 파생)로 판정한다. 컬럼에는
+  // `in_progress`/`cancelled` 가 기록되지 않아서(생성 시 scheduled, 결과 확정 시
+  // completed 뿐) 그 두 분기는 도달 불가능한 죽은 가지였다 — 진행 중인 경기가 계속
+  // "경기 예정" 으로 표시되던 원인이다.
   const chip =
-    fixture.status === 'cancelled'
+    fixture.liveStatus === 'cancelled'
       ? { tone: 'tm-badge-red', label: '취소' }
-      : fixture.status === 'in_progress'
+      : fixture.liveStatus === 'live'
         ? { tone: 'tm-badge-blue', label: '진행 중' }
-        : fixture.status === 'completed'
+        : fixture.liveStatus === 'ended'
           ? { tone: 'tm-badge-grey', label: '결과 미등록' }
           : { tone: 'tm-badge-grey', label: '경기 예정' };
   return <span className={`tm-badge tm-badge-sm ${chip.tone}`}>{chip.label}</span>;

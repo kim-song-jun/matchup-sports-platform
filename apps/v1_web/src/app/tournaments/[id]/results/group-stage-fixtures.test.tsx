@@ -158,6 +158,9 @@ const twoGroupTournament = () =>
         homeTeamName: '연남 스포츠',
         awayTeamName: '망원 FC',
         status: 'scheduled',
+        // 상태 칩은 `liveStatus` 로 판정하므로 픽스처 두 필드를 함께 맞춰 둔다 —
+        // 한쪽만 바꾸면 서버가 만들지 않는 조합이 되어 테스트가 현실과 어긋난다.
+        liveStatus: 'scheduled',
       }),
     ],
   });
@@ -232,7 +235,12 @@ describe('최종결과 — 조별리그 경기 블록', () => {
       <ResultsPageContent
         tournament={makeTournament({
           groups: tournament.groups,
-          fixtures: tournament.fixtures.map((f) => ({ ...f, status: 'scheduled', result: null })),
+          fixtures: tournament.fixtures.map((f) => ({
+            ...f,
+            status: 'scheduled',
+            liveStatus: 'scheduled' as const,
+            result: null,
+          })),
         })}
       />,
     );

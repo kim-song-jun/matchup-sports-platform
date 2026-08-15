@@ -2834,7 +2834,17 @@ export type V1TournamentFixture = {
   legNumber: number;
   scheduledAt: string | null;
   venue: string | null;
+  /**
+   * 원본 `V1TournamentFixture.status` 컬럼(`scheduled|completed|cancelled`). 서버가
+   * 이 컬럼을 `in_progress`로 전이시키는 경로가 없으므로 **라이브 판정에 쓰면 안 된다** —
+   * 그 용도는 아래 `liveStatus`다.
+   */
   status: string;
+  /**
+   * `V1Game.state` 우선으로 파생한 공개 진행 상태(`scheduled|live|ended|cancelled`).
+   * 공개 일정 API(`/tournaments/:id/schedule`)가 쓰는 것과 같은 어휘·같은 판정 함수다.
+   */
+  liveStatus: string;
   homeRegistrationId: string | null;
   homeTeamId: string | null;
   homeTeamName: string | null;

@@ -2923,7 +2923,15 @@ export function useV1Tournament(id: string, options?: { livePolling?: boolean })
     enabled: !!id,
     refetchInterval: livePolling
       ? (query: { state: { data?: V1TournamentDetail } }) => {
-          const hasLiveFixture = query.state.data?.fixtures.some((f) => f.status === 'in_progress') ?? false;
+          // `f.status`(원본 컬럼)가 아니라 `f.liveStatus`(V1Game.state 파생)를 본다.
+          // 이 게이트는 원래 `f.status === 'in_progress'`였는데, 서버에는 그 컬럼을
+          // `in_progress`로 전이시키는 코드가 한 줄도 없다 — 결과 확정 시 곧바로
+          // `completed`로 갈 뿐이다. 그래서 조건이 항상 false였고, 이 훅을 유일하게
+          // livePolling으로 켜는 `/tournaments/:id/bracket`의 대진표·순위표는 경기가
+          // 진행 중이어도 한 번도 자동 갱신되지 않았다(같은 화면의 공개 일정 훅은
+          // `'live'` 어휘를 쓰는 다른 API라 정상 동작해서, 일정만 갱신되고 대진표는
+          // 멈춰 있는 형태로 드러났다).
+          const hasLiveFixture = query.state.data?.fixtures.some((f) => f.liveStatus === 'live') ?? false;
           return hasLiveFixture ? V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS : false;
         }
       : undefined,

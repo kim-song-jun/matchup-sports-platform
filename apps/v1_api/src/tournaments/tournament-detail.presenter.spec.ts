@@ -112,6 +112,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
 
   function fixtureRow(
     game: TournamentDetailRow['fixtures'][number]['game'],
+    status: TournamentDetailRow['fixtures'][number]['status'] = 'completed',
   ): TournamentDetailRow['fixtures'][number] {
     return {
       id: 'fixture-1',
@@ -121,7 +122,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       legNumber: 1,
       scheduledAt: null,
       venue: null,
-      status: 'completed',
+      status,
       homeRegistrationId: 'reg-1',
       homeRegistration: { team: { id: 'team-1', name: '서울 FC', profile: null } },
       awayRegistrationId: 'reg-2',
@@ -136,6 +137,10 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     const row = baseRow({
       fixtures: [
         fixtureRow({
+          // `state`는 공개 상세가 픽스처의 라이브 여부를 판정하는 유일한 authoritative
+          // 신호다(`V1TournamentFixture.status`는 in_progress로 전이하지 않는다).
+          // OFFICIAL 리비전이 존재하는 이 시나리오의 경기는 이미 끝난 상태다.
+          state: 'ENDED',
           sides: [
             { id: 'side-home', sideKey: 'HOME' },
             { id: 'side-away', sideKey: 'AWAY' },
@@ -186,6 +191,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     const row = baseRow({
       fixtures: [
         fixtureRow({
+          state: 'ENDED',
           sides: [
             { id: 'side-home', sideKey: 'HOME' },
             { id: 'side-away', sideKey: 'AWAY' },
@@ -236,6 +242,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     const row = baseRow({
       fixtures: [
         fixtureRow({
+          state: 'ENDED',
           sides: [],
           participants: [],
           events: [],
@@ -253,5 +260,44 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
 
     const presented = presentTournamentDetail(row);
     expect(presented.fixtures[0].result).toBeNull();
+  });
+
+  /**
+   * 이 두 케이스가 프로덕션에서 실제로 깨져 있던 조합이다. `V1TournamentFixture.status`는
+   * 생성 시 `scheduled`로 박히고 결과 확정 때 곧장 `completed`로 가며, `in_progress`로
+   * 전이시키는 writer가 코드베이스에 존재하지 않는다. 그래서 "경기가 뛰고 있는 중"을
+   * `status`만으로 판별하려던 소비자(`/tournaments/:id/bracket`의 라이브 폴링 게이트)는
+   * 조건이 영원히 false여서 대진표·순위표를 한 번도 갱신하지 않았다.
+   *
+   * 아래 첫 케이스는 그 정확한 상태(경기는 LIVE인데 fixture.status는 아직 scheduled)를
+   * 재현한다 — `liveStatus`가 없거나 `status`에서 파생되면 실패한다.
+   */
+  it('경기가 LIVE면 fixture.status가 scheduled여도 liveStatus는 live다', () => {
+    const row = baseRow({
+      fixtures: [
+        fixtureRow(
+          {
+            state: 'LIVE',
+            sides: [],
+            participants: [],
+            events: [],
+            currentOfficialRevision: null,
+          } as never,
+          'scheduled',
+        ),
+      ],
+    } as never);
+
+    const presented = presentTournamentDetail(row);
+    // 원본 컬럼은 손대지 않는다 — 어드민 화면이 이 어휘에 의존한다.
+    expect(presented.fixtures[0].status).toBe('scheduled');
+    expect(presented.fixtures[0].liveStatus).toBe('live');
+  });
+
+  it('game이 아직 없으면 liveStatus는 fixture.status에서 파생된다', () => {
+    const row = baseRow({ fixtures: [fixtureRow(null as never, 'scheduled')] } as never);
+
+    const presented = presentTournamentDetail(row);
+    expect(presented.fixtures[0].liveStatus).toBe('scheduled');
   });
 });

@@ -13,6 +13,7 @@ function makeFixture(overrides: Partial<V1TournamentFixture> = {}): V1Tournament
     scheduledAt: null,
     venue: null,
     status: 'completed',
+    liveStatus: 'ended',
     homeRegistrationId: 'reg-home',
     homeTeamId: 'team-home',
     homeTeamName: '서울 유나이티드',

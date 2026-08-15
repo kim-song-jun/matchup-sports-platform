@@ -38,6 +38,7 @@ function makeFixture(
     scheduledAt: null,
     venue: null,
     status: 'completed',
+    liveStatus: 'ended',
     homeRegistrationId: 'registration-home',
     homeTeamId: 'team-home',
     homeTeamName: '홈 팀',

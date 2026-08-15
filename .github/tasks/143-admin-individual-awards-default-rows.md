@@ -33,3 +33,4 @@
 - 기본 4행 강제 병합을 제거하고 아이콘 선택 UI를 추가했다.
 - API awards service 테스트 33/33, Web 아이콘 계약 테스트 2/2 통과.
 - v1 API/Web `tsc --noEmit` 통과.
+- PR 전체 API gate에서 schema source manifest 드리프트를 발견해 새 nullable 컬럼이 포함된 검증 완료 스키마 해시로 재고정했다.

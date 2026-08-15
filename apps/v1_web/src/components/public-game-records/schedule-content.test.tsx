@@ -212,6 +212,19 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
     expect(screen.getByRole('separator', { name: '전반과 후반 구분' })).toBeInTheDocument();
   });
 
+  it('전·후반 구분선은 카드 중앙에서 절반 폭의 점선으로 표시된다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={{
+      ...makeData(),
+      items: [fixtureEntry({
+        scorers: [{ side: 'home', participantName: '전반 선수', jerseyNumber: 7, period: 1, clockMs: 60_000 }],
+      })],
+    }} />);
+
+    const separator = screen.getByRole('separator', { name: '전반과 후반 구분' });
+    expect(separator).toHaveStyle({ width: '50%', justifySelf: 'center' });
+    expect(separator.getAttribute('style')).toContain('border-top: 1px dotted var(--border)');
+  });
+
   it('득점이 없으면 득점 영역과 구분선을 모두 표시하지 않는다', () => {
     render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry()] }} />);
 

@@ -519,7 +519,7 @@ describe('ScheduleContent — 일정 카드 득점자 요약', () => {
           items: [
             {
               ...makeSchedule().items[0],
-              scorers: [{ side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 600_000 }],
+              scorers: [{ side: 'home', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 }],
             },
           ],
         })}
@@ -543,7 +543,7 @@ describe('ScheduleContent — 일정 카드 득점자 요약', () => {
           items: [
             {
               ...makeSchedule().items[0],
-              scorers: [{ side: 'away', participantName: null, jerseyNumber: null, clockMs: 300_000 }],
+              scorers: [{ side: 'away', participantName: null, jerseyNumber: null, period: 2, clockMs: 300_000 }],
             },
           ],
         })}

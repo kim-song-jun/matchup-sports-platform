@@ -78,6 +78,7 @@ export interface PublicScheduleScorer {
   readonly side: 'home' | 'away';
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;
+  readonly period: number | null;
   readonly clockMs: number | null;
 }
 

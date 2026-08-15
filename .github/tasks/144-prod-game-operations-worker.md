@@ -25,6 +25,7 @@ outbox without a production consumer.
 - `.github/workflows/deploy.yml`
 - `deploy/DEPLOY_GUIDE.md`
 - `scripts/qa/test-prod-release-state.sh`
+- `.changeset/quiet-workers-run.md`
 
 ## Forbidden files
 

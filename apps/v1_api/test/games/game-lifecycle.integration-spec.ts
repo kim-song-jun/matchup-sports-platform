@@ -266,7 +266,7 @@ describe('Task 6 L1 game lifecycle', () => {
       tournamentHomeSideId,
       'lineup-save',
       {
-        expectedVersion: 0,
+        expectedVersion: 1,
         clientCommandId: 'lineup-save',
         formation: '1-0',
         // football-v1 pins minPlayers:7/maxPlayers:11 (added lineup-size gate on
@@ -326,8 +326,8 @@ describe('Task 6 L1 game lifecycle', () => {
       'lineup-save-away',
       {
         // Lineup CAS is side-scoped: HOME save/submit must not stale AWAY's
-        // first editor, whose latest lineup revision is still 0.
-        expectedVersion: 0,
+        // first editor, whose latest auto-created lineup revision is still 1.
+        expectedVersion: 1,
         clientCommandId: 'lineup-save-away',
         formation: '1-0',
         participants: Array.from({ length: 7 }, (_, index) => ({

@@ -144,7 +144,7 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
       started: true,
     }));
     const saved = await games.saveLineup(authUser(ids.platformOps), gameId, homeSideId, 'records-e2e-lineup', {
-      expectedVersion: 0,
+      expectedVersion: 1,
       clientCommandId: 'records-e2e-lineup',
       participants: [
         { displayNameSnapshot: 'Records E2E Player', jerseyNumber: 10, position: 'GOLEIRO', started: true, userId: ids.targetUser },

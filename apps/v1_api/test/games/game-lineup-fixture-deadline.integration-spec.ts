@@ -158,7 +158,7 @@ describe('GamesService.saveLineup rejects tournament-fixture saves once the game
     expect(before.state).toBe('SCHEDULED');
 
     const firstSave = await games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-fixture-deadline-first-save', {
-      expectedVersion: 0,
+      expectedVersion: 1,
       clientCommandId: 'idem-fixture-deadline-first-save',
       participants: starters(minPlayers),
     });

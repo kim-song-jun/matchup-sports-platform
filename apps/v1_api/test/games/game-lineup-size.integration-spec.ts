@@ -175,7 +175,7 @@ describe('GamesService.saveLineup enforces the pinned competition config roster-
 
     const before = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
     const saved = await games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-size-at-cap', {
-      expectedVersion: 0,
+      expectedVersion: 1,
       clientCommandId: 'idem-game-lineup-size-at-cap',
       participants: starters(pinnedMaxPlayers),
     });

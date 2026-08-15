@@ -611,6 +611,12 @@ describe('골키퍼 지정 버튼의 aria-label 조사(을/를)', () => {
   });
 
   it('받침 있는 이름에는 "을"을 붙인다', () => {
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(
+      baseRoster([
+        { userId: 'u-hong', name: '홍길동' },
+        { userId: 'u-cheol', name: '박철' },
+      ]),
+    );
     hoisted.useV1GameLineupsMock.mockReturnValue({
       data: [baseGameLineup()], // displayNameSnapshot: '홍길동' (받침 있음)
       isLoading: false,
@@ -621,7 +627,7 @@ describe('골키퍼 지정 버튼의 aria-label 조사(을/를)', () => {
 
     render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
 
-    expect(screen.getByRole('button', { name: '홍길동을 골키퍼로 지정' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '박철을 골키퍼로 지정' })).toBeInTheDocument();
   });
 });
 

@@ -208,7 +208,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
         ...guests(pinnedMinPlayers - 1, 'happy'),
       ],
     });
-    expect(saved.version).toBe(before + 1);
+    expect(saved.lineupRevision).toBe(before + 1);
 
     const participant = await prisma.v1GameParticipant.findFirstOrThrow({
       where: { lineupId: saved.lineupId, displayNameSnapshot: 'Roster Link Member' },
@@ -244,7 +244,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
         ...guests(pinnedMinPlayers - 1, 'self'),
       ],
     });
-    expect(saved.version).toBe(before + 1);
+    expect(saved.lineupRevision).toBe(before + 1);
 
     const participant = await prisma.v1GameParticipant.findFirstOrThrow({
       where: { lineupId: saved.lineupId, displayNameSnapshot: 'Roster Link Manager Self' },
@@ -312,7 +312,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
         ...guests(pinnedMinPlayers - 1, 'pure-guest'),
       ],
     });
-    expect(saved.version).toBe(before + 1);
+    expect(saved.lineupRevision).toBe(before + 1);
 
     const participant = await prisma.v1GameParticipant.findFirstOrThrow({
       where: { lineupId: saved.lineupId, displayNameSnapshot: 'Roster Link Pure Guest' },

@@ -1,5 +1,11 @@
 # v1_web
 
+## 0.4.1
+
+### Patch Changes
+
+- 656a122: Allow the production promotion gate to verify Changesets that were added and consumed entirely between the main and dev revisions.
+
 ## 0.4.0
 
 ### Minor Changes

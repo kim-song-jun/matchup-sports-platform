@@ -185,10 +185,19 @@ describe('fixture-lineup.view-model — 등록 명단이 유일한 출처', () =
 
   it('저장 페이로드는 등록 명단의 userId를 함께 실어 보낸다', () => {
     const payload = buildSavePayload(withOneStarter(), 'GK');
+    expect(payload.expectedVersion).toBe(0);
     expect(payload.participants).toEqual([
       expect.objectContaining({ userId: 'user-hong', displayNameSnapshot: '홍길동', started: true }),
       expect.objectContaining({ userId: 'user-kim', displayNameSnapshot: '김철수', started: false }),
     ]);
+  });
+
+  it('상대 팀과 공유하는 game version이 아니라 내 사이드의 최신 lineup revision을 CAS로 쓴다', () => {
+    const saved = lineup([participant({ userId: HONG.userId, started: true })]);
+    const state = hydrateFixtureLineupState([saved], 'side-1', 99, 'GK', [HONG, KIM]);
+
+    expect(state.lineupRevision).toBe(2);
+    expect(buildSavePayload(toggleStarter(state, KIM.userId), 'GK').expectedVersion).toBe(2);
   });
 });
 

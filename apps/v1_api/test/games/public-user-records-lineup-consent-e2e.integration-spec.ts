@@ -138,17 +138,16 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
     // 1) 라인업 저장 -- targetUser를 로스터에 지정한다. saveLineup이 같은
     // 트랜잭션에서 ROSTER_ASSERTED 연결을 자동 생성한다(별도 연결 요청/승인
     // 없이 -- 이게 이번 작업이 메운 공백이다).
-    const beforeLineup = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
     const guests = Array.from({ length: Math.max(minPlayers - 1, 0) }, (_, index) => ({
       displayNameSnapshot: `Records E2E guest ${index + 1}`,
       jerseyNumber: 50 + index,
       started: true,
     }));
     const saved = await games.saveLineup(authUser(ids.platformOps), gameId, homeSideId, 'records-e2e-lineup', {
-      expectedVersion: beforeLineup.version,
+      expectedVersion: 1,
       clientCommandId: 'records-e2e-lineup',
       participants: [
-        { displayNameSnapshot: 'Records E2E Player', jerseyNumber: 10, started: true, userId: ids.targetUser },
+        { displayNameSnapshot: 'Records E2E Player', jerseyNumber: 10, position: 'GOLEIRO', started: true, userId: ids.targetUser },
         ...guests,
       ],
     });

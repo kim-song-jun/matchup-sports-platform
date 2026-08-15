@@ -383,6 +383,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   // 설정을 몰라 "몇 명이어야 맞는지"를 말할 수 없었다. 고른 대형과 선발 수의 차이 자체는
   // 여기가 아니라 PitchFormationEditor가 드롭다운 바로 아래에서 따로 알려준다.
   const starterCount = state.starters.length;
+  const goalkeeperCount = state.starters.filter((entry) => entry.goalkeeper).length;
   const outfieldGuidance = !formationSupported
     ? null
     : formationOptions.length === 0
@@ -396,11 +397,13 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     activeSlots !== null ? matchSlotsToEntries(activeSlots, state.starters).filter((row) => row.entry === null).length : 0;
   // 제출을 막는 사유. null 이면 제출 가능하다 — 버튼의 disabled 조건과 하단 CTA 안내
   // 문구가 같은 값을 보므로 "버튼은 잠겼는데 이유는 안 보이는" 어긋남이 생기지 않는다.
-  const submitBlockedReason = state.dirty
-    ? '저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요.'
+  const goalkeeperBlockedReason = goalkeeperCount === 1 ? null : '선발 골키퍼를 한 명 지정해 주세요.';
+  const submitBlockedReason = goalkeeperBlockedReason
+    ?? (state.dirty
+      ? '저장하지 않은 변경사항이 있어요 — 먼저 저장해 주세요.'
     : emptySlotCount > 0
       ? `포지션 자리 ${emptySlotCount}개가 비어 있어요.`
-      : null;
+      : null);
 
   /** 히스토리·프리셋을 시트가 읽는 한 가지 모양으로 맞춘다. */
   const loadableHistory: LoadableLineup[] = (historyQuery.data?.items ?? []).map((item) => ({
@@ -555,7 +558,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
       setState((prev) =>
         prev === null
           ? prev
-          : { ...prev, gameVersion: result.version, lineupId: result.lineupId, lineupState: 'DRAFT', dirty: false },
+          : { ...prev, lineupRevision: result.lineupRevision, lineupId: result.lineupId, lineupState: 'DRAFT', dirty: false },
       );
       setSaveStatus('saved');
     } catch (err) {
@@ -568,9 +571,9 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
     if (state === null || state.lineupId === null) return;
     setSaveError(null);
     try {
-      const result = await submitMutation.mutateAsync({ lineupId: state.lineupId, expectedVersion: state.gameVersion });
+      const result = await submitMutation.mutateAsync({ lineupId: state.lineupId, expectedVersion: state.lineupRevision });
       setState((prev) =>
-        prev === null ? prev : { ...prev, gameVersion: result.version, lineupState: 'SUBMITTED', dirty: false },
+        prev === null ? prev : { ...prev, lineupRevision: result.lineupRevision, lineupState: 'SUBMITTED', dirty: false },
       );
       // 새로 제출됐으니 재편집 세션은 닫는다 — 다시 바꾸려면 "다시 편집하기"를 또 눌러야
       // 한다(제출 완료를 매번 인지한 뒤 편집하게 하려는 의도, 실수로 이어지는 편집 방지).
@@ -601,7 +604,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
 
   return (
     <AppChrome title="라인업" activeTab="tournaments" backHref={`/tournaments/${tournamentId}`} bottomNav={false} desktopHead>
-      <div style={{ padding: '0 16px 96px', display: 'grid', gap: 14 }}>
+      <div className="tm-fixture-lineup-page" style={{ display: 'grid', gap: 14 }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">{homeName} vs {awayName}</div>
           <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
@@ -769,26 +772,25 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                   sub="대회 참가 신청의 선수 명단을 먼저 채워 주세요 — 라인업은 그 명단에서 고르는 거예요."
                 />
               ) : (
-                <Card pad={0}>
-                  {rosterEntries.map((entry, index) => {
+                <div className="tm-fixture-lineup-roster-grid">
+                  {rosterEntries.map((entry) => {
                     const jerseyInputId = `lineup-jersey-${entry.key}`;
                     const isStarter = starterKeys.has(entry.key);
                     return (
-                      <div
+                      <Card
                         key={entry.key}
+                        pad={12}
                         style={{
-                          padding: 12,
-                          ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}),
                           // 선발은 배경 틴트로도 구분한다 — 체크 표시 하나에만 기대면
                           // 목록이 길어질수록 "지금 몇 명이 선발인지"가 눈으로 안 잡힌다.
                           ...(isStarter ? { background: 'var(--blue50)' } : {}),
                         }}
                       >
-                        {/* 1줄: 선발 체크 · 골키퍼 지정 · 이름. 등번호는 아래 줄에
+                        {/* 1줄: 선발 체크 · 이름 · 상태. 골키퍼와 등번호는 아래 줄에
                             라벨과 함께 독립된 자리를 준다(2026-08 사용자 지적: 등번호 입력이
                             "전혀 없는 것처럼" 보였다 — 이름·버튼들 사이에 낀 56px 빈 칸으로는
                             입력 가능한 필드라는 게 눈에 띄지 않았다). */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="tm-fixture-lineup-player-main">
                           <label
                             style={{
                               flexShrink: 0,
@@ -809,45 +811,6 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                               style={{ width: 22, height: 22, accentColor: 'var(--blue500)' }}
                             />
                           </label>
-                          {/* 골키퍼는 선발 중에서만 정한다 — 후보 행에도 GK 배지가 있으면
-                              "후보 골키퍼"라는 없는 상태가 있는 것처럼 읽힌다. 자리는 비워
-                              두지 않고 같은 폭을 차지하게 해 이름 열이 행마다 어긋나지 않게 한다. */}
-                          {isStarter ? (
-                          <button
-                            type="button"
-                            aria-pressed={entry.goalkeeper}
-                            disabled={!editable}
-                            onClick={() =>
-                              setState((prev) => (prev ? withSeatedNewcomers(prev, setGoalkeeper(prev, entry.key)) : prev))
-                            }
-                            aria-label={
-                              entry.goalkeeper
-                                ? `${entry.displayName}, 골키퍼로 지정됨`
-                                : josa(entry.displayName, ['을', '를']) + ' 골키퍼로 지정'
-                            }
-                            style={{
-                              flexShrink: 0,
-                              minWidth: 44,
-                              minHeight: 44,
-                              borderRadius: 999,
-                              // 2026-08 QA 지적: 미지정 상태(점선 아웃라인 이전 버전)도 "GK"가
-                              // 진하게 박힌 원이라 선발 전원이 골키퍼처럼 보였다. 지정된 1명만
-                              // 피치 토큰(PlayerToken)과 동일한 orange700 채움 배지로 "확정"
-                              // 느낌을 주고, 미지정은 점선 아웃라인(이 파일의 EmptySlotMarker와
-                              // 같은 "탭해서 지정" 관용구)으로 눌리지 않은 토글임을 분명히 한다.
-                              border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1.5px dashed var(--grey300)',
-                              background: entry.goalkeeper ? 'var(--orange700)' : 'transparent',
-                              color: entry.goalkeeper ? '#fff' : 'var(--text-caption)',
-                              fontSize: 12,
-                              fontWeight: entry.goalkeeper ? 800 : 600,
-                              cursor: editable ? 'pointer' : 'default',
-                            }}
-                          >
-                            GK
-                          </button>
-                          ) : (
-                            <span aria-hidden="true" style={{ flexShrink: 0, width: 44 }} />
-                          )}
                           <span
                             className="tm-text-label"
                             style={{
@@ -868,7 +831,28 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                             {isStarter ? '선발' : '후보'}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                        <div className="tm-fixture-lineup-player-controls">
+                          {isStarter ? (
+                            <button
+                              type="button"
+                              className="tm-fixture-lineup-gk"
+                              aria-pressed={entry.goalkeeper}
+                              disabled={!editable}
+                              onClick={() =>
+                                setState((prev) => (prev ? withSeatedNewcomers(prev, setGoalkeeper(prev, entry.key)) : prev))
+                              }
+                              aria-label={
+                                entry.goalkeeper
+                                  ? `${entry.displayName}, 골키퍼로 지정됨`
+                                  : josa(entry.displayName, ['을', '를']) + ' 골키퍼로 지정'
+                              }
+                              data-selected={entry.goalkeeper}
+                            >
+                              GK
+                            </button>
+                          ) : (
+                            <span aria-hidden="true" className="tm-fixture-lineup-gk-placeholder" />
+                          )}
                           <label
                             htmlFor={jerseyInputId}
                             className="tm-text-caption"
@@ -879,7 +863,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                                 buildSavePayload가 null이면 아예 필드를 생략) — "필수처럼 보여서
                                 막힌 줄 알았다"는 오해를 막기 위해 선택 입력임을 라벨에서 바로
                                 밝힌다(2026-08 QA 지적). */}
-                            <span style={{ fontWeight: 400, color: 'var(--text-caption)' }}> (선택)</span>
+                            <span className="tm-fixture-lineup-optional" style={{ fontWeight: 400, color: 'var(--text-caption)' }}> (선택)</span>
                           </label>
                           <input
                             id={jerseyInputId}
@@ -888,7 +872,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                             aria-label={`${entry.displayName} 등번호`}
                             className="tm-input"
                             placeholder="번호"
-                            style={{ width: 72, textAlign: 'center', fontWeight: 700 }}
+                            style={{ textAlign: 'center', fontWeight: 700 }}
                             value={entry.jerseyNumber ?? ''}
                             disabled={!editable}
                             onChange={(event) =>
@@ -900,10 +884,10 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                             }
                           />
                         </div>
-                      </div>
+                      </Card>
                     );
                   })}
-                </Card>
+                </div>
               )}
             </section>
 
@@ -957,7 +941,8 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               // 보조 액션과 이미 같은 언어(테두리 + 옅은 배경)라 활성 상태가 분명히 눌러지는
               // 버튼으로 보이면서도 파란 주 CTA(라인업 제출하기)를 침범하지 않는다.
               className="tm-btn tm-btn-lg tm-btn-outline"
-              disabled={saveMutation.isPending}
+              disabled={saveMutation.isPending || goalkeeperBlockedReason !== null}
+              aria-describedby={goalkeeperBlockedReason !== null ? 'fixture-lineup-submit-blocked' : undefined}
               onClick={handleSave}
             >
               {/* "저장했어요"는 마지막 저장 이후 편집이 없을 때만 참이다 — 예전에는

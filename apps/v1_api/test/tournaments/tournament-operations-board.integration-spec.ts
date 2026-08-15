@@ -1677,6 +1677,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       // subject (draft capture + listLineups projection) exercised.
       participants: Array.from({ length: 7 }, (_, index) => ({
         displayNameSnapshot: `Player ${index + 1}`,
+        ...(index === 0 ? { position: 'GK' } : {}),
         started: true,
       })),
     };
@@ -1776,7 +1777,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
       lastSequence: 0,
     });
     const dto: SubmitGameLineupDto = {
-      expectedVersion: 2,
+      expectedVersion: 1,
       clientCommandId: 'task18-submit-again',
       takeoverToken: submitAgainTakeover.takeoverToken,
     };
@@ -1805,15 +1806,15 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
   // 앞에 둔다. 순서를 뒤집으면 이 테스트가 LIVE 상태의 게임에 저장을 시도하게 되어
   // 검증 대상(권한)이 아니라 상태 게이트에 걸릴 수 있다.
   it('allows lineup capture by a field_operator scoped to the fixture (2026-08-11: lineup_mutate granted)', async () => {
-    const current = await lineupPrisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
     const dto: SaveGameLineupDto = {
-      expectedVersion: current.version,
+      expectedVersion: 0,
       clientCommandId: 'task18-lineup-field-operator-allowed',
       // Same football-v1 minPlayers:7/maxPlayers:11 roster-size gate as the director capture test
       // above -- a real payload, not the old denial test's `participants: []` placeholder (which
       // only worked because it never reached this validation before the 403).
       participants: Array.from({ length: 7 }, (_, index) => ({
         displayNameSnapshot: `FO Player ${index + 1}`,
+        ...(index === 0 ? { position: 'GK' } : {}),
         started: true,
       })),
     };
@@ -3226,6 +3227,7 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
         // (200 + envelope shape + Idempotency-Key header) exercised.
         participants: Array.from({ length: 7 }, (_, index) => ({
           displayNameSnapshot: `HTTP Player ${index + 1}`,
+          ...(index === 0 ? { position: 'GK' } : {}),
           started: true,
         })),
       })
@@ -3243,7 +3245,6 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
   // `awaySideAId` with a freshly-read game version so it doesn't perturb the director test's
   // hardcoded `expectedVersion: 0` against `homeSideAId` above.
   it('lineup PUT: allows a field_operator scoped to the fixture to save a lineup, returning 200 (2026-08-11: lineup_mutate granted)', async () => {
-    const current = await httpPrisma.v1Game.findUniqueOrThrow({ where: { id: gameAId } });
     const clientCommandId = randomUUID();
     const res = await request(app.getHttpServer())
       .put(`/api/v1/tournament-ops/tournaments/${httpIds.tournamentA}/fixtures/${httpIds.fixtureA}/lineup/${awaySideAId}`)
@@ -3253,10 +3254,11 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
       // always mismatches). The director save test above sets this; this test must too.
       .set('idempotency-key', clientCommandId)
       .send({
-        expectedVersion: current.version,
+        expectedVersion: 0,
         clientCommandId,
         participants: Array.from({ length: 7 }, (_, index) => ({
           displayNameSnapshot: `FO HTTP Player ${index + 1}`,
+          ...(index === 0 ? { position: 'GK' } : {}),
           started: true,
         })),
       })

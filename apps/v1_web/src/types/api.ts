@@ -3005,10 +3005,22 @@ export type V1TournamentAward = {
   id: string;
   awardType: string;   // 'mvp' | 'top_scorer' | ...
   awardLabel: string;  // 'MVP' | '득점왕' | ...
+  iconKey?: V1TournamentAwardIconKey | null;
   recipientName: string;
   teamName: string | null;
   note: string | null;
 };
+
+export type V1TournamentAwardIconKey =
+  | 'trophy'
+  | 'crown'
+  | 'goal'
+  | 'shield'
+  | 'glove'
+  | 'handshake'
+  | 'sparkles'
+  | 'medal'
+  | 'star';
 
 /** Shared payment summary embedded in registrations */
 export type V1TournamentPaymentSummary = {

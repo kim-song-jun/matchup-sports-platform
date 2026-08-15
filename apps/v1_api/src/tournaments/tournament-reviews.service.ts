@@ -8,7 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ListTournamentReviewsQueryDto {
@@ -67,6 +67,10 @@ export class TournamentAwardItemDto {
 
   @IsString()
   awardLabel!: string;
+
+  @IsOptional()
+  @IsIn(['trophy', 'crown', 'goal', 'shield', 'glove', 'handshake', 'sparkles', 'medal', 'star'])
+  iconKey?: string;
 
   @IsString()
   recipientName!: string;
@@ -489,6 +493,7 @@ export class TournamentReviewsService {
       id: a.id,
       awardType: a.awardType,
       awardLabel: a.awardLabel,
+      iconKey: a.iconKey ?? null,
       recipientName: a.recipientName,
       teamName: a.teamName ?? null,
       note: a.note ?? null,
@@ -584,6 +589,7 @@ export class TournamentReviewsService {
             tournamentId,
             awardType: a.awardType,
             awardLabel: a.awardLabel,
+            iconKey: a.iconKey ?? null,
             recipientName: a.recipientName,
             teamName: a.teamName,
             note: a.note ?? null,
@@ -601,6 +607,7 @@ export class TournamentReviewsService {
           beforeJson: {
             awards: before.map((a) => ({
               awardLabel: a.awardLabel,
+              iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
               teamName: a.teamName ?? null,
             })),
@@ -608,6 +615,7 @@ export class TournamentReviewsService {
           afterJson: {
             awards: awards.map((a) => ({
               awardLabel: a.awardLabel,
+              iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
               teamName: a.teamName,
             })),

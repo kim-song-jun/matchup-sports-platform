@@ -98,7 +98,13 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
   }
 
   async function currentVersion(): Promise<number> {
-    return (await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } })).version;
+    return (
+      await prisma.v1GameLineup.findFirst({
+        where: { gameId, sideId: hostSideId },
+        orderBy: { revision: 'desc' },
+        select: { revision: true },
+      })
+    )?.revision ?? 0;
   }
 
   beforeAll(async () => {
@@ -198,7 +204,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
       expectedVersion: before,
       clientCommandId: 'idem-roster-link-happy',
       participants: [
-        { displayNameSnapshot: 'Roster Link Member', jerseyNumber: 7, started: true, userId: ids.memberUser },
+        { displayNameSnapshot: 'Roster Link Member', jerseyNumber: 7, position: 'GOLEIRO', started: true, userId: ids.memberUser },
         ...guests(pinnedMinPlayers - 1, 'happy'),
       ],
     });
@@ -234,7 +240,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
       expectedVersion: before,
       clientCommandId: 'idem-roster-link-self',
       participants: [
-        { displayNameSnapshot: 'Roster Link Manager Self', jerseyNumber: 9, started: true, userId: ids.managerUser },
+        { displayNameSnapshot: 'Roster Link Manager Self', jerseyNumber: 9, position: 'GOLEIRO', started: true, userId: ids.managerUser },
         ...guests(pinnedMinPlayers - 1, 'self'),
       ],
     });
@@ -266,7 +272,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
         expectedVersion: before,
         clientCommandId: 'idem-roster-link-not-member',
         participants: [
-          { displayNameSnapshot: 'Roster Link Outsider', jerseyNumber: 11, started: true, userId: ids.outsiderUser },
+          { displayNameSnapshot: 'Roster Link Outsider', jerseyNumber: 11, position: 'GOLEIRO', started: true, userId: ids.outsiderUser },
           ...guests(pinnedMinPlayers - 1, 'not-member'),
         ],
       }),
@@ -286,7 +292,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
         expectedVersion: before,
         clientCommandId: 'idem-roster-link-duplicate',
         participants: [
-          { displayNameSnapshot: 'Roster Link Dup Starter', jerseyNumber: 1, started: true, userId: ids.memberUser },
+          { displayNameSnapshot: 'Roster Link Dup Starter', jerseyNumber: 1, position: 'GOLEIRO', started: true, userId: ids.memberUser },
           { displayNameSnapshot: 'Roster Link Dup Bench', jerseyNumber: 2, started: true, userId: ids.memberUser },
           ...guests(Math.max(pinnedMinPlayers - 2, 0), 'duplicate'),
         ],
@@ -302,7 +308,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
       expectedVersion: before,
       clientCommandId: 'idem-roster-link-guest',
       participants: [
-        { displayNameSnapshot: 'Roster Link Pure Guest', jerseyNumber: 13, started: true },
+        { displayNameSnapshot: 'Roster Link Pure Guest', jerseyNumber: 13, position: 'GOLEIRO', started: true },
         ...guests(pinnedMinPlayers - 1, 'pure-guest'),
       ],
     });

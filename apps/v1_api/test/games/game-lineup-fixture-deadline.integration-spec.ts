@@ -66,6 +66,7 @@ function starters(count: number) {
   return Array.from({ length: count }, (_, index) => ({
     displayNameSnapshot: `Fixture deadline participant ${index + 1}`,
     jerseyNumber: index + 1,
+    ...(index === 0 ? { position: 'GOLEIRO' } : {}),
     started: true,
   }));
 }
@@ -157,7 +158,7 @@ describe('GamesService.saveLineup rejects tournament-fixture saves once the game
     expect(before.state).toBe('SCHEDULED');
 
     const firstSave = await games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-fixture-deadline-first-save', {
-      expectedVersion: before.version,
+      expectedVersion: 0,
       clientCommandId: 'idem-fixture-deadline-first-save',
       participants: starters(minPlayers),
     });
@@ -168,7 +169,7 @@ describe('GamesService.saveLineup rejects tournament-fixture saves once the game
     // go through as long as the game hasn't started yet.
     const afterFirstSave = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
     const resave = await games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-fixture-deadline-resave', {
-      expectedVersion: afterFirstSave.version,
+      expectedVersion: firstSave.lineupRevision,
       clientCommandId: 'idem-fixture-deadline-resave',
       participants: starters(minPlayers),
     });

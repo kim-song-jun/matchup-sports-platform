@@ -75,6 +75,7 @@ function starters(count: number) {
   return Array.from({ length: count }, (_, index) => ({
     displayNameSnapshot: `Lineup size participant ${index + 1}`,
     jerseyNumber: index + 1,
+    ...(index === 0 ? { position: 'GOLEIRO' } : {}),
     started: true,
   }));
 }
@@ -174,7 +175,7 @@ describe('GamesService.saveLineup enforces the pinned competition config roster-
 
     const before = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
     const saved = await games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-size-at-cap', {
-      expectedVersion: before.version,
+      expectedVersion: 0,
       clientCommandId: 'idem-game-lineup-size-at-cap',
       participants: starters(pinnedMaxPlayers),
     });
@@ -184,7 +185,7 @@ describe('GamesService.saveLineup enforces the pinned competition config roster-
     const afterSave = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
     const overCap = await captureFailure(() =>
       games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-size-over-cap', {
-        expectedVersion: afterSave.version,
+        expectedVersion: saved.lineupRevision,
         clientCommandId: 'idem-game-lineup-size-over-cap',
         participants: starters(pinnedMaxPlayers + 1),
       }),
@@ -199,14 +200,50 @@ describe('GamesService.saveLineup enforces the pinned competition config roster-
     expect(afterRejection.version).toBe(afterSave.version);
   });
 
+  it('requires exactly one starting goalkeeper using the sport-specific position code', async () => {
+    const latestLineup = await prisma.v1GameLineup.findFirstOrThrow({
+      where: { gameId, sideId: hostSideId },
+      orderBy: { revision: 'desc' },
+    });
+    const noGoalkeeper = starters(pinnedMinPlayers).map((participant) => ({
+      displayNameSnapshot: participant.displayNameSnapshot,
+      jerseyNumber: participant.jerseyNumber,
+      started: participant.started,
+    }));
+    const missing = await captureFailure(() =>
+      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-gk-missing', {
+        expectedVersion: latestLineup.revision,
+        clientCommandId: 'idem-game-lineup-gk-missing',
+        participants: noGoalkeeper,
+      }),
+    );
+    expectHttpCode(missing, 422, 'LINEUP_GOALKEEPER_INVALID');
+
+    const multipleGoalkeepers = starters(pinnedMinPlayers).map((participant, index) =>
+      index === 1 ? { ...participant, position: 'GOLEIRO' } : participant,
+    );
+    const multiple = await captureFailure(() =>
+      games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-gk-multiple', {
+        expectedVersion: latestLineup.revision,
+        clientCommandId: 'idem-game-lineup-gk-multiple',
+        participants: multipleGoalkeepers,
+      }),
+    );
+    expectHttpCode(multiple, 422, 'LINEUP_GOALKEEPER_INVALID');
+  });
+
   it('rejects a roster below the pinned minPlayers, with the count in the error message', async () => {
     expect(pinnedMinPlayers).toBeGreaterThan(0);
     const belowMinCount = pinnedMinPlayers - 1;
 
     const before = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    const latestLineup = await prisma.v1GameLineup.findFirstOrThrow({
+      where: { gameId, sideId: hostSideId },
+      orderBy: { revision: 'desc' },
+    });
     const belowMin = await captureFailure(() =>
       games.saveLineup(authUser(ids.platformOpsUser), gameId, hostSideId, 'idem-game-lineup-size-below-min', {
-        expectedVersion: before.version,
+        expectedVersion: latestLineup.revision,
         clientCommandId: 'idem-game-lineup-size-below-min',
         participants: starters(belowMinCount),
       }),

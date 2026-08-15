@@ -277,10 +277,30 @@ describe('Task 6 L1 game lifecycle', () => {
         // exercised without tripping the new invariant.
         participants: Array.from({ length: 7 }, (_, index) => ({
           displayNameSnapshot: `Lifecycle Player ${index + 1}`,
+          ...(index === 0 ? { position: 'GK' } : {}),
           started: true,
         })),
       },
     );
+    const staleSameSideSave = await captureFailure(() =>
+      service.saveLineup(
+        authUser(ids.operatorUser),
+        tournamentGameId,
+        tournamentHomeSideId,
+        'lineup-save-stale-same-side',
+        {
+          expectedVersion: 0,
+          clientCommandId: 'lineup-save-stale-same-side',
+          formation: '1-0',
+          participants: Array.from({ length: 7 }, (_, index) => ({
+            displayNameSnapshot: `Stale Lifecycle Player ${index + 1}`,
+            ...(index === 0 ? { position: 'GK' } : {}),
+            started: true,
+          })),
+        },
+      ),
+    );
+    expectHttpCode(staleSameSideSave, 409, 'VERSION_CONFLICT');
     const lineupSubmitToken = await grantTournamentTakeover(tournamentGameId, ids.operatorUser);
     const submittedLineup = await service.submitLineup(
       authUser(ids.operatorUser),
@@ -288,7 +308,7 @@ describe('Task 6 L1 game lifecycle', () => {
       String(savedLineup.lineupId),
       'lineup-submit',
       {
-        expectedVersion: 1,
+        expectedVersion: savedLineup.lineupRevision,
         clientCommandId: 'lineup-submit',
         takeoverToken: lineupSubmitToken,
       },
@@ -305,13 +325,14 @@ describe('Task 6 L1 game lifecycle', () => {
       tournamentAwaySideId,
       'lineup-save-away',
       {
-        // Game version is a single counter shared across every command on the
-        // game -- by this point it's already at 2 (home lineup save + submit).
-        expectedVersion: 2,
+        // Lineup CAS is side-scoped: HOME save/submit must not stale AWAY's
+        // first editor, whose latest lineup revision is still 0.
+        expectedVersion: 0,
         clientCommandId: 'lineup-save-away',
         formation: '1-0',
         participants: Array.from({ length: 7 }, (_, index) => ({
           displayNameSnapshot: `Away Lifecycle Player ${index + 1}`,
+          ...(index === 0 ? { position: 'GK' } : {}),
           started: true,
         })),
       },
@@ -323,7 +344,7 @@ describe('Task 6 L1 game lifecycle', () => {
       String(awaySavedLineup.lineupId),
       'lineup-submit-away',
       {
-        expectedVersion: 3,
+        expectedVersion: awaySavedLineup.lineupRevision,
         clientCommandId: 'lineup-submit-away',
         takeoverToken: awayLineupSubmitToken,
       },

@@ -139,7 +139,7 @@ function baseGameLineup(overrides: Partial<GameLineup> = {}): GameLineup {
         userId: null,
         displayNameSnapshot: '홍길동',
         jerseyNumber: 7,
-        position: null,
+        position: 'GK',
         positionX: null,
         positionY: null,
         started: true,
@@ -273,6 +273,25 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
     );
   });
 
+  it('선발 골키퍼가 없으면 저장과 제출을 모두 막고 이유를 보여준다', () => {
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(), isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: baseGame(), isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [baseGameLineup({
+        participants: baseGameLineup().participants.map((participant) => ({ ...participant, position: null })),
+      })],
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '라인업 제출하기' })).toBeDisabled();
+    expect(screen.getByText('선발 골키퍼를 한 명 지정해 주세요.')).toBeInTheDocument();
+  });
+
   it('하단 고정 CTA를 쓰므로 하단 탭바를 렌더하지 않는다', () => {
     // .tm-fixed-cta 는 bottom:0, 탭바는 74px 높이로 같은 자리를 쓴다. 둘을 함께 띄우면
     // 저장·제출 버튼과 "배치 설정" 바텀시트 하단이 탭바에 가려진다(2026-08-13 제보).
@@ -293,6 +312,7 @@ describe('FixtureLineupPageClient — 실패 상태에서 빠져나올 길', () 
     });
 
     const { container } = render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    expect(container.querySelector('.tm-fixture-lineup-page')).toBeInTheDocument();
 
     expect(container.querySelector('.tm-fixed-cta')).not.toBeNull();
     expect(screen.queryByRole('navigation', { name: '주요 메뉴' })).not.toBeInTheDocument();
@@ -333,7 +353,7 @@ describe('FixtureLineupPageClient — 등록 명단에서 선발 고르기', () 
   });
 
   it('등록 명단 전원이 한 목록에 뜨고, 저장된 선발만 체크돼 있다', () => {
-    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+    const { container } = render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
 
     // 저장된 라인업에는 홍길동 한 명뿐이지만, 명단에 있는 나머지도 후보로 함께 보여야
     // 팀장이 "누구를 넣을 수 있는지"를 이 화면에서 판단할 수 있다.
@@ -341,6 +361,7 @@ describe('FixtureLineupPageClient — 등록 명단에서 선발 고르기', () 
     expect(screen.getByRole('checkbox', { name: '김후보 선발' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: '김알파 선발' })).not.toBeChecked();
     expect(screen.getByText('선발 1명 · 후보 3명')).toBeInTheDocument();
+    expect(container.querySelector('.tm-fixture-lineup-roster-grid')).toBeInTheDocument();
   });
 
   it('체크하면 선발로, 다시 누르면 후보로 돌아가고 요약 숫자가 따라 바뀐다', () => {

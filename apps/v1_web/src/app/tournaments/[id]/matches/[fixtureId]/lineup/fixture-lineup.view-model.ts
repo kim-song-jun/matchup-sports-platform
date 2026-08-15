@@ -8,8 +8,8 @@ import type { V1SaveGameLineupPayload } from '@/hooks/use-v1-api';
 /**
  * 대회 경기(tournament fixture) 라인업 편집기 상태 — team-match 쪽
  * (lineup.view-model.ts)과 구조는 비슷하지만 CAS 토큰이 다르다(lineup의
- * revision이 아니라 games.service.ts saveLineup/submitLineup이 쓰는
- * game.version).
+ * revision을 CAS 토큰으로 쓴다. 홈·원정이 공유하는 game.version을 쓰면 상대 팀이
+ * 저장할 때마다 내 편집기가 stale이 되므로, 사이드별 최신 lineup revision만 따른다.
  *
  * **선수의 유일한 출처는 대회 참가 등록 명단**(V1TournamentPlayer)이다. 예전에는 이
  * 화면에서 이름을 직접 타이핑해 선수를 만들 수 있었는데, 그러면 등록하지 않은 사람이
@@ -21,8 +21,8 @@ export type FixtureLineupState = {
   starters: LineupEntryDraft[];
   bench: LineupEntryDraft[];
   formation: string | null;
-  /** 다음 저장에 실어 보낼 expectedVersion == 서버의 game.version. */
-  gameVersion: number;
+  /** 다음 저장·제출에 실어 보낼 expectedVersion == 이 사이드의 최신 lineup revision. */
+  lineupRevision: number;
   /** 마지막으로 저장에 성공한 DRAFT 라인업 id — 제출(submit) 대상. */
   lineupId: string | null;
   lineupState: 'DRAFT' | 'SUBMITTED' | 'LOCKED' | null;
@@ -35,12 +35,12 @@ export type FixtureLineupState = {
 /** 라인업을 짤 수 있는 등록 명단의 한 사람. `useV1FixtureLineupRoster` 응답 행과 같은 모양. */
 export type FixtureRosterPlayer = { userId: string; name: string };
 
-export function createEmptyFixtureLineupState(gameVersion: number): FixtureLineupState {
+export function createEmptyFixtureLineupState(lineupRevision: number): FixtureLineupState {
   return {
     starters: [],
     bench: [],
     formation: null,
-    gameVersion,
+    lineupRevision,
     lineupId: null,
     lineupState: null,
     dirty: false,
@@ -63,7 +63,7 @@ export function createEmptyFixtureLineupState(gameVersion: number): FixtureLineu
 export function hydrateFixtureLineupState(
   lineups: GameLineup[],
   mySideId: string,
-  gameVersion: number,
+  _gameVersion: number,
   /** [알파 감사 E] 이 종목의 실제 골키퍼 포지션 코드(예: 축구 'GK', 풋살 'GOLEIRO') —
    * formation-slots.ts의 goalkeeperPositionCode(lineupConfig.positions)로 구한다.
    * 하드코딩된 'GK'로 비교하면 풋살처럼 코드가 다른 종목에서 저장된 골키퍼를
@@ -130,7 +130,7 @@ export function hydrateFixtureLineupState(
     starters,
     bench,
     formation: own?.formation ?? null,
-    gameVersion,
+    lineupRevision: own?.revision ?? 0,
     // 초기 라인업은 **제출 대상이 아니다.** 그 리비전을 그대로 제출하면 화면에는 후보로
     // 보이는 사람들이 전원 선발로 확정된다 — 화면과 저장된 내용이 어긋나는 최악의 경우다.
     // lineupId 를 비워 두면 화면이 "먼저 저장" 경로를 강제하고, 저장이 만든 새 리비전
@@ -258,7 +258,7 @@ export function clearPlayerPosition(state: FixtureLineupState, key: string): Fix
 }
 
 /** team-match 쪽 selectFormation(lineup.view-model.ts)과 로직은 같지만 상태 타입이
- * 달라(gameVersion vs baseRevision) 그대로 재사용할 수 없다. */
+ * 달라(lineupRevision vs baseRevision) 그대로 재사용할 수 없다. */
 export function selectFormation(state: FixtureLineupState, formation: string | null): FixtureLineupState {
   return { ...state, formation, dirty: true };
 }
@@ -320,7 +320,7 @@ export function buildSavePayload(
   goalkeeperCode: string,
 ): V1SaveGameLineupPayload {
   return {
-    expectedVersion: state.gameVersion,
+    expectedVersion: state.lineupRevision,
     ...(state.formation !== null ? { formation: state.formation } : {}),
     participants: [
       ...state.starters.map((entry) => ({

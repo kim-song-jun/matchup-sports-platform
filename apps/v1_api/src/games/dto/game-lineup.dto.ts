@@ -68,6 +68,7 @@ export class GameLineupParticipantDto {
 }
 
 export class SaveGameLineupDto {
+  /** Latest revision for the target side's lineup, or 0 when the side has no lineup yet. */
   @Type(() => Number)
   @IsInt()
   @Min(0)
@@ -88,6 +89,7 @@ export class SaveGameLineupDto {
 }
 
 export class SubmitGameLineupDto {
+  /** Revision of the draft lineup identified by the route's lineupId. */
   @Type(() => Number)
   @IsInt()
   @Min(0)

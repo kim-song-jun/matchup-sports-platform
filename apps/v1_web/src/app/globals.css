@@ -6551,3 +6551,86 @@ button:disabled {
 :root.dark .tm-seg-tab[data-active='true'] {
   background: var(--grey150);
 }
+
+/* 대회 경기 라인업 명단: 모바일부터 한 줄에 두 선수씩 보여 긴 명단의 스크롤을 줄인다.
+   각 카드 안은 체크/이름과 GK/등번호를 두 줄로 나눠 44px 조작부를 유지한다. */
+.tm-fixture-lineup-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* 고정 저장/제출 바는 검증 문구까지 포함해 기본 120px 안팎이다. 본문이 기존 96px만
+   비우면 피치·명단의 마지막 행이 바 아래에 숨으므로 safe-area 포함 여유를 명시한다. */
+.tm-fixture-lineup-page {
+  padding: 0 16px calc(156px + var(--v1-shell-safe-bottom));
+  scroll-padding-bottom: calc(156px + var(--v1-shell-safe-bottom));
+}
+
+.tm-lineup-formation-sheet {
+  overscroll-behavior: contain;
+  scroll-padding-bottom: calc(32px + var(--v1-shell-safe-bottom));
+}
+
+.tm-fixture-lineup-player-main,
+.tm-fixture-lineup-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tm-fixture-lineup-player-controls {
+  margin-top: 8px;
+}
+
+.tm-fixture-lineup-gk,
+.tm-fixture-lineup-gk-placeholder {
+  flex: 0 0 44px;
+  width: 44px;
+  min-height: 44px;
+}
+
+.tm-fixture-lineup-gk {
+  border: 1.5px dashed var(--grey300);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-caption);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tm-fixture-lineup-gk[data-selected='true'] {
+  border-style: solid;
+  border-color: var(--orange700);
+  background: var(--orange700);
+  color: #fff;
+  font-weight: 800;
+}
+
+.tm-fixture-lineup-player-controls .tm-input {
+  width: 54px;
+  min-width: 0;
+  padding-inline: 6px;
+}
+
+@media (max-width: 420px) {
+  .tm-fixture-lineup-optional {
+    display: none;
+  }
+}
+
+@media (max-width: 360px) {
+  /* 이 폭에서는 전역 규칙이 CTA 버튼을 1열로 쌓으므로 실제 바 높이도 함께 늘어난다. */
+  .tm-fixture-lineup-page {
+    padding-bottom: calc(224px + var(--v1-shell-safe-bottom));
+    scroll-padding-bottom: calc(224px + var(--v1-shell-safe-bottom));
+  }
+}
+
+@media (min-width: 768px) {
+  .tm-fixture-lineup-roster-grid { gap: 8px; }
+  .tm-fixture-lineup-player-main,
+  .tm-fixture-lineup-player-controls { gap: 8px; }
+  .tm-fixture-lineup-player-controls .tm-input { width: 72px; }
+}

@@ -738,6 +738,7 @@ function FormationSheet({
       />
       <div
         ref={sheetRef}
+        className="tm-lineup-formation-sheet"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -751,7 +752,7 @@ function FormationSheet({
           overflowY: 'auto',
           background: 'var(--card-surface)',
           borderRadius: '16px 16px 0 0',
-          padding: '16px 20px calc(20px + env(safe-area-inset-bottom))',
+          padding: '16px 20px calc(32px + env(safe-area-inset-bottom))',
           boxShadow: '0 -8px 24px rgba(0,0,0,0.18)',
         }}
       >

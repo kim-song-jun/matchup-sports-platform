@@ -135,6 +135,10 @@ type CommandBoundaryInput = {
   bodyCommandId: string;
   takeoverToken?: string;
   payload: unknown;
+  /** Lineup commands own their concurrency boundary per side/revision. The game row is still
+   * locked and versioned for aggregate ordering, but an opponent lineup command must not make
+   * this side's editor stale. The mutation callback must enforce the resource revision. */
+  versionScope?: 'game' | 'lineup';
 };
 
 type ImmutableGameEventInput = Omit<AppendGameEventDto, 'expectedVersion' | 'clientEventId' | 'takeoverToken'>;
@@ -2031,6 +2035,7 @@ export class GamesService {
         action: 'lineup_save',
         actor: await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate'),
         expectedVersion: dto.expectedVersion,
+        versionScope: 'lineup',
         headerIdempotencyKey,
         bodyCommandId: dto.clientCommandId,
         payload: { sideId, ...dto },
@@ -2078,6 +2083,18 @@ export class GamesService {
         ) {
           throw this.forbidden();
         }
+        const previous = await tx.v1GameLineup.findFirst({
+          where: { gameId, sideId },
+          orderBy: { revision: 'desc' },
+        });
+        const currentLineupRevision = previous?.revision ?? 0;
+        if (dto.expectedVersion !== currentLineupRevision) {
+          throw new ConflictException({
+            code: 'VERSION_CONFLICT',
+            message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+            details: { expectedVersion: dto.expectedVersion, currentVersion: currentLineupRevision },
+          });
+        }
         // team-match-lineup.service.ts#resolveEntries enforces this same gate for the
         // team-match lineup path (LINEUP_SIZE_INVALID against the pinned
         // V1CompetitionConfigVersion.lineup.{min,max}Players) — this generic
@@ -2096,6 +2113,18 @@ export class GamesService {
           throw new UnprocessableEntityException({
             code: 'LINEUP_SIZE_INVALID',
             message: `선발 인원은 ${lineupLimits.minPlayers}명 이상 ${lineupLimits.maxPlayers}명 이하여야 해요.`,
+          });
+        }
+        const goalkeeperCode =
+          parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
+          'GK';
+        const goalkeeperCount = dto.participants.filter(
+          (participant) => participant.started && participant.position === goalkeeperCode,
+        ).length;
+        if (goalkeeperCount !== 1) {
+          throw new UnprocessableEntityException({
+            code: 'LINEUP_GOALKEEPER_INVALID',
+            message: '선발 라인업에는 골키퍼를 정확히 한 명 지정해야 해요.',
           });
         }
         // 라인업에 실려 온 계정(userId) 검증. 이 값이 저장되면 아래에서 신원 연결이
@@ -2159,10 +2188,6 @@ export class GamesService {
             });
           }
         }
-        const previous = await tx.v1GameLineup.findFirst({
-          where: { gameId, sideId },
-          orderBy: { revision: 'desc' },
-        });
         const lineup = await tx.v1GameLineup.create({
           data: {
             gameId,
@@ -2246,6 +2271,7 @@ export class GamesService {
         action: 'lineup_submit',
         actor: await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate'),
         expectedVersion: dto.expectedVersion,
+        versionScope: 'lineup',
         headerIdempotencyKey,
         bodyCommandId: dto.clientCommandId,
         takeoverToken: dto.takeoverToken,
@@ -2287,6 +2313,23 @@ export class GamesService {
         const lineup = await tx.v1GameLineup.findFirst({ where: { id: lineupId, gameId } });
         if (lineup === null) {
           throw this.notFound('GAME_LINEUP_NOT_FOUND');
+        }
+        const latestSideLineup = await tx.v1GameLineup.findFirst({
+          where: { gameId, sideId: lineup.sideId },
+          orderBy: { revision: 'desc' },
+          select: { id: true, revision: true },
+        });
+        const currentLineupRevision = latestSideLineup?.revision ?? 0;
+        if (
+          latestSideLineup === null ||
+          latestSideLineup.id !== lineup.id ||
+          dto.expectedVersion !== currentLineupRevision
+        ) {
+          throw new ConflictException({
+            code: 'VERSION_CONFLICT',
+            message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+            details: { expectedVersion: dto.expectedVersion, currentVersion: currentLineupRevision },
+          });
         }
         if (
           context.actor.actorType === 'USER' &&
@@ -3793,7 +3836,7 @@ export class GamesService {
         try {
           context = assertGameCommandContext({
             actor,
-            expectedVersion: input.expectedVersion,
+            expectedVersion: input.versionScope === 'lineup' ? game.version : input.expectedVersion,
             currentVersion: game.version,
             headerIdempotencyKey: input.headerIdempotencyKey ?? '',
             bodyClientCommandId: input.bodyCommandId,

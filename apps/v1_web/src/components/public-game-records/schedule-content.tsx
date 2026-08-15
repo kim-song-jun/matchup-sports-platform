@@ -144,7 +144,14 @@ function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] })
       <div
         role="separator"
         aria-label="전반과 후반 구분"
-        style={{ gridColumn: '1 / -1', height: 1, margin: '6px 0', background: 'var(--border)' }}
+        style={{
+          gridColumn: '1 / -1',
+          justifySelf: 'center',
+          width: '50%',
+          height: 0,
+          margin: '6px 0',
+          borderTop: '1px dotted var(--border)',
+        }}
       />
       {halfRow('후반 득점', secondHalf)}
     </div>

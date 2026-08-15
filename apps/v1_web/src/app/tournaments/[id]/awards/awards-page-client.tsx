@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Star, ImagePlus, X, Trophy, Medal, Goal, Handshake, Shield, Hand, Sparkles, Crown } from 'lucide-react';
+import { Star, ImagePlus, X, Trophy, Medal } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useRef, useState } from 'react';
@@ -21,6 +21,7 @@ import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
 import { publicAssetPath } from '@/lib/assets';
+import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 
 const REVIEW_PHOTO_MAX = 3;
 const REVIEW_EMBED_CAP = 3;
@@ -240,19 +241,6 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
     );
   }
 
-  const AwardIcon = ({ type }: { type: string }) => {
-    const size = 22;
-    switch (type) {
-      case 'mvp': return <Crown size={size} className="tm-medal-gold" strokeWidth={2} />;
-      case 'top_scorer': return <Goal size={size} style={{ color: 'var(--blue700)' }} strokeWidth={2} />;
-      case 'best_defense': return <Shield size={size} style={{ color: 'var(--blue700)' }} strokeWidth={2} />;
-      case 'best_keeper': return <Hand size={size} style={{ color: 'var(--green700)' }} strokeWidth={2} />;
-      case 'fair_play': return <Handshake size={size} style={{ color: 'var(--green700)' }} strokeWidth={2} />;
-      case 'best_rookie': return <Sparkles size={size} style={{ color: 'var(--orange700)' }} strokeWidth={2} />;
-      default: return <Trophy size={size} className="tm-medal-gold" strokeWidth={2} />;
-    }
-  };
-
   return (
     <section style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">개인 어워드</h3>
@@ -264,7 +252,7 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
             borderRadius: 10, border: '1px solid var(--grey150)',
           }}>
             <span style={{ display: 'inline-flex', flexShrink: 0 }} aria-hidden="true">
-              <AwardIcon type={award.awardType} />
+              <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} />
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               {/* [R-T2] flex:1/minWidth:0 컬럼 — 고정폭 아님, 12로 상향. */}

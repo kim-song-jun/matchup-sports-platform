@@ -58,6 +58,7 @@ function awardRow(overrides: Record<string, unknown> = {}) {
     tournamentId: 'tournament-1',
     awardType: 'mvp',
     awardLabel: 'MVP',
+    iconKey: 'crown',
     recipientName: '김철수',
     teamName: '레알마드리드',
     note: null,
@@ -219,6 +220,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
         {
           awardType: 'mvp',
           awardLabel: 'MVP',
+          iconKey: 'medal',
           recipientName: '김철수',
           teamName: '레알마드리드',
         },
@@ -228,6 +230,9 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(prisma.v1TournamentAward.deleteMany).toHaveBeenCalledWith({
       where: { tournamentId: 'tournament-1' },
     });
+    expect(prisma.v1TournamentAward.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ iconKey: 'medal' }) }),
+    );
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ awardType: 'mvp', recipientName: '김철수' });
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);

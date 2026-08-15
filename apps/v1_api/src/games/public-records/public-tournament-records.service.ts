@@ -620,6 +620,7 @@ export class PublicTournamentRecordsService {
         type: true,
         sideId: true,
         participantId: true,
+        payload: true,
         period: true,
         clockMs: true,
         reversesEventId: true,
@@ -653,6 +654,7 @@ export class PublicTournamentRecordsService {
         const participant = event.participantId === null ? undefined : participantById.get(event.participantId);
         return {
           type: event.type,
+          cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
           sideId: event.sideId,
           // `sideId`는 스키마상 nullable(`String?`)이지만 GOAL/CARD 이벤트는 게임
           // 로직상 항상 한쪽 사이드에 귀속되므로 실질적으로는 null이 되지 않는다 --
@@ -1024,6 +1026,12 @@ type PublicScoreValue = {
 function liveScoreToPublicScore(score: GameScore | null): PublicScoreValue | null {
   if (score === null) return null;
   return { home: score.home, away: score.away, penalties: null };
+}
+
+function parseCardColor(value: Prisma.JsonValue): 'YELLOW' | 'RED' | null {
+  if (value === null || Array.isArray(value) || typeof value !== 'object') return null;
+  const card = value.card;
+  return card === 'YELLOW' || card === 'RED' ? card : null;
 }
 
 /**

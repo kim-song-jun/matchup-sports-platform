@@ -48,6 +48,7 @@ describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고
       events: [
         {
           type: 'GOAL',
+          cardColor: null,
           sideId: 'side-home',
           side: 'home',
           participantId: 'p-1',
@@ -71,6 +72,7 @@ describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고
       events: [
         {
           type: 'CARD',
+          cardColor: 'YELLOW',
           sideId: 'side-home',
           side: 'home',
           participantId: 'p-1',
@@ -93,8 +95,8 @@ describe('MatchDetailContent — 전반/후반 섹션 분리', () => {
   it('전반과 후반 이벤트가 각각 자기 구간에만 들어간다 (시간 역전 버그 회귀)', () => {
     const data = makeDetail({
       events: [
-        { type: 'GOAL', sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 600_000 },
-        { type: 'GOAL', sideId: 'side-away', side: 'away', participantId: 'p-2', participantName: '이선수', jerseyNumber: 10, period: 2, clockMs: 300_000 },
+        { type: 'GOAL', cardColor: null, sideId: 'side-home', side: 'home', participantId: 'p-1', participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 600_000 },
+        { type: 'GOAL', cardColor: null, sideId: 'side-away', side: 'away', participantId: 'p-2', participantName: '이선수', jerseyNumber: 10, period: 2, clockMs: 300_000 },
       ],
     });
 
@@ -111,12 +113,30 @@ describe('MatchDetailContent — 전반/후반 섹션 분리', () => {
   it('period가 null인 이벤트는 "기타" 구간에 담겨 유실되지 않는다', () => {
     const data = makeDetail({
       events: [
-        { type: 'CARD', sideId: 'side-home', side: 'home', participantId: 'p-3', participantName: '박선수', jerseyNumber: 5, period: null, clockMs: null },
+        { type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-3', participantName: '박선수', jerseyNumber: 5, period: null, clockMs: null },
       ],
     });
 
     render(<MatchDetailContent data={data} />);
 
     expect(within(screen.getByRole('group', { name: '기타' })).getByText('박선수')).toBeInTheDocument();
+  });
+});
+
+describe('MatchDetailContent — 카드 색상', () => {
+  it('옐로카드와 레드카드를 서로 다른 아이콘과 접근 가능한 이름으로 표시한다', () => {
+    const data = makeDetail({
+      events: [
+        { type: 'CARD', cardColor: 'YELLOW', sideId: 'side-home', side: 'home', participantId: 'p-yellow', participantName: '옐로 선수', jerseyNumber: 5, period: 1, clockMs: 300_000 },
+        { type: 'CARD', cardColor: 'RED', sideId: 'side-away', side: 'away', participantId: 'p-red', participantName: '레드 선수', jerseyNumber: 6, period: 1, clockMs: 600_000 },
+      ],
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.getByText('🟨')).toBeInTheDocument();
+    expect(screen.getByText('옐로카드')).toHaveClass('sr-only');
+    expect(screen.getByText('🟥')).toBeInTheDocument();
+    expect(screen.getByText('레드카드')).toHaveClass('sr-only');
   });
 });

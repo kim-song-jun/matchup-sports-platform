@@ -57,6 +57,7 @@ type FakeGoalEvent = {
   type: 'GOAL' | 'CARD' | 'FOUL' | 'SUBSTITUTION' | 'CORRECTION';
   sideId: string;
   participantId: string | null;
+  period: number | null;
   clockMs: number;
   reversesEventId: string | null;
 };
@@ -194,8 +195,8 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
       consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
       consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
       goalEvents: [
-        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
-        { id: 'g2', gameId: 'game-1', type: 'GOAL', sideId: 'side-away', participantId: INELIGIBLE.id, clockMs: 2_700_000, reversesEventId: null },
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 600_000, reversesEventId: null },
+        { id: 'g2', gameId: 'game-1', type: 'GOAL', sideId: 'side-away', participantId: INELIGIBLE.id, period: 2, clockMs: 2_700_000, reversesEventId: null },
       ],
     });
     const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
@@ -206,8 +207,8 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     // INELIGIBLE(연동/동의 없음)도 이름이 그대로 실린다 -- 대회 참가자는 동의와
     // 무관하게 공개된다(정책 변경). 이전 정책 회귀는 아래 롤백 플래그 테스트로 옮겼다.
     expect(result.items[0].scorers).toEqual([
-      { side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 600_000 },
-      { side: 'away', participantName: '이영희', jerseyNumber: 10, clockMs: 2_700_000 },
+      { side: 'home', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
+      { side: 'away', participantName: '이영희', jerseyNumber: 10, period: 2, clockMs: 2_700_000 },
     ]);
   });
 
@@ -221,8 +222,8 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
         consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
         userConsents: [{ userId: 'user-1', state: 'GRANTED' }],
         goalEvents: [
-          { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
-          { id: 'g2', gameId: 'game-1', type: 'GOAL', sideId: 'side-away', participantId: INELIGIBLE.id, clockMs: 2_700_000, reversesEventId: null },
+          { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 600_000, reversesEventId: null },
+          { id: 'g2', gameId: 'game-1', type: 'GOAL', sideId: 'side-away', participantId: INELIGIBLE.id, period: 2, clockMs: 2_700_000, reversesEventId: null },
         ],
       });
       const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
@@ -230,8 +231,8 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
       const result = await service.getSchedule(TOURNAMENT_ID, {});
 
       expect(result.items[0].scorers).toEqual([
-        { side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 600_000 },
-        { side: 'away', participantName: null, jerseyNumber: null, clockMs: 2_700_000 },
+        { side: 'home', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
+        { side: 'away', participantName: null, jerseyNumber: null, period: 2, clockMs: 2_700_000 },
       ]);
     } finally {
       delete process.env[CONSENT_GATE_ENV_KEY];
@@ -244,9 +245,9 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
       consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
       consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
       goalEvents: [
-        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 600_000, reversesEventId: null },
         // 취소 행은 GOAL 이 아니라 CORRECTION 이다 -- 이게 실제 저장 구조다.
-        { id: 'c1', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: 'g1' },
+        { id: 'c1', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 600_000, reversesEventId: 'g1' },
       ],
     });
     const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
@@ -266,12 +267,12 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
       consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
       consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
       goalEvents: [
-        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 645_886, reversesEventId: null },
-        { id: 'g5', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 27_166_083, reversesEventId: null },
-        { id: 'c9', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 27_166_083, reversesEventId: 'g5' },
-        { id: 'c10', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 645_886, reversesEventId: 'g1' },
-        { id: 'g11', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 27_166_083, reversesEventId: null },
-        { id: 'g12', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 645_886, reversesEventId: null },
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 645_886, reversesEventId: null },
+        { id: 'g5', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 27_166_083, reversesEventId: null },
+        { id: 'c9', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 27_166_083, reversesEventId: 'g5' },
+        { id: 'c10', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 645_886, reversesEventId: 'g1' },
+        { id: 'g11', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 27_166_083, reversesEventId: null },
+        { id: 'g12', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 645_886, reversesEventId: null },
       ],
     });
     const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
@@ -280,8 +281,8 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
 
     // 살아있는 골은 재기록된 g11/g12 둘뿐 -- 4개가 아니다.
     expect(result.items[0].scorers).toEqual([
-      { side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 27_166_083 },
-      { side: 'home', participantName: '김철수', jerseyNumber: 7, clockMs: 645_886 },
+      { side: 'home', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 27_166_083 },
+      { side: 'home', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 645_886 },
     ]);
   });
 
@@ -306,7 +307,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
       consentLinks: [{ participantId: ELIGIBLE.id, linkId: 'link-1', userId: 'user-1' }],
       consentSnapshots: [{ linkId: 'link-1', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
       goalEvents: [
-        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, clockMs: 600_000, reversesEventId: null },
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 600_000, reversesEventId: null },
       ],
     });
     const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);

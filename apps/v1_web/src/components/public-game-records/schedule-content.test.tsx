@@ -125,7 +125,7 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
 describe('ScheduleContent — 이상 클럭 경고 표식(alpha 452′ 사고)', () => {
   it('득점자의 clockMs가 이상값이면 분 표시는 그대로 두고 경고 표식을 붙인다', () => {
     const data = { ...makeData(), items: [fixtureEntry({
-      scorers: [{ side: 'home', participantName: '김선수', jerseyNumber: 9, clockMs: 27_166_083 }],
+      scorers: [{ side: 'home', participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 27_166_083 }],
     })] };
 
     render(<ScheduleContent tournamentId="tour-1" data={data} />);
@@ -138,7 +138,7 @@ describe('ScheduleContent — 이상 클럭 경고 표식(alpha 452′ 사고)',
 
   it('정상 clockMs 득점자에는 경고 표식이 붙지 않는다', () => {
     const data = { ...makeData(), items: [fixtureEntry({
-      scorers: [{ side: 'home', participantName: '김선수', jerseyNumber: 9, clockMs: 649_891 }],
+      scorers: [{ side: 'home', participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 649_891 }],
     })] };
 
     render(<ScheduleContent tournamentId="tour-1" data={data} />);
@@ -164,8 +164,8 @@ describe('ScheduleContent — 스코어 행과 득점자 행의 3열 축 일치'
       ...makeData(),
       items: [fixtureEntry({
         scorers: [
-          { side: 'home', participantName: '홈선수', jerseyNumber: 7, clockMs: 645_886 },
-          { side: 'away', participantName: '원정선수', jerseyNumber: 11, clockMs: 48_263 },
+          { side: 'home', participantName: '홈선수', jerseyNumber: 7, period: 1, clockMs: 645_886 },
+          { side: 'away', participantName: '원정선수', jerseyNumber: 11, period: 2, clockMs: 48_263 },
         ],
       })],
     };
@@ -179,6 +179,44 @@ describe('ScheduleContent — 스코어 행과 득점자 행의 3열 축 일치'
     expect(scoreRow?.style.gridTemplateColumns).not.toBe('');
     expect(scorerRow.style.gridTemplateColumns).toBe(scoreRow?.style.gridTemplateColumns);
     expect(scorerRow.style.columnGap).toBe(scoreRow?.style.columnGap);
+  });
+});
+
+describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
+  it('입력 순서와 무관하게 전반을 위에, 후반을 아래에 각각 시간순으로 표시한다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      scorers: [
+        { side: 'home', participantName: '후반 8분', jerseyNumber: 8, period: 2, clockMs: 480_000 },
+        { side: 'home', participantName: '전반 12분', jerseyNumber: 12, period: 1, clockMs: 720_000 },
+        { side: 'home', participantName: '전반 3분', jerseyNumber: 3, period: 1, clockMs: 180_000 },
+        { side: 'home', participantName: '후반 2분', jerseyNumber: 2, period: 2, clockMs: 120_000 },
+      ],
+    })] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    const scorerSummary = screen.getByRole('list', { name: '득점자' });
+    expect(Array.from(scorerSummary.querySelectorAll('[role="group"]')).map((group) => group.getAttribute('aria-label')))
+      .toEqual(['전반 득점', '후반 득점']);
+    expect(screen.getByRole('group', { name: '전반 득점' })).toHaveTextContent(/전반 3분.*전반 12분/);
+    expect(screen.getByRole('group', { name: '후반 득점' })).toHaveTextContent(/후반 2분.*후반 8분/);
+  });
+
+  it.each([
+    ['전반만', [{ side: 'home' as const, participantName: '전반 선수', jerseyNumber: 7, period: 1, clockMs: 60_000 }], '전반 득점'],
+    ['후반만', [{ side: 'away' as const, participantName: '후반 선수', jerseyNumber: 9, period: 2, clockMs: 60_000 }], '후반 득점'],
+  ])('%s 득점해도 득점 묶음과 전·후반 경계선이 함께 표시된다', (_case, scorers, groupName) => {
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({ scorers })] }} />);
+
+    expect(screen.getByRole('group', { name: groupName })).toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: '전반과 후반 구분' })).toBeInTheDocument();
+  });
+
+  it('득점이 없으면 득점 영역과 구분선을 모두 표시하지 않는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry()] }} />);
+
+    expect(screen.queryByRole('list', { name: '득점자' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('separator', { name: '전반과 후반 구분' })).not.toBeInTheDocument();
   });
 });
 

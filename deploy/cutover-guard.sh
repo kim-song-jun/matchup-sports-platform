@@ -127,7 +127,7 @@ else
       -f "${COMPOSE_FILE}"
       --env-file "${ENV_FILE}"
     )
-    "${compose[@]}" up -d --no-deps v1_api v1_web || log "앱 재기동 실패 — 사람이 개입해야 합니다"
+    "${compose[@]}" up -d --no-deps v1_api v1_web v1_game_operations_worker || log "앱 재기동 실패 — 사람이 개입해야 합니다"
 
     for _ in $(seq 1 24); do
       if curl -fsS --max-time 10 "${INTERNAL_HEALTH_URL}" 2>/dev/null | jq -e '.data.checks.db == true' >/dev/null 2>&1; then

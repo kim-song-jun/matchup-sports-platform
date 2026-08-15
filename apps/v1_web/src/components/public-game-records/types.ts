@@ -78,6 +78,7 @@ export interface PublicScheduleScorer {
   readonly side: 'home' | 'away';
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;
+  readonly period: number | null;
   readonly clockMs: number | null;
 }
 
@@ -161,6 +162,8 @@ export interface PublicLineup {
  */
 export interface PublicMatchEvent {
   readonly type: string;
+  /** CARD 이벤트의 저장된 색상. CARD가 아니거나 알 수 없는 과거 payload면 null. */
+  readonly cardColor: 'YELLOW' | 'RED' | null;
   readonly sideId: string;
   readonly side: 'home' | 'away';
   readonly participantId: string | null;

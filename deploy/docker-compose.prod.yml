@@ -110,6 +110,43 @@ services:
         limits:
           memory: 512M
 
+  v1_game_operations_worker:
+    image: ${V1_API_IMAGE}
+    container_name: teameet_v1_game_operations_worker
+    command: ["node", "dist/src/jobs/v1-game-operations-worker.main.js"]
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_APP_PASSWORD:-${V1_DB_PASSWORD:-${DB_PASSWORD}}}@${V1_DB_HOST:-v1_postgres}:5432/${V1_DB_NAME:-teameet_v1}
+      NODE_ENV: production
+      WORKER_PORT: ${WORKER_PORT:-8122}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:${WORKER_PORT:-8122}/api/v1/game-operations-worker/health').then(async (res) => { const json = await res.json(); const status = json?.data?.status ?? json?.status; if (!res.ok || status !== 'healthy') throw new Error('game operations worker health ' + res.status + ' status=' + status); }).catch(() => process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      v1_postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
   v1_web:
     image: ${V1_WEB_IMAGE}
     container_name: teameet_v1_web

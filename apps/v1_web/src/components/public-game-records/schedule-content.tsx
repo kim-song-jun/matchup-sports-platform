@@ -94,8 +94,10 @@ const SCORE_AXIS_COLUMN_GAP = 10;
  */
 function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] }) {
   if (scorers.length === 0) return null;
-  const home = scorers.filter((scorer) => scorer.side === 'home');
-  const away = scorers.filter((scorer) => scorer.side === 'away');
+  const byClock = (a: PublicScheduleEntry['scorers'][number], b: PublicScheduleEntry['scorers'][number]) =>
+    (a.clockMs ?? Number.MAX_SAFE_INTEGER) - (b.clockMs ?? Number.MAX_SAFE_INTEGER);
+  const firstHalf = scorers.filter((scorer) => scorer.period === 1).sort(byClock);
+  const secondHalf = scorers.filter((scorer) => scorer.period !== 1).sort(byClock);
   const goalLine = (scorer: PublicScheduleEntry['scorers'][number], index: number) => (
     <div key={index}>
       {formatGoalMinute(scorer.clockMs)}
@@ -103,14 +105,33 @@ function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] })
       {isClockAbnormal(scorer.clockMs) ? <AbnormalClockBadge /> : null}
     </div>
   );
+  const halfRow = (label: string, halfScorers: PublicScheduleEntry['scorers']) => {
+    const home = halfScorers.filter((scorer) => scorer.side === 'home');
+    const away = halfScorers.filter((scorer) => scorer.side === 'away');
+    if (halfScorers.length === 0) return null;
+    return (
+      <div
+        role="group"
+        aria-label={label}
+        style={{
+          display: 'grid',
+          gridColumn: '1 / -1',
+          gridTemplateColumns: SCORE_AXIS_COLUMNS,
+          columnGap: SCORE_AXIS_COLUMN_GAP,
+        }}
+      >
+        <div style={{ textAlign: 'right' }}>{home.map(goalLine)}</div>
+        <div aria-hidden="true" style={{ textAlign: 'center' }}>⚽</div>
+        <div style={{ textAlign: 'left' }}>{away.map(goalLine)}</div>
+      </div>
+    );
+  };
   return (
     <div
       role="list"
       aria-label="득점자"
       style={{
         display: 'grid',
-        // 스코어 행과 **같은** 축(`SCORE_AXIS_COLUMNS`) — 홈 득점자는 홈 팀명
-        // 아래, 원정 득점자는 원정 팀명 아래, ⚽는 스코어 칸 아래에 놓인다.
         gridTemplateColumns: SCORE_AXIS_COLUMNS,
         columnGap: SCORE_AXIS_COLUMN_GAP,
         marginTop: 4,
@@ -119,9 +140,20 @@ function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] })
         color: 'var(--text-caption)',
       }}
     >
-      <div style={{ textAlign: 'right' }}>{home.map(goalLine)}</div>
-      <div aria-hidden="true" style={{ textAlign: 'center' }}>⚽</div>
-      <div style={{ textAlign: 'left' }}>{away.map(goalLine)}</div>
+      {halfRow('전반 득점', firstHalf)}
+      <div
+        role="separator"
+        aria-label="전반과 후반 구분"
+        style={{
+          gridColumn: '1 / -1',
+          justifySelf: 'center',
+          width: '50%',
+          height: 0,
+          margin: '6px 0',
+          borderTop: '1px dotted var(--border)',
+        }}
+      />
+      {halfRow('후반 득점', secondHalf)}
     </div>
   );
 }

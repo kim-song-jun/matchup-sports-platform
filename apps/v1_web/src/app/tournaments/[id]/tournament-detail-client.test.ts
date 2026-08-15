@@ -755,6 +755,25 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.getByText('대진표 준비 중')).toBeInTheDocument();
   });
 
+  it('shows a pre-created pending knockout bracket before the group stage finishes', () => {
+    const group = makeGroup({ id: 'group-a', phase: 'group' });
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'in_progress',
+      format: 'group_knockout',
+      groups: [group],
+      fixtures: [
+        makeFixture({ id: 'group-fixture', groupId: group.id, round: 'group', status: 'scheduled' }),
+        makeFixture({ id: 'semi-fixture', groupId: null, round: '4강', homeTeamName: 'TBD', awayTeamName: 'TBD' }),
+      ],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getByText('결선 대진표')).toBeInTheDocument();
+    expect(screen.getAllByText('미정').length).toBeGreaterThanOrEqual(2);
+  });
+
   it('explains the current team application, payment, and roster flow', () => {
     const tournament = makeTournament({
       id: 't1',

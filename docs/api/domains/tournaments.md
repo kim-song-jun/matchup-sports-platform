@@ -14,6 +14,12 @@ Public list/detail items include `campaignSlug` only while the related campaign 
 
 After bracket publication, each public `groups[].standings[]` row includes nullable `teamLogoUrl` from the registered team's current profile. Tournament detail and bracket clients render it through the shared team-avatar fallback contract, so a missing or failed image remains distinguishable without replacing valid saved logos.
 
+## Individual awards
+
+`GET /api/v1/admin/tournaments/:tournamentId/awards` returns the saved award list, and `PUT` to the same path replaces it atomically. Each item contains `awardType`, `awardLabel`, nullable `iconKey`, `recipientName`, nullable `teamName`, nullable `note`, and optional `sortOrder` on writes. `iconKey` accepts `trophy`, `crown`, `goal`, `shield`, `glove`, `handshake`, `sparkles`, `medal`, or `star`; unknown values are rejected by DTO validation. Public `GET /api/v1/tournaments/:id` exposes the same nullable `iconKey` within `awards[]`. Existing rows with `iconKey=null` retain the legacy `awardType`-based icon mapping in the Web client.
+
+Award mutations require a mutation-capable active admin. Recipients must belong to a confirmed tournament roster, and a supplied team name must match both a confirmed registration and that recipient's roster membership. The mutation replaces awards and writes its admin audit record in one transaction.
+
 Published `fixtures[]` also includes nullable `homeTeamId`, `homeTeamLogoUrl`, `awayTeamId`, and `awayTeamLogoUrl`. Bracket match cards use these identity fields for saved team logos and reserve the generated fallback only for missing, undecided, or failed images.
 
 ## Tournament staff runtime boundary

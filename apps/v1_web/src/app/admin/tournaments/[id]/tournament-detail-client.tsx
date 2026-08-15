@@ -88,9 +88,11 @@ import type {
   V1TournamentAward,
   V1AdminTournamentReview,
   V1TournamentGenderCategory,
+  V1TournamentAwardIconKey,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
+import { legacyAwardIconKey, TOURNAMENT_AWARD_ICON_OPTIONS, TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 
@@ -125,6 +127,7 @@ import {
 } from '@/components/admin/tournaments/promo-card-fields';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
+import { TournamentStatisticsTab } from './tournament-statistics-tab';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -448,7 +451,7 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
 
 // ── Tab type ──────────────────────────────────────────────────────────────
 
-type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'popups' | 'campaign' | 'reviews' | 'awards';
+type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'popups' | 'campaign' | 'reviews' | 'awards' | 'statistics';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'info', label: '대회 정보' },
@@ -460,6 +463,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'campaign', label: '캠페인' },
   { id: 'reviews', label: '리뷰 관리' },
   { id: 'awards', label: '개인 어워드' },
+  { id: 'statistics', label: '통계' },
 ];
 
 // ── Registration roster modal ─────────────────────────────────────────────
@@ -3004,7 +3008,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             ? tournament.operationCounts?.registrations
             : tab.id === 'bracket'
               ? tournament.operationCounts?.fixtures
-              : tournament.operationCounts?.announcements;
+              : tab.id === 'announcements'
+                ? tournament.operationCounts?.announcements
+                : undefined;
           return (
             <button
               key={tab.id}
@@ -3164,6 +3170,17 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             tournamentId={id}
             showToast={showToast}
           />
+        )}
+      </div>
+
+      <div
+        id="panel-statistics"
+        aria-labelledby="tab-statistics"
+        role="tabpanel"
+        hidden={activeTab !== 'statistics'}
+      >
+        {activeTab === 'statistics' && (
+          <TournamentStatisticsTab tournamentId={id} />
         )}
       </div>
 
@@ -3945,14 +3962,7 @@ function InfoTab({
 
 // ── Tab: Individual Awards ────────────────────────────────────────────────
 
-const DEFAULT_AWARD_TYPES = [
-  { awardType: 'mvp', awardLabel: 'MVP' },
-  { awardType: 'top_scorer', awardLabel: '득점왕' },
-  { awardType: 'best_defense', awardLabel: '베스트 수비수' },
-  { awardType: 'fair_play', awardLabel: '페어플레이' },
-];
-
-type AwardForm = { awardType: string; awardLabel: string; recipientName: string; teamName: string; note: string };
+type AwardForm = { awardType: string; awardLabel: string; iconKey: V1TournamentAwardIconKey; recipientName: string; teamName: string; note: string };
 
 function AwardsTab({
   tournamentId,
@@ -3969,48 +3979,31 @@ function AwardsTab({
     .filter((r) => r.status === 'confirmed')
     .map((r) => ({ id: r.id, label: r.teamName ?? r.teamId }));
 
-  // 기존 어워드 또는 빈 템플릿
-  const [rows, setRows] = useState<AwardForm[]>(() => {
-    return DEFAULT_AWARD_TYPES.map((d) => ({
-      awardType: d.awardType,
-      awardLabel: d.awardLabel,
-      recipientName: '',
-      teamName: '',
-      note: '',
-    }));
-  });
+  // 저장되지 않은 기본 어워드를 강제로 만들지 않는다. 관리자가 추가한 항목만 저장·표시한다.
+  const [rows, setRows] = useState<AwardForm[]>([]);
 
   // 기존 저장된 어워드 로드 — 어드민 대회 상세 응답에는 awards가 없어
   // GET /admin/tournaments/:id/awards 로 별도 하이드레이션한다
   const [loaded, setLoaded] = useState(false);
-  if (savedAwards && !loaded) {
-    const existing = savedAwards;
-    if (existing.length > 0) {
-      const merged = DEFAULT_AWARD_TYPES.map((d) => {
-        const found = existing.find((a) => a.awardType === d.awardType);
-        return {
-          awardType: d.awardType,
-          awardLabel: d.awardLabel,
-          recipientName: found?.recipientName ?? '',
-          teamName: found?.teamName ?? '',
-          note: found?.note ?? '',
-        };
-      });
-      // extra custom awards
-      existing.filter((a) => !DEFAULT_AWARD_TYPES.some((d) => d.awardType === a.awardType)).forEach((a) => {
-        merged.push({ awardType: a.awardType, awardLabel: a.awardLabel, recipientName: a.recipientName, teamName: a.teamName ?? '', note: a.note ?? '' });
-      });
-      setRows(merged);
-    }
+  useEffect(() => {
+    if (!savedAwards || loaded) return;
+    setRows(savedAwards.map((award) => ({
+      awardType: award.awardType,
+      awardLabel: award.awardLabel,
+      iconKey: award.iconKey ?? legacyAwardIconKey(award.awardType),
+      recipientName: award.recipientName,
+      teamName: award.teamName ?? '',
+      note: award.note ?? '',
+    })));
     setLoaded(true);
-  }
+  }, [loaded, savedAwards]);
 
   const update = (idx: number, field: keyof AwardForm, value: string) => {
     setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
   };
 
   const addRow = () => {
-    setRows((prev) => [...prev, { awardType: `custom_${Date.now()}`, awardLabel: '', recipientName: '', teamName: '', note: '' }]);
+    setRows((prev) => [...prev, { awardType: `custom_${Date.now()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', teamName: '', note: '' }]);
   };
 
   const removeRow = (idx: number) => {
@@ -4018,12 +4011,16 @@ function AwardsTab({
   };
 
   const handleSave = () => {
+    const incompleteRow = rows.find((row) => !row.awardLabel.trim() || !row.recipientName.trim());
+    if (incompleteRow) {
+      showToast('각 항목의 어워드명과 수상자를 모두 입력해 주세요.', 'error');
+      return;
+    }
     const awards = rows
-      .filter((r) => r.awardLabel.trim() && r.recipientName.trim())
       .map((r, i) => ({ ...r, awardLabel: r.awardLabel.trim(), recipientName: r.recipientName.trim(), teamName: r.teamName.trim() || undefined, note: r.note.trim() || undefined, sortOrder: i }));
     setAwards.mutate(awards, {
       onSuccess: () => showToast('개인 어워드가 저장됐어요.', 'success'),
-      onError: () => showToast('저장 중 오류가 발생했어요.', 'error'),
+      onError: (err) => showToast(extractErrorMessage(err, '개인 어워드를 저장하지 못했어요.'), 'error'),
     });
   };
 
@@ -4038,6 +4035,12 @@ function AwardsTab({
       </div>
 
       <div className="flex flex-col gap-3">
+        {loaded && rows.length === 0 && (
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-5 text-center">
+            <p className="text-[13px] font-semibold text-[var(--text-strong)]">등록된 개인 어워드가 없어요.</p>
+            <p className="mt-1 text-[12px] text-[var(--text-muted)]">필요한 어워드만 항목 추가로 등록해 주세요.</p>
+          </div>
+        )}
         {rows.map((row, idx) => (
           <AwardRow
             key={idx}
@@ -4114,6 +4117,24 @@ function AwardRow({
         />
         {/* 파괴적 동작이므로 손가락으로 정확히 누를 수 있어야 한다 — 히트 영역 44px. */}
         <button type="button" onClick={() => removeRow(idx)} className="text-[var(--text-muted)] hover:text-red-500 inline-flex items-center justify-center min-h-11 min-w-11 shrink-0" aria-label="항목 삭제"><X size={16} /></button>
+      </div>
+      <div className="mb-2">
+        <label htmlFor={`award-icon-${idx}`} className="text-[var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">아이콘</label>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)]" aria-hidden="true">
+            <TournamentAwardIcon iconKey={row.iconKey} />
+          </span>
+          <select
+            id={`award-icon-${idx}`}
+            value={row.iconKey}
+            onChange={(event) => update(idx, 'iconKey', event.target.value)}
+            className="h-11 flex-1 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[13px] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            {TOURNAMENT_AWARD_ICON_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>

@@ -20,7 +20,6 @@ import {
 import {
   partitionTournamentSections,
   isGroupStageComplete,
-  allGroupPhasesComplete,
 } from '@/app/tournaments/[id]/tournament-detail-client';
 import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
 import { ScheduleContent } from '@/components/public-game-records/schedule-content';
@@ -373,11 +372,10 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const { groupPhaseGroups, knockoutFixtures, hasGroupStandings, hasKnockoutFixtures } =
     partitionTournamentSections(format, fixtures, groups);
 
-  // §B-8 — 결선 대진표는 조별리그가 실제로 끝난 뒤에만 보여준다. knockout 포맷은
-  // 애초에 조별리그가 없는 대회라(오너 지시: "knockout 형식은 처음부터 보여야
-  // 한다") 이 게이트를 적용하지 않고 hasKnockoutFixtures만으로 판단한다.
-  const groupStageDone = format === 'knockout' ? true : allGroupPhasesComplete(groups, fixtures);
-  const showBracket = hasKnockoutFixtures && groupStageDone;
+  // 결선 fixture를 미리 만들었다면 참가 팀이 아직 정해지지 않았어도 대진 구조와
+  // 시간을 공개한다. TournamentBracket은 nullable 팀 슬롯을 `미정`으로 표시하므로,
+  // 조별 순위 확정 전 팀을 지어내지 않으면서도 일정과 대진표가 같은 정보를 보여준다.
+  const showBracket = hasKnockoutFixtures;
 
   /**
    * §데스크탑 폭 배분 — 결선 라운드 수가 대진표에 필요한 가로 폭의 유일한 근거다.

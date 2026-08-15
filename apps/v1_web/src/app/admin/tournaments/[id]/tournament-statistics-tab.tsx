@@ -72,9 +72,13 @@ export function buildTournamentStatistics(
       const teamName = goal.team === 'home'
         ? fixture.homeTeamName
         : fixture.awayTeamName;
-      const key = goal.playerId
-        ? `player:${goal.playerId}`
-        : `named:${registrationId ?? teamName}:${goal.playerName.trim().toLocaleLowerCase('ko-KR')}`;
+      // `goal.playerId` is scoped to one game, so the same roster player gets a
+      // different value in every fixture. Use tournament-stable team identity and
+      // the recorded name snapshot for cross-fixture scoring aggregation.
+      const normalizedPlayerName = goal.playerName.trim().normalize('NFKC').toLocaleLowerCase('ko-KR');
+      const normalizedTeamKey = registrationId
+        ?? teamName.trim().normalize('NFKC').toLocaleLowerCase('ko-KR');
+      const key = `named:${normalizedTeamKey}:${normalizedPlayerName}`;
       const existing = scorers.get(key);
       if (existing) {
         existing.goals += 1;

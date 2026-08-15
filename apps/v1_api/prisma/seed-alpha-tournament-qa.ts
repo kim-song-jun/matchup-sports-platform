@@ -763,9 +763,9 @@ export async function createScenario(
   });
   await tx.v1TournamentAward.createMany({
     data: [
-      { tournamentId: scenario.id, awardType: 'mvp', awardLabel: 'MVP', recipientName: teams[0].persona.realName, teamName: teams[0].team.name, note: '결승 2골 1도움', sortOrder: 0 },
-      { tournamentId: scenario.id, awardType: 'top_scorer', awardLabel: '득점왕', recipientName: teams[2].persona.realName, teamName: teams[2].team.name, note: '대회 6골', sortOrder: 1 },
-      { tournamentId: scenario.id, awardType: 'best_keeper', awardLabel: '베스트 골키퍼', recipientName: teams[1].persona.realName, teamName: teams[1].team.name, note: '선방률 82%', sortOrder: 2 },
+      { tournamentId: scenario.id, awardType: 'mvp', awardLabel: 'MVP', iconKey: 'crown', recipientName: teams[0].persona.realName, teamName: teams[0].team.name, note: '결승 2골 1도움', sortOrder: 0 },
+      { tournamentId: scenario.id, awardType: 'top_scorer', awardLabel: '득점왕', iconKey: 'goal', recipientName: teams[2].persona.realName, teamName: teams[2].team.name, note: '대회 6골', sortOrder: 1 },
+      { tournamentId: scenario.id, awardType: 'best_keeper', awardLabel: '베스트 골키퍼', iconKey: 'glove', recipientName: teams[1].persona.realName, teamName: teams[1].team.name, note: '선방률 82%', sortOrder: 2 },
     ],
   });
   await tx.v1TournamentReview.createMany({

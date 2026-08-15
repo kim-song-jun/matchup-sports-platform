@@ -2157,6 +2157,7 @@ model V1TournamentAward {
   tournamentId  String   @map("tournament_id")
   awardType     String   @map("award_type") // 'mvp' | 'top_scorer' | 'best_defense' | etc.
   awardLabel    String   @map("award_label") // 표시명: 'MVP', '득점왕', '베스트 11' 등
+  iconKey       String?  @map("icon_key") // trophy | crown | goal | shield | glove | handshake | sparkles | medal | star
   recipientName String   @map("recipient_name") // 수심자 이름
   teamName      String?  @map("team_name") // 수심자 팀명
   note          String? // 추가 설명

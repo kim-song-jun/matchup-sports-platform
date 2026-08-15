@@ -3011,7 +3011,7 @@ export function useV1SetTournamentAwards(tournamentId: string) {
   return useMutation({
     mutationFn: (awards: {
       awardType: string; awardLabel: string; recipientName: string;
-      teamName?: string; note?: string; sortOrder?: number;
+      iconKey?: string; teamName?: string; note?: string; sortOrder?: number;
     }[]) => v1Put<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`, { awards }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });

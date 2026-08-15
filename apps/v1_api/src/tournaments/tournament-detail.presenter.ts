@@ -283,6 +283,7 @@ export function presentTournamentDetail(
       id: award.id,
       awardType: award.awardType,
       awardLabel: award.awardLabel,
+      iconKey: award.iconKey ?? null,
       recipientName: award.recipientName,
       teamName: award.teamName ?? null,
       note: award.note ?? null,

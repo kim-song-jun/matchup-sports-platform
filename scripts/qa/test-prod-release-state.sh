@@ -105,7 +105,7 @@ if validate_prod_release_manifest "${tampered}" "${SHA_A}" "0.1.0" "${tampered_c
   exit 1
 fi
 
-# D5 회귀 방지: prod compose 에는 v1_game_operations_worker 가 없다.
+# Production release parity: API image also owns the outbox worker runtime.
 # assert_running_release_digests 는 "${compose[@]}" ps -q <service>) 를 `$(...)` 커맨드
 # 치환 안에서 호출한다 — 즉 compose_mock 은 서브셸에서 실행되므로, 셸 배열에 호출 기록을
 # 남기면 부모 셸에 반영되지 않는다(bash 서브셸 변수 격리). 파일에 기록해야 값이 살아남는다.
@@ -115,6 +115,7 @@ compose_mock() {
   printf '%s\n' "$*" >> "${compose_calls_log}"
   case "$*" in
     'ps -q v1_api') echo container-api ;;
+    'ps -q v1_game_operations_worker') echo container-worker ;;
     'ps -q v1_web') echo container-web ;;
     *) echo "unexpected compose invocation: $*" >&2; return 1 ;;
   esac
@@ -126,6 +127,7 @@ cat > "${mock_bin}/docker" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   'inspect --format {{.Config.Image}} container-api') echo "${V1_API_IMAGE}" ;;
+  'inspect --format {{.Config.Image}} container-worker') echo "${V1_API_IMAGE}" ;;
   'inspect --format {{.Config.Image}} container-web') echo "${V1_WEB_IMAGE}" ;;
   *) echo "unexpected docker invocation: \$*" >&2; exit 1 ;;
 esac
@@ -136,12 +138,12 @@ if ! assert_running_release_digests; then
   exit 1
 fi
 compose_call_count="$(wc -l < "${compose_calls_log}" | tr -d '[:space:]')"
-if [[ "${compose_call_count}" != 2 ]]; then
-  echo "assert_running_release_digests queried more than v1_api/v1_web (worker regression?)" >&2
+if [[ "${compose_call_count}" != 3 ]]; then
+  echo "assert_running_release_digests did not query the complete API/Web/worker release unit" >&2
   cat "${compose_calls_log}" >&2
   exit 1
 fi
-if grep -qv -E '^ps -q (v1_api|v1_web)$' "${compose_calls_log}"; then
+if grep -qv -E '^ps -q (v1_api|v1_web|v1_game_operations_worker)$' "${compose_calls_log}"; then
   echo "assert_running_release_digests queried an unexpected service:" >&2
   cat "${compose_calls_log}" >&2
   exit 1

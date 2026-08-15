@@ -111,8 +111,8 @@ prod EC2 instance profile(`teameet-certbot-route53`)에는 `TeameetProdImmutable
 **`deploy` job — `production` environment 승인 후**
 
 5. GitHub secret·variable 을 고정 런타임 경로(`~/.teameet-prod-runtime/.env`)로 동기화한다. **런타임 설정 변경이 승인 뒤에만 일어나도록 이 단계는 여기 있다** — 승인 전에 바꾸면 그 사이 재기동이 "새 설정 + 옛 이미지" 조합을 띄울 수 있다.
-6. `deploy/deploy-prod.sh` 를 EC2 에서 실행한다 — 이 한 스크립트가 activation(release-sha 디렉터리로 `~/teameet` 심볼릭 링크 원자 스왑) → `docker login`/`pull`(ECR digest) → `prisma migrate deploy`(정확히 1회) → 컨테이너 교체 → 헬스 계약 확인 → active/previous 상태(`~/.teameet-prod-releases/state.json`) 원자 승격까지 전부 수행한다. 실패하면 ERR trap 이 이전 활성 릴리스로 자동 복구를 시도한다.
-7. workflow는 internal API, root-origin API, root Web과 legacy browser `/v1/home`이 현재 경로로 308 redirect되는지를 러너에서 한 번 더 health check한다(EC2 로컬은 성공했지만 네트워크 경로 문제로 퍼블릭엔 아직 안 나온 경우를 잡기 위함).
+6. `deploy/deploy-prod.sh` 를 EC2 에서 실행한다 — 이 한 스크립트가 activation(release-sha 디렉터리로 `~/teameet` 심볼릭 링크 원자 스왑) → `docker login`/`pull`(ECR digest) → `prisma migrate deploy`(정확히 1회) → API/Web/game-operations worker 컨테이너 교체 → 헬스 계약 확인 → active/previous 상태(`~/.teameet-prod-releases/state.json`) 원자 승격까지 전부 수행한다. 실패하면 ERR trap 이 이전 활성 릴리스로 자동 복구를 시도한다.
+7. workflow는 internal API와 game-operations worker, root-origin API, root Web과 legacy browser `/v1/home`이 현재 경로로 308 redirect되는지를 러너에서 한 번 더 health check한다(EC2 로컬은 성공했지만 worker 또는 네트워크 경로가 준비되지 않은 경우를 잡기 위함).
 
 `build-images`와 `deploy`는 같은 concurrency group(`deploy-production`)을 공유한다. 승인 대기 중인 릴리스가 있으면 다음 릴리스의 빌드도 뒤에 큐잉되므로, 두 릴리스가 같은 호스트를 동시에 건드리지 않는다.
 
@@ -208,10 +208,12 @@ cd ~/teameet/deploy
 
 sudo docker compose -f docker-compose.prod.yml --env-file .env ps
 sudo docker logs teameet_v1_api -f --tail 100
+sudo docker logs teameet_v1_game_operations_worker -f --tail 100
 sudo docker logs teameet_v1_web -f --tail 100
 sudo docker logs teameet_nginx -f --tail 100
 
 sudo docker compose -f docker-compose.prod.yml --env-file .env restart v1_api
+sudo docker compose -f docker-compose.prod.yml --env-file .env restart v1_game_operations_worker
 sudo docker compose -f docker-compose.prod.yml --env-file .env restart v1_web
 sudo docker compose -f docker-compose.prod.yml --env-file .env restart nginx
 ```

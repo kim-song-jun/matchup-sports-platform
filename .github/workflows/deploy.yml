@@ -46,6 +46,13 @@ jobs:
           fi
           git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > /tmp/teameet-changed-files.txt
           if [[ ${BASE_REF} == main && ${HEAD_REF} == dev ]]; then
+            # A Changeset can be added and consumed entirely between main and dev,
+            # so it is absent from the final tree diff. Preserve deleted Changeset
+            # paths from commit history as the auditable release receipt.
+            git log --format= --name-only --diff-filter=D \
+              "${BASE_SHA}..${HEAD_SHA}" -- '.changeset/*.md' \
+              >> /tmp/teameet-changed-files.txt
+            sort -u -o /tmp/teameet-changed-files.txt /tmp/teameet-changed-files.txt
             export RELEASE_PROMOTION=true
             export BASE_API_VERSION=$(git show ${BASE_SHA}:apps/v1_api/package.json | jq -er .version)
             export BASE_WEB_VERSION=$(git show ${BASE_SHA}:apps/v1_web/package.json | jq -er .version)

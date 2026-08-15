@@ -1,5 +1,19 @@
 # v1_api
 
+## 0.4.0
+
+### Minor Changes
+
+- ee5f202: 대회 관리자가 개인 어워드마다 아이콘을 선택해 저장하고 공개 시상 화면에 표시할 수 있게 하며, 저장되지 않은 기본 어워드 4개를 자동 생성하지 않습니다.
+
+### Patch Changes
+
+- d100d04: 공개 대회 경기 기록에서 옐로카드와 레드카드를 실제 기록 색상에 맞게 구분하고, 일정 카드의 득점 기록을 전반과 후반 순서로 나눠 표시합니다.
+- 940c3f7: 대회 경기 라인업을 팀별 revision으로 안전하게 저장하고, 선발 골키퍼 검증과 모바일 2열 명단 및 하단 액션 영역을 개선합니다.
+- 0b9a0fa: 조별리그 진행 중에도 미리 생성한 결선 일정과 대진표를 `미정` 팀 슬롯으로 공개합니다.
+- 314dca1: 대회 경기 일정의 득점 기록을 전반과 후반으로 나누고 각 구간을 시간순으로 표시합니다.
+- 6d43302: Run the game-operations outbox worker as part of the production release unit and fail deployment health checks when it is unavailable.
+
 ## 0.3.2
 
 ### Patch Changes

@@ -564,7 +564,12 @@ export function useV1GameOperationsConsole(
         // is appended; the ack handler in `sendQueuedItem` only updates
         // queue/sync/version state for this device's own sends.
         receivedSequenceRef.current = committed.sequence;
-        dispatchSync({ type: 'BACKFILLED', lastSequence: committed.sequence });
+        // `BACKFILLED`가 아니라 `EVENT_ARRIVED`인 이유는 그 액션의 주석 참고 —
+        // 이 브로드캐스트는 꼬리에 한 건을 붙일 뿐 이미 난 구멍을 채우지 않는다.
+        // (스냅숏 자체에 구멍이 있으면 `applySnapshot`이 GAP을 걸어 두는데,
+        // 거기서 `receivedSequenceRef`는 이미 `snapshot.lastSequence`까지 올라가
+        // 있으므로 그 다음 이벤트는 여기서 "연속"으로 판정된다.)
+        dispatchSync({ type: 'EVENT_ARRIVED', lastSequence: committed.sequence });
         setLiveEvents((current) => [...current, committed.event]);
       } else if (committed.sequence > receivedSequenceRef.current + 1) {
         // Non-contiguous broadcast: something between the last event we
@@ -798,9 +803,9 @@ export function useV1GameOperationsConsole(
           // (`acknowledgeGameEvent`의 `client.emit`), 그 본문을 받아 append하는
           // 쪽은 `onCommitted`다. 여기서 미리 올리면 뒤이어 도착한 자기 이벤트가
           // "이미 아는 중복"으로 버려져 자기가 기록한 이벤트가 화면에서 사라진다.
-          // `BACKFILLED`가 아니라 `SELF_ACK`인 이유는 그 액션의 주석 참고 — ack은
-          // 빠진 구간의 이벤트 본문을 하나도 실어 오지 않으므로 갭 프리즈를 풀 수 없다.
-          dispatchSync({ type: 'SELF_ACK', lastSequence: result.sequence });
+          // `BACKFILLED`가 아니라 `EVENT_ARRIVED`인 이유는 그 액션의 주석 참고 —
+          // ack은 빠진 구간의 이벤트 본문을 하나도 실어 오지 않으므로 갭 프리즈를 풀 수 없다.
+          dispatchSync({ type: 'EVENT_ARRIVED', lastSequence: result.sequence });
           setGameSnapshot((current) => (current ? { ...current, version: result.version! } : current));
           void queryClient.invalidateQueries({ queryKey: v1Keys.game(gameId) });
         } else {

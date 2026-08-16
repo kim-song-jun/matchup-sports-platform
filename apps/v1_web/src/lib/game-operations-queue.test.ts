@@ -247,20 +247,41 @@ describe('gap (backfill required before further sends)', () => {
    * 서버가 `SUBSTITUTION_OUT_NOT_ON_PITCH`로 거부하고, 그 코드는 NON_RETRYABLE이라
    * '다시 시도' 버튼조차 뜨지 않는다.
    */
-  it('gap 상태에서 내 이벤트의 ack(SELF_ACK)은 프리즈를 풀지 못한다', () => {
+  it('gap 상태에서 내 이벤트의 ack(EVENT_ARRIVED)은 프리즈를 풀지 못한다', () => {
     const gapped = gameSyncReducer(
       { status: 'synced', lastSequence: 10 },
       { type: 'GAP', expectedSequence: 11, availableFrom: 14 },
     );
 
-    const afterSelfAck = gameSyncReducer(gapped, { type: 'SELF_ACK', lastSequence: 15 });
+    const afterSelfAck = gameSyncReducer(gapped, { type: 'EVENT_ARRIVED', lastSequence: 15 });
 
     expect(afterSelfAck).toEqual(gapped);
     expect(canAppendWhileSyncing(afterSelfAck)).toBe(false);
 
     // 동기 상태에서는 종전대로 lastSequence를 전진시킨다(정상 경로 회귀 방지).
-    const synced = gameSyncReducer({ status: 'synced', lastSequence: 10 }, { type: 'SELF_ACK', lastSequence: 11 });
+    const synced = gameSyncReducer({ status: 'synced', lastSequence: 10 }, { type: 'EVENT_ARRIVED', lastSequence: 11 });
     expect(synced).toEqual({ status: 'synced', lastSequence: 11 });
+  });
+
+  /**
+   * 위와 같은 구멍이지만 도착 경로가 다르다 — **다른 운영자의 연속 브로드캐스트**다.
+   * `applySnapshot`은 구멍 난 스냅숏에도 `receivedSequenceRef`를 `snapshot.lastSequence`
+   * 까지 올려 두므로(그래야 이미 본문을 받은 뒷부분이 중복으로 버려지지 않는다),
+   * 그 다음 이벤트는 `onCommitted`에서 **"연속"으로 판정된다.** 이때 `BACKFILLED`를
+   * 쏘면 앞쪽 구멍이 그대로인 채 프리즈만 풀린다.
+   */
+  it('gap 상태에서 연속 브로드캐스트가 도착해도 프리즈는 유지된다', () => {
+    // 스냅숏 [1,2,4,5] → lastSequence 5, 구멍은 3
+    const gapped = gameSyncReducer(
+      { status: 'synced', lastSequence: 0 },
+      { type: 'GAP', expectedSequence: 3, availableFrom: 4 },
+    );
+
+    // 시퀀스 6이 꼬리에 연속으로 도착한다(receivedSequenceRef는 이미 5).
+    const afterBroadcast = gameSyncReducer(gapped, { type: 'EVENT_ARRIVED', lastSequence: 6 });
+
+    expect(afterBroadcast).toEqual(gapped);
+    expect(canAppendWhileSyncing(afterBroadcast)).toBe(false);
   });
 });
 

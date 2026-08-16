@@ -275,6 +275,38 @@ describe('useV1GameOperationsConsole — 전체 리싱크 재진입 가드', () 
     unmount();
   });
 
+  /**
+   * 구멍 난 스냅숏으로 GAP에 들어간 뒤 **꼬리에 연속인** 브로드캐스트가 도착하는
+   * 경우. `applySnapshot`은 구멍이 있어도 `receivedSequenceRef`를
+   * `snapshot.lastSequence`까지 올려 두므로(그래야 이미 본문을 받은 뒷부분이
+   * 중복으로 버려지지 않는다) 그 다음 이벤트는 `onCommitted`에서 "연속"으로
+   * 판정된다. 여기서 `BACKFILLED`를 쏘면 앞쪽 구멍은 그대로인데 프리즈만 풀린다.
+   */
+  it('갭 상태에서 꼬리에 연속인 브로드캐스트가 와도 프리즈가 풀리지 않는다', async () => {
+    // 시퀀스 2가 없는 이력 — lastSequence는 3이다.
+    const holed = { events: [goalEvent(1), goalEvent(3)], lastSequence: 3 };
+    const { fire, result, unmount } = await mountConsole(holed);
+
+    await waitFor(() => expect(result.current.sync.status).toBe('gap'));
+
+    // 다른 운영자의 골(seq 4)이 꼬리에 연속으로 도착한다.
+    act(() =>
+      fire('game.event.committed', {
+        gameId: GAME_ID,
+        sequence: 4,
+        version: 9,
+        event: goalEvent(4),
+      }),
+    );
+
+    // 본문은 받았으니 목록에는 붙지만, 시퀀스 2는 여전히 비어 있다 —
+    // 불완전한 타임라인 위에서 새 이벤트를 커밋시키면 안 된다.
+    expect(result.current.liveEvents).toHaveLength(3);
+    expect(result.current.sync.status).toBe('gap');
+
+    unmount();
+  });
+
   it('늦게 도착한 오래된 스냅숏이 그 사이 append된 이벤트를 덮어쓰지 않는다', async () => {
     const contiguous = { events: [goalEvent(1), goalEvent(2)], lastSequence: 2 };
     const { fire, setDeferAcks, flushPending, result, unmount } = await mountConsole(contiguous);

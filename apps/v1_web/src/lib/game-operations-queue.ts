@@ -394,16 +394,25 @@ export type GameSyncAction =
   | { readonly type: 'GAP'; readonly expectedSequence: number; readonly availableFrom: number }
   | { readonly type: 'BACKFILLED'; readonly lastSequence: number }
   /**
-   * 이 기기가 보낸 이벤트의 ack — "내 이벤트가 시퀀스 N으로 확정됐다"는 사실만
-   * 알려줄 뿐 **빠진 구간의 이벤트 본문은 하나도 실어 오지 않는다**. 그래서
-   * `BACKFILLED`와 구분한다: 예전에는 ack 경로도 `BACKFILLED`를 디스패치했는데,
-   * 그 리듀서는 상태와 무관하게 `synced`를 돌려주므로 **백필 없이 갭 프리즈가
-   * 풀렸다**(전송 in-flight 중에 다른 운영자의 비연속 브로드캐스트가 도착해 GAP이
-   * 걸리고, 곧이어 내 ack이 도착하면 그 자리에서 해제된다). 그 상태로 교체를
-   * 기록하면 불완전한 피치 상태 위에서 나가 서버가
+   * **이벤트 하나가 도착했다** — 이 기기가 보낸 이벤트의 ack이거나, 이미 아는
+   * 마지막 시퀀스와 연속인 브로드캐스트다. 둘 다 "시퀀스 N이 확정됐다"는 사실과
+   * (브로드캐스트라면) 그 한 건의 본문만 실어 올 뿐 **빠진 구간은 하나도 채우지
+   * 않는다**. 그래서 `BACKFILLED`와 구분한다.
+   *
+   * 예전에는 두 경로 모두 `BACKFILLED`를 디스패치했는데, 그 리듀서는 상태와
+   * 무관하게 `synced`를 돌려주므로 **백필 없이 갭 프리즈가 풀렸다.** 두 가지
+   * 실제 경로가 있었다:
+   *  - ack: 전송 in-flight 중 다른 운영자의 비연속 브로드캐스트로 GAP이 걸리고,
+   *    곧이어 내 ack이 도착해 그 자리에서 해제.
+   *  - 연속 브로드캐스트: 스냅숏 자체에 구멍이 있어 GAP으로 들어갔는데
+   *    (`applySnapshot`이 `receivedSequenceRef`를 `snapshot.lastSequence`까지
+   *    올려 둔다), 그 다음 이벤트가 꼬리에 연속으로 도착하면 해제.
+   *    구멍은 그대로인데 프리즈만 풀린다.
+   *
+   * 그 상태로 교체를 기록하면 불완전한 피치 상태 위에서 나가 서버가
    * `SUBSTITUTION_OUT_NOT_ON_PITCH`로 거부하는데 그 코드는 NON_RETRYABLE이다.
    */
-  | { readonly type: 'SELF_ACK'; readonly lastSequence: number };
+  | { readonly type: 'EVENT_ARRIVED'; readonly lastSequence: number };
 
 export function gameSyncReducer(state: GameSyncState, action: GameSyncAction): GameSyncState {
   switch (action.type) {
@@ -429,12 +438,13 @@ export function gameSyncReducer(state: GameSyncState, action: GameSyncAction): G
         availableFrom: action.availableFrom,
       };
     case 'BACKFILLED':
-      // 실제로 이벤트 본문을 손에 넣은 경우에만 디스패치된다(전체 스냅숏 적용,
-      // 연속 브로드캐스트 append). 갭을 푸는 유일한 경로다.
+      // **전체 이력을 통째로 손에 넣었을 때만** 디스패치된다 — 즉 구멍이 없는
+      // 스냅숏을 적용한 경우뿐이다(`applySnapshot`이 `firstSequenceHole`로 직접
+      // 판정한다). 갭을 푸는 유일한 경로다.
       return { status: 'synced', lastSequence: action.lastSequence };
-    case 'SELF_ACK':
-      // 위 액션 주석 참고 — 갭이 난 상태를 풀 자격이 없다(빠진 구간을 하나도
-      // 채우지 않았다). 동기 상태에서만 lastSequence를 전진시킨다.
+    case 'EVENT_ARRIVED':
+      // 위 액션 주석 참고 — 이벤트 한 건은 갭을 풀 자격이 없다(빠진 구간을
+      // 하나도 채우지 않았다). 동기 상태에서만 lastSequence를 전진시킨다.
       if (state.status === 'gap') return state;
       return { status: 'synced', lastSequence: action.lastSequence };
     default:

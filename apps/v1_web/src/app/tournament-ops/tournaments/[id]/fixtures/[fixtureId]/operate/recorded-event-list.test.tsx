@@ -132,6 +132,50 @@ describe('RecordedEventList', () => {
     expect(screen.getByText('아직 기록된 이벤트가 없어요.')).toBeInTheDocument();
   });
 
+  /**
+   * 레거시 대회 결과에서 복원된 골(`goal-event-backfill.ts`)은 전/후반이 원본에 없었고
+   * 분도 없을 수 있는데, `period`·`clockMs` 가 non-null 컬럼이라 `1`·`0` 으로 저장된다.
+   * 공개 화면은 서버가 그 값을 null 로 내려 억제하는데, 이 콘솔만 원시 행을 받아
+   * "전반 0:00" 이라고 단정하고 있었다 — 결과 정정을 판단하는 화면이라 더 위험하다.
+   */
+  it('복원된 골(분 미상)은 "전반 0:00" 이 아니라 시각 미상으로 표시한다', () => {
+    const backfilled = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 0),
+      payload: { source: 'GOAL_BACKFILL_V1', legacyPlayerName: '정우진', minuteKnown: false },
+    };
+    render(<RecordedEventList events={[backfilled]} sides={SIDES} lineups={LINEUPS} />);
+
+    const row = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')[0];
+    expect(row).toHaveTextContent('시각 미상');
+    expect(row).not.toHaveTextContent('후반');
+    expect(row).not.toHaveTextContent('0:00');
+  });
+
+  it('복원된 골이라도 레거시에 분이 남아 있으면 그 시각은 보여주되 전/후반은 단정하지 않는다', () => {
+    const backfilled = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 71 * 60000),
+      payload: { source: 'GOAL_BACKFILL_V1', legacyPlayerName: '정우진' },
+    };
+    render(<RecordedEventList events={[backfilled]} sides={SIDES} lineups={LINEUPS} />);
+
+    const row = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')[0];
+    expect(row).toHaveTextContent('71:00');
+    expect(row).not.toHaveTextContent('후반');
+  });
+
+  it('백필 표식이 없는 라이브 이벤트는 payload 에 minuteKnown 이 있어도 시각을 그대로 보여준다', () => {
+    // payload 는 기록 클라이언트가 자유롭게 채우는 객체다 — `source` 를 확인하지 않으면
+    // 라이브 71분 골의 시각이 이 화면에서 사라진다.
+    const live = {
+      ...goal(1, HOME_SIDE_ID, 'p-jung', 71 * 60000),
+      payload: { note: '현장 메모', minuteKnown: false },
+    };
+    render(<RecordedEventList events={[live]} sides={SIDES} lineups={LINEUPS} />);
+
+    expect(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem')[0])
+      .toHaveTextContent('후반 71:00');
+  });
+
   it('CARD 이벤트는 payload.card 색으로 옐로/레드를 구분해 렌더한다 — 죽은 스위치 분기 회귀 방지', () => {
     const yellowCard = {
       ...goal(1, HOME_SIDE_ID, 'p-jung', 60000),

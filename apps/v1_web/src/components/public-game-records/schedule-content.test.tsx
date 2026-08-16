@@ -225,6 +225,35 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
     expect(separator.getAttribute('style')).toContain('border-top: 1px dotted var(--border)');
   });
 
+  /**
+   * 레거시 대회 결과에서 복원된 골(`goal-event-backfill.ts`)은 원본에 전/후반이 아예
+   * 없었다 -- 서버가 `period: null`("모름")로 내려준다. 예전 `period !== 1` 분기는 그
+   * 골들을 전부 "후반 득점"으로 밀어넣어, 모른다고 내려온 값을 화면에서 단정으로
+   * 바꿔놨다.
+   */
+  it('period가 null인 득점(전·후반 미상)은 후반이 아니라 별도 묶음으로 표시한다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      scorers: [
+        { side: 'home', participantName: '후반 선수', jerseyNumber: 8, period: 2, clockMs: 480_000 },
+        { side: 'home', participantName: '미상 선수', jerseyNumber: 11, period: null, clockMs: 720_000 },
+      ],
+    })] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByRole('group', { name: '후반 득점' })).toHaveTextContent('후반 선수');
+    expect(screen.getByRole('group', { name: '후반 득점' })).not.toHaveTextContent('미상 선수');
+    expect(screen.getByRole('group', { name: '기타 득점' })).toHaveTextContent('미상 선수');
+  });
+
+  it('전·후반 미상 득점이 없으면 기타 묶음 자체를 렌더하지 않는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({
+      scorers: [{ side: 'home', participantName: '전반 선수', jerseyNumber: 7, period: 1, clockMs: 60_000 }],
+    })] }} />);
+
+    expect(screen.queryByRole('group', { name: '기타 득점' })).not.toBeInTheDocument();
+  });
+
   it('득점이 없으면 득점 영역과 구분선을 모두 표시하지 않는다', () => {
     render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry()] }} />);
 

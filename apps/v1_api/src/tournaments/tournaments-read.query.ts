@@ -75,7 +75,10 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
           },
           events: {
             where: { OR: [{ type: 'GOAL' }, { reversesEventId: { not: null } }] },
-            select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true },
+            // `payload`는 골 이벤트 백필의 `minuteKnown: false` 표식용 --
+            // tournament-bracket.service.ts의 같은 인라인 select와 정확히 일치해야 한다
+            // (tournament-fixture-official-result.ts 하단 주석 참고).
+            select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true, payload: true },
           },
         },
       },

@@ -460,6 +460,13 @@ export function useV1GameOperationsConsole(
     let resyncInFlight = false;
     let resyncCoalesced = false;
     let resyncTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    // 시도마다 번호를 붙여 "늦게 도착한 이전 시도의 ack"을 식별한다. 타임아웃
+    // 탈출구가 다음 시도를 이미 재발사한 뒤 옛 ack이 도착하면, 그 ack이
+    // `releaseResyncGuard()`를 불러 **최신 시도의** 타임아웃을 지우고 가드까지
+    // 풀어버린다 — 그때부터 구독이 중첩 발사되고(가드 무력화) 그 중첩 시도의
+    // ack이 다시 다음 타임아웃을 지우는 연쇄가 된다. 자기 시도가 여전히 최신일
+    // 때만 가드를 건드리게 해서 이 연쇄를 끊는다.
+    let resyncAttemptId = 0;
     const releaseResyncGuard = () => {
       if (resyncTimeoutId !== null) {
         clearTimeout(resyncTimeoutId);
@@ -473,6 +480,7 @@ export function useV1GameOperationsConsole(
         return;
       }
       resyncInFlight = true;
+      const attemptId = ++resyncAttemptId;
       // ack이 끝내 오지 않아도 가드가 영구 래치되지 않게 하는 탈출구
       // (`SUBSCRIBE_ACK_TIMEOUT_MS` 주석 참고). 합쳐 둔 요청이 있으면 그때 한 번
       // 재발사한다 — 없으면 가드만 풀고 다음 트리거를 기다린다(재시도 폭주 방지).
@@ -487,6 +495,10 @@ export function useV1GameOperationsConsole(
         'game.subscribe',
         { gameId, afterSequence: 0 },
         (result: SubscribeAck) => {
+          // 이미 다음 시도가 나갔다면 이 ack은 낡았다 — 가드도 스냅숏도 건드리지
+          // 않고 버린다. 최신 시도가 더 새로운 스냅숏을 가져오고, 서버가 함께
+          // push하는 `game.snapshot`은 `onSnapshot`의 단조성 가드가 거른다.
+          if (attemptId !== resyncAttemptId) return;
           releaseResyncGuard();
           if (cancelled) return;
           if (result.status === 'subscribed' && result.snapshot) {

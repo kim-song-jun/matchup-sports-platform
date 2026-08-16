@@ -118,6 +118,11 @@ function createMockSocket(server: { events: readonly GameEventRecord[]; lastSequ
       const queued = pendingResponses.splice(0, pendingResponses.length);
       for (const respond of queued) respond();
     },
+    /** 가장 오래 보류된 응답 하나만 흘린다 — "늦게 도착한 옛 시도의 ack" 재현용. */
+    flushOldest() {
+      const respond = pendingResponses.shift();
+      respond?.();
+    },
     pendingCount() {
       return pendingResponses.length;
     },
@@ -190,6 +195,39 @@ describe('useV1GameOperationsConsole — 전체 리싱크 재진입 가드', () 
     });
 
     // 타임아웃 탈출구가 없으면 이 트리거는 영원히 무음 no-op이 된다.
+    act(() => fire('connect'));
+    expect(subscribeCalls).toHaveLength(3);
+
+    vi.useRealTimers();
+    unmount();
+  });
+
+  it('타임아웃으로 재발사한 뒤 도착한 옛 시도의 ack은 최신 시도의 가드를 풀지 못한다', async () => {
+    const contiguous = { events: [goalEvent(1), goalEvent(2)], lastSequence: 2 };
+    const { fire, subscribeCalls, setDeferAcks, flushOldest, result, unmount, subscribeAckTimeoutMs } =
+      await mountConsole(contiguous);
+    await waitFor(() => expect(result.current.liveEvents).toHaveLength(2));
+    expect(subscribeCalls).toHaveLength(1);
+
+    setDeferAcks(true);
+    vi.useFakeTimers();
+
+    // 시도 A — ack이 오지 않아 타임아웃 탈출구가 가드를 푼다.
+    act(() => fire('connect'));
+    expect(subscribeCalls).toHaveLength(2);
+    act(() => {
+      vi.advanceTimersByTime(subscribeAckTimeoutMs);
+    });
+
+    // 시도 B — 새 가드와 새 타임아웃을 세운 채 in-flight 다.
+    act(() => fire('connect'));
+    expect(subscribeCalls).toHaveLength(3);
+
+    // 이제 시도 A 의 ack 이 뒤늦게 도착한다. 시도별 식별이 없으면 이 ack 이
+    // 시도 B 의 타임아웃을 지우고 `resyncInFlight` 를 풀어 가드를 무력화한다.
+    act(() => flushOldest());
+
+    // 시도 B 가 아직 응답을 기다리는 중이므로 추가 구독이 나가면 안 된다.
     act(() => fire('connect'));
     expect(subscribeCalls).toHaveLength(3);
 

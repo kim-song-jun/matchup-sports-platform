@@ -128,17 +128,14 @@ import {
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
 import { TournamentStatisticsTab } from './tournament-statistics-tab';
+import { useTournamentAdmin } from './tournament-admin-context';
+import {
+  TOURNAMENT_STATUS_LABEL,
+  formatDate,
+  formatDateRange,
+} from './tournament-admin-shared';
 
 // ── Constants ─────────────────────────────────────────────────────────────
-
-const TOURNAMENT_STATUS_LABEL: Record<string, string> = {
-  draft: '초안',
-  open: '접수 중',
-  closed: '마감',
-  in_progress: '진행 중',
-  completed: '완료',
-  cancelled: '취소됨',
-};
 
 const ELIGIBILITY_LABEL: Record<string, string> = {
   non_pro: '아마추어',
@@ -219,48 +216,7 @@ const REGISTRATION_STATUS_FILTERS: { value: string; label: string }[] = [
 // ── Status transition guards ────────────────────────────────────────────────
 
 /** Returns next allowed statuses from the current one */
-function allowedNextStatuses(current: V1TournamentStatus): V1TournamentStatus[] {
-  switch (current) {
-    case 'draft':
-      return ['open', 'cancelled'];
-    case 'open':
-      return ['closed', 'cancelled'];
-    case 'closed':
-      return ['in_progress', 'open', 'cancelled'];
-    case 'in_progress':
-      return ['completed', 'cancelled'];
-    case 'completed':
-    case 'cancelled':
-      return [];
-    default:
-      return [];
-  }
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
-
-function formatDateRange(startStr: string | null, endStr: string | null): string {
-  const start = formatDate(startStr);
-  if (start === '—') return start;
-  const end = formatDate(endStr);
-  if (end === '—' || end === start) return start;
-  return `${start} ~ ${end}`;
-}
 
 function formatCurrency(n: number): string {
   if (n === 0) return '무료';
@@ -2023,7 +1979,7 @@ export function BracketTab({
 
 // ── Tab: Announcements ────────────────────────────────────────────────────
 
-function AnnouncementsTab({
+export function AnnouncementsTab({
   tournamentId,
   showToast,
 }: {
@@ -2335,21 +2291,13 @@ function AnnouncementsTab({
 
 // ── Main detail client ────────────────────────────────────────────────────
 
-export default function TournamentDetailClient({ id }: { id: string }) {
-  const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
-  const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
-  const changeStatus = useV1ChangeTournamentStatus(id);
-
-  const { toasts, showToast } = useAdminToast();
+export function TournamentInfoSection() {
+  const { tournamentId: id, canWrite, showToast } = useTournamentAdmin();
+  const { data: tournament } = useV1AdminTournament(id);
   const updateTournament = useV1UpdateTournament(id);
   const { data: masterSports } = useV1MasterSports();
   const uploadImages = useV1UploadImages();
-  const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
 
-  const [activeTab, setActiveTab] = useState<TabId>('registrations');
-
-  // ── Edit form state ──────────────────────────────────────────────────
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editSportId, setEditSportId] = useState('');
@@ -2704,129 +2652,13 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     });
   };
 
-  // ── Registration data (needed by bracket tab for confirmed teams) ────
-  const { data: regData } = useV1AdminTournamentRegistrations(id);
-  const registrations = regData?.items ?? [];
+  // 로딩·에러는 셸(layout)이 이미 처리한다 — 여기서는 데이터가 없으면 조용히 비운다.
+  if (!tournament) return null;
 
-  // ── Status change ────────────────────────────────────────────────────
-  const handleStatusChange = async (nextStatus: V1TournamentStatus) => {
-    // 취소는 비가역 → 반드시 확인 게이트
-    if (nextStatus === 'cancelled') {
-      // "취소"(모달 닫기)와 "대회 취소"(대회를 없앰)가 나란히 놓이면 급할 때 오독한다 —
-      // 두 버튼이 서로 다른 말이 되도록 닫기 쪽을 '돌아가기'로 바꾼다.
-      const ok = await confirmStatusChange({
-        title: '대회를 취소할까요?',
-        message: '취소하면 되돌릴 수 없어요. 참가 신청과 일정도 함께 무효가 돼요.',
-        confirmLabel: '대회 취소하기',
-        cancelLabel: '돌아가기',
-        tone: 'danger',
-      });
-      if (!ok) return;
-    }
-    changeStatus.mutate(
-      { status: nextStatus },
-      {
-        onSuccess: (res) => {
-          if (res.alreadyInStatus) {
-            showToast('이미 이 상태예요.', 'success');
-          } else {
-            showToast('상태를 변경했어요.', 'success');
-          }
-        },
-        onError: (err) =>
-          showToast(extractErrorMessage(err, '상태 변경에 실패했어요.'), 'error'),
-      },
-    );
-  };
-
-  if (isPending) {
-    return (
-      <div className="animate-pulse">
-        <div className="mb-4 h-4 bg-[var(--surface-soft)] rounded-lg w-24" />
-        <div className="h-7 bg-[var(--surface-soft)] rounded-lg w-64 mb-2" />
-        <div className="h-4 bg-[var(--surface-soft)] rounded-lg w-48 mb-6" />
-        <AdminTableSkeleton cols={5} />
-      </div>
-    );
-  }
-
-  if (isError || !tournament) {
-    return (
-      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
-        <p className="text-sm text-[var(--red700)] font-medium">
-          {extractErrorMessage(error, '대회 정보를 불러오지 못했어요.')}
-        </p>
-        <button
-          type="button"
-          onClick={() => void refetch()}
-          className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          다시 시도하기
-        </button>
-      </div>
-    );
-  }
-
-  const nextStatuses = allowedNextStatuses(tournament.status);
   const scheduleLabel = formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt);
-
 
   return (
     <>
-      {/* ── Back link ─────────────────────────────────────────────────── */}
-      <div className="mb-4">
-        <Link
-          href="/admin/tournaments"
-          className="inline-flex items-center gap-1 min-h-[44px] text-[13px] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-        >
-          <ChevronLeft size={14} aria-hidden="true" />
-          대회 목록으로
-        </Link>
-      </div>
-
-      {/* ── Header ────────────────────────────────────────────────────── */}
-      {/* f9: status buttons moved below header to avoid 6-line title wrap on mobile */}
-      <AdminPageHeader
-        eyebrow="플랫폼 · 대회"
-        title={tournament.title}
-        description={`${TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} · ${tournament.venue ?? '장소 미정'} · ${scheduleLabel}`}
-      />
-
-      {/* ── Status change actions (f9: separate row, flex-wrap, h-[44px]) ── */}
-      {/* #5: forward transitions = solid blue (primary); 취소하기 = outline red-text (not solid) */}
-      {canWrite && nextStatuses.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-5">
-          {nextStatuses.map((s) => {
-            const isDestructive = s === 'cancelled';
-            const label =
-              s === 'open' ? '접수 시작하기' :
-              s === 'closed' ? '접수 마감하기' :
-              s === 'in_progress' ? '대회 시작하기' :
-              s === 'completed' ? '대회 완료하기' :
-              s === 'cancelled' ? '취소하기' :
-              `${TOURNAMENT_STATUS_LABEL[s] ?? s}(으)로 변경`;
-            return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => handleStatusChange(s)}
-                disabled={changeStatus.isPending}
-                className={[
-                  'inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold',
-                  'transition-colors disabled:opacity-50',
-                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap',
-                  isDestructive
-                    ? 'text-[var(--red700)] border border-[var(--tint-red-border)] bg-transparent hover:bg-[var(--red50)]'
-                    : 'text-white bg-blue-500 hover:bg-blue-600',
-                ].join(' ')}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* ── Info card (ADM-TOURN-05: prize/rules/refund read-back) ──── */}
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
         <div className="flex items-center justify-between mb-3">
@@ -2993,196 +2825,12 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* ── Tabs (f11: min-h-[44px], active = border-b-2 blue-500) ──
-          sticky: 대회 정보·홍보 카드가 위를 길게 차지해 탭이 화면 밖으로 밀려나면
-          운영자가 대진 관리 진입점을 못 찾는다. 스크롤해도 탭이 따라오게 고정한다.
-          고정된 탭이 아래 내용 위로 겹쳐 지나가므로 경계를 위한 hairline 그림자만 둔다. */}
-      <div
-        role="tablist"
-        aria-label="대회 운영 탭"
-        className="sticky top-0 z-20 flex max-w-full gap-1 overflow-x-auto bg-[var(--surface-soft)] rounded-xl p-1 mb-4 w-fit shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
-      >
-        {TABS.map((tab) => {
-          const active = activeTab === tab.id;
-          const count = tab.id === 'registrations'
-            ? tournament.operationCounts?.registrations
-            : tab.id === 'bracket'
-              ? tournament.operationCounts?.fixtures
-              : tab.id === 'announcements'
-                ? tournament.operationCounts?.announcements
-                : undefined;
-          return (
-            <button
-              key={tab.id}
-              id={`tab-${tab.id}`}
-              role="tab"
-              aria-selected={active}
-              aria-label={typeof count === 'number' ? `${tab.label} ${count}` : tab.label}
-              aria-controls={`panel-${tab.id}`}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={[
-                'inline-flex shrink-0 items-center min-h-[44px] px-4 rounded-lg text-[13px] font-medium transition-colors',
-                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                active
-                  ? 'bg-[var(--card-surface)] text-[var(--text-strong)] shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-strong)]',
-              ].join(' ')}
-            >
-              <span>{tab.label}</span>
-              <span className={active ? 'ml-1.5 font-semibold tabular-nums text-[var(--blue700)]' : 'ml-1.5 font-semibold tabular-nums text-[var(--text-muted)]'} aria-hidden="true">
-                {typeof count === 'number' ? count.toLocaleString('ko-KR') : '—'}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Tournament-ops quick links: 이 관리자 콘솔 탭들과 별개인 대회 현장 운영
-          콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다. T6-5(D-16):
-          권한이 없으면 숨기지 않고 비활성 + 사유로 보여준다. */}
-      <TournamentOpsQuickLinks tournamentId={id} />
-
-      {/* ── Tab panels ────────────────────────────────────────────────── */}
-      <div
-        id="panel-info"
-        aria-labelledby="tab-info"
-        hidden={activeTab !== 'info'}
-      >
-        {activeTab === 'info' && (
-          <InfoTab
-            tournamentId={id}
-            showToast={showToast}
-            onOpenBasicEdit={openEdit}
-            onOpenPromoEdit={openPromoEdit}
-          />
-        )}
-      </div>
-
-      <div
-        id={`panel-registrations`}
-        aria-labelledby="tab-registrations"
-        role="tabpanel"
-        hidden={activeTab !== 'registrations'}
-      >
-        {activeTab === 'registrations' && (
-          <RegistrationsTab
-            tournamentId={id}
-            showToast={showToast}
-            tournamentTeamCount={tournament?.teamCount}
-            canWrite={canWrite}
-          />
-        )}
-      </div>
-
-      <div
-        id={`panel-bracket`}
-        aria-labelledby="tab-bracket"
-        role="tabpanel"
-        hidden={activeTab !== 'bracket'}
-      >
-        {activeTab === 'bracket' && (
-          <BracketTab
-            tournamentId={id}
-            showToast={showToast}
-            registrations={registrations}
-            registrationDeadlineAt={tournament?.registrationDeadlineAt}
-            bracketPublishedAt={tournament?.bracketPublishedAt}
-            bracketPublishScheduledAt={tournament?.bracketPublishScheduledAt}
-            canWrite={canWrite}
-          />
-        )}
-      </div>
-
-      <div
-        id={`panel-announcements`}
-        aria-labelledby="tab-announcements"
-        role="tabpanel"
-        hidden={activeTab !== 'announcements'}
-      >
-        {activeTab === 'announcements' && (
-          <AnnouncementsTab
-            tournamentId={id}
-            showToast={showToast}
-          />
-        )}
-      </div>
-
-      <div
-        id={`panel-sponsors`}
-        aria-labelledby="tab-sponsors"
-        role="tabpanel"
-        hidden={activeTab !== 'sponsors'}
-      >
-        {activeTab === 'sponsors' && (
-          <TournamentSponsorsTab tournamentId={id} showToast={showToast} />
-        )}
-      </div>
-
-      <div
-        id="panel-popups"
-        aria-labelledby="tab-popups"
-        role="tabpanel"
-        hidden={activeTab !== 'popups'}
-      >
-        {activeTab === 'popups' && (
-          <TournamentPopupTab tournamentId={id} canWrite={canWrite} showToast={showToast} />
-        )}
-      </div>
-
-      <div
-        id="panel-campaign"
-        aria-labelledby="tab-campaign"
-        role="tabpanel"
-        hidden={activeTab !== 'campaign'}
-      >
-        {activeTab === 'campaign' && (
-          <TournamentCampaignTab
-            tournamentId={id}
-            canWrite={canWrite}
-            showToast={showToast}
-          />
-        )}
-      </div>
-
-      <div
-        id="panel-reviews"
-        aria-labelledby="tab-reviews"
-        role="tabpanel"
-        hidden={activeTab !== 'reviews'}
-      >
-        {activeTab === 'reviews' && (
-          <ReviewsTab
-            tournamentId={id}
-            showToast={showToast}
-          />
-        )}
-      </div>
-
-      <div
-        id="panel-awards"
-        aria-labelledby="tab-awards"
-        role="tabpanel"
-        hidden={activeTab !== 'awards'}
-      >
-        {activeTab === 'awards' && (
-          <AwardsTab
-            tournamentId={id}
-            showToast={showToast}
-          />
-        )}
-      </div>
-
-      <div
-        id="panel-statistics"
-        aria-labelledby="tab-statistics"
-        role="tabpanel"
-        hidden={activeTab !== 'statistics'}
-      >
-        {activeTab === 'statistics' && (
-          <TournamentStatisticsTab tournamentId={id} />
-        )}
-      </div>
+      <InfoTab
+        tournamentId={id}
+        showToast={showToast}
+        onOpenBasicEdit={openEdit}
+        onOpenPromoEdit={openPromoEdit}
+      />
 
       {/* ── D1: 대회 정보 수정 모달 ──────────────────────────────────── */}
       <SimpleModal
@@ -3716,11 +3364,6 @@ export default function TournamentDetailClient({ id }: { id: string }) {
           </div>
         </form>
       </SimpleModal>
-
-      {/* 대회 상태 변경 confirm modal (취소 등 비가역 액션) */}
-      {StatusConfirmModal}
-
-      <AdminToasts toasts={toasts} />
     </>
   );
 }
@@ -3776,7 +3419,7 @@ function GenderQuotaInput({
   );
 }
 
-function InfoTab({
+export function InfoTab({
   tournamentId,
   showToast,
   onOpenBasicEdit,
@@ -3964,7 +3607,7 @@ function InfoTab({
 
 type AwardForm = { awardType: string; awardLabel: string; iconKey: V1TournamentAwardIconKey; recipientName: string; teamName: string; note: string };
 
-function AwardsTab({
+export function AwardsTab({
   tournamentId,
   showToast,
 }: {
@@ -4182,7 +3825,7 @@ function AwardRow({
 
 const REVIEWS_PAGE_SIZE = 10;
 
-function ReviewsTab({
+export function ReviewsTab({
   tournamentId,
   showToast,
 }: {

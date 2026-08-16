@@ -13,6 +13,7 @@ export default function AdminTeamMatchSeriesListPage() {
   return (
     <div>
       <AdminPageHeader
+        eyebrow="플랫폼"
         title="리그 관리"
         description="공식 리그를 개설하고 대진·순위를 관리해요."
         action={

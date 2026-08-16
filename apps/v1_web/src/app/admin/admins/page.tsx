@@ -480,6 +480,7 @@ export default function AdminAdminsPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="설정"
         title="관리자 관리"
         description="운영자·지원 권한을 부여하고 관리해요."
         action={

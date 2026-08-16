@@ -158,7 +158,7 @@ export default function AdminTeamDetailPage() {
   if (isError || !team) {
     return (
       <>
-        <AdminPageHeader title="팀 상세" action={<BackLink />} />
+        <AdminPageHeader eyebrow="플랫폼 · 팀" title="팀 상세" action={<BackLink />} />
         <AdminEmpty
           title="팀 정보를 불러오지 못했어요"
           description={extractErrorMessage(error, '잠시 후 다시 시도해 주세요.')}
@@ -181,6 +181,7 @@ export default function AdminTeamDetailPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="플랫폼 · 팀"
         title="팀 상세"
         description={team.name}
         action={<BackLink />}

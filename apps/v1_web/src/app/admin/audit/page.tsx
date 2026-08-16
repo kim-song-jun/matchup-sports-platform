@@ -459,7 +459,7 @@ export default function AdminAuditPage() {
   return (
     <>
       <AdminPageHeader
-        eyebrow="운영 도구"
+        eyebrow="운영"
         title="감사 로그"
         description="관리자 액션과 상태 변경 이력을 확인해요."
       />

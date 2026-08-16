@@ -2787,7 +2787,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       {/* ── Header ────────────────────────────────────────────────────── */}
       {/* f9: status buttons moved below header to avoid 6-line title wrap on mobile */}
       <AdminPageHeader
-        eyebrow="대회 관리"
+        eyebrow="플랫폼 · 대회"
         title={tournament.title}
         description={`${TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} · ${tournament.venue ?? '장소 미정'} · ${scheduleLabel}`}
       />

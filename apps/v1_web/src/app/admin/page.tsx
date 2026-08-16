@@ -79,7 +79,6 @@ export default function AdminOverviewPage() {
   return (
     <>
       <AdminPageHeader
-        eyebrow="운영 대시보드"
         title="운영 개요"
         description="플랫폼 현황을 한눈에 확인해요."
       />

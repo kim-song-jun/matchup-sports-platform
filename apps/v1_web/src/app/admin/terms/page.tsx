@@ -323,6 +323,7 @@ export default function AdminTermsPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="콘텐츠"
         title="약관 관리"
         description="회원가입·대회 신청·하단 메뉴 약관을 버전 단위로 관리해요. 발행본은 수정하지 않고 새 버전으로 이어집니다."
         action={

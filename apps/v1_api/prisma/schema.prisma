@@ -1972,13 +1972,6 @@ enum V1TournamentGroupPhase {
   third_place
 }
 
-enum V1TournamentFixtureStatus {
-  scheduled
-  in_progress
-  completed
-  cancelled
-}
-
 enum V1TournamentGoalTeam {
   home
   away
@@ -2309,7 +2302,6 @@ model V1TournamentFixture {
   scheduledAt                DateTime?                 @map("scheduled_at")
   fieldId                    String?                   @map("field_id")
   venue                      String?
-  status                     V1TournamentFixtureStatus @default(scheduled)
   createdAt                  DateTime                  @default(now()) @map("created_at")
   updatedAt                  DateTime                  @updatedAt @map("updated_at")
   // Nullable / no default until the deferred contract-phase migration adds

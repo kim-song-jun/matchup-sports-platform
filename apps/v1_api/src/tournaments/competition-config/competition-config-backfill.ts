@@ -189,7 +189,14 @@ async function driftIsResolvedBySuccessor(
   const [activeTournaments, activeTeamMatches, activeFixtures] = await Promise.all([
     prisma.v1Tournament.count({ where: { competitionConfigVersionId: row.id, deletedAt: null } }),
     prisma.v1TeamMatch.count({ where: { competitionConfigVersionId: row.id, status: { not: 'completed' } } }),
-    prisma.v1TournamentFixture.count({ where: { competitionConfigVersionId: row.id, status: { not: 'completed' } } }),
+    // status !== 'completed' 의 파생 등가. 컬럼은 officialize 시점의 비정규화 캐시라
+    // "공식 리비전이 없는 픽스처" 와 같은 집합이다(prod·alpha 복제본 대조 mismatch 0).
+    prisma.v1TournamentFixture.count({
+      where: {
+        competitionConfigVersionId: row.id,
+        NOT: { game: { is: { currentOfficialRevisionId: { not: null } } } },
+      },
+    }),
   ]);
   return activeTournaments === 0 && activeTeamMatches === 0 && activeFixtures === 0;
 }

@@ -151,7 +151,7 @@ export class TournamentCompetitionConfig {
         });
       }
       await tx.v1TournamentFixture.updateMany({
-        where: { tournamentId, status: { not: 'completed' } },
+        where: { tournamentId, NOT: { game: { is: { currentOfficialRevisionId: { not: null } } } } },
         data: { competitionConfigVersionId: selected.id },
       });
       // GamesService의 라인업 검증은 fixture가 아니라 V1Game에 pin된 버전을 읽는다.

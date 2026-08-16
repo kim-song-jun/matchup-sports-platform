@@ -371,7 +371,8 @@ export class TournamentBracketService {
             awayRegistrationId: dto.awayRegistrationId ?? null,
             scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
             venue: dto.venue ?? null,
-            status: 'scheduled',
+            // status 컬럼은 제거됐다 — 진행 상태는 V1Game(state / currentOfficialRevisionId)이
+            // authoritative 하고, 픽스처에 그 사본을 두지 않는다.
             competitionConfigVersionId: pinnedTournament.competitionConfigVersionId,
           },
         }));

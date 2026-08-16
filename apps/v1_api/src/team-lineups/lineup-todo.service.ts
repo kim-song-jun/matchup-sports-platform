@@ -86,9 +86,9 @@ export class LineupTodoService {
   private async loadTournamentFixtures(teamIds: string[] | null, now: Date) {
     const fixtures = await this.prisma.v1TournamentFixture.findMany({
       where: {
-        status: 'scheduled',
+        // status: 'scheduled' 의 파생 등가 — 공식 결과가 아직 없는 픽스처.
         scheduledAt: { gte: now },
-        game: { isNot: null },
+        game: { is: { currentOfficialRevisionId: null } },
         OR: [
           { homeRegistration: this.registrationFilter(teamIds) },
           { awayRegistration: this.registrationFilter(teamIds) },

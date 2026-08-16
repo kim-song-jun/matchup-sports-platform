@@ -214,7 +214,13 @@ export function presentTournamentDetail(
       legNumber: fixture.legNumber,
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
-      status: fixture.status,
+      /**
+       * 컬럼이 사라졌지만 응답 필드는 유지한다 — 어드민 화면이 이 어휘에 의존한다.
+       * 컬럼에 실제로 기록되던 값은 `scheduled`/`completed` 둘뿐이었고 그 둘이
+       * "공식 리비전 없음/있음" 과 정확히 대응했으므로(prod·alpha 전수 대조 mismatch 0),
+       * 같은 두 값을 파생해 내려주면 소비처 입장에서 바뀌는 것이 없다.
+       */
+      status: fixture.game?.currentOfficialRevision ? 'completed' : 'scheduled',
       homeRegistrationId: fixture.homeRegistrationId,
       // homeTeamName은 세 갈래: 슬롯에 팀이 아직 배정 안 됐으면 'TBD'(기존 동작 유지),
       // 배정은 됐지만 모집 중이라 가려야 하면 null(진짜 미배정과 구분되는 값 —

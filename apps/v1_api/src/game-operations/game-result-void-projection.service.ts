@@ -187,12 +187,14 @@ export class GameResultVoidProjectionService {
 
     for (const edge of edges) {
       const registrationId = edge.sourceOutcome === 'WINNER' ? winnerRegistrationId : loserRegistrationId;
-      const target = await tx.$queryRaw<Array<{ id: string; status: string }>>`
-        SELECT id, status::text AS status FROM v1_tournament_fixtures
-        WHERE id = ${edge.targetFixtureId} FOR UPDATE
+      const target = await tx.$queryRaw<Array<{ id: string; hasOfficialResult: boolean }>>`
+        SELECT f.id, (g.current_official_revision_id IS NOT NULL) AS "hasOfficialResult"
+        FROM v1_tournament_fixtures f
+        LEFT JOIN v1_games g ON g.tournament_fixture_id = f.id
+        WHERE f.id = ${edge.targetFixtureId} FOR UPDATE OF f
       `;
-      if (target[0] === undefined || target[0].status !== 'scheduled') {
-        // Already advanced past 'scheduled' downstream -- the sync command
+      if (target[0] === undefined || target[0].hasOfficialResult) {
+        // Already has an official result downstream -- the sync command
         // already blocks this in the common case; a late/replayed worker
         // run must never clobber a fixture that has moved on.
         continue;

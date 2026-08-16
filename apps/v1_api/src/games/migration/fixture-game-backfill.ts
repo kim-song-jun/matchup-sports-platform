@@ -143,7 +143,10 @@ function visibilityModeFromConfig(config: ConfigRow): V1VisibilityMode {
  */
 async function collectCandidates(client: MigrationReadClient): Promise<Candidates> {
   const fixtures = await client.v1TournamentFixture.findMany({
-    where: { status: { in: ['scheduled', 'in_progress'] }, game: null },
+    // 예전엔 status 로 "아직 안 끝난 픽스처" 를 걸렀다. 게임이 없는 픽스처는 정의상
+    // 공식 리비전도 없으므로(그 관계로만 결과가 존재한다) `game: null` 이 이미 그 조건을
+    // 함의한다 — prod·alpha 복제본 모두 게임 없는 픽스처가 0건이라 실제 대상도 동일하다.
+    where: { game: null },
     orderBy: { id: 'asc' },
     select: {
       id: true,

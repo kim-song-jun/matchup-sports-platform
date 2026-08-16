@@ -193,7 +193,13 @@ export const gameSchemaSourceManifest = {
   // 개인 어워드 icon_key는 game domain 밖의 nullable 컬럼이지만 이 guard는 전체
   // schema.prisma 바이트를 결속한다. 전용 20260815193000 migration의 빈 DB replay와
   // drift 검증을 통과한 스키마 해시로 재고정하며 game operations migration은 불변이다.
-  schema: '3b90ebc59111f96a58073949b939cb1a13b26c14709149c0e2d573dbfa601744',
+  // v1_tournament_fixtures.status 컬럼과 V1TournamentFixtureStatus enum 제거로 재고정.
+  // game 도메인을 직접 건드리는 변경이다 — 진출/리뷰/설정 게이트가 이 컬럼 대신
+  // V1Game.currentOfficialRevisionId 를 직접 보도록 앞선 릴리스에서 옮겼고, 이번
+  // 마이그레이션(20260816060000_v1_drop_tournament_fixture_status)이 컬럼을 떨군다.
+  // additive 가 아닌 contract 이므로 코드 제거가 선행 릴리스로 배포된 뒤에만 안전하다.
+  // 바인딩된 20260729000100_v1_game_operations 는 편집하지 않았으므로 migration 해시는 불변.
+  schema: '612436ce619eb17e603a0c1f147a6504ee32edb25e3c7104b69d077261bf8ddf',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

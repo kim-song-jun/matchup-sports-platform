@@ -1,4 +1,4 @@
-import type { V1GameState, V1TournamentFixtureStatus, V1VisibilityMode } from '@prisma/client';
+import type { V1GameState, V1VisibilityMode } from '@prisma/client';
 import type { PublicGameVisibilityMode } from '../games.types';
 
 /**
@@ -74,13 +74,6 @@ export function resolveResultState(input: {
   return input.supersedesId === null ? 'official' : 'corrected';
 }
 
-const FIXTURE_STATUS_TO_PUBLIC_STATUS: Record<V1TournamentFixtureStatus, string> = {
-  scheduled: 'scheduled',
-  in_progress: 'live',
-  completed: 'ended',
-  cancelled: 'cancelled',
-};
-
 const GAME_STATE_TO_PUBLIC_STATUS: Record<V1GameState, string> = {
   SCHEDULED: 'scheduled',
   LIVE: 'live',
@@ -93,13 +86,15 @@ const GAME_STATE_TO_PUBLIC_STATUS: Record<V1GameState, string> = {
  * The fixture-level lifecycle label shown under `hidden`/`status_only`
  * modes (matrix column "Bracket/status": "lifecycle only"). Prefers the
  * live `V1Game.state` once a game exists (it is authoritative the moment
- * the game starts); falls back to the fixture's own status before a game
- * has been created for it.
+ * the game starts). Before a game exists there is nothing else to read —
+ * the fixture's own status column was removed as a redundant cache.
  */
 export function publicFixtureStatus(input: {
   readonly gameState: V1GameState | null;
-  readonly fixtureStatus: V1TournamentFixtureStatus;
 }): string {
   if (input.gameState !== null) return GAME_STATE_TO_PUBLIC_STATUS[input.gameState];
-  return FIXTURE_STATUS_TO_PUBLIC_STATUS[input.fixtureStatus];
+  // 게임이 아직 없는 픽스처. 예전에는 `V1TournamentFixture.status` 컬럼으로 폴백했지만
+  // 그 컬럼은 제거됐다 — 게임이 없으면 결과도 있을 수 없으므로 `scheduled` 외의 값이
+  // 나올 수 없다(prod·alpha 복제본 모두 게임 없는 픽스처 0건).
+  return 'scheduled';
 }

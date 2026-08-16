@@ -41,7 +41,7 @@ export class TournamentFixtureReviewsService {
     const fixtures = (await this.prisma.v1TournamentFixture.findMany({
       where: {
         ...(tournamentId ? { tournamentId } : {}),
-        status: 'completed',
+        game: { is: { currentOfficialRevisionId: { not: null } } },
         homeRegistrationId: { not: null },
         awayRegistrationId: { not: null },
         OR: [

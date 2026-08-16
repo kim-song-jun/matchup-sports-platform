@@ -358,7 +358,7 @@ export class PublicTournamentRecordsService {
       currentRevisionState,
       supersedesId: fixture.game?.currentOfficialRevision?.supersedesId ?? null,
     });
-    const status = publicFixtureStatus({ gameState: fixture.game?.state ?? null, fixtureStatus: fixture.status });
+    const status = publicFixtureStatus({ gameState: fixture.game?.state ?? null });
 
     const officialScore = parseScore(fixture.game?.currentOfficialRevision?.score);
     const officialAt = fixture.game?.currentOfficialRevision?.officialAt ?? null;
@@ -858,7 +858,7 @@ function presentScheduleEntry(
   const currentRevisionState = normalizeRevisionState(fixture.game?.currentOfficialRevision?.state);
   const officialScore = parseScore(fixture.game?.currentOfficialRevision?.score);
   const showOfficialResult = currentRevisionState === 'OFFICIAL' && officialScore !== null;
-  const status = publicFixtureStatus({ gameState: fixture.game?.state ?? null, fixtureStatus: fixture.status });
+  const status = publicFixtureStatus({ gameState: fixture.game?.state ?? null });
   // Lane 1 fix (관중 라이브 스코어): while genuinely LIVE and no official
   // revision exists yet, use the GOAL-event tally instead of leaving the score
   // null -- see `public-live-score.ts`'s doc comment for why

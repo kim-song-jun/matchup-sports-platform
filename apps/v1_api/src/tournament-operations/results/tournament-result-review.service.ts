@@ -478,12 +478,10 @@ export class TournamentResultReviewService {
         // via the outbox event below) then always observes a consistent,
         // already-committed 'completed' status with no eventual-consistency
         // gap. Idempotent on repeat officialize (e.g. a later correction).
-        if (game.tournamentFixtureId !== null) {
-          await tx.v1TournamentFixture.update({
-            where: { id: game.tournamentFixtureId },
-            data: { status: V1TournamentFixtureStatus.completed },
-          });
-        }
+        // (컬럼 제거) 예전에는 여기서 fixture.status 를 completed 로 찍었다. 그 쓰기의
+        // 유일한 목적이 "공식 결과가 생겼다"를 픽스처에 복사해 두는 것이었는데, 바로 위
+        // 공식 포인터 스왑이 이미 그 사실 자체이므로 소비처가 원본을 직접 보게 바꿨다.
+        // 캐시가 사라져 두 값이 어긋날 여지도 함께 없어진다.
         await this.writeOutbox(
           tx,
           `game:${gameId}:revision:${officialized.revision}:officialize`,

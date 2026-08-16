@@ -31,7 +31,7 @@ export async function recalculateTournamentFixtureTeamTrust(
     }),
     tx.v1TournamentFixture.count({
       where: {
-        status: 'completed',
+        game: { is: { currentOfficialRevisionId: { not: null } } },
         OR: [
           { homeRegistration: { is: { teamId: targetTeamId } } },
           { awayRegistration: { is: { teamId: targetTeamId } } },

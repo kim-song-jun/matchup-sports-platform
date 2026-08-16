@@ -1,6 +1,6 @@
 'use client';
 
-import { AnnouncementsTab } from '../tournament-detail-client';
+import { AnnouncementsTab } from '../announcements-tab';
 import { useTournamentAdmin } from '../tournament-admin-context';
 
 export default function AdminTournamentAnnouncementsPage() {

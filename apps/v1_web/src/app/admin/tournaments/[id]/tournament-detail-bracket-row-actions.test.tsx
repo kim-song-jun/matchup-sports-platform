@@ -20,7 +20,7 @@ import {
   useV1UpdateFixture,
   useV1UpdateGroup,
 } from '@/hooks/use-v1-api';
-import { BracketTab } from './tournament-detail-client';
+import { BracketTab } from './bracket-tab';
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminBracket: vi.fn(),

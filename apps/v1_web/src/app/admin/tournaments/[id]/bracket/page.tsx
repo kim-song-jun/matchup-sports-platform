@@ -1,7 +1,7 @@
 'use client';
 
 import { useV1AdminTournament, useV1AdminTournamentRegistrations } from '@/hooks/use-v1-api';
-import { BracketTab } from '../tournament-detail-client';
+import { BracketTab } from '../bracket-tab';
 import { useTournamentAdmin } from '../tournament-admin-context';
 
 export default function AdminTournamentBracketPage() {

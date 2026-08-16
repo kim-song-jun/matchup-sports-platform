@@ -1,6 +1,6 @@
 'use client';
 
-import { TournamentInfoSection } from '../tournament-detail-client';
+import { TournamentInfoSection } from '../info-section';
 
 export default function AdminTournamentInfoPage() {
   return <TournamentInfoSection />;

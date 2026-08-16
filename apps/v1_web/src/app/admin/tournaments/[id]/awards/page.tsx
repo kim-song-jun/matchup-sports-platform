@@ -1,6 +1,6 @@
 'use client';
 
-import { AwardsTab } from '../tournament-detail-client';
+import { AwardsTab } from '../awards-tab';
 import { useTournamentAdmin } from '../tournament-admin-context';
 
 export default function AdminTournamentAwardsPage() {

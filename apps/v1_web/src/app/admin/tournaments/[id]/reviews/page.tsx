@@ -1,6 +1,6 @@
 'use client';
 
-import { ReviewsTab } from '../tournament-detail-client';
+import { ReviewsTab } from '../reviews-tab';
 import { useTournamentAdmin } from '../tournament-admin-context';
 
 export default function AdminTournamentReviewsPage() {

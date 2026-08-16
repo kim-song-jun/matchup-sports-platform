@@ -1,7 +1,7 @@
 'use client';
 
 import { useV1AdminTournament } from '@/hooks/use-v1-api';
-import { RegistrationsTab } from '../tournament-detail-client';
+import { RegistrationsTab } from '../registrations-tab';
 import { useTournamentAdmin } from '../tournament-admin-context';
 
 export default function AdminTournamentRegistrationsPage() {

@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Tournament } from '@/types/api';
-import { TournamentInfoSection } from './tournament-detail-client';
+import { TournamentInfoSection } from './info-section';
 import { TournamentAdminShell } from './tournament-admin-shell';
 import { TournamentAdminProvider } from './tournament-admin-context';
 

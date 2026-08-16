@@ -127,8 +127,7 @@ export type GameOperationsQueueAction =
         readonly event: QueuedGameEventInput;
         readonly payloadHash: string;
       };
-    }
-  | { readonly type: 'CLEAR_ACKED' };
+    };
 
 function mapItem(
   state: GameOperationsQueueState,
@@ -209,9 +208,6 @@ export function gameOperationsQueueReducer(
             }
           : item,
       );
-
-    case 'CLEAR_ACKED':
-      return { items: state.items.filter((item) => item.status !== 'acked') };
 
     default:
       return state;
@@ -294,6 +290,12 @@ export function deserializeQueueState(raw: string | null): GameOperationsQueueSt
  * sent for the first time) or it already committed (the server replays the
  * stored ack instead of creating a duplicate). `queued`/`failed`/`acked`
  * items are left exactly as they were.
+ *
+ * `acked` 항목은 **이 픽스 이후로는 새로 저장되지 않는다** — `persistQueue`
+ * (`use-v1-game-operations-console.ts`)가 저장 직전에 걸러낸다(그 함수의 주석 참고).
+ * 그래도 여기와 `isQueuedGameEvent`가 `acked`를 계속 받아들이는 이유는, 이 픽스
+ * **이전에** 저장된 로컬스토리지 항목에는 acked가 들어 있기 때문이다 — 그걸
+ * 무효 취급하면 같은 키의 미전송 항목까지 통째로 버려진다.
  */
 export function hydrateAfterReload(items: readonly QueuedGameEvent[]): GameOperationsQueueState {
   return {
@@ -390,11 +392,31 @@ export const INITIAL_SYNC_STATE: GameSyncState = { status: 'synced', lastSequenc
 export type GameSyncAction =
   | { readonly type: 'SNAPSHOT'; readonly lastSequence: number }
   | { readonly type: 'GAP'; readonly expectedSequence: number; readonly availableFrom: number }
-  | { readonly type: 'BACKFILLED'; readonly lastSequence: number };
+  | { readonly type: 'BACKFILLED'; readonly lastSequence: number }
+  /**
+   * 이 기기가 보낸 이벤트의 ack — "내 이벤트가 시퀀스 N으로 확정됐다"는 사실만
+   * 알려줄 뿐 **빠진 구간의 이벤트 본문은 하나도 실어 오지 않는다**. 그래서
+   * `BACKFILLED`와 구분한다: 예전에는 ack 경로도 `BACKFILLED`를 디스패치했는데,
+   * 그 리듀서는 상태와 무관하게 `synced`를 돌려주므로 **백필 없이 갭 프리즈가
+   * 풀렸다**(전송 in-flight 중에 다른 운영자의 비연속 브로드캐스트가 도착해 GAP이
+   * 걸리고, 곧이어 내 ack이 도착하면 그 자리에서 해제된다). 그 상태로 교체를
+   * 기록하면 불완전한 피치 상태 위에서 나가 서버가
+   * `SUBSTITUTION_OUT_NOT_ON_PITCH`로 거부하는데 그 코드는 NON_RETRYABLE이다.
+   */
+  | { readonly type: 'SELF_ACK'; readonly lastSequence: number };
 
 export function gameSyncReducer(state: GameSyncState, action: GameSyncAction): GameSyncState {
   switch (action.type) {
     case 'SNAPSHOT':
+      // 갭이 난 상태에서는 SNAPSHOT을 무시한다. SNAPSHOT은 REST로 읽어온
+      // `lastSequence` 숫자를 반영하는 통로일 뿐(콘솔의 `initialLastSequence`
+      // effect) 빠진 이벤트를 실제로 채워 오지 않는데, 예전에는 무조건
+      // `{ status: 'synced' }`를 돌려줘 아래 GAP 주석이 못박은 계약("불완전한
+      // 타임라인 위에 새 이벤트를 절대 커밋시키지 않는다")을 무단으로 풀었다 —
+      // `providers.tsx`의 `refetchOnWindowFocus: true` 때문에 갭이 난 채로 창을
+      // 한 번 갔다 오기만 해도 전송 게이트가 열렸다. 갭을 푸는 유일한 경로는
+      // 실제 백필(`BACKFILLED`)이다.
+      if (state.status === 'gap') return state;
       return { status: 'synced', lastSequence: action.lastSequence };
     case 'GAP':
       // A gap freezes further sends (`canAppendWhileSyncing` below) until an
@@ -407,6 +429,13 @@ export function gameSyncReducer(state: GameSyncState, action: GameSyncAction): G
         availableFrom: action.availableFrom,
       };
     case 'BACKFILLED':
+      // 실제로 이벤트 본문을 손에 넣은 경우에만 디스패치된다(전체 스냅숏 적용,
+      // 연속 브로드캐스트 append). 갭을 푸는 유일한 경로다.
+      return { status: 'synced', lastSequence: action.lastSequence };
+    case 'SELF_ACK':
+      // 위 액션 주석 참고 — 갭이 난 상태를 풀 자격이 없다(빠진 구간을 하나도
+      // 채우지 않았다). 동기 상태에서만 lastSequence를 전진시킨다.
+      if (state.status === 'gap') return state;
       return { status: 'synced', lastSequence: action.lastSequence };
     default:
       return state;

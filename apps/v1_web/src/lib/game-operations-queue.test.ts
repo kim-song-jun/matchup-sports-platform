@@ -211,6 +211,57 @@ describe('gap (backfill required before further sends)', () => {
     expect(resynced).toEqual({ status: 'synced', lastSequence: 14 });
     expect(canAppendWhileSyncing(resynced)).toBe(true);
   });
+
+  /**
+   * `GAP` 케이스의 주석은 "불완전한 타임라인 위에 새 이벤트를 절대 커밋시키지
+   * 않는다"고 못박고 있는데, `SNAPSHOT`은 무조건 `{ status: 'synced' }`를 돌려줘
+   * 그 프리즈를 **무단으로 해제**한다. 콘솔은 REST `initialLastSequence`가 바뀔
+   * 때마다(`providers.tsx`의 `refetchOnWindowFocus: true` → 창 포커스 복귀마다)
+   * SNAPSHOT을 디스패치하므로, 갭이 난 채로 창을 한 번 갔다 오기만 하면 백필이
+   * 끝나지 않았는데도 전송 게이트가 풀린다. 갭을 푸는 것은 실제 백필
+   * (`BACKFILLED`)뿐이어야 한다.
+   */
+  it('gap 상태에서 SNAPSHOT을 받아도 백필 전까지는 gap이 유지된다', () => {
+    const gapped = gameSyncReducer(
+      { status: 'synced', lastSequence: 10 },
+      { type: 'GAP', expectedSequence: 11, availableFrom: 14 },
+    );
+    expect(canAppendWhileSyncing(gapped)).toBe(false);
+
+    const afterSnapshot = gameSyncReducer(gapped, { type: 'SNAPSHOT', lastSequence: 10 });
+
+    expect(afterSnapshot.status).toBe('gap');
+    expect(canAppendWhileSyncing(afterSnapshot)).toBe(false);
+
+    // 갭을 푸는 유일한 경로는 여전히 실제 백필이다.
+    const resynced = gameSyncReducer(afterSnapshot, { type: 'BACKFILLED', lastSequence: 14 });
+    expect(canAppendWhileSyncing(resynced)).toBe(true);
+  });
+
+  /**
+   * SNAPSHOT과 **같은 구멍**이 전송 ack 경로에도 있었다. 콘솔은 자기 이벤트의
+   * ack에서 `BACKFILLED`를 디스패치했는데, 그 액션은 상태와 무관하게 `synced`를
+   * 돌려준다 — 즉 전송이 in-flight인 사이 다른 운영자의 비연속 브로드캐스트로
+   * GAP이 걸려도 내 ack 하나가 도착하면 **빠진 구간을 한 건도 받아오지 않은 채**
+   * 게이트가 열렸다. 그 창에서 교체를 기록하면 불완전한 피치 상태 위에서 나가
+   * 서버가 `SUBSTITUTION_OUT_NOT_ON_PITCH`로 거부하고, 그 코드는 NON_RETRYABLE이라
+   * '다시 시도' 버튼조차 뜨지 않는다.
+   */
+  it('gap 상태에서 내 이벤트의 ack(SELF_ACK)은 프리즈를 풀지 못한다', () => {
+    const gapped = gameSyncReducer(
+      { status: 'synced', lastSequence: 10 },
+      { type: 'GAP', expectedSequence: 11, availableFrom: 14 },
+    );
+
+    const afterSelfAck = gameSyncReducer(gapped, { type: 'SELF_ACK', lastSequence: 15 });
+
+    expect(afterSelfAck).toEqual(gapped);
+    expect(canAppendWhileSyncing(afterSelfAck)).toBe(false);
+
+    // 동기 상태에서는 종전대로 lastSequence를 전진시킨다(정상 경로 회귀 방지).
+    const synced = gameSyncReducer({ status: 'synced', lastSequence: 10 }, { type: 'SELF_ACK', lastSequence: 11 });
+    expect(synced).toEqual({ status: 'synced', lastSequence: 11 });
+  });
 });
 
 describe('revoke (permission revoked mid-session)', () => {

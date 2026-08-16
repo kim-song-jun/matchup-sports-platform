@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { V1TeamMembershipRole } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveTournamentFixtureOfficialTimestamp } from '../tournaments/tournament-fixture-official-result';
 import {
   fixtureTeams,
   fixtureTitle,
@@ -271,7 +272,13 @@ export class TournamentFixtureReviewsService {
       select: tournamentFixtureSelect(),
     });
     if (!fixture) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
-    if (fixture.status !== 'completed' || !officialResultTimestamp(fixture)) {
+    // 예전엔 `status !== 'completed' || !officialResultTimestamp(fixture)` 였다. 앞 절은
+    // 뒤 절의 비정규화 캐시라 중복이었고, 컬럼을 없애도 판정이 달라지지 않는다.
+    // 다만 officialResultTimestamp() 는 공식 리비전이 없으면 레거시 result.recorded_at 으로
+    // 폴백하므로, 앞 절을 그냥 지우면 "레거시 결과만 있는 픽스처"에서 게이트가 느슨해진다 —
+    // prod·alpha 복제본 실측으로 그런 행이 0건임을 확인했지만, 느슨해질 여지 자체를 없애려고
+    // 폴백 인자를 빼고 공식 리비전만 본다.
+    if (!resolveTournamentFixtureOfficialTimestamp(fixture.game, null)) {
       throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
     }
 

@@ -12,7 +12,13 @@ type AdvancementEdgeRow = {
 type LockedFixtureRow = {
   id: string;
   tournamentId: string;
-  status: string;
+  /**
+   * `v1_tournament_fixtures.status` 컬럼 대신 쓰는 파생 판정. 그 컬럼은 생성 시
+   * `scheduled`, officialize 시 `completed` 두 값만 기록되고 그 두 전이가 각각
+   * "공식 리비전 없음/있음"과 정확히 대응한다(prod·alpha 복제본 전수 대조 mismatch 0).
+   * 컬럼은 결국 이 사실의 비정규화 캐시라, 게이트는 원본을 직접 본다.
+   */
+  hasOfficialResult: boolean;
   homeRegistrationId: string | null;
   awayRegistrationId: string | null;
 };
@@ -32,17 +38,21 @@ export class GameResultBracketProjectionService {
       revision.tournamentFixtureId,
       ...edges.map(({ targetFixtureId }) => targetFixtureId),
     ])].sort();
+    // FOR UPDATE OF f: outer join 의 nullable 쪽(v1_games)은 Postgres 가 잠글 수 없다
+    // ("FOR UPDATE cannot be applied to the nullable side of an outer join").
+    // 잠금 대상은 원래도 픽스처 행이므로 의미는 그대로다.
     const fixtures = await tx.$queryRaw<LockedFixtureRow[]>`
       SELECT
-        id,
-        tournament_id AS "tournamentId",
-        status::text AS status,
-        home_registration_id AS "homeRegistrationId",
-        away_registration_id AS "awayRegistrationId"
-      FROM v1_tournament_fixtures
-      WHERE id IN (${Prisma.join(fixtureIds)})
-      ORDER BY id ASC
-      FOR UPDATE
+        f.id,
+        f.tournament_id AS "tournamentId",
+        (g.current_official_revision_id IS NOT NULL) AS "hasOfficialResult",
+        f.home_registration_id AS "homeRegistrationId",
+        f.away_registration_id AS "awayRegistrationId"
+      FROM v1_tournament_fixtures f
+      LEFT JOIN v1_games g ON g.tournament_fixture_id = f.id
+      WHERE f.id IN (${Prisma.join(fixtureIds)})
+      ORDER BY f.id ASC
+      FOR UPDATE OF f
     `;
     const fixtureById = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
     const source = fixtureById.get(revision.tournamentFixtureId);
@@ -50,7 +60,7 @@ export class GameResultBracketProjectionService {
       source === undefined ||
       revision.tournamentId === null ||
       source.tournamentId !== revision.tournamentId ||
-      source.status !== 'completed' ||
+      !source.hasOfficialResult ||
       source.homeRegistrationId === null ||
       source.awayRegistrationId === null ||
       source.homeRegistrationId === source.awayRegistrationId
@@ -153,7 +163,7 @@ export class GameResultBracketProjectionService {
       target === undefined ||
       target.tournamentId !== source.tournamentId ||
       target.id === source.id ||
-      target.status !== 'scheduled'
+      target.hasOfficialResult
     ) {
       throw new Error('BRACKET_TARGET_STATE_INVALID');
     }

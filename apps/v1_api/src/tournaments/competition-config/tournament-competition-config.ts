@@ -62,7 +62,12 @@ export class TournamentCompetitionConfig {
       startedGameCount,
     ] = await Promise.all([
       this.prisma.v1TournamentFixture.count({ where: { tournamentId } }),
-      this.prisma.v1TournamentFixture.count({ where: { tournamentId, status: 'completed' } }),
+      // status 컬럼 대신 공식 리비전 존재로 센다 — 그 컬럼은 officialize 시점에 같은
+      // 트랜잭션으로 찍히는 비정규화 캐시일 뿐이라 두 방식의 카운트가 항상 같다
+      // (prod·alpha 복제본에서 대회별 카운트 불일치 0건).
+      this.prisma.v1TournamentFixture.count({
+        where: { tournamentId, game: { currentOfficialRevisionId: { not: null } } },
+      }),
       this.prisma.v1TournamentStanding.count({ where: { group: { tournamentId } } }),
       // 조에 팀을 배정하면 0점 순위 행이 미리 생긴다. 그 초기 행은 경기 결과가 아니므로
       // 설정 변경을 막지 않고, 실제 성적 값이 들어간 행만 소급 영향으로 본다.

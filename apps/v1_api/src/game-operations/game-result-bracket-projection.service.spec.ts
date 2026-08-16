@@ -64,14 +64,17 @@ function makeTx() {
       {
         id: SOURCE_FIXTURE,
         tournamentId: TOURNAMENT,
-        status: 'completed',
+        // 예전엔 status: 'completed' 였다. 진출 게이트가 픽스처 컬럼 대신 공식 리비전
+        // 존재를 직접 보도록 바뀌면서 잠금 쿼리가 이 파생 boolean 을 돌려준다.
+        hasOfficialResult: true,
         homeRegistrationId: HOME_REG,
         awayRegistrationId: AWAY_REG,
       },
       {
         id: TARGET_FIXTURE,
         tournamentId: TOURNAMENT,
-        status: 'scheduled',
+        // 예전 status: 'scheduled' 에 대응 — 진출 대상은 아직 결과가 없어야 한다.
+        hasOfficialResult: false,
         homeRegistrationId: null,
         awayRegistrationId: null,
       },

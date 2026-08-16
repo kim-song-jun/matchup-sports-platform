@@ -367,6 +367,18 @@ END $$`,
     reason:
       'FK on the same newly-added nullable column, which the additivity rules already treat as safe when written as a bare ALTER TABLE -- it is flagged here only because the idempotency guard wraps it in a DO block the parser cannot see into. Legacy NULL-valued rows bypass the constraint by definition, and the OLD app only ever produces NULL team_id, so no old write can violate it. ON DELETE RESTRICT adds no rolling risk either: V1Team is never physically deleted in this codebase (always deletedAt soft delete) and the sibling FK on v1_tournament_registrations.team_id already uses RESTRICT. Reviewed 2026-08-13.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260816060000_v1_drop_tournament_fixture_status/migration.sql',
+    statement: 'ALTER TABLE "v1_tournament_fixtures" DROP COLUMN "status"',
+    reason:
+      'ACCEPTED RISK, not a refutation -- unlike every other entry in this list, this one does NOT argue the rolling-deploy hazard is absent. It is present and was accepted deliberately by the repo owner. deploy-prod.sh runs `prisma migrate deploy` BEFORE recreating containers, so between those two steps the PREVIOUS app image serves traffic against a schema that no longer has this column; Prisma emits explicit column lists, so every fixture read in that window fails until the swap completes. The owner chose to ship the code removal and the drop in one release rather than split them across two deploys, judging the seconds-scale window acceptable for this surface. Everything else about the drop is verified: the column was a denormalized cache of "an official result exists", only `scheduled` and `completed` were ever written to it, and restored copies of production and alpha agreed with `v1_games.current_official_revision_id IS NOT NULL` in both directions across 205 rows with zero exceptions and zero fixtures lacking a game. Every read and write of the column is removed in this same change. Reviewed 2026-08-16.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260816060000_v1_drop_tournament_fixture_status/migration.sql',
+    statement: 'DROP TYPE "V1TournamentFixtureStatus"',
+    reason:
+      'Drops the enum type left unreferenced by the DROP COLUMN above -- it has no other column in the schema. Same accepted deploy-window risk as that statement and nothing beyond it: a type with no remaining dependents cannot be read or written by either app version. Reviewed 2026-08-16.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

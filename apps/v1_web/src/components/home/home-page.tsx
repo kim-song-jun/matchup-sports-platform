@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ShieldAlert, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
 import {
   BellIcon,
@@ -57,6 +58,10 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
           {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
           {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
+          {/* 남은 후기 유도 — 홈에는 대회 후기 전용 바텀시트 모달만 있어서 경기 후기는
+              마이 메뉴 서브텍스트 한 줄 말고 알릴 길이 없었다. 마이페이지와 같은 컴포넌트를
+              써서 두 화면의 숫자가 갈리지 않게 한다(남은 게 없으면 스스로 null). */}
+          <PendingReviewsCard />
 
           {/* Greeting + activity stats */}
           <div className="tm-home-greeting-block">

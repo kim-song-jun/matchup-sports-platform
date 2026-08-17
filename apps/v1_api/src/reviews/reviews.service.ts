@@ -40,6 +40,12 @@ type ReviewTagCode = keyof typeof REVIEW_TAGS;
 
 const ELIGIBLE_PARTICIPANT_STATUSES: V1MatchParticipantStatus[] = ['active', 'completed'];
 
+/**
+ * 개인 매너 점수(V1UserReputationSummary)에 합산하는 소스. 대회 개인 후기는 여기 없다 —
+ * tournament_* 컬럼으로 따로 집계한다(한 대회에서 수십 건이 한꺼번에 들어와 점수가 급변한다).
+ */
+const PERSONAL_REPUTATION_SOURCES: V1PostEventReviewSourceType[] = ['match', 'team_match'];
+
 type SourceType = 'match' | 'team_match' | 'tournament_fixture';
 type TargetType = 'user' | 'team';
 type RevealScopeCandidate = { sourceType: V1PostEventReviewSourceType; sourceId: string; sourceGroupId: string | null };
@@ -236,12 +242,12 @@ export class ReviewsService {
     const now = new Date();
     const targetFilter = query.targetType === 'team'
       ? { targetTeamId: { in: await this.participatingTeamIds(user.id) }, targetType: 'team' as const }
-      // 개인 대상 요약은 개인 매치(sourceType='match') 후기만 센다.
-      // 대회 개인 후기는 V1UserReputationSummary의 tournament_* 컬럼으로 따로 집계되는데
-      // (recalculateUserReputation도 sourceType='match'로 좁혀 같은 분리를 지킨다), 여기만
-      // 필터가 없으면 그 후기들이 종목별 평균에 원시 건수 그대로 합산돼 분리가 절반만 이뤄진다.
-      // 대회에서 상대팀 로스터 전원에게 평가받으면 며칠 만에 수십 건이 들어와 점수가 급변한다.
-      : { targetUserId: user.id, targetType: 'user' as const, sourceType: 'match' as const };
+      // 개인 대상 요약은 매너 점수와 같은 소스만 센다(PERSONAL_REPUTATION_SOURCES) — 두 곳이
+      // 갈리면 화면이 모순된다. 실제로 팀매치가 여기서만 빠져 있던 동안, 개별 목록엔 팀매치
+      // 후기가 보이는데 집계는 "아직 없어요"로 떴다.
+      // 대회 개인 후기는 계속 제외한다: V1UserReputationSummary의 tournament_* 컬럼으로 따로
+      // 집계되고, 한 대회에서 상대 로스터 전원에게 수십 건이 들어와 평균이 급변하기 때문이다.
+      : { targetUserId: user.id, targetType: 'user' as const, sourceType: { in: PERSONAL_REPUTATION_SOURCES } };
 
     const candidates = await this.prisma.v1PostEventReview.findMany({
       where: { status: 'submitted', sportId: { not: null }, ...targetFilter },
@@ -991,12 +997,17 @@ export class ReviewsService {
   private async recalculateUserReputation(tx: PrismaTx, targetUserId: string) {
     const now = new Date();
     const candidates = await tx.v1PostEventReview.findMany({
-      where: { targetUserId, targetType: 'user', status: 'submitted', sourceType: 'match' },
+      // 개인 매치와 팀매치를 함께 센다. 둘 다 "함께 뛴 상대가 나를 평가한 것"이라 성격이 같다 —
+      // 팀매치가 빠져 있던 동안은 후기를 받아도 매너 점수가 그대로여서, 받은 후기 화면에
+      // "아직 집계된 리뷰가 없어요"가 뜨는데 바로 아래 개별 목록엔 팀매치 후기가 보이는
+      // 모순이 있었다. 대회 개인 후기(tournament_fixture)는 여전히 제외한다 — 한 대회에서
+      // 상대 로스터 전원에게 수십 건이 들어와 점수가 급변하므로 tournament_* 컬럼에 따로 쌓는다.
+      where: { targetUserId, targetType: 'user', status: 'submitted', sourceType: { in: PERSONAL_REPUTATION_SOURCES } },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
     const reverseReviews = candidates.length
       ? await tx.v1PostEventReview.findMany({
-          where: { reviewerUserId: targetUserId, sourceType: 'match', sourceId: { in: [...new Set(candidates.map((review) => review.sourceId))] }, status: 'submitted' },
+          where: { reviewerUserId: targetUserId, sourceType: { in: PERSONAL_REPUTATION_SOURCES }, sourceId: { in: [...new Set(candidates.map((review) => review.sourceId))] }, status: 'submitted' },
           select: { sourceId: true, reviewerUserId: true, targetUserId: true },
         })
       : [];

@@ -94,20 +94,26 @@ export class ReviewsService {
     const reviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         status: 'submitted',
-        // 개인/팀매치 신규 후기는 집계로만 공개한다. 대회 후기는 익명 개별 항목으로 공개하되,
-        // 아래 reveal gate를 통과하기 전에는 응답에 넣지 않는다.
-        OR: [{ sportId: null }, { sourceType: 'tournament_fixture' }],
+        // 신규 후기는 익명 개별 항목으로 공개하되, 아래 reveal gate를 통과하기 전에는 응답에
+        // 넣지 않는다. 팀매치가 여기 빠져 있었다: 팀매치 후기를 쓸 수는 있는데 받은 사람은
+        // 내용을 영영 못 보고 매너 점수 집계로만 반영됐다 — 같은 성격의 대회 경기 후기는
+        // 익명으로라도 보이던 것과 어긋난다. 개인 매치(match)는 sportId=null 레거시 행과
+        // 구분이 안 되는 게 아니라, 아래 sportId === null 분기가 "작성자까지 공개"라는
+        // 다른 정책을 쓰므로 sourceType 으로 명시해 둘을 갈라 놓는다.
+        OR: [{ sportId: null }, { sourceType: { in: ['tournament_fixture', 'team_match', 'match'] } }],
         AND: [{ OR: receivedFilters }],
       },
       orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
       include: reviewInclude(),
     });
-    const tournamentReviews = reviews.filter((review) => review.sourceType === 'tournament_fixture' && review.sportId !== null);
-    const userTournamentReviews = tournamentReviews.filter((review) => review.targetType === 'user');
-    const teamTournamentReviews = tournamentReviews.filter((review) => review.targetType === 'team');
+    // reveal 짝 판정 대상은 "sportId 가 있는 신규 후기" 전부다 — 예전엔 대회 후기만 모아서,
+    // 팀매치는 서로 평가해도 짝이 성립하지 않아 72시간 폴백만 남았다.
+    const revealableReviews = reviews.filter((review) => review.sportId !== null);
+    const userRevealable = revealableReviews.filter((review) => review.targetType === 'user');
+    const teamRevealable = revealableReviews.filter((review) => review.targetType === 'team');
     const [reverseUserReviews, reverseTeamReviews] = await Promise.all([
-      this.reverseUserReviews(user.id, userTournamentReviews),
-      this.reverseTeamReviews(teamTournamentReviews),
+      this.reverseUserReviews(user.id, userRevealable),
+      this.reverseTeamReviews(teamRevealable),
     ]);
     const now = new Date();
     const visibleReviews = reviews.filter((review) => {

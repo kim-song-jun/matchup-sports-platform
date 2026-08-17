@@ -328,6 +328,10 @@ export function GameResultReviewPanel({
           }}
           sides={game.sides}
           lineups={lineupsQuery.data ?? []}
+          // 재제출도 정정과 **같은** 서버 승부차기 가드(`applyPenalties`)를 통과한다 --
+          // 그래서 같은 값을 내려준다: 폼이 기존 승부차기 점수를 이어서 보낼지 판정하고,
+          // 못 보내는 상태를 저장 전에 알린다(`game-result-correction-panel.tsx` 주석 참고).
+          isKnockoutFixture={game.isKnockoutFixture}
           submitting={supersedeAndSubmit.isPending}
           errorMessage={
             supersedeAndSubmit.isError ? describeResultReviewError(supersedeAndSubmit.error) : null

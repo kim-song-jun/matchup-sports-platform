@@ -129,7 +129,7 @@ export default function AdminTeamMatchesPage() {
   return (
     <>
       <AdminPageHeader
-        eyebrow="플랫폼 관리"
+        eyebrow="플랫폼"
         title="팀매치 관리"
         description="플랫폼 내 모든 팀매치의 상태를 필터링하고 관리해요."
       />

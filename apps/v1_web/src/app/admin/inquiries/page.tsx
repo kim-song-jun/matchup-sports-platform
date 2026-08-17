@@ -133,6 +133,7 @@ export default function AdminInquiriesPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="콘텐츠"
         title="문의 관리"
         description="사용자 문의를 확인하고 답변 상태를 관리해요."
       />

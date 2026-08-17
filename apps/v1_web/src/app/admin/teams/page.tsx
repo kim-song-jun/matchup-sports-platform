@@ -140,7 +140,7 @@ export default function AdminTeamsPage() {
   return (
     <>
       <AdminPageHeader
-        eyebrow="플랫폼 관리"
+        eyebrow="플랫폼"
         title="팀 관리"
         description="플랫폼 내 모든 팀의 상태를 검색하고 관리해요."
       />

@@ -30,7 +30,9 @@ export type TournamentVenuePrepItem = {
 };
 
 export type TournamentPostEventCard = {
-  key: 'results' | 'video' | 'reviews' | 'sponsor' | 'next_tournament';
+  // 'reviews'는 없다 — 후기 진입점은 이 카드 목록이 아니라 TournamentFixtureReviewEntrySection과
+  // 완료 액션 리스트가 담당한다. 예전엔 카드도 만들었지만 소비처가 항상 필터로 걸러 렌더된 적이 없다.
+  key: 'results' | 'video' | 'sponsor' | 'next_tournament';
   title: string;
   body: string;
   status: HubState;
@@ -186,7 +188,6 @@ export function getTournamentPostEventCards({
 }): TournamentPostEventCard[] {
   const resultsNotice = findAnnouncementByCategory(announcements, 'results');
   const mediaNotice = findAnnouncementByCategory(announcements, 'media');
-  const reviewNotice = findAnnouncementByCategory(announcements, 'review');
   const sponsorNotice = findAnnouncementByCategory(announcements, 'sponsor');
 
   return [
@@ -201,7 +202,6 @@ export function getTournamentPostEventCards({
       actionLabel: mediaNotice ? '미디어 공지 보기' : null,
       href: mediaNotice ? announcementHref(mediaNotice.id) : null,
     },
-    getReviewCard(hasCompletedFixture, reviewNotice),
     getSponsorCard({ sponsorCount, sponsorNotice, hasAnnouncements }),
     {
       key: 'next_tournament',
@@ -252,32 +252,6 @@ function getResultCard({
     status: status === 'completed' ? 'operator_update' : 'upcoming',
     actionLabel: null,
     href: null,
-  };
-}
-
-function getReviewCard(
-  hasCompletedFixture: boolean,
-  reviewNotice: TournamentAnnouncementSummary | null,
-): TournamentPostEventCard {
-  if (hasCompletedFixture) {
-    return {
-      key: 'reviews',
-      title: '리뷰·매너 기록',
-      body: '완료된 대회 경기는 리뷰함에서 상대팀 매너 평가를 작성해요.',
-      status: 'available',
-      actionLabel: '리뷰 작성',
-      href: '/my/reviews',
-    };
-  }
-  return {
-    key: 'reviews',
-    title: '리뷰·매너 기록',
-    body: reviewNotice
-      ? '리뷰 참여 방식과 매너 평가 안내는 운영진 공지를 기준으로 확인해요.'
-      : '대회 경기 리뷰는 경기 종료 후 리뷰 기능과 연결될 예정이에요.',
-    status: reviewNotice ? 'available' : 'upcoming',
-    actionLabel: reviewNotice ? '리뷰 안내 보기' : null,
-    href: reviewNotice ? announcementHref(reviewNotice.id) : null,
   };
 }
 

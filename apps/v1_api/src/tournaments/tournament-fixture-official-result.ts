@@ -103,7 +103,60 @@ export type TournamentFixtureGoalEventRow = {
   participantId: string | null;
   clockMs: number;
   reversesEventId: string | null;
+  /**
+   * 골 이벤트 백필이 남긴 표식(`source` / `minuteKnown`)만 이 파일이 payload에서
+   * 읽는다 — 그 외 키는 보지 않는다. 아래 `isBackfilledGoalEvent` 주석 참고.
+   */
+  payload: Prisma.JsonValue;
 };
+
+/**
+ * 골 이벤트 백필(`games/migration/goal-event-backfill.ts`)이 자기가 쓴 GOAL 이벤트에
+ * 싣는 `payload.source` 값. **읽는 쪽인 이 파일이 정본**이고 백필이 이걸 import 해서
+ * 쓴다 — 양쪽이 문자열을 따로 적으면 한쪽만 바뀌었을 때 표식이 조용히 무시되고
+ * (= "모름"이 "0분"으로 되살아나고) 컴파일러는 아무 말도 하지 않는다.
+ */
+export const GOAL_BACKFILL_EVENT_SOURCE = 'GOAL_BACKFILL_V1' as const;
+
+function backfillPayload(payload: Prisma.JsonValue | undefined): Record<string, unknown> | null {
+  if (payload === null || payload === undefined || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  // `source` 확인이 이 판정의 핵심 방어다. `V1GameEvent.payload`는 `AppendGameEventDto`
+  // 에서 `@IsObject()` 하나만 걸린 자유형 객체라(games/dto/game-event.dto.ts), 전역
+  // ValidationPipe의 whitelist도 그 안쪽까지 파고들지 않는다 — 즉 기록 클라이언트가
+  // 아무 키나 넣을 수 있다. `minuteKnown` 만 보고 판정하면 라이브 기록에 우연히(혹은
+  // 악의로) 실린 `minuteKnown: false` 가 실제 71분 득점의 시각을 공개 화면에서
+  // 지워버린다. 백필이 쓴 행에만 적용되도록 producer 를 먼저 확인한다.
+  return record.source === GOAL_BACKFILL_EVENT_SOURCE ? record : null;
+}
+
+/**
+ * "이 GOAL 이벤트는 골 이벤트 백필이 레거시 스냅숏에서 복원한 행인가."
+ *
+ * 백필이 복원하는 레거시 원본(`v1_tournament_fixture_results`의 goals[])은 골마다
+ * **분(minute) 하나만** 갖고 있었고 전/후반(period)은 아예 기록된 적이 없다. 그런데
+ * `V1GameEvent.period` 는 non-null 컬럼이라 백필은 모든 골을 `period: 1` 로 넣을 수밖에
+ * 없다 — 그 값을 그대로 내보내면 공개 화면이 그걸 "전반"이라고 단정한다(상세 타임라인의
+ * `periodLabel()` 섹션 헤딩, 일정 카드의 전반/후반 분리). 그래서 백필이 쓴 골은 period 를
+ * `null`("모름")로 내린다. 백필 행 **전부**가 대상이라 `minuteKnown` 같은 별도 표식이
+ * 필요 없고, 덕분에 이 규칙은 이미 삽입된 행에도 소급 적용된다.
+ */
+export function isPeriodUnknown(payload: Prisma.JsonValue | undefined): boolean {
+  return backfillPayload(payload) !== null;
+}
+
+/**
+ * "이 골은 레거시 기록에 분 자체가 없던 골인가" — 백필이 그런 골에만
+ * `minuteKnown: false` 를 싣는다. `clockMs` 가 non-null 컬럼이라 그런 골도 `0` 으로
+ * 저장될 수밖에 없어서, 이 표식이 없으면 "0분 득점"과 "몇 분인지 모름"이 구분되지
+ * 않는다. 표식이 있을 때만 분을 `null` 로 내리고, 없으면 기존대로 `clockMs` 를 그대로
+ * 환산한다 — 표식 없는 `clockMs: 0` 을 null 로 접으면 실제 개막 직후 득점이 사라진다.
+ */
+export function isMinuteUnknown(payload: Prisma.JsonValue | undefined): boolean {
+  return backfillPayload(payload)?.minuteKnown === false;
+}
 
 /**
  * 레거시 `v1_tournament_fixture_goals`의 신규 대응은 `V1GameEvent`의 GOAL 이벤트다.
@@ -112,9 +165,15 @@ export type TournamentFixtureGoalEventRow = {
  * loadScorers()의 reversedIds 패턴 참고)와 동일한 함정이라, 그 두 곳과 똑같이
  * `reversesEventId`로 되돌려진 이벤트 id 집합을 먼저 구해서 제외한다.
  *
- * 참고로 GAME_BACKFILL로 들어온 21건의 기존 대회 픽스처는 `V1GameEvent` 행 자체를
- * 전혀 만들지 않았다(백필은 score JSON에만 goals를 넣었다) — 그래서 이 함수는 그 21건에
- * 대해 항상 빈 배열을 반환한다. "재현 못 하는 필드" 보고 대상.
+ * GAME_BACKFILL로 들어온 21건의 기존 대회 픽스처는 원래 `V1GameEvent` 행 자체가
+ * 없어서(백필이 score JSON에만 goals를 넣었다) 이 함수가 항상 빈 배열을 반환했다.
+ * 골 이벤트 백필(`games/migration/goal-event-backfill.ts`)이 그 골들을 GOAL 이벤트로
+ * 복원하면서 더는 그렇지 않다 — 다만 그 백필은 참가자를 특정할 수 없는 골
+ * (`PARTICIPANT_UNRESOLVED`)은 일부러 넣지 않으므로, 여기서 나오는 골 목록이 score
+ * JSON의 goals 전부와 일치한다는 보장은 없다.
+ *
+ * `minute`은 `clockMs`를 분으로 환산하되, 백필이 `payload.minuteKnown: false`로
+ * "분을 모른다"고 표시한 골은 `0`이 아니라 `null`로 내린다(`isMinuteUnknown` 주석 참고).
  */
 export function deriveTournamentFixtureOfficialGoals(
   events: readonly TournamentFixtureGoalEventRow[],
@@ -135,7 +194,8 @@ export function deriveTournamentFixtureOfficialGoals(
       // 레거시 minute은 기록자가 수기로 입력한 "경기 중 몇 분"이었다(전/후반을 합산했는지
       // 여부도 보장되지 않았다). 신규 경로는 이벤트의 period 내 경과 시간(clockMs)만 갖고
       // 있어 전/후반 누적 분이 아니라 "해당 피리어드 시작 후 경과 분"이다 — 근사치다.
-      minute: Math.max(0, Math.floor(event.clockMs / 60000)),
+      // 단 "분 자체가 기록되지 않은 골"은 근사치조차 없으므로 null(모름)이다.
+      minute: isMinuteUnknown(event.payload) ? null : Math.max(0, Math.floor(event.clockMs / 60000)),
     }));
 }
 
@@ -300,7 +360,9 @@ export function resolveTournamentFixtureOfficialTimestamp(
 /**
  * V1GameEvent를 GOAL/reversesEventId만 좁혀 읽을 때 쓰는 Prisma where/select 모양 --
  * `where: { OR: [{ type: 'GOAL' }, { reversesEventId: { not: null } }] },
- * select: { id, type, sideId, participantId, clockMs, reversesEventId }`.
+ * select: { id, type, sideId, participantId, clockMs, reversesEventId, payload }`.
+ * `payload`는 골 이벤트 백필의 `minuteKnown: false` 표식을 읽기 위한 것으로,
+ * 빠뜨리면 "분을 모르는 골"이 조용히 `0분`으로 표시된다.
  * Prisma의 `WhereInput`은 배열 필드(`OR`)가 mutable(`T[]`)이라 `as const`로 얼린 공용
  * 상수를 만들면 readonly 튜플이 되어 대입 자리마다 타입 에러가 난다 -- 그래서 상수로
  * 추출하지 않고, 이 모양 그대로 각 호출부(tournament-bracket.service.ts의 getBracket,

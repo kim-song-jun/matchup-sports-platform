@@ -183,6 +183,7 @@ function AdminUsersPageContent() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="플랫폼"
         title="회원 관리"
         description="플랫폼 전체 회원의 상태를 검색하고 관리해요."
       />

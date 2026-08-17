@@ -3,11 +3,14 @@
 import Link from 'next/link';
 import { Star } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { useV1PendingTournamentReviews } from '@/hooks/use-v1-api';
 
 /** 마이페이지 상단 — 참가 확정 대회 중 아직 리뷰를 남기지 않은 건 안내 카드 */
 export function PendingTournamentReviewCard() {
-  const { data } = useV1PendingTournamentReviews();
+  // enabled 를 안 넘기면 기본값 true 라 비로그인 방문자도 인증 필요한 엔드포인트를 때린다
+  // (모달 쪽 PendingTournamentReviewModal 은 이미 세션을 넘기고 있었다).
+  const { data } = useV1PendingTournamentReviews(hasStoredV1Session());
   const target = data?.[0];
   if (!target) return null;
 

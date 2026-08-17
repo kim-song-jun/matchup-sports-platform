@@ -131,6 +131,7 @@ export default function AdminUserDetailPage() {
     return (
       <>
         <AdminPageHeader
+          eyebrow="플랫폼 · 회원"
           title="회원 상세"
           action={<BackLink />}
         />
@@ -158,6 +159,7 @@ export default function AdminUserDetailPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="플랫폼 · 회원"
         title="회원 상세"
         description={userTitle(user)}
         action={<BackLink />}

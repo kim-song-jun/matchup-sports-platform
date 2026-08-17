@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1Tournament } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -57,6 +58,7 @@ export class TournamentsAdminService {
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
     private readonly kakaoGeocoding: KakaoGeocodingService,
+    private readonly notifications: NotificationsService,
   ) {
     this.lineupSizeConfigResolver = new LineupSizeConfigResolver(prisma, adminContext);
     this.tournamentCompetitionConfig = new TournamentCompetitionConfig(prisma, adminContext);
@@ -599,7 +601,49 @@ export class TournamentsAdminService {
       );
     });
 
+    if (to === 'completed') {
+      await this.requestTournamentReviews(tournamentId);
+    }
+
     return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false };
+  }
+
+  /**
+   * 대회가 종료되는 순간, 후기를 쓸 수 있는 사람에게만 후기 요청 알림을 보낸다.
+   *
+   * 수신자 조건은 대회 후기 작성 권한과 정확히 같아야 한다(tournament-reviews.service.ts
+   * eligibleTeamWhere) — 참가 확정(confirmed) 팀의 active owner/manager. 넓게 보내면 열어봐야
+   * 쓸 수 없는 알림이 되고, 좁게 보내면 정작 쓸 사람이 못 받는다.
+   *
+   * 발송 실패가 상태 전이를 되돌리면 안 되므로 트랜잭션 밖에서, fire-and-forget 계열로 호출한다.
+   */
+  private async requestTournamentReviews(tournamentId: string) {
+    const registrations = await this.prisma.v1TournamentRegistration.findMany({
+      where: {
+        tournamentId,
+        status: 'confirmed',
+        team: {
+          status: 'active',
+          deletedAt: null,
+          memberships: { some: { status: 'active', role: { in: ['owner', 'manager'] } } },
+        },
+      },
+      select: {
+        team: {
+          select: {
+            memberships: {
+              where: { status: 'active', role: { in: ['owner', 'manager'] } },
+              select: { userId: true },
+            },
+          },
+        },
+      },
+    });
+    const userIds = [
+      ...new Set(registrations.flatMap((registration) => registration.team.memberships.map((m) => m.userId))),
+    ];
+    if (userIds.length === 0) return;
+    await this.notifications.emitNotificationToMany(userIds, 'tournament_completed_review_request', tournamentId);
   }
 
   /**

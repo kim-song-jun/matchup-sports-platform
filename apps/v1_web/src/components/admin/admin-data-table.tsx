@@ -292,7 +292,11 @@ export function AdminDataTable<T>({
                 {columns.map((col) => (
                   <div key={col.key} className="flex items-start gap-2 text-[13px]">
                     <dt className="shrink-0 text-[var(--text-muted)] w-[90px] font-medium">{col.header}</dt>
-                    <dd className="text-[var(--text-body)] flex-1 tabular-nums">{col.render(row)}</dd>
+                    {/* min-w-0: flex item 의 기본 min-width 는 auto 라, 셀 내용이 길면 dd 가
+                        줄어들지 못하고 뷰포트를 밀어낸다(390px 화면에서 dd 가 410px 로 버텨
+                        문서에 가로 스크롤 +151px 발생 — /admin/notices 실측). 안쪽 truncate 도
+                        이 min-width 가 풀려야 동작한다. */}
+                    <dd className="min-w-0 text-[var(--text-body)] flex-1 tabular-nums">{col.render(row)}</dd>
                   </div>
                 ))}
               </dl>
@@ -330,8 +334,10 @@ export function AdminTablePaginationBar({
   const to = Math.min(page * limit, total);
   const pages = visiblePages(page, totalPages);
 
+  // 44×44: 프로젝트 터치 타겟 최솟값. 40px 로 두면 목록 19곳의 페이지네이션이 전부
+  // 기준 미달이 된다(실측: 이전/다음 44×40, 숫자 40×40).
   const btn = [
-    'inline-flex items-center justify-center min-w-[40px] min-h-[40px] px-2 rounded-lg',
+    'inline-flex items-center justify-center min-w-[44px] min-h-[44px] px-2 rounded-lg',
     'text-[var(--font-size-label)] font-medium transition-colors',
     'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
     'disabled:cursor-not-allowed disabled:opacity-40',

@@ -155,6 +155,7 @@ function AdminMatchesPageContent() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="플랫폼"
         title="매치 관리"
         description="플랫폼 전체 매치의 상태를 검색하고 관리해요."
       />

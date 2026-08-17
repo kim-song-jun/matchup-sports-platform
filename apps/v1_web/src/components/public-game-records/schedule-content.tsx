@@ -97,7 +97,12 @@ function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] })
   const byClock = (a: PublicScheduleEntry['scorers'][number], b: PublicScheduleEntry['scorers'][number]) =>
     (a.clockMs ?? Number.MAX_SAFE_INTEGER) - (b.clockMs ?? Number.MAX_SAFE_INTEGER);
   const firstHalf = scorers.filter((scorer) => scorer.period === 1).sort(byClock);
-  const secondHalf = scorers.filter((scorer) => scorer.period !== 1).sort(byClock);
+  const secondHalf = scorers.filter((scorer) => scorer.period !== null && scorer.period !== 1).sort(byClock);
+  // `period === null` = "전/후반을 모른다". 레거시 대회 결과에서 복원된 골이 그렇다
+  // (`goal-event-backfill.ts` — 원본에 전/후반이 없었고, 서버가 `isPeriodUnknown`으로
+  // null을 내려준다). `period !== 1`로 뭉뚱그리면 이 골들이 전부 "후반 득점"으로
+  // 렌더돼, 모른다고 내려온 값이 화면에서는 단정으로 바뀐다.
+  const unknownPeriod = scorers.filter((scorer) => scorer.period === null).sort(byClock);
   const goalLine = (scorer: PublicScheduleEntry['scorers'][number], index: number) => (
     <div key={index}>
       {formatGoalMinute(scorer.clockMs)}
@@ -154,6 +159,10 @@ function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] })
         }}
       />
       {halfRow('후반 득점', secondHalf)}
+      {/* 전/후반을 모르는 골(복원된 레거시 대회 결과)이 있을 때만 나타나는 세 번째 줄.
+          `halfRow`가 빈 배열이면 null을 반환하므로 평소에는 아무것도 렌더되지 않는다 --
+          전·후반 축(구분선 포함)은 위 두 줄이 그대로 유지한다. */}
+      {halfRow('기타 득점', unknownPeriod)}
     </div>
   );
 }

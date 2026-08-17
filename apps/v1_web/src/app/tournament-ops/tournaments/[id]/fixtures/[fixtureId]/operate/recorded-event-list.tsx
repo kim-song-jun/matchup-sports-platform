@@ -1,9 +1,27 @@
 'use client';
 
 import { Handshake, Undo2 } from 'lucide-react';
+import { isBackfilledEvent, isBackfilledMinuteUnknown } from '@/lib/backfilled-goal-event';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { periodLabel } from './period-label';
 import type { GameEventRecord, GameLineup } from '@/types/game-operations';
+
+/**
+ * 이벤트 행 왼쪽의 "전반 12:00" 뱃지 문구.
+ *
+ * 레거시 대회 결과에서 복원된 골(`@/lib/backfilled-goal-event` 참고)은 원본에 전/후반이
+ * 없었고 분도 없을 수 있는데, `period`·`clockMs` 가 non-null 컬럼이라 각각 `1`·`0` 으로
+ * 저장돼 있다 — 그대로 찍으면 이 화면이 "전반 0:00" 이라고 단정한다. 공개 화면은 서버가
+ * 이미 이 값들을 `null` 로 내려 억제하는데, 운영 콘솔만 원시 행을 받아 거짓 주장을
+ * 되살리고 있었다. 결과 정정(correction)을 판단하는 화면이라 오히려 더 정확해야 한다.
+ */
+function eventTimeLabel(event: GameEventRecord): string {
+  if (!isBackfilledEvent(event.payload)) {
+    return `${periodLabel(event.period)} ${formatMatchClock(event.clockMs)}`;
+  }
+  // 전/후반은 어느 경우든 모른다. 분은 남아 있으면 그대로 쓴다.
+  return isBackfilledMinuteUnknown(event.payload) ? '시각 미상' : formatMatchClock(event.clockMs);
+}
 
 /**
  * 서버에 확정된 경기 이벤트 로그.
@@ -89,7 +107,7 @@ export function RecordedEventList({
                     구분 가능하게 한다 — ms 는 여기서는 산만하기만 하다(초 단위로 이미
                     충분히 구분되고, 커맨드 왕복 지연처럼 액션 가능한 값이 아니다). */}
                 <span className="shrink-0 rounded bg-[var(--surface-soft)] px-1.5 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)]">
-                  {periodLabel(event.period)} {formatMatchClock(event.clockMs)}
+                  {eventTimeLabel(event)}
                 </span>
                 <p className="truncate text-sm font-medium text-[var(--text-strong)]">
                   {eventTypeLabel(event)}

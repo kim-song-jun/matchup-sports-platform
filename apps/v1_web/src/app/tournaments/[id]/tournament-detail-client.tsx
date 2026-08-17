@@ -473,7 +473,14 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
     data?.fixtures.some((fixture) => fixture.status === 'completed' && fixture.result !== null) ?? false;
   const fixtureReviews = useV1Reviews(
     { tab: 'pending', tournamentId, limit: 50 },
-    { enabled: hasSessionHint && data?.status === 'in_progress' && hasCompletedFixture },
+    // completed 도 포함해야 한다 — 후기는 대회가 끝난 뒤에 쓰는 것이라, in_progress 로만 조건을
+    // 걸면 정작 쓸 시점에 목록이 비어 진입점이 사라진다.
+    {
+      enabled:
+        hasSessionHint &&
+        (data?.status === 'in_progress' || data?.status === 'completed') &&
+        hasCompletedFixture,
+    },
   );
   const myRegistration =
     myRegistrations.find((registration) => registration.status !== 'cancelled') ??

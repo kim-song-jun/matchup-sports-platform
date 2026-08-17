@@ -297,7 +297,7 @@ export default function AdminPopupsPage() {
   return (
     <>
       <AdminPageHeader
-        eyebrow="콘텐츠 운영"
+        eyebrow="콘텐츠"
         title="팝업 관리"
         description="팝업의 노출 화면, 이동 링크, 게시 기간을 관리해요."
         action={(

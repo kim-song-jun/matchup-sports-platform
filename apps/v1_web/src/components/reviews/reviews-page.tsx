@@ -139,7 +139,9 @@ function ReviewsReceivedContent({
 function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }) {
   return (
     <div style={{ marginTop: 24 }}>
-      <div className="tm-my-section-label">대회에서 받은 익명 리뷰</div>
+      {/* 이 섹션은 대회 전용이 아니다 — 팀매치·개인 매치 후기도 같은 익명·reveal 규칙으로
+          여기 들어온다(예전엔 대회 후기만 조회 대상이라 "대회에서"가 맞았다). */}
+      <div className="tm-my-section-label">경기에서 받은 익명 리뷰</div>
       <div className="tm-text-caption" style={{ marginBottom: 10 }}>작성자는 공개되지 않으며, 상호 작성 완료 또는 72시간 뒤에 보여요.</div>
       {model.anonymousUserGroups.length > 0 ? <ReceivedGroupSection groups={model.anonymousUserGroups} title="내가 받은 리뷰" /> : null}
       {model.anonymousTeamGroups.length > 0 ? (

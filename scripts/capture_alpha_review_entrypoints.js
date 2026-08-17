@@ -44,9 +44,13 @@ const MATCH_ID = (process.env.ALPHA_MATCH_ID || '').trim();
 const FIXTURE_ID = (process.env.ALPHA_FIXTURE_ID || '').trim();
 
 const PAGES = [
+  // 마이페이지 — "남은 후기 N건" 통합 배너가 뜨는 곳(경기 후기 + 대회 후기 합산)
+  ['my-page', '/my'],
   ['reviews-hub', '/my/reviews'],
   ['reviews-written', '/my/reviews?tab=written'],
   ['reviews-received', '/my/reviews?tab=received'],
+  // 받은 후기 '개별' 목록(익명 카드) — 탭 화면은 집계 대시보드라 개별 항목이 안 보인다.
+  ['reviews-received-detail', '/my/reviews/received'],
   ...(FIXTURE_ID ? [['review-write', `/my/reviews/tournament_fixture/${FIXTURE_ID}`]] : []),
   ...(TOURNAMENT_ID
     ? [
@@ -129,6 +133,8 @@ async function waitForContent(page) {
           hasFixtureReviewSection: text.includes('리뷰할 수 있는 경기'),
           hasTournamentReviewRow: text.includes('대회 후기'),
           hasReviewCta: text.includes('후기 남기기'),
+          hasPendingReviewBanner: /남은 후기\s*\d+\s*건/.test(text),
+          pendingBannerText: (text.match(/남은 후기\s*\d+\s*건[\s\S]{0,80}/) || [''])[0].replace(/\s+/g, ' ').trim(),
           reviewHrefs: hrefs.filter((h) => h && (h.includes('/my/reviews') || h.includes('/awards'))),
         };
       });
@@ -137,7 +143,7 @@ async function waitForContent(page) {
       console.log(
         `${pageName} ${widthName}(${width}) status=${response?.status() ?? '-'} ` +
           `경기후기섹션=${probe.hasFixtureReviewSection} 대회후기=${probe.hasTournamentReviewRow} ` +
-          `후기CTA=${probe.hasReviewCta}`,
+          `후기CTA=${probe.hasReviewCta} 남은후기배너=${probe.hasPendingReviewBanner}`,
       );
       await ctx.close();
     }

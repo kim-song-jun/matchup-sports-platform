@@ -100,6 +100,8 @@ describe('TournamentsAdminService', () => {
     v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentFixture: { count: jest.Mock; updateMany: jest.Mock };
     v1TournamentStanding: { count: jest.Mock };
+    // 대회 종료 시 후기 요청 알림 수신자(참가 확정 팀의 owner/manager) 조회용.
+    v1TournamentRegistration: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
 

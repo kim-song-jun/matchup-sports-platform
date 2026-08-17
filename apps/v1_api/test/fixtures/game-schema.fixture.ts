@@ -193,7 +193,11 @@ export const gameSchemaSourceManifest = {
   // 개인 어워드 icon_key는 game domain 밖의 nullable 컬럼이지만 이 guard는 전체
   // schema.prisma 바이트를 결속한다. 전용 20260815193000 migration의 빈 DB replay와
   // drift 검증을 통과한 스키마 해시로 재고정하며 game operations migration은 불변이다.
-  schema: '3b90ebc59111f96a58073949b939cb1a13b26c14709149c0e2d573dbfa601744',
+  // 2026-08-17 재핀: 리그전 통합 순위(V1TournamentOverallStanding) 신규 테이블 +
+  // V1Tournament.minMatchesPerTeam + V1TournamentStanding.fairPlayPoints 추가.
+  // 게임 도메인(V1Game*) 모델은 건드리지 않았고 전부 additive다.
+  // 뒷받침 마이그레이션: 20260817000000_v1_tournament_league_format.
+  schema: 'd5cdfe15b3f19da0b5427bdb62435db14d968392a6db305a63021dd84e296011',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

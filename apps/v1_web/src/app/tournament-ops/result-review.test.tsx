@@ -116,6 +116,9 @@ function buildGame(actorRole: GameActorRole, overrides?: Partial<TournamentGameD
     currentOfficialRevisionId: null,
     sides: SIDES,
     actorRole,
+    // 서버가 `GET /games/:gameId` 응답에 항상 싣는 필드 -- 조별(비결선)이 기본값이고,
+    // 결선 경기를 다루는 테스트만 `isKnockoutFixture: true` 로 덮어쓴다.
+    isKnockoutFixture: false,
     ...overrides,
   };
 }
@@ -530,6 +533,25 @@ describe('correction -- create against the current official revision, always cap
         changes: expect.objectContaining({
           score: { home: 2, away: 1 },
           eventsHash: 'hash-1',
+          // 정정은 **이미 남아 있는 기록 전체**를 다시 실어 보내야 한다 -- 서버
+          // (`tournament-result-review.service.ts` 의 `createCorrection`)는
+          // `assists ?? 0`/`fouls ?? 0` 으로 채우므로, 폼이 두 필드를 빼먹으면
+          // 점수만 고치는 정정 한 번에 선수 개개인의 어시스트·파울이 전부 0으로
+          // 초기화된다(사용자 보고 결함). 그래서 여기서는 `objectContaining` 으로
+          // 느슨하게 넘기지 않고 참가자 행을 필드 단위로 정확히 단언한다.
+          actualParticipants: [
+            {
+              participantId: 'participant-aaaaaa111111',
+              sideId: 'side-home',
+              started: true,
+              minutesPlayed: 90,
+              goals: 2,
+              assists: 1,
+              fouls: 0,
+              cards: { yellow: 0, red: 0 },
+              goalkeeper: false,
+            },
+          ],
         }),
       },
       expect.any(Object),
@@ -595,6 +617,68 @@ describe('correction -- create against the current official revision, always cap
     );
     const calledMessage = hookMocks.confirm.mock.calls[0][0].message as string;
     expect(calledMessage).not.toContain('undefined');
+  });
+});
+
+/**
+ * 결선(knockout) 무승부 사전 경고 -- 패널이 `game.isKnockoutFixture`(서버가
+ * `GET /games/:gameId` 응답에 이미 싣는 필드, `games.service.ts` 의
+ * `isKnockoutFixture(tx, tournamentFixtureId)`)를 정정 폼까지 내려보내야 성립한다.
+ *
+ * 서버는 결선 경기의 정규시간 무승부를 승부차기 없이 거부한다(409
+ * `TOURNAMENT_PENALTY_REQUIRED`). 지금은 저장 버튼을 눌러야 알 수 있다.
+ */
+describe('결선 무승부는 저장 전에 폼이 알려준다', () => {
+  it('결선 경기 정정에서 정규시간이 무승부가 되면 폼에 경고가 뜬다', async () => {
+    hookMocks.game.data = buildGame('platform_ops', {
+      version: 2,
+      currentOfficialRevisionId: 'rev-1',
+      isKnockoutFixture: true,
+    });
+    hookMocks.revisions.data = [
+      buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL', score: { home: 2, away: 1 } }),
+    ];
+    const user = userEvent.setup();
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    await user.click(screen.getByRole('button', { name: '정정 시작' }));
+    const dialog = screen.getByRole('dialog');
+    // 라이브 영역(`role="status"`)은 문구가 생기기 전에도 DOM 에 있어야 스크린리더가
+    // 내용 변경을 읽어 준다 -- 그래서 "없음"은 노드 부재가 아니라 빈 문구로 확인한다.
+    expect(within(dialog).getByRole('status').textContent).toBe('');
+
+    fireEvent.change(within(dialog).getByLabelText('원정 점수'), { target: { value: '2' } });
+
+    expect(within(dialog).getByRole('status')).toHaveTextContent(/승부차기/);
+  });
+
+  it('무효화된 결선 경기의 재입력은 경고만 하고 제출을 막지 않는다', async () => {
+    // 무효화된 결과의 재입력(VOID_REENTRY)은 정정과 다른 계약이라, 프론트가
+    // 무승부를 이유로 제출 자체를 막아서는 안 된다 -- 경고까지가 프론트의 역할이다.
+    hookMocks.game.data = buildGame('platform_ops', {
+      version: 5,
+      currentOfficialRevisionId: 'rev-2',
+      isKnockoutFixture: true,
+    });
+    hookMocks.revisions.data = [
+      buildRevision({ id: 'rev-2', revision: 2, state: 'VOID', supersedesId: 'rev-1', reason: '중복 경기로 확인' }),
+      buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL', score: { home: 2, away: 1 } }),
+    ];
+    const user = userEvent.setup();
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+
+    await user.click(screen.getByRole('button', { name: '결과 다시 입력' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('원정 점수'), { target: { value: '2' } });
+
+    expect(within(dialog).getByRole('status')).toHaveTextContent(/승부차기/);
+
+    await user.type(within(dialog).getByLabelText('재입력 사유'), '무효 후 재입력');
+    const submitButton = within(dialog).getByRole('button', { name: '결과 제출' });
+    expect(submitButton).toBeEnabled();
+    await user.click(submitButton);
+
+    expect(hookMocks.createCorrection.mutate).toHaveBeenCalledTimes(1);
   });
 });
 

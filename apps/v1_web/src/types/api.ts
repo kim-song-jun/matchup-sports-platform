@@ -1339,13 +1339,24 @@ export type V1GameResultParticipantInput = {
 
 /**
  * 결과 제출 시 **보내는** 스코어. 서버가 돌려주는 스냅샷(`V1GameResultScore`)과 형태가 다르다 —
- * 보낼 때는 정규시간 점수만 평평하게 보내고, 서버가 regulation/penalty/goals/incomplete 로
- * 감싼 스냅샷을 만들어 돌려준다. 예전에는 두 방향이 한 타입을 공유해서 읽기 쪽 형태가 틀린 채로
- * 컴파일을 통과했다.
+ * 보낼 때는 평평한 형태로 보내고, 서버가 regulation/penalty/goals/incomplete 로
+ * 감싼 스냅샷을 만들어 돌려주는 경로가 따로 있다. 예전에는 두 방향이 한 타입을 공유해서
+ * 읽기 쪽 형태가 틀린 채로 컴파일을 통과했다.
+ *
+ * **이 타입이 곧 서버 `GameScoreDto`의 whitelist다.** `main.ts`가 `whitelist: true,
+ * forbidNonWhitelisted: true`로 검증하므로 여기 없는 키를 하나라도 실어 보내면
+ * `400 VALIDATION_ERROR`가 난다(알파 실측 — 스냅샷을 그대로 넘겨 `goals`/`penalty`/
+ * `regulation`/`incomplete`/`provenance`가 딸려간 사고). 반대로 `penalties`는 여분 필드가
+ * 아니라 **허용 필드**다 — `GameScoreDto`(`apps/v1_api/src/games/dto/game-result.dto.ts`)에
+ * `home`/`away`/`penalties?` 정확히 3키가 선언돼 있다. 예전에는 여기서 `penalties`가 빠져
+ * 있어서 정정 폼이 결선 경기의 승부차기 점수를 조용히 탈락시켰다(정규시간 무승부만 남아
+ * 승자가 사라졌다). 허용 키 목록을 따로 하드코딩하지 말고 **이 타입에서 파생**시켜라 —
+ * 목록을 두 벌 두면 또 드리프트한다.
  */
 export type V1GameResultScoreInput = {
   home: number;
   away: number;
+  penalties?: { home: number; away: number };
 };
 
 export type V1CreateGameResultRevisionPayload = {

@@ -27,7 +27,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
-import { PendingTournamentReviewCard } from '@/components/tournaments/pending-review-card';
+import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
@@ -131,9 +131,9 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
           </div>
           {/* RIGHT: menu sections */}
           <div className="tm-my-desktop-main">
-            {/* 스태프 배정이 있는 사용자에게만 렌더된다(없으면 null) — 대회 운영 화면으로
-                들어갈 앱 내 유일한 진입점이다. */}
-            <PendingTournamentReviewCard />
+            {/* 남은 후기(경기 후기 + 대회 후기)를 한 카드로 모아 안내한다. 남은 게 없으면 null.
+                (기존 주석은 스태프 배정 얘기였는데 이 컴포넌트와 무관한 잔재라 함께 정리했다.) */}
+            <PendingReviewsCard />
             <div className="tm-my-desktop-menu-grid">
               {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
             </div>

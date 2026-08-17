@@ -38,6 +38,12 @@ import {
   parseLineupLimits,
   parsePeriodDurations,
 } from '../tournaments/competition-config/competition-config.parse';
+import { readIsKnockoutFixture, readKnockoutFixtureFacts } from '../tournaments/knockout-fixture';
+import {
+  assertBracketResolvable,
+  assertPenaltiesNotAllowed,
+  needsKnockoutFixtureFacts,
+} from './core/knockout-penalties';
 import { GameTakeoverService } from './game-takeover.service';
 import {
   decideTournamentStaffAccess,
@@ -790,7 +796,7 @@ export class GamesService {
         // 않는다). 콘솔은 이 값으로 "승부차기 시작" 버튼을 조별리그 무승부
         // 에서는 아예 보여주지 않는다 — 보여줬다가 `end` 제출 시점에야
         // `TOURNAMENT_PENALTY_NOT_ALLOWED`로 실패하는 깨진 UX를 막는다.
-        isKnockoutFixture: await this.isKnockoutFixture(tx, tournamentFixtureId),
+        isKnockoutFixture: await readIsKnockoutFixture(tx, tournamentFixtureId),
         lineupConfig: parseLineupConfigForResponse(config?.lineup ?? null),
         // Live-substitution addition: the console needs this to decide
         // whether to surface the rolling quick-substitution mode (config-
@@ -5161,48 +5167,20 @@ export class GamesService {
    * every other TOURNAMENT_FIXTURE `end` keeps behaving exactly as before
    * this feature existed.
    *
-   * When penalties ARE present, both required conditions are enforced here
-   * (not left to the async bracket projection, which only ever sees an
-   * already-persisted revision and cannot reject bad input before it's
-   * written):
-   *  - the fixture must be a knockout-phase fixture (`V1TournamentGroup.
-   *    phase !== 'group'`, the phase column -- NOT `round`, which is a
-   *    free-text ko/en display label and not a safe discriminator, see
-   *    `isKnockoutFixture`). A group-stage draw stays a draw; recording a
-   *    "shootout winner" there would corrupt `calculateCompetitionStandings`
-   *    the moment anything read `score.penalties` for standings purposes.
-   *  - regulation must actually be level. A shootout score attached to a
-   *    decisive regulation result is meaningless (real football never plays
-   *    penalties when someone already won in 90 minutes) and would silently
-   *    sit unread in `score.penalties` forever, which is exactly the kind
-   *    of dead, unverifiable state this repo's 기술부채 0 rule forbids
-   *    accepting.
+   * 판정 자체는 이 파일에 두지 않는다. 규칙은
+   * `games/core/knockout-penalties.ts`의 순수 함수
+   * (`assertPenaltiesNotAllowed` / `assertBracketResolvable`)에, 그 규칙이
+   * 필요로 하는 DB 사실 읽기는 `tournaments/knockout-fixture.ts`의
+   * `readKnockoutFixtureFacts`에 있다. 이유·근거·POISONED 사고 기록은 전부
+   * 그 두 파일의 docblock으로 **옮겼다**(복제하지 않았다) — 원래 이 가드가
+   * `end` 레인의 private 메서드 안에만 있었기 때문에 정정(correction) 레인이
+   * 같은 가드를 하나도 갖지 못했고, 그 결함을 고치려면 판정이 두 레인에서
+   * 공유 가능한 자리에 있어야 한다.
    *
-   * `extractEndPenalties` already guaranteed `penalties.home !==
-   * penalties.away` (a shootout must produce a winner), so once both checks
-   * below pass, `GameResultBracketProjectionService.resolveWinnerSide` can
-   * trust `score.penalties` unconditionally.
-   *
-   * 역방향 가드(운영 콘솔 종료 흐름 개편): **결선 무승부인데 승부차기가
-   * 없는** `end`도 여기서 막는다. 예전엔 그대로 통과시켜 리비전이
-   * SUBMITTED로 저장됐고, 그 뒤 비동기 브래킷 프로젝션이
-   * `resolveWinnerSide`에서 `BRACKET_RESULT_DRAW_UNSUPPORTED`를 던져
-   * 6회 재시도 끝에 outbox 잡이 조용히 POISONED로 남았다 — 운영자는
-   * "경기 종료 성공"만 보고 다음 라운드 대진이 영영 비어 있는 것을
-   * 나중에야 알게 된다. 실패를 비동기 잡이 아니라 커맨드 자리에서
-   * 돌려주면 운영자가 그 자리에서 승부차기를 입력해 복구할 수 있다.
-   * (조별리그 무승부는 정상 결과이므로 knockout일 때만 막는다.)
-   *
-   * 이 가드는 `resultRecoveryDeriveAndSubmit`(이미 ENDED인데 리비전이 0건인
-   * 게임을 복구하는 경로)에도 그대로 적용된다 — 일부러 분기하지 않았다.
-   * 그 경로로 무승부 결선 리비전을 만들면 똑같이 브래킷이 POISONED가
-   * 되므로, "조용히 만들어 두기"보다 거부하는 쪽이 맞다.
-   *
-   * 대신 그 경로에도 빠져나갈 문을 열어 둔다: `GameResultRecoveryDto.penalties`로
-   * `end`와 같은 형태의 승부차기 점수를 실을 수 있다. 이 문이 없으면 결선 무승부
-   * 레거시 게임(GOAL 이벤트가 없어 0-0으로 산출되는 백필 이전 데이터 포함)은
-   * 복구가 영구히 막힌다 — 결과 교정 흐름은 리비전이 1건 이상이어야 시작할 수
-   * 있어 대안이 되지 못한다. 그래서 메시지도 특정 커맨드를 지목하지 않는다.
+   * `extractEndPenalties`가 이미 `penalties.home !== penalties.away`(승부차기는
+   * 승자를 만들어야 한다)를 보장하므로, 이 경로를 통과한 `score.penalties`는
+   * `GameResultBracketProjectionService.resolveWinnerSide`가 무조건 신뢰할 수
+   * 있다.
    */
   private async applyPenalties(
     tx: Transaction,
@@ -5210,45 +5188,17 @@ export class GamesService {
     score: GameScore,
     penalties: { home: number; away: number } | undefined,
   ): Promise<GameScore> {
-    if (penalties === undefined) {
-      if (score.home === score.away && (await this.isKnockoutFixture(tx, game.tournamentFixtureId))) {
-        throw new ConflictException({
-          code: 'TOURNAMENT_PENALTY_REQUIRED',
-          message: '결선 경기는 무승부로 끝낼 수 없어요. 승부차기 결과를 입력해주세요.',
-        });
-      }
+    // 결정적 스코어 + 승부차기 없음이면 어떤 fact도 판정을 바꾸지 않으므로
+    // 질의하지 않는다 — 리팩터 전 단축 평가 동작을 그대로 보존한다.
+    if (!needsKnockoutFixtureFacts(score, penalties)) {
       return score;
     }
-    if (!(await this.isKnockoutFixture(tx, game.tournamentFixtureId))) {
-      throw new ConflictException({
-        code: 'TOURNAMENT_PENALTY_NOT_ALLOWED',
-        message: 'Penalty shootouts can only be recorded for knockout-phase fixtures',
-      });
+    const facts = await readKnockoutFixtureFacts(tx, game.tournamentFixtureId);
+    if (penalties === undefined) {
+      assertBracketResolvable(score, facts);
+      return score;
     }
-    if (score.home !== score.away) {
-      throw new ConflictException({
-        code: 'TOURNAMENT_PENALTY_NOT_ALLOWED',
-        message: 'Penalty shootouts are only recorded when regulation time ends level',
-      });
-    }
-    return { ...score, penalties };
-  }
-
-  /**
-   * Knockout판별은 `V1TournamentGroup.phase`(semi/final/third_place)로만
-   * 한다 -- `V1TournamentFixture.round`는 한글/영문이 섞인 표시용 라벨이라
-   * 판별 기준으로 쓰면 함정이다(프로젝트 메모리 기록 그대로).
-   * `groupId`가 없는 픽스처(어느 조에도 배정되지 않음)는 knockout임을
-   * 확인할 방법이 없으므로 보수적으로 knockout이 아닌 것으로 취급한다 --
-   * 승부차기를 지어낼 근거가 없을 때는 허용하지 않는 쪽이 안전하다.
-   */
-  private async isKnockoutFixture(tx: Transaction, tournamentFixtureId: string | null): Promise<boolean> {
-    if (tournamentFixtureId === null) return false;
-    const fixture = await tx.v1TournamentFixture.findUnique({
-      where: { id: tournamentFixtureId },
-      select: { group: { select: { phase: true } } },
-    });
-    return fixture?.group !== null && fixture?.group !== undefined && fixture.group.phase !== 'group';
+    return assertPenaltiesNotAllowed(score, penalties, facts);
   }
 
   private async assertTeamMatchMatched(tx: Transaction, teamMatchId: string | null): Promise<void> {
@@ -5511,10 +5461,22 @@ export class GamesService {
           where: { id: game.id },
           data: { version: { increment: 1 } },
         });
-        // 승부차기를 그대로 넘긴다 — 결선 무승부 게임을 복구하려면 `end`와 똑같이 penalties가
+        // 승부차기를 넘긴다 — 결선 무승부 게임을 복구하려면 `end`와 똑같이 penalties가
         // 필요하다(applyPenalties의 TOURNAMENT_PENALTY_REQUIRED 가드). 넘기지 않으면 그런 게임은
         // 복구 자체가 409로 막혀 영구 막다른 길이 된다.
-        return this.deriveTournamentRevision(tx, { ...game, version: updated.version }, context, dto.penalties);
+        //
+        // `end` 레인과 **같은** `extractEndPenalties`를 통과시킨다. DTO
+        // (`GameResultRecoveryDto.penalties`)는 형태까지만 보고 "동점 승부차기"는
+        // 통과시키므로, 그대로 넘기면 승자 없는 결과가 저장되고
+        // `resolveWinnerSide`가 draw로 떨어뜨려 잡이 POISONED로 남는다 — 운영자
+        // 화면에는 "복구 성공"만 보인다. 422 `TOURNAMENT_PENALTY_INVALID`로
+        // 커맨드 자리에서 거부하는 것이 이 레인의 계약이다.
+        return this.deriveTournamentRevision(
+          tx,
+          { ...game, version: updated.version },
+          context,
+          extractEndPenalties({ penalties: dto.penalties }),
+        );
       },
     );
   }

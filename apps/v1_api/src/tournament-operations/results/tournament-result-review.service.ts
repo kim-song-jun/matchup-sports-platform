@@ -18,9 +18,18 @@ import {
 } from '../../common/audit/operation-audit-writer.service';
 import {
   canonicalGameCommandPayloadHash,
+  extractEndPenalties,
   gameOperationAuditActor,
   toGameHttpException,
 } from '../../games/games.service';
+import {
+  assertBracketResolvable,
+  assertPenaltiesNotAllowed,
+  needsKnockoutFixtureFacts,
+  readStoredPenalties,
+  requiresDecisiveResult,
+} from '../../games/core/knockout-penalties';
+import { readKnockoutFixtureFacts } from '../../tournaments/knockout-fixture';
 import {
   assertGameCommandContext,
   assertRevisionSupersession,
@@ -38,6 +47,7 @@ import type {
   GameResultInvariantInput,
   GameResultParticipant,
   GameRevisionMutationResult,
+  GameScore,
 } from '../../games/games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { V1AuthUser } from '../../auth/v1-auth-user';
@@ -299,7 +309,16 @@ export class TournamentResultReviewService {
           }
           throw error;
         }
-        const invariant = await this.resultInvariantInput(tx, game, dto);
+        // 재제출도 정정과 같은 참가자 가드를 통과해야 한다. `validateGameResultInvariants`
+        // 만으로는 부족하다 — 그건 `sideId`가 이 게임의 side인지만 보고
+        // (`game-invariants.ts`) participantId가 **이 게임의 참가자인지**는 보지
+        // 않는다. 그 구멍을 정정 레인에서만 막으면 재제출이라는 같은 HTTP
+        // 도달 가능 레인으로 남의 경기 participantId가 그대로 들어온다.
+        // `validateGameResultInvariants` **앞에** 두는 것은 의도적이다: 같은 결함에
+        // 두 레인이 같은 코드(422 `PARTICIPANT_INVALID`)를 돌려주게 만든다.
+        await this.assertRevisionParticipantsValid(tx, gameId, base.id, dto);
+        const score = await this.assertPenaltiesForRevision(tx, game, base.score, dto.score);
+        const invariant = await this.resultInvariantInput(tx, game, { ...dto, score });
         try {
           validateGameResultInvariants(invariant);
         } catch (error) {
@@ -319,7 +338,7 @@ export class TournamentResultReviewService {
           data: {
             gameId,
             revision: await this.nextRevisionNumber(tx, gameId),
-            score: jsonInput(dto.score),
+            score: jsonInput(score),
             eventsHash: dto.eventsHash,
             missingScorer: invariant.missingScorer,
             mvpParticipantId: dto.mvpParticipantId,
@@ -669,14 +688,23 @@ export class TournamentResultReviewService {
           }
           throw error;
         }
-        await this.assertCorrectionParticipantsValid(tx, gameId, dto.changes);
+        await this.assertRevisionParticipantsValid(tx, gameId, base.id, dto.changes);
+        const score = await this.assertPenaltiesForRevision(tx, game, base.score, dto.changes.score);
+        // 이 레인은 `validateGameResultInvariants`를 **부르지 않는다**
+        // (`assertCorrectionParticipantsValid` docblock의 이유: 이벤트 로그 자체가
+        // 정정 대상일 수 있고 ENDED 게임은 새 이벤트를 받을 수 없다 — 켜면 정당한
+        // 정정이 422로 막힌다). 그러나 `missingScorer`는 교차검증이 아니라 이벤트
+        // 스트림에서 계산되는 **사실**이므로 supersede 경로와 같은 출처를 쓴다.
+        // 예전엔 `false`를 하드코딩해, 정정 한 번으로 "득점자 미상 골이 있다"는
+        // 경고가 조용히 사라졌다 — 그러면 아무도 그 골의 득점자를 채워 넣지 않는다.
+        const invariant = await this.resultInvariantInput(tx, game, { ...dto.changes, score });
         const draft = await tx.v1GameResultRevision.create({
           data: {
             gameId,
             revision: await this.nextRevisionNumber(tx, gameId),
-            score: jsonInput(dto.changes.score),
+            score: jsonInput(score),
             eventsHash: dto.changes.eventsHash,
-            missingScorer: false,
+            missingScorer: invariant.missingScorer,
             mvpParticipantId: dto.changes.mvpParticipantId,
             reason: dto.reason,
             createdByActorType: 'USER',
@@ -1046,33 +1074,161 @@ export class TournamentResultReviewService {
   }
 
   /**
+   * 이 파일이 새 리비전을 만드는 두 경로(`supersedeAndSubmit`,
+   * `createResultCorrection`) 공용 승부차기 검증. **저장할 score를** 돌려주며,
+   * 반환값을 그대로 저장해야 한다 — 클라이언트가 보낸 객체를 그대로 저장하면
+   * 아래 두 구멍이 그대로 DB로 들어간다.
+   *
+   * 세 단계 모두 `end` 레인과 같은 함수를 쓴다(레인마다 규칙을 복제하지 않는
+   * 것이 이 변경의 요점이다):
+   *  1. `extractEndPenalties` — 형태·결정성. DTO를 강타입화해도
+   *     (`GameScoreDto.penalties`) `penalties: null`은 여전히 통과하고
+   *     (`@IsOptional()`이 null을 건너뛴다) `{home:3,away:3}`(동점 승부차기)도
+   *     통과한다. 둘 다 저장되면 아웃박스의 `parseOfficialPenalties` /
+   *     `resolveWinnerSide`가 throw해 잡이 6회 재시도 끝에 POISONED로 남는다.
+   *     422 `TOURNAMENT_PENALTY_INVALID`로 커맨드 자리에서 거부한다.
+   *  2. `assertPenaltiesNotAllowed` — 조별리그 픽스처거나 정규시간에 이미
+   *     승자가 났으면 409 `TOURNAMENT_PENALTY_NOT_ALLOWED`.
+   *  3. `assertBracketResolvable` — 승부차기로도 해결되지 않는 결선 무승부를 409
+   *     `TOURNAMENT_PENALTY_REQUIRED`로 거부한다. 이 가드가 없으면 그 리비전이
+   *     그대로 공식이 되고 브래킷 프로젝션이 POISONED로 죽어, 운영자는 "성공"만
+   *     보고 다음 라운드 대진이 영영 비어 있는 것을 나중에 안다.
+   *
+   * ## base 리비전의 승부차기 승계 (이게 없으면 정정 자체가 막힌다)
+   *
+   * 정정·재제출 폼은 **항상 평평한 `{home, away}`만 보낸다** — 여분 필드를
+   * 실으면 `GameScoreDto`의 `forbidNonWhitelisted`에 걸려 400이 나기 때문이고
+   * (`result-edit-modal.tsx`의 `onConfirm` 주석, 알파 실측), 클라이언트 타입
+   * `V1GameResultScoreInput`에는 penalties 필드가 아예 없다. 한편 `end` 레인이
+   * 이미 결선 무승부를 막으므로 **공식이 된 결선 무승부 경기는 예외 없이
+   * `score.penalties`를 갖는다.**
+   *
+   * 그래서 클라이언트가 penalties를 생략했다는 사실만으로 3단계를 적용하면,
+   * 승부차기로 결정된 모든 결선 경기가 "득점자 오기입 하나 고치기"조차 409로
+   * 거부되고 폼에는 승부차기 입력란이 없어 그 지시를 만족시킬 방법이 없다 —
+   * 사용자가 보고한 바로 그 화면이 영구히 막힌다. 그건 POISONED를 하드 블록으로
+   * 바꾸는 게 아니라 정상 흐름을 차단하는 회귀다.
+   *
+   * 그래서 penalties가 생략됐고 **정정 후 정규시간이 여전히 동점일 때만** base
+   * 리비전에 저장된 값을 승계한다(`readStoredPenalties`). 정정이 정규시간을
+   * 결정적으로 바꿨다면(1-1 → 2-1) 승부차기는 의미가 없어 승계하지 않는다 —
+   * 승계하면 `assertPenaltiesNotAllowed`가 "이미 승자가 났다"로 거부해 그것도
+   * 막다른 길이 된다. 승계된 값은 다시 1·2단계를 통과하므로, 승계가 검증을
+   * 우회하는 문은 아니다.
+   */
+  private async assertPenaltiesForRevision(
+    tx: Transaction,
+    game: LockedTournamentGame,
+    baseScore: Prisma.JsonValue,
+    score: { home: number; away: number; penalties?: { home: number; away: number } },
+  ): Promise<GameScore> {
+    const submitted = extractEndPenalties({ penalties: score.penalties });
+    const regulation: GameScore = { home: score.home, away: score.away };
+    // 결정적 스코어 + 승부차기 없음이면 어떤 fact도 판정을 바꾸지 않고 승계할
+    // 것도 없다(승계는 정규시간 동점일 때만) — 잠금 구간에서 질의하지 않는다.
+    if (!needsKnockoutFixtureFacts(regulation, submitted)) {
+      return regulation;
+    }
+    const facts = await readKnockoutFixtureFacts(tx, game.tournamentFixtureId);
+    if (submitted !== undefined) {
+      return assertPenaltiesNotAllowed(regulation, submitted, facts);
+    }
+    // 승계는 "무승부를 그대로 두면 브래킷이 멈추는" 픽스처에서만 한다
+    // (`requiresDecisiveResult` — `assertBracketResolvable`과 **같은** 술어).
+    // 조별리그처럼 무승부가 정상인 픽스처에까지 승계하면
+    // `assertPenaltiesNotAllowed`가 "조별리그엔 승부차기를 기록할 수 없다"로
+    // 그 정정을 거부해, 승부차기가 잘못 저장된 레거시 조별 경기를 고칠 방법이
+    // 사라진다(승계하지 않으면 그 정정이 잘못된 값을 정상적으로 걷어낸다).
+    const carried =
+      regulation.home === regulation.away && requiresDecisiveResult(facts)
+        ? readStoredPenalties(baseScore)
+        : undefined;
+    if (carried === undefined) {
+      assertBracketResolvable(regulation, facts);
+      return regulation;
+    }
+    // 승계값도 예외가 아니다. 동점 승부차기가 저장돼 있던 레거시 리비전은 여기서
+    // 해결 불가한 무승부로 거부된다(`assertBracketResolvable`의 동점 분기).
+    assertBracketResolvable({ ...regulation, penalties: carried }, facts);
+    return assertPenaltiesNotAllowed(regulation, carried, facts);
+  }
+
+  /**
    * Correction changes intentionally are not cross-validated against the
    * frozen event stream (the event log can be exactly what the correction
    * is fixing, and a game in ENDED/CANCELLED can no longer accept new
    * events) -- but participants must still be real, unique, and correctly
    * sided, and any MVP must be one of them.
+   *
+   * "real"이 실제로 강제되는 것은 이 변경부터다. 예전에는 중복과 "sideId가 이
+   * 게임의 side인가"만 봐서 **다른 경기의 participantId**가 그대로 통과했고,
+   * `v1_game_result_participants.participantId`에는 FK도 없어서 DB도 막지
+   * 않았다(schema.prisma) — 그 결과가 남의 경기 성적을 이 경기 기록으로
+   * 집계하는 것이었다(`public-user-records.service.ts`가 이 테이블을 직접
+   * 읽는다). 이제 이 게임의 `v1GameParticipant` 집합을 읽어 소속과 진영까지
+   * 대조한다. 참가자 집합을 라인업 revision으로 좁히지 않는 것은 정본
+   * 프로듀서(`GamesService.deriveTournamentRevision`)와 같은 술어를 쓰기
+   * 위해서다 — 더 좁히면 정당한 정정이 정본보다 먼저 막힌다.
+   *
+   * 별도의 side 조회는 없앴다. 참가자의 실제 `sideId`와 일치하는지 보면 그
+   * `sideId`가 이 게임의 side라는 것은 자동으로 따라오므로, 남겨 두면 아무도
+   * 읽지 않는 죽은 질의가 된다.
+   *
+   * 정정(correction)과 재제출(supersede) **양쪽**이 이 가드를 쓴다. 재제출은
+   * `validateGameResultInvariants`도 함께 돌지만 그건 `sideId`의 존재만 보고
+   * participantId의 소속은 보지 않아(`game-invariants.ts`) 같은 구멍이 남는다.
    */
-  private async assertCorrectionParticipantsValid(
+  private async assertRevisionParticipantsValid(
     tx: Transaction,
     gameId: string,
-    changes: GameResultCorrectionChangesDto,
+    baseRevisionId: string,
+    content: Pick<GameResultCorrectionChangesDto, 'actualParticipants' | 'mvpParticipantId'>,
   ): Promise<void> {
-    const sides = await tx.v1GameSide.findMany({ where: { gameId }, select: { id: true } });
-    const sideIds = new Set(sides.map((side) => side.id));
-    const seen = new Set<string>();
-    for (const participant of changes.actualParticipants) {
-      if (seen.has(participant.participantId) || !sideIds.has(participant.sideId)) {
+    // 빈 배열은 **base 리비전에 개인기록이 있었을 때만** 거부한다. 통과시키면 새
+    // 리비전의 개인기록이 0행이 되어 그 경기의 선수 개개인 기록이 전멸하지만
+    // (사용자 보고 증상), 무조건 거부하면 **정본 프로듀서가 정당하게 0행으로 만든
+    // 경기**를 아무도 고칠 수 없게 된다: `deriveTournamentRevision`의 출전 게이트
+    // (`appearedIds`)는 선발이 아무도 표시되지 않고 이벤트도 없으면 0행을 쓰고,
+    // TBD 브래킷 픽스처나 로스터가 비어 있는 등록은 `v1GameParticipant` 자체가
+    // 0행인 게임을 만든다(`tournament-bracket.service.ts`). 정정 폼은 base
+    // 리비전에서만 참가자를 채우고 로스터 추가 수단이 없으므로
+    // (`result-edit-modal.tsx`) 그런 경기의 점수 정정은 영구히 400/422가 된다.
+    // 그래서 술어는 "비우지 말라"가 아니라 **"있던 것을 비우지 말라"**다.
+    if (content.actualParticipants.length === 0) {
+      const baseParticipantCount = await tx.v1GameResultParticipant.count({
+        where: { resultRevisionId: baseRevisionId },
+      });
+      if (baseParticipantCount > 0) {
         throw new UnprocessableEntityException({
           code: 'PARTICIPANT_INVALID',
-          message: 'Correction participants must be unique and belong to a game side',
+          message: 'actualParticipants must not drop every participant recorded on the base revision',
+        });
+      }
+    }
+    const participants = await tx.v1GameParticipant.findMany({
+      where: { gameId },
+      select: { id: true, sideId: true },
+    });
+    const sideByParticipantId = new Map(participants.map((participant) => [participant.id, participant.sideId]));
+    const seen = new Set<string>();
+    for (const participant of content.actualParticipants) {
+      const actualSideId = sideByParticipantId.get(participant.participantId);
+      if (
+        seen.has(participant.participantId) ||
+        actualSideId === undefined ||
+        actualSideId !== participant.sideId
+      ) {
+        throw new UnprocessableEntityException({
+          code: 'PARTICIPANT_INVALID',
+          message: 'Revision participants must be unique participants of this game, on their own side',
         });
       }
       seen.add(participant.participantId);
     }
-    if (changes.mvpParticipantId !== undefined && !seen.has(changes.mvpParticipantId)) {
+    if (content.mvpParticipantId !== undefined && !seen.has(content.mvpParticipantId)) {
       throw new UnprocessableEntityException({
         code: 'PARTICIPANT_INVALID',
-        message: 'MVP must be one of the correction actualParticipants',
+        message: 'MVP must be one of the submitted actualParticipants',
       });
     }
   }

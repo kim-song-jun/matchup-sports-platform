@@ -236,6 +236,13 @@ jobs:
           # (test/tournaments/game-operation-flag-seed.integration-spec.ts)이 검증한다.
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/config/game-operation-flags-seed.cli.ts
+          # 골 이벤트 백필 CLI 는 **배포가 자동 실행하지 않는다** — 실행 시점은 운영자가
+          # 정한다(되돌리는 경로가 없는 이벤트를 만들기 때문). 다만 그러면 "코드는 있는데
+          # 배선이 깨진" 결함을 아무도 못 잡으므로, `--dry-run` 으로 기동만 확인한다.
+          # 빈 DB 라 후보는 0건이고, 검증 대상은 개수가 아니라 "부팅해서 정상 종료하는가"다.
+          # 위 시드 CLI 와 같은 이유로 test:integration **뒤에** 둔다.
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
+            src/games/migration/goal-event-backfill.cli.ts --dry-run
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 
       - name: V1 API unit tests

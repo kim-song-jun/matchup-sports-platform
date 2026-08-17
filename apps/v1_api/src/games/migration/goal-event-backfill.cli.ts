@@ -1,8 +1,13 @@
 /**
  * Post-deploy CLI for the goal-event backfill (see goal-event-backfill.ts for
  * the full design writeup — why this exists, the idempotency key, the
- * participant-matching decision, and why `period`/`occurredAt` are
- * placeholders).
+ * participant-matching decision, and why `period`/`occurredAt` are stored as
+ * placeholders that the public read paths suppress rather than display).
+ *
+ * On reading the output: `gamesEligible` is the number of rows this backfill
+ * CLAIMS, not the number still needing work — it does not fall to 0 as the
+ * backfill completes. "Nothing left to do" is a dry run reporting
+ * `eventsCreated: 0` and `quarantined: 0`.
  *
  * Run against a deployed environment as:
  *

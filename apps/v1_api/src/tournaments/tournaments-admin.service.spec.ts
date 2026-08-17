@@ -11,6 +11,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { KakaoGeocodingService } from './kakao-geocoding.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CompetitionConfigRegistry } from './competition-config/competition-config-registry';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 import { TournamentsAdminService } from './tournaments-admin.service';
@@ -81,6 +82,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
 describe('TournamentsAdminService', () => {
   let service: TournamentsAdminService;
   let kakaoGeocoding: { geocode: jest.Mock };
+  let notifications: { emitNotificationToMany: jest.Mock };
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
     v1Sport: { findUnique: jest.Mock };
@@ -121,6 +123,7 @@ describe('TournamentsAdminService', () => {
       // 아니라 이 경로를 안 타므로 unconfigured mock(undefined 반환)으로 둬도 무해하다.
       v1CompetitionConfigVersion: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentFixture: { count: jest.fn(), updateMany: jest.fn() },
+      v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { count: jest.fn() },
       $transaction: jest.fn(),
     };
@@ -129,6 +132,7 @@ describe('TournamentsAdminService', () => {
 
     // 기본값: 키 미설정 상태와 동일하게 항상 null 반환(geocoding disabled). 개별 테스트에서 override.
     kakaoGeocoding = { geocode: jest.fn().mockResolvedValue(null) };
+    notifications = { emitNotificationToMany: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -136,6 +140,7 @@ describe('TournamentsAdminService', () => {
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
         { provide: KakaoGeocodingService, useValue: kakaoGeocoding },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -342,6 +347,45 @@ describe('TournamentsAdminService', () => {
       response: { code: 'TOURNAMENT_STATUS_TRANSITION_INVALID' },
     });
     expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  // 대회가 끝나는 순간이 후기를 쓰는 시점이다. 이 알림이 없으면 사용자가 대회 페이지를
+  // 다시 찾아 들어오지 않는 한 후기를 쓸 계기가 없다. 수신자는 대회 후기 작성 권한과
+  // 정확히 같아야 한다(참가 확정 팀의 owner/manager) — 넓으면 못 쓰는 알림, 좁으면 누락.
+  it('changeStatus: in_progress → completed 시 참가팀 팀장·운영진에게 후기 요청 알림을 보낸다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress', entryFee: 0 }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'completed' }));
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { team: { memberships: [{ userId: 'owner-a' }, { userId: 'manager-a' }] } },
+      // 같은 사람이 두 팀의 운영진이면 알림은 한 번만 가야 한다.
+      { team: { memberships: [{ userId: 'manager-a' }, { userId: 'owner-b' }] } },
+    ]);
+
+    await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'completed' });
+
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      ['owner-a', 'manager-a', 'owner-b'],
+      'tournament_completed_review_request',
+      'tournament-1',
+    );
+    // 조회 조건이 후기 권한과 갈리면 못 쓰는 사람에게 알림이 간다 — 조건 자체를 고정한다.
+    const where = prisma.v1TournamentRegistration.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({
+      tournamentId: 'tournament-1',
+      status: 'confirmed',
+      team: { status: 'active', deletedAt: null },
+    });
+  });
+
+  it('changeStatus: completed 외 전이에서는 후기 요청 알림을 보내지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', entryFee: 0 }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'open' }));
+
+    await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open' });
+
+    expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
   });
 
   it('changeStatus: same status is idempotent (no write)', async () => {

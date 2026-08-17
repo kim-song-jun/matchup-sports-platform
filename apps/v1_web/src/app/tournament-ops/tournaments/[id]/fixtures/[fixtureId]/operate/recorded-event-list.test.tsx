@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { RecordedEventList } from './recorded-event-list';
 import type { GameEventRecord, GameLineup, GameSide } from '@/types/game-operations';
+import { GOAL_BACKFILL_EVENT_SOURCE } from '@/lib/backfilled-goal-event';
 
 /**
  * 이 목록이 존재하는 이유는 "기록한 이벤트" 자리에 **서버에 확정된 이벤트 로그**를 보여주기
@@ -141,7 +142,7 @@ describe('RecordedEventList', () => {
   it('복원된 골(분 미상)은 "전반 0:00" 이 아니라 시각 미상으로 표시한다', () => {
     const backfilled = {
       ...goal(1, HOME_SIDE_ID, 'p-jung', 0),
-      payload: { source: 'GOAL_BACKFILL_V1', legacyPlayerName: '정우진', minuteKnown: false },
+      payload: { source: GOAL_BACKFILL_EVENT_SOURCE, legacyPlayerName: '정우진', minuteKnown: false },
     };
     render(<RecordedEventList events={[backfilled]} sides={SIDES} lineups={LINEUPS} />);
 
@@ -154,7 +155,7 @@ describe('RecordedEventList', () => {
   it('복원된 골이라도 레거시에 분이 남아 있으면 그 시각은 보여주되 전/후반은 단정하지 않는다', () => {
     const backfilled = {
       ...goal(1, HOME_SIDE_ID, 'p-jung', 71 * 60000),
-      payload: { source: 'GOAL_BACKFILL_V1', legacyPlayerName: '정우진' },
+      payload: { source: GOAL_BACKFILL_EVENT_SOURCE, legacyPlayerName: '정우진' },
     };
     render(<RecordedEventList events={[backfilled]} sides={SIDES} lineups={LINEUPS} />);
 

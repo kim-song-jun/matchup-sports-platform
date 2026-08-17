@@ -19,7 +19,14 @@
  * 객체라(`AppendGameEventDto` 는 `@IsObject()` 하나만 건다), `minuteKnown` 만 보고
  * 판정하면 라이브로 기록된 71분 골의 시각이 지워질 수 있다.
  */
-const GOAL_BACKFILL_EVENT_SOURCE = 'GOAL_BACKFILL_V1';
+/**
+ * export 하는 이유: 이 sentinel 은 백필 판정의 **유일한 키**다. 테스트가 같은 문자열을
+ * 따로 적으면, 서버가 값을 바꿨을 때 테스트는 옛 문자열로 계속 통과하면서 프로덕션만
+ * 조용히 깨진다(컴파일러가 문자열 리터럴 두 개의 불일치를 잡아 줄 방법이 없다).
+ * 서버 쪽도 같은 이유로 `tournament-fixture-official-result.ts` 가 상수를 export 하고
+ * 백필이 그것을 import 한다 — 웹도 같은 규율을 따른다.
+ */
+export const GOAL_BACKFILL_EVENT_SOURCE = 'GOAL_BACKFILL_V1';
 
 function backfillPayload(payload: Record<string, unknown> | undefined | null): Record<string, unknown> | null {
   if (payload === null || payload === undefined) return null;

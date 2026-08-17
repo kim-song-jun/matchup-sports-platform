@@ -19,6 +19,7 @@ import { currentRuntimeConfiguration, resolveV1RequestIdentity } from '../auth/v
 import { requireProductionFrontendOrigin } from '../common/security/v1-mutation-origin';
 import { getPendingSocialSignupRoute } from '../auth/social-signup-access';
 import { AppendGameEventDto } from '../games/dto/game-event.dto';
+import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
 import { GamesService } from '../games/games.service';
 import type { GameEventAppendResult } from '../games/games.types';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
@@ -184,6 +185,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     private readonly tournamentStaffAccess: TournamentStaffAccessService,
     @Inject(GamesService) private readonly gamesService: GameRealtimeOperations,
     @InjectPinoLogger(RealtimeGateway.name) private readonly logger: PinoLogger,
+    private readonly gameBroadcast: GameBroadcastRegistry,
   ) {}
 
   private readonly gameSubscriptions = new Map<
@@ -192,6 +194,17 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   >();
 
   afterInit(server: Server): void {
+    // Hand the games lane a way to reach this namespace's rooms without
+    // GamesModule importing RealtimeModule (which would close the module graph
+    // into a cycle — RealtimeModule already imports GamesModule). See
+    // games/game-broadcast.registry.ts for why the binding is runtime rather
+    // than a Nest injection token.
+    this.gameBroadcast.register({
+      emitToGame: (gameId, event, payload) => {
+        server.to(gameRoom(gameId)).emit(event, payload);
+      },
+    });
+
     server.use((socket, next) => {
       void this.authenticateSocket(socket)
         .then(() => next())

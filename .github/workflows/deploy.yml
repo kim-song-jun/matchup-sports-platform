@@ -101,6 +101,16 @@ jobs:
       - name: Prod deploy security guard tests
         run: node --test scripts/qa/prod-deploy-security-guard.test.mjs
 
+      # `v1_game_operations_worker` 가 alpha compose 에만 선언되고 prod 에는 끝내 들어가지
+      # 않아, 프로덕션이 아웃박스 디스패처 없이 돌던 것을 오래 아무도 몰랐다(2026-08-16).
+      # 그 건은 배포 검증에 해당 서비스를 명시해 막았지만 그건 서비스 하나짜리 방어라,
+      # 다음에 alpha 에만 추가되는 서비스는 똑같이 누락된다 — 집합 자체를 비교한다.
+      - name: Compose service parity (alpha-only service guard)
+        run: pnpm qa:compose-service-parity
+
+      - name: Compose service parity guard tests
+        run: node --test scripts/qa/check-compose-service-parity.test.mjs
+
       # 이 스위트는 존재만 하고 CI 에서 한 번도 실행되지 않았다 — 그래서
       # "changeset 을 전부 소비하면 alpha 배포가 깨진다"는 계약 위반이 계속 살아 있었다.
       # 디렉터리 인자(`node --test scripts/release/`)는 Node 버전에 따라 모듈 해석으로
@@ -226,6 +236,13 @@ jobs:
           # (test/tournaments/game-operation-flag-seed.integration-spec.ts)이 검증한다.
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/config/game-operation-flags-seed.cli.ts
+          # 골 이벤트 백필 CLI 는 **배포가 자동 실행하지 않는다** — 실행 시점은 운영자가
+          # 정한다(되돌리는 경로가 없는 이벤트를 만들기 때문). 다만 그러면 "코드는 있는데
+          # 배선이 깨진" 결함을 아무도 못 잡으므로, `--dry-run` 으로 기동만 확인한다.
+          # 빈 DB 라 후보는 0건이고, 검증 대상은 개수가 아니라 "부팅해서 정상 종료하는가"다.
+          # 위 시드 CLI 와 같은 이유로 test:integration **뒤에** 둔다.
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
+            src/games/migration/goal-event-backfill.cli.ts --dry-run
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 
       - name: V1 API unit tests

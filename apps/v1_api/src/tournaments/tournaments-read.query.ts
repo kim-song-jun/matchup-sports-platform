@@ -68,6 +68,15 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
       result: { include: { goals: { orderBy: { createdAt: 'asc' } } } },
       game: {
         select: {
+          // `V1Game.state` is what actually moves when a match kicks off. The
+          // `V1TournamentFixture.status` enum has four values
+          // (scheduled | in_progress | completed | cancelled), but only two are
+          // ever written: `scheduled` at creation (tournament-bracket.service.ts)
+          // and `completed` at officialize (tournament-result-review.service.ts).
+          // No writer advances it to `in_progress` or `cancelled`. The presenter
+          // derives `liveStatus` from this state so the public detail response can
+          // say a fixture is live at all.
+          state: true,
           sides: { select: { id: true, sideKey: true } },
           participants: { select: { id: true, displayNameSnapshot: true } },
           currentOfficialRevision: {
@@ -75,7 +84,10 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
           },
           events: {
             where: { OR: [{ type: 'GOAL' }, { reversesEventId: { not: null } }] },
-            select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true },
+            // `payload`는 골 이벤트 백필의 `minuteKnown: false` 표식용 --
+            // tournament-bracket.service.ts의 같은 인라인 select와 정확히 일치해야 한다
+            // (tournament-fixture-official-result.ts 하단 주석 참고).
+            select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true, payload: true },
           },
         },
       },

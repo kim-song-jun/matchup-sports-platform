@@ -176,6 +176,7 @@ describe('public tournament QA regressions', () => {
           awayTeamLogoUrl: '/uploads/teams/busan.png',
           awayRegistrationId: 'registration-away',
           status: 'completed',
+          liveStatus: 'ended',
           result: {
             homeScore: 2,
             awayScore: 1,

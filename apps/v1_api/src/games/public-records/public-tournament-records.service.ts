@@ -4,6 +4,10 @@ import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournaments/tournament-detail.presenter';
+// 골 이벤트 백필이 복원한 골의 "모르는 값" 판정 -- 대진표 쪽
+// (`deriveTournamentFixtureOfficialGoals`)과 공개 기록 쪽이 같은 규칙을 써야 같은 골이
+// 화면마다 다르게(0분 vs 표시 없음 / 전반 vs 기타) 보이지 않는다.
+import { isMinuteUnknown, isPeriodUnknown } from '../../tournaments/tournament-fixture-official-result';
 import {
   TournamentStaffAccessService,
   type TournamentStaffResource,
@@ -111,6 +115,31 @@ const FIXTURE_MATCH_SELECT = {
 type FixtureMatchRow = Prisma.V1TournamentFixtureGetPayload<{ select: typeof FIXTURE_MATCH_SELECT }>;
 
 type EffectiveMode = 'status_only' | 'live' | 'official_only';
+
+/**
+ * DB의 `orderBy: [period, clockMs, sequence]`는 백필이 넣은 `period: 1`/`clockMs: 0`
+ * 플레이스홀더를 진짜 값으로 믿고 정렬한다 -- 그래서 위 매핑이 그 둘을 null("모름")로
+ * 내리고 나면 정렬 결과가 그 판단과 어긋난다. "몇 분인지 모른다"고 선언한 골이 정렬에서는
+ * 맨 앞, 즉 "그 경기의 첫 골"이라는 또 다른 시각 주장을 하게 되는 것이다(실제 12분·55분
+ * 골보다 위에 렌더된다).
+ *
+ * 그래서 매핑 뒤에 모르는 값을 뒤로 보낸다. 프론트가 이 순서를 그대로 믿는 쪽
+ * (`match-detail-content.tsx`는 "서버가 이미 정렬해 내려주므로 버킷 안에서 절대 다시
+ * 정렬하지 않는다")과 자기가 다시 정렬하는 쪽(`schedule-content.tsx`의
+ * `clockMs ?? MAX_SAFE_INTEGER`)이 공존하는데, 후자가 이미 null을 뒤로 보내므로 서버가
+ * 같은 규칙을 쓰지 않으면 **같은 골이 두 화면에서 정반대 위치**에 나타난다.
+ *
+ * `Array.prototype.sort`는 안정 정렬이라 알려진 값들 사이의 기존 순서(= DB가 준
+ * period/clockMs/sequence 순서)는 그대로 보존된다.
+ */
+function byUnknownLast(
+  a: { period: number | null; clockMs: number | null },
+  b: { period: number | null; clockMs: number | null },
+): number {
+  const period = (a.period ?? Number.MAX_SAFE_INTEGER) - (b.period ?? Number.MAX_SAFE_INTEGER);
+  if (period !== 0) return period;
+  return (a.clockMs ?? Number.MAX_SAFE_INTEGER) - (b.clockMs ?? Number.MAX_SAFE_INTEGER);
+}
 
 @Injectable()
 export class PublicTournamentRecordsService {
@@ -663,10 +692,19 @@ export class PublicTournamentRecordsService {
           participantId: eligible ? event.participantId : null,
           participantName: eligible ? (participant?.displayNameSnapshot ?? null) : null,
           jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
-          period: event.period,
-          clockMs: event.clockMs,
+          // 백필로 복원된 골은 `period: 1`로 저장돼 있지만 그건 컬럼이 non-null이라
+          // 어쩔 수 없이 넣은 값이고 레거시 원본엔 전/후반 자체가 없었다 -- 그대로
+          // 내보내면 이 타임라인이 `periodLabel(1)`="전반" 헤딩을 붙여 없던 사실을
+          // 만든다. null이면 프론트가 이미 "기타" 구간으로 렌더한다.
+          period: isPeriodUnknown(event.payload) ? null : event.period,
+          // 백필로 복원된 "분 미상" 골은 `clockMs: 0`으로 저장돼 있으므로 그대로
+          // 내보내면 "0:00 득점"이 된다 -- 표식이 있으면 시각을 아예 내리지 않는다
+          // (`PublicMatchEvent.clockMs`는 이미 `number | null`이고, 프론트
+          // `formatClock`/`isClockAbnormal`도 null을 "표시 없음"으로 다룬다).
+          clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
         };
-      });
+      })
+      .sort(byUnknownLast);
   }
 
   /**
@@ -699,7 +737,9 @@ export class PublicTournamentRecordsService {
       where: { gameId: { in: gameIds } },
       // buildEvents 와 같은 이유로 시각순 -- sequence 는 tiebreak 용으로만 남긴다.
       orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
-      select: { id: true, gameId: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, reversesEventId: true },
+      // `payload`는 백필의 `minuteKnown: false` 표식을 읽기 위한 것 -- buildEvents가
+      // 이미 같은 이유로 payload를 읽는다. 빠뜨리면 일정 카드에서만 "0′"가 뜬다.
+      select: { id: true, gameId: true, type: true, sideId: true, participantId: true, period: true, clockMs: true, reversesEventId: true, payload: true },
     });
     const reversedIds = new Set(
       events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
@@ -720,9 +760,16 @@ export class PublicTournamentRecordsService {
         // sideId nullable 방어(위 buildEvents와 동일한 fail-safe 규칙).
         side: (sideKeyById.get(event.sideId ?? '') === 'HOME' ? 'home' : 'away') as 'home' | 'away',
         participantId: event.participantId,
-        period: event.period,
-        clockMs: event.clockMs,
+        // buildEvents와 동일한 규칙 -- 백필 복원 골은 전/후반을 모른다.
+        period: isPeriodUnknown(event.payload) ? null : event.period,
+        // buildEvents와 동일한 규칙 -- 분 미상 골은 시각을 내리지 않는다.
+        clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
       }));
+      // 여기서는 `byUnknownLast` 로 다시 정렬하지 않는다 -- 일정 카드
+      // (`schedule-content.tsx` 의 ScorerSummary)가 이미 `clockMs ?? MAX_SAFE_INTEGER`
+      // 로 자기가 정렬하며 모르는 값을 뒤로 보낸다. 서버가 여기서 한 번 더 정렬하면
+      // "DB가 준 순서를 그대로 넘긴다"는 이 메서드의 기존 계약만 흔들고(취소·재기록
+      // 회귀 스펙이 그 순서를 고정하고 있다) 화면 결과는 달라지지 않는다.
       result.set(fixture.game.id, rows);
     }
     return result;

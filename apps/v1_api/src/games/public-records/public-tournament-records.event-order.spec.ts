@@ -39,7 +39,9 @@ type FakeEvent = {
   clockMs: number;
   sequence: number;
   reversesEventId: string | null;
-  payload?: { card: 'YELLOW' | 'RED' };
+  // CARD 색상(`{ card }`)뿐 아니라 골 이벤트 백필이 남기는 표식
+  // (`{ source, minuteKnown }`)도 담아야 해서 자유형이다.
+  payload?: Record<string, unknown>;
 };
 
 /** 실제 Prisma orderBy(단일 객체 또는 배열)를 그대로 흉내 낸다. */
@@ -283,5 +285,70 @@ describe('PublicTournamentRecordsService -- 이벤트는 경기 시각순(sequen
     // 입력 순서(sequence)는 goal-late 가 먼저지만, 시간순으로는 goal-early(600_000)가
     // 먼저다. sequence 로 되돌리면 [2_700_000, 600_000] 이 나와 이 assertion 이 실패한다.
     expect(result.items[0].scorers.map((scorer) => scorer.clockMs)).toEqual([600_000, 2_700_000]);
+  });
+});
+
+/**
+ * 골 이벤트 백필(`games/migration/goal-event-backfill.ts`)이 복원한 골은 저장 시점에
+ * `period: 1`(컬럼이 non-null) 과, 레거시에 분이 없었다면 `clockMs: 0` 을 갖는다. 둘 다
+ * 원본에 없던 값이라 그대로 내보내면 공개 화면이 "전반 0:00 득점"이라고 단정한다.
+ */
+const BACKFILL_PAYLOAD = { source: 'GOAL_BACKFILL_V1', legacyPlayerName: '분모름 득점자', minuteKnown: false };
+const BACKFILL_MIXED_EVENTS: FakeEvent[] = [
+  // 레거시 분이 있던 백필 골 -- 시각은 살리되 전/후반은 여전히 모른다.
+  { id: 'backfill-known-minute', gameId: GAME_ID, type: 'GOAL', sideId: 'side-home', participantId: null, period: 1, clockMs: 12 * 60_000, sequence: 1, reversesEventId: null, payload: { source: 'GOAL_BACKFILL_V1', legacyPlayerName: '12분 득점자' } },
+  // 레거시에 분이 아예 없던 백필 골 -- clockMs 0 으로 저장돼 있다.
+  { id: 'backfill-unknown-minute', gameId: GAME_ID, type: 'GOAL', sideId: 'side-home', participantId: null, period: 1, clockMs: 0, sequence: 2, reversesEventId: null, payload: BACKFILL_PAYLOAD },
+  // 같은 경기에 실제로 라이브 기록된 골이 섞여 있는 상황.
+  { id: 'live-goal', gameId: GAME_ID, type: 'GOAL', sideId: 'side-home', participantId: HOME_SCORER.id, period: 2, clockMs: 300_000, sequence: 3, reversesEventId: null },
+];
+
+describe('PublicTournamentRecordsService -- 백필이 복원한 골은 없는 사실을 만들지 않는다', () => {
+  it('getMatch: 백필 골은 period 를 단정하지 않고(null), 분 미상 골은 시각도 내리지 않는다', async () => {
+    const prisma = buildFakePrisma(BACKFILL_MIXED_EVENTS);
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    // period 를 그대로 흘리면 [1, ...] 이 나오고 프론트가 "전반" 헤딩을 붙인다
+    // (match-detail-content.tsx 의 periodLabel 그룹핑). null 이어야 "기타"로 렌더된다.
+    // 그리고 모르는 값(period null / clockMs null)은 아는 값 뒤로 간다 -- clockMs 0 인
+    // 백필 골이 정렬 맨 앞에 서면 "이 경기의 첫 골"이라는 새 주장이 된다.
+    expect(result.events.map((event) => [event.period, event.clockMs])).toEqual([
+      [2, 300_000],
+      [null, 12 * 60_000],
+      [null, null],
+    ]);
+  });
+
+  it('getSchedule: 같은 억제 규칙이 일정 카드 득점자 요약에도 적용된다', async () => {
+    const prisma = buildFakePrisma(BACKFILL_MIXED_EVENTS);
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    // 여기 순서는 DB(orderBy period/clockMs/sequence)가 준 그대로다 -- 일정 카드는
+    // `clockMs ?? MAX_SAFE_INTEGER` 로 자기가 다시 정렬하므로 모르는 값이 뒤로 가는 것은
+    // 그쪽 책임이고, 서버가 보장해야 하는 것은 "period/clockMs 를 단정하지 않는 것"이다.
+    expect(result.items[0].scorers.map((scorer) => [scorer.period, scorer.clockMs])).toEqual([
+      [null, null],
+      [null, 12 * 60_000],
+      [2, 300_000],
+    ]);
+  });
+
+  it('백필 표식이 없는 라이브 이벤트의 payload 는 시각·전후반을 지우지 못한다', async () => {
+    // `V1GameEvent.payload` 는 AppendGameEventDto 에서 @IsObject() 하나만 걸린 자유형
+    // 객체라 기록 클라이언트가 아무 키나 넣을 수 있다. `minuteKnown` 만 보고 판정하면
+    // 아래 71분 골의 시각이 공개 화면에서 사라진다.
+    const events: FakeEvent[] = [
+      { id: 'live-goal-71', gameId: GAME_ID, type: 'GOAL', sideId: 'side-home', participantId: HOME_SCORER.id, period: 2, clockMs: 71 * 60_000, sequence: 1, reversesEventId: null, payload: { note: '현장 메모', minuteKnown: false } },
+    ];
+    const prisma = buildFakePrisma(events);
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.events.map((event) => [event.period, event.clockMs])).toEqual([[2, 71 * 60_000]]);
   });
 });

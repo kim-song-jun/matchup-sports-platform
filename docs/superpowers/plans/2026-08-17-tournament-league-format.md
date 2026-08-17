@@ -23,8 +23,23 @@
 - **base는 항상 `dev`.** dev 머지 = alpha 즉시 실배포.
 - **UI 검증은 로컬 next 서버가 아니라 alpha 배포 후 스크린샷으로 한다.**
 - **커밋은 pathspec으로 내 파일만** 지정하고 직후 `git show --stat HEAD`로 휩쓸린 파일이 없는지 확인한다. `git add -A` / `git commit -a` 금지.
-- 테스트 실행: `cd apps/v1_api && pnpm test` (unit), `pnpm test:integration` (통합, --runInBand)
-- worktree에는 node_modules가 없다. 메인 트리에서 심링크하거나 `pnpm --filter v1_api ...`를 레포 루트에서 실행한다.
+### 실행 환경 (2026-08-17 실측)
+
+- **worktree에는 node_modules가 없고 `pnpm`도 PATH에 없다.** 메인 트리에서 심링크를 걸어 두었다
+  (`node_modules`, `apps/v1_api/node_modules`, `apps/v1_web/node_modules`).
+  테스트는 **`./node_modules/.bin/jest`를 직접 호출**한다:
+  ```bash
+  cd apps/v1_api && ./node_modules/.bin/jest --selectProjects unit --testPathPatterns <패턴>
+  cd apps/v1_api && ./node_modules/.bin/tsc --noEmit
+  ```
+  `jest.config.ts` ES module 경고가 뜨지만 fallback으로 정상 실행된다 — 무시한다.
+- **기준선 (2026-08-17 실측):** `round-robin-schedule.spec.ts` → **11 tests passed**.
+  Task 2의 회귀 게이트는 이 11개다.
+- **⚠️ 이 환경에는 Teameet v1 PostgreSQL이 떠 있지 않다.** 포트 5432는 다른 프로젝트가
+  점유 중이며 그 컨테이너는 건드리지 않는다. 따라서 **DB가 필요한 스텝은 실행하지 말고
+  작성까지만 하고 넘어간다** — CI의 `V1 migration replay + drift gate`가 실제로 검증한다.
+  해당 스텝: Task 3 Step 6(`prisma migrate diff`), Task 5 Step 6(통합 테스트).
+  대신 Task 3에서는 `schema.prisma`와 `migration.sql`의 컬럼·제약·인덱스를 **한 줄씩 눈으로 대조**한다.
 
 ---
 
@@ -340,8 +355,8 @@ export function generateRoundRobinFixtures(
 
 - [ ] **Step 3: 기존 테스트가 여전히 통과하는지 확인한다 (회귀 게이트)**
 
-Run: `cd apps/v1_api && pnpm test -- round-robin-schedule.spec`
-Expected: PASS — 12개 전부. 실패하면 **spec이 아니라 커널을 고친다.**
+Run: `cd apps/v1_api && ./node_modules/.bin/jest --selectProjects unit --testPathPatterns round-robin-schedule`
+Expected: PASS — **11개 전부**(Global Constraints의 기준선과 동일한 수). 실패하면 **spec이 아니라 커널을 고친다.**
 
 - [ ] **Step 4: 시리즈 호출부 타입이 깨지지 않았는지 확인한다**
 
@@ -479,7 +494,12 @@ ALTER TABLE "v1_tournament_overall_standings"
   FOREIGN KEY ("registration_id") REFERENCES "v1_tournament_registrations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ```
 
-- [ ] **Step 6: 마이그레이션이 빈 DB에서 재생되는지 확인한다**
+- [ ] **Step 6: 마이그레이션이 빈 DB에서 재생되는지 확인한다 — ⚠️ 이 환경에서는 실행 보류**
+
+> Teameet v1 PostgreSQL이 이 환경에 없다(Global Constraints 참조). **아래 명령을 실행하지 말고**,
+> 대신 `schema.prisma`의 신규 모델·컬럼과 `migration.sql`의 컬럼·제약·인덱스를 한 줄씩 대조해
+> 이름·타입·NOT NULL·DEFAULT·unique·FK가 모두 일치하는지 확인하고 넘어간다.
+> 실제 재생 검증은 CI의 `V1 migration replay + drift gate`가 수행한다.
 
 Run:
 ```bash
@@ -864,7 +884,10 @@ include를 재사용한다.
 > **불변식: `recalculateAndUpsertGroupStandings`가 호출되는 모든 경로에서
 > `recalculateAndUpsertOverallStandings`도 같은 `tx`로 호출되어야 한다.**
 
-- [ ] **Step 6: 통합 테스트로 트랜잭션 원자성을 검증한다**
+- [ ] **Step 6: 통합 테스트를 작성한다 — ⚠️ 이 환경에서는 실행 보류**
+
+> Teameet v1 PostgreSQL이 이 환경에 없다. **테스트 파일은 작성하되 실행하지 않는다.**
+> `pnpm test:integration`은 CI와 DB가 있는 환경에서 돌린다.
 
 `apps/v1_api/test/integration/` 아래에 시나리오를 추가한다:
 - 2개 조에 각각 2팀, 각 조 1경기 결과 확정
@@ -872,8 +895,8 @@ include를 재사용한다.
   승점 합계가 일치하는지 확인
 - 통합 upsert가 실패하도록 강제했을 때 조별도 롤백되는지 확인
 
-Run: `cd apps/v1_api && pnpm test:integration`
-Expected: PASS
+Run: (보류 — DB 없음)
+Expected: 파일이 작성되어 있고 tsc가 통과하면 이 스텝은 완료로 본다.
 
 - [ ] **Step 7: 커밋한다**
 

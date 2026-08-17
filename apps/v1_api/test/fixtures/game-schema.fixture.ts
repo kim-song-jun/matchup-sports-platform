@@ -193,7 +193,13 @@ export const gameSchemaSourceManifest = {
   // 개인 어워드 icon_key는 game domain 밖의 nullable 컬럼이지만 이 guard는 전체
   // schema.prisma 바이트를 결속한다. 전용 20260815193000 migration의 빈 DB replay와
   // drift 검증을 통과한 스키마 해시로 재고정하며 game operations migration은 불변이다.
-  schema: '3b90ebc59111f96a58073949b939cb1a13b26c14709149c0e2d573dbfa601744',
+  // 대회 후기의 "팀당 1건" unique(@@unique([tournamentId, teamId]))를 뺐다. game domain 밖의
+  // 제약이지만 이 guard 는 schema.prisma 전체 바이트를 결속하므로 여기서 걸린다 — 파일 해시
+  // 노이즈이지 game operations 계약 변화가 아니다. 전용 마이그레이션
+  // 20260817120000_v1_tournament_review_drop_team_unique 의 빈 DB replay + drift 검증을 통과한
+  // 스키마로 재고정하며, 바인딩된 20260729000100_v1_game_operations 는 건드리지 않았다
+  // (migration 해시가 그대로인 이유다). `shasum -a 256` 으로 이 브랜치 파일에서 재계산.
+  schema: '338aafa11ca7a3b4953e3c81f9dbd79d21009db34760d7384d3d7c802b892c51',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

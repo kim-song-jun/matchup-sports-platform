@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -6,6 +6,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReceivedSummaryQueryDto } from './dto/received-summary-query.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
+import { HidePostEventReviewDto } from './dto/moderate-review.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
 import { ReviewsService } from './reviews.service';
 
@@ -66,5 +67,23 @@ export class ReviewsController {
   @Throttle({ default: { limit: 110, ttl: 60_000 } })
   submit(@CurrentUser() user: V1AuthUser, @Body() dto: SubmitReviewDto) {
     return this.reviewsService.submit(user, dto);
+  }
+
+  // ─────────── 어드민 후기 숨김 (V1AuthGuard + 서비스 레벨 admin 체크) ───────────
+  // 경기 후기에는 지금까지 숨김 경로가 없어 악의적 후기를 어드민조차 내릴 수 없었다.
+  // 대회 후기(tournament-reviews.controller.ts)와 같은 PATCH .../hide|unhide 모양을 쓴다.
+
+  @Patch('admin/:reviewId/hide')
+  hide(
+    @CurrentUser() user: V1AuthUser,
+    @Param('reviewId') reviewId: string,
+    @Body() dto: HidePostEventReviewDto,
+  ) {
+    return this.reviewsService.hideReview(user, reviewId, dto);
+  }
+
+  @Patch('admin/:reviewId/unhide')
+  unhide(@CurrentUser() user: V1AuthUser, @Param('reviewId') reviewId: string) {
+    return this.reviewsService.unhideReview(user, reviewId);
   }
 }

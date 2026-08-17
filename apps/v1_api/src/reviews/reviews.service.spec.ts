@@ -38,7 +38,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService({} as never, tournamentFixtureReviews as never);
+    const service = new ReviewsService({} as never, tournamentFixtureReviews as never, adminContextStub());
 
     await expect(service.list(user, { tab: 'pending', tournamentId, limit: 20 })).resolves.toEqual({
       items: [{ sourceType: 'tournament_fixture', sourceId, remainingCount: 2 }],
@@ -92,7 +92,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
     await expect(service.submit(user, {
       sourceType: 'match',
@@ -164,7 +164,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
     await service.submit(user, {
       sourceType: 'match',
@@ -244,7 +244,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
     await service.submit(user, {
       sourceType: 'team_match',
@@ -281,7 +281,7 @@ describe('ReviewsService', () => {
 
     it('개인 대상 후기를 400으로 막지 않고 대상 정보를 그대로 대회 서비스에 넘긴다', async () => {
       const tournamentFixtureReviews = stubTournamentService();
-      const service = new ReviewsService({} as never, tournamentFixtureReviews as never);
+      const service = new ReviewsService({} as never, tournamentFixtureReviews as never, adminContextStub());
 
       await service.submit(user, {
         sourceType: 'tournament_fixture',
@@ -302,7 +302,7 @@ describe('ReviewsService', () => {
 
     it('대상 두 종류를 함께 보내면 400으로 막는다', async () => {
       const tournamentFixtureReviews = stubTournamentService();
-      const service = new ReviewsService({} as never, tournamentFixtureReviews as never);
+      const service = new ReviewsService({} as never, tournamentFixtureReviews as never, adminContextStub());
 
       await expect(service.submit(user, {
         sourceType: 'tournament_fixture',
@@ -319,7 +319,7 @@ describe('ReviewsService', () => {
     // 팀 매치도 라인업(V1GameParticipant.userId)을 근거로 개인 대상 후기를 받는다.
     // 단 shape는 여전히 배타적이어야 한다 — targetUserId와 targetTeamId를 함께 보내면 거부.
     it('팀 매치 개인 후기는 targetUserId 단독일 때만 받는다', async () => {
-      const service = new ReviewsService({} as never, stubTournamentService() as never);
+      const service = new ReviewsService({} as never, stubTournamentService() as never, adminContextStub());
 
       await expect(service.submit(user, {
         sourceType: 'team_match',
@@ -344,7 +344,7 @@ describe('ReviewsService', () => {
         v1UserReputationSummary: { upsert: jest.fn().mockResolvedValue({}) },
       };
       const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-      const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+      const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
       await service['recalculateUserReputation'](prisma as never, 'x');
 
@@ -371,7 +371,7 @@ describe('ReviewsService', () => {
           v1UserReputationSummary: { upsert: upsertMock },
         };
         const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
         await service['recalculateUserReputation'](prisma as never, 'x');
 
@@ -408,7 +408,7 @@ describe('ReviewsService', () => {
           v1TeamTrustScore: { upsert: upsertMock },
         };
         const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
         await service['recalculateTeamTrust'](prisma as never, 'team-x');
 
@@ -461,7 +461,7 @@ describe('ReviewsService', () => {
           v1TeamTrustScore: { upsert: upsertMock },
         };
         const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
         await service['recalculateTeamTrust'](prisma as never, 'team-x');
 
@@ -523,7 +523,7 @@ describe('ReviewsService', () => {
           v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
           v1PostEventReview: { findMany },
         };
-        const service = new ReviewsService(prisma as never, {} as never);
+        const service = new ReviewsService(prisma as never, {} as never, adminContextStub());
 
         const result = await service.received(user, { limit: 20 });
 
@@ -572,7 +572,7 @@ describe('ReviewsService', () => {
           v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
           v1PostEventReview: { findMany },
         };
-        const service = new ReviewsService(prisma as never, {} as never);
+        const service = new ReviewsService(prisma as never, {} as never, adminContextStub());
 
         const result = await service.received(user, { limit: 20 });
 
@@ -602,7 +602,7 @@ describe('ReviewsService', () => {
               .mockResolvedValueOnce([]),
           },
         };
-        const service = new ReviewsService(prisma as never, {} as never);
+        const service = new ReviewsService(prisma as never, {} as never, adminContextStub());
 
         await expect(service.received(user, { limit: 20 })).resolves.toEqual({
           items: [],
@@ -625,7 +625,7 @@ describe('ReviewsService', () => {
               .mockResolvedValueOnce([]),
           },
         };
-        const service = new ReviewsService(prisma as never, {} as never);
+        const service = new ReviewsService(prisma as never, {} as never, adminContextStub());
 
         await expect(service.received(user, { limit: 20 })).resolves.toEqual({
           items: [],
@@ -667,7 +667,7 @@ describe('ReviewsService', () => {
           submit: jest.fn(),
           sourceSummaries: jest.fn(),
         };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
         const result = await service.receivedSummary(
           { id: 'x', email: 'x@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' },
@@ -712,7 +712,7 @@ describe('ReviewsService', () => {
           submit: jest.fn(),
           sourceSummaries: jest.fn(),
         };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
         const result = await service.receivedSummary(
           { id: 'user-p', email: 'user-p@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' },
@@ -1024,6 +1024,117 @@ describe('ReviewsService', () => {
   });
 });
 
+
+/**
+ * 숨김/복구 경로만 AdminContextService 를 쓴다. 나머지 케이스는 이 스텁을 건드리지 않으므로
+ * 호출되면 그 자체가 회귀 신호가 되도록 명시적으로 실패시킨다.
+ */
+function adminContextStub() {
+  return {
+    getMutationAdmin: jest.fn(async () => { throw new Error('adminContext 를 기대하지 않은 경로에서 호출했다'); }),
+    logAdminAction: jest.fn(),
+  } as never;
+}
+
+// 경기 후기에는 숨김 경로가 아예 없었다 — 스키마의 V1PostEventReviewStatus 에 hidden 이
+// 있는데도 그 값을 쓰는 코드가 0건이라, 악의적 후기를 어드민조차 내릴 수 없었다.
+describe('ReviewsService — 어드민 후기 숨김', () => {
+  const adminRecord = { id: 'admin-1', role: 'ops' };
+
+  function makeWorld(reviewRow: FakeRow | null) {
+    const update = jest.fn().mockResolvedValue({});
+    const upsert = jest.fn().mockResolvedValue({});
+    const logAdminAction = jest.fn();
+    const prisma = {
+      v1PostEventReview: {
+        findUnique: jest.fn().mockResolvedValue(reviewRow),
+        findMany: jest.fn().mockResolvedValue([]),
+        update,
+      },
+      v1UserReputationSummary: { upsert },
+      v1TeamTrustScore: { upsert },
+      v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
+      $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb({
+        v1PostEventReview: { update, findMany: jest.fn().mockResolvedValue([]) },
+        v1UserReputationSummary: { upsert },
+        v1TeamTrustScore: { upsert },
+        v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
+      })),
+    };
+    const adminContext = {
+      getMutationAdmin: jest.fn().mockResolvedValue(adminRecord),
+      logAdminAction,
+    };
+    const service = new ReviewsService(prisma as never, {} as never, adminContext as never);
+    return { service, prisma, update, upsert, adminContext, logAdminAction };
+  }
+
+  const submittedReview = {
+    id: 'review-1',
+    status: 'submitted',
+    sourceType: 'match',
+    targetType: 'user',
+    targetUserId: 'target-user',
+    targetTeamId: null,
+  };
+
+  it('숨기면 status 를 hidden 으로 바꾸고 대상의 평판을 다시 계산한다', async () => {
+    const { service, update, upsert, logAdminAction } = makeWorld(submittedReview);
+
+    await expect(service.hideReview(user, 'review-1', { reason: '욕설' })).resolves.toEqual({ alreadyHidden: false });
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'review-1' },
+      data: expect.objectContaining({ status: 'hidden' }),
+    }));
+    // 집계는 status='submitted' 로 좁혀 읽지만 저장된 요약은 그대로 남는다 — 재계산이 빠지면
+    // 숨긴 후기가 매너 점수에 계속 살아 있다.
+    expect(upsert).toHaveBeenCalled();
+    expect(logAdminAction).toHaveBeenCalled();
+  });
+
+  it('이미 숨겨진 후기는 멱등하게 alreadyHidden 을 돌려준다', async () => {
+    const { service, update } = makeWorld({ ...submittedReview, status: 'hidden' });
+
+    await expect(service.hideReview(user, 'review-1', {})).resolves.toEqual({ alreadyHidden: true });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('없는 후기는 REVIEW_NOT_FOUND', async () => {
+    const { service } = makeWorld(null);
+
+    await expect(service.hideReview(user, 'ghost', {})).rejects.toMatchObject({
+      response: { code: 'REVIEW_NOT_FOUND' },
+    });
+  });
+
+  it('복구는 hidden 일 때만 — removed 는 종착 상태라 되살리지 않는다', async () => {
+    const { service, update } = makeWorld({ ...submittedReview, status: 'removed' });
+
+    await expect(service.unhideReview(user, 'review-1')).resolves.toEqual({ alreadyVisible: true });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('숨김 복구는 status 를 submitted 로 되돌리고 재계산한다', async () => {
+    const { service, update, upsert } = makeWorld({ ...submittedReview, status: 'hidden' });
+
+    await expect(service.unhideReview(user, 'review-1')).resolves.toEqual({ alreadyVisible: false });
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'submitted', hiddenAt: null }),
+    }));
+    expect(upsert).toHaveBeenCalled();
+  });
+
+  it('어드민이 아니면 숨길 수 없다 (getMutationAdmin 이 게이트)', async () => {
+    const { service, adminContext, update } = makeWorld(submittedReview);
+    adminContext.getMutationAdmin.mockRejectedValue(new Error('FORBIDDEN'));
+
+    await expect(service.hideReview(user, 'review-1', {})).rejects.toThrow('FORBIDDEN');
+    expect(update).not.toHaveBeenCalled();
+  });
+});
+
 type FakeRow = Record<string, unknown>;
 
 // where 절을 실제로 해석하는 최소 fake — mock이 인자를 무시하고 고정값을 돌려주면
@@ -1048,7 +1159,7 @@ function matchesWhere(row: FakeRow, where: FakeRow): boolean {
 
 function makeService(prisma: unknown) {
   const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-  return new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+  return new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 }
 
 function authUser(id: string) {
@@ -1262,7 +1373,7 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
 
   it('겸직자에게 두 방향이 모두 대상으로 나오고, 각 대상에 작성자 팀이 실린다', async () => {
     const prisma = makeDualPrisma();
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
     const source = await service.source(user, { sourceType: 'team_match', sourceId: teamSourceId });
 
@@ -1278,7 +1389,7 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
   it('원정팀을 평가하면 홈팀 입장으로 저장된다 (대상이 작성자 팀을 결정)', async () => {
     const createMock = jest.fn().mockResolvedValue(createdRow(hostTeamId, awayTeamId));
     const prisma = makeDualPrisma(createMock);
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
     await service.submit(user, {
       sourceType: 'team_match',
@@ -1299,7 +1410,7 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
   it('반대 방향(홈팀 평가)은 원정팀 입장으로 저장된다', async () => {
     const createMock = jest.fn().mockResolvedValue(createdRow(awayTeamId, hostTeamId));
     const prisma = makeDualPrisma(createMock);
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
     await service.submit(user, {
       sourceType: 'team_match',
@@ -1325,7 +1436,7 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
       { teamId: hostTeamId, role: 'manager', team: { name: '홈팀' } },
       { teamId: awayTeamId, role: 'member', team: { name: '원정팀' } },
     ]);
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
     const source = await service.source(user, { sourceType: 'team_match', sourceId: teamSourceId });
 

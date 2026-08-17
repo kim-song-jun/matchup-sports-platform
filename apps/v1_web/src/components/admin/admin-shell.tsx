@@ -156,10 +156,16 @@ function useSectionLabel(pathname: string, canManageAdmins: boolean): string {
   return match?.label ?? '관리';
 }
 
-/** Sidebar / drawer section heading. Purely visual — the list semantics stay on the links. */
+/**
+ * Sidebar / drawer section heading. Purely visual — the list semantics stay on the links.
+ *
+ * 높이를 아끼는 이유: 사이드바는 항목 19개(19×44px)만으로도 이미 1080p 뷰포트를 넘긴다.
+ * 구획 라벨을 44px(터치 타겟 크기)로 두면 4구획이 176px를 더해 넘침이 두 배가 된다 —
+ * 라벨은 클릭 대상이 아니므로 44px 규칙 대상이 아니고, 읽히는 최소 높이만 준다.
+ */
 function NavGroupLabel({ label }: { label: string }) {
   return (
-    <p className="px-4 pt-4 pb-1 text-[var(--font-size-caption)] font-bold tracking-wide text-[var(--text-caption)]">
+    <p className="px-4 pt-3 pb-1 leading-none text-[var(--font-size-caption)] font-bold tracking-wide text-[var(--text-caption)]">
       {label}
     </p>
   );

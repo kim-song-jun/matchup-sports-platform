@@ -568,13 +568,21 @@ export default function AdminTermsPage() {
                 </div>
               ) : null}
 
+              {/* 미리보기 본문은 자체 스크롤 영역에 담는다. 예전에는 약관 전문을 그대로 펼쳐
+                  화면 높이가 4,851px(모바일 8.7화면)까지 늘어났고, 정작 편집 폼이 위쪽 20%로
+                  밀려 스크롤을 되감아야 했다(2026-08-17 로컬 실측). */}
               <div className="rounded-2xl bg-[var(--surface-soft)] p-4">
                 <p className="mb-3 text-xs font-bold text-[var(--text-muted)]">실제 본문 미리보기</p>
                 <article className="mx-auto max-w-[680px] rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5 md:p-7">
                   <h3 className="text-xl font-bold text-[var(--text-strong)]">{form.title || '약관 제목'}</h3>
                   {form.subtitle ? <p className="mt-2 text-sm text-[var(--text-muted)]">{form.subtitle}</p> : null}
                   <p className="mt-1 text-xs text-gray-400">{form.version || '버전 미입력'}</p>
-                  <div className="mt-6 whitespace-pre-wrap break-words text-sm leading-7 text-[var(--text-body)]">
+                  <div
+                    tabIndex={0}
+                    role="region"
+                    aria-label="약관 본문 미리보기"
+                    className="mt-6 max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-7 text-[var(--text-body)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
                     {form.content || '약관 본문이 여기에 표시돼요.'}
                   </div>
                 </article>

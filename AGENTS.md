@@ -491,7 +491,7 @@ The sections below fill project-specific gaps while preserving curated content a
      못 뽑는다). `POST /api/v1/auth/login` 이 유일한 발급 경로이고, 스크립트엔 `ALPHA_SESSION_TOKEN`
      환경변수로만 넘긴다. alpha E2E 계정 목록은 저장소 밖 비공개 메모리에 있다(Codex는 사용자에게 요청).
   2. **배포 창을 피하라**(2026-08-13 실사고). 배포 중 502를 결함으로 오진한다. 측정 전에
-     `curl -fsSI .../landing | grep -i x-teameet-commit` 로 서빙 SHA를 확인하고 그것이 내 머지를
+     `curl -fsSI .../landing | grep -iE 'x-teameet-(release|commit)'` 로 서빙 버전·SHA를 확인하고 그것이 내 머지를
      포함하는지 `git merge-base --is-ancestor` 로 검증한다. 앞 배포 run이 `cancelled` 로 남을 수
      있으니(뒤 머지가 대체) 마지막 **성공** 배포 SHA를 봐야 한다.
   3. **라이브 경기는 운영 API로 만든다.** alpha엔 `live` 경기가 보통 없다. 재사용 하네스

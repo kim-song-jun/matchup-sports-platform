@@ -592,7 +592,7 @@ curl -sS -D- -o/dev/null https://alpha.teameet.co.kr/api/v1/auth/login \
   -H 'content-type: application/json' \
   -d '{"email":"<계정>","password":"<비밀번호>"}' \
   | grep -i '^set-cookie: teameet_v1_session'
-export ALPHA_SESSION_TOKEN='v1.<payload>.<signature>'   # 스크립트엔 이 환경변수로만 넘긴다
+export ALPHA_SESSION_TOKEN='v1.<payload>.<HMAC>'   # 스크립트엔 이 환경변수로만 넘긴다
 ```
 
 ### 2. 배포 창을 피한다 (Critical — 2026-08-13 실사고)

@@ -542,6 +542,77 @@ describe('ReviewsService', () => {
       }
     });
 
+    // 팀매치 후기는 "받은 후기" 목록 필터에서 빠져 있었다 — 쓸 수는 있는데 받은 사람은
+    // 내용을 영영 못 보고 매너 점수 집계로만 반영됐다. 같은 성격의 대회 경기 후기는 익명으로
+    // 보이던 것과 어긋난다. 아래 두 케이스가 노출과 reveal 짝 판정을 함께 고정한다.
+    const teamMatchReceivedReview = (submittedAtValue: Date) => ({
+      ...tournamentReceivedReview(submittedAtValue),
+      id: 'review-team-match-received',
+      sourceType: 'team_match',
+      sourceId: 'team-match-1',
+      sourceGroupId: null,
+    });
+
+    it('상호 제출된 팀매치 개인 리뷰도 즉시 익명으로 반환한다', async () => {
+      const now = new Date('2026-08-14T12:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(now);
+      try {
+        const candidate = teamMatchReceivedReview(new Date('2026-08-14T11:00:00.000Z'));
+        const findMany = jest.fn()
+          .mockResolvedValueOnce([candidate])
+          // 같은 팀매치에서 내가 상대를 평가한 행 — 짝이 성립해 72시간을 기다리지 않는다.
+          .mockResolvedValueOnce([{
+            sourceType: 'team_match',
+            sourceId: 'team-match-1',
+            sourceGroupId: null,
+            reviewerUserId: user.id,
+            targetUserId,
+          }]);
+        const prisma = {
+          v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+          v1PostEventReview: { findMany },
+        };
+        const service = new ReviewsService(prisma as never, {} as never);
+
+        const result = await service.received(user, { limit: 20 });
+
+        expect(result.items).toEqual([
+          expect.objectContaining({ reviewId: candidate.id, anonymous: true, reviewerUser: null, rating: 5 }),
+        ]);
+        // mock 은 where 를 무시하고 값을 돌려주므로, 조회 조건 자체를 단언하지 않으면 필터를
+        // 되돌려도 이 테스트가 통과한다(가짜 통과). team_match 가 조회 대상에서 빠지는 순간
+        // 받은 사람은 다시 내용을 못 보게 되므로 그 지점을 직접 고정한다.
+        const where = (findMany.mock.calls[0][0] as { where: { OR: Array<{ sourceType?: { in: string[] } }> } }).where;
+        const sourceTypeFilter = where.OR.find((clause) => clause.sourceType)?.sourceType?.in ?? [];
+        expect(sourceTypeFilter).toEqual(expect.arrayContaining(['team_match', 'tournament_fixture', 'match']));
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('상대가 아직 안 쓴 팀매치 리뷰는 72시간 전까지 숨긴다', async () => {
+      const now = new Date('2026-08-14T12:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(now);
+      try {
+        const prisma = {
+          v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+          v1PostEventReview: {
+            findMany: jest.fn()
+              .mockResolvedValueOnce([teamMatchReceivedReview(new Date('2026-08-14T11:00:00.000Z'))])
+              .mockResolvedValueOnce([]),
+          },
+        };
+        const service = new ReviewsService(prisma as never, {} as never);
+
+        await expect(service.received(user, { limit: 20 })).resolves.toEqual({
+          items: [],
+          pageInfo: { nextCursor: null, hasNext: false },
+        });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('상대가 제출하지 않았고 72시간 전인 대회 리뷰는 받은 목록에서 숨긴다', async () => {
       const now = new Date('2026-08-14T12:00:00.000Z');
       jest.useFakeTimers().setSystemTime(now);

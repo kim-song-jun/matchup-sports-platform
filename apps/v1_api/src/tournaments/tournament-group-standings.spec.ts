@@ -8,6 +8,7 @@
  * 함수 호출로 증명한다(필드 존재만 확인하는 것이 아니라, 승부차기로 결정된 무승부 픽스처를
  * 넣었을 때 결과 StandingFixture가 정규시간 스코어 그대로인지 검증).
  */
+import type { Prisma } from '@prisma/client';
 import {
   fairPlayByRegistrationFromGroups,
   recalculateAndUpsertGroupStandings,
@@ -63,7 +64,10 @@ describe('standingsFixturesFromGroup (승부차기는 조별 순위에 영향을
  */
 describe('fairPlayByRegistrationFromGroups (F5: 페어플레이 실제 연결)', () => {
   function officialGroup(overrides: {
-    resultParticipants: Array<{ sideId: string; cards: unknown }>;
+    // cards 는 Prisma 의 Json 컬럼이라 JsonValue 여야 한다. unknown 으로 두면
+    // StandingsSourceGroup 에 대입할 때 TS2322 로 막힌다(로컬에서 ts-jest diagnostics 를
+    // 끄고 돌리면 통과하지만 CI 의 tsc --noEmit 이 잡는다).
+    resultParticipants: Array<{ sideId: string; cards: Prisma.JsonValue }>;
     sides?: Array<{ id: string; sideKey: string }>;
   }): StandingsSourceGroup {
     return {

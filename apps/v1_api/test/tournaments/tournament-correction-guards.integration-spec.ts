@@ -534,14 +534,19 @@ describe('대회 결과 정정 레인 가드', () => {
   });
 
   /**
-   * 2-C 🔴. 정정 폼이 승부차기를 떨어뜨린 결과가 그대로 확정되면 브래킷이
+   * 2-C 🔴. 정정이 결선 경기를 무승부로 만들면 브래킷이 승자를 못 뽑아
    * 조용히 멈춘다. 정정 시점에 409로 돌려줘야 운영자가 그 자리에서 승부차기를
    * 입력해 복구할 수 있다.
+   *
+   * base 는 **결정적**(2:1, 승부차기 없음)이어야 한다 — 승계할 승부차기가
+   * 아예 없는 상태에서 정정이 동점을 만드는 것이 이 가드의 실제 도달 경로다.
+   * base 가 이미 `1:1 + penalties` 인 경우는 `readStoredPenalties` 가 승계하므로
+   * **통과가 정답**이고, 그 경로는 아래 '2-C 역방향' 테스트가 따로 못박는다.
+   * (CI 첫 실행에서 이 테스트가 실패해 발견 — base 를 동점+승부차기로 두면
+   *  승계가 일어나 거부되지 않는다.)
    */
-  it('2-C: 결선 무승부를 승부차기 없이 정정하면 409 TOURNAMENT_PENALTY_REQUIRED로 거부하고 리비전을 만들지 않는다', async () => {
-    const setup = await endAndOfficialize(ids.drawCorrectionFixture, 1, 1, {
-      penalties: { home: 5, away: 4 },
-    });
+  it('2-C: 결정적 결선 결과를 무승부로 정정하면 409 TOURNAMENT_PENALTY_REQUIRED로 거부하고 리비전을 만들지 않는다', async () => {
+    const setup = await endAndOfficialize(ids.drawCorrectionFixture, 2, 1);
     const before = await revisionCount(setup.gameId);
 
     // 정정 폼이 실제로 보내는 형태: 평평한 {home, away} — 승부차기 탈락.

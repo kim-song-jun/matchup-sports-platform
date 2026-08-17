@@ -4,6 +4,7 @@ import {
   recalculateAndUpsertGroupStandings,
   type StandingsSourceGroup,
 } from '../tournaments/tournament-group-standings';
+import { recalculateAndUpsertOverallStandings } from '../tournaments/tournament-overall-standings';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 
 type GroupForStandingsRow = StandingsSourceGroup & {
@@ -97,6 +98,7 @@ export class GameResultStandingsProjectionService {
     if (!tournament || tournament.deletedAt !== null || !tournament.competitionConfigVersionId) return;
 
     const config = validateCompetitionConfig(tournament.competitionConfig);
+    const now = new Date();
     await recalculateAndUpsertGroupStandings(
       tx,
       {
@@ -105,7 +107,44 @@ export class GameResultStandingsProjectionService {
         config,
         group,
       },
-      new Date(),
+      now,
+    );
+
+    // Invariant (§7.1): every path that calls recalculateAndUpsertGroupStandings
+    // must also call recalculateAndUpsertOverallStandings in the same tx, so
+    // the group view and the overall (통합) view never drift. Unlike
+    // TournamentBracketService.recalculateStandings() (admin-triggered, loops
+    // every group-phase group already), this automatic per-result trigger
+    // only has the one affected group loaded above — so it re-fetches every
+    // group-phase group of the tournament here, in the same transaction, to
+    // feed the overall recalculation.
+    const allGroups = (await tx.v1TournamentGroup.findMany({
+      where: { tournamentId: tournament.id, phase: 'group' },
+      select: {
+        id: true,
+        groupTeams: { select: { registrationId: true } },
+        fixtures: {
+          where: { status: 'completed' },
+          select: {
+            homeRegistrationId: true,
+            awayRegistrationId: true,
+            game: {
+              select: { currentOfficialRevision: { select: { state: true, score: true } } },
+            },
+          },
+        },
+      },
+    })) as StandingsSourceGroup[];
+
+    await recalculateAndUpsertOverallStandings(
+      tx,
+      {
+        tournamentId: tournament.id,
+        configVersionId: tournament.competitionConfigVersionId,
+        config,
+        groups: allGroups,
+      },
+      now,
     );
   }
 }

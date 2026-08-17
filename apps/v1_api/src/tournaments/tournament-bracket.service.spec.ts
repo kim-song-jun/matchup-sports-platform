@@ -68,6 +68,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     sportId: 'sport-1',
     title: '테스트 대회',
     status: 'in_progress',
+    format: 'group_knockout',
     registrationDeadlineAt: null,
     scheduledAt: null,
     venue: null,
@@ -176,6 +177,7 @@ describe('TournamentBracketService', () => {
     v1TournamentFixtureGoal: { findMany: jest.Mock; deleteMany: jest.Mock; createMany: jest.Mock };
     v1TournamentPlayer: { findMany: jest.Mock };
     v1TournamentStanding: { upsert: jest.Mock; findMany: jest.Mock };
+    v1TournamentOverallStanding: { upsert: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
@@ -211,6 +213,7 @@ describe('TournamentBracketService', () => {
       },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { upsert: jest.fn(), findMany: jest.fn() },
+      v1TournamentOverallStanding: { upsert: jest.fn().mockResolvedValue({}) },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
@@ -333,6 +336,49 @@ describe('TournamentBracketService', () => {
       }),
     );
     expect(result).toMatchObject({ advanceCount: null });
+  });
+
+  // ─── 리그 대회 차단 규칙 ────────────────────────────────────────────────────
+
+  describe('리그 대회 차단 규칙', () => {
+    it('format=league인 대회에 knockout 조를 만들면 LEAGUE_KNOCKOUT_GROUP_FORBIDDEN으로 거부한다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ format: 'league' }));
+
+      await expect(
+        service.createGroup(ownerUser, 'tournament-1', { name: '4강', phase: 'semi', sortOrder: 1 }),
+      ).rejects.toMatchObject({
+        response: { code: 'LEAGUE_KNOCKOUT_GROUP_FORBIDDEN' },
+      });
+      expect(prisma.v1TournamentGroup.create).not.toHaveBeenCalled();
+    });
+
+    it('format=league인 대회에 advanceCount를 설정하면 LEAGUE_ADVANCE_COUNT_FORBIDDEN으로 거부한다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ format: 'league' }));
+
+      await expect(
+        service.createGroup(ownerUser, 'tournament-1', {
+          name: 'A조',
+          phase: 'group',
+          sortOrder: 1,
+          advanceCount: 2,
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'LEAGUE_ADVANCE_COUNT_FORBIDDEN' },
+      });
+      expect(prisma.v1TournamentGroup.create).not.toHaveBeenCalled();
+    });
+
+    it('format=group_knockout인 대회는 knockout 조를 그대로 만들 수 있다', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+      prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ format: 'group_knockout' }));
+      prisma.v1TournamentGroup.create.mockResolvedValue(groupRow({ phase: 'semi' }));
+
+      await expect(
+        service.createGroup(ownerUser, 'tournament-1', { name: '4강', phase: 'semi', sortOrder: 1 }),
+      ).resolves.toBeDefined();
+    });
   });
 
   // ─── createGroupTeam ──────────────────────────────────────────────────────
@@ -578,6 +624,19 @@ describe('TournamentBracketService', () => {
     expect(pos1?.[0].create).toMatchObject({ registrationId: 'reg-1', points: 3, wins: 1 });
     expect(pos2?.[0].create).toMatchObject({ registrationId: 'reg-2', points: 0, losses: 1 });
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalled();
+
+    // 불변식(§7.1): recalculateAndUpsertGroupStandings가 호출되는 경로는 같은 tx에서
+    // recalculateAndUpsertOverallStandings도 호출해야 한다 — 조별 화면과 통합 화면이
+    // 어긋나지 않도록. 같은 승자(reg-1, 승점 3)가 통합 순위에도 반영되었는지 확인.
+    const overallUpsertCalls = (prisma.v1TournamentOverallStanding.upsert as jest.Mock).mock.calls;
+    expect(overallUpsertCalls.length).toBe(2);
+    const overallPos1 = overallUpsertCalls.find((c) => c[0].create.position === 1)?.[0].create;
+    expect(overallPos1).toMatchObject({
+      tournamentId: 'tournament-1',
+      registrationId: 'reg-1',
+      points: 3,
+      wins: 1,
+    });
   });
 
   it('recalculateStandings: draw fixture(라이브 종료된 평평한 score) → both teams get 1 point', async () => {

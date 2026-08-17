@@ -44,6 +44,7 @@ function makePrisma(options: {
 }) {
   const tx = {
     v1TournamentStanding: { upsert: jest.fn().mockResolvedValue({}) },
+    v1TournamentOverallStanding: { upsert: jest.fn().mockResolvedValue({}) },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
   const prisma = {
@@ -155,6 +156,13 @@ describe('runTournamentStandingsRecalculation', () => {
       quarantined: 0,
     });
     expect(result.quarantine).toEqual([]);
+
+    // 불변식(§7.1): recalculateAndUpsertGroupStandings가 호출되는 경로는 같은 tx에서
+    // recalculateAndUpsertOverallStandings도 호출해야 한다.
+    const overallCalls = (tx.v1TournamentOverallStanding.upsert as jest.Mock).mock.calls;
+    expect(overallCalls).toHaveLength(2);
+    const overallWinner = overallCalls.find((c) => c[0].create.registrationId === 'reg-1')?.[0].create;
+    expect(overallWinner).toMatchObject({ tournamentId: 't-1', points: 3, wins: 1, position: 1 });
   });
 
   it('a discovered tournament that no longer resolves (deleted between discovery and fetch) is skipped, not quarantined', async () => {

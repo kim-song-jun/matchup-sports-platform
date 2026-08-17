@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import {
   V1GameSideKey,
@@ -47,6 +48,7 @@ import {
   type TournamentFixtureLegacyResult,
 } from './tournament-fixture-official-result';
 import { recalculateAndUpsertGroupStandings } from './tournament-group-standings';
+import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 
 @Injectable()
 export class TournamentBracketService {
@@ -74,6 +76,30 @@ export class TournamentBracketService {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
     return tournament;
+  }
+
+  /**
+   * 리그 대회는 브래킷(토너먼트) 개념을 갖지 않는다.
+   * 서버가 format을 실제로 읽어 막지 않으면 관리자 화면에서 실수로
+   * 브래킷 액션을 눌렀을 때 데이터가 조용히 뒤섞인다.
+   */
+  private assertLeagueGroupShape(format: string, phase: string, advanceCount?: number | null) {
+    if (format !== 'league') return;
+    // V1TournamentGroupPhase = 'group' | 'semi' | 'final' | 'third_place'.
+    // 리그 대회는 조별리그만 갖고 브래킷(토너먼트) 단계를 갖지 않으므로 'group' 외
+    // 나머지 phase(semi/final/third_place)는 전부 knockout 조로 간주해 막는다.
+    if (phase !== 'group') {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_KNOCKOUT_GROUP_FORBIDDEN',
+        message: '리그 대회에는 토너먼트 조를 만들 수 없어요.',
+      });
+    }
+    if (advanceCount !== undefined && advanceCount !== null) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_ADVANCE_COUNT_FORBIDDEN',
+        message: '리그 대회에는 진출 팀 수를 설정할 수 없어요.',
+      });
+    }
   }
 
   private async loadFixture(fixtureId: string): Promise<V1TournamentFixture> {
@@ -154,7 +180,8 @@ export class TournamentBracketService {
 
   async createGroup(user: V1AuthUser, tournamentId: string, dto: CreateGroupDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    await this.loadTournament(tournamentId);
+    const tournament = await this.loadTournament(tournamentId);
+    this.assertLeagueGroupShape(tournament.format, dto.phase ?? 'group', dto.advanceCount);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const group = await tx.v1TournamentGroup.create({
@@ -669,10 +696,14 @@ export class TournamentBracketService {
   /** 조 이름·진출 팀 수 수정. */
   async updateGroup(user: V1AuthUser, groupId: string, dto: UpdateGroupDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const group = await this.prisma.v1TournamentGroup.findUnique({ where: { id: groupId } });
+    const group = await this.prisma.v1TournamentGroup.findUnique({
+      where: { id: groupId },
+      include: { tournament: { select: { format: true } } },
+    });
     if (!group) {
       throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
     }
+    this.assertLeagueGroupShape(group.tournament.format, group.phase, dto.advanceCount);
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.v1TournamentGroup.update({
         where: { id: groupId },
@@ -835,6 +866,17 @@ export class TournamentBracketService {
           now,
         );
       }
+
+      // Invariant: every path that calls recalculateAndUpsertGroupStandings
+      // must also call recalculateAndUpsertOverallStandings in the same tx,
+      // so the group view and the overall (통합) view never drift. This
+      // route already has every group-phase group loaded above, so it can
+      // feed them straight in.
+      await recalculateAndUpsertOverallStandings(
+        tx,
+        { tournamentId, configVersionId: competitionConfigVersionId, config, groups },
+        now,
+      );
 
       await this.adminContext.logAdminAction(
         admin,

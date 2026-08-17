@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import { UnprocessableEntityException } from '@nestjs/common';
 import { validateCompetitionConfig } from './competition-config/competition-config';
 import { recalculateAndUpsertGroupStandings } from './tournament-group-standings';
+import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 
 /**
  * Batch counterpart of `TournamentBracketService.recalculateStandings()`
@@ -125,6 +126,18 @@ export async function runTournamentStandingsRecalculation(
           now,
         );
       }
+
+      // Invariant (§7.1): every path that calls recalculateAndUpsertGroupStandings
+      // must also call recalculateAndUpsertOverallStandings in the same tx,
+      // so the group view and the overall (통합) view never drift. This batch
+      // loop already has every group-phase group loaded above, so it can feed
+      // them straight in — same pattern as
+      // TournamentBracketService.recalculateStandings().
+      await recalculateAndUpsertOverallStandings(
+        tx,
+        { tournamentId, configVersionId, config, groups },
+        now,
+      );
     });
 
     tournamentsRecalculated += 1;

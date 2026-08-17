@@ -195,6 +195,7 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
           ),
         },
         mode: toDetailMode(viewerState, getStatus(query.data)),
+        reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data)),
         applyLabel: applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
         applyPending: applyMatch.isPending || withdrawMatch.isPending,
         statusLabel: statusLabel(viewerState, getStatus(query.data)),
@@ -414,6 +415,21 @@ function getStatus(match: V1Match): V1MatchApiStatus {
 
 function getViewerState(match: V1Match, preflight?: Exclude<V1ViewerState, 'guest'>): V1ViewerState {
   return preflight ?? match.viewer?.state ?? match.viewerState ?? 'none';
+}
+
+/**
+ * 매치가 끝난 뒤 후기 작성 화면으로 가는 진입점. 실제로 평가할 대상이 있는지(같이 뛴 다른
+ * 참가자)는 작성 화면이 /reviews/sources/match/:id 로 직접 받는다 — 여기서 미리 판정하면
+ * 서버 규칙과 갈릴 때 조용히 어긋난다. 여기서는 "완료 + 참가자" 까지만 본다.
+ */
+function buildMatchReviewAction(
+  matchId: string,
+  viewerState: V1ViewerState,
+  status: V1MatchApiStatus,
+): MatchDetailViewModel['reviewAction'] {
+  if (status !== 'completed') return null;
+  if (viewerState !== 'host' && viewerState !== 'approved') return null;
+  return { label: '후기 남기기', href: `/my/reviews/match/${matchId}` };
 }
 
 function statusToCardStatus(status: V1MatchApiStatus, viewerState: V1ViewerState = 'none'): MatchCardModel['status'] {

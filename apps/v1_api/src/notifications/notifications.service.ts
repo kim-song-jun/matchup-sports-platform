@@ -34,6 +34,7 @@ export type NotificationEventType =
   | 'tournament_registration_submitted'
   | 'tournament_payment_confirmed'
   | 'tournament_announcement_published'
+  | 'tournament_completed_review_request'
   | 'team_invitation_received'
   | 'team_invitation_accepted'
   | 'inquiry_answered'
@@ -109,7 +110,8 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'tournament_registration_cancelled' ||
     type === 'tournament_registration_submitted' ||
     type === 'tournament_payment_confirmed' ||
-    type === 'tournament_announcement_published'
+    type === 'tournament_announcement_published' ||
+    type === 'tournament_completed_review_request'
   ) {
     return 'activityEnabled';
   }
@@ -146,7 +148,8 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'tournament_registration_cancelled' ||
     type === 'tournament_registration_submitted' ||
     type === 'tournament_payment_confirmed' ||
-    type === 'tournament_announcement_published'
+    type === 'tournament_announcement_published' ||
+    type === 'tournament_completed_review_request'
   ) {
     return 'tournament';
   }
@@ -183,6 +186,18 @@ function deepLinkForEvent(
   if (type === 'team_join_application_received' && targetId) {
     return `/teams/${targetId}/members`;
   }
+  // 완료 알림은 본문이 "리뷰를 남겨보세요!"인데 링크는 매치 상세로 보내고 있었다 — 그 화면엔
+  // 후기 CTA가 없어서 알림을 눌러도 후기를 쓸 수 없는 막다른 길이었다. 작성 화면으로 바로 보낸다.
+  if (type === 'match_completed' && targetId) {
+    return `/my/reviews/match/${targetId}`;
+  }
+  if (type === 'team_match_completed' && targetId) {
+    return `/my/reviews/team_match/${targetId}`;
+  }
+  // 대회 후기는 상호 후기(/my/reviews)가 아니라 대회별 시상·후기 화면에서 쓴다.
+  if (type === 'tournament_completed_review_request' && targetId) {
+    return `/tournaments/${targetId}/awards`;
+  }
   // Task 12, reminders lane: targetId is the compound "${teamId}:${scheduleId}" string (see
   // schedule-reminder.service.ts) — parsed only here, never used for authorization anywhere in
   // this service.
@@ -214,6 +229,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_match_closed: '팀매치 모집이 마감됐어요',
   team_match_cancelled: '팀매치가 취소됐어요',
   team_match_completed: '팀매치가 완료됐어요. 리뷰를 남겨보세요!',
+  tournament_completed_review_request: '대회가 끝났어요. 후기를 남겨주세요!',
   tournament_registration_confirmed: '대회 참가가 확정됐어요',
   tournament_registration_waitlisted: '대기자 명단에 등록됐어요',
   tournament_registration_cancelled: '대회 참가가 취소됐어요',
@@ -250,6 +266,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_match_closed: '모집이 마감되어 대기 중인 신청이 종료됐어요.',
   team_match_cancelled: '팀매치가 취소됐어요.',
   team_match_completed: '팀매치 리뷰를 남겨보세요.',
+  tournament_completed_review_request: '함께한 대회는 어땠나요? 참가팀 후기를 남겨주세요.',
   tournament_registration_confirmed: '대회 참가가 확정됐어요.',
   tournament_registration_waitlisted: '대기자 명단에 등록됐어요.',
   tournament_registration_cancelled: '대회 참가 신청이 취소됐어요.',

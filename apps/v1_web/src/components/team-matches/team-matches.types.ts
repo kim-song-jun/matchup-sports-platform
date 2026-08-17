@@ -99,6 +99,9 @@ export type TeamMatchDetailViewModel = {
   // no longer has a standalone "complete" mutation (Task 16 removed it); completion is now
   // an atomic side effect of submitting a validated result revision on that screen.
   resultAction?: { label: string; href: string; tone?: 'primary' | 'neutral' } | null;
+  /** 경기 종료 후 후기 작성 화면(/my/reviews/team_match/:id) 링크. 참가팀 소속일 때만 설정된다.
+   * 이 링크가 없던 동안 팀매치 후기는 /my/reviews 목록에 뜨기를 기다리는 수밖에 없었다. */
+  reviewAction?: { label: string; href: string } | null;
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;

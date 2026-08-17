@@ -206,6 +206,27 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   const showChat = mode === 'approved' && Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
+  // 경기가 끝난 뒤 후기로 가는 유일한 상세 화면 진입점. 완료 알림도 후기 화면으로 보내지만,
+  // 매치 상세에서 직접 들어갈 길이 없으면 알림을 지운 사용자는 후기를 쓸 방법이 사라진다.
+  const reviewCard = model.reviewAction ? (
+    <Card pad={16} style={{ marginTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="tm-text-body-lg">후기</div>
+          <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
+            함께 뛴 참가자에게 후기를 남겨요.
+          </div>
+        </div>
+        <Link
+          className="tm-btn tm-btn-sm tm-btn-primary"
+          href={model.reviewAction.href}
+          style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+        >
+          {model.reviewAction.label}
+        </Link>
+      </div>
+    </Card>
+  ) : null;
   const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | string | null | Promise<void | string | null>) | undefined, fallbackMessage: string) => {
     // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
@@ -322,6 +343,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 ))}
               </div>
             </Card>
+            {reviewCard}
           </div>
 
           {/* Right column: sticky summary + CTA */}
@@ -395,6 +417,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               ))}
             </div>
           </Card>
+          {reviewCard}
         </div>
       </article>
 

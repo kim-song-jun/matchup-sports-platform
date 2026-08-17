@@ -319,7 +319,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   예전엔 결과 입력 버튼이 카드 없이 붕 떠서 라인업 카드와 시각적으로
                   분리돼 보였다(QA 지적). model.lineupHref/resultAction은
                   team-matches-client.tsx가 권한 조건일 때만 설정한다. */}
-              {model.lineupHref || model.resultAction ? (
+              {model.lineupHref || model.resultAction || model.reviewAction ? (
                 <Card pad={16} style={{ marginTop: 10 }}>
                   <div className="tm-text-body-lg">매치 관리</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
@@ -358,6 +358,35 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                           style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
                         >
                           {model.resultAction.label}
+                        </Link>
+                      </div>
+                    ) : null}
+                    {/* 후기: 경기가 끝나야 열린다. 이 행이 없던 동안 팀매치 후기로 가는 링크가
+                        앱 전체에 없어서, /my/reviews 목록에 뜨기를 기다리는 수밖에 없었다. */}
+                    {model.reviewAction ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          ...(model.lineupHref || model.resultAction
+                            ? { borderTop: '1px solid var(--border)', paddingTop: 12 }
+                            : {}),
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div className="tm-text-label" style={{ fontWeight: 600 }}>후기</div>
+                          <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
+                            상대 팀과 함께 뛴 선수에게 후기를 남겨요.
+                          </div>
+                        </div>
+                        <Link
+                          className="tm-btn tm-btn-sm tm-btn-primary"
+                          href={model.reviewAction.href}
+                          style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+                        >
+                          {model.reviewAction.label}
                         </Link>
                       </div>
                     ) : null}

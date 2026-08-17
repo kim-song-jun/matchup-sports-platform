@@ -221,6 +221,10 @@ describe('ReviewsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      // 라인업이 없는 팀 매치 — 이 케이스는 팀 후기의 sportId 스냅샷만 본다.
+      v1Game: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1GameParticipant: { findMany: jest.fn().mockResolvedValue([]) },
+      v1User: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
         v1PostEventReview: {
           create: createMock,
@@ -312,9 +316,9 @@ describe('ReviewsService', () => {
       expect(tournamentFixtureReviews.submit).not.toHaveBeenCalled();
     });
 
-    // 팀 매치에는 참가 선수 명단을 담는 모델이 없어(신청·승인이 팀 단위) "그 경기의 상대 선수"를
-    // 특정할 근거가 없다. 대회에만 열어둔 개인 후기가 team_match로 새어나가지 않는지 고정한다.
-    it('팀 매치에는 개인 대상 후기를 열지 않는다', async () => {
+    // 팀 매치도 라인업(V1GameParticipant.userId)을 근거로 개인 대상 후기를 받는다.
+    // 단 shape는 여전히 배타적이어야 한다 — targetUserId와 targetTeamId를 함께 보내면 거부.
+    it('팀 매치 개인 후기는 targetUserId 단독일 때만 받는다', async () => {
       const service = new ReviewsService({} as never, stubTournamentService() as never);
 
       await expect(service.submit(user, {
@@ -322,6 +326,7 @@ describe('ReviewsService', () => {
         sourceId: teamSourceId,
         targetType: 'user',
         targetUserId,
+        targetTeamId: hostTeamId,
         rating: 5,
         tagCodes: ['manner'],
       })).rejects.toMatchObject({ response: { code: 'INVALID_TEAM_MATCH_REVIEW_TARGET' } });
@@ -652,11 +657,27 @@ describe('ReviewsService', () => {
     });
   });
 
-  // 2026-08-12 정책: 팀 후기 작성 주체가 owner/manager → 참가팀 active 멤버 전원으로 열렸고,
-  // 중복 방지 단위는 팀이 아니라 사람이다. 아래 케이스가 그 역전을 붙잡는다.
-  describe('팀 후기 작성 권한 — 참가팀 멤버 전원', () => {
-    it('일반 멤버(role=member)도 상대팀 후기를 제출할 수 있다', async () => {
+  // 상대 "팀" 후기는 팀장·운영진(owner/manager)만 쓴다 — 대회 경기 경로와 같은 규칙이다.
+  // 2026-08-12에 잠시 "참가팀 active 멤버 전원"으로 열렸으나, 팀을 대표해 남기는 평가라는
+  // 원래 규칙으로 되돌렸다. 일반 팀원은 대신 상대 "선수" 후기를 쓴다(아래 describe).
+  // 중복 방지 단위가 팀이 아니라 사람이라는 점은 그대로다.
+  describe('팀 후기 작성 권한 — 팀장·운영진', () => {
+    it('일반 멤버(role=member)는 상대팀 후기를 쓸 수 없다', async () => {
       const { prisma, createMock } = teamMatchWorld([{ userId: memberAId, teamId: hostTeamId, role: 'member' }]);
+      const service = makeService(prisma);
+
+      const error = await service.submit(authUser(memberAId), teamReviewDto(5)).catch((err: unknown) => err);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toEqual({
+        code: 'TEAM_REVIEW_ROLE_REQUIRED',
+        message: '상대팀 후기는 팀장·운영진만 작성할 수 있어요.',
+      });
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('운영진(role=manager)은 상대팀 후기를 제출할 수 있다', async () => {
+      const { prisma, createMock } = teamMatchWorld([{ userId: memberAId, teamId: hostTeamId, role: 'manager' }]);
       const service = makeService(prisma);
 
       const result = await service.submit(authUser(memberAId), teamReviewDto(5));
@@ -670,18 +691,12 @@ describe('ReviewsService', () => {
           sourceType: 'team_match',
         }),
       }));
-      // 멤버십 조회에 role 필터가 다시 들어오면 이 단언이 깨진다(정책 역전 감지 지점).
-      expect((prisma.v1TeamMembership.findMany.mock.calls[0][0] as { where: unknown }).where).toEqual({
-        userId: memberAId,
-        status: 'active',
-        teamId: { in: [hostTeamId, awayTeamId] },
-      });
     });
 
-    it('같은 팀의 두 사람이 각각 제출하면 두 건 모두 저장된다', async () => {
+    it('같은 팀의 팀장·운영진이 각각 제출하면 두 건 모두 저장된다', async () => {
       const { prisma, createMock, reviewRows } = teamMatchWorld([
-        { userId: memberAId, teamId: hostTeamId, role: 'member' },
-        { userId: memberBId, teamId: hostTeamId, role: 'member' },
+        { userId: memberAId, teamId: hostTeamId, role: 'owner' },
+        { userId: memberBId, teamId: hostTeamId, role: 'manager' },
       ]);
       const service = makeService(prisma);
 
@@ -697,7 +712,7 @@ describe('ReviewsService', () => {
     });
 
     it('같은 사람이 같은 상대팀에 다시 제출하면 기존 후기를 alreadySubmitted로 돌려준다', async () => {
-      const { prisma, createMock } = teamMatchWorld([{ userId: memberAId, teamId: hostTeamId, role: 'member' }]);
+      const { prisma, createMock } = teamMatchWorld([{ userId: memberAId, teamId: hostTeamId, role: 'owner' }]);
       const service = makeService(prisma);
 
       const first = await service.submit(authUser(memberAId), teamReviewDto(5));
@@ -723,11 +738,11 @@ describe('ReviewsService', () => {
       expect(createMock).not.toHaveBeenCalled();
     });
 
-    it('팀장이 이미 쓴 경기가 다른 팀원의 pending 목록에는 그대로 남는다', async () => {
+    it('팀장이 이미 쓴 경기가 다른 운영진의 pending 목록에는 그대로 남는다', async () => {
       const { prisma } = teamMatchWorld(
         [
           { userId: leaderId, teamId: hostTeamId, role: 'owner' },
-          { userId: memberAId, teamId: hostTeamId, role: 'member' },
+          { userId: memberAId, teamId: hostTeamId, role: 'manager' },
         ],
         // 팀장이 이미 제출한 후기 1건
         [{
@@ -747,18 +762,115 @@ describe('ReviewsService', () => {
       const service = makeService(prisma);
 
       const leaderPending = await service['pendingTeamReviews'](authUser(leaderId), 20);
-      const memberPending = await service['pendingTeamReviews'](authUser(memberAId), 20);
+      const managerPending = await service['pendingTeamReviews'](authUser(memberAId), 20);
 
       // 팀장 본인은 이미 썼으므로 목록에서 빠진다(= mock이 무조건 빈 목록을 주는 게 아님을 함께 보장)
       expect(leaderPending).toEqual([]);
-      expect(memberPending).toHaveLength(1);
-      expect(memberPending[0]).toMatchObject({
+      expect(managerPending).toHaveLength(1);
+      expect(managerPending[0]).toMatchObject({
         sourceId: teamSourceId,
         state: 'ready',
         reviewedCount: 0,
         remainingCount: 1,
         targetTeam: { teamId: awayTeamId },
       });
+    });
+
+    // 팀 후기를 팀장·운영진으로 좁힌 뒤 남는 위험: 일반 팀원의 pending 목록에 "1건 남음"이 계속
+    // 뜨는데 작성 화면엔 쓸 대상이 하나도 없는 상태. 목록의 카운트도 역할을 반영해야 한다.
+    it('라인업이 없는 팀 매치는 일반 팀원의 pending 목록에서 빠진다', async () => {
+      const { prisma } = teamMatchWorld([{ userId: memberAId, teamId: hostTeamId, role: 'member' }]);
+      const service = makeService(prisma);
+
+      await expect(service['pendingTeamReviews'](authUser(memberAId), 20)).resolves.toEqual([]);
+    });
+  });
+
+  // 일반 팀원이 팀 매치에서 쓰는 후기는 "상대했던 선수"다. 근거는 그 경기 라인업에 실린
+  // 연동 팀원(V1GameParticipant.userId)뿐이며, 게스트·미제출 라인업은 대상이 되지 않는다.
+  describe('팀 매치 상대 선수 후기 — 역할 무관', () => {
+    const opponentA = 'away-player-a';
+    const opponentB = 'away-player-b';
+
+    it('일반 멤버도 상대팀 라인업의 선수를 대상으로 받는다 (팀 대상은 빠진다)', async () => {
+      const { prisma } = teamMatchWorld(
+        [{ userId: memberAId, teamId: hostTeamId, role: 'member' }],
+        [],
+        [opponentA, opponentB],
+      );
+      const service = makeService(prisma);
+
+      const source = await service.source(authUser(memberAId), { sourceType: 'team_match', sourceId: teamSourceId });
+
+      expect(source.targets.map((target) => target.targetType)).toEqual(['user', 'user']);
+      expect(source.targets.map((target) => target.targetUserId)).toEqual([opponentA, opponentB]);
+    });
+
+    it('팀장에게는 상대 팀과 상대 선수가 모두 대상으로 나온다', async () => {
+      const { prisma } = teamMatchWorld(
+        [{ userId: leaderId, teamId: hostTeamId, role: 'owner' }],
+        [],
+        [opponentA],
+      );
+      const service = makeService(prisma);
+
+      const source = await service.source(authUser(leaderId), { sourceType: 'team_match', sourceId: teamSourceId });
+
+      expect(source.targets.map((target) => target.targetType)).toEqual(['team', 'user']);
+      expect(source.targets[0].targetTeamId).toBe(awayTeamId);
+      expect(source.targets[1].targetUserId).toBe(opponentA);
+    });
+
+    it('일반 멤버가 상대 선수 후기를 제출하면 저장되고 개인 평판이 갱신된다', async () => {
+      const { prisma, createMock, userReputationUpsert } = teamMatchWorld(
+        [{ userId: memberAId, teamId: hostTeamId, role: 'member' }],
+        [],
+        [opponentA],
+      );
+      const service = makeService(prisma);
+
+      const result = await service.submit(authUser(memberAId), {
+        sourceType: 'team_match',
+        sourceId: teamSourceId,
+        targetType: 'user',
+        targetUserId: opponentA,
+        rating: 4,
+        tagCodes: ['manner'],
+      });
+
+      expect(result.alreadySubmitted).toBe(false);
+      expect(createMock).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          reviewerUserId: memberAId,
+          reviewerTeamId: hostTeamId,
+          sourceType: 'team_match',
+          targetType: 'user',
+          targetUserId: opponentA,
+        }),
+      }));
+      expect(userReputationUpsert).toHaveBeenCalled();
+    });
+
+    it('라인업에 없는 사람은 대상이 아니다', async () => {
+      const { prisma, createMock } = teamMatchWorld(
+        [{ userId: memberAId, teamId: hostTeamId, role: 'member' }],
+        [],
+        [opponentA],
+      );
+      const service = makeService(prisma);
+
+      const error = await service.submit(authUser(memberAId), {
+        sourceType: 'team_match',
+        sourceId: teamSourceId,
+        targetType: 'user',
+        targetUserId: 'never-played',
+        rating: 4,
+        tagCodes: ['manner'],
+      }).catch((err: unknown) => err);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({ code: 'TARGET_NOT_REVIEWABLE' });
+      expect(createMock).not.toHaveBeenCalled();
     });
   });
 
@@ -840,6 +952,10 @@ type FakeRow = Record<string, unknown>;
 // "팀 기준 → 사람 기준" 회귀를 잡을 수 없기 때문에 조회 조건을 직접 평가한다.
 function matchesWhere(row: FakeRow, where: FakeRow): boolean {
   return Object.entries(where).every(([field, condition]) => {
+    // 팀 대상/개인 대상 후기를 한 번에 읽는 쿼리가 쓰는 분기 — 하위 절 중 하나만 맞으면 된다.
+    if (field === 'OR') {
+      return (condition as FakeRow[]).some((clause) => matchesWhere(row, clause));
+    }
     if (condition !== null && typeof condition === 'object') {
       if ('in' in (condition as object)) return ((condition as { in: unknown[] }).in).includes(row[field]);
       // { not: null } — 팀 신뢰점수 집계가 reviewerTeamId가 null인 행을 "이름 없는 한 팀"으로
@@ -876,6 +992,8 @@ function teamReviewDto(rating: number) {
 function teamMatchWorld(
   memberships: Array<{ userId: string; teamId: string; role: string }>,
   seededReviews: FakeRow[] = [],
+  /** 상대(원정)팀 라인업에 실린 연동 팀원 userId 목록. 비우면 라인업 없는 팀 매치. */
+  awayRosterUserIds: string[] = [],
 ) {
   const membershipRows: FakeRow[] = memberships.map((membership) => ({
     ...membership,
@@ -896,6 +1014,24 @@ function teamMatchWorld(
     approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
   };
 
+  // 원정팀 사이드에 연동 팀원이 실린 라인업 한 벌. 서비스는 gameId+sideId로 참가자를 모아
+  // userId가 있는 행만 후기 대상으로 쓴다.
+  const awaySideId = 'side-away';
+  const gameRow = {
+    id: 'game-1',
+    teamMatchId: teamSourceId,
+    sides: [
+      { id: 'side-home', teamId: hostTeamId },
+      { id: awaySideId, teamId: awayTeamId },
+    ],
+  };
+  const gameParticipantRows = awayRosterUserIds.map((userId) => ({
+    gameId: gameRow.id,
+    sideId: awaySideId,
+    userId,
+    displayNameSnapshot: `선수-${userId}`,
+  }));
+
   let sequence = 0;
   const createMock = jest.fn(async ({ data }: { data: FakeRow }) => {
     sequence += 1;
@@ -906,15 +1042,19 @@ function teamMatchWorld(
       sourceType: data.sourceType,
       sourceId: data.sourceId,
       targetType: data.targetType,
-      targetTeamId: data.targetTeamId,
-      targetUserId: null,
+      targetTeamId: data.targetTeamId ?? null,
+      targetUserId: data.targetUserId ?? null,
       rating: data.rating,
       sportId: data.sportId,
       status: 'submitted',
       submittedAt,
       tags: [],
-      targetUser: null,
-      targetTeam: { id: data.targetTeamId, name: '원정팀', profile: { logoUrl: null } },
+      targetUser: data.targetUserId
+        ? { id: data.targetUserId, profile: { nickname: `선수-${String(data.targetUserId)}`, profileImageUrl: null } }
+        : null,
+      targetTeam: data.targetTeamId
+        ? { id: data.targetTeamId, name: '원정팀', profile: { logoUrl: null } }
+        : null,
       reviewerUser: { id: data.reviewerUserId, profile: { nickname: '작성자', profileImageUrl: null } },
       reviewerTeam: { id: data.reviewerTeamId, name: '홈팀', profile: { logoUrl: null } },
     };
@@ -923,6 +1063,7 @@ function teamMatchWorld(
   });
   const reviewFindMany = jest.fn(async ({ where }: { where: FakeRow }) => reviewRows.filter((row) => matchesWhere(row, where)));
   const teamTrustUpsert = jest.fn().mockResolvedValue({});
+  const userReputationUpsert = jest.fn().mockResolvedValue({});
 
   const prisma = {
     v1TeamMatch: {
@@ -936,14 +1077,30 @@ function teamMatchWorld(
       findFirst: jest.fn(async ({ where }: { where: FakeRow }) => reviewRows.find((row) => matchesWhere(row, where)) ?? null),
       findMany: reviewFindMany,
     },
+    // awayRosterUserIds 가 비면 라인업 없는 팀 매치 — 상대 선수 대상 0명이라 팀 후기 경로만 남는다.
+    v1Game: {
+      findUnique: jest.fn().mockResolvedValue(awayRosterUserIds.length ? gameRow : null),
+      findMany: jest.fn().mockResolvedValue(awayRosterUserIds.length ? [{ ...gameRow, teamMatchId: teamSourceId }] : []),
+    },
+    v1GameParticipant: { findMany: jest.fn().mockResolvedValue(gameParticipantRows) },
+    v1User: {
+      findMany: jest.fn().mockResolvedValue(
+        awayRosterUserIds.map((userId) => ({
+          id: userId,
+          profile: { nickname: `선수-${userId}`, profileImageUrl: null },
+        })),
+      ),
+    },
     $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
       v1PostEventReview: { create: createMock, findMany: reviewFindMany },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(1) },
       v1TeamTrustScore: { upsert: teamTrustUpsert },
+      // 선수 후기 경로는 팀 신뢰점수가 아니라 개인 평판을 갱신한다.
+      v1UserReputationSummary: { upsert: userReputationUpsert },
     })),
   };
 
-  return { prisma, createMock, reviewRows, teamTrustUpsert };
+  return { prisma, createMock, reviewRows, teamTrustUpsert, userReputationUpsert };
 }
 
 async function runTeamTrust(candidates: FakeRow[], reverseReviews: FakeRow[]) {
@@ -966,9 +1123,11 @@ async function runTeamTrust(candidates: FakeRow[], reverseReviews: FakeRow[]) {
  * (b) 두 방향 중 한쪽만 노출되는 것, (c) 작성자 팀이 뒤바뀌어 저장되는 것.
  */
 describe('ReviewsService — 양 팀 겸직 후기', () => {
+  // 두 방향이 모두 열리려면 양쪽에서 팀 후기 자격(owner/manager)이 있어야 한다.
+  // 한쪽만 자격이 있는 경우는 아래 '역할은 방향별로 따로 판정된다'가 따로 고정한다.
   const bothTeamMemberships = [
     { teamId: hostTeamId, role: 'manager', team: { name: '홈팀' } },
-    { teamId: awayTeamId, role: 'member', team: { name: '원정팀' } },
+    { teamId: awayTeamId, role: 'manager', team: { name: '원정팀' } },
   ];
 
   const createdRow = (reviewerTeamId: string, targetTeamId: string) => ({
@@ -1007,6 +1166,10 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      // 겸직 케이스는 팀 후기 방향만 검증한다 — 라인업 없음(선수 대상 0명).
+      v1Game: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+      v1GameParticipant: { findMany: jest.fn().mockResolvedValue([]) },
+      v1User: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
         v1PostEventReview: { create: createMock, findMany: jest.fn().mockResolvedValue([]) },
         v1TeamMatch: { count: jest.fn().mockResolvedValue(1) },
@@ -1074,5 +1237,25 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
         data: expect.objectContaining({ reviewerTeamId: awayTeamId, targetTeamId: hostTeamId }),
       }),
     );
+  });
+
+  // 겸직이라도 역할은 팀마다 다르다 — 홈팀 운영진이지만 원정팀에서는 일반 팀원이면
+  // 원정팀 입장(=홈팀 평가) 방향만 막혀야 하고, 홈팀 입장 방향은 그대로 열려 있어야 한다.
+  it('역할은 방향별로 따로 판정된다 (한쪽만 자격이 있으면 그 방향만 열린다)', async () => {
+    const prisma = makeDualPrisma();
+    prisma.v1TeamMembership.findMany = jest.fn().mockResolvedValue([
+      { teamId: hostTeamId, role: 'manager', team: { name: '홈팀' } },
+      { teamId: awayTeamId, role: 'member', team: { name: '원정팀' } },
+    ]);
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+    const source = await service.source(user, { sourceType: 'team_match', sourceId: teamSourceId });
+
+    expect(source.targets).toHaveLength(1);
+    expect(source.targets[0]).toMatchObject({
+      targetType: 'team',
+      targetTeamId: awayTeamId,
+      reviewerTeam: { teamId: hostTeamId },
+    });
   });
 });

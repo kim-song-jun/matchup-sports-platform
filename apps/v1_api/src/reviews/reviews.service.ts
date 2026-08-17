@@ -20,6 +20,10 @@ import { SubmitReviewDto } from './dto/submit-review.dto';
 import { isReviewRevealed, reviewRevealScope } from './review-visibility';
 import { average, revealGroupKey, trustStateForReviewCount } from './team-trust-aggregation';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
+import { AdminContextService } from '../common/admin-context.service';
+import { HidePostEventReviewDto } from './dto/moderate-review.dto';
+import { recalculateTournamentUserReputation } from './tournament-fixture-review-reputation';
+import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-review-trust';
 
 const REVIEW_TAGS = {
   punctual: '시간 약속을 잘 지켜요',
@@ -49,7 +53,90 @@ export class ReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tournamentFixtureReviews: TournamentFixtureReviewsService,
+    private readonly adminContext: AdminContextService,
   ) {}
+
+  /**
+   * 어드민 후기 숨김 — 경기 후기(V1PostEventReview)에는 지금까지 숨김 경로가 아예 없었다.
+   * 스키마의 V1PostEventReviewStatus 에 hidden/removed 가 정의돼 있는데도 그 값을 쓰는 코드가
+   * 0건이라, 악의적 후기가 들어와도 어드민조차 내릴 수 없었다(대회 후기에만 hide 가 있었다).
+   *
+   * 집계는 전부 status='submitted' 로 좁혀 읽으므로 숨기는 순간 조회에서 빠지지만, 미리 계산해
+   * 저장해 둔 평판·신뢰점수는 그대로 남는다 — 그래서 숨김/복구 뒤 해당 대상만 다시 계산한다.
+   */
+  async hideReview(user: V1AuthUser, reviewId: string, dto: HidePostEventReviewDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const review = await this.prisma.v1PostEventReview.findUnique({ where: { id: reviewId } });
+    if (!review) throw notFound('REVIEW_NOT_FOUND', '리뷰를 찾을 수 없어요.');
+    if (review.status === 'hidden') return { alreadyHidden: true };
+
+    const reason = dto.reason?.trim() || null;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1PostEventReview.update({ where: { id: reviewId }, data: { status: 'hidden', hiddenAt: new Date() } });
+      await this.recalculateForReview(tx, review);
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'review.hide',
+          targetType: 'post_event_review',
+          targetId: reviewId,
+          reason,
+          beforeJson: { status: review.status },
+          afterJson: { status: 'hidden' },
+        },
+        tx,
+      );
+    });
+    return { alreadyHidden: false };
+  }
+
+  async unhideReview(user: V1AuthUser, reviewId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const review = await this.prisma.v1PostEventReview.findUnique({ where: { id: reviewId } });
+    if (!review) throw notFound('REVIEW_NOT_FOUND', '리뷰를 찾을 수 없어요.');
+    // removed 는 숨김과 다른 종착 상태다 — 복구 대상은 hidden 뿐이다.
+    if (review.status !== 'hidden') return { alreadyVisible: true };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1PostEventReview.update({ where: { id: reviewId }, data: { status: 'submitted', hiddenAt: null } });
+      await this.recalculateForReview(tx, review);
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'review.unhide',
+          targetType: 'post_event_review',
+          targetId: reviewId,
+          reason: null,
+          beforeJson: { status: 'hidden' },
+          afterJson: { status: 'submitted' },
+        },
+        tx,
+      );
+    });
+    return { alreadyVisible: false };
+  }
+
+  /** 후기 한 건이 기여하던 집계만 골라 다시 계산한다. 소스·대상 조합마다 쌓이는 컬럼이 다르다. */
+  private async recalculateForReview(
+    tx: PrismaTx,
+    review: { sourceType: V1PostEventReviewSourceType; targetType: V1PostEventReviewTargetType; targetUserId: string | null; targetTeamId: string | null },
+  ) {
+    if (review.targetType === 'user' && review.targetUserId) {
+      if (review.sourceType === 'tournament_fixture') {
+        await recalculateTournamentUserReputation(tx, review.targetUserId);
+      } else {
+        await this.recalculateUserReputation(tx, review.targetUserId);
+      }
+      return;
+    }
+    if (review.targetTeamId) {
+      if (review.sourceType === 'tournament_fixture') {
+        await recalculateTournamentFixtureTeamTrust(tx, review.targetTeamId);
+      } else {
+        await this.recalculateTeamTrust(tx, review.targetTeamId);
+      }
+    }
+  }
 
   async list(user: V1AuthUser, query: ListReviewsQueryDto) {
     const tab = query.tab ?? 'pending';

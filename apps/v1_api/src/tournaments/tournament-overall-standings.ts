@@ -47,6 +47,24 @@ export async function recalculateAndUpsertOverallStandings(
 ): Promise<CalculatedStanding[]> {
   const { registrationIds, fixtures } = overallStandingsInput(params.groups);
 
+  // F4: 더 이상 어느 조에도 속하지 않는 registration(조 배정 해제·조 삭제)의 기존
+  // 통합 순위 행을 지운다 — upsert만으로는 계산 대상에서 빠진 팀의 행이 영원히
+  // 남아 공개 API에 유령 팀이 계속 노출된다.
+  //
+  // `registrationIds`가 빈 배열이면(조가 하나도 없음) `notIn: []`을 그대로 쓰지
+  // 않고 별도 분기로 처리한다 — Prisma의 `notIn: []` 동작을 계산 대상 존재를
+  // 전제로 신뢰할 수 없어(전부 지워야 하는 이 경우를 검증 없이 맡기면 의도와
+  // 다르게 동작할 위험이 있다), 의도를 명시적으로 코드에 남긴다.
+  if (registrationIds.length > 0) {
+    await tx.v1TournamentOverallStanding.deleteMany({
+      where: { tournamentId: params.tournamentId, registrationId: { notIn: registrationIds } },
+    });
+  } else {
+    await tx.v1TournamentOverallStanding.deleteMany({
+      where: { tournamentId: params.tournamentId },
+    });
+  }
+
   const standings = calculateCompetitionStandings({
     tournamentId: params.tournamentId,
     configVersionId: params.configVersionId,

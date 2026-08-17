@@ -44,7 +44,10 @@ function makePrisma(options: {
 }) {
   const tx = {
     v1TournamentStanding: { upsert: jest.fn().mockResolvedValue({}) },
-    v1TournamentOverallStanding: { upsert: jest.fn().mockResolvedValue({}) },
+    v1TournamentOverallStanding: {
+      upsert: jest.fn().mockResolvedValue({}),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
   const prisma = {

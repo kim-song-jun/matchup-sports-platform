@@ -45,7 +45,10 @@ function makeTx() {
     // (they return before it via one of the early skip paths).
     v1TournamentGroup: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentStanding: { upsert: jest.fn().mockResolvedValue({}) },
-    v1TournamentOverallStanding: { upsert: jest.fn().mockResolvedValue({}) },
+    v1TournamentOverallStanding: {
+      upsert: jest.fn().mockResolvedValue({}),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 }

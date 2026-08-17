@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { validateCompetitionConfig } from '../tournaments/competition-config/competition-config';
 import {
+  fairPlayByRegistrationFromGroups,
   recalculateAndUpsertGroupStandings,
   type StandingsSourceGroup,
 } from '../tournaments/tournament-group-standings';
@@ -78,7 +79,18 @@ export class GameResultStandingsProjectionService {
             homeRegistrationId: true,
             awayRegistrationId: true,
             game: {
-              select: { currentOfficialRevision: { select: { state: true, score: true } } },
+              select: {
+                currentOfficialRevision: {
+                  select: {
+                    state: true,
+                    score: true,
+                    // F5: 페어플레이 벌점 원천. tournament-group-standings.ts의
+                    // fairPlayByRegistrationFromGroups() 참고.
+                    resultParticipants: { select: { sideId: true, cards: true } },
+                  },
+                },
+                sides: { select: { id: true, sideKey: true } },
+              },
             },
           },
         },
@@ -99,6 +111,9 @@ export class GameResultStandingsProjectionService {
 
     const config = validateCompetitionConfig(tournament.competitionConfig);
     const now = new Date();
+    // F5: 이 그룹만으로 계산해도 값은 전체 조 기준과 동일하다 — 픽스처는 조별로
+    // 분리돼 있어 다른 조 픽스처가 이 그룹 팀의 카드 집계에 섞일 수 없다.
+    const groupFairPlayByRegistration = fairPlayByRegistrationFromGroups([group]);
     await recalculateAndUpsertGroupStandings(
       tx,
       {
@@ -106,6 +121,7 @@ export class GameResultStandingsProjectionService {
         configVersionId: tournament.competitionConfigVersionId,
         config,
         group,
+        fairPlayByRegistration: groupFairPlayByRegistration,
       },
       now,
     );
@@ -129,7 +145,18 @@ export class GameResultStandingsProjectionService {
             homeRegistrationId: true,
             awayRegistrationId: true,
             game: {
-              select: { currentOfficialRevision: { select: { state: true, score: true } } },
+              select: {
+                currentOfficialRevision: {
+                  select: {
+                    state: true,
+                    score: true,
+                    // F5: 페어플레이 벌점 원천. tournament-group-standings.ts의
+                    // fairPlayByRegistrationFromGroups() 참고.
+                    resultParticipants: { select: { sideId: true, cards: true } },
+                  },
+                },
+                sides: { select: { id: true, sideKey: true } },
+              },
             },
           },
         },
@@ -143,6 +170,7 @@ export class GameResultStandingsProjectionService {
         configVersionId: tournament.competitionConfigVersionId,
         config,
         groups: allGroups,
+        fairPlayByRegistration: fairPlayByRegistrationFromGroups(allGroups),
       },
       now,
     );

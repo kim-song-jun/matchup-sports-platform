@@ -1,7 +1,10 @@
 import type { PrismaClient } from '@prisma/client';
 import { UnprocessableEntityException } from '@nestjs/common';
 import { validateCompetitionConfig } from './competition-config/competition-config';
-import { recalculateAndUpsertGroupStandings } from './tournament-group-standings';
+import {
+  fairPlayByRegistrationFromGroups,
+  recalculateAndUpsertGroupStandings,
+} from './tournament-group-standings';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 
 /**
@@ -98,7 +101,20 @@ export async function runTournamentStandingsRecalculation(
         fixtures: {
           where: { status: 'completed' },
           include: {
-            game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } },
+            game: {
+              select: {
+                currentOfficialRevision: {
+                  select: {
+                    state: true,
+                    score: true,
+                    // F5: 페어플레이 벌점 원천. tournament-group-standings.ts의
+                    // fairPlayByRegistrationFromGroups() 참고.
+                    resultParticipants: { select: { sideId: true, cards: true } },
+                  },
+                },
+                sides: { select: { id: true, sideKey: true } },
+              },
+            },
             // R3 §4-3단계 한시적 레거시 폴백 입력 — standingsFixturesFromGroup()이 새 경로에
             // OFFICIAL 리비전이 없는 픽스처(game 백필 전)만 이 스코어로 대체한다. §4-4단계에서 제거.
             result: {
@@ -114,6 +130,8 @@ export async function runTournamentStandingsRecalculation(
         },
       },
     });
+    // F5: 그룹별/통합 upsert 양쪽에 동일하게 넘길 페어플레이 벌점 Map.
+    const fairPlayByRegistration = fairPlayByRegistrationFromGroups(groups);
 
     await prisma.$transaction(async (tx) => {
       for (const group of groups) {
@@ -122,7 +140,7 @@ export async function runTournamentStandingsRecalculation(
         // trigger (GameResultStandingsProjectionService).
         await recalculateAndUpsertGroupStandings(
           tx,
-          { tournamentId, configVersionId, config, group },
+          { tournamentId, configVersionId, config, group, fairPlayByRegistration },
           now,
         );
       }
@@ -135,7 +153,7 @@ export async function runTournamentStandingsRecalculation(
       // TournamentBracketService.recalculateStandings().
       await recalculateAndUpsertOverallStandings(
         tx,
-        { tournamentId, configVersionId, config, groups },
+        { tournamentId, configVersionId, config, groups, fairPlayByRegistration },
         now,
       );
     });

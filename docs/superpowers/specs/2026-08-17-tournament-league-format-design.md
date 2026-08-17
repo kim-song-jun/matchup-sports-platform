@@ -342,20 +342,36 @@ tx: [ 조별 standings upsert ] → [ 통합 standings upsert ] → commit
 
 ### 8.2 페어플레이 포인트
 
-원천: `V1GameResultParticipant.cards` (Json) — 공식(official) 결과 리비전의 참가자별 카드.
+원천: `V1GameResultParticipant.cards` (Json) — 공식(OFFICIAL) 결과 리비전의 참가자별 카드.
 
-집계 규칙(기본값, `CompetitionConfig`에서 조정 가능):
+**구현 중 확인된 데이터 한계 (2026-08-17 실측 — 설계 초안 정정)**
 
-| 사건 | 벌점 |
-|---|---|
-| 옐로 카드 | 1 |
-| 옐로 2장 누적 퇴장 | 3 |
-| 직접 레드 | 4 |
-| 옐로 + 직접 레드 | 5 |
+초안은 FIFA 관례대로 4단계 벌점표를 적었지만, 이 저장소의 `cards` Json은
+**`{ yellow, red }` 2종만 저장한다** — "경고 누적 퇴장"과 "직접 퇴장"을 구분하는 필드가
+도메인 모델 어디에도 없다(`games.service.ts`의 CARD 이벤트 집계에서 확인).
+따라서 실제 집계는 아래와 같다:
+
+| 사건 | 벌점 | 비고 |
+|---|---|---|
+| 옐로 카드 | 1 | |
+| 레드 카드 | 4 | 직접 퇴장으로 간주 |
+| ~~옐로 2장 누적 퇴장~~ | ~~3~~ | **저장된 데이터로 복원 불가** |
+
+즉 실제로는 경고 누적 퇴장이었던 레드 카드가 **1점씩 과대 계상**된다. 이 오차를 없애려면
+카드 이벤트에 퇴장 사유를 저장하는 별도 작업이 필요하며, 그 전까지는 이 근사를 사용한다.
+`league-fair-play.ts`에 같은 내용을 주석으로 남긴다.
+
+**레거시 fallback 경기**(신 경로 OFFICIAL 리비전 이전, `V1TournamentFixtureResult`만 있는 경기)는
+카드 컬럼 자체가 없어 페어플레이 기여가 0이다. 조용히 0으로 두지 않고 코드에 명시한다.
 
 **낮을수록 상위**(`competition-standings.ts:161-163`이 이미 오름차순 비교로 구현돼 있다).
 `calculateCompetitionStandings`에 `fairPlayByRegistration?: Map<string, number>` 입력을 추가하고,
 없으면 현재와 동일하게 0으로 동작한다(하위 호환).
+
+**주의 — 파라미터만 추가하면 기능이 아니다.** 초안대로 입력 파라미터만 만들고 실제로 카드를
+집계해 넘기는 호출부를 두지 않으면 운영에서는 여전히 전부 0이라 5단계 tie-break가 죽어 있다.
+`recalculateAndUpsertGroupStandings`가 호출되는 **모든 경로**(§7.1의 3곳)에서 카드 조회를
+포함하도록 include를 확장해야 한다.
 
 ### 8.3 매직넘버
 

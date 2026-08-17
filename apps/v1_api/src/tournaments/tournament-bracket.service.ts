@@ -47,7 +47,10 @@ import {
   type TournamentFixtureGameForResult,
   type TournamentFixtureLegacyResult,
 } from './tournament-fixture-official-result';
-import { recalculateAndUpsertGroupStandings } from './tournament-group-standings';
+import {
+  fairPlayByRegistrationFromGroups,
+  recalculateAndUpsertGroupStandings,
+} from './tournament-group-standings';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 
 @Injectable()
@@ -842,7 +845,21 @@ export class TournamentBracketService {
         fixtures: {
           where: { status: 'completed' },
           include: {
-            game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } },
+            game: {
+              select: {
+                currentOfficialRevision: {
+                  select: {
+                    state: true,
+                    score: true,
+                    // F5: 페어플레이 벌점 원천(팀별 카드 집계용). 신규 경로 픽스처에만 있다 —
+                    // tournament-group-standings.ts의 fairPlayByRegistrationFromGroups() 참고.
+                    resultParticipants: { select: { sideId: true, cards: true } },
+                  },
+                },
+                // F5: participant.sideId → home/away 매핑용.
+                sides: { select: { id: true, sideKey: true } },
+              },
+            },
             // R3 §4-3단계 한시적 레거시 폴백 입력 — standingsFixturesFromGroup()이 새 경로에
             // OFFICIAL 리비전이 없는 픽스처(game 백필 전)만 이 스코어로 대체한다. §4-4단계에서 제거.
             result: {
@@ -853,6 +870,10 @@ export class TournamentBracketService {
       },
     });
     const now = new Date();
+    // F5: 페어플레이 벌점 — 모든 조의 픽스처를 넘겨 한 번에 집계한 registrationId
+    // → 벌점 Map을 그룹별 upsert와 통합 upsert 양쪽에 그대로 넘긴다(그룹 픽스처는
+    // 조별로 분리돼 있으므로 그룹 하나만 넘겨 계산해도 값은 동일하다).
+    const fairPlayByRegistration = fairPlayByRegistrationFromGroups(groups);
 
     await this.prisma.$transaction(async (tx) => {
       for (const group of groups) {
@@ -862,7 +883,7 @@ export class TournamentBracketService {
         // the one affected group instead of looping every group.
         await recalculateAndUpsertGroupStandings(
           tx,
-          { tournamentId, configVersionId: competitionConfigVersionId, config, group },
+          { tournamentId, configVersionId: competitionConfigVersionId, config, group, fairPlayByRegistration },
           now,
         );
       }
@@ -874,7 +895,7 @@ export class TournamentBracketService {
       // feed them straight in.
       await recalculateAndUpsertOverallStandings(
         tx,
-        { tournamentId, configVersionId: competitionConfigVersionId, config, groups },
+        { tournamentId, configVersionId: competitionConfigVersionId, config, groups, fairPlayByRegistration },
         now,
       );
 

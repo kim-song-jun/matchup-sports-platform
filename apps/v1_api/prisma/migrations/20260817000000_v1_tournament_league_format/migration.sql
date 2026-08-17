@@ -25,7 +25,11 @@ CREATE TABLE IF NOT EXISTS "v1_tournament_overall_standings" (
   CONSTRAINT "v1_tournament_overall_standings_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS "v1_tournament_overall_standings_tournament_id_registration_id_key"
+-- 인덱스 이름은 Prisma 가 생성하는 이름을 그대로 쓴다. 관례대로
+-- `<table>_<col1>_<col2>_key` 로 지으면 65자가 되어 PostgreSQL 의 63자 식별자 한도에
+-- 잘리고(`..._registration_id_k`), Prisma 는 자체 축약 규칙으로 만든 이름을 기대하기 때문에
+-- migrate diff 가 "Renamed index" drift 로 CI 를 깨뜨린다.
+CREATE UNIQUE INDEX IF NOT EXISTS "v1_tournament_overall_standings_tournament_id_registration__key"
   ON "v1_tournament_overall_standings" ("tournament_id", "registration_id");
 
 CREATE INDEX IF NOT EXISTS "v1_tournament_overall_standings_tournament_id_position_idx"

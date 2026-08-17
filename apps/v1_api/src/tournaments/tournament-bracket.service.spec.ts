@@ -177,7 +177,7 @@ describe('TournamentBracketService', () => {
     v1TournamentFixtureGoal: { findMany: jest.Mock; deleteMany: jest.Mock; createMany: jest.Mock };
     v1TournamentPlayer: { findMany: jest.Mock };
     v1TournamentStanding: { upsert: jest.Mock; findMany: jest.Mock };
-    v1TournamentOverallStanding: { upsert: jest.Mock };
+    v1TournamentOverallStanding: { upsert: jest.Mock; deleteMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
@@ -213,7 +213,10 @@ describe('TournamentBracketService', () => {
       },
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { upsert: jest.fn(), findMany: jest.fn() },
-      v1TournamentOverallStanding: { upsert: jest.fn().mockResolvedValue({}) },
+      v1TournamentOverallStanding: {
+        upsert: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),

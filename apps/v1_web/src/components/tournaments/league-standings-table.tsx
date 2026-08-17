@@ -127,7 +127,7 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
           <tbody>
             {sorted.map((row) => {
               const diff = row.goalsFor - row.goalsAgainst;
-              const diffColor = diff > 0 ? 'var(--blue500)' : diff < 0 ? 'var(--red, #ff4d4f)' : 'var(--text-muted)';
+              const diffColor = diff > 0 ? 'var(--blue500)' : diff < 0 ? 'var(--red500)' : 'var(--text-muted)';
               return (
                 <tr key={row.registrationId} className="tm-standings-row">
                   <td style={{ paddingLeft: 12 }}>

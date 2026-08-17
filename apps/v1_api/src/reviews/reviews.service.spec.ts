@@ -334,10 +334,10 @@ describe('ReviewsService', () => {
   });
 
   describe('recalculateUserReputation', () => {
-    // 소스 분리의 반대편 절반 — 대회 개인 후기는 tournament_* 컬럼에만 쌓여야 하고,
-    // 이 필터가 빠지면 대회 한 번에 들어온 수십 건이 개인 매치 평점을 통째로 덮는다.
-    // mock은 where와 무관하게 고정값을 주므로 인자 단언으로만 잡을 수 있다.
-    it('개인 매치(sourceType=match) 후기만 mannerScore 집계에 넣는다', async () => {
+    // 개인 매치와 팀매치는 둘 다 "함께 뛴 상대의 평가"라 같이 센다. 대회 개인 후기만 제외 —
+    // 한 대회에서 상대 로스터 전원에게 수십 건이 들어와 평균을 통째로 덮으므로 tournament_*
+    // 컬럼에 따로 쌓는다. mock은 where와 무관하게 고정값을 주므로 인자 단언으로만 잡을 수 있다.
+    it('개인 매치와 팀매치 후기를 mannerScore 집계에 넣고, 대회 후기는 제외한다', async () => {
       const findManyMock = jest.fn().mockResolvedValue([]);
       const prisma = {
         v1PostEventReview: { findMany: findManyMock },
@@ -348,9 +348,10 @@ describe('ReviewsService', () => {
 
       await service['recalculateUserReputation'](prisma as never, 'x');
 
-      expect(findManyMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        where: expect.objectContaining({ targetUserId: 'x', targetType: 'user', sourceType: 'match' }),
-      }));
+      const where = findManyMock.mock.calls[0][0].where as { sourceType: { in: string[] } };
+      expect(where).toMatchObject({ targetUserId: 'x', targetType: 'user' });
+      expect(where.sourceType.in).toEqual(expect.arrayContaining(['match', 'team_match']));
+      expect(where.sourceType.in).not.toContain('tournament_fixture');
     });
 
     it('공개되지 않은(상대 미제출+72시간 미경과) 리뷰는 mannerScore 집계에서 제외한다', async () => {

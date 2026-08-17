@@ -4,6 +4,7 @@ import {
   createV1SessionToken,
   V1_SESSION_COOKIE_NAME,
 } from '../auth/v1-session';
+import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
 import { GamesService } from '../games/games.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
@@ -106,6 +107,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },
         { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
+        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
       ],
     }).compile();
     gateway = moduleRef.get(RealtimeGateway);

@@ -167,7 +167,7 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
       pendingPaymentCount: 0,
       groups: [group],
       fixtures: [
-        { id: 'fx-1', groupId: 'group-a', round: 'group', fixtureNumber: 1, legNumber: 1, scheduledAt: null, venue: null, homeRegistrationId: null, homeTeamId: 'team-1', homeTeamName: '성수 FC', homeTeamLogoUrl: null, awayRegistrationId: null, awayTeamId: 'team-2', awayTeamName: '한강 유나이티드', awayTeamLogoUrl: null, status: 'completed', result: null, videos: [] },
+        { id: 'fx-1', groupId: 'group-a', round: 'group', fixtureNumber: 1, legNumber: 1, scheduledAt: null, venue: null, homeRegistrationId: null, homeTeamId: 'team-1', homeTeamName: '성수 FC', homeTeamLogoUrl: null, awayRegistrationId: null, awayTeamId: 'team-2', awayTeamName: '한강 유나이티드', awayTeamLogoUrl: null, status: 'completed', liveStatus: 'ended', result: null, videos: [] },
       ],
       announcements: [],
       sponsors: [],

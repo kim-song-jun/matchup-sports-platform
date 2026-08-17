@@ -139,7 +139,9 @@ export function buildTournamentStages(tournament: V1TournamentDetail): Tournamen
     for (const round of orderedRounds) {
       const roundFixtures = fixtures.filter((f) => f.round === round);
       const allCompleted = roundFixtures.every((f) => f.status === 'completed');
-      const anyInProgress = roundFixtures.some((f) => f.status === 'in_progress');
+      // 픽스처의 진행 중 판정은 `liveStatus`(V1Game.state 파생)로만 한다 — 원본
+      // `status` 컬럼은 `in_progress` 로 전이되지 않아 이 조건이 항상 false 였다.
+      const anyInProgress = roundFixtures.some((f) => f.liveStatus === 'live');
       const s: StageStatus = allCompleted ? 'done' : anyInProgress || inProgress ? 'active' : 'upcoming';
       stages.push({ key: round, label: round === 'semi' ? '4강' : round, status: s });
     }
@@ -148,7 +150,7 @@ export function buildTournamentStages(tournament: V1TournamentDetail): Tournamen
     const finalFixtures = fixtures.filter((f) => f.round === 'final');
     if (finalFixtures.length > 0 || stages.length > 0) {
       const finalCompleted = finalFixtures.every((f) => f.status === 'completed') && finalFixtures.length > 0;
-      const finalActive = finalFixtures.some((f) => f.status === 'in_progress') || (inProgress && stages.every((s) => s.status === 'done'));
+      const finalActive = finalFixtures.some((f) => f.liveStatus === 'live') || (inProgress && stages.every((s) => s.status === 'done'));
       stages.push({
         key: 'final',
         label: '결승',

@@ -22,6 +22,11 @@ Award mutations require a mutation-capable active admin. Recipients must belong 
 
 Published `fixtures[]` also includes nullable `homeTeamId`, `homeTeamLogoUrl`, `awayTeamId`, and `awayTeamLogoUrl`. Bracket match cards use these identity fields for saved team logos and reserve the generated fallback only for missing, undecided, or failed images.
 
+Each published fixture carries two distinct status fields, and public surfaces must not confuse them:
+
+- `status` — the raw `V1TournamentFixture.status` column. The enum has four values (`scheduled | in_progress | completed | cancelled`), but only two are ever written: `scheduled` at bracket creation and `completed` when a result is officialized. **No writer advances it to `in_progress` or `cancelled`**, so it stays `scheduled` for the entire duration of a live match. Treat it as "has this fixture's result been decided", never as "is this match live".
+- `liveStatus` — required, one of `scheduled | live | ended | cancelled`. Derived by `publicFixtureStatus()` (`PublicFixtureStatus`), which prefers the authoritative `V1Game.state` and falls back to the column only when no game row exists yet. This is the same vocabulary and the same function that `GET /api/v1/tournaments/:id/schedule` and `GET /api/v1/tournaments/:id/matches/:fixtureId` already return, so all three public reads agree. **Every live-state decision — LIVE badges, bracket/stepper progress, spectator polling gates — must read `liveStatus`.**
+
 ## Tournament staff runtime boundary
 
 Task 7 wires the scoped tournament-staff access, guard, and management services into

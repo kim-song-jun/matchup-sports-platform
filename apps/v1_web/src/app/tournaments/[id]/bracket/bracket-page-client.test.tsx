@@ -96,6 +96,7 @@ function makeFixture(
     legNumber: 1,
     scheduledAt: null,
     venue: null,
+    liveStatus: 'scheduled',
     homeRegistrationId: null,
     homeTeamId: 'team-home',
     homeTeamName: '홈팀',

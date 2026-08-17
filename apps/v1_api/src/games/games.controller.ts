@@ -35,11 +35,50 @@ import {
   RevokeIdentityLinkDto,
   RevokeParticipantConsentDto,
 } from './dto/game-participant-identity.dto';
+import { GameBroadcastRegistry } from './game-broadcast.registry';
+import type { GameEventAppendResult } from './games.types';
 import { GamesService } from './games.service';
 
 @Controller('games')
 export class GamesController {
-  constructor(private readonly gamesService: GamesService) {}
+  constructor(
+    private readonly gamesService: GamesService,
+    private readonly gameBroadcast: GameBroadcastRegistry,
+  ) {}
+
+  /**
+   * Fan the just-committed event out to `game:<gameId>` subscribers.
+   *
+   * The socket lane (`RealtimeGateway.acknowledgeGameEvent`) has always done
+   * this for `game.event.append`/`game.event.retry`; the REST lane below writes
+   * to the same durable event log through the same `GamesService` methods but
+   * used to notify nobody, so an operator console subscribed to the game only
+   * learned about a REST-originated goal/reversal/assist on its next manual
+   * refetch. Same event name and same payload shape as the socket lane — the
+   * frozen realtime contract already requires receivers to de-duplicate by
+   * durable `sequence`, so a client that sees both is unaffected.
+   *
+   * An idempotent replay is deliberately still broadcast: the gateway does the
+   * same (it emits on `status: 'replayed'` too), and sequence-based de-dup on
+   * the receiving side makes the extra delivery inert.
+   *
+   * A result WITHOUT `event` is deliberately NOT broadcast. `event` is optional
+   * only for an idempotent replay of a request stored before that field existed
+   * (see its doc comment in games.types.ts); emitting `event: undefined` would
+   * reintroduce the exact `id: undefined` / `reversesEventId: undefined`
+   * scoreboard corruption that field was added to fix. Dropping the delivery is
+   * safe — a replay carries no new durable sequence for a subscriber to miss.
+   */
+  private broadcastCommitted(gameId: string, result: GameEventAppendResult): GameEventAppendResult {
+    if (result.event === undefined) return result;
+    this.gameBroadcast.emitToGame(gameId, 'game.event.committed', {
+      gameId,
+      sequence: result.sequence,
+      version: result.version,
+      event: result.event,
+    });
+    return result;
+  }
 
   @Get(':gameId/visibility')
   @UseGuards(OptionalV1AuthGuard)
@@ -94,7 +133,9 @@ export class GamesController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: AppendGameEventDto,
   ) {
-    return this.gamesService.appendEvent(user, gameId, idempotencyKey, dto);
+    return this.gamesService
+      .appendEvent(user, gameId, idempotencyKey, dto)
+      .then((result) => this.broadcastCommitted(gameId, result));
   }
 
   @Post(':gameId/events/:eventId/reverse')
@@ -106,7 +147,9 @@ export class GamesController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: ReverseGameEventDto,
   ) {
-    return this.gamesService.reverseEvent(user, gameId, eventId, idempotencyKey, dto);
+    return this.gamesService
+      .reverseEvent(user, gameId, eventId, idempotencyKey, dto)
+      .then((result) => this.broadcastCommitted(gameId, result));
   }
 
   @Post(':gameId/events/:eventId/assist')
@@ -118,7 +161,9 @@ export class GamesController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: AssignGoalAssistDto,
   ) {
-    return this.gamesService.assignGoalAssist(user, gameId, eventId, idempotencyKey, dto);
+    return this.gamesService
+      .assignGoalAssist(user, gameId, eventId, idempotencyKey, dto)
+      .then((result) => this.broadcastCommitted(gameId, result));
   }
 
   @Get(':gameId/lineups')

@@ -7,6 +7,7 @@ import {
   MyTournamentFixturesController,
   TournamentFixtureLineupAccessController,
 } from './tournament-fixture-lineup-access.controller';
+import { GameBroadcastRegistry } from './game-broadcast.registry';
 import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
 
@@ -17,7 +18,13 @@ import { GamesService } from './games.service';
     TournamentFixtureLineupAccessController,
     MyTournamentFixturesController,
   ],
-  providers: [GamesService, GameTakeoverService, OptionalV1AuthGuard, V1AuthGuard],
-  exports: [GamesService, GameTakeoverService],
+  providers: [
+    GamesService,
+    GameTakeoverService,
+    GameBroadcastRegistry,
+    OptionalV1AuthGuard,
+    V1AuthGuard,
+  ],
+  exports: [GamesService, GameTakeoverService, GameBroadcastRegistry],
 })
 export class GamesModule {}

@@ -14,6 +14,7 @@ function makeFixture(
     scheduledAt: null,
     venue: null,
     status: 'scheduled',
+    liveStatus: 'scheduled',
     homeRegistrationId: null,
     homeTeamId: null,
     homeTeamName: 'Home',

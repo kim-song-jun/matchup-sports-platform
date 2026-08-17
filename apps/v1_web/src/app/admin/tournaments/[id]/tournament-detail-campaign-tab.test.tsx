@@ -3,7 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Tournament } from '@/types/api';
-import TournamentDetailClient from './tournament-detail-client';
+import { TournamentInfoSection } from './info-section';
+import { TournamentAdminShell } from './tournament-admin-shell';
+import { TournamentAdminProvider } from './tournament-admin-context';
 
 type WiringHookMocks = {
   tournamentQuery: {
@@ -40,6 +42,10 @@ vi.mock('@/hooks/use-v1-api', async () => {
     useV1UploadImages: () => ({ ...hookMocks.mutation, mutateAsync: vi.fn() }),
   };
 });
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/admin/tournaments/tournament-1/registrations',
+}));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
   useConfirm: () => ({ confirm: vi.fn(), ConfirmModal: null }),
@@ -111,7 +117,7 @@ const tournament: V1Tournament = {
   updatedAt: '2026-07-14T00:00:00.000Z',
 };
 
-describe('TournamentDetailClient campaign tab wiring', () => {
+describe('대회 상세 섹션 라우팅 · 정보 수정 폼', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.assign(hookMocks.tournamentQuery, {
@@ -123,21 +129,31 @@ describe('TournamentDetailClient campaign tab wiring', () => {
     });
   });
 
-  it('opens the campaign management panel from the existing tournament detail controls', async () => {
-    const user = userEvent.setup();
+  it('links each tournament section to its own route', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
     render(
       <QueryClientProvider client={queryClient}>
-        <TournamentDetailClient id="tournament-1" />
+        <TournamentAdminShell id="tournament-1">
+          <div>section content</div>
+        </TournamentAdminShell>
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('tab', { name: '캠페인' }));
-
-    expect(screen.getByRole('tab', { name: '캠페인' })).toHaveAttribute('aria-selected', 'true');
-    expect(document.querySelector('#panel-campaign')).toBeVisible();
+    // 탭 전환이 아니라 하위 라우트 이동이어야 딥링크·뒤로가기가 동작한다.
+    for (const [label, slug] of [
+      ['캠페인', 'campaign'],
+      ['신청 관리', 'registrations'],
+      ['대진 관리', 'bracket'],
+      ['통계', 'statistics'],
+    ] as const) {
+      expect(screen.getByRole('link', { name: new RegExp(`^${label}`) })).toHaveAttribute(
+        'href',
+        `/admin/tournaments/tournament-1/${slug}`,
+      );
+    }
+    expect(screen.queryByRole('tab')).toBeNull();
   });
 
   it('persists cleared optional tournament fields as null', async () => {
@@ -155,7 +171,11 @@ describe('TournamentDetailClient campaign tab wiring', () => {
     });
     render(
       <QueryClientProvider client={queryClient}>
-        <TournamentDetailClient id="tournament-1" />
+        <TournamentAdminProvider
+          value={{ tournamentId: 'tournament-1', canWrite: true, showToast: vi.fn() }}
+        >
+          <TournamentInfoSection />
+        </TournamentAdminProvider>
       </QueryClientProvider>,
     );
 

@@ -226,6 +226,7 @@ export default function AdminNoticesPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="콘텐츠"
         title="공지사항 관리"
         description="서비스 공지를 조회하고 운영자가 새 공지를 작성해요."
       />

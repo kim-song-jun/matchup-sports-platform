@@ -115,7 +115,7 @@ export default function AdminTournamentsPage() {
   return (
     <>
       <AdminPageHeader
-        eyebrow="플랫폼 관리"
+        eyebrow="플랫폼"
         title="대회 관리"
         description="플랫폼 내 모든 대회의 상태를 필터링하고 관리해요."
         action={

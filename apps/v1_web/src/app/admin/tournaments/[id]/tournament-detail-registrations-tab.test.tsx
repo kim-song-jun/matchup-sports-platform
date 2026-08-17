@@ -18,7 +18,7 @@ import {
   useV1AdminRemovePlayer,
   useV1AdminRosterEligibleMembers,
 } from '@/hooks/use-v1-api';
-import { RegistrationsTab } from './tournament-detail-client';
+import { RegistrationsTab } from './registrations-tab';
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: vi.fn(),

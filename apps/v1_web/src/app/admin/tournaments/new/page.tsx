@@ -271,7 +271,7 @@ export default function AdminTournamentsNewPage() {
       </div>
 
       <AdminPageHeader
-        eyebrow="대회 관리"
+        eyebrow="플랫폼 · 대회"
         title="새 대회 만들기"
         description="기본 정보부터 참가 조건까지 입력하면 대회가 초안으로 만들어져요. 마지막 확인 화면에서 참가자에게 보일 모습을 확인한 뒤 접수를 시작하세요."
       />

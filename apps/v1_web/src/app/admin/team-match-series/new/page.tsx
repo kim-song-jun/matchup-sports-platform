@@ -100,7 +100,7 @@ export default function AdminTeamMatchSeriesNewPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <AdminPageHeader title="리그 개설" description="팀을 등록하고 라운드로빈 대진을 자동으로 만들어요." />
+      <AdminPageHeader eyebrow="플랫폼 · 리그" title="리그 개설" description="팀을 등록하고 라운드로빈 대진을 자동으로 만들어요." />
 
       <div className="space-y-5">
         <div>

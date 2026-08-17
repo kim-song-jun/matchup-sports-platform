@@ -69,6 +69,7 @@ export default function AdminIntegrationSettingsPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="설정"
         title="연동 설정"
         description="카카오맵 API 키를 등록하면 대회 상세의 현장 안내에 실제 지도와 내비게이션 길찾기가 표시돼요. 등록하지 않아도 기존 네이버 지도 검색 링크는 그대로 동작해요."
       />

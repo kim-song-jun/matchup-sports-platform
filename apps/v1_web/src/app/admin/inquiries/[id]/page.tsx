@@ -191,6 +191,7 @@ export default function AdminInquiryDetailPage() {
     return (
       <>
         <AdminPageHeader
+          eyebrow="콘텐츠 · 문의"
           title="문의 상세"
           action={
             <Link
@@ -222,6 +223,7 @@ export default function AdminInquiryDetailPage() {
   return (
     <>
       <AdminPageHeader
+        eyebrow="콘텐츠 · 문의"
         title="문의 상세"
         description={requesterName(inquiry)}
         action={

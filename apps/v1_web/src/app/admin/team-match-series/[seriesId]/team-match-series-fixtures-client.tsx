@@ -61,7 +61,7 @@ export default function TeamMatchSeriesFixturesClient({ seriesId }: { seriesId: 
 
   return (
     <div>
-      <AdminPageHeader title={series.title} description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`} />
+      <AdminPageHeader eyebrow="플랫폼 · 리그" title={series.title} description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`} />
 
       {series.fixtures.length === 0 ? (
         <div className="flex flex-col gap-3">

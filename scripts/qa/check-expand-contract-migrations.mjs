@@ -23,6 +23,19 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20260817120000_v1_tournament_review_drop_team_unique/migration.sql',
+    statement: 'DROP INDEX IF EXISTS "v1_tournament_reviews_tournament_id_team_id_key"',
+    reason:
+      'Drops the tournament-review "one per TEAM" unique so a team\'s owner AND managers can each leave a ' +
+      'review, matching what post-event team reviews already do (their duplicate key became per-PERSON in ' +
+      '2026-08-12). Rolling-deploy safe in both directions: a DROP only RELAXES a constraint, so no running ' +
+      'instance can trip it, and the old app keeps rejecting a second per-team review in its service layer ' +
+      '(ALREADY_REVIEWED) so it cannot create rows the restored index would reject on rollback. The ' +
+      'per-person key (v1_tournament_reviews_tournament_id_author_user_id_key) is untouched and still bounds ' +
+      'how many reviews one account can write. The gate rejects bare DROP INDEX as a category, not because ' +
+      'this particular drop is unsafe. Reviewed 2026-08-17.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260813200000_v1_team_lineup_reuse/migration.sql',
     statement:
       'DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = ' +

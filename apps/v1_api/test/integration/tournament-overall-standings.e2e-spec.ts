@@ -175,7 +175,12 @@ describe('recalculateAndUpsertOverallStandings + recalculateAndUpsertGroupStandi
   }
 
   it('조별 승점 합계와 통합 승점 합계가 같은 트랜잭션 갱신 후 일치한다', async () => {
-    const tournament = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: ids.tournamentId } });
+    // competitionConfig 는 relation 이라 include 하지 않으면 타입에 없다
+    // (프로덕션 경로 tournament-bracket.service.ts:810 과 같은 조회 모양을 쓴다).
+    const tournament = await prisma.v1Tournament.findUniqueOrThrow({
+      where: { id: ids.tournamentId },
+      include: { competitionConfig: true },
+    });
     const config = validateCompetitionConfig(tournament.competitionConfig);
     const configVersionId = tournament.competitionConfigVersionId!;
     const groups = await loadGroupsForStandings();
@@ -220,7 +225,12 @@ describe('recalculateAndUpsertOverallStandings + recalculateAndUpsertGroupStandi
   });
 
   it('통합 upsert가 실패하면 같은 트랜잭션의 조별 upsert도 롤백된다', async () => {
-    const tournament = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: ids.tournamentId } });
+    // competitionConfig 는 relation 이라 include 하지 않으면 타입에 없다
+    // (프로덕션 경로 tournament-bracket.service.ts:810 과 같은 조회 모양을 쓴다).
+    const tournament = await prisma.v1Tournament.findUniqueOrThrow({
+      where: { id: ids.tournamentId },
+      include: { competitionConfig: true },
+    });
     const config = validateCompetitionConfig(tournament.competitionConfig);
     const configVersionId = tournament.competitionConfigVersionId!;
     const groups = await loadGroupsForStandings();

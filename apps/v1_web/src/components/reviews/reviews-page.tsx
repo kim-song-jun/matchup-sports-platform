@@ -56,17 +56,26 @@ export function ReviewsPageView({
         <ReviewTabs active={model.tab} onChange={onTabChange} />
         {isReceivedTab ? (
           <>
-            <div>
-              <div className="tm-my-section-label">내가 받은 리뷰 집계</div>
-              <ReviewsSummaryDashboard summary={summary} period={period} onPeriodChange={onPeriodChange} loading={summaryLoading} />
-            </div>
-            {hasManagedTeam ? (
-              <div style={{ marginTop: 24 }}>
-                <div className="tm-my-section-label">내 팀이 받은 리뷰 집계</div>
-                <ReviewsSummaryDashboard summary={teamSummary} period={teamPeriod} onPeriodChange={onTeamPeriodChange} loading={teamSummaryLoading} />
-              </div>
-            ) : null}
+            {/* 개별 리뷰가 주인공, 요약은 보조. 요약은 집계 0건이면 스스로 렌더하지 않는다. */}
             {hasAnonymousContent ? <AnonymousReceivedContent model={receivedModel} /> : null}
+            <div style={{ display: 'grid', gap: 12, marginTop: hasAnonymousContent ? 24 : 0 }}>
+              <ReviewsSummaryDashboard
+                summary={summary}
+                period={period}
+                onPeriodChange={onPeriodChange}
+                loading={summaryLoading}
+                title="내가 받은 리뷰 요약"
+              />
+              {hasManagedTeam ? (
+                <ReviewsSummaryDashboard
+                  summary={teamSummary}
+                  period={teamPeriod}
+                  onPeriodChange={onTeamPeriodChange}
+                  loading={teamSummaryLoading}
+                  title="내 팀이 받은 리뷰 요약"
+                />
+              ) : null}
+            </div>
             {hasLegacyContent ? (
               <div style={{ marginTop: 24 }}>
                 <div className="tm-my-section-label">이전 리뷰</div>
@@ -139,7 +148,9 @@ function ReviewsReceivedContent({
 function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }) {
   return (
     <div style={{ marginTop: 24 }}>
-      <div className="tm-my-section-label">대회에서 받은 익명 리뷰</div>
+      {/* 이 섹션은 대회 전용이 아니다 — 팀매치·개인 매치 후기도 같은 익명·reveal 규칙으로
+          여기 들어온다(예전엔 대회 후기만 조회 대상이라 "대회에서"가 맞았다). */}
+      <div className="tm-my-section-label">경기에서 받은 익명 리뷰</div>
       <div className="tm-text-caption" style={{ marginBottom: 10 }}>작성자는 공개되지 않으며, 상호 작성 완료 또는 72시간 뒤에 보여요.</div>
       {model.anonymousUserGroups.length > 0 ? <ReceivedGroupSection groups={model.anonymousUserGroups} title="내가 받은 리뷰" /> : null}
       {model.anonymousTeamGroups.length > 0 ? (
@@ -255,17 +266,27 @@ export function ReviewsReceivedPageView({
     // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
     <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received" desktopHead>
       <div className="tm-review-shell">
-        <div>
-          <div className="tm-my-section-label">내가 받은 리뷰 집계</div>
-          <ReviewsSummaryDashboard summary={summary} period={period} onPeriodChange={onPeriodChange} loading={summaryLoading} />
-        </div>
-        {hasManagedTeam ? (
-          <div style={{ marginTop: 24 }}>
-            <div className="tm-my-section-label">내 팀이 받은 리뷰 집계</div>
-            <ReviewsSummaryDashboard summary={teamSummary} period={teamPeriod} onPeriodChange={onTeamPeriodChange} loading={teamSummaryLoading} />
-          </div>
-        ) : null}
+        {/* 개별 리뷰가 주인공이고 요약은 보조다 — 예전엔 순서가 반대라 큰 대시보드 두 개를
+            지나야 정작 받은 리뷰 내용이 나왔다. 요약은 집계가 0건이면 스스로 렌더하지 않는다. */}
         {hasAnonymousContent ? <AnonymousReceivedContent model={model} /> : null}
+        <div style={{ display: 'grid', gap: 12, marginTop: hasAnonymousContent ? 24 : 0 }}>
+          <ReviewsSummaryDashboard
+            summary={summary}
+            period={period}
+            onPeriodChange={onPeriodChange}
+            loading={summaryLoading}
+            title="내가 받은 리뷰 요약"
+          />
+          {hasManagedTeam ? (
+            <ReviewsSummaryDashboard
+              summary={teamSummary}
+              period={teamPeriod}
+              onPeriodChange={onTeamPeriodChange}
+              loading={teamSummaryLoading}
+              title="내 팀이 받은 리뷰 요약"
+            />
+          ) : null}
+        </div>
         {hasLegacyContent ? (
           <div style={{ marginTop: 24 }}>
             <div className="tm-my-section-label">이전 리뷰</div>

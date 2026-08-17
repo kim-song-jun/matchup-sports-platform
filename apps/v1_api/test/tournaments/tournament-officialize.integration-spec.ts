@@ -333,7 +333,20 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
         expectedVersion: 3,
         clientCommandId: 'task22-wrong-base',
         score: { home: 1, away: 0 },
-        actualParticipants: [],
+        // 실제 참가자를 담는다. 이 테스트가 노리는 것은 "base가 아직 SUBMITTED라
+        // 재제출이 거부된다"는 것뿐이고 참가자와는 무관하지만, 빈 배열을 남겨 두면
+        // "참가자 없는 결과가 정상 입력"이라는 잘못된 선례가 된다 — 빈
+        // actualParticipants는 그 경기의 개인기록을 0행으로 만드는 결함이다.
+        actualParticipants: [
+          {
+            participantId: scorerId,
+            sideId: homeSideId,
+            started: true,
+            goals: 1,
+            cards: { yellow: 0, red: 0 },
+            goalkeeper: false,
+          },
+        ],
         eventsHash: 'wrong-base',
         reason: 'attempted before any review decision',
       }),
@@ -470,7 +483,19 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
       reason: 'scorer misattributed',
       changes: {
         score: { home: 1, away: 0 },
-        actualParticipants: [],
+        // 정정의 요지가 "득점자 오기입"(reason)이므로 정정본에는 올바른 득점자가
+        // 들어 있어야 한다. `previewHash`는 score + eventsHash + mvpParticipantId만
+        // 해싱하므로 참가자를 채워도 아래 officialize의 해시 검증에는 영향이 없다.
+        actualParticipants: [
+          {
+            participantId: scorerId,
+            sideId: homeSideId,
+            started: true,
+            goals: 1,
+            cards: { yellow: 0, red: 0 },
+            goalkeeper: false,
+          },
+        ],
         eventsHash: 'corrected-hash',
       },
     });
@@ -521,7 +546,19 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
         reason: 'attempted correction against a stale official pointer',
         changes: {
           score: { home: 9, away: 9 },
-          actualParticipants: [],
+          // stale base 검사(`REVISION_MUST_BE_SUPERSEDED`)가 참가자 검증보다 먼저
+          // 걸리므로 결과는 같지만, 빈 배열을 남겨 두면 "참가자 없는 정정이 정상
+          // 입력"으로 읽히는 가짜 픽스처가 된다.
+          actualParticipants: [
+            {
+              participantId: scorerId,
+              sideId: homeSideId,
+              started: true,
+              goals: 1,
+              cards: { yellow: 0, red: 0 },
+              goalkeeper: false,
+            },
+          ],
           eventsHash: 'stale-correction-hash',
         },
       }),

@@ -101,10 +101,8 @@ export function toReviewsReceivedPageModel(data: V1ReviewReceivedResponse | unde
       { label: '평균', value: averageRating(items) },
       { label: '태그', value: `${tagCount}개` },
     ],
-    anonymousUserGroups: groupReceivedReviews(userReviews.filter((review) => review.anonymous)),
-    anonymousTeamGroups: groupReceivedReviews(teamReviews.filter((review) => review.anonymous)),
-    legacyUserGroups: groupReceivedReviews(userReviews.filter((review) => !review.anonymous)),
-    legacyTeamGroups: groupReceivedReviews(teamReviews.filter((review) => !review.anonymous)),
+    userGroups: groupReceivedReviews(userReviews),
+    teamGroups: groupReceivedReviews(teamReviews),
   };
 }
 
@@ -151,10 +149,13 @@ function groupReceivedReviews(items: V1ReceivedReviewDetail[]) {
     return {
       sourceType,
       sourceId,
-      title: sourceTypeLabel(sourceType),
-      meta: first?.anonymous
-        ? `작성자 비공개 · 받은 리뷰 ${reviews.length}건`
-        : `${first ? formatDateTime(first.submittedAt) : '종료 일정'} · 받은 리뷰 ${reviews.length}건`,
+      // 어느 경기였는지를 제목으로 — 예전엔 "팀매치"처럼 종류만 나와서 맥락을 알 수 없었다.
+      title: first?.source?.title ?? sourceTypeLabel(sourceType),
+      meta: [
+        sourceTypeLabel(sourceType),
+        first?.submittedAt ? formatDateTime(first.submittedAt) : null,
+        `받은 리뷰 ${reviews.length}건`,
+      ].filter(Boolean).join(' · '),
       average: averageRating(reviews),
       reviews,
     };

@@ -392,6 +392,7 @@ export const v1ReviewsReceivedFixture: V1ReviewReceivedResponse = {
       tags: [{ tagCode: 'play_again', label: '또 같이 운동하고 싶어요' }],
       status: 'submitted',
       submittedAt: '2026-05-18T22:14:00.000Z',
+      source: null,
     },
     {
       reviewId: 'review-team-received-1',
@@ -407,6 +408,7 @@ export const v1ReviewsReceivedFixture: V1ReviewReceivedResponse = {
       tags: [{ tagCode: 'communication', label: '소통이 원활해요' }],
       status: 'submitted',
       submittedAt: '2026-05-19T22:14:00.000Z',
+      source: null,
     },
   ],
   pageInfo: { nextCursor: null, hasNext: false },

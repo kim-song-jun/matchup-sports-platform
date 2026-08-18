@@ -52,6 +52,7 @@ const RULES_ID = '11111111-1111-4111-8111-111111111111';
 const PRIVACY_ID = '22222222-2222-4222-8222-222222222222';
 const REFUND_ID = '33333333-3333-4333-8333-333333333333';
 const MEDIA_ID = '44444444-4444-4444-8444-444444444444';
+const RECORD_DISCLOSURE_ID = '55555555-5555-4555-8555-555555555555';
 const validSubmit = {
   termsDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID],
   paymentMethod: 'bank_transfer' as const,
@@ -70,6 +71,7 @@ describe('TournamentRegistrationsService', () => {
     v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock };
+    v1UserProfile: { updateMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
@@ -91,6 +93,7 @@ describe('TournamentRegistrationsService', () => {
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
+      v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       $transaction: jest.fn(),
       // R17-005 / R16-001 / R17-006: $queryRaw is called inside transactions for
       // SELECT FOR UPDATE; a no-op mock is sufficient for unit tests.
@@ -443,6 +446,68 @@ describe('TournamentRegistrationsService', () => {
       ...validSubmit, paymentMethod: 'pg', depositorName: undefined,
     });
     expect(result).toMatchObject({ payment: { method: 'pg' } });
+  });
+
+  // ─── submit: tournament_record_disclosure → tournamentRealNameVisible 연동 ──────
+  // (2026-08-18 사용자 결정 -- 소급 금지 회귀 테스트 포함)
+
+  it('submit: 대회 경기 기록 공개(선택) 동의 → tournamentRealNameVisible 을 false→true 로 켠다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+    managedTerms.assertTournamentAcceptances.mockResolvedValueOnce({
+      acceptedDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID, RECORD_DISCLOSURE_ID],
+      notAcceptedDocumentIds: [MEDIA_ID],
+      acceptedCodes: new Set([
+        'tournament_rules',
+        'tournament_privacy',
+        'tournament_refund',
+        'tournament_record_disclosure',
+      ]),
+    });
+
+    await service.submit(manager, 'tournament-1', 'reg-1', {
+      ...validSubmit,
+      termsDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID, RECORD_DISCLOSURE_ID],
+    });
+
+    expect(prisma.v1UserProfile.updateMany).toHaveBeenCalledWith({
+      where: { userId: manager.id, tournamentRealNameVisible: false },
+      data: { tournamentRealNameVisible: true },
+    });
+  });
+
+  it('submit: 대회 경기 기록 공개(선택) 미동의 → tournamentRealNameVisible 을 건드리지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+    // 기본 managedTerms mock(beforeEach)은 RULES/PRIVACY/REFUND 만 accepted 로 잡고
+    // RECORD_DISCLOSURE_ID 는 애초에 termsDocumentIds 에 없다 -- validSubmit 그대로 사용.
+
+    await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+    expect(prisma.v1UserProfile.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('소급 금지 회귀: v1.1 tournament_privacy 에만 동의했던 기존 사용자는 이 신청으로 토글이 건드려지지 않는다', async () => {
+    // Given: v1.1 시절부터 tournament_privacy(필수, 실명 공개와 무관한 10개 목적)에는
+    // 이미 동의해 왔지만 신규 선택 항목(tournament_record_disclosure)에는 동의한 적 없는
+    // 기존 사용자가, v1.2 배포 이후 같은 필수 항목들로 새 대회에 신청하는 상황.
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+    managedTerms.assertTournamentAcceptances.mockResolvedValueOnce({
+      acceptedDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID],
+      notAcceptedDocumentIds: [MEDIA_ID, RECORD_DISCLOSURE_ID],
+      acceptedCodes: new Set(['tournament_rules', 'tournament_privacy', 'tournament_refund']),
+    });
+
+    await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+    expect(prisma.v1UserProfile.updateMany).not.toHaveBeenCalled();
   });
 
   // ─── cancel-request ─────────────────────────────────────────────────────────────

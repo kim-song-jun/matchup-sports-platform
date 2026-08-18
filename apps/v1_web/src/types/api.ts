@@ -3740,6 +3740,25 @@ export type V1IntegrationSettings = {
   updatedAt: string | null;
 };
 
+/** GET /admin/settings/reviews — 리뷰 작성 가능 기간 정책 */
+export type V1ReviewPolicySettings = {
+  /** 공식 결과 확정 시각부터 후기를 쓸 수 있는 시간(시간 단위) */
+  reviewWindowHours: number;
+  /** 화면 표기용 문구 — 24시간 배수면 "7일", 아니면 "36시간" */
+  reviewWindowLabel: string;
+  minHours: number;
+  maxHours: number;
+  defaultHours: number;
+  /** 설정 행이 아직 없어 기본값으로 동작 중인지 */
+  isDefault: boolean;
+  updatedAt: string | null;
+};
+
+/** PATCH /admin/settings/reviews 바디 */
+export type V1UpdateReviewPolicySettingsPayload = {
+  reviewWindowHours: number;
+};
+
 /** PATCH /admin/settings/integrations 바디 — undefined=미변경, ""=삭제(env 폴백 복귀), 값=설정 */
 export type V1UpdateIntegrationSettingsPayload = {
   kakaoRestApiKey?: string;

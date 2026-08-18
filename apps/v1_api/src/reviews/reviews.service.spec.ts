@@ -11,7 +11,7 @@ const user = {
 const sourceId = '00000000-0000-4000-8000-000000000010';
 const targetUserId = '00000000-0000-4000-8000-000000000002';
 const submittedAt = new Date('2026-06-02T12:00:00.000Z');
-// team_match 는 이제 completedAt 기준 48시간 마감(review-deadline.ts)이 실제 시각(Date.now())으로
+// team_match 는 completedAt 기준 마감(review-deadline.ts, 기간은 어드민 설정)이 실제 시각(Date.now())으로
 // 판정된다(Task 4). submittedAt 은 하드코딩된 과거 날짜라 이 게이트가 생기면서 저절로 마감을
 // 넘겨버린다 — 마감 판정과 무관한 시나리오(멤버십/역할/대상 로직)의 팀매치 completedAt 픽스처는
 // 별도로 "방금 완료"를 뜻하는 이 상대값을 쓴다. 마감 자체를 테스트하는 케이스만 옛 날짜를 그대로 쓴다.
@@ -26,6 +26,11 @@ const memberAId = '00000000-0000-4000-8000-000000000041';
 const memberBId = '00000000-0000-4000-8000-000000000042';
 const leaderId = '00000000-0000-4000-8000-000000000043';
 const outsiderId = '00000000-0000-4000-8000-000000000044';
+
+/** ReviewPolicySettingsService 스텁 — 마감 기간만 주입한다(기본 168시간=7일). */
+function reviewPolicyStub(windowHours = 168) {
+  return { getWindowHours: jest.fn().mockResolvedValue(windowHours) } as never;
+}
 
 describe('ReviewsService', () => {
   it('tournamentId pending 필터는 해당 대회의 fixture 후기만 조회한다', async () => {
@@ -43,7 +48,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService({} as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService({} as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     await expect(service.list(user, { tab: 'pending', tournamentId, limit: 20 })).resolves.toEqual({
       items: [{ sourceType: 'tournament_fixture', sourceId, remainingCount: 2 }],
@@ -97,7 +102,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     await expect(service.submit(user, {
       sourceType: 'match',
@@ -169,7 +174,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     await service.submit(user, {
       sourceType: 'match',
@@ -185,7 +190,7 @@ describe('ReviewsService', () => {
     );
   });
 
-  it('match 소스는 48h 마감 없이 무기한 제출 가능하다(D-12, 완료 플로우 부재)', async () => {
+  it('match 소스는 마감 없이 무기한 제출 가능하다(D-12, 완료 플로우 부재)', async () => {
     // V1Match.completedAt 을 채우는 write 경로가 이 저장소에 없다(스펙 §1.2.2) — 앵커가 항상
     // 비어 있으므로 match 소스에는 review-deadline.ts 를 아예 호출하지 않는다. 100일 전 완료로
     // 세팅해도(=team_match 였다면 진작 마감) 제출이 막히지 않는지를 회귀로 고정한다.
@@ -239,7 +244,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     await expect(service.submit(user, {
       sourceType: 'match',
@@ -252,9 +257,9 @@ describe('ReviewsService', () => {
     expect(createMock).toHaveBeenCalled();
   });
 
-  it('team_match: completedAt(앵커) 기준 48시간을 넘기면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
+  it('team_match: completedAt(앵커) 기준 설정된 기간을 넘기면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
     // completedAt 은 games.service.ts 결과 확정 시 채워진다(스펙 §6.1) — team_match 는 이 값이
-    // 앵커라 48시간이 지나면 teamMatchSourceContext() 진입 즉시(다른 조회 전에) 막혀야 한다.
+    // 앵커라 기간이 지나면 teamMatchSourceContext() 진입 즉시(다른 조회 전에) 막혀야 한다.
     const closedCompletedAt = new Date('2020-01-01T00:00:00.000Z');
     const prisma = {
       v1TeamMatch: {
@@ -278,7 +283,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     // catch 결과는 성공 반환형과의 유니온이라 getStatus() 를 직접 부르면 컴파일되지 않는다
     // (CI 타입체크 실패로 확인). GoneException 자체가 410 을 뜻하므로 인스턴스 검사로
@@ -357,7 +362,7 @@ describe('ReviewsService', () => {
       submit: jest.fn(),
       sourceSummaries: jest.fn(),
     };
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     await service.submit(user, {
       sourceType: 'team_match',
@@ -394,7 +399,7 @@ describe('ReviewsService', () => {
 
     it('개인 대상 후기를 400으로 막지 않고 대상 정보를 그대로 대회 서비스에 넘긴다', async () => {
       const tournamentFixtureReviews = stubTournamentService();
-      const service = new ReviewsService({} as never, tournamentFixtureReviews as never, adminContextStub());
+      const service = new ReviewsService({} as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
       await service.submit(user, {
         sourceType: 'tournament_fixture',
@@ -415,7 +420,7 @@ describe('ReviewsService', () => {
 
     it('대상 두 종류를 함께 보내면 400으로 막는다', async () => {
       const tournamentFixtureReviews = stubTournamentService();
-      const service = new ReviewsService({} as never, tournamentFixtureReviews as never, adminContextStub());
+      const service = new ReviewsService({} as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
       await expect(service.submit(user, {
         sourceType: 'tournament_fixture',
@@ -432,7 +437,7 @@ describe('ReviewsService', () => {
     // 팀 매치도 라인업(V1GameParticipant.userId)을 근거로 개인 대상 후기를 받는다.
     // 단 shape는 여전히 배타적이어야 한다 — targetUserId와 targetTeamId를 함께 보내면 거부.
     it('팀 매치 개인 후기는 targetUserId 단독일 때만 받는다', async () => {
-      const service = new ReviewsService({} as never, stubTournamentService() as never, adminContextStub());
+      const service = new ReviewsService({} as never, stubTournamentService() as never, adminContextStub(), reviewPolicyStub());
 
       await expect(service.submit(user, {
         sourceType: 'team_match',
@@ -457,7 +462,7 @@ describe('ReviewsService', () => {
         v1UserReputationSummary: { upsert: jest.fn().mockResolvedValue({}) },
       };
       const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-      const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+      const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
       await service['recalculateUserReputation'](prisma as never, 'x');
 
@@ -485,7 +490,7 @@ describe('ReviewsService', () => {
           v1UserReputationSummary: { upsert: upsertMock },
         };
         const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
         await service['recalculateUserReputation'](prisma as never, 'x');
 
@@ -522,7 +527,7 @@ describe('ReviewsService', () => {
           v1TeamTrustScore: { upsert: upsertMock },
         };
         const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
         await service['recalculateTeamTrust'](prisma as never, 'team-x');
 
@@ -575,7 +580,7 @@ describe('ReviewsService', () => {
           v1TeamTrustScore: { upsert: upsertMock },
         };
         const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
         await service['recalculateTeamTrust'](prisma as never, 'team-x');
 
@@ -644,6 +649,7 @@ describe('ReviewsService', () => {
           prisma as never,
           { sourceSummaries: jest.fn().mockResolvedValue(new Map()) } as never,
           adminContextStub(),
+          reviewPolicyStub(),
         );
 
         const result = await service.received(user, { limit: 20 });
@@ -699,6 +705,7 @@ describe('ReviewsService', () => {
           prisma as never,
           { sourceSummaries: jest.fn().mockResolvedValue(new Map()) } as never,
           adminContextStub(),
+          reviewPolicyStub(),
         );
 
         const result = await service.received(user, { limit: 20 });
@@ -729,7 +736,7 @@ describe('ReviewsService', () => {
               .mockResolvedValueOnce([]),
           },
         };
-        const service = new ReviewsService(prisma as never, {} as never, adminContextStub());
+        const service = new ReviewsService(prisma as never, {} as never, adminContextStub(), reviewPolicyStub());
 
         await expect(service.received(user, { limit: 20 })).resolves.toEqual({
           items: [],
@@ -752,7 +759,7 @@ describe('ReviewsService', () => {
               .mockResolvedValueOnce([]),
           },
         };
-        const service = new ReviewsService(prisma as never, {} as never, adminContextStub());
+        const service = new ReviewsService(prisma as never, {} as never, adminContextStub(), reviewPolicyStub());
 
         await expect(service.received(user, { limit: 20 })).resolves.toEqual({
           items: [],
@@ -796,7 +803,7 @@ describe('ReviewsService', () => {
           submit: jest.fn(),
           sourceSummaries: jest.fn(),
         };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
         const result = await service.receivedSummary(
           { id: 'x', email: 'x@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' },
@@ -843,7 +850,7 @@ describe('ReviewsService', () => {
           submit: jest.fn(),
           sourceSummaries: jest.fn(),
         };
-        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
         const result = await service.receivedSummary(
           { id: 'user-p', email: 'user-p@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' },
@@ -1202,7 +1209,7 @@ describe('ReviewsService — 어드민 후기 숨김', () => {
       getMutationAdmin: jest.fn().mockResolvedValue(adminRecord),
       logAdminAction,
     };
-    const service = new ReviewsService(prisma as never, {} as never, adminContext as never);
+    const service = new ReviewsService(prisma as never, {} as never, adminContext as never, reviewPolicyStub());
     return { service, prisma, update, upsert, adminContext, logAdminAction };
   }
 
@@ -1296,7 +1303,7 @@ function matchesWhere(row: FakeRow, where: FakeRow): boolean {
 
 function makeService(prisma: unknown) {
   const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
-  return new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+  return new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 }
 
 function authUser(id: string) {
@@ -1510,7 +1517,7 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
 
   it('겸직자에게 두 방향이 모두 대상으로 나오고, 각 대상에 작성자 팀이 실린다', async () => {
     const prisma = makeDualPrisma();
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     const source = await service.source(user, { sourceType: 'team_match', sourceId: teamSourceId });
 
@@ -1526,7 +1533,7 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
   it('원정팀을 평가하면 홈팀 입장으로 저장된다 (대상이 작성자 팀을 결정)', async () => {
     const createMock = jest.fn().mockResolvedValue(createdRow(hostTeamId, awayTeamId));
     const prisma = makeDualPrisma(createMock);
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     await service.submit(user, {
       sourceType: 'team_match',
@@ -1547,7 +1554,7 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
   it('반대 방향(홈팀 평가)은 원정팀 입장으로 저장된다', async () => {
     const createMock = jest.fn().mockResolvedValue(createdRow(awayTeamId, hostTeamId));
     const prisma = makeDualPrisma(createMock);
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     await service.submit(user, {
       sourceType: 'team_match',
@@ -1575,7 +1582,7 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
       { teamId: hostTeamId, role: 'manager', team: { name: '홈팀' } },
       { teamId: awayTeamId, role: 'member', team: { name: '원정팀' } },
     ]);
-    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub());
 
     const source = await service.source(user, { sourceType: 'team_match', sourceId: teamSourceId });
 
@@ -1619,7 +1626,12 @@ describe('publicTeamSummary — 공개 팀 후기 요약', () => {
         v1TeamMembership: { findMany: membershipFindMany },
         v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
       };
-      const service = new ReviewsService(prisma as never, stubs().tournamentFixtureReviews as never, adminContextStub());
+      const service = new ReviewsService(
+        prisma as never,
+        stubs().tournamentFixtureReviews as never,
+        adminContextStub(),
+        reviewPolicyStub(),
+      );
 
       const result = await service.publicTeamSummary('team-x');
 
@@ -1650,7 +1662,12 @@ describe('publicTeamSummary — 공개 팀 후기 요약', () => {
         v1TeamMembership: { findMany: jest.fn() },
         v1Sport: { findMany: jest.fn().mockResolvedValue([]) },
       };
-      const service = new ReviewsService(prisma as never, stubs().tournamentFixtureReviews as never, adminContextStub());
+      const service = new ReviewsService(
+        prisma as never,
+        stubs().tournamentFixtureReviews as never,
+        adminContextStub(),
+        reviewPolicyStub(),
+      );
 
       const result = await service.publicTeamSummary('team-x');
 

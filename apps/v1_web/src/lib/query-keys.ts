@@ -127,6 +127,7 @@ export const v1Keys = {
   receivedInvitations: () => [...v1Keys.all, 'me', 'invitations'] as const,
   myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
+  adminReviewPolicySettings: () => [...v1Keys.all, 'admin', 'review-policy-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
   // Task 21: live tournament operations console (fixture lineup + event backfill).
   // `game`은 위쪽에 이미 선언돼 있어 여기서 다시 정의하지 않는다 — 양쪽 브랜치가

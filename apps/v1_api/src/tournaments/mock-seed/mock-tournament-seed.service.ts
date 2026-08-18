@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../../prisma/prisma.service';
 import { AdminContextService } from '../../common/admin-context.service';
 import { V1AuthUser } from '../../auth/v1-auth-user';
+import { runFixtureGameBackfill } from '../../games/migration/fixture-game-backfill';
 import { isMockSeedEnabled } from './mock-seed.config';
 import { CreateMockTournamentDto, type MockSeedStatus } from './mock-tournament-seed.dto';
 
@@ -51,6 +52,21 @@ export class MockTournamentSeedService {
       ?? await this.prisma.v1Sport.findFirst({});
     if (!sport) throw new BadRequestException({ code: 'NO_SPORT', message: '종목 데이터가 없어요.' });
 
+    // 픽스처에 competitionConfigVersionId 가 없으면 fixture-game-backfill 이 CONFIG_MISSING 으로
+    // 격리해 V1Game 이 만들어지지 않는다 — 운영 콘솔이 "경기 미생성"으로 뜨는 원인이다.
+    // 값을 아는 쪽(이 시드)이 만들 때 바로 박는다.
+    const competitionConfig = await this.prisma.v1CompetitionConfigVersion.findFirst({
+      where: { status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!competitionConfig) {
+      throw new BadRequestException({
+        code: 'NO_COMPETITION_CONFIG',
+        message: 'ACTIVE 상태의 대회 설정(config)이 없어요. competition-config 백필을 먼저 돌려주세요.',
+      });
+    }
+
     const teams = await this.pickTeams(teamCount);
     const now = new Date();
     const label = dto.titleSuffix?.trim() || this.autoLabel(format, teamCount, status, reviewReady);
@@ -71,6 +87,7 @@ export class MockTournamentSeedService {
           registrationDeadlineAt: now,
           entryFee: 0,
           status: status === 'open' ? 'open' : status === 'in_progress' ? 'in_progress' : 'completed',
+          competitionConfigVersionId: competitionConfig.id,
           createdByAdminUserId: admin.id,
         },
       });
@@ -104,9 +121,13 @@ export class MockTournamentSeedService {
         registrations.push({ ...registration, sortOrder: index, teamName: team.name });
       }
 
-      const fixtures = await this.buildFixtures(tx, tournament.id, format, registrations, withResults, now);
+      const fixtures = await this.buildFixtures(tx, tournament.id, format, registrations, withResults, now, competitionConfig.id);
       return { tournament, registrationCount: registrations.length, fixtureCount: fixtures };
     }, { timeout: 30_000 });
+
+    // 픽스처만으로는 운영 콘솔을 열 수 없다 — V1Game 은 이 백필이 만든다(배포 때 한 번 도는 것과
+    // 같은 경로). 시드가 만든 대회는 그 배포 이후에 생기므로 여기서 직접 돌려야 한다.
+    const backfill = await runFixtureGameBackfill(this.prisma as never, { mode: 'apply' });
 
     await this.adminContext.logAdminAction(admin, {
       action: 'tournament.mock_seed',
@@ -125,6 +146,7 @@ export class MockTournamentSeedService {
       status: created.tournament.status,
       reviewReady,
       route: `/tournaments/${created.tournament.id}`,
+      gamesCreated: backfill.counts.gamesCreated,
       // 로그인해서 확인하려면 어떤 계정이 이 대회에 들어가 있는지 알아야 한다.
       // 비밀번호는 응답에 담지 않는다 — 이 저장소는 public 이고 시드 계정은 공통 비밀번호를 쓴다.
       teams: teams.map((team) => ({
@@ -137,6 +159,16 @@ export class MockTournamentSeedService {
         })),
       })),
     };
+  }
+
+  /**
+   * 지금 쓸 수 있는 테스트 팀 수 — 화면이 "몇 팀까지 되는지"를 미리 알려주려면 필요하다.
+   * 눌러 보고 나서야 400 으로 알게 되면 사용자가 조건을 스스로 좁힐 수 없다.
+   */
+  async availability() {
+    if (!isMockSeedEnabled()) return { enabled: false, usableTeamCount: 0, maxTeamCount: 0 };
+    const usable = await this.findUsableTeams();
+    return { enabled: true, usableTeamCount: usable.length, maxTeamCount: Math.min(usable.length, 16) };
   }
 
   /** 대회 이름에 조건이 드러나야 목록에서 어떤 테스트용인지 바로 읽힌다. */
@@ -156,6 +188,17 @@ export class MockTournamentSeedService {
    * 팀이 모자라면 조용히 적게 만들지 않고 실패시킨다(반쪽짜리 대회는 검증에 쓸모가 없다).
    */
   private async pickTeams(teamCount: number): Promise<SeedTeam[]> {
+    const usable = await this.findUsableTeams();
+    if (usable.length < teamCount) {
+      throw new BadRequestException({
+        code: 'NOT_ENOUGH_TEAMS',
+        message: `명단을 채울 수 있는 테스트 팀이 부족해요. 필요 ${teamCount}팀, 사용 가능 ${usable.length}팀 (active 멤버 3명 이상 + 팀장 보유 + 전원 테스트 계정).`,
+      });
+    }
+    return usable.slice(0, teamCount);
+  }
+
+  private async findUsableTeams(): Promise<SeedTeam[]> {
     const candidates = await this.prisma.v1Team.findMany({
       where: {
         status: 'active',
@@ -194,7 +237,6 @@ export class MockTournamentSeedService {
           // 한 명이라도 실사용자가 섞여 있으면 통째로 제외한다.
           team.memberships.every((m) => m.user?.email?.endsWith(TEST_ACCOUNT_DOMAIN) === true),
       )
-      .slice(0, teamCount)
       .map((team) => ({
         teamId: team.id,
         name: team.name,
@@ -207,12 +249,6 @@ export class MockTournamentSeedService {
           role: m.role,
         })),
       }));
-    if (usable.length < teamCount) {
-      throw new BadRequestException({
-        code: 'NOT_ENOUGH_TEAMS',
-        message: `명단을 채울 수 있는 테스트 팀이 부족해요. 필요 ${teamCount}팀, 사용 가능 ${usable.length}팀 (active 멤버 3명 이상 + 팀장 보유 + 전원 테스트 계정).`,
-      });
-    }
     return usable;
   }
 
@@ -224,6 +260,7 @@ export class MockTournamentSeedService {
     registrations: Array<{ id: string; sortOrder: number; teamName: string }>,
     withResults: boolean,
     now: Date,
+    competitionConfigVersionId: string,
   ): Promise<number> {
     const pairs: Array<{ home: string; away: string; round: string; groupId: string | null }> = [];
 
@@ -265,6 +302,7 @@ export class MockTournamentSeedService {
           awayRegistrationId: pair.away,
           scheduledAt: now,
           venue: '목업 테스트 경기장',
+          competitionConfigVersionId,
           status: withResults ? 'completed' : 'scheduled',
         },
       });

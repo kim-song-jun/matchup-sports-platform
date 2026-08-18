@@ -13,6 +13,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
+import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
 import { staffRoleLabel } from '@/components/tournament-ops/badges';
 import { GrantStaffModal, type GrantableRoleOption } from '@/components/tournament-ops/grant-staff-modal';
 import { RevokeStaffModal } from '@/components/tournament-ops/revoke-staff-modal';
@@ -127,19 +128,19 @@ function TournamentFieldsSection({
           <MapPin size={18} />
         </span>
         <div>
-          <h2 id="tournament-fields-heading" className="text-[15px] font-bold text-[var(--text-strong)]">
+          <h2 id="tournament-fields-heading" className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">
             경기장(필드)
           </h2>
-          <p className="text-[13px] text-[var(--text-muted)] mt-0.5">
+          <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] mt-0.5">
             경기가 열리는 코트·구장이에요. 필드 담당자는 담당 경기장을 정해야 배정할 수 있어요.
           </p>
         </div>
       </div>
 
       {isPending ? (
-        <p className="text-[13px] text-[var(--text-muted)]">경기장을 불러오는 중이에요…</p>
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">경기장을 불러오는 중이에요…</p>
       ) : fields.length === 0 ? (
-        <p className="text-[13px] text-[var(--text-muted)]">
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">
           아직 등록된 경기장이 없어요.{' '}
           {canCreate ? '아래에서 먼저 등록해 주세요.' : '플랫폼 운영자에게 등록을 요청해 주세요.'}
         </p>
@@ -148,11 +149,11 @@ function TournamentFieldsSection({
           {fields.map((field) => (
             <li
               key={field.id}
-              className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-soft)] px-3 py-1 text-[13px] text-[var(--text-body)]"
+              className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-soft)] px-3 py-1 text-[length:var(--font-size-label)] text-[var(--text-body)]"
             >
               {field.name}
               {field.active === false ? (
-                <span className="text-[12px] text-[var(--text-muted)]">사용 안 함</span>
+                <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">사용 안 함</span>
               ) : null}
             </li>
           ))}
@@ -191,12 +192,12 @@ function TournamentFieldsSection({
       )}
 
       {error !== null && (
-        <p className="text-[13px] text-[var(--red700)]" role="alert">
+        <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">
           {error}
         </p>
       )}
       {notice !== null && (
-        <p className="text-[13px] text-[var(--text-body)]" role="status">
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-body)]" role="status">
           {notice}
         </p>
       )}
@@ -282,35 +283,31 @@ export function StaffClient({ tournamentId }: Props) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex justify-between items-start gap-3">
-        <div>
-          <p className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] tracking-normal mb-1">
-            {tournament.data?.title ?? '대회 운영'}
-          </p>
-          <h1 className="text-[22px] md:text-[24px] font-bold text-[var(--text-strong)]">스태프</h1>
-          <p className="text-[13px] md:text-[14px] text-[var(--text-muted)] mt-1">
-            대회 운영을 도와주는 스태프의 배정 현황이에요.
-          </p>
-        </div>
-        {canManage && (
-          <button
-            type="button"
-            onClick={() => {
-              setGrantError(null);
-              setGrantOpen(true);
-            }}
-            className="flex items-center gap-1.5 h-[44px] px-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
-          >
-            <UserPlus size={16} aria-hidden="true" />
-            스태프 배정
-          </button>
-        )}
-      </div>
+      <OpsPageHeader
+        tournamentTitle={tournament.data?.title}
+        title="스태프"
+        description="대회 운영을 도와주는 스태프의 배정 현황이에요."
+        action={
+          canManage ? (
+            <button
+              type="button"
+              onClick={() => {
+                setGrantError(null);
+                setGrantOpen(true);
+              }}
+              className="flex items-center gap-1.5 h-[44px] px-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
+            >
+              <UserPlus size={16} aria-hidden="true" />
+              스태프 배정
+            </button>
+          ) : null
+        }
+      />
 
       {grantNotice !== null && (
         <p
           role="status"
-          className="bg-[var(--blue50)] text-[var(--blue700)] rounded-2xl px-4 py-3 text-[13px] leading-relaxed"
+          className="bg-[var(--blue50)] text-[var(--blue700)] rounded-2xl px-4 py-3 text-[length:var(--font-size-label)] leading-relaxed"
         >
           {grantNotice}
         </p>
@@ -358,19 +355,19 @@ export function StaffClient({ tournamentId }: Props) {
               <table className="w-max min-w-full text-sm text-[var(--text-body)]">
                 <thead className="sticky top-0 bg-[var(--surface-soft)] border-b border-[var(--border)]">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       역할
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       담당 범위
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       만료
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       상태
                     </th>
-                    <th scope="col" className="px-4 py-3 text-right font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-right font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       작업
                     </th>
                   </tr>
@@ -388,7 +385,7 @@ export function StaffClient({ tournamentId }: Props) {
                           <p className="font-medium text-[var(--text-strong)]">
                             {assignment.nickname ?? `${assignment.userId.slice(0, 8)}…`}
                           </p>
-                          <p className="text-[12px] text-[var(--text-muted)]">{staffRoleLabel(assignment.role)}</p>
+                          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{staffRoleLabel(assignment.role)}</p>
                         </td>
                         <td className="px-4 py-3 align-middle">
                           {assignment.fieldId
@@ -403,7 +400,7 @@ export function StaffClient({ tournamentId }: Props) {
                         <td className="px-4 py-3 align-middle">
                           <span
                             className={[
-                              'inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-medium',
+                              'inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--font-size-caption)] font-medium',
                               STATUS_TONE_CLASSES[status.tone],
                             ].join(' ')}
                           >
@@ -449,18 +446,18 @@ export function StaffClient({ tournamentId }: Props) {
                       <p className="font-medium text-[var(--text-strong)] truncate">
                         {assignment.nickname ?? `${assignment.userId.slice(0, 8)}…`}
                       </p>
-                      <p className="text-[12px] text-[var(--text-muted)]">{staffRoleLabel(assignment.role)}</p>
+                      <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{staffRoleLabel(assignment.role)}</p>
                     </div>
                     <span
                       className={[
-                        'inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-medium shrink-0',
+                        'inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--font-size-caption)] font-medium shrink-0',
                         STATUS_TONE_CLASSES[status.tone],
                       ].join(' ')}
                     >
                       {status.label}
                     </span>
                   </div>
-                  <p className="text-[12px] text-gray-400 mt-1">
+                  <p className="text-[length:var(--font-size-caption)] text-gray-400 mt-1">
                     {assignment.fieldId
                       ? fieldNameById.get(assignment.fieldId) ?? '필드'
                       : assignment.fixtureIds.length > 0

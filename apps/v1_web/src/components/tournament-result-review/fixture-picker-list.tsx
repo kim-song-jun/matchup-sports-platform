@@ -30,6 +30,8 @@ export function FixturePickerList({
   onSelect,
   emptyTitle,
   emptySub,
+  emptyCta,
+  onEmptyCta,
   teamNamesByFixtureId,
 }: {
   items: readonly TournamentOperationsBoardItem[];
@@ -37,12 +39,17 @@ export function FixturePickerList({
   onSelect: (item: TournamentOperationsBoardItem) => void;
   emptyTitle: string;
   emptySub: string;
+  /** 빈 화면에서 갈 다음 곳. 이 목록이 비는 건 대개 "앞 단계가 아직 안 끝났다"는
+   *  뜻이라(정정은 결과 확정이, 검토는 경기 종료가 전제) 그 단계로 가는 길을 함께
+   *  준다 — 예전에는 안내 문구만 있고 갈 곳이 없는 막다른 길이었다. */
+  emptyCta?: string;
+  onEmptyCta?: () => void;
   /** fixtureId → 팀 이름. 운영 보드와 같은 소스(useV1Tournament().fixtures)에서 만든다.
    *  보드 API 응답에는 팀 이름이 없어서, 이게 없으면 "어느 경기인지" 알 수 없다. */
   teamNamesByFixtureId?: ReadonlyMap<string, { home: string; away: string }>;
 }) {
   if (items.length === 0) {
-    return <EmptyState title={emptyTitle} sub={emptySub} />;
+    return <EmptyState title={emptyTitle} sub={emptySub} cta={emptyCta} onCta={onEmptyCta} />;
   }
 
   return (

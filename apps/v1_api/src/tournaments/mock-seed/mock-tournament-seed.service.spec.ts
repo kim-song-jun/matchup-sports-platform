@@ -105,6 +105,25 @@ describe('MockTournamentSeedService', () => {
   // 로컬 generated Prisma client 가 stale 이라 tsc 가 통과했고 mock prisma 는 where/data 를 검증하지
   // 않아 유닛테스트도 통과했다. 그래서 mock 이 아니라 **schema.prisma 원문**을 권위로 삼아
   // 서비스가 실제로 넘긴 필드가 모델에 존재하는지 대조한다.
+  /* 공개 상세 프리젠터(`tournament-detail.presenter.ts`)는 `bracketPublishedAt` 이
+     비어 있으면 groups/fixtures 를 빈 배열로 감춘다. 목업이 그 값을 안 채워서,
+     경기를 30개 만들어 놓고도 "진행중" 대회의 대진표·일정이 관중에게 통째로 빈
+     화면으로 보였다(2026-08-18 alpha 실측: 목업 2건 모두 공개 fixtures 0건).
+     모집중은 아직 대진이 없는 게 정상이므로 그때만 비운다. */
+  it('진행중·종료 목업은 대진표를 공개 상태로 만든다', async () => {
+    const { service, tx } = makeWorld();
+    await service.createTournament(user, { format: 'league', teamCount: 4, status: 'in_progress' });
+    const created = tx.v1Tournament.create.mock.calls[0][0] as { data: { bracketPublishedAt: Date | null } };
+    expect(created.data.bracketPublishedAt).toBeInstanceOf(Date);
+  });
+
+  it('모집중 목업은 대진표를 아직 공개하지 않는다', async () => {
+    const { service, tx } = makeWorld();
+    await service.createTournament(user, { format: 'league', teamCount: 4, status: 'open' });
+    const created = tx.v1Tournament.create.mock.calls[0][0] as { data: { bracketPublishedAt: Date | null } };
+    expect(created.data.bracketPublishedAt).toBeNull();
+  });
+
   it('명단 payload 의 모든 필드가 schema.prisma 의 V1TournamentPlayer 에 실재한다', async () => {
     const { service, players } = makeWorld();
     await service.createTournament(user, { format: 'league', teamCount: 4 });

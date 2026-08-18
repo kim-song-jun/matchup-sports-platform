@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
-import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { ErrorState } from '@/components/v1-ui/primitives';
+import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { useTournamentEndedFixtures, type TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
 import { FixturePickerList } from '@/components/tournament-result-review/fixture-picker-list';
@@ -22,6 +22,7 @@ import { ResultReviewGridStyles } from '@/components/tournament-result-review/re
 export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }) {
   const tournament = useV1Tournament(tournamentId);
   const boardQuery = useTournamentEndedFixtures(tournamentId);
+  const router = useRouter();
   const searchParams = useSearchParams();
   const deepLinkFixtureId = searchParams.get('fixtureId');
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(() => deepLinkFixtureId);
@@ -72,16 +73,12 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
 
   return (
     <RequireAuth>
-      <main style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960, margin: '0 auto' }}>
-        <AppBackLink className="tm-text-label" fallbackHref={`/tournaments/${encodeURIComponent(tournamentId)}`}>
-          ← 대회로
-        </AppBackLink>
-        {/* 소비자용 대회 화면과 이질감이 있다는 지적(2026-08-05)을 반영해 그 화면들이
-            이미 쓰는 eyebrow(파란 대회명)+제목 톤을 맞췄다. */}
-        <p className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] tracking-normal">
-          {tournament.data?.title ?? '대회 운영'}
-        </p>
-        <h1 className="tm-text-heading">결과 정정</h1>
+      <div className="flex flex-col gap-4">
+        <OpsPageHeader
+          tournamentTitle={tournament.data?.title}
+          title="결과 정정"
+          description="이미 확정된 공식 결과를 사유와 함께 바로잡아요."
+        />
 
         {deepLinkNotFound ? (
           <p className="tm-text-caption" role="status" style={{ color: 'var(--text-muted)' }}>
@@ -110,7 +107,9 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
                 setTimeout(() => panelHeadingRef.current?.focus(), 0);
               }}
               emptyTitle="정정할 결과가 없어요"
-              emptySub="공식 확정된 결과가 있는 경기가 없어요."
+              emptySub="정정은 공식 확정된 결과가 있어야 할 수 있어요. 아직 확정한 경기가 없다면 결과 검토에서 먼저 확정해 주세요."
+              emptyCta="결과 검토로 가기"
+              onEmptyCta={() => router.push(`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/result-review`)}
             />
 
             {selectedItem && selectedItem.gameId ? (
@@ -133,7 +132,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
           </div>
           </>
         ) : null}
-      </main>
+      </div>
     </RequireAuth>
   );
 }

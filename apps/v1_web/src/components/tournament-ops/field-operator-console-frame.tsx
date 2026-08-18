@@ -42,10 +42,10 @@ export function FieldOperatorConsoleFrame({
           <ChevronLeft size={20} aria-hidden="true" />
         </Link>
         <div className="flex-1 min-w-0 flex flex-col">
-          <span className="text-[var(--font-size-body-sm)] font-bold text-[var(--text-strong)] truncate">
+          <span className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)] truncate">
             {tournamentTitle ?? '대회 운영'}
           </span>
-          <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit">
+          <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit">
             {staffRoleLabel('FIELD_OPERATOR')}
           </span>
         </div>

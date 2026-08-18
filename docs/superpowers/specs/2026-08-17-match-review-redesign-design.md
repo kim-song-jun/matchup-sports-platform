@@ -2,9 +2,10 @@
 
 - 상태: **설계 초안 — §14 미결 확정 필요** (4항목 개별 채점 방향은 사용자 확정, 세부 구현 결정 다수는 이 문서의 권고안)
 - 근거 기획 문서: `01_상대평가_기능정의서.txt` (v1.0, 기준일 2026-08-12, 평가 시스템 정본)
-- 기준 커밋: `36cbf281` (origin/dev)
+- 기준 커밋: `36cbf281` (origin/dev, 최초 조사 시점)
 - 관련 스펙: `docs/superpowers/specs/2026-08-17-tournament-league-format-design.md` — **병행 진행, 파일 충돌 없음** (근거 §1.3)
 - 리비전 노트: 적대적 리뷰 6건(blocking 1 · major 2 · minor 3) 반영판. blocking·major 3건은 코드 재확인 후 **설계를 수정해 해결**했고(§4.6/§7.2/§7.3/§10/§6.1), minor 3건은 코드 근거를 다시 확인해 사실 정정했다(§3.1/§4.4/§5.2). 새로 사용자 확인이 필요해진 항목은 없다 — 기존 §14 항목만 유지된다.
+- **리비전 노트(2026-08-18 현행화, 재확인 커밋 `204eb246`)**: 최초 조사(2026-08-17) 이후 dev에 리뷰 도메인 커밋 6건이 추가로 머지돼 §1.2·§1.4의 "현행" 서술 일부가 낡았다. 코드로 재확인해 고쳤다 — ① **`hidden`은 더 이상 죽은 값이 아니다**(`cba61c75`가 `PATCH /reviews/admin/:reviewId/hide|unhide`를 추가해 실제 write path 2곳이 생겼다) — 다만 D-9가 기대는 "13개 집계 호출부가 전부 `status:'submitted'`로 게이트한다"는 핵심 근거는 재확인 결과 그대로 참(13곳 그대로)이라 D-9의 **결론(신규 enum 값도 자동 제외)은 안전**하고, 인용 근거 문장만 고쳤다. `removed`는 여전히 write 0건으로 죽은 값이다. ② **팀매치에 개인(선수) 평가 경로가 신설됐다**(`68cc67bc`) — D-2의 "team_match는 개인 평가 경로 자체가 없음"이라는 전제가 깨져 근거 문장을 고쳤다(결정 자체는 유지, §3 D-2 참조). ③ 팀매치 팀 후기의 역할 게이트가 "active 멤버 전원"에서 대회와 동일한 "팀장·운영진만"으로 되돌아갔다(`68cc67bc`). ④ 팀매치·개인매치 후기가 "받은 후기" 화면에 처음으로 노출되기 시작했다(`61fac30d`) — 그 전엔 작성은 가능해도 수신자가 영영 못 봤다. ⑤ 개인 매너점수 집계가 team_match를 포함하도록 버그가 고쳐졌다(`673cbf9b`). ⑥ `f575e5ac`(대회 후기 "팀당 1건" 제약 완화)와 `dee10932`(종목 배지 표시 버그)는 이 스펙이 다루는 `V1PostEventReview`(경기 후기) 도메인이 아니라 별도 모델 `V1TournamentReview`(대회 자체 후기, `tournament-reviews.service.ts`)와 프론트 표시 버그라 §1.2 서술에 영향 없음 — 확인만 하고 넘어간다.
 
 ## 1. 배경
 
@@ -16,20 +17,20 @@
 
 ### 1.2 현행 구현 정밀 조사
 
-전체 리뷰 모듈: `apps/v1_api/src/reviews/` (13개 파일, 4,648줄 — `reviews.service.ts` 1,041줄 + `tournament-fixture-reviews.service.ts` 506줄이 핵심).
+전체 리뷰 모듈: `apps/v1_api/src/reviews/` (최초 조사 시점 13개 파일 — `reviews.service.ts` 1,041줄 + `tournament-fixture-reviews.service.ts` 506줄이 핵심. **2026-08-18 재확인**: `cba61c75`가 `dto/moderate-review.dto.ts`를 추가해 14개 파일이 됐고, 6커밋 중 5건이 `reviews.service.ts`를 건드리며 **1,041줄 → 1,390줄**로 늘었다. `tournament-fixture-reviews.service.ts`는 이번 6커밋 어디에도 손대지 않아 506줄 그대로다).
 
 | 항목 | 현행 | 근거 |
 |---|---|---|
-| 누가 평가하는가 (팀) | 대회: 팀 대표(owner/manager)만 상대팀 1회. 일반 팀매치: **active 멤버 전원**(대표 제한 없음) | `tournament-fixture-reviews.service.ts:177-179` `canReviewOpponentTeam()`, `reviews.service.ts:610-633` `resolveReviewerTeams()` |
-| 누가 평가하는가 (개인) | 대회: **상대팀 active 멤버 누구나**(실출전 여부 무관). 개인 매치: `V1MatchParticipant.status in (active,completed)` | `tournament-fixture-reviews.service.ts:318-337` `resolveReviewerTeams()` — 역할만 확인, 실출전 확인 없음 |
-| 언제 평가하는가 | 시간 마감 없음 — 무기한 제출 가능 | `grep 'REVIEW_WINDOW_CLOSED\|opensAt\|expiresAt' apps/v1_api/src/reviews/*.ts` → 0건 |
+| 누가 평가하는가 (팀) | 대회·팀매치 **둘 다** 팀 대표(owner/manager)만 상대팀 1회. 팀매치는 2026-08-12~08-17 사이 "active 멤버 전원"으로 잠깐 열렸다가 **2026-08-17(`68cc67bc`)에 대회와 같은 규칙으로 되돌아갔다**(같은 사용자가 대회에선 되고 팀매치에선 안 되는 모순 해소 목적) | `tournament-fixture-reviews.service.ts:177-179`, `reviews.service.ts:628,801-816,1334-1336` `canReviewOpponentTeam()`(두 파일에 동일 규칙: `role === 'owner' \|\| 'manager'`) |
+| 누가 평가하는가 (개인) | 대회: **상대팀 active 멤버 누구나**(실출전 여부 무관). 개인 매치: `V1MatchParticipant.status in (active,completed)`. **팀매치: 2026-08-17(`68cc67bc`)에 신설** — 역할 무관(팀원도 가능), 대상은 그 경기의 **제출된 라인업**(`V1GameParticipant.userId not null`)에 있는 상대팀 선수만(팀 멤버십 전원이 아님, §1.2.3) | `tournament-fixture-reviews.service.ts:318-337` `resolveReviewerTeams()` — 역할만 확인, 실출전 확인 없음. 팀매치 신설분: `reviews.service.ts:644-659`(role-agnostic 대상 생성) `675-723` `teamMatchOpponentRosters()`(라인업 기반 명단) |
+| 언제 평가하는가 | 시간 마감 없음 — 무기한 제출 가능 | `grep 'REVIEW_WINDOW_CLOSED\|opensAt\|expiresAt' apps/v1_api/src/reviews/*.ts` → 0건(2026-08-18 재확인해도 0건 — 이 스펙 이전엔 아무도 마감을 추가하지 않았다) |
 | 무엇을 평가하는가 | 단일 `rating`(1~5) + `tagCodes`(8종 프리셋, 자유 텍스트 아님) | `dto/submit-review.dto.ts:22-41`, `schema.prisma:1388` |
-| 스키마 모델명 | `V1PostEventReview`(단일 테이블, 3개 sourceType 공유) + `V1PostEventReviewTag`(1:N) | `schema.prisma:1378-1439` |
-| 상태 enum | `submitted \| hidden \| removed` — **`hidden`/`removed`는 어떤 write path도 대입하지 않는 죽은 값**(전 리뷰 서비스에서 write 0건, 모든 집계가 `status:'submitted'`로 게이트) | `grep "status: 'hidden'\|status: 'removed'"` → 0건; 집계 쿼리 13곳 전부 `status:'submitted'` |
-| 공개 규칙 | "서로 다른 상대팀 3건" 아님 — **상호 제출 OR 72시간 경과**(쌍 단위), 3건은 별도의 `trustState` 등급 배지(verified/estimated/sample/none)일 뿐 개별 리뷰 공개 게이트가 아님 | `review-visibility.ts:22-37`, `team-trust-aggregation.ts:158-162` |
-| 개인 평가 대상 명단 | **상대팀 "등록 로스터"**(`V1TournamentPlayer`, `removedAt: null`) — 실제 출전 여부와 무관 | `tournament-fixture-reviews.service.ts:353-360` |
-| 익명성 | `received()` 응답에서 `reviewerUser/reviewerTeam`을 null 처리, 정확한 제출 시각도 숨김 — 구현됨 | `reviews.service.ts:853-863` |
-| 팀신뢰/평판 집계 | `V1TeamTrustScore`/`V1UserReputationSummary` — team_match 전용 컬럼과 tournament 전용 컬럼을 **의도적으로 분리**(과거 last-write-wins 충돌 실사고 예방, 코드 주석에 명시) | `schema.prisma:1030-1057`, `1352-1376` |
+| 스키마 모델명 | `V1PostEventReview`(단일 테이블, 3개 sourceType 공유) + `V1PostEventReviewTag`(1:N). **참고**: 이름이 비슷한 `V1TournamentReview`(대회 자체에 대한 후기 — 운영·시설 평가, `tournament-reviews.service.ts`)는 완전히 별도 모델·별도 도메인이며 이 스펙의 대상이 아니다(§리비전 노트 2026-08-18) | `schema.prisma:1378-1439` vs `schema.prisma:2120-2150`(별도 모델) |
+| 상태 enum | `submitted \| hidden \| removed` — **`hidden`은 2026-08-17(`cba61c75`)부터 더 이상 죽은 값이 아니다**: 어드민 전용 `PATCH /reviews/admin/:reviewId/hide`\|`unhide`가 write path로 신설됐고, hide/unhide 트랜잭션이 영향받는 평판·신뢰점수를 즉시 재계산한다. **`removed`는 여전히 죽은 값**(write 0건, 복구 대상에서도 명시적으로 제외됨). 다만 "모든 집계가 `status:'submitted'`로 게이트"라는 핵심 사실은 재확인해도 그대로 참(13곳) — 이 사실에 의존하는 D-9의 결론(신규 enum 자동 제외)은 안전하다(§3 D-9) | `grep "status: 'hidden'\|status: 'removed'"` → hidden 쓰기 2곳(`reviews.service.ts:81,107`), removed 쓰기 0건; 라우트 `reviews.controller.ts:76-87`; 집계 쿼리 13곳 전부 `status:'submitted'`(2026-08-18 재카운트 동일) |
+| 공개 규칙 | "서로 다른 상대팀 3건" 아님 — **상호 제출 OR 72시간 경과**(쌍 단위), 3건은 별도의 `trustState` 등급 배지(verified/estimated/sample/none)일 뿐 개별 리뷰 공개 게이트가 아님. **다만 2026-08-17(`61fac30d`) 이전엔 이 reveal 로직 자체가 `team_match`/`match` 후기엔 적용되지 않았다** — `received()` 조회가 `tournament_fixture`(+레거시)만 읽어서, 팀매치·개인매치 후기는 작성은 됐지만 수신자가 영영 볼 수 없었다(집계에만 반영). 이제는 세 sourceType 모두 같은 reveal 규칙을 탄다 | `review-visibility.ts:22-37`, `team-trust-aggregation.ts:158-162`, `reviews.service.ts:182-206`(received 조회 범위 확장) |
+| 개인 평가 대상 명단 | **대회**: 상대팀 "등록 로스터"(`V1TournamentPlayer`, `removedAt: null`) — 실제 출전 여부와 무관(§5의 실출전 게이트가 노리는 갭이 바로 이것, 미변경). **팀매치(신설, 2026-08-17)**: 등록 로스터가 아니라 **그 경기 제출 라인업**이라 이미 대회보다 좁다 — 단, "공식 결과 리비전에 확정된 실제 출전"(§1.2.1의 `V1GameResultParticipant`)까지는 아니고 "제출된 라인업"(`V1GameParticipant`) 단계에서 멈춘다(§1.2.3) | `tournament-fixture-reviews.service.ts:353-360`; 팀매치: `reviews.service.ts:675-723` |
+| 익명성 | `received()` 응답에서 `reviewerUser/reviewerTeam`을 null 처리, 정확한 제출 시각도 숨김 — 구현됨(2026-08-18 재확인: 로직 자체는 불변, 다만 위 "공개 규칙" 행처럼 적용 대상 sourceType이 넓어졌다) | `reviews.service.ts:1193-1199`(`toAnonymousReceivedReview`, 최초 조사 시점엔 853-863 — 파일이 349줄 늘며 이동) |
+| 팀신뢰/평판 집계 | `V1TeamTrustScore`/`V1UserReputationSummary` — **대회 전용 컬럼**(`tournament*`)과 **비대회 컬럼**(`mannerScore`/`reviewCount` 등, match+team_match 공유)을 **의도적으로 분리**(과거 last-write-wins 충돌 실사고 예방, 코드 주석에 명시). **2026-08-17(`673cbf9b`) 전에는 버그가 있었다**: 개인 비대회 집계(`recalculateUserReputation`)가 `sourceType='match'`만 셌고 `team_match`는 빠졌다 — 팀매치 개인 후기가 막 생긴 참이라(`68cc67bc`) 그 즉시 노출된 버그. `PERSONAL_REPUTATION_SOURCES = ['match','team_match']`로 고쳐 지금은 둘 다 같은 컬럼에 합산된다 | `schema.prisma:1030-1057`, `1352-1376`; `reviews.service.ts:47`(`PERSONAL_REPUTATION_SOURCES` 정의) |
 | 이상 탐지 | 없음 | `grep 'flag\|anomaly\|이상'` → 0건 |
 | 부정확한 코멘트 | `tournament-fixture-reviews.service.ts:216-218`가 **정확히** 이 갭을 명문화: "대회 경기 라인업(V1GameParticipant)에는 userId 컬럼이 없어서... 실제로 누가 뛰었는지 사용자 단위로 알 수 없다" — **이 주석 자체가 지금은 낡았다**(§1.2.1) | — |
 
@@ -50,9 +51,19 @@
 - `matches.service.ts`에도 `complete()`류 메서드가 없다 — `cancel()`(360-430행)이 `status: 'cancelled'`만 쓴다.
 - `V1Match.completedAt`을 채우는(write) 코드는 이 저장소 전체에서 **0건**이다. 유일하게 `status`를 `'completed'`로 바꿀 수 있는 경로는 `admin.service.ts:414`의 `changeMatchStatus()`(`AdminGuard`, `ChangeMatchStatusDto`가 `@IsIn(['recruiting','closed','cancelled','completed','archived'])`로 `completed`를 허용 — `admin.dto.ts:362-369`) — **운영자가 수동으로 상태만 바꾸는 경로이고, 이 경로도 `completedAt`은 건드리지 않는다**(`admin.service.ts:419`: `data: { status: dto.status }`뿐).
 - 대조: `V1TeamMatch.completedAt`은 `games.service.ts:2807`(`data: { status: V1TeamMatchStatus.completed, completedAt: new Date() }`)에서 결과 확정과 함께 실제로 채워진다. `match`만 이 배관이 없다.
-- `reviews.service.ts:942-944`의 `isCompleted()`(`status === 'completed' || Boolean(completedAt)`)는 `status`만으로도 통과하므로 **관리자 수동 개입을 거친 매치의 리뷰 제출 자체는 가능하다** — 다만 그 경로로 완료된 매치는 전부 `completedAt = null`이다.
+- `reviews.service.ts:1282-1284`의 `isCompleted()`(`status === 'completed' || Boolean(completedAt)`, 최초 조사 시점엔 942-944 — 그 사이 파일이 349줄 늘며 이동, 로직은 불변)는 `status`만으로도 통과하므로 **관리자 수동 개입을 거친 매치의 리뷰 제출 자체는 가능하다** — 다만 그 경로로 완료된 매치는 전부 `completedAt = null`이다.
 
-**결론**: `match` 리뷰는 "도달 불가"가 아니라 "도달 가능하지만 §6.1이 지정한 앵커 컬럼이 실제 사용 경로에서 항상 비어 있다." `anchor + 48h`를 `null + 48h`로 계산할 수는 없으므로, §6.1·§7의 `match` 행은 이 사실을 반영해 이번 웨이브에서 제외한다(§3 D-12).
+**결론**: `match` 리뷰는 "도달 불가"가 아니라 "도달 가능하지만 §6.1이 지정한 앵커 컬럼이 실제 사용 경로에서 항상 비어 있다." `anchor + 48h`를 `null + 48h`로 계산할 수는 없으므로, §6.1·§7의 `match` 행은 이 사실을 반영해 이번 웨이브에서 제외한다(§3 D-12). 이 결론은 2026-08-18 재확인에도 그대로다 — `matches.controller.ts`/`matches.service.ts`/`admin.service.ts`는 6개 재확인 대상 커밋 어디에서도 건드리지 않았다.
+
+#### 1.2.3 현행화(2026-08-18) — 팀매치에 개인(선수) 평가 경로가 신설됐다
+
+최초 조사 시점엔 "`team_match`는 팀 평가만 있고 개인 평가 경로가 없다"가 사실이었다(당시 근거로 D-2가 이 사실에 기대 실출전 게이트 범위를 `tournament_fixture`로만 좁혔다). `68cc67bc`(2026-08-17)가 이걸 바꿨다:
+
+- **팀 후기 역할 게이트 원복**: 2026-08-12에 "참가팀 active 멤버 전원"으로 풀렸던 상대 **팀** 후기 작성 권한이 다시 "팀장·운영진(owner/manager)만"으로 돌아갔다 — 대회 경기(`tournament_fixture`)와 동일 규칙(`canReviewOpponentTeam()`, `reviews.service.ts:1334-1336`).
+- **선수 후기 신설**: 상대 **선수** 후기는 역할 무관 — 팀원 누구나 쓸 수 있다(`reviews.service.ts:644-659`). 대상 명단의 근거는 그 경기에 **제출된 라인업**(`V1GameParticipant.userId not null`, `teamMatchOpponentRosters()` — `reviews.service.ts:675-723`)이지, 팀 멤버십 전체가 아니다. 게스트(연동 계정 없는 참가자, `userId = null`)는 애초에 평가 대상 명단에 들지 않는다.
+- **이 라인업 기준은 §1.2.1·§5가 논의하는 "실출전"(`V1GameResultParticipant`, 공식 결과 리비전에서 파생된 실제 출전 기록)과 다른, 더 약한 필터다** — "제출됐다"이지 "실제로 뛰었다/출전했다"가 아니다. 즉 라인업엔 있지만 실제로는 출전하지 않은 후보 선수도 현재는 팀매치 평가 대상에 포함된다.
+
+**§3 D-2에 대한 영향**: D-2의 원래 근거("`team_match`는 개인 평가 경로 자체가 없음")는 이제 거짓이다. 다만 D-2가 확정한 **범위 자체**("§5의 신규 실출전 게이트는 `tournament_fixture`에만 적용")는 이 사실만으로 뒤집히지 않는다 — 팀매치는 이미 대회보다 좁은 "제출 라인업" 필터를 스스로 갖고 있어서(등록 로스터 전체보다는 낫다), §5의 미적용이 대회처럼 "출전 여부와 완전히 무관"한 상태로 방치되는 것은 아니기 때문이다. 다만 이 스펙이 실제 구현되면 **두 sourceType의 엄격도가 서로 어긋나는 새로운 비일관성**이 생긴다 — `tournament_fixture`는 §5 적용 후 "공식 결과에 확정된 실제 출전"까지 요구하는데 `team_match`는 여전히 "라인업 제출"에서 멈춘다. 이 비일관성을 이번 웨이브에서 함께 해소할지는 새로운 사용자 결정 사항이므로 D-2를 임의로 확장하지 않고 §13 리스크에 기록해 둔다(아래).
 
 ### 1.3 리그전(병행 스펙)과의 충돌 확인
 
@@ -73,8 +84,8 @@ git worktree list  → 9개 worktree 확인
 |---|---|---|---|---|
 | 채점 항목 | SKILL/MANNER/PUNCTUALITY/SAFETY 4항목 각 1~5 | 단일 rating + 8종 태그 | 항목 세분화 전무 | §4 스키마 확장 |
 | 평가 기간 | 경기 확정 후 48시간 | 무기한 | 마감 없음 | §6 신규(`team_match`/`tournament_fixture`만 — §1.2.2·D-12) |
-| 평가 자격(선수) | 실제 출전 선수만 | 상대팀 등록 로스터(실출전 무관) | 자격 기준 자체가 다름 | §5 신규 |
-| 공개 기준 | 상대팀 단위 3건부터 | 상호제출 OR 72h(쌍 단위) | 기준 불일치 — 다만 3건 임계값은 `trustState` 등급으로 **이미 존재** | §14 미결(D-3, 옵션은 §3.1) |
+| 평가 자격(선수) | 실제 출전 선수만 | `tournament_fixture`: 상대팀 등록 로스터(실출전 무관, §1.2). `team_match`: **2026-08-17(`68cc67bc`) 신설** — 등록 로스터보다는 좁은 "제출 라인업" 기준이지만 "공식 결과 확정 실출전"보다는 넓음(§1.2.3) | `tournament_fixture`는 자격 기준 자체가 다름(문서01 요구와 갭 그대로). `team_match`는 이미 부분적으로 좁혀져 있어 갭이 최초 조사 시점보다 작지만, 여전히 "실제 출전"과 정확히 일치하지 않음 | §5 신규(`tournament_fixture`만, D-2). `team_match`의 잔여 격차는 이번 웨이브 범위 밖(§1.2.3, §13) |
+| 공개 기준 | 상대팀 단위 3건부터 | 상호제출 OR 72h(쌍 단위) | 기준 불일치 — 다만 3건 임계값은 `trustState` 등급으로 **이미 존재**. **2026-08-17(`61fac30d`) 전에는 `team_match`/`match` 후기가 이 기준 자체를 적용받지 못하고(수신자에게 영영 비공개) 집계에만 반영됐는데, 지금은 세 sourceType 전부 동일 기준을 탄다**(§1.2) | §14 미결(D-3, 옵션은 §3.1) |
 | 이상 탐지 | 3종 규칙 → FLAGGED → 운영 검토 | 없음 | 전무 | §7 신규 |
 | 데이터 모델 | ReviewTask/MatchReview/MatchReviewScore/ReviewAggregateUnit/ReviewSummary/ReviewRiskFlag | V1PostEventReview 단일 테이블 + live 재계산 | 모델명·구조 상이 | §4 매핑 결정 |
 | 정정 시 처리 | 마감 후 정정 → 대상 재계산 없음, 운영 플래그만 | 없음(48h 자체가 없으므로) | §6에서 자연 해결 | §6 |
@@ -103,13 +114,13 @@ git worktree list  → 9개 worktree 확인
 | ID | 항목 | 결정 | 근거 |
 |---|---|---|---|
 | D-1 | 적용 범위 | **`match`/`team_match`/`tournament_fixture` 3종 sourceType 전체**에 4항목 채점 구조를 통일 적용 | "현행 단일 rating+태그 구조를 유지하지 않는다"는 사용자 결정은 공유 스키마(`V1PostEventReview`) 전체를 가리킴 — 2종만 남기면 두 개의 평가 시스템이 영구 공존(기술부채). `scoringVersion` 컬럼으로 sourceType별 차등 롤아웃도 사후에 가능해 리스크는 낮음. **주의**: 이 D-1은 "4항목 채점 스키마" 범위만 확정한다 — 48h 마감·이상탐지의 `match` 적용 여부는 별도 결정(D-12) |
-| D-2 | 실출전 자격 게이트 범위 | **`tournament_fixture` 개인 평가에만** 적용. `match`는 기존 참가자 상태 필터가 이미 동등한 역할을 함(§5.3). `team_match`는 개인 평가 경로 자체가 없음(팀 평가만 존재, 변경 없음) | 근거 데이터(V1GameResultParticipant)가 Game 엔진 경유 소스에만 존재. `match`는 Game 엔진을 타지 않음(§1.2.1) |
+| D-2 | 실출전 자격 게이트 범위 | **`tournament_fixture` 개인 평가에만** 적용. `match`는 기존 참가자 상태 필터가 이미 동등한 역할을 함(§5.3). `team_match`는 **2026-08-17(`68cc67bc`)에 개인(선수) 평가 경로가 신설됐지만**(§1.2.3 — 최초 조사 시점의 "경로 자체가 없음"은 더 이상 사실이 아니다), 이미 대상 명단이 "등록 로스터 전체"가 아니라 **그 경기 제출 라인업**으로 좁혀져 있어(`teamMatchOpponentRosters`, §1.2.3) §5 신규 게이트를 이번 웨이브에 함께 적용하지 않아도 대회처럼 "출전 여부 완전 무관" 상태는 아니다 — 범위는 그대로 `tournament_fixture`만 유지 | 근거 데이터(V1GameResultParticipant)가 Game 엔진 경유 소스에만 존재. `match`는 Game 엔진을 타지 않음(§1.2.1). `team_match`는 게임 엔진을 타지만(라인업 기준 필터가 이미 있음) "제출 라인업"과 "공식 결과 확정 실출전"의 엄격도 차이가 새 비일관성으로 남는다(§1.2.3, §13 리스크) — 이 격차 해소는 §14 미결이 아니라 이번 스펙 범위 밖의 별도 후속 결정으로 남긴다(사용자가 명시 요청하지 않은 scope 확장 금지) |
 | D-4 | `rating` 컬럼 | **유지**(NOT NULL). 4항목 신규 리뷰는 `rating = round(avg(4항목))`을 계속 채운다 | 13개 기존 집계 호출부가 `.rating`을 읽는다 — 컬럼을 없애면 전체를 같은 PR에서 재작성해야 함. 항목별 평균은 신규 컬럼으로 **추가**(§4), 기존 경로는 무변경 |
 | D-5 | 항목별 평균 저장 위치 | `V1TeamTrustScore`/`V1UserReputationSummary`에 `metric*Score` 8컬럼씩 **확장**(신규 `ReviewSummary` 테이블 신설 아님) | 두 모델이 이미 "대회/통산 공개용 항목 평균"이라는 `ReviewSummary`의 역할을 정확히 수행 중(scope 분리 컬럼 컨벤션도 이미 확립돼 있음) — 신규 테이블은 그 역할을 복제할 뿐 |
 | D-6 | ReviewTask | **신설 안 함** — 마감은 `officialAt + 48h`를 매 요청 시점에 계산(저장 안 함) | `LINEUP_DEADLINE_PASSED` 등 이 저장소의 기존 마감 판정이 전부 이 패턴(계산, 미저장). 저장하면 정정 시 마감을 갱신하는 동기화 책임이 새로 생긴다(§6) |
 | D-7 | 태그 폐기 | 신규 리뷰는 태그를 쓰지 않는다. `V1PostEventReviewTag` 테이블·과거 태그 데이터는 **삭제하지 않고** 레거시 리뷰 조회 시에만 노출 | `sportId: null` 레거시 마커 패턴이 이미 이 파일에 확립돼 있음(§8에서 동일 패턴 재사용) |
 | D-8 | 이상 탐지 실행 방식 | 신규 cron 프로세스가 아니라 **기존 outbox+worker 패턴** 재사용(`registerHandler`, `availableAt` 스케줄) | `v1-game-operations-worker.service.ts:73`의 확립된 패턴 — 새 배포 단위 없이 기존 worker에 핸들러만 등록 |
-| D-9 | FLAGGED 처리 | 신규 enum 값 `flagged`/`archived` 추가(status 필터가 이미 `submitted`로 게이트하므로 13개 호출부 무변경으로 자동 제외) | §1.2에서 확인한 "hidden/removed가 죽은 값"과 동일한 안전한 additive 패턴 |
+| D-9 | FLAGGED 처리 | 신규 enum 값 `flagged`/`archived` 추가(status 필터가 이미 `submitted`로 게이트하므로 13개 호출부 무변경으로 자동 제외) | **(2026-08-18 근거 정정)** 최초 근거였던 "hidden/removed가 둘 다 죽은 값"은 더 이상 사실이 아니다 — `hidden`은 `cba61c75`(2026-08-17)로 실제 write path(`PATCH /reviews/admin/:reviewId/hide`\|`unhide`)가 생겼다(§1.2). 그런데 이 결정이 실제로 기대는 안전 근거는 "hidden/removed가 안 쓰인다"가 아니라 **"13개 집계 호출부가 전부 `status:'submitted'`로 게이트한다"**였고, 이 사실은 재확인해도 그대로 참(여전히 13곳) — 그래서 결론(신규 enum 값도 코드 변경 없이 자동 제외)은 안 바뀐다. 오히려 `cba61c75`의 hide/unhide 구현은 이 스펙의 §7.2·§7.3이 요구하는 "상태 전이 시 반드시 관련 재계산 함수를 같은 트랜잭션에서 호출" 패턴을 이미 실제 코드로 증명한 선례라 D-9·§7의 설계를 강화한다(`reviews.service.ts:73-146`의 `hideReview`/`unhideReview`/`recalculateForReview`) |
 | D-10 | API 경로 | 신규 배치 엔드포인트 만들지 않음 — 기존 `POST /reviews`(단건) 유지, 페이로드만 변경 | 프론트가 이미 타깃별 순차 제출 루프 + throttle 여유(110/60s)를 갖추고 있음(`reviews.controller.ts:53-64` 주석) — 배치화는 사용자가 요청한 스코프(4항목 재설계) 밖 |
 | D-11 | `rating` → `compositeScore` API 리네이밍 | DB 컬럼명은 `rating` 유지, **API JSON 응답 키만** `compositeScore`로 변경(breaking) | 프론트는 어차피 4항목 표시를 위해 재작성 필요 — 같은 파도에 계약을 문서 어휘와 맞추는 것이 저비용 |
 | D-12 | `match`의 48h 마감·이상탐지 적용 시점 | **이번 웨이브 제외.** `match`는 D-1의 4항목 채점 스키마만 적용하고, §6(48h 마감)·§7(이상탐지)은 `V1Match` 완료(complete) 플로우가 도입된 뒤 후속 처리한다 | `V1Match.completedAt`을 채우는 코드 경로가 0건(§1.2.2) — 존재하지 않는 앵커에 마감을 걸면 `anchor + 48h`가 항상 `null`이 되어 미정의 동작(항상 즉시 마감 또는 항상 무제한)이 된다. 이건 제품 선호가 아니라 구현 공백이 강제하는 조건이라 사용자 확인 없이 확정한다(§14의 "사용자만 답할 수 있는 결정"에 해당하지 않음) |
@@ -503,6 +514,7 @@ availableAt: anchor + 48h + 10분(버퍼 — 마지막 순간 제출까지 반�
 | 프로덕션 리뷰 건수 미확인 상태로 §8 이관 설계를 확정 | §8.2에 재검토 기준 명시 — 실제 착수 전 건수 확인 권장 |
 | `match` 리뷰의 48h 마감·이상탐지가 이번 웨이브에서 빠짐(D-12) — 완료 플로우 도입 시점이 불확실해 "언제 후속으로 채워지는지"가 열려 있음 | `match` 완료 플로우 도입 PR과 함께 §6.1·§7.1의 `match` 행을 채우는 후속 작업을 명시적으로 백로그에 남긴다. 그 전까지 `match` 리뷰는 4항목 채점만 적용되고 마감·이상탐지는 현행(무기한·미탐지) 그대로다 — 사용자에게 "48h 안에 평가해주세요" 문구를 `match` 화면에는 노출하지 않도록 프론트 PR에서 sourceType별 분기 필요 |
 | 재계산 advisory lock이 대회 종료 직후 리뷰 폭주 구간에서 재계산 트랜잭션을 지연시킬 수 있음(§10) | targetId 단위로 lock 범위가 좁아 서로 다른 대상 간 경합은 없음. 필요 시 지연 지표를 모니터링하고 심하면 배치 재계산으로 전환 검토 |
+| **(2026-08-18 신규)** `68cc67bc`가 `team_match`에 개인 평가를 신설하면서 대상 명단 필터가 "제출 라인업" 기준으로 생겼다(§1.2.3). 이 스펙이 §5를 `tournament_fixture`에만 적용하면, 구현 완료 후 두 sourceType의 실출전 엄격도가 서로 달라진다 — `tournament_fixture`는 "공식 결과 확정 실출전", `team_match`는 "라인업 제출"에 머무름 | D-2 범위는 이번 웨이브에서 바꾸지 않는다(§3 D-2). `team_match`를 §5와 같은 엄격도로 올릴지는 이 스펙의 확정 방향(4항목 채점·48h·실출전·이상탐지) 밖의 새 결정이므로, 사용자가 명시적으로 범위 확장을 요청하면 별도 후속 스펙으로 다룬다 |
 
 ## 14. 미결
 

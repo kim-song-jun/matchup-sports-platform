@@ -16,7 +16,7 @@ import {
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
-import { readGameResultScore } from '@/lib/game-result-score';
+import { formatPenaltyShootout, readGameResultScore } from '@/lib/game-result-score';
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
 import { GameStateBadge, WarningBadge, WARNING_LABELS } from '@/components/tournament-ops/badges';
@@ -83,7 +83,7 @@ function FixtureResultCell({
       </p>
       {score.penalties ? (
         <p className="text-[12px] tabular-nums text-[var(--text-muted)]">
-          승부차기 {score.penalties.home}:{score.penalties.away}
+          {formatPenaltyShootout(score.penalties)}
         </p>
       ) : null}
     </div>

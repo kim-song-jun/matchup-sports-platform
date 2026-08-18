@@ -38,6 +38,13 @@ export type KnockoutFixtureFacts = {
 };
 
 /**
+ * 승부차기 한 건의 저장 형태. `GameScore['penalties']`에서 **파생**시켜서, 키가 하나
+ * 늘 때(선축이 그랬다) 이 모듈의 시그니처들이 자동으로 따라오게 한다 — 같은 모양을
+ * 여러 곳에 손으로 적어 두면 새 키가 조용히 중간 레인에서 떨어진다.
+ */
+export type StoredPenalties = NonNullable<GameScore['penalties']>;
+
+/**
  * 승부차기 점수를 받아도 되는 상황인지 검증하고, 통과하면 그 점수를 실은
  * `GameScore`를 돌려준다. 두 조건은 여기서만 강제된다(비동기 브래킷
  * 프로젝션은 이미 저장된 리비전만 보므로 잘못된 입력을 저장 **전에** 거부할
@@ -81,7 +88,7 @@ export type KnockoutFixtureFacts = {
  */
 export function assertPenaltiesNotAllowed(
   score: GameScore,
-  penalties: { home: number; away: number },
+  penalties: StoredPenalties,
   facts: KnockoutFixtureFacts,
 ): GameScore {
   if (!facts.isKnockoutFixture) {
@@ -115,7 +122,7 @@ export function assertPenaltiesNotAllowed(
  */
 export function needsKnockoutFixtureFacts(
   score: GameScore,
-  penalties: { home: number; away: number } | undefined,
+  penalties: StoredPenalties | undefined,
 ): boolean {
   return penalties !== undefined || score.home === score.away;
 }
@@ -235,7 +242,7 @@ export function assertBracketResolvable(score: GameScore, facts: KnockoutFixture
  * `parse-official-score.ts`의 docblock대로 `penalties`는 평평한 프로듀서만
  * 쓴다(`GamesService.deriveTournamentRevision`, 이 서비스).
  */
-export function readStoredPenalties(storedScore: unknown): { home: number; away: number } | undefined {
+export function readStoredPenalties(storedScore: unknown): StoredPenalties | undefined {
   if (typeof storedScore !== 'object' || storedScore === null || Array.isArray(storedScore)) {
     return undefined;
   }
@@ -253,6 +260,17 @@ export function readStoredPenalties(storedScore: unknown): { home: number; away:
     away < 0
   ) {
     return undefined;
+  }
+  // 선축도 함께 승계한다 — 빠뜨리면 **정정 한 번에 "누가 먼저 찼는지"가 영구히
+  // 사라진다**(정정 폼에는 선축 입력란이 없으므로 되살릴 수단도 없다).
+  //
+  // 점수와 달리 선축은 없어도 승계를 막지 않는다: 이 필드가 생기기 전 리비전에는
+  // 아예 없고, 저장 컬럼은 느슨한 JSON 이라 'HOME'/'AWAY'가 아닌 값이 들어 있을 수도
+  // 있다. 그 경우 승부차기 점수까지 버리면 결선 정정이 통째로 막히므로 선축만
+  // 떨어뜨린다.
+  const firstKickSideKey = (raw as { firstKickSideKey?: unknown }).firstKickSideKey;
+  if (firstKickSideKey === 'HOME' || firstKickSideKey === 'AWAY') {
+    return { home, away, firstKickSideKey };
   }
   return { home, away };
 }

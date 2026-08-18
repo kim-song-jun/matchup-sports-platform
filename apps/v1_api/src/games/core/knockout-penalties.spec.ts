@@ -268,6 +268,36 @@ describe('readStoredPenalties', () => {
     });
   });
 
+  /**
+   * 선축(`firstKickSideKey`)도 함께 승계해야 한다.
+   *
+   * 정정·재제출 폼은 평평한 `{home, away}`만 보내므로 base 리비전의 승부차기를 여기서
+   * 읽어 승계한다. 선축을 빠뜨리면 **정정 한 번에 "누가 먼저 찼는지"가 영구히 사라진다**
+   * — 폼에 선축 입력란이 없으므로 되살릴 수단도 없다. 바로 아래 "선축이 없던 레거시"
+   * 케이스가 계속 초록인 채 이 테스트만 빨간 것이, 고쳐야 할 것이 "읽기 자체"가 아니라
+   * **승계 대상 키 목록**이라는 증거다.
+   */
+  it('선축(firstKickSideKey)도 함께 승계한다', () => {
+    expect(
+      readStoredPenalties({ home: 1, away: 1, penalties: { home: 5, away: 4, firstKickSideKey: 'AWAY' } }),
+    ).toEqual({ home: 5, away: 4, firstKickSideKey: 'AWAY' });
+  });
+
+  it('선축이 없던 레거시 리비전은 선축 키 없이 그대로 승계한다', () => {
+    expect(readStoredPenalties({ home: 1, away: 1, penalties: { home: 5, away: 4 } })).toEqual({
+      home: 5,
+      away: 4,
+    });
+  });
+
+  /** 저장 컬럼은 느슨한 JSON이라 'HOME'/'AWAY'가 아닌 값이 들어 있을 수 있다. 그 경우
+   *  승부차기 점수까지 버리면 결선 정정이 통째로 막히므로, 선축만 떨어뜨린다. */
+  it('선축 값이 HOME/AWAY가 아니면 승부차기는 살리고 선축만 떨어뜨린다', () => {
+    expect(
+      readStoredPenalties({ home: 1, away: 1, penalties: { home: 5, away: 4, firstKickSideKey: 'BOTH' } }),
+    ).toEqual({ home: 5, away: 4 });
+  });
+
   it('동점 승부차기도 그대로 돌려준다 — assertBracketResolvable이 정확한 이유로 거부해야 한다', () => {
     expect(readStoredPenalties({ home: 1, away: 1, penalties: { home: 3, away: 3 } })).toEqual({
       home: 3,

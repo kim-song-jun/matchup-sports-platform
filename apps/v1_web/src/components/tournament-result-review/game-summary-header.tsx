@@ -7,7 +7,7 @@ import type {
   TournamentGameDetail,
 } from '@/hooks/use-tournament-result-review';
 import { ACTOR_ROLE_LABELS } from './result-review-copy';
-import { formatGameResultScore, readGameResultScore } from '@/lib/game-result-score';
+import { formatGameResultScore, formatPenaltyShootout, readGameResultScore } from '@/lib/game-result-score';
 
 const GAME_STATE_LABELS: Record<TournamentGameDetail['state'], string> = {
   SCHEDULED: '예정',
@@ -57,9 +57,10 @@ export function GameSummaryHeader({
     currentRevision && currentRevision.state === 'OFFICIAL'
       ? (readGameResultScore(currentRevision.score)?.penalties ?? null)
       : null;
-  const confirmedPenaltyLabel = confirmedPenalties
-    ? `승부차기 ${confirmedPenalties.home}:${confirmedPenalties.away}`
-    : null;
+  // 문구 조립은 `formatPenaltyShootout` 하나로 모은다 — 여기서 손으로 조립하면 선축이
+  // 빠져, 같은 화면 아래 리비전 타임라인(`formatGameResultScoreWithPenalties`)에는
+  // `선축 원정`이 뜨는데 이 헤더에는 안 뜨는 어긋남이 생긴다.
+  const confirmedPenaltyLabel = confirmedPenalties ? formatPenaltyShootout(confirmedPenalties) : null;
   const isVoided = currentRevision?.state === 'VOID';
 
   return (

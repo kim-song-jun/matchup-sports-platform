@@ -208,6 +208,57 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
  * 그래서 아래 두 테스트는 배선 자체가 아니라 **배선이 있어야만 성립하는 관찰 가능한 결과**
  * (실제 제출 payload 의 `penalties` + 사전 경고 문구)를 단언한다.
  */
+/**
+ * 결과 검수 화면 상단 헤더(`GameSummaryHeader`)는 승부차기 문구를 손으로 조립하고 있었다
+ * (`승부차기 {home}:{away}`). 그래서 같은 화면 **아래** 리비전 타임라인은 공용 포맷터를
+ * 써서 `선축 원정`이 뜨는데 **바로 위** 헤더에는 안 뜨는 어긋남이 생겼다 — 같은 사실이
+ * 한 화면 안에서 있다/없다로 갈렸다.
+ */
+describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기', () => {
+  const OFFICIAL_PENALTY_REVISION = {
+    ...STALE_REVISION,
+    id: 'revision-official',
+    state: 'OFFICIAL',
+    score: { home: 0, away: 0, penalties: { home: 2, away: 0, firstKickSideKey: 'AWAY' } },
+  };
+
+  beforeEach(() => {
+    eventsMock.state = {
+      data: { events: [], lastSequence: 0, gap: null },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: () => {},
+    };
+    mocks.useGameResultRevisions.mockReturnValue({
+      data: [OFFICIAL_PENALTY_REVISION],
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    mocks.useReviewResultDecision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
+    mocks.useOfficializeResultRevision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
+    mocks.useSupersedeAndSubmitResult.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+      reset: vi.fn(),
+    });
+    mocks.useTournamentGame.mockReturnValue({
+      data: gameDetail({ isKnockoutFixture: true, currentOfficialRevisionId: 'revision-official' }),
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('확정된 결선 경기의 헤더가 승부차기와 선축을 함께 보여준다', () => {
+    render(<GameResultReviewPanel gameId={GAME_ID} />);
+
+    expect(screen.getByText('승부차기 2:0, 선축 원정')).toBeInTheDocument();
+  });
+});
+
 describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드를 따른다', () => {
   const PENALTY_REVISION = {
     ...STALE_REVISION,

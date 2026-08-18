@@ -24,6 +24,29 @@ export class PenaltyScoreDto {
   @IsInt()
   @Min(0)
   away!: number;
+
+  /**
+   * 선축(먼저 찬 팀). 점수 두 개로는 복원할 수 없는 동전 던지기 결과다.
+   *
+   * **선언이 곧 허용이다.** `main.ts`의 `whitelist: true, forbidNonWhitelisted: true`는
+   * `@ValidateNested()`가 걸린 중첩 객체 **안까지** 적용되므로, 이 필드를 여기 적지
+   * 않으면 `penalties.firstKickSideKey`를 실은 요청이 여분 키로 400이 된다. 반대로
+   * 여기 한 곳에 적으면 `GameScoreDto.penalties`와 `GameResultRecoveryDto.penalties`
+   * **두 레인이 동시에** 이 키를 받는다 — 두 레인 모두 이 DTO를 재사용하기 때문이다.
+   *
+   * `penalties` 자체와 **같은 이유로** `@IsOptional()`이 아니라 `@ValidateIf`를 쓴다:
+   * `@IsOptional()`은 값이 `null`일 때도 검증 전체를 건너뛰므로 `firstKickSideKey: null`이
+   * 위반 0건으로 통과한다(실측). 그리고 이 DTO를 공유하는 **팀 매치 레인**
+   * (`CreateGameResultRevisionDto` → `GamesService.createResultRevision`)은 `jsonInput(dto.score)`를
+   * 그대로 저장하므로 — `extractEndPenalties`가 없는 경로다 — 그 null이 `score.penalties`에
+   * 실제로 박힌다. 그러면 "선축 없음(키 부재)"과 "선축 null" 두 상태가 공존하게 되고,
+   * 그건 `extractEndPenalties`가 애써 지키는 불변식("없으면 없는 것이 유일한 표현")을
+   * DTO 쪽 입구로 되돌리는 것이다. `@ValidateIf`로 undefined만 면제하면 null은 `@IsIn`에
+   * 걸려 400이 된다.
+   */
+  @ValidateIf((penalties: PenaltyScoreDto) => penalties.firstKickSideKey !== undefined)
+  @IsIn(['HOME', 'AWAY'])
+  firstKickSideKey?: 'HOME' | 'AWAY';
 }
 
 export class GameScoreDto {

@@ -148,17 +148,31 @@ function toEditable(record: GameResultParticipantRecord): EditableParticipant {
  * 값, 여분 키)이 **새 권위 리비전에 그대로 박제**된다.
  *
  * 판정 기준은 서버 `extractEndPenalties`(`games.service.ts`)와 같다 -- 0 이상 정수 +
- * 승자가 갈릴 것. 통과한 값도 `{home, away}` 로 **다시 만들어서** 돌려준다(원본 객체를
- * 그대로 넘기지 않는다): 느슨한 JSON 에 딸려 온 여분 키를 여기서 떨어뜨리는 게 이
- * 함수의 두 번째 일이다.
+ * 승자가 갈릴 것. 통과한 값도 **다시 만들어서** 돌려준다(원본 객체를 그대로 넘기지
+ * 않는다): 느슨한 JSON 에 딸려 온 여분 키를 여기서 떨어뜨리는 게 이 함수의 두 번째 일이다.
+ *
+ * 그래서 **허용 키 목록을 여기서 빠뜨리면 그 값은 조용히 사라진다.** 선축
+ * (`firstKickSideKey`)이 정확히 그 자리다 -- 서버 `PenaltyScoreDto` 가 받아 주는 허용
+ * 키이므로 재조립에 포함해야 한다. 빠뜨리면 승부차기로 승자가 갈린 결선 경기를 한 번만
+ * 정정해도 "누가 먼저 찼는지"가 영구히 사라진다(이 폼에는 선축 입력란이 없어 되살릴
+ * 수단도 없다). 값이 'HOME'/'AWAY' 가 아니면 선축만 떨어뜨리고 점수는 살린다 -- 서버
+ * `readStoredPenalties` 와 같은 관용 기준이다(여기서 점수까지 버리면 결선 정정이 통째로
+ * 막힌다).
  */
-function readSubmittablePenalties(raw: unknown): { home: number; away: number } | null {
+function readSubmittablePenalties(raw: unknown): GameResultScoreInput['penalties'] | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
-  const { home, away } = raw as { home?: unknown; away?: unknown };
+  const { home, away, firstKickSideKey } = raw as {
+    home?: unknown;
+    away?: unknown;
+    firstKickSideKey?: unknown;
+  };
   if (typeof home !== 'number' || !Number.isInteger(home) || home < 0) return null;
   if (typeof away !== 'number' || !Number.isInteger(away) || away < 0) return null;
   // 동점 승부차기는 승자를 못 가리므로 서버가 422 `TOURNAMENT_PENALTY_INVALID` 로 막는다.
   if (home === away) return null;
+  if (firstKickSideKey === 'HOME' || firstKickSideKey === 'AWAY') {
+    return { home, away, firstKickSideKey };
+  }
   return { home, away };
 }
 

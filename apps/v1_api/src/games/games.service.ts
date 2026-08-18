@@ -37,12 +37,14 @@ import {
   parseLineupConfigForResponse,
   parseLineupLimits,
   parsePeriodDurations,
+  parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
 import { readIsKnockoutFixture, readKnockoutFixtureFacts } from '../tournaments/knockout-fixture';
 import {
   assertBracketResolvable,
   assertPenaltiesNotAllowed,
   needsKnockoutFixtureFacts,
+  type StoredPenalties,
 } from './core/knockout-penalties';
 import { GameTakeoverService } from './game-takeover.service';
 import {
@@ -497,7 +499,7 @@ function assertClockNotDrifted(occurredAt: string): void {
  */
 export function extractEndPenalties(
   payload: Record<string, unknown>,
-): { home: number; away: number } | undefined {
+): { home: number; away: number; firstKickSideKey?: 'HOME' | 'AWAY' } | undefined {
   const raw = payload.penalties;
   if (raw === undefined) return undefined;
   if (
@@ -524,7 +526,30 @@ export function extractEndPenalties(
       message: 'A penalty shootout must produce a decisive winner',
     });
   }
-  return { home, away };
+  // 선축(먼저 찬 팀). `PenaltyScoreDto`가 이미 `'HOME'|'AWAY'`만 통과시키지만, 이
+  // 함수는 DTO를 거치지 않는 경로(`GameCommandDto.payload`는 느슨한 레코드다)에서도
+  // 불리므로 여기서 다시 좁힌다.
+  //
+  // 못 쓰는 값은 **조용히 버리지 않고 422로 되돌린다.** 같은 함수가 잘못된 home/away에는
+  // 이미 422를 던지는데 선축만 삼키면, 형식 오류를 어떤 것은 거부하고 어떤 것은 무시하는
+  // 기준이 한 함수 안에서 갈린다. 더 나쁜 건 조용히 버릴 때의 결말이다: `'home'`(소문자)
+  // 같은 오타를 보낸 운영자에게는 200이 돌아가지만 리비전에는 선축이 없고, 정정 폼에는
+  // 선축 입력란이 없어 되살릴 수단도 없다 — 이 변경이 막으려던 바로 그 영구 손실이다.
+  //
+  // 반면 **키가 아예 없는 것**은 오류가 아니라 정상이다(선축이 생기기 전 클라이언트,
+  // 그리고 정정 승계 경로). 그때는 키 자체를 빼서 돌려준다 — `undefined`나 `null`을
+  // 그대로 실으면 그 형태가 `jsonInput`을 타고 `score` JSON 컬럼에 들어가(`null`은 실제로
+  // 저장된다) `readStoredPenalties`·`parseOfficialPenalties` 계열이 "선축 없음"과 "선축이
+  // null" 두 상태를 구분해야 하는 부채가 생긴다. 없으면 없는 것이 유일한 표현이다.
+  const firstKickSideKey = (raw as { firstKickSideKey?: unknown }).firstKickSideKey;
+  if (firstKickSideKey === undefined) return { home, away };
+  if (firstKickSideKey !== 'HOME' && firstKickSideKey !== 'AWAY') {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: "penalties.firstKickSideKey must be 'HOME' or 'AWAY' when provided",
+    });
+  }
+  return { home, away, firstKickSideKey };
 }
 
 /**
@@ -784,7 +809,7 @@ export class GamesService {
       // server source of truth (apps/v1_web/src/components/lineup/formation-slots.ts).
       const config = await tx.v1CompetitionConfigVersion.findUnique({
         where: { id: game.competitionConfigVersionId },
-        select: { lineup: true, periods: true },
+        select: { lineup: true, periods: true, result: true },
       });
       const lineup = config === null ? {} : jsonObject(config.lineup);
       const { tournamentFixtureId, ...gameFields } = game;
@@ -813,6 +838,13 @@ export class GamesService {
         // 피리어드가 몇 분짜리인지" 를 알아야 비정상 클럭을 판단할 수 있다 —
         // `parsePeriodDurations` 문서 참고.
         periodDurations: config === null ? null : parsePeriodDurations(config.periods),
+        // 승부차기 선축·결판 판정 추가 — 콘솔이 "승부차기 종료" 버튼을 언제 열지
+        // 판단하려면 이 대회가 FIFA 정규(5킥 이내라도 수학적으로 끝났으면 종료)인지
+        // "끝까지 차는" 정책인지를 알아야 한다. `substitutionPolicy`/`periodDurations`와
+        // 동형이다 — 서버가 config 를 해석해서 UI 가 쓸 형태로만 내보내고, 프런트는
+        // config JSON 을 직접 읽지 않는다. `parseResultPolicy`가 키 부재를 기본값
+        // (`earlyStop: true`)으로 메우므로 `config === null`이어도 같은 기본값이다.
+        penaltyShootoutPolicy: parseResultPolicy(config?.result ?? null),
       };
     });
   }
@@ -4551,7 +4583,7 @@ export class GamesService {
     tx: Transaction,
     game: LockedGame,
     context: GameCommandContext,
-    penalties?: { home: number; away: number },
+    penalties?: StoredPenalties,
   ): Promise<GameRevisionMutationResult> {
     const [events, participants, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
@@ -5186,7 +5218,7 @@ export class GamesService {
     tx: Transaction,
     game: LockedGame,
     score: GameScore,
-    penalties: { home: number; away: number } | undefined,
+    penalties: StoredPenalties | undefined,
   ): Promise<GameScore> {
     // 결정적 스코어 + 승부차기 없음이면 어떤 fact도 판정을 바꾸지 않으므로
     // 질의하지 않는다 — 리팩터 전 단축 평가 동작을 그대로 보존한다.

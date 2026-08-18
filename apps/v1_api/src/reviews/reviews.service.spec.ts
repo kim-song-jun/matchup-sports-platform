@@ -661,6 +661,8 @@ describe('ReviewsService', () => {
           v1PostEventReview: {
             findMany: findManyMock,
           },
+          // 요약이 종목 코드를 붙여 내려주려고 v1Sport 를 조회한다(배지 매핑 키).
+          v1Sport: { findMany: jest.fn().mockResolvedValue([]) },
         };
         const tournamentFixtureReviews = {
           pending: jest.fn(),
@@ -675,8 +677,9 @@ describe('ReviewsService', () => {
           { targetType: 'user' },
         );
 
+        // sportCode 는 배지 매핑 키다 — v1Sport 조회가 비면 null 로 떨어진다(배지는 "기타").
         expect(result.bySport).toEqual([
-          { sportId: 'futsal', ratingAvg: 5, ratingCount: 1, tagRates: [{ tagCode: 'manner', label: '매너가 좋아요', rate: 1, count: 1 }] },
+          { sportId: 'futsal', sportCode: null, ratingAvg: 5, ratingCount: 1, tagRates: [{ tagCode: 'manner', label: '매너가 좋아요', rate: 1, count: 1 }] },
         ]);
         expect(findManyMock).toHaveBeenCalledTimes(2);
       } finally {
@@ -706,6 +709,7 @@ describe('ReviewsService', () => {
           v1TeamMembership: {
             findMany: jest.fn().mockResolvedValue([{ teamId: 'team-a' }]),
           },
+          v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
         };
         const tournamentFixtureReviews = {
           pending: jest.fn(),
@@ -721,7 +725,7 @@ describe('ReviewsService', () => {
         );
 
         expect(result.bySport).toEqual([
-          { sportId: 'futsal', ratingAvg: 5, ratingCount: 1, tagRates: [] },
+          { sportId: 'futsal', sportCode: 'futsal', ratingAvg: 5, ratingCount: 1, tagRates: [] },
         ]);
       } finally {
         jest.useRealTimers();

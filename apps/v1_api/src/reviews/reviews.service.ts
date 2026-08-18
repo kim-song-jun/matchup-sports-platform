@@ -278,7 +278,20 @@ export class ReviewsService {
       ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === query.period)
       : revealed;
 
-    return { bySport: summarizeBySport(filtered), availableMonths };
+    // 프론트의 종목 배지·색상은 v1Sport.code 로 매핑한다(SPORT_ACCENT_MAP). sportId(UUID)만
+    // 내려주면 어떤 종목이든 "기타"로 떨어지므로 코드를 함께 실어 보낸다.
+    const bySport = summarizeBySport(filtered);
+    const sports = bySport.length
+      ? await this.prisma.v1Sport.findMany({
+          where: { id: { in: bySport.map((entry) => entry.sportId) } },
+          select: { id: true, code: true },
+        })
+      : [];
+    const codeById = new Map(sports.map((sport) => [sport.id, sport.code]));
+    return {
+      bySport: bySport.map((entry) => ({ ...entry, sportCode: codeById.get(entry.sportId) ?? null })),
+      availableMonths,
+    };
   }
 
   private async reverseUserReviews(targetUserId: string, candidates: RevealScopeCandidate[]) {

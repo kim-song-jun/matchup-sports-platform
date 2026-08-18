@@ -125,6 +125,8 @@ function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }
   );
 }
 
+const SUBMIT_HINT_ID = 'review-submit-hint';
+
 export function ReviewSourcePageView({
   drafts,
   errorMessage,
@@ -147,6 +149,9 @@ export function ReviewSourcePageView({
 }) {
   const pendingTargets = model?.targets.filter((target) => !target.locked && !target.alreadySubmitted && !target.review) ?? [];
   const canSubmit = pendingTargets.some((target) => drafts[targetKey(target.targetType, target.targetUserId, target.targetTeamId)]?.tagCodes.length > 0);
+  // 아직 쓸 대상이 남아 있는데 태그를 하나도 안 골라 버튼이 잠긴 상태에서만 안내한다 —
+  // 로딩·에러·전송 중이거나 남은 대상이 없으면 버튼이 회색인 이유가 다르므로 띄우지 않는다.
+  const showSubmitHint = !loading && !errorMessage && !submitting && pendingTargets.length > 0 && !canSubmit;
 
   return (
     <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
@@ -189,7 +194,26 @@ export function ReviewSourcePageView({
         ) : null}
       </div>
       <div className="tm-fixed-cta">
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!canSubmit || submitting || loading || Boolean(errorMessage)} onClick={onSubmit} type="button">
+        {/* 별점은 기본값(5)으로 이미 채워져 있어서, 태그를 안 고른 사용자 눈에는 "다 했는데
+            버튼만 회색"으로 보인다 — 태그 1개 이상은 서버 계약(SubmitReviewDto 의
+            `@ArrayMinSize(1)`)이라 버튼을 풀어줄 수는 없으니, 왜 못 보내는지를 말해준다.
+            `aria-describedby` 로 버튼에 묶어 스크린리더도 비활성 이유를 읽게 한다. */}
+        {showSubmitHint ? (
+          <p
+            id={SUBMIT_HINT_ID}
+            className="tm-text-caption"
+            style={{ margin: '0 0 8px', textAlign: 'center', color: 'var(--text-caption)' }}
+          >
+            태그를 하나 이상 골라야 리뷰를 보낼 수 있어요
+          </p>
+        ) : null}
+        <button
+          aria-describedby={showSubmitHint ? SUBMIT_HINT_ID : undefined}
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          disabled={!canSubmit || submitting || loading || Boolean(errorMessage)}
+          onClick={onSubmit}
+          type="button"
+        >
           {submitting ? '전송 중' : '리뷰 보내기'}
         </button>
       </div>

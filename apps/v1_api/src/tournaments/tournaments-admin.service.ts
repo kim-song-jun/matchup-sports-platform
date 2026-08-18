@@ -259,6 +259,7 @@ export class TournamentsAdminService {
           title: dto.title,
           competitionConfigVersionId,
           format: dto.format ?? 'group_knockout',
+          minMatchesPerTeam: dto.minMatchesPerTeam ?? null,
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
           rosterDeadlineAt: dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
@@ -434,6 +435,7 @@ export class TournamentsAdminService {
     if (dto.sportId !== undefined) data.sport = { connect: { id: dto.sportId } };
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.format !== undefined) data.format = dto.format;
+    if (dto.minMatchesPerTeam !== undefined) data.minMatchesPerTeam = dto.minMatchesPerTeam ?? null;
     if (dto.registrationDeadlineAt !== undefined) {
       data.registrationDeadlineAt = dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null;
     }

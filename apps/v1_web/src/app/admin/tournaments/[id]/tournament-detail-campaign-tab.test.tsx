@@ -83,6 +83,7 @@ const tournament: V1Tournament = {
   genderMaxMale: null,
   genderMinFemale: null,
   genderMaxFemale: null,
+  minMatchesPerTeam: null,
   entryFee: 300000,
   prizePool: 4000000,
   prizeSummary: '총 400만원 상당 상금',

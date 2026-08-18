@@ -26,6 +26,16 @@ vi.mock('@/components/tournaments/tournament-inquiry-section', () => ({
   TournamentInquirySection: () => null,
 }));
 
+// 리그(format='league') 대회는 LeagueStandingsSection 이 마운트되면서
+// GET /tournaments/:id/standings/overall 을 호출한다. 스텁하지 않으면 실제 fetch 가
+// 나가거나 비동기 setState 로 act 경고·플레이키 테스트가 된다.
+// never-resolving Promise 로 두면 컴포넌트가 loading 상태(렌더 없음)에 머물러
+// 이 파일의 단언(순위표가 아니라 대진표/안내 문구를 본다)이 결정적으로 유지된다.
+vi.mock('@/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api-client')>()),
+  v1Get: vi.fn(() => new Promise(() => {})),
+}));
+
 /* ── Factories ── */
 
 function makeGroup(
@@ -740,10 +750,14 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
 
     expect(screen.getByText('참가 신청 안내')).toBeInTheDocument();
     expect(screen.getByText('대회 진행 방식')).toBeInTheDocument();
-    // 순위표는 상세 화면에 인라인으로 남지 않고 /bracket 바로가기 안내(StandingsMovedNotice)로
-    // 대체됐다(§A-1) — 이 파일 상단 주석 참고. 옛 인라인 '순위표' 헤딩을 찾던 단언을
-    // 실제 렌더 문구로 갱신한다.
-    expect(screen.getByText('실시간 순위표는 대진표에서 확인하세요')).toBeInTheDocument();
+    // §A-1에서 순위표는 /bracket 바로가기 안내(StandingsMovedNotice)로 대체됐지만,
+    // 리그전 도입(2026-08-17 스펙 §9)으로 **format='league'인 대회에 한해** 상세 화면이
+    // 통합 순위표(LeagueStandingsSection)를 직접 렌더한다 — 조별 순위가 아니라 대회 전체를
+    // 합산한 새 개념이라 /bracket의 조별 순위표와 역할이 겹치지 않는다.
+    // 그 섹션은 서버 조회 완료 전에는 아무것도 렌더하지 않으므로(레이아웃 흔들림 방지),
+    // 여기서는 옛 안내 문구가 더 이상 나오지 않는 것을 확인한다.
+    // 다른 format(group_knockout 등)에서는 StandingsMovedNotice가 그대로 유지된다.
+    expect(screen.queryByText('실시간 순위표는 대진표에서 확인하세요')).not.toBeInTheDocument();
     expect(screen.getByText('대진표 준비 중')).toBeInTheDocument();
   });
 

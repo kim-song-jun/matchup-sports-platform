@@ -148,6 +148,12 @@ describe('TournamentsReadService', () => {
     v1TournamentStaffAssignment: {
       findMany: jest.Mock;
     };
+    v1TournamentOverallStanding: {
+      findMany: jest.Mock;
+    };
+    v1TournamentFixture: {
+      findMany: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
@@ -163,6 +169,12 @@ describe('TournamentsReadService', () => {
         findUnique: jest.fn().mockResolvedValue(null),
       },
       v1TournamentStaffAssignment: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      v1TournamentOverallStanding: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      v1TournamentFixture: {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
@@ -992,6 +1004,101 @@ describe('TournamentsReadService', () => {
     expect(callArgs.where).toMatchObject({
       tournamentId: 'tournament-1',
       status: 'published',
+    });
+  });
+
+  // ─── getOverallStandings (Task 8, §6.2) ──────────────────────────────────────
+
+  describe('getOverallStandings', () => {
+    const tournamentId = 'tournament-1';
+
+    beforeEach(() => {
+      prisma.v1Tournament.findFirst.mockResolvedValue({
+        id: tournamentId,
+        competitionConfig: { tieBreak: { points: { win: 3, draw: 1, loss: 0 } } },
+      });
+      prisma.v1TournamentOverallStanding.findMany.mockResolvedValue([
+        {
+          registrationId: 'reg-1',
+          position: 1,
+          points: 18,
+          wins: 6,
+          draws: 0,
+          losses: 1,
+          goalsFor: 22,
+          goalsAgainst: 9,
+          fairPlayPoints: 3,
+          recalculatedAt: new Date('2026-08-17T10:00:00.000Z'),
+          registration: {
+            team: { name: 'FC 서울' },
+            // 실제 select에는 없는 필드지만, 이후 실수로 select를 넓혀도 응답에
+            // 새지 않는지 방어적으로 검증하기 위해 mock에 PII를 함께 심어 둔다.
+            appliedByUser: {
+              profile: { realName: '홍길동', phone: '010-1234-5678', birthDate: '1990-01-01' },
+            },
+          },
+        },
+        {
+          registrationId: 'reg-2',
+          position: 2,
+          points: 10,
+          wins: 3,
+          draws: 1,
+          losses: 3,
+          goalsFor: 12,
+          goalsAgainst: 15,
+          fairPlayPoints: 5,
+          recalculatedAt: new Date('2026-08-17T10:00:00.000Z'),
+          registration: { team: { name: 'FC 부산' } },
+        },
+      ]);
+      prisma.v1TournamentFixture.findMany.mockResolvedValue([
+        {
+          homeRegistrationId: 'reg-1',
+          awayRegistrationId: 'reg-2',
+          game: { currentOfficialRevision: { state: 'OFFICIAL' } },
+          result: null,
+        },
+        {
+          homeRegistrationId: 'reg-1',
+          awayRegistrationId: 'reg-2',
+          game: null,
+          result: null,
+        },
+      ]);
+    });
+
+    it('통합 순위·진행률·매직넘버를 반환한다', async () => {
+      const result = await service.getOverallStandings(tournamentId);
+
+      expect(result.standings).toHaveLength(2);
+      expect(result.standings[0]).toMatchObject({
+        registrationId: 'reg-1',
+        teamName: 'FC 서울',
+        position: 1,
+        points: 18,
+      });
+      expect(result.standings[1]).toMatchObject({ registrationId: 'reg-2', teamName: 'FC 부산' });
+      expect(result.progress).toEqual({ total: 2, played: 1, remaining: 1, percent: 50 });
+      // 2위(reg-2) 최대 = 10 + 1(잔여) * 3(승점) = 13, 1위(reg-1) 현재 18 → 확정
+      expect(result.magicNumber).toEqual({ registrationId: 'reg-1', value: 0, clinched: true });
+      expect(result.recalculatedAt).toBe('2026-08-17T10:00:00.000Z');
+    });
+
+    it('대회를 찾을 수 없으면 404 TOURNAMENT_NOT_FOUND를 던진다', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue(null);
+
+      await expect(service.getOverallStandings('ghost')).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_NOT_FOUND' },
+      });
+    });
+
+    it('통합 순위 응답에 선수 개인정보가 포함되지 않는다', async () => {
+      const result = await service.getOverallStandings(tournamentId);
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toContain('realName');
+      expect(serialized).not.toContain('birthDate');
+      expect(serialized).not.toContain('phone');
     });
   });
 });

@@ -334,10 +334,10 @@ describe('ReviewsService', () => {
   });
 
   describe('recalculateUserReputation', () => {
-    // 소스 분리의 반대편 절반 — 대회 개인 후기는 tournament_* 컬럼에만 쌓여야 하고,
-    // 이 필터가 빠지면 대회 한 번에 들어온 수십 건이 개인 매치 평점을 통째로 덮는다.
-    // mock은 where와 무관하게 고정값을 주므로 인자 단언으로만 잡을 수 있다.
-    it('개인 매치(sourceType=match) 후기만 mannerScore 집계에 넣는다', async () => {
+    // 개인 매치와 팀매치는 둘 다 "함께 뛴 상대의 평가"라 같이 센다. 대회 개인 후기만 제외 —
+    // 한 대회에서 상대 로스터 전원에게 수십 건이 들어와 평균을 통째로 덮으므로 tournament_*
+    // 컬럼에 따로 쌓는다. mock은 where와 무관하게 고정값을 주므로 인자 단언으로만 잡을 수 있다.
+    it('개인 매치와 팀매치 후기를 mannerScore 집계에 넣고, 대회 후기는 제외한다', async () => {
       const findManyMock = jest.fn().mockResolvedValue([]);
       const prisma = {
         v1PostEventReview: { findMany: findManyMock },
@@ -348,9 +348,10 @@ describe('ReviewsService', () => {
 
       await service['recalculateUserReputation'](prisma as never, 'x');
 
-      expect(findManyMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        where: expect.objectContaining({ targetUserId: 'x', targetType: 'user', sourceType: 'match' }),
-      }));
+      const where = findManyMock.mock.calls[0][0].where as { sourceType: { in: string[] } };
+      expect(where).toMatchObject({ targetUserId: 'x', targetType: 'user' });
+      expect(where.sourceType.in).toEqual(expect.arrayContaining(['match', 'team_match']));
+      expect(where.sourceType.in).not.toContain('tournament_fixture');
     });
 
     it('공개되지 않은(상대 미제출+72시간 미경과) 리뷰는 mannerScore 집계에서 제외한다', async () => {
@@ -660,6 +661,8 @@ describe('ReviewsService', () => {
           v1PostEventReview: {
             findMany: findManyMock,
           },
+          // 요약이 종목 코드를 붙여 내려주려고 v1Sport 를 조회한다(배지 매핑 키).
+          v1Sport: { findMany: jest.fn().mockResolvedValue([]) },
         };
         const tournamentFixtureReviews = {
           pending: jest.fn(),
@@ -674,8 +677,9 @@ describe('ReviewsService', () => {
           { targetType: 'user' },
         );
 
+        // sportCode 는 배지 매핑 키다 — v1Sport 조회가 비면 null 로 떨어진다(배지는 "기타").
         expect(result.bySport).toEqual([
-          { sportId: 'futsal', ratingAvg: 5, ratingCount: 1, tagRates: [{ tagCode: 'manner', label: '매너가 좋아요', rate: 1, count: 1 }] },
+          { sportId: 'futsal', sportCode: null, ratingAvg: 5, ratingCount: 1, tagRates: [{ tagCode: 'manner', label: '매너가 좋아요', rate: 1, count: 1 }] },
         ]);
         expect(findManyMock).toHaveBeenCalledTimes(2);
       } finally {
@@ -705,6 +709,7 @@ describe('ReviewsService', () => {
           v1TeamMembership: {
             findMany: jest.fn().mockResolvedValue([{ teamId: 'team-a' }]),
           },
+          v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
         };
         const tournamentFixtureReviews = {
           pending: jest.fn(),
@@ -720,7 +725,7 @@ describe('ReviewsService', () => {
         );
 
         expect(result.bySport).toEqual([
-          { sportId: 'futsal', ratingAvg: 5, ratingCount: 1, tagRates: [] },
+          { sportId: 'futsal', sportCode: 'futsal', ratingAvg: 5, ratingCount: 1, tagRates: [] },
         ]);
       } finally {
         jest.useRealTimers();

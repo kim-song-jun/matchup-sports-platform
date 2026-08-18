@@ -9,7 +9,6 @@ import { trackEvent } from '@/lib/analytics';
 import { dismissPushNudge, shouldShowPushNudge } from '@/lib/session-storage';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import type { V1ResolveLocationResponse } from '@/types/api';
-import { PendingTournamentReviewModal } from '@/components/tournaments/pending-review-modal';
 import { HomePageView } from './home-page';
 import { toHomeChatRooms, toHomeModel, withoutHomeContent } from './home-client-model';
 import type { HomeViewModel } from './home.types';
@@ -80,7 +79,6 @@ export function HomePageClient() {
   if (query.isError) {
     return (
       <>
-        <PendingTournamentReviewModal />
         <HomePageView
           model={{
             ...nonDataFallback,
@@ -104,7 +102,6 @@ export function HomePageClient() {
 
   return (
     <>
-      <PendingTournamentReviewModal />
       <HomePageView
         model={
           query.data

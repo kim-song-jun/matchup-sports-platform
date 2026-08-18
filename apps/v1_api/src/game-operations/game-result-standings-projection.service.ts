@@ -1,9 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { validateCompetitionConfig } from '../tournaments/competition-config/competition-config';
 import {
+  fairPlayByRegistrationFromGroups,
   recalculateAndUpsertGroupStandings,
   type StandingsSourceGroup,
 } from '../tournaments/tournament-group-standings';
+import { recalculateAndUpsertOverallStandings } from '../tournaments/tournament-overall-standings';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 
 type GroupForStandingsRow = StandingsSourceGroup & {
@@ -77,7 +79,18 @@ export class GameResultStandingsProjectionService {
             homeRegistrationId: true,
             awayRegistrationId: true,
             game: {
-              select: { currentOfficialRevision: { select: { state: true, score: true } } },
+              select: {
+                currentOfficialRevision: {
+                  select: {
+                    state: true,
+                    score: true,
+                    // F5: 페어플레이 벌점 원천. tournament-group-standings.ts의
+                    // fairPlayByRegistrationFromGroups() 참고.
+                    resultParticipants: { select: { sideId: true, cards: true } },
+                  },
+                },
+                sides: { select: { id: true, sideKey: true } },
+              },
             },
           },
         },
@@ -97,6 +110,10 @@ export class GameResultStandingsProjectionService {
     if (!tournament || tournament.deletedAt !== null || !tournament.competitionConfigVersionId) return;
 
     const config = validateCompetitionConfig(tournament.competitionConfig);
+    const now = new Date();
+    // F5: 이 그룹만으로 계산해도 값은 전체 조 기준과 동일하다 — 픽스처는 조별로
+    // 분리돼 있어 다른 조 픽스처가 이 그룹 팀의 카드 집계에 섞일 수 없다.
+    const groupFairPlayByRegistration = fairPlayByRegistrationFromGroups([group]);
     await recalculateAndUpsertGroupStandings(
       tx,
       {
@@ -104,8 +121,58 @@ export class GameResultStandingsProjectionService {
         configVersionId: tournament.competitionConfigVersionId,
         config,
         group,
+        fairPlayByRegistration: groupFairPlayByRegistration,
       },
-      new Date(),
+      now,
+    );
+
+    // Invariant (§7.1): every path that calls recalculateAndUpsertGroupStandings
+    // must also call recalculateAndUpsertOverallStandings in the same tx, so
+    // the group view and the overall (통합) view never drift. Unlike
+    // TournamentBracketService.recalculateStandings() (admin-triggered, loops
+    // every group-phase group already), this automatic per-result trigger
+    // only has the one affected group loaded above — so it re-fetches every
+    // group-phase group of the tournament here, in the same transaction, to
+    // feed the overall recalculation.
+    const allGroups = (await tx.v1TournamentGroup.findMany({
+      where: { tournamentId: tournament.id, phase: 'group' },
+      select: {
+        id: true,
+        groupTeams: { select: { registrationId: true } },
+        fixtures: {
+          where: { status: 'completed' },
+          select: {
+            homeRegistrationId: true,
+            awayRegistrationId: true,
+            game: {
+              select: {
+                currentOfficialRevision: {
+                  select: {
+                    state: true,
+                    score: true,
+                    // F5: 페어플레이 벌점 원천. tournament-group-standings.ts의
+                    // fairPlayByRegistrationFromGroups() 참고.
+                    resultParticipants: { select: { sideId: true, cards: true } },
+                  },
+                },
+                sides: { select: { id: true, sideKey: true } },
+              },
+            },
+          },
+        },
+      },
+    })) as StandingsSourceGroup[];
+
+    await recalculateAndUpsertOverallStandings(
+      tx,
+      {
+        tournamentId: tournament.id,
+        configVersionId: tournament.competitionConfigVersionId,
+        config,
+        groups: allGroups,
+        fairPlayByRegistration: fairPlayByRegistrationFromGroups(allGroups),
+      },
+      now,
     );
   }
 }

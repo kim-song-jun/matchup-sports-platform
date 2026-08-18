@@ -2071,6 +2071,8 @@ model V1Tournament {
   // 20260729000200_v1_competition_config while this column was still
   // nullable), so `competitionConfig` stays a real relation, just optional.
   competitionConfigVersionId String?                     @map("competition_config_version_id")
+  /** 리그전에서 각 팀이 최소 몇 경기를 보장받는지. null이면 검증하지 않는다. */
+  minMatchesPerTeam          Int?                        @map("min_matches_per_team")
 
   sport                V1Sport                              @relation(fields: [sportId], references: [id], onDelete: Restrict)
   competitionConfig    V1CompetitionConfigVersion?          @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
@@ -2089,6 +2091,7 @@ model V1Tournament {
   operationAudits      V1OperationAudit[]
   advancementEdges     V1TournamentFixtureAdvancementEdge[]
   officialResultCaches V1GameOfficialResultCache[]
+  overallStandings     V1TournamentOverallStanding[]
 
   @@index([status, scheduledAt])
   @@index([sportId, status])
@@ -2202,6 +2205,7 @@ model V1TournamentRegistration {
   homeFixtures     V1TournamentFixture[]   @relation("V1TournamentFixtureHome")
   awayFixtures     V1TournamentFixture[]   @relation("V1TournamentFixtureAway")
   standings        V1TournamentStanding[]
+  overallStandings V1TournamentOverallStanding[]
 
   @@unique([tournamentId, teamId])
   @@index([tournamentId, status])
@@ -2431,6 +2435,7 @@ model V1TournamentStanding {
   losses         Int       @default(0)
   goalsFor       Int       @default(0) @map("goals_for")
   goalsAgainst   Int       @default(0) @map("goals_against")
+  fairPlayPoints Int       @default(0) @map("fair_play_points")
   position       Int?
   recalculatedAt DateTime? @map("recalculated_at")
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -2442,6 +2447,35 @@ model V1TournamentStanding {
   @@unique([groupId, registrationId])
   @@index([groupId, position])
   @@map("v1_tournament_standings")
+}
+
+/**
+ * 대회 전체(모든 조 합산) 통합 순위. 조별 순위(V1TournamentStanding)와
+ * 항상 같은 트랜잭션에서 갱신된다 — 한쪽만 갱신되는 경로를 만들지 말 것.
+ * 소화 경기 수는 wins + draws + losses 로 파생한다(중복 저장 금지).
+ */
+model V1TournamentOverallStanding {
+  id             String    @id @default(uuid())
+  tournamentId   String    @map("tournament_id")
+  registrationId String    @map("registration_id")
+  points         Int       @default(0)
+  wins           Int       @default(0)
+  draws          Int       @default(0)
+  losses         Int       @default(0)
+  goalsFor       Int       @default(0) @map("goals_for")
+  goalsAgainst   Int       @default(0) @map("goals_against")
+  fairPlayPoints Int       @default(0) @map("fair_play_points")
+  position       Int?
+  recalculatedAt DateTime? @map("recalculated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tournament   V1Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  registration V1TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, registrationId])
+  @@index([tournamentId, position])
+  @@map("v1_tournament_overall_standings")
 }
 
 model V1TournamentAnnouncement {

@@ -6,9 +6,17 @@ import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits } from '@/lib/number-format';
 import { useV1PublishTournamentBracket, useV1UnpublishTournamentBracket, useV1AdminBracket, useV1CreateGroup, useV1AssignGroupTeam, useV1CreateFixture, useV1RecalculateStandings, useV1UpdateFixture, useV1DeleteFixture, useV1UpdateGroup, useV1DeleteGroup, useV1RemoveGroupTeam } from '@/hooks/use-v1-api';
-import type { V1AdminTournamentRegistration, V1AdminBracketGroup, V1AdminBracketFixture } from '@/types/api';
+import type {
+  V1AdminTournamentRegistration,
+  V1AdminBracketGroup,
+  V1AdminBracketFixture,
+  V1GenerateLeagueFixturesResponse,
+} from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
+import { V1ApiError, v1Post } from '@/lib/api-client';
+// 조별리그 라운드로빈은 서버(POST /admin/tournaments/:id/league/fixtures/generate)로 이관했다.
+// 여기 남는 knockoutSeedPairs 는 녹아웃 시드 페어링 전용이다.
+import { knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { BracketGroupQuickAdd } from './bracket-group-quick-add';
@@ -75,6 +83,14 @@ export function BracketTab({
   const [focusGroupId, setFocusGroupId] = useState<string | null>(null);
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
   const { confirm: confirmModal, ConfirmModal } = useConfirm();
+
+  // ── 조별리그 대진 자동 생성(서버 API, 회전 수 선택) ────────────────
+  // 이 컴포넌트의 다른 mutation 은 전용 훅(`hooks/use-v1-api.ts`)이 React Query 캐시
+  // invalidate 를 담당하지만, 신규 리그 API 는 그 파일을 건드리지 않도록
+  // v1Post 직접 호출 + 로컬 pending state + useV1AdminBracket 의 refetch() 로 구현했다.
+  const [isGeneratingLeague, setIsGeneratingLeague] = useState(false);
+  const [legsPickerGroupId, setLegsPickerGroupId] = useState<string | null>(null);
+  const [legsPickerValue, setLegsPickerValue] = useState<'1' | '2'>('1');
 
   const confirmedRegistrations = registrations.filter((r) => r.status === 'confirmed');
   // EntityPicker 어댑터 — 팀 select 자리에 쓸 아이템 목록(제출 payload는 계속 registrationId 문자열)
@@ -187,6 +203,20 @@ export function BracketTab({
 
     const isKnockout = group.phase === 'semi' || group.phase === 'final' || group.phase === 'third_place';
 
+    if (!isKnockout) {
+      // GROUP phase — 조별리그 대진은 서버가 만든다. 회전 수(1회전/2회전)를 모달에서 고른 뒤
+      // POST /admin/tournaments/:id/league/fixtures/generate 를 호출한다.
+      // 기존 fixture 존재 여부·최소 경기 수 검증도 서버가 판정하므로 여기서 미리 묻지 않는다.
+      if (group.groupTeams.length < 2) {
+        showToast('조에 팀이 2개 이상 있어야 자동 생성할 수 있어요.', 'error');
+        return;
+      }
+      setLegsPickerValue('1');
+      setLegsPickerGroupId(targetGroupId);
+      return;
+    }
+
+    // KNOCKOUT phase — 아래는 전부 녹아웃 시드 페어링 경로다.
     // Check for existing fixtures in this group
     const existingInGroup = allFixtures.filter((f) => f.groupId === targetGroupId);
     if (existingInGroup.length > 0) {
@@ -204,30 +234,7 @@ export function BracketTab({
 
     setIsAutoGenerating(true);
     try {
-      if (!isKnockout) {
-        // GROUP phase — round-robin: every unordered pair once
-        const teams = group.groupTeams;
-        if (teams.length < 2) {
-          showToast('조에 팀이 2개 이상 있어야 자동 생성할 수 있어요.', 'error');
-          return;
-        }
-        // 라운드로빈: 모든 비순서 쌍 1회 (순수 함수 roundRobinRounds — circle method)
-        const payloads: Parameters<typeof createFixture.mutate>[0][] = [];
-        roundRobinRounds(teams).forEach((pairs, round) => {
-          const roundLabel = `조별 ${round + 1}라운드`;
-          for (const [home, away] of pairs) {
-            payloads.push({
-              groupId: targetGroupId,
-              round: roundLabel,
-              fixtureNumber: nextNum++,
-              homeRegistrationId: home.registrationId,
-              awayRegistrationId: away.registrationId,
-            });
-          }
-        });
-        await mutateSequential(payloads);
-        showToast(`조별리그 경기 일정 ${payloads.length}개를 자동으로 만들었어요.`, 'success');
-      } else {
+      {
         // KNOCKOUT phase — seed-pair: 1 vs N, 2 vs N-1, …
         const teams = group.groupTeams;
         const roundLabel =
@@ -268,6 +275,44 @@ export function BracketTab({
       showToast(extractErrorMessage(err, '자동 생성에 실패했어요.'), 'error');
     } finally {
       setIsAutoGenerating(false);
+    }
+  };
+
+  // ── 조별리그 대진 생성 확정 — 회전 수 선택 모달의 "자동 생성" 클릭 ──
+  const handleGenerateLeagueFixtures = async (replaceExisting: boolean) => {
+    if (!legsPickerGroupId) return;
+    const legs = Number(legsPickerValue);
+    setIsGeneratingLeague(true);
+    try {
+      const res = await v1Post<V1GenerateLeagueFixturesResponse>(
+        `/admin/tournaments/${tournamentId}/league/fixtures/generate`,
+        { groupId: legsPickerGroupId, legs, replaceExisting },
+      );
+      setLegsPickerGroupId(null);
+      await refetch();
+      showToast(`조별리그 경기 일정 ${res.created}개를 자동으로 만들었어요.`, 'success');
+      // 서버가 생성을 막지는 않지만 알아야 하는 사항(일정 미지정·홀수 팀 bye)을 함께 알린다.
+      // 이걸 삼키면 관리자가 "일정이 비어 있다"를 나중에 현장에서 발견하게 된다.
+      // 실패가 아니므로 error 로 띄우지 않고 기본 톤으로 알린다.
+      for (const warning of res.warnings ?? []) {
+        showToast(warning.message);
+      }
+    } catch (err) {
+      if (err instanceof V1ApiError && err.code === 'LEAGUE_FIXTURES_ALREADY_EXIST') {
+        const ok = await confirmModal({
+          title: '대진 교체',
+          message: '이미 대진이 있어요. 교체할까요?',
+          confirmLabel: '교체',
+          tone: 'danger',
+        });
+        if (ok) await handleGenerateLeagueFixtures(true);
+        return;
+      }
+      // LEAGUE_MIN_MATCHES_NOT_MET 등 그 외 코드는 서버 message 를 그대로 노출한다
+      // (message 에 이미 필요한 회전 수 안내가 포함돼 있다).
+      showToast(extractErrorMessage(err, '자동 생성에 실패했어요.'), 'error');
+    } finally {
+      setIsGeneratingLeague(false);
     }
   };
 
@@ -759,6 +804,51 @@ export function BracketTab({
             </button>
           </div>
         </form>
+      </SimpleModal>
+
+      {/* ── 조별리그 대진 자동 생성 — 회전 수 선택 모달 ───────── */}
+      <SimpleModal
+        open={legsPickerGroupId !== null}
+        title="조별리그 대진 자동 생성"
+        onClose={() => setLegsPickerGroupId(null)}
+        pending={isGeneratingLeague}
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="league-fixtures-legs" className="text-[13px] text-[var(--text-strong)]">회전 수</label>
+            <select
+              id="league-fixtures-legs"
+              value={legsPickerValue}
+              onChange={(e) => setLegsPickerValue(e.target.value as '1' | '2')}
+              disabled={isGeneratingLeague}
+              className={inputCls}
+            >
+              <option value="1">1회전 (싱글 라운드로빈)</option>
+              <option value="2">2회전 (홈/어웨이 더블 라운드로빈)</option>
+            </select>
+            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)]">
+              모든 팀이 서로 {legsPickerValue}회씩 맞붙는 대진을 자동으로 만들어요.
+            </p>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setLegsPickerGroupId(null)}
+              disabled={isGeneratingLeague}
+              className="flex-1 h-[44px] rounded-xl text-[13px] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleGenerateLeagueFixtures(false)}
+              disabled={isGeneratingLeague}
+              className={'flex-1 ' + submitBtnCls}
+            >
+              {isGeneratingLeague ? '생성 중…' : '자동 생성'}
+            </button>
+          </div>
+        </div>
       </SimpleModal>
     </div>
     </>

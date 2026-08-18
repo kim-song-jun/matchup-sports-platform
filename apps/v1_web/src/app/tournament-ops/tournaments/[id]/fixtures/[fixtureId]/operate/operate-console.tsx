@@ -54,8 +54,8 @@ import {
   playerLabel,
 } from './confirm-copy';
 import {
-  isPenaltyShootoutDecisive,
   penaltyScoreBySideId,
+  penaltyShootoutOutcome,
   type PenaltyKick,
   type PenaltyKickResult,
 } from '@/lib/penalty-shootout';
@@ -412,6 +412,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return readGameResultScore(chosen?.score)?.penalties ?? null;
   }, [gameEnded, resultRevisions.data, gameDetail.data?.currentOfficialRevisionId]);
 
+  /* 확정된 승부차기의 선축 사이드. 저장값은 `sideKey`(`'HOME'|'AWAY'`)이므로 여기서
+     사이드 목록과 맞춰 실제 팀으로 되돌린다. 선축이 없던 시절에 저장된 경기(그리고 중첩
+     백필 형태)는 `null` — 모르는 것을 지어내지 않고 표시 자체를 생략한다. */
+  const confirmedFirstKicker = useMemo(() => {
+    const sideKey = confirmedPenalties?.firstKickSideKey;
+    if (sideKey === undefined) return null;
+    return (gameDetail.data?.sides ?? []).find((side) => side.sideKey === sideKey) ?? null;
+  }, [confirmedPenalties, gameDetail.data?.sides]);
+
   // 과제 2 — 승부차기 시작 버튼 노출 조건. 종료 흐름 개편(사용자 결정 2·3)
   // 으로 이 시점이 **후반 종료 이후**로 옮겨졌다: 예전엔 "마지막 피리어드가
   // 아직 LIVE인 동안"(`currentPeriod !== null && !hasNextPeriod`)에 띄웠는데,
@@ -459,6 +468,17 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 킥이 없음 — 이 하나의 상태로 "열림 여부"와 "킥 목록"을 함께 표현해 별도
   // boolean을 두지 않는다.
   const [penaltyKicks, setPenaltyKicks] = useState<PenaltyKick[] | null>(null);
+  // 선축(동전 던지기 결과). 킥 목록과 달리 이 값은 **서버에 남는다** —
+  // `end` 커맨드의 `payload.penalties.firstKickSideKey`로 실려 리비전에 저장된다.
+  // 패널이 닫혀 있는 동안에는 의미가 없으므로 패널을 열 때마다 초기화한다.
+  const [firstKickSideId, setFirstKickSideId] = useState<string | null>(null);
+  // 이 대회의 종료 판정 정책. 서버가 pinned config에서 해석해 내려준다. 응답에 없으면
+  // (구버전 배포·캐시된 쿼리) FIFA 정규로 읽는다 — 이전 동작보다 엄격한 쪽이라 안전한
+  // 폴백이다(`GameDetail.penaltyShootoutPolicy` doc 참고).
+  // useMemo인 이유: 매 렌더 새 객체를 만들면 이 값을 dep으로 쓰는 콜백
+  // (`handleFinishPenaltyShootout`)이 매번 새로 만들어진다.
+  const penaltyEarlyStop = gameDetail.data?.penaltyShootoutPolicy?.earlyStop ?? true;
+  const penaltyPolicy = useMemo(() => ({ earlyStop: penaltyEarlyStop }), [penaltyEarlyStop]);
 
   const { confirm, ConfirmModal: confirmModal } = useConfirm();
 
@@ -743,6 +763,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     const copy = penaltyShootoutStartConfirmCopy(gameDetail.data?.sides ?? [], scoreBySideId);
     if (!(await confirm(copy))) return;
     setPenaltyKicks([]);
+    // 선축은 매번 다시 고른다 — 직전 승부차기(취소했던 것)의 선택이 남아 있으면
+    // 운영자가 동전을 던지지도 않고 그대로 진행하게 된다.
+    setFirstKickSideId(null);
   }, [confirm, gameDetail.data?.sides, scoreBySideId]);
 
   // 패널을 닫는다 — 취소는 사이드 이펙트가 없으므로(아직 아무것도 서버에
@@ -775,12 +798,24 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     const score = penaltyScoreBySideId(penaltyKicks);
     const homeScore = score.get(homeSide.id) ?? 0;
     const awayScore = score.get(awaySide.id) ?? 0;
-    if (!isPenaltyShootoutDecisive(homeScore, awayScore)) return;
-    const copy = penaltyShootoutFinishConfirmCopy(homeSide, awaySide, homeScore, awayScore);
+    // 패널의 "승부차기 종료" 버튼과 **같은 술어**를 여기서도 한 번 더 본다 — 버튼
+    // 비활성만으로는 막을 수 없는 경로(포커스된 채 Enter, 확인 모달 대기 중 상태 변화)가
+    // 남기 때문이다. 이 판정은 서버가 할 수 없다(총점 두 개만 저장한다).
+    if (penaltyShootoutOutcome(penaltyKicks, sidesList, firstKickSideId, penaltyPolicy) !== 'DECIDED') {
+      return;
+    }
+    // 선축은 사이드 id가 아니라 `sideKey`로 보낸다 — 저장되는 곳이 `score.penalties`라
+    // 점수(home/away)와 같은 기준틀이어야 하고, 게임별로 달라지는 id를 결과 스냅샷에
+    // 박아 두면 나중에 그 값을 읽는 화면이 사이드 목록 없이는 해석할 수 없다.
+    const firstKickSideKey = firstKickSideId === awaySide.id ? 'AWAY' : 'HOME';
+    const firstKickSide = firstKickSideKey === 'AWAY' ? awaySide : homeSide;
+    const copy = penaltyShootoutFinishConfirmCopy(homeSide, awaySide, homeScore, awayScore, firstKickSide);
     if (!(await confirm(copy))) return;
     setPenaltyKicks(null);
-    await handleRunCommand('end', { penalties: { home: homeScore, away: awayScore } });
-  }, [penaltyKicks, gameDetail.data?.sides, confirm, handleRunCommand]);
+    await handleRunCommand('end', {
+      penalties: { home: homeScore, away: awayScore, firstKickSideKey },
+    });
+  }, [penaltyKicks, firstKickSideId, penaltyPolicy, gameDetail.data?.sides, confirm, handleRunCommand]);
 
   // 이슈 #375 — Copilot review 패턴 재사용(PR #276, 위 liveEventsRef와 같은
   // 이유): 되돌리기 토스트의 onClick이 "토스트를 띄운 그 순간의"
@@ -999,11 +1034,21 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 className="flex items-center gap-1.5 rounded-lg bg-[var(--blue50)] px-2.5 py-1 text-sm font-bold tabular-nums text-[var(--blue700)] dark:bg-blue-500/10"
                 aria-label={`승부차기 ${sides
                   .map((side) => `${side.displayNameSnapshot} ${penaltyScoreForSide(side, confirmedPenalties)}점`)
-                  .join(', ')}`}
+                  .join(', ')}${
+                  confirmedFirstKicker === null ? '' : `, 선축 ${confirmedFirstKicker.displayNameSnapshot}`
+                }`}
               >
                 <Target size={16} aria-hidden="true" />
                 승부차기{' '}
                 {sides.map((side) => penaltyScoreForSide(side, confirmedPenalties)).join(':')}
+                {/* 선축은 점수와 함께 결과의 일부다(두 숫자로는 복원되지 않는다). 여기서는
+                    사이드 목록이 있으므로 `홈`/`원정` 대신 실제 팀 이름을 쓴다 — 목록형
+                    화면(결과 검수·픽스처 목록)은 이름을 갖고 있지 않아
+                    `formatGameResultScoreWithPenalties`가 `홈`/`원정`을 쓴다. 선축이 없던
+                    시절에 저장된 경기는 이 조각을 아예 그리지 않는다. */}
+                {confirmedFirstKicker === null ? null : (
+                  <span className="font-semibold">· 선축 {confirmedFirstKicker.displayNameSnapshot}</span>
+                )}
               </span>
             ) : null}
             {currentPeriod && currentPeriod.startedAt ? (
@@ -1305,10 +1350,13 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         <PenaltyShootoutPanel
           sides={sides}
           kicks={penaltyKicks}
+          firstKickSideId={firstKickSideId}
+          onSelectFirstKicker={setFirstKickSideId}
           onRecordKick={handleRecordPenaltyKick}
           onUndoLastKick={handleUndoPenaltyKick}
           onFinish={() => void handleFinishPenaltyShootout()}
           onCancel={handleCancelPenaltyShootout}
+          policy={penaltyPolicy}
           finishing={commandPending}
         />
       ) : null}

@@ -177,6 +177,19 @@ export function validateCompetitionConfig(value: unknown): CompetitionConfig {
   ) {
     invalidConfig('result의 득점자 또는 MVP 규칙이 올바르지 않아요.');
   }
+  // `result.penaltyShootout`은 canonical 프리셋에 없는 optional 키다(프리셋을 건드리면
+  // contentHash가 드리프트해 백필 CLI와 version-in-use 트리거에 걸린다 —
+  // `competition-config.types.ts` 참고). 그래서 위 positions/formations와 **같은 패턴**으로
+  // "있을 때만" 검사한다: 저장된 모든 기존 row에는 이 키가 없고, 이 함수는 쓰기 게이트일
+  // 뿐 아니라 읽기 경로에서 저장된 row에 다시 돌기도 하므로 키 부재로 던지면 기존 대회의
+  // 순위 재계산이 통째로 깨진다. 반대로 키가 **있는데** 모양이 틀린 것은 진짜 검증 실패다.
+  const penaltyShootoutProvided = isRecord(result) && result.penaltyShootout !== undefined;
+  if (
+    penaltyShootoutProvided &&
+    (!isRecord(result.penaltyShootout) || typeof result.penaltyShootout.earlyStop !== 'boolean')
+  ) {
+    invalidConfig('result.penaltyShootout.earlyStop은 true 또는 false여야 해요.');
+  }
   const tieBreak = value.tieBreak;
   const points = isRecord(tieBreak) ? tieBreak.points : null;
   if (

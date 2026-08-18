@@ -75,6 +75,14 @@ export class CreateTournamentDto {
   @IsIn(TOURNAMENT_FORMATS)
   format?: TournamentFormat;
 
+  /** 리그 방식에서 각 팀이 최소 몇 경기를 보장받아야 하는지. 비워두면 검증하지 않는다. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '최소 경기 수는 정수여야 해요.' })
+  @Min(1, { message: '최소 경기 수는 1경기 이상이어야 해요.' })
+  @Max(50, { message: '최소 경기 수는 50경기를 넘을 수 없어요.' })
+  minMatchesPerTeam?: number;
+
   @IsOptional()
   @IsDateString()
   registrationDeadlineAt?: string;
@@ -363,6 +371,14 @@ export class UpdateTournamentDto {
   @IsOptional()
   @IsIn(TOURNAMENT_FORMATS)
   format?: TournamentFormat;
+
+  /** 리그 방식에서 각 팀이 최소 몇 경기를 보장받아야 하는지. 비워두면 검증하지 않는다. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '최소 경기 수는 정수여야 해요.' })
+  @Min(1, { message: '최소 경기 수는 1경기 이상이어야 해요.' })
+  @Max(50, { message: '최소 경기 수는 50경기를 넘을 수 없어요.' })
+  minMatchesPerTeam?: number;
 
   @IsOptional()
   @IsDateString()

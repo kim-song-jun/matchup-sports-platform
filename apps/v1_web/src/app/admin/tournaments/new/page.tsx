@@ -938,6 +938,28 @@ function ParticipationStep({
         )}
       </Field>
 
+      {state.format === 'league' ? (
+        <Field
+          id="minMatchesPerTeam"
+          label="최소 경기 수"
+          hint="각 팀이 최소 몇 경기를 보장받을지 정해요. 비워두면 검증하지 않아요."
+          error={errors.minMatchesPerTeam}
+        >
+          <input
+            id="minMatchesPerTeam"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={50}
+            value={state.minMatchesPerTeam}
+            onChange={(event) => setField('minMatchesPerTeam', event.target.value)}
+            disabled={pending}
+            aria-invalid={Boolean(errors.minMatchesPerTeam)}
+            className={inputClass}
+          />
+        </Field>
+      ) : null}
+
       {state.genderCategory === 'mixed' ? (
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
           <h3 className="text-sm font-bold text-[var(--text-strong)]">혼성 명단 쿼터</h3>

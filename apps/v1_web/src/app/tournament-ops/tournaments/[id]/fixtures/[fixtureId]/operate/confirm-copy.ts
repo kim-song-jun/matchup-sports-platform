@@ -214,16 +214,22 @@ export function penaltyShootoutStartConfirmCopy(
 }
 
 /** 승부차기 종료 확인 — `end` 커맨드를 실제로 실행하는 마지막 단계라
- * `end`와 같은 danger 톤을 쓴다(되돌릴 수 없음은 동일하다). */
+ * `end`와 같은 danger 톤을 쓴다(되돌릴 수 없음은 동일하다).
+ *
+ * 선축도 함께 보여준다: 이 확인을 지나면 `firstKickSideKey`가 리비전 `score.penalties`에
+ * **영구히** 박히는데, 선축 라디오는 첫 킥이 기록되는 순간 잠기므로 운영자가 잘못 고른
+ * 선축을 알아챌 마지막 기회가 이 모달이다(저장된 뒤에는 정정 폼에 선축 입력란이 없어
+ * 되살릴 수단이 없다). */
 export function penaltyShootoutFinishConfirmCopy(
   homeSide: GameSide,
   awaySide: GameSide,
   homeScore: number,
   awayScore: number,
+  firstKickSide: GameSide,
 ): ConfirmCopy {
   return {
     title: '승부차기를 종료할까요?',
-    message: `${homeSide.displayNameSnapshot} ${homeScore} : ${awayScore} ${awaySide.displayNameSnapshot} 승부차기로 경기를 종료해요. 종료하면 되돌릴 수 없어요.`,
+    message: `${homeSide.displayNameSnapshot} ${homeScore} : ${awayScore} ${awaySide.displayNameSnapshot} 승부차기로 경기를 종료해요. 선축은 ${firstKickSide.displayNameSnapshot}이에요. 종료하면 되돌릴 수 없어요.`,
     confirmLabel: '승부차기 종료',
     tone: 'danger',
   };

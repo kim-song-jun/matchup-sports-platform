@@ -8,6 +8,11 @@ import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { Trophy, Goal, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
+import { v1Get } from '@/lib/api-client';
+import {
+  LeagueStandingsTable,
+  type LeagueStandingsTableData,
+} from '@/components/tournaments/league-standings-table';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
@@ -1537,6 +1542,63 @@ function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
   );
 }
 
+/**
+ * Task 11: 리그 대회 공개 상세의 통합 순위표 — `GET /tournaments/:id/standings/overall`을
+ * 직접 조회한다. 도메인 훅 파일(`hooks/use-v1-api.ts`)은 이 태스크의 배정 파일이 아니라서
+ * 여기서 `v1Get`을 인라인으로 호출한다(Task 10이 그 파일에 전용 react-query 훅을 추가하면
+ * 이 컴포넌트를 그 훅 호출로 교체할 수 있다). `useQuery`(react-query)가 아니라 수동
+ * `useEffect` 페칭을 쓰는 이유: `TournamentDetailView`는 기존 테스트(`tournament-detail-client.test.ts`,
+ * 이 태스크의 배정 파일이 아니라 여기서 함께 고칠 수 없다)에서 `QueryClientProvider` 없이
+ * 단독 렌더되므로, `useQuery`를 쓰면 "No QueryClient set" 에러로 그 테스트들이 깨진다.
+ * 로딩 중에는 조용히 아무것도 렌더하지 않고(레이아웃 흔들림 방지), 실패 시에는 기존
+ * `ErrorState`를 재사용한다.
+ */
+function LeagueStandingsSection({ tournamentId }: { tournamentId: string }) {
+  const [state, setState] = useState<
+    | { status: 'loading' }
+    | { status: 'error' }
+    | { status: 'success'; data: LeagueStandingsTableData }
+  >({ status: 'loading' });
+  const [retryToken, setRetryToken] = useState(0);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    let cancelled = false;
+    setState({ status: 'loading' });
+    v1Get<LeagueStandingsTableData>(`/tournaments/${tournamentId}/standings/overall`)
+      .then((data) => {
+        if (!cancelled) setState({ status: 'success', data });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: 'error' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId, retryToken]);
+
+  if (state.status === 'loading') return null;
+
+  if (state.status === 'error') {
+    return (
+      <section aria-label="통합 순위표" style={{ marginTop: 24 }}>
+        <ErrorState message="순위표를 불러오지 못했어요." onRetry={() => setRetryToken((n) => n + 1)} />
+      </section>
+    );
+  }
+
+  const { data } = state;
+
+  return (
+    <section aria-labelledby="league-standings-heading" style={{ marginTop: 24 }}>
+      <div id="league-standings-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+        통합 순위
+      </div>
+      <LeagueStandingsTable data={data} />
+    </section>
+  );
+}
+
 /* ── FormatLeftSections —
  * Renders group fixtures but NOT the bracket and NOT standings (TARGET §A-1: 순위표는
  * /bracket으로 일원화되어 StandingsMovedNotice로 대체됐다 — GroupStandingsTable/
@@ -1556,7 +1618,7 @@ function FormatLeftSections({ tournament }: { tournament: V1TournamentDetail }) 
   if (format === 'league') {
     return (
       <>
-        {hasGroupStandings ? <StandingsMovedNotice tournamentId={tournament.id} /> : null}
+        {hasGroupStandings ? <LeagueStandingsSection tournamentId={tournament.id} /> : null}
 
         {hasAnyFixtures ? (
           <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>

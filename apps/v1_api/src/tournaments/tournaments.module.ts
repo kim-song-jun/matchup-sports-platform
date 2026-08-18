@@ -13,6 +13,7 @@ import { AdminRegistrationsController } from './admin-registrations.controller';
 import { AdminRegistrationsService } from './admin-registrations.service';
 import { TournamentBracketController } from './tournament-bracket.controller';
 import { TournamentBracketService } from './tournament-bracket.service';
+import { LeagueFixtureGeneratorService } from './league-fixture-generator.service';
 import { TournamentPlayersController, TournamentPlayersAdminController } from './tournament-players.controller';
 import { TournamentPlayersService } from './tournament-players.service';
 import { TournamentsReadController } from './tournaments-read.controller';
@@ -92,6 +93,7 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentRegistrationsService,
     AdminRegistrationsService,
     TournamentBracketService,
+    LeagueFixtureGeneratorService,
     TournamentPlayersService,
     TournamentsReadService,
     TournamentAnnouncementsService,

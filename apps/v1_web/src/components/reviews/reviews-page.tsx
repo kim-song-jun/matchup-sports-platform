@@ -55,7 +55,19 @@ export function ReviewsPageView({
         <ReviewTabs active={model.tab} onChange={onTabChange} />
         {isReceivedTab ? (
           <>
-            {/* 개별 리뷰가 주인공, 요약은 보조. 요약은 집계 0건이면 스스로 렌더하지 않는다. */}
+            {loading ? <ReviewSkeleton count={2} /> : null}
+            {!loading && errorMessage ? (
+              <ReviewNotice title="리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} />
+            ) : null}
+            {/* 요약 카드는 집계 0건이면 스스로 렌더하지 않는다 — 개별 리뷰까지 0건이면 화면에
+                아무것도 남지 않으므로(실측: 완전 빈 화면) 여기서 빈 상태를 책임진다. */}
+            {!loading && !errorMessage && !hasReceivedContent ? (
+              <ReviewEmpty
+                title="아직 받은 리뷰가 없어요"
+                sub="경기가 끝나고 함께 뛴 사람들이 리뷰를 남기면 여기에 모여요."
+              />
+            ) : null}
+            {/* 개별 리뷰가 주인공, 요약은 보조. */}
             {hasReceivedContent ? <AnonymousReceivedContent model={receivedModel} /> : null}
             <div style={{ display: 'grid', gap: 12, marginTop: hasReceivedContent ? 24 : 0 }}>
               <ReviewsSummaryDashboard

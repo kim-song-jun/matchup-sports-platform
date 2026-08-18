@@ -69,7 +69,6 @@ export function TournamentPostEventHubSection({
   hasAnnouncements,
   sponsorCount,
   announcements,
-  fixtureReviewState = { status: 'guest', items: [] },
 }: {
   tournamentId: string;
   status: V1TournamentStatus;
@@ -77,23 +76,14 @@ export function TournamentPostEventHubSection({
   hasAnnouncements: boolean;
   sponsorCount?: number;
   announcements: TournamentAnnouncementSummary[];
-  fixtureReviewState?: TournamentFixtureReviewState;
 }) {
   // completed: verbose 5카드 대신 Toss식 컴팩트 액션 리스트로 대체(스크롤·복잡도 축소).
   // 단 "리뷰할 수 있는 경기"는 여기서도 함께 내린다 — 후기는 대회가 끝난 뒤에 쓰는 것인데
   // 예전엔 completed 가 되는 순간 이 진입점이 통째로 사라져, 정작 쓸 시점에 들어갈 길이 없었다.
+  // 경기별 후기 진입은 "대회 후기" 화면(/tournaments/:id/awards)으로 합쳤다 — 대회 상세에
+  // 후기 입구가 두 개(대회 후기 행 + 리뷰할 수 있는 경기 섹션)라 어디로 가야 하는지 헷갈렸다.
   if (status === 'completed') {
-    const hasCompletedFixtureAfterEnd = fixtures.some(
-      (fixture) => fixture.status === 'completed' && fixture.result !== null,
-    );
-    return (
-      <>
-        {hasCompletedFixtureAfterEnd ? (
-          <TournamentFixtureReviewEntrySection fixtures={fixtures} state={fixtureReviewState} />
-        ) : null}
-        <TournamentCompletedActionList tournamentId={tournamentId} />
-      </>
-    );
+    return <TournamentCompletedActionList tournamentId={tournamentId} />;
   }
 
   // draft/open/closed: 대회가 아직 시작도 안 했는데 "대회 후" 콘텐츠를 보여줄 단계가
@@ -126,9 +116,7 @@ export function TournamentPostEventHubSection({
   return (
     <>
       {availableCards.length > 0 ? <PostEventActionList heading="대회 현황" cards={availableCards} /> : null}
-      {hasCompletedFixture ? (
-        <TournamentFixtureReviewEntrySection fixtures={fixtures} state={fixtureReviewState} />
-      ) : null}
+
     </>
   );
 }
@@ -205,7 +193,7 @@ function PostEventActionList({ heading, cards }: { heading: string; cards: Tourn
   );
 }
 
-function TournamentFixtureReviewEntrySection({
+export function TournamentFixtureReviewEntrySection({
   fixtures,
   state,
 }: {

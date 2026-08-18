@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { assertPenaltyShootoutConcluded } from '../../games/core/penalty-shootout-outcome';
+import { assertPenaltyShootoutPersistable } from '../../games/core/penalty-shootout-outcome';
 import { parseResultPolicy } from '../../tournaments/competition-config/competition-config.parse';
 import {
   Prisma,
@@ -1147,6 +1147,15 @@ export class TournamentResultReviewService {
       // 설명하는 값이라, 옮기면 `home <= takenHome` 같은 불변식이 조용히 깨진다.
       const carriedOver = this.carryPenaltyAuditFields(submitted, baseScore);
       const applied = assertPenaltiesNotAllowed(regulation, carriedOver, facts);
+      // 정정이 승부차기를 **새로 쓰는가**를 base 와 비교해 판정한다. 새로 쓰는 것이면
+      // `end` 와 똑같이 킥 수를 요구하고, base 를 그대로 옮기는 것이면 면제한다.
+      //
+      // 이 구분이 없으면 정정이 `end` 의 우회로가 된다 — 2026-08-18 알파 교차 측정에서
+      // 같은 `{home:9, away:0}` 이 `end` 에선 422, 정정에선 201 로 저장됐다. 반대로
+      // 무조건 요구하면 킥 수가 생기기 전에 저장된 리비전의 정정이 영구히 막힌다.
+      const base = readStoredPenalties(baseScore);
+      const inheritedFromBase =
+        base !== undefined && base.home === carriedOver.home && base.away === carriedOver.away;
       // 정정 레인에도 **결판 판정을 건다.** 예전에는 이 레인이 `assertPenaltiesNotAllowed`
       // 하나만 통과시켜, `end` 가 422 로 막는 값(킥 수가 말이 안 되는 승부차기)을 정정으로는
       // 그대로 저장할 수 있었다 — 게이트를 한 레인에만 달면 다른 레인이 우회로가 된다.
@@ -1155,7 +1164,9 @@ export class TournamentResultReviewService {
         where: { id: game.competitionConfigVersionId },
         select: { result: true },
       });
-      assertPenaltyShootoutConcluded(carriedOver, parseResultPolicy(config?.result ?? null));
+      assertPenaltyShootoutPersistable(carriedOver, parseResultPolicy(config?.result ?? null), {
+        requireKickCounts: !inheritedFromBase,
+      });
       return applied;
     }
     // 승계는 "무승부를 그대로 두면 브래킷이 멈추는" 픽스처에서만 한다

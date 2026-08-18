@@ -40,7 +40,7 @@ import {
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
 import { readIsKnockoutFixture, readKnockoutFixtureFacts } from '../tournaments/knockout-fixture';
-import { assertPenaltyShootoutConcluded } from './core/penalty-shootout-outcome';
+import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import {
   assertBracketResolvable,
   assertPenaltiesNotAllowed,
@@ -5328,28 +5328,17 @@ export class GamesService {
     penalties: StoredPenalties,
     penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
   ): Promise<void> {
-    if (penalties.takenHome === undefined || penalties.takenAway === undefined) {
-      // 킥 수 없이 승부차기를 **새로 기록**하는 것은 거부한다. 이게 없으면 아래 정책 판정이
-      // 통째로 건너뛰어져, `curl` 한 줄로 `{home:1, away:0}` 을 보내면 원정이 한 번도 차지
-      // 않은 승부차기가 그대로 공식 결과가 된다 — 2026-08-18 알파에서 201 응답과 공개 화면
-      // 노출까지 실측했다. 화면의 가드는 프런트에만 있어 이 경로를 전혀 막지 못했다.
-      //
-      // 복구 레인은 면제다: 킥 수가 생기기 전에 저장된 리비전에는 그 값이 없어서,
-      // 여기서 요구하면 옛 결과의 복구가 영구히 막힌다.
-      if (penaltyOrigin === 'END_COMMAND') {
-        throw new UnprocessableEntityException({
-          code: 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED',
-          message:
-            'penalties.takenHome and penalties.takenAway are required when recording a penalty shootout',
-        });
-      }
-      return;
-    }
     const config = await tx.v1CompetitionConfigVersion.findUnique({
       where: { id: game.competitionConfigVersionId },
       select: { result: true },
     });
-    assertPenaltyShootoutConcluded(penalties, parseResultPolicy(config?.result ?? null));
+    // 판정은 두 레인이 공유하는 단일 관문에 있다(`assertPenaltyShootoutPersistable`).
+    // 여기서 정하는 건 "킥 수를 요구할 것인가" 하나뿐이다: `end` 는 승부차기를 **새로 쓰는**
+    // 경로라 클라이언트가 킥 목록을 들고 있으므로 요구하고, 복구는 이미 저장된 값을 옮기는
+    // 경로라 면제한다(킥 수가 생기기 전 리비전에는 그 값이 없다).
+    assertPenaltyShootoutPersistable(penalties, parseResultPolicy(config?.result ?? null), {
+      requireKickCounts: penaltyOrigin === 'END_COMMAND',
+    });
   }
 
   private async assertTeamMatchMatched(tx: Transaction, teamMatchId: string | null): Promise<void> {

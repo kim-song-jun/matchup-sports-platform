@@ -10,7 +10,7 @@ import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
-import { useV1ReceivedReviewSummary } from '@/hooks/use-v1-api';
+import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import type {
@@ -330,28 +330,14 @@ function TeamRecordLinkCard({
   description,
   badge,
 }: {
-  href: string;
+  /** 없으면 링크가 아니라 표시 전용 카드로 그린다 — 갈 곳이 없는데 눌리는 것처럼 보이면 안 된다. */
+  href?: string;
   title: string;
   description: string;
   badge?: string | null;
 }) {
-  return (
-    <Link
-      className="tm-pressable"
-      href={href}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 10,
-        border: '1px solid var(--border)',
-        borderRadius: 14,
-        padding: '14px 16px',
-        background: 'var(--bg)',
-        textDecoration: 'none',
-        color: 'inherit',
-      }}
-    >
+  const body = (
+    <>
       <div>
         <div className="tm-text-label">{title}</div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>{description}</div>
@@ -360,8 +346,26 @@ function TeamRecordLinkCard({
         {badge ? (
           <span className="tm-badge tm-badge-blue" style={{ whiteSpace: 'nowrap' }}>{badge}</span>
         ) : null}
-        <ChevronRightIcon size={18} aria-hidden="true" />
+        {href ? <ChevronRightIcon size={18} aria-hidden="true" /> : null}
       </div>
+    </>
+  );
+  const style: CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    border: '1px solid var(--border)',
+    borderRadius: 14,
+    padding: '14px 16px',
+    background: 'var(--bg)',
+    textDecoration: 'none',
+    color: 'inherit',
+  };
+  if (href === undefined) return <div style={style}>{body}</div>;
+  return (
+    <Link className="tm-pressable" href={href} style={style}>
+      {body}
     </Link>
   );
 }
@@ -378,12 +382,15 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const [heroMessage, setHeroMessage] = useState('');
 
   /**
-   * 내 팀일 때만 "받은 후기" 요약을 부른다. 이 응답은 **로그인 사용자가 받은 팀 후기**라
-   * 남의 팀 상세에서 부르면 그 팀 것이 아니라 내 것이 나온다 — 남의 팀 후기를 공개로
-   * 읽는 경로는 아직 API 자체가 없다.
+   * 팀 후기 요약. **공개 엔드포인트**(`GET /teams/:id/reviews`)라 내 팀이든 남의 팀이든
+   * 그 팀이 받은 평가를 그대로 읽는다 — 예전에는 "로그인한 나"가 받은 후기를 주는
+   * `/reviews/received` 밖에 없어서 내 팀에서만 보여줄 수 있었다.
+   *
+   * 공개라고 규칙이 느슨한 건 아니다: 서버가 같은 상호평가 공개 게이트를 지나므로,
+   * 상대가 아직 안 썼고 유예 시간도 안 지난 후기는 여기에도 안 잡힌다.
    */
   const isMyTeam = mode === 'mine';
-  const reviewSummary = useV1ReceivedReviewSummary('team', undefined, { enabled: isMyTeam });
+  const reviewSummary = useV1PublicTeamReviewSummary(team.id);
   const teamReviewCount = (reviewSummary.data?.bySport ?? []).reduce((sum, row) => sum + row.ratingCount, 0);
   // 종목별로 쪼개져 오므로 개수로 가중 평균을 낸다 — 종목이 하나면 그 값 그대로다.
   const teamReviewAvg =
@@ -457,14 +464,16 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             title="팀 전적"
             description="승·무·패와 경기별 기록을 확인해요."
           />
-          {isMyTeam ? (
+          {isMyTeam || teamReviewCount > 0 ? (
             <TeamRecordLinkCard
-              href="/my/reviews?tab=received"
+              href={isMyTeam ? '/my/reviews?tab=received' : undefined}
               title="받은 후기"
               description={
-                teamReviewCount > 0
-                  ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
-                  : '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
+                teamReviewCount === 0
+                  ? '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
+                  : isMyTeam
+                    ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
+                    : '이 팀과 뛴 팀들이 남긴 평가예요.'
               }
               badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}개` : null}
             />
@@ -632,16 +641,18 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             title="팀 전적"
             description="승·무·패와 경기별 기록을 확인해요."
           />
-          {/* 받은 후기는 내 팀에서만 — 이 요약 API 는 "로그인 사용자가 받은 팀 후기"라
-              남의 팀 상세에 두면 그 팀이 아니라 내 후기가 실린다. */}
-          {isMyTeam ? (
+          {/* 내 팀은 후기가 0건이어도 "아직 없다"는 사실이 정보다(쌓아야 할 것). 남의 팀은
+              받은 후기가 있을 때만 보여준다 — 빈 카드는 방문자에게 알려줄 게 없다. */}
+          {isMyTeam || teamReviewCount > 0 ? (
             <TeamRecordLinkCard
-              href="/my/reviews?tab=received"
+              href={isMyTeam ? '/my/reviews?tab=received' : undefined}
               title="받은 후기"
               description={
-                teamReviewCount > 0
-                  ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
-                  : '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
+                teamReviewCount === 0
+                  ? '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
+                  : isMyTeam
+                    ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
+                    : '이 팀과 뛴 팀들이 남긴 평가예요.'
               }
               // 별점만 두면 몇 명이 준 점수인지 알 수 없다 — 개수를 함께 적는다.
               badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}개` : null}

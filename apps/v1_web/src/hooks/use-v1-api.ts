@@ -1854,6 +1854,19 @@ export function useV1ReceivedReviewSummary(targetType: 'user' | 'team', period?:
   });
 }
 
+/**
+ * 팀 상세가 쓰는 **공개** 팀 후기 요약 — 남의 팀에서도 그 팀이 받은 평가를 읽는다.
+ * `useV1ReceivedReviewSummary` 는 "로그인한 나"가 받은 것이라 남의 팀 상세에 쓰면 내
+ * 후기를 그 팀 평가인 양 보여준다(그래서 이 훅이 따로 있다).
+ */
+export function useV1PublicTeamReviewSummary(teamId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.publicTeamReviews(teamId),
+    queryFn: () => v1Get<V1ReviewReceivedSummaryResponse>(`/teams/${teamId}/reviews`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+  });
+}
+
 export function useV1ReviewSource(sourceType: V1ReviewSourceType, sourceId: string, options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.reviewSource(sourceType, sourceId),

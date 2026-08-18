@@ -22,7 +22,7 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1LeaveTeam: vi.fn(),
   // 기본 반환값이 없으면 이 훅을 신경 쓰지 않는 기존 테스트들이 전부 undefined.data 로 깨진다.
   // 반환 타입을 명시하지 않으면 `{ data: undefined }` 로 좁혀져 mockReturnValue 가 막힌다.
-  useV1ReceivedReviewSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
+  useV1PublicTeamReviewSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
@@ -579,7 +579,7 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
   }
 
   it('내 팀이면 전적과 받은 후기 링크를 함께 보여주고, 요약을 배지로 적는다', () => {
-    teamApiMocks.useV1ReceivedReviewSummary.mockReturnValue({
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
       data: {
         bySport: [
           { sportId: 's1', sportCode: 'futsal', ratingAvg: 5, ratingCount: 3, tagRates: [] },
@@ -603,17 +603,29 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     expect(reviewLink).toHaveTextContent('4개');
   });
 
-  it('남의 팀에는 받은 후기 링크를 두지 않는다 (내 후기를 그 팀 평가로 보이게 하면 안 된다)', () => {
-    teamApiMocks.useV1ReceivedReviewSummary.mockReturnValue({ data: undefined });
+  it('남의 팀도 그 팀이 받은 후기를 보여주되, 내 후기 화면으로 보내지는 않는다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
+      data: { bySport: [{ sportId: 's1', sportCode: 'futsal', ratingAvg: 4.5, ratingCount: 2, tagRates: [] }], availableMonths: [] },
+    });
 
     render(<TeamDetailPageView model={modelWithMode('default')} />);
 
-    expect(screen.getAllByRole('link', { name: /팀 전적/ })).toHaveLength(2);
+    // 요약은 보인다 — 공개 엔드포인트라 그 팀이 받은 평가가 맞다.
+    expect(screen.getAllByText('받은 후기').length).toBeGreaterThan(0);
+    // 하지만 링크는 아니다: /my/reviews 는 "내" 후기 화면이라 남의 팀에서 그리로 보내면 거짓말이 된다.
     expect(screen.queryAllByRole('link', { name: /받은 후기/ })).toHaveLength(0);
   });
 
+  it('남의 팀이고 받은 후기가 0건이면 카드 자체를 두지 않는다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
+
+    render(<TeamDetailPageView model={modelWithMode('default')} />);
+
+    expect(screen.queryAllByText('받은 후기')).toHaveLength(0);
+  });
+
   it('받은 후기가 아직 없으면 배지 없이 안내만 보여준다', () => {
-    teamApiMocks.useV1ReceivedReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
 
     render(<TeamDetailPageView model={modelWithMode('mine')} />);
 

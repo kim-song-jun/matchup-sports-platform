@@ -6019,6 +6019,30 @@ button:disabled {
   border: none;
   background: #000;
 }
+/* 임베드가 막혔을 때의 탈출구 — 유튜브 원본으로 가는 링크 (match-videos.tsx) */
+.tm-video-modal-foot {
+  margin-top: 8px;
+}
+.tm-video-modal-external {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  transition: background 0.15s;
+}
+.tm-video-modal-external:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.tm-video-modal-external:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 /* 영상이 여러 개일 때 모달 하단 플레이리스트 */
 .tm-video-playlist {
   display: flex;

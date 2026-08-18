@@ -39,6 +39,17 @@ export function youtubeEmbedUrl(videoId: string): string {
   return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`;
 }
 
+/**
+ * 유튜브 원본 시청 URL — 임베드가 실패했을 때의 탈출구.
+ * 임베드는 CSP(frame-src)·업로더의 "다른 사이트에서 재생 허용" 설정·연령 제한 등
+ * 우리가 제어할 수 없는 이유로 막힐 수 있어서, 재생 모달에 항상 이 링크를 함께 둔다.
+ * 등록된 원본 문자열이 아니라 videoId 로 다시 만든다 — youtu.be/embed/shorts 어떤 형태로
+ * 등록됐든 관전자에게는 같은 시청 페이지를 준다.
+ */
+export function youtubeWatchUrl(videoId: string): string {
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
 export type VideoKind = 'youtube' | 'file' | 'external';
 
 const UPLOADS_PREFIX = '/uploads/';

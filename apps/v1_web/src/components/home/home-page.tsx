@@ -56,12 +56,17 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         {/* ── LEFT: main content column ─────────────────────────────────── */}
         <div className="tm-home-main">
 
-          {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
-          {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
+          {/* 홈은 좌우 여백을 섹션마다 각자 준다(.tm-section-title 등 20px). 배너들은 그게 없어
+              카드가 화면 끝에서 끝까지 늘어나 아래 콘텐츠의 여백선과 어긋났다(390 실측: 배너
+              0~390 vs 다른 카드 20~370). 배너 슬롯이 그 여백을 책임진다. */}
+          <div className="tm-home-banner-slot">
+            {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
+            {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
           {/* 남은 후기 유도 — 홈에는 대회 후기 전용 바텀시트 모달만 있어서 경기 후기는
               마이 메뉴 서브텍스트 한 줄 말고 알릴 길이 없었다. 마이페이지와 같은 컴포넌트를
               써서 두 화면의 숫자가 갈리지 않게 한다(남은 게 없으면 스스로 null). */}
-          <PendingReviewsCard />
+            <PendingReviewsCard />
+          </div>
 
           {/* Greeting + activity stats */}
           <div className="tm-home-greeting-block">

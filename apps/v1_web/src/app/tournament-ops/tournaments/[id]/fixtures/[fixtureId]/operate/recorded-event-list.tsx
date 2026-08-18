@@ -92,6 +92,14 @@ export function RecordedEventList({
    * 홈=파랑 / 원정=주황 — 색상환 179° 차이라 색각 이상에서도 갈린다.
    */
   const homeSideId = sides[0]?.id ?? null;
+  /** 팀 색은 "이 이벤트가 어느 팀 것인가"를 말하는 신호다 — 그걸 판별할 수 없는
+   *  상태에서 한쪽 색을 칠하면 없는 정보를 지어내는 셈이 된다. `sides`가 아직
+   *  로드되지 않았거나(첫 렌더) 이벤트에 팀이 없으면(팀 단위 파울 등) 중립
+   *  테두리색으로 물러난다 — 그때는 옆의 팀 이름도 비어 있어 색만 남는다. */
+  const teamAccent = (sideId: string | null): 'home' | 'away' | 'unknown' => {
+    if (sideId === null || homeSideId === null) return 'unknown';
+    return sideId === homeSideId ? 'home' : 'away';
+  };
   const playerName = new Map(
     lineups.flatMap((lineup) =>
       lineup.participants.map((participant) => [
@@ -128,11 +136,11 @@ export function RecordedEventList({
             <span
               aria-hidden="true"
               className={`w-1 shrink-0 self-stretch rounded-full ${
-                event.sideId === null
-                  ? 'bg-[var(--border)]'
-                  : event.sideId === homeSideId
-                    ? 'bg-[var(--blue500)]'
-                    : 'bg-[var(--orange500)]'
+                {
+                  home: 'bg-[var(--blue500)]',
+                  away: 'bg-[var(--orange500)]',
+                  unknown: 'bg-[var(--border)]',
+                }[teamAccent(event.sideId)]
               }`}
             />
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -204,14 +212,14 @@ export function RecordedEventList({
                     실측). 색을 더 쓰지 않고(R-C1) 굵기로만 대비를 올린다 — 색으로
                     팀을 구분하면 색만으로 의미를 전달하게 돼 R-C3 에 걸린다. */}
                 <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
-                  {event.sideId ? (
+                  {teamAccent(event.sideId) === 'unknown' ? null : (
                     <span
                       aria-hidden="true"
                       className={`h-2 w-2 shrink-0 rounded-full ${
-                        event.sideId === homeSideId ? 'bg-[var(--blue500)]' : 'bg-[var(--orange500)]'
+                        teamAccent(event.sideId) === 'home' ? 'bg-[var(--blue500)]' : 'bg-[var(--orange500)]'
                       }`}
                     />
-                  ) : null}
+                  )}
                   {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
                 </span>
               </div>

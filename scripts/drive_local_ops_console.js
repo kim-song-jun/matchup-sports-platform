@@ -10,7 +10,6 @@ const path = require('node:path');
 const WEB = process.env.WEB_BASE || 'http://localhost:3013';
 const OUT = process.env.OUT_DIR || path.join(process.cwd(), '.screenshots', 'ops-console-step345');
 const [tournamentId, fixtureId, userId, userEmail] = process.argv.slice(2);
-const STAGE = process.env.STAGE || 'all';
 
 if (!tournamentId || !fixtureId || !userId || !userEmail) {
   console.error('usage: node scripts/drive_local_ops_console.js <tournamentId> <fixtureId> <userId> <userEmail>');

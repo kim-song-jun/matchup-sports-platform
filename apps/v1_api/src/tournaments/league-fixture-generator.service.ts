@@ -13,6 +13,8 @@ export interface LeagueGenerationGuardInput {
   teamCount: number;
   existingFixtureCount: number;
   fixturesWithResultCount: number;
+  /** Game 이 연결된 fixture 수. Restrict FK 때문에 이런 fixture 는 삭제할 수 없다. */
+  fixturesWithGameCount: number;
   minMatchesPerTeam: number | null;
   legs: number;
   replaceExisting: boolean;
@@ -52,6 +54,18 @@ export function assertLeagueGenerationAllowed(input: LeagueGenerationGuardInput)
     throw new ConflictException({
       code: 'LEAGUE_FIXTURES_HAVE_RESULTS',
       message: '결과가 확정된 경기가 있어 대진을 다시 만들 수 없어요.',
+    });
+  }
+  // 결과가 없어도 Game 이 연결돼 있으면 지울 수 없다. `V1Game.tournamentFixtureId` 는
+  // `onDelete: Restrict`(schema.prisma) 라서 deleteMany 가 FK 위반으로 터지고 500 이 된다
+  // (2026-08-17 alpha 실측: liveStatus=live 인 조별 fixture 가 있는 조에서 재현).
+  // Restrict 는 라인업·이벤트·결과 리비전을 지키려는 의도된 보호이므로 우회하지 않고
+  // 무엇을 먼저 정리해야 하는지 알려준다.
+  if (input.replaceExisting && input.fixturesWithGameCount > 0) {
+    throw new ConflictException({
+      code: 'LEAGUE_FIXTURES_HAVE_GAMES',
+      message: '경기 기록이 연결된 대진이 있어 다시 만들 수 없어요. 해당 경기를 먼저 정리해주세요.',
+      fixturesWithGameCount: input.fixturesWithGameCount,
     });
   }
   const perTeam = matchesPerTeam(input.teamCount, input.legs);
@@ -149,13 +163,14 @@ export class LeagueFixtureGeneratorService {
       where: { groupId: group.id },
       select: {
         id: true,
-        game: { select: { currentOfficialRevision: { select: { state: true } } } },
+        game: { select: { id: true, currentOfficialRevision: { select: { state: true } } } },
         result: { select: { id: true } },
       },
     });
     const fixturesWithResultCount = existingFixtures.filter((fixture) =>
       hasTournamentFixtureOfficialResult(fixture.game, fixture.result),
     ).length;
+    const fixturesWithGameCount = existingFixtures.filter((fixture) => fixture.game != null).length;
 
     assertLeagueGenerationAllowed({
       format: tournament.format,
@@ -163,6 +178,7 @@ export class LeagueFixtureGeneratorService {
       teamCount: group.groupTeams.length,
       existingFixtureCount: existingFixtures.length,
       fixturesWithResultCount,
+      fixturesWithGameCount,
       minMatchesPerTeam: tournament.minMatchesPerTeam,
       legs: dto.legs,
       replaceExisting: dto.replaceExisting ?? false,

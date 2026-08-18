@@ -6611,3 +6611,33 @@ button:disabled {
   .tm-fixture-lineup-player-controls { gap: 8px; }
   .tm-fixture-lineup-player-controls .tm-input { width: 72px; }
 }
+
+/* 후기 작성 — 선수 개별 평가는 접어 두고 원하는 사람만 펼쳐 쓴다(팀 평가가 기본). */
+.tm-review-player-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+  list-style: none;
+}
+.tm-review-player-summary::-webkit-details-marker { display: none; }
+.tm-review-player-summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.tm-review-player-details[open] > .tm-review-player-summary::after {
+  transform: rotate(-135deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-review-player-summary::after { transition: none; }
+}
+

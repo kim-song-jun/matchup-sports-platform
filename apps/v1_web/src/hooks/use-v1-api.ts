@@ -2045,6 +2045,32 @@ export function useV1UpdateRecordConsent() {
   });
 }
 
+/**
+ * 대회 경기 기록 실명 표시 토글 (2026-08-18 사용자 결정) -- 대회 라인업/이벤트 득점자/
+ * MVP에 닉네임 대신 실명을 보여줄지. `V1RecordConsent`(위)와 달리 "동의"가 아니라
+ * 표시 선호도라 `policyHash`가 없고, 대회 신청 때마다 다시 묻지 않는다 -- 한 번 켜면
+ * 그 뒤로 계속 적용되고 여기서 언제든 끌 수 있다. 기본값 false(닉네임).
+ */
+export type V1TournamentRealNameVisibility = { visible: boolean };
+
+export function useV1TournamentRealNameVisibility() {
+  return useQuery({
+    queryKey: v1Keys.tournamentRealNameVisibility(),
+    queryFn: () => v1Get<V1TournamentRealNameVisibility>('/me/tournament-real-name-visibility'),
+  });
+}
+
+export function useV1UpdateTournamentRealNameVisibility() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { visible: boolean }) =>
+      v1Patch<V1TournamentRealNameVisibility>('/me/tournament-real-name-visibility', body),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1TournamentRealNameVisibility>(v1Keys.tournamentRealNameVisibility(), result);
+    },
+  });
+}
+
 export function useV1Profile() {
   return useQuery({
     queryKey: v1Keys.profile(),

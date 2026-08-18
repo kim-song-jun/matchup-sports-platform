@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Star,
+  UserCheck,
   Users,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
@@ -64,6 +65,7 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   Mail,
   Send,
   ShieldCheck,
+  UserCheck,
 };
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {

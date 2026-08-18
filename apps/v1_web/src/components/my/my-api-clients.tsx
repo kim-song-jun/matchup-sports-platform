@@ -43,12 +43,14 @@ import {
   useV1TeamDetail,
   useV1TeamJoinApplications,
   useV1TeamMembers,
+  useV1TournamentRealNameVisibility,
   useV1UploadImages,
   useV1UpdateMyPreferences,
   useV1UpdateMyRegion,
   useV1UpdateProfile,
   useV1UpdateRecordConsent,
   useV1UpdateSettings,
+  useV1UpdateTournamentRealNameVisibility,
   useV1WithdrawalRequest,
   useV1WithdrawMyJoinApplication,
 } from '@/hooks/use-v1-api';
@@ -1618,6 +1620,95 @@ export function RecordConsentSettingsPageClient() {
               {formatTournamentDateTimeLong(consent.data.effectiveAt)}부터 공개하고 있어요.
             </div>
           ) : null}
+        </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+/**
+ * 대회 경기 기록 실명 표시 토글 (2026-08-18 사용자 결정) -- `RecordConsentSettingsPageClient`
+ * 바로 위와 같은 화면 구조를 재사용하되, "동의"가 아니라 표시 선호도 스위치라 policyHash가
+ * 없고 소급 공개 경고 문구도 없다(대회 신청 때마다 다시 묻지 않고 언제든 여기서 끌 수 있다는
+ * 점만 알리면 된다). 대회 신청 흐름에서는 이 값을 묻지 않는다 -- 프로필에서 한 번 켜면 계속
+ * 적용된다는 게 이 정책의 핵심이라, 문구가 그 사실을 분명히 전달해야 한다.
+ */
+export function TournamentRealNameVisibilitySettingsPageClient() {
+  const visibility = useV1TournamentRealNameVisibility();
+  const update = useV1UpdateTournamentRealNameVisibility();
+  const [toggleError, setToggleError] = useState(false);
+
+  if (visibility.isError) {
+    return (
+      <AppChrome title="대회 기록 실명 표시" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+        <div className="tm-my-shell">
+          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void visibility.refetch()} />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const visible = Boolean(visibility.data?.visible);
+  const toggle = () => {
+    setToggleError(false);
+    update.mutate({ visible: !visible }, { onError: () => setToggleError(true) });
+  };
+
+  return (
+    <AppChrome title="대회 기록 실명 표시" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+      <div className="tm-my-shell">
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">대회 기록 실명 표시</h1>
+          </div>
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">대회 경기 기록에 실명 표시</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              대회 라인업·득점자·MVP에 붙는 이름이에요. 끄면 닉네임으로 표시되고, 대회
+              신청할 때마다 다시 묻지 않아요 — 여기서 한 번 켜면 계속 적용되고, 언제든
+              다시 끌 수 있어요.
+            </div>
+          </Card>
+          {toggleError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+            </Card>
+          ) : null}
+          <div className="tm-card" style={{ padding: 0 }}>
+            <button
+              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+              onClick={toggle}
+              type="button"
+              disabled={visibility.isLoading || update.isPending}
+              role="switch"
+              aria-checked={visible}
+              aria-label="대회 기록 실명 표시"
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body">대회 기록 실명 표시</div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                  {update.isPending
+                    ? '저장하는 중이에요…'
+                    : visible
+                      ? '지금 실명으로 표시돼요. 끄면 닉네임으로 바뀌어요.'
+                      : '지금은 닉네임으로 표시돼요. 켜면 실명으로 바뀌어요.'}
+                </div>
+              </div>
+              <span
+                className="tm-text-caption"
+                style={{ minWidth: 24, textAlign: 'right', color: visible ? 'var(--blue500)' : 'var(--text-caption)' }}
+                aria-hidden="true"
+              >
+                {visible ? 'ON' : 'OFF'}
+              </span>
+              <span className={`tm-toggle ${visible ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
     </AppChrome>

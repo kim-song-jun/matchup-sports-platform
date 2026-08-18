@@ -20,6 +20,7 @@ import {
   UpdateMyRegionsDto,
   UpdateProfileDto,
   UpdateSettingsDto,
+  UpdateTournamentRealNameVisibilityDto,
   WithdrawalRequestDto,
 } from './dto/profile.dto';
 import { ProfileService } from './profile.service';
@@ -86,6 +87,21 @@ export class ProfileController {
   @UseGuards(V1AuthGuard)
   updateMyRecordConsent(@CurrentUser() user: V1AuthUser, @Body() dto: UpdateMyRecordConsentDto) {
     return this.profileService.updateMyRecordConsent(user, dto);
+  }
+
+  @Get('me/tournament-real-name-visibility')
+  @UseGuards(V1AuthGuard)
+  myTournamentRealNameVisibility(@CurrentUser() user: V1AuthUser) {
+    return this.profileService.myTournamentRealNameVisibility(user);
+  }
+
+  @Patch('me/tournament-real-name-visibility')
+  @UseGuards(V1AuthGuard)
+  updateMyTournamentRealNameVisibility(
+    @CurrentUser() user: V1AuthUser,
+    @Body() dto: UpdateTournamentRealNameVisibilityDto,
+  ) {
+    return this.profileService.updateMyTournamentRealNameVisibility(user, dto);
   }
 
   @Post('auth/logout')

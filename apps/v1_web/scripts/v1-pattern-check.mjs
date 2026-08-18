@@ -9,11 +9,11 @@
  *  1) 합니다체(입니다/습니다/됩니다/합니다 등) — 사용자 노출 UI 문자열은 해요체 단일 어조.
  *  2) 미정의 CSS 토큰 — globals.css가 var(--x)로 참조하지만 정의도 fallback도 없는 토큰
  *     (런타임 silent fail 방지, WS1 사고 재발 차단).
- *  3) 무효한 폰트 크기 토큰 클래스 — `text-[var(--font-size-x)]`. Tailwind v4 는
+ *  3) 무효한 폰트 크기 토큰 클래스 — `text-[var(--font-size-<이름>)]`. Tailwind v4 는
  *     `text-[...]` 안의 맨 var() 를 **색상**으로 해석해 `color: var(--font-size-x)` 를
  *     내보낸다. 폰트 크기가 아예 안 걸리고 부모 크기를 상속하는데, 클래스 이름만 보면
  *     맞아 보여서 코드 리뷰로는 안 잡힌다(2026-08-18 실측: h1 24px 의도 → 16px 렌더,
- *     42개 파일 168곳). 타입을 명시한 `text-[length:var(--font-size-x)]` 를 쓴다.
+ *     42개 파일 168곳). 타입을 명시한 `text-[length:var(--font-size-<이름>)]` 를 쓴다.
  *
  * 사용: node scripts/v1-pattern-check.mjs   (apps/v1_web에서)
  */

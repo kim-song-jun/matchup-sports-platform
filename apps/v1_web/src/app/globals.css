@@ -6308,7 +6308,9 @@ button:disabled {
   .tm-schedule-list {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
+    /* align-items 를 건드리지 않는다(기본 stretch). `start` 로 두면 같은 행의 두 셀이
+       각자 콘텐츠 높이만 차지해서, 한쪽에만 "라인업 보기" 버튼이 붙은 행에서 세로
+       구분선이 짧게 끊기고 격자가 들쭉날쭉해진다(alpha 실측). */
   }
   .tm-schedule-list > .tm-schedule-row:nth-child(odd) { border-right: 1px solid var(--grey100); }
   .tm-schedule-list > .tm-schedule-row:nth-child(-n + 2) { border-top: 0; }

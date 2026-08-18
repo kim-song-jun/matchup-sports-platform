@@ -5290,16 +5290,6 @@ export class GamesService {
     penalties: StoredPenalties | undefined,
     penaltyOrigin: 'END_COMMAND' | 'RECOVERY' = 'RECOVERY',
   ): Promise<GameScore> {
-    // 킥 수가 실려 왔으면 서버도 프런트와 **같은 술어**로 결판을 판정한다. 예전에는
-    // 이 판정이 프런트에만 있어(총점 두 개로는 킥 수를 알 수 없었다) 화면의 가드가
-    // API 직접 호출로 그대로 우회됐고, 결판 규칙이 두 곳에 따로 살아 갈릴 수 있었다.
-    //
-    // `needsKnockoutFixtureFacts` 단축 평가보다 **앞에** 둔다: 그 함수는 브래킷 판정에
-    // 필요한 fact를 읽을지 정하는 것이고, 이 게이트는 브래킷과 무관하게 승부차기
-    // payload 자체의 유효성을 본다(조별리그 경기에 승부차기가 실려 와도 검사한다).
-    if (penalties !== undefined) {
-      await this.assertPenaltyShootoutConcludedForGame(tx, game, penalties, penaltyOrigin);
-    }
     // 결정적 스코어 + 승부차기 없음이면 어떤 fact도 판정을 바꾸지 않으므로
     // 질의하지 않는다 — 리팩터 전 단축 평가 동작을 그대로 보존한다.
     if (!needsKnockoutFixtureFacts(score, penalties)) {
@@ -5310,7 +5300,17 @@ export class GamesService {
       assertBracketResolvable(score, facts);
       return score;
     }
-    return assertPenaltiesNotAllowed(score, penalties, facts);
+    // **자격 먼저, 내용 나중.** `assertPenaltiesNotAllowed`가 "이 경기가 애초에 승부차기를
+    // 받을 수 있는가"(조별리그가 아닌가 · 정규시간이 무승부인가)를 409로 가른다. 킥 수·정책
+    // 검사를 그보다 앞에 두면 **조별리그 경기에 승부차기를 보낸 운영자에게 "킥 수를 넣어라"가
+    // 뜬다** — 시키는 대로 킥 수를 채워 넣어도 여전히 거부당하는 막다른 안내다.
+    // (2026-08-18 CI 실측: 통합 테스트 4건이 409를 기대했는데 422가 나와 실패했다.)
+    const applied = assertPenaltiesNotAllowed(score, penalties, facts);
+    // 자격을 통과한 뒤에야 내용을 본다 — 킥 수가 실려 왔으면 서버도 프런트와 **같은 술어**로
+    // 결판을 판정한다. 예전에는 이 판정이 프런트에만 있어(총점 두 개로는 킥 수를 알 수 없다)
+    // 화면의 가드가 API 직접 호출로 그대로 우회됐다.
+    await this.assertPenaltyShootoutConcludedForGame(tx, game, penalties, penaltyOrigin);
+    return applied;
   }
 
   /**

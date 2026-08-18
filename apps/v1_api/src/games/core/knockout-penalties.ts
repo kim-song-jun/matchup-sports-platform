@@ -269,8 +269,33 @@ export function readStoredPenalties(storedScore: unknown): StoredPenalties | und
   // 있다. 그 경우 승부차기 점수까지 버리면 결선 정정이 통째로 막히므로 선축만
   // 떨어뜨린다.
   const firstKickSideKey = (raw as { firstKickSideKey?: unknown }).firstKickSideKey;
-  if (firstKickSideKey === 'HOME' || firstKickSideKey === 'AWAY') {
-    return { home, away, firstKickSideKey };
-  }
-  return { home, away };
+  const side: { firstKickSideKey?: 'HOME' | 'AWAY' } =
+    firstKickSideKey === 'HOME' || firstKickSideKey === 'AWAY' ? { firstKickSideKey } : {};
+
+  // 킥 수도 선축과 **같은 이유로** 승계한다: 정정 폼에는 승부차기 입력란이 아예 없어
+  // (2026-08-18 실측, 폼 필드 186개 중 승부차기 필드 0개) 여기서 떨어뜨리면 되살릴
+  // 수단이 없다. 둘은 항상 함께 있거나 함께 없다 — 한쪽만 살리면 어느 팀이 몇 번
+  // 찼는지 모르는 채로 "킥 수를 안다"고 착각한 판정이 돌아간다.
+  const rawTakenHome = (raw as { takenHome?: unknown }).takenHome;
+  const rawTakenAway = (raw as { takenAway?: unknown }).takenAway;
+  const countsValid =
+    typeof rawTakenHome === 'number' &&
+    Number.isInteger(rawTakenHome) &&
+    rawTakenHome >= 0 &&
+    typeof rawTakenAway === 'number' &&
+    Number.isInteger(rawTakenAway) &&
+    rawTakenAway >= 0 &&
+    home <= rawTakenHome &&
+    away <= rawTakenAway;
+  const counts = countsValid ? { takenHome: rawTakenHome, takenAway: rawTakenAway } : {};
+
+  // 우회 표식은 **감사 기록**이라 정정을 건너뛰어도 살아남아야 한다. 정정 폼은 승부차기를
+  // 바꾸지 못하므로(입력란 없음) "규칙과 다른 결론으로 닫았다"는 사실은 그대로 유효하다.
+  // 여기서 떨어뜨리면 정정 한 번에 우회와 정상 종료가 기록상 구분되지 않게 된다.
+  const override =
+    (raw as { operatorOverride?: unknown }).operatorOverride === true
+      ? { operatorOverride: true as const }
+      : {};
+
+  return { home, away, ...side, ...counts, ...override };
 }

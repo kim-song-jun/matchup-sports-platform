@@ -1,14 +1,17 @@
-import { formatTournamentDateRangeShort } from '@/lib/date-utils';
+import { formatTournamentDateRangeMedium } from '@/lib/date-utils';
 
 /**
- * 홍보 카드(홈 오늘의 추천 · 대회 목록 상단)의 "사실 문구" 4종 — 날짜/팀/장소/상금.
+ * 홍보 카드(홈 오늘의 추천 · 대회 목록 상단)에서 대회 정보로부터 그대로 만들 수 있는
+ * 문구 3종 — 날짜/장소/상금. 관리자가 손대지 않은 것만 여기서 파생한 값으로 채운다.
  *
- * 이 4개는 카드 제목·배지·소개 문구와 달리 공개 화면에 폴백이 없어서(비면 아예 렌더되지
- * 않는다 — components/home/tournament-hero-card.tsx, app/tournaments/page.tsx 배너),
- * 관리자가 직접 쓰지 않으면 카드가 빈약해진다. 그런데 값 자체는 대회 생성 폼 앞 단계에
- * 이미 다 있으므로, 관리자가 손대지 않은 문구는 여기서 파생한 기본값으로 채운다.
+ * teamsText(강조 문구)는 일부러 뺐다. 이름은 "팀 문구"였지만 운영에서는 팀 수가 아니라
+ * "마감임박"처럼 상태를 강조하는 자유 문구로 쓰고 있어(2026-08-18 프로덕션 8개 홍보
+ * 슬롯 전수 확인 — 팀 수로 쓴 사례 0건), 팀 수를 자동으로 넣으면 매번 지워야 한다.
+ *
+ * 날짜 형식은 프로덕션에서 관리자가 실제로 써 온 'M월 D일 (요일)'을 따른다(같은 확인에서
+ * 4개 대회 중 3개가 이 형식). 목록 카드의 compact 표기('M/D (요일)')와는 일부러 다르다.
  */
-export const PROMO_FACT_KEYS = ['dateText', 'teamsText', 'locationText', 'prizeText'] as const;
+export const PROMO_FACT_KEYS = ['dateText', 'locationText', 'prizeText'] as const;
 
 export type PromoFactKey = (typeof PROMO_FACT_KEYS)[number];
 
@@ -17,7 +20,6 @@ export type PromoFactsDirty = Record<PromoFactKey, boolean>;
 
 export const EMPTY_PROMO_FACTS_DIRTY: PromoFactsDirty = {
   dateText: false,
-  teamsText: false,
   locationText: false,
   prizeText: false,
 };
@@ -28,8 +30,6 @@ export type TournamentPromoFactSource = {
   scheduledAt: string | null | undefined;
   /** 대회 종료 일시 — 시작일과 같거나 비어 있으면 단일 날짜로 표기한다 */
   scheduledEndAt: string | null | undefined;
-  /** 참가 팀 수 — 폼의 문자열 값 그대로 받아 숫자로 해석한다 */
-  teamCount: string | null | undefined;
   venue: string | null | undefined;
   /** 총 상금 — 폼의 문자열 값 그대로 */
   prizePool: string | null | undefined;
@@ -44,8 +44,7 @@ export function buildTournamentPromoFactDefaults(
   source: TournamentPromoFactSource,
 ): Record<PromoFactKey, string> {
   return {
-    dateText: formatTournamentDateRangeShort(source.scheduledAt, source.scheduledEndAt) ?? '',
-    teamsText: formatTeamCount(source.teamCount),
+    dateText: formatTournamentDateRangeMedium(source.scheduledAt, source.scheduledEndAt) ?? '',
     locationText: source.venue?.trim() ?? '',
     prizeText: formatPrizeText(source.prizeSummary, source.prizePool),
   };
@@ -86,12 +85,6 @@ export function markChangedPromoFacts(
     changed = true;
   }
   return changed ? result : dirty;
-}
-
-function formatTeamCount(teamCount: string | null | undefined): string {
-  const parsed = Number(teamCount?.trim());
-  if (!Number.isFinite(parsed) || parsed <= 0) return '';
-  return `${parsed}팀`;
 }
 
 function formatPrizeText(

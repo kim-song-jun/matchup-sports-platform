@@ -743,24 +743,30 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       );
     }
 
-    it('앞 단계 대회 정보를 넣으면 두 홍보 카드의 날짜·팀·장소·상금 문구가 채워진다', () => {
+    it('앞 단계 대회 정보를 넣으면 두 홍보 카드의 날짜·장소·상금 문구가 채워진다', () => {
       const state = stateWithTournamentInfo();
 
       for (const promo of [state.promoHome, state.promoList]) {
         expect(promo).toMatchObject({
-          dateText: '8/29 (토)',
-          teamsText: '16팀',
+          dateText: '8월 29일 (토)',
           locationText: '서울월드컵보조경기장',
           prizeText: '총 상금 3,000,000원',
         });
       }
     });
 
+    it('강조 문구는 팀 수로 자동 채우지 않는다 — 운영에서 상태 문구로 쓰는 자리다', () => {
+      const state = stateWithTournamentInfo();
+
+      expect(state.promoHome.teamsText).toBe('');
+      expect(state.promoList.teamsText).toBe('');
+    });
+
     it('관리자가 고친 문구는 앞 단계 값을 다시 바꿔도 그대로 둔다', () => {
       const edited = tournamentCreateReducer(stateWithTournamentInfo(), {
         type: 'set-promo',
         slot: 'promoHome',
-        value: { ...stateWithTournamentInfo().promoHome, teamsText: '16개 팀 격돌' },
+        value: { ...stateWithTournamentInfo().promoHome, locationText: '수원 실내구장 A코트' },
       });
 
       const relocated = tournamentCreateReducer(edited, {
@@ -768,16 +774,10 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
         field: 'venue',
         value: '수원종합운동장',
       });
-      const resized = tournamentCreateReducer(relocated, {
-        type: 'set-field',
-        field: 'teamCount',
-        value: '24',
-      });
 
-      expect(resized.promoHome.teamsText).toBe('16개 팀 격돌');
-      expect(resized.promoHome.locationText).toBe('수원종합운동장');
+      expect(relocated.promoHome.locationText).toBe('수원 실내구장 A코트');
       // 손대지 않은 목록 카드는 새 값을 그대로 따라간다.
-      expect(resized.promoList.teamsText).toBe('24팀');
+      expect(relocated.promoList.locationText).toBe('수원종합운동장');
     });
 
     it('관리자가 빈 칸으로 지운 문구는 다시 채우지 않는다', () => {
@@ -803,14 +803,14 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
         slot: 'promoHome',
         value: {
           ...stateWithTournamentInfo().promoHome,
-          teamsText: '16개 팀 격돌',
+          dateText: '이번 주말 단 하루',
           locationText: '',
         },
       });
       const editedList = tournamentCreateReducer(edited, {
         type: 'set-promo',
         slot: 'promoList',
-        value: { ...edited.promoList, teamsText: '목록 전용 문구' },
+        value: { ...edited.promoList, locationText: '목록 전용 장소' },
       });
 
       const reset = tournamentCreateReducer(editedList, {
@@ -819,10 +819,10 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       });
 
       expect(reset.promoHome).toMatchObject({
-        teamsText: '16팀',
+        dateText: '8월 29일 (토)',
         locationText: '서울월드컵보조경기장',
       });
-      expect(reset.promoList.teamsText).toBe('목록 전용 문구');
+      expect(reset.promoList.locationText).toBe('목록 전용 장소');
     });
   });
 });

@@ -9,7 +9,6 @@ import {
 const EMPTY_SOURCE = {
   scheduledAt: '',
   scheduledEndAt: '',
-  teamCount: '',
   venue: '',
   prizePool: '',
   prizeSummary: '',
@@ -23,7 +22,7 @@ describe('buildTournamentPromoFactDefaults', () => {
         scheduledAt: '2026-08-29T09:00',
         scheduledEndAt: '2026-08-29T18:00',
       }).dateText,
-    ).toBe('8/29 (토)');
+    ).toBe('8월 29일 (토)');
 
     expect(
       buildTournamentPromoFactDefaults({
@@ -31,20 +30,19 @@ describe('buildTournamentPromoFactDefaults', () => {
         scheduledAt: '2026-08-29T09:00',
         scheduledEndAt: '2026-08-30T18:00',
       }).dateText,
-    ).toBe('8/29 (토)~8/30 (일)');
+    ).toBe('8월 29일 (토)~8월 30일 (일)');
   });
 
-  it('팀 수·장소를 문구로 만들고, 팀 수가 0이거나 비면 빈 문자열을 준다', () => {
-    const filled = buildTournamentPromoFactDefaults({
-      ...EMPTY_SOURCE,
-      teamCount: '16',
-      venue: '  서울월드컵보조경기장  ',
-    });
-    expect(filled.teamsText).toBe('16팀');
-    expect(filled.locationText).toBe('서울월드컵보조경기장');
+  it('장소는 앞뒤 공백을 털어 그대로 쓴다', () => {
+    expect(
+      buildTournamentPromoFactDefaults({ ...EMPTY_SOURCE, venue: '  서울월드컵보조경기장  ' })
+        .locationText,
+    ).toBe('서울월드컵보조경기장');
+  });
 
-    expect(buildTournamentPromoFactDefaults({ ...EMPTY_SOURCE, teamCount: '0' }).teamsText).toBe('');
-    expect(buildTournamentPromoFactDefaults(EMPTY_SOURCE).teamsText).toBe('');
+  it('강조 문구는 파생 대상이 아니다 — 운영에서 팀 수가 아닌 상태 문구로 쓰고 있다', () => {
+    const defaults = buildTournamentPromoFactDefaults({ ...EMPTY_SOURCE, venue: '서울구장' });
+    expect(Object.keys(defaults).sort()).toEqual(['dateText', 'locationText', 'prizeText']);
   });
 
   it('상금 문구는 요약이 우선이고, 요약이 없으면 총 상금을 쓴다', () => {
@@ -63,10 +61,9 @@ describe('buildTournamentPromoFactDefaults', () => {
     expect(buildTournamentPromoFactDefaults({ ...EMPTY_SOURCE, prizePool: '0' }).prizeText).toBe('');
   });
 
-  it('아무 정보도 없으면 네 문구 모두 빈 문자열이다', () => {
+  it('아무 정보도 없으면 세 문구 모두 빈 문자열이다', () => {
     expect(buildTournamentPromoFactDefaults(EMPTY_SOURCE)).toEqual({
       dateText: '',
-      teamsText: '',
       locationText: '',
       prizeText: '',
     });
@@ -74,22 +71,16 @@ describe('buildTournamentPromoFactDefaults', () => {
 });
 
 describe('applyPromoFactDefaults', () => {
-  const value = { dateText: '', teamsText: '기존 팀 문구', locationText: '', prizeText: '' };
-  const defaults = {
-    dateText: '8/29 (토)',
-    teamsText: '16팀',
-    locationText: '서울구장',
-    prizeText: '',
-  };
+  const value = { dateText: '', locationText: '관리자가 고른 장소', prizeText: '' };
+  const defaults = { dateText: '8월 29일 (토)', locationText: '서울구장', prizeText: '' };
 
   it('dirty가 아닌 문구만 기본값으로 채운다', () => {
     const next = applyPromoFactDefaults(value, defaults, {
       ...EMPTY_PROMO_FACTS_DIRTY,
-      teamsText: true,
+      locationText: true,
     });
-    expect(next.dateText).toBe('8/29 (토)');
-    expect(next.locationText).toBe('서울구장');
-    expect(next.teamsText).toBe('기존 팀 문구');
+    expect(next.dateText).toBe('8월 29일 (토)');
+    expect(next.locationText).toBe('관리자가 고른 장소');
   });
 
   it('기본값이 빈 문자열이면 기존 값을 지우지 않는다', () => {
@@ -102,21 +93,21 @@ describe('applyPromoFactDefaults', () => {
   });
 
   it('바뀔 게 없으면 같은 객체를 그대로 돌려준다', () => {
-    const same = { dateText: '8/29 (토)', teamsText: '16팀', locationText: '서울구장', prizeText: '' };
+    const same = { dateText: '8월 29일 (토)', locationText: '서울구장', prizeText: '' };
     expect(applyPromoFactDefaults(same, defaults, EMPTY_PROMO_FACTS_DIRTY)).toBe(same);
   });
 });
 
 describe('markChangedPromoFacts', () => {
-  const previous = { dateText: '8/29 (토)', teamsText: '16팀', locationText: '', prizeText: '' };
+  const previous = { dateText: '8월 29일 (토)', locationText: '서울구장', prizeText: '' };
 
   it('실제로 바뀐 문구만 dirty로 표시한다', () => {
     const dirty = markChangedPromoFacts(
       previous,
-      { ...previous, teamsText: '16개 팀 참가' },
+      { ...previous, locationText: '수원종합운동장' },
       EMPTY_PROMO_FACTS_DIRTY,
     );
-    expect(dirty.teamsText).toBe(true);
+    expect(dirty.locationText).toBe(true);
     expect(dirty.dateText).toBe(false);
   });
 

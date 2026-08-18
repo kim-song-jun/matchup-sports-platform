@@ -256,7 +256,6 @@ export function tournamentCreateReducer(
 const PROMO_FACT_SOURCE_FIELDS = [
   'scheduledAt',
   'scheduledEndAt',
-  'teamCount',
   'venue',
   'prizePool',
   'prizeSummary',
@@ -382,13 +381,11 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     promoFactsDirty: {
       promoHome: dirtyFromSavedPromo({
         dateText: tournament.promoHomeDateText ?? '',
-        teamsText: tournament.promoHomeTeamsText ?? '',
         locationText: tournament.promoHomeLocationText ?? '',
         prizeText: tournament.promoHomePrizeText ?? '',
       }),
       promoList: dirtyFromSavedPromo({
         dateText: tournament.promoListDateText ?? '',
-        teamsText: tournament.promoListTeamsText ?? '',
         locationText: tournament.promoListLocationText ?? '',
         prizeText: tournament.promoListPrizeText ?? '',
       }),

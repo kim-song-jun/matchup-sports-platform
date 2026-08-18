@@ -1191,7 +1191,7 @@ function PresentationStep({
           <h3 className="text-sm font-bold text-[var(--text-strong)]">홍보 카드</h3>
           <p className="mt-1 text-xs text-[var(--text-caption)]">
             생성과 동시에 홈·대회 목록 홍보를 준비할 수 있어요. 노출은 각 카드에서 켜세요.
-            날짜·팀·장소·상금 문구는 앞 단계에 입력한 대회 정보로 미리 채워 두었고, 직접 고치면
+            날짜·장소·상금 문구는 앞 단계에 입력한 대회 정보로 미리 채워 두었고, 직접 고치면
             그 문구는 그대로 유지돼요. 홍보 이미지를 비워두면 위에서 올린 대표 이미지를 함께 사용해요.
           </p>
         </div>

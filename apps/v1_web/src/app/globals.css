@@ -253,6 +253,11 @@
   --v1-shell-bottom-nav-height: 74px;
   --v1-shell-wide-bottom-nav-height: 76px;
   --v1-shell-page-x: 20px;
+  /* 후기 화면들이 데스크톱에서 공유하는 본문 폭. 후기는 한 흐름 안에서 화면을 넘나든다
+     (대회 후기 목록 → 리뷰할 수 있는 경기 → 리뷰 남기기) — 화면마다 폭이 다르면 같은
+     흐름인데 매번 레이아웃이 갈아엎히는 것처럼 보인다(오너 지적). 값을 바꿀 일이 생기면
+     여기 한 곳만 고친다. */
+  --v1-review-column-width: 720px;
   --v1-shell-topbar-x: 16px;
   --v1-shell-wide-topbar-left-x: 20px;
   --v1-shell-wide-topbar-right-x: 14px;
@@ -6190,7 +6195,9 @@ button:disabled {
 @media (min-width: 1024px) {
   /* 본문을 데스크탑 전체 폭에 늘리지 않고 좌측 라인에 고정 */
   .tm-reviews-body {
-    max-width: 1000px;
+    /* `desktop/my.css` 의 `.tm-review-shell`/`.tm-review-compose-shell` 과 같은 토큰을
+       쓴다 — 이 화면에서 "리뷰할 수 있는 경기"를 눌러 넘어가는 곳이 바로 그 셸이다. */
+    max-width: var(--v1-review-column-width);
     margin: 0;
   }
 

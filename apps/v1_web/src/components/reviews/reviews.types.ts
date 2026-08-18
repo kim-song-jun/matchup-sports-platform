@@ -64,3 +64,10 @@ export type ReviewsReceivedPageModel = {
   userGroups: ReceivedReviewGroup[];
   teamGroups: ReceivedReviewGroup[];
 };
+
+/**
+ * 아직 손대지 않은 리뷰 대상의 별점 초기값. 한때 이 값이 4로 **네 군데에 각각** 적혀
+ * 있었다(초기 draft 생성 · 태그 토글 · 제출 · 렌더 fallback) — 한 곳만 고치면 화면에
+ * 보이는 별과 실제로 전송되는 별이 갈린다. 값을 바꿀 일이 생기면 여기 한 곳만 고친다.
+ */
+export const DEFAULT_REVIEW_RATING = 5;

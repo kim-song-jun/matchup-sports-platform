@@ -4538,7 +4538,10 @@ button:disabled {
 }
 
 .tm-review-star[data-active="true"] {
-  color: var(--blue500);
+  /* 읽기 전용 별(`RatingStar`, awards-page-client.tsx)이 `--orange500` 이라, 후기 흐름
+     안에서 같은 별점이 화면마다 다른 색으로 보였다(오너 결정: 둘 다 주황으로 통일).
+     입력 가능하다는 신호는 색이 아니라 커서·호버·터치 타깃(::before 44px)이 맡는다. */
+  color: var(--orange500);
 }
 
 .tm-review-star:disabled {

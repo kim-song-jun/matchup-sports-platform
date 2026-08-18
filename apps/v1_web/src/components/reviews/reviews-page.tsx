@@ -3,6 +3,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
+import { DEFAULT_REVIEW_RATING } from './reviews.types';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import { REVIEW_TAG_OPTIONS, toTargetViewModel } from './reviews.view-model';
 import { ReviewsSummaryDashboard } from './reviews-summary-dashboard';
@@ -172,7 +173,7 @@ export function ReviewSourcePageView({
                 return (
                   <ReviewTargetCard
                     key={key}
-                    draft={drafts[key] ?? { rating: target.review?.rating ?? 4, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
+                    draft={drafts[key] ?? { rating: target.review?.rating ?? DEFAULT_REVIEW_RATING, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
                     onToggleTag={(tagCode) => onToggleTag(key, tagCode)}
                     onUpdateRating={(rating) => onUpdateRating(key, rating)}
                     target={targetModel}

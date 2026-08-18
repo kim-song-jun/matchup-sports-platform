@@ -24,6 +24,27 @@ function eventTimeLabel(event: GameEventRecord): string {
   return isBackfilledMinuteUnknown(event.payload) ? '시각 미상' : formatMatchClock(event.clockMs);
 }
 
+
+/**
+ * 이벤트 종류를 훑어볼 때의 보조 신호. **색만으로 뜻을 전하지 않는다** — 바로 옆에
+ * `eventTypeLabel`(골/옐로카드/…)이 그대로 붙어 있고, 이 점은 `aria-hidden` 이다.
+ * 목록이 길어지면 글자를 하나하나 읽는 대신 색으로 먼저 훑게 된다.
+ */
+function eventDotClass(event: GameEventRecord): string {
+  switch (event.type) {
+    case 'GOAL':
+      return 'bg-[var(--green500)]';
+    case 'CARD':
+      return event.payload.card === 'RED' ? 'bg-[var(--red500)]' : 'bg-[var(--yellow500)]';
+    case 'FOUL':
+      return 'bg-[var(--grey400)]';
+    case 'SUBSTITUTION':
+      return 'bg-[var(--blue500)]';
+    default:
+      return 'bg-[var(--grey300)]';
+  }
+}
+
 /**
  * 서버에 확정된 경기 이벤트 로그.
  *
@@ -63,6 +84,14 @@ export function RecordedEventList({
   }
 
   const sideName = new Map(sides.map((side) => [side.id, side.displayNameSnapshot]));
+  /**
+   * 팀 색. 예전에는 "색으로 팀을 구분하면 색만으로 의미를 전달하게 된다"는 이유로 색을
+   * 아예 쓰지 않고 굵기로만 대비를 올렸다. 그 판단의 핵심은 *색만으로* 였다 — 팀 이름은
+   * 그대로 두고 색을 **덧붙이면** R-C3 를 지키면서 훑어보기만 빨라진다. 실화면에서 양 팀이
+   * 같은 회색 텍스트로만 갈려 "어느 팀 골이었지"를 매번 읽어야 했다(2026-08-18 확인).
+   * 홈=파랑 / 원정=주황 — 색상환 179° 차이라 색각 이상에서도 갈린다.
+   */
+  const homeSideId = sides[0]?.id ?? null;
   const playerName = new Map(
     lineups.flatMap((lineup) =>
       lineup.participants.map((participant) => [
@@ -92,8 +121,21 @@ export function RecordedEventList({
         return (
           <li
             key={event.id}
-            className="flex flex-col gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2"
+            className="flex items-stretch gap-2 rounded-lg border border-[var(--border)] py-2 pl-2 pr-3"
           >
+            {/* 팀 레일 — 행 왼쪽 색 막대. 팀 이름은 오른쪽에 그대로 남아 있어
+                색만으로 정보를 전달하지 않는다(R-C3). */}
+            <span
+              aria-hidden="true"
+              className={`w-1 shrink-0 self-stretch rounded-full ${
+                event.sideId === null
+                  ? 'bg-[var(--border)]'
+                  : event.sideId === homeSideId
+                    ? 'bg-[var(--blue500)]'
+                    : 'bg-[var(--orange500)]'
+              }`}
+            />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             {/* 좁은 폭에서는 위아래로 쌓는다. 한 줄로 두면 액션 묶음(어시스트·
                 되돌리기·팀명)이 shrink-0 이라 폭을 먼저 가져가고, 남은 자리에서
                 이벤트 문구가 잘려 "골 · 1 김..." 처럼 선수 이름이 사라졌다(알파
@@ -110,6 +152,10 @@ export function RecordedEventList({
                 <span className="shrink-0 rounded bg-[var(--surface-soft)] px-1.5 py-0.5 text-xs font-medium tabular-nums text-[var(--text-muted)]">
                   {eventTimeLabel(event)}
                 </span>
+                <span
+                  aria-hidden="true"
+                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${eventDotClass(event)}`}
+                />
                 <p className="truncate text-sm font-medium text-[var(--text-strong)]">
                   {eventTypeLabel(event)}
                   {event.type === 'SUBSTITUTION'
@@ -157,10 +203,19 @@ export function RecordedEventList({
                     가장 약하게 표현돼 있었다(11px·regular·muted, 우측 끝 — 알파 390px
                     실측). 색을 더 쓰지 않고(R-C1) 굵기로만 대비를 올린다 — 색으로
                     팀을 구분하면 색만으로 의미를 전달하게 돼 R-C3 에 걸린다. */}
-                <span className="text-xs font-medium text-[var(--text-muted)]">
+                <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
+                  {event.sideId ? (
+                    <span
+                      aria-hidden="true"
+                      className={`h-2 w-2 shrink-0 rounded-full ${
+                        event.sideId === homeSideId ? 'bg-[var(--blue500)]' : 'bg-[var(--orange500)]'
+                      }`}
+                    />
+                  ) : null}
                   {event.sideId ? (sideName.get(event.sideId) ?? '') : ''}
                 </span>
               </div>
+            </div>
             </div>
           </li>
         );

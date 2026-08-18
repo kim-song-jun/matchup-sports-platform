@@ -33,7 +33,7 @@ import { randomUuid } from '@/lib/uuid';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
 import { latestOperableLineup } from './lineup-grid';
 import { ElapsedMatchClock } from './elapsed-match-clock';
-import { QueueStatusPanel } from './queue-status-panel';
+import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { QuickSubstitutionPanel } from './quick-substitution-panel';
@@ -1017,13 +1017,34 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             가정하지 않는다. */}
         {sides.length > 0 ? (
           <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <p className="flex items-baseline gap-1.5">
+            {/* 점수는 이 화면에서 가장 멀리서 확인되는 값이다 — 현장에서는 화면을
+                손에 들고 보는 게 아니라 테이블에 두고 곁눈질한다. text-2xl(24px)로는
+                옆의 라벨·칩과 무게가 비슷해 한눈에 잡히지 않아 text-4xl 로 올린다.
+                양옆에 팀 색 점을 붙여 어느 숫자가 어느 팀인지 읽지 않고 알 수 있게
+                하되, 팀 이름은 바로 위 제목 줄("A vs B")에 그대로 있으므로 색만으로
+                정보를 전달하지 않는다(R-C3). sides 배열 순서를 그대로 써서 제목 줄과
+                좌우 순서가 반드시 일치한다. */}
+            <p className="flex items-center gap-2">
               <span className="text-xs font-semibold text-[var(--text-muted)]">스코어</span>
               <span
-                className="text-2xl font-bold tabular-nums text-[var(--text-strong)]"
+                className="flex items-center gap-1.5 text-4xl font-extrabold leading-none tabular-nums text-[var(--text-strong)]"
                 aria-label={`스코어 ${sides.map((side) => `${side.displayNameSnapshot} ${scoreBySideId.get(side.id) ?? 0}점`).join(', ')}`}
               >
-                {sides.map((side) => scoreBySideId.get(side.id) ?? 0).join(' : ')}
+                {/* 점수 문자열("2 : 1")은 한 텍스트 노드로 유지한다 — 숫자 사이에
+                    엘리먼트를 끼우면 화면은 같아 보여도 점수를 읽는 쪽(스크린리더,
+                    그리고 이 값을 계약으로 검증하는 테스트)에서 하나의 값으로
+                    잡히지 않는다. 팀 색 점은 양옆 바깥에 둔다(좌=홈, 우=원정). */}
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--blue500)]"
+                />
+                <span>{sides.map((side) => scoreBySideId.get(side.id) ?? 0).join(' : ')}</span>
+                {sides.length > 1 ? (
+                  <span
+                    aria-hidden="true"
+                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--orange500)]"
+                  />
+                ) : null}
               </span>
             </p>
             {/* 승부차기 — 정규시간 점수와 다른 값이라 위 스코어에 섞지 않고 별도 칩으로
@@ -1307,9 +1328,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         />
       </section>
 
-      {ops.queue.items.length > 0 && (
+      {/* 전부 ack 된 평상시에는 이 섹션 자체를 그리지 않는다 — 성공은 위 "기록된
+          이벤트"가 이미 보여주므로, 여기는 손이 필요한 것만 남는 자리다. */}
+      {hasUnsettledQueueItems(ops.queue.items) && (
         <section className="px-4">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">전송 상태</h3>
+          <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">전송 대기·실패</h3>
           <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} />
         </section>
       )}

@@ -6,9 +6,20 @@ import type { QueuedGameEvent, QueuedEventStatus } from '@/lib/game-operations-q
 
 /**
  * Task 21 — the durable local event queue's visible status list. Acceptance
- * criterion: "a failed event remains visible" — every item, whatever its
- * status, stays in this list until it acks; nothing is silently dropped.
+ * criterion: "a failed event remains visible" — nothing that still needs the
+ * operator's attention is silently dropped.
+ *
+ * 이미 ack 된 항목은 여기서 빼고 위의 "기록된 이벤트"(서버 확정 로그)에 맡긴다.
+ * 예전에는 ack 된 것까지 남아, 전부 성공한 평상시에도 `골·옐로카드·골·파울·교체`가
+ * "기록 완료"로만 나열됐다 — 위 목록과 1:1 중복이면서 시각·선수·팀은 없어 정보량이
+ * 사실상 0이었고, 그 소음이 우측 절반을 상시 차지했다(2026-08-18 실화면 확인).
+ * 실패·대기·전송중만 남기면 이 패널은 "지금 뭔가 잘못됐다"는 신호 전용이 된다.
  */
+
+/** 아직 운영자가 알아야 할 항목(대기·전송중·실패)이 있는가. 섹션 노출 판정에 쓴다. */
+export function hasUnsettledQueueItems(items: readonly QueuedGameEvent[]): boolean {
+  return items.some((item) => item.status !== 'acked');
+}
 
 export interface QueueStatusPanelProps {
   readonly items: readonly QueuedGameEvent[];
@@ -42,17 +53,18 @@ function eventLabel(item: QueuedGameEvent): string {
 }
 
 export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
-  if (items.length === 0) {
+  const unsettled = items.filter((item) => item.status !== 'acked');
+  if (unsettled.length === 0) {
     return (
       <p className="px-1 py-3 text-xs text-[var(--text-muted)]">
-        기록된 이벤트가 아직 없어요.
+        모두 서버에 기록됐어요.
       </p>
     );
   }
 
   return (
     <ul className="flex flex-col gap-1.5" aria-label="기록한 이벤트 목록">
-      {items.map((item) => (
+      {unsettled.map((item) => (
         <li
           key={item.clientEventId}
           className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-3 py-2"

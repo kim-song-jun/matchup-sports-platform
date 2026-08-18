@@ -101,16 +101,52 @@ describe('AssistPickerSheet — 어시스트 없음·맥락·잘림 (2026-08-18 
     expect(screen.getByText(/전반 01:00/)).toBeInTheDocument();
   });
 
-  it('선수가 많으면 더 있다는 신호를 준다 — 예전에는 잘려도 알 수 없었다', () => {
-    const many = Array.from({ length: 8 }, (_, i) => ({
-      ...TEAMMATE,
-      id: `p-${i}`,
-      displayNameSnapshot: `선수${i}`,
-      jerseyNumber: i === 0 ? null : i,
-    }));
-    render(<AssistPickerSheet {...base} teammates={many} onClose={vi.fn()} />);
-    expect(screen.getByText('아래로 더 있어요')).toBeInTheDocument();
-    // 등번호 없는 선수 앞에 "-" 가 붙지 않는다.
-    expect(screen.getByRole('button', { name: /선수0/ })).not.toHaveTextContent('-');
+  /** jsdom 은 레이아웃을 계산하지 않아 scrollHeight/clientHeight 가 항상 0 이다.
+   *  "목록이 넘친다/안 넘친다"는 이 컴포넌트가 실제로 분기하는 조건이므로 그 두 값만
+   *  직접 세워 두 갈래를 각각 검증한다(넘침 신호는 목록 스크롤 여부의 함수여야 하고,
+   *  선수 수 어림짐작이어서는 안 된다 — 4명이 딱 들어맞는 390px 화면에서 마지막
+   *  선수가 페이드에 반쯤 지워지던 실제 결함). */
+  function stubListMetrics({ scrollHeight, clientHeight }: { scrollHeight: number; clientHeight: number }) {
+    const scroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight');
+    const client = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, value: scrollHeight });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: clientHeight });
+    return () => {
+      if (scroll) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', scroll);
+      if (client) Object.defineProperty(HTMLElement.prototype, 'clientHeight', client);
+    };
+  }
+
+  const manyTeammates = Array.from({ length: 8 }, (_, i) => ({
+    ...TEAMMATE,
+    id: `p-${i}`,
+    displayNameSnapshot: `선수${i}`,
+    jerseyNumber: i === 0 ? null : i,
+  }));
+
+  it('목록이 실제로 넘칠 때만 더 있다는 신호를 준다', () => {
+    const restore = stubListMetrics({ scrollHeight: 600, clientHeight: 200 });
+    try {
+      render(<AssistPickerSheet {...base} teammates={manyTeammates} onClose={vi.fn()} />);
+      expect(screen.getByText('아래로 더 있어요')).toBeInTheDocument();
+      // 등번호 없는 선수 앞에 "-" 가 붙지 않는다.
+      expect(screen.getByRole('button', { name: /선수0/ })).not.toHaveTextContent('-');
+    } finally {
+      restore();
+    }
+  });
+
+  it('목록이 다 보이면 신호도 아래쪽 페이드도 없다 — 마지막 선수가 잘린 것처럼 보이면 안 된다', () => {
+    const restore = stubListMetrics({ scrollHeight: 200, clientHeight: 200 });
+    try {
+      const { container } = render(
+        <AssistPickerSheet {...base} teammates={manyTeammates.slice(0, 4)} onClose={vi.fn()} />,
+      );
+      expect(screen.queryByText('아래로 더 있어요')).not.toBeInTheDocument();
+      const list = container.querySelector('[role="list"]');
+      expect(list?.className).not.toContain('mask-image');
+    } finally {
+      restore();
+    }
   });
 });

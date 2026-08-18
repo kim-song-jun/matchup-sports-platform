@@ -48,8 +48,17 @@ export function penaltyShootoutDecided(
   if (home === away) return false;
 
   if (firstKickSideKey === undefined) {
-    // 선축을 모르면 "누가 몇 개 남았는지"를 계산할 수 없다 — 보수적으로 같은
-    // 횟수를 찬 경우에만 결판으로 본다(A1과 같은 문장).
+    // 선축을 모르면 "누가 몇 개 남았는지"를 계산할 수 없다 — 어느 팀이 선축인지에 따라
+    // 잔여 킥이 갈리기 때문이다. 그래서 **조기 종료를 아예 허용하지 않는다**: 5킥을 다
+    // 채우고 같은 횟수를 찬 경우에만 결판으로 본다(A1의 문장을 그대로 쓴다).
+    //
+    // 2026-08-18 알파 실측 정정 — 예전엔 `takenHome === takenAway` 한 줄이라 5킥 바닥이
+    // 없었고, 그 결과 **키 하나를 빼면 게이트가 통째로 뚫렸다**:
+    //   {home:1, away:0, takenHome:1, takenAway:1, firstKickSideKey:'HOME'} → 422 UNDECIDED
+    //   {home:1, away:0, takenHome:1, takenAway:1}                          → 201 통과
+    // 주석은 "보수적"이라고 적혀 있었지만 실제로는 A1보다도 A2보다도 느슨했다.
+    // 우회가 쉬운 쪽이 기본값이 되면 게이트가 있으나 마나다.
+    if (takenHome < 5 || takenAway < 5) return false;
     return takenHome === takenAway;
   }
   const firstIsHome = firstKickSideKey === 'HOME';

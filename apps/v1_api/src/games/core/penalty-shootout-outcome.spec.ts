@@ -47,10 +47,44 @@ describe('penaltyShootoutDecided — 서버가 킥 수를 보고 판정한다', 
     ).toBe(true);
   });
 
-  it('선축을 모르면 같은 횟수를 찬 경우에만 결판으로 본다 — 홈으로 가정하지 않는다', () => {
-    // 선축 하드코딩이 이 기능이 고친 바로 그 결함이라, 레거시에서도 되살리지 않는다.
+  /**
+   * **2026-08-18 알파 실측 — 이 자리의 예전 테스트가 결함을 통과시켰다.**
+   *
+   * 예전엔 `4/3`과 `3/3`만 검증하고 **`1/1`을 빼먹어서**, 선축 미상 분기가 5킥 바닥 없이
+   * `takenHome === takenAway` 한 줄이던 것을 잡지 못했다. 그 결과 **키 하나만 빼면 게이트가
+   * 통째로 뚫렸다** — 라이브에서 같은 경기·같은 버전으로 재현했다:
+   *
+   *   `{home:1, away:0, takenHome:1, takenAway:1, firstKickSideKey:'HOME'}` → 422 UNDECIDED
+   *   `{home:1, away:0, takenHome:1, takenAway:1}`                          → **201 통과**
+   *
+   * 선축을 모르면 잔여 킥을 계산할 수 없으므로 **조기 종료를 아예 허용하지 않는다** —
+   * A1과 같은 문장(5킥 바닥 + 같은 횟수)을 쓴다.
+   */
+  it('선축을 모르면 조기 종료를 허용하지 않는다 — 5킥을 다 채워야 결판이다', () => {
+    // ★ 회귀의 핵심 케이스: 각 1킥. 예전 구현은 `1 === 1`로 결판을 냈다.
+    expect(penaltyShootoutDecided({ home: 1, away: 0, takenHome: 1, takenAway: 1 }, A2)).toBe(false);
+    expect(penaltyShootoutDecided({ home: 1, away: 0, takenHome: 1, takenAway: 1 }, A1)).toBe(false);
+    // 5킥 미만은 같은 횟수여도 결판이 아니다.
+    expect(penaltyShootoutDecided({ home: 3, away: 0, takenHome: 3, takenAway: 3 }, A2)).toBe(false);
+    // 킥 수가 다르면 당연히 결판이 아니다(선축 하드코딩으로 되돌아가지 않는다).
     expect(penaltyShootoutDecided({ home: 4, away: 0, takenHome: 4, takenAway: 3 }, A2)).toBe(false);
-    expect(penaltyShootoutDecided({ home: 3, away: 0, takenHome: 3, takenAway: 3 }, A2)).toBe(true);
+    // 5킥을 다 채우고 같은 횟수를 찼으면 결판이다 — 잠가 두기만 하는 분기가 아니다.
+    expect(penaltyShootoutDecided({ home: 3, away: 1, takenHome: 5, takenAway: 5 }, A2)).toBe(true);
+  });
+
+  it('선축 미상 분기가 선축을 아는 경우보다 느슨하면 안 된다 — 두 정책 어느 쪽보다도', () => {
+    // 이 단언이 D-1의 본질이다: 키를 빼는 것이 **완화**가 되면 게이트는 있으나 마나다.
+    for (const policy of [A1, A2]) {
+      for (const [takenHome, takenAway] of [[1, 1], [2, 2], [3, 3], [4, 4], [4, 3]] as const) {
+        const withSide = penaltyShootoutDecided(
+          { home: takenHome, away: 0, takenHome, takenAway, firstKickSideKey: 'HOME' },
+          policy,
+        );
+        const withoutSide = penaltyShootoutDecided({ home: takenHome, away: 0, takenHome, takenAway }, policy);
+        // 선축을 모를 때 DECIDED 라면, 아는 경우에도 DECIDED 여야 한다.
+        if (withoutSide) expect(withSide).toBe(true);
+      }
+    }
   });
 
   it('서든데스는 같은 횟수를 찬 뒤 점수가 갈려야 결판이다', () => {

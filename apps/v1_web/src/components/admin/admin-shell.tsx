@@ -116,6 +116,12 @@ interface AdminShellProps {
    * Should be set to `true` only for `adminRole === 'owner'`.
    */
   canManageAdmins?: boolean;
+  /**
+   * 표가 넓은 화면(대진 관리 등)에서 본문 폭 상한을 푼다.
+   * 기본값을 넓히지 않는 이유: 대부분의 어드민 화면은 텍스트 문단·폼이라 한 줄이 길어지면
+   * 오히려 읽기 어려워진다. 넓힐 이유가 있는 화면만 켠다.
+   */
+  wide?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -423,7 +429,7 @@ function Drawer({
 }
 
 // ── Shell ─────────────────────────────────────────────────────────────────
-export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmins = false }: AdminShellProps) {
+export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmins = false, wide = false }: AdminShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
   const { data: pendingInquiries } = useV1AdminInquiriesPendingCount();
@@ -530,7 +536,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
 
         {/* Page content */}
         <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 md:py-6 lg:py-8">
-          <div className="max-w-[1200px] xl:max-w-[1320px] mx-auto w-full">{children}</div>
+          <div className={`${wide ? 'max-w-none' : 'max-w-[1200px] xl:max-w-[1320px]'} mx-auto w-full`}>{children}</div>
         </main>
       </div>
     </div>

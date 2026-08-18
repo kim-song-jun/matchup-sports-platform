@@ -18,7 +18,7 @@ export function PushFailureTable() {
       key: 'userIdHash',
       header: '사용자',
       render: (failure) => (
-        <span className="font-mono text-[var(--font-size-label)] text-[var(--text-body)]">
+        <span className="font-mono text-[length:var(--font-size-label)] text-[var(--text-body)]">
           {failure.userIdHash}
         </span>
       ),
@@ -27,7 +27,7 @@ export function PushFailureTable() {
       key: 'endpointSuffix',
       header: '구독',
       render: (failure) => (
-        <span className="font-mono text-[var(--font-size-label)] text-[var(--text-muted)]">
+        <span className="font-mono text-[length:var(--font-size-label)] text-[var(--text-muted)]">
           …{failure.endpointSuffix}
         </span>
       ),
@@ -55,7 +55,7 @@ export function PushFailureTable() {
       width: 'w-[88px]',
       render: (failure) =>
         failure.acknowledgedAt ? (
-          <span className="inline-flex items-center gap-1 text-[var(--font-size-micro)] font-semibold text-[var(--text-muted)]">
+          <span className="inline-flex items-center gap-1 text-[length:var(--font-size-micro)] font-semibold text-[var(--text-muted)]">
             <CheckCircle2 size={13} aria-hidden="true" />
             확인됨
           </span>
@@ -64,7 +64,7 @@ export function PushFailureTable() {
             type="button"
             onClick={() => ackMutation.mutate([failure.id])}
             disabled={ackMutation.isPending}
-            className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             aria-label={`${failure.userIdHash} 실패 알림 확인`}
           >
             확인

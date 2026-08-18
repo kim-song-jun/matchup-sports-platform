@@ -167,7 +167,7 @@ function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean })
       <span className="flex flex-col items-start">
         <span>{item.label}</span>
         {item.disabledReason ? (
-          <span className="text-[var(--font-size-micro)] font-normal text-gray-400 dark:text-gray-500">{item.disabledReason}</span>
+          <span className="text-[length:var(--font-size-micro)] font-normal text-gray-400 dark:text-gray-500">{item.disabledReason}</span>
         ) : null}
       </span>
     </button>
@@ -304,7 +304,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
                 {tournamentTitle ?? '대회 운영'}
               </span>
               {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
-              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
                 {staffRoleLabel(role)}
               </span>
             </div>
@@ -399,7 +399,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
               {tournamentTitle ?? '대회 운영'}
             </span>
             {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
-            <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+            <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
               {staffRoleLabel(role)}
             </span>
           </div>

@@ -66,7 +66,7 @@ function shortId(id: string | null | undefined): string {
 function IdCell({ id }: { id: string | null | undefined }) {
   if (!id) return <span className="text-gray-400">—</span>;
   return (
-    <span className="font-mono text-[var(--font-size-micro)] text-[var(--text-muted)]" title={id}>
+    <span className="font-mono text-[length:var(--font-size-micro)] text-[var(--text-muted)]" title={id}>
       {shortId(id)}
     </span>
   );
@@ -155,8 +155,8 @@ function LogDetailModal({
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex gap-3 py-1.5">
-      <dt className="w-[92px] shrink-0 text-[var(--font-size-label)] text-[var(--text-muted)]">{label}</dt>
-      <dd className="min-w-0 flex-1 break-all text-[var(--font-size-body-sm)] text-[var(--text-strong)]">{value}</dd>
+      <dt className="w-[92px] shrink-0 text-[length:var(--font-size-label)] text-[var(--text-muted)]">{label}</dt>
+      <dd className="min-w-0 flex-1 break-all text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">{value}</dd>
     </div>
   );
 }
@@ -165,8 +165,8 @@ function StateBlock({ label, value }: { label: string; value: unknown }) {
   if (value === null || value === undefined) return null;
   return (
     <section className="mt-4">
-      <h3 className="mb-1.5 text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</h3>
-      <pre className="max-h-[220px] overflow-auto rounded-xl bg-[var(--surface-soft)] p-3 font-mono text-[var(--font-size-micro)] leading-relaxed text-[var(--text-body)]">
+      <h3 className="mb-1.5 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</h3>
+      <pre className="max-h-[220px] overflow-auto rounded-xl bg-[var(--surface-soft)] p-3 font-mono text-[length:var(--font-size-micro)] leading-relaxed text-[var(--text-body)]">
         {JSON.stringify(value, null, 2)}
       </pre>
     </section>
@@ -392,7 +392,7 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             render: (row) => (
               <span className="flex items-center gap-1 flex-wrap">
                 <AdminStatusPill status={row.fromStatus} />
-                <span className="text-gray-400 text-[var(--font-size-micro)]" aria-hidden="true">→</span>
+                <span className="text-gray-400 text-[length:var(--font-size-micro)]" aria-hidden="true">→</span>
                 <AdminStatusPill status={row.toStatus} />
               </span>
             ),
@@ -482,7 +482,7 @@ export default function AdminAuditPage() {
               type="button"
               onClick={() => handleTabChange(tab.key)}
               className={[
-                'px-4 min-h-[44px] rounded-lg text-[var(--font-size-label)] font-medium transition-colors',
+                'px-4 min-h-[44px] rounded-lg text-[length:var(--font-size-label)] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 isActive
                   ? 'bg-[var(--card-surface)] text-[var(--text-strong)] shadow-sm'
@@ -510,7 +510,7 @@ export default function AdminAuditPage() {
               onClick={() => setTargetType(opt.value)}
               aria-pressed={isActive}
               className={[
-                'inline-flex items-center px-3 min-h-[44px] rounded-full text-[var(--font-size-label)] font-medium transition-colors',
+                'inline-flex items-center px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 isActive
                   ? 'bg-blue-500 text-white'

@@ -25,13 +25,13 @@ function AccessDenied() {
         <span className="text-[var(--text-caption)]" aria-hidden="true">
           <ShieldOff size={48} />
         </span>
-        <h1 className="text-[var(--font-size-subhead)] font-bold text-[var(--text-strong)]">운영자 권한이 필요해요</h1>
-        <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
+        <h1 className="text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">운영자 권한이 필요해요</h1>
+        <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           이 페이지는 플랫폼 운영자만 접근할 수 있어요. 계정 권한을 확인해 주세요.
         </p>
         <Link
           href="/home"
-          className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           서비스로 돌아가기
         </Link>
@@ -54,14 +54,14 @@ function AdminErrorScreen({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4">
       <div className="flex flex-col items-center gap-3 text-center max-w-[320px]">
-        <h1 className="text-[var(--font-size-subhead)] font-bold text-[var(--text-strong)]">잠시 문제가 생겼어요</h1>
-        <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
+        <h1 className="text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">잠시 문제가 생겼어요</h1>
+        <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           일시적인 오류로 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           다시 시도
         </button>

@@ -203,7 +203,7 @@ function AdminMatchesPageContent() {
                   <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
                     {row.title}
                   </span>
-                  <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]">
+                  <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
                     {row.placeName}
                   </span>
                 </div>
@@ -245,7 +245,7 @@ function AdminMatchesPageContent() {
                       setModalOpen(true);
                     }}
                     className={[
-                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                       'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}

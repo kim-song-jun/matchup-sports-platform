@@ -217,7 +217,7 @@ export function GateConfirmModal({
                 ].join(' ')}
                 aria-required="true"
               />
-              <p className="text-[var(--font-size-caption)] text-right text-gray-400 tabular-nums">
+              <p className="text-[length:var(--font-size-caption)] text-right text-gray-400 tabular-nums">
                 {reason.length} / {REASON_MAX}
               </p>
             </div>

@@ -76,8 +76,8 @@ export default function AdminIntegrationSettingsPage() {
 
       <div className="max-w-[560px]">
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="카카오맵 연동 설정">
-          <h2 className="text-[var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">카카오맵 연동</h2>
-          <p className="mt-1 text-[var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed">
+          <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">카카오맵 연동</h2>
+          <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed">
             REST API 키는 대회 장소 지오코딩(서버 전용)에, JS 키는 대회 상세 지도 임베드에 사용돼요. 두 키
             모두{' '}
             <a
@@ -92,7 +92,7 @@ export default function AdminIntegrationSettingsPage() {
           </p>
 
           {isError ? (
-            <div className="mt-4 rounded-xl bg-[var(--red50)] px-3 py-2 text-[var(--font-size-caption)] text-[var(--red700)]">
+            <div className="mt-4 rounded-xl bg-[var(--red50)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--red700)]">
               {errorMessage}
               <button type="button" onClick={() => void refetch()} className="ml-2 font-semibold underline">
                 다시 시도
@@ -102,7 +102,7 @@ export default function AdminIntegrationSettingsPage() {
 
           <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit}>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">카카오 REST API 키</span>
+              <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">카카오 REST API 키</span>
               <input
                 value={kakaoRestApiKey ?? ''}
                 onChange={(event) => setKakaoRestApiKey(event.target.value)}
@@ -123,7 +123,7 @@ export default function AdminIntegrationSettingsPage() {
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">카카오맵 JS 키</span>
+              <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">카카오맵 JS 키</span>
               <input
                 value={kakaoMapsJsKey ?? ''}
                 onChange={(event) => setKakaoMapsJsKey(event.target.value)}
@@ -141,14 +141,14 @@ export default function AdminIntegrationSettingsPage() {
                 onDelete={() => setKakaoMapsJsKey('')}
                 onCancelDelete={() => setKakaoMapsJsKey(undefined)}
               />
-              <span className="text-[var(--font-size-micro)] text-gray-400">
+              <span className="text-[length:var(--font-size-micro)] text-gray-400">
                 JS 키는 지도 스크립트에 포함되어 브라우저에 그대로 노출돼요 — 카카오 개발자 콘솔에서 이 앱의
                 사용 도메인을 등록해두면 다른 도메인에서의 무단 사용을 막을 수 있어요.
               </span>
             </label>
 
             {!canWrite ? (
-              <p className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-[var(--font-size-caption)] text-[var(--text-muted)]">
+              <p className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                 지원 역할은 연동 설정을 조회할 수 있지만 저장할 수 없어요.
               </p>
             ) : null}
@@ -194,14 +194,14 @@ function KeyFieldFooter({
   if (pendingDelete) {
     return (
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[var(--font-size-micro)] font-semibold text-[var(--red700)]">
+        <span className="text-[length:var(--font-size-micro)] font-semibold text-[var(--red700)]">
           삭제 예정 — 저장하면 이 키가 삭제되고 환경변수 값(또는 미설정)으로 되돌아가요.
         </span>
         <button
           type="button"
           onClick={onCancelDelete}
           disabled={disabled}
-          className="shrink-0 text-[var(--font-size-micro)] font-semibold text-[var(--text-muted)] underline hover:text-[var(--text-body)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="shrink-0 text-[length:var(--font-size-micro)] font-semibold text-[var(--text-muted)] underline hover:text-[var(--text-body)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           취소
         </button>
@@ -211,13 +211,13 @@ function KeyFieldFooter({
 
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[var(--font-size-micro)] text-[var(--text-muted)]">{sourceText}</span>
+      <span className="text-[length:var(--font-size-micro)] text-[var(--text-muted)]">{sourceText}</span>
       {canWrite && canDelete ? (
         <button
           type="button"
           onClick={onDelete}
           disabled={disabled}
-          className="inline-flex shrink-0 items-center gap-1 text-[var(--font-size-micro)] font-semibold text-[var(--text-muted)] hover:text-[var(--red700)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex shrink-0 items-center gap-1 text-[length:var(--font-size-micro)] font-semibold text-[var(--text-muted)] hover:text-[var(--red700)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <X size={12} aria-hidden="true" />이 키 삭제
         </button>

@@ -739,7 +739,7 @@ export function BracketTab({
             </div>
           </div>
           {editFixture?.result && (
-            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)] m-0">결과가 기록된 경기는 팀을 바꿀 수 없어요. 팀을 바꾸려면 결과를 먼저 삭제해 주세요.</p>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] m-0">결과가 기록된 경기는 팀을 바꿀 수 없어요. 팀을 바꾸려면 결과를 먼저 삭제해 주세요.</p>
           )}
           <div className="flex gap-2 pt-1">
             <button
@@ -826,7 +826,7 @@ export function BracketTab({
               <option value="1">1회전 (싱글 라운드로빈)</option>
               <option value="2">2회전 (홈/어웨이 더블 라운드로빈)</option>
             </select>
-            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)]">
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
               모든 팀이 서로 {legsPickerValue}회씩 맞붙는 대진을 자동으로 만들어요.
             </p>
           </div>

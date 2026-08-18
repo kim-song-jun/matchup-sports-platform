@@ -213,7 +213,7 @@ export function ReviewsTab({
               placeholder="예: 욕설/비방 신고 접수"
               className={textareaCls}
             />
-            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)] text-right">{hideReason.length}/200</p>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] text-right">{hideReason.length}/200</p>
           </div>
           <div className="flex gap-2 mt-1">
             <button
@@ -287,7 +287,7 @@ function ReviewModerationCard({
               <span className="text-[12px] text-[var(--text-muted)] truncate">· {review.teamName}</span>
             )}
             {isHidden && (
-              <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] text-[var(--font-size-caption)] font-semibold">
+              <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] text-[length:var(--font-size-caption)] font-semibold">
                 숨김
               </span>
             )}
@@ -303,7 +303,7 @@ function ReviewModerationCard({
                 />
               ))}
             </span>
-            <span className="text-[var(--font-size-caption)] text-[var(--text-muted)]">{formatDate(review.createdAt)}</span>
+            <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{formatDate(review.createdAt)}</span>
           </div>
         </div>
       </div>

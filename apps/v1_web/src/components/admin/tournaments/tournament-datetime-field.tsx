@@ -29,7 +29,7 @@ export function TournamentDatetimeField({
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]"
+        className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]"
       >
         {label}
         {required ? (
@@ -50,7 +50,7 @@ export function TournamentDatetimeField({
         aria-invalid={Boolean(error)}
         aria-describedby={descriptionId}
         className={[
-          'h-[44px] w-full rounded-xl border bg-[var(--card-surface)] px-3 text-[var(--font-size-label)] text-[var(--text-strong)]',
+          'h-[44px] w-full rounded-xl border bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)]',
           'focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50',
           error
             ? 'border-[var(--red700)] focus:border-[var(--red700)]'
@@ -61,14 +61,14 @@ export function TournamentDatetimeField({
         <p
           id={`${id}-error`}
           role="alert"
-          className="text-[var(--font-size-caption)] text-[var(--red700)]"
+          className="text-[length:var(--font-size-caption)] text-[var(--red700)]"
         >
           {error}
         </p>
       ) : hint ? (
         <p
           id={`${id}-hint`}
-          className="text-[var(--font-size-caption)] text-[var(--text-caption)]"
+          className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]"
         >
           {hint}
         </p>

@@ -169,7 +169,7 @@ export function RichTextEditor({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</span>
+      <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</span>
       <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)] focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
         <div className="flex flex-wrap gap-1 border-b border-[var(--border)] bg-[var(--surface-soft)] p-2" role="toolbar" aria-label="본문 서식">
           <ToolbarButton label="실행 취소" onClick={() => editor?.chain().focus().undo().run()} disabled={disabled || !editor?.can().undo()}><Undo2 /></ToolbarButton>

@@ -1,3 +1,4 @@
+import { UnprocessableEntityException } from '@nestjs/common';
 import { HttpException } from '@nestjs/common';
 import { V1GameState, type V1GameParticipant } from '@prisma/client';
 import { validate } from 'class-validator';
@@ -242,6 +243,48 @@ describe('GamesService command boundary', () => {
   });
 
   describe('extractEndPenalties (트랙 B: end 커맨드의 승부차기 payload 파싱)', () => {
+    // 킥 수(`takenHome`/`takenAway`)와 우회 표식(`operatorOverride`)은 서버가
+    // 승부차기 종료를 스스로 판정하고, 규칙과 다른 결론을 기록에 남기기 위한 필드다.
+    it('킥 수를 그대로 실어 돌려준다 — 서버 판정과 감사 기록의 입력이 된다', () => {
+      expect(
+        extractEndPenalties({ penalties: { home: 3, away: 1, takenHome: 4, takenAway: 4 } }),
+      ).toEqual({ home: 3, away: 1, takenHome: 4, takenAway: 4 });
+    });
+
+    it('킥 수를 한쪽만 보내면 422 — 반쪽 정보로 판정이 돌면 정상 결과가 거부된다', () => {
+      // 없는 쪽을 0으로 메우면 그 팀이 한 번도 안 찬 것으로 읽힌다.
+      expect(() => extractEndPenalties({ penalties: { home: 3, away: 1, takenHome: 4 } })).toThrow(
+        UnprocessableEntityException,
+      );
+      expect(() => extractEndPenalties({ penalties: { home: 3, away: 1, takenAway: 4 } })).toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('성공 수가 시도 수를 넘으면 422 — 정책과 무관한 산술 불변식이라 override 로도 면제되지 않는다', () => {
+      expect(() =>
+        extractEndPenalties({
+          penalties: { home: 5, away: 1, takenHome: 4, takenAway: 4, operatorOverride: true },
+        }),
+      ).toThrow(UnprocessableEntityException);
+    });
+
+    it('operatorOverride 는 true 일 때만 저장한다 — false 는 키 부재로 정규화된다', () => {
+      // "우회 아님"이 키 부재와 false 두 표현을 갖지 않게 한다.
+      expect(
+        extractEndPenalties({ penalties: { home: 2, away: 0, operatorOverride: false } }),
+      ).toEqual({ home: 2, away: 0 });
+      expect(
+        extractEndPenalties({ penalties: { home: 2, away: 0, operatorOverride: true } }),
+      ).toEqual({ home: 2, away: 0, operatorOverride: true });
+    });
+
+    it('operatorOverride 가 boolean 이 아니면 422', () => {
+      expect(() =>
+        extractEndPenalties({ penalties: { home: 2, away: 0, operatorOverride: 'yes' } }),
+      ).toThrow(UnprocessableEntityException);
+    });
+
     it('payload.penalties가 없으면 undefined(대부분의 end 커맨드는 승부차기가 없다)', () => {
       expect(extractEndPenalties({})).toBeUndefined();
     });

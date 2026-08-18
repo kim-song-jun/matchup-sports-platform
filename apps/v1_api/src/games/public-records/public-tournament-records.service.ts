@@ -137,6 +137,7 @@ type ParticipantNameProfileRow = {
   displayName: string | null;
   nickname: string;
   tournamentRealNameVisible: boolean;
+  deletedAt: Date | null;
 };
 
 /**
@@ -643,7 +644,14 @@ export class PublicTournamentRecordsService {
     if (uniqueUserIds.length === 0) return new Map();
     const profiles = await this.prisma.v1UserProfile.findMany({
       where: { userId: { in: uniqueUserIds } },
-      select: { userId: true, realName: true, displayName: true, nickname: true, tournamentRealNameVisible: true },
+      select: {
+        userId: true,
+        realName: true,
+        displayName: true,
+        nickname: true,
+        tournamentRealNameVisible: true,
+        deletedAt: true,
+      },
     });
     return new Map(profiles.map((profile) => [profile.userId, profile] as const));
   }
@@ -917,11 +925,19 @@ function normalizeRevisionState(state: V1GameResultRevisionState | undefined): '
  *     `displayNameSnapshot` 그대로다 -- 이 경우는 전혀 바뀌지 않았다.
  *   - `userId`가 있는데 프로필이 없거나(온보딩 미완료 등) 토글이 없으면 실명 없이
  *     조용히 시작해야 하므로(fail-closed) 역시 스냅샷으로 접지한다.
- *   - `userId`가 있고 토글 OFF(기본값)면 `V1UserProfile.displayName ?? nickname`
- *     (닉네임)을 쓴다.
+ *   - `userId`가 있고 토글 OFF(기본값)면 `V1UserProfile.nickname`(닉네임)을 쓴다.
+ *     **`displayName`을 여기 끼워 넣으면 안 된다** -- 그 컬럼은 닉네임이 아니라
+ *     실명의 레거시 미러다: 가입 경로(`auth.service.ts`)가 `const realName = displayName;`
+ *     으로 가입 폼의 실명을 두 컬럼에 함께 쓰고, `UpdateProfileDto.displayName`은
+ *     `@deprecated`로 남아 `realName`으로 접힌다. 실제로 2026-08-18 alpha에서
+ *     이 폴백 때문에 OFF인데도 실명이 그대로 노출됐다(닉네임 `E2E선수01` 대신
+ *     `선수01`). 코드베이스의 다른 공개 경로도 모두 `profile.nickname`을 쓴다
+ *     (`profile.service.ts`, `public-user-records.service.ts`).
  *   - `userId`가 있고 토글 ON이면 `V1UserProfile.realName`(실명)을 쓰되, 그 필드가
  *     비어 있으면(실명을 아직 입력 안 한 채 토글만 켠 경우) 닉네임으로 방어적으로
  *     내려간다 -- 빈 이름을 보여주지 않기 위함이지 실명을 지어내는 게 아니다.
+ *   - 탈퇴 회원(`deletedAt != null`)만 예외로 `displayName`('탈퇴 회원')을 쓴다 --
+ *     탈퇴 처리가 nickname을 `deleted_<8자>` 식별자로 덮어쓰기 때문이다.
  *
  * `displayNameSnapshot`은 여전히 라인업/브라켓 생성 시점에 찍힌 불변 스냅샷이라
  * `V1User`로의 라이브 조인이 아예 없다(계정을 탈퇴해도 갱신되지 않는다, `roster-cleanup.ts`와
@@ -977,10 +993,14 @@ function resolveParticipantDisplayName(
   if (participant.userId === null) return participant.displayNameSnapshot;
   const profile = profileByUserId.get(participant.userId);
   if (profile === undefined) return participant.displayNameSnapshot;
+  // 탈퇴 회원만 예외로 displayName을 쓴다. 탈퇴 처리(admin.service.ts)가 nickname을
+  // `deleted_<8자>`라는 내부 식별자로 덮어쓰고 displayName에만 '탈퇴 회원'을 남기므로,
+  // 여기서 nickname을 쓰면 화면에 식별자가 그대로 노출된다.
+  if (profile.deletedAt !== null) return profile.displayName ?? profile.nickname;
   if (profile.tournamentRealNameVisible) {
-    return profile.realName ?? profile.displayName ?? profile.nickname;
+    return profile.realName ?? profile.nickname;
   }
-  return profile.displayName ?? profile.nickname;
+  return profile.nickname;
 }
 
 /**

@@ -39,6 +39,7 @@ import {
   buildTournamentCreatePayload,
   buildTournamentPreviewItem,
   canSubmitTournamentCreate,
+  hasPromoFactEdits,
   tournamentCreateReducer,
   validateTournamentCreateStep,
   type TournamentCreateAction,
@@ -1207,6 +1208,7 @@ function PresentationStep({
           disabled={pending}
           priorityError={errors.promoHomePriority}
           onResetFacts={() => dispatch({ type: 'reset-promo-facts', slot: 'promoHome' })}
+          canResetFacts={hasPromoFactEdits(state, 'promoHome')}
           // 이 자리를 비웠을 때 실제로 노출될 이미지 — 자기 자리를 뺀 폴백 결과를 그대로 넘겨
           // 미리보기가 공개 화면과 어긋나지 않게 한다.
           defaultImageUrl={resolveTournamentImage(
@@ -1230,6 +1232,7 @@ function PresentationStep({
           disabled={pending}
           priorityError={errors.promoListPriority}
           onResetFacts={() => dispatch({ type: 'reset-promo-facts', slot: 'promoList' })}
+          canResetFacts={hasPromoFactEdits(state, 'promoList')}
           defaultImageUrl={resolveTournamentImage(
             {
               coverImageUrl: state.coverImageUrl,

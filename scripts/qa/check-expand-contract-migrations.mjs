@@ -380,6 +380,55 @@ END $$`,
     reason:
       'FK on the same newly-added nullable column, which the additivity rules already treat as safe when written as a bare ALTER TABLE -- it is flagged here only because the idempotency guard wraps it in a DO block the parser cannot see into. Legacy NULL-valued rows bypass the constraint by definition, and the OLD app only ever produces NULL team_id, so no old write can violate it. ON DELETE RESTRICT adds no rolling risk either: V1Team is never physically deleted in this codebase (always deletedAt soft delete) and the sibling FK on v1_tournament_registrations.team_id already uses RESTRICT. Reviewed 2026-08-13.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement: `INSERT INTO "v1_managed_terms_policies" ("id", "code", "name", "is_active", "created_at", "updated_at") VALUES ('f772fb99-2671-4066-8874-54867ce0ecf4', 'tournament_record_disclosure', '대회 경기 기록 공개 동의', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Seeds a brand-new managed-terms POLICY row (code 'tournament_record_disclosure') that nothing can " +
+      "observe on its own: this repo surfaces terms only by walking placement -> policy -> latest published " +
+      "document for a context (ManagedTermsRuntimeService.currentTournamentTerms), so a policy with no " +
+      "placement is unreachable by every deployed revision, old and new. INSERT only, never UPDATE or " +
+      "DELETE, and ON CONFLICT (\"id\") DO NOTHING makes a re-run a no-op. No pre-existing row is touched -- " +
+      "in particular tournament_privacy v1.1 is deliberately left alone (this migration names it only in " +
+      "comments), so no existing consent is invalidated and no re-consent is triggered. Rolling the app " +
+      "back leaves an unread row behind, exactly like a CREATE TABLE. Why it exists: the public record " +
+      "screens now show a nickname unless the player opts into real-name display, and that opt-in needs its " +
+      "own consent basis -- tournament_privacy lists ten purposes, none of which is publishing match " +
+      "records. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement: `INSERT INTO "v1_managed_terms_documents" ("id", "policy_id", "version", "title", "content", "content_hash", "change_summary", "requires_reconsent", "status", "effective_at", "published_at", "created_at", "updated_at") VALUES ( '86b39028-bd47-4a4e-9c09-6a4c71c34df6', 'f772fb99-2671-4066-8874-54867ce0ecf4', 'v1.1', '대회 경기 기록 공개 동의', $terms$본인은 팀밋 대회 경기 기록(라인업, 득점·어시스트 등 이벤트 기록, MVP 등)에 닉네임 대신 실명이 표시되는 것에 동의할 수 있습니다. 이 동의는 선택 사항이며, 동의하지 않아도 대회 신청 및 참가에는 어떠한 제한도 없습니다. 1. 공개 항목 이름, 등번호, 포지션, 소속 팀명, 경기별 기록(출전·득점·어시스트·경고·퇴장·MVP 등) 2. 공개 목적 대회 경기 기록 및 참가 명단을 팀밋 서비스 내에서 공개 게시하기 위한 목적으로 이용합니다. 3. 공개 위치 팀밋 서비스 내 대회 기록, 순위표, 선수 기록 화면 4. 공개 기간 동의 시점부터 본인이 철회하기 전까지 계속 공개됩니다. 철회 후에는 별도 요청 없이 즉시 닉네임 표시로 전환됩니다. 5. 동의 거부 및 철회 안내 본 동의는 선택 사항입니다. 동의하지 않아도 대회 신청 및 참가에는 제한이 없으며, 이 경우 경기 기록에는 닉네임이 표시됩니다. 이미 동의한 경우에도 마이페이지 > 설정 > 대회 기록 실명 표시에서 언제든지 철회할 수 있습니다. 6. 유의사항 회사는 공개된 경기 기록을 대회 운영, 기록 게시, 서비스 제공 목적 범위 내에서만 사용합니다. 본인은 위 내용을 확인하였으며 대회 경기 기록 공개(실명 표시)에 동의합니다. 회사명: 아이위(IWI) 대표자: 김봉목 이메일: teameetsports@naver.com 시행일: 2026년 8월 18일$terms$, 'b0527fa26264263b1ed78388472df50499c9e2cb0730ff0a3d28e090f278e65a', '대회 경기 기록(라인업/득점/MVP 등)에 실명 표시를 선택적으로 동의받기 위한 신규 정책 최초 발행', true, 'published'::"V1TermsDocumentStatus", '2026-08-18T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP ) ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Seeds the single published DOCUMENT (v1.1) of the tournament_record_disclosure policy created one " +
+      "statement earlier in this same file, so it inherits that row's reachability argument: a document is " +
+      "surfaced only through its policy's placement, leaving it invisible until the third statement lands. " +
+      "After that it is read identically by both revisions -- " +
+      "apps/v1_api/src/terms/managed-terms-runtime.service.ts is unchanged across this release, so there is " +
+      "no version skew in how the row is interpreted. INSERT only with ON CONFLICT (\"id\") DO NOTHING; no " +
+      "existing document, content hash, or consent event is modified, so the forced-re-consent path (which " +
+      "keys on a policy's document version changing) is never entered. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement: `INSERT INTO "v1_managed_terms_placements" ("id", "policy_id", "context", "requirement", "display_order", "is_active", "created_at", "updated_at") VALUES ( '7ef702a4-6289-4913-a31a-319de15bebd8', 'f772fb99-2671-4066-8874-54867ce0ecf4', 'tournament_application'::"V1ManagedTermsContext", 'optional'::"V1ManagedTermsRequirement", 4, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP ) ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Seeds the PLACEMENT that makes the two rows above visible in the tournament_application context. " +
+      "This is the one statement here an old app instance can actually observe mid-rollout, and it is safe " +
+      "in that window precisely because it is optional: both gates in managed-terms-runtime.service.ts that " +
+      "can block a user (currentTournamentTerms' readiness check and assertTournamentAcceptances' " +
+      "missingRequiredDocumentIds) filter on requirement === 'required', so an optional placement can " +
+      "neither reject a registration nor force re-consent. An old instance simply renders one more optional " +
+      "checkbox -- it is fully data-driven and already does exactly this for the sibling optional " +
+      "tournament_media placement. display_order 4 appends after the four existing placements (0-2 " +
+      "required, 3 tournament_media) instead of renumbering any of them, and ON CONFLICT (\"id\") DO NOTHING " +
+      "makes a re-run a no-op. The one behavioural gap in a rollback window is that the old submit() does " +
+      "not flip V1UserProfile.tournamentRealNameVisible, so a user who ticks the box while rolled back " +
+      "stays at the column default of false: they keep being shown by nickname, which is the " +
+      "under-disclosure (safe) direction rather than publishing a name nobody asked to publish, and they " +
+      "can turn it on themselves at my > settings > tournament real-name once the new build is back. " +
+      "Reviewed 2026-08-18.",
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

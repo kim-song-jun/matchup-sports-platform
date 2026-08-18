@@ -55,22 +55,23 @@ export class MockTournamentSeedService {
     const withLineups = dto.withLineups ?? false;
     const withResults = dto.withResults || reviewReady || status === 'completed';
 
-    const sport = await this.prisma.v1Sport.findFirst({ where: { code: 'futsal' } })
-      ?? await this.prisma.v1Sport.findFirst({});
+    const sport = await this.pickSport();
     if (!sport) throw new BadRequestException({ code: 'NO_SPORT', message: '종목 데이터가 없어요.' });
 
     // 픽스처에 competitionConfigVersionId 가 없으면 fixture-game-backfill 이 CONFIG_MISSING 으로
     // 격리해 V1Game 이 만들어지지 않는다 — 운영 콘솔이 "경기 미생성"으로 뜨는 원인이다.
     // 값을 아는 쪽(이 시드)이 만들 때 바로 박는다.
+    // 종목마다 config 가 따로 있고 라인업 하한도 다르다(alpha 실측: 풋살 3명 · 축구 7명).
+    // 종목을 안 맞추고 최신 ACTIVE 를 집으면 대회 종목과 어긋난 규칙이 박힌다.
     const competitionConfig = await this.prisma.v1CompetitionConfigVersion.findFirst({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', sportCode: sport.code },
       orderBy: { createdAt: 'desc' },
       select: { id: true, lineup: true },
     });
     if (!competitionConfig) {
       throw new BadRequestException({
         code: 'NO_COMPETITION_CONFIG',
-        message: 'ACTIVE 상태의 대회 설정(config)이 없어요. competition-config 백필을 먼저 돌려주세요.',
+        message: `${sport.code} 종목의 ACTIVE 대회 설정(config)이 없어요. competition-config 백필을 먼저 돌려주세요.`,
       });
     }
 
@@ -183,15 +184,26 @@ export class MockTournamentSeedService {
    * 지금 쓸 수 있는 테스트 팀 수 — 화면이 "몇 팀까지 되는지"를 미리 알려주려면 필요하다.
    * 눌러 보고 나서야 400 으로 알게 되면 사용자가 조건을 스스로 좁힐 수 없다.
    */
+  /** 목업 대회의 종목. availability 와 생성이 같은 종목을 봐야 라인업 하한 안내가 실제와 맞는다. */
+  private async pickSport() {
+    return (
+      (await this.prisma.v1Sport.findFirst({ where: { code: 'futsal' }, select: { id: true, code: true } })) ??
+      (await this.prisma.v1Sport.findFirst({ select: { id: true, code: true } }))
+    );
+  }
+
   async availability() {
     if (!isMockSeedEnabled()) {
       return { enabled: false, usableTeamCount: 0, maxTeamCount: 0, minPlayersPerTeam: 0 };
     }
-    const config = await this.prisma.v1CompetitionConfigVersion.findFirst({
-      where: { status: 'ACTIVE' },
-      orderBy: { createdAt: 'desc' },
-      select: { lineup: true },
-    });
+    const sport = await this.pickSport();
+    const config = sport
+      ? await this.prisma.v1CompetitionConfigVersion.findFirst({
+          where: { status: 'ACTIVE', sportCode: sport.code },
+          orderBy: { createdAt: 'desc' },
+          select: { lineup: true },
+        })
+      : null;
     const minPlayers = readLineupMinPlayers(config?.lineup ?? null);
     const usable = await this.findUsableTeams(minPlayers);
     return {

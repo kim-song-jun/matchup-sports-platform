@@ -138,6 +138,18 @@ describe('MockTournamentSeedService', () => {
     expect(unknownFields).toEqual([]);
   });
 
+  // alpha 에는 ACTIVE config 가 5개 있고 종목마다 라인업 하한이 다르다(풋살 3명 · 축구 7명).
+  // 종목을 안 맞추고 최신 것을 집으면 대회 종목과 어긋난 규칙이 박힌다.
+  it('대회 종목에 맞는 ACTIVE config 를 고른다', async () => {
+    const { service, prisma } = makeWorld(4);
+
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    expect(prisma.v1CompetitionConfigVersion.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'ACTIVE', sportCode: 'futsal' } }),
+    );
+  });
+
   // alpha 실측: ACTIVE config 가 minPlayers 7 인데 목업이 멤버 4명 팀을 뽑아, 라인업 화면에서
   // "포지션 자리가 비어 있어요"로 제출 자체가 막혔다. 하한은 config 에서 읽어야 한다.
   it('라인업 최소 인원을 config 에서 읽어 팀 조회 조건에 쓴다', async () => {

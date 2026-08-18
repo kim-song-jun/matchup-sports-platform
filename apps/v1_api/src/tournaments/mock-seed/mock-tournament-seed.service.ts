@@ -157,7 +157,8 @@ export class MockTournamentSeedService {
         memberships: {
           where: { status: 'active' },
           // 테스트하려면 어떤 계정으로 로그인해야 하는지가 결과에 같이 나와야 한다.
-          select: { userId: true, role: true, user: { select: { email: true, nickname: true } } },
+          // 닉네임은 V1User 가 아니라 V1UserProfile 에 있다.
+          select: { userId: true, role: true, user: { select: { email: true, profile: { select: { nickname: true } } } } },
         },
       },
       orderBy: { createdAt: 'asc' },
@@ -174,7 +175,7 @@ export class MockTournamentSeedService {
         accounts: team.memberships.map((m) => ({
           userId: m.userId,
           email: m.user?.email ?? '',
-          nickname: m.user?.nickname ?? '',
+          nickname: m.user?.profile?.nickname ?? '',
           role: m.role,
         })),
       }));

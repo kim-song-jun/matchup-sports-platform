@@ -600,7 +600,18 @@ export class TournamentsAdminService {
     });
 
     if (to === 'completed') {
-      await this.requestTournamentReviews(tournamentId);
+      // 후기 요청 알림은 상태 전이의 **부수 효과**다. 전이는 위 트랜잭션에서 이미 커밋됐으므로
+      // 여기서 던지면 DB 는 completed 인데 API 만 실패로 응답한다 — 운영자는 "완료 처리가
+      // 실패했다"고 읽고 재시도하게 되고, 두 번째 호출은 alreadyInStatus 로 돌아와 더 헷갈린다.
+      // 수신자 조회(DB 일시 오류)와 발송(알림 인프라) 어느 쪽이 넘어져도 전이 결과는 지킨다.
+      try {
+        await this.requestTournamentReviews(tournamentId);
+      } catch (error) {
+        this.logger.error(
+          `대회 ${tournamentId} 완료 후기 요청 알림에 실패했지만 completed 전이는 유지한다`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
     }
 
     return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false };

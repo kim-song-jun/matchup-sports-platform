@@ -62,7 +62,11 @@ type TeamMatchWithRelations = V1TeamMatch & {
     trustScore: { trustState: 'verified' | 'estimated' | 'sample' | 'none' } | null;
     memberships: Array<{ id: string; userId: string; role: 'owner' | 'manager' | 'member'; status: string }>;
   };
-  approvedApplicantTeam: { id: string; name: string } | null;
+  approvedApplicantTeam: {
+    id: string;
+    name: string;
+    memberships: Array<{ userId: string; role: 'owner' | 'manager' | 'member'; status: string }>;
+  } | null;
   applications: Array<V1TeamMatchApplication & { applicantTeam: { id: string; name: string } }>;
   game: { id: string } | null;
 };
@@ -1174,7 +1178,18 @@ export class TeamMatchesService {
             : false,
         },
       },
-      approvedApplicantTeam: { select: { id: true, name: true } },
+      approvedApplicantTeam: {
+        select: {
+          id: true,
+          name: true,
+          // 후기 자격은 "참가팀의 active 멤버"다(reviews.service.ts resolveReviewerTeams) —
+          // 역할을 안 가린다. hostTeam 과 똑같이 현재 유저의 멤버십만 실어서, 화면이 그
+          // 자격을 서버와 같은 기준으로 판정할 수 있게 한다.
+          memberships: user
+            ? { where: { userId: user.id, status: 'active' }, select: { userId: true, role: true, status: true } }
+            : false,
+        },
+      },
       applications: {
         where: user ? { OR: [{ status: 'approved' }, { appliedByUserId: user.id }] } : { status: 'approved' },
         include: { applicantTeam: { select: { id: true, name: true } } },
@@ -1247,14 +1262,24 @@ export class TeamMatchesService {
 
   private async getViewer(teamMatch: TeamMatchWithRelations, user: V1AuthUser | null) {
     if (!user) {
-      return { state: 'guest', manageableHostTeam: false, eligibleTeams: [], manageRoute: null };
+      return { state: 'guest', manageableHostTeam: false, participantMember: false, eligibleTeams: [], manageRoute: null };
     }
     const hostMembership = teamMatch.hostTeam.memberships[0];
     const manageableHostTeam = hostMembership?.role === 'owner' || hostMembership?.role === 'manager';
+    // 후기 자격 판정용 — 역할을 가리지 않는 "참가팀 소속" 여부.
+    // `state` 는 이 목적에 못 쓴다: 'host_team' 은 host 팀 owner/manager 만, 'approved' 는
+    // 신청서를 낸 사람 한 명만 받는다. 그 둘로 화면을 게이팅하면 양 팀 일반 팀원은 물론
+    // (매니저가 신청한 경우) 신청팀 owner 까지 후기 진입점을 잃는데, 서버
+    // (reviews.service.ts resolveReviewerTeams)는 두 팀의 active 멤버 전원을 허용한다.
+    // 상대가 확정되지 않았으면 후기 대상 자체가 없으므로 false 다.
+    const participantMember =
+      teamMatch.approvedApplicantTeamId !== null &&
+      (teamMatch.hostTeam.memberships.length > 0 || (teamMatch.approvedApplicantTeam?.memberships.length ?? 0) > 0);
     const eligibleTeams = await this.getUserManageableTeams(user.id);
     return {
       state: this.getViewerState(teamMatch, user),
       manageableHostTeam,
+      participantMember,
       eligibleTeams: eligibleTeams.map((team) => {
         const application = teamMatch.applications.find((item) => item.applicantTeamId === team.id);
         const reasonCode = getEligibilityReason(teamMatch, team.id, application);

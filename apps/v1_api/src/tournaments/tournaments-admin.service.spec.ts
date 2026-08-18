@@ -380,6 +380,35 @@ describe('TournamentsAdminService', () => {
     });
   });
 
+  // 알림은 전이의 부수 효과다 — 전이는 트랜잭션에서 이미 커밋됐으므로, 수신자 조회나 발송이
+  // 넘어져도 API 는 성공을 돌려줘야 한다. 여기서 던지면 DB 는 completed 인데 운영자 화면은
+  // "완료 처리 실패"로 보이고, 재시도하면 alreadyInStatus 로 돌아와 더 헷갈린다.
+  it('changeStatus: 후기 요청 수신자 조회가 실패해도 completed 전이는 성공으로 응답한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress', entryFee: 0 }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'completed' }));
+    prisma.v1TournamentRegistration.findMany.mockRejectedValue(new Error('db connection lost'));
+
+    const result = await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'completed' });
+
+    expect(result).toMatchObject({ status: 'completed', previousStatus: 'in_progress' });
+  });
+
+  it('changeStatus: 후기 요청 알림 발송이 실패해도 completed 전이는 성공으로 응답한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress', entryFee: 0 }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'completed' }));
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { team: { memberships: [{ userId: 'owner-a' }] } },
+    ]);
+    notifications.emitNotificationToMany.mockRejectedValueOnce(new Error('notification infra down'));
+
+    const result = await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'completed' });
+
+    expect(result).toMatchObject({ status: 'completed' });
+    expect(notifications.emitNotificationToMany).toHaveBeenCalled();
+  });
+
   it('changeStatus: completed 외 전이에서는 후기 요청 알림을 보내지 않는다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', entryFee: 0 }));

@@ -291,7 +291,10 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
 // 이게 없던 동안 앱 전체에 그 URL을 만드는 코드가 0건이라, 사용자는 /my/reviews 목록에
 // 그 매치가 뜨기를 기다리는 수밖에 없었다. 경기 종료 + 참가팀 소속 두 조건을 고정한다.
 describe('TeamMatchDetailPageClient — 후기 진입점', () => {
-  function mockTeamMatch(viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean }, status: string) {
+  function mockTeamMatch(
+    viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean; participantMember?: boolean },
+    status: string,
+  ) {
     useV1TeamMatchMock.mockReturnValue({
       data: {
         id: 'team-match-1',
@@ -304,7 +307,11 @@ describe('TeamMatchDetailPageClient — 후기 진입점', () => {
         capacityText: '2/2',
         displayState: status,
         status,
-        viewer: { state: viewer.state, manageableHostTeam: viewer.manageableHostTeam ?? false },
+        viewer: {
+          state: viewer.state,
+          manageableHostTeam: viewer.manageableHostTeam ?? false,
+          participantMember: viewer.participantMember ?? false,
+        },
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
       },
       isError: false,
@@ -317,7 +324,22 @@ describe('TeamMatchDetailPageClient — 후기 진입점', () => {
   });
 
   it('경기가 끝나면 호스트팀 운영진에게 후기 진입점이 보인다', () => {
-    mockTeamMatch({ state: 'host_team', manageableHostTeam: true }, 'completed');
+    mockTeamMatch({ state: 'host_team', manageableHostTeam: true, participantMember: true }, 'completed');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByRole('link', { name: '후기 남기기' })).toHaveAttribute(
+      'href',
+      '/my/reviews/team_match/team-match-1',
+    );
+  });
+
+  // 회귀 방지 — 종전 게이트는 `canManageHostTeam || viewerState === 'approved'` 였다.
+  // 서버의 viewerState 는 host 팀 owner/manager 에게만 'host_team' 을, **신청서를 낸 한 사람**
+  // 에게만 'approved' 를 준다. 그래서 양 팀 일반 팀원은 'none' 으로 내려와 후기 진입점을
+  // 잃었는데, 서버(resolveReviewerTeams)는 두 팀의 active 멤버 전원에게 후기를 허용한다.
+  it('참가팀 일반 팀원(viewerState=none)에게도 보인다', () => {
+    mockTeamMatch({ state: 'none', manageableHostTeam: false, participantMember: true }, 'completed');
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
@@ -328,7 +350,7 @@ describe('TeamMatchDetailPageClient — 후기 진입점', () => {
   });
 
   it('승인된 상대팀 소속에게도 보인다', () => {
-    mockTeamMatch({ state: 'approved', manageableHostTeam: false }, 'completed');
+    mockTeamMatch({ state: 'approved', manageableHostTeam: false, participantMember: true }, 'completed');
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
@@ -336,7 +358,7 @@ describe('TeamMatchDetailPageClient — 후기 진입점', () => {
   });
 
   it('경기 전(matched)에는 보이지 않는다', () => {
-    mockTeamMatch({ state: 'host_team', manageableHostTeam: true }, 'matched');
+    mockTeamMatch({ state: 'host_team', manageableHostTeam: true, participantMember: true }, 'matched');
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 

@@ -213,7 +213,16 @@ export const gameSchemaSourceManifest = {
   // 20260818000000_v1_tournament_real_name_visibility 로 뒷받침되며, NOT NULL + DEFAULT
   // 추가라 양방향 롤링 배포에 안전하다. 바인딩된 20260729000100_v1_game_operations 는
   // 건드리지 않았으므로 migration 해시는 그대로다.
-  schema: 'd86af494115c478502a9e32a8060716c982f10e9ee14a0e7435bd62524defb79',
+  // 2026-08-18 재핀: 경기 후기 4항목 채점 재설계(스펙 §4) -- enum 4종 신규
+  // (V1PostEventReviewMetric/ScoringVersion/RiskRule/RiskFlagStatus), V1PostEventReviewStatus 에
+  // flagged/archived 2값 추가, 모델 2개 신규(V1PostEventReviewMetricScore /
+  // V1PostEventReviewRiskFlag), V1PostEventReview.scoringVersion, V1TeamTrustScore 및
+  // V1UserReputationSummary 에 metric_* 컬럼 10개씩. 전부 additive 이고 game domain(V1Game*)
+  // 모델은 한 줄도 건드리지 않았다 -- 이 guard 가 schema.prisma **전체 바이트**를 결속하기
+  // 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 뒷받침 마이그레이션은
+  // 20260817010000_v1_post_event_review_scoring_redesign 이며, 바인딩된
+  // 20260729000100_v1_game_operations 는 그대로라 migration 해시는 변하지 않는다.
+  schema: '252cb9cca98af4dd2c436c309cfce06cc7970c9f6c5fe616454ea58685ebea50',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

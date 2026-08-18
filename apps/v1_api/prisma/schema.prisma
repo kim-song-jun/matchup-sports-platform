@@ -203,10 +203,39 @@ enum V1PostEventReviewTargetType {
   team
 }
 
+enum V1PostEventReviewMetric {
+  SKILL
+  MANNER
+  PUNCTUALITY
+  SAFETY
+}
+
+enum V1PostEventReviewScoringVersion {
+  legacy_single_rating
+  four_metric
+}
+
+enum V1PostEventReviewRiskRule {
+  EXTREME_LOW_OUTLIER
+  UNIFORM_TEAM_EXTREME
+  REPEATED_LOW_PAIR
+}
+
+enum V1PostEventReviewRiskFlagStatus {
+  pending
+  resolved_active
+  resolved_excluded
+}
+
 enum V1PostEventReviewStatus {
   submitted
   hidden
   removed
+  // 이상 탐지 판정 대상. 13개 집계 호출부가 전부 status:'submitted'로 게이트하므로
+  // 이 값으로 전이되면 코드 변경 없이 집계에서 자동 제외된다.
+  flagged
+  // 경기 무효(VOID) 시. 후기를 지우지 않고 집계에서만 빼기 위한 상태다.
+  archived
 }
 
 enum V1ChatRoomStatus {
@@ -1054,6 +1083,19 @@ model V1UserReputationSummary {
   tournamentReviewCount Int          @default(0) @map("tournament_review_count")
   tournamentSourceLabel String?      @map("tournament_source_label")
   // calculatedAt은 두 경로가 공유한다(V1TeamTrustScore와 동일) — 값이 아니라 "마지막 재계산 시각"이라 소스별로 나눌 필요가 없다.
+  // 4항목 개별 채점(V1PostEventReviewMetricScore) 평균. 기존 mannerScore(종합 rating 기반)와
+  // metricMannerScore(MANNER 항목 단독 평균)는 이름이 비슷하지만 **다른 컬럼**이다 — 합치지 않는다.
+  metricSkillScore       Decimal? @map("metric_skill_score") @db.Decimal(4, 2)
+  metricPunctualityScore Decimal? @map("metric_punctuality_score") @db.Decimal(4, 2)
+  metricSafetyScore      Decimal? @map("metric_safety_score") @db.Decimal(4, 2)
+  metricMannerScore      Decimal? @map("metric_manner_score") @db.Decimal(4, 2)
+  metricReviewCount      Int      @default(0) @map("metric_review_count")
+  // 대회(tournament_fixture) 전용 분리 — 위 tournament* 컬럼들과 같은 이유다.
+  tournamentMetricSkillScore       Decimal? @map("tournament_metric_skill_score") @db.Decimal(4, 2)
+  tournamentMetricPunctualityScore Decimal? @map("tournament_metric_punctuality_score") @db.Decimal(4, 2)
+  tournamentMetricSafetyScore      Decimal? @map("tournament_metric_safety_score") @db.Decimal(4, 2)
+  tournamentMetricMannerScore      Decimal? @map("tournament_metric_manner_score") @db.Decimal(4, 2)
+  tournamentMetricReviewCount      Int      @default(0) @map("tournament_metric_review_count")
   calculatedAt DateTime? @map("calculated_at")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
@@ -1373,6 +1415,19 @@ model V1TeamTrustScore {
   tournamentMatchCount  Int          @default(0) @map("tournament_match_count")
   tournamentSourceLabel String?      @map("tournament_source_label")
   sourceLabel           String?      @map("source_label")
+  // 4항목 개별 채점(V1PostEventReviewMetricScore) 평균. 기존 mannerScore(종합 rating 기반)와
+  // metricMannerScore(MANNER 항목 단독 평균)는 이름이 비슷하지만 **다른 컬럼**이다 — 합치지 않는다.
+  metricSkillScore       Decimal? @map("metric_skill_score") @db.Decimal(4, 2)
+  metricPunctualityScore Decimal? @map("metric_punctuality_score") @db.Decimal(4, 2)
+  metricSafetyScore      Decimal? @map("metric_safety_score") @db.Decimal(4, 2)
+  metricMannerScore      Decimal? @map("metric_manner_score") @db.Decimal(4, 2)
+  metricReviewCount      Int      @default(0) @map("metric_review_count")
+  // 대회(tournament_fixture) 전용 분리 — 위 tournament* 컬럼들과 같은 이유다.
+  tournamentMetricSkillScore       Decimal? @map("tournament_metric_skill_score") @db.Decimal(4, 2)
+  tournamentMetricPunctualityScore Decimal? @map("tournament_metric_punctuality_score") @db.Decimal(4, 2)
+  tournamentMetricSafetyScore      Decimal? @map("tournament_metric_safety_score") @db.Decimal(4, 2)
+  tournamentMetricMannerScore      Decimal? @map("tournament_metric_manner_score") @db.Decimal(4, 2)
+  tournamentMetricReviewCount      Int      @default(0) @map("tournament_metric_review_count")
   calculatedAt          DateTime?    @map("calculated_at")
   createdAt             DateTime     @default(now()) @map("created_at")
   updatedAt             DateTime     @updatedAt @map("updated_at")
@@ -1401,12 +1456,17 @@ model V1PostEventReview {
   removedAt      DateTime?                   @map("removed_at")
   createdAt      DateTime                    @default(now()) @map("created_at")
   updatedAt      DateTime                    @updatedAt @map("updated_at")
+  // 이 후기가 어느 채점 체계로 제출됐는지. 기존 행은 전부 legacy_single_rating 이고,
+  // 4항목 전환 이후 제출분만 four_metric 이다 — 두 세대를 섞어 평균 내지 않기 위한 구분자다.
+  scoringVersion V1PostEventReviewScoringVersion @default(legacy_single_rating) @map("scoring_version")
 
   reviewerUser V1User                 @relation("V1PostEventReviewReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
   reviewerTeam V1Team?                @relation("V1PostEventReviewReviewerTeam", fields: [reviewerTeamId], references: [id], onDelete: Restrict)
   targetUser   V1User?                @relation("V1PostEventReviewTargetUser", fields: [targetUserId], references: [id], onDelete: Restrict)
   targetTeam   V1Team?                @relation("V1PostEventReviewTargetTeam", fields: [targetTeamId], references: [id], onDelete: Restrict)
   tags         V1PostEventReviewTag[]
+  metricScores V1PostEventReviewMetricScore[]
+  riskFlags    V1PostEventReviewRiskFlag[]
 
   @@unique([reviewerUserId, targetUserId, sourceType, sourceId])
   // 개인 대상 후기 중 대회(tournament_fixture) 후기는 중복 방지 스코프가 경기가 아니라 **대회**다 —
@@ -1444,6 +1504,39 @@ model V1PostEventReviewTag {
   @@unique([reviewId, tagCode])
   @@index([tagCode])
   @@map("v1_post_event_review_tags")
+}
+
+model V1PostEventReviewMetricScore {
+  id       String                  @id @default(uuid())
+  reviewId String                  @map("review_id")
+  metric   V1PostEventReviewMetric
+  score    Int
+
+  review V1PostEventReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, metric])
+  @@map("v1_post_event_review_metric_scores")
+}
+
+model V1PostEventReviewRiskFlag {
+  id               String                          @id @default(uuid())
+  // 같은 판정 묶음(경기 × 규칙 등)을 운영자가 한 번에 처리하기 위한 키. 운영 큐가 이 단위로 resolve 한다.
+  groupKey         String                          @map("group_key")
+  reviewId         String                          @map("review_id")
+  ruleCode         V1PostEventReviewRiskRule       @map("rule_code")
+  riskScore        Int                             @map("risk_score")
+  signal           Json
+  status           V1PostEventReviewRiskFlagStatus @default(pending)
+  resolvedByUserId String?                         @map("resolved_by_user_id")
+  resolvedAt       DateTime?                       @map("resolved_at")
+  createdAt        DateTime                        @default(now()) @map("created_at")
+
+  review V1PostEventReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, ruleCode])
+  @@index([status, createdAt])
+  @@index([groupKey])
+  @@map("v1_post_event_review_risk_flags")
 }
 
 model V1TeamMatch {

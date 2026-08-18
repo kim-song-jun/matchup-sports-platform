@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { KakaoGeocodingService } from './kakao-geocoding.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { TournamentsAdminController } from './tournaments-admin.controller';
 import { TournamentsAdminService } from './tournaments-admin.service';
 
@@ -204,6 +205,7 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
         AdminContextService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: KakaoGeocodingService, useValue: { geocode: jest.fn().mockResolvedValue(null) } },
+        { provide: NotificationsService, useValue: { emitNotificationToMany: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 

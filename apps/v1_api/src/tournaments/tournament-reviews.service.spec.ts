@@ -707,23 +707,42 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
     expect(result.teamName).toBe('레알마드리드');
   });
 
-  // (b) 같은 팀 두 번째 작성은 ALREADY_REVIEWED
-  it('submitReview: 같은 팀 몫으로 다른 운영진이 이미 썼으면 ALREADY_REVIEWED, 저장하지 않는다', async () => {
+  // (b) 중복 판정 단위는 팀이 아니라 사람이다 (2026-08-17)
+  //     예전엔 팀당 1건이라 팀장이 먼저 쓰면 운영진이 막혔다. 경기 후기는 이미 사람 기준이라
+  //     같은 성격의 평가가 두 도메인에서 다르게 동작했다.
+  it('submitReview: 같은 팀의 다른 운영진이 이미 썼어도 내 몫은 쓸 수 있다', async () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([
       { teamId: 'team-1', team: { name: '레알마드리드' } },
     ]);
-    // 팀장이 이미 같은 팀(teamId: team-1) 몫으로 후기를 써 둔 상태 — authorUserId는 나와 다르다.
+    // 사람 기준 조회라 "내가 쓴 것"이 없으면 null 이 돌아온다.
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentReview.create.mockResolvedValue(
+      reviewRow({ authorUserId: 'manager-user-id', teamId: 'team-1', teamName: '레알마드리드' }),
+    );
+
+    await service.submitReview('tournament-1', { ...plainUser, id: 'manager-user-id' }, { rating: 4 });
+
+    expect(prisma.v1TournamentReview.create).toHaveBeenCalled();
+    // mock 은 where 를 무시하므로 조회 조건을 직접 단언하지 않으면 팀 기준으로 되돌려도 통과한다.
+    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tournamentId: 'tournament-1', authorUserId: 'manager-user-id' },
+      }),
+    );
+  });
+
+  it('submitReview: 내가 이미 쓴 대회면 ALREADY_REVIEWED, 저장하지 않는다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
     prisma.v1TournamentReview.findFirst.mockResolvedValue(
-      reviewRow({ authorUserId: 'owner-user-id', teamId: 'team-1', teamName: '레알마드리드' }),
+      reviewRow({ authorUserId: 'manager-user-id', teamId: 'team-1', teamName: '레알마드리드' }),
     );
 
     await expect(
-      service.submitReview(
-        'tournament-1',
-        { ...plainUser, id: 'manager-user-id' },
-        { rating: 4 },
-      ),
+      service.submitReview('tournament-1', { ...plainUser, id: 'manager-user-id' }, { rating: 4 }),
     ).rejects.toMatchObject({ response: { code: 'ALREADY_REVIEWED' } });
     expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
   });

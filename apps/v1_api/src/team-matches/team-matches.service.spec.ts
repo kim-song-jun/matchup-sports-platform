@@ -782,6 +782,80 @@ describe('TeamMatchesService', () => {
     expect(result.viewer.manageableHostTeam).toBe(false);
   });
 
+  // 후기 자격은 역할을 안 가린다(reviews.service.ts resolveReviewerTeams: 두 팀의 active 멤버
+  // 전원). 그런데 `viewer.state` 는 host 팀 owner/manager 에게만 'host_team' 을, 신청서를 낸
+  // 한 사람에게만 'approved' 를 준다 — 바로 위 테스트가 그 사실을 고정하고 있다. 그래서 화면이
+  // state 로 후기 진입점을 게이팅하면 양 팀 일반 팀원이 통째로 잘려 나간다. participantMember 는
+  // 그 판정을 위해 따로 내려주는 값이라, state 와 독립적으로 계약을 고정한다.
+  function detailRowWithOpponent(hostMemberships: unknown[], applicantMemberships: unknown[], opponent: boolean) {
+    return {
+      ...teamMatchRow({ status: 'completed', startAt: FUTURE }),
+      approvedApplicantTeamId: opponent ? 'team-applicant' : null,
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: 'owner-user',
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: hostMemberships,
+      },
+      approvedApplicantTeam: opponent
+        ? { id: 'team-applicant', name: '신청팀', memberships: applicantMemberships }
+        : null,
+      applications: [],
+    };
+  }
+
+  it('detail: 호스트팀 일반 멤버도 상대가 확정된 경기에서는 참가팀 소속으로 표시된다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      detailRowWithOpponent([{ id: 'mem-1', userId: manager.id, role: 'member', status: 'active' }], [], true),
+    );
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.viewer.state).toBe('none');
+    expect(result.viewer.manageableHostTeam).toBe(false);
+    expect(result.viewer.participantMember).toBe(true);
+  });
+
+  it('detail: 신청팀 일반 멤버도 참가팀 소속으로 표시된다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      detailRowWithOpponent([], [{ userId: manager.id, role: 'member', status: 'active' }], true),
+    );
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.viewer.participantMember).toBe(true);
+  });
+
+  it('detail: 어느 팀에도 속하지 않으면 참가팀 소속이 아니다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(detailRowWithOpponent([], [], true));
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.viewer.participantMember).toBe(false);
+  });
+
+  // 상대가 확정되기 전에는 후기 대상 자체가 없다 — 소속만으로 열어 주면 안 된다.
+  it('detail: 상대팀이 확정되지 않았으면 호스트팀 멤버여도 참가팀 소속이 아니다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      detailRowWithOpponent([{ id: 'mem-1', userId: manager.id, role: 'member', status: 'active' }], [], false),
+    );
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.viewer.participantMember).toBe(false);
+  });
+
   it('approveApplication: 신청자가 없을 때 404 NOT_FOUND', async () => {
     prisma.v1TeamMatchApplication.findFirst.mockResolvedValue(null);
 

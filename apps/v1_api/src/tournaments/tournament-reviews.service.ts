@@ -265,13 +265,11 @@ export class TournamentReviewsService {
       targetTeam = match;
     }
 
-    // 3. 중복 리뷰 확인 — (a) 나는 대회당 1건만(authorUserId 유일 제약과 동일 정책),
-    //    (b) 같은 팀도 대회당 1건만(다른 운영진이 이미 썼어도 막는다).
+    // 3. 중복 리뷰 확인 — 대회당 사람 1건(authorUserId 유일 제약과 동일 정책).
+    //    "팀당 1건"은 2026-08-17에 뺐다: 팀장이 먼저 쓰면 운영진이 못 쓰게 되는데, 경기 후기는
+    //    이미 사람 기준이라 같은 성격의 평가가 두 도메인에서 다르게 동작했다.
     const existing = await this.prisma.v1TournamentReview.findFirst({
-      where: {
-        tournamentId,
-        OR: [{ authorUserId: user.id }, { teamId: targetTeam.teamId }],
-      },
+      where: { tournamentId, authorUserId: user.id },
     });
     if (existing) {
       throw new BadRequestException({ code: 'ALREADY_REVIEWED', message: '이미 리뷰를 작성했어요.' });
@@ -320,16 +318,16 @@ export class TournamentReviewsService {
       string,
       { id: string; title: string; scheduledEndAt: Date | null; updatedAt: Date }
     >();
-    const teamIds = new Set<string>();
     for (const r of registrations) {
       if (!uniqueTournaments.has(r.tournament.id)) uniqueTournaments.set(r.tournament.id, r.tournament);
-      teamIds.add(r.teamId);
     }
 
+    // "이미 썼다" 판정도 사람 기준 — 팀 기준이면 팀장이 쓴 순간 나머지 운영진의 pending
+    // 목록에서 그 대회가 사라지는데, 이제는 각자 쓸 수 있으므로 남아 있어야 한다.
     const reviewed = await this.prisma.v1TournamentReview.findMany({
       where: {
         tournamentId: { in: [...uniqueTournaments.keys()] },
-        OR: [{ authorUserId: userId }, { teamId: { in: [...teamIds] } }],
+        authorUserId: userId,
       },
       select: { tournamentId: true },
     });

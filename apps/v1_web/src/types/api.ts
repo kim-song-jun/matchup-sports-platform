@@ -1057,6 +1057,12 @@ export type V1TeamMatch = V1Match & {
   viewer?: {
     state: V1TeamMatchViewerState;
     manageableHostTeam?: boolean;
+    /**
+     * 역할을 가리지 않는 "참가팀(host·승인 신청팀) active 멤버" 여부 — 후기 진입점 판정용.
+     * `state` 로 대신할 수 없다: 'host_team' 은 host 팀 owner/manager, 'approved' 는 신청서를
+     * 낸 한 사람만 받는다(team-matches.service.ts getViewerState).
+     */
+    participantMember?: boolean;
     eligibleTeams?: Array<{
       teamId: string;
       name: string;
@@ -1561,6 +1567,8 @@ export type V1ReviewListItem = {
   state: 'ready' | 'done';
   reviewerTeam?: { teamId: string; name: string } | null;
   targetTeam?: { teamId: string; name: string } | null;
+  /** 작성된 리뷰에서 "누구에게 쓴 것인지" — 한 경기에 여러 명을 평가하면 이게 없으면 구분되지 않는다. */
+  targetUser?: { userId: string; nickname: string } | null;
 };
 
 export type V1ReviewListResponse = {
@@ -1580,12 +1588,13 @@ export type V1ReviewReceivedResponse = {
 };
 
 export type V1ReceivedReviewDetail = Omit<V1ReviewDetail, 'reviewerUser' | 'reviewerTeam' | 'submittedAt'> & {
-  /** 신규 대회 리뷰는 작성자 식별자를 절대 내려주지 않는다. */
+  /** 2026-08-18 정책으로 작성자를 공개한다. 남겨둔 이유: 과거 응답과의 호환. */
   anonymous: boolean;
   reviewerUser: V1ReviewActorUser | null;
   reviewerTeam: V1ReviewActorTeam | null;
-  /** 익명 리뷰는 행동 시점으로 작성자를 추정하지 못하도록 제출 시각도 숨긴다. */
   submittedAt: string | null;
+  /** 어느 경기에서 받은 후기인지. 소스를 못 찾으면 null. */
+  source: { sourceType: V1ReviewSourceType; sourceId: string; title: string; completedAt: string | null } | null;
 };
 
 export type V1ReviewerTeam = {
@@ -1652,6 +1661,8 @@ export type V1ReviewTagRate = {
 
 export type V1ReviewSportSummary = {
   sportId: string;
+  /** v1Sport.code — 종목 배지·색상 매핑 키. 매핑 못 찾으면 null. */
+  sportCode: string | null;
   ratingAvg: number | null;
   ratingCount: number;
   tagRates: V1ReviewTagRate[];
@@ -3644,6 +3655,25 @@ export type V1IntegrationSettings = {
   kakaoMapsJsKey: string | null;
   kakaoMapsJsKeySource: V1IntegrationKeySource;
   updatedAt: string | null;
+};
+
+/** GET /admin/settings/reviews — 리뷰 작성 가능 기간 정책 */
+export type V1ReviewPolicySettings = {
+  /** 공식 결과 확정 시각부터 후기를 쓸 수 있는 시간(시간 단위) */
+  reviewWindowHours: number;
+  /** 화면 표기용 문구 — 24시간 배수면 "7일", 아니면 "36시간" */
+  reviewWindowLabel: string;
+  minHours: number;
+  maxHours: number;
+  defaultHours: number;
+  /** 아직 어드민이 저장한 적 없어 기본값으로 동작 중인지 */
+  isDefault: boolean;
+  updatedAt: string | null;
+};
+
+/** PATCH /admin/settings/reviews 바디 */
+export type V1UpdateReviewPolicySettingsPayload = {
+  reviewWindowHours: number;
 };
 
 /** PATCH /admin/settings/integrations 바디 — undefined=미변경, ""=삭제(env 폴백 복귀), 값=설정 */

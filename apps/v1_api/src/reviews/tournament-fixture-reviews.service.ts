@@ -1,7 +1,16 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  GoneException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { V1TeamMembershipRole } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
+import { ReviewPolicySettingsService } from './review-policy-settings.service';
 import {
   fixtureTeams,
   fixtureTitle,
@@ -29,7 +38,10 @@ import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-revi
 
 @Injectable()
 export class TournamentFixtureReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reviewPolicySettings: ReviewPolicySettingsService,
+  ) {}
 
   async pending(user: V1AuthUser, limit: number, tournamentId?: string) {
     const memberships = await this.participatingTeamMemberships(user.id);
@@ -274,6 +286,16 @@ export class TournamentFixtureReviewsService {
     if (fixture.status !== 'completed' || !officialResultTimestamp(fixture)) {
       throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
     }
+    // 평가창. 기간은 어드민 설정(V1ReviewPolicySettings, 기본 168시간=7일)에서 읽고, 저장하지
+    // 않고 매 조회 시점에 계산한다 -- 정정으로 officialAt 이 갱신되면 마감도 그 시각 기준으로
+    // 자동 연장되고, 어드민이 기간을 바꾸면 다음 요청부터 곧바로 반영된다.
+    const windowHours = await this.reviewPolicySettings.getWindowHours();
+    if (reviewWindowClosed(officialResultTimestamp(fixture), new Date(), windowHours)) {
+      throw new GoneException({
+        code: 'REVIEW_WINDOW_CLOSED',
+        message: `평가 가능 기간(${formatReviewWindow(windowHours)})이 지났어요.`,
+      });
+    }
 
     const teams = fixtureTeams(fixture);
     if (!teams) throw conflict('TOURNAMENT_FIXTURE_NOT_READY', 'Tournament fixture does not have both teams');
@@ -451,8 +473,22 @@ type ReviewContext = {
   readonly existingByUserId: Map<string, ReviewWithIncludes>;
 };
 
-function canReviewOpponentTeam(role: V1TeamMembershipRole) {
-  return role === 'owner' || role === 'manager';
+/**
+ * 상대 "팀" 후기를 쓸 수 있는 역할.
+ *
+ * 2026-08-18 사용자 결정으로 **모든 참가 멤버**에게 열었다. 그 전에는 owner/manager 만
+ * 쓸 수 있었는데(2026-08-14 역할 규칙), 후기 화면을 "상대 팀 평가가 기본, 선수는 선택"으로
+ * 바꾸면서 팀원에게는 기본 대상이 하나도 없는 화면이 남기 때문이다.
+ *
+ * 팀 평점이 인원 많은 팀 쪽으로 기우는 문제는 생기지 않는다 — 팀 후기는 사람 기준으로
+ * 1인 1건이고(같은 경기에 같은 사람이 두 번 못 씀), 평점은 팀 단위 평균이 아니라 개별
+ * 항목으로 노출된다.
+ *
+ * 대회 경기 경로(tournament-fixture-reviews.service.ts)와 **같은 규칙**을 유지해야 한다 —
+ * 두 곳이 갈리면 같은 사용자가 대회에서는 되고 팀매치에서는 안 되는 모순이 생긴다.
+ */
+function canReviewOpponentTeam(_role: V1TeamMembershipRole) {
+  return true;
 }
 
 function teamTarget(context: ReviewContext) {

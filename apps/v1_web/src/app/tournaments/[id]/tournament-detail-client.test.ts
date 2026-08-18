@@ -291,10 +291,6 @@ describe('getTournamentPostEventCards', () => {
       status: 'upcoming',
       actionLabel: null,
     });
-    expect(cards.find((card) => card.key === 'reviews')).toMatchObject({
-      status: 'upcoming',
-      actionLabel: null,
-    });
   });
 
   it('marks results as available only when completed fixture results are present', () => {
@@ -343,11 +339,6 @@ describe('getTournamentPostEventCards', () => {
       status: 'available',
       actionLabel: '미디어 공지 보기',
       href: '#announcement-ann-media',
-    });
-    expect(cards.find((card) => card.key === 'reviews')).toMatchObject({
-      status: 'available',
-      actionLabel: '리뷰 안내 보기',
-      href: '#announcement-ann-review',
     });
     expect(cards.find((card) => card.key === 'sponsor')).toMatchObject({
       status: 'available',

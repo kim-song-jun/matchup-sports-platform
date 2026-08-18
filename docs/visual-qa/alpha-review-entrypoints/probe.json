@@ -1,0 +1,317 @@
+[
+  {
+    "page": "my-page",
+    "width": "mobile",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/my-page-mobile-390.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": true,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": true,
+    "pendingBannerText": "남은 후기 37건 함께 뛴 상대 평가 36건 · 대회 후기 1건 경기 후기 36건 쓰기 대회 후기 쓰기 내 활동 참여한 매치 승인 대기와 완료 내역을 확인해요",
+    "reviewHrefs": [
+      "/my/reviews",
+      "/tournaments/663d78c6-fa99-4007-a81b-06937ff14c19/awards",
+      "/my/reviews"
+    ]
+  },
+  {
+    "page": "my-page",
+    "width": "tablet",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/my-page-tablet-768.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": true,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": true,
+    "pendingBannerText": "남은 후기 37건 함께 뛴 상대 평가 36건 · 대회 후기 1건 경기 후기 36건 쓰기 대회 후기 쓰기 내 활동 참여한 매치 승인 대기와 완료 내역을 확인해요",
+    "reviewHrefs": [
+      "/my/reviews",
+      "/tournaments/663d78c6-fa99-4007-a81b-06937ff14c19/awards",
+      "/my/reviews"
+    ]
+  },
+  {
+    "page": "my-page",
+    "width": "desktop",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/my-page-desktop-1440.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": true,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": true,
+    "pendingBannerText": "남은 후기 37건 함께 뛴 상대 평가 36건 · 대회 후기 1건 경기 후기 36건 쓰기 대회 후기 쓰기 내 활동 참여한 매치 승인 대기와 완료 내역을 확인해요",
+    "reviewHrefs": [
+      "/my/reviews",
+      "/tournaments/663d78c6-fa99-4007-a81b-06937ff14c19/awards",
+      "/my/reviews"
+    ]
+  },
+  {
+    "page": "reviews-hub",
+    "width": "mobile",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-hub-mobile-390.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=pending",
+      "/my/reviews?tab=written",
+      "/my/reviews?tab=received",
+      "/my/reviews/tournament_fixture/e31f0b0e-7fe9-4cb4-89d1-780945f5a36d",
+      "/my/reviews/tournament_fixture/5d6f1895-35ff-4063-a8ae-2210349e5190",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68",
+      "/my/reviews/tournament_fixture/d2101a1d-f5be-4b69-8025-6b108a1dd28c",
+      "/my/reviews/tournament_fixture/c9cf0eae-dcfd-4887-bdcc-6b23ba9c8a5d",
+      "/my/reviews/tournament_fixture/9f875aaf-3585-4d6a-9fee-b3c53c93d8fb",
+      "/my/reviews/tournament_fixture/b0731caf-e1d0-4c2d-abf1-2b33f6a9087e"
+    ]
+  },
+  {
+    "page": "reviews-hub",
+    "width": "tablet",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-hub-tablet-768.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=pending",
+      "/my/reviews?tab=written",
+      "/my/reviews?tab=received",
+      "/my/reviews/tournament_fixture/e31f0b0e-7fe9-4cb4-89d1-780945f5a36d",
+      "/my/reviews/tournament_fixture/5d6f1895-35ff-4063-a8ae-2210349e5190",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68",
+      "/my/reviews/tournament_fixture/d2101a1d-f5be-4b69-8025-6b108a1dd28c",
+      "/my/reviews/tournament_fixture/c9cf0eae-dcfd-4887-bdcc-6b23ba9c8a5d",
+      "/my/reviews/tournament_fixture/9f875aaf-3585-4d6a-9fee-b3c53c93d8fb",
+      "/my/reviews/tournament_fixture/b0731caf-e1d0-4c2d-abf1-2b33f6a9087e"
+    ]
+  },
+  {
+    "page": "reviews-hub",
+    "width": "desktop",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-hub-desktop-1440.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=pending",
+      "/my/reviews?tab=written",
+      "/my/reviews?tab=received",
+      "/my/reviews/tournament_fixture/e31f0b0e-7fe9-4cb4-89d1-780945f5a36d",
+      "/my/reviews/tournament_fixture/5d6f1895-35ff-4063-a8ae-2210349e5190",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68",
+      "/my/reviews/tournament_fixture/d2101a1d-f5be-4b69-8025-6b108a1dd28c",
+      "/my/reviews/tournament_fixture/c9cf0eae-dcfd-4887-bdcc-6b23ba9c8a5d",
+      "/my/reviews/tournament_fixture/9f875aaf-3585-4d6a-9fee-b3c53c93d8fb",
+      "/my/reviews/tournament_fixture/b0731caf-e1d0-4c2d-abf1-2b33f6a9087e"
+    ]
+  },
+  {
+    "page": "reviews-written",
+    "width": "mobile",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-written-mobile-390.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=pending",
+      "/my/reviews?tab=written",
+      "/my/reviews?tab=received",
+      "/my/reviews/team_match/e3b65f01-bf53-458c-aa93-8a138c192ad2",
+      "/my/reviews/team_match/e3b65f01-bf53-458c-aa93-8a138c192ad2",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68"
+    ]
+  },
+  {
+    "page": "reviews-written",
+    "width": "tablet",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-written-tablet-768.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=pending",
+      "/my/reviews?tab=written",
+      "/my/reviews?tab=received",
+      "/my/reviews/team_match/e3b65f01-bf53-458c-aa93-8a138c192ad2",
+      "/my/reviews/team_match/e3b65f01-bf53-458c-aa93-8a138c192ad2",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68"
+    ]
+  },
+  {
+    "page": "reviews-written",
+    "width": "desktop",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-written-desktop-1440.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=pending",
+      "/my/reviews?tab=written",
+      "/my/reviews?tab=received",
+      "/my/reviews/team_match/e3b65f01-bf53-458c-aa93-8a138c192ad2",
+      "/my/reviews/team_match/e3b65f01-bf53-458c-aa93-8a138c192ad2",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68",
+      "/my/reviews/tournament_fixture/5d38b6d8-9259-42a6-bf35-9d6d3bc87a68"
+    ]
+  },
+  {
+    "page": "reviews-received",
+    "width": "mobile",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-received-mobile-390.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=pending",
+      "/my/reviews?tab=written",
+      "/my/reviews?tab=received"
+    ]
+  },
+  {
+    "page": "reviews-received",
+    "width": "tablet",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-received-tablet-768.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=pending",
+      "/my/reviews?tab=written",
+      "/my/reviews?tab=received"
+    ]
+  },
+  {
+    "page": "reviews-received",
+    "width": "desktop",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-received-desktop-1440.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=pending",
+      "/my/reviews?tab=written",
+      "/my/reviews?tab=received"
+    ]
+  },
+  {
+    "page": "reviews-received-detail",
+    "width": "mobile",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-received-detail-mobile-390.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=received",
+      "/my/reviews?tab=received"
+    ]
+  },
+  {
+    "page": "reviews-received-detail",
+    "width": "tablet",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-received-detail-tablet-768.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=received",
+      "/my/reviews?tab=received"
+    ]
+  },
+  {
+    "page": "reviews-received-detail",
+    "width": "desktop",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/reviews-received-detail-desktop-1440.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": false,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews?tab=received",
+      "/my/reviews?tab=received"
+    ]
+  },
+  {
+    "page": "team-match-detail",
+    "width": "mobile",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/team-match-detail-mobile-390.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": true,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews/team_match/e3b65f01-bf53-458c-aa93-8a138c192ad2"
+    ]
+  },
+  {
+    "page": "team-match-detail",
+    "width": "tablet",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/team-match-detail-tablet-768.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": true,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews/team_match/e3b65f01-bf53-458c-aa93-8a138c192ad2"
+    ]
+  },
+  {
+    "page": "team-match-detail",
+    "width": "desktop",
+    "status": 200,
+    "file": "/Users/sungjun/Dev/projects/matchup-sports-platform/docs/visual-qa/alpha-review-entrypoints/team-match-detail-desktop-1440.png",
+    "hasFixtureReviewSection": false,
+    "hasTournamentReviewRow": false,
+    "hasReviewCta": true,
+    "hasPendingReviewBanner": false,
+    "pendingBannerText": "",
+    "reviewHrefs": [
+      "/my/reviews/team_match/e3b65f01-bf53-458c-aa93-8a138c192ad2"
+    ]
+  }
+]

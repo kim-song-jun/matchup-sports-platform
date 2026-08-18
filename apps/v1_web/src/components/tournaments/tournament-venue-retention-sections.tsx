@@ -69,7 +69,6 @@ export function TournamentPostEventHubSection({
   hasAnnouncements,
   sponsorCount,
   announcements,
-  fixtureReviewState = { status: 'guest', items: [] },
 }: {
   tournamentId: string;
   status: V1TournamentStatus;
@@ -77,9 +76,12 @@ export function TournamentPostEventHubSection({
   hasAnnouncements: boolean;
   sponsorCount?: number;
   announcements: TournamentAnnouncementSummary[];
-  fixtureReviewState?: TournamentFixtureReviewState;
 }) {
   // completed: verbose 5카드 대신 Toss식 컴팩트 액션 리스트로 대체(스크롤·복잡도 축소).
+  // 단 "리뷰할 수 있는 경기"는 여기서도 함께 내린다 — 후기는 대회가 끝난 뒤에 쓰는 것인데
+  // 예전엔 completed 가 되는 순간 이 진입점이 통째로 사라져, 정작 쓸 시점에 들어갈 길이 없었다.
+  // 경기별 후기 진입은 "대회 후기" 화면(/tournaments/:id/awards)으로 합쳤다 — 대회 상세에
+  // 후기 입구가 두 개(대회 후기 행 + 리뷰할 수 있는 경기 섹션)라 어디로 가야 하는지 헷갈렸다.
   if (status === 'completed') {
     return <TournamentCompletedActionList tournamentId={tournamentId} />;
   }
@@ -107,16 +109,14 @@ export function TournamentPostEventHubSection({
   // 동일하게 절제 원칙상 제외. 아무것도 없으면(경기 결과·공지 전무) 섹션째 숨긴다 — 조별
   // 순위·대진표는 이미 같은 페이지 다른 섹션에서 보여주고 있어 여기서 반복하지 않는다.
   const availableCards = cards.filter(
-    (card) => card.status === 'available' && card.key !== 'next_tournament' && card.key !== 'reviews',
+    (card) => card.status === 'available' && card.key !== 'next_tournament',
   );
   if (availableCards.length === 0 && !hasCompletedFixture) return null;
 
   return (
     <>
       {availableCards.length > 0 ? <PostEventActionList heading="대회 현황" cards={availableCards} /> : null}
-      {hasCompletedFixture ? (
-        <TournamentFixtureReviewEntrySection fixtures={fixtures} state={fixtureReviewState} />
-      ) : null}
+
     </>
   );
 }
@@ -130,7 +130,6 @@ export type TournamentFixtureReviewState = {
 const POST_EVENT_CARD_ICON: Record<TournamentPostEventCard['key'], ReactNode> = {
   results: <Trophy size={18} strokeWidth={2} aria-hidden="true" />,
   video: <Video size={18} strokeWidth={2} aria-hidden="true" />,
-  reviews: <Star size={18} strokeWidth={2} aria-hidden="true" />,
   sponsor: <Gift size={18} strokeWidth={2} aria-hidden="true" />,
   next_tournament: <Search size={18} strokeWidth={2} aria-hidden="true" />,
 };
@@ -194,7 +193,7 @@ function PostEventActionList({ heading, cards }: { heading: string; cards: Tourn
   );
 }
 
-function TournamentFixtureReviewEntrySection({
+export function TournamentFixtureReviewEntrySection({
   fixtures,
   state,
 }: {
@@ -381,9 +380,11 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
     },
     {
       key: 'reviews',
-      label: '후기·매너 평가',
-      caption: '함께한 팀에게 리뷰를 남겨요',
-      href: '/my/reviews',
+      label: '대회 후기',
+      caption: '이 대회의 참가팀 후기를 보고 남겨요',
+      // 예전엔 '/my/reviews'로 보내 대회 컨텍스트가 통째로 사라졌다 — 어떤 대회의 후기를
+      // 쓰려던 건지 화면이 알 수 없어 사용자가 목록에서 다시 찾아야 했다.
+      href: `/tournaments/${tournamentId}/awards`,
       icon: <Star size={18} strokeWidth={2} aria-hidden="true" />,
     },
   ];

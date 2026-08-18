@@ -1924,6 +1924,25 @@ button:disabled {
   padding-top: 16px;
 }
 
+/*
+ * 홈 상단 배너(알림 · 휴대폰 인증 · 남은 후기) 슬롯.
+ * 홈 본문 컨테이너(.tm-scroll-area)는 좌우 패딩이 0 이고 섹션마다 각자 20px 을 준다.
+ * 배너 카드에는 그게 없어 화면 끝까지 늘어나 아래 콘텐츠와 여백선이 어긋났다.
+ * 데스크톱에서는 .tm-home-main 이 그리드 컬럼이라 컬럼 자체가 여백을 갖는다 — 그때는 0.
+ */
+.tm-home-banner-slot {
+  /* 상단 16px: 이게 없으면 배너 카드가 헤더 바로 아래(스크롤 영역 top)에 딱 붙어 카드 윗변이
+     헤더에 먹힌 것처럼 보인다(390 실측: 헤더 아래 56, 카드 top 56). 배너가 없을 때 첫 요소가
+     되는 .tm-home-greeting-block 이 이미 padding-top:16px 을 갖고 있어 값도 그와 맞춘다. */
+  padding: 16px 20px 0;
+}
+
+@media (min-width: 1024px) {
+  .tm-home-banner-slot {
+    padding: 0;
+  }
+}
+
 /* 오늘의 추천 — 세로 스택 대신 가로 캐러셀(스와이프, 다음 카드 살짝 peek). 스크롤바는 전역 숨김. */
 .tm-home-featured-carousel {
   display: flex;
@@ -5816,6 +5835,8 @@ button:disabled {
   flex-shrink: 0;
 }
 .tm-review-card-author { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+/* 팀명 뒤에 붙는 작성자 개인 이름 — 팀명보다 약하게 보여 주체(팀)와 작성자를 함께 읽히게 한다. */
+.tm-review-card-author-sub { font-weight: 500; color: var(--text-muted); }
 /* [공개 화면 R-T2 정리] .tm-review-card-team(11px)은 TSX 어디서도 참조되지
    않는 죽은 코드(리뷰 카드는 팀명을 author 슬롯에 합쳐 렌더 — awards-page-client.tsx
    review.teamName ?? review.authorNickname)라 삭제. */
@@ -6211,10 +6232,19 @@ button:disabled {
 }
 
 @media (min-width: 1024px) {
-  /* 본문을 데스크탑 전체 폭에 늘리지 않고 좌측 라인에 고정 */
+  /*
+   * 후기 목록은 데스크탑에서 표로 바뀌는데(아래 .tm-reviews-table 전환) 760px 로 묶어 두고
+   * margin:0 으로 좌측에 붙여 놔서, 1440px 화면에서 왼쪽 절반만 쓰고 오른쪽이 통째로 비었다.
+   * 표는 넓을수록 한 화면에 더 많은 행이 들어오므로 상한을 올리고 가운데로 정렬한다.
+   * 검색바는 따로 상한을 두지 않으면 함께 늘어나 입력칸만 과하게 길어진다.
+   */
   .tm-reviews-body {
-    max-width: 760px;
-    margin: 0;
+    max-width: 1080px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .tm-reviews-searchbar {
+    max-width: 560px;
   }
 
   /* 카드 목록 → 테이블로 전환 */
@@ -6660,3 +6690,33 @@ button:disabled {
   .tm-fixture-lineup-player-controls { gap: 8px; }
   .tm-fixture-lineup-player-controls .tm-input { width: 72px; }
 }
+
+/* 후기 작성 — 선수 개별 평가는 접어 두고 원하는 사람만 펼쳐 쓴다(팀 평가가 기본). */
+.tm-review-player-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+  list-style: none;
+}
+.tm-review-player-summary::-webkit-details-marker { display: none; }
+.tm-review-player-summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.tm-review-player-details[open] > .tm-review-player-summary::after {
+  transform: rotate(-135deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-review-player-summary::after { transition: none; }
+}
+

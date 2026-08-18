@@ -8,6 +8,7 @@ import { useRef, useState } from 'react';
 import {
   useV1Tournament,
   useV1TournamentParticipantCheck,
+  useV1Reviews,
   useV1MyTournamentReview,
   useV1SubmitTournamentReview,
   useV1UploadImages,
@@ -17,6 +18,7 @@ import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
+import { TournamentFixtureReviewEntrySection } from '@/components/tournaments/tournament-venue-retention-sections';
 import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
@@ -550,7 +552,14 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
       <div className="tm-review-card-header">
         <div className="tm-review-card-avatar" aria-hidden="true">{letter}</div>
         <div>
-          <div className="tm-review-card-author">{review.teamName ?? review.authorNickname}</div>
+          {/* 팀명만 보이면 "어떤 사람이 남겼는지"를 알 수 없다 — 팀장·운영진이 팀을 대표해 쓰는
+              후기라 둘 다 필요하다(어드민 화면은 이미 둘 다 보여준다). */}
+          <div className="tm-review-card-author">
+            {review.teamName ?? review.authorNickname}
+            {review.teamName && review.authorNickname ? (
+              <span className="tm-review-card-author-sub"> · {review.authorNickname}</span>
+            ) : null}
+          </div>
           <div className="tm-review-card-date">{date}</div>
         </div>
         <div className="tm-review-card-stars" aria-label={`별점 ${review.rating}점`}>
@@ -574,6 +583,35 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
 }
 
 /* ── 리뷰 섹션 (실제 데이터 + 권한 gate) ── */
+/**
+ * 이 대회의 경기별 후기 진입 — 예전엔 대회 상세에 있었다. 대회 상세에 후기 입구가 두 개
+ * ("대회 후기" 행 + "리뷰할 수 있는 경기" 섹션)라 어디로 가야 하는지 헷갈려서, 후기는 이
+ * 화면 하나로 모았다. 대회 후기(대회 자체)와 경기별 후기(상대팀·상대 선수)를 같이 본다.
+ */
+function FixtureReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
+  const hasSession = hasStoredV1Session();
+  const hasCompletedFixture = tournament.fixtures.some(
+    (fixture) => fixture.status === 'completed' && fixture.result !== null,
+  );
+  const query = useV1Reviews(
+    { tab: 'pending', tournamentId: tournament.id, limit: 50 },
+    { enabled: hasSession && hasCompletedFixture },
+  );
+  if (!hasSession || !hasCompletedFixture) return null;
+
+  const state = query.isError
+    ? { status: 'error' as const, items: [], onRetry: () => void query.refetch() }
+    : query.isPending || query.isFetching
+      ? { status: 'loading' as const, items: [] }
+      : { status: 'ready' as const, items: query.data?.items ?? [] };
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <TournamentFixtureReviewEntrySection fixtures={tournament.fixtures} state={state} />
+    </div>
+  );
+}
+
 function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
   const [showForm, setShowForm] = useState(false);
   const hasSession = hasStoredV1Session();
@@ -623,12 +661,15 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
           <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
               {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다 */}
+              {/* 실제 권한은 참가 확정 팀의 owner(팀장) + manager(운영진)다
+                  — tournaments/tournament-reviews.service.ts eligibleTeamWhere 참조.
+                  "팀 대표만"이라고 안내하면 운영진이 자기는 못 쓴다고 오해한다. */}
               {isCompleted && isParticipant && !alreadyReviewed
                 ? '첫 번째 후기를 남겨보세요!'
                 : isCompleted && !hasSession
-                  ? '아직 등록된 후기가 없어요. 로그인하면 참가팀 대표는 후기를 작성할 수 있어요.'
+                  ? '아직 등록된 후기가 없어요. 로그인하면 참가팀의 팀장·운영진은 후기를 작성할 수 있어요.'
                   : isCompleted && hasSession && !isParticipant
-                    ? '아직 등록된 후기가 없어요. 후기는 대회를 신청한 팀 대표만 작성할 수 있어요.'
+                    ? '아직 등록된 후기가 없어요. 후기는 대회에 참가한 팀의 팀장·운영진만 작성할 수 있어요.'
                     : '아직 등록된 후기가 없어요.'}
             </p>
           </Card>
@@ -762,6 +803,7 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
             <IndividualAwardsSection tournament={tournament} />
 
             {/* 참가팀 후기 */}
+            <FixtureReviewsSection tournament={tournament} />
             <ReviewsSection tournament={tournament} />
           </div>
         </div>
@@ -771,7 +813,8 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
         /* 상금 정보가 없는 대회는 2열 그리드 대신 전체 폭 단일 컬럼으로 — 빈 좌측 트랙이 생기지 않도록 */
         <div className="tm-tourn-hero-full" style={{ padding: '0 20px' }}>
           <IndividualAwardsSection tournament={tournament} />
-          <ReviewsSection tournament={tournament} />
+          <FixtureReviewsSection tournament={tournament} />
+            <ReviewsSection tournament={tournament} />
         </div>
       )}
 

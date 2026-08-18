@@ -49,6 +49,7 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-apply-label">{model.applyLabel}</span>
       {model.onApply && <button onClick={model.onApply}>상대팀 신청</button>}
       {model.resultAction && <a href={model.resultAction.href}>{model.resultAction.label}</a>}
+      {model.reviewAction && <a href={model.reviewAction.href}>{model.reviewAction.label}</a>}
     </div>
   ),
   TeamMatchListPageView: () => null,
@@ -283,5 +284,92 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
     expect(model.style).not.toBe(mockFallback.style);
     expect(model.format).toBe('');
     expect(model.uniform).toBe('');
+  });
+});
+
+// 팀매치 후기 화면(/my/reviews/team_match/:id)으로 가는 링크는 이 CTA 하나뿐이다 —
+// 이게 없던 동안 앱 전체에 그 URL을 만드는 코드가 0건이라, 사용자는 /my/reviews 목록에
+// 그 매치가 뜨기를 기다리는 수밖에 없었다. 경기 종료 + 참가팀 소속 두 조건을 고정한다.
+describe('TeamMatchDetailPageClient — 후기 진입점', () => {
+  function mockTeamMatch(
+    viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean; participantMember?: boolean },
+    status: string,
+  ) {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '서울 풋살장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        capacityText: '2/2',
+        displayState: status,
+        status,
+        viewer: {
+          state: viewer.state,
+          manageableHostTeam: viewer.manageableHostTeam ?? false,
+          participantMember: viewer.participantMember ?? false,
+        },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+      },
+      isError: false,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it('경기가 끝나면 호스트팀 운영진에게 후기 진입점이 보인다', () => {
+    mockTeamMatch({ state: 'host_team', manageableHostTeam: true, participantMember: true }, 'completed');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByRole('link', { name: '후기 남기기' })).toHaveAttribute(
+      'href',
+      '/my/reviews/team_match/team-match-1',
+    );
+  });
+
+  // 회귀 방지 — 종전 게이트는 `canManageHostTeam || viewerState === 'approved'` 였다.
+  // 서버의 viewerState 는 host 팀 owner/manager 에게만 'host_team' 을, **신청서를 낸 한 사람**
+  // 에게만 'approved' 를 준다. 그래서 양 팀 일반 팀원은 'none' 으로 내려와 후기 진입점을
+  // 잃었는데, 서버(resolveReviewerTeams)는 두 팀의 active 멤버 전원에게 후기를 허용한다.
+  it('참가팀 일반 팀원(viewerState=none)에게도 보인다', () => {
+    mockTeamMatch({ state: 'none', manageableHostTeam: false, participantMember: true }, 'completed');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByRole('link', { name: '후기 남기기' })).toHaveAttribute(
+      'href',
+      '/my/reviews/team_match/team-match-1',
+    );
+  });
+
+  it('승인된 상대팀 소속에게도 보인다', () => {
+    mockTeamMatch({ state: 'approved', manageableHostTeam: false, participantMember: true }, 'completed');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByRole('link', { name: '후기 남기기' })).toBeInTheDocument();
+  });
+
+  it('경기 전(matched)에는 보이지 않는다', () => {
+    mockTeamMatch({ state: 'host_team', manageableHostTeam: true, participantMember: true }, 'matched');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.queryByRole('link', { name: '후기 남기기' })).not.toBeInTheDocument();
+  });
+
+  it('무관한 사용자에게는 보이지 않는다', () => {
+    mockTeamMatch({ state: 'none', manageableHostTeam: false }, 'completed');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.queryByRole('link', { name: '후기 남기기' })).not.toBeInTheDocument();
   });
 });

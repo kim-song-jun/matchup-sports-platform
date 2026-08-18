@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  GoneException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,9 +18,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
+import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
+import { ReviewPolicySettingsService } from './review-policy-settings.service';
 import { isReviewRevealed, reviewRevealScope } from './review-visibility';
 import { average, revealGroupKey, trustStateForReviewCount } from './team-trust-aggregation';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
+import { AdminContextService } from '../common/admin-context.service';
+import { HidePostEventReviewDto } from './dto/moderate-review.dto';
+import { recalculateTournamentUserReputation } from './tournament-fixture-review-reputation';
+import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-review-trust';
 
 const REVIEW_TAGS = {
   punctual: '시간 약속을 잘 지켜요',
@@ -36,6 +43,12 @@ type ReviewTagCode = keyof typeof REVIEW_TAGS;
 
 const ELIGIBLE_PARTICIPANT_STATUSES: V1MatchParticipantStatus[] = ['active', 'completed'];
 
+/**
+ * 개인 매너 점수(V1UserReputationSummary)에 합산하는 소스. 대회 개인 후기는 여기 없다 —
+ * tournament_* 컬럼으로 따로 집계한다(한 대회에서 수십 건이 한꺼번에 들어와 점수가 급변한다).
+ */
+const PERSONAL_REPUTATION_SOURCES: V1PostEventReviewSourceType[] = ['match', 'team_match'];
+
 type SourceType = 'match' | 'team_match' | 'tournament_fixture';
 type TargetType = 'user' | 'team';
 type RevealScopeCandidate = { sourceType: V1PostEventReviewSourceType; sourceId: string; sourceGroupId: string | null };
@@ -49,7 +62,91 @@ export class ReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tournamentFixtureReviews: TournamentFixtureReviewsService,
+    private readonly adminContext: AdminContextService,
+    private readonly reviewPolicySettings: ReviewPolicySettingsService,
   ) {}
+
+  /**
+   * 어드민 후기 숨김 — 경기 후기(V1PostEventReview)에는 지금까지 숨김 경로가 아예 없었다.
+   * 스키마의 V1PostEventReviewStatus 에 hidden/removed 가 정의돼 있는데도 그 값을 쓰는 코드가
+   * 0건이라, 악의적 후기가 들어와도 어드민조차 내릴 수 없었다(대회 후기에만 hide 가 있었다).
+   *
+   * 집계는 전부 status='submitted' 로 좁혀 읽으므로 숨기는 순간 조회에서 빠지지만, 미리 계산해
+   * 저장해 둔 평판·신뢰점수는 그대로 남는다 — 그래서 숨김/복구 뒤 해당 대상만 다시 계산한다.
+   */
+  async hideReview(user: V1AuthUser, reviewId: string, dto: HidePostEventReviewDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const review = await this.prisma.v1PostEventReview.findUnique({ where: { id: reviewId } });
+    if (!review) throw notFound('REVIEW_NOT_FOUND', '리뷰를 찾을 수 없어요.');
+    if (review.status === 'hidden') return { alreadyHidden: true };
+
+    const reason = dto.reason?.trim() || null;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1PostEventReview.update({ where: { id: reviewId }, data: { status: 'hidden', hiddenAt: new Date() } });
+      await this.recalculateForReview(tx, review);
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'review.hide',
+          targetType: 'post_event_review',
+          targetId: reviewId,
+          reason,
+          beforeJson: { status: review.status },
+          afterJson: { status: 'hidden' },
+        },
+        tx,
+      );
+    });
+    return { alreadyHidden: false };
+  }
+
+  async unhideReview(user: V1AuthUser, reviewId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const review = await this.prisma.v1PostEventReview.findUnique({ where: { id: reviewId } });
+    if (!review) throw notFound('REVIEW_NOT_FOUND', '리뷰를 찾을 수 없어요.');
+    // removed 는 숨김과 다른 종착 상태다 — 복구 대상은 hidden 뿐이다.
+    if (review.status !== 'hidden') return { alreadyVisible: true };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1PostEventReview.update({ where: { id: reviewId }, data: { status: 'submitted', hiddenAt: null } });
+      await this.recalculateForReview(tx, review);
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'review.unhide',
+          targetType: 'post_event_review',
+          targetId: reviewId,
+          reason: null,
+          beforeJson: { status: 'hidden' },
+          afterJson: { status: 'submitted' },
+        },
+        tx,
+      );
+    });
+    return { alreadyVisible: false };
+  }
+
+  /** 후기 한 건이 기여하던 집계만 골라 다시 계산한다. 소스·대상 조합마다 쌓이는 컬럼이 다르다. */
+  private async recalculateForReview(
+    tx: PrismaTx,
+    review: { sourceType: V1PostEventReviewSourceType; targetType: V1PostEventReviewTargetType; targetUserId: string | null; targetTeamId: string | null },
+  ) {
+    if (review.targetType === 'user' && review.targetUserId) {
+      if (review.sourceType === 'tournament_fixture') {
+        await recalculateTournamentUserReputation(tx, review.targetUserId);
+      } else {
+        await this.recalculateUserReputation(tx, review.targetUserId);
+      }
+      return;
+    }
+    if (review.targetTeamId) {
+      if (review.sourceType === 'tournament_fixture') {
+        await recalculateTournamentFixtureTeamTrust(tx, review.targetTeamId);
+      } else {
+        await this.recalculateTeamTrust(tx, review.targetTeamId);
+      }
+    }
+  }
 
   async list(user: V1AuthUser, query: ListReviewsQueryDto) {
     const tab = query.tab ?? 'pending';
@@ -94,20 +191,26 @@ export class ReviewsService {
     const reviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         status: 'submitted',
-        // 개인/팀매치 신규 후기는 집계로만 공개한다. 대회 후기는 익명 개별 항목으로 공개하되,
-        // 아래 reveal gate를 통과하기 전에는 응답에 넣지 않는다.
-        OR: [{ sportId: null }, { sourceType: 'tournament_fixture' }],
+        // 신규 후기는 익명 개별 항목으로 공개하되, 아래 reveal gate를 통과하기 전에는 응답에
+        // 넣지 않는다. 팀매치가 여기 빠져 있었다: 팀매치 후기를 쓸 수는 있는데 받은 사람은
+        // 내용을 영영 못 보고 매너 점수 집계로만 반영됐다 — 같은 성격의 대회 경기 후기는
+        // 익명으로라도 보이던 것과 어긋난다. 개인 매치(match)는 sportId=null 레거시 행과
+        // 구분이 안 되는 게 아니라, 아래 sportId === null 분기가 "작성자까지 공개"라는
+        // 다른 정책을 쓰므로 sourceType 으로 명시해 둘을 갈라 놓는다.
+        OR: [{ sportId: null }, { sourceType: { in: ['tournament_fixture', 'team_match', 'match'] } }],
         AND: [{ OR: receivedFilters }],
       },
       orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
       include: reviewInclude(),
     });
-    const tournamentReviews = reviews.filter((review) => review.sourceType === 'tournament_fixture' && review.sportId !== null);
-    const userTournamentReviews = tournamentReviews.filter((review) => review.targetType === 'user');
-    const teamTournamentReviews = tournamentReviews.filter((review) => review.targetType === 'team');
+    // reveal 짝 판정 대상은 "sportId 가 있는 신규 후기" 전부다 — 예전엔 대회 후기만 모아서,
+    // 팀매치는 서로 평가해도 짝이 성립하지 않아 72시간 폴백만 남았다.
+    const revealableReviews = reviews.filter((review) => review.sportId !== null);
+    const userRevealable = revealableReviews.filter((review) => review.targetType === 'user');
+    const teamRevealable = revealableReviews.filter((review) => review.targetType === 'team');
     const [reverseUserReviews, reverseTeamReviews] = await Promise.all([
-      this.reverseUserReviews(user.id, userTournamentReviews),
-      this.reverseTeamReviews(teamTournamentReviews),
+      this.reverseUserReviews(user.id, userRevealable),
+      this.reverseTeamReviews(teamRevealable),
     ]);
     const now = new Date();
     const visibleReviews = reviews.filter((review) => {
@@ -127,11 +230,17 @@ export class ReviewsService {
     const cursorIndex = query.cursor ? visibleReviews.findIndex((review) => review.id === query.cursor) : -1;
     const pageStart = cursorIndex >= 0 ? cursorIndex + 1 : 0;
     const pageItems = visibleReviews.slice(pageStart, pageStart + limit);
+    const sourceSummaries = await this.reviewSourceSummaries(pageItems);
 
     return {
-      items: pageItems.map((review) => review.sportId === null
-        ? { ...this.toReviewDetail(review), anonymous: false as const }
-        : this.toAnonymousReceivedReview(review)),
+      items: pageItems.map((review) => ({
+        ...this.toReviewDetail(review),
+        // 작성자 닉네임을 공개한다(2026-08-18 정책). 예전에는 보복 우려로 가렸는데, 그 탓에
+        // "누가 언제 어느 경기에서" 남긴 평가인지 전혀 알 수 없어 받은 사람이 맥락을 못 잡았다.
+        anonymous: false as const,
+        // 어느 경기에서 받은 후기인지 — 예전엔 카드 제목이 "팀매치"처럼 종류만 나왔다.
+        source: sourceSummaries.get(`${review.sourceType}:${review.sourceId}`) ?? null,
+      })),
       pageInfo: {
         nextCursor: visibleReviews.length > pageStart + limit ? pageItems.at(-1)?.id ?? null : null,
         hasNext: visibleReviews.length > pageStart + limit,
@@ -143,12 +252,12 @@ export class ReviewsService {
     const now = new Date();
     const targetFilter = query.targetType === 'team'
       ? { targetTeamId: { in: await this.participatingTeamIds(user.id) }, targetType: 'team' as const }
-      // 개인 대상 요약은 개인 매치(sourceType='match') 후기만 센다.
-      // 대회 개인 후기는 V1UserReputationSummary의 tournament_* 컬럼으로 따로 집계되는데
-      // (recalculateUserReputation도 sourceType='match'로 좁혀 같은 분리를 지킨다), 여기만
-      // 필터가 없으면 그 후기들이 종목별 평균에 원시 건수 그대로 합산돼 분리가 절반만 이뤄진다.
-      // 대회에서 상대팀 로스터 전원에게 평가받으면 며칠 만에 수십 건이 들어와 점수가 급변한다.
-      : { targetUserId: user.id, targetType: 'user' as const, sourceType: 'match' as const };
+      // 개인 대상 요약은 매너 점수와 같은 소스만 센다(PERSONAL_REPUTATION_SOURCES) — 두 곳이
+      // 갈리면 화면이 모순된다. 실제로 팀매치가 여기서만 빠져 있던 동안, 개별 목록엔 팀매치
+      // 후기가 보이는데 집계는 "아직 없어요"로 떴다.
+      // 대회 개인 후기는 계속 제외한다: V1UserReputationSummary의 tournament_* 컬럼으로 따로
+      // 집계되고, 한 대회에서 상대 로스터 전원에게 수십 건이 들어와 평균이 급변하기 때문이다.
+      : { targetUserId: user.id, targetType: 'user' as const, sourceType: { in: PERSONAL_REPUTATION_SOURCES } };
 
     const candidates = await this.prisma.v1PostEventReview.findMany({
       where: { status: 'submitted', sportId: { not: null }, ...targetFilter },
@@ -179,7 +288,20 @@ export class ReviewsService {
       ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === query.period)
       : revealed;
 
-    return { bySport: summarizeBySport(filtered), availableMonths };
+    // 프론트의 종목 배지·색상은 v1Sport.code 로 매핑한다(SPORT_ACCENT_MAP). sportId(UUID)만
+    // 내려주면 어떤 종목이든 "기타"로 떨어지므로 코드를 함께 실어 보낸다.
+    const bySport = summarizeBySport(filtered);
+    const sports = bySport.length
+      ? await this.prisma.v1Sport.findMany({
+          where: { id: { in: bySport.map((entry) => entry.sportId) } },
+          select: { id: true, code: true },
+        })
+      : [];
+    const codeById = new Map(sports.map((sport) => [sport.id, sport.code]));
+    return {
+      bySport: bySport.map((entry) => ({ ...entry, sportCode: codeById.get(entry.sportId) ?? null })),
+      availableMonths,
+    };
   }
 
   private async reverseUserReviews(targetUserId: string, candidates: RevealScopeCandidate[]) {
@@ -220,7 +342,9 @@ export class ReviewsService {
       return this.submitPersonalReview(user, dto, tagCodes);
     }
     if (dto.sourceType === 'team_match') {
-      return this.submitTeamReview(user, dto, tagCodes);
+      return dto.targetType === 'user'
+        ? this.submitTeamMatchPlayerReview(user, dto, tagCodes)
+        : this.submitTeamReview(user, dto, tagCodes);
     }
     return this.tournamentFixtureReviews.submit(user, dto, tagCodes);
   }
@@ -295,7 +419,12 @@ export class ReviewsService {
   }
 
   private async pendingTeamReviews(user: V1AuthUser, limit: number) {
-    const teamIds = await this.participatingTeamIds(user.id);
+    const memberships = await this.prisma.v1TeamMembership.findMany({
+      where: { userId: user.id, status: 'active' },
+      select: { teamId: true, role: true },
+    });
+    const teamIds = memberships.map((membership) => membership.teamId);
+    const roleByTeamId = new Map(memberships.map((membership) => [membership.teamId, membership.role]));
     if (!teamIds.length) return [];
 
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
@@ -329,7 +458,11 @@ export class ReviewsService {
       },
     });
     // "이미 썼음" 판정은 사람 기준 — 팀 기준으로 두면 팀장이 쓴 순간 나머지 팀원 전원에게 완료로 표시된다.
-    const reviewKeys = await this.existingTeamReviewKeys(teamMatches.map((match) => match.id), user.id);
+    const teamMatchIds = teamMatches.map((match) => match.id);
+    const [reviewKeys, rostersBySource] = await Promise.all([
+      this.existingTeamReviewKeys(teamMatchIds, user.id),
+      this.teamMatchRostersBySource(teamMatchIds),
+    ]);
 
     return teamMatches
       .flatMap((match) => {
@@ -339,18 +472,31 @@ export class ReviewsService {
           const isHost = reviewerTeamId === match.hostTeamId;
           const targetTeam = isHost ? match.approvedApplicantTeam : match.hostTeam;
           const key = teamReviewKey(match.id, targetTeam?.id ?? '');
+          const role = roleByTeamId.get(reviewerTeamId);
+          // 팀 후기는 팀장·운영진만 — 목록의 남은 개수도 실제로 쓸 수 있는 대상만 세야
+          // "1건 남음"을 눌렀는데 쓸 게 없는 화면이 나오지 않는다.
+          const canReviewTeam = role ? canReviewOpponentTeam(role) : false;
+          const rosterUserIds = (rostersBySource.get(match.id)?.get(targetTeam?.id ?? '') ?? [])
+            .filter((userId) => userId !== user.id);
+          const reviewedUserIds = reviewKeys.users.get(match.id) ?? new Set<string>();
+          const teamReviewed = reviewKeys.teams.has(key);
+          const targetCount = (canReviewTeam ? 1 : 0) + rosterUserIds.length;
+          const reviewedCount =
+            (canReviewTeam && teamReviewed ? 1 : 0) +
+            rosterUserIds.filter((userId) => reviewedUserIds.has(userId)).length;
           return {
             sourceType: 'team_match' as const,
             sourceId: match.id,
             title: match.title,
             completedAt: toIso(match.completedAt ?? match.startAt),
-            targetType: 'team' as const,
-            targetCount: 1,
-            reviewedCount: reviewKeys.has(key) ? 1 : 0,
-            remainingCount: reviewKeys.has(key) ? 0 : 1,
+            // 목록 배지가 작성 화면과 어긋나지 않도록 실제 대표 대상 종류를 따른다.
+            targetType: canReviewTeam ? ('team' as const) : ('user' as const),
+            targetCount,
+            reviewedCount,
+            remainingCount: Math.max(targetCount - reviewedCount, 0),
             reviewerTeam: { teamId: reviewerTeamId, name: isHost ? match.hostTeam.name : match.approvedApplicantTeam?.name ?? '' },
             targetTeam: targetTeam ? { teamId: targetTeam.id, name: targetTeam.name } : null,
-            state: reviewKeys.has(key) ? 'done' : 'ready',
+            state: reviewedCount >= targetCount ? 'done' : 'ready',
             completedAtSort: (match.completedAt ?? match.startAt).getTime(),
           };
         });
@@ -421,6 +567,16 @@ export class ReviewsService {
   }
 
   private async teamMatchSource(user: V1AuthUser, sourceId: string) {
+    const { payload } = await this.teamMatchSourceContext(user, sourceId);
+    return payload;
+  }
+
+  /**
+   * 작성 화면 payload와, 그 payload를 만들 때 이미 판정한 "내 참가팀 + 역할"을 함께 돌려준다.
+   * 제출 경로가 역할을 다시 조회하지 않도록 하기 위한 것 — 같은 판정을 두 번 하면 그 사이에
+   * 멤버십이 바뀌었을 때 화면과 저장 결과가 어긋난다.
+   */
+  private async teamMatchSourceContext(user: V1AuthUser, sourceId: string) {
     const teamMatch = await this.prisma.v1TeamMatch.findUnique({
       where: { id: sourceId },
       select: {
@@ -438,6 +594,13 @@ export class ReviewsService {
     });
     if (!teamMatch) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
     if (!isCompleted(teamMatch)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
+    // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐) — 정정 승인으로 앵커가
+    // 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(저장하지 않는다).
+    // 기간은 어드민 설정(V1ReviewPolicySettings, 기본 168시간=7일)에서 읽는다.
+    const windowHours = await this.reviewPolicySettings.getWindowHours();
+    if (reviewWindowClosed(teamMatch.completedAt, new Date(), windowHours)) {
+      throw gone('REVIEW_WINDOW_CLOSED', `평가 가능 기간(${formatReviewWindow(windowHours)})이 지났어요.`);
+    }
     if (!teamMatch.approvedApplicantTeamId || !teamMatch.approvedApplicantTeam) {
       throw conflict('TEAM_MATCH_NOT_READY', 'Team match does not have an approved opponent');
     }
@@ -446,41 +609,134 @@ export class ReviewsService {
     const reviewerTeams = await this.resolveReviewerTeams(user.id, teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId);
     const opponentOf = (reviewerTeamId: string) =>
       reviewerTeamId === teamMatch.hostTeamId ? teamMatch.approvedApplicantTeam! : teamMatch.hostTeam;
+    const opponentTeamIds = reviewerTeams.map((team) => opponentOf(team.teamId).id);
+    const rosterByTeamId = await this.teamMatchOpponentRosters(teamMatch.id, opponentTeamIds);
+    const rosterUserIds = [...rosterByTeamId.values()].flat().map((player) => player.userId);
+
     // 기존 후기 조회도 사람 기준 — 팀 기준으로 조회하면 같은 팀 다른 사람의 후기를 "내 후기"로 잘못 잠근다.
     const existingReviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         reviewerUserId: user.id,
-        targetTeamId: { in: reviewerTeams.map((team) => opponentOf(team.teamId).id) },
         sourceType: 'team_match',
         sourceId: teamMatch.id,
+        OR: [
+          { targetTeamId: { in: opponentTeamIds } },
+          ...(rosterUserIds.length ? [{ targetUserId: { in: rosterUserIds } }] : []),
+        ],
       },
       include: reviewInclude(),
     });
-    const existingByTargetTeam = new Map(existingReviews.map((review) => [review.targetTeamId, review]));
+    const existingByTargetTeam = new Map(
+      existingReviews.filter((review) => review.targetType === 'team').map((review) => [review.targetTeamId, review]),
+    );
+    const existingByTargetUser = new Map(
+      existingReviews.filter((review) => review.targetType === 'user').map((review) => [review.targetUserId, review]),
+    );
 
-    return {
+    const payload = {
       source: sourceSummary('team_match', teamMatch.id, teamMatch.title, teamMatch.completedAt ?? teamMatch.startAt),
       sportId: teamMatch.sportId,
       // 겸직이면 단일 값으로 좁힐 수 없으므로 null — 소비자는 target.reviewerTeam 을 봐야 한다.
       reviewerTeam: reviewerTeams.length === 1 ? reviewerTeams[0] : null,
-      targets: reviewerTeams.map((reviewerTeam) => {
+      targets: reviewerTeams.flatMap((reviewerTeam) => {
         const targetTeam = opponentOf(reviewerTeam.teamId);
         const existing = existingByTargetTeam.get(targetTeam.id) ?? null;
-        return {
-          targetType: 'team' as const,
-          targetUserId: null,
-          targetTeamId: targetTeam.id,
-          reviewerTeam,
-          name: targetTeam.name,
-          imageUrl: targetTeam.profile?.logoUrl ?? null,
-          subtitle: '상대 팀',
-          alreadySubmitted: Boolean(existing),
-          review: existing ? this.toReviewDetail(existing) : null,
-          locked: Boolean(existing),
-          lockReason: existing ? 'ALREADY_SUBMITTED' : null,
-        };
+        // 상대 팀 후기는 팀장·운영진만 — 대회 경기(tournament-fixture-reviews.service.ts)와 같은 규칙이다.
+        const teamTargets = canReviewOpponentTeam(reviewerTeam.role)
+          ? [{
+              targetType: 'team' as const,
+              targetUserId: null,
+              targetTeamId: targetTeam.id,
+              reviewerTeam,
+              name: targetTeam.name,
+              imageUrl: targetTeam.profile?.logoUrl ?? null,
+              subtitle: '상대 팀',
+              alreadySubmitted: Boolean(existing),
+              review: existing ? this.toReviewDetail(existing) : null,
+              locked: Boolean(existing),
+              lockReason: existing ? 'ALREADY_SUBMITTED' : null,
+            }]
+          : [];
+        // 상대 선수 후기는 역할 무관 — 팀원도 자기가 상대한 사람을 평가한다.
+        const playerTargets = (rosterByTeamId.get(targetTeam.id) ?? []).map((player) => {
+          const existingPlayerReview = existingByTargetUser.get(player.userId) ?? null;
+          return {
+            targetType: 'user' as const,
+            targetUserId: player.userId,
+            targetTeamId: null,
+            reviewerTeam,
+            name: player.name,
+            imageUrl: player.imageUrl,
+            subtitle: `${targetTeam.name} 선수`,
+            alreadySubmitted: Boolean(existingPlayerReview),
+            review: existingPlayerReview ? this.toReviewDetail(existingPlayerReview) : null,
+            locked: Boolean(existingPlayerReview),
+            lockReason: existingPlayerReview ? 'ALREADY_SUBMITTED' : null,
+          };
+        });
+        return [...teamTargets, ...playerTargets];
       }),
     };
+    return { payload, reviewerTeams, opponentOf };
+  }
+
+  /**
+   * 팀 매치에서 "그 경기에 실제로 뛴 상대 선수" 명단.
+   *
+   * 근거는 제출된 라인업 하나뿐이다 — V1Game.teamMatchId 로 연결된 경기의, 상대 팀 사이드에 속한
+   * V1GameParticipant 중 userId 가 채워진 행(연동 팀원)만 센다. 게스트(userId=null)는 플랫폼 계정이
+   * 없어 평가 대상이 될 수 없고, 라인업을 제출하지 않은 팀 매치는 명단 자체가 없으므로 선수 후기도
+   * 없다(팀 후기만 남는다). 팀 멤버십 전원으로 대체하지 않는 이유: 그 경기에 안 뛴 사람까지
+   * 평가 대상이 되어 "상대했던 팀원"이라는 전제가 깨진다.
+   */
+  private async teamMatchOpponentRosters(teamMatchId: string, opponentTeamIds: string[]) {
+    const rosterByTeamId = new Map<string, Array<{ userId: string; name: string; imageUrl: string | null }>>();
+    if (!opponentTeamIds.length) return rosterByTeamId;
+
+    const game = await this.prisma.v1Game.findUnique({
+      where: { teamMatchId },
+      select: { id: true, sides: { select: { id: true, teamId: true } } },
+    });
+    if (!game) return rosterByTeamId;
+
+    const sideIdsByTeamId = new Map<string, string[]>();
+    for (const side of game.sides) {
+      if (!side.teamId || !opponentTeamIds.includes(side.teamId)) continue;
+      sideIdsByTeamId.set(side.teamId, [...(sideIdsByTeamId.get(side.teamId) ?? []), side.id]);
+    }
+    const sideIds = [...sideIdsByTeamId.values()].flat();
+    if (!sideIds.length) return rosterByTeamId;
+
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { gameId: game.id, sideId: { in: sideIds }, userId: { not: null } },
+      select: { sideId: true, userId: true, displayNameSnapshot: true },
+    });
+    // V1GameParticipant.userId 는 FK 가 아니라 nullable 컬럼이라(스키마 주석 참조) relation include 가
+    // 불가능하다 — 프로필은 id 로 따로 모아 온다.
+    const profiles = await this.prisma.v1User.findMany({
+      where: { id: { in: [...new Set(participants.map((participant) => participant.userId!))] } },
+      select: { id: true, profile: { select: { nickname: true, profileImageUrl: true } } },
+    });
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile.profile]));
+
+    for (const [teamId, teamSideIds] of sideIdsByTeamId) {
+      const seen = new Set<string>();
+      const roster: Array<{ userId: string; name: string; imageUrl: string | null }> = [];
+      for (const participant of participants) {
+        if (!participant.userId || !teamSideIds.includes(participant.sideId)) continue;
+        // 라인업 개정(revision)이 여러 벌 남아 있으면 같은 사람이 여러 번 잡힌다.
+        if (seen.has(participant.userId)) continue;
+        seen.add(participant.userId);
+        const profile = profileById.get(participant.userId);
+        roster.push({
+          userId: participant.userId,
+          name: profile?.nickname ?? participant.displayNameSnapshot,
+          imageUrl: profile?.profileImageUrl ?? null,
+        });
+      }
+      rosterByTeamId.set(teamId, roster);
+    }
+    return rosterByTeamId;
   }
 
   private async submitPersonalReview(user: V1AuthUser, dto: SubmitReviewDto, tagCodes: ReviewTagCode[]) {
@@ -516,12 +772,65 @@ export class ReviewsService {
     return { review: this.toReviewDetail(review), alreadySubmitted: isExistingReviewResult(review) };
   }
 
+  private async submitTeamMatchPlayerReview(user: V1AuthUser, dto: SubmitReviewDto, tagCodes: ReviewTagCode[]) {
+    if (!dto.targetUserId) throw badRequest('TARGET_USER_REQUIRED', 'targetUserId is required');
+    const targetUserId = dto.targetUserId;
+    const { payload: source } = await this.teamMatchSourceContext(user, dto.sourceId);
+    const target = source.targets.find((item) => item.targetType === 'user' && item.targetUserId === targetUserId);
+    if (!target) throw forbidden('TARGET_NOT_REVIEWABLE', 'Target user is not reviewable for this source');
+    const existing = target.review;
+    if (existing) return { review: existing, alreadySubmitted: true };
+
+    const review = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.v1PostEventReview.create({
+        data: {
+          reviewerUserId: user.id,
+          reviewerTeamId: target.reviewerTeam.teamId,
+          sourceType: 'team_match',
+          sourceId: dto.sourceId,
+          targetType: 'user',
+          targetUserId,
+          rating: dto.rating,
+          sportId: source.sportId,
+          tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
+        },
+        include: reviewInclude(),
+      });
+      await this.recalculateUserReputation(tx, targetUserId);
+      return created;
+    }).catch(async (error: unknown) => {
+      if (!isUniqueConstraintError(error)) throw error;
+      return this.findExistingTeamMatchPlayerReview(user.id, dto.sourceId, targetUserId);
+    });
+
+    return { review: this.toReviewDetail(review), alreadySubmitted: isExistingReviewResult(review) };
+  }
+
+  private async findExistingTeamMatchPlayerReview(reviewerUserId: string, sourceId: string, targetUserId: string) {
+    const review = await this.prisma.v1PostEventReview.findFirst({
+      where: { reviewerUserId, sourceType: 'team_match', sourceId, targetUserId },
+      include: reviewInclude(),
+    });
+    if (!review) throw conflict('DUPLICATE_REVIEW_RETRY', 'Duplicate review was detected but existing review was not found');
+    return markExistingReviewResult(review);
+  }
+
   private async submitTeamReview(user: V1AuthUser, dto: SubmitReviewDto, tagCodes: ReviewTagCode[]) {
     if (!dto.targetTeamId) throw badRequest('TARGET_TEAM_REQUIRED', 'targetTeamId is required');
     const targetTeamId = dto.targetTeamId;
-    const source = await this.teamMatchSource(user, dto.sourceId);
-    const target = source.targets.find((item) => item.targetTeamId === targetTeamId);
-    if (!target) throw forbidden('TARGET_NOT_REVIEWABLE', 'Target team is not reviewable for this source');
+    const { payload: source, reviewerTeams, opponentOf } = await this.teamMatchSourceContext(user, dto.sourceId);
+    const target = source.targets.find((item) => item.targetType === 'team' && item.targetTeamId === targetTeamId);
+    if (!target) {
+      // 역할 미달이면 위에서 팀 target 자체가 빠진다. "대상이 없다"로만 응답하면 화면이 안내
+      // 문구를 만들 수 없으므로, 상대 팀은 맞는데 역할이 모자란 경우를 따로 구분해 돌려준다.
+      const blockedByRole = reviewerTeams.some(
+        (reviewerTeam) => opponentOf(reviewerTeam.teamId).id === targetTeamId && !canReviewOpponentTeam(reviewerTeam.role),
+      );
+      if (blockedByRole) {
+        throw forbidden('TEAM_REVIEW_ROLE_REQUIRED', '상대팀 후기는 팀장·운영진만 작성할 수 있어요.');
+      }
+      throw forbidden('TARGET_NOT_REVIEWABLE', 'Target team is not reviewable for this source');
+    }
     // 2팀 경기에서는 대상 팀이 곧 작성자 팀을 결정한다(B를 평가하면 나는 A 입장) —
     // 겸직이어도 별도의 reviewerTeamId 를 받을 필요가 없다.
     const existing = target.review;
@@ -588,7 +897,10 @@ export class ReviewsService {
             select: { id: true, title: true, completedAt: true, startAt: true },
           })
         : [],
-      this.tournamentFixtureReviews.sourceSummaries(tournamentFixtureIds),
+      // 빈 배열까지 위임하면 호출부가 대회 픽스처를 하나도 안 보는 경우에도 왕복이 생긴다.
+      tournamentFixtureIds.length
+        ? this.tournamentFixtureReviews.sourceSummaries(tournamentFixtureIds)
+        : new Map<string, ReturnType<typeof sourceSummary>>(),
     ]);
 
     return new Map([
@@ -651,16 +963,60 @@ export class ReviewsService {
   }
 
   private async existingTeamReviewKeys(sourceIds: string[], reviewerUserId: string) {
-    if (!sourceIds.length) return new Set<string>();
+    if (!sourceIds.length) return { teams: new Set<string>(), users: new Map<string, Set<string>>() };
     const reviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         sourceType: 'team_match',
         sourceId: { in: sourceIds },
         reviewerUserId,
       },
-      select: { sourceId: true, targetTeamId: true },
+      select: { sourceId: true, targetType: true, targetTeamId: true, targetUserId: true },
     });
-    return new Set(reviews.map((review) => teamReviewKey(review.sourceId, review.targetTeamId ?? '')));
+    const teams = new Set<string>();
+    const users = new Map<string, Set<string>>();
+    for (const review of reviews) {
+      if (review.targetType === 'team') {
+        teams.add(teamReviewKey(review.sourceId, review.targetTeamId ?? ''));
+      } else if (review.targetUserId) {
+        users.set(review.sourceId, (users.get(review.sourceId) ?? new Set<string>()).add(review.targetUserId));
+      }
+    }
+    return { teams, users };
+  }
+
+  /** 여러 팀 매치의 상대팀 로스터를 한 번에 — 목록 화면이 매치마다 왕복하지 않도록 배치 조회한다. */
+  private async teamMatchRostersBySource(teamMatchIds: string[]) {
+    const empty = new Map<string, Map<string, string[]>>();
+    if (!teamMatchIds.length) return empty;
+
+    const games = await this.prisma.v1Game.findMany({
+      where: { teamMatchId: { in: teamMatchIds } },
+      select: { id: true, teamMatchId: true, sides: { select: { id: true, teamId: true } } },
+    });
+    if (!games.length) return empty;
+
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { gameId: { in: games.map((game) => game.id) }, userId: { not: null } },
+      select: { gameId: true, sideId: true, userId: true },
+    });
+
+    for (const game of games) {
+      if (!game.teamMatchId) continue;
+      const byTeamId = new Map<string, string[]>();
+      for (const side of game.sides) {
+        if (!side.teamId) continue;
+        const userIds = [
+          ...new Set(
+            participants
+              .filter((participant) => participant.gameId === game.id && participant.sideId === side.id)
+              .map((participant) => participant.userId!)
+          ),
+        ];
+        byTeamId.set(side.teamId, [...(byTeamId.get(side.teamId) ?? []), ...userIds]);
+      }
+      empty.set(game.teamMatchId, byTeamId);
+    }
+    return empty;
   }
 
   /**
@@ -674,12 +1030,17 @@ export class ReviewsService {
   private async recalculateUserReputation(tx: PrismaTx, targetUserId: string) {
     const now = new Date();
     const candidates = await tx.v1PostEventReview.findMany({
-      where: { targetUserId, targetType: 'user', status: 'submitted', sourceType: 'match' },
+      // 개인 매치와 팀매치를 함께 센다. 둘 다 "함께 뛴 상대가 나를 평가한 것"이라 성격이 같다 —
+      // 팀매치가 빠져 있던 동안은 후기를 받아도 매너 점수가 그대로여서, 받은 후기 화면에
+      // "아직 집계된 리뷰가 없어요"가 뜨는데 바로 아래 개별 목록엔 팀매치 후기가 보이는
+      // 모순이 있었다. 대회 개인 후기(tournament_fixture)는 여전히 제외한다 — 한 대회에서
+      // 상대 로스터 전원에게 수십 건이 들어와 점수가 급변하므로 tournament_* 컬럼에 따로 쌓는다.
+      where: { targetUserId, targetType: 'user', status: 'submitted', sourceType: { in: PERSONAL_REPUTATION_SOURCES } },
       select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
     const reverseReviews = candidates.length
       ? await tx.v1PostEventReview.findMany({
-          where: { reviewerUserId: targetUserId, sourceType: 'match', sourceId: { in: [...new Set(candidates.map((review) => review.sourceId))] }, status: 'submitted' },
+          where: { reviewerUserId: targetUserId, sourceType: { in: PERSONAL_REPUTATION_SOURCES }, sourceId: { in: [...new Set(candidates.map((review) => review.sourceId))] }, status: 'submitted' },
           select: { sourceId: true, reviewerUserId: true, targetUserId: true },
         })
       : [];
@@ -798,20 +1159,19 @@ export class ReviewsService {
     if (dto.sourceType === 'match' && (dto.targetType !== 'user' || !dto.targetUserId || dto.targetTeamId)) {
       throw badRequest('INVALID_MATCH_REVIEW_TARGET', 'Match reviews require targetType=user and targetUserId only');
     }
-    if (dto.sourceType === 'team_match' && (dto.targetType !== 'team' || !dto.targetTeamId || dto.targetUserId)) {
-      throw badRequest('INVALID_TEAM_MATCH_REVIEW_TARGET', 'Team match reviews require targetType=team and targetTeamId only');
-    }
-    // 대회 후기만 팀·개인 두 대상을 모두 받는다. 개인 대상 명단의 근거는 상대팀 등록 로스터
-    // (V1TournamentPlayer)이며, 이 근거가 있는 소스는 대회뿐이다 — team_match는 참가자 명단을
-    // 기록하는 모델이 없어서(신청·승인은 팀 단위) "그 경기의 상대 선수"를 특정할 수 없다.
-    // 그래서 team_match는 위 규칙대로 targetType=team만 계속 받는다.
-    if (dto.sourceType === 'tournament_fixture') {
+    // team_match도 대회 경기와 같은 두 대상을 받는다. 개인 대상 명단의 근거는 그 경기에 제출된
+    // 라인업(V1GameParticipant.userId)이다 — 팀 매치 라인업은 연동 팀원의 userId를 그대로 저장하고
+    // (team-matches/team-match-lineup.service.ts resolveEntry) 게스트만 null로 남긴다. 예전 주석은
+    // "team_match는 참가자 명단을 기록하는 모델이 없다"고 적고 있었으나 라인업 도입으로 더는 사실이 아니다.
+    if (dto.sourceType === 'team_match' || dto.sourceType === 'tournament_fixture') {
       const teamShape = dto.targetType === 'team' && dto.targetTeamId && !dto.targetUserId;
       const userShape = dto.targetType === 'user' && dto.targetUserId && !dto.targetTeamId;
       if (!teamShape && !userShape) {
         throw badRequest(
-          'INVALID_TOURNAMENT_FIXTURE_REVIEW_TARGET',
-          'Tournament fixture reviews require either targetType=team with targetTeamId or targetType=user with targetUserId',
+          dto.sourceType === 'team_match'
+            ? 'INVALID_TEAM_MATCH_REVIEW_TARGET'
+            : 'INVALID_TOURNAMENT_FIXTURE_REVIEW_TARGET',
+          'Reviews require either targetType=team with targetTeamId or targetType=user with targetUserId',
         );
       }
     }
@@ -850,18 +1210,6 @@ export class ReviewsService {
     };
   }
 
-  private toAnonymousReceivedReview(review: ReviewWithIncludes) {
-    const detail = this.toReviewDetail(review);
-    return {
-      ...detail,
-      anonymous: true as const,
-      reviewerUser: null,
-      reviewerTeam: null,
-      // 정확한 제출 시각도 상대의 행동 시점과 대조하면 작성자 추정 단서가 된다.
-      submittedAt: null,
-    };
-  }
-
   private toWrittenListItem(review: ReviewWithIncludes, sources: Map<string, ReturnType<typeof sourceSummary>>) {
     const source = sources.get(`${review.sourceType}:${review.sourceId}`);
     const targetName = review.targetType === 'team'
@@ -880,6 +1228,11 @@ export class ReviewsService {
       state: 'done' as const,
       reviewerTeam: review.reviewerTeam ? { teamId: review.reviewerTeam.id, name: review.reviewerTeam.name } : null,
       targetTeam: review.targetTeam ? { teamId: review.targetTeam.id, name: review.targetTeam.name } : null,
+      // 한 경기에서 여러 사람에게 쓴 리뷰는 sourceId 가 같아서, 대상자를 안 실으면 목록에서
+      // 서로 구분되지 않는다("누구에게 쓴 건지" 알 수 없음). targetUser 는 이미 조인돼 있다.
+      targetUser: review.targetUser
+        ? { userId: review.targetUser.id, nickname: review.targetUser.profile?.nickname ?? '참가자' }
+        : null,
     };
   }
 }
@@ -986,6 +1339,24 @@ function resolveReviewerTeamIds(teamIds: string[], hostTeamId: string, approvedA
 }
 
 // 작성 주체가 사람이므로 키에는 팀이 들어가지 않는다 — 조회 자체가 reviewerUserId로 좁혀져 있다.
+/**
+ * 상대 "팀" 후기를 쓸 수 있는 역할.
+ *
+ * 2026-08-18 사용자 결정으로 **모든 참가 멤버**에게 열었다. 그 전에는 owner/manager 만
+ * 쓸 수 있었는데(2026-08-14 역할 규칙), 후기 화면을 "상대 팀 평가가 기본, 선수는 선택"으로
+ * 바꾸면서 팀원에게는 기본 대상이 하나도 없는 화면이 남기 때문이다.
+ *
+ * 팀 평점이 인원 많은 팀 쪽으로 기우는 문제는 생기지 않는다 — 팀 후기는 사람 기준으로
+ * 1인 1건이고(같은 경기에 같은 사람이 두 번 못 씀), 평점은 팀 단위 평균이 아니라 개별
+ * 항목으로 노출된다.
+ *
+ * 대회 경기 경로(tournament-fixture-reviews.service.ts)와 **같은 규칙**을 유지해야 한다 —
+ * 두 곳이 갈리면 같은 사용자가 대회에서는 되고 팀매치에서는 안 되는 모순이 생긴다.
+ */
+function canReviewOpponentTeam(_role: V1TeamMembershipRole) {
+  return true;
+}
+
 function teamReviewKey(sourceId: string, targetTeamId: string) {
   return `${sourceId}:${targetTeamId}`;
 }
@@ -1008,6 +1379,10 @@ function notFound(code: string, message: string) {
 
 function conflict(code: string, message: string) {
   return new ConflictException({ code, message });
+}
+
+function gone(code: string, message: string) {
+  return new GoneException({ code, message });
 }
 
 function summarizeBySport(

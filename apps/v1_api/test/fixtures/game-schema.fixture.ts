@@ -193,7 +193,20 @@ export const gameSchemaSourceManifest = {
   // 개인 어워드 icon_key는 game domain 밖의 nullable 컬럼이지만 이 guard는 전체
   // schema.prisma 바이트를 결속한다. 전용 20260815193000 migration의 빈 DB replay와
   // drift 검증을 통과한 스키마 해시로 재고정하며 game operations migration은 불변이다.
-  schema: '3b90ebc59111f96a58073949b939cb1a13b26c14709149c0e2d573dbfa601744',
+  // 대회 후기 "팀당 1건" 제약 드롭(20260817120000_v1_tournament_review_drop_team_unique)으로
+  // 재고정한다. 이 diff 는 V1TournamentReview 의 @@unique([tournamentId, teamId]) 하나를 지운
+  // 것이 전부다 — v1_game_* 모델·enum·relation 은 물론 게임 도메인의 어떤 바이트도 건드리지
+  // 않는다. 이 guard 가 발화한 것은 schema.prisma 파일 **전체**를 해시하기 때문이며, 게임
+  // 스키마가 변했다는 신호가 아니다(이 파일의 "대회 후기 팀 귀속" 재-pin 과 같은 성격).
+  // 바인딩된 20260729000100_v1_game_operations 마이그레이션은 불변이라 migration 해시는 그대로다.
+  // 이 브랜치의 파일에 `shasum -a 256` 을 돌려 새로 계산했다.
+  // 2026-08-18 재핀(프로덕션 라인): 후기 작성 기간을 어드민 편집 설정으로 도입하며 싱글턴 모델
+  // V1ReviewPolicySettings 1개를 추가했다(reviewWindowHours 기본 168시간=7일). 순수 additive 이고
+  // game domain(V1Game*) 모델·enum 은 건드리지 않았다 -- 이 guard 가 schema.prisma **전체 바이트**를
+  // 결속하기 때문에 걸리는 것이지 game operations 계약 변경이 아니다. 뒷받침 마이그레이션은
+  // 20260818120000_v1_review_policy_settings 이며, 바인딩된 20260729000100_v1_game_operations 는
+  // 그대로라 migration 해시는 변하지 않는다.
+  schema: 'fad7e3637cab1365fba7a3bf10be8bd7ef33a87112f58a6429048d940fcddd6d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

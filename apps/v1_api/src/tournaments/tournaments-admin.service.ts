@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1Tournament } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -57,6 +58,7 @@ export class TournamentsAdminService {
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
     private readonly kakaoGeocoding: KakaoGeocodingService,
+    private readonly notifications: NotificationsService,
   ) {
     this.lineupSizeConfigResolver = new LineupSizeConfigResolver(prisma, adminContext);
     this.tournamentCompetitionConfig = new TournamentCompetitionConfig(prisma, adminContext);
@@ -597,7 +599,60 @@ export class TournamentsAdminService {
       );
     });
 
+    if (to === 'completed') {
+      // 후기 요청 알림은 상태 전이의 **부수 효과**다. 전이는 위 트랜잭션에서 이미 커밋됐으므로
+      // 여기서 던지면 DB 는 completed 인데 API 만 실패로 응답한다 — 운영자는 "완료 처리가
+      // 실패했다"고 읽고 재시도하게 되고, 두 번째 호출은 alreadyInStatus 로 돌아와 더 헷갈린다.
+      // 수신자 조회(DB 일시 오류)와 발송(알림 인프라) 어느 쪽이 넘어져도 전이 결과는 지킨다.
+      try {
+        await this.requestTournamentReviews(tournamentId);
+      } catch (error) {
+        this.logger.error(
+          `대회 ${tournamentId} 완료 후기 요청 알림에 실패했지만 completed 전이는 유지한다`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
+
     return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false };
+  }
+
+  /**
+   * 대회가 종료되는 순간, 후기를 쓸 수 있는 사람에게만 후기 요청 알림을 보낸다.
+   *
+   * 수신자 조건은 대회 후기 작성 권한과 정확히 같아야 한다(tournament-reviews.service.ts
+   * eligibleTeamWhere) — 참가 확정(confirmed) 팀의 active owner/manager. 넓게 보내면 열어봐야
+   * 쓸 수 없는 알림이 되고, 좁게 보내면 정작 쓸 사람이 못 받는다.
+   *
+   * 발송 실패가 상태 전이를 되돌리면 안 되므로 트랜잭션 밖에서, fire-and-forget 계열로 호출한다.
+   */
+  private async requestTournamentReviews(tournamentId: string) {
+    const registrations = await this.prisma.v1TournamentRegistration.findMany({
+      where: {
+        tournamentId,
+        status: 'confirmed',
+        team: {
+          status: 'active',
+          deletedAt: null,
+          memberships: { some: { status: 'active', role: { in: ['owner', 'manager'] } } },
+        },
+      },
+      select: {
+        team: {
+          select: {
+            memberships: {
+              where: { status: 'active', role: { in: ['owner', 'manager'] } },
+              select: { userId: true },
+            },
+          },
+        },
+      },
+    });
+    const userIds = [
+      ...new Set(registrations.flatMap((registration) => registration.team.memberships.map((m) => m.userId))),
+    ];
+    if (userIds.length === 0) return;
+    await this.notifications.emitNotificationToMany(userIds, 'tournament_completed_review_request', tournamentId);
   }
 
   /**

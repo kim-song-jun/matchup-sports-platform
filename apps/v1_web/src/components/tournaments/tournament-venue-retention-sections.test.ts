@@ -12,25 +12,6 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
 }));
 
-describe('getTournamentPostEventCards', () => {
-  it('links completed tournament fixtures to the review inbox instead of an upcoming placeholder', () => {
-    const cards = getTournamentPostEventCards({
-      status: 'completed',
-      hasCompletedFixture: true,
-      hasAnnouncements: false,
-      sponsorCount: 0,
-      announcements: [],
-    });
-
-    expect(cards.find((card) => card.key === 'reviews')).toMatchObject({
-      title: '리뷰·매너 기록',
-      status: 'available',
-      actionLabel: '리뷰 작성',
-      href: '/my/reviews',
-    });
-  });
-});
-
 describe('getVenueNavigationLinks', () => {
   it('builds correctly formatted kakao/naver/tmap route deep links + web fallbacks from venue + coordinates', () => {
     const links = getVenueNavigationLinks('잠실종합운동장', 37.5, 127.07);
@@ -233,7 +214,12 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
       'href',
       '/tournaments/tour-42/bracket',
     );
-    expect(screen.getByRole('link', { name: /후기·매너 평가/ })).toHaveAttribute('href', '/my/reviews');
+    // 후기 행은 대회 컨텍스트를 유지해야 한다 — 예전엔 '/my/reviews'로 보내 "어느 대회의
+    // 후기를 쓰려던 건지"가 사라졌고, 사용자가 목록에서 대회를 다시 찾아야 했다.
+    expect(screen.getByRole('link', { name: /대회 후기/ })).toHaveAttribute(
+      'href',
+      '/tournaments/tour-42/awards',
+    );
     expect(screen.getByText('대회 후 더보기')).toBeInTheDocument();
   });
 
@@ -270,99 +256,35 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders direct review entries only for completed fixtures with results while the tournament is in progress', () => {
-    const fixtures: V1TournamentFixture[] = [
+  // 경기별 후기 진입은 "대회 후기" 화면(/tournaments/:id/awards)으로 옮겼다 — 대회 상세에
+  // 후기 입구가 둘("대회 후기" 행 + "리뷰할 수 있는 경기" 섹션)이라 어디로 가야 하는지
+  // 헷갈렸다. 여기서는 대회 상세가 더 이상 그 섹션을 렌더하지 않는다는 것만 고정한다.
+  it('대회 상세는 경기별 후기 섹션을 더 이상 렌더하지 않는다 (대회 후기 화면으로 이동)', () => {
+    const fixtures = [
       {
         id: 'f1',
-        groupId: null,
         round: '조별 1라운드',
         status: 'completed',
-        homeRegistrationId: 'r1',
-        awayRegistrationId: 'r2',
         homeTeamName: '팀A',
         awayTeamName: '팀B',
         result: { homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
       } as V1TournamentFixture,
-      {
-        id: 'f-completed-without-result',
-        round: '조별 2라운드',
-        status: 'completed',
-        homeTeamName: '팀C',
-        awayTeamName: '팀D',
-        result: null,
-      } as V1TournamentFixture,
-      {
-        id: 'f-penalty',
-        round: '결승',
-        status: 'completed',
-        homeTeamName: null,
-        awayTeamName: 'TBD',
-        result: { homeScore: 1, awayScore: 1, hasPenalty: true, homePenaltyScore: 5, awayPenaltyScore: 4 },
-      } as V1TournamentFixture,
-      {
-        id: 'f-scheduled',
-        round: '조별 3라운드',
-        status: 'scheduled',
-        homeTeamName: '팀E',
-        awayTeamName: '팀F',
-        result: { homeScore: 0, awayScore: 0, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
-      } as V1TournamentFixture,
     ];
 
-    render(
-      createElement(TournamentPostEventHubSection, {
-        tournamentId: 'tour-42',
-        status: 'in_progress',
-        fixtures,
-        hasAnnouncements: false,
-        sponsorCount: 0,
-        announcements: [],
-        fixtureReviewState: {
-          status: 'ready',
-          items: [
-            {
-              sourceType: 'tournament_fixture',
-              sourceId: 'f1',
-              title: 'TeamMeet Cup · 조별 1라운드',
-              completedAt: '2026-08-14T00:00:00.000Z',
-              targetType: 'team',
-              targetCount: 3,
-              reviewedCount: 1,
-              remainingCount: 2,
-              state: 'ready',
-            },
-            {
-              sourceType: 'tournament_fixture',
-              sourceId: 'f-penalty',
-              title: 'TeamMeet Cup · 결승',
-              completedAt: '2026-08-14T01:00:00.000Z',
-              targetType: 'user',
-              targetCount: 1,
-              reviewedCount: 0,
-              remainingCount: 1,
-              state: 'ready',
-            },
-          ],
-        },
-      }),
-    );
-
-    expect(screen.getByText('대회 현황')).toBeInTheDocument();
-    // 결과·순위처럼 실제로 열린 행만 유지하고, generic 리뷰함 링크와 준비 중 placeholder는 제거한다.
-    expect(screen.queryByText('하이라이트 영상')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /리뷰·매너 기록/ })).not.toBeInTheDocument();
-
-    expect(screen.getByText('리뷰할 수 있는 경기')).toBeInTheDocument();
-    expect(screen.getByText('경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '팀A 대 팀B 경기 남은 리뷰 2개 작성' })).toHaveAttribute(
-      'href',
-      '/my/reviews/tournament_fixture/f1',
-    );
-    expect(screen.getByText('남은 리뷰 2개')).toBeInTheDocument();
-    expect(screen.getByText('2 : 1')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '비공개 대 미정 경기 남은 리뷰 1개 작성' })).toBeInTheDocument();
-    expect(screen.getByText('PK 5 : 4')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /팀C 대 팀D/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /팀E 대 팀F/ })).not.toBeInTheDocument();
+    for (const status of ['in_progress', 'completed'] as const) {
+      const { unmount } = render(
+        createElement(TournamentPostEventHubSection, {
+          tournamentId: 'tour-42',
+          status,
+          fixtures,
+          hasAnnouncements: false,
+          sponsorCount: 0,
+          announcements: [],
+        }),
+      );
+      expect(screen.queryByText('리뷰할 수 있는 경기')).not.toBeInTheDocument();
+      unmount();
+    }
   });
+
 });

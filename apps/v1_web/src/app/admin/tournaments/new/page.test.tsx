@@ -19,6 +19,10 @@ import {
   tournamentCreateReducer,
   validateTournamentCreateStep,
 } from './tournament-create-model';
+import type {
+  TournamentCreateAction,
+  TournamentCreateState,
+} from './tournament-create-model';
 import type { V1Tournament } from '@/types/api';
 
 const routerPush = vi.fn();
@@ -723,5 +727,102 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
     renderPage();
 
     expect(routerReplace).toHaveBeenCalledWith('/admin/tournaments/draft-1');
+  });
+  describe('홍보 카드 사실 문구 자동 채움', () => {
+    /** 날짜·팀 수·장소·총 상금을 넣은 상태 — 홍보 문구의 출처가 되는 앞 단계 값이다. */
+    function stateWithTournamentInfo() {
+      return [
+        { type: 'set-scheduled-at', value: '2026-08-29T09:00' },
+        { type: 'set-field', field: 'scheduledEndAt', value: '2026-08-29T18:00' },
+        { type: 'set-field', field: 'teamCount', value: '16' },
+        { type: 'set-field', field: 'venue', value: '서울월드컵보조경기장' },
+        { type: 'set-field', field: 'prizePool', value: '3000000' },
+      ].reduce<TournamentCreateState>(
+        (state, action) => tournamentCreateReducer(state, action as TournamentCreateAction),
+        INITIAL_TOURNAMENT_CREATE_STATE,
+      );
+    }
+
+    it('앞 단계 대회 정보를 넣으면 두 홍보 카드의 날짜·팀·장소·상금 문구가 채워진다', () => {
+      const state = stateWithTournamentInfo();
+
+      for (const promo of [state.promoHome, state.promoList]) {
+        expect(promo).toMatchObject({
+          dateText: '8/29 (토)',
+          teamsText: '16팀',
+          locationText: '서울월드컵보조경기장',
+          prizeText: '총 상금 3,000,000원',
+        });
+      }
+    });
+
+    it('관리자가 고친 문구는 앞 단계 값을 다시 바꿔도 그대로 둔다', () => {
+      const edited = tournamentCreateReducer(stateWithTournamentInfo(), {
+        type: 'set-promo',
+        slot: 'promoHome',
+        value: { ...stateWithTournamentInfo().promoHome, teamsText: '16개 팀 격돌' },
+      });
+
+      const relocated = tournamentCreateReducer(edited, {
+        type: 'set-field',
+        field: 'venue',
+        value: '수원종합운동장',
+      });
+      const resized = tournamentCreateReducer(relocated, {
+        type: 'set-field',
+        field: 'teamCount',
+        value: '24',
+      });
+
+      expect(resized.promoHome.teamsText).toBe('16개 팀 격돌');
+      expect(resized.promoHome.locationText).toBe('수원종합운동장');
+      // 손대지 않은 목록 카드는 새 값을 그대로 따라간다.
+      expect(resized.promoList.teamsText).toBe('24팀');
+    });
+
+    it('관리자가 빈 칸으로 지운 문구는 다시 채우지 않는다', () => {
+      const cleared = tournamentCreateReducer(stateWithTournamentInfo(), {
+        type: 'set-promo',
+        slot: 'promoList',
+        value: { ...stateWithTournamentInfo().promoList, prizeText: '' },
+      });
+
+      const repriced = tournamentCreateReducer(cleared, {
+        type: 'set-field',
+        field: 'prizePool',
+        value: '5000000',
+      });
+
+      expect(repriced.promoList.prizeText).toBe('');
+      expect(repriced.promoHome.prizeText).toBe('총 상금 5,000,000원');
+    });
+
+    it('"대회 정보로 다시 채우기"는 해당 카드만 현재 대회 정보로 되돌린다', () => {
+      const edited = tournamentCreateReducer(stateWithTournamentInfo(), {
+        type: 'set-promo',
+        slot: 'promoHome',
+        value: {
+          ...stateWithTournamentInfo().promoHome,
+          teamsText: '16개 팀 격돌',
+          locationText: '',
+        },
+      });
+      const editedList = tournamentCreateReducer(edited, {
+        type: 'set-promo',
+        slot: 'promoList',
+        value: { ...edited.promoList, teamsText: '목록 전용 문구' },
+      });
+
+      const reset = tournamentCreateReducer(editedList, {
+        type: 'reset-promo-facts',
+        slot: 'promoHome',
+      });
+
+      expect(reset.promoHome).toMatchObject({
+        teamsText: '16팀',
+        locationText: '서울월드컵보조경기장',
+      });
+      expect(reset.promoList.teamsText).toBe('목록 전용 문구');
+    });
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { ImagePlus } from 'lucide-react';
+import { ImagePlus, RotateCcw } from 'lucide-react';
 import { useId, useRef } from 'react';
 import {
   PromoHomePreview,
@@ -31,6 +31,12 @@ type PromoCardFieldsProps = {
   disabled?: boolean;
   priorityError?: string;
   /**
+   * 날짜/팀/장소/상금 문구를 대회 정보에서 다시 만들어 채운다. 넘기지 않으면 버튼이
+   * 나오지 않는다 — 이미 저장된 대회를 고치는 화면에서는 관리자가 정한 문구를
+   * 임의로 되돌리지 않기 위해 생략한다.
+   */
+  onResetFacts?: () => void;
+  /**
    * 이 자리를 비워뒀을 때 실제로 노출될 기본 이미지 — 보통 대회 커버지만, 커버가 없으면
    * 다른 홍보 자리의 이미지일 수도 있다(resolveTournamentImage 의 폴백 순서). 호출자가 자기
    * 자리를 뺀 폴백 결과를 계산해 넘겨야 미리보기가 공개 화면과 어긋나지 않는다.
@@ -51,6 +57,7 @@ export function PromoCardFields({
   disabled = false,
   priorityError,
   defaultImageUrl,
+  onResetFacts,
 }: PromoCardFieldsProps) {
   const generatedId = useId().replaceAll(':', '');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -83,16 +90,29 @@ export function PromoCardFields({
             저장 전에 실제 카드 형태를 확인할 수 있어요.
           </p>
         </div>
-        <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">
-          <input
-            type="checkbox"
-            checked={value.enabled}
-            onChange={(event) => update('enabled', event.target.checked)}
-            disabled={disabled}
-            className="h-4 w-4"
-          />
-          노출
-        </label>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {onResetFacts ? (
+            <button
+              type="button"
+              onClick={onResetFacts}
+              disabled={disabled}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-xs font-semibold text-[var(--text-body)] disabled:opacity-50"
+            >
+              <RotateCcw size={14} aria-hidden="true" />
+              대회 정보로 다시 채우기
+            </button>
+          ) : null}
+          <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">
+            <input
+              type="checkbox"
+              checked={value.enabled}
+              onChange={(event) => update('enabled', event.target.checked)}
+              disabled={disabled}
+              className="h-4 w-4"
+            />
+            노출
+          </label>
+        </div>
       </div>
 
       <div className="mt-4">

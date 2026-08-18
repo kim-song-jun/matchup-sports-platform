@@ -1601,12 +1601,13 @@ export type V1ReviewReceivedResponse = {
 };
 
 export type V1ReceivedReviewDetail = Omit<V1ReviewDetail, 'reviewerUser' | 'reviewerTeam' | 'submittedAt'> & {
-  /** 신규 대회 리뷰는 작성자 식별자를 절대 내려주지 않는다. */
+  /** 2026-08-18 정책으로 작성자를 공개한다. 남겨둔 이유: 과거 응답과의 호환. */
   anonymous: boolean;
   reviewerUser: V1ReviewActorUser | null;
   reviewerTeam: V1ReviewActorTeam | null;
-  /** 익명 리뷰는 행동 시점으로 작성자를 추정하지 못하도록 제출 시각도 숨긴다. */
   submittedAt: string | null;
+  /** 어느 경기에서 받은 후기인지. 소스를 못 찾으면 null. */
+  source: { sourceType: V1ReviewSourceType; sourceId: string; title: string; completedAt: string | null } | null;
 };
 
 export type V1ReviewerTeam = {

@@ -86,24 +86,27 @@ describe('reviews view model — 대회 경기 리뷰 계약', () => {
       tags: [{ tagCode: 'manner', label: '매너가 좋아요' }],
       status: 'submitted' as const,
       submittedAt: '2026-08-14T12:00:00.000Z' as string | null,
+      source: null as { sourceType: 'tournament_fixture'; sourceId: string; title: string; completedAt: string | null } | null,
     };
     const model = toReviewsReceivedPageModel({
       items: [
-        { ...shared, reviewId: 'anonymous', anonymous: true, reviewerUser: null, reviewerTeam: null, submittedAt: null },
         {
           ...shared,
-          reviewId: 'legacy',
+          reviewId: 'r1',
           anonymous: false,
-          reviewerUser: { userId: 'old-reviewer', name: '기존 작성자', imageUrl: null },
+          reviewerUser: { userId: 'reviewer-1', name: '보낸 사람', imageUrl: null },
           reviewerTeam: null,
+          source: { sourceType: 'tournament_fixture', sourceId: shared.sourceId, title: '여름컵 · 8강 2경기', completedAt: '2026-08-14T12:00:00.000Z' },
         },
       ],
       pageInfo: { nextCursor: null, hasNext: false },
     });
 
-    expect(model.anonymousUserGroups.flatMap((group) => group.reviews).map((review) => review.reviewId)).toEqual(['anonymous']);
-    expect(model.anonymousUserGroups[0]?.meta).toBe('작성자 비공개 · 받은 리뷰 1건');
-    expect(model.legacyUserGroups.flatMap((group) => group.reviews).map((review) => review.reviewId)).toEqual(['legacy']);
+    // "이전 리뷰"(제도 전) 분기는 제거했다 — 받은 리뷰는 한 목록으로 모은다.
+    expect(model.userGroups.flatMap((group) => group.reviews).map((review) => review.reviewId)).toEqual(['r1']);
+    // 카드 제목이 "대회 경기"처럼 종류만 나오면 어느 경기였는지 알 수 없다.
+    expect(model.userGroups[0]?.title).toBe('여름컵 · 8강 2경기');
+    expect(model.userGroups[0]?.meta).toContain('받은 리뷰 1건');
   });
 });
 

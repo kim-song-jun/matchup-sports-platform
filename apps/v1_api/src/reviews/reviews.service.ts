@@ -226,11 +226,17 @@ export class ReviewsService {
     const cursorIndex = query.cursor ? visibleReviews.findIndex((review) => review.id === query.cursor) : -1;
     const pageStart = cursorIndex >= 0 ? cursorIndex + 1 : 0;
     const pageItems = visibleReviews.slice(pageStart, pageStart + limit);
+    const sourceSummaries = await this.reviewSourceSummaries(pageItems);
 
     return {
-      items: pageItems.map((review) => review.sportId === null
-        ? { ...this.toReviewDetail(review), anonymous: false as const }
-        : this.toAnonymousReceivedReview(review)),
+      items: pageItems.map((review) => ({
+        ...this.toReviewDetail(review),
+        // 작성자 닉네임을 공개한다(2026-08-18 정책). 예전에는 보복 우려로 가렸는데, 그 탓에
+        // "누가 언제 어느 경기에서" 남긴 평가인지 전혀 알 수 없어 받은 사람이 맥락을 못 잡았다.
+        anonymous: false as const,
+        // 어느 경기에서 받은 후기인지 — 예전엔 카드 제목이 "팀매치"처럼 종류만 나왔다.
+        source: sourceSummaries.get(`${review.sourceType}:${review.sourceId}`) ?? null,
+      })),
       pageInfo: {
         nextCursor: visibleReviews.length > pageStart + limit ? pageItems.at(-1)?.id ?? null : null,
         hasNext: visibleReviews.length > pageStart + limit,
@@ -880,7 +886,10 @@ export class ReviewsService {
             select: { id: true, title: true, completedAt: true, startAt: true },
           })
         : [],
-      this.tournamentFixtureReviews.sourceSummaries(tournamentFixtureIds),
+      // 빈 배열까지 위임하면 호출부가 대회 픽스처를 하나도 안 보는 경우에도 왕복이 생긴다.
+      tournamentFixtureIds.length
+        ? this.tournamentFixtureReviews.sourceSummaries(tournamentFixtureIds)
+        : new Map<string, ReturnType<typeof sourceSummary>>(),
     ]);
 
     return new Map([
@@ -1187,18 +1196,6 @@ export class ReviewsService {
       tags: review.tags.map((tag) => ({ tagCode: tag.tagCode, label: tag.labelSnapshot })),
       status: review.status,
       submittedAt: toIso(review.submittedAt),
-    };
-  }
-
-  private toAnonymousReceivedReview(review: ReviewWithIncludes) {
-    const detail = this.toReviewDetail(review);
-    return {
-      ...detail,
-      anonymous: true as const,
-      reviewerUser: null,
-      reviewerTeam: null,
-      // 정확한 제출 시각도 상대의 행동 시점과 대조하면 작성자 추정 단서가 된다.
-      submittedAt: null,
     };
   }
 

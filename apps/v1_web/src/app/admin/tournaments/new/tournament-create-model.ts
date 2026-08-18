@@ -16,6 +16,15 @@ import {
   isoToDatetimeLocal,
 } from '@/components/admin/tournaments/tournament-datetime-field';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
+import {
+  applyPromoFactDefaults,
+  buildTournamentPromoFactDefaults,
+  EMPTY_PROMO_FACTS_DIRTY,
+  markChangedPromoFacts,
+  PROMO_FACT_KEYS,
+  type PromoFactKey,
+  type PromoFactsDirty,
+} from '@/lib/tournament-promo-defaults';
 
 export const TOURNAMENT_CREATE_STEPS = [
   { title: '기본 정보', description: '종목과 대회 성격' },
@@ -74,6 +83,11 @@ export type TournamentCreateState = {
   coverImageUrl: string | null;
   promoHome: TournamentPromoCardValue;
   promoList: TournamentPromoCardValue;
+  /**
+   * 홍보 카드의 날짜/팀/장소/상금 문구 중 관리자가 직접 고친 것 — true인 문구는 앞 단계
+   * 값이 바뀌어도 자동 갱신하지 않는다(registrationDeadlineDirty와 같은 규칙).
+   */
+  promoFactsDirty: { promoHome: PromoFactsDirty; promoList: PromoFactsDirty };
 };
 
 const EMPTY_PROMO: TournamentPromoCardValue = {
@@ -130,11 +144,15 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   coverImageUrl: null,
   promoHome: { ...EMPTY_PROMO },
   promoList: { ...EMPTY_PROMO },
+  promoFactsDirty: {
+    promoHome: { ...EMPTY_PROMO_FACTS_DIRTY },
+    promoList: { ...EMPTY_PROMO_FACTS_DIRTY },
+  },
 };
 
 type FormField = Exclude<
   keyof TournamentCreateState,
-  'step' | 'prizeRows' | 'promoHome' | 'promoList'
+  'step' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty'
 >;
 
 export type TournamentCreateAction =
@@ -150,6 +168,8 @@ export type TournamentCreateAction =
       slot: 'promoHome' | 'promoList';
       patch: Partial<TournamentPromoCardValue>;
     }
+  /** 한 홍보 카드의 사실 문구를 앞 단계 값 기준으로 되돌린다("대회 정보로 다시 채우기"). */
+  | { type: 'reset-promo-facts'; slot: 'promoHome' | 'promoList' }
   | { type: 'copy-bank'; bankName: string; bankAccount: string; bankHolder: string }
   /** 초안 생성/수정 성공 직후 — draftId를 고정하고 확인 단계로 넘어간다. */
   | { type: 'draft-created'; tournament: V1Tournament }
@@ -170,7 +190,7 @@ export function tournamentCreateReducer(
       if (action.field === 'sportId' && action.value !== state.sportId) {
         return { ...state, sportId: action.value as string, lineupMaxPlayers: '' };
       }
-      return { ...state, [action.field]: action.value };
+      return syncPromoFacts({ ...state, [action.field]: action.value }, action.field);
     case 'set-scheduled-at': {
       const registrationDeadlineAt = state.registrationDeadlineDirty
         ? state.registrationDeadlineAt
@@ -178,7 +198,10 @@ export function tournamentCreateReducer(
       const rosterDeadlineAt = state.rosterDeadlineDirty
         ? state.rosterDeadlineAt
         : suggestDeadline(action.value, 7);
-      return { ...state, scheduledAt: action.value, registrationDeadlineAt, rosterDeadlineAt };
+      return syncPromoFacts(
+        { ...state, scheduledAt: action.value, registrationDeadlineAt, rosterDeadlineAt },
+        'scheduledAt',
+      );
     }
     case 'set-registration-deadline':
       return {
@@ -191,9 +214,26 @@ export function tournamentCreateReducer(
     case 'set-prize-rows':
       return { ...state, prizeRows: action.rows };
     case 'set-promo':
-      return { ...state, [action.slot]: action.value };
+      return withPromoValue(state, action.slot, action.value);
     case 'patch-promo':
-      return { ...state, [action.slot]: { ...state[action.slot], ...action.patch } };
+      return withPromoValue(state, action.slot, { ...state[action.slot], ...action.patch });
+    case 'reset-promo-facts': {
+      const cleared: TournamentCreateState = {
+        ...state,
+        promoFactsDirty: {
+          ...state.promoFactsDirty,
+          [action.slot]: { ...EMPTY_PROMO_FACTS_DIRTY },
+        },
+      };
+      return {
+        ...cleared,
+        [action.slot]: applyPromoFactDefaults(
+          cleared[action.slot],
+          buildTournamentPromoFactDefaults(cleared),
+          EMPTY_PROMO_FACTS_DIRTY,
+        ),
+      };
+    }
     case 'copy-bank':
       return {
         ...state,
@@ -212,6 +252,67 @@ export function tournamentCreateReducer(
   }
 }
 
+/** buildTournamentPromoFactDefaults의 입력이 되는 앞 단계 필드 — 이 값이 바뀌면 문구를 다시 만든다. */
+const PROMO_FACT_SOURCE_FIELDS = [
+  'scheduledAt',
+  'scheduledEndAt',
+  'venue',
+  'prizePool',
+  'prizeSummary',
+] as const;
+
+/**
+ * 앞 단계 값이 바뀐 뒤, 관리자가 손대지 않은 홍보 문구를 새 값으로 다시 채운다.
+ * changedField를 주면 그 필드가 홍보 문구의 출처일 때만 동작하고, 생략하면 항상 다시 채운다.
+ */
+function syncPromoFacts(
+  state: TournamentCreateState,
+  changedField?: keyof TournamentCreateState,
+): TournamentCreateState {
+  if (changedField && !(PROMO_FACT_SOURCE_FIELDS as readonly string[]).includes(changedField)) {
+    return state;
+  }
+  const defaults = buildTournamentPromoFactDefaults(state);
+  const promoHome = applyPromoFactDefaults(state.promoHome, defaults, state.promoFactsDirty.promoHome);
+  const promoList = applyPromoFactDefaults(state.promoList, defaults, state.promoFactsDirty.promoList);
+  if (promoHome === state.promoHome && promoList === state.promoList) return state;
+  return { ...state, promoHome, promoList };
+}
+
+/** 홍보 카드 값을 교체하면서, 관리자가 직접 바꾼 사실 문구를 dirty로 표시한다. */
+function withPromoValue(
+  state: TournamentCreateState,
+  slot: 'promoHome' | 'promoList',
+  value: TournamentPromoCardValue,
+): TournamentCreateState {
+  const dirty = markChangedPromoFacts(state[slot], value, state.promoFactsDirty[slot]);
+  if (dirty === state.promoFactsDirty[slot]) return { ...state, [slot]: value };
+  return {
+    ...state,
+    [slot]: value,
+    promoFactsDirty: { ...state.promoFactsDirty, [slot]: dirty },
+  };
+}
+
+/**
+ * 서버에 저장돼 있던 문구가 "관리자가 정한 값"인지 판정한다.
+ *
+ * 이 위저드는 자동으로 채운 문구도 그대로 저장하므로, 저장돼 있다는 사실만으로는 관리자가
+ * 손댔는지 알 수 없다. 대신 지금 대회 정보로 만든 파생값과 대조한다 — 같으면 자동으로
+ * 채워진 그대로이므로 dirty가 아니고(초안 저장·새로고침 뒤에도 자동 갱신이 이어진다),
+ * 다르면 관리자가 고쳤거나 지운 것이므로 dirty다.
+ */
+function dirtyFromSavedPromo(
+  saved: Record<PromoFactKey, string>,
+  defaults: Record<PromoFactKey, string>,
+): PromoFactsDirty {
+  const dirty = { ...EMPTY_PROMO_FACTS_DIRTY };
+  for (const key of PROMO_FACT_KEYS) {
+    if (saved[key].trim() !== defaults[key]) dirty[key] = true;
+  }
+  return dirty;
+}
+
 /**
  * V1Tournament(서버 응답) → 위저드 폼 필드. 새로고침으로 `?draftId=`만 남았을 때 폼 전체를
  * 되살리는 데 쓴다(뒤로가기 없이 "이전"으로 3단계를 다시 열어도 값이 비어 있지 않아야 한다).
@@ -226,7 +327,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       }))
     : INITIAL_TOURNAMENT_CREATE_STATE.prizeRows;
 
-  return {
+  const restored: TournamentCreateState = {
     ...INITIAL_TOURNAMENT_CREATE_STATE,
     draftId: tournament.id,
     sportId: tournament.sportId,
@@ -288,6 +389,29 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       priority: String(tournament.promoListPriority),
     },
   };
+
+  const defaults = buildTournamentPromoFactDefaults(restored);
+  return syncPromoFacts({
+    ...restored,
+    promoFactsDirty: {
+      promoHome: dirtyFromSavedPromo(
+        {
+          dateText: tournament.promoHomeDateText ?? '',
+          locationText: tournament.promoHomeLocationText ?? '',
+          prizeText: tournament.promoHomePrizeText ?? '',
+        },
+        defaults,
+      ),
+      promoList: dirtyFromSavedPromo(
+        {
+          dateText: tournament.promoListDateText ?? '',
+          locationText: tournament.promoListLocationText ?? '',
+          prizeText: tournament.promoListPrizeText ?? '',
+        },
+        defaults,
+      ),
+    },
+  });
 }
 
 /**

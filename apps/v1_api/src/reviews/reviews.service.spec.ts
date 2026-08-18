@@ -1588,3 +1588,75 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
     );
   });
 });
+
+/**
+ * 오너 요청(2026-08-18) — 팀 상세에서 **그 팀이 받은 후기**를 누구나 보게 한다. 기존
+ * `receivedSummary` 는 "로그인한 나"가 받은 것이라 남의 팀 상세에 쓰면 내 후기를 그 팀
+ * 평가인 양 보여준다. 공개 경로는 팀 id 로 직접 집계하되, **공개 게이트는 동일**해야 한다 —
+ * 이 경로만 느슨하면 아직 공개되면 안 되는 상호평가가 새어 나가는 구멍이 된다.
+ */
+describe('publicTeamSummary — 공개 팀 후기 요약', () => {
+  function stubs() {
+    return {
+      tournamentFixtureReviews: { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() },
+    };
+  }
+
+  it('그 팀이 받은 후기만 집계하고, 로그인 사용자의 팀 목록을 조회하지 않는다', async () => {
+    const submittedAt = new Date('2026-08-01T00:00:00Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-01T01:00:00Z'));
+    try {
+      const findMany = jest
+        .fn()
+        .mockResolvedValueOnce([
+          { sourceId: 'tm1', reviewerUserId: 'user-p', reviewerTeamId: 'team-a', targetUserId: null, targetTeamId: 'team-x', rating: 4, sportId: 'futsal', submittedAt, tags: [] },
+        ])
+        .mockResolvedValueOnce([{ sourceId: 'tm1', reviewerTeamId: 'team-x', targetTeamId: 'team-a' }]);
+      const membershipFindMany = jest.fn();
+      const prisma = {
+        v1PostEventReview: { findMany },
+        // 공개 경로는 "내가 속한 팀"을 물을 필요가 없다 — 물었다면 로그인 의존이 남아 있다는 뜻이다.
+        v1TeamMembership: { findMany: membershipFindMany },
+        v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
+      };
+      const service = new ReviewsService(prisma as never, stubs().tournamentFixtureReviews as never, adminContextStub());
+
+      const result = await service.publicTeamSummary('team-x');
+
+      expect(membershipFindMany).not.toHaveBeenCalled();
+      // 대상 필터가 팀 id 로 직접 걸려야 한다.
+      expect(findMany.mock.calls[0][0].where).toMatchObject({ targetTeamId: 'team-x', targetType: 'team' });
+      expect(result.bySport).toEqual([
+        { sportId: 'futsal', sportCode: 'futsal', ratingAvg: 4, ratingCount: 1, tagRates: [] },
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('상대가 아직 안 썼고 유예 시간도 안 지난 후기는 공개 경로에서도 빠진다', async () => {
+    const submittedAt = new Date('2026-08-01T00:00:00Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-01T01:00:00Z')); // 유예 시간 미경과
+    try {
+      const findMany = jest
+        .fn()
+        .mockResolvedValueOnce([
+          { sourceId: 'tm1', reviewerUserId: 'user-p', reviewerTeamId: 'team-a', targetUserId: null, targetTeamId: 'team-x', rating: 5, sportId: 'futsal', submittedAt, tags: [] },
+        ])
+        // 반대 방향 후기 없음 → 아직 공개 시점이 아니다
+        .mockResolvedValueOnce([]);
+      const prisma = {
+        v1PostEventReview: { findMany },
+        v1TeamMembership: { findMany: jest.fn() },
+        v1Sport: { findMany: jest.fn().mockResolvedValue([]) },
+      };
+      const service = new ReviewsService(prisma as never, stubs().tournamentFixtureReviews as never, adminContextStub());
+
+      const result = await service.publicTeamSummary('team-x');
+
+      expect(result.bySport).toEqual([]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

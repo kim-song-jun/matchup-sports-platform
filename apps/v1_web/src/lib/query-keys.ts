@@ -43,6 +43,8 @@ export const v1Keys = {
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,
   reviewsReceivedSummary: (targetType: 'user' | 'team', period?: string) => [...v1Keys.all, 'reviews', 'received', 'summary', targetType, period ?? 'all'] as const,
+  /** 공개 팀 후기 요약 — 로그인 사용자와 무관하게 팀 id 로만 캐시된다. */
+  publicTeamReviews: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'reviews'] as const,
   chatRooms: () => [...v1Keys.all, 'chat', 'rooms'] as const,
   chatRoom: (roomId: string) => [...v1Keys.chatRooms(), roomId] as const,
   chatMessages: (roomId: string) => [...v1Keys.chatRoom(roomId), 'messages'] as const,

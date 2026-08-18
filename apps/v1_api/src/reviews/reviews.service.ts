@@ -1329,12 +1329,21 @@ function resolveReviewerTeamIds(teamIds: string[], hostTeamId: string, approvedA
 
 // 작성 주체가 사람이므로 키에는 팀이 들어가지 않는다 — 조회 자체가 reviewerUserId로 좁혀져 있다.
 /**
- * 상대 "팀" 후기를 쓸 수 있는 역할. 대회 경기 경로
- * (tournament-fixture-reviews.service.ts canReviewOpponentTeam)와 같은 규칙을 쓴다 —
+ * 상대 "팀" 후기를 쓸 수 있는 역할.
+ *
+ * 2026-08-18 사용자 결정으로 **모든 참가 멤버**에게 열었다. 그 전에는 owner/manager 만
+ * 쓸 수 있었는데(2026-08-14 역할 규칙), 후기 화면을 "상대 팀 평가가 기본, 선수는 선택"으로
+ * 바꾸면서 팀원에게는 기본 대상이 하나도 없는 화면이 남기 때문이다.
+ *
+ * 팀 평점이 인원 많은 팀 쪽으로 기우는 문제는 생기지 않는다 — 팀 후기는 사람 기준으로
+ * 1인 1건이고(같은 경기에 같은 사람이 두 번 못 씀), 평점은 팀 단위 평균이 아니라 개별
+ * 항목으로 노출된다.
+ *
+ * 대회 경기 경로(tournament-fixture-reviews.service.ts)와 **같은 규칙**을 유지해야 한다 —
  * 두 곳이 갈리면 같은 사용자가 대회에서는 되고 팀매치에서는 안 되는 모순이 생긴다.
  */
-function canReviewOpponentTeam(role: V1TeamMembershipRole) {
-  return role === 'owner' || role === 'manager';
+function canReviewOpponentTeam(_role: V1TeamMembershipRole) {
+  return true;
 }
 
 function teamReviewKey(sourceId: string, targetTeamId: string) {

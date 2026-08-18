@@ -5,6 +5,8 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { assertPenaltyShootoutConcluded } from '../../games/core/penalty-shootout-outcome';
+import { parseResultPolicy } from '../../tournaments/competition-config/competition-config.parse';
 import {
   Prisma,
   V1GameEventType,
@@ -1136,7 +1138,25 @@ export class TournamentResultReviewService {
     }
     const facts = await readKnockoutFixtureFacts(tx, game.tournamentFixtureId);
     if (submitted !== undefined) {
-      return assertPenaltiesNotAllowed(regulation, submitted, facts);
+      // 클라이언트가 킥 수·우회 표식을 빠뜨렸으면 **base 에서 메운다.** 정정 폼에는
+      // 승부차기 입력란이 아예 없어(2026-08-18 실측: 폼 필드 186개 중 0개) 폼이 보내는
+      // 값은 언제나 base 를 재조립한 것인데, 재조립이 세 키만 옮기면 정정 한 번에
+      // 킥 수와 "우회로 닫았다"는 감사 기록이 **영구히 사라진다**(되살릴 화면이 없다).
+      //
+      // 점수가 base 와 다를 때는 메우지 않는다 — 그때의 base 킥 수는 다른 승부차기를
+      // 설명하는 값이라, 옮기면 `home <= takenHome` 같은 불변식이 조용히 깨진다.
+      const carriedOver = this.carryPenaltyAuditFields(submitted, baseScore);
+      const applied = assertPenaltiesNotAllowed(regulation, carriedOver, facts);
+      // 정정 레인에도 **결판 판정을 건다.** 예전에는 이 레인이 `assertPenaltiesNotAllowed`
+      // 하나만 통과시켜, `end` 가 422 로 막는 값(킥 수가 말이 안 되는 승부차기)을 정정으로는
+      // 그대로 저장할 수 있었다 — 게이트를 한 레인에만 달면 다른 레인이 우회로가 된다.
+      // 킥 수가 없는 레거시 승계는 `assertPenaltyShootoutConcluded` 가 그대로 통과시킨다.
+      const config = await tx.v1CompetitionConfigVersion.findUnique({
+        where: { id: game.competitionConfigVersionId },
+        select: { result: true },
+      });
+      assertPenaltyShootoutConcluded(carriedOver, parseResultPolicy(config?.result ?? null));
+      return applied;
     }
     // 승계는 "무승부를 그대로 두면 브래킷이 멈추는" 픽스처에서만 한다
     // (`requiresDecisiveResult` — `assertBracketResolvable`과 **같은** 술어).
@@ -1156,6 +1176,30 @@ export class TournamentResultReviewService {
     // 해결 불가한 무승부로 거부된다(`assertBracketResolvable`의 동점 분기).
     assertBracketResolvable({ ...regulation, penalties: carried }, facts);
     return assertPenaltiesNotAllowed(regulation, carried, facts);
+  }
+
+  /**
+   * 정정이 보낸 승부차기에 킥 수·우회 표식이 없으면 base 리비전에서 메운다.
+   *
+   * 왜 서버가 메우나 — 이 값들은 **정정 화면이 되살릴 수 없는 정보**다. 폼에 승부차기
+   * 입력란이 없으므로 운영자는 다시 입력할 수단이 없고, 한 번 떨어지면 이후 모든 정정에서
+   * 서버가 결판을 판정할 근거도 함께 사라진다. 클라이언트를 고치는 것과 별개로 서버가
+   * 마지막 방어선을 갖는다 — 옛 번들을 띄워 둔 탭 하나가 감사 기록을 지울 수 있어서다.
+   *
+   * **점수가 같을 때만** 메운다. 점수가 다르면 base 의 킥 수는 다른 승부차기를 설명하는
+   * 값이라, 그대로 옮기면 "성공 수가 시도 수를 넘는" 조합이 조용히 만들어진다.
+   */
+  private carryPenaltyAuditFields(submitted: StoredPenalties, baseScore: Prisma.JsonValue): StoredPenalties {
+    if (submitted.takenHome !== undefined && submitted.takenAway !== undefined) return submitted;
+    const base = readStoredPenalties(baseScore);
+    if (base === undefined) return submitted;
+    if (base.home !== submitted.home || base.away !== submitted.away) return submitted;
+    const counts =
+      base.takenHome !== undefined && base.takenAway !== undefined
+        ? { takenHome: base.takenHome, takenAway: base.takenAway }
+        : {};
+    const override = base.operatorOverride === true ? { operatorOverride: true as const } : {};
+    return { ...submitted, ...counts, ...override };
   }
 
   /**

@@ -161,19 +161,35 @@ function toEditable(record: GameResultParticipantRecord): EditableParticipant {
  */
 function readSubmittablePenalties(raw: unknown): GameResultScoreInput['penalties'] | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
-  const { home, away, firstKickSideKey } = raw as {
+  const { home, away, firstKickSideKey, takenHome, takenAway, operatorOverride } = raw as {
     home?: unknown;
     away?: unknown;
     firstKickSideKey?: unknown;
+    takenHome?: unknown;
+    takenAway?: unknown;
+    operatorOverride?: unknown;
   };
   if (typeof home !== 'number' || !Number.isInteger(home) || home < 0) return null;
   if (typeof away !== 'number' || !Number.isInteger(away) || away < 0) return null;
   // 동점 승부차기는 승자를 못 가리므로 서버가 422 `TOURNAMENT_PENALTY_INVALID` 로 막는다.
   if (home === away) return null;
-  if (firstKickSideKey === 'HOME' || firstKickSideKey === 'AWAY') {
-    return { home, away, firstKickSideKey };
-  }
-  return { home, away };
+  const side: { firstKickSideKey?: 'HOME' | 'AWAY' } =
+    firstKickSideKey === 'HOME' || firstKickSideKey === 'AWAY' ? { firstKickSideKey } : {};
+  // 킥 수와 우회 표식도 **함께 옮긴다.** 이 화면에는 승부차기 입력란이 아예 없어서
+  // (2026-08-18 실측: 폼 필드 186개 중 0개) 여기서 떨어뜨리면 운영자가 되살릴 수단이 없고,
+  // 정정 한 번에 "이 결과는 규칙과 다르게 닫혔다"는 감사 기록이 영구히 사라진다.
+  // 킥 수는 둘 다 유효할 때만 옮긴다 — 한쪽만 옮기면 어느 팀이 몇 번 찼는지 모르는 채로
+  // 서버 판정이 돌아간다.
+  const countsValid =
+    typeof takenHome === 'number' &&
+    Number.isInteger(takenHome) &&
+    takenHome >= home &&
+    typeof takenAway === 'number' &&
+    Number.isInteger(takenAway) &&
+    takenAway >= away;
+  const counts = countsValid ? { takenHome, takenAway } : {};
+  const override = operatorOverride === true ? { operatorOverride: true } : {};
+  return { home, away, ...side, ...counts, ...override };
 }
 
 /** 숫자 입력 정규화 -- 서버 `GameScoreDto`/`GameResultParticipantDto` 의 숫자 필드는

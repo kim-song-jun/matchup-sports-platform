@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ShieldOff } from 'lucide-react';
 import { useV1AdminMe } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
@@ -74,7 +75,20 @@ interface AdminGateProps {
   children: ReactNode;
 }
 
+/**
+ * 본문 폭 상한을 푸는 화면 목록.
+ *
+ * 대진 관리는 라운드·번호·홈·어웨이·결과 + 액션 3개가 한 행이라, 1200px 안에서는 조가 커질수록
+ * 세로로만 길어져 한눈에 안 들어온다(8팀 조 = 28경기). 어드민 기본값을 넓히지 않는 이유는
+ * 나머지 화면 대부분이 폼·문단이라 한 줄이 길어지면 오히려 읽기 어려워지기 때문이다.
+ */
+export function isWideAdminRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return /^\/admin\/tournaments\/[^/]+\/bracket(\/|$)/.test(pathname);
+}
+
 export function AdminGate({ children }: AdminGateProps) {
+  const pathname = usePathname();
   const { data, isPending, isError, error, refetch } = useV1AdminMe();
 
   if (isPending) {
@@ -102,6 +116,7 @@ export function AdminGate({ children }: AdminGateProps) {
       adminName={adminName}
       adminRoleLabel={roleLabel}
       canManageAdmins={data.adminRole === 'owner'}
+      wide={isWideAdminRoute(pathname)}
     >
       {children}
     </AdminShell>

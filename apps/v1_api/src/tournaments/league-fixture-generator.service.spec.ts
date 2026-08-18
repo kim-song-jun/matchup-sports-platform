@@ -53,8 +53,20 @@ describe('assertLeagueGenerationAllowed', () => {
     ).not.toThrow();
   });
 
-  it('리그가 아닌 대회면 거부한다', () => {
+  it('순수 토너먼트 대회면 거부한다 — 브래킷 대진은 조 순위에서 뽑아야 한다', () => {
     expect(() => assertLeagueGenerationAllowed({ ...base, format: 'knockout' }))
+      .toThrow(UnprocessableEntityException);
+  });
+
+  // 조별리그+토너먼트의 조 단계는 리그와 대진 규칙이 같은데도 format 검사에서 먼저 막혀
+  // 8팀 조 28경기를 손으로 넣어야 했다.
+  it('조별리그+토너먼트 대회의 조 단계는 허용한다', () => {
+    expect(() => assertLeagueGenerationAllowed({ ...base, format: 'group_knockout' })).not.toThrow();
+  });
+
+  // 다만 결선 조는 여전히 막는다 — 진출팀 결정은 이 생성기가 할 일이 아니다.
+  it('조별리그+토너먼트라도 결선 조에서는 거부한다', () => {
+    expect(() => assertLeagueGenerationAllowed({ ...base, format: 'group_knockout', groupPhase: 'semi' }))
       .toThrow(UnprocessableEntityException);
   });
 

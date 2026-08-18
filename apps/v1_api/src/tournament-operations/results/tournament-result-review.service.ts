@@ -28,6 +28,7 @@ import {
   needsKnockoutFixtureFacts,
   readStoredPenalties,
   requiresDecisiveResult,
+  type StoredPenalties,
 } from '../../games/core/knockout-penalties';
 import { readKnockoutFixtureFacts } from '../../tournaments/knockout-fixture';
 import {
@@ -121,7 +122,10 @@ function jsonObject(value: Prisma.JsonValue): Record<string, unknown> {
 // result-revision draft in this file: only `supersedeAndSubmit`
 // (tournament resubmission after reject/request_supplement) today.
 type ResultRevisionContentInput = {
-  score: { home: number; away: number; penalties?: { home: number; away: number } };
+  // `penalties`의 모양을 손으로 다시 적지 않는다 — 같은 모양을 여러 곳에 적어 두면
+  // 새 키(예: `firstKickSideKey`)가 중간 레인에서 조용히 떨어진다. 단일 소스는
+  // `GameScore['penalties']`(= `StoredPenalties`)다.
+  score: { home: number; away: number; penalties?: StoredPenalties };
   actualParticipants: ReadonlyArray<{
     participantId: string;
     sideId: string;
@@ -1096,11 +1100,12 @@ export class TournamentResultReviewService {
    *
    * ## base 리비전의 승부차기 승계 (이게 없으면 정정 자체가 막힌다)
    *
-   * 정정·재제출 폼은 **항상 평평한 `{home, away}`만 보낸다** — 여분 필드를
-   * 실으면 `GameScoreDto`의 `forbidNonWhitelisted`에 걸려 400이 나기 때문이고
-   * (`result-edit-modal.tsx`의 `onConfirm` 주석, 알파 실측), 클라이언트 타입
-   * `V1GameResultScoreInput`에는 penalties 필드가 아예 없다. 한편 `end` 레인이
-   * 이미 결선 무승부를 막으므로 **공식이 된 결선 무승부 경기는 예외 없이
+   * 정정·재제출 폼은 승부차기를 **보낼 수도, 생략할 수도 있다.** 예전에는 폼이 평평한
+   * `{home, away}`만 보냈고(여분 필드는 `GameScoreDto`의 `forbidNonWhitelisted`에 걸려
+   * 400이었다 — 알파 실측) 클라이언트 타입 `V1GameResultScoreInput`에 penalties 필드
+   * 자체가 없었지만, 지금은 `PenaltyScoreDto`에 선언된 키(`home`/`away`/`firstKickSideKey`)를
+   * 그대로 실어 보낸다(`result-edit-modal.tsx`의 `readSubmittablePenalties`). 한편 `end`
+   * 레인이 이미 결선 무승부를 막으므로 **공식이 된 결선 무승부 경기는 예외 없이
    * `score.penalties`를 갖는다.**
    *
    * 그래서 클라이언트가 penalties를 생략했다는 사실만으로 3단계를 적용하면,
@@ -1120,7 +1125,7 @@ export class TournamentResultReviewService {
     tx: Transaction,
     game: LockedTournamentGame,
     baseScore: Prisma.JsonValue,
-    score: { home: number; away: number; penalties?: { home: number; away: number } },
+    score: { home: number; away: number; penalties?: StoredPenalties },
   ): Promise<GameScore> {
     const submitted = extractEndPenalties({ penalties: score.penalties });
     const regulation: GameScore = { home: score.home, away: score.away };

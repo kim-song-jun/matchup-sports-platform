@@ -351,6 +351,35 @@ describe('ResultEditModal — 승부차기(penalties) 점수 보존', () => {
 
     expect(onConfirm.mock.calls[0][0].score.penalties).toEqual({ home: 2, away: 1 });
   });
+
+  /**
+   * 선축(`firstKickSideKey`)도 **여분 키가 아니라 허용 키**다 -- 정정 한 번으로 사라지면
+   * 안 된다.
+   *
+   * `readSubmittablePenalties` 는 통과한 값을 `{home, away}` 로 **다시 만들어서** 돌려준다
+   * (바로 위 테스트가 지키는 계약: 레거시 여분 키를 떨어뜨린다). 그 재조립이 선축까지 함께
+   * 지우기 때문에, 승부차기로 승자가 갈린 결선 경기를 한 번만 정정해도 "누가 먼저 찼는지"가
+   * 영구히 사라진다 -- 폼에는 선축 입력란이 없으므로 되살릴 수단도 없다. 위 `note: 'legacy'`
+   * 테스트가 계속 초록인 채로 이 테스트만 빨간 것이, 고쳐야 할 것이 "여분 키 필터 자체"가
+   * 아니라 **허용 키 목록**이라는 증거다.
+   */
+  it('선축(firstKickSideKey)은 여분 키가 아니라 허용 키다 -- 정정에서 살아서 나간다', () => {
+    const { onConfirm } = submitEdit(
+      {
+        score: { home: 1, away: 1, penalties: { home: 5, away: 4, firstKickSideKey: 'AWAY' } },
+      },
+      ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '어시스트만 정정' } });
+        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      },
+      { isKnockoutFixture: true },
+    );
+
+    const submittedScore = onConfirm.mock.calls[0][0].score;
+    expect(submittedScore.penalties).toEqual({ home: 5, away: 4, firstKickSideKey: 'AWAY' });
+    // 선축이 허용 키가 돼도 스냅샷 전용 필드는 여전히 떨어져야 한다(서버 whitelist).
+    expectNoForbiddenScoreKeys(submittedScore);
+  });
 });
 
 /**

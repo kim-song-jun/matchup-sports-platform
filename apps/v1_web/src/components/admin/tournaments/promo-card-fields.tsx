@@ -1,6 +1,6 @@
 'use client';
 
-import { ImagePlus } from 'lucide-react';
+import { ImagePlus, RotateCcw } from 'lucide-react';
 import { useId, useRef } from 'react';
 import {
   PromoHomePreview,
@@ -31,6 +31,12 @@ type PromoCardFieldsProps = {
   disabled?: boolean;
   priorityError?: string;
   /**
+   * 날짜/장소/상금 문구를 대회 정보에서 다시 만들어 채운다. 넘기지 않으면 버튼이
+   * 나오지 않는다 — 이미 저장된 대회를 고치는 화면에서는 관리자가 정한 문구를
+   * 임의로 되돌리지 않기 위해 생략한다.
+   */
+  onResetFacts?: () => void;
+  /**
    * 이 자리를 비워뒀을 때 실제로 노출될 기본 이미지 — 보통 대회 커버지만, 커버가 없으면
    * 다른 홍보 자리의 이미지일 수도 있다(resolveTournamentImage 의 폴백 순서). 호출자가 자기
    * 자리를 뺀 폴백 결과를 계산해 넘겨야 미리보기가 공개 화면과 어긋나지 않는다.
@@ -51,6 +57,7 @@ export function PromoCardFields({
   disabled = false,
   priorityError,
   defaultImageUrl,
+  onResetFacts,
 }: PromoCardFieldsProps) {
   const generatedId = useId().replaceAll(':', '');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -83,16 +90,29 @@ export function PromoCardFields({
             저장 전에 실제 카드 형태를 확인할 수 있어요.
           </p>
         </div>
-        <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">
-          <input
-            type="checkbox"
-            checked={value.enabled}
-            onChange={(event) => update('enabled', event.target.checked)}
-            disabled={disabled}
-            className="h-4 w-4"
-          />
-          노출
-        </label>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {onResetFacts ? (
+            <button
+              type="button"
+              onClick={onResetFacts}
+              disabled={disabled}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-xs font-semibold text-[var(--text-body)] disabled:opacity-50"
+            >
+              <RotateCcw size={14} aria-hidden="true" />
+              날짜·장소·상금 다시 채우기
+            </button>
+          ) : null}
+          <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">
+            <input
+              type="checkbox"
+              checked={value.enabled}
+              onChange={(event) => update('enabled', event.target.checked)}
+              disabled={disabled}
+              className="h-4 w-4"
+            />
+            노출
+          </label>
+        </div>
       </div>
 
       <div className="mt-4">
@@ -104,79 +124,106 @@ export function PromoCardFields({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field id={`${prefix}-title`} label="카드 제목">
+        <Field id={`${prefix}-title`} label="카드 제목" hint="비우면 대회 이름이 그대로 나와요.">
           <input
             id={`${prefix}-title`}
             value={value.title}
             onChange={(event) => update('title', event.target.value)}
             disabled={disabled}
             maxLength={120}
+            aria-describedby={`${prefix}-title-hint`}
+            placeholder={fallback.title || '대회 이름'}
             className={inputClass}
           />
         </Field>
-        <Field id={`${prefix}-badge`} label="배지">
+        <Field id={`${prefix}-badge`} label="배지" hint="카드 맨 위 작은 라벨. 비우면 '추천 대회'가 나와요.">
           <input
             id={`${prefix}-badge`}
             value={value.badgeText}
             onChange={(event) => update('badgeText', event.target.value)}
             disabled={disabled}
             maxLength={60}
+            aria-describedby={`${prefix}-badge-hint`}
+            placeholder="추천 대회"
             className={inputClass}
           />
         </Field>
         <div className="sm:col-span-2">
-          <Field id={`${prefix}-subtitle`} label="소개 문구">
+          <Field
+            id={`${prefix}-subtitle`}
+            label="소개 문구"
+            hint="제목 아래 한 줄. 비우면 대회 장소가 대신 나와요."
+          >
             <input
               id={`${prefix}-subtitle`}
               value={value.subtitle}
               onChange={(event) => update('subtitle', event.target.value)}
               disabled={disabled}
               maxLength={300}
+              aria-describedby={`${prefix}-subtitle-hint`}
               className={inputClass}
             />
           </Field>
         </div>
-        <Field id={`${prefix}-date`} label="날짜 문구">
+        <Field id={`${prefix}-date`} label="날짜 문구" hint="대회 일정에서 자동으로 채워요.">
           <input
             id={`${prefix}-date`}
             value={value.dateText}
             onChange={(event) => update('dateText', event.target.value)}
             disabled={disabled}
             maxLength={120}
+            aria-describedby={`${prefix}-date-hint`}
             className={inputClass}
           />
         </Field>
-        <Field id={`${prefix}-teams`} label="팀 문구">
+        <Field
+          id={`${prefix}-teams`}
+          label="강조 문구"
+          hint="날짜와 장소 사이에 들어가는 자유 문구예요. 비워도 돼요."
+        >
           <input
             id={`${prefix}-teams`}
             value={value.teamsText}
             onChange={(event) => update('teamsText', event.target.value)}
             disabled={disabled}
             maxLength={120}
+            aria-describedby={`${prefix}-teams-hint`}
+            placeholder="예: 마감임박 · 16팀 참가"
             className={inputClass}
           />
         </Field>
-        <Field id={`${prefix}-location`} label="장소 문구">
+        <Field id={`${prefix}-location`} label="장소 문구" hint="대회 장소에서 자동으로 채워요.">
           <input
             id={`${prefix}-location`}
             value={value.locationText}
             onChange={(event) => update('locationText', event.target.value)}
             disabled={disabled}
             maxLength={120}
+            aria-describedby={`${prefix}-location-hint`}
             className={inputClass}
           />
         </Field>
-        <Field id={`${prefix}-prize`} label="상금 문구">
+        <Field
+          id={`${prefix}-prize`}
+          label="상금 문구"
+          hint="상품 및 상금 요약에서 자동으로 채워요."
+        >
           <input
             id={`${prefix}-prize`}
             value={value.prizeText}
             onChange={(event) => update('prizeText', event.target.value)}
             disabled={disabled}
             maxLength={160}
+            aria-describedby={`${prefix}-prize-hint`}
             className={inputClass}
           />
         </Field>
-        <Field id={`${prefix}-priority`} label="노출 우선순위" error={priorityError}>
+        <Field
+          id={`${prefix}-priority`}
+          label="노출 우선순위"
+          hint="숫자가 클수록 위에 나와요."
+          error={priorityError}
+        >
           <input
             id={`${prefix}-priority`}
             type="number"
@@ -186,6 +233,7 @@ export function PromoCardFields({
             value={value.priority}
             onChange={(event) => update('priority', event.target.value)}
             disabled={disabled}
+            aria-describedby={`${prefix}-priority-hint`}
             aria-invalid={Boolean(priorityError)}
             className={inputClass}
           />
@@ -257,11 +305,14 @@ export function PromoCardFields({
 function Field({
   id,
   label,
+  hint,
   error,
   children,
 }: {
   id: string;
   label: string;
+  /** 이 칸을 비웠을 때 무엇이 나오는지 / 어디에 쓰이는지 — 입력과 aria-describedby로 잇는다. */
+  hint?: string;
   error?: string;
   children: React.ReactNode;
 }) {
@@ -271,6 +322,11 @@ function Field({
         {label}
       </label>
       {children}
+      {hint ? (
+        <p id={`${id}-hint`} className="text-xs text-[var(--text-caption)]">
+          {hint}
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="text-xs font-medium text-[var(--red500)]">
           {error}

@@ -64,6 +64,31 @@ export function formatTournamentDateTimeShort(dateStr: string | null | undefined
 }
 
 /**
+ * 홍보 슬롯용 중간 형식: 'M월 D일 (요일)'
+ * 홈·대회 목록 홍보 카드처럼 한눈에 읽혀야 하는 자리에서 사용해요 — 연도는 빼고
+ * 월/일을 한글로 적어 compact 형식('M/D (요일)')보다 잘 읽힌다.
+ * dateStr 이 없거나 invalid 이면 null 반환.
+ */
+export function formatTournamentDateMedium(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`;
+}
+
+/** 여러 날에 걸친 대회를 'M월 D일 (요일)~M월 D일 (요일)'로 적는다. 하루면 시작일만 준다. */
+export function formatTournamentDateRangeMedium(
+  startStr: string | null | undefined,
+  endStr: string | null | undefined,
+): string | null {
+  const start = formatTournamentDateMedium(startStr);
+  if (!start) return null;
+  const end = formatTournamentDateMedium(endStr);
+  if (!end || end === start) return start;
+  return `${start}~${end}`;
+}
+
+/**
  * 상세 슬롯용 긴 형식: 'YYYY년 M월 D일 (요일)'
  * 대회 상세 페이지에서 사용해요.
  * dateStr 이 없거나 invalid 이면 '날짜 미정' 반환.

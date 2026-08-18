@@ -1561,6 +1561,8 @@ export type V1ReviewListItem = {
   state: 'ready' | 'done';
   reviewerTeam?: { teamId: string; name: string } | null;
   targetTeam?: { teamId: string; name: string } | null;
+  /** 작성된 리뷰에서 "누구에게 쓴 것인지" — 한 경기에 여러 명을 평가하면 이게 없으면 구분되지 않는다. */
+  targetUser?: { userId: string; nickname: string } | null;
 };
 
 export type V1ReviewListResponse = {

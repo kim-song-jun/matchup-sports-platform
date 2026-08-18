@@ -552,7 +552,14 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
       <div className="tm-review-card-header">
         <div className="tm-review-card-avatar" aria-hidden="true">{letter}</div>
         <div>
-          <div className="tm-review-card-author">{review.teamName ?? review.authorNickname}</div>
+          {/* 팀명만 보이면 "어떤 사람이 남겼는지"를 알 수 없다 — 팀장·운영진이 팀을 대표해 쓰는
+              후기라 둘 다 필요하다(어드민 화면은 이미 둘 다 보여준다). */}
+          <div className="tm-review-card-author">
+            {review.teamName ?? review.authorNickname}
+            {review.teamName && review.authorNickname ? (
+              <span className="tm-review-card-author-sub"> · {review.authorNickname}</span>
+            ) : null}
+          </div>
           <div className="tm-review-card-date">{date}</div>
         </div>
         <div className="tm-review-card-stars" aria-label={`별점 ${review.rating}점`}>

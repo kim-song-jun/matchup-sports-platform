@@ -47,6 +47,42 @@ describe('ReviewsService', () => {
     expect(tournamentFixtureReviews.pending).toHaveBeenCalledWith(user, 20, tournamentId);
   });
 
+  // 한 경기에서 여러 명에게 쓴 리뷰는 sourceId 가 같다. 대상자를 안 실으면 "작성된 리뷰" 목록에서
+  // 행이 서로 구분되지 않아 누구에게 쓴 건지 알 수 없다(targetUser 는 이미 조인돼 있었는데 버려졌다).
+  it('작성된 리뷰 목록에 대상자를 함께 싣는다', async () => {
+    const prisma = {
+      v1PostEventReview: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'review-1',
+            sourceType: 'team_match',
+            sourceId,
+            targetType: 'user',
+            submittedAt,
+            reviewerTeam: null,
+            targetTeam: null,
+            targetUser: { id: targetUserId, profile: { nickname: '상대선수' } },
+          },
+        ]),
+      },
+      v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
+      v1Match: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn().mockResolvedValue([]),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+
+    const result = await service.list(user, { tab: 'written', limit: 20 });
+
+    // list() 반환 타입이 경로별 union 이라 written 항목만 좁혀서 본다.
+    const [item] = result.items as Array<{ targetUser?: { userId: string; nickname: string } | null }>;
+    expect(item.targetUser).toEqual({ userId: targetUserId, nickname: '상대선수' });
+  });
+
   it('returns an idempotent duplicate response when personal review create hits the unique constraint', async () => {
     const existingReview = {
       id: 'review-1',

@@ -5816,6 +5816,8 @@ button:disabled {
   flex-shrink: 0;
 }
 .tm-review-card-author { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+/* 팀명 뒤에 붙는 작성자 개인 이름 — 팀명보다 약하게 보여 주체(팀)와 작성자를 함께 읽히게 한다. */
+.tm-review-card-author-sub { font-weight: 500; color: var(--text-muted); }
 /* [공개 화면 R-T2 정리] .tm-review-card-team(11px)은 TSX 어디서도 참조되지
    않는 죽은 코드(리뷰 카드는 팀명을 author 슬롯에 합쳐 렌더 — awards-page-client.tsx
    review.teamName ?? review.authorNickname)라 삭제. */
@@ -6185,10 +6187,19 @@ button:disabled {
 }
 
 @media (min-width: 1024px) {
-  /* 본문을 데스크탑 전체 폭에 늘리지 않고 좌측 라인에 고정 */
+  /*
+   * 후기 목록은 데스크탑에서 표로 바뀌는데(아래 .tm-reviews-table 전환) 760px 로 묶어 두고
+   * margin:0 으로 좌측에 붙여 놔서, 1440px 화면에서 왼쪽 절반만 쓰고 오른쪽이 통째로 비었다.
+   * 표는 넓을수록 한 화면에 더 많은 행이 들어오므로 상한을 올리고 가운데로 정렬한다.
+   * 검색바는 따로 상한을 두지 않으면 함께 늘어나 입력칸만 과하게 길어진다.
+   */
   .tm-reviews-body {
-    max-width: 760px;
-    margin: 0;
+    max-width: 1080px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .tm-reviews-searchbar {
+    max-width: 560px;
   }
 
   /* 카드 목록 → 테이블로 전환 */

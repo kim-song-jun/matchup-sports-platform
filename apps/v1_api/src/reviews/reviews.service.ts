@@ -1217,6 +1217,11 @@ export class ReviewsService {
       state: 'done' as const,
       reviewerTeam: review.reviewerTeam ? { teamId: review.reviewerTeam.id, name: review.reviewerTeam.name } : null,
       targetTeam: review.targetTeam ? { teamId: review.targetTeam.id, name: review.targetTeam.name } : null,
+      // 한 경기에서 여러 사람에게 쓴 리뷰는 sourceId 가 같아서, 대상자를 안 실으면 목록에서
+      // 서로 구분되지 않는다("누구에게 쓴 건지" 알 수 없음). targetUser 는 이미 조인돼 있다.
+      targetUser: review.targetUser
+        ? { userId: review.targetUser.id, nickname: review.targetUser.profile?.nickname ?? '참가자' }
+        : null,
     };
   }
 }

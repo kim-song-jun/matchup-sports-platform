@@ -17,6 +17,8 @@ export type ReviewListCardModel = V1ReviewListItem & {
   href: string;
   badgeLabel: string;
   kindLabel: string;
+  /** 누구에게 쓴 리뷰인지(팀명 또는 닉네임). 대상이 없으면 null. */
+  targetLabel: string | null;
   meta: string;
   ctaLabel: string;
 };

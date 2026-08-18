@@ -40,7 +40,9 @@ export class ReviewPolicySettingsService {
       minHours: MIN_REVIEW_WINDOW_HOURS,
       maxHours: MAX_REVIEW_WINDOW_HOURS,
       defaultHours: DEFAULT_REVIEW_WINDOW_HOURS,
-      isDefault: row == null,
+      // 마이그레이션이 싱글턴 행을 미리 시드하므로 "행이 없음"으로는 기본값 상태를 알 수 없다.
+      // 어드민이 한 번이라도 저장하면 updatedByAdminUserId 가 채워지므로 그걸로 판정한다.
+      isDefault: row == null || row.updatedByAdminUserId == null,
       updatedAt: row?.updatedAt?.toISOString() ?? null,
     };
   }

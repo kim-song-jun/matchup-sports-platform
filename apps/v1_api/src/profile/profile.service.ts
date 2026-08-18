@@ -19,6 +19,7 @@ import {
   UpdateMyRegionsDto,
   UpdateProfileDto,
   UpdateSettingsDto,
+  UpdateTournamentRealNameVisibilityDto,
   WithdrawalRequestDto,
 } from './dto/profile.dto';
 
@@ -680,6 +681,45 @@ export class ProfileService {
       create: { userId: user.id, state, policyHash: dto.policyHash },
     });
     return toRecordConsentResponse(consent);
+  }
+
+  /**
+   * 대회 경기 기록 실명 표시 토글 조회 (2026-08-18 사용자 결정). 프로필 row 자체가
+   * 없는 사용자(온보딩 미완료 등)는 `V1UserProfile`의 컬럼 기본값과 동일하게
+   * false(닉네임)를 반환한다 -- `settings()`가 알림 선호도 row 없을 때 default를
+   * 반환하는 것과 같은 패턴.
+   */
+  async myTournamentRealNameVisibility(user: V1AuthUser) {
+    const profile = await this.prisma.v1UserProfile.findUnique({
+      where: { userId: user.id },
+      select: { tournamentRealNameVisible: true },
+    });
+    return { visible: profile?.tournamentRealNameVisible ?? false };
+  }
+
+  /**
+   * 대회 경기 기록 실명 표시 토글 저장. `updateMe`(PATCH /me/profile)와 달리 nickname/
+   * gender 같은 다른 필수 필드를 함께 요구하지 않는다 -- 이 화면은 스위치 하나만 다룬다.
+   * 프로필 row가 아직 없으면(온보딩 미완료) upsert의 create 분기가 nickname 없이
+   * 만들 수 없으므로 404로 막는다 -- 프로필을 먼저 등록해야 켤 수 있다는 뜻이고,
+   * `updateMyRecordConsent`가 별도 모델(`V1UserRecordConsent`)이라 이 제약이 없는 것과
+   * 다른 점이다(이 토글은 V1UserProfile 자체에 얹힌 컬럼이라서다).
+   */
+  async updateMyTournamentRealNameVisibility(user: V1AuthUser, dto: UpdateTournamentRealNameVisibilityDto) {
+    this.assertMutableAccount(user);
+    const existing = await this.prisma.v1UserProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
+    if (!existing) {
+      throw new NotFoundException({
+        code: 'PROFILE_NOT_FOUND',
+        message: '프로필을 먼저 등록해주세요.',
+      });
+    }
+    const profile = await this.prisma.v1UserProfile.update({
+      where: { userId: user.id },
+      data: { tournamentRealNameVisible: dto.visible },
+      select: { tournamentRealNameVisible: true },
+    });
+    return { visible: profile.tournamentRealNameVisible };
   }
 
   logout() {

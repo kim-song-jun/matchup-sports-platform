@@ -72,6 +72,10 @@ export const settingsModel: SettingsViewModel = {
         // F2: 팀 라인업에 연결된 내 경기 기록을 공개 프로필(/users/:id/records)에 노출할지
         // 사용자 단위로 한 번에 켜고 끈다. 새 API 계약: GET/PUT /me/record-consent.
         { label: '경기 기록 공개', sub: '내 활동 기록을 공개 프로필에 표시할지 정해요', href: '/my/settings/record-consent', icon: 'ShieldCheck' },
+        // 2026-08-18: 대회 경기 기록(라인업/득점자/MVP)의 이름 표시를 닉네임 기본에서
+        // 실명으로 바꾸는 스위치. 위 record-consent와는 별개 축 -- 그건 "기록이 보이는가",
+        // 이건 "보이면 어떤 이름인가". API 계약: GET/PATCH /me/tournament-real-name-visibility.
+        { label: '대회 기록 실명 표시', sub: '대회 라인업·득점자 이름을 실명으로 보여줄지 정해요', href: '/my/settings/tournament-real-name', icon: 'UserCheck' },
       ],
     },
     {

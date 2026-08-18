@@ -4,11 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
-import { useV1TournamentReviews } from '@/hooks/use-v1-api';
+import { useV1Tournament, useV1TournamentReviews } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { publicAssetPath } from '@/lib/assets';
-import { ReviewCard, RatingStar } from '../awards/awards-page-client';
-import type { V1TournamentReview } from '@/types/api';
+import { ReviewCard, ReviewFormModal, useTournamentReviewWriteGate } from '../awards/awards-page-client';
 
 const PAGE_SIZE = 10;
 const PAGER_WINDOW = 5;
@@ -89,71 +87,10 @@ function ReviewsPager({
   );
 }
 
-function ReviewsTable({ reviews }: { reviews: V1TournamentReview[] }) {
-  return (
-    <div className="tm-reviews-table-wrap">
-      <table className="tm-reviews-table">
-        <thead>
-          <tr>
-            <th>작성자</th>
-            <th>팀</th>
-            <th>평점</th>
-            <th>후기</th>
-            <th>사진</th>
-            <th>작성일</th>
-          </tr>
-        </thead>
-        <tbody>
-          {reviews.map((review) => {
-            const date = new Date(review.createdAt).toLocaleDateString('ko-KR', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            });
-            const photoUrls = review.photoUrls ?? [];
-            return (
-              <tr key={review.id}>
-                <td>{review.authorNickname}</td>
-                <td className="tm-reviews-table-team">{review.teamName ?? '—'}</td>
-                <td>
-                  <span className="tm-reviews-table-stars" aria-label={`별점 ${review.rating}점`}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <RatingStar key={i} filled={i < review.rating} size={13} />
-                    ))}
-                  </span>
-                </td>
-                <td className="tm-reviews-table-comment" title={review.comment ?? undefined}>
-                  {review.comment || <span className="tm-reviews-table-empty">—</span>}
-                </td>
-                <td>
-                  {photoUrls.length > 0 ? (
-                    <div className="tm-reviews-table-photos">
-                      {photoUrls.slice(0, 3).map((url) => (
-                        <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer">
-                          <img src={publicAssetPath(url)} alt="" loading="lazy" />
-                        </a>
-                      ))}
-                      {photoUrls.length > 3 && (
-                        <span className="tm-reviews-table-photo-more">+{photoUrls.length - 3}</span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="tm-reviews-table-empty">—</span>
-                  )}
-                </td>
-                <td className="tm-reviews-table-date">{date}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: string }) {
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
+  const [showForm, setShowForm] = useState(false);
   const search = useDebouncedValue(searchInput, 350);
 
   // search가 바뀐 렌더에서 즉시 1페이지로 취급 — useEffect로 되돌리면 이전 page로 한 번 더 낭비성 요청이 나감
@@ -164,6 +101,13 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
     effectivePage = 1;
     if (page !== 1) setPage(1);
   }
+
+  // 이 화면에 어느 대회의 후기인지 적으려면 대회 자체가 필요하다 — 예전에는 제목이
+  // "참가팀 후기" 한 줄뿐이라, 링크를 타고 들어온 사람은 어느 대회 후기를 보고 있는지
+  // 화면 어디에서도 알 수 없었다(오너 지적: "참가팀 후기도 명확하게 나왔으면 좋겠고").
+  const { data: tournament } = useV1Tournament(tournamentId);
+  const { canWrite, isCompleted, isParticipant, alreadyReviewed, hasSession } =
+    useTournamentReviewWriteGate(tournamentId, tournament?.status ?? 'draft');
 
   const { data, isLoading, isFetching, isError, error, refetch } = useV1TournamentReviews(tournamentId, {
     page: effectivePage,
@@ -182,9 +126,53 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
       activeTab="tournaments"
       desktopHead
     >
+      {showForm && <ReviewFormModal tournamentId={tournamentId} onClose={() => setShowForm(false)} />}
       <div className="tm-tourn-sub-page">
-        <h1 className="sr-only">대회 참가팀 후기</h1>
         <div className="tm-reviews-body" style={{ padding: '20px 20px 40px' }}>
+          <header style={{ marginBottom: 14 }}>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-strong)' }}>
+              {tournament ? `${tournament.title} 참가팀 후기` : '참가팀 후기'}
+            </h1>
+            <p className="tm-text-caption" style={{ margin: '4px 0 0', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              이 대회에 참가한 팀의 팀장·운영진이 남긴 후기예요.
+            </p>
+          </header>
+
+          {/* 후기를 "보러" 온 사람과 "쓰러" 온 사람이 같은 링크로 들어온다 — 쓸 수 있는
+              사람에게는 여기서 바로 쓰게 하고(시상 화면까지 되돌아가지 않게), 못 쓰는
+              사람에게는 왜 못 쓰는지를 상태별로 알린다. */}
+          {canWrite ? (
+            <button
+              type="button"
+              className="tm-btn tm-btn-md tm-btn-primary"
+              style={{ display: 'inline-flex', minHeight: 44, margin: '12px 0 4px' }}
+              onClick={() => setShowForm(true)}
+            >
+              + 후기 쓰기
+            </button>
+          ) : isCompleted && isParticipant && alreadyReviewed ? (
+            <div
+              className="tm-text-caption"
+              style={{
+                display: 'inline-block',
+                color: 'var(--text-caption)',
+                background: 'var(--grey100)',
+                padding: '6px 10px',
+                borderRadius: 8,
+                margin: '12px 0 4px',
+              }}
+            >
+              ✓ 이 대회 후기를 이미 남겼어요
+            </div>
+          ) : isCompleted && !hasSession ? (
+            <div
+              className="tm-text-caption"
+              style={{ color: 'var(--text-caption)', lineHeight: 1.5, margin: '12px 0 4px' }}
+            >
+              로그인하면 참가팀의 팀장·운영진은 후기를 작성할 수 있어요.
+            </div>
+          ) : null}
+
           <label className="tm-reviews-searchbar">
             <Search size={16} aria-hidden="true" />
             <input
@@ -214,14 +202,14 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
             <>
               <div className="tm-reviews-count">총 {total}개의 후기</div>
 
+              {/* 넓은 화면에서는 예전에 같은 데이터를 6열 표로 한 번 더 그렸다 — 별점이
+                  칸에 갇히고 후기 본문은 한 줄로 잘려서, 정작 읽으러 온 내용이 가장 안
+                  읽히는 형태였다(오너 지적: "이 테이블형식도 이상한것같아"). 이제 모든
+                  폭에서 같은 후기 카드를 쓰고, 넓어지면 열 수만 늘린다. */}
               <div className="tm-reviews-cards" style={{ opacity: isFetching ? 0.6 : 1 }}>
                 {reviews.map((review) => (
                   <ReviewCard key={review.id} review={review} />
                 ))}
-              </div>
-
-              <div style={{ opacity: isFetching ? 0.6 : 1 }}>
-                <ReviewsTable reviews={reviews} />
               </div>
 
               <ReviewsPager page={page} totalPages={totalPages} onChange={setPage} />

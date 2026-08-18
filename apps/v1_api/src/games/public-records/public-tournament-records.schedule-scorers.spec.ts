@@ -60,6 +60,8 @@ type FakeGoalEvent = {
   period: number | null;
   clockMs: number;
   reversesEventId: string | null;
+  /** CARD 이벤트의 색상은 컬럼이 아니라 payload(`{ card: 'YELLOW' | 'RED' }`)에 있다. */
+  payload?: unknown;
 };
 
 function buildFakePrisma(options: {
@@ -511,5 +513,73 @@ describe('PublicTournamentRecordsService.getSchedule -- 참가팀 공개 정책 
     const result = await service.getSchedule(SCHEDULE_TOURNAMENT_UUID, {}, undefined);
 
     expect(result.items[0].home).toEqual({ registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' });
+  });
+});
+
+/**
+ * 일정 카드 **카드(경고/퇴장) 요약** 전용. 예전에는 이 요약이 골만 실어서, 같은
+ * 경기의 같은 경고가 경기 상세 타임라인에는 나오는데 대회 일정 카드에서는 통째로
+ * 사라졌다(오너 지적). 아래 테스트가 그 회귀를 막는다.
+ */
+describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 카드(경고/퇴장) 요약', () => {
+  it('CARD 이벤트가 색상과 함께 cards에 실리고, scorers에는 섞이지 않는다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 600_000, reversesEventId: null },
+        { id: 'c1', gameId: 'game-1', type: 'CARD', sideId: 'side-away', participantId: INELIGIBLE.id, period: 2, clockMs: 1_500_000, reversesEventId: null, payload: { card: 'YELLOW' } },
+        { id: 'c2', gameId: 'game-1', type: 'CARD', sideId: 'side-home', participantId: ELIGIBLE.id, period: 2, clockMs: 1_740_000, reversesEventId: null, payload: { card: 'RED' } },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].cards).toEqual([
+      { side: 'away', cardColor: 'YELLOW', participantName: '이영희', jerseyNumber: 10, period: 2, clockMs: 1_500_000 },
+      { side: 'home', cardColor: 'RED', participantName: '김철수', jerseyNumber: 7, period: 2, clockMs: 1_740_000 },
+    ]);
+    // `scorers`는 골만 담는 기존 계약 그대로 -- 이미 배포된 클라이언트가 이 배열의
+    // length를 골 수로 읽고 있어, 카드가 한 건이라도 섞이면 곧장 스코어 오독이 된다.
+    expect(result.items[0].scorers).toEqual([
+      { side: 'home', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
+    ]);
+  });
+
+  it('색상을 알 수 없는 과거 payload의 카드는 색을 추측하지 않고 cardColor: null로 내려간다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [
+        { id: 'c1', gameId: 'game-1', type: 'CARD', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 300_000, reversesEventId: null },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].cards).toEqual([
+      { side: 'home', cardColor: null, participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 300_000 },
+    ]);
+  });
+
+  it('취소된(reversesEventId로 되돌려진) 카드는 요약에서 빠진다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [
+        { id: 'c1', gameId: 'game-1', type: 'CARD', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 300_000, reversesEventId: null, payload: { card: 'YELLOW' } },
+        { id: 'x1', gameId: 'game-1', type: 'CORRECTION', sideId: 'side-home', participantId: ELIGIBLE.id, period: 1, clockMs: 300_000, reversesEventId: 'c1' },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].cards).toEqual([]);
   });
 });

@@ -206,19 +206,26 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
       }),
     );
 
+    // 행마다 라벨이 약속하는 화면으로 가야 한다 — 한때 "최종 결과·시상"이 경기별 결과
+    // 목록(/results)으로, "대회 후기"가 시상 화면(/awards)으로 가서 두 행이 서로의
+    // 화면을 가리키고 있었다(오너 지적: "이건 대회 후기를 보러가는거고").
     expect(screen.getByRole('link', { name: /최종 결과·시상/ })).toHaveAttribute(
       'href',
-      '/tournaments/tour-42/results',
+      '/tournaments/tour-42/awards',
     );
     expect(screen.getByRole('link', { name: /대진표·조별 순위/ })).toHaveAttribute(
       'href',
       '/tournaments/tour-42/bracket',
     );
+    expect(screen.getByRole('link', { name: /경기별 결과·기록/ })).toHaveAttribute(
+      'href',
+      '/tournaments/tour-42/results',
+    );
     // 후기 행은 대회 컨텍스트를 유지해야 한다 — 예전엔 '/my/reviews'로 보내 "어느 대회의
     // 후기를 쓰려던 건지"가 사라졌고, 사용자가 목록에서 대회를 다시 찾아야 했다.
     expect(screen.getByRole('link', { name: /대회 후기/ })).toHaveAttribute(
       'href',
-      '/tournaments/tour-42/awards',
+      '/tournaments/tour-42/reviews',
     );
     expect(screen.getByText('대회 후 더보기')).toBeInTheDocument();
   });

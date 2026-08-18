@@ -101,6 +101,28 @@ export function formatGoalMinute(clockMs: number | null): string {
   return `${Math.floor(clockMs / 60_000)}′`;
 }
 
+/**
+ * 골/카드 이벤트의 아이콘 + 스크린리더 라벨. 경기 상세 타임라인
+ * (`match-detail-content.tsx`)과 일정 카드 요약(`schedule-content.tsx`)이 **같은
+ * 표현을 공유**한다 — 한때 상세에만 이 매핑이 있어서, 같은 경기의 같은 카드가
+ * 상세에서는 🟨로 나오고 일정 카드에서는 아예 나오지 않았다.
+ *
+ * 아이콘은 항상 `aria-hidden`으로 두고 `label`을 `sr-only`로 함께 낸다 —
+ * 색(노랑/빨강)만으로 경고와 퇴장을 구분하지 않는다는 프로젝트 접근성 규칙
+ * 때문이고, 그래서 색을 모르는 과거 payload(`cardColor: null`)도 색을 추측하지
+ * 않고 중립 기호로 그린다.
+ */
+export function eventPresentation(event: {
+  type: string;
+  cardColor: 'YELLOW' | 'RED' | null;
+}): { icon: string; label: string } {
+  if (event.type === 'GOAL') return { icon: '⚽', label: '골' };
+  if (event.type === 'CARD' && event.cardColor === 'RED') return { icon: '🟥', label: '레드카드' };
+  if (event.type === 'CARD' && event.cardColor === 'YELLOW') return { icon: '🟨', label: '옐로카드' };
+  if (event.type === 'CARD') return { icon: '□', label: '카드 색상 확인 필요' };
+  return { icon: '•', label: event.type };
+}
+
 /** `mm:ss` from a game clock in milliseconds, used for goal/card event rows. */
 export function formatClock(clockMs: number | null): string {
   if (clockMs === null) return '';

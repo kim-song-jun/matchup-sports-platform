@@ -5,6 +5,13 @@ import { V1AuthUser } from '../../auth/v1-auth-user';
 import { isMockSeedEnabled } from './mock-seed.config';
 import { CreateMockTournamentDto, type MockSeedStatus } from './mock-tournament-seed.dto';
 
+/**
+ * 시드 계정 전용 도메인. 목업 대회에는 이 도메인만으로 이뤄진 팀만 넣는다 —
+ * 실사용자 팀을 끌어들이면 그 사람들 마이페이지에 가짜 대회가 뜨고 후기 대상까지 된다.
+ * 실제 가입자는 이 도메인의 이메일을 가질 수 없다.
+ */
+const TEST_ACCOUNT_DOMAIN = '@teameet.test';
+
 type SeedAccount = { userId: string; email: string; nickname: string; role: string };
 type SeedTeam = { teamId: string; name: string; ownerUserId: string; memberUserIds: string[]; accounts: SeedAccount[] };
 
@@ -165,7 +172,13 @@ export class MockTournamentSeedService {
       take: teamCount * 4,
     });
     const usable = candidates
-      .filter((team) => team.memberships.length >= 3 && team.memberships.some((m) => m.role === 'owner'))
+      .filter(
+        (team) =>
+          team.memberships.length >= 3 &&
+          team.memberships.some((m) => m.role === 'owner') &&
+          // 한 명이라도 실사용자가 섞여 있으면 통째로 제외한다.
+          team.memberships.every((m) => m.user?.email?.endsWith(TEST_ACCOUNT_DOMAIN) === true),
+      )
       .slice(0, teamCount)
       .map((team) => ({
         teamId: team.id,
@@ -182,7 +195,7 @@ export class MockTournamentSeedService {
     if (usable.length < teamCount) {
       throw new BadRequestException({
         code: 'NOT_ENOUGH_TEAMS',
-        message: `명단을 채울 수 있는 팀이 부족해요. 필요 ${teamCount}팀, 사용 가능 ${usable.length}팀 (active 멤버 3명 이상 + 팀장 보유).`,
+        message: `명단을 채울 수 있는 테스트 팀이 부족해요. 필요 ${teamCount}팀, 사용 가능 ${usable.length}팀 (active 멤버 3명 이상 + 팀장 보유 + 전원 테스트 계정).`,
       });
     }
     return usable;

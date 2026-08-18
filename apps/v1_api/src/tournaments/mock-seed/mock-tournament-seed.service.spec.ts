@@ -56,9 +56,9 @@ function makeWorld(teamCount = 4) {
     id: `team-${i}`,
     name: `팀${i}`,
     memberships: [
-      { userId: `owner-${i}`, role: 'owner' },
-      { userId: `member-${i}-1`, role: 'member' },
-      { userId: `member-${i}-2`, role: 'member' },
+      { userId: `owner-${i}`, role: 'owner', user: { email: `owner${i}@teameet.test`, profile: { nickname: `팀장${i}` } } },
+      { userId: `member-${i}-1`, role: 'member', user: { email: `m${i}a@teameet.test`, profile: { nickname: `선수${i}A` } } },
+      { userId: `member-${i}-2`, role: 'member', user: { email: `m${i}b@teameet.test`, profile: { nickname: `선수${i}B` } } },
     ],
   }));
   const fixtures: Array<Record<string, unknown>> = [];
@@ -128,7 +128,22 @@ describe('MockTournamentSeedService', () => {
     expect(unknownFields).toEqual([]);
   });
 
-// jerseyNumber 와 같은 종류의 두 번째 결함: 닉네임을 V1User 에서 고르려 했는데 실제로는
+  // alpha 에는 실사용자 팀(대행FC 등)이 섞여 있다. 목업 대회가 그 팀을 끌어들이면
+  // 실제 사용자 마이페이지에 가짜 대회가 뜨고 후기 대상까지 된다 — 통째로 제외해야 한다.
+  it('실사용자가 한 명이라도 섞인 팀은 쓰지 않는다', async () => {
+    const { service, prisma } = makeWorld(4);
+    const teams = await prisma.v1Team.findMany();
+    teams[0].memberships[1].user.email = 'real.person@gmail.com';
+    prisma.v1Team.findMany.mockResolvedValue(teams);
+
+    // 4팀이 필요한데 하나가 실사용자 팀이라 3팀만 남는다 → 반쪽 대회를 만들지 않고 실패한다.
+    await expect(service.createTournament(user, { format: 'league', teamCount: 4 })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  // jerseyNumber 와 같은 종류의 두 번째 결함: 닉네임을 V1User 에서 고르려 했는데 실제로는
   // V1UserProfile 에 있다. select 도 payload 와 같은 방식으로 스키마에 대조한다.
   it('팀 조회 select 의 모든 경로가 schema.prisma 에 실재한다', async () => {
     const { service, prisma } = makeWorld();

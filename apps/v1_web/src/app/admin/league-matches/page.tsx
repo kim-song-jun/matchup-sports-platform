@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { AdminPageHeader, AdminDataTable, AdminEmpty, AdminStatusPill } from '@/components/admin';
 import { useV1AdminLeagueMatchList } from '@/hooks/use-v1-api';
-import type { V1AdminLeagueListItem } from '@/types/league-matches';
+import type { V1AdminLeagueListItem } from '@/types/league-match';
 
 export default function AdminLeagueMatchListPage() {
   const { data, isPending, isError, refetch } = useV1AdminLeagueMatchList();

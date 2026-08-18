@@ -6,7 +6,7 @@ import { useV1AdminLeagueMatch, useV1GenerateLeagueFixtures, useV1UpdateLeagueFi
 import { extractErrorMessage } from '@/lib/error-message';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
-import type { V1LeagueFixture } from '@/types/league-matches';
+import type { V1LeagueFixture } from '@/types/league-match';
 
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';

@@ -4440,7 +4440,7 @@ import type {
   V1LeagueStandingsResponse,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
-} from '@/types/league-matches';
+} from '@/types/league-match';
 
 export function useV1AdminLeagueMatchList() {
   return useQuery({

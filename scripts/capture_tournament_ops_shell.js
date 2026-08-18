@@ -41,10 +41,11 @@ const WIDTHS = [[390, 900], [768, 1100], [1440, 1100]];
     for (const [w, h] of WIDTHS) {
       await page.setViewportSize({ width: w, height: h });
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180000 });
-      // 셸 내비가 붙을 때까지 기다린다 — 안 기다리면 인증 로딩 화면을 찍는다.
-      await page
-        .waitForSelector('nav[aria-label="주 메뉴"], button[aria-label="메뉴 열기"]', { timeout: 120000 })
-        .catch(() => {});
+      /* 셸 내비가 붙을 때까지 기다린다 — 안 기다리면 "로그인 정보를 확인하고 있어요"
+         인증 로딩 화면을 찍는다. 실패를 삼키면 인증·게이트가 깨진 화면도 성공한
+         스크린샷처럼 저장돼, 이 캡처를 근거로 쓰는 판단이 통째로 틀어진다. 그래서
+         catch 하지 않고 그대로 실패시킨다. */
+      await page.waitForSelector('nav[aria-label="주 메뉴"], button[aria-label="메뉴 열기"]', { timeout: 120000 });
       await page.waitForTimeout(2500);
       await page.screenshot({ path: path.join(OUT, `${name}-${w}.png`), fullPage: true });
     }
@@ -57,7 +58,9 @@ const WIDTHS = [[390, 900], [768, 1100], [1440, 1100]];
   for (const [route, name] of PAGES) {
     await page.setViewportSize({ width: 1440, height: 1100 });
     await page.goto(`${WEB}/tournament-ops/tournaments/${tournamentId}/${route}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('nav[aria-label="주 메뉴"]', { timeout: 60000 }).catch(() => {});
+    // 계약 측정도 같은 이유로 실패를 삼키지 않는다 — 셸이 안 떴는데 CONTRACT 로그가
+    // 찍히면 "측정했다"는 말 자체가 거짓이 된다.
+    await page.waitForSelector('nav[aria-label="주 메뉴"]', { timeout: 60000 });
     await page.waitForTimeout(1500);
     const info = await page.evaluate(() => {
       const h1 = document.querySelector('h1');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
@@ -9,7 +9,7 @@ import {
   buildFormationPresets, describeSquadSize, goalkeeperPositionCode, slotsWithGoalkeeper,
   type FormationPreset,
 } from '@/components/lineup/formation-slots';
-import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
+import { PitchFormationEditor, type PitchDropResolver } from '@/components/lineup/pitch-formation-editor';
 import { LoadLineupSheet, type LoadableLineup } from '@/components/lineup/load-lineup-sheet';
 import { SavePresetDialog } from '@/components/lineup/save-preset-dialog';
 import { buildRecentJerseyMap, describeSkipped, resolveJerseyNumber, resolveLoadableEntries } from '@/components/lineup/lineup-source';
@@ -41,6 +41,7 @@ import {
   selectFormation,
   setGoalkeeper,
   setJerseyNumber,
+  dropPlayerOnPitch,
   setPlayerPosition,
   toggleStarter,
   unplaceFromSlot,
@@ -83,6 +84,42 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
   // tournamentId로 대회 상세를 별도 조회해 sport.name을 가져온다 — 그 결과, 이 가드가
   // 아예 없던 이전 버전은 배드민턴·농구 등 비축구 대회 경기에서도 축구 피치 도형을
   // 조건 없이 그렸다(2026-08 QA 지적, 실제 버그).
+  /**
+   * 명단 카드를 피치로 끌어다 놓는 경로. 예전에는 ①명단에서 선발 체크 → ②피치에서 다시
+   * 배치, 두 단계를 거쳐야 했다(오너 지적: "드래그앤드롭으로 데스크탑에서 넣는다던가").
+   * 이제 카드를 피치 위로 끌면 그 자리에 바로 놓이고 선발 처리까지 함께 일어난다.
+   *
+   * 기존 경로(체크박스 · 대기 목록에서 고른 뒤 피치 탭)는 **그대로 남는다** — 드래그는
+   * 포인터를 정밀하게 쓸 수 있을 때만 편한 보조 수단이라, 키보드·보조기기 사용자에게서
+   * 유일한 길을 빼앗으면 안 된다.
+   *
+   * 착지점 판정(피치 안인지, 슬롯 모드면 어느 빈 자리인지)은 좌표계를 아는 피치 에디터가
+   * `dropResolverRef` 로 대신 해 준다.
+   */
+  const dropResolverRef = useRef<PitchDropResolver | null>(null);
+  const [draggingRosterKey, setDraggingRosterKey] = useState<string | null>(null);
+
+  function handleRosterPointerDown(key: string) {
+    return (event: React.PointerEvent<HTMLDivElement>) => {
+      // 마우스는 주 버튼만. 체크박스·등번호 입력 같은 카드 안 컨트롤을 누른 것은 드래그로
+      // 삼지 않는다 — 그랬다간 체크 한 번이 매번 드래그로 해석된다.
+      if (event.button !== 0) return;
+      if ((event.target as HTMLElement).closest('input, button, a, label, select')) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setDraggingRosterKey(key);
+    };
+  }
+
+  function handleRosterPointerUp(key: string) {
+    return (event: React.PointerEvent<HTMLDivElement>) => {
+      if (draggingRosterKey !== key) return;
+      setDraggingRosterKey(null);
+      const target = dropResolverRef.current?.resolve(event.clientX, event.clientY) ?? null;
+      if (target === null) return;
+      setState((prev) => (prev === null ? prev : dropPlayerOnPitch(prev, key, target)));
+    };
+  }
+
   const tournamentQuery = useV1Tournament(tournamentId);
   const formationSupportedSportName = tournamentQuery.data?.sport?.name ?? null;
   const formationSupported =
@@ -664,7 +701,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
               />
             ) : state.starters.length === 0 ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
-                먼저 명단에서 선발을 등록해야 피치에 배치할 수 있어요.
+                명단에서 선수를 체크하거나, 카드를 이 피치로 끌어다 놓으면 선발로 들어가요.
               </p>
             ) : (
               <div style={{ marginTop: 8 }}>
@@ -695,6 +732,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                   onUnplacePlayer={(key) => setState((prev) => (prev ? clearPlayerPosition(prev, key) : prev))}
                   onPlaceInSlot={(key, slot) => setState((prev) => (prev ? placeInSlot(prev, key, slot) : prev))}
                   onUnplaceFromSlot={(key) => setState((prev) => (prev ? unplaceFromSlot(prev, key) : prev))}
+                  dropResolverRef={dropResolverRef}
                 />
               </div>
             )}
@@ -707,7 +745,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
             />
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
               {editable
-                ? '체크한 선수가 선발이에요. 체크하지 않은 선수는 후보로 들어가요.'
+                ? '체크한 선수가 선발이에요. 카드를 피치로 끌어다 놓으면 그 자리에 바로 배치돼요.'
                 : '이 경기의 선발·후보 명단이에요.'}
             </p>
             {/* 등록 명단이 유일한 출처라 이 화면에는 선수를 추가하는 입력이 없다 —
@@ -780,10 +818,15 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                       <Card
                         key={entry.key}
                         pad={12}
+                        onPointerDown={editable ? handleRosterPointerDown(entry.key) : undefined}
+                        onPointerUp={editable ? handleRosterPointerUp(entry.key) : undefined}
+                        onPointerCancel={editable ? () => setDraggingRosterKey(null) : undefined}
                         style={{
                           // 선발은 배경 틴트로도 구분한다 — 체크 표시 하나에만 기대면
                           // 목록이 길어질수록 "지금 몇 명이 선발인지"가 눈으로 안 잡힌다.
                           ...(isStarter ? { background: 'var(--blue50)' } : {}),
+                          ...(editable ? { touchAction: 'none' } : {}),
+                          ...(draggingRosterKey === entry.key ? { opacity: 0.55 } : {}),
                         }}
                       >
                         {/* 1줄: 선발 체크 · 이름 · 상태. 골키퍼와 등번호는 아래 줄에

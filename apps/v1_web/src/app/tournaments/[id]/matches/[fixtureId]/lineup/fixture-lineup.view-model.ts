@@ -344,3 +344,24 @@ export function buildSavePayload(
     ],
   };
 }
+
+/**
+ * 명단 카드를 피치로 끌어다 놓았을 때의 상태 전이. **후보를 끌어왔으면 선발로 올린 뒤
+ * 배치한다** — 두 동작이 한 제스처로 끝나야 "끌어다 놓았다"는 기대와 맞는다(예전에는
+ * ①명단에서 선발 체크 → ②피치에서 다시 배치, 두 단계였다).
+ *
+ * 착지점 판정(피치 안인지, 슬롯 모드면 어느 빈 자리인지)은 좌표계를 아는 피치 에디터가
+ * 하고, 이 함수는 그 결과만 받아 상태를 만든다.
+ */
+export function dropPlayerOnPitch(
+  state: FixtureLineupState,
+  key: string,
+  target: { kind: 'point'; x: number; y: number } | { kind: 'slot'; slot: FormationSlot },
+): FixtureLineupState {
+  const seated = state.bench.some((row) => row.key === key) ? moveToStarters(state, key) : state;
+  // 선발에도 후보에도 없는 key(이미 사라진 카드를 놓는 등)면 아무것도 하지 않는다.
+  if (!seated.starters.some((row) => row.key === key)) return state;
+  return target.kind === 'slot'
+    ? placeInSlot(seated, key, target.slot)
+    : setPlayerPosition(seated, key, target.x, target.y);
+}

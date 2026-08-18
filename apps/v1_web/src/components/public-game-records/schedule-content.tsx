@@ -312,13 +312,14 @@ function ScheduleRow({
   const row = (
     <Link
       href={`/tournaments/${tournamentId}/matches/${entry.fixtureId}`}
-      className="tm-pressable"
+      // 구분선을 인라인이 아니라 클래스로 그린다 — 인라인 style 은 미디어쿼리가 이길 수
+      // 없어서, 데스크톱에서 목록을 2열로 펼 때 격자선을 다시 그릴 방법이 없어진다.
+      // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
+      className={`tm-pressable${myFixture ? '' : ' tm-schedule-row'}`}
       style={{
         display: 'block',
         padding: '12px 16px',
         minHeight: 44,
-        // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
-        ...(myFixture ? {} : { borderTop: '1px solid var(--grey100)' }),
         textDecoration: 'none',
       }}
     >
@@ -407,8 +408,8 @@ function ScheduleRow({
   // 형제로 둔다: 링크 안에 링크를 넣으면 유효하지 않은 마크업이 되고 클릭 대상도 모호해진다.
   return (
     <div
+      className="tm-schedule-row tm-schedule-row-mine"
       style={{
-        borderTop: '1px solid var(--grey100)',
         borderLeft: '3px solid var(--blue500)',
         // 예전에는 행 전체를 `--blue50`(#e8f3ff)로 칠했다 — 내 팀 경기가 연달아 있으면
         // 목록의 절반이 통째로 파랗게 덮여, 강조가 아니라 배경 자체가 바뀐 것처럼 보였다
@@ -600,7 +601,7 @@ export function ScheduleContent({
         {data.items.length === 0 ? (
           <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
         ) : (
-          <Card pad={0}>
+          <Card pad={0} className="tm-schedule-list">
             {data.items.map((entry) => (
               <ScheduleRow
                 key={entry.fixtureId}
@@ -629,7 +630,7 @@ export function ScheduleContent({
           <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
             시간 미정 경기
           </h3>
-          <Card pad={0}>
+          <Card pad={0} className="tm-schedule-list">
             {data.unscheduled.map((entry) => (
               <ScheduleRow
                 key={entry.fixtureId}

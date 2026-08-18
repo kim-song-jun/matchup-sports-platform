@@ -6,6 +6,10 @@ services:
     image: ${ALPHA_API_IMAGE:?ALPHA_API_IMAGE must be an ECR digest URI}
     environment:
       V1_RELEASE: ${ALPHA_RELEASE_VERSION:-}
+      # 목업 대회 생성(어드민 버튼)은 이 오버레이에서만 켠다. NODE_ENV 로는 alpha 와 프로덕션을
+      # 구분할 수 없어서(둘 다 production) 전용 플래그를 쓴다 — 프로덕션 compose 에는 없으므로
+      # 그쪽에서는 라우트가 404 이고 버튼도 렌더되지 않는다.
+      V1_ENABLE_MOCK_SEED: "true"
 
   # 워커는 전용 이미지를 빌드하지 않고 API 이미지를 그대로 재사용한다
   # (alpha-release-common.sh 의 assert_running_release_digests 가

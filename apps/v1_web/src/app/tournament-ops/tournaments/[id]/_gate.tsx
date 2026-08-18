@@ -93,13 +93,13 @@ function AccessDenied({ scopeNotYetSupported }: { scopeNotYetSupported: boolean 
         <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">
           <ShieldOff size={48} />
         </span>
-        <h1 className="text-[var(--font-size-subhead)] font-bold text-[var(--text-strong)]">
+        <h1 className="text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">
           {scopeNotYetSupported ? '담당 범위 밖의 화면이에요' : '대회 운영자 권한이 필요해요'}
         </h1>
         {/* 종전 문구는 "필드/경기 담당자용 화면은 아직 준비 중"이었다 — 담당 경기 콘솔로
             직행하는 경로가 생긴 지금은 사실이 아니다. 막힌 이유(대회 전체 화면)와 대신
             갈 곳(내 대회 운영)을 그대로 적는다. */}
-        <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
+        <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           {scopeNotYetSupported
             ? '대회 전체 화면은 대회 운영자만 열 수 있어요. 담당 경기는 “내 대회 운영”에서 바로 들어갈 수 있어요.'
             : '이 화면은 이 대회에 배정된 운영 스태프만 접근할 수 있어요. 배정 상태를 확인해 주세요.'}
@@ -108,7 +108,7 @@ function AccessDenied({ scopeNotYetSupported }: { scopeNotYetSupported: boolean 
             떨어져서, 막힌 담당자가 갈 곳이 아예 없는 막다른 길이었다. 담당 대회 목록으로 보낸다. */}
         <Link
           href={scopeNotYetSupported ? '/my/tournament-staff' : '/home'}
-          className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           {scopeNotYetSupported ? '내 대회 운영으로 가기' : '서비스로 돌아가기'}
         </Link>
@@ -121,16 +121,16 @@ function GateErrorScreen({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="min-h-screen bg-[var(--surface-soft)] flex items-center justify-center px-4">
       <div className="flex flex-col items-center gap-3 text-center max-w-[320px]">
-        <h1 className="text-[var(--font-size-subhead)] font-bold text-[var(--text-strong)]">
+        <h1 className="text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">
           잠시 문제가 생겼어요
         </h1>
-        <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
+        <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] leading-relaxed">
           일시적인 오류로 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           다시 시도
         </button>

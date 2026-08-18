@@ -178,7 +178,7 @@ export default function AdminTeamMatchesPage() {
                 <span className="block truncate font-medium text-[var(--text-strong)]" title={row.title}>
                   {row.title}
                 </span>
-                <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]">
+                <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
                   {row.hostTeamName}
                 </span>
               </div>
@@ -207,7 +207,7 @@ export default function AdminTeamMatchesPage() {
                   onClick={() => setModalRow(row)}
                   aria-label={`${row.title} 상태 변경`}
                   className={[
-                    'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                    'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                     'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                     'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                   ].join(' ')}
@@ -248,14 +248,14 @@ export default function AdminTeamMatchesPage() {
       {/* 페이지 이동 실패는 목록이 비어 보이지 않으므로 따로 알린다. */}
       {isError && rows.length > 0 && (
         <div className="mt-4 flex flex-col items-center gap-1.5">
-          <p className="text-[var(--font-size-label)] text-red-500" role="alert">
+          <p className="text-[length:var(--font-size-label)] text-red-500" role="alert">
             {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
           </p>
           <button
             type="button"
             onClick={() => void refetch()}
             disabled={isFetching}
-            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-medium text-[var(--text-body)] bg-[var(--card-surface)] border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-body)] bg-[var(--card-surface)] border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             {isFetching ? '불러오는 중…' : '다시 시도'}
           </button>

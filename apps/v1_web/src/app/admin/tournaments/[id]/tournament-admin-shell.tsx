@@ -259,7 +259,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
                 aria-label={group.label}
                 className="flex shrink-0 gap-1 lg:flex-col lg:gap-0"
               >
-                <p className="hidden lg:block px-3 pt-3 pb-1 text-[var(--font-size-caption)] font-bold tracking-wide text-[var(--text-caption)]">
+                <p className="hidden lg:block px-3 pt-3 pb-1 text-[length:var(--font-size-caption)] font-bold tracking-wide text-[var(--text-caption)]">
                   {group.label}
                 </p>
                 {group.items.map((item) => (

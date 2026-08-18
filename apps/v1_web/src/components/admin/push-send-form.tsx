@@ -18,7 +18,7 @@ function formatUserLabel(user: { nickname: string | null; displayName: string | 
 
 function segmentButtonClass(active: boolean) {
   return [
-    'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
+    'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-xl text-[length:var(--font-size-body-sm)] font-semibold transition-colors',
     'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
     active
       ? 'bg-blue-500 text-white'
@@ -141,7 +141,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
             현재 웹 푸시를 구독 중인 <strong>모든 회원</strong>에게 아래 알림을 발송해요. 이 작업은 되돌릴 수 없어요.
           </p>
           <div className="bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl px-3.5 py-3">
-            <p className="text-[var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">제목</p>
+            <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">제목</p>
             <p className="text-[14px] font-semibold text-[var(--text-strong)] break-words">{title}</p>
           </div>
         </div>
@@ -303,7 +303,7 @@ export function PushSendForm() {
       >
         {/* Target toggle */}
         <div className="flex flex-col gap-1.5">
-          <span id="push-send-target-label" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+          <span id="push-send-target-label" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
             발송 대상
           </span>
           <div role="radiogroup" aria-labelledby="push-send-target-label" className="grid grid-cols-2 gap-2">
@@ -341,7 +341,7 @@ export function PushSendForm() {
         {/* User picker */}
         {target === 'user' && (
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="push-send-user" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+            <label htmlFor="push-send-user" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
               받는 사람
             </label>
             <EntityPicker
@@ -362,7 +362,7 @@ export function PushSendForm() {
         {target === 'broadcast' && (
           <p
             role="note"
-            className="text-[var(--font-size-label)] text-[var(--orange700)] bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] rounded-xl px-3.5 py-3 flex items-start gap-2"
+            className="text-[length:var(--font-size-label)] text-[var(--orange700)] bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] rounded-xl px-3.5 py-3 flex items-start gap-2"
           >
             <AlertTriangle size={15} className="text-[var(--orange700)] shrink-0 mt-0.5" aria-hidden="true" />
             현재 웹 푸시를 구독 중인 모든 회원에게 발송돼요. 공지 알림을 꺼둔 회원은 자동으로 제외돼요.
@@ -371,7 +371,7 @@ export function PushSendForm() {
 
         {/* Title */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="push-send-title" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+          <label htmlFor="push-send-title" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
             제목 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
             <span className="sr-only">(필수)</span>
           </label>
@@ -391,14 +391,14 @@ export function PushSendForm() {
               'transition-colors disabled:opacity-50',
             ].join(' ')}
           />
-          <p className="text-[var(--font-size-micro)] text-right text-gray-400 tabular-nums">
+          <p className="text-[length:var(--font-size-micro)] text-right text-gray-400 tabular-nums">
             {title.length} / {TITLE_MAX}
           </p>
         </div>
 
         {/* Body */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="push-send-body" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+          <label htmlFor="push-send-body" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
             내용
           </label>
           <textarea
@@ -416,14 +416,14 @@ export function PushSendForm() {
               'transition-colors disabled:opacity-50',
             ].join(' ')}
           />
-          <p className="text-[var(--font-size-micro)] text-right text-gray-400 tabular-nums">
+          <p className="text-[length:var(--font-size-micro)] text-right text-gray-400 tabular-nums">
             {body.length} / {BODY_MAX}
           </p>
         </div>
 
         {/* URL */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="push-send-url" className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+          <label htmlFor="push-send-url" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
             이동 링크 <span className="text-gray-400 font-normal">(선택)</span>
           </label>
           <input
@@ -446,7 +446,7 @@ export function PushSendForm() {
           type="submit"
           disabled={!canSubmit}
           className={[
-            'inline-flex items-center justify-center gap-1.5 min-h-[48px] rounded-xl text-[var(--font-size-body)] font-semibold transition-colors',
+            'inline-flex items-center justify-center gap-1.5 min-h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold transition-colors',
             'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
             canSubmit
               ? 'bg-blue-500 text-white hover:bg-blue-600'

@@ -134,13 +134,13 @@ export default function AdminOverviewPage() {
       {/* ── Warning section ───────────────────────────────────────────── */}
       {!isPending && !isError && (
         <section aria-label="주의 필요 항목" className="mb-6">
-          <h2 className="text-[var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">주의 필요</h2>
+          <h2 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">주의 필요</h2>
           {totalWarnings === 0 ? (
             <div className="flex items-center gap-2.5 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
               <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />
               {/* text-green-700은 dark: 변형이 없는 고정값이라 --green50(dark) 배경 위에서 2.70~3.07:1로 AA 미달.
                   admin-status-pill.tsx와 동일하게 --green700 토큰 부재 시 중립 강조 토큰(--text-strong)으로 대체. */}
-              <p className="text-[var(--font-size-body-sm)] text-[var(--text-strong)]">지금은 조치가 필요한 항목이 없어요.</p>
+              <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]">지금은 조치가 필요한 항목이 없어요.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -198,10 +198,10 @@ export default function AdminOverviewPage() {
       {!isPending && !isError && (
         <section aria-label="최근 운영 활동" className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)]">최근 운영 활동</h2>
+            <h2 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">최근 운영 활동</h2>
             <Link
               href="/admin/audit"
-              className="flex items-center gap-0.5 text-[var(--font-size-label)] text-blue-500 font-medium hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
+              className="flex items-center gap-0.5 text-[length:var(--font-size-label)] text-blue-500 font-medium hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
             >
               전체 보기
               <ArrowRight size={13} aria-hidden="true" />
@@ -210,7 +210,7 @@ export default function AdminOverviewPage() {
 
           {!overview?.recentActions?.length ? (
             <div className="py-10 text-center">
-              <p className="text-[var(--font-size-body-sm)] text-gray-400">최근 운영 활동이 없어요.</p>
+              <p className="text-[length:var(--font-size-body-sm)] text-gray-400">최근 운영 활동이 없어요.</p>
             </div>
           ) : (
             <ul role="list">
@@ -223,14 +223,14 @@ export default function AdminOverviewPage() {
                   <AdminStatusPill status={action.targetType} label={adminTargetTypeLabel(action.targetType)} />
 
                   {/* Action description */}
-                  <span className="flex-1 text-[var(--font-size-label)] text-[var(--text-body)] truncate">
+                  <span className="flex-1 text-[length:var(--font-size-label)] text-[var(--text-body)] truncate">
                     {adminActionLabel(action.actionType)}
                   </span>
 
                   {/* Relative time */}
                   <time
                     dateTime={action.createdAt}
-                    className="text-[var(--font-size-caption)] text-gray-400 shrink-0 tabular-nums"
+                    className="text-[length:var(--font-size-caption)] text-gray-400 shrink-0 tabular-nums"
                   >
                     {formatRelativeTime(action.createdAt)}
                   </time>

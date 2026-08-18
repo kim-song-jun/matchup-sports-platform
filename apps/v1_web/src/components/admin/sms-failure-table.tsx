@@ -34,7 +34,7 @@ export function SmsFailureTable() {
       key: 'eventType',
       header: '유형',
       render: (failure) => (
-        <span className="text-[var(--font-size-label)] font-medium text-[var(--text-body)] whitespace-nowrap">
+        <span className="text-[length:var(--font-size-label)] font-medium text-[var(--text-body)] whitespace-nowrap">
           {eventTypeLabel(failure.eventType)}
         </span>
       ),
@@ -43,7 +43,7 @@ export function SmsFailureTable() {
       key: 'phoneMasked',
       header: '대상',
       render: (failure) => (
-        <span className="font-mono text-[var(--font-size-label)] text-[var(--text-muted)]">
+        <span className="font-mono text-[length:var(--font-size-label)] text-[var(--text-muted)]">
           …{failure.phoneMasked}
         </span>
       ),
@@ -86,7 +86,7 @@ export function SmsFailureTable() {
       width: 'w-[88px]',
       render: (failure) =>
         failure.acknowledgedAt ? (
-          <span className="inline-flex items-center gap-1 text-[var(--font-size-micro)] font-semibold text-[var(--text-muted)]">
+          <span className="inline-flex items-center gap-1 text-[length:var(--font-size-micro)] font-semibold text-[var(--text-muted)]">
             <CheckCircle2 size={13} aria-hidden="true" />
             확인됨
           </span>
@@ -95,7 +95,7 @@ export function SmsFailureTable() {
             type="button"
             onClick={() => ackMutation.mutate([failure.id])}
             disabled={ackMutation.isPending}
-            className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             // 유형 라벨에 이미 '실패'가 들어가는 경우가 많아 '… 실패 확인'은 중복이 된다.
             // 대상까지 붙여 같은 유형의 행끼리도 스크린리더에서 구분되게 한다.
             aria-label={`${eventTypeLabel(failure.eventType)} (대상 ${failure.phoneMasked}) 확인 처리`}

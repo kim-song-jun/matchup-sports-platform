@@ -85,7 +85,7 @@ export function AdminFilterBar({
                     aria-pressed={active}
                     aria-label={typeof opt.count === 'number' ? `${opt.label} ${opt.count}` : opt.label}
                     className={[
-                      'inline-flex items-center px-3 min-h-[44px] rounded-full text-[var(--font-size-label)] font-medium transition-colors',
+                      'inline-flex items-center px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       active
                         ? 'bg-blue-500 text-white'

@@ -171,7 +171,7 @@ function useSectionLabel(pathname: string, canManageAdmins: boolean): string {
  */
 function NavGroupLabel({ label }: { label: string }) {
   return (
-    <p className="px-4 pt-3 pb-1 leading-none text-[var(--font-size-caption)] font-bold tracking-wide text-[var(--text-caption)]">
+    <p className="px-4 pt-3 pb-1 leading-none text-[length:var(--font-size-caption)] font-bold tracking-wide text-[var(--text-caption)]">
       {label}
     </p>
   );
@@ -182,7 +182,7 @@ function NavBadge({ count }: { count: number }) {
   return (
     <span
       aria-hidden="true"
-      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
+      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[length:var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -355,7 +355,7 @@ function Drawer({
             <span className="text-[15px] font-bold text-[var(--text-strong)]">Teameet 운영</span>
             {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
-              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5">
                 {adminRoleLabel}
               </span>
             )}
@@ -461,7 +461,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
             <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight">Teameet 운영</span>
             {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
-              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
                 {adminRoleLabel}
               </span>
             )}

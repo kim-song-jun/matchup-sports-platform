@@ -284,7 +284,7 @@ export function StaffClient({ tournamentId }: Props) {
     <div className="flex flex-col gap-5">
       <div className="flex justify-between items-start gap-3">
         <div>
-          <p className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] tracking-normal mb-1">
+          <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] tracking-normal mb-1">
             {tournament.data?.title ?? '대회 운영'}
           </p>
           <h1 className="text-[22px] md:text-[24px] font-bold text-[var(--text-strong)]">스태프</h1>

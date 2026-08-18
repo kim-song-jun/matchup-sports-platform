@@ -52,10 +52,10 @@ describe('ReviewPolicySettingsService', () => {
     });
   });
 
-  // 마이그레이션이 싱글턴 행을 시드하므로 "아직 아무도 안 건드린 상태"는 행 부재가 아니라
-  // updatedByAdminUserId=null 로 나타난다. 이걸 false 로 판정하면 어드민의 "· 기본값" 표기가
-  // 영영 뜨지 않는다(Copilot PR #555 지적).
-  it('시드된 행이지만 어드민이 편집한 적 없으면 isDefault=true 다', async () => {
+  // 행이 어떤 경로로든 생겼지만 어드민이 저장한 적 없으면 여전히 기본값 상태다.
+  // (Copilot PR #555 지적 — 당시엔 마이그레이션이 행을 시드했고, 지금은 시드하지 않지만
+  //  두 경우 모두에서 "· 기본값" 표기가 정확해야 한다.)
+  it('행이 있어도 어드민이 편집한 적 없으면 isDefault=true 다', async () => {
     const { service } = build({ reviewWindowHours: 168, updatedByAdminUserId: null });
     await expect(service.get()).resolves.toMatchObject({ isDefault: true });
   });

@@ -150,6 +150,8 @@ export class TeamMatchesService {
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
       costNote: teamMatch.costNote,
+      // null 이면 일반 팀 매치, 값이 있으면 리그전이다. 프론트는 이 값의 유무로 배지를 건다.
+      league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
@@ -262,6 +264,9 @@ export class TeamMatchesService {
       include: {
         sport: { select: { name: true } },
         hostTeam: { select: { id: true, name: true } },
+        // 내 경기 목록도 리그전 배지를 단다(사용자 결정 3). 이 목록은 공용 include 를
+        // 쓰지 않고 자체 select 라, 여기에 따로 실지 않으면 배지가 이 화면에서만 빠진다.
+        league: { select: { id: true, title: true } },
         applications: {
           where: { applicantTeamId: { in: teamIds } },
           include: { applicantTeam: { select: { id: true, name: true } } },
@@ -296,6 +301,7 @@ export class TeamMatchesService {
           teamId,
           teamName: teamIds.includes(teamMatch.hostTeamId) ? teamMatch.hostTeam.name : application?.applicantTeam.name,
           applicationId: application?.id ?? null,
+          league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
           manageRoute: relation === 'host_team' ? `/team-matches/${teamMatch.id}/manage` : null,
           detailRoute: `/team-matches/${teamMatch.id}`,
         };
@@ -1185,6 +1191,11 @@ export class TeamMatchesService {
       // only route the v1 web client already fetches for a team match, so we
       // surface the 1:1 Game relation here instead of adding a new endpoint.
       game: { select: { id: true } },
+      // 리그전 표시(2026-08-18). 이 관계가 없으면 응답에 리그 소속이 실리지 않아
+      // 화면에서 "이 경기가 리그전인지" 알 방법이 아예 없다 -- 배지의 유일한 근거다.
+      // 확장 단계라 league(신규)만 읽는다. 구 series 관계는 롤링 배포 창을 위해
+      // 스키마에 남아 있지만 새 코드는 읽지 않는다.
+      league: { select: { id: true, title: true } },
     } satisfies Prisma.V1TeamMatchInclude;
   }
 
@@ -1208,6 +1219,7 @@ export class TeamMatchesService {
         trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
       },
       costNote: teamMatch.costNote,
+      league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,

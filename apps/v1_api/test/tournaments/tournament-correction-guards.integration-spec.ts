@@ -587,7 +587,9 @@ describe('대회 결과 정정 레인 가드', () => {
    */
   it('2-C: 승부차기를 실어 정정하면 저장되고, officialize 후 POISONED 없이 끝난다', async () => {
     const setup = await endAndOfficialize(ids.penaltyCorrectionFixture, 1, 1, {
-      penalties: { home: 5, away: 4 },
+      // `end` 레인은 킥 수를 요구한다. 정정(아래 `correct`)은 면제라, 이 테스트가
+      // 두 레인의 계약 차이를 그대로 태운다.
+      penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },
     });
 
     // 최초 확정은 home 승 → 다음 라운드 HOME 슬롯은 host 팀.
@@ -651,7 +653,7 @@ describe('대회 결과 정정 레인 가드', () => {
    */
   it('2-C 역방향: 폼이 penalties를 떨어뜨려도 base 승부차기를 승계해 득점자 정정이 통과한다', async () => {
     const setup = await endAndOfficialize(ids.carryOverFixture, 1, 1, {
-      penalties: { home: 5, away: 4 },
+      penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },
     });
 
     // 폼이 실제로 보내는 형태 — 평평한 {home, away}. 참가자 기록만 바꾼다.
@@ -665,7 +667,13 @@ describe('대회 결과 정정 레인 가드', () => {
     });
     // 승계된 값이 실제로 저장돼야 한다 — 저장되지 않으면 officialize 후
     // `resolveWinnerSide`가 draw로 떨어져 잡이 POISONED가 된다.
-    expect(draft.score).toEqual({ home: 1, away: 1, penalties: { home: 5, away: 4 } });
+    // 킥 수까지 함께 승계돼야 한다 — 정정 폼에 승부차기 입력란이 없어, 여기서 떨어지면
+    // 되살릴 수단이 없고 이후 정정마다 서버가 결판을 판정할 근거를 잃는다.
+    expect(draft.score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },
+    });
   });
 
   describe('참가자·승부차기 형태 가드 (조별리그 픽스처)', () => {

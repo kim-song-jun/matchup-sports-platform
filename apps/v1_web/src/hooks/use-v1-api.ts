@@ -2043,6 +2043,32 @@ export function useV1UpdateRecordConsent() {
   });
 }
 
+/**
+ * 대회 경기 기록 실명 표시 토글 (2026-08-18 사용자 결정) -- 대회 라인업/이벤트 득점자/
+ * MVP에 닉네임 대신 실명을 보여줄지. `V1RecordConsent`(위)와 달리 "동의"가 아니라
+ * 표시 선호도라 `policyHash`가 없고, 대회 신청 때마다 다시 묻지 않는다 -- 한 번 켜면
+ * 그 뒤로 계속 적용되고 여기서 언제든 끌 수 있다. 기본값 false(닉네임).
+ */
+export type V1TournamentRealNameVisibility = { visible: boolean };
+
+export function useV1TournamentRealNameVisibility() {
+  return useQuery({
+    queryKey: v1Keys.tournamentRealNameVisibility(),
+    queryFn: () => v1Get<V1TournamentRealNameVisibility>('/me/tournament-real-name-visibility'),
+  });
+}
+
+export function useV1UpdateTournamentRealNameVisibility() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { visible: boolean }) =>
+      v1Patch<V1TournamentRealNameVisibility>('/me/tournament-real-name-visibility', body),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1TournamentRealNameVisibility>(v1Keys.tournamentRealNameVisibility(), result);
+    },
+  });
+}
+
 export function useV1Profile() {
   return useQuery({
     queryKey: v1Keys.profile(),
@@ -3381,6 +3407,55 @@ export function useV1AdminTournaments(params?: AdminTournamentListFilters) {
     // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
     // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * 목업 대회 생성 — alpha 전용. 서버가 V1_ENABLE_MOCK_SEED 로 잠그고, 꺼져 있으면 이 조회가
+ * enabled:false 를 돌려주므로 화면이 버튼째 숨긴다.
+ */
+export function useV1MockSeedAvailability() {
+  return useQuery({
+    queryKey: ['admin-mock-seed-availability'],
+    queryFn: () => v1Get<{ enabled: boolean }>('/admin/mock-seed/availability'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export type CreateMockTournamentInput = {
+  format?: 'league' | 'knockout' | 'group_knockout';
+  teamCount?: number;
+  status?: 'open' | 'in_progress' | 'completed';
+  withResults?: boolean;
+  reviewReady?: boolean;
+  titleSuffix?: string;
+};
+
+export type CreateMockTournamentResult = {
+  tournamentId: string;
+  title: string;
+  format: string;
+  teamCount: number;
+  fixtureCount: number;
+  status: string;
+  reviewReady: boolean;
+  route: string;
+  /** 이 대회에 참가한 테스트 계정 — 어떤 계정으로 로그인해야 검증할 수 있는지 알려준다. */
+  teams: Array<{
+    teamId: string;
+    teamName: string;
+    accounts: Array<{ email: string; nickname: string; role: string }>;
+  }>;
+};
+
+export function useV1CreateMockTournament() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateMockTournamentInput) =>
+      v1Post<CreateMockTournamentResult>('/admin/mock-seed/tournaments', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournaments'] });
+    },
   });
 }
 

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useV1MyTeams, useV1ReceivedReviews, useV1ReceivedReviewSummary, useV1Reviews, useV1ReviewSource, useV1SubmitReview } from '@/hooks/use-v1-api';
 import type { V1ReviewSourceType, V1ReviewTargetType } from '@/types/api';
 import { ReviewSourcePageView, ReviewsPageView, ReviewsReceivedPageView, ReviewSubmitCompleteView } from './reviews-page';
-import type { ReviewTargetDraft, ReviewsTab } from './reviews.types';
+import { DEFAULT_REVIEW_RATING, type ReviewTargetDraft, type ReviewsTab } from './reviews.types';
 import { toReviewSourcePageModel, toReviewsPageModel, toReviewsReceivedPageModel } from './reviews.view-model';
 
 export function ReviewsPageClient({ initialTab }: { initialTab: ReviewsTab }) {
@@ -67,7 +67,7 @@ export function ReviewSourcePageClient({
         const key = targetKey(target.targetType, target.targetUserId, target.targetTeamId);
         if (next[key]) continue;
         next[key] = {
-          rating: target.review?.rating ?? 4,
+          rating: target.review?.rating ?? DEFAULT_REVIEW_RATING,
           tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [],
         };
       }
@@ -85,7 +85,7 @@ export function ReviewSourcePageClient({
 
   const toggleTag = (key: string, tagCode: string) => {
     setDrafts((current) => {
-      const draft = current[key] ?? { rating: 4, tagCodes: [] };
+      const draft = current[key] ?? { rating: DEFAULT_REVIEW_RATING, tagCodes: [] };
       const exists = draft.tagCodes.includes(tagCode);
       return {
         ...current,
@@ -114,7 +114,7 @@ export function ReviewSourcePageClient({
     try {
       for (const target of readyTargets) {
         const key = targetKey(target.targetType, target.targetUserId, target.targetTeamId);
-        const draft = drafts[key] ?? { rating: 4, tagCodes: [] };
+        const draft = drafts[key] ?? { rating: DEFAULT_REVIEW_RATING, tagCodes: [] };
         await submit.mutateAsync({
           sourceType,
           sourceId,

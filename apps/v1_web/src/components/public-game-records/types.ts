@@ -82,6 +82,23 @@ export interface PublicScheduleScorer {
   readonly clockMs: number | null;
 }
 
+/**
+ * One card (booking/sending-off) in a schedule card's event summary. Consent
+ * gating on `participantName`/`jerseyNumber` is identical to
+ * `PublicScheduleScorer` — `null` means "withheld", never "unknown".
+ *
+ * `cardColor` is `null` only for legacy payloads that never stored a colour;
+ * the schedule card then draws a neutral card rather than guessing yellow.
+ */
+export interface PublicScheduleCard {
+  readonly side: 'home' | 'away';
+  readonly cardColor: 'YELLOW' | 'RED' | null;
+  readonly participantName: string | null;
+  readonly jerseyNumber: number | null;
+  readonly period: number | null;
+  readonly clockMs: number | null;
+}
+
 /** One row of `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]`. */
 export interface PublicScheduleEntry {
   readonly fixtureId: string;
@@ -103,6 +120,7 @@ export interface PublicScheduleEntry {
   readonly clock: PublicGameClock | null;
   readonly periodBreak: PublicPeriodBreak | null;
   readonly scorers: readonly PublicScheduleScorer[];
+  readonly cards: readonly PublicScheduleCard[];
   readonly hasVideo: boolean;
 }
 

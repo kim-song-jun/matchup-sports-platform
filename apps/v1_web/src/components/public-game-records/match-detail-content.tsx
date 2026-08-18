@@ -8,6 +8,7 @@ import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
   fixtureStatusLabel,
+  eventPresentation,
   formatClock,
   formatScoreline,
   isClockAbnormal,
@@ -100,14 +101,6 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
       <div style={{ display: 'flex', justifyContent: 'flex-start' }}>{event.side === 'away' ? content : null}</div>
     </div>
   );
-}
-
-function eventPresentation(event: PublicMatchEvent): { icon: string; label: string } {
-  if (event.type === 'GOAL') return { icon: '⚽', label: '골' };
-  if (event.type === 'CARD' && event.cardColor === 'RED') return { icon: '🟥', label: '레드카드' };
-  if (event.type === 'CARD' && event.cardColor === 'YELLOW') return { icon: '🟨', label: '옐로카드' };
-  if (event.type === 'CARD') return { icon: '□', label: '카드 색상 확인 필요' };
-  return { icon: '•', label: event.type };
 }
 
 function EventsSection({

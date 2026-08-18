@@ -506,7 +506,7 @@ describe('ReviewsService', () => {
       submittedAt: submittedAtValue,
     });
 
-    it('상호 제출된 대회 개인 리뷰를 즉시 익명으로 반환한다', async () => {
+    it('상호 제출된 대회 개인 리뷰를 즉시 반환하고 작성자를 공개한다', async () => {
       const now = new Date('2026-08-14T12:00:00.000Z');
       jest.useFakeTimers().setSystemTime(now);
       try {
@@ -523,18 +523,24 @@ describe('ReviewsService', () => {
         const prisma = {
           v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
           v1PostEventReview: { findMany },
+          // 받은 후기 카드에 "어느 경기였는지"를 싣느라 소스 요약을 조회한다.
+          v1Match: { findMany: jest.fn().mockResolvedValue([]) },
+          v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
         };
-        const service = new ReviewsService(prisma as never, {} as never, adminContextStub());
+        const service = new ReviewsService(
+          prisma as never,
+          { sourceSummaries: jest.fn().mockResolvedValue(new Map()) } as never,
+          adminContextStub(),
+        );
 
         const result = await service.received(user, { limit: 20 });
 
+        // 2026-08-18 정책: 작성자 닉네임을 공개한다. reveal 게이트(상호 제출/72시간)는 그대로다.
         expect(result.items).toEqual([
           expect.objectContaining({
             reviewId: candidate.id,
-            anonymous: true,
-            reviewerUser: null,
-            reviewerTeam: null,
-            submittedAt: null,
+            anonymous: false,
+            reviewerUser: expect.objectContaining({ name: '보낸 선수' }),
             rating: 5,
           }),
         ]);
@@ -554,7 +560,7 @@ describe('ReviewsService', () => {
       sourceGroupId: null,
     });
 
-    it('상호 제출된 팀매치 개인 리뷰도 즉시 익명으로 반환한다', async () => {
+    it('상호 제출된 팀매치 개인 리뷰도 즉시 반환한다', async () => {
       const now = new Date('2026-08-14T12:00:00.000Z');
       jest.useFakeTimers().setSystemTime(now);
       try {
@@ -572,13 +578,20 @@ describe('ReviewsService', () => {
         const prisma = {
           v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
           v1PostEventReview: { findMany },
+          // 받은 후기 카드에 "어느 경기였는지"를 싣느라 소스 요약을 조회한다.
+          v1Match: { findMany: jest.fn().mockResolvedValue([]) },
+          v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
         };
-        const service = new ReviewsService(prisma as never, {} as never, adminContextStub());
+        const service = new ReviewsService(
+          prisma as never,
+          { sourceSummaries: jest.fn().mockResolvedValue(new Map()) } as never,
+          adminContextStub(),
+        );
 
         const result = await service.received(user, { limit: 20 });
 
         expect(result.items).toEqual([
-          expect.objectContaining({ reviewId: candidate.id, anonymous: true, reviewerUser: null, rating: 5 }),
+          expect.objectContaining({ reviewId: candidate.id, anonymous: false, rating: 5 }),
         ]);
         // mock 은 where 를 무시하고 값을 돌려주므로, 조회 조건 자체를 단언하지 않으면 필터를
         // 되돌려도 이 테스트가 통과한다(가짜 통과). team_match 가 조회 대상에서 빠지는 순간

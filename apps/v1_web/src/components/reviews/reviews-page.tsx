@@ -3,6 +3,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
+import { DEFAULT_REVIEW_RATING } from './reviews.types';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import { REVIEW_TAG_OPTIONS, toTargetViewModel } from './reviews.view-model';
 import { ReviewsSummaryDashboard } from './reviews-summary-dashboard';
@@ -47,8 +48,7 @@ export function ReviewsPageView({
   const isReceivedTab = model.tab === 'received';
   // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
   // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
-  const hasAnonymousContent = receivedModel.anonymousUserGroups.length > 0 || receivedModel.anonymousTeamGroups.length > 0;
-  const hasLegacyContent = loading || Boolean(errorMessage) || receivedModel.legacyUserGroups.length > 0 || receivedModel.legacyTeamGroups.length > 0;
+  const hasReceivedContent = receivedModel.userGroups.length > 0 || receivedModel.teamGroups.length > 0;
 
   return (
     <AppChrome title="리뷰" activeTab="my" backHref="/my" desktopHead>
@@ -57,8 +57,8 @@ export function ReviewsPageView({
         {isReceivedTab ? (
           <>
             {/* 개별 리뷰가 주인공, 요약은 보조. 요약은 집계 0건이면 스스로 렌더하지 않는다. */}
-            {hasAnonymousContent ? <AnonymousReceivedContent model={receivedModel} /> : null}
-            <div style={{ display: 'grid', gap: 12, marginTop: hasAnonymousContent ? 24 : 0 }}>
+            {hasReceivedContent ? <AnonymousReceivedContent model={receivedModel} /> : null}
+            <div style={{ display: 'grid', gap: 12, marginTop: hasReceivedContent ? 24 : 0 }}>
               <ReviewsSummaryDashboard
                 summary={summary}
                 period={period}
@@ -76,18 +76,6 @@ export function ReviewsPageView({
                 />
               ) : null}
             </div>
-            {hasLegacyContent ? (
-              <div style={{ marginTop: 24 }}>
-                <div className="tm-my-section-label">이전 리뷰</div>
-                <div className="tm-text-caption" style={{ marginBottom: 10 }}>이 기능이 도입되기 전에 받은 리뷰예요.</div>
-                <ReviewsReceivedContent
-                  errorMessage={errorMessage}
-                  loading={loading}
-                  model={receivedModel}
-                  onRetry={onRetry}
-                />
-              </div>
-            ) : null}
           </>
         ) : (
           <>
@@ -123,42 +111,21 @@ export function ReviewsPageView({
   );
 }
 
-function ReviewsReceivedContent({
-  errorMessage,
-  loading,
-  model,
-  onRetry,
-}: QueryStateProps & {
-  model: ReviewsReceivedPageModel;
-}) {
-  const empty = model.legacyUserGroups.length === 0 && model.legacyTeamGroups.length === 0;
-
-  return (
-    <>
-      <ReviewStats stats={model.stats} />
-      {loading ? <ReviewSkeleton count={2} /> : null}
-      {!loading && errorMessage ? <ReviewNotice title="받은 리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
-      {!loading && !errorMessage && empty ? <ReviewEmpty title="받은 리뷰가 없어요" sub="상대방이 보낸 리뷰가 경기별로 모여서 보여요." /> : null}
-      {!loading && !errorMessage && model.legacyUserGroups.length > 0 ? <ReceivedGroupSection title="내가 받은 리뷰" groups={model.legacyUserGroups} /> : null}
-      {!loading && !errorMessage && model.legacyTeamGroups.length > 0 ? <ReceivedGroupSection title="내 팀이 받은 리뷰" groups={model.legacyTeamGroups} /> : null}
-    </>
-  );
-}
-
 function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }) {
   return (
     <div style={{ marginTop: 24 }}>
-      {/* 이 섹션은 대회 전용이 아니다 — 팀매치·개인 매치 후기도 같은 익명·reveal 규칙으로
-          여기 들어온다(예전엔 대회 후기만 조회 대상이라 "대회에서"가 맞았다). */}
-      <div className="tm-my-section-label">경기에서 받은 익명 리뷰</div>
-      <div className="tm-text-caption" style={{ marginBottom: 10 }}>작성자는 공개되지 않으며, 상호 작성 완료 또는 72시간 뒤에 보여요.</div>
-      {model.anonymousUserGroups.length > 0 ? <ReceivedGroupSection groups={model.anonymousUserGroups} title="내가 받은 리뷰" /> : null}
-      {model.anonymousTeamGroups.length > 0 ? (
-        <div style={{ marginTop: 16 }}><ReceivedGroupSection groups={model.anonymousTeamGroups} title="내 팀이 받은 리뷰" /></div>
+      {/* 제도 전/후를 나누지 않는다 — "이전 리뷰" 섹션은 제거했다. 작성자도 공개한다. */}
+      <div className="tm-my-section-label">경기에서 받은 리뷰</div>
+      <div className="tm-text-caption" style={{ marginBottom: 10 }}>상호 작성이 끝나거나 72시간이 지나면 보여요.</div>
+      {model.userGroups.length > 0 ? <ReceivedGroupSection groups={model.userGroups} title="내가 받은 리뷰" /> : null}
+      {model.teamGroups.length > 0 ? (
+        <div style={{ marginTop: 16 }}><ReceivedGroupSection groups={model.teamGroups} title="내 팀이 받은 리뷰" /></div>
       ) : null}
     </div>
   );
 }
+
+const SUBMIT_HINT_ID = 'review-submit-hint';
 
 export function ReviewSourcePageView({
   drafts,
@@ -182,6 +149,9 @@ export function ReviewSourcePageView({
 }) {
   const pendingTargets = model?.targets.filter((target) => !target.locked && !target.alreadySubmitted && !target.review) ?? [];
   const canSubmit = pendingTargets.some((target) => drafts[targetKey(target.targetType, target.targetUserId, target.targetTeamId)]?.tagCodes.length > 0);
+  // 아직 쓸 대상이 남아 있는데 태그를 하나도 안 골라 버튼이 잠긴 상태에서만 안내한다 —
+  // 로딩·에러·전송 중이거나 남은 대상이 없으면 버튼이 회색인 이유가 다르므로 띄우지 않는다.
+  const showSubmitHint = !loading && !errorMessage && !submitting && pendingTargets.length > 0 && !canSubmit;
 
   return (
     <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
@@ -208,7 +178,7 @@ export function ReviewSourcePageView({
                 return (
                   <ReviewTargetCard
                     key={key}
-                    draft={drafts[key] ?? { rating: target.review?.rating ?? 4, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
+                    draft={drafts[key] ?? { rating: target.review?.rating ?? DEFAULT_REVIEW_RATING, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
                     onToggleTag={(tagCode) => onToggleTag(key, tagCode)}
                     onUpdateRating={(rating) => onUpdateRating(key, rating)}
                     target={targetModel}
@@ -224,7 +194,26 @@ export function ReviewSourcePageView({
         ) : null}
       </div>
       <div className="tm-fixed-cta">
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!canSubmit || submitting || loading || Boolean(errorMessage)} onClick={onSubmit} type="button">
+        {/* 별점은 기본값(5)으로 이미 채워져 있어서, 태그를 안 고른 사용자 눈에는 "다 했는데
+            버튼만 회색"으로 보인다 — 태그 1개 이상은 서버 계약(SubmitReviewDto 의
+            `@ArrayMinSize(1)`)이라 버튼을 풀어줄 수는 없으니, 왜 못 보내는지를 말해준다.
+            `aria-describedby` 로 버튼에 묶어 스크린리더도 비활성 이유를 읽게 한다. */}
+        {showSubmitHint ? (
+          <p
+            id={SUBMIT_HINT_ID}
+            className="tm-text-caption"
+            style={{ margin: '0 0 8px', textAlign: 'center', color: 'var(--text-caption)' }}
+          >
+            태그를 하나 이상 골라야 리뷰를 보낼 수 있어요
+          </p>
+        ) : null}
+        <button
+          aria-describedby={showSubmitHint ? SUBMIT_HINT_ID : undefined}
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          disabled={!canSubmit || submitting || loading || Boolean(errorMessage)}
+          onClick={onSubmit}
+          type="button"
+        >
           {submitting ? '전송 중' : '리뷰 보내기'}
         </button>
       </div>
@@ -260,16 +249,15 @@ export function ReviewsReceivedPageView({
 }) {
   // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
   // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
-  const hasAnonymousContent = model.anonymousUserGroups.length > 0 || model.anonymousTeamGroups.length > 0;
-  const hasLegacyContent = loading || Boolean(errorMessage) || model.legacyUserGroups.length > 0 || model.legacyTeamGroups.length > 0;
+  const hasReceivedContent = model.userGroups.length > 0 || model.teamGroups.length > 0;
   return (
     // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
     <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received" desktopHead>
       <div className="tm-review-shell">
         {/* 개별 리뷰가 주인공이고 요약은 보조다 — 예전엔 순서가 반대라 큰 대시보드 두 개를
             지나야 정작 받은 리뷰 내용이 나왔다. 요약은 집계가 0건이면 스스로 렌더하지 않는다. */}
-        {hasAnonymousContent ? <AnonymousReceivedContent model={model} /> : null}
-        <div style={{ display: 'grid', gap: 12, marginTop: hasAnonymousContent ? 24 : 0 }}>
+        {hasReceivedContent ? <AnonymousReceivedContent model={model} /> : null}
+        <div style={{ display: 'grid', gap: 12, marginTop: hasReceivedContent ? 24 : 0 }}>
           <ReviewsSummaryDashboard
             summary={summary}
             period={period}
@@ -287,18 +275,6 @@ export function ReviewsReceivedPageView({
             />
           ) : null}
         </div>
-        {hasLegacyContent ? (
-          <div style={{ marginTop: 24 }}>
-            <div className="tm-my-section-label">이전 리뷰</div>
-            <div className="tm-text-caption" style={{ marginBottom: 10 }}>이 기능이 도입되기 전에 받은 리뷰예요.</div>
-            <ReviewsReceivedContent
-              errorMessage={errorMessage}
-              loading={loading}
-              model={model}
-              onRetry={onRetry}
-            />
-          </div>
-        ) : null}
       </div>
     </AppChrome>
   );
@@ -439,7 +415,7 @@ function StarRating({ disabled, onChange, rating }: { disabled?: boolean; onChan
   );
 }
 
-function ReceivedGroupSection({ groups, title }: { groups: ReviewsReceivedPageModel['anonymousUserGroups']; title: string }) {
+function ReceivedGroupSection({ groups, title }: { groups: ReviewsReceivedPageModel['userGroups']; title: string }) {
   return (
     <section>
       <div className="tm-my-section-label">{title}</div>
@@ -467,9 +443,10 @@ function ReceivedReviewRow({ review }: { review: V1ReceivedReviewDetail }) {
   const firstTag = review.tags[0]?.label ?? '별점만';
   return (
     <div className="tm-review-received-row">
-      <Avatar imageUrl={review.reviewerUser?.imageUrl} initials={review.anonymous ? '익명' : review.reviewerUser?.name.slice(0, 2) ?? '리뷰'} size={34} />
+      {/* 작성자를 공개한다(2026-08-18). 팀 대상 후기는 보낸 팀 이름이 더 유용해서 팀명을 우선한다. */}
+      <Avatar imageUrl={review.reviewerUser?.imageUrl} initials={(review.reviewerTeam?.name ?? review.reviewerUser?.name ?? '리뷰').slice(0, 2)} size={34} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="tm-text-label">{review.anonymous ? '익명 리뷰' : review.reviewerTeam?.name ?? review.reviewerUser?.name ?? '리뷰'}</div>
+        <div className="tm-text-label">{review.reviewerTeam?.name ?? review.reviewerUser?.name ?? '작성자 미상'}</div>
         <div className="tm-text-caption" style={{ marginTop: 2 }}>{review.rating}점 · {firstTag}</div>
       </div>
     </div>

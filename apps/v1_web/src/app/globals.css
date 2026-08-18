@@ -253,6 +253,11 @@
   --v1-shell-bottom-nav-height: 74px;
   --v1-shell-wide-bottom-nav-height: 76px;
   --v1-shell-page-x: 20px;
+  /* 후기 화면들이 데스크톱에서 공유하는 본문 폭. 후기는 한 흐름 안에서 화면을 넘나든다
+     (대회 후기 목록 → 리뷰할 수 있는 경기 → 리뷰 남기기) — 화면마다 폭이 다르면 같은
+     흐름인데 매번 레이아웃이 갈아엎히는 것처럼 보인다(오너 지적). 값을 바꿀 일이 생기면
+     여기 한 곳만 고친다. */
+  --v1-review-column-width: 720px;
   --v1-shell-topbar-x: 16px;
   --v1-shell-wide-topbar-left-x: 20px;
   --v1-shell-wide-topbar-right-x: 14px;
@@ -4533,7 +4538,10 @@ button:disabled {
 }
 
 .tm-review-star[data-active="true"] {
-  color: var(--blue500);
+  /* 읽기 전용 별(`RatingStar`, awards-page-client.tsx)이 `--orange500` 이라, 후기 흐름
+     안에서 같은 별점이 화면마다 다른 색으로 보였다(오너 결정: 둘 다 주황으로 통일).
+     입력 가능하다는 신호는 색이 아니라 커서·호버·터치 타깃(::before 44px)이 맡는다. */
+  color: var(--orange500);
 }
 
 .tm-review-star:disabled {
@@ -6125,14 +6133,17 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+/* 모든 폭에서 같은 후기 카드를 쓴다 — 넓어지면 열 수만 늘린다. 예전에는 1024px 이상에서
+   카드를 숨기고 같은 데이터를 6열 표로 다시 그렸는데, 별점이 칸에 갇히고 후기 본문은 한 줄로
+   잘려 정작 읽으러 온 내용이 가장 안 읽혔다(오너 지적). 카드 한 벌만 남기면 좁은 화면에서
+   검증한 레이아웃이 넓은 화면에도 그대로 적용된다. */
 .tm-reviews-cards {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
+  align-items: start;
   transition: opacity 0.15s;
 }
-
-.tm-reviews-table-wrap { display: none; }
 
 .tm-reviews-pager {
   display: flex;
@@ -6187,74 +6198,16 @@ button:disabled {
 @media (min-width: 1024px) {
   /* 본문을 데스크탑 전체 폭에 늘리지 않고 좌측 라인에 고정 */
   .tm-reviews-body {
-    max-width: 760px;
+    /* `desktop/my.css` 의 `.tm-review-shell`/`.tm-review-compose-shell` 과 같은 토큰을
+       쓴다 — 이 화면에서 "리뷰할 수 있는 경기"를 눌러 넘어가는 곳이 바로 그 셸이다. */
+    max-width: var(--v1-review-column-width);
     margin: 0;
   }
 
-  /* 카드 목록 → 테이블로 전환 */
-  .tm-reviews-cards { display: none; }
-  .tm-reviews-table-wrap {
-    display: block;
-    overflow-x: auto;
-    border: 1px solid var(--grey150);
-    border-radius: 12px;
-  }
-  .tm-reviews-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  .tm-reviews-table thead th {
-    text-align: left;
-    padding: 10px 14px;
-    background: var(--grey50);
-    color: var(--text-caption);
-    font-weight: 600;
-    font-size: 12px;
-    border-bottom: 1px solid var(--grey150);
-    white-space: nowrap;
-  }
-  .tm-reviews-table tbody td {
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--grey100);
-    color: var(--text);
-    vertical-align: middle;
-  }
-  .tm-reviews-table tbody tr:last-child td { border-bottom: none; }
-  .tm-reviews-table tbody tr:hover { background: var(--grey50); }
-  .tm-reviews-table-team { color: var(--text-caption); white-space: nowrap; }
-  .tm-reviews-table-stars { display: flex; gap: 1px; white-space: nowrap; }
-  .tm-reviews-table-comment {
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .tm-reviews-table-empty { color: var(--text-caption); }
-  .tm-reviews-table-photos { display: flex; gap: 4px; }
-  .tm-reviews-table-photos a {
-    display: block;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-  .tm-reviews-table-photos img { width: 100%; height: 100%; object-fit: cover; }
-  .tm-reviews-table-photo-more {
-    display: inline-flex;
-    align-items: center;
-    /* [공개 화면 R-T2 정리] "+N" 인디케이터 — 고정폭 없어 캡션 토큰으로 상향. */
-    font-size: var(--font-size-caption);
-    color: var(--text-caption);
-    padding-left: 2px;
-  }
-  .tm-reviews-table-date {
-    color: var(--text-caption);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
+  /* 넓은 화면에서는 카드를 2열로 — 표로 갈아끼우지 않는다(위 .tm-reviews-cards 주석 참고). */
+  .tm-reviews-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
 .tm-hub-section-title {
   font-size: 15px;
   font-weight: 850;

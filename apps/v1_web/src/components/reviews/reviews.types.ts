@@ -60,8 +60,14 @@ export type ReceivedReviewGroup = {
 
 export type ReviewsReceivedPageModel = {
   stats: ReviewStat[];
-  anonymousUserGroups: ReceivedReviewGroup[];
-  anonymousTeamGroups: ReceivedReviewGroup[];
-  legacyUserGroups: ReceivedReviewGroup[];
-  legacyTeamGroups: ReceivedReviewGroup[];
+  /** 제도 전/후를 나누지 않는다 — "이전 리뷰" 섹션은 2026-08-18에 제거했다. */
+  userGroups: ReceivedReviewGroup[];
+  teamGroups: ReceivedReviewGroup[];
 };
+
+/**
+ * 아직 손대지 않은 리뷰 대상의 별점 초기값. 한때 이 값이 4로 **네 군데에 각각** 적혀
+ * 있었다(초기 draft 생성 · 태그 토글 · 제출 · 렌더 fallback) — 한 곳만 고치면 화면에
+ * 보이는 별과 실제로 전송되는 별이 갈린다. 값을 바꿀 일이 생기면 여기 한 곳만 고친다.
+ */
+export const DEFAULT_REVIEW_RATING = 5;

@@ -6,6 +6,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { TournamentsAdminController } from './tournaments-admin.controller';
+import { MockTournamentSeedController } from './mock-seed/mock-tournament-seed.controller';
+import { MockTournamentSeedService } from './mock-seed/mock-tournament-seed.service';
 import { TournamentsAdminService } from './tournaments-admin.service';
 import { TournamentRegistrationsController } from './tournament-registrations.controller';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
@@ -76,6 +78,7 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentCampaignsPublicController,
     TournamentCampaignsAdminController,
     TournamentsAdminController,
+    MockTournamentSeedController,
     AdminRegistrationsController,
     TournamentBracketController,
     TournamentPlayersController,
@@ -89,6 +92,7 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentResultReviewController,
   ],
   providers: [
+    MockTournamentSeedService,
     TournamentsAdminService,
     TournamentRegistrationsService,
     AdminRegistrationsService,

@@ -13,6 +13,7 @@ import type { GameLineupState } from '@/types/game-operations';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
+  eventPresentation,
   fixtureStatusLabel,
   formatGoalMinute,
   formatScoreline,
@@ -78,91 +79,138 @@ const SCORE_AXIS_COLUMNS = 'minmax(0, 1fr) 64px minmax(0, 1fr)';
 const SCORE_AXIS_COLUMN_GAP = 10;
 
 /**
- * 득점자 요약 -- 골이 하나도 없으면 이 함수 자체가 `null`을 반환해 빈 줄을
- * 아예 렌더하지 않는다(요구사항: "골이 없으면 그 줄 자체를 렌더하지 마라").
+ * 경기 이벤트 요약 -- 골과 카드(경고/퇴장)를 **한 축 위에 시간순으로** 쌓는다.
+ * 이벤트가 하나도 없으면 이 함수 자체가 `null`을 반환해 빈 줄을 아예 렌더하지 않는다.
+ *
+ * 한때 이 요약은 골만 실었다 -- 그래서 같은 경기의 같은 경고/퇴장이 경기 상세
+ * 타임라인에는 나오는데 대회 일정 카드에서는 통째로 사라졌다(오너 지적). 이제
+ * 아이콘 표현은 상세와 같은 `eventPresentation`을 공유한다.
  *
  * 홈/원정 분리: 스코어 행이 이미 "홈은 오른쪽 정렬, 원정은 왼쪽 정렬"로 좌우를
- * 확립해 뒀으므로, 득점자도 **그 행과 같은 3열 축**(`SCORE_AXIS_COLUMNS`)을
- * 문자 그대로 공유한다 — 비슷한 패턴을 다시 적는 게 아니라 같은 상수를 쓴다.
- * 예시 문구("⚽ 10' 김골키 · 45' 김골키")처럼 한 줄로 이어붙이는 방식은
- * 390px 폭에서 "어느 팀 골인지"를 시간순 나열만으로는 알 수 없다는 문제가 있다
- * (2:0 같은 스코어에서 이게 실제 정보 손실이다) -- 이미 검증된 좌우분리 패턴을
- * 그대로 재사용해 폭 문제와 팀 귀속 모호성을 동시에 해결한다. 이름이 null(동의
- * 없음)인 골은 이름을 지어내지 않고 시간만 남긴다. jerseyNumber는 DTO에는 있지만
- * 좁은 카드에 다 욱여넣으면 오히려 안 읽히므로 이 컴포넌트는 의도적으로 쓰지
- * 않는다(상세 페이지 타임라인에서는 등번호까지 보여준다).
+ * 확립해 뒀으므로, 이벤트도 **그 행과 같은 3열 축**(`SCORE_AXIS_COLUMNS`)을
+ * 문자 그대로 공유한다 -- 비슷한 패턴을 다시 적는 게 아니라 같은 상수를 쓴다.
+ * 한 줄로 시간순 나열만 하면 390px 폭에서 "어느 팀 기록인지"를 알 수 없다.
+ *
+ * **한 이벤트 = 한 행**이고 아이콘은 그 행 가운데에 놓인다. 예전에는 한 구간의
+ * 모든 골이 좌우 칸에 여러 줄로 쌓이는데 가운데 ⚽는 하나뿐이어서, 홈 2골 :
+ * 원정 1골 같은 경우 어느 줄이 어느 아이콘에 걸리는지 읽을 수 없었다 -- 카드가
+ * 섞이면(골·경고·퇴장 아이콘이 서로 다르다) 그 모호함이 곧장 오독이 된다.
+ *
+ * 이름이 null(동의 없음)인 이벤트는 이름을 지어내지 않고 시간만 남긴다.
+ * jerseyNumber는 DTO에는 있지만 좁은 카드에 다 욱여넣으면 오히려 안 읽히므로 이
+ * 컴포넌트는 의도적으로 쓰지 않는다(상세 페이지 타임라인에서는 등번호까지 보여준다).
  */
-function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] }) {
-  if (scorers.length === 0) return null;
-  const byClock = (a: PublicScheduleEntry['scorers'][number], b: PublicScheduleEntry['scorers'][number]) =>
+type ScheduleEventItem = {
+  key: string;
+  side: 'home' | 'away';
+  icon: string;
+  label: string;
+  participantName: string | null;
+  period: number | null;
+  clockMs: number | null;
+};
+
+function toScheduleEventItems(entry: PublicScheduleEntry): ScheduleEventItem[] {
+  const goals = entry.scorers.map((scorer, index) => ({
+    key: `goal-${index}`,
+    side: scorer.side,
+    ...eventPresentation({ type: 'GOAL', cardColor: null }),
+    participantName: scorer.participantName,
+    period: scorer.period,
+    clockMs: scorer.clockMs,
+  }));
+  // `?? []` -- 서버는 항상 이 키를 채우지만, 배포 과도기나 React Query 캐시에 남은
+  // 구 응답에는 `cards` 키가 아예 없을 수 있다(`formatPenaltyScoreline`이 `penalties`를
+  // 같은 이유로 방어한다). 시스템 경계에서 들어오는 값이라 키 부재를 정상 입력으로 다룬다.
+  const cards = (entry.cards ?? []).map((card, index) => ({
+    key: `card-${index}`,
+    side: card.side,
+    ...eventPresentation({ type: 'CARD', cardColor: card.cardColor }),
+    participantName: card.participantName,
+    period: card.period,
+    clockMs: card.clockMs,
+  }));
+  return [...goals, ...cards];
+}
+
+function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
+  const items = toScheduleEventItems(entry);
+  if (items.length === 0) return null;
+
+  const byClock = (a: ScheduleEventItem, b: ScheduleEventItem) =>
     (a.clockMs ?? Number.MAX_SAFE_INTEGER) - (b.clockMs ?? Number.MAX_SAFE_INTEGER);
-  const firstHalf = scorers.filter((scorer) => scorer.period === 1).sort(byClock);
-  const secondHalf = scorers.filter((scorer) => scorer.period !== null && scorer.period !== 1).sort(byClock);
-  // `period === null` = "전/후반을 모른다". 레거시 대회 결과에서 복원된 골이 그렇다
-  // (`goal-event-backfill.ts` — 원본에 전/후반이 없었고, 서버가 `isPeriodUnknown`으로
-  // null을 내려준다). `period !== 1`로 뭉뚱그리면 이 골들이 전부 "후반 득점"으로
-  // 렌더돼, 모른다고 내려온 값이 화면에서는 단정으로 바뀐다.
-  const unknownPeriod = scorers.filter((scorer) => scorer.period === null).sort(byClock);
-  const goalLine = (scorer: PublicScheduleEntry['scorers'][number], index: number) => (
-    <div key={index}>
-      {formatGoalMinute(scorer.clockMs)}
-      {scorer.participantName ? ` ${scorer.participantName}` : ''}
-      {isClockAbnormal(scorer.clockMs) ? <AbnormalClockBadge /> : null}
-    </div>
-  );
-  const halfRow = (label: string, halfScorers: PublicScheduleEntry['scorers']) => {
-    const home = halfScorers.filter((scorer) => scorer.side === 'home');
-    const away = halfScorers.filter((scorer) => scorer.side === 'away');
-    if (halfScorers.length === 0) return null;
-    return (
-      <div
-        role="group"
-        aria-label={label}
-        style={{
-          display: 'grid',
-          gridColumn: '1 / -1',
-          gridTemplateColumns: SCORE_AXIS_COLUMNS,
-          columnGap: SCORE_AXIS_COLUMN_GAP,
-        }}
-      >
-        <div style={{ textAlign: 'right' }}>{home.map(goalLine)}</div>
-        <div aria-hidden="true" style={{ textAlign: 'center' }}>⚽</div>
-        <div style={{ textAlign: 'left' }}>{away.map(goalLine)}</div>
-      </div>
-    );
-  };
+  // `period === null` = "전/후반을 모른다". 레거시 대회 결과에서 복원된 기록이 그렇다
+  // (`goal-event-backfill.ts` -- 원본에 전/후반이 없었고, 서버가 `isPeriodUnknown`으로
+  // null을 내려준다). `period !== 1`로 뭉뚱그리면 이 기록들이 전부 "후반"으로 렌더돼,
+  // 모른다고 내려온 값이 화면에서는 단정으로 바뀐다.
+  const sections = [
+    { key: 'first', label: '전반', items: items.filter((item) => item.period === 1).sort(byClock) },
+    {
+      key: 'second',
+      label: '후반',
+      items: items.filter((item) => item.period !== null && item.period !== 1).sort(byClock),
+    },
+    { key: 'unknown', label: '기타', items: items.filter((item) => item.period === null).sort(byClock) },
+  ].filter((section) => section.items.length > 0);
+
   return (
     <div
       role="list"
-      aria-label="득점자"
+      aria-label="경기 기록"
       style={{
         display: 'grid',
-        gridTemplateColumns: SCORE_AXIS_COLUMNS,
-        columnGap: SCORE_AXIS_COLUMN_GAP,
-        marginTop: 4,
+        gap: 8,
+        marginTop: 8,
         // [R-T2] 좌우 1fr 트랙이라 폭이 늘어도 그리드가 흡수 — 12로 상향.
         fontSize: 12,
         color: 'var(--text-caption)',
       }}
     >
-      {halfRow('전반 득점', firstHalf)}
-      <div
-        role="separator"
-        aria-label="전반과 후반 구분"
-        style={{
-          gridColumn: '1 / -1',
-          justifySelf: 'center',
-          width: '50%',
-          height: 0,
-          margin: '6px 0',
-          borderTop: '1px dotted var(--border)',
-        }}
-      />
-      {halfRow('후반 득점', secondHalf)}
-      {/* 전/후반을 모르는 골(복원된 레거시 대회 결과)이 있을 때만 나타나는 세 번째 줄.
-          `halfRow`가 빈 배열이면 null을 반환하므로 평소에는 아무것도 렌더되지 않는다 --
-          전·후반 축(구분선 포함)은 위 두 줄이 그대로 유지한다. */}
-      {halfRow('기타 득점', unknownPeriod)}
+      {sections.map((section) => (
+        <div key={section.key} role="group" aria-label={`${section.label} 기록`} style={{ display: 'grid', gap: 3 }}>
+          {/* 예전엔 전/후반 사이에 점선 하나만 그어서 그게 무슨 경계인지 알 수 없었다 —
+              구간 이름을 직접 적는다(디자인 규칙: 의미 구분은 선·색만으로 하지 않는다). */}
+          <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <span style={{ fontWeight: 700, color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
+              {section.label}
+            </span>
+            <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          </div>
+          {section.items.map((item) => (
+            <ScheduleEventRow key={item.key} item={item} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
+  const content = (
+    <span>
+      {formatGoalMinute(item.clockMs)}
+      {item.participantName ? ` ${item.participantName}` : ''}
+      {isClockAbnormal(item.clockMs) ? <AbnormalClockBadge /> : null}
+    </span>
+  );
+
+  return (
+    <div
+      role="listitem"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: SCORE_AXIS_COLUMNS,
+        columnGap: SCORE_AXIS_COLUMN_GAP,
+        alignItems: 'center',
+      }}
+    >
+      <div style={{ textAlign: 'right' }}>{item.side === 'home' ? content : null}</div>
+      <div style={{ textAlign: 'center', lineHeight: 1 }}>
+        <span aria-hidden="true">{item.icon}</span>
+        <span className="sr-only">{item.label}</span>
+      </div>
+      <div style={{ textAlign: 'left' }}>{item.side === 'away' ? content : null}</div>
     </div>
   );
 }
@@ -281,7 +329,10 @@ function ScheduleRow({
               fontSize: 12,
               fontWeight: 800,
               color: 'var(--blue700)',
-              background: 'var(--card-surface)',
+              // 행 배경이 중립(grey50)으로 바뀌면서 파란색이 남은 자리는 이 배지와
+              // 왼쪽 액센트 바 둘뿐이다 — 배지가 파랗게 떠야 "우리 팀"이 눈에 걸린다.
+              // 예전처럼 카드 표면색(흰색)으로 두면 중립 배경 위에서 배지 윤곽이 사라진다.
+              background: 'var(--blue50)',
               borderRadius: 6,
               padding: '2px 6px',
             }}
@@ -340,7 +391,7 @@ function ScheduleRow({
       {/* 스코어 아래 보조 표기 — 스코어 칸(가운데 64px)이 행 정중앙이라 행 전체를
           가운데 정렬하면 그대로 스코어 밑에 놓인다. 승부차기가 없으면 렌더 없음. */}
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
-      <ScorerSummary scorers={entry.scorers} />
+      <MatchEventSummary entry={entry} />
       {venue ? (
         // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.
         <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)' }}>{venue}</div>
@@ -359,7 +410,18 @@ function ScheduleRow({
       style={{
         borderTop: '1px solid var(--grey100)',
         borderLeft: '3px solid var(--blue500)',
-        background: 'var(--blue50)',
+        // 예전에는 행 전체를 `--blue50`(#e8f3ff)로 칠했다 — 내 팀 경기가 연달아 있으면
+        // 목록의 절반이 통째로 파랗게 덮여, 강조가 아니라 배경 자체가 바뀐 것처럼 보였다
+        // (오너 지적: "하이라이트 색상도 그렇고"). 파랑은 왼쪽 액센트 바와 "우리 팀"
+        // 배지에만 남기고 면(面)은 중립 톤으로 되돌린다 — 이 저장소의 절제 원칙대로
+        // 강조는 넓은 색면이 아니라 좁은 액센트로 준다.
+        //
+        // `--grey50`이 아니라 `--grey100`인 이유: 스코어 칸이 `--grey50` pill이라,
+        // 행 배경까지 `--grey50`으로 두면 **두 색이 정확히 같아져 스코어 pill이 배경에
+        // 통째로 녹는다**(alpha 실측: rowBg === pillBg === rgb(249,250,251)). 한 단계
+        // 진한 톤을 써서 pill이 그 위로 떠오르게 한다 — 라이트/다크 양쪽 모두에서
+        // 두 토큰이 서로 다른 값이라 대비가 유지된다.
+        background: 'var(--grey100)',
       }}
     >
       {row}

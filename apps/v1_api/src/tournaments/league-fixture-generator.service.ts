@@ -26,16 +26,20 @@ export function matchesPerTeam(teamCount: number, legs: number): number {
 }
 
 export function assertLeagueGenerationAllowed(input: LeagueGenerationGuardInput): void {
-  if (input.format !== 'league') {
+  // 조별리그+토너먼트 대회의 **조 단계**는 리그와 대진 규칙이 완전히 같다(라운드로빈).
+  // 그런데 format 검사에서 먼저 막혀 자동 생성을 아예 못 썼다 — 조가 8팀이면 28경기를
+  // 손으로 넣어야 했다. 결선 브래킷(semi/final/third_place)은 조 순위에서 진출팀을 뽑는
+  // 별개 문제라 아래 groupPhase 가드가 그대로 막는다.
+  if (input.format !== 'league' && input.format !== 'group_knockout') {
     throw new UnprocessableEntityException({
       code: 'TOURNAMENT_NOT_LEAGUE',
-      message: '리그 대회에서만 리그 대진을 생성할 수 있어요.',
+      message: '리그 또는 조별리그+토너먼트 대회에서만 조별 대진을 생성할 수 있어요.',
     });
   }
   if (input.groupPhase !== 'group') {
     throw new UnprocessableEntityException({
       code: 'LEAGUE_GROUP_PHASE_INVALID',
-      message: '리그 대진은 조별 단계에서만 생성할 수 있어요.',
+      message: '자동 생성은 조별 단계에서만 할 수 있어요. 준결승·결승·3위 결정전 대진은 직접 넣어주세요.',
     });
   }
   if (input.teamCount < 2) {

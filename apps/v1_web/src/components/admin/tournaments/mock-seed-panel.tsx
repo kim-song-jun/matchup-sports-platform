@@ -24,7 +24,7 @@ const STATUSES: Array<{ value: NonNullable<CreateMockTournamentInput['status']>;
 ];
 
 const FIELD_CLASS =
-  'h-[44px] px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-[var(--font-size-label)] text-gray-900 dark:text-white focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
+  'h-[44px] px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-[length:var(--font-size-label)] text-gray-900 dark:text-white focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
 
 /**
  * 검증용 목업 대회를 한 번에 만드는 패널 — alpha 전용.
@@ -43,15 +43,21 @@ export function MockSeedPanel() {
   const [status, setStatus] = useState<NonNullable<CreateMockTournamentInput['status']>>('in_progress');
   const [withResults, setWithResults] = useState(false);
   const [reviewReady, setReviewReady] = useState(false);
+  const [withLineups, setWithLineups] = useState(false);
   const [created, setCreated] = useState<CreateMockTournamentResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!availability.data?.enabled) return null;
 
+  const maxTeamCount = availability.data.maxTeamCount ?? 16;
+  const usableTeamCount = availability.data.usableTeamCount ?? 0;
+  const minPlayersPerTeam = availability.data.minPlayersPerTeam ?? 0;
+  const teamCountTooHigh = teamCount > maxTeamCount;
+
   const submit = () => {
     setError(null);
     createMock.mutate(
-      { format, teamCount, status, withResults, reviewReady },
+      { format, teamCount, status, withResults, reviewReady, withLineups },
       {
         onSuccess: (result) => setCreated(result),
         onError: (err) => setError(extractErrorMessage(err, '목업 대회를 만들지 못했어요.')),
@@ -66,36 +72,55 @@ export function MockSeedPanel() {
     >
       <div className="flex items-center gap-2">
         <FlaskConical size={16} className="text-amber-600 dark:text-amber-400" aria-hidden="true" />
-        <h2 id="mock-seed-heading" className="text-[var(--font-size-label)] font-semibold text-gray-900 dark:text-white">
+        <h2 id="mock-seed-heading" className="text-[length:var(--font-size-label)] font-semibold text-gray-900 dark:text-white">
           목업 대회 생성 (alpha 전용)
         </h2>
       </div>
-      <p className="mt-1 text-[var(--font-size-caption)] text-gray-600 dark:text-gray-400">
-        조건에 맞는 테스트 대회를 하나 만들어요. 팀 등록·명단까지 채우고 <strong>라인업은 비워 둡니다</strong> — 라인업 제출은 직접 테스트하세요.
+      <p className="mt-1 text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">
+        조건에 맞는 테스트 대회를 하나 만들어요. 팀 등록·명단·경기(운영 콘솔)까지 준비해요.
+        라인업은 기본적으로 비워 두니 직접 제출해 보시고, 그 다음 단계를 테스트하려면{' '}
+        <strong>라인업까지 제출</strong>을 켜세요.
+      </p>
+      <p className="mt-1 text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">
+        지금 쓸 수 있는 테스트 팀 <strong>{usableTeamCount}팀</strong> (최대 {maxTeamCount}팀까지 만들 수 있어요).
+        실제 사용자가 섞인 팀은 쓰지 않아요.
+        {minPlayersPerTeam > 0 ? (
+          <>
+            {' '}이 대회 설정은 선발 <strong>{minPlayersPerTeam}명</strong> 이상이라, 멤버가 그보다 적은 팀은
+            라인업을 제출할 수 없어 제외돼요.
+          </>
+        ) : null}
       </p>
 
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-[var(--font-size-caption)] text-gray-600 dark:text-gray-400">형식</span>
+          <span className="text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">형식</span>
           <select className={FIELD_CLASS} value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
             {FORMATS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-[var(--font-size-caption)] text-gray-600 dark:text-gray-400">팀 수</span>
+          <span className="text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">팀 수</span>
           <input
-            className={`${FIELD_CLASS} w-[88px]`}
+            className={`${FIELD_CLASS} w-[88px] ${teamCountTooHigh ? 'border-red-400 dark:border-red-600' : ''}`}
             type="number"
             min={2}
-            max={16}
+            max={maxTeamCount}
             value={teamCount}
             onChange={(e) => setTeamCount(Number(e.target.value))}
+            aria-invalid={teamCountTooHigh}
+            aria-describedby={teamCountTooHigh ? 'mock-seed-team-count-hint' : undefined}
           />
+          {teamCountTooHigh ? (
+            <span id="mock-seed-team-count-hint" className="text-[length:var(--font-size-caption)] text-red-600 dark:text-red-400">
+              최대 {maxTeamCount}팀
+            </span>
+          ) : null}
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-[var(--font-size-caption)] text-gray-600 dark:text-gray-400">상태</span>
+          <span className="text-[length:var(--font-size-caption)] text-gray-600 dark:text-gray-400">상태</span>
           <select className={FIELD_CLASS} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
             {STATUSES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
@@ -103,32 +128,39 @@ export function MockSeedPanel() {
 
         <label className="flex items-center gap-2 h-[44px]">
           <input type="checkbox" checked={withResults} onChange={(e) => setWithResults(e.target.checked)} className="w-4 h-4" />
-          <span className="text-[var(--font-size-label)] text-gray-900 dark:text-white">경기 결과까지</span>
+          <span className="text-[length:var(--font-size-label)] text-gray-900 dark:text-white">경기 결과까지</span>
         </label>
 
         <label className="flex items-center gap-2 h-[44px]">
           <input type="checkbox" checked={reviewReady} onChange={(e) => setReviewReady(e.target.checked)} className="w-4 h-4" />
-          <span className="text-[var(--font-size-label)] text-gray-900 dark:text-white">후기 작성 가능</span>
+          <span className="text-[length:var(--font-size-label)] text-gray-900 dark:text-white">후기 작성 가능</span>
+        </label>
+
+        <label className="flex items-center gap-2 h-[44px]">
+          <input type="checkbox" checked={withLineups} onChange={(e) => setWithLineups(e.target.checked)} className="w-4 h-4" />
+          <span className="text-[length:var(--font-size-label)] text-gray-900 dark:text-white">라인업까지 제출</span>
         </label>
 
         <button
           type="button"
           onClick={submit}
-          disabled={createMock.isPending}
-          className="inline-flex items-center gap-1.5 h-[44px] px-4 rounded-xl text-[var(--font-size-label)] font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-60 transition-colors focus-visible:outline-2 focus-visible:outline-amber-500 focus-visible:outline-offset-2"
+          disabled={createMock.isPending || teamCountTooHigh}
+          className="inline-flex items-center gap-1.5 h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-60 transition-colors focus-visible:outline-2 focus-visible:outline-amber-500 focus-visible:outline-offset-2"
         >
           {createMock.isPending ? '만드는 중…' : '목업 대회 만들기'}
         </button>
       </div>
 
       {error ? (
-        <p role="alert" className="mt-3 text-[var(--font-size-caption)] text-red-600 dark:text-red-400">{error}</p>
+        <p role="alert" className="mt-3 text-[length:var(--font-size-caption)] text-red-600 dark:text-red-400">{error}</p>
       ) : null}
 
       {created ? (
-        <div className="mt-3 text-[var(--font-size-caption)] text-gray-700 dark:text-gray-300">
+        <div className="mt-3 text-[length:var(--font-size-caption)] text-gray-700 dark:text-gray-300">
           <p>
-            <strong>{created.title}</strong> 생성됨 · {created.teamCount}팀 · 경기 {created.fixtureCount}개{' '}
+            <strong>{created.title}</strong> 생성됨 · {created.teamCount}팀 · 경기 {created.fixtureCount}개
+            {created.gamesCreated > 0 ? ` · 운영 콘솔 ${created.gamesCreated}경기 준비됨` : ''}
+            {created.lineupsSubmitted > 0 ? ` · 라인업 ${created.lineupsSubmitted}건 제출됨` : ''}{' '}
             <Link href={created.route} className="text-blue-600 dark:text-blue-400 underline">대회 보기</Link>
           </p>
 

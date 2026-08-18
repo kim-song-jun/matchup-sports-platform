@@ -466,3 +466,26 @@ describe('ScheduleContent — 우리 팀 행에서도 스코어가 배경에 묻
     expect(highlighted?.style.background).not.toBe(scorePill.style.background);
   });
 });
+
+/**
+ * 경기 목록은 데스크톱에서 두 열로 펴진다(`.tm-schedule-list`, globals.css). 그 격자선을
+ * 미디어쿼리로 다시 그리려면 행 구분선이 **클래스**여야 한다 — 인라인 style 로 되돌아가면
+ * 특이도에서 미디어쿼리가 지고, 두 열 사이 경계선이 사라지거나 첫 행 위에 겹선이 생긴다.
+ */
+describe('ScheduleContent — 행 구분선은 인라인이 아니라 클래스로 그린다', () => {
+  it('경기 행이 구분선 클래스를 갖고, 인라인 border 를 직접 들고 있지 않다', () => {
+    render(
+      <ScheduleContent
+        tournamentId="tour-1"
+        data={{ ...makeData(), items: [fixtureEntry(), fixtureEntry({ fixtureId: 'fixture-2' })] }}
+      />,
+    );
+
+    const rows = screen.getAllByRole('link').filter((a) => /\/matches\//.test(a.getAttribute('href') ?? ''));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row).toHaveClass('tm-schedule-row');
+      expect(row.style.borderTop).toBe('');
+    }
+  });
+});

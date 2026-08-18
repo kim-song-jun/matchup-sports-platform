@@ -168,7 +168,7 @@ function AwardRow({
         <button type="button" onClick={() => removeRow(idx)} className="text-[var(--text-muted)] hover:text-red-500 inline-flex items-center justify-center min-h-11 min-w-11 shrink-0" aria-label="항목 삭제"><X size={16} /></button>
       </div>
       <div className="mb-2">
-        <label htmlFor={`award-icon-${idx}`} className="text-[var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">아이콘</label>
+        <label htmlFor={`award-icon-${idx}`} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">아이콘</label>
         <div className="flex items-center gap-2">
           <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)]" aria-hidden="true">
             <TournamentAwardIcon iconKey={row.iconKey} />
@@ -187,7 +187,7 @@ function AwardRow({
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label htmlFor={`award-recipient-${idx}`} className="text-[var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">수상자 이름 *</label>
+          <label htmlFor={`award-recipient-${idx}`} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">수상자 이름 *</label>
           <EntityPicker
             id={`award-recipient-${idx}`}
             value={recipientValue}
@@ -198,11 +198,11 @@ function AwardRow({
             emptyText={selectedRegistrationId ? '명단에 없는 선수예요' : '검색 결과가 없어요'}
           />
           {!teamNameTrimmed && (
-            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)] mt-1">소속 팀을 먼저 선택하면 명단에서 고를 수 있어요</p>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-1">소속 팀을 먼저 선택하면 명단에서 고를 수 있어요</p>
           )}
         </div>
         <div>
-          <label htmlFor={`award-team-${idx}`} className="text-[var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">소속 팀 (선택)</label>
+          <label htmlFor={`award-team-${idx}`} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">소속 팀 (선택)</label>
           <EntityPicker
             id={`award-team-${idx}`}
             value={selectedTeamItem}

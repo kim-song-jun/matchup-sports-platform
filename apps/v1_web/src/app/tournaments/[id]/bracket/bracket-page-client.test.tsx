@@ -649,3 +649,52 @@ describe('BracketPageContent — 결선 라운드 수에 따른 칼럼 배분 �
     expect(container.querySelector('.tm-bracket-page-grid-slim-bracket')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 오너 지적(2026-08-18) — 순위표도 대진표도 아직 없는 대회의 "순위 · 대진표" 탭이,
+ * 왼쪽 절반을 빈 채로 넓게 잡고 오른쪽에 빈 상태만 치우쳐 붙어 있었다. 2열 폭 배분을
+ * **두 칼럼이 다 있는지 따지지 않고** 항상 걸었기 때문이다. 칼럼이 하나뿐이면 그리드를
+ * 1열로 접어 그 칼럼이 폭을 온전히 쓰게 한다.
+ */
+describe('BracketPageContent — 한쪽 칼럼만 있을 때는 2열로 펴지 않는다', () => {
+  it('조별 순위가 아직 없으면 빈 순위 칼럼을 만들지 않고 1열로 접는다', () => {
+    const { container } = renderBracketStandingsTab(
+      makeTournament({
+        id: 'tour-no-standings',
+        status: 'in_progress',
+        format: 'group_knockout',
+        // 조 편성 자체가 아직 없는 상태 = 좌측에 그릴 게 없다. (조가 하나라도 있으면
+        // 순위 행이 없어도 `toGroupStandingsRows` 가 편성 팀을 0값 기준선으로 내주므로
+        // 좌측이 비지 않는다 — #374. alpha 실측 케이스가 바로 이 "조 0개" 쪽이었다.)
+        groups: [],
+        fixtures: [],
+      }),
+    );
+
+    const grid = container.querySelector('.tm-bracket-page-grid');
+    expect(grid).toBeInTheDocument();
+    // 2열 배분 클래스가 하나도 붙지 않아야 한다 — 붙으면 빈 칼럼이 폭을 가져간다.
+    expect(grid).not.toHaveClass('tm-tourn-sub-grid-6040');
+    expect(grid).not.toHaveClass('tm-tourn-sub-grid-2col');
+    expect(grid).not.toHaveClass('tm-bracket-page-grid-empty');
+    // 칼럼 자체도 하나뿐이어야 한다(빈 div 를 남기지 않는다).
+    expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
+    expect(screen.getByText('대진표가 아직 공개되지 않았어요')).toBeInTheDocument();
+  });
+
+  it('리그 포맷은 대진표 칼럼이 없으므로 순위표만 1열로 놓는다', () => {
+    const { container } = renderBracketStandingsTab(
+      makeTournament({
+        id: 'tour-league',
+        status: 'in_progress',
+        format: 'league',
+        groups: [],
+        fixtures: [],
+      }),
+    );
+
+    const grid = container.querySelector('.tm-bracket-page-grid');
+    expect(grid).not.toHaveClass('tm-tourn-sub-grid-2col');
+    expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
+  });
+});

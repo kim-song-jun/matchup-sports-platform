@@ -338,7 +338,7 @@ export function AdminTablePaginationBar({
   // 기준 미달이 된다(실측: 이전/다음 44×40, 숫자 40×40).
   const btn = [
     'inline-flex items-center justify-center min-w-[44px] min-h-[44px] px-2 rounded-lg',
-    'text-[var(--font-size-label)] font-medium transition-colors',
+    'text-[length:var(--font-size-label)] font-medium transition-colors',
     'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
     'disabled:cursor-not-allowed disabled:opacity-40',
   ].join(' ');
@@ -348,7 +348,7 @@ export function AdminTablePaginationBar({
       className="flex flex-wrap items-center justify-between gap-3 pt-1"
       aria-label="목록 페이지"
     >
-      <p className="text-[var(--font-size-label)] text-[var(--text-muted)] tabular-nums">
+      <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] tabular-nums">
         전체 {total.toLocaleString('ko-KR')}건 중 {from.toLocaleString('ko-KR')}–
         {to.toLocaleString('ko-KR')}
       </p>

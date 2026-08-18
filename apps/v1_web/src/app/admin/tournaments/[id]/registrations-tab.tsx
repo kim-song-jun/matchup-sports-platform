@@ -159,7 +159,7 @@ export function RosterModal({
                 <div className="flex min-w-0 items-center gap-2">
                   <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-strong)]">{p.realName}</p>
                   {p.isTeamCaptain ? (
-                    <span className="shrink-0 rounded-md bg-[var(--blue50)] px-1.5 py-0.5 text-[var(--font-size-caption)] font-semibold text-[var(--blue700)]">팀장</span>
+                    <span className="shrink-0 rounded-md bg-[var(--blue50)] px-1.5 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">팀장</span>
                   ) : null}
                 </div>
                 <p className="text-xs text-[var(--text-muted)]">
@@ -574,7 +574,7 @@ export function RegistrationsTab({
               {opt.value !== 'all' && count > 0 && (
                 <span
                   className={[
-                    'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[var(--font-size-caption)] font-semibold tabular-nums',
+                    'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[length:var(--font-size-caption)] font-semibold tabular-nums',
                     // active 상태의 카운트 배지는 파란 칩(bg-blue-500, 테마 불변) 위에 얹히는
                     // 반투명 흰 원이라 --static-white 를 써야 한다 — --card-surface 는 다크에서
                     // 거의 검정이라 파란 칩 위에서 탁하게 죽는 회귀가 있었다(전수검수 발견).

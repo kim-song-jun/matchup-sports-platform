@@ -182,11 +182,11 @@ export function EntityPicker({
     return (
       <div className="flex items-center justify-between h-[44px] px-3 bg-[var(--blue50)] border border-[var(--tint-blue-border)] rounded-xl">
         <div className="flex flex-col min-w-0">
-          <span className="text-[var(--font-size-label)] font-semibold text-[var(--blue700)] truncate">
+          <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] truncate">
             {value.label}
           </span>
           {value.description && (
-            <span className="text-[var(--font-size-micro)] text-[var(--blue700)] truncate">{value.description}</span>
+            <span className="text-[length:var(--font-size-micro)] text-[var(--blue700)] truncate">{value.description}</span>
           )}
         </div>
         <button
@@ -246,9 +246,9 @@ export function EntityPicker({
           className="absolute left-0 right-0 top-[48px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl shadow-md z-20 overflow-hidden max-h-[240px] overflow-y-auto"
         >
           {loading ? (
-            <p className="px-4 py-3 text-[var(--font-size-label)] text-gray-400">검색 중…</p>
+            <p className="px-4 py-3 text-[length:var(--font-size-label)] text-gray-400">검색 중…</p>
           ) : menuEntries.length === 0 ? (
-            <p className="px-4 py-3 text-[var(--font-size-label)] text-gray-400">{emptyText}</p>
+            <p className="px-4 py-3 text-[length:var(--font-size-label)] text-gray-400">{emptyText}</p>
           ) : (
             <div role="listbox" id={`${menuId}-list`} aria-label={`${placeholder} 결과`}>
               {menuEntries.map((entry, idx) => {
@@ -271,7 +271,7 @@ export function EntityPicker({
                         highlighted ? 'bg-[var(--surface-soft)]' : '',
                       ].join(' ')}
                     >
-                      <span className="text-[var(--font-size-label)] font-medium text-[var(--text-muted)]">
+                      <span className="text-[length:var(--font-size-label)] font-medium text-[var(--text-muted)]">
                         {clearLabel}
                       </span>
                     </button>
@@ -303,15 +303,15 @@ export function EntityPicker({
                     ].join(' ')}
                   >
                     <span
-                      className={`text-[var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-[var(--text-strong)]'}`}
+                      className={`text-[length:var(--font-size-label)] font-semibold ${item.disabled ? 'text-gray-400' : 'text-[var(--text-strong)]'}`}
                     >
                       {item.label}
                     </span>
                     {item.description && (
-                      <span className="text-[var(--font-size-caption)] text-gray-400">{item.description}</span>
+                      <span className="text-[length:var(--font-size-caption)] text-gray-400">{item.description}</span>
                     )}
                     {item.disabled && item.disabledReason && (
-                      <span className="text-[var(--font-size-caption)] text-gray-400">{item.disabledReason}</span>
+                      <span className="text-[length:var(--font-size-caption)] text-gray-400">{item.disabledReason}</span>
                     )}
                   </button>
                 );

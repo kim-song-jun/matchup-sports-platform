@@ -223,13 +223,13 @@ function AdminUsersPageContent() {
                   <span className="flex items-center gap-1.5">
                     <span className="truncate font-medium text-[var(--text-strong)]">{formatUserTitle(row)}</span>
                     {row.adminRole ? (
-                      <span className="shrink-0 rounded bg-[var(--blue50)] px-1.5 py-0.5 text-[var(--font-size-micro)] font-semibold text-[var(--blue700)]">
+                      <span className="shrink-0 rounded bg-[var(--blue50)] px-1.5 py-0.5 text-[length:var(--font-size-micro)] font-semibold text-[var(--blue700)]">
                         운영자
                       </span>
                     ) : null}
                   </span>
                   {row.email ? (
-                    <span className="block truncate text-[var(--font-size-micro)] text-[var(--text-muted)]" title={row.email}>
+                    <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]" title={row.email}>
                       {row.email}
                     </span>
                   ) : null}
@@ -309,7 +309,7 @@ function AdminUsersPageContent() {
               <Link
                 href={`/admin/users/${row.userId}`}
                 className={[
-                  'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                  'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                   'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}
@@ -326,7 +326,7 @@ function AdminUsersPageContent() {
                       setModalOpen(true);
                     }}
                     className={[
-                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
                       'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}

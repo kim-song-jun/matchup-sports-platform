@@ -6208,6 +6208,11 @@ button:disabled {
   .tm-reviews-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* §경기 일정 목록 — 행 구분선은 인라인이 아니라 여기서 그린다(인라인이면 아래 데스크톱
+   2열 규칙이 이길 수 없다). 첫 행 위에는 선을 긋지 않는다 — 카드 자체 테두리와 겹친다. */
+.tm-schedule-row { border-top: 1px solid var(--grey100); }
+.tm-schedule-list > .tm-schedule-row:first-child { border-top: 0; }
+
 .tm-hub-section-title {
   font-size: 15px;
   font-weight: 850;
@@ -6294,8 +6299,27 @@ button:disabled {
   /* §일정 탭 가로 밀도 — 1440에서 일정 카드가 998px까지 늘어나는데 팀명·점수는 중앙
      정렬이라 좌우로 각각 300px 가까이 비고, 조·시간·구장은 양 끝에 붙어 시선 이동만
      길어졌다. 읽기 좋은 폭으로 묶어 가운데 세운다. */
+
+  /* §경기 일정 가로 밀도 — 1440 실측에서 경기 카드가 한 열로만 쌓여 세로로 길고 좌우가
+     비었다(오너 지적: "너무 세로로만 길고 아쉽다"). 가로가 남는 폭에서는 두 열로 펴
+     한 화면에 두 배의 경기를 담는다. 모바일은 기존 한 열 리스트 그대로다.
+     홀수 번째 셀에만 오른쪽 선을 둬 두 열 사이 경계를 만들고, 두 번째 행부터는
+     `.tm-schedule-row` 의 위쪽 선이 가로 격자를 이룬다 — 첫 두 셀은 위 선을 지운다. */
+  .tm-schedule-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* align-items 를 건드리지 않는다(기본 stretch). `start` 로 두면 같은 행의 두 셀이
+       각자 콘텐츠 높이만 차지해서, 한쪽에만 "라인업 보기" 버튼이 붙은 행에서 세로
+       구분선이 짧게 끊기고 격자가 들쭉날쭉해진다(alpha 실측). */
+  }
+  .tm-schedule-list > .tm-schedule-row:nth-child(odd) { border-right: 1px solid var(--grey100); }
+  .tm-schedule-list > .tm-schedule-row:nth-child(-n + 2) { border-top: 0; }
+
   .tm-bracket-schedule-pane {
-    max-width: 840px;
+    /* 840 → 1040: 이 폭은 경기 카드가 한 열로 쌓이던 시절 "읽기 좋은 한 열 폭"으로 정한
+       값이다. 위 `.tm-schedule-list` 가 두 열로 펴면서 전제가 바뀌었다 — 840 이면 열당
+       약 420px 라 팀명·스코어·득점자 줄이 다시 눌린다. 열당 약 520px 가 되게 넓힌다. */
+    max-width: 1040px;
     margin: 0 auto;
     width: 100%;
   }

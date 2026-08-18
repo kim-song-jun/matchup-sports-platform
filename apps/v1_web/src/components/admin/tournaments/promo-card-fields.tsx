@@ -96,10 +96,13 @@ export function PromoCardFields({
               type="button"
               onClick={onResetFacts}
               disabled={disabled}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-xs font-semibold text-[var(--text-body)] disabled:opacity-50"
+              aria-label="날짜·장소·상금 문구를 대회 정보로 다시 채우기"
+              className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-xs font-semibold text-[var(--text-body)] disabled:opacity-50"
             >
               <RotateCcw size={14} aria-hidden="true" />
-              날짜·장소·상금 다시 채우기
+              {/* 좁은 화면에서 라벨 전체를 쓰면 두 줄로 접혀 카드 헤더가 무너진다. */}
+              <span className="hidden sm:inline">날짜·장소·상금 다시 채우기</span>
+              <span className="sm:hidden">다시 채우기</span>
             </button>
           ) : null}
           <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)]">

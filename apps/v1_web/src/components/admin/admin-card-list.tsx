@@ -151,11 +151,11 @@ export function AdminCardList<T>({
             {/* 제목 + 상태 */}
             <div className="flex justify-between items-start gap-2">
               <div className="min-w-0">
-                <p className="text-[var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] truncate">
+                <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] truncate">
                   {model.title}
                 </p>
                 {model.subtitle != null && (
-                  <p className="text-[var(--font-size-caption)] text-gray-400 mt-0.5 truncate">
+                  <p className="text-[length:var(--font-size-caption)] text-gray-400 mt-0.5 truncate">
                     {model.subtitle}
                   </p>
                 )}
@@ -175,7 +175,7 @@ export function AdminCardList<T>({
                 {model.meta.map((m, i) => (
                   <dd
                     key={i}
-                    className="flex items-center gap-1.5 text-[var(--font-size-label)] text-[var(--text-muted)] tabular-nums min-w-0"
+                    className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)] tabular-nums min-w-0"
                   >
                     {m.icon && (
                       <span className="shrink-0 text-gray-400 inline-flex" aria-hidden="true">
@@ -189,7 +189,7 @@ export function AdminCardList<T>({
             )}
 
             {model.description ? (
-              <div className="mt-2.5 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-[var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap break-words">
+              <div className="mt-2.5 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap break-words">
                 {model.description}
               </div>
             ) : null}

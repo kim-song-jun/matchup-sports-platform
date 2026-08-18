@@ -1,7 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { MockTournamentSeedService } from './mock-tournament-seed.service';
+
+// 백필은 별도 모듈의 검증 대상이라 여기서는 호출 여부만 본다.
+jest.mock('../../games/migration/fixture-game-backfill', () => ({
+  runFixtureGameBackfill: jest.fn(async () => ({
+    counts: { gamesCreated: 6, periodsBackfilled: 0, visibilityPoliciesBackfilled: 0, quarantined: 0 },
+    quarantine: [],
+  })),
+}));
+import { MockTournamentSeedService, readLineupMinPlayers } from './mock-tournament-seed.service';
 
 /**
  * schema.prisma 원문에서 모델별 필드 맵을 만든다.
@@ -75,6 +83,8 @@ function makeWorld(teamCount = 4) {
   };
   const prisma = {
     v1Sport: { findFirst: jest.fn().mockResolvedValue({ id: 'sport-futsal', code: 'futsal' }) },
+    v1CompetitionConfigVersion: { findFirst: jest.fn().mockResolvedValue({ id: 'config-1', lineup: { minPlayers: 3, maxPlayers: 11 } }) },
+    v1Game: { findMany: jest.fn().mockResolvedValue([]) },
     v1Team: { findMany: jest.fn().mockResolvedValue(teams) },
     $transaction: jest.fn(async (cb: (t: unknown) => Promise<unknown>) => cb(tx)),
   };
@@ -145,6 +155,78 @@ describe('MockTournamentSeedService', () => {
       (field) => !scalarFields.has(field),
     );
     expect(unknownFields).toEqual([]);
+  });
+
+  // alpha 실측: ACTIVE config 가 minPlayers 7 인데 목업이 멤버 4명 팀을 뽑아, 라인업 화면에서
+  // "포지션 자리가 비어 있어요"로 제출 자체가 막혔다. 하한은 config 에서 읽어야 한다.
+  it('라인업 최소 인원을 config 에서 읽어 팀 조회 조건에 쓴다', async () => {
+    const { service, prisma } = makeWorld(4);
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({
+      id: 'config-1',
+      lineup: { minPlayers: 3, maxPlayers: 11 },
+    });
+
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    const where = prisma.v1Team.findMany.mock.calls[0][0].where as { memberCount?: { gte?: number } };
+    expect(where.memberCount).toEqual({ gte: 3 });
+  });
+
+  it('config 의 lineup 값이 이상하면 안전한 하한으로 되돌린다', () => {
+    expect(readLineupMinPlayers({ minPlayers: 7 })).toBe(7);
+    expect(readLineupMinPlayers(null)).toBe(3);
+    expect(readLineupMinPlayers({ minPlayers: 0 })).toBe(3);
+    expect(readLineupMinPlayers({ minPlayers: 'seven' })).toBe(3);
+  });
+
+  // 기본은 라인업을 비워 둔다 — 라인업 제출 자체가 손으로 테스트할 대상이기 때문이다.
+  it('withLineups 를 주지 않으면 라인업을 건드리지 않는다', async () => {
+    const { service, prisma } = makeWorld(4);
+
+    const result = await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    expect(prisma.v1Game.findMany).not.toHaveBeenCalled();
+    expect(result.lineupsSubmitted).toBe(0);
+  });
+
+  // 눌러 보고 400 으로 알게 되면 사용자가 조건을 스스로 좁힐 수 없다 — 화면이 미리 상한을 안다.
+  it('availability 가 쓸 수 있는 팀 수와 상한을 함께 돌려준다', async () => {
+    const { service } = makeWorld(4);
+
+    await expect(service.availability()).resolves.toEqual({
+      enabled: true,
+      usableTeamCount: 4,
+      maxTeamCount: 4,
+      // 화면이 "몇 명 이상 팀만 쓸 수 있는지"를 설명하려면 이 값이 필요하다.
+      minPlayersPerTeam: 3,
+    });
+  });
+
+  it('플래그가 꺼져 있으면 availability 도 0 을 돌려준다', async () => {
+    process.env.V1_ENABLE_MOCK_SEED = '';
+    const { service, prisma } = makeWorld(4);
+
+    await expect(service.availability()).resolves.toEqual({
+      enabled: false,
+      usableTeamCount: 0,
+      maxTeamCount: 0,
+      minPlayersPerTeam: 0,
+    });
+    expect(prisma.v1Team.findMany).not.toHaveBeenCalled();
+  });
+
+  // 픽스처만 있으면 운영 콘솔이 "경기 미생성"으로 뜬다(alpha 실측). V1Game 은 백필이 만들고,
+  // 그 백필은 competitionConfigVersionId 가 없는 픽스처를 CONFIG_MISSING 으로 격리한다.
+  it('픽스처에 competitionConfigVersionId 를 박고 게임 백필을 돌린다', async () => {
+    const { runFixtureGameBackfill } = jest.requireMock('../../games/migration/fixture-game-backfill');
+    const { service, fixtures } = makeWorld(4);
+
+    const result = await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    expect(fixtures.length).toBeGreaterThan(0);
+    expect(fixtures.every((fixture) => fixture.competitionConfigVersionId === 'config-1')).toBe(true);
+    expect(runFixtureGameBackfill).toHaveBeenCalledWith(expect.anything(), { mode: 'apply' });
+    expect(result.gamesCreated).toBe(6);
   });
 
   // alpha 실측: 4팀 요청은 창이 teamCount*4=16 이라 "사용 가능 3팀"으로 실패했는데 8팀 요청은

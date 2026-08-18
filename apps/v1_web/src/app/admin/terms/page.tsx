@@ -399,11 +399,11 @@ export default function AdminTermsPage() {
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {policy.placements.map((placement) => (
-                      <span key={placement.placementId} className="rounded-full bg-[var(--surface-soft)] px-2 py-1 text-[var(--font-size-caption)] text-[var(--text-muted)]">
+                      <span key={placement.placementId} className="rounded-full bg-[var(--surface-soft)] px-2 py-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                         {contextLabel[placement.context]} · {requirementLabel[placement.requirement]}
                       </span>
                     ))}
-                    <span className="rounded-full bg-[var(--blue50)] px-2 py-1 text-[var(--font-size-caption)] text-[var(--blue700)]">
+                    <span className="rounded-full bg-[var(--blue50)] px-2 py-1 text-[length:var(--font-size-caption)] text-[var(--blue700)]">
                       동의 {policy.documents.reduce((sum, document) => sum + document.consentEventCount, 0).toLocaleString('ko-KR')}건
                     </span>
                   </div>

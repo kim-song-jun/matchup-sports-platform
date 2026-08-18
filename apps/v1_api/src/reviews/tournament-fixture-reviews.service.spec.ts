@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, GoneException } from '@nestjs/common';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 
 const user = {
@@ -26,7 +26,11 @@ const secondOpponentPlayerId = '00000000-0000-4000-8000-000000000012';
 // 상대팀 등록에 있었지만 대회 도중 빠진 선수(removedAt) — 대상에서 빠져야 한다.
 const removedOpponentPlayerId = '00000000-0000-4000-8000-000000000013';
 const sportId = 'sport-futsal';
-const recordedAt = new Date('2026-06-20T12:00:00.000Z');
+// 48시간 평가창(Task 4, §6)이 실제 시각(new Date())과 이 값을 비교한다 — 고정된 과거
+// 날짜를 쓰면 스펙 작성 시점 이후로는 항상 REVIEW_WINDOW_CLOSED(410)로 깨진다(실사고 —
+// reviews.service.spec.ts의 고정 날짜가 이 문제로 14건 깨졌다). 그래서 "지금으로부터
+// N시간 전"으로 매 실행마다 창 안에 들어오도록 계산한다.
+const recordedAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
 describe('TournamentFixtureReviewsService', () => {
   it('returns the opponent team target for a completed tournament fixture', async () => {
@@ -44,6 +48,7 @@ describe('TournamentFixtureReviewsService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -82,6 +87,7 @@ describe('TournamentFixtureReviewsService', () => {
         player({ registrationId: reviewerRegistrationId, userId: user.id, nickname: '성수 캡틴' }),
       ]),
       v1PostEventReview: reviewStore([]),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -116,6 +122,7 @@ describe('TournamentFixtureReviewsService', () => {
       ]),
       v1PostEventReview: reviewStore([]),
       $transaction: jest.fn(),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -133,6 +140,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: playerStore([player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' })]),
       v1PostEventReview: reviewStore([]),
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(reputationTx(createMock))),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -166,6 +174,7 @@ describe('TournamentFixtureReviewsService', () => {
         playerReviewRow({ id: 'review-mine', reviewerUserId: user.id, targetUserId: opponentPlayerId, rating: 3 }),
       ]),
       $transaction: transactionMock,
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -278,6 +287,7 @@ describe('TournamentFixtureReviewsService', () => {
         )),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -327,6 +337,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([]),
       $transaction: jest.fn(),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -344,6 +355,7 @@ describe('TournamentFixtureReviewsService', () => {
         player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
       ]),
       v1PostEventReview: reviewStore([]),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -365,6 +377,7 @@ describe('TournamentFixtureReviewsService', () => {
       ]),
       v1PostEventReview: reviewStore([]),
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(reputationTx(createMock))),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -385,6 +398,7 @@ describe('TournamentFixtureReviewsService', () => {
       // 팀장(user)이 같은 대회·같은 상대팀에 이미 후기를 남긴 상태.
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(trustTx(createMock))),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -417,6 +431,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
       $transaction: jest.fn().mockRejectedValue({ code: 'P2002' }),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -433,6 +448,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-mine', reviewerUserId: teammate.id, rating: 3 })]),
       $transaction: transactionMock,
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never);
 
@@ -490,6 +506,138 @@ describe('TournamentFixtureReviewsService', () => {
     expect(error).toBeInstanceOf(ForbiddenException);
     expect(error).toMatchObject({ response: { code: 'NOT_TEAM_MEMBER' } });
   });
+
+  // 실출전 게이트(Task 3, §5.4): roster(대상 명단) 자체를 실출전 userId로 좁힌다.
+  it('로스터에는 있지만 실출전이 아닌 선수는 대상 목록에서 빠진다', async () => {
+    const prisma = {
+      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
+      v1TournamentPlayer: playerStore([
+        player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
+        player({ registrationId: targetRegistrationId, userId: secondOpponentPlayerId, nickname: '러너스 7번' }),
+      ]),
+      v1PostEventReview: reviewStore([]),
+      $transaction: jest.fn(),
+      // 원정(상대) 실출전 = opponentPlayerId뿐이다 — secondOpponentPlayerId는 등록 로스터엔
+      // 있지만 공식 결과상 실제로 뛰지 않았다.
+      ...appearanceStore([user.id], [opponentPlayerId]),
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never);
+
+    const result = await service.source(user, fixtureId);
+
+    // 대상 목록 자체가 이미 실출전으로 좁혀진다 — secondOpponentPlayerId는 애초에 나오지 않는다.
+    expect(result.targets.map((target) => target.targetUserId ?? target.targetTeamId)).toEqual([
+      targetTeamId,
+      opponentPlayerId,
+    ]);
+
+    // 계획서 초안은 이 시나리오(실출전이 아닌 상대를 targetUserId로 지정)가
+    // NOT_ACTUAL_PARTICIPANT(403)를 던진다고 적었지만, 실제 구현을 따라가 보면 roster 자체가
+    // reviewContexts()에서 이미 실출전으로 좁혀지므로 secondOpponentPlayerId는 애초에
+    // "유효한 target이 아니다" — 기존 TARGET_NOT_REVIEWABLE 분기에서 걸린다.
+    // NOT_ACTUAL_PARTICIPANT는 §5.4가 명시한 대로 "작성자 본인"의 실출전 여부 전용이며,
+    // 그 경로는 바로 다음 테스트가 검증한다. (계획서와 다르게 구현한 근거이자 이 테스트의
+    // 존재 이유 — 잘못된 기대 에러 코드를 그대로 박제하지 않기 위해 코드를 재확인하고 고쳤다.)
+    await expect(
+      service.submit(
+        user,
+        { sourceId: fixtureId, targetType: 'user', targetUserId: secondOpponentPlayerId, rating: 5 },
+        ['manner'],
+      ),
+    ).rejects.toMatchObject({ response: { code: 'TARGET_NOT_REVIEWABLE' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('작성자 본인이 자기 사이드의 실출전 명단에 없으면 NOT_ACTUAL_PARTICIPANT(403)를 던진다', async () => {
+    const prisma = {
+      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
+      v1TournamentPlayer: playerStore([
+        player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
+      ]),
+      v1PostEventReview: reviewStore([]),
+      $transaction: jest.fn(),
+      // 홈(내) 실출전 명단이 비어 있다 — 작성자(user.id)가 팀 멤버·로스터엔 있지만 실제로는
+      // 뛰지 않았다(예: 벤치, 부상 대기). 대상(opponentPlayerId)은 실출전이라 roster 검사는 통과한다.
+      ...appearanceStore([], [opponentPlayerId]),
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never);
+
+    await expect(
+      service.submit(
+        user,
+        { sourceId: fixtureId, targetType: 'user', targetUserId: opponentPlayerId, rating: 5 },
+        ['manner'],
+      ),
+    ).rejects.toMatchObject({ response: { code: 'NOT_ACTUAL_PARTICIPANT' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('appearedUserIdsBySide가 null이면(Game 백필 전) 등록 로스터 전체를 대상으로 유지한다', async () => {
+    const prisma = {
+      v1TournamentFixture: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...fixture({ id: fixtureId, fixtureNumber: 1 }),
+          // Game 미연결(백필 전) — officialResultTimestamp()는 레거시 result.recordedAt으로
+          // 폴백하므로 완료 게이트는 그대로 통과하지만, appearedUserIdsBySide()는 null을
+          // 반환해야 한다(§5.2 폴백 조건: game이 없음).
+          game: null,
+          result: { recordedAt },
+        }),
+      },
+      v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
+      v1TournamentPlayer: playerStore([
+        player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
+        player({ registrationId: targetRegistrationId, userId: secondOpponentPlayerId, nickname: '러너스 7번' }),
+      ]),
+      v1PostEventReview: reviewStore([]),
+      // v1GameResultParticipant/v1GameParticipant/v1GameSide는 일부러 넣지 않는다 —
+      // appearedUserIdsBySide()가 game이 null이면 그 델리게이트들을 아예 호출하지 않고
+      // 첫 줄에서 null을 반환해야 하고, 이 테스트가 바로 그 계약을 검증한다.
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never);
+
+    const result = await service.source(user, fixtureId);
+
+    // appeared가 null(폴백)이면 필터링하지 않는다 — 등록 로스터 두 명 모두 그대로 남는다.
+    expect(result.targets.map((target) => target.targetUserId ?? target.targetTeamId)).toEqual([
+      targetTeamId,
+      opponentPlayerId,
+      secondOpponentPlayerId,
+    ]);
+  });
+
+  // 48시간 평가창(Task 4, §6). team_match와 마찬가지로 저장하지 않고 매 조회 시점에 계산한다.
+  it('공식 결과 확정 후 48시간이 지나면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
+    const prisma = {
+      v1TournamentFixture: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...fixture({ id: fixtureId, fixtureNumber: 1 }),
+          game: {
+            id: 'game-1',
+            currentOfficialRevision: {
+              id: 'revision-1',
+              state: 'OFFICIAL',
+              officialAt: new Date(Date.now() - (48 * 60 + 1) * 60 * 1000), // 48시간 1분 전
+            },
+          },
+        }),
+      },
+      // 마감 게이트는 팀 멤버십 조회(resolveReviewerTeams)보다 먼저 던져야 한다 — 아래
+      // toHaveBeenCalled 단언이 그 순서를 고정한다.
+      v1TeamMembership: { findMany: jest.fn() },
+      v1TournamentPlayer: playerStore([]),
+      v1PostEventReview: { findFirst: jest.fn(), findMany: jest.fn() },
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never);
+
+    const error = await service.source(user, fixtureId).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GoneException);
+    expect(error).toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
+    expect(prisma.v1TeamMembership.findMany).not.toHaveBeenCalled();
+  });
 });
 
 type Row = Record<string, unknown>;
@@ -529,6 +677,36 @@ function reviewStore(rows: Row[]) {
 function playerStore(rows: Row[]) {
   return {
     findMany: jest.fn(async (args: { where: Row }) => rows.filter((row) => matchesWhere(row, args.where))),
+  };
+}
+
+// 실출전 게이트(Task 3, §5)가 reviewContexts()에서 무조건 호출하는 3개 델리게이트.
+// homeUserIds/awayUserIds에 든 사람만 "실출전"으로 판정된다. 게이트 자체를 검증하지 않는
+// 나머지 테스트는 이 파일에 등장하는 모든 userId를 기본값으로 써서 필터링이 no-op이 되게
+// 한다 — appeared가 항상 로스터의 상위집합이라 좁혀도 아무것도 빠지지 않는다.
+const allKnownUserIds = [user.id, teammate.id, opponentPlayerId, secondOpponentPlayerId, removedOpponentPlayerId];
+
+function appearanceStore(
+  homeUserIds: readonly string[] = allKnownUserIds,
+  awayUserIds: readonly string[] = allKnownUserIds,
+) {
+  const participants = [
+    ...homeUserIds.map((userId, index) => ({ id: `home-participant-${index}`, userId, sideId: 'home-side' })),
+    ...awayUserIds.map((userId, index) => ({ id: `away-participant-${index}`, userId, sideId: 'away-side' })),
+  ];
+  return {
+    v1GameResultParticipant: {
+      findMany: jest.fn(async () => participants.map((participant) => ({ participantId: participant.id }))),
+    },
+    v1GameParticipant: {
+      findMany: jest.fn(async () => participants),
+    },
+    v1GameSide: {
+      findMany: jest.fn(async () => [
+        { id: 'home-side', sideKey: 'HOME' },
+        { id: 'away-side', sideKey: 'AWAY' },
+      ]),
+    },
   };
 }
 
@@ -629,7 +807,7 @@ function fixture(input: { readonly id: string; readonly fixtureNumber: number })
     status: 'completed',
     scheduledAt: recordedAt,
     updatedAt: recordedAt,
-    game: { currentOfficialRevision: { state: 'OFFICIAL', officialAt: recordedAt } },
+    game: { id: 'game-1', currentOfficialRevision: { id: 'revision-1', state: 'OFFICIAL', officialAt: recordedAt } },
     homeRegistration: {
       id: reviewerRegistrationId,
       teamId: reviewerTeamId,

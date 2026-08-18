@@ -191,7 +191,7 @@ export function ErrorLogsClient() {
         // route 가 길면(예: /tournaments/campaigns/...) 표 전체를 밀어내 오른쪽 컬럼과
         // 상세 버튼이 가로 스크롤 밖으로 사라진다. 잘라 보여주고 전문은 title 로 준다.
         <span
-          className="block truncate font-mono text-[var(--font-size-label)] text-[var(--text-body)] lg:max-w-[200px]"
+          className="block truncate font-mono text-[length:var(--font-size-label)] text-[var(--text-body)] lg:max-w-[200px]"
           title={row.route ?? undefined}
         >
           {row.route ?? '—'}
@@ -229,7 +229,7 @@ export function ErrorLogsClient() {
       width: 'w-[96px]',
       render: (row) => (
         <span
-          className="font-mono text-[var(--font-size-micro)] text-gray-400 whitespace-nowrap"
+          className="font-mono text-[length:var(--font-size-micro)] text-gray-400 whitespace-nowrap"
           title={row.releaseSha ?? undefined}
         >
           {shortRelease(row.releaseSha)}
@@ -262,7 +262,7 @@ export function ErrorLogsClient() {
                 onClick={() => setSource(opt.value)}
                 aria-pressed={active}
                 className={[
-                  'inline-flex items-center px-3 min-h-[44px] rounded-full text-[var(--font-size-label)] font-medium transition-colors',
+                  'inline-flex items-center px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                   active
                     ? 'bg-blue-500 text-white'
@@ -284,7 +284,7 @@ export function ErrorLogsClient() {
                 onClick={() => setLevel(opt.value)}
                 aria-pressed={active}
                 className={[
-                  'inline-flex items-center px-3 min-h-[44px] rounded-full text-[var(--font-size-label)] font-medium transition-colors',
+                  'inline-flex items-center px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                   active
                     ? 'bg-blue-500 text-white'
@@ -297,7 +297,7 @@ export function ErrorLogsClient() {
           })}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <label className="flex items-center gap-1.5 text-[var(--font-size-label)] text-[var(--text-muted)]">
+          <label className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
             상태코드
             <input
               type="number"
@@ -308,7 +308,7 @@ export function ErrorLogsClient() {
               className="w-[88px] h-[44px] px-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-[var(--font-size-label)] text-[var(--text-muted)]">
+          <label className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
             시작일
             <input
               type="date"
@@ -317,7 +317,7 @@ export function ErrorLogsClient() {
               className="h-[44px] px-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-[var(--font-size-label)] text-[var(--text-muted)]">
+          <label className="flex items-center gap-1.5 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
             종료일
             <input
               type="date"
@@ -364,7 +364,7 @@ export function ErrorLogsClient() {
           <button
             type="button"
             onClick={() => setSelectedId(row.id)}
-            className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             aria-label={`${row.message} 상세 보기`}
           >
             보기
@@ -374,13 +374,13 @@ export function ErrorLogsClient() {
 
       {pageChangeFailed && (
         <div className="flex flex-col items-center gap-2">
-          <p className="text-[var(--font-size-body-sm)] text-[var(--text-muted)]" role="alert">
+          <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]" role="alert">
             {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
           </p>
           <button
             type="button"
             onClick={() => void refetch()}
-            className="inline-flex items-center justify-center h-[44px] px-6 bg-white dark:bg-gray-800 border border-[var(--border)] rounded-xl text-[var(--font-size-body-sm)] text-[var(--text-body)] font-medium hover:border-blue-300 hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center h-[44px] px-6 bg-white dark:bg-gray-800 border border-[var(--border)] rounded-xl text-[length:var(--font-size-body-sm)] text-[var(--text-body)] font-medium hover:border-blue-300 hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             다시 시도하기
           </button>

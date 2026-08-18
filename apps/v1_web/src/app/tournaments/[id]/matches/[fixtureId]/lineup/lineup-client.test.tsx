@@ -762,3 +762,41 @@ describe('이슈 #378 — SUBMITTED 이후 재편집 진입점', () => {
     expect(screen.queryByRole('button', { name: '저장' })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * alpha 실측 결함(2026-08-18) — 명단 카드를 피치로 끌어다 놓는 경로를 추가했는데, 선발이
+ * 0명이면 **피치 자체가 렌더되지 않아** 끌어다 놓을 대상이 화면에 없었다. 라인업을 처음
+ * 짜는 순간이 바로 그 상태라, 새 경로가 가장 필요한 시점에 막혀 있었던 셈이다.
+ */
+describe('FixtureLineupPageClient — 선발이 0명이어도 피치는 그린다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1FixtureLineupRosterMock.mockReturnValue(baseRoster());
+    hoisted.useV1TournamentMock.mockReturnValue({ data: { sport: { name: '풋살' } }, isLoading: false, isError: false });
+    hoisted.useV1FixtureLineupAccessMock.mockReturnValue({
+      data: baseAccess(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    hoisted.useV1GameMock.mockReturnValue({ data: baseGame(), isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    // 아무도 선발이 아닌 상태 = 라인업을 이제 막 짜기 시작한 화면
+    hoisted.useV1GameLineupsMock.mockReturnValue({
+      data: [baseGameLineup({ participants: [] })],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('편집 가능하면 빈 피치와 함께 끌어다 놓으라는 안내를 보여준다', () => {
+    render(<FixtureLineupPageClient tournamentId="t-1" fixtureId="f-1" />);
+
+    // 피치 에디터가 실제로 마운트됐는지 — 포메이션 컨트롤의 "자유 배치"는 프리셋이
+    // 하나도 없어도 항상 남는 항목이라 피치 렌더 여부의 안정적인 신호다.
+    expect(screen.getAllByRole('button', { name: /^자유 배치/ }).length).toBeGreaterThan(0);
+    expect(screen.getByText(/카드를 아래 피치로 끌어다 놓으면/)).toBeInTheDocument();
+  });
+});

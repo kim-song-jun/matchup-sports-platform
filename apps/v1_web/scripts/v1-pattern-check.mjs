@@ -9,6 +9,11 @@
  *  1) 합니다체(입니다/습니다/됩니다/합니다 등) — 사용자 노출 UI 문자열은 해요체 단일 어조.
  *  2) 미정의 CSS 토큰 — globals.css가 var(--x)로 참조하지만 정의도 fallback도 없는 토큰
  *     (런타임 silent fail 방지, WS1 사고 재발 차단).
+ *  3) 무효한 폰트 크기 토큰 클래스 — `text-[var(--font-size-x)]`. Tailwind v4 는
+ *     `text-[...]` 안의 맨 var() 를 **색상**으로 해석해 `color: var(--font-size-x)` 를
+ *     내보낸다. 폰트 크기가 아예 안 걸리고 부모 크기를 상속하는데, 클래스 이름만 보면
+ *     맞아 보여서 코드 리뷰로는 안 잡힌다(2026-08-18 실측: h1 24px 의도 → 16px 렌더,
+ *     42개 파일 168곳). 타입을 명시한 `text-[length:var(--font-size-x)]` 를 쓴다.
  *
  * 사용: node scripts/v1-pattern-check.mjs   (apps/v1_web에서)
  */
@@ -75,8 +80,30 @@ function checkUndefinedTokens() {
   }
 }
 
+/* ── 3) 무효한 폰트 크기 토큰 클래스 검사 ─────────────────────────── */
+function checkInertFontSizeClasses() {
+  let files = '';
+  try {
+    files = execSync("grep -rl 'text-\\[var(--font-size-' src || true", { encoding: 'utf8' });
+  } catch {}
+  for (const f of files.split('\n').filter(Boolean)) {
+    const txt = readFileSync(f, 'utf8');
+    for (const [index, line] of txt.split('\n').entries()) {
+      // 한 줄에 여러 개가 있을 수 있다(클래스 문자열이 길어 줄이 잘 안 나뉜다) —
+      // match() 로 첫 건만 보면 나머지가 보고에서 빠진다.
+      for (const m of line.matchAll(/text-\[var\((--font-size-[a-zA-Z0-9_-]+)\)\]/g)) {
+        violations.push(
+          `[무효 폰트 크기 클래스] ${f}:${index + 1}: text-[var(${m[1]})] — ` +
+            `Tailwind v4 가 색상으로 해석해 크기가 안 걸린다. text-[length:var(${m[1]})] 로 쓸 것`,
+        );
+      }
+    }
+  }
+}
+
 checkHapnida();
 checkUndefinedTokens();
+checkInertFontSizeClasses();
 
 if (violations.length) {
   console.error(`\n✗ v1 패턴 검사 실패 — ${violations.length}건:\n`);
@@ -84,4 +111,4 @@ if (violations.length) {
   console.error('\n참고: docs/v1-coding-patterns.md\n');
   process.exit(1);
 }
-console.log('✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0)');
+console.log('✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0)');

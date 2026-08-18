@@ -37,7 +37,7 @@ export function CoverImageUploader({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+      <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
         {label}
       </span>
       <div className="grid gap-3 sm:grid-cols-[minmax(0,240px)_1fr] sm:items-center">

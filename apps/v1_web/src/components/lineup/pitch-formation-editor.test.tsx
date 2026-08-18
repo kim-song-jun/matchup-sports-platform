@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { LineupEntryDraft } from '@/app/team-matches/[id]/lineup/lineup.view-model';
 import { slotsWithGoalkeeper, type FormationPreset } from './formation-slots';
-import { PitchFormationEditor } from './pitch-formation-editor';
+import { PitchFormationEditor, shortPitchLabel } from './pitch-formation-editor';
 
 /** 포메이션 칩 하나를 누른다. 데스크톱 사이드 패널과 모바일 드로어에 같은 컨트롤이 두 벌
  * 렌더되므로 첫 번째(데스크톱)를 조작한다. 빈 문자열은 "자유 배치".
@@ -294,5 +294,33 @@ describe('PitchFormationEditor — 모바일 포메이션 진입점', () => {
     render(<PitchFormationEditor {...baseProps} editable={false} starters={[]} slots={null} />);
 
     expect(mobileEntry()).toBeDisabled();
+  });
+});
+
+/**
+ * alpha 실측(2026-08-18) — 피치 토큰 라벨이 "E2E 알파 A팀 선수1" 처럼 팀명으로 시작하는
+ * 이름을 그대로 써서 84px 라벨에서 "E2E 알파 A..." 로 잘렸다. 정작 누구인지가 잘려 나간다.
+ * 토큰은 이미 그 팀의 라인업이라 팀명은 되풀이일 뿐이므로 접두사만 걷어낸다.
+ */
+describe('shortPitchLabel', () => {
+  it('팀명으로 시작하는 이름에서 팀명 접두사를 걷어낸다', () => {
+    expect(shortPitchLabel('E2E 알파 A팀 선수1', 'E2E 알파 A팀')).toBe('선수1');
+  });
+
+  it('팀명으로 시작하지 않으면 그대로 둔다', () => {
+    expect(shortPitchLabel('홍길동', 'E2E 알파 A팀')).toBe('홍길동');
+  });
+
+  it('팀명을 모르면 그대로 둔다', () => {
+    expect(shortPitchLabel('E2E 알파 A팀 선수1', null)).toBe('E2E 알파 A팀 선수1');
+    expect(shortPitchLabel('E2E 알파 A팀 선수1', '')).toBe('E2E 알파 A팀 선수1');
+  });
+
+  it('이름이 팀명과 완전히 같으면 빈 라벨을 만들지 않고 원본을 쓴다', () => {
+    expect(shortPitchLabel('E2E 알파 A팀', 'E2E 알파 A팀')).toBe('E2E 알파 A팀');
+  });
+
+  it('공백으로 쪼개지 않는다 — "김 철수" 의 성을 지워 다른 사람으로 만들면 안 된다', () => {
+    expect(shortPitchLabel('김 철수', 'E2E 알파 A팀')).toBe('김 철수');
   });
 });

@@ -515,7 +515,7 @@ export function TournamentInfoSection() {
             <div key={promo.key} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[13px] font-semibold text-[var(--text-strong)]">{promo.title}</p>
-                <span className={`rounded-full px-2.5 py-1 text-[var(--font-size-caption)] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
+                <span className={`rounded-full px-2.5 py-1 text-[length:var(--font-size-caption)] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
                   {promo.enabled ? '노출' : '숨김'}
                 </span>
               </div>
@@ -590,7 +590,7 @@ export function TournamentInfoSection() {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            <p className="text-[var(--font-size-caption)] text-[var(--text-muted)]">종목을 바꾸면 목록·상세의 종목 뱃지와 필터에 바로 반영돼요.</p>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">종목을 바꾸면 목록·상세의 종목 뱃지와 필터에 바로 반영돼요.</p>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -1116,7 +1116,7 @@ const TOURNAMENT_FORMAT_LABEL: Record<string, string> = {
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-[var(--font-size-caption)] text-[var(--text-muted)]">{label}</dt>
+      <dt className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{label}</dt>
       <dd className="text-[13px] text-[var(--text-strong)] m-0">{value}</dd>
     </div>
   );
@@ -1301,7 +1301,7 @@ function InfoTab({
       <div className="border border-[var(--border)] rounded-xl p-4 bg-[var(--card-surface)] flex flex-col gap-3">
         <div>
           <h4 className="text-[13px] font-bold text-[var(--text-strong)] m-0">상금·시상 정보</h4>
-          <p className="text-[var(--font-size-caption)] text-[var(--text-muted)] mt-0.5 mb-0">공개 페이지 &quot;시상·리뷰&quot;의 상금 카드에 그대로 표시돼요.</p>
+          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5 mb-0">공개 페이지 &quot;시상·리뷰&quot;의 상금 카드에 그대로 표시돼요.</p>
         </div>
         <PrizeBreakdownEditor
           rows={prizeRows}

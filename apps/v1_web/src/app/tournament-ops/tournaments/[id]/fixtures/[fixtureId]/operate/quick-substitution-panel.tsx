@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeftRight, X } from 'lucide-react';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
+import { jerseyText } from './player-label';
 
 export interface QuickSubstitutionPanelProps {
   readonly sides: readonly GameSide[];
@@ -155,7 +156,9 @@ export function QuickSubstitutionPanel({
                             : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)] hover:bg-[var(--surface-soft)]',
                         ].join(' ')}
                       >
-                        <span className="tabular-nums text-gray-400">{participant.jerseyNumber ?? '-'}</span>
+                        <span className="inline-block min-w-[1.25rem] text-right tabular-nums text-gray-400">
+                          {jerseyText(participant.jerseyNumber)}
+                        </span>
                         {participant.displayNameSnapshot}
                       </button>
                     </li>

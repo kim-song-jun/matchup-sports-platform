@@ -128,3 +128,47 @@ describe('PenaltyShootoutPanel — 종료가 잠긴 사유 안내', () => {
     expect(screen.getByText('먼저 차는 팀을 골라주세요.')).toBeInTheDocument();
   });
 });
+
+describe('PenaltyShootoutPanel — 정규 시간 스코어 (2026-08-18 실화면 반영)', () => {
+  /**
+   * 이 패널은 화면 중앙 모달이라 뒤의 스코어보드를 통째로 가린다. 정규 시간이 몇 대 몇으로
+   * 끝나 승부차기까지 왔는지는 승부차기 내내 필요한 정보인데, 가려지면 확인할 방법이 없다.
+   */
+  it('정규 시간 스코어를 패널 안에 보여준다', () => {
+    render(
+      <PenaltyShootoutPanel
+        sides={[HOME, AWAY]}
+        kicks={[]}
+        firstKickSideId={null}
+        onSelectFirstKicker={vi.fn()}
+        onRecordKick={vi.fn()}
+        onUndoLastKick={vi.fn()}
+        onFinish={vi.fn()}
+        onCancel={vi.fn()}
+        regulationScoreBySideId={new Map([[HOME.id, 2], [AWAY.id, 2]])}
+        policy={{ earlyStop: true }}
+        finishing={false}
+      />,
+    );
+    expect(screen.getByText('정규 시간')).toBeInTheDocument();
+    expect(screen.getByText('2 : 2')).toBeInTheDocument();
+  });
+
+  it('스코어를 안 넘기면 그 줄을 그리지 않는다 — 빈 자리를 만들지 않는다', () => {
+    render(
+      <PenaltyShootoutPanel
+        sides={[HOME, AWAY]}
+        kicks={[]}
+        firstKickSideId={null}
+        onSelectFirstKicker={vi.fn()}
+        onRecordKick={vi.fn()}
+        onUndoLastKick={vi.fn()}
+        onFinish={vi.fn()}
+        onCancel={vi.fn()}
+        policy={{ earlyStop: true }}
+        finishing={false}
+      />,
+    );
+    expect(screen.queryByText('정규 시간')).toBeNull();
+  });
+});

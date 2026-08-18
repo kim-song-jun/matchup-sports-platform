@@ -83,3 +83,62 @@ describe('리뷰 작성 화면 — 아직 손대지 않은 대상의 별점 초�
     expect(stars!.querySelectorAll('[data-active="false"]')).toHaveLength(0);
   });
 });
+
+/**
+ * 별점이 기본값으로 이미 채워져 있으니, 태그를 안 고른 사용자 눈에는 "다 했는데 버튼만
+ * 회색"으로 보인다. 태그 1개 이상은 서버 계약(`SubmitReviewDto` 의 `@ArrayMinSize(1)`)
+ * 이라 버튼을 풀어줄 수 없으므로, **왜 못 보내는지**가 화면에 남아 있어야 한다.
+ */
+describe('리뷰 작성 화면 — 보내기 버튼이 잠긴 이유 안내', () => {
+  it('태그를 하나도 고르지 않았으면 이유를 적고, 버튼에 그 설명을 묶는다', () => {
+    const { container } = render(
+      <ReviewSourcePageView
+        drafts={{}}
+        errorMessage={null}
+        loading={false}
+        message={null}
+        model={makeModel()}
+        onRetry={() => {}}
+        onSubmit={() => {}}
+        onToggleTag={() => {}}
+        onUpdateRating={() => {}}
+        submitting={false}
+      />,
+    );
+
+    const submit = container.querySelector('.tm-fixed-cta button') as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+
+    const hintId = submit.getAttribute('aria-describedby');
+    expect(hintId).toBeTruthy();
+    // 스크린리더가 읽을 수 있게 실제로 그 id 를 가진 요소가 있어야 한다(허공을 가리키면 안 된다).
+    expect(container.querySelector(`#${hintId}`)?.textContent).toMatch(/태그/);
+  });
+
+  it('태그를 고른 대상이 하나라도 있으면 안내는 사라지고 버튼이 열린다', () => {
+    const model = makeModel();
+    // 컴포넌트 내부 `targetKey()` 와 같은 규칙: 팀 대상은 `team:{teamId}`.
+    // 그 규칙이 바뀌면 이 테스트가 깨지는 편이 낫다 — drafts 키가 어긋나면 사용자가 고른
+    // 태그가 조용히 무시되고 버튼이 영영 안 열린다.
+    const key = `team:${model.targets[0].targetTeamId}`;
+
+    const { container } = render(
+      <ReviewSourcePageView
+        drafts={{ [key]: { rating: DEFAULT_REVIEW_RATING, tagCodes: ['MANNER'] } }}
+        errorMessage={null}
+        loading={false}
+        message={null}
+        model={model}
+        onRetry={() => {}}
+        onSubmit={() => {}}
+        onToggleTag={() => {}}
+        onUpdateRating={() => {}}
+        submitting={false}
+      />,
+    );
+
+    const submit = container.querySelector('.tm-fixed-cta button') as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+    expect(submit.getAttribute('aria-describedby')).toBeNull();
+  });
+});

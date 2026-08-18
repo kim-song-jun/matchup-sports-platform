@@ -6,6 +6,7 @@ import {
   extractYoutubeVideoId,
   youtubeThumbnailUrl,
   youtubeEmbedUrl,
+  youtubeWatchUrl,
   videoKind,
 } from '@/lib/video-utils';
 
@@ -213,6 +214,24 @@ export function MatchVideos({
                 <video key={active.id} src={active.url} controls autoPlay playsInline />
               )}
             </div>
+            {/* 임베드는 우리가 제어할 수 없는 이유로 막힐 수 있다 — 사이트 CSP, 업로더가 끈
+                "다른 사이트에서 재생 허용", 연령 제한. 그때 iframe 은 빈 화면이나 유튜브
+                에러만 보여 주고 모달은 빠져나갈 곳이 없는 막다른 길이 된다. 유튜브 영상에는
+                항상 원본으로 가는 링크를 함께 둔다. */}
+            {activeYoutubeId !== null && (
+              <p className="tm-video-modal-foot">
+                <a
+                  href={youtubeWatchUrl(activeYoutubeId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="재생이 안 되면 유튜브에서 보기 (새 창)"
+                  className="tm-video-modal-external"
+                >
+                  <ExternalLink size={12} aria-hidden="true" />
+                  재생이 안 되면 유튜브에서 보기
+                </a>
+              </p>
+            )}
             {videos.length > 1 && (
               <div className="tm-video-playlist" aria-label="영상 선택">
                 {videos.map((v, i) =>

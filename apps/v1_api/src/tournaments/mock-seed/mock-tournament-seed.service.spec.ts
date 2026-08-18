@@ -128,6 +128,19 @@ describe('MockTournamentSeedService', () => {
     expect(unknownFields).toEqual([]);
   });
 
+  // alpha 에서 13개 대회 생성이 전부 "사용 가능 1팀"으로 실패했다: 후보를 오래된 팀 순으로
+  // teamCount*4 개만 가져오는데 그 범위가 실사용자 팀으로 가득 차서, 정작 전원이 테스트
+  // 계정인 QA 스쿼드 팀들이 후보에 들지도 못했다. 필터는 DB 쿼리 단계에 있어야 한다.
+  it('테스트 계정 팀 조건을 DB where 에서 건다', async () => {
+    const { service, prisma } = makeWorld(4);
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    const where = prisma.v1Team.findMany.mock.calls[0][0].where as {
+      memberships?: { every?: { user?: { email?: { endsWith?: string } } } };
+    };
+    expect(where.memberships?.every?.user?.email?.endsWith).toBe('@teameet.test');
+  });
+
   // alpha 에는 실사용자 팀(대행FC 등)이 섞여 있다. 목업 대회가 그 팀을 끌어들이면
   // 실제 사용자 마이페이지에 가짜 대회가 뜨고 후기 대상까지 된다 — 통째로 제외해야 한다.
   it('실사용자가 한 명이라도 섞인 팀은 쓰지 않는다', async () => {

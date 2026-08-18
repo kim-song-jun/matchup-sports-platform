@@ -157,7 +157,17 @@ export class MockTournamentSeedService {
    */
   private async pickTeams(teamCount: number): Promise<SeedTeam[]> {
     const candidates = await this.prisma.v1Team.findMany({
-      where: { status: 'active', deletedAt: null, memberships: { some: { status: 'active', role: 'owner' } } },
+      where: {
+        status: 'active',
+        deletedAt: null,
+        memberships: {
+          some: { status: 'active', role: 'owner' },
+          // 테스트 팀만 DB 에서 걸러온다. 메모리에서만 걸러내면 take 범위(오래된 팀 순)가
+          // 실사용자 팀으로 차서 정작 QA 스쿼드가 후보에 들지 못한다 — 실제로 alpha 에서
+          // "사용 가능 1팀" 으로 전부 실패했다.
+          every: { user: { email: { endsWith: TEST_ACCOUNT_DOMAIN } } },
+        },
+      },
       select: {
         id: true,
         name: true,

@@ -336,7 +336,11 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
 
 function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['pushNudge']> }) {
   return (
-    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    // 390px 에서 아이콘(36) + 문구 + CTA + 닫기(44) 를 한 줄에 넣으면 gap·패딩까지 합쳐
+    // 220px 넘게 먹어 문구가 들어갈 자리가 거의 남지 않는다. 정보 줄과 CTA 를 분리해
+    // 같은 자리에 뜨는 "남은 후기" 배너와 같은 리듬으로 맞춘다.
+    <Card pad={14}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
         style={{
@@ -353,27 +357,28 @@ function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['
       >
         <BellIcon size={18} strokeWidth={2} />
       </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="tm-text-label">알림을 받아보세요</div>
-        <div className="tm-text-caption" style={{ marginTop: 2 }}>매칭, 채팅, 경기 결과 소식을 놓치지 않아요.</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="tm-text-label">알림을 받아보세요</div>
+          <div className="tm-text-caption" style={{ marginTop: 2 }}>매칭, 채팅, 경기 결과 소식을 놓치지 않아요.</div>
+        </div>
+        <button
+          type="button"
+          aria-label="알림 받기 안내 닫기"
+          className="tm-pressable"
+          style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={pushNudge.onDismiss}
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
       </div>
       <button
         type="button"
-        className="tm-btn tm-btn-sm tm-btn-primary"
-        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+        className="tm-btn tm-btn-sm tm-btn-primary tm-btn-block"
+        style={{ marginTop: 12, minHeight: 44 }}
         disabled={pushNudge.subscribing}
         onClick={pushNudge.onSubscribe}
       >
         {pushNudge.subscribing ? '확인 중' : '알림 받기'}
-      </button>
-      <button
-        type="button"
-        aria-label="알림 받기 안내 닫기"
-        className="tm-pressable"
-        style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        onClick={pushNudge.onDismiss}
-      >
-        <X size={18} aria-hidden="true" />
       </button>
     </Card>
   );

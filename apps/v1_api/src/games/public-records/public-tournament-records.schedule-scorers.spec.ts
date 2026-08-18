@@ -55,6 +55,11 @@ type FakeNameProfile = {
   displayName: string | null;
   nickname: string;
   tournamentRealNameVisible: boolean;
+  /**
+   * 프로덕션 select 가 항상 돌려주는 필드라 픽스처도 필수로 둔다 -- 생략을 허용하면
+   * `undefined !== null` 이 참이 되어 미탈퇴 프로필이 탈퇴로 오판된다.
+   */
+  deletedAt: Date | null;
 };
 
 type FakeGoalEvent = {
@@ -383,7 +388,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 대회 경기 기록 실
 
   it('토글 ON: V1UserProfile.realName을 보여준다(닉네임/스냅샷 아님)', async () => {
     const prisma = buildLinkedPrisma([
-      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: true },
+      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: true, deletedAt: null },
     ]);
     const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
 
@@ -392,20 +397,24 @@ describe('PublicTournamentRecordsService.getSchedule -- 대회 경기 기록 실
     expect(result.items[0].scorers[0]).toMatchObject({ participantName: '홍길동' });
   });
 
-  it('토글 OFF(기본값): displayName ?? nickname을 보여준다(실명 아님)', async () => {
+  it('토글 OFF(기본값): nickname을 보여준다(실명 아님)', async () => {
     const prisma = buildLinkedPrisma([
-      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: false },
+      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: false, deletedAt: null },
     ]);
     const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
 
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
-    expect(result.items[0].scorers[0]).toMatchObject({ participantName: '길동이' });
+    expect(result.items[0].scorers[0]).toMatchObject({ participantName: '닉네임러' });
   });
 
-  it('토글 OFF + displayName 없음: nickname으로 내려간다', async () => {
+  // 일정 카드 경로에도 상세 경로와 같은 회귀 방어를 둔다: 실데이터에서는
+  // realName 과 displayName 이 **같은 값**(가입 폼의 실명)이라, OFF 분기가
+  // displayName 을 조금이라도 우선하면 그 즉시 실명이 공개된다.
+  // 근거와 실측은 public-tournament-records.service.ts 의 정책 주석 참고.
+  it('실데이터 모양(realName === displayName)에서도 OFF면 실명이 새지 않는다', async () => {
     const prisma = buildLinkedPrisma([
-      { userId: 'user-linked', realName: '홍길동', displayName: null, nickname: '닉네임러', tournamentRealNameVisible: false },
+      { userId: 'user-linked', realName: '홍길동', displayName: '홍길동', nickname: '닉네임러', tournamentRealNameVisible: false, deletedAt: null },
     ]);
     const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
 

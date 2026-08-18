@@ -27,6 +27,11 @@ type FakeNameProfile = {
   displayName: string | null;
   nickname: string;
   tournamentRealNameVisible: boolean;
+  /**
+   * 프로덕션 select 가 항상 돌려주는 필드라 픽스처도 필수로 둔다 -- 생략을 허용하면
+   * `undefined !== null` 이 참이 되어 미탈퇴 프로필이 탈퇴로 오판된다.
+   */
+  deletedAt: Date | null;
 };
 
 type FakeGoalEvent = {
@@ -857,7 +862,7 @@ describe('PublicTournamentRecordsService.getMatch -- 대회 경기 기록 실명
 
   it('토글 ON: 이벤트/라인업 모두 V1UserProfile.realName(실명)을 보여준다', async () => {
     const prisma = buildLinkedGoalPrisma([
-      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: true },
+      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: true, deletedAt: null },
     ]);
     const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
 
@@ -869,15 +874,54 @@ describe('PublicTournamentRecordsService.getMatch -- 대회 경기 기록 실명
     expect(result.events).toEqual([expect.objectContaining({ participantName: '홍길동' })]);
   });
 
-  it('토글 OFF(기본값): 실명이 아니라 displayName ?? nickname(닉네임)을 보여준다', async () => {
+  it('토글 OFF(기본값): 실명이 아니라 nickname(닉네임)을 보여준다', async () => {
     const prisma = buildLinkedGoalPrisma([
-      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: false },
+      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: false, deletedAt: null },
     ]);
     const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
 
     const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
 
-    expect(result.events).toEqual([expect.objectContaining({ participantName: '길동이' })]);
+    expect(result.events).toEqual([expect.objectContaining({ participantName: '닉네임러' })]);
+  });
+
+  // 이 테스트가 이 파일의 핵심 회귀 방어다. 위 케이스들은 realName과 displayName을
+  // 서로 다른 값으로 꾸며 두는데, 실제 데이터에는 그런 행이 없다 --
+  // `auth.service.ts`의 가입 경로가 `const realName = displayName;`으로 **같은 값**
+  // (가입 폼에 적은 실명)을 두 컬럼에 함께 쓰고, `UpdateProfileDto.displayName`은
+  // `@deprecated`로 남은 realName의 미러다. 그래서 OFF 분기가 displayName을 우선하면
+  // "닉네임을 보여준다"는 계약이 실데이터에서 조용히 깨진다(2026-08-18 alpha 실측:
+  // 공개 기록에 nickname이 아니라 displayName이 떴다). 프로덕션과 같은 모양으로 고정한다.
+  it('실데이터 모양(realName === displayName)에서도 OFF면 실명이 새지 않는다', async () => {
+    const prisma = buildLinkedGoalPrisma([
+      { userId: 'user-linked', realName: '홍길동', displayName: '홍길동', nickname: '닉네임러', tournamentRealNameVisible: false, deletedAt: null },
+    ]);
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.events).toEqual([expect.objectContaining({ participantName: '닉네임러' })]);
+  });
+
+  // 탈퇴 회원은 nickname이 `deleted_<8자>`(admin.service.ts buildDeletedNickname)라
+  // 화면에 그대로 내보낼 수 없다. 탈퇴 시 displayName만 '탈퇴 회원'으로 덮어쓰므로
+  // 이 경우에만 displayName을 쓴다.
+  it('탈퇴 회원은 deleted_ 닉네임 대신 익명화된 displayName을 보여준다', async () => {
+    const prisma = buildLinkedGoalPrisma([
+      {
+        userId: 'user-linked',
+        realName: null,
+        displayName: '탈퇴 회원',
+        nickname: 'deleted_1234abcd',
+        tournamentRealNameVisible: false,
+        deletedAt: new Date('2026-08-01T00:00:00.000Z'),
+      },
+    ]);
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.events).toEqual([expect.objectContaining({ participantName: '탈퇴 회원' })]);
   });
 
   it('userId 없음(게스트/미연동): 프로필 조인 대상이 아니므로 displayNameSnapshot 그대로다', async () => {
@@ -892,7 +936,7 @@ describe('PublicTournamentRecordsService.getMatch -- 대회 경기 기록 실명
       // userId가 없는데도 nameProfiles를 채워 둬 "조인 자체를 안 한다"를 증명한다 --
       // 매칭되는 프로필이 있어도 게스트 참가자는 여전히 스냅샷이어야 한다.
       nameProfiles: [
-        { userId: 'user-unrelated', realName: '무관한사람', displayName: null, nickname: '무관닉네임', tournamentRealNameVisible: true },
+        { userId: 'user-unrelated', realName: '무관한사람', displayName: null, nickname: '무관닉네임', tournamentRealNameVisible: true, deletedAt: null },
       ],
       events: [
         {
@@ -925,7 +969,9 @@ describe('PublicTournamentRecordsService.getMatch -- 대회 경기 기록 실명
 
   it('토글 ON인데 realName이 비어 있으면(실명 미입력) 빈 이름 대신 닉네임으로 방어적으로 내려간다', async () => {
     const prisma = buildLinkedGoalPrisma([
-      { userId: 'user-linked', realName: null, displayName: null, nickname: '닉네임러', tournamentRealNameVisible: true },
+      // displayName이 남아 있어도(레거시 미러) 실명이 없으면 닉네임으로 내려가야 한다 --
+      // displayName을 실명 대체재로 쓰면 OFF 계약과 어긋난 값이 ON 경로로 새어 나온다.
+      { userId: 'user-linked', realName: null, displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: true, deletedAt: null },
     ]);
     const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
 

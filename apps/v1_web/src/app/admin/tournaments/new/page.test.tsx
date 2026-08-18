@@ -797,6 +797,30 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
       expect(repriced.promoHome.prizeText).toBe('총 상금 5,000,000원');
     });
 
+    it('초안 저장 후 새로고침해도 자동으로 채워졌던 문구는 계속 대회 정보를 따라간다', () => {
+      // 서버에는 자동 파생 문구도 그대로 저장된다 — 저장돼 있다는 이유만으로 dirty로 굳으면
+      // 새로고침 뒤 일정·장소를 고쳐도 홍보 문구가 옛 값에 멈춘다.
+      const hydrated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+        type: 'hydrate-from-draft',
+        tournament: fakeDraftTournament({
+          venue: '서울월드컵보조경기장',
+          // 관리자가 손대지 않아 파생값 그대로 저장된 문구
+          promoHomeLocationText: '서울월드컵보조경기장',
+          // 관리자가 직접 고쳐 저장한 문구
+          promoHomePrizeText: '🎁 특별 상품 증정',
+        }),
+      });
+
+      const relocated = tournamentCreateReducer(hydrated, {
+        type: 'set-field',
+        field: 'venue',
+        value: '수원종합운동장',
+      });
+
+      expect(relocated.promoHome.locationText).toBe('수원종합운동장');
+      expect(relocated.promoHome.prizeText).toBe('🎁 특별 상품 증정');
+    });
+
     it('"대회 정보로 다시 채우기"는 해당 카드만 현재 대회 정보로 되돌린다', () => {
       const edited = tournamentCreateReducer(stateWithTournamentInfo(), {
         type: 'set-promo',

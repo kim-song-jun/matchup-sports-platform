@@ -294,11 +294,21 @@ function withPromoValue(
   };
 }
 
-/** 서버에 이미 저장돼 있던 문구는 관리자가 정한 값이므로 dirty로 본다(자동 갱신 대상 제외). */
-function dirtyFromSavedPromo(value: Record<PromoFactKey, string>): PromoFactsDirty {
+/**
+ * 서버에 저장돼 있던 문구가 "관리자가 정한 값"인지 판정한다.
+ *
+ * 이 위저드는 자동으로 채운 문구도 그대로 저장하므로, 저장돼 있다는 사실만으로는 관리자가
+ * 손댔는지 알 수 없다. 대신 지금 대회 정보로 만든 파생값과 대조한다 — 같으면 자동으로
+ * 채워진 그대로이므로 dirty가 아니고(초안 저장·새로고침 뒤에도 자동 갱신이 이어진다),
+ * 다르면 관리자가 고쳤거나 지운 것이므로 dirty다.
+ */
+function dirtyFromSavedPromo(
+  saved: Record<PromoFactKey, string>,
+  defaults: Record<PromoFactKey, string>,
+): PromoFactsDirty {
   const dirty = { ...EMPTY_PROMO_FACTS_DIRTY };
   for (const key of PROMO_FACT_KEYS) {
-    if (value[key].trim().length > 0) dirty[key] = true;
+    if (saved[key].trim() !== defaults[key]) dirty[key] = true;
   }
   return dirty;
 }
@@ -317,7 +327,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       }))
     : INITIAL_TOURNAMENT_CREATE_STATE.prizeRows;
 
-  return syncPromoFacts({
+  const restored: TournamentCreateState = {
     ...INITIAL_TOURNAMENT_CREATE_STATE,
     draftId: tournament.id,
     sportId: tournament.sportId,
@@ -378,17 +388,28 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       prizeText: tournament.promoListPrizeText ?? '',
       priority: String(tournament.promoListPriority),
     },
+  };
+
+  const defaults = buildTournamentPromoFactDefaults(restored);
+  return syncPromoFacts({
+    ...restored,
     promoFactsDirty: {
-      promoHome: dirtyFromSavedPromo({
-        dateText: tournament.promoHomeDateText ?? '',
-        locationText: tournament.promoHomeLocationText ?? '',
-        prizeText: tournament.promoHomePrizeText ?? '',
-      }),
-      promoList: dirtyFromSavedPromo({
-        dateText: tournament.promoListDateText ?? '',
-        locationText: tournament.promoListLocationText ?? '',
-        prizeText: tournament.promoListPrizeText ?? '',
-      }),
+      promoHome: dirtyFromSavedPromo(
+        {
+          dateText: tournament.promoHomeDateText ?? '',
+          locationText: tournament.promoHomeLocationText ?? '',
+          prizeText: tournament.promoHomePrizeText ?? '',
+        },
+        defaults,
+      ),
+      promoList: dirtyFromSavedPromo(
+        {
+          dateText: tournament.promoListDateText ?? '',
+          locationText: tournament.promoListLocationText ?? '',
+          prizeText: tournament.promoListPrizeText ?? '',
+        },
+        defaults,
+      ),
     },
   });
 }

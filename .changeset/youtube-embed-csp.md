@@ -8,7 +8,8 @@
   재생 모달의 유튜브 임베드(`www.youtube-nocookie.com`)가 브라우저에서 차단돼, 썸네일까지는
   정상으로 보이는데(썸네일은 `img-src ... https:` 로 허용됨) 모달 안이 빈 화면이었다.
   업로드한 mp4 는 same-origin 이라 멀쩡히 재생돼서 증상이 유튜브에만 나타났다.
-- **수정**: 전 CSP 정의(운영·alpha 공통 스니펫 + 인라인 8곳)에 유튜브 두 호스트만 담은
+- **수정**: CSP 정의 9곳(`nginx.security-headers.conf` 스니펫 1 + `nginx.conf` 인라인 7 +
+  `nginx.alpha.conf` 인라인 1)에 유튜브 두 호스트만 담은
   `frame-src` 허용 목록을 추가한다. 그 밖의 출처는 `default-src 'self'` 폴백에 그대로 막히고,
   우리 페이지가 남에게 embed 되는 것을 막는 `frame-ancestors` 는 손대지 않았다.
 - **폴백**: CSP 를 풀어도 업로더가 임베드를 끈 영상·연령 제한 영상은 유튜브 쪽에서 막는다.

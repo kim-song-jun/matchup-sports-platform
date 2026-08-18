@@ -13,16 +13,30 @@ describe('penaltyShootoutDecided — 서버가 킥 수를 보고 판정한다', 
     ).toBe(false);
   });
 
-  it('각 1킥 1:0은 A2에서 미결(잔여 4킥으로 역전 가능)이고 A1에서는 결판이다', () => {
+  it('각 1킥 1:0은 두 정책 모두 미결이다 — 1라운드 종료는 어떤 규정에도 없다', () => {
+    // 2026-08-18 정정: 예전 A1은 여기서 결판을 냈다(`earlyStop: false`라는 이름과 정반대).
     const counts = { home: 1, away: 0, takenHome: 1, takenAway: 1, firstKickSideKey: 'HOME' } as const;
     expect(penaltyShootoutDecided(counts, A2)).toBe(false);
-    expect(penaltyShootoutDecided(counts, A1)).toBe(true);
+    expect(penaltyShootoutDecided(counts, A1)).toBe(false);
+  });
+
+  it('각 3킥 3:0 — A2는 역전 불가라 결판, A1은 5킥을 마저 차야 한다', () => {
+    const counts = { home: 3, away: 0, takenHome: 3, takenAway: 3, firstKickSideKey: 'HOME' } as const;
+    expect(penaltyShootoutDecided(counts, A2)).toBe(true);
+    expect(penaltyShootoutDecided(counts, A1)).toBe(false);
+  });
+
+  it('A1도 5킥을 다 채우면 판정한다', () => {
+    expect(
+      penaltyShootoutDecided({ home: 3, away: 1, takenHome: 5, takenAway: 5, firstKickSideKey: 'HOME' }, A1),
+    ).toBe(true);
   });
 
   it('선축 4킥 4점 / 후축 3킥 0점은 A2에서 결판, A1에서는 미결 — 두 정책이 갈리는 지점', () => {
     const counts = { home: 4, away: 0, takenHome: 4, takenAway: 3, firstKickSideKey: 'HOME' } as const;
     expect(penaltyShootoutDecided(counts, A2)).toBe(true);
     expect(penaltyShootoutDecided(counts, A1)).toBe(false);
+    // A1이 여기서 미결인 이유는 "킥 수가 달라서"가 아니라 **5킥을 안 채워서**다.
   });
 
   it('선축이 원정일 때 잔여 킥을 원정 기준으로 센다 — 홈으로 굳으면 답이 갈린다', () => {

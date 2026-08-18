@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -27,6 +27,26 @@ export interface AssistPickerSheetProps {
  */
 export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel, teammates, onAttach, onClose }: AssistPickerSheetProps) {
   const [pending, setPending] = useState<string | null>(null);
+  /* 목록이 실제로 넘칠 때만 아래쪽 페이드와 "아래로 더 있어요"를 켠다. 예전에는
+     둘 다 무조건 켜져 있어(페이드는 상시, 문구는 `teammates.length > 4` 어림짐작),
+     4명이 딱 들어맞는 화면에서도 마지막 선수가 반쯤 지워져 "잘렸다"처럼 보였다
+     (2026-08-18 390px 실화면). 초깃값은 측정 전에도 그럴듯한 어림짐작을 쓰고,
+     마운트 뒤 실제 scrollHeight 로 덮어쓴다. */
+  const listRef = useRef<HTMLDivElement>(null);
+  const [listOverflows, setListOverflows] = useState(teammates.length > 4);
+  const measureOverflow = useCallback(() => {
+    const el = listRef.current;
+    if (el === null) return;
+    setListOverflows(el.scrollHeight > el.clientHeight + 1);
+  }, []);
+  useEffect(() => {
+    measureOverflow();
+    const el = listRef.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measureOverflow);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measureOverflow, teammates.length]);
   const [error, setError] = useState<string | null>(null);
   if (!open) return null;
 
@@ -117,7 +137,10 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
           어시스트 없이 두기
         </button>
         <div
-          className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent)]"
+          ref={listRef}
+          className={`flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto${
+            listOverflows ? ' [mask-image:linear-gradient(to_bottom,black_calc(100%-24px),transparent)]' : ''
+          }`}
           role="list"
         >
           {teammates.map((teammate) => (
@@ -136,7 +159,7 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
             </Button>
           ))}
         </div>
-        {teammates.length > 4 ? (
+        {listOverflows ? (
           <p className="mt-1 shrink-0 text-center text-xs text-[var(--text-muted)]" aria-hidden="true">
             아래로 더 있어요
           </p>

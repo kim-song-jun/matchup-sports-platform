@@ -177,27 +177,17 @@ export function ReviewSourcePageView({
                 <div>
                   <div className="tm-text-caption">{model.sourceMeta}</div>
                   <div className="tm-text-body-lg" style={{ marginTop: 4 }}>{model.source.title}</div>
-                  {model.reviewerTeam ? <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.reviewerTeam.name} 대표로 작성</div> : null}
+
                 </div>
                 <span className="tm-badge tm-badge-blue">{model.progressLabel.split(' · ')[0]}</span>
               </div>
             </Card>
-            <div className="tm-review-target-stack">
-              {model.targets.map((target) => {
-                // reviewerTeam 이 null = 양 팀 겸직이라 대상마다 작성자 팀이 다르다는 뜻.
-                const targetModel = toTargetViewModel(target, model.reviewerTeam === null);
-                const key = targetKey(target.targetType, target.targetUserId, target.targetTeamId);
-                return (
-                  <ReviewTargetCard
-                    key={key}
-                    draft={drafts[key] ?? { rating: target.review?.rating ?? DEFAULT_REVIEW_RATING, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
-                    onToggleTag={(tagCode) => onToggleTag(key, tagCode)}
-                    onUpdateRating={(rating) => onUpdateRating(key, rating)}
-                    target={targetModel}
-                  />
-                );
-              })}
-            </div>
+            <ReviewTargetSections
+              drafts={drafts}
+              model={model}
+              onToggleTag={onToggleTag}
+              onUpdateRating={onUpdateRating}
+            />
             <Card className={message ? 'tm-review-notice-error' : ''} pad={14} style={message ? undefined : { background: 'var(--grey50)' }}>
               <div className="tm-text-label">{message ?? '작성 현황'}</div>
               <div className="tm-text-caption" style={{ marginTop: 5 }}>{message ? '선택 상태를 확인한 뒤 다시 시도해 주세요.' : model.progressLabel}</div>
@@ -303,11 +293,11 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
         <div className="tm-text-heading" style={{ marginTop: 22 }}>리뷰를 보냈어요</div>
         <Card pad={16} style={{ marginTop: 24, textAlign: 'left' }}>
           <div className="tm-text-label">{model.source.title}</div>
+          {/* "별점 선택됨"·"태그 선택됨"은 무엇을 보냈든 항상 같은 문구라 아무것도 알려주지
+              않았다. 실제로 달라지는 값(보낸 인원 / 남은 인원)만 남긴다. */}
           <div className="tm-review-chip-row">
             <span className="tm-badge tm-badge-blue">{reviewed}명 전송</span>
-            <span className="tm-badge tm-badge-blue">별점 선택됨</span>
-            <span className="tm-badge tm-badge-blue">태그 선택됨</span>
-            <span className="tm-badge tm-badge-grey">{remaining}명 남음</span>
+            {remaining > 0 ? <span className="tm-badge tm-badge-grey">{remaining}명 남음</span> : null}
           </div>
         </Card>
       </div>
@@ -315,6 +305,66 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" onClick={onConfirm} type="button">확인</button>
       </div>
     </AppChrome>
+  );
+}
+
+/**
+ * 후기 작성 대상 배치 — **상대 팀 평가가 기본이고 선수는 선택**이다.
+ *
+ * 예전에는 팀 1 + 선수 N(대회 경기에서 최대 8명)을 전부 같은 높이의 카드로 세로로 깔아,
+ * 화면이 "이 경기의 모든 사람을 평가해야 한다"처럼 읽혔다. 실제로는 팀 평가만 남겨도 되고
+ * 인상 깊은 선수만 골라 덧붙이면 된다 — 제출도 이미 "태그를 고른 대상만" 보낸다.
+ */
+function ReviewTargetSections({
+  drafts,
+  model,
+  onToggleTag,
+  onUpdateRating,
+}: {
+  drafts: Record<string, ReviewTargetDraft>;
+  model: ReviewSourcePageModel;
+  onToggleTag: (key: string, tagCode: string) => void;
+  onUpdateRating: (key: string, rating: number) => void;
+}) {
+  const teamTargets = model.targets.filter((target) => target.targetType === 'team');
+  const playerTargets = model.targets.filter((target) => target.targetType !== 'team');
+  // 이미 손댄 선수가 있는데 접어 두면 그 결과가 사라진 것처럼 보인다.
+  const hasPlayerProgress = playerTargets.some((target) => target.alreadySubmitted || target.review);
+  // 팀 대상이 아예 없으면 선수가 유일한 할 일이므로 펼친 채로 둔다.
+  // 이 파일은 서버 컴포넌트로도 렌더되므로(use client 없음) 상태 대신 <details> 로 접는다.
+  const playersOpen = hasPlayerProgress || teamTargets.length === 0;
+
+  const renderCard = (target: ReviewSourcePageModel['targets'][number]) => {
+    // reviewerTeam 이 null = 양 팀 겸직이라 대상마다 작성자 팀이 다르다는 뜻.
+    const targetModel = toTargetViewModel(target, model.reviewerTeam === null);
+    const key = targetKey(target.targetType, target.targetUserId, target.targetTeamId);
+    return (
+      <ReviewTargetCard
+        key={key}
+        draft={drafts[key] ?? { rating: target.review?.rating ?? DEFAULT_REVIEW_RATING, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
+        onToggleTag={(tagCode) => onToggleTag(key, tagCode)}
+        onUpdateRating={(rating) => onUpdateRating(key, rating)}
+        target={targetModel}
+      />
+    );
+  };
+
+  return (
+    <>
+      {teamTargets.length > 0 ? <div className="tm-review-target-stack">{teamTargets.map(renderCard)}</div> : null}
+
+      {playerTargets.length > 0 ? (
+        <details className="tm-review-player-details" open={playersOpen} style={{ marginTop: teamTargets.length > 0 ? 16 : 0 }}>
+          <summary className="tm-review-player-summary">
+            선수 개별 평가 <span className="tab-num">{playerTargets.length}</span>명
+          </summary>
+          <div className="tm-text-caption" style={{ margin: '6px 0 10px' }}>
+            남기고 싶은 선수만 골라 주세요. 비워 두면 팀 후기만 전송돼요.
+          </div>
+          <div className="tm-review-target-stack">{playerTargets.map(renderCard)}</div>
+        </details>
+      ) : null}
+    </>
   );
 }
 

@@ -1929,6 +1929,22 @@ button:disabled {
   padding-top: 16px;
 }
 
+/*
+ * 홈 상단 배너(알림 · 휴대폰 인증 · 남은 후기) 슬롯.
+ * 홈 본문 컨테이너(.tm-scroll-area)는 좌우 패딩이 0 이고 섹션마다 각자 20px 을 준다.
+ * 배너 카드에는 그게 없어 화면 끝까지 늘어나 아래 콘텐츠와 여백선이 어긋났다.
+ * 데스크톱에서는 .tm-home-main 이 그리드 컬럼이라 컬럼 자체가 여백을 갖는다 — 그때는 0.
+ */
+.tm-home-banner-slot {
+  padding: 0 20px;
+}
+
+@media (min-width: 1024px) {
+  .tm-home-banner-slot {
+    padding: 0;
+  }
+}
+
 /* 오늘의 추천 — 세로 스택 대신 가로 캐러셀(스와이프, 다음 카드 살짝 peek). 스크롤바는 전역 숨김. */
 .tm-home-featured-carousel {
   display: flex;
@@ -6027,6 +6043,32 @@ button:disabled {
   border: none;
   background: #000;
 }
+/* 임베드가 막혔을 때의 탈출구 — 유튜브 원본으로 가는 링크 (match-videos.tsx) */
+.tm-video-modal-foot {
+  margin-top: 8px;
+}
+.tm-video-modal-external {
+  /* 플레이리스트 칩(34px)과 달리 44px 를 지킨다 — 임베드가 막혔을 때 이 링크가 영상을 볼
+     유일한 경로라, 모달 안에서 놓치면 안 되는 핵심 액션이다. */
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  transition: background 0.15s;
+}
+.tm-video-modal-external:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.tm-video-modal-external:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 /* 영상이 여러 개일 때 모달 하단 플레이리스트 */
 .tm-video-playlist {
   display: flex;
@@ -6611,3 +6653,33 @@ button:disabled {
   .tm-fixture-lineup-player-controls { gap: 8px; }
   .tm-fixture-lineup-player-controls .tm-input { width: 72px; }
 }
+
+/* 후기 작성 — 선수 개별 평가는 접어 두고 원하는 사람만 펼쳐 쓴다(팀 평가가 기본). */
+.tm-review-player-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+  list-style: none;
+}
+.tm-review-player-summary::-webkit-details-marker { display: none; }
+.tm-review-player-summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.tm-review-player-details[open] > .tm-review-player-summary::after {
+  transform: rotate(-135deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-review-player-summary::after { transition: none; }
+}
+

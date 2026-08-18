@@ -197,7 +197,7 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
   it('전송할 것이 없으면 전송 상태 절을 세우지 않는다', () => {
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
-    expect(screen.queryByText('전송 상태')).toBeNull();
+    expect(screen.queryByText('전송 대기·실패')).toBeNull();
   });
 
   it('대기·실패한 전송이 있을 때만 전송 상태를 따로 세운다', () => {
@@ -216,8 +216,29 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
 
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
-    expect(screen.getByText('전송 상태')).toBeInTheDocument();
+    expect(screen.getByText('전송 대기·실패')).toBeInTheDocument();
     // 서버 로그는 그대로 남아 있어야 한다 — 큐가 그것을 대체하지 않는다.
+    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
+  });
+
+  // 전부 ack 된 평상시에는 이 절이 통째로 사라져야 한다. 예전에는 ack 된 항목까지 남아
+  // "골·옐로카드·골 · 기록 완료"가 위 확정 로그와 1:1로 중복됐다(시각·선수·팀 없이).
+  it('전부 서버에 기록된 뒤에는 전송 절을 남기지 않는다', () => {
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({
+        queue: {
+          items: [
+            { clientEventId: 'c-1', status: 'acked', lastError: null, event: { type: 'GOAL', payload: {} } },
+            { clientEventId: 'c-2', status: 'acked', lastError: null, event: { type: 'FOUL', payload: {} } },
+          ],
+        },
+      }),
+    );
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByText('전송 대기·실패')).toBeNull();
+    // 확정 로그는 그대로다 — 큐를 숨긴 것이지 기록을 숨긴 게 아니다.
     expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
   });
 });

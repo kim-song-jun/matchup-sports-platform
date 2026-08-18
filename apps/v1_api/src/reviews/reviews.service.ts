@@ -248,8 +248,24 @@ export class ReviewsService {
     };
   }
 
+  /**
+   * 팀 상세 화면이 쓰는 **공개** 요약 — 특정 팀이 받은 후기를 집계한다. 로그인 없이도
+   * 볼 수 있어야 하므로 사용자 기준 필터(`participatingTeamIds`)가 아니라 팀 id 를 직접 건다.
+   *
+   * 공개라고 해서 게이트를 느슨하게 두지 않는다: 아래 `summarizeTargetReviews` 를 그대로
+   * 지나므로 **상호평가 공개 규칙(`isReviewRevealed`)이 동일하게 적용된다** — 상대가 아직
+   * 안 썼고 유예 시간도 안 지난 후기는 여기서도 보이지 않는다. 이 경로만 따로 집계했다면
+   * 그 규칙을 우회하는 구멍이 됐을 것이다.
+   */
+  async publicTeamSummary(teamId: string, query?: { period?: string }) {
+    return this.summarizeTargetReviews(
+      { targetTeamId: teamId, targetType: 'team' as const },
+      'team',
+      query?.period,
+    );
+  }
+
   async receivedSummary(user: V1AuthUser, query: { targetType: 'user' | 'team'; period?: string }) {
-    const now = new Date();
     const targetFilter = query.targetType === 'team'
       ? { targetTeamId: { in: await this.participatingTeamIds(user.id) }, targetType: 'team' as const }
       // 개인 대상 요약은 매너 점수와 같은 소스만 센다(PERSONAL_REPUTATION_SOURCES) — 두 곳이
@@ -258,15 +274,30 @@ export class ReviewsService {
       // 대회 개인 후기는 계속 제외한다: V1UserReputationSummary의 tournament_* 컬럼으로 따로
       // 집계되고, 한 대회에서 상대 로스터 전원에게 수십 건이 들어와 평균이 급변하기 때문이다.
       : { targetUserId: user.id, targetType: 'user' as const, sourceType: { in: PERSONAL_REPUTATION_SOURCES } };
+    return this.summarizeTargetReviews(targetFilter, query.targetType, query.period, user.id);
+  }
 
+  /**
+   * 요약 집계의 단 하나의 구현. "누구의 요약인가"(대상 필터)만 호출부가 정하고, 공개 규칙과
+   * 종목·태그 집계는 전부 여기 있다 — 공개 경로와 내 화면 경로가 각자 집계하면 같은 팀의
+   * 같은 후기가 화면마다 다르게 세어진다.
+   */
+  private async summarizeTargetReviews(
+    targetFilter: Record<string, unknown>,
+    targetType: 'user' | 'team',
+    period?: string,
+    /** 개인 대상일 때 역방향 후기를 찾는 기준 사용자. 팀 대상에는 필요 없다. */
+    reverseUserId?: string,
+  ) {
+    const now = new Date();
     const candidates = await this.prisma.v1PostEventReview.findMany({
       where: { status: 'submitted', sportId: { not: null }, ...targetFilter },
       select: { sourceType: true, sourceId: true, sourceGroupId: true, reviewerUserId: true, reviewerTeamId: true, targetUserId: true, targetTeamId: true, rating: true, sportId: true, submittedAt: true, tags: { select: { tagCode: true, labelSnapshot: true } } },
     });
 
-    const reverseReviews = query.targetType === 'team'
+    const reverseReviews = targetType === 'team'
       ? await this.reverseTeamReviews(candidates)
-      : await this.reverseUserReviews(user.id, candidates);
+      : await this.reverseUserReviews(reverseUserId ?? '', candidates);
 
     const revealed = candidates.filter((review) =>
       isReviewRevealed(
@@ -274,8 +305,8 @@ export class ReviewsService {
           // 짝을 맞추는 단위는 경기가 아니라 reviewRevealScope() — 대회 후기는 중복 방지 스코프가
           // 대회 단위라, 서로 다른 경기에서 평가한 짝이 픽스처 기준으로는 절대 맞지 않는다.
           sourceId: reviewRevealScope(review),
-          reviewerUserId: query.targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
-          targetUserId: query.targetType === 'team' ? review.targetTeamId : review.targetUserId,
+          reviewerUserId: targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
+          targetUserId: targetType === 'team' ? review.targetTeamId : review.targetUserId,
           submittedAt: review.submittedAt,
         },
         reverseReviews,
@@ -284,8 +315,8 @@ export class ReviewsService {
     );
 
     const availableMonths = [...new Set(revealed.map((review) => review.submittedAt.toISOString().slice(0, 7)))].sort().reverse();
-    const filtered = query.period
-      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === query.period)
+    const filtered = period
+      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === period)
       : revealed;
 
     // 프론트의 종목 배지·색상은 v1Sport.code 로 매핑한다(SPORT_ACCENT_MAP). sportId(UUID)만
@@ -1334,12 +1365,21 @@ function resolveReviewerTeamIds(teamIds: string[], hostTeamId: string, approvedA
 
 // 작성 주체가 사람이므로 키에는 팀이 들어가지 않는다 — 조회 자체가 reviewerUserId로 좁혀져 있다.
 /**
- * 상대 "팀" 후기를 쓸 수 있는 역할. 대회 경기 경로
- * (tournament-fixture-reviews.service.ts canReviewOpponentTeam)와 같은 규칙을 쓴다 —
+ * 상대 "팀" 후기를 쓸 수 있는 역할.
+ *
+ * 2026-08-18 사용자 결정으로 **모든 참가 멤버**에게 열었다. 그 전에는 owner/manager 만
+ * 쓸 수 있었는데(2026-08-14 역할 규칙), 후기 화면을 "상대 팀 평가가 기본, 선수는 선택"으로
+ * 바꾸면서 팀원에게는 기본 대상이 하나도 없는 화면이 남기 때문이다.
+ *
+ * 팀 평점이 인원 많은 팀 쪽으로 기우는 문제는 생기지 않는다 — 팀 후기는 사람 기준으로
+ * 1인 1건이고(같은 경기에 같은 사람이 두 번 못 씀), 평점은 팀 단위 평균이 아니라 개별
+ * 항목으로 노출된다.
+ *
+ * 대회 경기 경로(tournament-fixture-reviews.service.ts)와 **같은 규칙**을 유지해야 한다 —
  * 두 곳이 갈리면 같은 사용자가 대회에서는 되고 팀매치에서는 안 되는 모순이 생긴다.
  */
-function canReviewOpponentTeam(role: V1TeamMembershipRole) {
-  return role === 'owner' || role === 'manager';
+function canReviewOpponentTeam(_role: V1TeamMembershipRole) {
+  return true;
 }
 
 function teamReviewKey(sourceId: string, targetTeamId: string) {

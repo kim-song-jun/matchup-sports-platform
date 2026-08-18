@@ -878,18 +878,16 @@ describe('ReviewsService', () => {
   // 팀원이 상대 "선수" 후기를 쓰는 것으로 메워진다(아래 describe).
   // 중복 방지 단위가 팀이 아니라 사람이라는 점은 그대로다.
   describe('팀 후기 작성 권한 — 팀장·운영진', () => {
-    it('일반 멤버(role=member)는 상대팀 후기를 쓸 수 없다', async () => {
+    // 2026-08-18 정책 변경: 상대 팀 후기를 모든 참가 멤버에게 열었다. 후기 화면이 "상대 팀
+    // 평가가 기본, 선수는 선택"으로 바뀌면서 팀원에게 기본 대상이 하나도 없어지기 때문이다.
+    it('일반 멤버(role=member)도 상대팀 후기를 제출할 수 있다', async () => {
       const { prisma, createMock } = teamMatchWorld([{ userId: memberAId, teamId: hostTeamId, role: 'member' }]);
       const service = makeService(prisma);
 
-      const error = await service.submit(authUser(memberAId), teamReviewDto(5)).catch((err: unknown) => err);
+      const result = await service.submit(authUser(memberAId), teamReviewDto(5));
 
-      expect(error).toBeInstanceOf(ForbiddenException);
-      expect((error as ForbiddenException).getResponse()).toEqual({
-        code: 'TEAM_REVIEW_ROLE_REQUIRED',
-        message: '상대팀 후기는 팀장·운영진만 작성할 수 있어요.',
-      });
-      expect(createMock).not.toHaveBeenCalled();
+      expect(result.alreadySubmitted).toBe(false);
+      expect(createMock).toHaveBeenCalled();
     });
 
     it('운영진(role=manager)은 상대팀 후기를 제출할 수 있다', async () => {
@@ -994,11 +992,16 @@ describe('ReviewsService', () => {
 
     // 팀 후기를 팀장·운영진으로 좁힌 뒤 남는 위험: 일반 팀원의 pending 목록에 "1건 남음"이 계속
     // 뜨는데 작성 화면엔 쓸 대상이 하나도 없는 상태. 목록의 카운트도 역할을 반영해야 한다.
-    it('라인업이 없는 팀 매치는 일반 팀원의 pending 목록에서 빠진다', async () => {
+    // 2026-08-18 정책 변경 전에는 라인업이 없으면 팀원에게 쓸 대상이 하나도 없어 목록에서
+    // 빠졌다. 이제는 라인업과 무관하게 상대 팀 1건이 항상 남으므로 목록에 뜬다.
+    it('라인업이 없어도 일반 팀원의 pending 목록에 상대 팀 후기가 남는다', async () => {
       const { prisma } = teamMatchWorld([{ userId: memberAId, teamId: hostTeamId, role: 'member' }]);
       const service = makeService(prisma);
 
-      await expect(service['pendingTeamReviews'](authUser(memberAId), 20)).resolves.toEqual([]);
+      const pending = await service['pendingTeamReviews'](authUser(memberAId), 20);
+
+      expect(pending).toHaveLength(1);
+      expect(pending[0]).toMatchObject({ sourceType: 'team_match', remainingCount: 1 });
     });
   });
 
@@ -1008,7 +1011,9 @@ describe('ReviewsService', () => {
     const opponentA = 'away-player-a';
     const opponentB = 'away-player-b';
 
-    it('일반 멤버도 상대팀 라인업의 선수를 대상으로 받는다 (팀 대상은 빠진다)', async () => {
+    // 2026-08-18 정책 변경 후: 일반 멤버에게도 상대 팀이 대상으로 나온다. 팀이 먼저 오고
+    // 선수가 뒤따르는 순서는 화면이 "팀 평가가 기본, 선수는 선택"으로 그리는 근거다.
+    it('일반 멤버도 상대 팀과 상대 선수를 모두 대상으로 받는다', async () => {
       const { prisma } = teamMatchWorld(
         [{ userId: memberAId, teamId: hostTeamId, role: 'member' }],
         [],
@@ -1018,8 +1023,9 @@ describe('ReviewsService', () => {
 
       const source = await service.source(authUser(memberAId), { sourceType: 'team_match', sourceId: teamSourceId });
 
-      expect(source.targets.map((target) => target.targetType)).toEqual(['user', 'user']);
-      expect(source.targets.map((target) => target.targetUserId)).toEqual([opponentA, opponentB]);
+      expect(source.targets.map((target) => target.targetType)).toEqual(['team', 'user', 'user']);
+      expect(source.targets.filter((target) => target.targetType === 'user').map((target) => target.targetUserId))
+        .toEqual([opponentA, opponentB]);
     });
 
     it('팀장에게는 상대 팀과 상대 선수가 모두 대상으로 나온다', async () => {
@@ -1568,7 +1574,9 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
 
   // 겸직이라도 역할은 팀마다 다르다 — 홈팀 운영진이지만 원정팀에서는 일반 팀원이면
   // 원정팀 입장(=홈팀 평가) 방향만 막혀야 하고, 홈팀 입장 방향은 그대로 열려 있어야 한다.
-  it('역할은 방향별로 따로 판정된다 (한쪽만 자격이 있으면 그 방향만 열린다)', async () => {
+  // 2026-08-18 정책 변경으로 팀 후기 자격이 역할과 무관해졌다. 그래도 **작성자 팀이 방향마다
+  // 올바르게 붙는지**는 여전히 고정해야 한다 — 뒤바뀌면 남의 팀 이름으로 후기가 저장된다.
+  it('역할이 달라도 두 방향 모두 열리고 작성자 팀은 방향별로 맞게 붙는다', async () => {
     const prisma = makeDualPrisma();
     prisma.v1TeamMembership.findMany = jest.fn().mockResolvedValue([
       { teamId: hostTeamId, role: 'manager', team: { name: '홈팀' } },
@@ -1578,11 +1586,94 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
 
     const source = await service.source(user, { sourceType: 'team_match', sourceId: teamSourceId });
 
-    expect(source.targets).toHaveLength(1);
-    expect(source.targets[0]).toMatchObject({
-      targetType: 'team',
-      targetTeamId: awayTeamId,
-      reviewerTeam: { teamId: hostTeamId },
-    });
+    expect(source.targets).toHaveLength(2);
+    expect(source.targets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ targetTeamId: awayTeamId, reviewerTeam: expect.objectContaining({ teamId: hostTeamId }) }),
+        expect.objectContaining({ targetTeamId: hostTeamId, reviewerTeam: expect.objectContaining({ teamId: awayTeamId }) }),
+      ]),
+    );
+  });
+});
+
+/**
+ * 오너 요청(2026-08-18) — 팀 상세에서 **그 팀이 받은 후기**를 누구나 보게 한다. 기존
+ * `receivedSummary` 는 "로그인한 나"가 받은 것이라 남의 팀 상세에 쓰면 내 후기를 그 팀
+ * 평가인 양 보여준다. 공개 경로는 팀 id 로 직접 집계하되, **공개 게이트는 동일**해야 한다 —
+ * 이 경로만 느슨하면 아직 공개되면 안 되는 상호평가가 새어 나가는 구멍이 된다.
+ */
+describe('publicTeamSummary — 공개 팀 후기 요약', () => {
+  function stubs() {
+    return {
+      tournamentFixtureReviews: { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() },
+    };
+  }
+
+  it('그 팀이 받은 후기만 집계하고, 로그인 사용자의 팀 목록을 조회하지 않는다', async () => {
+    const submittedAt = new Date('2026-08-01T00:00:00Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-01T01:00:00Z'));
+    try {
+      const findMany = jest
+        .fn()
+        .mockResolvedValueOnce([
+          { sourceId: 'tm1', reviewerUserId: 'user-p', reviewerTeamId: 'team-a', targetUserId: null, targetTeamId: 'team-x', rating: 4, sportId: 'futsal', submittedAt, tags: [] },
+        ])
+        .mockResolvedValueOnce([{ sourceId: 'tm1', reviewerTeamId: 'team-x', targetTeamId: 'team-a' }]);
+      const membershipFindMany = jest.fn();
+      const prisma = {
+        v1PostEventReview: { findMany },
+        // 공개 경로는 "내가 속한 팀"을 물을 필요가 없다 — 물었다면 로그인 의존이 남아 있다는 뜻이다.
+        v1TeamMembership: { findMany: membershipFindMany },
+        v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
+      };
+      const service = new ReviewsService(
+        prisma as never,
+        stubs().tournamentFixtureReviews as never,
+        adminContextStub(),
+        reviewPolicyStub(),
+      );
+
+      const result = await service.publicTeamSummary('team-x');
+
+      expect(membershipFindMany).not.toHaveBeenCalled();
+      // 대상 필터가 팀 id 로 직접 걸려야 한다.
+      expect(findMany.mock.calls[0][0].where).toMatchObject({ targetTeamId: 'team-x', targetType: 'team' });
+      expect(result.bySport).toEqual([
+        { sportId: 'futsal', sportCode: 'futsal', ratingAvg: 4, ratingCount: 1, tagRates: [] },
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('상대가 아직 안 썼고 유예 시간도 안 지난 후기는 공개 경로에서도 빠진다', async () => {
+    const submittedAt = new Date('2026-08-01T00:00:00Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-01T01:00:00Z')); // 유예 시간 미경과
+    try {
+      const findMany = jest
+        .fn()
+        .mockResolvedValueOnce([
+          { sourceId: 'tm1', reviewerUserId: 'user-p', reviewerTeamId: 'team-a', targetUserId: null, targetTeamId: 'team-x', rating: 5, sportId: 'futsal', submittedAt, tags: [] },
+        ])
+        // 반대 방향 후기 없음 → 아직 공개 시점이 아니다
+        .mockResolvedValueOnce([]);
+      const prisma = {
+        v1PostEventReview: { findMany },
+        v1TeamMembership: { findMany: jest.fn() },
+        v1Sport: { findMany: jest.fn().mockResolvedValue([]) },
+      };
+      const service = new ReviewsService(
+        prisma as never,
+        stubs().tournamentFixtureReviews as never,
+        adminContextStub(),
+        reviewPolicyStub(),
+      );
+
+      const result = await service.publicTeamSummary('team-x');
+
+      expect(result.bySport).toEqual([]);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

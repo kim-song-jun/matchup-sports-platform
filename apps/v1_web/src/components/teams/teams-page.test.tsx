@@ -20,6 +20,9 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1CancelTeamInvitation: vi.fn(),
   useV1TeamInvitations: vi.fn(),
   useV1LeaveTeam: vi.fn(),
+  // 기본 반환값이 없으면 이 훅을 신경 쓰지 않는 기존 테스트들이 전부 undefined.data 로 깨진다.
+  // 반환 타입을 명시하지 않으면 `{ data: undefined }` 로 좁혀져 mockReturnValue 가 막힌다.
+  useV1PublicTeamReviewSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
@@ -559,5 +562,73 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
     await waitFor(() => expect(cancelMutate).toHaveBeenCalledTimes(2));
     expect(screen.getByRole('button', { name: '김도윤님 초대 취소' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '박서준님 초대 취소' })).toBeDisabled();
+  });
+});
+
+/**
+ * 오너 지적(2026-08-18) — 팀 상세 모바일에서 "팀 전적" 링크가 위 매치 섹션과 **간격 0px**
+ * 로 맞붙어 그 섹션의 일부처럼 보였고, 팀에서 리뷰를 볼 길이 아예 없었다. 두 링크를
+ * "팀 기록" 섹션으로 묶어 세운다.
+ *
+ * 받은 후기 링크는 **내 팀에서만** 보여야 한다 — 이 요약 API 는 "로그인 사용자가 받은 팀
+ * 후기"라, 남의 팀 상세에 두면 그 팀 것이 아니라 내 후기를 그 팀 평가인 양 보여주게 된다.
+ */
+describe('TeamDetailPageView — 팀 기록 섹션', () => {
+  function modelWithMode(mode: TeamDetailViewModel['mode']): TeamDetailViewModel {
+    return { ...getTeamDetailViewModel('default'), mode };
+  }
+
+  it('내 팀이면 전적과 받은 후기 링크를 함께 보여주고, 요약을 배지로 적는다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
+      data: {
+        bySport: [
+          { sportId: 's1', sportCode: 'futsal', ratingAvg: 5, ratingCount: 3, tagRates: [] },
+          { sportId: 's2', sportCode: 'soccer', ratingAvg: 4, ratingCount: 1, tagRates: [] },
+        ],
+        availableMonths: [],
+      },
+    });
+
+    render(<TeamDetailPageView model={modelWithMode('mine')} />);
+
+    // 이 화면은 모바일·데스크톱 레이아웃을 **둘 다 마운트**하고 CSS 로 하나만 보여준다 —
+    // 두 벌이 같은 링크를 갖는 게 정상이고, 한쪽에만 있으면 그게 회귀다.
+    expect(screen.getAllByRole('link', { name: /팀 전적/ })).toHaveLength(2);
+    const reviewLinks = screen.getAllByRole('link', { name: /받은 후기/ });
+    expect(reviewLinks).toHaveLength(2);
+    const reviewLink = reviewLinks[0];
+    expect(reviewLink).toHaveAttribute('href', '/my/reviews?tab=received');
+    // 개수로 가중 평균: (5×3 + 4×1) / 4 = 4.75 → 4.8, 총 4개
+    expect(reviewLink).toHaveTextContent('4.8');
+    expect(reviewLink).toHaveTextContent('4개');
+  });
+
+  it('남의 팀도 그 팀이 받은 후기를 보여주되, 내 후기 화면으로 보내지는 않는다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
+      data: { bySport: [{ sportId: 's1', sportCode: 'futsal', ratingAvg: 4.5, ratingCount: 2, tagRates: [] }], availableMonths: [] },
+    });
+
+    render(<TeamDetailPageView model={modelWithMode('default')} />);
+
+    // 요약은 보인다 — 공개 엔드포인트라 그 팀이 받은 평가가 맞다.
+    expect(screen.getAllByText('받은 후기').length).toBeGreaterThan(0);
+    // 하지만 링크는 아니다: /my/reviews 는 "내" 후기 화면이라 남의 팀에서 그리로 보내면 거짓말이 된다.
+    expect(screen.queryAllByRole('link', { name: /받은 후기/ })).toHaveLength(0);
+  });
+
+  it('남의 팀이고 받은 후기가 0건이면 카드 자체를 두지 않는다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
+
+    render(<TeamDetailPageView model={modelWithMode('default')} />);
+
+    expect(screen.queryAllByText('받은 후기')).toHaveLength(0);
+  });
+
+  it('받은 후기가 아직 없으면 배지 없이 안내만 보여준다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
+
+    render(<TeamDetailPageView model={modelWithMode('mine')} />);
+
+    expect(screen.getAllByRole('link', { name: /받은 후기/ })[0]).toHaveTextContent('아직 받은 후기가 없어요');
   });
 });

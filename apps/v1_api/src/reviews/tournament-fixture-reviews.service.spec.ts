@@ -333,7 +333,28 @@ describe('TournamentFixtureReviewsService', () => {
   });
 
   // 역할별 계약: owner/manager는 상대팀+상대 선수, member는 상대 선수만 평가한다.
-  it('일반 멤버는 상대팀 후기를 제출할 수 없다', async () => {
+  // 2026-08-18 정책 변경 후: 일반 멤버도 상대 팀 후기를 낼 수 있다. 이 테스트가 잡는 회귀는
+  // "역할 필터가 되살아나 NOT_TEAM_MEMBER 로 떨어지는 것"이다.
+  it('일반 멤버도 상대팀 후기를 제출할 수 있다', async () => {
+    const createMock = jest.fn().mockResolvedValue({
+      id: 'review-member-team',
+      reviewerUserId: teammate.id,
+      reviewerTeamId,
+      sourceType: 'tournament_fixture',
+      sourceId: fixtureId,
+      sourceGroupId: tournamentId,
+      targetType: 'team',
+      targetTeamId,
+      targetUserId: null,
+      targetTeam: { id: targetTeamId, name: '러너스', profile: { logoUrl: null } },
+      targetUser: null,
+      reviewerUser: { id: teammate.id, profile: { nickname: '성수 멤버', profileImageUrl: null } },
+      reviewerTeam: { id: reviewerTeamId, name: '성수 FC', profile: { logoUrl: null } },
+      rating: 4,
+      tags: [],
+      status: 'submitted',
+      submittedAt: recordedAt,
+    });
     const prisma = {
       v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       // role 필터가 살아 있으면(role: { in: ['owner','manager'] }) 이 행이 걸러져
@@ -341,18 +362,19 @@ describe('TournamentFixtureReviewsService', () => {
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([]),
-      $transaction: jest.fn(),
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(trustTx(createMock))),
       ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
-    await expect(
-      service.submit(teammate, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 4 }, ['manner']),
-    ).rejects.toMatchObject({ response: { code: 'TEAM_REVIEW_ROLE_REQUIRED' } });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    await service.submit(teammate, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 4 }, ['manner']);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(createMock).toHaveBeenCalled();
   });
 
-  it('source(): 일반 멤버에게는 상대 선수 target만 반환한다', async () => {
+  // 2026-08-18 정책 변경: 팀 후기를 모든 참가 멤버에게 열었다. 팀이 먼저 오고 선수가 뒤따르는
+  // 순서는 화면이 "팀 평가가 기본, 선수는 선택"으로 그리는 근거다.
+  it('source(): 일반 멤버에게도 상대 팀과 상대 선수가 모두 반환된다', async () => {
     const prisma = {
       v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
@@ -366,7 +388,10 @@ describe('TournamentFixtureReviewsService', () => {
 
     await expect(service.source(teammate, fixtureId)).resolves.toMatchObject({
       reviewerTeam: { teamId: reviewerTeamId, name: '성수 FC', role: 'member' },
-      targets: [{ targetType: 'user', targetUserId: opponentPlayerId, targetTeamId: null, locked: false }],
+      targets: [
+        { targetType: 'team', targetUserId: null, locked: false },
+        { targetType: 'user', targetUserId: opponentPlayerId, targetTeamId: null, locked: false },
+      ],
     });
   });
 
@@ -480,8 +505,9 @@ describe('TournamentFixtureReviewsService', () => {
     const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     // 판정 키가 팀 기준으로 되돌아가면 팀장의 후기가 팀원 전원의 목록을 완료 처리해 []가 된다.
+    // 2026-08-18 정책 변경으로 팀원에게도 상대 팀 대상이 생겨 대상은 팀1 + 선수1 = 2건이다.
     await expect(service.pending(teammate, 20, tournamentId)).resolves.toMatchObject([
-      { sourceId: fixtureId, targetType: 'user', targetCount: 1, targetTeam: { teamId: targetTeamId }, remainingCount: 1, state: 'ready' },
+      { sourceId: fixtureId, targetCount: 2, targetTeam: { teamId: targetTeamId }, remainingCount: 2, state: 'ready' },
     ]);
     // "이미 썼음" 조회도 사람 축이어야 한다(팀 축이면 팀장의 후기가 팀원 목록을 지운다).
     expect(prisma.v1PostEventReview.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({

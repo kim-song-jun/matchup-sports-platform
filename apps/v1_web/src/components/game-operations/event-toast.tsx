@@ -54,17 +54,25 @@ export function useEventToast() {
 
 export function EventToasts({ toasts, onDismiss }: { toasts: readonly EventToastItem[]; onDismiss?: (id: number) => void }) {
   if (toasts.length === 0) return null;
+  // `left-1/2 + -translate-x-1/2`로 가운데를 맞추면 390px에서 토스트가 세로로
+  // 찌그러진다(실측: "골을 기록했어요"가 한 줄에 한 글자씩 쌓였다). fixed 요소는
+  // `right`가 없으면 가용 폭이 `100% - left`, 즉 50vw(390px에서 195px)로 잘리고
+  // `max-w-[90vw]`(=351px)는 그보다 넓어 아무 것도 늘려주지 못한다 — 데스크톱
+  // (50vw=720px)에서만 멀쩡해 보였던 이유다. `inset-x-0`로 폭을 뷰포트 전체로 주고
+  // 가운데 정렬은 flex(`items-center`)에 맡긴다. 전폭 컨테이너가 아래 화면 조작을
+  // 가로막지 않도록 컨테이너는 `pointer-events-none`, 토스트 자신만
+  // `pointer-events-auto`로 되살린다.
   return (
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2"
+      className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4"
     >
       {toasts.map((toast) => (
         <div
           key={toast.id}
           role="status"
-          className="flex min-w-[200px] max-w-[90vw] items-center gap-3 rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-lg motion-safe:animate-[fade-in_0.15s_ease-out] sm:max-w-[400px]"
+          className="pointer-events-auto flex min-w-[200px] max-w-full items-center gap-3 rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-lg motion-safe:animate-[fade-in_0.15s_ease-out] sm:max-w-[400px]"
         >
           <CheckCircle2 size={16} aria-hidden="true" className="shrink-0" />
           <span className="flex-1">{toast.message}</span>

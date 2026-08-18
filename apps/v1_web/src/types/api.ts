@@ -1652,6 +1652,8 @@ export type V1ReviewTagRate = {
 
 export type V1ReviewSportSummary = {
   sportId: string;
+  /** v1Sport.code — 종목 배지·색상 매핑 키. 매핑 못 찾으면 null. */
+  sportCode: string | null;
   ratingAvg: number | null;
   ratingCount: number;
   tagRates: V1ReviewTagRate[];

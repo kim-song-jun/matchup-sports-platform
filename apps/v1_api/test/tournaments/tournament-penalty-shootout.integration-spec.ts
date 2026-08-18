@@ -367,11 +367,22 @@ describe('Track B tournament penalty shootout', () => {
 
   it('결선 무승부 + 승부차기 기록 → 저장되고, 공개 응답 필드에 나오고, 브래킷 승자가 승부차기로 정해진다', async () => {
     const gameId = await buildTournamentGame(ids.knockoutSourceFixture);
-    const ended = await driveToEnd(gameId, 1, 1, { penalties: { home: 5, away: 4 } });
+    // 선축은 **원정**으로 보낸다. `end` payload 가 가공 없이 리비전 score 에 박히는지를
+    // 보는 단언이므로(아래 `toEqual`), 선축을 원정으로 두면 "홈이 무조건 먼저 찬다"는
+    // 하드코딩이 서버로 새어 들어오는 회귀도 같은 단언 하나가 잡는다.
+    const ended = await driveToEnd(gameId, 1, 1, {
+      penalties: { home: 5, away: 4, firstKickSideKey: 'AWAY' },
+    });
     expect(ended.revisionState).toBe(V1GameResultRevisionState.SUBMITTED);
 
     const revision = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: ended.revisionId } });
-    expect(revision.score).toEqual({ home: 1, away: 1, penalties: { home: 5, away: 4 } });
+    // `toEqual`(부분 일치가 아니다)을 유지한다 — 이 단언의 가치는 "정확히 이 키들만"에
+    // 있다. `objectContaining` 으로 느슨하게 바꾸면 여분 키 유입도, 키 손실도 못 잡는다.
+    expect(revision.score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 5, away: 4, firstKickSideKey: 'AWAY' },
+    });
 
     const officialized = await resultReview.officializeResultRevision(
       authUser(ids.platformOps),

@@ -244,4 +244,55 @@ describe('2-G: penalties는 강타입 검증을 통과해야 한다', () => {
       validateAs(GameScoreDto, { home: 1, away: 1, penalties: { home: 5, away: 4 } }),
     ).resolves.toEqual([]);
   });
+
+  /**
+   * 선축(`firstKickSideKey`)에도 `penalties` 자체와 **같은 함정**이 있다.
+   *
+   * `@IsOptional()`은 값이 `null`일 때도 검증 전체를 건너뛰므로 `firstKickSideKey: null`이
+   * 위반 0건으로 통과한다. 그리고 이 DTO를 공유하는 **팀 매치 레인**
+   * (`GamesService.createResultRevision`)은 `jsonInput(dto.score)`를 그대로 저장하므로 —
+   * `extractEndPenalties`가 없는 경로다 — 그 null이 `score.penalties`에 실제로 박힌다.
+   * 그러면 "선축 없음(키 부재)"과 "선축 null" 두 상태가 공존하게 되고, 그건 서버가
+   * 애써 지키는 불변식("없으면 없는 것이 유일한 표현")을 DTO 입구로 되돌리는 것이다.
+   */
+  it('선축이 null이면 거부한다 — @IsOptional()이었다면 통과했을 값', async () => {
+    const errors = await validateAs(GameScoreDto, {
+      home: 1,
+      away: 1,
+      penalties: { home: 5, away: 4, firstKickSideKey: null },
+    });
+
+    expectFailedAtOrUnder(errors, 'penalties');
+  });
+
+  it.each([
+    ['소문자', 'home'],
+    ['공백 포함', 'AWAY '],
+    ['사이드 id', 'side-home'],
+  ])('선축이 %s이면 거부한다 — HOME/AWAY만 허용한다', async (_label, firstKickSideKey) => {
+    const errors = await validateAs(GameScoreDto, {
+      home: 1,
+      away: 1,
+      penalties: { home: 5, away: 4, firstKickSideKey },
+    });
+
+    expectFailedAtOrUnder(errors, 'penalties');
+  });
+
+  it('선축을 생략하면 통과한다(짝 증거 — null과 undefined를 구분한다)', async () => {
+    await expect(
+      validateAs(GameScoreDto, { home: 1, away: 1, penalties: { home: 5, away: 4 } }),
+    ).resolves.toEqual([]);
+  });
+
+  /**
+   * **선언이 곧 허용이다.** `main.ts`의 `whitelist + forbidNonWhitelisted`는
+   * `@ValidateNested()`가 걸린 중첩 객체 안까지 적용되므로, `PenaltyScoreDto`에 이 키를
+   * 적지 않았다면 선축을 실은 요청이 여분 키로 400이 된다(알파 실사고와 같은 부류).
+   */
+  it('선축 HOME/AWAY는 통과한다 — 중첩 whitelist를 뚫는 유일한 방법이 이 선언이다', async () => {
+    await expect(
+      validateAs(GameScoreDto, { home: 1, away: 1, penalties: { home: 5, away: 4, firstKickSideKey: 'AWAY' } }),
+    ).resolves.toEqual([]);
+  });
 });

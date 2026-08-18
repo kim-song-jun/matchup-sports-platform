@@ -271,6 +271,51 @@ describe('GamesService command boundary', () => {
     ])('penalties가 구조를 갖추지 못하면(%s) 422 TOURNAMENT_PENALTY_INVALID', (_label, penalties) => {
       expect(() => extractEndPenalties({ penalties })).toThrow(HttpException);
     });
+
+    /**
+     * 선축(`firstKickSideKey`)은 이 기능의 **주 write-path**다 — 운영 콘솔이 `end` 커맨드
+     * `payload.penalties`에 실어 보내는 유일한 경로이고, 여기서 떨어뜨리면 결과 리비전에
+     * 아무것도 남지 않는다(정정 폼에도 선축 입력란이 없어 되살릴 수 없다). `end` payload는
+     * `GameCommandDto.payload`(느슨한 Record)라 `PenaltyScoreDto`의 `@IsIn`을 거치지 않으므로
+     * 이 함수가 그 값을 검사하는 **유일한** 지점이다.
+     */
+    it('선축을 함께 보내면 보존한다', () => {
+      expect(extractEndPenalties({ penalties: { home: 5, away: 4, firstKickSideKey: 'AWAY' } })).toEqual({
+        home: 5,
+        away: 4,
+        firstKickSideKey: 'AWAY',
+      });
+    });
+
+    // 키가 없는 것은 오류가 아니다(선축이 생기기 전 클라이언트 · 정정 승계). "없으면 없는
+    // 것이 유일한 표현" — `firstKickSideKey: undefined`를 실어 보내지 않는다는 뜻이기도 하다.
+    it('선축이 없으면 키 자체가 없다 — undefined를 실어 보내지 않는다', () => {
+      const result = extractEndPenalties({ penalties: { home: 5, away: 4 } });
+      expect(result).toEqual({ home: 5, away: 4 });
+      expect(result && 'firstKickSideKey' in result).toBe(false);
+    });
+
+    it.each([
+      ['소문자 오타', 'home'],
+      ['공백 포함', 'AWAY '],
+      ['null', null],
+      ['사이드 id', 'side-home'],
+    ])(
+      '선축이 HOME/AWAY가 아니면(%s) 422 — 조용히 버리면 200이 돌아가는데 선축만 사라진다',
+      (_label, firstKickSideKey) => {
+        expect(() => extractEndPenalties({ penalties: { home: 5, away: 4, firstKickSideKey } })).toThrow(
+          HttpException,
+        );
+        try {
+          extractEndPenalties({ penalties: { home: 5, away: 4, firstKickSideKey } });
+        } catch (error) {
+          expect((error as HttpException).getStatus()).toBe(422);
+          expect((error as HttpException).getResponse()).toEqual(
+            expect.objectContaining({ code: 'TOURNAMENT_PENALTY_INVALID' }),
+          );
+        }
+      },
+    );
   });
 });
 

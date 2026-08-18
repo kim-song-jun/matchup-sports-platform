@@ -1285,7 +1285,10 @@ export type V1GameResultScore =
   | {
       home: number;
       away: number;
-      penalties?: { home: number; away: number };
+      /** `firstKickSideKey`(선축)는 평평한 형태에만 있다 — 중첩 백필 형태는 이 필드가
+       *  생기기 전 데이터라 담고 있지 않다. 이 필드가 생기기 전에 저장된 평평한 리비전도
+       *  마찬가지로 없으므로 optional 이다. */
+      penalties?: { home: number; away: number; firstKickSideKey?: 'HOME' | 'AWAY' };
     };
 
 export type V1GameResultCards = { yellow: number; red: number };
@@ -1356,7 +1359,14 @@ export type V1GameResultParticipantInput = {
 export type V1GameResultScoreInput = {
   home: number;
   away: number;
-  penalties?: { home: number; away: number };
+  /**
+   * `firstKickSideKey`(선축)도 여분 키가 아니라 **허용 키**다 — 서버
+   * `PenaltyScoreDto`(`apps/v1_api/src/games/dto/game-result.dto.ts`)에 선언돼 있고,
+   * `whitelist`는 `@ValidateNested()`가 걸린 중첩 객체 안까지 적용되므로 **선언이 곧
+   * 허용**이다. 정정 폼이 이 키를 떨어뜨리면 정정 한 번에 "누가 먼저 찼는지"가 영구히
+   * 사라진다(폼에 선축 입력란이 없어 되살릴 수단도 없다).
+   */
+  penalties?: { home: number; away: number; firstKickSideKey?: 'HOME' | 'AWAY' };
 };
 
 export type V1CreateGameResultRevisionPayload = {

@@ -215,6 +215,21 @@ export interface GameScore {
   penalties?: {
     home: number;
     away: number;
+    /**
+     * 선축(먼저 찬 팀). 동전 던지기 결과라 점수 두 개로는 복원할 수 없다 —
+     * 여기 없으면 "누가 먼저 찼는지"는 어디에도 남지 않는다.
+     *
+     * `penalties` **안쪽**에 두는 것이 중요하다. `GameScore`의 최상위에 새 키를
+     * 두면 같은 형태를 공유하는 `GameScoreDto`가 `main.ts`의
+     * `whitelist: true, forbidNonWhitelisted: true` 아래서 그 키를 여분 키로 보고
+     * `400 VALIDATION_ERROR`를 낸다(알파 실측 사고). 중첩 객체 안에서도 whitelist는
+     * 그대로 적용되므로, `PenaltyScoreDto`에 **선언하는 것이 곧 허용**이다.
+     *
+     * optional인 이유: 이 필드가 생기기 전에 저장된 리비전에는 값이 없다. 승부차기
+     * 점수 자체는 그 리비전들에도 있으므로, 선축이 없다고 승부차기를 통째로
+     * 버리면 결선 정정이 막힌다(`readStoredPenalties` 참고).
+     */
+    firstKickSideKey?: 'HOME' | 'AWAY';
   };
 }
 

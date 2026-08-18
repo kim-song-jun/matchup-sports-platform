@@ -50,12 +50,13 @@ import {
   commandConfirmCopy,
   commitActionConfirmCopy,
   penaltyShootoutFinishConfirmCopy,
+  penaltyShootoutOverrideFinishConfirmCopy,
   penaltyShootoutStartConfirmCopy,
   playerLabel,
 } from './confirm-copy';
 import {
   penaltyScoreBySideId,
-  penaltyShootoutOutcome,
+  penaltyFinishAvailability,
   type PenaltyKick,
   type PenaltyKickResult,
 } from '@/lib/penalty-shootout';
@@ -789,7 +790,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 배열 순서가 아니라 `sideKey`로 매핑한다(백엔드 `scoreFromEvents`/
   // `GameScore`가 sideKey 기준이지 sides 배열 순서 기준이 아니다 — 순서로
   // 매핑하면 HOME/AWAY가 뒤바뀐 채로 기록될 수 있다).
-  const handleFinishPenaltyShootout = useCallback(async () => {
+  const handleFinishPenaltyShootout = useCallback(async (options: { readonly override: boolean }) => {
     if (penaltyKicks === null) return;
     const sidesList = gameDetail.data?.sides ?? [];
     const homeSide = sidesList.find((side) => side.sideKey === 'HOME');
@@ -801,15 +802,34 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     // 패널의 "승부차기 종료" 버튼과 **같은 술어**를 여기서도 한 번 더 본다 — 버튼
     // 비활성만으로는 막을 수 없는 경로(포커스된 채 Enter, 확인 모달 대기 중 상태 변화)가
     // 남기 때문이다. 이 판정은 서버가 할 수 없다(총점 두 개만 저장한다).
-    if (penaltyShootoutOutcome(penaltyKicks, sidesList, firstKickSideId, penaltyPolicy) !== 'DECIDED') {
-      return;
-    }
+    const availability = penaltyFinishAvailability(penaltyKicks, sidesList, firstKickSideId, penaltyPolicy);
+    // `BLOCKED`는 어느 버튼으로 왔든 거부한다 — 보낼 값이 없거나(사이드·선축 미정) 서버가
+    // 되돌릴 값(동점)이라, 우회 종료라도 통과시키면 실패하는 요청만 늘어난다.
+    if (availability === 'BLOCKED') return;
+    // 자동 종료 버튼으로 온 요청은 규칙상 결판난 상태에서만 통과시킨다. `OVERRIDABLE`을
+    // 여기서 걸러야, 모달이 열려 있는 동안 킥이 되돌려져 상태가 뒤로 간 경우에도
+    // "그래도 종료"를 누른 적 없는 운영자가 우회 경로로 끌려가지 않는다.
+    if (availability === 'OVERRIDABLE' && !options.override) return;
     // 선축은 사이드 id가 아니라 `sideKey`로 보낸다 — 저장되는 곳이 `score.penalties`라
     // 점수(home/away)와 같은 기준틀이어야 하고, 게임별로 달라지는 id를 결과 스냅샷에
     // 박아 두면 나중에 그 값을 읽는 화면이 사이드 목록 없이는 해석할 수 없다.
     const firstKickSideKey = firstKickSideId === awaySide.id ? 'AWAY' : 'HOME';
     const firstKickSide = firstKickSideKey === 'AWAY' ? awaySide : homeSide;
-    const copy = penaltyShootoutFinishConfirmCopy(homeSide, awaySide, homeScore, awayScore, firstKickSide);
+    // 문구는 `options.override`가 아니라 **현재 상태**(`availability`)로 고른다 — 운영자가
+    // "그래도 종료"를 누른 뒤 그사이 상태가 결판으로 바뀌었다면 보여줄 것은 평범한 종료
+    // 확인이지, 안 끝났다는 경고가 아니다.
+    const copy =
+      availability === 'OVERRIDABLE'
+        ? penaltyShootoutOverrideFinishConfirmCopy(
+            homeSide,
+            awaySide,
+            homeScore,
+            awayScore,
+            penaltyKicks.filter((kick) => kick.sideId === homeSide.id).length,
+            penaltyKicks.filter((kick) => kick.sideId === awaySide.id).length,
+            firstKickSide,
+          )
+        : penaltyShootoutFinishConfirmCopy(homeSide, awaySide, homeScore, awayScore, firstKickSide);
     if (!(await confirm(copy))) return;
     setPenaltyKicks(null);
     await handleRunCommand('end', {
@@ -1354,7 +1374,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           onSelectFirstKicker={setFirstKickSideId}
           onRecordKick={handleRecordPenaltyKick}
           onUndoLastKick={handleUndoPenaltyKick}
-          onFinish={() => void handleFinishPenaltyShootout()}
+          onFinish={(options) => void handleFinishPenaltyShootout(options)}
           onCancel={handleCancelPenaltyShootout}
           policy={penaltyPolicy}
           finishing={commandPending}

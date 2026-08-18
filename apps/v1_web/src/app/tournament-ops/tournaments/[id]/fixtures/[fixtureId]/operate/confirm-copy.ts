@@ -234,3 +234,30 @@ export function penaltyShootoutFinishConfirmCopy(
     tone: 'danger',
   };
 }
+
+/**
+ * 규칙상 아직 결판이 안 났는데 운영자가 그대로 닫으려 할 때의 확인 문구
+ * (`penaltyFinishAvailability`가 `OVERRIDABLE`인 경우).
+ *
+ * 일반 종료 문구와 갈라 두는 이유: 이 확인은 "예상대로 끝났는지 확인"이 아니라
+ * **"자동 판정과 다른 결론을 내린다"**는 선언이다. 그래서 ① 제목이 아직 안 끝났음을
+ * 먼저 말하고, ② 점수만이 아니라 **각 팀이 몇 번 찼는지**까지 보여준다 — 킥 수가
+ * 어긋난 것이 바로 자동 판정이 멈춘 이유이고, 운영자가 오조작을 알아채는 지점도
+ * 거기다(예: 되돌리기를 한 번 덜 눌러 원정 킥이 하나 모자란 상태).
+ */
+export function penaltyShootoutOverrideFinishConfirmCopy(
+  homeSide: GameSide,
+  awaySide: GameSide,
+  homeScore: number,
+  awayScore: number,
+  homeKicks: number,
+  awayKicks: number,
+  firstKickSide: GameSide,
+): ConfirmCopy {
+  return {
+    title: '아직 안 끝난 승부차기예요',
+    message: `${homeSide.displayNameSnapshot} ${homeKicks}킥 ${homeScore}점 · ${awaySide.displayNameSnapshot} ${awayKicks}킥 ${awayScore}점 — 규칙상 아직 결판이 나지 않았어요. 이대로 ${homeScore} : ${awayScore} 로 종료할까요? 선축은 ${firstKickSide.displayNameSnapshot}이에요. 종료하면 되돌릴 수 없어요.`,
+    confirmLabel: '그래도 종료',
+    tone: 'danger',
+  };
+}

@@ -3,8 +3,10 @@ import {
   nextPenaltyKicker,
   penaltyScoreBySideId,
   penaltyShootoutOutcome,
+  penaltyFinishAvailability,
   type PenaltyKick,
   type PenaltyKickResult,
+  type PenaltyShootoutPolicy,
 } from './penalty-shootout';
 
 const HOME = 'side-home';
@@ -218,5 +220,70 @@ describe('penaltyShootoutOutcome', () => {
     expect(penaltyShootoutOutcome(kicksFor(HOME, 1, 1), [{ id: HOME }], HOME, { earlyStop: true })).toBe(
       'IN_PROGRESS',
     );
+  });
+});
+
+describe('penaltyFinishAvailability — 운영자가 경기를 닫을 수 있는 상태', () => {
+  const SIDES = [{ id: 'home' }, { id: 'away' }];
+  const A2: PenaltyShootoutPolicy = { earlyStop: true };
+  const A1: PenaltyShootoutPolicy = { earlyStop: false };
+  const kick = (sideId: string, result: PenaltyKickResult): PenaltyKick => ({ sideId, result });
+
+  it('규칙상 결판난 상태는 READY — 우회 버튼 없이 그냥 종료된다', () => {
+    // 각 3킥, 선축 3점 : 후축 0점 (잔여 2킥으로 역전 불가)
+    const kicks = [
+      kick('home', 'SCORED'), kick('away', 'MISSED'),
+      kick('home', 'SCORED'), kick('away', 'MISSED'),
+      kick('home', 'SCORED'), kick('away', 'MISSED'),
+    ];
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A2)).toBe('READY');
+  });
+
+  it('킥 수가 달라 자동 판정이 멈춘 상태는 OVERRIDABLE — 기권·중단이 여기로 온다', () => {
+    // 홈 2킥 2점 / 원정 1킥 0점: 원정이 남은 4킥을 다 넣으면 역전 가능해 규칙상 미결.
+    // 그러나 원정이 기권하면 이 상태가 최종이고, 닫지 못하면 경기가 영원히 열려 있다.
+    const kicks = [
+      kick('home', 'SCORED'), kick('away', 'MISSED'),
+      kick('home', 'SCORED'),
+    ];
+    expect(penaltyShootoutOutcome(kicks, SIDES, 'home', A2)).toBe('IN_PROGRESS');
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A2)).toBe('OVERRIDABLE');
+  });
+
+  it('서든데스에서 킥 수가 하나 어긋난 상태도 OVERRIDABLE', () => {
+    // 양 팀 5킥씩 1:0으로 이미 갈렸는데 홈이 6번째를 더 찬 국면 — 서든데스 규칙은
+    // "같은 횟수"를 요구하므로 자동으로는 안 끝나지만, 원정이 더 못 차면 닫아야 한다.
+    const kicks = [
+      ...Array.from({ length: 5 }, (): PenaltyKick[] => [kick('home', 'MISSED'), kick('away', 'MISSED')]).flat(),
+      kick('home', 'SCORED'),
+    ];
+    expect(penaltyShootoutOutcome(kicks, SIDES, 'home', A2)).toBe('IN_PROGRESS');
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A2)).toBe('OVERRIDABLE');
+  });
+
+  it('A1(끝까지 차는 정책)에서 킥 수가 다르면 OVERRIDABLE — 정책과 무관하게 닫는 길은 남는다', () => {
+    const kicks = [kick('home', 'SCORED'), kick('away', 'MISSED'), kick('home', 'SCORED')];
+    expect(penaltyShootoutOutcome(kicks, SIDES, 'home', A1)).toBe('IN_PROGRESS');
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A1)).toBe('OVERRIDABLE');
+  });
+
+  it('점수가 같으면 BLOCKED — 서버가 TOURNAMENT_PENALTY_INVALID로 되돌린다', () => {
+    // 눌러도 실패할 버튼을 열어 주면 운영자를 속이는 것이라, 우회 경로를 주지 않는다.
+    const kicks = [kick('home', 'SCORED'), kick('away', 'SCORED')];
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A2)).toBe('BLOCKED');
+  });
+
+  it('킥이 하나도 없으면 BLOCKED — 양쪽 0점이라 보낼 결과 자체가 없다', () => {
+    expect(penaltyFinishAvailability([], SIDES, 'home', A2)).toBe('BLOCKED');
+  });
+
+  it('선축을 안 골랐으면 BLOCKED — 선축 없이는 payload를 만들 수 없다', () => {
+    const kicks = [kick('home', 'SCORED')];
+    expect(penaltyFinishAvailability(kicks, SIDES, null, A2)).toBe('BLOCKED');
+  });
+
+  it('사이드가 2개가 아니면 BLOCKED', () => {
+    const kicks = [kick('home', 'SCORED')];
+    expect(penaltyFinishAvailability(kicks, [{ id: 'home' }], 'home', A2)).toBe('BLOCKED');
   });
 });

@@ -22,6 +22,9 @@ const HOME_SCORER = {
   id: 'participant-home',
   sideId: 'side-home',
   lineupId: 'lineup-home-1',
+  // 2026-08-18 대회 실명 표시 정책: userId 없는(미연동) 참가자라 이 스펙의 관심사
+  // (이벤트 정렬)와 무관하게 항상 displayNameSnapshot 그대로 나온다.
+  userId: null,
   displayNameSnapshot: '김철수',
   jerseyNumber: 7,
   position: 'FW',
@@ -184,6 +187,14 @@ function buildFakePrisma(events: readonly FakeEvent[]): PrismaService {
       },
     },
     v1ParticipantConsentSnapshot: {
+      async findMany() {
+        return [];
+      },
+    },
+    // 2026-08-18 대회 실명 표시 정책 -- loadParticipantNameProfiles가 매 getMatch 호출마다
+    // (게이팅 없이) 조회한다. 이 스펙의 유일한 참가자(HOME_SCORER)는 userId가 없어
+    // 애초에 in 조회 대상이 아니지만, 호출 자체는 항상 일어나므로 mock이 없으면 깨진다.
+    v1UserProfile: {
       async findMany() {
         return [];
       },

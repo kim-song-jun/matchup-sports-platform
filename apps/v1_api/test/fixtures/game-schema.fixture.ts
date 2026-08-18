@@ -206,7 +206,14 @@ export const gameSchemaSourceManifest = {
   // schema.prisma 에 `shasum -a 256` 을 돌려 재계산한 것이다 — 어느 한쪽 브랜치의 해시를
   // 그대로 가져오면 병합 결과와 달라 SOURCE_SNAPSHOT_DRIFT 로 CI 가 깨진다.
   // migration 해시는 양쪽 다 새 마이그레이션 파일만 추가했으므로 그대로다.
-  schema: 'd2b1a8f1d911f32c239c75e6cda860d0a126cb7301e13879aafa8261b42ebf02',
+  // 2026-08-18 재핀: 대회 경기 기록 실명 표시 정책 뒤집기(F2 record-consent와 별개 스위치) --
+  // V1UserProfile.tournamentRealNameVisible(Boolean, default false) 추가. game domain 밖의
+  // 컬럼이지만 이 guard는 schema.prisma 전체 바이트를 결속하므로 여기서 걸린다 — 파일 해시
+  // 노이즈이지 game operations 계약 변화가 아니다. 전용 마이그레이션
+  // 20260818000000_v1_tournament_real_name_visibility 로 뒷받침되며, NOT NULL + DEFAULT
+  // 추가라 양방향 롤링 배포에 안전하다. 바인딩된 20260729000100_v1_game_operations 는
+  // 건드리지 않았으므로 migration 해시는 그대로다.
+  schema: 'd86af494115c478502a9e32a8060716c982f10e9ee14a0e7435bd62524defb79',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

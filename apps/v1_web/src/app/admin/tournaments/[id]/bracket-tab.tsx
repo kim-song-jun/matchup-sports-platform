@@ -291,6 +291,12 @@ export function BracketTab({
       setLegsPickerGroupId(null);
       await refetch();
       showToast(`조별리그 경기 일정 ${res.created}개를 자동으로 만들었어요.`, 'success');
+      // 서버가 생성을 막지는 않지만 알아야 하는 사항(일정 미지정·홀수 팀 bye)을 함께 알린다.
+      // 이걸 삼키면 관리자가 "일정이 비어 있다"를 나중에 현장에서 발견하게 된다.
+      // 실패가 아니므로 error 로 띄우지 않고 기본 톤으로 알린다.
+      for (const warning of res.warnings ?? []) {
+        showToast(warning.message);
+      }
     } catch (err) {
       if (err instanceof V1ApiError && err.code === 'LEAGUE_FIXTURES_ALREADY_EXIST') {
         const ok = await confirmModal({

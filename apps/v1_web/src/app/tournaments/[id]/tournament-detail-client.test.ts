@@ -26,6 +26,16 @@ vi.mock('@/components/tournaments/tournament-inquiry-section', () => ({
   TournamentInquirySection: () => null,
 }));
 
+// 리그(format='league') 대회는 LeagueStandingsSection 이 마운트되면서
+// GET /tournaments/:id/standings/overall 을 호출한다. 스텁하지 않으면 실제 fetch 가
+// 나가거나 비동기 setState 로 act 경고·플레이키 테스트가 된다.
+// never-resolving Promise 로 두면 컴포넌트가 loading 상태(렌더 없음)에 머물러
+// 이 파일의 단언(순위표가 아니라 대진표/안내 문구를 본다)이 결정적으로 유지된다.
+vi.mock('@/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api-client')>()),
+  v1Get: vi.fn(() => new Promise(() => {})),
+}));
+
 /* ── Factories ── */
 
 function makeGroup(

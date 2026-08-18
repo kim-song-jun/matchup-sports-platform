@@ -2,33 +2,17 @@
 
 import { EmptyState } from '@/components/v1-ui/primitives';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import type {
+  V1LeagueOverallStandingRow,
+  V1LeagueOverallStandingsResponse,
+} from '@/types/api';
 
 /**
- * `Task 10`이 `types/api.ts`에 추가하는 `V1LeagueOverallStandingsResponse`와 동일한
- * 구조를 로컬로 선언한다. Task 10과 동시에 실행돼 그 타입이 아직 존재하지 않을 수
- * 있어 여기서는 이 컴포넌트 전용 prop 타입으로 둔다 — Task 10 머지 후에는 이 타입을
- * 지우고 `import type { V1LeagueOverallStandingsResponse } from '@/types/api'`로
- * 교체해야 한다.
+ * 타입은 `@/types/api`가 단일 소스다. 여기서는 이 컴포넌트를 쓰는 쪽이 편하도록
+ * 이름만 짧게 별칭을 준다 — 구조를 다시 선언하면 API 계약이 바뀔 때 조용히 어긋난다.
  */
-export interface LeagueOverallStandingRow {
-  registrationId: string;
-  teamName: string;
-  position: number | null;
-  points: number;
-  wins: number;
-  draws: number;
-  losses: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  fairPlayPoints: number;
-}
-
-export interface LeagueStandingsTableData {
-  standings: LeagueOverallStandingRow[];
-  progress: { total: number; played: number; remaining: number; percent: number };
-  magicNumber: { registrationId: string; value: number; clinched: boolean } | null;
-  recalculatedAt: string | null;
-}
+export type LeagueOverallStandingRow = V1LeagueOverallStandingRow;
+export type LeagueStandingsTableData = V1LeagueOverallStandingsResponse;
 
 /**
  * §4.1 통합 순위 테이블 — 리그(풀리그) 대회의 공개 상세에서 조별 순위가 아니라

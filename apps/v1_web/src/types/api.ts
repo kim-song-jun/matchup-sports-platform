@@ -2722,6 +2722,8 @@ export type V1Tournament = {
   genderMaxMale: number | null;
   genderMinFemale: number | null;
   genderMaxFemale: number | null;
+  /** 리그(format==='league') 대회에서 각 팀이 보장받아야 할 최소 경기 수. null이면 검증하지 않는다. */
+  minMatchesPerTeam: number | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -3216,6 +3218,37 @@ export type V1AdminTournamentBracket = {
   standings: V1AdminBracketStanding[];
 };
 
+/** POST /admin/tournaments/:tournamentId/league/fixtures/generate 응답 — 리그 대진 일괄 생성 결과 */
+export interface V1GenerateLeagueFixturesResponse {
+  created: number;
+  deleted: number;
+  perTeamMatches: number;
+  rounds: number;
+  warnings: Array<{ code: string; message: string }>;
+}
+
+/** GET /tournaments/:id/standings/overall 통합 순위 행 — 리그 대회 전체 조를 합친 순위표 한 줄 */
+export interface V1LeagueOverallStandingRow {
+  registrationId: string;
+  teamName: string;
+  position: number | null;
+  points: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  fairPlayPoints: number;
+}
+
+/** GET /tournaments/:id/standings/overall 응답 — 통합 순위 + 진행률 + 매직넘버 */
+export interface V1LeagueOverallStandingsResponse {
+  standings: V1LeagueOverallStandingRow[];
+  progress: { total: number; played: number; remaining: number; percent: number };
+  magicNumber: { registrationId: string; value: number; clinched: boolean } | null;
+  recalculatedAt: string | null;
+}
+
 /** Admin tournament announcement (includes tournamentId, body, updatedAt — full admin serialize) */
 export type V1AdminTournamentAnnouncement = {
   id: string;
@@ -3351,6 +3384,8 @@ export type V1CreateTournamentPayload = {
   genderMaxMale?: number;
   genderMinFemale?: number;
   genderMaxFemale?: number;
+  /** 리그(format==='league') 대회에서 각 팀이 보장받아야 할 최소 경기 수. 생략하면 검증하지 않는다. */
+  minMatchesPerTeam?: number;
   entryFee?: number;
   prizePool?: number;
   prizeSummary?: string;

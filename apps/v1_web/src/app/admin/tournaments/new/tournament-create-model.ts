@@ -60,6 +60,8 @@ export type TournamentCreateState = {
   genderMaxMale: string;
   genderMinFemale: string;
   genderMaxFemale: string;
+  /** "최소 경기 수" — format이 'league'일 때만 노출. 빈 문자열이면 미설정(서버 검증 안 함). */
+  minMatchesPerTeam: string;
   entryFee: string;
   bankName: string;
   bankAccount: string;
@@ -111,6 +113,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   genderMaxMale: '',
   genderMinFemale: '',
   genderMaxFemale: '',
+  minMatchesPerTeam: '',
   entryFee: '0',
   bankName: '',
   bankAccount: '',
@@ -248,6 +251,8 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     genderMaxMale: tournament.genderMaxMale !== null ? String(tournament.genderMaxMale) : '',
     genderMinFemale: tournament.genderMinFemale !== null ? String(tournament.genderMinFemale) : '',
     genderMaxFemale: tournament.genderMaxFemale !== null ? String(tournament.genderMaxFemale) : '',
+    minMatchesPerTeam:
+      tournament.minMatchesPerTeam !== null ? String(tournament.minMatchesPerTeam) : '',
     entryFee: String(tournament.entryFee),
     bankName: tournament.bankName ?? '',
     bankAccount: tournament.bankAccount ?? '',
@@ -413,6 +418,17 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
       if (!state.bankAccount.trim()) errors.bankAccount = '유료 대회는 계좌번호가 필요해요.';
       if (!state.bankHolder.trim()) errors.bankHolder = '유료 대회는 예금주가 필요해요.';
     }
+    if (state.format === 'league' && state.minMatchesPerTeam.trim() !== '') {
+      const minMatchesPerTeam = numeric(state.minMatchesPerTeam);
+      if (
+        minMatchesPerTeam === null ||
+        !Number.isInteger(minMatchesPerTeam) ||
+        minMatchesPerTeam < 1 ||
+        minMatchesPerTeam > 50
+      ) {
+        errors.minMatchesPerTeam = '최소 경기 수는 1~50경기 사이의 정수여야 해요.';
+      }
+    }
     if (state.genderCategory === 'mixed') {
       const minMale = optionalNumeric(state.genderMinMale);
       const maxMale = optionalNumeric(state.genderMaxMale);
@@ -503,6 +519,9 @@ export function buildTournamentCreatePayload(
       state.substitutionMode === 'limited' && state.maxSubstitutions.trim() !== ''
         ? Number(state.maxSubstitutions.trim())
         : undefined,
+    // 빈 값이면 아예 보내지 않는다 — 0이나 빈 문자열을 보내면 서버 @IsInt @Min(1)이 422로
+    // 거절한다(관리자가 아무것도 입력하지 않았는데 검증 요청이 되는 사고).
+    minMatchesPerTeam: state.minMatchesPerTeam.trim() !== '' ? Number(state.minMatchesPerTeam.trim()) : undefined,
     entryFee: Number(state.entryFee || '0'),
     bankName: state.bankName.trim() || undefined,
     bankAccount: state.bankAccount.trim() || undefined,

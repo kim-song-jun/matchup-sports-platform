@@ -96,6 +96,7 @@ function previousTournament(): V1Tournament {
     genderMaxMale: null,
     genderMinFemale: null,
     genderMaxFemale: null,
+    minMatchesPerTeam: null,
     entryFee: 50000,
     prizePool: null,
     prizeSummary: null,
@@ -436,6 +437,48 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
     expect(rolling.substitutionMode).toBe('rolling');
     expect(rolling.maxSubstitutions).toBeUndefined();
+  });
+
+  it('T6c omits minMatchesPerTeam from the payload when left blank', () => {
+    const payload = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-futsal',
+      title: 'x',
+      format: 'league',
+      minMatchesPerTeam: '',
+    });
+    expect(payload.minMatchesPerTeam).toBeUndefined();
+    // undefined 값은 JSON.stringify에서 키 자체가 사라진다 — 실제로 서버에 전송되지
+    // 않는다는 것을 axios가 쓰는 것과 같은 직렬화 경로로 증명한다(0/빈 문자열이 실려
+    // @IsInt @Min(1)에 422로 거절되는 걸 막는 게 이 필드의 핵심 계약이다).
+    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty('minMatchesPerTeam');
+  });
+
+  it('T6d serializes minMatchesPerTeam as a number when set', () => {
+    const payload = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-futsal',
+      title: 'x',
+      format: 'league',
+      minMatchesPerTeam: '6',
+    });
+    expect(payload.minMatchesPerTeam).toBe(6);
+  });
+
+  it('T6e hydrates minMatchesPerTeam from a draft tournament in edit mode', () => {
+    const draft = fakeDraftTournament({ format: 'league', minMatchesPerTeam: 8 });
+    const hydrated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'hydrate-from-draft',
+      tournament: draft,
+    });
+    expect(hydrated.minMatchesPerTeam).toBe('8');
+
+    const withoutValue = fakeDraftTournament({ format: 'league', minMatchesPerTeam: null });
+    const hydratedEmpty = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'hydrate-from-draft',
+      tournament: withoutValue,
+    });
+    expect(hydratedEmpty.minMatchesPerTeam).toBe('');
   });
 
   it('blocks moving forward and shows the current step validation error', async () => {

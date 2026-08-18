@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import {
   V1GameSideKey,
@@ -46,7 +47,11 @@ import {
   type TournamentFixtureGameForResult,
   type TournamentFixtureLegacyResult,
 } from './tournament-fixture-official-result';
-import { recalculateAndUpsertGroupStandings } from './tournament-group-standings';
+import {
+  fairPlayByRegistrationFromGroups,
+  recalculateAndUpsertGroupStandings,
+} from './tournament-group-standings';
+import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 
 @Injectable()
 export class TournamentBracketService {
@@ -74,6 +79,30 @@ export class TournamentBracketService {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
     return tournament;
+  }
+
+  /**
+   * 리그 대회는 브래킷(토너먼트) 개념을 갖지 않는다.
+   * 서버가 format을 실제로 읽어 막지 않으면 관리자 화면에서 실수로
+   * 브래킷 액션을 눌렀을 때 데이터가 조용히 뒤섞인다.
+   */
+  private assertLeagueGroupShape(format: string, phase: string, advanceCount?: number | null) {
+    if (format !== 'league') return;
+    // V1TournamentGroupPhase = 'group' | 'semi' | 'final' | 'third_place'.
+    // 리그 대회는 조별리그만 갖고 브래킷(토너먼트) 단계를 갖지 않으므로 'group' 외
+    // 나머지 phase(semi/final/third_place)는 전부 knockout 조로 간주해 막는다.
+    if (phase !== 'group') {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_KNOCKOUT_GROUP_FORBIDDEN',
+        message: '리그 대회에는 토너먼트 조를 만들 수 없어요.',
+      });
+    }
+    if (advanceCount !== undefined && advanceCount !== null) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_ADVANCE_COUNT_FORBIDDEN',
+        message: '리그 대회에는 진출 팀 수를 설정할 수 없어요.',
+      });
+    }
   }
 
   private async loadFixture(fixtureId: string): Promise<V1TournamentFixture> {
@@ -154,7 +183,8 @@ export class TournamentBracketService {
 
   async createGroup(user: V1AuthUser, tournamentId: string, dto: CreateGroupDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    await this.loadTournament(tournamentId);
+    const tournament = await this.loadTournament(tournamentId);
+    this.assertLeagueGroupShape(tournament.format, dto.phase ?? 'group', dto.advanceCount);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const group = await tx.v1TournamentGroup.create({
@@ -669,10 +699,14 @@ export class TournamentBracketService {
   /** 조 이름·진출 팀 수 수정. */
   async updateGroup(user: V1AuthUser, groupId: string, dto: UpdateGroupDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const group = await this.prisma.v1TournamentGroup.findUnique({ where: { id: groupId } });
+    const group = await this.prisma.v1TournamentGroup.findUnique({
+      where: { id: groupId },
+      include: { tournament: { select: { format: true } } },
+    });
     if (!group) {
       throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
     }
+    this.assertLeagueGroupShape(group.tournament.format, group.phase, dto.advanceCount);
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.v1TournamentGroup.update({
         where: { id: groupId },
@@ -811,7 +845,21 @@ export class TournamentBracketService {
         fixtures: {
           where: { status: 'completed' },
           include: {
-            game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } },
+            game: {
+              select: {
+                currentOfficialRevision: {
+                  select: {
+                    state: true,
+                    score: true,
+                    // F5: 페어플레이 벌점 원천(팀별 카드 집계용). 신규 경로 픽스처에만 있다 —
+                    // tournament-group-standings.ts의 fairPlayByRegistrationFromGroups() 참고.
+                    resultParticipants: { select: { sideId: true, cards: true } },
+                  },
+                },
+                // F5: participant.sideId → home/away 매핑용.
+                sides: { select: { id: true, sideKey: true } },
+              },
+            },
             // R3 §4-3단계 한시적 레거시 폴백 입력 — standingsFixturesFromGroup()이 새 경로에
             // OFFICIAL 리비전이 없는 픽스처(game 백필 전)만 이 스코어로 대체한다. §4-4단계에서 제거.
             result: {
@@ -822,6 +870,10 @@ export class TournamentBracketService {
       },
     });
     const now = new Date();
+    // F5: 페어플레이 벌점 — 모든 조의 픽스처를 넘겨 한 번에 집계한 registrationId
+    // → 벌점 Map을 그룹별 upsert와 통합 upsert 양쪽에 그대로 넘긴다(그룹 픽스처는
+    // 조별로 분리돼 있으므로 그룹 하나만 넘겨 계산해도 값은 동일하다).
+    const fairPlayByRegistration = fairPlayByRegistrationFromGroups(groups);
 
     await this.prisma.$transaction(async (tx) => {
       for (const group of groups) {
@@ -831,10 +883,21 @@ export class TournamentBracketService {
         // the one affected group instead of looping every group.
         await recalculateAndUpsertGroupStandings(
           tx,
-          { tournamentId, configVersionId: competitionConfigVersionId, config, group },
+          { tournamentId, configVersionId: competitionConfigVersionId, config, group, fairPlayByRegistration },
           now,
         );
       }
+
+      // Invariant: every path that calls recalculateAndUpsertGroupStandings
+      // must also call recalculateAndUpsertOverallStandings in the same tx,
+      // so the group view and the overall (통합) view never drift. This
+      // route already has every group-phase group loaded above, so it can
+      // feed them straight in.
+      await recalculateAndUpsertOverallStandings(
+        tx,
+        { tournamentId, configVersionId: competitionConfigVersionId, config, groups, fairPlayByRegistration },
+        now,
+      );
 
       await this.adminContext.logAdminAction(
         admin,

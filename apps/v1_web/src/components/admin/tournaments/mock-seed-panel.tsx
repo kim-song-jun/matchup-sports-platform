@@ -126,10 +126,42 @@ export function MockSeedPanel() {
       ) : null}
 
       {created ? (
-        <p className="mt-3 text-[var(--font-size-caption)] text-gray-700 dark:text-gray-300">
-          <strong>{created.title}</strong> 생성됨 · {created.teamCount}팀 · 경기 {created.fixtureCount}개{' '}
-          <Link href={created.route} className="text-blue-600 dark:text-blue-400 underline">대회 보기</Link>
-        </p>
+        <div className="mt-3 text-[var(--font-size-caption)] text-gray-700 dark:text-gray-300">
+          <p>
+            <strong>{created.title}</strong> 생성됨 · {created.teamCount}팀 · 경기 {created.fixtureCount}개{' '}
+            <Link href={created.route} className="text-blue-600 dark:text-blue-400 underline">대회 보기</Link>
+          </p>
+
+          {created.teams?.length ? (
+            <details className="mt-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-white/70 dark:bg-gray-900/40 p-3">
+              <summary className="cursor-pointer font-semibold text-gray-900 dark:text-white">
+                이 대회에 들어간 테스트 계정 ({created.teams.reduce((sum, team) => sum + team.accounts.length, 0)}명)
+              </summary>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">
+                아래 계정으로 로그인하면 팀장·팀원 각 시점의 화면을 확인할 수 있어요.
+                비밀번호는 <strong>모든 테스트 계정이 같은 값</strong>을 쓰며, 이 저장소는 공개돼 있어 화면에 싣지 않아요 — 운영자에게 전달받은 공통 비밀번호를 사용하세요.
+              </p>
+              <ul className="mt-2 space-y-2">
+                {created.teams.map((team) => (
+                  <li key={team.teamId}>
+                    <p className="font-medium text-gray-900 dark:text-white">{team.teamName}</p>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {team.accounts.map((account) => (
+                        <li key={account.email} className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono text-gray-800 dark:text-gray-200">{account.email}</span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {account.nickname}
+                            {account.role === 'owner' ? ' · 팀장' : account.role === 'manager' ? ' · 운영진' : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

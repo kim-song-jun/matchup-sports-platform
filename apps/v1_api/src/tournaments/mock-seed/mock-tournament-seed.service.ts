@@ -5,7 +5,15 @@ import { V1AuthUser } from '../../auth/v1-auth-user';
 import { isMockSeedEnabled } from './mock-seed.config';
 import { CreateMockTournamentDto, type MockSeedStatus } from './mock-tournament-seed.dto';
 
-type SeedTeam = { teamId: string; name: string; ownerUserId: string; memberUserIds: string[] };
+/**
+ * 시드 계정 전용 도메인. 목업 대회에는 이 도메인만으로 이뤄진 팀만 넣는다 —
+ * 실사용자 팀을 끌어들이면 그 사람들 마이페이지에 가짜 대회가 뜨고 후기 대상까지 된다.
+ * 실제 가입자는 이 도메인의 이메일을 가질 수 없다.
+ */
+const TEST_ACCOUNT_DOMAIN = '@teameet.test';
+
+type SeedAccount = { userId: string; email: string; nickname: string; role: string };
+type SeedTeam = { teamId: string; name: string; ownerUserId: string; memberUserIds: string[]; accounts: SeedAccount[] };
 
 /**
  * 검증용 목업 대회를 한 번에 만든다 — 대회 생성 → 팀 등록(확정) → 명단 채우기 → 조 편성 →
@@ -87,7 +95,9 @@ export class MockTournamentSeedService {
             registrationId: registration.id,
             userId,
             realName: `${team.name} 선수${playerIndex + 1}`,
-            jerseyNumber: playerIndex + 1,
+            // 실 시드(seed-alpha-tournament-qa.ts)와 같은 값. default 인 needs_review 로 두면
+            // 명단이 '검토 대기'로 남아서 "명단까지 채워진 대회"가 되지 않는다.
+            eligibilityStatus: 'non_pro' as const,
           })),
           skipDuplicates: true,
         });
@@ -115,6 +125,17 @@ export class MockTournamentSeedService {
       status: created.tournament.status,
       reviewReady,
       route: `/tournaments/${created.tournament.id}`,
+      // 로그인해서 확인하려면 어떤 계정이 이 대회에 들어가 있는지 알아야 한다.
+      // 비밀번호는 응답에 담지 않는다 — 이 저장소는 public 이고 시드 계정은 공통 비밀번호를 쓴다.
+      teams: teams.map((team) => ({
+        teamId: team.teamId,
+        teamName: team.name,
+        accounts: team.accounts.slice(0, 8).map((account) => ({
+          email: account.email,
+          nickname: account.nickname,
+          role: account.role,
+        })),
+      })),
     };
   }
 
@@ -140,24 +161,41 @@ export class MockTournamentSeedService {
       select: {
         id: true,
         name: true,
-        memberships: { where: { status: 'active' }, select: { userId: true, role: true } },
+        memberships: {
+          where: { status: 'active' },
+          // 테스트하려면 어떤 계정으로 로그인해야 하는지가 결과에 같이 나와야 한다.
+          // 닉네임은 V1User 가 아니라 V1UserProfile 에 있다.
+          select: { userId: true, role: true, user: { select: { email: true, profile: { select: { nickname: true } } } } },
+        },
       },
       orderBy: { createdAt: 'asc' },
       take: teamCount * 4,
     });
     const usable = candidates
-      .filter((team) => team.memberships.length >= 3 && team.memberships.some((m) => m.role === 'owner'))
+      .filter(
+        (team) =>
+          team.memberships.length >= 3 &&
+          team.memberships.some((m) => m.role === 'owner') &&
+          // 한 명이라도 실사용자가 섞여 있으면 통째로 제외한다.
+          team.memberships.every((m) => m.user?.email?.endsWith(TEST_ACCOUNT_DOMAIN) === true),
+      )
       .slice(0, teamCount)
       .map((team) => ({
         teamId: team.id,
         name: team.name,
         ownerUserId: team.memberships.find((m) => m.role === 'owner')!.userId,
         memberUserIds: team.memberships.map((m) => m.userId),
+        accounts: team.memberships.map((m) => ({
+          userId: m.userId,
+          email: m.user?.email ?? '',
+          nickname: m.user?.profile?.nickname ?? '',
+          role: m.role,
+        })),
       }));
     if (usable.length < teamCount) {
       throw new BadRequestException({
         code: 'NOT_ENOUGH_TEAMS',
-        message: `명단을 채울 수 있는 팀이 부족해요. 필요 ${teamCount}팀, 사용 가능 ${usable.length}팀 (active 멤버 3명 이상 + 팀장 보유).`,
+        message: `명단을 채울 수 있는 테스트 팀이 부족해요. 필요 ${teamCount}팀, 사용 가능 ${usable.length}팀 (active 멤버 3명 이상 + 팀장 보유 + 전원 테스트 계정).`,
       });
     }
     return usable;

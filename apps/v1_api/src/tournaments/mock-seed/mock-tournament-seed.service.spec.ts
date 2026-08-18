@@ -1,5 +1,53 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MockTournamentSeedService } from './mock-tournament-seed.service';
+
+/**
+ * schema.prisma 원문에서 모델별 필드 맵을 만든다.
+ * mock prisma 는 payload/select 를 검증하지 않고 로컬 generated client 는 stale 일 수 있어서,
+ * "실제로 존재하는 필드인가"를 판정할 권위가 스키마 원문밖에 없다.
+ */
+function parseSchemaModels(): Map<string, Map<string, string>> {
+  const schema = readFileSync(join(__dirname, '../../../prisma/schema.prisma'), 'utf8');
+  const models = new Map<string, Map<string, string>>();
+  const modelPattern = /model (\w+) \{([\s\S]*?)\n\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = modelPattern.exec(schema)) !== null) {
+    const fields = new Map<string, string>();
+    for (const rawLine of match[2].split('\n')) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('//') || line.startsWith('@@')) continue;
+      const [name, type] = line.split(/\s+/);
+      if (!name || !type) continue;
+      fields.set(name, type.replace(/[?[\]]/g, ''));
+    }
+    models.set(match[1], fields);
+  }
+  return models;
+}
+
+/** select 트리를 따라 내려가며 각 단계의 키가 그 모델에 실재하는지 확인한다. */
+function unknownSelectFields(
+  models: Map<string, Map<string, string>>,
+  modelName: string,
+  select: Record<string, unknown>,
+  path = modelName,
+): string[] {
+  const fields = models.get(modelName);
+  if (!fields) return [`${path}: 모델 없음`];
+  const problems: string[] = [];
+  for (const [key, value] of Object.entries(select)) {
+    const fieldType = fields.get(key);
+    if (!fieldType) {
+      problems.push(`${path}.${key}`);
+      continue;
+    }
+    const nested = (value as { select?: Record<string, unknown> })?.select;
+    if (nested) problems.push(...unknownSelectFields(models, fieldType, nested, `${path}.${key}`));
+  }
+  return problems;
+}
 
 const user = { id: 'admin-1', email: 'a@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' } as never;
 
@@ -8,9 +56,9 @@ function makeWorld(teamCount = 4) {
     id: `team-${i}`,
     name: `팀${i}`,
     memberships: [
-      { userId: `owner-${i}`, role: 'owner' },
-      { userId: `member-${i}-1`, role: 'member' },
-      { userId: `member-${i}-2`, role: 'member' },
+      { userId: `owner-${i}`, role: 'owner', user: { email: `owner${i}@teameet.test`, profile: { nickname: `팀장${i}` } } },
+      { userId: `member-${i}-1`, role: 'member', user: { email: `m${i}a@teameet.test`, profile: { nickname: `선수${i}A` } } },
+      { userId: `member-${i}-2`, role: 'member', user: { email: `m${i}b@teameet.test`, profile: { nickname: `선수${i}B` } } },
     ],
   }));
   const fixtures: Array<Record<string, unknown>> = [];
@@ -51,6 +99,68 @@ describe('MockTournamentSeedService', () => {
 
     await expect(service.createTournament(user, {})).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  // 이 테스트가 없어서 alpha 에서 500 이 났다: 존재하지 않는 `jerseyNumber` 를 createMany 에 넘겼는데,
+  // 로컬 generated Prisma client 가 stale 이라 tsc 가 통과했고 mock prisma 는 where/data 를 검증하지
+  // 않아 유닛테스트도 통과했다. 그래서 mock 이 아니라 **schema.prisma 원문**을 권위로 삼아
+  // 서비스가 실제로 넘긴 필드가 모델에 존재하는지 대조한다.
+  it('명단 payload 의 모든 필드가 schema.prisma 의 V1TournamentPlayer 에 실재한다', async () => {
+    const { service, players } = makeWorld();
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+    expect(players.length).toBeGreaterThan(0);
+
+    const schema = readFileSync(join(__dirname, '../../../prisma/schema.prisma'), 'utf8');
+    const model = /model V1TournamentPlayer \{([\s\S]*?)\n\}/.exec(schema);
+    expect(model).not.toBeNull();
+    const scalarFields = new Set(
+      model![1]
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('//') && !line.startsWith('@@'))
+        .map((line) => line.split(/\s+/)[0]),
+    );
+    expect(scalarFields.has('realName')).toBe(true); // 파서 자체가 망가지면 이 단언이 먼저 깨진다
+
+    const unknownFields = [...new Set(players.flatMap((row) => Object.keys(row)))].filter(
+      (field) => !scalarFields.has(field),
+    );
+    expect(unknownFields).toEqual([]);
+  });
+
+  // alpha 에는 실사용자 팀(대행FC 등)이 섞여 있다. 목업 대회가 그 팀을 끌어들이면
+  // 실제 사용자 마이페이지에 가짜 대회가 뜨고 후기 대상까지 된다 — 통째로 제외해야 한다.
+  it('실사용자가 한 명이라도 섞인 팀은 쓰지 않는다', async () => {
+    const { service, prisma } = makeWorld(4);
+    const teams = await prisma.v1Team.findMany();
+    teams[0].memberships[1].user.email = 'real.person@gmail.com';
+    prisma.v1Team.findMany.mockResolvedValue(teams);
+
+    // 4팀이 필요한데 하나가 실사용자 팀이라 3팀만 남는다 → 반쪽 대회를 만들지 않고 실패한다.
+    await expect(service.createTournament(user, { format: 'league', teamCount: 4 })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  // jerseyNumber 와 같은 종류의 두 번째 결함: 닉네임을 V1User 에서 고르려 했는데 실제로는
+  // V1UserProfile 에 있다. select 도 payload 와 같은 방식으로 스키마에 대조한다.
+  it('팀 조회 select 의 모든 경로가 schema.prisma 에 실재한다', async () => {
+    const { service, prisma } = makeWorld();
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    const select = prisma.v1Team.findMany.mock.calls[0][0].select as Record<string, unknown>;
+    const models = parseSchemaModels();
+    expect(models.get('V1Team')?.has('memberships')).toBe(true); // 파서가 망가지면 여기서 먼저 깨진다
+
+    expect(unknownSelectFields(models, 'V1Team', select)).toEqual([]);
+  });
+
+  // 명단이 needs_review 로 남으면 "명단까지 채워진 대회"가 아니다 — 실 시드와 같은 값을 쓴다.
+  it('명단은 non_pro 로 확정 상태로 넣는다', async () => {
+    const { service, players } = makeWorld();
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+    expect(players.every((row) => row.eligibilityStatus === 'non_pro')).toBe(true);
   });
 
   it('라인업은 만들지 않는다 — 라인업 제출은 손으로 테스트하는 게 목적이다', async () => {

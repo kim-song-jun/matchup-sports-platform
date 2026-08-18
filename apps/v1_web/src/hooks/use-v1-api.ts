@@ -4429,87 +4429,87 @@ export function useV1RevokeTournamentStaff(tournamentId: string) {
 }
 
 import type {
-  V1AdminSeriesDetail,
-  V1AdminSeriesListItem,
-  V1CreateSeriesPayload,
-  V1CreateSeriesResult,
-  V1GenerateSeriesFixturesPayload,
-  V1GenerateSeriesFixturesResult,
-  V1PublicSeriesDetail,
-  V1SeriesPlayerRecordsResponse,
-  V1SeriesStandingsResponse,
-  V1UpdateSeriesFixturePayload,
-  V1UpdateSeriesFixtureResult,
-} from '@/types/team-match-series';
+  V1AdminLeagueDetail,
+  V1AdminLeagueListItem,
+  V1CreateLeaguePayload,
+  V1CreateLeagueResult,
+  V1GenerateLeagueFixturesPayload,
+  V1GenerateLeagueFixturesResult,
+  V1PublicLeagueDetail,
+  V1LeaguePlayerRecordsResponse,
+  V1LeagueStandingsResponse,
+  V1UpdateLeagueFixturePayload,
+  V1UpdateLeagueFixtureResult,
+} from '@/types/league-matches';
 
-export function useV1AdminTeamMatchSeriesList() {
+export function useV1AdminLeagueMatchList() {
   return useQuery({
-    queryKey: v1Keys.adminTeamMatchSeriesList(),
-    queryFn: () => v1Get<{ items: V1AdminSeriesListItem[] }>('/admin/team-match-series'),
+    queryKey: v1Keys.adminLeagueMatchList(),
+    queryFn: () => v1Get<{ items: V1AdminLeagueListItem[] }>('/admin/league-matches'),
   });
 }
 
-export function useV1AdminTeamMatchSeries(seriesId: string) {
+export function useV1AdminLeagueMatch(leagueId: string) {
   return useQuery({
-    queryKey: v1Keys.adminTeamMatchSeries(seriesId),
-    queryFn: () => v1Get<V1AdminSeriesDetail>(`/admin/team-match-series/${seriesId}`),
-    enabled: Boolean(seriesId),
+    queryKey: v1Keys.adminLeagueMatch(leagueId),
+    queryFn: () => v1Get<V1AdminLeagueDetail>(`/admin/league-matches/${leagueId}`),
+    enabled: Boolean(leagueId),
   });
 }
 
-export function useV1CreateTeamMatchSeries() {
+export function useV1CreateLeagueMatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: V1CreateSeriesPayload) => v1Post<V1CreateSeriesResult>('/admin/team-match-series', body),
+    mutationFn: (body: V1CreateLeaguePayload) => v1Post<V1CreateLeagueResult>('/admin/league-matches', body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeriesList() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }
 
-export function useV1GenerateSeriesFixtures(seriesId: string) {
+export function useV1GenerateLeagueFixtures(leagueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: V1GenerateSeriesFixturesPayload) =>
-      v1Post<V1GenerateSeriesFixturesResult>(`/admin/team-match-series/${seriesId}/fixtures`, body),
+    mutationFn: (body: V1GenerateLeagueFixturesPayload) =>
+      v1Post<V1GenerateLeagueFixturesResult>(`/admin/league-matches/${leagueId}/fixtures`, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeries(seriesId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeriesList() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }
 
-export function useV1UpdateSeriesFixture(seriesId: string) {
+export function useV1UpdateLeagueFixture(leagueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1UpdateSeriesFixturePayload }) =>
-      v1Patch<V1UpdateSeriesFixtureResult>(`/admin/team-match-series/${seriesId}/fixtures/${teamMatchId}`, body),
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1UpdateLeagueFixturePayload }) =>
+      v1Patch<V1UpdateLeagueFixtureResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}`, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatchSeries(seriesId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
     },
   });
 }
 
-export function useV1TeamMatchSeries(seriesId: string) {
+export function useV1LeagueMatch(leagueId: string) {
   return useQuery({
-    queryKey: v1Keys.teamMatchSeries(seriesId),
-    queryFn: () => v1Get<V1PublicSeriesDetail>(`/team-match-series/${seriesId}`),
-    enabled: Boolean(seriesId),
+    queryKey: v1Keys.leagueMatch(leagueId),
+    queryFn: () => v1Get<V1PublicLeagueDetail>(`/league-matches/${leagueId}`),
+    enabled: Boolean(leagueId),
   });
 }
 
-export function useV1TeamMatchSeriesStandings(seriesId: string) {
+export function useV1LeagueMatchStandings(leagueId: string) {
   return useQuery({
-    queryKey: v1Keys.teamMatchSeriesStandings(seriesId),
-    queryFn: () => v1Get<V1SeriesStandingsResponse>(`/team-match-series/${seriesId}/standings`),
-    enabled: Boolean(seriesId),
+    queryKey: v1Keys.leagueMatchStandings(leagueId),
+    queryFn: () => v1Get<V1LeagueStandingsResponse>(`/league-matches/${leagueId}/standings`),
+    enabled: Boolean(leagueId),
   });
 }
 
-export function useV1TeamMatchSeriesPlayerRecords(seriesId: string) {
+export function useV1LeagueMatchPlayerRecords(leagueId: string) {
   return useQuery({
-    queryKey: v1Keys.teamMatchSeriesPlayerRecords(seriesId),
-    queryFn: () => v1Get<V1SeriesPlayerRecordsResponse>(`/team-match-series/${seriesId}/player-records`),
-    enabled: Boolean(seriesId),
+    queryKey: v1Keys.leagueMatchPlayerRecords(leagueId),
+    queryFn: () => v1Get<V1LeaguePlayerRecordsResponse>(`/league-matches/${leagueId}/player-records`),
+    enabled: Boolean(leagueId),
   });
 }

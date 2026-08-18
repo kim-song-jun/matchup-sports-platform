@@ -59,7 +59,7 @@ const FIXTURE_SCHEDULE_SELECT = {
       // no official revision yet (see `public-live-score.ts`/`public-clock.ts`).
       sides: { select: { id: true, sideKey: true } },
       periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
-      // 일정 카드 득점자 요약(loadScorers)이 이름/등번호를 붙이는 데 쓴다 --
+      // 일정 카드 이벤트 요약(loadScheduleEvents)이 이름/등번호를 붙이는 데 쓴다 --
       // getMatch의 buildEvents/buildLineup과 동일한 원본 필드.
       participants: { select: { id: true, sideId: true, displayNameSnapshot: true, jerseyNumber: true } },
     },
@@ -115,6 +115,21 @@ const FIXTURE_MATCH_SELECT = {
 type FixtureMatchRow = Prisma.V1TournamentFixtureGetPayload<{ select: typeof FIXTURE_MATCH_SELECT }>;
 
 type EffectiveMode = 'status_only' | 'live' | 'official_only';
+
+/**
+ * 일정 카드 요약에 실리는 한 건의 경기 이벤트 -- 골이거나 카드(경고/퇴장)다.
+ * `loadScheduleEvents`가 DB 행에서 만들고 `presentScheduleEntry`가 동의(consent)
+ * 게이팅을 거쳐 `scorers`/`cards` 두 배열로 갈라 응답에 싣는다. 이름/등번호가
+ * 아직 붙어 있지 않은 중간 형태라 `participantId`만 들고 있다.
+ */
+type ScheduleEventRow = {
+  type: 'GOAL' | 'CARD';
+  cardColor: 'YELLOW' | 'RED' | null;
+  side: 'home' | 'away';
+  participantId: string | null;
+  period: number | null;
+  clockMs: number | null;
+};
 
 /**
  * DB의 `orderBy: [period, clockMs, sequence]`는 백필이 넣은 `period: 1`/`clockMs: 0`
@@ -231,7 +246,7 @@ export class PublicTournamentRecordsService {
     // 달리 플래그로 게이팅하지 않는다. `status_only`는 presentScheduleEntry가
     // 결과 자체를 숨기므로 거기서 걸러진다.
     const allPageFixtures = [...pageFixtures, ...rawUnscheduled];
-    const scorersByGameId = await this.loadScorers(allPageFixtures);
+    const eventsByGameId = await this.loadScheduleEvents(allPageFixtures);
     const scorerParticipantIds = allPageFixtures.flatMap((fixture) =>
       (fixture.game?.participants ?? []).map((participant) => participant.id),
     );
@@ -244,13 +259,13 @@ export class PublicTournamentRecordsService {
 
     const items = pageFixtures
       .map((fixture) =>
-        presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, scorersByGameId, consentMap, now, hideIdentity),
+        presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, eventsByGameId, consentMap, now, hideIdentity),
       )
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
     const unscheduled = rawUnscheduled
       .map((fixture) =>
-        presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, scorersByGameId, consentMap, now, hideIdentity),
+        presentScheduleEntry(fixture, publicLiveEnabled, liveScoreByGameId, eventsByGameId, consentMap, now, hideIdentity),
       )
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
@@ -709,7 +724,7 @@ export class PublicTournamentRecordsService {
 
   /**
    * 일정 카드 득점자 요약(D-24 확장) -- 페이지에 실린 모든 픽스처(예정/미정 전부)의
-   * GOAL 이벤트를 한 번에 배치 조회한다. `loadLiveScores`와 같은 이유로 픽스처별
+   * GOAL·CARD 이벤트를 한 번에 배치 조회한다. `loadLiveScores`와 같은 이유로 픽스처별
    * 쿼리를 피한다. `official_only`로 이미 끝난 경기도 득점자를 보여줘야 하므로
    * (schema 상 PUBLIC_LIVE 플래그는 LIVE 정책만 강등시킨다 -- `effectivePublicVisibilityMode`
    * 참고) `loadLiveScores`와 달리 이 메서드는 플래그로 게이팅하지 않고 항상 실행한다.
@@ -717,9 +732,9 @@ export class PublicTournamentRecordsService {
    * `getMatch`의 `buildEvents`와 동일한 규칙으로 수행한다 -- 라인업 게이트와
    * 독립이라는 계약도 동일하게 유지된다.
    */
-  private async loadScorers(
+  private async loadScheduleEvents(
     fixtures: readonly FixtureScheduleRow[],
-  ): Promise<ReadonlyMap<string, readonly { side: 'home' | 'away'; participantId: string | null; period: number | null; clockMs: number | null }[]>> {
+  ): Promise<ReadonlyMap<string, readonly ScheduleEventRow[]>> {
     const fixturesWithGame = fixtures.filter(
       (fixture): fixture is FixtureScheduleRow & { game: NonNullable<FixtureScheduleRow['game']> } =>
         fixture.game !== null,
@@ -746,17 +761,24 @@ export class PublicTournamentRecordsService {
     );
     const eventsByGame = new Map<string, typeof events>();
     for (const event of events) {
-      if (event.type !== 'GOAL') continue;
+      // GOAL 과 CARD 만 일정 카드에 실린다 -- `buildEvents`(경기 상세 타임라인)가 고르는
+      // 것과 정확히 같은 두 종류다. 취소(CORRECTION) 행은 `reversedIds` 를 만드는 데만
+      // 쓰이고 자신은 요약에 들어가지 않는다.
+      if (event.type !== 'GOAL' && event.type !== 'CARD') continue;
       if (reversedIds.has(event.id)) continue;
       const list = eventsByGame.get(event.gameId) ?? [];
       list.push(event);
       eventsByGame.set(event.gameId, list);
     }
 
-    const result = new Map<string, { side: 'home' | 'away'; participantId: string | null; period: number | null; clockMs: number | null }[]>();
+    const result = new Map<string, ScheduleEventRow[]>();
     for (const fixture of fixturesWithGame) {
       const sideKeyById = new Map(fixture.game.sides.map((side) => [side.id, side.sideKey] as const));
       const rows = (eventsByGame.get(fixture.game.id) ?? []).map((event) => ({
+        type: event.type === 'CARD' ? ('CARD' as const) : ('GOAL' as const),
+        // 카드 색상은 payload 에만 있다 -- `buildEvents` 와 같은 파서를 쓴다. GOAL 이거나
+        // 색을 모르는 과거 payload 면 null 이고, 그때 프론트는 색 대신 중립 카드로 그린다.
+        cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
         // sideId nullable 방어(위 buildEvents와 동일한 fail-safe 규칙).
         side: (sideKeyById.get(event.sideId ?? '') === 'HOME' ? 'home' : 'away') as 'home' | 'away',
         participantId: event.participantId,
@@ -893,7 +915,7 @@ function presentScheduleEntry(
   fixture: FixtureScheduleRow,
   publicLiveEnabled: boolean,
   liveScoreByGameId: ReadonlyMap<string, GameScore>,
-  scorersByGameId: ReadonlyMap<string, readonly { side: 'home' | 'away'; participantId: string | null; period: number | null; clockMs: number | null }[]>,
+  eventsByGameId: ReadonlyMap<string, readonly ScheduleEventRow[]>,
   consentMap: Map<string, ParticipantConsentEligibility>,
   now: Date,
   hideIdentity: boolean,
@@ -931,20 +953,22 @@ function presentScheduleEntry(
       ? resolvePeriodBreak(fixture.game?.periods ?? [])
       : null;
 
-  // 득점자 요약 -- `status_only`는 결과 자체를 숨기므로 골 요약도 함께 숨긴다.
+  // 경기 이벤트 요약 -- `status_only`는 결과 자체를 숨기므로 골·카드 요약도 함께 숨긴다.
   // 이름/등번호 노출 규칙은 getMatch의 buildEvents와 정확히 동일하다: 동의
   // (consent)가 eligible일 때만 이름을 채우고, 아니면 시간만 남긴다.
   const participantById = new Map((fixture.game?.participants ?? []).map((p) => [p.id, p] as const));
-  const scorers =
+  const summarizedEvents =
     mode === 'status_only' || fixture.game === null
       ? []
-      : (scorersByGameId.get(fixture.game.id) ?? []).map((raw) => {
+      : (eventsByGameId.get(fixture.game.id) ?? []).map((raw) => {
           const consent = raw.participantId === null ? undefined : consentMap.get(raw.participantId);
-          // 일정 카드 득점자 요약은 스태프 우회가 없는 화면이라 항상 isStaffBypass=false
+          // 일정 카드 이벤트 요약은 스태프 우회가 없는 화면이라 항상 isStaffBypass=false
           // 로 호출한다(되돌린 상태에서도 기존 동작 그대로).
           const eligible = resolveParticipantNameEligible(false, consent);
           const participant = raw.participantId === null ? undefined : participantById.get(raw.participantId);
           return {
+            type: raw.type,
+            cardColor: raw.cardColor,
             side: raw.side,
             participantName: eligible ? (participant?.displayNameSnapshot ?? null) : null,
             jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
@@ -952,6 +976,14 @@ function presentScheduleEntry(
             clockMs: raw.clockMs,
           };
         });
+  // `scorers`는 골만 담는 기존 계약 그대로 유지한다(`type`/`cardColor` 없이) -- 이미
+  // 배포된 클라이언트가 이 배열의 length 를 골 수로 읽고 있어 카드가 섞이면 곧장 오독이 된다.
+  const scorers = summarizedEvents
+    .filter((event) => event.type === 'GOAL')
+    .map(({ type: _type, cardColor: _cardColor, ...goal }) => goal);
+  const cards = summarizedEvents
+    .filter((event) => event.type === 'CARD')
+    .map(({ type: _type, ...card }) => card);
 
   return {
     fixtureId: fixture.id,
@@ -976,6 +1008,7 @@ function presentScheduleEntry(
     clock,
     periodBreak,
     scorers,
+    cards,
     hasVideo: fixture.videos.length > 0,
   };
 }

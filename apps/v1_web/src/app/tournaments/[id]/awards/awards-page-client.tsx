@@ -8,7 +8,6 @@ import { useRef, useState } from 'react';
 import {
   useV1Tournament,
   useV1TournamentParticipantCheck,
-  useV1Reviews,
   useV1MyTournamentReview,
   useV1SubmitTournamentReview,
   useV1UploadImages,
@@ -18,7 +17,6 @@ import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
-import { TournamentFixtureReviewEntrySection } from '@/components/tournaments/tournament-venue-retention-sections';
 import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
@@ -325,7 +323,12 @@ function parseTeamSelectionOptions(error: unknown): { teamId: string; teamName: 
   return teams.length > 0 ? teams : null;
 }
 
-function ReviewFormModal({
+/**
+ * 대회 후기 작성 폼(바텀시트). 시상 화면의 후기 섹션과 후기 전용 목록 페이지
+ * (`/tournaments/:id/reviews`)가 **같은 폼**을 띄운다 — 후기 진입점이 둘로 갈리면서
+ * 폼이 복제되면 팀 선택 재제출·사진 업로드 같은 예외 처리가 곧장 두 벌로 갈라진다.
+ */
+export function ReviewFormModal({
   tournamentId, onClose,
 }: { tournamentId: string; onClose: () => void }) {
   const [rating, setRating] = useState(5);
@@ -575,47 +578,38 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
   );
 }
 
-/* ── 리뷰 섹션 (실제 데이터 + 권한 gate) ── */
 /**
- * 이 대회의 경기별 후기 진입 — 예전엔 대회 상세에 있었다. 대회 상세에 후기 입구가 두 개
- * ("대회 후기" 행 + "리뷰할 수 있는 경기" 섹션)라 어디로 가야 하는지 헷갈려서, 후기는 이
- * 화면 하나로 모았다. 대회 후기(대회 자체)와 경기별 후기(상대팀·상대 선수)를 같이 본다.
+ * 후기를 쓸 수 있는지 판정하는 단 하나의 자리. 시상 화면의 후기 섹션과 후기 전용
+ * 목록 페이지가 이 훅을 공유한다 — 권한 규칙(대회 종료 + 참가 확정 팀의 팀장·운영진 +
+ * 미작성)이 화면마다 따로 적히면, 한쪽만 고쳐져 "여기선 쓸 수 있는데 저기선 안 되는"
+ * 상태가 조용히 생긴다.
+ *
+ * `isParticipant`/`alreadyReviewed`는 버튼뿐 아니라 **빈 상태 안내 문구**를 고르는 데도
+ * 쓰이므로(왜 못 쓰는지를 상태별로 안내한다) 판정 결과를 통째로 돌려준다.
  */
-function FixtureReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
+export function useTournamentReviewWriteGate(tournamentId: string, status: V1TournamentDetail['status']) {
   const hasSession = hasStoredV1Session();
-  const hasCompletedFixture = tournament.fixtures.some(
-    (fixture) => fixture.status === 'completed' && fixture.result !== null,
-  );
-  const query = useV1Reviews(
-    { tab: 'pending', tournamentId: tournament.id, limit: 50 },
-    { enabled: hasSession && hasCompletedFixture },
-  );
-  if (!hasSession || !hasCompletedFixture) return null;
+  const isCompleted = status === 'completed';
 
-  const state = query.isError
-    ? { status: 'error' as const, items: [], onRetry: () => void query.refetch() }
-    : query.isPending || query.isFetching
-      ? { status: 'loading' as const, items: [] }
-      : { status: 'ready' as const, items: query.data?.items ?? [] };
-
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <TournamentFixtureReviewEntrySection fixtures={tournament.fixtures} state={state} />
-    </div>
-  );
-}
-
-function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
-  const [showForm, setShowForm] = useState(false);
-  const hasSession = hasStoredV1Session();
-  const isCompleted = tournament.status === 'completed';
-
-  const { data: participantData } = useV1TournamentParticipantCheck(tournament.id, hasSession && isCompleted);
-  const { data: myReview } = useV1MyTournamentReview(tournament.id, hasSession && isCompleted);
+  const { data: participantData } = useV1TournamentParticipantCheck(tournamentId, hasSession && isCompleted);
+  const { data: myReview } = useV1MyTournamentReview(tournamentId, hasSession && isCompleted);
 
   const isParticipant = participantData?.isParticipant ?? false;
   const alreadyReviewed = !!myReview;
-  const canWrite = isCompleted && isParticipant && !alreadyReviewed;
+  return {
+    hasSession,
+    isCompleted,
+    isParticipant,
+    alreadyReviewed,
+    canWrite: isCompleted && isParticipant && !alreadyReviewed,
+  };
+}
+
+/* ── 리뷰 섹션 (실제 데이터 + 권한 gate) ── */
+function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
+  const [showForm, setShowForm] = useState(false);
+  const { hasSession, isCompleted, isParticipant, alreadyReviewed, canWrite } =
+    useTournamentReviewWriteGate(tournament.id, tournament.status);
 
   const reviews = tournament.reviews ?? [];
 
@@ -796,7 +790,6 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
             <IndividualAwardsSection tournament={tournament} />
 
             {/* 참가팀 후기 */}
-            <FixtureReviewsSection tournament={tournament} />
             <ReviewsSection tournament={tournament} />
           </div>
         </div>
@@ -806,7 +799,6 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
         /* 상금 정보가 없는 대회는 2열 그리드 대신 전체 폭 단일 컬럼으로 — 빈 좌측 트랙이 생기지 않도록 */
         <div className="tm-tourn-hero-full" style={{ padding: '0 20px' }}>
           <IndividualAwardsSection tournament={tournament} />
-          <FixtureReviewsSection tournament={tournament} />
             <ReviewsSection tournament={tournament} />
         </div>
       )}

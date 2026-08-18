@@ -6032,11 +6032,13 @@ button:disabled {
   margin-top: 8px;
 }
 .tm-video-modal-external {
+  /* 플레이리스트 칩(34px)과 달리 44px 를 지킨다 — 임베드가 막혔을 때 이 링크가 영상을 볼
+     유일한 경로라, 모달 안에서 놓치면 안 되는 핵심 액션이다. */
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 44px;
+  padding: 0 14px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
   font-size: 12px;

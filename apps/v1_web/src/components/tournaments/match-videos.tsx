@@ -223,7 +223,8 @@ export function MatchVideos({
                 <a
                   href={youtubeWatchUrl(activeYoutubeId)}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
+                  aria-label="재생이 안 되면 유튜브에서 보기 (새 창)"
                   className="tm-video-modal-external"
                 >
                   <ExternalLink size={12} aria-hidden="true" />

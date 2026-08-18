@@ -80,7 +80,9 @@ export function PendingReviewsCard() {
         {firstTournament ? (
           <Link
             href={`/tournaments/${firstTournament.tournamentId}/awards`}
-            className={`tm-btn tm-btn-sm tm-btn-block ${eventRemaining > 0 ? 'tm-btn-neutral' : 'tm-btn-primary'}`}
+            // 배너 배경이 blue500 8% 라 tm-btn-neutral(grey100)은 배경에 묻혀 버튼으로 안 읽힌다.
+            // 두 번째 CTA 는 위계를 낮추되 형태는 남아야 하므로 흰 배경 + 테두리로 분리한다.
+            className={`tm-btn tm-btn-sm tm-btn-block ${eventRemaining > 0 ? 'tm-btn-outline' : 'tm-btn-primary'}`}
             style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
             대회 후기 쓰기

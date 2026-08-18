@@ -1924,6 +1924,25 @@ button:disabled {
   padding-top: 16px;
 }
 
+/*
+ * 홈 상단 배너(알림 · 휴대폰 인증 · 남은 후기) 슬롯.
+ * 홈 본문 컨테이너(.tm-scroll-area)는 좌우 패딩이 0 이고 섹션마다 각자 20px 을 준다.
+ * 배너 카드에는 그게 없어 화면 끝까지 늘어나 아래 콘텐츠와 여백선이 어긋났다.
+ * 데스크톱에서는 .tm-home-main 이 그리드 컬럼이라 컬럼 자체가 여백을 갖는다 — 그때는 0.
+ */
+.tm-home-banner-slot {
+  /* 상단 16px: 이게 없으면 배너 카드가 헤더 바로 아래(스크롤 영역 top)에 딱 붙어 카드 윗변이
+     헤더에 먹힌 것처럼 보인다(390 실측: 헤더 아래 56, 카드 top 56). 배너가 없을 때 첫 요소가
+     되는 .tm-home-greeting-block 이 이미 padding-top:16px 을 갖고 있어 값도 그와 맞춘다. */
+  padding: 16px 20px 0;
+}
+
+@media (min-width: 1024px) {
+  .tm-home-banner-slot {
+    padding: 0;
+  }
+}
+
 /* 오늘의 추천 — 세로 스택 대신 가로 캐러셀(스와이프, 다음 카드 살짝 peek). 스크롤바는 전역 숨김. */
 .tm-home-featured-carousel {
   display: flex;

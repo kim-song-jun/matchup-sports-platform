@@ -13,6 +13,12 @@ import { CreateMockTournamentDto, type MockSeedStatus } from './mock-tournament-
  */
 const TEST_ACCOUNT_DOMAIN = '@teameet.test';
 
+/** 라인업 제출에 필요한 최소 선발 인원. config.lineup 은 Json 이라 안전하게 읽는다. */
+export function readLineupMinPlayers(lineup: unknown): number {
+  const value = (lineup as { minPlayers?: unknown } | null)?.minPlayers;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.trunc(value) : 3;
+}
+
 type SeedAccount = { userId: string; email: string; nickname: string; role: string };
 type SeedTeam = { teamId: string; name: string; ownerUserId: string; memberUserIds: string[]; accounts: SeedAccount[] };
 
@@ -46,6 +52,7 @@ export class MockTournamentSeedService {
     const status: MockSeedStatus = dto.status ?? 'in_progress';
     // 후기를 쓰려면 공식 결과가 있어야 한다 — reviewReady 는 종료+결과를 함께 요구한다.
     const reviewReady = dto.reviewReady ?? false;
+    const withLineups = dto.withLineups ?? false;
     const withResults = dto.withResults || reviewReady || status === 'completed';
 
     const sport = await this.prisma.v1Sport.findFirst({ where: { code: 'futsal' } })
@@ -58,7 +65,7 @@ export class MockTournamentSeedService {
     const competitionConfig = await this.prisma.v1CompetitionConfigVersion.findFirst({
       where: { status: 'ACTIVE' },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: { id: true, lineup: true },
     });
     if (!competitionConfig) {
       throw new BadRequestException({
@@ -67,7 +74,11 @@ export class MockTournamentSeedService {
       });
     }
 
-    const teams = await this.pickTeams(teamCount);
+    // 라인업 제출 최소 인원 — 이 인원을 못 채우는 팀을 넣으면 "포지션 자리가 비어 있어요"로
+    // 제출 자체가 막혀 라인업 테스트가 불가능하다(alpha 실측: 멤버 4명 팀이 뽑혀 제출 불가).
+    const minPlayers = readLineupMinPlayers(competitionConfig.lineup);
+
+    const teams = await this.pickTeams(teamCount, minPlayers);
     const now = new Date();
     const label = dto.titleSuffix?.trim() || this.autoLabel(format, teamCount, status, reviewReady);
     const title = `(목업) ${this.stamp(now)} ${label}`;
@@ -79,8 +90,10 @@ export class MockTournamentSeedService {
           title,
           format,
           teamCount,
-          minPlayers: 3,
-          maxPlayers: 12,
+          // 대회 참가 명단 하한도 라인업 하한과 맞춘다 — 어긋나면 명단은 통과했는데
+          // 라인업 제출이 막히는 상태가 만들어진다.
+          minPlayers,
+          maxPlayers: Math.max(minPlayers + 5, 12),
           venue: '목업 테스트 경기장',
           scheduledAt: now,
           scheduledEndAt: now,
@@ -108,7 +121,7 @@ export class MockTournamentSeedService {
         });
         // 명단은 항상 채운다. 실제 userId 를 넣어야 후기 대상(상대 선수)이 생긴다.
         await tx.v1TournamentPlayer.createMany({
-          data: team.memberUserIds.slice(0, 8).map((userId, playerIndex) => ({
+          data: team.memberUserIds.slice(0, Math.max(minPlayers + 2, 8)).map((userId, playerIndex) => ({
             registrationId: registration.id,
             userId,
             realName: `${team.name} 선수${playerIndex + 1}`,
@@ -129,12 +142,16 @@ export class MockTournamentSeedService {
     // 같은 경로). 시드가 만든 대회는 그 배포 이후에 생기므로 여기서 직접 돌려야 한다.
     const backfill = await runFixtureGameBackfill(this.prisma as never, { mode: 'apply' });
 
+    const lineupsSubmitted = withLineups
+      ? await this.submitLineups(created.tournament.id, minPlayers)
+      : 0;
+
     await this.adminContext.logAdminAction(admin, {
       action: 'tournament.mock_seed',
       targetType: 'tournament',
       targetId: created.tournament.id,
       reason: `목업 대회 생성 (${format}/${teamCount}팀/${status}${reviewReady ? '/후기가능' : ''})`,
-      afterJson: { title, format, teamCount, status, withResults, reviewReady },
+      afterJson: { title, format, teamCount, status, withResults, reviewReady, withLineups },
     });
 
     return {
@@ -147,6 +164,7 @@ export class MockTournamentSeedService {
       reviewReady,
       route: `/tournaments/${created.tournament.id}`,
       gamesCreated: backfill.counts.gamesCreated,
+      lineupsSubmitted,
       // 로그인해서 확인하려면 어떤 계정이 이 대회에 들어가 있는지 알아야 한다.
       // 비밀번호는 응답에 담지 않는다 — 이 저장소는 public 이고 시드 계정은 공통 비밀번호를 쓴다.
       teams: teams.map((team) => ({
@@ -166,9 +184,69 @@ export class MockTournamentSeedService {
    * 눌러 보고 나서야 400 으로 알게 되면 사용자가 조건을 스스로 좁힐 수 없다.
    */
   async availability() {
-    if (!isMockSeedEnabled()) return { enabled: false, usableTeamCount: 0, maxTeamCount: 0 };
-    const usable = await this.findUsableTeams();
-    return { enabled: true, usableTeamCount: usable.length, maxTeamCount: Math.min(usable.length, 16) };
+    if (!isMockSeedEnabled()) {
+      return { enabled: false, usableTeamCount: 0, maxTeamCount: 0, minPlayersPerTeam: 0 };
+    }
+    const config = await this.prisma.v1CompetitionConfigVersion.findFirst({
+      where: { status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+      select: { lineup: true },
+    });
+    const minPlayers = readLineupMinPlayers(config?.lineup ?? null);
+    const usable = await this.findUsableTeams(minPlayers);
+    return {
+      enabled: true,
+      usableTeamCount: usable.length,
+      maxTeamCount: Math.min(usable.length, 16),
+      minPlayersPerTeam: minPlayers,
+    };
+  }
+
+  /**
+   * 이 대회 경기들의 라인업을 제출 상태로 올린다.
+   *
+   * 백필이 이미 등록 명단으로 participant 를 만들어 뒀으므로 새로 만들지 않는다 — 앞에서
+   * minPlayers 명을 선발로, 1명을 골키퍼로 표시하고 나머지는 후보로 남긴 뒤 라인업을 SUBMITTED
+   * 로 올린다. 명단이 minPlayers 에 못 미치는 경기는 건드리지 않는다(반쪽 제출은 화면에서
+   * "자리가 비어 있어요"로 보여 오히려 혼란스럽다).
+   */
+  private async submitLineups(tournamentId: string, minPlayers: number): Promise<number> {
+    const games = await this.prisma.v1Game.findMany({
+      where: { tournamentFixture: { tournamentId } },
+      select: {
+        id: true,
+        lineups: { where: { state: 'DRAFT' }, select: { id: true, sideId: true, version: true } },
+        participants: { select: { id: true, lineupId: true }, orderBy: { createdAt: 'asc' } },
+      },
+    });
+
+    let submitted = 0;
+    for (const game of games) {
+      for (const lineup of game.lineups) {
+        const roster = game.participants.filter((participant) => participant.lineupId === lineup.id);
+        if (roster.length < minPlayers) continue;
+
+        const starters = roster.slice(0, minPlayers);
+        await this.prisma.$transaction(async (tx) => {
+          await tx.v1GameParticipant.updateMany({
+            where: { lineupId: lineup.id },
+            data: { started: false, position: null },
+          });
+          await tx.v1GameParticipant.updateMany({
+            where: { id: { in: starters.map((participant) => participant.id) } },
+            data: { started: true },
+          });
+          // 골키퍼는 정확히 1명이어야 한다 — 없으면 제출이 거부된다.
+          await tx.v1GameParticipant.update({ where: { id: starters[0].id }, data: { position: 'GK' } });
+          await tx.v1GameLineup.update({
+            where: { id: lineup.id },
+            data: { state: 'SUBMITTED', submittedAt: new Date(), version: { increment: 1 } },
+          });
+        });
+        submitted += 1;
+      }
+    }
+    return submitted;
   }
 
   /** 대회 이름에 조건이 드러나야 목록에서 어떤 테스트용인지 바로 읽힌다. */
@@ -187,24 +265,24 @@ export class MockTournamentSeedService {
    * 명단을 채울 수 있는 팀만 고른다 — active 멤버가 최소 3명 있어야 선수 후기 대상이 생긴다.
    * 팀이 모자라면 조용히 적게 만들지 않고 실패시킨다(반쪽짜리 대회는 검증에 쓸모가 없다).
    */
-  private async pickTeams(teamCount: number): Promise<SeedTeam[]> {
-    const usable = await this.findUsableTeams();
+  private async pickTeams(teamCount: number, minPlayers: number): Promise<SeedTeam[]> {
+    const usable = await this.findUsableTeams(minPlayers);
     if (usable.length < teamCount) {
       throw new BadRequestException({
         code: 'NOT_ENOUGH_TEAMS',
-        message: `명단을 채울 수 있는 테스트 팀이 부족해요. 필요 ${teamCount}팀, 사용 가능 ${usable.length}팀 (active 멤버 3명 이상 + 팀장 보유 + 전원 테스트 계정).`,
+        message: `명단을 채울 수 있는 테스트 팀이 부족해요. 필요 ${teamCount}팀, 사용 가능 ${usable.length}팀 (라인업 제출 최소 인원 ${minPlayers}명 이상 + 팀장 보유 + 전원 테스트 계정).`,
       });
     }
     return usable.slice(0, teamCount);
   }
 
-  private async findUsableTeams(): Promise<SeedTeam[]> {
+  private async findUsableTeams(minPlayers: number): Promise<SeedTeam[]> {
     const candidates = await this.prisma.v1Team.findMany({
       where: {
         status: 'active',
         deletedAt: null,
-        // 명단을 채우려면 active 멤버가 3명 이상이어야 한다 — 이것도 DB 에서 거른다.
-        memberCount: { gte: 3 },
+        // 라인업을 제출하려면 선발 최소 인원을 채워야 한다 — 그 아래 팀은 애초에 후보가 아니다.
+        memberCount: { gte: minPlayers },
         memberships: {
           some: { status: 'active', role: 'owner' },
           // 테스트 팀만 DB 에서 걸러온다. 메모리에서만 걸러내면 take 범위(오래된 팀 순)가
@@ -232,7 +310,7 @@ export class MockTournamentSeedService {
     const usable = candidates
       .filter(
         (team) =>
-          team.memberships.length >= 3 &&
+          team.memberships.length >= minPlayers &&
           team.memberships.some((m) => m.role === 'owner') &&
           // 한 명이라도 실사용자가 섞여 있으면 통째로 제외한다.
           team.memberships.every((m) => m.user?.email?.endsWith(TEST_ACCOUNT_DOMAIN) === true),

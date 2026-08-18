@@ -42,6 +42,26 @@ describe('parseOfficialScore', () => {
     ).toEqual({ home: 2, away: 0 });
   });
 
+  it('중첩 형태의 승부차기(penalty, 단수)도 읽는다', () => {
+    // 이 폴백이 없으면 중첩 형태로 저장된 경기만 승부차기가 조용히 사라져,
+    // resolveTeamRecordResult()가 승부차기로 갈린 경기를 DRAWN 으로 기록한다.
+    expect(
+      parseOfficialScore({
+        regulation: { home: 1, away: 1 },
+        penalty: { home: 5, away: 4 },
+        goals: [],
+        incomplete: false,
+        provenance: 'TOURNAMENT_FIXTURE_RESULT',
+      }),
+    ).toEqual({ home: 1, away: 1, penalties: { home: 5, away: 4 } });
+  });
+
+  it('중첩 형태의 승부차기가 malformed 면 평평한 형태와 똑같이 거부한다', () => {
+    expect(() =>
+      parseOfficialScore({ regulation: { home: 1, away: 1 }, penalty: { home: 5 } }),
+    ).toThrow('OFFICIAL revision penalties must be non-negative integer home and away scores');
+  });
+
   it('prefers the flat top-level key over a co-present nested regulation key', () => {
     // Never actually co-present in persisted data (the two producers are
     // mutually exclusive), but proves the COALESCE-style precedence the DB

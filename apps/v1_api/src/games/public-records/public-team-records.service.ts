@@ -1,7 +1,30 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  isMinuteUnknown,
+  isPeriodUnknown,
+  parseTournamentFixtureOfficialScore,
+} from '../../tournaments/tournament-fixture-official-result';
 import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, type RecordCursor } from './public-cursor';
+import { loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
+import {
+  byUnknownLast,
+  isTournamentParticipantNameGatingReverted,
+  loadParticipantNameProfiles,
+  parseCardColor,
+  resolveParticipantDisplayName,
+  resolveParticipantNameEligible,
+} from './participant-name-gating';
+
+type GameSideRow = { readonly id: string; readonly sideKey: 'HOME' | 'AWAY'; readonly teamId: string | null };
+type GameParticipantRow = {
+  readonly id: string;
+  readonly userId: string | null;
+  readonly displayNameSnapshot: string;
+  readonly jerseyNumber: number | null;
+};
 
 interface TeamRecordFactRow {
   readonly id: string;
@@ -14,10 +37,30 @@ interface TeamRecordFactRow {
   readonly goalsAgainst: number;
   readonly officialAt: Date;
   readonly resultRevision: {
-    readonly supersedesId: string | null;
-    readonly game: { readonly currentOfficialRevisionId: string | null; readonly teamMatchId: string | null };
+    readonly score: Prisma.JsonValue;
+    readonly game: {
+      readonly currentOfficialRevisionId: string | null;
+      readonly teamMatchId: string | null;
+      readonly sides: readonly GameSideRow[];
+      readonly participants: readonly GameParticipantRow[];
+    };
   };
 }
+
+/** 승부차기까지 간 경기만 채워지는 팀 관점 페널티 스코어 -- 없었던 경기는 항상 null. */
+type TeamPenalties = { readonly for: number; readonly against: number };
+
+/** 팀 전적 한 건에 실리는 골/카드 이벤트 -- 시간순(period asc, clockMs asc) 정렬. */
+type TeamRecordEventRow = {
+  readonly id: string;
+  readonly type: 'GOAL' | 'CARD';
+  readonly side: 'own' | 'opponent';
+  readonly participantName: string | null;
+  readonly jerseyNumber: number | null;
+  readonly period: number | null;
+  readonly clockMs: number | null;
+  readonly cardColor: 'YELLOW' | 'RED' | null;
+};
 
 /**
  * Task 24 -- `GET /teams/:id/records`. Team aggregates never need consent
@@ -27,6 +70,13 @@ interface TeamRecordFactRow {
  * *current* official revision counts" rule the void-projection comment
  * documents, so a corrected or voided result is never double-counted or
  * shown stale.
+ *
+ * `penalties`/`events`는 대회 경기 기록(`public-tournament-records.service.ts`)이
+ * 이미 검증한 규칙을 그대로 재사용한다 -- 이름 게이팅이 갈리면 팀 전적에서만
+ * 실명이 더 노출되는 개인정보 사고가 되므로, 판정 함수 자체를
+ * `./participant-name-gating`에서 공유한다(D-03의 "팀 집계는 동의 무관하게
+ * 공개"와는 별개 축: 그건 goalsFor/goalsAgainst 같은 *집계 숫자*에만 적용되고,
+ * *득점자 실명*은 대회 기록과 동일하게 게이팅된다).
  */
 @Injectable()
 export class PublicTeamRecordsService {
@@ -62,7 +112,7 @@ export class PublicTeamRecordsService {
     const tournamentIds = Array.from(
       new Set(currentRows.map((row) => row.tournamentId).filter((id): id is string => id !== null)),
     );
-    const [opponentTeams, tournaments] = await Promise.all([
+    const [opponentTeams, tournaments, eventsByGameId] = await Promise.all([
       opponentTeamIds.length === 0
         ? []
         : this.prisma.v1Team.findMany({
@@ -72,6 +122,7 @@ export class PublicTeamRecordsService {
       tournamentIds.length === 0
         ? []
         : this.prisma.v1Tournament.findMany({ where: { id: { in: tournamentIds } }, select: { id: true, title: true } }),
+      this.loadEvents(currentRows, teamId),
     ]);
     const opponentNameById = new Map(opponentTeams.map((row) => [row.id, row.name]));
     const opponentLogoById = new Map(opponentTeams.map((row) => [row.id, row.profile?.logoUrl ?? null]));
@@ -88,10 +139,13 @@ export class PublicTeamRecordsService {
       opponentTeamName: row.opponentTeamId === null ? null : (opponentNameById.get(row.opponentTeamId) ?? null),
       opponentTeamLogoUrl: row.opponentTeamId === null ? null : (opponentLogoById.get(row.opponentTeamId) ?? null),
       result: row.result,
+      // 정규시간 스코어 그대로 -- 승부차기로 덮어쓰지 않는다(계약). 승부차기는 아래
+      // penalties 필드에서 별도로 실린다.
       goalsFor: row.goalsFor,
       goalsAgainst: row.goalsAgainst,
+      penalties: resolveTeamPenalties(row.resultRevision.score, row.resultRevision.game.sides, teamId),
+      events: eventsByGameId.get(row.gameId) ?? [],
       officialAt: row.officialAt.toISOString(),
-      isCorrected: row.resultRevision.supersedesId !== null,
     }));
 
     const lastPageRow = pageRows[pageRows.length - 1];
@@ -143,12 +197,118 @@ export class PublicTeamRecordsService {
         officialAt: true,
         resultRevision: {
           select: {
-            supersedesId: true,
-            game: { select: { currentOfficialRevisionId: true, teamMatchId: true } },
+            score: true,
+            game: {
+              select: {
+                currentOfficialRevisionId: true,
+                teamMatchId: true,
+                // 승부차기(penalties)의 home/away를 이 팀 관점 for/against로 뒤집으려면
+                // 이 경기에서 이 팀이 home/away 어느 쪽이었는지가 필요하다 -- 이벤트
+                // 요약의 own/opponent 판정도 같은 sides를 재사용한다(loadEvents).
+                sides: { select: { id: true, sideKey: true, teamId: true } },
+                // 이벤트 요약(loadEvents)이 이름/등번호를 붙이는 데 쓴다 -- 이미 같은
+                // 메인 쿼리로 불러오므로 gameId별 추가 조회가 필요 없다(N+1 금지).
+                participants: { select: { id: true, userId: true, displayNameSnapshot: true, jerseyNumber: true } },
+              },
+            },
           },
         },
       },
     });
+  }
+
+  /**
+   * 페이지에 실린 gameId 전부를 한 번의 배치 쿼리로 읽는다(N+1 금지) --
+   * `public-tournament-records.service.ts`의 `buildEvents`/`loadScheduleEvents`와
+   * 동일한 패턴: CORRECTION으로 취소된 이벤트는 `reversesEventId`로 걸러내고,
+   * GOAL/CARD만 남기고, 백필이 남긴 "모른다" 표식(`isPeriodUnknown`/`isMinuteUnknown`)을
+   * null로 접은 뒤 `byUnknownLast`로 정렬한다.
+   *
+   * 이름 게이팅은 대회 기록과 완전히 동일해야 한다(`resolveParticipantNameEligible`/
+   * `resolveParticipantDisplayName` 공유) -- 팀 전적 화면엔 스태프 우회 개념이 없으므로
+   * `isStaffBypass`는 항상 false다(일정 카드 득점자 요약과 동일한 이유).
+   */
+  private async loadEvents(
+    currentRows: readonly TeamRecordFactRow[],
+    teamId: string,
+  ): Promise<ReadonlyMap<string, readonly TeamRecordEventRow[]>> {
+    const gameIds = Array.from(new Set(currentRows.map((row) => row.gameId)));
+    if (gameIds.length === 0) return new Map();
+
+    const events = await this.prisma.v1GameEvent.findMany({
+      where: { gameId: { in: gameIds } },
+      orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
+      select: {
+        id: true,
+        gameId: true,
+        type: true,
+        sideId: true,
+        participantId: true,
+        payload: true,
+        period: true,
+        clockMs: true,
+        reversesEventId: true,
+      },
+    });
+    const reversedIds = new Set(
+      events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
+    );
+    const eventsByGame = new Map<string, typeof events>();
+    for (const event of events) {
+      if (event.type !== 'GOAL' && event.type !== 'CARD') continue;
+      if (reversedIds.has(event.id)) continue;
+      const list = eventsByGame.get(event.gameId) ?? [];
+      list.push(event);
+      eventsByGame.set(event.gameId, list);
+    }
+
+    const scorerParticipantIds = Array.from(eventsByGame.values())
+      .flat()
+      .map((event) => event.participantId)
+      .filter((id): id is string => id !== null);
+    // 정책 공개(기본값)에서는 이름이 동의와 무관하게 항상 보이므로 이 맵을 채울 필요가
+    // 없다 -- 대회 기록의 동일한 게이팅과 이유가 같다(participant-name-gating.ts).
+    const consentMap = isTournamentParticipantNameGatingReverted()
+      ? await loadParticipantConsentEligibility(this.prisma, scorerParticipantIds)
+      : new Map<string, ParticipantConsentEligibility>();
+    const nameProfileByUserId = await loadParticipantNameProfiles(
+      this.prisma,
+      currentRows.flatMap((row) => row.resultRevision.game.participants.map((participant) => participant.userId)),
+    );
+
+    const result = new Map<string, TeamRecordEventRow[]>();
+    for (const row of currentRows) {
+      const sides = row.resultRevision.game.sides;
+      const ownSideKey = sides.find((side) => side.teamId === teamId)?.sideKey ?? null;
+      const sideKeyBySideId = new Map(sides.map((side) => [side.id, side.sideKey] as const));
+      const participantById = new Map(
+        row.resultRevision.game.participants.map((participant) => [participant.id, participant] as const),
+      );
+
+      const rows = (eventsByGame.get(row.gameId) ?? [])
+        .map((event) => {
+          const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
+          const eligible = resolveParticipantNameEligible(false, consent);
+          const participant = event.participantId === null ? undefined : participantById.get(event.participantId);
+          const eventSideKey = event.sideId === null ? null : (sideKeyBySideId.get(event.sideId) ?? null);
+          return {
+            id: event.id,
+            type: event.type === 'CARD' ? ('CARD' as const) : ('GOAL' as const),
+            // sideId/ownSideKey가 둘 다 nullable 방어(스키마상 GOAL/CARD엔 항상 붙지만) --
+            // 알 수 없으면 이 팀 소속으로 잘못 세지 않도록 보수적으로 'opponent'로 접는다
+            // (buildEvents의 side fail-safe와 동일한 원칙).
+            side: (eventSideKey !== null && eventSideKey === ownSideKey ? 'own' : 'opponent') as 'own' | 'opponent',
+            participantName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
+            jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+            period: isPeriodUnknown(event.payload) ? null : event.period,
+            clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
+            cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
+          };
+        })
+        .sort(byUnknownLast);
+      result.set(row.gameId, rows);
+    }
+    return result;
   }
 
   private async fetchSummary(
@@ -207,6 +367,34 @@ export class PublicTeamRecordsService {
       goalsAgainst: row?.goalsAgainst ?? 0,
     };
   }
+}
+
+/**
+ * `resultRevision.score`(정규시간 + 선택적 승부차기)를 이 팀 관점 for/against로
+ * 뒤집는다. `v1_game_result_revisions.score`에는 서로 다른 두 형태가 공존한다 —
+ * 평평한 형태는 `penalties`(복수), 레거시 백필이 남긴 중첩 형태는 `penalty`(단수,
+ * `regulation`의 형제 필드). `parseTournamentFixtureOfficialScore`
+ * (`tournaments/tournament-fixture-official-result.ts`)가 이미 두 형태를 함께
+ * 읽도록 검증된 단일 파서라 여기서도 그걸 그대로 재사용한다 — 한쪽만 읽는 별도
+ * 파서를 새로 만들면 `public-tournament-records.service.ts`의 `parseScore()`,
+ * 이 리비전 백필 마이그레이션(`20260818160000_v1_team_record_facts_penalty_result`)
+ * 의 `COALESCE(score->'penalties', score->'penalty')`와 또 갈라지는 함정을
+ * 반복한다(이 저장소에서 이미 반복된 패턴). 파싱이 실패하거나(`null`) 승부차기
+ * 값이 없으면 그 한 행 때문에 목록 전체를 500으로 죽이지 않고 "승부차기 정보
+ * 없음"(null)으로 접는다(값을 지어내지 않는다).
+ */
+function resolveTeamPenalties(
+  scoreJson: Prisma.JsonValue,
+  sides: readonly GameSideRow[],
+  teamId: string,
+): TeamPenalties | null {
+  const score = parseTournamentFixtureOfficialScore(scoreJson);
+  if (score === null || score.homePenaltyScore === null || score.awayPenaltyScore === null) return null;
+  const ownSideKey = sides.find((side) => side.teamId === teamId)?.sideKey;
+  if (ownSideKey === undefined) return null;
+  return ownSideKey === 'HOME'
+    ? { for: score.homePenaltyScore, against: score.awayPenaltyScore }
+    : { for: score.awayPenaltyScore, against: score.homePenaltyScore };
 }
 
 function seasonBounds(season: string | undefined): { readonly gte: Date; readonly lt: Date } | null {

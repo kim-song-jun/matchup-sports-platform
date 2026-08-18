@@ -250,6 +250,34 @@ export interface PublicMatchDetail {
   readonly nextMatch: PublicNextMatch | null;
 }
 
+/**
+ * 승부차기 최종 스코어(팀 전적 API 전용 형태). `PublicPenaltyScore`(home/away)와 달리
+ * 조회 대상 팀 기준으로 이미 정규화돼 온다 -- 팀 전적 화면은 항상 "우리 팀 vs 상대"로
+ * 읽어야 하므로 소비처가 매번 home/away를 팀 관점으로 다시 매핑할 필요가 없다.
+ * 승부차기가 없었던 경기(대부분)는 `null`.
+ */
+export interface PublicTeamRecordPenalties {
+  readonly for: number;
+  readonly against: number;
+}
+
+/**
+ * 팀 전적 행을 펼쳤을 때 보여주는 골/카드 이벤트. `PublicMatchEvent`와 필드 의미는
+ * 같지만 `side`가 'home'/'away'가 아니라 조회 대상 팀 기준 'own'/'opponent'로 이미
+ * 정규화돼 온다. `participantName`/`jerseyNumber`의 null은 동의/실명정책 게이팅
+ * 결과이지 데이터 누락이 아니다 -- `presentParticipantName()`으로 렌더한다.
+ */
+export interface PublicTeamRecordEvent {
+  readonly id: string;
+  readonly type: 'GOAL' | 'CARD';
+  readonly side: 'own' | 'opponent';
+  readonly participantName: string | null;
+  readonly jerseyNumber: number | null;
+  readonly period: number | null;
+  readonly clockMs: number | null;
+  readonly cardColor: 'YELLOW' | 'RED' | null;
+}
+
 export interface PublicTeamRecordItem {
   readonly gameId: string;
   readonly teamMatchId: string | null;
@@ -260,10 +288,14 @@ export interface PublicTeamRecordItem {
   readonly opponentTeamLogoUrl: string | null;
   /** `WON | DRAWN | LOST` (`V1TeamRecordResult`), kept as `string` to avoid a `@prisma/client` import. */
   readonly result: string;
+  /** 정규시간 점수 그대로 -- 승부차기가 있어도 이 값을 승부차기 스코어로 덮어쓰지 않는다. */
   readonly goalsFor: number;
   readonly goalsAgainst: number;
   readonly officialAt: string;
-  readonly isCorrected: boolean;
+  /** 승부차기가 있었던 경기(결선 무승부 후 승부차기)만 채워진다. */
+  readonly penalties: PublicTeamRecordPenalties | null;
+  /** 시간순(period asc, clockMs asc) 정렬. 골·카드 이벤트만 담긴다. */
+  readonly events: readonly PublicTeamRecordEvent[];
 }
 
 export interface PublicTeamRecordsSummary {
@@ -303,7 +335,6 @@ export interface PublicUserRecordItem {
   readonly started: boolean;
   readonly goalkeeper: boolean;
   readonly mvp: boolean;
-  readonly isCorrected: boolean;
   readonly officialAt: string;
 }
 

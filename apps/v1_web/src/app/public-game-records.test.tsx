@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fetchPublicV1 } from '@/lib/seo';
 import {
@@ -15,6 +15,7 @@ import { TeamRecordsContent } from '@/components/public-game-records/team-record
 import { UserRecordsContent } from '@/components/public-game-records/user-records-content';
 import type {
   PublicMatchDetail,
+  PublicTeamRecordEvent,
   PublicTeamRecordsResponse,
   PublicTournamentScheduleResponse,
   PublicUserRecordsResponse,
@@ -187,7 +188,7 @@ describe('MatchDetailContent — 정정/무효 상태 표시', () => {
   });
 });
 
-/* ── 컴포넌트: 팀/개인 기록의 정정 표시 ── */
+/* ── 컴포넌트: 팀/개인 기록 행 ── */
 
 function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): PublicTeamRecordsResponse {
   return {
@@ -208,7 +209,8 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         goalsFor: 2,
         goalsAgainst: 1,
         officialAt: '2026-08-10T11:00:00.000Z',
-        isCorrected: true,
+        penalties: null,
+        events: [],
       },
     ],
     nextCursor: null,
@@ -216,27 +218,90 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
   };
 }
 
-describe('TeamRecordsContent — 정정 배지', () => {
+function makeTeamRecordEvent(overrides: Partial<PublicTeamRecordEvent> = {}): PublicTeamRecordEvent {
+  return {
+    id: 'event-1',
+    type: 'GOAL',
+    side: 'own',
+    participantName: '홍길동',
+    jerseyNumber: 9,
+    period: 1,
+    clockMs: 12 * 60_000,
+    cardColor: null,
+    ...overrides,
+  };
+}
+
+describe('TeamRecordsContent — 팀 로고', () => {
   it('현재 팀과 상대 팀의 저장된 로고를 표시한다', () => {
     const { container } = render(<TeamRecordsContent data={makeTeamRecords()} />);
 
     expect(container.querySelector('img[src="/uploads/teams/seoul.png"]')).toBeInTheDocument();
     expect(container.querySelector('img[src="/uploads/teams/busan.png"]')).toBeInTheDocument();
   });
+});
 
-  it('isCorrected=true인 행은 정정됨 배지를 보여준다', () => {
-    render(<TeamRecordsContent data={makeTeamRecords()} />);
-    expect(screen.getByText('정정됨')).toBeInTheDocument();
+describe('TeamRecordsContent — 승부차기 보조 표기', () => {
+  it('penalties가 있으면 정규시간 스코어 아래에 "승부차기 N-M" 을 보여준다', () => {
+    const data = makeTeamRecords({
+      items: [{ ...makeTeamRecords().items[0], goalsFor: 1, goalsAgainst: 1, penalties: { for: 4, against: 3 } }],
+    });
+    render(<TeamRecordsContent data={data} />);
+
+    // 정규시간 스코어(1 : 1)는 그대로 남아있고, 승부차기 스코어로 대체되지 않는다.
+    expect(screen.getByText('1 : 1')).toBeInTheDocument();
+    expect(screen.getByText('승부차기 4-3')).toBeInTheDocument();
   });
 
-  it('isCorrected=false인 행은 정정됨 배지를 보여주지 않는다', () => {
-    const data = makeTeamRecords();
-    render(
-      <TeamRecordsContent
-        data={{ ...data, items: [{ ...data.items[0], isCorrected: false }] }}
-      />,
-    );
-    expect(screen.queryByText('정정됨')).not.toBeInTheDocument();
+  it('penalties가 null이면 승부차기 보조 텍스트를 렌더하지 않는다', () => {
+    render(<TeamRecordsContent data={makeTeamRecords()} />);
+    expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamRecordsContent — 경기 기록 아코디언', () => {
+  it('이벤트가 없는 행은 펼치기 버튼을 렌더하지 않는다', () => {
+    render(<TeamRecordsContent data={makeTeamRecords()} />);
+    expect(screen.queryByRole('button', { name: /전 경기 기록/ })).not.toBeInTheDocument();
+  });
+
+  it('펼치기 전에는 골/카드 타임라인이 보이지 않고, 버튼을 누르면 보이며 aria-expanded가 바뀐다', () => {
+    const data = makeTeamRecords({
+      items: [
+        {
+          ...makeTeamRecords().items[0],
+          events: [
+            makeTeamRecordEvent({ id: 'g1', type: 'GOAL', side: 'own', participantName: '홍길동', clockMs: 12 * 60_000 }),
+            makeTeamRecordEvent({ id: 'c1', type: 'CARD', side: 'opponent', cardColor: 'YELLOW', participantName: '김철수', clockMs: 20 * 60_000 }),
+          ],
+        },
+      ],
+    });
+    render(<TeamRecordsContent data={data} />);
+
+    const toggle = screen.getByRole('button', { name: /부산 FC 전 경기 기록 펼치기/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('홍길동')).not.toBeInTheDocument();
+    expect(screen.queryByText('김철수')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    expect(screen.getByText('12′')).toBeInTheDocument();
+    expect(screen.getByText('김철수')).toBeInTheDocument();
+    expect(screen.getByText('20′')).toBeInTheDocument();
+  });
+
+  it('행 전체를 감싼 상세 링크는 그대로 유지된다(펼치기와 별개)', () => {
+    const data = makeTeamRecords({
+      items: [{ ...makeTeamRecords().items[0], events: [makeTeamRecordEvent()] }],
+    });
+    const { container } = render(<TeamRecordsContent data={data} />);
+    const link = container.querySelector('a[href="/tournaments/tournament-1"]');
+    expect(link).toBeInTheDocument();
+    // 버튼은 <a> 안이 아니라 형제 요소여야 한다(a 안에 button 중첩 금지).
+    expect(link?.querySelector('button')).toBeNull();
   });
 });
 
@@ -264,7 +329,6 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
         started: true,
         goalkeeper: false,
         mvp: true,
-        isCorrected: false,
         officialAt: '2026-08-10T11:00:00.000Z',
       },
     ],
@@ -273,15 +337,12 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
   };
 }
 
-describe('UserRecordsContent — 정정 배지', () => {
-  it('isCorrected=true인 행은 정정됨 배지를 보여준다', () => {
-    const data = makeUserRecords();
-    render(
-      <UserRecordsContent
-        data={{ ...data, items: [{ ...data.items[0], isCorrected: true }] }}
-      />,
-    );
-    expect(screen.getByText('정정됨')).toBeInTheDocument();
+describe('UserRecordsContent — 기록 행', () => {
+  it('MVP 행은 MVP 배지를 보여준다', () => {
+    render(<UserRecordsContent data={makeUserRecords()} />);
+    // KPI 요약 카드에도 "MVP" 라벨이 있어 텍스트만으로는 모호하다 -- 기록 행(목록) 안의
+    // 배지(<span>)만 특정해서 확인한다.
+    expect(screen.getByText('MVP', { selector: 'section span' })).toBeInTheDocument();
   });
 });
 

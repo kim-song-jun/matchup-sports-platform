@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { generateRoundRobin } from '../common/scheduling/round-robin';
-import { resolveFixtureStartAt, type FixtureScheduleTemplate } from '../team-match-series/round-robin-schedule';
+import { resolveFixtureStartAt, type FixtureScheduleTemplate } from '../league-matches/round-robin-schedule';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';

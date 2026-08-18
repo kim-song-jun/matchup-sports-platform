@@ -203,7 +203,7 @@ export class MatchesService {
    * Prisma `distinct`는 Postgres `DISTINCT ON`으로 컴파일되는데, 이때
    * `orderBy`가 distinct 필드로 시작해야 한다 — `distinct: ['placeName']` +
    * `orderBy: { createdAt: 'desc' }` 조합은 "최근순 distinct 장소"라는 의도와
-   * 어긋난다(team-match-series-admin.service.ts의 loadRecentVenues와 동일한
+   * 어긋난다(league-match-admin.service.ts의 loadRecentVenues와 동일한
    * 이유로, 넉넉히 가져온 뒤 애플리케이션에서 dedup한다).
    */
   async recentVenues(user: V1AuthUser) {
@@ -213,7 +213,7 @@ export class MatchesService {
       take: 30,
       select: { placeName: true, placeAddress: true },
     });
-    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(team-match-series-admin
+    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(league-match-admin
     // .service.ts의 loadRecentVenues와 동일한 방어) — 안 하면 공백만 다른 "중복" 장소가
     // 서로 다른 칩으로 뜨거나, 공백뿐인 값이 빈 칩으로 렌더될 수 있다.
     const seen = new Set<string>();

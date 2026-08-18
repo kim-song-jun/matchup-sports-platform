@@ -3,8 +3,10 @@ import {
   nextPenaltyKicker,
   penaltyScoreBySideId,
   penaltyShootoutOutcome,
+  penaltyFinishAvailability,
   type PenaltyKick,
   type PenaltyKickResult,
+  type PenaltyShootoutPolicy,
 } from './penalty-shootout';
 
 const HOME = 'side-home';
@@ -152,22 +154,38 @@ describe('penaltyShootoutOutcome', () => {
    * A1은 여기서 갈린다: A1의 기준은 "수학적으로 확정됐는가"가 아니라 **"라운드가
    * 끝났는가"**다. 같은 횟수를 찼고 점수가 갈렸으므로 A1은 이 라운드에서 종료한다.
    */
-  it('각 3킥 2:1 — A2는 아직 뒤집힐 수 있어 미결, A1은 라운드가 끝나 확정', () => {
+  it('각 3킥 2:1 — 두 정책 모두 미결이다(A2는 역전 가능, A1은 5킥 미달)', () => {
     const kicks = [...kicksFor(HOME, 3, 2), ...kicksFor(AWAY, 3, 1)];
     expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: true })).toBe('IN_PROGRESS');
-    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('DECIDED');
+    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('IN_PROGRESS');
   });
 
   /**
-   * A1이 5킥 구간을 통째로 잠그면 안 된다는 증거. 각 3킥 3:0은 후축이 남은 2킥을 다
-   * 넣어도 2점이라 현장에서 이미 끝난 승부차기다. 여기서 A1이 미결을 돌려주면
-   * "승부차기 종료"가 영영 안 켜져, 운영자는 **차지도 않은 킥 4개를 지어내야만**
-   * 경기를 닫을 수 있다(결선 브래킷이 그 자리에서 멈춘다).
+   * **2026-08-18 정정 — 이 자리에 있던 두 테스트가 결함을 못박고 있었다.**
+   *
+   * 예전 A1은 "같은 횟수를 찼고 점수가 갈렸으면 결판"이라, 각 1킥 1:0에 승부차기가
+   * 끝났다. 어느 대회 규정에도 없는 동작이고 `earlyStop: false`("조기 종료 안 함")라는
+   * 이름과 정반대다. 아래 두 테스트가 그 경계를 고정한다.
+   *
+   * 예전 주석은 "A1이 5킥 구간을 잠그면 운영자가 차지도 않은 킥을 지어내야 한다"고
+   * 이 동작을 정당화했는데, 그 막다른 길은 이제 운영자 명시 종료("그래도 종료")가
+   * 연다 — 규칙을 왜곡해서 출구를 만들 이유가 없다.
    */
-  it('각 3킥 3:0은 A1에서도 확정한다 — 라운드가 끝났고 점수가 갈렸다', () => {
+  it('A1은 각 1킥 1:0에서 끝나지 않는다 — 1라운드 종료는 어떤 규정에도 없다', () => {
+    const kicks = [...kicksFor(HOME, 1, 1), ...kicksFor(AWAY, 1, 0)];
+    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('IN_PROGRESS');
+  });
+
+  it('각 3킥 3:0 — A2는 역전 불가라 종료, A1은 5킥을 마저 차야 한다', () => {
+    // 두 정책이 갈리는 지점이 정확히 여기다: 조기 종료를 허용하는가 하나뿐이다.
     const kicks = [...kicksFor(HOME, 3, 3), ...kicksFor(AWAY, 3, 0)];
-    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('DECIDED');
     expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: true })).toBe('DECIDED');
+    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('IN_PROGRESS');
+  });
+
+  it('A1도 5킥을 다 채우면 판정한다 — 잠가 두기만 하는 정책이 아니다', () => {
+    const kicks = [...kicksFor(HOME, 5, 3), ...kicksFor(AWAY, 5, 1)];
+    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('DECIDED');
   });
 
   it('5킥씩 다 차고 점수가 갈리면 두 정책 모두 확정한다', () => {
@@ -218,5 +236,70 @@ describe('penaltyShootoutOutcome', () => {
     expect(penaltyShootoutOutcome(kicksFor(HOME, 1, 1), [{ id: HOME }], HOME, { earlyStop: true })).toBe(
       'IN_PROGRESS',
     );
+  });
+});
+
+describe('penaltyFinishAvailability — 운영자가 경기를 닫을 수 있는 상태', () => {
+  const SIDES = [{ id: 'home' }, { id: 'away' }];
+  const A2: PenaltyShootoutPolicy = { earlyStop: true };
+  const A1: PenaltyShootoutPolicy = { earlyStop: false };
+  const kick = (sideId: string, result: PenaltyKickResult): PenaltyKick => ({ sideId, result });
+
+  it('규칙상 결판난 상태는 READY — 우회 버튼 없이 그냥 종료된다', () => {
+    // 각 3킥, 선축 3점 : 후축 0점 (잔여 2킥으로 역전 불가)
+    const kicks = [
+      kick('home', 'SCORED'), kick('away', 'MISSED'),
+      kick('home', 'SCORED'), kick('away', 'MISSED'),
+      kick('home', 'SCORED'), kick('away', 'MISSED'),
+    ];
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A2)).toBe('READY');
+  });
+
+  it('킥 수가 달라 자동 판정이 멈춘 상태는 OVERRIDABLE — 기권·중단이 여기로 온다', () => {
+    // 홈 2킥 2점 / 원정 1킥 0점: 원정이 남은 4킥을 다 넣으면 역전 가능해 규칙상 미결.
+    // 그러나 원정이 기권하면 이 상태가 최종이고, 닫지 못하면 경기가 영원히 열려 있다.
+    const kicks = [
+      kick('home', 'SCORED'), kick('away', 'MISSED'),
+      kick('home', 'SCORED'),
+    ];
+    expect(penaltyShootoutOutcome(kicks, SIDES, 'home', A2)).toBe('IN_PROGRESS');
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A2)).toBe('OVERRIDABLE');
+  });
+
+  it('서든데스에서 킥 수가 하나 어긋난 상태도 OVERRIDABLE', () => {
+    // 양 팀 5킥씩 1:0으로 이미 갈렸는데 홈이 6번째를 더 찬 국면 — 서든데스 규칙은
+    // "같은 횟수"를 요구하므로 자동으로는 안 끝나지만, 원정이 더 못 차면 닫아야 한다.
+    const kicks = [
+      ...Array.from({ length: 5 }, (): PenaltyKick[] => [kick('home', 'MISSED'), kick('away', 'MISSED')]).flat(),
+      kick('home', 'SCORED'),
+    ];
+    expect(penaltyShootoutOutcome(kicks, SIDES, 'home', A2)).toBe('IN_PROGRESS');
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A2)).toBe('OVERRIDABLE');
+  });
+
+  it('A1(끝까지 차는 정책)에서 킥 수가 다르면 OVERRIDABLE — 정책과 무관하게 닫는 길은 남는다', () => {
+    const kicks = [kick('home', 'SCORED'), kick('away', 'MISSED'), kick('home', 'SCORED')];
+    expect(penaltyShootoutOutcome(kicks, SIDES, 'home', A1)).toBe('IN_PROGRESS');
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A1)).toBe('OVERRIDABLE');
+  });
+
+  it('점수가 같으면 BLOCKED — 서버가 TOURNAMENT_PENALTY_INVALID로 되돌린다', () => {
+    // 눌러도 실패할 버튼을 열어 주면 운영자를 속이는 것이라, 우회 경로를 주지 않는다.
+    const kicks = [kick('home', 'SCORED'), kick('away', 'SCORED')];
+    expect(penaltyFinishAvailability(kicks, SIDES, 'home', A2)).toBe('BLOCKED');
+  });
+
+  it('킥이 하나도 없으면 BLOCKED — 양쪽 0점이라 보낼 결과 자체가 없다', () => {
+    expect(penaltyFinishAvailability([], SIDES, 'home', A2)).toBe('BLOCKED');
+  });
+
+  it('선축을 안 골랐으면 BLOCKED — 선축 없이는 payload를 만들 수 없다', () => {
+    const kicks = [kick('home', 'SCORED')];
+    expect(penaltyFinishAvailability(kicks, SIDES, null, A2)).toBe('BLOCKED');
+  });
+
+  it('사이드가 2개가 아니면 BLOCKED', () => {
+    const kicks = [kick('home', 'SCORED')];
+    expect(penaltyFinishAvailability(kicks, [{ id: 'home' }], 'home', A2)).toBe('BLOCKED');
   });
 });

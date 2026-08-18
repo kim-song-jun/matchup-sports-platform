@@ -137,13 +137,25 @@ export function penaltyShootoutOutcome(
   //  1 > 0 + 5가 거짓이라 IN_PROGRESS다.)
   if (takenFirst === 0 || takenSecond === 0) return 'IN_PROGRESS';
 
-  // A1(`earlyStop: false`) — **라운드가 끝나야** 결판을 본다. 5킥 구간이든 그 뒤든 문장이
-  // 같아 분기 앞에 한 번만 둔다. 즉 이 정책은 "한 팀이 더 찬 상태에서는 절대 끝내지 않는다".
+  // A1(`earlyStop: false`) — **조기 종료 없이 5킥을 다 채운다.**
   //
-  // 여기서 5킥 구간을 통째로 IN_PROGRESS로 만들면 안 된다: 각 3킥 3:0(후축이 남은 2킥을 다
-  // 넣어도 2점)처럼 현장에서 이미 끝난 승부차기를 종료할 수 없어, 운영자가 차지도 않은 킥을
-  // 지어내야만 경기를 닫을 수 있는 막다른 상태가 된다.
+  // 2026-08-18 정정: 예전 구현은 이 자리에서 "같은 횟수 + 점수 갈림"이면 곧바로 결판이라
+  // 판정했는데, 그러면 **각 1킥 1:0에 승부차기가 끝난다.** 어느 대회 규정에도 없는 동작이고,
+  // `earlyStop: false`("조기 종료 안 함")라는 이름과 정반대다. 더 나쁜 건 같은 구현이
+  // 반대 방향으로도 틀렸다는 것이다 — 선축 4킥 4점 / 후축 3킥 0점처럼 **수학적으로 이미
+  // 끝난** 경기는 킥 수가 다르다는 이유로 끝내지 못했다. 즉 A1은 A2보다 느슨하면서 동시에
+  // 엄격한, 어느 규칙에도 대응하지 않는 제3의 정책이었다.
+  //
+  // 두 정책의 올바른 대비는 **조기 종료를 허용하는가** 하나뿐이다:
+  //   A2 = FIFA 정규 — 5킥 이내라도 잔여 킥으로 역전 불가하면 종료
+  //   A1 = 5킥을 다 채운 뒤에만 판정, 그 뒤는 서든데스(두 정책 공통)
+  //
+  // 예전 주석은 "5킥 구간을 통째로 IN_PROGRESS로 만들면 운영자가 차지도 않은 킥을 지어내야
+  // 하는 막다른 상태가 된다"고 경고했는데, 그 막다른 길은 이제 **운영자 명시 종료**
+  // ("그래도 종료", `penaltyFinishAvailability`의 `OVERRIDABLE`)가 연다 — 규칙을 왜곡해서
+  // 출구를 만들 이유가 없어졌다.
   if (!policy.earlyStop) {
+    if (takenFirst < 5 || takenSecond < 5) return 'IN_PROGRESS';
     return takenFirst === takenSecond && scoreFirst !== scoreSecond ? 'DECIDED' : 'IN_PROGRESS';
   }
 
@@ -162,4 +174,40 @@ export function penaltyShootoutOutcome(
   // 여기에 "같은 킥 수" 조건이 없으면 후축이 답할 기회를 얻기 전에 종료할 수 있고,
   // "점수가 다름" 조건이 없으면 무승부 승부차기가 나가 서버가 422로 되돌린다.
   return takenFirst === takenSecond && scoreFirst !== scoreSecond ? 'DECIDED' : 'IN_PROGRESS';
+}
+
+/**
+ * "승부차기 종료"를 지금 누를 수 있는가 — 세 갈래.
+ *
+ * `penaltyShootoutOutcome`만으로는 화면을 만들 수 없다. 그 술어는 "규칙상 결판이 났나"만
+ * 답하는데, 현장에는 **규칙이 끝나기 전에 승부차기가 끝나는** 경우가 있기 때문이다:
+ * 한 팀이 기권하거나, 선수가 없어 더 못 차거나, 심판이 중단시키거나. 그때 자동 판정만
+ * 믿으면 운영자는 경기를 닫을 수 없고, 닫으려면 **차지도 않은 킥을 지어내야** 한다 —
+ * 기록을 정확히 남기려고 만든 가드가 오히려 기록을 조작하게 만드는 셈이다.
+ *
+ * 그래서 "못 끝냄"을 둘로 나눈다.
+ * - `OVERRIDABLE`: 규칙상 아직 안 끝났지만 **운영자가 책임지고 닫을 수 있는** 상태.
+ *   확인 모달로 현재 집계를 그대로 보여주고 명시적으로 한 번 더 받는다.
+ * - `BLOCKED`: 닫으면 **안 되는** 상태. 여기에 우회로를 열어 주면 안 된다.
+ *   ① 사이드가 2개가 아니거나 선축이 없으면 애초에 기록 자체가 성립하지 않고,
+ *   ② 점수가 같으면 서버가 `TOURNAMENT_PENALTY_INVALID`로 되돌린다 —
+ *   눌러도 실패할 버튼을 열어 주는 건 운영자를 속이는 것이다.
+ *   (킥이 하나도 없는 상태는 양쪽 0점이라 ②에 자연히 포함된다.)
+ */
+export type PenaltyFinishAvailability = 'READY' | 'OVERRIDABLE' | 'BLOCKED';
+
+export function penaltyFinishAvailability(
+  kicks: readonly PenaltyKick[],
+  sides: readonly { id: string }[],
+  firstKickSideId: string | null,
+  policy: PenaltyShootoutPolicy,
+): PenaltyFinishAvailability {
+  if (penaltyShootoutOutcome(kicks, sides, firstKickSideId, policy) === 'DECIDED') return 'READY';
+  if (sides.length !== 2) return 'BLOCKED';
+  const first = sides.find((side) => side.id === firstKickSideId);
+  const second = sides.find((side) => side.id !== firstKickSideId);
+  if (first === undefined || second === undefined) return 'BLOCKED';
+  const score = penaltyScoreBySideId(kicks);
+  if ((score.get(first.id) ?? 0) === (score.get(second.id) ?? 0)) return 'BLOCKED';
+  return 'OVERRIDABLE';
 }

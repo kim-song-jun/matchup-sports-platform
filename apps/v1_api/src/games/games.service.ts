@@ -40,6 +40,7 @@ import {
   parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
 import { readIsKnockoutFixture, readKnockoutFixtureFacts } from '../tournaments/knockout-fixture';
+import { assertPenaltyShootoutConcluded } from './core/penalty-shootout-outcome';
 import {
   assertBracketResolvable,
   assertPenaltiesNotAllowed,
@@ -497,9 +498,7 @@ function assertClockNotDrifted(occurredAt: string): void {
  * elsewhere in this file) so this pure parsing rule is unit-testable without
  * a database.
  */
-export function extractEndPenalties(
-  payload: Record<string, unknown>,
-): { home: number; away: number; firstKickSideKey?: 'HOME' | 'AWAY' } | undefined {
+export function extractEndPenalties(payload: Record<string, unknown>): StoredPenalties | undefined {
   const raw = payload.penalties;
   if (raw === undefined) return undefined;
   if (
@@ -541,15 +540,67 @@ export function extractEndPenalties(
   // 그대로 실으면 그 형태가 `jsonInput`을 타고 `score` JSON 컬럼에 들어가(`null`은 실제로
   // 저장된다) `readStoredPenalties`·`parseOfficialPenalties` 계열이 "선축 없음"과 "선축이
   // null" 두 상태를 구분해야 하는 부채가 생긴다. 없으면 없는 것이 유일한 표현이다.
+  // 킥 수(`takenHome`/`takenAway`). 이게 실려 와야 서버도 "홈 1킥 1:0 / 원정 0킥"과
+  // "각 5킥 1:0"을 구분할 수 있다 — 총점 두 개만으로는 구조적으로 같은 값이라,
+  // 예전 서버가 막을 수 있는 건 무승부뿐이었고 화면의 가드는 API 직접 호출로
+  // 그대로 우회됐다.
+  //
+  // **둘 다 있거나 둘 다 없어야 한다.** 한쪽만 오면 어느 팀이 몇 번 찼는지 알 수
+  // 없는데도 "킥 수를 안다"고 착각한 채 판정이 돌아간다 — 없는 쪽을 0으로 메우면
+  // 그 팀이 한 번도 안 찬 것으로 읽혀 정상 결과가 거부된다.
+  const takenHome = parseKickCount(raw, 'takenHome');
+  const takenAway = parseKickCount(raw, 'takenAway');
+  if ((takenHome === undefined) !== (takenAway === undefined)) {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: 'penalties.takenHome and penalties.takenAway must be provided together',
+    });
+  }
+  // 성공 수가 시도 수를 넘을 수는 없다. 이건 정책과 무관한 산술 불변식이라
+  // `assertPenaltyShootoutConcluded`(정책 판정)가 아니라 여기서 본다 —
+  // `operatorOverride`로도 면제되지 않아야 하는 종류의 오류다.
+  if (takenHome !== undefined && takenAway !== undefined && (home > takenHome || away > takenAway)) {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: 'penalties scored count cannot exceed the number of kicks taken',
+    });
+  }
+  const operatorOverrideRaw = (raw as { operatorOverride?: unknown }).operatorOverride;
+  if (operatorOverrideRaw !== undefined && typeof operatorOverrideRaw !== 'boolean') {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: 'penalties.operatorOverride must be a boolean when provided',
+    });
+  }
+  // `true`일 때만 싣는다. `false`를 저장하면 "우회 아님"이 두 가지 표현(키 부재 ·
+  // false)을 갖게 되고, 그건 이 함수가 `firstKickSideKey`에서 이미 지키는 불변식
+  // ("없으면 없는 것이 유일한 표현")을 깨는 것이다.
+  const counts =
+    takenHome !== undefined && takenAway !== undefined ? { takenHome, takenAway } : {};
+  const override = operatorOverrideRaw === true ? { operatorOverride: true as const } : {};
+
   const firstKickSideKey = (raw as { firstKickSideKey?: unknown }).firstKickSideKey;
-  if (firstKickSideKey === undefined) return { home, away };
+  if (firstKickSideKey === undefined) return { home, away, ...counts, ...override };
   if (firstKickSideKey !== 'HOME' && firstKickSideKey !== 'AWAY') {
     throw new UnprocessableEntityException({
       code: 'TOURNAMENT_PENALTY_INVALID',
       message: "penalties.firstKickSideKey must be 'HOME' or 'AWAY' when provided",
     });
   }
-  return { home, away, firstKickSideKey };
+  return { home, away, firstKickSideKey, ...counts, ...override };
+}
+
+/** `takenHome`/`takenAway` 한 칸을 읽는다 — 없으면 `undefined`, 형식이 틀리면 422. */
+function parseKickCount(raw: unknown, key: 'takenHome' | 'takenAway'): number | undefined {
+  const value = (raw as Record<string, unknown>)[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: `penalties.${key} must be a non-negative integer when provided`,
+    });
+  }
+  return value;
 }
 
 /**
@@ -1055,7 +1106,13 @@ export class GamesService {
               data: { state: V1GamePeriodState.ENDED, endedAt: now, ...(resolved ?? {}) },
             });
           }
-          return this.deriveTournamentRevision(tx, updated, context, extractEndPenalties(dto.payload));
+          return this.deriveTournamentRevision(
+            tx,
+            updated,
+            context,
+            extractEndPenalties(dto.payload),
+            'END_COMMAND',
+          );
         }
         return {
           gameId: updated.id,
@@ -4584,6 +4641,18 @@ export class GamesService {
     game: LockedGame,
     context: GameCommandContext,
     penalties?: StoredPenalties,
+    /**
+     * 어느 레인에서 왔는가. 승부차기 킥 수를 **요구할 수 있는지**가 여기서 갈린다.
+     *
+     * `END_COMMAND` — 운영 콘솔이 승부차기를 **지금 기록하는** 경로다. 클라이언트가 킥
+     *   목록을 들고 있으므로 킥 수를 못 보낼 이유가 없다. 그래서 이 레인에서는 킥 수를
+     *   필수로 만든다 — 총점 두 개만으로는 "각 5킥 1:0"(정상)과 "홈 1킥, 원정 0킥"(비정상)이
+     *   같은 값이라 서버가 구분할 수 없고, 실제로 알파에서 `{home:1, away:0}` 만 실은
+     *   `end` 호출이 **201로 통과해 공개 화면까지 퍼지는 것**을 실측했다(2026-08-18).
+     * `RECOVERY` — 이미 저장된 리비전을 복구·승계하는 경로다. 킥 수가 생기기 전에 저장된
+     *   결과에는 그 값이 없으므로 요구하면 복구가 영구히 막힌다.
+     */
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY' = 'RECOVERY',
   ): Promise<GameRevisionMutationResult> {
     const [events, participants, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
@@ -4608,7 +4677,7 @@ export class GamesService {
       parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
       'GK';
     const regulationScore = this.scoreFromEvents(events, sides);
-    const score = await this.applyPenalties(tx, game, regulationScore, penalties);
+    const score = await this.applyPenalties(tx, game, regulationScore, penalties, penaltyOrigin);
     // Issue #392 fix: `missingScorer` must be derived from the SAME
     // reversed-event-excluding aggregation `aggregateGameParticipantStats`
     // already builds below for goals/cards/assists/fouls -- moved ahead of
@@ -5219,6 +5288,7 @@ export class GamesService {
     game: LockedGame,
     score: GameScore,
     penalties: StoredPenalties | undefined,
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY' = 'RECOVERY',
   ): Promise<GameScore> {
     // 결정적 스코어 + 승부차기 없음이면 어떤 fact도 판정을 바꾸지 않으므로
     // 질의하지 않는다 — 리팩터 전 단축 평가 동작을 그대로 보존한다.
@@ -5230,7 +5300,56 @@ export class GamesService {
       assertBracketResolvable(score, facts);
       return score;
     }
-    return assertPenaltiesNotAllowed(score, penalties, facts);
+    // **자격 먼저, 내용 나중.** `assertPenaltiesNotAllowed`가 "이 경기가 애초에 승부차기를
+    // 받을 수 있는가"(조별리그가 아닌가 · 정규시간이 무승부인가)를 409로 가른다. 킥 수·정책
+    // 검사를 그보다 앞에 두면 **조별리그 경기에 승부차기를 보낸 운영자에게 "킥 수를 넣어라"가
+    // 뜬다** — 시키는 대로 킥 수를 채워 넣어도 여전히 거부당하는 막다른 안내다.
+    // (2026-08-18 CI 실측: 통합 테스트 4건이 409를 기대했는데 422가 나와 실패했다.)
+    const applied = assertPenaltiesNotAllowed(score, penalties, facts);
+    // 자격을 통과한 뒤에야 내용을 본다 — 킥 수가 실려 왔으면 서버도 프런트와 **같은 술어**로
+    // 결판을 판정한다. 예전에는 이 판정이 프런트에만 있어(총점 두 개로는 킥 수를 알 수 없다)
+    // 화면의 가드가 API 직접 호출로 그대로 우회됐다.
+    await this.assertPenaltyShootoutConcludedForGame(tx, game, penalties, penaltyOrigin);
+    return applied;
+  }
+
+  /**
+   * 이 대회의 승부차기 종료 정책을 읽어 게이트를 건다. 정책 해석은 `getGame`이
+   * 프런트에 `penaltyShootoutPolicy`를 내려줄 때 쓰는 것과 **같은 `parseResultPolicy`**다 —
+   * 화면이 버튼을 여는 기준과 서버가 저장을 허용하는 기준이 갈리면, 운영자에게는
+   * "눌렀는데 실패했다"로만 보인다.
+   *
+   * 킥 수가 없는 요청(레거시 클라이언트·정정 승계)은 `assertPenaltyShootoutConcluded`가
+   * 즉시 통과시키므로 config 를 읽을 필요도 없다 — 그 경우 질의를 건너뛴다.
+   */
+  private async assertPenaltyShootoutConcludedForGame(
+    tx: Transaction,
+    game: LockedGame,
+    penalties: StoredPenalties,
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
+  ): Promise<void> {
+    if (penalties.takenHome === undefined || penalties.takenAway === undefined) {
+      // 킥 수 없이 승부차기를 **새로 기록**하는 것은 거부한다. 이게 없으면 아래 정책 판정이
+      // 통째로 건너뛰어져, `curl` 한 줄로 `{home:1, away:0}` 을 보내면 원정이 한 번도 차지
+      // 않은 승부차기가 그대로 공식 결과가 된다 — 2026-08-18 알파에서 201 응답과 공개 화면
+      // 노출까지 실측했다. 화면의 가드는 프런트에만 있어 이 경로를 전혀 막지 못했다.
+      //
+      // 복구 레인은 면제다: 킥 수가 생기기 전에 저장된 리비전에는 그 값이 없어서,
+      // 여기서 요구하면 옛 결과의 복구가 영구히 막힌다.
+      if (penaltyOrigin === 'END_COMMAND') {
+        throw new UnprocessableEntityException({
+          code: 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED',
+          message:
+            'penalties.takenHome and penalties.takenAway are required when recording a penalty shootout',
+        });
+      }
+      return;
+    }
+    const config = await tx.v1CompetitionConfigVersion.findUnique({
+      where: { id: game.competitionConfigVersionId },
+      select: { result: true },
+    });
+    assertPenaltyShootoutConcluded(penalties, parseResultPolicy(config?.result ?? null));
   }
 
   private async assertTeamMatchMatched(tx: Transaction, teamMatchId: string | null): Promise<void> {

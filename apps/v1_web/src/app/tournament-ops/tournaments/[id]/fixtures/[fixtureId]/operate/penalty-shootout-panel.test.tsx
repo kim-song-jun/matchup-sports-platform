@@ -43,9 +43,11 @@ function renderPanel(
     firstKickSideId?: string | null;
     sides?: readonly GameSide[];
     onSelectFirstKicker?: (sideId: string) => void;
+    onFinish?: (options: { readonly override: boolean }) => void;
   } = {},
 ) {
   const onSelectFirstKicker = overrides.onSelectFirstKicker ?? vi.fn();
+  const onFinish = overrides.onFinish ?? vi.fn();
   render(
     <PenaltyShootoutPanel
       sides={overrides.sides ?? [HOME, AWAY]}
@@ -54,13 +56,13 @@ function renderPanel(
       onSelectFirstKicker={onSelectFirstKicker}
       onRecordKick={vi.fn()}
       onUndoLastKick={vi.fn()}
-      onFinish={vi.fn()}
+      onFinish={onFinish}
       onCancel={vi.fn()}
       policy={{ earlyStop: true }}
       finishing={false}
     />,
   );
-  return { onSelectFirstKicker };
+  return { onSelectFirstKicker, onFinish };
 }
 
 describe('PenaltyShootoutPanel — 키보드 접근성', () => {
@@ -126,6 +128,67 @@ describe('PenaltyShootoutPanel — 종료가 잠긴 사유 안내', () => {
     expect(screen.getByRole('button', { name: /성공/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /실패/ })).toBeDisabled();
     expect(screen.getByText('먼저 차는 팀을 골라주세요.')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 승부차기가 **규칙보다 먼저 끝나는** 현장 상황을 운영자가 기록할 수 있는가.
+ *
+ * 한 팀이 기권하거나 선수가 없어 더 못 차면 두 팀의 킥 수가 어긋난 채로 경기가 끝난다.
+ * 자동 판정(`penaltyShootoutOutcome`)만 믿으면 그 상태에서는 "승부차기 종료"가 영원히
+ * 잠겨 있어, 운영자가 경기를 닫으려면 **차지도 않은 킥을 지어내야** 한다 — 잘못된 기록을
+ * 막으려고 만든 가드가 오히려 기록을 조작하게 만드는 셈이다. 그래서 우회 종료를 둔다.
+ *
+ * 다만 우회를 **아무 데나 열면 안 된다**: 점수가 같으면 서버가 되돌리므로(422), 그 버튼은
+ * 눌러도 실패만 하는 거짓 출구가 된다. 아래 세 테스트가 그 경계를 고정한다.
+ */
+describe('PenaltyShootoutPanel — 규칙보다 먼저 끝난 승부차기 닫기', () => {
+  const kick = (sideId: string, result: 'SCORED' | 'MISSED'): PenaltyKick => ({ sideId, result });
+
+  it('킥 수가 달라 자동 판정이 멈추면 "그래도 종료"가 나타나고, 누르면 override로 올라간다', async () => {
+    const user = userEvent.setup();
+    // 홈 2킥 2점 / 원정 1킥 0점 — 원정이 남은 킥을 다 넣으면 역전 가능해 규칙상 미결이다.
+    const { onFinish } = renderPanel({
+      firstKickSideId: HOME.id,
+      kicks: [kick(HOME.id, 'SCORED'), kick(AWAY.id, 'MISSED'), kick(HOME.id, 'SCORED')],
+    });
+    const panel = screen.getByRole('dialog', { name: '승부차기' });
+
+    // 자동 종료는 잠겨 있어야 한다 — 우회가 자동 종료를 대체하는 게 아니라 곁에 붙는 것이다.
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
+
+    const override = within(panel).getByRole('button', { name: '그래도 종료' });
+    await user.click(override);
+    expect(onFinish).toHaveBeenCalledWith({ override: true });
+  });
+
+  it('점수가 같으면 "그래도 종료"를 주지 않는다 — 눌러도 서버가 되돌린다', () => {
+    renderPanel({
+      firstKickSideId: HOME.id,
+      kicks: [kick(HOME.id, 'SCORED'), kick(AWAY.id, 'SCORED')],
+    });
+    const panel = screen.getByRole('dialog', { name: '승부차기' });
+
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
+    expect(within(panel).queryByRole('button', { name: '그래도 종료' })).toBeNull();
+  });
+
+  it('규칙상 결판난 상태에서는 "그래도 종료"가 없고 자동 종료가 override 없이 올라간다', async () => {
+    const user = userEvent.setup();
+    // 각 3킥, 홈 3점 : 원정 0점 — 잔여 2킥으로 역전 불가라 자동으로 결판이다.
+    const { onFinish } = renderPanel({
+      firstKickSideId: HOME.id,
+      kicks: [
+        kick(HOME.id, 'SCORED'), kick(AWAY.id, 'MISSED'),
+        kick(HOME.id, 'SCORED'), kick(AWAY.id, 'MISSED'),
+        kick(HOME.id, 'SCORED'), kick(AWAY.id, 'MISSED'),
+      ],
+    });
+    const panel = screen.getByRole('dialog', { name: '승부차기' });
+
+    expect(within(panel).queryByRole('button', { name: '그래도 종료' })).toBeNull();
+    await user.click(within(panel).getByRole('button', { name: '승부차기 종료' }));
+    expect(onFinish).toHaveBeenCalledWith({ override: false });
   });
 });
 

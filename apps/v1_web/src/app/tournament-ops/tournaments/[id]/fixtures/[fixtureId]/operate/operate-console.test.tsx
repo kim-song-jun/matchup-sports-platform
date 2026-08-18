@@ -1198,9 +1198,11 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     const missButton = within(panel).getByRole('button', { name: /실패/ });
 
     // 홈 2킥 2점 / 원정 1킥 0점 — 원정이 남은 4킥을 다 넣으면 역전 가능하므로 규칙상 미결.
-    fireEvent.click(successButton); // 홈 1:0
-    fireEvent.click(missButton); // 원정 1:0
-    fireEvent.click(successButton); // 홈 2:0 — 여기서 원정이 기권했다고 하자
+    // 아래 주석은 **점수가 아니라 킥 수와 점수**를 함께 적는다 — 이 테스트의 관심사가
+    // "몇 대 몇인가"가 아니라 "누가 몇 번 찼는가"이기 때문이다.
+    fireEvent.click(successButton); // 홈 1킥 1점
+    fireEvent.click(missButton); // 원정 1킥 0점
+    fireEvent.click(successButton); // 홈 2킥 2점 — 여기서 원정이 기권했다고 하자
 
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
     fireEvent.click(within(panel).getByRole('button', { name: '그래도 종료' }));

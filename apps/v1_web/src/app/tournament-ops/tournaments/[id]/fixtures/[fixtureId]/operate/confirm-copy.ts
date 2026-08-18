@@ -244,6 +244,11 @@ export function penaltyShootoutFinishConfirmCopy(
  * 먼저 말하고, ② 점수만이 아니라 **각 팀이 몇 번 찼는지**까지 보여준다 — 킥 수가
  * 어긋난 것이 바로 자동 판정이 멈춘 이유이고, 운영자가 오조작을 알아채는 지점도
  * 거기다(예: 되돌리기를 한 번 덜 눌러 원정 킥이 하나 모자란 상태).
+ *
+ * 조사는 숫자가 아니라 **`승부차기`에 붙인다**(일반 종료 문구와 같은 방식). 한국어에서
+ * 숫자에 붙는 조사는 받침에 따라 갈리는데(0 → "영으로", 2 → "이로", 3 → "삼으로")
+ * 점수는 런타임 값이라 어느 쪽이 맞는지 코드가 알 수 없다 — 숫자 뒤에 조사를 붙이는
+ * 순간 어떤 점수에서는 반드시 틀린 문장이 나온다.
  */
 export function penaltyShootoutOverrideFinishConfirmCopy(
   homeSide: GameSide,
@@ -256,7 +261,7 @@ export function penaltyShootoutOverrideFinishConfirmCopy(
 ): ConfirmCopy {
   return {
     title: '아직 안 끝난 승부차기예요',
-    message: `${homeSide.displayNameSnapshot} ${homeKicks}킥 ${homeScore}점 · ${awaySide.displayNameSnapshot} ${awayKicks}킥 ${awayScore}점 — 규칙상 아직 결판이 나지 않았어요. 이대로 ${homeScore} : ${awayScore} 로 종료할까요? 선축은 ${firstKickSide.displayNameSnapshot}이에요. 종료하면 되돌릴 수 없어요.`,
+    message: `${homeSide.displayNameSnapshot} ${homeKicks}킥 ${homeScore}점 · ${awaySide.displayNameSnapshot} ${awayKicks}킥 ${awayScore}점 — 규칙상 아직 결판이 나지 않았어요. 이대로 ${homeScore} : ${awayScore} 승부차기로 종료할까요? 선축은 ${firstKickSide.displayNameSnapshot}이에요. 종료하면 되돌릴 수 없어요.`,
     confirmLabel: '그래도 종료',
     tone: 'danger',
   };

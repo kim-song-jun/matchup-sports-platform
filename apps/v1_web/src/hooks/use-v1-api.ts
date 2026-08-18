@@ -3414,6 +3414,12 @@ export type CreateMockTournamentResult = {
   status: string;
   reviewReady: boolean;
   route: string;
+  /** 이 대회에 참가한 테스트 계정 — 어떤 계정으로 로그인해야 검증할 수 있는지 알려준다. */
+  teams: Array<{
+    teamId: string;
+    teamName: string;
+    accounts: Array<{ email: string; nickname: string; role: string }>;
+  }>;
 };
 
 export function useV1CreateMockTournament() {

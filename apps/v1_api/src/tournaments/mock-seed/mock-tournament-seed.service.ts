@@ -5,7 +5,8 @@ import { V1AuthUser } from '../../auth/v1-auth-user';
 import { isMockSeedEnabled } from './mock-seed.config';
 import { CreateMockTournamentDto, type MockSeedStatus } from './mock-tournament-seed.dto';
 
-type SeedTeam = { teamId: string; name: string; ownerUserId: string; memberUserIds: string[] };
+type SeedAccount = { userId: string; email: string; nickname: string; role: string };
+type SeedTeam = { teamId: string; name: string; ownerUserId: string; memberUserIds: string[]; accounts: SeedAccount[] };
 
 /**
  * 검증용 목업 대회를 한 번에 만든다 — 대회 생성 → 팀 등록(확정) → 명단 채우기 → 조 편성 →
@@ -87,7 +88,9 @@ export class MockTournamentSeedService {
             registrationId: registration.id,
             userId,
             realName: `${team.name} 선수${playerIndex + 1}`,
-            jerseyNumber: playerIndex + 1,
+            // 실 시드(seed-alpha-tournament-qa.ts)와 같은 값. default 인 needs_review 로 두면
+            // 명단이 '검토 대기'로 남아서 "명단까지 채워진 대회"가 되지 않는다.
+            eligibilityStatus: 'non_pro' as const,
           })),
           skipDuplicates: true,
         });
@@ -115,6 +118,17 @@ export class MockTournamentSeedService {
       status: created.tournament.status,
       reviewReady,
       route: `/tournaments/${created.tournament.id}`,
+      // 로그인해서 확인하려면 어떤 계정이 이 대회에 들어가 있는지 알아야 한다.
+      // 비밀번호는 응답에 담지 않는다 — 이 저장소는 public 이고 시드 계정은 공통 비밀번호를 쓴다.
+      teams: teams.map((team) => ({
+        teamId: team.teamId,
+        teamName: team.name,
+        accounts: team.accounts.slice(0, 8).map((account) => ({
+          email: account.email,
+          nickname: account.nickname,
+          role: account.role,
+        })),
+      })),
     };
   }
 
@@ -140,7 +154,11 @@ export class MockTournamentSeedService {
       select: {
         id: true,
         name: true,
-        memberships: { where: { status: 'active' }, select: { userId: true, role: true } },
+        memberships: {
+          where: { status: 'active' },
+          // 테스트하려면 어떤 계정으로 로그인해야 하는지가 결과에 같이 나와야 한다.
+          select: { userId: true, role: true, user: { select: { email: true, nickname: true } } },
+        },
       },
       orderBy: { createdAt: 'asc' },
       take: teamCount * 4,
@@ -153,6 +171,12 @@ export class MockTournamentSeedService {
         name: team.name,
         ownerUserId: team.memberships.find((m) => m.role === 'owner')!.userId,
         memberUserIds: team.memberships.map((m) => m.userId),
+        accounts: team.memberships.map((m) => ({
+          userId: m.userId,
+          email: m.user?.email ?? '',
+          nickname: m.user?.nickname ?? '',
+          role: m.role,
+        })),
       }));
     if (usable.length < teamCount) {
       throw new BadRequestException({

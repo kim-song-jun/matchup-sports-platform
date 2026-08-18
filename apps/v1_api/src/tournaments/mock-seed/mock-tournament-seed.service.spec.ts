@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MockTournamentSeedService } from './mock-tournament-seed.service';
 
@@ -51,6 +53,40 @@ describe('MockTournamentSeedService', () => {
 
     await expect(service.createTournament(user, {})).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  // 이 테스트가 없어서 alpha 에서 500 이 났다: 존재하지 않는 `jerseyNumber` 를 createMany 에 넘겼는데,
+  // 로컬 generated Prisma client 가 stale 이라 tsc 가 통과했고 mock prisma 는 where/data 를 검증하지
+  // 않아 유닛테스트도 통과했다. 그래서 mock 이 아니라 **schema.prisma 원문**을 권위로 삼아
+  // 서비스가 실제로 넘긴 필드가 모델에 존재하는지 대조한다.
+  it('명단 payload 의 모든 필드가 schema.prisma 의 V1TournamentPlayer 에 실재한다', async () => {
+    const { service, players } = makeWorld();
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+    expect(players.length).toBeGreaterThan(0);
+
+    const schema = readFileSync(join(__dirname, '../../../prisma/schema.prisma'), 'utf8');
+    const model = /model V1TournamentPlayer \{([\s\S]*?)\n\}/.exec(schema);
+    expect(model).not.toBeNull();
+    const scalarFields = new Set(
+      model![1]
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('//') && !line.startsWith('@@'))
+        .map((line) => line.split(/\s+/)[0]),
+    );
+    expect(scalarFields.has('realName')).toBe(true); // 파서 자체가 망가지면 이 단언이 먼저 깨진다
+
+    const unknownFields = [...new Set(players.flatMap((row) => Object.keys(row)))].filter(
+      (field) => !scalarFields.has(field),
+    );
+    expect(unknownFields).toEqual([]);
+  });
+
+  // 명단이 needs_review 로 남으면 "명단까지 채워진 대회"가 아니다 — 실 시드와 같은 값을 쓴다.
+  it('명단은 non_pro 로 확정 상태로 넣는다', async () => {
+    const { service, players } = makeWorld();
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+    expect(players.every((row) => row.eligibilityStatus === 'non_pro')).toBe(true);
   });
 
   it('라인업은 만들지 않는다 — 라인업 제출은 손으로 테스트하는 게 목적이다', async () => {

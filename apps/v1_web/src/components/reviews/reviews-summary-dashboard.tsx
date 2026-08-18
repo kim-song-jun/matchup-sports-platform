@@ -73,7 +73,8 @@ export function ReviewsSummaryDashboard({
 
       <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
         {bySport.map((sport) => {
-          const accent = getSportAccent(sport.sportId);
+          // sportId 는 UUID 다 — 배지 매핑 키는 v1Sport.code(sportCode).
+          const accent = getSportAccent(sport.sportCode ?? '');
           const topTags = sport.tagRates.slice(0, 3);
           return (
             <div key={sport.sportId} style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
@@ -88,7 +89,8 @@ export function ReviewsSummaryDashboard({
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                   {topTags.map((tag) => (
                     <span key={tag.tagCode} className="tm-badge" style={{ background: 'var(--grey100)', color: 'var(--text-caption)' }}>
-                      {tag.label} <span className="tab-num">{Math.round(tag.rate * 100)}%</span>
+                      {tag.label}{' '}
+                      <span className="tab-num">{Math.round(tag.rate * 100)}%</span>
                     </span>
                   ))}
                 </div>

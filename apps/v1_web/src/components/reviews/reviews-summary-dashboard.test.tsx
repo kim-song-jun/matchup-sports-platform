@@ -4,7 +4,7 @@ import { ReviewsSummaryDashboard } from './reviews-summary-dashboard';
 
 const summary = {
   bySport: [
-    { sportId: 'futsal', ratingAvg: 4.8, ratingCount: 12, tagRates: [{ tagCode: 'manner', label: '매너가 좋아요', rate: 0.68, count: 8 }] },
+    { sportId: 'sport-uuid-1', sportCode: 'futsal', ratingAvg: 4.8, ratingCount: 12, tagRates: [{ tagCode: 'manner', label: '매너가 좋아요', rate: 0.68, count: 8 }] },
   ],
   availableMonths: ['2026-07', '2026-06'],
 };

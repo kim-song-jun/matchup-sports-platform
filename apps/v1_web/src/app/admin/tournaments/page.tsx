@@ -19,6 +19,7 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+import { MockSeedPanel } from '@/components/admin/tournaments/mock-seed-panel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -114,6 +115,7 @@ export default function AdminTournamentsPage() {
 
   return (
     <>
+      <MockSeedPanel />
       <AdminPageHeader
         eyebrow="플랫폼"
         title="대회 관리"

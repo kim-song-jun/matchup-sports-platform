@@ -107,3 +107,33 @@ describe('assertPenaltyShootoutConcluded — 저장 게이트', () => {
     ).not.toThrow();
   });
 });
+
+/**
+ * 2026-08-18 알파 실측 재현 — 이 테스트가 지키는 것은 **경로 C가 다시 열리지 않는 것**이다.
+ *
+ * 킥 수 없이 `POST /games/:id/commands/end` 에 `{ home: 1, away: 0 }` 만 실어 보내면
+ * HTTP 201 로 통과했고, 원정이 한 번도 차지 않은 승부차기가 공식 결과가 되어 공개
+ * 관전자 화면(`scoreStatus: "official"`)까지 퍼졌다. 화면의 가드는 프런트에만 있어
+ * 이 경로를 전혀 막지 못했다.
+ *
+ * 게이트 자체는 서비스 레인(`assertPenaltyShootoutConcludedForGame`)에 있고 트랜잭션이
+ * 필요하지만, 그 판정이 기대는 **순수 규칙**은 여기서 고정한다: 킥 수가 없으면 정책
+ * 판정을 할 수 없다는 것. 아래 두 단언이 그 전제를 명시한다.
+ */
+describe('킥 수가 없으면 판정 자체가 불가능하다 (경로 C 회귀 방지)', () => {
+  it('총점만으로는 정상과 비정상이 같은 값이라 구분할 수 없다', () => {
+    // 알파에서 실제로 저장된 비정상 값과, 정상적으로 도달 가능한 값이 총점상 동일하다.
+    const 비정상 = { home: 1, away: 0, takenHome: 1, takenAway: 0, firstKickSideKey: 'HOME' } as const;
+    const 정상 = { home: 1, away: 0, takenHome: 5, takenAway: 5, firstKickSideKey: 'HOME' } as const;
+    expect({ home: 비정상.home, away: 비정상.away }).toEqual({ home: 정상.home, away: 정상.away });
+    // 킥 수가 있으면 갈린다 — 그래서 `end` 레인은 킥 수를 필수로 요구한다.
+    expect(penaltyShootoutDecided(비정상, A2)).toBe(false);
+    expect(penaltyShootoutDecided(정상, A2)).toBe(true);
+  });
+
+  it('킥 수가 없으면 게이트가 통과시킨다 — 그래서 레인 구분이 유일한 방어선이다', () => {
+    // 이 함수는 복구 레인용 degrade 를 유지한다. `end` 레인의 차단은 호출부
+    // (`assertPenaltyShootoutConcludedForGame`)가 담당한다는 계약을 명시한다.
+    expect(() => assertPenaltyShootoutConcluded({ home: 1, away: 0 }, A2)).not.toThrow();
+  });
+});

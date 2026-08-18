@@ -1,5 +1,6 @@
 ---
-'teameet': patch
+"v1_api": patch
+"v1_web": patch
 ---
 
 목업 대회 생성이 명단 단계에서 500 으로 실패하던 문제 수정. `V1TournamentPlayer` 에 없는

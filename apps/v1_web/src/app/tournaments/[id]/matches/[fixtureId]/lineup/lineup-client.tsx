@@ -175,6 +175,14 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
       : editingSideId === access.data?.homeSideId
         ? access.data?.homeTeamId ?? null
         : access.data?.awayTeamId ?? null;
+  /** 피치 토큰 라벨에서 팀명 접두사를 떼는 데만 쓴다 — 등록 명단의 표시 이름이
+   *  "<팀명> 선수1" 처럼 팀명으로 시작하면 84px 라벨이 이름 쪽에서 잘려 누구인지 못 읽는다. */
+  const editingTeamName =
+    editingSideId === null
+      ? null
+      : editingSideId === access.data?.homeSideId
+        ? access.data?.homeTeamName ?? null
+        : access.data?.awayTeamName ?? null;
   const [loadSheetOpen, setLoadSheetOpen] = useState(false);
   const [loadNotice, setLoadNotice] = useState<string | null>(null);
   const [savePresetOpen, setSavePresetOpen] = useState(false);
@@ -743,6 +751,7 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                   onPlaceInSlot={(key, slot) => setState((prev) => (prev ? placeInSlot(prev, key, slot) : prev))}
                   onUnplaceFromSlot={(key) => setState((prev) => (prev ? unplaceFromSlot(prev, key) : prev))}
                   dropResolverRef={dropResolverRef}
+                  teamName={editingTeamName}
                 />
               </div>
             )}

@@ -3410,6 +3410,49 @@ export function useV1AdminTournaments(params?: AdminTournamentListFilters) {
   });
 }
 
+/**
+ * 목업 대회 생성 — alpha 전용. 서버가 V1_ENABLE_MOCK_SEED 로 잠그고, 꺼져 있으면 이 조회가
+ * enabled:false 를 돌려주므로 화면이 버튼째 숨긴다.
+ */
+export function useV1MockSeedAvailability() {
+  return useQuery({
+    queryKey: ['admin-mock-seed-availability'],
+    queryFn: () => v1Get<{ enabled: boolean }>('/admin/mock-seed/availability'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export type CreateMockTournamentInput = {
+  format?: 'league' | 'knockout' | 'group_knockout';
+  teamCount?: number;
+  status?: 'open' | 'in_progress' | 'completed';
+  withResults?: boolean;
+  reviewReady?: boolean;
+  titleSuffix?: string;
+};
+
+export type CreateMockTournamentResult = {
+  tournamentId: string;
+  title: string;
+  format: string;
+  teamCount: number;
+  fixtureCount: number;
+  status: string;
+  reviewReady: boolean;
+  route: string;
+};
+
+export function useV1CreateMockTournament() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateMockTournamentInput) =>
+      v1Post<CreateMockTournamentResult>('/admin/mock-seed/tournaments', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournaments'] });
+    },
+  });
+}
+
 export function useV1AdminTournament(id: string) {
   return useQuery({
     queryKey: v1Keys.adminTournament(id),

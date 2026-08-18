@@ -60,8 +60,7 @@ export type ReceivedReviewGroup = {
 
 export type ReviewsReceivedPageModel = {
   stats: ReviewStat[];
-  anonymousUserGroups: ReceivedReviewGroup[];
-  anonymousTeamGroups: ReceivedReviewGroup[];
-  legacyUserGroups: ReceivedReviewGroup[];
-  legacyTeamGroups: ReceivedReviewGroup[];
+  /** 제도 전/후를 나누지 않는다 — "이전 리뷰" 섹션은 2026-08-18에 제거했다. */
+  userGroups: ReceivedReviewGroup[];
+  teamGroups: ReceivedReviewGroup[];
 };

@@ -7,7 +7,7 @@ import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { Trophy, Goal, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
-import { useV1Tournament, useV1MyRegistrations, useV1Reviews } from '@/hooks/use-v1-api';
+import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import {
   LeagueStandingsTable,
@@ -27,7 +27,6 @@ import {
 import {
   TournamentPostEventHubSection,
   TournamentVenuePrepSection,
-  type TournamentFixtureReviewState,
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
@@ -471,17 +470,6 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   });
   const hasCompletedFixture =
     data?.fixtures.some((fixture) => fixture.status === 'completed' && fixture.result !== null) ?? false;
-  const fixtureReviews = useV1Reviews(
-    { tab: 'pending', tournamentId, limit: 50 },
-    // completed 도 포함해야 한다 — 후기는 대회가 끝난 뒤에 쓰는 것이라, in_progress 로만 조건을
-    // 걸면 정작 쓸 시점에 목록이 비어 진입점이 사라진다.
-    {
-      enabled:
-        hasSessionHint &&
-        (data?.status === 'in_progress' || data?.status === 'completed') &&
-        hasCompletedFixture,
-    },
-  );
   const myRegistration =
     myRegistrations.find((registration) => registration.status !== 'cancelled') ??
     myRegistrations[0] ??
@@ -498,13 +486,6 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
     trackEvent('tournament_view', { tournamentId });
   }, [data, tournamentId]);
 
-  const fixtureReviewState: TournamentFixtureReviewState = !hasSessionHint
-    ? { status: 'guest', items: [] }
-    : fixtureReviews.isError
-      ? { status: 'error', items: [], onRetry: () => void fixtureReviews.refetch() }
-      : fixtureReviews.isPending || fixtureReviews.isFetching
-        ? { status: 'loading', items: [] }
-        : { status: 'ready', items: fixtureReviews.data?.items ?? [] };
 
   if (isLoading) {
     return (
@@ -541,8 +522,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
         <TournamentDetailView
           tournament={data}
           myRegistration={myRegistration}
-          fixtureReviewState={fixtureReviewState}
-        />
+          />
       </AppChrome>
     </>
   );
@@ -556,11 +536,9 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
 export function TournamentDetailView({
   tournament,
   myRegistration,
-  fixtureReviewState = { status: 'guest', items: [] },
 }: {
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
-  fixtureReviewState?: TournamentFixtureReviewState;
 }) {
   const status = getTournamentStatusConfig(tournament.status);
   const sportAccent = getSportAccent(tournament.sport.code);
@@ -830,7 +808,6 @@ export function TournamentDetailView({
         hasAnnouncements={hasAnnouncements}
         sponsorCount={tournament.sponsors.length}
         announcements={tournament.announcements}
-        fixtureReviewState={fixtureReviewState}
       />
 
       {/* ── Section 3 + 4: Format-aware fixtures / standings (non-bracket portions) ── */}
@@ -868,7 +845,6 @@ export function TournamentDetailView({
         hasAnnouncements={hasAnnouncements}
         sponsorCount={tournament.sponsors.length}
         announcements={tournament.announcements}
-        fixtureReviewState={fixtureReviewState}
       />
 
       <TournamentParticipantSection

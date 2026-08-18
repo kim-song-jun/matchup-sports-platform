@@ -2,8 +2,12 @@ import { createElement } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { getTournamentPostEventCards, getVenueNavigationLinks } from './tournament-venue-retention-model';
-import { TournamentPostEventHubSection, TournamentVenuePrepSection } from './tournament-venue-retention-sections';
-import type { V1TournamentFixture } from '@/types/api';
+import {
+  TournamentFixtureReviewEntrySection,
+  TournamentPostEventHubSection,
+  TournamentVenuePrepSection,
+} from './tournament-venue-retention-sections';
+import type { V1ReviewListItem, V1TournamentFixture } from '@/types/api';
 
 // TournamentVenueMap fetches the Kakao Maps JS key via this hook — 이 스위트에서는
 // "키가 없다"는 (그래서 지도 임베드가 스킵되는) 상태를 고정해 규약대로 검증한다.
@@ -206,19 +210,26 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
       }),
     );
 
+    // 행마다 라벨이 약속하는 화면으로 가야 한다 — 한때 "최종 결과·시상"이 경기별 결과
+    // 목록(/results)으로, "대회 후기"가 시상 화면(/awards)으로 가서 두 행이 서로의
+    // 화면을 가리키고 있었다(오너 지적: "이건 대회 후기를 보러가는거고").
     expect(screen.getByRole('link', { name: /최종 결과·시상/ })).toHaveAttribute(
       'href',
-      '/tournaments/tour-42/results',
+      '/tournaments/tour-42/awards',
     );
     expect(screen.getByRole('link', { name: /대진표·조별 순위/ })).toHaveAttribute(
       'href',
       '/tournaments/tour-42/bracket',
     );
+    expect(screen.getByRole('link', { name: /경기별 결과·기록/ })).toHaveAttribute(
+      'href',
+      '/tournaments/tour-42/results',
+    );
     // 후기 행은 대회 컨텍스트를 유지해야 한다 — 예전엔 '/my/reviews'로 보내 "어느 대회의
     // 후기를 쓰려던 건지"가 사라졌고, 사용자가 목록에서 대회를 다시 찾아야 했다.
     expect(screen.getByRole('link', { name: /대회 후기/ })).toHaveAttribute(
       'href',
-      '/tournaments/tour-42/awards',
+      '/tournaments/tour-42/reviews',
     );
     expect(screen.getByText('대회 후 더보기')).toBeInTheDocument();
   });
@@ -256,105 +267,12 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders direct review entries only for completed fixtures with results while the tournament is in progress', () => {
-    const fixtures: V1TournamentFixture[] = [
-      {
-        id: 'f1',
-        groupId: null,
-        round: '조별 1라운드',
-        status: 'completed',
-        homeRegistrationId: 'r1',
-        awayRegistrationId: 'r2',
-        homeTeamName: '팀A',
-        awayTeamName: '팀B',
-        result: { homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
-      } as V1TournamentFixture,
-      {
-        id: 'f-completed-without-result',
-        round: '조별 2라운드',
-        status: 'completed',
-        homeTeamName: '팀C',
-        awayTeamName: '팀D',
-        result: null,
-      } as V1TournamentFixture,
-      {
-        id: 'f-penalty',
-        round: '결승',
-        status: 'completed',
-        homeTeamName: null,
-        awayTeamName: 'TBD',
-        result: { homeScore: 1, awayScore: 1, hasPenalty: true, homePenaltyScore: 5, awayPenaltyScore: 4 },
-      } as V1TournamentFixture,
-      {
-        id: 'f-scheduled',
-        round: '조별 3라운드',
-        status: 'scheduled',
-        homeTeamName: '팀E',
-        awayTeamName: '팀F',
-        result: { homeScore: 0, awayScore: 0, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
-      } as V1TournamentFixture,
-    ];
-
-    render(
-      createElement(TournamentPostEventHubSection, {
-        tournamentId: 'tour-42',
-        status: 'in_progress',
-        fixtures,
-        hasAnnouncements: false,
-        sponsorCount: 0,
-        announcements: [],
-        fixtureReviewState: {
-          status: 'ready',
-          items: [
-            {
-              sourceType: 'tournament_fixture',
-              sourceId: 'f1',
-              title: 'TeamMeet Cup · 조별 1라운드',
-              completedAt: '2026-08-14T00:00:00.000Z',
-              targetType: 'team',
-              targetCount: 3,
-              reviewedCount: 1,
-              remainingCount: 2,
-              state: 'ready',
-            },
-            {
-              sourceType: 'tournament_fixture',
-              sourceId: 'f-penalty',
-              title: 'TeamMeet Cup · 결승',
-              completedAt: '2026-08-14T01:00:00.000Z',
-              targetType: 'user',
-              targetCount: 1,
-              reviewedCount: 0,
-              remainingCount: 1,
-              state: 'ready',
-            },
-          ],
-        },
-      }),
-    );
-
-    expect(screen.getByText('대회 현황')).toBeInTheDocument();
-    // 결과·순위처럼 실제로 열린 행만 유지하고, generic 리뷰함 링크와 준비 중 placeholder는 제거한다.
-    expect(screen.queryByText('하이라이트 영상')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /리뷰·매너 기록/ })).not.toBeInTheDocument();
-
-    expect(screen.getByText('리뷰할 수 있는 경기')).toBeInTheDocument();
-    expect(screen.getByText('경기 결과와 내 역할을 확인해 아직 남길 수 있는 리뷰만 보여드려요.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '팀A 대 팀B 경기 남은 리뷰 2개 작성' })).toHaveAttribute(
-      'href',
-      '/my/reviews/tournament_fixture/f1',
-    );
-    expect(screen.getByText('남은 리뷰 2개')).toBeInTheDocument();
-    expect(screen.getByText('2 : 1')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '비공개 대 미정 경기 남은 리뷰 1개 작성' })).toBeInTheDocument();
-    expect(screen.getByText('PK 5 : 4')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /팀C 대 팀D/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /팀E 대 팀F/ })).not.toBeInTheDocument();
-  });
-
-  // 후기는 대회가 끝난 뒤에 쓴다. 예전에는 status가 completed로 넘어가는 순간 이 섹션이
-  // 통째로 사라져(완료 액션 리스트로 early-return) 정작 쓸 시점에 들어갈 길이 없었다.
-  it('대회가 종료된 뒤에도 "리뷰할 수 있는 경기" 진입점이 남는다', () => {
+  // 경기별 후기 진입은 후기 화면(/tournaments/:id/reviews)으로 옮겼다 — 대회 상세에
+  // 후기 입구가 둘("대회 후기" 행 + "리뷰할 수 있는 경기" 섹션)이라 어디로 가야 하는지
+  // 헷갈렸다. 한때 시상 화면(/awards)에 뒀는데, 그러면 후기를 쓰러 온 사람이 "최종
+  // 결과·시상"을 눌러야 해서 라벨과 내용이 다시 어긋났다. 여기서는 대회 상세가 더 이상
+  // 그 섹션을 렌더하지 않는다는 것만 고정한다.
+  it('대회 상세는 경기별 후기 섹션을 더 이상 렌더하지 않는다 (후기 화면으로 이동)', () => {
     const fixtures = [
       {
         id: 'f1',
@@ -366,39 +284,89 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
       } as V1TournamentFixture,
     ];
 
+    for (const status of ['in_progress', 'completed'] as const) {
+      const { unmount } = render(
+        createElement(TournamentPostEventHubSection, {
+          tournamentId: 'tour-42',
+          status,
+          fixtures,
+          hasAnnouncements: false,
+          sponsorCount: 0,
+          announcements: [],
+        }),
+      );
+      expect(screen.queryByText('리뷰할 수 있는 경기')).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+});
+
+/**
+ * 이 섹션은 대회 상세 → 시상 화면(`/awards`) → 후기 화면(`/tournaments/:id/reviews`)으로
+ * 두 번 옮겨졌는데 그동안 자기 렌더 계약을 고정한 테스트가 없었다. 다음에 또 옮기더라도
+ * "어떤 경기가, 몇 개 남았고, 어디로 가는지"는 그대로여야 한다.
+ */
+describe('TournamentFixtureReviewEntrySection', () => {
+  const COMPLETED_FIXTURE = {
+    id: 'fixture-9',
+    round: '조별 1라운드',
+    status: 'completed',
+    homeTeamName: '팀A',
+    awayTeamName: '팀B',
+    result: { homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
+  } as V1TournamentFixture;
+
+  function reviewItem(overrides: Partial<V1ReviewListItem> = {}): V1ReviewListItem {
+    return {
+      sourceType: 'tournament_fixture',
+      sourceId: 'fixture-9',
+      title: '조별 1라운드',
+      completedAt: null,
+      targetType: 'team',
+      targetCount: 5,
+      reviewedCount: 0,
+      remainingCount: 5,
+      state: 'ready',
+      ...overrides,
+    };
+  }
+
+  it('남은 리뷰가 있는 완료 경기를 그 경기의 후기 작성 화면으로 이어준다', () => {
     render(
-      createElement(TournamentPostEventHubSection, {
-        tournamentId: 'tour-42',
-        status: 'completed',
-        fixtures,
-        hasAnnouncements: false,
-        sponsorCount: 0,
-        announcements: [],
-        fixtureReviewState: {
-          status: 'ready',
-          items: [
-            {
-              sourceType: 'tournament_fixture',
-              sourceId: 'f1',
-              title: 'TeamMeet Cup · 조별 1라운드',
-              completedAt: '2026-08-14T00:00:00.000Z',
-              targetType: 'team',
-              targetCount: 3,
-              reviewedCount: 1,
-              remainingCount: 2,
-              state: 'ready',
-            },
-          ],
-        },
+      createElement(TournamentFixtureReviewEntrySection, {
+        fixtures: [COMPLETED_FIXTURE],
+        state: { status: 'ready', items: [reviewItem()] },
       }),
     );
 
     expect(screen.getByText('리뷰할 수 있는 경기')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '팀A 대 팀B 경기 남은 리뷰 2개 작성' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /팀A 대 팀B/ })).toHaveAttribute(
       'href',
-      '/my/reviews/tournament_fixture/f1',
+      '/my/reviews/tournament_fixture/fixture-9',
     );
-    // 완료 액션 리스트는 그대로 함께 남는다(대체가 아니라 추가).
-    expect(screen.getByText('대회 후 더보기')).toBeInTheDocument();
+    expect(screen.getByText('남은 리뷰 5개')).toBeInTheDocument();
+  });
+
+  it('남길 리뷰가 없으면 섹션째 렌더하지 않는다 (빈 껍데기로 자리 차지하지 않음)', () => {
+    const { container } = render(
+      createElement(TournamentFixtureReviewEntrySection, {
+        fixtures: [COMPLETED_FIXTURE],
+        state: { status: 'ready', items: [reviewItem({ remainingCount: 0, state: 'done' })] },
+      }),
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('비로그인 방문자에게는 아무것도 보여주지 않는다', () => {
+    const { container } = render(
+      createElement(TournamentFixtureReviewEntrySection, {
+        fixtures: [COMPLETED_FIXTURE],
+        state: { status: 'guest', items: [] },
+      }),
+    );
+
+    expect(container).toBeEmptyDOMElement();
   });
 });

@@ -6125,14 +6125,17 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+/* 모든 폭에서 같은 후기 카드를 쓴다 — 넓어지면 열 수만 늘린다. 예전에는 1024px 이상에서
+   카드를 숨기고 같은 데이터를 6열 표로 다시 그렸는데, 별점이 칸에 갇히고 후기 본문은 한 줄로
+   잘려 정작 읽으러 온 내용이 가장 안 읽혔다(오너 지적). 카드 한 벌만 남기면 좁은 화면에서
+   검증한 레이아웃이 넓은 화면에도 그대로 적용된다. */
 .tm-reviews-cards {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
+  align-items: start;
   transition: opacity 0.15s;
 }
-
-.tm-reviews-table-wrap { display: none; }
 
 .tm-reviews-pager {
   display: flex;
@@ -6187,74 +6190,14 @@ button:disabled {
 @media (min-width: 1024px) {
   /* 본문을 데스크탑 전체 폭에 늘리지 않고 좌측 라인에 고정 */
   .tm-reviews-body {
-    max-width: 760px;
+    max-width: 1000px;
     margin: 0;
   }
 
-  /* 카드 목록 → 테이블로 전환 */
-  .tm-reviews-cards { display: none; }
-  .tm-reviews-table-wrap {
-    display: block;
-    overflow-x: auto;
-    border: 1px solid var(--grey150);
-    border-radius: 12px;
-  }
-  .tm-reviews-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  .tm-reviews-table thead th {
-    text-align: left;
-    padding: 10px 14px;
-    background: var(--grey50);
-    color: var(--text-caption);
-    font-weight: 600;
-    font-size: 12px;
-    border-bottom: 1px solid var(--grey150);
-    white-space: nowrap;
-  }
-  .tm-reviews-table tbody td {
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--grey100);
-    color: var(--text);
-    vertical-align: middle;
-  }
-  .tm-reviews-table tbody tr:last-child td { border-bottom: none; }
-  .tm-reviews-table tbody tr:hover { background: var(--grey50); }
-  .tm-reviews-table-team { color: var(--text-caption); white-space: nowrap; }
-  .tm-reviews-table-stars { display: flex; gap: 1px; white-space: nowrap; }
-  .tm-reviews-table-comment {
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .tm-reviews-table-empty { color: var(--text-caption); }
-  .tm-reviews-table-photos { display: flex; gap: 4px; }
-  .tm-reviews-table-photos a {
-    display: block;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-  .tm-reviews-table-photos img { width: 100%; height: 100%; object-fit: cover; }
-  .tm-reviews-table-photo-more {
-    display: inline-flex;
-    align-items: center;
-    /* [공개 화면 R-T2 정리] "+N" 인디케이터 — 고정폭 없어 캡션 토큰으로 상향. */
-    font-size: var(--font-size-caption);
-    color: var(--text-caption);
-    padding-left: 2px;
-  }
-  .tm-reviews-table-date {
-    color: var(--text-caption);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
+  /* 넓은 화면에서는 카드를 2열로 — 표로 갈아끼우지 않는다(위 .tm-reviews-cards 주석 참고). */
+  .tm-reviews-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
 .tm-hub-section-title {
   font-size: 15px;
   font-weight: 850;

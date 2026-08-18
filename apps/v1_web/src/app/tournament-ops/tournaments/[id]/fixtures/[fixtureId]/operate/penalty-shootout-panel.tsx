@@ -23,6 +23,12 @@ export interface PenaltyShootoutPanelProps {
   readonly onUndoLastKick: () => void;
   readonly onFinish: () => void;
   readonly onCancel: () => void;
+  /**
+   * 정규 시간 스코어(sideId → 득점). 패널이 화면 중앙 모달이라 뒤의 스코어보드를
+   * 통째로 가린다 — 승부차기 중에 "정규 시간이 몇 대 몇이었지"를 확인할 방법이
+   * 사라지므로 패널 안에 함께 띄운다(2026-08-18 로컬 실화면에서 확인).
+   */
+  readonly regulationScoreBySideId?: ReadonlyMap<string, number>;
   /** 이 대회의 종료 판정 정책(`GameDetail.penaltyShootoutPolicy`). */
   readonly policy: PenaltyShootoutPolicy;
   /** "승부차기 종료" 명령이 서버 왕복 중일 때 — 다른 명령 버튼과 동일하게
@@ -123,6 +129,7 @@ export function PenaltyShootoutPanel({
   kicks,
   firstKickSideId,
   onSelectFirstKicker,
+  regulationScoreBySideId,
   onRecordKick,
   onUndoLastKick,
   onFinish,
@@ -192,9 +199,19 @@ export function PenaltyShootoutPanel({
         className="flex max-h-[85vh] w-full max-w-[480px] flex-col rounded-t-2xl bg-[var(--card-surface)] shadow-[0_8px_32px_rgba(20,28,45,0.2)] sm:rounded-2xl"
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
-          <h2 id="penalty-shootout-title" className="text-base font-bold text-[var(--text-strong)]">
-            승부차기
-          </h2>
+          <div className="min-w-0">
+            <h2 id="penalty-shootout-title" className="text-base font-bold text-[var(--text-strong)]">
+              승부차기
+            </h2>
+            {regulationScoreBySideId && sides.length === 2 ? (
+              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                <span>정규 시간</span>
+                <span className="font-bold tabular-nums text-[var(--text-strong)]">
+                  {regulationScoreBySideId.get(sides[0].id) ?? 0} : {regulationScoreBySideId.get(sides[1].id) ?? 0}
+                </span>
+              </p>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={onCancel}
@@ -215,7 +232,7 @@ export function PenaltyShootoutPanel({
               누가 먼저 차나요?
             </legend>
             <div className="mt-1 grid grid-cols-2 gap-2">
-              {sides.map((side) => {
+              {sides.map((side, index) => {
                 const inputId = `${firstKickGroupId}-${side.id}`;
                 return (
                   <label
@@ -235,6 +252,14 @@ export function PenaltyShootoutPanel({
                       checked={firstKickSideId === side.id}
                       disabled={firstKickLocked}
                       onChange={() => onSelectFirstKicker(side.id)}
+                    />
+                    {/* 색만으로 구분하지 않는다 — 팀 이름은 그대로 두고, 훑어볼 때의
+                        보조 신호로만 색 점을 얹는다(홈 파랑 / 원정 주황, 콘솔 전체 공통). */}
+                    <span
+                      aria-hidden="true"
+                      className={`h-3 w-3 shrink-0 rounded-full ${
+                        index === 0 ? 'bg-[var(--blue500)]' : 'bg-[var(--orange500)]'
+                      }`}
                     />
                     <span className="truncate text-sm font-semibold text-[var(--text-strong)]">
                       {side.displayNameSnapshot}

@@ -45,6 +45,7 @@ import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-even
 import { deriveFoulCounts } from '@/lib/team-foul-counter';
 import { deriveOnPitchParticipantIds, countActiveSubstitutions } from '@/lib/on-pitch-state';
 import { TeamFoulCounterBar } from '@/components/game-operations/team-foul-counter-bar';
+import { formatMatchClock } from '@/lib/game-operations-clock';
 import { periodLabel } from './period-label';
 import {
   commandConfirmCopy,
@@ -1338,6 +1339,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           open
           event={assistTarget.event}
           scorerName={playerLabel(assistTarget.event.participantId, lineups)}
+          teamName={sides.find((side) => side.id === assistTarget.event.sideId)?.displayNameSnapshot}
+          whenLabel={`${periodLabel(assistTarget.event.period)} ${formatMatchClock(assistTarget.event.clockMs)}`}
           teammates={teammatesForSide(assistTarget.event.sideId, lineups, assistTarget.event.participantId)}
           onAttach={(assistParticipantId) => attachAssist(assistTarget.event, assistParticipantId)}
           onClose={() => setAssistTarget(null)}
@@ -1356,6 +1359,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           onUndoLastKick={handleUndoPenaltyKick}
           onFinish={() => void handleFinishPenaltyShootout()}
           onCancel={handleCancelPenaltyShootout}
+          regulationScoreBySideId={scoreBySideId}
           policy={penaltyPolicy}
           finishing={commandPending}
         />

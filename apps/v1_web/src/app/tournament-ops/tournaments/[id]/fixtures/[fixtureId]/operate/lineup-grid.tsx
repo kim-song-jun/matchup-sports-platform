@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
+import { jerseyText } from './player-label';
 
 /**
  * Task 21 — tappable player grid for the live operations console.
@@ -159,7 +160,7 @@ export function LineupGrid({
                           aria-hidden="true"
                           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-soft)] text-xs font-bold tabular-nums text-[var(--text-muted)]"
                         >
-                          {participant.jerseyNumber ?? '-'}
+                          {jerseyText(participant.jerseyNumber)}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-[var(--text-strong)]">

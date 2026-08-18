@@ -3417,8 +3417,11 @@ export function useV1AdminTournaments(params?: AdminTournamentListFilters) {
 export function useV1MockSeedAvailability() {
   return useQuery({
     queryKey: ['admin-mock-seed-availability'],
-    queryFn: () => v1Get<{ enabled: boolean }>('/admin/mock-seed/availability'),
-    staleTime: 5 * 60_000,
+    // 쓸 수 있는 팀 수가 곧 만들 수 있는 대회 규모의 상한이다. 눌러 보고 400 으로 알게 되면
+    // 사용자가 조건을 스스로 좁힐 수 없어서, 화면이 미리 알 수 있게 함께 받아 온다.
+    queryFn: () =>
+      v1Get<{ enabled: boolean; usableTeamCount: number; maxTeamCount: number }>('/admin/mock-seed/availability'),
+    staleTime: 60_000,
   });
 }
 
@@ -3440,6 +3443,8 @@ export type CreateMockTournamentResult = {
   status: string;
   reviewReady: boolean;
   route: string;
+  /** 백필이 만든 V1Game 수 — 0이면 운영 콘솔이 "경기 미생성"으로 뜬다. */
+  gamesCreated: number;
   /** 이 대회에 참가한 테스트 계정 — 어떤 계정으로 로그인해야 검증할 수 있는지 알려준다. */
   teams: Array<{
     teamId: string;

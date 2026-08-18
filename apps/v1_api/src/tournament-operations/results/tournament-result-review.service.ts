@@ -1190,16 +1190,23 @@ export class TournamentResultReviewService {
    * 값이라, 그대로 옮기면 "성공 수가 시도 수를 넘는" 조합이 조용히 만들어진다.
    */
   private carryPenaltyAuditFields(submitted: StoredPenalties, baseScore: Prisma.JsonValue): StoredPenalties {
-    if (submitted.takenHome !== undefined && submitted.takenAway !== undefined) return submitted;
     const base = readStoredPenalties(baseScore);
     if (base === undefined) return submitted;
     if (base.home !== submitted.home || base.away !== submitted.away) return submitted;
+    // **누락된 필드만 메우고 전달된 값은 보존한다.** 킥 수가 다 왔다고 조기 return 하면
+    // `operatorOverride` 만 빠진 경우("우회로 닫았다"는 기록)를 되살리지 못한다 — 부분적으로
+    // 업데이트된 클라이언트가 정확히 그 형태를 보낸다.
+    const needsCounts = submitted.takenHome === undefined || submitted.takenAway === undefined;
     const counts =
-      base.takenHome !== undefined && base.takenAway !== undefined
+      needsCounts && base.takenHome !== undefined && base.takenAway !== undefined
         ? { takenHome: base.takenHome, takenAway: base.takenAway }
         : {};
-    const override = base.operatorOverride === true ? { operatorOverride: true as const } : {};
-    return { ...submitted, ...counts, ...override };
+    const override =
+      submitted.operatorOverride === undefined && base.operatorOverride === true
+        ? { operatorOverride: true as const }
+        : {};
+    // base 값을 먼저 깔고 submitted 를 덮는 순서 — 전달된 값이 항상 이긴다.
+    return { ...counts, ...override, ...submitted };
   }
 
   /**

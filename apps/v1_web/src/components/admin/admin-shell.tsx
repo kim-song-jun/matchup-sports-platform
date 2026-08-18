@@ -20,6 +20,7 @@ import {
   ClipboardList,
   ShieldCheck,
   Settings,
+  Star,
   Send,
   BellRing,
   ScrollText,
@@ -58,6 +59,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { label: '웹 푸시 실패', href: '/admin/ops/push-failures', icon: <BellRing size={18} /> },
   { label: 'SMS · 인증 실패', href: '/admin/ops/sms-failures', icon: <MessageSquareWarning size={18} /> },
   { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
+  { label: '후기 정책', href: '/admin/settings/reviews', icon: <Star size={18} /> },
   { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} /> },
   { label: '경기 운영 플래그', href: '/admin/ops/operation-flags', icon: <Radio size={18} /> },
 ];

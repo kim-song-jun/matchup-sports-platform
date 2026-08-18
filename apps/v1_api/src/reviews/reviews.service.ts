@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  GoneException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,6 +18,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
+import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
+import { ReviewPolicySettingsService } from './review-policy-settings.service';
 import { isReviewRevealed, reviewRevealScope } from './review-visibility';
 import { average, revealGroupKey, trustStateForReviewCount } from './team-trust-aggregation';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
@@ -60,6 +63,7 @@ export class ReviewsService {
     private readonly prisma: PrismaService,
     private readonly tournamentFixtureReviews: TournamentFixtureReviewsService,
     private readonly adminContext: AdminContextService,
+    private readonly reviewPolicySettings: ReviewPolicySettingsService,
   ) {}
 
   /**
@@ -590,6 +594,13 @@ export class ReviewsService {
     });
     if (!teamMatch) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
     if (!isCompleted(teamMatch)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
+    // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐) — 정정 승인으로 앵커가
+    // 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(저장하지 않는다).
+    // 기간은 어드민 설정(V1ReviewPolicySettings, 기본 168시간=7일)에서 읽는다.
+    const windowHours = await this.reviewPolicySettings.getWindowHours();
+    if (reviewWindowClosed(teamMatch.completedAt, new Date(), windowHours)) {
+      throw gone('REVIEW_WINDOW_CLOSED', `평가 가능 기간(${formatReviewWindow(windowHours)})이 지났어요.`);
+    }
     if (!teamMatch.approvedApplicantTeamId || !teamMatch.approvedApplicantTeam) {
       throw conflict('TEAM_MATCH_NOT_READY', 'Team match does not have an approved opponent');
     }
@@ -1368,6 +1379,10 @@ function notFound(code: string, message: string) {
 
 function conflict(code: string, message: string) {
   return new ConflictException({ code, message });
+}
+
+function gone(code: string, message: string) {
+  return new GoneException({ code, message });
 }
 
 function summarizeBySport(

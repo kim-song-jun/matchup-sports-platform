@@ -200,7 +200,13 @@ export const gameSchemaSourceManifest = {
   // 스키마가 변했다는 신호가 아니다(이 파일의 "대회 후기 팀 귀속" 재-pin 과 같은 성격).
   // 바인딩된 20260729000100_v1_game_operations 마이그레이션은 불변이라 migration 해시는 그대로다.
   // 이 브랜치의 파일에 `shasum -a 256` 을 돌려 새로 계산했다.
-  schema: '338aafa11ca7a3b4953e3c81f9dbd79d21009db34760d7384d3d7c802b892c51',
+  // 2026-08-18 재핀(프로덕션 라인): 후기 작성 기간을 어드민 편집 설정으로 도입하며 싱글턴 모델
+  // V1ReviewPolicySettings 1개를 추가했다(reviewWindowHours 기본 168시간=7일). 순수 additive 이고
+  // game domain(V1Game*) 모델·enum 은 건드리지 않았다 -- 이 guard 가 schema.prisma **전체 바이트**를
+  // 결속하기 때문에 걸리는 것이지 game operations 계약 변경이 아니다. 뒷받침 마이그레이션은
+  // 20260818120000_v1_review_policy_settings 이며, 바인딩된 20260729000100_v1_game_operations 는
+  // 그대로라 migration 해시는 변하지 않는다.
+  schema: 'fad7e3637cab1365fba7a3bf10be8bd7ef33a87112f58a6429048d940fcddd6d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

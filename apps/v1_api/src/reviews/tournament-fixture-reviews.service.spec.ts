@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, GoneException } from '@nestjs/common';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 
 const user = {
@@ -26,7 +26,15 @@ const secondOpponentPlayerId = '00000000-0000-4000-8000-000000000012';
 // 상대팀 등록에 있었지만 대회 도중 빠진 선수(removedAt) — 대상에서 빠져야 한다.
 const removedOpponentPlayerId = '00000000-0000-4000-8000-000000000013';
 const sportId = 'sport-futsal';
-const recordedAt = new Date('2026-06-20T12:00:00.000Z');
+// 후기 작성 기간(기본 7일)의 앵커가 되는 공식 결과 시각. 여기에 고정 과거 날짜를 쓰면 스펙
+// 작성 시점 이후로는 항상 REVIEW_WINDOW_CLOSED(410)로 깨진다 — 그래서 "지금으로부터 N시간 전"으로
+// 매 실행마다 창 안에 들어오도록 계산한다. 마감 자체를 테스트하는 케이스만 옛 시각을 따로 쓴다.
+const recordedAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+/** ReviewPolicySettingsService 스텁 — 마감 기간만 주입한다(기본 168시간=7일). */
+function reviewPolicyStub(windowHours = 168) {
+  return { getWindowHours: jest.fn().mockResolvedValue(windowHours) } as never;
+}
 
 describe('TournamentFixtureReviewsService', () => {
   it('returns the opponent team target for a completed tournament fixture', async () => {
@@ -45,7 +53,7 @@ describe('TournamentFixtureReviewsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.source(user, fixtureId)).resolves.toMatchObject({
       source: {
@@ -83,7 +91,7 @@ describe('TournamentFixtureReviewsService', () => {
       ]),
       v1PostEventReview: reviewStore([]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     const result = await service.source(user, fixtureId);
 
@@ -117,7 +125,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([]),
       $transaction: jest.fn(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(user, { sourceId: fixtureId, targetType: 'user', targetUserId: teammate.id, rating: 5 }, ['manner']),
@@ -134,7 +142,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([]),
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(reputationTx(createMock))),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(user, { sourceId: fixtureId, targetType: 'user', targetUserId: opponentPlayerId, rating: 5 }, ['manner']),
@@ -167,7 +175,7 @@ describe('TournamentFixtureReviewsService', () => {
       ]),
       $transaction: transactionMock,
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(user, { sourceId: secondFixtureId, targetType: 'user', targetUserId: opponentPlayerId, rating: 1 }, ['manner']),
@@ -191,7 +199,7 @@ describe('TournamentFixtureReviewsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.pending(user, 20)).resolves.toMatchObject([
       {
@@ -219,7 +227,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: { findMany: jest.fn() },
       v1PostEventReview: { findMany: jest.fn() },
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.pending(user, 20, tournamentId)).resolves.toEqual([]);
     expect(prisma.v1PostEventReview.findMany).not.toHaveBeenCalled();
@@ -240,7 +248,7 @@ describe('TournamentFixtureReviewsService', () => {
         playerReviewRow({ id: 'review-mine', reviewerUserId: user.id, targetUserId: opponentPlayerId, rating: 4 }),
       ]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.pending(user, 20)).resolves.toMatchObject([
       { sourceId: fixtureId, targetCount: 3, reviewedCount: 1, remainingCount: 2, state: 'ready' },
@@ -279,7 +287,7 @@ describe('TournamentFixtureReviewsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.source(user, secondFixtureId)).resolves.toMatchObject({
       targets: [
@@ -310,7 +318,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: { findFirst: jest.fn(), findMany: jest.fn() },
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.source(user, fixtureId)).rejects.toMatchObject({
       response: { code: 'SOURCE_NOT_COMPLETED' },
@@ -349,7 +357,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([]),
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(trustTx(createMock))),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await service.submit(teammate, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 4 }, ['manner']);
     expect(prisma.$transaction).toHaveBeenCalled();
@@ -367,7 +375,7 @@ describe('TournamentFixtureReviewsService', () => {
       ]),
       v1PostEventReview: reviewStore([]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.source(teammate, fixtureId)).resolves.toMatchObject({
       reviewerTeam: { teamId: reviewerTeamId, name: '성수 FC', role: 'member' },
@@ -391,7 +399,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([]),
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(reputationTx(createMock))),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(teammate, { sourceId: fixtureId, targetType: 'user', targetUserId: opponentPlayerId, rating: 4 }, ['manner']),
@@ -411,7 +419,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(trustTx(createMock))),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     // 중복 판정이 팀 기준으로 되돌아가면 팀장의 후기가 "내 기존 후기"로 잡혀
     // alreadySubmitted: true로 조기 리턴되고 create가 호출되지 않는다.
@@ -443,7 +451,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
       $transaction: jest.fn().mockRejectedValue({ code: 'P2002' }),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(teammate, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 2 }, ['manner']),
@@ -459,7 +467,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-mine', reviewerUserId: teammate.id, rating: 3 })]),
       $transaction: transactionMock,
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(teammate, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 1 }, ['manner']),
@@ -481,7 +489,7 @@ describe('TournamentFixtureReviewsService', () => {
       ]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     // 판정 키가 팀 기준으로 되돌아가면 팀장의 후기가 팀원 전원의 목록을 완료 처리해 []가 된다.
     // 2026-08-18 정책 변경으로 팀원에게도 상대 팀 대상이 생겨 대상은 팀1 + 선수1 = 2건이다.
@@ -509,13 +517,70 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     const error = await service.source(outsider, fixtureId).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(ForbiddenException);
     expect(error).toMatchObject({ response: { code: 'NOT_TEAM_MEMBER' } });
   });
+
+  // ── 후기 작성 기간(신규) ──────────────────────────────────────────────
+  // 이 브랜치(프로덕션 라인)에는 원래 마감이 없었다. 아래 한 쌍이 (a) 게이트가 실제로 걸리고
+  // (b) 기간이 하드코딩이 아니라 어드민 설정에서 온다는 것을 함께 증명한다.
+  it('공식 결과 확정 후 설정된 기간이 지나면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
+    const prisma = {
+      v1TournamentFixture: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...fixture({ id: fixtureId, fixtureNumber: 1 }),
+          game: {
+            currentOfficialRevision: {
+              state: 'OFFICIAL',
+              officialAt: new Date(Date.now() - (48 * 60 + 1) * 60 * 1000), // 설정값 48시간 기준 1분 초과
+            },
+          },
+        }),
+      },
+      // 마감 게이트는 팀 멤버십 조회보다 먼저 던져야 한다 — 아래 단언이 그 순서를 고정한다.
+      v1TeamMembership: { findMany: jest.fn() },
+      v1TournamentPlayer: playerStore([]),
+      v1PostEventReview: { findFirst: jest.fn(), findMany: jest.fn() },
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub(48));
+
+    const error = await service.source(user, fixtureId).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GoneException);
+    expect(error).toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
+    expect(prisma.v1TeamMembership.findMany).not.toHaveBeenCalled();
+  });
+
+  it('같은 경기라도 설정 기간이 더 길면(기본 168시간) 아직 막지 않는다', async () => {
+    const prisma = {
+      v1TournamentFixture: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...fixture({ id: fixtureId, fixtureNumber: 1 }),
+          game: {
+            currentOfficialRevision: {
+              state: 'OFFICIAL',
+              officialAt: new Date(Date.now() - (48 * 60 + 1) * 60 * 1000),
+            },
+          },
+        }),
+      },
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentPlayer: playerStore([]),
+      v1PostEventReview: { findFirst: jest.fn(), findMany: jest.fn() },
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub(168));
+
+    const error = await service.source(user, fixtureId).catch((caught: unknown) => caught);
+
+    // 마감을 통과했으므로 REVIEW_WINDOW_CLOSED 가 아니어야 하고, 다음 단계까지 갔어야 한다.
+    expect(error).not.toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
+    expect(prisma.v1TeamMembership.findMany).toHaveBeenCalled();
+  });
+
 });
 
 type Row = Record<string, unknown>;

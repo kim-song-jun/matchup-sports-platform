@@ -1,7 +1,16 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  GoneException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { V1TeamMembershipRole } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
+import { ReviewPolicySettingsService } from './review-policy-settings.service';
 import {
   fixtureTeams,
   fixtureTitle,
@@ -29,7 +38,10 @@ import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-revi
 
 @Injectable()
 export class TournamentFixtureReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reviewPolicySettings: ReviewPolicySettingsService,
+  ) {}
 
   async pending(user: V1AuthUser, limit: number, tournamentId?: string) {
     const memberships = await this.participatingTeamMemberships(user.id);
@@ -273,6 +285,16 @@ export class TournamentFixtureReviewsService {
     if (!fixture) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
     if (fixture.status !== 'completed' || !officialResultTimestamp(fixture)) {
       throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
+    }
+    // 평가창. 기간은 어드민 설정(V1ReviewPolicySettings, 기본 168시간=7일)에서 읽고, 저장하지
+    // 않고 매 조회 시점에 계산한다 -- 정정으로 officialAt 이 갱신되면 마감도 그 시각 기준으로
+    // 자동 연장되고, 어드민이 기간을 바꾸면 다음 요청부터 곧바로 반영된다.
+    const windowHours = await this.reviewPolicySettings.getWindowHours();
+    if (reviewWindowClosed(officialResultTimestamp(fixture), new Date(), windowHours)) {
+      throw new GoneException({
+        code: 'REVIEW_WINDOW_CLOSED',
+        message: `평가 가능 기간(${formatReviewWindow(windowHours)})이 지났어요.`,
+      });
     }
 
     const teams = fixtureTeams(fixture);

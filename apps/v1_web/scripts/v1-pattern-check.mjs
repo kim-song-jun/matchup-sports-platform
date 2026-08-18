@@ -89,8 +89,9 @@ function checkInertFontSizeClasses() {
   for (const f of files.split('\n').filter(Boolean)) {
     const txt = readFileSync(f, 'utf8');
     for (const [index, line] of txt.split('\n').entries()) {
-      const m = line.match(/text-\[var\((--font-size-[a-zA-Z0-9_-]+)\)\]/);
-      if (m) {
+      // 한 줄에 여러 개가 있을 수 있다(클래스 문자열이 길어 줄이 잘 안 나뉜다) —
+      // match() 로 첫 건만 보면 나머지가 보고에서 빠진다.
+      for (const m of line.matchAll(/text-\[var\((--font-size-[a-zA-Z0-9_-]+)\)\]/g)) {
         violations.push(
           `[무효 폰트 크기 클래스] ${f}:${index + 1}: text-[var(${m[1]})] — ` +
             `Tailwind v4 가 색상으로 해석해 크기가 안 걸린다. text-[length:var(${m[1]})] 로 쓸 것`,

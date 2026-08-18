@@ -8,6 +8,13 @@ const path = require('node:path');
 const WEB = process.env.WEB_BASE || 'http://localhost:3013';
 const OUT = process.env.OUT_DIR || path.join(process.cwd(), '.screenshots', 'admin-font-tokens');
 const [userId, userEmail] = process.argv.slice(2);
+/* 인자를 안 받고 그냥 진행하면 localStorage 에 "undefined" 가 박혀 헤더 dev 인증이
+   실패하고, 캡처도 분포 로그도 전부 게이트/로그인 화면 기준이 된다 — 결과가 그럴듯해
+   보여서 잘못된 근거로 쓰이기 쉽다. 시작 전에 막는다. */
+if (!userId || !userEmail) {
+  console.error('usage: node scripts/capture_admin_font_tokens.js <userId> <userEmail>');
+  process.exit(2);
+}
 const PAGES = [['/admin/notices', 'notices'], ['/admin/audit', 'audit'], ['/admin/ops/errors', 'error-logs']];
 const WIDTHS = [[390, 900], [768, 1100], [1440, 1100]];
 fs.mkdirSync(OUT, { recursive: true });

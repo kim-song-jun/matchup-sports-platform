@@ -365,7 +365,7 @@ describe('ReviewsService', () => {
     // 팀 매치도 라인업(V1GameParticipant.userId)을 근거로 개인 대상 후기를 받는다.
     // 단 shape는 여전히 배타적이어야 한다 — targetUserId와 targetTeamId를 함께 보내면 거부.
     it('팀 매치 개인 후기는 targetUserId 단독일 때만 받는다', async () => {
-      const service = new ReviewsService({} as never, stubTournamentService() as never, adminContextStub());
+      const service = new ReviewsService({} as never, stubTournamentService() as never, adminContextStub(), reviewPolicyStub());
 
       await expect(service.submit(user, {
         sourceType: 'team_match',
@@ -577,6 +577,7 @@ describe('ReviewsService', () => {
           prisma as never,
           { sourceSummaries: jest.fn().mockResolvedValue(new Map()) } as never,
           adminContextStub(),
+          reviewPolicyStub(),
         );
 
         const result = await service.received(user, { limit: 20 });
@@ -632,6 +633,7 @@ describe('ReviewsService', () => {
           prisma as never,
           { sourceSummaries: jest.fn().mockResolvedValue(new Map()) } as never,
           adminContextStub(),
+          reviewPolicyStub(),
         );
 
         const result = await service.received(user, { limit: 20 });

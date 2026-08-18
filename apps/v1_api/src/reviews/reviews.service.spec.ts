@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, GoneException } from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
 
 const user = {
@@ -280,12 +280,15 @@ describe('ReviewsService', () => {
     };
     const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
 
+    // catch 결과는 성공 반환형과의 유니온이라 getStatus() 를 직접 부르면 컴파일되지 않는다
+    // (CI 타입체크 실패로 확인). GoneException 자체가 410 을 뜻하므로 인스턴스 검사로
+    // 상태코드까지 함께 고정한다 -- tournament-fixture-reviews.service.spec.ts 와 같은 방식.
     const error = await service
       .source(user, { sourceType: 'team_match', sourceId: teamSourceId })
-      .catch((caught: { response?: unknown; getStatus?: () => number }) => caught);
+      .catch((caught: unknown) => caught);
 
+    expect(error).toBeInstanceOf(GoneException);
     expect(error).toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
-    expect(error.getStatus?.()).toBe(410);
     // 마감 판정이 다른 조회보다 먼저 걸려야 한다 — 멤버십·라인업까지 안 갔다는 뜻.
     expect(prisma.v1TeamMatch.findUnique).toHaveBeenCalledTimes(1);
   });

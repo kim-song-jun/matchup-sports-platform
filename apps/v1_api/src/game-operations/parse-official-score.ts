@@ -48,23 +48,33 @@ export function parseOfficialScore(score: Prisma.JsonValue): OfficialScore {
   ) {
     throw new Error('OFFICIAL revision requires non-negative integer home and away scores');
   }
-  const penalties = parseOfficialPenalties(record.penalties);
+  // 승부차기도 home/away 와 같은 이유로 두 형태를 모두 읽는다 -- 다만 키 이름이
+  // 형태별로 다르다: 평평한 형태는 `penalties`(복수), 중첩 형태는 `penalty`(단수,
+  // `regulation` 의 형제 필드). 위 home/away 는 처음부터 폴백을 갖고 있었는데 승부차기만
+  // 빠져 있어서, 중첩 형태로 저장된 경기는 승부차기가 조용히 사라졌다 -- 그러면
+  // `resolveTeamRecordResult` 가 승부차기로 갈린 경기를 DRAWN 으로 기록한다(이 커밋이
+  // 고치는 바로 그 버그가 그 경기 집합에서만 되살아난다). 같은 함정을 이미 겪은
+  // `public-tournament-records.service.ts` 의 `parseScore()` 와 같은 문장이다.
+  const penalties = parseOfficialPenalties(record.penalties ?? record.penalty);
   return { home, away, ...(penalties === undefined ? {} : { penalties }) };
 }
 
 /**
- * `V1GameResultRevision.score.penalties` is only ever written by the flat
- * producer shape (`{home,away,penalties?}` — see `OfficialScore`'s doc).
+ * 승부차기 값은 평평한 형태에서는 `penalties`(복수), 중첩 형태에서는 `penalty`(단수)로
+ * 저장된다 — 호출부가 두 키를 합쳐 넘기므로 이 함수는 값의 모양만 검사한다.
  * Absent is the ordinary case (no shootout recorded); present, it must be
  * exactly as strict as the top-level home/away check above so a malformed
  * value can never silently reach `GameResultBracketProjectionService`'s
  * penalty-aware winner resolution.
  */
 function parseOfficialPenalties(value: unknown): { home: number; away: number } | undefined {
-  if (value === undefined) return undefined;
+  // `null` 도 "승부차기 없음"이다. 평평한 형태는 키를 아예 빼서 없음을 표현하지만
+  // 중첩 형태(`createImportedGame()`)는 `penalty: null` 을 **명시적으로** 쓴다 --
+  // null 을 malformed 로 거부하면 승부차기가 없었던 모든 중첩 형태 리비전이 통째로
+  // 파싱 실패한다.
+  if (value === undefined || value === null) return undefined;
   if (
     typeof value !== 'object' ||
-    value === null ||
     Array.isArray(value) ||
     typeof (value as { home?: unknown }).home !== 'number' ||
     !Number.isInteger((value as { home: number }).home) ||

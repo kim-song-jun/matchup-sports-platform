@@ -75,6 +75,21 @@ export function formatPenaltyScoreline(
   return `승부차기 ${score.penalties.home}-${score.penalties.away}`;
 }
 
+/**
+ * 팀 전적 행의 승부차기 보조 텍스트. `formatPenaltyScoreline`(대회 일정/경기 상세용,
+ * `PublicScore`/`PublicScoreStatus`를 받는다)과 문구를 통일한다 -- 같은 사실(승부차기
+ * 스코어)이 화면마다 다르게 읽히면 안 되기 때문이다. 팀 전적 API는 조회 대상 팀
+ * 기준으로 이미 정규화된 `{ for, against }`를 내려주므로 home/away 변환이 필요 없다.
+ * 승부차기가 없었던 경기(`penalties === null`)는 `null`을 돌려주고, 호출부는 아무것도
+ * 렌더하지 않는다.
+ */
+export function formatTeamRecordPenaltyScoreline(
+  penalties: { readonly for: number; readonly against: number } | null,
+): string | null {
+  if (penalties === null) return null;
+  return `승부차기 ${penalties.for}-${penalties.against}`;
+}
+
 const TEAM_RECORD_RESULT_LABEL: Record<string, string> = { WON: '승', DRAWN: '무', LOST: '패' };
 
 /** Team-record row result ('WON'|'DRAWN'|'LOST' as a plain string, see `PublicTeamRecordItem.result`). */

@@ -1178,6 +1178,51 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     );
   });
 
+  // 현장에서는 규칙보다 먼저 승부차기가 끝난다 — 한 팀이 기권하거나 선수가 없어 더 못 차면
+  // 두 팀의 킥 수가 어긋난 채로 경기가 종료된다. 자동 판정만 믿으면 그 상태에서 종료가
+  // 영원히 잠겨, 운영자는 **차지도 않은 킥을 지어내야만** 경기를 닫을 수 있었다.
+  it('킥 수가 어긋나 자동 종료가 잠긴 상태에서도 "그래도 종료"로 end 커맨드가 실제 집계 그대로 나간다', async () => {
+    setup();
+    mocks.postV1GameCommand.mockResolvedValue({
+      gameId: 'game-1', state: 'ENDED', version: 3, revisionId: 'rev-1', revision: 1, revisionState: 'SUBMITTED',
+    });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
+    const startDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
+
+    const panel = await screen.findByRole('dialog', { name: '승부차기' });
+    chooseFirstKicker(panel, '강남 풋살 클럽');
+    const successButton = within(panel).getByRole('button', { name: /성공/ });
+    const missButton = within(panel).getByRole('button', { name: /실패/ });
+
+    // 홈 2킥 2점 / 원정 1킥 0점 — 원정이 남은 4킥을 다 넣으면 역전 가능하므로 규칙상 미결.
+    fireEvent.click(successButton); // 홈 1:0
+    fireEvent.click(missButton); // 원정 1:0
+    fireEvent.click(successButton); // 홈 2:0 — 여기서 원정이 기권했다고 하자
+
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
+    fireEvent.click(within(panel).getByRole('button', { name: '그래도 종료' }));
+
+    // 확인 문구가 평소 종료와 달라야 한다 — 이건 "예상대로 끝났나" 확인이 아니라
+    // "자동 판정과 다른 결론을 낸다"는 선언이고, 킥 수까지 보여줘야 오조작을 알아챈다.
+    const finishDialog = await screen.findByRole('dialog', { name: '아직 안 끝난 승부차기예요' });
+    expect(finishDialog).toHaveTextContent('강남 풋살 클럽 2킥 2점');
+    expect(finishDialog).toHaveTextContent('성수 풋살 클럽 1킥 0점');
+    fireEvent.click(within(finishDialog).getByRole('button', { name: '그래도 종료' }));
+
+    await waitFor(() =>
+      expect(mocks.postV1GameCommand).toHaveBeenCalledWith(
+        'game-1',
+        'end',
+        expect.objectContaining({
+          payload: { penalties: { home: 2, away: 0, firstKickSideKey: 'HOME' } },
+        }),
+      ),
+    );
+  });
+
   it('두 팀 점수가 같으면 "승부차기 종료" 버튼이 비활성이다(무승부 승부차기는 백엔드도 거부)', async () => {
     setup();
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);

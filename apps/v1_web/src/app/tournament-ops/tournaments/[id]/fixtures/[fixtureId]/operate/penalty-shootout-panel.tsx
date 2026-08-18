@@ -7,7 +7,7 @@ import type { GameSide } from '@/types/game-operations';
 import {
   nextPenaltyKicker,
   penaltyScoreBySideId,
-  penaltyShootoutOutcome,
+  penaltyFinishAvailability,
   type PenaltyKick,
   type PenaltyKickResult,
   type PenaltyShootoutPolicy,
@@ -21,7 +21,10 @@ export interface PenaltyShootoutPanelProps {
   readonly onSelectFirstKicker: (sideId: string) => void;
   readonly onRecordKick: (sideId: string, result: PenaltyKickResult) => void;
   readonly onUndoLastKick: () => void;
-  readonly onFinish: () => void;
+  /** 종료 요청. `override`는 "규칙상 아직 안 끝났지만 운영자가 책임지고 닫는다"는 뜻 —
+   * 호출부가 확인 문구를 갈라 쓰는 근거이자, 잘못 눌린 자동 종료가 override 경로로
+   * 흘러드는 것을 막는 표식이다. */
+  readonly onFinish: (options: { readonly override: boolean }) => void;
   readonly onCancel: () => void;
   /** 이 대회의 종료 판정 정책(`GameDetail.penaltyShootoutPolicy`). */
   readonly policy: PenaltyShootoutPolicy;
@@ -171,8 +174,11 @@ export function PenaltyShootoutPanel({
 
   const score = penaltyScoreBySideId(kicks);
   const nextSideId = nextPenaltyKicker(kicks, sides, firstKickSideId);
-  const decisive =
-    sides.length === 2 && penaltyShootoutOutcome(kicks, sides, firstKickSideId, policy) === 'DECIDED';
+  // 세 갈래(`READY`/`OVERRIDABLE`/`BLOCKED`)를 그대로 화면에 옮긴다 — 예전에는 "결판났나"
+  // 하나뿐이라, 규칙상 안 끝났지만 현장에서는 끝난 경우(기권·중단)에 운영자가 경기를 닫을
+  // 방법이 아예 없었다.
+  const availability = penaltyFinishAvailability(kicks, sides, firstKickSideId, policy);
+  const decisive = availability === 'READY';
   // 선축은 첫 킥 전에만 고를 수 있다 — 킥이 하나라도 기록된 뒤에 바꾸면 이미 기록된
   // 킥들의 순서 해석이 통째로 달라진다. 되돌리기로 킥을 전부 지우면 다시 고를 수 있다.
   const firstKickLocked = kicks.length > 0;
@@ -330,13 +336,36 @@ export function PenaltyShootoutPanel({
         </div>
 
         <div className="border-t border-[var(--border)] px-5 py-4">
-          <Button size="lg" variant="primary" block disabled={!decisive} loading={finishing} onClick={onFinish}>
+          <Button
+            size="lg"
+            variant="primary"
+            block
+            disabled={!decisive}
+            loading={finishing}
+            onClick={() => onFinish({ override: false })}
+          >
             승부차기 종료
           </Button>
           {!decisive ? (
             <p className="mt-2 text-center tm-text-caption text-[var(--text-muted)]">
               {undecidedReason(sides, kicks, firstKickSideId)}
             </p>
+          ) : null}
+          {/* 우회 종료는 `OVERRIDABLE`일 때만 — `BLOCKED`(사이드 미정 · 선축 미선택 · 동점)에서
+              열어 주면 눌러도 서버가 되돌리거나 애초에 보낼 값이 없다. 자동 종료와 시각적으로
+              분명히 갈라 두려고 primary가 아닌 outline이고, 위 사유 문구 바로 아래에 둬서
+              "왜 막혔는지 → 그래도 닫는 길" 순서로 읽히게 한다. */}
+          {availability === 'OVERRIDABLE' ? (
+            <Button
+              size="md"
+              variant="outline"
+              block
+              className="mt-3"
+              loading={finishing}
+              onClick={() => onFinish({ override: true })}
+            >
+              그래도 종료
+            </Button>
           ) : null}
         </div>
       </div>

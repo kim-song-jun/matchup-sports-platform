@@ -699,12 +699,22 @@ export function FixtureLineupPageClient({ tournamentId, fixtureId }: { tournamen
                 title="이 종목은 피치 배치를 아직 지원하지 않아요"
                 sub={`${josa(formationSupportedSportName ?? '이 종목', ['은', '는'])} 축구·풋살과 코트 모양·포지션 개념이 달라 준비 중이에요. 명단 탭에서 선발·후보는 그대로 관리할 수 있어요.`}
               />
-            ) : state.starters.length === 0 ? (
+            ) : state.starters.length === 0 && !editable ? (
+              // 읽기 전용인데 선발도 없으면 그릴 것도 놓을 곳도 없다 — 빈 피치를 세워 둘 이유가 없다.
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
-                명단에서 선수를 체크하거나, 카드를 이 피치로 끌어다 놓으면 선발로 들어가요.
+                아직 선발로 등록된 선수가 없어요.
               </p>
             ) : (
               <div style={{ marginTop: 8 }}>
+                {/* 선발이 0명이어도 **피치는 그린다.** 예전엔 이 자리에 안내 문구만 두고 피치를
+                    통째로 숨겼는데, 그러면 명단 카드를 끌어다 놓을 대상이 화면에 없어 정작
+                    라인업을 처음 짜는 순간에 드래그를 쓸 수 없다(오너 요청으로 추가한 경로가
+                    가장 필요한 시점에 막히는 셈이다). */}
+                {state.starters.length === 0 ? (
+                  <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '0 0 8px' }}>
+                    명단에서 선수를 체크하거나, 카드를 아래 피치로 끌어다 놓으면 선발로 들어가요.
+                  </p>
+                ) : null}
                 <PitchFormationEditor
                   starters={state.starters}
                   formation={state.formation}

@@ -65,6 +65,7 @@ export class ProfileService {
       reputation,
       personalActivityCount,
       monthlyPersonalMatchCount,
+      tournamentAppearances,
     ] = await Promise.all([
       // V1UserReputationSummary 캐시는 리뷰 제출 이벤트(submitPersonalReview/submitTeamReview) 안에서만 갱신되고,
       // 72시간 경과로 리뷰가 새로 reveal 가능해지는 시점을 트리거하는 cron은 없다(사용자 결정: cron 추가 안 함).
@@ -84,17 +85,20 @@ export class ProfileService {
           match: { status: 'completed', deletedAt: null, startAt: { gte: monthStart, lt: nextMonthStart } },
         },
       }),
+      // 레거시 개인매치(V1MatchParticipant)만 세면 대회(V1Game 계열)를 여러 번 뛴 유저도 0으로 보인다
+      // (프로덕션 실측: 팀원 7명 전원 matchCount=0). 대회 출전은 별도 카운트로 더한다.
+      this.countTournamentAppearances(user.id, monthStart, nextMonthStart),
     ]);
     const mannerScore = reputation.mannerScore;
 
     return {
       totals: {
-        activityCount: personalActivityCount,
+        activityCount: personalActivityCount + tournamentAppearances.total,
         teamCount: teamIds.length,
         mannerScore,
       },
       monthly: {
-        matchCount: monthlyPersonalMatchCount,
+        matchCount: monthlyPersonalMatchCount + tournamentAppearances.monthly,
         mannerScore,
         winRate: null,
       },
@@ -330,6 +334,7 @@ export class ProfileService {
       monthlyMatchCount,
       monthlyTeamJoinCount,
       monthlyReviewCount,
+      tournamentAppearances,
     ] = await Promise.all([
       this.prisma.v1MatchParticipant.count({
         where: {
@@ -367,20 +372,84 @@ export class ProfileService {
       }),
       // 캐시에는 월별 값이 없으므로 이번 달 리뷰만 live로 reveal 필터링한다 (ReviewsService.receivedSummary 패턴 이식)
       this.getRevealedMonthlyReviewCount(userId, monthStart, nextMonthStart),
+      // 레거시 개인매치(V1MatchParticipant)만 세면 대회(V1Game 계열)를 여러 번 뛴 유저도 0으로 보인다
+      // (프로덕션 실측: 팀원 7명 전원 matchCount=0). 대회 출전은 별도 카운트로 더한다.
+      this.countTournamentAppearances(userId, monthStart, nextMonthStart),
     ]);
 
     return {
       totals: {
-        matchCount,
+        matchCount: matchCount + tournamentAppearances.total,
         teamCount,
         reviewCount: reputation.reviewCount,
       },
       monthly: {
-        matchCount: monthlyMatchCount,
+        matchCount: monthlyMatchCount + tournamentAppearances.monthly,
         teamJoinCount: monthlyTeamJoinCount,
         reviewCount: monthlyReviewCount,
       },
     };
+  }
+
+  /**
+   * 사용자에 연결된(`V1ParticipantIdentityLinkCurrent`) participant 들의 대회 경기 출전 수를
+   * 누적/이번 달로 센다. `GET /users/:id/records`(public-user-records.service.ts)와 같은
+   * "현재 공식 리비전만"(`resultRevision.game.currentOfficialRevisionId === resultRevision.id`
+   * && `officialAt !== null`) 규칙을 쓴다 — 정정/무효 처리된 경기가 이중 계산되지 않게.
+   *
+   * 동의(consent) 게이트는 일부러 적용하지 않는다(사용자 결정) — 여기서 새는 건 "몇 번 뛰었는지"
+   * 라는 집계 숫자뿐이고, 참가자 실명·경기 상세는 노출하지 않는다. 소속 팀도 팀 상세 페이지에서
+   * 이미 공개 정보다. `GET /users/:id/records`의 개별 이벤트/실명 노출과는 노출 수준이 다르므로
+   * 같은 게이트를 여기 적용할 이유가 없다 — 나중에 "왜 여기만 게이트가 없나"를 묻게 될 것이므로
+   * 남긴다.
+   *
+   * 같은 경기가 여러 participant 행으로 잡혀도(예: 대회 도중 로스터가 갱신된 경우) gameId 기준
+   * Set으로 중복 제거한다.
+   */
+  private async countTournamentAppearances(
+    userId: string,
+    monthStart: Date,
+    nextMonthStart: Date,
+  ): Promise<{ total: number; monthly: number }> {
+    const links = await this.prisma.v1ParticipantIdentityLinkCurrent.findMany({
+      where: { userId },
+      select: { participantId: true },
+    });
+    if (links.length === 0) return { total: 0, monthly: 0 };
+    const participantIds = links.map((link) => link.participantId);
+
+    const rows = await this.prisma.v1GameResultParticipant.findMany({
+      where: { participantId: { in: participantIds } },
+      select: {
+        resultRevision: {
+          select: {
+            id: true,
+            gameId: true,
+            officialAt: true,
+            game: { select: { currentOfficialRevisionId: true, sourceType: true } },
+          },
+        },
+      },
+    });
+
+    const totalGameIds = new Set<string>();
+    const monthlyGameIds = new Set<string>();
+    for (const row of rows) {
+      const revision = row.resultRevision;
+      // TEAM_MATCH(팀 매치) 참가자도 identity link 를 가질 수 있다(레거시 2자 승인 API
+      // POST /games/:gameId/participants/:participantId/identity-link-requests + .../attest 경유,
+      // sourceType 검사가 없다) — "대회 경기 출전 수"는 TOURNAMENT_FIXTURE 만 센다.
+      if (revision.game.sourceType !== 'TOURNAMENT_FIXTURE') continue;
+      const isCurrent = revision.game.currentOfficialRevisionId === revision.id;
+      if (!isCurrent || revision.officialAt === null) continue;
+
+      totalGameIds.add(revision.gameId);
+      if (revision.officialAt >= monthStart && revision.officialAt < nextMonthStart) {
+        monthlyGameIds.add(revision.gameId);
+      }
+    }
+
+    return { total: totalGameIds.size, monthly: monthlyGameIds.size };
   }
 
   /**

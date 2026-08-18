@@ -159,7 +159,12 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
                 <span className="tm-text-body" style={{ fontWeight: 700 }}>활동 요약</span>
               </div>
               <div className="tm-my-profile-stats">
-                <StatItem label="매치" value={activitySummary.totals.matchCount} unit="회" />
+                {/* "매치"는 개인 매치만 가리키는 이 플랫폼의 관례어인데, matchCount 는 이제
+                 * 개인 매치 + 대회 경기 출전 수를 합친 값이다(GET /users/:id/public-profile
+                 * activitySummary.totals.matchCount). 라벨을 그대로 두면 대회에서 뛴 사람의
+                 * 숫자가 실제보다 부풀어 보이는 걸 "매치 집계 오류"로 오해할 수 있어 개인
+                 * 매치·대회 경기를 모두 포괄하는 "경기"로 바꾼다. */}
+                <StatItem label="경기" value={activitySummary.totals.matchCount} unit="회" />
                 <StatItem label="팀" value={activitySummary.totals.teamCount} unit="개" />
                 <StatItem label="후기" value={activitySummary.totals.reviewCount} unit="개" />
               </div>
@@ -173,7 +178,9 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
                 <span className="tm-text-body" style={{ fontWeight: 700 }}>이번 달 활동</span>
               </div>
               <div className="tm-my-monthly">
-                <StatItem label="매치" value={activitySummary.monthly.matchCount} unit="회" />
+                {/* totals와 동일한 이유로 "경기"로 통일 — monthly.matchCount 도 이번 달
+                 * 개인 매치 + 대회 경기 출전 수 합산이다. */}
+                <StatItem label="경기" value={activitySummary.monthly.matchCount} unit="회" />
                 <StatItem label="팀 가입" value={activitySummary.monthly.teamJoinCount} unit="회" />
                 <StatItem label="후기" value={activitySummary.monthly.reviewCount} unit="개" />
               </div>

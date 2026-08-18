@@ -29,6 +29,16 @@ import type { PrismaService } from '../../prisma/prisma.service';
  * 상태이기만 하면 그 사용자에 연결된 모든 과거 경기가 즉시 공개 후보가 된다.
  * `isParticipantPubliclyEligible`은 그래서 시간 인자를 받지 않는다 -- 호출부가
  * `officialAt`/`identityAsOf` 같은 사실 시각을 이 판정에 넘길 이유 자체가 없다.
+ *
+ * ## 예외: 집계 카운트(활동 요약)는 이 게이트 밖이다
+ * `ProfileService.countTournamentAppearances()`(`GET /me/activity-summary`,
+ * `GET /users/:id/public-profile`이 쓴다)는 이 동의 판정을 **의도적으로 조회하지
+ * 않는다** -- 새는 정보가 "개별 경기 실명/상세"가 아니라 "몇 번 뛰었는지" 총계
+ * 숫자 하나뿐이라 여기 게이트와 노출 수준이 다르다고 판단했기 때문이다(사용자
+ * 결정). 그래서 `GET /users/:id/records`(이 파일의 규칙 적용, 동의 안 하면
+ * items 0건)와 `GET /users/:id/public-profile`(이 게이트 미적용, 대회 출전
+ * 횟수가 activitySummary에 그대로 합산됨)은 같은 참가 사실에 대해 서로 다른
+ * 노출 기준을 갖는다 -- 의도된 것이지 버그가 아니다.
  */
 export type PublicConsentState = 'GRANTED' | 'REVOKED';
 

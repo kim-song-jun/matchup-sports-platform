@@ -58,7 +58,13 @@ export function penaltyShootoutDecided(
   const scoreFirst = firstIsHome ? home : away;
   const scoreSecond = firstIsHome ? away : home;
 
-  if (!policy.earlyStop) return takenFirst === takenSecond;
+  // A1 = 조기 종료 없음 — 5킥을 다 채운 뒤에만 판정한다. 프런트 술어의 같은 분기와
+  // 문장을 맞춘다(2026-08-18 정정: 예전엔 각 1킥 1:0에 결판이 나 어느 규정에도 없는
+  // 동작이었다).
+  if (!policy.earlyStop) {
+    if (takenFirst < 5 || takenSecond < 5) return false;
+    return takenFirst === takenSecond;
+  }
 
   if (takenFirst < 5 || takenSecond < 5) {
     const remainingFirst = Math.max(0, 5 - takenFirst);

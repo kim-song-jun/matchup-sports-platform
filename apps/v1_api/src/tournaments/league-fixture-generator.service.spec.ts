@@ -14,10 +14,44 @@ describe('assertLeagueGenerationAllowed', () => {
     teamCount: 4,
     existingFixtureCount: 0,
     fixturesWithResultCount: 0,
+    fixturesWithGameCount: 0,
     minMatchesPerTeam: null as number | null,
     legs: 1,
     replaceExisting: false,
   };
+
+  it('결과가 없어도 Game 이 연결된 대진이 있으면 교체를 거부한다', () => {
+    // V1Game.tournamentFixtureId 가 onDelete: Restrict 라 deleteMany 가 FK 위반으로
+    // 터진다(2026-08-17 alpha 에서 500 으로 재현). 가드가 먼저 막아야 한다.
+    try {
+      assertLeagueGenerationAllowed({
+        ...base,
+        replaceExisting: true,
+        existingFixtureCount: 3,
+        fixturesWithResultCount: 0,
+        fixturesWithGameCount: 1,
+      });
+      throw new Error('should have thrown');
+    } catch (error) {
+      const response = (error as ConflictException).getResponse() as {
+        code: string;
+        fixturesWithGameCount: number;
+      };
+      expect(response.code).toBe('LEAGUE_FIXTURES_HAVE_GAMES');
+      expect(response.fixturesWithGameCount).toBe(1);
+    }
+  });
+
+  it('Game 이 하나도 없으면 교체를 허용한다', () => {
+    expect(() =>
+      assertLeagueGenerationAllowed({
+        ...base,
+        replaceExisting: true,
+        existingFixtureCount: 3,
+        fixturesWithGameCount: 0,
+      }),
+    ).not.toThrow();
+  });
 
   it('리그가 아닌 대회면 거부한다', () => {
     expect(() => assertLeagueGenerationAllowed({ ...base, format: 'knockout' }))
@@ -207,7 +241,11 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   });
 
   // F2-1: VOID 등 비공식 리비전은 "결과 있음"으로 오판하면 안 된다.
-  it('F2: VOID 리비전만 있는 fixture는 결과 확정으로 치지 않아 재생성을 막지 않는다', async () => {
+  it('F2: VOID 리비전만 있는 fixture는 "결과 확정"으로 치지 않지만, Game 이 붙어 있어 교체는 막힌다', async () => {
+    // VOID 리비전이 있다는 건 그 fixture 에 V1Game 이 연결돼 있다는 뜻이다.
+    // `V1Game.tournamentFixtureId` 가 onDelete: Restrict 라 deleteMany 가 FK 위반으로
+    // 터진다 — 2026-08-17 alpha 에서 실제로 500 이 났다. 따라서 결과 판정(HAVE_RESULTS)에는
+    // 걸리지 않아도 Game 가드(HAVE_GAMES)가 먼저 막아야 하고, deleteMany 는 호출되지 않아야 한다.
     prisma.v1TournamentGroup.findFirst.mockResolvedValue({
       id: 'group-a',
       name: 'A조',
@@ -218,14 +256,14 @@ describe('LeagueFixtureGeneratorService.generate', () => {
       ],
     });
     prisma.v1TournamentFixture.findMany.mockResolvedValue([
-      { id: 'fx-1', game: { currentOfficialRevision: { state: 'VOID' } }, result: null },
+      { id: 'fx-1', game: { id: 'g-1', currentOfficialRevision: { state: 'VOID' } }, result: null },
     ]);
-    prisma.v1TournamentFixture.deleteMany.mockResolvedValue({ count: 1 });
 
-    const result = await service.generate(user, 't1', dto({ groupId: 'group-a', replaceExisting: true }));
+    await expect(
+      service.generate(user, 't1', dto({ groupId: 'group-a', replaceExisting: true })),
+    ).rejects.toMatchObject({ response: { code: 'LEAGUE_FIXTURES_HAVE_GAMES' } });
 
-    expect(result).toMatchObject({ created: 1, deleted: 1 });
-    expect(prisma.v1TournamentFixture.deleteMany).toHaveBeenCalledWith({ where: { groupId: 'group-a' } });
+    expect(prisma.v1TournamentFixture.deleteMany).not.toHaveBeenCalled();
   });
 
   // F2-2: game 연결이 없는 레거시 완료 경기(V1TournamentFixtureResult만 존재)를 놓치면

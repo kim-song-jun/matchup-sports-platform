@@ -424,3 +424,45 @@ describe('ScheduleContent — 일정 카드에 경고·퇴장도 함께 표시�
     expect(screen.getByRole('list', { name: '경기 기록' })).toBeInTheDocument();
   });
 });
+
+/**
+ * alpha 실측 회귀(2026-08-18). "우리 팀" 행의 파란 배경을 절제하며 `--grey50`으로
+ * 바꿨는데, 스코어 칸 pill이 이미 `--grey50`이라 **두 색이 정확히 같아져 스코어가
+ * 배경에 통째로 녹았다**(실측: rowBg === pillBg === rgb(249,250,251)). 스코어는 이
+ * 카드에서 가장 먼저 읽히는 값이라 그게 사라지면 강조를 절제한 게 아니라 정보를
+ * 지운 것이다. 색 값 자체를 단언하지 않고(그건 구현 되읊기다) **두 배경이 서로
+ * 달라야 한다는 불변식**만 본다.
+ */
+describe('ScheduleContent — 우리 팀 행에서도 스코어가 배경에 묻히지 않는다', () => {
+  it('내 팀 경기 행의 배경과 스코어 칸 배경이 같은 색이 아니다', () => {
+    const myFixtures = {
+      teams: [
+        {
+          registrationId: 'reg-1',
+          teamId: 'team-1',
+          teamName: '우리팀',
+          fixtures: [
+            { fixtureId: 'fixture-1', lineupState: 'SUBMITTED', scheduledAt: null, opponentTeamName: '상대팀' },
+          ],
+        },
+      ],
+    } as unknown as Parameters<typeof ScheduleContent>[0]['myFixtures'];
+
+    render(
+      <ScheduleContent
+        tournamentId="tour-1"
+        data={{ ...makeData(), items: [fixtureEntry()] }}
+        myFixtures={myFixtures}
+      />,
+    );
+
+    const scorePill = screen.getByText('1 : 0');
+    const row = scorePill.closest('a');
+    const highlighted = row?.parentElement;
+
+    // 양쪽 모두 실제로 배경을 갖고 있어야 한다 — 둘 다 빈 문자열이면 아래 단언이 공허하게 통과한다.
+    expect(highlighted?.style.background).not.toBe('');
+    expect(scorePill.style.background).not.toBe('');
+    expect(highlighted?.style.background).not.toBe(scorePill.style.background);
+  });
+});

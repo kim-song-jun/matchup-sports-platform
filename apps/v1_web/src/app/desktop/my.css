@@ -234,7 +234,7 @@
   /* Constrain the reviews shell so single-column rows don't stretch. */
   .tm-review-shell {
     padding: 0 0 48px;
-    max-width: 720px;
+    max-width: var(--v1-review-column-width);
     /* 가운데 정렬 — .tm-my-settings-desktop 패턴 일치 */
     margin-left: auto;
     margin-right: auto;
@@ -251,7 +251,7 @@
 
   /* Review compose shell: same max-width. */
   .tm-review-compose-shell {
-    max-width: 720px;
+    max-width: var(--v1-review-column-width);
     padding-bottom: 120px;
     /* 가운데 정렬 — .tm-review-shell 패턴 일치 */
     margin-left: auto;

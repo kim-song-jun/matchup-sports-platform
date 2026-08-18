@@ -1057,6 +1057,12 @@ export type V1TeamMatch = V1Match & {
   viewer?: {
     state: V1TeamMatchViewerState;
     manageableHostTeam?: boolean;
+    /**
+     * 역할을 가리지 않는 "참가팀(host·승인 신청팀) active 멤버" 여부 — 후기 진입점 판정용.
+     * `state` 로 대신할 수 없다: 'host_team' 은 host 팀 owner/manager, 'approved' 는 신청서를
+     * 낸 한 사람만 받는다(team-matches.service.ts getViewerState).
+     */
+    participantMember?: boolean;
     eligibleTeams?: Array<{
       teamId: string;
       name: string;

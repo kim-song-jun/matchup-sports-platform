@@ -128,6 +128,19 @@ describe('MockTournamentSeedService', () => {
     expect(unknownFields).toEqual([]);
   });
 
+  // alpha 실측: 4팀 요청은 창이 teamCount*4=16 이라 "사용 가능 3팀"으로 실패했는데 8팀 요청은
+  // 창이 32 라 성공했다 — 조건을 못 채우는 소규모 테스트 팀들이 창을 차지한 것이다.
+  // 조회 창을 요청 팀 수에 비례시키면 안 된다.
+  it('후보 조회 창을 요청 팀 수에 비례시키지 않는다', async () => {
+    const { service, prisma } = makeWorld(4);
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    const args = prisma.v1Team.findMany.mock.calls[0][0] as { take: number; where: { memberCount?: unknown } };
+    expect(args.take).toBeGreaterThanOrEqual(100);
+    // 멤버 3명 미만인 팀은 애초에 후보가 아니다 — DB 에서 걸러 창을 낭비하지 않는다.
+    expect(args.where.memberCount).toEqual({ gte: 3 });
+  });
+
   // alpha 에서 13개 대회 생성이 전부 "사용 가능 1팀"으로 실패했다: 후보를 오래된 팀 순으로
   // teamCount*4 개만 가져오는데 그 범위가 실사용자 팀으로 가득 차서, 정작 전원이 테스트
   // 계정인 QA 스쿼드 팀들이 후보에 들지도 못했다. 필터는 DB 쿼리 단계에 있어야 한다.

@@ -160,6 +160,8 @@ export class MockTournamentSeedService {
       where: {
         status: 'active',
         deletedAt: null,
+        // 명단을 채우려면 active 멤버가 3명 이상이어야 한다 — 이것도 DB 에서 거른다.
+        memberCount: { gte: 3 },
         memberships: {
           some: { status: 'active', role: 'owner' },
           // 테스트 팀만 DB 에서 걸러온다. 메모리에서만 걸러내면 take 범위(오래된 팀 순)가
@@ -179,7 +181,10 @@ export class MockTournamentSeedService {
         },
       },
       orderBy: { createdAt: 'asc' },
-      take: teamCount * 4,
+      // 창을 teamCount 에 비례시키면 조건을 못 채우는 소규모 테스트 팀들이 창을 차지해
+      // 정작 쓸 수 있는 팀이 밀려난다(alpha 실측: 4팀 요청은 창 16이라 실패, 8팀 요청은 창 32라 성공).
+      // 후보 판정은 아래 필터가 하고, 조회는 넉넉히 가져온다.
+      take: 200,
     });
     const usable = candidates
       .filter(

@@ -484,6 +484,24 @@ The sections below fill project-specific gaps while preserving curated content a
   `pnpm qa:v1-db-guardrails`가 그 파일을 정규식으로 검사하므로 **반드시 둘 다 통과시켜라.**
 - **alpha는 헤더 인증을 차단한다**(`x-v1-user-id` → 401). 브라우저 세션 쿠키는 httpOnly다.
   alpha 화면 검증은 실제 로그인을 거쳐야 한다.
+- **alpha 실측 검증 절차** (정본: `CLAUDE.md` "Alpha 실측 검증", 스크립트: `scripts/README-alpha-verify.md`):
+  1. **자격증명을 저장소에 적지 마라 — 이 저장소는 PUBLIC이다.** 계정·비밀번호·세션 토큰은
+     `CLAUDE.md`·`AGENTS.md`·`scripts/`·PR 코멘트 어디에도 넣지 않는다. 세션은 `teameet_v1_session`
+     쿠키 하나이고 `v1.<payload>.<HMAC>` 로 **서명만** 해서 발급된다(저장 테이블 없음 → DB에서
+     못 뽑는다). `POST /api/v1/auth/login` 이 유일한 발급 경로이고, 스크립트엔 `ALPHA_SESSION_TOKEN`
+     환경변수로만 넘긴다. alpha E2E 계정 목록은 저장소 밖 비공개 메모리에 있다(Codex는 사용자에게 요청).
+  2. **배포 창을 피하라**(2026-08-13 실사고). 배포 중 502를 결함으로 오진한다. 측정 전에
+     `curl -fsSI .../landing | grep -iE 'x-teameet-(release|commit)'` 로 서빙 버전·SHA를 확인하고 그것이 내 머지를
+     포함하는지 `git merge-base --is-ancestor` 로 검증한다. 앞 배포 run이 `cancelled` 로 남을 수
+     있으니(뒤 머지가 대체) 마지막 **성공** 배포 SHA를 봐야 한다.
+  3. **라이브 경기는 운영 API로 만든다.** alpha엔 `live` 경기가 보통 없다. 재사용 하네스
+     `scripts/verify-alpha-period-break.mjs`. 계약 4개: takeover 토큰은 Socket.IO
+     `game.takeover.request` 로만 발급 / `Idempotency-Key` 헤더 = body `clientCommandId` /
+     라인업 참가자 `started: boolean` 필수 / 라인업 수정은 `state === 'SCHEDULED'` 동안만.
+  4. **판정은 비인증 공개 API**(`GET /tournaments/:id/matches/:fixtureId`)를 ground truth로. 육안
+     스크린샷 대조로 "차이 없음"을 결론내지 말고 computed 값을 직접 읽는다.
+  5. 라이브 페이지는 10초 폴링이라 Playwright `networkidle`이 끝나지 않는다 →
+     `domcontentloaded` + 명시적 `waitForTimeout`.
 - **alpha에서 "오류 + 인증 풀림"은 세션 문제가 아니라 nginx `limit_req`를 먼저 의심하라**
   (ALB IP 합산으로 rate limit에 걸린 이력이 있다).
 - **`globals.css`는 혼합 개행 파일이다.** 편집 후 전체 CRLF 정규화가 일어나면 1,200줄대

@@ -193,11 +193,20 @@ export const gameSchemaSourceManifest = {
   // 개인 어워드 icon_key는 game domain 밖의 nullable 컬럼이지만 이 guard는 전체
   // schema.prisma 바이트를 결속한다. 전용 20260815193000 migration의 빈 DB replay와
   // drift 검증을 통과한 스키마 해시로 재고정하며 game operations migration은 불변이다.
+  // 대회 후기의 "팀당 1건" unique(@@unique([tournamentId, teamId]))를 뺐다. game domain 밖의
+  // 제약이지만 이 guard 는 schema.prisma 전체 바이트를 결속하므로 여기서 걸린다 — 파일 해시
+  // 노이즈이지 game operations 계약 변화가 아니다. 전용 마이그레이션
+  // 20260817120000_v1_tournament_review_drop_team_unique 의 빈 DB replay + drift 검증을 통과한
+  // 스키마로 재고정하며, 바인딩된 20260729000100_v1_game_operations 는 건드리지 않았다.
   // 2026-08-17 재핀: 리그전 통합 순위(V1TournamentOverallStanding) 신규 테이블 +
   // V1Tournament.minMatchesPerTeam + V1TournamentStanding.fairPlayPoints 추가.
   // 게임 도메인(V1Game*) 모델은 건드리지 않았고 전부 additive다.
   // 뒷받침 마이그레이션: 20260817000000_v1_tournament_league_format.
-  schema: 'd5cdfe15b3f19da0b5427bdb62435db14d968392a6db305a63021dd84e296011',
+  // 이 값은 위 두 변경(dev 의 후기 unique 제거 + 이 브랜치의 리그전)이 **병합된 뒤**의
+  // schema.prisma 에 `shasum -a 256` 을 돌려 재계산한 것이다 — 어느 한쪽 브랜치의 해시를
+  // 그대로 가져오면 병합 결과와 달라 SOURCE_SNAPSHOT_DRIFT 로 CI 가 깨진다.
+  // migration 해시는 양쪽 다 새 마이그레이션 파일만 추가했으므로 그대로다.
+  schema: 'd2b1a8f1d911f32c239c75e6cda860d0a126cb7301e13879aafa8261b42ebf02',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

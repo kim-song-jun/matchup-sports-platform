@@ -571,6 +571,88 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 6. **CI flake**(Postgres `40P01 deadlock` 등)는 내 변경과 무관함 확인 후 `gh run rerun <id> --failed`. 머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass.
 7. **런타임·환경 의존 동작은 로컬 포렌식에 매몰되지 말고 alpha 배포로 검증한다(Critical — 2026-08-09 실사고).** SSR 상태코드·스트리밍·프로덕션 렌더처럼 **환경에 따라 달라지는 동작**을 진단할 때, 로컬 `next start`/`next build` 반복 실험에 세션을 통째로 태우지 말 것. dev 머지 = 즉시 alpha 실배포이므로 **fix 후보를 dev에 머지해 alpha에서 직접 재측정**하는 것이 이 레포의 검증 루프이자 ground truth다. 실사고: schedule 라우트의 not-found HTTP 200 결함을 로컬에서 파다가 (a) `next start` 좀비 서버가 옛 빌드를 서빙해 거짓 결론을 냈고(`kill $SRV`가 래퍼만 죽이고 next-server 자식이 포트 점유 → 이후 측정이 stale 빌드를 때림), (b) 병렬 세션의 `next dev` 와 겹쳐 결과가 뒤엉켰다 — 몇 시간·수십 빌드를 태우고도 못 고쳤다. **불가피하게 로컬 prod 렌더로 검증해야 하면**: `next start` 대신 `node .next/standalone/apps/v1_web/server.js`(alpha 실런타임)를 쓰고, 매 측정마다 fresh 포트 + `lsof -tnP -iTCP:<port>` 로 실제 리스너 PID 를 확인해 그 PID 로 종료하며, 측정 전 좀비 next-server 를 전수 확인한다. 그래도 **1순위는 alpha 배포-측정**이다.
 
+## Alpha 실측 검증 (E2E 테스트 절차)
+
+> 위 7번의 "alpha 가 ground truth"를 실제로 실행하는 절차. 상세 스크립트 목록: `scripts/README-alpha-verify.md`
+
+### 1. 자격증명 — 저장소에 절대 적지 않는다
+
+**이 저장소는 PUBLIC이다.** 계정·비밀번호·세션 토큰을 `CLAUDE.md`·`AGENTS.md`·`scripts/`·PR
+코멘트 어디에도 적지 말 것. alpha E2E 계정 목록과 공통 비밀번호는 **저장소 밖의 비공개
+프로젝트 메모리**(`~/.claude/projects/<이 저장소>/memory/alpha-e2e-test-accounts.md`)에 있다.
+계정 종류: 플랫폼 관리자(`adminRole=ops`) / 대회 스태프 / A·B팀 팀장 / 선수 10명(양 팀 소속) /
+초대 대상 3명. 전 계정 약관 동의·휴대폰·이메일 인증 완료.
+
+세션은 `teameet_v1_session` **쿠키 하나**이고 `v1.<payload>.<HMAC>` 형태로 **서명만 해서**
+발급된다 — 저장 테이블이 없으므로 **DB에서 뽑을 수 없다.** alpha는 프로덕션 모드라
+**헤더 dev 인증(`x-v1-user-*`)이 401**이다(로컬 검증과 다른 점). `login` API가 유일한 발급 경로다.
+
+```bash
+curl -sS -D- -o/dev/null https://alpha.teameet.co.kr/api/v1/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"<계정>","password":"<비밀번호>"}' \
+  | grep -i '^set-cookie: teameet_v1_session'
+export ALPHA_SESSION_TOKEN='v1.<payload>.<HMAC>'   # 스크립트엔 이 환경변수로만 넘긴다
+```
+
+### 2. 배포 창을 피한다 (Critical — 2026-08-13 실사고)
+
+배포 중에는 502가 뜬다. 그 창에서 측정하면 **멀쩡한 화면을 결함으로 오진한다.** 측정 전에
+① 배포 완료 ② 배포된 SHA가 내 머지를 포함하는지를 반드시 확인한다.
+
+```bash
+gh run list --workflow deploy-alpha.yml --branch dev --limit 1 \
+  --json headSha,status,conclusion --jq '.[0]'
+curl -fsSI https://alpha.teameet.co.kr/landing | grep -i 'x-teameet-\(release\|commit\)'
+curl -fsS  https://alpha.teameet.co.kr/api/v1/health   # .data.checks.db === true
+git merge-base --is-ancestor <내 머지 커밋> <배포 SHA> && echo "포함됨"
+```
+
+`x-teameet-commit` 이 **내 머지 커밋 이후**여야 내 변경을 보고 있는 것이다. 직전 배포 run이
+`cancelled` 로 남아 있을 수 있다(뒤 머지가 앞 배포를 대체) — 그때 alpha가 서빙하는 SHA는
+마지막 **성공** 배포의 것이다.
+
+### 3. 라이브 경기 상태는 운영 API로 직접 만든다
+
+alpha에는 `status === 'live'` 경기가 보통 없다(전부 `ended`). 라이브 전용 UI(경기 시계,
+하프타임 배지, 라이브 스코어, 콘솔 재연결)는 "재현 불가"로 접지 말고 운영자 경로를 그대로
+밟는다. 재사용 하네스: `scripts/verify-alpha-period-break.mjs`.
+
+```
+라인업 저장·제출 → start → end-period(하프타임) → start-period(후반) → end-period → end
+```
+
+실측으로 확인된 계약 4개(하나라도 어기면 400/409/422):
+1. **takeover 토큰은 REST로 못 받는다.** `TOURNAMENT_FIXTURE` 게임의 모든 커맨드에 필수인데
+   발급 경로는 Socket.IO `/game-operations` 의 `game.takeover.request` 하나뿐이다
+   (`socket.io-client` + `extraHeaders: { cookie }` + `auth: { clientInstanceId,
+   authorizationSubjectVersion: 0 }`).
+2. **`Idempotency-Key` 헤더 = body의 `clientCommandId`.** 다르면 422 `COMMAND_IDEMPOTENCY_KEY_MISMATCH`.
+3. **라인업 참가자에 `started: boolean` 필수.** 빼면 400인데 `details.messages`가 빈 배열로 와서
+   원인이 안 보인다. `participantId`는 optional이라 `displayNameSnapshot`만으로 구성 가능(풋살 `minPlayers: 3`).
+4. **라인업 수정은 `state === 'SCHEDULED'` 동안만.** 이후 409 `LINEUP_DEADLINE_PASSED` — 이미 시작된
+   경기를 재사용할 땐 라인업 단계를 건너뛴다.
+
+### 4. 판정은 공개 API를 ground truth로
+
+커맨드 응답이 아니라 `GET /tournaments/:id/matches/:fixtureId`(비인증)를 매 전이마다 찍어
+**관전자가 실제로 받는 값**을 본다. 육안 스크린샷 대조로 "차이 없음"을 결론내지 말고
+computed 값(색·폰트크기·정렬)을 직접 읽는다.
+
+### 5. 캡처 시 주의
+
+- 라이브 경기가 있는 페이지는 10초 주기 폴링이라 Playwright `waitUntil: 'networkidle'`이
+  **절대 끝나지 않는다**(60초 타임아웃) → `domcontentloaded` + 명시적 `waitForTimeout`.
+- 캡처 스크립트는 **`scripts/` 내부**에 둔다(`/tmp`는 모듈 해석 실패).
+- 갤러리는 페이지별 📱390 / 📲768 / 🖥1440 3열 + raw URL 200 확인 후 PR 코멘트 게시.
+
+### 6. 배포와 QA 시드의 관계
+
+alpha는 배포마다 QA 시드가 다시 돈다. 시드의 `deleteMany`는 **자기 대회 범위로만** 한정되고
+사용자·팀은 `upsert`만 하므로 **E2E 계정·팀은 배포로 지워지지 않는다.** 다만 시드가 자기
+대회(`(테스트)` 로 시작하는 것들)의 **조 배정을 초기화**하므로, E2E는 **새 대회를 직접 만들어**
+진행하는 편이 안전하다.
+
 ## Agent Team 운영
 
 글로벌 `~/.claude/CLAUDE.md`의 Agent Team 운영 섹션 참조.

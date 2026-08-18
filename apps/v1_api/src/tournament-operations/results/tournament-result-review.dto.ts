@@ -54,6 +54,20 @@ export class SupersedeAndSubmitGameResultRevisionDto {
   @Type(() => GameScoreDto)
   score!: GameScoreDto;
 
+  /**
+   * 빈 배열을 통과시키면 새 리비전의 `v1_game_result_participants`가 0행이 되고,
+   * 그 리비전이 공식이 되는 순간 그 경기의 선수 개개인 기록이 전멸한다
+   * (`public-user-records.service.ts`가 그 테이블을 직접 읽는다).
+   *
+   * 그래도 여기에 `@ArrayNotEmpty()`를 붙이지 **않는다.** 그건 무조건적이어서
+   * 정본 프로듀서가 정당하게 0행으로 만든 경기(선발 미표시·이벤트 없음, 로스터가
+   * 빈 등록, TBD 브래킷 픽스처)의 점수 정정까지 400으로 막는다 — 정정 폼은 base
+   * 리비전에서만 참가자를 채우므로 그런 경기는 영구히 고칠 수 없게 된다.
+   * 필요한 술어는 "비우지 말라"가 아니라 **"있던 것을 비우지 말라"**여서 base
+   * 리비전을 읽어야 하고, 그건 DTO가 알 수 없다 —
+   * `TournamentResultReviewService.assertRevisionParticipantsValid`가 422
+   * `PARTICIPANT_INVALID`로 처리한다.
+   */
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => GameResultParticipantDto)
@@ -118,6 +132,7 @@ export class GameResultCorrectionChangesDto {
   @Type(() => GameScoreDto)
   score!: GameScoreDto;
 
+  /** 빈 배열을 DTO가 아니라 서비스에서 다루는 이유는 `SupersedeAndSubmitGameResultRevisionDto` 쪽 주석 참조. */
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => GameResultParticipantDto)

@@ -2143,13 +2143,12 @@ model V1TournamentReview {
   // 팀 삭제로 사라지는 경로 자체를 DB 레벨에서 막는 것이 SetNull보다 강한 보장이다.
   team       V1Team?      @relation("V1TournamentReviewTeam", fields: [teamId], references: [id], onDelete: Restrict)
 
+  // 대회당 사람 1건. "팀당 1건"(@@unique([tournamentId, teamId]))은 2026-08-17에 드롭했다 —
+  // 같은 팀의 팀장이 먼저 쓰면 운영진이 ALREADY_REVIEWED 로 막혔는데, 경기 후기는 이미 사람
+  // 기준이라(773f211f) 같은 성격의 평가가 두 도메인에서 다르게 동작했다. 대회 후기 평점은
+  // 어디에서도 집계되지 않고 개별 항목으로만 노출되므로, 인원 많은 팀 쪽으로 점수가 기우는
+  // 문제도 생기지 않는다.
   @@unique([tournamentId, authorUserId])
-  // 팀당 대회 1건 제약. WHERE 절 partial index가 아니라 평범한 composite unique로 구현한다 —
-  // Postgres 표준 NULL-distinct 시맨틱상 team_id가 NULL인 행끼리는 서로 유일성 위반이 아니므로
-  // (레거시 미연결 리뷰가 여러 건 있어도 안전), 애초에 partial index가 필요 없다. 반대로 partial
-  // index를 쓰면 Prisma schema DSL이 WHERE 절을 표현할 수 없어 `prisma migrate diff` 드리프트
-  // 게이트가 항상 실패한다 — 그래서 여기서는 의도적으로 평범한 unique를 쓴다.
-  @@unique([tournamentId, teamId])
   @@index([tournamentId, createdAt])
   @@map("v1_tournament_reviews")
 }

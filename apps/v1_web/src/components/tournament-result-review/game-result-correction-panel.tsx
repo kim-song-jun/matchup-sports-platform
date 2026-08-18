@@ -272,6 +272,12 @@ export function GameResultCorrectionPanel({
           }}
           sides={game.sides}
           lineups={lineupsQuery.data ?? []}
+          // 서버 `applyPenalties` 는 승부차기를 **결선 픽스처 + 정규시간 무승부**에서만
+          // 받는다. 폼은 이 값으로 (a) 기존 승부차기 점수를 이어서 보낼지 판정하고
+          // (b) 무승부인데 승부차기가 없거나 반대로 승부차기가 남아 못 보내는 상태를
+          // 저장 전에 알린다. 내려주지 않으면 결선 경기의 승부차기 결과가 조용히
+          // 사라지므로 이 prop 은 필수(기본값 없음)다.
+          isKnockoutFixture={game.isKnockoutFixture}
           submitting={createCorrection.isPending}
           errorMessage={createCorrection.isError ? describeResultReviewError(createCorrection.error) : null}
           onCancel={() => {

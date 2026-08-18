@@ -23,6 +23,21 @@ const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   SCORER_REQUIRED: '득점자를 입력해야 확정할 수 있어요.',
   COMMAND_IDEMPOTENCY_KEY_MISMATCH: '요청을 다시 시도하지 못했어요. 화면을 새로고침한 뒤 다시 시도해 주세요.',
   IDEMPOTENCY_PAYLOAD_CONFLICT: '요청 내용이 바뀌어 다시 시도하지 못했어요. 화면을 새로고침해 주세요.',
+  // 승부차기 가드 3종. 서버 문구는 바이트 동일 제약이 있어 서버에서 못 바꾸는데
+  // 그중 4개가 영문 원문이라(`games.service.ts`), 매핑이 없으면 그대로 화면에 노출된다.
+  //
+  // NOT_ALLOWED·INVALID 는 서버에 **문구가 2종씩** 있지만 프론트는 두 변종을 구분할 수
+  // 없다 -- `extractErrorCode` 는 code 만 읽고, 두 변종의 code 와 HTTP status 가 완전히
+  // 같다(NOT_ALLOWED 는 둘 다 409, INVALID 는 둘 다 422). 서버 원문 substring 매칭으로
+  // 갈라 쓰는 방법은 "바꿀 수 없는 영문 원문"에 프론트를 결합시키는 새 기술부채이므로 쓰지
+  // 않고, **코드별 문구 하나가 두 원인을 모두 포괄**하도록 적는다.
+  //   NOT_ALLOWED: '결선 픽스처가 아님' + '정규시간이 무승부가 아님'
+  //   INVALID:     '0 이상 정수가 아님' + '승자가 갈리지 않음'
+  TOURNAMENT_PENALTY_REQUIRED: '결선 경기는 무승부로 끝낼 수 없어요. 승부차기 결과를 입력해 주세요.',
+  TOURNAMENT_PENALTY_NOT_ALLOWED:
+    '승부차기는 결선 경기의 정규시간 무승부에서만 기록할 수 있어요. 경기 종류와 정규시간 점수를 다시 확인해 주세요.',
+  TOURNAMENT_PENALTY_INVALID:
+    '승부차기 점수가 올바르지 않아요. 양 팀 점수를 0 이상의 정수로, 승자가 갈리도록 입력해 주세요.',
 };
 
 /** Extracts a domain error code and maps it to a 해요체 안내 문구, falling

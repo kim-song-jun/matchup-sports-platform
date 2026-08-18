@@ -1294,7 +1294,17 @@ export type V1GameResultScore =
       /** `firstKickSideKey`(선축)는 평평한 형태에만 있다 — 중첩 백필 형태는 이 필드가
        *  생기기 전 데이터라 담고 있지 않다. 이 필드가 생기기 전에 저장된 평평한 리비전도
        *  마찬가지로 없으므로 optional 이다. */
-      penalties?: { home: number; away: number; firstKickSideKey?: 'HOME' | 'AWAY' };
+      penalties?: {
+    home: number;
+    away: number;
+    firstKickSideKey?: 'HOME' | 'AWAY';
+    /** 각 팀이 찬 킥 수. 서버가 결판을 판정하는 근거이고, 정정 화면에는 입력란이
+     * 없어 여기서 떨어뜨리면 되살릴 수단이 없다. 둘은 항상 함께 있거나 함께 없다. */
+    takenHome?: number;
+    takenAway?: number;
+    /** 규칙상 미결인 승부차기를 운영자가 명시적으로 닫았다는 감사 기록. */
+    operatorOverride?: boolean;
+  };
     };
 
 export type V1GameResultCards = { yellow: number; red: number };
@@ -1372,7 +1382,17 @@ export type V1GameResultScoreInput = {
    * 허용**이다. 정정 폼이 이 키를 떨어뜨리면 정정 한 번에 "누가 먼저 찼는지"가 영구히
    * 사라진다(폼에 선축 입력란이 없어 되살릴 수단도 없다).
    */
-  penalties?: { home: number; away: number; firstKickSideKey?: 'HOME' | 'AWAY' };
+  penalties?: {
+    home: number;
+    away: number;
+    firstKickSideKey?: 'HOME' | 'AWAY';
+    /** 각 팀이 찬 킥 수. 서버가 결판을 판정하는 근거이고, 정정 화면에는 입력란이
+     * 없어 여기서 떨어뜨리면 되살릴 수단이 없다. 둘은 항상 함께 있거나 함께 없다. */
+    takenHome?: number;
+    takenAway?: number;
+    /** 규칙상 미결인 승부차기를 운영자가 명시적으로 닫았다는 감사 기록. */
+    operatorOverride?: boolean;
+  };
 };
 
 export type V1CreateGameResultRevisionPayload = {

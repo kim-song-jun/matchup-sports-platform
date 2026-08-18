@@ -35,6 +35,21 @@ const TOKEN_SIZE_PCT = 11; // 피치 너비 대비 토큰 지름 비율
  * 슬롯 UX 작업 범위 안에서 함께 44px로 올린다(같은 파일을 손대는 김에 기술부채 해결). */
 const TOUCH_TARGET_PX = 44;
 
+/**
+ * 피치 바깥(명단 패널)에서 끌어온 선수를 어디에 놓을지 이 컴포넌트가 대신 판정해 주는
+ * 창구. 좌표계(피치 rect → % 변환, y축 뒤집기)와 슬롯 배치 규칙은 전부 이 파일 안에만
+ * 있는 지식이라, 바깥에서 같은 계산을 다시 짜면 두 벌이 갈린다 — 그래서 판정만 노출하고
+ * 실제 상태 변경은 호출부(라인업 화면)가 자기 뷰모델로 한다.
+ */
+export type PitchDropTarget =
+  | { kind: 'point'; x: number; y: number }
+  | { kind: 'slot'; slot: FormationSlot };
+
+export type PitchDropResolver = {
+  /** 화면 좌표가 피치 밖이면 null. 슬롯 모드에서 빈 자리가 없어도 null(놓을 곳이 없다). */
+  resolve: (clientX: number, clientY: number) => PitchDropTarget | null;
+};
+
 export type PitchFormationEditorProps = {
   starters: LineupEntryDraft[];
   formation: string | null;
@@ -52,6 +67,8 @@ export type PitchFormationEditorProps = {
   onUnplacePlayer: (key: string) => void;
   onPlaceInSlot: (key: string, slot: FormationSlot) => void;
   onUnplaceFromSlot: (key: string) => void;
+  /** 명단 패널에서 피치로 끌어다 놓는 경로를 쓰려면 이 ref 를 넘긴다(선택). */
+  dropResolverRef?: React.MutableRefObject<PitchDropResolver | null>;
 };
 
 export function PitchFormationEditor({
@@ -66,6 +83,7 @@ export function PitchFormationEditor({
   onUnplacePlayer,
   onPlaceInSlot,
   onUnplaceFromSlot,
+  dropResolverRef,
 }: PitchFormationEditorProps) {
   const pitchRef = useRef<HTMLDivElement>(null);
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
@@ -163,6 +181,46 @@ export function PitchFormationEditor({
     onPlacePlayer(selectedWaitingKey, point.x, point.y);
     setSelectedWaitingKey(null);
   }
+
+  // 명단 패널에서 끌어온 선수의 착지점 판정. 매 렌더마다 최신 슬롯 상태로 갈아 끼운다 —
+  // 클로저가 오래된 `matched` 를 잡고 있으면 이미 찬 자리에 또 놓게 된다.
+  useEffect(() => {
+    if (dropResolverRef === undefined) return;
+    dropResolverRef.current = {
+      resolve(clientX: number, clientY: number) {
+        if (!editable) return null;
+        const rect = pitchRef.current?.getBoundingClientRect();
+        if (!rect || rect.width === 0 || rect.height === 0) return null;
+        // `pointToPitchPct` 는 값을 0~100 으로 clamp 하므로 피치 밖에서 놓아도 가장자리
+        // 좌표를 돌려준다 — 바깥에 떨어뜨린 것을 "가장자리에 놓았다"로 오해하지 않도록
+        // rect 안인지 먼저 본다.
+        if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+          return null;
+        }
+        const point = pointToPitchPct(clientX, clientY);
+        if (point === null) return null;
+        if (!slotMode) return { kind: 'point', x: point.x, y: point.y };
+
+        // 슬롯 모드에서는 임의 좌표가 아니라 "빈 자리"에만 앉는다. 놓은 지점에서 가장
+        // 가까운 빈 자리를 고른다 — 자리가 다 찼으면 놓을 곳이 없다는 뜻으로 null.
+        const emptySlots = matched.filter((row) => row.entry === null).map((row) => row.slot);
+        if (emptySlots.length === 0) return null;
+        let nearest = emptySlots[0];
+        let nearestDistance = Number.POSITIVE_INFINITY;
+        for (const slot of emptySlots) {
+          const distance = (slot.x - point.x) ** 2 + (slot.y - point.y) ** 2;
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearest = slot;
+          }
+        }
+        return { kind: 'slot', slot: nearest };
+      },
+    };
+    return () => {
+      dropResolverRef.current = null;
+    };
+  });
 
   function handleTokenPointerDown(entry: LineupEntryDraft) {
     return (event: React.PointerEvent<HTMLButtonElement>) => {

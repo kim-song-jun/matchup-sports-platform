@@ -1106,7 +1106,13 @@ export class GamesService {
               data: { state: V1GamePeriodState.ENDED, endedAt: now, ...(resolved ?? {}) },
             });
           }
-          return this.deriveTournamentRevision(tx, updated, context, extractEndPenalties(dto.payload));
+          return this.deriveTournamentRevision(
+            tx,
+            updated,
+            context,
+            extractEndPenalties(dto.payload),
+            'END_COMMAND',
+          );
         }
         return {
           gameId: updated.id,
@@ -4635,6 +4641,18 @@ export class GamesService {
     game: LockedGame,
     context: GameCommandContext,
     penalties?: StoredPenalties,
+    /**
+     * 어느 레인에서 왔는가. 승부차기 킥 수를 **요구할 수 있는지**가 여기서 갈린다.
+     *
+     * `END_COMMAND` — 운영 콘솔이 승부차기를 **지금 기록하는** 경로다. 클라이언트가 킥
+     *   목록을 들고 있으므로 킥 수를 못 보낼 이유가 없다. 그래서 이 레인에서는 킥 수를
+     *   필수로 만든다 — 총점 두 개만으로는 "각 5킥 1:0"(정상)과 "홈 1킥, 원정 0킥"(비정상)이
+     *   같은 값이라 서버가 구분할 수 없고, 실제로 알파에서 `{home:1, away:0}` 만 실은
+     *   `end` 호출이 **201로 통과해 공개 화면까지 퍼지는 것**을 실측했다(2026-08-18).
+     * `RECOVERY` — 이미 저장된 리비전을 복구·승계하는 경로다. 킥 수가 생기기 전에 저장된
+     *   결과에는 그 값이 없으므로 요구하면 복구가 영구히 막힌다.
+     */
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY' = 'RECOVERY',
   ): Promise<GameRevisionMutationResult> {
     const [events, participants, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
@@ -4659,7 +4677,7 @@ export class GamesService {
       parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
       'GK';
     const regulationScore = this.scoreFromEvents(events, sides);
-    const score = await this.applyPenalties(tx, game, regulationScore, penalties);
+    const score = await this.applyPenalties(tx, game, regulationScore, penalties, penaltyOrigin);
     // Issue #392 fix: `missingScorer` must be derived from the SAME
     // reversed-event-excluding aggregation `aggregateGameParticipantStats`
     // already builds below for goals/cards/assists/fouls -- moved ahead of
@@ -5270,6 +5288,7 @@ export class GamesService {
     game: LockedGame,
     score: GameScore,
     penalties: StoredPenalties | undefined,
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY' = 'RECOVERY',
   ): Promise<GameScore> {
     // 킥 수가 실려 왔으면 서버도 프런트와 **같은 술어**로 결판을 판정한다. 예전에는
     // 이 판정이 프런트에만 있어(총점 두 개로는 킥 수를 알 수 없었다) 화면의 가드가
@@ -5279,7 +5298,7 @@ export class GamesService {
     // 필요한 fact를 읽을지 정하는 것이고, 이 게이트는 브래킷과 무관하게 승부차기
     // payload 자체의 유효성을 본다(조별리그 경기에 승부차기가 실려 와도 검사한다).
     if (penalties !== undefined) {
-      await this.assertPenaltyShootoutConcludedForGame(tx, game, penalties);
+      await this.assertPenaltyShootoutConcludedForGame(tx, game, penalties, penaltyOrigin);
     }
     // 결정적 스코어 + 승부차기 없음이면 어떤 fact도 판정을 바꾸지 않으므로
     // 질의하지 않는다 — 리팩터 전 단축 평가 동작을 그대로 보존한다.
@@ -5307,8 +5326,25 @@ export class GamesService {
     tx: Transaction,
     game: LockedGame,
     penalties: StoredPenalties,
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
   ): Promise<void> {
-    if (penalties.takenHome === undefined || penalties.takenAway === undefined) return;
+    if (penalties.takenHome === undefined || penalties.takenAway === undefined) {
+      // 킥 수 없이 승부차기를 **새로 기록**하는 것은 거부한다. 이게 없으면 아래 정책 판정이
+      // 통째로 건너뛰어져, `curl` 한 줄로 `{home:1, away:0}` 을 보내면 원정이 한 번도 차지
+      // 않은 승부차기가 그대로 공식 결과가 된다 — 2026-08-18 알파에서 201 응답과 공개 화면
+      // 노출까지 실측했다. 화면의 가드는 프런트에만 있어 이 경로를 전혀 막지 못했다.
+      //
+      // 복구 레인은 면제다: 킥 수가 생기기 전에 저장된 리비전에는 그 값이 없어서,
+      // 여기서 요구하면 옛 결과의 복구가 영구히 막힌다.
+      if (penaltyOrigin === 'END_COMMAND') {
+        throw new UnprocessableEntityException({
+          code: 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED',
+          message:
+            'penalties.takenHome and penalties.takenAway are required when recording a penalty shootout',
+        });
+      }
+      return;
+    }
     const config = await tx.v1CompetitionConfigVersion.findUnique({
       where: { id: game.competitionConfigVersionId },
       select: { result: true },

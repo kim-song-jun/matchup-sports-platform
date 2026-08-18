@@ -818,6 +818,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     // 문구는 `options.override`가 아니라 **현재 상태**(`availability`)로 고른다 — 운영자가
     // "그래도 종료"를 누른 뒤 그사이 상태가 결판으로 바뀌었다면 보여줄 것은 평범한 종료
     // 확인이지, 안 끝났다는 경고가 아니다.
+    // 확인 문구와 서버 payload가 **같은 숫자**를 쓰게 한 곳에서 센다 — 따로 세면
+    // 모달이 보여준 킥 수와 실제로 저장되는 킥 수가 갈릴 수 있다.
+    const homeKicks = penaltyKicks.filter((kick) => kick.sideId === homeSide.id).length;
+    const awayKicks = penaltyKicks.filter((kick) => kick.sideId === awaySide.id).length;
     const copy =
       availability === 'OVERRIDABLE'
         ? penaltyShootoutOverrideFinishConfirmCopy(
@@ -825,15 +829,28 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             awaySide,
             homeScore,
             awayScore,
-            penaltyKicks.filter((kick) => kick.sideId === homeSide.id).length,
-            penaltyKicks.filter((kick) => kick.sideId === awaySide.id).length,
+            homeKicks,
+            awayKicks,
             firstKickSide,
           )
         : penaltyShootoutFinishConfirmCopy(homeSide, awaySide, homeScore, awayScore, firstKickSide);
     if (!(await confirm(copy))) return;
     setPenaltyKicks(null);
     await handleRunCommand('end', {
-      penalties: { home: homeScore, away: awayScore, firstKickSideKey },
+      penalties: {
+        home: homeScore,
+        away: awayScore,
+        firstKickSideKey,
+        // 킥 수를 함께 보내야 서버도 같은 술어로 결판을 판정할 수 있다 — 총점 두 개로는
+        // "홈 1킥 1:0 / 원정 0킥"과 "각 5킥 1:0"이 같은 값이라, 이게 없으면 화면의
+        // 가드가 프런트 단독이 되어 API 직접 호출로 그대로 우회된다.
+        takenHome: homeKicks,
+        takenAway: awayKicks,
+        // 우회로 닫았다는 사실을 **기록에 남긴다**. 서버는 이 값을 `score.penalties`에
+        // 그대로 저장하므로 리비전에 영구히 남아, 나중에 "이 결과는 왜 규칙과 다른가"에
+        // 답할 수 있다. 규칙대로 끝난 종료에는 싣지 않는다(키 부재가 곧 "우회 아님").
+        ...(availability === 'OVERRIDABLE' ? { operatorOverride: true } : {}),
+      },
     });
   }, [penaltyKicks, firstKickSideId, penaltyPolicy, gameDetail.data?.sides, confirm, handleRunCommand]);
 

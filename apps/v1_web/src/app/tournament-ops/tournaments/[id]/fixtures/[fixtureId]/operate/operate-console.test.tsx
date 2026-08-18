@@ -1172,7 +1172,12 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
         'game-1',
         'end',
         expect.objectContaining({
-          payload: { penalties: { home: 3, away: 0, firstKickSideKey: 'HOME' } },
+          // 킥 수가 함께 나가야 서버도 같은 술어로 결판을 판정할 수 있다. 규칙대로
+          // 끝난 종료이므로 `operatorOverride`는 **실리지 않는다** — 키 부재가 곧
+          // "우회 아님"이라, 여기에 키가 생기면 감사 기록이 우회를 구분하지 못한다.
+          payload: {
+            penalties: { home: 3, away: 0, firstKickSideKey: 'HOME', takenHome: 3, takenAway: 3 },
+          },
         }),
       ),
     );
@@ -1219,7 +1224,19 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
         'game-1',
         'end',
         expect.objectContaining({
-          payload: { penalties: { home: 2, away: 0, firstKickSideKey: 'HOME' } },
+          // 우회 종료는 킥 수(2 vs 1)와 `operatorOverride: true`를 함께 싣는다 —
+          // 서버가 이 값을 `score.penalties`에 저장해 리비전에 영구히 남기므로,
+          // 나중에 "이 결과는 왜 규칙과 다른가"에 답할 수 있는 유일한 근거가 된다.
+          payload: {
+            penalties: {
+              home: 2,
+              away: 0,
+              firstKickSideKey: 'HOME',
+              takenHome: 2,
+              takenAway: 1,
+              operatorOverride: true,
+            },
+          },
         }),
       ),
     );

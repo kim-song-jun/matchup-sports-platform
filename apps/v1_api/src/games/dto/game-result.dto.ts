@@ -47,6 +47,36 @@ export class PenaltyScoreDto {
   @ValidateIf((penalties: PenaltyScoreDto) => penalties.firstKickSideKey !== undefined)
   @IsIn(['HOME', 'AWAY'])
   firstKickSideKey?: 'HOME' | 'AWAY';
+
+  /**
+   * 각 팀이 찬 킥 수. **선언이 곧 허용**이라는 위 `firstKickSideKey`의 설명이
+   * 그대로 적용된다 — 여기 적지 않으면 이 키를 실은 요청이 여분 키로 400 이 된다.
+   *
+   * 서버가 승부차기 종료를 판정하려면 성공 수(`home`/`away`)만으로는 부족하다:
+   * "홈 1킥 1:0 / 원정 0킥"과 "각 5킥 1:0"이 같은 값이라 구분이 안 된다.
+   * 둘을 함께 보내야 하고(한쪽만 오면 422), 성공 수가 시도 수를 넘을 수 없다 —
+   * 그 두 규칙은 `extractEndPenalties`가 강제한다.
+   *
+   * `@ValidateIf`를 쓰는 이유도 같다: `@IsOptional()`은 `null`일 때 검증을 통째로
+   * 건너뛰어 `takenHome: null`이 위반 0건으로 통과한다.
+   */
+  @ValidateIf((penalties: PenaltyScoreDto) => penalties.takenHome !== undefined)
+  @IsInt()
+  @Min(0)
+  takenHome?: number;
+
+  @ValidateIf((penalties: PenaltyScoreDto) => penalties.takenAway !== undefined)
+  @IsInt()
+  @Min(0)
+  takenAway?: number;
+
+  /**
+   * 규칙상 미결인 승부차기를 운영자가 명시적으로 닫았다는 표식(감사 기록).
+   * 자세한 근거는 `GameScore['penalties'].operatorOverride` docblock 참고.
+   */
+  @ValidateIf((penalties: PenaltyScoreDto) => penalties.operatorOverride !== undefined)
+  @IsBoolean()
+  operatorOverride?: boolean;
 }
 
 export class GameScoreDto {

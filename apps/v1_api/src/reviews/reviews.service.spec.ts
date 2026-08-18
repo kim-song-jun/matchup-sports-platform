@@ -11,6 +11,11 @@ const user = {
 const sourceId = '00000000-0000-4000-8000-000000000010';
 const targetUserId = '00000000-0000-4000-8000-000000000002';
 const submittedAt = new Date('2026-06-02T12:00:00.000Z');
+// team_match 는 이제 completedAt 기준 48시간 마감(review-deadline.ts)이 실제 시각(Date.now())으로
+// 판정된다(Task 4). submittedAt 은 하드코딩된 과거 날짜라 이 게이트가 생기면서 저절로 마감을
+// 넘겨버린다 — 마감 판정과 무관한 시나리오(멤버십/역할/대상 로직)의 팀매치 completedAt 픽스처는
+// 별도로 "방금 완료"를 뜻하는 이 상대값을 쓴다. 마감 자체를 테스트하는 케이스만 옛 날짜를 그대로 쓴다.
+const teamMatchCompletedAt = new Date(Date.now() - 60 * 60 * 1000);
 
 const teamSourceId = '00000000-0000-4000-8000-000000000030';
 const hostTeamId = '00000000-0000-4000-8000-000000000031';
@@ -180,6 +185,111 @@ describe('ReviewsService', () => {
     );
   });
 
+  it('match 소스는 48h 마감 없이 무기한 제출 가능하다(D-12, 완료 플로우 부재)', async () => {
+    // V1Match.completedAt 을 채우는 write 경로가 이 저장소에 없다(스펙 §1.2.2) — 앵커가 항상
+    // 비어 있으므로 match 소스에는 review-deadline.ts 를 아예 호출하지 않는다. 100일 전 완료로
+    // 세팅해도(=team_match 였다면 진작 마감) 제출이 막히지 않는지를 회귀로 고정한다.
+    const veryOldCompletedAt = new Date('2020-01-01T00:00:00.000Z');
+    const createMock = jest.fn().mockResolvedValue({
+      id: 'review-unlimited',
+      sourceType: 'match',
+      sourceId,
+      targetType: 'user',
+      targetUser: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } },
+      targetTeam: null,
+      reviewerUser: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } },
+      reviewerTeam: null,
+      rating: 5,
+      sportId: 'sport-futsal',
+      tags: [],
+      status: 'submitted',
+      submittedAt,
+    });
+    const prisma = {
+      v1Match: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: sourceId,
+          title: '성수 풋살파크 개인 매치',
+          status: 'completed',
+          completedAt: veryOldCompletedAt,
+          startAt: veryOldCompletedAt,
+          sportId: 'sport-futsal',
+          participants: [
+            { userId: user.id, user: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } } },
+            { userId: targetUserId, user: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } } },
+          ],
+        }),
+      },
+      v1PostEventReview: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
+        v1PostEventReview: {
+          create: createMock,
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        v1UserReputationSummary: {
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+      })),
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+
+    await expect(service.submit(user, {
+      sourceType: 'match',
+      sourceId,
+      targetType: 'user',
+      targetUserId,
+      rating: 5,
+      tagCodes: ['manner'],
+    })).resolves.toMatchObject({ alreadySubmitted: false });
+    expect(createMock).toHaveBeenCalled();
+  });
+
+  it('team_match: completedAt(앵커) 기준 48시간을 넘기면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
+    // completedAt 은 games.service.ts 결과 확정 시 채워진다(스펙 §6.1) — team_match 는 이 값이
+    // 앵커라 48시간이 지나면 teamMatchSourceContext() 진입 즉시(다른 조회 전에) 막혀야 한다.
+    const closedCompletedAt = new Date('2020-01-01T00:00:00.000Z');
+    const prisma = {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: teamSourceId,
+          title: '성수 풋살파크 팀 매치',
+          status: 'completed',
+          completedAt: closedCompletedAt,
+          startAt: closedCompletedAt,
+          sportId: 'sport-futsal',
+          hostTeamId,
+          approvedApplicantTeamId: awayTeamId,
+          hostTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+          approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+        }),
+      },
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never, adminContextStub());
+
+    const error = await service
+      .source(user, { sourceType: 'team_match', sourceId: teamSourceId })
+      .catch((caught: { response?: unknown; getStatus?: () => number }) => caught);
+
+    expect(error).toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
+    expect(error.getStatus?.()).toBe(410);
+    // 마감 판정이 다른 조회보다 먼저 걸려야 한다 — 멤버십·라인업까지 안 갔다는 뜻.
+    expect(prisma.v1TeamMatch.findUnique).toHaveBeenCalledTimes(1);
+  });
+
   it('submitTeamReview: 리뷰 생성 시 팀 매치의 sportId를 스냅샷으로 저장한다', async () => {
     const createMock = jest.fn().mockResolvedValue({
       id: 'review-3',
@@ -202,8 +312,8 @@ describe('ReviewsService', () => {
           id: teamSourceId,
           title: '성수 풋살파크 팀 매치',
           status: 'completed',
-          completedAt: submittedAt,
-          startAt: submittedAt,
+          completedAt: teamMatchCompletedAt,
+          startAt: teamMatchCompletedAt,
           sportId: 'sport-futsal',
           hostTeamId,
           approvedApplicantTeamId: awayTeamId,
@@ -1212,8 +1322,8 @@ function teamMatchWorld(
     id: teamSourceId,
     title: '성수 풋살파크 팀 매치',
     status: 'completed',
-    completedAt: submittedAt,
-    startAt: submittedAt,
+    completedAt: teamMatchCompletedAt,
+    startAt: teamMatchCompletedAt,
     sportId: 'sport-futsal',
     hostTeamId,
     approvedApplicantTeamId: awayTeamId,
@@ -1359,8 +1469,8 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
           id: teamSourceId,
           title: '홈팀 vs 원정팀',
           status: 'completed',
-          completedAt: submittedAt,
-          startAt: submittedAt,
+          completedAt: teamMatchCompletedAt,
+          startAt: teamMatchCompletedAt,
           sportId: 'sport-futsal',
           hostTeamId,
           approvedApplicantTeamId: awayTeamId,

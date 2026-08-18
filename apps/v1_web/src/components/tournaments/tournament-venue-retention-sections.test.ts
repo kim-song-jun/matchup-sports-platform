@@ -2,8 +2,12 @@ import { createElement } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { getTournamentPostEventCards, getVenueNavigationLinks } from './tournament-venue-retention-model';
-import { TournamentPostEventHubSection, TournamentVenuePrepSection } from './tournament-venue-retention-sections';
-import type { V1TournamentFixture } from '@/types/api';
+import {
+  TournamentFixtureReviewEntrySection,
+  TournamentPostEventHubSection,
+  TournamentVenuePrepSection,
+} from './tournament-venue-retention-sections';
+import type { V1ReviewListItem, V1TournamentFixture } from '@/types/api';
 
 // TournamentVenueMap fetches the Kakao Maps JS key via this hook — 이 스위트에서는
 // "키가 없다"는 (그래서 지도 임베드가 스킵되는) 상태를 고정해 규약대로 검증한다.
@@ -263,10 +267,12 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     expect(container).toBeEmptyDOMElement();
   });
 
-  // 경기별 후기 진입은 "대회 후기" 화면(/tournaments/:id/awards)으로 옮겼다 — 대회 상세에
+  // 경기별 후기 진입은 후기 화면(/tournaments/:id/reviews)으로 옮겼다 — 대회 상세에
   // 후기 입구가 둘("대회 후기" 행 + "리뷰할 수 있는 경기" 섹션)이라 어디로 가야 하는지
-  // 헷갈렸다. 여기서는 대회 상세가 더 이상 그 섹션을 렌더하지 않는다는 것만 고정한다.
-  it('대회 상세는 경기별 후기 섹션을 더 이상 렌더하지 않는다 (대회 후기 화면으로 이동)', () => {
+  // 헷갈렸다. 한때 시상 화면(/awards)에 뒀는데, 그러면 후기를 쓰러 온 사람이 "최종
+  // 결과·시상"을 눌러야 해서 라벨과 내용이 다시 어긋났다. 여기서는 대회 상세가 더 이상
+  // 그 섹션을 렌더하지 않는다는 것만 고정한다.
+  it('대회 상세는 경기별 후기 섹션을 더 이상 렌더하지 않는다 (후기 화면으로 이동)', () => {
     const fixtures = [
       {
         id: 'f1',
@@ -294,4 +300,73 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     }
   });
 
+});
+
+/**
+ * 이 섹션은 대회 상세 → 시상 화면(`/awards`) → 후기 화면(`/tournaments/:id/reviews`)으로
+ * 두 번 옮겨졌는데 그동안 자기 렌더 계약을 고정한 테스트가 없었다. 다음에 또 옮기더라도
+ * "어떤 경기가, 몇 개 남았고, 어디로 가는지"는 그대로여야 한다.
+ */
+describe('TournamentFixtureReviewEntrySection', () => {
+  const COMPLETED_FIXTURE = {
+    id: 'fixture-9',
+    round: '조별 1라운드',
+    status: 'completed',
+    homeTeamName: '팀A',
+    awayTeamName: '팀B',
+    result: { homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
+  } as V1TournamentFixture;
+
+  function reviewItem(overrides: Partial<V1ReviewListItem> = {}): V1ReviewListItem {
+    return {
+      sourceType: 'tournament_fixture',
+      sourceId: 'fixture-9',
+      title: '조별 1라운드',
+      completedAt: null,
+      targetType: 'team',
+      targetCount: 5,
+      reviewedCount: 0,
+      remainingCount: 5,
+      state: 'ready',
+      ...overrides,
+    };
+  }
+
+  it('남은 리뷰가 있는 완료 경기를 그 경기의 후기 작성 화면으로 이어준다', () => {
+    render(
+      createElement(TournamentFixtureReviewEntrySection, {
+        fixtures: [COMPLETED_FIXTURE],
+        state: { status: 'ready', items: [reviewItem()] },
+      }),
+    );
+
+    expect(screen.getByText('리뷰할 수 있는 경기')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /팀A 대 팀B/ })).toHaveAttribute(
+      'href',
+      '/my/reviews/tournament_fixture/fixture-9',
+    );
+    expect(screen.getByText('남은 리뷰 5개')).toBeInTheDocument();
+  });
+
+  it('남길 리뷰가 없으면 섹션째 렌더하지 않는다 (빈 껍데기로 자리 차지하지 않음)', () => {
+    const { container } = render(
+      createElement(TournamentFixtureReviewEntrySection, {
+        fixtures: [COMPLETED_FIXTURE],
+        state: { status: 'ready', items: [reviewItem({ remainingCount: 0, state: 'done' })] },
+      }),
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('비로그인 방문자에게는 아무것도 보여주지 않는다', () => {
+    const { container } = render(
+      createElement(TournamentFixtureReviewEntrySection, {
+        fixtures: [COMPLETED_FIXTURE],
+        state: { status: 'guest', items: [] },
+      }),
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
 });

@@ -8,7 +8,6 @@ import { useRef, useState } from 'react';
 import {
   useV1Tournament,
   useV1TournamentParticipantCheck,
-  useV1Reviews,
   useV1MyTournamentReview,
   useV1SubmitTournamentReview,
   useV1UploadImages,
@@ -18,7 +17,6 @@ import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
-import { TournamentFixtureReviewEntrySection } from '@/components/tournaments/tournament-venue-retention-sections';
 import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
@@ -608,35 +606,6 @@ export function useTournamentReviewWriteGate(tournamentId: string, status: V1Tou
 }
 
 /* ── 리뷰 섹션 (실제 데이터 + 권한 gate) ── */
-/**
- * 이 대회의 경기별 후기 진입 — 예전엔 대회 상세에 있었다. 대회 상세에 후기 입구가 두 개
- * ("대회 후기" 행 + "리뷰할 수 있는 경기" 섹션)라 어디로 가야 하는지 헷갈려서, 후기는 이
- * 화면 하나로 모았다. 대회 후기(대회 자체)와 경기별 후기(상대팀·상대 선수)를 같이 본다.
- */
-function FixtureReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
-  const hasSession = hasStoredV1Session();
-  const hasCompletedFixture = tournament.fixtures.some(
-    (fixture) => fixture.status === 'completed' && fixture.result !== null,
-  );
-  const query = useV1Reviews(
-    { tab: 'pending', tournamentId: tournament.id, limit: 50 },
-    { enabled: hasSession && hasCompletedFixture },
-  );
-  if (!hasSession || !hasCompletedFixture) return null;
-
-  const state = query.isError
-    ? { status: 'error' as const, items: [], onRetry: () => void query.refetch() }
-    : query.isPending || query.isFetching
-      ? { status: 'loading' as const, items: [] }
-      : { status: 'ready' as const, items: query.data?.items ?? [] };
-
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <TournamentFixtureReviewEntrySection fixtures={tournament.fixtures} state={state} />
-    </div>
-  );
-}
-
 function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
   const [showForm, setShowForm] = useState(false);
   const { hasSession, isCompleted, isParticipant, alreadyReviewed, canWrite } =
@@ -821,7 +790,6 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
             <IndividualAwardsSection tournament={tournament} />
 
             {/* 참가팀 후기 */}
-            <FixtureReviewsSection tournament={tournament} />
             <ReviewsSection tournament={tournament} />
           </div>
         </div>
@@ -831,7 +799,6 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
         /* 상금 정보가 없는 대회는 2열 그리드 대신 전체 폭 단일 컬럼으로 — 빈 좌측 트랙이 생기지 않도록 */
         <div className="tm-tourn-hero-full" style={{ padding: '0 20px' }}>
           <IndividualAwardsSection tournament={tournament} />
-          <FixtureReviewsSection tournament={tournament} />
             <ReviewsSection tournament={tournament} />
         </div>
       )}

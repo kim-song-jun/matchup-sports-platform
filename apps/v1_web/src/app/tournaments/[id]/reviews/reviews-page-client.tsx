@@ -4,9 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
-import { useV1Tournament, useV1TournamentReviews } from '@/hooks/use-v1-api';
+import { useV1Reviews, useV1Tournament, useV1TournamentReviews } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { hasStoredV1Session } from '@/lib/session-storage';
+import { TournamentFixtureReviewEntrySection } from '@/components/tournaments/tournament-venue-retention-sections';
 import { ReviewCard, ReviewFormModal, useTournamentReviewWriteGate } from '../awards/awards-page-client';
+import type { V1TournamentDetail } from '@/types/api';
 
 const PAGE_SIZE = 10;
 const PAGER_WINDOW = 5;
@@ -85,6 +88,33 @@ function ReviewsPager({
       </button>
     </nav>
   );
+}
+
+/**
+ * 이 대회의 **경기별** 후기 진입 — 대회 후기(대회 자체 별점·코멘트)와는 다른 것이라
+ * 나란히 둔다. 예전엔 대회 상세에 있었다가 시상 화면(`/awards`)으로 옮겨졌는데,
+ * 그러면 "리뷰할 수 있는 경기"를 보려고 **"최종 결과·시상"을 눌러야** 했다 — 후기를
+ * 쓰러 온 사람이 시상 화면을 거쳐야 하는 건, 후기 링크가 시상 화면으로 가던 원래
+ * 문제(오너 지적)를 방향만 바꿔 되풀이한 것이다. 후기는 후기 화면에 모은다.
+ */
+function FixtureReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
+  const hasSession = hasStoredV1Session();
+  const hasCompletedFixture = tournament.fixtures.some(
+    (fixture) => fixture.status === 'completed' && fixture.result !== null,
+  );
+  const query = useV1Reviews(
+    { tab: 'pending', tournamentId: tournament.id, limit: 50 },
+    { enabled: hasSession && hasCompletedFixture },
+  );
+  if (!hasSession || !hasCompletedFixture) return null;
+
+  const state = query.isError
+    ? { status: 'error' as const, items: [], onRetry: () => void query.refetch() }
+    : query.isPending || query.isFetching
+      ? { status: 'loading' as const, items: [] }
+      : { status: 'ready' as const, items: query.data?.items ?? [] };
+
+  return <TournamentFixtureReviewEntrySection fixtures={tournament.fixtures} state={state} />;
 }
 
 export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: string }) {
@@ -172,6 +202,12 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
               로그인하면 참가팀의 팀장·운영진은 후기를 작성할 수 있어요.
             </div>
           ) : null}
+
+          {tournament ? <FixtureReviewsSection tournament={tournament} /> : null}
+
+          <h2 className="tm-hub-section-title" style={{ margin: '24px 0 8px' }}>
+            참가팀 후기
+          </h2>
 
           <label className="tm-reviews-searchbar">
             <Search size={16} aria-hidden="true" />

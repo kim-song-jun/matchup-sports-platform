@@ -31,14 +31,26 @@
 - **숫자 기본값은 `??`를 쓴다.**
 - **커밋은 pathspec으로 내 파일만** + 직후 `git show --stat HEAD` 검증.
 - **base는 `dev`. dev 머지 = alpha 즉시 실배포.** UI 검증은 로컬 next 서버가 아니라 alpha 배포 후 스크린샷(390/768/1440)으로 한다.
-- **레거시 클라이언트 호환 창(스펙 §12.5·§14)은 미결이다** — Task 5에서 구체적으로 다시 다룬다. 이 계획은 배포 순서(백엔드 직후 프론트 배포)를 전제로 "즉시 breaking" 경로를 기본으로 작성하되, 사용자가 이중 지원 기간을 선택하면 Task 5 Step 3의 대안 분기를 따른다.
-- **이상 탐지 자동화 수준(관찰 모드 vs 자동 FLAGGED 전이, 스펙 §14)도 미결이다** — Task 10에서 `DISABLE_REVIEW_RISK_SWEEP` 환경변수(레포 기존 `DISABLE_MARKETPLACE_CRON`/`DISABLE_OPS_ALERT_CRON` 선례와 동일 패턴)로 배포는 가능하게 하되, "판정만 기록하고 status는 안 바꾸는 관찰 모드"는 사용자 결정 후 별도 플래그로 추가한다(Task 10에 정확한 분기 지점 명시).
+- **레거시 payload 이중 지원은 하지 않는다 (2026-08-18 사용자 확정 — 스펙 §14).** `POST /reviews`는 `scores` 4항목만 받는다. Task 5의 "Step 3-대안(이중 지원)"은 **적용하지 않는다.**
+  - **그래서 원자 배포가 필수 제약이 된다.** dev 머지 = alpha 즉시 실배포라, 백엔드 breaking 변경이 프론트보다 먼저 배포되는 순간 구형 프론트가 400을 받는다. 이중 지원이라는 완충이 없으므로 **`POST /reviews` 스키마를 바꾸는 백엔드 태스크(5·6)와 그 호출부 프론트 태스크(14)는 반드시 같은 PR에 넣는다.** 이 제약 때문에 아래 PR 경계를 원래 3개에서 4개로 재편했다(원안은 Task 5를 PR 1, Task 14를 PR 3에 두어 그 사이가 통째로 장애 구간이 됐다).
+- **이상 탐지는 관찰 모드로 시작한다 (2026-08-18 사용자 확정 — 스펙 §14).** 첫 배포에서는 판정 결과(`riskScore`·플래그 row)만 기록하고 **리뷰 status를 `flagged`로 바꾸지 않는다.** Task 10에 `REVIEW_RISK_AUTO_FLAG` 환경변수(미설정 = 관찰 모드, `true`일 때만 자동 전이)를 추가하고, `tx.v1PostEventReview.updateMany(...status:'flagged')` 호출을 이 플래그로 감싼다. `DISABLE_REVIEW_RISK_SWEEP`(스윕 전체 off)와는 **다른 스위치**다 — 전자는 "판정도 안 함", 후자는 "판정은 하되 숨기지 않음".
 
 ---
 
 ## File Structure
 
-### PR 1 — 스키마 + 실출전 게이트 + 48시간 평가창
+> **PR 경계 재편(2026-08-18).** 레거시 이중 지원을 하지 않기로 확정되면서 breaking 백엔드와
+> 프론트가 같은 PR에 있어야 한다. 원안(PR 3개)에서 Task 5·6·7을 떼어 Task 14와 묶은 PR 2를
+> 신설해 **4개**로 재편한다. Task 번호와 내용은 그대로다 — 묶는 단위만 바뀐다.
+>
+> | PR | 태스크 | 성격 |
+> |---|---|---|
+> | PR 1 | Task 1–4 | 스키마·실출전 게이트·48h 창 — **non-breaking** |
+> | PR 2 | Task 5·6·7 + **Task 14** | `POST /reviews` 4항목 전환 + 프론트 제출 폼 — **breaking, 원자 배포** |
+> | PR 3 | Task 8–12 | 이상 탐지 + 운영 큐 (**관찰 모드**로 배포) |
+> | PR 4 | Task 13·15·16 | 이관 리포트 + 요약 표시 + alpha 시각 검증 |
+
+### PR 1 — 스키마 + 실출전 게이트 + 48시간 평가창 (Task 1–4)
 
 | 파일 | 책임 |
 |---|---|
@@ -51,14 +63,26 @@
 | `apps/v1_api/src/reviews/tournament-fixture-reviews.service.ts` (수정) | 실출전 게이트 적용, 48h 마감 체크 |
 | `apps/v1_api/src/reviews/review-deadline.ts` (신규) | 48h 마감 공유 순수함수 |
 | `apps/v1_api/src/reviews/review-deadline.spec.ts` (신규) | 마감 헬퍼 단위 테스트 |
-| `apps/v1_api/src/reviews/reviews.service.ts` (수정) | 48h 체크(team_match), scores 저장, metric 신뢰점수 갱신, advisory lock |
-| `apps/v1_api/src/reviews/dto/submit-review.dto.ts` (수정) | `rating`+`tagCodes` → `scores` 4항목 (breaking) |
-| `apps/v1_api/src/reviews/dto/review-score.dto.ts` (신규) | nested scores DTO |
-| `apps/v1_api/src/reviews/tournament-fixture-review-reputation.ts` (수정) | metric 컬럼 갱신 + advisory lock |
-| `apps/v1_api/src/reviews/tournament-fixture-review-trust.ts` (수정) | metric 컬럼 갱신 + advisory lock |
+| `apps/v1_api/src/reviews/reviews.service.ts` (수정) | 48h 체크(team_match)만. scores 저장·metric 갱신·advisory lock 은 **PR 2** |
 | `apps/v1_api/src/reviews/reviews.service.spec.ts`, `tournament-fixture-reviews.service.spec.ts`, `tournament-fixture-review-reputation.spec.ts`, `tournament-fixture-review-trust.spec.ts` (수정) | 회귀 + 신규 케이스 |
 
-### PR 2 — 이상 탐지 + FLAGGED 운영 큐
+### PR 2 — `POST /reviews` 4항목 전환 + 프론트 제출 폼 (Task 5·6·7 + 14) — **원자 배포**
+
+> 백엔드와 프론트를 **같은 PR**에 둔다. 쪼개면 그 사이 구간에서 구형 프론트가 400을 받는다
+> (이중 지원 없음 확정 — Global Constraints 참조).
+
+| 파일 | 책임 |
+|---|---|
+| `apps/v1_api/src/reviews/dto/submit-review.dto.ts` (수정) | `rating`+`tagCodes` → `scores` 4항목 (breaking) |
+| `apps/v1_api/src/reviews/dto/review-score.dto.ts` (신규) | nested scores DTO |
+| `apps/v1_api/src/reviews/reviews.service.ts` (수정) | scores 저장 + `rating` 파생 + metric 신뢰점수 갱신 + advisory lock |
+| `apps/v1_api/src/reviews/tournament-fixture-review-reputation.ts` (수정) | metric 컬럼 갱신 + advisory lock |
+| `apps/v1_api/src/reviews/tournament-fixture-review-trust.ts` (수정) | metric 컬럼 갱신 + advisory lock |
+| `apps/v1_web/src/components/reviews/reviews-api-clients.tsx` (수정) | 제출 폼을 4항목 슬라이더로 전환 |
+| `apps/v1_web/src/components/reviews/reviews.types.ts` (수정) | `ReviewTargetDraft` → `scores` |
+| `apps/v1_web/src/types/api.ts` (수정) | `scores`/`compositeScore`/`scoringVersion` 요청·응답 타입 |
+
+### PR 3 — 이상 탐지 + FLAGGED 운영 큐 (Task 8–12, 관찰 모드)
 
 | 파일 | 책임 |
 |---|---|
@@ -74,21 +98,18 @@
 | `apps/v1_api/src/reviews/dto/resolve-review-flags.dto.ts` (신규) | resolve 요청 DTO |
 | `apps/v1_api/src/reviews/reviews.module.ts` (수정) | 신규 provider/controller 등록 |
 
-### PR 3 — 데이터 이관 리포트 + 프론트
+### PR 4 — 데이터 이관 리포트 + 요약 표시 + 시각 검증 (Task 13·15·16)
 
 | 파일 | 책임 |
 |---|---|
 | `apps/v1_api/scripts/review-legacy-migration-report.ts` (신규) | 읽기 전용 건수 리포트(스펙 §8) |
-| `apps/v1_web/src/components/reviews/reviews-api-clients.tsx` (수정) | 제출 폼을 4항목 슬라이더로 전환 |
-| `apps/v1_web/src/components/reviews/reviews.types.ts` (수정) | `ReviewTargetDraft` → `scores` |
 | `apps/v1_web/src/components/reviews/reviews-summary-dashboard.tsx` (수정) | 항목별 막대 + legacy 배지 |
-| `apps/v1_web/src/types/api.ts` (수정) | `scores`/`compositeScore`/`scoringVersion` 응답 타입 |
 | `apps/v1_web/src/app/admin/reviews/flags/page.tsx` (신규) | 운영 FLAGGED 큐 화면 |
 | `apps/v1_web/src/components/admin/review-flags-table.tsx` (신규) | groupKey 단위 resolve UI |
 
 ---
 
-# PR 1 — 스키마 + 실출전 게이트 + 48시간 평가창
+# PR 1 — 스키마 + 실출전 게이트 + 48시간 평가창 (Task 1–4)
 
 ## Task 1: Prisma 스키마 + 마이그레이션 + drift gate 재핀
 
@@ -806,13 +827,15 @@ git commit -m "feat(reviews): team_match/tournament_fixture 48시간 평가창 �
 git show --stat HEAD
 ```
 
-> **§14 미결 — 사용자 결정 대기(D-3):** 이 Task는 공개(reveal) 게이트를 건드리지 않는다. 스펙 §3.1이 제시한 "3건 게이트로 승격" 옵션은 이 계획 어디에서도 구현하지 않았다 — 현행 상호제출 OR 72h 유지가 기본값이며, 사용자가 D-3을 결정하면 별도 태스크로 `review-visibility.ts`/`isReviewRevealed()`를 수정한다.
+> **§14 D-3 확정(2026-08-18): 현행 유지.** 이 Task는 공개(reveal) 게이트를 건드리지 않으며, 앞으로도 건드리지 않는다 — 상호제출 OR 72h 그대로다. 스펙 §3.1의 "3건 게이트로 승격" 옵션은 **채택되지 않았다**(팀 2~3개 대회가 영구 "집계 중"에 갇히는 회귀 + `trustState` 배지와 3건 기준이 이중으로 존재하는 혼란). `review-visibility.ts`/`isReviewRevealed()`는 이 스펙 범위에서 수정 대상이 아니다.
 
 ---
 
 ## Task 5: `SubmitReviewDto`를 4항목 `scores`로 전환 (breaking, D-1·D-7·D-11)
 
-> **⚠️ 배포 순서 관련 사용자 결정 대기 (스펙 §12.5·§14):** 이 Task는 `POST /reviews`의 요청 바디를 `rating`+`tagCodes`에서 `scores` 4항목 필수로 바꾼다 — **breaking change**다. 아래 Step 3은 "즉시 breaking"(백엔드 배포 직후 프론트 배포, 그 사이 창에서는 구형 프론트 요청이 400) 경로를 기본으로 작성했다. 사용자가 "짧은 이중 지원 기간"을 선택하면 Step 3-대안을 대신 적용한다 — **아래 두 경로 중 하나를 착수 전에 확정한다.**
+> **✅ 확정(2026-08-18): 이중 지원 없음 — 아래 Step 3(즉시 breaking)만 적용한다.** `POST /reviews`는 `scores` 4항목만 받는다. **Step 3-대안은 적용하지 않는다**(문서에는 근거 보존용으로 남겨 두되 실행하지 않는다).
+>
+> **⚠️ 원자 배포 필수.** 이중 지원이라는 완충이 없으므로, 이 Task와 Task 6·7·**14(프론트 제출 폼)**를 **같은 PR(PR 2)** 에 넣어 함께 배포한다. 백엔드만 먼저 dev에 머지하면 그 즉시 alpha에 배포되어 구형 프론트가 400을 받는다 — PR을 쪼개는 순간 이 결정은 장애가 된다.
 
 **Files:**
 - Modify: `apps/v1_api/src/reviews/dto/submit-review.dto.ts`
@@ -936,7 +959,7 @@ export class SubmitReviewDto {
 }
 ```
 
-- [ ] **Step 3-대안 (사용자가 이중 지원 기간을 선택한 경우에만 적용):**
+- [ ] ~~**Step 3-대안 (이중 지원)** — **미채택(2026-08-18). 실행하지 않는다.** 아래는 결정 근거 보존용 기록이다:~~
 
 `scores`를 optional로 두고 `rating`+`tagCodes`도 함께 받는 과도기 shape을 만든다:
 
@@ -1050,7 +1073,7 @@ Expected: PASS(순수함수라 바로 통과 — TDD의 "실패 확인" 단계�
 
 각 호출부의 함수 시그니처에서 `tagCodes: ReviewTagCode[]`/`tagCodes: TournamentFixtureReviewTagCode[]` 파라미터도 함께 제거하고, 그 파라미터를 넘기던 `submit()` 진입점(`:327-340`, `tournament-fixture-reviews.service.ts`의 `submit()`)의 `uniqueTagCodes(dto.tagCodes)` 호출도 제거한다.
 
-> Step 3-대안(Task 5에서 이중 지원 기간을 택한 경우): `dto.scores`가 있으면 위 4-metric 경로, 없고 `dto.rating`만 있으면 기존 `rating: dto.rating, scoringVersion: 'legacy_single_rating', tags: {...}` 경로를 그대로 유지하는 조건 분기를 추가한다.
+> ~~Step 3-대안(미채택): `dto.scores`가 있으면 위 4-metric 경로, 없고 `dto.rating`만 있으면 기존 `rating: dto.rating, scoringVersion: 'legacy_single_rating', tags: {...}` 경로를 그대로 유지하는 조건 분기를 추가한다.
 
 - [ ] **Step 4: `recalculateUserReputation`에 `metric*` 컬럼 갱신을 추가한다**
 
@@ -1258,11 +1281,11 @@ git commit -m "fix(reviews): 신뢰점수 재계산 4곳에 advisory lock 적용
 git show --stat HEAD
 ```
 
-> **PR 1 종료 지점.** 여기서 PR을 열고 base가 `dev`인지 `gh pr view <N> --json baseRefName`으로 확인한다. 머지 전 `./node_modules/.bin/tsc --noEmit` 0건 + 유닛 테스트 전부 PASS를 실배포 게이트로 취급한다(dev 머지 = alpha 즉시 배포).
+> **PR 1 종료 지점 (Task 1–4).** 여기서 PR을 열고 base가 `dev`인지 `gh pr view <N> --json baseRefName`으로 확인한다. 머지 전 `./node_modules/.bin/tsc --noEmit` 0건 + 유닛 테스트 전부 PASS를 실배포 게이트로 취급한다(dev 머지 = alpha 즉시 배포).
 
 ---
 
-# PR 2 — 이상 탐지 + FLAGGED 운영 큐
+# PR 3 — 이상 탐지 + FLAGGED 운영 큐 (Task 8–12, 관찰 모드)
 
 ## Task 8: 이상 탐지 규칙 3종 순수함수 (§7.2)
 
@@ -1871,7 +1894,68 @@ if (process.env.DISABLE_REVIEW_RISK_SWEEP !== 'true') {
 }
 ```
 
-> `DISABLE_REVIEW_RISK_SWEEP`는 이 저장소의 `DISABLE_MARKETPLACE_CRON`/`DISABLE_OPS_ALERT_CRON` 선례와 동일한 opt-out 패턴이다(CLAUDE.md Known Blockers 2·3 참조) — 배포는 항상 가능하게 하되, 임계값이 튜닝되지 않은 상태에서 자동 FLAGGED 전이가 프로덕션에 나가는 것이 우려되면 이 변수로 끌 수 있다. **다만 이 플래그는 "이상탐지 전체를 끄는" 스위치이지, 스펙 §14가 묻는 "관찰 모드(리스크 스코어만 기록, status는 안 바꿈)"와는 다르다** — 관찰 모드가 필요하면 `handler` 안의 `tx.v1PostEventReview.updateMany(...status:'flagged')` 호출만 별도 플래그로 skip하는 추가 분기가 필요하고, 이는 사용자가 §14를 결정한 뒤 별도로 추가한다.
+> `DISABLE_REVIEW_RISK_SWEEP`는 이 저장소의 `DISABLE_MARKETPLACE_CRON`/`DISABLE_OPS_ALERT_CRON` 선례와 동일한 opt-out 패턴이다(CLAUDE.md Known Blockers 2·3 참조) — 스윕 자체를 끈다.
+>
+> **관찰 모드 확정(2026-08-18 사용자 — 스펙 §14). 두 스위치는 서로 다르다:**
+>
+> | 환경변수 | 미설정(기본) | 설정 시 |
+> |---|---|---|
+> | `DISABLE_REVIEW_RISK_SWEEP` | 스윕 실행 | `true` → **판정 자체를 안 함** |
+> | `REVIEW_RISK_AUTO_FLAG` | **관찰 모드** — 판정·플래그 row 기록, 리뷰 status 유지 | `true` → 자동 `flagged` 전이 |
+>
+> 즉 **첫 배포는 `REVIEW_RISK_AUTO_FLAG` 미설정(관찰 모드)** 으로 나간다. 임계값이 근거 데이터 없는 추정치라, 오탐이 정상 후기를 숨기고 신뢰점수를 흔드는 사고를 먼저 막는 것이 확정된 방침이다. 실데이터로 임계값을 튜닝한 뒤 이 변수를 켠다.
+
+- [ ] **Step 관찰모드-1: `REVIEW_RISK_AUTO_FLAG` 분기 추가**
+
+`review-risk-sweep.service.ts` 핸들러에서 **판정·플래그 row 생성은 항상 실행**하고, 리뷰 status 전이만 감싼다:
+
+```ts
+/**
+ * 관찰 모드(기본값): 이상 판정과 플래그 row는 남기되 리뷰 status 는 건드리지 않는다.
+ * 임계값이 아직 실데이터로 튜닝되지 않은 추정치라, 오탐이 정상 후기를 집계에서
+ * 빼버리는 쪽보다 운영자가 큐를 보고 판단하는 쪽이 안전하다(2026-08-18 사용자 확정, 스펙 §14).
+ * `REVIEW_RISK_AUTO_FLAG=true` 로만 자동 전이를 켠다.
+ */
+const autoFlagEnabled = process.env.REVIEW_RISK_AUTO_FLAG === 'true';
+```
+
+```ts
+// 플래그 row 는 모드와 무관하게 항상 기록한다 -- 운영 큐(Task 11)가 이걸 읽는다.
+await tx.v1PostEventReviewFlag.createMany({ data: flagRows, skipDuplicates: true });
+
+if (autoFlagEnabled) {
+  // status 전이는 반드시 같은 트랜잭션에서 재계산을 동반한다(스펙 §7.2 -- 전이 후
+  // 재계산을 빠뜨리면 캐시된 metric*Score 가 과거값을 들고 남는다).
+  await tx.v1PostEventReview.updateMany({
+    where: { id: { in: flaggedReviewIds } },
+    data: { status: 'flagged' },
+  });
+  await recalculateForFlaggedTargets(tx, flaggedReviewIds);
+}
+```
+
+- [ ] **Step 관찰모드-2: 두 모드 각각의 테스트**
+
+`review-risk-sweep.service.spec.ts`에 **양방향**으로 고정한다 — 기본값이 조용히 자동 전이로 바뀌는 회귀를 잡기 위함이다:
+
+```ts
+it('기본(관찰 모드): 플래그 row 는 만들지만 리뷰 status 는 바꾸지 않는다', async () => {
+  delete process.env.REVIEW_RISK_AUTO_FLAG;
+  // ... 스윕 실행
+  expect(tx.v1PostEventReviewFlag.createMany).toHaveBeenCalled();
+  expect(tx.v1PostEventReview.updateMany).not.toHaveBeenCalled();
+});
+
+it('REVIEW_RISK_AUTO_FLAG=true: flagged 전이 + 재계산까지 수행한다', async () => {
+  process.env.REVIEW_RISK_AUTO_FLAG = 'true';
+  // ... 스윕 실행
+  expect(tx.v1PostEventReview.updateMany).toHaveBeenCalledWith(
+    expect.objectContaining({ data: { status: 'flagged' } }),
+  );
+});
+```
+
+`afterEach`에서 `delete process.env.REVIEW_RISK_AUTO_FLAG`로 되돌려 다른 스펙에 새지 않게 한다.
 
 - [ ] **Step 5: 테스트가 통과하는지 확인한다**
 
@@ -2175,11 +2259,11 @@ git commit -m "feat(reviews): 경기 무효(VOID) 시 관련 리뷰를 archived�
 git show --stat HEAD
 ```
 
-> **PR 2 종료 지점.** PR을 열고 base가 `dev`인지 확인. `DISABLE_REVIEW_RISK_SWEEP`가 배포 직후 기본값(미설정 = 활성)으로 나가도 되는지는 §14 미결(관찰 모드 여부)과 별개로, 이 PR 자체는 룰 임계값이 추정치임을 PR 설명에 명시한다(스펙 §13 리스크 그대로 인용).
+> **PR 3 종료 지점 (Task 8–12).** PR을 열고 base가 `dev`인지 확인. **관찰 모드로 배포한다** — `REVIEW_RISK_AUTO_FLAG` 미설정이 기본이며, 이 상태에서는 판정·플래그 row 기록만 하고 리뷰 status는 바꾸지 않는다(2026-08-18 사용자 확정). 룰 임계값이 추정치임을 PR 설명에 명시한다(스펙 §13 리스크 그대로 인용).
 
 ---
 
-# PR 3 — 데이터 이관 리포트 + 프론트
+# PR 4 — 데이터 이관 리포트 + 요약 표시 + 시각 검증 (Task 13·15·16)
 
 ## Task 13: 레거시 데이터 이관 dry-run 리포트 (§8, 파괴적 작업 아님)
 

@@ -32,6 +32,11 @@ const sportId = 'sport-futsal';
 // N시간 전"으로 매 실행마다 창 안에 들어오도록 계산한다.
 const recordedAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
+/** ReviewPolicySettingsService 스텁 — 마감 기간만 주입한다(기본 168시간=7일). */
+function reviewPolicyStub(windowHours = 168) {
+  return { getWindowHours: jest.fn().mockResolvedValue(windowHours) } as never;
+}
+
 describe('TournamentFixtureReviewsService', () => {
   it('returns the opponent team target for a completed tournament fixture', async () => {
     const prisma = {
@@ -50,7 +55,7 @@ describe('TournamentFixtureReviewsService', () => {
       },
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.source(user, fixtureId)).resolves.toMatchObject({
       source: {
@@ -89,7 +94,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([]),
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     const result = await service.source(user, fixtureId);
 
@@ -124,7 +129,7 @@ describe('TournamentFixtureReviewsService', () => {
       $transaction: jest.fn(),
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(user, { sourceId: fixtureId, targetType: 'user', targetUserId: teammate.id, rating: 5 }, ['manner']),
@@ -142,7 +147,7 @@ describe('TournamentFixtureReviewsService', () => {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(reputationTx(createMock))),
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(user, { sourceId: fixtureId, targetType: 'user', targetUserId: opponentPlayerId, rating: 5 }, ['manner']),
@@ -176,7 +181,7 @@ describe('TournamentFixtureReviewsService', () => {
       $transaction: transactionMock,
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(user, { sourceId: secondFixtureId, targetType: 'user', targetUserId: opponentPlayerId, rating: 1 }, ['manner']),
@@ -200,7 +205,7 @@ describe('TournamentFixtureReviewsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.pending(user, 20)).resolves.toMatchObject([
       {
@@ -228,7 +233,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: { findMany: jest.fn() },
       v1PostEventReview: { findMany: jest.fn() },
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.pending(user, 20, tournamentId)).resolves.toEqual([]);
     expect(prisma.v1PostEventReview.findMany).not.toHaveBeenCalled();
@@ -249,7 +254,7 @@ describe('TournamentFixtureReviewsService', () => {
         playerReviewRow({ id: 'review-mine', reviewerUserId: user.id, targetUserId: opponentPlayerId, rating: 4 }),
       ]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.pending(user, 20)).resolves.toMatchObject([
       { sourceId: fixtureId, targetCount: 3, reviewedCount: 1, remainingCount: 2, state: 'ready' },
@@ -289,7 +294,7 @@ describe('TournamentFixtureReviewsService', () => {
       },
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.source(user, secondFixtureId)).resolves.toMatchObject({
       targets: [
@@ -320,7 +325,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: { findFirst: jest.fn(), findMany: jest.fn() },
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.source(user, fixtureId)).rejects.toMatchObject({
       response: { code: 'SOURCE_NOT_COMPLETED' },
@@ -339,7 +344,7 @@ describe('TournamentFixtureReviewsService', () => {
       $transaction: jest.fn(),
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(teammate, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 4 }, ['manner']),
@@ -357,7 +362,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([]),
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.source(teammate, fixtureId)).resolves.toMatchObject({
       reviewerTeam: { teamId: reviewerTeamId, name: '성수 FC', role: 'member' },
@@ -379,7 +384,7 @@ describe('TournamentFixtureReviewsService', () => {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(reputationTx(createMock))),
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(teammate, { sourceId: fixtureId, targetType: 'user', targetUserId: opponentPlayerId, rating: 4 }, ['manner']),
@@ -400,7 +405,7 @@ describe('TournamentFixtureReviewsService', () => {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(trustTx(createMock))),
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     // 중복 판정이 팀 기준으로 되돌아가면 팀장의 후기가 "내 기존 후기"로 잡혀
     // alreadySubmitted: true로 조기 리턴되고 create가 호출되지 않는다.
@@ -433,7 +438,7 @@ describe('TournamentFixtureReviewsService', () => {
       $transaction: jest.fn().mockRejectedValue({ code: 'P2002' }),
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(teammate, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 2 }, ['manner']),
@@ -450,7 +455,7 @@ describe('TournamentFixtureReviewsService', () => {
       $transaction: transactionMock,
       ...appearanceStore(),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(teammate, { sourceId: fixtureId, targetType: 'team', targetTeamId, rating: 1 }, ['manner']),
@@ -472,7 +477,7 @@ describe('TournamentFixtureReviewsService', () => {
       ]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     // 판정 키가 팀 기준으로 되돌아가면 팀장의 후기가 팀원 전원의 목록을 완료 처리해 []가 된다.
     await expect(service.pending(teammate, 20, tournamentId)).resolves.toMatchObject([
@@ -499,7 +504,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     const error = await service.source(outsider, fixtureId).catch((caught: unknown) => caught);
 
@@ -522,7 +527,7 @@ describe('TournamentFixtureReviewsService', () => {
       // 있지만 공식 결과상 실제로 뛰지 않았다.
       ...appearanceStore([user.id], [opponentPlayerId]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     const result = await service.source(user, fixtureId);
 
@@ -562,7 +567,7 @@ describe('TournamentFixtureReviewsService', () => {
       // 뛰지 않았다(예: 벤치, 부상 대기). 대상(opponentPlayerId)은 실출전이라 roster 검사는 통과한다.
       ...appearanceStore([], [opponentPlayerId]),
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(
       service.submit(
@@ -596,7 +601,7 @@ describe('TournamentFixtureReviewsService', () => {
       // appearedUserIdsBySide()가 game이 null이면 그 델리게이트들을 아예 호출하지 않고
       // 첫 줄에서 null을 반환해야 하고, 이 테스트가 바로 그 계약을 검증한다.
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     const result = await service.source(user, fixtureId);
 
@@ -608,8 +613,8 @@ describe('TournamentFixtureReviewsService', () => {
     ]);
   });
 
-  // 48시간 평가창(Task 4, §6). team_match와 마찬가지로 저장하지 않고 매 조회 시점에 계산한다.
-  it('공식 결과 확정 후 48시간이 지나면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
+  // 평가창(Task 4, §6). 기간은 어드민 설정에서 오고, 저장하지 않고 매 조회 시점에 계산한다.
+  it('공식 결과 확정 후 설정된 기간이 지나면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
     const prisma = {
       v1TournamentFixture: {
         findUnique: jest.fn().mockResolvedValue({
@@ -619,7 +624,7 @@ describe('TournamentFixtureReviewsService', () => {
             currentOfficialRevision: {
               id: 'revision-1',
               state: 'OFFICIAL',
-              officialAt: new Date(Date.now() - (48 * 60 + 1) * 60 * 1000), // 48시간 1분 전
+              officialAt: new Date(Date.now() - (48 * 60 + 1) * 60 * 1000), // 설정값 48시간 기준 1분 초과
             },
           },
         }),
@@ -630,13 +635,43 @@ describe('TournamentFixtureReviewsService', () => {
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: { findFirst: jest.fn(), findMany: jest.fn() },
     };
-    const service = new TournamentFixtureReviewsService(prisma as never);
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub(48));
 
     const error = await service.source(user, fixtureId).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(GoneException);
     expect(error).toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
     expect(prisma.v1TeamMembership.findMany).not.toHaveBeenCalled();
+  });
+
+  // 위 케이스와 같은 픽스처(48시간 1분 경과)를 기본 기간(168시간)에서 보면 아직 열려 있어야 한다.
+  // 이 한 쌍이 "기간이 하드코딩이 아니라 설정에서 온다"는 것을 실제로 증명한다.
+  it('같은 경기라도 설정 기간이 더 길면(기본 168시간) 아직 막지 않는다', async () => {
+    const prisma = {
+      v1TournamentFixture: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...fixture({ id: fixtureId, fixtureNumber: 1 }),
+          game: {
+            id: 'game-1',
+            currentOfficialRevision: {
+              id: 'revision-1',
+              state: 'OFFICIAL',
+              officialAt: new Date(Date.now() - (48 * 60 + 1) * 60 * 1000),
+            },
+          },
+        }),
+      },
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentPlayer: playerStore([]),
+      v1PostEventReview: { findFirst: jest.fn(), findMany: jest.fn() },
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub(168));
+
+    const error = await service.source(user, fixtureId).catch((caught: unknown) => caught);
+
+    // 마감 게이트를 통과했으므로 REVIEW_WINDOW_CLOSED 가 아니어야 하고, 다음 단계(멤버십 조회)까지 갔어야 한다.
+    expect(error).not.toMatchObject({ response: { code: 'REVIEW_WINDOW_CLOSED' } });
+    expect(prisma.v1TeamMembership.findMany).toHaveBeenCalled();
   });
 });
 

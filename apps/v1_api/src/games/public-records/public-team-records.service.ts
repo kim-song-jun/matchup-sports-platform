@@ -236,7 +236,17 @@ export class PublicTeamRecordsService {
     if (gameIds.length === 0) return new Map();
 
     const events = await this.prisma.v1GameEvent.findMany({
-      where: { gameId: { in: gameIds } },
+      // 화면에 그리는 건 GOAL/CARD 뿐이지만 취소 이벤트도 함께 읽어야 한다 -- 아래
+      // `reversedIds` 가 그 `reversesEventId` 로 취소된 골·카드를 걸러내기 때문에,
+      // 타입만으로 좁히면 취소 사실 자체가 사라져 이미 취소된 골이 되살아난다.
+      // 타입을 열거(CORRECTION)하는 대신 `reversesEventId` 유무로 잡는 건
+      // `public-tournament-records.service.ts` 의 같은 쿼리들과 맞춘 것이다 -- 취소가
+      // 어떤 타입으로 기록되든 걸린다. PERIOD_START/FOUL/SUBSTITUTION 등은 이 단계에서
+      // 아예 읽지 않는다(페이지 단위로 여러 경기를 한 번에 읽으므로 payload 까지 딸려온다).
+      where: {
+        gameId: { in: gameIds },
+        OR: [{ type: { in: ['GOAL', 'CARD'] } }, { reversesEventId: { not: null } }],
+      },
       orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
       select: {
         id: true,

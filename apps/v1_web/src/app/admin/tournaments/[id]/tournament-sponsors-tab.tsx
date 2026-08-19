@@ -23,9 +23,11 @@ import type { V1AdminTournamentSponsor } from '@/types/api';
 
 export function TournamentSponsorsTab({
   tournamentId,
+  canWrite,
   showToast,
 }: {
   tournamentId: string;
+  canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
   const [form, setForm] = useState<SponsorForm>(emptySponsorForm);
@@ -115,17 +117,26 @@ export function TournamentSponsorsTab({
 
   return (
     <div className="flex flex-col gap-6">
-      <TournamentSponsorForm
-        form={form}
-        mode={formMode}
-        pending={formPending}
-        uploadingLogo={uploadImages.isPending}
-        logoUploadError={logoUploadError}
-        onSelectLogo={(file) => void handleSelectLogo(file)}
-        setField={setField}
-        onSubmit={handleSubmit}
-        onCancel={editingSponsorId ? resetForm : undefined}
-      />
+      {canWrite ? (
+        <TournamentSponsorForm
+          form={form}
+          mode={formMode}
+          pending={formPending}
+          uploadingLogo={uploadImages.isPending}
+          logoUploadError={logoUploadError}
+          onSelectLogo={(file) => void handleSelectLogo(file)}
+          setField={setField}
+          onSubmit={handleSubmit}
+          onCancel={editingSponsorId ? resetForm : undefined}
+        />
+      ) : (
+        <p
+          className="rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
+          role="status"
+        >
+          조회 전용 권한으로 접속했어요. 협찬 정보를 추가하거나 변경하려면 운영 권한이 필요해요.
+        </p>
+      )}
 
       {(isPending || isError) && (
         <AdminDataTable
@@ -164,31 +175,33 @@ export function TournamentSponsorsTab({
                   {sponsor.benefitText}
                 </p>
               ) : null}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => startEdit(sponsor)}
-                  className={[
-                    'min-h-[44px] rounded-lg bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)]',
-                    'transition-colors hover:bg-[var(--border)]',
-                  ].join(' ')}
-                >
-                  수정
-                </button>
-                {sponsor.isActive ? (
+              {canWrite ? (
+                <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => handleDeactivate(sponsor)}
-                    disabled={deactivateSponsor.isPending}
+                    onClick={() => startEdit(sponsor)}
                     className={[
-                      'min-h-[44px] rounded-lg bg-[var(--red50)] px-3 text-xs font-semibold text-[var(--red700)]',
-                      'transition-colors hover:bg-[var(--tint-red)] disabled:opacity-50',
+                      'min-h-[44px] rounded-lg bg-[var(--surface-soft)] px-3 text-xs font-semibold text-[var(--text-body)]',
+                      'transition-colors hover:bg-[var(--border)]',
                     ].join(' ')}
                   >
-                    비공개
+                    수정
                   </button>
-                ) : null}
-              </div>
+                  {sponsor.isActive ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDeactivate(sponsor)}
+                      disabled={deactivateSponsor.isPending}
+                      className={[
+                        'min-h-[44px] rounded-lg bg-[var(--red50)] px-3 text-xs font-semibold text-[var(--red700)]',
+                        'transition-colors hover:bg-[var(--tint-red)] disabled:opacity-50',
+                      ].join(' ')}
+                    >
+                      비공개
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

@@ -687,7 +687,7 @@ export function RegistrationsTab({
           const isLocked = !!reg.rosterLockedAt;
           return (
             <>
-              {reg.status === 'awaiting_payment' && (
+              {canWrite && reg.status === 'awaiting_payment' && (
                 <ActionButton
                   onClick={() => handleConfirmPayment(reg)}
                   disabled={confirmPayment.isPending}
@@ -696,7 +696,7 @@ export function RegistrationsTab({
                   tone="blue"
                 />
               )}
-              {(reg.status === 'payment_checking' || reg.status === 'paid') && (
+              {canWrite && (reg.status === 'payment_checking' || reg.status === 'paid') && (
                 <>
                   <ActionButton
                     onClick={() => void handleConfirmClick(reg)}
@@ -714,7 +714,7 @@ export function RegistrationsTab({
                   />
                 </>
               )}
-              {reg.status === 'confirmed' &&
+              {canWrite && reg.status === 'confirmed' &&
                 (isLocked ? (
                   <ActionButton
                     onClick={() => handleRosterUnlock(reg)}
@@ -732,7 +732,7 @@ export function RegistrationsTab({
                     tone="gray"
                   />
                 ))}
-              {reg.status === 'confirmed' &&
+              {canWrite && reg.status === 'confirmed' &&
                 (reg.rosterDeadlineOverrideAt ? (
                   <ActionButton
                     onClick={() => handleRosterDeadlineOverrideRevoke(reg)}
@@ -750,7 +750,7 @@ export function RegistrationsTab({
                     tone="gray"
                   />
                 ))}
-              {reg.status === 'cancel_requested' && (
+              {canWrite && reg.status === 'cancel_requested' && (
                 <ActionButton
                   onClick={() => void handleRejectCancel(reg)}
                   disabled={rejectCancelRequest.isPending}
@@ -769,7 +769,7 @@ export function RegistrationsTab({
                 tone="gray"
               />
               <ExportCsvButton registrationId={reg.id} showToast={showToast} />
-              {ADMIN_CANCELLABLE.has(reg.status) && (
+              {canWrite && ADMIN_CANCELLABLE.has(reg.status) && (
                 <ActionButton
                   onClick={() => void handleCancel(reg)}
                   disabled={cancelRegistration.isPending}

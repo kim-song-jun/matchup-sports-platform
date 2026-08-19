@@ -20,9 +20,11 @@ const REVIEWS_PAGE_SIZE = 10;
 
 export function ReviewsTab({
   tournamentId,
+  canWrite,
   showToast,
 }: {
   tournamentId: string;
+  canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
   const [page, setPage] = useState(1);
@@ -89,6 +91,15 @@ export function ReviewsTab({
           부적절한 리뷰를 숨기거나 다시 공개할 수 있어요. 숨긴 리뷰는 사용자 화면에서 보이지 않아요.
         </p>
       </div>
+
+      {!canWrite && (
+        <p
+          className="mb-4 rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
+          role="status"
+        >
+          조회 전용 권한으로 접속했어요. 리뷰를 숨기거나 다시 공개하려면 운영 권한이 필요해요.
+        </p>
+      )}
 
       <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
         <div className="relative flex-1">
@@ -158,6 +169,7 @@ export function ReviewsTab({
               <ReviewModerationCard
                 key={review.id}
                 review={review}
+                canWrite={canWrite}
                 onHide={() => { setHideTarget(review); setHideReason(''); }}
                 onUnhide={() => handleUnhide(review)}
                 unhidePending={unhideReview.isPending}
@@ -243,11 +255,13 @@ export function ReviewsTab({
 
 function ReviewModerationCard({
   review,
+  canWrite,
   onHide,
   onUnhide,
   unhidePending,
 }: {
   review: V1AdminTournamentReview;
+  canWrite: boolean;
   onHide: () => void;
   onUnhide: () => void;
   unhidePending: boolean;
@@ -336,26 +350,28 @@ function ReviewModerationCard({
         </p>
       )}
 
-      <div className="mt-3">
-        {isHidden ? (
-          <button
-            type="button"
-            onClick={onUnhide}
-            disabled={unhidePending}
-            className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            {unhidePending ? '처리 중...' : '공개로 전환'}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onHide}
-            className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            숨기기
-          </button>
-        )}
-      </div>
+      {canWrite && (
+        <div className="mt-3">
+          {isHidden ? (
+            <button
+              type="button"
+              onClick={onUnhide}
+              disabled={unhidePending}
+              className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              {unhidePending ? '처리 중...' : '공개로 전환'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onHide}
+              className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              숨기기
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

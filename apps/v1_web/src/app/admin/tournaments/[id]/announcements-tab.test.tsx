@@ -42,7 +42,7 @@ describe('AnnouncementsTab category round-trip', () => {
 
   it('loads the announcement category into the edit form and includes it in the update payload', async () => {
     const user = userEvent.setup();
-    render(<AnnouncementsTab tournamentId="tournament-1" showToast={vi.fn()} />);
+    render(<AnnouncementsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: `"${announcement.title}" 수정` }));
 
@@ -57,5 +57,16 @@ describe('AnnouncementsTab category round-trip', () => {
     expect(args.announcementId).toBe('ann-1');
     // 과거: update payload에 category 필드 자체가 빠져 서버에 반영되지 않던 버그
     expect(args.body).toMatchObject({ category: 'media' });
+  });
+
+  it('hides the compose form and every mutation button for read-only admins', () => {
+    render(<AnnouncementsTab tournamentId="tournament-1" canWrite={false} showToast={vi.fn()} />);
+
+    expect(screen.getByText(announcement.title)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('조회 전용 권한');
+    expect(screen.queryByRole('button', { name: `"${announcement.title}" 수정` })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: `"${announcement.title}" 삭제` })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: `"${announcement.title}" 발행` })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('제목')).not.toBeInTheDocument();
   });
 });

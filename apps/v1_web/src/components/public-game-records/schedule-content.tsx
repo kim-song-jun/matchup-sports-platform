@@ -97,6 +97,8 @@ type ScheduleEventItem = {
   side: 'home' | 'away';
   icon: string;
   label: string;
+  /** 눈에 보이는 표식(자책골 등). `eventPresentation` 이 필요한 이벤트에만 채운다. */
+  badge?: string;
   participantName: string | null;
   period: number | null;
   clockMs: number | null;
@@ -175,20 +177,69 @@ function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
         color: 'var(--text-caption)',
       }}
     >
-      {halfRow('전반 득점', firstHalf)}
-      <div
-        role="separator"
-        aria-label="전반과 후반 구분"
-        style={{
-          gridColumn: '1 / -1',
-          justifySelf: 'center',
-          width: '50%',
-          height: 0,
-          margin: '6px 0',
-          borderTop: '1px dotted var(--border)',
-        }}
-      />
-      {halfRow('후반 득점', secondHalf)}
+      {sections.map((section) => (
+        <div key={section.key} role="group" aria-label={`${section.label} 기록`} style={{ display: 'grid', gap: 3 }}>
+          {/* 예전엔 전/후반 사이에 점선 하나만 그어서 그게 무슨 경계인지 알 수 없었다 —
+              구간 이름을 직접 적는다(디자인 규칙: 의미 구분은 선·색만으로 하지 않는다). */}
+          <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <span style={{ fontWeight: 700, color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
+              {section.label}
+            </span>
+            <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          </div>
+          {section.items.map((item) => (
+            <ScheduleEventRow key={item.key} item={item} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
+  const content = (
+    <span>
+      {formatGoalMinute(item.clockMs)}
+      {item.participantName ? ` ${item.participantName}` : ''}
+      {isClockAbnormal(item.clockMs) ? <AbnormalClockBadge /> : null}
+    </span>
+  );
+
+  return (
+    <div
+      role="listitem"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: SCORE_AXIS_COLUMNS,
+        columnGap: SCORE_AXIS_COLUMN_GAP,
+        alignItems: 'center',
+      }}
+    >
+      <div style={{ textAlign: 'right' }}>{item.side === 'home' ? content : null}</div>
+      <div style={{ textAlign: 'center', lineHeight: 1 }}>
+        <span aria-hidden="true">{item.icon}</span>
+        <span className="sr-only">{item.label}</span>
+        {item.badge ? (
+          /* 자책골처럼 아이콘만으로 뜻이 갈리지 않는 이벤트에 붙는 **보이는** 표식.
+             `sr-only` 라벨만으로는 화면에서 일반 골과 구분되지 않는다(2026-08-19 alpha 실측:
+             관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
+          <span
+            style={{
+              fontSize: 10,
+              lineHeight: 1.4,
+              padding: '0 4px',
+              borderRadius: 4,
+              fontWeight: 700,
+              color: 'var(--danger-text, #b42318)',
+              background: 'var(--danger-surface, rgba(217,45,32,0.10))',
+            }}
+          >
+            {item.badge}
+          </span>
+        ) : null}
+      </div>
+      <div style={{ textAlign: 'left' }}>{item.side === 'away' ? content : null}</div>
     </div>
   );
 }

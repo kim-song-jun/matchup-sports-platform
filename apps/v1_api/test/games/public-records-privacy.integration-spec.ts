@@ -550,7 +550,6 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     const consentedItem = consentedRecords.items.find((item) => item.gameId === gameMainId);
     expect(consentedItem).toBeDefined();
     expect(consentedItem?.goals).toBe(1);
-    expect(consentedItem?.isCorrected).toBe(false);
   });
 
   it('no-consent: a linked-but-revoked participant contributes to the team goal count but never to their own public user record', async () => {
@@ -637,7 +636,6 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     const consentedItemsForGame = consentedRecords.items.filter((item) => item.gameId === gameMainId);
     expect(consentedItemsForGame).toHaveLength(1);
     expect(consentedItemsForGame[0]?.goals).toBe(2);
-    expect(consentedItemsForGame[0]?.isCorrected).toBe(true);
 
     // The revoked participant still never surfaces even under the new revision.
     const revokedRecords = await userRecords.getRecords(ids.userRevoked, {});

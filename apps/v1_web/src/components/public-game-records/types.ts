@@ -352,14 +352,25 @@ export interface PublicUserRecordsSummary {
 }
 
 /**
- * `GET /users/:id/records` response. Every row here already passed
- * `isParticipantPubliclyEligible` server-side -- this is the user's own
- * career page, so every appearance shown here is one the user consented to
- * make public. `nickname` is the user's own profile nickname, never gated.
+ * `GET /users/:id/records` response.
+ *
+ * `viewerIsOwner`가 `true`면 조회자 본인의 페이지다 -- 이 경우 `consentGranted`가
+ * `false`여도 `items`가 채워진다(본인은 동의 없이도 자기 기록을 볼 수 있다). 다만 그
+ * 상태는 "남에게는 아직 안 보이는 상태"이므로 화면에서 그 사실과 해결 경로(공개 동의
+ * 설정)를 반드시 알려야 한다. `viewerIsOwner`가 `false`면 `items`는 언제나
+ * `isParticipantPubliclyEligible` 서버 게이팅을 통과한(=공개 동의가 켜진) 행만 담는다.
+ * `nickname`은 본인 프로필 닉네임이라 게이팅 대상이 아니다.
+ *
+ * `consentGranted`는 `viewerIsOwner`가 `true`일 때만 응답에 실린다 -- 타인이 조회할 땐
+ * 키 자체가 빠진다(`public-user-records.service.ts`의 서버 측 결정: 본인 동의 여부가
+ * `items` 존재 여부와 별개로 새는 신호이기 때문). 그래서 optional이다 -- 소비처는
+ * `viewerIsOwner`가 `false`일 때 이 필드를 읽으면 안 된다(항상 `undefined`).
  */
 export interface PublicUserRecordsResponse {
   readonly userId: string;
   readonly nickname: string | null;
+  readonly viewerIsOwner: boolean;
+  readonly consentGranted?: boolean;
   readonly summary: PublicUserRecordsSummary;
   readonly items: readonly PublicUserRecordItem[];
   readonly nextCursor: string | null;

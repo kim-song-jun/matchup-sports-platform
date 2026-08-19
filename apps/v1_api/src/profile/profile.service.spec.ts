@@ -337,6 +337,7 @@ describe('ProfileService activitySummary', () => {
         v1MatchParticipant: {
           count: jest.fn().mockResolvedValueOnce(7).mockResolvedValueOnce(2),
         },
+        v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
       };
       const service = new ProfileService(prisma as never);
 
@@ -376,6 +377,7 @@ describe('ProfileService activitySummary', () => {
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+        v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
       };
       const service = new ProfileService(prisma as never);
 
@@ -410,6 +412,7 @@ describe('ProfileService activitySummary', () => {
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+        v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
       };
       const service = new ProfileService(prisma as never);
 
@@ -417,6 +420,257 @@ describe('ProfileService activitySummary', () => {
 
       expect(result.totals.mannerScore).toBe(4);
       expect(result.monthly.mannerScore).toBe(4);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe('ProfileService tournament appearance aggregation', () => {
+  const now = new Date('2026-08-15T12:00:00Z');
+  const monthStart = new Date('2026-08-01T00:00:00Z');
+
+  // countTournamentAppearances()가 읽는 shape을 그대로 흉내낸다: participantId로 연결된
+  // V1GameResultParticipant 행 각각이 하나의 resultRevision(+game)에 속한다.
+  function gameResultRow(config: {
+    gameId: string;
+    revisionId: string;
+    currentOfficialRevisionId: string | null;
+    officialAt: Date | null;
+  }) {
+    // sourceType 은 select 에 없다 — where 가 이미 TOURNAMENT_FIXTURE 로 좁히므로
+    // 서비스가 그 필드를 읽지 않는다(위 TEAM_MATCH 테스트가 where 쪽을 검증한다).
+    return {
+      resultRevision: {
+        id: config.revisionId,
+        gameId: config.gameId,
+        officialAt: config.officialAt,
+        game: { currentOfficialRevisionId: config.currentOfficialRevisionId },
+      },
+    };
+  }
+
+  it('activitySummary(): 신원 연결이 없으면 대회 출전 쿼리를 건너뛰고 레거시 매치 수만 반환한다', async () => {
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      const gameResultParticipantFindMany = jest.fn();
+      const prisma = {
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+        v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+        v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(1) },
+        v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
+        v1GameResultParticipant: { findMany: gameResultParticipantFindMany },
+      };
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.activitySummary(user);
+
+      expect(gameResultParticipantFindMany).not.toHaveBeenCalled();
+      expect(result.totals.activityCount).toBe(3);
+      expect(result.monthly.matchCount).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('activitySummary(): 현재 공식 리비전 + officialAt 있는 대회 출전만 세어 레거시 매치 수에 더한다', async () => {
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      const rows = [
+        // 현재 공식 리비전 + 이번 달 → total, monthly 모두 카운트
+        gameResultRow({
+          gameId: 'game-1',
+          revisionId: 'revision-1-current',
+          currentOfficialRevisionId: 'revision-1-current',
+          officialAt: new Date('2026-08-10T00:00:00Z'),
+        }),
+        // 정정으로 superseded된(구) 리비전 — game.currentOfficialRevisionId가 다른 값을 가리키므로 제외
+        gameResultRow({
+          gameId: 'game-2',
+          revisionId: 'revision-2-old',
+          currentOfficialRevisionId: 'revision-2-new',
+          officialAt: new Date('2026-08-11T00:00:00Z'),
+        }),
+        // officialAt이 아직 없는(미확정) 리비전 — 제외
+        gameResultRow({
+          gameId: 'game-3',
+          revisionId: 'revision-3-current',
+          currentOfficialRevisionId: 'revision-3-current',
+          officialAt: null,
+        }),
+        // 현재 공식 리비전이지만 지난달 경기 — total에는 포함, monthly에서는 제외
+        gameResultRow({
+          gameId: 'game-4',
+          revisionId: 'revision-4-current',
+          currentOfficialRevisionId: 'revision-4-current',
+          officialAt: new Date('2026-07-20T00:00:00Z'),
+        }),
+      ];
+      const prisma = {
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+        v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+        v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0) },
+        v1ParticipantIdentityLinkCurrent: {
+          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+        },
+        v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
+      };
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.activitySummary(user);
+
+      // total: game-1, game-4 (2건) — game-2(superseded), game-3(officialAt null)는 제외
+      expect(result.totals.activityCount).toBe(2);
+      // monthly: game-1만 (1건) — game-4는 지난달
+      expect(result.monthly.matchCount).toBe(1);
+      expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith({
+        where: {
+          participantId: { in: ['participant-1'] },
+          resultRevision: {
+            officialAt: { not: null },
+            game: { sourceType: 'TOURNAMENT_FIXTURE' },
+          },
+        },
+        select: {
+          resultRevision: {
+            select: {
+              id: true,
+              gameId: true,
+              officialAt: true,
+              game: { select: { currentOfficialRevisionId: true } },
+            },
+          },
+        },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('activitySummary(): TEAM_MATCH(팀 매치) 결과가 섞이지 않도록 쿼리에서 sourceType 을 제한한다', async () => {
+    // 레거시 2자 승인 API(identity-link-requests + attest)는 sourceType 검사 없이
+    // TEAM_MATCH 게임 참가자에도 identity link 를 걸 수 있다 — "대회 경기 출전 수"는
+    // TOURNAMENT_FIXTURE 만 세어야 한다(확정 계약). 걸러내는 주체가 DB(where)이므로
+    // 이 테스트는 "그 필터가 쿼리에 실려 나가는가"를 본다 — 필터를 빼면 TEAM_MATCH 행이
+    // 그대로 합산되고 이 단언이 깨진다.
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      const rows = [
+        gameResultRow({
+          gameId: 'game-tournament',
+          revisionId: 'revision-tournament-current',
+          currentOfficialRevisionId: 'revision-tournament-current',
+          officialAt: new Date('2026-08-10T00:00:00Z'),
+        }),
+      ];
+      const prisma = {
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+        v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+        v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0) },
+        v1ParticipantIdentityLinkCurrent: {
+          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+        },
+        v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
+      };
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.activitySummary(user);
+
+      expect(result.totals.activityCount).toBe(1);
+      expect(result.monthly.matchCount).toBe(1);
+      expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            resultRevision: { officialAt: { not: null }, game: { sourceType: 'TOURNAMENT_FIXTURE' } },
+          }),
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('activitySummary(): 같은 gameId가 여러 participant 행으로 잡혀도 gameId 기준으로 한 번만 센다', async () => {
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      const rows = [
+        gameResultRow({
+          gameId: 'game-1',
+          revisionId: 'revision-1-current',
+          currentOfficialRevisionId: 'revision-1-current',
+          officialAt: new Date('2026-08-10T00:00:00Z'),
+        }),
+        // 로스터 교체 등으로 같은 게임에 두 번째 participant 행이 잡혀도 gameId가 같으면 1건으로 처리
+        gameResultRow({
+          gameId: 'game-1',
+          revisionId: 'revision-1-current',
+          currentOfficialRevisionId: 'revision-1-current',
+          officialAt: new Date('2026-08-10T00:00:00Z'),
+        }),
+      ];
+      const prisma = {
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+        v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+        v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+        v1ParticipantIdentityLinkCurrent: {
+          findMany: jest.fn().mockResolvedValue([
+            { participantId: 'participant-1' },
+            { participantId: 'participant-2' },
+          ]),
+        },
+        v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
+      };
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.activitySummary(user);
+
+      expect(result.totals.activityCount).toBe(1);
+      expect(result.monthly.matchCount).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('publicProfile(): 대회 출전 수가 동의 게이트 없이 레거시 매치 수에 합산된다', async () => {
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      const targetUserId = 'user-public-tournament';
+      const baseUser = {
+        id: targetUserId,
+        deletedAt: null,
+        accountStatus: 'active',
+        profile: { nickname: '대회러' },
+        reputationSummary: { trustState: 'sample', mannerScore: null, reviewCount: 0 },
+      };
+      const rows = [
+        gameResultRow({
+          gameId: 'game-1',
+          revisionId: 'revision-1-current',
+          currentOfficialRevisionId: 'revision-1-current',
+          officialAt: new Date('2026-08-10T00:00:00Z'),
+        }),
+      ];
+      const prisma = {
+        v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
+        v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+        v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
+        v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
+        v1ParticipantIdentityLinkCurrent: {
+          // 사용자 단위/participant 단위 동의를 아예 조회하지 않는다 — 이 집계는 게이트 대상이 아니다.
+          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+        },
+        v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
+        v1UserRecordConsent: { findMany: jest.fn() },
+        v1ParticipantConsentSnapshot: { findMany: jest.fn() },
+      };
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.publicProfile(null, targetUserId);
+
+      expect(result.activitySummary.totals.matchCount).toBe(1);
+      expect(result.activitySummary.monthly.matchCount).toBe(1);
+      expect(prisma.v1UserRecordConsent.findMany).not.toHaveBeenCalled();
+      expect(prisma.v1ParticipantConsentSnapshot.findMany).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
     }
@@ -479,6 +733,7 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
       v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
       v1PostEventReview: { findMany },
+      v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
     };
   }
 

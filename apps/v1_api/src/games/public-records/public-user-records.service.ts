@@ -21,7 +21,6 @@ interface EligibleResultRow {
   readonly started: boolean;
   readonly goalkeeper: boolean;
   readonly officialAt: Date;
-  readonly isCorrected: boolean;
   readonly isMvp: boolean;
   readonly score: { home: number; away: number } | null;
 }
@@ -36,12 +35,21 @@ interface EligibleResultRow {
  * 미연동 게스트, 사용자 단위 동의가 없는/철회된 연동, 개별 스냅샷으로 숨긴 참가
  * 기록은 전부 (b)에서 걸러져 조용히 빠진다 -- placeholder/error 행 없음("no
  * `PENDING_IDENTITY` row is created").
+ *
+ * **본인 조회 우회(2026-08-18 사용자 결정)**: 조회자(`viewerId`, 서버 세션 기준 --
+ * `OptionalV1AuthGuard` + `@CurrentUser()`)가 조회 대상 `userId`와 같으면(self-view)
+ * `isParticipantPubliclyEligible`의 **사용자 단위 동의 조건만** 건너뛴다. 신원 연결
+ * (`linkedUserId !== null`) 조건은 그대로 요구한다 -- 연결 자체가 없는 참가 기록은
+ * 남의 것일 수 있어서다. participant 단위 개별 숨김(최신 스냅샷 `REVOKED`)도 본인
+ * 화면에서 그대로 존중한다 -- 이건 사용자 단위 동의와 별개로 "이 경기 하나만 숨기고
+ * 싶다"는 명시적 선택이므로, 동의를 다시 켜도 이 개별 override는 유지돼야 의도와
+ * 맞는다. 판별은 쿼리 파라미터/헤더가 아니라 반드시 서버 세션(`viewerId`)으로만 한다.
  */
 @Injectable()
 export class PublicUserRecordsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getRecords(userId: string, query: PublicRecordsQueryDto) {
+  async getRecords(userId: string, query: PublicRecordsQueryDto, viewerId?: string) {
     const user = await this.prisma.v1User.findUnique({
       where: { id: userId },
       select: { id: true, profile: { select: { nickname: true } } },
@@ -50,7 +58,18 @@ export class PublicUserRecordsService {
       throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User was not found' });
     }
 
-    const eligibleRows = await this.loadEligibleRows(userId, query.season);
+    const viewerIsOwner = viewerId !== undefined && viewerId === userId;
+
+    // 동의 행은 본인 조회일 때만 읽는다 -- 타인 조회에서는 응답에 싣지도 않으므로
+    // (아래 `consentGranted` 주석 참고) 공개 라우트의 hot path 에 쓸모없는 왕복이 하나
+    // 붙는 셈이었다. 개별 참가 기록의 동의 판정은 `loadEligibleRows` 가 자체적으로
+    // (`loadParticipantConsentEligibility`) 하므로 이 조회와 무관하다.
+    const [eligibleRows, consent] = await Promise.all([
+      this.loadEligibleRows(userId, query.season, viewerIsOwner),
+      viewerIsOwner
+        ? this.prisma.v1UserRecordConsent.findUnique({ where: { userId }, select: { state: true } })
+        : Promise.resolve(null),
+    ]);
     const cursor = decodeRecordCursor(query.cursor);
     const limit = query.limit ?? 20;
 
@@ -83,13 +102,29 @@ export class PublicUserRecordsService {
     return {
       userId: user.id,
       nickname: user.profile?.nickname ?? null,
+      viewerIsOwner,
+      // 타인이 조회할 땐 이 필드를 아예 싣지 않는다(계약 변경, 아래 참고) -- 본인 조회일
+      // 때만 boolean으로 채운다.
+      //
+      // 원래 계약(task doc)은 이 필드를 항상 내려보내는 것이었다. 검토 결과 items가
+      // 비어 있을 때(=REVOKED 스냅샷으로 전부 숨겨졌거나, 아직 대회 라인업에 한 번도
+      // 연결된 적이 없거나) consentGranted 값만으로 "이 사용자가 공개 동의를 켰는지"가
+      // items 존재 여부와 별개로 드러난다 -- items가 이미 알려주는 정보(공개된 기록이
+      // 있는지)와 다른, 새로 새는 신호다. 프론트(`user-records-content.tsx`)도 타인
+      // 조회 시 이 값을 전혀 읽지 않으므로(빈 상태 문구가 신원 연결/동의 두 원인을
+      // 구분하지 않고 함께 안내) 기능 손실 없이 막을 수 있다.
+      ...(viewerIsOwner ? { consentGranted: consent?.state === 'GRANTED' } : {}),
       summary,
       items: detail,
       nextCursor,
     };
   }
 
-  private async loadEligibleRows(userId: string, season: string | undefined): Promise<EligibleResultRow[]> {
+  private async loadEligibleRows(
+    userId: string,
+    season: string | undefined,
+    viewerIsOwner: boolean,
+  ): Promise<EligibleResultRow[]> {
     const links = await this.prisma.v1ParticipantIdentityLinkCurrent.findMany({
       where: { userId },
       select: { participantId: true },
@@ -117,7 +152,6 @@ export class PublicUserRecordsService {
             id: true,
             gameId: true,
             officialAt: true,
-            supersedesId: true,
             mvpParticipantId: true,
             score: true,
             game: {
@@ -136,7 +170,17 @@ export class PublicUserRecordsService {
       if (!isCurrent || revision.officialAt === null) continue;
 
       const consent = eligibility.get(row.participantId);
-      if (consent === undefined || !isParticipantPubliclyEligible(consent)) continue;
+      if (consent === undefined) continue;
+      if (viewerIsOwner) {
+        // 본인 조회: 사용자 단위 동의(GRANTED)는 우회한다 -- 신원 연결은 그대로 요구하고
+        // (이론상 항상 참이다. 위 links 쿼리가 이미 userId로 필터링했으므로), participant
+        // 단위 개별 숨김(REVOKED 스냅샷)은 본인이 "이 경기 하나만 숨기겠다"고 명시적으로
+        // 끈 것이므로 본인 화면에서도 그대로 존중한다.
+        if (consent.linkedUserId === null) continue;
+        if (consent.latestParticipantSnapshotState === 'REVOKED') continue;
+      } else if (!isParticipantPubliclyEligible(consent)) {
+        continue;
+      }
 
       if (seasonRange && (revision.officialAt < seasonRange.gte || revision.officialAt >= seasonRange.lt)) {
         continue;
@@ -159,7 +203,6 @@ export class PublicUserRecordsService {
         started: row.started,
         goalkeeper: row.goalkeeper,
         officialAt: revision.officialAt,
-        isCorrected: revision.supersedesId !== null,
         isMvp: revision.mvpParticipantId === row.participantId,
         score: parseScore(revision.score),
       });
@@ -246,7 +289,6 @@ export class PublicUserRecordsService {
         started: row.started,
         goalkeeper: row.goalkeeper,
         mvp: row.isMvp,
-        isCorrected: row.isCorrected,
         officialAt: row.officialAt.toISOString(),
       };
     });

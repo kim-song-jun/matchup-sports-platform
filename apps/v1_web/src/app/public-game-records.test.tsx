@@ -309,6 +309,10 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
   return {
     userId: 'user-1',
     nickname: '홍길동',
+    // 기본값은 **타인 조회** 형태다 — 서버는 이때 `consentGranted` 키를 아예 싣지 않으므로
+    // 픽스처도 그 형태를 그대로 따른다. 여기에 값을 넣어두면 "타인에게도 동의 상태가
+    // 보인다"는 잘못된 계약을 테스트가 정상으로 통과시킨다.
+    viewerIsOwner: false,
     summary: { appearances: 1, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 1 },
     items: [
       {
@@ -343,6 +347,44 @@ describe('UserRecordsContent — 기록 행', () => {
     // KPI 요약 카드에도 "MVP" 라벨이 있어 텍스트만으로는 모호하다 -- 기록 행(목록) 안의
     // 배지(<span>)만 특정해서 확인한다.
     expect(screen.getByText('MVP', { selector: 'section span' })).toBeInTheDocument();
+  });
+});
+
+describe('UserRecordsContent — 본인 전용 공개 안내 배너', () => {
+  it('본인 + 미동의(viewerIsOwner=true, consentGranted=false)면 배너를 보여준다', () => {
+    render(
+      <UserRecordsContent data={makeUserRecords({ viewerIsOwner: true, consentGranted: false })} />,
+    );
+    expect(screen.getByText('이 기록은 아직 나에게만 보여요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '경기 기록 공개 설정하기' })).toHaveAttribute(
+      'href',
+      '/my/settings/record-consent',
+    );
+  });
+
+  it('본인 + 동의(viewerIsOwner=true, consentGranted=true)면 배너를 보여주지 않는다', () => {
+    render(
+      <UserRecordsContent data={makeUserRecords({ viewerIsOwner: true, consentGranted: true })} />,
+    );
+    expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
+  });
+
+  it('타인이 볼 때(viewerIsOwner=false)는 본인 동의 상태와 무관하게 배너를 보여주지 않는다', () => {
+    render(
+      <UserRecordsContent data={makeUserRecords({ viewerIsOwner: false, consentGranted: false })} />,
+    );
+    expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
+  });
+
+  it('본인 + 미동의여도 items가 0건이면(대회 라인업 연결 자체가 없음) 배너 대신 빈 상태만 보여준다', () => {
+    render(
+      <UserRecordsContent
+        data={makeUserRecords({ viewerIsOwner: true, consentGranted: false, items: [] })}
+      />,
+    );
+    // "숨겨진 기록이 있다"는 배너와 "기록이 아예 없다"는 EmptyState가 동시에 뜨면 모순된다.
+    expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
+    expect(screen.getByText('아직 등록된 경기 기록이 없어요')).toBeInTheDocument();
   });
 });
 

@@ -626,6 +626,35 @@ describe('2-C: 결선 경기 정정은 브래킷을 해결할 수 있어야 한�
    *   `POST /games/:id/corrections` + `{home:9, away:0}` → **201, 그대로 저장**
    * 저장된 값엔 킥 수도 선축도 없어 이후 어떤 판정도 근거를 갖지 못했다.
    */
+  /**
+   * **2026-08-19 alpha 감사 F-2 회귀 가드.** 선축이 승계되지 않아, 5킥 전에 결판난 경기의
+   * 정정이 422 로 하드 차단됐다 — 선축이 없으면 결판 판정이 "선축 미상" 분기로 떨어지고
+   * 그 분기는 5킥 바닥을 요구하기 때문이다. 정정 폼에는 승부차기 입력란이 0개라
+   * **운영자에게 탈출구가 없었다**(같은 요청에 선축 키 하나만 붙이면 201 이었다).
+   */
+  it('5킥 전에 결판난 승부차기도 선축을 승계해 정정이 통과한다 — 탈출구 없는 422 방지', async () => {
+    const harness = createHarness({
+      phase: 'semi',
+      hasAdvancementEdge: true,
+      // 각 3킥 3:0 — 잔여 2킥으로 역전 불가라 `end` 가 201 로 받아 주는 정상 조기 결판.
+      baseScore: {
+        home: 1,
+        away: 1,
+        penalties: { home: 3, away: 0, takenHome: 3, takenAway: 3, firstKickSideKey: 'HOME' },
+      },
+    });
+
+    // 폼이 선축을 빠뜨린 형태(옛 번들). 킥 수·선축 모두 base 에서 메워져야 한다.
+    await harness.correct({ score: { home: 1, away: 1, penalties: { home: 3, away: 0 } } });
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 3, away: 0, takenHome: 3, takenAway: 3, firstKickSideKey: 'HOME' },
+    });
+  });
+
   it('승부차기를 새로 쓰는 정정에 킥 수가 없으면 거부한다 — end 레인과 같은 기준', async () => {
     const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true });
 

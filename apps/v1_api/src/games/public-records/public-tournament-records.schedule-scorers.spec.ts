@@ -68,7 +68,7 @@ type FakeGoalEvent = {
   // 취소는 GOAL 행이 아니라 CORRECTION 행이 `reversesEventId` 로 가리킨다.
   // fake 가 type 을 안 갖고 있으면 그 구조를 흉내낼 수 없어, 취소된 골이
   // 그대로 남는 실제 버그를 이 스펙이 못 잡는다(알파 실측으로 드러난 사고).
-  type: 'GOAL' | 'CARD' | 'FOUL' | 'SUBSTITUTION' | 'CORRECTION';
+  type: 'GOAL' | 'OWN_GOAL' | 'CARD' | 'FOUL' | 'SUBSTITUTION' | 'CORRECTION';
   sideId: string;
   participantId: string | null;
   period: number | null;
@@ -239,6 +239,24 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     expect(result.items[0].scorers).toEqual([
       { side: 'home', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
       { side: 'away', participantName: '이영희', jerseyNumber: 10, period: 2, clockMs: 2_700_000 },
+    ]);
+  });
+
+  it('자책골은 득점 귀속 side와 가해 선수 정보를 유지하고 ownGoal=true로 구분한다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [
+        { id: 'og1', gameId: 'game-1', type: 'OWN_GOAL', sideId: 'side-home', participantId: INELIGIBLE.id, period: 1, clockMs: 124_000, reversesEventId: null },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scorers).toEqual([
+      { side: 'home', ownGoal: true, participantName: '이영희', jerseyNumber: 10, period: 1, clockMs: 124_000 },
     ]);
   });
 

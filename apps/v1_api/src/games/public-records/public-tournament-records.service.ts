@@ -1028,10 +1028,9 @@ function presentScheduleEntry(
   // 배포된 클라이언트가 이 배열의 length 를 골 수로 읽고 있어 카드가 섞이면 곧장 오독이 된다.
   const scorers = summarizedEvents
     .filter((event) => event.type === 'GOAL' || event.type === 'OWN_GOAL')
-    .map(({ type, cardColor: _cardColor, ...goal }) => ({
-      ...goal,
-      ownGoal: type === 'OWN_GOAL',
-    }));
+    .map(({ type, cardColor: _cardColor, ...goal }) =>
+      type === 'OWN_GOAL' ? { ...goal, ownGoal: true as const } : goal,
+    );
   const cards = summarizedEvents
     .filter((event) => event.type === 'CARD')
     .map(({ type: _type, ...card }) => card);

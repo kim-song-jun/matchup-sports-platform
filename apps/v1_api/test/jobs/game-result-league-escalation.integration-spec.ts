@@ -23,9 +23,12 @@ async function seedLeagueSubmittedRevision(submittedAt: Date, opts: { asLeague: 
   const homeTeam = await prisma.v1Team.create({ data: { ownerUserId: homeOwnerId, sportId: sport.id, regionId: region.id, name: `esc-home-${suiteId}` } });
   const awayTeam = await prisma.v1Team.create({ data: { ownerUserId: awayOwnerId, sportId: sport.id, regionId: region.id, name: `esc-away-${suiteId}` } });
 
-  let seriesId: string | null = null;
+  // 프로덕션 코드는 이제 v1_team_matches.league_id 로 리그 여부를 판단한다
+  // (result-escalation raw SQL). 구 seriesId 로 픽스처를 만들면 리그로 인식되지 않아
+  // 12시간 에스컬레이션이 안 생긴다 -- 실제로 이 테스트가 그 회귀를 잡았다.
+  let leagueId: string | null = null;
   if (opts.asLeague) {
-    const series = await prisma.v1TeamMatchSeries.create({
+    const league = await prisma.v1League.create({
       data: {
         title: `에스컬레이션 리그 ${suiteId}`,
         sportId: sport.id,
@@ -36,7 +39,7 @@ async function seedLeagueSubmittedRevision(submittedAt: Date, opts: { asLeague: 
         tieBreakJson: { order: ['points', 'goalDifference', 'goalsFor', 'headToHead'] },
       },
     });
-    seriesId = series.id;
+    leagueId = league.id;
   }
   const teamMatch = await prisma.v1TeamMatch.create({
     data: {
@@ -49,7 +52,7 @@ async function seedLeagueSubmittedRevision(submittedAt: Date, opts: { asLeague: 
       startAt: new Date(),
       status: 'matched',
       approvedApplicantTeamId: awayTeam.id,
-      seriesId,
+      leagueId,
     },
   });
   const game = await prisma.v1Game.create({
@@ -86,13 +89,13 @@ async function cleanupLeagueSubmittedRevision(ctx: Awaited<ReturnType<typeof see
   await prisma.v1TeamMatchApplication.deleteMany({ where: { teamMatchId: ctx.teamMatch.id } });
   const teamMatch = await prisma.v1TeamMatch.findUnique({ where: { id: ctx.teamMatch.id } });
   await prisma.v1TeamMatch.delete({ where: { id: ctx.teamMatch.id } });
-  if (teamMatch?.seriesId) await prisma.v1TeamMatchSeries.delete({ where: { id: teamMatch.seriesId } }).catch(() => undefined);
+  if (teamMatch?.leagueId) await prisma.v1League.delete({ where: { id: teamMatch.leagueId } }).catch(() => undefined);
 }
 
 describe('GameResultSubmittedEscalationService — 리그 12시간 에스컬레이션', () => {
   afterAll(async () => prisma.$disconnect());
 
-  it('seriesId가 있는 팀매치는 12시간 뒤 due_at인 ESCALATION 행 1개만 생기고, escalationHandler가 원정+홈+admin 3명에게 알림을 보낸다', async () => {
+  it('leagueId가 있는 팀매치는 12시간 뒤 due_at인 ESCALATION 행 1개만 생기고, escalationHandler가 원정+홈+admin 3명에게 알림을 보낸다', async () => {
     const service = new GameResultSubmittedEscalationService();
     const submittedAt = new Date(Date.now() - 13 * 60 * 60 * 1_000); // 13시간 전 -> 12h 임계값 지남
     const ctx = await seedLeagueSubmittedRevision(submittedAt);
@@ -122,7 +125,7 @@ describe('GameResultSubmittedEscalationService — 리그 12시간 에스컬레�
     }
   });
 
-  it('seriesId가 없는(일반) 팀매치는 기존 48시간 임계값과 0건 리그알림 동작이 그대로 유지된다', async () => {
+  it('leagueId가 없는(일반) 팀매치는 기존 48시간 임계값과 0건 리그알림 동작이 그대로 유지된다', async () => {
     const service = new GameResultSubmittedEscalationService();
     const submittedAt = new Date(Date.now() - 1_000);
     const ctx = await seedLeagueSubmittedRevision(submittedAt, { asLeague: false });

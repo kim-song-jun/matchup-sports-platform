@@ -10,6 +10,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { TournamentPopupForm } from './tournament-popup-form';
 import {
   emptyPopupForm,
@@ -40,6 +41,7 @@ export function TournamentPopupTab({
   const createPopup = useV1CreateTournamentPopup(tournamentId);
   const updatePopup = useV1UpdateTournamentPopup(tournamentId);
   const deletePopup = useV1DeleteTournamentPopup(tournamentId);
+  const { confirm: confirmModal, ConfirmModal } = useConfirm();
   const popups = data?.items ?? [];
   const formMode = editingPopupId ? 'update' : 'create';
   const formPending = createPopup.isPending || updatePopup.isPending;
@@ -85,8 +87,13 @@ export function TournamentPopupTab({
     setEditingPopupId(popup.id);
   };
 
-  const handleDelete = (popup: V1AdminTournamentPopup) => {
-    const confirmed = window.confirm(`"${popup.title}" 팝업을 삭제할까요? 삭제한 팝업은 복구할 수 없어요.`);
+  const handleDelete = async (popup: V1AdminTournamentPopup) => {
+    const confirmed = await confirmModal({
+      title: '팝업을 삭제할까요?',
+      message: `"${popup.title}" 팝업을 삭제해요. 삭제한 팝업은 복구할 수 없어요.`,
+      confirmLabel: '삭제',
+      tone: 'danger',
+    });
     if (!confirmed) return;
     deletePopup.mutate(popup.id, {
       onSuccess: () => {
@@ -164,7 +171,7 @@ export function TournamentPopupTab({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDelete(popup)}
+                    onClick={() => void handleDelete(popup)}
                     disabled={deletePopup.isPending}
                     className={[
                       'min-h-[44px] rounded-lg bg-[var(--red50)] px-3 text-xs font-semibold text-[var(--red700)]',
@@ -179,6 +186,7 @@ export function TournamentPopupTab({
           ))}
         </div>
       )}
+      {ConfirmModal}
     </div>
   );
 }

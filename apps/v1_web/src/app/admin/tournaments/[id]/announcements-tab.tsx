@@ -5,6 +5,7 @@ import { Megaphone, Send, Pencil, Trash2 } from 'lucide-react';
 import { useV1AdminAnnouncements, useV1CreateAnnouncement, useV1DeleteAnnouncement, useV1PublishAnnouncement, useV1UpdateAnnouncement } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentAnnouncement, V1AnnouncementAudience, V1AnnouncementCategory } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { formatDate } from './tournament-admin-shared';
@@ -32,6 +33,7 @@ export function AnnouncementsTab({
   const updateAnnouncement = useV1UpdateAnnouncement(tournamentId);
   const publishAnnouncement = useV1PublishAnnouncement(tournamentId);
   const deleteAnnouncement = useV1DeleteAnnouncement(tournamentId);
+  const { confirm: confirmModal, ConfirmModal } = useConfirm();
 
   const [editingAnnouncement, setEditingAnnouncement] = useState<V1AdminTournamentAnnouncement | null>(null);
   const [annTitle, setAnnTitle] = useState('');
@@ -119,8 +121,13 @@ export function AnnouncementsTab({
     });
   };
 
-  const handleDelete = (ann: V1AdminTournamentAnnouncement) => {
-    const confirmed = window.confirm(`"${ann.title}" 공지를 삭제할까요? 삭제한 공지는 복구할 수 없어요.`);
+  const handleDelete = async (ann: V1AdminTournamentAnnouncement) => {
+    const confirmed = await confirmModal({
+      title: '공지를 삭제할까요?',
+      message: `"${ann.title}" 공지를 삭제해요. 삭제한 공지는 복구할 수 없어요.`,
+      confirmLabel: '삭제',
+      tone: 'danger',
+    });
     if (!confirmed) return;
     deleteAnnouncement.mutate(ann.id, {
       onSuccess: () => {
@@ -322,7 +329,7 @@ export function AnnouncementsTab({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDelete(ann)}
+                  onClick={() => void handleDelete(ann)}
                   disabled={deleteAnnouncement.isPending}
                   aria-label={`"${ann.title}" 삭제`}
                   className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-lg text-xs font-medium text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2"
@@ -339,6 +346,7 @@ export function AnnouncementsTab({
           ))}
         </div>
       )}
+      {ConfirmModal}
     </div>
   );
 }

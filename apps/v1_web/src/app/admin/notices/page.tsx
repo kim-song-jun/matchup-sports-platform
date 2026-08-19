@@ -21,12 +21,10 @@ import {
   useV1UpdateAdminNotice,
 } from '@/hooks/use-v1-api';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
-import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { EMPTY_RICH_CONTENT, isRichContentEmpty, resolveRichContent, richContentPlainText } from '@/lib/rich-content';
 import type {
   AdminListFilters,
-  CursorPage,
   V1AdminNoticeAudience,
   V1AdminNoticeCategory,
   V1AdminNoticeCreatePayload,

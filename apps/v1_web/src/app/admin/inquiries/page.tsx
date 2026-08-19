@@ -12,11 +12,9 @@ import {
   useAdminToast,
 } from '@/components/admin';
 import { useV1AdminInquiries } from '@/hooks/use-v1-api';
-import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import type {
   AdminListFilters,
-  CursorPage,
   V1AdminInquiryRow,
   V1InquiryCategory,
   V1InquiryStatus,

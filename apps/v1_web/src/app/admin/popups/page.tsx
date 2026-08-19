@@ -27,6 +27,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { isSafePopupLink, isSafePopupTargetPath, POPUP_TARGET_LABELS, POPUP_TARGET_OPTIONS } from '@/lib/popup-targets';
 import { EMPTY_RICH_CONTENT, isRichContentEmpty, resolveRichContent, richContentPlainText } from '@/lib/rich-content';
 import type {
@@ -149,6 +150,7 @@ export default function AdminPopupsPage() {
   const createPopup = useV1CreateAdminPopup();
   const updatePopup = useV1UpdateAdminPopup();
   const deletePopup = useV1DeleteAdminPopup();
+  const { confirm: confirmModal, ConfirmModal } = useConfirm();
   const tournamentsQuery = useV1AdminTournaments({ limit: 50 });
   const contentAssets = useTemporaryContentAssets();
   const isSaving = createPopup.isPending || updatePopup.isPending;
@@ -276,8 +278,14 @@ export default function AdminPopupsPage() {
     });
   }
 
-  function removePopup(row: V1AdminPopupRow) {
-    if (!window.confirm(`“${row.title}” 팝업을 삭제할까요? 삭제한 내용은 복구할 수 없어요.`)) return;
+  async function removePopup(row: V1AdminPopupRow) {
+    const confirmed = await confirmModal({
+      title: '팝업을 삭제할까요?',
+      message: `“${row.title}” 팝업을 삭제해요. 삭제한 내용은 복구할 수 없어요.`,
+      confirmLabel: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     deletePopup.mutate(row.popupId, {
       onSuccess: () => {
         if (selectedId === row.popupId) setSelectedId('');
@@ -358,7 +366,7 @@ export default function AdminPopupsPage() {
                 <button type="button" onClick={() => openEdit(row)} disabled={!canWrite || isMutating} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--text-body)] hover:border-blue-300 hover:text-[var(--blue700)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
                   <Pencil size={15} aria-hidden="true" /> 수정
                 </button>
-                <button type="button" onClick={() => removePopup(row)} disabled={!canWrite || isMutating} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-[var(--tint-red-border)] bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--red700)] hover:bg-[var(--tint-red)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2">
+                <button type="button" onClick={() => void removePopup(row)} disabled={!canWrite || isMutating} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-[var(--tint-red-border)] bg-[var(--card-surface)] px-3 text-sm font-semibold text-[var(--red700)] hover:bg-[var(--tint-red)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2">
                   <Trash2 size={15} aria-hidden="true" /> 삭제
                 </button>
               </>
@@ -443,6 +451,7 @@ export default function AdminPopupsPage() {
       />
 
       <AdminToasts toasts={toasts} />
+      {ConfirmModal}
     </>
   );
 }

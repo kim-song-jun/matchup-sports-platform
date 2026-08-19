@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Film } from 'lucide-react';
+import { Film, MapPin } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import {
   TournamentStandingsTable,
@@ -320,7 +320,7 @@ function ScheduleRow({
       // 구분선을 인라인이 아니라 클래스로 그린다 — 인라인 style 은 미디어쿼리가 이길 수
       // 없어서, 데스크톱에서 목록을 2열로 펼 때 격자선을 다시 그릴 방법이 없어진다.
       // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
-      className={`tm-pressable${myFixture ? '' : ' tm-schedule-row'}`}
+      className={`tm-pressable${myFixture ? '' : ' tm-schedule-card'}`}
       style={{
         display: 'block',
         padding: '12px 16px',
@@ -399,8 +399,13 @@ function ScheduleRow({
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
       <MatchEventSummary entry={entry} />
       {venue ? (
+        // 아이콘을 함께 둔다 — 경기장 이름이 "1 (1)" 처럼 짧으면 맨 텍스트만으로는 그게
+        // 장소인지 번호인지 알 수 없다(오너 지적: "1(1)은 뭔지 모르겠고").
         // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.
-        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)' }}>{venue}</div>
+        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <MapPin size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <span>{venue}</span>
+        </div>
       ) : null}
     </Link>
   );
@@ -413,7 +418,7 @@ function ScheduleRow({
   // 형제로 둔다: 링크 안에 링크를 넣으면 유효하지 않은 마크업이 되고 클릭 대상도 모호해진다.
   return (
     <div
-      className="tm-schedule-row tm-schedule-row-mine"
+      className="tm-schedule-card tm-schedule-card-mine"
       style={{
         borderLeft: '3px solid var(--blue500)',
         // 예전에는 행 전체를 `--blue50`(#e8f3ff)로 칠했다 — 내 팀 경기가 연달아 있으면
@@ -529,7 +534,9 @@ function ScheduleGroupBlock({
           {group.label}
         </div>
       ) : null}
-      <Card pad={0} className="tm-schedule-list">
+      {/* 예전엔 `Card` 하나를 grid 로 쪼갰다 — 화면에는 한 장을 반으로 자른 것처럼 보이고
+          경기마다 테두리가 없어 카드로 읽히지 않았다(오너 지적). 이제 경기 하나가 카드 하나다. */}
+      <div className="tm-schedule-list">
         {group.entries.map((entry) => (
           <ScheduleRow
             key={entry.fixtureId}
@@ -539,7 +546,7 @@ function ScheduleGroupBlock({
             showGroupLabel={!showGroupHeading}
           />
         ))}
-      </Card>
+      </div>
     </div>
   );
 }

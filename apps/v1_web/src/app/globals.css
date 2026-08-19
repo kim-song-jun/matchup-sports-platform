@@ -6253,10 +6253,19 @@ button:disabled {
   .tm-reviews-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* §경기 일정 목록 — 행 구분선은 인라인이 아니라 여기서 그린다(인라인이면 아래 데스크톱
-   2열 규칙이 이길 수 없다). 첫 행 위에는 선을 긋지 않는다 — 카드 자체 테두리와 겹친다. */
-.tm-schedule-row { border-top: 1px solid var(--grey100); }
-.tm-schedule-list > .tm-schedule-row:first-child { border-top: 0; }
+/* §경기 일정 목록 — **경기 하나가 카드 하나**다. 예전엔 카드 한 장을 grid 로 쪼개서
+   화면에는 한 장을 반으로 자른 것처럼 보였고, 경기마다 테두리가 없어 카드로 읽히지
+   않았다(오너 지적). 이제 목록은 카드들을 담는 그리드일 뿐이다. */
+.tm-schedule-list {
+  display: grid;
+  gap: 10px;
+}
+.tm-schedule-card {
+  border: 1px solid var(--grey150);
+  border-radius: 12px;
+  background: var(--bg);
+  overflow: hidden;
+}
 
 .tm-hub-section-title {
   font-size: 15px;
@@ -6346,23 +6355,13 @@ button:disabled {
      길어졌다. 읽기 좋은 폭으로 묶어 가운데 세운다. */
 
   /* §경기 일정 가로 밀도 — 1440 실측에서 경기 카드가 한 열로만 쌓여 세로로 길고 좌우가
-     비었다(오너 지적: "너무 세로로만 길고 아쉽다"). 가로가 남는 폭에서는 두 열로 펴
-     한 화면에 두 배의 경기를 담는다. 모바일은 기존 한 열 리스트 그대로다.
-     홀수 번째 셀에만 오른쪽 선을 둬 두 열 사이 경계를 만들고, 두 번째 행부터는
-     `.tm-schedule-row` 의 위쪽 선이 가로 격자를 이룬다 — 첫 두 셀은 위 선을 지운다. */
+     비었다(오너 지적: "너무 세로로만 길고 아쉽다"). 가로가 남는 폭에서는 두 열로 편다.
+     `repeat(2, ...)` 고정이 아니라 auto-fit 인 이유: 일정을 조·라운드로 묶고 나니 한
+     그룹에 경기가 하나뿐인 경우(A조 1경기)가 흔한데, 2열 고정이면 오른쪽 절반이 통째로
+     비어 보인다(alpha 실측). auto-fit 은 채울 카드가 없으면 트랙을 접는다. */
   .tm-schedule-list {
-    display: grid;
-    /* `repeat(2, ...)` 고정이 아니라 auto-fit — 일정을 조·라운드로 묶고 나니 한 그룹에
-       경기가 하나뿐인 경우(A조 1경기)가 흔한데, 2열 고정이면 오른쪽 절반이 통째로 비어
-       보인다(alpha 실측). auto-fit 은 채울 카드가 없으면 트랙을 접어 남은 카드가 폭을
-       가져간다 — 2경기 이상인 그룹은 예전처럼 두 열로 펴진다. */
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
-    /* align-items 를 건드리지 않는다(기본 stretch). `start` 로 두면 같은 행의 두 셀이
-       각자 콘텐츠 높이만 차지해서, 한쪽에만 "라인업 보기" 버튼이 붙은 행에서 세로
-       구분선이 짧게 끊기고 격자가 들쭉날쭉해진다(alpha 실측). */
   }
-  .tm-schedule-list > .tm-schedule-row:nth-child(odd) { border-right: 1px solid var(--grey100); }
-  .tm-schedule-list > .tm-schedule-row:nth-child(-n + 2) { border-top: 0; }
 
   .tm-bracket-schedule-pane {
     /* 840 → 1040: 이 폭은 경기 카드가 한 열로 쌓이던 시절 "읽기 좋은 한 열 폭"으로 정한

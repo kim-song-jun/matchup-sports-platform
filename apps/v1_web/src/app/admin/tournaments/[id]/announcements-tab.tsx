@@ -52,6 +52,7 @@ export function AnnouncementsTab({
     setEditingAnnouncement(ann);
     setAnnTitle(ann.title);
     setAnnBody(ann.body);
+    setAnnCategory(ann.category);
     setAnnAudience(ann.audience as V1AnnouncementAudience);
     setAnnPublish(Boolean(ann.publishedAt));
   };
@@ -62,6 +63,7 @@ export function AnnouncementsTab({
     const payload = {
       title: annTitle.trim(),
       body: annBody.trim(),
+      category: annCategory,
       audience: annAudience,
       publish: annPublish,
     };
@@ -193,7 +195,7 @@ export function AnnouncementsTab({
                 id="ann-category"
                 value={annCategory}
                 onChange={(e) => setAnnCategory(e.target.value as V1AnnouncementCategory)}
-                disabled={createAnnouncement.isPending}
+                disabled={isSavingAnnouncement}
                 className={inputCls}
               >
                 <option value="general">일반</option>
@@ -241,7 +243,7 @@ export function AnnouncementsTab({
             className={submitBtnCls}
           >
             <Megaphone size={15} aria-hidden="true" />
-            {createAnnouncement.isPending ? '작성 중…' : '공지 작성'}
+            {isSavingAnnouncement ? '저장 중…' : editingAnnouncement ? '공지 수정' : '공지 작성'}
           </button>
         </form>
       </div>

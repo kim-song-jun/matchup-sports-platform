@@ -134,7 +134,12 @@ export class LeagueMatchAdminService {
     const schedule = generateRoundRobinFixtures(teamIds, dto.weeksCount);
 
     const createdIds = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "v1_team_match_series" WHERE id = ${leagueId} FOR UPDATE`;
+      // 락은 신 테이블(v1_leagues)에 건다. 재명명 때 Prisma 델리게이트만 바꾸고 이 raw SQL
+      // 문자열을 놓쳐 구 테이블을 잠그고 있었다 -- 문자열 안의 테이블명은 타입 시스템이 못 본다.
+      // 구 테이블을 잠그면 두 겹으로 위험하다: ① 미러 행이 없는 리그에서는 SELECT ... FOR UPDATE
+      // 가 0행이라 아무것도 잠그지 않아 동시성 보호가 조용히 사라지고, ② 수축 릴리스가 그 테이블을
+      // 지우는 순간 relation does not exist 로 깨진다.
+      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
       const existingCount = await tx.v1TeamMatch.count({ where: { leagueId } });
       if (existingCount > 0) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });

@@ -477,6 +477,7 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
     return {
       v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
       v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
       v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
       v1PostEventReview: { findMany },
     };
@@ -604,6 +605,68 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
 
       expect(result.reputation.reviewCount).toBe(1);
       expect(result.reputation.mannerScore).toBe(5);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('동의된 공식 대회 출전 기록을 활동 요약과 이번 달 대회 수에 반영한다', async () => {
+    const now = new Date('2026-08-15T12:00:00Z');
+    jest.useFakeTimers().setSystemTime(now);
+
+    try {
+      const prisma = {
+        ...buildPrisma(),
+        v1ParticipantIdentityLinkCurrent: {
+          findMany: jest.fn().mockImplementation((args: { where: Record<string, unknown> }) =>
+            Promise.resolve(
+              'userId' in args.where
+                ? [{ participantId: 'participant-1' }]
+                : [{ participantId: 'participant-1', linkId: 'link-1', userId: targetUserId }],
+            ),
+          ),
+        },
+        v1UserRecordConsent: {
+          findMany: jest.fn().mockResolvedValue([{ userId: targetUserId, state: 'GRANTED' }]),
+        },
+        v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
+        v1GameResultParticipant: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 'result-participant-1',
+              resultRevisionId: 'revision-1',
+              participantId: 'participant-1',
+              sideId: 'side-away',
+              started: true,
+              minutesPlayed: null,
+              goals: 1,
+              assists: 0,
+              cards: { yellow: 0, red: 0 },
+              goalkeeper: false,
+              resultRevision: {
+                id: 'revision-1',
+                gameId: 'game-1',
+                officialAt: now,
+                supersedesId: null,
+                mvpParticipantId: null,
+                score: { home: 1, away: 1, penalties: { home: 2, away: 3 } },
+                game: {
+                  sourceType: 'TOURNAMENT_FIXTURE',
+                  tournamentFixtureId: 'fixture-1',
+                  currentOfficialRevisionId: 'revision-1',
+                  tournamentFixture: { tournamentId: 'tournament-1' },
+                },
+              },
+            },
+          ]),
+        },
+      };
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.publicProfile(null, targetUserId);
+
+      expect(result.activitySummary.totals).toMatchObject({ matchCount: 1, tournamentCount: 1 });
+      expect(result.activitySummary.monthly).toMatchObject({ matchCount: 1, tournamentCount: 1 });
     } finally {
       jest.useRealTimers();
     }

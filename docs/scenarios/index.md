@@ -301,6 +301,18 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 ## How To Use
 
+## 2026-08-19 — Team records and public profile integration
+
+- Status: PASS, 2 routes x 3 viewports.
+- Routes: team records and public user profile.
+- Verified penalty-based 5-0-0 summary, separate 3:2 shootout display,
+  lazy goal-detail expansion, exact match-detail navigation, removed
+  corrected badges, tournament activity counts, and responsive overflow.
+- All intercepted contract APIs and the real public match-detail API
+  returned 200. Console errors, page errors, and request failures were zero.
+- Before/after screenshots and the run manifest are under
+  output/playwright/task-127-records-profile.
+
 1. `index.md`에서 현재 우선순위와 열린 논점을 확인한다.
 2. 해당 기능 문서로 이동해 체크박스를 직접 갱신한다.
 3. 이슈가 생기면 개별 문서에도 적고, 최종 판단/논의는 `Discussion`에 요약한다.

@@ -158,8 +158,9 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
                 </span>
                 <span className="tm-text-body" style={{ fontWeight: 700 }}>활동 요약</span>
               </div>
-              <div className="tm-my-profile-stats">
-                <StatItem label="매치" value={activitySummary.totals.matchCount} unit="회" />
+              <div className="tm-my-monthly">
+                <StatItem label="경기" value={activitySummary.totals.matchCount} unit="회" />
+                <StatItem label="대회" value={activitySummary.totals.tournamentCount} unit="개" />
                 <StatItem label="팀" value={activitySummary.totals.teamCount} unit="개" />
                 <StatItem label="후기" value={activitySummary.totals.reviewCount} unit="개" />
               </div>
@@ -173,7 +174,8 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
                 <span className="tm-text-body" style={{ fontWeight: 700 }}>이번 달 활동</span>
               </div>
               <div className="tm-my-monthly">
-                <StatItem label="매치" value={activitySummary.monthly.matchCount} unit="회" />
+                <StatItem label="경기" value={activitySummary.monthly.matchCount} unit="회" />
+                <StatItem label="대회" value={activitySummary.monthly.tournamentCount} unit="개" />
                 <StatItem label="팀 가입" value={activitySummary.monthly.teamJoinCount} unit="회" />
                 <StatItem label="후기" value={activitySummary.monthly.reviewCount} unit="개" />
               </div>

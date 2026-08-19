@@ -254,6 +254,8 @@ export interface PublicTeamRecordItem {
   readonly gameId: string;
   readonly teamMatchId: string | null;
   readonly tournamentId: string | null;
+  readonly fixtureId: string | null;
+  readonly round: string | null;
   readonly tournamentTitle: string | null;
   readonly opponentTeamId: string | null;
   readonly opponentTeamName: string | null;
@@ -262,6 +264,7 @@ export interface PublicTeamRecordItem {
   readonly result: string;
   readonly goalsFor: number;
   readonly goalsAgainst: number;
+  readonly penalties: { readonly for: number; readonly against: number } | null;
   readonly officialAt: string;
   readonly isCorrected: boolean;
 }

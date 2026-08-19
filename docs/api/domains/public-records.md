@@ -272,3 +272,17 @@ identity/side itself:
 - `nextMatch` on the match view is a simple "next fixture where either of
   these two teams next appears" lookup, not a bracket-aware "next round"
   projection.
+
+### Team record outcome and detail contract (2026-08-19)
+
+- Team result uses regulation goals first. When regulation is tied and an
+  official penalty score exists, penalties decide WON or LOST; only a match
+  with no decisive shootout remains DRAWN.
+- Goals for and against remain regulation goals. A shootout is returned
+  separately as the team-oriented penalties object with for and against.
+- Tournament record rows include fixtureId and round. The web list uses
+  those identifiers to lazily request the existing public match endpoint,
+  so goal events and consent-filtered scorer names share the match-detail
+  projection.
+- isCorrected remains available for audit-aware consumers, but compact team
+  and user record lists do not render a separate 정정됨 badge.

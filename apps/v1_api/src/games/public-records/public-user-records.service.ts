@@ -1,17 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { officialRecordResult } from '../../game-operations/official-score-outcome';
 import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, isAfterCursor, type RecordCursor } from './public-cursor';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from './public-consent';
 
-interface EligibleResultRow {
+export interface EligibleResultRow {
   readonly participantResultId: string;
   readonly resultRevisionId: string;
   readonly participantId: string;
   readonly gameId: string;
   readonly sourceType: string;
   readonly tournamentFixtureId: string | null;
+  readonly tournamentId: string | null;
   readonly sideId: string;
   readonly goals: number;
   readonly assists: number;
@@ -23,7 +25,7 @@ interface EligibleResultRow {
   readonly officialAt: Date;
   readonly isCorrected: boolean;
   readonly isMvp: boolean;
-  readonly score: { home: number; away: number } | null;
+  readonly score: { home: number; away: number; penalties?: { home: number; away: number } } | null;
 }
 
 /**
@@ -50,7 +52,7 @@ export class PublicUserRecordsService {
       throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User was not found' });
     }
 
-    const eligibleRows = await this.loadEligibleRows(userId, query.season);
+    const eligibleRows = await this.getEligibleActivityRows(userId, query.season);
     const cursor = decodeRecordCursor(query.cursor);
     const limit = query.limit ?? 20;
 
@@ -89,7 +91,7 @@ export class PublicUserRecordsService {
     };
   }
 
-  private async loadEligibleRows(userId: string, season: string | undefined): Promise<EligibleResultRow[]> {
+  async getEligibleActivityRows(userId: string, season: string | undefined): Promise<EligibleResultRow[]> {
     const links = await this.prisma.v1ParticipantIdentityLinkCurrent.findMany({
       where: { userId },
       select: { participantId: true },
@@ -121,7 +123,12 @@ export class PublicUserRecordsService {
             mvpParticipantId: true,
             score: true,
             game: {
-              select: { sourceType: true, tournamentFixtureId: true, currentOfficialRevisionId: true },
+              select: {
+                sourceType: true,
+                tournamentFixtureId: true,
+                currentOfficialRevisionId: true,
+                tournamentFixture: { select: { tournamentId: true } },
+              },
             },
           },
         },
@@ -150,6 +157,7 @@ export class PublicUserRecordsService {
         gameId: revision.gameId,
         sourceType: revision.game.sourceType,
         tournamentFixtureId: revision.game.tournamentFixtureId,
+        tournamentId: revision.game.tournamentFixture?.tournamentId ?? null,
         sideId: row.sideId,
         goals: row.goals,
         assists: row.assists,
@@ -221,9 +229,7 @@ export class PublicUserRecordsService {
 
       let result: 'WON' | 'LOST' | 'DRAWN' | null = null;
       if (row.score !== null && ownSide !== null) {
-        const own = ownSide.sideKey === 'HOME' ? row.score.home : row.score.away;
-        const opponent = ownSide.sideKey === 'HOME' ? row.score.away : row.score.home;
-        result = own > opponent ? 'WON' : own < opponent ? 'LOST' : 'DRAWN';
+        result = officialRecordResult(row.score, ownSide.sideKey);
       }
 
       return {
@@ -270,17 +276,29 @@ function parseCards(value: Prisma.JsonValue): { yellow: number; red: number } {
   return { yellow: 0, red: 0 };
 }
 
-function parseScore(value: Prisma.JsonValue): { home: number; away: number } | null {
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof (value as { home?: unknown }).home === 'number' &&
-    typeof (value as { away?: unknown }).away === 'number'
-  ) {
-    return { home: (value as { home: number }).home, away: (value as { away: number }).away };
-  }
-  return null;
+function parseScore(value: Prisma.JsonValue): { home: number; away: number; penalties?: { home: number; away: number } } | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const record = value as Record<string, Prisma.JsonValue | undefined>;
+  const regulation = record.regulation;
+  const nestedRegulation =
+    typeof regulation === 'object' && regulation !== null && !Array.isArray(regulation)
+      ? regulation as Record<string, Prisma.JsonValue | undefined>
+      : undefined;
+  const home = record.home ?? nestedRegulation?.home;
+  const away = record.away ?? nestedRegulation?.away;
+  if (typeof home !== 'number' || typeof away !== 'number') return null;
+
+  const rawPenalties = record.penalties ?? record.penalty;
+  const penalties =
+    typeof rawPenalties === 'object' && rawPenalties !== null && !Array.isArray(rawPenalties) &&
+    typeof (rawPenalties as { home?: unknown }).home === 'number' &&
+    typeof (rawPenalties as { away?: unknown }).away === 'number'
+      ? {
+          home: (rawPenalties as { home: number }).home,
+          away: (rawPenalties as { away: number }).away,
+        }
+      : undefined;
+  return { home, away, ...(penalties === undefined ? {} : { penalties }) };
 }
 
 function seasonBounds(season: string | undefined): { readonly gte: Date; readonly lt: Date } | null {

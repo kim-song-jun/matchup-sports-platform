@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { OfficialRevisionRow, OfficialScore } from './game-result-official-projection.types';
+import { officialRecordResult, type OfficialSideKey } from './official-score-outcome';
 
 export class GameResultOfficialFactsService {
   async project(
@@ -25,12 +26,14 @@ export class GameResultOfficialFactsService {
 
     const sides = [
       {
+        sideKey: 'HOME' as OfficialSideKey,
         teamId: revision.homeTeamId,
         opponentTeamId: revision.awayTeamId,
         goalsFor: score.home,
         goalsAgainst: score.away,
       },
       {
+        sideKey: 'AWAY' as OfficialSideKey,
         teamId: revision.awayTeamId,
         opponentTeamId: revision.homeTeamId,
         goalsFor: score.away,
@@ -39,11 +42,7 @@ export class GameResultOfficialFactsService {
     ];
     for (const side of sides) {
       if (side.teamId === null) continue;
-      const result = side.goalsFor > side.goalsAgainst
-        ? 'WON'
-        : side.goalsFor < side.goalsAgainst
-          ? 'LOST'
-          : 'DRAWN';
+      const result = officialRecordResult(score, side.sideKey);
       await tx.$executeRaw`
         INSERT INTO v1_team_record_facts (
           id, revision_id, game_id, team_id, opponent_team_id, tournament_id,

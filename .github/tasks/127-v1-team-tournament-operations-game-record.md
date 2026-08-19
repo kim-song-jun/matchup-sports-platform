@@ -1766,3 +1766,94 @@ file` 리다이렉트가 이유 불명으로 조용히 실패해(파일 내용 �
 에러 메시지 없음) 첫 시도가 무효였다 — `/tmp` 경유 `cp`로 재시도해
 해결. 원인 미상이라 재발 시 참고: git-show 직접 리다이렉트가 실패하면
 `git show ref:path > /tmp/x && cp /tmp/x path`로 우회.
+
+## 2026-08-19 후속 — 승부차기 전적·경기 펼침·공개 프로필 활동 통합
+
+### 재현 증거
+
+- 프로덕션 팀 `b2f113fb-5457-45c4-9a77-0833698be7e9`의 결승전은 정규시간
+  `1:1`, 승부차기 `2:3`으로 참우돈가가 이겼지만 `/teams/:id/records`는
+  `DRAWN`, 요약은 `4승 1무`로 반환했다.
+- 같은 팀 공개 멤버 7명은 결승전 공개 라인업과 득점 이벤트에 존재하지만
+  `/users/:id/public-profile`의 전체/월간 경기 수와 `/users/:id/records`의
+  출전 기록은 전원 0이었다.
+- `main`과 `dev` 모두 `GameResultOfficialFactsService`와
+  `PublicUserRecordsService`가 정규시간 점수만 비교하며, 공개 프로필 요약은
+  개인 매칭 `V1MatchParticipant`만 집계한다.
+
+### 요구사항
+
+- [ ] 정규시간 동점 + 유효한 승부차기 점수는 팀 전적과 개인 결과에서 승/패로 판정한다.
+- [ ] 득실은 정규시간 점수를 유지하고 승부차기 점수는 별도 표시한다.
+- [ ] 이미 저장된 현재 공식 리비전의 잘못된 `DRAWN` 팀 fact를 멱등적으로 복구한다.
+- [ ] 팀 전적 항목에 fixture/라운드/승부차기/득점 요약을 일괄 제공한다.
+- [ ] 팀 전적 카드에 접근 가능한 펼침 버튼을 두고 득점 기록과 경기 상세 링크를 제공한다.
+- [ ] 사용자-facing `정정됨` 배지는 제거하되 서버의 정정 이력은 유지한다.
+- [ ] 공개 프로필 전체/월간 활동 요약에 공개 가능한 공식 대회 출전을 포함한다.
+- [ ] 대회 라인업의 회원 연결과 공식 참가 기록이 누락된 기존 데이터를 멱등적으로 복구한다.
+- [ ] 개인정보 공개 동의 및 participant 단위 revoke 규칙은 유지한다.
+- [ ] API 문서, 타입, fixture, 단위/통합/E2E 증거를 같은 변경에서 동기화한다.
+
+### Acceptance Criteria
+
+- Given 정규시간 `1:1`, 승부차기 `2:3`인 현재 공식 결선 경기
+  When 양 팀의 전적과 출전 선수 기록을 조회하면
+  Then 홈은 패, 원정은 승이며 스코어는 `1:1 (승부차기 2:3)`로 보인다.
+- Given 기존 프로덕션 결승 데이터
+  When 복구 작업을 반복 실행하면
+  Then 잘못된 무승부 fact와 누락된 참가 기록이 한 번만 교정되고 중복 행이 생기지 않는다.
+- Given 공개 동의가 유효한 대회 참가자
+  When 공개 프로필과 전체 활동 기록을 조회하면
+  Then 대회 출전이 전체/이번 달 집계 및 경기 목록에 일관되게 포함된다.
+- Given 공개 동의가 없거나 개별 기록이 revoke된 참가자
+  When 공개 프로필/기록을 조회하면
+  Then 개인 경기 상세는 노출되지 않고 팀 집계만 유지된다.
+
+### Owned scope
+
+- `apps/v1_api/src/game-operations/**`
+- `apps/v1_api/src/games/public-records/**`
+- `apps/v1_api/src/games/migration/**`
+- `apps/v1_api/src/profile/**`
+- `apps/v1_web/src/components/public-game-records/**`
+- `apps/v1_web/src/components/users/public-profile-client.tsx`
+- `apps/v1_web/src/app/teams/[id]/records/**`
+- `apps/v1_web/src/app/users/[id]/records/**`
+- `docs/api/domains/public-records.md`
+- Task 127 관련 테스트와 QA 증거
+
+### Progress Snapshot
+
+### Completion Snapshot — 2026-08-19
+
+The unchecked requirement list above is superseded by this completed
+snapshot:
+
+- [x] Penalty shootouts decide team and public player WON/LOST outcomes
+  while regulation goals remain unchanged.
+- [x] Existing current official penalty outcomes, roster identity links,
+  latest-lineup appearances, and participant result rows have an idempotent
+  repair migration.
+- [x] Team record rows expose fixture, round, and team-oriented penalty
+  fields; the web row expands lazily to consent-filtered goal details.
+- [x] Compact team and player history no longer shows a corrected badge.
+- [x] Public profile totals and monthly activity include consent-eligible
+  official tournament appearances and distinct tournament counts.
+- [x] API docs, unit tests, migration-chain validation, production build,
+  and headed browser screenshots are complete.
+
+Validation:
+
+- API unit: 30 passed across official score, latest lineup, and profile.
+- Web unit: 41 passed for public records.
+- API TypeScript: passed.
+- Web production build: passed, 98 static pages generated.
+- Prisma: all 120 migrations applied to a clean PostgreSQL 16 database.
+- Browser QA: team records and public profile passed at 390x844, 768x1024,
+  and 1440x900 with API 200 responses, no console/page/request failures,
+  no horizontal overflow, and before/after screenshots.
+- Evidence manifest:
+  output/playwright/task-127-records-profile/manifest.json
+
+- 2026-08-19: 프로덕션 공개 API와 `main`/`dev` 소스를 교차 확인해 재현 및 원인을 확정했다.
+- 2026-08-19: `fix/v1-records-profile-integration` 브랜치에서 구현 시작.

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, type RecordCursor } from './public-cursor';
@@ -15,7 +16,13 @@ interface TeamRecordFactRow {
   readonly officialAt: Date;
   readonly resultRevision: {
     readonly supersedesId: string | null;
-    readonly game: { readonly currentOfficialRevisionId: string | null; readonly teamMatchId: string | null };
+    readonly score: Prisma.JsonValue;
+    readonly game: {
+      readonly currentOfficialRevisionId: string | null;
+      readonly teamMatchId: string | null;
+      readonly tournamentFixture: { readonly id: string; readonly round: string } | null;
+      readonly sides: readonly { readonly teamId: string | null; readonly sideKey: 'HOME' | 'AWAY' }[];
+    };
   };
 }
 
@@ -77,11 +84,21 @@ export class PublicTeamRecordsService {
     const opponentLogoById = new Map(opponentTeams.map((row) => [row.id, row.profile?.logoUrl ?? null]));
     const tournamentTitleById = new Map(tournaments.map((row) => [row.id, row.title]));
 
-    const items = currentRows.map((row) => ({
+    const items = currentRows.map((row) => {
+      const score = parseScore(row.resultRevision.score);
+      const ownSide = row.resultRevision.game.sides.find((side) => side.teamId === teamId) ?? null;
+      const penalties = score?.penalties && ownSide
+        ? ownSide.sideKey === 'HOME'
+          ? { for: score.penalties.home, against: score.penalties.away }
+          : { for: score.penalties.away, against: score.penalties.home }
+        : null;
+      return {
       gameId: row.gameId,
       // exactly-one-source: a game is either tournament-sourced (tournamentId set) or
       // team-match-sourced (teamMatchId set), never both -- see V1Game's CHECK constraint.
       teamMatchId: row.resultRevision.game.teamMatchId,
+      fixtureId: row.resultRevision.game.tournamentFixture?.id ?? null,
+      round: row.resultRevision.game.tournamentFixture?.round ?? null,
       tournamentId: row.tournamentId,
       tournamentTitle: row.tournamentId === null ? null : (tournamentTitleById.get(row.tournamentId) ?? null),
       opponentTeamId: row.opponentTeamId,
@@ -90,9 +107,11 @@ export class PublicTeamRecordsService {
       result: row.result,
       goalsFor: row.goalsFor,
       goalsAgainst: row.goalsAgainst,
+      penalties,
       officialAt: row.officialAt.toISOString(),
       isCorrected: row.resultRevision.supersedesId !== null,
-    }));
+    };
+    });
 
     const lastPageRow = pageRows[pageRows.length - 1];
     const nextCursor =
@@ -144,7 +163,15 @@ export class PublicTeamRecordsService {
         resultRevision: {
           select: {
             supersedesId: true,
-            game: { select: { currentOfficialRevisionId: true, teamMatchId: true } },
+            score: true,
+            game: {
+              select: {
+                currentOfficialRevisionId: true,
+                teamMatchId: true,
+                tournamentFixture: { select: { id: true, round: true } },
+                sides: { select: { teamId: true, sideKey: true } },
+              },
+            },
           },
         },
       },
@@ -207,6 +234,31 @@ export class PublicTeamRecordsService {
       goalsAgainst: row?.goalsAgainst ?? 0,
     };
   }
+}
+
+function parseScore(value: Prisma.JsonValue): {
+  readonly home: number;
+  readonly away: number;
+  readonly penalties: { readonly home: number; readonly away: number } | null;
+} | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const record = value as Record<string, Prisma.JsonValue | undefined>;
+  const regulation = record.regulation;
+  const nestedRegulation =
+    typeof regulation === 'object' && regulation !== null && !Array.isArray(regulation)
+      ? regulation as Record<string, Prisma.JsonValue | undefined>
+      : undefined;
+  const home = record.home ?? nestedRegulation?.home;
+  const away = record.away ?? nestedRegulation?.away;
+  if (typeof home !== 'number' || typeof away !== 'number') return null;
+  const rawPenalty = record.penalties ?? record.penalty;
+  const penalties =
+    typeof rawPenalty === 'object' && rawPenalty !== null && !Array.isArray(rawPenalty) &&
+    typeof (rawPenalty as { home?: unknown }).home === 'number' &&
+    typeof (rawPenalty as { away?: unknown }).away === 'number'
+      ? { home: (rawPenalty as { home: number }).home, away: (rawPenalty as { away: number }).away }
+      : null;
+  return { home, away, penalties };
 }
 
 function seasonBounds(season: string | undefined): { readonly gte: Date; readonly lt: Date } | null {

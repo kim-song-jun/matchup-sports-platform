@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fetchPublicV1 } from '@/lib/seo';
 import {
@@ -37,6 +37,26 @@ vi.mock('@/lib/seo', async (importOriginal) => {
     fetchPublicV1: vi.fn(),
   };
 });
+
+vi.mock('@/components/public-game-records/use-public-game-records', () => ({
+  usePublicMatch: vi.fn(() => ({
+    data: {
+      events: [
+        {
+          type: 'GOAL',
+          sideId: 'side-away',
+          participantId: 'participant-1',
+          participantName: '득점 선수',
+          jerseyNumber: 9,
+          period: 2,
+          clockMs: 120000,
+        },
+      ],
+    },
+    isPending: false,
+    isError: false,
+  })),
+}));
 
 vi.mock('./tournaments/[id]/schedule/schedule-page-client', () => ({
   SchedulePageClient: () => null,
@@ -200,6 +220,8 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         gameId: 'game-1',
         teamMatchId: null,
         tournamentId: 'tournament-1',
+        fixtureId: 'fixture-1',
+        round: '결승',
         tournamentTitle: '테스트 대회',
         opponentTeamId: 'team-away',
         opponentTeamName: '부산 FC',
@@ -207,6 +229,7 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         result: 'WON',
         goalsFor: 2,
         goalsAgainst: 1,
+        penalties: { for: 4, against: 3 },
         officialAt: '2026-08-10T11:00:00.000Z',
         isCorrected: true,
       },
@@ -216,7 +239,7 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
   };
 }
 
-describe('TeamRecordsContent — 정정 배지', () => {
+describe('TeamRecordsContent — 승부차기와 경기 기록 펼침', () => {
   it('현재 팀과 상대 팀의 저장된 로고를 표시한다', () => {
     const { container } = render(<TeamRecordsContent data={makeTeamRecords()} />);
 
@@ -224,18 +247,24 @@ describe('TeamRecordsContent — 정정 배지', () => {
     expect(container.querySelector('img[src="/uploads/teams/busan.png"]')).toBeInTheDocument();
   });
 
-  it('isCorrected=true인 행은 정정됨 배지를 보여준다', () => {
+  it('승부차기 점수는 정규시간 점수와 분리해서 보여준다', () => {
     render(<TeamRecordsContent data={makeTeamRecords()} />);
-    expect(screen.getByText('정정됨')).toBeInTheDocument();
+    expect(screen.getByText('승부차기 4 : 3')).toBeInTheDocument();
   });
 
-  it('isCorrected=false인 행은 정정됨 배지를 보여주지 않는다', () => {
-    const data = makeTeamRecords();
-    render(
-      <TeamRecordsContent
-        data={{ ...data, items: [{ ...data.items[0], isCorrected: false }] }}
-      />,
+  it('아래 화살표를 누르면 득점 기록과 정확한 경기 상세 링크를 보여준다', () => {
+    render(<TeamRecordsContent data={makeTeamRecords()} />);
+    fireEvent.click(screen.getByRole('button', { name: '경기 기록 펼치기' }));
+
+    expect(screen.getByText(/득점 선수/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '경기 상세 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/tournament-1/matches/fixture-1',
     );
+  });
+
+  it('정정 이력은 사용자 전적 목록에 별도 배지로 표시하지 않는다', () => {
+    render(<TeamRecordsContent data={makeTeamRecords()} />);
     expect(screen.queryByText('정정됨')).not.toBeInTheDocument();
   });
 });
@@ -273,15 +302,15 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
   };
 }
 
-describe('UserRecordsContent — 정정 배지', () => {
-  it('isCorrected=true인 행은 정정됨 배지를 보여준다', () => {
+describe('UserRecordsContent — 정정 이력 표시', () => {
+  it('정정 이력은 개인 전적 목록에 별도 배지로 표시하지 않는다', () => {
     const data = makeUserRecords();
     render(
       <UserRecordsContent
         data={{ ...data, items: [{ ...data.items[0], isCorrected: true }] }}
       />,
     );
-    expect(screen.getByText('정정됨')).toBeInTheDocument();
+    expect(screen.queryByText('정정됨')).not.toBeInTheDocument();
   });
 });
 

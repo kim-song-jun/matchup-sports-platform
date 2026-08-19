@@ -129,6 +129,15 @@
 
 ## Source References
 
+Public activity summary integration (2026-08-19):
+
+- The totals response distinguishes match, tournament, team, and review
+  counts. The monthly response distinguishes match, tournament, team join,
+  and review counts.
+- Match and tournament counts include current official tournament
+  participant results that pass the same identity-link and user record
+  consent gate as the public personal-records endpoint.
+
 - `apps/v1_api/src/profile/profile.controller.ts`
 - `apps/v1_api/src/profile/profile.service.ts`
 - `apps/v1_api/src/profile/dto/profile.dto.ts`

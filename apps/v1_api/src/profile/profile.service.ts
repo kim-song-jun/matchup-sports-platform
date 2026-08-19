@@ -9,6 +9,7 @@ import {
 import { Prisma, V1AuthProvider, V1ConsentState } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { PublicUserRecordsService } from '../games/public-records/public-user-records.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
@@ -322,12 +323,22 @@ export class ProfileService {
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const officialRows = await new PublicUserRecordsService(this.prisma).getEligibleActivityRows(userId, undefined);
+    const monthlyOfficialRows = officialRows.filter(
+      (row) => row.officialAt >= monthStart && row.officialAt < nextMonthStart,
+    );
+    const officialTournamentCount = new Set(
+      officialRows.map((row) => row.tournamentId).filter((id): id is string => id !== null),
+    ).size;
+    const monthlyOfficialTournamentCount = new Set(
+      monthlyOfficialRows.map((row) => row.tournamentId).filter((id): id is string => id !== null),
+    ).size;
 
     const [
-      matchCount,
+      personalMatchCount,
       teamCount,
       reputation,
-      monthlyMatchCount,
+      monthlyPersonalMatchCount,
       monthlyTeamJoinCount,
       monthlyReviewCount,
     ] = await Promise.all([
@@ -371,12 +382,14 @@ export class ProfileService {
 
     return {
       totals: {
-        matchCount,
+        matchCount: personalMatchCount + officialRows.length,
+        tournamentCount: officialTournamentCount,
         teamCount,
         reviewCount: reputation.reviewCount,
       },
       monthly: {
-        matchCount: monthlyMatchCount,
+        matchCount: monthlyPersonalMatchCount + monthlyOfficialRows.length,
+        tournamentCount: monthlyOfficialTournamentCount,
         teamJoinCount: monthlyTeamJoinCount,
         reviewCount: monthlyReviewCount,
       },

@@ -63,6 +63,7 @@ import {
   GameContractError,
   projectParticipantForPublic,
   resolveGameIdempotency,
+  selectLatestLineupParticipants,
   serializeGameVisibility,
   validateGameResultInvariants,
   validateSubstitution,
@@ -4654,15 +4655,20 @@ export class GamesService {
      */
     penaltyOrigin: 'END_COMMAND' | 'RECOVERY' = 'RECOVERY',
   ): Promise<GameRevisionMutationResult> {
-    const [events, participants, sides, config] = await Promise.all([
+    const [events, participantCandidates, lineups, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
+      tx.v1GameLineup.findMany({
+        where: { gameId: game.id },
+        select: { id: true, sideId: true, revision: true },
+      }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
       tx.v1CompetitionConfigVersion.findUnique({
         where: { id: game.competitionConfigVersionId },
         select: { lineup: true },
       }),
     ]);
+    const participants = selectLatestLineupParticipants(participantCandidates, lineups);
     // 하드코딩 버그 수정: started/goalkeeper를 실제 라인업 값과 무관하게
     // 항상 true/false로 박아 넣었다 -- 후보로 저장한 선수도 결과 프로젝션에서는
     // 전부 선발로 보였고, 실제로 골키퍼였던 선수도 항상 goalkeeper:false였다.

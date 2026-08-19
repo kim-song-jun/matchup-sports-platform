@@ -244,8 +244,10 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
   return {
     userId: 'user-1',
     nickname: '홍길동',
+    // 기본값은 **타인 조회** 형태다 — 서버는 이때 `consentGranted` 키를 아예 싣지 않으므로
+    // 픽스처도 그 형태를 그대로 따른다. 여기에 값을 넣어두면 "타인에게도 동의 상태가
+    // 보인다"는 잘못된 계약을 테스트가 정상으로 통과시킨다.
     viewerIsOwner: false,
-    consentGranted: true,
     summary: { appearances: 1, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 1 },
     items: [
       {

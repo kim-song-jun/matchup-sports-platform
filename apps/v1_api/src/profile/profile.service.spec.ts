@@ -437,17 +437,15 @@ describe('ProfileService tournament appearance aggregation', () => {
     revisionId: string;
     currentOfficialRevisionId: string | null;
     officialAt: Date | null;
-    sourceType?: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
   }) {
+    // sourceType 은 select 에 없다 — where 가 이미 TOURNAMENT_FIXTURE 로 좁히므로
+    // 서비스가 그 필드를 읽지 않는다(위 TEAM_MATCH 테스트가 where 쪽을 검증한다).
     return {
       resultRevision: {
         id: config.revisionId,
         gameId: config.gameId,
         officialAt: config.officialAt,
-        game: {
-          currentOfficialRevisionId: config.currentOfficialRevisionId,
-          sourceType: config.sourceType ?? 'TOURNAMENT_FIXTURE',
-        },
+        game: { currentOfficialRevisionId: config.currentOfficialRevisionId },
       },
     };
   }
@@ -526,14 +524,20 @@ describe('ProfileService tournament appearance aggregation', () => {
       // monthly: game-1만 (1건) — game-4는 지난달
       expect(result.monthly.matchCount).toBe(1);
       expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith({
-        where: { participantId: { in: ['participant-1'] } },
+        where: {
+          participantId: { in: ['participant-1'] },
+          resultRevision: {
+            officialAt: { not: null },
+            game: { sourceType: 'TOURNAMENT_FIXTURE' },
+          },
+        },
         select: {
           resultRevision: {
             select: {
               id: true,
               gameId: true,
               officialAt: true,
-              game: { select: { currentOfficialRevisionId: true, sourceType: true } },
+              game: { select: { currentOfficialRevisionId: true } },
             },
           },
         },
@@ -543,10 +547,12 @@ describe('ProfileService tournament appearance aggregation', () => {
     }
   });
 
-  it('activitySummary(): TEAM_MATCH(팀 매치) 참가자 결과는 대회 출전 수에서 제외한다', async () => {
+  it('activitySummary(): TEAM_MATCH(팀 매치) 결과가 섞이지 않도록 쿼리에서 sourceType 을 제한한다', async () => {
     // 레거시 2자 승인 API(identity-link-requests + attest)는 sourceType 검사 없이
     // TEAM_MATCH 게임 참가자에도 identity link 를 걸 수 있다 — "대회 경기 출전 수"는
-    // TOURNAMENT_FIXTURE 만 세어야 한다(확정 계약).
+    // TOURNAMENT_FIXTURE 만 세어야 한다(확정 계약). 걸러내는 주체가 DB(where)이므로
+    // 이 테스트는 "그 필터가 쿼리에 실려 나가는가"를 본다 — 필터를 빼면 TEAM_MATCH 행이
+    // 그대로 합산되고 이 단언이 깨진다.
     jest.useFakeTimers().setSystemTime(now);
     try {
       const rows = [
@@ -555,14 +561,6 @@ describe('ProfileService tournament appearance aggregation', () => {
           revisionId: 'revision-tournament-current',
           currentOfficialRevisionId: 'revision-tournament-current',
           officialAt: new Date('2026-08-10T00:00:00Z'),
-          sourceType: 'TOURNAMENT_FIXTURE',
-        }),
-        gameResultRow({
-          gameId: 'game-team-match',
-          revisionId: 'revision-team-match-current',
-          currentOfficialRevisionId: 'revision-team-match-current',
-          officialAt: new Date('2026-08-11T00:00:00Z'),
-          sourceType: 'TEAM_MATCH',
         }),
       ];
       const prisma = {
@@ -578,9 +576,15 @@ describe('ProfileService tournament appearance aggregation', () => {
 
       const result = await service.activitySummary(user);
 
-      // TOURNAMENT_FIXTURE 1건만 카운트, TEAM_MATCH 는 제외
       expect(result.totals.activityCount).toBe(1);
       expect(result.monthly.matchCount).toBe(1);
+      expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            resultRevision: { officialAt: { not: null }, game: { sourceType: 'TOURNAMENT_FIXTURE' } },
+          }),
+        }),
+      );
     } finally {
       jest.useRealTimers();
     }

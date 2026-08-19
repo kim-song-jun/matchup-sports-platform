@@ -536,7 +536,15 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     expect(teamItem).toBeDefined();
     // Team aggregates count every goal regardless of any scorer's consent.
     expect(teamItem?.goalsFor).toBe(3);
-    expect(teamItem?.isCorrected).toBe(false);
+    // No shootout on this fixture (regulation 3:0 decided it outright).
+    expect(teamItem?.penalties).toBeNull();
+    // Team records' event summary shares the exact same name-gating rule as
+    // tournament records (participant-name-gating.ts) -- every home scorer is
+    // named here too, and all three are 'own' since hostTeam is the home side.
+    const teamGoalEvents = teamItem?.events.filter((event) => event.type === 'GOAL') ?? [];
+    expect(teamGoalEvents).toHaveLength(3);
+    expect(teamGoalEvents.every((event) => event.side === 'own')).toBe(true);
+    expect(teamGoalEvents.every((event) => event.participantName !== null)).toBe(true);
 
     const consentedRecords = await userRecords.getRecords(ids.userConsented, {});
     const consentedItem = consentedRecords.items.find((item) => item.gameId === gameMainId);
@@ -623,7 +631,6 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     // double-counted alongside the new one.
     expect(teamItemsForGame).toHaveLength(1);
     expect(teamItemsForGame[0]?.goalsFor).toBe(4);
-    expect(teamItemsForGame[0]?.isCorrected).toBe(true);
 
     const consentedRecords = await userRecords.getRecords(ids.userConsented, {});
     const consentedItemsForGame = consentedRecords.items.filter((item) => item.gameId === gameMainId);

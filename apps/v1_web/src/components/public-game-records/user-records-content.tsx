@@ -52,17 +52,38 @@ function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
         ...resultStripeStyle(item.result),
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        {/* [R-T2] 고정폭 없는 텍스트/배지 — 아래 2개 span 모두 12로 상향. */}
-        {/* isCorrected 배지 제거 후 이 행에 남는 건 MVP 배지 하나뿐이라, 별도 flex
-         * wrapper 없이 날짜/대회명 span과 나란히 두는 것만으로 공간이 자연스럽게
-         * 재배분된다(빈 wrapper를 남겨두지 않음). */}
-        <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>
+      {/* [R-T2] 고정폭 없는 텍스트/배지 — 아래 span 모두 12로 상향.
+          '정정됨' 배지 제거 후 재균형: 우측에 남는 배지는 MVP 하나뿐이라 고정폭
+          `justify-content: space-between` 대신 날짜/대회명 span이 `flex:1`로 남은
+          폭을 모두 차지하게 하고(대회명이 길어도 줄임표 전까지 더 길게 보임),
+          MVP가 없는 행은 우측 슬롯 자체를 렌더하지 않는다. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <span
+          style={{
+            fontSize: 12,
+            color: 'var(--text-caption)',
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {formatTournamentDateShort(item.officialAt) ?? ''}
           {item.tournamentTitle ? ` · ${item.tournamentTitle}` : ''}
         </span>
         {item.mvp ? (
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange700, #a36100)', background: 'var(--orange50)', borderRadius: 6, padding: '2px 6px' }}>
+          <span
+            style={{
+              flexShrink: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--orange700, #a36100)',
+              background: 'var(--orange50)',
+              borderRadius: 6,
+              padding: '2px 6px',
+            }}
+          >
             MVP
           </span>
         ) : null}

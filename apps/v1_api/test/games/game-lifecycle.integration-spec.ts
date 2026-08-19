@@ -503,12 +503,11 @@ describe('Task 6 L1 game lifecycle', () => {
       gameState: V1GameState.ENDED,
       gameVersion: 7,
       revisionStates: [V1GameResultRevisionState.SUBMITTED],
-      // 1 game-creation-time participant ("Host One") + the 7-player SUBMITTED
-      // HOME lineup roster + the 7-player SUBMITTED AWAY lineup roster (the
+      // The creation-time HOME placeholder ("Host One") is superseded once a submitted lineup exists.
+      // The latest 7-player HOME and AWAY lineup rosters are retained (the
       // AWAY lineup exists so `start` clears assertLineupsSubmittedForStart --
-      // deriveTournamentRevision counts every v1GameParticipant row on the
-      // game, not just one side).
-      participantCounts: [15],
+      // the official snapshot freezes 14 unique latest-lineup appearances).
+      participantCounts: [14],
     });
 
     const replay = await service.executeCommand(

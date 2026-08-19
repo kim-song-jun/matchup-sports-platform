@@ -1329,6 +1329,7 @@ export type V1GameResultRevision = {
   revision: number;
   state: V1GameResultRevisionState;
   score: V1GameResultScore;
+  goalEvents?: V1GameResultGoalEventInput[] | null;
   eventsHash: string;
   missingScorer: boolean;
   mvpParticipantId: string | null;
@@ -1342,6 +1343,15 @@ export type V1GameResultRevision = {
   createdAt: string;
   updatedAt: string;
   resultParticipants: V1GameResultParticipantRow[];
+};
+
+export type V1GameResultGoalEventInput = {
+  id: string;
+  sideId: string;
+  participantId?: string;
+  minute?: number;
+  period?: number;
+  ownGoal: boolean;
 };
 
 export type V1GameResultParticipantInput = {

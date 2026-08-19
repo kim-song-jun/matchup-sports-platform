@@ -219,6 +219,21 @@ describe('RecordedEventList', () => {
     );
     expect(screen.queryByRole('button', { name: /되돌리기/ })).toBeNull();
   });
+
+  it('골·카드 이벤트는 수정·취소 버튼으로 공용 되돌리기 콜백을 호출한다', async () => {
+    const onReverseEvent = vi.fn();
+    const recordedGoal = goal(1, HOME_SIDE_ID, 'p-jung', 124_000);
+    render(
+      <RecordedEventList
+        events={[recordedGoal]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onReverseEvent={onReverseEvent}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: '수정·취소' }));
+    expect(onReverseEvent).toHaveBeenCalledWith(recordedGoal);
+  });
 });
 
 /**

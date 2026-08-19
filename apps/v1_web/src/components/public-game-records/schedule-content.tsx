@@ -92,9 +92,44 @@ const SCORE_AXIS_COLUMN_GAP = 10;
  * 좁은 카드에 다 욱여넣으면 오히려 안 읽히므로 이 컴포넌트는 의도적으로 쓰지
  * 않는다(상세 페이지 타임라인에서는 등번호까지 보여준다).
  */
-function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] }) {
-  if (scorers.length === 0) return null;
-  const byClock = (a: PublicScheduleEntry['scorers'][number], b: PublicScheduleEntry['scorers'][number]) =>
+type ScheduleEventItem = {
+  key: string;
+  side: 'home' | 'away';
+  icon: string;
+  label: string;
+  participantName: string | null;
+  period: number | null;
+  clockMs: number | null;
+};
+
+function toScheduleEventItems(entry: PublicScheduleEntry): ScheduleEventItem[] {
+  const goals = entry.scorers.map((scorer, index) => ({
+    key: `goal-${index}`,
+    side: scorer.side,
+    ...eventPresentation({ type: scorer.ownGoal ? 'OWN_GOAL' : 'GOAL', cardColor: null }),
+    participantName: scorer.participantName,
+    period: scorer.period,
+    clockMs: scorer.clockMs,
+  }));
+  // `?? []` -- 서버는 항상 이 키를 채우지만, 배포 과도기나 React Query 캐시에 남은
+  // 구 응답에는 `cards` 키가 아예 없을 수 있다(`formatPenaltyScoreline`이 `penalties`를
+  // 같은 이유로 방어한다). 시스템 경계에서 들어오는 값이라 키 부재를 정상 입력으로 다룬다.
+  const cards = (entry.cards ?? []).map((card, index) => ({
+    key: `card-${index}`,
+    side: card.side,
+    ...eventPresentation({ type: 'CARD', cardColor: card.cardColor }),
+    participantName: card.participantName,
+    period: card.period,
+    clockMs: card.clockMs,
+  }));
+  return [...goals, ...cards];
+}
+
+function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
+  const items = toScheduleEventItems(entry);
+  if (items.length === 0) return null;
+
+  const byClock = (a: ScheduleEventItem, b: ScheduleEventItem) =>
     (a.clockMs ?? Number.MAX_SAFE_INTEGER) - (b.clockMs ?? Number.MAX_SAFE_INTEGER);
   const firstHalf = scorers.filter((scorer) => scorer.period === 1).sort(byClock);
   const secondHalf = scorers.filter((scorer) => scorer.period !== 1).sort(byClock);

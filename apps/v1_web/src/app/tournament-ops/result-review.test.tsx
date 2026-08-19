@@ -652,9 +652,7 @@ describe('결선 무승부는 저장 전에 폼이 알려준다', () => {
     expect(within(dialog).getByRole('status')).toHaveTextContent(/승부차기/);
   });
 
-  it('무효화된 결선 경기의 재입력은 경고만 하고 제출을 막지 않는다', async () => {
-    // 무효화된 결과의 재입력(VOID_REENTRY)은 정정과 다른 계약이라, 프론트가
-    // 무승부를 이유로 제출 자체를 막아서는 안 된다 -- 경고까지가 프론트의 역할이다.
+  it('무효화된 결선 경기 재입력에서도 승부차기를 입력해 제출할 수 있다', async () => {
     hookMocks.game.data = buildGame('platform_ops', {
       version: 5,
       currentOfficialRevisionId: 'rev-2',
@@ -675,6 +673,10 @@ describe('결선 무승부는 저장 전에 폼이 알려준다', () => {
 
     await user.type(within(dialog).getByLabelText('재입력 사유'), '무효 후 재입력');
     const submitButton = within(dialog).getByRole('button', { name: '결과 제출' });
+    expect(submitButton).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('홈 성공'), { target: { value: '4' } });
+    fireEvent.change(within(dialog).getByLabelText('원정 성공'), { target: { value: '3' } });
+    await user.click(within(dialog).getByLabelText('홈'));
     expect(submitButton).toBeEnabled();
     await user.click(submitButton);
 

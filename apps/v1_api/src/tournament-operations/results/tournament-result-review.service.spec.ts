@@ -64,6 +64,7 @@ type CreatedRevision = {
   revision: number;
   state: V1GameResultRevisionState;
   score: unknown;
+  goalEvents: unknown;
   missingScorer: boolean;
   eventsHash: string;
 };
@@ -155,6 +156,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
     revision: 1,
     state: options.baseState ?? V1GameResultRevisionState.OFFICIAL,
     score: options.baseScore ?? { home: 1, away: 0 },
+    goalEvents: null,
     eventsHash: 'b'.repeat(64),
     mvpParticipantId: null,
   };
@@ -199,6 +201,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
           revision: args.data.revision as number,
           state: V1GameResultRevisionState.DRAFT,
           score: args.data.score,
+          goalEvents: args.data.goalEvents,
           missingScorer: args.data.missingScorer as boolean,
           eventsHash: args.data.eventsHash as string,
         };
@@ -370,6 +373,68 @@ describe('createResultCorrection — 정상 정정(하네스 건전성 증거)',
     );
 
     expectHttp(error, 422, 'PARTICIPANT_INVALID');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+});
+
+describe('공식 득점 타임라인 정합성', () => {
+  it('정정한 득점자와 개인 득점 합계가 일치하면 새 참가자 기록에 반영한다', async () => {
+    const harness = createHarness();
+    await harness.correct({
+      score: { home: 0, away: 1 },
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 1 },
+      ],
+      goalEvents: [
+        {
+          id: 'corrected-goal-1',
+          sideId: ids.awaySide,
+          participantId: ids.awayPlayer,
+          minute: 3,
+          period: 1,
+          ownGoal: false,
+        },
+      ],
+    });
+
+    expect(harness.createdParticipants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ participantId: ids.homePlayer, goals: 0 }),
+        expect.objectContaining({ participantId: ids.awayPlayer, goals: 1 }),
+      ]),
+    );
+  });
+
+  it('자책골은 상대 팀 점수에는 더하지만 해당 선수 개인 득점에는 더하지 않는다', async () => {
+    const harness = createHarness();
+    await harness.correct({
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 0 },
+      ],
+      goalEvents: [
+        {
+          id: 'own-goal-1',
+          sideId: ids.homeSide,
+          participantId: ids.awayPlayer,
+          minute: 3,
+          period: 1,
+          ownGoal: true,
+        },
+      ],
+    });
+    expect(harness.createdRevisions).toHaveLength(1);
+  });
+
+  it('득점 타임라인 합계가 전체 점수와 다르면 리비전을 만들지 않는다', async () => {
+    const harness = createHarness();
+    const error = await captureFailure(() =>
+      harness.correct({
+        goalEvents: [],
+      }),
+    );
+    expectHttp(error, 422, 'RESULT_GOAL_TIMELINE_INVALID');
     expect(harness.createdRevisions).toHaveLength(0);
   });
 });
@@ -758,6 +823,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
 
     expect(harness.createdRevisions).toHaveLength(1);
     expect(harness.createdRevisions[0].state).toBe(V1GameResultRevisionState.SUBMITTED);
+    expect(harness.createdRevisions[0].goalEvents).toBeUndefined();
     expect(harness.createdParticipants.map((row) => row.participantId)).toEqual([
       ids.homePlayer,
       ids.awayPlayer,

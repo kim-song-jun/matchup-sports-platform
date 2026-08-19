@@ -130,3 +130,16 @@ Every new table uses UUID `id`, `createdAt`, `updatedAt` unless declared append-
 Raw migration triggers `v1_guard_result_revision_transition`, `v1_block_terminal_revision_mutation`, `v1_guard_result_participant_mutation`, and `v1_block_used_config_mutation` enforce the content-freeze/terminal rules above, reject UPDATE/DELETE of terminal revisions, reject participant INSERT/UPDATE/DELETE unless the locked parent is `DRAFT`, and reject referenced config changes. Composite/deferred constraints enforce same-game current/supersession pointers and same-tournament field/fixture scope. The deterministic final tie-break seed is `SHA-256(tournamentId || ":" || competitionConfigVersionId || ":" || sortedTeamIds)` ascending lexical bytes; no random runtime draw is allowed.
 
 <!-- API_CONTRACT_SECTION_END:Frozen additive schema ledger -->
+
+### Task 150 event/result correction addendum (2026-08-19)
+
+- POST /games/:gameId/events accepts OWN_GOAL. sideId is the team credited
+  with the goal, while participantId is required and must belong to the
+  opposing side. It changes the credited score but not personal goal totals.
+- The live console uses POST .../events/:eventId/reverse for active goal,
+  own-goal, card, foul, and substitution rows. It appends a CORRECTION audit
+  event and never overwrites the original; the operator then re-enters the
+  corrected event.
+- GET .../result-revisions includes nullable goalEvents snapshots with id,
+  sideId, participantId, minute, period, and ownGoal. Older null snapshots
+  fall back to the append-only event stream.

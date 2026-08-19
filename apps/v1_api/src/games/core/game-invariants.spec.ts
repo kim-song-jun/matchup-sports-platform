@@ -198,6 +198,61 @@ describe('validateGameResultInvariants — Task 17 TEAM_MATCH event-vs-score exe
   });
 });
 
+describe('validateGameResultInvariants — own goal', () => {
+  const sides = [
+    { id: 'side-home', sideKey: 'HOME' as const },
+    { id: 'side-away', sideKey: 'AWAY' as const },
+  ];
+
+  it('credits the score to the benefited side without adding a personal goal', () => {
+    expect(() =>
+      validateGameResultInvariants({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        score: { home: 1, away: 0 },
+        sides,
+        participants: [
+          { id: 'away-defender', sideId: 'side-away', goals: 0, cards: { yellow: 0, red: 0 } },
+        ],
+        events: [
+          {
+            type: V1GameEventType.OWN_GOAL,
+            sideId: 'side-home',
+            participantId: 'away-defender',
+            period: 1,
+            clockMs: 124_000,
+          },
+        ],
+        scorerPolicy: 'required',
+        missingScorer: false,
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects an own-goal culprit who belongs to the credited side', () => {
+    expect(() =>
+      validateGameResultInvariants({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        score: { home: 1, away: 0 },
+        sides,
+        participants: [
+          { id: 'home-player', sideId: 'side-home', goals: 0, cards: { yellow: 0, red: 0 } },
+        ],
+        events: [
+          {
+            type: V1GameEventType.OWN_GOAL,
+            sideId: 'side-home',
+            participantId: 'home-player',
+            period: 1,
+            clockMs: 124_000,
+          },
+        ],
+        scorerPolicy: 'required',
+        missingScorer: false,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'PARTICIPANT_SIDE_MISMATCH' }));
+  });
+});
+
 describe('validateGameResultInvariants — assist/foul cross-check (T1-4)', () => {
   const twoSides = [
     { id: 'side-home', sideKey: 'HOME' as const },

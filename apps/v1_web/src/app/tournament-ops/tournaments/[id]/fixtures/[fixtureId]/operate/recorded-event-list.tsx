@@ -4,6 +4,46 @@ import { Handshake, Undo2 } from 'lucide-react';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { periodLabel } from './period-label';
 import type { GameEventRecord, GameLineup } from '@/types/game-operations';
+import { formatPlayerLabel } from './player-label';
+
+/**
+ * 이벤트 행 왼쪽의 "전반 12:00" 뱃지 문구.
+ *
+ * 레거시 대회 결과에서 복원된 골(`@/lib/backfilled-goal-event` 참고)은 원본에 전/후반이
+ * 없었고 분도 없을 수 있는데, `period`·`clockMs` 가 non-null 컬럼이라 각각 `1`·`0` 으로
+ * 저장돼 있다 — 그대로 찍으면 이 화면이 "전반 0:00" 이라고 단정한다. 공개 화면은 서버가
+ * 이미 이 값들을 `null` 로 내려 억제하는데, 운영 콘솔만 원시 행을 받아 거짓 주장을
+ * 되살리고 있었다. 결과 정정(correction)을 판단하는 화면이라 오히려 더 정확해야 한다.
+ */
+function eventTimeLabel(event: GameEventRecord): string {
+  if (!isBackfilledEvent(event.payload)) {
+    return `${periodLabel(event.period)} ${formatMatchClock(event.clockMs)}`;
+  }
+  // 전/후반은 어느 경우든 모른다. 분은 남아 있으면 그대로 쓴다.
+  return isBackfilledMinuteUnknown(event.payload) ? '시각 미상' : formatMatchClock(event.clockMs);
+}
+
+
+/**
+ * 이벤트 종류를 훑어볼 때의 보조 신호. **색만으로 뜻을 전하지 않는다** — 바로 옆에
+ * `eventTypeLabel`(골/옐로카드/…)이 그대로 붙어 있고, 이 점은 `aria-hidden` 이다.
+ * 목록이 길어지면 글자를 하나하나 읽는 대신 색으로 먼저 훑게 된다.
+ */
+function eventDotClass(event: GameEventRecord): string {
+  switch (event.type) {
+    case 'GOAL':
+    case 'OWN_GOAL':
+      return 'bg-[var(--green500)]';
+    case 'CARD':
+      return event.payload.card === 'RED' ? 'bg-[var(--red500)]' : 'bg-[var(--yellow500)]';
+    case 'FOUL':
+      return 'bg-[var(--grey400)]';
+    case 'SUBSTITUTION':
+      return 'bg-[var(--blue500)]';
+    default:
+      return 'bg-[var(--grey300)]';
+  }
+}
 
 /**
  * 서버에 확정된 경기 이벤트 로그.
@@ -20,6 +60,7 @@ export function RecordedEventList({
   sides,
   lineups,
   onAttachAssist,
+  onReverseEvent,
   onReverseSubstitution,
 }: {
   readonly events: readonly GameEventRecord[];
@@ -33,6 +74,8 @@ export function RecordedEventList({
   /** 빠른 교체 모드의 오조작 복구 경로 — 되돌리기 버튼은 아직 되돌려지지
    * 않은 SUBSTITUTION 이벤트에만 뜬다. 새 되돌리기 API가 아니라 기존
    * `GamesService.reverseEvent`(CORRECTION) 를 그대로 호출한다. */
+  readonly onReverseEvent?: (event: GameEventRecord) => void;
+  /** @deprecated 새 호출부는 모든 수정 가능 이벤트를 받는 onReverseEvent를 사용한다. */
   readonly onReverseSubstitution?: (event: GameEventRecord) => void;
 }) {
   if (events.length === 0) {
@@ -68,8 +111,12 @@ export function RecordedEventList({
           event.assistParticipantId === null &&
           event.participantId !== null &&
           !reversedIds.has(event.id);
-        const canReverseSubstitution =
-          onReverseSubstitution !== undefined && event.type === 'SUBSTITUTION' && !reversedIds.has(event.id);
+        const reverseHandler = onReverseEvent ?? onReverseSubstitution;
+        const canReverse =
+          reverseHandler !== undefined &&
+          (onReverseEvent !== undefined || event.type === 'SUBSTITUTION') &&
+          ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL', 'SUBSTITUTION'].includes(event.type) &&
+          !reversedIds.has(event.id);
         return (
           <li
             key={event.id}
@@ -124,14 +171,14 @@ export function RecordedEventList({
                     어시스트
                   </button>
                 ) : null}
-                {canReverseSubstitution ? (
+                {canReverse ? (
                   <button
                     type="button"
-                    onClick={() => onReverseSubstitution(event)}
+                    onClick={() => reverseHandler?.(event)}
                     className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                   >
                     <Undo2 size={12} aria-hidden="true" />
-                    되돌리기
+                    {event.type === 'SUBSTITUTION' ? '되돌리기' : '수정·취소'}
                   </button>
                 ) : null}
                 {/* 팀 귀속은 기록자가 매 행에서 즉시 확인해야 하는 정보인데, 행에서
@@ -178,6 +225,8 @@ function eventTypeLabel(event: GameEventRecord): string {
   switch (event.type) {
     case 'GOAL':
       return '골';
+    case 'OWN_GOAL':
+      return '자책골';
     case 'CARD':
       return event.payload.card === 'RED' ? '레드카드' : '옐로카드';
     case 'FOUL':

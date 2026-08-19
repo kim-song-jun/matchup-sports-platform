@@ -94,7 +94,42 @@ export type TournamentFixtureOfficialGoal = {
   playerId: string | null;
   playerName: string;
   minute: number | null;
+  ownGoal?: boolean;
 };
+
+export type TournamentFixtureRevisionGoal = {
+  id: string;
+  sideId: string;
+  participantId: string | null;
+  minute: number | null;
+  period: number | null;
+  ownGoal: boolean;
+};
+
+export function parseTournamentFixtureRevisionGoals(
+  value: Prisma.JsonValue | null | undefined,
+): TournamentFixtureRevisionGoal[] | null {
+  if (!Array.isArray(value)) return null;
+  const parsed: TournamentFixtureRevisionGoal[] = [];
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) return null;
+    const row = item as Record<string, unknown>;
+    if (typeof row.id !== 'string' || typeof row.sideId !== 'string') return null;
+    if (row.participantId !== null && row.participantId !== undefined && typeof row.participantId !== 'string') return null;
+    if (row.minute !== null && row.minute !== undefined && (!Number.isSafeInteger(row.minute) || (row.minute as number) < 0)) return null;
+    if (row.period !== null && row.period !== undefined && (!Number.isSafeInteger(row.period) || (row.period as number) < 1)) return null;
+    if (typeof row.ownGoal !== 'boolean') return null;
+    parsed.push({
+      id: row.id,
+      sideId: row.sideId,
+      participantId: typeof row.participantId === 'string' ? row.participantId : null,
+      minute: typeof row.minute === 'number' ? row.minute : null,
+      period: typeof row.period === 'number' ? row.period : null,
+      ownGoal: row.ownGoal,
+    });
+  }
+  return parsed;
+}
 
 export type TournamentFixtureGoalEventRow = {
   id: string;
@@ -125,7 +160,11 @@ export function deriveTournamentFixtureOfficialGoals(
     events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
   );
   return events
-    .filter((event) => event.type === 'GOAL' && !reversedIds.has(event.id))
+    .filter(
+      (event) =>
+        (event.type === 'GOAL' || event.type === 'OWN_GOAL') &&
+        !reversedIds.has(event.id),
+    )
     .map((event) => ({
       id: event.id,
       team: sideKeyById.get(event.sideId ?? '') === 'HOME' ? ('home' as const) : ('away' as const),
@@ -135,7 +174,9 @@ export function deriveTournamentFixtureOfficialGoals(
       // 레거시 minute은 기록자가 수기로 입력한 "경기 중 몇 분"이었다(전/후반을 합산했는지
       // 여부도 보장되지 않았다). 신규 경로는 이벤트의 period 내 경과 시간(clockMs)만 갖고
       // 있어 전/후반 누적 분이 아니라 "해당 피리어드 시작 후 경과 분"이다 — 근사치다.
-      minute: Math.max(0, Math.floor(event.clockMs / 60000)),
+      // 단 "분 자체가 기록되지 않은 골"은 근사치조차 없으므로 null(모름)이다.
+      minute: isMinuteUnknown(event.payload) ? null : Math.max(0, Math.ceil(event.clockMs / 60000)),
+      ...(event.type === 'OWN_GOAL' ? { ownGoal: true } : {}),
     }));
 }
 
@@ -147,6 +188,7 @@ export type TournamentFixtureGameForResult = {
     id: string;
     state: string;
     score: Prisma.JsonValue;
+    goalEvents?: Prisma.JsonValue | null;
     officialAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -224,7 +266,21 @@ export function resolveTournamentFixtureOfficialResult(
     const participantNameById = new Map(
       game.participants.map((participant) => [participant.id, participant.displayNameSnapshot] as const),
     );
-    const goals = deriveTournamentFixtureOfficialGoals(game.events, sideKeyById, participantNameById);
+    const revisionGoals = parseTournamentFixtureRevisionGoals(revision.goalEvents);
+    const goals =
+      revisionGoals === null
+        ? deriveTournamentFixtureOfficialGoals(game.events, sideKeyById, participantNameById)
+        : revisionGoals.map((event) => ({
+            id: event.id,
+            team: sideKeyById.get(event.sideId) === 'HOME' ? ('home' as const) : ('away' as const),
+            playerId: event.participantId,
+            playerName:
+              event.participantId === null
+                ? '선수 정보 없음'
+                : (participantNameById.get(event.participantId) ?? '선수 정보 없음'),
+            minute: event.minute,
+            ...(event.ownGoal ? { ownGoal: true } : {}),
+          }));
     return {
       revisionId: revision.id,
       score,

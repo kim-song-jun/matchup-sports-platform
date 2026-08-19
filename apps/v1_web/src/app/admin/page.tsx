@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useV1AdminOpsSummary, useV1AdminOverview } from '@/hooks/use-v1-api';
 import {
   AdminKpiCard,
@@ -57,7 +57,12 @@ function WarningCard({ label, value, tone, href, sub }: WarningCardProps) {
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function AdminOverviewPage() {
   const { data: overview, isPending, isError, refetch } = useV1AdminOverview();
-  const { data: opsSummary, isPending: opsPending, isError: opsError } = useV1AdminOpsSummary();
+  const {
+    data: opsSummary,
+    isPending: opsPending,
+    isError: opsError,
+    refetch: opsRefetch,
+  } = useV1AdminOpsSummary();
 
   // Warning items require attention
   const warningSuspendedBlocked =
@@ -135,6 +140,27 @@ export default function AdminOverviewPage() {
       {!isPending && !isError && (
         <section aria-label="주의 필요 항목" className="mb-6">
           <h2 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">주의 필요</h2>
+          {/* 운영 실패 지표(웹 푸시·SMS) 로딩 실패는 카드를 조용히 숨기는 대신 명시적으로
+              알린다 — 숨기면 "조치 필요 없음"(초록)이 실패를 가리는 무신호 상태가 된다.
+              이 '실패 시 무신호 금지' 계약은 이후 대시보드 개편(M6 WS 전환)에서도 유지해야 한다. */}
+          {opsError && (
+            <div
+              role="alert"
+              className="mb-3 flex flex-wrap items-center gap-2.5 p-4 bg-[var(--red50)] border border-[var(--tint-red-border)] rounded-xl"
+            >
+              <AlertTriangle size={18} className="text-[var(--red700)] shrink-0" aria-hidden="true" />
+              <p className="flex-1 min-w-[200px] text-[length:var(--font-size-body-sm)] text-[var(--red700)]">
+                운영 실패 지표(웹 푸시 · SMS)를 불러오지 못했어요. 아래 상태에는 반영되지 않았어요.
+              </p>
+              <button
+                type="button"
+                onClick={() => void opsRefetch()}
+                className="text-sm text-[var(--red700)] font-semibold underline underline-offset-2 min-h-[44px] px-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+              >
+                다시 시도
+              </button>
+            </div>
+          )}
           {totalWarnings === 0 ? (
             <div className="flex items-center gap-2.5 p-4 bg-[var(--green50)] border border-green-100 rounded-xl">
               <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />

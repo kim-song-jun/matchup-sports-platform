@@ -7,7 +7,11 @@ import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournam
 // 골 이벤트 백필이 복원한 골의 "모르는 값" 판정 -- 대진표 쪽
 // (`deriveTournamentFixtureOfficialGoals`)과 공개 기록 쪽이 같은 규칙을 써야 같은 골이
 // 화면마다 다르게(0분 vs 표시 없음 / 전반 vs 기타) 보이지 않는다.
-import { isMinuteUnknown, isPeriodUnknown } from '../../tournaments/tournament-fixture-official-result';
+import {
+  isMinuteUnknown,
+  isPeriodUnknown,
+  parseTournamentFixtureRevisionGoals,
+} from '../../tournaments/tournament-fixture-official-result';
 import {
   TournamentStaffAccessService,
   type TournamentStaffResource,
@@ -58,7 +62,7 @@ const FIXTURE_SCHEDULE_SELECT = {
       id: true,
       state: true,
       visibilityPolicy: { select: { mode: true, lineupAt: true } },
-      currentOfficialRevision: { select: { state: true, supersedesId: true, officialAt: true, score: true } },
+      currentOfficialRevision: { select: { state: true, supersedesId: true, officialAt: true, score: true, goalEvents: true } },
       // Lane 1 addition -- `sides`/`periods` back the live-score tally and the
       // elapsed-clock projection for a fixture that is genuinely LIVE and has
       // no official revision yet (see `public-live-score.ts`/`public-clock.ts`).
@@ -122,7 +126,7 @@ const FIXTURE_MATCH_SELECT = {
         },
       },
       currentOfficialRevision: {
-        select: { state: true, supersedesId: true, officialAt: true, score: true, mvpParticipantId: true },
+        select: { state: true, supersedesId: true, officialAt: true, score: true, goalEvents: true, mvpParticipantId: true },
       },
       // Lane 1 addition -- see FIXTURE_SCHEDULE_SELECT above.
       periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
@@ -141,7 +145,7 @@ type EffectiveMode = 'status_only' | 'live' | 'official_only';
  * 아직 붙어 있지 않은 중간 형태라 `participantId`만 들고 있다.
  */
 type ScheduleEventRow = {
-  type: 'GOAL' | 'CARD';
+  type: 'GOAL' | 'OWN_GOAL' | 'CARD';
   cardColor: 'YELLOW' | 'RED' | null;
   side: 'home' | 'away';
   participantId: string | null;
@@ -481,6 +485,9 @@ export class PublicTournamentRecordsService {
             fixture.game?.id ?? null,
             fixture.game?.sides ?? [],
             fixture.game?.participants ?? [],
+            fixture.game?.currentOfficialRevision?.state === 'OFFICIAL'
+              ? fixture.game.currentOfficialRevision.goalEvents
+              : null,
             consentMap,
             nameProfileByUserId,
             isStaffBypass,
@@ -644,7 +651,7 @@ export class PublicTournamentRecordsService {
     // 관전자 폴링으로 반복 호출되는 경로라 카드·교체·파울까지 전부 읽으면
     // 그만큼 DB/네트워크 비용이 그대로 쌓인다.
     const events = await this.prisma.v1GameEvent.findMany({
-      where: { gameId: { in: gameIds }, OR: [{ type: 'GOAL' }, { reversesEventId: { not: null } }] },
+      where: { gameId: { in: gameIds }, OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }] },
       select: { id: true, gameId: true, type: true, sideId: true, reversesEventId: true },
     });
     const eventsByGame = new Map<string, typeof events>();
@@ -670,7 +677,7 @@ export class PublicTournamentRecordsService {
     const events = await this.prisma.v1GameEvent.findMany({
       // loadLiveScores 와 같은 이유로 범위를 좁힌다 — 단일 경기 조회라도 관전자
       // 폴링으로 반복 호출된다.
-      where: { gameId, OR: [{ type: 'GOAL' }, { reversesEventId: { not: null } }] },
+      where: { gameId, OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }] },
       select: { id: true, type: true, sideId: true, reversesEventId: true },
     });
     const sideKeyById = new Map(sides.map((side) => [side.id, side.sideKey] as const));
@@ -681,6 +688,7 @@ export class PublicTournamentRecordsService {
     gameId: string | null,
     sides: readonly { id: string; sideKey: 'HOME' | 'AWAY' }[],
     participants: readonly { id: string; userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null }[],
+    officialGoalEvents: Prisma.JsonValue | null,
     consentMap: Map<string, ParticipantConsentEligibility>,
     nameProfileByUserId: ReadonlyMap<string, ParticipantNameProfileRow>,
     isStaffBypass: boolean,
@@ -707,15 +715,21 @@ export class PublicTournamentRecordsService {
     const reversedIds = new Set(
       events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
     );
-    const scoringTypes: ReadonlySet<V1GameEventType> = new Set(['GOAL', 'CARD']);
+    const scoringTypes: ReadonlySet<V1GameEventType> = new Set(['GOAL', 'OWN_GOAL', 'CARD']);
+    const revisionGoals = parseTournamentFixtureRevisionGoals(officialGoalEvents);
     const participantById = new Map(participants.map((participant) => [participant.id, participant] as const));
     // 홈/원정 매핑을 이 자리에서 서버가 직접 해준다 -- `sideId` 는 클라이언트에서
     // 재구성할 수 없는 내부 id 라서, 라인업(lineup)이 아직 공개되지 않은 경기라도
     // (아래 참고: 이름/등번호가 라인업 게이트와 독립인 것과 같은 이유로) 타임라인을
     // 홈/원정으로 나눠 보여줄 수 있어야 한다.
     const sideKeyById = new Map(sides.map((side) => [side.id, side.sideKey] as const));
-    return events
-      .filter((event) => scoringTypes.has(event.type) && !reversedIds.has(event.id))
+    const eventRows = events
+      .filter(
+        (event) =>
+          scoringTypes.has(event.type) &&
+          !reversedIds.has(event.id) &&
+          (revisionGoals === null || event.type === 'CARD'),
+      )
       .map((event) => {
         const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
         // 동의(consent) 게이트는 lineup과 정확히 동일하게 적용한다 -- eligible 이
@@ -754,6 +768,27 @@ export class PublicTournamentRecordsService {
         };
       })
       .sort(byUnknownLast);
+    if (revisionGoals === null) return eventRows;
+    const revisionRows = revisionGoals.map((event) => {
+      const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
+      const eligible = resolveParticipantNameEligible(isStaffBypass, consent);
+      const participant =
+        event.participantId === null ? undefined : participantById.get(event.participantId);
+      return {
+        type: event.ownGoal ? ('OWN_GOAL' as const) : ('GOAL' as const),
+        cardColor: null,
+        sideId: event.sideId,
+        side: sideKeyById.get(event.sideId) === 'HOME' ? ('home' as const) : ('away' as const),
+        participantId: eligible ? event.participantId : null,
+        participantName: eligible
+          ? resolveParticipantDisplayName(participant, nameProfileByUserId)
+          : null,
+        jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+        period: event.period,
+        clockMs: event.minute === null ? null : event.minute * 60000,
+      };
+    });
+    return [...eventRows, ...revisionRows].sort(byUnknownLast);
   }
 
   /**
@@ -798,7 +833,7 @@ export class PublicTournamentRecordsService {
       // GOAL 과 CARD 만 일정 카드에 실린다 -- `buildEvents`(경기 상세 타임라인)가 고르는
       // 것과 정확히 같은 두 종류다. 취소(CORRECTION) 행은 `reversedIds` 를 만드는 데만
       // 쓰이고 자신은 요약에 들어가지 않는다.
-      if (event.type !== 'GOAL' && event.type !== 'CARD') continue;
+      if (event.type !== 'GOAL' && event.type !== 'OWN_GOAL' && event.type !== 'CARD') continue;
       if (reversedIds.has(event.id)) continue;
       const list = eventsByGame.get(event.gameId) ?? [];
       list.push(event);
@@ -808,8 +843,19 @@ export class PublicTournamentRecordsService {
     const result = new Map<string, ScheduleEventRow[]>();
     for (const fixture of fixturesWithGame) {
       const sideKeyById = new Map(fixture.game.sides.map((side) => [side.id, side.sideKey] as const));
-      const rows = (eventsByGame.get(fixture.game.id) ?? []).map((event) => ({
-        type: event.type === 'CARD' ? ('CARD' as const) : ('GOAL' as const),
+      const revisionGoals =
+        fixture.game.currentOfficialRevision?.state === 'OFFICIAL'
+          ? parseTournamentFixtureRevisionGoals(fixture.game.currentOfficialRevision.goalEvents)
+          : null;
+      const rows: ScheduleEventRow[] = (eventsByGame.get(fixture.game.id) ?? [])
+        .filter((event) => revisionGoals === null || event.type === 'CARD')
+        .map((event) => ({
+        type:
+          event.type === 'CARD'
+            ? ('CARD' as const)
+            : event.type === 'OWN_GOAL'
+              ? ('OWN_GOAL' as const)
+              : ('GOAL' as const),
         // 카드 색상은 payload 에만 있다 -- `buildEvents` 와 같은 파서를 쓴다. GOAL 이거나
         // 색을 모르는 과거 payload 면 null 이고, 그때 프론트는 색 대신 중립 카드로 그린다.
         cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
@@ -820,7 +866,19 @@ export class PublicTournamentRecordsService {
         period: isPeriodUnknown(event.payload) ? null : event.period,
         // buildEvents와 동일한 규칙 -- 분 미상 골은 시각을 내리지 않는다.
         clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
-      }));
+        }));
+      if (revisionGoals !== null) {
+        rows.push(
+          ...revisionGoals.map((event) => ({
+            type: event.ownGoal ? ('OWN_GOAL' as const) : ('GOAL' as const),
+            cardColor: null,
+            side: sideKeyById.get(event.sideId) === 'HOME' ? ('home' as const) : ('away' as const),
+            participantId: event.participantId,
+            period: event.period,
+            clockMs: event.minute === null ? null : event.minute * 60000,
+          })),
+        );
+      }
       // 여기서는 `byUnknownLast` 로 다시 정렬하지 않는다 -- 일정 카드
       // (`schedule-content.tsx` 의 ScorerSummary)가 이미 `clockMs ?? MAX_SAFE_INTEGER`
       // 로 자기가 정렬하며 모르는 값을 뒤로 보낸다. 서버가 여기서 한 번 더 정렬하면
@@ -969,8 +1027,10 @@ function presentScheduleEntry(
   // `scorers`는 골만 담는 기존 계약 그대로 유지한다(`type`/`cardColor` 없이) -- 이미
   // 배포된 클라이언트가 이 배열의 length 를 골 수로 읽고 있어 카드가 섞이면 곧장 오독이 된다.
   const scorers = summarizedEvents
-    .filter((event) => event.type === 'GOAL')
-    .map(({ type: _type, cardColor: _cardColor, ...goal }) => goal);
+    .filter((event) => event.type === 'GOAL' || event.type === 'OWN_GOAL')
+    .map(({ type, cardColor: _cardColor, ...goal }) =>
+      type === 'OWN_GOAL' ? { ...goal, ownGoal: true as const } : goal,
+    );
   const cards = summarizedEvents
     .filter((event) => event.type === 'CARD')
     .map(({ type: _type, ...card }) => card);

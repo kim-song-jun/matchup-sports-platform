@@ -42,6 +42,7 @@ const STATUS_BADGE_CLASS: Record<QueuedEventStatus, string> = {
 
 function eventLabel(item: QueuedGameEvent): string {
   if (item.event.type === 'GOAL') return '골';
+  if (item.event.type === 'OWN_GOAL') return '자책골';
   if (item.event.type === 'CARD') {
     const card = item.event.payload.card;
     return card === 'RED' ? '레드카드' : '옐로카드';

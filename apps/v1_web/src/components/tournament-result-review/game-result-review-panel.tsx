@@ -16,6 +16,7 @@ import { RecordedEventList } from '@/app/tournament-ops/tournaments/[id]/fixture
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { deriveEditableGoalEvents } from '@/lib/result-goal-events';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { RevisionTimeline } from './revision-timeline';
@@ -150,6 +151,7 @@ export function GameResultReviewPanel({
         revisionId: freshRevision.id,
         expectedVersion: freshGame.version,
         score: freshRevision.score,
+        goalEvents: freshRevision.goalEvents,
         eventsHash: freshRevision.eventsHash,
         mvpParticipantId: freshRevision.mvpParticipantId,
       },
@@ -323,6 +325,10 @@ export function GameResultReviewPanel({
           reasonLabel="재제출 사유"
           base={{
             score: resubmitTarget.score,
+            goalEvents: deriveEditableGoalEvents(
+              resubmitTarget.goalEvents,
+              eventsQuery.data?.events ?? [],
+            ),
             participants: resubmitTarget.resultParticipants,
             mvpParticipantId: resubmitTarget.mvpParticipantId,
           }}
@@ -346,6 +352,7 @@ export function GameResultReviewPanel({
                 revisionId: resubmitTarget.id,
                 expectedVersion: game.version,
                 score: input.score,
+                goalEvents: input.goalEvents,
                 actualParticipants: input.actualParticipants,
                 eventsHash: resubmitTarget.eventsHash,
                 mvpParticipantId: input.mvpParticipantId,

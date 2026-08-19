@@ -76,6 +76,7 @@ export interface PublicSideSummary {
  */
 export interface PublicScheduleScorer {
   readonly side: 'home' | 'away';
+  readonly ownGoal?: boolean;
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;
   readonly period: number | null;
@@ -269,7 +270,7 @@ export interface PublicTeamRecordPenalties {
  */
 export interface PublicTeamRecordEvent {
   readonly id: string;
-  readonly type: 'GOAL' | 'CARD';
+  readonly type: 'GOAL' | 'OWN_GOAL' | 'CARD';
   readonly side: 'own' | 'opponent';
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;

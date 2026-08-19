@@ -33,6 +33,7 @@ function eventTimeLabel(event: GameEventRecord): string {
 function eventDotClass(event: GameEventRecord): string {
   switch (event.type) {
     case 'GOAL':
+    case 'OWN_GOAL':
       return 'bg-[var(--green500)]';
     case 'CARD':
       return event.payload.card === 'RED' ? 'bg-[var(--red500)]' : 'bg-[var(--yellow500)]';
@@ -60,6 +61,7 @@ export function RecordedEventList({
   sides,
   lineups,
   onAttachAssist,
+  onReverseEvent,
   onReverseSubstitution,
 }: {
   readonly events: readonly GameEventRecord[];
@@ -73,6 +75,8 @@ export function RecordedEventList({
   /** 빠른 교체 모드의 오조작 복구 경로 — 되돌리기 버튼은 아직 되돌려지지
    * 않은 SUBSTITUTION 이벤트에만 뜬다. 새 되돌리기 API가 아니라 기존
    * `GamesService.reverseEvent`(CORRECTION) 를 그대로 호출한다. */
+  readonly onReverseEvent?: (event: GameEventRecord) => void;
+  /** @deprecated 새 호출부는 모든 수정 가능 이벤트를 받는 onReverseEvent를 사용한다. */
   readonly onReverseSubstitution?: (event: GameEventRecord) => void;
 }) {
   if (events.length === 0) {
@@ -124,8 +128,12 @@ export function RecordedEventList({
           event.assistParticipantId === null &&
           event.participantId !== null &&
           !reversedIds.has(event.id);
-        const canReverseSubstitution =
-          onReverseSubstitution !== undefined && event.type === 'SUBSTITUTION' && !reversedIds.has(event.id);
+        const reverseHandler = onReverseEvent ?? onReverseSubstitution;
+        const canReverse =
+          reverseHandler !== undefined &&
+          (onReverseEvent !== undefined || event.type === 'SUBSTITUTION') &&
+          ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL', 'SUBSTITUTION'].includes(event.type) &&
+          !reversedIds.has(event.id);
         return (
           <li
             key={event.id}
@@ -197,14 +205,14 @@ export function RecordedEventList({
                     어시스트
                   </button>
                 ) : null}
-                {canReverseSubstitution ? (
+                {canReverse ? (
                   <button
                     type="button"
-                    onClick={() => onReverseSubstitution(event)}
+                    onClick={() => reverseHandler?.(event)}
                     className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                   >
                     <Undo2 size={12} aria-hidden="true" />
-                    되돌리기
+                    {event.type === 'SUBSTITUTION' ? '되돌리기' : '수정·취소'}
                   </button>
                 ) : null}
                 {/* 팀 귀속은 기록자가 매 행에서 즉시 확인해야 하는 정보인데, 행에서
@@ -260,6 +268,8 @@ function eventTypeLabel(event: GameEventRecord): string {
   switch (event.type) {
     case 'GOAL':
       return '골';
+    case 'OWN_GOAL':
+      return '자책골';
     case 'CARD':
       return event.payload.card === 'RED' ? '레드카드' : '옐로카드';
     case 'FOUL':

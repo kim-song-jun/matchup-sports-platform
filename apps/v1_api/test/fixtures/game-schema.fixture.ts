@@ -239,7 +239,7 @@ export const gameSchemaSourceManifest = {
   // 20260729000100_v1_game_operations 는 그대로라 migration 해시는 변하지 않는다.
   // 위 두 재핀이 **병합된 뒤**의 schema.prisma 에 shasum 을 다시 돌려 계산한 값이다 --
   // 어느 한쪽 브랜치의 해시를 그대로 쓰면 병합 결과와 달라 SOURCE_SNAPSHOT_DRIFT 로 CI 가 깨진다.
-  schema: '1e223170eeace75995eb4b01ee3b6ef2d11a3da1aa816215db18dde4cf9c4002',
+  schema: '35acb3a8d851075a75489c5a472e373222563c06b1cc5da169687be4d8bc8977',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

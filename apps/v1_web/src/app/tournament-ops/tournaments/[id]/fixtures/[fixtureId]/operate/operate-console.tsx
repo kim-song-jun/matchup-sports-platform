@@ -166,6 +166,7 @@ const ACTION_BUTTONS: ReadonlyArray<{
   readonly allowTeamOnly: boolean;
 }> = [
   { type: 'GOAL', label: '골', allowTeamOnly: false },
+  { type: 'OWN_GOAL', label: '자책골', allowTeamOnly: false },
   { type: 'CARD', label: '옐로카드', cardColor: 'YELLOW', allowTeamOnly: false },
   { type: 'CARD', label: '레드카드', cardColor: 'RED', allowTeamOnly: false },
   { type: 'FOUL', label: '파울', allowTeamOnly: true },
@@ -376,7 +377,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       // `undefined` id being treated as "this exact event was reversed" —
       // handled above by keeping `undefined` out of `reversedIds` in the
       // first place, not by disqualifying events that lack an `id`.
-      if (event.type !== 'GOAL' || event.sideId === null || event.sideId === undefined || reversedIds.has(event.id)) {
+      if (
+        (event.type !== 'GOAL' && event.type !== 'OWN_GOAL') ||
+        event.sideId === null ||
+        event.sideId === undefined ||
+        reversedIds.has(event.id)
+      ) {
         continue;
       }
       score.set(event.sideId, (score.get(event.sideId) ?? 0) + 1);
@@ -597,6 +603,33 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       await ops.assignAssist({ eventId: event.id, assistParticipantId });
     },
     [ops],
+  );
+
+  const handleReverseEvent = useCallback(
+    async (event: GameEventRecord) => {
+      const label =
+        event.type === 'GOAL'
+          ? '골'
+          : event.type === 'OWN_GOAL'
+            ? '자책골'
+            : event.type === 'CARD'
+              ? '카드'
+              : event.type === 'FOUL'
+                ? '파울'
+                : '교체';
+      const ok = await confirm({
+        title: `${label} 기록을 취소할까요?`,
+        message:
+          event.type === 'SUBSTITUTION'
+            ? '취소 기록이 감사 로그에 남아요.'
+            : '취소 기록이 감사 로그에 남아요. 취소 후 올바른 기록을 다시 입력해 주세요.',
+        confirmLabel: '기록 취소',
+        tone: 'danger',
+      });
+      if (!ok) return;
+      await ops.reverseEvent({ eventId: event.id, reason: `${label} 기록 수정·취소` });
+    },
+    [confirm, ops],
   );
 
   // 빠른 교체 모드의 단일 확정 탭 — QuickSubstitutionPanel은 "지정 후 탭"
@@ -1253,43 +1286,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           화면에서 "배경이 꽉 찬 유채색 강조"는 0개가 되고, 색은 작은
           지시자로만 남는다 — 나머지(버튼 배경·테두리·라벨)는 후퇴시켜
           강조가 뭉개지지 않게 한다(R-D2).
-          위계 재설계(alpha 390px 실측 지적) — 예전엔 "교체"만 마지막 칸이라는
-          이유로 전폭(2칸)을 차지해, 실제 사용 빈도·중요도가 가장 낮은 축에
-          속하는 교체가 화면에서 가장 큰 버튼이 됐다(다섯 버튼 중 유일하게
-          "행동 하나로 끝나지 않는" 액션이라 오히려 실수 유발 여지도 큼). 실제
-          현장 빈도는 골이 압도적으로 높고(경기당 여러 번, 즉시 기록 필요),
-          카드·파울이 그다음, 교체가 가장 드물다(경기당 정해진 횟수). 전폭
-          자리를 마지막 항목이 아니라 **골**에 준다 — 모바일에서는 골이
-          단독으로 한 줄 전체(2칸)를 차지하고 살짝 더 높게(h-20) 서서
-          "가장 먼저 눈에 띄고 가장 먼저 손이 가는" 위치(엄지 도달 최상단)를
-          갖는다. 나머지 네 버튼(옐로/레드/파울/교체)은 그 아래 2×2로 가지런히
-          정렬된다 — 카드 2개가 한 행, 파울·교체가 한 행이라 성격이 가까운
-          것끼리 묶인다. 색은 여전히 전부 outline 중립(R-K5 "동급 CTA는
-          1개"를 지키려 골을 primary/파란색으로 올리지 않는다 — 이미 헤더의
-          "일시 중지"가 이 화면의 유일한 파란 CTA다) — 위계는 오직 크기·
-          위치로만 만든다.
-          sm 이상: 5개가 균등 5열이면 이 위계가 데스크톱에서만 사라진다.
-          6열 그리드로 바꿔 골이 2칸(전체의 2/6 ≈ 33%), 나머지가 각 1칸
-          (1/6 ≈ 17%)을 차지하게 해 폭 2배 관계를 모바일과 동일하게
-          유지하면서, 6개 칸(2+1+1+1+1)이 딱 맞아떨어져 줄바꿈 없이 한 줄에
-          정렬된다. */}
+          자책골이 추가된 현재는 6개 액션을 모바일 2열·데스크톱 6열로
+          균등 배치한다. 골만 2칸을 쓰면 총 7칸이 되어 마지막 액션이 홀로
+          다음 줄로 밀리므로, 모든 액션의 크기와 터치 영역을 동일하게 둔다. */}
       <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-6">
         {ACTION_BUTTONS.map((button, index) => (
           <Button
             key={`${button.type}-${button.cardColor ?? index}`}
             size="lg"
             variant="outline"
-            className={`flex-col gap-1${
-              // [알파 감사 F] 데스크톱(lg, 1024px+)에서는 버튼이 더 크고 눌러야
-              // 쉬워지는 방향이 맞다 — 경기 중 빠르게 눌러야 하는 화면이다.
-              // 모바일(h-20/h-16)·태블릿(sm:h-16)은 기존 그대로 두고 lg에서만
-              // 한 단계 더 키운다(h-24/h-20).
-              index === 0 ? ' col-span-2 h-20 sm:col-span-2 sm:h-16 lg:h-24' : ' h-16 lg:h-20'
-            }`}
+            className="h-16 flex-col gap-1 lg:h-20"
             disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
             onClick={() => handleSelectAction(button)}
           >
-            {button.type === 'GOAL' ? (
+            {button.type === 'GOAL' || button.type === 'OWN_GOAL' ? (
               <Goal size={18} aria-hidden="true" className="text-green-600 dark:text-green-400" />
             ) : button.type === 'FOUL' ? (
               <AlertTriangle size={18} aria-hidden="true" className="text-[var(--text-muted)]" />
@@ -1361,7 +1371,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           sides={sides}
           lineups={lineups}
           onAttachAssist={(event) => setAssistTarget({ event })}
-          onReverseSubstitution={(event) => void ops.reverseEvent({ eventId: event.id, reason: '교체 되돌리기' })}
+          onReverseEvent={(event) => void handleReverseEvent(event)}
         />
       </section>
 

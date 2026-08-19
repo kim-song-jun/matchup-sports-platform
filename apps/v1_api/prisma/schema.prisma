@@ -387,6 +387,7 @@ enum V1ConsentState {
 
 enum V1GameEventType {
   GOAL
+  OWN_GOAL
   CARD
   SUBSTITUTION
   PERIOD_START
@@ -2961,6 +2962,7 @@ model V1GameResultRevision {
   revision             Int
   state                V1GameResultRevisionState  @default(DRAFT)
   score                Json
+  goalEvents           Json?                      @map("goal_events")
   eventsHash           String                     @map("events_hash")
   missingScorer        Boolean                    @default(false) @map("missing_scorer")
   mvpParticipantId     String?                    @map("mvp_participant_id")

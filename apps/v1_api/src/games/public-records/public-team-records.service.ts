@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   isMinuteUnknown,
   isPeriodUnknown,
+  parseTournamentFixtureRevisionGoals,
   parseTournamentFixtureOfficialScore,
 } from '../../tournaments/tournament-fixture-official-result';
 import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
@@ -38,6 +39,7 @@ interface TeamRecordFactRow {
   readonly officialAt: Date;
   readonly resultRevision: {
     readonly score: Prisma.JsonValue;
+    readonly goalEvents: Prisma.JsonValue | null;
     readonly game: {
       readonly currentOfficialRevisionId: string | null;
       readonly teamMatchId: string | null;
@@ -53,7 +55,7 @@ type TeamPenalties = { readonly for: number; readonly against: number };
 /** 팀 전적 한 건에 실리는 골/카드 이벤트 -- 시간순(period asc, clockMs asc) 정렬. */
 type TeamRecordEventRow = {
   readonly id: string;
-  readonly type: 'GOAL' | 'CARD';
+  readonly type: 'GOAL' | 'OWN_GOAL' | 'CARD';
   readonly side: 'own' | 'opponent';
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;
@@ -198,6 +200,7 @@ export class PublicTeamRecordsService {
         resultRevision: {
           select: {
             score: true,
+            goalEvents: true,
             game: {
               select: {
                 currentOfficialRevisionId: true,
@@ -245,7 +248,7 @@ export class PublicTeamRecordsService {
       // 아예 읽지 않는다(페이지 단위로 여러 경기를 한 번에 읽으므로 payload 까지 딸려온다).
       where: {
         gameId: { in: gameIds },
-        OR: [{ type: { in: ['GOAL', 'CARD'] } }, { reversesEventId: { not: null } }],
+        OR: [{ type: { in: ['GOAL', 'OWN_GOAL', 'CARD'] } }, { reversesEventId: { not: null } }],
       },
       orderBy: [{ period: 'asc' }, { clockMs: 'asc' }, { sequence: 'asc' }],
       select: {
@@ -265,7 +268,7 @@ export class PublicTeamRecordsService {
     );
     const eventsByGame = new Map<string, typeof events>();
     for (const event of events) {
-      if (event.type !== 'GOAL' && event.type !== 'CARD') continue;
+      if (event.type !== 'GOAL' && event.type !== 'OWN_GOAL' && event.type !== 'CARD') continue;
       if (reversedIds.has(event.id)) continue;
       const list = eventsByGame.get(event.gameId) ?? [];
       list.push(event);
@@ -295,7 +298,9 @@ export class PublicTeamRecordsService {
         row.resultRevision.game.participants.map((participant) => [participant.id, participant] as const),
       );
 
+      const revisionGoals = parseTournamentFixtureRevisionGoals(row.resultRevision.goalEvents);
       const rows = (eventsByGame.get(row.gameId) ?? [])
+        .filter((event) => revisionGoals === null || event.type === 'CARD')
         .map((event) => {
           const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
           const eligible = resolveParticipantNameEligible(false, consent);
@@ -303,7 +308,12 @@ export class PublicTeamRecordsService {
           const eventSideKey = event.sideId === null ? null : (sideKeyBySideId.get(event.sideId) ?? null);
           return {
             id: event.id,
-            type: event.type === 'CARD' ? ('CARD' as const) : ('GOAL' as const),
+            type:
+              event.type === 'CARD'
+                ? ('CARD' as const)
+                : event.type === 'OWN_GOAL'
+                  ? ('OWN_GOAL' as const)
+                  : ('GOAL' as const),
             // sideId/ownSideKey가 둘 다 nullable 방어(스키마상 GOAL/CARD엔 항상 붙지만) --
             // 알 수 없으면 이 팀 소속으로 잘못 세지 않도록 보수적으로 'opponent'로 접는다
             // (buildEvents의 side fail-safe와 동일한 원칙).
@@ -316,6 +326,33 @@ export class PublicTeamRecordsService {
           };
         })
         .sort(byUnknownLast);
+      if (revisionGoals !== null) {
+        rows.push(
+          ...revisionGoals.map((event) => {
+            const consent =
+              event.participantId === null ? undefined : consentMap.get(event.participantId);
+            const eligible = resolveParticipantNameEligible(false, consent);
+            const participant =
+              event.participantId === null ? undefined : participantById.get(event.participantId);
+            const eventSideKey = sideKeyBySideId.get(event.sideId) ?? null;
+            return {
+              id: event.id,
+              type: event.ownGoal ? ('OWN_GOAL' as const) : ('GOAL' as const),
+              side: (eventSideKey !== null && eventSideKey === ownSideKey
+                ? 'own'
+                : 'opponent') as 'own' | 'opponent',
+              participantName: eligible
+                ? resolveParticipantDisplayName(participant, nameProfileByUserId)
+                : null,
+              jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+              period: event.period,
+              clockMs: event.minute === null ? null : event.minute * 60000,
+              cardColor: null,
+            };
+          }),
+        );
+        rows.sort(byUnknownLast);
+      }
       result.set(row.gameId, rows);
     }
     return result;

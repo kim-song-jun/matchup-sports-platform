@@ -92,9 +92,8 @@ describe('ScheduleContent — 순위표 팀 링크', () => {
 /**
  * alpha "452′" 실측 사고(2026-08) 회귀 방지. DB 실측값 그대로 재현한다:
  * `v1_game_events.clock_ms` GOAL 27,166,083ms(≈452분, 20분 피리어드 경기)
- * -- 공개 일정 화면(이 컴포넌트)에 `452′`가 경고 표식 없이 그대로 나갔던
- * 화면이다. 숫자 자체는 조작·은폐하지 않고(그대로 `452′`가 보여야 한다)
- * 경고 표식만 추가로 붙어야 한다.
+ * -- 공개 일정 화면(이 컴포넌트)에 내림값 `452′`가 경고 표식 없이 나갔던
+ * 화면이다. 현재 계약은 초 단위를 올림한 `453′`와 경고 표식을 함께 보여준다.
  */
 function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> = {}): import('./types').PublicScheduleEntry {
   return {
@@ -124,15 +123,15 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
 }
 
 describe('ScheduleContent — 이상 클럭 경고 표식(alpha 452′ 사고)', () => {
-  it('득점자의 clockMs가 이상값이면 분 표시는 그대로 두고 경고 표식을 붙인다', () => {
+  it('득점자의 clockMs가 이상값이면 분을 올림해 표시하고 경고 표식을 붙인다', () => {
     const data = { ...makeData(), items: [fixtureEntry({
       scorers: [{ side: 'home', participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 27_166_083 }],
     })] };
 
     render(<ScheduleContent tournamentId="tour-1" data={data} />);
 
-    // 숫자 자체(452′)는 조작·은폐되지 않고 그대로 보인다.
-    expect(screen.getByText(/452′/)).toBeInTheDocument();
+    // 초 단위가 남아 있으므로 사용자 계약대로 453분으로 올림해 보인다.
+    expect(screen.getByText(/453′/)).toBeInTheDocument();
     // 그 옆에 경고 표식이 붙는다.
     expect(screen.getByLabelText('비정상적으로 긴 경기 시각이에요. 확인이 필요해요.')).toBeInTheDocument();
   });
@@ -144,7 +143,7 @@ describe('ScheduleContent — 이상 클럭 경고 표식(alpha 452′ 사고)',
 
     render(<ScheduleContent tournamentId="tour-1" data={data} />);
 
-    expect(screen.getByText(/10′/)).toBeInTheDocument();
+    expect(screen.getByText(/11′/)).toBeInTheDocument();
     expect(screen.queryByLabelText('비정상적으로 긴 경기 시각이에요. 확인이 필요해요.')).not.toBeInTheDocument();
   });
 });

@@ -151,6 +151,7 @@ async function buildOfficialGame(fixtureId: string): Promise<{ gameId: string; o
   const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
   const previewHash = canonicalGameCommandPayloadHash({
     score: submitted.score,
+    goalEvents: submitted.goalEvents,
     eventsHash: submitted.eventsHash,
     mvpParticipantId: submitted.mvpParticipantId,
   });
@@ -429,9 +430,10 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     return { homeSideId: home.id, scorerId: scorer.id };
   }
 
-  function previewHash(revision: { score: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
+  function previewHash(revision: { score: unknown; goalEvents: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
     return canonicalGameCommandPayloadHash({
       score: revision.score,
+      goalEvents: revision.goalEvents,
       eventsHash: revision.eventsHash,
       mvpParticipantId: revision.mvpParticipantId,
     });

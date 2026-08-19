@@ -47,7 +47,11 @@ export function tallyLiveScore(
   let home = 0;
   let away = 0;
   for (const event of events) {
-    if (event.type !== 'GOAL' || event.sideId === null || reversed.has(event.id)) continue;
+    if (
+      (event.type !== 'GOAL' && event.type !== 'OWN_GOAL') ||
+      event.sideId === null ||
+      reversed.has(event.id)
+    ) continue;
     // HOME 이 아닌 것을 전부 AWAY 로 몰면, sideId 가 맵에 없는 경우(다른 경기의 side
     // id 가 섞이거나 side 행이 지워진 이상 데이터)까지 원정팀 골로 잘못 집계된다 —
     // 관전자에게 보이는 숫자라 조용히 틀리면 안 된다. 아는 두 값만 센다.

@@ -324,14 +324,26 @@ export class TournamentResultReviewService {
         // 두 레인이 같은 코드(422 `PARTICIPANT_INVALID`)를 돌려주게 만든다.
         await this.assertRevisionParticipantsValid(tx, gameId, base.id, dto);
         const score = await this.assertPenaltiesForRevision(tx, game, base.score, dto.score);
-        const invariant = await this.resultInvariantInput(tx, game, { ...dto, score });
-        try {
-          validateGameResultInvariants(invariant);
-        } catch (error) {
-          if (error instanceof GameContractError) {
-            throw toGameHttpException(error);
+        let missingScorer: boolean;
+        if (dto.goalEvents !== undefined) {
+          missingScorer = await this.assertGoalTimelineConsistent(
+            tx,
+            gameId,
+            score,
+            dto.actualParticipants,
+            dto.goalEvents,
+          );
+        } else {
+          const invariant = await this.resultInvariantInput(tx, game, { ...dto, score });
+          try {
+            validateGameResultInvariants(invariant);
+          } catch (error) {
+            if (error instanceof GameContractError) {
+              throw toGameHttpException(error);
+            }
+            throw error;
           }
-          throw error;
+          missingScorer = invariant.missingScorer;
         }
         // The `v1_guard_result_participant_mutation` trigger (see
         // prisma/migrations/20260729000100_v1_game_operations) only permits
@@ -345,8 +357,14 @@ export class TournamentResultReviewService {
             gameId,
             revision: await this.nextRevisionNumber(tx, gameId),
             score: jsonInput(score),
+            goalEvents:
+              dto.goalEvents !== undefined
+                ? jsonInput(dto.goalEvents)
+                : base.goalEvents === null
+                  ? undefined
+                  : jsonInput(base.goalEvents),
             eventsHash: dto.eventsHash,
-            missingScorer: invariant.missingScorer,
+            missingScorer,
             mvpParticipantId: dto.mvpParticipantId,
             reason: dto.reason,
             createdByActorType: 'USER',
@@ -584,6 +602,7 @@ export class TournamentResultReviewService {
             revision: await this.nextRevisionNumber(tx, gameId),
             state: V1GameResultRevisionState.VOID,
             score: jsonInput(revision.score),
+            goalEvents: revision.goalEvents === null ? undefined : jsonInput(revision.goalEvents),
             eventsHash: revision.eventsHash,
             missingScorer: revision.missingScorer,
             mvpParticipantId: revision.mvpParticipantId,
@@ -703,14 +722,29 @@ export class TournamentResultReviewService {
         // 스트림에서 계산되는 **사실**이므로 supersede 경로와 같은 출처를 쓴다.
         // 예전엔 `false`를 하드코딩해, 정정 한 번으로 "득점자 미상 골이 있다"는
         // 경고가 조용히 사라졌다 — 그러면 아무도 그 골의 득점자를 채워 넣지 않는다.
-        const invariant = await this.resultInvariantInput(tx, game, { ...dto.changes, score });
+        const missingScorer =
+          dto.changes.goalEvents !== undefined
+            ? await this.assertGoalTimelineConsistent(
+                tx,
+                gameId,
+                score,
+                dto.changes.actualParticipants,
+                dto.changes.goalEvents,
+              )
+            : (await this.resultInvariantInput(tx, game, { ...dto.changes, score })).missingScorer;
         const draft = await tx.v1GameResultRevision.create({
           data: {
             gameId,
             revision: await this.nextRevisionNumber(tx, gameId),
             score: jsonInput(score),
+            goalEvents:
+              dto.changes.goalEvents !== undefined
+                ? jsonInput(dto.changes.goalEvents)
+                : base.goalEvents === null
+                  ? undefined
+                  : jsonInput(base.goalEvents),
             eventsHash: dto.changes.eventsHash,
-            missingScorer: invariant.missingScorer,
+            missingScorer,
             mvpParticipantId: dto.changes.mvpParticipantId,
             reason: dto.reason,
             createdByActorType: 'USER',
@@ -1006,11 +1040,13 @@ export class TournamentResultReviewService {
    */
   private projectionPreviewHash(revision: {
     score: Prisma.JsonValue;
+    goalEvents: Prisma.JsonValue | null;
     eventsHash: string;
     mvpParticipantId: string | null;
   }): string {
     return canonicalGameCommandPayloadHash({
       score: revision.score,
+      goalEvents: revision.goalEvents,
       eventsHash: revision.eventsHash,
       mvpParticipantId: revision.mvpParticipantId,
     });
@@ -1307,6 +1343,103 @@ export class TournamentResultReviewService {
         message: 'MVP must be one of the submitted actualParticipants',
       });
     }
+  }
+
+  /**
+   * 종료 후 정정에서는 append-only 원본 이벤트가 아니라 운영자가 확인한
+   * goalEvents 스냅샷이 공식 득점 사실이다. 점수·득점자 개인 합계·자책골
+   * 귀속이 서로 갈라진 리비전은 공개 전적과 개인 통계를 다시 불일치시키므로
+   * 새 리비전을 만들기 전에 한 번에 검증한다.
+   */
+  private async assertGoalTimelineConsistent(
+    tx: Transaction,
+    gameId: string,
+    score: { home: number; away: number },
+    participants: ReadonlyArray<{ participantId: string; sideId: string; goals: number }>,
+    goalEvents: ReadonlyArray<{
+      id: string;
+      sideId: string;
+      participantId?: string;
+      ownGoal: boolean;
+    }>,
+  ): Promise<boolean> {
+    const sides = await tx.v1GameSide.findMany({
+      where: { gameId },
+      select: { id: true, sideKey: true },
+    });
+    const homeSideId = sides.find((side) => side.sideKey === 'HOME')?.id;
+    const awaySideId = sides.find((side) => side.sideKey === 'AWAY')?.id;
+    if (!homeSideId || !awaySideId) {
+      throw new UnprocessableEntityException({
+        code: 'RESULT_GOAL_TIMELINE_INVALID',
+        message: 'Game must have HOME and AWAY sides',
+      });
+    }
+
+    const participantById = new Map(
+      participants.map((participant) => [participant.participantId, participant] as const),
+    );
+    const personalGoals = new Map<string, number>();
+    const seenIds = new Set<string>();
+    let homeGoals = 0;
+    let awayGoals = 0;
+    let missingScorer = false;
+
+    for (const goal of goalEvents) {
+      if (seenIds.has(goal.id) || (goal.sideId !== homeSideId && goal.sideId !== awaySideId)) {
+        throw new UnprocessableEntityException({
+          code: 'RESULT_GOAL_TIMELINE_INVALID',
+          message: 'Goal timeline ids must be unique and use a game side',
+        });
+      }
+      seenIds.add(goal.id);
+      if (goal.sideId === homeSideId) homeGoals += 1;
+      else awayGoals += 1;
+
+      if (!goal.participantId) {
+        if (goal.ownGoal) {
+          throw new UnprocessableEntityException({
+            code: 'RESULT_GOAL_TIMELINE_INVALID',
+            message: 'Own goal must identify the opposing participant',
+          });
+        }
+        missingScorer = true;
+        continue;
+      }
+      const participant = participantById.get(goal.participantId);
+      const sideMatches = participant
+        ? goal.ownGoal
+          ? participant.sideId !== goal.sideId
+          : participant.sideId === goal.sideId
+        : false;
+      if (!sideMatches) {
+        throw new UnprocessableEntityException({
+          code: 'RESULT_GOAL_TIMELINE_INVALID',
+          message: goal.ownGoal
+            ? 'Own-goal participant must belong to the opposing side'
+            : 'Goal participant must belong to the credited side',
+        });
+      }
+      if (!goal.ownGoal) {
+        personalGoals.set(goal.participantId, (personalGoals.get(goal.participantId) ?? 0) + 1);
+      }
+    }
+
+    if (homeGoals !== score.home || awayGoals !== score.away) {
+      throw new UnprocessableEntityException({
+        code: 'RESULT_GOAL_TIMELINE_INVALID',
+        message: 'Goal timeline totals must match the submitted score',
+      });
+    }
+    for (const participant of participants) {
+      if (participant.goals !== (personalGoals.get(participant.participantId) ?? 0)) {
+        throw new UnprocessableEntityException({
+          code: 'RESULT_GOAL_TIMELINE_INVALID',
+          message: 'Participant goal totals must match the official goal timeline',
+        });
+      }
+    }
+    return missingScorer;
   }
 
   /**

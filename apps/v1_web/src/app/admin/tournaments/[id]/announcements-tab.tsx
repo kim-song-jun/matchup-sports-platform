@@ -19,9 +19,11 @@ import {
 
 export function AnnouncementsTab({
   tournamentId,
+  canWrite,
   showToast,
 }: {
   tournamentId: string;
+  canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
   const { data: annData, isPending: annPending, isError: annError, error: annErr, refetch: annRefetch } = useV1AdminAnnouncements(tournamentId);
@@ -133,6 +135,15 @@ export function AnnouncementsTab({
   return (
     <div className="flex flex-col gap-6">
       {/* ── 공지 작성 폼 ─────────────────────────────────────────────── */}
+      {!canWrite && (
+        <p
+          className="rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
+          role="status"
+        >
+          조회 전용 권한으로 접속했어요. 공지를 작성하거나 변경하려면 운영 권한이 필요해요.
+        </p>
+      )}
+      {canWrite && (
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-5">
         <h3 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">공지 작성</h3>
         {editingAnnouncement && (
@@ -247,6 +258,7 @@ export function AnnouncementsTab({
           </button>
         </form>
       </div>
+      )}
 
       {/* ── 공지 목록 ─────────────────────────────────────────────────── */}
       {(annPending || annError) && (
@@ -283,7 +295,7 @@ export function AnnouncementsTab({
                       : '대기팀만'}
                   </p>
                 </div>
-                {!ann.publishedAt && (
+                {canWrite && !ann.publishedAt && (
                   <button
                     type="button"
                     onClick={() => handlePublish(ann.id)}
@@ -296,6 +308,7 @@ export function AnnouncementsTab({
                   </button>
                 )}
               </div>
+              {canWrite && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -318,6 +331,7 @@ export function AnnouncementsTab({
                   삭제
                 </button>
               </div>
+              )}
               <p className="mt-2 text-[13px] text-[var(--text-muted)] whitespace-pre-wrap leading-relaxed">
                 {ann.body}
               </p>

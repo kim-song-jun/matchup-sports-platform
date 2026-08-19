@@ -445,6 +445,15 @@ export class TournamentResultReviewService {
             message: 'The projection preview hash does not match the current revision content',
           });
         }
+        // 승격 시점의 얇은 안전망(2026-08-19 alpha 감사 F-4). 승부차기 검증은 지금까지
+        // **DRAFT 를 만드는 시점에만** 걸렸다 — 결함 있는 빌드나 면제 경로로 만들어진
+        // 리비전은 나중에 그대로 공식이 될 수 있었고, 실제로 알파에 그런 DRAFT 가 남아 있다.
+        //
+        // **킥 수는 요구하지 않는다**(`requireKickCounts: false`). 이 자리는 *저장된 값을
+        // 승격*하는 곳이라, 요구하면 킥 수가 생기기 전에 만들어진 리비전이 영구히 공식화
+        // 불가가 된다 — 운영자가 승격 화면에서 킥 수를 채워 넣을 수단도 없다. 잡는 것은
+        // "킥 수가 있는데 그 값이 정책상 결판이 아닌" 경우로 좁힌다.
+        await this.assertStoredPenaltiesPersistable(tx, game, revision.score);
         const flow: RevisionFlow =
           revision.state === V1GameResultRevisionState.DRAFT ? 'CORRECTION' : 'STANDARD';
         this.assertTransition({ from: revision.state, to: V1GameResultRevisionState.OFFICIAL, flow });
@@ -1209,6 +1218,27 @@ export class TournamentResultReviewService {
    * **점수가 같을 때만** 메운다. 점수가 다르면 base 의 킥 수는 다른 승부차기를 설명하는
    * 값이라, 그대로 옮기면 "성공 수가 시도 수를 넘는" 조합이 조용히 만들어진다.
    */
+  /**
+   * 이미 저장된 리비전의 승부차기가 지금도 정책상 유효한지 본다(승격 게이트).
+   * 저장값을 그대로 읽으므로 킥 수는 요구하지 않는다 — 자세한 근거는 호출부 주석 참고.
+   */
+  private async assertStoredPenaltiesPersistable(
+    tx: Transaction,
+    game: LockedTournamentGame,
+    storedScore: Prisma.JsonValue,
+  ): Promise<void> {
+    const stored = readStoredPenalties(storedScore);
+    if (stored === undefined) return;
+    if (stored.takenHome === undefined || stored.takenAway === undefined) return;
+    const config = await tx.v1CompetitionConfigVersion.findUnique({
+      where: { id: game.competitionConfigVersionId },
+      select: { result: true },
+    });
+    assertPenaltyShootoutPersistable(stored, parseResultPolicy(config?.result ?? null), {
+      requireKickCounts: false,
+    });
+  }
+
   private carryPenaltyAuditFields(submitted: StoredPenalties, baseScore: Prisma.JsonValue): StoredPenalties {
     const base = readStoredPenalties(baseScore);
     if (base === undefined) return submitted;
@@ -1225,8 +1255,21 @@ export class TournamentResultReviewService {
       submitted.operatorOverride === undefined && base.operatorOverride === true
         ? { operatorOverride: true as const }
         : {};
+    // 선축도 **같은 이유로** 메운다. 빠뜨렸다가 2026-08-19 alpha 감사에서 두 가지 피해가
+    // 실측됐다:
+    //   ① 5킥 전에 결판난 경기(각 3킥 3:0 등)는 정정이 **422 로 하드 차단**된다 —
+    //      선축이 없으면 결판 판정이 "선축 미상" 분기로 떨어지고 그 분기는 5킥 바닥을
+    //      요구하기 때문이다. 정정 폼에는 승부차기 입력란이 0개라 **운영자에게 탈출구가 없다.**
+    //      (같은 요청에서 선축 키 하나만 붙이면 201 — 키 하나가 갈랐다.)
+    //   ② 5킥 이상 경기는 막히지 않는 대신 선축이 **조용히 소실**된다.
+    // 즉 킥 수에 따라 하드 데드엔드 또는 조용한 기록 손실로 갈렸다. 이 함수가 존재하는
+    // 이유("폼이 되살릴 수 없는 값을 서버가 메운다")가 이 필드에만 적용되지 않고 있었다.
+    const side =
+      submitted.firstKickSideKey === undefined && base.firstKickSideKey !== undefined
+        ? { firstKickSideKey: base.firstKickSideKey }
+        : {};
     // base 값을 먼저 깔고 submitted 를 덮는 순서 — 전달된 값이 항상 이긴다.
-    return { ...counts, ...override, ...submitted };
+    return { ...counts, ...override, ...side, ...submitted };
   }
 
   /**

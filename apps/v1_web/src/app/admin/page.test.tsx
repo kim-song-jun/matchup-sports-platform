@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import AdminOverviewPage from './page';
 
@@ -25,7 +26,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 describe('AdminOverviewPage — ops summary 실패 무신호 금지', () => {
-  it('shows an explicit alert with retry when the ops summary query fails, instead of silently hiding the cards', () => {
+  it('shows an explicit alert with retry when the ops summary query fails, instead of silently hiding the cards', async () => {
+    const user = userEvent.setup();
     const opsRefetch = vi.fn();
     opsSummaryMock.mockReturnValue({
       data: undefined,
@@ -42,7 +44,7 @@ describe('AdminOverviewPage — ops summary 실패 무신호 금지', () => {
     // 다른 경고가 0이면 초록 상태 자체는 유지하되, alert가 그 위를 한정한다
     expect(screen.getByText('지금은 조치가 필요한 항목이 없어요.')).toBeInTheDocument();
 
-    screen.getByRole('button', { name: '다시 시도' }).click();
+    await user.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(opsRefetch).toHaveBeenCalled();
   });
 

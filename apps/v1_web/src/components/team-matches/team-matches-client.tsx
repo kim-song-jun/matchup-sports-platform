@@ -228,6 +228,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           hostTeamId: query.data.hostTeam?.teamId ?? null,
           hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
           hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
+          league: query.data.league ?? null,
           applicantActionError: actionError,
           manageHref: canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
           applicantTeams: toApplicantTeamsWithActions(
@@ -338,6 +339,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     style: match.matchStyle?.length ? match.matchStyle.join(' · ') : legacyNote,
     cost: costs.cost,
     opponentCost: costs.opponentCost,
+    league: match.league ?? null,
     uniform: match.uniformColor || '',
     gender: match.genderRule ?? fallback.gender,
     status,

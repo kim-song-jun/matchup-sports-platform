@@ -1031,6 +1031,12 @@ export type V1TeamMatch = V1Match & {
   place?: { name: string; addressText?: string | null };
   displayState?: V1TeamMatchApiStatus;
   costNote?: string | null;
+  /**
+   * 리그전 경기면 소속 리그, 일반 팀 매치면 null. 백엔드
+   * team-matches.service.ts 의 toListItem()/detail()/myTeamMatches() 와
+   * admin listTeamMatches() 가 같은 모양으로 내려준다.
+   */
+  league?: { leagueId: string; title: string } | null;
   rulesText?: string | null;
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
@@ -3738,6 +3744,25 @@ export type V1IntegrationSettings = {
   kakaoMapsJsKey: string | null;
   kakaoMapsJsKeySource: V1IntegrationKeySource;
   updatedAt: string | null;
+};
+
+/** GET /admin/settings/reviews — 리뷰 작성 가능 기간 정책 */
+export type V1ReviewPolicySettings = {
+  /** 공식 결과 확정 시각부터 후기를 쓸 수 있는 시간(시간 단위) */
+  reviewWindowHours: number;
+  /** 화면 표기용 문구 — 24시간 배수면 "7일", 아니면 "36시간" */
+  reviewWindowLabel: string;
+  minHours: number;
+  maxHours: number;
+  defaultHours: number;
+  /** 설정 행이 아직 없어 기본값으로 동작 중인지 */
+  isDefault: boolean;
+  updatedAt: string | null;
+};
+
+/** PATCH /admin/settings/reviews 바디 */
+export type V1UpdateReviewPolicySettingsPayload = {
+  reviewWindowHours: number;
 };
 
 /** PATCH /admin/settings/integrations 바디 — undefined=미변경, ""=삭제(env 폴백 복귀), 값=설정 */

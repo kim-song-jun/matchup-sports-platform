@@ -222,7 +222,24 @@ export const gameSchemaSourceManifest = {
   // 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 뒷받침 마이그레이션은
   // 20260817010000_v1_post_event_review_scoring_redesign 이며, 바인딩된
   // 20260729000100_v1_game_operations 는 그대로라 migration 해시는 변하지 않는다.
-  schema: '252cb9cca98af4dd2c436c309cfce06cc7970c9f6c5fe616454ea58685ebea50',
+  // 2026-08-18 재핀: 일반 리그 재명명의 **확장(expand) 단계** -- V1League / V1LeagueTeam
+  // 신규 모델, V1LeagueState enum, V1TeamMatch.leagueId 신규 nullable 컬럼. 전부 additive 이고
+  // 구 모델(V1TeamMatchSeries*)과 구 컬럼(seriesId)은 **그대로 살려 둔다** -- 롤링 배포 창에서
+  // 구버전 컨테이너가 계속 그것을 읽기 때문이다(deploy-alpha.sh 가 migrate 를 컨테이너 교체보다
+  // 먼저 돌린다). 구 이름 제거는 별도 릴리스(수축 단계)에서 한다.
+  // game domain(V1Game*) 모델은 건드리지 않았다 -- 이 guard 가 schema.prisma 전체 바이트를
+  // 결속하기 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 뒷받침 마이그레이션은
+  // 20260818120000_v1_league_expand 이며, 바인딩된 20260729000100_v1_game_operations 는
+  // 그대로라 migration 해시는 변하지 않는다.
+  // 2026-08-18 재핀: 리뷰 작성 가능 기간을 48시간 하드코딩에서 어드민 편집 설정으로 바꾸며
+  // 싱글턴 모델 V1ReviewPolicySettings 1개를 신규 추가했다(reviewWindowHours 기본 168시간).
+  // 순수 additive 이고 game domain(V1Game*) 모델·enum 은 한 줄도 건드리지 않았다 -- 이 guard 가
+  // schema.prisma **전체 바이트**를 결속하기 때문에 걸리는 것이지 game operations 계약 변경이 아니다.
+  // 뒷받침 마이그레이션은 20260818120000_v1_review_policy_settings 이며, 바인딩된
+  // 20260729000100_v1_game_operations 는 그대로라 migration 해시는 변하지 않는다.
+  // 위 두 재핀이 **병합된 뒤**의 schema.prisma 에 shasum 을 다시 돌려 계산한 값이다 --
+  // 어느 한쪽 브랜치의 해시를 그대로 쓰면 병합 결과와 달라 SOURCE_SNAPSHOT_DRIFT 로 CI 가 깨진다.
+  schema: '1e223170eeace75995eb4b01ee3b6ef2d11a3da1aa816215db18dde4cf9c4002',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

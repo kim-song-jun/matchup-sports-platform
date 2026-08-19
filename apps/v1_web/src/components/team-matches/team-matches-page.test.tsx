@@ -130,3 +130,46 @@ describe('팀매치 만들기 진행 표시줄 — 클릭 이동', () => {
     expect(screen.queryByRole('button', { name: /단계.*이동/ })).not.toBeInTheDocument();
   });
 });
+
+// 리그전 배지(2026-08-18). 배지가 조용히 사라지거나, 반대로 일반 팀매치에까지 붙는
+// 회귀를 둘 다 잡는다 -- 한쪽만 단언하면 "항상 보임"/"항상 안 보임" 회귀를 놓친다.
+describe('리그전 배지', () => {
+  it('리그 소속이면 목록 카드에 리그전 배지가 보인다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' } }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(container.textContent).toContain('리그전');
+  });
+
+  it('리그 소속이 아니면 목록 카드에 리그전 배지가 없다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], league: null }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(container.textContent).not.toContain('리그전');
+  });
+
+  it('상세에서는 리그명과 함께 리그 홈으로 링크한다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match.league = { leagueId: 'lg-1', title: '가을 리그' };
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+    const link = container.querySelector<HTMLAnchorElement>('a[href="/league-matches/lg-1"]');
+
+    // 링크가 있어야 리그 상세로 갈 수 있다 -- 이 화면 외에는 진입점이 없다.
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toContain('가을 리그');
+  });
+
+  it('리그 소속이 아니면 상세에 리그 링크가 없다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match.league = null;
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(container.querySelector('a[href^="/league-matches/"]')).toBeNull();
+  });
+});

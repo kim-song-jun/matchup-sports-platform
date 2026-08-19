@@ -897,6 +897,7 @@ model V1Sport {
   teamMatches     V1TeamMatch[]
   tournaments     V1Tournament[]
   teamMatchSeries V1TeamMatchSeries[]
+  leagues         V1League[]         @relation("V1LeagueSport")
 
   @@index([isActive, sortOrder])
   @@map("v1_sports")
@@ -947,6 +948,7 @@ model V1Region {
   teams           V1Team[]
   teamMatches     V1TeamMatch[]
   teamMatchSeries V1TeamMatchSeries[]
+  leagues         V1League[]         @relation("V1LeagueRegion")
 
   @@index([parentId])
   @@index([level, isActive, sortOrder])
@@ -1230,6 +1232,7 @@ model V1Team {
   tournamentRegistrations      V1TournamentRegistration[]
   tournamentReviews            V1TournamentReview[]       @relation("V1TournamentReviewTeam")
   teamMatchSeriesEntries       V1TeamMatchSeriesTeam[]
+  leagueEntries                V1LeagueTeam[]              @relation("V1LeagueTeamTeam")
   lineupPresets                V1TeamLineupPreset[]
 
   @@index([ownerUserId])
@@ -1576,6 +1579,11 @@ model V1TeamMatch {
   // there too), so `competitionConfig` stays a real relation, just optional.
   competitionConfigVersionId String?           @map("competition_config_version_id")
   seriesId                   String?           @map("series_id")
+  // 확장-수축 재명명(2026-08-18). 확장 단계에서는 두 컬럼이 함께 산다 --
+  // seriesId 는 구버전 컨테이너가 롤링 배포 창에서 계속 읽는 값이라 지금 지우면 안 되고,
+  // leagueId 가 새 코드가 읽고 쓰는 값이다. 두 값은 서비스 계층에서 함께 기록한다.
+  // 수축 단계(별도 릴리스)에서 seriesId 와 v1_team_match_series* 를 제거한다.
+  leagueId                   String?           @map("league_id")
 
   hostTeam              V1Team                      @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
   createdByUser         V1User                      @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -1589,6 +1597,7 @@ model V1TeamMatch {
   game                  V1Game?                     @relation("V1GameTeamMatch")
   competitionConfig     V1CompetitionConfigVersion? @relation("V1TeamMatchCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_team_matches_competition_config_fk")
   series                V1TeamMatchSeries?          @relation("V1TeamMatchSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_team_matches_series_fk")
+  league                V1League?                   @relation("V1TeamMatchLeague", fields: [leagueId], references: [id], onDelete: SetNull, map: "v1_team_matches_league_fk")
 
   @@index([hostTeamId])
   @@index([createdByUserId])
@@ -1601,6 +1610,7 @@ model V1TeamMatch {
   @@index([createdAt])
   @@index([competitionConfigVersionId], map: "v1_team_matches_competition_config_idx")
   @@index([seriesId, startAt], map: "v1_team_matches_series_start_at_idx")
+  @@index([leagueId, startAt], map: "v1_team_matches_league_start_at_idx")
   @@map("v1_team_matches")
 }
 
@@ -1671,6 +1681,55 @@ model V1TeamMatchSeriesTeam {
   @@unique([seriesId, teamId], map: "v1_team_match_series_teams_series_team_key")
   @@index([teamId])
   @@map("v1_team_match_series_teams")
+}
+
+// ── 확장-수축 재명명: 여기부터가 새 이름(League) 쪽이다 ────────────────────────
+// 위의 V1TeamMatchSeries* 는 롤링 배포 창 동안 구버전 컨테이너가 계속 쓰는 구 이름이라
+// 이 릴리스에서 지우지 않는다. 새 코드는 아래 모델만 읽고, 쓰기는 양쪽에 한다.
+// 수축 단계(별도 릴리스)에서 구 모델·구 컬럼을 제거한다.
+// 사용자 화면 문구는 이 재명명 이전부터 이미 "리그"였다 -- 이건 코드/DB 이름만의 정렬이다.
+
+enum V1LeagueState {
+  draft
+  active
+  completed
+}
+
+model V1League {
+  id                   String        @id @default(uuid())
+  title                String
+  sportId              String        @map("sport_id")
+  regionId             String        @map("region_id")
+  createdByAdminUserId String        @map("created_by_admin_user_id")
+  startsOn             DateTime      @map("starts_on")
+  endsOn               DateTime      @map("ends_on")
+  tieBreakJson         Json          @map("tie_break_json")
+  state                V1LeagueState @default(draft)
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  sport          V1Sport         @relation("V1LeagueSport", fields: [sportId], references: [id], onDelete: Restrict, map: "v1_leagues_sport_fk")
+  region         V1Region        @relation("V1LeagueRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_leagues_region_fk")
+  createdByAdmin V1AdminUser     @relation("V1LeagueAdmin", fields: [createdByAdminUserId], references: [id], onDelete: Restrict, map: "v1_leagues_admin_fk")
+  teams          V1LeagueTeam[]
+  teamMatches    V1TeamMatch[]   @relation("V1TeamMatchLeague")
+
+  @@index([sportId, state])
+  @@map("v1_leagues")
+}
+
+model V1LeagueTeam {
+  id        String   @id @default(uuid())
+  leagueId  String   @map("league_id")
+  teamId    String   @map("team_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  league V1League @relation(fields: [leagueId], references: [id], onDelete: Cascade, map: "v1_league_teams_league_fk")
+  team   V1Team   @relation("V1LeagueTeamTeam", fields: [teamId], references: [id], onDelete: Restrict, map: "v1_league_teams_team_fk")
+
+  @@unique([leagueId, teamId], map: "v1_league_teams_league_team_key")
+  @@index([teamId])
+  @@map("v1_league_teams")
 }
 
 model V1ChatRoom {
@@ -1917,6 +1976,7 @@ model V1AdminUser {
   inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
   contentAssets                    V1ContentAsset[]
   createdTeamMatchSeries           V1TeamMatchSeries[]
+  createdLeagues                   V1League[]                       @relation("V1LeagueAdmin")
 
   @@index([adminRole, status])
   @@index([grantedByAdminUserId])
@@ -2657,6 +2717,20 @@ model V1IntegrationSettings {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("v1_integration_settings")
+}
+
+/// 리뷰(경기 후기) 작성 가능 기간 정책. 어드민이 런타임에 바꾼다.
+/// 마감을 저장해 두지 않고 매 요청 시점에 계산하므로(review-deadline.ts), 여기를 늘리면
+/// 직전 정책으로는 마감됐던 경기도 다시 열리고, 줄이면 열려 있던 경기가 즉시 닫힌다.
+model V1ReviewPolicySettings {
+  id                   String   @id @default("singleton")
+  /// 공식 결과 확정 시각(앵커)부터 후기를 쓸 수 있는 시간(시간 단위). 기본 168시간(7일).
+  reviewWindowHours    Int      @default(168) @map("review_window_hours")
+  // 감사 추적용 참조 문자열 — FK 관계는 두지 않는다(V1IntegrationSettings와 같은 규칙).
+  updatedByAdminUserId String?  @map("updated_by_admin_user_id")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("v1_review_policy_settings")
 }
 
 model V1Game {

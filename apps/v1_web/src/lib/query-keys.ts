@@ -118,15 +118,16 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'sponsors'] as const,
   adminTournamentPopups: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'popups'] as const,
-  adminTeamMatchSeriesList: () => [...v1Keys.all, 'admin', 'team-match-series'] as const,
-  adminTeamMatchSeries: (seriesId: string) => [...v1Keys.all, 'admin', 'team-match-series', seriesId] as const,
-  teamMatchSeries: (seriesId: string) => [...v1Keys.all, 'team-match-series', seriesId] as const,
-  teamMatchSeriesStandings: (seriesId: string) => [...v1Keys.teamMatchSeries(seriesId), 'standings'] as const,
-  teamMatchSeriesPlayerRecords: (seriesId: string) => [...v1Keys.teamMatchSeries(seriesId), 'player-records'] as const,
+  adminLeagueMatchList: () => [...v1Keys.all, 'admin', 'league-matches'] as const,
+  adminLeagueMatch: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId] as const,
+  leagueMatch: (leagueId: string) => [...v1Keys.all, 'league-matches', leagueId] as const,
+  leagueMatchStandings: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'standings'] as const,
+  leagueMatchPlayerRecords: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'player-records'] as const,
   teamInvitations: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'invitations'] as const,
   receivedInvitations: () => [...v1Keys.all, 'me', 'invitations'] as const,
   myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
+  adminReviewPolicySettings: () => [...v1Keys.all, 'admin', 'review-policy-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
   // Task 21: live tournament operations console (fixture lineup + event backfill).
   // `game`은 위쪽에 이미 선언돼 있어 여기서 다시 정의하지 않는다 — 양쪽 브랜치가

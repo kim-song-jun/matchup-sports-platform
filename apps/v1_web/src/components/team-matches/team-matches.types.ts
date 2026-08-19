@@ -14,6 +14,8 @@ export type TeamMatchModel = {
   style: string;
   cost: number;
   opponentCost: number;
+  /** 값이 있으면 리그전 경기다. */
+  league?: { leagueId: string; title: string } | null;
   uniform: string;
   gender: string;
   manner: number;
@@ -72,6 +74,8 @@ export type TeamMatchDetailViewModel = {
     hostTeamId?: string | null;
     hostTeamLogoUrl?: string | null;
     hostTeamTrustState?: string | null;
+    /** 값이 있으면 리그전 경기다(리그 홈으로 딥링크). null 이면 일반 팀 매치. */
+    league?: { leagueId: string; title: string } | null;
     applicantActionError?: string | null;
     manageHref?: string;
     applicantTeams: Array<{

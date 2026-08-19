@@ -541,14 +541,37 @@ describe('2-C: 결선 경기 정정은 브래킷을 해결할 수 있어야 한�
   it('승부차기를 실어 정정하면 그 점수가 리비전 score에 그대로 저장된다', async () => {
     const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true });
 
-    await harness.correct({ score: { home: 1, away: 1, penalties: { home: 5, away: 4 } } });
+    // 승부차기를 **새로 쓰는** 정정이므로 킥 수를 함께 보낸다 — `end` 레인과 같은 요구다.
+    await harness.correct({
+      score: { home: 1, away: 1, penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 } },
+    });
 
     expect(harness.createdRevisions).toHaveLength(1);
     expect(harness.createdRevisions[0].score).toEqual({
       home: 1,
       away: 1,
-      penalties: { home: 5, away: 4 },
+      penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },
     });
+  });
+
+  /**
+   * **2026-08-18 알파 교차 측정 회귀 가드.** 킥 수 필수 가드가 `end` 레인에만 있어서
+   * 같은 값이 레인에 따라 갈렸다:
+   *   `POST /games/:id/end`         + `{home:9, away:0}` → 422
+   *   `POST /games/:id/corrections` + `{home:9, away:0}` → **201, 그대로 저장**
+   * 저장된 값엔 킥 수도 선축도 없어 이후 어떤 판정도 근거를 갖지 못했다.
+   */
+  it('승부차기를 새로 쓰는 정정에 킥 수가 없으면 거부한다 — end 레인과 같은 기준', async () => {
+    const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true });
+
+    const error = await captureFailure(() =>
+      harness.correct({ score: { home: 1, away: 1, penalties: { home: 9, away: 0 } } }),
+    );
+
+    expect((error as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED',
+    });
+    expect(harness.createdRevisions).toHaveLength(0);
   });
 
   it('조별리그 무승부 정정은 정상 결과이므로 막지 않는다(짝 증거)', async () => {
@@ -674,12 +697,15 @@ describe('2-C 역방향: 승부차기로 결정된 결선 경기의 정정이 �
       baseScore: baseWithPenalties,
     });
 
-    await harness.correct({ score: { home: 1, away: 1, penalties: { home: 4, away: 6 } } });
+    // base 와 점수가 다른 = 승부차기를 바꾸는 정정이므로 킥 수가 필요하다.
+    await harness.correct({
+      score: { home: 1, away: 1, penalties: { home: 4, away: 6, takenHome: 6, takenAway: 6 } },
+    });
 
     expect(harness.createdRevisions[0].score).toEqual({
       home: 1,
       away: 1,
-      penalties: { home: 4, away: 6 },
+      penalties: { home: 4, away: 6, takenHome: 6, takenAway: 6 },
     });
   });
 

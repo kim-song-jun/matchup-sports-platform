@@ -101,7 +101,7 @@ export async function loadParticipantNameProfiles(
  *
  * `public-consent.ts`의 판정 로직 자체는 건드리지 않는다 -- 위 "이름이 보이는가" 게이트와
  * 그 롤백 경로, 그리고 이 파일 밖의 다른 두 소비자(`public-user-records.service.ts`의
- * 개인 기록, `team-match-series-public.service.ts`의 팀 매치 시리즈)가 여전히 그대로
+ * 개인 기록, `league-match-public.service.ts`의 리그)가 여전히 그대로
  * 의존한다. `V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE`로 되돌렸을 때도
  * `resolveParticipantDisplayName`의 토글 기반 이름 선택은 그대로 적용된다 -- 그 환경
  * 변수가 통제하는 것은 "이름이 보이는가"뿐이고 "어떤 이름인가"는 이번 정책이 대체한

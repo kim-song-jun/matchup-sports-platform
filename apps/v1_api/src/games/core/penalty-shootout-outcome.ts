@@ -95,6 +95,50 @@ export function penaltyShootoutDecided(
  * 물었을 때 답할 수 있는 유일한 근거다. 플래그 없이 통과시키면 우회와 정상 종료가
  * 기록상 구분되지 않는다.
  */
+/**
+ * 승부차기를 **저장해도 되는가**를 판정하는 단일 관문. `end`·복구·정정 세 경로가 모두
+ * 이 함수를 통과한다.
+ *
+ * 왜 하나로 합쳤나 — 게이트가 경로마다 따로 있으면 한쪽에만 붙은 규칙이 다른 쪽의 우회로가
+ * 된다. 실제로 그렇게 됐다: 킥 수 필수 가드가 `end` 레인 서비스 메서드 안에만 있어서
+ * **같은 값이 경로에 따라 422와 201로 갈렸다**(2026-08-18 alpha 교차 측정).
+ *   `POST /games/:id/end`         + `{home:9, away:0}` → 422 KICK_COUNTS_REQUIRED
+ *   `POST /games/:id/corrections` + `{home:9, away:0}` → 201, 그대로 저장
+ * 저장된 값에는 킥 수도 선축도 없어 **이후 어떤 판정도 근거를 갖지 못한다.**
+ *
+ * `requireKickCounts` 를 호출부가 정하는 이유: 킥 수를 **항상** 요구하면 그 필드가 생기기
+ * 전에 저장된 리비전의 복구·정정이 영구히 막힌다. 그래서 "승부차기를 새로 쓰는가"(요구함)와
+ * "이미 저장된 값을 그대로 옮기는가"(면제)를 호출부가 구분해 넘긴다 —
+ * `end`는 항상 true, 복구는 false, 정정은 base 와 점수가 다를 때만 true.
+ *
+ * **킥 수가 없으면 `policy` 를 보지 않는다.** 호출부가 config 조회를 건너뛸 수 있도록
+ * 이 성질을 계약으로 유지한다.
+ */
+export function assertPenaltyShootoutPersistable(
+  penalties: {
+    home: number;
+    away: number;
+    takenHome?: number;
+    takenAway?: number;
+    operatorOverride?: boolean;
+    firstKickSideKey?: 'HOME' | 'AWAY';
+  },
+  policy: PenaltyShootoutPolicy,
+  options: { readonly requireKickCounts: boolean },
+): void {
+  if (penalties.takenHome === undefined || penalties.takenAway === undefined) {
+    if (options.requireKickCounts) {
+      throw new UnprocessableEntityException({
+        code: 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED',
+        message:
+          'penalties.takenHome and penalties.takenAway are required when recording a penalty shootout',
+      });
+    }
+    return;
+  }
+  assertPenaltyShootoutConcluded(penalties, policy);
+}
+
 export function assertPenaltyShootoutConcluded(
   penalties: {
     home: number;

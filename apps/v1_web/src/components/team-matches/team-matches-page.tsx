@@ -179,6 +179,17 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           {match.hostTeamTrustState && match.hostTeamTrustState !== 'none' ? (
             <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
           ) : null}
+          {/* 리그 상세 페이지는 앱 안에 진입점이 전혀 없었다(직접 URL 만) -- 이 링크가
+              사실상 첫 통로다. 배지 자체를 링크로 만들어 리그명을 함께 보여준다. */}
+          {match.league ? (
+            <Link
+              href={`/league-matches/${match.league.leagueId}`}
+              className="tm-badge tm-badge-grey"
+              style={{ textDecoration: 'none' }}
+            >
+              리그전 · {match.league.title}
+            </Link>
+          ) : null}
         </div>
       </div>
       {/* 팀 보기는 보조 CTA — apply가 단일 primary; 파란 fill 중복 방지(R-K5) */}
@@ -659,6 +670,9 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
           <span className="tm-badge tm-badge-grey">{match.grade}등급</span>
           <span className="tm-badge tm-badge-grey">{match.format}</span>
           <span className="tm-badge tm-badge-grey">{match.gender}</span>
+          {/* 리그전 배지: 상태(모집중/마감)가 아니라 카테고리라 중립 grey 를 쓴다.
+              컬러만으로 뜻을 전달하지 않도록 "리그전" 텍스트를 함께 싣는다(DESIGN.md 규칙). */}
+          {match.league ? <span className="tm-badge tm-badge-grey">리그전</span> : null}
           {match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}
         </div>
         <div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div>

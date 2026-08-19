@@ -752,7 +752,7 @@ export function ResultEditModal({
                 </div>
               ))}
               {goalEvents.length === 0 ? (
-                <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>등록된 득점이 없습니다.</p>
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>등록된 득점이 없어요.</p>
               ) : null}
             </div>
           </section>

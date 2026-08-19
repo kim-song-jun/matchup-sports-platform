@@ -1243,21 +1243,6 @@ export class TournamentResultReviewService {
     return assertPenaltiesNotAllowed(regulation, carried, facts);
   }
 
-  /**
-   * 정정이 보낸 승부차기에 킥 수·우회 표식이 없으면 base 리비전에서 메운다.
-   *
-   * 왜 서버가 메우나 — 이 값들은 **정정 화면이 되살릴 수 없는 정보**다. 폼에 승부차기
-   * 입력란이 없으므로 운영자는 다시 입력할 수단이 없고, 한 번 떨어지면 이후 모든 정정에서
-   * 서버가 결판을 판정할 근거도 함께 사라진다. 클라이언트를 고치는 것과 별개로 서버가
-   * 마지막 방어선을 갖는다 — 옛 번들을 띄워 둔 탭 하나가 감사 기록을 지울 수 있어서다.
-   *
-   * **점수가 같을 때만** 메운다. 점수가 다르면 base 의 킥 수는 다른 승부차기를 설명하는
-   * 값이라, 그대로 옮기면 "성공 수가 시도 수를 넘는" 조합이 조용히 만들어진다.
-   */
-  /**
-   * 이미 저장된 리비전의 승부차기가 지금도 정책상 유효한지 본다(승격 게이트).
-   * 저장값을 그대로 읽으므로 킥 수는 요구하지 않는다 — 자세한 근거는 호출부 주석 참고.
-   */
   private async assertStoredPenaltiesPersistable(
     tx: Transaction,
     game: LockedTournamentGame,
@@ -1275,6 +1260,21 @@ export class TournamentResultReviewService {
     });
   }
 
+  /**
+   * 정정이 보낸 승부차기에 킥 수·우회 표식이 없으면 base 리비전에서 메운다.
+   *
+   * 왜 서버가 메우나 — 이 값들은 **정정 화면이 되살릴 수 없는 정보**다. 폼에 승부차기
+   * 입력란이 없으므로 운영자는 다시 입력할 수단이 없고, 한 번 떨어지면 이후 모든 정정에서
+   * 서버가 결판을 판정할 근거도 함께 사라진다. 클라이언트를 고치는 것과 별개로 서버가
+   * 마지막 방어선을 갖는다 — 옛 번들을 띄워 둔 탭 하나가 감사 기록을 지울 수 있어서다.
+   *
+   * **점수가 같을 때만** 메운다. 점수가 다르면 base 의 킥 수는 다른 승부차기를 설명하는
+   * 값이라, 그대로 옮기면 "성공 수가 시도 수를 넘는" 조합이 조용히 만들어진다.
+   */
+  /**
+   * 이미 저장된 리비전의 승부차기가 지금도 정책상 유효한지 본다(승격 게이트).
+   * 저장값을 그대로 읽으므로 킥 수는 요구하지 않는다 — 자세한 근거는 호출부 주석 참고.
+   */
   private carryPenaltyAuditFields(submitted: StoredPenalties, baseScore: Prisma.JsonValue): StoredPenalties {
     const base = readStoredPenalties(baseScore);
     if (base === undefined) return submitted;

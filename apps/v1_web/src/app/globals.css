@@ -6352,7 +6352,11 @@ button:disabled {
      `.tm-schedule-row` 의 위쪽 선이 가로 격자를 이룬다 — 첫 두 셀은 위 선을 지운다. */
   .tm-schedule-list {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* `repeat(2, ...)` 고정이 아니라 auto-fit — 일정을 조·라운드로 묶고 나니 한 그룹에
+       경기가 하나뿐인 경우(A조 1경기)가 흔한데, 2열 고정이면 오른쪽 절반이 통째로 비어
+       보인다(alpha 실측). auto-fit 은 채울 카드가 없으면 트랙을 접어 남은 카드가 폭을
+       가져간다 — 2경기 이상인 그룹은 예전처럼 두 열로 펴진다. */
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
     /* align-items 를 건드리지 않는다(기본 stretch). `start` 로 두면 같은 행의 두 셀이
        각자 콘텐츠 높이만 차지해서, 한쪽에만 "라인업 보기" 버튼이 붙은 행에서 세로
        구분선이 짧게 끊기고 격자가 들쭉날쭉해진다(alpha 실측). */

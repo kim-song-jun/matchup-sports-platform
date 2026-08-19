@@ -303,11 +303,14 @@ function ScheduleRow({
   tournamentId,
   entry,
   myFixture,
+  showGroupLabel = true,
 }: {
   tournamentId: string;
   entry: PublicScheduleEntry;
   /** 이 경기가 로그인한 팀장의 팀 경기라면 그 정보 — 아니면 undefined(공개 방문자 포함). */
   myFixture?: MyFixtureRowInfo;
+  /** 그룹 제목("A조")이 바로 위에 있으면 카드 안에서 같은 말을 되풀이하지 않는다. */
+  showGroupLabel?: boolean;
 }) {
   const dateLabel = formatTournamentDateTimeShort(entry.scheduledAt);
   const venue = venueLabel(entry);
@@ -347,7 +350,7 @@ function ScheduleRow({
       ) : null}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
-          {entry.groupName ?? entry.round}
+          {showGroupLabel ? entry.groupName ?? entry.round : ''}
           {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
           <VideoBadge hasVideo={entry.hasVideo} />
         </span>
@@ -507,6 +510,40 @@ function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
   );
 }
 
+/** 한 그룹(A조·4강 …)의 경기 묶음. 그룹 제목을 실제로 그렸으면 카드 안의 같은 라벨은 지운다. */
+function ScheduleGroupBlock({
+  tournamentId,
+  group,
+  showGroupHeading,
+  myFixtureById,
+}: {
+  tournamentId: string;
+  group: { key: string; label: string; entries: PublicScheduleEntry[] };
+  showGroupHeading: boolean;
+  myFixtureById: Map<string, MyFixtureRowInfo>;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {showGroupHeading ? (
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 700 }}>
+          {group.label}
+        </div>
+      ) : null}
+      <Card pad={0} className="tm-schedule-list">
+        {group.entries.map((entry) => (
+          <ScheduleRow
+            key={entry.fixtureId}
+            tournamentId={tournamentId}
+            entry={entry}
+            myFixture={myFixtureById.get(entry.fixtureId)}
+            showGroupLabel={!showGroupHeading}
+          />
+        ))}
+      </Card>
+    </div>
+  );
+}
+
 /**
  * 단계(조별리그/결선) → 조·라운드 두 겹으로 묶어 보여준다. 예전에는 서버 순서대로 한
  * 목록에 쏟아부었고, 데스크톱 2열에서 A조·B조·결승·4강이 좌우로 뒤섞였다(오너 지적).
@@ -576,24 +613,14 @@ function ScheduleSections({
               <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{phase.label}</div>
             ) : null}
             {phase.groups.map((group) => (
-              <div key={group.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {/* 그룹 제목이 단계 제목과 같은 말이면(4강 안의 "4강") 한 번만 적는다. */}
-                {group.label !== phase.label || phase.groups.length > 1 ? (
-                  <div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 700 }}>
-                    {group.label}
-                  </div>
-                ) : null}
-                <Card pad={0} className="tm-schedule-list">
-                  {group.entries.map((entry) => (
-                    <ScheduleRow
-                      key={entry.fixtureId}
-                      tournamentId={tournamentId}
-                      entry={entry}
-                      myFixture={myFixtureById.get(entry.fixtureId)}
-                    />
-                  ))}
-                </Card>
-              </div>
+              <ScheduleGroupBlock
+                key={group.key}
+                tournamentId={tournamentId}
+                group={group}
+                // 그룹 제목이 단계 제목과 같은 말이면(4강 안의 "4강") 한 번만 적는다.
+                showGroupHeading={group.label !== phase.label || phase.groups.length > 1}
+                myFixtureById={myFixtureById}
+              />
             ))}
           </section>
         ))

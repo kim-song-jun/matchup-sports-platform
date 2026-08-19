@@ -196,7 +196,7 @@ export function FieldErrorText({ id, message }: { id?: string; message?: string 
  * #3 1단계: 장소 입력창 포커스 시 이 팀(팀매치)·나(개인매치)가 과거에 실제로 입력했던
  * 장소를 칩으로 보여주고 탭 한 번으로 채운다. 새 Venue 테이블 없이 과거 입력값
  * distinct 조회 결과를 그대로 쓴다(백엔드: matches/team-matches recentVenues,
- * team-match-series recentVenues). 칩 버튼에 onMouseDown preventDefault를 걸어
+ * league-match recentVenues). 칩 버튼에 onMouseDown preventDefault를 걸어
  * 클릭이 입력창 blur보다 먼저 처리되게 한다 — EntityPicker 드롭다운과 동일한 패턴.
  *
  * 개인/팀매치 생성 위저드와 리그 대진 일괄생성 폼(관리자) 양쪽이 공유한다 — 두 화면

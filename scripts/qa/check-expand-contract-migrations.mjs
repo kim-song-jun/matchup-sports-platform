@@ -450,6 +450,45 @@ END $$`,
       "can turn it on themselves at my > settings > tournament real-name once the new build is back. " +
       "Reviewed 2026-08-18.",
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818120000_v1_league_expand/migration.sql',
+    statement: `INSERT INTO "v1_leagues" ( "id", "title", "sport_id", "region_id", "created_by_admin_user_id", "starts_on", "ends_on", "tie_break_json", "state", "created_at", "updated_at" ) SELECT s."id", s."title", s."sport_id", s."region_id", s."created_by_admin_user_id", s."starts_on", s."ends_on", s."tie_break_json", s."state"::text::"V1LeagueState", s."created_at", s."updated_at" FROM "v1_team_match_series" s ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Copies existing rows from v1_team_match_series into the newly created v1_leagues table -- the expand " +
+      "half of a two-release rename (2026-08-18 user decision: expand-contract, zero downtime). It writes " +
+      "only to a table this same migration creates three statements earlier, so no deployed revision -- old " +
+      "or new -- can observe it as a change: the old app has never heard of v1_leagues, and the new app " +
+      "finds it already populated. The source table is left completely untouched and keeps serving old " +
+      "containers through the rolling window. Row ids are carried over verbatim rather than regenerated, so " +
+      "v1_team_matches.series_id and .league_id always point at the same league and no id-mapping table is " +
+      "needed. INSERT ... SELECT with ON CONFLICT (\"id\") DO NOTHING, so a re-run is a no-op. Why a straight " +
+      "RENAME was rejected instead: deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it " +
+      "recreates the containers (line 288), with seeds and standings recalculation in between -- renaming " +
+      "in place would leave old containers querying a table that no longer exists for that whole span. " +
+      "Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818120000_v1_league_expand/migration.sql',
+    statement: `INSERT INTO "v1_league_teams" ("id", "league_id", "team_id", "created_at") SELECT t."id", t."series_id", t."team_id", t."created_at" FROM "v1_team_match_series_teams" t ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Same expand-half copy for the join table: v1_team_match_series_teams -> v1_league_teams, into a " +
+      "table created by this same migration. Carries ids over verbatim for the same reason as the parent " +
+      "copy, and maps the old series_id column onto the new league_id column. The source table is " +
+      "untouched. ON CONFLICT (\"id\") DO NOTHING makes a re-run a no-op. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818120000_v1_league_expand/migration.sql',
+    statement: `UPDATE "v1_team_matches" SET "league_id" = "series_id" WHERE "series_id" IS NOT NULL AND "league_id" IS NULL`,
+    reason:
+      "Backfills the new v1_team_matches.league_id column that this same migration adds, from the existing " +
+      "series_id. This is the one statement that touches a pre-existing table, and it is safe in the " +
+      "rolling window for two reasons: it only writes the brand-new column (WHERE league_id IS NULL), so no " +
+      "column any deployed revision reads is modified, and series_id -- which old containers do read -- is " +
+      "left exactly as it was. Since ids were carried over by the two copies above, league_id ends up " +
+      "holding the identical value as series_id, so the two columns can never disagree about which league a " +
+      "match belongs to during the window. Re-running is a no-op because of the IS NULL guard. The " +
+      "contract-phase release drops series_id once no old container remains. Reviewed 2026-08-18.",
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

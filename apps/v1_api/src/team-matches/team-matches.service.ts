@@ -65,6 +65,9 @@ type TeamMatchWithRelations = V1TeamMatch & {
   approvedApplicantTeam: { id: string; name: string } | null;
   applications: Array<V1TeamMatchApplication & { applicantTeam: { id: string; name: string } }>;
   game: { id: string } | null;
+  // teamMatchInclude() 와 짝을 이루는 **손으로 쓴** 타입이라, include 를 넓혀도 여기를
+  // 함께 고치지 않으면 컴파일이 깨진다(실제로 CI 가 TS2551 로 잡았다).
+  league: { id: string; title: string } | null;
 };
 
 @Injectable()
@@ -150,6 +153,8 @@ export class TeamMatchesService {
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
       costNote: teamMatch.costNote,
+      // null 이면 일반 팀 매치, 값이 있으면 리그전이다. 프론트는 이 값의 유무로 배지를 건다.
+      league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
@@ -187,7 +192,7 @@ export class TeamMatchesService {
    * Prisma `distinct`는 Postgres `DISTINCT ON`으로 컴파일되는데, 이때
    * `orderBy`가 distinct 필드로 시작해야 한다 — `distinct: ['placeName']` +
    * `orderBy: { createdAt: 'desc' }` 조합은 "최근순 distinct 장소"라는 의도와
-   * 어긋난다(team-match-series-admin.service.ts의 loadRecentVenues와 동일한
+   * 어긋난다(league-match-admin.service.ts의 loadRecentVenues와 동일한
    * 이유로, 넉넉히 가져온 뒤 애플리케이션에서 dedup한다).
    */
   async recentVenues(user: V1AuthUser, teamId: string) {
@@ -198,7 +203,7 @@ export class TeamMatchesService {
       take: 30,
       select: { placeName: true, placeAddress: true },
     });
-    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(team-match-series-admin
+    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(league-match-admin
     // .service.ts의 loadRecentVenues와 동일한 방어) — 안 하면 공백만 다른 "중복" 장소가
     // 서로 다른 칩으로 뜨거나, 공백뿐인 값이 빈 칩으로 렌더될 수 있다.
     const seen = new Set<string>();
@@ -262,6 +267,9 @@ export class TeamMatchesService {
       include: {
         sport: { select: { name: true } },
         hostTeam: { select: { id: true, name: true } },
+        // 내 경기 목록도 리그전 배지를 단다(사용자 결정 3). 이 목록은 공용 include 를
+        // 쓰지 않고 자체 select 라, 여기에 따로 실지 않으면 배지가 이 화면에서만 빠진다.
+        league: { select: { id: true, title: true } },
         applications: {
           where: { applicantTeamId: { in: teamIds } },
           include: { applicantTeam: { select: { id: true, name: true } } },
@@ -296,6 +304,7 @@ export class TeamMatchesService {
           teamId,
           teamName: teamIds.includes(teamMatch.hostTeamId) ? teamMatch.hostTeam.name : application?.applicantTeam.name,
           applicationId: application?.id ?? null,
+          league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
           manageRoute: relation === 'host_team' ? `/team-matches/${teamMatch.id}/manage` : null,
           detailRoute: `/team-matches/${teamMatch.id}`,
         };
@@ -1185,6 +1194,11 @@ export class TeamMatchesService {
       // only route the v1 web client already fetches for a team match, so we
       // surface the 1:1 Game relation here instead of adding a new endpoint.
       game: { select: { id: true } },
+      // 리그전 표시(2026-08-18). 이 관계가 없으면 응답에 리그 소속이 실리지 않아
+      // 화면에서 "이 경기가 리그전인지" 알 방법이 아예 없다 -- 배지의 유일한 근거다.
+      // 확장 단계라 league(신규)만 읽는다. 구 series 관계는 롤링 배포 창을 위해
+      // 스키마에 남아 있지만 새 코드는 읽지 않는다.
+      league: { select: { id: true, title: true } },
     } satisfies Prisma.V1TeamMatchInclude;
   }
 
@@ -1208,6 +1222,7 @@ export class TeamMatchesService {
         trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
       },
       costNote: teamMatch.costNote,
+      league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,

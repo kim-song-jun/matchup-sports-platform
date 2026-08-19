@@ -40,7 +40,7 @@ import { TournamentOperationsStaffModule } from './tournament-operations/staff/t
 import { TournamentOperationsBoardModule } from './tournament-operations/board/tournament-operations-board.module';
 import { TournamentOperationsFieldsModule } from './tournament-operations/fields/tournament-operations-fields.module';
 import { TournamentFixtureVideosModule } from './tournaments/videos/tournament-fixture-videos.module';
-import { TeamMatchSeriesModule } from './team-match-series/team-match-series.module';
+import { LeagueMatchModule } from './league-matches/league-match.module';
 
 @Module({
   imports: [
@@ -77,7 +77,7 @@ import { TeamMatchSeriesModule } from './team-match-series/team-match-series.mod
     ReviewsModule,
     UploadsModule,
     TournamentsModule,
-    TeamMatchSeriesModule,
+    LeagueMatchModule,
     VerificationModule,
     IntegrationsModule,
     LogsModule,

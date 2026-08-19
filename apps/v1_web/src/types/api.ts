@@ -1031,6 +1031,12 @@ export type V1TeamMatch = V1Match & {
   place?: { name: string; addressText?: string | null };
   displayState?: V1TeamMatchApiStatus;
   costNote?: string | null;
+  /**
+   * 리그전 경기면 소속 리그, 일반 팀 매치면 null. 백엔드
+   * team-matches.service.ts 의 toListItem()/detail()/myTeamMatches() 와
+   * admin listTeamMatches() 가 같은 모양으로 내려준다.
+   */
+  league?: { leagueId: string; title: string } | null;
   rulesText?: string | null;
   minLevelCode?: string | null;
   maxLevelCode?: string | null;

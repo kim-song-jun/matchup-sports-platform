@@ -1853,7 +1853,7 @@ Validation:
   and 1440x900 with API 200 responses, no console/page/request failures,
   no horizontal overflow, and before/after screenshots.
 - Evidence manifest:
-  output/playwright/task-127-records-profile/manifest.json
+  docs/screenshots/task-127-records-profile/manifest.json
 
 - 2026-08-19: 프로덕션 공개 API와 `main`/`dev` 소스를 교차 확인해 재현 및 원인을 확정했다.
 - 2026-08-19: `fix/v1-records-profile-integration` 브랜치에서 구현 시작.

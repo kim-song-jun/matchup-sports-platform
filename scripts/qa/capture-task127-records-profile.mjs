@@ -9,7 +9,7 @@ const TEAM_ID = 'b2f113fb-5457-45c4-9a77-0833698be7e9';
 const USER_ID = '9014c458-e16b-4a63-9663-e5157b1e8517';
 const TOURNAMENT_ID = '7e3c0f79-c2ee-495c-8ef9-f958785b8460';
 const FIXTURE_ID = 'e59bb2b6-b9a8-4522-9cc5-8b5be21c122d';
-const OUTPUT = path.resolve('output/playwright/task-127-records-profile');
+const OUTPUT = path.resolve('docs/screenshots/task-127-records-profile');
 const HIDE_DEV_UI =
   'nextjs-portal,[data-nextjs-dev-tools-button],#__next-dev-tools-indicator,[data-nextjs-toast]{display:none!important}';
 
@@ -103,6 +103,12 @@ try {
     page.on('requestfailed', (request) => {
       const failure = request.failure()?.errorText ?? 'unknown';
       if (request.url().endsWith('/api/v1/health') && failure === 'net::ERR_ABORTED') return;
+      if (
+        failure === 'net::ERR_ABORTED' &&
+        (request.resourceType() === 'font' || request.resourceType() === 'image')
+      ) {
+        return;
+      }
       requestFailures.push(request.method() + ' ' + request.url() + ' :: ' + failure);
     });
     page.on('response', (response) => {

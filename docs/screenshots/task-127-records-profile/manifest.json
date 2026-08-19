@@ -1,0 +1,119 @@
+{
+  "browserPid": 31308,
+  "parentPid": 32560,
+  "routes": [
+    "/teams/b2f113fb-5457-45c4-9a77-0833698be7e9/records",
+    "/users/9014c458-e16b-4a63-9663-e5157b1e8517"
+  ],
+  "fixtureSource": "production public API response patched with the post-migration projection contract",
+  "results": [
+    {
+      "viewport": "390x844",
+      "baselineRecordsScreenshot": "docs/screenshots/task-127-records-profile/mobile-390-baseline-team-records.png",
+      "baselineProfileScreenshot": "docs/screenshots/task-127-records-profile/mobile-390-baseline-public-profile.png",
+      "recordsScreenshot": "docs/screenshots/task-127-records-profile/mobile-390-team-records.png",
+      "profileScreenshot": "docs/screenshots/task-127-records-profile/mobile-390-public-profile.png",
+      "apiResponses": [
+        {
+          "url": "http://localhost:3013/api/v1/teams/b2f113fb-5457-45c4-9a77-0833698be7e9/records",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/health",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/popups/active?screen=teams",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/7e3c0f79-c2ee-495c-8ef9-f958785b8460/matches/e59bb2b6-b9a8-4522-9cc5-8b5be21c122d",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/users/9014c458-e16b-4a63-9663-e5157b1e8517/public-profile",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/health",
+          "status": 200
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": []
+    },
+    {
+      "viewport": "768x1024",
+      "baselineRecordsScreenshot": "docs/screenshots/task-127-records-profile/tablet-768-baseline-team-records.png",
+      "baselineProfileScreenshot": "docs/screenshots/task-127-records-profile/tablet-768-baseline-public-profile.png",
+      "recordsScreenshot": "docs/screenshots/task-127-records-profile/tablet-768-team-records.png",
+      "profileScreenshot": "docs/screenshots/task-127-records-profile/tablet-768-public-profile.png",
+      "apiResponses": [
+        {
+          "url": "http://localhost:3013/api/v1/teams/b2f113fb-5457-45c4-9a77-0833698be7e9/records",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/health",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/popups/active?screen=teams",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/7e3c0f79-c2ee-495c-8ef9-f958785b8460/matches/e59bb2b6-b9a8-4522-9cc5-8b5be21c122d",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/users/9014c458-e16b-4a63-9663-e5157b1e8517/public-profile",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/health",
+          "status": 200
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": []
+    },
+    {
+      "viewport": "1440x900",
+      "baselineRecordsScreenshot": "docs/screenshots/task-127-records-profile/desktop-1440-baseline-team-records.png",
+      "baselineProfileScreenshot": "docs/screenshots/task-127-records-profile/desktop-1440-baseline-public-profile.png",
+      "recordsScreenshot": "docs/screenshots/task-127-records-profile/desktop-1440-team-records.png",
+      "profileScreenshot": "docs/screenshots/task-127-records-profile/desktop-1440-public-profile.png",
+      "apiResponses": [
+        {
+          "url": "http://localhost:3013/api/v1/health",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/teams/b2f113fb-5457-45c4-9a77-0833698be7e9/records",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/popups/active?screen=teams",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/tournaments/7e3c0f79-c2ee-495c-8ef9-f958785b8460/matches/e59bb2b6-b9a8-4522-9cc5-8b5be21c122d",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/users/9014c458-e16b-4a63-9663-e5157b1e8517/public-profile",
+          "status": 200
+        },
+        {
+          "url": "http://localhost:3013/api/v1/health",
+          "status": 200
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": []
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Film } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
@@ -22,6 +23,7 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
+import { buildScheduleFilters, groupScheduleEntries } from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
 
 /**
@@ -506,6 +508,101 @@ function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
 }
 
 /**
+ * 단계(조별리그/결선) → 조·라운드 두 겹으로 묶어 보여준다. 예전에는 서버 순서대로 한
+ * 목록에 쏟아부었고, 데스크톱 2열에서 A조·B조·결승·4강이 좌우로 뒤섞였다(오너 지적).
+ *
+ * 필터는 **지금 일정에 실제로 있는 것만** 칩으로 만든다 — 고를 게 없는 칩은 눌러도 빈
+ * 화면이라, 있는 척하는 버튼이 된다.
+ */
+function ScheduleSections({
+  tournamentId,
+  entries,
+  myFixtureById,
+}: {
+  tournamentId: string;
+  entries: readonly PublicScheduleEntry[];
+  myFixtureById: Map<string, MyFixtureRowInfo>;
+}) {
+  const [filter, setFilter] = useState('all');
+  const phases = groupScheduleEntries(entries);
+  const hasMyFixtures = entries.some((entry) => myFixtureById.has(entry.fixtureId));
+  const filters = buildScheduleFilters(phases, hasMyFixtures);
+
+  // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
+  const activeFilter = filters.some((option) => option.key === filter) ? filter : 'all';
+
+  const visiblePhases = phases
+    .filter((phase) => activeFilter === 'all' || activeFilter === 'mine' || activeFilter === phase.key)
+    .map((phase) => ({
+      ...phase,
+      groups: phase.groups
+        .map((group) => ({
+          ...group,
+          entries:
+            activeFilter === 'mine'
+              ? group.entries.filter((entry) => myFixtureById.has(entry.fixtureId))
+              : group.entries,
+        }))
+        .filter((group) => group.entries.length > 0),
+    }))
+    .filter((phase) => phase.groups.length > 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {filters.length > 1 ? (
+        <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {filters.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              role="tab"
+              aria-selected={activeFilter === option.key}
+              className={`tm-chip${activeFilter === option.key ? ' tm-chip-active' : ''}`}
+              onClick={() => setFilter(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {visiblePhases.length === 0 ? (
+        <EmptyState title="해당하는 경기가 없어요" sub="다른 보기를 선택해 주세요." />
+      ) : (
+        visiblePhases.map((phase) => (
+          <section key={phase.key} aria-label={phase.label} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* 단계가 하나뿐이면(순수 토너먼트 등) 제목이 목록 전체를 되풀이할 뿐이라 숨긴다. */}
+            {phases.length > 1 ? (
+              <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{phase.label}</div>
+            ) : null}
+            {phase.groups.map((group) => (
+              <div key={group.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* 그룹 제목이 단계 제목과 같은 말이면(4강 안의 "4강") 한 번만 적는다. */}
+                {group.label !== phase.label || phase.groups.length > 1 ? (
+                  <div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 700 }}>
+                    {group.label}
+                  </div>
+                ) : null}
+                <Card pad={0} className="tm-schedule-list">
+                  {group.entries.map((entry) => (
+                    <ScheduleRow
+                      key={entry.fixtureId}
+                      tournamentId={tournamentId}
+                      entry={entry}
+                      myFixture={myFixtureById.get(entry.fixtureId)}
+                    />
+                  ))}
+                </Card>
+              </div>
+            ))}
+          </section>
+        ))
+      )}
+    </div>
+  );
+}
+
+/**
  * `showStandings=false` 는 이 콘텐츠가 **순위표를 이미 보여주는 화면 안에** 들어갈 때
  * 쓴다. `/bracket` 은 "순위 · 대진표" 탭에서 조별 순위를 그리는데, "경기 일정" 탭이
  * 같은 순위표를 한 번 더 그려서 탭만 바꾸면 같은 표가 두 번 나왔다(오너 지적:
@@ -601,16 +698,11 @@ export function ScheduleContent({
         {data.items.length === 0 ? (
           <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
         ) : (
-          <Card pad={0} className="tm-schedule-list">
-            {data.items.map((entry) => (
-              <ScheduleRow
-                key={entry.fixtureId}
-                tournamentId={tournamentId}
-                entry={entry}
-                myFixture={myFixtureById.get(entry.fixtureId)}
-              />
-            ))}
-          </Card>
+          <ScheduleSections
+            tournamentId={tournamentId}
+            entries={data.items}
+            myFixtureById={myFixtureById}
+          />
         )}
         {hasNextPage ? (
           <button

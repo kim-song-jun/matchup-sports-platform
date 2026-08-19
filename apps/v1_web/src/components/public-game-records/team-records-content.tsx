@@ -51,11 +51,11 @@ function RecordDetails({ item }: { item: PublicTeamRecordItem }) {
       {item.tournamentId && item.fixtureId ? (
         match.isPending ? (
           <span className='tm-text-caption' style={{ color: 'var(--text-caption)' }}>
-            경기 기록을 불러오는 중입니다.
+            경기 기록을 불러오는 중이에요.
           </span>
         ) : match.isError ? (
           <span className='tm-text-caption' role='alert' style={{ color: 'var(--red600)' }}>
-            경기 기록을 불러오지 못했습니다.
+            경기 기록을 불러오지 못했어요.
           </span>
         ) : goals.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -77,12 +77,12 @@ function RecordDetails({ item }: { item: PublicTeamRecordItem }) {
           </div>
         ) : (
           <span className='tm-text-caption' style={{ color: 'var(--text-caption)' }}>
-            등록된 득점 기록이 없습니다.
+            등록된 득점 기록이 없어요.
           </span>
         )
       ) : (
         <span className='tm-text-caption' style={{ color: 'var(--text-caption)' }}>
-          이 경기의 공개 상세 기록은 제공되지 않습니다.
+          이 경기의 공개 상세 기록은 제공되지 않아요.
         </span>
       )}
       {href ? (

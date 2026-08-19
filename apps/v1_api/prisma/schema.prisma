@@ -2719,6 +2719,20 @@ model V1IntegrationSettings {
   @@map("v1_integration_settings")
 }
 
+/// 리뷰(경기 후기) 작성 가능 기간 정책. 어드민이 런타임에 바꾼다.
+/// 마감을 저장해 두지 않고 매 요청 시점에 계산하므로(review-deadline.ts), 여기를 늘리면
+/// 직전 정책으로는 마감됐던 경기도 다시 열리고, 줄이면 열려 있던 경기가 즉시 닫힌다.
+model V1ReviewPolicySettings {
+  id                   String   @id @default("singleton")
+  /// 공식 결과 확정 시각(앵커)부터 후기를 쓸 수 있는 시간(시간 단위). 기본 168시간(7일).
+  reviewWindowHours    Int      @default(168) @map("review_window_hours")
+  // 감사 추적용 참조 문자열 — FK 관계는 두지 않는다(V1IntegrationSettings와 같은 규칙).
+  updatedByAdminUserId String?  @map("updated_by_admin_user_id")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("v1_review_policy_settings")
+}
+
 model V1Game {
   id                         String                      @id @default(uuid())
   sourceType                 V1GameSourceType            @map("source_type")

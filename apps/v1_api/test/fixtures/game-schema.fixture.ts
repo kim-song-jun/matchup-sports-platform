@@ -231,7 +231,15 @@ export const gameSchemaSourceManifest = {
   // 결속하기 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 뒷받침 마이그레이션은
   // 20260818120000_v1_league_expand 이며, 바인딩된 20260729000100_v1_game_operations 는
   // 그대로라 migration 해시는 변하지 않는다.
-  schema: '1af27845e827ac7ba0d5cf9591c76a9ae3f15a0718f61c8a63d58cf5df520669',
+  // 2026-08-18 재핀: 리뷰 작성 가능 기간을 48시간 하드코딩에서 어드민 편집 설정으로 바꾸며
+  // 싱글턴 모델 V1ReviewPolicySettings 1개를 신규 추가했다(reviewWindowHours 기본 168시간).
+  // 순수 additive 이고 game domain(V1Game*) 모델·enum 은 한 줄도 건드리지 않았다 -- 이 guard 가
+  // schema.prisma **전체 바이트**를 결속하기 때문에 걸리는 것이지 game operations 계약 변경이 아니다.
+  // 뒷받침 마이그레이션은 20260818120000_v1_review_policy_settings 이며, 바인딩된
+  // 20260729000100_v1_game_operations 는 그대로라 migration 해시는 변하지 않는다.
+  // 위 두 재핀이 **병합된 뒤**의 schema.prisma 에 shasum 을 다시 돌려 계산한 값이다 --
+  // 어느 한쪽 브랜치의 해시를 그대로 쓰면 병합 결과와 달라 SOURCE_SNAPSHOT_DRIFT 로 CI 가 깨진다.
+  schema: '1e223170eeace75995eb4b01ee3b6ef2d11a3da1aa816215db18dde4cf9c4002',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

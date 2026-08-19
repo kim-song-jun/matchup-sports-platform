@@ -238,6 +238,8 @@ import type {
   V1InvitationActionResult,
   V1IntegrationSettings,
   V1UpdateIntegrationSettingsPayload,
+  V1ReviewPolicySettings,
+  V1UpdateReviewPolicySettingsPayload,
   V1PublicKakaoMapsKeyResponse,
   V1TournamentOperationsBoardFilters,
   V1TournamentOperationsBoardPage,
@@ -1851,6 +1853,19 @@ export function useV1ReceivedReviewSummary(targetType: 'user' | 'team', period?:
     queryKey: v1Keys.reviewsReceivedSummary(targetType, period),
     queryFn: () => v1Get<V1ReviewReceivedSummaryResponse>('/reviews/received/summary', { targetType, period }),
     enabled: options?.enabled,
+  });
+}
+
+/**
+ * 팀 상세가 쓰는 **공개** 팀 후기 요약 — 남의 팀에서도 그 팀이 받은 평가를 읽는다.
+ * `useV1ReceivedReviewSummary` 는 "로그인한 나"가 받은 것이라 남의 팀 상세에 쓰면 내
+ * 후기를 그 팀 평가인 양 보여준다(그래서 이 훅이 따로 있다).
+ */
+export function useV1PublicTeamReviewSummary(teamId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.publicTeamReviews(teamId),
+    queryFn: () => v1Get<V1ReviewReceivedSummaryResponse>(`/teams/${teamId}/reviews`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
   });
 }
 
@@ -4180,6 +4195,31 @@ export function useV1UpdateIntegrationSettings() {
       v1Patch<V1IntegrationSettings>('/admin/settings/integrations', payload),
     onSuccess: (data) => {
       queryClient.setQueryData(v1Keys.adminIntegrationSettings(), data);
+    },
+  });
+}
+
+/** GET /admin/settings/reviews — 리뷰 작성 가능 기간 조회 */
+export function useV1AdminReviewPolicySettings() {
+  return useQuery({
+    queryKey: v1Keys.adminReviewPolicySettings(),
+    queryFn: () => v1Get<V1ReviewPolicySettings>('/admin/settings/reviews'),
+  });
+}
+
+/**
+ * PATCH /admin/settings/reviews — 작성 가능 기간 저장.
+ * 마감은 저장돼 있지 않고 매 요청 시점에 계산되므로, 기간을 늘리면 직전 정책으로 마감됐던
+ * 경기도 다시 열리고 줄이면 즉시 닫힌다. 후기 목록 캐시도 함께 무효화한다.
+ */
+export function useV1UpdateReviewPolicySettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1UpdateReviewPolicySettingsPayload) =>
+      v1Patch<V1ReviewPolicySettings>('/admin/settings/reviews', payload),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminReviewPolicySettings(), data);
+      void queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'reviews'] });
     },
   });
 }

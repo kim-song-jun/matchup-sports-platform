@@ -18,7 +18,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
-import { reviewWindowClosed } from './review-deadline';
+import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
+import { ReviewPolicySettingsService } from './review-policy-settings.service';
 import { isReviewRevealed, reviewRevealScope } from './review-visibility';
 import { average, revealGroupKey, trustStateForReviewCount } from './team-trust-aggregation';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
@@ -62,6 +63,7 @@ export class ReviewsService {
     private readonly prisma: PrismaService,
     private readonly tournamentFixtureReviews: TournamentFixtureReviewsService,
     private readonly adminContext: AdminContextService,
+    private readonly reviewPolicySettings: ReviewPolicySettingsService,
   ) {}
 
   /**
@@ -246,8 +248,24 @@ export class ReviewsService {
     };
   }
 
+  /**
+   * 팀 상세 화면이 쓰는 **공개** 요약 — 특정 팀이 받은 후기를 집계한다. 로그인 없이도
+   * 볼 수 있어야 하므로 사용자 기준 필터(`participatingTeamIds`)가 아니라 팀 id 를 직접 건다.
+   *
+   * 공개라고 해서 게이트를 느슨하게 두지 않는다: 아래 `summarizeTargetReviews` 를 그대로
+   * 지나므로 **상호평가 공개 규칙(`isReviewRevealed`)이 동일하게 적용된다** — 상대가 아직
+   * 안 썼고 유예 시간도 안 지난 후기는 여기서도 보이지 않는다. 이 경로만 따로 집계했다면
+   * 그 규칙을 우회하는 구멍이 됐을 것이다.
+   */
+  async publicTeamSummary(teamId: string, query?: { period?: string }) {
+    return this.summarizeTargetReviews(
+      { targetTeamId: teamId, targetType: 'team' as const },
+      'team',
+      query?.period,
+    );
+  }
+
   async receivedSummary(user: V1AuthUser, query: { targetType: 'user' | 'team'; period?: string }) {
-    const now = new Date();
     const targetFilter = query.targetType === 'team'
       ? { targetTeamId: { in: await this.participatingTeamIds(user.id) }, targetType: 'team' as const }
       // 개인 대상 요약은 매너 점수와 같은 소스만 센다(PERSONAL_REPUTATION_SOURCES) — 두 곳이
@@ -256,15 +274,30 @@ export class ReviewsService {
       // 대회 개인 후기는 계속 제외한다: V1UserReputationSummary의 tournament_* 컬럼으로 따로
       // 집계되고, 한 대회에서 상대 로스터 전원에게 수십 건이 들어와 평균이 급변하기 때문이다.
       : { targetUserId: user.id, targetType: 'user' as const, sourceType: { in: PERSONAL_REPUTATION_SOURCES } };
+    return this.summarizeTargetReviews(targetFilter, query.targetType, query.period, user.id);
+  }
 
+  /**
+   * 요약 집계의 단 하나의 구현. "누구의 요약인가"(대상 필터)만 호출부가 정하고, 공개 규칙과
+   * 종목·태그 집계는 전부 여기 있다 — 공개 경로와 내 화면 경로가 각자 집계하면 같은 팀의
+   * 같은 후기가 화면마다 다르게 세어진다.
+   */
+  private async summarizeTargetReviews(
+    targetFilter: Record<string, unknown>,
+    targetType: 'user' | 'team',
+    period?: string,
+    /** 개인 대상일 때 역방향 후기를 찾는 기준 사용자. 팀 대상에는 필요 없다. */
+    reverseUserId?: string,
+  ) {
+    const now = new Date();
     const candidates = await this.prisma.v1PostEventReview.findMany({
       where: { status: 'submitted', sportId: { not: null }, ...targetFilter },
       select: { sourceType: true, sourceId: true, sourceGroupId: true, reviewerUserId: true, reviewerTeamId: true, targetUserId: true, targetTeamId: true, rating: true, sportId: true, submittedAt: true, tags: { select: { tagCode: true, labelSnapshot: true } } },
     });
 
-    const reverseReviews = query.targetType === 'team'
+    const reverseReviews = targetType === 'team'
       ? await this.reverseTeamReviews(candidates)
-      : await this.reverseUserReviews(user.id, candidates);
+      : await this.reverseUserReviews(reverseUserId ?? '', candidates);
 
     const revealed = candidates.filter((review) =>
       isReviewRevealed(
@@ -272,8 +305,8 @@ export class ReviewsService {
           // 짝을 맞추는 단위는 경기가 아니라 reviewRevealScope() — 대회 후기는 중복 방지 스코프가
           // 대회 단위라, 서로 다른 경기에서 평가한 짝이 픽스처 기준으로는 절대 맞지 않는다.
           sourceId: reviewRevealScope(review),
-          reviewerUserId: query.targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
-          targetUserId: query.targetType === 'team' ? review.targetTeamId : review.targetUserId,
+          reviewerUserId: targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
+          targetUserId: targetType === 'team' ? review.targetTeamId : review.targetUserId,
           submittedAt: review.submittedAt,
         },
         reverseReviews,
@@ -282,8 +315,8 @@ export class ReviewsService {
     );
 
     const availableMonths = [...new Set(revealed.map((review) => review.submittedAt.toISOString().slice(0, 7)))].sort().reverse();
-    const filtered = query.period
-      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === query.period)
+    const filtered = period
+      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === period)
       : revealed;
 
     // 프론트의 종목 배지·색상은 v1Sport.code 로 매핑한다(SPORT_ACCENT_MAP). sportId(UUID)만
@@ -594,8 +627,9 @@ export class ReviewsService {
     if (!isCompleted(teamMatch)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
     // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐, 스펙 §6.1) — 정정 승인 시
     // 앵커가 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(D-6, 저장 안 함).
-    if (reviewWindowClosed(teamMatch.completedAt, new Date())) {
-      throw gone('REVIEW_WINDOW_CLOSED', '평가 가능 기간(48시간)이 지났어요.');
+    const windowHours = await this.reviewPolicySettings.getWindowHours();
+    if (reviewWindowClosed(teamMatch.completedAt, new Date(), windowHours)) {
+      throw gone('REVIEW_WINDOW_CLOSED', `평가 가능 기간(${formatReviewWindow(windowHours)})이 지났어요.`);
     }
     if (!teamMatch.approvedApplicantTeamId || !teamMatch.approvedApplicantTeam) {
       throw conflict('TEAM_MATCH_NOT_READY', 'Team match does not have an approved opponent');

@@ -20,6 +20,7 @@ import {
   ClipboardList,
   ShieldCheck,
   Settings,
+  Star,
   Send,
   BellRing,
   ScrollText,
@@ -94,7 +95,10 @@ const BASE_NAV_GROUPS: NavGroup[] = [
   },
   {
     label: '설정',
-    items: [{ label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> }],
+    items: [
+      { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
+      { label: '후기 정책', href: '/admin/settings/reviews', icon: <Star size={18} /> },
+    ],
   },
 ];
 

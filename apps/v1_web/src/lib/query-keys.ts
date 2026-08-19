@@ -43,6 +43,8 @@ export const v1Keys = {
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,
   reviewsReceivedSummary: (targetType: 'user' | 'team', period?: string) => [...v1Keys.all, 'reviews', 'received', 'summary', targetType, period ?? 'all'] as const,
+  /** 공개 팀 후기 요약 — 로그인 사용자와 무관하게 팀 id 로만 캐시된다. */
+  publicTeamReviews: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'reviews'] as const,
   chatRooms: () => [...v1Keys.all, 'chat', 'rooms'] as const,
   chatRoom: (roomId: string) => [...v1Keys.chatRooms(), roomId] as const,
   chatMessages: (roomId: string) => [...v1Keys.chatRoom(roomId), 'messages'] as const,
@@ -125,6 +127,7 @@ export const v1Keys = {
   receivedInvitations: () => [...v1Keys.all, 'me', 'invitations'] as const,
   myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
+  adminReviewPolicySettings: () => [...v1Keys.all, 'admin', 'review-policy-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
   // Task 21: live tournament operations console (fixture lineup + event backfill).
   // `game`은 위쪽에 이미 선언돼 있어 여기서 다시 정의하지 않는다 — 양쪽 브랜치가

@@ -60,9 +60,15 @@ export class PublicUserRecordsService {
 
     const viewerIsOwner = viewerId !== undefined && viewerId === userId;
 
+    // 동의 행은 본인 조회일 때만 읽는다 -- 타인 조회에서는 응답에 싣지도 않으므로
+    // (아래 `consentGranted` 주석 참고) 공개 라우트의 hot path 에 쓸모없는 왕복이 하나
+    // 붙는 셈이었다. 개별 참가 기록의 동의 판정은 `loadEligibleRows` 가 자체적으로
+    // (`loadParticipantConsentEligibility`) 하므로 이 조회와 무관하다.
     const [eligibleRows, consent] = await Promise.all([
       this.loadEligibleRows(userId, query.season, viewerIsOwner),
-      this.prisma.v1UserRecordConsent.findUnique({ where: { userId }, select: { state: true } }),
+      viewerIsOwner
+        ? this.prisma.v1UserRecordConsent.findUnique({ where: { userId }, select: { state: true } })
+        : Promise.resolve(null),
     ]);
     const cursor = decodeRecordCursor(query.cursor);
     const limit = query.limit ?? 20;

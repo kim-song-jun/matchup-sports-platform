@@ -419,14 +419,24 @@ export class ProfileService {
     const participantIds = links.map((link) => link.participantId);
 
     const rows = await this.prisma.v1GameResultParticipant.findMany({
-      where: { participantId: { in: participantIds } },
+      // sourceType·officialAt 은 DB 에서 먼저 거른다 -- 링크가 많은 사용자일수록 아래
+      // 루프까지 끌고 올 행이 불필요하게 커진다. "현재 공식 리비전인가"(컬럼 대 컬럼
+      // 비교)만 where 로 표현할 수 없어 루프에 남는다. 이번 달 범위는 여기서 거르면
+      // 안 된다 -- monthly 는 total 의 부분집합이라 같은 쿼리로 둘 다 세야 한다.
+      where: {
+        participantId: { in: participantIds },
+        resultRevision: {
+          officialAt: { not: null },
+          game: { sourceType: 'TOURNAMENT_FIXTURE' },
+        },
+      },
       select: {
         resultRevision: {
           select: {
             id: true,
             gameId: true,
             officialAt: true,
-            game: { select: { currentOfficialRevisionId: true, sourceType: true } },
+            game: { select: { currentOfficialRevisionId: true } },
           },
         },
       },
@@ -436,10 +446,9 @@ export class ProfileService {
     const monthlyGameIds = new Set<string>();
     for (const row of rows) {
       const revision = row.resultRevision;
-      // TEAM_MATCH(팀 매치) 참가자도 identity link 를 가질 수 있다(레거시 2자 승인 API
-      // POST /games/:gameId/participants/:participantId/identity-link-requests + .../attest 경유,
-      // sourceType 검사가 없다) — "대회 경기 출전 수"는 TOURNAMENT_FIXTURE 만 센다.
-      if (revision.game.sourceType !== 'TOURNAMENT_FIXTURE') continue;
+      // sourceType(TEAM_MATCH 제외)과 officialAt 은 위 where 가 이미 걸렀다 -- 여기서는
+      // where 로 표현할 수 없는 "현재 공식 리비전인가"(컬럼 대 컬럼 비교)만 본다.
+      // officialAt 은 스키마상 nullable 이라 아래 비교를 위해 타입만 좁힌다.
       const isCurrent = revision.game.currentOfficialRevisionId === revision.id;
       if (!isCurrent || revision.officialAt === null) continue;
 

@@ -621,8 +621,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         title: `${label} 기록을 취소할까요?`,
         message:
           event.type === 'SUBSTITUTION'
-            ? '취소 기록이 감사 로그에 남습니다.'
-            : '취소 기록이 감사 로그에 남습니다. 취소 후 올바른 기록을 다시 입력해 주세요.',
+            ? '취소 기록이 감사 로그에 남아요.'
+            : '취소 기록이 감사 로그에 남아요. 취소 후 올바른 기록을 다시 입력해 주세요.',
         confirmLabel: '기록 취소',
         tone: 'danger',
       });

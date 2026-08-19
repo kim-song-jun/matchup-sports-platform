@@ -1159,12 +1159,21 @@ export class TournamentResultReviewService {
       // 정정 레인에도 **결판 판정을 건다.** 예전에는 이 레인이 `assertPenaltiesNotAllowed`
       // 하나만 통과시켜, `end` 가 422 로 막는 값(킥 수가 말이 안 되는 승부차기)을 정정으로는
       // 그대로 저장할 수 있었다 — 게이트를 한 레인에만 달면 다른 레인이 우회로가 된다.
-      // 킥 수가 없는 레거시 승계는 `assertPenaltyShootoutConcluded` 가 그대로 통과시킨다.
-      const config = await tx.v1CompetitionConfigVersion.findUnique({
-        where: { id: game.competitionConfigVersionId },
-        select: { result: true },
-      });
-      assertPenaltyShootoutPersistable(carriedOver, parseResultPolicy(config?.result ?? null), {
+      // 킥 수가 없는 레거시 승계는 `assertPenaltyShootoutPersistable` 가 그대로 통과시킨다.
+      // 킥 수가 없으면 관문이 정책을 보지 않는다(`assertPenaltyShootoutPersistable` 계약) —
+      // 잠금 구간에서 쓸모없는 config 질의를 하지 않도록 여기서 먼저 갈라 준다.
+      const needsPolicy = carriedOver.takenHome !== undefined && carriedOver.takenAway !== undefined;
+      const policy = needsPolicy
+        ? parseResultPolicy(
+            (
+              await tx.v1CompetitionConfigVersion.findUnique({
+                where: { id: game.competitionConfigVersionId },
+                select: { result: true },
+              })
+            )?.result ?? null,
+          )
+        : { earlyStop: true };
+      assertPenaltyShootoutPersistable(carriedOver, policy, {
         requireKickCounts: !inheritedFromBase,
       });
       return applied;

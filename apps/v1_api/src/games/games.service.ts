@@ -5328,17 +5328,25 @@ export class GamesService {
     penalties: StoredPenalties,
     penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
   ): Promise<void> {
-    const config = await tx.v1CompetitionConfigVersion.findUnique({
-      where: { id: game.competitionConfigVersionId },
-      select: { result: true },
-    });
-    // 판정은 두 레인이 공유하는 단일 관문에 있다(`assertPenaltyShootoutPersistable`).
+    // 판정은 모든 경로가 공유하는 단일 관문에 있다(`assertPenaltyShootoutPersistable`).
     // 여기서 정하는 건 "킥 수를 요구할 것인가" 하나뿐이다: `end` 는 승부차기를 **새로 쓰는**
     // 경로라 클라이언트가 킥 목록을 들고 있으므로 요구하고, 복구는 이미 저장된 값을 옮기는
     // 경로라 면제한다(킥 수가 생기기 전 리비전에는 그 값이 없다).
-    assertPenaltyShootoutPersistable(penalties, parseResultPolicy(config?.result ?? null), {
-      requireKickCounts: penaltyOrigin === 'END_COMMAND',
-    });
+    const requireKickCounts = penaltyOrigin === 'END_COMMAND';
+    // 킥 수가 없으면 관문이 정책을 보지 않는다(그 함수의 계약) — 잠금 구간에서 쓸모없는
+    // config 질의를 하지 않도록 여기서 먼저 갈라 준다.
+    const needsPolicy = penalties.takenHome !== undefined && penalties.takenAway !== undefined;
+    const policy = needsPolicy
+      ? parseResultPolicy(
+          (
+            await tx.v1CompetitionConfigVersion.findUnique({
+              where: { id: game.competitionConfigVersionId },
+              select: { result: true },
+            })
+          )?.result ?? null,
+        )
+      : { earlyStop: true };
+    assertPenaltyShootoutPersistable(penalties, policy, { requireKickCounts });
   }
 
   private async assertTeamMatchMatched(tx: Transaction, teamMatchId: string | null): Promise<void> {

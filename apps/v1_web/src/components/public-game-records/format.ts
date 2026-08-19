@@ -113,7 +113,7 @@ export function userRecordResultLabel(result: 'WON' | 'LOST' | 'DRAWN' | null): 
  */
 export function formatGoalMinute(clockMs: number | null): string {
   if (clockMs === null) return '';
-  return `${Math.floor(clockMs / 60_000)}′`;
+  return `${Math.ceil(clockMs / 60_000)}′`;
 }
 
 /**
@@ -132,19 +132,17 @@ export function eventPresentation(event: {
   cardColor: 'YELLOW' | 'RED' | null;
 }): { icon: string; label: string } {
   if (event.type === 'GOAL') return { icon: '⚽', label: '골' };
+  if (event.type === 'OWN_GOAL') return { icon: '⚽', label: '자책골' };
   if (event.type === 'CARD' && event.cardColor === 'RED') return { icon: '🟥', label: '레드카드' };
   if (event.type === 'CARD' && event.cardColor === 'YELLOW') return { icon: '🟨', label: '옐로카드' };
   if (event.type === 'CARD') return { icon: '□', label: '카드 색상 확인 필요' };
   return { icon: '•', label: event.type };
 }
 
-/** `mm:ss` from a game clock in milliseconds, used for goal/card event rows. */
+/** 축구 기록 관례의 올림 분 표기. 예: 2:04에 발생한 이벤트는 `3′`로 표시한다. */
 export function formatClock(clockMs: number | null): string {
   if (clockMs === null) return '';
-  const totalSeconds = Math.max(0, Math.floor(clockMs / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  return `${Math.ceil(Math.max(0, clockMs) / 60_000)}′`;
 }
 
 /**

@@ -9,10 +9,12 @@ import {
   useVoidResultRevision,
 } from '@/hooks/use-tournament-result-review';
 import { useV1GameLineups } from '@/hooks/use-v1-api';
+import { useV1GameEventsBackfill } from '@/hooks/use-v1-game-operations';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { deriveEditableGoalEvents } from '@/lib/result-goal-events';
 import { RevisionTimeline } from './revision-timeline';
 import { GameSummaryHeader } from './game-summary-header';
 import { ReasonModal } from './reason-modal';
@@ -64,6 +66,7 @@ export function GameResultCorrectionPanel({
   // 정정 폼의 참가자 실명 표시용 -- 로딩 중/실패 시 빈 배열로 두면 모달이 기존
   // 폴백(사이드 + id 뒷자리)으로 얌전히 물러난다(아래 lineups prop 참고).
   const lineupsQuery = useV1GameLineups(gameId);
+  const eventsQuery = useV1GameEventsBackfill(gameId, 0);
   const createCorrection = useCreateResultCorrection(gameId, tournamentId);
   const officialize = useOfficializeResultRevision(gameId, tournamentId);
   const voidRevision = useVoidResultRevision(gameId, tournamentId);
@@ -164,6 +167,7 @@ export function GameResultCorrectionPanel({
         revisionId: pendingCorrection.id,
         expectedVersion: game.version,
         score: pendingCorrection.score,
+        goalEvents: pendingCorrection.goalEvents,
         eventsHash: pendingCorrection.eventsHash,
         mvpParticipantId: pendingCorrection.mvpParticipantId,
       },
@@ -267,6 +271,10 @@ export function GameResultCorrectionPanel({
           reasonLabel={entryCopy.reasonLabel}
           base={{
             score: editPrefill.score,
+            goalEvents: deriveEditableGoalEvents(
+              editPrefill.goalEvents,
+              eventsQuery.data?.events ?? [],
+            ),
             participants: editPrefill.resultParticipants,
             mvpParticipantId: editPrefill.mvpParticipantId,
           }}
@@ -292,6 +300,7 @@ export function GameResultCorrectionPanel({
                 reason: input.reason,
                 changes: {
                   score: input.score,
+                  goalEvents: input.goalEvents,
                   actualParticipants: input.actualParticipants,
                   eventsHash: editPrefill.eventsHash,
                   mvpParticipantId: input.mvpParticipantId,

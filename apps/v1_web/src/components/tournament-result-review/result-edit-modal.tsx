@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type {
+  GameResultGoalEventInput,
   GameResultParticipantInput,
   GameResultParticipantRecord,
   GameResultScore,
@@ -29,6 +30,7 @@ import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/g
  */
 export type ResultEditSubmitInput = {
   score: GameResultScoreInput;
+  goalEvents: GameResultGoalEventInput[];
   actualParticipants: GameResultParticipantInput[];
   mvpParticipantId?: string;
   reason: string;
@@ -42,6 +44,7 @@ export type ResultEditModalProps = {
   reasonLabel?: string;
   base: {
     score: GameResultScore;
+    goalEvents?: readonly GameResultGoalEventInput[];
     participants: readonly GameResultParticipantRecord[];
     mvpParticipantId: string | null;
   };
@@ -133,6 +136,15 @@ function toEditable(record: GameResultParticipantRecord): EditableParticipant {
     cards: { ...record.cards },
     goalkeeper: record.goalkeeper,
   };
+}
+
+function participantFitsGoal(
+  goal: GameResultGoalEventInput,
+  participant: EditableParticipant,
+): boolean {
+  return goal.ownGoal
+    ? participant.sideId !== goal.sideId
+    : participant.sideId === goal.sideId;
 }
 
 /**
@@ -291,6 +303,15 @@ export function ResultEditModal({
   // 하는 숫자 입력란의 편집 시작값일 뿐이다.
   const [home, setHome] = useState(readGameResultScore(base.score)?.home ?? 0);
   const [away, setAway] = useState(readGameResultScore(base.score)?.away ?? 0);
+  const initialPenalties = readSubmittablePenalties(readGameResultScore(base.score)?.penalties);
+  const [penaltyHome, setPenaltyHome] = useState(initialPenalties?.home ?? 0);
+  const [penaltyAway, setPenaltyAway] = useState(initialPenalties?.away ?? 0);
+  const [firstKickSideKey, setFirstKickSideKey] = useState<'' | 'HOME' | 'AWAY'>(
+    initialPenalties?.firstKickSideKey ?? '',
+  );
+  const [goalEvents, setGoalEvents] = useState<GameResultGoalEventInput[]>(() =>
+    (base.goalEvents ?? []).map((event) => ({ ...event })),
+  );
   const [participants, setParticipants] = useState<EditableParticipant[]>(() =>
     base.participants.map(toEditable),
   );
@@ -377,7 +398,14 @@ export function ResultEditModal({
   // 고치는 입력란은 아직 이 폼의 범위가 아니므로, 이어서 보낼 수 없는 상태에서는 값을
   // 떨어뜨리고 그 사실을 경고로 드러낸다(아래 `penaltyWarning`).
   const rawPenalties: unknown = baseScore?.penalties;
-  const submittablePenalties = readSubmittablePenalties(rawPenalties);
+  const submittablePenalties =
+    penaltyHome !== penaltyAway
+      ? {
+          home: penaltyHome,
+          away: penaltyAway,
+          ...(firstKickSideKey ? { firstKickSideKey } : {}),
+        }
+      : null;
   /**
    * 서버가 `penalties` 를 **받아 주는 상태인가**. 판정을 서버 `applyPenalties`
    * (`games.service.ts`)와 1:1로 맞춘다 -- 그쪽은 두 방향 모두 하드 거부한다:
@@ -463,11 +491,26 @@ export function ResultEditModal({
       }),
     [participants, base.participants],
   );
-  const canSubmit = trimmedReason.length > 0 && !submitting;
+  const canSubmit =
+    trimmedReason.length > 0 && (!penaltiesAllowed || submittablePenalties !== null) && !submitting;
 
   function updateParticipant(index: number, patch: Partial<EditableParticipant>) {
     setParticipants((current) =>
       current.map((participant, i) => (i === index ? { ...participant, ...patch } : participant)),
+    );
+  }
+
+  function replaceGoalEvents(next: GameResultGoalEventInput[]) {
+    setGoalEvents(next);
+    setHome(next.filter((event) => event.sideId === sides.find((side) => side.sideKey === 'HOME')?.id).length);
+    setAway(next.filter((event) => event.sideId === sides.find((side) => side.sideKey === 'AWAY')?.id).length);
+    setParticipants((current) =>
+      current.map((participant) => ({
+        ...participant,
+        goals: next.filter(
+          (event) => !event.ownGoal && event.participantId === participant.participantId,
+        ).length,
+      })),
     );
   }
 
@@ -572,6 +615,147 @@ export function ResultEditModal({
               {formatGameResultScoreWithPenalties(draftScore)}
             </p>
           ) : null}
+
+          {penaltiesAllowed ? (
+            <section className="tm-card" style={{ padding: 12, marginBottom: 20 }}>
+              <p className="tm-text-label" style={{ fontWeight: 600, marginBottom: 10 }}>
+                승부차기 결과
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                <StatNumberField id={`${idPrefix}-penalty-home`} label="홈 성공" value={penaltyHome} onValueChange={setPenaltyHome} />
+                <StatNumberField id={`${idPrefix}-penalty-away`} label="원정 성공" value={penaltyAway} onValueChange={setPenaltyAway} />
+              </div>
+              <fieldset style={{ marginTop: 12 }}>
+                <legend className="tm-text-caption" style={{ marginBottom: 6 }}>먼저 차는 팀</legend>
+                <div style={{ display: 'flex', gap: 16 }}>
+                  {(['HOME', 'AWAY'] as const).map((sideKey) => (
+                    <label key={sideKey} className="tm-text-caption" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input type="radio" name={`${idPrefix}-first-kick`} checked={firstKickSideKey === sideKey} onChange={() => setFirstKickSideKey(sideKey)} />
+                      {sideKey === 'HOME' ? '홈' : '원정'}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            </section>
+          ) : null}
+
+          <section style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+              <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--text-strong)' }}>
+                득점 기록과 순서
+              </p>
+              <button
+                type="button"
+                className="tm-btn tm-btn-sm tm-btn-neutral"
+                onClick={() => {
+                  const scoringSide = sides.find((side) => side.sideKey === 'HOME') ?? sides[0];
+                  if (!scoringSide) return;
+                  replaceGoalEvents([
+                    ...goalEvents,
+                    {
+                      id: `correction-${Date.now()}`,
+                      sideId: scoringSide.id,
+                      minute: 0,
+                      period: 1,
+                      ownGoal: false,
+                    },
+                  ]);
+                }}
+              >
+                득점 추가
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {goalEvents.map((goal, index) => (
+                <div key={goal.id} className="tm-card" style={{ padding: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(88px, 0.8fr) minmax(120px, 1.4fr) 76px 86px', gap: 8 }}>
+                    <select
+                      aria-label={`${index + 1}번째 득점 팀`}
+                      className="tm-input"
+                      value={goal.sideId}
+                      onChange={(event) =>
+                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? { ...item, sideId: event.target.value, participantId: undefined }
+                            : item,
+                        ))
+                      }
+                    >
+                      {sides.map((side) => <option key={side.id} value={side.id}>{sideLabel(sides, side.id)}</option>)}
+                    </select>
+                    <select
+                      aria-label={`${index + 1}번째 득점 선수`}
+                      className="tm-input"
+                      value={goal.participantId ?? ''}
+                      onChange={(event) =>
+                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? { ...item, participantId: event.target.value || undefined }
+                            : item,
+                        ))
+                      }
+                    >
+                      <option value="">선수 미지정</option>
+                      {participants.filter((participant) => participantFitsGoal(goal, participant)).map((participant) => (
+                        <option key={participant.participantId} value={participant.participantId}>
+                          {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label={`${index + 1}번째 득점 유형`}
+                      className="tm-input"
+                      value={goal.ownGoal ? 'OWN_GOAL' : 'GOAL'}
+                      onChange={(event) =>
+                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? {
+                                ...item,
+                                ownGoal: event.target.value === 'OWN_GOAL',
+                                participantId: undefined,
+                              }
+                            : item,
+                        ))
+                      }
+                    >
+                      <option value="GOAL">골</option>
+                      <option value="OWN_GOAL">자책골</option>
+                    </select>
+                    <input
+                      aria-label={`${index + 1}번째 득점 분`}
+                      type="number"
+                      min={0}
+                      className="tm-input"
+                      value={goal.minute ?? 0}
+                      onChange={(event) =>
+                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, minute: toStatValue(event.target.value) } : item,
+                        ))
+                      }
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 8 }}>
+                    <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={index === 0} onClick={() => {
+                      const next = [...goalEvents];
+                      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                      replaceGoalEvents(next);
+                    }}>위로</button>
+                    <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={index === goalEvents.length - 1} onClick={() => {
+                      const next = [...goalEvents];
+                      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                      replaceGoalEvents(next);
+                    }}>아래로</button>
+                    <button type="button" className="tm-btn tm-btn-sm tm-btn-danger" onClick={() => replaceGoalEvents(goalEvents.filter((_, itemIndex) => itemIndex !== index))}>
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {goalEvents.length === 0 ? (
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>등록된 득점이 없어요.</p>
+              ) : null}
+            </div>
+          </section>
 
           <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--text-strong)', marginBottom: 8 }}>
             참가자별 기록
@@ -714,6 +898,7 @@ export function ResultEditModal({
                 // 아니라 **허용 필드**다 -- 결선 무승부는 승부차기로만 승자가 갈리므로,
                 // 서버가 받아 주는 상태(`penaltiesAllowed`)에서는 반드시 실어 보낸다.
                 score: draftScore,
+                goalEvents,
                 actualParticipants: participants,
                 ...(mvpParticipantId ? { mvpParticipantId } : {}),
                 reason: trimmedReason,

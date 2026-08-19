@@ -387,6 +387,7 @@ enum V1ConsentState {
 
 enum V1GameEventType {
   GOAL
+  OWN_GOAL
   CARD
   SUBSTITUTION
   PERIOD_START
@@ -896,7 +897,6 @@ model V1Sport {
   teams           V1Team[]
   teamMatches     V1TeamMatch[]
   tournaments     V1Tournament[]
-  teamMatchSeries V1TeamMatchSeries[]
   leagues         V1League[]         @relation("V1LeagueSport")
 
   @@index([isActive, sortOrder])
@@ -947,7 +947,6 @@ model V1Region {
   matches         V1Match[]
   teams           V1Team[]
   teamMatches     V1TeamMatch[]
-  teamMatchSeries V1TeamMatchSeries[]
   leagues         V1League[]         @relation("V1LeagueRegion")
 
   @@index([parentId])
@@ -1231,7 +1230,6 @@ model V1Team {
   postEventTeamReviewsReceived V1PostEventReview[]        @relation("V1PostEventReviewTargetTeam")
   tournamentRegistrations      V1TournamentRegistration[]
   tournamentReviews            V1TournamentReview[]       @relation("V1TournamentReviewTeam")
-  teamMatchSeriesEntries       V1TeamMatchSeriesTeam[]
   leagueEntries                V1LeagueTeam[]              @relation("V1LeagueTeamTeam")
   lineupPresets                V1TeamLineupPreset[]
 
@@ -1578,11 +1576,9 @@ model V1TeamMatch {
   // 20260729000100_v1_game_operations while this column was still nullable
   // there too), so `competitionConfig` stays a real relation, just optional.
   competitionConfigVersionId String?           @map("competition_config_version_id")
-  seriesId                   String?           @map("series_id")
-  // 확장-수축 재명명(2026-08-18). 확장 단계에서는 두 컬럼이 함께 산다 --
-  // seriesId 는 구버전 컨테이너가 롤링 배포 창에서 계속 읽는 값이라 지금 지우면 안 되고,
-  // leagueId 가 새 코드가 읽고 쓰는 값이다. 두 값은 서비스 계층에서 함께 기록한다.
-  // 수축 단계(별도 릴리스)에서 seriesId 와 v1_team_match_series* 를 제거한다.
+  // 소속 리그(일반 리그, 대회와 무관). null 이면 단발 팀 매치다.
+  // 2026-08-18 재명명의 확장-수축이 여기서 끝났다 -- 구 seriesId 컬럼과
+  // v1_team_match_series* 는 수축 릴리스에서 제거됐다.
   leagueId                   String?           @map("league_id")
 
   hostTeam              V1Team                      @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
@@ -1596,7 +1592,6 @@ model V1TeamMatch {
   chatRoom              V1ChatRoom?
   game                  V1Game?                     @relation("V1GameTeamMatch")
   competitionConfig     V1CompetitionConfigVersion? @relation("V1TeamMatchCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_team_matches_competition_config_fk")
-  series                V1TeamMatchSeries?          @relation("V1TeamMatchSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_team_matches_series_fk")
   league                V1League?                   @relation("V1TeamMatchLeague", fields: [leagueId], references: [id], onDelete: SetNull, map: "v1_team_matches_league_fk")
 
   @@index([hostTeamId])
@@ -1609,7 +1604,6 @@ model V1TeamMatch {
   @@index([startAt])
   @@index([createdAt])
   @@index([competitionConfigVersionId], map: "v1_team_matches_competition_config_idx")
-  @@index([seriesId, startAt], map: "v1_team_matches_series_start_at_idx")
   @@index([leagueId, startAt], map: "v1_team_matches_league_start_at_idx")
   @@map("v1_team_matches")
 }
@@ -1640,54 +1634,11 @@ model V1TeamMatchApplication {
   @@map("v1_team_match_applications")
 }
 
-enum V1TeamMatchSeriesState {
-  draft
-  active
-  completed
-}
-
-model V1TeamMatchSeries {
-  id                   String                 @id @default(uuid())
-  title                String
-  sportId              String                 @map("sport_id")
-  regionId             String                 @map("region_id")
-  createdByAdminUserId String                 @map("created_by_admin_user_id")
-  startsOn             DateTime               @map("starts_on")
-  endsOn               DateTime               @map("ends_on")
-  tieBreakJson         Json                   @map("tie_break_json")
-  state                V1TeamMatchSeriesState @default(draft)
-  createdAt            DateTime               @default(now()) @map("created_at")
-  updatedAt            DateTime               @updatedAt @map("updated_at")
-
-  sport          V1Sport                 @relation(fields: [sportId], references: [id], onDelete: Restrict, map: "v1_team_match_series_sport_fk")
-  region         V1Region                @relation(fields: [regionId], references: [id], onDelete: Restrict, map: "v1_team_match_series_region_fk")
-  createdByAdmin V1AdminUser             @relation(fields: [createdByAdminUserId], references: [id], onDelete: Restrict, map: "v1_team_match_series_admin_fk")
-  teams          V1TeamMatchSeriesTeam[]
-  teamMatches    V1TeamMatch[]           @relation("V1TeamMatchSeries")
-
-  @@index([sportId, state])
-  @@map("v1_team_match_series")
-}
-
-model V1TeamMatchSeriesTeam {
-  id        String   @id @default(uuid())
-  seriesId  String   @map("series_id")
-  teamId    String   @map("team_id")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  series V1TeamMatchSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade, map: "v1_team_match_series_teams_series_fk")
-  team   V1Team            @relation(fields: [teamId], references: [id], onDelete: Restrict, map: "v1_team_match_series_teams_team_fk")
-
-  @@unique([seriesId, teamId], map: "v1_team_match_series_teams_series_team_key")
-  @@index([teamId])
-  @@map("v1_team_match_series_teams")
-}
-
-// ── 확장-수축 재명명: 여기부터가 새 이름(League) 쪽이다 ────────────────────────
-// 위의 V1TeamMatchSeries* 는 롤링 배포 창 동안 구버전 컨테이너가 계속 쓰는 구 이름이라
-// 이 릴리스에서 지우지 않는다. 새 코드는 아래 모델만 읽고, 쓰기는 양쪽에 한다.
-// 수축 단계(별도 릴리스)에서 구 모델·구 컬럼을 제거한다.
-// 사용자 화면 문구는 이 재명명 이전부터 이미 "리그"였다 -- 이건 코드/DB 이름만의 정렬이다.
+// ── 일반 리그(League) — 대회(Tournament)와는 별개 도메인 ──────────────────────
+// 팀 매치 여러 개를 묶는 컨테이너다. 개별 경기는 V1TeamMatch 그대로이고,
+// leagueId 가 채워진 경기가 "리그전"으로 표시된다.
+// 사용자 화면 문구는 이 재명명 이전부터 이미 "리그"였다 -- 재명명은 코드/DB 이름을
+// 그 문구에 맞춘 작업이었다(확장-수축 2단계, 2026-08-18~19).
 
 enum V1LeagueState {
   draft
@@ -1975,7 +1926,6 @@ model V1AdminUser {
   recordedTournamentResults        V1TournamentFixtureResult[] @relation("V1TournamentFixtureResultRecordedByAdmin")
   inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
   contentAssets                    V1ContentAsset[]
-  createdTeamMatchSeries           V1TeamMatchSeries[]
   createdLeagues                   V1League[]                       @relation("V1LeagueAdmin")
 
   @@index([adminRole, status])
@@ -2961,6 +2911,7 @@ model V1GameResultRevision {
   revision             Int
   state                V1GameResultRevisionState  @default(DRAFT)
   score                Json
+  goalEvents           Json?                      @map("goal_events")
   eventsHash           String                     @map("events_hash")
   missingScorer        Boolean                    @default(false) @map("missing_scorer")
   mvpParticipantId     String?                    @map("mvp_participant_id")

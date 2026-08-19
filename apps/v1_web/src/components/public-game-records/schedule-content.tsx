@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Film } from 'lucide-react';
+import { Film, MapPin } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import {
   TournamentStandingsTable,
@@ -22,6 +23,7 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
+import { buildScheduleFilters, groupScheduleEntries } from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
 
 /**
@@ -114,7 +116,7 @@ function toScheduleEventItems(entry: PublicScheduleEntry): ScheduleEventItem[] {
   const goals = entry.scorers.map((scorer, index) => ({
     key: `goal-${index}`,
     side: scorer.side,
-    ...eventPresentation({ type: 'GOAL', cardColor: null }),
+    ...eventPresentation({ type: scorer.ownGoal ? 'OWN_GOAL' : 'GOAL', cardColor: null }),
     participantName: scorer.participantName,
     period: scorer.period,
     clockMs: scorer.clockMs,
@@ -301,11 +303,14 @@ function ScheduleRow({
   tournamentId,
   entry,
   myFixture,
+  showGroupLabel = true,
 }: {
   tournamentId: string;
   entry: PublicScheduleEntry;
   /** 이 경기가 로그인한 팀장의 팀 경기라면 그 정보 — 아니면 undefined(공개 방문자 포함). */
   myFixture?: MyFixtureRowInfo;
+  /** 그룹 제목("A조")이 바로 위에 있으면 카드 안에서 같은 말을 되풀이하지 않는다. */
+  showGroupLabel?: boolean;
 }) {
   const dateLabel = formatTournamentDateTimeShort(entry.scheduledAt);
   const venue = venueLabel(entry);
@@ -315,7 +320,7 @@ function ScheduleRow({
       // 구분선을 인라인이 아니라 클래스로 그린다 — 인라인 style 은 미디어쿼리가 이길 수
       // 없어서, 데스크톱에서 목록을 2열로 펼 때 격자선을 다시 그릴 방법이 없어진다.
       // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
-      className={`tm-pressable${myFixture ? '' : ' tm-schedule-row'}`}
+      className={`tm-pressable${myFixture ? '' : ' tm-schedule-card'}`}
       style={{
         display: 'block',
         padding: '12px 16px',
@@ -345,7 +350,7 @@ function ScheduleRow({
       ) : null}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
-          {entry.groupName ?? entry.round}
+          {showGroupLabel ? entry.groupName ?? entry.round : ''}
           {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
           <VideoBadge hasVideo={entry.hasVideo} />
         </span>
@@ -394,8 +399,13 @@ function ScheduleRow({
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
       <MatchEventSummary entry={entry} />
       {venue ? (
+        // 아이콘을 함께 둔다 — 경기장 이름이 "1 (1)" 처럼 짧으면 맨 텍스트만으로는 그게
+        // 장소인지 번호인지 알 수 없다(오너 지적: "1(1)은 뭔지 모르겠고").
         // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.
-        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)' }}>{venue}</div>
+        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <MapPin size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <span>{venue}</span>
+        </div>
       ) : null}
     </Link>
   );
@@ -408,7 +418,7 @@ function ScheduleRow({
   // 형제로 둔다: 링크 안에 링크를 넣으면 유효하지 않은 마크업이 되고 클릭 대상도 모호해진다.
   return (
     <div
-      className="tm-schedule-row tm-schedule-row-mine"
+      className="tm-schedule-card tm-schedule-card-mine"
       style={{
         borderLeft: '3px solid var(--blue500)',
         // 예전에는 행 전체를 `--blue50`(#e8f3ff)로 칠했다 — 내 팀 경기가 연달아 있으면
@@ -501,6 +511,127 @@ function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
           />
         </section>
       ))}
+    </div>
+  );
+}
+
+/** 한 그룹(A조·4강 …)의 경기 묶음. 그룹 제목을 실제로 그렸으면 카드 안의 같은 라벨은 지운다. */
+function ScheduleGroupBlock({
+  tournamentId,
+  group,
+  showGroupHeading,
+  myFixtureById,
+}: {
+  tournamentId: string;
+  group: { key: string; label: string; entries: PublicScheduleEntry[] };
+  showGroupHeading: boolean;
+  myFixtureById: Map<string, MyFixtureRowInfo>;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {showGroupHeading ? (
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 700 }}>
+          {group.label}
+        </div>
+      ) : null}
+      {/* 예전엔 `Card` 하나를 grid 로 쪼갰다 — 화면에는 한 장을 반으로 자른 것처럼 보이고
+          경기마다 테두리가 없어 카드로 읽히지 않았다(오너 지적). 이제 경기 하나가 카드 하나다. */}
+      <div className="tm-schedule-list">
+        {group.entries.map((entry) => (
+          <ScheduleRow
+            key={entry.fixtureId}
+            tournamentId={tournamentId}
+            entry={entry}
+            myFixture={myFixtureById.get(entry.fixtureId)}
+            showGroupLabel={!showGroupHeading}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 단계(조별리그/결선) → 조·라운드 두 겹으로 묶어 보여준다. 예전에는 서버 순서대로 한
+ * 목록에 쏟아부었고, 데스크톱 2열에서 A조·B조·결승·4강이 좌우로 뒤섞였다(오너 지적).
+ *
+ * 필터는 **지금 일정에 실제로 있는 것만** 칩으로 만든다 — 고를 게 없는 칩은 눌러도 빈
+ * 화면이라, 있는 척하는 버튼이 된다.
+ */
+function ScheduleSections({
+  tournamentId,
+  entries,
+  myFixtureById,
+}: {
+  tournamentId: string;
+  entries: readonly PublicScheduleEntry[];
+  myFixtureById: Map<string, MyFixtureRowInfo>;
+}) {
+  const [filter, setFilter] = useState('all');
+  const phases = groupScheduleEntries(entries);
+  const hasMyFixtures = entries.some((entry) => myFixtureById.has(entry.fixtureId));
+  const filters = buildScheduleFilters(phases, hasMyFixtures);
+
+  // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
+  const activeFilter = filters.some((option) => option.key === filter) ? filter : 'all';
+
+  const visiblePhases = phases
+    .filter((phase) => activeFilter === 'all' || activeFilter === 'mine' || activeFilter === phase.key)
+    .map((phase) => ({
+      ...phase,
+      groups: phase.groups
+        .map((group) => ({
+          ...group,
+          entries:
+            activeFilter === 'mine'
+              ? group.entries.filter((entry) => myFixtureById.has(entry.fixtureId))
+              : group.entries,
+        }))
+        .filter((group) => group.entries.length > 0),
+    }))
+    .filter((phase) => phase.groups.length > 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {filters.length > 1 ? (
+        <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {filters.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              role="tab"
+              aria-selected={activeFilter === option.key}
+              className={`tm-chip${activeFilter === option.key ? ' tm-chip-active' : ''}`}
+              onClick={() => setFilter(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {visiblePhases.length === 0 ? (
+        <EmptyState title="해당하는 경기가 없어요" sub="다른 보기를 선택해 주세요." />
+      ) : (
+        visiblePhases.map((phase) => (
+          <section key={phase.key} aria-label={phase.label} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* 단계가 하나뿐이면(순수 토너먼트 등) 제목이 목록 전체를 되풀이할 뿐이라 숨긴다. */}
+            {phases.length > 1 ? (
+              <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{phase.label}</div>
+            ) : null}
+            {phase.groups.map((group) => (
+              <ScheduleGroupBlock
+                key={group.key}
+                tournamentId={tournamentId}
+                group={group}
+                // 그룹 제목이 단계 제목과 같은 말이면(4강 안의 "4강") 한 번만 적는다.
+                showGroupHeading={group.label !== phase.label || phase.groups.length > 1}
+                myFixtureById={myFixtureById}
+              />
+            ))}
+          </section>
+        ))
+      )}
     </div>
   );
 }
@@ -601,16 +732,11 @@ export function ScheduleContent({
         {data.items.length === 0 ? (
           <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
         ) : (
-          <Card pad={0} className="tm-schedule-list">
-            {data.items.map((entry) => (
-              <ScheduleRow
-                key={entry.fixtureId}
-                tournamentId={tournamentId}
-                entry={entry}
-                myFixture={myFixtureById.get(entry.fixtureId)}
-              />
-            ))}
-          </Card>
+          <ScheduleSections
+            tournamentId={tournamentId}
+            entries={data.items}
+            myFixtureById={myFixtureById}
+          />
         )}
         {hasNextPage ? (
           <button

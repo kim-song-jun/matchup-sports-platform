@@ -528,6 +528,109 @@ END $$`,
       "no-op: the WHERE clause only selects result = 'DRAWN', which an already-corrected row no longer is. " +
       'The gate rejects UPDATE as a category because it cannot prove additivity. Reviewed 2026-08-19.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `ALTER TABLE "v1_team_matches" DROP CONSTRAINT IF EXISTS "v1_team_matches_series_fk"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the FK first because the column it " +
+      "constrains cannot be dropped while it exists. Removing a constraint only RELAXES the schema, so no " +
+      "running instance can be tripped by it. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP INDEX IF EXISTS "v1_team_matches_series_start_at_idx"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the index on (series_id, start_at). An " +
+      "index is pure read acceleration -- no query depends on it for correctness, and nothing reads " +
+      "series_id any more. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `ALTER TABLE "v1_team_matches" DROP COLUMN IF EXISTS "series_id"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops v1_team_matches.series_id. Its data is " +
+      "not lost: the expand migration copied it into league_id carrying the SAME ids, and every write since " +
+      "then set both columns to the same value (the dual write removed in this release), so league_id is a " +
+      "complete and identical replacement. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP TABLE IF EXISTS "v1_team_match_series_teams"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the join table. Dropped before its " +
+      "parent because it holds the FK pointing at it. Its rows were copied id-for-id into v1_league_teams " +
+      "by the expand migration. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP TABLE IF EXISTS "v1_team_match_series"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the legacy league table. Its rows were " +
+      "copied id-for-id into v1_leagues by the expand migration and kept in sync afterwards by " +
+      "mirrorLeagueToLegacy, so what is dropped here is a mirror, not an original. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP TYPE IF EXISTS "V1TeamMatchSeriesState"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the now-unreferenced enum type. Its " +
+      "only users were the two tables dropped just above, so this cannot affect anything still in the " +
+      "schema. Reviewed 2026-08-19.",
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

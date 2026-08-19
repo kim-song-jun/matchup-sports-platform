@@ -52,7 +52,6 @@ export class LeagueMatchAdminService {
           teams: { createMany: { data: uniqueTeamIds.map((teamId) => ({ teamId })) } },
         },
       });
-      await mirrorLeagueToLegacy(tx, created, uniqueTeamIds);
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -167,9 +166,6 @@ export class LeagueMatchAdminService {
             approvedApplicantTeamId: away.id,
             competitionConfigVersionId: config.id,
             leagueId: league.id,
-            // 이중 쓰기(확장 단계). 구버전 컨테이너와 롤백 대상 이미지는 seriesId 로
-            // 리그 소속을 판단한다 -- 같은 값을 넣어 두 컬럼이 절대 어긋나지 않게 한다.
-            seriesId: league.id,
           },
         });
         await this.games.createFromSourceInTransaction(
@@ -217,8 +213,6 @@ export class LeagueMatchAdminService {
       }
       if (ids.length > 0) {
         await tx.v1League.update({ where: { id: league.id }, data: { state: 'active' } });
-        // 이중 쓰기(확장 단계) -- 구버전 컨테이너는 아직 구 테이블의 state 를 읽는다.
-        await tx.v1TeamMatchSeries.updateMany({ where: { id: league.id }, data: { state: 'active' } });
       }
       await this.adminContext.logAdminAction(
         admin,
@@ -329,36 +323,4 @@ export class LeagueMatchAdminService {
     });
     return new Map(teams.map((team) => [team.id, team]));
   }
-}
-
-/**
- * 확장-수축 재명명의 **확장 단계에서만** 필요한 이중 쓰기.
- *
- * 새 코드는 v1_leagues 를 읽지만, 롤링 배포 창의 구버전 컨테이너와 롤백 대상 이미지는
- * 여전히 v1_team_match_series 를 읽는다(deploy-alpha.sh 가 migrate 를 컨테이너 교체보다
- * 먼저 돌리기 때문에 그 창이 실제로 존재한다). 그래서 새 리그를 만들 때 구 테이블에도
- * **같은 id 로** 미러 행을 남긴다 -- id 가 같아야 v1_team_matches 의 league_id 와 series_id 가
- * 항상 같은 리그를 가리킨다.
- *
- * **수축 릴리스에서 이 함수와 호출부를 통째로 삭제한다.** 그때는 구 테이블 자체가 사라진다.
- */
-async function mirrorLeagueToLegacy(
-  tx: Prisma.TransactionClient,
-  league: { id: string; title: string; sportId: string; regionId: string; createdByAdminUserId: string; startsOn: Date; endsOn: Date; tieBreakJson: Prisma.JsonValue; state: string },
-  teamIds: readonly string[],
-) {
-  await tx.v1TeamMatchSeries.create({
-    data: {
-      id: league.id,
-      title: league.title,
-      sportId: league.sportId,
-      regionId: league.regionId,
-      createdByAdminUserId: league.createdByAdminUserId,
-      startsOn: league.startsOn,
-      endsOn: league.endsOn,
-      tieBreakJson: league.tieBreakJson === null ? Prisma.JsonNull : league.tieBreakJson,
-      state: league.state as 'draft' | 'active' | 'completed',
-      teams: { createMany: { data: teamIds.map((teamId) => ({ teamId })) } },
-    },
-  });
 }

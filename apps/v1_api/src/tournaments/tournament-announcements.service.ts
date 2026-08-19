@@ -178,6 +178,7 @@ export class TournamentAnnouncementsService {
       ? announcement.publishedAt ?? new Date()
       : null;
     const audience = dto.audience ?? announcement.audience;
+    const category = dto.category ?? announcement.category;
     // 이미 공개된 공지가 재저장(publishedAt 유지)되는 경우가 아니라, draft → 공개로
     // 새로 전환되는 경우에만 알림을 보낸다(중복 발송 금지).
     const newlyPublished = announcement.publishedAt === null && publishedAt !== null;
@@ -188,6 +189,7 @@ export class TournamentAnnouncementsService {
         data: {
           title: dto.title,
           body: dto.body,
+          category,
           audience,
           publishedAt,
         },
@@ -201,12 +203,14 @@ export class TournamentAnnouncementsService {
           beforeJson: {
             tournamentId: announcement.tournamentId,
             title: announcement.title,
+            category: announcement.category,
             audience: announcement.audience,
             publishedAt: announcement.publishedAt?.toISOString() ?? null,
           },
           afterJson: {
             tournamentId: result.tournamentId,
             title: result.title,
+            category: result.category,
             audience: result.audience,
             publishedAt: result.publishedAt?.toISOString() ?? null,
           },

@@ -272,3 +272,15 @@ identity/side itself:
 - `nextMatch` on the match view is a simple "next fixture where either of
   these two teams next appears" lookup, not a bracket-aware "next round"
   projection.
+
+### Official goal timeline and minute display (2026-08-19)
+
+When an official result exists, schedules, match detail, and team records
+prefer currentOfficialRevision.goalEvents. Corrected scorer, own-goal type,
+order, and minute therefore replace the raw append-only goal projection only
+after officialization. A null snapshot from an older revision falls back to
+active GOAL and OWN_GOAL events.
+
+Public record time uses a ceiling minute without seconds. An event captured at
+2:04 is displayed as 3′. Own goals count toward the credited team score and
+are labelled separately, but never count as the culprit's personal goal.

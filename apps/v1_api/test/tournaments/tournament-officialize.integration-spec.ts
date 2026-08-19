@@ -176,9 +176,10 @@ async function endWithOneHomeGoal(gameId: string): Promise<{ homeSideId: string;
   return { homeSideId: home.id, scorerId: scorer.id };
 }
 
-function previewHash(revision: { score: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
+function previewHash(revision: { score: unknown; goalEvents: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
   return canonicalGameCommandPayloadHash({
     score: revision.score,
+    goalEvents: revision.goalEvents,
     eventsHash: revision.eventsHash,
     mvpParticipantId: revision.mvpParticipantId,
   });

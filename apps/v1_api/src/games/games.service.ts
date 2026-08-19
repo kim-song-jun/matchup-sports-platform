@@ -4415,10 +4415,18 @@ export class GamesService {
       const participant = await tx.v1GameParticipant.findFirst({
         where: { gameId: game.id, id: dto.participantId },
       });
-      if (participant === null || participant.sideId !== dto.sideId) {
+      const participantMustBeOpposingSide = dto.type === V1GameEventType.OWN_GOAL;
+      if (
+        participant === null ||
+        (participantMustBeOpposingSide
+          ? participant.sideId === dto.sideId
+          : participant.sideId !== dto.sideId)
+      ) {
         throw new UnprocessableEntityException({
           code: 'PARTICIPANT_SIDE_MISMATCH',
-          message: 'Event participant and side do not agree',
+          message: participantMustBeOpposingSide
+            ? 'Own-goal participant must belong to the opposing side'
+            : 'Event participant and side do not agree',
         });
       }
     }
@@ -4695,6 +4703,22 @@ export class GamesService {
         gameId: game.id,
         revision: 1,
         score: jsonInput(score),
+        goalEvents: jsonInput(
+          events
+            .filter(
+              (event) =>
+                (event.type === V1GameEventType.GOAL || event.type === V1GameEventType.OWN_GOAL) &&
+                !events.some((candidate) => candidate.reversesEventId === event.id),
+            )
+            .map((event) => ({
+              id: event.id,
+              sideId: event.sideId,
+              participantId: event.participantId,
+              minute: Math.max(0, Math.ceil(event.clockMs / 60000)),
+              period: event.period,
+              ownGoal: event.type === V1GameEventType.OWN_GOAL,
+            })),
+        ),
         eventsHash: canonicalGameCommandPayloadHash(events.map((event) => event.payloadHash)),
         missingScorer,
         createdByActorType: context.actor.actorType,
@@ -5131,6 +5155,8 @@ export class GamesService {
         gameId,
         revision: predecessor.revision + 1,
         score: jsonInput(predecessor.score),
+        goalEvents:
+          predecessor.goalEvents === null ? undefined : jsonInput(predecessor.goalEvents),
         eventsHash: predecessor.eventsHash,
         missingScorer: predecessor.missingScorer,
         mvpParticipantId: predecessor.mvpParticipantId,
@@ -5249,7 +5275,11 @@ export class GamesService {
     let home = 0;
     let away = 0;
     events.forEach((event) => {
-      if (event.type !== V1GameEventType.GOAL || event.sideId === null || reversed.has(event.id)) {
+      if (
+        (event.type !== V1GameEventType.GOAL && event.type !== V1GameEventType.OWN_GOAL) ||
+        event.sideId === null ||
+        reversed.has(event.id)
+      ) {
         return;
       }
       if (sideIds.get(event.sideId) === 'home') {

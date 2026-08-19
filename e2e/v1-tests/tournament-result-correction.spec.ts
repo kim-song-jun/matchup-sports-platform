@@ -143,6 +143,7 @@ test.describe('[E2E-CORR-01] platform_ops void + director 플래그 off->on->off
           clientCommandId: officializeId,
           projectionPreviewHash: projectionPreviewHash({
             score: { home: 0, away: 0 },
+            goalEvents: [],
             eventsHash: submitted.eventsHash,
             mvpParticipantId: null,
           }),

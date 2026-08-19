@@ -114,7 +114,7 @@ function toScheduleEventItems(entry: PublicScheduleEntry): ScheduleEventItem[] {
   const goals = entry.scorers.map((scorer, index) => ({
     key: `goal-${index}`,
     side: scorer.side,
-    ...eventPresentation({ type: 'GOAL', cardColor: null }),
+    ...eventPresentation({ type: scorer.ownGoal ? 'OWN_GOAL' : 'GOAL', cardColor: null }),
     participantName: scorer.participantName,
     period: scorer.period,
     clockMs: scorer.clockMs,

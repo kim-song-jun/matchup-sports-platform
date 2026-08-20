@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   useTournamentOpsRole: vi.fn(),
   assignFixtureField: vi.fn(),
   clearFixtureField: vi.fn(),
+  pathname: { value: '/tournament-ops/tournaments/t-1/operations' },
 }));
 
 // 런타임에는 `_gate.tsx` 가 이 화면을 항상 TournamentOpsRoleProvider 로 감싼다(셸 분기).
@@ -20,7 +21,7 @@ vi.mock('@/components/tournament-ops/role-context', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/tournament-ops/tournaments/t-1/operations',
+  usePathname: () => mocks.pathname.value,
   useRouter: () => ({ replace: mocks.routerReplace }),
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -110,6 +111,7 @@ describe('OperationsBoardClient', () => {
     mocks.assignFixtureField.mockReset();
     mocks.clearFixtureField.mockReset();
     mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
+    mocks.pathname.value = '/tournament-ops/tournaments/t-1/operations';
     mocks.useV1TournamentOperationsBoard.mockReturnValue({
       data: PAGE,
       isPending: false,
@@ -336,5 +338,27 @@ describe('OperationsBoardClient', () => {
     expect(screen.getAllByText(/4강/).length).toBeGreaterThan(0);
     // 더 이상 다음 페이지가 없으므로 "더 보기" 버튼은 사라진다.
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+
+  // 본문 링크도 셸 nav 와 같이 **지금 표면**을 따라가야 한다. nav 만 표면 인식으로 바꾸고
+  // 본문을 하드코딩으로 남겨 두면, 어드민에서 '운영 콘솔'을 누르는 순간 스태프 경로로
+  // 튕겨 나가 콘솔 셸이 다시 뜬다(alpha 실측에서 실제로 그랬다).
+  it('경기 콘솔 링크가 스태프 표면에서는 /tournament-ops 를 가리킨다', () => {
+    render(<OperationsBoardClient tournamentId="t-1" />);
+    const links = screen.getAllByRole('link', { name: /운영 콘솔/ });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.getAttribute('href')).toMatch(/^\/tournament-ops\/tournaments\/t-1\/fixtures\//);
+    }
+  });
+
+  it('경기 콘솔 링크가 어드민 표면에서는 /admin/live 를 가리킨다', () => {
+    mocks.pathname.value = '/admin/live/t-1/operations';
+    render(<OperationsBoardClient tournamentId="t-1" />);
+    const links = screen.getAllByRole('link', { name: /운영 콘솔/ });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.getAttribute('href')).toMatch(/^\/admin\/live\/t-1\/fixtures\//);
+    }
   });
 });

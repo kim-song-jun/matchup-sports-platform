@@ -16,6 +16,13 @@ export interface V1LeagueFixture {
   startAt: string;
   placeName: string;
   status: string;
+  /**
+   * 경기 결과 점수 — 백엔드 채움 작업이 병행 진행 중이라(Task 152) 당분간 항상
+   * undefined일 수 있다. 소비 측(league-match-standings-client.tsx)은 값이 없으면
+   * 스코어 대신 상태 기반 문구("예정"/"결과 대기")로 대체해 화면이 깨지지 않게 한다.
+   */
+  homeScore?: number;
+  awayScore?: number;
 }
 
 export interface V1AdminLeagueDetail {

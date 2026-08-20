@@ -173,7 +173,6 @@ describe('순위표 컬럼 통일 — 두 소비처(bracket 탭 vs schedule 탭)
       sponsors: [],
       reviews: [],
       awards: [],
-      popup: null,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     };

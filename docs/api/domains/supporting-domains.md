@@ -22,7 +22,7 @@
 | `inquiries` | `/api/v1/inquiries`, `/api/v1/inquiries/:id`, `/api/v1/admin/inquiries`, `/api/v1/admin/inquiries/:id`, `/api/v1/admin/inquiries/:id/replies`, `/api/v1/admin/inquiries/:id/status` |
 | `badges` | `/api/v1/badges`, `/api/v1/badges/team/:teamId` |
 | `users/blocks` | `/api/v1/users/blocks`, `/api/v1/users/blocks/:blockedId` |
-| `tournaments` | `/api/v1/tournaments`, `/api/v1/tournaments/:id`, `/api/v1/tournaments/campaigns/:slug`, `/api/v1/tournaments/:tournamentId/registrations`, `/api/v1/admin/tournaments/:tournamentId/campaign`, `/api/v1/admin/tournaments/:tournamentId/sponsors`, `/api/v1/admin/tournaments/:tournamentId/popups`, `/api/v1/admin/tournaments/:tournamentId/publish-bracket`, `/api/v1/admin/tournaments/:tournamentId/bracket`, `/api/v1/admin/fixtures/:fixtureId/result` |
+| `tournaments` | `/api/v1/tournaments`, `/api/v1/tournaments/:id`, `/api/v1/tournaments/campaigns/:slug`, `/api/v1/tournaments/:tournamentId/registrations`, `/api/v1/admin/tournaments/:tournamentId/campaign`, `/api/v1/admin/tournaments/:tournamentId/sponsors`, `/api/v1/admin/tournaments/:tournamentId/publish-bracket`, `/api/v1/admin/tournaments/:tournamentId/bracket`, `/api/v1/admin/fixtures/:fixtureId/result` |
 | `health` | `/api/v1/health` |
 | `venue reviews` | `/api/v1/venues/:id/reviews` |
 
@@ -197,10 +197,6 @@
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/sponsors` | Required + Admin | 대회 협찬/이벤트 생성 |
 | `PATCH` | `/api/v1/admin/tournaments/:tournamentId/sponsors/:sponsorId` | Required + Admin | 대회 협찬/이벤트 수정 |
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/sponsors/:sponsorId/deactivate` | Required + Admin | 대회 협찬/이벤트 비공개 전환 |
-| `GET` | `/api/v1/admin/tournaments/:tournamentId/popups` | Required + Active Admin | 대회 팝업 전체 목록 |
-| `POST` | `/api/v1/admin/tournaments/:tournamentId/popups` | Required + Owner/Ops | 대회 팝업 생성 |
-| `PATCH` | `/api/v1/admin/tournaments/:tournamentId/popups/:popupId` | Required + Owner/Ops | 대회 팝업 전체 필드 수정 |
-| `DELETE` | `/api/v1/admin/tournaments/:tournamentId/popups/:popupId` | Required + Owner/Ops | 대회 팝업 삭제 |
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/publish-bracket` | Required + Owner/Ops | 공개 상세에 대진표 일괄 공개 |
 | `GET` | `/api/v1/admin/tournaments/:tournamentId/bracket` | Required + Active Admin | 조/경기/순위 운영 데이터 조회 |
 | `POST` | `/api/v1/admin/fixtures/:fixtureId/result` | Required + Owner/Ops | 경기 결과와 득점자/영상 기록 |
@@ -246,18 +242,13 @@
   - `isActive=false` 또는 deactivate endpoint는 public detail의 `sponsors` 노출에서 제외한다.
 - Admin sponsor mutation은 `getMutationAdmin` 권한 게이트를 사용하고, `tournament_sponsor.create|update|deactivate` admin action log를 남긴다.
 
-### 대회 팝업 계약
+### 대회 팝업 계약 (제거됨)
 
-- `CreateTournamentPopupDto`와 `UpdateTournamentPopupDto`는 같은 전체 입력 계약을 사용한다. `PATCH`도 partial patch가 아니므로 아래 필드를 모두 보내야 한다.
-  - `title`: trim 후 비어 있지 않은 문자열, max 120
-  - `body`: trim 후 비어 있지 않은 문자열, max 5000
-  - `imageUrl?`: protocol이 있는 URL, max 1000. 빈 문자열 또는 미전송은 `null`로 저장한다.
-  - `status`: `draft | published | archived`
-  - `displayStartAt?`, `displayEndAt?`: ISO date string 또는 `null`
-- 시작/종료가 모두 있으면 종료 시각이 시작 시각보다 늦어야 한다. 그렇지 않으면 `400 INVALID_DISPLAY_WINDOW`다.
-- admin 목록 응답은 `{ items }`이며 최신 생성순이다. 생성/수정 item 필드는 `id`, `tournamentId`, `title`, `body`, `imageUrl`, `status`, `displayStartAt`, `displayEndAt`, `createdAt`, `updatedAt`이다. 삭제 응답은 `{ popupId, deleted: true }`다.
-- 다른 대회에 속하거나 존재하지 않는 popup ID는 `404 TOURNAMENT_POPUP_NOT_FOUND`, 존재하지 않는 대회는 `404 TOURNAMENT_NOT_FOUND`다. 생성/수정/삭제는 삭제되지 않은 대회만 허용하고 admin action log를 같은 transaction에서 남긴다.
-- 공개 `GET /api/v1/tournaments/:id` 응답에는 `popup`이 추가된다. 현재 시각에 `status=published`, `displayStartAt <= now`(또는 null), `displayEndAt > now`(또는 null)를 모두 만족하는 최신 생성 popup 1건만 `{ popupId, title, body, imageUrl }`로 반환하며, 없으면 `null`이다. admin용 상태·기간·timestamp는 공개 popup 응답에 포함하지 않는다.
+- 대회 전용 팝업(`V1TournamentPopup`, `/api/v1/admin/tournaments/:tournamentId/popups`)은 제거됐다.
+  대회 팝업은 전역 팝업(`/api/v1/admin/popups`)의 `targetPaths: ["/tournaments/<id>"]` 로 만든다 —
+  `PopupsService.findActive` 가 정확 경로를 화면 그룹보다 우선해서 고른다(Task 131).
+- 공개 `GET /api/v1/tournaments/:id` 응답에서 `popup` 필드가 사라졌다. 대회 상세의 팝업은
+  전역 팝업 경로(`GET /api/v1/popups/active?screen=tournaments&path=/tournaments/<id>`)로 조회된다.
 
 ### 대진표 공개와 경기 결과 계약
 
@@ -364,7 +355,6 @@ The admin management API and `/admin/terms` UI are implemented. `subtitle` and `
 - `apps/v1_api/src/tournaments/tournaments-read.controller.ts`, `tournaments-read.service.ts`, `dto/tournament-read.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-campaigns.controller.ts`, `tournament-campaign-read.service.ts`, `tournament-campaign-admin.service.ts`, `dto/tournament-campaign.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-sponsors.controller.ts`, `tournament-sponsors.service.ts`, `dto/tournament-sponsor.dto.ts`
-- `apps/v1_api/src/tournaments/tournament-popup.controller.ts`, `tournament-popup.service.ts`, `dto/tournament-popup.dto.ts`
 - `apps/v1_api/src/tournaments/tournaments-admin.controller.ts`, `tournaments-admin.service.ts`
 - `apps/v1_api/src/tournaments/tournament-bracket.controller.ts`, `tournament-bracket.service.ts`, `dto/admin-bracket.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-detail.presenter.ts`, `tournaments-read.query.ts`

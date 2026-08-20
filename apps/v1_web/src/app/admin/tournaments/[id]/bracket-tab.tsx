@@ -612,18 +612,19 @@ export function BracketTab({
               // 항상 막혀 있다(tournament-bracket.service.ts). 이 행은 그 콘솔로 안내한다:
               // 이미 결과가 있으면(레거시 읽기 전용 표시, '결과' 컬럼 참고) 정정 화면으로,
               // 아직 없으면 검토 화면으로 — T6-1(2026-08-07)부터 두 화면 다 `?fixtureId=`
-              // 딥링크를 받아 그 경기를 바로 선택된 상태로 연다. `from=admin`은 T6-2 복귀
-              // 경로 판별용 — ops 셸이 이 파라미터를 세션에 기록해 "서비스로 돌아가기"를
-              // "대회 관리로 돌아가기"로 바꾼다.
-              const opsQuery = `fixtureId=${encodeURIComponent(f.id)}&from=admin`;
+              // 딥링크를 받아 그 경기를 바로 선택된 상태로 연다.
+              // `from=admin`은 더 이상 붙이지 않는다: 어드민 표면(`/admin/live/…`)은 경로만
+              // 보고 복귀 지점을 알 수 있고, 그 파라미터는 세션에 출처를 박제해 같은 대회를
+              // 스태프 표면에서 여는 사람에게까지 '대회 관리로 돌아가기'를 남긴다.
+              const opsQuery = `fixtureId=${encodeURIComponent(f.id)}`;
               const resultConsoleHref = f.result
-                ? `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/records/corrections?${opsQuery}`
-                : `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/result-review?${opsQuery}`;
+                ? `/admin/live/${encodeURIComponent(tournamentId)}/records/corrections?${opsQuery}`
+                : `/admin/live/${encodeURIComponent(tournamentId)}/result-review?${opsQuery}`;
               const resultConsoleLabel = f.result ? '결과 정정하러 가기' : '결과 검토하러 가기';
               // T6-4: 아직 뛰고 있거나 곧 시작할 경기는 결과 검토보다 라이브 운영 콘솔이
               // 우선이다 — 같은 자리에 "운영 콘솔 열기"를 추가로 노출한다.
               const canOperate = f.status === 'scheduled' || f.status === 'in_progress';
-              const operateHref = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(f.id)}/operate?from=admin`;
+              const operateHref = `/admin/live/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(f.id)}/operate`;
               return (
                 <span className="inline-flex items-center gap-1.5">
                   <button

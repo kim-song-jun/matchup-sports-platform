@@ -4,7 +4,7 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-export default async function TournamentOperationsBoardPage({ params }: Props) {
+export default async function AdminTournamentOperationsBoardPage({ params }: Props) {
   const { id } = await params;
   return <OperationsBoardClient tournamentId={id} />;
 }

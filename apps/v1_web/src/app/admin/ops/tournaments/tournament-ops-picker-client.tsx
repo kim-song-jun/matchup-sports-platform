@@ -78,7 +78,7 @@ export function TournamentOpsPickerClient() {
           ]}
           renderActions={(row) => (
             <Link
-              href={`/tournament-ops/tournaments/${encodeURIComponent(row.id)}/operations?from=admin`}
+              href={`/admin/live/${encodeURIComponent(row.id)}/operations`}
               aria-label={`${row.title} 운영 콘솔 열기`}
               // 전수검수: hover:bg-blue-100(raw, dark: 짝 없음)이 다크에서 밝은
               // blue700 텍스트와 겹쳐 대비 1.99:1까지 붕괴 — 다크 대응된 --blue100

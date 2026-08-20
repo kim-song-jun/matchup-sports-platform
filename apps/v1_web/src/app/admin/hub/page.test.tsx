@@ -43,7 +43,7 @@ describe('AdminHubPage — 할 일 인박스', () => {
     );
     expect(screen.getByRole('link', { name: /검토하기/ })).toHaveAttribute(
       'href',
-      '/tournament-ops/tournaments/tour-1/result-review',
+      '/admin/live/tour-1/result-review',
     );
     // 처리할 일이 남아 있으면 초록 안내는 없다
     expect(screen.queryByText('지금은 처리할 일이 없어요.')).not.toBeInTheDocument();

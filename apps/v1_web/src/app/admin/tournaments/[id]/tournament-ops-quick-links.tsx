@@ -32,8 +32,8 @@ export function TournamentOpsQuickLinks({ tournamentId }: { tournamentId: string
   }
 
   const links = [
-    { href: `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/staff?from=admin`, label: '스태프 배정 콘솔' },
-    { href: `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations?from=admin`, label: '운영 보드' },
+    { href: `/admin/live/${encodeURIComponent(tournamentId)}/staff`, label: '스태프 배정 콘솔' },
+    { href: `/admin/live/${encodeURIComponent(tournamentId)}/operations`, label: '운영 보드' },
   ];
 
   return (

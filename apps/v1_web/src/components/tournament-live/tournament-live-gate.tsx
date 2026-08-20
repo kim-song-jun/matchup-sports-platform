@@ -17,6 +17,7 @@ import type { V1TournamentStaffRole } from '@/types/api';
 import { TournamentOpsShell } from '@/components/tournament-ops/tournament-ops-shell';
 import { FieldOperatorConsoleFrame } from '@/components/tournament-ops/field-operator-console-frame';
 import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-context';
+import { fixtureIdFromConsolePath, isAdminLiveConsolePath } from '@/lib/tournament-live-routes';
 
 // ── 역할 도출 ────────────────────────────────────────────────────────────
 /**
@@ -55,25 +56,6 @@ function deriveRole(
  * 거부된다) **셸을 건너뛰고 자기 경기 화면만** 열어 준다. 아래 분기는 셸 진입 판정을
  * 바꾸지 않고, 종전에 무조건 "권한 없음"으로 끝나던 경로 하나만 연다.
  */
-const FIXTURE_CONSOLE_PATH = /^\/tournament-ops\/tournaments\/([^/]+)\/fixtures\/([^/]+)/;
-
-function decodeSegment(segment: string): string {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    // 잘못 인코딩된 경로는 원문 그대로 비교한다 — 여기서 던지면 화면 전체가 죽는다.
-    return segment;
-  }
-}
-
-function fixtureIdFromConsolePath(pathname: string | null, tournamentId: string): string | null {
-  if (pathname === null) return null;
-  const match = FIXTURE_CONSOLE_PATH.exec(pathname);
-  if (match === null) return null;
-  // 경로 세그먼트는 인코딩돼 있을 수 있고 params의 tournamentId는 디코딩된 값이다.
-  return decodeSegment(match[1]) === tournamentId ? decodeSegment(match[2]) : null;
-}
-
 // ── 화면 ──────────────────────────────────────────────────────────────────
 function GateLoadingScreen() {
   return (
@@ -140,12 +122,12 @@ function GateErrorScreen({ onRetry }: { onRetry: () => void }) {
 }
 
 // ── Gate ──────────────────────────────────────────────────────────────────
-interface TournamentOpsGateProps {
+interface TournamentLiveGateProps {
   children: ReactNode;
   tournamentId: string;
 }
 
-export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateProps) {
+export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGateProps) {
   const authMe = useV1AuthMe();
   const staff = useV1TournamentStaffAssignments(tournamentId);
   // 공개 대회 상세(제목 표시용)는 셸 진입 가능 여부와 무관하다 — 실패해도 게이트를 막지 않고
@@ -163,11 +145,17 @@ export function TournamentOpsGate({ children, tournamentId }: TournamentOpsGateP
   // T6-2: `?from=admin`은 admin 화면이 명시적으로 실어 보내는 진입 의도다
   // (referrer는 신뢰하지 않는다 — 계획 문서 "설계 노트" 참고). 첫 진입 시
   // sessionStorage에 대회 단위로 박제해 셸 안 다른 nav로 이동한 뒤에도 유지한다.
-  const cameFromAdmin = searchParams.get('from') === 'admin';
+  // 어드민 표면(`/admin/live/:id`)에서는 출처가 자명하다 — 쿼리 없이도 '대회 관리로
+  // 돌아가기'가 맞다. 스태프 표면에서만 `?from=admin` 이 의미를 갖는다.
+  const onAdminSurface = isAdminLiveConsolePath(pathname);
+  const queryFromAdmin = searchParams.get('from') === 'admin';
   useEffect(() => {
-    if (cameFromAdmin) saveTournamentOpsOrigin(tournamentId, 'admin');
-  }, [cameFromAdmin, tournamentId]);
-  const origin = cameFromAdmin ? 'admin' : getTournamentOpsOrigin(tournamentId);
+    // 박제는 **쿼리로 온 경우만** 한다. 어드민 표면은 경로만 보면 알 수 있는데도 박제하면,
+    // 같은 대회를 스태프 표면에서 여는 사람에게 '대회 관리로 돌아가기'가 남아 그가 갈 수
+    // 없는 화면으로 안내하게 된다(sessionStorage 는 대회 단위로만 구분한다).
+    if (queryFromAdmin) saveTournamentOpsOrigin(tournamentId, 'admin');
+  }, [queryFromAdmin, tournamentId]);
+  const origin = onAdminSurface || queryFromAdmin ? 'admin' : getTournamentOpsOrigin(tournamentId);
 
   if (authMe.isPending || staff.isPending) {
     return <GateLoadingScreen />;

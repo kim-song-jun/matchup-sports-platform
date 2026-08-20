@@ -143,7 +143,7 @@ export default function AdminHubPage() {
           <TournamentBreakdownCard
             title="대회별 결과 검토 대기"
             rows={data.resultReviewPending.tournaments}
-            hrefFor={(id) => `/tournament-ops/tournaments/${id}/result-review`}
+            hrefFor={(id) => `/admin/live/${id}/result-review`}
             linkLabel="검토하기"
           />
         </div>

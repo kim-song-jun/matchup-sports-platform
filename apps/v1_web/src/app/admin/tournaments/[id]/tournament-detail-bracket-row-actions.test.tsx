@@ -89,12 +89,12 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
     const reviewLinks = screen.getAllByRole('link', { name: /결과 검토하러 가기/ });
     expect(reviewLinks.length).toBeGreaterThan(0);
     for (const link of reviewLinks) {
-      expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/tournament-1/result-review?fixtureId=fx-9&from=admin');
+      expect(link).toHaveAttribute('href', '/admin/live/tournament-1/result-review?fixtureId=fx-9');
     }
     const operateLinks = screen.getAllByRole('link', { name: /운영 콘솔 열기/ });
     expect(operateLinks.length).toBeGreaterThan(0);
     for (const link of operateLinks) {
-      expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/tournament-1/fixtures/fx-9/operate?from=admin');
+      expect(link).toHaveAttribute('href', '/admin/live/tournament-1/fixtures/fx-9/operate');
     }
   });
 
@@ -115,7 +115,7 @@ describe('BracketTab 행 액션 (T6-1/T6-4)', () => {
     const correctionLinks = screen.getAllByRole('link', { name: /결과 정정하러 가기/ });
     expect(correctionLinks.length).toBeGreaterThan(0);
     for (const link of correctionLinks) {
-      expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/tournament-1/records/corrections?fixtureId=fx-9&from=admin');
+      expect(link).toHaveAttribute('href', '/admin/live/tournament-1/records/corrections?fixtureId=fx-9');
     }
     expect(screen.queryByRole('link', { name: /운영 콘솔 열기/ })).not.toBeInTheDocument();
   });

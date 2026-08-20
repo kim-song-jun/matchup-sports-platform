@@ -772,7 +772,7 @@ export class GamesService {
         if (side === undefined) {
           throw new GameContractError('PARTICIPANT_INVALID', 'Participant side is missing');
         }
-        await tx.v1GameParticipant.create({
+        const createdParticipant = await tx.v1GameParticipant.create({
           data: {
             gameId: game.id,
             sideId: side.id,
@@ -783,6 +783,15 @@ export class GamesService {
             position: participant.position,
           },
         });
+        if (participant.userId !== undefined) {
+          await this.createRosterAssertedIdentityLink(
+            tx,
+            createdParticipant.id,
+            participant.userId,
+            context.actor,
+            'source_roster',
+          );
+        }
       }
 
       const periodCount = this.periodCount(config.periods);
@@ -2311,30 +2320,13 @@ export class GamesService {
           // 로스터 귀속을 신원 연결(identity link)로 자동 승격한다 -- 방금 만든
           // participant라 정상적으로는 기존 링크가 있을 수 없지만, 방어적으로 한
           // 번 더 확인한다(재시도 등으로 이 루프가 두 번 돌 가능성에 대비).
-          const existingLink = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
-            where: { participantId: createdParticipant.id },
-          });
-          if (existingLink !== null) continue;
-          const linkId = randomUUID();
-          const identityEvent = await this.appendIdentityEvent(tx, {
-            participantId: createdParticipant.id,
-            linkId,
-            requestId: linkId,
-            action: V1IdentityLinkAction.ROSTER_ASSERTED,
-            userId: participant.userId,
-            actorType: V1IdentityActorType.USER,
-            actorUserId: user.id,
-            reason: 'roster',
-          });
-          await tx.v1ParticipantIdentityLinkCurrent.create({
-            data: {
-              participantId: createdParticipant.id,
-              linkId,
-              userId: participant.userId,
-              version: 1,
-              effectiveFrom: identityEvent.effectiveAt,
-            },
-          });
+          await this.createRosterAssertedIdentityLink(
+            tx,
+            createdParticipant.id,
+            participant.userId,
+            { actorType: 'USER', actorUserId: user.id },
+            'roster',
+          );
         }
         const updated = await tx.v1Game.update({
           where: { id: gameId },
@@ -3758,9 +3750,15 @@ export class GamesService {
           actorUserId: string;
         }
       | {
-          action: typeof V1IdentityLinkAction.EXPIRED;
+          action:
+            | typeof V1IdentityLinkAction.EXPIRED
+            | typeof V1IdentityLinkAction.ROSTER_ASSERTED;
           actorType: typeof V1IdentityActorType.SYSTEM;
-          systemActor: 'IDENTITY_LINK_EXPIRY';
+          systemActor:
+            | 'IDENTITY_LINK_EXPIRY'
+            | 'GAME_END_DERIVER'
+            | 'GAME_BACKFILL'
+            | 'PROJECTION_REPAIR';
         }
     ),
   ) {
@@ -3787,6 +3785,64 @@ export class GamesService {
     } catch (error) {
       throw this.mapIdentityEventError(error);
     }
+  }
+
+  /**
+   * Roster-backed participants become readable personal records in the same
+   * transaction that creates them. `V1GameParticipant.userId` alone is not a
+   * public identity assertion; the records reader intentionally follows the
+   * append-only identity event plus current-link pair.
+   */
+  private async createRosterAssertedIdentityLink(
+    tx: Transaction,
+    participantId: string,
+    userId: string,
+    actor:
+      | { actorType: 'USER'; actorUserId: string }
+      | {
+          actorType: 'SYSTEM';
+          systemActor: 'GAME_END_DERIVER' | 'GAME_BACKFILL' | 'PROJECTION_REPAIR';
+        },
+    reason: string,
+  ): Promise<void> {
+    const existingLink = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+      where: { participantId },
+    });
+    if (existingLink !== null) return;
+
+    const linkId = randomUUID();
+    const identityEvent =
+      actor.actorType === 'USER'
+        ? await this.appendIdentityEvent(tx, {
+            participantId,
+            linkId,
+            requestId: linkId,
+            action: V1IdentityLinkAction.ROSTER_ASSERTED,
+            userId,
+            actorType: V1IdentityActorType.USER,
+            actorUserId: actor.actorUserId,
+            reason,
+          })
+        : await this.appendIdentityEvent(tx, {
+            participantId,
+            linkId,
+            requestId: linkId,
+            action: V1IdentityLinkAction.ROSTER_ASSERTED,
+            userId,
+            actorType: V1IdentityActorType.SYSTEM,
+            systemActor: actor.systemActor,
+            reason,
+          });
+
+    await tx.v1ParticipantIdentityLinkCurrent.create({
+      data: {
+        participantId,
+        linkId,
+        userId,
+        version: 1,
+        effectiveFrom: identityEvent.effectiveAt,
+      },
+    });
   }
 
   private mapIdentityEventError(error: unknown) {

@@ -183,7 +183,15 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
         { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Roster link host' },
         { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: 'Roster link away' },
       ],
-      participants: [],
+      participants: [
+        {
+          sourceParticipantId: 'source-roster-member',
+          userId: ids.memberUser,
+          sideKey: V1GameSideKey.HOME,
+          displayNameSnapshot: 'Source roster member',
+          jerseyNumber: 6,
+        },
+      ],
     };
     const created = await prisma.$transaction((tx) =>
       games.createFromSourceInTransaction(tx, input, creationContext('roster-link-source', input)),
@@ -196,6 +204,31 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
 
   afterAll(async () => {
     await prisma.$disconnect();
+  });
+
+  it('source creation links a roster user in the same transaction', async () => {
+    const participant = await prisma.v1GameParticipant.findFirstOrThrow({
+      where: { gameId, displayNameSnapshot: 'Source roster member' },
+    });
+    expect(participant.userId).toBe(ids.memberUser);
+
+    const event = await prisma.v1ParticipantIdentityLinkEvent.findFirstOrThrow({
+      where: { participantId: participant.id },
+    });
+    expect(event).toEqual(
+      expect.objectContaining({
+        action: 'ROSTER_ASSERTED',
+        userId: ids.memberUser,
+        actorType: 'USER',
+        actorUserId: ids.platformOps,
+        reason: 'source_roster',
+      }),
+    );
+    expect(
+      await prisma.v1ParticipantIdentityLinkCurrent.findUnique({
+        where: { participantId: participant.id },
+      }),
+    ).toEqual(expect.objectContaining({ userId: ids.memberUser, linkId: event.linkId }));
   });
 
   it('happy path: a team member userId in the roster creates ROSTER_ASSERTED event + current link', async () => {

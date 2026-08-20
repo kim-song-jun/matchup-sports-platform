@@ -201,6 +201,14 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     dateLabel: formatTournamentDateShort(match.startsAt) ?? '',
     venue: match.place?.name ?? match.placeName ?? '',
   }));
+  /* R4: "내 리그" — 전용 리그 API 없이 이 팀의 팀매치 목록(host + 신청 모두, status
+   * 필터 없음)에서 league 필드만 distinct 로 추린다. openMatchesQuery는 recruiting +
+   * limit 5로 좁혀져 있어 이미 마감/완료된 리그전을 놓치므로 별도 쿼리로 둔다. */
+  const myLeaguesQuery = useV1TeamMatches(
+    { teamId, limit: 50 },
+    { enabled: Boolean(query.data) },
+  );
+  const myLeagues = dedupeLeagues(myLeaguesQuery.data?.items ?? []);
   const fallback = getTeamDetailViewModel();
 
   useEffect(() => {
@@ -275,6 +283,8 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
         onShare: () => shareTeam(query.data),
         openMatches,
         openMatchesLoading: openMatchesQuery.isLoading,
+        myLeagues,
+        myLeaguesLoading: myLeaguesQuery.isLoading,
       }
     : fallback;
 
@@ -709,6 +719,23 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
   const maxName = team.profile.maxLevel?.name?.trim();
   if (minName && maxName) return minName === maxName ? minName : `${minName}-${maxName}`;
   return minName ?? maxName ?? '';
+}
+
+/**
+ * R4 "내 리그" — GET /team-matches?teamId= 응답의 각 항목이 이미 들고 있는
+ * league 필드(leagueId/title)만으로 distinct 목록을 만든다. 전용 리그 API가
+ * 없으므로 여기서 클라이언트 사이드로 추린다 — 같은 리그의 여러 팀매치가
+ * 섞여 있어도 리그당 한 번만 노출한다. 첫 등장 순서를 유지한다(최신 매치일수록
+ * 목록 앞쪽에 오도록 이미 정렬된 응답을 그대로 존중).
+ */
+function dedupeLeagues(items: Array<{ league?: { leagueId: string; title: string } | null }>) {
+  const seen = new Map<string, { leagueId: string; title: string }>();
+  for (const item of items) {
+    if (item.league && !seen.has(item.league.leagueId)) {
+      seen.set(item.league.leagueId, item.league);
+    }
+  }
+  return Array.from(seen.values());
 }
 
 function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {

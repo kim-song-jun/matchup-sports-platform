@@ -361,3 +361,99 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     expect(screen.getAllByText('멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.').length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * "내 리그" (R4, 2026-08-20) — GET /team-matches?teamId= 응답이 이미 내려주는 league
+ * 필드만으로 클라이언트에서 distinct 리그를 추린다(전용 리그 API 없음). 리그 상세로
+ * 가는 인앱 진입점이 team-matches 상세 화면 배지 하나뿐이었어서(team-matches-page.tsx
+ * 참고) 팀장·선수가 자기 팀의 리그를 발견할 방법이 사실상 없었다.
+ */
+describe('TeamDetailPageClient — 내 리그', () => {
+  function baseTeamDetail(overrides: Record<string, unknown> = {}) {
+    return {
+      teamId: 'team-1',
+      name: '성수 풋살 크루',
+      status: 'active',
+      visibility: 'public',
+      sport: { sportId: 'sport-futsal', name: '풋살' },
+      region: { regionId: 'region-seoul', name: '서울', parentName: null },
+      joinPolicy: 'approval_required',
+      membersVisibilityEnabled: true,
+      canViewMembers: true,
+      profile: {
+        logoUrl: null,
+        coverImageUrl: null,
+        introduction: '',
+        activityAreaText: null,
+        activityDays: [],
+        activityFrequency: null,
+        activityTimeSlots: [],
+        activityTypes: [],
+        activityMemo: null,
+        activitySummary: null,
+        skillLevelText: null,
+        genderRule: '성별 무관',
+        joinPolicy: 'approval_required',
+        memberGoalCount: 20,
+      },
+      owner: { userId: 'user-owner', displayName: '김도윤', profileImageUrl: null },
+      membersPreview: [],
+      memberCount: 0,
+      managerCount: 1,
+      trust: { trustState: 'none', score: null },
+      viewer: {
+        role: 'none',
+        membershipId: null,
+        joinState: 'none',
+        canRequestJoin: true,
+        disabledReason: null,
+        manageRoute: null,
+      },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'none', message: '가입 불가' } });
+    teamApiMocks.useV1CreateTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    teamApiMocks.useV1ResolveChatRoom.mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+  });
+
+  it('같은 리그에 속한 팀매치가 여러 개여도 "내 리그"에는 리그당 한 번만 보여준다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+    // openMatchesQuery(status:'recruiting')와 myLeaguesQuery(status 없음)를 같은 훅으로
+    // 구분해 호출하므로, filters로 어느 쪽인지 갈라 서로 다른 fixture를 돌려준다.
+    teamApiMocks.useV1TeamMatches.mockImplementation((filters: { status?: string } = {}) => {
+      if (filters.status === 'recruiting') return { data: { items: [] }, isLoading: false };
+      return {
+        data: {
+          items: [
+            { id: 'tm-1', teamMatchId: 'tm-1', title: '가을 리그 1R', startsAt: '2026-09-01T10:00:00Z', league: { leagueId: 'lg-1', title: '가을 리그' } },
+            { id: 'tm-2', teamMatchId: 'tm-2', title: '가을 리그 2R', startsAt: '2026-09-08T10:00:00Z', league: { leagueId: 'lg-1', title: '가을 리그' } },
+            { id: 'tm-3', teamMatchId: 'tm-3', title: '일반 팀매치', startsAt: '2026-09-10T10:00:00Z', league: null },
+          ],
+        },
+        isLoading: false,
+      };
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    // dedupe가 깨지면 매치 2건이 각각 링크를 만들어 레이아웃당 2개(총 4개)가 된다 —
+    // 정확히 2개(데스크톱·모바일 레이아웃당 1개씩)여야 dedupe가 실제로 동작한 것이다.
+    const leagueLinks = screen.getAllByRole('link', { name: /가을 리그/ });
+    expect(leagueLinks).toHaveLength(2);
+    leagueLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-1'));
+  });
+
+  it('리그 소속 팀매치가 하나도 없으면 "내 리그" 섹션 자체가 없다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+    teamApiMocks.useV1TeamMatches.mockReturnValue({ data: { items: [] }, isLoading: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
+  });
+});

@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -112,7 +113,9 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode']) {
 }
 
 export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewModel }) {
+  const router = useRouter();
   const { match, mode } = model;
+  const league = match.league;
   const locked = mode === 'pending' || mode === 'approved';
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
   const canRunAction = Boolean(model.onApply);
@@ -180,15 +183,27 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
             <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
           ) : null}
           {/* 리그 상세 페이지는 앱 안에 진입점이 전혀 없었다(직접 URL 만) -- 이 링크가
-              사실상 첫 통로다. 배지 자체를 링크로 만들어 리그명을 함께 보여준다. */}
-          {match.league ? (
-            <Link
-              href={`/league-matches/${match.league.leagueId}`}
-              className="tm-badge tm-badge-grey"
-              style={{ textDecoration: 'none' }}
+              사실상 첫 통로다. 배지 자체를 링크로 만들어 리그명을 함께 보여준다.
+              hostTeamCard 전체가 이미 팀 상세로 가는 Link라 배지를 또 <a>로 두면 <a>가
+              중첩돼 브라우저가 바깥 <a>를 조기에 닫아버린다(오케스트레이터 지적,
+              2026-08-20) -- TeamMatchCard(R3, 목록 카드 리그전 배지)와 동일하게
+              button + preventDefault/stopPropagation + router.push로 바꿨고,
+              같은 .tm-league-badge-link 클래스를 재사용해 화살표 아이콘+밑줄로
+              "클릭 가능함"을 컬러 외 신호로도 전달한다. */}
+          {league ? (
+            <button
+              type="button"
+              className="tm-badge tm-badge-grey tm-league-badge-link"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                router.push(`/league-matches/${league.leagueId}`);
+              }}
+              aria-label={`${league.title} 리그 상세로 이동`}
             >
-              리그전 · {match.league.title}
-            </Link>
+              리그전 · {league.title}
+              <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
+            </button>
           ) : null}
         </div>
       </div>
@@ -645,6 +660,8 @@ function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
 function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      P1: 숫자:단위 2:1 비율 + tabular-nums. 매너·승 통계는 caption 유지. */
+  const router = useRouter();
+  const league = match.league;
   const statusLabel = match.status === 'mine' ? '내 매치' : match.status === 'pending' ? '승인 대기' : match.status === 'approved' ? '승인 완료' : match.status === 'closed' ? '마감' : '모집 중';
   const statusClass = match.status === 'mine' ? 'tm-badge-blue' : match.status === 'pending' ? 'tm-badge-orange' : match.status === 'approved' ? 'tm-badge-green' : match.status === 'closed' ? 'tm-badge-grey' : 'tm-badge-blue';
   return (
@@ -671,8 +688,27 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
           <span className="tm-badge tm-badge-grey">{match.format}</span>
           <span className="tm-badge tm-badge-grey">{match.gender}</span>
           {/* 리그전 배지: 상태(모집중/마감)가 아니라 카테고리라 중립 grey 를 쓴다.
-              컬러만으로 뜻을 전달하지 않도록 "리그전" 텍스트를 함께 싣는다(DESIGN.md 규칙). */}
-          {match.league ? <span className="tm-badge tm-badge-grey">리그전</span> : null}
+              컬러만으로 뜻을 전달하지 않도록 "리그전" 텍스트를 함께 싣는다(DESIGN.md 규칙).
+              카드 전체가 이미 상세로 가는 Link라 <a>를 중첩하면 브라우저 파서가 바깥
+              <a>를 조기에 닫아 하이드레이션 불일치·레이아웃 붕괴를 낸다(HTML5 어댑션
+              에이전시 규칙 — <a> 안에 새 <a>가 열리면 바깥 태그가 강제로 닫힌다).
+              대신 button + stopPropagation/preventDefault로 안전하게 리그 홈으로
+              이동시킨다. "클릭 가능함"은 컬러가 아니라 화살표 아이콘+밑줄로 전달한다. */}
+          {league ? (
+            <button
+              type="button"
+              className="tm-badge tm-badge-grey tm-league-badge-link"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                router.push(`/league-matches/${league.leagueId}`);
+              }}
+              aria-label={`${league.title} 리그 상세로 이동`}
+            >
+              리그전
+              <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
+            </button>
+          ) : null}
           {match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}
         </div>
         <div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div>

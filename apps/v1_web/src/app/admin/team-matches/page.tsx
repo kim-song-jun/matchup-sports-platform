@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   useV1AdminTeamMatches,
   useV1AdminMe,
@@ -63,6 +64,17 @@ const PAGE_SIZE = 20;
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTeamMatchesPage() {
+  // useSearchParams는 Suspense 경계가 필요하다 (users/matches 페이지와 동일 구조)
+  return (
+    <Suspense fallback={null}>
+      <AdminTeamMatchesPageContent />
+    </Suspense>
+  );
+}
+
+function AdminTeamMatchesPageContent() {
+  const searchParams = useSearchParams();
+  const initialStatus = searchParams.get('status') ?? '';
   // ── Admin capabilities ─────────────────────────────────────────────
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
@@ -77,14 +89,7 @@ export default function AdminTeamMatchesPage() {
     filters,
     resetToFirstPage,
     buildPagination,
-  } = useAdminListQuery({ pageSize: PAGE_SIZE });
-
-  // URL searchParam pre-selection on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const s = params.get('status') ?? '';
-    if (s) setActiveStatus(s);
-  }, [setActiveStatus]);
+  } = useAdminListQuery({ initialStatus, pageSize: PAGE_SIZE });
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches(filters);
   const rows = data?.items ?? [];

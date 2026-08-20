@@ -21,6 +21,7 @@ import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
 import { GameStateBadge, WarningBadge, WARNING_LABELS } from '@/components/tournament-ops/badges';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
+import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { TournamentProgressStepper, buildTournamentStages } from '@/components/tournaments/tournament-progress-stepper';
 import type {
   V1GameState,
@@ -171,6 +172,9 @@ interface Props {
 export function OperationsBoardClient({ tournamentId }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  // 이 화면은 스태프 표면과 어드민 표면 양쪽에서 렌더된다 — 본문 링크도 nav 와 같이
+  // 지금 표면을 따라가야 한다(하드코딩하면 어드민에서 누를 때 스태프 경로로 튕긴다).
+  const liveBase = resolveTournamentLiveBase(pathname, tournamentId);
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
@@ -473,7 +477,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <Link
-                          href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                          href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
                           className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                         >
                           운영 콘솔
@@ -530,7 +534,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                   </div>
                 )}
                 <Link
-                  href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                  href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
                   className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   운영 콘솔로 이동

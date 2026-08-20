@@ -231,8 +231,10 @@ function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
               padding: '0 4px',
               borderRadius: 4,
               fontWeight: 700,
-              color: 'var(--danger-text, #b42318)',
-              background: 'var(--danger-surface, rgba(217,45,32,0.10))',
+              // 실제 팔레트 토큰을 쓴다 — `--danger-*` 는 이 코드베이스에 없어서
+              // 하드코딩 fallback 이 항상 적용되고 있었다(다크모드도 따라오지 않는다).
+              color: 'var(--red700)',
+              background: 'var(--tint-red)',
             }}
           >
             {item.badge}

@@ -39,3 +39,5 @@
 - 2026-08-20: Windows worktree CRLF 해시가 아닌 Git committed LF blob을 Git Bash로 다시 계산해 source snapshot을 `6836627b...`로 교정.
 - 2026-08-20: 첫 Alpha 배포가 expand-contract 가드에서 migration DML을 차단. 보정 `UPDATE`를 idempotent app-level CLI로 이동하고 CI/Alpha/prod/setup의 migrate 후 실행 경로에 연결.
 - 2026-08-20: 후처리 단위 테스트 3건, API `tsc --noEmit`, Alpha/prod/setup 배포 스크립트 `bash -n` 통과.
+- 2026-08-20: Alpha 배포 성공. 이름-only 수상 26건을 모두 단일 계정에 연결했지만 완료 대회 QA persona에 공개 기록 동의 fixture가 없어 비로그인 프로필 검증이 0건으로 가려짐을 확인. 최초 생성 시에만 GRANTED를 넣고 이후 사용자의 철회는 보존하도록 QA 시드를 보완.
+- 2026-08-20: Alpha 시드 대상 테스트 8건과 API `tsc --noEmit` 통과.

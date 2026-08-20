@@ -1,7 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateTeamContactDto, DeclineTeamContactDto } from './dto/team-contact.dto';
+import { CreateTeamContactDto, DeclineTeamContactDto, ListTeamContactsQueryDto } from './dto/team-contact.dto';
 
 /** 한 팀이 24시간 동안 보낼 수 있는 컨택 수. 확정값 — 스펙 §2. */
 const DAILY_SEND_LIMIT = 10;
@@ -9,6 +9,15 @@ const DAILY_SEND_LIMIT = 10;
 const EXPIRY_DAYS = 7;
 /** 새 컨택을 막는 "진행 중" 상태들. accepted 를 포함해야 채팅방 파편화를 막는다. */
 const ACTIVE_STATUSES = ['requested', 'accepted'] as const;
+/** 목록 조회 기본/최대 페이지 크기. */
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 50;
+
+// 공유 node_modules 의 생성된 Prisma 클라이언트가 origin/dev 의 schema.prisma 보다 오래됐다
+// (V1TeamContact 관련 타입이 아예 없음 — 2026-08-20 실측, 이 worktree 한정 환경 제약).
+// `@prisma/client` 에서 V1TeamContactStatus 를 import 하면 stale client 에 없어 깨지므로
+// 로컬 union 타입으로 대체한다. `prisma generate` 는 모노레포 전체 공유 경로라 절대 금지.
+type TeamContactStatus = 'requested' | 'accepted' | 'declined' | 'withdrawn' | 'expired';
 
 // 이 레포는 공용 에러 헬퍼를 두지 않고 파일마다 로컬로 중복 정의한다
 // (chat/matches/team-matches/teams 4개 서비스가 각각 같은 함수를 갖고 있다).
@@ -181,5 +190,67 @@ export class TeamContactsService {
       });
     }
     return membership;
+  }
+
+  async listForTeam(user: V1AuthUser, teamId: string, query: ListTeamContactsQueryDto) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const limit = Math.min(Math.max(query.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+
+    const rows = await this.prisma.v1TeamContact.findMany({
+      where: {
+        ...(query.direction === 'outbound' ? { fromTeamId: teamId } : { toTeamId: teamId }),
+        ...(query.status ? { status: query.status as TeamContactStatus } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+    return {
+      items: pageItems.map((row) => this.toListItem(row)),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async detail(user: V1AuthUser, contactId: string) {
+    const contact = await this.prisma.v1TeamContact.findUnique({ where: { id: contactId } });
+    if (!contact) {
+      throw new NotFoundException({ code: 'TEAM_CONTACT_NOT_FOUND', message: '컨택을 찾을 수 없어요.' });
+    }
+    await this.assertParticipantSide(user.id, contact);
+    return this.toListItem(contact);
+  }
+
+  /** 받는 팀 → 보낸 팀 순으로 본다. 어느 한쪽 운영진이면 통과. */
+  private async assertParticipantSide(
+    userId: string,
+    contact: { fromTeamId: string; toTeamId: string },
+  ) {
+    for (const teamId of [contact.toTeamId, contact.fromTeamId]) {
+      const membership = await this.prisma.v1TeamMembership.findFirst({
+        where: {
+          teamId, userId, status: 'active',
+          role: { in: ['owner', 'manager'] },
+          team: { status: 'active', deletedAt: null },
+        },
+        select: { id: true },
+      });
+      if (membership) return;
+    }
+    throw new ForbiddenException({
+      code: 'PERMISSION_DENIED',
+      message: '이 컨택을 볼 권한이 없어요.',
+    });
+  }
+
+  /**
+   * 만료를 표시에 반영한다. 목록은 행이 많아 각 행마다 updateMany 를 돌리지 않고
+   * 표시 상태만 계산한다 — DB 정리는 그 컨택을 실제로 다루는 respond()/detail() 에서 일어난다.
+   */
+  private toListItem(row: { id: string; status: string; expiresAt: Date; [k: string]: unknown }) {
+    const expired = row.status === 'requested' && row.expiresAt <= new Date();
+    return { ...row, status: expired ? 'expired' : row.status };
   }
 }

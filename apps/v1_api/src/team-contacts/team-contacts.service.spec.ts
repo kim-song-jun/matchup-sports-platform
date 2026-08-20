@@ -7,6 +7,7 @@ function makePrisma() {
     v1TeamMembership: { findFirst: jest.fn() },
     v1TeamContact: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       count: jest.fn(),
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -289,5 +290,78 @@ describe('TeamContactsService 응답 처리', () => {
     await expect(service.accept(actor, 'c1')).rejects.toMatchObject({
       response: { code: 'TEAM_CONTACT_STATE_CONFLICT', details: { currentStatus: 'declined' } },
     });
+  });
+});
+
+describe('TeamContactsService.listForTeam', () => {
+  it('inbound 는 받은 것만, outbound 는 보낸 것만 조회한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findMany.mockResolvedValue([]);
+    const service = new TeamContactsService(prisma);
+
+    await service.listForTeam(actor, 'B', { direction: 'inbound' });
+    expect(prisma.v1TeamContact.findMany.mock.calls[0][0].where).toMatchObject({ toTeamId: 'B' });
+
+    prisma.v1TeamContact.findMany.mockClear();
+    await service.listForTeam(actor, 'B', { direction: 'outbound' });
+    expect(prisma.v1TeamContact.findMany.mock.calls[0][0].where).toMatchObject({ fromTeamId: 'B' });
+  });
+
+  it('limit+1 을 가져와 hasNext 를 판정하고 초과분은 잘라낸다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    const rows = Array.from({ length: 3 }, (_, i) => ({
+      id: `c${i}`, status: 'requested', expiresAt: new Date(Date.now() + 86_400_000),
+      fromTeamId: 'A', toTeamId: 'B', message: 'hi', createdAt: new Date(),
+    }));
+    prisma.v1TeamContact.findMany.mockResolvedValue(rows);
+    const service = new TeamContactsService(prisma);
+
+    const result = await service.listForTeam(actor, 'B', { direction: 'inbound', limit: 2 });
+    expect(prisma.v1TeamContact.findMany.mock.calls[0][0].take).toBe(3);
+    expect(result.items).toHaveLength(2);
+    expect(result.pageInfo.hasNext).toBe(true);
+    expect(result.pageInfo.nextCursor).toBe('c1');
+  });
+
+  it('만료 시각이 지난 requested 항목은 목록에서도 expired 로 보인다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findMany.mockResolvedValue([{
+      id: 'c1', status: 'requested', expiresAt: new Date(Date.now() - 1000),
+      fromTeamId: 'A', toTeamId: 'B', message: 'hi', createdAt: new Date(),
+    }]);
+    const service = new TeamContactsService(prisma);
+
+    const result = await service.listForTeam(actor, 'B', { direction: 'inbound' });
+    expect(result.items[0].status).toBe('expired');
+  });
+
+  it('상세는 보낸 팀 운영진도 볼 수 있다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue({
+      id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested',
+      expiresAt: new Date(Date.now() + 86_400_000), message: 'hi', createdAt: new Date(),
+    });
+    // 받는 팀('B') 조회는 실패, 보낸 팀('A') 조회는 성공
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'm1' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.detail(actor, 'c1')).resolves.toMatchObject({ id: 'c1' });
+  });
+
+  it('양쪽 어디에도 속하지 않으면 상세를 볼 수 없다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue({
+      id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested',
+      expiresAt: new Date(Date.now() + 86_400_000), message: 'hi', createdAt: new Date(),
+    });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.detail(actor, 'c1')).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

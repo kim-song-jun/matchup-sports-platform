@@ -106,7 +106,7 @@ describe('penaltyScoreBySideId', () => {
  * 승계한다.
  *
  * `earlyStop`은 대회 설정(`CompetitionConfig.result`)에서 오는 스위치다:
- *  - `true`  (A2, FIFA 정규 · 기본값) — 5킥 이내라도 남은 킥으로 뒤집을 수 없으면 종료.
+ *  - `true`  (A2, 기본값) — 기본 3킥 이내라도 남은 킥으로 뒤집을 수 없으면 종료.
  *  - `false` (A1, 끝까지) — 두 팀이 같은 횟수를 찬 뒤 점수가 갈려야 종료.
  *
  * 두 정책은 "한쪽이라도 0킥이면 확정하지 않는다"는 불변식을 **공유**한다.
@@ -141,8 +141,8 @@ describe('penaltyShootoutOutcome', () => {
    * 통과한다. 선축 4킥 4점 / 후축 3킥 0점 = 후축이 남은 2킥을 다 넣어도 2점이라
    * 수학적으로 이미 끝났다(A2는 종료), 그러나 킥 수가 다르다(A1은 계속).
    */
-  it('선축 4킥 4점 / 후축 3킥 0점 — earlyStop이면 확정, 아니면 계속', () => {
-    const kicks = [...kicksFor(HOME, 4, 4), ...kicksFor(AWAY, 3, 0)];
+  it('선축 3킥 3점 / 후축 2킥 0점 — 횟수가 달라도 earlyStop이면 확정한다', () => {
+    const kicks = [...kicksFor(HOME, 3, 3), ...kicksFor(AWAY, 2, 0)];
     expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: true })).toBe('DECIDED');
     expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('IN_PROGRESS');
   });
@@ -154,10 +154,10 @@ describe('penaltyShootoutOutcome', () => {
    * A1은 여기서 갈린다: A1의 기준은 "수학적으로 확정됐는가"가 아니라 **"라운드가
    * 끝났는가"**다. 같은 횟수를 찼고 점수가 갈렸으므로 A1은 이 라운드에서 종료한다.
    */
-  it('각 3킥 2:1 — 두 정책 모두 미결이다(A2는 역전 가능, A1은 5킥 미달)', () => {
+  it('각 3킥 2:1 — 기본 구간이 끝나 점수가 갈렸으므로 두 정책 모두 확정한다', () => {
     const kicks = [...kicksFor(HOME, 3, 2), ...kicksFor(AWAY, 3, 1)];
-    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: true })).toBe('IN_PROGRESS');
-    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('IN_PROGRESS');
+    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: true })).toBe('DECIDED');
+    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('DECIDED');
   });
 
   /**
@@ -176,11 +176,11 @@ describe('penaltyShootoutOutcome', () => {
     expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('IN_PROGRESS');
   });
 
-  it('각 3킥 3:0 — A2는 역전 불가라 종료, A1은 5킥을 마저 차야 한다', () => {
+  it('각 3킥 3:0 — 기본 구간이 끝나 두 정책 모두 종료한다', () => {
     // 두 정책이 갈리는 지점이 정확히 여기다: 조기 종료를 허용하는가 하나뿐이다.
     const kicks = [...kicksFor(HOME, 3, 3), ...kicksFor(AWAY, 3, 0)];
     expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: true })).toBe('DECIDED');
-    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('IN_PROGRESS');
+    expect(penaltyShootoutOutcome(kicks, SIDES, HOME, { earlyStop: false })).toBe('DECIDED');
   });
 
   it('A1도 5킥을 다 채우면 판정한다 — 잠가 두기만 하는 정책이 아니다', () => {
@@ -221,7 +221,7 @@ describe('penaltyShootoutOutcome', () => {
    * 그대로 뒤집은 것이다.
    */
   it('선축이 원정이어도 대칭으로 판정한다 — 홈 하드코딩 회귀를 잡는다', () => {
-    const kicks = [...kicksFor(AWAY, 4, 4), ...kicksFor(HOME, 3, 0)];
+    const kicks = [...kicksFor(AWAY, 3, 3), ...kicksFor(HOME, 2, 0)];
     expect(penaltyShootoutOutcome(kicks, SIDES, AWAY, { earlyStop: true })).toBe('DECIDED');
     expect(penaltyShootoutOutcome(kicks, SIDES, AWAY, { earlyStop: false })).toBe('IN_PROGRESS');
   });

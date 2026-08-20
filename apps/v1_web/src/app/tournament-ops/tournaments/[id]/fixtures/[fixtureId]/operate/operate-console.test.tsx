@@ -1079,11 +1079,11 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
    * **그 값을 어디서 얻는가**는 거기서 검증되지 않는다 — 콘솔이 서버 값을 무시하고
    * `true`로 굳혀도 술어 테스트는 전부 초록이다.
    *
-   * 그래서 두 정책의 답이 갈리는 국면을 UI로 직접 만든다: 홈(선축) 4킥 4점 / 원정 3킥
-   * 0점. 원정이 남은 2킥을 다 넣어도 2점이라 A2(FIFA 정규)는 종료를 허용하지만, 킥 수가
-   * 달라 A1(라운드가 끝나야 결판)은 아직 막는다.
+   * 그래서 두 정책의 답이 갈리는 국면을 UI로 직접 만든다: 홈(선축) 3킥 3점 / 원정 2킥
+   * 0점. 원정의 마지막 킥으로도 따라잡을 수 없어 A2는 종료를 허용하지만, 조기 종료를
+   * 끈 A1은 원정의 세 번째 킥까지 기다린다.
    */
-  async function openPanelAndKickFourToThree(policy?: { earlyStop: boolean }): Promise<HTMLElement> {
+  async function openPanelAndKickThreeToTwo(policy?: { earlyStop: boolean }): Promise<HTMLElement> {
     setup(policy === undefined ? {} : { penaltyShootoutPolicy: policy });
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
@@ -1095,8 +1095,8 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     chooseFirstKicker(panel, '강남 풋살 클럽');
     const successButton = within(panel).getByRole('button', { name: /성공/ });
     const missButton = within(panel).getByRole('button', { name: /실패/ });
-    // 홈 성공 / 원정 실패를 세 번 반복한 뒤 홈이 한 번 더 성공 → 홈 4킥 4점 / 원정 3킥 0점.
-    for (let round = 0; round < 3; round += 1) {
+    // 홈 성공 / 원정 실패를 두 번 반복한 뒤 홈이 한 번 더 성공 → 홈 3킥 3점 / 원정 2킥 0점.
+    for (let round = 0; round < 2; round += 1) {
       fireEvent.click(successButton);
       fireEvent.click(missButton);
     }
@@ -1104,19 +1104,19 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     return panel;
   }
 
-  it('earlyStop 정책이면(기본) 홈 4킥 4점 / 원정 3킥 0점에서 승부차기를 종료할 수 있다', async () => {
-    const panel = await openPanelAndKickFourToThree({ earlyStop: true });
+  it('earlyStop 정책이면(기본) 홈 3킥 3점 / 원정 2킥 0점에서 승부차기를 종료할 수 있다', async () => {
+    const panel = await openPanelAndKickThreeToTwo({ earlyStop: true });
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
   });
 
   it('서버가 earlyStop=false를 내려주면 같은 국면에서 종료가 잠긴다 — 정책이 UI까지 배선돼 있다', async () => {
-    const panel = await openPanelAndKickFourToThree({ earlyStop: false });
+    const panel = await openPanelAndKickThreeToTwo({ earlyStop: false });
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
-    expect(panel).toHaveTextContent('두 팀이 같은 횟수를 차야 해요.');
+    expect(panel).toHaveTextContent('성수 풋살 클럽의 응답 킥이 남아 있어요.');
   });
 
   it('서버가 정책을 안 내려주면(레거시 응답) FIFA 정규로 폴백한다', async () => {
-    const panel = await openPanelAndKickFourToThree(undefined);
+    const panel = await openPanelAndKickThreeToTwo(undefined);
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
   });
 
@@ -1148,16 +1148,13 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     const successButton = within(panel).getByRole('button', { name: /성공/ });
     const missButton = within(panel).getByRole('button', { name: /실패/ });
 
-    // 순서는 항상 번갈아 찬다(선축인 홈 먼저) — 홈 성공 / 원정 실패를 세 번 반복해
-    // 각 3킥 3:0을 만든다. 마지막 원정 실패 전까지는(각 2킥 2:0, 원정에게 3킥 남음)
-    // 아직 결판이 아니다.
+    // 순서는 항상 번갈아 찬다(선축인 홈 먼저). 홈의 세 번째 성공 시점에는 원정이
+    // 한 번 덜 찼어도 마지막 킥으로 따라잡을 수 없으므로 규칙상 결판이다.
     fireEvent.click(successButton); // 홈 1:0
     fireEvent.click(missButton); // 원정 1:0
     fireEvent.click(successButton); // 홈 2:0
     fireEvent.click(missButton); // 원정 2:0
     fireEvent.click(successButton); // 홈 3:0
-    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
-    fireEvent.click(missButton); // 원정 3:0 — 남은 2킥을 다 넣어도 못 따라잡는다
 
     const finishButton = within(panel).getByRole('button', { name: '승부차기 종료' });
     expect(finishButton).not.toBeDisabled();
@@ -1176,7 +1173,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
           // 끝난 종료이므로 `operatorOverride`는 **실리지 않는다** — 키 부재가 곧
           // "우회 아님"이라, 여기에 키가 생기면 감사 기록이 우회를 구분하지 못한다.
           payload: {
-            penalties: { home: 3, away: 0, firstKickSideKey: 'HOME', takenHome: 3, takenAway: 3 },
+            penalties: { home: 3, away: 0, firstKickSideKey: 'HOME', takenHome: 3, takenAway: 2 },
           },
         }),
       ),

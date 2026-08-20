@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from 'react';
 import type { AdminToastVariant } from '@/components/admin';
+import type { TournamentAdminRole } from '@/lib/admin-tournament-role';
 
 /**
  * 대회 상세는 섹션마다 라우트가 나뉜다(`/admin/tournaments/:id/:section`). 셸(layout)이
@@ -12,7 +13,12 @@ import type { AdminToastVariant } from '@/components/admin';
  */
 export interface TournamentAdminContextValue {
   tournamentId: string;
-  /** `status:write` capability 보유 여부 — 쓰기 액션 노출 판정 */
+  /**
+   * 지금 사용자의 대회 관리 역할. 플랫폼 관리자와 대회 스태프를 같은 어휘로 표현한다
+   * (`lib/admin-tournament-role.ts` — 서버 `assertAccess` 와 같은 역할 집합).
+   */
+  role: TournamentAdminRole;
+  /** 쓰기 액션 노출 판정 — `role` 에서 파생된다(별도 상태가 아니다). */
   canWrite: boolean;
   showToast: (message: string, variant?: AdminToastVariant) => void;
 }

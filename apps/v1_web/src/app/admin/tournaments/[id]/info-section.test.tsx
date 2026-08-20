@@ -77,7 +77,7 @@ const tournament = {
 function renderSection(canWrite: boolean) {
   hooks.tournament = tournament;
   return render(
-    <TournamentAdminProvider value={{ tournamentId: 'tournament-1', canWrite, showToast: vi.fn() }}>
+    <TournamentAdminProvider value={{ tournamentId: 'tournament-1', role: canWrite ? 'PLATFORM_OPS' : 'SUPPORT_READONLY', canWrite, showToast: vi.fn() }}>
       <TournamentInfoSection />
     </TournamentAdminProvider>,
   );

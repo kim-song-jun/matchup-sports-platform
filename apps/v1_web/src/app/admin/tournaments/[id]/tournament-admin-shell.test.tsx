@@ -9,6 +9,8 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TournamentAdminShell } from './tournament-admin-shell';
 
+const { adminRoleMock } = vi.hoisted(() => ({ adminRoleMock: { value: 'ops' as 'owner' | 'ops' | 'support' } }));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin/tournaments/tournament-1/info',
 }));
@@ -18,7 +20,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     data: {
       id: 'tournament-1',
       title: '서울 풋살 챔피언십',
-      status: 'published',
+      status: 'in_progress',
       sport: { code: 'futsal', name: '풋살' },
       operationCounts: { registrations: 3, fixtures: 4, announcements: 1 },
     },
@@ -27,7 +29,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
+  useV1AdminMe: () => ({ data: { capabilities: ['status:write'], adminRole: adminRoleMock.value } }),
   useV1ChangeTournamentStatus: () => ({ mutate: vi.fn(), isPending: false }),
   useV1TournamentStaffAssignments: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
 }));
@@ -55,6 +57,19 @@ describe('TournamentAdminShell 섹션 내비', () => {
       'href',
       '/admin/tournaments/tournament-1/overview',
     );
+  });
+
+  it('조회 전용 관리자에게는 상태 변경 버튼을 열지 않는다', () => {
+    // canWrite 를 capabilities 에서 역할 파생으로 옮겼다 — 옮긴 뒤에도 support 는
+    // 상태를 못 바꿔야 한다(서버가 막더라도 화면이 눌리는 것처럼 보이면 결함이다).
+    adminRoleMock.value = 'support';
+    const readOnly = render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+    expect(screen.queryByRole('button', { name: '대회 완료하기' })).not.toBeInTheDocument();
+    readOnly.unmount();
+
+    adminRoleMock.value = 'ops';
+    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+    expect(screen.getByRole('button', { name: '대회 완료하기' })).toBeInTheDocument();
   });
 
   it('대회 하위 섹션은 그대로 대회 경로를 가리킨다', () => {

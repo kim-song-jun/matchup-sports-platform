@@ -261,6 +261,64 @@ function TeamOpenMatchesSection({
   );
 }
 
+/**
+ * "내 리그" (R4) — 이 팀이 host 또는 신청자로 속한 팀매치 목록(GET /team-matches?teamId=)
+ * 에서 distinct 로 추린 리그. 전용 리그 API가 없어 팀 상세 진입점을 만드는 유일한
+ * 방법이었다 -- 리그 상세로 가는 인앱 링크가 team-matches 상세 화면 배지 하나뿐이라
+ * (team-matches-page.tsx 참고) 팀장·선수가 리그를 발견할 방법이 사실상 없었다.
+ * 리그가 하나도 없으면 제목까지 포함해 섹션 전체를 렌더하지 않는다 -- 빈 섹션 노출 금지.
+ */
+function TeamMyLeaguesSection({
+  leagues,
+  loading,
+}: {
+  leagues?: TeamDetailViewModel['myLeagues'];
+  loading?: boolean;
+}) {
+  const items = leagues ?? [];
+  if (!loading && items.length === 0) return null;
+  return (
+    <>
+      <SectionTitle title="내 리그" sub="이 팀이 참가 중인 리그예요." />
+      {loading ? (
+        <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-label="내 리그 불러오는 중">
+          {[0, 1].map((i) => (
+            <div key={i} className="tm-review-skeleton" style={{ height: 56, borderRadius: 14 }} aria-hidden="true" />
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {items.map((league) => (
+            <Link
+              key={league.leagueId}
+              className="tm-pressable"
+              href={`/league-matches/${league.leagueId}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                padding: '14px 16px',
+                background: 'var(--bg)',
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
+            >
+              <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>리그전</span>
+                <div className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{league.title}</div>
+              </div>
+              <ChevronRightIcon size={18} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-caption)' }} />
+            </Link>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 function TeamOperationsSection({
   operations,
   compact = false,
@@ -459,6 +517,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
           </Card>
           <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+          <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} />
           <TeamRecordLinkCard
             href={`/teams/${team.id}/records`}
             title="팀 전적"
@@ -629,6 +688,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
         ) : null}
         <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+        <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} />
 
         {/* 기록으로 가는 링크 묶음. 예전에는 "팀 전적" 링크 하나가 위 매치 섹션과 **간격 0px
             로 맞붙어**(alpha 390 실측) 그 섹션의 일부처럼 보였다 — 별개 항목이므로 자기

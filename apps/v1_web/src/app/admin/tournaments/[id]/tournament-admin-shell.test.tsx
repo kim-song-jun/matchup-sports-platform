@@ -5,7 +5,7 @@
  * 항목은 대회 하위 탭이 아니라 **경로를 프리필한 전역 화면 링크**여야 한다 — 이 링크가
  * 사라지거나 옛 하위 경로로 되돌아가면 운영자는 그 대회의 팝업을 만들 길이 없어진다.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TournamentAdminShell } from './tournament-admin-shell';
 
@@ -43,6 +43,18 @@ describe('TournamentAdminShell 섹션 내비', () => {
     );
     // 대회 하위 팝업 라우트는 더 이상 존재하지 않는다.
     expect(popupLink.getAttribute('href')).not.toContain('/admin/tournaments/tournament-1/popups');
+  });
+
+  it("'개요'가 운영 그룹의 첫 항목이다 — 기본 랜딩이 여기다", () => {
+    render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
+
+    const group = screen.getByRole('group', { name: '운영' });
+    const labels = within(group).getAllByRole('link').map((link) => link.textContent?.trim());
+    expect(labels[0]).toBe('개요');
+    expect(within(group).getByRole('link', { name: /개요/ })).toHaveAttribute(
+      'href',
+      '/admin/tournaments/tournament-1/overview',
+    );
   });
 
   it('대회 하위 섹션은 그대로 대회 경로를 가리킨다', () => {

@@ -52,6 +52,7 @@ const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
   {
     label: '운영',
     items: [
+      { slug: 'overview', label: '개요' },
       { slug: 'info', label: '대회 정보' },
       { slug: 'registrations', label: '신청 관리', countKey: 'registrations' },
       { slug: 'bracket', label: '대진 관리', countKey: 'fixtures' },

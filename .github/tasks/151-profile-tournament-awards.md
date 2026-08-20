@@ -37,3 +37,5 @@
 - 2026-08-20: API 대상 61개, Web 대상 53개 테스트 및 양 패키지 `tsc --noEmit` 통과. 공개 대회 상세은 동의 우회를 막기 위해 `recipientUserId`를 노출하지 않도록 회귀 테스트로 고정.
 - 2026-08-20: PR #588 최초 CI에서 schema source snapshot guard가 변경을 감지해 실패. 새 migration 근거를 명시하고 현재 schema SHA-256으로 canonical fixture를 재핀.
 - 2026-08-20: Windows worktree CRLF 해시가 아닌 Git committed LF blob을 Git Bash로 다시 계산해 source snapshot을 `6836627b...`로 교정.
+- 2026-08-20: 첫 Alpha 배포가 expand-contract 가드에서 migration DML을 차단. 보정 `UPDATE`를 idempotent app-level CLI로 이동하고 CI/Alpha/prod/setup의 migrate 후 실행 경로에 연결.
+- 2026-08-20: 후처리 단위 테스트 3건, API `tsc --noEmit`, Alpha/prod/setup 배포 스크립트 `bash -n` 통과.

@@ -266,6 +266,8 @@ fi
 # (§6 — prod 는 진짜 사용자 데이터다).
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js'
 
 # restart-containers.sh 의 업로드 백업/복원 왕복을 그대로 흡수한다(D 표에 없던 prod 전용
 # 안전장치 — alpha 에는 없지만 기존 prod 배포가 볼륨 마운트에도 불구하고 방어적으로 이

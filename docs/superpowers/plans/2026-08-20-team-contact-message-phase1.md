@@ -1825,8 +1825,13 @@ git show --stat HEAD
 - Modify: `apps/v1_web/src/components/teams/teams-client.tsx`
 - Modify: `apps/v1_web/src/components/my/my-api-clients.tsx`
 - Modify: `apps/v1_web/src/lib/query-keys.ts`
-- Modify: `apps/v1_web/src/hooks/use-v1-api.ts`
+- Modify: `apps/v1_web/src/hooks/use-v1-api.ts` (훅 6개 신규 **+ `useV1ResolveChatRoom` 유니온 확장**)
 - Create: `apps/v1_web/src/lib/team-role.test.ts`
+
+> **필수 — 빠뜨리면 Task 11 이 컴파일되지 않는다**: `use-v1-api.ts:1919` 의
+> `useV1ResolveChatRoom` 은 `mutationFn: (body: { targetType: 'match' | 'team' | 'team_match'; targetId: string })`
+> 로 유니온이 하드코딩돼 있다. Task 11 의 "대화 열기" 가 `'team_contact'` 로 호출하므로
+> **이 유니온에 `| 'team_contact'` 를 추가한다.** (2026-08-20 사전 스캔에서 발견 — 원래 어느 태스크에도 없었다.)
 
 **Interfaces:**
 - Consumes: Task 8의 엔드포인트

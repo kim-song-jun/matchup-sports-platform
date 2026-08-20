@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
 import { presentTournamentCard } from './tournament-card.presenter';
@@ -62,7 +63,9 @@ export class TournamentsReadService {
    * 공개 대회 목록.
    * - deletedAt=null + status in (open/closed/in_progress/completed)
    * - 각 카드에 confirmedCount(status=confirmed registration 수) 포함
-   * - cursor 페이지네이션(createdAt desc → id 기준)
+   * - **두 가지 페이지네이션을 동시에 지원한다**: 모바일 무한 스크롤은 `cursor`,
+   *   데스크톱 페이지 번호는 `page`. 둘 다 오면 page 가 이긴다(`paginationArgs`).
+   *   응답의 `nextCursor`/`hasNext` 는 그대로라 기존 호출자는 영향받지 않는다.
    */
   async list(query: TournamentListQueryDto) {
     const limit = query.limit ?? 20;
@@ -73,23 +76,36 @@ export class TournamentsReadService {
       ...(query.sportId ? { sportId: query.sportId } : {}),
     };
 
-    const rows = await this.prisma.v1Tournament.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      include: TOURNAMENT_LIST_INCLUDE,
-    });
+    // 전체 건수는 페이지 번호를 그릴 때만 센다 — 무한 스크롤은 "다음이 있는지"만 알면
+    // 되므로 매 스크롤마다 COUNT 를 한 번 더 때릴 이유가 없다.
+    const wantsPageNumbers = query.page !== undefined && query.page > 0;
+
+    const [rows, total] = await Promise.all([
+      this.prisma.v1Tournament.findMany({
+        where,
+        // createdAt 만으로는 전순서가 아니다 — 같은 시각에 만들어진 대회들(시드·일괄
+        // 생성에서 흔하다)의 상대 순서가 쿼리마다 달라지면, skip 기반 페이지에서는 행이
+        // 중복되거나 통째로 빠진다. id 를 tiebreaker 로 붙여 순서를 고정한다.
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+        ...paginationArgs(query, limit),
+        include: TOURNAMENT_LIST_INCLUDE,
+      }),
+      wantsPageNumbers ? this.prisma.v1Tournament.count({ where }) : Promise.resolve(null),
+    ]);
 
     const hasNext = rows.length > limit;
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
 
     return {
       items: pageItems.map(presentTournamentCard),
-      pageInfo: {
-        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
         hasNext,
-      },
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
     };
   }
 

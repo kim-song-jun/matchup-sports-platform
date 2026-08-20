@@ -3398,10 +3398,9 @@ export type V1ExportRosterCsvResult = {
 
 export type V1TournamentListPage = {
   items: V1TournamentListItem[];
-  pageInfo: {
-    nextCursor: string | null;
-    hasNext: boolean;
-  };
+  // 커서(모바일 무한 스크롤)와 페이지 번호(데스크톱) 두 방식을 같은 응답으로 지원한다 —
+  // `page` 를 보낸 요청에만 total/totalPages 가 채워진다(COUNT 를 그때만 돌린다).
+  pageInfo: PageInfo;
 };
 
 export type V1AdminTournamentListPage = {

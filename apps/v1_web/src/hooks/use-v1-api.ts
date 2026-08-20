@@ -2907,6 +2907,8 @@ type TournamentListFilters = {
   status?: 'open' | 'closed' | 'in_progress' | 'completed';
   sportId?: string;
   cursor?: string;
+  /** 데스크톱 페이지 번호. cursor 와 함께 오면 서버가 page 를 택한다. */
+  page?: number;
   limit?: number;
 };
 
@@ -2914,6 +2916,9 @@ export function useV1Tournaments(params?: TournamentListFilters) {
   return useQuery({
     queryKey: v1Keys.tournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1TournamentListPage>('/tournaments', params),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 목록이 빈 화면으로 깜빡이면
+    // 스크롤 위치와 읽던 자리를 잃는다(어드민 목록과 같은 처리).
+    placeholderData: keepPreviousData,
   });
 }
 

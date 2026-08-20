@@ -60,6 +60,7 @@ export const v1Keys = {
   publicProfile: (userId: string) => [...v1Keys.all, 'users', userId, 'public-profile'] as const,
   settings: () => [...v1Keys.all, 'me', 'settings'] as const,
   adminOverview: () => [...v1Keys.all, 'admin', 'overview'] as const,
+  adminGlobalSearch: (q: string) => [...v1Keys.all, 'admin', 'search', q] as const,
   adminActionLogs: () => [...v1Keys.all, 'admin', 'action-logs'] as const,
   adminMe: () => [...v1Keys.all, 'admin', 'me'] as const,
   adminUsers: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'users', filters ?? {}] as const,

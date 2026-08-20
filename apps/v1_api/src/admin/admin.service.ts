@@ -27,6 +27,7 @@ import {
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
   AdminPopupListQueryDto,
+  AdminGlobalSearchQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
   AdminNoticeListQueryDto,
@@ -953,6 +954,69 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ─── Team list / detail ────────────────────────────────────────────────────
+
+  /**
+   * 전역 검색 (커맨드 팔레트용) — 회원/팀/매치 3도메인을 도메인당 최대 5건으로 가볍게 조회한다.
+   * 목록 API들과 동일한 검색 필드를 쓰되(list* 메서드의 q where 절과 동일 계약),
+   * summary groupBy·상세 select 없이 팔레트에 필요한 최소 필드만 내려준다.
+   */
+  async globalSearch(user: V1AuthUser, query: AdminGlobalSearchQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const q = query.q.trim();
+    if (!q) return { users: [], teams: [], matches: [] };
+
+    const contains = { contains: q, mode: 'insensitive' as const };
+    const TAKE = 5;
+
+    const [users, teams, matches] = await Promise.all([
+      this.prisma.v1User.findMany({
+        where: {
+          OR: [
+            { profile: { nickname: contains } },
+            { profile: { realName: contains } },
+            { profile: { displayName: contains } },
+            { email: contains },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: TAKE,
+        select: {
+          id: true,
+          email: true,
+          accountStatus: true,
+          profile: { select: { nickname: true, displayName: true } },
+        },
+      }),
+      this.prisma.v1Team.findMany({
+        where: { name: contains },
+        orderBy: { createdAt: 'desc' },
+        take: TAKE,
+        select: { id: true, name: true, status: true },
+      }),
+      this.prisma.v1Match.findMany({
+        where: { OR: [{ title: contains }, { placeName: contains }] },
+        orderBy: { createdAt: 'desc' },
+        take: TAKE,
+        select: { id: true, title: true, placeName: true, status: true },
+      }),
+    ]);
+
+    return {
+      users: users.map((row) => ({
+        userId: row.id,
+        label: row.profile?.nickname ?? row.profile?.displayName ?? row.email ?? '프로필 없음',
+        sublabel: row.email,
+        status: row.accountStatus,
+      })),
+      teams: teams.map((row) => ({ teamId: row.id, label: row.name, status: row.status })),
+      matches: matches.map((row) => ({
+        matchId: row.id,
+        label: row.title,
+        sublabel: row.placeName,
+        status: row.status,
+      })),
+    };
+  }
 
   async listTeams(user: V1AuthUser, query: AdminTeamListQueryDto) {
     await this.getActiveAdmin(user.id);

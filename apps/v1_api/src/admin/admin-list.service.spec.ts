@@ -775,4 +775,79 @@ describe('AdminService — list/detail endpoints', () => {
       });
     });
   });
+
+  // ─── globalSearch (커맨드 팔레트 전역 검색) ────────────────────────────────
+
+  describe('globalSearch', () => {
+    it('throws 403 for non-admin', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+      await expect(service.globalSearch(nonAdminAuthUser, { q: 'kim' })).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('returns empty domains for blank q without touching the DB', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      const result = await service.globalSearch(adminAuthUser, { q: '   ' });
+      expect(result).toEqual({ users: [], teams: [], matches: [] });
+      expect(prisma.v1User.findMany).not.toHaveBeenCalled();
+      expect(prisma.v1Team.findMany).not.toHaveBeenCalled();
+      expect(prisma.v1Match.findMany).not.toHaveBeenCalled();
+    });
+
+    it('queries the same q fields as the list endpoints and maps slim palette rows', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1User.findMany.mockResolvedValue([
+        {
+          id: 'u-1',
+          email: 'host@teameet.v1',
+          accountStatus: 'active',
+          profile: { nickname: '호스트민', displayName: '호스트민' },
+        },
+      ]);
+      prisma.v1Team.findMany.mockResolvedValue([
+        { id: 't-1', name: '민FC', status: 'active' },
+      ]);
+      prisma.v1Match.findMany.mockResolvedValue([
+        { id: 'm-1', title: '민 매치', placeName: '서울 풋살장', status: 'open' },
+      ]);
+
+      const result = await service.globalSearch(adminAuthUser, { q: ' 민 ' });
+
+      // 회원 검색은 목록 API와 동일한 4개 필드 OR (nickname/realName/displayName/email)
+      const userWhere = prisma.v1User.findMany.mock.calls[0][0].where;
+      expect(userWhere.OR).toHaveLength(4);
+      expect(userWhere.OR).toEqual(
+        expect.arrayContaining([
+          { profile: { nickname: { contains: '민', mode: 'insensitive' } } },
+          { email: { contains: '민', mode: 'insensitive' } },
+        ]),
+      );
+      // 도메인당 최대 5건
+      expect(prisma.v1User.findMany.mock.calls[0][0].take).toBe(5);
+      expect(prisma.v1Team.findMany.mock.calls[0][0].take).toBe(5);
+      expect(prisma.v1Match.findMany.mock.calls[0][0].take).toBe(5);
+
+      expect(result.users).toEqual([
+        { userId: 'u-1', label: '호스트민', sublabel: 'host@teameet.v1', status: 'active' },
+      ]);
+      expect(result.teams).toEqual([{ teamId: 't-1', label: '민FC', status: 'active' }]);
+      expect(result.matches).toEqual([
+        { matchId: 'm-1', label: '민 매치', sublabel: '서울 풋살장', status: 'open' },
+      ]);
+    });
+
+    it('falls back to displayName then email when nickname is missing', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1User.findMany.mockResolvedValue([
+        { id: 'u-2', email: 'no-nick@teameet.v1', accountStatus: 'active', profile: null },
+      ]);
+      prisma.v1Team.findMany.mockResolvedValue([]);
+      prisma.v1Match.findMany.mockResolvedValue([]);
+
+      const result = await service.globalSearch(adminAuthUser, { q: 'no-nick' });
+      expect(result.users[0].label).toBe('no-nick@teameet.v1');
+    });
+  });
+
 });

@@ -602,7 +602,18 @@ export class TournamentsAdminService {
     });
 
     if (to === 'completed') {
-      await this.requestTournamentReviews(tournamentId);
+      // 후기 요청 알림은 상태 전이의 **부수 효과**다. 전이는 위 트랜잭션에서 이미 커밋됐으므로
+      // 여기서 던지면 DB 는 completed 인데 API 만 실패로 응답한다 — 운영자는 "완료 처리가
+      // 실패했다"고 읽고 재시도하게 되고, 두 번째 호출은 alreadyInStatus 로 돌아와 더 헷갈린다.
+      // 수신자 조회(DB 일시 오류)와 발송(알림 인프라) 어느 쪽이 넘어져도 전이 결과는 지킨다.
+      try {
+        await this.requestTournamentReviews(tournamentId);
+      } catch (error) {
+        this.logger.error(
+          `대회 ${tournamentId} 완료 후기 요청 알림에 실패했지만 completed 전이는 유지한다`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
     }
 
     return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false };
@@ -615,7 +626,10 @@ export class TournamentsAdminService {
    * eligibleTeamWhere) — 참가 확정(confirmed) 팀의 active owner/manager. 넓게 보내면 열어봐야
    * 쓸 수 없는 알림이 되고, 좁게 보내면 정작 쓸 사람이 못 받는다.
    *
-   * 발송 실패가 상태 전이를 되돌리면 안 되므로 트랜잭션 밖에서, fire-and-forget 계열로 호출한다.
+   * 발송 실패가 상태 전이를 되돌리면 안 되므로 트랜잭션 밖에서 **best-effort** 로 호출한다
+   * (호출부에서 await + try/catch — 실패는 삼키되 응답 전에 끝낸다). 진짜 fire-and-forget
+   * 으로 떼어내지 않는 이유는, 요청 수명이 끝난 뒤 알림이 조용히 유실되는 것보다 관리자
+   * 응답을 쿼리 한 번만큼 늦추는 편이 낫기 때문이다.
    */
   private async requestTournamentReviews(tournamentId: string) {
     const registrations = await this.prisma.v1TournamentRegistration.findMany({

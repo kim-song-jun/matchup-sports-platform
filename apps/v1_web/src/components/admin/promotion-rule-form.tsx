@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { V1PromotionRule } from '@/types/league-series';
 
 const inputClass =
@@ -39,6 +39,20 @@ export function hitsMajorityGuard(rule: V1PromotionRule, teamCount: number): boo
 }
 
 export function PromotionRuleForm({ value, onChange, disabled = false }: PromotionRuleFormProps) {
+  // 숫자 입력을 지우는 순간 Number('') === 0 이 규칙에 박히면 서버가 422 로 거부한다.
+  // 그렇다고 즉시 최솟값으로 되돌리면 "20"을 "5"로 고치려고 지웠을 때 커서 앞에 1 이 남아
+  // "15"가 되어버린다. 그래서 화면에 보이는 문자열(draft)과 실제 규칙 값을 분리하고,
+  // 파싱에 성공했을 때만 규칙을 갱신한다 — 지운 상태는 화면에만 남고 규칙은 직전 유효값을 지킨다.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draftOf = (key: string, fallback: number) => drafts[key] ?? String(fallback);
+
+  const commitNumber = (key: string, raw: string, min: number, apply: (parsed: number) => void) => {
+    setDrafts((prev) => ({ ...prev, [key]: raw }));
+    const parsed = Number(raw);
+    if (raw.trim() === '' || !Number.isFinite(parsed) || parsed < min) return;
+    apply(parsed);
+  };
+
   const previews = useMemo(
     () =>
       PREVIEW_TEAM_COUNTS.map((teamCount) => ({
@@ -86,11 +100,13 @@ export function PromotionRuleForm({ value, onChange, disabled = false }: Promoti
               step={1}
               className={inputClass}
               disabled={disabled}
-              value={Math.round((value.ratio ?? 0.2) * 100)}
-              onChange={(e) => {
-                const percent = Number(e.target.value);
-                onChange({ ...value, ratio: Number.isFinite(percent) ? percent / 100 : undefined });
-              }}
+              value={draftOf('ratio', Math.round((value.ratio ?? 0.2) * 100))}
+              onChange={(e) =>
+                commitNumber('ratio', e.target.value, 1, (percent) => {
+                  if (percent > 50) return;
+                  onChange({ ...value, ratio: percent / 100 });
+                })
+              }
             />
             <p className="mt-1 text-xs text-[var(--text-muted)]">1~50%. 절반을 넘으면 리그가 성립하지 않아요.</p>
           </div>
@@ -106,8 +122,12 @@ export function PromotionRuleForm({ value, onChange, disabled = false }: Promoti
               step={1}
               className={inputClass}
               disabled={disabled}
-              value={value.fixedCount ?? 1}
-              onChange={(e) => onChange({ ...value, fixedCount: Number(e.target.value) })}
+              value={draftOf('fixedCount', value.fixedCount ?? 1)}
+              onChange={(e) =>
+                commitNumber('fixedCount', e.target.value, 1, (parsed) =>
+                  onChange({ ...value, fixedCount: Math.trunc(parsed) }),
+                )
+              }
             />
           </div>
         )}
@@ -142,8 +162,12 @@ export function PromotionRuleForm({ value, onChange, disabled = false }: Promoti
             step={1}
             className={inputClass}
             disabled={disabled}
-            value={value.minSlots ?? 1}
-            onChange={(e) => onChange({ ...value, minSlots: Number(e.target.value) })}
+            value={draftOf('minSlots', value.minSlots ?? 1)}
+            onChange={(e) =>
+              commitNumber('minSlots', e.target.value, 1, (parsed) =>
+                onChange({ ...value, minSlots: Math.trunc(parsed) }),
+              )
+            }
           />
         </div>
       </div>

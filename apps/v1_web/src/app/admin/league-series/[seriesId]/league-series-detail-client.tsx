@@ -16,6 +16,10 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
   const { toasts, showToast } = useAdminToast();
   const { data: series, isPending, isError, refetch } = useV1AdminLeagueSeries(seriesId);
   const [preview, setPreview] = useState<V1PromotionPreviewResponse | null>(null);
+  // 새 preview 가 올 때마다 증가시켜 PromotionCommitPanel 을 remount 한다 — 패널이 들고 있는
+  // 수정 상태(overrides)가 남으면 다시 계산한 순위표에 옛 선택이 그대로 얹힌다.
+  // 같은 시즌을 재계산하는 경우도 순위가 바뀌었을 수 있으므로 seasonNo 가 아니라 카운터를 쓴다.
+  const [previewNonce, setPreviewNonce] = useState(0);
 
   const previewPromotions = useV1PreviewLeaguePromotions(seriesId);
   const commitPromotions = useV1CommitLeaguePromotions(seriesId);
@@ -24,6 +28,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
     previewPromotions.mutate(seasonNo, {
       onSuccess: (result) => {
         setPreview(result);
+        setPreviewNonce((n) => n + 1);
         // 이미 확정된 시즌은 다시 확정할 수 없다 — commit 이 409 로 막히므로 미리 알린다.
         if (result.alreadyDecided) showToast('이미 승강이 확정된 시즌이에요.', 'error');
       },
@@ -154,6 +159,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
             규칙이 계산한 결과예요. 다음 시즌에 참가하지 않는 팀은 &lsquo;불참&rsquo;으로 바꿔 주세요.
           </p>
           <PromotionCommitPanel
+            key={previewNonce}
             preview={preview}
             submitting={commitPromotions.isPending}
             onCommit={handleCommit}

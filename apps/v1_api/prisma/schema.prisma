@@ -1645,7 +1645,8 @@ model V1TeamMatchApplication {
 // 그 문구에 맞춘 작업이었다(확장-수축 2단계, 2026-08-18~19).
 //
 // Task 153 부터 V1League 는 두 가지로 쓰인다:
-//   (a) seriesId = null  → 종래의 단발 리그. 시즌·티어 개념 없음(tier=1, seasonNo=1).
+//   (a) seriesId = null  → 종래의 단발 리그. tier·seasonNo 도 함께 null 이다
+//                          (티어가 "1부"인 게 아니라 티어 개념 자체가 없다).
 //   (b) seriesId != null → 리그 체계(V1LeagueSeries)의 "N시즌 x T티어" 인스턴스.
 //                          시즌 종료 시 순위표 기반으로 승격·강등이 계산된다.
 // (a) 를 (b) 로 강제 이관하지 않는다 — 기존 리그는 그대로 동작해야 한다.

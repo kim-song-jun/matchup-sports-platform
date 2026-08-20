@@ -50,6 +50,19 @@ export class LeagueSeriesAdminService {
     const rule: PromotionRule = dto.promotionRule ?? { ...DEFAULT_PROMOTION_RULE };
     this.assertRuleValid(rule);
 
+    // 리그(V1League) 생성과 달리 시리즈에는 팀이 딸려 오지 않는다 — 팀의 sportId 와 대조해
+    // 간접 검증되던 경로가 없으므로 종목도 직접 확인한다. 안 하면 FK 위반이 500 으로 샌다.
+    const sport = await this.prisma.v1Sport.findFirst({
+      where: { id: dto.sportId, isActive: true },
+      select: { id: true },
+    });
+    if (sport === null) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_SPORT_INVALID',
+        message: '활성화된 종목만 선택할 수 있어요.',
+      });
+    }
+
     const region = await this.prisma.v1Region.findFirst({
       where: { id: dto.regionId, isActive: true, level: 2 },
       select: { id: true },

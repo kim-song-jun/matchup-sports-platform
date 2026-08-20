@@ -256,7 +256,9 @@ export const gameSchemaSourceManifest = {
   // 전부 additive 이며 삭제는 없다. game domain(V1Game*) 모델은 건드리지 않았고 바인딩된
   // 20260729000100_v1_game_operations 도 그대로라 migration 해시는 변하지 않는다.
   // 뒷받침 마이그레이션: 20260820210000_v1_league_tier_and_promotion.
-  schema: '82504bcce1d9a0b1f7a6317ea1581417189530944c25c149deca13cf35e6be44',
+  // (같은 PR 내 재핀: 리뷰 지적으로 리그 도메인 주석 한 줄을 고쳤다 — 단발 리그의
+  //  tier/seasonNo 가 1 이 아니라 null 이라는 설명. 모델·필드 변경은 없다.)
+  schema: '8ba501c312757eb2c034aa13827adb8ca6a7c4c186d418b3568eab4df226fa19',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

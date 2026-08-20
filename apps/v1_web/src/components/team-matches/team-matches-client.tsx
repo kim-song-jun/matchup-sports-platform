@@ -613,19 +613,17 @@ function buildResultAction(
 /**
  * 경기가 끝난 뒤 후기 작성 화면으로 가는 진입점.
  *
- * 서버가 실제로 어떤 대상을 열어줄지(상대 팀 / 상대 선수)는 역할과 라인업에 따라 갈리지만,
- * 그 판정은 작성 화면이 /reviews/sources/... 로 직접 받는다 — 여기서 미리 흉내 내면 두 곳의
- * 규칙이 갈릴 때 조용히 어긋난다. 그래서 "참가팀 소속 + 경기 종료"까지만 보고 링크를 연다.
- */
-/**
- * 후기 진입점은 **참가팀 소속**이면 연다 — 역할로 좁히지 않는다.
- *
+ * 게이트는 **참가팀 소속 + 경기 종료**까지만 본다 — 역할로 좁히지 않는다.
  * 종전에는 `canManageHostTeam || viewerState === 'approved'` 였는데, 그 둘은 각각
  * "host 팀 owner/manager" 와 "신청서를 낸 사람 한 명"이라(team-matches.service.ts
  * getViewerState) 양 팀 일반 팀원 전원과 (매니저가 신청한 경우) 신청팀 owner 까지
- * 진입점을 잃었다. 서버는 두 팀의 active 멤버 전원에게 후기를 허용하므로
- * (reviews.service.ts resolveReviewerTeams) 화면도 같은 기준으로 연다.
- * 실제 작성 권한은 서버가 다시 판정하므로, 여기서 넓게 여는 쪽이 안전하다.
+ * 진입점을 잃었다. 서버는 두 팀의 active 멤버 전원에게 후기를 허용한다
+ * (reviews.service.ts resolveReviewerTeams).
+ *
+ * 서버가 실제로 어떤 대상을 열어줄지(상대 팀 / 상대 선수)는 역할과 라인업에 따라 갈리지만,
+ * 그 판정은 작성 화면이 /reviews/sources/... 로 직접 받는다 — 여기서 미리 흉내 내면 두 곳의
+ * 규칙이 갈릴 때 조용히 어긋난다. 실제 작성 권한은 서버가 다시 판정하므로, 화면은 같은
+ * 기준으로 넓게 여는 쪽이 안전하다.
  */
 function buildReviewAction(
   teamMatchId: string,

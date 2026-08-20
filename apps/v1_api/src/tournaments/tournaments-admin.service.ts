@@ -626,7 +626,10 @@ export class TournamentsAdminService {
    * eligibleTeamWhere) — 참가 확정(confirmed) 팀의 active owner/manager. 넓게 보내면 열어봐야
    * 쓸 수 없는 알림이 되고, 좁게 보내면 정작 쓸 사람이 못 받는다.
    *
-   * 발송 실패가 상태 전이를 되돌리면 안 되므로 트랜잭션 밖에서, fire-and-forget 계열로 호출한다.
+   * 발송 실패가 상태 전이를 되돌리면 안 되므로 트랜잭션 밖에서 **best-effort** 로 호출한다
+   * (호출부에서 await + try/catch — 실패는 삼키되 응답 전에 끝낸다). 진짜 fire-and-forget
+   * 으로 떼어내지 않는 이유는, 요청 수명이 끝난 뒤 알림이 조용히 유실되는 것보다 관리자
+   * 응답을 쿼리 한 번만큼 늦추는 편이 낫기 때문이다.
    */
   private async requestTournamentReviews(tournamentId: string) {
     const registrations = await this.prisma.v1TournamentRegistration.findMany({

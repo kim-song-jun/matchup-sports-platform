@@ -1,4 +1,4 @@
-import { IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class CreateTeamContactDto {
   @IsUUID()
@@ -8,4 +8,11 @@ export class CreateTeamContactDto {
   @MinLength(1)
   @MaxLength(500)
   message!: string;
+}
+
+export class DeclineTeamContactDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
 }

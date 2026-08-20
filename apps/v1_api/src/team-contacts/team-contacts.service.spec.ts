@@ -5,7 +5,14 @@ import { TeamContactsService } from './team-contacts.service';
 function makePrisma() {
   const prisma: any = {
     v1TeamMembership: { findFirst: jest.fn() },
-    v1TeamContact: { findFirst: jest.fn(), count: jest.fn(), create: jest.fn() },
+    v1TeamContact: {
+      findFirst: jest.fn(),
+      count: jest.fn(),
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
     $executeRaw: jest.fn(),
   };
   prisma.$transaction = jest.fn().mockImplementation((cb: any) => cb(prisma));
@@ -130,5 +137,104 @@ describe('TeamContactsService.create', () => {
     const backward = JSON.stringify(prisma.$executeRaw.mock.calls[0]);
 
     expect(forward).toBe(backward);
+  });
+});
+
+describe('TeamContactsService 응답 처리', () => {
+  const contact = {
+    id: 'c1', fromTeamId: 'A', toTeamId: 'B', status: 'requested',
+    expiresAt: new Date(Date.now() + 86_400_000),
+  };
+
+  it('받는 팀 운영진이 수락하면 accepted 로 바뀐다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue(contact);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.update.mockResolvedValue({ ...contact, status: 'accepted' });
+    const service = new TeamContactsService(prisma);
+
+    const result = await service.accept(actor, 'c1');
+    expect(result.contact.status).toBe('accepted');
+    expect(result.alreadyProcessed).toBe(false);
+  });
+
+  it('이미 수락된 컨택을 다시 수락하면 멱등하게 통과하고 다시 쓰지 않는다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue({ ...contact, status: 'accepted' });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    const service = new TeamContactsService(prisma);
+
+    const result = await service.accept(actor, 'c1');
+    expect(result.alreadyProcessed).toBe(true);
+    expect(prisma.v1TeamContact.update).not.toHaveBeenCalled();
+  });
+
+  it('거절된 컨택은 수락할 수 없다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue({ ...contact, status: 'declined' });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.accept(actor, 'c1')).rejects.toMatchObject({
+      response: { code: 'TEAM_CONTACT_STATE_CONFLICT' },
+    });
+  });
+
+  it('보낸 팀 운영진은 수락할 수 없다 — 수락 권한은 받는 팀에만 있다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue(contact);
+    // 'B'(받는 팀) 멤버십 조회는 실패해야 한다
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.accept(actor, 'c1')).rejects.toBeInstanceOf(ForbiddenException);
+    const where = prisma.v1TeamMembership.findFirst.mock.calls[0][0].where;
+    expect(where.teamId).toBe('B');
+  });
+
+  it('철회는 보낸 팀 운영진만 할 수 있다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue(contact);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.update.mockResolvedValue({ ...contact, status: 'withdrawn' });
+    const service = new TeamContactsService(prisma);
+
+    const result = await service.withdraw(actor, 'c1');
+    expect(result.contact.status).toBe('withdrawn');
+    // 보낸 팀('A') 기준으로 권한을 봤는지
+    expect(prisma.v1TeamMembership.findFirst.mock.calls[0][0].where.teamId).toBe('A');
+  });
+
+  // 만료: 이 레포에는 cron 인프라(@nestjs/schedule)가 0건이므로 배치가 아니라 읽기 시점에 처리한다
+  it('만료 시각이 지난 requested 컨택은 수락할 수 없고 expired 로 간주한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue({
+      ...contact,
+      expiresAt: new Date(Date.now() - 1000),
+    });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.accept(actor, 'c1')).rejects.toMatchObject({
+      response: { code: 'TEAM_CONTACT_STATE_CONFLICT' },
+    });
+  });
+
+  it('만료된 컨택을 읽으면 DB 상태도 expired 로 정리한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue({
+      ...contact,
+      expiresAt: new Date(Date.now() - 1000),
+    });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    const service = new TeamContactsService(prisma);
+
+    await service.accept(actor, 'c1').catch(() => undefined);
+    expect(prisma.v1TeamContact.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'c1', status: 'requested' }),
+        data: { status: 'expired' },
+      }),
+    );
   });
 });

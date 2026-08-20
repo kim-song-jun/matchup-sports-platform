@@ -1,7 +1,7 @@
-import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateTeamContactDto } from './dto/team-contact.dto';
+import { CreateTeamContactDto, DeclineTeamContactDto } from './dto/team-contact.dto';
 
 /** 한 팀이 24시간 동안 보낼 수 있는 컨택 수. 확정값 — 스펙 §2. */
 const DAILY_SEND_LIMIT = 10;
@@ -74,6 +74,74 @@ export class TeamContactsService {
         },
       });
     });
+  }
+
+  async accept(user: V1AuthUser, contactId: string) {
+    return this.respond(user, contactId, 'toTeamId', 'accepted');
+  }
+
+  async decline(user: V1AuthUser, contactId: string, dto: DeclineTeamContactDto) {
+    return this.respond(user, contactId, 'toTeamId', 'declined', dto.reason ?? null);
+  }
+
+  async withdraw(user: V1AuthUser, contactId: string) {
+    return this.respond(user, contactId, 'fromTeamId', 'withdrawn');
+  }
+
+  private async respond(
+    user: V1AuthUser,
+    contactId: string,
+    actorSide: 'fromTeamId' | 'toTeamId',
+    nextStatus: 'accepted' | 'declined' | 'withdrawn',
+    declineReason: string | null = null,
+  ) {
+    const contact = await this.prisma.v1TeamContact.findUnique({ where: { id: contactId } });
+    if (!contact) {
+      throw new NotFoundException({ code: 'TEAM_CONTACT_NOT_FOUND', message: '컨택을 찾을 수 없어요.' });
+    }
+    await this.assertCanManageTeam(user.id, contact[actorSide]);
+
+    const status = await this.settleExpiry(contact);
+
+    // 멱등: 이미 목표 상태면 아무것도 쓰지 않고 그대로 돌려준다
+    if (status === nextStatus) {
+      return { contact, alreadyProcessed: true };
+    }
+    if (status !== 'requested') {
+      throw stateConflict(
+        '이미 처리된 컨택이에요.',
+        'TEAM_CONTACT_STATE_CONFLICT',
+        { currentStatus: status },
+      );
+    }
+
+    const updated = await this.prisma.v1TeamContact.update({
+      where: { id: contactId },
+      data: {
+        status: nextStatus,
+        respondedByUserId: user.id,
+        respondedAt: new Date(),
+        declineReason,
+      },
+    });
+    return { contact: updated, alreadyProcessed: false };
+  }
+
+  /**
+   * 만료를 읽기 시점에 반영한다. 이 레포에는 cron 인프라(@nestjs/schedule)가 없어
+   * 배치로 돌릴 수 없다 — team-matches 의 getApiStatus() 와 같은 lazy-flip 방식이다.
+   * 판정과 DB 정리를 한 곳에 모아, 목록 조회와 상태 전이가 서로 다른 답을 내지 않게 한다.
+   */
+  private async settleExpiry(contact: { id: string; status: string; expiresAt: Date }) {
+    if (contact.status !== 'requested' || contact.expiresAt > new Date()) {
+      return contact.status;
+    }
+    // status 를 where 에 넣어 동시에 수락된 건을 덮어쓰지 않게 한다
+    await this.prisma.v1TeamContact.updateMany({
+      where: { id: contact.id, status: 'requested', expiresAt: { lt: new Date() } },
+      data: { status: 'expired' },
+    });
+    return 'expired';
   }
 
   // team-matches.service.ts 의 동명 private 메서드와 같은 패턴이다.

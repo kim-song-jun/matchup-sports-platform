@@ -23,13 +23,6 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
-    file: 'apps/v1_api/prisma/migrations/20260820180000_v1_tournament_award_recipient_user/migration.sql',
-    statement:
-      "WITH candidates AS ( SELECT award.\"id\" AS \"award_id\", MIN(player.\"user_id\") AS \"user_id\", COUNT(DISTINCT player.\"user_id\") AS \"candidate_count\" FROM \"v1_tournament_awards\" award JOIN \"v1_tournament_registrations\" registration ON registration.\"tournament_id\" = award.\"tournament_id\" AND registration.\"status\" = 'confirmed' JOIN \"v1_teams\" team ON team.\"id\" = registration.\"team_id\" JOIN \"v1_tournament_players\" player ON player.\"registration_id\" = registration.\"id\" AND player.\"removed_at\" IS NULL AND BTRIM(player.\"real_name\") = BTRIM(award.\"recipient_name\") WHERE award.\"team_name\" IS NULL OR BTRIM(team.\"name\") = BTRIM(award.\"team_name\") GROUP BY award.\"id\" ) UPDATE \"v1_tournament_awards\" award SET \"recipient_user_id\" = candidates.\"user_id\" FROM candidates WHERE award.\"id\" = candidates.\"award_id\" AND candidates.\"candidate_count\" = 1",
-    reason:
-      "One-shot backfill of the recipient_user_id column that the SAME migration just added as a nullable TEXT column (PR #588). Rolling-deploy safety: OLD app code neither selects nor writes the new column (stale Prisma client has no field for it), so old containers running against the migrated DB are unaffected; the UPDATE touches only the brand-new all-NULL column, never an existing one, and links only unambiguous rows (candidate_count = 1). Runs once under migrate deploy; re-running would be a no-op re-assignment of the same values. Reviewed 2026-08-20 while unblocking the alpha deploy this statement had halted.",
-  },
-  {
     file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
     statement:
       "INSERT INTO \"v1_managed_terms_placements\" (\"id\", \"policy_id\", \"context\", \"requirement\", \"display_order\", \"is_active\", \"created_at\", \"updated_at\") VALUES ( '7ef702a4-6289-4913-a31a-319de15bebd8', 'f772fb99-2671-4066-8874-54867ce0ecf4', 'tournament_application'::\"V1ManagedTermsContext\", 'optional'::\"V1ManagedTermsRequirement\", 4, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP ) ON CONFLICT (\"id\") DO NOTHING",

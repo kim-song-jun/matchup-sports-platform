@@ -41,3 +41,4 @@
 - 2026-08-20: 후처리 단위 테스트 3건, API `tsc --noEmit`, Alpha/prod/setup 배포 스크립트 `bash -n` 통과.
 - 2026-08-20: Alpha 배포 성공. 이름-only 수상 26건을 모두 단일 계정에 연결했지만 완료 대회 QA persona에 공개 기록 동의 fixture가 없어 비로그인 프로필 검증이 0건으로 가려짐을 확인. 최초 생성 시에만 GRANTED를 넣고 이후 사용자의 철회는 보존하도록 QA 시드를 보완.
 - 2026-08-20: Alpha 시드 대상 테스트 8건과 API `tsc --noEmit` 통과.
+- 2026-08-20: 동시 PR #594가 이미 제거된 migration `UPDATE`의 reviewed exception을 뒤늦게 추가해 dead allowlist가 생김. 동일 SQL 재도입을 허용하지 않도록 예외를 제거.

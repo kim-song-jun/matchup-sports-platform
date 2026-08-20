@@ -4,7 +4,9 @@ import { UPLOAD_HARD_CAP_BYTES } from '../uploads/uploads.controller';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { Throttle } from '@nestjs/throttler';
 import {
+  AdminGlobalSearchQueryDto,
   AdminListQueryDto,
   AdminLogsQueryDto,
   AdminInquiryListQueryDto,
@@ -103,6 +105,13 @@ export class AdminController {
     @Body() dto: ChangeTeamMatchStatusDto,
   ) {
     return this.adminService.changeTeamMatchStatus(user, teamMatchId, dto);
+  }
+
+  /** 전역 검색 — 커맨드 팔레트(⌘K). 클라이언트 300ms debounce 전제, 남용 방지로 60회/분 제한 */
+  @Get('search')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  globalSearch(@CurrentUser() user: V1AuthUser, @Query() query: AdminGlobalSearchQueryDto) {
+    return this.adminService.globalSearch(user, query);
   }
 
   @Get('action-logs')

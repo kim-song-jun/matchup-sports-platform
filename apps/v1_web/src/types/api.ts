@@ -1980,6 +1980,33 @@ export type V1Home = {
   recommendedTeams?: V1Team[];
 };
 
+/** GET /admin/search — 커맨드 팔레트 전역 검색 결과 (도메인당 최대 5건) */
+export type V1AdminGlobalSearchUserHit = {
+  userId: string;
+  label: string;
+  sublabel: string | null;
+  status: string;
+};
+
+export type V1AdminGlobalSearchTeamHit = {
+  teamId: string;
+  label: string;
+  status: string;
+};
+
+export type V1AdminGlobalSearchMatchHit = {
+  matchId: string;
+  label: string;
+  sublabel: string | null;
+  status: string;
+};
+
+export type V1AdminGlobalSearchResult = {
+  users: V1AdminGlobalSearchUserHit[];
+  teams: V1AdminGlobalSearchTeamHit[];
+  matches: V1AdminGlobalSearchMatchHit[];
+};
+
 export type V1AdminOverview = {
   users: { active: number; suspended: number; blocked: number; withdrawalPending: number };
   matches: { recruiting: number; cancelled: number; completed: number };

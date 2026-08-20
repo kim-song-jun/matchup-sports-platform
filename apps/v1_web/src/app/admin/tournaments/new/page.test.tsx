@@ -16,6 +16,7 @@ import AdminTournamentsNewPage from './page';
 import {
   INITIAL_TOURNAMENT_CREATE_STATE,
   buildTournamentCreatePayload,
+  hasPromoFactEdits,
   tournamentCreateReducer,
   validateTournamentCreateStep,
 } from './tournament-create-model';
@@ -795,6 +796,42 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
 
       expect(repriced.promoList.prizeText).toBe('');
       expect(repriced.promoHome.prizeText).toBe('총 상금 5,000,000원');
+    });
+
+    it('되돌릴 파생값이 없는 칸도 다시 채우기로 비워진다 — 버튼이 무반응처럼 보이던 결함', () => {
+      // 장소·상금을 앞 단계에서 입력하지 않아 파생값이 빈 칸인 상태에서, 관리자가 문구만
+      // 직접 써 넣었다. 이때 "다시 채우기"가 그 칸을 건너뛰면 버튼이 아무 일도 안 한 것처럼
+      // 보인다(alpha 재현 확인).
+      const dated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+        type: 'set-scheduled-at',
+        value: '2026-08-29T09:00',
+      });
+      const typed = tournamentCreateReducer(dated, {
+        type: 'set-promo',
+        slot: 'promoHome',
+        value: { ...dated.promoHome, locationText: '직접 쓴 장소', prizeText: '직접 쓴 상금' },
+      });
+
+      expect(hasPromoFactEdits(typed, 'promoHome')).toBe(true);
+
+      const reset = tournamentCreateReducer(typed, {
+        type: 'reset-promo-facts',
+        slot: 'promoHome',
+      });
+
+      expect(reset.promoHome.locationText).toBe('');
+      expect(reset.promoHome.prizeText).toBe('');
+      // 파생값이 있는 날짜는 그대로 유지된다.
+      expect(reset.promoHome.dateText).toBe('8월 29일 (토)');
+      // 되돌린 뒤에는 되돌릴 것이 없다 — 버튼이 비활성으로 바뀐다.
+      expect(hasPromoFactEdits(reset, 'promoHome')).toBe(false);
+    });
+
+    it('직접 고친 문구가 없으면 되돌릴 것도 없다고 알린다', () => {
+      const state = stateWithTournamentInfo();
+
+      expect(hasPromoFactEdits(state, 'promoHome')).toBe(false);
+      expect(hasPromoFactEdits(state, 'promoList')).toBe(false);
     });
 
     it('초안 저장 후 새로고침해도 자동으로 채워졌던 문구는 계속 대회 정보를 따라간다', () => {

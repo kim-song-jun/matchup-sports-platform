@@ -217,23 +217,23 @@ export function tournamentCreateReducer(
       return withPromoValue(state, action.slot, action.value);
     case 'patch-promo':
       return withPromoValue(state, action.slot, { ...state[action.slot], ...action.patch });
-    case 'reset-promo-facts': {
-      const cleared: TournamentCreateState = {
+    case 'reset-promo-facts':
+      return {
         ...state,
+        // 되돌리기는 "대회 정보 기준으로 맞춘다"는 뜻이라 파생값을 그대로 덮어쓴다 —
+        // 대회 정보에 값이 없으면 그 칸도 비운다. 자동 동기화(applyPromoFactDefaults)는
+        // 반대로 빈 파생값으로 기존 문구를 지우지 않는데, 그건 관리자가 앞 단계를 입력하는
+        // 도중 잠깐 비는 것과 구분해야 하기 때문이다. 여기서 같은 규칙을 쓰면 되돌릴 파생값이
+        // 없는 칸이 그냥 남아 버튼이 아무 일도 안 한 것처럼 보인다(실제 제보).
+        [action.slot]: {
+          ...state[action.slot],
+          ...buildTournamentPromoFactDefaults(state),
+        },
         promoFactsDirty: {
           ...state.promoFactsDirty,
           [action.slot]: { ...EMPTY_PROMO_FACTS_DIRTY },
         },
       };
-      return {
-        ...cleared,
-        [action.slot]: applyPromoFactDefaults(
-          cleared[action.slot],
-          buildTournamentPromoFactDefaults(cleared),
-          EMPTY_PROMO_FACTS_DIRTY,
-        ),
-      };
-    }
     case 'copy-bank':
       return {
         ...state,
@@ -250,6 +250,18 @@ export function tournamentCreateReducer(
         step: CONFIRM_STEP_INDEX,
       };
   }
+}
+
+/**
+ * 이 홍보 카드에 "되돌릴 것"이 있는지 — 관리자가 사실 문구를 하나라도 직접 고쳤는가.
+ * 되돌릴 게 없는데 버튼이 눌리면 아무 일도 일어나지 않아 무반응처럼 보이므로, 그때는
+ * 버튼을 비활성으로 두어 상태를 드러낸다.
+ */
+export function hasPromoFactEdits(
+  state: TournamentCreateState,
+  slot: 'promoHome' | 'promoList',
+): boolean {
+  return PROMO_FACT_KEYS.some((key) => state.promoFactsDirty[slot][key]);
 }
 
 /** buildTournamentPromoFactDefaults의 입력이 되는 앞 단계 필드 — 이 값이 바뀌면 문구를 다시 만든다. */

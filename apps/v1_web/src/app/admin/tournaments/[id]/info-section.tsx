@@ -5,7 +5,7 @@ import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1UpdateTournament, useV1UploadImages } from '@/hooks/use-v1-api';
-import type { V1UpdateTournamentPayload, V1TournamentGenderCategory } from '@/types/api';
+import type { V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
@@ -396,7 +396,9 @@ export function TournamentInfoSection() {
 
   return (
     <>
-      {/* ── Info card (ADM-TOURN-05: prize/rules/refund read-back) ──── */}
+      {/* 대회 정보 — 읽기 요약 하나 + 편집 진입점 하나.
+          예전에는 같은 값(마감·참가비·팀 수·출전 인원·교체 방식·계좌…)을 이 카드와 아래
+          요약표가 각각 그렸고, '대회 정보 수정' 버튼도 두 곳에 있었다. */}
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[13px] font-bold text-[var(--text-strong)]">대회 정보</span>
@@ -413,40 +415,41 @@ export function TournamentInfoSection() {
         </div>
         <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
           {[
+            { label: '상태', value: TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status },
+            { label: '형식', value: TOURNAMENT_FORMAT_LABEL[tournament.format] ?? tournament.format },
+            { label: '대회 일정', value: scheduleLabel },
+            { label: '장소', value: tournament.venue ?? '미정' },
+            { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
+            { label: '명단 마감', value: formatDate(tournament.rosterDeadlineAt) },
             { label: '참가비', value: formatCurrency(tournament.entryFee) },
             { label: '팀 수', value: `${tournament.teamCount}팀` },
-            { label: '선수 수 (등록 명단)', value: `${tournament.minPlayers}~${tournament.maxPlayers}명` },
+            { label: '신청 수', value: `${tournament.registrationCount}팀` },
+            { label: '선수 구성 (등록 명단)', value: `${tournament.minPlayers}~${tournament.maxPlayers}명` },
             {
               label: '출전 인원',
               value: tournament.lineupMaxPlayers !== null ? `${tournament.lineupMaxPlayers}명` : '미지정',
             },
             {
               label: '교체 방식',
-              value:
-                substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions),
+              value: substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions),
             },
-            { label: '신청 수', value: `${tournament.registrationCount}팀` },
-            { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
-            { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
-            { label: '명단 마감', value: formatDate(tournament.rosterDeadlineAt) },
-            { label: '대회 일정', value: scheduleLabel },
-            { label: '상품 및 상금', value: tournament.prizeSummary || '—' },
+            {
+              label: '입금 계좌',
+              value: tournament.bankName
+                ? `${tournament.bankName} ${tournament.bankAccount ?? ''}${tournament.bankHolder ? ` (${tournament.bankHolder})` : ''}`
+                : '미등록',
+            },
           ].map(({ label, value }) => (
             <div key={label}>
               <dt className="text-xs text-[var(--text-muted)] font-medium mb-0.5">{label}</dt>
-              <dd className={`text-[13px] text-[var(--text-strong)] ${label === '상품 및 상금' ? 'whitespace-pre-wrap leading-relaxed' : ''}`}>{value}</dd>
+              <dd className="text-[13px] text-[var(--text-strong)]">{value}</dd>
             </div>
           ))}
         </dl>
-        {/* Long-form fields */}
-        {(tournament.prizeBreakdown || tournament.rulesText || tournament.refundPolicyText) && (
+        {/* 규정·환불은 긴 글이라 표가 아니라 아래에 펼친다. 상금은 바로 아래 전용 카드에서
+            읽고 고치므로 여기서 또 보여주지 않는다. */}
+        {(tournament.rulesText || tournament.refundPolicyText) ? (
           <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4">
-            {tournament.prizeBreakdown && (
-              <div>
-                <p className="text-xs text-[var(--text-muted)] font-medium mb-0.5">상금 배분</p>
-                <p className="text-[13px] text-[var(--text-strong)] whitespace-pre-wrap leading-relaxed">{tournament.prizeBreakdown}</p>
-              </div>
-            )}
             {tournament.rulesText && (
               <div>
                 <p className="text-xs text-[var(--text-muted)] font-medium mb-0.5">대회 규정</p>
@@ -460,12 +463,14 @@ export function TournamentInfoSection() {
               </div>
             )}
           </div>
-        )}
-        {/* Null-state hint when all long-form fields are absent */}
-        {!tournament.prizeBreakdown && !tournament.rulesText && !tournament.refundPolicyText && (
-          <p className="mt-3 text-xs text-[var(--text-muted)]">상금 배분, 대회 규정, 환불 정책을 아직 입력하지 않았어요.</p>
+        ) : (
+          <p className="mt-3 text-xs text-[var(--text-muted)]">대회 규정과 환불 정책을 아직 입력하지 않았어요.</p>
         )}
       </div>
+
+      <CoverImageCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
+
+      <PrizeCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
 
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
         <div className="flex items-center justify-between gap-3 mb-3">
@@ -561,13 +566,6 @@ export function TournamentInfoSection() {
           ))}
         </div>
       </div>
-
-      <InfoTab
-        tournamentId={id}
-        showToast={showToast}
-        onOpenBasicEdit={openEdit}
-        onOpenPromoEdit={openPromoEdit}
-      />
 
       {/* ── D1: 대회 정보 수정 모달 ──────────────────────────────────── */}
       <SimpleModal
@@ -1113,15 +1111,6 @@ const TOURNAMENT_FORMAT_LABEL: Record<string, string> = {
   group_knockout: '조별리그 + 토너먼트',
 };
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{label}</dt>
-      <dd className="text-[13px] text-[var(--text-strong)] m-0">{value}</dd>
-    </div>
-  );
-}
-
 function GenderQuotaInput({
   id,
   label,
@@ -1156,41 +1145,20 @@ function GenderQuotaInput({
   );
 }
 
-function InfoTab({
-  tournamentId,
+/** 커버 이미지 — 목록 카드 썸네일. 읽기 전용 관리자에게는 업로더를 잠근다. */
+function CoverImageCard({
+  tournament,
+  canWrite,
   showToast,
-  onOpenBasicEdit,
-  onOpenPromoEdit,
 }: {
-  tournamentId: string;
+  tournament: V1Tournament;
+  canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
-  onOpenBasicEdit: () => void;
-  onOpenPromoEdit: () => void;
 }) {
-  const { data: tournament } = useV1AdminTournament(tournamentId);
-  const updateTournament = useV1UpdateTournament(tournamentId);
+  const updateTournament = useV1UpdateTournament(tournament.id);
   const uploadImages = useV1UploadImages();
 
-  const [prizePool, setPrizePool] = useState('');
-  const [prizeSummary, setPrizeSummary] = useState('');
-  // 배분은 구조화 행으로 편집하고 저장 시 기존 텍스트 포맷으로 직렬화한다 (공개 파서 호환).
-  // 각 행 값(value)은 자유 텍스트 — 금액("600,000원")이든 물품("우승 트로피")이든 그대로 보관한다.
-  const [prizeRows, setPrizeRows] = useState<TournamentPrizeRow[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  if (tournament && !loaded) {
-    setPrizePool(tournament.prizePool !== null && tournament.prizePool !== undefined ? String(tournament.prizePool) : '');
-    setPrizeSummary(tournament.prizeSummary ?? '');
-    setPrizeRows(
-      parsePrizeRows(tournament.prizeBreakdown ?? '').map((row) => ({
-        id: createPrizeRowId(),
-        label: row.label,
-        value: row.amount,
-      })),
-    );
-    setLoaded(true);
-  }
-
-  const handleCoverUpload = async (file: File) => {
+  const handleUpload = async (file: File) => {
     try {
       const { urls } = await uploadImages.mutateAsync(file);
       if (!urls[0]) {
@@ -1206,14 +1174,63 @@ function InfoTab({
     }
   };
 
-  const handleCoverRemove = () => {
+  const handleRemove = () => {
     updateTournament.mutate({ coverImageUrl: null }, {
       onSuccess: () => showToast('커버 이미지를 제거했어요.', 'success'),
       onError: (err) => showToast(extractErrorMessage(err, '커버 이미지 제거에 실패했어요.'), 'error'),
     });
   };
 
-  const handlePrizeSave = () => {
+  return (
+    <section
+      aria-label="커버 이미지"
+      className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6"
+    >
+      <p className="text-[13px] font-bold text-[var(--text-strong)] mb-3">커버 이미지</p>
+      <CoverImageUploader
+        value={tournament.coverImageUrl}
+        onSelectFile={(file) => void handleUpload(file)}
+        onClear={handleRemove}
+        uploading={uploadImages.isPending}
+        disabled={!canWrite || updateTournament.isPending}
+        eager
+      />
+    </section>
+  );
+}
+
+/**
+ * 상금·시상 — 이 대회의 상금을 **읽고 고치는 단 한 곳**. 예전에는 위 요약표가
+ * prizeSummary 를, 그 아래 긴 글 영역이 prizeBreakdown 을 각각 또 보여줬다.
+ */
+function PrizeCard({
+  tournament,
+  canWrite,
+  showToast,
+}: {
+  tournament: V1Tournament;
+  canWrite: boolean;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+}) {
+  const updateTournament = useV1UpdateTournament(tournament.id);
+
+  // 대회 데이터를 prop 으로 받으므로 초기값을 한 번만 계산한다 — 예전에는 렌더 도중
+  // setState 로 채우고 `loaded` 플래그로 재진입을 막았다.
+  const [prizePool, setPrizePool] = useState(() =>
+    tournament.prizePool !== null && tournament.prizePool !== undefined ? String(tournament.prizePool) : '',
+  );
+  const [prizeSummary, setPrizeSummary] = useState(() => tournament.prizeSummary ?? '');
+  // 배분은 구조화 행으로 편집하고 저장 시 기존 텍스트 포맷으로 직렬화한다 (공개 파서 호환).
+  // 각 행 값(value)은 자유 텍스트 — 금액("600,000원")이든 물품("우승 트로피")이든 그대로 보관한다.
+  const [prizeRows, setPrizeRows] = useState<TournamentPrizeRow[]>(() =>
+    parsePrizeRows(tournament.prizeBreakdown ?? '').map((row) => ({
+      id: createPrizeRowId(),
+      label: row.label,
+      value: row.amount,
+    })),
+  );
+
+  const handleSave = () => {
     const payload: V1UpdateTournamentPayload = {};
     const pool = prizePool.trim();
     if (pool !== '') {
@@ -1238,104 +1255,51 @@ function InfoTab({
     });
   };
 
-  if (!tournament) {
-    return <div className="p-4 text-[13px] text-[var(--text-muted)]">대회 정보를 불러오는 중이에요…</div>;
-  }
-
-  const inputBoxCls = 'w-full text-[13px] border border-[var(--border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400';
+  const inputBoxCls = 'w-full text-[13px] border border-[var(--border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-[var(--surface-soft)]';
 
   return (
-    <div className="p-4 flex flex-col gap-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h3 className="text-[15px] font-bold text-[var(--text-strong)]">대회 정보</h3>
-          <p className="text-[12px] text-[var(--text-muted)] mt-0.5">대회 요약을 확인하고 상금·시상 정보를 수정하세요.</p>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={onOpenBasicEdit} className="inline-flex items-center text-xs text-[var(--blue700)] font-semibold px-3 min-h-[36px] rounded-lg border border-[var(--tint-blue-border)] hover:bg-[var(--blue50)]">기본 정보 수정</button>
-          <button type="button" onClick={onOpenPromoEdit} className="inline-flex items-center text-xs text-[var(--text-muted)] font-semibold px-3 min-h-[36px] rounded-lg border border-[var(--border)] hover:bg-[var(--surface-soft)]">프로모 설정</button>
-        </div>
+    <section
+      aria-label="상금·시상 정보"
+      className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6 flex flex-col gap-3"
+    >
+      <div>
+        <p className="text-[13px] font-bold text-[var(--text-strong)] m-0">상금·시상 정보</p>
+        <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5 mb-0">공개 페이지 &quot;시상·리뷰&quot;의 상금 카드에 그대로 표시돼요.</p>
       </div>
+      <PrizeBreakdownEditor
+        rows={prizeRows}
+        onChange={setPrizeRows}
+        prizePool={prizePool}
+        onPrizePoolChange={setPrizePool}
+        disabled={!canWrite || updateTournament.isPending}
+      />
 
-      {/* 요약 (읽기 전용) */}
-      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 border border-[var(--border)] rounded-xl p-4 bg-[var(--card-surface)] m-0">
-        <InfoRow label="상태" value={TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} />
-        <InfoRow label="형식" value={TOURNAMENT_FORMAT_LABEL[tournament.format] ?? tournament.format} />
-        <InfoRow label="장소" value={tournament.venue ?? '미정'} />
-        <InfoRow label="대회 기간" value={formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt)} />
-        <InfoRow label="신청 마감" value={formatDate(tournament.registrationDeadlineAt)} />
-        <InfoRow label="명단 마감" value={formatDate(tournament.rosterDeadlineAt)} />
-        <InfoRow label="참가비" value={formatCurrency(tournament.entryFee)} />
-        <InfoRow label="팀 수" value={`${tournament.teamCount}팀`} />
-        <InfoRow label="선수 구성 (등록 명단)" value={`${tournament.minPlayers}~${tournament.maxPlayers}명`} />
-        <InfoRow
-          label="출전 인원"
-          value={tournament.lineupMaxPlayers !== null ? `${tournament.lineupMaxPlayers}명` : '미지정'}
-        />
-        <InfoRow
-          label="교체 방식"
-          value={
-            tournament.substitutionMode === null
-              ? '미지정'
-              : tournament.substitutionMode === 'rolling'
-                ? '무제한(롤링)'
-                : substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions)
-          }
-        />
-        <InfoRow label="입금 계좌" value={tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount ?? ''}` : '미등록'} />
-      </dl>
-
-      {/* 커버 이미지 (목록 카드 썸네일) */}
-      <div className="border border-[var(--border)] rounded-xl p-4 bg-[var(--card-surface)] flex flex-col gap-3">
-        <CoverImageUploader
-          value={tournament.coverImageUrl}
-          onSelectFile={(file) => void handleCoverUpload(file)}
-          onClear={handleCoverRemove}
-          uploading={uploadImages.isPending}
-          disabled={updateTournament.isPending}
-          eager
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="info-prize-summary" className="text-[12px] text-[var(--text-body)]">상품 및 상금</label>
+        <textarea
+          id="info-prize-summary"
+          value={prizeSummary}
+          onChange={(e) => setPrizeSummary(e.target.value)}
+          disabled={!canWrite || updateTournament.isPending}
+          rows={2}
+          maxLength={500}
+          placeholder="예: 우승팀 현금 100만원 + 트로피"
+          className={inputBoxCls}
         />
       </div>
 
-      {/* 상금·시상 (수정 가능) */}
-      <div className="border border-[var(--border)] rounded-xl p-4 bg-[var(--card-surface)] flex flex-col gap-3">
-        <div>
-          <h4 className="text-[13px] font-bold text-[var(--text-strong)] m-0">상금·시상 정보</h4>
-          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5 mb-0">공개 페이지 &quot;시상·리뷰&quot;의 상금 카드에 그대로 표시돼요.</p>
-        </div>
-        <PrizeBreakdownEditor
-          rows={prizeRows}
-          onChange={setPrizeRows}
-          prizePool={prizePool}
-          onPrizePoolChange={setPrizePool}
-          disabled={updateTournament.isPending}
-        />
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="info-prize-summary" className="text-[12px] text-[var(--text-body)]">상품 및 상금</label>
-          <textarea
-            id="info-prize-summary"
-            value={prizeSummary}
-            onChange={(e) => setPrizeSummary(e.target.value)}
-            disabled={updateTournament.isPending}
-            rows={2}
-            maxLength={500}
-            placeholder="예: 우승팀 현금 100만원 + 트로피"
-            className={inputBoxCls}
-          />
-        </div>
-
+      {canWrite && (
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={handlePrizeSave}
+            onClick={handleSave}
             disabled={updateTournament.isPending}
             className="inline-flex items-center justify-center text-[13px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 h-[44px] rounded-xl"
           >
             {updateTournament.isPending ? '저장 중…' : '상금 정보 저장'}
           </button>
         </div>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

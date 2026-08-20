@@ -284,3 +284,30 @@ active GOAL and OWN_GOAL events.
 Public record time uses a ceiling minute without seconds. An event captured at
 2:04 is displayed as 3′. Own goals count toward the credited team score and
 are labelled separately, but never count as the culprit's personal goal.
+
+### Participant identity linkage and personal records (2026-08-20)
+
+Personal activity records are derived from official game revisions; they are
+not maintained as a second per-user statistics table. A participant is visible
+to that derivation only after a current participant-to-user identity link exists.
+
+`GamesService.createFromSourceInTransaction` now treats a source roster slot
+with a persisted `userId` the same way as a later lineup save: in the game
+creation transaction it appends a `ROSTER_ASSERTED` identity-link event and
+upserts the matching current link. Guest slots without a `userId` remain
+unlinked. This prevents source-created tournament games from becoming official
+while their real lineup users still have empty `/users/:id/records` responses.
+
+Historic repair is deliberately scoped to one tournament and is dry-run by
+default:
+
+```powershell
+pnpm --filter v1_api exec ts-node --transpile-only src/games/migration/participant-identity-link-backfill.cli.ts --tournament-id <uuid>
+pnpm --filter v1_api exec ts-node --transpile-only src/games/migration/participant-identity-link-backfill.cli.ts --tournament-id <uuid> --apply
+```
+
+The repair considers only participants from current official revisions with a
+persisted `userId`, no current link, and no prior identity-link event history.
+Rejected, revoked, or otherwise historically adjudicated links are therefore
+never recreated by this command. Applied rows use the system actor
+`GAME_BACKFILL`, and rerunning the command is idempotent.

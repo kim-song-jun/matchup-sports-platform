@@ -40,7 +40,23 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Tournament: () => ({
     data: {
       title: '가을 풋살 대회',
-      fixtures: [{ id: 'fixture-1', homeTeamName: '레드팀', awayTeamName: '블루팀' }],
+      format: 'knockout',
+      status: 'in_progress',
+      // `round`/`liveStatus` 는 `V1TournamentFixture` 의 필수 필드다. 예전 목업은 둘 다
+      // 빠져 있었는데, 진행 단계 스테퍼가 `round === 'final'` 처럼 값을 **비교만** 하던
+      // 동안에는 undefined 도 조용히 지나가서 드리프트가 드러나지 않았다. 스테퍼가 라운드
+      // 이름을 실제로 읽기 시작하자 이 목업만 터졌다 — 실제 API 는 항상 채워 보낸다.
+      fixtures: [
+        {
+          id: 'fixture-1',
+          round: '8강',
+          fixtureNumber: 1,
+          liveStatus: 'live',
+          status: 'scheduled',
+          homeTeamName: '레드팀',
+          awayTeamName: '블루팀',
+        },
+      ],
     },
   }),
 }));

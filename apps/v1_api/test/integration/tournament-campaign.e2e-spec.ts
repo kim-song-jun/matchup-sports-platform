@@ -151,7 +151,13 @@ describe('Tournament campaign integration contract', () => {
     expect(publishedPreview.body.data.status).toBe('published');
     expect(publishedPreview.body.data.tournament).toEqual(publicCampaign.body.data.tournament);
     const list = await request(app.getHttpServer()).get('/api/v1/tournaments').expect(200);
-    expect(list.body.data.items[0].campaignSlug).toBe('integration-cup');
+    // 이 픽스처는 대회 두 개를 `createMany` 로 한 번에 만들어 `createdAt` 이 같다 —
+    // 목록 정렬의 tiebreaker(`id desc`)가 둘 중 어느 쪽을 앞에 세우는지는 사용자에게
+    // 의미가 없으므로, 위치가 아니라 **id 로 찾아** 캠페인 슬러그를 확인한다.
+    const listed = list.body.data.items.find(
+      (item: { id: string }) => item.id === tournamentId,
+    );
+    expect(listed.campaignSlug).toBe('integration-cup');
     const detail = await request(app.getHttpServer())
       .get(`/api/v1/tournaments/${tournamentId}`)
       .expect(200);

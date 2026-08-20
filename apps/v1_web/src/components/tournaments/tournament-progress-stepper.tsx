@@ -114,10 +114,18 @@ import type { V1TournamentDetail, V1TournamentFixture } from '@/types/api';
  * **전부 빈 배열**이 됐고, 그래서 조별리그·4강이 영원히 "예정"(번호)으로 남고 결승만
  * 대회 status 로 체크됐다(오너 지적: "결승 갔을 때 조별리그, 4강이 check가 안되는").
  */
-type RoundKind = 'group' | 'third_place' | 'knockout';
+type RoundKind = 'group' | 'third_place' | 'knockout' | 'unknown';
 
-function classifyRound(round: string): RoundKind {
+/**
+ * 라운드 이름이 비었으면 어느 단계로도 세지 않는다(`unknown`). 이름이 없는 픽스처를
+ * 억지로 결선으로 분류하면 제목 없는 빈 스텝이 하나 생기고, 그게 "다음 단계"처럼
+ * 읽힌다. 값 자체를 못 믿는 이유는 이 필드가 운영자가 직접 적는 자유 문자열이기
+ * 때문이다 — 스테퍼 하나가 대회 상세·운영 보드 전체를 못 그리게 만들면 안 된다.
+ */
+function classifyRound(round: string | null | undefined): RoundKind {
+  if (typeof round !== 'string') return 'unknown';
   const r = round.trim();
+  if (r === '') return 'unknown';
   // 3·4위전은 진행 단계가 아니다 — 결승과 같은 시점에 치르는 곁가지라 스텝에 넣으면
   // "결승 다음 단계"처럼 읽힌다.
   if (r === 'third_place' || (r.includes('3') && r.includes('위'))) return 'third_place';

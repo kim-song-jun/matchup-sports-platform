@@ -97,15 +97,16 @@ export class TournamentsReadService {
     const hasNext = rows.length > limit;
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
 
+    const nextCursor = hasNext ? (pageItems.at(-1)?.id ?? null) : null;
+
     return {
       items: pageItems.map(presentTournamentCard),
-      pageInfo: buildPageInfo({
-        page: query.page,
-        limit,
-        total,
-        hasNext,
-        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
-      }),
+      // 페이지 번호를 묻지 않은 요청에는 **예전과 똑같은 두 필드만** 돌려준다. total 을
+      // 세지 않았으므로 `total: 0`/`totalPages: 0` 을 실어 보내면 "전체 0건"이라는 거짓말이
+      // 되고, 커서 클라이언트가 그 값을 읽기 시작하면 조용히 틀린 화면이 나온다.
+      pageInfo: wantsPageNumbers
+        ? buildPageInfo({ page: query.page, limit, total, hasNext, nextCursor })
+        : { nextCursor, hasNext },
     };
   }
 

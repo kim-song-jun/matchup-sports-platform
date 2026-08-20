@@ -319,6 +319,16 @@ describe('TournamentsReadService', () => {
     expect(prisma.v1Tournament.count).not.toHaveBeenCalled();
   });
 
+  it('list: 커서 요청의 pageInfo 는 예전과 같은 두 필드만 갖는다', async () => {
+    // 통합 스펙(`test/integration/health.e2e-spec.ts`)이 이 응답 모양을 통째로 비교한다 —
+    // total 을 세지도 않고 `total: 0` 을 실어 보내면 "전체 0건"이라는 거짓말이 된다.
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    const result = await service.list({});
+
+    expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+  });
+
   it('list: COUNT 필터는 목록 필터와 같은 where 를 쓴다', async () => {
     prisma.v1Tournament.findMany.mockResolvedValue([]);
     prisma.v1Tournament.count.mockResolvedValue(0);

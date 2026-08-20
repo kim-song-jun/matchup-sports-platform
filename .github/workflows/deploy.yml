@@ -176,10 +176,18 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -Eeuo pipefail
-          BASE_SHA="$(git merge-base "origin/${BASE_REF}" "${HEAD_SHA}")"
+          # base 는 이벤트 payload 를 우선 쓴다. `git merge-base origin/<base>` 로 직접
+          # 구하려다 실패했는데(2026-08-20), PR 체크아웃에는 base 브랜치의 원격 추적 ref
+          # 가 없어 `origin/dev` 를 해석하지 못한다 — 바로 위 changeset 스텝이 payload
+          # 값을 먼저 쓰고 못 쓸 때만 fetch 로 보강하는 것도 같은 이유다.
+          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            git fetch --no-tags origin "${BASE_REF}"
+            BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
+          fi
           echo "expand-contract gate: ${BASE_SHA} -> ${HEAD_SHA}"
           node scripts/qa/check-expand-contract-migrations.mjs "${BASE_SHA}" "${HEAD_SHA}"
 

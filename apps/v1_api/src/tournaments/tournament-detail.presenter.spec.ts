@@ -146,7 +146,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
             { id: 'side-home', sideKey: 'HOME' },
             { id: 'side-away', sideKey: 'AWAY' },
           ],
-          participants: [{ id: 'participant-1', displayNameSnapshot: '김선수' }],
+          participants: [{ id: 'participant-1', sideId: 'side-home', displayNameSnapshot: '김선수' }],
           events: [
             {
               id: 'event-goal-1',

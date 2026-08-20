@@ -244,7 +244,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     ]);
   });
 
-  it('자책골은 득점 귀속 side와 가해 선수 정보를 유지하고 ownGoal=true로 구분한다', async () => {
+  it('자책골은 행위 선수 소속팀 영역에 표시하고 ownGoal=true로 구분한다', async () => {
     const prisma = buildFakePrisma({
       fixtures: [makeFixture({})],
       consentLinks: [],
@@ -258,7 +258,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
     expect(result.items[0].scorers).toEqual([
-      { side: 'home', ownGoal: true, participantName: '이영희', jerseyNumber: 10, period: 1, clockMs: 124_000 },
+      { side: 'away', ownGoal: true, participantName: '이영희', jerseyNumber: 10, period: 1, clockMs: 124_000 },
     ]);
   });
 

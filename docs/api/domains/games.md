@@ -151,6 +151,8 @@ Raw migration triggers `v1_guard_result_revision_transition`, `v1_block_terminal
 - POST /games/:gameId/events accepts OWN_GOAL. sideId is the team credited
   with the goal, while participantId is required and must belong to the
   opposing side. It changes the credited score but not personal goal totals.
+  Public event projections keep that credited side for score integrity but
+  place the participant row under the participant's actual team.
 - The live console uses POST .../events/:eventId/reverse for active goal,
   own-goal, card, foul, and substitution rows. It appends a CORRECTION audit
   event and never overwrites the original; the operator then re-enters the

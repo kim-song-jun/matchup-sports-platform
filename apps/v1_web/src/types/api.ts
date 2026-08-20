@@ -2888,6 +2888,7 @@ export type V1TournamentFixtureGoal = {
   playerId: string | null;
   playerName: string;
   minute: number | null;
+  ownGoal?: boolean;
 };
 
 export type V1TournamentFixtureResult = {

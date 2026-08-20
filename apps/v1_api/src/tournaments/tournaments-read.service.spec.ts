@@ -906,7 +906,7 @@ describe('TournamentsReadService', () => {
               { id: 'side-home', sideKey: 'HOME' },
               { id: 'side-away', sideKey: 'AWAY' },
             ],
-            participants: [{ id: 'player-1', displayNameSnapshot: '홍길동' }],
+            participants: [{ id: 'player-1', sideId: 'side-home', displayNameSnapshot: '홍길동' }],
             events: [
               {
                 id: 'goal-1',

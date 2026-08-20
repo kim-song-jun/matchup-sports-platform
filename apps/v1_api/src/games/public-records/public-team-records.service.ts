@@ -6,6 +6,7 @@ import {
   isPeriodUnknown,
   parseTournamentFixtureRevisionGoals,
   parseTournamentFixtureOfficialScore,
+  resolveGoalDisplaySideId,
 } from '../../tournaments/tournament-fixture-official-result';
 import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, type RecordCursor } from './public-cursor';
@@ -22,6 +23,7 @@ import {
 type GameSideRow = { readonly id: string; readonly sideKey: 'HOME' | 'AWAY'; readonly teamId: string | null };
 type GameParticipantRow = {
   readonly id: string;
+  readonly sideId: string;
   readonly userId: string | null;
   readonly displayNameSnapshot: string;
   readonly jerseyNumber: number | null;
@@ -211,7 +213,7 @@ export class PublicTeamRecordsService {
                 sides: { select: { id: true, sideKey: true, teamId: true } },
                 // 이벤트 요약(loadEvents)이 이름/등번호를 붙이는 데 쓴다 -- 이미 같은
                 // 메인 쿼리로 불러오므로 gameId별 추가 조회가 필요 없다(N+1 금지).
-                participants: { select: { id: true, userId: true, displayNameSnapshot: true, jerseyNumber: true } },
+                participants: { select: { id: true, sideId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true } },
               },
             },
           },
@@ -297,6 +299,9 @@ export class PublicTeamRecordsService {
       const participantById = new Map(
         row.resultRevision.game.participants.map((participant) => [participant.id, participant] as const),
       );
+      const participantSideIdById = new Map(
+        row.resultRevision.game.participants.map((participant) => [participant.id, participant.sideId] as const),
+      );
 
       const revisionGoals = parseTournamentFixtureRevisionGoals(row.resultRevision.goalEvents);
       const rows = (eventsByGame.get(row.gameId) ?? [])
@@ -305,7 +310,13 @@ export class PublicTeamRecordsService {
           const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
           const eligible = resolveParticipantNameEligible(false, consent);
           const participant = event.participantId === null ? undefined : participantById.get(event.participantId);
-          const eventSideKey = event.sideId === null ? null : (sideKeyBySideId.get(event.sideId) ?? null);
+          const displaySideId = resolveGoalDisplaySideId(
+            event.sideId ?? '',
+            event.participantId,
+            event.type === 'OWN_GOAL',
+            participantSideIdById,
+          );
+          const eventSideKey = sideKeyBySideId.get(displaySideId) ?? null;
           return {
             id: event.id,
             type:
@@ -334,7 +345,13 @@ export class PublicTeamRecordsService {
             const eligible = resolveParticipantNameEligible(false, consent);
             const participant =
               event.participantId === null ? undefined : participantById.get(event.participantId);
-            const eventSideKey = sideKeyBySideId.get(event.sideId) ?? null;
+            const displaySideId = resolveGoalDisplaySideId(
+              event.sideId,
+              event.participantId,
+              event.ownGoal,
+              participantSideIdById,
+            );
+            const eventSideKey = sideKeyBySideId.get(displaySideId) ?? null;
             return {
               id: event.id,
               type: event.ownGoal ? ('OWN_GOAL' as const) : ('GOAL' as const),

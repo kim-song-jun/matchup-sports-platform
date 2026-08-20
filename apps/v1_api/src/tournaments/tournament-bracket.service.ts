@@ -949,7 +949,7 @@ export class TournamentBracketService {
           game: {
             select: {
               sides: { select: { id: true, sideKey: true } },
-              participants: { select: { id: true, displayNameSnapshot: true } },
+              participants: { select: { id: true, sideId: true, displayNameSnapshot: true } },
               currentOfficialRevision: {
                 select: { id: true, state: true, score: true, goalEvents: true, officialAt: true, createdAt: true, updatedAt: true },
               },

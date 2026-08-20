@@ -259,6 +259,7 @@ describe('deriveTournamentFixtureOfficialGoals — minuteKnown', () => {
     ['side-away', 'AWAY'],
   ]);
   const participantNameById = new Map<string, string>();
+  const participantSideIdById = new Map<string, string>([['participant-away', 'side-away']]);
 
   function goalEvent(overrides: Record<string, unknown> = {}) {
     return {
@@ -291,6 +292,17 @@ describe('deriveTournamentFixtureOfficialGoals — minuteKnown', () => {
     );
 
     expect(goals[0].minute).toBe(71);
+  });
+
+  it('자책골은 점수 귀속팀이 아니라 행위 선수 소속팀 영역에 표시한다', () => {
+    const goals = deriveTournamentFixtureOfficialGoals(
+      [goalEvent({ type: 'OWN_GOAL', sideId: 'side-home', participantId: 'participant-away' })],
+      sideKeyById,
+      participantNameById,
+      participantSideIdById,
+    );
+
+    expect(goals[0]).toMatchObject({ team: 'away', playerId: 'participant-away', ownGoal: true });
   });
 
   it('진짜 0분 득점(minuteKnown 표식 없음)은 계속 0으로 남는다 — null과 구분된다', () => {

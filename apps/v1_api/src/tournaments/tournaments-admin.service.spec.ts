@@ -353,31 +353,37 @@ describe('TournamentsAdminService', () => {
 
   // 대회가 끝나는 순간이 후기를 쓰는 시점이다. 이 알림이 없으면 사용자가 대회 페이지를
   // 다시 찾아 들어오지 않는 한 후기를 쓸 계기가 없다. 수신자는 대회 후기 작성 권한과
-  // 정확히 같아야 한다(참가 확정 팀의 owner/manager) — 넓으면 못 쓰는 알림, 좁으면 누락.
-  it('changeStatus: in_progress → completed 시 참가팀 팀장·운영진에게 후기 요청 알림을 보낸다', async () => {
+  // 정확히 같아야 한다 — 넓으면 못 쓰는 알림, 좁으면 누락.
+  //
+  // 2026-08-18 에 상대 팀 후기를 모든 참가 멤버에게 열었으므로(#554) 수신자도 active 멤버
+  // 전원이다. 그 전 규칙(owner/manager)을 그대로 뒀더니 프로덕션에서 작성 가능 164명 중
+  // 29명만 알림을 받았다.
+  it('changeStatus: in_progress → completed 시 참가팀 active 멤버 전원에게 후기 요청 알림을 보낸다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress', entryFee: 0 }));
     prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'completed' }));
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([
-      { team: { memberships: [{ userId: 'owner-a' }, { userId: 'manager-a' }] } },
-      // 같은 사람이 두 팀의 운영진이면 알림은 한 번만 가야 한다.
+      { team: { memberships: [{ userId: 'owner-a' }, { userId: 'manager-a' }, { userId: 'member-a' }] } },
+      // 같은 사람이 두 팀에 속해 있으면 알림은 한 번만 가야 한다.
       { team: { memberships: [{ userId: 'manager-a' }, { userId: 'owner-b' }] } },
     ]);
 
     await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'completed' });
 
     expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
-      ['owner-a', 'manager-a', 'owner-b'],
+      ['owner-a', 'manager-a', 'member-a', 'owner-b'],
       'tournament_completed_review_request',
       'tournament-1',
     );
     // 조회 조건이 후기 권한과 갈리면 못 쓰는 사람에게 알림이 간다 — 조건 자체를 고정한다.
-    const where = prisma.v1TournamentRegistration.findMany.mock.calls[0][0].where;
-    expect(where).toMatchObject({
+    const args = prisma.v1TournamentRegistration.findMany.mock.calls[0][0];
+    expect(args.where).toMatchObject({
       tournamentId: 'tournament-1',
       status: 'confirmed',
       team: { status: 'active', deletedAt: null },
     });
+    // 역할 필터가 되살아나면 팀원이 다시 알림에서 빠진다 — 조회·선택 양쪽을 고정한다.
+    expect(JSON.stringify(args)).not.toContain('owner');
   });
 
   it('changeStatus: completed 외 전이에서는 후기 요청 알림을 보내지 않는다', async () => {

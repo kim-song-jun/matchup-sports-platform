@@ -189,9 +189,15 @@ export function RecordedEventList({
 
                     이 목록에서 가장 중요한 정보가 "무엇을·누가"인데 그게 제일 먼저 사라지는
                     셈이라, 한 줄을 고집하는 대신 두 줄까지 허용한다. 행 높이가 최대 한 줄
-                    변하는 대가로 정보가 보존된다 — 컨테이너가 넉넉해지면(`@md`) 기존처럼
-                    한 줄 말줄임으로 돌아간다. */}
-                <p className="line-clamp-2 text-sm font-medium text-[var(--text-strong)] @md:truncate">
+                    변하는 대가로 정보가 보존된다.
+
+                    **폭에 따라 `truncate` 로 되돌리지 않는다.** `.line-clamp-2` 는 Tailwind
+                    유틸이 아니라 `globals.css` 의 커스텀 클래스(`display:-webkit-box` +
+                    `-webkit-line-clamp:2`)라, `@md:truncate` 로는 그 두 선언이 지워지지 않아
+                    넓은 폭에서도 클램프가 남는다(Copilot 리뷰 지적). 굳이 되돌릴 이유도 없다 —
+                    컨테이너가 넉넉하면 라벨이 어차피 한 줄에 들어가서 클램프가 발동하지 않고,
+                    행 높이도 그대로 균일하다. 모드를 하나로 두는 편이 단순하고 예측 가능하다. */}
+                <p className="line-clamp-2 text-sm font-medium text-[var(--text-strong)]">
                   {eventTypeLabel(event)}
                   {event.type === 'SUBSTITUTION'
                     ? substitutionDetailSuffix(event, playerName)

@@ -56,13 +56,13 @@ const STATIC_ROUTES = [
 
 /** 상세 화면은 실제 id 가 필요하다 — 목록 API 에서 첫 항목을 뽑아 경로를 만든다. */
 async function resolveDetailRoutes(ctx) {
-  const pick = async (apiPath) => {
+  const pick = async (apiPath, idField = 'id') => {
     try {
       const res = await ctx.request.get(`${BASE}${apiPath}`);
       if (!res.ok()) return null;
       const body = await res.json();
       const items = body?.items ?? body?.data?.items ?? body?.data ?? body;
-      return Array.isArray(items) && items.length ? items[0]?.id ?? null : null;
+      return Array.isArray(items) && items.length ? items[0]?.[idField] ?? null : null;
     } catch {
       return null;
     }
@@ -75,8 +75,8 @@ async function resolveDetailRoutes(ctx) {
   if (teamId) routes.push(['team-detail', `/admin/teams/${teamId}`]);
   const inquiryId = await pick('/api/v1/admin/inquiries?limit=1');
   if (inquiryId) routes.push(['inquiry-detail', `/admin/inquiries/${inquiryId}`]);
-  const seriesId = await pick('/api/v1/admin/team-match-series?limit=1');
-  if (seriesId) routes.push(['series-detail', `/admin/team-match-series/${seriesId}`]);
+  const leagueId = await pick('/api/v1/admin/league-matches?limit=1', 'leagueId');
+  if (leagueId) routes.push(['league-detail', `/admin/league-matches/${leagueId}`]);
 
   const tournamentId = await pick('/api/v1/admin/tournaments?limit=1');
   if (tournamentId) {

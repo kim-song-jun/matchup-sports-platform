@@ -48,6 +48,7 @@ export type MyMatch = {
   note: string;
   href: string;
   reviewHref?: string;
+  league?: { leagueId: string; title: string } | null;
 };
 
 export type MyMatchesViewModel = {

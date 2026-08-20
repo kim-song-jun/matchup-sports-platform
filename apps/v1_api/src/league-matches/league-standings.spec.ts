@@ -49,6 +49,50 @@ describe('calculateLeagueStandings', () => {
     expect(a).toMatchObject({ played: 2, wins: 1, losses: 1, goalsFor: 1, goalsAgainst: 1, points: 3 });
   });
 
+  it('3팀 순환 동률(A>B>C>A)은 모든 기준이 소진되고 팀ID 사전순 폴백으로 결정적으로 정렬된다', () => {
+    // A 1-0 B, B 1-0 C, C 1-0 A — 셋 다 1승 1패 3점, GD 0, GF 1이고 맞대결(h2h)조차
+    // 같은 순환이라 미니 리그도 전원 3점 동률. 기준이 전부 소진되는 유일한 실전형 케이스다.
+    const fixtures = [
+      { homeTeamId: 'A', awayTeamId: 'B', homeScore: 1, awayScore: 0 },
+      { homeTeamId: 'B', awayTeamId: 'C', homeScore: 1, awayScore: 0 },
+      { homeTeamId: 'C', awayTeamId: 'A', homeScore: 1, awayScore: 0 },
+    ];
+    const result = calculateLeagueStandings({ teamIds: ['A', 'B', 'C'], fixtures, tieBreakOrder: ORDER });
+    expect(result.every((r) => r.points === 3 && r.goalsFor - r.goalsAgainst === 0 && r.goalsFor === 1)).toBe(true);
+    expect(result.map((r) => r.teamId)).toEqual(['A', 'B', 'C']); // 사전순 폴백
+    // teamIds 입력 순서가 달라도 같은 순위가 나와야 결정적이다.
+    const shuffled = calculateLeagueStandings({ teamIds: ['C', 'A', 'B'], fixtures, tieBreakOrder: ORDER });
+    expect(shuffled).toEqual(result);
+  });
+
+  it('3팀 동률에서 headToHead가 1팀만 분리하고 남은 2팀은 잔여 기준(goalDifference)으로 갈린다', () => {
+    // A·B·C 모두 4점 동률. 맞대결(A 1-0 B, C 2-0 B, A 1-1 C)만 보면 A=4, C=4, B=0으로
+    // B만 분리되고, A·C는 h2h로도 동률이라 다음 기준인 전체 goalDifference(C +2 > A +1)로
+    // 갈린다. B의 전체 GD(+3)는 셋 중 최고이므로, headToHead를 건너뛰고 GD로 정렬했다면
+    // B가 1위가 됐을 것이다 — 이 단언이 h2h가 실제로 먼저 적용됨을 증명한다.
+    const fixtures = [
+      { homeTeamId: 'A', awayTeamId: 'B', homeScore: 1, awayScore: 0 },
+      { homeTeamId: 'C', awayTeamId: 'B', homeScore: 2, awayScore: 0 },
+      { homeTeamId: 'A', awayTeamId: 'C', homeScore: 1, awayScore: 1 },
+      { homeTeamId: 'B', awayTeamId: 'D', homeScore: 6, awayScore: 0 },
+      { homeTeamId: 'B', awayTeamId: 'D', homeScore: 0, awayScore: 0 },
+    ];
+    const result = calculateLeagueStandings({
+      teamIds: ['A', 'B', 'C', 'D'],
+      fixtures,
+      tieBreakOrder: ['points', 'headToHead', 'goalDifference', 'goalsFor'],
+    });
+    const byId = new Map(result.map((r) => [r.teamId, r]));
+    // 전제 검증: 셋이 승점 동률이고, B의 GD가 셋 중 가장 크다.
+    expect(byId.get('A')!.points).toBe(4);
+    expect(byId.get('B')!.points).toBe(4);
+    expect(byId.get('C')!.points).toBe(4);
+    const gd = (id: string) => byId.get(id)!.goalsFor - byId.get(id)!.goalsAgainst;
+    expect(gd('B')).toBeGreaterThan(gd('C'));
+    expect(gd('B')).toBeGreaterThan(gd('A'));
+    expect(result.map((r) => r.teamId)).toEqual(['C', 'A', 'B', 'D']);
+  });
+
   it('미확정 경기(fixtures에 없는 팀)는 played=0으로 남아 순위 계산에서 자연히 밀린다', () => {
     const result = calculateLeagueStandings({ teamIds: ['A', 'B', 'C'], fixtures: [], tieBreakOrder: ORDER });
     expect(result.every((r) => r.played === 0 && r.points === 0)).toBe(true);

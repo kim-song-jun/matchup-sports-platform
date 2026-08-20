@@ -213,6 +213,79 @@ describe('LeagueMatchFixturesClient', () => {
     }));
   });
 
+  it('조회가 실패하면 에러 메시지와 재시도 버튼을 보여주고, 버튼을 누르면 refetch를 호출한다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    const refetch = vi.fn();
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: new Error('리그를 찾을 수 없어요.'),
+      refetch,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(screen.getByText('리그를 찾을 수 없어요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('로딩 중에는 빈 화면 대신 로딩 표시를 렌더링한다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({ data: undefined, isPending: true } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    const { container } = render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 로딩 중 완전 빈 화면(null 렌더) 회귀를 잡는다 — 스켈레톤이 시각적으로 존재해야 한다.
+    expect(container.querySelector('.animate-pulse')).not.toBeNull();
+  });
+
+  it('일시·구장 입력을 값 변경 없이 blur만 하면 PATCH를 호출하지 않는다', () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state: 'active',
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'matched' },
+        ],
+      },
+      isPending: false,
+    } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    const mutate = vi.fn();
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    // 표를 탭으로 지나가는 상황: 값은 그대로인데 blur 만 발생 → 쓰기(PATCH)가 발생하면 안 된다.
+    const [startInput] = screen.getAllByLabelText('가을 풋살 리그 1주차 일시');
+    fireEvent.blur(startInput);
+    const [placeInput] = screen.getAllByLabelText('가을 풋살 리그 1주차 구장');
+    fireEvent.blur(placeInput);
+
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
   it('최근 사용한 장소가 없으면 칩 영역을 렌더링하지 않는다', () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1AdminLeagueMatchMock.mockReturnValue({

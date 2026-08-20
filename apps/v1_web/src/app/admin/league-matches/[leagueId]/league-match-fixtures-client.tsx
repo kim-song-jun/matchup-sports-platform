@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminPageHeader, AdminDataTable, AdminStatusPill, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminPageHeader, AdminDataTable, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { useV1AdminLeagueMatch, useV1GenerateLeagueFixtures, useV1UpdateLeagueFixture } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
@@ -22,7 +22,7 @@ const WEEKDAY_OPTIONS = [
 ];
 
 export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: string }) {
-  const { data: series, isPending } = useV1AdminLeagueMatch(leagueId);
+  const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
   const generateFixtures = useV1GenerateLeagueFixtures(leagueId);
   const updateFixture = useV1UpdateLeagueFixture(leagueId);
   const { toasts, showToast } = useAdminToast();
@@ -31,7 +31,33 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const [time, setTime] = useState('18:00');
   const [placeName, setPlaceName] = useState('');
 
-  if (isPending || series === undefined) return null;
+  if (isPending) {
+    return (
+      <div className="animate-pulse">
+        <div className="mb-4 h-4 bg-[var(--surface-soft)] rounded-lg w-24" />
+        <div className="h-7 bg-[var(--surface-soft)] rounded-lg w-64 mb-2" />
+        <div className="h-4 bg-[var(--surface-soft)] rounded-lg w-48 mb-6" />
+        <AdminTableSkeleton cols={4} />
+      </div>
+    );
+  }
+
+  if (isError || !series) {
+    return (
+      <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] py-10 px-4 flex flex-col items-center gap-3 text-center">
+        <p className="text-sm text-[var(--red700)] font-medium">
+          {extractErrorMessage(error, '리그 정보를 불러오지 못했어요.')}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        >
+          다시 시도하기
+        </button>
+      </div>
+    );
+  }
 
   const onGenerate = async () => {
     // 요일은 골랐는데 time input(type="time")을 비워 지운 상태로 제출하면 서버가 형식
@@ -148,6 +174,8 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                   aria-label={`${row.title} 일시`}
                   defaultValue={toDatetimeLocalValue(row.startAt)}
                   onBlur={(e) => {
+                    // 값이 그대로면 PATCH를 보내지 않는다 — 표를 탭으로 지나가기만 해도 쓰기가 발생하는 것 방지.
+                    if (e.target.value === toDatetimeLocalValue(row.startAt)) return;
                     const startsAt = fromDatetimeLocalValue(e.target.value);
                     if (!startsAt) return;
                     onFieldBlur(row, { startsAt });
@@ -163,7 +191,10 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
                 <input
                   aria-label={`${row.title} 구장`}
                   defaultValue={row.placeName}
-                  onBlur={(e) => onFieldBlur(row, { placeName: e.target.value })}
+                  onBlur={(e) => {
+                    if (e.target.value === row.placeName) return;
+                    onFieldBlur(row, { placeName: e.target.value });
+                  }}
                   className={inputClass}
                 />
               ),

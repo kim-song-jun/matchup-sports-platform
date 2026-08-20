@@ -2,8 +2,8 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { MyInvitationsPageView, MyJoinApplicationsPageView } from './my-page';
-import type { MyInvitationsViewModel, MyJoinApplicationItem, MyJoinApplicationsViewModel } from './my.types';
+import { MyInvitationsPageView, MyJoinApplicationsPageView, MyTeamDetailPageView } from './my-page';
+import type { MyInvitationsViewModel, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMatch, MyTeamDetailViewModel } from './my.types';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/my/invitations',
@@ -165,5 +165,54 @@ describe('MyJoinApplicationsPageView — 보낸 가입 신청 상태 표시', ()
 
     expect(screen.getByRole('button', { name: '성수 러너스 FC 가입 신청 취소' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '마포 농구 클럽 가입 신청 취소' })).not.toBeDisabled();
+  });
+});
+
+// 리그전 배지(그룹 F). 백엔드 myTeamMatches 가 내려주는 league 소속이 내 경기(최근 팀매치)
+// 행까지 살아서 도달하는지 검증한다 — 배지가 조용히 사라지거나 일반 팀매치에 붙는 회귀 방지.
+describe('MyTeamDetailPageView — 최근 팀매치 리그전 배지', () => {
+  function match(overrides: Partial<MyMatch> = {}): MyMatch {
+    return {
+      id: 'tm-1',
+      title: '주말 리그 3라운드',
+      meta: '9월 1일 (일) 20:00 · 풋살',
+      status: 'recruiting',
+      statusLabel: '모집 중',
+      note: '성수 FC 관련 팀매치예요.',
+      href: '/team-matches/tm-1',
+      ...overrides,
+    };
+  }
+
+  function detailModel(recentMatches: MyMatch[]): MyTeamDetailViewModel {
+    return {
+      team: {
+        id: 'team-1',
+        name: '성수 FC',
+        logo: '성',
+        sport: '풋살',
+        region: '성동구',
+        role: 'owner',
+        roleLabel: '팀장',
+        members: 12,
+        manner: '4.8',
+        next: '다음 일정 없음',
+        description: '성수동 풋살 팀이에요.',
+      },
+      actions: [],
+      recentMatches,
+    };
+  }
+
+  it('리그 소속 경기 행에는 리그전 배지가 보인다', () => {
+    render(<MyTeamDetailPageView model={detailModel([match({ league: { leagueId: 'lg-1', title: '가을 리그' } })])} />);
+
+    expect(screen.getByText('리그전')).toBeInTheDocument();
+  });
+
+  it('리그 소속이 아닌 경기 행에는 리그전 배지가 없다', () => {
+    render(<MyTeamDetailPageView model={detailModel([match({ league: null })])} />);
+
+    expect(screen.queryByText('리그전')).not.toBeInTheDocument();
   });
 });

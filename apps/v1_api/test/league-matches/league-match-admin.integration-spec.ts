@@ -8,6 +8,8 @@ import { createV1IntegrationApp } from '../integration/integration-app';
 const suiteId = randomUUID().slice(0, 8);
 const ownerUserId = `t4-league-admin-owner-${suiteId}`;
 const opsUserId = `t4-league-admin-ops-${suiteId}`;
+// V1AdminUser 행이 없는 일반 활성 유저 — 어드민 경계(403) 네거티브 전용 액터.
+const regularUserId = `t4-league-admin-regular-${suiteId}`;
 
 describe('POST /admin/league-matches + fixtures', () => {
   let app: INestApplication;
@@ -26,7 +28,7 @@ describe('POST /admin/league-matches + fixtures', () => {
     // seedFixtures 패턴을 그대로 따른다: active user + onboarding completed + phone
     // verified + 필수 약관 동의 + V1AdminUser(owner/ops).
     await prisma.v1User.createMany({
-      data: [ownerUserId, opsUserId].map((id) => ({
+      data: [ownerUserId, opsUserId, regularUserId].map((id) => ({
         id,
         email: `${id}@integration.test`,
         onboardingStatus: 'completed',
@@ -40,7 +42,9 @@ describe('POST /admin/league-matches + fixtures', () => {
       .filter((item) => item.requirement === 'required')
       .map((item) => item.documentId);
     await Promise.all(
-      [ownerUserId, opsUserId].map((userId) => termsService.acceptSignupTerms(userId, requiredDocumentIds)),
+      [ownerUserId, opsUserId, regularUserId].map((userId) =>
+        termsService.acceptSignupTerms(userId, requiredDocumentIds),
+      ),
     );
     await prisma.v1AdminUser.createMany({
       data: [
@@ -352,5 +356,66 @@ describe('POST /admin/league-matches + fixtures', () => {
 
     const after = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchIdInSeriesA } });
     expect(after.placeName).toBe(before.placeName);
+  });
+
+  it('V1AdminUser 행이 없는 일반 유저는 세 mutation 전부 403 PERMISSION_DENIED로 거부되고 아무 것도 쓰이지 않는다', async () => {
+    const forbiddenTitle = `일반유저 침입 리그-${suiteId}`;
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', regularUserId)
+      .send({
+        title: forbiddenTitle,
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+      });
+    expect(createRes.status).toBe(403);
+    expect(createRes.body.code).toBe('PERMISSION_DENIED');
+    expect(await prisma.v1League.count({ where: { title: forbiddenTitle } })).toBe(0);
+
+    // 권한 검사(getMutationAdmin)가 리소스 조회보다 앞서는 것도 계약이다 — 존재하지 않는
+    // id로도 404가 아니라 403이어야 비인가 사용자에게 리소스 존재 여부가 새지 않는다.
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${randomUUID()}/fixtures`)
+      .set('x-v1-user-id', regularUserId)
+      .send({ weeksCount: 1 });
+    expect(fixturesRes.status).toBe(403);
+    expect(fixturesRes.body.code).toBe('PERMISSION_DENIED');
+
+    const updateRes = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/league-matches/${randomUUID()}/fixtures/${randomUUID()}`)
+      .set('x-v1-user-id', regularUserId)
+      .send({ placeName: '침입 시도 장소' });
+    expect(updateRes.status).toBe(403);
+    expect(updateRes.body.code).toBe('PERMISSION_DENIED');
+  });
+
+  it('인증 헤더 없는 요청은 세 mutation 전부 401 UNAUTHENTICATED', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .send({
+        title: '무인증 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+      });
+    expect(createRes.status).toBe(401);
+    expect(createRes.body.code).toBe('UNAUTHENTICATED');
+
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${randomUUID()}/fixtures`)
+      .send({ weeksCount: 1 });
+    expect(fixturesRes.status).toBe(401);
+    expect(fixturesRes.body.code).toBe('UNAUTHENTICATED');
+
+    const updateRes = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/league-matches/${randomUUID()}/fixtures/${randomUUID()}`)
+      .send({ placeName: '무인증 시도 장소' });
+    expect(updateRes.status).toBe(401);
+    expect(updateRes.body.code).toBe('UNAUTHENTICATED');
   });
 });

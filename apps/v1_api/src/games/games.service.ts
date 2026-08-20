@@ -1119,8 +1119,8 @@ export class GamesService {
             tx,
             updated,
             context,
-            extractEndPenalties(dto.payload),
             'END_COMMAND',
+            extractEndPenalties(dto.payload),
           );
         }
         return {
@@ -4704,7 +4704,6 @@ export class GamesService {
     tx: Transaction,
     game: LockedGame,
     context: GameCommandContext,
-    penalties?: StoredPenalties,
     /**
      * 어느 레인에서 왔는가. 승부차기 킥 수를 **요구할 수 있는지**가 여기서 갈린다.
      *
@@ -4716,7 +4715,8 @@ export class GamesService {
      * `RECOVERY` — 이미 저장된 리비전을 복구·승계하는 경로다. 킥 수가 생기기 전에 저장된
      *   결과에는 그 값이 없으므로 요구하면 복구가 영구히 막힌다.
      */
-    penaltyOrigin: 'END_COMMAND' | 'RECOVERY' = 'RECOVERY',
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
+    penalties?: StoredPenalties,
   ): Promise<GameRevisionMutationResult> {
     const [events, participants, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
@@ -5374,7 +5374,7 @@ export class GamesService {
     game: LockedGame,
     score: GameScore,
     penalties: StoredPenalties | undefined,
-    penaltyOrigin: 'END_COMMAND' | 'RECOVERY' = 'RECOVERY',
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
   ): Promise<GameScore> {
     // 결정적 스코어 + 승부차기 없음이면 어떤 fact도 판정을 바꾸지 않으므로
     // 질의하지 않는다 — 리팩터 전 단축 평가 동작을 그대로 보존한다.
@@ -5705,10 +5705,18 @@ export class GamesService {
         // `resolveWinnerSide`가 draw로 떨어뜨려 잡이 POISONED로 남는다 — 운영자
         // 화면에는 "복구 성공"만 보인다. 422 `TOURNAMENT_PENALTY_INVALID`로
         // 커맨드 자리에서 거부하는 것이 이 레인의 계약이다.
+        //
+        // 킥 수도 `end` 와 **똑같이 요구한다**(2026-08-19 alpha 감사 F-3). 예전에는 이 레인이
+        // 기본값 `'RECOVERY'`(면제)로 떨어져 킥 수 없는 승부차기를 받아 줬는데, 면제의 근거로
+        // 적힌 "이미 저장된 값을 옮기는 경로"가 이 레인엔 성립하지 않는다 — **진입 조건 자체가
+        // `existingRevisionCount === 0`**(위 참조)이라 옮겨 올 값이 없고, 승부차기는
+        // `dto.penalties` 로 **새로 작성**된다. 성격이 `end` 와 같으므로 기준도 같아야 한다.
+        // (면제가 실제로 필요한 곳은 정정 레인의 "base 를 그대로 옮기는" 경우뿐이다.)
         return this.deriveTournamentRevision(
           tx,
           { ...game, version: updated.version },
           context,
+          'END_COMMAND',
           extractEndPenalties({ penalties: dto.penalties }),
         );
       },

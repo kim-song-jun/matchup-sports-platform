@@ -173,7 +173,7 @@ describe('대회 상세 섹션 라우팅 · 정보 수정 폼', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <TournamentAdminProvider
-          value={{ tournamentId: 'tournament-1', canWrite: true, showToast: vi.fn() }}
+          value={{ tournamentId: 'tournament-1', role: 'PLATFORM_OPS', canWrite: true, showToast: vi.fn() }}
         >
           <TournamentInfoSection />
         </TournamentAdminProvider>

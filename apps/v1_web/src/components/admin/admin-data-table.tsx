@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent, ReactNode } from 'react';
 import { AdminEmpty } from './admin-empty';
+import { PaginationBar, type PaginationBarProps } from '../v1-ui/pagination-bar';
 import { AdminListSkeleton } from './admin-skeleton';
 
 // ── Column definition ─────────────────────────────────────────────────────
@@ -68,15 +69,8 @@ interface AdminDataTableProps<T> {
   pagination?: AdminTablePagination;
 }
 
-export interface AdminTablePagination {
-  page: number;
-  totalPages: number;
-  total: number;
-  limit: number;
-  onPageChange: (page: number) => void;
-  /** 페이지 이동 요청이 진행 중이면 버튼을 잠근다. */
-  loading?: boolean;
-}
+/** 표 하단 페이지네이션 props — 공용 `PaginationBar` 와 같은 계약을 쓴다. */
+export type AdminTablePagination = PaginationBarProps;
 
 // ── Alignment utility ─────────────────────────────────────────────────────
 function alignClass(align: AdminTableColumn<unknown>['align']): string {
@@ -312,7 +306,7 @@ export function AdminDataTable<T>({
       )}
 
       {pagination && pagination.totalPages > 1 && (
-        <AdminTablePaginationBar {...pagination} />
+        <PaginationBar {...pagination} />
       )}
     </>
   );
@@ -321,111 +315,8 @@ export function AdminDataTable<T>({
 /**
  * 표 하단 페이지네이션. "전체 N건 중 M–K"를 함께 보여준다 — 운영자가 목록 어디쯤을 보고
  * 있는지 알아야 하고, 커서 기반 "더 보기"만으로는 그 감각이 생기지 않는다.
+ *
+ * 구현은 `components/v1-ui/pagination-bar.tsx` 로 옮겼다(소비자 대회 목록도 같은 바를
+ * 쓴다). 이 이름은 어드민 19곳의 호출부를 그대로 두려고 남긴 재수출이다.
  */
-export function AdminTablePaginationBar({
-  page,
-  totalPages,
-  total,
-  limit,
-  onPageChange,
-  loading,
-}: AdminTablePagination) {
-  const from = (page - 1) * limit + 1;
-  const to = Math.min(page * limit, total);
-  const pages = visiblePages(page, totalPages);
-
-  // 44×44: 프로젝트 터치 타겟 최솟값. 40px 로 두면 목록 19곳의 페이지네이션이 전부
-  // 기준 미달이 된다(실측: 이전/다음 44×40, 숫자 40×40).
-  const btn = [
-    'inline-flex items-center justify-center min-w-[44px] min-h-[44px] px-2 rounded-lg',
-    'text-[length:var(--font-size-label)] font-medium transition-colors',
-    'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-    'disabled:cursor-not-allowed disabled:opacity-40',
-  ].join(' ');
-
-  return (
-    <nav
-      className="flex flex-wrap items-center justify-between gap-3 pt-1"
-      aria-label="목록 페이지"
-    >
-      <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] tabular-nums">
-        전체 {total.toLocaleString('ko-KR')}건 중 {from.toLocaleString('ko-KR')}–
-        {to.toLocaleString('ko-KR')}
-      </p>
-
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1 || loading}
-          className={[btn, 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]'].join(' ')}
-          aria-label="이전 페이지"
-        >
-          이전
-        </button>
-
-        {pages.map((item, index) =>
-          item === null ? (
-            // 페이지가 많을 때의 생략 구간. 버튼이 아니므로 포커스를 받지 않는다.
-            <span
-              key={`gap-${index}`}
-              className="px-1 text-[var(--text-muted)] select-none"
-              aria-hidden="true"
-            >
-              …
-            </span>
-          ) : (
-            <button
-              key={item}
-              type="button"
-              onClick={() => onPageChange(item)}
-              disabled={loading}
-              aria-current={item === page ? 'page' : undefined}
-              aria-label={`${item}페이지`}
-              className={[
-                btn,
-                'tabular-nums',
-                item === page
-                  ? 'bg-blue-500 text-white'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]',
-              ].join(' ')}
-            >
-              {item}
-            </button>
-          ),
-        )}
-
-        <button
-          type="button"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages || loading}
-          className={[btn, 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]'].join(' ')}
-          aria-label="다음 페이지"
-        >
-          다음
-        </button>
-      </div>
-    </nav>
-  );
-}
-
-/**
- * 현재 페이지 주변만 보여주고 나머지는 생략(null)으로 접는다. 페이지가 수백 개가 되어도
- * 버튼 줄이 넘치지 않게 한다.
- */
-function visiblePages(page: number, totalPages: number): Array<number | null> {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  const pages: Array<number | null> = [1];
-  const start = Math.max(2, page - 1);
-  const end = Math.min(totalPages - 1, page + 1);
-
-  if (start > 2) pages.push(null);
-  for (let current = start; current <= end; current += 1) pages.push(current);
-  if (end < totalPages - 1) pages.push(null);
-
-  pages.push(totalPages);
-  return pages;
-}
+export { PaginationBar as AdminTablePaginationBar };

@@ -370,14 +370,28 @@ function ScheduleRow({
           <LineupStatusBadge lineupState={myFixture.lineupState} />
         </div>
       ) : null}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
+      {/* 카드 머리줄 — 왼쪽에 "어디서"(조·장소), 오른쪽에 "언제"(날짜·상태).
+          장소는 원래 카드 맨 아래에 있었는데, 조로 묶은 뒤로는 카드 안에서 조 이름을
+          되풀이하지 않게 되면서 이 왼쪽 자리가 통째로 비었다(오너 지적: "여기서 장소를
+          좌상단으로 올려도 될것같아 카드에서"). 빈 자리를 채우면서 스코어 아래 줄도
+          한 줄 짧아진다. 긴 구장명은 말줄임으로 접고 날짜 쪽은 줄이지 않는다 —
+          경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center', minWidth: 0 }}>
           {showGroupLabel ? entry.groupName ?? entry.round : ''}
           {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
           <VideoBadge hasVideo={entry.hasVideo} />
+          {venue ? (
+            // 아이콘을 함께 둔다 — 경기장 이름이 "1 (1)" 처럼 짧으면 맨 텍스트만으로는
+            // 그게 장소인지 번호인지 알 수 없다(오너 지적: "1(1)은 뭔지 모르겠고").
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, fontWeight: 400 }}>
+              <MapPin size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue}</span>
+            </span>
+          ) : null}
         </span>
         {/* [R-T2] 고정폭 없는 flex 텍스트 — 12로 상향. */}
-        <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
           {dateLabel ?? '일정 미정'}
           {entry.status === 'live' ? (
             <LiveBadge clock={entry.clock} periodBreak={entry.periodBreak} />
@@ -420,15 +434,6 @@ function ScheduleRow({
           가운데 정렬하면 그대로 스코어 밑에 놓인다. 승부차기가 없으면 렌더 없음. */}
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
       <MatchEventSummary entry={entry} />
-      {venue ? (
-        // 아이콘을 함께 둔다 — 경기장 이름이 "1 (1)" 처럼 짧으면 맨 텍스트만으로는 그게
-        // 장소인지 번호인지 알 수 없다(오너 지적: "1(1)은 뭔지 모르겠고").
-        // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.
-        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <MapPin size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
-          <span>{venue}</span>
-        </div>
-      ) : null}
     </Link>
   );
 

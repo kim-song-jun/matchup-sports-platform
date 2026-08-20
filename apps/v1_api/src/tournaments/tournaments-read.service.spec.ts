@@ -133,6 +133,7 @@ describe('TournamentsReadService', () => {
     v1Tournament: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
+      count: jest.Mock;
     };
     // 참가팀 식별 정보 통일 정책(fix/v1-publish)의 운영자·스태프 우회는
     // TournamentStaffAccessService(실제 구현)를 그대로 배선하므로, 그게 의존하는
@@ -158,6 +159,7 @@ describe('TournamentsReadService', () => {
       v1Tournament: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
       },
       v1AdminUser: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -269,6 +271,76 @@ describe('TournamentsReadService', () => {
 
     const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
     expect(callArgs.where.sportId).toBeUndefined();
+  });
+
+  // ─── list — 페이지 번호(데스크톱) ────────────────────────────────────────────
+
+  it('list: page=3 → skip=(page-1)*limit, cursor 는 쓰지 않는다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ page: 3, limit: 20 });
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    expect(callArgs.skip).toBe(40);
+    expect(callArgs.cursor).toBeUndefined();
+  });
+
+  it('list: page 와 cursor 가 함께 오면 page 가 이긴다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ page: 2, cursor: 'cursor-id', limit: 10 });
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    expect(callArgs.skip).toBe(10);
+    expect(callArgs.cursor).toBeUndefined();
+  });
+
+  it('list: page 요청이면 전체 건수를 세어 totalPages/hasPrev 를 채운다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([tournamentCard({ id: 't-1' })]);
+    prisma.v1Tournament.count.mockResolvedValue(42);
+
+    const result = await service.list({ page: 2, limit: 20 });
+
+    expect(prisma.v1Tournament.count).toHaveBeenCalledTimes(1);
+    expect(result.pageInfo).toMatchObject({ page: 2, total: 42, totalPages: 3, hasPrev: true });
+  });
+
+  it('list: 커서(무한 스크롤) 요청에는 COUNT 를 돌리지 않는다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ cursor: 'cursor-id', limit: 20 });
+
+    expect(prisma.v1Tournament.count).not.toHaveBeenCalled();
+  });
+
+  it('list: 커서 요청의 pageInfo 는 예전과 같은 두 필드만 갖는다', async () => {
+    // 통합 스펙(`test/integration/health.e2e-spec.ts`)이 이 응답 모양을 통째로 비교한다 —
+    // total 을 세지도 않고 `total: 0` 을 실어 보내면 "전체 0건"이라는 거짓말이 된다.
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    const result = await service.list({});
+
+    expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+  });
+
+  it('list: COUNT 필터는 목록 필터와 같은 where 를 쓴다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+    prisma.v1Tournament.count.mockResolvedValue(0);
+
+    await service.list({ page: 1, sportId: 'sport-uuid-1', status: 'in_progress' });
+
+    const listWhere = prisma.v1Tournament.findMany.mock.calls[0][0].where;
+    const countWhere = prisma.v1Tournament.count.mock.calls[0][0].where;
+    expect(countWhere).toEqual(listWhere);
+  });
+
+  it('list: 정렬은 createdAt 동률을 id 로 깨서 페이지 경계가 흔들리지 않게 한다', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ page: 1 });
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    expect(callArgs.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
   });
 
   // ─── get — not found / hidden ────────────────────────────────────────────────

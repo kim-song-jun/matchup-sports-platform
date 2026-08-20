@@ -1,0 +1,134 @@
+import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { TeamContactsService } from './team-contacts.service';
+
+// 이 레포의 유닛 테스트 관례: Prisma 는 전체 jest.fn() mock. 실 DB 를 쓰지 않는다.
+function makePrisma() {
+  const prisma: any = {
+    v1TeamMembership: { findFirst: jest.fn() },
+    v1TeamContact: { findFirst: jest.fn(), count: jest.fn(), create: jest.fn() },
+    $executeRaw: jest.fn(),
+  };
+  prisma.$transaction = jest.fn().mockImplementation((cb: any) => cb(prisma));
+  return prisma;
+}
+
+const actor = { id: 'u1', email: 'u1@t.example.test', accountStatus: 'active', onboardingStatus: 'completed' } as any;
+const dto = { fromTeamId: 'A', message: '주말 경기 가능하실까요?' };
+
+describe('TeamContactsService.create', () => {
+  it('보내는 팀의 owner/manager 가 아니면 PERMISSION_DENIED 로 거부한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+    // 권한이 없으면 생성 시도조차 하지 않는다
+    expect(prisma.v1TeamContact.create).not.toHaveBeenCalled();
+  });
+
+  it('자기 팀에는 보낼 수 없다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.create(actor, 'A', dto)).rejects.toMatchObject({
+      response: { code: 'TEAM_CONTACT_SELF_NOT_ALLOWED' },
+    });
+    expect(prisma.v1TeamContact.create).not.toHaveBeenCalled();
+  });
+
+  it('같은 팀쌍에 이미 진행 중인 컨택이 있으면 새로 만들지 않고 기존 건을 알려준다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findFirst.mockResolvedValue({ id: 'existing', status: 'accepted' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
+      response: {
+        code: 'TEAM_CONTACT_ALREADY_ACTIVE',
+        details: { existingContactId: 'existing', existingStatus: 'accepted' },
+      },
+    });
+    expect(prisma.v1TeamContact.create).not.toHaveBeenCalled();
+  });
+
+  it('중복 확인은 방향과 무관하게 본다 — 상대가 우리에게 보낸 건이 있어도 막는다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findFirst.mockResolvedValue({ id: 'inbound', status: 'requested' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.create(actor, 'B', dto)).rejects.toBeInstanceOf(ConflictException);
+
+    // 양방향으로 조회했는지 — where 에 OR 두 방향이 다 들어있어야 한다
+    const where = prisma.v1TeamContact.findFirst.mock.calls[0][0].where;
+    expect(where.OR).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fromTeamId: 'A', toTeamId: 'B' }),
+        expect.objectContaining({ fromTeamId: 'B', toTeamId: 'A' }),
+      ]),
+    );
+    expect(where.status).toEqual({ in: ['requested', 'accepted'] });
+  });
+
+  it('24시간 내 발송이 한도에 닿으면 거부한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findFirst.mockResolvedValue(null);
+    prisma.v1TeamContact.count.mockResolvedValue(10);
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
+      response: { code: 'TEAM_CONTACT_DAILY_LIMIT_EXCEEDED' },
+    });
+    expect(prisma.v1TeamContact.create).not.toHaveBeenCalled();
+  });
+
+  it('한도 직전(9건)이면 통과한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findFirst.mockResolvedValue(null);
+    prisma.v1TeamContact.count.mockResolvedValue(9);
+    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.create(actor, 'B', dto)).resolves.toMatchObject({ id: 'new' });
+  });
+
+  it('생성 전에 팀쌍 advisory lock 을 먼저 잡는다 — 순서가 뒤바뀌면 동시 요청이 둘 다 통과한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findFirst.mockResolvedValue(null);
+    prisma.v1TeamContact.count.mockResolvedValue(0);
+    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested' });
+    const service = new TeamContactsService(prisma);
+
+    const order: string[] = [];
+    prisma.$executeRaw.mockImplementation(() => { order.push('lock'); return Promise.resolve(1); });
+    prisma.v1TeamContact.findFirst.mockImplementation(() => { order.push('dupCheck'); return Promise.resolve(null); });
+
+    await service.create(actor, 'B', dto);
+    expect(order[0]).toBe('lock');
+    expect(order).toContain('dupCheck');
+  });
+
+  it('락 키는 팀 id 를 정렬해서 만든다 — A→B 와 B→A 가 같은 락을 잡아야 한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findFirst.mockResolvedValue(null);
+    prisma.v1TeamContact.count.mockResolvedValue(0);
+    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new' });
+    const service = new TeamContactsService(prisma);
+
+    await service.create(actor, 'zzz', { fromTeamId: 'aaa', message: 'hi there' });
+    const forward = JSON.stringify(prisma.$executeRaw.mock.calls[0]);
+    prisma.$executeRaw.mockClear();
+
+    await service.create(actor, 'aaa', { fromTeamId: 'zzz', message: 'hi there' });
+    const backward = JSON.stringify(prisma.$executeRaw.mock.calls[0]);
+
+    expect(forward).toBe(backward);
+  });
+});

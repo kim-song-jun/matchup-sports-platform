@@ -4,7 +4,8 @@
  * 화면과 인가는 하나인데 **URL 은 둘**이다:
  * - 스태프용 `/tournament-ops/tournaments/:id/…` — 마이페이지에서 담당 경기로 들어오는 길.
  *   일반 사용자에게 `/admin` URL 을 노출하지 않기 위해 그대로 둔다.
- * - 어드민용 `/admin/tournaments/:id/live/…` — 대회 관리 셸 안에서 이어지는 길.
+ * - 어드민용 `/admin/live/:id/…` — 대회 관리에서 이어지는 길(경로를 이렇게 잡은 이유는
+ *   아래 `adminLiveBase` 주석 참고).
  *
  * 셸의 nav 와 경기 콘솔 딥링크 판정은 **지금 어느 표면에 있는지**를 따라가야 한다.
  * 한쪽 경로를 하드코딩하면 다른 표면에서 nav 가 상대 표면으로 튕겨 나간다.
@@ -41,9 +42,14 @@ function decodeSegment(segment: string): string {
   }
 }
 
+/**
+ * 경기 콘솔은 `/fixtures/:fixtureId/operate` 하나뿐이다. `/fixtures/:fixtureId` 까지만 보고
+ * 판정하면 나중에 그 아래 다른 화면이 생겼을 때 **그 화면까지 콘솔 딥링크로 오인**한다 —
+ * 이 판정은 셸 진입이 거부된 필드 담당자를 우회 통과시키는 자리라 넓어지면 안 된다.
+ */
 const CONSOLE_PATHS = [
-  /^\/tournament-ops\/tournaments\/([^/]+)\/fixtures\/([^/]+)/,
-  /^\/admin\/live\/([^/]+)\/fixtures\/([^/]+)/,
+  /^\/tournament-ops\/tournaments\/([^/]+)\/fixtures\/([^/]+)\/operate(?:\/|$)/,
+  /^\/admin\/live\/([^/]+)\/fixtures\/([^/]+)\/operate(?:\/|$)/,
 ];
 
 /**

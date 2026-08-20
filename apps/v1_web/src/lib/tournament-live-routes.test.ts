@@ -69,6 +69,17 @@ describe('fixtureIdFromConsolePath', () => {
     expect(fixtureIdFromConsolePath('/admin/live/t-1/operations', 't-1')).toBeNull();
     expect(fixtureIdFromConsolePath('/admin/tournaments/t-1/bracket', 't-1')).toBeNull();
   });
+
+  it('경기 콘솔이 아닌 fixtures 하위 경로까지 넓히지 않는다', () => {
+    // 이 판정은 셸 진입이 거부된 필드 담당자를 우회 통과시키는 자리다. `/fixtures/:id` 까지만
+    // 보면 나중에 생기는 하위 화면이 전부 콘솔 딥링크로 오인돼 우회가 넓어진다.
+    expect(fixtureIdFromConsolePath('/admin/live/t-1/fixtures/fx-9', 't-1')).toBeNull();
+    expect(fixtureIdFromConsolePath('/admin/live/t-1/fixtures/fx-9/summary', 't-1')).toBeNull();
+    expect(fixtureIdFromConsolePath('/tournament-ops/tournaments/t-1/fixtures/fx-9/summary', 't-1')).toBeNull();
+    // 콘솔 자체와 그 하위는 계속 인식한다.
+    expect(fixtureIdFromConsolePath('/admin/live/t-1/fixtures/fx-9/operate', 't-1')).toBe('fx-9');
+    expect(fixtureIdFromConsolePath('/admin/live/t-1/fixtures/fx-9/operate/lineup', 't-1')).toBe('fx-9');
+  });
 });
 
 describe('tournamentIdFromAdminLivePath', () => {

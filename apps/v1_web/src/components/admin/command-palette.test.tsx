@@ -64,15 +64,39 @@ describe('CommandPalette', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('navigates with arrow keys and Enter', () => {
+  it('navigates with arrow keys and Enter, clamping at both ends', () => {
     render(<CommandPalette open onClose={vi.fn()} />);
     typeAndDebounce('민');
 
     const input = screen.getByRole('combobox', { name: '회원·팀·매치 전역 검색' });
+    // 위로는 0에서 멈춘다
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
     // 두 번째 항목(팀 민FC)으로 이동
     expect(pushMock).toHaveBeenCalledWith('/admin/teams/t-1');
+
+    // 아래로는 마지막 항목에서 멈춘다 (3개 항목에 ArrowDown 5회)
+    pushMock.mockClear();
+    for (let i = 0; i < 5; i += 1) fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(pushMock).toHaveBeenCalledWith('/admin/matches');
+  });
+
+  it('does not hijack arrow keys when there are no results', () => {
+    searchMock.mockImplementation((q: string) => ({
+      data: q ? { users: [], teams: [], matches: [] } : undefined,
+      isFetching: false,
+    }));
+    render(<CommandPalette open onClose={vi.fn()} />);
+    typeAndDebounce('없는검색어');
+
+    const input = screen.getByRole('combobox', { name: '회원·팀·매치 전역 검색' });
+    const arrowNotPrevented = fireEvent.keyDown(input, { key: 'ArrowDown' });
+    // preventDefault가 호출되지 않아야 한다 (fireEvent는 defaultPrevented면 false 반환)
+    expect(arrowNotPrevented).toBe(true);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('closes on Escape and renders nothing while closed', () => {

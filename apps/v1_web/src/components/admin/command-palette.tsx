@@ -69,17 +69,19 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     return () => clearTimeout(timer);
   }, [input, open]);
 
-  // ESC 닫기 + body 스크롤 잠금
+  // ESC 닫기 + body 스크롤 잠금 — 드로어 등 다른 오버레이가 이미 잠근 상태를
+  // 풀어버리지 않도록 이전 overflow 값을 저장했다가 그대로 복원한다.
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handler);
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handler);
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
     };
   }, [open, onClose]);
 
@@ -124,6 +126,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // 결과가 없으면 화살표 키를 가로채지 않는다 (입력 커서 이동 유지 + 인덱스 -1 방지)
+    if (items.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActiveIndex((i) => Math.min(i + 1, items.length - 1));

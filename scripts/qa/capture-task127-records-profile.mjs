@@ -7,8 +7,7 @@ const PROD_WEB = 'https://teameet.co.kr';
 const PROD_API = 'https://teameet.co.kr/api/v1';
 const TEAM_ID = 'b2f113fb-5457-45c4-9a77-0833698be7e9';
 const USER_ID = '9014c458-e16b-4a63-9663-e5157b1e8517';
-const TOURNAMENT_ID = '7e3c0f79-c2ee-495c-8ef9-f958785b8460';
-const FIXTURE_ID = 'e59bb2b6-b9a8-4522-9cc5-8b5be21c122d';
+const PENALTY_DECIDED_GAME_ID = 'e4ae62f8-90fc-4ffc-96b9-477c52860709';
 const OUTPUT = path.resolve('docs/screenshots/task-127-records-profile');
 const HIDE_DEV_UI =
   'nextjs-portal,[data-nextjs-dev-tools-button],#__next-dev-tools-indicator,[data-nextjs-toast]{display:none!important}';
@@ -29,16 +28,13 @@ async function getJson(pathname) {
 
 const teamRecords = await getJson('/teams/' + TEAM_ID + '/records');
 const profile = await getJson('/users/' + USER_ID + '/public-profile');
+// 승부차기로 결판난 결승 한 건만 수리된 값으로 덮어 이 PR이 고치는 두 가지(승패 판정,
+// 정규시간과 분리된 승부차기 표기)를 화면에서 확인한다. 나머지 행은 승부차기가 없던
+// 경기이므로 penalties=null 그대로 둔다.
 const repairedItems = teamRecords.data.items.map((item) =>
-  item.gameId === 'e4ae62f8-90fc-4ffc-96b9-477c52860709'
-    ? {
-        ...item,
-        result: 'WON',
-        fixtureId: FIXTURE_ID,
-        round: '결승',
-        penalties: { for: 3, against: 2 },
-      }
-    : { ...item, fixtureId: null, round: null, penalties: null },
+  item.gameId === PENALTY_DECIDED_GAME_ID
+    ? { ...item, result: 'WON', penalties: { for: 3, against: 2 } }
+    : { ...item, penalties: null },
 );
 const repairedTeamRecords = {
   ...teamRecords,
@@ -128,25 +124,11 @@ try {
       timeout: 60000,
     });
     await page.addStyleTag({ content: HIDE_DEV_UI });
-    await page.getByText('승부차기 3 : 2').waitFor({ state: 'visible' });
-    const detailResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes('/tournaments/' + TOURNAMENT_ID + '/matches/' + FIXTURE_ID) &&
-        response.request().method() === 'GET',
-    );
-    await page.getByRole('button', { name: '경기 기록 펼치기' }).click();
-    const detailResponse = await detailResponsePromise;
-    if (!detailResponse.ok()) {
-      throw new Error(viewport.key + ': match detail API failed with ' + detailResponse.status());
-    }
-    await page.getByRole('link', { name: '경기 상세 보기' }).waitFor({ state: 'visible' });
+    // 정규시간 스코어를 승부차기 숫자로 덮지 않고 보조 표기로만 붙인다(`formatTeamRecordPenaltyScoreline`).
+    await page.getByText('승부차기 3-2').waitFor({ state: 'visible' });
     const recordsText = await page.locator('body').innerText();
     if (!recordsText.includes('5·0·0')) throw new Error(viewport.key + ': repaired W-D-L summary missing');
     if (recordsText.includes('정정됨')) throw new Error(viewport.key + ': corrected badge still visible');
-    const detailHref = await page.getByRole('link', { name: '경기 상세 보기' }).getAttribute('href');
-    if (detailHref !== '/tournaments/' + TOURNAMENT_ID + '/matches/' + FIXTURE_ID) {
-      throw new Error(viewport.key + ': wrong detail href ' + detailHref);
-    }
     const recordOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     );

@@ -1,16 +1,14 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   useV1AdminMe,
   useV1AdminMatches,
   useV1ChangeMatchStatus,
 } from '@/hooks/use-v1-api';
-import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
-import { Activity, User, Clock, Users } from 'lucide-react';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -22,7 +20,7 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-import type { V1AdminMatchRow, CursorPage } from '@/types/api';
+import type { V1AdminMatchRow } from '@/types/api';
 
 // ── Date formatter ────────────────────────────────────────────────────────────
 function formatDateTime(dateStr: string | null | undefined): string {

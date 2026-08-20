@@ -10,7 +10,6 @@ import {
 import type { V1AdminTeamRow } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useAdminListQuery } from '@/hooks/use-admin-list-query';
-import { User, Users, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
   AdminDataTable,

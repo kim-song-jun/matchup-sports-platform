@@ -11,6 +11,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -350,9 +351,11 @@ const PAGE_SIZE = 20;
 export default function AdminAdminsPage() {
   const { data: adminMe, isPending: mePending } = useV1AdminMe();
 
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
-  const [activeStatus, setActiveStatus] = useState('');
+  // 검색 debounce·상태 필터·page 리셋·페이지네이션 조립은 공용 훅이 담당한다.
+  // (이 페이지는 검색 미지원이라 hideSearch 유지 — 훅의 상태 필터·페이지 리셋만 쓴다.)
+  const { activeStatus, setActiveStatus, filters, buildPagination } = useAdminListQuery({
+    pageSize: PAGE_SIZE,
+  });
 
   // Modal state
   const [grantModalOpen, setGrantModalOpen] = useState(false);
@@ -368,15 +371,7 @@ export default function AdminAdminsPage() {
     isError,
     error,
     refetch,
-  } = useV1AdminAdmins({
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  });
-
-  useEffect(() => {
-    setPage(1);
-  }, [activeStatus]);
+  } = useV1AdminAdmins(filters);
 
   // ── Loading / gate states ────────────────────────────────────────────────
   if (mePending) {
@@ -500,7 +495,7 @@ export default function AdminAdminsPage() {
       />
 
       <div className="flex flex-col gap-4">
-        <AdminFilterBar hideSearch searchValue={''} onSearchChange={setActiveStatus} statusOptions={statusOptions} activeStatus={activeStatus} onStatusChange={setActiveStatus} />
+        <AdminFilterBar hideSearch searchValue={''} onSearchChange={() => undefined} statusOptions={statusOptions} activeStatus={activeStatus} onStatusChange={setActiveStatus} />
 
         {/* Card list */}
         <AdminDataTable<V1AdminRow>
@@ -628,18 +623,7 @@ export default function AdminAdminsPage() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={5}
-          pagination={
-            pageInfo?.totalPages
-              ? {
-                  page: pageInfo.page ?? page,
-                  totalPages: pageInfo.totalPages,
-                  total: pageInfo.total ?? 0,
-                  limit: pageInfo.limit ?? PAGE_SIZE,
-                  onPageChange: setPage,
-                  loading: listFetching,
-                }
-              : undefined
-          }
+          pagination={buildPagination(pageInfo, listFetching)}
         />
       </div>
 

@@ -260,6 +260,10 @@ done
   -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
   v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-tournament-qa.ts'
+# QA 시드가 복원한 기존 이름-only 수상도 포함해 단일 로스터 후보만 계정에 연결한다.
+# 이미 연결됐거나 동명이인 후보가 여러 명인 행은 건드리지 않는 멱등 CLI다.
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js'
 # QA 시드가 매 배포마다 대회를 리셋하므로, 공개 일정을 채우는 fixture-game 백필은 반드시
 # QA 시드 뒤에 돌아야 한다(앞에 두면 QA 시드가 만든 픽스처를 못 보고 무의미하다).
 #

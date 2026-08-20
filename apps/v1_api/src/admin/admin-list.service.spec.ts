@@ -731,6 +731,21 @@ describe('AdminService — list/detail endpoints', () => {
       expect(call.where).toMatchObject({ status: 'matched' });
     });
 
+    it('passes q as title/hostTeam.name OR to both findMany and the status facet groupBy', async () => {
+      prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+      await service.listTeamMatches(adminAuthUser, { q: '풋살' });
+
+      const expectedOr = [
+        { title: { contains: '풋살', mode: 'insensitive' } },
+        { hostTeam: { name: { contains: '풋살', mode: 'insensitive' } } },
+      ];
+      const findCall = prisma.v1TeamMatch.findMany.mock.calls[0][0] as { where: { OR?: unknown[] } };
+      expect(findCall.where.OR).toEqual(expectedOr);
+      // 상태 칩 카운트도 검색어가 반영된 값이어야 한다 (listMatches와 동일 계약)
+      const groupCall = prisma.v1TeamMatch.groupBy.mock.calls[0][0] as { where: { OR?: unknown[] } };
+      expect(groupCall.where.OR).toEqual(expectedOr);
+    });
+
     it('returns hasNext=true and nextCursor when rows exceed limit', async () => {
       const rows = Array.from({ length: 6 }, (_, i) => makeTeamMatchRow({ id: `tm-${i + 1}` }));
       prisma.v1TeamMatch.findMany.mockResolvedValue(rows);

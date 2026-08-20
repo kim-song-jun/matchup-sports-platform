@@ -1889,9 +1889,20 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
+    // 경기 제목 또는 호스트 팀명으로 찾는다 — listMatches의 q 계약과 동일한 방식.
+    const statusFacetWhere: Prisma.V1TeamMatchWhereInput = query.q
+      ? {
+          OR: [
+            { title: { contains: query.q, mode: 'insensitive' as const } },
+            { hostTeam: { name: { contains: query.q, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {};
+
     const [rows, statusGroups] = await Promise.all([this.prisma.v1TeamMatch.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
+        ...statusFacetWhere,
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
@@ -1910,6 +1921,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
     }), this.prisma.v1TeamMatch.groupBy({
       by: ['status'],
+      where: statusFacetWhere,
       _count: { _all: true },
     })]);
 

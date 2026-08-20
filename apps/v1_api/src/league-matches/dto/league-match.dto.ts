@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class CreateLeagueMatchDto {
   @IsString()
@@ -101,4 +101,31 @@ export class RegenerateLeagueFixturesDto extends GenerateLeagueFixturesDto {
   @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
+}
+
+// R5: 공개 리그 목록 필터/페이지네이션. team-matches의 TeamMatchesQueryDto(cursor·limit
+// 1~50)와 동일한 커서 관례를 따른다 — 두 목록 다 같은 프론트 스크롤/더보기 UX를 쓴다.
+export class ListLeagueMatchesQueryDto {
+  @IsOptional()
+  @IsUUID()
+  sportId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  regionId?: string;
+
+  @IsOptional()
+  @IsIn(['draft', 'active', 'completed'])
+  state?: 'draft' | 'active' | 'completed';
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
 }

@@ -122,6 +122,10 @@ export const v1Keys = {
   adminLeagueMatchList: () => [...v1Keys.all, 'admin', 'league-matches'] as const,
   adminLeagueMatch: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId] as const,
   adminLeagueTeams: (leagueId: string) => [...v1Keys.all, 'admin', 'league-matches', leagueId, 'teams'] as const,
+  // R5: 공개 리그 목록. leagueMatch(leagueId)와 같은 'league-matches' 네임스페이스를
+  // 쓰지만 두 번째 세그먼트가 문자열(leagueId)이 아니라 filters 객체라 값이 절대 겹치지
+  // 않는다 -- teamMatches(filters)/teamMatch(teamMatchId) 자매 쌍과 동일한 관례.
+  leagueMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'league-matches', filters ?? {}] as const,
   leagueMatch: (leagueId: string) => [...v1Keys.all, 'league-matches', leagueId] as const,
   leagueMatchStandings: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'standings'] as const,
   leagueMatchPlayerRecords: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'player-records'] as const,

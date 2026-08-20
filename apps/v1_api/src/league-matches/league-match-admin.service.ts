@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { resolveTeamMatchCompetitionConfig } from '../team-matches/resolve-team-match-competition-config';
 import { generateRoundRobinFixtures, resolveFixtureStartAt } from './round-robin-schedule';
-import { CreateLeagueMatchDto, GenerateLeagueFixturesDto, UpdateLeagueFixtureDto } from './dto/league-match.dto';
+import { CreateLeagueMatchDto, GenerateLeagueFixturesDto, RevertLeagueCompletionDto, UpdateLeagueFixtureDto } from './dto/league-match.dto';
 
 const DEFAULT_TIE_BREAK_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
 const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
@@ -306,6 +306,53 @@ export class LeagueMatchAdminService {
       return result;
     });
     return { teamMatchId: updated.id, startAt: updated.startAt, placeName: updated.placeName, placeAddress: updated.placeAddress };
+  }
+
+  // R6/D-3: 전 대진이 확정되면 리그는 자동으로 completed 전이한다(LeagueCompletionProjectionService).
+  // 이 메서드는 그 결과를 정정해야 할 때(오심 정정 등)를 위한 운영자 역전이다.
+  async revertCompletion(user: V1AuthUser, leagueId: string, dto: RevertLeagueCompletionDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const league = await this.prisma.v1League.findUnique({ where: { id: leagueId }, select: { id: true, state: true } });
+    if (league === null) {
+      throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+    }
+    if (league.state === 'active') {
+      // 이미 active면 멱등 처리 — Task 69/73의 accept/reject alreadyProcessed 계약과 동일.
+      return { leagueId: league.id, state: 'active' as const, alreadyProcessed: true };
+    }
+    if (league.state !== 'completed') {
+      // draft(대진조차 없는 리그)는 되돌릴 completed 상태 자체가 없다.
+      throw new ConflictException({
+        code: 'LEAGUE_NOT_COMPLETED',
+        message: '완료된 리그만 진행중으로 되돌릴 수 있어요.',
+      });
+    }
+
+    const alreadyProcessed = await this.prisma.$transaction(async (tx) => {
+      // 동시 요청 대비 조건부 UPDATE — 이미 다른 요청이 되돌렸다면(또는 자동 전이 로직이
+      // 마침 다시 completed로 돌려놨다면) 0행 매치로 조용히 no-op한다.
+      const reverted = await tx.v1League.updateMany({
+        where: { id: leagueId, state: 'completed' },
+        data: { state: 'active' },
+      });
+      if (reverted.count === 0) return true;
+
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.revert_completion',
+          targetType: 'league_match',
+          targetId: leagueId,
+          reason: dto.reason ?? null,
+          fromStatus: 'completed',
+          toStatus: 'active',
+        },
+        tx,
+      );
+      return false;
+    });
+
+    return { leagueId, state: 'active' as const, alreadyProcessed };
   }
 
   private async loadLeague(leagueId: string) {

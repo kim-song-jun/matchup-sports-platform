@@ -2424,6 +2424,14 @@ export type V1AdminTeamMatchRow = {
   title: string;
   hostTeamId: string;
   hostTeamName: string;
+  /**
+   * 이 팀매치를 담고 있는 리그. 단발 팀매치면 null.
+   *
+   * 리그는 팀매치와 별개 엔티티가 아니라 **팀매치를 묶는 컨테이너**다
+   * (`V1TeamMatch.leagueId`). 서버(`listTeamMatches`)는 이미 이 값을 내려주는데
+   * 이 타입에 선언이 없어 화면이 통째로 버리고 있었다.
+   */
+  league: { leagueId: string; title: string } | null;
   sportName: string;
   startAt: string;
   status: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';

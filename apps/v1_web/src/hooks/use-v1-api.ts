@@ -2210,6 +2210,9 @@ export function useV1AdminOverview() {
   return useQuery({
     queryKey: v1Keys.adminOverview(),
     queryFn: () => v1Get<V1AdminOverview>('/admin/overview'),
+    // 열어 둔 채 방치하면 숫자가 멈춘다 — 전역 staleTime 은 탭 재포커스에서만 다시 받는다.
+    // 같은 파일의 인박스·에러로그 훅이 쓰는 것과 같은 주기다.
+    refetchInterval: 30_000,
   });
 }
 
@@ -2870,6 +2873,9 @@ export function useV1AdminOpsSummary() {
   return useQuery({
     queryKey: v1Keys.adminOpsSummary(),
     queryFn: () => v1Get<V1AdminOpsSummary>('/admin/ops/summary'),
+    // 열어 둔 채 방치하면 숫자가 멈춘다 — 전역 staleTime 은 탭 재포커스에서만 다시 받는다.
+    // 같은 파일의 인박스·에러로그 훅이 쓰는 것과 같은 주기다.
+    refetchInterval: 30_000,
   });
 }
 

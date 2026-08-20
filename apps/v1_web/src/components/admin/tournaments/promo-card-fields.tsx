@@ -38,7 +38,8 @@ type PromoCardFieldsProps = {
   onResetFacts?: () => void;
   /**
    * 되돌릴 것이 있는가 — 관리자가 사실 문구를 하나라도 직접 고쳤는지. false 면 버튼을
-   * 눌러도 바뀔 게 없어 무반응처럼 보이므로 비활성으로 둔다.
+   * 눌러도 바뀔 게 없어 무반응처럼 보이므로 비활성으로 두고, 그 이유를 버튼 아래 문구로
+   * 함께 띄운다.
    */
   canResetFacts?: boolean;
   /**
@@ -72,6 +73,11 @@ export function PromoCardFields({
     key: K,
     fieldValue: TournamentPromoCardValue[K],
   ) => onChange({ ...value, [key]: fieldValue });
+  // 비활성 사유는 눈에 보이는 문구로 낸다 — disabled 버튼은 포인터 이벤트가 안 가서
+  // title 툴팁이 뜨지 않고(터치 기기엔 hover 자체가 없다), 탭 순서에서도 빠져 키보드·
+  // 스크린리더 사용자에게 이유가 닿지 않는다.
+  const resetHintId = `${prefix}-reset-hint`;
+  const showResetHint = Boolean(onResetFacts) && !canResetFacts;
   const trimmedDefaultImageUrl = defaultImageUrl?.trim() ?? '';
   const usingDefaultImage = !value.imageUrl.trim() && Boolean(trimmedDefaultImageUrl);
   const previewFields = {
@@ -102,12 +108,9 @@ export function PromoCardFields({
               type="button"
               onClick={onResetFacts}
               disabled={disabled || !canResetFacts}
-              title={
-                canResetFacts
-                  ? '날짜·장소·상금 문구를 대회 정보로 다시 채워요.'
-                  : '직접 고친 문구가 없어서 되돌릴 것이 없어요.'
-              }
+              title={canResetFacts ? '날짜·장소·상금 문구를 대회 정보로 다시 채워요.' : undefined}
               aria-label="날짜·장소·상금 문구를 대회 정보로 다시 채우기"
+              aria-describedby={showResetHint ? resetHintId : undefined}
               className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-xs font-semibold text-[var(--text-body)] disabled:opacity-50"
             >
               <RotateCcw size={14} aria-hidden="true" />
@@ -128,6 +131,12 @@ export function PromoCardFields({
           </label>
         </div>
       </div>
+
+      {showResetHint ? (
+        <p id={resetHintId} className="mt-2 text-xs text-[var(--text-caption)] sm:text-right">
+          직접 고친 문구가 없어서 되돌릴 것이 없어요.
+        </p>
+      ) : null}
 
       <div className="mt-4">
         {variant === 'home' ? (

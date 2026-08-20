@@ -59,7 +59,7 @@ const tournament = {
   entryFee: 50000,
   prizePool: 1000000,
   prizeSummary: '우승 트로피 + 상금',
-  prizeBreakdown: '우승: 600,000원',
+  prizeBreakdown: '우승 600,000원',
   promoHomeEnabled: false,
   promoHomePriority: 0,
   promoListEnabled: false,
@@ -110,6 +110,16 @@ describe('TournamentInfoSection', () => {
     // '상금 배분'은 편집기 안에서 한 번만 나온다 — 요약표가 같은 텍스트를 또 뿌리던
     // 읽기 블록이 사라졌다는 뜻이다.
     expect(screen.getAllByText('상금 배분')).toHaveLength(1);
+  });
+
+  it('상금 편집기는 저장된 값으로 채워져 열린다', () => {
+    renderSection(true);
+
+    // 초기값은 렌더 도중 setState 가 아니라 useState 초기화 함수로 한 번만 계산된다 —
+    // 비어 있는 폼이 뜨면 운영자가 기존 상금을 지운 채 저장하게 된다.
+    expect(screen.getByLabelText('상품 및 상금')).toHaveValue('우승 트로피 + 상금');
+    expect(screen.getByDisplayValue('우승')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('600,000원')).toBeInTheDocument();
   });
 
   it('읽기 전용 관리자에게는 저장 경로를 열어 주지 않는다', () => {

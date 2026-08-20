@@ -5,7 +5,7 @@ import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1UpdateTournament, useV1UploadImages } from '@/hooks/use-v1-api';
-import type { V1UpdateTournamentPayload, V1TournamentGenderCategory } from '@/types/api';
+import type { V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
@@ -468,9 +468,9 @@ export function TournamentInfoSection() {
         )}
       </div>
 
-      <CoverImageCard tournamentId={id} canWrite={canWrite} showToast={showToast} />
+      <CoverImageCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
 
-      <PrizeCard tournamentId={id} canWrite={canWrite} showToast={showToast} />
+      <PrizeCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
 
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
         <div className="flex items-center justify-between gap-3 mb-3">
@@ -1147,19 +1147,16 @@ function GenderQuotaInput({
 
 /** 커버 이미지 — 목록 카드 썸네일. 읽기 전용 관리자에게는 업로더를 잠근다. */
 function CoverImageCard({
-  tournamentId,
+  tournament,
   canWrite,
   showToast,
 }: {
-  tournamentId: string;
+  tournament: V1Tournament;
   canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
-  const { data: tournament } = useV1AdminTournament(tournamentId);
-  const updateTournament = useV1UpdateTournament(tournamentId);
+  const updateTournament = useV1UpdateTournament(tournament.id);
   const uploadImages = useV1UploadImages();
-
-  if (!tournament) return null;
 
   const handleUpload = async (file: File) => {
     try {
@@ -1207,37 +1204,31 @@ function CoverImageCard({
  * prizeSummary 를, 그 아래 긴 글 영역이 prizeBreakdown 을 각각 또 보여줬다.
  */
 function PrizeCard({
-  tournamentId,
+  tournament,
   canWrite,
   showToast,
 }: {
-  tournamentId: string;
+  tournament: V1Tournament;
   canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
-  const { data: tournament } = useV1AdminTournament(tournamentId);
-  const updateTournament = useV1UpdateTournament(tournamentId);
+  const updateTournament = useV1UpdateTournament(tournament.id);
 
-  const [prizePool, setPrizePool] = useState('');
-  const [prizeSummary, setPrizeSummary] = useState('');
+  // 대회 데이터를 prop 으로 받으므로 초기값을 한 번만 계산한다 — 예전에는 렌더 도중
+  // setState 로 채우고 `loaded` 플래그로 재진입을 막았다.
+  const [prizePool, setPrizePool] = useState(() =>
+    tournament.prizePool !== null && tournament.prizePool !== undefined ? String(tournament.prizePool) : '',
+  );
+  const [prizeSummary, setPrizeSummary] = useState(() => tournament.prizeSummary ?? '');
   // 배분은 구조화 행으로 편집하고 저장 시 기존 텍스트 포맷으로 직렬화한다 (공개 파서 호환).
   // 각 행 값(value)은 자유 텍스트 — 금액("600,000원")이든 물품("우승 트로피")이든 그대로 보관한다.
-  const [prizeRows, setPrizeRows] = useState<TournamentPrizeRow[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  if (tournament && !loaded) {
-    setPrizePool(tournament.prizePool !== null && tournament.prizePool !== undefined ? String(tournament.prizePool) : '');
-    setPrizeSummary(tournament.prizeSummary ?? '');
-    setPrizeRows(
-      parsePrizeRows(tournament.prizeBreakdown ?? '').map((row) => ({
-        id: createPrizeRowId(),
-        label: row.label,
-        value: row.amount,
-      })),
-    );
-    setLoaded(true);
-  }
-
-  if (!tournament) return null;
+  const [prizeRows, setPrizeRows] = useState<TournamentPrizeRow[]>(() =>
+    parsePrizeRows(tournament.prizeBreakdown ?? '').map((row) => ({
+      id: createPrizeRowId(),
+      label: row.label,
+      value: row.amount,
+    })),
+  );
 
   const handleSave = () => {
     const payload: V1UpdateTournamentPayload = {};

@@ -27,7 +27,10 @@
   런타임에서 한 번도 동작하지 않고 있었음을 발견하고 배선했다(PR #599). 이어서 Out of Scope 로
   남겨 뒀던 `V1TournamentPopup` UI/API 제거를 진행한다 — prod/alpha 모두 해당 테이블 0행이라
   데이터 이관은 필요 없었다(SSM 읽기 전용 조회로 확인). 테이블 DROP 은 배포 순서상 별도
-  릴리스로 미룬다(`prisma migrate deploy` 가 컨테이너 교체보다 먼저 돌기 때문).
+  릴리스로 미룬다(`prisma migrate deploy` 가 컨테이너 교체보다 먼저 돌기 때문). `schema.prisma` 에는
+  손대지 않는다 — v1 DB 가드레일이 스키마 변경에 마이그레이션 동반을 강제하므로, 주석만 고치려 해도
+  빈 마이그레이션을 만들어야 한다. **`V1TournamentPopup` 모델은 이 시점부터 코드에서 참조하지 않는다**
+  (읽고 쓰는 코드 0곳). 다음 릴리스에서 모델 삭제 + `DROP TABLE` 마이그레이션을 함께 낸다.
 
 ## Validation
 

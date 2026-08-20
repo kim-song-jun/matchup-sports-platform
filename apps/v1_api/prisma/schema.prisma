@@ -2635,13 +2635,8 @@ model V1TournamentSponsor {
   @@map("v1_tournament_sponsors")
 }
 
-/// **더 이상 쓰지 않는다 — 수축(contract) 단계 대기 중.** 대회 팝업은 V1Popup 의
-/// targetPaths(`/tournaments/<id>`) 로 통합됐고, 이 모델을 읽고 쓰던 코드는 전부 제거됐다.
-/// 테이블을 같은 릴리스에서 지우지 않는 이유: deploy-alpha.sh 는 `prisma migrate deploy` 를
-/// 컨테이너 교체보다 먼저 돌리므로, 지금 DROP 하면 그 사이 살아 있는 구버전 컨테이너의
-/// 대회 상세 조회가 사라진 테이블을 읽어 깨진다(20260819100000_v1_league_contract 의 선례와 같다).
-/// 이 릴리스가 배포돼 모든 컨테이너가 이 테이블을 안 읽게 된 뒤 별도 릴리스에서 DROP 한다.
-/// 새 코드가 이 모델을 다시 참조해서는 안 된다.
+/// 대회 상세 페이지 전용 공지/홍보 팝업. 기존 V1Popup(홈 전역 팝업, audience 타겟팅)과는 별개 모델 —
+/// 특정 대회에만 연결되는 팝업이라 의미가 다르다(Task 109 Track 8).
 model V1TournamentPopup {
   id             String         @id @default(uuid())
   tournamentId   String         @map("tournament_id")

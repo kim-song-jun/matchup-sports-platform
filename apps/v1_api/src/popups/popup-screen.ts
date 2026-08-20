@@ -29,7 +29,7 @@ export function isSafePopupLink(value: string) {
   }
 }
 
-/** ActivePopupQueryDto/AdminPopupDto 의 @MaxLength(500) 과 맞춘 상한. */
+/** ActivePopupQueryDto/CreateAdminPopupDto 의 @MaxLength(500) 과 맞춘 상한. */
 export const POPUP_TARGET_PATH_MAX_LENGTH = 500;
 
 export function isSafePopupTargetPath(value: string) {

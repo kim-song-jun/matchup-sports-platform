@@ -138,6 +138,18 @@ describe('MockTournamentSeedService', () => {
     expect(unknownFields).toEqual([]);
   });
 
+  // alpha 에는 ACTIVE config 가 5개 있고 종목마다 라인업 하한이 다르다(풋살 3명 · 축구 7명).
+  // 종목을 안 맞추고 최신 것을 집으면 대회 종목과 어긋난 규칙이 박힌다.
+  it('대회 종목에 맞는 ACTIVE config 를 고른다', async () => {
+    const { service, prisma } = makeWorld(4);
+
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    expect(prisma.v1CompetitionConfigVersion.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'ACTIVE', sportCode: 'futsal' } }),
+    );
+  });
+
   // alpha 실측: ACTIVE config 가 minPlayers 7 인데 목업이 멤버 4명 팀을 뽑아, 라인업 화면에서
   // "포지션 자리가 비어 있어요"로 제출 자체가 막혔다. 하한은 config 에서 읽어야 한다.
   it('라인업 최소 인원을 config 에서 읽어 팀 조회 조건에 쓴다', async () => {
@@ -181,6 +193,34 @@ describe('MockTournamentSeedService', () => {
       // 화면이 "몇 명 이상 팀만 쓸 수 있는지"를 설명하려면 이 값이 필요하다.
       minPlayersPerTeam: 3,
     });
+  });
+
+  // 하한을 지어내면(기본값 3) 화면은 정상처럼 보이는데 생성은 NO_COMPETITION_CONFIG 로 막힌다.
+  // 만들 수 있는 팀 수를 0 으로 닫아 버튼까지 잠근다 — 패널 자체는 남긴다(enabled 는 환경 플래그).
+  it('종목의 ACTIVE config 가 없으면 availability 가 만들 수 있는 팀 수를 0 으로 닫는다', async () => {
+    const { service, prisma } = makeWorld(4);
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue(null);
+
+    await expect(service.availability()).resolves.toEqual({
+      enabled: true,
+      usableTeamCount: 0,
+      maxTeamCount: 0,
+      minPlayersPerTeam: 0,
+    });
+    expect(prisma.v1Team.findMany).not.toHaveBeenCalled();
+  });
+
+  it('종목 자체가 없으면 config 를 찾지 않고 0 으로 닫는다', async () => {
+    const { service, prisma } = makeWorld(4);
+    prisma.v1Sport.findFirst.mockResolvedValue(null);
+
+    await expect(service.availability()).resolves.toEqual({
+      enabled: true,
+      usableTeamCount: 0,
+      maxTeamCount: 0,
+      minPlayersPerTeam: 0,
+    });
+    expect(prisma.v1CompetitionConfigVersion.findFirst).not.toHaveBeenCalled();
   });
 
   it('플래그가 꺼져 있으면 availability 도 0 을 돌려준다', async () => {

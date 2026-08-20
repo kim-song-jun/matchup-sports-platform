@@ -241,7 +241,7 @@ SELECT
   appeared.assists,
   appeared.fouls,
   jsonb_build_object('yellow', appeared.yellow_cards, 'red', appeared.red_cards),
-  appeared.position IN ('GK', 'GOALKEEPER', 'GOLEIRO'),
+  COALESCE(appeared.position IN ('GK', 'GOALKEEPER', 'GOLEIRO'), false),
   CURRENT_TIMESTAMP,
   CURRENT_TIMESTAMP
 FROM appeared

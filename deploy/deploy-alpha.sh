@@ -242,6 +242,60 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 
+readonly RECORDS_PROFILE_REPAIR_MIGRATION="20260819090000_v1_records_profile_integration_repair"
+
+recover_known_records_profile_migration_failure() {
+  local migration_table_exists failed_count failure_logs
+  migration_table_exists="$("${compose[@]}" exec -T v1_postgres \
+    psql -v ON_ERROR_STOP=1 -At \
+    -U "${V1_DB_USER:-teameet_v1}" \
+    -d "${V1_DB_NAME:-teameet_v1}" \
+    -c "SELECT to_regclass('public.\"_prisma_migrations\"') IS NOT NULL")"
+  if [[ "${migration_table_exists}" == "f" ]]; then
+    return 0
+  fi
+  [[ "${migration_table_exists}" == "t" ]] || {
+    echo "[alpha-deploy] Could not verify the Prisma migration table" >&2
+    return 1
+  }
+
+  failed_count="$("${compose[@]}" exec -T v1_postgres \
+    psql -v ON_ERROR_STOP=1 -At \
+    -U "${V1_DB_USER:-teameet_v1}" \
+    -d "${V1_DB_NAME:-teameet_v1}" \
+    -c "SELECT COUNT(*) FROM \"_prisma_migrations\" WHERE migration_name = '${RECORDS_PROFILE_REPAIR_MIGRATION}' AND finished_at IS NULL AND rolled_back_at IS NULL")"
+
+  [[ "${failed_count}" =~ ^[0-9]+$ ]] || {
+    echo "[alpha-deploy] Could not verify the known migration failure state" >&2
+    return 1
+  }
+  if [[ "${failed_count}" == "0" ]]; then
+    return 0
+  fi
+  if [[ "${failed_count}" != "1" ]]; then
+    echo "[alpha-deploy] Refusing to auto-recover ${failed_count} unresolved ${RECORDS_PROFILE_REPAIR_MIGRATION} attempts" >&2
+    return 1
+  fi
+
+  failure_logs="$("${compose[@]}" exec -T v1_postgres \
+    psql -v ON_ERROR_STOP=1 -At \
+    -U "${V1_DB_USER:-teameet_v1}" \
+    -d "${V1_DB_NAME:-teameet_v1}" \
+    -c "SELECT COALESCE(logs, '') FROM \"_prisma_migrations\" WHERE migration_name = '${RECORDS_PROFILE_REPAIR_MIGRATION}' AND finished_at IS NULL AND rolled_back_at IS NULL")"
+
+  if [[ "${failure_logs}" != *'null value in column "goalkeeper"'* ]] ||
+    [[ "${failure_logs}" != *'v1_game_result_participants'* ]] ||
+    [[ "${failure_logs}" != *'23502'* ]]; then
+    echo "[alpha-deploy] Refusing to auto-recover an unrecognized ${RECORDS_PROFILE_REPAIR_MIGRATION} failure" >&2
+    return 1
+  fi
+
+  echo "[alpha-deploy] Marking the reviewed nullable-goalkeeper failure rolled back before retry"
+  "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+    "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back ${RECORDS_PROFILE_REPAIR_MIGRATION}"
+}
+
+recover_known_records_profile_migration_failure
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
 # 게임 운영 플래그 불변 행 시드. 마이그레이션에 DML 을 넣을 수 없고(expand-contract 게이트)

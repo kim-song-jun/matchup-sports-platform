@@ -106,10 +106,26 @@ function TeamRecordEventsPanel({
       aria-label={`${teamName} 대 ${item.opponentTeamName ?? '상대 미상'} 경기 기록`}
       style={{ padding: '0 16px 14px', borderTop: '1px solid var(--grey100)' }}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', fontSize: 11, color: 'var(--text-caption)', margin: '10px 0 8px' }}>
-        <span style={{ textAlign: 'right' }}>{teamName}</span>
-        <span aria-hidden="true" />
-        <span style={{ textAlign: 'left' }}>{item.opponentTeamName ?? '상대 미상'}</span>
+      {/* 이벤트 행(`TeamRecordEventRow`)과 **같은 grid·gap·가운데 폭**을 쓴다 — 머리글만
+       * gap 없이 두면 두 팀명이 `…01팀(테스트) QA 스쿼드 02팀` 처럼 맞붙어 한 덩어리로
+       * 읽히고(알파 1440 실측), 아래 이벤트의 좌/우 열과 머리글이 어긋난다. */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr auto 1fr',
+          gap: 8,
+          fontSize: 11,
+          color: 'var(--text-caption)',
+          margin: '10px 0 8px',
+        }}
+      >
+        <span style={{ textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {teamName}
+        </span>
+        <span aria-hidden="true" style={{ minWidth: 36 }} />
+        <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {item.opponentTeamName ?? '상대 미상'}
+        </span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {item.events.map((event) => (

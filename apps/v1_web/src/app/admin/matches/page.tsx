@@ -9,6 +9,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import { Activity, User, Clock, Users } from 'lucide-react';
 import {
   AdminPageHeader,
@@ -71,12 +72,17 @@ function AdminMatchesPageContent() {
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') ?? '';
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeStatus, setActiveStatus] = useState(initialStatus);
-
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
+  // 검색 debounce·상태 필터·page 리셋·페이지네이션 조립은 공용 훅이 담당한다.
+  // (커서 누적 대신 페이지 단위 교체 — 목록 어디쯤인지와 총량이 보여야 한다.)
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    filters,
+    resetToFirstPage,
+    buildPagination,
+  } = useAdminListQuery({ initialStatus, pageSize: PAGE_SIZE });
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -84,30 +90,10 @@ function AdminMatchesPageContent() {
 
   const { toasts, showToast } = useAdminToast();
 
-  // Debounce search ~300ms
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim());
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Reset extra pages when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, activeStatus]);
-
   // Capability check
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
 
-  // Build filters
-  const filters = {
-    ...(debouncedSearch ? { q: debouncedSearch } : {}),
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
 
   const {
     data: firstPage,
@@ -138,7 +124,7 @@ function AdminMatchesPageContent() {
           setModalOpen(false);
           setSelectedRow(null);
           // Reset to first page so the updated row (incl. page2+ extras) is
-          setPage(1);
+          resetToFirstPage();
           showToast('매치 상태를 변경했어요.', 'success');
         },
         onError: (err) => {
@@ -266,18 +252,7 @@ function AdminMatchesPageContent() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={8}
-          pagination={
-            pageInfo?.totalPages
-              ? {
-                  page: pageInfo.page ?? page,
-                  totalPages: pageInfo.totalPages,
-                  total: pageInfo.total ?? 0,
-                  limit: pageInfo.limit ?? PAGE_SIZE,
-                  onPageChange: setPage,
-                  loading: isFetching,
-                }
-              : undefined
-          }
+          pagination={buildPagination(pageInfo, isFetching)}
         />
       </div>
 

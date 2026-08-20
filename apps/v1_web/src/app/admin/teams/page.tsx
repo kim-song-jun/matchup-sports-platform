@@ -9,6 +9,7 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamRow } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import { User, Users, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
@@ -60,42 +61,23 @@ export default function AdminTeamsPage() {
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
 
-  // ── Filter state ───────────────────────────────────────────────────
-  const [searchInput, setSearchInput] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
-  const [activeStatus, setActiveStatus] = useState('');
-
-  // ── Cursor pagination ──────────────────────────────────────────────
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
+  // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    filters,
+    resetToFirstPage,
+    buildPagination,
+  } = useAdminListQuery({ pageSize: PAGE_SIZE });
 
   // URL searchParam pre-selection on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('status') ?? '';
     if (s) setActiveStatus(s);
-  }, []);
-
-  // Debounce search input ~300ms
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(searchInput), 300);
-    return () => clearTimeout(t);
-  }, [searchInput]);
-
-  // Reset pagination whenever an applied filter changes
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedQ, activeStatus]);
-
-  const handleSearchChange = (value: string) => setSearchInput(value);
-  const handleStatusChange = (value: string) => setActiveStatus(value);
-
-  const filters = {
-    ...(debouncedQ ? { q: debouncedQ } : {}),
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
+  }, [setActiveStatus]);
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeams(filters);
   const rows = data?.items ?? [];
@@ -121,7 +103,7 @@ export default function AdminTeamsPage() {
         onSuccess: () => {
           setModalRow(null);
           showToast('팀 상태를 변경했어요.', 'success');
-          setPage(1);
+          resetToFirstPage();
         },
         onError: (err) => {
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
@@ -150,11 +132,11 @@ export default function AdminTeamsPage() {
         <AdminFilterBar
           searchLabel="팀명 검색"
           searchPlaceholder="팀명 검색"
-          searchValue={searchInput}
-          onSearchChange={handleSearchChange}
+          searchValue={search}
+          onSearchChange={setSearch}
           statusOptions={statusOptions}
           activeStatus={activeStatus}
-          onStatusChange={handleStatusChange}
+          onStatusChange={setActiveStatus}
         />
 
         {/* Card list */}
@@ -254,18 +236,7 @@ export default function AdminTeamsPage() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={8}
-          pagination={
-            pageInfo?.totalPages
-              ? {
-                  page: pageInfo.page ?? page,
-                  totalPages: pageInfo.totalPages,
-                  total: pageInfo.total ?? 0,
-                  limit: pageInfo.limit ?? PAGE_SIZE,
-                  onPageChange: setPage,
-                  loading: isFetching,
-                }
-              : undefined
-          }
+          pagination={buildPagination(pageInfo, isFetching)}
         />
 
         {/* Load more */}

@@ -585,6 +585,7 @@ model V1User {
   tournamentRegistrationsApplied V1TournamentRegistration[]    @relation("V1TournamentRegistrationApplicant")
   tournamentPlayerEntries        V1TournamentPlayer[]
   tournamentReviews              V1TournamentReview[]          @relation("V1TournamentReviewAuthor")
+  tournamentAwardsReceived       V1TournamentAward[]           @relation("V1TournamentAwardRecipient")
   tournamentStaffAssignments     V1TournamentStaffAssignment[] @relation("V1TournamentStaffUser")
   grantedTournamentStaff         V1TournamentStaffAssignment[] @relation("V1TournamentStaffGrantor")
   verificationTokens             V1VerificationToken[]
@@ -2271,17 +2272,20 @@ model V1TournamentAward {
   awardType     String   @map("award_type") // 'mvp' | 'top_scorer' | 'best_defense' | etc.
   awardLabel    String   @map("award_label") // 표시명: 'MVP', '득점왕', '베스트 11' 등
   iconKey       String?  @map("icon_key") // trophy | crown | goal | shield | glove | handshake | sparkles | medal | star
-  recipientName String   @map("recipient_name") // 수심자 이름
-  teamName      String?  @map("team_name") // 수심자 팀명
+  recipientName   String  @map("recipient_name") // 수상자 이름
+  recipientUserId String? @map("recipient_user_id")
+  teamName      String?  @map("team_name") // 수상자 팀명
   note          String? // 추가 설명
   sortOrder     Int      @default(0) @map("sort_order") // 표시 순서
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  recipient  V1User?      @relation("V1TournamentAwardRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
 
   @@unique([tournamentId, awardType])
   @@index([tournamentId, sortOrder])
+  @@index([recipientUserId, createdAt])
   @@map("v1_tournament_awards")
 }
 

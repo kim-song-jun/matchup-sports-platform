@@ -313,7 +313,17 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
     // 픽스처도 그 형태를 그대로 따른다. 여기에 값을 넣어두면 "타인에게도 동의 상태가
     // 보인다"는 잘못된 계약을 테스트가 정상으로 통과시킨다.
     viewerIsOwner: false,
-    summary: { appearances: 1, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 1 },
+    summary: {
+      appearances: 1,
+      goals: 1,
+      assists: 0,
+      yellowCards: 0,
+      redCards: 0,
+      mvpCount: 1,
+      matchMvpCount: 1,
+      tournamentAwardCount: 0,
+    },
+    tournamentAwards: [],
     items: [
       {
         id: 'result-1',
@@ -342,6 +352,37 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
 }
 
 describe('UserRecordsContent — 기록 행', () => {
+  it('출전·골·매치 MVP·대회 수상을 구분하고 실제 수상명을 표시한다', () => {
+    render(
+      <UserRecordsContent
+        data={makeUserRecords({
+          summary: {
+            ...makeUserRecords().summary,
+            tournamentAwardCount: 1,
+          },
+          tournamentAwards: [
+            {
+              id: 'award-1',
+              tournamentId: 'tournament-1',
+              tournamentTitle: '여름 챔피언십',
+              awardType: 'best_playmaker',
+              awardLabel: '베스트 플레이메이커',
+              iconKey: 'star',
+              teamName: '서울 유나이티드',
+              note: null,
+              awardedAt: '2026-08-10T11:00:00.000Z',
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByText('매치 MVP')).toBeInTheDocument();
+    expect(screen.getAllByText('대회 수상').length).toBeGreaterThan(0);
+    expect(screen.getByText('베스트 플레이메이커')).toBeInTheDocument();
+    expect(screen.getByText(/여름 챔피언십/)).toBeInTheDocument();
+  });
+
   it('MVP 행은 MVP 배지를 보여준다', () => {
     render(<UserRecordsContent data={makeUserRecords()} />);
     // KPI 요약 카드에도 "MVP" 라벨이 있어 텍스트만으로는 모호하다 -- 기록 행(목록) 안의

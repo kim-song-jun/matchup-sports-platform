@@ -75,6 +75,9 @@ export class TournamentAwardItemDto {
   @IsString()
   recipientName!: string;
 
+  @IsUUID()
+  recipientUserId!: string;
+
   @IsOptional()
   @IsString()
   teamName?: string;
@@ -493,6 +496,7 @@ export class TournamentReviewsService {
       awardLabel: a.awardLabel,
       iconKey: a.iconKey ?? null,
       recipientName: a.recipientName,
+      recipientUserId: a.recipientUserId,
       teamName: a.teamName ?? null,
       note: a.note ?? null,
     }));
@@ -519,57 +523,52 @@ export class TournamentReviewsService {
     }
 
     // 검증과 저장이 같은 값을 쓰도록 선(先)정규화 — 공백 섞인 입력이 그대로 저장되는 것을 방지.
-    const awards = dto.awards.map((a) => ({
+    const submittedAwards = dto.awards.map((a) => ({
       ...a,
       recipientName: a.recipientName.trim(),
       teamName: a.teamName?.trim() || null,
     }));
 
-    // 로스터 전용 강제 — 수상자는 해당 대회 확정(confirmed) 등록 팀 명단의 선수여야 하고,
-    // 팀명이 지정된 경우 확정 등록 팀명과 일치해야 한다 (자유 입력 차단).
-    if (awards.length > 0) {
+    // 로스터 전용 강제 — 이름만 비교하면 동명이인을 잘못 연결할 수 있으므로 계정 ID,
+    // 이름 스냅샷, 팀을 같은 confirmed 등록 행에서 교차 검증한다.
+    let awards: Array<TournamentAwardItemDto & { teamName: string }> = [];
+    if (submittedAwards.length > 0) {
       const registrations = await this.prisma.v1TournamentRegistration.findMany({
         where: { tournamentId, status: 'confirmed' },
         select: {
           team: { select: { name: true } },
-          players: { where: { removedAt: null }, select: { realName: true } },
+          players: { where: { removedAt: null }, select: { userId: true, realName: true } },
         },
       });
-      const rosterNames = new Set(
-        registrations.flatMap((r) => r.players.map((p) => p.realName.trim())),
-      );
-      // 팀명 → 그 팀의 선수 집합 (팀명 지정 시 수상자-팀 소속 교차 검증용)
-      const teamRosters = new Map<string, Set<string>>();
-      for (const r of registrations) {
-        const teamName = r.team.name.trim();
-        const roster = teamRosters.get(teamName) ?? new Set<string>();
-        for (const p of r.players) roster.add(p.realName.trim());
-        teamRosters.set(teamName, roster);
-      }
+      const roster = registrations.flatMap((registration) => {
+        const teamName = registration.team.name.trim();
+        return registration.players.map((player) => ({
+          userId: player.userId,
+          realName: player.realName.trim(),
+          teamName,
+        }));
+      });
 
-      for (const a of awards) {
-        if (!rosterNames.has(a.recipientName)) {
+      awards = submittedAwards.map((award) => {
+        const candidates = roster.filter(
+          (player) =>
+            player.userId === award.recipientUserId &&
+            (award.teamName === null || player.teamName === award.teamName),
+        );
+        const recipient = candidates.length === 1 ? candidates[0] : null;
+        if (recipient === null || recipient.realName !== award.recipientName) {
           throw new BadRequestException({
             code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-            message: `'${a.recipientName}'은(는) 대회 참가 명단에 없어요. 명단에서 수상자를 선택해 주세요.`,
+            message: `'${award.recipientName}' 수상자를 해당 대회 확정 명단에서 확인할 수 없어요. 명단에서 다시 선택해 주세요.`,
           });
         }
-        if (a.teamName) {
-          const teamRoster = teamRosters.get(a.teamName);
-          if (!teamRoster) {
-            throw new BadRequestException({
-              code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-              message: `'${a.teamName}'은(는) 대회에 참가 확정된 팀이 아니에요. 참가 팀에서 선택해 주세요.`,
-            });
-          }
-          if (!teamRoster.has(a.recipientName)) {
-            throw new BadRequestException({
-              code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-              message: `'${a.recipientName}'은(는) '${a.teamName}' 팀 명단에 없어요. 수상자와 팀을 다시 확인해 주세요.`,
-            });
-          }
-        }
-      }
+        return {
+          ...award,
+          recipientName: recipient.realName,
+          recipientUserId: recipient.userId,
+          teamName: recipient.teamName,
+        };
+      });
     }
 
     // 스냅샷 → 전체 교체 → 감사 기록을 한 트랜잭션에서 원자적으로 수행
@@ -589,6 +588,7 @@ export class TournamentReviewsService {
             awardLabel: a.awardLabel,
             iconKey: a.iconKey ?? null,
             recipientName: a.recipientName,
+            recipientUserId: a.recipientUserId,
             teamName: a.teamName,
             note: a.note ?? null,
             sortOrder: a.sortOrder ?? idx,
@@ -607,6 +607,7 @@ export class TournamentReviewsService {
               awardLabel: a.awardLabel,
               iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
+              recipientUserId: a.recipientUserId,
               teamName: a.teamName ?? null,
             })),
           },
@@ -615,6 +616,7 @@ export class TournamentReviewsService {
               awardLabel: a.awardLabel,
               iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
+              recipientUserId: a.recipientUserId,
               teamName: a.teamName,
             })),
           },

@@ -246,7 +246,11 @@ export const gameSchemaSourceManifest = {
   // 신 이름만 읽는 상태에서만 안전하다. game domain(V1Game*) 모델은 건드리지 않았고
   // 바인딩된 20260729000100_v1_game_operations 도 그대로라 migration 해시는 변하지 않는다.
   // 뒷받침 마이그레이션: 20260819100000_v1_league_contract.
-  schema: 'd7b7a2b27685c9a7a3d70e11a2363bc6fe4f5e836d1f6050d114a54fe41e6119',
+  // 2026-08-20 재핀: 대회 수상자 계정 연결을 위해 V1TournamentAward 에 nullable
+  // recipientUserId relation/index를 추가했다. game domain 모델·바인딩된 game operations
+  // migration은 바뀌지 않았으며 뒷받침 마이그레이션은
+  // 20260820180000_v1_tournament_award_recipient_user 이다.
+  schema: '6836627b976463894514c6870fa98e62cb1fdb209c47d2f5a30e122dacfd444d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -12,6 +12,7 @@ const award: V1TournamentAward = {
   awardLabel: 'MVP',
   iconKey: 'trophy',
   recipientName: '김선수',
+  recipientUserId: 'user-player-1',
   teamName: 'A팀',
   note: '3골 1어시스트',
 };
@@ -21,7 +22,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     data: { items: [{ id: 'reg-1', status: 'confirmed', teamId: 'team-1', teamName: 'A팀' }] },
   }),
   useV1AdminTournamentPlayers: () => ({
-    data: { players: [{ id: 'player-1', realName: '김선수' }] },
+    data: { players: [{ id: 'player-1', userId: 'user-player-1', realName: '김선수' }] },
     isFetching: false,
   }),
   useV1AdminTournamentAwards: () => ({ data: [award] }),

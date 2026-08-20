@@ -60,16 +60,14 @@ export class PublicUserRecordsService {
 
     const viewerIsOwner = viewerId !== undefined && viewerId === userId;
 
-    // 동의 행은 본인 조회일 때만 읽는다 -- 타인 조회에서는 응답에 싣지도 않으므로
-    // (아래 `consentGranted` 주석 참고) 공개 라우트의 hot path 에 쓸모없는 왕복이 하나
-    // 붙는 셈이었다. 개별 참가 기록의 동의 판정은 `loadEligibleRows` 가 자체적으로
-    // (`loadParticipantConsentEligibility`) 하므로 이 조회와 무관하다.
     const [eligibleRows, consent] = await Promise.all([
       this.loadEligibleRows(userId, query.season, viewerIsOwner),
-      viewerIsOwner
-        ? this.prisma.v1UserRecordConsent.findUnique({ where: { userId }, select: { state: true } })
-        : Promise.resolve(null),
+      this.prisma.v1UserRecordConsent.findUnique({ where: { userId }, select: { state: true } }),
     ]);
+    const tournamentAwards =
+      viewerIsOwner || consent?.state === 'GRANTED'
+        ? await this.loadTournamentAwards(userId, query.season)
+        : [];
     const cursor = decodeRecordCursor(query.cursor);
     const limit = query.limit ?? 20;
 
@@ -87,13 +85,17 @@ export class PublicUserRecordsService {
     // 공개하지만, 일반 파울 개수는 선수 개인 프로필에 낙인으로 남을 뿐
     // 관전자에게 주는 정보가 없다. DB(`V1GameResultParticipant.fouls`)와
     // 운영 콘솔의 팀 파울 카운터는 그대로 유지된다.
+    const matchMvpCount = eligibleRows.filter((row) => row.isMvp).length;
     const summary = {
       appearances: eligibleRows.length,
       goals: eligibleRows.reduce((sum, row) => sum + row.goals, 0),
       assists: eligibleRows.reduce((sum, row) => sum + row.assists, 0),
       yellowCards: eligibleRows.reduce((sum, row) => sum + row.cardsYellow, 0),
       redCards: eligibleRows.reduce((sum, row) => sum + row.cardsRed, 0),
-      mvpCount: eligibleRows.filter((row) => row.isMvp).length,
+      matchMvpCount,
+      // 구 Web 클라이언트 호환용 별칭. 신규 화면은 matchMvpCount를 사용한다.
+      mvpCount: matchMvpCount,
+      tournamentAwardCount: tournamentAwards.length,
     };
 
     const lastRow = page[page.length - 1];
@@ -115,9 +117,51 @@ export class PublicUserRecordsService {
       // 구분하지 않고 함께 안내) 기능 손실 없이 막을 수 있다.
       ...(viewerIsOwner ? { consentGranted: consent?.state === 'GRANTED' } : {}),
       summary,
+      tournamentAwards,
       items: detail,
       nextCursor,
     };
+  }
+
+  private async loadTournamentAwards(userId: string, season: string | undefined) {
+    const awards = await this.prisma.v1TournamentAward.findMany({
+      where: { recipientUserId: userId },
+      orderBy: [{ tournament: { scheduledEndAt: 'desc' } }, { sortOrder: 'asc' }],
+      select: {
+        id: true,
+        tournamentId: true,
+        awardType: true,
+        awardLabel: true,
+        iconKey: true,
+        teamName: true,
+        note: true,
+        createdAt: true,
+        tournament: {
+          select: { title: true, scheduledEndAt: true, updatedAt: true },
+        },
+      },
+    });
+    const seasonRange = seasonBounds(season);
+    return awards
+      .map((award) => {
+        const awardedAt = award.tournament.scheduledEndAt ?? award.tournament.updatedAt ?? award.createdAt;
+        return {
+          id: award.id,
+          tournamentId: award.tournamentId,
+          tournamentTitle: award.tournament.title,
+          awardType: award.awardType,
+          awardLabel: award.awardLabel,
+          iconKey: award.iconKey,
+          teamName: award.teamName,
+          note: award.note,
+          awardedAt: awardedAt.toISOString(),
+        };
+      })
+      .filter(
+        (award) =>
+          seasonRange === null ||
+          (new Date(award.awardedAt) >= seasonRange.gte && new Date(award.awardedAt) < seasonRange.lt),
+      );
   }
 
   private async loadEligibleRows(

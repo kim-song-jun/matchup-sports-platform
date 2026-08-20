@@ -46,9 +46,15 @@ V1LeagueSeries (신규)
   @@index([sportId, regionId, state])
 
 V1League (기존 확장 — "시리즈의 N시즌 × T티어" 인스턴스)
-  + seriesId  String?  @map("series_id")   ← nullable = 하위호환
-  + tier      Int      @default(1)
-  + seasonNo  Int      @default(1)
+  + seriesId  String?  @map("series_id")
+  + tier      Int?     ← nullable (구현 중 변경, 아래 이유)
+  + seasonNo  Int?     @map("season_no")
+
+  ※ tier/seasonNo 를 NOT NULL DEFAULT 1 로 두려다 nullable 로 바꿨다. 두 가지 이유:
+    ① 의미: 단발 리그는 티어가 "1부"인 게 아니라 티어 개념 자체가 없다. 기본값 1 을 주면
+       화면에 "1부" 뱃지가 잘못 붙고, 나중에 시리즈로 편입할 때 진짜 1부와 구분이 안 된다.
+    ② 게이트: expand-contract 게이트가 NOT NULL DEFAULT 컬럼이 낀 UNIQUE 인덱스를 additive 로
+       증명하지 못해 REVIEWED_NON_ADDITIVE 예외 등록이 필요해진다. nullable 이면 자동 통과한다.
   @@unique([seriesId, seasonNo, tier], map: "v1_leagues_series_season_tier_key")
   ※ seriesId 가 null 인 행은 unique 제약이 걸리지 않는다(Postgres NULL 동작) —
     기존 단발 리그가 서로 충돌하지 않는다.
@@ -79,9 +85,11 @@ V1LeaguePromotion (신규 — 승강 이력/감사 추적)
   "rounding": "ceil",     // "ceil" | "floor" | "round"
   "minSlots": 1,          // 최소 승강 팀 수
   "fixedCount": null,     // mode=fixed 일 때. 티어 팀 수와 무관한 고정값
-  "tierOverrides": {      // 특정 티어만 다른 규칙 (선택)
-    "1": { "relegateOnly": true }
+  "tierOverrides": {      // 특정 티어의 슬롯 수만 직접 지정 (선택)
+    "1": { "relegate": 4 }
   }
+  // relegateOnly/promoteOnly 같은 플래그는 두지 않았다 — 1부에 승격이 없고 최하위에 강등이
+  // 없는 것은 티어 위치로 이미 결정되므로 플래그가 중복이다. override 는 "몇 팀"만 정한다.
 }
 ```
 
@@ -234,3 +242,41 @@ commit body 는 서버가 규칙으로 재계산해 **검증**한 뒤 저장한�
 | 2 | 승강 플레이오프(2부 3위 vs 1부 하위) | **미도입** | 범위 밖. 시즌 데이터 쌓인 뒤 재검토 |
 | 3 | 자진 강등 허용 여부 | **미도입** | 어드민이 확정 화면에서 수동 조정하면 같은 효과. 별도 기능 불필요 |
 | 4 | 티어 경계 동점 처리 | 기존 tie-break 순서 따름 | `calculateLeagueStandings` 재사용. 갈리지 않으면 어드민 수동 |
+
+
+---
+
+## 구현 완료 기록 (2026-08-20)
+
+### 커밋
+1. `feat(v1-league): 리그 티어·시즌·승강 스키마 확장` — schema.prisma + 마이그레이션
+2. `feat(v1-league): 리그 승강 계산 + 시리즈 어드민 API` — 순수 함수 + 서비스 + 컨트롤러
+3. `feat(v1-league): 리그 티어·승강 어드민 화면 + 공개 티어 뱃지` — 프론트 전체
+4. `feat(v1-league): 어드민 내비게이션에 '리그 체계' 진입점 추가`
+
+### 검증 결과
+| 게이트 | 결과 |
+|---|---|
+| 백엔드 유닛 테스트 | 26건 통과 (`league-promotion.spec.ts`) |
+| 프론트 테스트 | 15건 통과 (규칙 폼 10 + 확정 패널 5) |
+| API tsc | 0 (격리 Prisma 클라이언트 기준) |
+| 웹 tsc | 0 |
+| v1 패턴 검사 | 통과 (합니다체 0 · 미정의 토큰 0) |
+| expand-contract 게이트 | passed |
+| 스키마 스냅샷 해시 | 재핀 완료 |
+
+### 로컬 tsc 검증 방법 (이 저장소 특유)
+공유 Prisma 클라이언트에는 `v1League` 모델이 아예 없다(리그 재명명 이후 generate 된 적이
+없음). 그래서 `tsc` 를 그냥 돌리면 **내 변경과 무관하게** 127개 오류가 나고, 기존 파일도
+똑같이 깨져 있어 baseline 과 구분이 안 된다.
+
+`prisma generate` 는 생성물이 모노레포 전체 공유 경로에 쓰여 다른 세션을 깨뜨리므로 금지다.
+대신 **generator `output` 을 scratchpad 로 고정한 스키마 사본**으로 격리 클라이언트를 만들고,
+`paths` 로 `@prisma/client` 를 거기로 매핑한 임시 tsconfig 로 검사했다. 공유 클라이언트가
+오염되지 않았음을 검사 전후로 확인했다(`grep -c "get v1League("` → 0 유지).
+
+### 남은 것
+- **시각 검증(3폭 스크린샷)**: 이 저장소는 로컬 next 서버 기동이 금지돼 있고 alpha 배포가
+  ground truth다. dev 머지 → alpha 배포 후 📱390 / 📲768 / 🖥1440 갤러리를 PR 에 게시해야 한다.
+- **통합 테스트**: preview → commit → 다음 시즌 생성 경로는 DB 가 필요해 CI 통합 테스트에서
+  커버한다. 순수 함수(승강 계산)와 프론트 상태 전이는 유닛으로 이미 덮었다.

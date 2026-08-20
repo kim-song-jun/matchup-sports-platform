@@ -246,7 +246,10 @@ const FEATURED_TEAMS: readonly TeamSeed[] = [
   { id: 'ab300000-0000-4000-8000-000000000004', name: '팀밋 선라이즈' },
 ] as const;
 
-function assertAlphaSeedAllowed(env: NodeJS.ProcessEnv) {
+// export: seed-alpha-league-qa.ts 가 같은 4중 가드(NODE_ENV·확인 플래그·alpha DB
+// 호스트/이름)를 그대로 재사용한다 — 리그 QA 시드도 alpha 전용이라 게이트가 갈라지면
+// 위험하므로 단일 소스를 공유한다.
+export function assertAlphaSeedAllowed(env: NodeJS.ProcessEnv) {
   if (env.NODE_ENV !== 'production') {
     throw new Error('Alpha tournament QA seed requires the production-mode alpha image.');
   }

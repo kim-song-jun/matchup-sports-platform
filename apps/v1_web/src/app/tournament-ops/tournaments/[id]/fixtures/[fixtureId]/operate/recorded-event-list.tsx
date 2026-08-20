@@ -180,7 +180,24 @@ export function RecordedEventList({
                   aria-hidden="true"
                   className={`h-2.5 w-2.5 shrink-0 rounded-full ${eventDotClass(event)}`}
                 />
-                <p className="truncate text-sm font-medium text-[var(--text-strong)]">
+                {/* 좁은 컨테이너에서는 **자르지 말고 줄을 늘린다**(`line-clamp-2`).
+                    줄을 나누는 것만으로는 부족했다 — 2026-08-20 alpha 실측: 1024px 에서
+                    사이드바 컨테이너가 **202px** 로 전 구간 중 가장 좁고(390 모바일의 292px
+                    보다도 좁다), 같은 줄의 시계 배지가 ~80px 를 먹어 이 문단에 114px 만 남는다.
+                    그 폭에서는 `교체 · 김민수 → 박지성`(127px)·`골 · 10 김민수 (도움 7 박지성)`
+                    (166px) 같은 **평범한 라벨이 이벤트 종류와 무관하게 잘린다.**
+
+                    이 목록에서 가장 중요한 정보가 "무엇을·누가"인데 그게 제일 먼저 사라지는
+                    셈이라, 한 줄을 고집하는 대신 두 줄까지 허용한다. 행 높이가 최대 한 줄
+                    변하는 대가로 정보가 보존된다.
+
+                    **폭에 따라 `truncate` 로 되돌리지 않는다.** `.line-clamp-2` 는 Tailwind
+                    유틸이 아니라 `globals.css` 의 커스텀 클래스(`display:-webkit-box` +
+                    `-webkit-line-clamp:2`)라, `@md:truncate` 로는 그 두 선언이 지워지지 않아
+                    넓은 폭에서도 클램프가 남는다(Copilot 리뷰 지적). 굳이 되돌릴 이유도 없다 —
+                    컨테이너가 넉넉하면 라벨이 어차피 한 줄에 들어가서 클램프가 발동하지 않고,
+                    행 높이도 그대로 균일하다. 모드를 하나로 두는 편이 단순하고 예측 가능하다. */}
+                <p className="line-clamp-2 text-sm font-medium text-[var(--text-strong)]">
                   {eventTypeLabel(event)}
                   {event.type === 'SUBSTITUTION'
                     ? substitutionDetailSuffix(event, playerName)

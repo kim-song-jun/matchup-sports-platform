@@ -1656,6 +1656,14 @@ button:disabled {
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
+  /* a11y 터치 타깃 (26->44). 이 배지는 원래 비인터랙티브 span 이라 배지 높이 그대로
+     26px 였는데, 카드 전체를 감싼 Link 안에서 중첩 앵커를 피하려고 button 으로 바꾸면서
+     "누를 수 있는 26px 표면"이 생겼다 — alpha 라이브 측정에서 390/768/1440 전부 26px
+     로 확인됐다. 히트 영역만 ::after 로 넓히는 방법도 있지만, 배지가 카드 Link 안에
+     있어 넓힌 영역이 위아래 형제 배지 줄을 덮으면 그 자리 탭이 팀이 아니라 리그로
+     새는 부작용이 생긴다. 그래서 이 저장소의 다른 a11y 상향 선례와 동일하게 요소
+     자체를 44px 로 올린다. */
+  min-height: 44px;
 }
 
 .tm-league-badge-link:focus-visible {

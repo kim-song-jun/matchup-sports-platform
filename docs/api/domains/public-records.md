@@ -49,7 +49,7 @@ existing file changed.
 | `GET /tournaments/:id/schedule` | `cursor?`, `limit? (1-100, default 20)`, `round?`, `groupId?` | `{ tournamentId, tournamentTitle, bracketPublished, items[], unscheduled[], standings[], nextCursor }` |
 | `GET /tournaments/:id/matches/:fixtureId` | -- | one match projection (see below) |
 | `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, items[] (including opponentTeamLogoUrl), nextCursor }` |
-| `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, items[], nextCursor }` |
+| `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, tournamentAwards[], items[], nextCursor }` |
 
 `cursor` is opaque (base64url JSON `{key,id}`); never construct it
 client-side.
@@ -311,3 +311,23 @@ persisted `userId`, no current link, and no prior identity-link event history.
 Rejected, revoked, or otherwise historically adjudicated links are therefore
 never recreated by this command. Applied rows use the system actor
 `GAME_BACKFILL`, and rerunning the command is idempotent.
+
+### Match MVP and tournament awards (2026-08-20)
+
+The user-record summary separates four user-facing metrics: `appearances`,
+`goals`, `matchMvpCount`, and `tournamentAwardCount`. Match MVP is derived
+only from the current official result revision's `mvpParticipantId`.
+`mvpCount` remains as a temporary compatibility alias with the same value as
+`matchMvpCount`; new clients must use the explicit field.
+
+`tournamentAwards[]` is a separate list backed by
+`V1TournamentAward.recipientUserId`. Each item contains `id`,
+`tournamentId`, `tournamentTitle`, `awardType`, the tournament-defined
+`awardLabel`, nullable `iconKey`, `teamName`, `note`, and `awardedAt`.
+Clients display `awardLabel` verbatim because award categories vary by
+tournament; they must not collapse tournament awards into match MVP.
+
+Self-view returns linked tournament awards regardless of public-record consent,
+matching the existing self-view game-record bypass. Other viewers receive the
+linked award list only while the target user's record consent is `GRANTED`;
+the response still omits `consentGranted` for non-owners.

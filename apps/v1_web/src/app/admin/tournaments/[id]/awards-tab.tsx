@@ -11,7 +11,7 @@ import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-p
 
 // ── Tab: Individual Awards ────────────────────────────────────────────────
 
-type AwardForm = { awardType: string; awardLabel: string; iconKey: V1TournamentAwardIconKey; recipientName: string; teamName: string; note: string };
+type AwardForm = { awardType: string; awardLabel: string; iconKey: V1TournamentAwardIconKey; recipientName: string; recipientUserId: string; teamName: string; note: string };
 
 export function AwardsTab({
   tournamentId,
@@ -43,6 +43,7 @@ export function AwardsTab({
       awardLabel: award.awardLabel,
       iconKey: award.iconKey ?? legacyAwardIconKey(award.awardType),
       recipientName: award.recipientName,
+      recipientUserId: award.recipientUserId ?? '',
       teamName: award.teamName ?? '',
       note: award.note ?? '',
     })));
@@ -54,7 +55,7 @@ export function AwardsTab({
   };
 
   const addRow = () => {
-    setRows((prev) => [...prev, { awardType: `custom_${Date.now()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', teamName: '', note: '' }]);
+    setRows((prev) => [...prev, { awardType: `custom_${Date.now()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', recipientUserId: '', teamName: '', note: '' }]);
   };
 
   const removeRow = (idx: number) => {
@@ -62,9 +63,9 @@ export function AwardsTab({
   };
 
   const handleSave = () => {
-    const incompleteRow = rows.find((row) => !row.awardLabel.trim() || !row.recipientName.trim());
+    const incompleteRow = rows.find((row) => !row.awardLabel.trim() || !row.teamName.trim() || !row.recipientName.trim() || !row.recipientUserId);
     if (incompleteRow) {
-      showToast('각 항목의 어워드명과 수상자를 모두 입력해 주세요.', 'error');
+      showToast('각 항목의 어워드명, 소속 팀, 수상자를 모두 선택해 주세요.', 'error');
       return;
     }
     const awards = rows
@@ -187,11 +188,11 @@ function AwardRow({
   const { data: roster, isFetching: rosterFetching } =
     useV1AdminTournamentPlayers(selectedRegistrationId);
   const playerItems: EntityPickerItem[] = (roster?.players ?? []).map((p) => ({
-    id: p.id,
+    id: p.userId,
     label: p.realName,
   }));
   const recipientValue: EntityPickerItem | null = row.recipientName
-    ? (playerItems.find((it) => it.label === row.recipientName) ?? { id: '', label: row.recipientName })
+    ? (playerItems.find((it) => it.id === row.recipientUserId) ?? { id: row.recipientUserId, label: row.recipientName })
     : null;
 
   return (
@@ -231,7 +232,10 @@ function AwardRow({
           <EntityPicker
             id={`award-recipient-${idx}`}
             value={recipientValue}
-            onChange={(item) => update(idx, 'recipientName', item?.label ?? '')}
+            onChange={(item) => {
+              update(idx, 'recipientName', item?.label ?? '');
+              update(idx, 'recipientUserId', item?.id ?? '');
+            }}
             items={playerItems}
             loading={!!selectedRegistrationId && rosterFetching}
             placeholder="명단에서 선택"
@@ -242,11 +246,15 @@ function AwardRow({
           )}
         </div>
         <div>
-          <label htmlFor={`award-team-${idx}`} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">소속 팀 (선택)</label>
+          <label htmlFor={`award-team-${idx}`} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">소속 팀 *</label>
           <EntityPicker
             id={`award-team-${idx}`}
             value={selectedTeamItem}
-            onChange={(item) => update(idx, 'teamName', item?.label ?? '')}
+            onChange={(item) => {
+              update(idx, 'teamName', item?.label ?? '');
+              update(idx, 'recipientName', '');
+              update(idx, 'recipientUserId', '');
+            }}
             items={teamItems}
             placeholder="참가 팀에서 선택"
           />

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { EyeOff } from 'lucide-react';
 import { Card, EmptyState, KPIStat } from '@/components/v1-ui/primitives';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { userRecordResultLabel } from './format';
 import { resultChipStyle, resultStripeStyle } from './result-emphasis';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
@@ -124,12 +125,67 @@ export function UserRecordsContent({
       {showOwnerVisibilityBanner ? <OwnerVisibilityBanner /> : null}
 
       <Card>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
           <KPIStat label="출전" value={data.summary.appearances} unit="경기" />
           <KPIStat label="골" value={data.summary.goals} unit="골" />
-          <KPIStat label="MVP" value={data.summary.mvpCount} unit="회" />
+          <KPIStat label="매치 MVP" value={data.summary.matchMvpCount} unit="회" />
+          <KPIStat label="대회 수상" value={data.summary.tournamentAwardCount} unit="회" />
         </div>
       </Card>
+
+      {data.tournamentAwards.length > 0 ? (
+        <section aria-labelledby="tournament-awards-title">
+          <h3 id="tournament-awards-title" className="tm-hub-section-title" style={{ marginBottom: 10 }}>대회 수상</h3>
+          <Card pad={0}>
+            {data.tournamentAwards.map((award) => (
+              <Link
+                key={award.id}
+                href={`/tournaments/${award.tournamentId}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '14px 16px',
+                  borderTop: '1px solid var(--grey100)',
+                  color: 'inherit',
+                  textDecoration: 'none',
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: 'inline-flex',
+                    width: 40,
+                    height: 40,
+                    flexShrink: 0,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 12,
+                    background: 'var(--surface-soft)',
+                  }}
+                >
+                  <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} size={20} />
+                </span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>
+                    {award.awardLabel}
+                  </span>
+                  <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--text-caption)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {award.tournamentTitle}
+                    {award.teamName ? ` · ${award.teamName}` : ''}
+                    {formatTournamentDateShort(award.awardedAt) ? ` · ${formatTournamentDateShort(award.awardedAt)}` : ''}
+                  </span>
+                  {award.note ? (
+                    <span style={{ display: 'block', marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>
+                      {award.note}
+                    </span>
+                  ) : null}
+                </span>
+              </Link>
+            ))}
+          </Card>
+        </section>
+      ) : null}
 
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>활동 기록</h3>

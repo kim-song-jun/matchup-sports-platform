@@ -3059,7 +3059,7 @@ export function useV1SetTournamentAwards(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (awards: {
-      awardType: string; awardLabel: string; recipientName: string;
+      awardType: string; awardLabel: string; recipientName: string; recipientUserId: string;
       iconKey?: string; teamName?: string; note?: string; sortOrder?: number;
     }[]) => v1Put<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`, { awards }),
     onSuccess: () => {

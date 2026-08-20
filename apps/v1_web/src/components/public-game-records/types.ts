@@ -350,6 +350,30 @@ export interface PublicUserRecordsSummary {
   readonly yellowCards: number;
   readonly redCards: number;
   readonly mvpCount: number;
+  readonly matchMvpCount: number;
+  readonly tournamentAwardCount: number;
+}
+
+export interface PublicUserTournamentAward {
+  readonly id: string;
+  readonly tournamentId: string;
+  readonly tournamentTitle: string;
+  readonly awardType: string;
+  readonly awardLabel: string;
+  readonly iconKey:
+    | 'trophy'
+    | 'crown'
+    | 'goal'
+    | 'shield'
+    | 'glove'
+    | 'handshake'
+    | 'sparkles'
+    | 'medal'
+    | 'star'
+    | null;
+  readonly teamName: string | null;
+  readonly note: string | null;
+  readonly awardedAt: string;
 }
 
 /**
@@ -373,6 +397,7 @@ export interface PublicUserRecordsResponse {
   readonly viewerIsOwner: boolean;
   readonly consentGranted?: boolean;
   readonly summary: PublicUserRecordsSummary;
+  readonly tournamentAwards: readonly PublicUserTournamentAward[];
   readonly items: readonly PublicUserRecordItem[];
   readonly nextCursor: string | null;
 }

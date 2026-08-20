@@ -756,7 +756,10 @@ export function ScheduleContent({
           <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
             시간 미정 경기
           </h3>
-          <Card pad={0} className="tm-schedule-list">
+          {/* 그룹 목록과 같은 컨테이너다 — 여기만 `Card` 로 남아 있었더니, 경기가 1건일 때
+              테두리 쳐진 카드 안에서 좌측 절반만 차고 우측이 "액자 속 빈 공간"이 됐다.
+              행 자체가 이미 `tm-schedule-card` 라 바깥 카드는 이중 크롬이기도 하다. */}
+          <div className="tm-schedule-list">
             {data.unscheduled.map((entry) => (
               <ScheduleRow
                 key={entry.fixtureId}
@@ -765,7 +768,7 @@ export function ScheduleContent({
                 myFixture={myFixtureById.get(entry.fixtureId)}
               />
             ))}
-          </Card>
+          </div>
         </section>
       ) : null}
     </div>

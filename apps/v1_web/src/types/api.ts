@@ -1197,20 +1197,6 @@ export type V1TeamMatchApplicationsPage = {
   };
 };
 
-export type V1MyTeamMatch = {
-  teamMatchId: string;
-  title: string;
-  sportName: string;
-  startsAt: string;
-  status: V1TeamMatchApiStatus;
-  relation: 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
-  teamId?: string | null;
-  teamName?: string | null;
-  applicationId: string | null;
-  manageRoute: string | null;
-  detailRoute: string;
-};
-
 // ─── Task 17: Game aggregate + team result revisions (docs/api/domains/games.md) ───
 
 export type V1GameSourceType = 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
@@ -1329,6 +1315,7 @@ export type V1GameResultRevision = {
   revision: number;
   state: V1GameResultRevisionState;
   score: V1GameResultScore;
+  goalEvents?: V1GameResultGoalEventInput[] | null;
   eventsHash: string;
   missingScorer: boolean;
   mvpParticipantId: string | null;
@@ -1342,6 +1329,15 @@ export type V1GameResultRevision = {
   createdAt: string;
   updatedAt: string;
   resultParticipants: V1GameResultParticipantRow[];
+};
+
+export type V1GameResultGoalEventInput = {
+  id: string;
+  sideId: string;
+  participantId?: string;
+  minute?: number;
+  period?: number;
+  ownGoal: boolean;
 };
 
 export type V1GameResultParticipantInput = {
@@ -1970,6 +1966,33 @@ export type V1Home = {
   recommendedMatches?: V1Match[];
   recommendedTeamMatches?: V1TeamMatch[];
   recommendedTeams?: V1Team[];
+};
+
+/** GET /admin/search — 커맨드 팔레트 전역 검색 결과 (도메인당 최대 5건) */
+export type V1AdminGlobalSearchUserHit = {
+  userId: string;
+  label: string;
+  sublabel: string | null;
+  status: string;
+};
+
+export type V1AdminGlobalSearchTeamHit = {
+  teamId: string;
+  label: string;
+  status: string;
+};
+
+export type V1AdminGlobalSearchMatchHit = {
+  matchId: string;
+  label: string;
+  sublabel: string | null;
+  status: string;
+};
+
+export type V1AdminGlobalSearchResult = {
+  users: V1AdminGlobalSearchUserHit[];
+  teams: V1AdminGlobalSearchTeamHit[];
+  matches: V1AdminGlobalSearchMatchHit[];
 };
 
 export type V1AdminOverview = {
@@ -3076,6 +3099,8 @@ export type V1TournamentAward = {
   awardLabel: string;  // 'MVP' | '득점왕' | ...
   iconKey?: V1TournamentAwardIconKey | null;
   recipientName: string;
+  /** Admin award reads include this; public tournament detail omits account linkage. */
+  recipientUserId?: string | null;
   teamName: string | null;
   note: string | null;
 };

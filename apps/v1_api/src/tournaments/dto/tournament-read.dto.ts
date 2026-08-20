@@ -99,6 +99,10 @@ export class UpdateAnnouncementDto {
   body!: string;
 
   @IsOptional()
+  @IsIn(ANNOUNCEMENT_CATEGORIES)
+  category?: AnnouncementCategory;
+
+  @IsOptional()
   @IsIn(ANNOUNCEMENT_AUDIENCES)
   audience?: AnnouncementAudience;
 

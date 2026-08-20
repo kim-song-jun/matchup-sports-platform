@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Eye } from 'lucide-react';
@@ -10,6 +10,7 @@ import {
   useV1ChangeUserStatus,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import {
   AdminPageHeader,
   AdminFilterBar,
@@ -98,13 +99,17 @@ function AdminUsersPageContent() {
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') ?? '';
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeStatus, setActiveStatus] = useState(initialStatus);
-
-  // 커서 누적 대신 페이지 단위 교체다. 회원 목록은 "몇 명 중 어디쯤"이 보여야 하는데
-  // 누적 목록으로는 그 감각이 생기지 않는다.
-  const [page, setPage] = useState(1);
+  // 검색 debounce·상태 필터·page=1 리셋·페이지네이션 조립은 공용 훅이 담당한다.
+  // (커서 누적 대신 페이지 단위 교체 — 회원 목록은 "몇 명 중 어디쯤"이 보여야 한다.)
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    filters,
+    resetToFirstPage,
+    buildPagination,
+  } = useAdminListQuery({ initialStatus, pageSize: PAGE_SIZE });
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -112,30 +117,9 @@ function AdminUsersPageContent() {
 
   const { toasts, showToast } = useAdminToast();
 
-  // Debounce search ~300ms
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim());
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // 필터가 바뀌면 첫 페이지로 돌아간다 — 3페이지를 보던 중 조건을 좁히면 결과가 없을 수 있다.
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, activeStatus]);
-
   // Capability check
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
-
-  // Build filters
-  const filters = {
-    ...(debouncedSearch ? { q: debouncedSearch } : {}),
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
 
   const {
     data: firstPage,
@@ -166,7 +150,7 @@ function AdminUsersPageContent() {
           setModalOpen(false);
           setSelectedRow(null);
           // 방금 바꾼 행이 최신 상태로 다시 그려지도록 첫 페이지부터 받아온다.
-          setPage(1);
+          resetToFirstPage();
           showToast('회원 상태를 변경했어요.', 'success');
         },
         onError: (err) => {
@@ -347,18 +331,7 @@ function AdminUsersPageContent() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={8}
-          pagination={
-            pageInfo?.totalPages
-              ? {
-                  page: pageInfo.page ?? page,
-                  totalPages: pageInfo.totalPages,
-                  total: pageInfo.total ?? 0,
-                  limit: pageInfo.limit ?? PAGE_SIZE,
-                  onPageChange: setPage,
-                  loading: isFetching,
-                }
-              : undefined
-          }
+          pagination={buildPagination(pageInfo, isFetching)}
         />
       </div>
 

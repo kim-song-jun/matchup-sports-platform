@@ -21,6 +21,14 @@ export class LeagueMatchAdminService {
 
   async create(user: V1AuthUser, dto: CreateLeagueMatchDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    const startsOn = new Date(dto.startsOn);
+    const endsOn = new Date(dto.endsOn);
+    if (endsOn.getTime() < startsOn.getTime()) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_PERIOD_INVALID',
+        message: '종료일은 시작일보다 빠를 수 없어요.',
+      });
+    }
     const uniqueTeamIds = [...new Set(dto.teamIds)];
     if (uniqueTeamIds.length < 2) {
       throw new UnprocessableEntityException({
@@ -38,6 +46,18 @@ export class LeagueMatchAdminService {
         message: '리그 종목과 일치하는 활성 팀만 등록할 수 있어요.',
       });
     }
+    // 팀매치 생성과 같은 조건(활성 + level 2 시·군·구)으로 regionId를 사전 검증한다 —
+    // 검증 없이 진행하면 FK 위반(P2003)이 500으로 새어 나간다.
+    const region = await this.prisma.v1Region.findFirst({
+      where: { id: dto.regionId, isActive: true, level: 2 },
+      select: { id: true },
+    });
+    if (region === null) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_REGION_INVALID',
+        message: '활성화된 시·군·구 지역만 선택할 수 있어요.',
+      });
+    }
 
     const league = await this.prisma.$transaction(async (tx) => {
       const created = await tx.v1League.create({
@@ -46,13 +66,12 @@ export class LeagueMatchAdminService {
           sportId: dto.sportId,
           regionId: dto.regionId,
           createdByAdminUserId: admin.id,
-          startsOn: new Date(dto.startsOn),
-          endsOn: new Date(dto.endsOn),
+          startsOn,
+          endsOn,
           tieBreakJson: { order: DEFAULT_TIE_BREAK_ORDER },
           teams: { createMany: { data: uniqueTeamIds.map((teamId) => ({ teamId })) } },
         },
       });
-      await mirrorLeagueToLegacy(tx, created, uniqueTeamIds);
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -134,37 +153,51 @@ export class LeagueMatchAdminService {
     const schedule = generateRoundRobinFixtures(teamIds, dto.weeksCount);
 
     const createdIds = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "v1_team_match_series" WHERE id = ${leagueId} FOR UPDATE`;
+      // 락은 신 테이블(v1_leagues)에 건다. 재명명 때 Prisma 델리게이트만 바꾸고 이 raw SQL
+      // 문자열을 놓쳐 구 테이블을 잠그고 있었다 -- 문자열 안의 테이블명은 타입 시스템이 못 본다.
+      // 구 테이블을 잠그면 두 겹으로 위험하다: ① 미러 행이 없는 리그에서는 SELECT ... FOR UPDATE
+      // 가 0행이라 아무것도 잠그지 않아 동시성 보호가 조용히 사라지고, ② 수축 릴리스가 그 테이블을
+      // 지우는 순간 relation does not exist 로 깨진다.
+      await tx.$queryRaw`SELECT id FROM "v1_leagues" WHERE id = ${leagueId} FOR UPDATE`;
       const existingCount = await tx.v1TeamMatch.count({ where: { leagueId } });
       if (existingCount > 0) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
       }
       const teamsById = await this.loadTeamsWithMembers(tx, teamIds);
+      // league.teams에는 남아 있어도 그 사이 비활성/소프트삭제된 팀은 loadTeamsWithMembers의
+      // active 필터에 걸려 여기 없다 — 그대로 진행하면 undefined 참조로 500이 나므로,
+      // 행을 만들기 전에 도메인 오류로 거부한다(create()의 422 패턴과 동일).
+      const pairings = schedule.map((fixture) => {
+        const home = teamsById.get(fixture.homeTeamId);
+        const away = teamsById.get(fixture.awayTeamId);
+        if (home === undefined || away === undefined) {
+          throw new UnprocessableEntityException({
+            code: 'LEAGUE_TEAM_INVALID',
+            message: '비활성화되었거나 삭제된 팀이 포함돼 있어요.',
+          });
+        }
+        return { round: fixture.round, home, away };
+      });
       // 빈 문자열/공백만 있는 placeName 도 "미지정"으로 취급한다 — DTO 는 @IsOptional 문자열이라
       // 통과하고, ?? 는 ''를 대체하지 않아 그대로면 recentVenues 집계에서 조용히 빠지는 값이 저장된다.
       const trimmedPlaceName = dto.placeName?.trim();
       const placeName = trimmedPlaceName ? trimmedPlaceName : DEFAULT_FIXTURE_PLACE_NAME;
       const ids: string[] = [];
-      for (const fixture of schedule) {
-        const home = teamsById.get(fixture.homeTeamId)!;
-        const away = teamsById.get(fixture.awayTeamId)!;
-        const startAt = resolveFixtureStartAt(league.startsOn, fixture.round, dto.schedule);
+      for (const { round, home, away } of pairings) {
+        const startAt = resolveFixtureStartAt(league.startsOn, round, dto.schedule);
         const teamMatch = await tx.v1TeamMatch.create({
           data: {
             hostTeamId: home.id,
             createdByUserId: admin.userId,
             sportId: league.sportId,
             regionId: league.regionId,
-            title: `${league.title} ${fixture.round}주차`,
+            title: `${league.title} ${round}주차`,
             placeName,
             startAt,
             status: 'matched',
             approvedApplicantTeamId: away.id,
             competitionConfigVersionId: config.id,
             leagueId: league.id,
-            // 이중 쓰기(확장 단계). 구버전 컨테이너와 롤백 대상 이미지는 seriesId 로
-            // 리그 소속을 판단한다 -- 같은 값을 넣어 두 컬럼이 절대 어긋나지 않게 한다.
-            seriesId: league.id,
           },
         });
         await this.games.createFromSourceInTransaction(
@@ -212,8 +245,6 @@ export class LeagueMatchAdminService {
       }
       if (ids.length > 0) {
         await tx.v1League.update({ where: { id: league.id }, data: { state: 'active' } });
-        // 이중 쓰기(확장 단계) -- 구버전 컨테이너는 아직 구 테이블의 state 를 읽는다.
-        await tx.v1TeamMatchSeries.updateMany({ where: { id: league.id }, data: { state: 'active' } });
       }
       await this.adminContext.logAdminAction(
         admin,
@@ -233,6 +264,12 @@ export class LeagueMatchAdminService {
         tx,
       );
       return ids;
+    }, {
+      // 팀 수 × 주차 수만큼 팀매치·게임·참가자 행을 한 트랜잭션에서 만들어, 대형 리그는
+      // Prisma 기본 timeout(5초)을 쉽게 넘긴다. 레포 선례(mock-tournament-seed 30초,
+      // v1-game-operations-worker의 maxWait 명시)를 따라 넉넉히 잡는다.
+      timeout: 120_000,
+      maxWait: 10_000,
     });
 
     return { leagueId, createdCount: createdIds.length, teamMatchIds: createdIds };
@@ -274,7 +311,15 @@ export class LeagueMatchAdminService {
   private async loadLeague(leagueId: string) {
     const league = await this.prisma.v1League.findUnique({
       where: { id: leagueId },
-      include: { teams: { select: { teamId: true } } },
+      // DB 반환 순서는 정렬을 보장하지 않는다(league-fixture-generator의 F1과 같은 문제).
+      // 라운드로빈 커널의 홈 균형 tie-break가 입력 순서에 의존하므로 등록순(createdAt,
+      // createMany 동시 등록 동률이면 teamId)으로 명시 정렬해 대진이 실행마다 흔들리지 않게 한다.
+      include: {
+        teams: {
+          select: { teamId: true },
+          orderBy: [{ createdAt: 'asc' }, { teamId: 'asc' }],
+        },
+      },
     });
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
@@ -324,36 +369,4 @@ export class LeagueMatchAdminService {
     });
     return new Map(teams.map((team) => [team.id, team]));
   }
-}
-
-/**
- * 확장-수축 재명명의 **확장 단계에서만** 필요한 이중 쓰기.
- *
- * 새 코드는 v1_leagues 를 읽지만, 롤링 배포 창의 구버전 컨테이너와 롤백 대상 이미지는
- * 여전히 v1_team_match_series 를 읽는다(deploy-alpha.sh 가 migrate 를 컨테이너 교체보다
- * 먼저 돌리기 때문에 그 창이 실제로 존재한다). 그래서 새 리그를 만들 때 구 테이블에도
- * **같은 id 로** 미러 행을 남긴다 -- id 가 같아야 v1_team_matches 의 league_id 와 series_id 가
- * 항상 같은 리그를 가리킨다.
- *
- * **수축 릴리스에서 이 함수와 호출부를 통째로 삭제한다.** 그때는 구 테이블 자체가 사라진다.
- */
-async function mirrorLeagueToLegacy(
-  tx: Prisma.TransactionClient,
-  league: { id: string; title: string; sportId: string; regionId: string; createdByAdminUserId: string; startsOn: Date; endsOn: Date; tieBreakJson: Prisma.JsonValue; state: string },
-  teamIds: readonly string[],
-) {
-  await tx.v1TeamMatchSeries.create({
-    data: {
-      id: league.id,
-      title: league.title,
-      sportId: league.sportId,
-      regionId: league.regionId,
-      createdByAdminUserId: league.createdByAdminUserId,
-      startsOn: league.startsOn,
-      endsOn: league.endsOn,
-      tieBreakJson: league.tieBreakJson === null ? Prisma.JsonNull : league.tieBreakJson,
-      state: league.state as 'draft' | 'active' | 'completed',
-      teams: { createMany: { data: teamIds.map((teamId) => ({ teamId })) } },
-    },
-  });
 }

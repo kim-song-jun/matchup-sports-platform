@@ -68,7 +68,6 @@ describe('AdminPopupsPage', () => {
 
   it('supports popup list, detail, create, edit, and delete affordances', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<AdminPopupsPage />);
 
     expect(screen.getByRole('heading', { name: '팝업 관리' })).toBeInTheDocument();
@@ -85,7 +84,9 @@ describe('AdminPopupsPage', () => {
     expect(screen.getByRole('heading', { name: '새 팝업 생성' })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: '삭제' })[0]);
-    expect(window.confirm).toHaveBeenCalled();
+    // window.confirm 대신 공용 ConfirmModal이 뜨고, 모달의 '삭제' 확인을 눌러야 mutation이 실행된다
+    const confirmDialog = await screen.findByRole('dialog', { name: '팝업을 삭제할까요?' });
+    await user.click(within(confirmDialog).getByRole('button', { name: '삭제' }));
     expect(deleteMutate).toHaveBeenCalledWith('popup-1', expect.any(Object));
   });
 

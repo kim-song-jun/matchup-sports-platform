@@ -6,11 +6,30 @@ import {
   ALPHA_TOURNAMENT_SCENARIOS,
   buildAlphaTournamentCampaignContent,
   createCompetitionData,
+  ensureAlphaQaRecordConsent,
 } from '../../prisma/seed-alpha-tournament-qa';
 import { parseCampaignContentJson } from './tournament-campaign-content';
 import { FUTSAL_COMPETITION_CONFIG_ID } from './competition-config/competition-config-backfill';
 
 describe('alpha tournament QA campaign content', () => {
+  it('creates public-record consent for a QA persona without overwriting a later revocation', async () => {
+    const upsert = jest.fn().mockResolvedValue({});
+    await ensureAlphaQaRecordConsent(
+      { v1UserRecordConsent: { upsert } } as never,
+      'qa-user-1',
+    );
+
+    expect(upsert).toHaveBeenCalledWith({
+      where: { userId: 'qa-user-1' },
+      update: {},
+      create: {
+        userId: 'qa-user-1',
+        state: 'GRANTED',
+        policyHash: 'alpha-qa-fixture-v1',
+      },
+    });
+  });
+
   it('satisfies the persisted campaign contract used by the public event hub', () => {
     const content = buildAlphaTournamentCampaignContent(
       {

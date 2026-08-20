@@ -96,7 +96,6 @@ export interface LeagueFixtureRow {
 
 export function buildLeagueFixtureRows(input: {
   groupId: string;
-  groupName: string;
   registrationIds: readonly string[];
   legs: number;
   balanceHome: boolean;
@@ -154,7 +153,7 @@ export class LeagueFixtureGeneratorService {
     }
 
     // F1: DB 반환 순서는 정렬 순서를 보장하지 않는다. 라운드로빈 커널의 홈 균형
-    // tie-break(pickHomeByBalance)가 입력 순서에 의존하므로, sortOrder(동률이면
+    // tie-break(pickHome)가 입력 순서에 의존하므로, sortOrder(동률이면
     // registrationId)로 명시 정렬해 대진 생성이 실행마다 흔들리지 않게 한다.
     const sortedRegistrationIds = [...group.groupTeams]
       .sort((a, b) => a.sortOrder - b.sortOrder || (a.registrationId < b.registrationId ? -1 : a.registrationId > b.registrationId ? 1 : 0))
@@ -212,7 +211,6 @@ export class LeagueFixtureGeneratorService {
 
       const builtRows = buildLeagueFixtureRows({
         groupId: group.id,
-        groupName: group.name,
         registrationIds: sortedRegistrationIds,
         legs: dto.legs,
         balanceHome: dto.balanceHome ?? true,

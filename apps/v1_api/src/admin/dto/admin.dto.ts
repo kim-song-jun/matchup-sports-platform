@@ -18,6 +18,13 @@ import { POPUP_TARGET_SCREENS, PopupTargetScreen } from '../../popups/popup-scre
 
 // ─── List query DTOs ──────────────────────────────────────────────────────────
 
+/** GET /admin/search — 커맨드 팔레트 전역 검색. 회원/팀/매치 3도메인 동시 조회 */
+export class AdminGlobalSearchQueryDto {
+  @IsString()
+  @MaxLength(100)
+  q!: string;
+}
+
 export class AdminUserListQueryDto {
   @IsOptional()
   @IsIn(['active', 'suspended', 'blocked', 'withdrawal_pending', 'deleted'])
@@ -116,6 +123,13 @@ export class AdminTeamMatchListQueryDto {
   @IsOptional()
   @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
   status?: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
+
+  // 다른 어드민 목록(users/matches/teams)과 동일한 q 검색 계약 — 팀매치만 빠져 있어
+  // 특정 경기를 찾을 방법이 없었다(어드민 재정비 M2).
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
 
   @IsOptional()
   @IsString()

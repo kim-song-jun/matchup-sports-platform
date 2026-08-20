@@ -60,6 +60,7 @@ function awardRow(overrides: Record<string, unknown> = {}) {
     awardLabel: 'MVP',
     iconKey: 'crown',
     recipientName: '김철수',
+    recipientUserId: 'user-kim',
     teamName: '레알마드리드',
     note: null,
     sortOrder: 0,
@@ -89,11 +90,14 @@ function reviewRow(overrides: Record<string, unknown> = {}) {
 const confirmedRegistrationRows = [
   {
     team: { name: '레알마드리드' },
-    players: [{ realName: '김철수' }, { realName: '이영희' }],
+    players: [
+      { userId: 'user-kim', realName: '김철수' },
+      { userId: 'user-lee', realName: '이영희' },
+    ],
   },
   {
     team: { name: '바르셀로나' },
-    players: [{ realName: '박지성' }],
+    players: [{ userId: 'user-park', realName: '박지성' }],
   },
 ];
 
@@ -222,6 +226,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
           awardLabel: 'MVP',
           iconKey: 'medal',
           recipientName: '김철수',
+          recipientUserId: 'user-kim',
           teamName: '레알마드리드',
         },
       ],
@@ -259,6 +264,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
             awardType: 'mvp',
             awardLabel: 'MVP',
             recipientName: '김철수', // 레알마드리드 소속
+            recipientUserId: 'user-kim',
             teamName: '바르셀로나', // 다른 참가 팀
           },
         ],
@@ -281,6 +287,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
           awardType: 'mvp',
           awardLabel: 'MVP',
           recipientName: '  김철수  ',
+          recipientUserId: 'user-kim',
           teamName: ' 레알마드리드 ',
         },
       ],
@@ -315,7 +322,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
 
     const attempt = service.setAwards(ownerAuthUser, 'tournament-1', {
       awards: [
-        { awardType: 'mvp', awardLabel: 'MVP', recipientName: '외부인' },
+        { awardType: 'mvp', awardLabel: 'MVP', recipientName: '외부인', recipientUserId: 'user-external' },
       ],
     });
 
@@ -339,6 +346,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
             awardType: 'mvp',
             awardLabel: 'MVP',
             recipientName: '김철수',
+            recipientUserId: 'user-kim',
             teamName: '미참가팀',
           },
         ],
@@ -354,17 +362,22 @@ describe('TournamentReviewsService — awards admin gate', () => {
     prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
     prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
     prisma.v1TournamentAward.create.mockResolvedValue(
-      awardRow({ recipientName: '이영희', teamName: null }),
+      awardRow({ recipientName: '이영희', recipientUserId: 'user-lee', teamName: '레알마드리드' }),
     );
     prisma.v1TournamentAward.findMany.mockResolvedValue([
-      awardRow({ recipientName: '이영희', teamName: null }),
+      awardRow({ recipientName: '이영희', recipientUserId: 'user-lee', teamName: '레알마드리드' }),
     ]);
 
     const result = await service.setAwards(ownerAuthUser, 'tournament-1', {
-      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '이영희' }],
+      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '이영희', recipientUserId: 'user-lee' }],
     });
 
-    expect(result[0]).toMatchObject({ recipientName: '이영희', teamName: null });
+    expect(result[0]).toMatchObject({ recipientName: '이영희', recipientUserId: 'user-lee', teamName: '레알마드리드' });
+    expect(prisma.v1TournamentAward.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ recipientUserId: 'user-lee', teamName: '레알마드리드' }),
+      }),
+    );
   });
 
   it('setAwards: roster is scoped to confirmed registrations of the tournament', async () => {
@@ -376,7 +389,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
     prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
 
     await service.setAwards(ownerAuthUser, 'tournament-1', {
-      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '김철수' }],
+      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '김철수', recipientUserId: 'user-kim' }],
     });
 
     expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(

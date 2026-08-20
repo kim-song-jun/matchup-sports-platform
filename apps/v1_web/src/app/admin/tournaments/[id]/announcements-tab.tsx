@@ -5,6 +5,7 @@ import { Megaphone, Send, Pencil, Trash2 } from 'lucide-react';
 import { useV1AdminAnnouncements, useV1CreateAnnouncement, useV1DeleteAnnouncement, useV1PublishAnnouncement, useV1UpdateAnnouncement } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentAnnouncement, V1AnnouncementAudience, V1AnnouncementCategory } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import { formatDate } from './tournament-admin-shared';
@@ -19,9 +20,11 @@ import {
 
 export function AnnouncementsTab({
   tournamentId,
+  canWrite,
   showToast,
 }: {
   tournamentId: string;
+  canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
   const { data: annData, isPending: annPending, isError: annError, error: annErr, refetch: annRefetch } = useV1AdminAnnouncements(tournamentId);
@@ -30,6 +33,7 @@ export function AnnouncementsTab({
   const updateAnnouncement = useV1UpdateAnnouncement(tournamentId);
   const publishAnnouncement = useV1PublishAnnouncement(tournamentId);
   const deleteAnnouncement = useV1DeleteAnnouncement(tournamentId);
+  const { confirm: confirmModal, ConfirmModal } = useConfirm();
 
   const [editingAnnouncement, setEditingAnnouncement] = useState<V1AdminTournamentAnnouncement | null>(null);
   const [annTitle, setAnnTitle] = useState('');
@@ -52,6 +56,7 @@ export function AnnouncementsTab({
     setEditingAnnouncement(ann);
     setAnnTitle(ann.title);
     setAnnBody(ann.body);
+    setAnnCategory(ann.category);
     setAnnAudience(ann.audience as V1AnnouncementAudience);
     setAnnPublish(Boolean(ann.publishedAt));
   };
@@ -62,6 +67,7 @@ export function AnnouncementsTab({
     const payload = {
       title: annTitle.trim(),
       body: annBody.trim(),
+      category: annCategory,
       audience: annAudience,
       publish: annPublish,
     };
@@ -115,8 +121,13 @@ export function AnnouncementsTab({
     });
   };
 
-  const handleDelete = (ann: V1AdminTournamentAnnouncement) => {
-    const confirmed = window.confirm(`"${ann.title}" 공지를 삭제할까요? 삭제한 공지는 복구할 수 없어요.`);
+  const handleDelete = async (ann: V1AdminTournamentAnnouncement) => {
+    const confirmed = await confirmModal({
+      title: '공지를 삭제할까요?',
+      message: `"${ann.title}" 공지를 삭제해요. 삭제한 공지는 복구할 수 없어요.`,
+      confirmLabel: '삭제',
+      tone: 'danger',
+    });
     if (!confirmed) return;
     deleteAnnouncement.mutate(ann.id, {
       onSuccess: () => {
@@ -131,6 +142,15 @@ export function AnnouncementsTab({
   return (
     <div className="flex flex-col gap-6">
       {/* ── 공지 작성 폼 ─────────────────────────────────────────────── */}
+      {!canWrite && (
+        <p
+          className="rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
+          role="status"
+        >
+          조회 전용 권한으로 접속했어요. 공지를 작성하거나 변경하려면 운영 권한이 필요해요.
+        </p>
+      )}
+      {canWrite && (
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-5">
         <h3 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">공지 작성</h3>
         {editingAnnouncement && (
@@ -193,7 +213,7 @@ export function AnnouncementsTab({
                 id="ann-category"
                 value={annCategory}
                 onChange={(e) => setAnnCategory(e.target.value as V1AnnouncementCategory)}
-                disabled={createAnnouncement.isPending}
+                disabled={isSavingAnnouncement}
                 className={inputCls}
               >
                 <option value="general">일반</option>
@@ -241,10 +261,11 @@ export function AnnouncementsTab({
             className={submitBtnCls}
           >
             <Megaphone size={15} aria-hidden="true" />
-            {createAnnouncement.isPending ? '작성 중…' : '공지 작성'}
+            {isSavingAnnouncement ? '저장 중…' : editingAnnouncement ? '공지 수정' : '공지 작성'}
           </button>
         </form>
       </div>
+      )}
 
       {/* ── 공지 목록 ─────────────────────────────────────────────────── */}
       {(annPending || annError) && (
@@ -281,7 +302,7 @@ export function AnnouncementsTab({
                       : '대기팀만'}
                   </p>
                 </div>
-                {!ann.publishedAt && (
+                {canWrite && !ann.publishedAt && (
                   <button
                     type="button"
                     onClick={() => handlePublish(ann.id)}
@@ -294,6 +315,7 @@ export function AnnouncementsTab({
                   </button>
                 )}
               </div>
+              {canWrite && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -307,7 +329,7 @@ export function AnnouncementsTab({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDelete(ann)}
+                  onClick={() => void handleDelete(ann)}
                   disabled={deleteAnnouncement.isPending}
                   aria-label={`"${ann.title}" 삭제`}
                   className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-lg text-xs font-medium text-[var(--red700)] bg-[var(--red50)] hover:bg-red-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2"
@@ -316,6 +338,7 @@ export function AnnouncementsTab({
                   삭제
                 </button>
               </div>
+              )}
               <p className="mt-2 text-[13px] text-[var(--text-muted)] whitespace-pre-wrap leading-relaxed">
                 {ann.body}
               </p>
@@ -323,6 +346,7 @@ export function AnnouncementsTab({
           ))}
         </div>
       )}
+      {ConfirmModal}
     </div>
   );
 }

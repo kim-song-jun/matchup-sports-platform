@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
+import { CommandPalette } from './command-palette';
 import {
   LayoutDashboard,
+  Search,
   Users,
   Swords,
   UsersRound,
@@ -440,8 +442,21 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
   const navGroups = buildNavGroups(canManageAdmins, pendingInquiries?.count);
   const sectionLabel = useSectionLabel(pathname, canManageAdmins);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   /** Ref for the hamburger button so focus can be restored when the drawer closes (WCAG 2.4.3) */
   const hamburgerRef = useRef<HTMLButtonElement>(null);
+
+  // ⌘K / Ctrl+K — 어드민 어디서든 전역 검색 팔레트를 연다
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -470,6 +485,20 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
               </span>
             )}
           </div>
+        </div>
+
+        {/* 전역 검색 트리거 */}
+        <div className="px-3 pt-3">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="전역 검색 열기 (Cmd+K)"
+            className="flex w-full items-center gap-2 min-h-[40px] rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-[13px] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--text-body)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <Search size={14} aria-hidden="true" />
+            <span className="flex-1 text-left">회원·팀·매치 검색</span>
+            <kbd className="rounded border border-[var(--border)] bg-[var(--card-surface)] px-1.5 py-0.5 text-[length:var(--font-size-micro)]">⌘K</kbd>
+          </button>
         </div>
 
         {/* Nav */}
@@ -534,8 +563,15 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           <span className="flex-1 text-center text-[15px] font-bold text-[var(--text-strong)]">
             {sectionLabel}
           </span>
-          {/* Right slot placeholder (keeps title centered) */}
-          <div className="w-[44px]" aria-hidden="true" />
+          {/* Right slot: 전역 검색 (제목 중앙 정렬 유지 — 좌측 햄버거와 같은 44px) */}
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="전역 검색 열기"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-body)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <Search size={19} aria-hidden="true" />
+          </button>
         </header>
 
         {/* Page content */}
@@ -543,6 +579,8 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           <div className={`${wide ? 'max-w-none' : 'max-w-[1200px] xl:max-w-[1320px]'} mx-auto w-full`}>{children}</div>
         </main>
       </div>
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }

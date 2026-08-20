@@ -26,7 +26,6 @@ import {
   useV1DeclineTeamInvitation,
   useV1MyActivitySummary,
   useV1MyTeams,
-  useV1MyTeamMatches,
   useV1MyTournamentStaffAssignments,
   useV1MasterRegions,
   useV1MasterSports,
@@ -58,19 +57,18 @@ import { usePendingIds } from '@/hooks/use-pending-ids';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
   MyHomePageView,
   MyInvitationsPageView,
   MyJoinApplicationsPageView,
   SettingsPageView,
-  MyTeamDetailPageView,
   MyTeamMembersPageView,
   MyTeamsPageView,
 } from './my-page';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
+import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
@@ -271,44 +269,6 @@ export function MyJoinApplicationsPageClient() {
   );
 }
 
-export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
-  const query = useV1TeamDetail(teamId);
-  const teamMatches = useV1MyTeamMatches({ limit: 20 });
-
-  // 에러 상태: mock 폴백 없이 에러를 명시적으로 표시한다.
-  if (query.isError) {
-    return <ErrorState message="팀 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void query.refetch()} />;
-  }
-
-  // 로딩 중: data 부재 시 스켈레톤 대신 빈 모델을 사용 (MyTeamDetailPageView 내부 레이아웃 보존)
-  const team = query.data;
-  if (!team) {
-    return <MyTeamDetailPageView model={{ team: { id: teamId, name: '불러오는 중…', logo: '…', sport: '', region: '', role: 'member', roleLabel: '', members: 0, manner: '-', next: '', description: '' }, actions: [], recentMatches: [] }} />;
-  }
-
-  const viewerRole = team.viewer.role;
-  // #10: owner/manager에게만 운영 메뉴(멤버 관리, 팀 설정) 노출. viewer.role은 V1TeamDetail에 실제 존재함.
-  const canManage = isTeamOperatorRole(viewerRole);
-  const actions: MyTeamDetailViewModel['actions'] = [
-    { label: '팀매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'ClipboardList' },
-    ...(canManage
-      ? [
-          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/teams/${team.teamId}/members`, icon: 'Users' },
-          // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /teams/[id] 복귀 유도
-          { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit?from=my`, icon: 'Settings' },
-        ]
-      : []),
-  ];
-
-  const model: MyTeamDetailViewModel = {
-    team: toTeamDetailModel(team),
-    actions,
-    recentMatches: (teamMatches.data?.items ?? []).filter((match) => match.teamId === team.teamId).slice(0, 3).map(toMyTeamMatch),
-    chatHref: '/chat',
-  };
-
-  return <MyTeamDetailPageView model={model} />;
-}
 
 export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const [activeTab, setActiveTab] = useState<MyTeamMembersViewModel['activeTab']>('members');
@@ -2119,19 +2079,6 @@ function confirmAction(
   confirm(opts).then((ok) => {
     if (ok) action();
   });
-}
-
-function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatches'][number] {
-  const status = match.status === 'completed' || match.status === 'expired' || match.status === 'cancelled' ? 'ended' : match.relation === 'requested' ? 'pending' : match.relation === 'approved' ? 'approved' : 'recruiting';
-  return {
-    id: match.teamMatchId,
-    title: match.title,
-    meta: `${new Date(match.startsAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} · ${match.sportName}`,
-    status,
-    statusLabel: status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : status === 'ended' ? '종료' : '모집 중',
-    note: match.teamName ? `${match.teamName} 관련 팀매치예요.` : '내 팀 관련 팀매치예요.',
-    href: match.detailRoute,
-  };
 }
 
 function toMyInvitationItem(invitation: V1ReceivedInvitation, actionPending: boolean): MyInvitationItem {

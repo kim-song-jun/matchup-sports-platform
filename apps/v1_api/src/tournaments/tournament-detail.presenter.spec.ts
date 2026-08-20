@@ -163,6 +163,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
             id: 'revision-1',
             state: 'OFFICIAL',
             score: { regulation: { home: 3, away: 1 }, penalty: null, goals: [], incomplete: false },
+            goalEvents: null,
             officialAt: new Date('2026-06-15T10:00:00Z'),
             createdAt: new Date('2026-06-15T10:00:00Z'),
             updatedAt: new Date('2026-06-15T10:00:00Z'),
@@ -224,6 +225,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
             id: 'revision-2',
             state: 'OFFICIAL',
             score: { home: 0, away: 0 },
+            goalEvents: null,
             officialAt: new Date('2026-06-15T10:00:00Z'),
             createdAt: new Date('2026-06-15T10:00:00Z'),
             updatedAt: new Date('2026-06-15T10:00:00Z'),
@@ -255,6 +257,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
             id: 'revision-void',
             state: 'VOID',
             score: { home: 3, away: 1 },
+            goalEvents: null,
             officialAt: null,
             createdAt: new Date('2026-06-15T10:00:00Z'),
             updatedAt: new Date('2026-06-15T10:00:00Z'),
@@ -380,5 +383,27 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
     expect(presentTournamentDetail(row).fixtures[0].liveStatus).toBe('live');
+  });
+
+  it('공개 대회 수상에는 관리자용 recipientUserId 계정 연결을 노출하지 않는다', () => {
+    const row = baseRow({
+      awards: [
+        {
+          id: 'award-1',
+          awardType: 'mvp',
+          awardLabel: 'MVP',
+          iconKey: 'crown',
+          recipientName: '김선수',
+          recipientUserId: 'user-private-link',
+          teamName: '서울 FC',
+          note: null,
+        },
+      ],
+    } as never);
+
+    const presented = presentTournamentDetail(row);
+
+    expect(presented.awards[0]).toMatchObject({ awardLabel: 'MVP', recipientName: '김선수' });
+    expect(presented.awards[0]).not.toHaveProperty('recipientUserId');
   });
 });

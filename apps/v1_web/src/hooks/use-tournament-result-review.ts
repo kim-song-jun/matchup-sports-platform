@@ -5,6 +5,7 @@ import { v1Get, v1Post } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
 import type {
   V1GameResultCards,
+  V1GameResultGoalEventInput,
   V1GameResultParticipantInput,
   V1GameResultParticipantRow,
   V1GameResultRevision,
@@ -101,6 +102,8 @@ export type GameResultParticipantRecord = V1GameResultParticipantRow;
  * 필드를 빼먹은 폼이 조용히 통과하지 못하고 `tsc` 에서 걸린다.
  */
 export type GameResultParticipantInput = V1GameResultParticipantInput;
+
+export type GameResultGoalEventInput = V1GameResultGoalEventInput;
 
 export type GameResultRevision = V1GameResultRevision;
 
@@ -274,11 +277,13 @@ function canonicalizeForPreviewHash(value: unknown): unknown {
  */
 export async function computeProjectionPreviewHash(input: {
   score: unknown;
+  goalEvents?: unknown;
   eventsHash: string;
   mvpParticipantId: string | null;
 }): Promise<string> {
   const canonical = canonicalizeForPreviewHash({
     score: input.score,
+    ...(input.goalEvents !== undefined ? { goalEvents: input.goalEvents } : {}),
     eventsHash: input.eventsHash,
     mvpParticipantId: input.mvpParticipantId,
   });
@@ -321,6 +326,7 @@ export type SupersedeAndSubmitInput = {
   revisionId: string;
   expectedVersion: number;
   score: GameResultScoreInput;
+  goalEvents?: GameResultGoalEventInput[];
   actualParticipants: GameResultParticipantInput[];
   eventsHash: string;
   mvpParticipantId?: string;
@@ -349,6 +355,7 @@ export type OfficializeResultInput = {
   revisionId: string;
   expectedVersion: number;
   score: unknown;
+  goalEvents: unknown;
   eventsHash: string;
   mvpParticipantId: string | null;
 };
@@ -365,6 +372,7 @@ export function useOfficializeResultRevision(gameId: string, tournamentId?: stri
     mutationFn: async (input: OfficializeResultInput) => {
       const projectionPreviewHash = await computeProjectionPreviewHash({
         score: input.score,
+        goalEvents: input.goalEvents,
         eventsHash: input.eventsHash,
         mvpParticipantId: input.mvpParticipantId,
       });
@@ -407,6 +415,7 @@ export type CreateResultCorrectionInput = {
   reason: string;
   changes: {
     score: GameResultScoreInput;
+    goalEvents?: GameResultGoalEventInput[];
     actualParticipants: GameResultParticipantInput[];
     eventsHash: string;
     mvpParticipantId?: string;

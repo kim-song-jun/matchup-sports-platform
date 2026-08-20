@@ -83,7 +83,12 @@ describe('GET /league-matches/:leagueId/standings', () => {
     // 2단계: 공식 결과를 직접 확정 상태로 합성한다(v1_guard_game_official_fact_insert 트리거가
     // revision.state='OFFICIAL' + score/eventsHash/officialAt 정확 일치를 강제하므로 그대로 맞춘다).
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId } });
-    const homeTeam = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
+    // 대진 생성기가 teamA/teamB 중 누구를 홈으로 배정하는지는 계약이 아니다 — 실제 배정을
+    // 읽어 기대 순위를 도출한다(홈 3:1 승리 → 홈=승점 3/1위, 원정=승점 0/2위).
+    const teamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
+    const homeTeamId = teamMatch.hostTeamId;
+    const awayTeamId = teamMatch.approvedApplicantTeamId!;
+    expect([homeTeamId, awayTeamId].sort()).toEqual([teamA.id, teamB.id].sort());
     const officialAt = new Date('2026-08-10T12:00:00.000Z');
     const score = { home: 3, away: 1 };
     const revision = await prisma.v1GameResultRevision.create({
@@ -106,8 +111,8 @@ describe('GET /league-matches/:leagueId/standings', () => {
         gameId: game.id,
         revision: 1,
         sourceType: 'TEAM_MATCH',
-        homeTeamId: homeTeam.hostTeamId,
-        awayTeamId: homeTeam.approvedApplicantTeamId!,
+        homeTeamId,
+        awayTeamId,
         homeScore: score.home,
         awayScore: score.away,
         score,
@@ -119,8 +124,8 @@ describe('GET /league-matches/:leagueId/standings', () => {
     const confirmedRes = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/standings`);
     expect(confirmedRes.status).toBe(200);
     expect(confirmedRes.body.data.pendingFixtures).toEqual([]);
-    expect(confirmedRes.body.data.standings[0]).toMatchObject({ teamId: teamA.id, points: 3, position: 1 });
-    expect(confirmedRes.body.data.standings[1]).toMatchObject({ teamId: teamB.id, points: 0, position: 2 });
+    expect(confirmedRes.body.data.standings[0]).toMatchObject({ teamId: homeTeamId, points: 3, position: 1 });
+    expect(confirmedRes.body.data.standings[1]).toMatchObject({ teamId: awayTeamId, points: 0, position: 2 });
   });
 });
 
@@ -309,16 +314,16 @@ describe('GET /league-matches/:leagueId/player-records', () => {
     const res = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/player-records`);
     expect(res.status).toBe(200);
 
+    // 골 순위는 골이 1개 이상인 선수만 — 어시스트만 있는 assister는 여기 나오면 안 된다.
     expect(res.body.data.goals).toEqual([
       { userId: scorerUserId, nickname: 'T4골잡이', goals: 2, assists: 1 },
-      { userId: assisterUserId, nickname: 'T4도우미', goals: 0, assists: 3 },
     ]);
     expect(res.body.data.assists).toEqual([
       { userId: assisterUserId, nickname: 'T4도우미', goals: 0, assists: 3 },
       { userId: scorerUserId, nickname: 'T4골잡이', goals: 2, assists: 1 },
     ]);
     // `guestParticipantId`는 골 5·어시스트 5를 기록했지만 identity link가 없어
-    // 두 순위 모두 정확히 2행(scorer, assister)이어야 한다 — 위 toEqual이 이미
-    // "정확히 이 두 행만" 을 강제하므로 게스트 혼입 시 여기서 실패한다.
+    // 두 순위 어디에도 나오면 안 된다 — 위 toEqual이 "정확히 이 행들만" 을
+    // 강제하므로 게스트 혼입 시 여기서 실패한다.
   });
 });

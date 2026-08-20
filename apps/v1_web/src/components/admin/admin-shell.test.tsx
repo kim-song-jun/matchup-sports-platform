@@ -4,10 +4,14 @@ import { AdminShell } from './admin-shell';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin',
+  // CommandPalette(전역 검색)가 셸에 포함되면서 useRouter도 필요해졌다
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminInquiriesPendingCount: () => ({ data: { count: 0 } }),
+  // CommandPalette(전역 검색)가 셸에 포함되면서 필요해졌다
+  useV1AdminGlobalSearch: () => ({ data: undefined, isFetching: false }),
 }));
 
 describe('AdminShell nav', () => {

@@ -43,7 +43,8 @@ function page(nickname: string | null): PublicUserRecordsResponse {
   return {
     userId: 'user-1',
     nickname,
-    summary: { appearances: 0, goals: 0, mvpCount: 0 },
+    summary: { appearances: 0, goals: 0, mvpCount: 0, matchMvpCount: 0, tournamentAwardCount: 0 },
+    tournamentAwards: [],
     items: [],
     nextCursor: null,
   } as unknown as PublicUserRecordsResponse;

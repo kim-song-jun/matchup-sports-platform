@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatGoalMinute, formatPenaltyScoreline, formatScoreline, isClockAbnormal } from './format';
+import { formatClock, formatGoalMinute, formatPenaltyScoreline, formatScoreline, isClockAbnormal } from './format';
 
 /**
  * alpha 실측 사고(2026-08) 회귀 방지 -- 실제 DB 값으로 재현한다.
  * `v1_game_events.clock_ms`: CARD 649,891 / 652,602 / 655,603 / 657,938ms
  * (전부 ≈11분, 정상) vs GOAL 27,166,083ms(≈452분, 이상값 -- 공개 일정
- * 화면에 `452′`로 그대로 나갔던 값). `isClockAbnormal`은 이 정상/이상값을
+ * 화면에 과도한 분 값으로 그대로 나갔던 값). `isClockAbnormal`은 이 정상/이상값을
  * 정확히 갈라야 실제 사고를 재현·방지한다.
  */
 describe('isClockAbnormal', () => {
@@ -34,7 +34,12 @@ describe('isClockAbnormal', () => {
   // `formatGoalMinute`가 실제 값을 그대로(조작 없이) 반환하는지 함께 못박는다.
   it('이상값이어도 formatGoalMinute는 실제 clockMs를 그대로 표시한다(숫자 조작 금지)', () => {
     expect(isClockAbnormal(27_166_083)).toBe(true);
-    expect(formatGoalMinute(27_166_083)).toBe('452′');
+    expect(formatGoalMinute(27_166_083)).toBe('453′');
+  });
+
+  it('2분 4초 이벤트를 축구 기록 관례에 따라 3분으로 올림한다', () => {
+    expect(formatGoalMinute(124_000)).toBe('3′');
+    expect(formatClock(124_000)).toBe('3′');
   });
 });
 

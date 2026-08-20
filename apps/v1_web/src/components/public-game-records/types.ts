@@ -76,6 +76,7 @@ export interface PublicSideSummary {
  */
 export interface PublicScheduleScorer {
   readonly side: 'home' | 'away';
+  readonly ownGoal?: boolean;
   readonly participantName: string | null;
   readonly jerseyNumber: number | null;
   readonly period: number | null;
@@ -250,23 +251,52 @@ export interface PublicMatchDetail {
   readonly nextMatch: PublicNextMatch | null;
 }
 
+/**
+ * 승부차기 최종 스코어(팀 전적 API 전용 형태). `PublicPenaltyScore`(home/away)와 달리
+ * 조회 대상 팀 기준으로 이미 정규화돼 온다 -- 팀 전적 화면은 항상 "우리 팀 vs 상대"로
+ * 읽어야 하므로 소비처가 매번 home/away를 팀 관점으로 다시 매핑할 필요가 없다.
+ * 승부차기가 없었던 경기(대부분)는 `null`.
+ */
+export interface PublicTeamRecordPenalties {
+  readonly for: number;
+  readonly against: number;
+}
+
+/**
+ * 팀 전적 행을 펼쳤을 때 보여주는 골/카드 이벤트. `PublicMatchEvent`와 필드 의미는
+ * 같지만 `side`가 'home'/'away'가 아니라 조회 대상 팀 기준 'own'/'opponent'로 이미
+ * 정규화돼 온다. `participantName`/`jerseyNumber`의 null은 동의/실명정책 게이팅
+ * 결과이지 데이터 누락이 아니다 -- `presentParticipantName()`으로 렌더한다.
+ */
+export interface PublicTeamRecordEvent {
+  readonly id: string;
+  readonly type: 'GOAL' | 'OWN_GOAL' | 'CARD';
+  readonly side: 'own' | 'opponent';
+  readonly participantName: string | null;
+  readonly jerseyNumber: number | null;
+  readonly period: number | null;
+  readonly clockMs: number | null;
+  readonly cardColor: 'YELLOW' | 'RED' | null;
+}
+
 export interface PublicTeamRecordItem {
   readonly gameId: string;
   readonly teamMatchId: string | null;
   readonly tournamentId: string | null;
-  readonly fixtureId: string | null;
-  readonly round: string | null;
   readonly tournamentTitle: string | null;
   readonly opponentTeamId: string | null;
   readonly opponentTeamName: string | null;
   readonly opponentTeamLogoUrl: string | null;
   /** `WON | DRAWN | LOST` (`V1TeamRecordResult`), kept as `string` to avoid a `@prisma/client` import. */
   readonly result: string;
+  /** 정규시간 점수 그대로 -- 승부차기가 있어도 이 값을 승부차기 스코어로 덮어쓰지 않는다. */
   readonly goalsFor: number;
   readonly goalsAgainst: number;
-  readonly penalties: { readonly for: number; readonly against: number } | null;
   readonly officialAt: string;
-  readonly isCorrected: boolean;
+  /** 승부차기가 있었던 경기(결선 무승부 후 승부차기)만 채워진다. */
+  readonly penalties: PublicTeamRecordPenalties | null;
+  /** 시간순(period asc, clockMs asc) 정렬. 골·카드 이벤트만 담긴다. */
+  readonly events: readonly PublicTeamRecordEvent[];
 }
 
 export interface PublicTeamRecordsSummary {
@@ -306,7 +336,6 @@ export interface PublicUserRecordItem {
   readonly started: boolean;
   readonly goalkeeper: boolean;
   readonly mvp: boolean;
-  readonly isCorrected: boolean;
   readonly officialAt: string;
 }
 
@@ -321,18 +350,54 @@ export interface PublicUserRecordsSummary {
   readonly yellowCards: number;
   readonly redCards: number;
   readonly mvpCount: number;
+  readonly matchMvpCount: number;
+  readonly tournamentAwardCount: number;
+}
+
+export interface PublicUserTournamentAward {
+  readonly id: string;
+  readonly tournamentId: string;
+  readonly tournamentTitle: string;
+  readonly awardType: string;
+  readonly awardLabel: string;
+  readonly iconKey:
+    | 'trophy'
+    | 'crown'
+    | 'goal'
+    | 'shield'
+    | 'glove'
+    | 'handshake'
+    | 'sparkles'
+    | 'medal'
+    | 'star'
+    | null;
+  readonly teamName: string | null;
+  readonly note: string | null;
+  readonly awardedAt: string;
 }
 
 /**
- * `GET /users/:id/records` response. Every row here already passed
- * `isParticipantPubliclyEligible` server-side -- this is the user's own
- * career page, so every appearance shown here is one the user consented to
- * make public. `nickname` is the user's own profile nickname, never gated.
+ * `GET /users/:id/records` response.
+ *
+ * `viewerIsOwner`가 `true`면 조회자 본인의 페이지다 -- 이 경우 `consentGranted`가
+ * `false`여도 `items`가 채워진다(본인은 동의 없이도 자기 기록을 볼 수 있다). 다만 그
+ * 상태는 "남에게는 아직 안 보이는 상태"이므로 화면에서 그 사실과 해결 경로(공개 동의
+ * 설정)를 반드시 알려야 한다. `viewerIsOwner`가 `false`면 `items`는 언제나
+ * `isParticipantPubliclyEligible` 서버 게이팅을 통과한(=공개 동의가 켜진) 행만 담는다.
+ * `nickname`은 본인 프로필 닉네임이라 게이팅 대상이 아니다.
+ *
+ * `consentGranted`는 `viewerIsOwner`가 `true`일 때만 응답에 실린다 -- 타인이 조회할 땐
+ * 키 자체가 빠진다(`public-user-records.service.ts`의 서버 측 결정: 본인 동의 여부가
+ * `items` 존재 여부와 별개로 새는 신호이기 때문). 그래서 optional이다 -- 소비처는
+ * `viewerIsOwner`가 `false`일 때 이 필드를 읽으면 안 된다(항상 `undefined`).
  */
 export interface PublicUserRecordsResponse {
   readonly userId: string;
   readonly nickname: string | null;
+  readonly viewerIsOwner: boolean;
+  readonly consentGranted?: boolean;
   readonly summary: PublicUserRecordsSummary;
+  readonly tournamentAwards: readonly PublicUserTournamentAward[];
   readonly items: readonly PublicUserRecordItem[];
   readonly nextCursor: string | null;
 }

@@ -15,6 +15,7 @@ import { TeamRecordsContent } from '@/components/public-game-records/team-record
 import { UserRecordsContent } from '@/components/public-game-records/user-records-content';
 import type {
   PublicMatchDetail,
+  PublicTeamRecordEvent,
   PublicTeamRecordsResponse,
   PublicTournamentScheduleResponse,
   PublicUserRecordsResponse,
@@ -37,26 +38,6 @@ vi.mock('@/lib/seo', async (importOriginal) => {
     fetchPublicV1: vi.fn(),
   };
 });
-
-vi.mock('@/components/public-game-records/use-public-game-records', () => ({
-  usePublicMatch: vi.fn(() => ({
-    data: {
-      events: [
-        {
-          type: 'GOAL',
-          sideId: 'side-away',
-          participantId: 'participant-1',
-          participantName: '득점 선수',
-          jerseyNumber: 9,
-          period: 2,
-          clockMs: 120000,
-        },
-      ],
-    },
-    isPending: false,
-    isError: false,
-  })),
-}));
 
 vi.mock('./tournaments/[id]/schedule/schedule-page-client', () => ({
   SchedulePageClient: () => null,
@@ -207,7 +188,7 @@ describe('MatchDetailContent — 정정/무효 상태 표시', () => {
   });
 });
 
-/* ── 컴포넌트: 팀/개인 기록의 정정 표시 ── */
+/* ── 컴포넌트: 팀/개인 기록 행 ── */
 
 function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): PublicTeamRecordsResponse {
   return {
@@ -220,8 +201,6 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         gameId: 'game-1',
         teamMatchId: null,
         tournamentId: 'tournament-1',
-        fixtureId: 'fixture-1',
-        round: '결승',
         tournamentTitle: '테스트 대회',
         opponentTeamId: 'team-away',
         opponentTeamName: '부산 FC',
@@ -229,9 +208,9 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         result: 'WON',
         goalsFor: 2,
         goalsAgainst: 1,
-        penalties: { for: 4, against: 3 },
         officialAt: '2026-08-10T11:00:00.000Z',
-        isCorrected: true,
+        penalties: null,
+        events: [],
       },
     ],
     nextCursor: null,
@@ -239,33 +218,90 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
   };
 }
 
-describe('TeamRecordsContent — 승부차기와 경기 기록 펼침', () => {
+function makeTeamRecordEvent(overrides: Partial<PublicTeamRecordEvent> = {}): PublicTeamRecordEvent {
+  return {
+    id: 'event-1',
+    type: 'GOAL',
+    side: 'own',
+    participantName: '홍길동',
+    jerseyNumber: 9,
+    period: 1,
+    clockMs: 12 * 60_000,
+    cardColor: null,
+    ...overrides,
+  };
+}
+
+describe('TeamRecordsContent — 팀 로고', () => {
   it('현재 팀과 상대 팀의 저장된 로고를 표시한다', () => {
     const { container } = render(<TeamRecordsContent data={makeTeamRecords()} />);
 
     expect(container.querySelector('img[src="/uploads/teams/seoul.png"]')).toBeInTheDocument();
     expect(container.querySelector('img[src="/uploads/teams/busan.png"]')).toBeInTheDocument();
   });
+});
 
-  it('승부차기 점수는 정규시간 점수와 분리해서 보여준다', () => {
-    render(<TeamRecordsContent data={makeTeamRecords()} />);
-    expect(screen.getByText('승부차기 4 : 3')).toBeInTheDocument();
+describe('TeamRecordsContent — 승부차기 보조 표기', () => {
+  it('penalties가 있으면 정규시간 스코어 아래에 "승부차기 N-M" 을 보여준다', () => {
+    const data = makeTeamRecords({
+      items: [{ ...makeTeamRecords().items[0], goalsFor: 1, goalsAgainst: 1, penalties: { for: 4, against: 3 } }],
+    });
+    render(<TeamRecordsContent data={data} />);
+
+    // 정규시간 스코어(1 : 1)는 그대로 남아있고, 승부차기 스코어로 대체되지 않는다.
+    expect(screen.getByText('1 : 1')).toBeInTheDocument();
+    expect(screen.getByText('승부차기 4-3')).toBeInTheDocument();
   });
 
-  it('아래 화살표를 누르면 득점 기록과 정확한 경기 상세 링크를 보여준다', () => {
+  it('penalties가 null이면 승부차기 보조 텍스트를 렌더하지 않는다', () => {
     render(<TeamRecordsContent data={makeTeamRecords()} />);
-    fireEvent.click(screen.getByRole('button', { name: '경기 기록 펼치기' }));
+    expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
+  });
+});
 
-    expect(screen.getByText(/득점 선수/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '경기 상세 보기' })).toHaveAttribute(
-      'href',
-      '/tournaments/tournament-1/matches/fixture-1',
-    );
+describe('TeamRecordsContent — 경기 기록 아코디언', () => {
+  it('이벤트가 없는 행은 펼치기 버튼을 렌더하지 않는다', () => {
+    render(<TeamRecordsContent data={makeTeamRecords()} />);
+    expect(screen.queryByRole('button', { name: /전 경기 기록/ })).not.toBeInTheDocument();
   });
 
-  it('정정 이력은 사용자 전적 목록에 별도 배지로 표시하지 않는다', () => {
-    render(<TeamRecordsContent data={makeTeamRecords()} />);
-    expect(screen.queryByText('정정됨')).not.toBeInTheDocument();
+  it('펼치기 전에는 골/카드 타임라인이 보이지 않고, 버튼을 누르면 보이며 aria-expanded가 바뀐다', () => {
+    const data = makeTeamRecords({
+      items: [
+        {
+          ...makeTeamRecords().items[0],
+          events: [
+            makeTeamRecordEvent({ id: 'g1', type: 'GOAL', side: 'own', participantName: '홍길동', clockMs: 12 * 60_000 }),
+            makeTeamRecordEvent({ id: 'c1', type: 'CARD', side: 'opponent', cardColor: 'YELLOW', participantName: '김철수', clockMs: 20 * 60_000 }),
+          ],
+        },
+      ],
+    });
+    render(<TeamRecordsContent data={data} />);
+
+    const toggle = screen.getByRole('button', { name: /부산 FC 전 경기 기록 펼치기/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('홍길동')).not.toBeInTheDocument();
+    expect(screen.queryByText('김철수')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    expect(screen.getByText('12′')).toBeInTheDocument();
+    expect(screen.getByText('김철수')).toBeInTheDocument();
+    expect(screen.getByText('20′')).toBeInTheDocument();
+  });
+
+  it('행 전체를 감싼 상세 링크는 그대로 유지된다(펼치기와 별개)', () => {
+    const data = makeTeamRecords({
+      items: [{ ...makeTeamRecords().items[0], events: [makeTeamRecordEvent()] }],
+    });
+    const { container } = render(<TeamRecordsContent data={data} />);
+    const link = container.querySelector('a[href="/tournaments/tournament-1"]');
+    expect(link).toBeInTheDocument();
+    // 버튼은 <a> 안이 아니라 형제 요소여야 한다(a 안에 button 중첩 금지).
+    expect(link?.querySelector('button')).toBeNull();
   });
 });
 
@@ -273,7 +309,21 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
   return {
     userId: 'user-1',
     nickname: '홍길동',
-    summary: { appearances: 1, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 1 },
+    // 기본값은 **타인 조회** 형태다 — 서버는 이때 `consentGranted` 키를 아예 싣지 않으므로
+    // 픽스처도 그 형태를 그대로 따른다. 여기에 값을 넣어두면 "타인에게도 동의 상태가
+    // 보인다"는 잘못된 계약을 테스트가 정상으로 통과시킨다.
+    viewerIsOwner: false,
+    summary: {
+      appearances: 1,
+      goals: 1,
+      assists: 0,
+      yellowCards: 0,
+      redCards: 0,
+      mvpCount: 1,
+      matchMvpCount: 1,
+      tournamentAwardCount: 0,
+    },
+    tournamentAwards: [],
     items: [
       {
         id: 'result-1',
@@ -293,7 +343,6 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
         started: true,
         goalkeeper: false,
         mvp: true,
-        isCorrected: false,
         officialAt: '2026-08-10T11:00:00.000Z',
       },
     ],
@@ -302,15 +351,81 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
   };
 }
 
-describe('UserRecordsContent — 정정 이력 표시', () => {
-  it('정정 이력은 개인 전적 목록에 별도 배지로 표시하지 않는다', () => {
-    const data = makeUserRecords();
+describe('UserRecordsContent — 기록 행', () => {
+  it('출전·골·매치 MVP·대회 수상을 구분하고 실제 수상명을 표시한다', () => {
     render(
       <UserRecordsContent
-        data={{ ...data, items: [{ ...data.items[0], isCorrected: true }] }}
+        data={makeUserRecords({
+          summary: {
+            ...makeUserRecords().summary,
+            tournamentAwardCount: 1,
+          },
+          tournamentAwards: [
+            {
+              id: 'award-1',
+              tournamentId: 'tournament-1',
+              tournamentTitle: '여름 챔피언십',
+              awardType: 'best_playmaker',
+              awardLabel: '베스트 플레이메이커',
+              iconKey: 'star',
+              teamName: '서울 유나이티드',
+              note: null,
+              awardedAt: '2026-08-10T11:00:00.000Z',
+            },
+          ],
+        })}
       />,
     );
-    expect(screen.queryByText('정정됨')).not.toBeInTheDocument();
+
+    expect(screen.getByText('매치 MVP')).toBeInTheDocument();
+    expect(screen.getAllByText('대회 수상').length).toBeGreaterThan(0);
+    expect(screen.getByText('베스트 플레이메이커')).toBeInTheDocument();
+    expect(screen.getByText(/여름 챔피언십/)).toBeInTheDocument();
+  });
+
+  it('MVP 행은 MVP 배지를 보여준다', () => {
+    render(<UserRecordsContent data={makeUserRecords()} />);
+    // KPI 요약 카드에도 "MVP" 라벨이 있어 텍스트만으로는 모호하다 -- 기록 행(목록) 안의
+    // 배지(<span>)만 특정해서 확인한다.
+    expect(screen.getByText('MVP', { selector: 'section span' })).toBeInTheDocument();
+  });
+});
+
+describe('UserRecordsContent — 본인 전용 공개 안내 배너', () => {
+  it('본인 + 미동의(viewerIsOwner=true, consentGranted=false)면 배너를 보여준다', () => {
+    render(
+      <UserRecordsContent data={makeUserRecords({ viewerIsOwner: true, consentGranted: false })} />,
+    );
+    expect(screen.getByText('이 기록은 아직 나에게만 보여요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '경기 기록 공개 설정하기' })).toHaveAttribute(
+      'href',
+      '/my/settings/record-consent',
+    );
+  });
+
+  it('본인 + 동의(viewerIsOwner=true, consentGranted=true)면 배너를 보여주지 않는다', () => {
+    render(
+      <UserRecordsContent data={makeUserRecords({ viewerIsOwner: true, consentGranted: true })} />,
+    );
+    expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
+  });
+
+  it('타인이 볼 때(viewerIsOwner=false)는 본인 동의 상태와 무관하게 배너를 보여주지 않는다', () => {
+    render(
+      <UserRecordsContent data={makeUserRecords({ viewerIsOwner: false, consentGranted: false })} />,
+    );
+    expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
+  });
+
+  it('본인 + 미동의여도 items가 0건이면(대회 라인업 연결 자체가 없음) 배너 대신 빈 상태만 보여준다', () => {
+    render(
+      <UserRecordsContent
+        data={makeUserRecords({ viewerIsOwner: true, consentGranted: false, items: [] })}
+      />,
+    );
+    // "숨겨진 기록이 있다"는 배너와 "기록이 아예 없다"는 EmptyState가 동시에 뜨면 모순된다.
+    expect(screen.queryByText('이 기록은 아직 나에게만 보여요')).not.toBeInTheDocument();
+    expect(screen.getByText('아직 등록된 경기 기록이 없어요')).toBeInTheDocument();
   });
 });
 

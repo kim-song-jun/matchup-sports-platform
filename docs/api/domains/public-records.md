@@ -49,7 +49,7 @@ existing file changed.
 | `GET /tournaments/:id/schedule` | `cursor?`, `limit? (1-100, default 20)`, `round?`, `groupId?` | `{ tournamentId, tournamentTitle, bracketPublished, items[], unscheduled[], standings[], nextCursor }` |
 | `GET /tournaments/:id/matches/:fixtureId` | -- | one match projection (see below) |
 | `GET /teams/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ teamId, teamName, teamLogoUrl, summary, items[] (including opponentTeamLogoUrl), nextCursor }` |
-| `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, items[], nextCursor }` |
+| `GET /users/:id/records` | `cursor?`, `limit?`, `season? (YYYY)` | `{ userId, nickname, summary, tournamentAwards[], items[], nextCursor }` |
 
 `cursor` is opaque (base64url JSON `{key,id}`); never construct it
 client-side.
@@ -273,16 +273,72 @@ identity/side itself:
   these two teams next appears" lookup, not a bracket-aware "next round"
   projection.
 
-### Team record outcome and detail contract (2026-08-19)
+### Personal record outcome -- shootouts (2026-08-20)
 
-- Team result uses regulation goals first. When regulation is tied and an
-  official penalty score exists, penalties decide WON or LOST; only a match
-  with no decisive shootout remains DRAWN.
-- Goals for and against remain regulation goals. A shootout is returned
-  separately as the team-oriented penalties object with for and against.
-- Tournament record rows include fixtureId and round. The web list uses
-  those identifiers to lazily request the existing public match endpoint,
-  so goal events and consent-filtered scorer names share the match-detail
-  projection.
-- isCorrected remains available for audit-aware consumers, but compact team
-  and user record lists do not render a separate 정정됨 badge.
+`GET /users/:id/records` decides each row's `result` with the same
+`resolveTeamRecordResult` helper the team-record projection uses: regulation
+goals first, and only when regulation is tied does a decisive official
+penalty score turn the row into WON or LOST. Before this, a personal record
+row for a final that finished 1:1 with a 3:2 shootout was reported as DRAWN
+while the same match showed WON/LOST in team records. `goals` and the
+scoreline stay regulation-only -- shootout kicks are never added to a
+player's goal count.
+
+### Official goal timeline and minute display (2026-08-19)
+
+When an official result exists, schedules, match detail, and team records
+prefer currentOfficialRevision.goalEvents. Corrected scorer, own-goal type,
+order, and minute therefore replace the raw append-only goal projection only
+after officialization. A null snapshot from an older revision falls back to
+active GOAL and OWN_GOAL events.
+
+Public record time uses a ceiling minute without seconds. An event captured at
+2:04 is displayed as 3′. Own goals count toward the credited team score and
+are labelled separately, but never count as the culprit's personal goal.
+
+### Participant identity linkage and personal records (2026-08-20)
+
+Personal activity records are derived from official game revisions; they are
+not maintained as a second per-user statistics table. A participant is visible
+to that derivation only after a current participant-to-user identity link exists.
+
+`GamesService.createFromSourceInTransaction` now treats a source roster slot
+with a persisted `userId` the same way as a later lineup save: in the game
+creation transaction it appends a `ROSTER_ASSERTED` identity-link event and
+upserts the matching current link. Guest slots without a `userId` remain
+unlinked. This prevents source-created tournament games from becoming official
+while their real lineup users still have empty `/users/:id/records` responses.
+
+Historic repair is deliberately scoped to one tournament and is dry-run by
+default:
+
+```powershell
+pnpm --filter v1_api exec ts-node --transpile-only src/games/migration/participant-identity-link-backfill.cli.ts --tournament-id <uuid>
+pnpm --filter v1_api exec ts-node --transpile-only src/games/migration/participant-identity-link-backfill.cli.ts --tournament-id <uuid> --apply
+```
+
+The repair considers only participants from current official revisions with a
+persisted `userId`, no current link, and no prior identity-link event history.
+Rejected, revoked, or otherwise historically adjudicated links are therefore
+never recreated by this command. Applied rows use the system actor
+`GAME_BACKFILL`, and rerunning the command is idempotent.
+
+### Match MVP and tournament awards (2026-08-20)
+
+The user-record summary separates four user-facing metrics: `appearances`,
+`goals`, `matchMvpCount`, and `tournamentAwardCount`. Match MVP is derived
+only from the current official result revision's `mvpParticipantId`.
+`mvpCount` remains as a temporary compatibility alias with the same value as
+`matchMvpCount`; new clients must use the explicit field.
+
+`tournamentAwards[]` is a separate list backed by
+`V1TournamentAward.recipientUserId`. Each item contains `id`,
+`tournamentId`, `tournamentTitle`, `awardType`, the tournament-defined
+`awardLabel`, nullable `iconKey`, `teamName`, `note`, and `awardedAt`.
+Clients display `awardLabel` verbatim because award categories vary by
+tournament; they must not collapse tournament awards into match MVP.
+
+Self-view returns linked tournament awards regardless of public-record consent,
+matching the existing self-view game-record bypass. Other viewers receive the
+linked award list only while the target user's record consent is `GRANTED`;
+the response still omits `consentGranted` for non-owners.

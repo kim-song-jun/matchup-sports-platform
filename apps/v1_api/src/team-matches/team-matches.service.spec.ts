@@ -60,6 +60,7 @@ function teamMatchRow(overrides: Record<string, unknown> = {}) {
     costNote: null,
     status: 'recruiting',
     approvedApplicantTeamId: null,
+    leagueId: null,
     cancelledAt: null,
     minSportLevelId: null,
     maxSportLevelId: null,
@@ -485,6 +486,78 @@ describe('TeamMatchesService', () => {
       status: 409,
     });
     expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
+  it('cancel: 리그 대진(leagueId 有)은 호스트 팀이 직접 취소할 수 없다 → 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      teamMatchRow({ leagueId: 'league-1', status: 'matched', approvedApplicantTeamId: 'team-applicant' }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+
+    await expect(service.cancel(manager, 'tm-1', { reason: '일정 변경' })).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN' },
+    });
+    // 취소 전이·신청 일괄 거절 어느 쪽도 실행되면 안 된다
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatchApplication.updateMany).not.toHaveBeenCalled();
+  });
+
+  // ─── myTeamMatches: status 필터 + 정렬 결정성 ──────────────────────────────
+
+  it('myTeamMatches: 매치 상태 필터(cancelled)가 DB 쿼리에 실제로 적용된다', async () => {
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-host', role: 'owner' }]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+
+    await service.myTeamMatches(manager, { status: 'cancelled' });
+
+    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
+    expect(args.where.status).toBe('cancelled');
+  });
+
+  it('myTeamMatches: expired는 DB status가 아니라 startAt 과거 조건으로 매핑된다 (list()와 동일)', async () => {
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-host', role: 'owner' }]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+
+    await service.myTeamMatches(manager, { status: 'expired' });
+
+    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
+    expect(args.where.status).toBeUndefined();
+    expect(args.where.startAt.lt).toBeInstanceOf(Date);
+  });
+
+  it('myTeamMatches: 신청 상태 필터(requested)는 내 신청 상태로 걸리고 hosted 분기를 제외한다', async () => {
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-applicant', role: 'owner' }]);
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+
+    await service.myTeamMatches(manager, { status: 'requested' });
+
+    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
+    // 호스트 매치에는 "내 신청"이 없으므로 hostTeamId 분기가 있으면 안 된다
+    expect(args.where.OR).toEqual([
+      {
+        applications: {
+          some: expect.objectContaining({ status: 'requested' }),
+        },
+      },
+    ]);
+    // 노출되는 신청도 필터 상태와 일치해야 한다
+    expect(args.include.applications.where.status).toBe('requested');
+  });
+
+  it('list/myTeamMatches: cursor 페이지네이션 orderBy가 유일 tie-breaker(id)로 끝난다', async () => {
+    // 리그 일괄 생성 행은 startAt·createdAt이 동일할 수 있어 tie-breaker 없이는
+    // 페이지 경계에서 행이 누락/중복된다.
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+    await service.list(null, {});
+    await service.list(null, { sort: 'latest' });
+
+    prisma.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'team-host', role: 'owner' }]);
+    await service.myTeamMatches(manager, {});
+
+    for (const [args] of prisma.v1TeamMatch.findMany.mock.calls) {
+      expect(args.orderBy.at(-1)).toEqual({ id: 'desc' });
+    }
   });
 
   it('close: 모집 중 팀매치를 closed로 전환하고 pending 신청을 expired 처리한다', async () => {

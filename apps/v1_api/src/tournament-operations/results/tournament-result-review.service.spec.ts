@@ -64,6 +64,7 @@ type CreatedRevision = {
   revision: number;
   state: V1GameResultRevisionState;
   score: unknown;
+  goalEvents: unknown;
   missingScorer: boolean;
   eventsHash: string;
 };
@@ -155,6 +156,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
     revision: 1,
     state: options.baseState ?? V1GameResultRevisionState.OFFICIAL,
     score: options.baseScore ?? { home: 1, away: 0 },
+    goalEvents: null,
     eventsHash: 'b'.repeat(64),
     mvpParticipantId: null,
   };
@@ -199,6 +201,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
           revision: args.data.revision as number,
           state: V1GameResultRevisionState.DRAFT,
           score: args.data.score,
+          goalEvents: args.data.goalEvents,
           missingScorer: args.data.missingScorer as boolean,
           eventsHash: args.data.eventsHash as string,
         };
@@ -374,6 +377,68 @@ describe('createResultCorrection — 정상 정정(하네스 건전성 증거)',
   });
 });
 
+describe('공식 득점 타임라인 정합성', () => {
+  it('정정한 득점자와 개인 득점 합계가 일치하면 새 참가자 기록에 반영한다', async () => {
+    const harness = createHarness();
+    await harness.correct({
+      score: { home: 0, away: 1 },
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 1 },
+      ],
+      goalEvents: [
+        {
+          id: 'corrected-goal-1',
+          sideId: ids.awaySide,
+          participantId: ids.awayPlayer,
+          minute: 3,
+          period: 1,
+          ownGoal: false,
+        },
+      ],
+    });
+
+    expect(harness.createdParticipants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ participantId: ids.homePlayer, goals: 0 }),
+        expect.objectContaining({ participantId: ids.awayPlayer, goals: 1 }),
+      ]),
+    );
+  });
+
+  it('자책골은 상대 팀 점수에는 더하지만 해당 선수 개인 득점에는 더하지 않는다', async () => {
+    const harness = createHarness();
+    await harness.correct({
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 0 },
+      ],
+      goalEvents: [
+        {
+          id: 'own-goal-1',
+          sideId: ids.homeSide,
+          participantId: ids.awayPlayer,
+          minute: 3,
+          period: 1,
+          ownGoal: true,
+        },
+      ],
+    });
+    expect(harness.createdRevisions).toHaveLength(1);
+  });
+
+  it('득점 타임라인 합계가 전체 점수와 다르면 리비전을 만들지 않는다', async () => {
+    const harness = createHarness();
+    const error = await captureFailure(() =>
+      harness.correct({
+        goalEvents: [],
+      }),
+    );
+    expectHttp(error, 422, 'RESULT_GOAL_TIMELINE_INVALID');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+});
+
 /**
  * 2-E. 정정 경로만 `missingScorer: false`를 **하드코딩**한다
  * (`tournament-result-review.service.ts`의 correction 분기). 같은 파일의
@@ -541,14 +606,66 @@ describe('2-C: 결선 경기 정정은 브래킷을 해결할 수 있어야 한�
   it('승부차기를 실어 정정하면 그 점수가 리비전 score에 그대로 저장된다', async () => {
     const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true });
 
-    await harness.correct({ score: { home: 1, away: 1, penalties: { home: 5, away: 4 } } });
+    // 승부차기를 **새로 쓰는** 정정이므로 킥 수를 함께 보낸다 — `end` 레인과 같은 요구다.
+    await harness.correct({
+      score: { home: 1, away: 1, penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 } },
+    });
 
     expect(harness.createdRevisions).toHaveLength(1);
     expect(harness.createdRevisions[0].score).toEqual({
       home: 1,
       away: 1,
-      penalties: { home: 5, away: 4 },
+      penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },
     });
+  });
+
+  /**
+   * **2026-08-18 알파 교차 측정 회귀 가드.** 킥 수 필수 가드가 `end` 레인에만 있어서
+   * 같은 값이 레인에 따라 갈렸다:
+   *   `POST /games/:id/end`         + `{home:9, away:0}` → 422
+   *   `POST /games/:id/corrections` + `{home:9, away:0}` → **201, 그대로 저장**
+   * 저장된 값엔 킥 수도 선축도 없어 이후 어떤 판정도 근거를 갖지 못했다.
+   */
+  /**
+   * **2026-08-19 alpha 감사 F-2 회귀 가드.** 선축이 승계되지 않아, 5킥 전에 결판난 경기의
+   * 정정이 422 로 하드 차단됐다 — 선축이 없으면 결판 판정이 "선축 미상" 분기로 떨어지고
+   * 그 분기는 5킥 바닥을 요구하기 때문이다. 정정 폼에는 승부차기 입력란이 0개라
+   * **운영자에게 탈출구가 없었다**(같은 요청에 선축 키 하나만 붙이면 201 이었다).
+   */
+  it('5킥 전에 결판난 승부차기도 선축을 승계해 정정이 통과한다 — 탈출구 없는 422 방지', async () => {
+    const harness = createHarness({
+      phase: 'semi',
+      hasAdvancementEdge: true,
+      // 각 3킥 3:0 — 잔여 2킥으로 역전 불가라 `end` 가 201 로 받아 주는 정상 조기 결판.
+      baseScore: {
+        home: 1,
+        away: 1,
+        penalties: { home: 3, away: 0, takenHome: 3, takenAway: 3, firstKickSideKey: 'HOME' },
+      },
+    });
+
+    // 폼이 선축을 빠뜨린 형태(옛 번들). 킥 수·선축 모두 base 에서 메워져야 한다.
+    await harness.correct({ score: { home: 1, away: 1, penalties: { home: 3, away: 0 } } });
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 3, away: 0, takenHome: 3, takenAway: 3, firstKickSideKey: 'HOME' },
+    });
+  });
+
+  it('승부차기를 새로 쓰는 정정에 킥 수가 없으면 거부한다 — end 레인과 같은 기준', async () => {
+    const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true });
+
+    const error = await captureFailure(() =>
+      harness.correct({ score: { home: 1, away: 1, penalties: { home: 9, away: 0 } } }),
+    );
+
+    expect((error as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED',
+    });
+    expect(harness.createdRevisions).toHaveLength(0);
   });
 
   it('조별리그 무승부 정정은 정상 결과이므로 막지 않는다(짝 증거)', async () => {
@@ -674,12 +791,15 @@ describe('2-C 역방향: 승부차기로 결정된 결선 경기의 정정이 �
       baseScore: baseWithPenalties,
     });
 
-    await harness.correct({ score: { home: 1, away: 1, penalties: { home: 4, away: 6 } } });
+    // base 와 점수가 다른 = 승부차기를 바꾸는 정정이므로 킥 수가 필요하다.
+    await harness.correct({
+      score: { home: 1, away: 1, penalties: { home: 4, away: 6, takenHome: 6, takenAway: 6 } },
+    });
 
     expect(harness.createdRevisions[0].score).toEqual({
       home: 1,
       away: 1,
-      penalties: { home: 4, away: 6 },
+      penalties: { home: 4, away: 6, takenHome: 6, takenAway: 6 },
     });
   });
 
@@ -732,6 +852,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
 
     expect(harness.createdRevisions).toHaveLength(1);
     expect(harness.createdRevisions[0].state).toBe(V1GameResultRevisionState.SUBMITTED);
+    expect(harness.createdRevisions[0].goalEvents).toBeUndefined();
     expect(harness.createdParticipants.map((row) => row.participantId)).toEqual([
       ids.homePlayer,
       ids.awayPlayer,

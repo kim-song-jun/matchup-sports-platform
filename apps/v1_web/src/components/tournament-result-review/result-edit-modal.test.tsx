@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ResultEditModal } from './result-edit-modal';
 import type {
+  GameResultGoalEventInput,
   GameResultParticipantRecord,
   GameResultScore,
   TournamentGameSide,
@@ -94,6 +95,7 @@ function baseProps() {
     confirmLabel: '정정 제출',
     base: {
       score: SCORE,
+      goalEvents: [] as GameResultGoalEventInput[],
       participants: [
         resultParticipant(HOME_PARTICIPANT_ID, HOME_SIDE_ID),
         resultParticipant(AWAY_PARTICIPANT_ID, AWAY_SIDE_ID),
@@ -321,17 +323,17 @@ describe('ResultEditModal — 승부차기(penalties) 점수 보존', () => {
     expect(onConfirm.mock.calls[0][0].score).toEqual({ home: 1, away: 1 });
   });
 
-  it('승자가 갈리지 않는 승부차기(동점)는 싣지 않는다 -- 서버 422 TOURNAMENT_PENALTY_INVALID 를 새 리비전에 박제하지 않는다', () => {
+  it('승자가 갈리지 않는 승부차기(동점)는 제출을 막아 서버 422 값을 박제하지 않는다', () => {
     const { onConfirm } = submitEdit(
       { score: { home: 0, away: 0, penalties: { home: 3, away: 3 } } },
       ({ confirmLabel }) => {
         fireEvent.change(screen.getByLabelText('사유'), { target: { value: '어시스트만 정정' } });
-        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+        expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
       },
       { isKnockoutFixture: true },
     );
 
-    expect(onConfirm.mock.calls[0][0].score).toEqual({ home: 0, away: 0 });
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it('실어 보내는 penalties 는 느슨한 JSON 의 여분 키를 떨어뜨린 { home, away } 로 다시 만들어진다', () => {
@@ -562,12 +564,21 @@ describe('ResultEditModal — 결선 무승부 사전 경고', () => {
     expect(warningId).toBeTruthy();
     expect(document.querySelector(`[aria-describedby~="${warningId}"]`)).not.toBeNull();
 
-    // 경고일 뿐 차단이 아니다: 사유를 채우면 그대로 제출된다.
+    // 무승부에는 유효한 승부차기 결과가 필요하다. 점수와 선축 팀을 입력하면 제출된다.
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '무승부로 정정' } });
     const confirmButton = screen.getByRole('button', { name: props.confirmLabel });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('홈 성공'), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText('원정 성공'), { target: { value: '3' } });
+    fireEvent.click(screen.getByLabelText('원정'));
     expect(confirmButton).toBeEnabled();
     fireEvent.click(confirmButton);
     expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm.mock.calls[0][0].score.penalties).toEqual({
+      home: 4,
+      away: 3,
+      firstKickSideKey: 'AWAY',
+    });
   });
 
   it('결선 경기라도 무승부가 아니고 승부차기 기록도 없으면 경고 문구가 비어 있다', () => {
@@ -683,5 +694,29 @@ describe('ResultEditModal — 숫자 입력은 정수로 정규화된다', () =>
     });
 
     expect(onConfirm.mock.calls[0][0].score).toEqual({ home: 2, away: 0 });
+  });
+});
+
+describe('ResultEditModal — 공식 득점 타임라인 편집', () => {
+  it('득점 순서와 자책골 유형을 수정해 제출한다', () => {
+    const { onConfirm } = submitEdit(
+      {
+        goalEvents: [
+          { id: 'goal-1', sideId: HOME_SIDE_ID, participantId: HOME_PARTICIPANT_ID, minute: 1, period: 1, ownGoal: false },
+          { id: 'goal-2', sideId: AWAY_SIDE_ID, participantId: AWAY_PARTICIPANT_ID, minute: 3, period: 1, ownGoal: false },
+        ],
+      },
+      ({ confirmLabel }) => {
+        fireEvent.change(screen.getByLabelText('2번째 득점 유형'), { target: { value: 'OWN_GOAL' } });
+        fireEvent.click(screen.getAllByRole('button', { name: '위로' })[1]);
+        fireEvent.change(screen.getByLabelText('사유'), { target: { value: '득점 순서 및 자책골 정정' } });
+        fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+      },
+    );
+
+    expect(onConfirm.mock.calls[0][0].goalEvents).toEqual([
+      expect.objectContaining({ id: 'goal-2', ownGoal: true }),
+      expect.objectContaining({ id: 'goal-1', ownGoal: false }),
+    ]);
   });
 });

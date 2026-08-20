@@ -80,6 +80,11 @@ const ids = {
    * 이 테스트는 "정정이 통과하고 승부차기가 승계돼 저장되는가"만 본다.
    */
   carryOverFixture: '91000000-0000-4000-8000-000000000046',
+  /**
+   * 결선, 진출 엣지 없음. 정정 레인이 `end` 와 **같은 킥 수 기준**을 쓰는지 본다 —
+   * 게이트를 한 레인에만 달면 다른 레인이 우회로가 되기 때문이다.
+   */
+  kickCountBypassFixture: '91000000-0000-4000-8000-000000000047',
   /** 조별리그. 참가자 계열 가드(2-B/2-F/2-G)를 검증하는 픽스처. */
   participantGuardFixture: '91000000-0000-4000-8000-000000000044',
   /** 다른 경기 — 남의 participantId 출처. */
@@ -135,9 +140,10 @@ async function drainOutbox(): Promise<void> {
   }
 }
 
-function previewHash(revision: { score: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
+function previewHash(revision: { score: unknown; goalEvents: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
   return canonicalGameCommandPayloadHash({
     score: revision.score,
+    goalEvents: revision.goalEvents,
     eventsHash: revision.eventsHash,
     mvpParticipantId: revision.mvpParticipantId,
   });
@@ -446,6 +452,14 @@ describe('대회 결과 정정 레인 가드', () => {
           competitionConfigVersionId: config.id,
         },
         {
+          id: ids.kickCountBypassFixture,
+          tournamentId: ids.tournament,
+          groupId: ids.semiGroup,
+          round: '준결승',
+          fixtureNumber: 6,
+          competitionConfigVersionId: config.id,
+        },
+        {
           id: ids.participantGuardFixture,
           tournamentId: ids.tournament,
           groupId: ids.groupPhaseGroup,
@@ -495,6 +509,7 @@ describe('대회 결과 정정 레인 가드', () => {
       ids.participantGuardFixture,
       ids.foreignFixture,
       ids.carryOverFixture,
+      ids.kickCountBypassFixture,
     ]) {
       // eslint-disable-next-line no-await-in-loop
       await prisma.v1TournamentFixture.update({
@@ -587,8 +602,6 @@ describe('대회 결과 정정 레인 가드', () => {
    */
   it('2-C: 승부차기를 실어 정정하면 저장되고, officialize 후 POISONED 없이 끝난다', async () => {
     const setup = await endAndOfficialize(ids.penaltyCorrectionFixture, 1, 1, {
-      // `end` 레인은 킥 수를 요구한다. 정정(아래 `correct`)은 면제라, 이 테스트가
-      // 두 레인의 계약 차이를 그대로 태운다.
       penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },
     });
 
@@ -598,8 +611,11 @@ describe('대회 결과 정정 레인 가드', () => {
     });
     expect(targetBefore.homeRegistrationId).toBe(ids.hostRegistration);
 
+    // 승부차기 점수를 5:4 → 6:4 로 **바꾸는** 정정이므로 킥 수를 함께 보낸다.
+    // base 를 그대로 옮기는 정정만 면제고, 새로 쓰는 정정은 `end` 와 같은 기준이다
+    // (그 구분이 없으면 정정이 `end` 의 우회로가 된다 — 2026-08-18 alpha 교차 측정).
     const correction = await correct(setup, {
-      score: { home: 1, away: 1, penalties: { home: 6, away: 4 } },
+      score: { home: 1, away: 1, penalties: { home: 6, away: 4, takenHome: 6, takenAway: 6 } },
       actualParticipants: participantsOf(setup, 1, 1),
     });
     expect(correction.revisionState).toBe(V1GameResultRevisionState.DRAFT);
@@ -608,7 +624,11 @@ describe('대회 결과 정정 레인 가드', () => {
       where: { id: correction.revisionId },
     });
     // 클라이언트가 보낸 승부차기가 온전히 저장됐다.
-    expect(draft.score).toEqual({ home: 1, away: 1, penalties: { home: 6, away: 4 } });
+    expect(draft.score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 6, away: 4, takenHome: 6, takenAway: 6 },
+    });
 
     const gameBeforeOfficialize = await prisma.v1Game.findUniqueOrThrow({ where: { id: setup.gameId } });
     const officialized = await resultReview.officializeResultRevision(
@@ -651,6 +671,30 @@ describe('대회 결과 정정 레인 가드', () => {
    * 409가 요구하는 행동을 할 방법이 없다. 서버가 base 리비전의 값을 승계해야
    * 한다.
    */
+  /**
+   * **2026-08-18 alpha 교차 측정 회귀 가드 (통합 레벨).** 킥 수 필수 가드가 `end` 레인에만
+   * 있어서 같은 값이 레인에 따라 갈렸다:
+   *   `POST /games/:id/end`         + `{home:9, away:0}` → 422
+   *   `POST /games/:id/corrections` + `{home:9, away:0}` → **201, 그대로 저장**
+   * 저장된 값엔 킥 수도 선축도 없어 이후 어떤 판정도 근거를 갖지 못했다. 유닛 테스트가
+   * 순수 함수 계약을 지킨다면, 이 테스트는 **실제 HTTP 레인**이 그 계약을 통과하는지 본다.
+   */
+  it('2-C 우회로: 승부차기를 새로 쓰는 정정에 킥 수가 없으면 거부한다 — end 레인과 같은 기준', async () => {
+    const setup = await endAndOfficialize(ids.kickCountBypassFixture, 1, 1, {
+      penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },
+    });
+    const before = await prisma.v1GameResultRevision.count({ where: { gameId: setup.gameId } });
+
+    const rejected = await captureFailure(() =>
+      correct(setup, {
+        score: { home: 1, away: 1, penalties: { home: 9, away: 0 } },
+        actualParticipants: participantsOf(setup, 1, 1),
+      }),
+    );
+    expectHttpCode(rejected, 422, 'TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED');
+    expect(await prisma.v1GameResultRevision.count({ where: { gameId: setup.gameId } })).toBe(before);
+  });
+
   it('2-C 역방향: 폼이 penalties를 떨어뜨려도 base 승부차기를 승계해 득점자 정정이 통과한다', async () => {
     const setup = await endAndOfficialize(ids.carryOverFixture, 1, 1, {
       penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },

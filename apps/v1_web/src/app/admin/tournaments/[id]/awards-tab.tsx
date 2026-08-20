@@ -11,14 +11,16 @@ import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-p
 
 // ── Tab: Individual Awards ────────────────────────────────────────────────
 
-type AwardForm = { awardType: string; awardLabel: string; iconKey: V1TournamentAwardIconKey; recipientName: string; teamName: string; note: string };
+type AwardForm = { awardType: string; awardLabel: string; iconKey: V1TournamentAwardIconKey; recipientName: string; recipientUserId: string; teamName: string; note: string };
 
 export function AwardsTab({
   tournamentId,
+  canWrite,
   showToast,
 }: {
-  tournamentId: string;
-  showToast: (msg: string, v?: 'success' | 'error') => void;
+  readonly tournamentId: string;
+  readonly canWrite: boolean;
+  readonly showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
   const setAwards = useV1SetTournamentAwards(tournamentId);
   const { data: savedAwards } = useV1AdminTournamentAwards(tournamentId);
@@ -41,6 +43,7 @@ export function AwardsTab({
       awardLabel: award.awardLabel,
       iconKey: award.iconKey ?? legacyAwardIconKey(award.awardType),
       recipientName: award.recipientName,
+      recipientUserId: award.recipientUserId ?? '',
       teamName: award.teamName ?? '',
       note: award.note ?? '',
     })));
@@ -52,7 +55,7 @@ export function AwardsTab({
   };
 
   const addRow = () => {
-    setRows((prev) => [...prev, { awardType: `custom_${Date.now()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', teamName: '', note: '' }]);
+    setRows((prev) => [...prev, { awardType: `custom_${Date.now()}`, awardLabel: '', iconKey: 'trophy', recipientName: '', recipientUserId: '', teamName: '', note: '' }]);
   };
 
   const removeRow = (idx: number) => {
@@ -60,9 +63,9 @@ export function AwardsTab({
   };
 
   const handleSave = () => {
-    const incompleteRow = rows.find((row) => !row.awardLabel.trim() || !row.recipientName.trim());
+    const incompleteRow = rows.find((row) => !row.awardLabel.trim() || !row.teamName.trim() || !row.recipientName.trim() || !row.recipientUserId);
     if (incompleteRow) {
-      showToast('각 항목의 어워드명과 수상자를 모두 입력해 주세요.', 'error');
+      showToast('각 항목의 어워드명, 소속 팀, 수상자를 모두 선택해 주세요.', 'error');
       return;
     }
     const awards = rows
@@ -80,39 +83,77 @@ export function AwardsTab({
           <h3 className="text-[15px] font-bold text-[var(--text-strong)]">개인 어워드</h3>
           <p className="text-[12px] text-[var(--text-muted)] mt-0.5">MVP, 득점왕 등 개인 수상자를 입력하세요. 사용자 페이지(시상·리뷰)에 표시돼요.</p>
         </div>
-        <button type="button" onClick={addRow} className="inline-flex items-center text-xs text-[var(--blue700)] font-semibold px-3 min-h-[36px] rounded-lg border border-[var(--tint-blue-border)] hover:bg-[var(--blue50)]">+ 항목 추가</button>
+        {canWrite && (
+          <button type="button" onClick={addRow} className="inline-flex items-center text-xs text-[var(--blue700)] font-semibold px-3 min-h-[36px] rounded-lg border border-[var(--tint-blue-border)] hover:bg-[var(--blue50)]">+ 항목 추가</button>
+        )}
       </div>
 
       <div className="flex flex-col gap-3">
         {loaded && rows.length === 0 && (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-5 text-center">
             <p className="text-[13px] font-semibold text-[var(--text-strong)]">등록된 개인 어워드가 없어요.</p>
-            <p className="mt-1 text-[12px] text-[var(--text-muted)]">필요한 어워드만 항목 추가로 등록해 주세요.</p>
+            <p className="mt-1 text-[12px] text-[var(--text-muted)]">
+              {canWrite ? '필요한 어워드만 항목 추가로 등록해 주세요.' : '아직 등록된 시상 내역이 없어요.'}
+            </p>
           </div>
         )}
-        {rows.map((row, idx) => (
-          <AwardRow
-            key={idx}
-            idx={idx}
-            row={row}
-            update={update}
-            removeRow={removeRow}
-            tournamentId={tournamentId}
-            teamItems={awardTeamItems}
-          />
-        ))}
+        {canWrite
+          ? rows.map((row, idx) => (
+              <AwardRow
+                key={idx}
+                idx={idx}
+                row={row}
+                update={update}
+                removeRow={removeRow}
+                tournamentId={tournamentId}
+                teamItems={awardTeamItems}
+              />
+            ))
+          : rows.map((row, idx) => <AwardRowReadOnly key={idx} row={row} />)}
       </div>
 
       <div className="mt-4 pt-4 border-t border-[var(--border)]">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={setAwards.isPending}
-          className="w-full h-[44px] inline-flex items-center justify-center bg-blue-600 text-white font-semibold rounded-xl text-[13px] disabled:opacity-50 hover:bg-blue-700 transition-colors"
-        >
-          {setAwards.isPending ? '저장 중...' : '어워드 저장'}
-        </button>
+        {canWrite ? (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={setAwards.isPending}
+            className="w-full h-[44px] inline-flex items-center justify-center bg-blue-600 text-white font-semibold rounded-xl text-[13px] disabled:opacity-50 hover:bg-blue-700 transition-colors"
+          >
+            {setAwards.isPending ? '저장 중...' : '어워드 저장'}
+          </button>
+        ) : (
+          <p
+            className="rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
+            role="status"
+          >
+            조회 전용 권한으로 접속했어요. 시상 내역을 수정하려면 운영 권한이 필요해요.
+          </p>
+        )}
       </div>
+    </div>
+  );
+}
+
+// ── 조회 전용 어워드 행 ────────────────────────────────────────────────
+function AwardRowReadOnly({ row }: { readonly row: AwardForm }) {
+  return (
+    <div className="border border-[var(--border)] rounded-xl p-3 bg-[var(--card-surface)]">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)]" aria-hidden="true">
+          <TournamentAwardIcon iconKey={row.iconKey} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[13px] font-bold text-[var(--text-strong)] truncate">{row.awardLabel}</p>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)] truncate">
+            {row.recipientName}
+            {row.teamName ? ` · ${row.teamName}` : ''}
+          </p>
+        </div>
+      </div>
+      {row.note && (
+        <p className="mt-2 text-xs text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap">{row.note}</p>
+      )}
     </div>
   );
 }
@@ -147,11 +188,11 @@ function AwardRow({
   const { data: roster, isFetching: rosterFetching } =
     useV1AdminTournamentPlayers(selectedRegistrationId);
   const playerItems: EntityPickerItem[] = (roster?.players ?? []).map((p) => ({
-    id: p.id,
+    id: p.userId,
     label: p.realName,
   }));
   const recipientValue: EntityPickerItem | null = row.recipientName
-    ? (playerItems.find((it) => it.label === row.recipientName) ?? { id: '', label: row.recipientName })
+    ? (playerItems.find((it) => it.id === row.recipientUserId) ?? { id: row.recipientUserId, label: row.recipientName })
     : null;
 
   return (
@@ -191,7 +232,10 @@ function AwardRow({
           <EntityPicker
             id={`award-recipient-${idx}`}
             value={recipientValue}
-            onChange={(item) => update(idx, 'recipientName', item?.label ?? '')}
+            onChange={(item) => {
+              update(idx, 'recipientName', item?.label ?? '');
+              update(idx, 'recipientUserId', item?.id ?? '');
+            }}
             items={playerItems}
             loading={!!selectedRegistrationId && rosterFetching}
             placeholder="명단에서 선택"
@@ -202,11 +246,15 @@ function AwardRow({
           )}
         </div>
         <div>
-          <label htmlFor={`award-team-${idx}`} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">소속 팀 (선택)</label>
+          <label htmlFor={`award-team-${idx}`} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-1 block">소속 팀 *</label>
           <EntityPicker
             id={`award-team-${idx}`}
             value={selectedTeamItem}
-            onChange={(item) => update(idx, 'teamName', item?.label ?? '')}
+            onChange={(item) => {
+              update(idx, 'teamName', item?.label ?? '');
+              update(idx, 'recipientName', '');
+              update(idx, 'recipientUserId', '');
+            }}
             items={teamItems}
             placeholder="참가 팀에서 선택"
           />

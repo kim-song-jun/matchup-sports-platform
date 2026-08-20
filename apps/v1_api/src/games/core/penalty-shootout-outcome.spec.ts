@@ -1,5 +1,9 @@
 import { UnprocessableEntityException } from '@nestjs/common';
-import { assertPenaltyShootoutConcluded, penaltyShootoutDecided } from './penalty-shootout-outcome';
+import {
+  assertPenaltyShootoutConcluded,
+  assertPenaltyShootoutPersistable,
+  penaltyShootoutDecided,
+} from './penalty-shootout-outcome';
 
 const A2 = { earlyStop: true } as const;
 const A1 = { earlyStop: false } as const;
@@ -169,5 +173,59 @@ describe('킥 수가 없으면 판정 자체가 불가능하다 (경로 C 회귀
     // 이 함수는 복구 레인용 degrade 를 유지한다. `end` 레인의 차단은 호출부
     // (`assertPenaltyShootoutConcludedForGame`)가 담당한다는 계약을 명시한다.
     expect(() => assertPenaltyShootoutConcluded({ home: 1, away: 0 }, A2)).not.toThrow();
+  });
+});
+
+/**
+ * **2026-08-18 알파 교차 측정 — 게이트를 레인마다 따로 두면 다른 레인이 우회로가 된다.**
+ *
+ * 킥 수 필수 가드가 `end` 레인 서비스 메서드 **안에만** 있어서, 같은 값이 레인에 따라
+ * 다르게 처리됐다:
+ *
+ *   `POST /games/:id/end`         + `{home:9, away:0}` → 422 KICK_COUNTS_REQUIRED
+ *   `POST /games/:id/corrections` + `{home:9, away:0}` → **201, 그대로 저장**
+ *
+ * 저장된 값에는 킥 수도 선축도 없어 이후 어떤 판정도 근거를 갖지 못한다. 그래서 판정을
+ * `assertPenaltyShootoutPersistable` 하나로 합치고, 레인은 **"킥 수를 요구할 것인가"만**
+ * 넘기게 했다. 아래 테스트가 그 계약을 고정한다.
+ */
+describe('assertPenaltyShootoutPersistable — 두 레인이 공유하는 단일 관문', () => {
+  const noCounts = { home: 9, away: 0 } as const;
+
+  it('킥 수를 요구하는 레인에서는 킥 수 없는 승부차기를 거부한다', () => {
+    expect(() =>
+      assertPenaltyShootoutPersistable(noCounts, A2, { requireKickCounts: true }),
+    ).toThrow(UnprocessableEntityException);
+  });
+
+  it('요구하지 않는 레인에서는 통과시킨다 — 킥 수가 생기기 전 리비전의 정정·복구를 막지 않는다', () => {
+    expect(() =>
+      assertPenaltyShootoutPersistable(noCounts, A2, { requireKickCounts: false }),
+    ).not.toThrow();
+  });
+
+  it('킥 수가 있으면 요구 여부와 무관하게 **같은 결판 판정**을 받는다 — 레인별로 답이 갈리지 않는다', () => {
+    // 이게 우회로를 막는 핵심 성질이다: 킥 수를 실은 순간 두 레인의 판정이 동일해야 한다.
+    const undecided = { home: 1, away: 0, takenHome: 1, takenAway: 0, firstKickSideKey: 'HOME' } as const;
+    for (const requireKickCounts of [true, false]) {
+      expect(() => assertPenaltyShootoutPersistable(undecided, A2, { requireKickCounts })).toThrow(
+        UnprocessableEntityException,
+      );
+    }
+    const decided = { home: 3, away: 1, takenHome: 5, takenAway: 5, firstKickSideKey: 'HOME' } as const;
+    for (const requireKickCounts of [true, false]) {
+      expect(() =>
+        assertPenaltyShootoutPersistable(decided, A2, { requireKickCounts }),
+      ).not.toThrow();
+    }
+  });
+
+  it('override 는 결판 판정만 면제하고 킥 수 요구는 면제하지 않는다', () => {
+    // 우회 종료도 "몇 번 찼는지"는 말해야 한다 — 그게 없으면 감사 기록이 반쪽이다.
+    expect(() =>
+      assertPenaltyShootoutPersistable({ ...noCounts, operatorOverride: true }, A2, {
+        requireKickCounts: true,
+      }),
+    ).toThrow(UnprocessableEntityException);
   });
 });

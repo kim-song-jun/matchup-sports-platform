@@ -21,20 +21,40 @@ describe('generateRoundRobin', () => {
     }
   });
 
-  it('legs=2이면 각 페어가 두 번 만나고 홈/어웨이가 뒤바뀐다', () => {
-    const pairings = generateRoundRobin(['a', 'b', 'c', 'd'], { legs: 2 });
-    expect(pairings).toHaveLength(12);
-    const ab = pairings.filter((p) => [p.homeId, p.awayId].sort().join('-') === 'a-b');
-    expect(ab).toHaveLength(2);
-    expect(ab[0].homeId).not.toBe(ab[1].homeId);
+  // 한 쌍만 단언하면 나머지 쌍이 두 번 다 같은 홈이어도 통과한다(실제로 그런 결함이
+  // 있었다) — 모든 페어를 전수 단언해야 한다.
+  function expectEveryPairFlipped(ids: readonly string[]): void {
+    const pairings = generateRoundRobin(ids, { legs: 2 });
+    const pairCount = (ids.length * (ids.length - 1)) / 2;
+    expect(pairings).toHaveLength(pairCount * 2);
+    const homesByPair = new Map<string, string[]>();
+    for (const p of pairings) {
+      const key = [p.homeId, p.awayId].sort().join('-');
+      homesByPair.set(key, [...(homesByPair.get(key) ?? []), p.homeId]);
+    }
+    expect(homesByPair.size).toBe(pairCount);
+    for (const [key, homes] of homesByPair) {
+      // 실패 시 어느 페어가 안 뒤집혔는지 보이도록 key를 함께 단언한다.
+      expect({ key, distinctHomes: new Set(homes).size }).toEqual({ key, distinctHomes: 2 });
+    }
+  }
+
+  it('legs=2이면 짝수(4팀)에서 모든 페어가 두 번 만나고 두 leg의 홈이 서로 다르다', () => {
+    expectEveryPairFlipped(['a', 'b', 'c', 'd']);
   });
 
-  it('legs=2에서 각 참가자의 홈 경기 수와 원정 경기 수가 같다', () => {
-    const pairings = generateRoundRobin(['a', 'b', 'c', 'd'], { legs: 2 });
-    for (const id of ['a', 'b', 'c', 'd']) {
-      const home = pairings.filter((p) => p.homeId === id).length;
-      const away = pairings.filter((p) => p.awayId === id).length;
-      expect(home).toBe(away);
+  it('legs=2이면 홀수(5팀, bye 포함)에서도 모든 페어의 홈/어웨이가 뒤바뀐다', () => {
+    expectEveryPairFlipped(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('legs=2에서 각 참가자의 홈 경기 수와 원정 경기 수가 같다 — 짝수(4팀)·홀수(5팀) 모두', () => {
+    for (const ids of [['a', 'b', 'c', 'd'], ['a', 'b', 'c', 'd', 'e']]) {
+      const pairings = generateRoundRobin(ids, { legs: 2 });
+      for (const id of ids) {
+        const home = pairings.filter((p) => p.homeId === id).length;
+        const away = pairings.filter((p) => p.awayId === id).length;
+        expect({ id, home }).toEqual({ id, home: away });
+      }
     }
   });
 

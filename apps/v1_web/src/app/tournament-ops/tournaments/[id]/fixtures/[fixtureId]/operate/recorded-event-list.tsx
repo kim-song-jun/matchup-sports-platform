@@ -33,6 +33,7 @@ function eventTimeLabel(event: GameEventRecord): string {
 function eventDotClass(event: GameEventRecord): string {
   switch (event.type) {
     case 'GOAL':
+    case 'OWN_GOAL':
       return 'bg-[var(--green500)]';
     case 'CARD':
       return event.payload.card === 'RED' ? 'bg-[var(--red500)]' : 'bg-[var(--yellow500)]';
@@ -60,6 +61,7 @@ export function RecordedEventList({
   sides,
   lineups,
   onAttachAssist,
+  onReverseEvent,
   onReverseSubstitution,
 }: {
   readonly events: readonly GameEventRecord[];
@@ -73,6 +75,8 @@ export function RecordedEventList({
   /** 빠른 교체 모드의 오조작 복구 경로 — 되돌리기 버튼은 아직 되돌려지지
    * 않은 SUBSTITUTION 이벤트에만 뜬다. 새 되돌리기 API가 아니라 기존
    * `GamesService.reverseEvent`(CORRECTION) 를 그대로 호출한다. */
+  readonly onReverseEvent?: (event: GameEventRecord) => void;
+  /** @deprecated 새 호출부는 모든 수정 가능 이벤트를 받는 onReverseEvent를 사용한다. */
   readonly onReverseSubstitution?: (event: GameEventRecord) => void;
 }) {
   if (events.length === 0) {
@@ -124,8 +128,12 @@ export function RecordedEventList({
           event.assistParticipantId === null &&
           event.participantId !== null &&
           !reversedIds.has(event.id);
-        const canReverseSubstitution =
-          onReverseSubstitution !== undefined && event.type === 'SUBSTITUTION' && !reversedIds.has(event.id);
+        const reverseHandler = onReverseEvent ?? onReverseSubstitution;
+        const canReverse =
+          reverseHandler !== undefined &&
+          (onReverseEvent !== undefined || event.type === 'SUBSTITUTION') &&
+          ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL', 'SUBSTITUTION'].includes(event.type) &&
+          !reversedIds.has(event.id);
         return (
           <li
             key={event.id}
@@ -143,14 +151,22 @@ export function RecordedEventList({
                 }[teamAccent(event.sideId)]
               }`}
             />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="@container flex min-w-0 flex-1 flex-col gap-1.5">
             {/* 좁은 폭에서는 위아래로 쌓는다. 한 줄로 두면 액션 묶음(어시스트·
                 되돌리기·팀명)이 shrink-0 이라 폭을 먼저 가져가고, 남은 자리에서
                 이벤트 문구가 잘려 "골 · 1 김..." 처럼 선수 이름이 사라졌다(알파
                 390px 실측). 이 목록에서 가장 중요한 정보가 "누가 했는지"인데 그게
                 제일 먼저 잘리는 셈이라, 폭이 부족하면 자르는 대신 줄을 나눈다.
-                sm 이상은 한 줄에 다 들어가므로 기존 배치를 그대로 둔다. */}
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+
+                **뷰포트가 아니라 컨테이너 폭으로 판단한다**(`@container` + `@md:`).
+                예전엔 `sm:`(뷰포트 640px)을 썼는데, 이 목록은 데스크톱에서 **넓은 화면
+                안의 좁은 사이드바 컬럼**에 들어간다. 뷰포트는 1440px이라 `sm:` 이 켜져
+                한 줄로 배치되지만 실제 컬럼은 그만큼 넓지 않아, 문구가 통째로 사라졌다
+                (2026-08-19 alpha 실측: 1024·1280px 에서 `clientWidth 0 / scrollWidth 136`,
+                화면에는 `전반 5:00 ● 자… [수정·취소] ● 팀명` 만 남았다).
+                자책골(#568)이 `되돌리기`를 GOAL/OWN_GOAL/CARD/FOUL 전 행으로 넓히면서
+                드러났지만, 잘리는 것은 자책골 행만이 아니라 **그 네 종류 전부**였다. */}
+            <div className="flex flex-col gap-1 @md:flex-row @md:items-center @md:justify-between @md:gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 {/* clockMs 는 항상 정상이었다 — 표시만 분 단위(`m'`)로 뭉개서 같은 분에
                     찍힌 여러 이벤트를 구분할 수 없었다(실측 사고 사후조사에서 확인:
@@ -164,7 +180,24 @@ export function RecordedEventList({
                   aria-hidden="true"
                   className={`h-2.5 w-2.5 shrink-0 rounded-full ${eventDotClass(event)}`}
                 />
-                <p className="truncate text-sm font-medium text-[var(--text-strong)]">
+                {/* 좁은 컨테이너에서는 **자르지 말고 줄을 늘린다**(`line-clamp-2`).
+                    줄을 나누는 것만으로는 부족했다 — 2026-08-20 alpha 실측: 1024px 에서
+                    사이드바 컨테이너가 **202px** 로 전 구간 중 가장 좁고(390 모바일의 292px
+                    보다도 좁다), 같은 줄의 시계 배지가 ~80px 를 먹어 이 문단에 114px 만 남는다.
+                    그 폭에서는 `교체 · 김민수 → 박지성`(127px)·`골 · 10 김민수 (도움 7 박지성)`
+                    (166px) 같은 **평범한 라벨이 이벤트 종류와 무관하게 잘린다.**
+
+                    이 목록에서 가장 중요한 정보가 "무엇을·누가"인데 그게 제일 먼저 사라지는
+                    셈이라, 한 줄을 고집하는 대신 두 줄까지 허용한다. 행 높이가 최대 한 줄
+                    변하는 대가로 정보가 보존된다.
+
+                    **폭에 따라 `truncate` 로 되돌리지 않는다.** `.line-clamp-2` 는 Tailwind
+                    유틸이 아니라 `globals.css` 의 커스텀 클래스(`display:-webkit-box` +
+                    `-webkit-line-clamp:2`)라, `@md:truncate` 로는 그 두 선언이 지워지지 않아
+                    넓은 폭에서도 클램프가 남는다(Copilot 리뷰 지적). 굳이 되돌릴 이유도 없다 —
+                    컨테이너가 넉넉하면 라벨이 어차피 한 줄에 들어가서 클램프가 발동하지 않고,
+                    행 높이도 그대로 균일하다. 모드를 하나로 두는 편이 단순하고 예측 가능하다. */}
+                <p className="line-clamp-2 text-sm font-medium text-[var(--text-strong)]">
                   {eventTypeLabel(event)}
                   {event.type === 'SUBSTITUTION'
                     ? substitutionDetailSuffix(event, playerName)
@@ -197,14 +230,14 @@ export function RecordedEventList({
                     어시스트
                   </button>
                 ) : null}
-                {canReverseSubstitution ? (
+                {canReverse ? (
                   <button
                     type="button"
-                    onClick={() => onReverseSubstitution(event)}
+                    onClick={() => reverseHandler?.(event)}
                     className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                   >
                     <Undo2 size={12} aria-hidden="true" />
-                    되돌리기
+                    {event.type === 'SUBSTITUTION' ? '되돌리기' : '수정·취소'}
                   </button>
                 ) : null}
                 {/* 팀 귀속은 기록자가 매 행에서 즉시 확인해야 하는 정보인데, 행에서
@@ -260,6 +293,8 @@ function eventTypeLabel(event: GameEventRecord): string {
   switch (event.type) {
     case 'GOAL':
       return '골';
+    case 'OWN_GOAL':
+      return '자책골';
     case 'CARD':
       return event.payload.card === 'RED' ? '레드카드' : '옐로카드';
     case 'FOUL':

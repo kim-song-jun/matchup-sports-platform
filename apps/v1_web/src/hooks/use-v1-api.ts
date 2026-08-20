@@ -99,7 +99,6 @@ import type {
   V1RecentVenue,
   V1MyRegionUpdateResult,
   V1MyTeamsResponse,
-  V1MyTeamMatch,
   V1Notification,
   V1NotificationPreferences,
   V1NotificationsPage,
@@ -145,6 +144,7 @@ import type {
   V1TeamMatchMutationPayload,
   V1TeamMatchMutationResult,
   V1TeamMatchUpdatePayload,
+  V1AdminGlobalSearchResult,
   V1Game,
   V1GameResultRevision,
   V1CreateGameResultRevisionPayload,
@@ -1385,13 +1385,6 @@ export function useV1RejectTeamMatchApplication(teamMatchId: string) {
   });
 }
 
-export function useV1MyTeamMatches(filters?: ListFilters) {
-  return useQuery({
-    queryKey: [...v1Keys.all, 'me', 'team-matches', filters ?? {}] as const,
-    queryFn: () => v1Get<CursorPage<V1MyTeamMatch>>('/me/team-matches', filters),
-  });
-}
-
 // ─── Task 17: Game/result-revision + team-match lineup (result entry/approval) ───
 
 // 새 Idempotency-Key(v4 UUID)를 만들고, games.md의 고정 계약대로 헤더와 바디의
@@ -2218,6 +2211,18 @@ export function useV1AdminOverview() {
   return useQuery({
     queryKey: v1Keys.adminOverview(),
     queryFn: () => v1Get<V1AdminOverview>('/admin/overview'),
+  });
+}
+
+
+/** 어드민 전역 검색 (커맨드 팔레트 ⌘K) — 빈 질의어는 요청하지 않는다 */
+export function useV1AdminGlobalSearch(q: string) {
+  const trimmed = q.trim();
+  return useQuery({
+    queryKey: v1Keys.adminGlobalSearch(trimmed),
+    queryFn: () => v1Get<V1AdminGlobalSearchResult>('/admin/search', { q: trimmed }),
+    enabled: trimmed.length > 0,
+    staleTime: 15_000,
   });
 }
 
@@ -3059,7 +3064,7 @@ export function useV1SetTournamentAwards(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (awards: {
-      awardType: string; awardLabel: string; recipientName: string;
+      awardType: string; awardLabel: string; recipientName: string; recipientUserId: string;
       iconKey?: string; teamName?: string; note?: string; sortOrder?: number;
     }[]) => v1Put<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`, { awards }),
     onSuccess: () => {

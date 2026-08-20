@@ -31,6 +31,7 @@ export type GameLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
  */
 export type GameEventType =
   | 'GOAL'
+  | 'OWN_GOAL'
   | 'CARD'
   | 'FOUL'
   | 'SUBSTITUTION'

@@ -312,3 +312,14 @@ not stored — no schema change was needed.
   (fixture removal) do not pass through this service — see the service doc comment.
 - Limits: 10 videos per fixture (`409 FIXTURE_VIDEO_LIMIT_EXCEEDED`), no duplicate URL within a
   fixture (`409 FIXTURE_VIDEO_DUPLICATE`), upload route throttled to 3/min.
+
+### Task 150 official goal timeline correction (2026-08-19)
+
+SupersedeAndSubmitGameResultRevisionDto and
+CreateGameResultCorrectionDto.changes accept optional goalEvents arrays with
+id, sideId, participantId, minute, period, and ownGoal. When present, this
+revision snapshot—not the frozen raw event stream—is the validation and public
+projection source. The server returns 422 RESULT_GOAL_TIMELINE_INVALID if its
+score total, scorer side, own-goal opposing side, or participant goal totals
+do not agree. The correction UI also edits knockout penalty home/away scores
+and firstKickSideKey.

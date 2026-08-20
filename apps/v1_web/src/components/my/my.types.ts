@@ -85,13 +85,6 @@ export type MyTeamsViewModel = {
   summary: Array<{ label: string; value: number | string; unit?: string }>;
 };
 
-export type MyTeamDetailViewModel = {
-  team: MyTeam;
-  actions: MyMenuItem[];
-  recentMatches: MyMatch[];
-  chatHref?: string;
-};
-
 export type MyMember = {
   /** membershipId(멤버) 또는 applicationId(가입 요청) — React list key에 사용 */
   id: string;

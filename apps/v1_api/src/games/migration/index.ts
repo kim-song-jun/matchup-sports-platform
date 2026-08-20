@@ -16,3 +16,5 @@ export type {
   TeamRecordFactsBackfillQuarantineReason,
   TeamRecordFactsBackfillResult,
 } from './team-record-facts-backfill';
+export { runParticipantIdentityLinkBackfill } from './participant-identity-link-backfill';
+export type { ParticipantIdentityLinkBackfillResult } from './participant-identity-link-backfill';

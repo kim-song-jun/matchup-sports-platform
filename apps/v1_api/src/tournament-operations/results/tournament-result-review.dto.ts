@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -11,6 +12,34 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { GameResultParticipantDto, GameScoreDto } from '../../games/dto/game-result.dto';
+
+export class GameResultGoalEventDto {
+  @IsString()
+  @IsNotEmpty()
+  id!: string;
+
+  @IsUUID()
+  sideId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  participantId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minute?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  period?: number;
+
+  @IsBoolean()
+  ownGoal!: boolean;
+}
 
 /**
  * `POST /games/:gameId/result-revisions/:revisionId/review-decision` body.
@@ -72,6 +101,12 @@ export class SupersedeAndSubmitGameResultRevisionDto {
   @ValidateNested({ each: true })
   @Type(() => GameResultParticipantDto)
   actualParticipants!: GameResultParticipantDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GameResultGoalEventDto)
+  goalEvents?: GameResultGoalEventDto[];
 
   @IsString()
   @IsNotEmpty()
@@ -137,6 +172,12 @@ export class GameResultCorrectionChangesDto {
   @ValidateNested({ each: true })
   @Type(() => GameResultParticipantDto)
   actualParticipants!: GameResultParticipantDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GameResultGoalEventDto)
+  goalEvents?: GameResultGoalEventDto[];
 
   @IsString()
   @IsNotEmpty()

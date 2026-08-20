@@ -185,3 +185,13 @@ Current alpha advanced through the shared admin authorization hardening to relea
 
 - The phrase “new page” is not mapped to one canonical v1 route. It remains gated instead of being guessed. The interactive decision artifact is [`teameet-new-page-scope-decision.html`](/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-new-page-scope-decision.html): A extends the existing profile route, B creates the currently absent mercenary v1 flow (recommended), and C hardens the already-existing admin tournament-create wizard. No product/schema work starts before the user selects A, B, or C.
 - Alpha QA tournament persona rows do not include passwords in the seed. Browser mutation scenarios must use an explicitly authorized login flow or an isolated QA account; header-auth posture must not be weakened to make tests convenient.
+
+### Progress Snapshot — participant personal-record recovery (2026-08-20)
+
+- [x] Audited alpha tournament `2c29114d-29b2-4d19-80dc-b50eb449c80a`: all 6 fixtures are ended and official, while all 32 user-backed lineup participants returned empty personal records.
+- [x] Confirmed profile user `59050e8a-db94-46b0-aeae-a2108a9703dc` is not one of those 32 lineup users, so that account's zero appearances is independently correct.
+- [x] Fixed source-created games to append `ROSTER_ASSERTED` identity history and current linkage atomically for every persisted roster `userId`; guest slots remain unlinked.
+- [x] Added an exact-tournament, dry-run-by-default repair command for historic official participants. It excludes every participant with prior identity-link history, preserving rejected/revoked adjudication, and applies idempotently as `GAME_BACKFILL` only with `--apply`.
+- [x] Focused unit proof: 2/2 passed. Isolated PostgreSQL integration proof: 6/6 passed. API TypeScript check passed.
+- [ ] After this change is deployed to alpha, run the repair command first without `--apply`, review the exact candidate count for the tournament above, then run once with `--apply` and recheck the 32 actual lineup users. Do not fabricate the 18 historic missing jersey snapshots; only future/source roster values can be preserved safely.
+- [x] 2026-08-20 alpha dry-run returned 96 participant rows (6 official games x 16 participants, 32 distinct users). The first apply attempt failed on the first row because PostgreSQL folded unquoted camelCase raw-query aliases to lowercase; the serializable transaction rolled back in full, and an immediate dry-run proved all 96 candidates remained. Hotfix uses explicit snake_case raw keys before retrying.

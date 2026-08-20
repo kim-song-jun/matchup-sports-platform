@@ -103,9 +103,10 @@ async function drainOutbox(): Promise<void> {
   }
 }
 
-function previewHash(revision: { score: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
+function previewHash(revision: { score: unknown; goalEvents: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
   return canonicalGameCommandPayloadHash({
     score: revision.score,
+    goalEvents: revision.goalEvents,
     eventsHash: revision.eventsHash,
     mvpParticipantId: revision.mvpParticipantId,
   });
@@ -536,13 +537,20 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     expect(teamItem).toBeDefined();
     // Team aggregates count every goal regardless of any scorer's consent.
     expect(teamItem?.goalsFor).toBe(3);
-    expect(teamItem?.isCorrected).toBe(false);
+    // No shootout on this fixture (regulation 3:0 decided it outright).
+    expect(teamItem?.penalties).toBeNull();
+    // Team records' event summary shares the exact same name-gating rule as
+    // tournament records (participant-name-gating.ts) -- every home scorer is
+    // named here too, and all three are 'own' since hostTeam is the home side.
+    const teamGoalEvents = teamItem?.events.filter((event) => event.type === 'GOAL') ?? [];
+    expect(teamGoalEvents).toHaveLength(3);
+    expect(teamGoalEvents.every((event) => event.side === 'own')).toBe(true);
+    expect(teamGoalEvents.every((event) => event.participantName !== null)).toBe(true);
 
     const consentedRecords = await userRecords.getRecords(ids.userConsented, {});
     const consentedItem = consentedRecords.items.find((item) => item.gameId === gameMainId);
     expect(consentedItem).toBeDefined();
     expect(consentedItem?.goals).toBe(1);
-    expect(consentedItem?.isCorrected).toBe(false);
   });
 
   it('no-consent: a linked-but-revoked participant contributes to the team goal count but never to their own public user record', async () => {
@@ -624,13 +632,11 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     // double-counted alongside the new one.
     expect(teamItemsForGame).toHaveLength(1);
     expect(teamItemsForGame[0]?.goalsFor).toBe(4);
-    expect(teamItemsForGame[0]?.isCorrected).toBe(true);
 
     const consentedRecords = await userRecords.getRecords(ids.userConsented, {});
     const consentedItemsForGame = consentedRecords.items.filter((item) => item.gameId === gameMainId);
     expect(consentedItemsForGame).toHaveLength(1);
     expect(consentedItemsForGame[0]?.goals).toBe(2);
-    expect(consentedItemsForGame[0]?.isCorrected).toBe(true);
 
     // The revoked participant still never surfaces even under the new revision.
     const revokedRecords = await userRecords.getRecords(ids.userRevoked, {});

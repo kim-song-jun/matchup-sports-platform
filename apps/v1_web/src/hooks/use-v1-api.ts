@@ -145,6 +145,7 @@ import type {
   V1TeamMatchMutationResult,
   V1TeamMatchUpdatePayload,
   V1AdminGlobalSearchResult,
+  V1AdminHubInbox,
   V1Game,
   V1GameResultRevision,
   V1CreateGameResultRevisionPayload,
@@ -2223,6 +2224,16 @@ export function useV1AdminGlobalSearch(q: string) {
     queryFn: () => v1Get<V1AdminGlobalSearchResult>('/admin/search', { q: trimmed }),
     enabled: trimmed.length > 0,
     staleTime: 15_000,
+  });
+}
+
+
+/** 할 일 인박스 (M3 허브) — 운영자 액션 대기 요약. 화면 체류 중 30초 주기로 갱신 */
+export function useV1AdminHubInbox() {
+  return useQuery({
+    queryKey: v1Keys.adminHubInbox(),
+    queryFn: () => v1Get<V1AdminHubInbox>('/admin/hub/inbox'),
+    refetchInterval: 30_000,
   });
 }
 

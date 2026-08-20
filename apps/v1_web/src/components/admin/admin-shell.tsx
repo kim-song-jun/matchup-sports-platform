@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
 import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
 import { CommandPalette } from './command-palette';
 import {
+  Inbox,
   LayoutDashboard,
   Search,
   Users,
@@ -60,7 +61,10 @@ interface NavGroup {
 
 const BASE_NAV_GROUPS: NavGroup[] = [
   {
-    items: [{ label: '개요', href: '/admin', icon: <LayoutDashboard size={18} />, exact: true }],
+    items: [
+      { label: '개요', href: '/admin', icon: <LayoutDashboard size={18} />, exact: true },
+      { label: '할 일', href: '/admin/hub', icon: <Inbox size={18} /> },
+    ],
   },
   {
     label: '플랫폼',

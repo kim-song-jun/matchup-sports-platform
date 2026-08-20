@@ -151,7 +151,10 @@ describe('AdminService — list/detail endpoints', () => {
       v1Match: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1Team: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
-      v1Inquiry: { findMany: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1Inquiry: { findMany: jest.fn(), groupBy: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
+      v1Tournament: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentRegistration: { groupBy: jest.fn().mockResolvedValue([]) },
+      v1TournamentFixture: { findMany: jest.fn().mockResolvedValue([]) },
       // getTeam() live-recalculates trustScore via computeRevealedTeamTrustBatch(); default to
       // "no submitted reviews" so tests that don't care about trust reveal math still resolve.
       v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
@@ -862,6 +865,88 @@ describe('AdminService — list/detail endpoints', () => {
 
       const result = await service.globalSearch(adminAuthUser, { q: 'no-nick' });
       expect(result.users[0].label).toBe('no-nick@teameet.v1');
+    });
+  });
+
+
+  // ─── hubInbox (할 일 인박스 집계) ──────────────────────────────────────────
+
+  describe('hubInbox', () => {
+    it('throws 403 for non-admin', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+      await expect(service.hubInbox(nonAdminAuthUser)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('aggregates actionable registrations and review-pending fixtures per tournament with titles', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1TournamentRegistration.groupBy.mockResolvedValue([
+        { tournamentId: 'tour-1', _count: { _all: 3 } },
+        { tournamentId: 'tour-2', _count: { _all: 7 } },
+      ]);
+      prisma.v1TournamentFixture.findMany.mockResolvedValue([
+        { tournamentId: 'tour-1' },
+        { tournamentId: 'tour-1' },
+        { tournamentId: 'tour-3' },
+      ]);
+      prisma.v1Inquiry.count.mockResolvedValue(4);
+      prisma.v1Tournament.count.mockResolvedValue(2);
+      prisma.v1Tournament.findMany.mockResolvedValue([
+        { id: 'tour-1', title: '가을 풋살컵' },
+        { id: 'tour-2', title: '주말 리그' },
+        { id: 'tour-3', title: '신년 대회' },
+      ]);
+
+      const result = await service.hubInbox(adminAuthUser);
+
+      // 처리 대기 신청 상태 4종만 센다 (입금확인/확정대기/취소요청)
+      const regWhere = prisma.v1TournamentRegistration.groupBy.mock.calls[0][0].where;
+      expect(regWhere.status.in).toEqual([
+        'awaiting_payment',
+        'payment_checking',
+        'paid',
+        'cancel_requested',
+      ]);
+      expect(regWhere.tournament).toEqual({ deletedAt: null });
+
+      // 검토 대기 = ENDED + (공식 리비전 없음 OR 열린 에스컬레이션) — result-review 화면과 동일 정의
+      const fixtureWhere = prisma.v1TournamentFixture.findMany.mock.calls[0][0].where;
+      expect(fixtureWhere.game.is.state).toBe('ENDED');
+      expect(fixtureWhere.game.is.OR).toEqual([
+        { currentOfficialRevisionId: null },
+        {
+          resultRevisions: {
+            some: { resultEscalations: { some: { status: { in: ['PENDING', 'ACKNOWLEDGED'] } } } },
+          },
+        },
+      ]);
+
+      expect(result.pendingRegistrations.total).toBe(10);
+      // 건수 내림차순 정렬
+      expect(result.pendingRegistrations.tournaments).toEqual([
+        { tournamentId: 'tour-2', title: '주말 리그', count: 7 },
+        { tournamentId: 'tour-1', title: '가을 풋살컵', count: 3 },
+      ]);
+      expect(result.resultReviewPending.total).toBe(3);
+      expect(result.resultReviewPending.tournaments).toEqual([
+        { tournamentId: 'tour-1', title: '가을 풋살컵', count: 2 },
+        { tournamentId: 'tour-3', title: '신년 대회', count: 1 },
+      ]);
+      expect(result.pendingInquiries).toBe(4);
+      expect(result.tournamentsInProgress).toBe(2);
+    });
+
+    it('returns zeroed inbox without a title lookup when nothing is pending', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+
+      const result = await service.hubInbox(adminAuthUser);
+
+      expect(result).toEqual({
+        pendingRegistrations: { total: 0, tournaments: [] },
+        resultReviewPending: { total: 0, tournaments: [] },
+        pendingInquiries: 0,
+        tournamentsInProgress: 0,
+      });
+      expect(prisma.v1Tournament.findMany).not.toHaveBeenCalled();
     });
   });
 

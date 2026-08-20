@@ -4448,6 +4448,18 @@ import type {
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
 } from '@/types/league-match';
+import type {
+  V1CommitPromotionsPayload,
+  V1CommitPromotionsResult,
+  V1CreateLeagueSeriesPayload,
+  V1LeagueSeries,
+  V1LeagueSeriesDetail,
+  V1LeagueSeriesListItem,
+  V1PromotionPreviewResponse,
+  V1SeedSeasonPayload,
+  V1SeedSeasonResult,
+  V1UpdateLeagueSeriesPayload,
+} from '@/types/league-series';
 
 export function useV1AdminLeagueMatchList() {
   return useQuery({
@@ -4518,5 +4530,88 @@ export function useV1LeagueMatchPlayerRecords(leagueId: string) {
     queryKey: v1Keys.leagueMatchPlayerRecords(leagueId),
     queryFn: () => v1Get<V1LeaguePlayerRecordsResponse>(`/league-matches/${leagueId}/player-records`),
     enabled: Boolean(leagueId),
+  });
+}
+
+
+// ── 리그 체계(시리즈) — 티어 + 시즌 + 승강 (Task 153) ────────────────────────
+
+export function useV1AdminLeagueSeriesList() {
+  return useQuery({
+    queryKey: v1Keys.adminLeagueSeriesList(),
+    queryFn: () => v1Get<{ items: V1LeagueSeriesListItem[] }>('/admin/league-series'),
+  });
+}
+
+export function useV1AdminLeagueSeries(seriesId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminLeagueSeries(seriesId),
+    queryFn: () => v1Get<V1LeagueSeriesDetail>(`/admin/league-series/${seriesId}`),
+    enabled: Boolean(seriesId),
+  });
+}
+
+export function useV1CreateLeagueSeries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateLeagueSeriesPayload) => v1Post<V1LeagueSeries>('/admin/league-series', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeriesList() });
+    },
+  });
+}
+
+export function useV1UpdateLeagueSeries(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1UpdateLeagueSeriesPayload) =>
+      v1Patch<V1LeagueSeries>(`/admin/league-series/${seriesId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeries(seriesId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeriesList() });
+    },
+  });
+}
+
+/** 시즌 1 시딩 — 티어별 팀 배정은 어드민 수동이다. */
+export function useV1SeedLeagueSeason(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1SeedSeasonPayload) =>
+      v1Post<V1SeedSeasonResult>(`/admin/league-series/${seriesId}/seasons/seed`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeries(seriesId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+/**
+ * 승강 후보 계산 (dry-run). mutation 으로 두는 이유 — 어드민이 "계산하기"를 눌렀을 때만
+ * 돌아야 하고, 화면을 열 때 자동으로 계산되면 안 된다(미확정 경기가 남아 있으면 409).
+ */
+export function useV1PreviewLeaguePromotions(seriesId: string) {
+  return useMutation({
+    mutationFn: (seasonNo: number) =>
+      v1Post<V1PromotionPreviewResponse>(
+        `/admin/league-series/${seriesId}/seasons/${seasonNo}/promotions/preview`,
+        {},
+      ),
+  });
+}
+
+/** 최종 승인 — 이때 비로소 다음 시즌 리그와 참가 팀이 생긴다. */
+export function useV1CommitLeaguePromotions(seriesId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ seasonNo, body }: { seasonNo: number; body: V1CommitPromotionsPayload }) =>
+      v1Post<V1CommitPromotionsResult>(
+        `/admin/league-series/${seriesId}/seasons/${seasonNo}/promotions/commit`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueSeries(seriesId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
   });
 }

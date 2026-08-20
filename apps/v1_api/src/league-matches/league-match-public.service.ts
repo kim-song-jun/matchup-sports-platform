@@ -22,6 +22,12 @@ export class LeagueMatchPublicService {
       state: league.state,
       startsOn: league.startsOn,
       endsOn: league.endsOn,
+      // 시리즈에 속하지 않은 단발 리그는 셋 다 null 이다 — 화면은 null 이면 티어 뱃지를 띄우지 않는다.
+      seriesId: league.seriesId,
+      seriesTitle: league.series?.title ?? null,
+      tier: league.tier,
+      tierLabel: league.tier === null ? null : `${league.tier}부`,
+      seasonNo: league.seasonNo,
       teamIds: league.teams.map((entry) => entry.teamId),
       fixtures: fixtures.map((fixture) => ({
         teamMatchId: fixture.id,
@@ -135,7 +141,10 @@ export class LeagueMatchPublicService {
   private async loadLeague(leagueId: string) {
     const league = await this.prisma.v1League.findUnique({
       where: { id: leagueId },
-      include: { teams: { select: { teamId: true, team: { select: { name: true, profile: { select: { logoUrl: true } } } } } } },
+      include: {
+        teams: { select: { teamId: true, team: { select: { name: true, profile: { select: { logoUrl: true } } } } } },
+        series: { select: { id: true, title: true, tierCount: true } },
+      },
     });
     if (league === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });

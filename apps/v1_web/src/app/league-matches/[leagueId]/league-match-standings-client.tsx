@@ -44,6 +44,21 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
+      {/* 티어 뱃지는 리그 체계에 속한 리그에만 붙인다 — 단발 리그는 tierLabel 이 null 이라
+          "1부"로 잘못 보이지 않는다. 색만으로 구분하지 않도록 텍스트를 함께 쓴다. */}
+      {series.tierLabel != null && (
+        <p className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="rounded-md bg-blue-100 px-2 py-0.5 font-bold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+            {series.tierLabel}
+          </span>
+          {series.seriesTitle != null && (
+            <span className="text-[var(--text-muted)]">
+              {series.seriesTitle}
+              {series.seasonNo != null && ` · ${series.seasonNo}시즌`}
+            </span>
+          )}
+        </p>
+      )}
       <h1 className="text-xl font-bold text-[var(--text-strong)]">{series.title}</h1>
       {standings !== undefined && (
         <p className="mt-1 text-sm text-[var(--text-muted)]">

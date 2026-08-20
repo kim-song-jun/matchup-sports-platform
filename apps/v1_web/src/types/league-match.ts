@@ -35,6 +35,17 @@ export interface V1AdminLeagueDetail {
 export interface V1PublicLeagueDetail extends V1AdminLeagueDetail {
   startsOn: string;
   endsOn: string;
+  /**
+   * 리그 체계(시리즈)에 속한 리그만 채워진다. 단발 리그는 넷 다 null 이고,
+   * 그때 화면은 티어 뱃지를 아예 띄우지 않는다 — 단발 리그는 "1부"가 아니라
+   * 티어 개념 자체가 없기 때문이다. Task 153.
+   */
+  seriesId?: string | null;
+  seriesTitle?: string | null;
+  tier?: number | null;
+  /** '1부' / '2부' / '3부'. 서버가 만들어 준다. */
+  tierLabel?: string | null;
+  seasonNo?: number | null;
 }
 
 export interface V1CreateLeaguePayload {

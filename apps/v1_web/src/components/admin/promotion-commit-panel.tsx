@@ -1,0 +1,174 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { AlertTriangle, ArrowDown, ArrowUp, Minus, UserMinus } from 'lucide-react';
+import type {
+  V1CommitPromotionEntry,
+  V1PromotionKind,
+  V1PromotionPreviewResponse,
+} from '@/types/league-series';
+
+const KIND_META: Record<V1PromotionKind, { label: string; icon: typeof ArrowUp; className: string }> = {
+  promoted: { label: '승격', icon: ArrowUp, className: 'text-blue-700 dark:text-blue-300' },
+  relegated: { label: '강등', icon: ArrowDown, className: 'text-red-700 dark:text-red-300' },
+  stayed: { label: '잔류', icon: Minus, className: 'text-[var(--text-muted)]' },
+  withdrawn: { label: '불참', icon: UserMinus, className: 'text-amber-700 dark:text-amber-300' },
+};
+
+const KIND_ORDER: V1PromotionKind[] = ['promoted', 'stayed', 'relegated', 'withdrawn'];
+
+const selectClass =
+  'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-2 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
+
+interface PromotionCommitPanelProps {
+  preview: V1PromotionPreviewResponse;
+  submitting: boolean;
+  onCommit: (entries: V1CommitPromotionEntry[]) => void;
+}
+
+/**
+ * 승강 확정 3단계 중 [2] override + [3] commit 을 담당한다.
+ *
+ * 수정 중간 상태는 여기(로컬)에만 둔다 — preview 를 여러 번 다시 돌릴 수 있어야 하는데
+ * 서버에 미리 쓰면 매번 정리해야 한다. 최종 승인 시에만 전체 목록을 보낸다.
+ */
+export function PromotionCommitPanel({ preview, submitting, onCommit }: PromotionCommitPanelProps) {
+  const [overrides, setOverrides] = useState<Record<string, V1PromotionKind>>({});
+
+  const entries = useMemo(
+    () => preview.tiers.flatMap((tier) => tier.entries.map((entry) => ({ ...entry, tierLabel: tier.tierLabel }))),
+    [preview],
+  );
+
+  const kindOf = (teamId: string, computed: V1PromotionKind): V1PromotionKind => overrides[teamId] ?? computed;
+  const overriddenCount = entries.filter((entry) => kindOf(entry.teamId, entry.computedKind) !== entry.computedKind).length;
+
+  // 다음 시즌 팀 수는 서버 계산값(규칙 기준)이 아니라 어드민이 지금 고른 값으로 다시 센다 —
+  // 불참 처리한 팀이 화면 숫자에 즉시 반영돼야 "확정 후에 보니 팀이 없더라"를 막는다.
+  const projectedByTier = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const tier of preview.tiers) counts.set(tier.tier, 0);
+    for (const entry of entries) {
+      const kind = kindOf(entry.teamId, entry.computedKind);
+      if (kind === 'withdrawn') continue;
+      const toTier = kind === 'promoted' ? entry.tier - 1 : kind === 'relegated' ? entry.tier + 1 : entry.tier;
+      counts.set(toTier, (counts.get(toTier) ?? 0) + 1);
+    }
+    return counts;
+  }, [entries, overrides, preview.tiers]);
+
+  const handleCommit = () => {
+    onCommit(
+      entries.map((entry) => ({
+        teamId: entry.teamId,
+        fromTier: entry.tier,
+        kind: kindOf(entry.teamId, entry.computedKind),
+        ...(kindOf(entry.teamId, entry.computedKind) === entry.computedKind
+          ? {}
+          : { overrideNote: '어드민이 직접 조정' }),
+      })),
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {preview.warnings.length > 0 && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
+          <p className="flex items-center gap-1.5 text-sm font-bold text-amber-900 dark:text-amber-200">
+            <AlertTriangle size={16} aria-hidden="true" />
+            확인이 필요해요
+          </p>
+          <ul className="mt-2 space-y-1">
+            {preview.warnings.map((warning) => (
+              <li key={`${warning.tier}-${warning.code}`} className="text-xs text-amber-900 dark:text-amber-200">
+                {warning.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {preview.tiers.map((tier) => (
+        <section key={tier.tier} className="rounded-2xl border border-[var(--border-strong)] bg-[var(--card-surface)] p-4">
+          <header className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-sm font-bold text-[var(--text-strong)]">{tier.tierLabel}</h3>
+            <p className="text-xs text-[var(--text-muted)]">
+              지금 {tier.teamCount}팀 · 다음 시즌 예상{' '}
+              <span className="font-semibold text-[var(--text-strong)]">
+                {projectedByTier.get(tier.tier) ?? 0}팀
+              </span>
+              {tier.skippedByMajorityGuard && ' · 승강 건너뜀'}
+            </p>
+          </header>
+
+          {tier.entries.length === 0 ? (
+            <p className="mt-3 text-xs text-[var(--text-muted)]">참가 팀이 없어요.</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
+              {tier.entries.map((entry) => {
+                const kind = kindOf(entry.teamId, entry.computedKind);
+                const meta = KIND_META[kind];
+                const Icon = meta.icon;
+                const changed = kind !== entry.computedKind;
+                return (
+                  <li key={entry.teamId} className="flex flex-wrap items-center gap-3 py-2">
+                    <span className="w-8 text-sm font-semibold tabular-nums text-[var(--text-muted)]">
+                      {entry.position}위
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-strong)]">
+                      {entry.teamName}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${meta.className}`}>
+                      <Icon size={14} aria-hidden="true" />
+                      {meta.label}
+                    </span>
+                    {changed && (
+                      <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-2xs font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                        규칙은 {KIND_META[entry.computedKind].label}
+                      </span>
+                    )}
+                    <label className="sr-only" htmlFor={`kind-${entry.teamId}`}>
+                      {entry.teamName} 승강 결정
+                    </label>
+                    <select
+                      id={`kind-${entry.teamId}`}
+                      className={selectClass}
+                      value={kind}
+                      disabled={submitting}
+                      onChange={(e) =>
+                        setOverrides((prev) => ({ ...prev, [entry.teamId]: e.target.value as V1PromotionKind }))
+                      }
+                    >
+                      {KIND_ORDER.map((option) => (
+                        <option key={option} value={option}>
+                          {KIND_META[option].label}
+                        </option>
+                      ))}
+                    </select>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      ))}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border-strong)] bg-[var(--card-surface)] p-4">
+        <p className="text-xs text-[var(--text-muted)]">
+          총 {entries.length}팀
+          {overriddenCount > 0 && ` · 규칙과 다르게 정한 팀 ${overriddenCount}개`}
+          <br />
+          최종 승인하면 다음 시즌 리그가 만들어지고 되돌릴 수 없어요.
+        </p>
+        <button
+          type="button"
+          onClick={handleCommit}
+          disabled={submitting || entries.length === 0}
+          className="inline-flex min-h-[44px] items-center rounded-xl bg-blue-500 px-5 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {submitting ? '확정하는 중…' : '승강 최종 승인'}
+        </button>
+      </div>
+    </div>
+  );
+}

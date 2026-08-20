@@ -437,15 +437,20 @@ describe('ProfileService tournament appearance aggregation', () => {
     revisionId: string;
     currentOfficialRevisionId: string | null;
     officialAt: Date | null;
+    tournamentId?: string | null;
   }) {
     // sourceType 은 select 에 없다 — where 가 이미 TOURNAMENT_FIXTURE 로 좁히므로
     // 서비스가 그 필드를 읽지 않는다(위 TEAM_MATCH 테스트가 where 쪽을 검증한다).
+    const tournamentId = config.tournamentId === undefined ? `${config.gameId}-tournament` : config.tournamentId;
     return {
       resultRevision: {
         id: config.revisionId,
         gameId: config.gameId,
         officialAt: config.officialAt,
-        game: { currentOfficialRevisionId: config.currentOfficialRevisionId },
+        game: {
+          currentOfficialRevisionId: config.currentOfficialRevisionId,
+          tournamentFixture: tournamentId === null ? null : { tournamentId },
+        },
       },
     };
   }
@@ -537,7 +542,12 @@ describe('ProfileService tournament appearance aggregation', () => {
               id: true,
               gameId: true,
               officialAt: true,
-              game: { select: { currentOfficialRevisionId: true } },
+              game: {
+                select: {
+                  currentOfficialRevisionId: true,
+                  tournamentFixture: { select: { tournamentId: true } },
+                },
+              },
             },
           },
         },
@@ -859,6 +869,51 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
 
       expect(result.reputation.reviewCount).toBe(1);
       expect(result.reputation.mannerScore).toBe(5);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('같은 대회에서 두 경기를 뛰면 경기 수는 2, 대회 수는 1로 센다', async () => {
+    const now = new Date('2026-08-15T12:00:00Z');
+    jest.useFakeTimers().setSystemTime(now);
+
+    try {
+      // 한 대회(tournament-1)에서 두 경기, 다른 대회(tournament-2)에서 한 경기.
+      // 경기 수만 보면 3인데 대회 수는 2여야 한다 -- 두 값이 같은 카운터에서 나오므로
+      // 여기서 갈라지지 않으면 "대회 수"가 사실상 경기 수의 복사본이 된다.
+      function row(gameId: string, tournamentId: string) {
+        return {
+          resultRevision: {
+            id: `${gameId}-revision`,
+            gameId,
+            officialAt: now,
+            game: {
+              currentOfficialRevisionId: `${gameId}-revision`,
+              tournamentFixture: { tournamentId },
+            },
+          },
+        };
+      }
+      const prisma = {
+        ...buildPrisma(),
+        v1ParticipantIdentityLinkCurrent: {
+          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+        },
+        v1GameResultParticipant: {
+          findMany: jest.fn().mockResolvedValue([
+            row('game-1', 'tournament-1'),
+            row('game-2', 'tournament-1'),
+            row('game-3', 'tournament-2'),
+          ]),
+        },
+      };
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.publicProfile(null, targetUserId);
+
+      expect(result.activitySummary.totals).toMatchObject({ matchCount: 3, tournamentCount: 2 });
+      expect(result.activitySummary.monthly).toMatchObject({ matchCount: 3, tournamentCount: 2 });
     } finally {
       jest.useRealTimers();
     }

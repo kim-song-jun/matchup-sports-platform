@@ -328,10 +328,10 @@ export class ProfileService {
     const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
     const [
-      matchCount,
+      personalMatchCount,
       teamCount,
       reputation,
-      monthlyMatchCount,
+      monthlyPersonalMatchCount,
       monthlyTeamJoinCount,
       monthlyReviewCount,
       tournamentAppearances,
@@ -379,12 +379,14 @@ export class ProfileService {
 
     return {
       totals: {
-        matchCount: matchCount + tournamentAppearances.total,
+        matchCount: personalMatchCount + tournamentAppearances.total,
+        tournamentCount: tournamentAppearances.tournamentTotal,
         teamCount,
         reviewCount: reputation.reviewCount,
       },
       monthly: {
-        matchCount: monthlyMatchCount + tournamentAppearances.monthly,
+        matchCount: monthlyPersonalMatchCount + tournamentAppearances.monthly,
+        tournamentCount: tournamentAppearances.tournamentMonthly,
         teamJoinCount: monthlyTeamJoinCount,
         reviewCount: monthlyReviewCount,
       },
@@ -406,16 +408,24 @@ export class ProfileService {
    * 같은 경기가 여러 participant 행으로 잡혀도(예: 대회 도중 로스터가 갱신된 경우) gameId 기준
    * Set으로 중복 제거한다.
    */
+  /**
+   * 대회 출전 수(경기 단위)와 참가한 **대회 수**(distinct tournament)를 한 번에 센다.
+   *
+   * 두 값을 굳이 한 쿼리로 묶은 이유: 프로필 GET 한 번에 두 번 왕복하지 않기 위해서다.
+   * 그리고 여기서 세는 것은 **개수뿐**이라 `PublicUserRecordsService.loadEligibleRows()`
+   * 같은 전체 기록 행(골·카드·MVP·상대팀…)을 끌어오지 않는다 -- 출전이 많은 사용자의
+   * 프로필 조회마다 목록 전체를 메모리에 올리는 비용을 피한다.
+   */
   private async countTournamentAppearances(
     userId: string,
     monthStart: Date,
     nextMonthStart: Date,
-  ): Promise<{ total: number; monthly: number }> {
+  ): Promise<{ total: number; monthly: number; tournamentTotal: number; tournamentMonthly: number }> {
     const links = await this.prisma.v1ParticipantIdentityLinkCurrent.findMany({
       where: { userId },
       select: { participantId: true },
     });
-    if (links.length === 0) return { total: 0, monthly: 0 };
+    if (links.length === 0) return { total: 0, monthly: 0, tournamentTotal: 0, tournamentMonthly: 0 };
     const participantIds = links.map((link) => link.participantId);
 
     const rows = await this.prisma.v1GameResultParticipant.findMany({
@@ -436,7 +446,14 @@ export class ProfileService {
             id: true,
             gameId: true,
             officialAt: true,
-            game: { select: { currentOfficialRevisionId: true } },
+            game: {
+              select: {
+                currentOfficialRevisionId: true,
+                // "몇 개 대회에 나갔나"를 세려면 경기 → 픽스처 → 대회 한 단계가 더 필요하다.
+                // 컬럼 하나(tournamentId)만 더 실을 뿐 행 수는 그대로다.
+                tournamentFixture: { select: { tournamentId: true } },
+              },
+            },
           },
         },
       },
@@ -444,6 +461,8 @@ export class ProfileService {
 
     const totalGameIds = new Set<string>();
     const monthlyGameIds = new Set<string>();
+    const totalTournamentIds = new Set<string>();
+    const monthlyTournamentIds = new Set<string>();
     for (const row of rows) {
       const revision = row.resultRevision;
       // sourceType(TEAM_MATCH 제외)과 officialAt 은 위 where 가 이미 걸렀다 -- 여기서는
@@ -452,13 +471,23 @@ export class ProfileService {
       const isCurrent = revision.game.currentOfficialRevisionId === revision.id;
       if (!isCurrent || revision.officialAt === null) continue;
 
+      const isThisMonth = revision.officialAt >= monthStart && revision.officialAt < nextMonthStart;
       totalGameIds.add(revision.gameId);
-      if (revision.officialAt >= monthStart && revision.officialAt < nextMonthStart) {
-        monthlyGameIds.add(revision.gameId);
+      if (isThisMonth) monthlyGameIds.add(revision.gameId);
+
+      const tournamentId = revision.game.tournamentFixture?.tournamentId ?? null;
+      if (tournamentId !== null) {
+        totalTournamentIds.add(tournamentId);
+        if (isThisMonth) monthlyTournamentIds.add(tournamentId);
       }
     }
 
-    return { total: totalGameIds.size, monthly: monthlyGameIds.size };
+    return {
+      total: totalGameIds.size,
+      monthly: monthlyGameIds.size,
+      tournamentTotal: totalTournamentIds.size,
+      tournamentMonthly: monthlyTournamentIds.size,
+    };
   }
 
   /**

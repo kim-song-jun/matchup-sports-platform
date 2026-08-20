@@ -300,6 +300,20 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
   - 해결된 제품 문제: `/matches/new` create payload가 DTO에 없는 UI 필드를 전송하던 버그
   - 남은 갭: `TEAM-003`, `TEAM-004-B`, `TEAM-005-C`, `TM-SMOKE-001`, mercenary flow automation, chat unread/realtime depth expansion, marketplace/lesson CRUD + commerce automation, payment/review/badge/admin Playwright coverage, `/settings/notifications` protected-route live smoke rerun after dev-login recovery, `make dev-local` 대응 DB runtime abstraction, multi-browser 확대
 
+## 2026-08-19 — Team records and public profile integration
+
+- Status: PASS, 2 routes x 3 viewports.
+- Routes: team records and public user profile.
+- Verified penalty-decided outcomes, the separate shootout scoreline, the
+  removed corrected badges, tournament activity counts, and responsive
+  overflow at 390 / 768 / 1440.
+- All intercepted contract APIs returned 200. Console errors, page errors,
+  and request failures were zero.
+- Screenshots and the run manifest are under
+  docs/screenshots/task-127-records-profile. The team-record captures predate
+  the goal/card accordion that landed separately on `dev`, so treat them as
+  evidence for the outcome and shootout rows only.
+
 ## How To Use
 
 1. `index.md`에서 현재 우선순위와 열린 논점을 확인한다.

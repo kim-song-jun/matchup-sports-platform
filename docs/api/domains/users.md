@@ -129,6 +129,20 @@
 
 ## Source References
 
+Public activity summary integration (2026-08-20):
+
+- The totals response distinguishes match, tournament, team, and review
+  counts. The monthly response distinguishes match, tournament, team join,
+  and review counts.
+- `matchCount` counts distinct games and `tournamentCount` counts distinct
+  tournaments, both derived from the same single pass over the viewed user's
+  current official tournament participant results. A user who played five
+  games in one tournament therefore reads as five games and one tournament.
+- Both counts follow the identity link (`V1ParticipantIdentityLinkCurrent`)
+  only. Unlike `GET /users/:id/records`, they are aggregate counts and are
+  **not** filtered by the per-user record consent gate; keep that in mind
+  before treating either number as consent-scoped.
+
 - `apps/v1_api/src/profile/profile.controller.ts`
 - `apps/v1_api/src/profile/profile.service.ts`
 - `apps/v1_api/src/profile/dto/profile.dto.ts`

@@ -28,19 +28,28 @@ export interface TournamentOverviewCheck {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** 오늘 자정 기준으로 남은 일수 — "D-1"이 시/분 때문에 0으로 보이지 않게 날짜 단위로 센다. */
+/**
+ * 한국 시간 기준 달력 날짜(YYYY-MM-DD). 실행 환경의 로컬 타임존을 쓰면 같은 코드가
+ * 브라우저(KST)와 CI(UTC)에서 다른 날을 가리킨다 — 국내 대회 운영 화면이므로 KST 로 고정한다.
+ */
+const SEOUL_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+function seoulDayStart(date: Date): number {
+  const [year, month, day] = SEOUL_DATE_FORMAT.format(date).split('-').map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
+/** 오늘(KST) 자정 기준으로 남은 일수 — "D-1"이 시/분 때문에 0으로 보이지 않게 날짜 단위로 센다. */
 export function daysUntil(target: string | null | undefined, now: Date): number | null {
   if (!target) return null;
-  const at = new Date(target).getTime();
-  if (!Number.isFinite(at)) return null;
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const targetDate = new Date(at);
-  const startOfTarget = new Date(
-    targetDate.getFullYear(),
-    targetDate.getMonth(),
-    targetDate.getDate(),
-  ).getTime();
-  return Math.round((startOfTarget - startOfToday) / DAY_MS);
+  const at = new Date(target);
+  if (!Number.isFinite(at.getTime())) return null;
+  return Math.round((seoulDayStart(at) - seoulDayStart(now)) / DAY_MS);
 }
 
 export function resolveNextMilestone(tournament: V1Tournament, now: Date): TournamentNextMilestone {

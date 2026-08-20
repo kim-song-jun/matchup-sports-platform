@@ -42,6 +42,13 @@ describe('daysUntil', () => {
     expect(daysUntil('2026-08-19T23:59:00+09:00', NOW)).toBe(-1);
     expect(daysUntil(null, NOW)).toBeNull();
   });
+
+  it('실행 환경 타임존이 아니라 한국 날짜로 센다', () => {
+    // 같은 순간(UTC 15:01)이 KST 로는 다음 날 00:01 이다. 로컬 타임존으로 세면
+    // 브라우저(KST)에서 "내일"인 마감이 UTC 로 도는 CI 에서 "오늘"이 된다.
+    expect(daysUntil('2026-08-20T15:01:00Z', new Date('2026-08-20T01:00:00Z'))).toBe(1);
+    expect(daysUntil('2026-08-20T14:59:00Z', new Date('2026-08-20T01:00:00Z'))).toBe(0);
+  });
 });
 
 describe('resolveNextMilestone', () => {

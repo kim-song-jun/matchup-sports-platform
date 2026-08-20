@@ -124,6 +124,13 @@ export class AdminTeamMatchListQueryDto {
   @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
   status?: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
 
+  // 다른 어드민 목록(users/matches/teams)과 동일한 q 검색 계약 — 팀매치만 빠져 있어
+  // 특정 경기를 찾을 방법이 없었다(어드민 재정비 M2).
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
   @IsOptional()
   @IsString()
   cursor?: string;

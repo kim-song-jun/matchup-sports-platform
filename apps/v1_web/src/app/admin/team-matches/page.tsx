@@ -8,6 +8,7 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamMatchRow } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useAdminListQuery } from '@/hooks/use-admin-list-query';
 import { Activity, Clock, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
@@ -66,29 +67,24 @@ export default function AdminTeamMatchesPage() {
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
 
-  // ── Filter state (no search — backend has no q for team-matches) ───
-  const [activeStatus, setActiveStatus] = useState('');
+  // ── Filter state — 검색 debounce·상태 필터·page 리셋은 공용 훅이 담당 ─────
+  // (백엔드 q 지원이 이번에 추가되어 hideSearch도 함께 해제한다 — 제목·호스트 팀명 검색)
+  const {
+    search,
+    setSearch,
+    activeStatus,
+    setActiveStatus,
+    filters,
+    resetToFirstPage,
+    buildPagination,
+  } = useAdminListQuery({ pageSize: PAGE_SIZE });
 
   // URL searchParam pre-selection on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const s = params.get('status') ?? '';
     if (s) setActiveStatus(s);
-  }, []);
-
-  const handleStatusChange = (value: string) => {
-    setActiveStatus(value);
-    setPage(1);
-  };
-
-  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
-  const [page, setPage] = useState(1);
-
-  const filters = {
-    ...(activeStatus ? { status: activeStatus } : {}),
-    page,
-    limit: PAGE_SIZE,
-  };
+  }, [setActiveStatus]);
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches(filters);
   const rows = data?.items ?? [];
@@ -114,7 +110,7 @@ export default function AdminTeamMatchesPage() {
           setModalRow(null);
           showToast('팀매치 상태를 변경했어요.', 'success');
           // 방금 바꾼 행이 최신 상태로 다시 그려지도록 첫 페이지부터 받아온다.
-          setPage(1);
+          resetToFirstPage();
         },
         onError: (err) => {
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
@@ -134,16 +130,16 @@ export default function AdminTeamMatchesPage() {
         description="플랫폼 내 모든 팀매치의 상태를 필터링하고 관리해요."
       />
 
-      {/* Status chip filter — AdminFilterBar 재사용으로 chip 높이 min-h-[44px] + 페이지 간 리듬 통일.
-          백엔드가 q 파라미터를 미지원하므로 hideSearch=true로 검색 입력란만 생략한다. */}
+      {/* Filter bar — chip 높이 min-h-[44px] + 페이지 간 리듬 통일 */}
       <div className="mb-4">
         <AdminFilterBar
-          hideSearch
-          searchValue=""
-          onSearchChange={() => undefined}
+          searchLabel="경기 제목·호스트 팀명 검색"
+          searchPlaceholder="경기 제목·호스트 팀명 검색"
+          searchValue={search}
+          onSearchChange={setSearch}
           statusOptions={statusOptions}
           activeStatus={activeStatus}
-          onStatusChange={handleStatusChange}
+          onStatusChange={setActiveStatus}
         />
       </div>
 
@@ -218,18 +214,7 @@ export default function AdminTeamMatchesPage() {
             : undefined
         }
         loading={isInitialLoad}
-        pagination={
-          pageInfo?.totalPages
-            ? {
-                page: pageInfo.page ?? page,
-                totalPages: pageInfo.totalPages,
-                total: pageInfo.total ?? 0,
-                limit: pageInfo.limit ?? PAGE_SIZE,
-                onPageChange: setPage,
-                loading: isFetching,
-              }
-            : undefined
-        }
+        pagination={buildPagination(pageInfo, isFetching)}
         empty={
           <AdminEmpty
             title="검색 결과가 없어요"

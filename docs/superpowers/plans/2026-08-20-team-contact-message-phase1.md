@@ -1260,7 +1260,7 @@ Expected: FAIL — 타입 에러(유니온에 없는 리터럴) 또는 `deepLink
 6. `EVENT_BODIES` 에 3개, 같은 위치:
 
 ```ts
-  team_contact_received: '상대 팀이 경기 관련해 연락을 보냈어요.',
+  team_contact_received: '상대 팀이 보낸 컨택을 확인해 주세요.',
   team_contact_accepted: '이제 상대 팀과 대화할 수 있어요.',
   team_contact_declined: '아쉽지만 이번에는 성사되지 않았어요.',
 ```

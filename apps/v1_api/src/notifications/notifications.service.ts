@@ -281,7 +281,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_join_application_received: '팀 가입 신청을 확인해 주세요.',
   team_join_application_accepted: '팀 가입이 승인됐어요.',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요.',
-  team_contact_received: '상대 팀이 경기 관련해 연락을 보냈어요.',
+  team_contact_received: '상대 팀이 보낸 컨택을 확인해 주세요.',
   team_contact_accepted: '이제 상대 팀과 대화할 수 있어요.',
   team_contact_declined: '아쉽지만 이번에는 성사되지 않았어요.',
   team_match_application_received: '팀매치 신청을 확인해 주세요.',

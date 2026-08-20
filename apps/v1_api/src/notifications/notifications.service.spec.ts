@@ -400,7 +400,7 @@ describe('NotificationsService', () => {
   // 404 링크가 만들어진다. 세 함수 모두 파일 로컬이라 직접 import할 수 없으므로,
   // emitNotification이 실제로 prisma.v1Notification.create에 저장하는 데이터로 관측한다.
   describe.each([
-    ['team_contact_received' as const, '새 팀 컨택이 도착했어요', '상대 팀이 경기 관련해 연락을 보냈어요.'],
+    ['team_contact_received' as const, '새 팀 컨택이 도착했어요', '상대 팀이 보낸 컨택을 확인해 주세요.'],
     ['team_contact_accepted' as const, '팀 컨택이 수락됐어요', '이제 상대 팀과 대화할 수 있어요.'],
     ['team_contact_declined' as const, '팀 컨택이 거절됐어요', '아쉽지만 이번에는 성사되지 않았어요.'],
   ])('%s 알림 매핑', (eventType, expectedTitle, expectedBody) => {

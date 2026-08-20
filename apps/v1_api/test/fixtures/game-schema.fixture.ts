@@ -250,7 +250,14 @@ export const gameSchemaSourceManifest = {
   // recipientUserId relation/index를 추가했다. game domain 모델·바인딩된 game operations
   // migration은 바뀌지 않았으며 뒷받침 마이그레이션은
   // 20260820180000_v1_tournament_award_recipient_user 이다.
-  schema: '6836627b976463894514c6870fa98e62cb1fdb209c47d2f5a30e122dacfd444d',
+  // 2026-08-20 재핀: 팀 간 컨택 메시지(Phase 1) 스키마를 추가하면서 schema.prisma 가 바뀌었다.
+  // 추가한 것: enum V1TeamContactStatus / V1TeamContactPolicy, model V1TeamContact /
+  // V1TeamContactBlock, V1ChatRoom.teamContactId, V1Team.contactPolicy,
+  // V1InquiryRelatedType.team_contact — 전부 additive 이고 game domain(V1Game*) 은 건드리지 않았다.
+  // 이 guard 가 발동한 것은 schema.prisma 파일 전체 바이트를 결속하기 때문이며, game 도메인
+  // 변경 때문이 아니다. 뒷받침 마이그레이션: prisma/migrations/20260820210000_v1_team_contacts.
+  // 바인딩된 20260729000100_v1_game_operations 는 그대로이므로 .migration 해시는 바뀌지 않았다.
+  schema: 'b81b8caa8b647f78755e1debbd84d929c9d81758018281770623d160fd80a9f5',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

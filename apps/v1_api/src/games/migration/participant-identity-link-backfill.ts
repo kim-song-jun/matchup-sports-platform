@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient, V1IdentityActorType, V1IdentityLinkAction } from '@prisma/client';
 
-type CandidateRow = { participantId: string; userId: string };
+type CandidateRow = { participant_id: string; user_id: string };
 type TournamentRow = { id: string };
 
 export type ParticipantIdentityLinkBackfillResult = {
@@ -40,8 +40,8 @@ async function collectCandidates(
 ): Promise<CandidateRow[]> {
   return client.$queryRaw<CandidateRow[]>`
     SELECT DISTINCT
-      participant.id AS participantId,
-      participant.user_id AS userId
+      participant.id AS participant_id,
+      participant.user_id AS user_id
     FROM v1_game_result_participants result_participant
     JOIN v1_game_result_revisions revision
       ON revision.id = result_participant.result_revision_id
@@ -98,12 +98,12 @@ export async function runParticipantIdentityLinkBackfill(
             const linkId = randomUUID();
             const event = await tx.v1ParticipantIdentityLinkEvent.create({
               data: {
-                participantId: candidate.participantId,
+                participantId: candidate.participant_id,
                 linkId,
                 eventVersion: 1,
                 requestId: linkId,
                 action: V1IdentityLinkAction.ROSTER_ASSERTED,
-                userId: candidate.userId,
+                userId: candidate.user_id,
                 actorType: V1IdentityActorType.SYSTEM,
                 systemActor: 'GAME_BACKFILL',
                 reason: `tournament:${input.tournamentId}:source-participant-user-id`,
@@ -111,9 +111,9 @@ export async function runParticipantIdentityLinkBackfill(
             });
             await tx.v1ParticipantIdentityLinkCurrent.create({
               data: {
-                participantId: candidate.participantId,
+                participantId: candidate.participant_id,
                 linkId,
-                userId: candidate.userId,
+                userId: candidate.user_id,
                 version: event.eventVersion,
                 effectiveFrom: event.effectiveAt,
               },

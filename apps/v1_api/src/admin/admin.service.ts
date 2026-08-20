@@ -1036,7 +1036,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       'cancel_requested',
     ] as const;
 
-    const [regGroups, reviewFixtures, pendingInquiries, tournamentsInProgress] = await Promise.all([
+    const [regGroups, reviewGroups, pendingInquiries, tournamentsInProgress] = await Promise.all([
       this.prisma.v1TournamentRegistration.groupBy({
         by: ['tournamentId'],
         where: {
@@ -1045,7 +1045,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
         _count: { _all: true },
       }),
-      this.prisma.v1TournamentFixture.findMany({
+      this.prisma.v1TournamentFixture.groupBy({
+        by: ['tournamentId'],
         where: {
           tournament: { deletedAt: null },
           game: {
@@ -1066,19 +1067,17 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
             },
           },
         },
-        select: { tournamentId: true },
+        _count: { _all: true },
       }),
       this.prisma.v1Inquiry.count({ where: { status: { in: ['received', 'reviewing'] } } }),
       this.prisma.v1Tournament.count({ where: { status: 'in_progress', deletedAt: null } }),
     ]);
 
-    const reviewCounts = new Map<string, number>();
-    for (const row of reviewFixtures) {
-      reviewCounts.set(row.tournamentId, (reviewCounts.get(row.tournamentId) ?? 0) + 1);
-    }
-
     const tournamentIds = [
-      ...new Set([...regGroups.map((group) => group.tournamentId), ...reviewCounts.keys()]),
+      ...new Set([
+        ...regGroups.map((group) => group.tournamentId),
+        ...reviewGroups.map((group) => group.tournamentId),
+      ]),
     ];
     const titles = tournamentIds.length
       ? await this.prisma.v1Tournament.findMany({
@@ -1100,12 +1099,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           .sort((a, b) => b.count - a.count),
       },
       resultReviewPending: {
-        total: [...reviewCounts.values()].reduce((sum, count) => sum + count, 0),
-        tournaments: [...reviewCounts.entries()]
-          .map(([tournamentId, count]) => ({
-            tournamentId,
-            title: titleById.get(tournamentId) ?? '',
-            count,
+        total: reviewGroups.reduce((sum, group) => sum + group._count._all, 0),
+        tournaments: reviewGroups
+          .map((group) => ({
+            tournamentId: group.tournamentId,
+            title: titleById.get(group.tournamentId) ?? '',
+            count: group._count._all,
           }))
           .sort((a, b) => b.count - a.count),
       },

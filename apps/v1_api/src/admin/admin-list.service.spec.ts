@@ -154,7 +154,7 @@ describe('AdminService — list/detail endpoints', () => {
       v1Inquiry: { findMany: jest.fn(), groupBy: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
       v1Tournament: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { groupBy: jest.fn().mockResolvedValue([]) },
-      v1TournamentFixture: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentFixture: { groupBy: jest.fn().mockResolvedValue([]) },
       // getTeam() live-recalculates trustScore via computeRevealedTeamTrustBatch(); default to
       // "no submitted reviews" so tests that don't care about trust reveal math still resolve.
       v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
@@ -883,10 +883,9 @@ describe('AdminService — list/detail endpoints', () => {
         { tournamentId: 'tour-1', _count: { _all: 3 } },
         { tournamentId: 'tour-2', _count: { _all: 7 } },
       ]);
-      prisma.v1TournamentFixture.findMany.mockResolvedValue([
-        { tournamentId: 'tour-1' },
-        { tournamentId: 'tour-1' },
-        { tournamentId: 'tour-3' },
+      prisma.v1TournamentFixture.groupBy.mockResolvedValue([
+        { tournamentId: 'tour-1', _count: { _all: 2 } },
+        { tournamentId: 'tour-3', _count: { _all: 1 } },
       ]);
       prisma.v1Inquiry.count.mockResolvedValue(4);
       prisma.v1Tournament.count.mockResolvedValue(2);
@@ -909,7 +908,10 @@ describe('AdminService — list/detail endpoints', () => {
       expect(regWhere.tournament).toEqual({ deletedAt: null });
 
       // 검토 대기 = ENDED + (공식 리비전 없음 OR 열린 에스컬레이션) — result-review 화면과 동일 정의
-      const fixtureWhere = prisma.v1TournamentFixture.findMany.mock.calls[0][0].where;
+      const fixtureCall = prisma.v1TournamentFixture.groupBy.mock.calls[0][0];
+      // JS 재집계 대신 DB groupBy로 바로 센다 (Copilot 리뷰 반영)
+      expect(fixtureCall.by).toEqual(['tournamentId']);
+      const fixtureWhere = fixtureCall.where;
       expect(fixtureWhere.game.is.state).toBe('ENDED');
       expect(fixtureWhere.game.is.OR).toEqual([
         { currentOfficialRevisionId: null },

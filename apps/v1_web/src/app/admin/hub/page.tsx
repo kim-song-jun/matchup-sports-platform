@@ -47,6 +47,7 @@ function TournamentBreakdownCard({
             </span>
             <Link
               href={hrefFor(row.tournamentId)}
+              aria-label={`${row.title || '(제목 없음)'} ${linkLabel}`}
               className="shrink-0 inline-flex items-center gap-0.5 min-h-[44px] px-2 text-[length:var(--font-size-label)] font-medium text-blue-500 hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
             >
               {linkLabel}

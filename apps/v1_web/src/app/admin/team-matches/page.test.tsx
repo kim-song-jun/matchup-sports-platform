@@ -3,7 +3,7 @@
  * 서버는 목록 응답에 이미 `league` 를 실어 보내는데 프론트 타입에 선언이 없어 화면이 통째로
  * 버리고 있었다 — 운영자는 단발 경기와 리그전을 목록에서 구분할 수 없었다.
  */
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1AdminTeamMatchRow } from '@/types/api';
 import AdminTeamMatchesPage from './page';

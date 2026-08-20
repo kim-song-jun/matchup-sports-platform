@@ -114,6 +114,12 @@ export class AdminController {
     return this.adminService.globalSearch(user, query);
   }
 
+  /** 할 일 인박스 — 운영자 액션 대기 항목 요약 (M3 허브) */
+  @Get('hub/inbox')
+  hubInbox(@CurrentUser() user: V1AuthUser) {
+    return this.adminService.hubInbox(user);
+  }
+
   @Get('action-logs')
   actionLogs(@CurrentUser() user: V1AuthUser, @Query() query: AdminLogsQueryDto) {
     return this.adminService.actionLogs(user, query);

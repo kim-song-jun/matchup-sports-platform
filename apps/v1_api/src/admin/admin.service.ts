@@ -1018,6 +1018,101 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * 어드민 할 일 인박스 (M3) — 운영자 액션을 기다리는 항목의 요약 집계.
+   * - pendingRegistrations: 처리 대기 대회 신청 (입금확인·확정/대기·취소요청 대기 상태)
+   * - resultReviewPending: tournament-ops result-review 화면의 '검토 대기'와 동일 정의 —
+   *   ENDED 게임 중 공식 리비전이 없거나 열린(PENDING/ACKNOWLEDGED) SLA 에스컬레이션이 있는 경기.
+   *   (raw SQL 대신 관계 필터로 재현 — 운영 보드 서비스 로직과 드리프트를 만들지 않는다)
+   * - pendingInquiries / tournamentsInProgress: 기존 집계와 동일 where 재사용
+   */
+  async hubInbox(user: V1AuthUser) {
+    await this.getActiveAdmin(user.id);
+
+    const REGISTRATION_ACTIONABLE = [
+      'awaiting_payment',
+      'payment_checking',
+      'paid',
+      'cancel_requested',
+    ] as const;
+
+    const [regGroups, reviewGroups, pendingInquiries, tournamentsInProgress] = await Promise.all([
+      this.prisma.v1TournamentRegistration.groupBy({
+        by: ['tournamentId'],
+        where: {
+          status: { in: [...REGISTRATION_ACTIONABLE] },
+          tournament: { deletedAt: null },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.v1TournamentFixture.groupBy({
+        by: ['tournamentId'],
+        where: {
+          tournament: { deletedAt: null },
+          game: {
+            is: {
+              state: 'ENDED',
+              OR: [
+                { currentOfficialRevisionId: null },
+                {
+                  resultRevisions: {
+                    some: {
+                      resultEscalations: {
+                        some: { status: { in: ['PENDING', 'ACKNOWLEDGED'] } },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.v1Inquiry.count({ where: { status: { in: ['received', 'reviewing'] } } }),
+      this.prisma.v1Tournament.count({ where: { status: 'in_progress', deletedAt: null } }),
+    ]);
+
+    const tournamentIds = [
+      ...new Set([
+        ...regGroups.map((group) => group.tournamentId),
+        ...reviewGroups.map((group) => group.tournamentId),
+      ]),
+    ];
+    const titles = tournamentIds.length
+      ? await this.prisma.v1Tournament.findMany({
+          where: { id: { in: tournamentIds } },
+          select: { id: true, title: true },
+        })
+      : [];
+    const titleById = new Map(titles.map((row) => [row.id, row.title]));
+
+    return {
+      pendingRegistrations: {
+        total: regGroups.reduce((sum, group) => sum + group._count._all, 0),
+        tournaments: regGroups
+          .map((group) => ({
+            tournamentId: group.tournamentId,
+            title: titleById.get(group.tournamentId) ?? '',
+            count: group._count._all,
+          }))
+          .sort((a, b) => b.count - a.count),
+      },
+      resultReviewPending: {
+        total: reviewGroups.reduce((sum, group) => sum + group._count._all, 0),
+        tournaments: reviewGroups
+          .map((group) => ({
+            tournamentId: group.tournamentId,
+            title: titleById.get(group.tournamentId) ?? '',
+            count: group._count._all,
+          }))
+          .sort((a, b) => b.count - a.count),
+      },
+      pendingInquiries,
+      tournamentsInProgress,
+    };
+  }
+
   async listTeams(user: V1AuthUser, query: AdminTeamListQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);

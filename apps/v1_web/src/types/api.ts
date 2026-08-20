@@ -1993,6 +1993,20 @@ export type V1AdminGlobalSearchResult = {
   matches: V1AdminGlobalSearchMatchHit[];
 };
 
+/** GET /admin/hub/inbox — 할 일 인박스 (운영자 액션 대기 요약, M3) */
+export type V1AdminHubTournamentCount = {
+  tournamentId: string;
+  title: string;
+  count: number;
+};
+
+export type V1AdminHubInbox = {
+  pendingRegistrations: { total: number; tournaments: V1AdminHubTournamentCount[] };
+  resultReviewPending: { total: number; tournaments: V1AdminHubTournamentCount[] };
+  pendingInquiries: number;
+  tournamentsInProgress: number;
+};
+
 export type V1AdminOverview = {
   users: { active: number; suspended: number; blocked: number; withdrawalPending: number };
   matches: { recruiting: number; cancelled: number; completed: number };

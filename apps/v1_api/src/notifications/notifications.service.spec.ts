@@ -392,4 +392,66 @@ describe('NotificationsService', () => {
     expect(upsertCall.update).not.toHaveProperty('importantEnabled');
     expect(upsertCall.update).not.toHaveProperty('activityEnabled');
   });
+
+  // ─── team_contact_* mapping (Task 6) ──────────────────────────────────────
+  // preferenceFieldForEvent / targetTypeForEvent 는 말미에 폴백 return이 있어 분기를
+  // 빠뜨려도 tsc가 안 잡는다(조용히 activityEnabled/team_match로 샌다). deepLinkForEvent도
+  // 특례 없이 두면 ROUTE_BASE_BY_TARGET_TYPE['team']='/teams' 로 떨어져 /teams/{id} 라는
+  // 404 링크가 만들어진다. 세 함수 모두 파일 로컬이라 직접 import할 수 없으므로,
+  // emitNotification이 실제로 prisma.v1Notification.create에 저장하는 데이터로 관측한다.
+  describe.each([
+    ['team_contact_received' as const, '새 팀 컨택이 도착했어요', '상대 팀이 경기 관련해 연락을 보냈어요.'],
+    ['team_contact_accepted' as const, '팀 컨택이 수락됐어요', '이제 상대 팀과 대화할 수 있어요.'],
+    ['team_contact_declined' as const, '팀 컨택이 거절됐어요', '아쉽지만 이번에는 성사되지 않았어요.'],
+  ])('%s 알림 매핑', (eventType, expectedTitle, expectedBody) => {
+    it("targetType 이 'team' 이고 딥링크가 /my/team-contacts 로 간다 (폴백으로 새면 /teams/{id} 가 된다)", async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+      await service.emitNotification('user-1', eventType, 'contact-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            targetType: 'team',
+            deepLink: '/my/team-contacts/contact-1',
+            title: expectedTitle,
+            body: expectedBody,
+          }),
+        }),
+      );
+    });
+
+    it('teamEnabled 를 끈 사용자에게는 발송되지 않는다', async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({
+        matchEnabled: true,
+        teamEnabled: false,
+        teamMatchEnabled: true,
+        activityEnabled: true,
+        importantEnabled: true,
+      });
+
+      await service.emitNotification('user-1', eventType, 'contact-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+    });
+
+    it('activityEnabled 만 꺼도 발송된다 — activityEnabled 폴백으로 새지 않았다는 증거', async () => {
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({
+        matchEnabled: true,
+        teamEnabled: true,
+        teamMatchEnabled: true,
+        activityEnabled: false,
+        importantEnabled: true,
+      });
+      prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+      await service.emitNotification('user-1', eventType, 'contact-1');
+      await new Promise(setImmediate);
+
+      expect(prisma.v1Notification.create).toHaveBeenCalled();
+    });
+  });
 });

@@ -283,20 +283,31 @@ Phase 1~3에서 쓸 스키마를 한 번에 넣는다. 재핀 비용을 1회로 
 > — **모노레포 전체가 공유하는 경로** 에 쓰인다 (worktree 의 `node_modules` 는 메인 트리 심링크).
 > 같은 스키마를 보는 다른 세션의 클라이언트가 내 버전으로 덮여 그쪽 tsc·테스트가 갑자기 깨진다.
 
-`migrate diff` 로 SQL 만 뽑는다. 이 명령은 DB 에 쓰지 않고 클라이언트를 생성하지 않는다:
+**스키마-대-스키마 diff 를 쓴다 — DB 가 전혀 필요 없다.** `--from-migrations` 는 shadow DB 를
+요구하지만, 두 입력을 모두 *스키마 파일* 로 주면 Prisma 가 파일만 읽고 SQL 을 만든다.
+2026-08-20 에 이 저장소에서 실증했다: 같은 스키마끼리는 `-- This is an empty migration.`,
+모델을 하나 추가한 사본과는 정확한 `CREATE TABLE` SQL 이 나왔다. DB 접속도 client 생성도 없었다.
 
 ```bash
 cd apps/v1_api
-mkdir -p prisma/migrations/$(date +%Y%m%d%H%M%S)_v1_team_contacts
-npx prisma migrate diff \
-  --from-migrations prisma/migrations \
+# 1) 변경 전 스키마를 git 에서 꺼내 scratchpad 에 둔다 (소스 트리에 두지 않는다 — 커밋에 섞인다)
+git show HEAD:apps/v1_api/prisma/schema.prisma > <scratchpad>/base-schema.prisma
+
+# 2) 스키마를 수정한다 (Step 1)
+
+# 3) 두 파일을 비교해 SQL 을 만든다
+MIG=prisma/migrations/$(date +%Y%m%d%H%M%S)_v1_team_contacts
+mkdir -p "$MIG"
+./node_modules/.bin/prisma migrate diff \
+  --from-schema-datamodel <scratchpad>/base-schema.prisma \
   --to-schema-datamodel prisma/schema.prisma \
-  --shadow-database-url "$SHADOW_DATABASE_URL" \
-  --script > prisma/migrations/<위에서_만든_디렉터리>/migration.sql
+  --script > "$MIG/migration.sql"
 ```
 
-`SHADOW_DATABASE_URL` 은 **비어 있어도 되는 임시 DB** 를 가리켜야 한다. 없으면 사용자에게 요청한다 —
-개발 DB 를 shadow 로 쓰면 그 DB 가 초기화된다.
+> **잔여 위험**: 이 방식은 *마이그레이션 체인* 이 아니라 *HEAD 의 schema.prisma* 를 기준으로 비교한다.
+> 만약 dev 의 체인과 schema.prisma 가 이미 어긋나 있다면 그 드리프트는 여기서 안 보인다.
+> 다만 CI 의 "V1 migration replay + drift gate" 가 dev 에 대해 드리프트 0 을 강제하고 있으므로
+> HEAD 는 일치한다고 봐도 된다. 이 전제가 깨지면 CI 가 red 로 알려준다.
 
 생성된 `migration.sql` 을 열어 **순수 additive 인지** 확인한다. `DROP` / `ALTER COLUMN ... TYPE` /
 기존 테이블에 대한 `NOT NULL` 추가가 있으면 멈추고 보고한다.
@@ -307,17 +318,19 @@ npx prisma migrate diff \
 > **`prisma migrate reset` 을 쓰지 않는다.** 로컬 개발 DB 를 통째로 비우는데, 이 머신은
 > worktree 20개 이상이 같은 개발 DB 를 공유한다 — 다른 세션의 작업 데이터가 사라진다.
 
-마이그레이션 체인과 스키마가 일치하는지만 본다. 두 입력 모두 파일이므로 DB 접근이 없다:
+생성한 SQL 이 스키마 변경을 빠짐없이 담았는지 확인한다. 방법: SQL 안에 스키마에 넣은
+테이블·컬럼·enum 이 전부 나타나는지 대조한다.
 
 ```bash
-cd apps/v1_api && npx prisma migrate diff \
-  --from-migrations prisma/migrations \
-  --to-schema-datamodel prisma/schema.prisma \
-  --shadow-database-url "$SHADOW_DATABASE_URL" \
-  --exit-code
+cd apps/v1_api
+MIG=$(ls -d prisma/migrations/*_v1_team_contacts)
+for token in v1_team_contacts v1_team_contact_blocks team_contact_id contact_policy \
+             V1TeamContactStatus V1TeamContactPolicy team_contact; do
+  printf '%-24s %s\n' "$token" "$(grep -c "$token" "$MIG/migration.sql")"
+done
 ```
 
-Expected: `No difference detected.` 로 exit 0. 차이가 나오면 Step 2 의 SQL 이 스키마를 다 반영하지 못한 것이다.
+Expected: 전부 1 이상. 0 인 항목이 있으면 Step 1 의 스키마 수정이 빠졌거나 diff 가 못 잡은 것이다.
 
 **빈 DB 전체 체인 재생은 CI 가 한다** — test job 의 "V1 migration replay + drift gate" 가
 빈 DB 에 `migrate deploy` 를 돌리고 드리프트 0 을 검증한다. 로컬에서 재현하지 않는다.

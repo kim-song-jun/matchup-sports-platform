@@ -1,5 +1,7 @@
 # Task 127 - V1 Team, Tournament Operations, and Game Record
 
+> 2026-08-20 alpha hotfix: legacy lineup rows with `position = NULL` made the records/profile repair migration emit `goalkeeper = NULL`, violating the result-participant NOT NULL contract. The migration now maps that legacy state to `false`; alpha deployment may mark only the exact P3018/23502 failure for this migration rolled back before retrying, and fails closed for every other migration/error.
+
 Owner: root execution pipeline
 Status: Task 1 containment baseline frozen; every source revision requires fresh immutable verification evidence
 Target: v1 backend + v1 frontend + QA/docs

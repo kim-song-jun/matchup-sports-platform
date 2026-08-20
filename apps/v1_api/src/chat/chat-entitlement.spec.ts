@@ -33,6 +33,17 @@ describe('currentChatRecipientEntitlementWhere', () => {
     expect(some?.role).toEqual({ in: ['owner', 'manager'] });
   });
 
+  it('team_contact 방이면 양 팀의 owner/manager 로 좁힌다', () => {
+    const where = currentChatRecipientEntitlementWhere({
+      matchId: null, teamId: null, teamMatchId: null, teamMatch: null,
+      teamContactId: 'c1',
+      teamContact: { fromTeamId: 'A', toTeamId: 'B' },
+    });
+    const some = where.user?.teamMemberships?.some;
+    expect(some?.teamId).toEqual({ in: ['A', 'B'] });
+    expect(some?.role).toEqual({ in: ['owner', 'manager'] });
+  });
+
   // 이 테스트가 이 태스크의 존재 이유다.
   // 지금은 링크가 하나도 없는 방이 조용히 team_match 분기로 떨어져
   // teamId: { in: [] } 를 만든다 — 수신자 0명, 예외 없음. 알림이 소리 없이 사라진다.

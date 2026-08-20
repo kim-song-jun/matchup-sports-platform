@@ -8,6 +8,11 @@ type ChatEntitlementRoom = {
     hostTeamId: string;
     approvedApplicantTeamId: string | null;
   } | null;
+  teamContactId: string | null;
+  teamContact: {
+    fromTeamId: string;
+    toTeamId: string;
+  } | null;
 };
 
 const managerRoles = ['owner', 'manager'] as const;
@@ -59,6 +64,17 @@ export function currentChatEntitlementWhere(userId: string): Prisma.V1ChatRoomWh
           },
         },
       },
+      {
+        teamContact: {
+          is: {
+            status: 'accepted',
+            OR: [
+              { fromTeam: { memberships: { some: { userId, status: 'active', role: { in: [...managerRoles] } } } } },
+              { toTeam:   { memberships: { some: { userId, status: 'active', role: { in: [...managerRoles] } } } } },
+            ],
+          },
+        },
+      },
     ],
   };
 }
@@ -100,6 +116,18 @@ export function currentChatRecipientEntitlementWhere(
             status: 'active',
             role: { in: [...managerRoles] },
           },
+        },
+      },
+    };
+  }
+  if (room.teamContactId) {
+    const teamIds = [room.teamContact?.fromTeamId, room.teamContact?.toTeamId].filter(
+      (teamId): teamId is string => Boolean(teamId),
+    );
+    return {
+      user: {
+        teamMemberships: {
+          some: { teamId: { in: teamIds }, status: 'active', role: { in: [...managerRoles] } },
         },
       },
     };

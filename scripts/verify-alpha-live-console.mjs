@@ -5,9 +5,11 @@
  */
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 const BASE = 'https://alpha.teameet.co.kr';
-const OUT = process.env.OUT_DIR ?? '/private/tmp/claude-501/-Users-sungjun-Dev-projects-matchup-sports-platform/649fe467-4fd8-45cb-b161-4e1927ed92fa/scratchpad/m5-gallery';
+const OUT = process.env.OUT_DIR ?? path.join(os.tmpdir(), 'teameet-alpha-live-console');
 const WIDTHS = [
   { w: 390, h: 900, tag: 'mobile-390' },
   { w: 768, h: 1000, tag: 'tablet-768' },
@@ -21,7 +23,13 @@ async function login() {
     body: JSON.stringify({ email: process.env.ALPHA_EMAIL, password: process.env.ALPHA_PASSWORD }),
   });
   if (!res.ok) throw new Error(`login failed: ${res.status}`);
+  // getSetCookie 는 런타임에 따라 없을 수 있다 — 없으면 그 사실을 그대로 말한다
+  // (없는 채로 부르면 TypeError 만 남고 원인이 안 보인다).
+  if (typeof res.headers.getSetCookie !== 'function') {
+    throw new Error('이 Node 런타임에는 Headers.getSetCookie 가 없어요 (Node 20+ 필요)');
+  }
   const raw = res.headers.getSetCookie().find((c) => c.startsWith('teameet_v1_session='));
+  if (!raw) throw new Error('로그인 응답에 teameet_v1_session 쿠키가 없어요');
   return raw.split(';')[0].split('=').slice(1).join('=');
 }
 
@@ -84,7 +92,7 @@ async function main() {
   } finally {
     await browser.close();
   }
-  console.log('\n=== nav 표면 판정 (1440) ===');
+  console.log('\n=== 표면 판정 — nav 가 아니라 화면 전체 링크 기준 (1440) ===');
   for (const v of verdicts) console.log(JSON.stringify(v));
   console.log(`OUT=${OUT}`);
 }

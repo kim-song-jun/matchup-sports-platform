@@ -74,3 +74,12 @@ export class UpdateLeagueFixtureDto {
   @MaxLength(200)
   placeAddress?: string;
 }
+
+// R6: 결과 정정 등으로 completed -> active 역전이할 때, 왜 되돌렸는지 감사 로그에
+// 남기기 위한 선택 필드. 본문 없이 보내도(빈 객체) 유효하다.
+export class RevertLeagueCompletionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}

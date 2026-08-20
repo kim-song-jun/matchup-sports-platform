@@ -1,15 +1,23 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
 
+// routerPush를 vi.hoisted로 모듈 스코프에 고정 — useRouter()가 매 렌더 새 vi.fn()을
+// 반환하면 클릭 핸들러가 실제로 호출한 push를 테스트에서 단언할 방법이 없다.
+const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/team-matches/team-match-1/edit',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: routerPush, replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
+
+beforeEach(() => {
+  routerPush.mockClear();
+});
 
 function renderPage(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -150,26 +158,87 @@ describe('리그전 배지', () => {
     const { container } = renderPage(<TeamMatchListPageView model={model} />);
 
     expect(container.textContent).not.toContain('리그전');
+    expect(screen.queryByRole('button', { name: /리그 상세로 이동/ })).not.toBeInTheDocument();
   });
 
-  it('상세에서는 리그명과 함께 리그 홈으로 링크한다', () => {
+  // R3(2026-08-20): 목록 카드는 카드 전체가 이미 상세로 가는 <a>다. 배지를 또 <a>로
+  // 만들면 <a> 안에 <a>가 중첩돼 브라우저가 바깥 태그를 조기에 닫아버린다 -- 그래서
+  // button + preventDefault/stopPropagation로 구현했다. 이 두 테스트가 그 계약을 지킨다.
+  it('목록 카드의 리그전 배지는 중첩 <a> 없이 button으로 렌더된다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' } }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    // 카드 자체의 href는 여전히 팀매치 상세를 가리킨다 -- 카드 링크는 유지.
+    expect(container.querySelector('a[href="/team-matches/team-match-1"]')).not.toBeNull();
+    // 리그 배지는 <a>가 아니어야 한다 -- 중첩 <a>면 이 셀렉터가 걸린다.
+    expect(container.querySelector('a[href="/league-matches/lg-1"]')).toBeNull();
+    expect(screen.getByRole('button', { name: '가을 리그 리그 상세로 이동' })).toBeInTheDocument();
+  });
+
+  it('목록 카드의 리그전 배지를 클릭하면 카드 자체 이동 없이 리그 상세로만 한 번 이동한다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' } }];
+
+    renderPage(<TeamMatchListPageView model={model} />);
+    fireEvent.click(screen.getByRole('button', { name: '가을 리그 리그 상세로 이동' }));
+
+    // stopPropagation이 실패해 카드 링크까지 같이 눌렸다면 team-matches 경로로도
+    // push가 호출되거나 push가 두 번 호출된다 -- 정확히 리그 경로 한 번만 확인한다.
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith('/league-matches/lg-1');
+  });
+
+  it('상세에서는 리그명과 함께 리그 배지를 보여준다', () => {
     const model = getTeamMatchDetailViewModel();
     model.match.league = { leagueId: 'lg-1', title: '가을 리그' };
 
-    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
-    const link = container.querySelector<HTMLAnchorElement>('a[href="/league-matches/lg-1"]');
+    renderPage(<TeamMatchDetailPageView model={model} />);
 
-    // 링크가 있어야 리그 상세로 갈 수 있다 -- 이 화면 외에는 진입점이 없다.
-    expect(link).not.toBeNull();
-    expect(link?.textContent).toContain('가을 리그');
+    // hostTeamCard가 모바일·데스크톱 레이아웃 두 곳에 동시 마운트되므로 배지도 2개.
+    const badges = screen.getAllByRole('button', { name: '가을 리그 리그 상세로 이동' });
+    expect(badges).toHaveLength(2);
+    badges.forEach((badge) => expect(badge).toHaveTextContent('가을 리그'));
   });
 
-  it('리그 소속이 아니면 상세에 리그 링크가 없다', () => {
+  it('리그 소속이 아니면 상세에 리그 배지가 없다', () => {
     const model = getTeamMatchDetailViewModel();
     model.match.league = null;
 
     const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
 
     expect(container.querySelector('a[href^="/league-matches/"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: /리그 상세로 이동/ })).not.toBeInTheDocument();
+  });
+
+  // R3 후속(2026-08-20, 오케스트레이터 지적): hostTeamCard 전체가 이미 팀 상세로 가는
+  // Link인데 그 안의 리그 배지도 Link였다 -- 실제 중첩 <a>. 목록 카드(TeamMatchCard)와
+  // 동일한 button 패턴으로 고쳤고, 이 두 테스트가 그 계약을 지킨다.
+  it('상세 카드의 리그 배지는 중첩 <a> 없이 button으로 렌더되고, 카드 자체 href는 팀 경로로 유지된다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match.league = { leagueId: 'lg-1', title: '가을 리그' };
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    // hostTeamCard 자체 링크는 여전히 팀 상세를 가리킨다(fixture에 hostTeamHref가 없어 기본값 /teams).
+    expect(container.querySelector('a[href="/teams"]')).not.toBeNull();
+    // 리그 배지는 <a>가 아니어야 한다 -- 중첩 <a>면 이 셀렉터가 걸린다.
+    expect(container.querySelector('a[href="/league-matches/lg-1"]')).toBeNull();
+    expect(screen.getAllByRole('button', { name: '가을 리그 리그 상세로 이동' })).toHaveLength(2);
+  });
+
+  it('상세 카드의 리그 배지를 클릭하면 카드 자체 이동 없이 리그 상세로만 한 번 이동한다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match.league = { leagueId: 'lg-1', title: '가을 리그' };
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+    const [badge] = screen.getAllByRole('button', { name: '가을 리그 리그 상세로 이동' });
+    fireEvent.click(badge);
+
+    // stopPropagation이 실패해 hostTeamCard 링크까지 같이 눌렸다면 팀 경로로도 push가
+    // 호출되거나 push가 두 번 호출된다 -- 정확히 리그 경로 한 번만 확인한다.
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith('/league-matches/lg-1');
   });
 });

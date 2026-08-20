@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { CreateLeagueMatchDto, GenerateLeagueFixturesDto, UpdateLeagueFixtureDto } from './dto/league-match.dto';
+import { CreateLeagueMatchDto, GenerateLeagueFixturesDto, RevertLeagueCompletionDto, UpdateLeagueFixtureDto } from './dto/league-match.dto';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 
 // ParseUUIDPipe 기본 예외는 code 없는 영어 메시지라 AllExceptionsFilter 가 INTERNAL_ERROR 로
@@ -53,5 +53,16 @@ export class LeagueMatchAdminController {
     @Body() dto: UpdateLeagueFixtureDto,
   ) {
     return this.service.updateFixture(user, leagueId, teamMatchId, dto);
+  }
+
+  // R6: 전 대진 확정 시 자동으로 completed 전이한 리그를, 결과 정정 등을 위해
+  // 운영자가 다시 active로 되돌리는 액션. idempotent — 이미 active면 alreadyProcessed: true.
+  @Patch(':leagueId/revert-completion')
+  revertCompletion(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: RevertLeagueCompletionDto,
+  ) {
+    return this.service.revertCompletion(user, leagueId, dto);
   }
 }

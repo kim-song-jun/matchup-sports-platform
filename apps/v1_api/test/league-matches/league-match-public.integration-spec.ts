@@ -127,6 +127,187 @@ describe('GET /league-matches/:leagueId/standings', () => {
     expect(confirmedRes.body.data.standings[0]).toMatchObject({ teamId: homeTeamId, points: 3, position: 1 });
     expect(confirmedRes.body.data.standings[1]).toMatchObject({ teamId: awayTeamId, points: 0, position: 2 });
   });
+
+  it('취소된 대진은 공식 결과 fact가 있어도 순위·pendingFixtures 어디에도 반영되지 않는다 (R8)', async () => {
+    const teamA = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `pub-cancel-team-a-${suiteId}` } });
+    const teamB = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `pub-cancel-team-b-${suiteId}` } });
+
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '취소 반영 테스트 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        teamIds: [teamA.id, teamB.id],
+      });
+    const leagueId = createRes.body.data.leagueId;
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 1 });
+    const teamMatchId = fixturesRes.body.data.teamMatchIds[0];
+
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId } });
+    const teamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId } });
+    const homeTeamId = teamMatch.hostTeamId;
+    const awayTeamId = teamMatch.approvedApplicantTeamId!;
+    const officialAt = new Date('2026-08-12T12:00:00.000Z');
+    const score = { home: 5, away: 0 };
+    const revision = await prisma.v1GameResultRevision.create({
+      data: {
+        gameId: game.id,
+        revision: 1,
+        state: 'OFFICIAL',
+        score,
+        eventsHash: `t4-cancel-hash-${suiteId}`,
+        createdByActorType: 'SYSTEM',
+        createdBySystemActor: 'T4_SERIES_CANCEL_TEST',
+        submittedAt: officialAt,
+        officialAt,
+      },
+    });
+    await prisma.v1Game.update({ where: { id: game.id }, data: { currentOfficialRevisionId: revision.id } });
+    await prisma.v1GameOfficialFact.create({
+      data: {
+        revisionId: revision.id,
+        gameId: game.id,
+        revision: 1,
+        sourceType: 'TEAM_MATCH',
+        homeTeamId,
+        awayTeamId,
+        homeScore: score.home,
+        awayScore: score.away,
+        score,
+        eventsHash: `t4-cancel-hash-${suiteId}`,
+        officialAt,
+      },
+    });
+
+    // 공식 결과가 이미 존재하는 상태에서 어드민이 사후에 취소한다(오심·오입력 정정 시나리오).
+    await prisma.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: 'cancelled', cancelledAt: new Date() } });
+
+    const res = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/standings`);
+    expect(res.status).toBe(200);
+    // 두 팀 모두 played=0 -- 취소된 경기는 순위 계산에 전혀 반영되지 않는다(R8 이전에는
+    // fact가 있으므로 confirmed로 남아 played=1이 됐을 것이다).
+    expect(res.body.data.standings.every((row: { played: number }) => row.played === 0)).toBe(true);
+    // "예정 경기"로도 남지 않는다.
+    expect(res.body.data.pendingFixtures).toEqual([]);
+  });
+});
+
+const detailOwnerUserId = `t4-league-detail-owner-${suiteId}`;
+
+describe('GET /league-matches/:leagueId (detail, R1)', () => {
+  let app: INestApplication;
+  let cleanup: (() => Promise<void>) | undefined;
+  let prisma: PrismaService;
+  let sportId: string;
+  let regionId: string;
+
+  beforeAll(async () => {
+    ({ app, cleanup } = await createV1IntegrationApp());
+    prisma = app.get(PrismaService);
+    await prisma.v1User.create({
+      data: {
+        id: detailOwnerUserId,
+        email: `${detailOwnerUserId}@integration.test`,
+        onboardingStatus: 'completed',
+        phoneVerifiedAt: new Date('2026-08-01T00:00:00.000Z'),
+        accountStatus: 'active',
+      },
+    });
+    const termsService = app.get(ManagedTermsRuntimeService);
+    const signupTerms = await termsService.currentSignupTerms();
+    await termsService.acceptSignupTerms(
+      detailOwnerUserId,
+      signupTerms.items.filter((item) => item.requirement === 'required').map((item) => item.documentId),
+    );
+    await prisma.v1AdminUser.create({ data: { userId: detailOwnerUserId, adminRole: 'owner' } });
+    const sport = await prisma.v1Sport.upsert({
+      where: { code: 'futsal' },
+      update: {},
+      create: { code: 'futsal', name: '풋살' },
+    });
+    sportId = sport.id;
+    const region = await prisma.v1Region.create({
+      data: { code: `t4-league-detail-region-${suiteId}`, name: 'T4 리그 상세 테스트 지역', level: 2 },
+    });
+    regionId = region.id;
+  });
+
+  afterAll(async () => cleanup?.());
+
+  it('fixtures[]는 확정된 대진에 homeScore/awayScore를 채우고, 미확정 대진은 null로 내려준다', async () => {
+    const teamA = await prisma.v1Team.create({ data: { ownerUserId: detailOwnerUserId, sportId, regionId, name: `detail-team-a-${suiteId}` } });
+    const teamB = await prisma.v1Team.create({ data: { ownerUserId: detailOwnerUserId, sportId, regionId, name: `detail-team-b-${suiteId}` } });
+
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', detailOwnerUserId)
+      .send({
+        title: '상세 스코어 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+        teamIds: [teamA.id, teamB.id],
+      });
+    const leagueId = createRes.body.data.leagueId;
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', detailOwnerUserId)
+      .send({ weeksCount: 2 });
+    const [fixture1Id, fixture2Id] = fixturesRes.body.data.teamMatchIds;
+
+    // fixture1만 공식 결과를 확정한다. fixture2는 미확정 상태로 남긴다.
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: fixture1Id } });
+    const teamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: fixture1Id } });
+    const homeTeamId = teamMatch.hostTeamId;
+    const awayTeamId = teamMatch.approvedApplicantTeamId!;
+    const officialAt = new Date('2026-08-10T12:00:00.000Z');
+    const score = { home: 4, away: 2 };
+    const revision = await prisma.v1GameResultRevision.create({
+      data: {
+        gameId: game.id,
+        revision: 1,
+        state: 'OFFICIAL',
+        score,
+        eventsHash: `t4-detail-hash-${suiteId}`,
+        createdByActorType: 'SYSTEM',
+        createdBySystemActor: 'T4_LEAGUE_DETAIL_TEST',
+        submittedAt: officialAt,
+        officialAt,
+      },
+    });
+    await prisma.v1Game.update({ where: { id: game.id }, data: { currentOfficialRevisionId: revision.id } });
+    await prisma.v1GameOfficialFact.create({
+      data: {
+        revisionId: revision.id,
+        gameId: game.id,
+        revision: 1,
+        sourceType: 'TEAM_MATCH',
+        homeTeamId,
+        awayTeamId,
+        homeScore: score.home,
+        awayScore: score.away,
+        score,
+        eventsHash: `t4-detail-hash-${suiteId}`,
+        officialAt,
+      },
+    });
+
+    const res = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}`);
+    expect(res.status).toBe(200);
+    const fixtures: Array<{ teamMatchId: string; homeScore: number | null; awayScore: number | null }> = res.body.data.fixtures;
+    const fixture1 = fixtures.find((f) => f.teamMatchId === fixture1Id);
+    const fixture2 = fixtures.find((f) => f.teamMatchId === fixture2Id);
+    expect(fixture1).toMatchObject({ homeScore: score.home, awayScore: score.away });
+    expect(fixture2).toMatchObject({ homeScore: null, awayScore: null });
+  });
 });
 
 const recordsOwnerUserId = `t4-league-records-owner-${suiteId}`;

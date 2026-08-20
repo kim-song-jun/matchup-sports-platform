@@ -632,3 +632,50 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     expect(screen.getAllByRole('link', { name: /받은 후기/ })[0]).toHaveTextContent('아직 받은 후기가 없어요');
   });
 });
+
+/**
+ * "내 리그" (R4, 2026-08-20) — 리그 상세로 가는 인앱 진입점이 team-matches 상세 화면의
+ * 배지 하나뿐이었어서(team-matches-page.tsx 참고) 팀장·선수가 자기 팀의 리그를 발견할
+ * 방법이 사실상 없었다. 팀 상세에 이 팀이 속한 리그 목록을 보여준다.
+ */
+describe('TeamDetailPageView — 내 리그 섹션', () => {
+  function modelWithLeagues(
+    myLeagues: TeamDetailViewModel['myLeagues'],
+    myLeaguesLoading = false,
+  ): TeamDetailViewModel {
+    return { ...getTeamDetailViewModel('default'), myLeagues, myLeaguesLoading };
+  }
+
+  it('소속 리그가 있으면 리그별로 리그 상세 링크를 보여준다', () => {
+    render(
+      <TeamDetailPageView
+        model={modelWithLeagues([
+          { leagueId: 'lg-1', title: '가을 리그' },
+          { leagueId: 'lg-2', title: '겨울 리그' },
+        ])}
+      />,
+    );
+
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    // 모바일·데스크톱 두 레이아웃이 동시에 마운트되므로 리그당 2개씩 나온다.
+    const autumnLinks = screen.getAllByRole('link', { name: /가을 리그/ });
+    expect(autumnLinks).toHaveLength(2);
+    autumnLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-1'));
+    const winterLinks = screen.getAllByRole('link', { name: /겨울 리그/ });
+    expect(winterLinks).toHaveLength(2);
+    winterLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-2'));
+  });
+
+  it('소속 리그가 없으면 "내 리그" 섹션 자체를 렌더하지 않는다 — 빈 섹션 노출 금지', () => {
+    render(<TeamDetailPageView model={modelWithLeagues([])} />);
+
+    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
+  });
+
+  it('아직 로딩 중이면(빈 배열이어도) 섹션 제목과 스켈레톤을 보여준다', () => {
+    render(<TeamDetailPageView model={modelWithLeagues([], true)} />);
+
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('내 리그 불러오는 중').length).toBeGreaterThan(0);
+  });
+});

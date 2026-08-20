@@ -14,8 +14,25 @@ export class LeagueMatchPublicService {
     const fixtures = await this.prisma.v1TeamMatch.findMany({
       where: { leagueId },
       orderBy: { startAt: 'asc' },
-      select: { id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, startAt: true, placeName: true, status: true },
+      select: {
+        id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true, startAt: true, placeName: true, status: true,
+        game: { select: { id: true, currentOfficialRevisionId: true } },
+      },
     });
+
+    // standings()와 동일한 패턴: 확정 리비전 id를 모아 v1_game_official_fact를
+    // 단일 IN 조회로 가져온다(대진 수만큼 반복 조회하는 N+1을 만들지 않는다).
+    const currentRevisionIds = fixtures
+      .map((fixture) => fixture.game?.currentOfficialRevisionId ?? null)
+      .filter((id): id is string => id !== null);
+    const facts = currentRevisionIds.length === 0
+      ? []
+      : await this.prisma.v1GameOfficialFact.findMany({
+          where: { revisionId: { in: currentRevisionIds } },
+          select: { gameId: true, homeScore: true, awayScore: true },
+        });
+    const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
+
     return {
       leagueId: league.id,
       title: league.title,
@@ -29,15 +46,22 @@ export class LeagueMatchPublicService {
       tierLabel: league.tier === null ? null : `${league.tier}부`,
       seasonNo: league.seasonNo,
       teamIds: league.teams.map((entry) => entry.teamId),
-      fixtures: fixtures.map((fixture) => ({
-        teamMatchId: fixture.id,
-        title: fixture.title,
-        homeTeamId: fixture.hostTeamId,
-        awayTeamId: fixture.approvedApplicantTeamId,
-        startAt: fixture.startAt,
-        placeName: fixture.placeName,
-        status: fixture.status,
-      })),
+      fixtures: fixtures.map((fixture) => {
+        const fact = fixture.game === null ? undefined : factByGameId.get(fixture.game.id);
+        return {
+          teamMatchId: fixture.id,
+          title: fixture.title,
+          homeTeamId: fixture.hostTeamId,
+          awayTeamId: fixture.approvedApplicantTeamId,
+          startAt: fixture.startAt,
+          placeName: fixture.placeName,
+          status: fixture.status,
+          // 공식 결과가 아직 없으면(미확정 대진) null -- 0:0으로 오인되지 않게 명시적으로
+          // nullable을 유지한다.
+          homeScore: fact?.homeScore ?? null,
+          awayScore: fact?.awayScore ?? null,
+        };
+      }),
     };
   }
 
@@ -70,11 +94,19 @@ export class LeagueMatchPublicService {
     const confirmedFixtures: Array<{ homeTeamId: string; awayTeamId: string; homeScore: number; awayScore: number }> = [];
     const pendingFixtures: Array<{ teamMatchId: string; homeTeamId: string; awayTeamId: string | null; startAt: Date }> = [];
     for (const tm of teamMatches) {
+      // [정책 변경 이력 — R8] 이 분기는 원래 "공식 결과 fact가 있으면 팀매치 status와
+      // 무관하게 confirmed로 남긴다"는 의도된 동작이었다(이미 열린 경기의 결과는
+      // 취소돼도 기록으로 남겨야 한다는 전제). 하지만 어드민은 팀매치를 자유롭게
+      // cancelled로 바꿀 수 있어서, 오심·오입력 정정으로 취소된 경기가 여전히
+      // 순위에 반영되는 상태가 만들어질 수 있었다 -- 취소한 경기가 순위표에 그대로
+      // 남는 쪽이(정정이 반영되지 않는 것처럼 보임) 순위표 신뢰도를 해치는 더 큰
+      // 운영 리스크이므로, cancelled는 fact 존재 여부와 무관하게 confirmed·pending
+      // 양쪽에서 전부 제외하도록 뒤집는다. 취소된 대진은 앞으로도 치러지지 않으므로
+      // "예정 경기"로도 영구 집계되지 않는다.
+      if (tm.status === 'cancelled') continue;
+
       const fact = tm.game === null ? undefined : factByGameId.get(tm.game.id);
       if (fact === undefined || tm.approvedApplicantTeamId === null) {
-        // 취소된 대진은 앞으로 치러지지 않으므로 "예정 경기"로 영구 집계되지 않게 제외한다.
-        // 공식 결과 fact가 이미 있는 경기는 이 분기에 들어오지 않아 status와 무관하게 confirmed로 남는다.
-        if (tm.status === 'cancelled') continue;
         pendingFixtures.push({ teamMatchId: tm.id, homeTeamId: tm.hostTeamId, awayTeamId: tm.approvedApplicantTeamId, startAt: tm.startAt });
         continue;
       }

@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
+import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { useTournamentEndedFixtures, type TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
 import { FixturePickerList } from '@/components/tournament-result-review/fixture-picker-list';
@@ -56,7 +57,8 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
   );
 
   const selectedItem = needsReview.find((item) => item.fixtureId === selectedFixtureId) ?? null;
-  const correctionsHref = `/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/records/corrections`;
+  const liveBase = resolveTournamentLiveBase(usePathname(), tournamentId);
+  const correctionsHref = `${liveBase}/records/corrections`;
 
   // T6-1: 딥링크로 들어왔는데 목록이 로드된 뒤에도 해당 fixture가 없으면(아직
   // 종료 전이거나 이미 처리됨) 조용히 미선택 상태로 두지 않고 안내한다.
@@ -126,7 +128,7 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
                   : '아직 종료된 경기가 없어요. 운영 보드에서 경기 진행 상황을 확인할 수 있어요.'
               }
               emptyCta="운영 보드로 가기"
-              onEmptyCta={() => router.push(`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/operations`)}
+              onEmptyCta={() => router.push(`${liveBase}/operations`)}
             />
 
             {selectedItem && selectedItem.gameId ? (

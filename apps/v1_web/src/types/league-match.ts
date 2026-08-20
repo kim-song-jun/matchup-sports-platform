@@ -133,3 +133,22 @@ export interface V1LeaguePlayerRecordsResponse {
   goals: V1LeaguePlayerRecordRow[];
   assists: V1LeaguePlayerRecordRow[];
 }
+
+// R11(C-6): 몰수패·부전승 결과 입력. 스코어는 서버가 고정 컨벤션(승 1 : 몰수팀 0)으로
+// 계산하므로 요청에는 어느 팀이 불참했는지와 사유만 싣는다.
+export interface V1RecordLeagueForfeitPayload {
+  noShowTeamId: string;
+  reason: string;
+}
+
+export interface V1RecordLeagueForfeitResult {
+  teamMatchId: string;
+  leagueId: string;
+  noShowTeamId: string;
+  winningTeamId: string;
+  homeScore: number;
+  awayScore: number;
+  resultRevisionId: string;
+  /** true면 이미 같은 몰수 처리가 확정돼 있던 요청 재시도(중복 클릭)였다는 뜻. */
+  alreadyProcessed: boolean;
+}

@@ -9,7 +9,7 @@
 ## Reported gaps
 
 - [x] 실시간 골·카드·파울 기록을 잘못 입력한 뒤 수정할 수 있다.
-- [x] 자책골을 별도 유형으로 기록하고, 상대 팀 점수에는 반영하되 개인 득점에는 합산하지 않는다.
+- [x] 자책골을 별도 유형으로 기록하고, 상대 팀 점수에는 반영하되 개인 득점에는 합산하지 않는다. 공개 경기 기록에서는 행위 선수를 실제 소속팀 영역에 표시한다.
 - [x] 승부차기 선축 HOME/AWAY를 운영 콘솔에서 선택할 수 있다.
 - [x] 장시간 열린 운영 화면은 takeover token 만료를 자동 갱신하고 재동기화한다.
 - [x] 결과 정정의 선수별 합계가 공식화 후 개인·대회 통계에 반영된다.
@@ -37,6 +37,7 @@
 - 자책골은 득점 팀(side)과 행위 선수(participant)의 소속 팀이 반대다. 이벤트 타입을 `OWN_GOAL`로 분리하고 이 예외만 명시적으로 허용한다.
 - 정정 타임라인은 원본 이벤트를 즉시 변경하지 않는다. 리비전 스냅샷으로 저장해 OFFICIAL pointer 전환 시에만 공개 projection이 바뀌게 한다.
 - 2026-08-19 구현 완료: OWN_GOAL, 라이브 reverse/re-entry, goalEvents 리비전 스냅샷, 점수·개인 득점 서버 정합성 검증, 승부차기 정정, 공개 올림 분 표시를 반영했다.
+- 2026-08-20 자책골 표시 계약 보완: 득점 귀속 side는 점수 계산에만 사용하고, 일정·상세·팀 전적의 이벤트 행은 자책골 선수 소속팀 영역에 표시한다. 대회 득점자 집계에서도 자책골을 제외한다.
 - 2026-08-19 자동 검증: API target suite 103/103 + 신규 정합성 suite, Web target suite 124/124 + 신규 UI 회귀.
 - 2026-08-19 최종 검증: API 결과 정정/승부차기 통합 테스트 20/20 통과. headed Chromium에서 데스크톱 1440×900, 모바일 390×844 정정 모달과 LIVE 운영 콘솔을 캡처했으며 console/network 오류와 가로 넘침은 0건이었다.
 - Screenshot evidence: `output/playwright/task150/desktop-result-edit-modal.png`, `output/playwright/task150/mobile-result-edit-modal.png`, `output/playwright/task150/desktop-operate-console-live-events.png`.

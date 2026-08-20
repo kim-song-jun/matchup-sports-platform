@@ -907,7 +907,7 @@ describe('TournamentBracketService', () => {
         homeRegistration: { team: { name: '서울 FC' } },
         awayRegistration: { team: { name: '부산 SC' } },
         game: gameOfficialResultRow({
-          participants: [{ id: 'participant-1', displayNameSnapshot: '김선수' }],
+          participants: [{ id: 'participant-1', sideId: 'side-home', displayNameSnapshot: '김선수' }],
           // event-goal-1 은 나중에 event-correction-1(reversesEventId로 되돌림)에 의해
           // 취소됐다 -- type: 'GOAL' 필터만으로는 CORRECTION 자체가 GOAL이 아니라서 걸러지지
           // 않는다(이 저장소에서 이미 한 번 샌 버그와 동일한 함정). event-goal-2는 유효.

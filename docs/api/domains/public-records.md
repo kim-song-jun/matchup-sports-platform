@@ -283,7 +283,10 @@ active GOAL and OWN_GOAL events.
 
 Public record time uses a ceiling minute without seconds. An event captured at
 2:04 is displayed as 3′. Own goals count toward the credited team score and
-are labelled separately, but never count as the culprit's personal goal.
+are labelled separately, but never count as the culprit's personal goal or
+the tournament scorer ranking. Schedule, match-detail, and team-record event
+rows place the own-goal participant under the participant's actual team, not
+under the team credited with the score.
 
 ### Participant identity linkage and personal records (2026-08-20)
 

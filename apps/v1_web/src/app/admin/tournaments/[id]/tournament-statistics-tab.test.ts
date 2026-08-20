@@ -113,6 +113,28 @@ describe('buildTournamentStatistics', () => {
     ]);
   });
 
+  it('keeps own goals in the match score but excludes them from the scorer ranking', () => {
+    const ownGoal = {
+      ...goal('own-goal-1', 'away', 'participant-away', 'Own Goal Player'),
+      ownGoal: true,
+    };
+    const result = buildTournamentStatistics([
+      fixture({
+        id: 'fx-own-goal',
+        homeId: 'home',
+        homeName: 'Home FC',
+        awayId: 'away',
+        awayName: 'Away FC',
+        homeScore: 1,
+        awayScore: 0,
+        goals: [ownGoal],
+      }),
+    ]);
+
+    expect(result.scorers).toEqual([]);
+    expect(result.mostScored[0]).toMatchObject({ teamName: 'Home FC', goalsFor: 1 });
+  });
+
   it('keeps players with the same name on different teams separate', () => {
     const result = buildTournamentStatistics([
       fixture({

@@ -11,6 +11,7 @@ import {
   isMinuteUnknown,
   isPeriodUnknown,
   parseTournamentFixtureRevisionGoals,
+  resolveGoalDisplaySideId,
 } from '../../tournaments/tournament-fixture-official-result';
 import {
   TournamentStaffAccessService,
@@ -687,7 +688,7 @@ export class PublicTournamentRecordsService {
   private async buildEvents(
     gameId: string | null,
     sides: readonly { id: string; sideKey: 'HOME' | 'AWAY' }[],
-    participants: readonly { id: string; userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null }[],
+    participants: readonly { id: string; sideId: string; userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null }[],
     officialGoalEvents: Prisma.JsonValue | null,
     consentMap: Map<string, ParticipantConsentEligibility>,
     nameProfileByUserId: ReadonlyMap<string, ParticipantNameProfileRow>,
@@ -718,6 +719,9 @@ export class PublicTournamentRecordsService {
     const scoringTypes: ReadonlySet<V1GameEventType> = new Set(['GOAL', 'OWN_GOAL', 'CARD']);
     const revisionGoals = parseTournamentFixtureRevisionGoals(officialGoalEvents);
     const participantById = new Map(participants.map((participant) => [participant.id, participant] as const));
+    const participantSideIdById = new Map(
+      participants.map((participant) => [participant.id, participant.sideId] as const),
+    );
     // 홈/원정 매핑을 이 자리에서 서버가 직접 해준다 -- `sideId` 는 클라이언트에서
     // 재구성할 수 없는 내부 id 라서, 라인업(lineup)이 아직 공개되지 않은 경기라도
     // (아래 참고: 이름/등번호가 라인업 게이트와 독립인 것과 같은 이유로) 타임라인을
@@ -744,6 +748,12 @@ export class PublicTournamentRecordsService {
         // 골/카드 이벤트는 경기가 시작된 뒤에만 발생하므로 득점자를 보여주는 것이 선발
         // 명단을 미리 흘리는 것이 아니다.
         const participant = event.participantId === null ? undefined : participantById.get(event.participantId);
+        const displaySideId = resolveGoalDisplaySideId(
+          event.sideId ?? '',
+          event.participantId,
+          event.type === 'OWN_GOAL',
+          participantSideIdById,
+        );
         return {
           type: event.type,
           cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
@@ -751,7 +761,7 @@ export class PublicTournamentRecordsService {
           // `sideId`는 스키마상 nullable(`String?`)이지만 GOAL/CARD 이벤트는 게임
           // 로직상 항상 한쪽 사이드에 귀속되므로 실질적으로는 null이 되지 않는다 --
           // 그래도 타입 안전을 위해 null이면 'away'로 접지(fail-safe)한다.
-          side: sideKeyById.get(event.sideId ?? '') === 'HOME' ? ('home' as const) : ('away' as const),
+          side: sideKeyById.get(displaySideId) === 'HOME' ? ('home' as const) : ('away' as const),
           participantId: eligible ? event.participantId : null,
           participantName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
           jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
@@ -774,11 +784,17 @@ export class PublicTournamentRecordsService {
       const eligible = resolveParticipantNameEligible(isStaffBypass, consent);
       const participant =
         event.participantId === null ? undefined : participantById.get(event.participantId);
+      const displaySideId = resolveGoalDisplaySideId(
+        event.sideId,
+        event.participantId,
+        event.ownGoal,
+        participantSideIdById,
+      );
       return {
         type: event.ownGoal ? ('OWN_GOAL' as const) : ('GOAL' as const),
         cardColor: null,
         sideId: event.sideId,
-        side: sideKeyById.get(event.sideId) === 'HOME' ? ('home' as const) : ('away' as const),
+        side: sideKeyById.get(displaySideId) === 'HOME' ? ('home' as const) : ('away' as const),
         participantId: eligible ? event.participantId : null,
         participantName: eligible
           ? resolveParticipantDisplayName(participant, nameProfileByUserId)
@@ -843,6 +859,9 @@ export class PublicTournamentRecordsService {
     const result = new Map<string, ScheduleEventRow[]>();
     for (const fixture of fixturesWithGame) {
       const sideKeyById = new Map(fixture.game.sides.map((side) => [side.id, side.sideKey] as const));
+      const participantSideIdById = new Map(
+        fixture.game.participants.map((participant) => [participant.id, participant.sideId] as const),
+      );
       const revisionGoals =
         fixture.game.currentOfficialRevision?.state === 'OFFICIAL'
           ? parseTournamentFixtureRevisionGoals(fixture.game.currentOfficialRevision.goalEvents)
@@ -860,7 +879,14 @@ export class PublicTournamentRecordsService {
         // 색을 모르는 과거 payload 면 null 이고, 그때 프론트는 색 대신 중립 카드로 그린다.
         cardColor: event.type === 'CARD' ? parseCardColor(event.payload) : null,
         // sideId nullable 방어(위 buildEvents와 동일한 fail-safe 규칙).
-        side: (sideKeyById.get(event.sideId ?? '') === 'HOME' ? 'home' : 'away') as 'home' | 'away',
+        side: (sideKeyById.get(
+          resolveGoalDisplaySideId(
+            event.sideId ?? '',
+            event.participantId,
+            event.type === 'OWN_GOAL',
+            participantSideIdById,
+          ),
+        ) === 'HOME' ? 'home' : 'away') as 'home' | 'away',
         participantId: event.participantId,
         // buildEvents와 동일한 규칙 -- 백필 복원 골은 전/후반을 모른다.
         period: isPeriodUnknown(event.payload) ? null : event.period,
@@ -872,7 +898,17 @@ export class PublicTournamentRecordsService {
           ...revisionGoals.map((event) => ({
             type: event.ownGoal ? ('OWN_GOAL' as const) : ('GOAL' as const),
             cardColor: null,
-            side: sideKeyById.get(event.sideId) === 'HOME' ? ('home' as const) : ('away' as const),
+            side:
+              sideKeyById.get(
+                resolveGoalDisplaySideId(
+                  event.sideId,
+                  event.participantId,
+                  event.ownGoal,
+                  participantSideIdById,
+                ),
+              ) === 'HOME'
+                ? ('home' as const)
+                : ('away' as const),
             participantId: event.participantId,
             period: event.period,
             clockMs: event.minute === null ? null : event.minute * 60000,

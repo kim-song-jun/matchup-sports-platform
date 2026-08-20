@@ -66,6 +66,8 @@ export function buildTournamentStatistics(
     }
 
     for (const goal of fixture.result.goals) {
+      // 자책골은 경기 점수와 이벤트 타임라인에만 남고 개인 득점 순위에는 포함하지 않는다.
+      if (goal.ownGoal) continue;
       const registrationId = goal.team === 'home'
         ? fixture.homeRegistrationId
         : fixture.awayRegistrationId;

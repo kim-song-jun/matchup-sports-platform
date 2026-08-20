@@ -273,6 +273,17 @@ identity/side itself:
   these two teams next appears" lookup, not a bracket-aware "next round"
   projection.
 
+### Personal record outcome -- shootouts (2026-08-20)
+
+`GET /users/:id/records` decides each row's `result` with the same
+`resolveTeamRecordResult` helper the team-record projection uses: regulation
+goals first, and only when regulation is tied does a decisive official
+penalty score turn the row into WON or LOST. Before this, a personal record
+row for a final that finished 1:1 with a 3:2 shootout was reported as DRAWN
+while the same match showed WON/LOST in team records. `goals` and the
+scoreline stay regulation-only -- shootout kicks are never added to a
+player's goal count.
+
 ### Official goal timeline and minute display (2026-08-19)
 
 When an official result exists, schedules, match detail, and team records

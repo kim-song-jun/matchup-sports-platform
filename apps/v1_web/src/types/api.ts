@@ -1880,11 +1880,13 @@ export type V1PublicProfile = {
   activitySummary: {
     totals: {
       matchCount: number;
+      tournamentCount: number;
       teamCount: number;
       reviewCount: number;
     };
     monthly: {
       matchCount: number;
+      tournamentCount: number;
       teamJoinCount: number;
       reviewCount: number;
     };

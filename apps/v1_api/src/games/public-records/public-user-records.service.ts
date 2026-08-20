@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { resolveTeamRecordResult } from '../../game-operations/team-record-result';
+import { parseTournamentFixtureOfficialScore } from '../../tournaments/tournament-fixture-official-result';
 import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, isAfterCursor, type RecordCursor } from './public-cursor';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from './public-consent';
@@ -22,7 +24,12 @@ interface EligibleResultRow {
   readonly goalkeeper: boolean;
   readonly officialAt: Date;
   readonly isMvp: boolean;
-  readonly score: { home: number; away: number } | null;
+  /**
+   * 정규시간 스코어 + (승부차기까지 간 경기만) 페널티 스코어. 페널티는 `goals`/득실에
+   * 절대 합산하지 않고 오직 승패 판정(`result`)에만 쓴다 -- 팀 전적(`v1_team_record_facts`)
+   * 과 같은 계약이다.
+   */
+  readonly score: { home: number; away: number; penalties?: { home: number; away: number } } | null;
 }
 
 /**
@@ -308,9 +315,18 @@ export class PublicUserRecordsService {
 
       let result: 'WON' | 'LOST' | 'DRAWN' | null = null;
       if (row.score !== null && ownSide !== null) {
-        const own = ownSide.sideKey === 'HOME' ? row.score.home : row.score.away;
-        const opponent = ownSide.sideKey === 'HOME' ? row.score.away : row.score.home;
-        result = own > opponent ? 'WON' : own < opponent ? 'LOST' : 'DRAWN';
+        const isHome = ownSide.sideKey === 'HOME';
+        const own = isHome ? row.score.home : row.score.away;
+        const opponent = isHome ? row.score.away : row.score.home;
+        // 정규시간이 동점이고 승부차기로 결판난 경기를 개인 전적에서만 '무'로 보여주던
+        // 버그를 막는다 -- 팀 전적(GameResultOfficialFactsService)이 쓰는 것과 **같은**
+        // 판정 함수를 그대로 호출한다(같은 문장을 두 곳에 따로 적으면 반드시 갈린다).
+        result = resolveTeamRecordResult(
+          own,
+          opponent,
+          isHome ? row.score.penalties?.home : row.score.penalties?.away,
+          isHome ? row.score.penalties?.away : row.score.penalties?.home,
+        );
       }
 
       return {
@@ -356,17 +372,27 @@ function parseCards(value: Prisma.JsonValue): { yellow: number; red: number } {
   return { yellow: 0, red: 0 };
 }
 
-function parseScore(value: Prisma.JsonValue): { home: number; away: number } | null {
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof (value as { home?: unknown }).home === 'number' &&
-    typeof (value as { away?: unknown }).away === 'number'
-  ) {
-    return { home: (value as { home: number }).home, away: (value as { away: number }).away };
-  }
-  return null;
+/**
+ * `v1_game_result_revisions.score`는 두 형태가 공존한다 -- 평평한
+ * `{ home, away, penalties? }`와 레거시 백필이 남긴 중첩
+ * `{ regulation, penalty? }`. 여기서 따로 파서를 두면 팀 전적
+ * (`public-team-records.service.ts`)·대회 화면과 또 갈라지므로, 이미 두 형태를
+ * 함께 읽도록 검증된 단일 파서를 그대로 재사용한다.
+ */
+function parseScore(
+  value: Prisma.JsonValue,
+): { home: number; away: number; penalties?: { home: number; away: number } } | null {
+  const score = parseTournamentFixtureOfficialScore(value);
+  if (score === null) return null;
+  const penalties =
+    score.homePenaltyScore === null || score.awayPenaltyScore === null
+      ? undefined
+      : { home: score.homePenaltyScore, away: score.awayPenaltyScore };
+  return {
+    home: score.homeScore,
+    away: score.awayScore,
+    ...(penalties === undefined ? {} : { penalties }),
+  };
 }
 
 function seasonBounds(season: string | undefined): { readonly gte: Date; readonly lt: Date } | null {

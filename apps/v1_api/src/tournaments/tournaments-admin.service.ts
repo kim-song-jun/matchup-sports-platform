@@ -636,17 +636,30 @@ export class TournamentsAdminService {
       where: {
         tournamentId,
         status: 'confirmed',
+        // 확정된 참가 팀의 **활성 멤버 전원**에게 보낸다.
+        //
+        // ⚠️ 이 수신자 집합은 **대회 후기 작성 권한보다 넓다**(2026-08-20 확인).
+        // `TournamentReviewsService.eligibleTeamWhere` 는 여전히
+        // `role: { in: ['owner', 'manager'] }` 로 제한하므로, 일반 팀원은 알림을 받지만
+        // 아직 대회 후기를 쓸 수는 없다. 이는 **의도된 현재 상태**다 — 팀원이 대회가
+        // 끝났다는 사실과 후기 요청을 알게 하고, 권한 확대는 별도로 판단한다.
+        //
+        // (#554 가 넓힌 것은 **상대 팀 후기**이고 대회 후기가 아니다. 이 주석의 이전
+        //  버전이 그 둘을 근거로 뒤섞고 있었다.)
+        //
+        // 권한을 넓히기로 하면 고칠 곳은 `eligibleTeamWhere` 한 곳이고, 그때 이 주석의
+        // 경고도 함께 지워야 한다.
         team: {
           status: 'active',
           deletedAt: null,
-          memberships: { some: { status: 'active', role: { in: ['owner', 'manager'] } } },
+          memberships: { some: { status: 'active' } },
         },
       },
       select: {
         team: {
           select: {
             memberships: {
-              where: { status: 'active', role: { in: ['owner', 'manager'] } },
+              where: { status: 'active' },
               select: { userId: true },
             },
           },

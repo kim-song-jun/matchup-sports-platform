@@ -107,6 +107,8 @@ type ScheduleEventItem = {
   side: 'home' | 'away';
   icon: string;
   label: string;
+  /** 눈에 보이는 표식(자책골 등). `eventPresentation` 이 필요한 이벤트에만 채운다. */
+  badge?: string;
   participantName: string | null;
   period: number | null;
   clockMs: number | null;
@@ -211,6 +213,26 @@ function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
       <div style={{ textAlign: 'center', lineHeight: 1 }}>
         <span aria-hidden="true">{item.icon}</span>
         <span className="sr-only">{item.label}</span>
+        {item.badge ? (
+          /* 자책골처럼 아이콘만으로 뜻이 갈리지 않는 이벤트에 붙는 **보이는** 표식.
+             `sr-only` 라벨만으로는 화면에서 일반 골과 구분되지 않는다(2026-08-19 alpha 실측:
+             관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
+          <span
+            style={{
+              fontSize: 10,
+              lineHeight: 1.4,
+              padding: '0 4px',
+              borderRadius: 4,
+              fontWeight: 700,
+              // 실제 팔레트 토큰을 쓴다 — `--danger-*` 는 이 코드베이스에 없어서
+              // 하드코딩 fallback 이 항상 적용되고 있었다(다크모드도 따라오지 않는다).
+              color: 'var(--red700)',
+              background: 'var(--tint-red)',
+            }}
+          >
+            {item.badge}
+          </span>
+        ) : null}
       </div>
       <div style={{ textAlign: 'left' }}>{item.side === 'away' ? content : null}</div>
     </div>

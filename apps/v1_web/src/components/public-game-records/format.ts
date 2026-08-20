@@ -127,12 +127,28 @@ export function formatGoalMinute(clockMs: number | null): string {
  * 때문이고, 그래서 색을 모르는 과거 payload(`cardColor: null`)도 색을 추측하지
  * 않고 중립 기호로 그린다.
  */
+/**
+ * 이벤트 한 줄의 시각 표현.
+ *
+ * `badge` 는 **눈에 보이는 텍스트 표식**이다. 아이콘만으로 뜻이 갈리지 않는 이벤트에만 준다.
+ *
+ * 2026-08-19 alpha 실측 — 자책골이 일반 골과 **같은 `⚽`** 를 쓰고 `자책골` 라벨은
+ * `sr-only` 에만 들어가 있었다. 그래서 공개 화면에서 관전자가 보는 것은
+ * `⚽ 5′ 4 HOME 선발4` 가 **원정 열**에 뜬 모습뿐이었다 — "원정팀이 득점했는데 득점자가
+ * 홈 선수"로 읽히고, 자책골이라는 단서가 화면에 하나도 없었다. 스크린리더 사용자만
+ * 알 수 있었다.
+ *
+ * 이건 이 프로젝트가 명시한 규칙("의미 있는 구분은 컬러/아이콘만으로 전달하지 말고
+ * 텍스트를 병행한다")에 정면으로 걸린다. 아이콘을 바꾸는 것만으로는 부족하다 —
+ * 이모지는 폰트·플랫폼에 따라 모양이 갈리고, 두 축구공을 나란히 놓고 비교할 수 있는
+ * 상황도 아니다. 그래서 **텍스트 배지**를 준다.
+ */
 export function eventPresentation(event: {
   type: string;
   cardColor: 'YELLOW' | 'RED' | null;
-}): { icon: string; label: string } {
+}): { icon: string; label: string; badge?: string } {
   if (event.type === 'GOAL') return { icon: '⚽', label: '골' };
-  if (event.type === 'OWN_GOAL') return { icon: '⚽', label: '자책골' };
+  if (event.type === 'OWN_GOAL') return { icon: '⚽', label: '자책골', badge: '자책' };
   if (event.type === 'CARD' && event.cardColor === 'RED') return { icon: '🟥', label: '레드카드' };
   if (event.type === 'CARD' && event.cardColor === 'YELLOW') return { icon: '🟨', label: '옐로카드' };
   if (event.type === 'CARD') return { icon: '□', label: '카드 색상 확인 필요' };

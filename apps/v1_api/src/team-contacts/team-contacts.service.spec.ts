@@ -10,6 +10,7 @@ function makePrisma() {
       count: jest.fn(),
       create: jest.fn(),
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -150,7 +151,8 @@ describe('TeamContactsService 응답 처리', () => {
     const prisma = makePrisma();
     prisma.v1TeamContact.findUnique.mockResolvedValue(contact);
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    prisma.v1TeamContact.update.mockResolvedValue({ ...contact, status: 'accepted' });
+    prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({ ...contact, status: 'accepted' });
     const service = new TeamContactsService(prisma);
 
     const result = await service.accept(actor, 'c1');
@@ -166,7 +168,7 @@ describe('TeamContactsService 응답 처리', () => {
 
     const result = await service.accept(actor, 'c1');
     expect(result.alreadyProcessed).toBe(true);
-    expect(prisma.v1TeamContact.update).not.toHaveBeenCalled();
+    expect(prisma.v1TeamContact.updateMany).not.toHaveBeenCalled();
   });
 
   it('거절된 컨택은 수락할 수 없다', async () => {
@@ -196,7 +198,8 @@ describe('TeamContactsService 응답 처리', () => {
     const prisma = makePrisma();
     prisma.v1TeamContact.findUnique.mockResolvedValue(contact);
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
-    prisma.v1TeamContact.update.mockResolvedValue({ ...contact, status: 'withdrawn' });
+    prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({ ...contact, status: 'withdrawn' });
     const service = new TeamContactsService(prisma);
 
     const result = await service.withdraw(actor, 'c1');
@@ -236,5 +239,55 @@ describe('TeamContactsService 응답 처리', () => {
         data: { status: 'expired' },
       }),
     );
+  });
+
+  // 동시 응답 경쟁: 스펙상 응답자가 팀장+운영진 전원이라 여러 명이 동시에 누를 수 있다.
+  // 마지막 write 가 findUnique 로 읽은 상태만 믿고 가드 없이 update 하면, 두 응답자가
+  // 동시에 서로 다른 상태로 전이시킬 때 나중에 쓴 쪽이 조용히 이긴다 — updateMany +
+  // status 가드로 막는다.
+  it('응답 write 는 status=requested 가드를 건 updateMany 를 쓴다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue(contact);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TeamContact.findUniqueOrThrow.mockResolvedValue({ ...contact, status: 'accepted' });
+    const service = new TeamContactsService(prisma);
+
+    await service.accept(actor, 'c1');
+
+    expect(prisma.v1TeamContact.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'c1', status: 'requested' }),
+      }),
+    );
+  });
+
+  it('선점당했지만 결과가 같으면(동시에 같은 응답) 멱등하게 통과한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamContact.findUnique.mockResolvedValue(contact);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    // 우리가 requested 를 읽은 뒤, 우리가 쓰기 전에 다른 응답자가 먼저 같은 상태로 전이시켰다
+    prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 0 });
+    prisma.v1TeamContact.findUnique.mockResolvedValueOnce(contact)
+      .mockResolvedValueOnce({ ...contact, status: 'accepted' });
+    const service = new TeamContactsService(prisma);
+
+    const result = await service.accept(actor, 'c1');
+    expect(result.alreadyProcessed).toBe(true);
+    expect(result.contact.status).toBe('accepted');
+  });
+
+  it('선점당했고 결과가 다르면(먼저 거절됨) 충돌로 던진다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.updateMany.mockResolvedValue({ count: 0 });
+    // 최초 findUnique 는 requested 를 보여줬지만, 쓰기 직전에 다른 응답자가 declined 로 전이시켰다
+    prisma.v1TeamContact.findUnique.mockResolvedValueOnce(contact)
+      .mockResolvedValueOnce({ ...contact, status: 'declined' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.accept(actor, 'c1')).rejects.toMatchObject({
+      response: { code: 'TEAM_CONTACT_STATE_CONFLICT', details: { currentStatus: 'declined' } },
+    });
   });
 });

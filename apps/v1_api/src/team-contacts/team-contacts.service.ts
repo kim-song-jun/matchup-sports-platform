@@ -115,8 +115,8 @@ export class TeamContactsService {
       );
     }
 
-    const updated = await this.prisma.v1TeamContact.update({
-      where: { id: contactId },
+    const result = await this.prisma.v1TeamContact.updateMany({
+      where: { id: contactId, status: 'requested' },
       data: {
         status: nextStatus,
         respondedByUserId: user.id,
@@ -124,6 +124,23 @@ export class TeamContactsService {
         declineReason,
       },
     });
+
+    if (result.count === 0) {
+      // 우리가 requested 를 읽은 뒤 누군가 먼저 처리했다.
+      // 최신 상태를 다시 읽어 멱등(같은 결과)과 충돌(다른 결과)을 가른다.
+      const current = await this.prisma.v1TeamContact.findUnique({ where: { id: contactId } });
+      if (!current) {
+        throw new NotFoundException({ code: 'TEAM_CONTACT_NOT_FOUND', message: '컨택을 찾을 수 없어요.' });
+      }
+      if (current.status === nextStatus) {
+        return { contact: current, alreadyProcessed: true };
+      }
+      throw stateConflict('이미 처리된 컨택이에요.', 'TEAM_CONTACT_STATE_CONFLICT', {
+        currentStatus: current.status,
+      });
+    }
+
+    const updated = await this.prisma.v1TeamContact.findUniqueOrThrow({ where: { id: contactId } });
     return { contact: updated, alreadyProcessed: false };
   }
 
@@ -160,7 +177,7 @@ export class TeamContactsService {
     if (!membership) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: '팀장 또는 운영진만 컨택을 보낼 수 있어요.',
+        message: '팀장 또는 운영진만 할 수 있어요.',
       });
     }
     return membership;

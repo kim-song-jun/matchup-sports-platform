@@ -150,7 +150,10 @@ export class CommitPromotionsDto {
   @Type(() => CommitPromotionEntryDto)
   entries!: CommitPromotionEntryDto[];
 
-  /** 다음 시즌 리그 제목. 티어 수만큼 필요하다. */
+  /**
+   * 다음 시즌 리그를 함께 만들지 여부. 기본값 true —
+   * false 를 주면 승강 결정만 기록하고 다음 시즌 리그는 만들지 않는다.
+   */
   @IsOptional()
   @IsBoolean()
   createNextSeason?: boolean;

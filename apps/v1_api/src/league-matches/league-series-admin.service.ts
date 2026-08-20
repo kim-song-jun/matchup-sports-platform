@@ -355,9 +355,61 @@ export class LeagueSeriesAdminService {
       });
     }
 
+    // 같은 팀이 두 번 실려 오면 위의 Set 비교는 통과하지만 아래 createMany 가
+    // (fromLeagueId, teamId) unique 제약에 걸려 Prisma 예외가 500 으로 새어 나간다.
+    if (dto.entries.length !== submittedTeamIds.size) {
+      const seen = new Set<string>();
+      const duplicated = [...new Set(dto.entries.filter((e) => !seen.add(e.teamId)).map((e) => e.teamId))];
+      throw new UnprocessableEntityException({
+        code: 'PROMOTION_ENTRIES_DUPLICATED',
+        message: '같은 팀에 대한 결정이 두 번 들어왔어요.',
+        details: { duplicatedTeamIds: duplicated },
+      });
+    }
+
+    // fromTier 를 받아만 두고 쓰지 않으면 클라이언트가 엉뚱한 티어를 보내도 조용히 통과한다.
+    // 서버가 아는 티어와 다르면 클라이언트가 낡은 preview 를 들고 있다는 뜻이다.
+    const tierMismatch = dto.entries.filter((entry) => entry.fromTier !== computedByTeamId.get(entry.teamId)!.tier);
+    if (tierMismatch.length > 0) {
+      throw new UnprocessableEntityException({
+        code: 'PROMOTION_ENTRIES_TIER_MISMATCH',
+        message: '순위표가 바뀌었어요. 승강 후보를 다시 계산해 주세요.',
+        details: {
+          mismatches: tierMismatch.map((entry) => ({
+            teamId: entry.teamId,
+            sentTier: entry.fromTier,
+            actualTier: computedByTeamId.get(entry.teamId)!.tier,
+          })),
+        },
+      });
+    }
+
+    // 1부에서 승격, 최하위에서 강등은 갈 곳이 없다. 막지 않으면 kind 는 promoted 인데
+    // 티어는 그대로인 모순 행이 저장된다.
+    const impossible = dto.entries.filter((entry) => {
+      const tier = computedByTeamId.get(entry.teamId)!.tier;
+      return (
+        (entry.kind === 'promoted' && tier <= 1) ||
+        (entry.kind === 'relegated' && tier >= series.tierCount)
+      );
+    });
+    if (impossible.length > 0) {
+      throw new UnprocessableEntityException({
+        code: 'PROMOTION_KIND_IMPOSSIBLE',
+        message: '가장 위 티어에서 승격하거나 가장 아래 티어에서 강등할 수는 없어요.',
+        details: {
+          entries: impossible.map((entry) => ({
+            teamId: entry.teamId,
+            tier: computedByTeamId.get(entry.teamId)!.tier,
+            kind: entry.kind,
+          })),
+        },
+      });
+    }
+
     const resolved = dto.entries.map((entry) => {
       const computed = computedByTeamId.get(entry.teamId)!;
-      const toTier = this.resolveToTier(computed.tier, entry.kind, series.tierCount);
+      const toTier = this.resolveToTier(computed.tier, entry.kind);
       return {
         teamId: entry.teamId,
         fromLeagueId: leagueByTier.get(computed.tier)!,
@@ -443,9 +495,14 @@ export class LeagueSeriesAdminService {
     };
   }
 
-  private resolveToTier(fromTier: number, kind: PromotionKind, tierCount: number): number {
-    if (kind === 'promoted') return Math.max(1, fromTier - 1);
-    if (kind === 'relegated') return Math.min(tierCount, fromTier + 1);
+  /**
+   * 경계를 넘는 조합(1부 승격 / 최하위 강등)은 commitPromotions 가 이미 422 로 막는다.
+   * 그래서 여기서 clamp 하지 않는다 — clamp 하면 "승격인데 티어는 그대로"인 모순 행을
+   * 조용히 만들어 버린다.
+   */
+  private resolveToTier(fromTier: number, kind: PromotionKind): number {
+    if (kind === 'promoted') return fromTier - 1;
+    if (kind === 'relegated') return fromTier + 1;
     return fromTier;
   }
 

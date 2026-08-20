@@ -21,6 +21,9 @@ interface PromotionRuleFormProps {
  * 어드민이 저장 전에 결과를 볼 수 있어야 "0.2가 무슨 뜻인지" 묻지 않는다.
  */
 export function previewSlots(rule: V1PromotionRule, teamCount: number): number {
+  // 서버 baseSlots 와 동일하게 빈 티어는 0 이다 — minSlots 를 적용하면 팀이 없는데도
+  // "1팀 승격"으로 보인다.
+  if (teamCount === 0) return 0;
   const minSlots = rule.minSlots ?? 1;
   if (rule.mode === 'fixed') return Math.max(minSlots, rule.fixedCount ?? minSlots);
   const raw = teamCount * (rule.ratio ?? 0);

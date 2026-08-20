@@ -232,6 +232,19 @@ describe('calculatePromotions — 어드민 설정 반영', () => {
   });
 });
 
+describe('calculatePromotions — 빈 티어', () => {
+  it('팀이 0인 티어는 슬롯도 0이다 (minSlots 를 적용하지 않는다)', () => {
+    const plan = calculatePromotions({
+      tierCount: 2,
+      rule: RULE,
+      tiers: [tier(1, teamIds('A', 10)), tier(2, [])],
+    });
+    const empty = plan.tiers.find((t) => t.tier === 2)!;
+    expect(empty.promoteCount).toBe(0);
+    expect(empty.relegateCount).toBe(0);
+  });
+});
+
 describe('validatePromotionRule', () => {
   it('기본 규칙은 통과한다', () => {
     expect(validatePromotionRule(RULE)).toEqual([]);

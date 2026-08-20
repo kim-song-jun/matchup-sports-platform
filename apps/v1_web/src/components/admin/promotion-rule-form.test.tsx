@@ -25,6 +25,12 @@ describe('previewSlots — 서버 baseSlots 와 같은 결과를 내야 한다',
     expect(previewSlots({ mode: 'ratio', ratio: 0.2, rounding: 'floor', minSlots: 1 }, 4)).toBe(1);
   });
 
+  it('빈 티어는 0이다 — minSlots 를 적용하면 팀이 없는데 "1팀 승격"으로 보인다', () => {
+    // 서버 baseSlots 는 teamCount === 0 이면 0 을 반환한다. 여기가 갈리면 화면이 거짓말을 한다.
+    expect(previewSlots(RULE, 0)).toBe(0);
+    expect(previewSlots({ mode: 'fixed', fixedCount: 3, minSlots: 1 }, 0)).toBe(0);
+  });
+
   it('mode=fixed 는 팀 수와 무관하게 고정값을 쓴다', () => {
     const fixed: V1PromotionRule = { mode: 'fixed', fixedCount: 3, minSlots: 1 };
     expect(previewSlots(fixed, 8)).toBe(3);

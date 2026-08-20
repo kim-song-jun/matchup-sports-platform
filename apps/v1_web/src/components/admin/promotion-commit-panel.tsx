@@ -43,6 +43,17 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
   const kindOf = (teamId: string, computed: V1PromotionKind): V1PromotionKind => overrides[teamId] ?? computed;
   const overriddenCount = entries.filter((entry) => kindOf(entry.teamId, entry.computedKind) !== entry.computedKind).length;
 
+  const tierNumbers = preview.tiers.map((tier) => tier.tier);
+  const topTier = Math.min(...tierNumbers);
+  const bottomTier = Math.max(...tierNumbers);
+  // 서버가 422 로 거부할 조합을 보내기 전에 여기서 잡는다.
+  const impossible = entries.filter((entry) => {
+    const kind = kindOf(entry.teamId, entry.computedKind);
+    return (
+      (kind === 'promoted' && entry.tier <= topTier) || (kind === 'relegated' && entry.tier >= bottomTier)
+    );
+  });
+
   // 다음 시즌 팀 수는 서버 계산값(규칙 기준)이 아니라 어드민이 지금 고른 값으로 다시 센다 —
   // 불참 처리한 팀이 화면 숫자에 즉시 반영돼야 "확정 후에 보니 팀이 없더라"를 막는다.
   const projectedByTier = useMemo(() => {
@@ -52,6 +63,10 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
       const kind = kindOf(entry.teamId, entry.computedKind);
       if (kind === 'withdrawn') continue;
       const toTier = kind === 'promoted' ? entry.tier - 1 : kind === 'relegated' ? entry.tier + 1 : entry.tier;
+      // 존재하지 않는 티어(1부 승격 → 0, 최하위 강등 → tierCount+1)로는 세지 않는다.
+      // 서버가 그 조합을 422 로 거부하므로 화면에서도 팀이 조용히 사라지면 안 된다 —
+      // 아래 unreachable 로 모아 두고 경고를 띄운다.
+      if (!counts.has(toTier)) continue;
       counts.set(toTier, (counts.get(toTier) ?? 0) + 1);
     }
     return counts;
@@ -158,12 +173,19 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
           총 {entries.length}팀
           {overriddenCount > 0 && ` · 규칙과 다르게 정한 팀 ${overriddenCount}개`}
           <br />
-          최종 승인하면 다음 시즌 리그가 만들어지고 되돌릴 수 없어요.
+          {impossible.length > 0 ? (
+            <span className="font-semibold text-red-700 dark:text-red-300">
+              갈 곳이 없는 결정이 {impossible.length}개 있어요. 가장 위 티어는 승격할 수 없고 가장 아래
+              티어는 강등할 수 없어요.
+            </span>
+          ) : (
+            '최종 승인하면 다음 시즌 리그가 만들어지고 되돌릴 수 없어요.'
+          )}
         </p>
         <button
           type="button"
           onClick={handleCommit}
-          disabled={submitting || entries.length === 0}
+          disabled={submitting || entries.length === 0 || impossible.length > 0}
           className="inline-flex min-h-[44px] items-center rounded-xl bg-blue-500 px-5 text-sm font-semibold text-white disabled:opacity-50"
         >
           {submitting ? '확정하는 중…' : '승강 최종 승인'}

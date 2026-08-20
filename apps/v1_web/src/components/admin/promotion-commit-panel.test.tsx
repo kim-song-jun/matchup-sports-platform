@@ -113,6 +113,29 @@ describe('PromotionCommitPanel', () => {
     expect(entries.find((e: { teamId: string }) => e.teamId === 't1')).not.toHaveProperty('overrideNote');
   });
 
+  it('1부 팀을 승격으로 바꾸면 갈 곳이 없어 최종 승인이 막힌다', async () => {
+    const user = userEvent.setup();
+    render(<PromotionCommitPanel preview={PREVIEW} submitting={false} onCommit={vi.fn()} />);
+
+    await user.selectOptions(screen.getByLabelText('알파 승강 결정'), 'promoted');
+
+    expect(screen.getByText(/갈 곳이 없는 결정이 1개 있어요/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '승강 최종 승인' })).toBeDisabled();
+  });
+
+  it('갈 곳 없는 결정이 있어도 다른 티어 팀 수가 엉뚱하게 새지 않는다', async () => {
+    const user = userEvent.setup();
+    render(<PromotionCommitPanel preview={PREVIEW} submitting={false} onCommit={vi.fn()} />);
+
+    // 1부 1위를 승격(→ 0부)으로 바꾸면 존재하지 않는 티어로 카운트가 빠진다.
+    // 그 팀은 어느 티어에도 세지 않으므로 1부는 4팀에서 3팀이 된다.
+    await user.selectOptions(screen.getByLabelText('알파 승강 결정'), 'promoted');
+
+    expect(within(tierSection('1부')).getByText('3팀')).toBeInTheDocument();
+    // 2부는 영향을 받지 않는다.
+    expect(within(tierSection('2부')).getByText('4팀')).toBeInTheDocument();
+  });
+
   it('과반 가드 경고를 그대로 노출한다', () => {
     const guarded: V1PromotionPreviewResponse = {
       ...PREVIEW,

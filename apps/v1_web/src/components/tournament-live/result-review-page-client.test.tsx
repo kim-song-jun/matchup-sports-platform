@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useTournamentEndedFixtures: vi.fn(),
   useSearchParams: vi.fn(),
   routerPush: vi.fn(),
+  pathname: { value: '/tournament-ops/tournaments/t-1/result-review' },
 }));
 
 // `ResultReviewPageClient`가 자체적으로 `<RequireAuth>`로 감싸므로(공유 셸 미도입
@@ -25,6 +26,8 @@ vi.mock('@/hooks/use-tournament-result-review', async (importOriginal) => {
 });
 vi.mock('next/navigation', () => ({
   useSearchParams: (...args: unknown[]) => mocks.useSearchParams(...args),
+  // 본문 링크가 지금 표면을 따라가므로 pathname 이 필요하다.
+  usePathname: () => mocks.pathname.value,
   // 빈 목록에서 다음 단계로 보내는 CTA 가 라우터를 쓴다.
   useRouter: () => ({ push: mocks.routerPush }),
 }));

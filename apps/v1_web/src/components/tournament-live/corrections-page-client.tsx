@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
+import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { useTournamentEndedFixtures, type TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
 import { FixturePickerList } from '@/components/tournament-result-review/fixture-picker-list';
@@ -24,6 +25,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
   const boardQuery = useTournamentEndedFixtures(tournamentId);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const deepLinkFixtureId = searchParams.get('fixtureId');
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(() => deepLinkFixtureId);
   const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
@@ -109,7 +111,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
               emptyTitle="정정할 결과가 없어요"
               emptySub="정정은 공식 확정된 결과가 있어야 할 수 있어요. 아직 확정한 경기가 없다면 결과 검토에서 먼저 확정해 주세요."
               emptyCta="결과 검토로 가기"
-              onEmptyCta={() => router.push(`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/result-review`)}
+              onEmptyCta={() => router.push(`${resolveTournamentLiveBase(pathname, tournamentId)}/result-review`)}
             />
 
             {selectedItem && selectedItem.gameId ? (

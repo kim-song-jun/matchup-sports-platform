@@ -140,7 +140,10 @@ describe('AdminService — list/detail endpoints', () => {
     v1Match: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1Team: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
-    v1Inquiry: { findMany: jest.Mock; groupBy: jest.Mock };
+    v1Inquiry: { findMany: jest.Mock; groupBy: jest.Mock; count: jest.Mock };
+    v1Tournament: { count: jest.Mock; findMany: jest.Mock };
+    v1TournamentRegistration: { groupBy: jest.Mock };
+    v1TournamentFixture: { groupBy: jest.Mock };
     v1PostEventReview: { findMany: jest.Mock };
   };
 

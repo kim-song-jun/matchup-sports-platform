@@ -383,7 +383,14 @@ describe('TournamentsAdminService', () => {
       team: { status: 'active', deletedAt: null },
     });
     // 역할 필터가 되살아나면 팀원이 다시 알림에서 빠진다 — 조회·선택 양쪽을 고정한다.
-    expect(JSON.stringify(args)).not.toContain('owner');
+    //
+    // 문자열 매칭(`JSON.stringify(args).not.toContain('owner')`) 대신 구조로 본다:
+    // 그 방식은 팀명·주석·픽스처 데이터에 'owner' 가 우연히 섞이기만 해도 깨지고(오탐),
+    // 정작 확인하려는 것은 "role 필터가 있는가" 하나다.
+    expect(args.where.team.memberships.some).toEqual({ status: 'active' });
+    expect(args.where.team.memberships.some).not.toHaveProperty('role');
+    expect(args.select.team.select.memberships.where).toEqual({ status: 'active' });
+    expect(args.select.team.select.memberships.where).not.toHaveProperty('role');
   });
 
   it('changeStatus: completed 외 전이에서는 후기 요청 알림을 보내지 않는다', async () => {

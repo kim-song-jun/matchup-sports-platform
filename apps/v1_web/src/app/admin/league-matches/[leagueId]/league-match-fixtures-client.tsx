@@ -2,7 +2,15 @@
 
 import { useState } from 'react';
 import { AdminPageHeader, AdminDataTable, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
-import { useV1AdminLeagueMatch, useV1GenerateLeagueFixtures, useV1UpdateLeagueFixture } from '@/hooks/use-v1-api';
+import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
+import {
+  useV1AdminLeagueMatch,
+  useV1AdminLeagueTeams,
+  useV1CancelLeagueFixture,
+  useV1GenerateLeagueFixtures,
+  useV1RegenerateLeagueFixtures,
+  useV1UpdateLeagueFixture,
+} from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from '@/components/team-schedules/team-schedules.view-model';
 import { RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -25,11 +33,18 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
   const generateFixtures = useV1GenerateLeagueFixtures(leagueId);
   const updateFixture = useV1UpdateLeagueFixture(leagueId);
+  const cancelFixture = useV1CancelLeagueFixture(leagueId);
+  const regenerateFixtures = useV1RegenerateLeagueFixtures(leagueId);
+  const { data: teamsData } = useV1AdminLeagueTeams(leagueId);
   const { toasts, showToast } = useAdminToast();
   const [weeksCount, setWeeksCount] = useState(7);
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   const [time, setTime] = useState('18:00');
   const [placeName, setPlaceName] = useState('');
+  // R12: 취소 확인 대상 대진. null이면 모달을 닫는다.
+  const [cancelTarget, setCancelTarget] = useState<V1LeagueFixture | null>(null);
+  // R13: 대진 재생성 확인 모달 열림 상태.
+  const [regenerateModalOpen, setRegenerateModalOpen] = useState(false);
 
   if (isPending) {
     return (
@@ -78,10 +93,48 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
     }
   };
 
-  const onFieldBlur = (fixture: V1LeagueFixture, patch: { startsAt?: string; placeName?: string }) => {
+  const onFieldBlur = (fixture: V1LeagueFixture, patch: { startsAt?: string; placeName?: string; placeAddress?: string }) => {
     updateFixture.mutate(
       { teamMatchId: fixture.teamMatchId, body: patch },
       { onError: (error) => showToast(extractErrorMessage(error, '경기 정보를 저장하지 못했어요.'), 'error') },
+    );
+  };
+
+  // R12: 취소는 되돌릴 수 없는 조작이라 GateConfirmModal로 사유를 받은 뒤에만 실행한다.
+  const onConfirmCancel = (reason: string) => {
+    if (!cancelTarget) return;
+    cancelFixture.mutate(
+      { teamMatchId: cancelTarget.teamMatchId, body: { reason } },
+      {
+        onSuccess: (result) => {
+          setCancelTarget(null);
+          showToast(result.alreadyProcessed ? '이미 취소된 대진이에요.' : '대진을 취소했어요.', 'success');
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '대진을 취소하지 못했어요.'), 'error'),
+      },
+    );
+  };
+
+  // R13: 재생성은 리그의 대진 전체를 교체하는 조작이라 typedChallenge로 이중 확인을 받는다.
+  const onConfirmRegenerate = (reason: string) => {
+    if (dayOfWeek !== '' && time.trim() === '') {
+      showToast('요일을 골랐으면 시각도 입력해 주세요.', 'error');
+      return;
+    }
+    regenerateFixtures.mutate(
+      {
+        weeksCount,
+        reason,
+        ...(dayOfWeek === '' ? {} : { schedule: { dayOfWeek, time } }),
+        ...(placeName.trim() === '' ? {} : { placeName: placeName.trim() }),
+      },
+      {
+        onSuccess: (result) => {
+          setRegenerateModalOpen(false);
+          showToast(`기존 대진 ${result.cancelledCount}경기를 취소하고 새 대진 ${result.createdCount}경기를 만들었어요.`, 'success');
+        },
+        onError: (error) => showToast(extractErrorMessage(error, '대진을 다시 만들지 못했어요.'), 'error'),
+      },
     );
   };
 
@@ -160,51 +213,186 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
           </p>
         </div>
       ) : (
-        <AdminDataTable<V1LeagueFixture>
-          rows={series.fixtures}
-          keyExtractor={(row) => row.teamMatchId}
-          columns={[
-            { key: 'title', header: '경기', render: (row) => row.title },
-            {
-              key: 'startAt',
-              header: '일시',
-              render: (row) => (
+        <div className="flex flex-col gap-3">
+          {/* R13: 대진 재생성 — 기존 대진을 전부 취소하고 같은 팀 로스터로 새로 만드는
+              파괴적 조작이라, 위 생성 폼과 시각 구분되게 amber 톤 카드에 담는다. */}
+          <div className="rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-4">
+            <p className="mb-2 text-sm font-semibold text-[var(--orange700)]">대진 재생성</p>
+            <p className="mb-3 text-xs text-[var(--text-muted)]">
+              팀 구성이 바뀌었거나 주차·요일을 다시 정해야 하면, 아래 설정으로 기존 대진을 전부
+              취소하고 새로 만들어요. 공식 결과가 확정된 대진이 하나라도 있으면 만들 수 없어요.
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label htmlFor="regen-weeks-count" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">주차 수</label>
                 <input
-                  type="datetime-local"
-                  aria-label={`${row.title} 일시`}
-                  defaultValue={toDatetimeLocalValue(row.startAt)}
-                  onBlur={(e) => {
-                    // 값이 그대로면 PATCH를 보내지 않는다 — 표를 탭으로 지나가기만 해도 쓰기가 발생하는 것 방지.
-                    if (e.target.value === toDatetimeLocalValue(row.startAt)) return;
-                    const startsAt = fromDatetimeLocalValue(e.target.value);
-                    if (!startsAt) return;
-                    onFieldBlur(row, { startsAt });
-                  }}
-                  className={inputClass}
+                  id="regen-weeks-count"
+                  type="number"
+                  min={1}
+                  max={52}
+                  value={weeksCount}
+                  onChange={(e) => setWeeksCount(Number(e.target.value))}
+                  className={`${inputClass} w-24`}
                 />
-              ),
-            },
-            {
-              key: 'placeName',
-              header: '구장',
-              render: (row) => (
+              </div>
+              <div>
+                <label htmlFor="regen-day-of-week" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">요일</label>
+                <select
+                  id="regen-day-of-week"
+                  value={dayOfWeek}
+                  onChange={(e) => setDayOfWeek(e.target.value === '' ? '' : Number(e.target.value))}
+                  className={`${inputClass} w-32`}
+                >
+                  <option value="">시작일 그대로</option>
+                  {WEEKDAY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="regen-time" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시각</label>
                 <input
-                  aria-label={`${row.title} 구장`}
-                  defaultValue={row.placeName}
-                  onBlur={(e) => {
-                    if (e.target.value === row.placeName) return;
-                    onFieldBlur(row, { placeName: e.target.value });
-                  }}
-                  className={inputClass}
+                  id="regen-time"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  disabled={dayOfWeek === ''}
+                  className={`${inputClass} w-28 disabled:opacity-50`}
                 />
-              ),
-            },
-            { key: 'status', header: '상태', render: (row) => <AdminStatusPill status={row.status} /> },
-          ]}
-        />
+              </div>
+              <div>
+                <label htmlFor="regen-place-name" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">기본 장소</label>
+                <input
+                  id="regen-place-name"
+                  type="text"
+                  placeholder="장소 미정"
+                  value={placeName}
+                  onChange={(e) => setPlaceName(e.target.value)}
+                  className={`${inputClass} w-48`}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setRegenerateModalOpen(true)}
+                className="min-h-[44px] rounded-xl bg-[var(--button-fill-warning)] px-4 text-sm font-semibold text-white hover:bg-[var(--button-fill-warning-hover)] transition-colors"
+              >
+                대진 재생성
+              </button>
+            </div>
+          </div>
+
+          <AdminDataTable<V1LeagueFixture>
+            rows={series.fixtures}
+            keyExtractor={(row) => row.teamMatchId}
+            rowTone={(row) => (row.status === 'cancelled' ? 'danger' : undefined)}
+            actionsHeader="관리"
+            renderActions={(row) =>
+              row.status === 'cancelled' ? (
+                <span className="text-xs text-[var(--text-muted)]">취소됨</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCancelTarget(row)}
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--red50)] px-3 text-[13px] font-medium text-[var(--red700)] transition-colors hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  취소
+                </button>
+              )
+            }
+            columns={[
+              { key: 'title', header: '경기', render: (row) => row.title },
+              {
+                key: 'startAt',
+                header: '일시',
+                render: (row) => (
+                  <input
+                    type="datetime-local"
+                    aria-label={`${row.title} 일시`}
+                    defaultValue={toDatetimeLocalValue(row.startAt)}
+                    disabled={row.status === 'cancelled'}
+                    onBlur={(e) => {
+                      // 값이 그대로면 PATCH를 보내지 않는다 — 표를 탭으로 지나가기만 해도 쓰기가 발생하는 것 방지.
+                      if (e.target.value === toDatetimeLocalValue(row.startAt)) return;
+                      const startsAt = fromDatetimeLocalValue(e.target.value);
+                      if (!startsAt) return;
+                      onFieldBlur(row, { startsAt });
+                    }}
+                    className={`${inputClass} disabled:opacity-50`}
+                  />
+                ),
+              },
+              {
+                key: 'placeName',
+                header: '구장',
+                render: (row) => (
+                  <input
+                    aria-label={`${row.title} 구장`}
+                    defaultValue={row.placeName}
+                    disabled={row.status === 'cancelled'}
+                    onBlur={(e) => {
+                      if (e.target.value === row.placeName) return;
+                      onFieldBlur(row, { placeName: e.target.value });
+                    }}
+                    className={`${inputClass} disabled:opacity-50`}
+                  />
+                ),
+              },
+              {
+                key: 'placeAddress',
+                header: '주소',
+                render: (row) => (
+                  <input
+                    aria-label={`${row.title} 주소`}
+                    placeholder="상세 주소 (선택)"
+                    defaultValue={row.placeAddress ?? ''}
+                    disabled={row.status === 'cancelled'}
+                    onBlur={(e) => {
+                      if (e.target.value === (row.placeAddress ?? '')) return;
+                      onFieldBlur(row, { placeAddress: e.target.value });
+                    }}
+                    className={`${inputClass} disabled:opacity-50`}
+                  />
+                ),
+              },
+              { key: 'status', header: '상태', render: (row) => <AdminStatusPill status={row.status} /> },
+            ]}
+          />
+        </div>
       )}
 
       <AdminToasts toasts={toasts} />
+
+      {/* R12: 대진 취소 확인 — 되돌릴 수 없으므로 사유를 필수로 받는다. */}
+      <GateConfirmModal
+        open={cancelTarget !== null}
+        pending={cancelFixture.isPending}
+        title="대진을 취소할까요?"
+        description={
+          cancelTarget
+            ? `"${cancelTarget.title}" 대진을 취소해요. 순위 집계에서 즉시 제외되고 되돌릴 수 없어요.`
+            : ''
+        }
+        confirmLabel="대진 취소"
+        tone="amber"
+        onConfirm={onConfirmCancel}
+        onClose={() => setCancelTarget(null)}
+      />
+
+      {/* R13: 대진 재생성 확인 — 리그의 대진 전체를 교체하는 조작이라 typedChallenge로
+          이중 확인을 받는다. */}
+      <GateConfirmModal
+        open={regenerateModalOpen}
+        pending={regenerateFixtures.isPending}
+        title="대진을 다시 만들까요?"
+        description={`대진 ${series.fixtures.length}경기를 전부 취소하고 새로 만들어요.${
+          teamsData ? ` 참가팀: ${teamsData.teams.map((t) => t.name).join(', ')}` : ''
+        } 공식 결과가 확정된 대진이 있으면 실패해요.`}
+        confirmLabel="대진 재생성"
+        tone="amber"
+        typedChallenge="재생성"
+        onConfirm={onConfirmRegenerate}
+        onClose={() => setRegenerateModalOpen(false)}
+      />
     </div>
   );
 }

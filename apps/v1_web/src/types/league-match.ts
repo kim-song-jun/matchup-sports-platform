@@ -15,6 +15,8 @@ export interface V1LeagueFixture {
   awayTeamId: string | null;
   startAt: string;
   placeName: string;
+  /** 어드민 상세(V1AdminLeagueDetail)에서만 채워진다 — 공개 상세(V1PublicLeagueDetail)는 미포함. */
+  placeAddress?: string | null;
   status: string;
   /**
    * 경기 결과 점수 — 백엔드 채움 작업이 병행 진행 중이라(Task 152) 당분간 항상
@@ -76,6 +78,45 @@ export interface V1GenerateLeagueFixturesPayload {
 
 export interface V1GenerateLeagueFixturesResult {
   leagueId: string;
+  createdCount: number;
+  teamMatchIds: string[];
+}
+
+// R13: 참가팀 조회 — GET /admin/league-matches/:leagueId/teams
+export interface V1AdminLeagueTeam {
+  teamId: string;
+  /** 팀이 그 사이 소프트삭제됐으면 '(삭제된 팀)'. */
+  name: string;
+  status: string | null;
+  memberCount: number;
+  logoUrl: string | null;
+}
+
+export interface V1AdminLeagueTeamsResponse {
+  leagueId: string;
+  teams: V1AdminLeagueTeam[];
+}
+
+// R12: 리그 대진 취소 — POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel
+export interface V1CancelLeagueFixturePayload {
+  reason: string;
+}
+
+export interface V1CancelLeagueFixtureResult {
+  teamMatchId: string;
+  status: 'cancelled';
+  cancelledApplications: number;
+  alreadyProcessed: boolean;
+}
+
+// R13: 대진 재생성 — POST /admin/league-matches/:leagueId/fixtures/regenerate
+export interface V1RegenerateLeagueFixturesPayload extends V1GenerateLeagueFixturesPayload {
+  reason: string;
+}
+
+export interface V1RegenerateLeagueFixturesResult {
+  leagueId: string;
+  cancelledCount: number;
   createdCount: number;
   teamMatchIds: string[];
 }

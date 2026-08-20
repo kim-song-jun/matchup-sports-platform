@@ -1,8 +1,15 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { CreateLeagueMatchDto, GenerateLeagueFixturesDto, RevertLeagueCompletionDto, UpdateLeagueFixtureDto } from './dto/league-match.dto';
+import {
+  CancelLeagueFixtureDto,
+  CreateLeagueMatchDto,
+  GenerateLeagueFixturesDto,
+  RegenerateLeagueFixturesDto,
+  RevertLeagueCompletionDto,
+  UpdateLeagueFixtureDto,
+} from './dto/league-match.dto';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 
 // ParseUUIDPipe 기본 예외는 code 없는 영어 메시지라 AllExceptionsFilter 가 INTERNAL_ERROR 로
@@ -36,6 +43,12 @@ export class LeagueMatchAdminController {
     return this.service.create(user, dto);
   }
 
+  // R13: 참가팀 조회. 재생성 확인 모달에서 "지금 이 팀들로 다시 만든다"를 보여주는 용도.
+  @Get(':leagueId/teams')
+  listTeams(@CurrentUser() user: V1AuthUser, @Param('leagueId', leagueIdPipe) leagueId: string) {
+    return this.service.listTeams(user, leagueId);
+  }
+
   @Post(':leagueId/fixtures')
   generateFixtures(
     @CurrentUser() user: V1AuthUser,
@@ -43,6 +56,20 @@ export class LeagueMatchAdminController {
     @Body() dto: GenerateLeagueFixturesDto,
   ) {
     return this.service.generateFixtures(user, leagueId, dto);
+  }
+
+  // R13: 대진 재생성 — 기존 대진 전부를 취소하고 같은 팀 로스터로 새 라운드로빈 대진을 만든다.
+  // 파괴적 조작이라 사유가 필수이고(RegenerateLeagueFixturesDto), 공식 결과가 확정된 대진이
+  // 하나라도 있으면 서비스가 409 LEAGUE_FIXTURES_HAVE_OFFICIAL_RESULTS로 거부한다.
+  // 정적 세그먼트('regenerate')를 :leagueId/fixtures 뒤에 붙이는 라우트라
+  // POST :leagueId/fixtures(대진 생성)와 경로 세그먼트 수가 달라 충돌하지 않는다.
+  @Post(':leagueId/fixtures/regenerate')
+  regenerateFixtures(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: RegenerateLeagueFixturesDto,
+  ) {
+    return this.service.regenerateFixtures(user, leagueId, dto);
   }
 
   @Patch(':leagueId/fixtures/:teamMatchId')
@@ -53,6 +80,19 @@ export class LeagueMatchAdminController {
     @Body() dto: UpdateLeagueFixtureDto,
   ) {
     return this.service.updateFixture(user, leagueId, teamMatchId, dto);
+  }
+
+  // R12: 리그 대진 전용 취소. idempotent — 이미 cancelled면 alreadyProcessed: true.
+  // POST :id/cancel 컨벤션(matches/mercenary/marketplace orders 전역 패턴)을 그대로 따른다.
+  @Post(':leagueId/fixtures/:teamMatchId/cancel')
+  @HttpCode(200)
+  cancelFixture(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Param('teamMatchId', teamMatchIdPipe) teamMatchId: string,
+    @Body() dto: CancelLeagueFixtureDto,
+  ) {
+    return this.service.cancelFixture(user, leagueId, teamMatchId, dto);
   }
 
   // R6: 전 대진 확정 시 자동으로 completed 전이한 리그를, 결과 정정 등을 위해

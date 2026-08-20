@@ -1186,7 +1186,7 @@ function CoverImageCard({
       aria-label="커버 이미지"
       className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6"
     >
-      <p className="text-[13px] font-bold text-[var(--text-strong)] mb-3">커버 이미지</p>
+      {/* 제목은 CoverImageUploader가 자체 label로 그린다 — 여기서 또 그리면 같은 글자가 두 번 뜬다. */}
       <CoverImageUploader
         value={tournament.coverImageUrl}
         onSelectFile={(file) => void handleUpload(file)}

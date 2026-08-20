@@ -90,6 +90,8 @@ describe('TournamentInfoSection', () => {
     for (const label of ['신청 마감', '명단 마감', '참가비', '팀 수', '출전 인원', '교체 방식', '입금 계좌']) {
       expect(screen.getAllByText(label)).toHaveLength(1);
     }
+    // 카드 제목과 업로더 자체 label이 겹쳐 '커버 이미지'가 두 번 뜬 적이 있다.
+    expect(screen.getAllByText('커버 이미지')).toHaveLength(1);
   });
 
   it('편집 진입점은 관심사마다 하나씩이다', () => {

@@ -45,6 +45,7 @@ export class LeagueMatchPublicService {
         hostTeamId: true,
         approvedApplicantTeamId: true,
         startAt: true,
+        status: true,
         game: { select: { id: true, currentOfficialRevisionId: true } },
       },
     });
@@ -65,6 +66,9 @@ export class LeagueMatchPublicService {
     for (const tm of teamMatches) {
       const fact = tm.game === null ? undefined : factByGameId.get(tm.game.id);
       if (fact === undefined || tm.approvedApplicantTeamId === null) {
+        // 취소된 대진은 앞으로 치러지지 않으므로 "예정 경기"로 영구 집계되지 않게 제외한다.
+        // 공식 결과 fact가 이미 있는 경기는 이 분기에 들어오지 않아 status와 무관하게 confirmed로 남는다.
+        if (tm.status === 'cancelled') continue;
         pendingFixtures.push({ teamMatchId: tm.id, homeTeamId: tm.hostTeamId, awayTeamId: tm.approvedApplicantTeamId, startAt: tm.startAt });
         continue;
       }
@@ -120,10 +124,11 @@ export class LeagueMatchPublicService {
     const nicknameByUserId = new Map(users.map((u) => [u.id, u.profile?.nickname ?? null]));
 
     const rows = userIds.map((userId) => ({ userId, nickname: nicknameByUserId.get(userId) ?? null, ...totalsByUserId.get(userId)! }));
+    // 각 순위는 해당 기록이 1 이상인 선수만 노출한다 — 골 0개 선수가 득점 순위에 뜨면 안 된다.
     return {
       leagueId: league.id,
-      goals: [...rows].sort((a, b) => b.goals - a.goals).slice(0, PLAYER_RECORDS_LIMIT),
-      assists: [...rows].sort((a, b) => b.assists - a.assists).slice(0, PLAYER_RECORDS_LIMIT),
+      goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, PLAYER_RECORDS_LIMIT),
+      assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, PLAYER_RECORDS_LIMIT),
     };
   }
 

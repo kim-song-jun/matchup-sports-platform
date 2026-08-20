@@ -113,7 +113,6 @@ describe('buildLeagueFixtureRows', () => {
   it('라운드 번호를 round 문자열로, leg를 legNumber로 매핑한다', () => {
     const rows = buildLeagueFixtureRows({
       groupId: 'g1',
-      groupName: 'A조',
       registrationIds: ['r1', 'r2'],
       legs: 2,
       balanceHome: true,
@@ -128,7 +127,7 @@ describe('buildLeagueFixtureRows', () => {
 
   it('fixtureNumber가 1부터 연속으로 매겨진다', () => {
     const rows = buildLeagueFixtureRows({
-      groupId: 'g1', groupName: 'A조',
+      groupId: 'g1',
       registrationIds: ['r1', 'r2', 'r3', 'r4'],
       legs: 1, balanceHome: true, schedule: null,
     });
@@ -137,7 +136,7 @@ describe('buildLeagueFixtureRows', () => {
 
   it('fixtureNumberOffset을 주면 그만큼 밀려서 매겨진다 (F3)', () => {
     const rows = buildLeagueFixtureRows({
-      groupId: 'g2', groupName: 'B조',
+      groupId: 'g2',
       registrationIds: ['r3', 'r4'],
       legs: 1, balanceHome: true, schedule: null,
       fixtureNumberOffset: 6,
@@ -147,7 +146,7 @@ describe('buildLeagueFixtureRows', () => {
 
   it('schedule이 있으면 라운드별 startAt을 주차로 채운다', () => {
     const rows = buildLeagueFixtureRows({
-      groupId: 'g1', groupName: 'A조',
+      groupId: 'g1',
       registrationIds: ['r1', 'r2', 'r3', 'r4'],
       legs: 1, balanceHome: true,
       schedule: { startsOn: new Date('2026-09-01T00:00:00.000Z'), template: { dayOfWeek: 6, time: '20:00' } },

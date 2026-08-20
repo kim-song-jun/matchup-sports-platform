@@ -1207,6 +1207,7 @@ export type V1MyTeamMatch = {
   teamId?: string | null;
   teamName?: string | null;
   applicationId: string | null;
+  league?: { leagueId: string; title: string } | null;
   manageRoute: string | null;
   detailRoute: string;
 };

@@ -254,14 +254,45 @@ export class TeamMatchesService {
     const teamIds = memberships.map((membership) => membership.teamId);
     if (teamIds.length === 0) return { items: [], pageInfo: { nextCursor: null, hasNext: false } };
 
-    const includeHosted = !query.scope || query.scope === 'all' || query.scope === 'hosted';
+    // status 는 두 계열이 섞여 있다: 매치 상태(recruiting~expired)는 teamMatch.status 로,
+    // 신청 상태(requested~withdrawn)는 "내 신청"의 상태로 필터한다.
+    const applicationStatusFilter =
+      (['requested', 'approved', 'rejected', 'withdrawn'] as const).find((status) => status === query.status) ?? null;
+    // 신청 상태를 제외한 나머지도 리터럴 배열로 좁힌다 — query.status 를 그대로 쓰면 타입이
+    // 10개 값 union 이라 where.status(V1TeamMatchStatus)에 대입이 안 된다.
+    const matchStatusFilter =
+      (['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'expired'] as const).find(
+        (status) => status === query.status,
+      ) ?? null;
+
+    // 신청 상태는 호스트로 참여한 매치에는 성립하지 않으므로 hosted 분기를 제외한다
+    // (scope=hosted + 신청 상태 조합은 OR: [] → 빈 결과).
+    const includeHosted = (!query.scope || query.scope === 'all' || query.scope === 'hosted') && !applicationStatusFilter;
     const includeApplied = !query.scope || query.scope === 'all' || query.scope === 'applied';
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
       where: {
         deletedAt: null,
+        // 'expired'는 계산 상태(getApiStatus)라 DB status 로 존재하지 않는다 — list()와
+        // 동일하게 startAt 과거 조건으로 매핑한다.
+        ...(matchStatusFilter
+          ? matchStatusFilter === 'expired'
+            ? { startAt: { lt: new Date() } }
+            : { status: matchStatusFilter }
+          : {}),
         OR: [
           ...(includeHosted ? [{ hostTeamId: { in: teamIds } }] : []),
-          ...(includeApplied ? [{ applications: { some: { applicantTeamId: { in: teamIds } } } }] : []),
+          ...(includeApplied
+            ? [
+                {
+                  applications: {
+                    some: {
+                      applicantTeamId: { in: teamIds },
+                      ...(applicationStatusFilter ? { status: applicationStatusFilter } : {}),
+                    },
+                  },
+                },
+              ]
+            : []),
         ],
       },
       include: {
@@ -271,13 +302,19 @@ export class TeamMatchesService {
         // 쓰지 않고 자체 select 라, 여기에 따로 실지 않으면 배지가 이 화면에서만 빠진다.
         league: { select: { id: true, title: true } },
         applications: {
-          where: { applicantTeamId: { in: teamIds } },
+          // 신청 상태로 필터 중이면 노출하는 신청도 그 상태와 일치해야 한다 — 아니면
+          // 필터에 걸린 매치에 다른 상태의 최신 신청이 표시될 수 있다.
+          where: {
+            applicantTeamId: { in: teamIds },
+            ...(applicationStatusFilter ? { status: applicationStatusFilter } : {}),
+          },
           include: { applicantTeam: { select: { id: true, name: true } } },
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
       },
-      orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }],
+      // { id } tie-breaker: getOrderBy 와 같은 이유(리그 일괄 생성 행의 동률 정렬 결정성).
+      orderBy: [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
@@ -541,6 +578,14 @@ export class TeamMatchesService {
   async cancel(user: V1AuthUser, teamMatchId: string, dto: CancelTeamMatchDto) {
     this.assertActiveAccount(user);
     const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
+    // 리그 대진(leagueId 有)은 어드민이 일정을 관리한다 — 호스트 팀의 일방 취소를 허용하면
+    // 리그 순위표·잔여 라운드가 조용히 깨진다. 어드민 경로(POST /admin/team-matches/:id/status)만 유효.
+    if (teamMatch.leagueId !== null) {
+      throw stateConflict(
+        '리그 경기는 팀에서 직접 취소할 수 없어요. 리그 운영자에게 문의해주세요.',
+        'LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN',
+      );
+    }
     if (teamMatch.status === 'cancelled') {
       throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Team match is already cancelled' });
     }
@@ -1654,9 +1699,11 @@ export class TeamMatchesService {
   }
 }
 
+// 리그 일괄 생성 행은 startAt·createdAt이 전부 동일할 수 있어, 유일 tie-breaker(id)가
+// 없으면 cursor 페이지네이션 경계에서 행이 누락/중복된다.
 function getOrderBy(sort: TeamMatchesQueryDto['sort']): Prisma.V1TeamMatchOrderByWithRelationInput[] {
-  if (sort === 'latest') return [{ createdAt: 'desc' }];
-  return [{ startAt: 'asc' }, { createdAt: 'desc' }];
+  if (sort === 'latest') return [{ createdAt: 'desc' }, { id: 'desc' }];
+  return [{ startAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }];
 }
 
 function getGenderRuleWhere(genderRule: NonNullable<TeamMatchesQueryDto['genderRule']>) {

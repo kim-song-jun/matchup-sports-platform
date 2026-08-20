@@ -562,7 +562,12 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
           <div className="tm-text-body-lg">{match.title}</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>{match.meta}</div>
         </div>
-        <span className={`tm-badge ${match.status === 'pending' ? 'tm-badge-orange' : match.status === 'ended' ? 'tm-badge-grey' : 'tm-badge-blue'}`}>{match.statusLabel}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {/* 리그전 배지: 상태가 아니라 카테고리라 중립 grey — 컬러만으로 뜻을 전달하지
+              않도록 "리그전" 텍스트를 함께 싣는다(team-matches 목록 배지와 동일 idiom). */}
+          {match.league ? <span className="tm-badge tm-badge-grey">리그전</span> : null}
+          <span className={`tm-badge ${match.status === 'pending' ? 'tm-badge-orange' : match.status === 'ended' ? 'tm-badge-grey' : 'tm-badge-blue'}`}>{match.statusLabel}</span>
+        </span>
       </div>
       <p className="tm-text-caption" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{match.note}</p>
       <div className="tm-my-card-actions">

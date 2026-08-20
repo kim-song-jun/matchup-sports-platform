@@ -2131,6 +2131,7 @@ function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatch
     statusLabel: status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : status === 'ended' ? '종료' : '모집 중',
     note: match.teamName ? `${match.teamName} 관련 팀매치예요.` : '내 팀 관련 팀매치예요.',
     href: match.detailRoute,
+    league: match.league ?? null,
   };
 }
 

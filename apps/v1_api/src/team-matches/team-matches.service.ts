@@ -258,7 +258,12 @@ export class TeamMatchesService {
     // 신청 상태(requested~withdrawn)는 "내 신청"의 상태로 필터한다.
     const applicationStatusFilter =
       (['requested', 'approved', 'rejected', 'withdrawn'] as const).find((status) => status === query.status) ?? null;
-    const matchStatusFilter = applicationStatusFilter ? null : query.status ?? null;
+    // 신청 상태를 제외한 나머지도 리터럴 배열로 좁힌다 — query.status 를 그대로 쓰면 타입이
+    // 10개 값 union 이라 where.status(V1TeamMatchStatus)에 대입이 안 된다.
+    const matchStatusFilter =
+      (['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'expired'] as const).find(
+        (status) => status === query.status,
+      ) ?? null;
 
     // 신청 상태는 호스트로 참여한 매치에는 성립하지 않으므로 hosted 분기를 제외한다
     // (scope=hosted + 신청 상태 조합은 OR: [] → 빈 결과).

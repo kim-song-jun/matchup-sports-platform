@@ -4442,12 +4442,23 @@ import type {
   V1CreateLeagueResult,
   V1GenerateLeagueFixturesPayload,
   V1GenerateLeagueFixturesResult,
+  V1LeagueMatchesFilters,
   V1PublicLeagueDetail,
+  V1PublicLeagueListResponse,
   V1LeaguePlayerRecordsResponse,
   V1LeagueStandingsResponse,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
 } from '@/types/league-match';
+
+// R5: 공개 리그 목록. team-matches의 useV1TeamMatches(filters)와 동일한 형태 --
+// filters 객체 전체가 쿼리 키에 들어가 필터가 바뀌면 자동으로 새 쿼리로 취급된다.
+export function useV1LeagueMatches(filters?: V1LeagueMatchesFilters) {
+  return useQuery({
+    queryKey: v1Keys.leagueMatches(filters as Record<string, unknown> | undefined),
+    queryFn: () => v1Get<V1PublicLeagueListResponse>('/league-matches', filters),
+  });
+}
 
 export function useV1AdminLeagueMatchList() {
   return useQuery({

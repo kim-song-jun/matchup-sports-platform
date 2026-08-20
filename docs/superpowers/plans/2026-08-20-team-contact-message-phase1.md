@@ -696,7 +696,7 @@ git show --stat HEAD
   - `accept(user, contactId): Promise<{ contact: V1TeamContact; alreadyProcessed: boolean }>`
   - `decline(user, contactId, dto: DeclineTeamContactDto): Promise<{ contact; alreadyProcessed: boolean }>`
   - `withdraw(user, contactId): Promise<{ contact; alreadyProcessed: boolean }>`
-  - `private effectiveStatus(contact: { status: string; expiresAt: Date }): string` — 만료를 읽기 시점에 반영
+  - `private settleExpiry(contact: { id: string; status: string; expiresAt: Date }): Promise<string>` — 만료를 읽기 시점에 반영하고 DB 도 정리한다
 
 - [ ] **Step 1: 실패 테스트를 쓴다**
 

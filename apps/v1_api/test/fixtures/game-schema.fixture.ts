@@ -250,7 +250,7 @@ export const gameSchemaSourceManifest = {
   // recipientUserId relation/index를 추가했다. game domain 모델·바인딩된 game operations
   // migration은 바뀌지 않았으며 뒷받침 마이그레이션은
   // 20260820180000_v1_tournament_award_recipient_user 이다.
-  schema: '14b574339e01d6d73dea6f3c1eaab12c8c6cf9db9379e001f5f360ea2204d24c',
+  schema: '6836627b976463894514c6870fa98e62cb1fdb209c47d2f5a30e122dacfd444d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -195,6 +195,34 @@ describe('MockTournamentSeedService', () => {
     });
   });
 
+  // 하한을 지어내면(기본값 3) 화면은 정상처럼 보이는데 생성은 NO_COMPETITION_CONFIG 로 막힌다.
+  // 만들 수 있는 팀 수를 0 으로 닫아 버튼까지 잠근다 — 패널 자체는 남긴다(enabled 는 환경 플래그).
+  it('종목의 ACTIVE config 가 없으면 availability 가 만들 수 있는 팀 수를 0 으로 닫는다', async () => {
+    const { service, prisma } = makeWorld(4);
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue(null);
+
+    await expect(service.availability()).resolves.toEqual({
+      enabled: true,
+      usableTeamCount: 0,
+      maxTeamCount: 0,
+      minPlayersPerTeam: 0,
+    });
+    expect(prisma.v1Team.findMany).not.toHaveBeenCalled();
+  });
+
+  it('종목 자체가 없으면 config 를 찾지 않고 0 으로 닫는다', async () => {
+    const { service, prisma } = makeWorld(4);
+    prisma.v1Sport.findFirst.mockResolvedValue(null);
+
+    await expect(service.availability()).resolves.toEqual({
+      enabled: true,
+      usableTeamCount: 0,
+      maxTeamCount: 0,
+      minPlayersPerTeam: 0,
+    });
+    expect(prisma.v1CompetitionConfigVersion.findFirst).not.toHaveBeenCalled();
+  });
+
   it('플래그가 꺼져 있으면 availability 도 0 을 돌려준다', async () => {
     process.env.V1_ENABLE_MOCK_SEED = '';
     const { service, prisma } = makeWorld(4);

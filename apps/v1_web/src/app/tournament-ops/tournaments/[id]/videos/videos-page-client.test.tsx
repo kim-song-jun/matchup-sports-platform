@@ -16,6 +16,12 @@ vi.mock('@/components/tournament-ops/role-context', () => ({
   useTournamentOpsRole: () => mocks.useTournamentOpsRole(),
 }));
 
+// 머리말 eyebrow 가 대회명을 쓴다 — 이 테스트의 관심사는 영상 목록·등록이지 대회 조회가
+// 아니므로 QueryClient 를 세우는 대신 훅만 목한다.
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1Tournament: () => ({ data: { title: '테스트 대회' } }),
+}));
+
 vi.mock('@/hooks/use-v1-fixture-videos', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/use-v1-fixture-videos')>();
   return {

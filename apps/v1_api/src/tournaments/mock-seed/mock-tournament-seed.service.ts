@@ -101,6 +101,14 @@ export class MockTournamentSeedService {
           registrationDeadlineAt: now,
           entryFee: 0,
           status: status === 'open' ? 'open' : status === 'in_progress' ? 'in_progress' : 'completed',
+          /* 대진표 공개 — 모집중이 아닌 목업은 반드시 공개 상태로 만든다.
+             `tournament-detail.presenter.ts` 는 `bracketPublishedAt` 이 비어 있으면 공개
+             조회에서 groups/fixtures 를 **빈 배열로 감춘다**. 그래서 이 값을 안 채우면
+             경기를 30개 만들어 놓고도 "진행중" 대회의 대진표·일정이 관중·참가팀에게
+             통째로 빈 화면으로 보인다(2026-08-18 alpha 실측: 목업 2건 모두
+             bracketPublishedAt=null → 공개 fixtures 0 · /schedule 0건).
+             모집중(open)은 아직 대진이 나오기 전이 정상이라 그대로 둔다. */
+          bracketPublishedAt: status === 'open' ? null : now,
           competitionConfigVersionId: competitionConfig.id,
           createdByAdminUserId: admin.id,
         },

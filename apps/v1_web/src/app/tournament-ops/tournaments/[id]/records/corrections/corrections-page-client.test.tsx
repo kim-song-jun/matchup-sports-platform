@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { CorrectionsPageClient } from './corrections-page-client';
 
@@ -7,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useV1Tournament: vi.fn(),
   useTournamentEndedFixtures: vi.fn(),
   useSearchParams: vi.fn(),
+  routerPush: vi.fn(),
 }));
 
 // `CorrectionsPageClient`도 자체적으로 `<RequireAuth>`로 감싸므로(Task 1과 동일한
@@ -21,6 +23,8 @@ vi.mock('@/hooks/use-tournament-result-review', async (importOriginal) => {
 });
 vi.mock('next/navigation', () => ({
   useSearchParams: (...args: unknown[]) => mocks.useSearchParams(...args),
+  // 빈 목록에서 다음 단계로 보내는 CTA 가 라우터를 쓴다.
+  useRouter: () => ({ push: mocks.routerPush }),
 }));
 vi.mock('@/components/tournament-result-review/game-result-correction-panel', () => ({
   GameResultCorrectionPanel: ({ gameId }: { gameId: string }) => <div data-testid="panel">panel:{gameId}</div>,
@@ -62,6 +66,29 @@ describe('CorrectionsPageClient fixtureId 딥링크 (T6-2)', () => {
     render(<CorrectionsPageClient tournamentId="t-1" />);
     expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
     expect(screen.getByText(/정정 목록에 없어요/)).toBeInTheDocument();
+  });
+
+  /* 정정할 게 0건인 건 이 화면의 흔한 정상 상태다(공식 결과를 확정해야 생긴다).
+     예전에는 안내 문구만 있고 갈 곳이 없어, 전제 화면인 결과 검토를 사용자가 스스로
+     찾아야 했다 — 2026-08-18 alpha 실화면에서 이 막다른 길이 드러났다. */
+  it('정정할 결과가 없으면 전제 화면(결과 검토)으로 가는 길을 함께 준다', async () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    mocks.useTournamentEndedFixtures.mockReturnValue({
+      isPending: false, isSuccess: true, isError: false, data: { items: [] }, refetch: vi.fn(),
+    });
+    render(<CorrectionsPageClient tournamentId="t-1" />);
+    expect(screen.getByText('정정할 결과가 없어요')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '결과 검토로 가기' }));
+    expect(mocks.routerPush).toHaveBeenCalledWith('/tournament-ops/tournaments/t-1/result-review');
+  });
+
+  /* 셸(`TournamentOpsShell`)이 이미 <main> 을 그린다. 이 화면이 자기 <main> 을 또
+     열면 문서에 main 랜드마크가 둘 생겨 스크린리더 탐색이 깨지고, padding·최대 폭도
+     이중으로 걸린다(예전에 인라인 style maxWidth:960 이 셸의 1200 안에 또 있었다). */
+  it('셸이 그린 main 안에서 자기 main 을 다시 열지 않는다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    const { container } = render(<CorrectionsPageClient tournamentId="t-1" />);
+    expect(container.querySelectorAll('main')).toHaveLength(0);
   });
 
   it('fixtureId가 없으면 기존처럼 미선택 상태다', () => {

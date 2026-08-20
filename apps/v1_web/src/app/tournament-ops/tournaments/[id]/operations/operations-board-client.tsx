@@ -20,6 +20,7 @@ import { formatPenaltyShootout, readGameResultScore } from '@/lib/game-result-sc
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton, AdminTableSkeleton } from '@/components/admin/admin-skeleton';
 import { GameStateBadge, WarningBadge, WARNING_LABELS } from '@/components/tournament-ops/badges';
+import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
 import { TournamentProgressStepper, buildTournamentStages } from '@/components/tournaments/tournament-progress-stepper';
 import type {
   V1GameState,
@@ -74,7 +75,7 @@ function FixtureResultCell({
 }) {
   const score = readGameResultScore(item.currentScore);
   if (score === null) {
-    return <span className="text-[12px] text-gray-300 dark:text-gray-600">—</span>;
+    return <span className="text-[length:var(--font-size-caption)] text-gray-300 dark:text-gray-600">—</span>;
   }
   return (
     <div className={align === 'right' ? 'text-right' : undefined}>
@@ -82,7 +83,7 @@ function FixtureResultCell({
         {score.home}:{score.away}
       </p>
       {score.penalties ? (
-        <p className="text-[12px] tabular-nums text-[var(--text-muted)]">
+        <p className="text-[length:var(--font-size-caption)] tabular-nums text-[var(--text-muted)]">
           {formatPenaltyShootout(score.penalties)}
         </p>
       ) : null}
@@ -140,7 +141,7 @@ function FixtureFieldCell({
             assign.mutate({ fixtureId: item.fixtureId, fieldId: next }, { onError });
           }
         }}
-        className="min-h-11 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-2 text-[13px] text-[var(--text-body)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+        className="min-h-11 rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-2 text-[length:var(--font-size-label)] text-[var(--text-body)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
       >
         <option value="">미배정</option>
         {fields.map((field) => (
@@ -150,7 +151,7 @@ function FixtureFieldCell({
         ))}
       </select>
       {error !== null && (
-        <p className="text-[12px] text-[var(--red700)]" role="alert">
+        <p className="text-[length:var(--font-size-caption)] text-[var(--red700)]" role="alert">
           {error}
         </p>
       )}
@@ -297,26 +298,22 @@ export function OperationsBoardClient({ tournamentId }: Props) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex justify-between items-start gap-3">
-        <div>
-          <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] tracking-normal mb-1">
-            {tournament.data?.title ?? '대회 운영'}
-          </p>
-          <h1 className="text-[22px] md:text-[24px] font-bold text-[var(--text-strong)]">운영 보드</h1>
-          <p className="text-[13px] md:text-[14px] text-[var(--text-muted)] mt-1">
-            경기 진행 상태와 경고를 한눈에 확인해요. 15초마다 자동으로 갱신돼요.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void board.refetch()}
-          disabled={board.isFetching}
-          aria-label="지금 새로고침"
-          className="flex items-center justify-center w-[44px] h-[44px] rounded-xl border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
-        >
-          <RefreshCw size={18} aria-hidden="true" className={board.isFetching ? 'animate-spin' : ''} />
-        </button>
-      </div>
+      <OpsPageHeader
+        tournamentTitle={tournament.data?.title}
+        title="운영 보드"
+        description="경기 진행 상태와 경고를 한눈에 확인해요. 15초마다 자동으로 갱신돼요."
+        action={
+          <button
+            type="button"
+            onClick={() => void board.refetch()}
+            disabled={board.isFetching}
+            aria-label="지금 새로고침"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-xl border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
+          >
+            <RefreshCw size={18} aria-hidden="true" className={board.isFetching ? 'animate-spin' : ''} />
+          </button>
+        }
+      />
 
       {stages.length > 0 ? (
         <div className="border-y border-[var(--border)] py-3 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8">
@@ -417,25 +414,25 @@ export function OperationsBoardClient({ tournamentId }: Props) {
               <table className="w-max min-w-full text-sm text-[var(--text-body)]">
                 <thead className="sticky top-0 bg-[var(--surface-soft)] border-b border-[var(--border)]">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       대진
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       일정
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       필드
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       상태
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       결과
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       경고
                     </th>
-                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[12px]">
+                    <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
                       운영
                     </th>
                   </tr>
@@ -446,7 +443,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <p className="font-medium text-[var(--text-strong)]">{rowLabel(item)}</p>
                         {/* 모바일 카드와 같은 표기 — "4강 4경기"는 "4강의 4번째 경기"로 오독된다. */}
-                        <p className="text-[12px] text-gray-400">{item.round} · {item.fixtureNumber}번 경기</p>
+                        <p className="text-[length:var(--font-size-caption)] text-gray-400">{item.round} · {item.fixtureNumber}번 경기</p>
                       </td>
                       <td className="px-4 py-3 align-middle tabular-nums">
                         {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '미정'}
@@ -468,7 +465,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <div className="flex flex-wrap gap-1">
                           {rowWarnings(item).length === 0 ? (
-                            <span className="text-[12px] text-gray-300 dark:text-gray-600">—</span>
+                            <span className="text-[length:var(--font-size-caption)] text-gray-300 dark:text-gray-600">—</span>
                           ) : (
                             rowWarnings(item).map((code) => <WarningBadge key={code} code={code} />)
                           )}
@@ -477,7 +474,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <Link
                           href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                          className="inline-flex items-center min-h-11 px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                          className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                         >
                           운영 콘솔
                         </Link>
@@ -499,7 +496,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-medium text-[var(--text-strong)] truncate">{rowLabel(item)}</p>
-                    <p className="text-[12px] text-gray-400">
+                    <p className="text-[length:var(--font-size-caption)] text-gray-400">
                       {/* "4강 4경기"는 "4강의 4번째 경기"로 오독된다 — fixtureNumber 는
                           대회 전체 연번이므로 '번 경기'로 번호임을 드러낸다. */}
                       {item.round} · {item.fixtureNumber}번 경기 ·{' '}
@@ -517,7 +514,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                         />
                       </div>
                     ) : item.fieldName ? (
-                      <p className="text-[12px] text-gray-400 mt-0.5">필드 {item.fieldName}</p>
+                      <p className="text-[length:var(--font-size-caption)] text-gray-400 mt-0.5">필드 {item.fieldName}</p>
                     ) : null}
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
@@ -534,7 +531,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 )}
                 <Link
                   href={`/tournament-ops/tournaments/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                  className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[12px] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
                   운영 콘솔로 이동
                 </Link>
@@ -553,7 +550,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 {loadingMore ? '불러오는 중…' : '더 보기'}
               </button>
               {loadMoreError && (
-                <p className="text-[13px] text-[var(--red700)]" role="alert">
+                <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">
                   {loadMoreError}
                 </p>
               )}

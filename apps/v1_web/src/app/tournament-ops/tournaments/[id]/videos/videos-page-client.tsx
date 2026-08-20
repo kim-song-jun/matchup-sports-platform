@@ -7,6 +7,8 @@ import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { AdminToasts, useAdminToast } from '@/components/admin/admin-toast';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
+import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
+import { useV1Tournament } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
@@ -150,7 +152,7 @@ function AddVideoForm({
 
       {mode === 'link' ? (
         <div className="flex flex-col gap-1">
-          <label htmlFor={linkInputId} className="text-[13px] font-semibold text-[var(--text-body)]">
+          <label htmlFor={linkInputId} className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
             영상 주소
           </label>
           <input
@@ -164,13 +166,13 @@ function AddVideoForm({
             placeholder="https://youtu.be/..."
             className="h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
           />
-          <p className="text-[12px] text-[var(--text-muted)]">
+          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
             유튜브 등 http·https 로 시작하는 주소만 등록할 수 있어요.
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-1">
-          <label htmlFor={fileInputId} className="text-[13px] font-semibold text-[var(--text-body)]">
+          <label htmlFor={fileInputId} className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
             영상 파일
           </label>
           <input
@@ -184,7 +186,7 @@ function AddVideoForm({
             }}
             className="min-h-[44px] text-sm text-[var(--text-body)] file:mr-3 file:h-[36px] file:rounded-lg file:border-0 file:bg-[var(--surface-soft)] file:px-3 file:text-sm file:font-semibold file:text-[var(--text-body)] disabled:opacity-50"
           />
-          <p className="text-[12px] text-[var(--text-muted)]">
+          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
             {VIDEO_UPLOAD_EXTENSION_LABEL} 파일을 {VIDEO_UPLOAD_MAX_LABEL}까지 올릴 수 있어요. 업로드에는
             시간이 걸릴 수 있어요.
           </p>
@@ -192,7 +194,7 @@ function AddVideoForm({
       )}
 
       <div className="flex flex-col gap-1">
-        <label htmlFor={titleInputId} className="text-[13px] font-semibold text-[var(--text-body)]">
+        <label htmlFor={titleInputId} className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
           제목 (선택)
         </label>
         <input
@@ -208,7 +210,7 @@ function AddVideoForm({
       </div>
 
       {localError !== null && (
-        <p className="text-[13px] text-[var(--red700)]" role="alert">
+        <p className="text-[length:var(--font-size-label)] text-[var(--red700)]" role="alert">
           {localError}
         </p>
       )}
@@ -250,10 +252,10 @@ function FixtureVideoCard({
     <li className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-4 py-3 flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[15px] font-bold text-[var(--text-strong)] break-keep">
+          <p className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] break-keep">
             {fixtureLabel(fixture)}
           </p>
-          <p className="text-[13px] text-[var(--text-muted)] mt-0.5">
+          <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] mt-0.5">
             {fixture.scheduledAt ? formatAdminDateTime(fixture.scheduledAt) : '일정 미정'} · 영상{' '}
             {fixture.videos.length}개
           </p>
@@ -272,7 +274,7 @@ function FixtureVideoCard({
       </div>
 
       {fixture.videos.length === 0 ? (
-        <p className="text-[13px] text-[var(--text-muted)]">아직 등록된 영상이 없어요.</p>
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">아직 등록된 영상이 없어요.</p>
       ) : (
         <ul className="flex flex-col gap-1.5" role="list">
           {fixture.videos.map((video, index) => (
@@ -284,11 +286,11 @@ function FixtureVideoCard({
                 {video.source === 'upload' ? <Clapperboard size={16} /> : <ExternalLink size={16} />}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[14px] text-[var(--text-strong)] truncate">
+                <span className="block text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] truncate">
                   {videoTitle(video, index)}
                 </span>
                 {/* 출처는 아이콘만으로 구분하지 않는다 — 텍스트를 함께 둔다. */}
-                <span className="block text-[12px] text-[var(--text-muted)] truncate">
+                <span className="block text-[length:var(--font-size-caption)] text-[var(--text-muted)] truncate">
                   {video.source === 'upload' ? '업로드한 파일' : '외부 링크'} · {video.url}
                 </span>
               </span>
@@ -335,6 +337,9 @@ function FixtureVideoCard({
  */
 export function VideosPageClient({ tournamentId }: Props) {
   const role = useTournamentOpsRole();
+  /* 머리말 eyebrow 에 쓸 대회명 — 이 화면만 eyebrow 가 없어서 셸 안에서 혼자
+     "어느 대회인지" 문맥이 끊겼다. 다른 네 화면과 같은 소스를 쓴다. */
+  const tournament = useV1Tournament(tournamentId);
   const videos = useTournamentFixtureVideos(tournamentId);
   const remove = useDeleteFixtureVideo(tournamentId);
   const { toasts, showToast } = useAdminToast();
@@ -369,21 +374,26 @@ export function VideosPageClient({ tournamentId }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-3 px-4 py-4 max-w-[860px] mx-auto w-full">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-[18px] font-bold text-[var(--text-strong)]">경기 영상</h1>
-        <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
-          경기마다 하이라이트·중계 영상을 등록해요. 유튜브 같은 외부 링크를 붙이거나,{' '}
-          {VIDEO_UPLOAD_EXTENSION_LABEL} 파일을 {VIDEO_UPLOAD_MAX_LABEL}까지 직접 올릴 수 있어요.
-          등록한 영상은 공개 경기 기록 화면에서 바로 재생돼요.
+    /* 폭·여백은 셸의 <main>(px-4~lg:px-8 + max-w-[1200px])이 이미 책임진다 —
+       여기서 max-w-[860px] 를 또 걸면 같은 셸 안의 다른 화면과 본문 폭이 어긋난다. */
+    <div className="flex flex-col gap-4 w-full">
+      <OpsPageHeader
+        tournamentTitle={tournament.data?.title}
+        title="경기 영상"
+        description={
+          <>
+            경기마다 하이라이트·중계 영상을 등록해요. 유튜브 같은 외부 링크를 붙이거나,{' '}
+            {VIDEO_UPLOAD_EXTENSION_LABEL} 파일을 {VIDEO_UPLOAD_MAX_LABEL}까지 직접 올릴 수 있어요.
+            등록한 영상은 공개 경기 기록 화면에서 바로 재생돼요.
+          </>
+        }
+      />
+      {!canManage && (
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]" role="status">
+          지원 담당은 등록된 영상을 확인만 할 수 있어요. 등록·삭제는 대회 운영자(디렉터)나 플랫폼
+          운영자에게 요청해 주세요.
         </p>
-        {!canManage && (
-          <p className="text-[13px] text-[var(--text-muted)]" role="status">
-            지원 담당은 등록된 영상을 확인만 할 수 있어요. 등록·삭제는 대회 운영자(디렉터)나 플랫폼
-            운영자에게 요청해 주세요.
-          </p>
-        )}
-      </header>
+      )}
 
       {videos.isPending ? (
         <AdminListSkeleton />
@@ -409,7 +419,7 @@ export function VideosPageClient({ tournamentId }: Props) {
         />
       ) : (
         <>
-          <p className="text-[13px] text-[var(--text-muted)]" role="status">
+          <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]" role="status">
             경기 {fixtures.length}개 · 등록된 영상 {totalVideos}개
           </p>
           <ul className="flex flex-col gap-2" role="list">

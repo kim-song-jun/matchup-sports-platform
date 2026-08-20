@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   useV1Tournament: vi.fn(),
   useTournamentEndedFixtures: vi.fn(),
   useSearchParams: vi.fn(),
+  routerPush: vi.fn(),
 }));
 
 // `ResultReviewPageClient`가 자체적으로 `<RequireAuth>`로 감싸므로(공유 셸 미도입
@@ -24,6 +25,8 @@ vi.mock('@/hooks/use-tournament-result-review', async (importOriginal) => {
 });
 vi.mock('next/navigation', () => ({
   useSearchParams: (...args: unknown[]) => mocks.useSearchParams(...args),
+  // 빈 목록에서 다음 단계로 보내는 CTA 가 라우터를 쓴다.
+  useRouter: () => ({ push: mocks.routerPush }),
 }));
 vi.mock('@/components/tournament-result-review/game-result-review-panel', () => ({
   GameResultReviewPanel: ({ gameId }: { gameId: string }) => <div data-testid="panel">panel:{gameId}</div>,

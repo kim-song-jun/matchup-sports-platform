@@ -34,6 +34,16 @@ raw roster identity fields.
 | `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/submit` | authenticated **host** team owner/manager only (Task 16) | `SubmitGameResultRevisionDto`; team-match only. Same `409 TEAM_MATCH_NOT_MATCHED` precondition as the draft route above. It atomically validates/submits the revision and moves `SCHEDULED`, `LIVE`, or `PAUSED` to `ENDED`; the same transaction also completes the linked `V1TeamMatch` (`status=completed`, `completedAt`) — idempotently, via a `status != completed` guard so a correction-loop resubmit is a no-op — and, on the first real transition only, writes a matching `V1StatusChangeLog` row (`team_match`, `matched → completed`) so review eligibility keeps working and the status history stays complete now that the old `POST /api/v1/team-matches/:teamMatchId/complete` shortcut is removed (Task 16 — that route bypassed all result validation and opponent approval and never was part of this frozen contract). |
 | `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/decision` | authenticated opposing team result decider | `DecideGameResultRevisionDto`; `approve` or `change_request` for a team-match revision. |
 
+### Penalty-shootout conclusion rule
+
+Tournament shootouts use a three-kick opening series. With `earlyStop: true` (the default),
+the server accepts the result as soon as the trailing team cannot draw level with its remaining
+opening kicks, so `takenHome` and `takenAway` do not have to be equal for an early conclusion.
+If the score is tied after both teams complete three kicks, sudden death continues without an
+upper limit; an automatic conclusion then requires both teams to have completed the same
+sudden-death round and the scores to differ. The frontend previews this rule, but the API
+re-evaluates the same kick counts before persisting the result.
+
 ### Mutation, version, and history rules
 
 Every Game mutation requires `expectedVersion`, an `Idempotency-Key` header, and the matching

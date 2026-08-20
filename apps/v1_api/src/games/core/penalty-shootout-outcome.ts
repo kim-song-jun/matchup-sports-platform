@@ -28,6 +28,9 @@ export type PenaltyShootoutKickCounts = {
 
 export type PenaltyShootoutPolicy = { readonly earlyStop: boolean };
 
+/** Teameet tournament shootouts use a three-kick opening series. */
+export const PENALTY_SHOOTOUT_INITIAL_KICKS = 3;
+
 /**
  * 프런트 `penaltyShootoutOutcome`의 서버 미러. **판정 문장이 갈리면 안 되므로**
  * 분기 구조와 주석의 근거를 의도적으로 같게 유지한다.
@@ -41,7 +44,8 @@ export function penaltyShootoutDecided(
   policy: PenaltyShootoutPolicy,
 ): boolean {
   const { home, away, takenHome, takenAway, firstKickSideKey } = counts;
-  // 한 팀이 한 번도 안 찼으면 어떤 정책에서도 확정하지 않는다. 아래 5킥 산술이
+  const initialKicks = PENALTY_SHOOTOUT_INITIAL_KICKS;
+  // 한 팀이 한 번도 안 찼으면 어떤 정책에서도 확정하지 않는다. 아래 기본 킥 산술이
   // 이미 막는 것 아닌가? — 아니다. 킥 수가 크게 어긋난 국면(선축 6킥 6점 /
   // 후축 0킥)에서는 잔여 5로 `6 > 0 + 5`가 성립해 DECIDED가 나온다.
   if (takenHome === 0 || takenAway === 0) return false;
@@ -49,7 +53,7 @@ export function penaltyShootoutDecided(
 
   if (firstKickSideKey === undefined) {
     // 선축을 모르면 "누가 몇 개 남았는지"를 계산할 수 없다 — 어느 팀이 선축인지에 따라
-    // 잔여 킥이 갈리기 때문이다. 그래서 **조기 종료를 아예 허용하지 않는다**: 5킥을 다
+    // 잔여 킥이 갈리기 때문이다. 그래서 **조기 종료를 아예 허용하지 않는다**: 기본 3킥을 다
     // 채우고 같은 횟수를 찬 경우에만 결판으로 본다(A1의 문장을 그대로 쓴다).
     //
     // 2026-08-18 알파 실측 정정 — 예전엔 `takenHome === takenAway` 한 줄이라 5킥 바닥이
@@ -58,7 +62,7 @@ export function penaltyShootoutDecided(
     //   {home:1, away:0, takenHome:1, takenAway:1}                          → 201 통과
     // 주석은 "보수적"이라고 적혀 있었지만 실제로는 A1보다도 A2보다도 느슨했다.
     // 우회가 쉬운 쪽이 기본값이 되면 게이트가 있으나 마나다.
-    if (takenHome < 5 || takenAway < 5) return false;
+    if (takenHome < initialKicks || takenAway < initialKicks) return false;
     return takenHome === takenAway;
   }
   const firstIsHome = firstKickSideKey === 'HOME';
@@ -67,17 +71,17 @@ export function penaltyShootoutDecided(
   const scoreFirst = firstIsHome ? home : away;
   const scoreSecond = firstIsHome ? away : home;
 
-  // A1 = 조기 종료 없음 — 5킥을 다 채운 뒤에만 판정한다. 프런트 술어의 같은 분기와
+  // A1 = 조기 종료 없음 — 기본 3킥을 다 채운 뒤에만 판정한다. 프런트 술어의 같은 분기와
   // 문장을 맞춘다(2026-08-18 정정: 예전엔 각 1킥 1:0에 결판이 나 어느 규정에도 없는
   // 동작이었다).
   if (!policy.earlyStop) {
-    if (takenFirst < 5 || takenSecond < 5) return false;
+    if (takenFirst < initialKicks || takenSecond < initialKicks) return false;
     return takenFirst === takenSecond;
   }
 
-  if (takenFirst < 5 || takenSecond < 5) {
-    const remainingFirst = Math.max(0, 5 - takenFirst);
-    const remainingSecond = Math.max(0, 5 - takenSecond);
+  if (takenFirst < initialKicks || takenSecond < initialKicks) {
+    const remainingFirst = Math.max(0, initialKicks - takenFirst);
+    const remainingSecond = Math.max(0, initialKicks - takenSecond);
     if (scoreFirst > scoreSecond + remainingSecond) return true;
     if (scoreSecond > scoreFirst + remainingFirst) return true;
     return false;

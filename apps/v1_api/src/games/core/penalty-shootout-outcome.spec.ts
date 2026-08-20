@@ -24,20 +24,20 @@ describe('penaltyShootoutDecided — 서버가 킥 수를 보고 판정한다', 
     expect(penaltyShootoutDecided(counts, A1)).toBe(false);
   });
 
-  it('각 3킥 3:0 — A2는 역전 불가라 결판, A1은 5킥을 마저 차야 한다', () => {
+  it('각 3킥 3:0 — 기본 3회를 마쳐 두 정책 모두 결판이다', () => {
     const counts = { home: 3, away: 0, takenHome: 3, takenAway: 3, firstKickSideKey: 'HOME' } as const;
     expect(penaltyShootoutDecided(counts, A2)).toBe(true);
-    expect(penaltyShootoutDecided(counts, A1)).toBe(false);
+    expect(penaltyShootoutDecided(counts, A1)).toBe(true);
   });
 
-  it('A1도 5킥을 다 채우면 판정한다', () => {
+  it('A1은 기본 3회를 다 채우면 판정한다', () => {
     expect(
-      penaltyShootoutDecided({ home: 3, away: 1, takenHome: 5, takenAway: 5, firstKickSideKey: 'HOME' }, A1),
+      penaltyShootoutDecided({ home: 3, away: 1, takenHome: 3, takenAway: 3, firstKickSideKey: 'HOME' }, A1),
     ).toBe(true);
   });
 
-  it('선축 4킥 4점 / 후축 3킥 0점은 A2에서 결판, A1에서는 미결 — 두 정책이 갈리는 지점', () => {
-    const counts = { home: 4, away: 0, takenHome: 4, takenAway: 3, firstKickSideKey: 'HOME' } as const;
+  it('선축 3킥 3점 / 후축 2킥 0점은 횟수가 달라도 A2에서 결판이다', () => {
+    const counts = { home: 3, away: 0, takenHome: 3, takenAway: 2, firstKickSideKey: 'HOME' } as const;
     expect(penaltyShootoutDecided(counts, A2)).toBe(true);
     expect(penaltyShootoutDecided(counts, A1)).toBe(false);
     // A1이 여기서 미결인 이유는 "킥 수가 달라서"가 아니라 **5킥을 안 채워서**다.
@@ -47,7 +47,7 @@ describe('penaltyShootoutDecided — 서버가 킥 수를 보고 판정한다', 
     // 원정 선축 4킥 4점 / 홈 3킥 0점. 선축을 홈으로 착각하면 "선축 3킥 0점 /
     // 후축 4킥 4점"으로 읽혀 잔여 계산이 뒤집힌다.
     expect(
-      penaltyShootoutDecided({ home: 0, away: 4, takenHome: 3, takenAway: 4, firstKickSideKey: 'AWAY' }, A2),
+      penaltyShootoutDecided({ home: 0, away: 3, takenHome: 2, takenAway: 3, firstKickSideKey: 'AWAY' }, A2),
     ).toBe(true);
   });
 
@@ -69,11 +69,11 @@ describe('penaltyShootoutDecided — 서버가 킥 수를 보고 판정한다', 
     expect(penaltyShootoutDecided({ home: 1, away: 0, takenHome: 1, takenAway: 1 }, A2)).toBe(false);
     expect(penaltyShootoutDecided({ home: 1, away: 0, takenHome: 1, takenAway: 1 }, A1)).toBe(false);
     // 5킥 미만은 같은 횟수여도 결판이 아니다.
-    expect(penaltyShootoutDecided({ home: 3, away: 0, takenHome: 3, takenAway: 3 }, A2)).toBe(false);
+    expect(penaltyShootoutDecided({ home: 2, away: 0, takenHome: 2, takenAway: 2 }, A2)).toBe(false);
     // 킥 수가 다르면 당연히 결판이 아니다(선축 하드코딩으로 되돌아가지 않는다).
     expect(penaltyShootoutDecided({ home: 4, away: 0, takenHome: 4, takenAway: 3 }, A2)).toBe(false);
     // 5킥을 다 채우고 같은 횟수를 찼으면 결판이다 — 잠가 두기만 하는 분기가 아니다.
-    expect(penaltyShootoutDecided({ home: 3, away: 1, takenHome: 5, takenAway: 5 }, A2)).toBe(true);
+    expect(penaltyShootoutDecided({ home: 3, away: 1, takenHome: 3, takenAway: 3 }, A2)).toBe(true);
   });
 
   it('선축 미상 분기가 선축을 아는 경우보다 느슨하면 안 된다 — 두 정책 어느 쪽보다도', () => {
@@ -92,10 +92,10 @@ describe('penaltyShootoutDecided — 서버가 킥 수를 보고 판정한다', 
   });
 
   it('서든데스는 같은 횟수를 찬 뒤 점수가 갈려야 결판이다', () => {
-    const six = { home: 1, away: 0, takenHome: 6, takenAway: 5, firstKickSideKey: 'HOME' } as const;
-    expect(penaltyShootoutDecided(six, A2)).toBe(false);
+    const fourth = { home: 1, away: 0, takenHome: 4, takenAway: 3, firstKickSideKey: 'HOME' } as const;
+    expect(penaltyShootoutDecided(fourth, A2)).toBe(false);
     expect(
-      penaltyShootoutDecided({ home: 1, away: 0, takenHome: 6, takenAway: 6, firstKickSideKey: 'HOME' }, A2),
+      penaltyShootoutDecided({ home: 1, away: 0, takenHome: 4, takenAway: 4, firstKickSideKey: 'HOME' }, A2),
     ).toBe(true);
   });
 });

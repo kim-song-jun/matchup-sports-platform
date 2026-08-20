@@ -71,7 +71,10 @@ function undecidedReason(
     const waiting = takenFirst === 0 ? first : second;
     return `${waiting.displayNameSnapshot}이(가) 아직 한 번도 차지 않았어요.`;
   }
-  if (takenFirst !== takenSecond) return '두 팀이 같은 횟수를 차야 해요.';
+  if (takenFirst !== takenSecond) {
+    const waiting = takenFirst < takenSecond ? first : second;
+    return `${waiting.displayNameSnapshot}의 응답 킥이 남아 있어요.`;
+  }
   const score = penaltyScoreBySideId(kicks);
   if ((score.get(first.id) ?? 0) === (score.get(second.id) ?? 0)) return '점수가 같으면 끝낼 수 없어요.';
   return '아직 남은 킥으로 뒤집힐 수 있어요.';

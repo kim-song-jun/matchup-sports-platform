@@ -82,20 +82,21 @@ export type PenaltyShootoutOutcome = 'IN_PROGRESS' | 'DECIDED';
 /** 승부차기 종료 판정 정책 — 대회 설정(`GameDetail.penaltyShootoutPolicy`)에서 온다. */
 export interface PenaltyShootoutPolicy {
   /**
-   * **처음 5킥을 다 차기 전에** 끝내도 되는가.
+   * **기본 3킥을 다 차기 전에** 끝내도 되는가.
    *
    * `true`(FIFA 정규, 기본) — 라운드 중간이라도 남은 킥을 다 넣어서 못 따라잡는
    * 순간 종료.
-   * `false` — 라운드가 끝나야(= 양 팀이 **같은 횟수**를 찬 뒤) 결판을 볼 수 있다.
-   * 한 팀이 더 찬 상태에서는 수학적으로 이미 끝났어도 종료하지 않는다.
+   * `false` — 기본 3킥을 양 팀이 모두 찬 뒤에 결판을 볼 수 있다.
    *
    * 두 정책이 갈리는 국면은 "킥 수가 다른데 이미 수학적으로 확정된" 구간 하나뿐이다.
-   * 같은 횟수를 찬 뒤 점수가 갈렸다면 어느 정책이든 종료한다 — 그래서 `false`가
-   * 5킥 구간 전체를 잠그지는 않는다(잠그면 각 3킥 3:0처럼 현장에서 이미 끝난
-   * 승부차기를 영영 종료할 수 없다).
+   * 기본 구간 뒤 동점이면 서든데스로 넘어가며, 그때는 양 팀의 응답 킥 한 쌍이
+   * 끝난 뒤 점수가 갈려야 종료한다.
    */
   readonly earlyStop: boolean;
 }
+
+/** Teameet tournament shootouts use a three-kick opening series. */
+export const PENALTY_SHOOTOUT_INITIAL_KICKS = 3;
 
 /**
  * 승부차기가 끝났는지 판정한다.
@@ -125,52 +126,53 @@ export function penaltyShootoutOutcome(
   const takenSecond = kicks.filter((kick) => kick.sideId === second.id).length;
   const scoreFirst = kicks.filter((kick) => kick.sideId === first.id && kick.result === 'SCORED').length;
   const scoreSecond = kicks.filter((kick) => kick.sideId === second.id && kick.result === 'SCORED').length;
+  const initialKicks = PENALTY_SHOOTOUT_INITIAL_KICKS;
 
   // 두 정책이 **공유하는** 불변식이라 분기보다 먼저, 한 번만 둔다: 한쪽이라도 아직
   // 차지 않았으면 어떤 정책에서도 확정하지 않는다.
   //
-  // 아래 5킥 산술이 이미 막아 주는 것 아닌가? — **아니다.** 킥 수가 크게 어긋난 국면
-  // (선축 6킥 6점 / 후축 0킥)에서는 `remainingSecond`가 5라 `6 > 0 + 5`가 성립해
+  // 아래 기본 킥 산술이 이미 막아 주는 것 아닌가? — **아니다.** 킥 수가 크게 어긋난 국면
+  // (선축 4킥 4점 / 후축 0킥)에서는 `remainingSecond`가 3이라 `4 > 0 + 3`이 성립해
   // 후축이 한 번도 차지 않았는데 DECIDED가 나온다. 번갈아 차는 UI에서는 두 팀의 킥 수
   // 차이가 1을 넘지 않지만, 이 함수는 순수 술어라 호출부의 그 성질에 기대지 않는다.
   // (사용자가 보고한 "홈 1킥 1:0에 종료 가능"은 이 줄이 아니라 아래 산술이 막는다 —
-  //  1 > 0 + 5가 거짓이라 IN_PROGRESS다.)
+  //  1 > 0 + 3이 거짓이라 IN_PROGRESS다.)
   if (takenFirst === 0 || takenSecond === 0) return 'IN_PROGRESS';
 
-  // A1(`earlyStop: false`) — **조기 종료 없이 5킥을 다 채운다.**
+  // A1(`earlyStop: false`) — **조기 종료 없이 기본 3킥을 다 채운다.**
   //
   // 2026-08-18 정정: 예전 구현은 이 자리에서 "같은 횟수 + 점수 갈림"이면 곧바로 결판이라
   // 판정했는데, 그러면 **각 1킥 1:0에 승부차기가 끝난다.** 어느 대회 규정에도 없는 동작이고,
   // `earlyStop: false`("조기 종료 안 함")라는 이름과 정반대다. 더 나쁜 건 같은 구현이
-  // 반대 방향으로도 틀렸다는 것이다 — 선축 4킥 4점 / 후축 3킥 0점처럼 **수학적으로 이미
+  // 반대 방향으로도 틀렸다는 것이다 — 선축 3킥 3점 / 후축 2킥 0점처럼 **수학적으로 이미
   // 끝난** 경기는 킥 수가 다르다는 이유로 끝내지 못했다. 즉 A1은 A2보다 느슨하면서 동시에
   // 엄격한, 어느 규칙에도 대응하지 않는 제3의 정책이었다.
   //
   // 두 정책의 올바른 대비는 **조기 종료를 허용하는가** 하나뿐이다:
-  //   A2 = FIFA 정규 — 5킥 이내라도 잔여 킥으로 역전 불가하면 종료
-  //   A1 = 5킥을 다 채운 뒤에만 판정, 그 뒤는 서든데스(두 정책 공통)
+  //   A2 = 기본 3킥 이내라도 잔여 킥으로 역전 불가하면 종료
+  //   A1 = 기본 3킥을 다 채운 뒤에만 판정, 그 뒤는 서든데스(두 정책 공통)
   //
   // 예전 주석은 "5킥 구간을 통째로 IN_PROGRESS로 만들면 운영자가 차지도 않은 킥을 지어내야
   // 하는 막다른 상태가 된다"고 경고했는데, 그 막다른 길은 이제 **운영자 명시 종료**
   // ("그래도 종료", `penaltyFinishAvailability`의 `OVERRIDABLE`)가 연다 — 규칙을 왜곡해서
   // 출구를 만들 이유가 없어졌다.
   if (!policy.earlyStop) {
-    if (takenFirst < 5 || takenSecond < 5) return 'IN_PROGRESS';
+    if (takenFirst < initialKicks || takenSecond < initialKicks) return 'IN_PROGRESS';
     return takenFirst === takenSecond && scoreFirst !== scoreSecond ? 'DECIDED' : 'IN_PROGRESS';
   }
 
-  // 처음 5킥 구간(A2 · FIFA 정규). 남은 킥을 다 넣어도 못 따라잡으면 라운드 중간이라도 끝난다
-  // — 두 정책의 답이 갈리는 국면이 정확히 여기다(예: 선축 4킥 4점 / 후축 3킥 0점 — 수학적으로
+  // 기본 3킥 구간(A2). 남은 킥을 다 넣어도 못 따라잡으면 라운드 중간이라도 끝난다
+  // — 두 정책의 답이 갈리는 국면이 정확히 여기다(예: 선축 3킥 3점 / 후축 2킥 0점 — 수학적으로
   // 이미 끝났지만 킥 수가 달라 A1은 계속한다).
-  if (takenFirst < 5 || takenSecond < 5) {
-    const remainingFirst = Math.max(0, 5 - takenFirst);
-    const remainingSecond = Math.max(0, 5 - takenSecond);
+  if (takenFirst < initialKicks || takenSecond < initialKicks) {
+    const remainingFirst = Math.max(0, initialKicks - takenFirst);
+    const remainingSecond = Math.max(0, initialKicks - takenSecond);
     if (scoreFirst > scoreSecond + remainingSecond) return 'DECIDED';
     if (scoreSecond > scoreFirst + remainingFirst) return 'DECIDED';
     return 'IN_PROGRESS';
   }
 
-  // 5킥을 다 찬 뒤(서든데스)는 두 정책이 같다 — 같은 횟수를 찬 뒤 점수가 갈려야 끝난다.
+  // 기본 3킥 뒤(서든데스)는 두 정책이 같다 — 응답 킥 한 쌍 뒤 점수가 갈려야 끝난다.
   // 여기에 "같은 킥 수" 조건이 없으면 후축이 답할 기회를 얻기 전에 종료할 수 있고,
   // "점수가 다름" 조건이 없으면 무승부 승부차기가 나가 서버가 422로 되돌린다.
   return takenFirst === takenSecond && scoreFirst !== scoreSecond ? 'DECIDED' : 'IN_PROGRESS';

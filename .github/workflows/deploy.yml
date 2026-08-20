@@ -148,6 +148,39 @@ jobs:
       - name: Prod rollback guard tests
         run: bash scripts/qa/test-prod-rollback-guards.sh
 
+      # expand-contract 게이트를 **머지 전에** 돌린다.
+      #
+      # 2026-08-20 사고: 이 검사가 `deploy` job 에만 있었고 그 job 은 PR 에서 skip 된다.
+      # 그래서 마이그레이션을 포함한 PR 이 모든 체크를 통과해 머지됐고, 배포 단계에서야
+      # 거부돼 **alpha 가 2시간 20분 막혔다**(그사이 모든 세션의 실화면 검증이 멈췄다).
+      # 머지 후에야 알 수 있는 게이트는 게이트로서 늦다.
+      #
+      # base 는 PR 의 merge-base 다 — deploy 가 쓰는 "직전 릴리스" 기준과는 다르지만,
+      # 이 자리에서 답해야 하는 질문은 "이 PR 이 non-additive 문장을 **새로 들여오는가**"
+      # 이므로 그쪽이 맞다. 배포 시점의 최종 판정은 `deploy` job 이 그대로 유지한다
+      # (이 스텝은 그것을 대체하지 않고 앞당길 뿐이다).
+      #
+      # PR 에서만 돈다: push 이벤트에는 신뢰할 만한 base 가 없고, dev push 는 곧바로
+      # `deploy` 가 같은 검사를 실제 릴리스 기준으로 수행한다.
+      - name: Expand-contract migration gate (PR)
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -Eeuo pipefail
+          # base 는 이벤트 payload 를 우선 쓴다. `git merge-base origin/<base>` 로 직접
+          # 구하려다 실패했는데(2026-08-20), PR 체크아웃에는 base 브랜치의 원격 추적 ref
+          # 가 없어 `origin/dev` 를 해석하지 못한다 — 바로 위 changeset 스텝이 payload
+          # 값을 먼저 쓰고 못 쓸 때만 fetch 로 보강하는 것도 같은 이유다.
+          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            git fetch --no-tags origin "${BASE_REF}"
+            BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
+          fi
+          echo "expand-contract gate: ${BASE_SHA} -> ${HEAD_SHA}"
+          node scripts/qa/check-expand-contract-migrations.mjs "${BASE_SHA}" "${HEAD_SHA}"
+
   # ── API: 타입·마이그레이션·유닛·통합·빌드 ───────────────────────────────────
   api:
     name: API

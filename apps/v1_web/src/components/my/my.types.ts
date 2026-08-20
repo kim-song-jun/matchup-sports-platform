@@ -48,7 +48,6 @@ export type MyMatch = {
   note: string;
   href: string;
   reviewHref?: string;
-  league?: { leagueId: string; title: string } | null;
 };
 
 export type MyMatchesViewModel = {
@@ -84,13 +83,6 @@ export type MyTeam = {
 export type MyTeamsViewModel = {
   teams: MyTeam[];
   summary: Array<{ label: string; value: number | string; unit?: string }>;
-};
-
-export type MyTeamDetailViewModel = {
-  team: MyTeam;
-  actions: MyMenuItem[];
-  recentMatches: MyMatch[];
-  chatHref?: string;
 };
 
 export type MyMember = {

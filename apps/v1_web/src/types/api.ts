@@ -1197,21 +1197,6 @@ export type V1TeamMatchApplicationsPage = {
   };
 };
 
-export type V1MyTeamMatch = {
-  teamMatchId: string;
-  title: string;
-  sportName: string;
-  startsAt: string;
-  status: V1TeamMatchApiStatus;
-  relation: 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
-  teamId?: string | null;
-  teamName?: string | null;
-  applicationId: string | null;
-  league?: { leagueId: string; title: string } | null;
-  manageRoute: string | null;
-  detailRoute: string;
-};
-
 // ─── Task 17: Game aggregate + team result revisions (docs/api/domains/games.md) ───
 
 export type V1GameSourceType = 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';

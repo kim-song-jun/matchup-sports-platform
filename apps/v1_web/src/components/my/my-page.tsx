@@ -40,7 +40,6 @@ import type {
   MyMember,
   MyMenuItem,
   MyTeam,
-  MyTeamDetailViewModel,
   MyTeamMembersViewModel,
   MyTeamsViewModel,
   NotificationSettingsViewModel,
@@ -363,65 +362,6 @@ export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplication
   );
 }
 
-export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }) {
-  return (
-    <AppChrome title="팀 정보" activeTab="my" bottomNav={false} backHref="/my/teams">
-      <div className="tm-my-shell">
-        {/* Desktop page head */}
-        <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my/teams" aria-label="내 팀 목록으로 돌아가기">
-            <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
-          <h1 className="tm-text-heading">{model.team.name}</h1>
-        </div>
-        {/* Desktop 2-column layout */}
-        <div className="tm-my-team-detail-desktop">
-          {/* LEFT: hero + info + recent matches */}
-          <div className="tm-my-team-detail-left">
-            <section className="tm-my-team-hero">
-              <TeamAvatar seed={model.team.id} name={model.team.name} logoUrl={model.team.logoUrl} size="xl" />
-              <div>
-                <h2 className="tm-text-heading">{model.team.name}</h2>
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.team.sport} · {model.team.region} · {model.team.roleLabel}</div>
-              </div>
-              <p className="tm-text-body" style={{ margin: 0, lineHeight: 1.55 }}>{model.team.description}</p>
-            </section>
-            <Card pad={16}>
-              <InfoRow label="멤버" value={`${model.team.members}명`} />
-              <InfoRow label="매너" value={model.team.manner} />
-              <InfoRow label="다음 일정" value={model.team.next} />
-            </Card>
-            {model.recentMatches.length > 0 ? (
-              <>
-                <div className="tm-my-section-label">최근 팀매치</div>
-                <div className="tm-my-list-stack">{model.recentMatches.map((match) => <MyMatchCard key={match.id} match={match} manage />)}</div>
-              </>
-            ) : null}
-          </div>
-          {/* RIGHT sticky: action menu + CTA */}
-          <div className="tm-my-team-detail-right">
-            <MenuSection section={{ title: '운영 메뉴', items: model.actions }} />
-            {/* Desktop inline CTA (replaces fixed bottom bar) */}
-            <div className="tm-my-team-detail-cta tm-show-desktop">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link>
-                <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Mobile fixed CTA — hidden on desktop */}
-      <div className="tm-fixed-cta tm-hide-desktop">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link>
-          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link>
-        </div>
-      </div>
-    </AppChrome>
-  );
-}
-
 export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: { model: MyTeamMembersViewModel; backHref?: string }) {
   return (
     <AppChrome title="멤버 관리" activeTab="my" bottomNav={false} backHref={backHref}>
@@ -562,12 +502,7 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
           <div className="tm-text-body-lg">{match.title}</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>{match.meta}</div>
         </div>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {/* 리그전 배지: 상태가 아니라 카테고리라 중립 grey — 컬러만으로 뜻을 전달하지
-              않도록 "리그전" 텍스트를 함께 싣는다(team-matches 목록 배지와 동일 idiom). */}
-          {match.league ? <span className="tm-badge tm-badge-grey">리그전</span> : null}
-          <span className={`tm-badge ${match.status === 'pending' ? 'tm-badge-orange' : match.status === 'ended' ? 'tm-badge-grey' : 'tm-badge-blue'}`}>{match.statusLabel}</span>
-        </span>
+        <span className={`tm-badge ${match.status === 'pending' ? 'tm-badge-orange' : match.status === 'ended' ? 'tm-badge-grey' : 'tm-badge-blue'}`}>{match.statusLabel}</span>
       </div>
       <p className="tm-text-caption" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{match.note}</p>
       <div className="tm-my-card-actions">

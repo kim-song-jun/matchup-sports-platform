@@ -99,7 +99,6 @@ import type {
   V1RecentVenue,
   V1MyRegionUpdateResult,
   V1MyTeamsResponse,
-  V1MyTeamMatch,
   V1Notification,
   V1NotificationPreferences,
   V1NotificationsPage,
@@ -1383,13 +1382,6 @@ export function useV1RejectTeamMatchApplication(teamMatchId: string) {
       queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'applications'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
     },
-  });
-}
-
-export function useV1MyTeamMatches(filters?: ListFilters) {
-  return useQuery({
-    queryKey: [...v1Keys.all, 'me', 'team-matches', filters ?? {}] as const,
-    queryFn: () => v1Get<CursorPage<V1MyTeamMatch>>('/me/team-matches', filters),
   });
 }
 

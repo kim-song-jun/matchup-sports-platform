@@ -13,7 +13,7 @@ function makePrisma() {
       findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
-      updateMany: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     $executeRaw: jest.fn(),
   };
@@ -71,15 +71,64 @@ describe('TeamContactsService.create', () => {
 
     await expect(service.create(actor, 'B', dto)).rejects.toBeInstanceOf(ConflictException);
 
-    // 양방향으로 조회했는지 — where 에 OR 두 방향이 다 들어있어야 한다
+    // 양방향 OR 과 만료 인지 상태 OR 이 AND 로 함께 들어있어야 한다 —
+    // 만료된 requested 는 활성으로 치지 않아야 재발송을 막지 않는다.
     const where = prisma.v1TeamContact.findFirst.mock.calls[0][0].where;
-    expect(where.OR).toEqual(
+    expect(where.AND).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ fromTeamId: 'A', toTeamId: 'B' }),
-        expect.objectContaining({ fromTeamId: 'B', toTeamId: 'A' }),
+        expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({ fromTeamId: 'A', toTeamId: 'B' }),
+            expect.objectContaining({ fromTeamId: 'B', toTeamId: 'A' }),
+          ]),
+        }),
+        expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({ status: 'accepted' }),
+            expect.objectContaining({
+              status: 'requested',
+              expiresAt: expect.objectContaining({ gt: expect.any(Date) }),
+            }),
+          ]),
+        }),
       ]),
     );
-    expect(where.status).toEqual({ in: ['requested', 'accepted'] });
+  });
+
+  it('만료된 대기 건은 재발송을 막지 않는다 — 같은 트랜잭션 안에서 정리 후 생성한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    // 정리 후 재조회하면 활성 건이 없다(만료된 requested 는 활성이 아니므로)
+    prisma.v1TeamContact.findFirst.mockResolvedValue(null);
+    prisma.v1TeamContact.count.mockResolvedValue(0);
+    prisma.v1TeamContact.create.mockResolvedValue({ id: 'new', status: 'requested' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.create(actor, 'B', dto)).resolves.toMatchObject({ id: 'new' });
+
+    // 만료된 대기 건 정리 updateMany 가 이 팀쌍을 대상으로 호출됐는지
+    expect(prisma.v1TeamContact.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'requested',
+          expiresAt: expect.objectContaining({ lt: expect.any(Date) }),
+        }),
+        data: { status: 'expired' },
+      }),
+    );
+    expect(prisma.v1TeamContact.create).toHaveBeenCalled();
+  });
+
+  it('아직 만료 전인 대기 건은 여전히 재발송을 막는다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1TeamContact.findFirst.mockResolvedValue({ id: 'still-active', status: 'requested' });
+    const service = new TeamContactsService(prisma);
+
+    await expect(service.create(actor, 'B', dto)).rejects.toMatchObject({
+      response: { code: 'TEAM_CONTACT_ALREADY_ACTIVE' },
+    });
+    expect(prisma.v1TeamContact.create).not.toHaveBeenCalled();
   });
 
   it('24시간 내 발송이 한도에 닿으면 거부한다', async () => {

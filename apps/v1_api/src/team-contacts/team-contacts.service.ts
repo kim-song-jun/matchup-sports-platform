@@ -7,8 +7,6 @@ import { CreateTeamContactDto, DeclineTeamContactDto, ListTeamContactsQueryDto }
 const DAILY_SEND_LIMIT = 10;
 /** 무응답 컨택이 만료되기까지의 일수. 확정값 — 스펙 §6. */
 const EXPIRY_DAYS = 7;
-/** 새 컨택을 막는 "진행 중" 상태들. accepted 를 포함해야 채팅방 파편화를 막는다. */
-const ACTIVE_STATUSES = ['requested', 'accepted'] as const;
 /** 목록 조회 기본/최대 페이지 크기. */
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
@@ -45,12 +43,28 @@ export class TeamContactsService {
       const [left, right] = [dto.fromTeamId, toTeamId].sort();
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`team-contact:${left}:${right}`}, 0))`;
 
+      const now = new Date();
+      const directionOr = [
+        { fromTeamId: dto.fromTeamId, toTeamId },
+        { fromTeamId: toTeamId, toTeamId: dto.fromTeamId },
+      ];
+
+      // 이 팀쌍의 만료된 대기 건을 먼저 정리한다. advisory lock 안이라 경합이 없다.
+      // 이걸 안 하면 DB 는 requested 인데 화면은 expired 인 상태가 영구히 남아,
+      // Phase 2·3 이나 어드민 쿼리가 status 를 곧이곧대로 읽었을 때 틀린 답을 얻는다.
+      await tx.v1TeamContact.updateMany({
+        where: { status: 'requested', expiresAt: { lt: now }, OR: directionOr },
+        data: { status: 'expired' },
+      });
+
+      // 활성 = 수락된 것(만료 개념 없음) 또는 아직 만료 전인 대기 건.
+      // 만료 시각이 지난 requested 는 화면에 expired 로 보이므로(그리고 위에서 이미 정리됐으므로)
+      // 활성으로 치지 않는다 — 그래야 같은 팀쌍의 재발송이 영구히 막히지 않는다.
       const active = await tx.v1TeamContact.findFirst({
         where: {
-          status: { in: [...ACTIVE_STATUSES] },
-          OR: [
-            { fromTeamId: dto.fromTeamId, toTeamId },
-            { fromTeamId: toTeamId, toTeamId: dto.fromTeamId },
+          AND: [
+            { OR: directionOr },
+            { OR: [{ status: 'accepted' }, { status: 'requested', expiresAt: { gt: now } }] },
           ],
         },
         select: { id: true, status: true },
@@ -247,7 +261,8 @@ export class TeamContactsService {
 
   /**
    * 만료를 표시에 반영한다. 목록은 행이 많아 각 행마다 updateMany 를 돌리지 않고
-   * 표시 상태만 계산한다 — DB 정리는 그 컨택을 실제로 다루는 respond()/detail() 에서 일어난다.
+   * 표시 상태만 계산한다 — DB 정리는 respond() 와 create()(같은 팀쌍의 만료된 대기 건
+   * 사전 정리) 에서 일어난다. detail() 은 계산만 하고 DB 를 정리하지 않는다.
    */
   private toListItem(row: { id: string; status: string; expiresAt: Date; [k: string]: unknown }) {
     const expired = row.status === 'requested' && row.expiresAt <= new Date();

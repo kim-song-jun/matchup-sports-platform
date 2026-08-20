@@ -1,7 +1,8 @@
 'use client';
 
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Clock, Eye, MonitorUp, Pencil, Plus, Trash2, X } from 'lucide-react';
 import {
   AdminCardList,
@@ -103,19 +104,37 @@ function formatTargetScreens(targetScreens: V1PopupTargetScreen[]) {
 
 const PAGE_SIZE = 20;
 
+/**
+ * 대회 어드민의 '팝업' 항목이 `?targetPath=/tournaments/<id>` 로 이 화면을 연다 —
+ * 대회별 팝업 화면을 따로 두지 않고 전역 팝업 하나로 합쳤기 때문에, 어느 대회의
+ * 팝업인지는 경로 프리필로 이어받는다. 이때 화면 그룹 타겟은 비워 둔다(경로 전용):
+ * 'tournaments' 를 같이 걸면 그 팝업이 모든 대회 페이지에서 뜬다.
+ */
 export default function AdminPopupsPage() {
+  return (
+    <Suspense fallback={<AdminTableSkeleton rows={6} />}>
+      <AdminPopupsPageContent />
+    </Suspense>
+  );
+}
+
+function AdminPopupsPageContent() {
+  const searchParams = useSearchParams();
+  const requestedTargetPath = searchParams.get('targetPath') ?? '';
+  const initialTargetPath = isSafePopupTargetPath(requestedTargetPath) ? requestedTargetPath : '';
+
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('');
   // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState('');
-  const [mode, setMode] = useState<EditorMode>('view');
+  const [mode, setMode] = useState<EditorMode>(initialTargetPath ? 'create' : 'view');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState(EMPTY_RICH_CONTENT);
   const [status, setStatus] = useState<V1AdminPopupStatus>('published');
-  const [targetScreens, setTargetScreens] = useState<V1PopupTargetScreen[]>(['home']);
-  const [targetPath, setTargetPath] = useState('');
+  const [targetScreens, setTargetScreens] = useState<V1PopupTargetScreen[]>(initialTargetPath ? [] : ['home']);
+  const [targetPath, setTargetPath] = useState(initialTargetPath);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
   const [displayStartAt, setDisplayStartAt] = useState('');

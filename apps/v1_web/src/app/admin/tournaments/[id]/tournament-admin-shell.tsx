@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ExternalLink } from 'lucide-react';
 import {
   AdminPageHeader,
   AdminTableSkeleton,
@@ -40,6 +40,12 @@ interface SectionItem {
   label: string;
   /** 탭 옆 숫자에 쓰이는 operationCounts 키. 없으면 숫자를 그리지 않는다. */
   countKey?: CountKey;
+  /**
+   * 대회 셸 밖으로 나가는 항목의 링크를 만든다. 없으면 `${basePath}/${slug}` 를 쓴다.
+   * 팝업처럼 전역 화면 하나로 통합된 기능은 여기서 목적지를 지정한다 — 목록에서 빼버리면
+   * 운영자가 그 대회의 팝업을 어디서 만드는지 알 길이 없다.
+   */
+  externalHref?: (tournamentId: string) => string;
 }
 
 const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
@@ -56,7 +62,12 @@ const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
     label: '노출',
     items: [
       { slug: 'sponsors', label: '협찬' },
-      { slug: 'popups', label: '팝업' },
+      {
+        slug: 'popups',
+        label: '팝업',
+        externalHref: (tournamentId) =>
+          `/admin/popups?targetPath=${encodeURIComponent(`/tournaments/${tournamentId}`)}`,
+      },
       { slug: 'campaign', label: '캠페인' },
     ],
   },
@@ -75,17 +86,26 @@ function SectionLink({
   active,
   label,
   count,
+  leavesShell = false,
 }: {
   href: string;
   active: boolean;
   label: string;
   count?: number;
+  /** 대회 셸 밖(전역 어드민 화면)으로 나가는 링크 — 아이콘과 라벨로 미리 알린다. */
+  leavesShell?: boolean;
 }) {
   return (
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
-      aria-label={typeof count === 'number' ? `${label} ${count}` : undefined}
+      aria-label={
+        typeof count === 'number' || leavesShell
+          ? [label, typeof count === 'number' ? String(count) : '', leavesShell ? '전역 팝업 화면으로 이동' : '']
+              .filter(Boolean)
+              .join(' ')
+          : undefined
+      }
       className={[
         'inline-flex shrink-0 items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg text-[13px] transition-colors',
         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
@@ -94,7 +114,10 @@ function SectionLink({
           : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
       ].join(' ')}
     >
-      <span>{label}</span>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {leavesShell && <ExternalLink size={12} aria-hidden="true" />}
+      </span>
       {typeof count === 'number' && (
         <span
           className={
@@ -262,15 +285,19 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
                 <p className="hidden lg:block px-3 pt-3 pb-1 text-[length:var(--font-size-caption)] font-bold tracking-wide text-[var(--text-caption)]">
                   {group.label}
                 </p>
-                {group.items.map((item) => (
-                  <SectionLink
-                    key={item.slug}
-                    href={`${basePath}/${item.slug}`}
-                    active={pathname === `${basePath}/${item.slug}`}
-                    label={item.label}
-                    count={item.countKey ? counts?.[item.countKey] : undefined}
-                  />
-                ))}
+                {group.items.map((item) => {
+                  const sectionHref = `${basePath}/${item.slug}`;
+                  return (
+                    <SectionLink
+                      key={item.slug}
+                      href={item.externalHref ? item.externalHref(id) : sectionHref}
+                      active={!item.externalHref && pathname === sectionHref}
+                      label={item.label}
+                      count={item.countKey ? counts?.[item.countKey] : undefined}
+                      leavesShell={Boolean(item.externalHref)}
+                    />
+                  );
+                })}
               </div>
             ))}
           </div>

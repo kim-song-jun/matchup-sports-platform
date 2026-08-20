@@ -24,8 +24,6 @@ import { TournamentAnnouncementsController } from './tournament-announcements.co
 import { TournamentAnnouncementsService } from './tournament-announcements.service';
 import { TournamentSponsorsController } from './tournament-sponsors.controller';
 import { TournamentSponsorsService } from './tournament-sponsors.service';
-import { TournamentPopupController } from './tournament-popup.controller';
-import { TournamentPopupService } from './tournament-popup.service';
 import { TournamentReviewsController } from './tournament-reviews.controller';
 import { TournamentReviewsService } from './tournament-reviews.service';
 import { KakaoGeocodingService } from './kakao-geocoding.service';
@@ -86,7 +84,6 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentRegistrationsController,
     TournamentAnnouncementsController,
     TournamentSponsorsController,
-    TournamentPopupController,
     TournamentReviewsController,
     TournamentsReadController,
     TournamentResultReviewController,
@@ -102,7 +99,6 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentsReadService,
     TournamentAnnouncementsService,
     TournamentSponsorsService,
-    TournamentPopupService,
     TournamentReviewsService,
     KakaoGeocodingService,
     TournamentCampaignReadService,

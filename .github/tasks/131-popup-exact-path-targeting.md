@@ -23,6 +23,12 @@
 - 2026-08-04: `targetPaths` schema/API/runtime 우선순위와 `/admin/popups` 대회 선택 UI를 구현했다. 기존 콘텐츠·CTA·기간·화면 그룹 계약은 유지했다.
 - 2026-08-04: Prisma Client 생성, Web popup admin 5/5, popup target helper 5/5, Web/API `tsc --noEmit`이 통과했다. Backend Jest는 host Node 18에서 Jest TypeScript config를 정상 실행하지 못해 Node 22 환경 재검증이 필요하다. headed browser 미제공으로 관리자 화면 시각 QA도 후속 확인이 필요하다.
 
+- 2026-08-20: 후속 단계 착수. 프론트가 `/popups/active` 에 `path` 를 넘기지 않아 exact-path 매칭이
+  런타임에서 한 번도 동작하지 않고 있었음을 발견하고 배선했다(PR #599). 이어서 Out of Scope 로
+  남겨 뒀던 `V1TournamentPopup` UI/API 제거를 진행한다 — prod/alpha 모두 해당 테이블 0행이라
+  데이터 이관은 필요 없었다(SSM 읽기 전용 조회로 확인). 테이블 DROP 은 배포 순서상 별도
+  릴리스로 미룬다(`prisma migrate deploy` 가 컨테이너 교체보다 먼저 돌기 때문).
+
 ## Validation
 
 - `pnpm v1:db:generate` — PASS

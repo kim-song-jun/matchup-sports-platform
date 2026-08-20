@@ -31,6 +31,12 @@ const popup: V1AdminPopupRow = {
   updatedAt: '2026-07-13T00:00:00.000Z',
 };
 
+const { searchParamsMock } = vi.hoisted(() => ({ searchParamsMock: { value: new URLSearchParams() } }));
+
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => searchParamsMock.value,
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
   useV1AdminTournaments: () => ({
@@ -64,6 +70,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 describe('AdminPopupsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsMock.value = new URLSearchParams();
   });
 
   it('supports popup list, detail, create, edit, and delete affordances', async () => {
@@ -88,6 +95,26 @@ describe('AdminPopupsPage', () => {
     const confirmDialog = await screen.findByRole('dialog', { name: '팝업을 삭제할까요?' });
     await user.click(within(confirmDialog).getByRole('button', { name: '삭제' }));
     expect(deleteMutate).toHaveBeenCalledWith('popup-1', expect.any(Object));
+  });
+
+  // 대회별 팝업 화면을 없애고 이 화면 하나로 합쳤다 — 대회 어드민의 '팝업' 항목이 넘겨주는
+  // `?targetPath=/tournaments/<id>` 가 곧 "이 대회의 팝업"이라는 유일한 연결고리다.
+  it('opens the create form prefilled from a targetPath deep link', async () => {
+    searchParamsMock.value = new URLSearchParams({ targetPath: '/tournaments/tournament-1' });
+    render(<AdminPopupsPage />);
+
+    expect(await screen.findByRole('heading', { name: '새 팝업 생성' })).toBeInTheDocument();
+    expect(screen.getByLabelText('정확한 내부 경로')).toHaveValue('/tournaments/tournament-1');
+    // 경로 전용 타겟이어야 한다 — 대회 화면 그룹까지 켜지면 모든 대회 페이지에서 뜬다.
+    expect(screen.getByRole('checkbox', { name: /대회 목록/ })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /홈/ })).not.toBeChecked();
+  });
+
+  it('ignores an unsafe targetPath deep link', async () => {
+    searchParamsMock.value = new URLSearchParams({ targetPath: '/admin/tournaments/tournament-1' });
+    render(<AdminPopupsPage />);
+
+    expect(screen.queryByRole('heading', { name: '새 팝업 생성' })).not.toBeInTheDocument();
   });
 
   it('edits popup visibility as public, private, or draft with a display window', async () => {

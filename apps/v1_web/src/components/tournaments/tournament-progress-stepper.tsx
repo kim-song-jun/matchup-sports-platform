@@ -186,6 +186,19 @@ function makeMonotonic(stages: TournamentStage[], allDone: boolean): TournamentS
 }
 
 /**
+ * 이 라운드가 **결승**인가. 대회의 목적지를 판정한다 — 스텝의 마지막 칸이 되고,
+ * 픽스처가 아직 없으면 이 이름으로 빈 칸을 만들어 세운다.
+ *
+ * `준결승` 이 `결승` 을 부분 문자열로 포함하는 것이 함정이다. 그래서 포함 여부만 보지 않고
+ * 준결승 계열(`준결승`/`세미`)을 먼저 걸러낸다.
+ */
+function isFinalRound(round: string): boolean {
+  const r = round.trim();
+  if (r === 'semi' || r.includes('준결승') || r.includes('세미')) return false;
+  return r === 'final' || r.includes('결승') || r.toUpperCase() === 'FINAL';
+}
+
+/**
  * 결선 라운드들을 **진행 순서대로** 세운다. `fixtureNumber` 가 그 순서를 이미 갖고 있다
  * (alpha 실측: 조별 1,2 → 4강 3,4 → 결승 5 → 3·4위전 6). 라운드 이름 사전순이나
  * 서버 배열 순서로 정렬하면 결승이 4강 앞에 오는 대회가 나온다.
@@ -240,13 +253,27 @@ export function buildTournamentStages(tournament: V1TournamentDetail): Tournamen
 
   const drafts: StageDraft[] = [];
 
+  // 조별리그는 이 포맷의 **출발점**이라 픽스처가 아직 없어도 칸을 세운다 — 대진이 나오기
+  // 전에 들어온 사람도 "조별리그부터 시작하는 대회"라는 걸 알아야 한다.
   if (format !== 'knockout') {
-    const groupFixtures = fixtures.filter((f) => classifyRound(f.round) === 'group');
-    if (groupFixtures.length > 0) {
-      drafts.push({ key: 'group', label: '조별리그', fixtures: groupFixtures });
-    }
+    drafts.push({
+      key: 'group',
+      label: '조별리그',
+      fixtures: fixtures.filter((f) => classifyRound(f.round) === 'group'),
+    });
   }
   drafts.push(...knockoutStageDrafts(fixtures));
+
+  // 결승은 이 대회의 **목적지**다. 실제 결승 픽스처는 4강이 끝나야 생기는 경우가 많은데
+  // (alpha 실측: 진행 중인 조별+토너먼트 대회의 라운드가 `['조별 리그','4강']` 뿐),
+  // 존재하는 라운드만 세우면 스텝이 4강에서 끊겨 "이 대회는 4강이 끝"처럼 읽힌다
+  // (오너 지적: "결승까지도 항상 나와야하는거 아니야? 왜 이제는 4강까지밖에 안나오는거지").
+  // 없으면 빈 칸으로 만들어 마지막에 세운다 — 픽스처가 생기면 위 루프가 이미 넣었으므로
+  // 여기서 중복으로 붙지 않는다.
+  // (league 는 위에서 이미 반환했으므로 여기 남는 포맷은 knockout · group_knockout 뿐이다.)
+  if (!drafts.some((draft) => isFinalRound(draft.key))) {
+    drafts.push({ key: 'final', label: '결승', fixtures: [] });
+  }
 
   if (drafts.length === 0) return [];
 

@@ -23,7 +23,7 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
-import { buildScheduleFilters, groupScheduleEntries } from './schedule-grouping';
+import { buildScheduleFilters, groupScheduleEntries, groupUnscheduledEntries } from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
 
 /**
@@ -35,6 +35,15 @@ import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleRe
 function sideLabel(side: PublicScheduleEntry['home']): string {
   if (side === null) return '미정';
   return side.teamName ?? '비공개';
+}
+
+/**
+ * 대진이 아직 안 잡힌 자리인가. **양쪽 다** 미정이고 보여줄 스코어도 없을 때만 참이다 —
+ * 한쪽이라도 팀이 정해졌거나 결과가 나온 경기는 그대로 스코어 행으로 그린다(이상한
+ * 데이터라도 실제 기록을 숨기지 않는다).
+ */
+function matchupUndecided(entry: PublicScheduleEntry): boolean {
+  return entry.home === null && entry.away === null && entry.score === null;
 }
 
 function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
@@ -401,6 +410,24 @@ function ScheduleRow({
           <ScheduleResultBadge entry={entry} />
         </span>
       </div>
+      {matchupUndecided(entry) ? (
+        // 양쪽이 다 미정인 자리에 `미정  - : -  미정` 을 그리면, 같은 말이 세 번 반복되면서
+        // 스코어 pill 까지 빈 채로 남아 "고장난 카드"로 읽힌다(오너 지적: "미정 vs 미정").
+        // 대진이 아직 안 나온 것은 결함이 아니라 정상 상태이므로, 그 사실만 한 줄로 적는다.
+        // 한쪽만 미정인 경우(4강 한 자리가 먼저 확정된 상태)는 그대로 둔다 — 그때는
+        // "우리 팀 vs 미정" 이 실제로 알려주는 정보다.
+        <div
+          style={{
+            textAlign: 'center',
+            fontSize: 14,
+            fontWeight: 600,
+            color: 'var(--text-caption)',
+            padding: '4px 0',
+          }}
+        >
+          대진 확정 전
+        </div>
+      ) : (
       <div
         style={{
           display: 'grid',
@@ -430,6 +457,7 @@ function ScheduleRow({
           {sideLabel(entry.away)}
         </span>
       </div>
+      )}
       {/* 스코어 아래 보조 표기 — 스코어 칸(가운데 64px)이 행 정중앙이라 행 전체를
           가운데 정렬하면 그대로 스코어 밑에 놓인다. 승부차기가 없으면 렌더 없음. */}
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
@@ -783,16 +811,19 @@ export function ScheduleContent({
           <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
             시간 미정 경기
           </h3>
-          {/* 그룹 목록과 같은 컨테이너다 — 여기만 `Card` 로 남아 있었더니, 경기가 1건일 때
-              테두리 쳐진 카드 안에서 좌측 절반만 차고 우측이 "액자 속 빈 공간"이 됐다.
-              행 자체가 이미 `tm-schedule-card` 라 바깥 카드는 이중 크롬이기도 하다. */}
-          <div className="tm-schedule-list">
-            {data.unscheduled.map((entry) => (
-              <ScheduleRow
-                key={entry.fixtureId}
+          {/* 일정이 잡힌 목록과 같은 모양으로 묶는다 — 예전엔 한 줄로 흘려보내서 같은 조의
+              경기가 여러 개면 카드마다 `A조`·`4강` 이 반복됐다(오너 지적: "조도 중복되고").
+              컨테이너도 `Card` 가 아니라 그룹 목록과 같은 `tm-schedule-list` 다: 행 자체가
+              이미 `tm-schedule-card` 라 바깥 카드는 이중 크롬이고, 경기가 1건일 때는 테두리
+              안 우측이 "액자 속 빈 공간"으로 남았다. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {groupUnscheduledEntries(data.unscheduled).map((group) => (
+              <ScheduleGroupBlock
+                key={group.key}
                 tournamentId={tournamentId}
-                entry={entry}
-                myFixture={myFixtureById.get(entry.fixtureId)}
+                group={group}
+                showGroupHeading
+                myFixtureById={myFixtureById}
               />
             ))}
           </div>

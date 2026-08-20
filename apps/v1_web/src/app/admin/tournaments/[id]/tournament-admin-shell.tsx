@@ -18,6 +18,7 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1TournamentStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { canWriteTournamentAdmin, deriveTournamentAdminRole } from '@/lib/admin-tournament-role';
 import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
 import { TournamentAdminProvider } from './tournament-admin-context';
 import {
@@ -138,7 +139,12 @@ function SectionLink({
 export function TournamentAdminShell({ id, children }: { id: string; children: ReactNode }) {
   const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
   const { data: adminMe } = useV1AdminMe();
-  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  // 역할이 단일 출처다 — canWrite 는 거기서 파생된다. adminMe 가 아직 없으면 가장 좁은
+  // 역할(조회 전용)로 둔다: 로딩 중에 쓰기 버튼이 잠깐 보였다가 사라지면 안 된다.
+  const role = adminMe
+    ? deriveTournamentAdminRole({ kind: 'platform', adminRole: adminMe.adminRole })
+    : 'SUPPORT_READONLY';
+  const canWrite = canWriteTournamentAdmin(role);
   const changeStatus = useV1ChangeTournamentStatus(id);
   const { toasts, showToast } = useAdminToast();
   const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
@@ -209,7 +215,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   const counts = tournament.operationCounts;
 
   return (
-    <TournamentAdminProvider value={{ tournamentId: id, canWrite, showToast }}>
+    <TournamentAdminProvider value={{ tournamentId: id, role, canWrite, showToast }}>
       {/* ── Back link ─────────────────────────────────────────────────── */}
       <div className="mb-4">
         <Link

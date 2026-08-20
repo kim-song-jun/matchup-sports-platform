@@ -490,3 +490,91 @@ describe('ScheduleContent — 경기 하나가 카드 하나다', () => {
     }
   });
 });
+
+describe('ScheduleContent — 시간 미정 경기', () => {
+  /**
+   * 오너 지적("조도 중복되고"): 예전엔 이 목록을 한 줄로 흘려보내서, 같은 조의 경기가
+   * 여러 개면 카드마다 `A조` 가 그대로 반복됐다. 일정이 잡힌 목록은 이미 제목 한 번 +
+   * 카드 라벨 생략으로 처리하고 있었다 — 여기도 같은 모양이어야 한다.
+   */
+  it('같은 조의 미정 경기가 여러 개여도 조 이름은 한 번만 나온다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({ fixtureId: 'u-1', scheduledAt: null, groupName: 'A조', fixtureNumber: 1 }),
+        fixtureEntry({ fixtureId: 'u-2', scheduledAt: null, groupName: 'A조', fixtureNumber: 2 }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getAllByText('A조')).toHaveLength(1);
+  });
+
+  it('조가 다르면 각각 제목이 선다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({ fixtureId: 'u-1', scheduledAt: null, groupName: 'A조', fixtureNumber: 1 }),
+        fixtureEntry({ fixtureId: 'u-2', scheduledAt: null, groupName: 'B조', fixtureNumber: 2 }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getAllByText('A조')).toHaveLength(1);
+    expect(screen.getAllByText('B조')).toHaveLength(1);
+  });
+
+  /**
+   * 오너 지적("미정 vs 미정"): 양쪽이 다 미정인 자리에 `미정  - : -  미정` 을 그리면
+   * 같은 말이 반복되고 스코어 pill 도 빈 채로 남아 고장난 카드처럼 읽힌다.
+   */
+  it('양쪽 팀이 다 미정이면 가짜 스코어라인 대신 "대진 확정 전" 한 줄만 보여준다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({
+          fixtureId: 'u-1',
+          scheduledAt: null,
+          groupName: null,
+          round: '4강',
+          home: null,
+          away: null,
+          score: null,
+          scoreStatus: 'unavailable',
+          status: 'scheduled',
+          resultState: 'pending',
+        }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('대진 확정 전')).toBeInTheDocument();
+    expect(screen.queryByText('미정')).not.toBeInTheDocument();
+    expect(screen.queryByText('- : -')).not.toBeInTheDocument();
+  });
+
+  /** 한쪽만 미정인 경우는 실제로 알려주는 정보다 — 접지 않는다. */
+  it('한쪽 팀만 미정이면 상대 팀명과 함께 그대로 보여준다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({
+          fixtureId: 'u-1',
+          scheduledAt: null,
+          round: '4강',
+          groupName: null,
+          away: null,
+          score: null,
+          scoreStatus: 'unavailable',
+          status: 'scheduled',
+          resultState: 'pending',
+        }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('홈팀')).toBeInTheDocument();
+    expect(screen.getByText('미정')).toBeInTheDocument();
+    expect(screen.queryByText('대진 확정 전')).not.toBeInTheDocument();
+  });
+});

@@ -80,6 +80,29 @@ export function groupScheduleEntries(entries: readonly PublicScheduleEntry[]): S
     .filter((phase) => phase.groups.length > 0);
 }
 
+/**
+ * "시간 미정 경기" 목록을 같은 조·라운드끼리 묶는다.
+ *
+ * 이 목록은 예전에 한 줄로 흘려보냈다 — 그래서 같은 조(또는 라운드)의 경기가 여러 개면
+ * 카드마다 `A조`·`4강` 이 그대로 반복돼 나왔다(오너 지적: "조도 중복되고"). 일정이 잡힌
+ * 목록은 이미 제목 한 번 + 카드에서 라벨 생략으로 처리하고 있으므로, 여기도 같은 모양으로
+ * 맞춘다. 단계(조별/결선)까지 나누지는 않는다 — 시간 미정 목록은 보통 몇 건뿐이라
+ * 두 겹으로 접으면 제목만 늘어난다.
+ */
+export function groupUnscheduledEntries(entries: readonly PublicScheduleEntry[]): ScheduleGroup[] {
+  const byLabel = new Map<string, ScheduleGroup>();
+  for (const entry of entries) {
+    const label = groupLabelOf(entry);
+    const existing = byLabel.get(label);
+    if (existing === undefined) byLabel.set(label, { key: label, label, entries: [entry] });
+    else existing.entries.push(entry);
+  }
+  return [...byLabel.values()].map((group) => ({
+    ...group,
+    entries: [...group.entries].sort((a, b) => a.fixtureNumber - b.fixtureNumber),
+  }));
+}
+
 /** 필터 칩 하나. `key` 가 null 이면 "전체". */
 export type ScheduleFilter = { key: string; label: string };
 

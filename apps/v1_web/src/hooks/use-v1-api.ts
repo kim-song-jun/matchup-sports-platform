@@ -2210,6 +2210,9 @@ export function useV1AdminOverview() {
   return useQuery({
     queryKey: v1Keys.adminOverview(),
     queryFn: () => v1Get<V1AdminOverview>('/admin/overview'),
+    // 열어 둔 채 방치하면 숫자가 멈춘다 — 전역 staleTime 은 탭 재포커스에서만 다시 받는다.
+    // 같은 파일의 인박스·에러로그 훅이 쓰는 것과 같은 주기다.
+    refetchInterval: 30_000,
   });
 }
 
@@ -2870,6 +2873,9 @@ export function useV1AdminOpsSummary() {
   return useQuery({
     queryKey: v1Keys.adminOpsSummary(),
     queryFn: () => v1Get<V1AdminOpsSummary>('/admin/ops/summary'),
+    // 열어 둔 채 방치하면 숫자가 멈춘다 — 전역 staleTime 은 탭 재포커스에서만 다시 받는다.
+    // 같은 파일의 인박스·에러로그 훅이 쓰는 것과 같은 주기다.
+    refetchInterval: 30_000,
   });
 }
 
@@ -4442,7 +4448,9 @@ import type {
   V1CreateLeagueResult,
   V1GenerateLeagueFixturesPayload,
   V1GenerateLeagueFixturesResult,
+  V1LeagueMatchesFilters,
   V1PublicLeagueDetail,
+  V1PublicLeagueListResponse,
   V1LeaguePlayerRecordsResponse,
   V1LeagueStandingsResponse,
   V1UpdateLeagueFixturePayload,
@@ -4460,6 +4468,15 @@ import type {
   V1SeedSeasonResult,
   V1UpdateLeagueSeriesPayload,
 } from '@/types/league-series';
+
+// R5: 공개 리그 목록. team-matches의 useV1TeamMatches(filters)와 동일한 형태 --
+// filters 객체 전체가 쿼리 키에 들어가 필터가 바뀌면 자동으로 새 쿼리로 취급된다.
+export function useV1LeagueMatches(filters?: V1LeagueMatchesFilters) {
+  return useQuery({
+    queryKey: v1Keys.leagueMatches(filters as Record<string, unknown> | undefined),
+    queryFn: () => v1Get<V1PublicLeagueListResponse>('/league-matches', filters),
+  });
+}
 
 export function useV1AdminLeagueMatchList() {
   return useQuery({

@@ -8,6 +8,40 @@ export interface V1AdminLeagueListItem {
   endsOn: string;
 }
 
+/**
+ * R5 공개 리그 목록 항목 — GET /league-matches. 어드민 목록(V1AdminLeagueListItem)과
+ * 달리 fixtureCount는 담지 않는다(공개 화면은 "몇 경기가 남았는지"보다 "어떤 종목·지역·
+ * 몇 팀"이 발견 단계에 더 중요한 정보라 API 계약을 분리했다). sport에 code를 포함해
+ * getSportAccent(code)/SportGlyph로 대회 카드(V1TournamentListItem.sport)와 같은
+ * 시각 언어를 쓸 수 있게 한다.
+ */
+export interface V1PublicLeagueListItem {
+  leagueId: string;
+  title: string;
+  state: 'draft' | 'active' | 'completed';
+  startsOn: string;
+  endsOn: string;
+  sport: { sportId: string; code: string; name: string };
+  region: { regionId: string; name: string };
+  teamCount: number;
+}
+
+export interface V1PublicLeagueListResponse {
+  items: V1PublicLeagueListItem[];
+  pageInfo: { nextCursor: string | null; hasNext: boolean };
+}
+
+// type 별칭 -- tournaments 목록 필터(TournamentListFilters, hooks/use-v1-api.ts)와
+// 같은 이유로 interface가 아니라 type을 쓴다: v1Get(path, query?: Record<string, ...>)에
+// 캐스트 없이 바로 넘기는 관례를 그대로 따른다.
+export type V1LeagueMatchesFilters = {
+  sportId?: string;
+  regionId?: string;
+  state?: 'draft' | 'active' | 'completed';
+  cursor?: string;
+  limit?: number;
+};
+
 export interface V1LeagueFixture {
   teamMatchId: string;
   title: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useV1AdminMe,
   useV1AdminMatches,
@@ -68,6 +68,7 @@ export default function AdminMatchesPage() {
 
 function AdminMatchesPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialStatus = searchParams.get('status') ?? '';
 
   // 검색 debounce·상태 필터·page 리셋·페이지네이션 조립은 공용 훅이 담당한다.
@@ -160,6 +161,9 @@ function AdminMatchesPageContent() {
         <AdminDataTable<V1AdminMatchRow>
           rows={rows}
           keyExtractor={(row) => row.matchId}
+          // 상세 라우트는 있었는데 목록에서 갈 길이 없어 ⌘K 팔레트로만 도달 가능했다.
+          onRowClick={(row) => router.push(`/admin/matches/${encodeURIComponent(row.matchId)}`)}
+          rowClickLabel={(row) => `${row.title} 상세 보기`}
           tableMaxWidth="max-w-none"
           rowTone={(row) =>
             row.status === 'cancelled' ? 'danger' : row.status === 'closed' ? 'warning' : undefined

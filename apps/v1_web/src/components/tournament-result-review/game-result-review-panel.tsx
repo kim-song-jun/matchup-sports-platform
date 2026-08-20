@@ -12,7 +12,7 @@ import {
 } from '@/hooks/use-tournament-result-review';
 import { useV1GameLineups } from '@/hooks/use-v1-api';
 import { useV1GameEventsBackfill } from '@/hooks/use-v1-game-operations';
-import { RecordedEventList } from '@/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate/recorded-event-list';
+import { RecordedEventList } from '@/components/tournament-live/operate/recorded-event-list';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';

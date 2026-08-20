@@ -8,6 +8,7 @@ import { useV1AdminMe } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { AdminPageSkeleton } from '@/components/admin/admin-skeleton';
+import { isAdminLiveConsolePath } from '@/lib/tournament-live-routes';
 
 // ── Role label mapping ────────────────────────────────────────────────────
 function resolveRoleLabel(role: 'owner' | 'ops' | 'support' | undefined): string {
@@ -90,6 +91,18 @@ export function isWideAdminRoute(pathname: string | null): boolean {
 export function AdminGate({ children }: AdminGateProps) {
   const pathname = usePathname();
   const { data, isPending, isError, error, refetch } = useV1AdminMe();
+
+  // 대회 현장 콘솔(`/admin/live/:id/…`)은 **자기 게이트**가 있다. 여기서 막으면 그 대회에
+  // 배정된 스태프(플랫폼 관리자가 아닌 사람)가 화면을 보기도 전에 "운영자 권한이 필요해요"를
+  // 만난다 — 서버(TournamentStaffAccessService)는 관리자와 스태프를 모두 인가하는데
+  // 프론트만 "관리자 여부" 하나로 문을 지키던 불일치를 여기서 끊는다.
+  //
+  // 판정을 새로 만들지 않고 그대로 넘긴다: `/admin/live/[id]/layout.tsx` 의
+  // TournamentLiveGate 가 대회 스코프로 다시 판정하고, 그 안의 모든 API 는 서버에서
+  // 한 번 더 인가된다. 이 분기는 **오직 이 경로 접두사에만** 적용된다.
+  if (isAdminLiveConsolePath(pathname)) {
+    return <>{children}</>;
+  }
 
   if (isPending) {
     return <AdminLoadingScreen />;

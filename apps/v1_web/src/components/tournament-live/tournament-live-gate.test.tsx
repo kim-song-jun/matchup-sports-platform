@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
-import { TournamentOpsGate } from './_gate';
+import { TournamentLiveGate } from './tournament-live-gate';
 
 const mocks = vi.hoisted(() => ({
   useV1AuthMe: vi.fn(),
@@ -49,7 +49,7 @@ function apiError(statusCode: number, code: string, reason?: string) {
   });
 }
 
-describe('TournamentOpsGate', () => {
+describe('TournamentLiveGate', () => {
   beforeEach(() => {
     mocks.useV1AuthMe.mockReset();
     mocks.useV1Tournament.mockReset();
@@ -67,9 +67,9 @@ describe('TournamentOpsGate', () => {
   it('shows a loading screen while auth/staff queries are pending', () => {
     mocks.useV1TournamentStaffAssignments.mockReturnValue({ isPending: true });
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>보드</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
     expect(screen.queryByText('보드')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell')).not.toBeInTheDocument();
@@ -88,9 +88,9 @@ describe('TournamentOpsGate', () => {
     });
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>보드 콘텐츠</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.getByTestId('shell')).toHaveAttribute('data-role', 'TOURNAMENT_DIRECTOR');
@@ -105,9 +105,9 @@ describe('TournamentOpsGate', () => {
     });
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>보드 콘텐츠</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.getByTestId('shell')).toHaveAttribute('data-role', 'PLATFORM_OPS');
@@ -130,9 +130,9 @@ describe('TournamentOpsGate', () => {
     });
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>보드 콘텐츠</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.getByTestId('shell')).toHaveAttribute('data-role', 'PLATFORM_OPS');
@@ -147,9 +147,9 @@ describe('TournamentOpsGate', () => {
     });
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>보드 콘텐츠</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.getByText('대회 운영자 권한이 필요해요')).toBeInTheDocument();
@@ -165,9 +165,9 @@ describe('TournamentOpsGate', () => {
     });
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>보드 콘텐츠</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.getByText('담당 범위 밖의 화면이에요')).toBeInTheDocument();
@@ -190,9 +190,9 @@ describe('TournamentOpsGate', () => {
     });
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>보드 콘텐츠</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.getByText('잠시 문제가 생겼어요')).toBeInTheDocument();
@@ -204,7 +204,7 @@ describe('TournamentOpsGate', () => {
  * 필드 담당자 딥링크 (트랙 D) — 양방향으로 확인한다: 담당인 사람은 열리고, 담당이 아닌
  * 사람/역할/대회는 막힌다. 권한 게이트라 한쪽만 검증하면 과다 노출로 이어진다.
  */
-describe('TournamentOpsGate 필드 담당자 딥링크', () => {
+describe('TournamentLiveGate 필드 담당자 딥링크', () => {
   const CONSOLE_PATH = '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate';
 
   function scopeDeniedShell() {
@@ -258,9 +258,9 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
     myAssignments([fieldOperatorAssignment()]);
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>경기 콘솔</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.getByText('경기 콘솔')).toBeInTheDocument();
@@ -280,9 +280,9 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
     myAssignments([fieldOperatorAssignment({ fixtureIds: ['fx-other'] })]);
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>경기 콘솔</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.queryByText('경기 콘솔')).not.toBeInTheDocument();
@@ -294,9 +294,9 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
     myAssignments([fieldOperatorAssignment({ tournamentId: 't-2' })]);
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>경기 콘솔</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.queryByText('경기 콘솔')).not.toBeInTheDocument();
@@ -313,9 +313,9 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
     myAssignments([]);
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>경기 콘솔</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.queryByText('경기 콘솔')).not.toBeInTheDocument();
@@ -327,9 +327,9 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
     mocks.useV1MyStaffAssignments.mockReturnValue({ isPending: true });
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>경기 콘솔</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.queryByText('경기 콘솔')).not.toBeInTheDocument();
@@ -346,9 +346,9 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
     });
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>경기 콘솔</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.getByText('잠시 문제가 생겼어요')).toBeInTheDocument();
@@ -364,9 +364,9 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
     });
 
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>경기 콘솔</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
 
     expect(screen.getByTestId('shell')).toHaveAttribute('data-role', 'TOURNAMENT_DIRECTOR');
@@ -376,7 +376,7 @@ describe('TournamentOpsGate 필드 담당자 딥링크', () => {
   });
 });
 
-describe('TournamentOpsGate 진입 출처 (T6-2)', () => {
+describe('TournamentLiveGate 진입 출처 (T6-2)', () => {
   beforeEach(() => {
     mocks.useV1TournamentStaffAssignments.mockReturnValue({
       isPending: false,
@@ -389,9 +389,9 @@ describe('TournamentOpsGate 진입 출처 (T6-2)', () => {
   it('?from=admin이면 origin="admin"으로 셸에 전달하고 sessionStorage에 기록한다', () => {
     mocks.useSearchParams.mockReturnValue(new URLSearchParams('from=admin'));
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>x</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
     expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'admin');
     expect(window.sessionStorage.getItem('teameet.v1.tournamentOpsOrigin.t-1')).toBe('admin');
@@ -401,9 +401,9 @@ describe('TournamentOpsGate 진입 출처 (T6-2)', () => {
     window.sessionStorage.setItem('teameet.v1.tournamentOpsOrigin.t-1', 'admin');
     mocks.useSearchParams.mockReturnValue(new URLSearchParams());
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>x</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
     expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'admin');
   });
@@ -411,9 +411,9 @@ describe('TournamentOpsGate 진입 출처 (T6-2)', () => {
   it('한 번도 admin에서 온 적 없으면 origin="home"이다', () => {
     mocks.useSearchParams.mockReturnValue(new URLSearchParams());
     render(
-      <TournamentOpsGate tournamentId="t-1">
+      <TournamentLiveGate tournamentId="t-1">
         <div>x</div>
-      </TournamentOpsGate>,
+      </TournamentLiveGate>,
     );
     expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'home');
   });

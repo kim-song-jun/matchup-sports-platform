@@ -27,7 +27,7 @@ describe('TournamentOpsPickerClient (T6-3)', () => {
     const links = screen.getAllByRole('link', { name: /가을 풋살 대회 운영 콘솔 열기/ });
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
-      expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations?from=admin');
+      expect(link).toHaveAttribute('href', '/admin/live/t-1/operations');
     }
   });
 

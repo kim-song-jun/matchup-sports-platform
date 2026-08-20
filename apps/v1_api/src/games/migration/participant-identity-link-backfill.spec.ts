@@ -8,8 +8,8 @@ describe('runParticipantIdentityLinkBackfill', () => {
         .fn()
         .mockResolvedValueOnce([{ id: 'tournament-1' }])
         .mockResolvedValueOnce([
-          { participantId: 'participant-1', userId: 'user-1' },
-          { participantId: 'participant-2', userId: 'user-2' },
+          { participant_id: 'participant-1', user_id: 'user-1' },
+          { participant_id: 'participant-2', user_id: 'user-2' },
         ]),
       $transaction: jest.fn(),
     } as unknown as PrismaClient;
@@ -34,7 +34,7 @@ describe('runParticipantIdentityLinkBackfill', () => {
       $queryRaw: jest
         .fn()
         .mockResolvedValueOnce([{ id: 'tournament-1' }])
-        .mockResolvedValueOnce([{ participantId: 'participant-1', userId: 'user-1' }]),
+        .mockResolvedValueOnce([{ participant_id: 'participant-1', user_id: 'user-1' }]),
       v1ParticipantIdentityLinkEvent: {
         create: jest.fn().mockResolvedValue({
           linkId: 'generated-in-service',

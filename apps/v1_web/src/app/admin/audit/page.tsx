@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { adminAuditActorHref, adminAuditTargetHref } from '@/lib/admin-audit-links';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
@@ -14,7 +16,18 @@ import {
 } from '@/components/admin';
 
 // ── Types ─────────────────────────────────────────────────────────────────
-type TargetTypeFilter = '' | 'user' | 'match' | 'team' | 'team_match' | 'tournament';
+/** 필터 칩으로 고를 수 있는 값. 서버가 기록하는 targetType 전체가 아니라 자주 쓰는 것만이다. */
+type TargetTypeFilter =
+  | ''
+  | 'user'
+  | 'match'
+  | 'team'
+  | 'team_match'
+  | 'tournament'
+  | 'admin'
+  | 'notice'
+  | 'popup'
+  | 'inquiry';
 
 interface FilterOption {
   value: TargetTypeFilter;
@@ -29,6 +42,11 @@ interface Tab {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────
+/**
+ * 필터 칩은 **자주 쓰는 대상만** 고른 목록이다. 백엔드가 기록하는 targetType 은 40종이
+ * 넘어서(관리자 설정·약관·푸시 로그 등) 전부 칩으로 늘어놓으면 고르기 더 어려워진다 —
+ * 여기 없는 값은 '전체'에 그대로 포함된다.
+ */
 const TARGET_TYPE_OPTIONS: FilterOption[] = [
   { value: '', label: '전체' },
   { value: 'user', label: '회원' },
@@ -36,6 +54,10 @@ const TARGET_TYPE_OPTIONS: FilterOption[] = [
   { value: 'team', label: '팀' },
   { value: 'team_match', label: '팀매치' },
   { value: 'tournament', label: '대회' },
+  { value: 'admin', label: '관리자' },
+  { value: 'notice', label: '공지' },
+  { value: 'popup', label: '팝업' },
+  { value: 'inquiry', label: '문의' },
 ];
 
 const TABS: Tab[] = [
@@ -63,12 +85,23 @@ function shortId(id: string | null | undefined): string {
 }
 
 /** ID 는 축약해 보여주되 전문을 title 로 달아 둔다 — 축약본만으로는 대상을 특정할 수 없다. */
-function IdCell({ id }: { id: string | null | undefined }) {
+function IdCell({ id, href }: { id: string | null | undefined; href?: string | null }) {
   if (!id) return <span className="text-gray-400">—</span>;
+  const cls = 'font-mono text-[length:var(--font-size-micro)]';
+  // 링크를 걸 수 있는 대상만 링크가 된다 — 상세 화면이 없거나 targetId 가 그 라우트의
+  // id 가 아닌 타입은 그대로 텍스트다(잘못된 링크는 없는 링크보다 나쁘다).
+  if (!href) {
+    return <span className={`${cls} text-[var(--text-muted)]`} title={id}>{shortId(id)}</span>;
+  }
   return (
-    <span className="font-mono text-[length:var(--font-size-micro)] text-[var(--text-muted)]" title={id}>
+    <Link
+      href={href}
+      onClick={(event) => event.stopPropagation()}
+      title={id}
+      className={`${cls} text-[var(--blue700)] underline underline-offset-2 hover:bg-[var(--blue50)] rounded px-0.5 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2`}
+    >
       {shortId(id)}
-    </span>
+    </Link>
   );
 }
 
@@ -289,7 +322,7 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             key: 'targetId',
             header: '대상 ID',
             width: 'w-[120px]',
-            render: (row) => <IdCell id={row.targetId} />,
+            render: (row) => <IdCell id={row.targetId} href={adminAuditTargetHref(row.targetType, row.targetId)} />,
           },
           {
             key: 'adminUserId',
@@ -401,13 +434,18 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
             key: 'targetId',
             header: '대상 ID',
             width: 'w-[120px]',
-            render: (row) => <IdCell id={row.targetId} />,
+            render: (row) => <IdCell id={row.targetId} href={adminAuditTargetHref(row.targetType, row.targetId)} />,
           },
           {
             key: 'actor',
             header: '실행자',
             width: 'w-[120px]',
-            render: (row) => <IdCell id={row.adminUserId ?? row.actorUserId} />,
+            render: (row) => (
+              <IdCell
+                id={row.adminUserId ?? row.actorUserId}
+                href={row.adminUserId ? null : adminAuditActorHref(row.actorUserId)}
+              />
+            ),
           },
           {
             key: 'reason',

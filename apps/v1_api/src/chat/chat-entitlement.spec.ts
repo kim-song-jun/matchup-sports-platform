@@ -7,6 +7,8 @@ describe('currentChatRecipientEntitlementWhere', () => {
       teamId: null,
       teamMatchId: null,
       teamMatch: null,
+      teamContactId: null,
+      teamContact: null,
     });
     expect(where.user?.matchParticipants?.some?.matchId).toBe('m1');
   });
@@ -17,6 +19,8 @@ describe('currentChatRecipientEntitlementWhere', () => {
       teamId: 't1',
       teamMatchId: null,
       teamMatch: null,
+      teamContactId: null,
+      teamContact: null,
     });
     expect(where.user?.teamMemberships?.some?.teamId).toBe('t1');
   });
@@ -27,6 +31,8 @@ describe('currentChatRecipientEntitlementWhere', () => {
       teamId: null,
       teamMatchId: 'tm1',
       teamMatch: { hostTeamId: 'host', approvedApplicantTeamId: 'guest' },
+      teamContactId: null,
+      teamContact: null,
     });
     const some = where.user?.teamMemberships?.some;
     expect(some?.teamId).toEqual({ in: ['host', 'guest'] });
@@ -54,6 +60,8 @@ describe('currentChatRecipientEntitlementWhere', () => {
         teamId: null,
         teamMatchId: null,
         teamMatch: null,
+        teamContactId: null,
+        teamContact: null,
       }),
     ).toThrow(/not linked/i);
   });

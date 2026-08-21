@@ -9,7 +9,13 @@ import {
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateTeamContactDto, DeclineTeamContactDto, ListTeamContactsQueryDto } from './dto/team-contact.dto';
+import {
+  CreateContactBlockDto,
+  CreateTeamContactDto,
+  DeclineTeamContactDto,
+  ListTeamContactsQueryDto,
+  UpdateContactPolicyDto,
+} from './dto/team-contact.dto';
 
 /** 한 팀이 24시간 동안 보낼 수 있는 컨택 수. 확정값 — 스펙 §2. */
 const DAILY_SEND_LIMIT = 10;
@@ -66,6 +72,10 @@ export class TeamContactsService {
     if (dto.fromTeamId === toTeamId) {
       throw stateConflict('같은 팀에는 컨택을 보낼 수 없어요.', 'TEAM_CONTACT_SELF_NOT_ALLOWED');
     }
+
+    // advisory lock 트랜잭션 **앞**에서 부른다 — 이 검사는 팀쌍 경합과 무관해서
+    // 락 안에서 부르면 락 유지 시간만 늘어난다.
+    await this.assertRecipientAccepting(dto.fromTeamId, toTeamId);
 
     const expiresAt = new Date(Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -254,6 +264,98 @@ export class TeamContactsService {
       });
     }
     return membership;
+  }
+
+  /**
+   * 받는 팀이 지금 컨택을 받는 상태인지 본다. 세 가지 거부 사유(차단 / closed /
+   * recruiting_only 인데 모집 중 아님)를 **하나의 응답으로 통일**한다 — 응답이 갈리면
+   * 발신자가 "우리가 차단당했구나" 를 역추론할 수 있다(스펙 §8(b)).
+   */
+  private async assertRecipientAccepting(fromTeamId: string, toTeamId: string) {
+    const notAccepting = () =>
+      new ForbiddenException({
+        code: 'TEAM_CONTACT_NOT_ACCEPTING',
+        message: '이 팀은 지금 컨택을 받지 않고 있어요.',
+      });
+
+    // 양방향: 상대가 나를 차단했거나, 내가 상대를 차단했거나.
+    const block = await this.prisma.v1TeamContactBlock.findFirst({
+      where: {
+        OR: [
+          { teamId: toTeamId, blockedTeamId: fromTeamId },
+          { teamId: fromTeamId, blockedTeamId: toTeamId },
+        ],
+      },
+      select: { id: true },
+    });
+    if (block) throw notAccepting();
+
+    const team = await this.prisma.v1Team.findUnique({
+      where: { id: toTeamId },
+      select: { contactPolicy: true },
+    });
+    if (!team) {
+      throw new NotFoundException({ code: 'TEAM_NOT_FOUND', message: '팀을 찾을 수 없어요.' });
+    }
+    if (team.contactPolicy === 'closed') throw notAccepting();
+    if (team.contactPolicy === 'recruiting_only') {
+      // '모집 중' = 이 팀이 host 인 recruiting 팀매치가 하나라도 있음 (스펙 §2 확정 결정 5).
+      // 캐시 컬럼을 두지 않는다 — 두면 공고 생성·마감 시 무효화 책임이 새로 생긴다.
+      const recruiting = await this.prisma.v1TeamMatch.findFirst({
+        where: { hostTeamId: toTeamId, status: 'recruiting' },
+        select: { id: true },
+      });
+      if (!recruiting) throw notAccepting();
+    }
+  }
+
+  async createBlock(user: V1AuthUser, teamId: string, dto: CreateContactBlockDto) {
+    await this.assertCanManageTeam(user.id, teamId);
+    if (dto.blockedTeamId === teamId) {
+      throw stateConflict('자기 팀은 차단할 수 없어요.', 'TEAM_CONTACT_SELF_BLOCK_NOT_ALLOWED');
+    }
+    const existing = await this.prisma.v1TeamContactBlock.findFirst({
+      where: { teamId, blockedTeamId: dto.blockedTeamId },
+      select: { id: true },
+    });
+    if (existing) return { block: existing, alreadyBlocked: true };
+
+    const block = await this.prisma.v1TeamContactBlock.create({
+      data: {
+        teamId,
+        blockedTeamId: dto.blockedTeamId,
+        createdByUserId: user.id,
+        reason: dto.reason ?? null,
+      },
+    });
+    return { block, alreadyBlocked: false };
+  }
+
+  async listBlocks(user: V1AuthUser, teamId: string) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const items = await this.prisma.v1TeamContactBlock.findMany({
+      where: { teamId },
+      orderBy: { createdAt: 'desc' },
+      include: { blockedTeam: { select: { id: true, name: true } } },
+    });
+    return { items };
+  }
+
+  async removeBlock(user: V1AuthUser, teamId: string, blockedTeamId: string) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const result = await this.prisma.v1TeamContactBlock.deleteMany({ where: { teamId, blockedTeamId } });
+    // 멱등: 이미 없으면 그냥 removed:false. 없는 차단을 지우는 건 오류가 아니다.
+    return { removed: result.count > 0 };
+  }
+
+  async updateContactPolicy(user: V1AuthUser, teamId: string, dto: UpdateContactPolicyDto) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const team = await this.prisma.v1Team.update({
+      where: { id: teamId },
+      data: { contactPolicy: dto.contactPolicy },
+      select: { id: true, contactPolicy: true },
+    });
+    return team;
   }
 
   async listForTeam(user: V1AuthUser, teamId: string, query: ListTeamContactsQueryDto) {

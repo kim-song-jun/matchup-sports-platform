@@ -18,6 +18,21 @@ export class DeclineTeamContactDto {
   reason?: string;
 }
 
+export class CreateContactBlockDto {
+  @IsUUID()
+  blockedTeamId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}
+
+export class UpdateContactPolicyDto {
+  @IsIn(['open', 'recruiting_only', 'closed'])
+  contactPolicy!: 'open' | 'recruiting_only' | 'closed';
+}
+
 export class ListTeamContactsQueryDto {
   @IsOptional()
   @IsIn(['inbound', 'outbound'])

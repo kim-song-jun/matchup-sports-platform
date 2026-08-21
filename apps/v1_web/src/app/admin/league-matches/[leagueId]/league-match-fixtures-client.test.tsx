@@ -10,6 +10,7 @@ import {
   useV1GenerateLeagueFixtures,
   useV1RecordLeagueForfeit,
   useV1RegenerateLeagueFixtures,
+  useV1RevertLeagueCompletion,
   useV1UpdateLeagueFixture,
 } from '@/hooks/use-v1-api';
 import LeagueMatchFixturesClient from './league-match-fixtures-client';
@@ -29,6 +30,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1GenerateLeagueFixtures: vi.fn(),
   useV1RecordLeagueForfeit: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1RegenerateLeagueFixtures: vi.fn(),
+  // R6/D-3: 종료 역전이. 대부분의 테스트는 state !== 'completed' 라 버튼 자체가 안 뜨므로
+  // 기본값으로 충분하고, 역전이 테스트만 mutate 를 들여다본다.
+  useV1RevertLeagueCompletion: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useV1UpdateLeagueFixture: vi.fn(),
   // Providers 안의 ThemeProvider가 전역으로 호출한다 — 이 테스트가 <Providers>로 렌더하는 한 필요.
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
@@ -44,6 +48,7 @@ const useV1RecordLeagueForfeitMock = vi.mocked(useV1RecordLeagueForfeit, { parti
 const useV1GenerateLeagueFixturesMock = vi.mocked(useV1GenerateLeagueFixtures, { partial: true });
 const useV1RegenerateLeagueFixturesMock = vi.mocked(useV1RegenerateLeagueFixtures, { partial: true });
 const useV1UpdateLeagueFixtureMock = vi.mocked(useV1UpdateLeagueFixture, { partial: true });
+const useV1RevertLeagueCompletionMock = vi.mocked(useV1RevertLeagueCompletion, { partial: true });
 
 describe('LeagueMatchFixturesClient', () => {
   // datetime-local 표시값 검증은 UTC와 오프셋이 있는 타임존에서만 회귀를 잡는다
@@ -63,6 +68,7 @@ describe('LeagueMatchFixturesClient', () => {
     useV1AdminLeagueTeamsMock.mockReturnValue({ data: undefined } as never);
     useV1CancelLeagueFixtureMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     useV1RegenerateLeagueFixturesMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   });
 
   it('일시 입력 칸에 표시되는 값이 서버가 내려준 UTC 시각과 동일한 순간(instant)을 나타낸다 (로컬시간 미변환 시 9시간 어긋남 회귀 방지)', () => {
@@ -534,5 +540,54 @@ describe('LeagueMatchFixturesClient', () => {
       },
       expect.anything(),
     ));
+  });
+
+  it('완료된 리그에만 "진행 중으로 되돌리기"가 뜨고, 확인하면 revert mutation을 호출한다', async () => {
+    // R6/D-3: 전 대진 확정 시 리그는 자동으로 completed 가 된다. 결과를 정정하려면 되돌려야
+    // 하는데 그동안 이 엔드포인트에 화면이 없어 API 를 직접 치지 않는 한 되돌릴 방법이
+    // 없었다(2026-08-21 재감사).
+    const detail = (state: string) => ({
+      data: {
+        leagueId: 'league-1',
+        title: '가을 풋살 리그',
+        state,
+        teamIds: ['t1', 't2'],
+        fixtures: [
+          { teamMatchId: 'tm-1', title: '가을 풋살 리그 1주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-01T20:00:00.000Z', placeName: '장소 미정', status: 'completed' },
+        ],
+      },
+      isPending: false,
+    });
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1GenerateLeagueFixturesMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1UpdateLeagueFixtureMock.mockReturnValue({ mutate: vi.fn() } as never);
+
+    // 진행 중일 때는 버튼이 없어야 한다 — 그 상태에서는 서버가 409 로 막는다.
+    useV1AdminLeagueMatchMock.mockReturnValue(detail('active') as never);
+    const active = render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+    expect(screen.queryByRole('button', { name: '진행 중으로 되돌리기' })).not.toBeInTheDocument();
+    active.unmount();
+
+    const revertMutate = vi.fn();
+    useV1RevertLeagueCompletionMock.mockReturnValue({ mutate: revertMutate, isPending: false } as never);
+    useV1AdminLeagueMatchMock.mockReturnValue(detail('completed') as never);
+    render(
+      <Providers>
+        <LeagueMatchFixturesClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '진행 중으로 되돌리기' }));
+
+    // GateConfirmModal 은 사유 입력 후 확인을 눌러야 onConfirm 이 돈다(취소·재생성과 동일).
+    const reasonBox = await screen.findByLabelText(/^사유/);
+    fireEvent.change(reasonBox, { target: { value: '오심 정정' } });
+    fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
+
+    await waitFor(() => expect(revertMutate).toHaveBeenCalledWith({ reason: '오심 정정' }, expect.anything()));
   });
 });

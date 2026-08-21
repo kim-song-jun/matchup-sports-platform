@@ -141,6 +141,9 @@ export const v1Keys = {
   // 않는다 -- teamMatches(filters)/teamMatch(teamMatchId) 자매 쌍과 동일한 관례.
   leagueMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'league-matches', filters ?? {}] as const,
   leagueMatch: (leagueId: string) => [...v1Keys.all, 'league-matches', leagueId] as const,
+  // R4: 내 리그. leagueMatch(leagueId) 와 같은 네임스페이스지만 'me' 는 UUID 가 아니라
+  // 실제 리그 id 와 절대 충돌하지 않는다.
+  myLeagues: () => [...v1Keys.all, 'league-matches', 'me'] as const,
   leagueMatchStandings: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'standings'] as const,
   leagueMatchPlayerRecords: (leagueId: string) => [...v1Keys.leagueMatch(leagueId), 'player-records'] as const,
   teamInvitations: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'invitations'] as const,

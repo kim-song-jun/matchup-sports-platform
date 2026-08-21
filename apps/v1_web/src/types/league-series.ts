@@ -90,6 +90,9 @@ export interface V1SeedSeasonTier {
 
 export interface V1SeedSeasonPayload {
   tiers: V1SeedSeasonTier[];
+  /** 시즌 기간. 생략하면 서버가 오늘 + 90일로 채운다. 이후 시즌은 이 길이를 승계한다. */
+  startsOn?: string;
+  endsOn?: string;
 }
 
 export interface V1SeedSeasonResult {
@@ -147,7 +150,6 @@ export interface V1CommitPromotionEntry {
 
 export interface V1CommitPromotionsPayload {
   entries: V1CommitPromotionEntry[];
-  createNextSeason?: boolean;
   /** preview 응답의 ruleFingerprint. 불일치 시 서버가 409 PROMOTION_RULE_CHANGED 로 막는다. */
   ruleFingerprint?: string;
 }

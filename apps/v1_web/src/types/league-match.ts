@@ -37,6 +37,19 @@ export interface V1PublicLeagueListItem {
   teamCount: number;
 }
 
+/**
+ * R4: 내 리그 (GET /league-matches/me). 목록 아이템에 "내 팀이 어느 팀인지"를 얹는다 --
+ * 한 리그에 내 팀이 둘 이상일 수 있어(같은 사용자가 두 팀 소속) 배열이다.
+ * 참가 테이블 기준이라 **대진이 아직 없는 draft 리그도 들어온다.**
+ */
+export interface V1MyLeagueListItem extends V1PublicLeagueListItem {
+  myTeams: Array<{ teamId: string; name: string }>;
+}
+
+export interface V1MyLeagueListResponse {
+  items: V1MyLeagueListItem[];
+}
+
 export interface V1PublicLeagueListResponse {
   items: V1PublicLeagueListItem[];
   pageInfo: { nextCursor: string | null; hasNext: boolean };
@@ -46,6 +59,8 @@ export interface V1PublicLeagueListResponse {
 // 같은 이유로 interface가 아니라 type을 쓴다: v1Get(path, query?: Record<string, ...>)에
 // 캐스트 없이 바로 넘기는 관례를 그대로 따른다.
 export type V1LeagueMatchesFilters = {
+  /** 이 팀이 참가한 리그만. 대진이 없는 draft 리그도 걸린다. */
+  teamId?: string;
   sportId?: string;
   regionId?: string;
   state?: 'draft' | 'active' | 'completed';
@@ -167,6 +182,18 @@ export interface V1CancelLeagueFixtureResult {
    * 줄이는 조작이라 마지막 미확정 대진을 취소하면 리그가 그 자리에서 끝난다.
    */
   leagueCompleted: boolean;
+  alreadyProcessed: boolean;
+}
+
+// R6: 리그 종료 역전이 — POST /admin/league-matches/:leagueId/revert-completion.
+// 사유는 선택(감사 로그용). 이미 active 면 alreadyProcessed: true 로 멱등 응답한다.
+export interface V1RevertLeagueCompletionPayload {
+  reason?: string;
+}
+
+export interface V1RevertLeagueCompletionResult {
+  leagueId: string;
+  state: 'active';
   alreadyProcessed: boolean;
 }
 

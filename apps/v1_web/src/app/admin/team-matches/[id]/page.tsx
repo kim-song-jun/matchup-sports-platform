@@ -5,9 +5,11 @@ import { useParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ArrowLeft, CalendarClock, ListOrdered, MapPin, Trophy, Users } from 'lucide-react';
 import {
+  AdminDetailRow,
   AdminEmpty,
   AdminPageHeader,
   AdminStatusPill,
+  AdminSummaryItem,
   AdminTableSkeleton,
 } from '@/components/admin';
 import { useV1AdminTeamMatch } from '@/hooks/use-v1-api';
@@ -36,30 +38,6 @@ const APPLICATION_STATUS_LABEL: Record<string, string> = {
   rejected: '거절',
   withdrawn: '철회',
 };
-
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
-  // `value || '-'` 는 0 을 빈 값으로 삼키고, `value ?? '-'` 는 빈 문자열을 빈 칸으로 남긴다.
-  // 둘 다 틀리므로 "값이 없다"를 명시적으로 판정한다.
-  const isEmpty = value === null || value === undefined || value === '';
-  return (
-    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{isEmpty ? '-' : value}</dd>
-    </div>
-  );
-}
-
-function SummaryItem({ icon, label, value }: { icon: ReactNode; label: string; value: string | number }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
-        <span className="shrink-0 text-gray-400" aria-hidden="true">{icon}</span>
-        <span className="truncate">{label}</span>
-      </dt>
-      <dd className="shrink-0 text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
-    </div>
-  );
-}
 
 function BackLink() {
   return (
@@ -184,30 +162,30 @@ export default function AdminTeamMatchDetailPage() {
             )}
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DetailRow label="팀매치 ID" value={teamMatch.teamMatchId} />
-              <DetailRow label="종목" value={teamMatch.sportName} />
-              <DetailRow label="주최 팀" value={teamMatch.hostTeamName} />
-              <DetailRow label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
-              <DetailRow label="장소" value={teamMatch.placeName} />
-              <DetailRow label="주소" value={teamMatch.placeAddress} />
-              <DetailRow label="지역" value={teamMatch.regionName} />
-              <DetailRow label="시작" value={formatDateTime(teamMatch.startAt)} />
-              <DetailRow label="종료" value={formatDateTime(teamMatch.endAt)} />
-              <DetailRow label="신청 마감" value={formatDateTime(teamMatch.deadlineAt)} />
-              <DetailRow label="개설자" value={teamMatch.createdByName} />
-              <DetailRow label="생성일" value={formatDateTime(teamMatch.createdAt)} />
+              <AdminDetailRow label="팀매치 ID" value={teamMatch.teamMatchId} />
+              <AdminDetailRow label="종목" value={teamMatch.sportName} />
+              <AdminDetailRow label="주최 팀" value={teamMatch.hostTeamName} />
+              <AdminDetailRow label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
+              <AdminDetailRow label="장소" value={teamMatch.placeName} />
+              <AdminDetailRow label="주소" value={teamMatch.placeAddress} />
+              <AdminDetailRow label="지역" value={teamMatch.regionName} />
+              <AdminDetailRow label="시작" value={formatDateTime(teamMatch.startAt)} />
+              <AdminDetailRow label="종료" value={formatDateTime(teamMatch.endAt)} />
+              <AdminDetailRow label="신청 마감" value={formatDateTime(teamMatch.deadlineAt)} />
+              <AdminDetailRow label="개설자" value={teamMatch.createdByName} />
+              <AdminDetailRow label="생성일" value={formatDateTime(teamMatch.createdAt)} />
             </dl>
           </article>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="경기 조건">
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">경기 조건</h2>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <DetailRow label="경기 형식" value={teamMatch.matchFormat} />
-              <DetailRow label="형식 메모" value={teamMatch.formatNote} />
-              <DetailRow label="경기 성격" value={teamMatch.matchStyle.length > 0 ? teamMatch.matchStyle.join(', ') : null} />
-              <DetailRow label="성별 조건" value={teamMatch.genderRule} />
-              <DetailRow label="유니폼 색" value={teamMatch.uniformColor} />
-              <DetailRow label="비용 안내" value={teamMatch.costNote} />
+              <AdminDetailRow label="경기 형식" value={teamMatch.matchFormat} />
+              <AdminDetailRow label="형식 메모" value={teamMatch.formatNote} />
+              <AdminDetailRow label="경기 성격" value={teamMatch.matchStyle.length > 0 ? teamMatch.matchStyle.join(', ') : null} />
+              <AdminDetailRow label="성별 조건" value={teamMatch.genderRule} />
+              <AdminDetailRow label="유니폼 색" value={teamMatch.uniformColor} />
+              <AdminDetailRow label="비용 안내" value={teamMatch.costNote} />
             </dl>
           </section>
 
@@ -231,19 +209,19 @@ export default function AdminTeamMatchDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">
-              <SummaryItem icon={<Users size={16} />} label="상대팀 신청" value={`${teamMatch.applicationCount}건`} />
-              <SummaryItem icon={<Trophy size={16} />} label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
-              <SummaryItem icon={<ListOrdered size={16} />} label="리그" value={teamMatch.league?.title ?? '단발 경기'} />
-              <SummaryItem icon={<MapPin size={16} />} label="지역" value={teamMatch.regionName ?? '-'} />
-              <SummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatDateTime(teamMatch.startAt)} />
-              <SummaryItem icon={<CalendarClock size={16} />} label="경기 기록" value={teamMatch.hasGame ? '연결됨' : '없음'} />
+              <AdminSummaryItem icon={<Users size={16} />} label="상대팀 신청" value={`${teamMatch.applicationCount}건`} />
+              <AdminSummaryItem icon={<Trophy size={16} />} label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
+              <AdminSummaryItem icon={<ListOrdered size={16} />} label="리그" value={teamMatch.league?.title ?? '단발 경기'} />
+              <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={teamMatch.regionName ?? '-'} />
+              <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatDateTime(teamMatch.startAt)} />
+              <AdminSummaryItem icon={<CalendarClock size={16} />} label="경기 기록" value={teamMatch.hasGame ? '연결됨' : '없음'} />
             </dl>
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">주최 팀</h2>
             <dl className="mt-4 grid gap-3">
-              <SummaryItem icon={<Users size={16} />} label="이름" value={teamMatch.hostTeamName} />
+              <AdminSummaryItem icon={<Users size={16} />} label="이름" value={teamMatch.hostTeamName} />
             </dl>
             <Link
               href={`/admin/teams/${encodeURIComponent(teamMatch.hostTeamId)}`}

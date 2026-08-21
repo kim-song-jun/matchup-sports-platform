@@ -5,9 +5,11 @@ import { useParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ArrowLeft, CalendarClock, MapPin, UserRound, Users } from 'lucide-react';
 import {
+  AdminDetailRow,
   AdminEmpty,
   AdminPageHeader,
   AdminStatusPill,
+  AdminSummaryItem,
   AdminTableSkeleton,
 } from '@/components/admin';
 import { useV1AdminMatch } from '@/hooks/use-v1-api';
@@ -32,27 +34,6 @@ function formatDateTime(value: string | null | undefined) {
     minute: '2-digit',
     hour12: false,
   });
-}
-
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{value ?? '-'}</dd>
-    </div>
-  );
-}
-
-function SummaryItem({ icon, label, value }: { icon: ReactNode; label: string; value: string | number }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
-        <span className="shrink-0 text-gray-400" aria-hidden="true">{icon}</span>
-        <span className="truncate">{label}</span>
-      </dt>
-      <dd className="shrink-0 text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
-    </div>
-  );
 }
 
 function BackLink() {
@@ -122,14 +103,14 @@ export default function AdminMatchDetailPage() {
             </div>
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DetailRow label="매치 ID" value={match.matchId} />
-              <DetailRow label="종목" value={match.sportName} />
-              <DetailRow label="장소" value={match.placeName} />
-              <DetailRow label="지역" value={match.regionName} />
-              <DetailRow label="시작" value={formatDateTime(match.startAt)} />
-              <DetailRow label="신청 마감" value={formatDateTime(match.deadlineAt)} />
-              <DetailRow label="호스트" value={match.hostName} />
-              <DetailRow label="생성일" value={formatDateTime(match.createdAt)} />
+              <AdminDetailRow label="매치 ID" value={match.matchId} />
+              <AdminDetailRow label="종목" value={match.sportName} />
+              <AdminDetailRow label="장소" value={match.placeName} />
+              <AdminDetailRow label="지역" value={match.regionName} />
+              <AdminDetailRow label="시작" value={formatDateTime(match.startAt)} />
+              <AdminDetailRow label="신청 마감" value={formatDateTime(match.deadlineAt)} />
+              <AdminDetailRow label="호스트" value={match.hostName} />
+              <AdminDetailRow label="생성일" value={formatDateTime(match.createdAt)} />
             </dl>
           </article>
 
@@ -151,18 +132,18 @@ export default function AdminMatchDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">
-              <SummaryItem icon={<Users size={16} />} label="참가 인원" value={`${match.participantCount}/${match.maxParticipants}명`} />
-              <SummaryItem icon={<UserRound size={16} />} label="신청" value={`${match.applicationCount}건`} />
-              <SummaryItem icon={<MapPin size={16} />} label="지역" value={match.regionName ?? '-'} />
-              <SummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatDateTime(match.startAt)} />
-              <SummaryItem icon={<CalendarClock size={16} />} label="신청 마감" value={formatDateTime(match.deadlineAt)} />
+              <AdminSummaryItem icon={<Users size={16} />} label="참가 인원" value={`${match.participantCount}/${match.maxParticipants}명`} />
+              <AdminSummaryItem icon={<UserRound size={16} />} label="신청" value={`${match.applicationCount}건`} />
+              <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={match.regionName ?? '-'} />
+              <AdminSummaryItem icon={<CalendarClock size={16} />} label="시작" value={formatDateTime(match.startAt)} />
+              <AdminSummaryItem icon={<CalendarClock size={16} />} label="신청 마감" value={formatDateTime(match.deadlineAt)} />
             </dl>
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">호스트</h2>
             <dl className="mt-4 grid gap-3">
-              <SummaryItem icon={<UserRound size={16} />} label="이름" value={match.hostName ?? '-'} />
+              <AdminSummaryItem icon={<UserRound size={16} />} label="이름" value={match.hostName ?? '-'} />
             </dl>
             <Link
               href={`/admin/users/${encodeURIComponent(match.hostUserId)}`}

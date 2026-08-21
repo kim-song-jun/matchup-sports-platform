@@ -5,9 +5,11 @@ import { useParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ArrowLeft, Calendar, MapPin, Shield, Trophy, Users } from 'lucide-react';
 import {
+  AdminDetailRow,
   AdminEmpty,
   AdminPageHeader,
   AdminStatusPill,
+  AdminSummaryItem,
   AdminTableSkeleton,
 } from '@/components/admin';
 import { useV1AdminTeam } from '@/hooks/use-v1-api';
@@ -31,35 +33,6 @@ function formatDateTime(value: string | null | undefined) {
 function formatScore(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === '') return '-';
   return String(value);
-}
-
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="text-xs font-semibold text-gray-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">{value ?? '-'}</dd>
-    </div>
-  );
-}
-
-function SummaryItem({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
-      <dt className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
-        <span className="shrink-0 text-gray-400" aria-hidden="true">{icon}</span>
-        <span className="truncate">{label}</span>
-      </dt>
-      <dd className="shrink-0 text-sm font-bold tabular-nums text-[var(--text-strong)]">{value}</dd>
-    </div>
-  );
 }
 
 function BackLink() {
@@ -203,15 +176,15 @@ export default function AdminTeamDetailPage() {
             </div>
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DetailRow label="팀 ID" value={team.teamId} />
-              <DetailRow label="종목" value={team.sportName} />
-              <DetailRow label="지역" value={team.regionName} />
-              <DetailRow label="상태" value={team.status} />
-              <DetailRow label="팀장" value={team.ownerName} />
-              <DetailRow label="팀장 ID" value={team.ownerUserId} />
-              <DetailRow label="멤버 수" value={team.memberCount} />
-              <DetailRow label="매니저 수" value={team.managerCount} />
-              <DetailRow label="생성일" value={formatDateTime(team.createdAt)} />
+              <AdminDetailRow label="팀 ID" value={team.teamId} />
+              <AdminDetailRow label="종목" value={team.sportName} />
+              <AdminDetailRow label="지역" value={team.regionName} />
+              <AdminDetailRow label="상태" value={team.status} />
+              <AdminDetailRow label="팀장" value={team.ownerName} />
+              <AdminDetailRow label="팀장 ID" value={team.ownerUserId} />
+              <AdminDetailRow label="멤버 수" value={team.memberCount} />
+              <AdminDetailRow label="매니저 수" value={team.managerCount} />
+              <AdminDetailRow label="생성일" value={formatDateTime(team.createdAt)} />
             </dl>
           </article>
 
@@ -223,11 +196,11 @@ export default function AdminTeamDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">
-              <SummaryItem icon={<Users size={16} />} label="전체 멤버" value={team.memberCount} />
-              <SummaryItem icon={<Shield size={16} />} label="매니저" value={team.managerCount} />
-              <SummaryItem icon={<Trophy size={16} />} label="최근 주최 팀매치" value={team.recentHostedTeamMatches.length} />
-              <SummaryItem icon={<MapPin size={16} />} label="지역" value={team.regionName} />
-              <SummaryItem icon={<Calendar size={16} />} label="생성일" value={formatDateTime(team.createdAt)} />
+              <AdminSummaryItem icon={<Users size={16} />} label="전체 멤버" value={team.memberCount} />
+              <AdminSummaryItem icon={<Shield size={16} />} label="매니저" value={team.managerCount} />
+              <AdminSummaryItem icon={<Trophy size={16} />} label="최근 주최 팀매치" value={team.recentHostedTeamMatches.length} />
+              <AdminSummaryItem icon={<MapPin size={16} />} label="지역" value={team.regionName} />
+              <AdminSummaryItem icon={<Calendar size={16} />} label="생성일" value={formatDateTime(team.createdAt)} />
             </dl>
           </section>
 
@@ -235,10 +208,10 @@ export default function AdminTeamDetailPage() {
             <h2 className="text-[17px] font-bold text-[var(--text-strong)]">신뢰 정보</h2>
             {trust ? (
               <dl className="mt-4 grid gap-3">
-                <SummaryItem icon={<Shield size={16} />} label="상태" value={trust.trustState} />
-                <SummaryItem icon={<Shield size={16} />} label="매너 점수" value={formatScore(trust.mannerScore)} />
-                <SummaryItem icon={<Trophy size={16} />} label="반영 경기" value={trust.matchCount} />
-                <SummaryItem icon={<Calendar size={16} />} label="계산일" value={formatDateTime(trust.calculatedAt)} />
+                <AdminSummaryItem icon={<Shield size={16} />} label="상태" value={trust.trustState} />
+                <AdminSummaryItem icon={<Shield size={16} />} label="매너 점수" value={formatScore(trust.mannerScore)} />
+                <AdminSummaryItem icon={<Trophy size={16} />} label="반영 경기" value={trust.matchCount} />
+                <AdminSummaryItem icon={<Calendar size={16} />} label="계산일" value={formatDateTime(trust.calculatedAt)} />
               </dl>
             ) : (
               <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">

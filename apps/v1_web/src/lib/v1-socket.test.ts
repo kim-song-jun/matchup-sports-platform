@@ -14,7 +14,7 @@ const mockSocket = {
   off: vi.fn(),
   emit: vi.fn(),
 };
-type AuthCallback = (data: Record<string, string>) => void;
+type AuthCallback = (data: Record<string, string | number>) => void;
 const ioMock = vi.fn((_uri: string, _options: { auth: (cb: AuthCallback) => void }) => mockSocket);
 
 const reportClientError = vi.hoisted(() => vi.fn());
@@ -73,10 +73,48 @@ describe('getV1Socket', () => {
     const secondCb = vi.fn();
     options.auth(secondCb);
 
-    expect(secondCb).toHaveBeenCalledWith({
-      'x-v1-user-id': 'user-2',
-      'x-v1-user-email': 'user2@teameet.v1',
-    });
+    expect(secondCb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        'x-v1-user-id': 'user-2',
+        'x-v1-user-email': 'user2@teameet.v1',
+      }),
+    );
+  });
+});
+
+describe('getV1Socket — 네임스페이스와 핸드셰이크 메타데이터', () => {
+  it('게이트웨이가 있는 네임스페이스에 붙는다', async () => {
+    // 루트('/')에는 게이트웨이가 없다. 거기 붙으면 연결은 되지만 user 룸에 못 들어가고
+    // notification:new / chat:message 가 한 건도 도달하지 않는다(에러도 없이 조용히).
+    const { getV1Socket } = await import('./v1-socket');
+    getV1Socket();
+    expect(ioMock.mock.calls[0][0]).toBe('/game-operations');
+  });
+
+  it('게이트웨이가 요구하는 연결 메타데이터를 함께 보낸다', async () => {
+    // parseConnectionMetadata() 가 이 둘을 요구한다 — 없으면 SOCKET_METADATA_INVALID 로 거부된다.
+    const { getV1Socket } = await import('./v1-socket');
+    getV1Socket();
+    const cb = vi.fn();
+    ioMock.mock.calls[0][1].auth(cb);
+    expect(cb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientInstanceId: expect.any(String),
+        authorizationSubjectVersion: 0,
+      }),
+    );
+  });
+
+  it('경기 콘솔 소켓과 다른 clientInstanceId 를 쓴다', async () => {
+    // takeover 토큰이 (gameId, authorizationSubject, clientInstanceId) 에 묶인다 —
+    // 두 소켓이 같은 id 를 제시하면 콘솔의 재접속 판정이 흔들린다.
+    const { getV1Socket } = await import('./v1-socket');
+    getV1Socket();
+    const cb = vi.fn();
+    ioMock.mock.calls[0][1].auth(cb);
+    const notificationId = cb.mock.calls[0][0].clientInstanceId;
+    expect(window.sessionStorage.getItem('teameet.v1.notifications.clientInstanceId')).toBe(notificationId);
+    expect(window.sessionStorage.getItem('teameet.v1.gameOps.clientInstanceId')).toBeNull();
   });
 });
 

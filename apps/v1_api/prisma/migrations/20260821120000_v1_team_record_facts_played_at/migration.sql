@@ -1,6 +1,9 @@
 ALTER TABLE "v1_team_record_facts"
 ADD COLUMN "played_at" TIMESTAMP(3);
 
+ALTER TABLE v1_team_record_facts
+DISABLE TRIGGER v1_block_team_record_fact_mutation;
+
 UPDATE "v1_team_record_facts" AS fact
 SET "played_at" = COALESCE(team_match."start_at", fixture."scheduled_at", fact."official_at")
 FROM "v1_games" AS game
@@ -13,6 +16,9 @@ WHERE game."id" = fact."game_id";
 UPDATE "v1_team_record_facts"
 SET "played_at" = "official_at"
 WHERE "played_at" IS NULL;
+
+ALTER TABLE v1_team_record_facts
+ENABLE TRIGGER v1_block_team_record_fact_mutation;
 
 ALTER TABLE "v1_team_record_facts"
 ALTER COLUMN "played_at" SET NOT NULL;

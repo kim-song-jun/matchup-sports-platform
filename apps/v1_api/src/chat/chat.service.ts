@@ -92,8 +92,14 @@ export class ChatService {
       await this.assertCanUseTeamMatchChat(user.id, dto.targetId);
       return this.resolveTeamMatchRoom(user.id, dto.targetId);
     }
-    await this.assertCanUseTeamContactChat(user.id, dto.targetId);
-    return this.resolveTeamContactRoom(user.id, dto.targetId);
+    if (dto.targetType === 'team_contact') {
+      await this.assertCanUseTeamContactChat(user.id, dto.targetId);
+      return this.resolveTeamContactRoom(user.id, dto.targetId);
+    }
+    // DTO 의 @IsIn 이 targetType 을 네 값으로 제한하므로 여기 도달할 일은 없다.
+    // 도달했다면 새 방 종류가 이 분기 없이 추가된 것이다 — 조용히 마지막 분기로
+    // 새느니 크게 실패한다. assertCurrentRoomEntitlement 와 같은 규약이다.
+    throw validationError('Unsupported chat target type', 'targetType');
   }
 
   async detail(user: V1AuthUser, roomId: string) {

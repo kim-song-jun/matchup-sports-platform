@@ -1,21 +1,15 @@
 import Link from 'next/link';
 
-type MatchType = 'personal' | 'team' | 'league';
+type MatchType = 'personal' | 'team';
 
 interface MatchTypeSegmentProps {
   active: MatchType;
 }
 
 /**
- * 매치(개인/팀/리그) 유형 세그먼트. 탭 위젯이 아니라 라우팅 링크 3개이므로 aria-current로
+ * 매치(개인/팀) 유형 세그먼트. 탭 위젯이 아니라 라우팅 링크 2개이므로 aria-current로
  * 현재 선택을 표현하고, 스타일은 기존 정의된 .tm-segment-row + .tm-review-tab(data-active)
  * 패턴을 재사용한다.
- *
- * '리그'가 여기 있는 이유: 공개 리그 목록(/league-matches)은 페이지만 있고 그리로 향하는
- * 인앱 링크가 저장소 전체에 0건이라 URL 을 직접 입력해야만 닿았다(2026-08-21 재감사).
- * 하단 탭은 홈·매치·대회·팀·마이 5개로 고정이고 6번째를 늘리는 건 전역 내비 변경이라
- * 범위가 크다. 리그는 개인·팀 매치와 같은 "경기를 찾는" 축이고 리그 대진 자체가 팀매치
- * 레코드이므로, 이미 그 축을 표현하는 이 세그먼트가 가장 가까운 자리다.
  *
  * .tm-match-type-segment: 이 세그먼트는 스크롤 영역 직속 자식이라 .tm-segment-row 기본값만으로는
  * 좌우 여백이 0이 되어 위(검색바)·아래(종목 칩·카드)의 페이지 리듬과 어긋난다. 좌우 인셋만
@@ -41,14 +35,6 @@ export function MatchTypeSegment({ active }: MatchTypeSegmentProps) {
         aria-current={active === 'team' ? 'page' : undefined}
       >
         팀
-      </Link>
-      <Link
-        href="/league-matches"
-        className="tm-review-tab"
-        data-active={active === 'league'}
-        aria-current={active === 'league' ? 'page' : undefined}
-      >
-        리그
       </Link>
     </nav>
   );

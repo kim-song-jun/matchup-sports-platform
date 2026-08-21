@@ -54,6 +54,20 @@ existing file changed.
 `cursor` is opaque (base64url JSON `{key,id}`); never construct it
 client-side.
 
+For `GET /teams/:id/records`, every item exposes `playedAt`, not
+`officialAt`. `playedAt` is copied from `V1TeamMatch.startAt` for team matches
+or `V1TournamentFixture.scheduledAt` for tournament fixtures when the
+official fact is projected. The list order, cursor key, `season` filter, and
+summary all use this same match instant. A later result correction therefore
+updates the score without moving the match to the correction date.
+
+For `GET /teams/:id/records`, every item exposes `playedAt`, not
+`officialAt`. `playedAt` is copied from `V1TeamMatch.startAt` for team matches
+or `V1TournamentFixture.scheduledAt` for tournament fixtures when the
+official fact is projected. The list order, cursor key, `season` filter, and
+summary all use this same match instant. A later result correction therefore
+updates the score without moving the match to the correction date.
+
 ### Server-enforced visibility (matches the frozen output matrix exactly)
 
 Each fixture/game independently resolves `hidden | status_only | live |
@@ -248,6 +262,10 @@ identity/side itself:
   from the immutable event `payload.card`. `null` is reserved for non-card
   events or malformed historical payloads; consumers must not present it as
   a yellow card.
+  GOAL and OWN_GOAL may be intentionally recorded without `participantId`;
+  these writes carry `payload.anonymous: true` so they are not treated as a
+  missing-scorer integrity warning. Public event rows render a null goal
+  participant as `익명` and a null own-goal participant as `OG`.
 - `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]` gained
   `scorers: { side, participantName, jerseyNumber, period, clockMs }[]` -- a
   goal-only summary for the schedule card, same identity/consent rule as
@@ -294,7 +312,7 @@ active GOAL and OWN_GOAL events.
 
 Public record time uses a ceiling minute without seconds. An event captured at
 2:04 is displayed as 3′. Own goals count toward the credited team score and
-are labelled separately, but never count as the culprit's personal goal or
+are labelled `OG`, but never count as the culprit's personal goal or
 the tournament scorer ranking. Schedule, match-detail, and team-record event
 rows place the own-goal participant under the participant's actual team, not
 under the team credited with the score.

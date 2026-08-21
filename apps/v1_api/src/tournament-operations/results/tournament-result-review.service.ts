@@ -1403,6 +1403,7 @@ export class TournamentResultReviewService {
       id: string;
       sideId: string;
       participantId?: string;
+      anonymous?: boolean;
       ownGoal: boolean;
     }>,
   ): Promise<boolean> {
@@ -1440,13 +1441,14 @@ export class TournamentResultReviewService {
       else awayGoals += 1;
 
       if (!goal.participantId) {
-        if (goal.ownGoal) {
+        if (goal.anonymous !== true) {
           throw new UnprocessableEntityException({
             code: 'RESULT_GOAL_TIMELINE_INVALID',
-            message: 'Own goal must identify the opposing participant',
+            message: goal.ownGoal
+              ? 'Anonymous own goal must be explicitly marked'
+              : 'Anonymous goal must be explicitly marked',
           });
         }
-        missingScorer = true;
         continue;
       }
       const participant = participantById.get(goal.participantId);
@@ -1519,6 +1521,7 @@ export class TournamentResultReviewService {
         clockMs: event.clockMs,
         reversed: reversedIds.has(event.id),
         ...(payload.card === 'YELLOW' || payload.card === 'RED' ? { card: payload.card } : {}),
+        ...(payload.anonymous === true ? { anonymous: true } : {}),
       };
     });
     const resultConfig = config === null ? {} : jsonObject(config.result);
@@ -1528,7 +1531,8 @@ export class TournamentResultReviewService {
       (event) =>
         event.type === V1GameEventType.GOAL &&
         event.reversed !== true &&
-        event.participantId === undefined,
+        event.participantId === undefined &&
+        event.anonymous !== true,
     );
     const participants: GameResultParticipant[] = dto.actualParticipants.map((participant) => ({
       id: participant.participantId,

@@ -16,6 +16,7 @@ export type OfficialRevisionRow = {
   revision: number;
   score: Prisma.JsonValue;
   sourceHash: string;
+  playedAt: Date;
   officialAt: Date;
   reason: string | null;
   sourceType: string;

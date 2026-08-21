@@ -715,8 +715,25 @@ describe('ResultEditModal — 공식 득점 타임라인 편집', () => {
     );
 
     expect(onConfirm.mock.calls[0][0].goalEvents).toEqual([
-      expect.objectContaining({ id: 'goal-2', ownGoal: true }),
+      expect.objectContaining({ id: 'goal-2', ownGoal: true, anonymous: true }),
       expect.objectContaining({ id: 'goal-1', ownGoal: false }),
     ]);
+  });
+
+  it('선수를 지정하지 않은 새 골은 명시적인 익명 플래그로 제출한다', () => {
+    const { onConfirm } = submitEdit({}, ({ confirmLabel }) => {
+      fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));
+      fireEvent.change(screen.getByLabelText('사유'), { target: { value: '익명 득점 추가' } });
+      fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+    });
+
+    expect(onConfirm.mock.calls[0][0].goalEvents).toEqual([
+      expect.objectContaining({
+        sideId: HOME_SIDE_ID,
+        anonymous: true,
+        ownGoal: false,
+      }),
+    ]);
+    expect(onConfirm.mock.calls[0][0].goalEvents[0]).not.toHaveProperty('participantId');
   });
 });

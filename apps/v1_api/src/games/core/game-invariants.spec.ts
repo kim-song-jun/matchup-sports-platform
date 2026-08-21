@@ -251,6 +251,50 @@ describe('validateGameResultInvariants — own goal', () => {
       }),
     ).toThrow(expect.objectContaining({ code: 'PARTICIPANT_SIDE_MISMATCH' }));
   });
+
+  it('allows an explicitly anonymous own goal without a participant', () => {
+    expect(() =>
+      validateGameResultInvariants({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        score: { home: 1, away: 0 },
+        sides,
+        participants: [],
+        events: [
+          {
+            type: V1GameEventType.OWN_GOAL,
+            sideId: 'side-home',
+            anonymous: true,
+            period: 1,
+            clockMs: 124_000,
+          },
+        ],
+        scorerPolicy: 'required',
+        missingScorer: false,
+      }),
+    ).not.toThrow();
+  });
+
+  it('allows an explicitly anonymous goal under a required scorer policy', () => {
+    expect(() =>
+      validateGameResultInvariants({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        score: { home: 1, away: 0 },
+        sides,
+        participants: [],
+        events: [
+          {
+            type: V1GameEventType.GOAL,
+            sideId: 'side-home',
+            anonymous: true,
+            period: 1,
+            clockMs: 124_000,
+          },
+        ],
+        scorerPolicy: 'required',
+        missingScorer: false,
+      }),
+    ).not.toThrow();
+  });
 });
 
 describe('validateGameResultInvariants — assist/foul cross-check (T1-4)', () => {

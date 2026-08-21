@@ -28,6 +28,7 @@ function revisionRow(overrides: Partial<OfficialRevisionRow> = {}): OfficialRevi
     revision: 1,
     score: { home: 1, away: 1 },
     sourceHash: 'hash-1',
+    playedAt: new Date('2026-07-31T09:00:00Z'),
     officialAt: new Date('2026-08-01T00:00:00Z'),
     reason: null,
     sourceType: 'TOURNAMENT_FIXTURE',

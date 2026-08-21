@@ -24,6 +24,7 @@ export function officialRevisionRowSelect(): Prisma.Sql {
       revision.state::text AS state,
       revision.score,
       revision.events_hash AS "sourceHash",
+      COALESCE(team_match.start_at, fixture.scheduled_at, revision.official_at) AS "playedAt",
       revision.official_at AS "officialAt",
       revision.reason,
       game.source_type::text AS "sourceType",
@@ -35,6 +36,7 @@ export function officialRevisionRowSelect(): Prisma.Sql {
       COALESCE(policy.mode, 'HIDDEN'::"V1VisibilityMode") AS visibility
     FROM v1_game_result_revisions revision
     INNER JOIN v1_games game ON game.id = revision.game_id
+    LEFT JOIN v1_team_matches team_match ON team_match.id = game.team_match_id
     LEFT JOIN v1_tournament_fixtures fixture ON fixture.id = game.tournament_fixture_id
     LEFT JOIN v1_game_sides home_side ON home_side.game_id = game.id AND home_side.side_key = 'HOME'
     LEFT JOIN v1_game_sides away_side ON away_side.game_id = game.id AND away_side.side_key = 'AWAY'

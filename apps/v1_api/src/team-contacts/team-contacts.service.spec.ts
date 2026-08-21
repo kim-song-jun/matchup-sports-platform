@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { TeamContactsService } from './team-contacts.service';
 
 // 이 레포의 유닛 테스트 관례: Prisma 는 전체 jest.fn() mock. 실 DB 를 쓰지 않는다.
@@ -631,6 +632,36 @@ describe('발신 가드 — 차단·수신정책', () => {
     expect(bodies[0]).toEqual(bodies[1]);
     expect(bodies[1]).toEqual(bodies[2]);
   });
+
+  // 리뷰 라운드 1 (I1): 응답 본문이 같아도 DB 왕복 횟수가 사유마다 다르면(차단=1,
+  // closed=2, recruiting_only=3) 발신자가 응답 지연시간으로 "우리가 차단당했구나"를
+  // 역추론할 수 있다. 세 조회를 항상 병렬 실행하도록 고쳤으니, 세 거부 사유 모두
+  // block/team/teamMatch 조회가 정확히 같은 횟수(1회씩) 일어나야 한다.
+  it('왕복 횟수가 거부 사유와 무관하게 일정하다 — 타이밍으로 차단 여부를 역추론할 수 없어야 한다', async () => {
+    const counts: Array<{ block: number; team: number; teamMatch: number }> = [];
+    for (const setup of [
+      (p: any) => { p.v1TeamContactBlock.findFirst.mockResolvedValue({ id: 'b1' }); },
+      (p: any) => { p.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'closed' }); },
+      (p: any) => {
+        p.v1Team.findUnique.mockResolvedValue({ contactPolicy: 'recruiting_only' });
+        p.v1TeamMatch.findFirst.mockResolvedValue(null);
+      },
+    ]) {
+      const prisma = acceptingPrisma();
+      setup(prisma);
+      const service = new TeamContactsService(prisma, makeNotifications());
+      await service.create(actor, 'B', dto).catch(() => undefined);
+      counts.push({
+        block: prisma.v1TeamContactBlock.findFirst.mock.calls.length,
+        team: prisma.v1Team.findUnique.mock.calls.length,
+        teamMatch: prisma.v1TeamMatch.findFirst.mock.calls.length,
+      });
+    }
+    expect(counts[0]).toEqual(counts[1]);
+    expect(counts[1]).toEqual(counts[2]);
+    // 실제로 매 시나리오 1회씩 호출됐는지(0회로 스킵되는 경로가 남아있지 않은지)도 함께 확인.
+    expect(counts[0]).toEqual({ block: 1, team: 1, teamMatch: 1 });
+  });
 });
 
 describe('차단 관리', () => {
@@ -660,6 +691,59 @@ describe('차단 관리', () => {
     const r = await service.createBlock(actor, 'A', { blockedTeamId: 'B' });
     expect(r.alreadyBlocked).toBe(true);
     expect(prisma.v1TeamContactBlock.create).not.toHaveBeenCalled();
+  });
+
+  // 리뷰 라운드 1 (I2): 없는 blockedTeamId 를 보내면 create() 시점 FK 위반(P2003)으로
+  // raw 500 이 났다. 실재하지 않는 팀은 404 로 명시적으로 거부해야 한다.
+  it('없는 팀을 차단 대상으로 지정하면 TEAM_NOT_FOUND 404 를 던진다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1Team.findUnique.mockResolvedValue(null);
+    const service = new TeamContactsService(prisma, makeNotifications());
+    await expect(service.createBlock(actor, 'A', { blockedTeamId: 'ghost' })).rejects.toMatchObject({
+      status: 404,
+      response: { code: 'TEAM_NOT_FOUND' },
+    });
+    expect(prisma.v1TeamContactBlock.create).not.toHaveBeenCalled();
+  });
+
+  // 리뷰 라운드 1 (C1): findFirst 로 사전 확인해도 findFirst 와 create() 사이에 틈이
+  // 있다 — 동시 요청(더블클릭·재시도) 두 개가 그 틈을 지나가면 두 번째 create() 가
+  // @@unique([teamId, blockedTeamId]) 제약(P2002)에 걸린다. 이 저장소엔 전역 P2002
+  // 예외 필터가 없어 잡지 않으면 raw 500 + 영어 메시지가 나간다. 차단은 멱등이 자연스러운
+  // 결과이므로 P2002 를 잡아 findFirst 경로와 완전히 같은 응답으로 수렴해야 한다.
+  it('findFirst 와 create 사이 경합으로 P2002 가 나면 raw 500 대신 멱등하게 수렴한다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1Team.findUnique.mockResolvedValue({ id: 'B', contactPolicy: 'open' });
+    // 사전 조회 시점엔 없었지만(findFirst → null), create() 가 경합에 져 P2002 로 실패한다.
+    prisma.v1TeamContactBlock.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'b1', blockedTeamId: 'B' }); // P2002 이후 재조회
+    prisma.v1TeamContactBlock.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed on the fields: (`team_id`,`blocked_team_id`)', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+    const service = new TeamContactsService(prisma, makeNotifications());
+
+    const r = await service.createBlock(actor, 'A', { blockedTeamId: 'B' });
+    expect(r.alreadyBlocked).toBe(true);
+    expect(r.block).toMatchObject({ id: 'b1' });
+    expect(prisma.v1TeamContactBlock.findFirst).toHaveBeenCalledTimes(2);
+  });
+
+  it('P2002 가 아닌 다른 에러는 그대로 다시 던진다', async () => {
+    const prisma = makePrisma();
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'm1' });
+    prisma.v1Team.findUnique.mockResolvedValue({ id: 'B', contactPolicy: 'open' });
+    prisma.v1TeamContactBlock.findFirst.mockResolvedValue(null);
+    const boom = new Error('connection lost');
+    prisma.v1TeamContactBlock.create.mockRejectedValue(boom);
+    const service = new TeamContactsService(prisma, makeNotifications());
+
+    await expect(service.createBlock(actor, 'A', { blockedTeamId: 'B' })).rejects.toBe(boom);
   });
 });
 

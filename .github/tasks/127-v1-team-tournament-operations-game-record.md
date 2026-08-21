@@ -1866,6 +1866,9 @@ Validation:
   to match-stable `playedAt`.
 - [x] Updated the web record row and API/frontend contract tests so correcting
   a result no longer changes the displayed date or list position.
+- [x] Alpha deployment follow-up: bracketed the legacy fact backfill with the
+  existing append-only trigger disable/enable inside one migration transaction,
+  and added a signature-checked recovery for the single failed alpha attempt.
 
 Acceptance criteria:
 

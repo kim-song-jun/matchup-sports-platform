@@ -269,7 +269,10 @@ export const gameSchemaSourceManifest = {
   // 넣어 둔 채 충돌했다. 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 shasum 을 다시
   // 돌려 계산한 것이다 — 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 상단
   // 2026-08-19 병합 재핀 주석과 같은 사유).
-  schema: '20188bd7d344d99d6ca2c0338dbef250c736730a11324b30f044b403e18f88ed',
+  // 2026-08-21 hotfix: V1TeamRecordFact.playedAt is backed by the
+  // 20260821120000_v1_team_record_facts_played_at migration. The bound
+  // game-operations migration itself remains unchanged.
+  schema: '36a3b7e180f55627f1ff288e35861f27646660776151f20ab3c5074800ac17a2',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

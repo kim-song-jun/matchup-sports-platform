@@ -22,6 +22,54 @@ class UnparsableSqlError extends Error {}
 // the gate exists to catch does not apply. Keep this list SHORT: every entry
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821115900_v1_team_record_facts_played_at_compat/migration.sql',
+    statement:
+      "CREATE OR REPLACE FUNCTION v1_block_team_record_fact_mutation() RETURNS trigger LANGUAGE plpgsql AS $function$ BEGIN IF TG_OP = 'UPDATE' AND (to_jsonb(NEW) - 'played_at') IS NOT DISTINCT FROM (to_jsonb(OLD) - 'played_at') AND OLD.played_at IS NULL AND NEW.played_at IS NOT NULL THEN RETURN NEW; END IF; RAISE EXCEPTION 'team record facts are append-only' USING ERRCODE = '55000'; END $function$",
+    reason:
+      'Hotfix 2026-08-21. The existing append-only trigger remains installed and continues rejecting every DELETE and every UPDATE except a row-preserving NULL-to-value write of the newly introduced played_at field. Before that field exists, OLD.played_at fails closed; after the backfill, NOT NULL makes the exception unreachable. The following migration restores the original unconditional rejection. Reviewed after alpha exposed SQLSTATE 55000.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821120100_v1_team_record_facts_played_at_relock/migration.sql',
+    statement:
+      "CREATE OR REPLACE FUNCTION v1_block_team_record_fact_mutation() RETURNS trigger LANGUAGE plpgsql AS $function$ BEGIN RAISE EXCEPTION 'team record facts are append-only' USING ERRCODE = '55000'; END $function$",
+    reason:
+      'Hotfix 2026-08-21. Restores the original unconditional append-only trigger function immediately after played_at becomes NOT NULL. It narrows permissions and mutates no data or schema shape. Reviewed after alpha exposed SQLSTATE 55000.',
+  },
+  // --- records played-at hotfix (2026-08-21) ---------------------------------
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821120000_v1_team_record_facts_played_at/migration.sql',
+    statement:
+      'UPDATE "v1_team_record_facts" AS fact SET "played_at" = COALESCE(team_match."start_at", fixture."scheduled_at", fact."official_at") FROM "v1_games" AS game LEFT JOIN "v1_team_matches" AS team_match ON team_match."id" = game."team_match_id" LEFT JOIN "v1_tournament_fixtures" AS fixture ON fixture."id" = game."tournament_fixture_id" WHERE game."id" = fact."game_id"',
+    reason:
+      'Hotfix 2026-08-21. Backfills only the newly added played_at column from the immutable match source date, falling back to the existing official_at value. Old app instances neither select nor write this new column; new instances require it for team-record ordering. No pre-existing business column or result row is changed. Reviewed 2026-08-21.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821120000_v1_team_record_facts_played_at/migration.sql',
+    statement:
+      'UPDATE "v1_team_record_facts" SET "played_at" = "official_at" WHERE "played_at" IS NULL',
+    reason:
+      'Hotfix 2026-08-21. Defensive completion of the new played_at column for malformed legacy source links only. It touches no pre-existing column, and guarantees the following NOT NULL constraint cannot reject an existing row. Old instances ignore the column. Reviewed 2026-08-21.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821120000_v1_team_record_facts_played_at/migration.sql',
+    statement:
+      'ALTER TABLE "v1_team_record_facts" ALTER COLUMN "played_at" SET NOT NULL',
+    reason:
+      'Hotfix 2026-08-21. The two bounded backfills immediately above populate every existing row before this constraint is applied, while every new projection insert in the same release supplies played_at. Old instances do not insert team-record facts directly; projection writes are owned by the new service path. Reviewed 2026-08-21.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821120000_v1_team_record_facts_played_at/migration.sql',
+    statement: 'DROP INDEX IF EXISTS "v1_team_record_facts_team_official_at_idx"',
+    reason:
+      'Hotfix 2026-08-21. Replaces an ordering-only index after reads move from correction time to match time. Dropping it changes performance only; old queries remain semantically correct and PostgreSQL can execute them without the index during a rolling deploy. Reviewed 2026-08-21.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821120000_v1_team_record_facts_played_at/migration.sql',
+    statement: 'DROP INDEX IF EXISTS "v1_team_record_facts_team_tournament_idx"',
+    reason:
+      'Hotfix 2026-08-21. Replaces the tournament ordering index with the played_at equivalent created later in the same transaction. The old app retains correct query semantics if it overlaps the rollout; only its query plan may differ briefly. Reviewed 2026-08-21.',
+  },
   // ── PR #563 v1_records_profile_integration_repair (2026-08-19) ──────────
   // 8 statements, reviewed 2026-08-20 after this migration blocked every alpha
   // deploy from 06:44. Two of them (DISABLE TRIGGER, DELETE) carry residual risk

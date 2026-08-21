@@ -478,3 +478,17 @@ test('alpha deploy only recovers the reviewed nullable-goalkeeper migration fail
   assert.match(deployScript, /prisma migrate resolve --rolled-back \$\{RECORDS_PROFILE_REPAIR_MIGRATION\}/);
   assert.match(deployScript, /Refusing to auto-recover an unrecognized/);
 });
+
+test('alpha deploy only recovers the reviewed played-at append-only failure before deploy', () => {
+  const deployScript = readFileSync(join(repoRoot, 'deploy/deploy-alpha.sh'), 'utf8');
+  const recovery = deployScript.indexOf('recover_known_played_at_migration_failure');
+  const deploy = deployScript.indexOf('./node_modules/.bin/prisma migrate deploy');
+
+  assert.notEqual(recovery, -1);
+  assert.ok(recovery < deploy);
+  assert.match(deployScript, /20260821120000_v1_team_record_facts_played_at/);
+  assert.match(deployScript, /team record facts are append-only/);
+  assert.match(deployScript, /v1_block_team_record_fact_mutation/);
+  assert.match(deployScript, /55000/);
+  assert.match(deployScript, /prisma migrate resolve --rolled-back \$\{PLAYED_AT_MIGRATION\}/);
+});

@@ -108,7 +108,6 @@ describe('RecordedEventList', () => {
   });
 
   // 라인업 스냅샷에 없는 참가자를 이름으로 지어내면 운영자가 잘못된 득점자를 보게 된다.
-  // 이름을 못 찾으면 팀명만 남기고 조용히 비운다.
   /** 행의 두 색 신호를 각각 집어 온다 — 레일은 행 왼쪽 세로 막대(w-1),
    *  팀 점은 팀 이름 앞 원(h-2 w-2). innerHTML 문자열 매칭으로 뭉뚱그리면
    *  "unknown 이면 점을 아예 그리지 않는다"는 계약이 고정되지 않는다. */
@@ -152,7 +151,8 @@ describe('RecordedEventList', () => {
     expect(dot).toBeNull();
   });
 
-  it('does not invent a scorer name when the participant is missing from the lineup snapshot', () => {
+  // 알 수 없는 participantId는 지어내지 않고, 명시적으로 참가자가 없는 골만 익명으로 표시한다.
+  it('does not invent an unknown scorer and labels a participant-less goal as anonymous', () => {
     render(
       <RecordedEventList
         events={[goal(1, HOME_SIDE_ID, 'p-unknown', 3 * 60000), goal(2, AWAY_SIDE_ID, null, 5 * 60000)]}
@@ -166,7 +166,14 @@ describe('RecordedEventList', () => {
     expect(rows[0]).not.toHaveTextContent('정우진');
     expect(rows[0]).not.toHaveTextContent('·');
     expect(rows[1]).toHaveTextContent('성수 풋살 클럽');
+    expect(rows[1]).toHaveTextContent('골 · 익명');
     expect(rows[1]).not.toHaveTextContent('조현우');
+  });
+
+  it('선수 없는 자책골은 OG로 표시한다', () => {
+    const ownGoal = { ...goal(1, HOME_SIDE_ID, null, 60000), type: 'OWN_GOAL' as const, payload: { anonymous: true } };
+    render(<RecordedEventList events={[ownGoal]} sides={SIDES} lineups={LINEUPS} />);
+    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toHaveTextContent('자책골 · OG');
   });
 
   it('shows an empty state instead of an empty list when nothing is recorded yet', () => {

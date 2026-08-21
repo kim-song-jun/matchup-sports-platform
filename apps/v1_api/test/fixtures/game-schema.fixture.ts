@@ -269,6 +269,9 @@ export const gameSchemaSourceManifest = {
   // 넣어 둔 채 충돌했다. 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 shasum 을 다시
   // 돌려 계산한 것이다 — 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 상단
   // 2026-08-19 병합 재핀 주석과 같은 사유).
+  // 2026-08-21 hotfix: V1TeamRecordFact.playedAt is backed by the
+  // 20260821120000_v1_team_record_facts_played_at migration. The bound
+  // game-operations migration itself remains unchanged.
   // 2026-08-21 재핀: V1League 에 목록 조회용 인덱스 둘을 추가했다
   // (@@index([regionId, state]), @@index([createdAt(sort: Desc), id(sort: Desc)])).
   // 공개 리그 목록이 실제로 쓰는 필터·정렬 경로가 인덱스를 못 타고 있던 것을 덮는 것으로,
@@ -276,7 +279,11 @@ export const gameSchemaSourceManifest = {
   // 통과한다. game domain(V1Game*) 은 건드리지 않았고 바인딩된 20260729000100_v1_game_operations
   // 도 그대로라 migration 해시는 변하지 않는다.
   // 뒷받침 마이그레이션: 20260821100000_v1_league_list_indexes.
-  schema: '763fb97f41568f7d28ab426b26578e8fd029812c41225424109f328a89054aee',
+  // 병합 재핀: 위 두 변경(경기일 hotfix / 리그 인덱스)이 각자 자기 브랜치 기준 해시를 넣어
+  // 둔 채 충돌했다. 아래 값은 **두 변경이 병합된 뒤**의 schema.prisma 에 shasum 을 다시 돌려
+  // 계산한 것이다 — 어느 한쪽 브랜치의 해시를 그대로 쓰면 CI 가 깨진다(이 파일 위쪽
+  // 2026-08-19 / 2026-08-21 병합 재핀 주석과 같은 사유).
+  schema: '3a0d0566f2aeeea9f7b94e16f8f6bd63e0df0936d992a827da8c225ce4bdf6d9',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

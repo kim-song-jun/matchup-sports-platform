@@ -149,6 +149,7 @@ async function collectCandidates(client: MigrationReadClient): Promise<Collected
       revision: row.revision,
       score: row.score,
       sourceHash: row.sourceHash,
+      playedAt: row.playedAt,
       officialAt,
       reason: row.reason,
       sourceType: row.sourceType,

@@ -256,7 +256,7 @@ function ResultDraftSummary({
   opponentName: string;
 }) {
   function nameFor(participantId: string | null): string {
-    if (!participantId) return '미지정';
+    if (!participantId) return '익명';
     const row = roster.find((r) => r.participantId === participantId);
     if (!row) return participantId;
     return `${row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}${row.displayName}`;
@@ -838,7 +838,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                           value={goal.participantId ?? ''}
                           onChange={(event) => setGoalScorer(goal.key, event.target.value === '' ? null : event.target.value)}
                         >
-                          <option value="">미지정</option>
+                          <option value="">익명</option>
                           {appearedRoster.map((row) => (
                             <option key={row.participantId} value={row.participantId}>
                               {row.jerseyNumber ? `#${row.jerseyNumber} ` : ''}

@@ -47,11 +47,8 @@ export interface ActionTargetPickerProps {
   readonly frozen: FrozenEventCapture;
   readonly sides: readonly GameSide[];
   readonly lineups: readonly GameLineup[];
-  /** FOUL만 선수 없이 팀 단위로 기록하는 경로를 남겨둔다(백엔드가 이미
-   * 지원하던 경로 — `games.service.ts`의 `assertEventReferences`는
-   * `participantId`가 없는 FOUL/CARD를 그대로 허용한다. GOAL은 대회
-   * 정책(`tournamentScorerPolicy`)에 따라 득점자가 강제될 수 있어 여기서
-   * 임의로 선수 없이 보내면 안 된다). */
+  /** 팀 단위 기록 경로. GOAL/OWN_GOAL은 `payload.anonymous=true`를 함께
+   * 보내 의도적인 익명 기록과 실수로 누락된 득점자를 구분한다. */
   readonly allowTeamOnly: boolean;
   /** SUBSTITUTION 전용 — 지금 피치 위에 있는 참가자 id 집합(`on-pitch-state.
    * ts`가 `started` + 확정 이벤트 로그를 접어 만든 파생값). 1단계("나갈
@@ -192,7 +189,10 @@ export function ActionTargetPicker({
       period: frozen.period,
       clockMs: frozen.clockMs,
       occurredAt: frozen.occurredAt,
-      payload,
+      payload:
+        actionType === 'GOAL' || actionType === 'OWN_GOAL'
+          ? { ...payload, anonymous: true }
+          : payload,
     });
   };
 
@@ -316,7 +316,11 @@ export function ActionTargetPicker({
                   onClick={() => commitTeamOnly(side.id)}
                   className="min-h-[44px] rounded-lg border border-dashed border-[var(--border)] px-3 text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                 >
-                  {side.displayNameSnapshot} · 선수 지정 없이 기록
+                  {actionType === 'OWN_GOAL'
+                    ? `${side.displayNameSnapshot} 득점 · OG로 기록`
+                    : actionType === 'GOAL'
+                      ? `${side.displayNameSnapshot} · 익명 골로 기록`
+                      : `${side.displayNameSnapshot} · 선수 지정 없이 기록`}
                 </button>
               ))}
             </div>

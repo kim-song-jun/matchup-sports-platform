@@ -1857,5 +1857,34 @@ Validation:
 - Evidence manifest:
   docs/screenshots/task-127-records-profile/manifest.json
 
+### Follow-up Snapshot — 2026-08-21 team record match date
+
+- [x] Added `V1TeamRecordFact.playedAt` with a migration that backfills team
+  match `startAt` or tournament fixture `scheduledAt` for existing facts.
+- [x] Changed `GET /teams/:id/records` item date, descending order, cursor,
+  season filter, and season summary from correction-sensitive `officialAt`
+  to match-stable `playedAt`.
+- [x] Updated the web record row and API/frontend contract tests so correcting
+  a result no longer changes the displayed date or list position.
+- [x] Alpha deployment follow-up: added a narrow compatibility function before
+  the legacy backfill that permits only `played_at: NULL -> value`, restores the
+  strict append-only function immediately after, and signature-checks recovery
+  of the single failed alpha attempt.
+
+Acceptance criteria:
+
+- Given an older match whose result is corrected today, when its team records
+  page is loaded, then it remains ordered by the original match date and
+  displays that match date.
+
+Validation:
+
+- API regression: `public-team-records.service.spec.ts` 1 passed.
+- Web regression: `public-game-records.test.tsx` 43 passed.
+- API build, web TypeScript/pattern check, Prisma Client generation, and
+  Prisma schema validation passed.
+- Local v1 API/web services were not running, so authenticated headed-browser
+  verification of the route remains a deployment/runtime check.
+
 - 2026-08-19: 프로덕션 공개 API와 `main`/`dev` 소스를 교차 확인해 재현 및 원인을 확정했다.
 - 2026-08-19: `fix/v1-records-profile-integration` 브랜치에서 구현 시작.

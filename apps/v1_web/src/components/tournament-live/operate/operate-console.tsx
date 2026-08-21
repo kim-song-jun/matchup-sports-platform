@@ -152,9 +152,8 @@ interface PendingAction {
   readonly actionType: GameEventType;
   readonly actionLabel: string;
   readonly cardColor?: GameCardColor;
-  /** FOUL만 선수 없이 팀 단위로 기록하는 경로를 연다 — GOAL은 대회의
-   * `tournamentScorerPolicy`에 따라 득점자가 강제될 수 있어(백엔드
-   * `SCORER_REQUIRED`) 프런트가 임의로 "선수 없이" 옵션을 주면 안 된다. */
+  /** 선수 없이 팀 단위로 기록할 수 있는 이벤트인지 나타낸다. 득점 이벤트는
+   * 명시적인 익명 payload로 저장되어 누락 경고와 구분된다. */
   readonly allowTeamOnly: boolean;
   readonly frozen: FrozenEventCapture;
 }
@@ -165,8 +164,8 @@ const ACTION_BUTTONS: ReadonlyArray<{
   readonly cardColor?: GameCardColor;
   readonly allowTeamOnly: boolean;
 }> = [
-  { type: 'GOAL', label: '골', allowTeamOnly: false },
-  { type: 'OWN_GOAL', label: '자책골', allowTeamOnly: false },
+  { type: 'GOAL', label: '골', allowTeamOnly: true },
+  { type: 'OWN_GOAL', label: '자책골', allowTeamOnly: true },
   { type: 'CARD', label: '옐로카드', cardColor: 'YELLOW', allowTeamOnly: false },
   { type: 'CARD', label: '레드카드', cardColor: 'RED', allowTeamOnly: false },
   { type: 'FOUL', label: '파울', allowTeamOnly: true },
@@ -571,10 +570,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       );
       if (!(await confirm(copy))) return;
       void ops.submitEvent(input);
-      // GOAL은 이 콘솔에서 항상 참가자를 선택해 커밋한다(`ActionTargetPicker`가
-      // GOAL에는 `allowTeamOnly`를 열어주지 않는다) — `participantId`가 정말 없는
-      // 경우는 findRecentGoalEvent 자체가 매칭할 수 없으므로 어시스트 추가 액션을
-      // 달지 않는다(고아 토스트 액션을 만들지 않기 위한 방어적 가드).
+      // 익명 GOAL에는 participantId가 없어 findRecentGoalEvent가 매칭할 수 없으므로
+      // 어시스트 추가 액션을 달지 않는다(고아 토스트 액션을 만들지 않기 위한 가드).
       if (input.type === 'GOAL' && input.participantId !== undefined) {
         const participantId = input.participantId;
         const clockMs = input.clockMs;

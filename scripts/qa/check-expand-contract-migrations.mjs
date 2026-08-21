@@ -753,6 +753,44 @@ END $$`,
       "only users were the two tables dropped just above, so this cannot affect anything still in the " +
       "schema. Reviewed 2026-08-19.",
   },
+  // ── PR #627 v1_team_contacts (2026-08-21) ───────────────────────────────
+  // 링크 대상 CHECK 제약에 새 컬럼을 편입하는 DROP+재생성 쌍의 앞 절반.
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821000000_v1_team_contacts/migration.sql',
+    statement: `ALTER TABLE "v1_chat_rooms" DROP CONSTRAINT IF EXISTS "v1_chat_rooms_exactly_one_target_check"`,
+    reason:
+      'v1_chat_rooms 의 "링크 대상은 정확히 하나" CHECK 를 team_contact_id 까지 포함하도록 넓히는 ' +
+      'DROP + 즉시 재생성 쌍의 앞 절반이다. 게이트가 막는 이유는 DROP 이 결코 provably additive 하지 ' +
+      '않기 때문인데, 실제로 일어나는 일은 제약의 **완화**다: 새 술어는 ' +
+      '(match_id) + (team_id) + (team_match_id) + (team_contact_id) = 1 로, 기존 3개 술어를 만족하는 ' +
+      '모든 행이 새 술어도 그대로 만족한다(네 번째 항이 0 이라 합이 변하지 않는다). ' +
+      '롤링 배포 양방향 검증: (1) 구 인스턴스는 team_contact_id 를 아는 코드가 없어 match/team/team_match ' +
+      '방만 쓰는데 그 write 는 새 제약에서도 합=1 이라 거부되지 않는다. (2) 신 인스턴스가 만드는 ' +
+      'team_contact 방은 구 제약에서 합=0 으로 거부되므로, 이 마이그레이션이 신 코드보다 먼저 도는 ' +
+      '기존 배포 순서(deploy-alpha.sh 가 migrate deploy 를 컨테이너 재생성보다 먼저 실행)를 그대로 전제한다. ' +
+      '(3) 롤백 시 구 앱은 team_contact 행을 읽지도 쓰지도 않으므로 영향이 없다. ' +
+      'DROP 과 ADD 가 같은 migration.sql 안에 있어 제약 없는 창이 커밋 밖으로 노출되지 않는다. ' +
+      '같은 테이블에 team_id 를 추가했을 때도 동일한 DROP+재생성을 했다 ' +
+      '(20260630000000_v1_chat_room_team_target_constraint). Reviewed 2026-08-21.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821000000_v1_team_contacts/migration.sql',
+    statement:
+      `ALTER TABLE "v1_chat_rooms" ADD CONSTRAINT "v1_chat_rooms_exactly_one_target_check" ` +
+      `CHECK ( ( ("match_id" IS NOT NULL)::int + ("team_id" IS NOT NULL)::int ` +
+      `+ ("team_match_id" IS NOT NULL)::int + ("team_contact_id" IS NOT NULL)::int ) = 1 )`,
+    reason:
+      '위 DROP 의 짝 — 같은 이름의 제약을 team_contact_id 를 포함한 형태로 되돌려 놓는다. ' +
+      '게이트가 ADD CONSTRAINT 를 막는 이유는 새 제약이 기존 행을 거부할 수 있어 provably additive 가 ' +
+      '아니기 때문인데, 여기서는 그 위험이 구조적으로 없다: 새 술어는 직전 술어에 ' +
+      '`+ ("team_contact_id" IS NOT NULL)::int` 항 하나만 더한 것이고, 이 마이그레이션 이전에는 ' +
+      '그 컬럼 자체가 존재하지 않았으므로 모든 기존 행에서 그 항은 0 이다. 따라서 합이 변하지 않아 ' +
+      '**기존 제약을 만족하던 모든 행이 새 제약도 만족한다** — ADD 시점의 검증이 실패할 수 없다. ' +
+      '같은 이유로 구 인스턴스의 write(match/team/team_match 중 하나만 채움)도 새 제약을 통과한다. ' +
+      '즉 이 ADD 는 스키마를 조이는 것이 아니라 직전 DROP 이 만든 공백을 **더 느슨한 형태로** 메우는 ' +
+      '것이고, 둘이 같은 migration.sql 에 있어 제약 없는 창이 커밋 밖으로 노출되지 않는다. ' +
+      'Reviewed 2026-08-21.',
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();

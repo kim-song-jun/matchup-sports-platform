@@ -9,10 +9,11 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1LeagueFixture } from '@/types/league-match';
 
-// 승강 표시 — 색만으로 정보를 전달하지 않도록 기호(↑/↓/–/×)와 텍스트를 함께 쓴다.
 /**
  * 확정된 승강 결과 표기(Task 153 시나리오 4). 컬러만으로 뜻을 전달하지 않도록
- * 기호 + 텍스트를 함께 싣는다(DESIGN.md — 색맹 대응).
+ * 기호(↑/↓/–/×)와 텍스트를 함께 싣는다(DESIGN.md — 색맹 대응).
+ * 네 종류를 모두 담은 전수 Record라 `stayed`도 '잔류'로 표시된다 — 확정 전(null)일 때만
+ * '—'가 뜬다.
  */
 const PROMOTION_META: Record<'promoted' | 'relegated' | 'stayed' | 'withdrawn', { label: string; glyph: string; className: string }> = {
   promoted: { label: '승격', glyph: '↑', className: 'text-blue-700 dark:text-blue-300' },

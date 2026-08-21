@@ -7,10 +7,12 @@ import { LeagueMatchAdminController } from './league-match-admin.controller';
 import { LeagueMatchAdminService } from './league-match-admin.service';
 import { LeagueMatchPublicController } from './league-match-public.controller';
 import { LeagueMatchPublicService } from './league-match-public.service';
+import { LeagueSeriesAdminController } from './league-series-admin.controller';
+import { LeagueSeriesAdminService } from './league-series-admin.service';
 
 @Module({
   imports: [AdminContextModule, GamesModule],
-  controllers: [LeagueMatchAdminController, LeagueMatchPublicController],
-  providers: [LeagueMatchAdminService, LeagueMatchPublicService, OptionalV1AuthGuard, V1AuthGuard],
+  controllers: [LeagueMatchAdminController, LeagueMatchPublicController, LeagueSeriesAdminController],
+  providers: [LeagueMatchAdminService, LeagueMatchPublicService, LeagueSeriesAdminService, OptionalV1AuthGuard, V1AuthGuard],
 })
 export class LeagueMatchModule {}

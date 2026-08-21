@@ -899,6 +899,7 @@ model V1Sport {
   teamMatches     V1TeamMatch[]
   tournaments     V1Tournament[]
   leagues         V1League[]         @relation("V1LeagueSport")
+  leagueSeries    V1LeagueSeries[]   @relation("V1LeagueSeriesSport")
 
   @@index([isActive, sortOrder])
   @@map("v1_sports")
@@ -949,6 +950,7 @@ model V1Region {
   teams           V1Team[]
   teamMatches     V1TeamMatch[]
   leagues         V1League[]         @relation("V1LeagueRegion")
+  leagueSeries    V1LeagueSeries[]   @relation("V1LeagueSeriesRegion")
 
   @@index([parentId])
   @@index([level, isActive, sortOrder])
@@ -1232,6 +1234,7 @@ model V1Team {
   tournamentRegistrations      V1TournamentRegistration[]
   tournamentReviews            V1TournamentReview[]       @relation("V1TournamentReviewTeam")
   leagueEntries                V1LeagueTeam[]              @relation("V1LeagueTeamTeam")
+  leaguePromotions             V1LeaguePromotion[]         @relation("V1LeaguePromotionTeam")
   lineupPresets                V1TeamLineupPreset[]
 
   @@index([ownerUserId])
@@ -1640,6 +1643,13 @@ model V1TeamMatchApplication {
 // leagueId 가 채워진 경기가 "리그전"으로 표시된다.
 // 사용자 화면 문구는 이 재명명 이전부터 이미 "리그"였다 -- 재명명은 코드/DB 이름을
 // 그 문구에 맞춘 작업이었다(확장-수축 2단계, 2026-08-18~19).
+//
+// Task 153 부터 V1League 는 두 가지로 쓰인다:
+//   (a) seriesId = null  → 종래의 단발 리그. tier·seasonNo 도 함께 null 이다
+//                          (티어가 "1부"인 게 아니라 티어 개념 자체가 없다).
+//   (b) seriesId != null → 리그 체계(V1LeagueSeries)의 "N시즌 x T티어" 인스턴스.
+//                          시즌 종료 시 순위표 기반으로 승격·강등이 계산된다.
+// (a) 를 (b) 로 강제 이관하지 않는다 — 기존 리그는 그대로 동작해야 한다.
 
 enum V1LeagueState {
   draft
@@ -1657,17 +1667,98 @@ model V1League {
   endsOn               DateTime      @map("ends_on")
   tieBreakJson         Json          @map("tie_break_json")
   state                V1LeagueState @default(draft)
+  // 셋은 항상 함께 채워지거나 함께 null 이다. 단발 리그는 티어가 "1부"인 게 아니라
+  // 티어라는 개념 자체가 없으므로, 기본값 1 을 주지 않고 null 로 둔다 —
+  // 그래야 화면에서 단발 리그에 "1부" 뱃지가 잘못 붙지 않는다.
+  seriesId             String?       @map("series_id")
+  tier                 Int?
+  seasonNo             Int?          @map("season_no")
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
 
+  series         V1LeagueSeries? @relation("V1LeagueSeriesLeague", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_leagues_series_fk")
   sport          V1Sport         @relation("V1LeagueSport", fields: [sportId], references: [id], onDelete: Restrict, map: "v1_leagues_sport_fk")
   region         V1Region        @relation("V1LeagueRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_leagues_region_fk")
   createdByAdmin V1AdminUser     @relation("V1LeagueAdmin", fields: [createdByAdminUserId], references: [id], onDelete: Restrict, map: "v1_leagues_admin_fk")
   teams          V1LeagueTeam[]
   teamMatches    V1TeamMatch[]   @relation("V1TeamMatchLeague")
+  promotions     V1LeaguePromotion[] @relation("V1LeaguePromotionFromLeague")
 
+  // seriesId 가 null 인 행은 Postgres 의 NULL 비교 규칙상 이 제약에 걸리지 않는다 —
+  // 기존 단발 리그끼리는 서로 충돌하지 않는다.
+  @@unique([seriesId, seasonNo, tier], map: "v1_leagues_series_season_tier_key")
   @@index([sportId, state])
+  @@index([seriesId, seasonNo])
   @@map("v1_leagues")
+}
+
+// ── 리그 체계(Series) — 티어(1부/2부/3부) + 시즌 + 승강 ────────────────────────
+// 하나의 시리즈가 (종목 x 지역)의 리그 체계 하나를 뜻한다. 시리즈 아래에
+// 시즌(seasonNo) x 티어(tier) 조합마다 V1League 인스턴스가 하나씩 생긴다.
+// 티어 1 이 최상위(사용자 화면 문구로는 "1부")다.
+
+enum V1LeagueSeriesState {
+  draft
+  active
+  archived
+}
+
+model V1LeagueSeries {
+  id                   String              @id @default(uuid())
+  title                String
+  sportId              String              @map("sport_id")
+  regionId             String              @map("region_id")
+  createdByAdminUserId String              @map("created_by_admin_user_id")
+  // 1~3. 종목·지역에 따라 팀이 모이지 않으면 1티어로만 운영한다 —
+  // 티어를 억지로 3개로 쪼개면 빈 껍데기 리그가 생긴다.
+  tierCount            Int                 @default(1) @map("tier_count")
+  // 승강 규칙은 코드가 아니라 어드민이 정한다. 스키마는
+  // apps/v1_api/src/league-matches/league-promotion.ts 의 PromotionRule 을 따른다.
+  promotionRuleJson    Json                @map("promotion_rule_json")
+  state                V1LeagueSeriesState @default(draft)
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  sport          V1Sport     @relation("V1LeagueSeriesSport", fields: [sportId], references: [id], onDelete: Restrict, map: "v1_league_series_sport_fk")
+  region         V1Region    @relation("V1LeagueSeriesRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_league_series_region_fk")
+  createdByAdmin V1AdminUser @relation("V1LeagueSeriesAdmin", fields: [createdByAdminUserId], references: [id], onDelete: Restrict, map: "v1_league_series_admin_fk")
+  leagues        V1League[]  @relation("V1LeagueSeriesLeague")
+
+  @@index([sportId, regionId, state])
+  @@map("v1_league_series")
+}
+
+enum V1LeaguePromotionKind {
+  promoted
+  relegated
+  stayed
+  withdrawn
+}
+
+// 승강 확정 이력. 어드민이 최종 승인한 시점에만 행이 생긴다(preview 단계에서는 쓰지 않는다).
+// computedKind 는 규칙이 계산한 원래 값이고 kind 는 어드민이 최종 승인한 값이다 —
+// 둘이 다르면 사람이 개입한 것이고, 그 사유가 overrideNote 에 남는다.
+model V1LeaguePromotion {
+  id                   String                @id @default(uuid())
+  fromLeagueId         String                @map("from_league_id")
+  teamId               String                @map("team_id")
+  fromTier             Int                   @map("from_tier")
+  toTier               Int                   @map("to_tier")
+  kind                 V1LeaguePromotionKind
+  computedKind         V1LeaguePromotionKind @map("computed_kind")
+  overriddenByAdmin    Boolean               @default(false) @map("overridden_by_admin")
+  overrideNote         String?               @map("override_note")
+  decidedByAdminUserId String                @map("decided_by_admin_user_id")
+  decidedAt            DateTime              @default(now()) @map("decided_at")
+
+  fromLeague     V1League    @relation("V1LeaguePromotionFromLeague", fields: [fromLeagueId], references: [id], onDelete: Cascade, map: "v1_league_promotions_league_fk")
+  team           V1Team      @relation("V1LeaguePromotionTeam", fields: [teamId], references: [id], onDelete: Restrict, map: "v1_league_promotions_team_fk")
+  decidedByAdmin V1AdminUser @relation("V1LeaguePromotionAdmin", fields: [decidedByAdminUserId], references: [id], onDelete: Restrict, map: "v1_league_promotions_admin_fk")
+
+  // 한 시즌의 한 팀에 대한 승강 결정은 하나뿐이다 — 중복 확정을 DB 레벨에서 막는다.
+  @@unique([fromLeagueId, teamId], map: "v1_league_promotions_league_team_key")
+  @@index([teamId])
+  @@map("v1_league_promotions")
 }
 
 model V1LeagueTeam {
@@ -1928,6 +2019,8 @@ model V1AdminUser {
   inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
   contentAssets                    V1ContentAsset[]
   createdLeagues                   V1League[]                       @relation("V1LeagueAdmin")
+  createdLeagueSeries              V1LeagueSeries[]                 @relation("V1LeagueSeriesAdmin")
+  decidedLeaguePromotions          V1LeaguePromotion[]              @relation("V1LeaguePromotionAdmin")
 
   @@index([adminRole, status])
   @@index([grantedByAdminUserId])

@@ -275,7 +275,8 @@ export function TeamRecordsContent({
           <Card pad={0}>
             {data.items.map((item) => {
               const href = recordHref(item);
-              const hasEvents = item.events.length > 0;
+              // Rolling deploy 중 구 API 응답에는 events 필드가 없을 수 있다.
+              const hasEvents = (item.events?.length ?? 0) > 0;
               const isExpanded = hasEvents && expandedGameIds.has(item.gameId);
               const panelId = `team-record-events-${item.gameId}`;
               const row = (

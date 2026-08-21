@@ -5,7 +5,6 @@ import { isBackfilledEvent, isBackfilledMinuteUnknown } from '@/lib/backfilled-g
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import { periodLabel } from './period-label';
 import type { GameEventRecord, GameLineup } from '@/types/game-operations';
-import { formatPlayerLabel } from './player-label';
 
 /**
  * 이벤트 행 왼쪽의 "전반 12:00" 뱃지 문구.
@@ -92,7 +91,7 @@ export function RecordedEventList({
     lineups.flatMap((lineup) =>
       lineup.participants.map((participant) => [
         participant.id,
-        formatPlayerLabel(participant.jerseyNumber, participant.displayNameSnapshot),
+        `${participant.jerseyNumber ?? '-'} ${participant.displayNameSnapshot}`,
       ]),
     ),
   );
@@ -120,7 +119,7 @@ export function RecordedEventList({
           !reversedIds.has(event.id);
         return (
           <li
-            key={event.id}
+            key={event.id || event.clientEventId || `event-${event.sequence}`}
             className="flex flex-col gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2"
           >
             <div className="@container flex min-w-0 flex-1 flex-col gap-1.5">

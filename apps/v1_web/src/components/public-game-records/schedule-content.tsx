@@ -13,6 +13,7 @@ import type { GameLineupState } from '@/types/game-operations';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
+  eventPresentation,
   fixtureStatusLabel,
   formatGoalMinute,
   formatScoreline,
@@ -133,45 +134,28 @@ function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
 
   const byClock = (a: ScheduleEventItem, b: ScheduleEventItem) =>
     (a.clockMs ?? Number.MAX_SAFE_INTEGER) - (b.clockMs ?? Number.MAX_SAFE_INTEGER);
-  const firstHalf = scorers.filter((scorer) => scorer.period === 1).sort(byClock);
-  const secondHalf = scorers.filter((scorer) => scorer.period !== 1).sort(byClock);
-  const goalLine = (scorer: PublicScheduleEntry['scorers'][number], index: number) => (
-    <div key={index}>
-      {formatGoalMinute(scorer.clockMs)}
-      {scorer.participantName ? ` ${scorer.participantName}` : ''}
-      {isClockAbnormal(scorer.clockMs) ? <AbnormalClockBadge /> : null}
-    </div>
-  );
-  const halfRow = (label: string, halfScorers: PublicScheduleEntry['scorers']) => {
-    const home = halfScorers.filter((scorer) => scorer.side === 'home');
-    const away = halfScorers.filter((scorer) => scorer.side === 'away');
-    if (halfScorers.length === 0) return null;
-    return (
-      <div
-        role="group"
-        aria-label={label}
-        style={{
-          display: 'grid',
-          gridColumn: '1 / -1',
-          gridTemplateColumns: SCORE_AXIS_COLUMNS,
-          columnGap: SCORE_AXIS_COLUMN_GAP,
-        }}
-      >
-        <div style={{ textAlign: 'right' }}>{home.map(goalLine)}</div>
-        <div aria-hidden="true" style={{ textAlign: 'center' }}>⚽</div>
-        <div style={{ textAlign: 'left' }}>{away.map(goalLine)}</div>
-      </div>
-    );
-  };
+  // `period === null` = "전/후반을 모른다". 레거시 대회 결과에서 복원된 기록이 그렇다
+  // (`goal-event-backfill.ts` -- 원본에 전/후반이 없었고, 서버가 `isPeriodUnknown`으로
+  // null을 내려준다). `period !== 1`로 뭉뚱그리면 이 기록들이 전부 "후반"으로 렌더돼,
+  // 모른다고 내려온 값이 화면에서는 단정으로 바뀐다.
+  const sections = [
+    { key: 'first', label: '전반', items: items.filter((item) => item.period === 1).sort(byClock) },
+    {
+      key: 'second',
+      label: '후반',
+      items: items.filter((item) => item.period !== null && item.period !== 1).sort(byClock),
+    },
+    { key: 'unknown', label: '기타', items: items.filter((item) => item.period === null).sort(byClock) },
+  ].filter((section) => section.items.length > 0);
+
   return (
     <div
       role="list"
-      aria-label="득점자"
+      aria-label="경기 기록"
       style={{
         display: 'grid',
-        gridTemplateColumns: SCORE_AXIS_COLUMNS,
-        columnGap: SCORE_AXIS_COLUMN_GAP,
-        marginTop: 4,
+        gap: 8,
+        marginTop: 8,
         // [R-T2] 좌우 1fr 트랙이라 폭이 늘어도 그리드가 흡수 — 12로 상향.
         fontSize: 12,
         color: 'var(--text-caption)',
@@ -245,6 +229,7 @@ function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
     </div>
   );
 }
+
 
 function VideoBadge({ hasVideo }: { hasVideo: boolean }) {
   if (!hasVideo) return null;
@@ -419,7 +404,7 @@ function ScheduleRow({
       {/* 스코어 아래 보조 표기 — 스코어 칸(가운데 64px)이 행 정중앙이라 행 전체를
           가운데 정렬하면 그대로 스코어 밑에 놓인다. 승부차기가 없으면 렌더 없음. */}
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
-      <ScorerSummary scorers={entry.scorers} />
+      <MatchEventSummary entry={entry} />
       {venue ? (
         // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.
         <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)' }}>{venue}</div>

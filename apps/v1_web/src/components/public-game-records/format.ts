@@ -84,9 +84,9 @@ export function formatPenaltyScoreline(
  * 렌더하지 않는다.
  */
 export function formatTeamRecordPenaltyScoreline(
-  penalties: { readonly for: number; readonly against: number } | null,
+  penalties: { readonly for: number; readonly against: number } | null | undefined,
 ): string | null {
-  if (penalties === null) return null;
+  if (penalties == null) return null;
   return `승부차기 ${penalties.for}-${penalties.against}`;
 }
 

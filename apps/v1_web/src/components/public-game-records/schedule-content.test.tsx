@@ -116,6 +116,7 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
     clock: null,
     periodBreak: null,
     scorers: [],
+    cards: [],
     hasVideo: false,
     ...overrides,
   };
@@ -172,12 +173,18 @@ describe('ScheduleContent — 스코어 행과 득점자 행의 3열 축 일치'
     render(<ScheduleContent tournamentId="tour-1" data={data} />);
 
     const scoreRow = screen.getByText('1 : 0').parentElement;
-    const scorerRow = screen.getByRole('list', { name: '득점자' });
+    // 축을 쥐는 것은 이벤트 **행**이다 -- 한 이벤트가 한 행이고, 그 행이 스코어 행과
+    // 같은 3열 축 위에 홈/아이콘/원정을 놓는다(요약 컨테이너 자체는 구간을 세로로
+    // 쌓기만 한다). 행이 여러 개여도 전부 같은 상수를 쓰므로 첫 행으로 검사한다.
+    const eventRows = screen.getAllByRole('listitem');
 
-    // 축이 실제로 정의돼 있어야 한다 -- 양쪽 모두 빈 문자열이면 위 단언은 공허하게 통과한다.
+    expect(eventRows.length).toBeGreaterThan(0);
+    // 축이 실제로 정의돼 있어야 한다 -- 양쪽 모두 빈 문자열이면 아래 단언은 공허하게 통과한다.
     expect(scoreRow?.style.gridTemplateColumns).not.toBe('');
-    expect(scorerRow.style.gridTemplateColumns).toBe(scoreRow?.style.gridTemplateColumns);
-    expect(scorerRow.style.columnGap).toBe(scoreRow?.style.columnGap);
+    for (const row of eventRows) {
+      expect(row.style.gridTemplateColumns).toBe(scoreRow?.style.gridTemplateColumns);
+      expect(row.style.columnGap).toBe(scoreRow?.style.columnGap);
+    }
   });
 });
 
@@ -194,41 +201,66 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
 
     render(<ScheduleContent tournamentId="tour-1" data={data} />);
 
-    const scorerSummary = screen.getByRole('list', { name: '득점자' });
+    const scorerSummary = screen.getByRole('list', { name: '경기 기록' });
     expect(Array.from(scorerSummary.querySelectorAll('[role="group"]')).map((group) => group.getAttribute('aria-label')))
-      .toEqual(['전반 득점', '후반 득점']);
-    expect(screen.getByRole('group', { name: '전반 득점' })).toHaveTextContent(/전반 3분.*전반 12분/);
-    expect(screen.getByRole('group', { name: '후반 득점' })).toHaveTextContent(/후반 2분.*후반 8분/);
+      .toEqual(['전반 기록', '후반 기록']);
+    expect(screen.getByRole('group', { name: '전반 기록' })).toHaveTextContent(/전반 3분.*전반 12분/);
+    expect(screen.getByRole('group', { name: '후반 기록' })).toHaveTextContent(/후반 2분.*후반 8분/);
   });
 
+  /**
+   * 예전에는 이 자리에 점선 `role="separator"` 하나만 있었고, 기록이 한쪽 반에만 있어도
+   * 그 선을 항상 그렸다 -- 화면에는 아무 이름 없는 선 하나뿐이라 그게 전·후반 경계인지
+   * 다른 무엇인지 읽을 수 없었다(오너 지적: "레이아웃도 좀 아쉬운것같고"). 이제 각 구간에
+   * **이름을 직접 적고**(전반/후반/기타), 기록이 있는 구간만 렌더한다 -- 없는 후반을
+   * 그리지 않는 편이 정확하다.
+   */
   it.each([
-    ['전반만', [{ side: 'home' as const, participantName: '전반 선수', jerseyNumber: 7, period: 1, clockMs: 60_000 }], '전반 득점'],
-    ['후반만', [{ side: 'away' as const, participantName: '후반 선수', jerseyNumber: 9, period: 2, clockMs: 60_000 }], '후반 득점'],
-  ])('%s 득점해도 득점 묶음과 전·후반 경계선이 함께 표시된다', (_case, scorers, groupName) => {
+    ['전반만', [{ side: 'home' as const, participantName: '전반 선수', jerseyNumber: 7, period: 1, clockMs: 60_000 }], '전반 기록', '전반', '후반'],
+    ['후반만', [{ side: 'away' as const, participantName: '후반 선수', jerseyNumber: 9, period: 2, clockMs: 60_000 }], '후반 기록', '후반', '전반'],
+  ])('%s 기록이 있으면 그 구간만 이름과 함께 표시한다', (_case, scorers, groupName, shownLabel, hiddenLabel) => {
     render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({ scorers })] }} />);
 
-    expect(screen.getByRole('group', { name: groupName })).toBeInTheDocument();
-    expect(screen.getByRole('separator', { name: '전반과 후반 구분' })).toBeInTheDocument();
+    const group = screen.getByRole('group', { name: groupName });
+    // 구간 경계를 선만으로 표시하지 않는다 — 이름이 실제 화면 텍스트로 있어야 한다.
+    expect(group).toHaveTextContent(shownLabel);
+    expect(screen.queryByText(hiddenLabel)).not.toBeInTheDocument();
   });
 
-  it('전·후반 구분선은 카드 중앙에서 절반 폭의 점선으로 표시된다', () => {
-    render(<ScheduleContent tournamentId="tour-1" data={{
-      ...makeData(),
-      items: [fixtureEntry({
-        scorers: [{ side: 'home', participantName: '전반 선수', jerseyNumber: 7, period: 1, clockMs: 60_000 }],
-      })],
-    }} />);
+  /**
+   * 레거시 대회 결과에서 복원된 골(`goal-event-backfill.ts`)은 원본에 전/후반이 아예
+   * 없었다 -- 서버가 `period: null`("모름")로 내려준다. 예전 `period !== 1` 분기는 그
+   * 골들을 전부 "후반 득점"으로 밀어넣어, 모른다고 내려온 값을 화면에서 단정으로
+   * 바꿔놨다.
+   */
+  it('period가 null인 득점(전·후반 미상)은 후반이 아니라 별도 묶음으로 표시한다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      scorers: [
+        { side: 'home', participantName: '후반 선수', jerseyNumber: 8, period: 2, clockMs: 480_000 },
+        { side: 'home', participantName: '미상 선수', jerseyNumber: 11, period: null, clockMs: 720_000 },
+      ],
+    })] };
 
-    const separator = screen.getByRole('separator', { name: '전반과 후반 구분' });
-    expect(separator).toHaveStyle({ width: '50%', justifySelf: 'center' });
-    expect(separator.getAttribute('style')).toContain('border-top: 1px dotted var(--border)');
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByRole('group', { name: '후반 기록' })).toHaveTextContent('후반 선수');
+    expect(screen.getByRole('group', { name: '후반 기록' })).not.toHaveTextContent('미상 선수');
+    expect(screen.getByRole('group', { name: '기타 기록' })).toHaveTextContent('미상 선수');
+  });
+
+  it('전·후반 미상 득점이 없으면 기타 묶음 자체를 렌더하지 않는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({
+      scorers: [{ side: 'home', participantName: '전반 선수', jerseyNumber: 7, period: 1, clockMs: 60_000 }],
+    })] }} />);
+
+    expect(screen.queryByRole('group', { name: '기타 기록' })).not.toBeInTheDocument();
   });
 
   it('득점이 없으면 득점 영역과 구분선을 모두 표시하지 않는다', () => {
     render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry()] }} />);
 
-    expect(screen.queryByRole('list', { name: '득점자' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('separator', { name: '전반과 후반 구분' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: '경기 기록' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /기록$/ })).not.toBeInTheDocument();
   });
 });
 
@@ -237,6 +269,61 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
  * 알아야 한다. 예전에는 공개 일정만 있어서, 자기 팀 경기를 눈으로 찾아 하나씩 눌러
  * 들어가야 라인업 진입점을 만날 수 있었다.
  */
+
+describe('ScheduleContent — 일정 카드에 경고·퇴장도 함께 표시한다', () => {
+  it('카드 이벤트를 골과 같은 구간 안에 시간순으로 놓고, 색을 텍스트로도 알린다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      scorers: [{ side: 'home', participantName: '득점 선수', jerseyNumber: 9, period: 2, clockMs: 60_000 }],
+      cards: [
+        { side: 'away', cardColor: 'YELLOW', participantName: '경고 선수', jerseyNumber: 4, period: 2, clockMs: 30_000 },
+        { side: 'away', cardColor: 'RED', participantName: '퇴장 선수', jerseyNumber: 5, period: 2, clockMs: 120_000 },
+      ],
+    })] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    const secondHalf = screen.getByRole('group', { name: '후반 기록' });
+    // 시간순: 경고(0:30) → 골(1:00) → 퇴장(2:00). 골만 따로 모아 올리지 않는다.
+    expect(secondHalf).toHaveTextContent(/경고 선수[\s\S]*득점 선수[\s\S]*퇴장 선수/);
+    // 색만으로 경고/퇴장을 구분하지 않는다(접근성 규칙) — 스크린리더용 텍스트가 함께 있어야 한다.
+    expect(secondHalf).toHaveTextContent('옐로카드');
+    expect(secondHalf).toHaveTextContent('레드카드');
+  });
+
+  it('색을 알 수 없는 과거 카드 기록도 색을 지어내지 않고 그대로 보여준다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      cards: [{ side: 'home', cardColor: null, participantName: '미상 카드', jerseyNumber: 3, period: 1, clockMs: 60_000 }],
+    })] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    const firstHalf = screen.getByRole('group', { name: '전반 기록' });
+    expect(firstHalf).toHaveTextContent('미상 카드');
+    expect(firstHalf).toHaveTextContent('카드 색상 확인 필요');
+    expect(firstHalf).not.toHaveTextContent('옐로카드');
+    expect(firstHalf).not.toHaveTextContent('레드카드');
+  });
+
+  it('골이 없고 카드만 있어도 요약 줄을 렌더한다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({
+      cards: [{ side: 'home', cardColor: 'YELLOW', participantName: '경고 선수', jerseyNumber: 4, period: 1, clockMs: 60_000 }],
+    })] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByRole('list', { name: '경기 기록' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * alpha 실측 회귀(2026-08-18). "우리 팀" 행의 파란 배경을 절제하며 `--grey50`으로
+ * 바꿨는데, 스코어 칸 pill이 이미 `--grey50`이라 **두 색이 정확히 같아져 스코어가
+ * 배경에 통째로 녹았다**(실측: rowBg === pillBg === rgb(249,250,251)). 스코어는 이
+ * 카드에서 가장 먼저 읽히는 값이라 그게 사라지면 강조를 절제한 게 아니라 정보를
+ * 지운 것이다. 색 값 자체를 단언하지 않고(그건 구현 되읊기다) **두 배경이 서로
+ * 달라야 한다는 불변식**만 본다.
+ */
+
 describe('ScheduleContent — 우리 팀 경기 강조', () => {
   const myFixtures = {
     teams: [

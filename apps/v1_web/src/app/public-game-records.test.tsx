@@ -207,8 +207,9 @@ function makeTeamRecords(overrides: Partial<PublicTeamRecordsResponse> = {}): Pu
         result: 'WON',
         goalsFor: 2,
         goalsAgainst: 1,
+        penalties: null,
+        events: [],
         officialAt: '2026-08-10T11:00:00.000Z',
-        isCorrected: true,
       },
     ],
     nextCursor: null,
@@ -224,18 +225,8 @@ describe('TeamRecordsContent — 정정 배지', () => {
     expect(container.querySelector('img[src="/uploads/teams/busan.png"]')).toBeInTheDocument();
   });
 
-  it('isCorrected=true인 행은 정정됨 배지를 보여준다', () => {
+  it('팀 전적 행에는 정정됨 배지를 보여주지 않는다', () => {
     render(<TeamRecordsContent data={makeTeamRecords()} />);
-    expect(screen.getByText('정정됨')).toBeInTheDocument();
-  });
-
-  it('isCorrected=false인 행은 정정됨 배지를 보여주지 않는다', () => {
-    const data = makeTeamRecords();
-    render(
-      <TeamRecordsContent
-        data={{ ...data, items: [{ ...data.items[0], isCorrected: false }] }}
-      />,
-    );
     expect(screen.queryByText('정정됨')).not.toBeInTheDocument();
   });
 });
@@ -342,6 +333,7 @@ function makeSchedule(overrides: Partial<PublicTournamentScheduleResponse> = {})
         clock: null,
         periodBreak: null,
         scorers: [],
+        cards: [],
         hasVideo: false,
       },
     ],
@@ -399,6 +391,7 @@ describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여
           clock: null,
           periodBreak: null,
           scorers: [],
+          cards: [],
           hasVideo: false,
         },
       ],
@@ -440,6 +433,7 @@ describe('ScheduleContent — 진행 중 경기의 라이브 스코어/경과 �
     clock: { periodNumber: 2, elapsedMs: 23 * 60_000, isPaused: false },
     periodBreak: null,
     scorers: [],
+    cards: [],
     hasVideo: false,
   };
 
@@ -554,14 +548,14 @@ describe('ScheduleContent — 일정 카드 득점자 요약', () => {
         })}
       />,
     );
-    expect(screen.getByRole('list', { name: '득점자' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: '경기 기록' })).toBeInTheDocument();
     expect(screen.getByText(/10′/)).toBeInTheDocument();
     expect(screen.getByText(/김철수/)).toBeInTheDocument();
   });
 
   it('골이 없으면 득점자 요약 줄 자체를 렌더하지 않는다', () => {
     render(<ScheduleContent tournamentId="tournament-1" data={makeSchedule()} />);
-    expect(screen.queryByRole('list', { name: '득점자' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: '경기 기록' })).not.toBeInTheDocument();
   });
 
   it('참가자 이름이 null(동의 없음)이면 이름을 지어내지 않고 시간만 보여준다', () => {

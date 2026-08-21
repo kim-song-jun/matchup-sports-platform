@@ -11,6 +11,7 @@ import {
   useV1CreateTeamJoinApplication,
   useV1LeaveTeam,
   useV1MasterSports,
+  useV1MyTeams,
   useV1RecentSearches,
   useV1RecordSearch,
   useV1RejectTeamJoinApplication,
@@ -32,6 +33,8 @@ import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { teamSharePath } from '@/lib/team-share-route';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
@@ -201,6 +204,17 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     dateLabel: formatTournamentDateShort(match.startsAt) ?? '',
     venue: match.place?.name ?? match.placeName ?? '',
   }));
+  // 컨택 보내기 CTA 노출 조건 중 "로그인 상태" + "운영 권한 팀 보유"를 함께 판정한다.
+  // 팀 상세는 공개 SEO 페이지라 게스트도 항상 렌더되므로, notification-bell.tsx의
+  // useUnreadState와 동일하게 세션 힌트(hasStoredV1Session, 동기 localStorage 체크)가
+  // 있을 때만 /me/teams 를 호출한다 — SSR에서는 localStorage를 못 읽으므로 useEffect로
+  // 마운트 후 세팅한다. 힌트가 없으면(게스트) 쿼리 자체가 안 돌아 operatorTeamCount는 0.
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  const myTeamsQuery = useV1MyTeams(undefined, { enabled: hasSessionHint });
+  const operatorTeamCount = normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length;
   /* R4: "내 리그" — 전용 리그 API 없이 이 팀의 팀매치 목록(host + 신청 모두, status
    * 필터 없음)에서 league 필드만 distinct 로 추린다. openMatchesQuery는 recruiting +
    * limit 5로 좁혀져 있어 이미 마감/완료된 리그전을 놓치므로 별도 쿼리로 둔다. */
@@ -283,6 +297,10 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
         onShare: () => shareTeam(query.data),
         openMatches,
         openMatchesLoading: openMatchesQuery.isLoading,
+        contactHref:
+          toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
+            ? `/teams/${teamId}/contact/new`
+            : undefined,
         myLeagues,
         myLeaguesLoading: myLeaguesQuery.isLoading,
       }
@@ -860,10 +878,6 @@ function roleLabel(role: string) {
   if (role === 'owner') return '팀장';
   if (role === 'manager' || role === 'admin') return '운영진';
   return '멤버';
-}
-
-function isTeamOperatorRole(role?: string | null) {
-  return role === 'owner' || role === 'manager' || role === 'admin';
 }
 
 function isTeamMemberRole(role?: string | null) {

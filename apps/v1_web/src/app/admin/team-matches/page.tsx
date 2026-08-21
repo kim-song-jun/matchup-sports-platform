@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useV1AdminTeamMatches,
   useV1AdminMe,
@@ -75,6 +75,7 @@ export default function AdminTeamMatchesPage() {
 
 function AdminTeamMatchesPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialStatus = searchParams.get('status') ?? '';
   // ── Admin capabilities ─────────────────────────────────────────────
   const { data: adminMe } = useV1AdminMe();
@@ -153,6 +154,9 @@ function AdminTeamMatchesPageContent() {
       <AdminDataTable<V1AdminTeamMatchRow>
         rows={rows}
         keyExtractor={(r) => r.teamMatchId}
+        // 상세 라우트가 생겼다 — 목록에서 갈 길이 없으면 ⌘K 로만 도달한다.
+        onRowClick={(row) => router.push(`/admin/team-matches/${encodeURIComponent(row.teamMatchId)}`)}
+        rowClickLabel={(row) => `${row.title} 상세 보기`}
         tableMaxWidth="max-w-none"
         rowTone={(row) =>
           row.status === 'cancelled' ? 'danger' : row.status === 'archived' ? 'warning' : undefined

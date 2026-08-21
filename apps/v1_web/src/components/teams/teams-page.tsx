@@ -652,14 +652,30 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
           {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginTop: 6 }}>{heroMessage}</div> : null}
           <div className="tm-team-detail-sidebar-cta">
-            <button
-              className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
-              type="button"
-              disabled={!model.onCta || model.ctaPending}
-              onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}
-            >
-              {model.ctaPending ? '처리 중' : cta}
-            </button>
+            {model.contactHref ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+                <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.contactHref}>
+                  컨택 보내기
+                </Link>
+                <button
+                  className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
+                  type="button"
+                  disabled={!model.onCta || model.ctaPending}
+                  onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}
+                >
+                  {model.ctaPending ? '처리 중' : cta}
+                </button>
+              </div>
+            ) : (
+              <button
+                className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
+                type="button"
+                disabled={!model.onCta || model.ctaPending}
+                onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}
+              >
+                {model.ctaPending ? '처리 중' : cta}
+              </button>
+            )}
           </div>
         </aside>
       </div>
@@ -789,9 +805,20 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
         {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}
-        <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
-          {model.ctaPending ? '처리 중' : cta}
-        </button>
+        {model.contactHref ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+            <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.contactHref}>
+              컨택 보내기
+            </Link>
+            <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
+              {model.ctaPending ? '처리 중' : cta}
+            </button>
+          </div>
+        ) : (
+          <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
+            {model.ctaPending ? '처리 중' : cta}
+          </button>
+        )}
       </div>
     </AppChrome>
   );

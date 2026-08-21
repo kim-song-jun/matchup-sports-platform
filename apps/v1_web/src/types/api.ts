@@ -2438,6 +2438,39 @@ export type V1AdminTeamMatchRow = {
   createdAt: string;
 };
 
+export type V1AdminTeamMatchApplicationRow = {
+  applicationId: string;
+  status: string;
+  message: string | null;
+  applicantTeamId: string;
+  applicantTeamName: string;
+  createdAt: string;
+};
+
+export type V1AdminTeamMatchDetail = V1AdminTeamMatchRow & {
+  description: string | null;
+  sportCode: string;
+  regionName: string | null;
+  placeName: string;
+  placeAddress: string | null;
+  endAt: string | null;
+  deadlineAt: string | null;
+  approvedApplicantTeamId: string | null;
+  approvedApplicantTeamName: string | null;
+  createdByUserId: string;
+  createdByName: string | null;
+  /** 연결된 게임이 있으면 현장 콘솔에서 다룰 수 있는 경기다. 라이브 상태 자체는 여기서 안 준다. */
+  hasGame: boolean;
+  matchFormat: string | null;
+  formatNote: string | null;
+  matchStyle: string[];
+  genderRule: string | null;
+  uniformColor: string | null;
+  costNote: string | null;
+  applicationCount: number;
+  applications: V1AdminTeamMatchApplicationRow[];
+};
+
 export type V1AdminStatusChangeResult = {
   previousStatus: string;
   status: string;

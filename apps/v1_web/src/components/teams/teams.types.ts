@@ -92,6 +92,12 @@ export type TeamDetailViewModel = {
   ctaSuccessMessage?: string;
   ctaFailureMessage?: string;
   /**
+   * 팀 컨택 작성 화면(`/teams/:id/contact/new`) 링크. 로그인 상태 + 내 팀이 아님 + 운영
+   * 권한(owner/manager) 팀을 1개 이상 보유 — 세 조건을 모두 만족할 때만 채워지는 보조 CTA.
+   * 계산 위치: `TeamDetailPageClient`(teams-client.tsx).
+   */
+  contactHref?: string;
+  /**
    * 승인 대기 중일 때만 채워진다(mode === 'pending'). 토스트는 2초 뒤 사라지므로
    * "무엇을 기다리는 중인지"는 화면에 계속 남아 있어야 한다.
    */

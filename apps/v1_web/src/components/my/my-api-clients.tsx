@@ -14,6 +14,7 @@ import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
 import { clearStoredV1Session } from '@/lib/session-storage';
+import { isTeamOperatorRole } from '@/lib/team-role';
 import type { ThemePreference } from '@/lib/theme';
 import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
@@ -2168,11 +2169,6 @@ function roleLabel(role: string) {
   if (role === 'member') return '멤버';
   return '비회원';
 }
-
-function isTeamOperatorRole(role?: string | null) {
-  return role === 'owner' || role === 'manager' || role === 'admin';
-}
-
 
 function hasTrustValue(value: string) {
   return value === 'verified' || value === 'estimated';

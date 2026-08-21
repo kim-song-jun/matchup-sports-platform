@@ -953,6 +953,105 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * 팀매치 상세. getMatch 와 같은 모양이되 팀매치에만 있는 것들을 더한다:
+   * 상대팀 신청 목록, 승인된 상대팀, 소속 리그, 경기 조건(형식·성별 규칙 등).
+   *
+   * 라이브 경기 상태는 넣지 않는다 — 그건 현장 콘솔(/admin/live/:tournamentId)의 일이고,
+   * 여기서 다시 보여주면 같은 정보가 두 화면에 갈린다. 대신 연결된 게임이 있는지만 알린다.
+   */
+  async getTeamMatch(user: V1AuthUser, teamMatchId: string) {
+    await this.getActiveAdmin(user.id);
+
+    const row = await this.prisma.v1TeamMatch.findUnique({
+      where: { id: teamMatchId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        placeName: true,
+        placeAddress: true,
+        startAt: true,
+        endAt: true,
+        deadlineAt: true,
+        status: true,
+        matchFormat: true,
+        formatNote: true,
+        matchStyle: true,
+        genderRule: true,
+        uniformColor: true,
+        costNote: true,
+        createdAt: true,
+        hostTeamId: true,
+        hostTeam: { select: { name: true } },
+        approvedApplicantTeamId: true,
+        approvedApplicantTeam: { select: { name: true } },
+        sport: { select: { name: true, code: true } },
+        region: { select: { name: true } },
+        createdByUser: { select: { id: true, profile: { select: { nickname: true } } } },
+        league: { select: { id: true, title: true } },
+        game: { select: { id: true } },
+        applications: {
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+          select: {
+            id: true,
+            status: true,
+            message: true,
+            createdAt: true,
+            applicantTeamId: true,
+            applicantTeam: { select: { name: true } },
+          },
+        },
+        _count: { select: { applications: true } },
+      },
+    });
+
+    if (!row) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
+    }
+
+    return {
+      teamMatchId: row.id,
+      title: row.title,
+      description: row.description ?? null,
+      sportName: row.sport.name,
+      sportCode: row.sport.code,
+      regionName: row.region?.name ?? null,
+      placeName: row.placeName,
+      placeAddress: row.placeAddress ?? null,
+      startAt: row.startAt,
+      endAt: row.endAt ?? null,
+      deadlineAt: row.deadlineAt ?? null,
+      status: row.status,
+      hostTeamId: row.hostTeamId,
+      hostTeamName: row.hostTeam.name,
+      approvedApplicantTeamId: row.approvedApplicantTeamId ?? null,
+      approvedApplicantTeamName: row.approvedApplicantTeam?.name ?? null,
+      createdByUserId: row.createdByUser.id,
+      createdByName: row.createdByUser.profile?.nickname ?? null,
+      league: row.league ? { leagueId: row.league.id, title: row.league.title } : null,
+      // 게임이 붙어 있으면 현장 콘솔에서 다룰 수 있는 경기라는 뜻이다.
+      hasGame: row.game !== null,
+      matchFormat: row.matchFormat ?? null,
+      formatNote: row.formatNote ?? null,
+      matchStyle: row.matchStyle,
+      genderRule: row.genderRule ?? null,
+      uniformColor: row.uniformColor ?? null,
+      costNote: row.costNote ?? null,
+      applicationCount: row._count.applications,
+      applications: row.applications.map((application) => ({
+        applicationId: application.id,
+        status: application.status,
+        message: application.message ?? null,
+        applicantTeamId: application.applicantTeamId,
+        applicantTeamName: application.applicantTeam.name,
+        createdAt: application.createdAt,
+      })),
+      createdAt: row.createdAt,
+    };
+  }
+
   // ─── Team list / detail ────────────────────────────────────────────────────
 
   /**

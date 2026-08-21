@@ -208,7 +208,10 @@ export const gameSchemaSourceManifest = {
   // 그대로라 migration 해시는 변하지 않는다.
   // Hash normalized LF text so the same committed source verifies on Linux CI
   // and Windows checkouts whose Git configuration materializes CRLF.
-  schema: 'b6ebe1dc1d0e5fc4112c071938d62689effb3b84655c03a446a526b9ac459090',
+  // 2026-08-21 hotfix: V1TeamRecordFact.playedAt is backed by the
+  // 20260821120000_v1_team_record_facts_played_at migration. The bound
+  // game-operations migration itself remains unchanged.
+  schema: 'a0f25ad863220a52d138bf3218d6fcd3a6934c2f35ae084907c181482976c167',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

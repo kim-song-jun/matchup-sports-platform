@@ -283,10 +283,11 @@ describe('runTeamRecordFactsBackfill real-database contract', () => {
     await prisma.$executeRaw`
       INSERT INTO v1_team_record_facts (
         id, revision_id, game_id, team_id, opponent_team_id, tournament_id,
-        result, goals_for, goals_against, source_hash, official_at, recorded_at
+        result, goals_for, goals_against, source_hash, played_at, official_at, recorded_at
       ) VALUES (
         ${ids.alreadyHasFactRow}, ${ids.alreadyHasFactRevision}, ${ids.alreadyHasFactGame}, ${ids.hostTeam},
         ${ids.opponentTeam}, NULL, 'DRAWN', 2, 2, ${`${prefix}:already-hash`},
+        ${new Date('2026-08-03T00:00:00.000Z')},
         ${new Date('2026-08-03T00:05:00.000Z')}, CURRENT_TIMESTAMP
       )
     `;

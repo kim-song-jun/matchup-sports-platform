@@ -15,6 +15,7 @@ import {
   planNextSeasonTiers,
   resolveStoredForfeit,
   shouldCompleteLeague,
+  sortMyLeaguesByState,
 } from './league-lifecycle-rules';
 
 const HOME = 'team-home';
@@ -261,5 +262,43 @@ describe('parseStoredScore', () => {
     expect(parseStoredScore('1:0')).toBeNull();
     expect(parseStoredScore({ home: 1 })).toBeNull();
     expect(parseStoredScore({ home: null, away: 0 })).toBeNull();
+  });
+});
+
+describe('sortMyLeaguesByState — 내 리그 상태 정렬', () => {
+  it('진행 중 -> 준비 중 -> 종료 순으로 올린다', () => {
+    const sorted = sortMyLeaguesByState([
+      { id: 'c', state: 'completed' },
+      { id: 'd', state: 'draft' },
+      { id: 'a', state: 'active' },
+    ]);
+    expect(sorted.map((l) => l.id)).toEqual(['a', 'd', 'c']);
+  });
+
+  it('Prisma enum 순서(draft->active->completed)를 그대로 쓰면 안 된다 — draft 가 위로 오면 회귀', () => {
+    // `orderBy: { state: 'asc' }` 는 선언 순서를 따라 draft 를 맨 위로 올린다.
+    // "지금 뛰는 리그"를 찾으러 온 사용자에게는 정확히 반대다.
+    const sorted = sortMyLeaguesByState([
+      { id: 'draft-1', state: 'draft' },
+      { id: 'active-1', state: 'active' },
+    ]);
+    expect(sorted[0].id).toBe('active-1');
+  });
+
+  it('같은 상태 안에서는 입력 순서를 보존한다 (호출부의 createdAt desc 를 그대로 유지)', () => {
+    const sorted = sortMyLeaguesByState([
+      { id: 'a1', state: 'active' },
+      { id: 'a2', state: 'active' },
+      { id: 'a3', state: 'active' },
+    ]);
+    expect(sorted.map((l) => l.id)).toEqual(['a1', 'a2', 'a3']);
+  });
+
+  it('알 수 없는 상태는 맨 뒤로 보낸다 (enum 이 늘어나도 앞을 어지럽히지 않는다)', () => {
+    const sorted = sortMyLeaguesByState([
+      { id: 'x', state: 'archived' },
+      { id: 'a', state: 'active' },
+    ]);
+    expect(sorted.map((l) => l.id)).toEqual(['a', 'x']);
   });
 });

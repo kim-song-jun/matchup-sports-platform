@@ -12,7 +12,7 @@ import {
   useV1SeedLeagueSeason,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1CommitPromotionEntry, V1PromotionPreviewResponse, V1SeedSeasonTier } from '@/types/league-series';
+import type { V1CommitPromotionEntry, V1PromotionPreviewResponse, V1SeedSeasonPayload } from '@/types/league-series';
 
 export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: string }) {
   const { toasts, showToast } = useAdminToast();
@@ -27,9 +27,9 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
   const commitPromotions = useV1CommitLeaguePromotions(seriesId);
   const seedSeason = useV1SeedLeagueSeason(seriesId);
 
-  const handleSeed = (tiers: V1SeedSeasonTier[]) => {
+  const handleSeed = (payload: V1SeedSeasonPayload) => {
     seedSeason.mutate(
-      { tiers },
+      payload,
       {
         onSuccess: (result) => {
           void refetch();

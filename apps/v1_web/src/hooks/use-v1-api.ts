@@ -4553,6 +4553,7 @@ import type {
   V1GenerateLeagueFixturesPayload,
   V1GenerateLeagueFixturesResult,
   V1LeagueMatchesFilters,
+  V1MyLeagueListResponse,
   V1PublicLeagueDetail,
   V1PublicLeagueListResponse,
   V1LeaguePlayerRecordsResponse,
@@ -4561,6 +4562,8 @@ import type {
   V1RecordLeagueForfeitResult,
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
+  V1RevertLeagueCompletionPayload,
+  V1RevertLeagueCompletionResult,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
 } from '@/types/league-match';
@@ -4583,6 +4586,16 @@ export function useV1LeagueMatches(filters?: V1LeagueMatchesFilters) {
   return useQuery({
     queryKey: v1Keys.leagueMatches(filters as Record<string, unknown> | undefined),
     queryFn: () => v1Get<V1PublicLeagueListResponse>('/league-matches', filters),
+  });
+}
+
+// R4: 내 리그 — GET /league-matches/me. 로그인 전용이라 세션이 없으면 401 이 나므로
+// 호출부가 enabled 로 게이팅한다(마이 화면은 이미 인증 뒤라 항상 true).
+export function useV1MyLeagues(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.myLeagues(),
+    queryFn: () => v1Get<V1MyLeagueListResponse>('/league-matches/me'),
+    enabled: options?.enabled,
   });
 }
 
@@ -4661,6 +4674,20 @@ export function useV1CancelLeagueFixture(leagueId: string) {
   return useMutation({
     mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1CancelLeagueFixturePayload }) =>
       v1Post<V1CancelLeagueFixtureResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}/cancel`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+// R6: 리그 종료 역전이 — POST /admin/league-matches/:leagueId/revert-completion.
+// 상태 뱃지(진행 중/종료)와 목록의 state 컬럼이 함께 바뀌므로 상세·목록 캐시를 모두 무효화한다.
+export function useV1RevertLeagueCompletion(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1RevertLeagueCompletionPayload) =>
+      v1Post<V1RevertLeagueCompletionResult>(`/admin/league-matches/${leagueId}/revert-completion`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });

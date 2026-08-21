@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
-  IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsNumber,
@@ -124,6 +124,20 @@ export class SeedSeasonDto {
   @ValidateNested({ each: true })
   @Type(() => SeedSeasonTierDto)
   tiers!: SeedSeasonTierDto[];
+
+  /**
+   * 시즌 기간. 단발 리그 생성(CreateLeagueMatchDto)은 기간을 필수로 받는데 시리즈 경로만
+   * "오늘 + 90일" 로 하드코딩돼 있어 운영자가 시즌 길이를 정할 수 없었다(2026-08-21 재감사).
+   * 기존 호출부를 깨지 않도록 optional 로 두고, 없으면 종래 폴백을 그대로 쓴다.
+   * 이후 시즌은 직전 시즌 길이를 승계하므로 여기서 정한 기간이 시리즈 전체의 리듬이 된다.
+   */
+  @IsOptional()
+  @IsDateString()
+  startsOn?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endsOn?: string;
 }
 
 /** 최종 승인 시 어드민이 확정한 팀별 결정 한 건. */
@@ -151,13 +165,6 @@ export class CommitPromotionsDto {
   @Type(() => CommitPromotionEntryDto)
   entries!: CommitPromotionEntryDto[];
 
-  /**
-   * 다음 시즌 리그를 함께 만들지 여부. 기본값 true —
-   * false 를 주면 승강 결정만 기록하고 다음 시즌 리그는 만들지 않는다.
-   */
-  @IsOptional()
-  @IsBoolean()
-  createNextSeason?: boolean;
 
   /**
    * 이 결정을 만들어 낸 preview 의 `ruleFingerprint`. 서버가 지금 규칙의 지문과 비교해

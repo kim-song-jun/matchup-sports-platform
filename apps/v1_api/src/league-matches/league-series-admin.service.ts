@@ -243,8 +243,32 @@ export class LeagueSeriesAdminService {
       });
     }
 
-    const startsOn = new Date();
-    const endsOn = new Date(startsOn.getTime() + SEASON_LENGTH_FALLBACK_DAYS * 24 * 60 * 60 * 1000);
+    // 운영자가 기간을 주면 그것을 쓰고, 없으면 종래 폴백(오늘 + 90일)을 유지한다.
+    // 이후 시즌은 commitPromotions 가 직전 시즌 길이를 승계하므로 여기서 정한 기간이
+    // 시리즈 전체의 시즌 리듬이 된다.
+    //
+    // 한쪽만 오면 거부한다. endsOn 만 오면 startsOn 이 조용히 "오늘"로 채워져 운영자가
+    // 의도하지 않은 기간이 만들어지는데, 그 리듬을 다음 시즌들이 그대로 승계한다.
+    // 프론트도 같은 조건으로 막지만 그건 서버 보장이 아니다.
+    if ((dto.startsOn === undefined) !== (dto.endsOn === undefined)) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_PERIOD_INVALID',
+        message: '시즌 시작일과 종료일은 함께 입력하거나 함께 비워 주세요.',
+      });
+    }
+    const startsOn = dto.startsOn === undefined ? new Date() : new Date(dto.startsOn);
+    const endsOn =
+      dto.endsOn === undefined
+        ? new Date(startsOn.getTime() + SEASON_LENGTH_FALLBACK_DAYS * 24 * 60 * 60 * 1000)
+        : new Date(dto.endsOn);
+    if (endsOn.getTime() < startsOn.getTime()) {
+      // 단발 리그 생성(LeagueMatchAdminService.create)과 같은 코드·문구를 쓴다 —
+      // 같은 실수에 서로 다른 에러가 나오면 운영자가 두 경로를 다른 기능으로 오해한다.
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_PERIOD_INVALID',
+        message: '종료일은 시작일보다 빠를 수 없어요.',
+      });
+    }
 
     const created = await this.prisma.$transaction(async (tx) => {
       const leagues = [];
@@ -469,7 +493,7 @@ export class LeagueSeriesAdminService {
     // 판정은 planNextSeasonTiers 가 소유한다 — 아래 생성 루프와 같은 계산을 두 번 쓰면
     // 한쪽만 고쳐져 가드가 새는 날이 온다.
     const nextSeasonPlan = planNextSeasonTiers({ resolved, tierCount: series.tierCount });
-    if (dto.createNextSeason !== false && nextSeasonPlan.undersized.length > 0) {
+    if (nextSeasonPlan.undersized.length > 0) {
       throw new UnprocessableEntityException({
         code: 'PROMOTION_NEXT_SEASON_TIER_TOO_SMALL',
         message:
@@ -510,7 +534,7 @@ export class LeagueSeriesAdminService {
       });
 
       const createdLeagues: Array<{ id: string; tier: number; teamCount: number }> = [];
-      if (dto.createNextSeason !== false) {
+      {
         // 1팀 티어는 위에서 이미 422 로 막혔으므로 여기 남는 것은 2팀 이상 뿐이다.
         for (const { tier, teamIds } of nextSeasonPlan.tiers) {
           const league = await tx.v1League.create({

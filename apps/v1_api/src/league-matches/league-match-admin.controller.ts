@@ -97,7 +97,14 @@ export class LeagueMatchAdminController {
 
   // R6: 전 대진 확정 시 자동으로 completed 전이한 리그를, 결과 정정 등을 위해
   // 운영자가 다시 active로 되돌리는 액션. idempotent — 이미 active면 alreadyProcessed: true.
-  @Patch(':leagueId/revert-completion')
+  //
+  // POST 다 — 바로 위 cancelFixture 주석이 밝히듯 이 저장소의 멱등 액션 컨벤션은
+  // `POST :id/<action>` 이다(matches/mercenary/marketplace orders 전역 패턴). 이 라우트만
+  // PATCH 였던 탓에 재감사 중 POST 로 호출했다가 404 INTERNAL_ERROR 를 받았다 — 한
+  // 컨트롤러 안에서 같은 성격의 액션이 서로 다른 메서드를 쓰면 호출부가 매번 파일을
+  // 열어봐야 한다. @HttpCode(200) 도 cancelFixture 와 맞춘다(생성이 아니라 상태 전이).
+  @Post(':leagueId/revert-completion')
+  @HttpCode(200)
   revertCompletion(
     @CurrentUser() user: V1AuthUser,
     @Param('leagueId', leagueIdPipe) leagueId: string,

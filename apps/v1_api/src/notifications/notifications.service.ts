@@ -37,6 +37,9 @@ export type NotificationEventType =
   | 'tournament_completed_review_request'
   | 'team_invitation_received'
   | 'team_invitation_accepted'
+  | 'team_contact_received'
+  | 'team_contact_accepted'
+  | 'team_contact_declined'
   | 'inquiry_answered'
   // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
   // once the reminder's outbox row (inserted by TeamSchedulesService.triggerReminder) is claimed.
@@ -89,7 +92,10 @@ function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefF
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
     type === 'schedule_rsvp_deadline_reminder' ||
-    type === 'schedule_guest_recruitment_close_reminder'
+    type === 'schedule_guest_recruitment_close_reminder' ||
+    type === 'team_contact_received' ||
+    type === 'team_contact_accepted' ||
+    type === 'team_contact_declined'
   ) {
     return 'teamEnabled';
   }
@@ -138,7 +144,10 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'team_invitation_received' ||
     type === 'team_invitation_accepted' ||
     type === 'schedule_rsvp_deadline_reminder' ||
-    type === 'schedule_guest_recruitment_close_reminder'
+    type === 'schedule_guest_recruitment_close_reminder' ||
+    type === 'team_contact_received' ||
+    type === 'team_contact_accepted' ||
+    type === 'team_contact_declined'
   ) {
     return 'team';
   }
@@ -186,6 +195,16 @@ function deepLinkForEvent(
   if (type === 'team_join_application_received' && targetId) {
     return `/teams/${targetId}/members`;
   }
+  // team_contact_* targetType은 'team' 이라 ROUTE_BASE_BY_TARGET_TYPE['team']='/teams' 로 폴백하면
+  // /teams/{contactId} 가 되어 404 링크가 만들어진다 — 컨택 상세 화면으로 명시적으로 보낸다.
+  if (
+    (type === 'team_contact_received' ||
+      type === 'team_contact_accepted' ||
+      type === 'team_contact_declined') &&
+    targetId
+  ) {
+    return `/my/team-contacts/${targetId}`;
+  }
   // 완료 알림은 본문이 "리뷰를 남겨보세요!"인데 링크는 매치 상세로 보내고 있었다 — 그 화면엔
   // 후기 CTA가 없어서 알림을 눌러도 후기를 쓸 수 없는 막다른 길이었다. 작성 화면으로 바로 보낸다.
   if (type === 'match_completed' && targetId) {
@@ -222,6 +241,9 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_join_application_received: '팀 가입 신청이 도착했어요',
   team_join_application_accepted: '팀 가입 신청이 수락됐어요',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요',
+  team_contact_received: '새 팀 컨택이 도착했어요',
+  team_contact_accepted: '팀 컨택이 수락됐어요',
+  team_contact_declined: '팀 컨택이 거절됐어요',
   team_match_application_received: '팀매치 신청이 도착했어요',
   team_match_application_withdrawn: '팀매치 신청이 취소됐어요',
   team_match_application_approved: '팀매치 신청이 승인됐어요',
@@ -259,6 +281,9 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_join_application_received: '팀 가입 신청을 확인해 주세요.',
   team_join_application_accepted: '팀 가입이 승인됐어요.',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요.',
+  team_contact_received: '상대 팀이 보낸 컨택을 확인해 주세요.',
+  team_contact_accepted: '이제 상대 팀과 대화할 수 있어요.',
+  team_contact_declined: '아쉽지만 이번에는 성사되지 않았어요.',
   team_match_application_received: '팀매치 신청을 확인해 주세요.',
   team_match_application_withdrawn: '상대팀 신청이 취소됐어요.',
   team_match_application_approved: '팀매치 신청이 승인됐어요.',

@@ -23,6 +23,15 @@ export const v1Keys = {
   teamRecentVenues: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'recent-venues'] as const,
   teamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'team-matches', filters ?? {}] as const,
   teamMatch: (teamMatchId: string) => [...v1Keys.all, 'team-matches', teamMatchId] as const,
+  teamContacts: (teamId: string, filters?: Record<string, unknown>) =>
+    [...v1Keys.team(teamId), 'contacts', filters ?? {}] as const,
+  /**
+   * 필터 없는 컨택 목록 접두사 — **무효화 전용**.
+   * `teamContacts()` 는 마지막 원소가 필터 객체라 prefix match 로 전체를 무효화할 수
+   * 없다(위 `tournamentOperationsBoard` / `tournamentOperationsBoardAll` 과 같은 이유).
+   */
+  teamContactsAll: (teamId: string) => [...v1Keys.team(teamId), 'contacts'] as const,
+  teamContact: (contactId: string) => [...v1Keys.all, 'team-contacts', contactId] as const,
   teamSchedules: (teamId: string, filters?: Record<string, unknown>) => [...v1Keys.team(teamId), 'schedules', filters ?? {}] as const,
   teamSchedule: (teamId: string, scheduleId: string) => [...v1Keys.team(teamId), 'schedules', scheduleId] as const,
   mySchedule: (filters?: Record<string, unknown>) => [...v1Keys.all, 'me', 'schedule', filters ?? {}] as const,
@@ -69,6 +78,7 @@ export const v1Keys = {
   adminUser: (id: string) => [...v1Keys.all, 'admin', 'users', id] as const,
   adminMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'matches', filters ?? {}] as const,
   adminMatch: (id: string) => [...v1Keys.all, 'admin', 'matches', id] as const,
+  adminTeamMatch: (teamMatchId: string) => [...v1Keys.all, 'admin', 'team-matches', teamMatchId] as const,
   adminTeams: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'teams', filters ?? {}] as const,
   adminTeam: (id: string) => [...v1Keys.all, 'admin', 'teams', id] as const,
   adminPopups: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'popups', filters ?? {}] as const,

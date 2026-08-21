@@ -289,6 +289,11 @@ export class AdminController {
     return this.adminService.listTeamMatches(user, query);
   }
 
+  @Get('team-matches/:teamMatchId')
+  getTeamMatch(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {
+    return this.adminService.getTeamMatch(user, teamMatchId);
+  }
+
   // ─── Admin management (owner-only) ────────────────────────────────────────
 
   @Get('admins')

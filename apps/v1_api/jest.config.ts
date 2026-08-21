@@ -72,6 +72,11 @@ const config: Config = {
         // 내 변경과 무관한 선재 결함이다). 그래서 team-matches 선례를 따라 이 레인이
         // 새로 추가한 파일 하나만 명시 경로로 등록한다.
         '<rootDir>/test/league-matches/league-promotion.integration-spec.ts',
+        // team-contacts (Task 8): 이 글롭이 없으면 `jest --selectProjects integration`
+        // (= CI 의 migration replay + drift gate) 가 이 디렉터리를 절대 선택하지 않는다.
+        // 이 레포에서 같은 실수가 이미 4회 반복 지적됐다 — 위 team-schedules/team-match-series/
+        // team-lineups/team-matches 주석 참고.
+        '<rootDir>/test/team-contacts/**/*.integration-spec.ts',
       ],
     },
     {

@@ -206,8 +206,8 @@ export const gameSchemaSourceManifest = {
   // 결속하기 때문에 걸리는 것이지 game operations 계약 변경이 아니다. 뒷받침 마이그레이션은
   // 20260818120000_v1_review_policy_settings 이며, 바인딩된 20260729000100_v1_game_operations 는
   // 그대로라 migration 해시는 변하지 않는다.
-  schema: 'fad7e3637cab1365fba7a3bf10be8bd7ef33a87112f58a6429048d940fcddd6d',
-  migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
+  schema: 'e8274afb46d97ed1b9ba1589a327ccbada9708de9be1ff3b8890168fbdd3ff7a',
+  migration: '50b6662bebb9aee49eef76649b04f9a385d03d9a7097b2a6c4f35e96f1e7cad5',
 } as const;
 
 type GameSchemaSourcePaths = {

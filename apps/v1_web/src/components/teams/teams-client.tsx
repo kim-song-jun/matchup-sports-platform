@@ -11,6 +11,7 @@ import {
   useV1CreateTeamJoinApplication,
   useV1LeaveTeam,
   useV1MasterSports,
+  useV1MyTeams,
   useV1RecentSearches,
   useV1RecordSearch,
   useV1RejectTeamJoinApplication,
@@ -37,7 +38,7 @@ import { teamSharePath } from '@/lib/team-share-route';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
-import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyTeam, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
 import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
@@ -202,6 +203,11 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     dateLabel: formatTournamentDateShort(match.startsAt) ?? '',
     venue: match.place?.name ?? match.placeName ?? '',
   }));
+  // 컨택 보내기 CTA 노출 조건 중 "로그인 상태" + "운영 권한 팀 보유"를 함께 판정한다.
+  // 비로그인 상태에서는 /me/teams 가 401이라 myTeamsQuery.data 가 undefined로 남고,
+  // 자연히 operatorTeamCount === 0 이 되어 CTA도 노출되지 않는다 — 별도 인증 체크가 불필요하다.
+  const myTeamsQuery = useV1MyTeams();
+  const operatorTeamCount = normalizeMyTeams(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length;
   const fallback = getTeamDetailViewModel();
 
   useEffect(() => {
@@ -276,6 +282,10 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
         onShare: () => shareTeam(query.data),
         openMatches,
         openMatchesLoading: openMatchesQuery.isLoading,
+        contactHref:
+          toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
+            ? `/teams/${teamId}/contact/new`
+            : undefined,
       }
     : fallback;
 
@@ -739,6 +749,12 @@ function resolveJoinState(
   eligibility?: { joinState: string },
 ): string {
   return eligibility?.joinState ?? team.viewer.joinState;
+}
+
+/** `useV1MyTeams()` 응답은 배열이면서 `items`도 같이 들고 있는 하이브리드 형태다. */
+function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] {
+  if (!data) return [];
+  return 'items' in data ? data.items : (data as V1MyTeam[]);
 }
 
 function toDetailMode(

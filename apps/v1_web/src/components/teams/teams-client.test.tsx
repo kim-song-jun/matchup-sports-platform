@@ -13,6 +13,7 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1ResolveChatRoom: vi.fn(),
   useV1TeamMatches: vi.fn(),
   useV1TeamMembers: vi.fn(),
+  useV1MyTeams: vi.fn(() => ({ data: undefined })),
   useV1TeamJoinApplications: vi.fn(),
   useV1ChangeTeamMembershipRole: vi.fn(),
   useV1RemoveTeamMembership: vi.fn(),

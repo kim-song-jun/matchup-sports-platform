@@ -321,9 +321,10 @@ export class TeamContactsService {
   }
 
   /**
-   * 만료를 표시에 반영한다. 목록은 행이 많아 각 행마다 updateMany 를 돌리지 않고
-   * 표시 상태만 계산한다 — DB 정리는 respond() 와 create()(같은 팀쌍의 만료된 대기 건
-   * 사전 정리) 에서 일어난다. detail() 은 계산만 하고 DB 를 정리하지 않는다.
+   * 만료를 표시에 반영하는 **계산 전용** 헬퍼다. 행마다 write 를 돌리지 않기 위해 여기서는
+   * DB 를 건드리지 않는다. DB 정리는 호출 경로 쪽에서 한다 — create()(같은 팀쌍의 만료 대기 건
+   * 사전 정리) / respond()(settleExpiry) / listForTeam()(조회 전 해당 팀·방향 일괄 정리) /
+   * detail()(settleExpiry). 즉 네 경로 모두 읽는 시점에 DB 상태까지 맞춘다.
    */
   private toListItem(row: { id: string; status: string; expiresAt: Date; [k: string]: unknown }) {
     const expired = row.status === 'requested' && row.expiresAt <= new Date();

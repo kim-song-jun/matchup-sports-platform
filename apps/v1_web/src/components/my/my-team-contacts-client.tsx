@@ -19,7 +19,6 @@ import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
-import type { V1MyTeam, V1MyTeamsResponse } from '@/types/api';
 
 type Direction = 'inbound' | 'outbound';
 

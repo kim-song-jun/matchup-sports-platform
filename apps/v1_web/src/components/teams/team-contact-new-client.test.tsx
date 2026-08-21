@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { V1ApiError } from '@/lib/api-client';
 import { TeamContactNewPageClient } from './team-contact-new-client';
 
 const {
@@ -86,5 +87,48 @@ describe('TeamContactNewPageClient', () => {
     render(<TeamContactNewPageClient teamId="team-target" />);
 
     expect(screen.getByLabelText('보내는 팀')).toBeInTheDocument();
+  });
+
+  it('TEAM_CONTACT_ALREADY_ACTIVE 에러면 기존 컨택으로 가는 링크가 보인다', () => {
+    createContactMutate.mockImplementation((_vars, opts) => {
+      opts.onError(
+        new V1ApiError({
+          status: 'error',
+          statusCode: 409,
+          code: 'TEAM_CONTACT_ALREADY_ACTIVE',
+          message: '이미 진행 중인 컨택이 있어요.',
+          details: { existingContactId: 'contact-123' },
+          timestamp: new Date().toISOString(),
+        }),
+      );
+    });
+
+    render(<TeamContactNewPageClient teamId="team-target" />);
+    fireEvent.change(screen.getByLabelText('메시지'), { target: { value: 'hi' } });
+    fireEvent.click(screen.getByRole('button', { name: '컨택 보내기' }));
+
+    const link = screen.getByRole('link', { name: '진행 중인 컨택 보기' });
+    expect(link).toHaveAttribute('href', '/my/team-contacts/contact-123');
+  });
+
+  it('TEAM_CONTACT_DAILY_LIMIT_EXCEEDED 등 다른 에러면 링크가 없다', () => {
+    createContactMutate.mockImplementation((_vars, opts) => {
+      opts.onError(
+        new V1ApiError({
+          status: 'error',
+          statusCode: 429,
+          code: 'TEAM_CONTACT_DAILY_LIMIT_EXCEEDED',
+          message: '오늘 컨택을 모두 사용했어요.',
+          timestamp: new Date().toISOString(),
+        }),
+      );
+    });
+
+    render(<TeamContactNewPageClient teamId="team-target" />);
+    fireEvent.change(screen.getByLabelText('메시지'), { target: { value: 'hi' } });
+    fireEvent.click(screen.getByRole('button', { name: '컨택 보내기' }));
+
+    expect(screen.getByText('오늘 보낼 수 있는 컨택을 모두 사용했어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '진행 중인 컨택 보기' })).not.toBeInTheDocument();
   });
 });

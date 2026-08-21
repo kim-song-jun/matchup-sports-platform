@@ -33,12 +33,13 @@ import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
-import { isTeamOperatorRole } from '@/lib/team-role';
+import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { teamSharePath } from '@/lib/team-share-route';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
-import type { V1MyTeam, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
 import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
@@ -204,10 +205,16 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     venue: match.place?.name ?? match.placeName ?? '',
   }));
   // 컨택 보내기 CTA 노출 조건 중 "로그인 상태" + "운영 권한 팀 보유"를 함께 판정한다.
-  // 비로그인 상태에서는 /me/teams 가 401이라 myTeamsQuery.data 가 undefined로 남고,
-  // 자연히 operatorTeamCount === 0 이 되어 CTA도 노출되지 않는다 — 별도 인증 체크가 불필요하다.
-  const myTeamsQuery = useV1MyTeams();
-  const operatorTeamCount = normalizeMyTeams(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length;
+  // 팀 상세는 공개 SEO 페이지라 게스트도 항상 렌더되므로, notification-bell.tsx의
+  // useUnreadState와 동일하게 세션 힌트(hasStoredV1Session, 동기 localStorage 체크)가
+  // 있을 때만 /me/teams 를 호출한다 — SSR에서는 localStorage를 못 읽으므로 useEffect로
+  // 마운트 후 세팅한다. 힌트가 없으면(게스트) 쿼리 자체가 안 돌아 operatorTeamCount는 0.
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  const myTeamsQuery = useV1MyTeams(undefined, { enabled: hasSessionHint });
+  const operatorTeamCount = normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length;
   const fallback = getTeamDetailViewModel();
 
   useEffect(() => {
@@ -749,12 +756,6 @@ function resolveJoinState(
   eligibility?: { joinState: string },
 ): string {
   return eligibility?.joinState ?? team.viewer.joinState;
-}
-
-/** `useV1MyTeams()` 응답은 배열이면서 `items`도 같이 들고 있는 하이브리드 형태다. */
-function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] {
-  if (!data) return [];
-  return 'items' in data ? data.items : (data as V1MyTeam[]);
 }
 
 function toDetailMode(

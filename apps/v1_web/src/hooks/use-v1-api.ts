@@ -924,10 +924,11 @@ function formatActivityLabels(values: string[], labels: Record<string, string>) 
   return values.map((value) => labels[value]).filter(Boolean);
 }
 
-export function useV1MyTeams(filters?: ListFilters) {
+export function useV1MyTeams(filters?: ListFilters, options?: QueryOptions) {
   return useQuery({
     queryKey: [...v1Keys.all, 'me', 'teams', filters ?? {}] as const,
     queryFn: () => v1Get<V1MyTeamsResponse>('/me/teams', filters),
+    enabled: options?.enabled ?? true,
   });
 }
 

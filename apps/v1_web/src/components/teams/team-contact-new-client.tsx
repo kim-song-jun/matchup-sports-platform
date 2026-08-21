@@ -1,21 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card } from '@/components/v1-ui/primitives';
 import { useV1CreateTeamContact, useV1MyTeams, useV1TeamDetail } from '@/hooks/use-v1-api';
-import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
-import { isTeamOperatorRole } from '@/lib/team-role';
-import type { V1MyTeam, V1MyTeamsResponse } from '@/types/api';
+import { extractErrorCode, extractErrorDetails, extractErrorMessage } from '@/lib/error-message';
+import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
 
 const MESSAGE_MAX_LENGTH = 500;
-
-/** `useV1MyTeams()` 응답은 배열이면서 `items`도 같이 들고 있는 하이브리드 형태다. */
-function normalizeMyTeams(data: V1MyTeamsResponse | undefined): V1MyTeam[] {
-  if (!data) return [];
-  return 'items' in data ? data.items : (data as V1MyTeam[]);
-}
 
 // 팀 컨택 도메인 에러 코드 → 사용자 메시지. code 로만 분기한다(문자열 매칭 금지 — error-message.ts 주석 지침).
 const CONTACT_ERROR_MESSAGES: Record<string, string> = {
@@ -23,17 +17,29 @@ const CONTACT_ERROR_MESSAGES: Record<string, string> = {
   TEAM_CONTACT_DAILY_LIMIT_EXCEEDED: '오늘 보낼 수 있는 컨택을 모두 사용했어요.',
 };
 
+type SubmitError = { message: string; href?: string };
+
+/**
+ * `TEAM_CONTACT_ALREADY_ACTIVE` 응답의 `details.existingContactId` 를 방어적으로 꺼낸다.
+ * extractErrorDetails 는 unknown 을 돌려주므로, error-message.ts 의 extractErrorCode 와
+ * 같은 스타일로 — 느슨한 모양으로 캐스팅한 뒤 실제 값의 typeof 를 확인하고서만 쓴다.
+ */
+function extractExistingContactId(details: unknown): string | undefined {
+  const raw = (details as { existingContactId?: unknown } | null | undefined)?.existingContactId;
+  return typeof raw === 'string' && raw ? raw : undefined;
+}
+
 export function TeamContactNewPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
   const teamQuery = useV1TeamDetail(teamId);
   const myTeamsQuery = useV1MyTeams();
   const operatorTeams = useMemo(
-    () => normalizeMyTeams(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)),
+    () => normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)),
     [myTeamsQuery.data],
   );
   const [fromTeamId, setFromTeamId] = useState('');
   const [message, setMessage] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<SubmitError | null>(null);
   const createContact = useV1CreateTeamContact(teamId);
 
   // 운영 권한 팀이 1개면 선택 UI 없이 그 팀으로 고정한다.
@@ -52,11 +58,19 @@ export function TeamContactNewPageClient({ teamId }: { teamId: string }) {
         },
         onError: (err) => {
           const code = extractErrorCode(err);
-          if (code && CONTACT_ERROR_MESSAGES[code]) {
-            setError(CONTACT_ERROR_MESSAGES[code]);
+          if (code === 'TEAM_CONTACT_ALREADY_ACTIVE') {
+            const existingContactId = extractExistingContactId(extractErrorDetails(err));
+            setError({
+              message: CONTACT_ERROR_MESSAGES.TEAM_CONTACT_ALREADY_ACTIVE,
+              href: existingContactId ? `/my/team-contacts/${existingContactId}` : '/my/team-contacts',
+            });
             return;
           }
-          setError(extractErrorMessage(err, '컨택을 보내지 못했어요. 잠시 후 다시 시도해 주세요.'));
+          if (code && CONTACT_ERROR_MESSAGES[code]) {
+            setError({ message: CONTACT_ERROR_MESSAGES[code] });
+            return;
+          }
+          setError({ message: extractErrorMessage(err, '컨택을 보내지 못했어요. 잠시 후 다시 시도해 주세요.') });
         },
       },
     );
@@ -130,7 +144,16 @@ export function TeamContactNewPageClient({ teamId }: { teamId: string }) {
 
           {error ? (
             <div role="status" className="tm-text-caption" style={{ color: 'var(--red700)' }}>
-              {error}
+              <div>{error.message}</div>
+              {error.href ? (
+                <Link
+                  href={error.href}
+                  className="tm-btn tm-btn-sm tm-btn-neutral"
+                  style={{ marginTop: 8, display: 'inline-flex' }}
+                >
+                  진행 중인 컨택 보기
+                </Link>
+              ) : null}
             </div>
           ) : null}
 

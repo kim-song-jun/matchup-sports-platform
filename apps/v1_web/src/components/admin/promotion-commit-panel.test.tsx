@@ -20,6 +20,7 @@ const PREVIEW: V1PromotionPreviewResponse = {
   seriesId: 'series-1',
   seasonNo: 1,
   rule: { mode: 'ratio', ratio: 0.2, rounding: 'ceil', minSlots: 1 },
+  ruleFingerprint: 'a'.repeat(64),
   alreadyDecided: false,
   warnings: [],
   tiers: [
@@ -99,18 +100,30 @@ describe('PromotionCommitPanel', () => {
     render(<PromotionCommitPanel preview={PREVIEW} submitting={false} onCommit={onCommit} />);
 
     await user.selectOptions(screen.getByLabelText('델타 승강 결정'), 'withdrawn');
+    await user.type(screen.getByLabelText('델타 수정 사유'), '다음 시즌 불참 통보');
     await user.click(screen.getByRole('button', { name: '승강 최종 승인' }));
 
     const entries = onCommit.mock.calls[0][0];
     // 서버가 "빠진 팀"을 422 로 막으므로 8팀 전부가 실려야 한다.
     expect(entries).toHaveLength(8);
+    // 사유는 어드민이 적은 그대로 실린다 — 고정 문자열이면 감사 로그를 열어도
+    // "왜 규칙과 다르게 정했는지"를 알 수 없다.
     expect(entries.find((e: { teamId: string }) => e.teamId === 't4')).toMatchObject({
       kind: 'withdrawn',
       fromTier: 1,
-      overrideNote: expect.any(String),
+      overrideNote: '다음 시즌 불참 통보',
     });
     // 수정하지 않은 팀에는 사유를 붙이지 않는다.
     expect(entries.find((e: { teamId: string }) => e.teamId === 't1')).not.toHaveProperty('overrideNote');
+  });
+
+  it('규칙과 다르게 정한 팀에만 사유 입력란이 열린다', async () => {
+    const user = userEvent.setup();
+    render(<PromotionCommitPanel preview={PREVIEW} submitting={false} onCommit={vi.fn()} />);
+
+    expect(screen.queryByLabelText('델타 수정 사유')).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('델타 승강 결정'), 'withdrawn');
+    expect(screen.getByLabelText('델타 수정 사유')).toBeInTheDocument();
   });
 
   it('1부 팀을 승격으로 바꾸면 갈 곳이 없어 최종 승인이 막힌다', async () => {

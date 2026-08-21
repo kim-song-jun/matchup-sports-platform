@@ -55,7 +55,9 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
   const handleCommit = (entries: V1CommitPromotionEntry[]) => {
     if (preview === null) return;
     commitPromotions.mutate(
-      { seasonNo: preview.seasonNo, body: { entries } },
+      // preview 를 만든 규칙의 지문을 함께 보낸다 — 그 사이 어드민이 규칙을 바꿨다면
+      // 서버가 409 PROMOTION_RULE_CHANGED 로 막고 다시 계산하게 한다.
+      { seasonNo: preview.seasonNo, body: { entries, ruleFingerprint: preview.ruleFingerprint } },
       {
         onSuccess: (result) => {
           setPreview(null);
@@ -64,15 +66,6 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
             `${result.nextSeasonNo}시즌 리그 ${result.nextSeasonLeagues.length}개를 만들었어요.`,
             'success',
           );
-          // 팀이 2개 미만이라 만들지 않은 티어는 조용히 빠지면 안 된다 — 운영자가
-          // "왜 3부가 없지?"를 알 방법이 없다.
-          const skipped = result.skippedTiers ?? [];
-          if (skipped.length > 0) {
-            showToast(
-              `${skipped.map((entry) => `${entry.tierLabel}(${entry.teamCount}팀)`).join(' · ')}은 팀이 2개 미만이라 만들지 않았어요.`,
-              'error',
-            );
-          }
         },
         onError: (error) => showToast(extractErrorMessage(error, '승강을 확정하지 못했어요.'), 'error'),
       },

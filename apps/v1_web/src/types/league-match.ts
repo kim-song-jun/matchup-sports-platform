@@ -24,14 +24,16 @@ export interface V1PublicLeagueListItem {
   sport: { sportId: string; code: string; name: string };
   region: { regionId: string; name: string };
   /**
-   * 리그 체계(시리즈)에 속한 리그만 채워진다. 단발 리그는 넷 다 null.
-   * 목록에도 필요하다 -- 이 화면은 "자기 수준의 리그를 고르는" 곳이라 상세에
-   * 들어가야만 몇 부인지 알 수 있으면 고를 수가 없다(Task 153 시나리오 3).
+   * 리그 체계(시리즈)에 속한 리그만 값이 있다. 단발 리그는 전부 null — 티어가 "1부"인 게
+   * 아니라 티어 개념 자체가 없다. 목록에도 필요하다: 이 화면은 "자기 수준의 리그를 고르는"
+   * 곳이라 상세에 들어가야만 몇 부인지 알 수 있으면 고를 수가 없다(Task 153 시나리오 3).
+   * 서버가 항상 키를 내려주므로 optional 이 아니다.
    */
-  tier?: number | null;
-  tierLabel?: string | null;
-  seasonNo?: number | null;
-  seriesTitle?: string | null;
+  seriesId: string | null;
+  tier: number | null;
+  tierLabel: string | null;
+  seasonNo: number | null;
+  seriesTitle: string | null;
   teamCount: number;
 }
 
@@ -209,9 +211,9 @@ export interface V1LeagueStandingRow {
    * 어드민이 최종 승인한 승강 결과. preview 단계에서는 행이 만들어지지 않으므로
    * 값이 있다는 것은 곧 확정됐다는 뜻이다. 아직 확정 전이면 null (Task 153 시나리오 4).
    */
-  promotionKind?: 'promoted' | 'relegated' | 'stayed' | 'withdrawn' | null;
-  promotionToTier?: number | null;
-  promotionToTierLabel?: string | null;
+  promotionKind: 'promoted' | 'relegated' | 'stayed' | 'withdrawn' | null;
+  promotionToTier: number | null;
+  promotionToTierLabel: string | null;
 }
 
 export interface V1LeaguePendingFixture {
@@ -223,6 +225,10 @@ export interface V1LeaguePendingFixture {
 
 export interface V1LeagueStandingsResponse {
   leagueId: string;
+  tier: number | null;
+  tierLabel: string | null;
+  /** 이 리그(시즌)의 승강이 확정됐는지. false 면 순위표에 승강 열을 띄우지 않는다. */
+  promotionDecided: boolean;
   tieBreakOrder: string[];
   standings: V1LeagueStandingRow[];
   pendingFixtures: V1LeaguePendingFixture[];

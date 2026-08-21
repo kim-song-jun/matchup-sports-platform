@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { PromotionRuleForm } from './promotion-rule-form';
-import { previewSlots, hitsMajorityGuard } from './promotion-rule-form';
+import { previewSlots, tierSlotPreview } from './promotion-rule-form';
 import { V1_DEFAULT_PROMOTION_RULE, type V1PromotionRule } from '@/types/league-series';
 
 const RULE = V1_DEFAULT_PROMOTION_RULE;
@@ -42,24 +42,56 @@ describe('previewSlots — 서버 baseSlots 와 같은 결과를 내야 한다',
   });
 });
 
-describe('hitsMajorityGuard — 서버가 승강을 건너뛰는 조건을 미리 보여준다', () => {
-  it('3팀 리그는 1승격+1강등이 과반을 넘어 걸린다', () => {
+describe('tierSlotPreview — 서버 tierSlotCounts 와 같은 판정을 내야 한다', () => {
+  // 3티어 시리즈의 중간 티어(승격·강등 둘 다 있음)를 기준으로 한 기존 케이스들.
+  const mid = (rule: V1PromotionRule, teamCount: number) => tierSlotPreview(rule, 2, 3, teamCount);
+
+  it('3팀 티어는 1승격+1강등이 과반을 넘어 걸린다', () => {
     // floor(3/2) = 1 인데 승격 1 + 강등 1 = 2 > 1
-    expect(hitsMajorityGuard(RULE, 3)).toBe(true);
+    expect(mid(RULE, 3).skippedByMajorityGuard).toBe(true);
   });
 
-  it('4팀 리그는 1승격+1강등=2 가 floor(4/2)=2 이하라 통과한다', () => {
-    expect(hitsMajorityGuard(RULE, 4)).toBe(false);
+  it('4팀 티어는 1승격+1강등=2 가 floor(4/2)=2 이하라 통과한다', () => {
+    expect(mid(RULE, 4).skippedByMajorityGuard).toBe(false);
   });
 
   it('8팀·12팀처럼 팀이 넉넉하면 걸리지 않는다', () => {
-    expect(hitsMajorityGuard(RULE, 8)).toBe(false);
-    expect(hitsMajorityGuard(RULE, 12)).toBe(false);
+    expect(mid(RULE, 8).skippedByMajorityGuard).toBe(false);
+    expect(mid(RULE, 12).skippedByMajorityGuard).toBe(false);
   });
 
-  it('비율을 과하게 올리면 큰 리그에서도 걸린다', () => {
+  it('비율을 과하게 올리면 큰 티어에서도 걸린다', () => {
     // 10팀에 50% → 5팀씩 승강. 승격 5 + 강등 5 = 10 > floor(10/2) = 5
-    expect(hitsMajorityGuard({ ...RULE, ratio: 0.5 }, 10)).toBe(true);
+    expect(mid({ ...RULE, ratio: 0.5 }, 10).skippedByMajorityGuard).toBe(true);
+  });
+
+  // ── 티어 위치를 무시하던 옛 구현이 서버와 어긋났던 지점들 ──────────────────
+  // 옛 hitsMajorityGuard 는 언제나 slots*2 로 판정해 아래를 전부 틀렸다.
+  it('1부는 승격이 없어 강등만 계산한다', () => {
+    expect(tierSlotPreview(RULE, 1, 3, 6)).toEqual({
+      promoteCount: 0, relegateCount: 2, skippedByMajorityGuard: false,
+    });
+  });
+
+  it('최하위 티어는 강등이 없어 승격만 계산한다', () => {
+    expect(tierSlotPreview(RULE, 3, 3, 6)).toEqual({
+      promoteCount: 2, relegateCount: 0, skippedByMajorityGuard: false,
+    });
+  });
+
+  it('단일 티어 시리즈는 승강이 아예 없고 가드도 걸리지 않는다', () => {
+    expect(tierSlotPreview(RULE, 1, 1, 6)).toEqual({
+      promoteCount: 0, relegateCount: 0, skippedByMajorityGuard: false,
+    });
+  });
+
+  it('minSlots=3·8팀: 폼이 "건너뜀"이라 경고하던 1부에서 서버는 실제로 3팀을 강등시킨다', () => {
+    const rule: V1PromotionRule = { ...RULE, minSlots: 3 };
+    expect(tierSlotPreview(rule, 1, 3, 8)).toEqual({
+      promoteCount: 0, relegateCount: 3, skippedByMajorityGuard: false,
+    });
+    // 중간 티어만 실제로 가드에 걸린다.
+    expect(tierSlotPreview(rule, 2, 3, 8).skippedByMajorityGuard).toBe(true);
   });
 });
 
@@ -70,6 +102,7 @@ function Harness({ onRule }: { onRule: (rule: V1PromotionRule) => void }) {
   return (
     <PromotionRuleForm
       value={rule}
+      tierCount={3}
       onChange={(next) => {
         setRule(next);
         onRule(next);

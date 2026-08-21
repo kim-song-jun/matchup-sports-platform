@@ -142,12 +142,12 @@ describe('planNextSeasonTiers — 다음 시즌 편성', () => {
       { tier: 1, teamIds: ['a', 'b'] },
       { tier: 2, teamIds: ['c', 'd'] },
     ]);
-    expect(plan.skipped).toEqual([]);
+    expect(plan.undersized).toEqual([]);
   });
 
-  it('팀이 1개뿐인 티어는 만들지 않고 skipped 로 알린다 — alpha 에 실제로 생긴 1팀 리그', () => {
-    // 1팀 리그는 라운드로빈 대진이 0건이라 영원히 completed 가 되지 않고,
-    // regenerateFixtures 도 LEAGUE_TEAM_INVALID 로 막혀 복구가 안 된다.
+  it('팀이 1개뿐인 티어는 undersized 로 표시한다 — 서비스가 이걸 보고 확정을 422 로 막는다', () => {
+    // alpha 에 실제로 생긴 1팀 리그: 라운드로빈 대진이 0건이라 영원히 completed 가 되지
+    // 않고 regenerateFixtures 도 LEAGUE_TEAM_INVALID 로 막혀 복구가 안 된다.
     const plan = planNextSeasonTiers({
       resolved: rows([
         ['a', 1, 'stayed'],
@@ -157,10 +157,11 @@ describe('planNextSeasonTiers — 다음 시즌 편성', () => {
       tierCount: 2,
     });
     expect(plan.tiers).toEqual([{ tier: 1, teamIds: ['a', 'b'] }]);
-    expect(plan.skipped).toEqual([{ tier: 2, teamIds: ['c'] }]);
+    expect(plan.undersized).toEqual([{ tier: 2, teamIds: ['c'] }]);
   });
 
-  it('팀이 0개인 티어는 skipped 에도 넣지 않는다 — 알릴 것이 없다', () => {
+  it('팀이 0개인 티어는 undersized 가 아니다 — 그 티어를 열지 않는 것은 정상 결과다', () => {
+    // 예: 최하위 티어 전원이 승격. 막을 이유가 없다.
     const plan = planNextSeasonTiers({
       resolved: rows([
         ['a', 1, 'stayed'],
@@ -169,10 +170,10 @@ describe('planNextSeasonTiers — 다음 시즌 편성', () => {
       tierCount: 3,
     });
     expect(plan.tiers).toEqual([{ tier: 1, teamIds: ['a', 'b'] }]);
-    expect(plan.skipped).toEqual([]);
+    expect(plan.undersized).toEqual([]);
   });
 
-  it('탈퇴(withdrawn) 팀은 다음 시즌에서 빠지고, 그 결과 1팀이 되면 그 티어도 빠진다', () => {
+  it('탈퇴(withdrawn) 팀이 빠져 1팀이 되면 그 티어도 undersized 다', () => {
     const plan = planNextSeasonTiers({
       resolved: rows([
         ['a', 1, 'stayed'],
@@ -181,7 +182,7 @@ describe('planNextSeasonTiers — 다음 시즌 편성', () => {
       tierCount: 1,
     });
     expect(plan.tiers).toEqual([]);
-    expect(plan.skipped).toEqual([{ tier: 1, teamIds: ['a'] }]);
+    expect(plan.undersized).toEqual([{ tier: 1, teamIds: ['a'] }]);
   });
 });
 

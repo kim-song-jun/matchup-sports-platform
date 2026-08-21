@@ -78,8 +78,14 @@ export interface NextSeasonTierPlan {
 export interface NextSeasonPlan {
   /** 실제로 만들 티어. 팀 2개 이상인 것만 들어온다. */
   tiers: NextSeasonTierPlan[];
-  /** 팀이 1개뿐이라 만들지 않은 티어. 운영자에게 알려야 한다. */
-  skipped: NextSeasonTierPlan[];
+  /**
+   * 팀이 **정확히 1개**뿐이라 리그로 성립하지 않는 티어. 서비스는 이게 비어 있지 않으면
+   * 확정 자체를 422 로 막는다.
+   *
+   * 0팀 티어는 여기 넣지 않는다 — "다음 시즌에 그 티어를 열지 않는다"는 정상적인 결과이고
+   * (예: 최하위 티어 전원이 승격), 막을 이유가 없다.
+   */
+  undersized: NextSeasonTierPlan[];
 }
 
 /**
@@ -88,10 +94,11 @@ export interface NextSeasonPlan {
  * `create()` 와 `seedSeason()` 이 강제하는 **"서로 다른 팀 2개 이상"** 불변식을 이 경로도
  * 지킨다. 안 지키면 1팀짜리 리그가 만들어지는데(alpha 실측 사례 존재) 그건 라운드로빈
  * 대진이 0건이라 영원히 completed 가 되지 않고, regenerateFixtures 도 LEAGUE_TEAM_INVALID
- * 로 막혀 복구가 안 되는 死 리그다. 게다가 다음 시즌 승강 계산에 "1팀 티어"로 계속 참여한다.
+ * 로 막혀 복구가 안 되는 死 리그다. 승강으로 만들어졌으니 어드민이 팀을 더 넣을 경로도 없다.
  *
- * 확정 자체를 막지는 않는다 — 승강 결정은 이미 유효하고, 팀이 모자란 티어만 비우는 편이
- * 운영자가 수습할 여지를 남긴다. 대신 `skipped` 로 반드시 돌려준다.
+ * 그래서 **확정 자체를 막는다**(2026-08-21 사용자 확정). 그 티어만 조용히 비우는 쪽도
+ * 검토했지만, 팀이 통째로 사라지는 결과를 운영자가 나중에 발견하는 것보다 지금 막고
+ * 불참 처리·승강 결정을 조정하게 하는 편이 낫다.
  *
  * 탈퇴(withdrawn) 팀은 다음 시즌에 넣지 않는다.
  */
@@ -100,15 +107,15 @@ export function planNextSeasonTiers(input: {
   tierCount: number;
 }): NextSeasonPlan {
   const tiers: NextSeasonTierPlan[] = [];
-  const skipped: NextSeasonTierPlan[] = [];
+  const undersized: NextSeasonTierPlan[] = [];
   for (let tier = 1; tier <= input.tierCount; tier += 1) {
     const teamIds = input.resolved
       .filter((row) => row.kind !== 'withdrawn' && row.toTier === tier)
       .map((row) => row.teamId);
     if (teamIds.length >= 2) tiers.push({ tier, teamIds });
-    else if (teamIds.length > 0) skipped.push({ tier, teamIds });
+    else if (teamIds.length === 1) undersized.push({ tier, teamIds });
   }
-  return { tiers, skipped };
+  return { tiers, undersized };
 }
 
 /**

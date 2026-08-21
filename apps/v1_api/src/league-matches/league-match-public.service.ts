@@ -52,6 +52,7 @@ export class LeagueMatchPublicService {
         // 제목에 "1부"가 들어 있어서 읽히는 것에 기대면 안 된다: 제목은 운영자 자유입력이다.
         tier: true,
         seasonNo: true,
+        seriesId: true,
         series: { select: { id: true, title: true } },
         _count: { select: { teams: true } },
       },
@@ -69,7 +70,10 @@ export class LeagueMatchPublicService {
         endsOn: league.endsOn,
         sport: { sportId: league.sport.id, code: league.sport.code, name: league.sport.name },
         region: { regionId: league.region.id, name: league.region.name },
-        // 단발 리그는 셋 다 null -- 화면은 null이면 티어 뱃지를 아예 띄우지 않는다.
+        // 단발 리그는 넷 다 null -- 티어가 "1부"인 게 아니라 티어 개념 자체가 없다는
+        // 뜻이므로 상세 응답과 같은 규칙으로 null 을 유지하고, 화면은 null 이면 뱃지를
+        // 아예 띄우지 않는다.
+        seriesId: league.seriesId,
         tier: league.tier,
         tierLabel: league.tier === null ? null : `${league.tier}부`,
         seasonNo: league.seasonNo,
@@ -191,12 +195,15 @@ export class LeagueMatchPublicService {
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
     const teamLogoById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.profile?.logoUrl ?? null]));
 
-    // 확정된 승강 결과를 순위표에 함께 싣는다(Task 153 시나리오 4). preview 단계에서는
-    // 행이 아예 만들어지지 않으므로, 여기 값이 있다는 것은 곧 어드민이 최종 승인했다는 뜻이다.
+    // 확정된 승강 결과를 순위표에 얹는다(Task 153 시나리오 4). V1LeaguePromotion 은
+    // 그동안 createMany 로 쓰기만 하고 아무도 읽지 않는 테이블이었다 — 감사 추적을 위해
+    // 만들었는데 정작 어디에도 드러나지 않았다. preview 단계에서는 행이 아예 만들어지지
+    // 않으므로, 여기 값이 있다는 것은 곧 어드민이 최종 승인했다는 뜻이고, 확정 전(행 0건)
+    // 에는 전부 null 이라 순위표 모양이 바뀌지 않는다.
     // 어드민 전용 필드(computedKind/overriddenByAdmin/overrideNote/결정자)는 노출하지 않는다 --
     // "왜 규칙과 다르게 조정했는지"는 운영 판단이라 공개 대상이 아니다(153 Security Notes).
     const promotions = await this.prisma.v1LeaguePromotion.findMany({
-      where: { fromLeagueId: leagueId },
+      where: { fromLeagueId: league.id },
       select: { teamId: true, kind: true, toTier: true },
     });
     const promotionByTeamId = new Map(promotions.map((row) => [row.teamId, row]));
@@ -215,9 +222,12 @@ export class LeagueMatchPublicService {
 
     return {
       leagueId: league.id,
+      tier: league.tier,
+      tierLabel: league.tier === null ? null : `${league.tier}부`,
       tieBreakOrder,
       standings: standingsWithTeamName,
       pendingFixtures,
+      // 이름은 promotionsDecided 로 통일한다 -- 위 promotions 배열과 수를 맞춘다.
       promotionsDecided: promotions.length > 0,
     };
   }

@@ -131,6 +131,8 @@ export interface V1PromotionPreviewResponse {
   seriesId: string;
   seasonNo: number;
   rule: V1PromotionRule;
+  /** 이 preview 를 만든 규칙의 지문. commit 에 그대로 실어 보내 규칙 변경을 감지한다. */
+  ruleFingerprint: string;
   alreadyDecided: boolean;
   warnings: V1PromotionWarning[];
   tiers: V1PromotionPreviewTier[];
@@ -146,6 +148,8 @@ export interface V1CommitPromotionEntry {
 export interface V1CommitPromotionsPayload {
   entries: V1CommitPromotionEntry[];
   createNextSeason?: boolean;
+  /** preview 응답의 ruleFingerprint. 불일치 시 서버가 409 PROMOTION_RULE_CHANGED 로 막는다. */
+  ruleFingerprint?: string;
 }
 
 export interface V1CommitPromotionsResult {
@@ -155,10 +159,4 @@ export interface V1CommitPromotionsResult {
   decidedCount: number;
   overriddenCount: number;
   nextSeasonLeagues: Array<{ id: string; tier: number; tierLabel: string; teamCount: number }>;
-  /**
-   * 팀이 2개 미만이라 다음 시즌에 만들지 않은 티어. 1팀짜리 리그는 라운드로빈 대진이
-   * 0건이라 영원히 완료되지 않고 재생성도 막혀 복구가 안 되므로 아예 만들지 않는다.
-   * 조용히 빠지면 운영자가 "왜 3부가 없지?"를 알 수 없어 응답으로 반드시 알린다.
-   */
-  skippedTiers?: Array<{ tier: number; tierLabel: string; teamCount: number }>;
 }

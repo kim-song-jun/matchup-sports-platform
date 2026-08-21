@@ -9,6 +9,18 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1LeagueFixture } from '@/types/league-match';
 
+// 승강 표시 — 색만으로 정보를 전달하지 않도록 기호(↑/↓/–/×)와 텍스트를 함께 쓴다.
+/**
+ * 확정된 승강 결과 표기(Task 153 시나리오 4). 컬러만으로 뜻을 전달하지 않도록
+ * 기호 + 텍스트를 함께 싣는다(DESIGN.md — 색맹 대응).
+ */
+const PROMOTION_META: Record<'promoted' | 'relegated' | 'stayed' | 'withdrawn', { label: string; glyph: string; className: string }> = {
+  promoted: { label: '승격', glyph: '↑', className: 'text-blue-700 dark:text-blue-300' },
+  relegated: { label: '강등', glyph: '↓', className: 'text-red-700 dark:text-red-300' },
+  stayed: { label: '잔류', glyph: '–', className: 'text-[var(--text-muted)]' },
+  withdrawn: { label: '불참', glyph: '×', className: 'text-amber-700 dark:text-amber-300' },
+};
+
 const TIE_BREAK_LABELS: Record<string, string> = {
   points: '승점',
   goalDifference: '골득실',
@@ -43,18 +55,6 @@ const FIXTURE_STATUS_META: Record<string, { label: string; badgeClass: string }>
 function fixtureStatusMeta(status: string): { label: string; badgeClass: string } {
   return FIXTURE_STATUS_META[status] ?? { label: status, badgeClass: 'tm-badge-grey' };
 }
-
-/**
- * 확정된 승강 결과 표기(Task 153 시나리오 4). 컬러만으로 뜻을 전달하지 않도록
- * 화살표 기호 + 텍스트를 함께 싣는다(DESIGN.md — 색맹 대응).
- * `stayed`는 별도 표시를 하지 않는다 — 전 행의 대부분이 잔류라 표시하면 노이즈만 늘고,
- * "아무 일도 없었음"은 빈 칸으로 읽히는 편이 정확하다.
- */
-const PROMOTION_META: Record<string, { label: string; mark: string; className: string }> = {
-  promoted: { label: '승격', mark: '↑', className: 'text-blue-700 dark:text-blue-300' },
-  relegated: { label: '강등', mark: '↓', className: 'text-red-700 dark:text-red-300' },
-  withdrawn: { label: '불참', mark: '—', className: 'text-[var(--text-muted)]' },
-};
 
 /**
  * 점수 필드(homeScore/awayScore)는 값이 없을 수 있다(미확정 대진) — 그때는 0:0으로
@@ -200,8 +200,8 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                   <th scope="col">전적</th>
                   <th scope="col">승점</th>
                   <th scope="col">득실</th>
-                  {/* 승강이 확정되기 전에는 열 자체를 만들지 않는다 — 빈 칸만 늘어난 표가
-                      "아직 안 정해졌다"보다 읽기 어렵다. */}
+                  {/* 승강 열은 확정된 뒤에만 생긴다 — 확정 전에 빈 칸만 늘어난 표는
+                      "아직 안 정해졌다"보다 읽기 어렵고, 기존 순위표 모양도 그대로 유지된다. */}
                   {standings.promotionsDecided && <th scope="col">승강</th>}
                 </tr>
               </thead>
@@ -224,19 +224,19 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                     <td>{row.goalsFor}-{row.goalsAgainst}</td>
                     {standings.promotionsDecided && (
                       <td>
-                        {(() => {
-                          const meta = row.promotionKind == null ? undefined : PROMOTION_META[row.promotionKind];
-                          if (meta === undefined) return <span className="text-[var(--text-muted)]">잔류</span>;
-                          return (
-                            <span className={`inline-flex items-center gap-1 font-semibold ${meta.className}`}>
-                              <span aria-hidden="true">{meta.mark}</span>
-                              {meta.label}
-                              {row.promotionToTierLabel != null && row.promotionKind !== 'withdrawn' && (
-                                <span className="font-normal text-[var(--text-muted)]">{row.promotionToTierLabel}</span>
-                              )}
-                            </span>
-                          );
-                        })()}
+                        {row.promotionKind == null ? (
+                          <span className="text-[var(--text-muted)]">—</span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 whitespace-nowrap font-semibold ${PROMOTION_META[row.promotionKind].className}`}>
+                            <span aria-hidden="true">{PROMOTION_META[row.promotionKind].glyph}</span>
+                            {PROMOTION_META[row.promotionKind].label}
+                            {row.promotionKind === 'promoted' || row.promotionKind === 'relegated'
+                              ? row.promotionToTierLabel !== null && (
+                                  <span className="font-normal text-[var(--text-muted)]">({row.promotionToTierLabel})</span>
+                                )
+                              : null}
+                          </span>
+                        )}
                       </td>
                     )}
                   </tr>

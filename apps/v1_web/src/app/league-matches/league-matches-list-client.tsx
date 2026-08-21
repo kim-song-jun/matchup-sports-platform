@@ -164,16 +164,15 @@ export default function LeagueMatchesListClient() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          {/* 티어 뱃지는 리그 체계에 속한 리그에만 붙인다 — 단발 리그는 tierLabel이
-                              null이라 "1부"로 잘못 보이지 않는다. 제목에 "1부"가 들어 있어서 읽히는
-                              것에 기대면 안 된다(제목은 운영자 자유 입력). 상세
-                              (league-match-standings-client.tsx)와 같은 색·모양을 쓴다. */}
-                          {item.tierLabel != null && (
-                            <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
-                              {item.tierLabel}
-                            </span>
-                          )}
                           <span className="font-semibold text-[var(--text-strong)]">{item.title}</span>
+                          {/* 티어 뱃지 — 리그 체계에 속한 리그에만 붙인다. 단발 리그는
+                              tierLabel 이 null 이라(티어가 "1부"인 게 아니라 개념 자체가 없다)
+                              아무것도 표시하지 않는다. 제목에 "1부"가 들어 있어서 읽히는 것에
+                              기대면 안 된다 — 제목은 운영자 자유 입력이다. 팀이 자기 수준의
+                              리그를 고르는 지점이 바로 이 목록이라 상세뿐 아니라 여기에도 있어야 한다. */}
+                          {item.tierLabel !== null && (
+                            <span className="tm-badge tm-badge-sm tm-badge-blue">{item.tierLabel}</span>
+                          )}
                           <span className={`tm-badge tm-badge-sm ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
                         </div>
                         {item.seriesTitle != null && (

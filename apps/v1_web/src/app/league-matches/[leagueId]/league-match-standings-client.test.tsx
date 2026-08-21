@@ -297,7 +297,11 @@ describe('LeagueMatchStandingsClient', () => {
 
     // 확정 전
     useV1LeagueMatchStandingsMock.mockReturnValue({
-      data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: rows, pendingFixtures: [], promotionsDecided: false },
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: rows.map((r) => ({ ...r, promotionKind: null, promotionToTier: null, promotionToTierLabel: null })),
+        pendingFixtures: [], promotionsDecided: false,
+      },
     } as never);
     const before = render(
       <Providers>
@@ -327,8 +331,8 @@ describe('LeagueMatchStandingsClient', () => {
 
     expect(await screen.findByRole('columnheader', { name: '승강' })).toBeInTheDocument();
     expect(screen.getByText('강등')).toBeInTheDocument();
-    expect(screen.getByText('2부')).toBeInTheDocument();
-    // stayed 는 별도 표기를 하지 않고 "잔류"로만 읽힌다.
+    // 이동할 티어는 승격·강등에만 붙는다(잔류에는 붙지 않는다).
+    expect(screen.getByText('(2부)')).toBeInTheDocument();
     expect(screen.getByText('잔류')).toBeInTheDocument();
   });
 });

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { LeagueStanding } from './league-standings';
 
 // ── 승강(승격·강등) 계산 — 순수 함수 ────────────────────────────────────────
@@ -125,6 +126,14 @@ export function validatePromotionRule(rule: PromotionRule): PromotionRuleValidat
     if (!Number.isInteger(tier) || tier < 1) {
       errors.push({ field: `tierOverrides.${tierKey}`, message: '티어 키는 1 이상 정수여야 해요.' });
     }
+    // DTO 의 @IsObject() 는 tierOverrides 자체만 보고 그 안의 값은 검사하지 않는다.
+    // null 이 들어오면 아래 override[slotKey] 가 TypeError 로 터져 500 이 나가고,
+    // 숫자·문자열이면 조용히 무시돼 어드민이 설정했다고 믿는 값이 사라진다.
+    // 둘 다 여기서 막는다.
+    if (override === null || typeof override !== 'object' || Array.isArray(override)) {
+      errors.push({ field: `tierOverrides.${tierKey}`, message: '티어 override 는 { promote, relegate } 객체여야 해요.' });
+      continue;
+    }
     for (const slotKey of ['promote', 'relegate'] as const) {
       const value = override[slotKey];
       if (value !== undefined && (!Number.isInteger(value) || value < 0)) {
@@ -154,6 +163,74 @@ function baseSlots(rule: PromotionRule, teamCount: number): number {
   }
   const raw = teamCount * (rule.ratio ?? 0);
   return Math.max(minSlots, applyRounding(raw, rule.rounding ?? 'ceil'));
+}
+
+export interface TierSlotCounts {
+  promoteCount: number;
+  relegateCount: number;
+  skippedByMajorityGuard: boolean;
+}
+
+/**
+ * 티어 하나의 승격·강등 슬롯 수와 과반 가드 판정. **승강 계산의 단일 소스**다.
+ *
+ * calculatePromotions 와 어드민 규칙 폼(promotion-rule-form.tsx)이 둘 다 이 식을 쓴다 —
+ * 폼이 자기 나름의 근사식(항상 2*slots)을 들고 있었을 때, 티어 위치를 모르는 탓에
+ * "1부는 승격이 없다 / 최하위는 강등이 없다 / 단일 티어는 승강 자체가 없다"를 반영하지
+ * 못해 24개 조합 중 15개가 서버와 어긋났다(예: minSlots=3·8팀에서 폼은 "승강 건너뜀"이라
+ * 경고했지만 서버는 실제로 1부에서 3팀을 강등시켰다). 식이 두 벌이면 반드시 다시 갈린다.
+ */
+export function tierSlotCounts(
+  rule: PromotionRule,
+  tier: number,
+  tierCount: number,
+  teamCount: number,
+): TierSlotCounts {
+  if (teamCount === 0) return { promoteCount: 0, relegateCount: 0, skippedByMajorityGuard: false };
+
+  const override = rule.tierOverrides?.[String(tier)];
+  const slots = baseSlots(rule, teamCount);
+
+  // 1부는 위가 없으니 승격 없음. 최하위는 아래가 없으니 강등 없음.
+  const canPromote = tier > 1;
+  const canRelegate = tier < tierCount;
+
+  let promoteCount = Math.min(canPromote ? (override?.promote ?? slots) : 0, teamCount);
+  let relegateCount = Math.min(canRelegate ? (override?.relegate ?? slots) : 0, teamCount);
+
+  const skippedByMajorityGuard = promoteCount + relegateCount > Math.floor(teamCount / 2);
+  if (skippedByMajorityGuard) {
+    promoteCount = 0;
+    relegateCount = 0;
+  }
+
+  return { promoteCount, relegateCount, skippedByMajorityGuard };
+}
+
+/**
+ * 규칙의 내용 지문. preview 응답에 실어 보내고 commit 이 되돌려 받아, 그 사이에 어드민이
+ * 규칙을 바꿨는지 감지한다.
+ *
+ * 이게 없으면 규칙 변경이 조용히 통과한다 — fromTier 는 규칙과 무관하게 그대로라
+ * PROMOTION_ENTRIES_TIER_MISMATCH 가 못 잡고, 서버가 새 규칙으로 다시 계산한
+ * computedKind 와 어드민이 보고 결정한 옛 값이 달라져 **손대지도 않은 팀이
+ * overriddenByAdmin=true 로 박제된다**(alpha 실측: 수정 0건인데 overriddenCount=2).
+ * 감사 추적이 목적인 필드가 감사할 수 없는 값이 되는 셈이다.
+ */
+export function promotionRuleFingerprint(rule: PromotionRule): string {
+  // JSON.stringify 는 키 삽입 순서를 그대로 쓰므로 같은 규칙도 다른 문자열이 될 수 있다.
+  // 키를 정렬해 정규화한 뒤 해시한다.
+  const canonical = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value === null || typeof value !== 'object') return value;
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, v]) => v !== undefined)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, v]) => [k, canonical(v)]),
+    );
+  };
+  return createHash('sha256').update(JSON.stringify(canonical(rule))).digest('hex');
 }
 
 /**
@@ -197,34 +274,25 @@ export function calculatePromotions(input: {
       continue;
     }
 
-    const override = rule.tierOverrides?.[String(tier)];
-    const slots = baseSlots(rule, teamCount);
+    // 슬롯 수·가드 판정은 tierSlotCounts 가 단독으로 소유한다(프론트 규칙 폼과 공용).
+    const { promoteCount, relegateCount, skippedByMajorityGuard } = tierSlotCounts(rule, tier, tierCount, teamCount);
 
-    // 1부는 위가 없으니 승격 없음. 최하위는 아래가 없으니 강등 없음.
-    const canPromote = tier > 1;
-    const canRelegate = tier < tierCount;
-
-    let promoteCount = canPromote ? (override?.promote ?? slots) : 0;
-    let relegateCount = canRelegate ? (override?.relegate ?? slots) : 0;
-
-    promoteCount = Math.min(promoteCount, teamCount);
-    relegateCount = Math.min(relegateCount, teamCount);
-
-    const guardLimit = Math.floor(teamCount / 2);
-    const skipped = promoteCount + relegateCount > guardLimit;
-    if (skipped) {
+    if (skippedByMajorityGuard) {
+      // 경고 문구에는 가드에 걸린 "원래 적용하려던" 수를 보여줘야 어드민이 왜 건너뛰었는지 안다.
+      const override = rule.tierOverrides?.[String(tier)];
+      const slots = baseSlots(rule, teamCount);
+      const wouldPromote = Math.min(tier > 1 ? (override?.promote ?? slots) : 0, teamCount);
+      const wouldRelegate = Math.min(tier < tierCount ? (override?.relegate ?? slots) : 0, teamCount);
       warnings.push({
         tier,
         code: 'MAJORITY_GUARD_SKIPPED',
         message:
-          `${tier}부는 팀이 ${teamCount}개뿐이라 승격 ${promoteCount} · 강등 ${relegateCount} 을 적용하면 ` +
+          `${tier}부는 팀이 ${teamCount}개뿐이라 승격 ${wouldPromote} · 강등 ${wouldRelegate} 을 적용하면 ` +
           `잔류 팀이 과반에 못 미쳐요. 이 티어의 승강은 건너뛰었어요.`,
       });
-      promoteCount = 0;
-      relegateCount = 0;
     }
 
-    passes.push({ tier, teamCount, promoteCount, relegateCount, skipped, sorted });
+    passes.push({ tier, teamCount, promoteCount, relegateCount, skipped: skippedByMajorityGuard, sorted });
   }
 
   // 2차 패스 — 팀별 kind 배정 + 다음 시즌 예상 팀 수

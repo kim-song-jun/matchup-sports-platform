@@ -192,6 +192,20 @@ enum V1TeamMatchApplicationStatus {
   expired
 }
 
+enum V1TeamContactStatus {
+  requested
+  accepted
+  declined
+  withdrawn
+  expired
+}
+
+enum V1TeamContactPolicy {
+  open              // 기본값 — 누구나 컨택 가능
+  recruiting_only   // 이 팀이 host인 recruiting 상태 팀매치가 있을 때만
+  closed            // 컨택 받지 않음
+}
+
 enum V1PostEventReviewSourceType {
   match
   team_match
@@ -323,6 +337,7 @@ enum V1InquiryRelatedType {
   registration
   payment
   user
+  team_contact
 }
 
 enum V1UploadKind {
@@ -593,6 +608,9 @@ model V1User {
   uploadAssets                   V1UploadAsset[]
   acknowledgedResultEscalations  V1ResultEscalation[]          @relation("V1EscalationAcknowledgedBy")
   resolvedResultEscalations      V1ResultEscalation[]          @relation("V1EscalationResolvedBy")
+  teamContactRequestsMade        V1TeamContact[]               @relation("V1TeamContactRequestedBy")
+  teamContactRequestsResponded   V1TeamContact[]               @relation("V1TeamContactRespondedBy")
+  teamContactBlocksCreated       V1TeamContactBlock[]
 
   @@index([accountStatus])
   @@index([onboardingStatus])
@@ -1210,6 +1228,7 @@ model V1Team {
   name           String
   status         V1TeamStatus     @default(active)
   joinPolicy     V1TeamJoinPolicy @default(approval_required) @map("join_policy")
+  contactPolicy  V1TeamContactPolicy @default(open) @map("contact_policy")
   membersVisible Boolean          @default(true) @map("members_visible")
   memberCount    Int              @default(1) @map("member_count")
   managerCount   Int              @default(0) @map("manager_count")
@@ -1236,6 +1255,10 @@ model V1Team {
   leagueEntries                V1LeagueTeam[]              @relation("V1LeagueTeamTeam")
   leaguePromotions             V1LeaguePromotion[]         @relation("V1LeaguePromotionTeam")
   lineupPresets                V1TeamLineupPreset[]
+  contactRequestsSent          V1TeamContact[]             @relation("V1TeamContactFromTeam")
+  contactRequestsReceived      V1TeamContact[]             @relation("V1TeamContactToTeam")
+  contactBlocksMade            V1TeamContactBlock[]        @relation("V1TeamContactBlockOwner")
+  contactBlocksReceived        V1TeamContactBlock[]        @relation("V1TeamContactBlockTarget")
 
   @@index([ownerUserId])
   @@index([sportId, regionId, status])
@@ -1402,6 +1425,49 @@ model V1TeamInvitation {
   @@index([invitedUserId, status])
   @@index([teamId, status])
   @@map("v1_team_invitations")
+}
+
+model V1TeamContact {
+  id                String              @id @default(uuid())
+  fromTeamId        String              @map("from_team_id")
+  toTeamId          String              @map("to_team_id")
+  requestedByUserId String              @map("requested_by_user_id")
+  message           String                                      // 1~500자 (V1TeamMatchApplication.message와 동일 상한)
+  status            V1TeamContactStatus @default(requested)
+  respondedByUserId String?             @map("responded_by_user_id")
+  respondedAt       DateTime?           @map("responded_at")
+  declineReason     String?             @map("decline_reason")  // 200자 이하
+  expiresAt         DateTime            @map("expires_at")      // createdAt + 7일
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  fromTeam        V1Team      @relation("V1TeamContactFromTeam", fields: [fromTeamId], references: [id], onDelete: Cascade)
+  toTeam          V1Team      @relation("V1TeamContactToTeam", fields: [toTeamId], references: [id], onDelete: Cascade)
+  requestedByUser V1User      @relation("V1TeamContactRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  respondedByUser V1User?     @relation("V1TeamContactRespondedBy", fields: [respondedByUserId], references: [id], onDelete: SetNull)
+  chatRoom        V1ChatRoom?
+
+  @@index([fromTeamId, toTeamId, status])  // 중복/파편화 체크 (정방향)
+  @@index([toTeamId, status])              // 받은함 목록 + 역방향 중복 체크
+  @@index([fromTeamId, createdAt])         // 일일 발송 한도 카운트
+  @@map("v1_team_contacts")
+}
+
+model V1TeamContactBlock {
+  id              String   @id @default(uuid())
+  teamId          String   @map("team_id")           // 차단을 건 팀
+  blockedTeamId   String   @map("blocked_team_id")   // 차단당한 팀
+  createdByUserId String   @map("created_by_user_id")
+  reason          String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  team          V1Team @relation("V1TeamContactBlockOwner", fields: [teamId], references: [id], onDelete: Cascade)
+  blockedTeam   V1Team @relation("V1TeamContactBlockTarget", fields: [blockedTeamId], references: [id], onDelete: Cascade)
+  createdByUser V1User @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([teamId, blockedTeamId])
+  @@index([blockedTeamId])
+  @@map("v1_team_contact_blocks")
 }
 
 model V1TeamTrustScore {
@@ -1780,6 +1846,7 @@ model V1ChatRoom {
   matchId       String?          @unique @map("match_id")
   teamId        String?          @unique @map("team_id")
   teamMatchId   String?          @unique @map("team_match_id")
+  teamContactId String?          @unique @map("team_contact_id")
   status        V1ChatRoomStatus @default(active)
   lastMessageAt DateTime?        @map("last_message_at")
   createdAt     DateTime         @default(now()) @map("created_at")
@@ -1788,6 +1855,7 @@ model V1ChatRoom {
   match        V1Match?                @relation(fields: [matchId], references: [id], onDelete: Cascade)
   team         V1Team?                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
   teamMatch    V1TeamMatch?            @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
+  teamContact  V1TeamContact?          @relation(fields: [teamContactId], references: [id], onDelete: Cascade)
   participants V1ChatRoomParticipant[]
   messages     V1ChatMessage[]
 

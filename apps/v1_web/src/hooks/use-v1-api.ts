@@ -925,10 +925,11 @@ function formatActivityLabels(values: string[], labels: Record<string, string>) 
   return values.map((value) => labels[value]).filter(Boolean);
 }
 
-export function useV1MyTeams(filters?: ListFilters) {
+export function useV1MyTeams(filters?: ListFilters, options?: QueryOptions) {
   return useQuery({
     queryKey: [...v1Keys.all, 'me', 'teams', filters ?? {}] as const,
     queryFn: () => v1Get<V1MyTeamsResponse>('/me/teams', filters),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -1080,6 +1081,97 @@ export function useV1LeaveTeam(teamId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
     },
+  });
+}
+
+// ── Team contacts (Task 9) ────────────────────────────────────────────────
+// 팀 간 컨택 메시지. `toTeamId` 는 받는 팀(경로 파라미터), `fromTeamId` 는 보내는 팀(body).
+export type V1TeamContactStatus = 'requested' | 'accepted' | 'declined' | 'withdrawn' | 'expired';
+
+export type V1TeamContact = {
+  id: string;
+  fromTeamId: string;
+  toTeamId: string;
+  message: string;
+  status: V1TeamContactStatus;
+  declineReason: string | null;
+  expiresAt: string;
+  createdAt: string;
+};
+
+export type V1TeamContactList = {
+  items: V1TeamContact[];
+  pageInfo: { nextCursor: string | null; hasNext: boolean };
+};
+
+export function useV1TeamContacts(
+  teamId: string,
+  filters?: { direction?: 'inbound' | 'outbound'; status?: string; cursor?: string; limit?: number },
+) {
+  return useQuery({
+    queryKey: v1Keys.teamContacts(teamId, filters),
+    queryFn: () => v1Get<V1TeamContactList>(`/teams/${teamId}/contacts`, filters),
+    enabled: Boolean(teamId),
+  });
+}
+
+export function useV1TeamContact(contactId: string) {
+  return useQuery({
+    queryKey: v1Keys.teamContact(contactId),
+    queryFn: () => v1Get<V1TeamContact>(`/team-contacts/${contactId}`),
+    enabled: Boolean(contactId),
+  });
+}
+
+export function useV1CreateTeamContact(toTeamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { fromTeamId: string; message: string }) =>
+      v1Post<V1TeamContact>(`/teams/${toTeamId}/contacts`, body),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(variables.fromTeamId) });
+    },
+  });
+}
+
+/**
+ * 컨택 상태가 바뀌면 단건과 **양쪽 팀의 컨택함**을 모두 무효화한다.
+ * 전역 staleTime 이 30초라(providers.tsx) 목록을 안 건드리면 상세에서 수락한 뒤
+ * 목록으로 돌아갔을 때 옛 상태가 그대로 서빙된다.
+ * teamContactsAll 을 쓰는 이유: teamContacts() 는 마지막 요소가 필터 객체라 prefix match 가 안 된다.
+ */
+function invalidateTeamContactCaches(
+  queryClient: QueryClient,
+  contactId: string,
+  contact: { fromTeamId: string; toTeamId: string },
+) {
+  queryClient.invalidateQueries({ queryKey: v1Keys.teamContact(contactId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(contact.fromTeamId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.teamContactsAll(contact.toTeamId) });
+}
+
+export function useV1AcceptTeamContact(contactId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Patch<{ contact: V1TeamContact; alreadyProcessed: boolean }>(`/team-contacts/${contactId}/accept`),
+    onSuccess: (data) => invalidateTeamContactCaches(queryClient, contactId, data.contact),
+  });
+}
+
+export function useV1DeclineTeamContact(contactId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { reason?: string }) =>
+      v1Patch<{ contact: V1TeamContact; alreadyProcessed: boolean }>(`/team-contacts/${contactId}/decline`, body),
+    onSuccess: (data) => invalidateTeamContactCaches(queryClient, contactId, data.contact),
+  });
+}
+
+export function useV1WithdrawTeamContact(contactId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<{ contact: V1TeamContact; alreadyProcessed: boolean }>(`/team-contacts/${contactId}/withdraw`),
+    onSuccess: (data) => invalidateTeamContactCaches(queryClient, contactId, data.contact),
   });
 }
 
@@ -1917,7 +2009,7 @@ export function useV1ChatRoom(roomId: string) {
 export function useV1ResolveChatRoom() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { targetType: 'match' | 'team' | 'team_match'; targetId: string }) =>
+    mutationFn: (body: { targetType: 'match' | 'team' | 'team_match' | 'team_contact'; targetId: string }) =>
       v1Post<V1ChatRoomResolveResult>('/chat/rooms/resolve', body),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });

@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { NotificationEventType, NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTeamContactDto, DeclineTeamContactDto, ListTeamContactsQueryDto } from './dto/team-contact.dto';
 

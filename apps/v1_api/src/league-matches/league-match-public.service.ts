@@ -47,13 +47,14 @@ export class LeagueMatchPublicService {
         // 쓰고 있어(apps/v1_web/src/types/api.ts) 같은 관례를 그대로 맞춘다.
         sport: { select: { id: true, code: true, name: true } },
         region: { select: { id: true, name: true } },
-        _count: { select: { teams: true } },
-        // 티어 뱃지는 목록이 주 무대다 -- Task 153 User Scenario 3 이 "리그 목록에서
-        // 1부/2부/3부 뱃지를 보고 자기 수준의 리그에 신청"이다. 상세에만 있으면 팀이
-        // 리그를 고르는 그 순간에 정보가 없다.
-        seriesId: true,
+        // 티어는 목록에서도 필요하다 -- 이 목록은 "자기 수준의 리그를 고르는" 화면이라
+        // 상세에 들어가야만 몇 부인지 알 수 있으면 고를 수가 없다(Task 153 시나리오 3).
+        // 제목에 "1부"가 들어 있어서 읽히는 것에 기대면 안 된다: 제목은 운영자 자유입력이다.
         tier: true,
         seasonNo: true,
+        seriesId: true,
+        series: { select: { id: true, title: true } },
+        _count: { select: { teams: true } },
       },
     });
 
@@ -69,13 +70,15 @@ export class LeagueMatchPublicService {
         endsOn: league.endsOn,
         sport: { sportId: league.sport.id, code: league.sport.code, name: league.sport.name },
         region: { regionId: league.region.id, name: league.region.name },
-        teamCount: league._count.teams,
+        // 단발 리그는 넷 다 null -- 티어가 "1부"인 게 아니라 티어 개념 자체가 없다는
+        // 뜻이므로 상세 응답과 같은 규칙으로 null 을 유지하고, 화면은 null 이면 뱃지를
+        // 아예 띄우지 않는다.
         seriesId: league.seriesId,
         tier: league.tier,
-        // 단발 리그는 tier 가 null 이라 뱃지가 붙지 않는다 -- 티어가 "1부"인 게 아니라
-        // 티어 개념 자체가 없다는 뜻이므로 상세 응답과 같은 규칙으로 null 을 유지한다.
         tierLabel: league.tier === null ? null : `${league.tier}부`,
         seasonNo: league.seasonNo,
+        seriesTitle: league.series?.title ?? null,
+        teamCount: league._count.teams,
       })),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
     };
@@ -192,11 +195,13 @@ export class LeagueMatchPublicService {
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
     const teamLogoById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.profile?.logoUrl ?? null]));
 
-    // 확정된 승강 결과를 순위표에 얹는다 — Task 153 User Scenario 4("시즌 종료 후
-    // 순위표에서 자기 팀 행에 승격/강등/잔류 상태가 표시된다").
-    // V1LeaguePromotion 은 그동안 createMany 로 쓰기만 하고 아무도 읽지 않는
-    // 테이블이었다: 감사 추적을 위해 만들었는데 정작 어디에도 드러나지 않았다.
-    // 확정 전(행 0건)에는 전부 null 이라 순위표 모양이 바뀌지 않는다.
+    // 확정된 승강 결과를 순위표에 얹는다(Task 153 시나리오 4). V1LeaguePromotion 은
+    // 그동안 createMany 로 쓰기만 하고 아무도 읽지 않는 테이블이었다 — 감사 추적을 위해
+    // 만들었는데 정작 어디에도 드러나지 않았다. preview 단계에서는 행이 아예 만들어지지
+    // 않으므로, 여기 값이 있다는 것은 곧 어드민이 최종 승인했다는 뜻이고, 확정 전(행 0건)
+    // 에는 전부 null 이라 순위표 모양이 바뀌지 않는다.
+    // 어드민 전용 필드(computedKind/overriddenByAdmin/overrideNote/결정자)는 노출하지 않는다 --
+    // "왜 규칙과 다르게 조정했는지"는 운영 판단이라 공개 대상이 아니다(153 Security Notes).
     const promotions = await this.prisma.v1LeaguePromotion.findMany({
       where: { fromLeagueId: league.id },
       select: { teamId: true, kind: true, toTier: true },
@@ -210,6 +215,7 @@ export class LeagueMatchPublicService {
         teamName: teamNameById.get(row.teamId) ?? '',
         teamLogoUrl: teamLogoById.get(row.teamId) ?? null,
         promotionKind: promotion?.kind ?? null,
+        promotionToTier: promotion?.toTier ?? null,
         promotionToTierLabel: promotion === undefined ? null : `${promotion.toTier}부`,
       };
     });
@@ -218,16 +224,27 @@ export class LeagueMatchPublicService {
       leagueId: league.id,
       tier: league.tier,
       tierLabel: league.tier === null ? null : `${league.tier}부`,
-      promotionDecided: promotions.length > 0,
       tieBreakOrder,
       standings: standingsWithTeamName,
       pendingFixtures,
+      // 이름은 dev 에 이미 머지된 #628 계약을 따른다(promotionDecided). 이 브랜치는
+      // 한때 promotionsDecided 로 바꿨었지만, 그 사이 #628 이 dev 에 들어가 배포된
+      // 계약이 되었으므로 새로 이름을 바꿀 이유가 없다 -- 통합 테스트도 이 이름을 본다.
+      promotionDecided: promotions.length > 0,
     };
   }
 
   async playerRecords(leagueId: string) {
     const league = await this.loadLeague(leagueId);
-    const teamMatchIds = (await this.prisma.v1TeamMatch.findMany({ where: { leagueId }, select: { id: true } })).map((tm) => tm.id);
+    // 취소된 대진은 standings()와 동일한 기준으로 제외한다(R8). 이 필터가 없으면
+    // "순위표에서는 빠진 경기의 득점이 득점 순위에는 남아 있는" 상태가 만들어져
+    // 같은 화면 안에서 두 집계가 서로 다른 경기 집합을 쓰게 된다.
+    const teamMatchIds = (
+      await this.prisma.v1TeamMatch.findMany({
+        where: { leagueId, status: { not: 'cancelled' } },
+        select: { id: true },
+      })
+    ).map((tm) => tm.id);
     if (teamMatchIds.length === 0) return { leagueId: league.id, goals: [], assists: [] };
 
     const games = await this.prisma.v1Game.findMany({

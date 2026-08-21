@@ -4,6 +4,7 @@ import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { LeagueMatchPublicService } from './league-match-public.service';
+import { findUnfinishedSeasonLeagues, planNextSeasonTiers } from './league-lifecycle-rules';
 import {
   calculatePromotions,
   promotionRuleFingerprint,
@@ -465,22 +466,19 @@ export class LeagueSeriesAdminService {
     // 없어서, 1팀짜리 리그가 만들어질 수 있었다(alpha 실측: teamCount:1 리그 생성).
     // 그 리그는 대진 생성이 영구히 422 LEAGUE_TEAM_INVALID 라 시작도 종료도 못 하는
     // 죽은 리그가 되고, 승강으로 만들어졌으니 어드민이 팀을 더 넣을 경로도 없다.
-    if (dto.createNextSeason !== false) {
-      const undersized = [];
-      for (let tier = 1; tier <= series.tierCount; tier += 1) {
-        const count = resolved.filter((row) => row.kind !== 'withdrawn' && row.toTier === tier).length;
-        // 0팀 티어는 다음 시즌에 그 티어를 열지 않는다는 뜻이라 정상(아래에서 skip 된다).
-        if (count === 1) undersized.push({ tier, teamCount: count });
-      }
-      if (undersized.length > 0) {
-        throw new UnprocessableEntityException({
-          code: 'PROMOTION_NEXT_SEASON_TIER_TOO_SMALL',
-          message:
-            `${undersized.map((t) => tierLabel(t.tier)).join(' · ')}가 다음 시즌에 1팀만 남아요. ` +
-            '리그는 2팀 이상이어야 해요. 불참 처리한 팀이나 승강 결정을 조정해 주세요.',
-          details: { tiers: undersized },
-        });
-      }
+    // 판정은 planNextSeasonTiers 가 소유한다 — 아래 생성 루프와 같은 계산을 두 번 쓰면
+    // 한쪽만 고쳐져 가드가 새는 날이 온다.
+    const nextSeasonPlan = planNextSeasonTiers({ resolved, tierCount: series.tierCount });
+    if (dto.createNextSeason !== false && nextSeasonPlan.undersized.length > 0) {
+      throw new UnprocessableEntityException({
+        code: 'PROMOTION_NEXT_SEASON_TIER_TOO_SMALL',
+        message:
+          `${nextSeasonPlan.undersized.map((t) => tierLabel(t.tier)).join(' · ')}가 다음 시즌에 1팀만 남아요. ` +
+          '리그는 2팀 이상이어야 해요. 불참 처리한 팀이나 승강 결정을 조정해 주세요.',
+        details: {
+          tiers: nextSeasonPlan.undersized.map((entry) => ({ tier: entry.tier, teamCount: entry.teamIds.length })),
+        },
+      });
     }
 
     const nextSeasonNo = seasonNo + 1;
@@ -513,10 +511,8 @@ export class LeagueSeriesAdminService {
 
       const createdLeagues: Array<{ id: string; tier: number; teamCount: number }> = [];
       if (dto.createNextSeason !== false) {
-        for (let tier = 1; tier <= series.tierCount; tier += 1) {
-          // 탈퇴 팀은 다음 시즌에 넣지 않는다.
-          const teamIds = resolved.filter((row) => row.kind !== 'withdrawn' && row.toTier === tier).map((row) => row.teamId);
-          if (teamIds.length === 0) continue;
+        // 1팀 티어는 위에서 이미 422 로 막혔으므로 여기 남는 것은 2팀 이상 뿐이다.
+        for (const { tier, teamIds } of nextSeasonPlan.tiers) {
           const league = await tx.v1League.create({
             data: {
               title: `${series.title} ${nextSeasonNo}시즌 ${tierLabel(tier)}`,
@@ -543,7 +539,7 @@ export class LeagueSeriesAdminService {
         targetId: seriesId,
       });
 
-      return createdLeagues;
+      return { createdLeagues };
     });
 
     return {
@@ -552,7 +548,7 @@ export class LeagueSeriesAdminService {
       nextSeasonNo,
       decidedCount: resolved.length,
       overriddenCount: resolved.filter((row) => row.overriddenByAdmin).length,
-      nextSeasonLeagues: result.map((league) => ({ ...league, tierLabel: tierLabel(league.tier) })),
+      nextSeasonLeagues: result.createdLeagues.map((league) => ({ ...league, tierLabel: tierLabel(league.tier) })),
     };
   }
 
@@ -606,7 +602,24 @@ export class LeagueSeriesAdminService {
     return series;
   }
 
-  /** 시즌의 티어별 확정 순위표. 시즌이 실제로 끝나지 않았으면 승강을 계산하지 않는다. */
+  /**
+   * 시즌의 티어별 확정 순위표. 시즌이 실제로 끝나지 않았으면 승강을 계산하지 않는다.
+   *
+   * 게이트가 `pendingFixtures > 0`이면 안 된다(2026-08-21 재감사에서 실측으로 잡힌 결함).
+   * `pendingFixtures`는 **존재하는** 대진 중 미확정인 것만 세므로, 대진이 아직 하나도
+   * 없는 리그(`state=draft`)나 전 대진이 취소된 리그는 pending이 0이라 게이트를 그냥
+   * 통과한다. 그러면 전 팀 0승0무0패·0점인 순위표가 넘어가고, tie-break가 전부 소진된
+   * 뒤 `calculateLeagueStandings`의 결정적 폴백(팀ID 사전순)이 순위를 정한다 --
+   * 즉 **한 경기도 치르지 않은 시즌의 강등 팀이 UUID 사전순으로 뽑힌다.**
+   * alpha에서 3티어 전부 draft·대진 0건인 시리즈로 재현해 201 + 완전한 승강안을 받았다.
+   *
+   * 그래서 판정 기준을 D-3이 이미 만들어 둔 리그 상태(`completed`)로 옮긴다. 이 상태는
+   * "취소 제외 전 대진이 공식 결과를 확보했다"를 뜻하므로 승강이 요구하는 "확정 순위표"와
+   * 정확히 같은 조건이고, draft·빈 리그를 자동으로 배제한다.
+   * (대진을 취소로 끝낸 리그도 `completed`가 되도록 `cancelFixture`에 완료 재평가를
+   * 함께 넣었다 -- 그게 없으면 이 게이트가 교착을 만든다.)
+   */
+
   private async loadSeasonStandings(seriesId: string, seasonNo: number) {
     const leagues = await this.prisma.v1League.findMany({
       where: { seriesId, seasonNo },
@@ -620,26 +633,22 @@ export class LeagueSeriesAdminService {
       });
     }
 
-    // [감사 2026-08-21] 원래 게이트는 pendingFixtures > 0 하나뿐이었는데, 그건 "예정된
-    // 경기 중 미확정이 있는가"만 본다. 대진이 **한 건도 없는** draft 리그는 pending 이
-    // 0 이라 그대로 통과했다 — alpha 실측: 시딩 직후 경기 0건 상태에서 preview 201,
-    // commit 201 로 다음 시즌까지 생성됐고, 전원 0승0무0패 동률이라 강등 대상이
-    // tie-break/삽입 순서로 정해졌다. 화면은 "모든 경기 결과가 확정돼야 승강을 계산할
-    // 수 있어요"라고 안내하면서 버튼은 열려 있었다.
-    //
     // V1League.state 는 이 조건의 정확한 투영이다: draft -> active 는 대진 생성 시,
     // active -> completed 는 LeagueCompletionProjectionService 가 "취소 아닌 대진이
-    // 1건 이상 있고 전부 공식 확정" 일 때만 전이시킨다(수동 전이 경로 없음).
-    // 그래서 completed 를 요구하면 "대진 0건"과 "미확정 잔존"이 한 번에 막힌다.
-    const unfinished = leagues.filter((league) => league.state !== 'completed');
+    // 1건 이상 있고 전부 공식 확정" 일 때만 전이시킨다. 그래서 completed 를 요구하면
+    // "대진 0건"과 "미확정 잔존"이 한 번에 막힌다.
+    const unfinished = findUnfinishedSeasonLeagues(leagues);
     if (unfinished.length > 0) {
+      const labels = unfinished.map((league) => tierLabel(league.tier ?? 1)).join(' · ');
       throw new ConflictException({
         code: 'LEAGUE_SEASON_NOT_FINISHED',
-        message:
-          `${unfinished.map((l) => tierLabel(l.tier ?? 1)).join(' · ')}가 아직 끝나지 않았어요. ` +
-          '모든 경기 결과가 확정돼야 승강을 계산할 수 있어요.',
+        message: `${labels}가 아직 끝나지 않았어요. 모든 경기 결과가 확정돼야 승강을 계산할 수 있어요.`,
         details: {
-          tiers: unfinished.map((league) => ({ tier: league.tier ?? 1, state: league.state })),
+          unfinished: unfinished.map((league) => ({
+            leagueId: league.id,
+            tier: league.tier ?? 1,
+            state: league.state,
+          })),
         },
       });
     }

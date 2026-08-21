@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { resolveTeamMatchCompetitionConfig } from '../team-matches/resolve-team-match-competition-config';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
+import { LeagueCompletionProjectionService } from './league-completion-projection.service';
 import { FixtureScheduleTemplate, generateRoundRobinFixtures, resolveFixtureStartAt, RoundRobinFixture } from './round-robin-schedule';
 import {
   CancelLeagueFixtureDto,
@@ -21,6 +22,10 @@ const DEFAULT_FIXTURE_PLACE_NAME = '장소 미정';
 
 @Injectable()
 export class LeagueMatchAdminService {
+  // game-result-official-projection.service.ts와 동일한 관례 — 이 프로젝터는 DI 상태가
+  // 없고 tx만 받으므로 provider로 등록하지 않고 직접 인스턴스화한다.
+  private readonly leagueCompletion = new LeagueCompletionProjectionService();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
@@ -275,10 +280,16 @@ export class LeagueMatchAdminService {
     }
     if (teamMatch.status === 'cancelled') {
       // Task 69/73의 accept/reject, revertCompletion과 동일한 alreadyProcessed 계약.
-      return { teamMatchId: teamMatch.id, status: 'cancelled' as const, cancelledApplications: 0, alreadyProcessed: true };
+      return {
+        teamMatchId: teamMatch.id,
+        status: 'cancelled' as const,
+        cancelledApplications: 0,
+        leagueCompleted: false,
+        alreadyProcessed: true,
+      };
     }
 
-    const cancelledApplications = await this.prisma.$transaction(async (tx) => {
+    const { cancelledApplications, leagueCompleted } = await this.prisma.$transaction(async (tx) => {
       await tx.v1TeamMatch.update({
         where: { id: teamMatchId },
         data: { status: 'cancelled', cancelledAt: new Date() },
@@ -296,10 +307,21 @@ export class LeagueMatchAdminService {
         },
         tx,
       );
-      return rejected;
+      // D-3 구멍 메우기: 취소는 "남은 대진"을 줄이는 조작이라, 이 취소로 인해 취소되지
+      // 않은 대진이 전부 확정 상태가 됐을 수 있다. 결과 확정 경로와 정확히 같은 판정을
+      // 같은 트랜잭션에서 다시 돌린다 -- 안 하면 마지막 미확정 대진을 취소로 끝낸 리그가
+      // 완료 조건을 충족하면서도 영원히 active로 남는다(alpha 실측 재현).
+      const completed = await this.leagueCompletion.settle(tx, leagueId, 'remaining_fixture_cancelled');
+      return { cancelledApplications: rejected, leagueCompleted: completed };
     });
 
-    return { teamMatchId: teamMatch.id, status: 'cancelled' as const, cancelledApplications, alreadyProcessed: false };
+    return {
+      teamMatchId: teamMatch.id,
+      status: 'cancelled' as const,
+      cancelledApplications,
+      leagueCompleted,
+      alreadyProcessed: false,
+    };
   }
 
   // R13: 대진 재생성. generateFixtures()가 만든 팀매치는 생성 즉시 V1Game이 붙고

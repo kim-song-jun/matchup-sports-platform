@@ -23,11 +23,17 @@ export interface V1PublicLeagueListItem {
   endsOn: string;
   sport: { sportId: string; code: string; name: string };
   region: { regionId: string; name: string };
-  /** 리그 체계에 속한 리그만 값이 있다. 단발 리그는 셋 다 null — 티어 개념 자체가 없다. */
+  /**
+   * 리그 체계(시리즈)에 속한 리그만 값이 있다. 단발 리그는 전부 null — 티어가 "1부"인 게
+   * 아니라 티어 개념 자체가 없다. 목록에도 필요하다: 이 화면은 "자기 수준의 리그를 고르는"
+   * 곳이라 상세에 들어가야만 몇 부인지 알 수 있으면 고를 수가 없다(Task 153 시나리오 3).
+   * 서버가 항상 키를 내려주므로 optional 이 아니다.
+   */
   seriesId: string | null;
   tier: number | null;
   tierLabel: string | null;
   seasonNo: number | null;
+  seriesTitle: string | null;
   teamCount: number;
 }
 
@@ -156,6 +162,11 @@ export interface V1CancelLeagueFixtureResult {
   teamMatchId: string;
   status: 'cancelled';
   cancelledApplications: number;
+  /**
+   * 이 취소로 리그가 자동 종료(active -> completed)됐는지. 취소는 "남은 대진"을
+   * 줄이는 조작이라 마지막 미확정 대진을 취소하면 리그가 그 자리에서 끝난다.
+   */
+  leagueCompleted: boolean;
   alreadyProcessed: boolean;
 }
 
@@ -196,8 +207,12 @@ export interface V1LeagueStandingRow {
   goalsAgainst: number;
   points: number;
   position: number;
-  /** 승강이 확정된 시즌에만 값이 있다. 확정 전에는 null. */
+  /**
+   * 어드민이 최종 승인한 승강 결과. preview 단계에서는 행이 만들어지지 않으므로
+   * 값이 있다는 것은 곧 확정됐다는 뜻이다. 아직 확정 전이면 null (Task 153 시나리오 4).
+   */
   promotionKind: 'promoted' | 'relegated' | 'stayed' | 'withdrawn' | null;
+  promotionToTier: number | null;
   promotionToTierLabel: string | null;
 }
 
@@ -212,11 +227,14 @@ export interface V1LeagueStandingsResponse {
   leagueId: string;
   tier: number | null;
   tierLabel: string | null;
-  /** 이 리그(시즌)의 승강이 확정됐는지. false 면 순위표에 승강 열을 띄우지 않는다. */
-  promotionDecided: boolean;
   tieBreakOrder: string[];
   standings: V1LeagueStandingRow[];
   pendingFixtures: V1LeaguePendingFixture[];
+  /**
+   * 이 시즌의 승강이 확정됐는지. false 면 순위표에 승강 열을 띄우지 않는다.
+   * 서버가 항상 내려주므로 optional 이 아니다.
+   */
+  promotionDecided: boolean;
 }
 
 export interface V1LeaguePlayerRecordRow {
@@ -247,6 +265,12 @@ export interface V1RecordLeagueForfeitResult {
   homeScore: number;
   awayScore: number;
   resultRevisionId: string;
-  /** true면 이미 같은 몰수 처리가 확정돼 있던 요청 재시도(중복 클릭)였다는 뜻. */
+  /** true면 이미 몰수가 확정돼 있어 이번 호출이 아무것도 바꾸지 않았다는 뜻. */
   alreadyProcessed: boolean;
+  /**
+   * `alreadyProcessed`일 때만 의미가 있다. 요청한 몰수팀이 이미 확정된 몰수팀과
+   * 같은지 — false면 "반대 팀으로 정정하려 했지만 반영되지 않았다"는 뜻이라
+   * 화면이 성공으로 표시하면 안 된다.
+   */
+  requestMatchesStored?: boolean;
 }

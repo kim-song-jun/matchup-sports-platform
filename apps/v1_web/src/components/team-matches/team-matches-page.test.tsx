@@ -141,24 +141,33 @@ describe('팀매치 만들기 진행 표시줄 — 클릭 이동', () => {
 
 // 리그전 배지(2026-08-18). 배지가 조용히 사라지거나, 반대로 일반 팀매치에까지 붙는
 // 회귀를 둘 다 잡는다 -- 한쪽만 단언하면 "항상 보임"/"항상 안 보임" 회귀를 놓친다.
+//
+// 페이지 전체 textContent 에 '리그전' 이 있는지로 판정하지 않는다(2026-08-21 정정).
+// 그 방식은 화면 어디든 '리그'로 끝나는 요소와 '전'으로 시작하는 요소가 나란히 놓이면
+// 오탐한다 -- 실제로 매치 유형 세그먼트에 '리그' 탭이 생기자 바로 옆 '전체' 칩과 이어
+// 붙어 '리그전체' 가 되면서 이 단언이 깨졌다(배지는 없는데도). 배지는 접근 가능한
+// 이름을 가진 버튼이므로 그 역할로 정확히 겨냥한다.
 describe('리그전 배지', () => {
+  const leagueBadge = () => screen.queryByRole('button', { name: /리그 상세로 이동/ });
+
   it('리그 소속이면 목록 카드에 리그전 배지가 보인다', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{ ...model.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' } }];
 
-    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+    renderPage(<TeamMatchListPageView model={model} />);
 
-    expect(container.textContent).toContain('리그전');
+    const badge = leagueBadge();
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('리그전');
   });
 
   it('리그 소속이 아니면 목록 카드에 리그전 배지가 없다', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{ ...model.matches[0], league: null }];
 
-    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+    renderPage(<TeamMatchListPageView model={model} />);
 
-    expect(container.textContent).not.toContain('리그전');
-    expect(screen.queryByRole('button', { name: /리그 상세로 이동/ })).not.toBeInTheDocument();
+    expect(leagueBadge()).not.toBeInTheDocument();
   });
 
   // R3(2026-08-20): 목록 카드는 카드 전체가 이미 상세로 가는 <a>다. 배지를 또 <a>로

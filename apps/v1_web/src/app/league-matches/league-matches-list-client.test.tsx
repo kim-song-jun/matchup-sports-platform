@@ -175,4 +175,33 @@ describe('LeagueMatchesListClient', () => {
       expect.objectContaining({ cursor: 'league-2' }),
     );
   });
+
+  it('티어 리그는 목록에서 "N부" 뱃지와 시리즈명을 함께 보여주고, 단발 리그는 뱃지가 없다', () => {
+    // 이 화면은 "자기 수준의 리그를 고르는" 곳이라(Task 153 시나리오 3) 상세에 들어가야만
+    // 몇 부인지 알 수 있으면 고를 수가 없다. 제목에 "1부"가 들어 있어서 읽히는 것에
+    // 기대면 안 된다 — 제목은 운영자 자유 입력이다.
+    useV1MasterSportsMock.mockReturnValue({ data: [] });
+    useV1LeagueMatchesMock.mockReturnValue({
+      data: {
+        items: [
+          { ...league({ leagueId: 'tiered', title: '강남 리그 1시즌' }), tier: 1, tierLabel: '1부', seasonNo: 1, seriesTitle: '강남 풋살 리그' },
+          { ...league({ leagueId: 'standalone', title: '동네 리그' }), tier: null, tierLabel: null, seasonNo: null, seriesTitle: null },
+        ],
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    render(<LeagueMatchesListClient />);
+
+    const tiered = screen.getByRole('link', { name: /강남 리그 1시즌 상세로 이동/ });
+    expect(within(tiered).getByText('1부')).toBeInTheDocument();
+    expect(within(tiered).getByText(/강남 풋살 리그/)).toBeInTheDocument();
+
+    const standalone = screen.getByRole('link', { name: /동네 리그 상세로 이동/ });
+    expect(within(standalone).queryByText('1부')).not.toBeInTheDocument();
+  });
 });

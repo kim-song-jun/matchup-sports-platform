@@ -240,4 +240,99 @@ describe('LeagueMatchStandingsClient', () => {
     expect(pendingLink?.textContent).toContain('성수 FC');
     expect(pendingLink?.textContent).toContain('망원 FC');
   });
+
+  it('취소된 대진은 점수 대신 "집계 제외"로 표시한다', async () => {
+    // 순위표는 취소 대진을 완전히 제외하는데(R8) 일정에만 "취소됨 1 : 0"이 굵게 남으면
+    // 존재하는 점수가 왜 순위에 반영되지 않는지 알 수 없다. 두 집계가 같은 말을 해야 한다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'],
+        fixtures: [{
+          teamMatchId: 'tm-1', title: '1주차', homeTeamId: 't1', awayTeamId: 't2',
+          startAt: '2026-09-01T20:00:00.000Z', placeName: '성수 풋살장',
+          status: 'cancelled', homeScore: 1, awayScore: 0,
+        }],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByText('집계 제외')).toBeInTheDocument();
+    expect(screen.queryByText('1 : 0')).not.toBeInTheDocument();
+    // 취소 대진에 "예정"이 붙던 문제도 같이 사라져야 한다.
+    expect(screen.queryByText('예정')).not.toBeInTheDocument();
+  });
+
+  it('승강이 확정되면 순위표에 승격·강등 열이 붙고, 확정 전에는 열 자체가 없다', async () => {
+    // Task 153 시나리오 4. 확정 전에 빈 열을 만들면 "아직 안 정해졌다"가 안 읽힌다.
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그 1부', state: 'completed',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1', 't2'], fixtures: [], tier: 1, tierLabel: '1부', seasonNo: 1, seriesTitle: '강남 풋살 리그',
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    const rows = [
+      { teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, points: 3 },
+      { teamId: 't2', teamName: '망원 FC', teamLogoUrl: null, position: 2, played: 1, wins: 0, draws: 0, losses: 1, goalsFor: 0, goalsAgainst: 2, points: 0 },
+    ];
+
+    // 확정 전
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: rows.map((r) => ({ ...r, promotionKind: null, promotionToTier: null, promotionToTierLabel: null })),
+        pendingFixtures: [], promotionDecided: false,
+      },
+    } as never);
+    const before = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await screen.findByText('성수 FC');
+    expect(screen.queryByRole('columnheader', { name: '승강' })).not.toBeInTheDocument();
+    before.unmount();
+
+    // 확정 후
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [
+          { ...rows[0], promotionKind: 'stayed', promotionToTier: 1, promotionToTierLabel: '1부' },
+          { ...rows[1], promotionKind: 'relegated', promotionToTier: 2, promotionToTierLabel: '2부' },
+        ],
+        pendingFixtures: [], promotionDecided: true,
+      },
+    } as never);
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    expect(await screen.findByRole('columnheader', { name: '승강' })).toBeInTheDocument();
+    expect(screen.getByText('강등')).toBeInTheDocument();
+    // 이동할 티어는 승격·강등에만 붙는다(잔류에는 붙지 않는다).
+    expect(screen.getByText('(2부)')).toBeInTheDocument();
+    expect(screen.getByText('잔류')).toBeInTheDocument();
+  });
 });

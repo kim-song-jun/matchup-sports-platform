@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useV1LeagueMatches, useV1MasterSports } from '@/hooks/use-v1-api';
+import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
@@ -84,7 +85,9 @@ export default function LeagueMatchesListClient() {
   const activeSportLabel = sportId ? filterSports.find((sport) => sport.id === sportId)?.label : null;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
+    <>
+      <MatchTypeSegment active="league" />
+      <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="text-xl font-bold text-[var(--text-strong)]">리그전 찾기</h1>
       <p className="mt-1 text-sm text-[var(--text-muted)]">종목과 상태로 좁혀 관심 있는 리그를 찾아보세요.</p>
 
@@ -164,13 +167,20 @@ export default function LeagueMatchesListClient() {
                           <span className="font-semibold text-[var(--text-strong)]">{item.title}</span>
                           {/* 티어 뱃지 — 리그 체계에 속한 리그에만 붙인다. 단발 리그는
                               tierLabel 이 null 이라(티어가 "1부"인 게 아니라 개념 자체가 없다)
-                              아무것도 표시하지 않는다. 팀이 자기 수준의 리그를 고르는 지점이
-                              바로 이 목록이라 상세뿐 아니라 여기에도 있어야 한다. */}
+                              아무것도 표시하지 않는다. 제목에 "1부"가 들어 있어서 읽히는 것에
+                              기대면 안 된다 — 제목은 운영자 자유 입력이다. 팀이 자기 수준의
+                              리그를 고르는 지점이 바로 이 목록이라 상세뿐 아니라 여기에도 있어야 한다. */}
                           {item.tierLabel !== null && (
                             <span className="tm-badge tm-badge-sm tm-badge-blue">{item.tierLabel}</span>
                           )}
                           <span className={`tm-badge tm-badge-sm ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
                         </div>
+                        {item.seriesTitle != null && (
+                          <div className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
+                            {item.seriesTitle}
+                            {item.seasonNo != null && ` · ${item.seasonNo}시즌`}
+                          </div>
+                        )}
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)] sm:text-sm">
                           <span className="inline-flex items-center gap-1.5">
                             <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: accent.dot }} />
@@ -208,7 +218,8 @@ export default function LeagueMatchesListClient() {
           </>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

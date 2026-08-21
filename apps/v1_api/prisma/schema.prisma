@@ -358,6 +358,7 @@ enum V1ConsentState {
 
 enum V1GameEventType {
   GOAL
+  OWN_GOAL
   CARD
   SUBSTITUTION
   PERIOD_START
@@ -672,6 +673,14 @@ model V1UserProfile {
   displayName     String?   @map("display_name")
   realName        String?   @map("real_name")
   displayRegion   String?   @map("display_region")
+  /// 대회 경기 기록(라인업/이벤트 득점자/MVP)에 닉네임 대신 실명을 보여줄지 사용자가 직접
+  /// 켜고 끄는 스위치. 기본값 false(닉네임) -- 2026-08-18 사용자 결정으로 "대회 참가자
+  /// 실명은 신청 때마다 동의 없이 항상 공개"였던 이전 정책(2026-08-13)을 대체한다. 대회
+  /// 신청 흐름에는 이 값을 묻는 동의 스텝이 없다 -- 한 번 켜면 이후 모든 대회 기록에
+  /// 계속 적용되고, 언제든 여기서 끌 수 있다. `public-tournament-records.service.ts`가
+  /// 표시 시점에 `V1GameParticipant.userId`로 이 프로필을 조인해 즉시 반영한다(자세한
+  /// 배경은 그 파일의 `resolveParticipantDisplayName` 주석 참고).
+  tournamentRealNameVisible Boolean @default(false) @map("tournament_real_name_visible")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
@@ -2766,6 +2775,7 @@ model V1GameResultRevision {
   revision             Int
   state                V1GameResultRevisionState  @default(DRAFT)
   score                Json
+  goalEvents           Json?                      @map("goal_events")
   eventsHash           String                     @map("events_hash")
   missingScorer        Boolean                    @default(false) @map("missing_scorer")
   mvpParticipantId     String?                    @map("mvp_participant_id")

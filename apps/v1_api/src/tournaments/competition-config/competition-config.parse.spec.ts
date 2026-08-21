@@ -2,7 +2,9 @@ import {
   parseLineupConfigForResponse,
   parseLineupLimits,
   parsePeriodDurations,
+  parseResultPolicy,
 } from './competition-config.parse';
+import { FOOTBALL_V1_CONFIG, FUTSAL_V1_CONFIG } from './competition-config.presets';
 
 /**
  * The lineup screens pick which formation presets to offer from the squad size the admin
@@ -146,5 +148,79 @@ describe('parsePeriodDurations', () => {
     expect(parsePeriodDurations([{ durationMinutes: 20, extraTime: 'yes' }] as never)).toEqual([
       { durationMinutes: 20, extraTime: false },
     ]);
+  });
+});
+
+/**
+ * 승부차기 조기 종료(early stop) 정책의 **관용 리더**.
+ *
+ * ## 왜 프리셋을 바꾸지 않고 리더를 두는가
+ *
+ * canonical 프리셋(`competition-config.presets.ts`)의 `result` 를 건드리면 그 두 행의
+ * `contentHash` 가 바뀐다 → 백필 CLI 가 `COMPETITION_CONFIG_SEED_DRIFT` 로 실패하고
+ * (`competition-config-backfill.ts`), 이미 참조 중인 버전 행은
+ * `COMPETITION_CONFIG_VERSION_IN_USE` 트리거가 UPDATE 자체를 막는다 → alpha·prod 양쪽에
+ * 운영 데이터 마이그레이션이 필요해진다. 그래서 **저장된 config 는 그대로 두고**, 키가
+ * 없으면 기본값으로 읽는다. `parseLineupLimits`/`parsePeriodDurations` 와 같은
+ * "read-path 는 관용, write-path(`validateCompetitionConfig`)만 엄격" 규약을 따른다.
+ *
+ * ## 기본값이 `earlyStop: true` 인 이유
+ *
+ * FIFA 정규 규칙(5킥 이내라도 남은 킥으로 뒤집을 수 없으면 종료)이 기본이다. 이 기본값은
+ * 지금 동작(`home !== away` 하나만 보는 판정)보다 **더 엄격하다** — 각 3킥 2:1 은 오늘
+ * 결판으로 읽히지만 이 정책에서는 미결이다. 즉 키가 없는 기존 대회 전부가 기본값을 받아도
+ * "덜 막던 것을 더 막는" 방향이라 잘못 확정될 위험이 늘지 않는다.
+ *
+ * ## 저장 형태
+ *
+ * `result.penaltyShootout: { earlyStop: boolean }` — `getGame` 응답의
+ * `penaltyShootoutPolicy` 와 **동형**으로 둔다(`substitutionPolicy`/`periodDurations` 가
+ * 그렇듯 파싱 결과를 그대로 응답에 실을 수 있게). 이 형태는 이 테스트가 못 박는 계약이므로,
+ * 구현이 다른 키를 고르면 여기와 `competition-config.types.ts` 를 함께 바꿔야 한다.
+ */
+describe('parseResultPolicy', () => {
+  it('키가 없으면 FIFA 정규(earlyStop: true)를 기본값으로 쓴다', () => {
+    expect(parseResultPolicy(null)).toEqual({ earlyStop: true });
+    expect(parseResultPolicy(undefined)).toEqual({ earlyStop: true });
+    expect(parseResultPolicy({})).toEqual({ earlyStop: true });
+    expect(parseResultPolicy({ tournamentScorerPolicy: 'required' })).toEqual({ earlyStop: true });
+  });
+
+  /**
+   * 프리셋을 **바꾸지 않았다**는 것과, 그런데도 기존 대회가 기본값을 받는다는 것을 한
+   * 테스트가 동시에 지킨다. 누군가 프리셋에 값을 박아 넣어 이 문제를 "해결"하려 하면
+   * (= contentHash 드리프트 사고) 이 테스트가 아니라 `competition-config.presets.spec.ts`
+   * 의 해시 고정이 먼저 깨진다.
+   */
+  it('canonical 프리셋(무변경)도 기본값으로 읽힌다', () => {
+    expect(parseResultPolicy(FOOTBALL_V1_CONFIG.result)).toEqual({ earlyStop: true });
+    expect(parseResultPolicy(FUTSAL_V1_CONFIG.result)).toEqual({ earlyStop: true });
+  });
+
+  it('명시적으로 꺼 둔 대회는 끝까지 차는 정책(earlyStop: false)을 그대로 읽는다', () => {
+    expect(parseResultPolicy({ penaltyShootout: { earlyStop: false } })).toEqual({ earlyStop: false });
+  });
+
+  it('명시적으로 켜 둔 값도 그대로 읽는다', () => {
+    expect(parseResultPolicy({ penaltyShootout: { earlyStop: true } })).toEqual({ earlyStop: true });
+  });
+
+  /**
+   * 관용 리더의 핵심 — 형태가 깨진 값은 **throw 하지 않고** 기본값으로 떨어진다. 특히
+   * 문자열 `'false'` 를 boolean false 로 읽어 주면 안 된다: 그러면 오타 하나가 조용히
+   * 정책을 뒤집어, 아직 결판나지 않은 승부차기를 종료할 수 있게 만든다(= 이 작업이
+   * 고치려는 결함과 같은 부류).
+   */
+  it.each([
+    ['penaltyShootout 가 문자열', { penaltyShootout: 'off' }],
+    ['penaltyShootout 가 배열', { penaltyShootout: [] }],
+    ['penaltyShootout 가 null', { penaltyShootout: null }],
+    ['earlyStop 이 문자열 false', { penaltyShootout: { earlyStop: 'false' } }],
+    ['earlyStop 이 숫자 0', { penaltyShootout: { earlyStop: 0 } }],
+    ['earlyStop 누락', { penaltyShootout: {} }],
+    ['result 자체가 문자열', 'not-an-object'],
+    ['result 자체가 배열', []],
+  ])('%s이면 기본값으로 떨어진다', (_label, stored) => {
+    expect(parseResultPolicy(stored as never)).toEqual({ earlyStop: true });
   });
 });

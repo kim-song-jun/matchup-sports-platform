@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { OfficialRevisionRow, OfficialScore } from './game-result-official-projection.types';
+import { resolveTeamRecordResult } from './team-record-result';
 
 export class GameResultOfficialFactsService {
   async project(
@@ -29,21 +30,29 @@ export class GameResultOfficialFactsService {
         opponentTeamId: revision.awayTeamId,
         goalsFor: score.home,
         goalsAgainst: score.away,
+        penaltiesFor: score.penalties?.home,
+        penaltiesAgainst: score.penalties?.away,
       },
       {
         teamId: revision.awayTeamId,
         opponentTeamId: revision.homeTeamId,
         goalsFor: score.away,
         goalsAgainst: score.home,
+        penaltiesFor: score.penalties?.away,
+        penaltiesAgainst: score.penalties?.home,
       },
     ];
     for (const side of sides) {
       if (side.teamId === null) continue;
-      const result = side.goalsFor > side.goalsAgainst
-        ? 'WON'
-        : side.goalsFor < side.goalsAgainst
-          ? 'LOST'
-          : 'DRAWN';
+      // goals_for/goals_against 컬럼엔 정규시간 스코어만 저장한다(계약) -- 승부차기는
+      // 오직 result(WON/DRAWN/LOST) 판정에만 반영된다. 프로덕션 실측: 정규시간 1:1,
+      // 승부차기 2:3 이었던 결승이 여기서 항상 DRAWN 으로 잘못 기록됐었다.
+      const result = resolveTeamRecordResult(
+        side.goalsFor,
+        side.goalsAgainst,
+        side.penaltiesFor,
+        side.penaltiesAgainst,
+      );
       await tx.$executeRaw`
         INSERT INTO v1_team_record_facts (
           id, revision_id, game_id, team_id, opponent_team_id, tournament_id,

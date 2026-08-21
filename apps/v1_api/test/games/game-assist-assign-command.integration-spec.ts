@@ -681,6 +681,7 @@ describe('officializeResultRevision refuses a SUBMITTED revision that ASSIST_SYN
     // revision before an assist ever landed on it.
     staleProjectionPreviewHash = canonicalGameCommandPayloadHash({
       score: staleRevision.score,
+      goalEvents: staleRevision.goalEvents,
       eventsHash: staleRevision.eventsHash,
       mvpParticipantId: staleRevision.mvpParticipantId,
     });
@@ -717,6 +718,7 @@ describe('officializeResultRevision refuses a SUBMITTED revision that ASSIST_SYN
     });
     const previewHash = canonicalGameCommandPayloadHash({
       score: successor.score,
+      goalEvents: successor.goalEvents,
       eventsHash: successor.eventsHash,
       mvpParticipantId: successor.mvpParticipantId,
     });
@@ -807,6 +809,7 @@ describe('assignGoalAssist rejects when the game already has an OFFICIAL revisio
       clientCommandId: 'official-block-officialize',
       projectionPreviewHash: canonicalGameCommandPayloadHash({
         score: submitted.score,
+        goalEvents: submitted.goalEvents,
         eventsHash: submitted.eventsHash,
         mvpParticipantId: submitted.mvpParticipantId,
       }),

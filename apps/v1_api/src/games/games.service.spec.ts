@@ -1,3 +1,4 @@
+import { UnprocessableEntityException } from '@nestjs/common';
 import { HttpException } from '@nestjs/common';
 import { V1GameState, type V1GameParticipant } from '@prisma/client';
 import { validate } from 'class-validator';
@@ -242,6 +243,48 @@ describe('GamesService command boundary', () => {
   });
 
   describe('extractEndPenalties (트랙 B: end 커맨드의 승부차기 payload 파싱)', () => {
+    // 킥 수(`takenHome`/`takenAway`)와 우회 표식(`operatorOverride`)은 서버가
+    // 승부차기 종료를 스스로 판정하고, 규칙과 다른 결론을 기록에 남기기 위한 필드다.
+    it('킥 수를 그대로 실어 돌려준다 — 서버 판정과 감사 기록의 입력이 된다', () => {
+      expect(
+        extractEndPenalties({ penalties: { home: 3, away: 1, takenHome: 4, takenAway: 4 } }),
+      ).toEqual({ home: 3, away: 1, takenHome: 4, takenAway: 4 });
+    });
+
+    it('킥 수를 한쪽만 보내면 422 — 반쪽 정보로 판정이 돌면 정상 결과가 거부된다', () => {
+      // 없는 쪽을 0으로 메우면 그 팀이 한 번도 안 찬 것으로 읽힌다.
+      expect(() => extractEndPenalties({ penalties: { home: 3, away: 1, takenHome: 4 } })).toThrow(
+        UnprocessableEntityException,
+      );
+      expect(() => extractEndPenalties({ penalties: { home: 3, away: 1, takenAway: 4 } })).toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('성공 수가 시도 수를 넘으면 422 — 정책과 무관한 산술 불변식이라 override 로도 면제되지 않는다', () => {
+      expect(() =>
+        extractEndPenalties({
+          penalties: { home: 5, away: 1, takenHome: 4, takenAway: 4, operatorOverride: true },
+        }),
+      ).toThrow(UnprocessableEntityException);
+    });
+
+    it('operatorOverride 는 true 일 때만 저장한다 — false 는 키 부재로 정규화된다', () => {
+      // "우회 아님"이 키 부재와 false 두 표현을 갖지 않게 한다.
+      expect(
+        extractEndPenalties({ penalties: { home: 2, away: 0, operatorOverride: false } }),
+      ).toEqual({ home: 2, away: 0 });
+      expect(
+        extractEndPenalties({ penalties: { home: 2, away: 0, operatorOverride: true } }),
+      ).toEqual({ home: 2, away: 0, operatorOverride: true });
+    });
+
+    it('operatorOverride 가 boolean 이 아니면 422', () => {
+      expect(() =>
+        extractEndPenalties({ penalties: { home: 2, away: 0, operatorOverride: 'yes' } }),
+      ).toThrow(UnprocessableEntityException);
+    });
+
     it('payload.penalties가 없으면 undefined(대부분의 end 커맨드는 승부차기가 없다)', () => {
       expect(extractEndPenalties({})).toBeUndefined();
     });
@@ -271,6 +314,51 @@ describe('GamesService command boundary', () => {
     ])('penalties가 구조를 갖추지 못하면(%s) 422 TOURNAMENT_PENALTY_INVALID', (_label, penalties) => {
       expect(() => extractEndPenalties({ penalties })).toThrow(HttpException);
     });
+
+    /**
+     * 선축(`firstKickSideKey`)은 이 기능의 **주 write-path**다 — 운영 콘솔이 `end` 커맨드
+     * `payload.penalties`에 실어 보내는 유일한 경로이고, 여기서 떨어뜨리면 결과 리비전에
+     * 아무것도 남지 않는다(정정 폼에도 선축 입력란이 없어 되살릴 수 없다). `end` payload는
+     * `GameCommandDto.payload`(느슨한 Record)라 `PenaltyScoreDto`의 `@IsIn`을 거치지 않으므로
+     * 이 함수가 그 값을 검사하는 **유일한** 지점이다.
+     */
+    it('선축을 함께 보내면 보존한다', () => {
+      expect(extractEndPenalties({ penalties: { home: 5, away: 4, firstKickSideKey: 'AWAY' } })).toEqual({
+        home: 5,
+        away: 4,
+        firstKickSideKey: 'AWAY',
+      });
+    });
+
+    // 키가 없는 것은 오류가 아니다(선축이 생기기 전 클라이언트 · 정정 승계). "없으면 없는
+    // 것이 유일한 표현" — `firstKickSideKey: undefined`를 실어 보내지 않는다는 뜻이기도 하다.
+    it('선축이 없으면 키 자체가 없다 — undefined를 실어 보내지 않는다', () => {
+      const result = extractEndPenalties({ penalties: { home: 5, away: 4 } });
+      expect(result).toEqual({ home: 5, away: 4 });
+      expect(result && 'firstKickSideKey' in result).toBe(false);
+    });
+
+    it.each([
+      ['소문자 오타', 'home'],
+      ['공백 포함', 'AWAY '],
+      ['null', null],
+      ['사이드 id', 'side-home'],
+    ])(
+      '선축이 HOME/AWAY가 아니면(%s) 422 — 조용히 버리면 200이 돌아가는데 선축만 사라진다',
+      (_label, firstKickSideKey) => {
+        expect(() => extractEndPenalties({ penalties: { home: 5, away: 4, firstKickSideKey } })).toThrow(
+          HttpException,
+        );
+        try {
+          extractEndPenalties({ penalties: { home: 5, away: 4, firstKickSideKey } });
+        } catch (error) {
+          expect((error as HttpException).getStatus()).toBe(422);
+          expect((error as HttpException).getResponse()).toEqual(
+            expect.objectContaining({ code: 'TOURNAMENT_PENALTY_INVALID' }),
+          );
+        }
+      },
+    );
   });
 });
 

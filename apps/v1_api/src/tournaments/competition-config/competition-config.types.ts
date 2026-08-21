@@ -36,6 +36,28 @@ export type CompetitionConfig = {
     teamMatchScorerPolicy: 'optional_with_warning';
     mvpMin: 0;
     mvpMax: 1;
+    /**
+     * 승부차기 종료 판정 정책. **optional인 것이 핵심이다** — canonical 프리셋
+     * (`competition-config.presets.ts`)에는 이 키가 없고, 앞으로도 넣지 않는다.
+     *
+     * 프리셋의 `result`를 바꾸면 canonical row 2개의 `contentHash`가 바뀌어
+     * 백필 CLI가 `COMPETITION_CONFIG_SEED_DRIFT`로 실패하고, 이미 참조 중인 버전 row는
+     * `COMPETITION_CONFIG_VERSION_IN_USE` 트리거에 막혀 UPDATE 자체가 안 된다 —
+     * 즉 alpha·prod 양쪽에 운영 데이터 마이그레이션이 필요해진다. 기본값은
+     * 프리셋이 아니라 **읽는 쪽**(`parseResultPolicy`)이 준다.
+     *
+     * 이 플래그가 가르는 것은 **양 팀의 킥 수가 다른 순간에 종료를 허용하는가**다.
+     * `earlyStop: true`(기본) = 남은 킥으로 따라잡을 수 없으면 상대가 덜 찼더라도 종료
+     *   (예: 선축 3킥 3점 / 후축 2킥 0점 → 종료).
+     * `earlyStop: false` = **조기 종료 없음** — 양 팀이 기본 3킥을 마친 뒤 판정한다.
+     * 기본 3킥 뒤 동점이면 서든데스로 이어지고, 응답 킥 한 쌍 뒤 점수가 갈리면 종료한다.
+     * 두 정책 공통으로 **한 팀이 0킥이면 어떤 경우에도 확정하지 않는다.**
+     * 판정 구현은 프런트의 `penaltyShootoutOutcome`(`apps/v1_web/src/lib/penalty-shootout.ts`)
+     * 를 서버 판정식과 같은 분기 구조로 유지한다. 서버는 최종 점수와 양 팀 킥 수로 재검증한다.
+     */
+    penaltyShootout?: {
+      earlyStop: boolean;
+    };
   };
   tieBreak: {
     points: { win: number; draw: number; loss: number };

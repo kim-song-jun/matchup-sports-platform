@@ -33,6 +33,15 @@ const CAPACITY_HOLD_STATUSES: V1TournamentRegistration['status'][] = [
   'confirmed',
 ];
 
+/**
+ * 대회 경기 기록 공개(실명 표시) 선택 동의 정책 코드. `tournament_privacy`(필수, 10개
+ * 수집·이용 목적)와는 별도 정책이다 -- V1ManagedTermsPlacement가 @@unique([policyId,
+ * context])라 한 정책은 하나의 requirement만 가질 수 있어, 필수 문서 안에 선택 항목을
+ * 섞으면 그 항목도 사실상 강제 동의가 된다. 마이그레이션 근거:
+ * prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent.
+ */
+const TOURNAMENT_RECORD_DISCLOSURE_CODE = 'tournament_record_disclosure';
+
 type TournamentPaymentInstructionSource = Pick<
   V1Tournament,
   'entryFee' | 'bankName' | 'bankAccount' | 'bankHolder'
@@ -320,6 +329,21 @@ export class TournamentRegistrationsService {
         registration.teamId,
         termsDecisions,
       );
+      // 2026-08-18 사용자 결정: 대회 경기 기록 공개(선택) 동의 시 실명 표시 토글을 켠다.
+      // - 기존 값이 false인 사람만 켠다(updateMany where 조건) -- 이미 true면 그대로 두고,
+      //   프로필 row가 아직 없으면(온보딩 미완료) 0행 매치로 조용히 no-op한다. submit()은
+      //   대회 신청 제출이 본 목적이라 프로필 부재로 이 트랜잭션을 실패시키지 않는다.
+      // - "사용자가 명시적으로 껐던 것"과 "한 번도 켠 적 없는 기본값 false"를 구분할 감사
+      //   컬럼이 없다(V1UserProfile에 이력 필드 없음, updatedAt은 다른 필드 변경과 공유) --
+      //   이 구분은 현재 불가능하다는 걸 알고 default-false를 true로 뒤집는다.
+      // - 미동의로 신청해도 여기서 false로 되돌리지 않는다(다른 대회에서 이미 켠 상태일 수
+      //   있음 -- 이 토글은 대회 단위가 아니라 계정 단위 전역 스위치다).
+      if (termsDecisions.acceptedCodes.has(TOURNAMENT_RECORD_DISCLOSURE_CODE)) {
+        await tx.v1UserProfile.updateMany({
+          where: { userId: user.id, tournamentRealNameVisible: false },
+          data: { tournamentRealNameVisible: true },
+        });
+      }
       return { updated, payment, tournament: lockedTournament };
     });
 

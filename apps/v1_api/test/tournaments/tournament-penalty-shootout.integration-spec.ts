@@ -235,9 +235,10 @@ async function endGame(
   }) as Promise<GameRevisionMutationResult>;
 }
 
-function previewHash(revision: { score: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
+function previewHash(revision: { score: unknown; goalEvents: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
   return canonicalGameCommandPayloadHash({
     score: revision.score,
+    goalEvents: revision.goalEvents,
     eventsHash: revision.eventsHash,
     mvpParticipantId: revision.mvpParticipantId,
   });
@@ -367,11 +368,24 @@ describe('Track B tournament penalty shootout', () => {
 
   it('결선 무승부 + 승부차기 기록 → 저장되고, 공개 응답 필드에 나오고, 브래킷 승자가 승부차기로 정해진다', async () => {
     const gameId = await buildTournamentGame(ids.knockoutSourceFixture);
-    const ended = await driveToEnd(gameId, 1, 1, { penalties: { home: 5, away: 4 } });
+    // 선축은 **원정**으로 보낸다. `end` payload 가 가공 없이 리비전 score 에 박히는지를
+    // 보는 단언이므로(아래 `toEqual`), 선축을 원정으로 두면 "홈이 무조건 먼저 찬다"는
+    // 하드코딩이 서버로 새어 들어오는 회귀도 같은 단언 하나가 잡는다.
+    const ended = await driveToEnd(gameId, 1, 1, {
+      // 킥 수를 함께 싣는다 — 서버가 결판을 스스로 판정하려면 필수다(총점 두 개로는
+      // "각 5킥 5:4"와 "홈 5킥 · 원정 0킥"이 같은 값이라 구분할 수 없다).
+      penalties: { home: 5, away: 4, firstKickSideKey: 'AWAY', takenHome: 5, takenAway: 5 },
+    });
     expect(ended.revisionState).toBe(V1GameResultRevisionState.SUBMITTED);
 
     const revision = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: ended.revisionId } });
-    expect(revision.score).toEqual({ home: 1, away: 1, penalties: { home: 5, away: 4 } });
+    // `toEqual`(부분 일치가 아니다)을 유지한다 — 이 단언의 가치는 "정확히 이 키들만"에
+    // 있다. `objectContaining` 으로 느슨하게 바꾸면 여분 키 유입도, 키 손실도 못 잡는다.
+    expect(revision.score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 5, away: 4, firstKickSideKey: 'AWAY', takenHome: 5, takenAway: 5 },
+    });
 
     const officialized = await resultReview.officializeResultRevision(
       authUser(ids.platformOps),
@@ -446,7 +460,12 @@ describe('Track B tournament penalty shootout', () => {
     // 거부가 막다른 길이 아니라 "입력하고 다시 오세요"라는 복구 가능한
     // 게이트라는 증거. 골은 이미 커밋돼 있으므로 다시 넣지 않고 `end` 만 재전송한다
     // (driveToEnd 를 다시 부르면 고정 clientEventId + 바뀐 occurredAt 으로 멱등 충돌).
-    const ended = await endGame(gameId, game.version, { penalties: { home: 4, away: 2 } }, 2);
+    const ended = await endGame(
+      gameId,
+      game.version,
+      { penalties: { home: 4, away: 2, takenHome: 5, takenAway: 5 } },
+      2,
+    );
     expect(ended.revisionState).toBe(V1GameResultRevisionState.SUBMITTED);
   });
 

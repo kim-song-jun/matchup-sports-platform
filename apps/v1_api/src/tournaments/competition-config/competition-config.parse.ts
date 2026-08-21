@@ -147,3 +147,30 @@ export function parsePeriodDurations(
     return { durationMinutes, extraTime: raw.extraTime === true };
   });
 }
+
+/**
+ * 승부차기 종료 판정 정책을 `result` 컬럼에서 **관용적으로** 읽는다.
+ *
+ * 왜 프리셋이 아니라 여기서 기본값을 주는가: canonical 프리셋
+ * (`competition-config.presets.ts`)의 `result`를 건드리면 canonical row 2개의
+ * `contentHash`가 바뀌어 백필 CLI가 `COMPETITION_CONFIG_SEED_DRIFT`(competition-config-
+ * backfill.ts)로 실패하고, 이미 참조 중인 버전 row는 `COMPETITION_CONFIG_VERSION_IN_USE`
+ * 트리거에 막혀 UPDATE 자체가 거부된다 — alpha·prod 양쪽에 운영 데이터 마이그레이션이
+ * 필요해진다는 뜻이다. 기존 대회 row는 **전부** 이 키가 없으므로, 읽는 쪽이 기본값을
+ * 주면 프리셋·저장 데이터를 하나도 건드리지 않고 정책이 선다.
+ *
+ * 기본값은 `earlyStop: true`다. 기본 3킥 구간에서 남은 킥을 모두 성공해도 따라잡을 수
+ * 없으면 양 팀의 킥 수가 달라도 그 자리에서 종료한다.
+ *
+ * `parseLineupLimits`와 같은 관용 리더다 — throw하지 않고 필드 단위로 기본값에 떨어진다.
+ * 다만 boolean은 **엄격 비교**한다: 문자열 `'false'`나 숫자 `0`을 false로 읽어 주면 오타
+ * 하나가 조용히 정책을 뒤집어, 아직 결판나지 않은 승부차기를 종료할 수 있게 만든다
+ * (이 파서가 고치려는 결함과 정확히 같은 부류다).
+ */
+export function parseResultPolicy(
+  value: Prisma.JsonValue | null | undefined,
+): NonNullable<CompetitionConfig['result']['penaltyShootout']> {
+  const result = isRecord(value) ? value : {};
+  const penaltyShootout = isRecord(result.penaltyShootout) ? result.penaltyShootout : {};
+  return { earlyStop: penaltyShootout.earlyStop !== false };
+}

@@ -1,6 +1,7 @@
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameResultReviewPanel } from './game-result-review-panel';
+import type { TournamentGameDetail } from '@/hooks/use-tournament-result-review';
 
 /**
  * Root-cause regression (2026-08 alpha 실사고): 실제 점수는 2:1인데 "결과를
@@ -72,7 +73,13 @@ const FRESH_REVISION = {
   eventsHash: 'hash-fresh',
 };
 
-function gameDetail(overrides: Partial<Record<string, unknown>> = {}) {
+/**
+ * 반환 타입을 `TournamentGameDetail` 로 못 박아 둔다 -- 예전에는 반환 타입이 없고
+ * overrides 가 `Partial<Record<string, unknown>>` 이라, 서버 응답 계약에 필드가 늘어도
+ * (예: `isKnockoutFixture`) 이 mock 이 조용히 뒤처지고 `tsc` 는 아무 말도 하지 않았다
+ * (프로젝트 규칙 4 — 계약이 바뀌면 영향받는 inline mock 도 같은 변경에서 갱신한다).
+ */
+function gameDetail(overrides: Partial<TournamentGameDetail> = {}): TournamentGameDetail {
   return {
     id: GAME_ID,
     sourceType: 'TOURNAMENT_FIXTURE' as const,
@@ -86,6 +93,7 @@ function gameDetail(overrides: Partial<Record<string, unknown>> = {}) {
       { id: 'side-away', gameId: GAME_ID, sideKey: 'AWAY' as const, teamId: null, displayNameSnapshot: '원정' },
     ],
     actorRole: 'platform_ops' as const,
+    isKnockoutFixture: false,
     ...overrides,
   };
 }
@@ -188,5 +196,138 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
 
     // 실패는 실패로 보여야 한다 — 빈 목록처럼 보이면 안 된다
     expect(screen.getByText('세부 기록을 불러오지 못했어요')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 재제출(supersede-and-submit) 레인도 정정 레인과 **같은** 서버 승부차기 가드를 통과한다
+ * (`GamesService.applyPenalties`) -- 그러므로 이 패널도 `game.isKnockoutFixture` 를 폼까지
+ * 내려보내야 한다. 이 배선이 없으면 폼은 이 픽스처를 항상 비결선으로 보고, 결선 무승부
+ * 재제출에서 승부차기 결과를 조용히 떨어뜨린다(그 값을 고칠 입력란은 폼에 없다).
+ *
+ * 그래서 아래 두 테스트는 배선 자체가 아니라 **배선이 있어야만 성립하는 관찰 가능한 결과**
+ * (실제 제출 payload 의 `penalties` + 사전 경고 문구)를 단언한다.
+ */
+/**
+ * 결과 검수 화면 상단 헤더(`GameSummaryHeader`)는 승부차기 문구를 손으로 조립하고 있었다
+ * (`승부차기 {home}:{away}`). 그래서 같은 화면 **아래** 리비전 타임라인은 공용 포맷터를
+ * 써서 `선축 원정`이 뜨는데 **바로 위** 헤더에는 안 뜨는 어긋남이 생겼다 — 같은 사실이
+ * 한 화면 안에서 있다/없다로 갈렸다.
+ */
+describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기', () => {
+  const OFFICIAL_PENALTY_REVISION = {
+    ...STALE_REVISION,
+    id: 'revision-official',
+    state: 'OFFICIAL',
+    score: { home: 0, away: 0, penalties: { home: 2, away: 0, firstKickSideKey: 'AWAY' } },
+  };
+
+  beforeEach(() => {
+    eventsMock.state = {
+      data: { events: [], lastSequence: 0, gap: null },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: () => {},
+    };
+    mocks.useGameResultRevisions.mockReturnValue({
+      data: [OFFICIAL_PENALTY_REVISION],
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    mocks.useReviewResultDecision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
+    mocks.useOfficializeResultRevision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
+    mocks.useSupersedeAndSubmitResult.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+      reset: vi.fn(),
+    });
+    mocks.useTournamentGame.mockReturnValue({
+      data: gameDetail({ isKnockoutFixture: true, currentOfficialRevisionId: 'revision-official' }),
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('확정된 결선 경기의 헤더가 승부차기와 선축을 함께 보여준다', () => {
+    render(<GameResultReviewPanel gameId={GAME_ID} />);
+
+    expect(screen.getByText('승부차기 2:0, 선축 원정')).toBeInTheDocument();
+  });
+});
+
+describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드를 따른다', () => {
+  const PENALTY_REVISION = {
+    ...STALE_REVISION,
+    id: 'revision-rejected',
+    state: 'REJECTED',
+    score: { home: 1, away: 1, penalties: { home: 4, away: 3 } },
+  };
+  let supersedeMutate: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    supersedeMutate = vi.fn();
+    eventsMock.state = {
+      data: { events: [], lastSequence: 0, gap: null },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: () => {},
+    };
+    mocks.useGameResultRevisions.mockReturnValue({
+      data: [PENALTY_REVISION],
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    mocks.useReviewResultDecision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
+    mocks.useOfficializeResultRevision.mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false });
+    mocks.useSupersedeAndSubmitResult.mockReturnValue({
+      mutate: supersedeMutate,
+      isPending: false,
+      isError: false,
+      reset: vi.fn(),
+    });
+  });
+
+  function openResubmitForm(isKnockoutFixture: boolean) {
+    mocks.useTournamentGame.mockReturnValue({
+      data: gameDetail({ isKnockoutFixture }),
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<GameResultReviewPanel gameId={GAME_ID} />);
+    fireEvent.click(screen.getByRole('button', { name: '다시 제출' }));
+    return screen.getByRole('dialog');
+  }
+
+  it('결선 경기의 무승부 재제출에서는 기존 승부차기 점수가 제출 payload 로 살아서 나간다', () => {
+    const dialog = openResubmitForm(true);
+
+    fireEvent.change(within(dialog).getByLabelText('재제출 사유'), { target: { value: '반려 사유 반영' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '다시 제출' }));
+
+    expect(supersedeMutate).toHaveBeenCalledTimes(1);
+    expect(supersedeMutate.mock.calls[0][0].score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 4, away: 3 },
+    });
+  });
+
+  it('결선 경기에서 정규시간 승패가 갈리면 승부차기를 싣지 않고, 그 사실을 저장 전에 알린다', () => {
+    const dialog = openResubmitForm(true);
+
+    fireEvent.change(within(dialog).getByLabelText('홈 점수'), { target: { value: '2' } });
+    expect(within(dialog).getByRole('status').textContent).toMatch(/승부차기 결과는 함께 지워져요/);
+
+    fireEvent.change(within(dialog).getByLabelText('재제출 사유'), { target: { value: '정규시간 점수 정정' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '다시 제출' }));
+
+    expect(supersedeMutate.mock.calls[0][0].score).toEqual({ home: 2, away: 1 });
   });
 });

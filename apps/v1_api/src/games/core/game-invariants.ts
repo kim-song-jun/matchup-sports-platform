@@ -9,6 +9,7 @@ import { GameContractError } from './game-contract';
 const eventTypes = new Set<string>(Object.values(V1GameEventType));
 const sideScopedEventTypes = new Set<V1GameEventType>([
   V1GameEventType.GOAL,
+  V1GameEventType.OWN_GOAL,
   V1GameEventType.CARD,
   V1GameEventType.SUBSTITUTION,
   V1GameEventType.FOUL,
@@ -63,6 +64,9 @@ function validateEventShape(event: GameResultEvent): void {
   }
   if (event.type === V1GameEventType.FOUL && event.participantId === undefined) {
     throw new GameContractError('EVENT_INVALID', 'Foul event requires a participant');
+  }
+  if (event.type === V1GameEventType.OWN_GOAL && event.participantId === undefined) {
+    throw new GameContractError('EVENT_INVALID', 'Own goal event requires a participant');
   }
   if (event.assistParticipantId !== undefined && event.type !== V1GameEventType.GOAL) {
     throw new GameContractError('EVENT_INVALID', 'Assist can only be recorded on a GOAL event');
@@ -130,18 +134,28 @@ export function validateGameResultInvariants(input: GameResultInvariantInput): v
     if (event.participantId !== undefined && participant === undefined) {
       throw new GameContractError('PARTICIPANT_INVALID', 'Event participant does not belong to the game');
     }
-    if (participant !== undefined && participant.sideId !== event.sideId) {
+    const participantMustBeOpposingSide = event.type === V1GameEventType.OWN_GOAL;
+    if (
+      participant !== undefined &&
+      (participantMustBeOpposingSide
+        ? participant.sideId === event.sideId
+        : participant.sideId !== event.sideId)
+    ) {
       throw new GameContractError(
         'PARTICIPANT_SIDE_MISMATCH',
-        'Event participant and side do not agree',
+        participantMustBeOpposingSide
+          ? 'Own-goal participant must belong to the opposing side'
+          : 'Event participant and side do not agree',
       );
     }
-    if (event.type === V1GameEventType.GOAL) {
+    if (event.type === V1GameEventType.GOAL || event.type === V1GameEventType.OWN_GOAL) {
       if (side === undefined) {
         throw new GameContractError('EVENT_INVALID', 'Goal requires a game side');
       }
       eventScore[side.sideKey] += 1;
-      if (participant === undefined) {
+      if (event.type === V1GameEventType.OWN_GOAL) {
+        // 자책골은 상대 팀 점수만 올리고 행위 선수의 개인 득점에는 넣지 않는다.
+      } else if (participant === undefined) {
         hasMissingScorer = true;
         if (input.scorerPolicy === 'required') {
           throw new GameContractError('PARTICIPANT_INVALID', 'Scorer is required for every goal');

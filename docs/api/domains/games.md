@@ -34,6 +34,16 @@ raw roster identity fields.
 | `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/submit` | authenticated **host** team owner/manager only (Task 16) | `SubmitGameResultRevisionDto`; team-match only. Same `409 TEAM_MATCH_NOT_MATCHED` precondition as the draft route above. It atomically validates/submits the revision and moves `SCHEDULED`, `LIVE`, or `PAUSED` to `ENDED`; the same transaction also completes the linked `V1TeamMatch` (`status=completed`, `completedAt`) — idempotently, via a `status != completed` guard so a correction-loop resubmit is a no-op — and, on the first real transition only, writes a matching `V1StatusChangeLog` row (`team_match`, `matched → completed`) so review eligibility keeps working and the status history stays complete now that the old `POST /api/v1/team-matches/:teamMatchId/complete` shortcut is removed (Task 16 — that route bypassed all result validation and opponent approval and never was part of this frozen contract). |
 | `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/decision` | authenticated opposing team result decider | `DecideGameResultRevisionDto`; `approve` or `change_request` for a team-match revision. |
 
+### Penalty-shootout conclusion rule
+
+Tournament shootouts use a three-kick opening series. With `earlyStop: true` (the default),
+the server accepts the result as soon as the trailing team cannot draw level with its remaining
+opening kicks, so `takenHome` and `takenAway` do not have to be equal for an early conclusion.
+If the score is tied after both teams complete three kicks, sudden death continues without an
+upper limit; an automatic conclusion then requires both teams to have completed the same
+sudden-death round and the scores to differ. The frontend previews this rule, but the API
+re-evaluates the same kick counts before persisting the result.
+
 ### Mutation, version, and history rules
 
 Every Game mutation requires `expectedVersion`, an `Idempotency-Key` header, and the matching
@@ -130,3 +140,18 @@ Every new table uses UUID `id`, `createdAt`, `updatedAt` unless declared append-
 Raw migration triggers `v1_guard_result_revision_transition`, `v1_block_terminal_revision_mutation`, `v1_guard_result_participant_mutation`, and `v1_block_used_config_mutation` enforce the content-freeze/terminal rules above, reject UPDATE/DELETE of terminal revisions, reject participant INSERT/UPDATE/DELETE unless the locked parent is `DRAFT`, and reject referenced config changes. Composite/deferred constraints enforce same-game current/supersession pointers and same-tournament field/fixture scope. The deterministic final tie-break seed is `SHA-256(tournamentId || ":" || competitionConfigVersionId || ":" || sortedTeamIds)` ascending lexical bytes; no random runtime draw is allowed.
 
 <!-- API_CONTRACT_SECTION_END:Frozen additive schema ledger -->
+
+### Task 150 event/result correction addendum (2026-08-19)
+
+- POST /games/:gameId/events accepts OWN_GOAL. sideId is the team credited
+  with the goal, while participantId is required and must belong to the
+  opposing side. It changes the credited score but not personal goal totals.
+  Public event projections keep that credited side for score integrity but
+  place the participant row under the participant's actual team.
+- The live console uses POST .../events/:eventId/reverse for active goal,
+  own-goal, card, foul, and substitution rows. It appends a CORRECTION audit
+  event and never overwrites the original; the operator then re-enters the
+  corrected event.
+- GET .../result-revisions includes nullable goalEvents snapshots with id,
+  sideId, participantId, minute, period, and ownGoal. Older null snapshots
+  fall back to the append-only event stream.

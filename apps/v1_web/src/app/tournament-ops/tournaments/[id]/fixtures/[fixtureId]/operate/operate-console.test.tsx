@@ -991,6 +991,9 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
       sourceType?: 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
       liveEvents?: GameEventRecord[];
       periods?: ReadonlyArray<Record<string, unknown>>;
+      /** 서버가 대회 설정에서 해석해 내려주는 승부차기 종료 정책. 생략하면 서버가
+       *  이 필드를 안 보낸 상태(레거시 응답)를 그대로 재현한다. */
+      penaltyShootoutPolicy?: { earlyStop: boolean };
     } = {},
   ) {
     mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
@@ -1007,6 +1010,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
         periods: overrides.periods ?? [FIRST_PERIOD, FINAL_PERIOD],
         sides: PENALTY_SIDES,
         lineups: [],
+        penaltyShootoutPolicy: overrides.penaltyShootoutPolicy,
       },
       isLoading: false, isError: false, refetch: vi.fn(),
     });
@@ -1067,7 +1071,66 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
   });
 
-  it('승부차기 시작 확인 → 킥 입력(2:1) → 종료 확인을 거치면, end 커맨드가 sideKey 기준 최종 점수로 호출된다', async () => {
+  /**
+   * **대회 설정 스위치가 실제로 배선돼 있다는 유일한 증거.**
+   *
+   * `earlyStop`은 서버 `getGame` 응답(`penaltyShootoutPolicy`)에서 와서 술어까지
+   * 흘러가야 한다. 술어 자체는 `penalty-shootout.test.ts`가 양방향으로 검증하지만,
+   * **그 값을 어디서 얻는가**는 거기서 검증되지 않는다 — 콘솔이 서버 값을 무시하고
+   * `true`로 굳혀도 술어 테스트는 전부 초록이다.
+   *
+   * 그래서 두 정책의 답이 갈리는 국면을 UI로 직접 만든다: 홈(선축) 3킥 3점 / 원정 2킥
+   * 0점. 원정의 마지막 킥으로도 따라잡을 수 없어 A2는 종료를 허용하지만, 조기 종료를
+   * 끈 A1은 원정의 세 번째 킥까지 기다린다.
+   */
+  async function openPanelAndKickThreeToTwo(policy?: { earlyStop: boolean }): Promise<HTMLElement> {
+    setup(policy === undefined ? {} : { penaltyShootoutPolicy: policy });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
+    const startDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
+
+    const panel = await screen.findByRole('dialog', { name: '승부차기' });
+    chooseFirstKicker(panel, '강남 풋살 클럽');
+    const successButton = within(panel).getByRole('button', { name: /성공/ });
+    const missButton = within(panel).getByRole('button', { name: /실패/ });
+    // 홈 성공 / 원정 실패를 두 번 반복한 뒤 홈이 한 번 더 성공 → 홈 3킥 3점 / 원정 2킥 0점.
+    for (let round = 0; round < 2; round += 1) {
+      fireEvent.click(successButton);
+      fireEvent.click(missButton);
+    }
+    fireEvent.click(successButton);
+    return panel;
+  }
+
+  it('earlyStop 정책이면(기본) 홈 3킥 3점 / 원정 2킥 0점에서 승부차기를 종료할 수 있다', async () => {
+    const panel = await openPanelAndKickThreeToTwo({ earlyStop: true });
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
+  });
+
+  it('서버가 earlyStop=false를 내려주면 같은 국면에서 종료가 잠긴다 — 정책이 UI까지 배선돼 있다', async () => {
+    const panel = await openPanelAndKickThreeToTwo({ earlyStop: false });
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
+    expect(panel).toHaveTextContent('성수 풋살 클럽의 응답 킥이 남아 있어요.');
+  });
+
+  it('서버가 정책을 안 내려주면(레거시 응답) FIFA 정규로 폴백한다', async () => {
+    const panel = await openPanelAndKickThreeToTwo(undefined);
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
+  });
+
+  /**
+   * 킥 시퀀스가 "각 2킥 2:1"에서 "각 3킥 3:0"으로 바뀐 이유: 2킥씩 찬 2:1은 **결판이
+   * 아니다.** 원정에게 아직 3킥이 남아 있어 뒤집을 수 있기 때문이다(FIFA 정규).
+   * 예전 술어가 그 국면을 결판으로 읽은 것이 이 작업이 고치는 결함의 다른 얼굴이다 —
+   * `home !== away` 하나만 봤으므로 홈이 1킥 넣은 1:0조차 결판이었다.
+   *
+   * 이 테스트가 지키는 계약 자체(최종 점수를 **배열 순서가 아니라 `sideKey` 기준으로**
+   * 매핑해 `end` payload 에 싣는다)는 그대로다. 3:0은 원정이 남은 2킥을 다 넣어도 2점이라
+   * 수학적으로 끝난 국면이다.
+   */
+  it('승부차기 시작 확인 → 킥 입력(3:0) → 종료 확인을 거치면, end 커맨드가 sideKey 기준 최종 점수로 호출된다', async () => {
     setup();
     mocks.postV1GameCommand.mockResolvedValue({
       gameId: 'game-1', state: 'ENDED', version: 3, revisionId: 'rev-1', revision: 1, revisionState: 'SUBMITTED',
@@ -1079,30 +1142,99 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
 
     const panel = await screen.findByRole('dialog', { name: '승부차기' });
+    // 이 시나리오는 홈이 선축인 경우다 — 아래 기대 payload 의 `firstKickSideKey: 'HOME'`이
+    // 그 선택의 결과다(예전에는 고를 수 없었고 항상 홈으로 굳어 있었다).
+    chooseFirstKicker(panel, '강남 풋살 클럽');
     const successButton = within(panel).getByRole('button', { name: /성공/ });
     const missButton = within(panel).getByRole('button', { name: /실패/ });
 
-    // 순서는 항상 번갈아 찬다(홈 먼저) — 성공/성공/성공/실패 4번으로
-    // 홈 2 : 원정 1(결판)을 만든다: 홈 성공(1:0)→원정 성공(1:1)→홈 성공(2:1)
-    // →원정 실패(2:1, 결판).
-    fireEvent.click(successButton);
-    fireEvent.click(successButton);
-    fireEvent.click(successButton);
-    fireEvent.click(missButton);
+    // 순서는 항상 번갈아 찬다(선축인 홈 먼저). 홈의 세 번째 성공 시점에는 원정이
+    // 한 번 덜 찼어도 마지막 킥으로 따라잡을 수 없으므로 규칙상 결판이다.
+    fireEvent.click(successButton); // 홈 1:0
+    fireEvent.click(missButton); // 원정 1:0
+    fireEvent.click(successButton); // 홈 2:0
+    fireEvent.click(missButton); // 원정 2:0
+    fireEvent.click(successButton); // 홈 3:0
 
     const finishButton = within(panel).getByRole('button', { name: '승부차기 종료' });
     expect(finishButton).not.toBeDisabled();
     fireEvent.click(finishButton);
 
     const finishDialog = await screen.findByRole('dialog', { name: '승부차기를 종료할까요?' });
-    expect(finishDialog).toHaveTextContent('강남 풋살 클럽 2 : 1 성수 풋살 클럽');
+    expect(finishDialog).toHaveTextContent('강남 풋살 클럽 3 : 0 성수 풋살 클럽');
     fireEvent.click(within(finishDialog).getByRole('button', { name: '승부차기 종료' }));
 
     await waitFor(() =>
       expect(mocks.postV1GameCommand).toHaveBeenCalledWith(
         'game-1',
         'end',
-        expect.objectContaining({ payload: { penalties: { home: 2, away: 1 } } }),
+        expect.objectContaining({
+          // 킥 수가 함께 나가야 서버도 같은 술어로 결판을 판정할 수 있다. 규칙대로
+          // 끝난 종료이므로 `operatorOverride`는 **실리지 않는다** — 키 부재가 곧
+          // "우회 아님"이라, 여기에 키가 생기면 감사 기록이 우회를 구분하지 못한다.
+          payload: {
+            penalties: { home: 3, away: 0, firstKickSideKey: 'HOME', takenHome: 3, takenAway: 2 },
+          },
+        }),
+      ),
+    );
+  });
+
+  // 현장에서는 규칙보다 먼저 승부차기가 끝난다 — 한 팀이 기권하거나 선수가 없어 더 못 차면
+  // 두 팀의 킥 수가 어긋난 채로 경기가 종료된다. 자동 판정만 믿으면 그 상태에서 종료가
+  // 영원히 잠겨, 운영자는 **차지도 않은 킥을 지어내야만** 경기를 닫을 수 있었다.
+  it('킥 수가 어긋나 자동 종료가 잠긴 상태에서도 "그래도 종료"로 end 커맨드가 실제 집계 그대로 나간다', async () => {
+    setup();
+    mocks.postV1GameCommand.mockResolvedValue({
+      gameId: 'game-1', state: 'ENDED', version: 3, revisionId: 'rev-1', revision: 1, revisionState: 'SUBMITTED',
+    });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
+    const startDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
+
+    const panel = await screen.findByRole('dialog', { name: '승부차기' });
+    chooseFirstKicker(panel, '강남 풋살 클럽');
+    const successButton = within(panel).getByRole('button', { name: /성공/ });
+    const missButton = within(panel).getByRole('button', { name: /실패/ });
+
+    // 홈 2킥 2점 / 원정 1킥 0점 — 원정이 남은 4킥을 다 넣으면 역전 가능하므로 규칙상 미결.
+    // 아래 주석은 **점수가 아니라 킥 수와 점수**를 함께 적는다 — 이 테스트의 관심사가
+    // "몇 대 몇인가"가 아니라 "누가 몇 번 찼는가"이기 때문이다.
+    fireEvent.click(successButton); // 홈 1킥 1점
+    fireEvent.click(missButton); // 원정 1킥 0점
+    fireEvent.click(successButton); // 홈 2킥 2점 — 여기서 원정이 기권했다고 하자
+
+    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
+    fireEvent.click(within(panel).getByRole('button', { name: '그래도 종료' }));
+
+    // 확인 문구가 평소 종료와 달라야 한다 — 이건 "예상대로 끝났나" 확인이 아니라
+    // "자동 판정과 다른 결론을 낸다"는 선언이고, 킥 수까지 보여줘야 오조작을 알아챈다.
+    const finishDialog = await screen.findByRole('dialog', { name: '아직 안 끝난 승부차기예요' });
+    expect(finishDialog).toHaveTextContent('강남 풋살 클럽 2킥 2점');
+    expect(finishDialog).toHaveTextContent('성수 풋살 클럽 1킥 0점');
+    fireEvent.click(within(finishDialog).getByRole('button', { name: '그래도 종료' }));
+
+    await waitFor(() =>
+      expect(mocks.postV1GameCommand).toHaveBeenCalledWith(
+        'game-1',
+        'end',
+        expect.objectContaining({
+          // 우회 종료는 킥 수(2 vs 1)와 `operatorOverride: true`를 함께 싣는다 —
+          // 서버가 이 값을 `score.penalties`에 저장해 리비전에 영구히 남기므로,
+          // 나중에 "이 결과는 왜 규칙과 다른가"에 답할 수 있는 유일한 근거가 된다.
+          payload: {
+            penalties: {
+              home: 2,
+              away: 0,
+              firstKickSideKey: 'HOME',
+              takenHome: 2,
+              takenAway: 1,
+              operatorOverride: true,
+            },
+          },
+        }),
       ),
     );
   });
@@ -1119,7 +1251,35 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
   });
 
-  it('킥을 잘못 입력했을 때 "방금 킥 되돌리기"로 복구할 수 있다', async () => {
+  /**
+   * 선축(먼저 차는 팀)을 고른다. 승부차기는 동전 던지기로 선축을 정하고 시작하므로,
+   * 패널은 이걸 고르기 전까지 성공/실패 버튼을 잠근다 — 즉 킥을 기록하는 모든 시나리오는
+   * 이 단계를 거쳐야 한다(실제 운영자도 그렇게 한다).
+   */
+  function chooseFirstKicker(panel: HTMLElement, teamName: string): void {
+    fireEvent.click(within(panel).getByLabelText(teamName));
+  }
+
+  /**
+   * "다음 순서" 배지가 붙은 팀 이름. 패널은 `nextPenaltyKicker`가 고른 사이드
+   * 카드에만 이 배지를 렌더하므로, 배지가 어느 팀에 있는지가 곧 킥 상태다.
+   */
+  function nextKickerName(panel: HTMLElement): string {
+    const badge = within(panel).getByText('다음 순서');
+    return (badge.parentElement?.textContent ?? '').replace('다음 순서', '').trim();
+  }
+
+  /**
+   * 되돌리기 검증의 증거는 **패널이 그리는 킥 상태 자체**여야 한다 — 킥 기록 배지,
+   * 사이드별 점수, "다음 순서" 배지의 이동.
+   *
+   * 이전 판은 증거로 "'승부차기 종료' 버튼이 다시 활성화된다"를 썼는데, 그 활성화는
+   * 되돌리기가 동작해서가 아니라 **결판 술어가 킥 수를 보지 않아서**(홈 1:0이면
+   * 원정이 0킥이어도 결판으로 읽힘) 켜지는 것이었다. 즉 그 단언은 사용자가 보고한
+   * 결함을 "정답"으로 박제하고 주석으로까지 명문화하고 있었다. 원래 의도인 "undo가
+   * 실제로 상태를 되감는다"는 아래 증거들이 더 직접적으로 지킨다.
+   */
+  it('킥을 잘못 입력했을 때 "방금 킥 되돌리기"로 킥 상태가 되감긴다', async () => {
     setup();
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
@@ -1128,23 +1288,62 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
 
     const panel = await screen.findByRole('dialog', { name: '승부차기' });
+    chooseFirstKicker(panel, '강남 풋살 클럽');
     const undoButton = within(panel).getByRole('button', { name: '방금 킥 되돌리기' });
     // 킥이 하나도 없으면 되돌리기 자체가 막힌다(되돌릴 대상이 없다).
     expect(undoButton).toBeDisabled();
 
-    // 홈 성공(1:0) → 원정 성공(1:1)까지 두 번 찍으면 결판이 안 나 종료가
-    // 막힌다. 마지막(원정) 킥을 되돌리면 다시 1:0(홈만 득점)으로 돌아가
-    // "승부차기 종료"가 다시 활성화돼야 한다 — 오조작 복구가 실제로 상태를
-    // 바꾼다는 증거다.
+    const awayKicks = within(panel).getByLabelText('성수 풋살 클럽 킥 기록');
+    expect(awayKicks).toHaveTextContent('아직 기록된 킥이 없어요');
+
     const successButton = within(panel).getByRole('button', { name: /성공/ });
-    fireEvent.click(successButton); // 홈 1:0
-    fireEvent.click(successButton); // 원정 1:1
+    fireEvent.click(successButton); // 홈 성공 → 다음은 원정
+    expect(nextKickerName(panel)).toBe('성수 풋살 클럽');
+    fireEvent.click(successButton); // 원정 성공 → 다음은 다시 홈
+    expect(nextKickerName(panel)).toBe('강남 풋살 클럽');
+    expect(within(awayKicks).getByLabelText('1번째 킥 성공')).toBeInTheDocument();
     expect(undoButton).not.toBeDisabled();
+
+    fireEvent.click(undoButton); // 원정 킥 되돌림
+
+    // 되돌린 킥이 기록에서 사라지고, 차례도 원정으로 되돌아간다.
+    expect(awayKicks).toHaveTextContent('아직 기록된 킥이 없어요');
+    expect(within(awayKicks).queryByLabelText('1번째 킥 성공')).toBeNull();
+    expect(nextKickerName(panel)).toBe('성수 풋살 클럽');
+    // 되돌릴 킥이 하나(홈)만 남았다가, 그것마저 되돌리면 다시 잠긴다.
+    expect(undoButton).not.toBeDisabled();
+    fireEvent.click(undoButton);
+    expect(undoButton).toBeDisabled();
+  });
+
+  /**
+   * 사용자 보고 결함의 코어. 홈이 첫 킥을 성공하면 점수는 1:0이 되고, 옛 술어
+   * (`isPenaltyShootoutDecisive(home, away) { return home !== away; }`)는 킥 수를
+   * 보지 않으므로 이를 "결판"으로 읽어 `disabled={!decisive}`가 풀렸다 — **원정이
+   * 한 번도 차기 전에** 승부차기를 종료할 수 있었다.
+   */
+  it('홈만 1킥 성공한 상태에서는 "승부차기 종료"가 비활성이다 — 원정이 아직 한 번도 차지 않았다', async () => {
+    setup();
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
+    const startDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
+
+    const panel = await screen.findByRole('dialog', { name: '승부차기' });
+
+    // 선축을 먼저 골라야 성공/실패 버튼이 열린다. 이걸 빼면 클릭이 무시돼(버튼 disabled)
+    // 킥이 한 개도 기록되지 않고, 테스트는 "0킥이라 종료 불가"만 확인하는 공테스트가 된다
+    // — 옛 술어(`home !== away`)를 되살려도 0:0이라 그대로 초록이었다.
+    chooseFirstKicker(panel, '강남 풋살 클럽');
+    fireEvent.click(within(panel).getByRole('button', { name: /성공/ }));
+
+    // 홈이 실제로 1점을 넣었는지부터 확인한다 — 이 단언이 있어야 아래 disabled가
+    // "1:0인데도 잠겨 있다"를 뜻한다(옛 술어라면 여기서 버튼이 열린다).
+    expect(within(within(panel).getByLabelText('강남 풋살 클럽 킥 기록')).getByLabelText('1번째 킥 성공')).toBeInTheDocument();
+    expect(within(panel).getByLabelText('성수 풋살 클럽 킥 기록')).toHaveTextContent('아직 기록된 킥이 없어요');
     expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
-
-    fireEvent.click(undoButton); // 원정 킥 되돌림 → 홈 1:0
-
-    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
+    expect(panel).toHaveTextContent('성수 풋살 클럽이(가) 아직 한 번도 차지 않았어요.');
   });
 
   /* 종료 후 결과 표시 — 승부차기를 입력하고 종료하면 패널이 닫히고 헤더 스코어는

@@ -146,6 +146,47 @@ describe('OperationsBoardClient', () => {
       expect(screen.getAllByText('승부차기 2:0')).toHaveLength(2);
     });
 
+    /**
+     * 이 셀은 승부차기 문구를 손으로 조립하고 있었다(`승부차기 {home}:{away}`). 그래서
+     * 공용 포맷터에 선축을 넣어도 **이 화면만** 선축이 안 보였고, 같은 경기가 결과 검수
+     * 리비전 타임라인에는 `선축 원정`이 뜨는데 운영 보드에는 안 뜨는 어긋남이 생겼다.
+     */
+    it('선축이 기록된 경기는 승부차기 옆에 선축도 보여준다', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: {
+          ...PAGE,
+          items: [
+            {
+              ...ENDED_PENALTY_ITEM,
+              currentScore: { home: 0, away: 0, penalties: { home: 2, away: 0, firstKickSideKey: 'AWAY' } },
+            },
+          ],
+          liveWarnings: [],
+        },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      expect(screen.getAllByText('승부차기 2:0, 선축 원정')).toHaveLength(2);
+    });
+
+    // 선축이 없던 시절에 저장된 경기(그리고 중첩 백필 형태)는 모르는 것을 지어내지 않는다.
+    it('선축이 없는 경기는 선축을 그리지 않는다', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: { ...PAGE, items: [ENDED_PENALTY_ITEM], liveWarnings: [] },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      expect(screen.queryByText(/선축/)).not.toBeInTheDocument();
+    });
+
     it('아직 확정 결과가 없는 경기는 결과 칸을 비워 둔다 — 0:0 을 지어내지 않는다', () => {
       // ITEM_A 는 진행 중(currentScore: null)이다. 여기에 0:0 이 그려지면 운영자는
       // "득점 없이 끝난 경기"로 오독한다.

@@ -50,12 +50,13 @@ import {
   commandConfirmCopy,
   commitActionConfirmCopy,
   penaltyShootoutFinishConfirmCopy,
+  penaltyShootoutOverrideFinishConfirmCopy,
   penaltyShootoutStartConfirmCopy,
   playerLabel,
 } from './confirm-copy';
 import {
-  isPenaltyShootoutDecisive,
   penaltyScoreBySideId,
+  penaltyFinishAvailability,
   type PenaltyKick,
   type PenaltyKickResult,
 } from '@/lib/penalty-shootout';
@@ -164,6 +165,7 @@ const ACTION_BUTTONS: ReadonlyArray<{
   readonly allowTeamOnly: boolean;
 }> = [
   { type: 'GOAL', label: '골', allowTeamOnly: false },
+  { type: 'OWN_GOAL', label: '자책골', allowTeamOnly: false },
   { type: 'CARD', label: '옐로카드', cardColor: 'YELLOW', allowTeamOnly: false },
   { type: 'CARD', label: '레드카드', cardColor: 'RED', allowTeamOnly: false },
   { type: 'FOUL', label: '파울', allowTeamOnly: true },
@@ -374,7 +376,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       // `undefined` id being treated as "this exact event was reversed" —
       // handled above by keeping `undefined` out of `reversedIds` in the
       // first place, not by disqualifying events that lack an `id`.
-      if (event.type !== 'GOAL' || event.sideId === null || event.sideId === undefined || reversedIds.has(event.id)) {
+      if (
+        (event.type !== 'GOAL' && event.type !== 'OWN_GOAL') ||
+        event.sideId === null ||
+        event.sideId === undefined ||
+        reversedIds.has(event.id)
+      ) {
         continue;
       }
       score.set(event.sideId, (score.get(event.sideId) ?? 0) + 1);
@@ -411,6 +418,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     const chosen = officialId ? revisions.find((revision) => revision.id === officialId) : revisions[0];
     return readGameResultScore(chosen?.score)?.penalties ?? null;
   }, [gameEnded, resultRevisions.data, gameDetail.data?.currentOfficialRevisionId]);
+
+  /* 확정된 승부차기의 선축 사이드. 저장값은 `sideKey`(`'HOME'|'AWAY'`)이므로 여기서
+     사이드 목록과 맞춰 실제 팀으로 되돌린다. 선축이 없던 시절에 저장된 경기(그리고 중첩
+     백필 형태)는 `null` — 모르는 것을 지어내지 않고 표시 자체를 생략한다. */
+  const confirmedFirstKicker = useMemo(() => {
+    const sideKey = confirmedPenalties?.firstKickSideKey;
+    if (sideKey === undefined) return null;
+    return (gameDetail.data?.sides ?? []).find((side) => side.sideKey === sideKey) ?? null;
+  }, [confirmedPenalties, gameDetail.data?.sides]);
 
   // 과제 2 — 승부차기 시작 버튼 노출 조건. 종료 흐름 개편(사용자 결정 2·3)
   // 으로 이 시점이 **후반 종료 이후**로 옮겨졌다: 예전엔 "마지막 피리어드가
@@ -459,6 +475,17 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 킥이 없음 — 이 하나의 상태로 "열림 여부"와 "킥 목록"을 함께 표현해 별도
   // boolean을 두지 않는다.
   const [penaltyKicks, setPenaltyKicks] = useState<PenaltyKick[] | null>(null);
+  // 선축(동전 던지기 결과). 킥 목록과 달리 이 값은 **서버에 남는다** —
+  // `end` 커맨드의 `payload.penalties.firstKickSideKey`로 실려 리비전에 저장된다.
+  // 패널이 닫혀 있는 동안에는 의미가 없으므로 패널을 열 때마다 초기화한다.
+  const [firstKickSideId, setFirstKickSideId] = useState<string | null>(null);
+  // 이 대회의 종료 판정 정책. 서버가 pinned config에서 해석해 내려준다. 응답에 없으면
+  // (구버전 배포·캐시된 쿼리) FIFA 정규로 읽는다 — 이전 동작보다 엄격한 쪽이라 안전한
+  // 폴백이다(`GameDetail.penaltyShootoutPolicy` doc 참고).
+  // useMemo인 이유: 매 렌더 새 객체를 만들면 이 값을 dep으로 쓰는 콜백
+  // (`handleFinishPenaltyShootout`)이 매번 새로 만들어진다.
+  const penaltyEarlyStop = gameDetail.data?.penaltyShootoutPolicy?.earlyStop ?? true;
+  const penaltyPolicy = useMemo(() => ({ earlyStop: penaltyEarlyStop }), [penaltyEarlyStop]);
 
   const { confirm, ConfirmModal: confirmModal } = useConfirm();
 
@@ -575,6 +602,33 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       await ops.assignAssist({ eventId: event.id, assistParticipantId });
     },
     [ops],
+  );
+
+  const handleReverseEvent = useCallback(
+    async (event: GameEventRecord) => {
+      const label =
+        event.type === 'GOAL'
+          ? '골'
+          : event.type === 'OWN_GOAL'
+            ? '자책골'
+            : event.type === 'CARD'
+              ? '카드'
+              : event.type === 'FOUL'
+                ? '파울'
+                : '교체';
+      const ok = await confirm({
+        title: `${label} 기록을 취소할까요?`,
+        message:
+          event.type === 'SUBSTITUTION'
+            ? '취소 기록이 감사 로그에 남아요.'
+            : '취소 기록이 감사 로그에 남아요. 취소 후 올바른 기록을 다시 입력해 주세요.',
+        confirmLabel: '기록 취소',
+        tone: 'danger',
+      });
+      if (!ok) return;
+      await ops.reverseEvent({ eventId: event.id, reason: `${label} 기록 수정·취소` });
+    },
+    [confirm, ops],
   );
 
   // 빠른 교체 모드의 단일 확정 탭 — QuickSubstitutionPanel은 "지정 후 탭"
@@ -743,6 +797,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     const copy = penaltyShootoutStartConfirmCopy(gameDetail.data?.sides ?? [], scoreBySideId);
     if (!(await confirm(copy))) return;
     setPenaltyKicks([]);
+    // 선축은 매번 다시 고른다 — 직전 승부차기(취소했던 것)의 선택이 남아 있으면
+    // 운영자가 동전을 던지지도 않고 그대로 진행하게 된다.
+    setFirstKickSideId(null);
   }, [confirm, gameDetail.data?.sides, scoreBySideId]);
 
   // 패널을 닫는다 — 취소는 사이드 이펙트가 없으므로(아직 아무것도 서버에
@@ -766,7 +823,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 배열 순서가 아니라 `sideKey`로 매핑한다(백엔드 `scoreFromEvents`/
   // `GameScore`가 sideKey 기준이지 sides 배열 순서 기준이 아니다 — 순서로
   // 매핑하면 HOME/AWAY가 뒤바뀐 채로 기록될 수 있다).
-  const handleFinishPenaltyShootout = useCallback(async () => {
+  const handleFinishPenaltyShootout = useCallback(async (options: { readonly override: boolean }) => {
     if (penaltyKicks === null) return;
     const sidesList = gameDetail.data?.sides ?? [];
     const homeSide = sidesList.find((side) => side.sideKey === 'HOME');
@@ -775,12 +832,60 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     const score = penaltyScoreBySideId(penaltyKicks);
     const homeScore = score.get(homeSide.id) ?? 0;
     const awayScore = score.get(awaySide.id) ?? 0;
-    if (!isPenaltyShootoutDecisive(homeScore, awayScore)) return;
-    const copy = penaltyShootoutFinishConfirmCopy(homeSide, awaySide, homeScore, awayScore);
+    // 패널의 "승부차기 종료" 버튼과 **같은 술어**를 여기서도 한 번 더 본다 — 버튼
+    // 비활성만으로는 막을 수 없는 경로(포커스된 채 Enter, 확인 모달 대기 중 상태 변화)가
+    // 남기 때문이다. 이 판정은 서버가 할 수 없다(총점 두 개만 저장한다).
+    const availability = penaltyFinishAvailability(penaltyKicks, sidesList, firstKickSideId, penaltyPolicy);
+    // `BLOCKED`는 어느 버튼으로 왔든 거부한다 — 보낼 값이 없거나(사이드·선축 미정) 서버가
+    // 되돌릴 값(동점)이라, 우회 종료라도 통과시키면 실패하는 요청만 늘어난다.
+    if (availability === 'BLOCKED') return;
+    // 자동 종료 버튼으로 온 요청은 규칙상 결판난 상태에서만 통과시킨다. `OVERRIDABLE`을
+    // 여기서 걸러야, 모달이 열려 있는 동안 킥이 되돌려져 상태가 뒤로 간 경우에도
+    // "그래도 종료"를 누른 적 없는 운영자가 우회 경로로 끌려가지 않는다.
+    if (availability === 'OVERRIDABLE' && !options.override) return;
+    // 선축은 사이드 id가 아니라 `sideKey`로 보낸다 — 저장되는 곳이 `score.penalties`라
+    // 점수(home/away)와 같은 기준틀이어야 하고, 게임별로 달라지는 id를 결과 스냅샷에
+    // 박아 두면 나중에 그 값을 읽는 화면이 사이드 목록 없이는 해석할 수 없다.
+    const firstKickSideKey = firstKickSideId === awaySide.id ? 'AWAY' : 'HOME';
+    const firstKickSide = firstKickSideKey === 'AWAY' ? awaySide : homeSide;
+    // 문구는 `options.override`가 아니라 **현재 상태**(`availability`)로 고른다 — 운영자가
+    // "그래도 종료"를 누른 뒤 그사이 상태가 결판으로 바뀌었다면 보여줄 것은 평범한 종료
+    // 확인이지, 안 끝났다는 경고가 아니다.
+    // 확인 문구와 서버 payload가 **같은 숫자**를 쓰게 한 곳에서 센다 — 따로 세면
+    // 모달이 보여준 킥 수와 실제로 저장되는 킥 수가 갈릴 수 있다.
+    const homeKicks = penaltyKicks.filter((kick) => kick.sideId === homeSide.id).length;
+    const awayKicks = penaltyKicks.filter((kick) => kick.sideId === awaySide.id).length;
+    const copy =
+      availability === 'OVERRIDABLE'
+        ? penaltyShootoutOverrideFinishConfirmCopy(
+            homeSide,
+            awaySide,
+            homeScore,
+            awayScore,
+            homeKicks,
+            awayKicks,
+            firstKickSide,
+          )
+        : penaltyShootoutFinishConfirmCopy(homeSide, awaySide, homeScore, awayScore, firstKickSide);
     if (!(await confirm(copy))) return;
     setPenaltyKicks(null);
-    await handleRunCommand('end', { penalties: { home: homeScore, away: awayScore } });
-  }, [penaltyKicks, gameDetail.data?.sides, confirm, handleRunCommand]);
+    await handleRunCommand('end', {
+      penalties: {
+        home: homeScore,
+        away: awayScore,
+        firstKickSideKey,
+        // 킥 수를 함께 보내야 서버도 같은 술어로 결판을 판정할 수 있다 — 총점 두 개로는
+        // "홈 1킥 1:0 / 원정 0킥"과 "각 5킥 1:0"이 같은 값이라, 이게 없으면 화면의
+        // 가드가 프런트 단독이 되어 API 직접 호출로 그대로 우회된다.
+        takenHome: homeKicks,
+        takenAway: awayKicks,
+        // 우회로 닫았다는 사실을 **기록에 남긴다**. 서버는 이 값을 `score.penalties`에
+        // 그대로 저장하므로 리비전에 영구히 남아, 나중에 "이 결과는 왜 규칙과 다른가"에
+        // 답할 수 있다. 규칙대로 끝난 종료에는 싣지 않는다(키 부재가 곧 "우회 아님").
+        ...(availability === 'OVERRIDABLE' ? { operatorOverride: true } : {}),
+      },
+    });
+  }, [penaltyKicks, firstKickSideId, penaltyPolicy, gameDetail.data?.sides, confirm, handleRunCommand]);
 
   // 이슈 #375 — Copilot review 패턴 재사용(PR #276, 위 liveEventsRef와 같은
   // 이유): 되돌리기 토스트의 onClick이 "토스트를 띄운 그 순간의"
@@ -999,11 +1104,21 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 className="flex items-center gap-1.5 rounded-lg bg-[var(--blue50)] px-2.5 py-1 text-sm font-bold tabular-nums text-[var(--blue700)] dark:bg-blue-500/10"
                 aria-label={`승부차기 ${sides
                   .map((side) => `${side.displayNameSnapshot} ${penaltyScoreForSide(side, confirmedPenalties)}점`)
-                  .join(', ')}`}
+                  .join(', ')}${
+                  confirmedFirstKicker === null ? '' : `, 선축 ${confirmedFirstKicker.displayNameSnapshot}`
+                }`}
               >
                 <Target size={16} aria-hidden="true" />
                 승부차기{' '}
                 {sides.map((side) => penaltyScoreForSide(side, confirmedPenalties)).join(':')}
+                {/* 선축은 점수와 함께 결과의 일부다(두 숫자로는 복원되지 않는다). 여기서는
+                    사이드 목록이 있으므로 `홈`/`원정` 대신 실제 팀 이름을 쓴다 — 목록형
+                    화면(결과 검수·픽스처 목록)은 이름을 갖고 있지 않아
+                    `formatGameResultScoreWithPenalties`가 `홈`/`원정`을 쓴다. 선축이 없던
+                    시절에 저장된 경기는 이 조각을 아예 그리지 않는다. */}
+                {confirmedFirstKicker === null ? null : (
+                  <span className="font-semibold">· 선축 {confirmedFirstKicker.displayNameSnapshot}</span>
+                )}
               </span>
             ) : null}
             {currentPeriod && currentPeriod.startedAt ? (
@@ -1149,43 +1264,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           화면에서 "배경이 꽉 찬 유채색 강조"는 0개가 되고, 색은 작은
           지시자로만 남는다 — 나머지(버튼 배경·테두리·라벨)는 후퇴시켜
           강조가 뭉개지지 않게 한다(R-D2).
-          위계 재설계(alpha 390px 실측 지적) — 예전엔 "교체"만 마지막 칸이라는
-          이유로 전폭(2칸)을 차지해, 실제 사용 빈도·중요도가 가장 낮은 축에
-          속하는 교체가 화면에서 가장 큰 버튼이 됐다(다섯 버튼 중 유일하게
-          "행동 하나로 끝나지 않는" 액션이라 오히려 실수 유발 여지도 큼). 실제
-          현장 빈도는 골이 압도적으로 높고(경기당 여러 번, 즉시 기록 필요),
-          카드·파울이 그다음, 교체가 가장 드물다(경기당 정해진 횟수). 전폭
-          자리를 마지막 항목이 아니라 **골**에 준다 — 모바일에서는 골이
-          단독으로 한 줄 전체(2칸)를 차지하고 살짝 더 높게(h-20) 서서
-          "가장 먼저 눈에 띄고 가장 먼저 손이 가는" 위치(엄지 도달 최상단)를
-          갖는다. 나머지 네 버튼(옐로/레드/파울/교체)은 그 아래 2×2로 가지런히
-          정렬된다 — 카드 2개가 한 행, 파울·교체가 한 행이라 성격이 가까운
-          것끼리 묶인다. 색은 여전히 전부 outline 중립(R-K5 "동급 CTA는
-          1개"를 지키려 골을 primary/파란색으로 올리지 않는다 — 이미 헤더의
-          "일시 중지"가 이 화면의 유일한 파란 CTA다) — 위계는 오직 크기·
-          위치로만 만든다.
-          sm 이상: 5개가 균등 5열이면 이 위계가 데스크톱에서만 사라진다.
-          6열 그리드로 바꿔 골이 2칸(전체의 2/6 ≈ 33%), 나머지가 각 1칸
-          (1/6 ≈ 17%)을 차지하게 해 폭 2배 관계를 모바일과 동일하게
-          유지하면서, 6개 칸(2+1+1+1+1)이 딱 맞아떨어져 줄바꿈 없이 한 줄에
-          정렬된다. */}
+          자책골이 추가된 현재는 6개 액션을 모바일 2열·데스크톱 6열로
+          균등 배치한다. 골만 2칸을 쓰면 총 7칸이 되어 마지막 액션이 홀로
+          다음 줄로 밀리므로, 모든 액션의 크기와 터치 영역을 동일하게 둔다. */}
       <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-6">
         {ACTION_BUTTONS.map((button, index) => (
           <Button
             key={`${button.type}-${button.cardColor ?? index}`}
             size="lg"
             variant="outline"
-            className={`flex-col gap-1${
-              // [알파 감사 F] 데스크톱(lg, 1024px+)에서는 버튼이 더 크고 눌러야
-              // 쉬워지는 방향이 맞다 — 경기 중 빠르게 눌러야 하는 화면이다.
-              // 모바일(h-20/h-16)·태블릿(sm:h-16)은 기존 그대로 두고 lg에서만
-              // 한 단계 더 키운다(h-24/h-20).
-              index === 0 ? ' col-span-2 h-20 sm:col-span-2 sm:h-16 lg:h-24' : ' h-16 lg:h-20'
-            }`}
+            className="h-16 flex-col gap-1 lg:h-20"
             disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
             onClick={() => handleSelectAction(button)}
           >
-            {button.type === 'GOAL' ? (
+            {button.type === 'GOAL' || button.type === 'OWN_GOAL' ? (
               <Goal size={18} aria-hidden="true" className="text-green-600 dark:text-green-400" />
             ) : button.type === 'FOUL' ? (
               <AlertTriangle size={18} aria-hidden="true" className="text-[var(--text-muted)]" />
@@ -1257,7 +1349,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           sides={sides}
           lineups={lineups}
           onAttachAssist={(event) => setAssistTarget({ event })}
-          onReverseSubstitution={(event) => void ops.reverseEvent({ eventId: event.id, reason: '교체 되돌리기' })}
+          onReverseEvent={(event) => void handleReverseEvent(event)}
         />
       </section>
 
@@ -1305,10 +1397,13 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         <PenaltyShootoutPanel
           sides={sides}
           kicks={penaltyKicks}
+          firstKickSideId={firstKickSideId}
+          onSelectFirstKicker={setFirstKickSideId}
           onRecordKick={handleRecordPenaltyKick}
           onUndoLastKick={handleUndoPenaltyKick}
-          onFinish={() => void handleFinishPenaltyShootout()}
+          onFinish={(options) => void handleFinishPenaltyShootout(options)}
           onCancel={handleCancelPenaltyShootout}
+          policy={penaltyPolicy}
           finishing={commandPending}
         />
       ) : null}

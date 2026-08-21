@@ -13,6 +13,7 @@ import type { GameLineupState } from '@/types/game-operations';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
+  eventPresentation,
   fixtureStatusLabel,
   formatGoalMinute,
   formatScoreline,
@@ -92,71 +93,143 @@ const SCORE_AXIS_COLUMN_GAP = 10;
  * 좁은 카드에 다 욱여넣으면 오히려 안 읽히므로 이 컴포넌트는 의도적으로 쓰지
  * 않는다(상세 페이지 타임라인에서는 등번호까지 보여준다).
  */
-function ScorerSummary({ scorers }: { scorers: PublicScheduleEntry['scorers'] }) {
-  if (scorers.length === 0) return null;
-  const byClock = (a: PublicScheduleEntry['scorers'][number], b: PublicScheduleEntry['scorers'][number]) =>
+type ScheduleEventItem = {
+  key: string;
+  side: 'home' | 'away';
+  icon: string;
+  label: string;
+  /** 눈에 보이는 표식(자책골 등). `eventPresentation` 이 필요한 이벤트에만 채운다. */
+  badge?: string;
+  participantName: string | null;
+  period: number | null;
+  clockMs: number | null;
+};
+
+function toScheduleEventItems(entry: PublicScheduleEntry): ScheduleEventItem[] {
+  const goals = entry.scorers.map((scorer, index) => ({
+    key: `goal-${index}`,
+    side: scorer.side,
+    ...eventPresentation({ type: scorer.ownGoal ? 'OWN_GOAL' : 'GOAL', cardColor: null }),
+    participantName: scorer.participantName,
+    period: scorer.period,
+    clockMs: scorer.clockMs,
+  }));
+  // `?? []` -- 서버는 항상 이 키를 채우지만, 배포 과도기나 React Query 캐시에 남은
+  // 구 응답에는 `cards` 키가 아예 없을 수 있다(`formatPenaltyScoreline`이 `penalties`를
+  // 같은 이유로 방어한다). 시스템 경계에서 들어오는 값이라 키 부재를 정상 입력으로 다룬다.
+  const cards = (entry.cards ?? []).map((card, index) => ({
+    key: `card-${index}`,
+    side: card.side,
+    ...eventPresentation({ type: 'CARD', cardColor: card.cardColor }),
+    participantName: card.participantName,
+    period: card.period,
+    clockMs: card.clockMs,
+  }));
+  return [...goals, ...cards];
+}
+
+function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
+  const items = toScheduleEventItems(entry);
+  if (items.length === 0) return null;
+
+  const byClock = (a: ScheduleEventItem, b: ScheduleEventItem) =>
     (a.clockMs ?? Number.MAX_SAFE_INTEGER) - (b.clockMs ?? Number.MAX_SAFE_INTEGER);
-  const firstHalf = scorers.filter((scorer) => scorer.period === 1).sort(byClock);
-  const secondHalf = scorers.filter((scorer) => scorer.period !== 1).sort(byClock);
-  const goalLine = (scorer: PublicScheduleEntry['scorers'][number], index: number) => (
-    <div key={index}>
-      {formatGoalMinute(scorer.clockMs)}
-      {scorer.participantName ? ` ${scorer.participantName}` : ''}
-      {isClockAbnormal(scorer.clockMs) ? <AbnormalClockBadge /> : null}
-    </div>
-  );
-  const halfRow = (label: string, halfScorers: PublicScheduleEntry['scorers']) => {
-    const home = halfScorers.filter((scorer) => scorer.side === 'home');
-    const away = halfScorers.filter((scorer) => scorer.side === 'away');
-    if (halfScorers.length === 0) return null;
-    return (
-      <div
-        role="group"
-        aria-label={label}
-        style={{
-          display: 'grid',
-          gridColumn: '1 / -1',
-          gridTemplateColumns: SCORE_AXIS_COLUMNS,
-          columnGap: SCORE_AXIS_COLUMN_GAP,
-        }}
-      >
-        <div style={{ textAlign: 'right' }}>{home.map(goalLine)}</div>
-        <div aria-hidden="true" style={{ textAlign: 'center' }}>⚽</div>
-        <div style={{ textAlign: 'left' }}>{away.map(goalLine)}</div>
-      </div>
-    );
-  };
+  // `period === null` = "전/후반을 모른다". 레거시 대회 결과에서 복원된 기록이 그렇다
+  // (`goal-event-backfill.ts` -- 원본에 전/후반이 없었고, 서버가 `isPeriodUnknown`으로
+  // null을 내려준다). `period !== 1`로 뭉뚱그리면 이 기록들이 전부 "후반"으로 렌더돼,
+  // 모른다고 내려온 값이 화면에서는 단정으로 바뀐다.
+  const sections = [
+    { key: 'first', label: '전반', items: items.filter((item) => item.period === 1).sort(byClock) },
+    {
+      key: 'second',
+      label: '후반',
+      items: items.filter((item) => item.period !== null && item.period !== 1).sort(byClock),
+    },
+    { key: 'unknown', label: '기타', items: items.filter((item) => item.period === null).sort(byClock) },
+  ].filter((section) => section.items.length > 0);
+
   return (
     <div
       role="list"
-      aria-label="득점자"
+      aria-label="경기 기록"
       style={{
         display: 'grid',
-        gridTemplateColumns: SCORE_AXIS_COLUMNS,
-        columnGap: SCORE_AXIS_COLUMN_GAP,
-        marginTop: 4,
+        gap: 8,
+        marginTop: 8,
         // [R-T2] 좌우 1fr 트랙이라 폭이 늘어도 그리드가 흡수 — 12로 상향.
         fontSize: 12,
         color: 'var(--text-caption)',
       }}
     >
-      {halfRow('전반 득점', firstHalf)}
-      <div
-        role="separator"
-        aria-label="전반과 후반 구분"
-        style={{
-          gridColumn: '1 / -1',
-          justifySelf: 'center',
-          width: '50%',
-          height: 0,
-          margin: '6px 0',
-          borderTop: '1px dotted var(--border)',
-        }}
-      />
-      {halfRow('후반 득점', secondHalf)}
+      {sections.map((section) => (
+        <div key={section.key} role="group" aria-label={`${section.label} 기록`} style={{ display: 'grid', gap: 3 }}>
+          {/* 예전엔 전/후반 사이에 점선 하나만 그어서 그게 무슨 경계인지 알 수 없었다 —
+              구간 이름을 직접 적는다(디자인 규칙: 의미 구분은 선·색만으로 하지 않는다). */}
+          <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <span style={{ fontWeight: 700, color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
+              {section.label}
+            </span>
+            <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          </div>
+          {section.items.map((item) => (
+            <ScheduleEventRow key={item.key} item={item} />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
+
+function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
+  const content = (
+    <span>
+      {formatGoalMinute(item.clockMs)}
+      {item.participantName ? ` ${item.participantName}` : ''}
+      {isClockAbnormal(item.clockMs) ? <AbnormalClockBadge /> : null}
+    </span>
+  );
+
+  return (
+    <div
+      role="listitem"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: SCORE_AXIS_COLUMNS,
+        columnGap: SCORE_AXIS_COLUMN_GAP,
+        alignItems: 'center',
+      }}
+    >
+      <div style={{ textAlign: 'right' }}>{item.side === 'home' ? content : null}</div>
+      <div style={{ textAlign: 'center', lineHeight: 1 }}>
+        <span aria-hidden="true">{item.icon}</span>
+        <span className="sr-only">{item.label}</span>
+        {item.badge ? (
+          /* 자책골처럼 아이콘만으로 뜻이 갈리지 않는 이벤트에 붙는 **보이는** 표식.
+             `sr-only` 라벨만으로는 화면에서 일반 골과 구분되지 않는다(2026-08-19 alpha 실측:
+             관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
+          <span
+            style={{
+              fontSize: 10,
+              lineHeight: 1.4,
+              padding: '0 4px',
+              borderRadius: 4,
+              fontWeight: 700,
+              // 실제 팔레트 토큰을 쓴다 — `--danger-*` 는 이 코드베이스에 없어서
+              // 하드코딩 fallback 이 항상 적용되고 있었다(다크모드도 따라오지 않는다).
+              color: 'var(--red700)',
+              background: 'var(--tint-red)',
+            }}
+          >
+            {item.badge}
+          </span>
+        ) : null}
+      </div>
+      <div style={{ textAlign: 'left' }}>{item.side === 'away' ? content : null}</div>
+    </div>
+  );
+}
+
 
 function VideoBadge({ hasVideo }: { hasVideo: boolean }) {
   if (!hasVideo) return null;
@@ -331,7 +404,7 @@ function ScheduleRow({
       {/* 스코어 아래 보조 표기 — 스코어 칸(가운데 64px)이 행 정중앙이라 행 전체를
           가운데 정렬하면 그대로 스코어 밑에 놓인다. 승부차기가 없으면 렌더 없음. */}
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
-      <ScorerSummary scorers={entry.scorers} />
+      <MatchEventSummary entry={entry} />
       {venue ? (
         // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.
         <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)' }}>{venue}</div>

@@ -31,6 +31,7 @@ export type GameLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
  */
 export type GameEventType =
   | 'GOAL'
+  | 'OWN_GOAL'
   | 'CARD'
   | 'FOUL'
   | 'SUBSTITUTION'
@@ -176,6 +177,26 @@ export interface GameDetail {
    * 참고). `groupId`가 없는 픽스처는 보수적으로 `false`.
    */
   isKnockoutFixture: boolean;
+  /**
+   * 이 대회의 승부차기 종료 판정 정책 — 서버가 pinned config 의 `result` 를 해석해
+   * 내려준다(`parseResultPolicy`, `apps/v1_api/.../competition-config.parse.ts`).
+   * `substitutionPolicy`/`periodDurations` 와 같은 형태다: 프런트는 config JSON 을
+   * 직접 읽지 않는다.
+   *
+   * 의미는 `PenaltyShootoutPolicy`(`lib/penalty-shootout.ts`)에 한 번만 적는다 —
+   * 판정을 실제로 수행하는 곳이 거기다.
+   *
+   * optional 인 이유는 이 필드가 없던 서버 응답(캐시된 쿼리·구버전 배포)에서도 콘솔이
+   * 렌더돼야 하기 때문이다. 없으면 `penaltyShootoutOutcome` 의 기본값과 같은 FIFA 정규로
+   * 읽는다 — 그쪽이 이전 동작보다 **엄격한** 쪽이라 안전한 폴백이다.
+   */
+  penaltyShootoutPolicy?: GamePenaltyShootoutPolicy;
+}
+
+/** `result.penaltyShootout` from the game's pinned competition config, resolved
+ * server-side (`parseResultPolicy`). See `GameDetail.penaltyShootoutPolicy`. */
+export interface GamePenaltyShootoutPolicy {
+  earlyStop: boolean;
 }
 
 export interface GameEventRecord {

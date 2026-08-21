@@ -7,6 +7,7 @@ import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
+  eventPresentation,
   fixtureStatusLabel,
   formatClock,
   formatScoreline,
@@ -91,6 +92,26 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 36 }}>
         <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}>{presentation.icon}</span>
         <span className="sr-only">{presentation.label}</span>
+        {presentation.badge ? (
+          /* 자책골처럼 아이콘만으로 뜻이 갈리지 않는 이벤트에 붙는 **보이는** 표식.
+             `sr-only` 라벨만으로는 화면에서 일반 골과 구분되지 않는다(2026-08-19 alpha 실측:
+             관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
+          <span
+            style={{
+              fontSize: 10,
+              lineHeight: 1.4,
+              padding: '0 4px',
+              borderRadius: 4,
+              fontWeight: 700,
+              // 실제 팔레트 토큰을 쓴다 — `--danger-*` 는 이 코드베이스에 없어서
+              // 하드코딩 fallback 이 항상 적용되고 있었다(다크모드도 따라오지 않는다).
+              color: 'var(--red700)',
+              background: 'var(--tint-red)',
+            }}
+          >
+            {presentation.badge}
+          </span>
+        ) : null}
         {/* [R-T2] min-width:36 컬럼(고정폭 아님) 안 시각 텍스트 — 12로 상향. */}
         <span className="tab-num" style={{ fontSize: 12, color: 'var(--text-caption)' }}>
           {formatClock(event.clockMs)}
@@ -100,14 +121,6 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
       <div style={{ display: 'flex', justifyContent: 'flex-start' }}>{event.side === 'away' ? content : null}</div>
     </div>
   );
-}
-
-function eventPresentation(event: PublicMatchEvent): { icon: string; label: string } {
-  if (event.type === 'GOAL') return { icon: '⚽', label: '골' };
-  if (event.type === 'CARD' && event.cardColor === 'RED') return { icon: '🟥', label: '레드카드' };
-  if (event.type === 'CARD' && event.cardColor === 'YELLOW') return { icon: '🟨', label: '옐로카드' };
-  if (event.type === 'CARD') return { icon: '□', label: '카드 색상 확인 필요' };
-  return { icon: '•', label: event.type };
 }
 
 function EventsSection({

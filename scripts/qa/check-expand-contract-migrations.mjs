@@ -22,6 +22,128 @@ class UnparsableSqlError extends Error {}
 // the gate exists to catch does not apply. Keep this list SHORT: every entry
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
+  // ── PR #563 v1_records_profile_integration_repair (2026-08-19) ──────────
+  // 8 statements, reviewed 2026-08-20 after this migration blocked every alpha
+  // deploy from 06:44. Two of them (DISABLE TRIGGER, DELETE) carry residual risk
+  // that is named explicitly in their own reason rather than argued away.
+  {
+    file: "apps/v1_api/prisma/migrations/20260819090000_v1_records_profile_integration_repair/migration.sql",
+    statement:
+      "WITH penalty_outcomes AS ( SELECT trf.id, CASE WHEN trf.team_id = gof.home_team_id THEN CASE WHEN ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'home')::int > ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'away')::int THEN 'WON' ELSE 'LOST' END ELSE CASE WHEN ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'away')::int > ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'home')::int THEN 'WON' ELSE 'LOST' END END AS repaired_result FROM v1_team_record_facts trf JOIN v1_game_official_facts gof ON gof.revision_id = trf.revision_id JOIN v1_games game ON game.id = trf.game_id AND game.current_official_revision_id = trf.revision_id WHERE gof.home_score = gof.away_score AND jsonb_typeof(COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) = 'object' AND jsonb_typeof((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) -> 'home') = 'number' AND jsonb_typeof((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) -> 'away') = 'number' AND ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'home')::int <> ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'away')::int ) UPDATE v1_team_record_facts trf SET result = penalty_outcomes.repaired_result FROM penalty_outcomes WHERE trf.id = penalty_outcomes.id AND trf.result IS DISTINCT FROM penalty_outcomes.repaired_result",
+    reason:
+      "PR #563. Repairs v1_team_record_facts.result for regulation draws decided by a shootout: the fact row said LOST/WON from the drawn regulation score while the official revision's penalties say otherwise. Rolling-deploy safe both ways — it mutates no schema, and the column an old instance reads simply becomes CORRECT (that is the defect being fixed, alpha-observed). Idempotent by construction: the WHERE ends with `trf.result IS DISTINCT FROM penalty_outcomes.repaired_result`, and the row set is bounded to `home_score = away_score` rows whose penalties object has two numeric, unequal sides. Goals-for/against are untouched — penalties only decide WON/LOST. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260819090000_v1_records_profile_integration_repair/migration.sql",
+    statement:
+      "CREATE TEMP TABLE v1_record_repair_identity_links ON COMMIT DROP AS SELECT participant.id AS participant_id, participant.user_id, gen_random_uuid()::text AS link_id FROM v1_game_participants participant WHERE participant.user_id IS NOT NULL AND NOT EXISTS ( SELECT 1 FROM v1_participant_identity_link_current current_link WHERE current_link.participant_id = participant.id ) AND NOT EXISTS ( SELECT 1 FROM v1_participant_identity_link_events identity_event WHERE identity_event.participant_id = participant.id )",
+    reason:
+      "PR #563. `CREATE TEMP TABLE ... ON COMMIT DROP` — a session-local scratch table that no other connection can see and that Postgres drops at commit. It cannot affect a concurrently running old or new instance in either direction; the gate rejects it only because CREATE TEMP TABLE is not in its provably-additive list. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260819090000_v1_records_profile_integration_repair/migration.sql",
+    statement:
+      "INSERT INTO v1_participant_identity_link_events ( id, participant_id, link_id, event_version, request_id, action, user_id, effective_at, actor_type, actor_user_id, system_actor, reason, created_at ) SELECT gen_random_uuid()::text, participant_id, link_id, 1, link_id, 'ROSTER_ASSERTED'::\"V1IdentityLinkAction\", user_id, CURRENT_TIMESTAMP, 'SYSTEM'::\"V1IdentityActorType\", NULL, 'V1_RECORD_PROFILE_REPAIR', 'Backfill trusted roster participant identity for public record projection', CURRENT_TIMESTAMP FROM v1_record_repair_identity_links",
+    reason:
+      "PR #563. Appends ROSTER_ASSERTED identity-link EVENT rows for legacy tournament participants that predate automatic linking. Insert-only, and its source (the temp table above) already excludes any participant that has ANY existing identity event — so a revoked or disputed historical link is never recreated and no existing row is touched. An old instance reads one extra event row for a participant it already trusted; on rollback the rows are simply ignored. The gate rejects INSERT as a category because it cannot PROVE additivity, not because these rows are unsafe. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260819090000_v1_records_profile_integration_repair/migration.sql",
+    statement:
+      "INSERT INTO v1_participant_identity_link_current ( participant_id, link_id, user_id, version, effective_from, updated_at ) SELECT participant_id, link_id, user_id, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM v1_record_repair_identity_links ON CONFLICT (participant_id) DO NOTHING",
+    reason:
+      "PR #563. Materializes the current-link projection for exactly the participants seeded above, `ON CONFLICT (participant_id) DO NOTHING`. Insert-only with an explicit no-op on collision, so a participant that already has a current link keeps it untouched. Same rollback story as the event rows. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260819090000_v1_records_profile_integration_repair/migration.sql",
+    statement:
+      "ALTER TABLE v1_game_result_participants DISABLE TRIGGER v1_guard_result_participant_mutation",
+    reason:
+      "PR #563. `v1_guard_result_participant_mutation` rejects ANY insert/update/delete on v1_game_result_participants whose revision is not DRAFT (ERRCODE 55000). This repair by definition targets rows on OFFICIAL revisions, so the guard must be lifted for the two statements that follow and is restored immediately after (see the ENABLE entry). Scope is bounded by Postgres itself: ALTER TABLE takes ACCESS EXCLUSIVE, and Prisma runs a migration file in one transaction, so concurrent writers BLOCK rather than slip through the disabled window — no instance, old or new, can bypass the guard while it is off. RESIDUAL RISK, stated plainly: that same lock stalls live traffic touching this table for the duration of the repair. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260819090000_v1_records_profile_integration_repair/migration.sql",
+    statement:
+      "DELETE FROM v1_game_result_participants result_participant USING v1_game_result_revisions revision, v1_games game, v1_game_participants participant, v1_game_lineups lineup WHERE result_participant.result_revision_id = revision.id AND revision.id = game.current_official_revision_id AND game.source_type = 'TOURNAMENT_FIXTURE' AND result_participant.participant_id = participant.id AND participant.lineup_id = lineup.id AND EXISTS ( SELECT 1 FROM v1_game_lineups newer_lineup WHERE newer_lineup.game_id = lineup.game_id AND newer_lineup.side_id = lineup.side_id AND newer_lineup.revision > lineup.revision )",
+    reason:
+      "PR #563. Deletes appearance rows that hang off a SUPERSEDED lineup revision — the predicate requires `EXISTS (newer_lineup ... revision > lineup.revision)` for the same game+side, so every deleted row is provably orphaned by a later lineup and is re-derived by the backfill that follows. An old instance reading these rows was reading a stale roster; after the repair it reads the current one. RESIDUAL RISK, stated plainly: this is real, irreversible data removal, and its safety rests entirely on that superseded-lineup predicate being right. It is the single statement in this migration I would re-examine first if record counts look wrong after deploy. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260819090000_v1_records_profile_integration_repair/migration.sql",
+    statement:
+      "WITH reversed_events AS ( SELECT DISTINCT reverses_event_id AS event_id FROM v1_game_events WHERE reverses_event_id IS NOT NULL ), active_events AS ( SELECT event.* FROM v1_game_events event LEFT JOIN reversed_events reversed ON reversed.event_id = event.id WHERE reversed.event_id IS NULL ), appearance_rows AS ( SELECT revision.id AS result_revision_id, participant.id AS participant_id, participant.side_id, participant.started, participant.position, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'GOAL' AND event.participant_id = participant.id ) AS goals, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'GOAL' AND event.assist_participant_id = participant.id ) AS assists, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'FOUL' AND event.participant_id = participant.id ) AS fouls, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'CARD' AND event.participant_id = participant.id AND event.payload ->> 'card' IS DISTINCT FROM 'RED' ) AS yellow_cards, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'CARD' AND event.participant_id = participant.id AND event.payload ->> 'card' = 'RED' ) AS red_cards FROM v1_games game JOIN v1_game_result_revisions revision ON revision.id = game.current_official_revision_id AND revision.state = 'OFFICIAL' JOIN v1_game_participants participant ON participant.game_id = game.id JOIN v1_game_lineups lineup ON lineup.id = participant.lineup_id WHERE game.source_type = 'TOURNAMENT_FIXTURE' AND NOT EXISTS ( SELECT 1 FROM v1_game_lineups newer_lineup WHERE newer_lineup.game_id = lineup.game_id AND newer_lineup.side_id = lineup.side_id AND newer_lineup.revision > lineup.revision ) ), appeared AS ( SELECT row.* FROM appearance_rows row WHERE row.started OR row.goals > 0 OR row.assists > 0 OR row.fouls > 0 OR row.yellow_cards > 0 OR row.red_cards > 0 OR EXISTS ( SELECT 1 FROM active_events event JOIN v1_game_result_revisions revision ON revision.id = row.result_revision_id WHERE event.game_id = revision.game_id AND event.type = 'SUBSTITUTION' AND event.participant_id = row.participant_id ) ) INSERT INTO v1_game_result_participants ( id, result_revision_id, participant_id, side_id, started, minutes_played, goals, assists, fouls, cards, goalkeeper, created_at, updated_at ) SELECT gen_random_uuid()::text, appeared.result_revision_id, appeared.participant_id, appeared.side_id, appeared.started, NULL, appeared.goals, appeared.assists, appeared.fouls, jsonb_build_object('yellow', appeared.yellow_cards, 'red', appeared.red_cards), COALESCE(appeared.position IN ('GK', 'GOALKEEPER', 'GOLEIRO'), false), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM appeared ON CONFLICT (result_revision_id, participant_id) DO NOTHING",
+    reason:
+      "PR #563. Backfills the missing appearance rows for current OFFICIAL tournament revisions, mirroring deriveAppearedParticipantIds plus the stat-event safety net (started, or any goal/assist/foul/card/substitution, with reversed events excluded). `ON CONFLICT (result_revision_id, participant_id) DO NOTHING` so an existing row is never rewritten — this only ADDS the rows whose absence is the bug. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260819090000_v1_records_profile_integration_repair/migration.sql",
+    statement:
+      "ALTER TABLE v1_game_result_participants ENABLE TRIGGER v1_guard_result_participant_mutation",
+    reason:
+      "PR #563. Restores the guard disabled above, in the same transaction. If the migration fails at any point the transaction rolls back and the trigger is never left off — the disabled state cannot outlive this file. Reviewed 2026-08-20.",
+  },
+  // ── v1_records_repair_goalkeeper_null (2026-08-20) ──────────────────────
+  // 바로 위 PR #563 마이그레이션을 **고쳐서 다시 수행하는** 파일이다. SQL 은 한 줄만 다르다
+  // (`position IN (...)` → `COALESCE(..., false)`): nullable 인 position 이 NULL 이면 IN 이
+  // NULL 을 돌려주고, 그 NULL 이 NOT NULL 인 goalkeeper 컬럼에 들어가 alpha 배포가 23502 로
+  // 죽었다. 게이트가 기존 마이그레이션 수정을 금지하므로 새 파일로 앞으로 고친다.
+  // 판정 근거는 아래 8개 각 항목에서 위 원본과 동일하다 — 같은 구문, 같은 위험, 같은 결론.
+  {
+    file: "apps/v1_api/prisma/migrations/20260820190000_v1_records_repair_goalkeeper_null/migration.sql",
+    statement:
+      "WITH penalty_outcomes AS ( SELECT trf.id, CASE WHEN trf.team_id = gof.home_team_id THEN CASE WHEN ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'home')::int > ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'away')::int THEN 'WON' ELSE 'LOST' END ELSE CASE WHEN ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'away')::int > ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'home')::int THEN 'WON' ELSE 'LOST' END END AS repaired_result FROM v1_team_record_facts trf JOIN v1_game_official_facts gof ON gof.revision_id = trf.revision_id JOIN v1_games game ON game.id = trf.game_id AND game.current_official_revision_id = trf.revision_id WHERE gof.home_score = gof.away_score AND jsonb_typeof(COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) = 'object' AND jsonb_typeof((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) -> 'home') = 'number' AND jsonb_typeof((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) -> 'away') = 'number' AND ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'home')::int <> ((COALESCE(gof.score -> 'penalties', gof.score -> 'penalty')) ->> 'away')::int ) UPDATE v1_team_record_facts trf SET result = penalty_outcomes.repaired_result FROM penalty_outcomes WHERE trf.id = penalty_outcomes.id AND trf.result IS DISTINCT FROM penalty_outcomes.repaired_result",
+    reason:
+      "PR #563 재수행(#600 이후 alpha 차단 복구). Repairs v1_team_record_facts.result for regulation draws decided by a shootout: the fact row said LOST/WON from the drawn regulation score while the official revision's penalties say otherwise. Rolling-deploy safe both ways — it mutates no schema, and the column an old instance reads simply becomes CORRECT (that is the defect being fixed, alpha-observed). Idempotent by construction: the WHERE ends with `trf.result IS DISTINCT FROM penalty_outcomes.repaired_result`, and the row set is bounded to `home_score = away_score` rows whose penalties object has two numeric, unequal sides. Goals-for/against are untouched — penalties only decide WON/LOST. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260820190000_v1_records_repair_goalkeeper_null/migration.sql",
+    statement:
+      "CREATE TEMP TABLE v1_record_repair_identity_links ON COMMIT DROP AS SELECT participant.id AS participant_id, participant.user_id, gen_random_uuid()::text AS link_id FROM v1_game_participants participant WHERE participant.user_id IS NOT NULL AND NOT EXISTS ( SELECT 1 FROM v1_participant_identity_link_current current_link WHERE current_link.participant_id = participant.id ) AND NOT EXISTS ( SELECT 1 FROM v1_participant_identity_link_events identity_event WHERE identity_event.participant_id = participant.id )",
+    reason:
+      "PR #563 재수행(#600 이후 alpha 차단 복구). `CREATE TEMP TABLE ... ON COMMIT DROP` — a session-local scratch table that no other connection can see and that Postgres drops at commit. It cannot affect a concurrently running old or new instance in either direction; the gate rejects it only because CREATE TEMP TABLE is not in its provably-additive list. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260820190000_v1_records_repair_goalkeeper_null/migration.sql",
+    statement:
+      "INSERT INTO v1_participant_identity_link_events ( id, participant_id, link_id, event_version, request_id, action, user_id, effective_at, actor_type, actor_user_id, system_actor, reason, created_at ) SELECT gen_random_uuid()::text, participant_id, link_id, 1, link_id, 'ROSTER_ASSERTED'::\"V1IdentityLinkAction\", user_id, CURRENT_TIMESTAMP, 'SYSTEM'::\"V1IdentityActorType\", NULL, 'V1_RECORD_PROFILE_REPAIR', 'Backfill trusted roster participant identity for public record projection', CURRENT_TIMESTAMP FROM v1_record_repair_identity_links",
+    reason:
+      "PR #563 재수행(#600 이후 alpha 차단 복구). Appends ROSTER_ASSERTED identity-link EVENT rows for legacy tournament participants that predate automatic linking. Insert-only, and its source (the temp table above) already excludes any participant that has ANY existing identity event — so a revoked or disputed historical link is never recreated and no existing row is touched. An old instance reads one extra event row for a participant it already trusted; on rollback the rows are simply ignored. The gate rejects INSERT as a category because it cannot PROVE additivity, not because these rows are unsafe. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260820190000_v1_records_repair_goalkeeper_null/migration.sql",
+    statement:
+      "INSERT INTO v1_participant_identity_link_current ( participant_id, link_id, user_id, version, effective_from, updated_at ) SELECT participant_id, link_id, user_id, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM v1_record_repair_identity_links ON CONFLICT (participant_id) DO NOTHING",
+    reason:
+      "PR #563 재수행(#600 이후 alpha 차단 복구). Materializes the current-link projection for exactly the participants seeded above, `ON CONFLICT (participant_id) DO NOTHING`. Insert-only with an explicit no-op on collision, so a participant that already has a current link keeps it untouched. Same rollback story as the event rows. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260820190000_v1_records_repair_goalkeeper_null/migration.sql",
+    statement:
+      "ALTER TABLE v1_game_result_participants DISABLE TRIGGER v1_guard_result_participant_mutation",
+    reason:
+      "PR #563 재수행(#600 이후 alpha 차단 복구). `v1_guard_result_participant_mutation` rejects ANY insert/update/delete on v1_game_result_participants whose revision is not DRAFT (ERRCODE 55000). This repair by definition targets rows on OFFICIAL revisions, so the guard must be lifted for the two statements that follow and is restored immediately after (see the ENABLE entry). Scope is bounded by Postgres itself: ALTER TABLE takes ACCESS EXCLUSIVE, and Prisma runs a migration file in one transaction, so concurrent writers BLOCK rather than slip through the disabled window — no instance, old or new, can bypass the guard while it is off. RESIDUAL RISK, stated plainly: that same lock stalls live traffic touching this table for the duration of the repair. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260820190000_v1_records_repair_goalkeeper_null/migration.sql",
+    statement:
+      "DELETE FROM v1_game_result_participants result_participant USING v1_game_result_revisions revision, v1_games game, v1_game_participants participant, v1_game_lineups lineup WHERE result_participant.result_revision_id = revision.id AND revision.id = game.current_official_revision_id AND game.source_type = 'TOURNAMENT_FIXTURE' AND result_participant.participant_id = participant.id AND participant.lineup_id = lineup.id AND EXISTS ( SELECT 1 FROM v1_game_lineups newer_lineup WHERE newer_lineup.game_id = lineup.game_id AND newer_lineup.side_id = lineup.side_id AND newer_lineup.revision > lineup.revision )",
+    reason:
+      "PR #563 재수행(#600 이후 alpha 차단 복구). Deletes appearance rows that hang off a SUPERSEDED lineup revision — the predicate requires `EXISTS (newer_lineup ... revision > lineup.revision)` for the same game+side, so every deleted row is provably orphaned by a later lineup and is re-derived by the backfill that follows. An old instance reading these rows was reading a stale roster; after the repair it reads the current one. RESIDUAL RISK, stated plainly: this is real, irreversible data removal, and its safety rests entirely on that superseded-lineup predicate being right. It is the single statement in this migration I would re-examine first if record counts look wrong after deploy. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260820190000_v1_records_repair_goalkeeper_null/migration.sql",
+    statement:
+      "WITH reversed_events AS ( SELECT DISTINCT reverses_event_id AS event_id FROM v1_game_events WHERE reverses_event_id IS NOT NULL ), active_events AS ( SELECT event.* FROM v1_game_events event LEFT JOIN reversed_events reversed ON reversed.event_id = event.id WHERE reversed.event_id IS NULL ), appearance_rows AS ( SELECT revision.id AS result_revision_id, participant.id AS participant_id, participant.side_id, participant.started, participant.position, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'GOAL' AND event.participant_id = participant.id ) AS goals, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'GOAL' AND event.assist_participant_id = participant.id ) AS assists, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'FOUL' AND event.participant_id = participant.id ) AS fouls, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'CARD' AND event.participant_id = participant.id AND event.payload ->> 'card' IS DISTINCT FROM 'RED' ) AS yellow_cards, ( SELECT COUNT(*)::int FROM active_events event WHERE event.game_id = game.id AND event.type = 'CARD' AND event.participant_id = participant.id AND event.payload ->> 'card' = 'RED' ) AS red_cards FROM v1_games game JOIN v1_game_result_revisions revision ON revision.id = game.current_official_revision_id AND revision.state = 'OFFICIAL' JOIN v1_game_participants participant ON participant.game_id = game.id JOIN v1_game_lineups lineup ON lineup.id = participant.lineup_id WHERE game.source_type = 'TOURNAMENT_FIXTURE' AND NOT EXISTS ( SELECT 1 FROM v1_game_lineups newer_lineup WHERE newer_lineup.game_id = lineup.game_id AND newer_lineup.side_id = lineup.side_id AND newer_lineup.revision > lineup.revision ) ), appeared AS ( SELECT row.* FROM appearance_rows row WHERE row.started OR row.goals > 0 OR row.assists > 0 OR row.fouls > 0 OR row.yellow_cards > 0 OR row.red_cards > 0 OR EXISTS ( SELECT 1 FROM active_events event JOIN v1_game_result_revisions revision ON revision.id = row.result_revision_id WHERE event.game_id = revision.game_id AND event.type = 'SUBSTITUTION' AND event.participant_id = row.participant_id ) ) INSERT INTO v1_game_result_participants ( id, result_revision_id, participant_id, side_id, started, minutes_played, goals, assists, fouls, cards, goalkeeper, created_at, updated_at ) SELECT gen_random_uuid()::text, appeared.result_revision_id, appeared.participant_id, appeared.side_id, appeared.started, NULL, appeared.goals, appeared.assists, appeared.fouls, jsonb_build_object('yellow', appeared.yellow_cards, 'red', appeared.red_cards), COALESCE(appeared.position IN ('GK', 'GOALKEEPER', 'GOLEIRO'), false), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM appeared ON CONFLICT (result_revision_id, participant_id) DO NOTHING",
+    reason:
+      "PR #563 재수행(#600 이후 alpha 차단 복구). Backfills the missing appearance rows for current OFFICIAL tournament revisions, mirroring deriveAppearedParticipantIds plus the stat-event safety net (started, or any goal/assist/foul/card/substitution, with reversed events excluded). `ON CONFLICT (result_revision_id, participant_id) DO NOTHING` so an existing row is never rewritten — this only ADDS the rows whose absence is the bug. Reviewed 2026-08-20.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260820190000_v1_records_repair_goalkeeper_null/migration.sql",
+    statement:
+      "ALTER TABLE v1_game_result_participants ENABLE TRIGGER v1_guard_result_participant_mutation",
+    reason:
+      "PR #563 재수행(#600 이후 alpha 차단 복구). Restores the guard disabled above, in the same transaction. If the migration fails at any point the transaction rolls back and the trigger is never left off — the disabled state cannot outlive this file. Reviewed 2026-08-20.",
+  },
   {
     file: 'apps/v1_api/prisma/migrations/20260817120000_v1_tournament_review_drop_team_unique/migration.sql',
     statement: 'DROP INDEX IF EXISTS "v1_tournament_reviews_tournament_id_team_id_key"',
@@ -379,6 +501,94 @@ END $$`,
     statement: 'DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = \'v1_tournament_reviews_team_id_fkey\' ) THEN ALTER TABLE "v1_tournament_reviews" ADD CONSTRAINT "v1_tournament_reviews_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "v1_teams"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$',
     reason:
       'FK on the same newly-added nullable column, which the additivity rules already treat as safe when written as a bare ALTER TABLE -- it is flagged here only because the idempotency guard wraps it in a DO block the parser cannot see into. Legacy NULL-valued rows bypass the constraint by definition, and the OLD app only ever produces NULL team_id, so no old write can violate it. ON DELETE RESTRICT adds no rolling risk either: V1Team is never physically deleted in this codebase (always deletedAt soft delete) and the sibling FK on v1_tournament_registrations.team_id already uses RESTRICT. Reviewed 2026-08-13.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement: `INSERT INTO "v1_managed_terms_policies" ("id", "code", "name", "is_active", "created_at", "updated_at") VALUES ('f772fb99-2671-4066-8874-54867ce0ecf4', 'tournament_record_disclosure', '대회 경기 기록 공개 동의', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Seeds a brand-new managed-terms POLICY row (code 'tournament_record_disclosure') that nothing can " +
+      "observe on its own: this repo surfaces terms only by walking placement -> policy -> latest published " +
+      "document for a context (ManagedTermsRuntimeService.currentTournamentTerms), so a policy with no " +
+      "placement is unreachable by every deployed revision, old and new. INSERT only, never UPDATE or " +
+      "DELETE, and ON CONFLICT (\"id\") DO NOTHING makes a re-run a no-op. No pre-existing row is touched -- " +
+      "in particular tournament_privacy v1.1 is deliberately left alone (this migration names it only in " +
+      "comments), so no existing consent is invalidated and no re-consent is triggered. Rolling the app " +
+      "back leaves an unread row behind, exactly like a CREATE TABLE. Why it exists: the public record " +
+      "screens now show a nickname unless the player opts into real-name display, and that opt-in needs its " +
+      "own consent basis -- tournament_privacy lists ten purposes, none of which is publishing match " +
+      "records. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement: `INSERT INTO "v1_managed_terms_documents" ("id", "policy_id", "version", "title", "content", "content_hash", "change_summary", "requires_reconsent", "status", "effective_at", "published_at", "created_at", "updated_at") VALUES ( '86b39028-bd47-4a4e-9c09-6a4c71c34df6', 'f772fb99-2671-4066-8874-54867ce0ecf4', 'v1.1', '대회 경기 기록 공개 동의', $terms$본인은 팀밋 대회 경기 기록(라인업, 득점·어시스트 등 이벤트 기록, MVP 등)에 닉네임 대신 실명이 표시되는 것에 동의할 수 있습니다. 이 동의는 선택 사항이며, 동의하지 않아도 대회 신청 및 참가에는 어떠한 제한도 없습니다. 1. 공개 항목 이름, 등번호, 포지션, 소속 팀명, 경기별 기록(출전·득점·어시스트·경고·퇴장·MVP 등) 2. 공개 목적 대회 경기 기록 및 참가 명단을 팀밋 서비스 내에서 공개 게시하기 위한 목적으로 이용합니다. 3. 공개 위치 팀밋 서비스 내 대회 기록, 순위표, 선수 기록 화면 4. 공개 기간 동의 시점부터 본인이 철회하기 전까지 계속 공개됩니다. 철회 후에는 별도 요청 없이 즉시 닉네임 표시로 전환됩니다. 5. 동의 거부 및 철회 안내 본 동의는 선택 사항입니다. 동의하지 않아도 대회 신청 및 참가에는 제한이 없으며, 이 경우 경기 기록에는 닉네임이 표시됩니다. 이미 동의한 경우에도 마이페이지 > 설정 > 대회 기록 실명 표시에서 언제든지 철회할 수 있습니다. 6. 유의사항 회사는 공개된 경기 기록을 대회 운영, 기록 게시, 서비스 제공 목적 범위 내에서만 사용합니다. 본인은 위 내용을 확인하였으며 대회 경기 기록 공개(실명 표시)에 동의합니다. 회사명: 아이위(IWI) 대표자: 김봉목 이메일: teameetsports@naver.com 시행일: 2026년 8월 18일$terms$, 'b0527fa26264263b1ed78388472df50499c9e2cb0730ff0a3d28e090f278e65a', '대회 경기 기록(라인업/득점/MVP 등)에 실명 표시를 선택적으로 동의받기 위한 신규 정책 최초 발행', true, 'published'::"V1TermsDocumentStatus", '2026-08-18T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP ) ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Seeds the single published DOCUMENT (v1.1) of the tournament_record_disclosure policy created one " +
+      "statement earlier in this same file, so it inherits that row's reachability argument: a document is " +
+      "surfaced only through its policy's placement, leaving it invisible until the third statement lands. " +
+      "After that it is read identically by both revisions -- " +
+      "apps/v1_api/src/terms/managed-terms-runtime.service.ts is unchanged across this release, so there is " +
+      "no version skew in how the row is interpreted. INSERT only with ON CONFLICT (\"id\") DO NOTHING; no " +
+      "existing document, content hash, or consent event is modified, so the forced-re-consent path (which " +
+      "keys on a policy's document version changing) is never entered. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement: `INSERT INTO "v1_managed_terms_placements" ("id", "policy_id", "context", "requirement", "display_order", "is_active", "created_at", "updated_at") VALUES ( '7ef702a4-6289-4913-a31a-319de15bebd8', 'f772fb99-2671-4066-8874-54867ce0ecf4', 'tournament_application'::"V1ManagedTermsContext", 'optional'::"V1ManagedTermsRequirement", 4, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP ) ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Seeds the PLACEMENT that makes the two rows above visible in the tournament_application context. " +
+      "This is the one statement here an old app instance can actually observe mid-rollout, and it is safe " +
+      "in that window precisely because it is optional: both gates in managed-terms-runtime.service.ts that " +
+      "can block a user (currentTournamentTerms' readiness check and assertTournamentAcceptances' " +
+      "missingRequiredDocumentIds) filter on requirement === 'required', so an optional placement can " +
+      "neither reject a registration nor force re-consent. An old instance simply renders one more optional " +
+      "checkbox -- it is fully data-driven and already does exactly this for the sibling optional " +
+      "tournament_media placement. display_order 4 appends after the four existing placements (0-2 " +
+      "required, 3 tournament_media) instead of renumbering any of them, and ON CONFLICT (\"id\") DO NOTHING " +
+      "makes a re-run a no-op. The one behavioural gap in a rollback window is that the old submit() does " +
+      "not flip V1UserProfile.tournamentRealNameVisible, so a user who ticks the box while rolled back " +
+      "stays at the column default of false: they keep being shown by nickname, which is the " +
+      "under-disclosure (safe) direction rather than publishing a name nobody asked to publish, and they " +
+      "can turn it on themselves at my > settings > tournament real-name once the new build is back. " +
+      "Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818160000_v1_team_record_facts_penalty_result/migration.sql',
+    statement: 'ALTER TABLE v1_team_record_facts DISABLE TRIGGER v1_block_team_record_fact_mutation',
+    reason:
+      'Turns off the append-only guard trigger for the duration of THIS migration transaction only; the ' +
+      'matching ENABLE runs a few statements later in the same transaction, so a failure rolls the disable ' +
+      'back with everything else and no window exists where a running app can mutate the table unguarded ' +
+      '(ALTER TABLE takes ACCESS EXCLUSIVE, so concurrent writers are blocked, not merely unguarded). Same ' +
+      'device and same reason as 20260813200000_v1_appearance_gate_backfill, which disables ' +
+      'v1_guard_result_participant_mutation to backfill the sibling facts table. The gate rejects ALTER ' +
+      'TABLE ... DISABLE TRIGGER as a category because it cannot prove additivity, not because this pair is ' +
+      'unsafe. Reviewed 2026-08-19.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818160000_v1_team_record_facts_penalty_result/migration.sql',
+    statement: 'ALTER TABLE v1_team_record_facts ENABLE TRIGGER v1_block_team_record_fact_mutation',
+    reason:
+      'Restores the guard disabled above, in the same transaction. Strictly a RE-tightening: it returns the ' +
+      'table to exactly the state every deployed revision expects, so neither a rolling deploy nor a ' +
+      'rollback can observe a difference. Reviewed 2026-08-19.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818160000_v1_team_record_facts_penalty_result/migration.sql',
+    statement:
+      "WITH penalty_scores AS ( SELECT trf.id AS fact_id, side.side_key AS team_side_key, COALESCE(rev.score -> 'penalties', rev.score -> 'penalty') AS penalty_json FROM v1_team_record_facts trf JOIN v1_game_result_revisions rev ON rev.id = trf.revision_id JOIN v1_game_sides side ON side.game_id = trf.game_id AND side.team_id = trf.team_id WHERE trf.result = 'DRAWN' ), decided AS ( SELECT fact_id, CASE WHEN team_side_key = 'HOME' THEN (penalty_json ->> 'home')::int ELSE (penalty_json ->> 'away')::int END AS penalties_for, CASE WHEN team_side_key = 'HOME' THEN (penalty_json ->> 'away')::int ELSE (penalty_json ->> 'home')::int END AS penalties_against FROM penalty_scores WHERE penalty_json IS NOT NULL AND jsonb_typeof(penalty_json -> 'home') = 'number' AND jsonb_typeof(penalty_json -> 'away') = 'number' ) UPDATE v1_team_record_facts trf SET result = CASE WHEN decided.penalties_for > decided.penalties_against THEN 'WON' ELSE 'LOST' END FROM decided WHERE trf.id = decided.fact_id AND decided.penalties_for <> decided.penalties_against",
+    reason:
+      'Corrects rows that were recorded wrong: a knockout decided on penalties was stored as DRAWN because ' +
+      'the projection only looked at the regulation score (production: a final at 1:1 with penalties 2:3 ' +
+      'showed "draw" for BOTH teams). Rolling-deploy safe in both directions. Old instances only ever ' +
+      'INSERT into this table (GameResultOfficialFactsService.project, ON CONFLICT DO NOTHING) — they never ' +
+      'UPDATE or DELETE a row, so this cannot race a writer. On the read side both old and new code render ' +
+      'the same column as 승/무/패; the corrected value is the factually right one, so a rollback leaves ' +
+      'the data MORE accurate than before, not broken. The one cosmetic difference while rolled back: the ' +
+      'old UI has no "승부차기 N-M" line, so such a row reads as "승" next to a 1:1 scoreline without the ' +
+      'explanation — a missing annotation, not a wrong result, and it disappears once rolled forward again. ' +
+      'goals_for/goals_against are deliberately untouched (regulation score is the record). Re-running is a ' +
+      "no-op: the WHERE clause only selects result = 'DRAWN', which an already-corrected row no longer is. " +
+      'The gate rejects UPDATE as a category because it cannot prove additivity. Reviewed 2026-08-19.',
   },
 ];
 

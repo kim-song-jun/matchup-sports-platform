@@ -62,6 +62,7 @@
 - [ ] [10-profile-settings-admin.md](./10-profile-settings-admin.md) - partial: admin smoke spec exists, dashboard/users/payments/reviews honest-data runtime is verified, `SET-001` server sync is implemented but live protected-route smoke is blocked by current dev runtime instability
 - [ ] [11-team-and-venue-hubs.md](./11-team-and-venue-hubs.md) - Legacy stack: partial, team/venue hub aggregate payload, flat-list affiliation context, tournaments surface, route/API smoke are verified; owner/admin interactive browser smoke remains follow-up. **v1 stack (Task 26, 2026-08-04)**: v1 has no hub/venue domain at all (confirmed by source read); closest v1 equivalents mapped to Tasks 12/18/22/24; owns `E2E-PUBLIC-01` (unimplemented in `e2e/v1-tests/tournament.spec.ts` as of this revision)
 - [ ] [12-v1-sm-new-e2e-scenarios.md](./12-v1-sm-new-e2e-scenarios.md) - partial: SM New v1 E2E 시나리오 매트릭스. Task 135의 V1-14-008 진행 중 대회 fixture 리뷰는 역할별 대상·개인화 CTA·승부차기 표시와 member-light/owner-dark 390/768/1440 실제 브라우저 6/6 증거까지 Verified
+- [ ] [19-game-operations-result-correction.md](./19-game-operations-result-correction.md) - live event correction, own goals, official timeline, penalty correction, reconnect/jersey/minute regression; headed evidence pending
 - [x] [13-v1-open-design-recovery-from-zero.md](./13-v1-open-design-recovery-from-zero.md) - Verified: Open Design Recovery From Zero completed for 109-page export, current 87-route feature implementation audit, Task 11 full parity evidence, and 2026-06-05 ULW full visual QA with 522/522 live captures plus 348/348 wide desktop captures passing
 - [x] [14-policy-hardening-rules.md](./14-policy-hardening-rules.md) - Verified: POSCO MDS-derived QA policy hardening rules, GREEN contract test, CLI manual evidence, and tmux unavailable error record captured on 2026-06-07
 - [ ] [15-focused-full-flow-test-matrix.md](./15-focused-full-flow-test-matrix.md) - in progress: Task 122가 alpha 프로필·대회 persona E2E를 canonical v1 route와 6개 상태 fixture로 좁혔고, completed detail→results→영상 tab→awards 실제 이동과 awards mobile/tablet overflow 0을 확인했다. Awards 높이 수정은 alpha 배포됐고 after 캡처가 남았다. 영상 제어·profile/upload·registration/admin permission과 exact-ID cleanup은 남음
@@ -298,6 +299,20 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
   - 해결된 스펙 품질 문제: broad selector, auth wall 판정, bottom-nav contract, chat room response shape, hidden duplicate DOM 대응
   - 해결된 제품 문제: `/matches/new` create payload가 DTO에 없는 UI 필드를 전송하던 버그
   - 남은 갭: `TEAM-003`, `TEAM-004-B`, `TEAM-005-C`, `TM-SMOKE-001`, mercenary flow automation, chat unread/realtime depth expansion, marketplace/lesson CRUD + commerce automation, payment/review/badge/admin Playwright coverage, `/settings/notifications` protected-route live smoke rerun after dev-login recovery, `make dev-local` 대응 DB runtime abstraction, multi-browser 확대
+
+## 2026-08-19 — Team records and public profile integration
+
+- Status: PASS, 2 routes x 3 viewports.
+- Routes: team records and public user profile.
+- Verified penalty-decided outcomes, the separate shootout scoreline, the
+  removed corrected badges, tournament activity counts, and responsive
+  overflow at 390 / 768 / 1440.
+- All intercepted contract APIs returned 200. Console errors, page errors,
+  and request failures were zero.
+- Screenshots and the run manifest are under
+  docs/screenshots/task-127-records-profile. The team-record captures predate
+  the goal/card accordion that landed separately on `dev`, so treat them as
+  evidence for the outcome and shootout rows only.
 
 ## How To Use
 

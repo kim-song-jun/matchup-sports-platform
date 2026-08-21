@@ -151,6 +151,7 @@ async function buildOfficialGame(fixtureId: string): Promise<{ gameId: string; o
   const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
   const previewHash = canonicalGameCommandPayloadHash({
     score: submitted.score,
+    goalEvents: submitted.goalEvents,
     eventsHash: submitted.eventsHash,
     mvpParticipantId: submitted.mvpParticipantId,
   });
@@ -429,9 +430,10 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     return { homeSideId: home.id, scorerId: scorer.id };
   }
 
-  function previewHash(revision: { score: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
+  function previewHash(revision: { score: unknown; goalEvents: unknown; eventsHash: string; mvpParticipantId: string | null }): string {
     return canonicalGameCommandPayloadHash({
       score: revision.score,
+      goalEvents: revision.goalEvents,
       eventsHash: revision.eventsHash,
       mvpParticipantId: revision.mvpParticipantId,
     });
@@ -716,10 +718,10 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
 
   it('Q-11: cross-game current-pointer and supersedes corruption is rejected by the composite FKs at the database layer', async () => {
     const gameAId = await buildTournamentGame(ids.fixtureQ11A);
-    const submittedA = await (async () => {
-      await endGameWithHomeGoal(gameAId);
-      return prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId: gameAId } });
-    })();
+    // `endGameWithHomeGoal`의 반환값(득점자 + HOME side)을 버리지 않고 받는다 —
+    // 아래 correction draft가 실제 참가자를 담기 위해 필요하다.
+    const endedA = await endGameWithHomeGoal(gameAId);
+    const submittedA = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId: gameAId } });
     const officialA = await resultReview.officializeResultRevision(
       authUser(ids.platformOps),
       gameAId,
@@ -766,7 +768,18 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
       reason: 'draft used only to exercise the supersedes FK',
       changes: {
         score: { home: 1, away: 0 },
-        actualParticipants: [],
+        // 이 draft는 supersedes FK를 때리기 위한 도구일 뿐이지만, 빈 배열은
+        // 그 자체가 결함 입력이다(개인기록 0행). 실제 득점자를 담아 둔다.
+        actualParticipants: [
+          {
+            participantId: endedA.scorerId,
+            sideId: endedA.homeSideId,
+            started: true,
+            goals: 1,
+            cards: { yellow: 0, red: 0 },
+            goalkeeper: false,
+          },
+        ],
         eventsHash: 'task22tb-q11-correction-hash',
       },
     });

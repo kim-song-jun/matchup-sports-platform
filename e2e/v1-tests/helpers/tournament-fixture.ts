@@ -241,11 +241,13 @@ export async function endGameToSubmittedRevision(
  */
 export function projectionPreviewHash(revision: {
   readonly score: unknown;
+  readonly goalEvents: unknown;
   readonly eventsHash: string;
   readonly mvpParticipantId: string | null;
 }): string {
   return canonicalGameCommandPayloadHash({
     score: revision.score,
+    goalEvents: revision.goalEvents,
     eventsHash: revision.eventsHash,
     mvpParticipantId: revision.mvpParticipantId,
   });

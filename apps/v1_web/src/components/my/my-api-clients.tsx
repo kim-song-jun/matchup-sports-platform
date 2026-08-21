@@ -43,12 +43,14 @@ import {
   useV1TeamDetail,
   useV1TeamJoinApplications,
   useV1TeamMembers,
+  useV1TournamentRealNameVisibility,
   useV1UploadImages,
   useV1UpdateMyPreferences,
   useV1UpdateMyRegion,
   useV1UpdateProfile,
   useV1UpdateRecordConsent,
   useV1UpdateSettings,
+  useV1UpdateTournamentRealNameVisibility,
   useV1WithdrawalRequest,
   useV1WithdrawMyJoinApplication,
 } from '@/hooks/use-v1-api';
@@ -1618,6 +1620,120 @@ export function RecordConsentSettingsPageClient() {
               {formatTournamentDateTimeLong(consent.data.effectiveAt)}부터 공개하고 있어요.
             </div>
           ) : null}
+        </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+/**
+ * 대회 경기 기록 실명 표시 토글 (2026-08-18 사용자 결정) -- `RecordConsentSettingsPageClient`
+ * 바로 위와 같은 화면 구조를 재사용하되, "동의"가 아니라 표시 선호도 스위치라 policyHash가
+ * 없고 소급 공개 경고 문구도 없다(대회 신청 때마다 다시 묻지 않고 언제든 여기서 끌 수 있다는
+ * 점만 알리면 된다). 프로필에서 한 번 켜면 계속 적용된다는 게 이 정책의 핵심이라, 문구가 그
+ * 사실을 분명히 전달해야 한다.
+ *
+ * 대회 신청 흐름과의 관계 (2026-08-18 업데이트 -- 위 문단이 예전 사실을 담고 있었다):
+ * `tournament_privacy`(필수, 이름 등 수집·이용)와는 별개로, `tournament_record_disclosure`
+ * (선택, 신설 정책)에 대회 신청 화면에서 동의하면 이 화면을 거치지 않고도 서버가 이 토글을
+ * true로 켠다(`tournament-registrations.service.ts` submit() 참고, 이미 true거나 프로필
+ * row가 없으면 조용히 no-op). 즉 "대회 신청 때마다 다시 묻지 않는다"는 이 화면의 스위치
+ * 자체는 여전히 유효하지만, 신청 화면의 선택 동의 체크박스가 이 화면 밖에서 이 값을 켜는
+ * 두 번째 진입점이 됐다 -- 이 화면은 "언제든 끌 수 있는" 유일한 진입점 역할은 그대로 유지.
+ *
+ * 기존 사용자 안내 배너 (범위 밖, 계획만) -- 조사 결과: 이 저장소에는 이미 "한 번 노출되는
+ * 조건부 넛지 카드" 패턴이 있다. `components/home/home-client.tsx`의 `pushNudge`/
+ * `phoneVerifyNudge`가 예시 -- 서버/클라이언트 조건(권한 미허용, 미인증)으로 표시 여부를
+ * 계산하고, `PushNudgeBanner`/`PhoneVerifyBanner`(`components/home/home-page.tsx`)로
+ * 렌더링하며, `lib/session-storage.ts`의 `V1_PUSH_NUDGE_DISMISSED_KEY` 같은
+ * sessionStorage 키로 닫기 상태를 기록한다. 범용 배너 프리미티브는
+ * `components/v1-ui/primitives.tsx`의 `AlertBanner`(tone: error|info|warning).
+ * 이 토글을 위한 안내라면: (a) 홈 화면에 `TournamentRealNameNudgeBanner`를 추가해
+ * `V1UserProfile.tournamentRealNameVisible === false`이고 아직 안내를 본 적 없는
+ * 사용자에게만 노출 -- 단 `pushNudge`처럼 세션마다 리셋되는 sessionStorage는 "한 번만"
+ * 요구사항에 안 맞으므로(로그인마다 다시 뜸) 영구 dismiss는 서버 플래그(예:
+ * `V1UserProfile`에 `tournamentRealNameNudgeDismissedAt` 컬럼 추가, 스키마 변경 필요) 또는
+ * localStorage(기기 단위라 완벽하진 않지만 스키마 변경 없이 가능)로 가야 한다. (b) 배너
+ * CTA는 이 페이지(`/my/settings/tournament-real-name`)로 링크. 실제 구현은 이번 작업
+ * 범위 밖 -- 스키마 변경(서버 dismiss 플래그가 필요하다면) 여부를 먼저 사용자에게 확인하고
+ * 착수해야 한다.
+ */
+export function TournamentRealNameVisibilitySettingsPageClient() {
+  const visibility = useV1TournamentRealNameVisibility();
+  const update = useV1UpdateTournamentRealNameVisibility();
+  const [toggleError, setToggleError] = useState(false);
+
+  if (visibility.isError) {
+    return (
+      <AppChrome title="대회 기록 실명 표시" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+        <div className="tm-my-shell">
+          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void visibility.refetch()} />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const visible = Boolean(visibility.data?.visible);
+  const toggle = () => {
+    setToggleError(false);
+    update.mutate({ visible: !visible }, { onError: () => setToggleError(true) });
+  };
+
+  return (
+    <AppChrome title="대회 기록 실명 표시" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
+      <div className="tm-my-shell">
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">대회 기록 실명 표시</h1>
+          </div>
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">대회 경기 기록에 실명 표시</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              대회 라인업·득점자·MVP에 붙는 이름이에요. 끄면 닉네임으로 표시되고, 대회
+              신청할 때마다 다시 묻지 않아요 — 여기서 한 번 켜면 계속 적용되고, 언제든
+              다시 끌 수 있어요.
+            </div>
+          </Card>
+          {toggleError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+            </Card>
+          ) : null}
+          <div className="tm-card" style={{ padding: 0 }}>
+            <button
+              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+              onClick={toggle}
+              type="button"
+              disabled={visibility.isLoading || update.isPending}
+              role="switch"
+              aria-checked={visible}
+              aria-label="대회 기록 실명 표시"
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body">대회 기록 실명 표시</div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                  {update.isPending
+                    ? '저장하는 중이에요…'
+                    : visible
+                      ? '지금 실명으로 표시돼요. 끄면 닉네임으로 바뀌어요.'
+                      : '지금은 닉네임으로 표시돼요. 켜면 실명으로 바뀌어요.'}
+                </div>
+              </div>
+              <span
+                className="tm-text-caption"
+                style={{ minWidth: 24, textAlign: 'right', color: visible ? 'var(--blue500)' : 'var(--text-caption)' }}
+                aria-hidden="true"
+              >
+                {visible ? 'ON' : 'OFF'}
+              </span>
+              <span className={`tm-toggle ${visible ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
     </AppChrome>

@@ -16,6 +16,7 @@ import { RecordedEventList } from '@/app/tournament-ops/tournaments/[id]/fixture
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { deriveEditableGoalEvents } from '@/lib/result-goal-events';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { RevisionTimeline } from './revision-timeline';
@@ -150,6 +151,7 @@ export function GameResultReviewPanel({
         revisionId: freshRevision.id,
         expectedVersion: freshGame.version,
         score: freshRevision.score,
+        goalEvents: freshRevision.goalEvents,
         eventsHash: freshRevision.eventsHash,
         mvpParticipantId: freshRevision.mvpParticipantId,
       },
@@ -323,11 +325,19 @@ export function GameResultReviewPanel({
           reasonLabel="재제출 사유"
           base={{
             score: resubmitTarget.score,
+            goalEvents: deriveEditableGoalEvents(
+              resubmitTarget.goalEvents,
+              eventsQuery.data?.events ?? [],
+            ),
             participants: resubmitTarget.resultParticipants,
             mvpParticipantId: resubmitTarget.mvpParticipantId,
           }}
           sides={game.sides}
           lineups={lineupsQuery.data ?? []}
+          // 재제출도 정정과 **같은** 서버 승부차기 가드(`applyPenalties`)를 통과한다 --
+          // 그래서 같은 값을 내려준다: 폼이 기존 승부차기 점수를 이어서 보낼지 판정하고,
+          // 못 보내는 상태를 저장 전에 알린다(`game-result-correction-panel.tsx` 주석 참고).
+          isKnockoutFixture={game.isKnockoutFixture}
           submitting={supersedeAndSubmit.isPending}
           errorMessage={
             supersedeAndSubmit.isError ? describeResultReviewError(supersedeAndSubmit.error) : null
@@ -342,6 +352,7 @@ export function GameResultReviewPanel({
                 revisionId: resubmitTarget.id,
                 expectedVersion: game.version,
                 score: input.score,
+                goalEvents: input.goalEvents,
                 actualParticipants: input.actualParticipants,
                 eventsHash: resubmitTarget.eventsHash,
                 mvpParticipantId: input.mvpParticipantId,

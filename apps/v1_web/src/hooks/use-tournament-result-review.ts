@@ -3,7 +3,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
-import type { V1GameResultScore, V1GameResultScoreInput } from '@/types/api';
+import type {
+  V1GameResultCards,
+  V1GameResultGoalEventInput,
+  V1GameResultParticipantInput,
+  V1GameResultParticipantRow,
+  V1GameResultRevision,
+  V1GameResultRevisionState,
+  V1GameResultScore,
+  V1GameResultScoreInput,
+  V1GameRevisionMutationResult,
+  V1GameSide,
+} from '@/types/api';
 
 /**
  * Task 23 -- tournament result review / correction UI data layer.
@@ -14,15 +25,23 @@ import type { V1GameResultScore, V1GameResultScoreInput } from '@/types/api';
  * `TournamentOperationsBoardController` list endpoint. No new backend route is
  * invented here.
  *
- * Task 19 (`apps/v1_web/src/app/tournament-ops/layout.tsx`,
- * `apps/v1_web/src/hooks/use-tournament-operations.ts`) has not landed in this
- * worktree yet -- there is no shared tournament-ops shell/hook to build on top
- * of. This hook is therefore self-contained: it keeps its own query-key
- * builders locally instead of extending the shared `apps/v1_web/src/lib/
- * query-keys.ts` registry (which Task 23 does not own), so it never has to
- * touch a path outside this lane's declared ownership. When Task 19 lands,
- * `useTournamentEndedFixtures`'s board fetch is the one seam a future
- * refactor would want to fold into a shared board hook.
+ * Task 19's shared tournament-ops shell HAS landed
+ * (`apps/v1_web/src/app/tournament-ops/layout.tsx`,
+ * `components/tournament-ops/tournament-ops-shell.tsx`,
+ * `components/tournament-ops/role-context.tsx`), and so has the shared
+ * `apps/v1_web/src/lib/query-keys.ts` registry -- an earlier version of this
+ * comment claimed none of them existed, which was false. What is still absent
+ * is a shared board-fetch hook (`hooks/use-tournament-operations.ts` does not
+ * exist), so this hook keeps its own query-key builders locally rather than
+ * extending a registry Task 23 does not own. `useTournamentEndedFixtures`'s
+ * board fetch is the one seam a future refactor would want to fold into a
+ * shared board hook once that hook exists.
+ *
+ * Server-shape types below are ALIASES of the shared `@/types/api` contract
+ * wherever the shapes are identical. Re-declaring them locally as narrowed
+ * copies is what caused the `assists`/`fouls` data loss documented on
+ * `GameResultParticipantInput` -- a local copy silently drifts from the
+ * contract, and `tsc` cannot tell you it drifted.
  */
 
 // ── Shared server-shape types ───────────────────────────────────────────────
@@ -39,14 +58,7 @@ export type TournamentStaffActorRole =
  * `GamesService.resolveActor()`'s `TOURNAMENT_FIXTURE` branch. */
 export type GameActorRole = TournamentStaffActorRole;
 
-export type GameResultRevisionState =
-  | 'DRAFT'
-  | 'SUBMITTED'
-  | 'CHANGE_REQUESTED'
-  | 'SUPPLEMENT_REQUESTED'
-  | 'REJECTED'
-  | 'OFFICIAL'
-  | 'VOID';
+export type GameResultRevisionState = V1GameResultRevisionState;
 
 /**
  * `GET /games/:gameId/result-revisions`/the operations board 가 실제로 돌려주는
@@ -70,66 +82,37 @@ export type GameResultScore = V1GameResultScore;
  * 분리해 뒀다 -- `@/types/api`의 `V1GameResultScoreInput`을 그대로 재사용한다. */
 export type GameResultScoreInput = V1GameResultScoreInput;
 
-export type GameResultCards = { yellow: number; red: number };
+export type GameResultCards = V1GameResultCards;
 
-export type GameResultParticipantRecord = {
-  id: string;
-  resultRevisionId: string;
-  participantId: string;
-  sideId: string;
-  started: boolean;
-  minutesPlayed: number | null;
-  goals: number;
-  assists: number;
-  fouls: number;
-  cards: GameResultCards;
-  goalkeeper: boolean;
-};
+export type GameResultParticipantRecord = V1GameResultParticipantRow;
 
-/** Input shape for `SupersedeAndSubmitGameResultRevisionDto`/
- * `CreateGameResultCorrectionDto`'s `changes.actualParticipants` -- mirrors
- * `GameResultParticipantDto` in `apps/v1_api/src/games/dto/game-result.dto.ts`
- * field-for-field (that file is outside this lane's ownership; this type is a
- * standalone client-side mirror, not an import). */
-export type GameResultParticipantInput = {
-  participantId: string;
-  sideId: string;
-  started: boolean;
-  minutesPlayed?: number;
-  goals: number;
-  cards: GameResultCards;
-  goalkeeper: boolean;
-};
+/**
+ * Input shape for `SupersedeAndSubmitGameResultRevisionDto`/
+ * `CreateGameResultCorrectionDto`'s `changes.actualParticipants`.
+ *
+ * 예전에는 이 타입을 로컬에 다시 선언해 두고 주석으로 "서버
+ * `GameResultParticipantDto`(`apps/v1_api/src/games/dto/game-result.dto.ts`)를
+ * field-for-field 미러"라고 적었는데 **사실이 아니었다** -- 그 로컬 복제본에는
+ * `assists`/`fouls`가 빠져 있었다(서버 DTO 에는 `assists?`/`fouls?` 가 있고,
+ * `tournament-result-review.service.ts`는 미전달 시 `?? 0`으로 채운다). 그래서 정정
+ * 폼이 두 필드를 실어 보내지 않아 **점수만 고치는 정정 한 번에 선수 개개인의
+ * 어시스트·파울이 전부 0으로 초기화**됐고, 확정 후 어시스트를 고칠 유일한 통로가
+ * 이 정정 경로(직접 수정은 409 `RESULT_ALREADY_OFFICIAL`)라서 복구 수단도 없었다.
+ * 지금은 공용 계약(`V1GameResultParticipantInput`)의 alias 다 -- 계약이 늘어나면
+ * 필드를 빼먹은 폼이 조용히 통과하지 못하고 `tsc` 에서 걸린다.
+ */
+export type GameResultParticipantInput = V1GameResultParticipantInput;
 
-export type GameResultRevision = {
-  id: string;
-  gameId: string;
-  revision: number;
-  state: GameResultRevisionState;
-  score: GameResultScore;
-  eventsHash: string;
-  missingScorer: boolean;
-  mvpParticipantId: string | null;
-  reason: string | null;
-  createdByActorType: 'USER' | 'SYSTEM';
-  createdByUserId: string | null;
-  createdBySystemActor: string | null;
-  supersedesId: string | null;
-  submittedAt: string | null;
-  officialAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  resultParticipants: GameResultParticipantRecord[];
-};
+export type GameResultGoalEventInput = V1GameResultGoalEventInput;
 
-export type TournamentGameSide = {
-  id: string;
-  gameId: string;
-  sideKey: 'HOME' | 'AWAY';
-  teamId: string | null;
-  displayNameSnapshot: string;
-};
+export type GameResultRevision = V1GameResultRevision;
 
+export type TournamentGameSide = V1GameSide;
+
+/** 이 화면이 읽는 `GET /games/:gameId` 응답의 부분집합 -- 공용 `V1Game` 의 alias 로
+ * 둘 수 없다. `V1Game.actorRole` 은 `string`(team-match 액터까지 포함하는 느슨한
+ * 선언)이라 alias 하면 `ACTOR_ROLE_LABELS[role]` 인덱싱이 깨지고, `V1Game` 에는
+ * 아래 `isKnockoutFixture` 가 없다. */
 export type TournamentGameDetail = {
   id: string;
   sourceType: 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
@@ -140,6 +123,17 @@ export type TournamentGameDetail = {
   currentOfficialRevisionId: string | null;
   sides: TournamentGameSide[];
   actorRole: GameActorRole;
+  /**
+   * `V1TournamentGroup.phase !== 'group'` -- 서버가 `GET /games/:gameId` 응답에
+   * 이미 싣는 필드다(`GamesService.getGame()` 이
+   * `isKnockoutFixture(tx, tournamentFixtureId)` 결과를 그대로 넣는다). 운영 콘솔의
+   * "승부차기 시작" 버튼 표시용으로 추가됐고(`types/game-operations.ts` 의
+   * `GameDetail.isKnockoutFixture`), 이 lane 은 정정 폼의 사전 경고에 쓴다 --
+   * 결선 경기의 정규시간 무승부는 승부차기 없이 저장되지 않으므로(409
+   * `TOURNAMENT_PENALTY_REQUIRED`) 저장 버튼을 누르기 전에 알려야 한다.
+   * 픽스처가 대회 픽스처가 아니거나 조에 배정되지 않았으면 보수적으로 `false`.
+   */
+  isKnockoutFixture: boolean;
 };
 
 export type TournamentOperationsBoardWarning =
@@ -173,16 +167,7 @@ export type TournamentOperationsBoardResponse = {
   liveWarnings: Array<{ fixtureId: string; warnings: string[] }>;
 };
 
-export type GameRevisionMutationResult = {
-  gameId: string;
-  state: string;
-  version: number;
-  durableCommandId: string;
-  replayed: boolean;
-  revisionId: string;
-  revision: number;
-  revisionState: GameResultRevisionState;
-};
+export type GameRevisionMutationResult = V1GameRevisionMutationResult;
 
 // ── Query keys (local to this lane -- see module doc comment) ──────────────
 
@@ -292,11 +277,13 @@ function canonicalizeForPreviewHash(value: unknown): unknown {
  */
 export async function computeProjectionPreviewHash(input: {
   score: unknown;
+  goalEvents?: unknown;
   eventsHash: string;
   mvpParticipantId: string | null;
 }): Promise<string> {
   const canonical = canonicalizeForPreviewHash({
     score: input.score,
+    ...(input.goalEvents !== undefined ? { goalEvents: input.goalEvents } : {}),
     eventsHash: input.eventsHash,
     mvpParticipantId: input.mvpParticipantId,
   });
@@ -339,6 +326,7 @@ export type SupersedeAndSubmitInput = {
   revisionId: string;
   expectedVersion: number;
   score: GameResultScoreInput;
+  goalEvents?: GameResultGoalEventInput[];
   actualParticipants: GameResultParticipantInput[];
   eventsHash: string;
   mvpParticipantId?: string;
@@ -367,6 +355,7 @@ export type OfficializeResultInput = {
   revisionId: string;
   expectedVersion: number;
   score: unknown;
+  goalEvents: unknown;
   eventsHash: string;
   mvpParticipantId: string | null;
 };
@@ -383,6 +372,7 @@ export function useOfficializeResultRevision(gameId: string, tournamentId?: stri
     mutationFn: async (input: OfficializeResultInput) => {
       const projectionPreviewHash = await computeProjectionPreviewHash({
         score: input.score,
+        goalEvents: input.goalEvents,
         eventsHash: input.eventsHash,
         mvpParticipantId: input.mvpParticipantId,
       });
@@ -425,6 +415,7 @@ export type CreateResultCorrectionInput = {
   reason: string;
   changes: {
     score: GameResultScoreInput;
+    goalEvents?: GameResultGoalEventInput[];
     actualParticipants: GameResultParticipantInput[];
     eventsHash: string;
     mvpParticipantId?: string;

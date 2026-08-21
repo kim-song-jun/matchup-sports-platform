@@ -5,7 +5,7 @@ import type { PublicMatchDetail } from './types';
 
 /**
  * alpha "452′" 실측 사고(2026-08) 회귀 방지 — 경기 상세 타임라인
- * (`EventRow`, mm:ss `formatClock`)도 스케줄 카드와 동일한 이상 클럭
+ * (`EventRow`, 분 올림 `formatClock`)도 스케줄 카드와 동일한 이상 클럭
  * 경고 표식을 붙여야 한다. DB 실측값 그대로 재현한다.
  */
 function makeDetail(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDetail {
@@ -43,7 +43,7 @@ function makeDetail(overrides: Partial<PublicMatchDetail> = {}): PublicMatchDeta
 }
 
 describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고)', () => {
-  it('이벤트의 clockMs가 이상값이면 mm:ss 표시는 그대로 두고 경고 표식을 붙인다', () => {
+  it('이벤트의 clockMs가 이상값이면 분을 올림해 표시하고 경고 표식을 붙인다', () => {
     const data = makeDetail({
       events: [
         {
@@ -62,8 +62,7 @@ describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고
 
     render(<MatchDetailContent data={data} />);
 
-    // 숫자 자체(452:46)는 조작·은폐되지 않고 그대로 보인다.
-    expect(screen.getByText('452:46')).toBeInTheDocument();
+    expect(screen.getByText('453′')).toBeInTheDocument();
     expect(screen.getByLabelText('비정상적으로 긴 경기 시각이에요. 확인이 필요해요.')).toBeInTheDocument();
   });
 
@@ -86,7 +85,7 @@ describe('MatchDetailContent — 이상 클럭 경고 표식(alpha 452′ 사고
 
     render(<MatchDetailContent data={data} />);
 
-    expect(screen.getByText('10:49')).toBeInTheDocument();
+    expect(screen.getByText('11′')).toBeInTheDocument();
     expect(screen.queryByLabelText('비정상적으로 긴 경기 시각이에요. 확인이 필요해요.')).not.toBeInTheDocument();
   });
 });

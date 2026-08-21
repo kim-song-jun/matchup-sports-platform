@@ -170,10 +170,14 @@ export function ActionTargetPicker({
   const payload: Record<string, unknown> = actionType === 'CARD' ? { card: cardColor } : {};
 
   const commitPlayer = (input: { sideId: string; participant: GameLineupParticipant }) => {
+    const scoringSideId =
+      actionType === 'OWN_GOAL'
+        ? (sides.find((side) => side.id !== input.sideId)?.id ?? input.sideId)
+        : input.sideId;
     onCommit({
       type: actionType,
       participantId: input.participant.id,
-      sideId: input.sideId,
+      sideId: scoringSideId,
       period: frozen.period,
       clockMs: frozen.clockMs,
       occurredAt: frozen.occurredAt,

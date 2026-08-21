@@ -144,3 +144,15 @@ export class UpdateMyRecordConsentDto {
   @IsNotEmpty()
   policyHash!: string;
 }
+
+/**
+ * 대회 경기 기록(라인업/이벤트 득점자/MVP)에 닉네임 대신 실명을 보여줄지 (2026-08-18
+ * 사용자 결정). `UpdateMyRecordConsentDto`와 달리 이건 "동의"가 아니라 표시 선호도
+ * 스위치라 정책 버전을 감사할 `policyHash`가 없다 -- 대회 신청 때마다 다시 묻지 않고
+ * 한 번 켜면 계속 적용되는 값이라서다. `PublicTournamentRecordsService`가 표시
+ * 시점에 이 값을 조인해 즉시 반영한다.
+ */
+export class UpdateTournamentRealNameVisibilityDto {
+  @IsBoolean()
+  visible!: boolean;
+}

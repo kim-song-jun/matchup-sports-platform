@@ -5,6 +5,8 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { assertPenaltyShootoutPersistable } from '../../games/core/penalty-shootout-outcome';
+import { parseResultPolicy } from '../../tournaments/competition-config/competition-config.parse';
 import {
   Prisma,
   V1GameEventType,
@@ -18,9 +20,19 @@ import {
 } from '../../common/audit/operation-audit-writer.service';
 import {
   canonicalGameCommandPayloadHash,
+  extractEndPenalties,
   gameOperationAuditActor,
   toGameHttpException,
 } from '../../games/games.service';
+import {
+  assertBracketResolvable,
+  assertPenaltiesNotAllowed,
+  needsKnockoutFixtureFacts,
+  readStoredPenalties,
+  requiresDecisiveResult,
+  type StoredPenalties,
+} from '../../games/core/knockout-penalties';
+import { readKnockoutFixtureFacts } from '../../tournaments/knockout-fixture';
 import {
   assertGameCommandContext,
   assertRevisionSupersession,
@@ -38,6 +50,7 @@ import type {
   GameResultInvariantInput,
   GameResultParticipant,
   GameRevisionMutationResult,
+  GameScore,
 } from '../../games/games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { V1AuthUser } from '../../auth/v1-auth-user';
@@ -111,7 +124,10 @@ function jsonObject(value: Prisma.JsonValue): Record<string, unknown> {
 // result-revision draft in this file: only `supersedeAndSubmit`
 // (tournament resubmission after reject/request_supplement) today.
 type ResultRevisionContentInput = {
-  score: { home: number; away: number; penalties?: { home: number; away: number } };
+  // `penalties`의 모양을 손으로 다시 적지 않는다 — 같은 모양을 여러 곳에 적어 두면
+  // 새 키(예: `firstKickSideKey`)가 중간 레인에서 조용히 떨어진다. 단일 소스는
+  // `GameScore['penalties']`(= `StoredPenalties`)다.
+  score: { home: number; away: number; penalties?: StoredPenalties };
   actualParticipants: ReadonlyArray<{
     participantId: string;
     sideId: string;
@@ -299,14 +315,35 @@ export class TournamentResultReviewService {
           }
           throw error;
         }
-        const invariant = await this.resultInvariantInput(tx, game, dto);
-        try {
-          validateGameResultInvariants(invariant);
-        } catch (error) {
-          if (error instanceof GameContractError) {
-            throw toGameHttpException(error);
+        // 재제출도 정정과 같은 참가자 가드를 통과해야 한다. `validateGameResultInvariants`
+        // 만으로는 부족하다 — 그건 `sideId`가 이 게임의 side인지만 보고
+        // (`game-invariants.ts`) participantId가 **이 게임의 참가자인지**는 보지
+        // 않는다. 그 구멍을 정정 레인에서만 막으면 재제출이라는 같은 HTTP
+        // 도달 가능 레인으로 남의 경기 participantId가 그대로 들어온다.
+        // `validateGameResultInvariants` **앞에** 두는 것은 의도적이다: 같은 결함에
+        // 두 레인이 같은 코드(422 `PARTICIPANT_INVALID`)를 돌려주게 만든다.
+        await this.assertRevisionParticipantsValid(tx, gameId, base.id, dto);
+        const score = await this.assertPenaltiesForRevision(tx, game, base.score, dto.score);
+        let missingScorer: boolean;
+        if (dto.goalEvents !== undefined) {
+          missingScorer = await this.assertGoalTimelineConsistent(
+            tx,
+            gameId,
+            score,
+            dto.actualParticipants,
+            dto.goalEvents,
+          );
+        } else {
+          const invariant = await this.resultInvariantInput(tx, game, { ...dto, score });
+          try {
+            validateGameResultInvariants(invariant);
+          } catch (error) {
+            if (error instanceof GameContractError) {
+              throw toGameHttpException(error);
+            }
+            throw error;
           }
-          throw error;
+          missingScorer = invariant.missingScorer;
         }
         // The `v1_guard_result_participant_mutation` trigger (see
         // prisma/migrations/20260729000100_v1_game_operations) only permits
@@ -319,9 +356,15 @@ export class TournamentResultReviewService {
           data: {
             gameId,
             revision: await this.nextRevisionNumber(tx, gameId),
-            score: jsonInput(dto.score),
+            score: jsonInput(score),
+            goalEvents:
+              dto.goalEvents !== undefined
+                ? jsonInput(dto.goalEvents)
+                : base.goalEvents === null
+                  ? undefined
+                  : jsonInput(base.goalEvents),
             eventsHash: dto.eventsHash,
-            missingScorer: invariant.missingScorer,
+            missingScorer,
             mvpParticipantId: dto.mvpParticipantId,
             reason: dto.reason,
             createdByActorType: 'USER',
@@ -420,6 +463,15 @@ export class TournamentResultReviewService {
             message: 'The projection preview hash does not match the current revision content',
           });
         }
+        // 승격 시점의 얇은 안전망(2026-08-19 alpha 감사 F-4). 승부차기 검증은 지금까지
+        // **DRAFT 를 만드는 시점에만** 걸렸다 — 결함 있는 빌드나 면제 경로로 만들어진
+        // 리비전은 나중에 그대로 공식이 될 수 있었고, 실제로 알파에 그런 DRAFT 가 남아 있다.
+        //
+        // **킥 수는 요구하지 않는다**(`requireKickCounts: false`). 이 자리는 *저장된 값을
+        // 승격*하는 곳이라, 요구하면 킥 수가 생기기 전에 만들어진 리비전이 영구히 공식화
+        // 불가가 된다 — 운영자가 승격 화면에서 킥 수를 채워 넣을 수단도 없다. 잡는 것은
+        // "킥 수가 있는데 그 값이 정책상 결판이 아닌" 경우로 좁힌다.
+        await this.assertStoredPenaltiesPersistable(tx, game, revision.score);
         const flow: RevisionFlow =
           revision.state === V1GameResultRevisionState.DRAFT ? 'CORRECTION' : 'STANDARD';
         this.assertTransition({ from: revision.state, to: V1GameResultRevisionState.OFFICIAL, flow });
@@ -559,6 +611,7 @@ export class TournamentResultReviewService {
             revision: await this.nextRevisionNumber(tx, gameId),
             state: V1GameResultRevisionState.VOID,
             score: jsonInput(revision.score),
+            goalEvents: revision.goalEvents === null ? undefined : jsonInput(revision.goalEvents),
             eventsHash: revision.eventsHash,
             missingScorer: revision.missingScorer,
             mvpParticipantId: revision.mvpParticipantId,
@@ -669,14 +722,38 @@ export class TournamentResultReviewService {
           }
           throw error;
         }
-        await this.assertCorrectionParticipantsValid(tx, gameId, dto.changes);
+        await this.assertRevisionParticipantsValid(tx, gameId, base.id, dto.changes);
+        const score = await this.assertPenaltiesForRevision(tx, game, base.score, dto.changes.score);
+        // 이 레인은 `validateGameResultInvariants`를 **부르지 않는다**
+        // (`assertCorrectionParticipantsValid` docblock의 이유: 이벤트 로그 자체가
+        // 정정 대상일 수 있고 ENDED 게임은 새 이벤트를 받을 수 없다 — 켜면 정당한
+        // 정정이 422로 막힌다). 그러나 `missingScorer`는 교차검증이 아니라 이벤트
+        // 스트림에서 계산되는 **사실**이므로 supersede 경로와 같은 출처를 쓴다.
+        // 예전엔 `false`를 하드코딩해, 정정 한 번으로 "득점자 미상 골이 있다"는
+        // 경고가 조용히 사라졌다 — 그러면 아무도 그 골의 득점자를 채워 넣지 않는다.
+        const missingScorer =
+          dto.changes.goalEvents !== undefined
+            ? await this.assertGoalTimelineConsistent(
+                tx,
+                gameId,
+                score,
+                dto.changes.actualParticipants,
+                dto.changes.goalEvents,
+              )
+            : (await this.resultInvariantInput(tx, game, { ...dto.changes, score })).missingScorer;
         const draft = await tx.v1GameResultRevision.create({
           data: {
             gameId,
             revision: await this.nextRevisionNumber(tx, gameId),
-            score: jsonInput(dto.changes.score),
+            score: jsonInput(score),
+            goalEvents:
+              dto.changes.goalEvents !== undefined
+                ? jsonInput(dto.changes.goalEvents)
+                : base.goalEvents === null
+                  ? undefined
+                  : jsonInput(base.goalEvents),
             eventsHash: dto.changes.eventsHash,
-            missingScorer: false,
+            missingScorer,
             mvpParticipantId: dto.changes.mvpParticipantId,
             reason: dto.reason,
             createdByActorType: 'USER',
@@ -972,11 +1049,13 @@ export class TournamentResultReviewService {
    */
   private projectionPreviewHash(revision: {
     score: Prisma.JsonValue;
+    goalEvents: Prisma.JsonValue | null;
     eventsHash: string;
     mvpParticipantId: string | null;
   }): string {
     return canonicalGameCommandPayloadHash({
       score: revision.score,
+      goalEvents: revision.goalEvents,
       eventsHash: revision.eventsHash,
       mvpParticipantId: revision.mvpParticipantId,
     });
@@ -1046,35 +1125,364 @@ export class TournamentResultReviewService {
   }
 
   /**
+   * 이 파일이 새 리비전을 만드는 두 경로(`supersedeAndSubmit`,
+   * `createResultCorrection`) 공용 승부차기 검증. **저장할 score를** 돌려주며,
+   * 반환값을 그대로 저장해야 한다 — 클라이언트가 보낸 객체를 그대로 저장하면
+   * 아래 두 구멍이 그대로 DB로 들어간다.
+   *
+   * 세 단계 모두 `end` 레인과 같은 함수를 쓴다(레인마다 규칙을 복제하지 않는
+   * 것이 이 변경의 요점이다):
+   *  1. `extractEndPenalties` — 형태·결정성. DTO를 강타입화해도
+   *     (`GameScoreDto.penalties`) `penalties: null`은 여전히 통과하고
+   *     (`@IsOptional()`이 null을 건너뛴다) `{home:3,away:3}`(동점 승부차기)도
+   *     통과한다. 둘 다 저장되면 아웃박스의 `parseOfficialPenalties` /
+   *     `resolveWinnerSide`가 throw해 잡이 6회 재시도 끝에 POISONED로 남는다.
+   *     422 `TOURNAMENT_PENALTY_INVALID`로 커맨드 자리에서 거부한다.
+   *  2. `assertPenaltiesNotAllowed` — 조별리그 픽스처거나 정규시간에 이미
+   *     승자가 났으면 409 `TOURNAMENT_PENALTY_NOT_ALLOWED`.
+   *  3. `assertBracketResolvable` — 승부차기로도 해결되지 않는 결선 무승부를 409
+   *     `TOURNAMENT_PENALTY_REQUIRED`로 거부한다. 이 가드가 없으면 그 리비전이
+   *     그대로 공식이 되고 브래킷 프로젝션이 POISONED로 죽어, 운영자는 "성공"만
+   *     보고 다음 라운드 대진이 영영 비어 있는 것을 나중에 안다.
+   *
+   * ## base 리비전의 승부차기 승계 (이게 없으면 정정 자체가 막힌다)
+   *
+   * 정정·재제출 폼은 승부차기를 **보낼 수도, 생략할 수도 있다.** 예전에는 폼이 평평한
+   * `{home, away}`만 보냈고(여분 필드는 `GameScoreDto`의 `forbidNonWhitelisted`에 걸려
+   * 400이었다 — 알파 실측) 클라이언트 타입 `V1GameResultScoreInput`에 penalties 필드
+   * 자체가 없었지만, 지금은 `PenaltyScoreDto`에 선언된 키(`home`/`away`/`firstKickSideKey`)를
+   * 그대로 실어 보낸다(`result-edit-modal.tsx`의 `readSubmittablePenalties`). 한편 `end`
+   * 레인이 이미 결선 무승부를 막으므로 **공식이 된 결선 무승부 경기는 예외 없이
+   * `score.penalties`를 갖는다.**
+   *
+   * 그래서 클라이언트가 penalties를 생략했다는 사실만으로 3단계를 적용하면,
+   * 승부차기로 결정된 모든 결선 경기가 "득점자 오기입 하나 고치기"조차 409로
+   * 거부되고 폼에는 승부차기 입력란이 없어 그 지시를 만족시킬 방법이 없다 —
+   * 사용자가 보고한 바로 그 화면이 영구히 막힌다. 그건 POISONED를 하드 블록으로
+   * 바꾸는 게 아니라 정상 흐름을 차단하는 회귀다.
+   *
+   * 그래서 penalties가 생략됐고 **정정 후 정규시간이 여전히 동점일 때만** base
+   * 리비전에 저장된 값을 승계한다(`readStoredPenalties`). 정정이 정규시간을
+   * 결정적으로 바꿨다면(1-1 → 2-1) 승부차기는 의미가 없어 승계하지 않는다 —
+   * 승계하면 `assertPenaltiesNotAllowed`가 "이미 승자가 났다"로 거부해 그것도
+   * 막다른 길이 된다. 승계된 값은 다시 1·2단계를 통과하므로, 승계가 검증을
+   * 우회하는 문은 아니다.
+   */
+  private async assertPenaltiesForRevision(
+    tx: Transaction,
+    game: LockedTournamentGame,
+    baseScore: Prisma.JsonValue,
+    score: { home: number; away: number; penalties?: StoredPenalties },
+  ): Promise<GameScore> {
+    const submitted = extractEndPenalties({ penalties: score.penalties });
+    const regulation: GameScore = { home: score.home, away: score.away };
+    // 결정적 스코어 + 승부차기 없음이면 어떤 fact도 판정을 바꾸지 않고 승계할
+    // 것도 없다(승계는 정규시간 동점일 때만) — 잠금 구간에서 질의하지 않는다.
+    if (!needsKnockoutFixtureFacts(regulation, submitted)) {
+      return regulation;
+    }
+    const facts = await readKnockoutFixtureFacts(tx, game.tournamentFixtureId);
+    if (submitted !== undefined) {
+      // 클라이언트가 킥 수·우회 표식을 빠뜨렸으면 **base 에서 메운다.** 정정 폼에는
+      // 승부차기 입력란이 아예 없어(2026-08-18 실측: 폼 필드 186개 중 0개) 폼이 보내는
+      // 값은 언제나 base 를 재조립한 것인데, 재조립이 세 키만 옮기면 정정 한 번에
+      // 킥 수와 "우회로 닫았다"는 감사 기록이 **영구히 사라진다**(되살릴 화면이 없다).
+      //
+      // 점수가 base 와 다를 때는 메우지 않는다 — 그때의 base 킥 수는 다른 승부차기를
+      // 설명하는 값이라, 옮기면 `home <= takenHome` 같은 불변식이 조용히 깨진다.
+      const carriedOver = this.carryPenaltyAuditFields(submitted, baseScore);
+      const applied = assertPenaltiesNotAllowed(regulation, carriedOver, facts);
+      // 정정이 승부차기를 **새로 쓰는가**를 base 와 비교해 판정한다. 새로 쓰는 것이면
+      // `end` 와 똑같이 킥 수를 요구하고, base 를 그대로 옮기는 것이면 면제한다.
+      //
+      // 이 구분이 없으면 정정이 `end` 의 우회로가 된다 — 2026-08-18 알파 교차 측정에서
+      // 같은 `{home:9, away:0}` 이 `end` 에선 422, 정정에선 201 로 저장됐다. 반대로
+      // 무조건 요구하면 킥 수가 생기기 전에 저장된 리비전의 정정이 영구히 막힌다.
+      const base = readStoredPenalties(baseScore);
+      const inheritedFromBase =
+        base !== undefined && base.home === carriedOver.home && base.away === carriedOver.away;
+      // 정정 레인에도 **결판 판정을 건다.** 예전에는 이 레인이 `assertPenaltiesNotAllowed`
+      // 하나만 통과시켜, `end` 가 422 로 막는 값(킥 수가 말이 안 되는 승부차기)을 정정으로는
+      // 그대로 저장할 수 있었다 — 게이트를 한 레인에만 달면 다른 레인이 우회로가 된다.
+      // 킥 수가 없는 레거시 승계는 `assertPenaltyShootoutPersistable` 가 그대로 통과시킨다.
+      // 킥 수가 없으면 관문이 정책을 보지 않는다(`assertPenaltyShootoutPersistable` 계약) —
+      // 잠금 구간에서 쓸모없는 config 질의를 하지 않도록 여기서 먼저 갈라 준다.
+      const needsPolicy = carriedOver.takenHome !== undefined && carriedOver.takenAway !== undefined;
+      const policy = needsPolicy
+        ? parseResultPolicy(
+            (
+              await tx.v1CompetitionConfigVersion.findUnique({
+                where: { id: game.competitionConfigVersionId },
+                select: { result: true },
+              })
+            )?.result ?? null,
+          )
+        : { earlyStop: true };
+      assertPenaltyShootoutPersistable(carriedOver, policy, {
+        requireKickCounts: !inheritedFromBase,
+      });
+      return applied;
+    }
+    // 승계는 "무승부를 그대로 두면 브래킷이 멈추는" 픽스처에서만 한다
+    // (`requiresDecisiveResult` — `assertBracketResolvable`과 **같은** 술어).
+    // 조별리그처럼 무승부가 정상인 픽스처에까지 승계하면
+    // `assertPenaltiesNotAllowed`가 "조별리그엔 승부차기를 기록할 수 없다"로
+    // 그 정정을 거부해, 승부차기가 잘못 저장된 레거시 조별 경기를 고칠 방법이
+    // 사라진다(승계하지 않으면 그 정정이 잘못된 값을 정상적으로 걷어낸다).
+    const carried =
+      regulation.home === regulation.away && requiresDecisiveResult(facts)
+        ? readStoredPenalties(baseScore)
+        : undefined;
+    if (carried === undefined) {
+      assertBracketResolvable(regulation, facts);
+      return regulation;
+    }
+    // 승계값도 예외가 아니다. 동점 승부차기가 저장돼 있던 레거시 리비전은 여기서
+    // 해결 불가한 무승부로 거부된다(`assertBracketResolvable`의 동점 분기).
+    assertBracketResolvable({ ...regulation, penalties: carried }, facts);
+    return assertPenaltiesNotAllowed(regulation, carried, facts);
+  }
+
+  private async assertStoredPenaltiesPersistable(
+    tx: Transaction,
+    game: LockedTournamentGame,
+    storedScore: Prisma.JsonValue,
+  ): Promise<void> {
+    const stored = readStoredPenalties(storedScore);
+    if (stored === undefined) return;
+    if (stored.takenHome === undefined || stored.takenAway === undefined) return;
+    const config = await tx.v1CompetitionConfigVersion.findUnique({
+      where: { id: game.competitionConfigVersionId },
+      select: { result: true },
+    });
+    assertPenaltyShootoutPersistable(stored, parseResultPolicy(config?.result ?? null), {
+      requireKickCounts: false,
+    });
+  }
+
+  /**
+   * 정정이 보낸 승부차기에 킥 수·우회 표식이 없으면 base 리비전에서 메운다.
+   *
+   * 왜 서버가 메우나 — 이 값들은 **정정 화면이 되살릴 수 없는 정보**다. 폼에 승부차기
+   * 입력란이 없으므로 운영자는 다시 입력할 수단이 없고, 한 번 떨어지면 이후 모든 정정에서
+   * 서버가 결판을 판정할 근거도 함께 사라진다. 클라이언트를 고치는 것과 별개로 서버가
+   * 마지막 방어선을 갖는다 — 옛 번들을 띄워 둔 탭 하나가 감사 기록을 지울 수 있어서다.
+   *
+   * **점수가 같을 때만** 메운다. 점수가 다르면 base 의 킥 수는 다른 승부차기를 설명하는
+   * 값이라, 그대로 옮기면 "성공 수가 시도 수를 넘는" 조합이 조용히 만들어진다.
+   */
+  /**
+   * 이미 저장된 리비전의 승부차기가 지금도 정책상 유효한지 본다(승격 게이트).
+   * 저장값을 그대로 읽으므로 킥 수는 요구하지 않는다 — 자세한 근거는 호출부 주석 참고.
+   */
+  private carryPenaltyAuditFields(submitted: StoredPenalties, baseScore: Prisma.JsonValue): StoredPenalties {
+    const base = readStoredPenalties(baseScore);
+    if (base === undefined) return submitted;
+    if (base.home !== submitted.home || base.away !== submitted.away) return submitted;
+    // **누락된 필드만 메우고 전달된 값은 보존한다.** 킥 수가 다 왔다고 조기 return 하면
+    // `operatorOverride` 만 빠진 경우("우회로 닫았다"는 기록)를 되살리지 못한다 — 부분적으로
+    // 업데이트된 클라이언트가 정확히 그 형태를 보낸다.
+    const needsCounts = submitted.takenHome === undefined || submitted.takenAway === undefined;
+    const counts =
+      needsCounts && base.takenHome !== undefined && base.takenAway !== undefined
+        ? { takenHome: base.takenHome, takenAway: base.takenAway }
+        : {};
+    const override =
+      submitted.operatorOverride === undefined && base.operatorOverride === true
+        ? { operatorOverride: true as const }
+        : {};
+    // 선축도 **같은 이유로** 메운다. 빠뜨렸다가 2026-08-19 alpha 감사에서 두 가지 피해가
+    // 실측됐다:
+    //   ① 5킥 전에 결판난 경기(각 3킥 3:0 등)는 정정이 **422 로 하드 차단**된다 —
+    //      선축이 없으면 결판 판정이 "선축 미상" 분기로 떨어지고 그 분기는 5킥 바닥을
+    //      요구하기 때문이다. 정정 폼에는 승부차기 입력란이 0개라 **운영자에게 탈출구가 없다.**
+    //      (같은 요청에서 선축 키 하나만 붙이면 201 — 키 하나가 갈랐다.)
+    //   ② 5킥 이상 경기는 막히지 않는 대신 선축이 **조용히 소실**된다.
+    // 즉 킥 수에 따라 하드 데드엔드 또는 조용한 기록 손실로 갈렸다. 이 함수가 존재하는
+    // 이유("폼이 되살릴 수 없는 값을 서버가 메운다")가 이 필드에만 적용되지 않고 있었다.
+    const side =
+      submitted.firstKickSideKey === undefined && base.firstKickSideKey !== undefined
+        ? { firstKickSideKey: base.firstKickSideKey }
+        : {};
+    // base 값을 먼저 깔고 submitted 를 덮는 순서 — 전달된 값이 항상 이긴다.
+    return { ...counts, ...override, ...side, ...submitted };
+  }
+
+  /**
    * Correction changes intentionally are not cross-validated against the
    * frozen event stream (the event log can be exactly what the correction
    * is fixing, and a game in ENDED/CANCELLED can no longer accept new
    * events) -- but participants must still be real, unique, and correctly
    * sided, and any MVP must be one of them.
+   *
+   * "real"이 실제로 강제되는 것은 이 변경부터다. 예전에는 중복과 "sideId가 이
+   * 게임의 side인가"만 봐서 **다른 경기의 participantId**가 그대로 통과했고,
+   * `v1_game_result_participants.participantId`에는 FK도 없어서 DB도 막지
+   * 않았다(schema.prisma) — 그 결과가 남의 경기 성적을 이 경기 기록으로
+   * 집계하는 것이었다(`public-user-records.service.ts`가 이 테이블을 직접
+   * 읽는다). 이제 이 게임의 `v1GameParticipant` 집합을 읽어 소속과 진영까지
+   * 대조한다. 참가자 집합을 라인업 revision으로 좁히지 않는 것은 정본
+   * 프로듀서(`GamesService.deriveTournamentRevision`)와 같은 술어를 쓰기
+   * 위해서다 — 더 좁히면 정당한 정정이 정본보다 먼저 막힌다.
+   *
+   * 별도의 side 조회는 없앴다. 참가자의 실제 `sideId`와 일치하는지 보면 그
+   * `sideId`가 이 게임의 side라는 것은 자동으로 따라오므로, 남겨 두면 아무도
+   * 읽지 않는 죽은 질의가 된다.
+   *
+   * 정정(correction)과 재제출(supersede) **양쪽**이 이 가드를 쓴다. 재제출은
+   * `validateGameResultInvariants`도 함께 돌지만 그건 `sideId`의 존재만 보고
+   * participantId의 소속은 보지 않아(`game-invariants.ts`) 같은 구멍이 남는다.
    */
-  private async assertCorrectionParticipantsValid(
+  private async assertRevisionParticipantsValid(
     tx: Transaction,
     gameId: string,
-    changes: GameResultCorrectionChangesDto,
+    baseRevisionId: string,
+    content: Pick<GameResultCorrectionChangesDto, 'actualParticipants' | 'mvpParticipantId'>,
   ): Promise<void> {
-    const sides = await tx.v1GameSide.findMany({ where: { gameId }, select: { id: true } });
-    const sideIds = new Set(sides.map((side) => side.id));
-    const seen = new Set<string>();
-    for (const participant of changes.actualParticipants) {
-      if (seen.has(participant.participantId) || !sideIds.has(participant.sideId)) {
+    // 빈 배열은 **base 리비전에 개인기록이 있었을 때만** 거부한다. 통과시키면 새
+    // 리비전의 개인기록이 0행이 되어 그 경기의 선수 개개인 기록이 전멸하지만
+    // (사용자 보고 증상), 무조건 거부하면 **정본 프로듀서가 정당하게 0행으로 만든
+    // 경기**를 아무도 고칠 수 없게 된다: `deriveTournamentRevision`의 출전 게이트
+    // (`appearedIds`)는 선발이 아무도 표시되지 않고 이벤트도 없으면 0행을 쓰고,
+    // TBD 브래킷 픽스처나 로스터가 비어 있는 등록은 `v1GameParticipant` 자체가
+    // 0행인 게임을 만든다(`tournament-bracket.service.ts`). 정정 폼은 base
+    // 리비전에서만 참가자를 채우고 로스터 추가 수단이 없으므로
+    // (`result-edit-modal.tsx`) 그런 경기의 점수 정정은 영구히 400/422가 된다.
+    // 그래서 술어는 "비우지 말라"가 아니라 **"있던 것을 비우지 말라"**다.
+    if (content.actualParticipants.length === 0) {
+      const baseParticipantCount = await tx.v1GameResultParticipant.count({
+        where: { resultRevisionId: baseRevisionId },
+      });
+      if (baseParticipantCount > 0) {
         throw new UnprocessableEntityException({
           code: 'PARTICIPANT_INVALID',
-          message: 'Correction participants must be unique and belong to a game side',
+          message: 'actualParticipants must not drop every participant recorded on the base revision',
+        });
+      }
+    }
+    const participants = await tx.v1GameParticipant.findMany({
+      where: { gameId },
+      select: { id: true, sideId: true },
+    });
+    const sideByParticipantId = new Map(participants.map((participant) => [participant.id, participant.sideId]));
+    const seen = new Set<string>();
+    for (const participant of content.actualParticipants) {
+      const actualSideId = sideByParticipantId.get(participant.participantId);
+      if (
+        seen.has(participant.participantId) ||
+        actualSideId === undefined ||
+        actualSideId !== participant.sideId
+      ) {
+        throw new UnprocessableEntityException({
+          code: 'PARTICIPANT_INVALID',
+          message: 'Revision participants must be unique participants of this game, on their own side',
         });
       }
       seen.add(participant.participantId);
     }
-    if (changes.mvpParticipantId !== undefined && !seen.has(changes.mvpParticipantId)) {
+    if (content.mvpParticipantId !== undefined && !seen.has(content.mvpParticipantId)) {
       throw new UnprocessableEntityException({
         code: 'PARTICIPANT_INVALID',
-        message: 'MVP must be one of the correction actualParticipants',
+        message: 'MVP must be one of the submitted actualParticipants',
       });
     }
+  }
+
+  /**
+   * 종료 후 정정에서는 append-only 원본 이벤트가 아니라 운영자가 확인한
+   * goalEvents 스냅샷이 공식 득점 사실이다. 점수·득점자 개인 합계·자책골
+   * 귀속이 서로 갈라진 리비전은 공개 전적과 개인 통계를 다시 불일치시키므로
+   * 새 리비전을 만들기 전에 한 번에 검증한다.
+   */
+  private async assertGoalTimelineConsistent(
+    tx: Transaction,
+    gameId: string,
+    score: { home: number; away: number },
+    participants: ReadonlyArray<{ participantId: string; sideId: string; goals: number }>,
+    goalEvents: ReadonlyArray<{
+      id: string;
+      sideId: string;
+      participantId?: string;
+      ownGoal: boolean;
+    }>,
+  ): Promise<boolean> {
+    const sides = await tx.v1GameSide.findMany({
+      where: { gameId },
+      select: { id: true, sideKey: true },
+    });
+    const homeSideId = sides.find((side) => side.sideKey === 'HOME')?.id;
+    const awaySideId = sides.find((side) => side.sideKey === 'AWAY')?.id;
+    if (!homeSideId || !awaySideId) {
+      throw new UnprocessableEntityException({
+        code: 'RESULT_GOAL_TIMELINE_INVALID',
+        message: 'Game must have HOME and AWAY sides',
+      });
+    }
+
+    const participantById = new Map(
+      participants.map((participant) => [participant.participantId, participant] as const),
+    );
+    const personalGoals = new Map<string, number>();
+    const seenIds = new Set<string>();
+    let homeGoals = 0;
+    let awayGoals = 0;
+    let missingScorer = false;
+
+    for (const goal of goalEvents) {
+      if (seenIds.has(goal.id) || (goal.sideId !== homeSideId && goal.sideId !== awaySideId)) {
+        throw new UnprocessableEntityException({
+          code: 'RESULT_GOAL_TIMELINE_INVALID',
+          message: 'Goal timeline ids must be unique and use a game side',
+        });
+      }
+      seenIds.add(goal.id);
+      if (goal.sideId === homeSideId) homeGoals += 1;
+      else awayGoals += 1;
+
+      if (!goal.participantId) {
+        if (goal.ownGoal) {
+          throw new UnprocessableEntityException({
+            code: 'RESULT_GOAL_TIMELINE_INVALID',
+            message: 'Own goal must identify the opposing participant',
+          });
+        }
+        missingScorer = true;
+        continue;
+      }
+      const participant = participantById.get(goal.participantId);
+      const sideMatches = participant
+        ? goal.ownGoal
+          ? participant.sideId !== goal.sideId
+          : participant.sideId === goal.sideId
+        : false;
+      if (!sideMatches) {
+        throw new UnprocessableEntityException({
+          code: 'RESULT_GOAL_TIMELINE_INVALID',
+          message: goal.ownGoal
+            ? 'Own-goal participant must belong to the opposing side'
+            : 'Goal participant must belong to the credited side',
+        });
+      }
+      if (!goal.ownGoal) {
+        personalGoals.set(goal.participantId, (personalGoals.get(goal.participantId) ?? 0) + 1);
+      }
+    }
+
+    if (homeGoals !== score.home || awayGoals !== score.away) {
+      throw new UnprocessableEntityException({
+        code: 'RESULT_GOAL_TIMELINE_INVALID',
+        message: 'Goal timeline totals must match the submitted score',
+      });
+    }
+    for (const participant of participants) {
+      if (participant.goals !== (personalGoals.get(participant.participantId) ?? 0)) {
+        throw new UnprocessableEntityException({
+          code: 'RESULT_GOAL_TIMELINE_INVALID',
+          message: 'Participant goal totals must match the official goal timeline',
+        });
+      }
+    }
+    return missingScorer;
   }
 
   /**

@@ -37,7 +37,16 @@ import {
   parseLineupConfigForResponse,
   parseLineupLimits,
   parsePeriodDurations,
+  parseResultPolicy,
 } from '../tournaments/competition-config/competition-config.parse';
+import { readIsKnockoutFixture, readKnockoutFixtureFacts } from '../tournaments/knockout-fixture';
+import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
+import {
+  assertBracketResolvable,
+  assertPenaltiesNotAllowed,
+  needsKnockoutFixtureFacts,
+  type StoredPenalties,
+} from './core/knockout-penalties';
 import { GameTakeoverService } from './game-takeover.service';
 import {
   decideTournamentStaffAccess,
@@ -54,6 +63,7 @@ import {
   GameContractError,
   projectParticipantForPublic,
   resolveGameIdempotency,
+  selectLatestLineupParticipants,
   serializeGameVisibility,
   validateGameResultInvariants,
   validateSubstitution,
@@ -489,9 +499,7 @@ function assertClockNotDrifted(occurredAt: string): void {
  * elsewhere in this file) so this pure parsing rule is unit-testable without
  * a database.
  */
-export function extractEndPenalties(
-  payload: Record<string, unknown>,
-): { home: number; away: number } | undefined {
+export function extractEndPenalties(payload: Record<string, unknown>): StoredPenalties | undefined {
   const raw = payload.penalties;
   if (raw === undefined) return undefined;
   if (
@@ -518,7 +526,82 @@ export function extractEndPenalties(
       message: 'A penalty shootout must produce a decisive winner',
     });
   }
-  return { home, away };
+  // 선축(먼저 찬 팀). `PenaltyScoreDto`가 이미 `'HOME'|'AWAY'`만 통과시키지만, 이
+  // 함수는 DTO를 거치지 않는 경로(`GameCommandDto.payload`는 느슨한 레코드다)에서도
+  // 불리므로 여기서 다시 좁힌다.
+  //
+  // 못 쓰는 값은 **조용히 버리지 않고 422로 되돌린다.** 같은 함수가 잘못된 home/away에는
+  // 이미 422를 던지는데 선축만 삼키면, 형식 오류를 어떤 것은 거부하고 어떤 것은 무시하는
+  // 기준이 한 함수 안에서 갈린다. 더 나쁜 건 조용히 버릴 때의 결말이다: `'home'`(소문자)
+  // 같은 오타를 보낸 운영자에게는 200이 돌아가지만 리비전에는 선축이 없고, 정정 폼에는
+  // 선축 입력란이 없어 되살릴 수단도 없다 — 이 변경이 막으려던 바로 그 영구 손실이다.
+  //
+  // 반면 **키가 아예 없는 것**은 오류가 아니라 정상이다(선축이 생기기 전 클라이언트,
+  // 그리고 정정 승계 경로). 그때는 키 자체를 빼서 돌려준다 — `undefined`나 `null`을
+  // 그대로 실으면 그 형태가 `jsonInput`을 타고 `score` JSON 컬럼에 들어가(`null`은 실제로
+  // 저장된다) `readStoredPenalties`·`parseOfficialPenalties` 계열이 "선축 없음"과 "선축이
+  // null" 두 상태를 구분해야 하는 부채가 생긴다. 없으면 없는 것이 유일한 표현이다.
+  // 킥 수(`takenHome`/`takenAway`). 이게 실려 와야 서버도 "홈 1킥 1:0 / 원정 0킥"과
+  // "각 5킥 1:0"을 구분할 수 있다 — 총점 두 개만으로는 구조적으로 같은 값이라,
+  // 예전 서버가 막을 수 있는 건 무승부뿐이었고 화면의 가드는 API 직접 호출로
+  // 그대로 우회됐다.
+  //
+  // **둘 다 있거나 둘 다 없어야 한다.** 한쪽만 오면 어느 팀이 몇 번 찼는지 알 수
+  // 없는데도 "킥 수를 안다"고 착각한 채 판정이 돌아간다 — 없는 쪽을 0으로 메우면
+  // 그 팀이 한 번도 안 찬 것으로 읽혀 정상 결과가 거부된다.
+  const takenHome = parseKickCount(raw, 'takenHome');
+  const takenAway = parseKickCount(raw, 'takenAway');
+  if ((takenHome === undefined) !== (takenAway === undefined)) {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: 'penalties.takenHome and penalties.takenAway must be provided together',
+    });
+  }
+  // 성공 수가 시도 수를 넘을 수는 없다. 이건 정책과 무관한 산술 불변식이라
+  // `assertPenaltyShootoutConcluded`(정책 판정)가 아니라 여기서 본다 —
+  // `operatorOverride`로도 면제되지 않아야 하는 종류의 오류다.
+  if (takenHome !== undefined && takenAway !== undefined && (home > takenHome || away > takenAway)) {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: 'penalties scored count cannot exceed the number of kicks taken',
+    });
+  }
+  const operatorOverrideRaw = (raw as { operatorOverride?: unknown }).operatorOverride;
+  if (operatorOverrideRaw !== undefined && typeof operatorOverrideRaw !== 'boolean') {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: 'penalties.operatorOverride must be a boolean when provided',
+    });
+  }
+  // `true`일 때만 싣는다. `false`를 저장하면 "우회 아님"이 두 가지 표현(키 부재 ·
+  // false)을 갖게 되고, 그건 이 함수가 `firstKickSideKey`에서 이미 지키는 불변식
+  // ("없으면 없는 것이 유일한 표현")을 깨는 것이다.
+  const counts =
+    takenHome !== undefined && takenAway !== undefined ? { takenHome, takenAway } : {};
+  const override = operatorOverrideRaw === true ? { operatorOverride: true as const } : {};
+
+  const firstKickSideKey = (raw as { firstKickSideKey?: unknown }).firstKickSideKey;
+  if (firstKickSideKey === undefined) return { home, away, ...counts, ...override };
+  if (firstKickSideKey !== 'HOME' && firstKickSideKey !== 'AWAY') {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: "penalties.firstKickSideKey must be 'HOME' or 'AWAY' when provided",
+    });
+  }
+  return { home, away, firstKickSideKey, ...counts, ...override };
+}
+
+/** `takenHome`/`takenAway` 한 칸을 읽는다 — 없으면 `undefined`, 형식이 틀리면 422. */
+function parseKickCount(raw: unknown, key: 'takenHome' | 'takenAway'): number | undefined {
+  const value = (raw as Record<string, unknown>)[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new UnprocessableEntityException({
+      code: 'TOURNAMENT_PENALTY_INVALID',
+      message: `penalties.${key} must be a non-negative integer when provided`,
+    });
+  }
+  return value;
 }
 
 /**
@@ -690,7 +773,7 @@ export class GamesService {
         if (side === undefined) {
           throw new GameContractError('PARTICIPANT_INVALID', 'Participant side is missing');
         }
-        await tx.v1GameParticipant.create({
+        const createdParticipant = await tx.v1GameParticipant.create({
           data: {
             gameId: game.id,
             sideId: side.id,
@@ -701,6 +784,15 @@ export class GamesService {
             position: participant.position,
           },
         });
+        if (participant.userId !== undefined) {
+          await this.createRosterAssertedIdentityLink(
+            tx,
+            createdParticipant.id,
+            participant.userId,
+            context.actor,
+            'source_roster',
+          );
+        }
       }
 
       const periodCount = this.periodCount(config.periods);
@@ -778,7 +870,7 @@ export class GamesService {
       // server source of truth (apps/v1_web/src/components/lineup/formation-slots.ts).
       const config = await tx.v1CompetitionConfigVersion.findUnique({
         where: { id: game.competitionConfigVersionId },
-        select: { lineup: true, periods: true },
+        select: { lineup: true, periods: true, result: true },
       });
       const lineup = config === null ? {} : jsonObject(config.lineup);
       const { tournamentFixtureId, ...gameFields } = game;
@@ -790,7 +882,7 @@ export class GamesService {
         // 않는다). 콘솔은 이 값으로 "승부차기 시작" 버튼을 조별리그 무승부
         // 에서는 아예 보여주지 않는다 — 보여줬다가 `end` 제출 시점에야
         // `TOURNAMENT_PENALTY_NOT_ALLOWED`로 실패하는 깨진 UX를 막는다.
-        isKnockoutFixture: await this.isKnockoutFixture(tx, tournamentFixtureId),
+        isKnockoutFixture: await readIsKnockoutFixture(tx, tournamentFixtureId),
         lineupConfig: parseLineupConfigForResponse(config?.lineup ?? null),
         // Live-substitution addition: the console needs this to decide
         // whether to surface the rolling quick-substitution mode (config-
@@ -807,6 +899,13 @@ export class GamesService {
         // 피리어드가 몇 분짜리인지" 를 알아야 비정상 클럭을 판단할 수 있다 —
         // `parsePeriodDurations` 문서 참고.
         periodDurations: config === null ? null : parsePeriodDurations(config.periods),
+        // 승부차기 선축·결판 판정 추가 — 콘솔이 "승부차기 종료" 버튼을 언제 열지
+        // 판단하려면 이 대회가 FIFA 정규(5킥 이내라도 수학적으로 끝났으면 종료)인지
+        // "끝까지 차는" 정책인지를 알아야 한다. `substitutionPolicy`/`periodDurations`와
+        // 동형이다 — 서버가 config 를 해석해서 UI 가 쓸 형태로만 내보내고, 프런트는
+        // config JSON 을 직접 읽지 않는다. `parseResultPolicy`가 키 부재를 기본값
+        // (`earlyStop: true`)으로 메우므로 `config === null`이어도 같은 기본값이다.
+        penaltyShootoutPolicy: parseResultPolicy(config?.result ?? null),
       };
     });
   }
@@ -1017,7 +1116,13 @@ export class GamesService {
               data: { state: V1GamePeriodState.ENDED, endedAt: now, ...(resolved ?? {}) },
             });
           }
-          return this.deriveTournamentRevision(tx, updated, context, extractEndPenalties(dto.payload));
+          return this.deriveTournamentRevision(
+            tx,
+            updated,
+            context,
+            'END_COMMAND',
+            extractEndPenalties(dto.payload),
+          );
         }
         return {
           gameId: updated.id,
@@ -2216,30 +2321,13 @@ export class GamesService {
           // 로스터 귀속을 신원 연결(identity link)로 자동 승격한다 -- 방금 만든
           // participant라 정상적으로는 기존 링크가 있을 수 없지만, 방어적으로 한
           // 번 더 확인한다(재시도 등으로 이 루프가 두 번 돌 가능성에 대비).
-          const existingLink = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
-            where: { participantId: createdParticipant.id },
-          });
-          if (existingLink !== null) continue;
-          const linkId = randomUUID();
-          const identityEvent = await this.appendIdentityEvent(tx, {
-            participantId: createdParticipant.id,
-            linkId,
-            requestId: linkId,
-            action: V1IdentityLinkAction.ROSTER_ASSERTED,
-            userId: participant.userId,
-            actorType: V1IdentityActorType.USER,
-            actorUserId: user.id,
-            reason: 'roster',
-          });
-          await tx.v1ParticipantIdentityLinkCurrent.create({
-            data: {
-              participantId: createdParticipant.id,
-              linkId,
-              userId: participant.userId,
-              version: 1,
-              effectiveFrom: identityEvent.effectiveAt,
-            },
-          });
+          await this.createRosterAssertedIdentityLink(
+            tx,
+            createdParticipant.id,
+            participant.userId,
+            { actorType: 'USER', actorUserId: user.id },
+            'roster',
+          );
         }
         const updated = await tx.v1Game.update({
           where: { id: gameId },
@@ -3663,9 +3751,15 @@ export class GamesService {
           actorUserId: string;
         }
       | {
-          action: typeof V1IdentityLinkAction.EXPIRED;
+          action:
+            | typeof V1IdentityLinkAction.EXPIRED
+            | typeof V1IdentityLinkAction.ROSTER_ASSERTED;
           actorType: typeof V1IdentityActorType.SYSTEM;
-          systemActor: 'IDENTITY_LINK_EXPIRY';
+          systemActor:
+            | 'IDENTITY_LINK_EXPIRY'
+            | 'GAME_END_DERIVER'
+            | 'GAME_BACKFILL'
+            | 'PROJECTION_REPAIR';
         }
     ),
   ) {
@@ -3692,6 +3786,64 @@ export class GamesService {
     } catch (error) {
       throw this.mapIdentityEventError(error);
     }
+  }
+
+  /**
+   * Roster-backed participants become readable personal records in the same
+   * transaction that creates them. `V1GameParticipant.userId` alone is not a
+   * public identity assertion; the records reader intentionally follows the
+   * append-only identity event plus current-link pair.
+   */
+  private async createRosterAssertedIdentityLink(
+    tx: Transaction,
+    participantId: string,
+    userId: string,
+    actor:
+      | { actorType: 'USER'; actorUserId: string }
+      | {
+          actorType: 'SYSTEM';
+          systemActor: 'GAME_END_DERIVER' | 'GAME_BACKFILL' | 'PROJECTION_REPAIR';
+        },
+    reason: string,
+  ): Promise<void> {
+    const existingLink = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+      where: { participantId },
+    });
+    if (existingLink !== null) return;
+
+    const linkId = randomUUID();
+    const identityEvent =
+      actor.actorType === 'USER'
+        ? await this.appendIdentityEvent(tx, {
+            participantId,
+            linkId,
+            requestId: linkId,
+            action: V1IdentityLinkAction.ROSTER_ASSERTED,
+            userId,
+            actorType: V1IdentityActorType.USER,
+            actorUserId: actor.actorUserId,
+            reason,
+          })
+        : await this.appendIdentityEvent(tx, {
+            participantId,
+            linkId,
+            requestId: linkId,
+            action: V1IdentityLinkAction.ROSTER_ASSERTED,
+            userId,
+            actorType: V1IdentityActorType.SYSTEM,
+            systemActor: actor.systemActor,
+            reason,
+          });
+
+    await tx.v1ParticipantIdentityLinkCurrent.create({
+      data: {
+        participantId,
+        linkId,
+        userId,
+        version: 1,
+        effectiveFrom: identityEvent.effectiveAt,
+      },
+    });
   }
 
   private mapIdentityEventError(error: unknown) {
@@ -4320,10 +4472,18 @@ export class GamesService {
       const participant = await tx.v1GameParticipant.findFirst({
         where: { gameId: game.id, id: dto.participantId },
       });
-      if (participant === null || participant.sideId !== dto.sideId) {
+      const participantMustBeOpposingSide = dto.type === V1GameEventType.OWN_GOAL;
+      if (
+        participant === null ||
+        (participantMustBeOpposingSide
+          ? participant.sideId === dto.sideId
+          : participant.sideId !== dto.sideId)
+      ) {
         throw new UnprocessableEntityException({
           code: 'PARTICIPANT_SIDE_MISMATCH',
-          message: 'Event participant and side do not agree',
+          message: participantMustBeOpposingSide
+            ? 'Own-goal participant must belong to the opposing side'
+            : 'Event participant and side do not agree',
         });
       }
     }
@@ -4545,17 +4705,34 @@ export class GamesService {
     tx: Transaction,
     game: LockedGame,
     context: GameCommandContext,
-    penalties?: { home: number; away: number },
+    /**
+     * 어느 레인에서 왔는가. 승부차기 킥 수를 **요구할 수 있는지**가 여기서 갈린다.
+     *
+     * `END_COMMAND` — 운영 콘솔이 승부차기를 **지금 기록하는** 경로다. 클라이언트가 킥
+     *   목록을 들고 있으므로 킥 수를 못 보낼 이유가 없다. 그래서 이 레인에서는 킥 수를
+     *   필수로 만든다 — 총점 두 개만으로는 "각 5킥 1:0"(정상)과 "홈 1킥, 원정 0킥"(비정상)이
+     *   같은 값이라 서버가 구분할 수 없고, 실제로 알파에서 `{home:1, away:0}` 만 실은
+     *   `end` 호출이 **201로 통과해 공개 화면까지 퍼지는 것**을 실측했다(2026-08-18).
+     * `RECOVERY` — 이미 저장된 리비전을 복구·승계하는 경로다. 킥 수가 생기기 전에 저장된
+     *   결과에는 그 값이 없으므로 요구하면 복구가 영구히 막힌다.
+     */
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
+    penalties?: StoredPenalties,
   ): Promise<GameRevisionMutationResult> {
-    const [events, participants, sides, config] = await Promise.all([
+    const [events, participantCandidates, lineups, sides, config] = await Promise.all([
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
+      tx.v1GameLineup.findMany({
+        where: { gameId: game.id },
+        select: { id: true, sideId: true, revision: true },
+      }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),
       tx.v1CompetitionConfigVersion.findUnique({
         where: { id: game.competitionConfigVersionId },
         select: { lineup: true },
       }),
     ]);
+    const participants = selectLatestLineupParticipants(participantCandidates, lineups);
     // 하드코딩 버그 수정: started/goalkeeper를 실제 라인업 값과 무관하게
     // 항상 true/false로 박아 넣었다 -- 후보로 저장한 선수도 결과 프로젝션에서는
     // 전부 선발로 보였고, 실제로 골키퍼였던 선수도 항상 goalkeeper:false였다.
@@ -4570,7 +4747,7 @@ export class GamesService {
       parseLineupCatalog(config?.lineup ?? null).positions.find((position) => position.goalkeeper === true)?.code ??
       'GK';
     const regulationScore = this.scoreFromEvents(events, sides);
-    const score = await this.applyPenalties(tx, game, regulationScore, penalties);
+    const score = await this.applyPenalties(tx, game, regulationScore, penalties, penaltyOrigin);
     // Issue #392 fix: `missingScorer` must be derived from the SAME
     // reversed-event-excluding aggregation `aggregateGameParticipantStats`
     // already builds below for goals/cards/assists/fouls -- moved ahead of
@@ -4588,6 +4765,22 @@ export class GamesService {
         gameId: game.id,
         revision: 1,
         score: jsonInput(score),
+        goalEvents: jsonInput(
+          events
+            .filter(
+              (event) =>
+                (event.type === V1GameEventType.GOAL || event.type === V1GameEventType.OWN_GOAL) &&
+                !events.some((candidate) => candidate.reversesEventId === event.id),
+            )
+            .map((event) => ({
+              id: event.id,
+              sideId: event.sideId,
+              participantId: event.participantId,
+              minute: Math.max(0, Math.ceil(event.clockMs / 60000)),
+              period: event.period,
+              ownGoal: event.type === V1GameEventType.OWN_GOAL,
+            })),
+        ),
         eventsHash: canonicalGameCommandPayloadHash(events.map((event) => event.payloadHash)),
         missingScorer,
         createdByActorType: context.actor.actorType,
@@ -5024,6 +5217,8 @@ export class GamesService {
         gameId,
         revision: predecessor.revision + 1,
         score: jsonInput(predecessor.score),
+        goalEvents:
+          predecessor.goalEvents === null ? undefined : jsonInput(predecessor.goalEvents),
         eventsHash: predecessor.eventsHash,
         missingScorer: predecessor.missingScorer,
         mvpParticipantId: predecessor.mvpParticipantId,
@@ -5142,7 +5337,11 @@ export class GamesService {
     let home = 0;
     let away = 0;
     events.forEach((event) => {
-      if (event.type !== V1GameEventType.GOAL || event.sideId === null || reversed.has(event.id)) {
+      if (
+        (event.type !== V1GameEventType.GOAL && event.type !== V1GameEventType.OWN_GOAL) ||
+        event.sideId === null ||
+        reversed.has(event.id)
+      ) {
         return;
       }
       if (sideIds.get(event.sideId) === 'home') {
@@ -5161,94 +5360,85 @@ export class GamesService {
    * every other TOURNAMENT_FIXTURE `end` keeps behaving exactly as before
    * this feature existed.
    *
-   * When penalties ARE present, both required conditions are enforced here
-   * (not left to the async bracket projection, which only ever sees an
-   * already-persisted revision and cannot reject bad input before it's
-   * written):
-   *  - the fixture must be a knockout-phase fixture (`V1TournamentGroup.
-   *    phase !== 'group'`, the phase column -- NOT `round`, which is a
-   *    free-text ko/en display label and not a safe discriminator, see
-   *    `isKnockoutFixture`). A group-stage draw stays a draw; recording a
-   *    "shootout winner" there would corrupt `calculateCompetitionStandings`
-   *    the moment anything read `score.penalties` for standings purposes.
-   *  - regulation must actually be level. A shootout score attached to a
-   *    decisive regulation result is meaningless (real football never plays
-   *    penalties when someone already won in 90 minutes) and would silently
-   *    sit unread in `score.penalties` forever, which is exactly the kind
-   *    of dead, unverifiable state this repo's 기술부채 0 rule forbids
-   *    accepting.
+   * 판정 자체는 이 파일에 두지 않는다. 규칙은
+   * `games/core/knockout-penalties.ts`의 순수 함수
+   * (`assertPenaltiesNotAllowed` / `assertBracketResolvable`)에, 그 규칙이
+   * 필요로 하는 DB 사실 읽기는 `tournaments/knockout-fixture.ts`의
+   * `readKnockoutFixtureFacts`에 있다. 이유·근거·POISONED 사고 기록은 전부
+   * 그 두 파일의 docblock으로 **옮겼다**(복제하지 않았다) — 원래 이 가드가
+   * `end` 레인의 private 메서드 안에만 있었기 때문에 정정(correction) 레인이
+   * 같은 가드를 하나도 갖지 못했고, 그 결함을 고치려면 판정이 두 레인에서
+   * 공유 가능한 자리에 있어야 한다.
    *
-   * `extractEndPenalties` already guaranteed `penalties.home !==
-   * penalties.away` (a shootout must produce a winner), so once both checks
-   * below pass, `GameResultBracketProjectionService.resolveWinnerSide` can
-   * trust `score.penalties` unconditionally.
-   *
-   * 역방향 가드(운영 콘솔 종료 흐름 개편): **결선 무승부인데 승부차기가
-   * 없는** `end`도 여기서 막는다. 예전엔 그대로 통과시켜 리비전이
-   * SUBMITTED로 저장됐고, 그 뒤 비동기 브래킷 프로젝션이
-   * `resolveWinnerSide`에서 `BRACKET_RESULT_DRAW_UNSUPPORTED`를 던져
-   * 6회 재시도 끝에 outbox 잡이 조용히 POISONED로 남았다 — 운영자는
-   * "경기 종료 성공"만 보고 다음 라운드 대진이 영영 비어 있는 것을
-   * 나중에야 알게 된다. 실패를 비동기 잡이 아니라 커맨드 자리에서
-   * 돌려주면 운영자가 그 자리에서 승부차기를 입력해 복구할 수 있다.
-   * (조별리그 무승부는 정상 결과이므로 knockout일 때만 막는다.)
-   *
-   * 이 가드는 `resultRecoveryDeriveAndSubmit`(이미 ENDED인데 리비전이 0건인
-   * 게임을 복구하는 경로)에도 그대로 적용된다 — 일부러 분기하지 않았다.
-   * 그 경로로 무승부 결선 리비전을 만들면 똑같이 브래킷이 POISONED가
-   * 되므로, "조용히 만들어 두기"보다 거부하는 쪽이 맞다.
-   *
-   * 대신 그 경로에도 빠져나갈 문을 열어 둔다: `GameResultRecoveryDto.penalties`로
-   * `end`와 같은 형태의 승부차기 점수를 실을 수 있다. 이 문이 없으면 결선 무승부
-   * 레거시 게임(GOAL 이벤트가 없어 0-0으로 산출되는 백필 이전 데이터 포함)은
-   * 복구가 영구히 막힌다 — 결과 교정 흐름은 리비전이 1건 이상이어야 시작할 수
-   * 있어 대안이 되지 못한다. 그래서 메시지도 특정 커맨드를 지목하지 않는다.
+   * `extractEndPenalties`가 이미 `penalties.home !== penalties.away`(승부차기는
+   * 승자를 만들어야 한다)를 보장하므로, 이 경로를 통과한 `score.penalties`는
+   * `GameResultBracketProjectionService.resolveWinnerSide`가 무조건 신뢰할 수
+   * 있다.
    */
   private async applyPenalties(
     tx: Transaction,
     game: LockedGame,
     score: GameScore,
-    penalties: { home: number; away: number } | undefined,
+    penalties: StoredPenalties | undefined,
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
   ): Promise<GameScore> {
-    if (penalties === undefined) {
-      if (score.home === score.away && (await this.isKnockoutFixture(tx, game.tournamentFixtureId))) {
-        throw new ConflictException({
-          code: 'TOURNAMENT_PENALTY_REQUIRED',
-          message: '결선 경기는 무승부로 끝낼 수 없어요. 승부차기 결과를 입력해주세요.',
-        });
-      }
+    // 결정적 스코어 + 승부차기 없음이면 어떤 fact도 판정을 바꾸지 않으므로
+    // 질의하지 않는다 — 리팩터 전 단축 평가 동작을 그대로 보존한다.
+    if (!needsKnockoutFixtureFacts(score, penalties)) {
       return score;
     }
-    if (!(await this.isKnockoutFixture(tx, game.tournamentFixtureId))) {
-      throw new ConflictException({
-        code: 'TOURNAMENT_PENALTY_NOT_ALLOWED',
-        message: 'Penalty shootouts can only be recorded for knockout-phase fixtures',
-      });
+    const facts = await readKnockoutFixtureFacts(tx, game.tournamentFixtureId);
+    if (penalties === undefined) {
+      assertBracketResolvable(score, facts);
+      return score;
     }
-    if (score.home !== score.away) {
-      throw new ConflictException({
-        code: 'TOURNAMENT_PENALTY_NOT_ALLOWED',
-        message: 'Penalty shootouts are only recorded when regulation time ends level',
-      });
-    }
-    return { ...score, penalties };
+    // **자격 먼저, 내용 나중.** `assertPenaltiesNotAllowed`가 "이 경기가 애초에 승부차기를
+    // 받을 수 있는가"(조별리그가 아닌가 · 정규시간이 무승부인가)를 409로 가른다. 킥 수·정책
+    // 검사를 그보다 앞에 두면 **조별리그 경기에 승부차기를 보낸 운영자에게 "킥 수를 넣어라"가
+    // 뜬다** — 시키는 대로 킥 수를 채워 넣어도 여전히 거부당하는 막다른 안내다.
+    // (2026-08-18 CI 실측: 통합 테스트 4건이 409를 기대했는데 422가 나와 실패했다.)
+    const applied = assertPenaltiesNotAllowed(score, penalties, facts);
+    // 자격을 통과한 뒤에야 내용을 본다 — 킥 수가 실려 왔으면 서버도 프런트와 **같은 술어**로
+    // 결판을 판정한다. 예전에는 이 판정이 프런트에만 있어(총점 두 개로는 킥 수를 알 수 없다)
+    // 화면의 가드가 API 직접 호출로 그대로 우회됐다.
+    await this.assertPenaltyShootoutConcludedForGame(tx, game, penalties, penaltyOrigin);
+    return applied;
   }
 
   /**
-   * Knockout판별은 `V1TournamentGroup.phase`(semi/final/third_place)로만
-   * 한다 -- `V1TournamentFixture.round`는 한글/영문이 섞인 표시용 라벨이라
-   * 판별 기준으로 쓰면 함정이다(프로젝트 메모리 기록 그대로).
-   * `groupId`가 없는 픽스처(어느 조에도 배정되지 않음)는 knockout임을
-   * 확인할 방법이 없으므로 보수적으로 knockout이 아닌 것으로 취급한다 --
-   * 승부차기를 지어낼 근거가 없을 때는 허용하지 않는 쪽이 안전하다.
+   * 이 대회의 승부차기 종료 정책을 읽어 게이트를 건다. 정책 해석은 `getGame`이
+   * 프런트에 `penaltyShootoutPolicy`를 내려줄 때 쓰는 것과 **같은 `parseResultPolicy`**다 —
+   * 화면이 버튼을 여는 기준과 서버가 저장을 허용하는 기준이 갈리면, 운영자에게는
+   * "눌렀는데 실패했다"로만 보인다.
+   *
+   * 킥 수가 없는 요청(레거시 클라이언트·정정 승계)은 `assertPenaltyShootoutConcluded`가
+   * 즉시 통과시키므로 config 를 읽을 필요도 없다 — 그 경우 질의를 건너뛴다.
    */
-  private async isKnockoutFixture(tx: Transaction, tournamentFixtureId: string | null): Promise<boolean> {
-    if (tournamentFixtureId === null) return false;
-    const fixture = await tx.v1TournamentFixture.findUnique({
-      where: { id: tournamentFixtureId },
-      select: { group: { select: { phase: true } } },
-    });
-    return fixture?.group !== null && fixture?.group !== undefined && fixture.group.phase !== 'group';
+  private async assertPenaltyShootoutConcludedForGame(
+    tx: Transaction,
+    game: LockedGame,
+    penalties: StoredPenalties,
+    penaltyOrigin: 'END_COMMAND' | 'RECOVERY',
+  ): Promise<void> {
+    // 판정은 모든 경로가 공유하는 단일 관문에 있다(`assertPenaltyShootoutPersistable`).
+    // 여기서 정하는 건 "킥 수를 요구할 것인가" 하나뿐이다: `end` 는 승부차기를 **새로 쓰는**
+    // 경로라 클라이언트가 킥 목록을 들고 있으므로 요구하고, 복구는 이미 저장된 값을 옮기는
+    // 경로라 면제한다(킥 수가 생기기 전 리비전에는 그 값이 없다).
+    const requireKickCounts = penaltyOrigin === 'END_COMMAND';
+    // 킥 수가 없으면 관문이 정책을 보지 않는다(그 함수의 계약) — 잠금 구간에서 쓸모없는
+    // config 질의를 하지 않도록 여기서 먼저 갈라 준다.
+    const needsPolicy = penalties.takenHome !== undefined && penalties.takenAway !== undefined;
+    const policy = needsPolicy
+      ? parseResultPolicy(
+          (
+            await tx.v1CompetitionConfigVersion.findUnique({
+              where: { id: game.competitionConfigVersionId },
+              select: { result: true },
+            })
+          )?.result ?? null,
+        )
+      : { earlyStop: true };
+    assertPenaltyShootoutPersistable(penalties, policy, { requireKickCounts });
   }
 
   private async assertTeamMatchMatched(tx: Transaction, teamMatchId: string | null): Promise<void> {
@@ -5511,10 +5701,30 @@ export class GamesService {
           where: { id: game.id },
           data: { version: { increment: 1 } },
         });
-        // 승부차기를 그대로 넘긴다 — 결선 무승부 게임을 복구하려면 `end`와 똑같이 penalties가
+        // 승부차기를 넘긴다 — 결선 무승부 게임을 복구하려면 `end`와 똑같이 penalties가
         // 필요하다(applyPenalties의 TOURNAMENT_PENALTY_REQUIRED 가드). 넘기지 않으면 그런 게임은
         // 복구 자체가 409로 막혀 영구 막다른 길이 된다.
-        return this.deriveTournamentRevision(tx, { ...game, version: updated.version }, context, dto.penalties);
+        //
+        // `end` 레인과 **같은** `extractEndPenalties`를 통과시킨다. DTO
+        // (`GameResultRecoveryDto.penalties`)는 형태까지만 보고 "동점 승부차기"는
+        // 통과시키므로, 그대로 넘기면 승자 없는 결과가 저장되고
+        // `resolveWinnerSide`가 draw로 떨어뜨려 잡이 POISONED로 남는다 — 운영자
+        // 화면에는 "복구 성공"만 보인다. 422 `TOURNAMENT_PENALTY_INVALID`로
+        // 커맨드 자리에서 거부하는 것이 이 레인의 계약이다.
+        //
+        // 킥 수도 `end` 와 **똑같이 요구한다**(2026-08-19 alpha 감사 F-3). 예전에는 이 레인이
+        // 기본값 `'RECOVERY'`(면제)로 떨어져 킥 수 없는 승부차기를 받아 줬는데, 면제의 근거로
+        // 적힌 "이미 저장된 값을 옮기는 경로"가 이 레인엔 성립하지 않는다 — **진입 조건 자체가
+        // `existingRevisionCount === 0`**(위 참조)이라 옮겨 올 값이 없고, 승부차기는
+        // `dto.penalties` 로 **새로 작성**된다. 성격이 `end` 와 같으므로 기준도 같아야 한다.
+        // (면제가 실제로 필요한 곳은 정정 레인의 "base 를 그대로 옮기는" 경우뿐이다.)
+        return this.deriveTournamentRevision(
+          tx,
+          { ...game, version: updated.version },
+          context,
+          'END_COMMAND',
+          extractEndPenalties({ penalties: dto.penalties }),
+        );
       },
     );
   }

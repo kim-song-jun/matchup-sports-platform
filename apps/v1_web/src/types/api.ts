@@ -1291,7 +1291,20 @@ export type V1GameResultScore =
   | {
       home: number;
       away: number;
-      penalties?: { home: number; away: number };
+      /** `firstKickSideKey`(선축)는 평평한 형태에만 있다 — 중첩 백필 형태는 이 필드가
+       *  생기기 전 데이터라 담고 있지 않다. 이 필드가 생기기 전에 저장된 평평한 리비전도
+       *  마찬가지로 없으므로 optional 이다. */
+      penalties?: {
+        home: number;
+        away: number;
+        firstKickSideKey?: 'HOME' | 'AWAY';
+        /** 각 팀이 찬 킥 수. 서버가 결판을 판정하는 근거이고, 정정 화면에는 입력란이
+         * 없어 여기서 떨어뜨리면 되살릴 수단이 없다. 둘은 항상 함께 있거나 함께 없다. */
+        takenHome?: number;
+        takenAway?: number;
+        /** 규칙상 미결인 승부차기를 운영자가 명시적으로 닫았다는 감사 기록. */
+        operatorOverride?: boolean;
+      };
     };
 
 export type V1GameResultCards = { yellow: number; red: number };
@@ -1316,6 +1329,7 @@ export type V1GameResultRevision = {
   revision: number;
   state: V1GameResultRevisionState;
   score: V1GameResultScore;
+  goalEvents?: V1GameResultGoalEventInput[] | null;
   eventsHash: string;
   missingScorer: boolean;
   mvpParticipantId: string | null;
@@ -1329,6 +1343,15 @@ export type V1GameResultRevision = {
   createdAt: string;
   updatedAt: string;
   resultParticipants: V1GameResultParticipantRow[];
+};
+
+export type V1GameResultGoalEventInput = {
+  id: string;
+  sideId: string;
+  participantId?: string;
+  minute?: number;
+  period?: number;
+  ownGoal: boolean;
 };
 
 export type V1GameResultParticipantInput = {
@@ -1345,13 +1368,41 @@ export type V1GameResultParticipantInput = {
 
 /**
  * 결과 제출 시 **보내는** 스코어. 서버가 돌려주는 스냅샷(`V1GameResultScore`)과 형태가 다르다 —
- * 보낼 때는 정규시간 점수만 평평하게 보내고, 서버가 regulation/penalty/goals/incomplete 로
- * 감싼 스냅샷을 만들어 돌려준다. 예전에는 두 방향이 한 타입을 공유해서 읽기 쪽 형태가 틀린 채로
- * 컴파일을 통과했다.
+ * 보낼 때는 평평한 형태로 보내고, 서버가 regulation/penalty/goals/incomplete 로
+ * 감싼 스냅샷을 만들어 돌려주는 경로가 따로 있다. 예전에는 두 방향이 한 타입을 공유해서
+ * 읽기 쪽 형태가 틀린 채로 컴파일을 통과했다.
+ *
+ * **이 타입이 곧 서버 `GameScoreDto`의 whitelist다.** `main.ts`가 `whitelist: true,
+ * forbidNonWhitelisted: true`로 검증하므로 여기 없는 키를 하나라도 실어 보내면
+ * `400 VALIDATION_ERROR`가 난다(알파 실측 — 스냅샷을 그대로 넘겨 `goals`/`penalty`/
+ * `regulation`/`incomplete`/`provenance`가 딸려간 사고). 반대로 `penalties`는 여분 필드가
+ * 아니라 **허용 필드**다 — `GameScoreDto`(`apps/v1_api/src/games/dto/game-result.dto.ts`)에
+ * `home`/`away`/`penalties?` 정확히 3키가 선언돼 있다. 예전에는 여기서 `penalties`가 빠져
+ * 있어서 정정 폼이 결선 경기의 승부차기 점수를 조용히 탈락시켰다(정규시간 무승부만 남아
+ * 승자가 사라졌다). 허용 키 목록을 따로 하드코딩하지 말고 **이 타입에서 파생**시켜라 —
+ * 목록을 두 벌 두면 또 드리프트한다.
  */
 export type V1GameResultScoreInput = {
   home: number;
   away: number;
+  /**
+   * `firstKickSideKey`(선축)도 여분 키가 아니라 **허용 키**다 — 서버
+   * `PenaltyScoreDto`(`apps/v1_api/src/games/dto/game-result.dto.ts`)에 선언돼 있고,
+   * `whitelist`는 `@ValidateNested()`가 걸린 중첩 객체 안까지 적용되므로 **선언이 곧
+   * 허용**이다. 정정 폼이 이 키를 떨어뜨리면 정정 한 번에 "누가 먼저 찼는지"가 영구히
+   * 사라진다(폼에 선축 입력란이 없어 되살릴 수단도 없다).
+   */
+  penalties?: {
+    home: number;
+    away: number;
+    firstKickSideKey?: 'HOME' | 'AWAY';
+    /** 각 팀이 찬 킥 수. 서버가 결판을 판정하는 근거이고, 정정 화면에는 입력란이
+     * 없어 여기서 떨어뜨리면 되살릴 수단이 없다. 둘은 항상 함께 있거나 함께 없다. */
+    takenHome?: number;
+    takenAway?: number;
+    /** 규칙상 미결인 승부차기를 운영자가 명시적으로 닫았다는 감사 기록. */
+    operatorOverride?: boolean;
+  };
 };
 
 export type V1CreateGameResultRevisionPayload = {
@@ -1839,11 +1890,13 @@ export type V1PublicProfile = {
   activitySummary: {
     totals: {
       matchCount: number;
+      tournamentCount: number;
       teamCount: number;
       reviewCount: number;
     };
     monthly: {
       matchCount: number;
+      tournamentCount: number;
       teamJoinCount: number;
       reviewCount: number;
     };
@@ -2810,6 +2863,7 @@ export type V1TournamentFixtureGoal = {
   playerId: string | null;
   playerName: string;
   minute: number | null;
+  ownGoal?: boolean;
 };
 
 export type V1TournamentFixtureResult = {

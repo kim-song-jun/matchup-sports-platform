@@ -462,3 +462,19 @@ test('alpha deploy recreates nginx after replacing the release metadata bind mou
   assert.notEqual(metadataReplacement, -1);
   assert.ok(nginxRecreate > metadataReplacement);
 });
+
+test('alpha deploy only recovers the reviewed nullable-goalkeeper migration failure before deploy', () => {
+  const deployScript = readFileSync(join(repoRoot, 'deploy/deploy-alpha.sh'), 'utf8');
+  const recovery = deployScript.indexOf('recover_known_records_profile_migration_failure');
+  const deploy = deployScript.indexOf("./node_modules/.bin/prisma migrate deploy");
+
+  assert.notEqual(recovery, -1);
+  assert.ok(recovery < deploy);
+  assert.match(deployScript, /20260819090000_v1_records_profile_integration_repair/);
+  assert.match(deployScript, /to_regclass\('public\.\\"_prisma_migrations\\"'\)/);
+  assert.match(deployScript, /null value in column \"goalkeeper\"/);
+  assert.match(deployScript, /v1_game_result_participants/);
+  assert.match(deployScript, /23502/);
+  assert.match(deployScript, /prisma migrate resolve --rolled-back \$\{RECORDS_PROFILE_REPAIR_MIGRATION\}/);
+  assert.match(deployScript, /Refusing to auto-recover an unrecognized/);
+});

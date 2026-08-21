@@ -44,8 +44,22 @@ type FakeFixture = {
     currentOfficialRevision: { state: string; supersedesId: null; officialAt: Date; score: unknown } | null;
     sides: { id: string; sideKey: 'HOME' | 'AWAY' }[];
     periods: never[];
-    participants: { id: string; sideId: string; displayNameSnapshot: string; jerseyNumber: number | null }[];
+    participants: { id: string; sideId: string; userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null }[];
   } | null;
+};
+
+/** `loadParticipantNameProfiles`가 조회하는 V1UserProfile 투영 -- 스펙 전용 fake 타입. */
+type FakeNameProfile = {
+  userId: string;
+  realName: string | null;
+  displayName: string | null;
+  nickname: string;
+  tournamentRealNameVisible: boolean;
+  /**
+   * 프로덕션 select 가 항상 돌려주는 필드라 픽스처도 필수로 둔다 -- 생략을 허용하면
+   * `undefined !== null` 이 참이 되어 미탈퇴 프로필이 탈퇴로 오판된다.
+   */
+  deletedAt: Date | null;
 };
 
 type FakeGoalEvent = {
@@ -54,7 +68,7 @@ type FakeGoalEvent = {
   // 취소는 GOAL 행이 아니라 CORRECTION 행이 `reversesEventId` 로 가리킨다.
   // fake 가 type 을 안 갖고 있으면 그 구조를 흉내낼 수 없어, 취소된 골이
   // 그대로 남는 실제 버그를 이 스펙이 못 잡는다(알파 실측으로 드러난 사고).
-  type: 'GOAL' | 'CARD' | 'FOUL' | 'SUBSTITUTION' | 'CORRECTION';
+  type: 'GOAL' | 'OWN_GOAL' | 'CARD' | 'FOUL' | 'SUBSTITUTION' | 'CORRECTION';
   sideId: string;
   participantId: string | null;
   period: number | null;
@@ -73,6 +87,12 @@ function buildFakePrisma(options: {
    * 채워야 eligible로 남는다.
    */
   userConsents?: { userId: string; state: 'GRANTED' | 'REVOKED' }[];
+  /**
+   * 2026-08-18 대회 실명 표시 정책 -- `loadParticipantNameProfiles`가 in 조회하는
+   * V1UserProfile 행. 기본값 빈 배열이라 userId가 있는 참가자라도 프로필이 없으면
+   * (매칭 profile row 없음) 스냅샷으로 폴백하는 기존 테스트를 그대로 둔다.
+   */
+  nameProfiles?: FakeNameProfile[];
   goalEvents: FakeGoalEvent[];
   /**
    * 참가팀 공개 정책 통일(fix/v1-publish) — 기본값 'closed'(hideIdentity 항상
@@ -134,6 +154,13 @@ function buildFakePrisma(options: {
         return options.userConsents ?? [];
       },
     },
+    // 2026-08-18 대회 실명 표시 정책 -- 위 v1UserRecordConsent(동의 게이팅)와 달리
+    // 게이팅 없이 매 getSchedule 호출마다 조회한다("보이면 어떤 이름인가").
+    v1UserProfile: {
+      async findMany() {
+        return options.nameProfiles ?? [];
+      },
+    },
     v1GameEvent: {
       async findMany(args: { where: Record<string, unknown> }) {
         // loadLiveScores 경로 -- 이 스펙의 관심사가 아니다.
@@ -152,8 +179,11 @@ function buildFakePrisma(options: {
   return database as unknown as PrismaService;
 }
 
-const ELIGIBLE = { id: 'participant-eligible', sideId: 'side-home', displayNameSnapshot: '김철수', jerseyNumber: 7 };
-const INELIGIBLE = { id: 'participant-ineligible', sideId: 'side-away', displayNameSnapshot: '이영희', jerseyNumber: 10 };
+// userId: null(미연동) -- 이 파일의 기존(정책 공개/롤백/취소 등) 테스트는 이름 문자열
+// 선택(resolveParticipantDisplayName)이 아니라 "이름이 보이는가"만 다루므로, 스냅샷
+// 폴백 경로 그대로 두는 게 맞다. 실명/닉네임 토글 자체는 아래 전용 describe에서 검증한다.
+const ELIGIBLE = { id: 'participant-eligible', sideId: 'side-home', userId: null, displayNameSnapshot: '김철수', jerseyNumber: 7 };
+const INELIGIBLE = { id: 'participant-ineligible', sideId: 'side-away', userId: null, displayNameSnapshot: '이영희', jerseyNumber: 10 };
 
 function makeFixture(overrides: Partial<FakeFixture>): FakeFixture {
   return {
@@ -209,6 +239,24 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     expect(result.items[0].scorers).toEqual([
       { side: 'home', participantName: '김철수', jerseyNumber: 7, period: 1, clockMs: 600_000 },
       { side: 'away', participantName: '이영희', jerseyNumber: 10, period: 2, clockMs: 2_700_000 },
+    ]);
+  });
+
+  it('자책골은 행위 선수 소속팀 영역에 표시하고 ownGoal=true로 구분한다', async () => {
+    const prisma = buildFakePrisma({
+      fixtures: [makeFixture({})],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [
+        { id: 'og1', gameId: 'game-1', type: 'OWN_GOAL', sideId: 'side-home', participantId: INELIGIBLE.id, period: 1, clockMs: 124_000, reversesEventId: null },
+      ],
+    });
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scorers).toEqual([
+      { side: 'away', ownGoal: true, participantName: '이영희', jerseyNumber: 10, period: 1, clockMs: 124_000 },
     ]);
   });
 
@@ -315,6 +363,89 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     const result = await service.getSchedule(TOURNAMENT_ID, {});
 
     expect(result.items[0].scorers).toEqual([]);
+  });
+});
+
+/**
+ * 대회 경기 기록 실명 표시 정책(2026-08-18 사용자 결정) -- "이름이 보이는가"가 아니라
+ * "보이면 어떤 이름인가"를 검증한다. 위 describe와 달리 세 경우(토글 ON/OFF/userId 없음)를
+ * 각각 참가자 하나로 고정해 goalEvents 하나만 넣는다 -- 정책 자체는 이미 위에서
+ * 충분히 커버됐으므로 여기서는 resolveParticipantDisplayName의 표만 못박는다.
+ */
+describe('PublicTournamentRecordsService.getSchedule -- 대회 경기 기록 실명 표시 정책', () => {
+  const LINKED = { id: 'participant-linked', sideId: 'side-home', userId: 'user-linked', displayNameSnapshot: '스냅샷이름', jerseyNumber: 9 };
+
+  function buildLinkedPrisma(nameProfiles: FakeNameProfile[]) {
+    return buildFakePrisma({
+      fixtures: [
+        makeFixture({
+          game: {
+            id: 'game-1',
+            state: 'LIVE',
+            visibilityPolicy: { mode: 'LIVE', lineupAt: null },
+            currentOfficialRevision: null,
+            sides: [
+              { id: 'side-home', sideKey: 'HOME' },
+              { id: 'side-away', sideKey: 'AWAY' },
+            ],
+            periods: [],
+            participants: [LINKED],
+          },
+        }),
+      ],
+      consentLinks: [],
+      consentSnapshots: [],
+      nameProfiles,
+      goalEvents: [
+        { id: 'g1', gameId: 'game-1', type: 'GOAL', sideId: 'side-home', participantId: LINKED.id, period: 1, clockMs: 600_000, reversesEventId: null },
+      ],
+    });
+  }
+
+  it('토글 ON: V1UserProfile.realName을 보여준다(닉네임/스냅샷 아님)', async () => {
+    const prisma = buildLinkedPrisma([
+      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: true, deletedAt: null },
+    ]);
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scorers[0]).toMatchObject({ participantName: '홍길동' });
+  });
+
+  it('토글 OFF(기본값): nickname을 보여준다(실명 아님)', async () => {
+    const prisma = buildLinkedPrisma([
+      { userId: 'user-linked', realName: '홍길동', displayName: '길동이', nickname: '닉네임러', tournamentRealNameVisible: false, deletedAt: null },
+    ]);
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scorers[0]).toMatchObject({ participantName: '닉네임러' });
+  });
+
+  // 일정 카드 경로에도 상세 경로와 같은 회귀 방어를 둔다: 실데이터에서는
+  // realName 과 displayName 이 **같은 값**(가입 폼의 실명)이라, OFF 분기가
+  // displayName 을 조금이라도 우선하면 그 즉시 실명이 공개된다.
+  // 근거와 실측은 public-tournament-records.service.ts 의 정책 주석 참고.
+  it('실데이터 모양(realName === displayName)에서도 OFF면 실명이 새지 않는다', async () => {
+    const prisma = buildLinkedPrisma([
+      { userId: 'user-linked', realName: '홍길동', displayName: '홍길동', nickname: '닉네임러', tournamentRealNameVisible: false, deletedAt: null },
+    ]);
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scorers[0]).toMatchObject({ participantName: '닉네임러' });
+  });
+
+  it('userId는 있지만 매칭되는 V1UserProfile 행이 없으면(예: 온보딩 미완료) 스냅샷으로 폴백한다', async () => {
+    const prisma = buildLinkedPrisma([]); // 프로필 없음
+
+    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
+    const result = await service.getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scorers[0]).toMatchObject({ participantName: '스냅샷이름' });
   });
 });
 

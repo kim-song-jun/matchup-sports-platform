@@ -508,3 +508,144 @@ describe('GET /league-matches/:leagueId/player-records', () => {
     // 강제하므로 게스트 혼입 시 여기서 실패한다.
   });
 });
+
+const listOwnerUserId = `t5-league-list-owner-${suiteId}`;
+
+describe('GET /league-matches (list, R5)', () => {
+  let app: INestApplication;
+  let cleanup: (() => Promise<void>) | undefined;
+  let prisma: PrismaService;
+
+  beforeAll(async () => {
+    ({ app, cleanup } = await createV1IntegrationApp());
+    prisma = app.get(PrismaService);
+    await prisma.v1User.create({
+      data: {
+        id: listOwnerUserId,
+        email: `${listOwnerUserId}@integration.test`,
+        onboardingStatus: 'completed',
+        phoneVerifiedAt: new Date('2026-08-01T00:00:00.000Z'),
+        accountStatus: 'active',
+      },
+    });
+    const termsService = app.get(ManagedTermsRuntimeService);
+    const signupTerms = await termsService.currentSignupTerms();
+    await termsService.acceptSignupTerms(
+      listOwnerUserId,
+      signupTerms.items.filter((item) => item.requirement === 'required').map((item) => item.documentId),
+    );
+    await prisma.v1AdminUser.create({ data: { userId: listOwnerUserId, adminRole: 'owner' } });
+  });
+
+  afterAll(async () => cleanup?.());
+
+  // 각 테스트가 자기 전용 종목/지역/팀을 만든다 -- 같은 describe 안 다른 테스트가 만든
+  // 리그와 뒤섞이면 필터·페이지네이션 단언이 "정확히 이 리그들만"을 보장할 수 없다.
+  async function createLeagueScenario(opts: { title: string; startsOn: string; endsOn: string }) {
+    const scopeId = randomUUID().slice(0, 8);
+    const sport = await prisma.v1Sport.create({ data: { code: `t5-list-sport-${scopeId}`, name: `T5 목록 종목 ${scopeId}` } });
+    const region = await prisma.v1Region.create({ data: { code: `t5-list-region-${scopeId}`, name: `T5 목록 지역 ${scopeId}`, level: 2 } });
+    const teamA = await prisma.v1Team.create({ data: { ownerUserId: listOwnerUserId, sportId: sport.id, regionId: region.id, name: `t5-list-team-a-${scopeId}` } });
+    const teamB = await prisma.v1Team.create({ data: { ownerUserId: listOwnerUserId, sportId: sport.id, regionId: region.id, name: `t5-list-team-b-${scopeId}` } });
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', listOwnerUserId)
+      .send({ title: opts.title, sportId: sport.id, regionId: region.id, startsOn: opts.startsOn, endsOn: opts.endsOn, teamIds: [teamA.id, teamB.id] });
+    expect(createRes.status).toBe(201);
+    return { leagueId: createRes.body.data.leagueId as string, sportId: sport.id, regionId: region.id, teamAId: teamA.id, teamBId: teamB.id };
+  }
+
+  it('인증 헤더 없이도(비인증) 목록을 조회할 수 있다', async () => {
+    // .set('x-v1-user-id', ...) 를 의도적으로 붙이지 않는다 -- OptionalV1AuthGuard가
+    // 익명 접근을 허용하는지가 이 테스트의 계약이다.
+    const res = await request(app.getHttpServer()).get('/api/v1/league-matches');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data.items)).toBe(true);
+  });
+
+  it('sportId/regionId 필터가 다른 종목·지역의 리그를 제외한다', async () => {
+    const scenarioA = await createLeagueScenario({ title: `T5 필터 A ${suiteId}`, startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
+    const scenarioB = await createLeagueScenario({ title: `T5 필터 B ${suiteId}`, startsOn: '2026-09-02T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
+
+    const bySport = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenarioA.sportId}`);
+    expect(bySport.status).toBe(200);
+    const sportFilteredIds = bySport.body.data.items.map((item: { leagueId: string }) => item.leagueId);
+    expect(sportFilteredIds).toEqual([scenarioA.leagueId]);
+
+    const byRegion = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenarioB.regionId}`);
+    expect(byRegion.status).toBe(200);
+    const regionFilteredIds = byRegion.body.data.items.map((item: { leagueId: string }) => item.leagueId);
+    expect(regionFilteredIds).toEqual([scenarioB.leagueId]);
+
+    // 응답 item 모양 -- 화면이 쓰는 필드가 실제로 담겨 있는지(제목·종목명·지역명·기간·상태·참가팀 수).
+    expect(bySport.body.data.items[0]).toMatchObject({
+      leagueId: scenarioA.leagueId,
+      title: `T5 필터 A ${suiteId}`,
+      state: 'draft',
+      sport: { sportId: scenarioA.sportId },
+      region: { regionId: scenarioA.regionId },
+      teamCount: 2,
+    });
+  });
+
+  it('state 필터가 draft/active를 구분한다 -- 대진 생성 전은 draft, 생성 후는 active', async () => {
+    const scenario = await createLeagueScenario({ title: `T5 상태 ${suiteId}`, startsOn: '2026-09-05T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
+
+    const draftBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=draft`);
+    expect(draftBefore.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([scenario.leagueId]);
+    const activeBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=active`);
+    expect(activeBefore.body.data.items).toEqual([]);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${scenario.leagueId}/fixtures`)
+      .set('x-v1-user-id', listOwnerUserId)
+      .send({ weeksCount: 1 })
+      .expect(201);
+
+    const activeAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=active`);
+    expect(activeAfter.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([scenario.leagueId]);
+    const draftAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${scenario.sportId}&state=draft`);
+    expect(draftAfter.body.data.items).toEqual([]);
+  });
+
+  it('cursor 페이지네이션이 중복·누락 없이 다음 페이지로 이어지고, 마지막 페이지는 hasNext=false다', async () => {
+    const scopeId = randomUUID().slice(0, 8);
+    const sport = await prisma.v1Sport.create({ data: { code: `t5-list-page-sport-${scopeId}`, name: `T5 페이지 종목 ${scopeId}` } });
+    const region = await prisma.v1Region.create({ data: { code: `t5-list-page-region-${scopeId}`, name: `T5 페이지 지역 ${scopeId}`, level: 2 } });
+    // 서비스 기본 정렬은 createdAt desc(최근 개설순)다 -- 순차로(await) 3개를 만들면
+    // 마지막에 만든 리그가 가장 먼저 나와야 한다. leagueIds는 "만든 순서"(day 1→2→3)이므로
+    // 기대 목록 순서는 그 역순([2, 1, 0])이다.
+    const leagueIds: string[] = [];
+    for (const day of [1, 2, 3]) {
+      const teamA = await prisma.v1Team.create({ data: { ownerUserId: listOwnerUserId, sportId: sport.id, regionId: region.id, name: `t5-page-team-a-${scopeId}-${day}` } });
+      const teamB = await prisma.v1Team.create({ data: { ownerUserId: listOwnerUserId, sportId: sport.id, regionId: region.id, name: `t5-page-team-b-${scopeId}-${day}` } });
+      const createRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/league-matches')
+        .set('x-v1-user-id', listOwnerUserId)
+        .send({
+          title: `T5 페이지 ${day} ${scopeId}`,
+          sportId: sport.id,
+          regionId: region.id,
+          startsOn: `2026-11-0${day}T00:00:00.000Z`,
+          endsOn: '2026-11-30T00:00:00.000Z',
+          teamIds: [teamA.id, teamB.id],
+        });
+      leagueIds.push(createRes.body.data.leagueId);
+    }
+
+    const page1 = await request(app.getHttpServer()).get(`/api/v1/league-matches?sportId=${sport.id}&limit=2`);
+    expect(page1.status).toBe(200);
+    expect(page1.body.data.items).toHaveLength(2);
+    expect(page1.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([leagueIds[2], leagueIds[1]]);
+    expect(page1.body.data.pageInfo.hasNext).toBe(true);
+    expect(page1.body.data.pageInfo.nextCursor).toBe(leagueIds[1]);
+
+    const page2 = await request(app.getHttpServer()).get(
+      `/api/v1/league-matches?sportId=${sport.id}&limit=2&cursor=${page1.body.data.pageInfo.nextCursor}`,
+    );
+    expect(page2.status).toBe(200);
+    expect(page2.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([leagueIds[0]]);
+    expect(page2.body.data.pageInfo.hasNext).toBe(false);
+    expect(page2.body.data.pageInfo.nextCursor).toBeNull();
+  });
+});
